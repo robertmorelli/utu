@@ -1,0 +1,12 @@
+// What: an unbounded type parameter handed to a module that bounds it
+// Expect: V does not implement Ord (Order's T needs it); bound it: mod Ranked[V[Ord]]
+using Ord from std:Ord;
+using Order from std:Ord;
+
+mod Ranked[V] {
+    fn top(xs: Array[V]) V { Order[V].max_of(xs); }
+}
+
+export main() I32 {
+    Ranked[I32].top([4, 8, 2]);
+}

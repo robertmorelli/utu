@@ -24,8 +24,8 @@
  "benchmarks/fannkuch/fannkuch.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "f6957abd1bc65dcd",
-  "queries": "a685d2a96a7fc26a",
+  "entries": "bb60d4664bdb3a65",
+  "queries": "559d6e62c1c84270",
   "graphs": "b3a2bd44a5d73b32"
  },
  "benchmarks/fannkuch/fannkuch.utu normal": {
@@ -141,6 +141,17 @@
  "examples/bench/bench_basic.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
+ },
+ "examples/bounds.utu analysis": {
+  "diagnostics": "17e45ec47473665b",
+  "formatted": "e13debaf278cff6a",
+  "entries": "ff66eb386fb20019",
+  "queries": "27d7e13125565398",
+  "graphs": "14354754ab2a4650"
+ },
+ "examples/bounds.utu normal": {
+  "diagnostics": "17e45ec47473665b",
+  "formatted": "e13debaf278cff6a"
  },
  "examples/browser-board/main.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -266,8 +277,8 @@
  "examples/ci/codegen_control_flow.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "3ef29d2ace917128",
-  "queries": "0cc5a46e25b5b6d6",
+  "entries": "bfbc6ac907f0000e",
+  "queries": "d666d033d547e714",
   "graphs": "b2bffc9a18086351"
  },
  "examples/ci/codegen_control_flow.utu normal": {
@@ -574,8 +585,8 @@
  "examples/fannkuch.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "f569dbe6778bd095",
-  "queries": "230f3bb62a903462",
+  "entries": "8f1e6bd7189cc3eb",
+  "queries": "e079f7d9514a1363",
   "graphs": "1523b1f37a0daf8b"
  },
  "examples/fannkuch.utu normal": {
@@ -694,8 +705,8 @@
  "examples/jpl/jpl.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "c9242097ca21933e",
-  "queries": "c2a3069f10c19f22",
+  "entries": "26c1c994833f5d97",
+  "queries": "60caef0218625df1",
   "graphs": "6132e29c7d2cffca"
  },
  "examples/jpl/jpl.utu normal": {
@@ -705,8 +716,8 @@
  "examples/json/json.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "6311893523a0d866",
-  "queries": "235601dbba1db588",
+  "entries": "4a01b41fa2346223",
+  "queries": "dc2426f93538eb53",
   "graphs": "f06cd6e690f1a7a0"
  },
  "examples/json/json.utu normal": {
@@ -870,9 +881,9 @@
  "examples/promises.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9746ce49ddaf0081",
-  "queries": "09f4980c843da347",
-  "graphs": "369b4bcc4dcf9234"
+  "entries": "80aaf5898c6fd09a",
+  "queries": "94bda1688e1dd500",
+  "graphs": "46f13fc21436eb72"
  },
  "examples/promises.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -925,7 +936,7 @@
  "examples/stdlib.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "2af0138fd3c30355",
+  "entries": "6e003085f80618c3",
   "queries": "ee50bf15927411ca",
   "graphs": "b5fceb9280f62ae6"
  },
@@ -936,8 +947,8 @@
  "examples/streams.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "40ccbf9a782bfdcc",
-  "queries": "6c50f65a93b4756b",
+  "entries": "2cac00b6ddaec7a7",
+  "queries": "7790fc52d3071b21",
   "graphs": "9e3223095ec070e4"
  },
  "examples/streams.utu normal": {
@@ -2025,6 +2036,17 @@
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
+ "std/Ord.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "4f462b40f41b888b",
+  "queries": "96cf09d0b84d2f29",
+  "graphs": "ff58ce20a03bf097"
+ },
+ "std/Ord.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
  "std/PersistentSegmentTree.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
@@ -2105,7 +2127,7 @@
  "std/StrMap.utu analysis": {
   "diagnostics": "3b1bd22af4805f81",
   "formatted": "78461320eb179068",
-  "entries": "8314eeb85bbad161",
+  "entries": "71032dc011c88c14",
   "queries": "969ec33ba2bb7f33",
   "graphs": "ce03e67d4e9733fa"
  },

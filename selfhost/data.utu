@@ -26,7 +26,8 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     if not decl_is(decl, Decl.Struct) and not decl_is(decl, Decl.Variant) {
         // An unknown name was already reported; otherwise it names something that is not a struct.
         if ty_is(t, Ty.Error) { return error_value(); };
-        return unsupported(node);
+        report2(Diag.NotStruct, first_child(node), -1, t, -1);
+        return error_value();
     };
     let inits = next_sibling(first_child(node));
     return build_struct(t, decl, inits, node, cx);
@@ -198,7 +199,7 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_base(target, cx);
     if is_foreign(t) {
-        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        if op != Tok.Eq.to_i32() { return check_foreign_update(target, t, word_of(name), value, compound_word(op, node_last[target]), m, cx); };
         return check_foreign_set(target, t, word_of(name), value, m, cx);
     };
     let field = field_of(t, name);
@@ -434,7 +435,7 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let t = check_expr(base, -1, cx);
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
     if is_foreign(t) {
-        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        if op != Tok.Eq.to_i32() { return check_foreign_index_update(target, t, last_child(target), value, compound_word(op, node_last[target]), m, cx); };
         return check_foreign_index_set(t, last_child(target), value, m, cx);
     };
     let set = member(ty_decl(t), known_word(Known.SetIndex), Space.Method);
@@ -480,6 +481,14 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
 
 //! = Intrinsics of data
 
+/// Whether an intrinsic is a function of a module whose `&` is an array (Array's).
+fn intrinsic_array_fi(fi: I32) Bool {
+    let module = module_of(fi_decl[fi]);
+    if module < 0 or not decl_is(module, Decl.Module) or decl_a[module] < 0 { return false; };
+    let vt = repr(named(decl_a[module], fi_inst[fi]));
+    vt_is_ref(vt) and vt >= vt_defined and vt < vt_tuple and ht_kind[vt_heap(vt)] == Heap.Array.to_i32();
+}
+
 /// The array type of an intrinsic's module (Array's `&` in the instance).
 fn intrinsic_array_heap(fi: I32) I32 {
     let module = module_of(fi_decl[fi]);
@@ -504,6 +513,21 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
     if not is_data_tag(tag) { return 0; };
     let m = w_mark();
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
+    // What a program's @ir gives them is not checked: no crash on what they cannot take.
+    let from_codes = tag == known_word(Known.IrStringFromCodes);
+    let string_tag = from_codes or tag == known_word(Known.IrStringConcat) or tag == known_word(Known.IrStringEq)
+        or tag == known_word(Known.IrStringNe) or tag == known_word(Known.IrStringMeasure) or tag == known_word(Known.IrStringSlice)
+        or tag == known_word(Known.IrStringGet) or tag == known_word(Known.IrStringFromCodePoint);
+    if from_codes and (w_stack.len() == m or not vt_is_ref(w_type[w_stack[m]]) or w_type[w_stack[m]] < vt_defined) {
+        w_stack.resize(m);
+        ir_malformed(x);
+        return -1;
+    };
+    if not string_tag and not intrinsic_array_fi(fi) {
+        w_stack.resize(m);
+        ir_malformed(x);
+        return -1;
+    };
     if tag == known_word(Known.IrStringConcat) { call_builtin(Builtin.Concat, m); }
     else if tag == known_word(Known.IrStringEq) { call_builtin(Builtin.Equals, m); }
     else if tag == known_word(Known.IrStringNe) {

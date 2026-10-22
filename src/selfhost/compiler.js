@@ -24,8 +24,8 @@ import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/sou
 /** How a file joins the program. */
 export const ROLE = { entry: 0, import: 1, prelude: 2 };
 
-/** What a build is for: a module's exports, its tests, or @comptime values. */
-export const TARGET = { normal: 0, test: 1, comptime: 2 };
+/** What a build is for: a module's exports, its tests, @comptime values, or its benches. */
+export const TARGET = { normal: 0, test: 1, comptime: 2, bench: 3 };
 
 /** How builds are optimized; size (-Oz) is the default, as in stage 0. */
 export const OPTIMIZE = { none: 0, size: 1, speed: 2 };
@@ -87,9 +87,19 @@ export async function compile(utu, entry, host) {
   const diagnostics = readDiagnostics(utu, files).concat(sourceWarnings(files));
   if (size < 0) return { wasm: null, spec: null, diagnostics, files };
   return {
-    ...builtModule(utu, size), diagnostics, files, tests: target === 'test' ? readTests(utu) : [],
+    ...builtModule(utu, size), diagnostics, files,
+    tests: target === 'test' ? readTests(utu) : [], benches: target === 'bench' ? readBenches(utu) : [],
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
   };
+}
+
+/** A bench build's benches: each one's export (`__bench_k(n)`) and name. */
+function readBenches(utu) {
+  const benches = [];
+  for (let k = 0; k < utu.bench_count(); k++) {
+    benches.push({ export: `__bench_${k}`, name: stringValue(textAt(utu.src, utu.bench_name_start(k), utu.bench_name_end(k))) });
+  }
+  return benches;
 }
 
 /**
@@ -569,7 +579,27 @@ export async function compileProgram(utu, target, host = {}) {
       new Uint8Array(utu.comptime_bytes.buffer).set(bytes, at);
     }
   }
-  return utu.compile_program(target);
+  return validIr(utu, utu.compile_program(target));
+}
+
+/**
+ * A program's own @ir is not checked by the compiler: a module with any is
+ * compiled once here, and the engine's reason it is not valid Wasm is
+ * reported at each such body. Size `size` of the module just built, or -1.
+ */
+async function validIr(utu, size) {
+  if (size < 0 || !utu.user_ir_count?.()) return size;
+  try {
+    await WebAssembly.compile(new Uint8Array(utu.out.buffer, 0, size).slice(), COMPILE_OPTIONS);
+    return size;
+  } catch (error) {
+    if (!(error instanceof WebAssembly.CompileError)) throw error;
+    const bytes = encoder.encode(String(error.message).replace(/^WebAssembly\.\w+\(\): /, ''));
+    const at = utu.ir_invalid_room(bytes.length);
+    new Uint8Array(utu.src.buffer).set(bytes, at);
+    utu.ir_invalid_report(at, bytes.length);
+    return -1;
+  }
 }
 
 /** Why a `@comptime` evaluation threw, as the compiler's code for it (comptime_trap_text). */

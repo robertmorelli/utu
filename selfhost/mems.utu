@@ -282,6 +282,8 @@ fn finish_mems() void {
         k += 3;
     };
     if w_mark() == m { return; };
+    // Before the computed globals are set (their initializers may read mems).
+    if start_func[0] >= 0 { w_leaf(Op.Call, vt_none, start_func[0], 0); };
     w_node(Op.Seq, vt_none, 0, 0, m);
     let f = helper(vl_empty(), vl_empty(), vl_empty(), "start");
     func_body[f] = w_pop();

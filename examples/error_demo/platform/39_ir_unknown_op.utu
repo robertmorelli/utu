@@ -1,5 +1,5 @@
 // What: an @ir body with a misspelled intrinsic tag
-// Expect: @ir is for the standard library: use @wat
+// Expect: @ir: unknown intrinsic <ir-i32-mull> (pointing at the tag)
 fn square(a: I32) I32 {
     @ir/\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \/;
 }

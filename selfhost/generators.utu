@@ -97,14 +97,70 @@ fn is_generator(decl: I32) Bool {
     ret >= 0 and is_kind(first_child(ret), Node.Yield_type);
 }
 
-/// The generator a `for` loop consumes: its one source is a call of one.
+/// The generator a `for` loop consumes: its one source is a call of one,
+/// by name (`g(…)`, `m.g(…)`, `T.g(…)`). A method's, `x.g(…)`, needs x's
+/// type: see @generator_source.
 fn generator_call(for_node: I32) I32 {
+    let call = sole_call(for_node);
+    if call >= 0 and generator_decl_of(call) >= 0 { call; } else { -1; };
+}
+
+/// A `for` loop's one source, when it is a call; else -1.
+fn sole_call(for_node: I32) I32 {
     let sources = first_child(for_node);
     let source = first_child(sources);
     if source < 0 or next_sibling(source) >= 0 or next_sibling(first_child(source)) >= 0 { return -1; };
     let call = first_child(source);
-    if not is_kind(call, Node.Call_expr) or not is_kind(first_child(call), Node.Identifier) { return -1; };
-    if is_generator(node_decl[first_child(call)]) { call; } else { -1; };
+    if is_kind(call, Node.Call_expr) or is_kind(call, Node.Promoted_module_call_expr) { call; } else { -1; };
+}
+
+/// A call's argument list (-1 for none): `f(…)`'s, or `M[A].f(…)`'s.
+fn call_args(call: I32) I32 {
+    if is_kind(call, Node.Promoted_module_call_expr) { return next_sibling(next_sibling(next_sibling(first_child(call)))); };
+    next_sibling(first_child(call));
+}
+
+/// The generator a call names: `g(…)`, `m.g(…)` (a module's or an alias's),
+/// `T.g(…)`, or `M[A].g(…)`; else -1.
+fn generator_decl_of(call: I32) I32 {
+    let callee = first_child(call);
+    let d = -1;
+    if is_kind(call, Node.Promoted_module_call_expr) { d = node_decl[next_sibling(next_sibling(callee))]; }
+    else if is_kind(callee, Node.Identifier) { d = node_decl[callee]; }
+    else if is_kind(callee, Node.Field_expr) and is_kind(first_child(callee), Node.Identifier) {
+        let base = node_decl[first_child(callee)];
+        if decl_is(base, Decl.Module) { d = node_decl[last_child(callee)]; }
+        else if decl_is(base, Decl.Alias) and decl_is(decl_a[base], Decl.Module) { d = static_member(decl_a[base], word_of(last_child(callee))); };
+    } else if is_kind(callee, Node.Type_member_expr) { d = node_decl[last_child(callee)]; };
+    if is_generator(d) { d; } else { -1; };
+}
+
+/// The generator call a `for` loop consumes, a method's (`x.each()`, by x's
+/// type) too; else -1. A method's is recorded on its name.
+fn generator_source(for_node: I32, cx: Cx) I32 {
+    let call = sole_call(for_node);
+    if call < 0 { return -1; };
+    if generator_decl_of(call) >= 0 { return call; };
+    let callee = first_child(call);
+    if not is_kind(callee, Node.Field_expr) or is_module_path(callee) { return -1; };
+    let rt = type_only(first_child(callee), -1, cx);
+    if ty_is(rt, Ty.Error) or ty_is(rt, Ty.Nullable) or ty_decl(rt) < 0 { return -1; };
+    let d = member(ty_decl(rt), word_of(last_child(callee)), Space.Method);
+    if not is_generator(d) { return -1; };
+    node_decl[last_child(callee)] = d;
+    call;
+}
+
+/// The module instance a named generator call (see @generator_decl_of) runs in.
+fn generator_inst(call: I32, gen: I32, cx: Cx) I32 {
+    let callee = first_child(call);
+    let base = first_child(callee);
+    if is_kind(call, Node.Promoted_module_call_expr) { return instance(module_of(gen), type_args(next_sibling(callee), cx.inst)); };
+    if is_kind(callee, Node.Field_expr) and decl_is(node_decl[base], Decl.Alias) { return alias_instance(node_decl[base]); };
+    if is_kind(callee, Node.Type_member_expr) and not (is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module)) {
+        return ty_inst(type_path(base, cx.inst));
+    };
+    instance_for(module_of(gen), cx.inst);
 }
 
 /// The declarations of a generator (its parameters and locals): those
@@ -147,7 +203,7 @@ fn delegates_to_itself(gen: I32) Bool { calls_generator(last_child(decl_node[gen
 fn calls_generator(node: I32, gen: I32) Bool {
     if is_kind(node, Node.For_expr) {
         let call = generator_call(node);
-        if call >= 0 and node_decl[first_child(call)] == gen { return true; };
+        if call >= 0 and generator_decl_of(call) == gen { return true; };
     };
     let c = first_child(node);
     while (c >= 0) {
@@ -173,13 +229,19 @@ fn is_delegation(loop_: I32) Bool {
 /// itself goes to @check_recursive_loop; one already expanding here is a
 /// call item of its recursion, or reported.
 fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
-    let gen = node_decl[first_child(call)];
+    let gen = generator_decl_of(call);
+    // `x.each()`: a method's, x its receiver (see @generator_source).
+    let receiver = -1;
+    if gen < 0 {
+        gen = node_decl[last_child(first_child(call))];
+        receiver = first_child(first_child(call));
+    };
     // A generator that consumes itself would expand without end.
     for (0 ..< gen_decl.len()) |i| {
         if gen_decl[i] == gen {
             // One that delegates to itself in its own body is recursive, and
             // passes its values straight through.
-            if delegates_to_itself(gen) {
+            if delegates_to_itself(gen) and receiver < 0 {
                 if not is_delegation(node) {
                     report(Diag.GeneratorPassThrough, node, decl_name[gen]);
                     return error_value();
@@ -201,18 +263,37 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         };
         cap = node_decl[name];
     };
-    let inst = instance_for(module_of(gen), cx.inst);
+    let m = w_mark();
+    // A method's receiver is evaluated first, and its type is the instance.
+    let rt = if receiver >= 0 { check_expr(receiver, -1, cx); } else { -1; };
+    if receiver >= 0 and ty_is(rt, Ty.Error) { return error_since(m); };
+    let inst = if receiver >= 0 { ty_inst(rt); } else { generator_inst(call, gen, cx); };
     // Its element type: `yield T`.
     let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), inst);
-    if delegates_to_itself(gen) { return check_recursive_loop(node, call, gen, cap, elem, inst, cx); };
+    if delegates_to_itself(gen) {
+        // (A method's would pass its receiver along: not done.)
+        if receiver >= 0 {
+            w_stack.resize(m);
+            report(Diag.GeneratorRecursion, node, decl_name[gen]);
+            return error_value();
+        };
+        return check_recursive_loop(node, call, gen, cap, elem, inst, cx);
+    };
     let decls = generator_decls(gen);
     let saved = set_aside(decls);
     // Before the parameters are bound: a captured one may be a box.
     mark_boxes(fn_body(gen));
-    let m = w_mark();
+    // The receiver into self.
+    if receiver >= 0 {
+        let st = receiver_type(gen, inst);
+        coerce(rt, st, receiver);
+        let self_decl = vl_item(param_decls(gen), 0);
+        decl_ty[self_decl] = st;
+        bind_value(self_decl, st, m);
+    };
     // Arguments into the parameters.
     let params = param_list_of(gen);
-    let args = next_sibling(first_child(call));
+    let args = call_args(call);
     let a = if args >= 0 { first_child(args); } else { -1; };
     let p = if params >= 0 { first_child(params); } else { -1; };
     while (a >= 0 and p >= 0) {
@@ -268,10 +349,7 @@ fn expansion_of(node: I32) I32 {
 fn check_yield(node: I32, cx: Cx) I32 {
     let k = expansion_of(node);
     if k < 0 {
-        // (A method's `yield T` is reported.)
-        let f = parent_of(node);
-        while (f >= 0 and not is_kind(f, Node.Fn_decl)) { f = parent_of(f); };
-        if f < 0 or not is_method_generator(f) { report(Diag.YieldOutside, node, -1); };
+        report(Diag.YieldOutside, node, -1);
         return error_value();
     };
     let t = gen_type[k];
@@ -477,9 +555,9 @@ fn args_into_locals(args: I32, ptypes: I32, cx: Cx) Array[I32] {
 /// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
 fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
     let params = rec_params[r];
-    let args = next_sibling(first_child(call));
+    let args = call_args(call);
     if child_count(args) != vl_len[params] {
-        report2(Diag.GeneratorArity, node, word_of(first_child(call)), vl_len[params], child_count(args));
+        report2(Diag.GeneratorArity, node, decl_name[generator_decl_of(call)], vl_len[params], child_count(args));
         return error_value();
     };
     let m = w_mark();
@@ -586,7 +664,7 @@ fn rec_enter_frame(l: RecLoop, start: I32) void {
 /// `for (walk(root)) |x| { body }`, walk recursive.
 fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, inst: I32, cx: Cx) I32 {
     let params = param_list_of(gen);
-    let args = next_sibling(first_child(call));
+    let args = call_args(call);
     if child_count(args) != child_count(params) {
         report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args));
         return error_value();

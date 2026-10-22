@@ -1,5 +1,5 @@
 // What: an @ir body whose binary op has one operand (and is unclosed)
-// Expect: @ir is for the standard library: use @wat
+// Expect: @ir: <ir-i32-mul> needs two operands / is not closed
 fn square(a: I32) I32 {
     @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
 }

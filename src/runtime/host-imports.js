@@ -67,21 +67,33 @@ export function awaitImports(promiseSpec, utu = {}) {
  * `fun`, which has no environment parameter to prepend, unless flag 2 says
  * the environment is a capture (which may be null).
  *
- * Every `closure_call_*` field is the *same* function — invoking a JS callable.
+ * The closure also keeps `record`, a wasm struct of the funcref and the
+ * environment, under a symbol. A call from utu reads it back (`closure_rec`)
+ * and calls the body itself with `call_ref`: the import returns at once, so
+ * no JS frame stays on the stack and an `await` in the body can suspend. The
+ * JS function stays the closure's identity (`===`, removeEventListener).
+ *
+ * Every `closure_call_*` field is the *same* function — invoking a JS callable,
+ * for a JS function utu did not make (`closure_rec` gives null for it).
  * They differ only in wasm signature, since wasm imports are monomorphic, so one
  * shared implementation is aliased under every name the program needs. That
  * makes the cost of an extra arity one property assignment, not one function.
  */
+const CLOSURE_REC = Symbol('utu.closure');
+
 export function closureImports(closureSpec, utu = {}) {
   if (!closureSpec) return utu;
   if (closureSpec.new) {
     // flags: 1, the result is a Bool; 2, the environment is there even when
     // null (a closure whose one capture is its environment).
-    utu.closure_new = (fn, env, flags) => {
+    utu.closure_new = (fn, env, flags, record) => {
       const invoke = env == null && !(flags & 2) ? (...args) => fn(...args) : (...args) => fn(env, ...args);
-      return flags & 1 ? (...args) => !!invoke(...args) : invoke;
+      const closure = flags & 1 ? (...args) => !!invoke(...args) : invoke;
+      closure[CLOSURE_REC] = record;
+      return closure;
     };
   }
+  utu.closure_rec = closure => closure?.[CLOSURE_REC] ?? null;
   const apply = (closure, ...args) => closure(...args);
   for (const field of closureSpec.calls ?? []) utu[field] = apply;
   return utu;

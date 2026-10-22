@@ -1,0 +1,9 @@
+// What: a let-bound closure that awaits, given to the host
+// Expect: a closure the host calls cannot await, wherever it is written
+let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+let on_tick: fun(cl() void) void = @es/\ (f) => setTimeout(f, 0) \/;
+
+export main() void {
+    let tick = cl() { let v: I32 = await later(1); };
+    on_tick(tick);
+}

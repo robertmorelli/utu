@@ -1,0 +1,8 @@
+// What: two computed globals, each read (through a function) by the other's initializer
+// Expect: Globals b and a each need the other set first
+fn get_b() I32 { b + 1; }
+
+let a: I32 = get_b();
+let b: I32 = a * 2;
+
+export main() I32 { a + b; }

@@ -1,0 +1,13 @@
+// What: a protocol method that takes & (the implementer's type), called on a protocol value
+// Expect: Ord.cmp uses &, so only a bounded T calls it: mod M[T[Ord]]
+using Ord from std:Ord;
+
+struct Version[Ord]:
+    | major: I32
+
+fn Ord[Version].cmp |a| (b: Version) I32 { a.major - b.major; }
+
+export main() I32 {
+    let all: Array[Ord] = [Version { major: 2 }, Version { major: 3 }];
+    all[0].cmp(all[1]);
+}

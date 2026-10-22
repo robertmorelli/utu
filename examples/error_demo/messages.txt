@@ -609,6 +609,64 @@ ok
 14 │     };
 --- exit 1
 
+=== utu check examples/error_demo/control/400_break_unknown_label.utu
+ ERROR  No block labeled nowhere around this break
+        unknown-label · examples/error_demo/control/400_break_unknown_label.utu:5:15
+
+ 3 │ export main() I32 {
+ 4 │     let a = outer: {
+ 5 │         break nowhere 1;
+   │               ━━━━━━━
+   │               ╰─ no such label
+ 6 │         2;
+ 7 │     };
+--- exit 1
+
+=== utu check examples/error_demo/control/401_break_label_in_closure.utu
+ ERROR  No block labeled outer around this break
+        unknown-label · examples/error_demo/control/401_break_label_in_closure.utu:5:34
+
+ 3 │ export main() I32 {
+ 4 │     outer: {
+   │     ─────
+   │     ╰─ outside the closure
+ 5 │         let f = cl() I32 { break outer 1; };
+   │                                  ━━━━━
+   │                                  ╰─ no such label
+ 6 │         f();
+ 7 │     };
+
+  note  a closure cannot leave the block it is in
+--- exit 1
+
+=== utu check examples/error_demo/control/402_break_label_wrong_type.utu
+ ERROR  Expected I32, got Str
+        type-mismatch · examples/error_demo/control/402_break_label_wrong_type.utu:5:21
+
+ 3 │ export main() I32 {
+ 4 │     let n: I32 = found: {
+ 5 │         break found "seven";
+   │                     ━━━━━━━
+   │                     ╰─ Str
+ 6 │     };
+ 7 │     n;
+--- exit 1
+
+=== utu check examples/error_demo/control/403_break_label_no_value.utu
+ ERROR  n is I32, got void
+        type-mismatch · examples/error_demo/control/403_break_label_no_value.utu:5:9
+
+ 3 │ export main() I32 {
+ 4 │     let n: I32 = found: {
+   │            ───
+   │            ╰─ I32
+ 5 │         break found;
+   │         ━━━━━━━━━━━
+   │         ╰─ void
+ 6 │     };
+ 7 │     n;
+--- exit 1
+
 === utu check examples/error_demo/control/40_duplicate_match_bool.utu
  ERROR  Duplicate pattern true
         duplicate-pattern · examples/error_demo/control/40_duplicate_match_bool.utu:4:26
@@ -1091,16 +1149,18 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/77_break_with_value.utu
- ERROR  Expected ';', got 'x'
-        parse-error · examples/error_demo/control/77_break_with_value.utu:5:31
+ ERROR  No block labeled x around this break
+        unknown-label · examples/error_demo/control/77_break_with_value.utu:5:31
 
  3 │ fn first_even(xs: Array[I32]) I32 {
  4 │     for (xs) |x| {
  5 │         if x % 2 == 0 { break x; };
    │                               ━
-   │                               ╰─ ';'?
+   │                               ╰─ no such label
  6 │     };
  7 │     -1;
+
+  note  a loop's break takes no value; break name v leaves a block name: { … } with v
 --- exit 1
 
 === utu check examples/error_demo/control/78_missing_return_in_one_branch.utu
@@ -1647,6 +1707,67 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/340_await_closure_to_es.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/340_await_closure_to_es.utu:7:31
+
+ 5 │
+ 6 │ export main() void {
+ 7 │     each(cl(v) { let w: I32 = await later(v); });
+   │          ──                   ━━━━━━━━━━━━━━
+   │          │                    ╰─ suspends
+   │          ╰─ the host calls it
+ 8 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
+=== utu check examples/error_demo/iterators/341_await_through_fn_in_then.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/341_await_through_fn_in_then.utu:8:35
+
+ 6 │
+ 7 │ export main() void {
+ 8 │     later(1).then(cl(v) { let w = slow(v); });
+   │                   ──              ━━━━━━━
+   │                   │               ╰─ may suspend
+   │                   ╰─ the host calls it
+ 9 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
+=== utu check examples/error_demo/iterators/342_await_let_closure_to_es.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/342_await_let_closure_to_es.utu:7:36
+
+ 5 │
+ 6 │ export main() void {
+ 7 │     let tick = cl() { let v: I32 = await later(1); };
+   │                ──                  ━━━━━━━━━━━━━━
+   │                │                   ╰─ suspends
+   │                ╰─ the host calls it
+ 8 │     on_tick(tick);
+ 9 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
+=== utu check examples/error_demo/iterators/343_await_closure_to_declared_host.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/343_await_closure_to_declared_host.utu:8:49
+
+ 6 │
+ 7 │ export main() void {
+ 8 │     Browser.setTimeout(cl() void { let v: I32 = await later(1); }, 0.0);
+   │                        ──                       ━━━━━━━━━━━━━━
+   │                        │                        ╰─ suspends
+   │                        ╰─ the host calls it
+ 9 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
 === utu check examples/error_demo/iterators/34_for_float_range.utu
  ERROR  for needs an array or range, not F64
         invalid-for-source · examples/error_demo/iterators/34_for_float_range.utu:5:10
@@ -1723,6 +1844,19 @@ ok
    │          ╰─ here
  7 │     total;
  8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/400_generator_method_called.utu
+ ERROR  each is a generator: for (each(…)) |v| { … }
+        generator-call · examples/error_demo/iterators/400_generator_method_called.utu:14:5
+
+12 │ export main() I32 {
+13 │     let bag = Bag.new();
+14 │     bag.each();
+   │     ━━━━━━━━━━
+   │     ╰─ here
+15 │     0;
+16 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/40_for_bool_range.utu
@@ -2060,42 +2194,36 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/66_await_in_closure.utu
- ERROR  A closure cannot await
+ ERROR  A closure the host calls cannot await
         await-in-closure · examples/error_demo/iterators/66_await_in_closure.utu:8:22
 
  6 │ export main() I32 {
  7 │     later(1).then(cl(v) {
+   │                   ──
+   │                   ╰─ the host calls it
  8 │         let w: I32 = await later(v + 1);
    │                      ━━━━━━━━━━━━━━━━━━
-   │                      ╰─ here
+   │                      ╰─ suspends
  9 │         record(w);
 10 │     });
---- exit 1
 
-=== utu check examples/error_demo/iterators/67_await_for_in_closure.utu
- ERROR  A closure cannot await
-        await-in-closure · examples/error_demo/iterators/67_await_for_in_closure.utu:7:9
-
- 5 │ export main() I32 {
- 6 │     let run = cl() {
- 7 │         await for (Stream[I32].of([1, 2])) |v| { record(v); };
-   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │         ╰─ here
- 8 │     };
- 9 │     run();
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
 --- exit 1
 
 === utu check examples/error_demo/iterators/68_await_in_stream_map.utu
- ERROR  A closure cannot await
+ ERROR  A closure the host calls cannot await
         await-in-closure · examples/error_demo/iterators/68_await_in_stream_map.utu:6:61
 
  4 │
  5 │ export main() I32 {
  6 │     let s = Stream[I32].of([1, 2]).map(cl(v) { let w: I32 = await later(v); w; });
-   │                                                             ━━━━━━━━━━━━━━
-   │                                                             ╰─ here
+   │                                        ──                   ━━━━━━━━━━━━━━
+   │                                        │                    ╰─ suspends
+   │                                        ╰─ the host calls it
  7 │     let total = 0;
  8 │     await for (s) |v| { total += v; };
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
 --- exit 1
 
 === utu check examples/error_demo/iterators/69_await_promise_wrong_type.utu
@@ -2126,50 +2254,20 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/71_generator_from_module.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/iterators/71_generator_from_module.utu:4:24
-
- 2 │ // Expect: accepted (a module's generator is consumed like any other), or a clear message if not
- 3 │ mod seq {
- 4 │     fn squares(n: I32) yield I32 {
-   │                        ━━━━━━━━━
-   │                        ╰─ here
- 5 │         for (0 ..< n) |i| { yield i * i; };
- 6 │     }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/iterators/71_generator_from_module.utu:5:29
-
- 3 │ mod seq {
- 4 │     fn squares(n: I32) yield I32 {
- 5 │         for (0 ..< n) |i| { yield i * i; };
-   │                             ━━━━━━━━━━━
-   │                             ╰─ here
- 6 │     }
- 7 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/iterators/72_generator_as_value.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/iterators/72_generator_as_value.utu:3:20
+ ERROR  squares is a generator: for (squares(…)) |v| { … }
+        generator-call · examples/error_demo/iterators/72_generator_as_value.utu:8:15
 
- 1 │ // What: a generator stored in a variable to be consumed later
- 2 │ // Expect: squares is a generator, not a function value: consume it directly with for (squares(…)) |v|
- 3 │ fn squares(n: I32) yield I32 {
-   │                    ━━━━━━━━━
-   │                    ╰─ here
- 4 │     for (0 ..< n) |i| { yield i * i; };
- 5 │ }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/iterators/72_generator_as_value.utu:4:25
-
- 2 │ // Expect: squares is a generator, not a function value: consume it directly with for (squares(…)) |v|
- 3 │ fn squares(n: I32) yield I32 {
- 4 │     for (0 ..< n) |i| { yield i * i; };
-   │                         ━━━━━━━━━━━
-   │                         ╰─ here
- 5 │ }
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let gen = squares;
+   │               ━━━━━━━
+   │               ╰─ here
+ 9 │     let total = 0;
+10 │     for (gen(4)) |s| { total += s; };
 --- exit 1
 
 === utu check examples/error_demo/iterators/73_collect_without_type.utu
@@ -2224,27 +2322,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/77_generator_exported.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/iterators/77_generator_exported.utu:4:24
+ ERROR  squares is a generator: it expands into each for that reads it, so it cannot be exported
+        generator-export · examples/error_demo/iterators/77_generator_exported.utu:4:8
 
  2 │ // Expect: a generator cannot be exported: it expands inline at a for loop; export a function returning Array[I32]
  3 │ export lib {
  4 │     fn squares(n: I32) yield I32 {
-   │                        ━━━━━━━━━
-   │                        ╰─ here
+   │        ━━━━━━━
+   │        ╰─ a generator
  5 │         for (0 ..< n) |i| { yield i * i; };
  6 │     }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/iterators/77_generator_exported.utu:5:29
-
- 3 │ export lib {
- 4 │     fn squares(n: I32) yield I32 {
- 5 │         for (0 ..< n) |i| { yield i * i; };
-   │                             ━━━━━━━━━━━
-   │                             ╰─ here
- 6 │     }
- 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/iterators/78_generator_in_pipeline_body.utu
@@ -2334,16 +2421,8 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/85_generator_method.utu
- ERROR  A method cannot be a generator
-        generator-method · examples/error_demo/iterators/85_generator_method.utu:7:27
-
- 5 │         | items: Array[I32]
- 6 │     fn &.new(xs: Array[I32]) & { &{ items: xs }; }
- 7 │     fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
-   │                           ━━━━━━━━━
-   │                           ╰─ here
- 8 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/iterators/86_bisect_over_i64_range.utu
  ERROR  bisect takes a range of I32, not I64
@@ -2989,15 +3068,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/35_unknown_import_npm_missing.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/names/35_unknown_import_npm_missing.utu:6:5
+ ERROR  No declarations for npm:left-pad-xyz; is it installed?
+        host-missing · examples/error_demo/names/35_unknown_import_npm_missing.utu:3:16
 
+ 1 │ // What: imports an npm package that is not installed, and calls it
+ 2 │ // Expect: Cannot import "npm:left-pad-xyz": package not found in node_modules
+ 3 │ using pad from "npm:left-pad-xyz";
+   │                ━━━━━━━━━━━━━━━━━━
+   │                ╰─ not found
  4 │
  5 │ export main() Str {
- 6 │     pad.leftPad("7", 3);
-   │     ━━━
-   │     ╰─ here
- 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/36_unknown_import_node_typo.utu
@@ -3048,6 +3128,44 @@ ok
    │               ━
    │               ╰─ unexpected
  7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/400_module_as_value.utu
+ ERROR  shapes is a module, not a value
+        not-value · examples/error_demo/names/400_module_as_value.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let s = shapes;
+   │             ━━━━━━
+   │             ╰─ not a value
+ 9 │     0;
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/401_module_type_called.utu
+ ERROR  P is a type, not a value
+        not-value · examples/error_demo/names/401_module_type_called.utu:9:5
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     m.P(1);
+   │     ━━━
+   │     ╰─ not a value
+10 │     0;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/402_field_read_from_type.utu
+ ERROR  x is a field: read it from a value
+        not-value · examples/error_demo/names/402_field_read_from_type.utu:7:5
+
+ 5 │
+ 6 │ export main() I32 {
+ 7 │     P.x;
+   │     ━━━
+   │     ╰─ not a value
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/40_not_a_module_type_path.utu
@@ -4399,50 +4517,57 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/39_ir_unknown_op.utu
- ERROR  @ir is for the standard library: use @wat
-        ir-outside-std · examples/error_demo/platform/39_ir_unknown_op.utu:4:5
+ ERROR  No @ir element <ir-i32-mull>
+        ir-unknown · examples/error_demo/platform/39_ir_unknown_op.utu:4:5
 
- 2 │ // Expect: @ir is for the standard library: use @wat
+ 2 │ // Expect: @ir: unknown intrinsic <ir-i32-mull> (pointing at the tag)
  3 │ fn square(a: I32) I32 {
  4 │     @ir/\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \/;
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not the standard library
+   │     ╰─ unknown
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/400_new_of_utu_function.utu
+ ERROR  new makes host objects; mk is not a host class
+        new-not-host · examples/error_demo/platform/400_new_of_utu_function.utu:9:17
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     let p = new mk();
+   │                 ━━
+   │                 ╰─ not a host class
+10 │     p.x;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/401_ir_unknown_parameter.utu
+ ERROR  @ir names no parameter b
+        ir-unknown · examples/error_demo/platform/401_ir_unknown_parameter.utu:4:5
+
+ 2 │ // Expect: @ir names no parameter b
+ 3 │ fn square(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ unknown
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/40_ir_missing_operand.utu
- ERROR  @ir is for the standard library: use @wat
-        ir-outside-std · examples/error_demo/platform/40_ir_missing_operand.utu:4:5
-
- 2 │ // Expect: @ir is for the standard library: use @wat
- 3 │ fn square(a: I32) I32 {
- 4 │     @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not the standard library
- 5 │ }
---- exit 1
+ok
+--- exit 0
 
 === utu check examples/error_demo/platform/41_generator_as_value.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/platform/41_generator_as_value.utu:3:18
+ ERROR  count is a generator: for (count(…)) |v| { … }
+        generator-call · examples/error_demo/platform/41_generator_as_value.utu:8:13
 
- 1 │ // What: binding a generator function to a local as a value
- 2 │ // Expect: count is a generator: consume it with `for (count(…)) |value| { … }` (at line 8, not at the generator)
- 3 │ fn count(n: I32) yield I32 {
-   │                  ━━━━━━━━━
-   │                  ╰─ here
- 4 │     for (0 ..< n) |i| { yield i; };
- 5 │ }
-
- ERROR  yield outside a generator
-        yield-outside · examples/error_demo/platform/41_generator_as_value.utu:4:25
-
- 2 │ // Expect: count is a generator: consume it with `for (count(…)) |value| { … }` (at line 8, not at the generator)
- 3 │ fn count(n: I32) yield I32 {
- 4 │     for (0 ..< n) |i| { yield i; };
-   │                         ━━━━━━━
-   │                         ╰─ here
- 5 │ }
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let g = count;
+   │             ━━━━━
+   │             ╰─ here
+ 9 │     0;
+10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/42_foreign_root_typo.utu
@@ -4471,143 +4596,6 @@ ok
  9 │ }
 --- exit 1
 
-=== utu check examples/error_demo/platform/440_comptime_reads_itself.utu
- ERROR  @comptime t reads itself
-        comptime-cycle · examples/error_demo/platform/440_comptime_reads_itself.utu:4:20
-
- 2 │ // Expect: @comptime t reads itself
- 3 │ fn tab() Array[I32] { [t.len()]; }
- 4 │ const mem t: I32 = @comptime/\ tab() \/;
-   │                    ━━━━━━━━━━━━━━━━━━━━
-   │                    ╰─ waits on itself
- 5 │
- 6 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/441_comptime_cycle.utu
- ERROR  @comptime t reads u, which waits on it
-        comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:5:20
-
- 3 │ fn f() Array[I32] { [u.len()]; }
- 4 │ fn g() Array[I32] { [t.len()]; }
- 5 │ const mem t: I32 = @comptime/\ f() \/;
-   │                    ━━━━━━━━━━━━━━━━━━
-   │                    ╰─ waits on u
- 6 │ const mem u: I32 = @comptime/\ g() \/;
-
- ERROR  @comptime u reads t, which waits on it
-        comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:6:20
-
- 4 │ fn g() Array[I32] { [t.len()]; }
- 5 │ const mem t: I32 = @comptime/\ f() \/;
- 6 │ const mem u: I32 = @comptime/\ g() \/;
-   │                    ━━━━━━━━━━━━━━━━━━
-   │                    ╰─ waits on t
- 7 │
- 8 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/442_comptime_never_ends.utu
- ERROR  @comptime t trapped: it ran too long (a hundred million loop rounds)
-        comptime-trap · examples/error_demo/platform/442_comptime_never_ends.utu:7:20
-
- 5 │     [1];
- 6 │ }
- 7 │ const mem t: I32 = @comptime/\ f() \/;
-   │                    ━━━━━━━━━━━━━━━━━━
-   │                    ╰─ here
- 8 │
- 9 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/443_comptime_two_statements.utu
- ERROR  @comptime takes one expression: Expected ')', got ';'
-        parse-error · examples/error_demo/platform/443_comptime_two_statements.utu:3:38
-
- 1 │ // What: a @comptime body of two statements
- 2 │ // Expect: @comptime takes one expression: Expected ')', got ';'
- 3 │ const mem t: I32 = @comptime/\ [1, 2]; [3] \/;
-   │                                      ━
-   │                                      ╰─ unexpected
- 4 │
- 5 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/444_comptime_empty.utu
- ERROR  @comptime needs an expression
-        dsl-empty · examples/error_demo/platform/444_comptime_empty.utu:3:20
-
- 1 │ // What: an empty @comptime body
- 2 │ // Expect: @comptime needs an expression
- 3 │ const mem t: I32 = @comptime/\  \/;
-   │                    ━━━━━━━━━━━━━━━
-   │                    ╰─ empty
- 4 │
- 5 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/445_embed_empty.utu
- ERROR  @embed needs a file path
-        dsl-empty · examples/error_demo/platform/445_embed_empty.utu:3:23
-
- 1 │ // What: an empty @embed body
- 2 │ // Expect: @embed needs a file path
- 3 │ const mem bytes: U8 = @embed/\ \/;
-   │                       ━━━━━━━━━━━
-   │                       ╰─ empty
- 4 │
- 5 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu
- ERROR  7 is no Color
-        mem-element-range · examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu:4:23
-
- 2 │ // Expect: 7 is no Color
- 3 │ enum(U8) Color: | Red | Green | Blue
- 4 │ const mem cs: Color = [2, 7, 1];
-   │                       ━━━━━━━━━
-   │                       ╰─ here
- 5 │
- 6 │ export main() I32 {
---- exit 1
-
-=== utu check examples/error_demo/platform/447_ir_in_a_program.utu
- ERROR  @ir is for the standard library: use @wat
-        ir-outside-std · examples/error_demo/platform/447_ir_in_a_program.utu:4:5
-
- 2 │ // Expect: @ir is for the standard library: use @wat
- 3 │ fn len(a: I32) I32 {
- 4 │     @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not the standard library
- 5 │ }
---- exit 1
-
-=== utu check examples/error_demo/platform/448_wat_select_param.utu
- ERROR  select takes only (result t)
-        dsl-error · examples/error_demo/platform/448_wat_select_param.utu:4:58
-
- 2 │ // Expect: select takes only (result t)
- 3 │ fn pick(c: I32, a: I32, b: I32) I32 {
- 4 │     @wat/\ local.get $a local.get $b local.get $c select (param i32) \/;
-   │                                                          ━━━━━━━━━━━
-   │                                                          ╰─ here
- 5 │ }
---- exit 1
-
-=== utu check examples/error_demo/platform/449_dsl_nested_too_deeply.utu
- ERROR  DSLs nested too deeply (max 16)
-        dsl-too-deep · examples/error_demo/platform/449_dsl_nested_too_deeply.utu:4:117
-
- 2 │ // Expect: DSLs nested too deeply (max 16)
- 3 │ export main() I32 {
- 4 │     @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ 1 \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/;
-   │                                                                                                                     ━━━━━━━━━━━
-   │                                                                                                                     ╰─ too deep
- 5 │ }
---- exit 1
-
 === utu check examples/error_demo/platform/44_foreign_readonly_write.utu
  ERROR  tagName is readonly
         foreign-readonly · examples/error_demo/platform/44_foreign_readonly_write.utu:7:5
@@ -4618,59 +4606,6 @@ ok
    │     ━━━━━━━━━━
    │     ╰─ here
  8 │ }
---- exit 1
-
-=== utu check examples/error_demo/platform/450_mem_in_mod.utu
- ERROR  Unexpected 'mem': a mem goes at the top level of a file
-        parse-error · examples/error_demo/platform/450_mem_in_mod.utu:4:5
-
- 2 │ // Expect: Unexpected 'mem': a mem goes at the top level of a file
- 3 │ mod counts {
- 4 │     mem seen: I32 = [5, 6];
-   │     ━━━
-   │     ╰─ unexpected
- 5 │     fn second() I32 { seen[1]; }
- 6 │ }
---- exit 1
-
-=== utu check examples/error_demo/platform/451_stored_without_browser.utu
- ERROR  @stored needs using Browser from std:Browser
-        dsl-error · examples/error_demo/platform/451_stored_without_browser.utu:7:27
-
- 5 │
- 6 │ export main() Str {
- 7 │     let prefs = @stored/\ Prefs "prefs" Prefs { name: "a" } \/;
-   │                           ━
-   │                           ╰─ here
- 8 │     prefs.name;
- 9 │ }
---- exit 1
-
-=== utu check examples/error_demo/platform/452_comptime_calls_main.utu
- ERROR  main is the entry point, not a function: move its body into a fn
-        unknown-function · examples/error_demo/platform/452_comptime_calls_main.utu:3:24
-
- 1 │ // What: a @comptime helper calling main
- 2 │ // Expect: main is the entry point, not a function: move its body into a fn
- 3 │ fn tab() Array[I32] { [main()]; }
-   │                        ━━━━
-   │                        ╰─ not defined
- 4 │ const mem t: I32 = @comptime/\ tab() \/;
---- exit 1
-
-=== utu check examples/error_demo/platform/453_es_single_quoted_end.utu
- ERROR  Unexpected character '''
-        parse-error · examples/error_demo/platform/453_es_single_quoted_end.utu:3:51
-
- 1 │ // What: \/ in a single-quoted JavaScript string ends the @es body
- 2 │ // Expect: Unexpected character '''
- 3 │ let slash: fun(Str) Str = @es/\ (s) => s.split('\/').join("-") \/;
-   │                                                   ━
-   │                                                   ╰─ unexpected
- 4 │
- 5 │ export main() Str {
-
-  note  \/ ends a DSL body, except inside "…": write "\/" there, not '\/'
 --- exit 1
 
 === utu check examples/error_demo/platform/45_foreign_record_unknown_field.utu
@@ -5384,18 +5319,17 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/02_es_returns_null_for_str.utu
- ERROR  Wrong type from JavaScript: a Str, not null
-        uncaught-exception · examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
+ TRAP  Wrong type from JavaScript
+       trap · examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
 
- 4 │
  5 │ export main() I32 {
  6 │     let lang = read_setting("lang");
-   │                ━━━━━━━━━━━━━━━━━━━━
-   │                ╰─ here
  7 │     lang.len();
+   │     ━━━━━━━━━━
+   │     ╰─ here
  8 │ }
 
-  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
+  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/03_es_returns_wrong_type.utu
@@ -5726,11 +5660,11 @@ ok
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
-wasm://wasm/fe8e83be:1
+wasm://wasm/0b64b376:1
 
 
 RuntimeError: divide by zero
-    at closure (wasm://wasm/fe8e83be:wasm-function[7]:0xbe)
+    at closure (wasm://wasm/0b64b376:wasm-function[7]:0xc4)
     at invoke
 
 Node.js v25.8.1
@@ -7282,6 +7216,27 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu check examples/error_demo/syntax/90_error_in_imported_file.utu
+ ERROR  Unknown module shapes
+        unknown-module · examples/error_demo/syntax/90_error_in_imported_file.utu:3:7
+
+ 1 │ // What: an imported file has a syntax error (missing ';' in lib/broken_shapes.utu).
+ 2 │ // Expect: the error is reported in lib/broken_shapes.utu at line 4, not in this file.
+ 3 │ using shapes from "./lib/broken_shapes.utu";
+   │       ━━━━━━
+   │       ╰─ no such module
+ 4 │
+ 5 │ export main() F64 {
+
+ ERROR  Unknown variable shapes
+        unknown-variable · examples/error_demo/syntax/90_error_in_imported_file.utu:6:5
+
+ 4 │
+ 5 │ export main() F64 {
+ 6 │     shapes.square(3.0);
+   │     ━━━━━━
+   │     ╰─ not defined
+ 7 │ }
+
  ERROR  Missing ; after x
         missing-semicolon · examples/error_demo/syntax/lib/broken_shapes.utu:4:21
 
@@ -8018,6 +7973,92 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/320_bound_not_implemented.utu
+ ERROR  Point does not implement Ord (Order's T needs it)
+        bound-missing · examples/error_demo/types/320_bound_not_implemented.utu:11:21
+
+ 9 │
+10 │ export main() I32 {
+11 │     let far = Order[Point].max(Point { x: 1, y: 2 }, Point { x: 5, y: 0 });
+   │                     ━━━━━
+   │                     ╰─ no cmp
+12 │     far.x;
+13 │ }
+
+   ╭─ std:Ord
+41 │ mod Order[T[Ord]] {
+   │             ───
+   │             ╰─ needs Ord
+
+  note  implement it: fn Ord[Point].cmp |a| (b: Point) I32 { … }
+--- exit 1
+
+=== utu check examples/error_demo/types/321_unbounded_protocol_call.utu
+ ERROR  T has no method cmp; bound it: mod Largest[T[Ord]]
+        unbounded-call · examples/error_demo/types/321_unbounded_protocol_call.utu:8:27
+
+ 5 │ mod Largest[T] {
+   │             ─
+   │             ╰─ no Ord
+ 6 │     fn of(xs: Array[T]) T {
+ 7 │         let best = xs[0];
+ 8 │         for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };
+   │                           ━━━━━━━━━━━
+   │                           ╰─ T is unbounded
+ 9 │         best;
+10 │     }
+
+  fix   bound T by Ord
+ 5 │ mod Largest[T[Ord]] {
+--- exit 1
+
+=== utu check examples/error_demo/types/322_bound_not_a_protocol.utu
+ ERROR  Point is not a protocol; a bound names one
+        bound-not-proto · examples/error_demo/types/322_bound_not_a_protocol.utu:6:13
+
+ 4 │     | x: I32
+ 5 │
+ 6 │ mod Pairs[T[Point]] {
+   │             ━━━━━
+   │             ╰─ not a protocol
+ 7 │     fn first(a: T, b: T) T { a; }
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/323_bound_not_passed_on.utu
+ ERROR  V does not implement Ord (Order's T needs it)
+        bound-missing · examples/error_demo/types/323_bound_not_passed_on.utu:7:36
+
+ 5 │
+ 6 │ mod Ranked[V] {
+ 7 │     fn top(xs: Array[V]) V { Order[V].max_of(xs); }
+   │                                    ━
+   │                                    ╰─ V is unbounded
+ 8 │ }
+
+   ╭─ std:Ord
+41 │ mod Order[T[Ord]] {
+   │             ───
+   │             ╰─ needs Ord
+
+  note  bound it: mod Ranked[V[Ord]]
+
+  fix   bound V by Ord
+ 6 │ mod Ranked[V[Ord]] {
+--- exit 1
+
+=== utu check examples/error_demo/types/324_self_type_through_protocol_value.utu
+ ERROR  Ord.cmp uses &, so only a bounded T calls it: mod M[T[Ord]]
+        proto-self-dynamic · examples/error_demo/types/324_self_type_through_protocol_value.utu:12:5
+
+10 │ export main() I32 {
+11 │     let all: Array[Ord] = [Version { major: 2 }, Version { major: 3 }];
+12 │     all[0].cmp(all[1]);
+   │     ━━━━━━━━━━━━━━━━━━
+   │     ╰─ any Ord
+13 │ }
+--- exit 1
+
 === utu check examples/error_demo/types/32_proto_value_wrong_type.utu
  ERROR  total takes Shape, got Label
         type-mismatch · examples/error_demo/types/32_proto_value_wrong_type.utu:16:27
@@ -8128,6 +8169,47 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  9 │     lookup(raw);
    │            ━━━
    │            ╰─ I32
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/400_global_cycle.utu
+ ERROR  Globals b and a each need the other set first
+        global-cycle · examples/error_demo/types/400_global_cycle.utu:6:14
+
+ 4 │
+ 5 │ let a: I32 = get_b();
+   │     ─
+   │     ╰─ needs b
+ 6 │ let b: I32 = a * 2;
+   │              ━━━━━
+   │              ╰─ needs a
+ 7 │
+ 8 │ export main() I32 { a + b; }
+--- exit 1
+
+=== utu check examples/error_demo/types/401_global_reads_itself.utu
+ ERROR  Global count is read while it is being set
+        global-cycle · examples/error_demo/types/401_global_reads_itself.utu:3:18
+
+ 1 │ // What: a computed global whose initializer reads the global itself
+ 2 │ // Expect: Global count is read while it is being set
+ 3 │ let count: I32 = count + 1;
+   │                  ━━━━━━━━━
+   │                  ╰─ reads count
+ 4 │
+ 5 │ export main() I32 { count; }
+--- exit 1
+
+=== utu check examples/error_demo/types/402_struct_init_of_enum.utu
+ ERROR  E is not a struct: it has no fields to set
+        not-struct · examples/error_demo/types/402_struct_init_of_enum.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let e = E { x: 1 };
+   │             ━
+   │             ╰─ no fields
+ 9 │     0;
 10 │ }
 --- exit 1
 
@@ -8829,19 +8911,6 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │              ╰─ here
  9 │     ps.len();
 10 │ }
---- exit 1
-
-=== utu check examples/error_demo/types/92_invalid_global_init_call.utu
- ERROR  Global limit needs a literal
-        invalid-global-initializer · examples/error_demo/types/92_invalid_global_init_call.utu:5:18
-
- 3 │ fn compute() I32 { 3 * 7; }
- 4 │
- 5 │ let limit: I32 = compute();
-   │                  ━━━━━━━━━
-   │                  ╰─ here
- 6 │
- 7 │ export main() I32 { limit; }
 --- exit 1
 
 === utu check examples/error_demo/types/93_match_type_enum.utu
