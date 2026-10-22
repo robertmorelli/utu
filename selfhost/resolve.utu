@@ -196,6 +196,10 @@ enum(U8) Diag:
     | StorageType
     | ReturnValueFromVoid
     | ComptimeTrap
+    | DslEmpty
+    | ComptimeCycle
+    | IrOutsideStd
+    | DslTooDeep
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -768,8 +772,37 @@ fn declare_program() void {
             };
         };
     };
+    // An imported file's own items, and what is generated for its mems, are
+    // in a scope of its own: its modules and functions see them, other
+    // files do not. Its bindings are kept, and made again where it is walked.
+    file_bind_first.clear();
+    file_bind_end.clear();
+    file_bind_word.clear();
+    file_bind_decl.clear();
     for (0 ..< file_root.len()) |file| {
-        if declares_items(file) and file_root[file] >= 0 {
+        let mark = scope_mark();
+        if file_role[file] == FileRole.Import.to_i32() and file_root[file] >= 0 {
+            let first = decl_kind.len();
+            for (0 ..< file_root.len()) |part| {
+                if (part == file or owner_of(part) == file) and file_root[part] >= 0 {
+                    let item = first_child(file_root[part]);
+                    while (item >= 0) {
+                        if imported_item(item) { declare_entry_item(item, first); };
+                        item = next_sibling(item);
+                    };
+                };
+            };
+        };
+        file_bind_first.push(file_bind_word.len());
+        for (mark ..< scope_mark()) |b| {
+            file_bind_word.push(bind_word[b]);
+            file_bind_decl.push(bind_decl[b]);
+        };
+        file_bind_end.push(file_bind_word.len());
+        scope_pop(mark);
+    };
+    for (0 ..< file_root.len()) |file| {
+        if declares_items(file) and owner_of(file) < 0 and file_root[file] >= 0 {
             let first_entry = decl_kind.len();
             let item = first_child(file_root[file]);
             while (item >= 0) {
@@ -779,6 +812,24 @@ fn declare_program() void {
             if file_role[file] == FileRole.Entry.to_i32() { check_entry_surface(file_root[file]); };
         };
     };
+}
+
+/// By file: its own scope's bindings (an imported file's), a run of
+/// `file_bind_word` and `file_bind_decl`.
+vec file_bind_first: I32;
+vec file_bind_end: I32;
+vec file_bind_word: I32;
+vec file_bind_decl: I32;
+
+/// Bind an imported file's own items again (see @declare_program).
+fn bind_file_scope(file: I32) void {
+    for (file_bind_first[file] ..< file_bind_end[file]) |b| { bind(file_bind_word[b], file_bind_decl[b]); };
+}
+
+/// An imported file's item that is its own (not an entry point or a test).
+fn imported_item(item: I32) Bool {
+    not (is_kind(item, Node.Export_main_decl) or is_kind(item, Node.Export_lib_decl) or is_kind(item, Node.Test_decl)
+        or is_kind(item, Node.Bench_decl));
 }
 
 /// A program has one `export lib` or one `export main`, not both.
@@ -938,6 +989,10 @@ fn walk_program(headers: Bool) void {
         for (0 ..< file_root.len()) |file| {
             if file_role[file] == role.to_i32() and file_root[file] >= 0 {
                 let entry = declares_items(file);
+                let imported = file_role[file] == FileRole.Import.to_i32();
+                let scope = if imported { file; } else { owner_of(file); };
+                let file_mark = scope_mark();
+                if scope >= 0 { bind_file_scope(scope); };
                 let item = first_child(file_root[file]);
                 while (item >= 0) {
                     if is_kind(item, Node.Module_decl) {
@@ -950,11 +1005,12 @@ fn walk_program(headers: Bool) void {
                             c = next_sibling(c);
                         };
                         scope_pop(mark);
-                    } else if entry or is_kind(item, Node.Using_decl) {
+                    } else if entry or is_kind(item, Node.Using_decl) or (imported and imported_item(item)) {
                         walk_item(item, Walk { module: -1, headers: headers });
                     };
                     item = next_sibling(item);
                 };
+                scope_pop(file_mark);
             };
         };
     };

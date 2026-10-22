@@ -298,7 +298,8 @@ fn finish_mems() void {
 /// The `@comptime` mems, in order.
 vec comptime_mem: I32;
 /// Their values, from the host: bytes in `comptime_bytes`, or -1 until given,
-/// or -2 when the evaluation trapped (its count then the reason's code).
+/// or -2 when the evaluation trapped (its count then the reason's code), or
+/// -3 when it waits on itself (its count then the mem it waits on).
 vec comptime_start: I32;
 vec comptime_count: I32;
 export mem comptime_bytes: U8;
@@ -348,9 +349,12 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
         };
     } else {
         let k = comptime_index(decl);
-        // A number, or @es: not what fills a mem.
-        if k < 0 { report2(Diag.MemInitializer, init, decl_name[decl], 1, -1); };
+        // A number, or @es: not what fills a mem (an empty body is reported already).
+        let dsl = if is_kind(init, Node.Dsl_expr) { word_of(first_child(init)); } else { -1; };
+        let empty = (dsl == known_word(Known.Comptime) or dsl == known_word(Known.Embed)) and dsl_text_start(init) == dsl_text_end(init);
+        if k < 0 and not empty { report2(Diag.MemInitializer, init, decl_name[decl], 1, -1); };
         if k >= 0 and comptime_start[k] == -2 { report2(Diag.ComptimeTrap, init, decl_name[decl], comptime_count[k], -1); };
+        if k >= 0 and comptime_start[k] == -3 { report2(Diag.ComptimeCycle, init, decl_name[decl], comptime_count[k], -1); };
         if k >= 0 and comptime_start[k] >= 0 {
             let value_size = if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
             count = comptime_count[k];
@@ -432,17 +436,20 @@ fn find_comptime_mems() void {
     embed_count.clear();
     embed_bytes.clear();
     for (0 ..< file_root.len()) |file| {
-        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
+        if is_own_file(file) and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
             while (item >= 0) {
                 if is_kind(item, Node.Mem_decl) {
                     let init = last_child(item);
-                    if is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Comptime) {
+                    let dsl = if is_kind(init, Node.Dsl_expr) { word_of(first_child(init)); } else { -1; };
+                    // An empty body is reported here, and fills nothing.
+                    let empty = dsl >= 0 and dsl_text_start(init) == dsl_text_end(init);
+                    if empty and (dsl == known_word(Known.Comptime) or dsl == known_word(Known.Embed)) { report(Diag.DslEmpty, init, dsl); }
+                    else if dsl == known_word(Known.Comptime) {
                         comptime_mem.push(node_decl[first_child(item)]);
                         comptime_start.push(-1);
                         comptime_count.push(0);
-                    };
-                    if is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Embed) {
+                    } else if dsl == known_word(Known.Embed) {
                         embed_mem.push(node_decl[first_child(item)]);
                         embed_start.push(-1);
                         embed_count.push(0);
@@ -472,6 +479,7 @@ fn mem_address(s: Storage, m: I32) void {
 /// `name[i]`.
 fn check_mem_index(node: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(node)];
+    note_mem_use(decl);
     if is_kind(node, Node.Slice_expr) {
         report(Diag.MemIndex, node, decl_name[decl]);
         return error_value();
@@ -495,6 +503,7 @@ fn check_mem_index(node: I32, cx: Cx) I32 {
 /// `name[i] = v`, `name[i] op= v`.
 fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(target)];
+    note_mem_use(decl);
     if mem_is_const(decl) {
         report(Diag.ConstMem, at, decl_name[decl]);
         return error_value();
@@ -541,6 +550,7 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
 /// `name.len()`, `name.push(v)`, … The mem is `decl`; the call's arguments
 /// are `args`.
 fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
+    note_mem_use(decl);
     let word = word_of(name);
     memory_of(decl);  // (any use of a mem makes its memory or array)
     let len_g = mem_len[decl];

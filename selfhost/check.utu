@@ -63,10 +63,14 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     let h = fi_hash(decl, inst) & mask;
     while (fi_table[h] >= 0) {
         let f = fi_table[h];
-        if fi_decl[f] == decl and fi_inst[f] == inst { return f; };
+        if fi_decl[f] == decl and fi_inst[f] == inst {
+            note_reach(f);
+            return f;
+        };
         h = (h + 1) & mask;
     };
     let id = fi_decl.len();
+    note_reach(id);
     fi_table[h] = id;
     fi_decl.push(decl);
     fi_inst.push(inst);
@@ -2063,6 +2067,9 @@ fn reset_check() void {
     fi_ir.clear();
     fi_table.clear();
     fi_queue.clear();
+    reach_from.clear();
+    reach_to.clear();
+    checking_fi[0] = -1;
     cur_locals.clear();
     decl_local.resize(decl_kind.len());
     decl_ty.resize(decl_kind.len());
@@ -2107,6 +2114,11 @@ fn compile(target: Target) I32 {
     intern_known();
     find_prelude_types();
     reset_check();
+    comptime_fuel[0] = -1;
+    if target == Target.Comptime {
+        comptime_fuel[0] = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()));
+        glob_field_name[comptime_fuel[0]] = name_add("__comptime_fuel");
+    };
     validate_program();
     count_memories();
     report_wat();
@@ -2172,6 +2184,7 @@ fn compile(target: Target) I32 {
             let entry = file_role[file] == FileRole.Entry.to_i32();
             while (item >= 0) {
                 if entry and (target == Target.Normal or not is_kind(item, Node.Export_lib_decl)) { check_item(item); };
+                if not entry and imported_item(item) { check_item(item); };
                 if is_kind(item, Node.Module_decl) {
                     let module = node_decl[name_node(first_child(item))];
                     if not is_generic(module) {
@@ -2188,9 +2201,11 @@ fn compile(target: Target) I32 {
     };
     let next = 0;
     while (next < fi_queue.len()) {
+        checking_fi[0] = fi_queue[next];
         check_function(fi_queue[next]);
         next += 1;
     };
+    checking_fi[0] = -1;
     if diag_kind.len() > 0 { return -1; };
     encode_module();
 }

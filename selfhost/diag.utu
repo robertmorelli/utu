@@ -161,6 +161,23 @@ fn comptime_site(i: I32) I32 {
     -1;
 }
 
+/// The `@comptime` expression a parse error is in, or -1: the generated
+/// text from its start to the next one's (its expression did not end).
+fn comptime_parse_site(i: I32) I32 {
+    if diag_kind[i] != Diag.ParseError.to_i32() or diag_a[i] < 0 { return -1; };
+    let b = tok_start[diag_a[i]];
+    let k = comptime_text_start.len() - 1;
+    while (k >= 0 and comptime_text_start[k] > b) { k -= 1; };
+    k;
+}
+
+/// Byte `b` of @comptime expression k's generated text, as the place in its
+/// mem's body (past its end: the body's end).
+fn comptime_byte(k: I32, b: I32) I32 {
+    let at = if b < comptime_text_end[k] { b; } else { comptime_text_end[k]; };
+    dsl_text_start(comptime_text_node[k]) + at - comptime_text_start[k];
+}
+
 /// The kind's name, as stage 0 spells it.
 fn diag_kind_name(i: I32) Str {
     if comptime_site(i) >= 0 { return "type-mismatch"; };
@@ -170,6 +187,7 @@ fn diag_kind_name(i: I32) Str {
 /// A diagnostic's message for the host: one in a `@comptime` expression
 /// says so, and on which line of it.
 fn diag_message(i: I32) Str {
+    if comptime_parse_site(i) >= 0 { return "@comptime takes one expression: " + diag_text(i); };
     let k = comptime_site(i);
     if k < 0 { return diag_text(i); };
     let line = 4;
@@ -218,7 +236,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     if k == Diag.StorageType { return "storage-type"; };
     if k == Diag.ReturnValueFromVoid { return "type-mismatch"; };
-    if k == Diag.ComptimeTrap { return "comptime-trap"; };
+    if k == Diag.ComptimeTrap or k == Diag.ComptimeCycle { return "comptime-trap"; };
+    if k == Diag.DslEmpty or k == Diag.IrOutsideStd or k == Diag.DslTooDeep { return "invalid-dsl-usage"; };
     "type-mismatch";
 }
 
@@ -264,6 +283,7 @@ fn comptime_trap_text(code: I32) Str {
         5 => "a null value",
         6 => "the stack overflowed",
         7 => "JavaScript threw",
+        8 => "it ran too long (a hundred million loop rounds)",
         ~> "a trap",
     };
 }
@@ -427,6 +447,13 @@ fn diag_text(i: I32) Str {
             w + " returns void";
         },
         Diag.ComptimeTrap => "@comptime " + w + " trapped: " + comptime_trap_text(a),
+        Diag.DslEmpty => "@" + w + pick(w == "embed", " needs a file path", " needs an expression"),
+        Diag.ComptimeCycle => {
+            if a < 0 or decl_name[a] == word { return "@comptime " + w + " reads itself"; };
+            "@comptime " + w + " reads " + word_text(decl_name[a]) + ", which waits on it";
+        },
+        Diag.IrOutsideStd => "@ir is for the standard library: use @wat",
+        Diag.DslTooDeep => "DSLs nested too deeply (max " + int_text(a) + ")",
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -571,13 +598,16 @@ fn diag_default_label(i: I32) Str {
         Diag.IntegerOutOfRange => if a >= 0 { type_text(a); } else { "out of range"; },
         Diag.BareNull => "no type",
         Diag.NotCallable => "not a function",
-        Diag.ParseError => if b >= 0 { word_text(b) + "?"; } else { "unexpected"; },
+        Diag.ParseError => if b >= 0 and comptime_parse_site(i) < 0 { word_text(b) + "?"; } else { "unexpected"; },
+        Diag.DslEmpty => "empty",
+        Diag.ComptimeCycle => "waits on itself",
         ~> "here",
     };
 }
 
 /// The span a diagnostic points at: its node's, as byte offsets.
 fn diag_start(i: I32) I32 {
+    if comptime_parse_site(i) >= 0 { return comptime_byte(comptime_parse_site(i), tok_start[diag_a[i]]); };
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_a[i]; };
     let f = located_file(i);
@@ -589,6 +619,7 @@ fn diag_start(i: I32) I32 {
 
 /// Where a diagnostic's span ends (see @diag_start).
 fn diag_end(i: I32) I32 {
+    if comptime_parse_site(i) >= 0 { return comptime_byte(comptime_parse_site(i), tok_end[diag_a[i]]); };
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_b[i]; };
     let f = located_file(i);
@@ -624,6 +655,8 @@ fn diag_at(i: I32) I32 {
 fn diag_file(i: I32) I32 {
     let node = diag_at(i);
     if node < 0 {
+        let k = comptime_parse_site(i);
+        if k >= 0 { return file_of_token(node_first[comptime_text_node[k]]); };
         if diag_kind[i] == Diag.ParseError.to_i32() { return diag_word[i]; };
         return -1;
     };

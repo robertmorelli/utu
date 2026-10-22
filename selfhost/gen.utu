@@ -56,30 +56,45 @@ fn generated_file(start: I32) I32 {
     file;
 }
 
-/// Writes the generated sources for the entry file's mems, and parses them as
-/// one more file. Called before names are resolved.
+/// By file: the imported file a generated file's declarations belong to
+/// (they are in its scope, not the program's), or -1.
+vec gen_owner: I32;
+
+/// The imported file whose scope a file's declarations are in, or -1.
+fn owner_of(file: I32) I32 { if file < gen_owner.len() { gen_owner[file]; } else { -1; }; }
+
+/// Writes the generated sources for each own file's mems, and parses them
+/// as one more file per file. Called before names are resolved.
 fn generate_sources() void {
     comptime_text_start.clear();
     comptime_text_end.clear();
     comptime_text_node.clear();
-    let start = src.len();
-    for (0 ..< file_root.len()) |file| {
-        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
-            let item = first_child(file_root[file]);
+    gen_owner.clear();
+    let files = file_root.len();
+    for (0 ..< files) |owner| {
+        if is_own_file(owner) and file_root[owner] >= 0 {
+            let start = src.len();
+            let first = comptime_text_start.len();
+            let item = first_child(file_root[owner]);
             while (item >= 0) {
                 if is_kind(item, Node.Mem_decl) { generate_for_mem(item); };
                 item = next_sibling(item);
             };
+            if src.len() > start {
+                let file = generated_file(start);
+                let at = file_start[file];
+                for (first ..< comptime_text_start.len()) |k| {
+                    comptime_text_start[k] += at - start;
+                    comptime_text_end[k] += at - start;
+                };
+                let n = gen_owner.len();
+                gen_owner.resize(file + 1);
+                for (n ..< file + 1) |f| { gen_owner[f] = -1; };
+                if file_role[owner] == FileRole.Import.to_i32() { gen_owner[file] = owner; };
+                parse_file(file);
+            };
         };
     };
-    if src.len() == start { return; };
-    let file = generated_file(start);
-    let at = file_start[file];
-    for (0 ..< comptime_text_start.len()) |k| {
-        comptime_text_start[k] += at - start;
-        comptime_text_end[k] += at - start;
-    };
-    parse_file(file);
 }
 
 /// A mem declaration's generated source: its interner when it holds bytes,
@@ -91,20 +106,23 @@ fn generate_for_mem(item: I32) void {
     let byte_mem = w == Kw.count() or w == Kw.count() + 1;
     if byte_mem { gen_template(interner_template(), name); };
     let init = last_child(item);
-    if init != elem and is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Comptime) {
+    // (An empty body is reported, and generates nothing.)
+    if init != elem and is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Comptime)
+        and dsl_text_start(init) < dsl_text_end(init) {
         // export mem __comptime_NAME: V;
-        // fn __comptime_run_NAME() I32 { let values: Array[V] = EXPR; … }
+        // fn __comptime_run_NAME() I32 { let values: Array[V] = (EXPR); … }
+        // The parentheses keep EXPR one expression.
         let value = comptime_value_name(elem);
         gen_template("\nexport mem __comptime_$: ", name);
         gen_text(value);
         gen_template(";\nfn __comptime_run_$() I32 {\n    let values: Array[", name);
         gen_text(value);
-        gen_text("] = ");
+        gen_text("] = (");
         comptime_text_start.push(src.len());
         comptime_text_node.push(init);
         gen_span(dsl_text_start(init), dsl_text_end(init));
         comptime_text_end.push(src.len());
-        gen_template(";\n    __comptime_$.clear();\n    for (values) |v| { __comptime_$.push(v); };\n    values.len();\n}\n", name);
+        gen_template(");\n    __comptime_$.clear();\n    for (values) |v| { __comptime_$.push(v); };\n    values.len();\n}\n", name);
     };
 }
 
@@ -182,5 +200,94 @@ fn generated_mem_fn(mem_decl: I32, method: I32) I32 {
     if word >= before { return -1; };
     src.resize(start);
     let decl = lookup(word);
-    if decl_is(decl, Decl.Fn) { decl; } else { -1; };
+    if decl_is(decl, Decl.Fn) { return decl; };
+    // An imported file's mem: its functions are in that file's scope.
+    for (0 ..< decl_kind.len()) |d| { if decl_name[d] == word and decl_is(d, Decl.Fn) { return d; }; };
+    -1;
+}
+
+//! = Evaluating `@comptime` in order
+//!
+//! A `@comptime` expression may read another `@comptime` mem, which must be
+//! evaluated first. A @comptime build notes what each function it checks
+//! reaches (the functions it names, the mems it uses); the host runs only
+//! the expressions whose reach holds no mem still waiting, gives their
+//! values, and builds again for the rest. One that waits on itself, or on
+//! a mem that waits on it, is reported.
+
+/// What checked functions reach: from a function instance, to one (`to`
+/// >= 0) or to mem `-2 - to`.
+vec reach_from: I32;
+vec reach_to: I32;
+/// The function instance being checked, or -1.
+vec checking_fi: I32 = [-1];
+/// The mem a waiting expression reaches, found by @comptime_ready.
+vec comptime_blocker: I32 = [-1];
+
+/// Function instance `fi` names `to` (or uses mem `-2 - to`), while checked.
+fn note_reach(to: I32) void {
+    if checking_fi[0] < 0 { return; };
+    reach_from.push(checking_fi[0]);
+    reach_to.push(to);
+}
+
+fn note_mem_use(decl: I32) void { note_reach(-2 - decl); }
+
+/// Whether mem k's expression waits, and the build just made can evaluate
+/// it: nothing it reaches is a `@comptime` mem still waiting (that one is
+/// left in @comptime_blocker).
+fn comptime_ready(k: I32) Bool {
+    comptime_blocker[0] = -1;
+    if comptime_start[k] != -1 { return false; };
+    let word = intern_text("__comptime_run_" + word_text(decl_name[comptime_mem[k]]));
+    let reached = Array[Bool].new(fi_decl.len(), false);
+    for (0 ..< fi_decl.len()) |f| { if decl_name[fi_decl[f]] == word { reached[f] = true; }; };
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (0 ..< reach_from.len()) |e| {
+            let to = reach_to[e];
+            if reached[reach_from[e]] and to >= 0 and not reached[to] {
+                reached[to] = true;
+                changed = true;
+            };
+        };
+    };
+    for (0 ..< reach_from.len()) |e| {
+        if reached[reach_from[e]] and reach_to[e] <= -2 {
+            let other = comptime_index(-2 - reach_to[e]);
+            if other >= 0 and (comptime_start[other] == -1 or comptime_start[other] == -3) {
+                comptime_blocker[0] = comptime_mem[other];
+                return false;
+            };
+        };
+    };
+    true;
+}
+
+/// A @comptime build's fuel: a global each loop round takes one from, and
+/// traps at zero (the host reads it, exported, to say why).
+vec comptime_fuel: I32 = [-1];
+
+/// How many loop rounds a @comptime build may make.
+fn comptime_fuel_limit() I32 { 100000000; }
+
+/// `fuel -= 1; if fuel == 0 { unreachable }`, a node.
+fn fuel_check() I32 {
+    let g = comptime_fuel[0];
+    let m = w_mark();
+    let ms = w_mark();
+    w_leaf(Op.GlobalGet, vt_i32, g, 0);
+    w_i32(1);
+    w_i32_op(i32_sub, ms);
+    w_node(Op.GlobalSet, vt_none, g, 0, ms);
+    let mi = w_mark();
+    w_leaf(Op.GlobalGet, vt_i32, g, 0);
+    w_i32_op(i32_eqz, mi);
+    let mt = w_mark();
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, -1, 0, mi);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    w_pop();
 }

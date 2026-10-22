@@ -222,7 +222,7 @@ fn dsl_text_start(dsl: I32) I32 {
 fn dsl_text_end(dsl: I32) I32 {
     let t = node_first[last_child(dsl)];
     let i = tok_end[t] - 2;
-    let start = tok_start[t] + 2;
+    let start = dsl_text_start(dsl);
     while (i > start and is_space(src[i - 1])) { i -= 1; };
     i;
 }

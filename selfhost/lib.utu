@@ -175,6 +175,9 @@ export lib {
 
     fn embed_path_end(k: I32) I32 { dsl_text_end(last_child(decl_node[embed_mem[k]])); }
 
+    /// The file that declares embed k's mem, which its path is relative to.
+    fn embed_file(k: I32) I32 { file_of_token(node_first[decl_node[embed_mem[k]]]); }
+
     /// Room for a file's `n` bytes, written by the host at the offset returned in `embed_bytes`.
     fn embed_set(k: I32, n: I32) I32 {
         let at = embed_bytes.len();
@@ -191,6 +194,20 @@ export lib {
     fn comptime_value_size(k: I32) I32 {
         let s = mem_storage(comptime_mem[k]);
         if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
+    }
+
+    /// Whether mem k's expression is still to be evaluated (1) or not (0).
+    fn comptime_waiting(k: I32) I32 { if comptime_start[k] == -1 { 1; } else { 0; }; }
+
+    /// Whether the @comptime build just made can evaluate mem k (1): it
+    /// waits, and reaches no mem that waits (see `comptime_ready`).
+    fn comptime_can_run(k: I32) I32 { if comptime_ready(k) { 1; } else { 0; }; }
+
+    /// Mem k waits on itself, or on a mem that waits on it: reported.
+    fn comptime_cycle(k: I32) void {
+        comptime_ready(k);
+        comptime_start[k] = -3;
+        comptime_count[k] = comptime_blocker[0];
     }
 
     /// Mem k's evaluation trapped, for the reason `code` names (see ComptimeTrap's message).
