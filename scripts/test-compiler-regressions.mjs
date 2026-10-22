@@ -551,7 +551,7 @@ export lib {
     ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn gen() yield I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; Result[I32, Str].ok(s); }\nexport main() I32 { f().value(); }\n',
       'try in a generator'],
     ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; g(); }\nexport main() I32 { f().value(); }\n', 'try in defer'],
-    ['export main() I32 { let r = Result[I32, Str].ok(1); r._value; }\n', 'No field _value'],
+    ['export main() I32 { let r = Result[I32, Str].ok(1); r._value; }\n', 'Result has no field _value'],
     ['export main() I32 { let r: Result[I32, Str] = &{ _ok: true, _value: 1 }; 0; }\n', 'Result[I32, Str] is made by its own functions'],
   ];
   for (const [source, message] of mistakes) {

@@ -1,5 +1,5 @@
 // What: reads a Result's field directly instead of value() or value_or().
-// Expect: No field _value (Result's fields are std's own)
+// Expect: Result has no field _value (Result's fields are std's own)
 fn half(n: I32) Result[I32, Str] {
     if n % 2 != 0 { return Result[I32, Str].err("odd"); };
     Result[I32, Str].ok(n / 2);

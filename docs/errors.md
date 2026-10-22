@@ -92,7 +92,7 @@ or `continue`, a return of a value) drops the block's `errdefer`s unrun.
 | `try` or `errdefer` in a function returning `I32` | `try in a function returning I32, not a Result` |
 | `try` or `errdefer` in a generator | `try in a generator` |
 | `try` inside a `defer` | `try in defer` |
-| `r._value` | `No field _value` |
+| `r._value` | `Result has no field _value` |
 
 See [examples/results.utu](../examples/results.utu) for a program that uses
 all three.
