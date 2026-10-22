@@ -1596,6 +1596,7 @@ fn encode_names() void {
 fn encode_module() I32 {
     // Nodes made from here (inlining, cleaning up) have no syntax of their own.
     cur_src[0] = -1;
+    lean_closures();
     sweep();
     // -O3 inlines (inline.utu); what is no longer called is then swept out,
     // before the mems' late functions are made (and marked live).

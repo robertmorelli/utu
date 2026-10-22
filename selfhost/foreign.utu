@@ -1156,6 +1156,7 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
 
 /// Checks `arg` as the type it takes in `slot` (see @accept): that type.
 fn check_argument(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
+    host_callback(arg);
     let t = accept(slot, arg, view, cx);
     coerce(check_expr(arg, t, cx), t, arg);
     t;

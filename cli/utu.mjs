@@ -150,10 +150,11 @@ async function check(file, { utu }) {
 async function run(file, { utu, optimize, safe }) {
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe });
-  const { exports } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
+  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   // A main with parameters is for a host that passes them; run passes none.
-  if (exports.main.length > 0) {
+  // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
+  if (instance.exports.main.length > 0) {
     const params = /export\s+main\s*\(([^)]*)\)/.exec(await fs.readFile(file, 'utf8'))?.[1].trim();
     fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu run calls it with none`, 'main-arguments',
       ['Give main no parameters to run it, or call it from JavaScript (utu build).']);

@@ -1707,6 +1707,67 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/340_await_closure_to_es.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/340_await_closure_to_es.utu:7:31
+
+ 5 │
+ 6 │ export main() void {
+ 7 │     each(cl(v) { let w: I32 = await later(v); });
+   │          ──                   ━━━━━━━━━━━━━━
+   │          │                    ╰─ suspends
+   │          ╰─ the host calls it
+ 8 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
+=== utu check examples/error_demo/iterators/341_await_through_fn_in_then.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/341_await_through_fn_in_then.utu:8:35
+
+ 6 │
+ 7 │ export main() void {
+ 8 │     later(1).then(cl(v) { let w = slow(v); });
+   │                   ──              ━━━━━━━
+   │                   │               ╰─ may suspend
+   │                   ╰─ the host calls it
+ 9 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
+=== utu check examples/error_demo/iterators/342_await_let_closure_to_es.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/342_await_let_closure_to_es.utu:7:36
+
+ 5 │
+ 6 │ export main() void {
+ 7 │     let tick = cl() { let v: I32 = await later(1); };
+   │                ──                  ━━━━━━━━━━━━━━
+   │                │                   ╰─ suspends
+   │                ╰─ the host calls it
+ 8 │     on_tick(tick);
+ 9 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
+=== utu check examples/error_demo/iterators/343_await_closure_to_declared_host.utu
+ ERROR  A closure the host calls cannot await
+        await-in-closure · examples/error_demo/iterators/343_await_closure_to_declared_host.utu:8:49
+
+ 6 │
+ 7 │ export main() void {
+ 8 │     Browser.setTimeout(cl() void { let v: I32 = await later(1); }, 0.0);
+   │                        ──                       ━━━━━━━━━━━━━━
+   │                        │                        ╰─ suspends
+   │                        ╰─ the host calls it
+ 9 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
+--- exit 1
+
 === utu check examples/error_demo/iterators/34_for_float_range.utu
  ERROR  for needs an array or range, not F64
         invalid-for-source · examples/error_demo/iterators/34_for_float_range.utu:5:10
@@ -2133,42 +2194,36 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/66_await_in_closure.utu
- ERROR  A closure cannot await
+ ERROR  A closure the host calls cannot await
         await-in-closure · examples/error_demo/iterators/66_await_in_closure.utu:8:22
 
  6 │ export main() I32 {
  7 │     later(1).then(cl(v) {
+   │                   ──
+   │                   ╰─ the host calls it
  8 │         let w: I32 = await later(v + 1);
    │                      ━━━━━━━━━━━━━━━━━━
-   │                      ╰─ here
+   │                      ╰─ suspends
  9 │         record(w);
 10 │     });
---- exit 1
 
-=== utu check examples/error_demo/iterators/67_await_for_in_closure.utu
- ERROR  A closure cannot await
-        await-in-closure · examples/error_demo/iterators/67_await_for_in_closure.utu:7:9
-
- 5 │ export main() I32 {
- 6 │     let run = cl() {
- 7 │         await for (Stream[I32].of([1, 2])) |v| { record(v); };
-   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │         ╰─ here
- 8 │     };
- 9 │     run();
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
 --- exit 1
 
 === utu check examples/error_demo/iterators/68_await_in_stream_map.utu
- ERROR  A closure cannot await
+ ERROR  A closure the host calls cannot await
         await-in-closure · examples/error_demo/iterators/68_await_in_stream_map.utu:6:61
 
  4 │
  5 │ export main() I32 {
  6 │     let s = Stream[I32].of([1, 2]).map(cl(v) { let w: I32 = await later(v); w; });
-   │                                                             ━━━━━━━━━━━━━━
-   │                                                             ╰─ here
+   │                                        ──                   ━━━━━━━━━━━━━━
+   │                                        │                    ╰─ suspends
+   │                                        ╰─ the host calls it
  7 │     let total = 0;
  8 │     await for (s) |v| { total += v; };
+
+  note  A stack suspends only through utu's calls, not the host's; await outside the closure
 --- exit 1
 
 === utu check examples/error_demo/iterators/69_await_promise_wrong_type.utu
@@ -5605,11 +5660,11 @@ ok
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
-wasm://wasm/fe8e83be:1
+wasm://wasm/0b64b376:1
 
 
 RuntimeError: divide by zero
-    at closure (wasm://wasm/fe8e83be:wasm-function[7]:0xbe)
+    at closure (wasm://wasm/0b64b376:wasm-function[7]:0xc4)
     at invoke
 
 Node.js v25.8.1

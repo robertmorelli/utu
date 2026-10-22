@@ -985,8 +985,11 @@ mod tour {
         \\    first + second;
         \\}
         \\
+        \\fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+        \\
         \\export main() I32 {
-        \\    total(20, 22);                     // 42
+        \\    let later = cl(n: I32) I32 { await delay(n, 5); };   // a closure may await
+        \\    total(20, 22) + apply(later, 8);   // 50
         \\}
         ;
     }
@@ -1587,7 +1590,11 @@ mod tour {
                 code {
                     ".then";
                 }
-                " runs anywhere. ";
+                " runs anywhere. A closure utu calls may await too; one the host calls (a ";
+                code {
+                    ".then";
+                }
+                " callback, an event handler) may not: JSPI cannot suspend through the host's frame. ";
                 code {
                     "await for";
                 }

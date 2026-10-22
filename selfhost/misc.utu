@@ -75,7 +75,7 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
             check_expr(first, t, cx);
             w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m);
         } else {
-            w_node(Op.Call, repr(ty_b[t]), closure_call(t), 0, m);
+            w_node(Op.Call, repr(ty_b[t]), closure_invoker(t), 0, m);
         };
         return ty_b[t];
     };
@@ -334,13 +334,10 @@ fn is_promise_type(t: I32) Bool {
 }
 
 /// `await p`: the host's `utu.await_N` for the promise's value type, which
-/// suspends. `await for` reads a generator or a stream. Reported in a
-/// closure, which the host calls where the stack cannot suspend.
+/// suspends. `await for` reads a generator or a stream. In a closure too:
+/// utu calls a closure's body by `call_ref` (see @closure_invoker); one the
+/// host calls is reported where it is given to the host (@host_callbacks).
 fn check_await(node: I32, cx: Cx) I32 {
-    if in_closure(node) {
-        report(Diag.AwaitInClosure, node, -1);
-        return error_value();
-    };
     let e = first_child(node);
     if is_kind(e, Node.For_expr) {
         // `await for (gen()) |x| { … }`: the generator's body may await.
@@ -566,8 +563,8 @@ fn write_promise_json() void {
 
 /// Exports that reach an await, through calls: they must be entered through
 /// WebAssembly.promising for the stack to suspend. A call through a
-/// reference (a closure, a `fun`) may reach any function taken as a value:
-/// it awaits when one of those does.
+/// reference (a closure's body, a `fun`) may reach any function taken as a
+/// value: it awaits when one of those does.
 vec awaiting: U8;
 /// By function: named by ref.func.
 vec taken: U8;

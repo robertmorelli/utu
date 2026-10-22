@@ -452,7 +452,7 @@ fn diag_text(i: I32) Str {
         Diag.ForeignRecordMissing => "Missing property " + w,
         Diag.DslError => w,
         Diag.WatPlace => "@wat must be a function's whole body",
-        Diag.AwaitInClosure => "A closure cannot await",
+        Diag.AwaitInClosure => "A closure the host calls cannot await",
         Diag.InvalidEscape => {
             if a == 1 { return "Lone surrogate"; };
             if a == 2 { return "Unknown escape " + w; };
