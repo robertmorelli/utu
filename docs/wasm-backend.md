@@ -89,6 +89,36 @@ the first two sound. With it, a consumed generator compiles to what the
 equivalent hand-written loop compiles to. There is no inliner and no loop
 restructuring, so `-Oz` binaries are 10-25% larger than Binaryen's were.
 
+## Structs returned as their fields
+
+At `-O small` and `-O fast` (and their unsafe forms), a function that
+returns a struct it makes returns the struct's fields instead, as Wasm
+multi-value results (`selfhost/inline.utu`). Every return must be a
+`struct.new` of the result type, a call to another such function, or a local
+that holds one and is read only for its fields; generic instances
+(`Pair[I32]`, a `Result[T, E]`) count like any struct. The function gets a
+twin returning the fields, and becomes a wrapper making the struct from
+them, kept only for `fun` values, exports, and tail calls. Direct calls call
+the twin:
+
+- a result held in a local read only for its fields is those fields, in
+  locals: nothing is allocated;
+- a dropped result is the fields, dropped;
+- elsewhere (stored, passed on, captured, compared by reference, returned
+  from a function that does not return fields) the call makes the struct
+  from the fields.
+
+Structs are references, but nothing outside the function ever held this
+one, so making it at the call cannot be seen: an alias made after the call
+aliases the struct made there. A function that keeps the struct (stores it,
+passes it on) before returning it is left as it is. A function returns
+fields only where some direct call gains by it; at `-O small`, only where
+calls that allocate nothing outnumber calls that make the struct and no
+wrapper is kept, so the module does not grow. A point stepped and a
+`divmod` pair returned in a hot loop (both recursive, so never inlined) run
+about 15% faster and the module is 14% smaller; the programs in
+benchmarks/ have no such calls and build as before.
+
 ## Checks
 
 - `scripts/run-differential.mjs`: every program's behavior when run (each

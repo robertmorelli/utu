@@ -512,6 +512,36 @@ mod stdlib {
         "m.len()  m.keys() Array[Str]::size; keys in no particular order"
         ];
     }
+    fn ord_sample() Str {
+        \\using Ord from std:Ord;
+        \\using Order from std:Ord;
+        \\
+        \\struct Version[Ord]:
+        \\    | major: I32
+        \\    | minor: I32
+        \\
+        \\fn Ord[Version].cmp |a| (b: Version) I32 {
+        \\    if a.major != b.major { a.major - b.major; } else { a.minor - b.minor; };
+        \\}
+        \\
+        \\export main() Str {
+        \\    let words = ["pear", "fig", "apple"];
+        \\    Order[Str].sort(words);
+        \\    let v = Order[Version].max(Version { major: 1, minor: 4 }, Version { major: 1, minor: 9 });
+        \\    `${", ".join(words)} ${v.major}.${v.minor} ${Order[I32].clamp(12, 0, 10)}`;   // apple, fig, pear 1.9 10
+        \\}
+        ;
+    }
+    fn ord_rows() Array[Str] {
+        [
+        "a.cmp(b) I32::negative, zero, or positive: I32 U32 I64 U64 F32 F64 Str, and what implements Ord",
+        "Order[T].max(a, b)  Order[T].min(a, b)::the greater, the lesser (a, when they tie)",
+        "Order[T].clamp(x, low, high)::x, or the nearer end",
+        "Order[T].sort(xs)  Order[T].is_sorted(xs)::in place, stable, O(n log n)",
+        "Order[T].search(xs, x) I32::where x is in sorted xs, or -1",
+        "Order[T].max_of(xs)  Order[T].min_of(xs)::the greatest, the least"
+        ];
+    }
     fn intmap_rows() Array[Str] {
         [
         "IntMap.new()::an empty map from I32 to I32",
@@ -603,6 +633,7 @@ mod stdlib {
         "Str::host strings and text methods (prelude)",
         "Array[T] Found[T] Group[K, T]::arrays and iterator results (prelude)",
         "Buffer List StrMap IntMap Interner::growing arrays, persistent edits, hash maps, interning (using)",
+        "Ord Order[T[Ord]]::an order, and max, sort, search for any type with one (using)",
         "SegmentTree PersistentSegmentTree Spatial::range and 2D indexes (using)",
         "Promise[T] Stream[T]::JavaScript promises and async iterables (prelude)",
         "Random Console Time NumberField::host services (using)",
@@ -753,6 +784,10 @@ mod stdlib {
             = module("Interner", "Byte strings to dense ids. Keys arrive a byte at a time, from a string, an array, or a mem.", "using Interner from std:Interner;");
             = code.block(interner_sample());
             = api(interner_rows());
+            = module("Ord  Order[T[Ord]]", "An order: a.cmp(b) for the numbers and Str, and a bounded module of what to do with one. Implement it for your own type with fn Ord[T].cmp.", "using Order from std:Ord;");
+            = code.block(ord_sample());
+            = api(ord_rows());
+            = ui.further("docs/generics.md", "Generics and bounds");
             = module("Found[T] Group[K, T]", "What iterator terminals return: first_where gives ?Found[T], group_by gives Array[Group[K, T]].", "prelude");
             = code.block(found_sample());
             = group("std-indexes", "Indexes");

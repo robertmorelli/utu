@@ -26,7 +26,8 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     if not decl_is(decl, Decl.Struct) and not decl_is(decl, Decl.Variant) {
         // An unknown name was already reported; otherwise it names something that is not a struct.
         if ty_is(t, Ty.Error) { return error_value(); };
-        return unsupported(node);
+        report2(Diag.NotStruct, first_child(node), -1, t, -1);
+        return error_value();
     };
     let inits = next_sibling(first_child(node));
     return build_struct(t, decl, inits, node, cx);
@@ -198,7 +199,7 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_base(target, cx);
     if is_foreign(t) {
-        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        if op != Tok.Eq.to_i32() { return check_foreign_update(target, t, word_of(name), value, compound_word(op, node_last[target]), m, cx); };
         return check_foreign_set(target, t, word_of(name), value, m, cx);
     };
     let field = field_of(t, name);
@@ -434,7 +435,7 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let t = check_expr(base, -1, cx);
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
     if is_foreign(t) {
-        if op != Tok.Eq.to_i32() { return unsupported(at); };
+        if op != Tok.Eq.to_i32() { return check_foreign_index_update(target, t, last_child(target), value, compound_word(op, node_last[target]), m, cx); };
         return check_foreign_index_set(t, last_child(target), value, m, cx);
     };
     let set = member(ty_decl(t), known_word(Known.SetIndex), Space.Method);

@@ -220,6 +220,20 @@ enum(U8) Diag:
     | MainParams
     | TestName
     | TooManyParams
+    | BoundMissing     // `Sorted[Point]` when Point does not implement Sorted's T's bound
+    | UnboundedCall    // `a.cmp(b)` on a T no protocol bounds
+    | BoundNotProto    // `mod M[T[Point]]`: a bound must be a protocol
+    | ProtoSelfDynamic // a protocol member that takes `&`, used through a protocol value
+    | UnknownLabel
+    | GlobalCycle
+    | NotValue
+    | NotAssignable
+    | IrUnknown
+    | YieldPlace
+    | NotStruct
+    | NewNotHost
+    | GeneratorExport
+    | HostMissing
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -711,7 +725,7 @@ fn declare_module(item: I32) I32 {
         let index = 0;
         let param = first_child(c);
         while (param >= 0) {
-            let p = declare_named(Decl.ModuleParam, last_child(param), param, decl);
+            let p = declare_named(Decl.ModuleParam, first_child(param), param, decl);
             decl_a[p] = index;
             index += 1;
             param = next_sibling(param);
@@ -746,7 +760,7 @@ fn bind_module(module: I32) void {
     if is_kind(c, Node.Module_type_param_list) {
         let param = first_child(c);
         while (param >= 0) {
-            let n = name_node(last_child(param));
+            let n = name_node(first_child(param));
             bind(word_of(n), node_decl[n]);
             param = next_sibling(param);
         };
@@ -945,6 +959,11 @@ fn declare_program() void {
             // Files that import one module share its view, bound to one of them.
             for (0 ..< import_file.len()) |j| {
                 if decl_a[m] < 0 and import_target[j] == -2 and same_path(i, j) { decl_a[m] = view_of_import(j); };
+            };
+            // The host found none (an npm package not installed).
+            if decl_a[m] < 0 {
+                let path = import_path[i];
+                report(Diag.HostMissing, path, intern_text(bytes_text(tok_start[node_first[path]] + 1, tok_end[node_last[path] - 1] - 1)));
             };
         };
     };
@@ -1273,6 +1292,8 @@ fn walk_item(item: I32, w: Walk) void {
     if w.headers { return; };
     if kind == Node.Struct_decl.to_i32() or kind == Node.Proto_decl.to_i32() or kind == Node.Enum_decl.to_i32() {
         walk_type_item(item, w);
+    } else if kind == Node.Module_type_param_list.to_i32() {
+        walk_bounds(item, w);
     } else if kind == Node.Global_decl.to_i32() {
         let t = next_sibling(first_child(item));
         walk_type(t, w);
@@ -1347,8 +1368,7 @@ fn register_method(item: I32, w: Walk) void {
         walk_types(args, w);
         // `fn P[T].m`: also a method of T, so calls on a T find it.
         if decl_is(owner, Decl.Proto) {
-            let t = first_child(args);
-            let n = if is_kind(t, Node.Ref_type) { name_node(first_child(t)); } else { name_node(t); };
+            let n = impl_target(args);
             if n >= 0 and node_decl[n] >= 0 { add_member(node_decl[n], word_of(method), Space.Method, decl); };
         };
     };
@@ -1369,6 +1389,14 @@ fn register_method(item: I32, w: Walk) void {
             report2(Diag.MemberClash, method, word_of(method), owner, 1);
         };
     };
+}
+
+/// The node naming T in `fn P[T].m`'s `[T]` (`args`): a name, or `&` (in
+/// a module, every instance of its type), or -1.
+fn impl_target(args: I32) I32 {
+    let t = first_child(args);
+    if is_kind(t, Node.Promoted_type) { return t; };
+    if is_kind(t, Node.Ref_type) { name_node(first_child(t)); } else { name_node(t); };
 }
 
 /// `fn T:add |a, b|`: an operator of T.
@@ -1521,12 +1549,45 @@ fn walk_type_item(item: I32, w: Walk) void {
             let t = next_sibling(first_child(m));
             while (t >= 0) {
                 walk_type(t, w);
+                self_types(t, node_decl[first_child(item)]);
                 t = next_sibling(t);
             };
         } else if kind == Node.Type_ident.to_i32() and c != enum_name(item) and is_kind(item, Node.Enum_decl) {
             walk_elem_type(c, w);
         };
         c = next_sibling(c);
+    };
+}
+
+/// `&` in a protocol's member (`cmp(&) I32`) is the type implementing it:
+/// recorded as the protocol, and read as the implementer by a bounded
+/// module's calls and by conformance.
+fn self_types(node: I32, proto: I32) void {
+    if is_kind(node, Node.Promoted_type) { node_decl[node] = proto; };
+    let c = first_child(node);
+    while (c >= 0) {
+        self_types(c, proto);
+        c = next_sibling(c);
+    };
+}
+
+/// `mod M[T[P, Q]]`: each bound names a protocol.
+fn walk_bounds(list: I32, w: Walk) void {
+    let param = first_child(list);
+    while (param >= 0) {
+        let bounds = next_sibling(first_child(param));
+        if is_kind(bounds, Node.Impl_list) {
+            let b = first_child(bounds);
+            while (b >= 0) {
+                let d = walk_type_name(b, w);
+                if d >= 0 and not decl_is(d, Decl.Proto) {
+                    report2(Diag.BoundNotProto, b, -1, d, -1);
+                    diag_label("not a protocol");
+                };
+                b = next_sibling(b);
+            };
+        };
+        param = next_sibling(param);
     };
 }
 
@@ -1704,6 +1765,11 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
         Node.Block_expr => {
             // A label is not a variable.
             walk_expr(last_child(node), w);
+        },
+        Node.Break_expr => {
+            // `break label value`: the label is not a variable.
+            let label = first_child(node);
+            if label >= 0 { walk_expr(next_sibling(label), w); };
         },
         Node.Pipe_expr => {
             walk_expr(first_child(node), w);
