@@ -1,0 +1,10 @@
+// What: writes errdefer in a function that cannot return an error.
+// Expect: errdefer in a function returning I32, not a Result
+using console from std:Console;
+
+fn work(n: I32) I32 {
+    errdefer console.log("failed");
+    n * 2;
+}
+
+export main() I32 { work(4); }

@@ -1,0 +1,18 @@
+// What: uses try inside a generator, which has no Result to return.
+// Expect: try in a generator
+fn digit(c: I32) Result[I32, Str] {
+    if c < 48 or c > 57 { return Result[I32, Str].err("not a digit"); };
+    Result[I32, Str].ok(c - 48);
+}
+
+fn digits(codes: Array[I32]) yield I32 {
+    for (codes) |c| { yield try digit(c); };
+}
+
+fn total(codes: Array[I32]) Result[I32, Str] {
+    let t = 0;
+    for (digits(codes)) |d| { t += d; };
+    Result[I32, Str].ok(t);
+}
+
+export main() I32 { total([49, 50]).value(); }

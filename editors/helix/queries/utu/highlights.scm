@@ -60,7 +60,7 @@
 
 [
   "if" "else" "for" "while" "loop" "match" "alt" "promote" "orelse"
-  "return" "continue" "defer" "yield" "try" "catch" "await" "assert" "in" "out"
+  "return" "continue" "defer" "errdefer" "yield" "try" "catch" "await" "assert" "in" "out"
 ] @keyword.control
 
 [ "and" "or" "not" "xor" ] @keyword.operator

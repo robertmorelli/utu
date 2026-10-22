@@ -1,0 +1,54 @@
+//! `Result[T, E]`: a value of type T, or the error E that kept it from being
+//! made. It is for failures a caller should expect (input that does not
+//! parse, a key that is missing); a bug stays `fatal` or `assert`.
+//!
+//! ```
+//! fn half(n: I32) Result[I32, Str] {
+//!     if n % 2 != 0 { return Result[I32, Str].err("odd"); };
+//!     Result[I32, Str].ok(n / 2);
+//! }
+//!
+//! fn quarter(n: I32) Result[I32, Str] {
+//!     let h = try half(n);           // half's error is quarter's
+//!     half(h);
+//! }
+//! ```
+//!
+//! `try r` is r's value when it is ok; otherwise the function returns r's
+//! error, running its pending `errdefer`s and `defer`s, newest first. The
+//! function must return a Result with the same error type.
+//!
+//! It is an ordinary struct. The field not given holds Wasm's default (zero,
+//! or null for a reference) and is never read: fields whose names start with
+//! `_` belong to the standard library, so a program cannot see them.
+mod Result[T, E] {
+    struct &:
+        | _ok: Bool
+        | _value: T
+        | _error: E
+
+    /// A success holding `value`.
+    fn &.ok(value: T) & { &{ _ok: true, _value: value }; }
+
+    /// A failure holding `error`.
+    fn &.err(error: E) & { &{ _ok: false, _error: error }; }
+
+    fn &.is_ok |self| () Bool { self._ok; }
+
+    fn &.is_err |self| () Bool { not self._ok; }
+
+    /// The value; fatal when it is an error.
+    fn &.value |self| () T {
+        if not self._ok { fatal; };
+        self._value;
+    }
+
+    /// The error; fatal when it is a value.
+    fn &.error |self| () E {
+        if self._ok { fatal; };
+        self._error;
+    }
+
+    /// The value, or `fallback` when it is an error.
+    fn &.value_or |self| (fallback: T) T { if self._ok { self._value; } else { fallback; }; }
+}

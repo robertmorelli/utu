@@ -1,0 +1,13 @@
+// What: passes on an I32 error from a function whose errors are Str.
+// Expect: try passes on I32; the function's errors are Str (try does not convert errors)
+fn code(n: I32) Result[I32, I32] {
+    if n < 0 { return Result[I32, I32].err(n); };
+    Result[I32, I32].ok(n);
+}
+
+fn label(n: I32) Result[Str, Str] {
+    let c = try code(n);
+    Result[Str, Str].ok("code " + c.to_str());
+}
+
+export main() Str { label(4).value(); }

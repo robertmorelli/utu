@@ -133,6 +133,7 @@ enum(U8) BreakRule:
     | ContinueInDefer
     | ReturnInDefer
     | DeferNotStatement
+    | TryInDefer
 
 /// The JS typed array a mem's view is.
 fn view_array_name(s: Storage) Str {
@@ -219,6 +220,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.StorageType { return "storage-type"; };
     if k == Diag.ReturnValueFromVoid { return "type-mismatch"; };
     if k == Diag.ComptimeTrap { return "comptime-trap"; };
+    if k == Diag.StdOwnStruct { return "unknown-field"; };
+    if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try"; };
     "type-mismatch";
 }
 
@@ -278,6 +281,7 @@ fn break_rule_text(a: I32) Str {
     if r == BreakRule.BreakInDefer { return "break in defer"; };
     if r == BreakRule.ContinueInDefer { return "continue in defer"; };
     if r == BreakRule.ReturnInDefer { return "return in defer"; };
+    if r == BreakRule.TryInDefer { return "try in defer"; };
     "defer must be a statement";
 }
 
@@ -427,6 +431,17 @@ fn diag_text(i: I32) Str {
             w + " returns void";
         },
         Diag.ComptimeTrap => "@comptime " + w + " trapped: " + comptime_trap_text(a),
+        Diag.StdOwnStruct => type_text(a) + " is made by its own functions",
+        Diag.TryNotResult => "try needs a Result, not " + type_text(a),
+        Diag.TryPlace => {
+            // a: 0 try, 1 errdefer, outside a function returning a Result (b: its result);
+            // 2 try, 3 errdefer, in a generator
+            let what = pick(a == 0 or a == 2, "try", "errdefer");
+            if a >= 2 { return what + " in a generator"; };
+            if b < 0 { return what + " needs a function returning a Result"; };
+            what + " in a function returning " + type_text(b) + ", not a Result";
+        },
+        Diag.TryErrorMismatch => "try passes on " + type_text(a) + "; the function's errors are " + type_text(b),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -571,6 +586,10 @@ fn diag_default_label(i: I32) Str {
         Diag.IntegerOutOfRange => if a >= 0 { type_text(a); } else { "out of range"; },
         Diag.BareNull => "no type",
         Diag.NotCallable => "not a function",
+        Diag.TryNotResult => type_text(a),
+        Diag.TryErrorMismatch => type_text(a) + " errors",
+        Diag.TryPlace => pick(a >= 2, "in a generator", "no Result to return"),
+        Diag.StdOwnStruct => "use its functions",
         Diag.ParseError => if b >= 0 { word_text(b) + "?"; } else { "unexpected"; },
         ~> "here",
     };

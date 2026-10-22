@@ -156,6 +156,8 @@ enum(U8) Node:
     | Template_head
     | Template_middle
     | Template_tail
+    | Try_result_expr
+    | Errdefer_expr
 
 /// Every keyword of the grammar, as interned word ids: each is its variant's
 /// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
@@ -245,6 +247,7 @@ enum(U8) Kw:
     | Break
     | Continue
     | Defer
+    | Errdefer
     | Return
     | Fatal
     | Prune
@@ -1445,8 +1448,8 @@ fn prefix(p: Parser) I32 {
 fn is_expression_keyword(w: I32) Bool {
     w < Kw.count() and (w == Kw.If.to_i32() or w == Kw.Match.to_i32() or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32()
         or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32()
-        or w == Kw.Break.to_i32() or w == Kw.Continue.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Yield.to_i32()
-        or w == Kw.Return.to_i32() or w == Kw.Let.to_i32() or w == Kw.Cl.to_i32() or w == Kw.Fatal.to_i32()
+        or w == Kw.Break.to_i32() or w == Kw.Continue.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Errdefer.to_i32()
+        or w == Kw.Yield.to_i32() or w == Kw.Return.to_i32() or w == Kw.Let.to_i32() or w == Kw.Cl.to_i32() or w == Kw.Fatal.to_i32()
         or w == Kw.Prune.to_i32() or w == Kw.New.to_i32() or w == Kw.Await.to_i32() or w == Kw.Assert.to_i32()
         or w == Kw.Not.to_i32() or w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32());
 }
@@ -1492,10 +1495,11 @@ fn keyword_expression(p: Parser) I32 {
         if starts_expression(p) { expr(p, 0, true); };
         return node(p, if w == Kw.Return.to_i32() { Node.Return_expr; } else { Node.Continue_expr; }, at, first);
     };
-    if w == Kw.Yield.to_i32() or w == Kw.Defer.to_i32() {
+    if w == Kw.Yield.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Errdefer.to_i32() {
         advance(p);
         expr(p, 0, true);
-        return node(p, if w == Kw.Yield.to_i32() { Node.Yield_expr; } else { Node.Defer_expr; }, at, first);
+        let kind = if w == Kw.Yield.to_i32() { Node.Yield_expr; } else if w == Kw.Defer.to_i32() { Node.Defer_expr; } else { Node.Errdefer_expr; };
+        return node(p, kind, at, first);
     };
     if w == Kw.Break.to_i32() { return leaf(p, Node.Break_expr); };
     if w == Kw.Fatal.to_i32() { return leaf(p, Node.Fatal_expr); };
@@ -1964,11 +1968,28 @@ fn promote_expr(p: Parser) I32 {
     node(p, Node.Promote_expr, at, first);
 }
 
+/// `try { … } catch …` catches what the host throws; `try e` passes on e's error.
 fn try_expr(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
     advance(p);
+    if not is(p, Tok.LBrace) {
+        expr(p, 13, true);
+        return node(p, Node.Try_result_expr, at, first);
+    };
+    let body = mark();
+    let body_first = p.pos;
     block(p);
+    if not is_kw(p, Kw.Catch) {
+        // `try {…}` without catch: a block's value, as any other operand.
+        let operand = node(p, Node.Block_expr, body, body_first);
+        while (true) {
+            let next = infix(p, operand, 13, true);
+            if next < 0 { break; };
+            operand = next;
+        };
+        return node(p, Node.Try_result_expr, at, first);
+    };
     expect_kw(p, Kw.Catch);
     if is(p, Tok.Pipe) {
         advance(p);

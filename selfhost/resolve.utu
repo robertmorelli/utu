@@ -196,6 +196,10 @@ enum(U8) Diag:
     | StorageType
     | ReturnValueFromVoid
     | ComptimeTrap
+    | StdOwnStruct
+    | TryNotResult
+    | TryPlace
+    | TryErrorMismatch
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from

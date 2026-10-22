@@ -27,6 +27,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.if_expr,
         $.promote_expr,
         $.try_expr,
+        $.try_result_expr,
         $.match_expr,
         $.loop_match_expr,
         $.alt_expr,
@@ -36,6 +37,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.break_expr,
         $.continue_expr,
         $.defer_expr,
+        $.errdefer_expr,
         $.yield_expr,
         $.return_expr,
         $.bind_expr,
@@ -203,6 +205,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // try { ... } catch |e| { ... } — catches exceptions thrown by the host
     try_expr: ($) => seq('try', $.block, 'catch', optional(seq('|', $.identifier, '|')), $.block),
+    // try r — r's value when it is ok; else the function returns its error.
+    // Binds like await. `try {…}` without catch is this, on a block's value.
+    try_result_expr: ($) => prec.right(13, seq('try', $._expr)),
 
     // match on scalars; ~> is the default arm
     match_expr: ($) => seq('match', $._expr, '{', repeat($.match_arm), optional($.match_default), '}'),
@@ -231,6 +236,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
     continue_expr: ($) => prec.right(seq('continue', optional($._expr))),
     // defer expr — run when the enclosing block exits (end, return, break, continue).
     defer_expr: ($) => prec.right(seq('defer', $._expr)),
+    // errdefer expr — like defer, run only when the function returns an error.
+    errdefer_expr: ($) => prec.right(seq('errdefer', $._expr)),
     yield_expr: ($) => prec.right(seq('yield', $._expr)),
     return_expr: ($) => prec.right(seq('return', optional($._expr))),
 

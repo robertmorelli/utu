@@ -12,8 +12,8 @@ export function registerExamplesConformanceTests({ test, assertNoErrors, makeCom
   for (const file of utuFiles(path.join(ROOT, 'examples'))) {
     const name = path.relative(ROOT, file);
     test(`examples: ${name} analyses and emits valid Wasm`, async ({ ROOT }) => {
-      // Wutu programs are built by the self-hosted compiler alone (stage 0 refuses them).
-      const refusesWutu = (error) => String(error?.message ?? '').startsWith('Wutu templates are compiled by the self-hosted compiler');
+      // Wutu programs, and Result's try and errdefer, are built by the self-hosted compiler alone (stage 0 refuses them).
+      const refusesWutu = (error) => String(error?.message ?? '').includes(' are compiled by the self-hosted compiler');
       let analyzed;
       try {
         analyzed = await (await makeCompiler({ ROOT, target: 'analysis' })).analyzeFile(file);

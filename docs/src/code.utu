@@ -36,7 +36,7 @@ mod code {
         "bisect", "flat_map", "take_while", "skip_while", "partition", "distinct_by",
         "min_by", "max_by", "batched", "windows", "manual", "validate", "decode", "encode",
         "error", "in", "product", "fast_sum", "first_index", "last_index", "repeat", "yield",
-        "prune", "defer"
+        "prune", "defer", "errdefer"
         ];
         words any |w| {
             w == word;
