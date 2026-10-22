@@ -362,8 +362,9 @@ fn heap_below(t: I32, u: I32) Bool {
 //! Buffer, made, pushed to, and read there. Made into a local set once and
 //! read only as the object of its fields' gets and sets, it need not be
 //! made at all: each field is a local, the allocation sets them, and the
-//! local that held it is set to null and never read (local cleanup removes
-//! the store). Structs with packed fields stay as they are.
+//! local that held it is not set (or, when the allocation is inside a block,
+//! set to null and never read: local cleanup removes the store). Structs with
+//! packed fields stay as they are.
 
 /// The function's nodes, each with its parent and its place there.
 vec h_node: I32;
@@ -452,15 +453,7 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
         let storage = field_storage(t, i);
         if storage == vt_i8 or storage == vt_i16 { return false; };
     };
-    if h_index.len() < w_op.len() {
-        let old = h_index.len();
-        h_index.resize(w_op.len());
-        for (old ..< w_op.len()) |n| { h_index[n] = -1; };
-    };
-    for (0 ..< h_node.len()) |k| { h_index[h_node[k]] = k; };
-    let ok = struct_stays(local, t);
-    for (0 ..< h_node.len()) |k| { h_index[h_node[k]] = -1; };
-    if not ok { return false; };
+    if not struct_stays_indexed(local, t) { return false; };
     let fields = Array[I32].new(ht_b[t], 0);
     for (0 ..< ht_b[t]) |i| { fields[i] = add_local(f, field_storage(t, i)); };
     // Gets and sets of its fields are of the fields' locals.
@@ -491,19 +484,36 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
     // The allocation sets them, in order, and gives null.
     let nullable = vt_ref(t, true);
     let m = w_mark();
-    for (0 ..< w_count[made]) |i| {
-        let ms = w_mark();
-        w_push(w_kid(made, i));
-        w_node(Op.LocalSet, vt_none, fields[i], 0, ms);
+    if w_count[made] != ht_b[t] {
+        // One call giving the fields (see @struct_returns): stored from the
+        // stack, the last first.
+        w_push(w_kid(made, 0));
+        let i = ht_b[t];
+        while (i > 0) {
+            i -= 1;
+            w_leaf(Op.LocalSet, vt_none, fields[i], 0);
+        };
+    } else {
+        for (0 ..< w_count[made]) |i| {
+            let ms = w_mark();
+            w_push(w_kid(made, i));
+            w_node(Op.LocalSet, vt_none, fields[i], 0, ms);
+        };
     };
-    w_leaf(Op.RefNull, nullable, t, 0);
+    // Stored straight into the local, the store is the sets alone.
+    let direct = w_kid(set, 0) == made;
+    if not direct { w_leaf(Op.RefNull, nullable, nullable, 0); };
     let count = w_mark() - m;
     w_first[made] = w_kids.len();
     for (m ..< m + count) |i| { w_kids.push(w_stack[i]); };
     w_count[made] = count;
     w_stack.resize(m);
     w_op[made] = Op.Seq.to_i32();
-    w_type[made] = nullable;
+    w_type[made] = if direct { vt_none; } else { nullable; };
+    if direct {
+        w_op[set] = Op.Seq.to_i32();
+        w_type[set] = vt_none;
+    };
     // What carried it to the local, and the locals, may now hold null.
     let v = w_kid(set, 0);
     while (v != made) {
@@ -517,6 +527,19 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
         if local_types[at] >= vt_defined and vt_is_ref(local_types[at]) { local_types[at] = vt_ref(vt_heap(local_types[at]), true); };
     };
     true;
+}
+
+/// @struct_stays, with the walk's nodes indexed for it.
+fn struct_stays_indexed(local: I32, t: I32) Bool {
+    if h_index.len() < w_op.len() {
+        let old = h_index.len();
+        h_index.resize(w_op.len());
+        for (old ..< w_op.len()) |n| { h_index[n] = -1; };
+    };
+    for (0 ..< h_node.len()) |k| { h_index[h_node[k]] = k; };
+    let ok = struct_stays(local, t);
+    for (0 ..< h_node.len()) |k| { h_index[h_node[k]] = -1; };
+    ok;
 }
 
 /// Whether the struct of type `t` in `local` is used only for its fields:
@@ -561,4 +584,370 @@ fn add_carriers(local: I32) void {
         let n = h_node[n_at];
         if w_op[n] == Op.LocalGet.to_i32() and w_a[n] == local { h_carriers.push(n); };
     };
+}
+
+//! == Structs returned as their fields (-O small and fast)
+//!
+//! A function whose every return is a struct it makes (a `struct.new`, a
+//! call to another such function, or a local that holds one and is read
+//! only for its fields) returns the fields instead, as Wasm multi-value: a
+//! twin takes its body, and it becomes a wrapper making the struct from the
+//! twin's fields (for `fun` values, exports, and tail calls; swept when
+//! nothing uses it). Direct calls call the twin. Where the caller holds the
+//! result in a local read only for its fields (@locals_for_structs), nothing
+//! is made; elsewhere the call makes the struct. Nothing else ever held the
+//! struct, so making it at the call is not seen: no alias, no `==`, no
+//! mutation can tell.
+
+/// By function: the struct type it returns as its fields, or -1.
+vec sr_type: I32;
+/// By function: its twin returning the fields, or -1.
+vec sr_twin: I32;
+/// By function: its direct calls that make no struct when it returns
+/// fields (the result read only for its fields, dropped, or returned as
+/// fields), and the others (which make it).
+vec sr_gain: I32;
+vec sr_loss: I32;
+/// Found by @sr_returns: the nodes a returned struct comes from (rewritten
+/// to give its fields), the nodes it passes through, the locals it is read
+/// from.
+vec sr_ret: I32;
+vec sr_path: I32;
+vec sr_locals: I32;
+/// By function: whether a call in it now gives fields.
+vec sr_changed: U8;
+
+/// Whether any function now returns fields (the caller sweeps again).
+fn struct_returns() Bool {
+    let n = func_kind.len();
+    sr_type.resize(n);
+    sr_twin.resize(n);
+    sr_gain.resize(n);
+    sr_loss.resize(n);
+    sr_changed.resize(n);
+    for (0 ..< n) |f| {
+        sr_type[f] = sr_candidate(f);
+        sr_twin[f] = -1;
+        sr_changed[f] = 0;
+    };
+    // To a fixpoint: a return of a call is of fields while the callee's is,
+    // and a function returns fields where its calls gain by it.
+    while (true) {
+        let dropped = false;
+        for (0 ..< n) |f| {
+            if sr_type[f] >= 0 and not sr_returns(f, sr_type[f]) {
+                sr_type[f] = -1;
+                dropped = true;
+            };
+        };
+        if not dropped and not sr_weigh(n) { break; };
+    };
+    let any = false;
+    for (0 ..< n) |f| {
+        if sr_type[f] >= 0 {
+            any = true;
+            let twin = new_func(FuncKind.Defined, func_type(ht_a[func_type_of[f]], sr_list(sr_type[f])));
+            func_body[twin] = func_body[f];
+            func_locals[twin] = func_locals[f];
+            func_local_count[twin] = func_local_count[f];
+            func_debug_name[twin] = func_debug_name[f];
+            sr_twin[f] = twin;
+        };
+    };
+    if not any { return false; };
+    let all = func_kind.len();
+    func_live.resize(all);
+    func_uses.resize(all);
+    sr_type.resize(all);
+    sr_twin.resize(all);
+    sr_changed.resize(all);
+    for (n ..< all) |g| {
+        func_live[g] = 1;
+        func_uses[g] = 0;
+        sr_type[g] = -1;
+        sr_twin[g] = -1;
+        sr_changed[g] = 0;
+    };
+    for (0 ..< n) |f| { if sr_twin[f] >= 0 { sr_to_fields(f, sr_twin[f], sr_type[f]); }; };
+    // Direct calls call the twins.
+    for (0 ..< all) |f| { if optimizable(f) { sr_rewrite_calls(f, func_body[f], -1); }; };
+    for (0 ..< all) |f| {
+        if sr_changed[f] == 1 and sr_unshared(func_body[f]) { locals_for_structs(f); };
+    };
+    true;
+}
+
+/// Count each candidate's calls that gain and that lose, and drop those
+/// that gain nothing (or, building small, do not gain more than they lose).
+/// Whether any was dropped.
+fn sr_weigh(n: I32) Bool {
+    for (0 ..< n) |f| {
+        sr_gain[f] = 0;
+        sr_loss[f] = 0;
+    };
+    for (0 ..< n) |h| {
+        if optimizable(h) {
+            // (A candidate's walk notes what it returns.)
+            if sr_type[h] < 0 or not sr_returns(h, sr_type[h]) {
+                current_fold_function[0] = h;
+                h_walk_function(h);
+                sr_ret.clear();
+            };
+            let unshared = sr_unshared(func_body[h]);
+            for (0 ..< h_node.len()) |k| {
+                let c = h_node[k];
+                if w_op[c] == Op.Call.to_i32() and sr_type[w_a[c]] >= 0 {
+                    if sr_gains(c, k, unshared) { sr_gain[w_a[c]] += 1; } else { sr_loss[w_a[c]] += 1; };
+                };
+            };
+        };
+    };
+    let dropped = false;
+    for (0 ..< n) |f| {
+        // (Building small, a wrapper kept for other uses, or as many calls
+        // making the struct as not, would grow the module.)
+        let kept = func_field_name[f] >= 0 or func_uses[f] > sr_gain[f] + sr_loss[f];
+        if sr_type[f] >= 0 and (sr_gain[f] == 0 or (optimize_level[0] == 1 and (kept or sr_gain[f] <= sr_loss[f]))) {
+            sr_type[f] = -1;
+            dropped = true;
+        };
+    };
+    dropped;
+}
+
+/// Whether call `c` (at `k` in the walk) would make no struct: it is
+/// returned as fields, dropped, or stored in a local read only for its
+/// fields (in a body of its own, @locals_for_structs).
+fn sr_gains(c: I32, k: I32, unshared: Bool) Bool {
+    if sr_returned(c) { return true; };
+    let p = h_parent[k];
+    if p < 0 { return false; };
+    if w_op[p] == Op.Drop.to_i32() { return true; };
+    w_op[p] == Op.LocalSet.to_i32() and unshared and h_set[w_a[p]] == p and struct_stays_indexed(w_a[p], sr_type[w_a[c]]);
+}
+
+/// The struct type `f` may return as fields: it returns a struct of
+/// unpacked fields, and its body is its own; else -1.
+fn sr_candidate(f: I32) I32 {
+    if not optimizable(f) or func_code[f] >= 0 { return -1; };
+    let results = ht_b[func_type_of[f]];
+    if vl_len[results] != 1 { return -1; };
+    let vt = vl_item(results, 0);
+    if vt < vt_defined or vt >= vt_tuple { return -1; };
+    let t = vt_heap(vt);
+    if ht_kind[t] != Heap.Struct.to_i32() or ht_b[t] == 0 { return -1; };
+    for (0 ..< ht_b[t]) |i| {
+        let storage = field_storage(t, i);
+        if storage == vt_i8 or storage == vt_i16 { return -1; };
+    };
+    if not sr_unshared(func_body[f]) or has_op(func_body[f], Op.ReturnCall.to_i32()) { return -1; };
+    t;
+}
+
+/// Whether no node under `n` is held in two places (see sweep).
+fn sr_unshared(n: I32) Bool {
+    if n < node_holders.len() and node_holders[n] > 1 { return false; };
+    for (0 ..< w_count[n]) |i| { if not sr_unshared(w_kid(n, i)) { return false; }; };
+    true;
+}
+
+/// The fields of struct type `t`, as a list of value types.
+fn sr_list(t: I32) I32 {
+    let m = vl_begin();
+    for (0 ..< ht_b[t]) |i| { vl_add(field_storage(t, i)); };
+    vl_end(m);
+}
+
+/// The fields of struct type `t`, as one value type (a tuple for several).
+fn sr_vt(t: I32) I32 {
+    if ht_b[t] == 1 { return field_storage(t, 0); };
+    let list = sr_list(t);
+    func_type(vl_empty(), list);
+    vt_tuple_of(list);
+}
+
+/// Whether every return of `f` is a struct of type `t` made for it: fills
+/// @sr_ret, @sr_path, and @sr_locals.
+fn sr_returns(f: I32, t: I32) Bool {
+    current_fold_function[0] = f;
+    h_walk_function(f);
+    sr_ret.clear();
+    sr_path.clear();
+    sr_locals.clear();
+    if not sr_fresh(func_body[f], t, true) { return false; };
+    for (0 ..< h_node.len()) |k| {
+        let n = h_node[k];
+        if w_op[n] == Op.Return.to_i32() and (w_count[n] != 1 or not sr_fresh(w_kid(n, 0), t, true)) { return false; };
+    };
+    // A local returned is otherwise only the object of its fields' gets and sets.
+    for (0 ..< h_node.len()) |k| {
+        let n = h_node[k];
+        if w_op[n] == Op.LocalGet.to_i32() and sr_has_local(w_a[n]) and not sr_returned(n) {
+            let p = h_parent[k];
+            if p < 0 { return false; };
+            let op = w_op[p];
+            if not ((op == Op.StructGet.to_i32() or op == Op.StructSet.to_i32()) and h_place[k] == 0) { return false; };
+        };
+    };
+    true;
+}
+
+fn sr_has_local(x: I32) Bool {
+    for (0 ..< sr_locals.len()) |i| { if sr_locals[i] == x { return true; }; };
+    false;
+}
+
+fn sr_returned(n: I32) Bool {
+    for (0 ..< sr_ret.len()) |i| { if sr_ret[i] == n { return true; }; };
+    false;
+}
+
+/// Whether node `n`'s value is a struct of type `t` nothing else holds.
+/// `top`: `n` is returned (and noted); else it is stored in a local.
+fn sr_fresh(n: I32, t: I32, top: Bool) Bool {
+    let op = w_op[n];
+    if w_type[n] == vt_unreachable { return true; };
+    if op == Op.StructNew.to_i32() {
+        if w_a[n] != t or w_count[n] != ht_b[t] { return false; };
+        if top { sr_ret.push(n); };
+        return true;
+    };
+    if op == Op.Call.to_i32() {
+        if sr_type[w_a[n]] != t { return false; };
+        if top { sr_ret.push(n); };
+        return true;
+    };
+    if op == Op.LocalGet.to_i32() {
+        if not top or not sr_local_fresh(w_a[n], t) { return false; };
+        sr_ret.push(n);
+        if not sr_has_local(w_a[n]) { sr_locals.push(w_a[n]); };
+        return true;
+    };
+    if not vt_is_ref(w_type[n]) or w_count[n] == 0 { return false; };
+    let targeted = op == Op.Block.to_i32() and w_a[n] > 0 and w_a[n] < h_targeted.len() and h_targeted[w_a[n]] == 1;
+    if op == Op.Seq.to_i32() or op == Op.Block.to_i32() {
+        if top { sr_path.push(n); };
+        if not sr_fresh(w_kid(n, w_count[n] - 1), t, top) { return false; };
+        if not targeted { return true; };
+        // Each branch to the block carries such a struct.
+        if not top { return false; };
+        return sr_branches_fresh(w_a[n], t);
+    };
+    if op == Op.If.to_i32() and w_count[n] == 3 {
+        if top { sr_path.push(n); };
+        return sr_fresh(w_kid(n, 1), t, top) and sr_fresh(w_kid(n, 2), t, top);
+    };
+    false;
+}
+
+/// Whether each branch to `label` carries a struct of type `t` nothing else holds.
+fn sr_branches_fresh(label: I32, t: I32) Bool {
+    for (0 ..< h_node.len()) |k| {
+        let b = h_node[k];
+        let op = w_op[b];
+        if op == Op.Br.to_i32() and w_a[b] == label {
+            if w_count[b] != 1 or not sr_fresh(w_kid(b, 0), t, true) { return false; };
+        } else if op == Op.BrIf.to_i32() and w_a[b] == label {
+            return false;
+        } else if op == Op.BrTable.to_i32() {
+            for (0 ..< w_b[b]) |i| { if w_aux[w_a[b] + i] == label { return false; }; };
+        };
+    };
+    true;
+}
+
+/// Whether local `x` (not a parameter) is only ever stored a struct of type
+/// `t` nothing else holds.
+fn sr_local_fresh(x: I32, t: I32) Bool {
+    if x < vl_len[ht_a[func_type_of[current_fold_function[0]]]] { return false; };
+    let sets = 0;
+    for (0 ..< h_node.len()) |k| {
+        let n = h_node[k];
+        let op = w_op[n];
+        if op == Op.LocalTee.to_i32() and w_a[n] == x { return false; };
+        if op == Op.LocalSet.to_i32() and w_a[n] == x {
+            if w_count[n] != 1 or not sr_fresh(w_kid(n, 0), t, false) { return false; };
+            sets += 1;
+        };
+    };
+    sets > 0;
+}
+
+/// `twin` (holding f's body) gives the fields of what f returned; f makes
+/// the struct from them.
+fn sr_to_fields(f: I32, twin: I32, t: I32) void {
+    if not sr_returns(twin, t) { fatal; };
+    let fv = sr_vt(t);
+    for (0 ..< sr_path.len()) |i| { w_type[sr_path[i]] = fv; };
+    let params = vl_len[ht_a[func_type_of[twin]]];
+    for (0 ..< sr_ret.len()) |i| {
+        let n = sr_ret[i];
+        let op = w_op[n];
+        if op == Op.StructNew.to_i32() {
+            w_op[n] = Op.Seq.to_i32();
+            w_a[n] = 0;
+        } else if op == Op.Call.to_i32() {
+            w_a[n] = sr_twin[w_a[n]];
+        } else {
+            // A local's fields, read from it.
+            let x = w_a[n];
+            let vt = local_types[func_locals[twin] + x - params];
+            let m = w_mark();
+            for (0 ..< ht_b[t]) |j| {
+                let mj = w_mark();
+                w_get(vt, x);
+                w_node(Op.StructGet, field_storage(t, j), t, j, mj);
+            };
+            let count = w_mark() - m;
+            w_first[n] = w_kids.len();
+            for (m ..< m + count) |j| { w_kids.push(w_stack[j]); };
+            w_count[n] = count;
+            w_stack.resize(m);
+            w_op[n] = Op.Seq.to_i32();
+            w_a[n] = 0;
+        };
+        w_type[n] = fv;
+    };
+    // f: the struct, from the twin's fields.
+    let ps = ht_a[func_type_of[f]];
+    let m = w_mark();
+    let mc = w_mark();
+    for (0 ..< vl_len[ps]) |i| { w_get(vl_item(ps, i), i); };
+    w_node(Op.Call, fv, twin, 0, mc);
+    w_node(Op.StructNew, vt_ref(t, false), t, 0, m);
+    func_body[f] = w_pop();
+    func_local_count[f] = 0;
+}
+
+/// Each direct call under `n` (a kid of `parent`) to a function with
+/// a twin calls the twin, and makes the struct from its fields (or drops
+/// them, when the result is dropped).
+fn sr_rewrite_calls(f: I32, n: I32, parent: I32) void {
+    for (0 ..< w_count[n]) |i| { sr_rewrite_calls(f, w_kid(n, i), n); };
+    if w_op[n] != Op.Call.to_i32() or sr_twin[w_a[n]] < 0 { return; };
+    let g = w_a[n];
+    let t = sr_type[g];
+    let m = w_mark();
+    for (0 ..< w_count[n]) |i| { w_push(w_kid(n, i)); };
+    let call = w_node(Op.Call, sr_vt(t), sr_twin[g], 0, m);
+    w_pop();
+    sr_changed[f] = 1;
+    if parent >= 0 and w_op[parent] == Op.Drop.to_i32() {
+        let md = w_mark();
+        w_push(call);
+        for (0 ..< ht_b[t]) |i| { w_leaf(Op.Drop, vt_none, 0, 0); };
+        let count = w_mark() - md;
+        w_first[parent] = w_kids.len();
+        for (md ..< md + count) |i| { w_kids.push(w_stack[i]); };
+        w_count[parent] = count;
+        w_stack.resize(md);
+        w_op[parent] = Op.Seq.to_i32();
+        return;
+    };
+    w_op[n] = Op.StructNew.to_i32();
+    w_a[n] = t;
+    w_b[n] = 0;
+    w_first[n] = w_kids.len();
+    w_kids.push(call);
+    w_count[n] = 1;
 }

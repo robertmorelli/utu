@@ -82,7 +82,7 @@ mod compiler {
                 code {
                     "wasm:js-string";
                 }
-                " builtins and string constants are imported globals, so there is no shipped UTF-8 transcoder. In every build mode a local cleanup removes the copies and temporaries lowerings leave, which is what makes a consumed iterator compile to the loop you would have written by hand.";
+                " builtins and string constants are imported globals, so there is no shipped UTF-8 transcoder. In every build mode a local cleanup removes the copies and temporaries lowerings leave, which is what makes a consumed iterator compile to the loop you would have written by hand. Outside debug builds, a function that returns a struct it makes returns the fields instead (Wasm multi-value), and a caller that only reads them keeps them in locals: no allocation.";
             }
             = ui.further("docs/wasm-backend.md", "The wasm backend");
             p {
