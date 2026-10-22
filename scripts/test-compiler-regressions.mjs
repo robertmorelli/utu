@@ -526,6 +526,19 @@ export lib {
     assert.ok(result.diagnostics.some(d => d.message === message), `${files['main.utu']}\n  reported: ${result.diagnostics.map(d => d.message)}`);
     checked++;
   }
+  // A source map changes no byte of the module, in any mode; its entries
+  // are in offset order, each in the code, and the program's own lines are
+  // where they are.
+  const mapped = await write('fn boom(x: I32) I32 {\n    assert x > 5;\n    x * 2;\n}\nfn twice(n: I32) I32 { boom(n) + boom(n + 1); }\nexport main() I32 { twice(10); }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const plain = await compileFile(utu, mapped, { mode, debugNames: true });
+    const withMap = await compileFile(utu, mapped, { mode, debugNames: true, sourceMap: true });
+    assert.deepEqual(withMap.wasm, plain.wasm, mode);
+    const { entries } = withMap.map;
+    assert.ok(entries.length > 0 && entries.every((e, i) => i === 0 || e.at > entries[i - 1].at) && entries.at(-1).at < withMap.wasm.length, mode);
+    assert.ok(entries.some(e => e.kind === 'assert_expr' && e.file === mapped && e.line === 2 && e.column === 5 && e.owner === 'boom'), mode);
+    checked++;
+  }
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
