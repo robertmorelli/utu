@@ -1,0 +1,6 @@
+// What: a negative literal for a U64
+// Expect: -5 does not fit U64
+export main() I32 {
+    let count: U64 = -5;
+    count.to_i32();
+}

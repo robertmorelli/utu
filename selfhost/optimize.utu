@@ -137,24 +137,43 @@ fn opt_erase(n: I32) void {
     w_count[n] = 0;
 }
 
-/// The copies rewrite: whether anything changed.
+/// By local: the parameter its reads read instead, or -1; and that read's type.
+vec opt_copy_of: I32;
+vec opt_copy_type: I32;
+
+/// The copies rewrite: whether anything changed. Each local is settled in
+/// order (a copy of a copy settled before it is a copy of that parameter),
+/// then one walk rewrites every read.
 fn propagate_copies(params: I32) Bool {
     let changed = false;
+    opt_copy_of.resize(opt_gets.len());
+    opt_copy_type.resize(opt_gets.len());
+    for (0 ..< opt_gets.len()) |l| { opt_copy_of[l] = -1; };
     for (params ..< opt_gets.len()) |l| {
         if opt_sets[l] == 1 {
             let write = opt_nodes[opt_set_at[l]];
             let source = if w_count[write] == 1 { w_kid(write, 0); } else { -1; };
-            if w_op[write] == Op.LocalSet.to_i32() and source >= 0 and w_op[source] == Op.LocalGet.to_i32()
-                and w_a[source] < params and opt_sets[w_a[source]] == 0 and single_value(w_type[source]) {
-                for (0 ..< opt_nodes.len()) |k| {
-                    let n = opt_nodes[k];
-                    if w_op[n] == Op.LocalGet.to_i32() and w_a[n] == l and n != source {
-                        w_a[n] = w_a[source];
-                        w_type[n] = w_type[source];
-                        changed = true;
-                    };
+            if w_op[write] == Op.LocalSet.to_i32() and source >= 0 and w_op[source] == Op.LocalGet.to_i32() {
+                let p = w_a[source];
+                let t = w_type[source];
+                if p >= params and p < l and opt_copy_of[p] >= 0 {
+                    t = opt_copy_type[p];
+                    p = opt_copy_of[p];
+                };
+                if p < params and opt_sets[p] == 0 and single_value(t) {
+                    opt_copy_of[l] = p;
+                    opt_copy_type[l] = t;
                 };
             };
+        };
+    };
+    for (0 ..< opt_nodes.len()) |k| {
+        let n = opt_nodes[k];
+        if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
+            let l = w_a[n];
+            w_a[n] = opt_copy_of[l];
+            w_type[n] = opt_copy_type[l];
+            changed = true;
         };
     };
     changed;
@@ -205,22 +224,34 @@ fn sink_temporaries(params: I32) Bool {
 /// `local.get x` is `local.tee x (v)` there. When that was the local's one
 /// read, it is then never read, and the value takes the tee's place
 /// (@remove_unused_locals).
+///
+/// A tee moves the store into the next statement, which may be a store
+/// teed into the one after: a run of them nests, statement in statement, so
+/// a run stops at @tee_run_max (which code generation's recursion bears).
 fn tee_stores() Bool {
     let changed = false;
     for (0 ..< opt_nodes.len()) |k| {
         let block = opt_nodes[k];
         let op = w_op[block];
         if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+            let run = 0;
             for (0 ..< w_count[block]) |i| {
                 let write = w_kid(block, i);
-                if w_op[write] == Op.LocalSet.to_i32() and w_count[write] == 1 and tee_into(block, i + 1, write) {
+                // (What emits nothing is passed over, as by tee_into.)
+                if w_op[write] == Op.LocalSet.to_i32() and w_count[write] == 1 and run < tee_run_max and tee_into(block, i + 1, write) {
                     changed = true;
+                    run += 1;
+                } else if not emits_nothing(write) {
+                    run = 0;
                 };
             };
         };
     };
     changed;
 }
+
+/// The longest run of stores teed one into the next.
+let tee_run_max: I32 = 64;
 
 /// Whether the first instruction from kid `from` of `parent` on reads what
 /// `write` (kid `from - 1`) stores: the read becomes the tee, and the store

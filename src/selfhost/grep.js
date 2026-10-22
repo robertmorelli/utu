@@ -80,7 +80,7 @@ function parseSource(utu, text) {
  * holds: { at (file, start, end), bindings ({ name: place }) }.
  * `where` maps a hole's name to the type its node must have.
  */
-export function matchProgram(utu, files, pattern, { where = {} } = {}) {
+export function matchProgram(utu, files, pattern, { where = {}, seen = null } = {}) {
   const index = programIndex(utu, files);
   const kinds = new Uint8Array(utu.node_kind.buffer);
   const mem = name => new Int32Array(utu[name].buffer);
@@ -116,7 +116,16 @@ export function matchProgram(utu, files, pattern, { where = {} } = {}) {
 
   const matchNode = (p, n, env) => {
     if (p.hole !== undefined) {
-      if (p.hole !== '_' && where[p.hole] && !typeMatches(n, where[p.hole])) return false;
+      if (p.hole !== '_' && where[p.hole]) {
+        // What each constrained hole met (`seen`): whether any had the type, and the types.
+        const ok = typeMatches(n, where[p.hole]);
+        if (seen) {
+          if (!seen.has(p.hole)) seen.set(p.hole, { matched: false, types: new Set() });
+          const s = seen.get(p.hole);
+          if (ok) s.matched = true; else s.types.add(utu.node_type(n));
+        }
+        if (!ok) return false;
+      }
       if (p.hole === '_') return true;
       if (env.has(p.hole)) return code(env.get(p.hole)) === code(n);
       env.set(p.hole, n);
@@ -229,6 +238,7 @@ export async function grep(utu, entries, hostFor, { pattern = null, where = {}, 
     if (!seen.has(key)) { seen.add(key); matches.push(match); }
   };
   const texts = new Map();
+  const met = new Map();
   for (const entry of entries) {
     // Both builds: the exports' functions are checked in one, the tests in the other.
     for (const target of ['normal', 'test']) {
@@ -236,7 +246,7 @@ export async function grep(utu, entries, hostFor, { pattern = null, where = {}, 
       for (const file of built.files) texts.set(file.key, file.text);
       // A file that does not parse has no tree to search.
       for (const d of built.diagnostics) if (d.kind === 'parse-error' && d.file != null) skipped.add(d.file);
-      if (parsed) for (const match of matchProgram(utu, built.files, parsed, { where })) add(match);
+      if (parsed) for (const match of matchProgram(utu, built.files, parsed, { where, seen: met })) add(match);
       if (!references) continue;
       for (const { kind, definition, references: refs } of findReferences(utu, built.files, references)) {
         add({ at: definition, kind, declaration: true });
@@ -245,5 +255,8 @@ export async function grep(utu, entries, hostFor, { pattern = null, where = {}, 
     }
   }
   matches.sort((a, b) => a.at.file.localeCompare(b.at.file) || a.at.start - b.at.start);
-  return { matches, texts, skipped: [...skipped] };
+  // A constraint no candidate met: its type is likely misspelled.
+  const unmatched = Object.entries(where).filter(([hole]) => met.has(hole) && !met.get(hole).matched)
+    .map(([hole, type]) => ({ hole, type, seen: [...met.get(hole).types].filter(Boolean).sort() }));
+  return { matches, texts, skipped: [...skipped], unmatched };
 }

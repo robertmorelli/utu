@@ -1,0 +1,7 @@
+// What: a function of an imported file's top level, called from the importing file
+// Expect: Unknown variable helper: only the modules of shapes.utu are imported
+using shapes from "./import_parts/shapes.utu";
+
+export main() I32 {
+    shapes.area(2) + helper();
+}

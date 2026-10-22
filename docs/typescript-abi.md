@@ -211,7 +211,15 @@ create real JS objects. Missing required fields and readonly writes are errors.
 
 Numbers cross as `F64`, strings as `Str`, and booleans as actual JS booleans.
 Closures remain JS functions and preserve identity; boolean-returning closures
-produce JS booleans. Function pointers remain UTU-internal. Contextual callbacks
+produce JS booleans. Function pointers remain UTU-internal.
+
+The same holds at the other edges where utu values meet JavaScript: an `@es`
+body's arguments and results, and an export's results. A `Bool` reaches
+JavaScript as `true` or `false` and comes back as `!!v`. A `U32` reaches it
+unsigned (`v >>> 0`), and a `U64` as an unsigned BigInt
+(`BigInt.asUintN(64, v)`); on the way in, wasm keeps a value's low bits, so
+`4294967295` and `-1` are the same `U32`. An `@es` result of a nullable type
+treats `undefined` as `null`. Contextual callbacks
 derive parameter types from declarations, including DOM event maps.
 
 Host exceptions are caught with `try`:

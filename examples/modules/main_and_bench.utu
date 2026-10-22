@@ -24,7 +24,7 @@ bench "module counter get" {
     }
 }
 
-fn main() I32 {
+export main() I32 {
     let alias_box: ints.Box = step(9);
     let inline_box: counter[I32].Box = counter[I32].Box.new(12);
     alias_box.get() + inline_box.get();

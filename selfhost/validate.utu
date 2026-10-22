@@ -9,6 +9,9 @@
 /// `type N = distinct B;`: B is one of the numeric scalars.
 fn validate_distinct(node: I32) void {
     let base = last_child(node);
+    // An unknown base is the mistake (reported).
+    let n = name_node(base);
+    if n >= 0 and node_decl[n] < 0 and not builtin_type(word_of(n)) { return; };
     let t = decl_type(node_decl[base], 0);
     if not (t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64)
         or t == prelude(Prelude.U64) or t == prelude(Prelude.F32) or t == prelude(Prelude.F64)) {
@@ -30,21 +33,46 @@ fn int_enum_values() void {
     variant_value.resize(decl_kind.len());
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.IntEnum) { enum_values(d); };
+        if decl_is(d, Decl.Enum) and is_own_file(file_of_token(node_first[decl_node[d]])) { tag_enum_values(d); };
     };
 }
 
+/// A tag enum's variants take no `= n`.
+fn tag_enum_values(decl: I32) void {
+    let c = first_child(decl_node[decl]);
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) and is_kind(last_child(c), Node.Int_lit) {
+            report2(Diag.TagEnumValue, last_child(c), decl_name[node_decl[first_child(c)]], decl_name[decl], -1);
+        };
+        c = next_sibling(c);
+    };
+}
+
+/// An integer enum's values, counted in 64 bits and each checked against
+/// its representation: U8, I8, U16, I16, I32, or U32 (any other is reported,
+/// and counted as I32).
 fn enum_values(decl: I32) void {
     let node = decl_node[decl];
     let repr_word = word_of(after_qualifier(node));
-    let lo = 0;
-    let hi = 2147483647;
-    if repr_word == narrow_word(Narrow.U8) { hi = 255; };
-    if repr_word == narrow_word(Narrow.I8) { lo = -128; hi = 127; };
-    if repr_word == narrow_word(Narrow.U16) { hi = 65535; };
-    if repr_word == narrow_word(Narrow.I16) { lo = -32768; hi = 32767; };
-    if repr_word == known_word(Known.WordI32) { lo = -2147483648; };
     let own = is_own_file(file_of_token(node_first[node]));
-    let next = 0;
+    let bits = 32;
+    let signed = repr_word != known_word(Known.WordU32);
+    if repr_word == narrow_word(Narrow.U8) or repr_word == narrow_word(Narrow.I8) { bits = 8; };
+    if repr_word == narrow_word(Narrow.U16) or repr_word == narrow_word(Narrow.I16) { bits = 16; };
+    if repr_word == narrow_word(Narrow.U8) or repr_word == narrow_word(Narrow.U16) { signed = false; };
+    if own and bits == 32 and repr_word != known_word(Known.WordI32) and repr_word != known_word(Known.WordU32) {
+        report(Diag.EnumBase, after_qualifier(node), repr_word);
+        own = false;
+    };
+    let one: I64 = 1;
+    let half = one << (bits - 1).to_i64();
+    let lo: I64 = 0;
+    let hi: I64 = half + half - one;
+    if signed {
+        lo = 0 - half;
+        hi = half - one;
+    };
+    let next: I64 = 0;
     let first = -1;
     let c = first_child(node);
     while (c >= 0) {
@@ -52,17 +80,20 @@ fn enum_values(decl: I32) void {
             let v = node_decl[first_child(c)];
             let lit = last_child(c);
             if is_kind(lit, Node.Int_lit) {
-                let value = int_value(lit).to_i32();
-                if tok_kind[node_last[lit] - 2] == Tok.Minus.to_i32() or tok_kind[node_first[lit] - 1] == Tok.Minus.to_i32() { value = 0 - value; };
-                next = value;
+                let negate = tok_kind[node_last[lit] - 2] == Tok.Minus.to_i32() or tok_kind[node_first[lit] - 1] == Tok.Minus.to_i32();
+                if own and not int_fits(lit, negate, bits, signed) {
+                    let text = pick(negate, "-", "") + token_text(node_first[lit]);
+                    report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], intern_text(text), repr_word);
+                };
+                next = literal_bits(lit, prelude(Prelude.I64), negate);
             };
-            variant_value[v] = next;
-            if own and (next < lo or next > hi) { report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], next, repr_word); };
+            variant_value[v] = next.to_i32();
+            if own and (next < lo or next > hi) { report3(Diag.EnumValueRange, c, decl_name[v], decl_name[decl], intern_text(next.to_str()), repr_word); };
             if own {
                 let other = first;
                 while (other >= 0 and other != v) {
-                    if variant_value[other] == next {
-                        report3(Diag.EnumValueTwice, c, decl_name[v], decl_name[decl], decl_name[other], next);
+                    if variant_value[other] == variant_value[v] {
+                        report3(Diag.EnumValueTwice, c, decl_name[v], decl_name[decl], decl_name[other], intern_text(next.to_str()));
                         other = v;
                     } else {
                         other = other + 1;
@@ -86,6 +117,7 @@ fn validate_program() void {
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
             report2(Diag.ParseError, -1, file, file_error[file], file_wanted[file]);
+            parse_hint(file, file_error[file], file_wanted[file]);
         } else if is_own_file(file) {
             validate_tree(file_root[file]);
         };
@@ -105,7 +137,8 @@ fn validate_program() void {
 fn validate_module_members() void {
     for (0 ..< decl_kind.len()) |b| {
         // A generic module is instantiated (`M__I32`), not hoisted as itself.
-        if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) {
+        // (One named like a prelude module is reported as that.)
+        if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) and prelude_lookup(decl_name[b]) < 0 {
             for (0 ..< decl_kind.len()) |a| {
                 if a != b and decl_is(a, Decl.Module) and not is_generic(a) and decl_name[a] == decl_name[b] and module_before(a, b) {
                     let item = first_child(decl_node[b]);
@@ -200,6 +233,7 @@ fn validate_node(node: I32) void {
         Node.Global_decl => { validate_global(node); },
         Node.Distinct_decl => { validate_distinct(node); },
         Node.Yield_expr => { validate_yield(node); },
+        Node.Yield_type => { validate_yield_type(node); },
         Node.Defer_expr => { validate_defer(node); },
         Node.Errdefer_expr => { validate_defer(node); },
         Node.Await_expr => { validate_await(node); },
@@ -220,6 +254,7 @@ fn duplicate_names(node: I32, kind: Diag, what: I32) void {
             while (other != c) {
                 if node_kind[other] == k and word_of(first_child(other)) == word {
                     report2(kind, c, word, what, -1);
+                    diag_place(Extra.Related, first_child(other), "first here");
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -242,6 +277,7 @@ fn duplicate_words(node: I32, what: I32) void {
             while (other != c) {
                 if list_word(other) == word {
                     report2(Diag.DuplicateDeclaration, name_of_listed(c), word, what, -1);
+                    diag_place(Extra.Related, name_of_listed(other), "first here");
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -270,6 +306,7 @@ fn duplicate_alt_arms(node: I32) void {
             while (other != c) {
                 if is_kind(other, Node.Alt_arm) and node_text(first_child(other)) == text {
                     report2(Diag.DuplicatePattern, c, -1, 1, -1);
+                    diag_place(Extra.Related, first_child(other), "first here");
                     other = c;
                 } else {
                     other = next_sibling(other);
@@ -280,19 +317,47 @@ fn duplicate_alt_arms(node: I32) void {
     };
 }
 
+/// By word: the stamp of the block whose lets last named it; and the last stamp.
+vec let_seen: I32;
+vec let_stamp: I32 = [0];
+
+/// A new stamp for @word_seen: no word seen with it yet.
+fn word_stamp() I32 {
+    let_stamp[0] += 1;
+    let_stamp[0];
+}
+
+/// Whether `word` was seen with `stamp` before; it is now.
+fn word_seen(word: I32, stamp: I32) Bool {
+    if word < 0 { return false; };
+    if let_seen.len() <= word {
+        let k = let_seen.len();
+        let_seen.resize(src.interned() + 1);
+        for (k ..< let_seen.len()) |w| { let_seen[w] = 0; };
+    };
+    if let_seen[word] == stamp { return true; };
+    let_seen[word] = stamp;
+    false;
+}
+
 /// The lets of a block, each name once.
 fn duplicate_lets(block: I32) void {
+    let stamp = word_stamp();
     let c = first_child(block);
     while (c >= 0) {
         if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
             let word = word_of(first_child(c));
-            let other = first_child(block);
-            while (other != c) {
-                if is_kind(other, Node.Bind_expr) and is_kind(first_child(other), Node.Identifier) and word_of(first_child(other)) == word {
-                    report2(Diag.DuplicateDeclaration, c, word, 3, -1);
-                    other = c;
-                } else {
-                    other = next_sibling(other);
+            if word_seen(word, stamp) {
+                report2(Diag.DuplicateDeclaration, c, word, 3, -1);
+                // The first: looked for only once there is a mistake.
+                let other = first_child(block);
+                while (other != c) {
+                    if is_kind(other, Node.Bind_expr) and is_kind(first_child(other), Node.Identifier) and word_of(first_child(other)) == word {
+                        diag_place(Extra.Related, first_child(other), "first here");
+                        other = c;
+                    } else {
+                        other = next_sibling(other);
+                    };
                 };
             };
         };
@@ -352,29 +417,42 @@ fn invalid_global_initializer(node: I32) Bool {
 /// nullable, not arrays) can never be built.
 fn validate_recursive_structs() void {
     for (0 ..< decl_kind.len()) |d| {
-        if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]]))
-            and not is_generic(module_of(d)) and reaches_struct(d, d, 0) {
-            report(Diag.RecursiveType, decl_node[d], decl_name[d]);
+        if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]])) and not is_generic(module_of(d)) {
+            // The field the cycle goes through is marked.
+            let field = reaching_field(d, d, 0);
+            if field >= 0 { report(Diag.RecursiveType, field, decl_name[d]); };
         };
     };
 }
 
-/// Whether `target` is a struct field's type in `from`, or in one it holds
-/// (through at most 64 struct types).
-fn reaches_struct(from: I32, target: I32, depth: I32) Bool {
-    if depth > 64 { return false; };
+/// The field of `from` whose struct type is `target` or holds it (through
+/// at most 64 struct types), or -1.
+fn reaching_field(from: I32, target: I32, depth: I32) I32 {
+    if depth > 64 { return -1; };
     let c = first_child(decl_node[from]);
     while (c >= 0) {
         if is_kind(c, Node.Field) {
             let t = next_sibling(first_child(c));
             if is_kind(t, Node.Ref_type) and is_kind(first_child(t), Node.Type_ident) {
                 let d = node_decl[first_child(t)];
-                if decl_is(d, Decl.Struct) and (d == target or reaches_struct(d, target, depth + 1)) { return true; };
+                if decl_is(d, Decl.Struct) and (d == target or reaching_field(d, target, depth + 1) >= 0) { return c; };
             };
         };
         c = next_sibling(c);
     };
-    false;
+    -1;
+}
+
+/// A method declared `yield T` (`fn &.each |s| () yield T`): generators
+/// are functions, expanded where a `for` names them.
+fn is_method_generator(fn_node: I32) Bool {
+    let ret = child_of_kind(fn_node, Node.Return_type);
+    ret >= 0 and is_kind(first_child(ret), Node.Yield_type) and next_sibling(first_child(first_child(fn_node))) >= 0;
+}
+
+fn validate_yield_type(node: I32) void {
+    let f = parent_of(parent_of(node));
+    if f >= 0 and is_kind(f, Node.Fn_decl) and is_method_generator(f) { report(Diag.GeneratorMethod, node, -1); };
 }
 
 /// `yield` belongs in a generator, and not in a closure inside one (the
@@ -387,7 +465,8 @@ fn validate_yield(node: I32) void {
             return;
         };
         if is_kind(p, Node.Fn_decl) {
-            if not is_generator(node_decl[last_child(first_child(p))]) { report(Diag.YieldOutside, node, -1); };
+            // (A method's `yield T` is reported.)
+            if not is_generator(node_decl[last_child(first_child(p))]) and not is_method_generator(p) { report(Diag.YieldOutside, node, -1); };
             return;
         };
         p = parent_of(p);

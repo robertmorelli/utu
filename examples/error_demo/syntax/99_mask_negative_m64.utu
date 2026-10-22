@@ -1,0 +1,6 @@
+// What: a negative literal for a mask; a mask's bits are written unsigned
+// Expect: -1 does not fit M64, as with M32
+export main() I32 {
+    let all: M64 = -1;
+    0;
+}

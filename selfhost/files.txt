@@ -24,6 +24,7 @@ mems.utu
 host.utu
 enums.utu
 diag.utu
+hints.utu
 dsl.utu
 json.utu
 json_runtime.utu

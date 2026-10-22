@@ -20,6 +20,8 @@ vec inl_local_map: I32;
 /// While copying: how far its labels move, and where a `return` goes.
 vec inl_label_offset: I32 = [0];
 vec inl_return_label: I32 = [0];
+/// The call's syntax (see w_site).
+vec inl_site: I32 = [-1];
 /// The calls found in a body.
 vec inl_calls: I32;
 
@@ -99,6 +101,7 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
     inl_label_offset[0] = label;
     let block = label + max_label(func_body[g]) + 1;
     inl_return_label[0] = block;
+    inl_site[0] = w_src[c];
     // The arguments set the parameters, in order; then the body.
     let m = w_mark();
     for (0 ..< np) |i| {
@@ -156,7 +159,10 @@ fn inl_copy(n: I32) I32 {
         op = Op.Br.to_i32();
         a = inl_return_label[0];
     };
-    w_node(Op.from_i32(op), w_type[n], a, w_b[n], m);
+    let copy = w_node(Op.from_i32(op), w_type[n], a, w_b[n], m);
+    // Its syntax, the callee's, and the call it is inlined at: a source map places it so.
+    w_src[copy] = w_src[n];
+    w_site[copy] = inl_site[0];
     w_pop();
 }
 
@@ -214,8 +220,9 @@ fn inl_assigns(n: I32, local: I32) Bool {
 //! Equality calls `output()`, whose copy asks Stay? Edit? Equality? of the
 //! same local. Inside `if (ref.test T x)`, with x assigned at most once (as
 //! every local is set before it is read, the one assignment came before the
-//! test), a test of x against U is known: true when T is U or below it,
-//! false when T is final and is not. A local whose one assignment copies
+//! test) and x not a parameter assigned at all (it starts with a value), a
+//! test of x against U is known: true when T is U or below it, false when T
+//! is final and is not. A local whose one assignment copies
 //! another (`alt` keeps its scrutinee in one) is that other. An `if` on a
 //! known condition is the branch it takes.
 
@@ -228,7 +235,8 @@ vec fold_local: I32;
 vec fold_heap: I32;
 
 fn fold_known_tests(f: I32) void {
-    let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f];
+    let params = vl_len[ht_a[func_type_of[f]]];
+    let total = params + func_local_count[f];
     fold_assigned.resize(total);
     fold_copy_of.resize(total);
     for (0 ..< total) |i| {
@@ -236,6 +244,8 @@ fn fold_known_tests(f: I32) void {
         fold_copy_of[i] = -1;
     };
     note_assigned(func_body[f]);
+    // A parameter starts with a value, so any assignment may follow a test.
+    for (0 ..< params) |i| { if fold_assigned[i] > 0 { fold_assigned[i] = 2; }; };
     fold_local.clear();
     fold_heap.clear();
     fold(func_body[f]);

@@ -125,14 +125,21 @@ fn find_closures(node: I32, body: I32) void {
         let d = node_decl[first_child(node)];
         let list = captures_of(last_child(node));
         for (0 ..< vl_len[list]) |i| { if vl_item(list, i) == d { decl_boxed[d] = 1; }; };
+        // Its type is the one written, or the closure's own when it spells
+        // all of it: a closure naming itself cannot wait for its body's.
+        if decl_boxed[d] == 1 and next_sibling(first_child(node)) == last_child(node) and not fully_typed(last_child(node)) {
+            let u = self_use(last_child(node), d);
+            report(Diag.SelfUntyped, if u >= 0 { u; } else { node; }, decl_name[d]);
+        };
     };
     if is_kind(node, Node.Closure_expr) {
         let list = captures_of(node);
         for (0 ..< vl_len[list]) |i| {
             let d = vl_item(list, i);
-            // Only variables bound by a let or as a parameter can live in a box.
+            // Variables bound by a let, a parameter, a capture, an arm, or a catch.
             let k = decl_kind[d];
-            let bindable = k == Decl.Local.to_i32() or k == Decl.Param.to_i32() or k == Decl.SelfParam.to_i32() or k == Decl.ClosureParam.to_i32();
+            let bindable = k == Decl.Local.to_i32() or k == Decl.Param.to_i32() or k == Decl.SelfParam.to_i32() or k == Decl.ClosureParam.to_i32()
+                or k == Decl.Capture.to_i32() or k == Decl.ArmBinding.to_i32() or k == Decl.Promoted.to_i32() or k == Decl.Caught.to_i32();
             if bindable and assigned_after_capture(d, node, body) { decl_boxed[d] = 1; };
         };
     };
@@ -167,15 +174,38 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
         if is_kind(p, Node.Closure_expr) and not node_contains(p, decl) { return true; };
         p = parent_of(p);
     };
-    // After the capture (or in the closure).
-    if tok_start[node_first[write]] > tok_start[node_first[closure]] { return true; };
+    // After the capture (or in the closure), or of the closure itself (`f = cl() { … f … }`).
+    if tok_start[node_first[write]] > tok_start[node_first[closure]] or node_contains(write, closure) { return true; };
     // In a loop around the closure, within d's scope.
     p = parent_of(closure);
     while (p >= 0 and not node_contains(p, decl)) {
-        if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr)) and node_contains(p, write) { return true; };
+        if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr) or is_kind(p, Node.Loop_match_expr)) and node_contains(p, write) { return true; };
         p = parent_of(p);
     };
     false;
+}
+
+/// Whether a closure literal spells its whole type: each parameter's and its result's.
+fn fully_typed(closure: I32) Bool {
+    let list = child_of_kind(closure, Node.Closure_param_list);
+    let p = if list >= 0 { first_child(list); } else { -1; };
+    while (p >= 0) {
+        if next_sibling(first_child(p)) < 0 { return false; };
+        p = next_sibling(p);
+    };
+    child_of_kind(closure, Node.Return_type) >= 0;
+}
+
+/// The first name under `node` that refers to `d`, or -1.
+fn self_use(node: I32, d: I32) I32 {
+    if is_kind(node, Node.Identifier) and node_decl[node] == d { return node; };
+    let c = first_child(node);
+    while (c >= 0) {
+        let u = self_use(c, d);
+        if u >= 0 { return u; };
+        c = next_sibling(c);
+    };
+    -1;
 }
 
 /// Whether node `outer` spans node `inner`.
@@ -202,6 +232,15 @@ fn box_type(vt: I32) I32 {
 /// local, or in a new box its local holds.
 fn bind_value(d: I32, t: I32, m: I32) void {
     let vt = repr(t);
+    if vt >= vt_tuple {
+        // A tuple: a local each, in a row from decl_local.
+        let list = vt - vt_tuple;
+        let first = new_local(vl_item(list, 0));
+        for (1 ..< vl_len[list]) |i| { new_local(vl_item(list, i)); };
+        decl_local[d] = first;
+        set_tuple(first, list, m);
+        return;
+    };
     if decl_boxed[d] == 1 {
         let h = box_type(vt);
         w_node(Op.StructNew, vt_ref(h, false), h, 0, m);
@@ -215,9 +254,45 @@ fn bind_value(d: I32, t: I32, m: I32) void {
     w_node(Op.LocalSet, vt_none, local, 0, m);
 }
 
+/// Bind `d` (of type `t`) to the value in `local`: d is that local, or,
+/// when boxed, a new box filled from it.
+fn bind_local(d: I32, t: I32, local: I32) void {
+    decl_ty[d] = t;
+    if decl_boxed[d] == 0 {
+        decl_local[d] = local;
+        return;
+    };
+    let vt = repr(t);
+    let m = w_mark();
+    w_get(cur_locals[local], local);
+    if cur_locals[local] != vt { w_node(Op.RefAsNonNull, vt, 0, 0, m); };
+    bind_value(d, t, m);
+}
+
+/// The tuple on the stack (since `m`, of value types `list`) into the locals
+/// from `first` on (the last on top).
+fn set_tuple(first: I32, list: I32, m: I32) void {
+    let k = vl_len[list] - 1;
+    while (k >= 0) {
+        w_leaf(Op.LocalSet, vt_none, first + k, 0);
+        k -= 1;
+    };
+    w_node(Op.Seq, vt_none, 0, 0, m);
+}
+
 /// Push the value of declaration `d` (of type `t`).
 fn read_value(d: I32, t: I32) void {
     let vt = repr(t);
+    // A name bound to a value that never arrives (`let z = fatal;`).
+    if vt == vt_unreachable {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return;
+    };
+    if vt >= vt_tuple {
+        let list = vt - vt_tuple;
+        for (0 ..< vl_len[list]) |i| { w_leaf(Op.LocalGet, vl_item(list, i), decl_local[d] + i, 0); };
+        return;
+    };
     if decl_boxed[d] == 1 {
         let h = box_type(vt);
         let m = w_mark();
@@ -231,13 +306,15 @@ fn read_value(d: I32, t: I32) void {
 /// A write to `d` begins: a box is pushed first, its value to follow (see
 /// @write_end).
 fn write_begin(d: I32, t: I32) void {
-    if decl_boxed[d] == 1 { w_leaf(Op.LocalGet, vt_ref(box_type(repr(t)), true), decl_local[d], 0); };
+    if decl_boxed[d] == 1 and repr(t) < vt_tuple { w_leaf(Op.LocalGet, vt_ref(box_type(repr(t)), true), decl_local[d], 0); };
 }
 
 /// A write to `d` ends: the value on the stack since `m` goes into its box
 /// (pushed by @write_begin) or its local.
 fn write_end(d: I32, t: I32, m: I32) void {
-    if decl_boxed[d] == 1 {
+    if repr(t) >= vt_tuple {
+        set_tuple(decl_local[d], repr(t) - vt_tuple, m);
+    } else if decl_boxed[d] == 1 {
         w_node(Op.StructSet, vt_none, box_type(repr(t)), 0, m);
     } else {
         w_node(Op.LocalSet, vt_none, decl_local[d], 0, m);
@@ -282,7 +359,15 @@ fn save_function() void {
     for (0 ..< cur_locals.len()) |i| { saved_locals.push(cur_locals[i]); };
     saved_marks.push(cur_params[0]);
     saved_marks.push(next_label[0]);
-    saved_marks.push(saved_loops.len());
+    saved_marks.push(hide_loops());
+    cur_locals.clear();
+    next_label[0] = 0;
+}
+
+/// Set the loops aside, so that none is in reach; where they went in
+/// @saved_loops, for @show_loops.
+fn hide_loops() I32 {
+    let at = saved_loops.len();
     for (0 ..< loop_break.len()) |i| {
         saved_loops.push(loop_break[i]);
         saved_loops.push(loop_continue[i]);
@@ -291,9 +376,24 @@ fn save_function() void {
         saved_loops.push(loop_defers[i]);
         saved_loops.push(loop_break_defers[i]);
     };
-    cur_locals.clear();
     clear_loops();
-    next_label[0] = 0;
+    at;
+}
+
+/// Bring back the loops @hide_loops set aside at `at`.
+fn show_loops(at: I32) void {
+    clear_loops();
+    let i = at;
+    while (i < saved_loops.len()) {
+        loop_break.push(saved_loops[i]);
+        loop_continue.push(saved_loops[i + 1]);
+        loop_state.push(saved_loops[i + 2]);
+        loop_state_type.push(saved_loops[i + 3]);
+        loop_defers.push(saved_loops[i + 4]);
+        loop_break_defers.push(saved_loops[i + 5]);
+        i += 6;
+    };
+    saved_loops.resize(at);
 }
 
 /// Bring back what @save_function set aside.
@@ -310,18 +410,7 @@ fn restore_function() void {
     saved_locals.resize(locals_at);
     cur_params[0] = params;
     next_label[0] = label;
-    clear_loops();
-    let i = loops_at;
-    while (i < saved_loops.len()) {
-        loop_break.push(saved_loops[i]);
-        loop_continue.push(saved_loops[i + 1]);
-        loop_state.push(saved_loops[i + 2]);
-        loop_state_type.push(saved_loops[i + 3]);
-        loop_defers.push(saved_loops[i + 4]);
-        loop_break_defers.push(saved_loops[i + 5]);
-        i += 6;
-    };
-    saved_loops.resize(loops_at);
+    show_loops(loops_at);
 }
 
 //! = Closure literals
@@ -367,6 +456,19 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
             else if expected >= 0 and i < vl_len[ty_a[expected]] { vl_item(ty_a[expected], i); }
             else { -1; };
         if t < 0 {
+            // A closure where something else is wanted (as `Str`): that mismatch.
+            if exp >= 0 and not is_foreign(exp) and not ty_is(exp, Ty.Error) {
+                let mt = vl_begin();
+                let q = first_child(list);
+                while (q >= 0) {
+                    let q_type = next_sibling(first_child(q));
+                    vl_add(if q_type >= 0 { type_of(q_type, cx.inst); } else { ty_error(); });
+                    q = next_sibling(q);
+                };
+                let r_node = child_of_kind(node, Node.Return_type);
+                mismatch(node, expect, ty(Ty.Closure, vl_end(mt), if r_node >= 0 { type_of(r_node, cx.inst); } else { ty_error(); }));
+                return error_value();
+            };
             // Host declarations type the closures handed to them.
             if has_foreign() { return unsupported(node); };
             report(Diag.ClosureParamType, p, word_of(first_child(p)));
@@ -389,6 +491,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     for (0 ..< ncap) |k| {
         cap_types[k] = decl_ty[vl_item(caps, k)];
         cap_locals[k] = decl_local[vl_item(caps, k)];
+        if ty_is(cap_types[k], Ty.Tuple) {
+            report2(Diag.TupleLet, node, decl_name[vl_item(caps, k)], cap_types[k], 2);
+            return error_value();
+        };
     };
     // The environment: the captured values (boxes for boxed variables).
     let env_vts = Array[I32].new(ncap, 0);

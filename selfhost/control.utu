@@ -27,26 +27,16 @@ fn pattern_value(lit: I32, t: I32) I64 {
     };
     let negate = tok_kind[node_first[lit]] == Tok.Minus.to_i32();
     if is_kind(c, Node.Float_lit) {
-        if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; };
-        let text = "";
-        for (tok_start[node_first[c]] ..< tok_end[node_first[c]]) |i| { text = text + Str.from_code_point(src[i]); };
-        let f = parse_number(text);
-        if negate { f = 0.0 - f; };
-        return float_bits(f, t);
+        if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; return 0; };
+        if not literal_fits(c, t, negate) { pattern_fault[0] = 0; };
+        return literal_bits(c, t, negate);
     };
-    let v = int_value(c);
-    if negate { v = 0 - v; };
-    if is_float(t) { return float_bits(v.to_f64(), t); };
+    let v = literal_bits(c, t, negate);
     if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v; };
-    if not is_numeric(t) and not decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };
-    if not fits(v, t, negate) { pattern_fault[0] = 0; };
+    if decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };
+    if not is_numeric(t) { pattern_fault[0] = 3; return v; };
+    if not literal_fits(c, t, negate) { pattern_fault[0] = 0; };
     v;
-}
-
-/// The bits of `f` as float type `t` (F32 or F64).
-fn float_bits(f: F64, t: I32) I64 {
-    if t == prelude(Prelude.F32) { return f.to_f32().bits().to_i64(); };
-    f.bits();
 }
 
 /// Push the comparison of local `s` (of type `t`) with a pattern's value.
@@ -91,6 +81,8 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     // The arms and their values.
     let first_arm = arm_nodes.len();
     let default_ = -1;
+    let faulted = false;
+    let unknown_arm = false;
     let c = next_sibling(scrutinee);
     pattern_fault.resize(1);
     while (c >= 0) {
@@ -99,14 +91,20 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
             pattern_fault[0] = -1;
             let v = pattern_value(first_child(c), st);
             let fault = pattern_fault[0];
+            if fault >= 0 { faulted = true; };
             if fault == 4 {
                 let p = first_child(first_child(c));
                 report2(Diag.UnknownVariant, c, word_of(next_sibling(p)), st, -1);
+                suggest_member(ty_decl(st), next_sibling(p), Space.Member);
+                unknown_arm = true;
             } else if fault >= 0 {
                 report2(Diag.MatchPattern, c, -1, fault, st);
             } else {
                 for (first_arm ..< arm_nodes.len()) |k| {
-                    if arm_values[k] == v { report(Diag.DuplicatePattern, c, -1); };
+                    if arm_values[k] == v {
+                        report(Diag.DuplicatePattern, c, -1);
+                        diag_place(Extra.Related, first_child(arm_nodes[k]), "first here");
+                    };
                 };
                 arm_nodes.push(c);
                 arm_values.push(v);
@@ -115,7 +113,8 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
         c = next_sibling(c);
     };
     let last_arm = arm_nodes.len();
-    if default_ < 0 { match_exhaustive(node, st, first_arm, last_arm); };
+    // A pattern already reported, or an arm naming no variant, is the mistake: what it misses is no news.
+    if default_ < 0 and not faulted and not unknown_arm { match_exhaustive(node, st, first_arm, last_arm); };
     let t = -1;
     if looping {
         t = loop_match(s, st, first_arm, last_arm, default_, cx);
@@ -324,6 +323,7 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     let m = w_mark();
     coerce(check_expr(first_child(node), t, cx), t, first_child(node));
     w_node(Op.LocalSet, vt_none, loop_state[k], 0, m);
+    run_defers(loop_defers[k], cx);
     w_leaf(Op.Br, vt_unreachable, loop_continue[k], 0);
     w_node(Op.Seq, vt_unreachable, 0, 0, m);
     ty_never();
@@ -340,6 +340,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let et = check_expr(e, -1, cx);
     if ty_is(et, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_dynamic(et) { et = dynamic_nullable(et); };
     if not ty_is(et, Ty.Nullable) {
         report2(Diag.NotNullable, e, -1, et, -1);
         return error_since(m);
@@ -354,8 +355,20 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     w_node(Op.Plain, vt_i32, 69, 0, mc);
     let mt = w_mark();
     let d = node_decl[binding];
-    decl_local[d] = s;
-    decl_ty[d] = inner;
+    // A nullable number or Bool from the host: the binding is the primitive.
+    let local = s;
+    let bt = inner;
+    let boxed = boxed_primitive(inner);
+    if boxed >= 0 {
+        let mu = w_mark();
+        w_leaf(Op.LocalGet, repr(et), s, 0);
+        foreign_unbox(inner, boxed, false);
+        let u = new_local(repr(boxed));
+        w_node(Op.LocalSet, vt_none, u, 0, mu);
+        local = u;
+        bt = boxed;
+    };
+    bind_local(d, bt, local);
     let t = -1;
     if default_ < 0 {
         discard(check_expr(arm, ty_void(), cx));
@@ -381,15 +394,39 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let at = check_expr(a, if expect >= 0 { nullable(expect); } else { -1; }, cx);
     if ty_is(at, Ty.Error) { return finish_error(-1, m, cx); };
+    if is_dynamic(at) { at = dynamic_nullable(at); };
     if not ty_is(at, Ty.Nullable) {
         report2(Diag.NotNullable, a, -1, at, -1);
         return error_since(m);
     };
     let t = ty_a[at];
+    // A nullable number or Bool from the host: the value is the primitive.
+    let boxed = boxed_primitive(t);
     // `x orelse fatal`: wasm's own null check, with no branch.
     if is_kind(b, Node.Fatal_expr) {
         w_node(Op.RefAsNonNull, repr(t), 0, 0, m);
+        if boxed >= 0 {
+            foreign_unbox(t, boxed, false);
+            return boxed;
+        };
         return t;
+    };
+    if boxed >= 0 {
+        let s = new_local(repr(at));
+        w_node(Op.LocalSet, vt_none, s, 0, m);
+        let mi = w_mark();
+        w_leaf(Op.LocalGet, repr(at), s, 0);
+        w_node(Op.RefIsNull, vt_i32, 0, 0, mi);
+        let mt = w_mark();
+        coerce(check_expr(b, boxed, cx), boxed, b);
+        w_node(Op.Seq, repr(boxed), 0, 0, mt);
+        let me = w_mark();
+        w_leaf(Op.LocalGet, repr(at), s, 0);
+        foreign_unbox(t, boxed, false);
+        w_node(Op.Seq, repr(boxed), 0, 0, me);
+        w_node(Op.If, repr(boxed), new_label(), 0, mi);
+        w_node(Op.Seq, repr(boxed), 0, 0, m);
+        return boxed;
     };
     let s = new_local(repr(at));
     w_node(Op.LocalSet, vt_none, s, 0, m);
@@ -450,9 +487,8 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     if binding >= 0 {
         let d = node_decl[binding];
         let local = new_local(vt_externref);
-        decl_local[d] = local;
-        decl_ty[d] = prelude(Prelude.Externref);
         w_leaf(Op.LocalSet, vt_none, local, 0);
+        bind_local(d, prelude(Prelude.Externref), local);
     } else {
         w_leaf(Op.Drop, vt_none, 0, 0);
     };
@@ -597,9 +633,8 @@ fn check_let_tuple(node: I32, cx: Cx) I32 {
         let d = node_decl[names[k]];
         let et = vl_item(ty_a[t], k);
         let local = new_local(repr(et));
-        decl_local[d] = local;
-        decl_ty[d] = et;
         w_leaf(Op.LocalSet, vt_none, local, 0);
+        bind_local(d, et, local);
         k -= 1;
     };
     w_node(Op.Seq, vt_none, 0, 0, m);
@@ -727,8 +762,9 @@ fn check_for(node: I32, cx: Cx) I32 {
     let brk = new_label();
     let top = new_label();
     let next = new_label();
-    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) {
-        let d = if capture >= 0 { node_decl[first_child(capture)]; } else { -1; };
+    let d0 = if capture >= 0 { node_decl[first_child(capture)]; } else { -1; };
+    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0)) {
+        let d = d0;
         if d >= 0 {
             decl_ty[d] = types[0];
             decl_local[d] = counters[0];
@@ -765,8 +801,10 @@ fn check_for(node: I32, cx: Cx) I32 {
             let heap = vt_heap(cur_locals[arrays[k]]);
             w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
             w_node(Op.LocalSet, vt_none, local, 0, mg);
+            bind_local(d, types[k], local);
         } else {
-            decl_local[d] = counters[k];
+            // A boxed counter: a box per round, read back before the step.
+            bind_local(d, types[k], counters[k]);
         };
         k += 1;
         c = next_sibling(c);
@@ -776,7 +814,31 @@ fn check_for(node: I32, cx: Cx) I32 {
     discard(check_block(block, ty_void(), cx));
     leave_loop();
     w_node(Op.Block, vt_none, next, 0, mn);
-    for (0 ..< n) |j| { step_counter(counters[j], if kinds[j] == 2 { vt_i32; } else { repr(types[j]); }); };
+    k = 0;
+    c = if capture >= 0 { first_child(capture); } else { -1; };
+    while (c >= 0) {
+        if kinds[k] != 2 and decl_boxed[node_decl[c]] == 1 {
+            let mr = w_mark();
+            read_value(node_decl[c], types[k]);
+            w_node(Op.LocalSet, vt_none, counters[k], 0, mr);
+        };
+        k += 1;
+        c = next_sibling(c);
+    };
+    for (0 ..< n) |j| {
+        let vt = if kinds[j] == 2 { vt_i32; } else { repr(types[j]); };
+        if kinds[j] == 1 {
+            // Through the end: it is the last before the step, which could wrap
+            // past the type's largest value.
+            let unsigned = types[j] == prelude(Prelude.U32) or types[j] == prelude(Prelude.U64);
+            let mc = w_mark();
+            w_leaf(Op.LocalGet, vt, counters[j], 0);
+            w_leaf(Op.LocalGet, vt, ends[j], 0);
+            w_node(Op.Plain, vt_i32, past_end_op(vt, unsigned, false), 0, mc);
+            w_node(Op.BrIf, vt_none, brk, 0, mc);
+        };
+        step_counter(counters[j], vt);
+    };
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, mb);

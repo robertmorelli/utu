@@ -214,7 +214,7 @@ fn declared_type(type: Str) I32 {
     if is_kind(jp_container[0], Node.Module_decl) {
         let item = first_child(jp_container[0]);
         while (item >= 0) {
-            if (is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl)) and word_of(first_child(item)) == w { return item; };
+            if (is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl)) and type_word(item) == w { return item; };
             item = next_sibling(item);
         };
         return -1;
@@ -227,7 +227,7 @@ fn find_declared(node: I32, w: I32) I32 {
     let found = -1;
     let c = first_child(node);
     while (c >= 0) {
-        if (is_kind(c, Node.Struct_decl) or is_kind(c, Node.Enum_decl)) and word_of(first_child(c)) == w { found = c; };
+        if (is_kind(c, Node.Struct_decl) or is_kind(c, Node.Enum_decl)) and type_word(c) == w { found = c; };
         if is_kind(c, Node.Module_decl) {
             let inner = find_declared(c, w);
             if inner >= 0 { found = inner; };
@@ -236,6 +236,12 @@ fn find_declared(node: I32, w: I32) I32 {
     };
     found;
 }
+
+/// A struct's or enum's name (after an integer enum's representation).
+fn type_word(node: I32) I32 { word_of(if is_kind(node, Node.Enum_decl) { enum_name(node); } else { first_child(node); }); }
+
+/// A field-less variant as a value: `Red {}`, or an integer enum's `Level.Low`.
+fn json_variant(node: I32, type: Str, vname: Str) Str { if is_int_enum(node) { type + "." + vname; } else { vname + " {}"; }; }
 
 fn variant_fields(variant: I32) I32 {
     let c = next_sibling(first_child(variant));
@@ -333,7 +339,8 @@ fn json_zero(written: Str, visiting: I32) Str {
                 v = next_sibling(v);
             };
             if usable < 0 { json_fail(type + " has no variant without a recursive field"); };
-            body = word_text(word_of(first_child(usable))) + " { " + construct_fields(fields_holder_of(usable), next) + " }";
+            let vname = word_text(word_of(first_child(usable)));
+            body = if is_int_enum(node) { json_variant(node, type, vname); } else { vname + " { " + construct_fields(fields_holder_of(usable), next) + " }"; };
         };
         json_emit("fn " + name + "() " + type + " {\n    " + body + ";\n}");
     };
@@ -501,11 +508,11 @@ fn enum_reader(name: Str, type: Str) Str {
         while (v >= 0) {
             if is_kind(v, Node.Variant) {
                 let vname = word_text(word_of(first_child(v)));
-                arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n        out = " + vname + " {};\n    } else ";
+                arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n        out = " + json_variant(node, type, vname) + ";\n    } else ";
             };
             v = next_sibling(v);
         };
-        return "fn " + name + "(r: JsonReader__) " + type + " {\n    let out: " + type + " = " + zero_value + ";\n    __json_span(r);\n    " + arms + "{\n        __json_fail(r, " + unknown + ");\n    };\n    out;\n}";
+        return "fn " + name + "(r: JsonReader__) " + type + " {\n    let out: " + type + " = " + zero_value + ";\n    __json_ws(r);\n    let start = r.at;\n    __json_span(r);\n    " + arms + "{\n        r.at = start;\n        __json_fail(r, " + unknown + ");\n    };\n    out;\n}";
     };
     let arms = "";
     let v = first_child(node);
@@ -523,7 +530,7 @@ fn enum_reader(name: Str, type: Str) Str {
     };
     let kind_ref = name_ref("kind");
     "fn " + name + "(r: JsonReader__) " + type + " {\n    let out: " + type + " = " + zero_value + ";\n    __json_open(r, 123, \"expected an object\");\n    if __json_first(r, 125) {\n        __json_span(r);\n        if not __json_is(r, " + kind_ref
-        + ") {\n            __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n        };\n        __json_colon(r);\n        __json_span(r);\n        " + arms + "{\n            __json_fail(r, " + unknown
+        + ") {\n            __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n        };\n        __json_colon(r);\n        __json_ws(r);\n        let start = r.at;\n        __json_span(r);\n        " + arms + "{\n            r.at = start;\n            __json_fail(r, " + unknown
         + ");\n        };\n    } else {\n        __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n    };\n    out;\n}";
 }
 
@@ -556,7 +563,8 @@ fn json_write(written: Str, value: Str, w: Str) Str {
                     if not first { arms = arms + "\n"; };
                     first = false;
                     let holder = variant_fields(v);
-                    if not tagged { arms = arms + "        " + vname + " => {\n            " + tag + "\n        },"; }
+                    if is_int_enum(node) { arms = arms + "if v == " + json_variant(node, type, vname) + " {\n        " + tag + "\n    } else "; }
+                    else if not tagged { arms = arms + "        " + vname + " => {\n            " + tag + "\n        },"; }
                     else {
                         let kind_ = "__json_name(w, 123, " + name_ref("kind") + ");\n            " + tag;
                         if holder < 0 or child_count_of(holder, Node.Field) == 0 { arms = arms + "        " + vname + " => {\n            " + kind_ + "\n            __json_put(w, 125);\n        },"; }
@@ -565,7 +573,7 @@ fn json_write(written: Str, value: Str, w: Str) Str {
                 };
                 v = next_sibling(v);
             };
-            body = "alt v {\n" + arms + "\n        ~> {},\n    };";
+            body = if is_int_enum(node) { arms + "{};"; } else { "alt v {\n" + arms + "\n        ~> {},\n    };"; };
         };
         json_emit("fn " + name + "(w: JsonWriter__, v: " + type + ") void {\n    " + body + "\n}");
     };
@@ -640,9 +648,9 @@ fn sc_until(raw: Str, stops: Str) Str {
     let depth = 0;
     while (i < raw.len()) {
         let c = raw.get(i);
-        if c == 34 {
+        if c == 34 or c == 96 {
             i += 1;
-            while (i < raw.len() and raw.get(i) != 34) { i += if raw.get(i) == 92 { 2; } else { 1; }; };
+            while (i < raw.len() and raw.get(i) != c) { i += if raw.get(i) == 92 { 2; } else { 1; }; };
             i += 1;
         } else if text_at(raw, i, "//") {
             while (i < raw.len() and raw.get(i) != 10) { i += 1; };
@@ -683,6 +691,35 @@ fn sc_string(raw: Str) Str {
     if j >= raw.len() { return ""; };
     sc_at[0] = j + 1;
     raw.slice(i, j + 1);
+}
+
+/// What a JSON string literal (with its quotes) says: its escapes decoded.
+fn json_unescape(quoted: Str) Str {
+    let out = "";
+    let i = 1;
+    let end = quoted.len() - 1;
+    while (i < end) {
+        let c = quoted.get(i);
+        i += 1;
+        if c == 92 and i < end {
+            let e = quoted.get(i);
+            i += 1;
+            if e == 117 and i + 4 <= end {
+                let v = 0;
+                for (0 ..< 4) |k| {
+                    let h = quoted.get(i + k);
+                    v = v * 16 + (if h >= 97 { h - 87; } else if h >= 65 { h - 55; } else { h - 48; });
+                };
+                i += 4;
+                out = out + Str.from_code_point(v);
+            } else {
+                out = out + Str.from_code_point(if e == 110 { 10; } else if e == 116 { 9; } else if e == 114 { 13; } else if e == 98 { 8; } else if e == 102 { 12; } else { e; });
+            };
+        } else {
+            out = out + Str.from_code_point(c);
+        };
+    };
+    out;
 }
 
 // Patterns: object (its fields' patterns, linked), capture, or literal.
@@ -741,7 +778,7 @@ fn parse_pattern(raw: Str) I32 {
         while (not sc_peek(raw, "}")) {
             let key_start = sc_ws(raw);
             let quoted = sc_string(raw);
-            let key = if quoted.len() > 0 { quoted.slice(1, quoted.len() - 1); } else { sc_word(raw, true); };
+            let key = if quoted.len() > 0 { json_unescape(quoted); } else { sc_word(raw, true); };
             if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at[0], 1); };
             let written = if quoted.len() > 0 { quoted.len(); } else { key.len(); };
             let f = pat_first[p];
@@ -847,17 +884,10 @@ fn sc_keyword(raw: Str) Str {
     "";
 }
 
-/// Whether a pattern can be satisfied when its field is absent.
+/// Whether a pattern can be satisfied when its field is absent: only a
+/// `?T` capture or one with a default; an object pattern needs its object.
 fn pattern_optional(p: I32) Bool {
     if pat_is(p, Pat.Capture) { return word_text(pat_type[p]).get(0) == 63 or pat_fallback[p] >= 0; };
-    if pat_is(p, Pat.Object) {
-        let f = pat_first[p];
-        while (f >= 0) {
-            if not pattern_optional(f) { return false; };
-            f = pat_next[f];
-        };
-        return true;
-    };
     false;
 }
 
@@ -1018,7 +1048,7 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
         let expected = js_string("expected " + text);
         let c = text.get(0);
         let check = if c == 34 {
-            "__json_span(" + r + "); if " + r + ".failed == 0 and not __json_is(" + r + ", " + name_ref(text.slice(1, text.len() - 1)) + ") { __json_fail(" + r + ", " + expected + "); };";
+            "__json_span(" + r + "); if " + r + ".failed == 0 and not __json_is(" + r + ", " + name_ref(json_unescape(text)) + ") { __json_fail(" + r + ", " + expected + "); };";
         } else if c == 116 or c == 102 {
             "if __json_bool(" + r + ") != " + text + " { __json_fail(" + r + ", " + expected + "); };";
         } else if c == 110 {
@@ -1049,8 +1079,11 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
         + ", 125);\n        while (" + more + ") { __json_span(" + r + "); __json_colon(" + r + "); " + arms + "{ __json_skip(" + r + "); }; " + more + " = __json_next(" + r + ", 125); };\n        " + required;
 }
 
-/// A JSON number as a utu F64 literal: `3` is `3.0`.
+/// A JSON number as a utu F64 literal: `3` is `3.0`, `1e5` is `1.0e5`.
 fn float_text(text: Str) Str {
-    if text_index(text, ".", 0) >= 0 or text_index(text, "e", 0) >= 0 or text_index(text, "E", 0) >= 0 { return text; };
-    text + ".0";
+    if text_index(text, ".", 0) >= 0 { return text; };
+    let e = text_index(text, "e", 0);
+    if e < 0 { e = text_index(text, "E", 0); };
+    if e < 0 { return text + ".0"; };
+    text.slice(0, e) + ".0" + text.slice(e, text.len());
 }

@@ -1,0 +1,12 @@
+// What: an optional chain `?.` with orelse, which would skip the whole assignment when the chain is null.
+// Expect: ?. only in a statement; for a value, use promote
+struct Node:
+    | name: ?Str
+    | next: ?Node
+
+export main() Str {
+    let head = Node { name: "a", next: null };
+    let second = "none";
+    second = head.next?.name orelse "default";
+    second;
+}

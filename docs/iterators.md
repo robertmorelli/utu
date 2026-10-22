@@ -117,6 +117,11 @@ reuse results; iterator pipelines are not lazy values that escape their scope.
 These operators are synchronous. Promises and push streams are separate from
 this feature.
 
+A recursive generator (one with `for (g(…)) |v| { yield v; }` in its own body)
+runs each call's whole body before its values are consumed, so a call's side
+effects come before its yields reach the loop; values still arrive in
+depth-first order.
+
 ## Additional operators
 
 ```utu

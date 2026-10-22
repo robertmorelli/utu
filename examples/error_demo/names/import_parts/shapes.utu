@@ -1,0 +1,8 @@
+// A file the programs beside it import: its helper and its alias are its own.
+using mathops |ops| from "./mathops.utu";
+
+fn helper() I32 { 2; }
+
+mod shapes {
+    fn area(side: I32) I32 { ops.double(side * side) / helper(); }
+}

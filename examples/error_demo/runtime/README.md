@@ -63,9 +63,9 @@ once here and written `<usage>` after that.
 
 ## Options before the file
 
-    $ node cli/utu.mjs run -O3 $R/56_main_void_ok.utu
-    stderr: -O3: file not found
-    exit 1
+    $ node cli/utu.mjs run -O fast $R/56_main_void_ok.utu
+    stdout: 42
+    exit 0                                                 # options go anywhere
 
 ## Bad -O flag (and other unknown flags)
 
@@ -76,8 +76,12 @@ once here and written `<usage>` after that.
 ## Extra file argument
 
     $ node cli/utu.mjs check $R/56_main_void_ok.utu extra_arg.utu
-    stdout: ok
-    exit 0                                                 # extra_arg.utu (which does not exist) ignored
+    stderr: ERROR  Extra argument extra_arg.utu
+    exit 1
+
+    $ node cli/utu.mjs run $R/56_main_void_ok.utu -o out
+    stderr: ERROR  -o is only for build and build-exe
+    exit 1
 
 ## Not a utu file
 
@@ -149,9 +153,8 @@ once here and written `<usage>` after that.
 ## build: -o with no value
 
     $ node cli/utu.mjs build $R/56_main_void_ok.utu -o
-    stdout: 56_main_void_ok.wasm  37 bytes
-            56_main_void_ok.mjs   412 bytes
-    exit 0                                                 # wrote into the current directory
+    stderr: ERROR  -o needs a directory
+    exit 1
 
 ## check on a file with several errors
 

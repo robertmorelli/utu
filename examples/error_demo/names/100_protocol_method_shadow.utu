@@ -1,0 +1,15 @@
+// What: a function on a protocol with the name of one of its methods
+// Expect: Sh.area is already a protocol member
+proto Sh:
+    | area() I32
+
+struct Sq[Sh]:
+    | s: I32
+
+fn Sh[Sq].area |q| () I32 { q.s * q.s; }
+fn Sh.area |x| () I32 { 0; }
+
+export main() I32 {
+    let s: Sh = Sq { s: 3 };
+    s.area();
+}
