@@ -593,7 +593,22 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
     if k == Known.IrV128Const.to_i32() {
         // bytes="b0,…,b15" in w_aux as four little-endian words
         let a = x_attr(x, intern_text("bytes"));
-        if a < 0 { return -1; };
+        if a < 0 {
+            ir_malformed(x);
+            return -1;
+        };
+        // Up to sixteen bytes, each written in decimal, separated by commas.
+        let commas = 0;
+        for (attr_start[a] ..< attr_end[a]) |i| {
+            if src[i] == 44 { commas += 1; } else if src[i] < 48 or src[i] > 57 {
+                ir_malformed(x);
+                return -1;
+            };
+        };
+        if commas > 15 {
+            ir_malformed(x);
+            return -1;
+        };
         let at = w_aux.len();
         for (0 ..< 4) |i| { w_aux.push(0); };
         let i = attr_start[a];

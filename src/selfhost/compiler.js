@@ -594,7 +594,7 @@ async function validIr(utu, size) {
     return size;
   } catch (error) {
     if (!(error instanceof WebAssembly.CompileError)) throw error;
-    const bytes = encoder.encode(String(error.message).replace(/^WebAssembly\.\w+\(\): /, ''));
+    const bytes = encoder.encode(String(error.message).replace(/^WebAssembly\.\w+(\(\): | doesn't validate: )/, ''));
     const at = utu.ir_invalid_room(bytes.length);
     new Uint8Array(utu.src.buffer).set(bytes, at);
     utu.ir_invalid_report(at, bytes.length);

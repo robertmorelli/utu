@@ -791,6 +791,12 @@ export lib {
     ['const mem a: U8 = @embed/\\ \\/;\nexport main() I32 { a.len(); }\n', '@embed needs a file path'],
     ['enum(U8) Color: | Red | Green | Blue\nconst mem cs: Color = [2, 7, 1];\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
     ['enum(U8) Color: | Red | Green | Blue\nfn cs_() Array[I32] { [2, 7]; }\nconst mem cs: Color = @comptime/\\ cs_() \\/;\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    // A program's @ir: what the compiler would crash on, or not see, is a mistake at the body.
+    ['fn f(a: I32) I32 { @ir/\\ <ir-array-len><ir-ident name="a"/></ir-array-len> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-array-len> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-string-from-codes><ir-ident name="a"/></ir-string-from-codes> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-string-from-codes> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-lit value="1"/> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { f(1); }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-ident name="a"/> junk \\/; }\nexport main() I32 { f(1); }\n', '@ir body is empty or not well-formed IR'],
     ['fn f(c: I32, a: I32) I32 { @wat/\\ local.get $a local.get $a local.get $c select (param i32) \\/; }\nexport main() I32 { f(1, 2); }\n', 'select takes only (result t)'],
     [`export main() I32 { ${'@utu/\\ '.repeat(17)}1${' \\/'.repeat(17)}; }\n`, 'DSLs nested too deeply (max 16)'],
     ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nexport main() I32 { 1; }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
@@ -803,6 +809,11 @@ export lib {
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
+
+  // A program's @ir that makes invalid Wasm: said at the body, before the engine fails.
+  const badIr = await selfhost(await write('fn f(a: F64, b: F64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }\nexport main() I32 { f(1.0, 2.0); }\n'));
+  assert.ok(badIr.errors?.some(e => e.startsWith('@ir in f does not make valid Wasm: ')), String(badIr.errors));
+  checked++;
 
   // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
   const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));

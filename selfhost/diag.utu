@@ -606,6 +606,7 @@ fn diag_text(i: I32) Str {
         Diag.UnknownMember => word_text(diag_c[i]) + " has no member " + w,
         Diag.DslPlace => {
             if w == "embed" or w == "comptime" { return "@" + w + " only fills a mem"; };
+            if w == "ir" { return "@ir body is empty or not well-formed IR"; };
             "No DSL @" + w;
         },
         Diag.AltNotEnum => {
