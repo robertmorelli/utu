@@ -112,6 +112,10 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.equal(r.status, 0, r.stderr);
   const loaded = await import(pathToFileURL(path.join(dir, 'out', 'good.mjs')).href);
   assert.equal(loaded.exports.main(), 6);
+  // Beside its source, the default.
+  r = utu('build', 'good.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal((await import(pathToFileURL(path.join(dir, 'good.mjs')).href)).exports.main(), 6);
 
   if (spawnSync('bun', ['--version']).status === 0) {
     r = utu('build-exe', 'good.utu', '-o', 'good');

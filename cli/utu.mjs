@@ -186,7 +186,8 @@ async function build(file, { utu, optimize, safe, out }) {
   });
   // The loader bundled with the runtime pieces and the glue it imports.
   await bundle({
-    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: `${name}.mjs`, loader: 'js' },
+    // (Not named NAME.mjs: esbuild refuses an output that is its input.)
+    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
     outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: true, format: 'esm', platform: 'neutral',
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
