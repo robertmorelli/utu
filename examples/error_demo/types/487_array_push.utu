@@ -1,0 +1,7 @@
+// What: push on an Array, whose length is fixed.
+// Expect: No method Array[I32].push; note: a Buffer[T] grows (using Buffer from std:Buffer)
+export main() I32 {
+    let xs = [1, 2, 3];
+    xs.push(4);
+    xs.len();
+}

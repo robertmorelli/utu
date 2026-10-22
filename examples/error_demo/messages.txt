@@ -1828,6 +1828,21 @@ ok
  6 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/486_pipeline_after_and.utu
+ ERROR  A pipeline binds looser than and: its source is all of this
+        iterator-source · examples/error_demo/iterators/486_pipeline_after_and.utu:5:5
+
+ 3 │ export main() Bool {
+ 4 │     let ok = true;
+ 5 │     ok and (0 ..< 5) all |i| { i < 9; };
+   │     ━━━━━━━━━━━━━━━━
+   │     │      ╰─ the source meant?
+   │     ╰─ piped
+ 6 │ }
+
+  note  Parenthesize the pipeline: a and (xs all |x| { … })
+--- exit 1
+
 === utu check examples/error_demo/iterators/48_generator_mutual_recursion.utu
  ERROR  Generator evens recurses
         generator-recursion · examples/error_demo/iterators/48_generator_mutual_recursion.utu:9:16
@@ -2989,15 +3004,18 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/35_unknown_import_npm_missing.utu
- ERROR  Not supported yet
-        unsupported · examples/error_demo/names/35_unknown_import_npm_missing.utu:6:5
+ ERROR  No host declarations for "npm:left-pad-xyz"
+        host-unresolved · examples/error_demo/names/35_unknown_import_npm_missing.utu:3:16
 
+ 1 │ // What: imports an npm package that is not installed, and calls it
+ 2 │ // Expect: Cannot import "npm:left-pad-xyz": package not found in node_modules
+ 3 │ using pad from "npm:left-pad-xyz";
+   │                ━━━━━━━━━━━━━━━━━━
+   │                ╰─ not found
  4 │
  5 │ export main() Str {
- 6 │     pad.leftPad("7", 3);
-   │     ━━━
-   │     ╰─ here
- 7 │ }
+
+  note  npm: packages' declarations come from node_modules
 --- exit 1
 
 === utu check examples/error_demo/names/36_unknown_import_node_typo.utu
@@ -3176,6 +3194,21 @@ ok
    │       ╰─ already declared
  8 │
  9 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/489_import_a_function.utu
+ ERROR  helper is a function; using imports a mod
+        import-not-module · examples/error_demo/names/489_import_a_function.utu:3:7
+
+ 1 │ // What: `using` names a function of another file; only a mod can be imported.
+ 2 │ // Expect: helper is a function; using imports a mod (and nothing more at its use)
+ 3 │ using helper from "./lib/489_helper_lib.utu";
+   │       ━━━━━━
+   │       ╰─ not a mod
+ 4 │
+ 5 │ export main() I32 { helper(); }
+
+  note  Declare it in a mod there (mod m { … }) and import that
 --- exit 1
 
 === utu check examples/error_demo/names/48_duplicate_variant_struct_enum.utu
@@ -3854,6 +3887,10 @@ ok
 ok
 --- exit 0
 
+=== utu check examples/error_demo/names/lib/489_helper_lib.utu
+ok
+--- exit 0
+
 === utu check examples/error_demo/platform/01_mem_same_name_as_fn.utu
  ERROR  mem scores clashes with a function or global
         mem-clash · examples/error_demo/platform/01_mem_same_name_as_fn.utu:3:1
@@ -4526,6 +4563,21 @@ ok
  9 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/490_node_unknown_module.utu
+ ERROR  No host declarations for
+        host-unresolved · examples/error_demo/platform/490_node_unknown_module.utu:3:15
+
+ 1 │ // What: a  import whose declarations cannot be found (no such module).
+ 2 │ // Expect: No host declarations for  at the using; nothing at its uses
+ 3 │ using fs from
+   │               ━━━━━━━━
+   │               ╰─ not found
+ 4 │
+ 5 │ export main() I32 {
+
+  note   modules' declarations come from @types/node in node_modules
+--- exit 1
+
 === utu check examples/error_demo/platform/49_foreign_wrong_arg_type.utu
 ok
 --- exit 0
@@ -5174,18 +5226,18 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/01_orelse_fatal_null.utu
- TRAP  Null
-       trap · examples/error_demo/runtime/01_orelse_fatal_null.utu:8:16
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/01_orelse_fatal_null.utu:8:36
 
  6 │
  7 │ export main() I32 {
  8 │     let name = find_user(2) orelse fatal;
-   │                ━━━━━━━━━━━━━━━━━━━━━━━━━
-   │                ╰─ here
+   │                                    ━━━━━
+   │                                    ╰─ here
  9 │     name.len();
 10 │ }
 
-  in main  examples/error_demo/runtime/01_orelse_fatal_null.utu:8:16
+  in main  examples/error_demo/runtime/01_orelse_fatal_null.utu:8:36
 --- exit 1
 
 === utu run examples/error_demo/runtime/02_es_returns_null_for_str.utu
@@ -5466,18 +5518,18 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/23_json_decode_fatal.utu
- TRAP  Null
-       trap · examples/error_demo/runtime/23_json_decode_fatal.utu:8:13
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/23_json_decode_fatal.utu:8:57
 
  6 │
  7 │ export main() I32 {
  8 │     let p = @json/\ decode Point "{\"x\": 1}" \/ orelse fatal;
-   │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │             ╰─ here
+   │                                                         ━━━━━
+   │                                                         ╰─ here
  9 │     p.x;
 10 │ }
 
-  in main  examples/error_demo/runtime/23_json_decode_fatal.utu:8:13
+  in main  examples/error_demo/runtime/23_json_decode_fatal.utu:8:57
 --- exit 1
 
 === utu run examples/error_demo/runtime/24_enum_from_i32_bad.utu
@@ -5632,18 +5684,18 @@ Node.js v25.8.1
 --- exit 1
 
 === utu run examples/error_demo/runtime/35_orelse_fatal_field.utu
- TRAP  Null
-       trap · examples/error_demo/runtime/35_orelse_fatal_field.utu:9:13
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/35_orelse_fatal_field.utu:9:30
 
  7 │ export main() Str {
  8 │     let tail = Node { name: "b", next: null };
  9 │     let n = tail.next orelse fatal;
-   │             ━━━━━━━━━━━━━━━━━━━━━━
-   │             ╰─ here
+   │                              ━━━━━
+   │                              ╰─ here
 10 │     n.name;
 11 │ }
 
-  in main  examples/error_demo/runtime/35_orelse_fatal_field.utu:9:13
+  in main  examples/error_demo/runtime/35_orelse_fatal_field.utu:9:30
 --- exit 1
 
 === utu run examples/error_demo/runtime/360_assert_inlined_fast.utu -O fast
@@ -5726,7 +5778,7 @@ pass after (… ms)
 --- exit 0
 
 === utu test examples/error_demo/runtime/46_test_fatal.utu
-FAIL lookup finds bob: Null  at examples/error_demo/runtime/46_test_fatal.utu:8:16
+FAIL lookup finds bob: Reached fatal  at examples/error_demo/runtime/46_test_fatal.utu:8:37
 pass lookup finds ada (… ms)
 1 passed, 1 failed
 --- exit 1
@@ -5739,6 +5791,36 @@ FAIL fetches: offline  at examples/error_demo/runtime/47_test_rejected_promise.u
 === utu test examples/error_demo/runtime/48_test_buffer_safe.utu
 FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_test_buffer_safe.utu:9:12  in &.get_index
 0 passed, 1 failed
+--- exit 1
+
+=== utu run examples/error_demo/runtime/493_reversed_slice.utu
+ TRAP  Slice ends before it starts
+       trap · examples/error_demo/runtime/493_reversed_slice.utu:5:13
+
+ 3 │ export main() I32 {
+ 4 │     let a = [1, 2, 3];
+ 5 │     let b = a[2, 1];
+   │             ━━━━━━━
+   │             ╰─ here
+ 6 │     b.len();
+ 7 │ }
+
+  in array.slice  examples/error_demo/runtime/493_reversed_slice.utu:5:13
+  in main  examples/error_demo/runtime/493_reversed_slice.utu:5:13
+--- exit 1
+
+=== utu run examples/error_demo/runtime/494_string_index_past_end.utu
+ TRAP  Index out of bounds
+       trap · examples/error_demo/runtime/494_string_index_past_end.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let s = "abc";
+ 5 │     s[5];
+   │     ━━━━
+   │     ╰─ here
+ 6 │ }
+
+  in main  examples/error_demo/runtime/494_string_index_past_end.utu:5:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/50_no_main.utu
@@ -6520,6 +6602,100 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │               ╰─ ';'?
  4 │
  5 │ export main() void {
+--- exit 1
+
+=== utu check examples/error_demo/syntax/480_for_in_two_dots.utu
+ ERROR  Write for (0 ..< 10) |i|, not for i in
+        foreign-syntax · examples/error_demo/syntax/480_for_in_two_dots.utu:5:9
+
+ 3 │ export main() I32 {
+ 4 │     let t = 0;
+ 5 │     for i in 0..10 { t += i; };
+   │         ━━━━━━━━━━
+   │         ╰─ (0 ..< 10) |i|
+ 6 │     t;
+ 7 │ }
+
+  fix   Use for (0 ..< 10) |i|
+ 5 │     for (0 ..< 10) |i| { t += i; };
+--- exit 1
+
+=== utu check examples/error_demo/syntax/481_two_dots_range.utu
+ ERROR  Write ..< (end left out) or ... (end kept), not ..
+        foreign-syntax · examples/error_demo/syntax/481_two_dots_range.utu:4:7
+
+ 2 │ // Expect: Write ..< (end left out) or ... (end kept), not ..
+ 3 │ export main() I32 {
+ 4 │     (0..5) count;
+   │       ━━
+   │       ╰─ ..<
+ 5 │ }
+
+  fix   Use ..<
+ 4 │     (0..<5) count;
+--- exit 1
+
+=== utu check examples/error_demo/syntax/482_capital_let.utu
+ ERROR  Names of values and functions start lowercase (a capital starts a type)
+        foreign-syntax · examples/error_demo/syntax/482_capital_let.utu:3:5
+
+ 1 │ // What: a constant named in capitals, as in other languages.
+ 2 │ // Expect: Names of values and functions start lowercase (a capital starts a type); fix inf
+ 3 │ let INF = 1000000;
+   │     ━━━
+   │     ╰─ inf?
+ 4 │
+ 5 │ export main() I32 { INF; }
+
+  fix   Use inf
+ 3 │ let inf = 1000000;
+--- exit 1
+
+=== utu check examples/error_demo/syntax/483_capital_fn.utu
+ ERROR  Names of values and functions start lowercase (a capital starts a type)
+        foreign-syntax · examples/error_demo/syntax/483_capital_fn.utu:3:4
+
+ 1 │ // What: a function whose name starts with a capital.
+ 2 │ // Expect: Names of values and functions start lowercase (a capital starts a type); fix area
+ 3 │ fn Area(w: I32, h: I32) I32 { w * h; }
+   │    ━━━━
+   │    ╰─ area?
+ 4 │
+ 5 │ export main() I32 { Area(2, 3); }
+
+  fix   Use area
+ 3 │ fn area(w: I32, h: I32) I32 { w * h; }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/484_plus_plus.utu
+ ERROR  utu has no ++; write += 1
+        foreign-syntax · examples/error_demo/syntax/484_plus_plus.utu:5:6
+
+ 3 │ export main() I32 {
+ 4 │     let i = 0;
+ 5 │     i++;
+   │      ━━
+   │      ╰─ += 1
+ 6 │     i;
+ 7 │ }
+
+  fix   Use += 1
+ 5 │     i += 1;
+--- exit 1
+
+=== utu check examples/error_demo/syntax/485_match_string.utu
+ ERROR  match takes number, Bool, and enum patterns, not strings
+        foreign-syntax · examples/error_demo/syntax/485_match_string.utu:5:9
+
+ 3 │ fn apply(op: Str, a: I32, b: I32) I32 {
+ 4 │     match op {
+ 5 │         "+" => a + b,
+   │         ━━━
+   │         ╰─ a string
+ 6 │         "-" => a - b,
+ 7 │         ~> 0,
+
+  note  Compare strings with if: if op == "+" { … } else if …
 --- exit 1
 
 === utu check examples/error_demo/syntax/48_match_last_arm_no_comma.utu
@@ -7426,6 +7602,10 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │              ╰─ here
  6 │     fn &.empty() & { &{ v: null }; }
  7 │ }
+   ┆
+10 │     let b = Box[I32].empty();
+   │             ────────────────
+   │             ╰─ instantiated here
 --- exit 1
 
 === utu check examples/error_demo/types/103_generic_lists_protocol.utu
@@ -8058,6 +8238,35 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 10 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/487_array_push.utu
+ ERROR  No method Array[I32].push
+        unknown-method · examples/error_demo/types/487_array_push.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3];
+ 5 │     xs.push(4);
+   │     ━━━━━━━━━━
+   │     ╰─ no such method
+ 6 │     xs.len();
+ 7 │ }
+
+  note  An Array's length is fixed; a Buffer[T] grows: using Buffer from std:Buffer;
+--- exit 1
+
+=== utu check examples/error_demo/types/488_js_method_without_import.utu
+ ERROR  No method F64.toFixed
+        unknown-method · examples/error_demo/types/488_js_method_without_import.utu:5:5
+
+ 3 │ export main() Str {
+ 4 │     let n = 3.14159;
+ 5 │     n.toFixed(2);
+   │     ━━━━━━━━━━━━
+   │     ╰─ no such method
+ 6 │ }
+
+  note  JavaScript's methods come with using JS from std:JS;
+--- exit 1
+
 === utu check examples/error_demo/types/48_unknown_operator_unknown_operand.utu
  ERROR  Unknown variable totl; did you mean total?
         unknown-variable · examples/error_demo/types/48_unknown_operator_unknown_operand.utu:5:5
@@ -8073,6 +8282,38 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 
   fix   Use total
  5 │     total + 1;
+--- exit 1
+
+=== utu check examples/error_demo/types/491_global_array_literal.utu
+ ERROR  Global words needs a literal: a number, string, Bool, or null
+        invalid-global-initializer · examples/error_demo/types/491_global_array_literal.utu:3:25
+
+ 1 │ // What: a global initialized with an array literal.
+ 2 │ // Expect: Global words needs a literal: a number, string, Bool, or null; note: make it in a function
+ 3 │ let words: Array[Str] = ["a", "b"];
+   │                         ━━━━━━━━━━
+   │                         ╰─ here
+ 4 │
+ 5 │ export main() I32 { words.len(); }
+
+  note  Make other values in a function: fn words() … { … }
+--- exit 1
+
+=== utu check examples/error_demo/types/492_generic_nullable_scalar.utu
+ ERROR  I32 cannot be nullable
+        invalid-nullable-type · examples/error_demo/types/492_generic_nullable_scalar.utu:5:17
+
+ 3 │ mod Box[T] {
+ 4 │     struct &:
+ 5 │         | item: ?T
+   │                 ━━
+   │                 ╰─ here
+ 6 │     fn &.empty() & { &{ item: null }; }
+ 7 │ }
+   ┆
+10 │     let b = Box[I32].empty();
+   │             ────────────────
+   │             ╰─ instantiated here
 --- exit 1
 
 === utu check examples/error_demo/types/49_unknown_method_struct.utu
@@ -8657,7 +8898,7 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu check examples/error_demo/types/92_invalid_global_init_call.utu
- ERROR  Global limit needs a literal
+ ERROR  Global limit needs a literal: a number, string, Bool, or null
         invalid-global-initializer · examples/error_demo/types/92_invalid_global_init_call.utu:5:18
 
  3 │ fn compute() I32 { 3 * 7; }
@@ -8667,6 +8908,8 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │                  ╰─ here
  6 │
  7 │ export main() I32 { limit; }
+
+  note  Make other values in a function: fn limit() … { … }
 --- exit 1
 
 === utu check examples/error_demo/types/93_match_type_enum.utu
@@ -8683,16 +8926,18 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu check examples/error_demo/types/94_match_on_str_patterns.utu
- ERROR  Unexpected a string
-        parse-error · examples/error_demo/types/94_match_on_str_patterns.utu:5:9
+ ERROR  match takes number, Bool, and enum patterns, not strings
+        foreign-syntax · examples/error_demo/types/94_match_on_str_patterns.utu:5:9
 
  3 │ fn code(cmd: Str) I32 {
  4 │     match cmd {
  5 │         "start" => 1,
    │         ━━━━━━━
-   │         ╰─ unexpected
+   │         ╰─ a string
  6 │         ~> 0,
  7 │     };
+
+  note  Compare strings with if: if cmd == "start" { … } else if …
 --- exit 1
 
 === utu check examples/error_demo/types/95_match_pattern_not_bool.utu

@@ -501,7 +501,9 @@ fn child_count_of(node: I32, kind: Node) I32 {
 fn enum_reader(name: Str, type: Str) Str {
     let node = declared_type(type);
     let zero_value = json_zero(type, -1);
-    let unknown = js_string("unknown " + type + " variant");
+    // It names the variant read, when its text is plain (`unknown Expr variant "Mul"`).
+    let quote = js_string(Str.from_code_point(34));
+    let unknown = js_string("unknown " + type + " variant ") + " + " + quote + " + r.text.slice(r.ks, r.ks + r.kl) + " + quote;
     if not is_tagged(node) {
         let arms = "";
         let v = first_child(node);

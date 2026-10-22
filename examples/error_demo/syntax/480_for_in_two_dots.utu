@@ -1,0 +1,7 @@
+// What: a Rust/Python-style `for i in 0..10` loop.
+// Expect: Write for (0 ..< 10) |i|, not for i in (the fix is valid utu)
+export main() I32 {
+    let t = 0;
+    for i in 0..10 { t += i; };
+    t;
+}

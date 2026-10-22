@@ -1,0 +1,5 @@
+// What: a constant named in capitals, as in other languages.
+// Expect: Names of values and functions start lowercase (a capital starts a type); fix inf
+let INF = 1000000;
+
+export main() I32 { INF; }

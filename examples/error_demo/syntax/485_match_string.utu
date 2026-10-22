@@ -1,0 +1,11 @@
+// What: match over a string's values.
+// Expect: match takes number, Bool, and enum patterns, not strings; note: if op == "+" …
+fn apply(op: Str, a: I32, b: I32) I32 {
+    match op {
+        "+" => a + b,
+        "-" => a - b,
+        ~> 0,
+    };
+}
+
+export main() I32 { apply("+", 1, 2); }

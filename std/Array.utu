@@ -28,12 +28,8 @@ mod Array[T1] {
 
     // a[s, e] — copy subrange [start, end) into a new array.
     fn &.get_slice |self| (start: I32, end_: I32) & {
-        if checks() and end_ < start { Str.trap("slice end before start"); };
         @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
     }
-
-    // Whether the build keeps its checks (all but -O smallUnsafe and fastUnsafe).
-    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
 
     // ── Named methods (explicit call syntax) ──────────────────────────────
 
@@ -60,7 +56,6 @@ mod Array[T1] {
         @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
     }
     fn &.slice |self| (start: I32, end_: I32) & {
-        if checks() and end_ < start { Str.trap("slice end before start"); };
         @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
     }
 

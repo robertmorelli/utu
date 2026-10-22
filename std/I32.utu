@@ -24,6 +24,10 @@ mod I32 {
     // wasm has no I32.neg / I32.not; express them with real ops.
     //   neg a  = 0 - a
     //   bnot a = a xor 0xFFFFFFFF (-1)
+    // The lesser and the greater of two; the size of one (the least I32's is itself: 0 - x wraps).
+    fn min(a: &, b: &) & { if a < b { a; } else { b; }; }
+    fn max(a: &, b: &) & { if a > b { a; } else { b; }; }
+    fn abs(x: &) & { if x < 0 { 0 - x; } else { x; }; }
     fn &:neg  |a| & { @ir/\ <ir-i32-sub><ir-lit kind="int" type-name="I32" value="0"/><ir-ident name="a"/></ir-i32-sub> \/; }
     fn &:bnot |a| & { @ir/\ <ir-i32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="-1"/></ir-i32-xor> \/; }
     fn clz(x: &) & { @ir/\ <ir-i32-clz><ir-ident name="x"/></ir-i32-clz> \/; }

@@ -1,0 +1,7 @@
+// What: the file 489_import_a_function.utu imports from (not itself a mistake).
+// Expect: ok
+fn helper() I32 { 1; }
+
+mod helpers {
+    fn one() I32 { 1; }
+}

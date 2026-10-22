@@ -1,0 +1,12 @@
+// What: a generic module uses ?T, then is instantiated with I32 (a scalar has no null).
+// Expect: I32 cannot be nullable at ?T, and "instantiated here" at Box[I32]
+mod Box[T] {
+    struct &:
+        | item: ?T
+    fn &.empty() & { &{ item: null }; }
+}
+
+export main() I32 {
+    let b = Box[I32].empty();
+    0;
+}

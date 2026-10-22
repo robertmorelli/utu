@@ -1,0 +1,7 @@
+// What: an array slice whose end comes before its start.
+// Expect: trap: Slice ends before it starts, at the slice
+export main() I32 {
+    let a = [1, 2, 3];
+    let b = a[2, 1];
+    b.len();
+}

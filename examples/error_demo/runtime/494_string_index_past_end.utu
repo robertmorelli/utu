@@ -1,0 +1,6 @@
+// What: a string indexed past its end.
+// Expect: trap: Index out of bounds, at s[5]
+export main() I32 {
+    let s = "abc";
+    s[5];
+}
