@@ -1,0 +1,11 @@
+// What: an optional chain `?.` in an assert, which would pass silently when the chain is null.
+// Expect: ?. only in a statement; for a value, use promote
+struct Node:
+    | count: I32
+    | next: ?Node
+
+export main() I32 {
+    let head = Node { count: 1, next: null };
+    assert head.next?.count == 1;
+    0;
+}

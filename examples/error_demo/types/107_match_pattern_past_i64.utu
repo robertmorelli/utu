@@ -1,0 +1,10 @@
+// What: U64's largest value as a pattern over an I64
+// Expect: 18446744073709551615 is out of range for I64 (it once matched -1)
+fn status(code: I64) I32 {
+    match code {
+        18446744073709551615 => 1,
+        ~> 2,
+    };
+}
+
+export main() I32 { status(0); }

@@ -48,7 +48,7 @@ export async function main(command, fileArg, args) {
   }
   const analysis = await compiler.analyzeFile(file);
   if (command === 'display:debug' && analysis.artifacts.diagnostics.length) {
-    console.log(await formatDiagnostics(analysis.artifacts.diagnostics, { readFile: f => fs.readFile(f, 'utf8'), snapshot: analysis.snapshot }));
+    console.log(await formatDiagnostics(analysis.artifacts.diagnostics, { readFile: f => fs.readFile(f, 'utf8'), snapshot: analysis.snapshot, color: colored() }));
     process.exitCode = 1;
     return;
   }
@@ -57,6 +57,12 @@ export async function main(command, fileArg, args) {
     file, source, snapshot: analysis.snapshot, sectionTags,
     showLineNumbers: sectionTags != null && !args.includes('--noln'),
     showDiagnostics: false,
+    color: colored(),
   });
   if (rendered) console.log(rendered);
+}
+
+/** Stage 0's views are colored (as they always were) unless NO_COLOR is set, not empty. */
+function colored() {
+  return !process.env.NO_COLOR;
 }

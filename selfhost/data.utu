@@ -18,8 +18,8 @@ fn fields_holder(decl: I32) I32 {
 /// A field declaration's type, in instance `inst`.
 fn field_type(field: I32, inst: I32) I32 { type_of(next_sibling(first_child(decl_node[field])), inst); }
 
-/// `T { a: x, b: y }`: the fields in declaration order (each initializer
-/// checked in that order), then `struct.new`.
+/// `T { a: x, b: y }`: the initializers in the order written, then
+/// `struct.new` of the fields in declaration order.
 fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     let t = type_path(first_child(node), cx.inst);
     let decl = ty_decl(t);
@@ -45,29 +45,55 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
 }
 
 /// `struct.new` of `t` from the initializers from `first_init` on, each
-/// checked as its field's type in the fields' order. An unknown, repeated, or
+/// checked as its field's type and run in the order written. An unknown, repeated, or
 /// missing field is reported (a missing one's value is `unreachable`).
 fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     // Each initializer names a field once, and each field has one.
+    let unknown = false;
     let f = first_init;
     while (f >= 0) {
         let name = first_child(f);
         let field = member(decl, word_of(name), Space.Member);
-        if not decl_is(field, Decl.Field) { report2(Diag.UnknownField, f, word_of(name), decl, -1); }
+        if not decl_is(field, Decl.Field) {
+            report2(Diag.UnknownField, f, word_of(name), decl, -1);
+            suggest_field(decl, name);
+            unknown = true;
+        }
         else {
             node_decl[name] = field;
             let other = first_init;
             while (other != f) {
                 if word_of(first_child(other)) == word_of(name) {
                     report(Diag.DuplicateField, f, word_of(name));
+                    diag_place(Extra.Related, first_child(other), "first here");
                     other = f;
                 } else { other = next_sibling(other); };
             };
         };
         f = next_sibling(f);
     };
-    let m = w_mark();
+    let mt = w_mark();
     let holder = fields_holder(decl);
+    // Initializers run in the order written: when that is not the fields'
+    // order, each (but a literal) goes first into a local.
+    let temps = Array[I32].new(if holder >= 0 { child_count(holder); } else { 0; }, -1);
+    if not inits_in_order(holder, first_init) {
+        let f = first_init;
+        while (f >= 0) {
+            let field = node_decl[first_child(f)];
+            let value = last_child(f);
+            if decl_is(field, Decl.Field) and init_for(first_init, decl_name[field]) == f and not plain_init(value) {
+                let ft = field_type(field, ty_inst(t));
+                let local = new_local(repr(ft));
+                let ml = w_mark();
+                coerce(check_expr(value, ft, cx), ft, value);
+                w_node(Op.LocalSet, vt_none, local, 0, ml);
+                temps[decl_a[field]] = local;
+            };
+            f = next_sibling(f);
+        };
+    };
+    let m = w_mark();
     let c = if holder >= 0 { first_child(holder); } else { -1; };
     let missing = false;
     while (c >= 0) {
@@ -76,19 +102,46 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
             let init = init_for(first_init, decl_name[field]);
             let ft = field_type(field, ty_inst(t));
             if init < 0 {
-                if not missing { report2(Diag.MissingField, at, decl_name[field], decl, -1); };
+                // A misnamed field (reported) is the mistake, not the one it meant.
+                if not missing and not unknown {
+                    report2(Diag.MissingField, at, decl_name[field], decl, -1);
+                    if same_file(at, c) { diag_place(Extra.Related, first_child(c), "declared here"); };
+                };
                 missing = true;
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+            } else if temps[decl_a[field]] >= 0 {
+                // (A let: every branch is void, as stage -1 wants.)
+                let got = w_get(repr(ft), temps[decl_a[field]]);
             } else {
+                want(last_child(init), ft, Why.Field, field, -1);
                 coerce(check_expr(last_child(init), ft, cx), ft, last_child(init));
+                unwant();
             };
         };
         c = next_sibling(c);
     };
     let vt = repr(t);
     w_node(Op.StructNew, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m);
+    if m > mt { w_node(Op.Seq, vt_ref(vt_heap(vt), false), 0, 0, mt); };
     t;
 }
+
+/// Whether the initializers from `first_init` on name the fields of
+/// `holder` in its order (with none repeated or unknown).
+fn inits_in_order(holder: I32, first_init: I32) Bool {
+    let f = first_init;
+    let c = if holder >= 0 { first_child(holder); } else { -1; };
+    while (f >= 0) {
+        while (c >= 0 and not (is_kind(c, Node.Field) and word_of(first_child(c)) == word_of(first_child(f)))) { c = next_sibling(c); };
+        if c < 0 { return false; };
+        c = next_sibling(c);
+        f = next_sibling(f);
+    };
+    true;
+}
+
+/// Whether an initializer neither has effects nor sees them: a literal.
+fn plain_init(value: I32) Bool { is_kind(value, Node.Literal); }
 
 /// The initializer from `first_init` on that names field `word`, or -1.
 fn init_for(first_init: I32, word: I32) I32 {
@@ -112,7 +165,8 @@ fn field_of(t: I32, name: I32) I32 {
     };
     let field = member(decl, word_of(name), Space.Member);
     if not decl_is(field, Decl.Field) or not (decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Variant)) {
-        report(Diag.UnknownField, parent_of(name), word_of(name));
+        report2(Diag.UnknownField, parent_of(name), word_of(name), decl, -1);
+        suggest_field(decl, name);
         return -1;
     };
     node_decl[name] = field;
@@ -149,8 +203,8 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     };
     let field = field_of(t, name);
     if field == -2 {
-        if op != Tok.Eq.to_i32() { return unsupported(at); };
-        return proto_field_set(t, name, value, m, cx);
+        let word = if op == Tok.Eq.to_i32() { -1; } else { compound_word(op, node_last[target]); };
+        return proto_field_set(t, name, value, word, at, m, cx);
     };
     if field < 0 {
         check_expr(value, -1, cx);
@@ -161,7 +215,9 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let heap = vt_heap(repr(t));
     let index = decl_a[field];
     if op == Tok.Eq.to_i32() {
+        want(value, ft, Why.Field, field, -1);
         coerce(check_expr(value, ft, cx), ft, value);
+        unwant();
     } else {
         // Read the struct once: x.f = x.f op v.
         let obj = w_pop();
@@ -231,7 +287,9 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let c = first_elem;
     while (c >= 0) {
+        want(c, elem, Why.Elements, first_elem, -1);
         coerce(check_expr(c, elem, cx), elem, c);
+        unwant();
         c = next_sibling(c);
     };
     let vt = repr(t);
@@ -282,7 +340,7 @@ fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
 
 /// `Array[elem]`, the type.
 fn array_of(elem: I32) I32 {
-    let module = lookup(known_word(Known.WordArray));
+    let module = prelude_lookup(known_word(Known.WordArray));
     if not decl_is(module, Decl.Module) { return ty_error(); };
     let m = vl_begin();
     vl_add(elem);
@@ -391,7 +449,9 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let index = last_child(target);
     if op == Tok.Eq.to_i32() {
         coerce(check_expr(index, it, cx), it, index);
+        want(value, vt_, Why.Elements, -1, -1);
         coerce(check_expr(value, vt_, cx), vt_, value);
+        unwant();
         return finish_call(fi, m, cx);
     };
     // a[i] op= v: the array and index once each.
@@ -486,11 +546,12 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
 }
 
 /// Whether a type has a value to start from (a scalar, a nullable or host
-/// reference): `array.new_default` fills arrays of those.
+/// reference; not Str, a closure or a tuple, which are never null): `array.new_default` fills arrays of those.
 fn defaultable(t: I32) Bool {
-    if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Closure) or ty_is(t, Ty.Error) { return true; };
+    if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { return true; };
+    if ty_is(t, Ty.Closure) or ty_is(t, Ty.Tuple) or t == prelude(Prelude.Str) { return false; };
     let decl = ty_decl(t);
-    if decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Enum) or decl_is(decl, Decl.Variant) { return false; };
+    if decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Enum) or decl_is(decl, Decl.Variant) or decl_is(decl, Decl.Proto) { return false; };
     not is_array_type(t);
 }
 

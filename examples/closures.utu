@@ -41,11 +41,12 @@ fn annotated() I32 {
 }
 
 // ── Captures ─────────────────────────────────────────────────────────────────
-// Scalars are snapshot: `base` is copied when the closure is built, so the
-// later assignment is not visible to it.
+// Variables are shared: `base` is assigned after the closure captures it, so
+// it lives in a box the closure and the function both use, and the closure
+// sees the assignment. (A variable never assigned after a capture is copied.)
 //
-// GC references are shared: the closure holds the same Counter, so a mutation
-// made through it afterwards *is* visible.
+// GC references are shared too: the closure holds the same Counter, so a
+// mutation made through it afterwards is visible.
 
 fn capture_modes() I32 {
     let base: I32 = 100;
@@ -53,10 +54,10 @@ fn capture_modes() I32 {
 
     let read: cl() I32 = cl() { base + c.n; };
 
-    base = 999;      // not observed — scalars are snapshot
+    base = 999;      // observed — base is boxed
     c.n = 5;         // observed — the Counter is shared
 
-    read();          // 100 + 5
+    read();          // 999 + 5
 }
 
 // Nested closures work: `m` is free in the inner closure, so the outer one

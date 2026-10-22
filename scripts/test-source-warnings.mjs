@@ -13,6 +13,12 @@ assert.equal(warnings[0].primary.start, 1);
 // If/else expressions are values, however long the line.
 const branches = '    let result = if first_condition_value { first_branch_value; } else if second_condition_value { second_branch_value; } else { third_branch_value_here; };';
 assert.equal(compressedSourceWarnings(branches, 'test.utu').length, 0, branches);
+// One call with a long template is one statement, whatever its `${…}` and
+// however its strings escape a quote.
+const logged = '    console.log(`first ${alpha_value} second ${beta_value} third ${gamma_value} fourth ${delta_value} fifth ${epsilon_value} sixth ${zeta_value} ${"\\""} done`);';
+assert.equal(compressedSourceWarnings(logged, 'test.utu').length, 0, logged);
+assert.equal(compressedSourceWarnings('let q = "\\""; '+dense, 'test.utu').length, 1, 'escaped quote');
+assert.equal(compressedSourceWarnings('let t = `a ${ {x} } b`; '+dense, 'test.utu').length, 1, 'template closed');
 for (const source of ['// '+dense, '/*\n'+dense+'\n*/', '\\\\'+dense, 'let text = "'+dense+'";', 'export main() I32 { 1; }', dense.replaceAll('; ', ';\n')]) {
  assert.equal(compressedSourceWarnings(source, 'test.utu').length, 0, source);
 }

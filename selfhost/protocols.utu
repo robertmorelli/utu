@@ -15,13 +15,19 @@
 fn implements(t: I32, proto: I32) Bool {
     let d = if decl_is(t, Decl.Variant) { decl_owner[t]; } else { t; };
     let list = impl_list_of(d);
-    if list < 0 { return false; };
+    if list < 0 or in_generic(d) { return false; };
     let c = first_child(list);
     while (c >= 0) {
         if node_decl[c] == proto { return true; };
         c = next_sibling(c);
     };
     false;
+}
+
+/// Whether a declaration is in a module with type parameters.
+fn in_generic(d: I32) Bool {
+    let module = module_of(d);
+    module >= 0 and module_arity(module) > 0;
 }
 
 /// The `[P, …]` list of a struct or enum declaration, or -1.
@@ -63,8 +69,11 @@ fn method_impls(proto: I32, word: I32) I32 {
             if word_of(last_child(name)) == word {
                 let args = next_sibling(first_child(name));
                 // (`P[Nope]`, of no type, was reported: it implements nothing.)
-                let named_decl = if is_kind(args, Node.Module_type_arg_list) { node_decl[name_node(first_child(first_child(args)))]; } else { -1; };
-                if named_decl >= 0 {
+                // (`P[Box[I32]]` names no plain declaration: see in_generic.)
+                let n = if is_kind(args, Node.Module_type_arg_list) { name_node(first_child(first_child(args))); } else { -1; };
+                let named_decl = if n >= 0 { node_decl[n]; } else { -1; };
+                // (A generic type is never a P: see validate_protocols.)
+                if named_decl >= 0 and not in_generic(named_decl) {
                     let t = decl_type(named_decl, 0);
                     if ty_decl(t) >= 0 {
                         vl_add(d);
@@ -91,7 +100,12 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownField, parent_of(name), word_of(name));
+        report2(Diag.UnknownField, parent_of(name), word_of(name), proto, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    if is_kind(decl_node[pm], Node.Proto_setter) {
+        report2(Diag.ProtoAccess, parent_of(name), word_of(name), 1, proto);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -103,12 +117,21 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     ft;
 }
 
-/// `p.x = v`: the field x of whichever implementing type p is.
-fn proto_field_set(t: I32, name: I32, value: I32, m: I32, cx: Cx) I32 {
+/// `p.x = v`, or with operator `op` (-1 for none) `p.x op= v`: the field x
+/// of whichever implementing type p is.
+fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: Cx) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or is_kind(decl_node[pm], Node.Proto_method) {
-        report(Diag.UnknownField, parent_of(name), word_of(name));
+        report2(Diag.UnknownField, parent_of(name), word_of(name), proto, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    // `get x` is not written; `set x` is not read, so takes no `op=`.
+    let set_only = is_kind(decl_node[pm], Node.Proto_setter);
+    if is_kind(decl_node[pm], Node.Proto_getter) or (op >= 0 and set_only) {
+        report2(Diag.ProtoAccess, parent_of(name), word_of(name), if set_only { 1; } else { 0; }, proto);
+        check_expr(value, -1, cx);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -117,7 +140,11 @@ fn proto_field_set(t: I32, name: I32, value: I32, m: I32, cx: Cx) I32 {
     w_node(Op.LocalSet, vt_none, r, 0, m);
     let v = new_local(repr(ft));
     let mv = w_mark();
-    coerce(check_expr(value, ft, cx), ft, value);
+    if op < 0 { coerce(check_expr(value, ft, cx), ft, value); }
+    else {
+        proto_field_chain(implementers(proto), 0, r, word_of(name), ft, -1);
+        apply_operator(op, ft, value, at, cx, mv);
+    };
     w_node(Op.LocalSet, vt_none, v, 0, mv);
     proto_field_chain(implementers(proto), 0, r, word_of(name), ft, v);
     w_node(Op.Seq, vt_none, 0, 0, m);
@@ -241,7 +268,10 @@ fn validate_protocols() void {
                 let c = first_child(list);
                 while (c >= 0) {
                     let proto = node_decl[c];
-                    if decl_is(proto, Decl.Proto) {
+                    // Dispatch tests a declaration's one type, so no instances.
+                    if decl_is(proto, Decl.Proto) and in_generic(d) {
+                        report(Diag.ProtoGeneric, c, decl_name[proto]);
+                    } else if decl_is(proto, Decl.Proto) {
                         if decl_is(d, Decl.Enum) {
                             let v = first_child(decl_node[d]);
                             while (v >= 0) {

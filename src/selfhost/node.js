@@ -137,7 +137,7 @@ export function nodeHost({ root = process.cwd(), stdlib = nodeStdlib() } = {}) {
   return {
     stdlib,
     // Files are small and read whole: a sync read costs a fraction of an async one.
-    readFile: async file => fs.readFileSync(file, 'utf8'),
+    readFile: Object.assign(async file => fs.readFileSync(file, 'utf8'), { bytes: async file => fs.readFileSync(file) }),
     readBinaryFile: async file => fs.readFileSync(file),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
     // TypeScript is only needed when a program imports "npm:…" or "node:…".
