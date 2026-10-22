@@ -348,7 +348,11 @@ fn diag_text(i: I32) Str {
     let b = diag_b[i];
     let node = diag_node[i];
     match k {
-        Diag.UnknownVariable => pick(is_callee(node), "Unknown function ", "Unknown variable ") + w + did_you_mean(i),
+        Diag.UnknownVariable => {
+            // `export main` is the module's entry, not a function the program (or a @comptime build) can call.
+            if w == "main" and is_callee(node) { return "main is the entry point, not a function: move its body into a fn"; };
+            pick(is_callee(node), "Unknown function ", "Unknown variable ") + w + did_you_mean(i);
+        },
         Diag.UnknownType => "Unknown type " + w + did_you_mean(i),
         Diag.UnknownImport => {
             let path = import_path[missing_import[0]];
@@ -528,7 +532,10 @@ fn diag_text(i: I32) Str {
         Diag.AwaitNotPromise => "Cannot await " + type_text(a),
         Diag.ProtoMissing => decl_text(a) + " lacks " + word_text(diag_c[i]) + "." + w,
         Diag.ProtoSignature => word_text(a) + "[" + word_text(b) + "]." + w + " does not match the protocol",
-        Diag.MemElementRange => word_text(diag_c[i]) + " does not fit " + Storage.name(mem_storage(a)),
+        Diag.MemElementRange => {
+            if b == -1 and mem_int_enum(a) >= 0 { return word_text(diag_c[i]) + " is no " + word_text(decl_name[mem_int_enum(a)]); };
+            word_text(diag_c[i]) + " does not fit " + Storage.name(mem_storage(a));
+        },
         Diag.MemInitializer => {
             if a == 1 {
                 let head = mem_word(word) + " " + w + " takes a list, @embed, or @comptime";
@@ -568,6 +575,8 @@ fn diag_text(i: I32) Str {
             if b >= 0 and semicolon_in_multiline(a - 1) and word_text(b) == "';'" { return "Expected ';', got " + found + " (a \\\\ line's ';' is text)"; };
             if b >= 0 { return "Expected " + word_text(b) + ", got " + found; };
             if tok_kind[a] == Tok.End.to_i32() { return "Unexpected end of file"; };
+            // A mem is one program's memory: not a module's (made per instance) or a function's.
+            if found == "'mem'" or found == "'vec'" { return "Unexpected " + found + ": a " + found.slice(1, 4) + " goes at the top level of a file"; };
             "Unexpected " + found;
         },
         Diag.Unsupported => "Not supported yet",
@@ -670,6 +679,8 @@ fn diag_default_label(i: I32) Str {
         Diag.ParseError => if b >= 0 and comptime_parse_site(i) < 0 { word_text(b) + "?"; } else { "unexpected"; },
         Diag.DslEmpty => "empty",
         Diag.ComptimeCycle => "waits on itself",
+        Diag.IrOutsideStd => "not the standard library",
+        Diag.DslTooDeep => "too deep",
         Diag.ProtoGeneric => "on a generic type",
         Diag.SelfUntyped => "type not known yet",
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),

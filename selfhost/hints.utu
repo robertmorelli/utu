@@ -642,7 +642,7 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         parse_says("export fn is not a declaration");
         return true;
     };
-    if tok_says(k, "fn") and indented(k) and k == line_first(file, k) {
+    if tok_says(k, "fn") and indented(k) and k == line_first(file, k) and k == t {
         diag_focus(k, k, "nested");
         diag_note("Use a closure: let f = cl(x: I32) I32 { … };");
         parse_says("A function cannot be declared inside another");

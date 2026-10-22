@@ -129,6 +129,12 @@ fn intrinsic_body(block: I32) I32 {
     let e = first_child(block);
     if e < 0 or next_sibling(e) >= 0 or not is_kind(e, Node.Dsl_expr) { return -1; };
     if word_of(first_child(e)) != known_word(Known.Ir) { return -1; };
+    // @ir is unchecked compiler IR: the standard library's only (a program writes @wat).
+    if file_std[file_of_token(node_first[e])] != 1 {
+        report(Diag.IrOutsideStd, e, -1);
+        dsl_failed.push(e);
+        return -1;
+    };
     ir_tree(e);
 }
 
@@ -2348,7 +2354,21 @@ fn compile(target: Target) I32 {
     };
     // A file that does not parse ends the build; other mistakes do not stop
     // checking, which finds what else is wrong.
-    for (0 ..< file_root.len()) |file| { if file_root[file] < 0 { return -1; }; };
+    // Its parse error is the mistake: what resolving did not find in it
+    // (an imported module, …) follows from that, and is dropped.
+    for (0 ..< file_root.len()) |file| {
+        if file_root[file] < 0 {
+            let kept = 0;
+            for (0 ..< diag_kind.len()) |i| {
+                if diag_kind[i] == Diag.ParseError.to_i32() {
+                    diag_move(i, kept);
+                    kept += 1;
+                };
+            };
+            diag_truncate(kept);
+            return -1;
+        };
+    };
     let tests = 0;
     test_node.clear();
     for (0 ..< file_root.len()) |file| {

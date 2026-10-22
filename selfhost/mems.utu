@@ -342,6 +342,16 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
             if n % size != 0 { report(Diag.MemEmbed, init, decl_name[decl]); };
             for (0 ..< n) |i| { data_bytes.push(embed_bytes[embed_start[k] + i]); };
             count = n / size;
+            if mem_int_enum(decl) >= 0 {
+                let signed = s == Storage.I8 or s == Storage.I16 or s == Storage.I32;
+                for (0 ..< count) |e| {
+                    let v: I64 = 0;
+                    for (0 ..< size) |b| { v = v | ((embed_bytes[embed_start[k] + e * size + b] & 255).to_i64() << (b * 8).to_i64()); };
+                    let bits = (size * 8).to_i64();
+                    if signed and bits < 64 and (v >> (bits - 1)) & 1 == 1 { v = v - (1.to_i64() << bits); };
+                    check_variant_value(decl, v, init, e);
+                };
+            };
         };
     } else {
         let k = comptime_index(decl);
@@ -397,7 +407,7 @@ fn store_literal(decl: I32, lit: I32, negate: Bool, at: I32, i: I32) void {
     if not fits {
         let text = pick(negate, "-", "") + token_text(node_first[lit]);
         report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(text));
-    };
+    } else if s != Storage.F32 and s != Storage.F64 { check_variant_value(decl, bits, at, i); };
     let size = 1 << storage_shift(s);
     for (0 ..< size) |k| { data_bytes.push((bits >> (k * 8).to_i64()).to_i32() & 255); };
 }
@@ -420,8 +430,31 @@ fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
     else if s == Storage.I32 { lo = -2147483648; hi = 2147483647; }
     else if s == Storage.U32 { hi = 4294967295; }
     else { lo = 0 - 9223372036854775807 - 1; hi = 9223372036854775807; };
-    if v < lo or v > hi { report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(v.to_str())); };
+    if v < lo or v > hi { report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(v.to_str())); }
+    else { check_variant_value(decl, v, at, i); };
     for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
+}
+
+/// The integer enum a mem holds, or -1.
+fn mem_int_enum(decl: I32) I32 {
+    let e = node_decl[next_sibling(first_child(decl_node[decl]))];
+    if decl_is(e, Decl.IntEnum) { e; } else { -1; };
+}
+
+/// Element `i` of a mem of an integer enum must be one of its variants'
+/// values (a match over it has no other arm).
+fn check_variant_value(decl: I32, v: I64, at: I32, i: I32) void {
+    let e = mem_int_enum(decl);
+    if e < 0 { return; };
+    let d = e + 1;
+    while (d < decl_kind.len() and decl_owner[d] >= e and decl_owner[d] <= d) {
+        if decl_owner[d] == e and decl_is(d, Decl.Variant) and variant_value[d].to_i64() == v { return; };
+        // (A U32 enum's values above I32's are kept as their bits.)
+        if decl_owner[d] == e and decl_is(d, Decl.Variant) and (variant_value[d].to_i64() & 4294967295) == v { return; };
+        d += 1;
+    };
+    // (b -1: not a variant's value.)
+    report3(Diag.MemElementRange, at, decl_name[decl], decl, -1, intern_text(v.to_str()));
 }
 
 /// Where `decl` is in @comptime_mem, or -1.
