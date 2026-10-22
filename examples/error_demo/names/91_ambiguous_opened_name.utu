@@ -1,0 +1,10 @@
+// What: two opened modules both have `v`, and the call names neither
+// Expect: v is ambiguous: a.v or b.v
+mod a { fn v() I32 { 1; } }
+mod b { fn v() I32 { 2; } }
+using a;
+using b;
+
+export main() I32 {
+    v();
+}

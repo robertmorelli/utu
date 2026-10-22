@@ -1,0 +1,4 @@
+// A module shapes.utu imports under an alias.
+mod mathops {
+    fn double(value: I32) I32 { value * 2; }
+}

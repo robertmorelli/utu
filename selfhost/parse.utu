@@ -396,6 +396,7 @@ struct Save:
     | pos: I32
     | nodes: I32
     | pending: I32
+    | depth: I32
 
 //! = Tokens
 
@@ -482,11 +483,12 @@ fn mark_below(left: I32) I32 {
 }
 
 /// Before an attempt that may be given up (@restore).
-fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len() }; }
+fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0] }; }
 
 /// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
 fn restore(p: Parser, s: Save) void {
     p.pos = s.pos;
+    parse_depth[0] = s.depth;
     node_kind.resize(s.nodes);
     node_first.resize(s.nodes);
     node_last.resize(s.nodes);
@@ -1041,6 +1043,13 @@ fn bench_decl(p: Parser) I32 {
 //! = Types
 
 fn type_(p: Parser) I32 {
+    deeper(p);
+    let made = type_at(p);
+    parse_depth[0] -= 1;
+    made;
+}
+
+fn type_at(p: Parser) I32 {
     if is(p, Tok.Question) {
         let at = mark();
         let first = p.pos;
@@ -1149,10 +1158,14 @@ fn expression(p: Parser) I32 { expr(p, -1000, true); }
 /// An expression whose operators have precedence above `min`, or equal to it
 /// when `or_equal` (the rule this operand belongs to is right-associative).
 fn expr(p: Parser, min: I32, or_equal: Bool) I32 {
+    deeper(p);
     let left = prefix(p);
     while (true) {
         let next = infix(p, left, min, or_equal);
-        if next < 0 { return left; };
+        if next < 0 {
+            parse_depth[0] -= 1;
+            return left;
+        };
         left = next;
     };
     left;
@@ -1394,6 +1407,20 @@ fn pipe_args(p: Parser) I32 {
     };
     node(p, if placeholder { Node.Pipe_args_with_placeholder; } else { Node.Pipe_args_no_placeholder; }, args, first);
     node(p, Node.Pipe_args, at, first);
+}
+
+/// How deeply the parse is nested (expressions, types, `else if`s), and the
+/// most it has been and the token where: a program nested deeper than the
+/// compiler's stack bears is reported there (see src/selfhost/compiler.js).
+vec parse_depth: I32 = [0];
+vec parse_deepest: I32 = [0, -1];
+
+fn deeper(p: Parser) void {
+    parse_depth[0] += 1;
+    if parse_depth[0] > parse_deepest[0] {
+        parse_deepest[0] = parse_depth[0];
+        parse_deepest[1] = ptok[p.pos];
+    };
 }
 
 fn prefix(p: Parser) I32 {
@@ -1845,7 +1872,11 @@ fn if_expr(p: Parser) I32 {
     block(p);
     if is_kw(p, Kw.Else) {
         advance(p);
-        if is_kw(p, Kw.If) { if_expr(p); } else { block(p); };
+        if is_kw(p, Kw.If) {
+            deeper(p);
+            if_expr(p);
+            parse_depth[0] -= 1;
+        } else { block(p); };
     };
     node(p, Node.If_expr, at, first);
 }
@@ -2071,6 +2102,9 @@ fn parse(first: I32, last: I32) I32 {
     intern_words(first, last);
     let before = node_kind.len();
     pending.clear();
+    parse_depth[0] = 0;
+    parse_deepest[0] = 0;
+    parse_deepest[1] = -1;
     parse_furthest[0] = 0;
     parse_expected.clear();
     try {
@@ -2082,7 +2116,7 @@ fn parse(first: I32, last: I32) I32 {
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]];
         if parse_expected.len() > 0 { parse_error_wanted[0] = intern_text(wanted_text()); };
-        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
+        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0 });
         -1;
     };
 }
@@ -2173,7 +2207,7 @@ fn parse_expression(first: I32, last: I32) I32 {
         note_dsl_sites(before);
         e;
     } catch {
-        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0 });
+        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0 });
         -1;
     };
 }

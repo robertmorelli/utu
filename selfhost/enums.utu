@@ -301,6 +301,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     let m = w_mark();
     if variant < 0 {
         report2(Diag.UnknownVariant, pattern, word_of(pattern), st, -1);
+        suggest_member(ty_decl(st), if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)); } else { pattern; }, Space.Member);
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return ty_error();
     };
@@ -319,15 +320,13 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
     // The arm: bind, then its expression.
     let mt = w_mark();
     let c = next_sibling(pattern);
-    if is_kind(c, Node.Identifier) {
+    if arm_binding(a) >= 0 {
         let d = node_decl[c];
-        let local = new_local(vrepr);
-        decl_local[d] = local;
         decl_ty[d] = vt_;
         let mb = w_mark();
         w_get(repr(st), s);
         w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb);
-        w_node(Op.LocalSet, vt_none, local, 0, mb);
+        bind_value(d, vt_, mb);
         c = next_sibling(c);
     };
     let t1 = check_expr(c, expect, cx);
@@ -353,6 +352,12 @@ fn alt_variant(pattern: I32, enum_decl: I32) I32 {
 /// An `alt` without a default arm names every variant: the first missing one
 /// is reported.
 fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
+    // An arm naming no variant is the mistake (reported): no more of it.
+    let a0 = next_sibling(first_child(node));
+    while (a0 >= 0) {
+        if is_kind(a0, Node.Alt_arm) and alt_variant(first_child(a0), enum_decl) < 0 { return; };
+        a0 = next_sibling(a0);
+    };
     let c = first_child(decl_node[enum_decl]);
     while (c >= 0) {
         if is_kind(c, Node.Variant) {

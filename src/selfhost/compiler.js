@@ -17,7 +17,7 @@
 
 import {
   awaitImports, closureImports, exceptionImports, glueModuleSource, importObjectFromEval, importObjectFromGlue,
-  memoryImports, promiseImports, promisifyExports,
+  convertExports, memoryImports, promiseImports, promisifyExports,
 } from '../runtime/host-imports.js';
 import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
 
@@ -72,8 +72,17 @@ export async function compile(utu, entry, host) {
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
-  const files = await loadProgram(utu, entry, host);
-  const size = await compileProgram(utu, TARGET[target] ?? TARGET.normal, host);
+  let files, size;
+  try {
+    files = await loadProgram(utu, entry, host);
+    size = await compileProgram(utu, TARGET[target] ?? TARGET.normal, host);
+  } catch (error) {
+    if (!isStackOverflow(error)) throw error;
+    // The compiler recurses on nesting: a program nested past what its
+    // stack bears is a mistake in the program, reported where it is deepest.
+    files = loading.get(utu) ?? [];
+    return { wasm: null, spec: null, diagnostics: [tooDeep(utu, files, error)], files };
+  }
   const diagnostics = readDiagnostics(utu, files).concat(sourceWarnings(files));
   if (size < 0) return { wasm: null, spec: null, diagnostics, files };
   return { ...builtModule(utu, size), diagnostics, files, tests: target === 'test' ? readTests(utu) : [] };
@@ -83,9 +92,16 @@ export async function compile(utu, entry, host) {
 function readTests(utu) {
   const tests = [];
   for (let k = 0; k < utu.test_count(); k++) {
-    tests.push({ export: `__test_${k}`, name: JSON.parse(textAt(utu.src, utu.test_name_start(k), utu.test_name_end(k))) });
+    tests.push({ export: `__test_${k}`, name: stringValue(textAt(utu.src, utu.test_name_start(k), utu.test_name_end(k))) });
   }
   return tests;
+}
+
+const ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' };
+
+/** A utu string literal's text (quotes included), its escapes read as utu reads them. */
+function stringValue(literal) {
+  return literal.slice(1, -1).replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_, e) => e.length > 1 ? String.fromCharCode(parseInt(e.slice(1), 16)) : ESCAPES[e] ?? e);
 }
 
 /**
@@ -98,11 +114,13 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   const { resolvePath = defaultResolvePath, stdlib } = host;
   // Each file read once, though a program may be started twice.
   const readFile = async file => {
-    if (!texts.has(file)) texts.set(file, await host.readFile(file));
+    // Bytes as they are, when the host's readFile can give them: the compiler reports text that is not UTF-8.
+    if (!texts.has(file)) texts.set(file, await (host.readFile.bytes ?? host.readFile)(file));
     return texts.get(file);
   };
   const prelude = startProgram(utu, stdlib);
   const files = [...prelude.files];
+  loading.set(utu, files);
   const byKey = new Map(prelude.byKey);
   const foreign = [];
   addFile(utu, files, byKey, entry, await readFile(entry), ROLE.entry);
@@ -191,16 +209,80 @@ async function assembleWat(utu) {
 
 const PLATFORM_PATH = /^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;
 
-/** Add a file to the program, and parse it. Returns its index. */
-function addFile(utu, files, byKey, key, text, role) {
-  const bytes = encoder.encode(text);
+/** Add a file (its text, or its bytes) to the program, and parse it. Returns its index. */
+function addFile(utu, files, byKey, key, source, role) {
+  const bytes = typeof source === 'string' ? encoder.encode(source) : new Uint8Array(source);
+  const text = typeof source === 'string' ? source : new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
   const file = utu.file_add(bytes.length, role);
   if (key.startsWith('std:')) utu.file_mark_std?.(file);
   new Uint8Array(utu.src.buffer).set(bytes, utu.file_offset(file));
   files.push({ key, role, text, offset: utu.file_offset(file), bytes });
   byKey.set(key, file);
+  files.parsing = true;
   utu.file_parse(file);
+  files.parsing = false;
   return file;
+}
+
+/** By compiler: the files of the program it is loading (see @tooDeep). */
+const loading = new WeakMap();
+
+/** Whether an error is the engine's stack overflowing (V8 and JavaScriptCore say so alike). */
+function isStackOverflow(error) {
+  return error instanceof RangeError && /call stack/i.test(error.message);
+}
+
+/**
+ * A program the compiler's stack could not get through: where the parse
+ * was most deeply nested, when it overflowed parsing; else the deepest
+ * node of the program's own files (or, when nothing is deep, the node with
+ * the most children: a long chain of arms or links).
+ */
+function tooDeep(utu, files, error) {
+  const diagnostic = {
+    kind: 'nested-too-deeply', code: 'nested-too-deeply', severity: 'error', file: null,
+    message: 'Program nested too deeply', notes: ['The compiler recurses on nesting; split the expression, or the chain, into smaller ones.'],
+  };
+  let at = files.parsing ? utu.parse_deepest_at?.() ?? -1 : -1;
+  if (at < 0) at = deepestNode(utu, files);
+  const file = at < 0 ? null : files.findLast(f => f.offset <= at && at <= f.offset + f.bytes.length);
+  if (!file) return { ...diagnostic, message: `${diagnostic.message} (${error.message})` };
+  const where = place(file, at, at);
+  return { ...diagnostic, file: file.key, ...where, end: where.start + 1, label: 'nested too deeply', message: `${diagnostic.message} (at about line ${where.line})` };
+}
+
+/** The byte where the program's own files nest deepest (see @tooDeep), or -1. */
+function deepestNode(utu, files) {
+  let child, next, first, tokStart, n;
+  try {
+    n = utu.node_count();
+    [child, next, first] = ['node_child', 'node_next', 'node_first'].map(name => new Int32Array(utu[name].buffer, 0, n));
+    tokStart = new Int32Array(utu.tok_start.buffer);
+  } catch { return -1; }
+  const own = files.filter(f => f.role === ROLE.entry || f.role === ROLE.import);
+  const isOwn = byte => own.some(f => f.offset <= byte && byte < f.offset + f.bytes.length);
+  // The roots: nodes no node holds.
+  const held = new Uint8Array(n);
+  for (let node = 0; node < n; node++) for (let c = child[node]; c >= 0 && c < n && !held[c]; c = next[c]) held[c] = 1;
+  const depth = new Int32Array(n);
+  let deepest = -1, widest = -1, most = 0;
+  for (let root = 0; root < n; root++) {
+    if (held[root] || !isOwn(tokStart[first[root]])) continue;
+    const stack = [root];
+    while (stack.length) {
+      const node = stack.pop();
+      let kids = 0;
+      for (let c = child[node]; c >= 0 && c < n; c = next[c]) {
+        depth[c] = depth[node] + 1;
+        stack.push(c);
+        kids++;
+      }
+      if (deepest < 0 || depth[node] > depth[deepest]) deepest = node;
+      if (kids > most) { most = kids; widest = node; }
+    }
+  }
+  const node = deepest >= 0 && depth[deepest] >= 200 ? deepest : widest;
+  return node < 0 ? -1 : tokStart[first[node]];
 }
 
 // A declaration ABI's types as JSON bytes, and where each type starts in
@@ -481,20 +563,57 @@ function sourceWarnings(files) {
   }));
 }
 
-/** A byte offset in `src` as a UTF-16 offset in the file's text. */
 /** A diagnostic's extra rows, by kind (`Extra` in selfhost/resolve.utu). */
 const EXTRA = ['label', 'expected', 'found', 'related', 'note', 'fix'];
 
-/** Byte offsets into a file, as UTF-16 offsets and a 1-based line and column. */
+/**
+ * Byte offsets into a file, as UTF-16 offsets (what editors count) and a
+ * 1-based line and column (what a terminal shows: a column counts
+ * characters, and a line ends at \n, \r\n, or a lone \r).
+ */
 function place(file, startByte, endByte) {
-  const start = units(file, startByte);
-  const end = units(file, endByte);
-  const before = file.text.slice(0, start);
-  return { start, end, line: before.split('\n').length, column: start - before.lastIndexOf('\n') };
+  const { units, lines } = indexOf(file);
+  const at = byte => units[Math.min(Math.max(0, byte - file.offset), units.length - 1)];
+  const start = at(startByte);
+  const end = at(endByte);
+  let lo = 0, hi = lines.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (lines[mid] <= start) lo = mid; else hi = mid - 1; }
+  let column = 1;
+  for (let i = lines[lo]; i < start; i++) {
+    const c = file.text.charCodeAt(i);
+    if (c < 0xdc00 || c > 0xdfff) column++;
+  }
+  return { start, end, line: lo + 1, column };
 }
 
-function units(file, byte) {
-  return decoder.decode(file.bytes.subarray(0, Math.max(0, byte - file.offset))).length;
+/**
+ * A file's offsets, made once: the UTF-16 offset of each byte, and where
+ * each line starts (UTF-16).
+ */
+const indexes = new WeakMap();
+
+function indexOf(file) {
+  let index = indexes.get(file);
+  if (!index) {
+    const { bytes, text } = file;
+    const units = new Uint32Array(bytes.length + 1);
+    let u = 0;
+    for (let i = 0; i < bytes.length; i++) {
+      units[i] = u;
+      const b = bytes[i];
+      // A sequence's lead byte: four bytes are two UTF-16 units.
+      if ((b & 0xc0) !== 0x80) u += b >= 0xf0 ? 2 : 1;
+    }
+    units[bytes.length] = u;
+    const lines = [0];
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i);
+      if (c === 10 || (c === 13 && text.charCodeAt(i + 1) !== 10)) lines.push(i + 1);
+    }
+    index = { units, lines };
+    indexes.set(file, index);
+  }
+  return index;
 }
 
 /**
@@ -519,7 +638,7 @@ export async function instantiate(wasm, spec = {}, { loadGlue = null } = {}) {
     imports.utu = exceptionImports(imports.utu ?? {});
   }
   const instance = await WebAssembly.instantiate(module, imports);
-  return { module, instance, exports: promisifyExports(instance, spec.promises) };
+  return { module, instance, exports: convertExports(promisifyExports(instance, spec.promises), spec.exports) };
 }
 
 /** `../b.utu` from `/a/c.utu`: POSIX paths and URLs alike. */

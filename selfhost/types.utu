@@ -110,7 +110,40 @@ fn instance(module: I32, args: I32) I32 {
     inst_module.push(module);
     inst_args.push(args);
     inst_table[h] = id;
+    let depth = 0;
+    for (0 ..< vl_len[args]) |i| { depth = max_i32(depth, type_depth(vl_item(args, i))); };
+    inst_depth.push(depth + 1);
     id;
+}
+
+/// By instance: how deep its type arguments nest instances (`m[Array[I32]]` is 2).
+vec inst_depth: I32;
+
+/// How deeply instances nest in a type.
+fn type_depth(t: I32) I32 {
+    let kind = ty_kind[t];
+    if kind == Ty.Named.to_i32() { return if ty_b[t] > 0 { inst_depth[ty_b[t]]; } else { 0; }; };
+    if kind == Ty.Nullable.to_i32() { return type_depth(ty_a[t]); };
+    let depth = 0;
+    if kind == Ty.Tuple.to_i32() or kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() {
+        for (0 ..< vl_len[ty_a[t]]) |i| { depth = max_i32(depth, type_depth(vl_item(ty_a[t], i))); };
+    };
+    if kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() { depth = max_i32(depth, type_depth(ty_b[t])); };
+    depth;
+}
+
+fn max_i32(a: I32, b: I32) I32 { if a > b { a; } else { b; }; }
+
+/// The deepest instances nest (a generic module that instantiates itself
+/// with a bigger type each time would go on without end).
+let inst_depth_max: I32 = 64;
+
+/// Whether instance `inst` nests too deeply, which is reported at `node`
+/// (its module's name the word) where it first does.
+fn too_deep(inst: I32, node: I32) Bool {
+    if inst_depth[inst] <= inst_depth_max { return false; };
+    if inst_depth[inst] == inst_depth_max + 1 { report2(Diag.InstanceDepth, node, decl_name[inst_module[inst]], inst_depth_max, -1); };
+    true;
 }
 
 fn inst_grow() void {
@@ -195,7 +228,7 @@ fn find_prelude_types() void {
     prelude_ty.resize(Prelude.count());
     for (0 ..< Prelude.count()) |p| {
         let word = intern_text(Prelude.name(Prelude.from_i32(p)));
-        let decl = promoted(lookup(word));
+        let decl = promoted(prelude_lookup(word));
         prelude_ty[p] = if decl >= 0 { named(decl, 0); } else { ty_error(); };
     };
 }
@@ -216,7 +249,16 @@ fn type_of(node: I32, inst: I32) I32 {
     let kind = node_kind[node];
     if kind == Node.Ref_type.to_i32() { return type_path(first_child(node), inst); };
     if kind == Node.Type_ident.to_i32() or kind == Node.Promoted_type.to_i32() { return type_path(node, inst); };
-    if kind == Node.Nullable_type.to_i32() { return nullable(type_of(first_child(node), inst)); };
+    if kind == Node.Nullable_type.to_i32() {
+        // A scalar has no null: `?Id`, `?L` for an int enum, `?T` as `I32`.
+        let t = type_of(first_child(node), inst);
+        let d = ty_decl(t);
+        if is_scalar_kind(d) or (decl_is(d, Decl.TypeDecl) and is_scalar_decl(d)) {
+            report(Diag.InvalidNullableType, node, decl_name[d]);
+            return ty_error();
+        };
+        return nullable(t);
+    };
     if kind == Node.Paren_type.to_i32() { return type_of(first_child(node), inst); };
     if kind == Node.Void_type.to_i32() { return ty_void(); };
     if kind == Node.Return_type.to_i32() { return type_of(first_child(node), inst); };
@@ -240,8 +282,8 @@ fn type_of(node: I32, inst: I32) I32 {
         let params = vl_end(m);
         return ty(if kind == Node.Func_type.to_i32() { Ty.Fun; } else { Ty.Closure; }, params, result);
     };
-    // A generator's `yield T`, and anything else not known yet.
-    report(Diag.Unsupported, node, -1);
+    // A generator's `yield T` (a method's is reported), and anything else not known yet.
+    if not reported_within(node) { report(Diag.Unsupported, node, -1); };
     ty_error();
 }
 
@@ -258,7 +300,9 @@ fn type_path(node: I32, inst: I32) I32 {
             report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[args]);
             return ty_error();
         };
-        return named(decl, instance(owner, args));
+        let at = instance(owner, args);
+        if too_deep(at, node) { return ty_error(); };
+        return named(decl, at);
     };
     if kind == Node.Qualified_type_ref.to_i32() or kind == Node.Inline_module_type_path.to_i32() {
         let c = first_child(node);
@@ -282,9 +326,10 @@ fn type_path(node: I32, inst: I32) I32 {
             at = instance(owner, type_args(next_sibling(c), inst));
         } else {
             // `ints.Box` with `using boxy[I32] |ints|`: Box in boxy[I32].
-            let named_by = lookup(word_of(name_node(c)));
+            let named_by = node_alias[name_node(c)];
             at = if decl_is(named_by, Decl.Alias) { alias_instance(named_by); } else { instance_for(owner, inst); };
         };
+        if too_deep(at, node) { return ty_error(); };
         return named(member_decl, at);
     };
     let n = if kind == Node.Promoted_type.to_i32() { node; } else { name_node(node); };
@@ -500,6 +545,7 @@ fn reset_types() void {
     ty_table.clear();
     inst_module.clear();
     inst_args.clear();
+    inst_depth.clear();
     inst_table.clear();
     struct_inst.clear();
     struct_heap.clear();

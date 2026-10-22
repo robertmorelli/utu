@@ -28,6 +28,14 @@ const INTENDED = {
   // `Pair[I32]` of `mod Pair[A, B]`: stage 0 builds it, reading B as nothing.
   'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal': 'a module given too few type arguments is reported',
   'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test': 'a module given too few type arguments is reported',
+  // `Array[P].new_default(n)` of a protocol P: stage 0 fills it with null,
+  // which a P is never.
+  'baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu normal': 'an array of a protocol has no default',
+  'baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu test': 'an array of a protocol has no default',
+  'baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu normal': 'an array of a protocol has no default',
+  'baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu test': 'an array of a protocol has no default',
+  'baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu normal': 'an array of a protocol has no default',
+  'baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu test': 'an array of a protocol has no default',
   // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
   'examples/bounds.utu normal': 'bounded module parameters',
   'examples/bounds.utu test': 'bounded module parameters',

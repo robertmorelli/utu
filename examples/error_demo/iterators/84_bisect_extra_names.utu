@@ -1,0 +1,5 @@
+// What: bisect given a name more than its value and index
+// Expect: bisect takes 1 name and an optional index
+export main() I32 {
+    [1, 2, 3] bisect |v, i, j| { v < 2; };
+}

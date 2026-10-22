@@ -1,0 +1,8 @@
+// What: an integer enum over I64, which enums do not support
+// Expect: enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32
+enum(I64) Big:
+    | Huge = 5000000000
+
+export main() I32 {
+    0;
+}

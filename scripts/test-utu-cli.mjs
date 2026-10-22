@@ -34,10 +34,12 @@ export main() I32 {
   // under it, without color).
   r = utu('check', 'bad.utu');
   assert.equal(r.status, 1);
-  assert.equal(r.stderr.trim(), `ERROR  Expected I32, got Str
+  assert.equal(r.stderr.trim(), `ERROR  add takes I32, got Str
         type-mismatch · bad.utu:3:25
 
  1 │ fn add(a: I32, b: I32) I32 { a + b; }
+   │                ──────
+   │                ╰─ I32
  2 │ export main() I32 {
  3 │     let x: I32 = add(1, "two");
    │                         ━━━━━
@@ -70,9 +72,9 @@ export main() I32 {
   // The mark is under the code, past wide characters.
   await fs.writeFile(path.join(dir, 'wide.utu'), 'export main() I32 {\n    let s: Str = "漢字"; nope;\n}\n');
   assert.match(utu('check', 'wide.utu').stderr, /^ {3}│ {26}━{4}$/m);
-  // A file that ends early says so.
+  // A file that ends early says so, and which brace is left open.
   await fs.writeFile(path.join(dir, 'short.utu'), 'export main() I32 {\n');
-  assert.match(utu('check', 'short.utu').stderr, /Unexpected end of file/);
+  assert.match(utu('check', 'short.utu').stderr, /Unclosed \{[^]*╰─ never closed/);
 
   r = utu('run', 'good.utu');
   assert.equal(r.status, 0, r.stderr);

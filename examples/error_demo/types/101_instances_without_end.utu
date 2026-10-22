@@ -1,0 +1,11 @@
+// What: a generic module that instantiates itself with a bigger type each time it recurses
+// Expect: m's instances nest more than 64 deep (it would never finish compiling)
+mod m[T] {
+    fn f(n: I32) I32 {
+        if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
+    }
+}
+
+export main() I32 {
+    m[I32].f(3);
+}
