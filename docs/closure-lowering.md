@@ -28,6 +28,11 @@ params...)`:
 3. Otherwise (a host function, or a signature that does not match), call the
    `utu.closure_call_*` import, as before.
 
+At `-O small`, a module that never awaits keeps the smaller form: calls go
+straight to `closure_call_*`, `closure_new` gets no record, and each body
+takes its environment exactly typed, with no cast. So does a module, at any
+level, that calls no closure itself. Nothing in either can suspend.
+
 The body runs on the caller's Wasm stack, so an `await` in it, or in anything
 it calls, suspends up to the export's `WebAssembly.promising` wrapper. Exports
 that can reach an await through a `call_ref` are wrapped: a `call_ref` may

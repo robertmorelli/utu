@@ -870,9 +870,9 @@
  "examples/promises.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9746ce49ddaf0081",
-  "queries": "09f4980c843da347",
-  "graphs": "369b4bcc4dcf9234"
+  "entries": "80aaf5898c6fd09a",
+  "queries": "94bda1688e1dd500",
+  "graphs": "46f13fc21436eb72"
  },
  "examples/promises.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
