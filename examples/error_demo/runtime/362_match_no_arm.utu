@@ -1,0 +1,13 @@
+// What: a match reached with a value none of its arms takes
+// Expect: No arm for the value, at the match in label
+enum(U8) Level:
+    | Low
+    | High
+
+fn label(l: Level) I32 {
+    match l { Level.Low => 1, Level.High => 2, };
+}
+
+export main() I32 {
+    label(Level.from_i32(7));
+}

@@ -142,6 +142,37 @@ export lib {
     /// Function names in the modules built (1), or none (0, the default).
     fn set_debug_names(on: I32) void { debug_names[0] = on; }
 
+    /// A source map of the modules built (1: "Source maps" in wasm.utu), or none (0, the default).
+    fn set_source_map(on: I32) void { source_map[0] = on; }
+
+    /// The last module's source map: its entries, each an instruction's
+    /// byte offset in the module and its syntax node's byte span in src
+    /// (-1 for none), kind (as node_kind_name takes it), and function.
+    fn map_count() I32 { map_at.len(); }
+
+    fn map_offset(k: I32) I32 { map_at[k]; }
+
+    fn map_start(k: I32) I32 { span_start(map_node[k]); }
+
+    fn map_end(k: I32) I32 { if map_node[k] < 0 { -1; } else { tok_end[node_last[map_node[k]] - 1]; }; }
+
+    fn map_kind(k: I32) I32 { if map_node[k] < 0 { -1; } else { node_kind[map_node[k]]; }; }
+
+    /// The syntax of the call entry k's code was inlined at: its byte span, or -1.
+    fn map_site_start(k: I32) I32 { span_start(map_site[k]); }
+
+    fn map_site_end(k: I32) I32 { if map_site[k] < 0 { -1; } else { tok_end[node_last[map_site[k]] - 1]; }; }
+
+    /// Where the function that entry k's syntax is in starts (-1: none), and its name.
+    fn map_owner_start(k: I32) I32 { span_start(owner_of(map_node[k])); }
+
+    fn map_owner_name(k: I32) Str { owner_name(owner_of(map_node[k])); }
+
+    fn map_function_count() I32 { func_order.len(); }
+
+    /// Where the function (as map_owner_start) of function `i` of the module (imports first) starts, or -1.
+    fn map_function_start(i: I32) I32 { span_start(owner_of(func_src[func_order[i]])); }
+
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level; }
 
@@ -359,4 +390,30 @@ export lib {
         let name = Node.name(Node.from_i32(kind));
         Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len());
     }
+}
+
+/// Where a syntax node starts in src, or -1 for none.
+fn span_start(node: I32) I32 { if node < 0 { -1; } else { tok_start[node_first[node]]; }; }
+
+/// The function a syntax node is in (a declaration, a closure, a test), or -1.
+fn owner_of(node: I32) I32 {
+    let n = node;
+    while (n >= 0) {
+        let k = node_kind[n];
+        if k == Node.Fn_decl.to_i32() or k == Node.Op_decl.to_i32() or k == Node.Closure_expr.to_i32()
+            or k == Node.Test_decl.to_i32() or k == Node.Bench_decl.to_i32() or k == Node.Export_main_decl.to_i32() { return n; };
+        n = parent_of(n);
+    };
+    -1;
+}
+
+/// An owner's name, as a stack trace shows it.
+fn owner_name(node: I32) Str {
+    if node < 0 { return ""; };
+    if is_kind(node, Node.Closure_expr) { return "closure"; };
+    if is_kind(node, Node.Test_decl) { return "test"; };
+    if is_kind(node, Node.Bench_decl) { return "bench"; };
+    if is_kind(node, Node.Export_main_decl) { return "main"; };
+    let name = first_child(node);
+    bytes_text(tok_start[node_first[name]], tok_end[node_last[name] - 1]);
 }
