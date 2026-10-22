@@ -1547,6 +1547,7 @@ fn encode_names() void {
 /// (@optimize_module) when optimizing, numbered (@assign_indices), and
 /// encoded section by section. Returns their number.
 fn encode_module() I32 {
+    lean_closures();
     sweep();
     // -O3 inlines (inline.utu); what is no longer called is then swept out,
     // before the mems' late functions are made (and marked live).

@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { MODES } from '../src/selfhost/compiler.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
@@ -94,6 +95,55 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
+  // `await` through closures: utu calls a closure's body by call_ref, so the
+  // stack suspends through it (once "trying to suspend without
+  // WebAssembly.promising"). In every mode; a closure stays the JS function
+  // the host sees, and a JS function still calls as a closure.
+  const awaiting = await write(`let delay: fun(I32, I32) Promise[I32] = @es/\\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \\/;
+let same: fun(cl(I32) I32, cl(I32) I32) Bool = @es/\\ (a, b) => a === b \\/;
+let js_double: fun() cl(I32) I32 = @es/\\ () => (x) => x * 2 \\/;
+let js_call: fun(cl(I32) I32, I32) I32 = @es/\\ (f, x) => f(x) \\/;
+struct Box:
+    | f: cl(I32) I32
+fn slow(n: I32) I32 { await delay(n, 1) + 1; }
+fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+fn ticks(n: I32) yield I32 { for (0 ..< n) |i| { yield await delay(i, 1); }; }
+export lib {
+    fn through() I32 { apply(cl(n) { slow(n); }, 41); }
+    fn nested() I32 {
+        let k = 10;
+        let outer = cl(n: I32) I32 { let inner = cl(m: I32) I32 { await delay(m + k, 1); }; inner(n) + await delay(1, 1); };
+        outer(5);
+    }
+    fn stored() I32 {
+        let b = Box { f: cl(n) { await delay(n * 3, 1); } };
+        let fs = [cl(n: I32) I32 { slow(n); }, cl(n: I32) I32 { n; }];
+        b.f(7) * 100 + fs[0](1) + fs[1](2);
+    }
+    fn generator() I32 { let total = cl() I32 { let t = 0; for (ticks(4)) |v| { t += v; }; t; }; total(); }
+    fn pipeline() I32 {
+        let piped = cl(xs: Array[I32]) I32 { xs filter |x| { await delay(x, 1) > 1; } fold(0) |s, x| { s + await delay(x, 1); }; };
+        piped([1, 2, 3]);
+    }
+    fn identity() I32 { let f = cl(n: I32) I32 { n + 1; }; if same(f, f) { js_call(f, 1); } else { 0; }; }
+    fn js_function() I32 { apply(js_double(), 21); }
+    fn calls() I32 {
+        let k = 3;
+        let s = 0;
+        for (0 ..< 2000000) |i| { s = s + apply(cl(n) { n * k; }, i) % 7; };
+        s;
+    }
+}
+`);
+  const awaited = { through: 42, nested: 16, stored: 2104, generator: 6, pipeline: 5, identity: 2, js_function: 42, calls: 5999997 };
+  for (const [mode, options] of Object.entries(MODES)) {
+    const built = await compileFile(utu, awaiting, options);
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    for (const [name, value] of Object.entries(awaited)) assert.equal(await exports[name](), value, `${mode}: ${name}`);
+    checked++;
+  }
+
   // Mistakes the self-hosted compiler reports, in its words.
   const mistakes = [
     ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
@@ -106,6 +156,9 @@ export lib {
       'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
     ['fn f() I32 {\n    let x = 1\n    x;\n}\n', "Expected ';', got 'x'"],
+    // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
+    ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
+      'A closure the host calls cannot await'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

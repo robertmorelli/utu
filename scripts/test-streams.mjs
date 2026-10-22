@@ -58,7 +58,7 @@ try {
     ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`', 'await for needs a generator call or a stream'],
     ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'a stream loop binds one value: await for (s) |value| { … }', 'A stream loop binds one value'],
     ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', "Cannot access field 'iterator' on nullable ?Stream[I32]", '?Stream[I32] may be null'],
-    ['fn f(s: Stream[I32]) I32 { let g = cl() I32 { let t = 0; await for (s) |v| { t += v; }; t; }; g(); }', 'a closure cannot await: a closure is called through the host, where JSPI cannot suspend; await in a function (a `fun` value can be passed instead)', 'A closure cannot await'],
+    // (A closure utu calls may await: the self-hosted compiler calls its body by call_ref. Stage 0 still reports it.)
   ];
   for (const [i, [body, stage0, selfhost]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);

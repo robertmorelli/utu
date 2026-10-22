@@ -1,12 +1,52 @@
 # Closure lowering and callable ABI
 
-`cl(...) R` is always an ordinary JavaScript function carried as an externref.
-Construction calls `utu.closure_new`; invocation calls a signature-specific
-`utu.closure_call_*` import. This includes closures whose only use is a local
-call. A callback returned to JavaScript needs no adapter at the call site.
-`fun(...) R` is the UTU-only function-pointer representation, using Wasm
-function references and `call_ref`. Converting `fun` to `cl` explicitly creates
-a JavaScript wrapper with a null environment.
+`cl(...) R` is always an ordinary JavaScript function carried as an externref,
+so its identity is the function's (`===`, `removeEventListener`). A callback
+returned to JavaScript needs no adapter at the call site. `fun(...) R` is the
+UTU-only function-pointer representation, using Wasm function references and
+`call_ref`. Converting `fun` to `cl` creates a JavaScript wrapper with a null
+environment.
+
+## Calling a closure (self-hosted compiler)
+
+A closure's body is a Wasm function `(anyref env, params...) -> R`; it casts
+the environment at entry, so every body of one signature has one function
+type. Construction calls a module helper, `closure.new(fn, env, flags)`, which
+builds a record struct `{fn: funcref, env: anyref}` and calls
+`utu.closure_new(fn, env, flags, record)`. The host returns the JS function and
+keeps the record on it under a symbol.
+
+A call from UTU goes to a per-signature helper, `closure.call(closure,
+params...)`:
+
+1. `utu.closure_rec(closure)` returns the record, or null for a JavaScript
+   function UTU did not make. It returns at once, so no JS frame stays on the
+   stack.
+2. With a record: if its funcref is a body of the signature, `call_ref` it with
+   the environment; if it is a decayed `fun` of the signature, `call_ref` it
+   without one.
+3. Otherwise (a host function, or a signature that does not match), call the
+   `utu.closure_call_*` import, as before.
+
+The body runs on the caller's Wasm stack, so an `await` in it, or in anything
+it calls, suspends up to the export's `WebAssembly.promising` wrapper. Exports
+that can reach an await through a `call_ref` are wrapped: a `call_ref` may
+reach any function taken as a value, and closure bodies are taken by
+`ref.func`.
+
+A closure the host calls (a `.then` callback, an event handler, a callback an
+npm package keeps) runs through its JS function: JSPI cannot suspend through
+that frame. The checker reports a closure written in the call (or bound by a
+`let`) that awaits, or calls by name a function that may await, where it is
+given to an `@es` or declared host function, or to a UTU function whose body is
+`@ir`/`@es` or that passes the parameter to an `@es` function (`Promise.then`,
+`Stream.map`). A closure value that reaches the host another way and suspends
+fails at run time.
+
+Measured: 2M calls of `apply(cl(n) { n * k; }, i)` (closure made each
+iteration), warm, `-O fast`: Node 25 210 ms to 57 ms, Bun 175 ms to 60 ms;
+with the closure made once, Node 90 ms to 15 ms, Bun 130 ms to 12 ms. A plain
+JavaScript function called as a `cl` pays one more import call than before.
 
 ## Pass contract
 
@@ -44,7 +84,8 @@ codegen optimization may remove them entirely from the shipped binary.
 ## Escape analysis boundary
 
 Escape analysis must not switch a `cl` value to the `fun` representation or
-bypass the JavaScript ABI. There is currently no escape-analysis pass. Before
+bypass the JavaScript ABI (a call from UTU skips the JS frame, but the closure
+is still made by `closure_new`). There is currently no escape-analysis pass. Before
 adding one, identify an optimization that preserves this contract and measure
 its effect on emitted Wasm and required JavaScript together.
 
