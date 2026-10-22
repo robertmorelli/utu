@@ -68,10 +68,11 @@ export async function loadCompiler(wasm, spec = {}) {
 export async function compile(utu, entry, host) {
   const chosen = host.mode ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false } = { ...host, ...chosen };
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
+  utu.set_source_map?.(sourceMap ? 1 : 0);
   let files, size;
   try {
     files = await loadProgram(utu, entry, host);
@@ -85,7 +86,84 @@ export async function compile(utu, entry, host) {
   }
   const diagnostics = readDiagnostics(utu, files).concat(sourceWarnings(files));
   if (size < 0) return { wasm: null, spec: null, diagnostics, files };
-  return { ...builtModule(utu, size), diagnostics, files, tests: target === 'test' ? readTests(utu) : [] };
+  return {
+    ...builtModule(utu, size), diagnostics, files, tests: target === 'test' ? readTests(utu) : [],
+    map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
+  };
+}
+
+/**
+ * The last module's source map (see src/selfhost/sourcemap.js): by entry,
+ * in offset order, an instruction's byte offset in the module and the
+ * syntax it was made for (file, 1-based line and column, UTF-16 span in the
+ * file, node kind), with the function that syntax is in (`owner`, and
+ * `ownerAt`, where it starts in the compiler's source) and, for code inlined
+ * from it, the call it is at (`site`: file, line, column, span); and by
+ * function of the module, where it was declared (as `ownerAt`), or null.
+ */
+export function readSourceMap(utu, files) {
+  const ordered = files.toSorted((a, b) => a.offset - b.offset);
+  const lines = new Map();
+  // A byte of src as its file, line and column (UTF-16), by each file's line starts.
+  const where = byte => {
+    let lo = 0, hi = ordered.length - 1, file = null;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (ordered[mid].offset <= byte) { file = ordered[mid]; lo = mid + 1; } else hi = mid - 1; }
+    if (!file || byte > file.offset + file.bytes.length) return null;
+    // Each line's start, as a byte and as a UTF-16 offset.
+    let starts = lines.get(file);
+    if (!starts) {
+      starts = { bytes: [0], units: [0] };
+      for (let i = 0; i < file.bytes.length; i++) {
+        if (file.bytes[i] !== 10) continue;
+        const from = starts.bytes.at(-1);
+        starts.units.push(starts.units.at(-1) + decoder.decode(file.bytes.subarray(from, i + 1)).length);
+        starts.bytes.push(i + 1);
+      }
+      lines.set(file, starts);
+    }
+    const local = byte - file.offset;
+    lo = 0; hi = starts.bytes.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts.bytes[mid] <= local) lo = mid; else hi = mid - 1; }
+    const column = decoder.decode(file.bytes.subarray(starts.bytes[lo], local)).length + 1;
+    return { file, line: lo + 1, column, offset: starts.units[lo] + column - 1 };
+  };
+  // Entries share syntax: each node's place, kind and owner read once.
+  const places = new Map();
+  const kinds = new Map();
+  const owners = new Map();
+  const entries = [];
+  for (let k = 0; k < utu.map_count(); k++) {
+    const startByte = utu.map_start(k);
+    const endByte = utu.map_end(k);
+    const key = `${startByte}:${endByte}`;
+    let syntax = places.get(key);
+    if (!syntax) {
+      const at = startByte >= 0 ? where(startByte) : null;
+      const kind = utu.map_kind(k);
+      if (!kinds.has(kind)) kinds.set(kind, kind >= 0 ? utu.node_kind_name(kind) : null);
+      const ownerAt = utu.map_owner_start(k);
+      if (ownerAt >= 0 && !owners.has(ownerAt)) owners.set(ownerAt, utu.map_owner_name(k));
+      syntax = {
+        file: at?.file.key ?? null, line: at?.line ?? null, column: at?.column ?? null,
+        start: at?.offset ?? null, end: at ? where(endByte)?.offset ?? at.offset : null, kind: kinds.get(kind),
+        owner: ownerAt >= 0 ? owners.get(ownerAt) : null, ownerAt: ownerAt >= 0 ? ownerAt : null,
+      };
+      places.set(key, syntax);
+    }
+    // Code inlined from another function: the call it is at.
+    const siteByte = utu.map_site_start?.(k) ?? -1;
+    const site = siteByte >= 0 ? where(siteByte) : null;
+    entries.push({
+      at: utu.map_offset(k), ...syntax,
+      site: site && { file: site.file.key, line: site.line, column: site.column, start: site.offset, end: where(utu.map_site_end(k))?.offset ?? site.offset },
+    });
+  }
+  const functions = [];
+  for (let i = 0; i < utu.map_function_count(); i++) {
+    const at = utu.map_function_start(i);
+    functions.push(at >= 0 ? at : null);
+  }
+  return { entries, functions };
 }
 
 /** A test build's tests: each one's export and name. */
