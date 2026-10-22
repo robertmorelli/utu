@@ -1,4 +1,4 @@
-// The utu CLI (on the self-hosted compiler): check, run, test, build, and
+// The utu CLI (on the self-hosted compiler): check, run, test, bench, build, and
 // build-exe when bun is installed.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -86,6 +86,25 @@ export main() I32 {
   assert.match(r.stdout, /^FAIL fails: /m);
   assert.match(r.stdout, /1 passed, 1 failed/);
 
+  // utu bench: a row per bench, its median time per iteration and how many
+  // runs of how many iterations; a bench that traps is a FAIL row.
+  await write('benches.utu', `fn add(a: I32, b: I32) I32 { a + b; }
+bench "adding" {
+    let total = 0;
+    measure { total = add(total, 1); }
+}
+bench "trapping" {
+    measure { assert false; }
+}
+`);
+  r = utu('bench', 'benches.utu');
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stdout, /^bench +median +iterations$/m);
+  assert.match(r.stdout, /^adding +[0-9.]+ (ns|µs|ms|s) +11 × \d+$/m);
+  assert.match(r.stdout, /^trapping +FAIL: /m);
+  r = utu('bench', 'good.utu');
+  assert.equal(r.stdout.trim(), 'No benches');
+
   // The build modes: small (the default) and fast keep the checks Wasm does
   // not make itself, so past a Buffer's length is a trap; the unsafe ones
   // leave them out, and it reaches the capacity beyond.
@@ -118,7 +137,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.equal(r.status, 0, r.stderr);
     assert.equal(spawnSync(path.join(dir, 'good'), { encoding: 'utf8' }).stdout.trim(), '6');
   }
-  console.log('utu cli: check, run, test, build, build-exe pass');
+  console.log('utu cli: check, run, test, bench, build, build-exe pass');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

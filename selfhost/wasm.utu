@@ -737,6 +737,8 @@ fn sweep() void {
     for (0 ..< glob_kind.len()) |g| {
         if glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] >= 0 { mark_global(g); };
     };
+    // (The start function the computed globals made; see check.utu.)
+    if start_func[0] >= 0 { mark_func(start_func[0]); };
     while (live_work.len() > 0) {
         let node = live_work[live_work.len() - 1];
         live_work.resize(live_work.len() - 1);

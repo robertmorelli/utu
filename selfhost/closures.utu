@@ -469,8 +469,6 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
                 mismatch(node, expect, ty(Ty.Closure, vl_end(mt), if r_node >= 0 { type_of(r_node, cx.inst); } else { ty_error(); }));
                 return error_value();
             };
-            // Host declarations type the closures handed to them.
-            if has_foreign() { return unsupported(node); };
             report(Diag.ClosureParamType, p, word_of(first_child(p)));
             diag_label("cl(" + word_text(word_of(first_child(p))) + ": T)");
             t = ty_error();

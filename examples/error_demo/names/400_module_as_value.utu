@@ -1,0 +1,10 @@
+// What: a module named where a value is wanted
+// Expect: shapes is a module, not a value
+mod shapes {
+    fn area(w: I32, h: I32) I32 { w * h; }
+}
+
+export main() I32 {
+    let s = shapes;
+    0;
+}

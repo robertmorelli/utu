@@ -24,8 +24,8 @@ import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/sou
 /** How a file joins the program. */
 export const ROLE = { entry: 0, import: 1, prelude: 2 };
 
-/** What a build is for: a module's exports, its tests, or @comptime values. */
-export const TARGET = { normal: 0, test: 1, comptime: 2 };
+/** What a build is for: a module's exports, its tests, @comptime values, or its benches. */
+export const TARGET = { normal: 0, test: 1, comptime: 2, bench: 3 };
 
 /** How builds are optimized; size (-Oz) is the default, as in stage 0. */
 export const OPTIMIZE = { none: 0, size: 1, speed: 2 };
@@ -85,7 +85,19 @@ export async function compile(utu, entry, host) {
   }
   const diagnostics = readDiagnostics(utu, files).concat(sourceWarnings(files));
   if (size < 0) return { wasm: null, spec: null, diagnostics, files };
-  return { ...builtModule(utu, size), diagnostics, files, tests: target === 'test' ? readTests(utu) : [] };
+  return {
+    ...builtModule(utu, size), diagnostics, files,
+    tests: target === 'test' ? readTests(utu) : [], benches: target === 'bench' ? readBenches(utu) : [],
+  };
+}
+
+/** A bench build's benches: each one's export (`__bench_k(n)`) and name. */
+function readBenches(utu) {
+  const benches = [];
+  for (let k = 0; k < utu.bench_count(); k++) {
+    benches.push({ export: `__bench_${k}`, name: stringValue(textAt(utu.src, utu.bench_name_start(k), utu.bench_name_end(k))) });
+  }
+  return benches;
 }
 
 /** A test build's tests: each one's export and name. */

@@ -1,0 +1,8 @@
+// What: a struct's field read from the type instead of a value
+// Expect: x is a field: read it from a value
+struct P:
+    | x: I32
+
+export main() I32 {
+    P.x;
+}

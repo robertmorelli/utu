@@ -1,5 +1,5 @@
 // What: a method declared as a generator
-// Expect: A method cannot be a generator (declare it as a function: fn each_item(b: Bag) yield I32)
+// Expect: accepted (a method may be a generator: for (bag.each()) |v| { … })
 mod Bag {
     struct &:
         | items: Array[I32]

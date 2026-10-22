@@ -220,6 +220,16 @@ enum(U8) Diag:
     | MainParams
     | TestName
     | TooManyParams
+    | UnknownLabel
+    | GlobalCycle
+    | NotValue
+    | NotAssignable
+    | IrUnknown
+    | YieldPlace
+    | NotStruct
+    | NewNotHost
+    | GeneratorExport
+    | HostMissing
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -945,6 +955,11 @@ fn declare_program() void {
             // Files that import one module share its view, bound to one of them.
             for (0 ..< import_file.len()) |j| {
                 if decl_a[m] < 0 and import_target[j] == -2 and same_path(i, j) { decl_a[m] = view_of_import(j); };
+            };
+            // The host found none (an npm package not installed).
+            if decl_a[m] < 0 {
+                let path = import_path[i];
+                report(Diag.HostMissing, path, intern_text(bytes_text(tok_start[node_first[path]] + 1, tok_end[node_last[path] - 1] - 1)));
             };
         };
     };
@@ -1704,6 +1719,11 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
         Node.Block_expr => {
             // A label is not a variable.
             walk_expr(last_child(node), w);
+        },
+        Node.Break_expr => {
+            // `break label value`: the label is not a variable.
+            let label = first_child(node);
+            if label >= 0 { walk_expr(next_sibling(label), w); };
         },
         Node.Pipe_expr => {
             walk_expr(first_child(node), w);

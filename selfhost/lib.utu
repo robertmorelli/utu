@@ -132,7 +132,7 @@ export lib {
     fn node_count() I32 { node_kind.len(); }
 
     /// Check and encode the resolved program for a `Target` (0: its exports,
-    /// 1: its tests). Returns the module's size in `out`, or -1 when there
+    /// 1: its tests, 2: @comptime values, 3: its benches). Returns the module's size in `out`, or -1 when there
     /// are diagnostics.
     fn compile_program(target: I32) I32 { compile(Target.from_i32(target)); }
 
@@ -155,6 +155,13 @@ export lib {
     fn test_name_start(k: I32) I32 { tok_start[node_first[first_child(test_node[k])]]; }
 
     fn test_name_end(k: I32) I32 { tok_end[node_first[first_child(test_node[k])]]; }
+
+    /// A bench build's benches: how many, and where bench k's name is in src.
+    fn bench_count() I32 { bench_node.len(); }
+
+    fn bench_name_start(k: I32) I32 { tok_start[node_first[first_child(bench_node[k])]]; }
+
+    fn bench_name_end(k: I32) I32 { tok_end[node_first[first_child(bench_node[k])]]; }
 
     fn file_count() I32 { file_root.len(); }
 
