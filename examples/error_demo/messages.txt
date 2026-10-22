@@ -5235,16 +5235,31 @@ ok
 
 === utu run examples/error_demo/runtime/01_orelse_fatal_null.utu
  TRAP  Null
-       trap · examples/error_demo/runtime/01_orelse_fatal_null.utu
+       trap · examples/error_demo/runtime/01_orelse_fatal_null.utu:8:16
 
-  in main
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let name = find_user(2) orelse fatal;
+   │                ━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                ╰─ here
+ 9 │     name.len();
+10 │ }
+
+  in main  examples/error_demo/runtime/01_orelse_fatal_null.utu:8:16
 --- exit 1
 
 === utu run examples/error_demo/runtime/02_es_returns_null_for_str.utu
  TRAP  Wrong type from JavaScript
-       trap · examples/error_demo/runtime/02_es_returns_null_for_str.utu
+       trap · examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
 
-  in main
+ 5 │ export main() I32 {
+ 6 │     let lang = read_setting("lang");
+ 7 │     lang.len();
+   │     ━━━━━━━━━━
+   │     ╰─ here
+ 8 │ }
+
+  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/03_es_returns_wrong_type.utu
@@ -5253,71 +5268,136 @@ ok
 
 === utu run examples/error_demo/runtime/04_array_index_oob.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/04_array_index_oob.utu
+       trap · examples/error_demo/runtime/04_array_index_oob.utu:7:18
 
-  in sum
-  in main
+ 5 │     let i = 0;
+ 6 │     while (i <= xs.len()) {
+ 7 │         total += xs[i];
+   │                  ━━━━━
+   │                  ╰─ here
+ 8 │         i += 1;
+ 9 │     };
+
+  in sum  examples/error_demo/runtime/04_array_index_oob.utu:7:18
+  in main  examples/error_demo/runtime/04_array_index_oob.utu:14:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/05_array_negative_index.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/05_array_negative_index.utu
+       trap · examples/error_demo/runtime/05_array_negative_index.utu:6:5
 
-  in main
+ 4 │     let xs = Array[I32].new(4, 0);
+ 5 │     let last = xs.len() - 5;
+ 6 │     xs[last] = 7;
+   │     ━━━━━━━━━━━━
+   │     ╰─ here
+ 7 │     xs[0];
+ 8 │ }
+
+  in main  examples/error_demo/runtime/05_array_negative_index.utu:6:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/06_buffer_past_length.utu
- TRAP  fatal, failed assert, or failed check
-       trap · examples/error_demo/runtime/06_buffer_past_length.utu
+ TRAP  Failed check in std:Buffer
+       trap · examples/error_demo/runtime/06_buffer_past_length.utu:10:5
 
-  in &.get_index
-  in main
+ 8 │     b.push(20);
+ 9 │     b.push(30);
+10 │     b[5];
+   │     ━━━━
+   │     ╰─ called here
+11 │ }
+
+  in &.get_index  std:Buffer:36:55
+  in main  examples/error_demo/runtime/06_buffer_past_length.utu:10:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/07_buffer_past_capacity.utu
- TRAP  fatal, failed assert, or failed check
-       trap · examples/error_demo/runtime/07_buffer_past_capacity.utu
+ TRAP  Failed check in std:Buffer
+       trap · examples/error_demo/runtime/07_buffer_past_capacity.utu:8:5
 
-  in &.get_index
-  in main
+ 6 │     let b = Buffer[I32].new();
+ 7 │     b.push(1);
+ 8 │     b[100];
+   │     ━━━━━━
+   │     ╰─ called here
+ 9 │ }
+
+  in &.get_index  std:Buffer:36:55
+  in main  examples/error_demo/runtime/07_buffer_past_capacity.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/08_buffer_pop_empty.utu
- TRAP  fatal, failed assert, or failed check
-       trap · examples/error_demo/runtime/08_buffer_pop_empty.utu
+ TRAP  Failed check in std:Buffer
+       trap · examples/error_demo/runtime/08_buffer_pop_empty.utu:7:5
 
-  in &.pop
-  in main
+ 5 │ export main() I32 {
+ 6 │     let b = Buffer[I32].new();
+ 7 │     b.pop();
+   │     ━━━━━━━
+   │     ╰─ called here
+ 8 │ }
+
+  in &.pop  std:Buffer:47:44
+  in main  examples/error_demo/runtime/08_buffer_pop_empty.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/09_div_by_zero.utu
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/09_div_by_zero.utu
+       trap · examples/error_demo/runtime/09_div_by_zero.utu:4:5
 
-  in average
-  in main
+ 2 │ // Expect: trap: integer division by zero at 09_div_by_zero.utu:4
+ 3 │ fn average(total: I32, count: I32) I32 {
+ 4 │     total / count;
+   │     ━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+
+  in average  examples/error_demo/runtime/09_div_by_zero.utu:4:5
+  in main  examples/error_demo/runtime/09_div_by_zero.utu:9:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/10_rem_by_zero.utu
  TRAP  Integer remainder by zero
-       trap · examples/error_demo/runtime/10_rem_by_zero.utu
+       trap · examples/error_demo/runtime/10_rem_by_zero.utu:4:5
 
-  in bucket
-  in main
+ 2 │ // Expect: trap: integer remainder by zero at 10_rem_by_zero.utu:4
+ 3 │ fn bucket(hash: I32, buckets: I32) I32 {
+ 4 │     hash % buckets;
+   │     ━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+
+  in bucket  examples/error_demo/runtime/10_rem_by_zero.utu:4:5
+  in main  examples/error_demo/runtime/10_rem_by_zero.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/11_div_overflow.utu
  TRAP  Integer overflow
-       trap · examples/error_demo/runtime/11_div_overflow.utu
+       trap · examples/error_demo/runtime/11_div_overflow.utu:6:5
 
-  in main
+ 4 │     let min = -2147483647 - 1;
+ 5 │     let d = 0 - 1;
+ 6 │     min / d;
+   │     ━━━━━━━
+   │     ╰─ here
+ 7 │ }
+
+  in main  examples/error_demo/runtime/11_div_overflow.utu:6:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/12_i64_div_by_zero.utu
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/12_i64_div_by_zero.utu
+       trap · examples/error_demo/runtime/12_i64_div_by_zero.utu:6:5
 
-  in main
+ 4 │     let a: I64 = 100;
+ 5 │     let b: I64 = 0;
+ 6 │     a / b;
+   │     ━━━━━
+   │     ╰─ here
+ 7 │ }
+
+  in main  examples/error_demo/runtime/12_i64_div_by_zero.utu:6:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/13_float_to_int_conversion.utu
@@ -5325,48 +5405,99 @@ ok
 --- exit 0
 
 === utu run examples/error_demo/runtime/14_fatal_in_match.utu
- TRAP  fatal, failed assert, or failed check
-       trap · examples/error_demo/runtime/14_fatal_in_match.utu
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/14_fatal_in_match.utu:4:38
 
-  in step
-  in main
+ 2 │ // Expect: trap: fatal at 14_fatal_in_match.utu:4 (in `step`)
+ 3 │ fn step(state: I32) I32 {
+ 4 │     match state { 0 => 1, 1 => 2, ~> fatal, };
+   │                                      ━━━━━
+   │                                      ╰─ here
+ 5 │ }
+
+  in step  examples/error_demo/runtime/14_fatal_in_match.utu:4:38
+  in main  examples/error_demo/runtime/14_fatal_in_match.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/15_assert_fails.utu
- TRAP  fatal, failed assert, or failed check
-       trap · examples/error_demo/runtime/15_assert_fails.utu
+ TRAP  Failed assert
+       trap · examples/error_demo/runtime/15_assert_fails.utu:4:5
 
-  in checked_div
-  in main
+ 2 │ // Expect: assertion failed: `b != 0` at 15_assert_fails.utu:4
+ 3 │ fn checked_div(a: I32, b: I32) I32 {
+ 4 │     assert b != 0;
+   │     ━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │     a / b;
+ 6 │ }
+
+  in checked_div  examples/error_demo/runtime/15_assert_fails.utu:4:5
+  in main  examples/error_demo/runtime/15_assert_fails.utu:9:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/16_wat_unreachable.utu
- TRAP  fatal, failed assert, or failed check
-       trap · examples/error_demo/runtime/16_wat_unreachable.utu
+ TRAP  Reached unreachable code
+       trap · examples/error_demo/runtime/16_wat_unreachable.utu:3:1
 
-  in never
-  in main
+ 1 │ // What: an `unreachable` instruction in inline wat is reached
+ 2 │ // Expect: trap: unreachable at 16_wat_unreachable.utu:4
+ 3 │ fn never(x: I32) I32 {
+ 4 │     @wat/\ unreachable \/;
+ 5 │ }
+   │ ━
+   │ ╰─ here
+ 6 │
+ 7 │ export main() I32 {
+
+  in never  examples/error_demo/runtime/16_wat_unreachable.utu:3:1
+  in main  examples/error_demo/runtime/16_wat_unreachable.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/17_stack_overflow.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/17_stack_overflow.utu
+       trap · examples/error_demo/runtime/17_stack_overflow.utu:3:27
 
-  in count_down
+ 1 │ // What: a recursive function with no base case
+ 2 │ // Expect: stack overflow in `count_down` (recursion too deep) at 17_stack_overflow.utu:4
+ 3 │ fn count_down(n: I32) I32 {
+ 4 │     count_down(n - 1) + 1;
+ 5 │ }
+   │ ━
+   │ ╰─ here
+ 6 │
+ 7 │ export main() I32 {
+
+  in count_down  examples/error_demo/runtime/17_stack_overflow.utu:3:27
+  in count_down  examples/error_demo/runtime/17_stack_overflow.utu:4:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/18_out_of_memory.utu
  TRAP  Array too large
-       trap · examples/error_demo/runtime/18_out_of_memory.utu
+       trap · examples/error_demo/runtime/18_out_of_memory.utu:4:14
 
-  in main
+ 2 │ // Expect: out of memory: could not allocate Array[I64] of 2000000000 elements
+ 3 │ export main() I32 {
+ 4 │     let xs = Array[I64].new(2000000000, 0.to_i64());
+   │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │              ╰─ here
+ 5 │     xs.len();
+ 6 │ }
+
+  in main  examples/error_demo/runtime/18_out_of_memory.utu:4:14
 --- exit 1
 
 === utu run examples/error_demo/runtime/19_es_throws.utu
  ERROR  not a number: twelve
-        uncaught-exception · examples/error_demo/runtime/19_es_throws.utu
+        uncaught-exception · examples/error_demo/runtime/19_es_throws.utu:10:5
 
-  in main
+ 8 │
+ 9 │ export main() F64 {
+10 │     parse("twelve");
+   │     ━━━━━━━━━━━━━━━
+   │     ╰─ here
+11 │ }
+
+  in main  examples/error_demo/runtime/19_es_throws.utu:10:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/20_es_throws_string.utu
@@ -5381,17 +5512,32 @@ ok
 
 === utu run examples/error_demo/runtime/22_trap_in_catch_try.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/22_trap_in_catch_try.utu
+       trap · examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11
 
-  in get
-  in main
+ 2 │ // Expect: the trap message, not swallowed by catch
+ 3 │ fn get(xs: Array[I32], i: I32) I32 {
+ 4 │     try { xs[i]; } catch { -1; };
+   │           ━━━━━
+   │           ╰─ here
+ 5 │ }
+
+  in get  examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11
+  in main  examples/error_demo/runtime/22_trap_in_catch_try.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/23_json_decode_fatal.utu
  TRAP  Null
-       trap · examples/error_demo/runtime/23_json_decode_fatal.utu
+       trap · examples/error_demo/runtime/23_json_decode_fatal.utu:8:13
 
-  in main
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     let p = @json/\ decode Point "{\"x\": 1}" \/ orelse fatal;
+   │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │             ╰─ here
+ 9 │     p.x;
+10 │ }
+
+  in main  examples/error_demo/runtime/23_json_decode_fatal.utu:8:13
 --- exit 1
 
 === utu run examples/error_demo/runtime/24_enum_from_i32_bad.utu
@@ -5400,24 +5546,46 @@ ok
 
 === utu run examples/error_demo/runtime/25_es_returns_wrong_struct.utu
  ERROR  type incompatibility when transforming from/to JS
-        uncaught-exception · examples/error_demo/runtime/25_es_returns_wrong_struct.utu
+        uncaught-exception · examples/error_demo/runtime/25_es_returns_wrong_struct.utu:10:9
 
-  in main
+ 8 │
+ 9 │ export main() F64 {
+10 │     alt load_shape() {
+   │         ━━━━━━━━━━━━
+   │         ╰─ here
+11 │         Circle |c| => c.r,
+12 │         Square |s| => s.side,
+
+  in main  examples/error_demo/runtime/25_es_returns_wrong_struct.utu:10:9
 --- exit 1
 
 === utu run examples/error_demo/runtime/26_es_callback_traps.utu
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/26_es_callback_traps.utu
+       trap · examples/error_demo/runtime/26_es_callback_traps.utu:7:25
 
-  in closure
-  in main
+ 5 │ export main() I32 {
+ 6 │     let xs = [10, 20, 30];
+ 7 │     map_all(xs, cl(i) { 100 / (i - 1); });
+   │                         ━━━━━━━━━━━━━
+   │                         ╰─ here
+ 8 │ }
+
+  in closure  examples/error_demo/runtime/26_es_callback_traps.utu:7:25
+  in main  examples/error_demo/runtime/26_es_callback_traps.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/27_async_trap_after_await.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/27_async_trap_after_await.utu
+       trap · examples/error_demo/runtime/27_async_trap_after_await.utu:9:5
 
-  in main
+ 7 │     let xs = [1, 2, 3];
+ 8 │     let i = await delay(7, 5);
+ 9 │     xs[i];
+   │     ━━━━━
+   │     ╰─ here
+10 │ }
+
+  in main  examples/error_demo/runtime/27_async_trap_after_await.utu:9:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
@@ -5434,65 +5602,158 @@ Node.js v25.8.1
 
 === utu run examples/error_demo/runtime/29_deep_recursion_with_base.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu
+       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:3:23
 
-  in sum_to
+ 1 │ // What: correct-looking recursion that is simply too deep (summing a list recursively)
+ 2 │ // Expect: stack overflow in `sum_to` at 29_deep_recursion_with_base.utu:4; a short trace, not 10,000 frames
+ 3 │ fn sum_to(n: I32) I64 {
+ 4 │     if n == 0 { 0.to_i64(); } else { n.to_i64() + sum_to(n - 1); };
+ 5 │ }
+   │ ━
+   │ ╰─ here
+ 6 │
+ 7 │ export main() I64 {
+
+  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:3:23
+  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
 --- exit 1
 
 === utu run examples/error_demo/runtime/30_string_index_oob.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/30_string_index_oob.utu
+       trap · examples/error_demo/runtime/30_string_index_oob.utu:5:5
 
-  in main
+ 3 │ export main() I32 {
+ 4 │     let s = "abc";
+ 5 │     s[10];
+   │     ━━━━━
+   │     ╰─ here
+ 6 │ }
+
+  in main  examples/error_demo/runtime/30_string_index_oob.utu:5:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/31_slice_bad_range.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/31_slice_bad_range.utu
+       trap · examples/error_demo/runtime/31_slice_bad_range.utu:5:16
 
-  in array.slice
-  in main
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3, 4];
+ 5 │     let tail = xs[2, 9];
+   │                ━━━━━━━━
+   │                ╰─ here
+ 6 │     tail.len();
+ 7 │ }
+
+  in array.slice  examples/error_demo/runtime/31_slice_bad_range.utu:5:16
+  in main  examples/error_demo/runtime/31_slice_bad_range.utu:5:16
 --- exit 1
 
 === utu run examples/error_demo/runtime/32_mem_out_of_bounds.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/32_mem_out_of_bounds.utu
+       trap · examples/error_demo/runtime/32_mem_out_of_bounds.utu:7:5
 
-  in main
+ 5 │ export main() I32 {
+ 6 │     bytes.push(1);
+ 7 │     bytes[1000000];
+   │     ━━━━━━━━━━━━━━
+   │     ╰─ here
+ 8 │ }
+
+  in main  examples/error_demo/runtime/32_mem_out_of_bounds.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/33_vec_out_of_bounds.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/33_vec_out_of_bounds.utu
+       trap · examples/error_demo/runtime/33_vec_out_of_bounds.utu:7:5
 
-  in main
+ 5 │ export main() I32 {
+ 6 │     stack.push(7);
+ 7 │     stack[5];
+   │     ━━━━━━━━
+   │     ╰─ here
+ 8 │ }
+
+  in main  examples/error_demo/runtime/33_vec_out_of_bounds.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/34_array_new_negative.utu
  TRAP  Array too large
-       trap · examples/error_demo/runtime/34_array_new_negative.utu
+       trap · examples/error_demo/runtime/34_array_new_negative.utu:4:5
 
-  in make
-  in main
+ 2 │ // Expect: trap: negative array length -1 in Array[I32].new
+ 3 │ fn make(n: I32) Array[I32] {
+ 4 │     Array[I32].new(n - 1, 0);
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+
+  in make  examples/error_demo/runtime/34_array_new_negative.utu:4:5
+  in main  examples/error_demo/runtime/34_array_new_negative.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/35_orelse_fatal_field.utu
  TRAP  Null
-       trap · examples/error_demo/runtime/35_orelse_fatal_field.utu
+       trap · examples/error_demo/runtime/35_orelse_fatal_field.utu:9:13
+
+ 7 │ export main() Str {
+ 8 │     let tail = Node { name: "b", next: null };
+ 9 │     let n = tail.next orelse fatal;
+   │             ━━━━━━━━━━━━━━━━━━━━━━
+   │             ╰─ here
+10 │     n.name;
+11 │ }
+
+  in main  examples/error_demo/runtime/35_orelse_fatal_field.utu:9:13
+--- exit 1
+
+=== utu run examples/error_demo/runtime/360_assert_inlined_fast.utu -O fast
+ TRAP  Failed assert
+       trap · examples/error_demo/runtime/360_assert_inlined_fast.utu:5:5
+
+ 3 │ // Expect: Failed assert at the assert, in clamp (inlined into main), then main at the call
+ 4 │ fn clamp(x: I32) I32 {
+ 5 │     assert x >= 0;
+   │     ━━━━━━━━━━━━━
+   │     ╰─ here
+ 6 │     x;
+ 7 │ }
+
+  in clamp  examples/error_demo/runtime/360_assert_inlined_fast.utu:5:5  (inlined into main)
+  in main  examples/error_demo/runtime/360_assert_inlined_fast.utu:10:5
+--- exit 1
+
+=== utu run examples/error_demo/runtime/361_trap_unsafe_no_place.utu -O fastUnsafe
+ TRAP  Integer division by zero
+       trap · examples/error_demo/runtime/361_trap_unsafe_no_place.utu
 
   in main
 --- exit 1
 
+=== utu run examples/error_demo/runtime/362_match_no_arm.utu
+ TRAP  No arm for the value
+       trap · examples/error_demo/runtime/362_match_no_arm.utu:8:5
+
+ 6 │
+ 7 │ fn label(l: Level) I32 {
+ 8 │     match l { Level.Low => 1, Level.High => 2, };
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 9 │ }
+
+  in label  examples/error_demo/runtime/362_match_no_arm.utu:8:5
+  in main  examples/error_demo/runtime/362_match_no_arm.utu:12:5
+--- exit 1
+
 === utu test examples/error_demo/runtime/40_test_one_failing.utu
 pass clamp passes through values in range (… ms)
-FAIL clamp keeps values in range: fatal, failed assert, or failed check
+FAIL clamp keeps values in range: Failed assert  at examples/error_demo/runtime/40_test_one_failing.utu:14:5
 pass clamp lifts low values (… ms)
 2 passed, 1 failed
 --- exit 1
 
 === utu test examples/error_demo/runtime/41_test_traps.utu
 pass first element (… ms)
-FAIL last element: Index out of bounds  in last
+FAIL last element: Index out of bounds  at examples/error_demo/runtime/41_test_traps.utu:4:5  in last
 1 passed, 1 failed
 --- exit 1
 
@@ -5509,13 +5770,13 @@ FAIL last element: Index out of bounds  in last
 --- exit 1
 
 === utu test examples/error_demo/runtime/43_test_es_throws.utu
-FAIL parses numbers: not a number: x
+FAIL parses numbers: not a number: x  at examples/error_demo/runtime/43_test_es_throws.utu:6:12
 pass still runs (… ms)
 1 passed, 1 failed
 --- exit 1
 
 === utu test examples/error_demo/runtime/44_test_stack_overflow.utu
-FAIL forever: Stack overflow  in loop_forever
+FAIL forever: Stack overflow  at examples/error_demo/runtime/44_test_stack_overflow.utu:3:29  in loop_forever ← loop_forever
 pass after (… ms)
 1 passed, 1 failed
 --- exit 1
@@ -5525,18 +5786,18 @@ pass after (… ms)
 --- exit 0
 
 === utu test examples/error_demo/runtime/46_test_fatal.utu
-FAIL lookup finds bob: Null
+FAIL lookup finds bob: Null  at examples/error_demo/runtime/46_test_fatal.utu:8:16
 pass lookup finds ada (… ms)
 1 passed, 1 failed
 --- exit 1
 
 === utu test examples/error_demo/runtime/47_test_rejected_promise.utu
-FAIL fetches: offline
+FAIL fetches: offline  at examples/error_demo/runtime/47_test_rejected_promise.utu:6:19
 0 passed, 1 failed
 --- exit 1
 
 === utu test examples/error_demo/runtime/48_test_buffer_safe.utu
-FAIL third item: fatal, failed assert, or failed check  in &.get_index
+FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_test_buffer_safe.utu:9:12  in &.get_index
 0 passed, 1 failed
 --- exit 1
 

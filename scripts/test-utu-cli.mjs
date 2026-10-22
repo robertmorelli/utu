@@ -95,7 +95,9 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   for (const mode of [[], ['-O', 'fast']]) {
     r = utu('run', 'past.utu', ...mode);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /TRAP  fatal, failed assert, or failed check/);
+    // The standard library's check, shown where the program used it.
+    assert.match(r.stderr, /TRAP  Failed check in std:Buffer\n {7}trap · past\.utu:2:59/);
+    assert.match(r.stderr, /in main  past\.utu:2:59/);
   }
   for (const mode of ['smallUnsafe', 'fastUnsafe']) {
     r = utu('run', 'past.utu', '-O', mode);
@@ -106,6 +108,60 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.match(utu('run', 'past.utu', '-O', 'fast', '-O', 'small').stderr, /Two build modes/);
   assert.match(utu('run', 'past.utu', '-O', 'fastUnsfe').stderr, /did you mean fastUnsafe/);
   assert.match(utu('run', 'past.utu', '-O3').stderr, /Unknown option -O3/);
+
+  // A trap at its line, with the functions it was in, by a source map:
+  // each kind of trap, in debug (exact), small and fast (best effort).
+  const traps = {
+    assert: ['fn boom(x: I32) I32 {\n    assert x > 5;\n    x * 2;\n}\nexport main() I32 { boom(10) + boom(1); }\n', 'Failed assert', '2:5', 'boom'],
+    fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    x;\n}\nexport main() I32 { check(-1); }\n', 'Reached fatal', '2:16', 'check'],
+    divide: ['fn div(a: I32, b: I32) I32 {\n    a / b;\n}\nexport main() I32 { div(7, 0); }\n', 'Integer division by zero', '2:5', 'div'],
+    bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:5', 'at'],
+    null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Null', '2:5', 'pick'],
+    arm: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'No arm for the value', '5:5', 'name'],
+  };
+  for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
+    await write(`${name}.utu`, source);
+    for (const mode of ['debug', 'small', 'fast']) {
+      r = utu('run', `${name}.utu`, '-O', mode);
+      assert.equal(r.status, 1, `${name} ${mode}: ${r.stdout}`);
+      assert.ok(r.stderr.startsWith(` TRAP  ${title}\n       trap · ${name}.utu:${at}\n`), `${name} ${mode}:\n${r.stderr}`);
+      assert.match(r.stderr, /╰─ here/, `${name} ${mode}`);
+      // The function, at its line: inlined into main in fast, a frame of its own else.
+      assert.ok(r.stderr.includes(`in ${fn}  ${name}.utu:${at}`), `${name} ${mode}:\n${r.stderr}`);
+      assert.match(r.stderr, /in main  \S+\.utu:\d+:\d+/, `${name} ${mode}`);
+    }
+  }
+  assert.match(utu('run', 'assert.utu', '-O', 'fast').stderr, /in boom  assert\.utu:2:5  \(inlined into main\)/);
+  // The unsafe modes keep no map: what, not where.
+  r = utu('run', 'assert.utu', '-O', 'smallUnsafe');
+  assert.match(r.stderr, /^ TRAP  fatal, failed assert, or failed check\n {7}trap · assert\.utu\n/);
+  // A failed test says where.
+  assert.match(utu('test', 'good.utu').stdout, /^FAIL fails: Failed assert {2}at good\.utu:5:16/m);
+
+  // build writes a source map in debug, and in small or fast when asked.
+  r = utu('build', 'assert.utu', '-O', 'debug', '-o', 'mapped');
+  assert.equal(r.status, 0, r.stderr);
+  const map = JSON.parse(await fs.readFile(path.join(dir, 'mapped', 'assert.wasm.map'), 'utf8'));
+  assert.equal(map.version, 3);
+  assert.deepEqual(map.sources, ['../assert.utu']);
+  assert.match(map.mappings, /^[A-Za-z0-9+/,]+$/);
+  const mapped = await fs.readFile(path.join(dir, 'mapped', 'assert.wasm'));
+  const custom = WebAssembly.Module.customSections(new WebAssembly.Module(mapped), 'sourceMappingURL');
+  assert.equal(new TextDecoder().decode(custom[0]).slice(1), 'assert.wasm.map');
+  r = utu('build', 'assert.utu', '-o', 'plain');
+  assert.equal(r.status, 0, r.stderr);
+  await assert.rejects(fs.access(path.join(dir, 'plain', 'assert.wasm.map')));
+  r = utu('build', 'assert.utu', '-O', 'fast', '--source-map', '-o', 'fastmap');
+  assert.equal(r.status, 0, r.stderr);
+  await fs.access(path.join(dir, 'fastmap', 'assert.wasm.map'));
+  assert.match(utu('build', 'assert.utu', '-O', 'fastUnsafe', '--source-map').stderr, /No source map in fastUnsafe/);
+  assert.match(utu('run', 'assert.utu', '--source-map').stderr, /--source-map is only for build/);
+
+  // A program nested past the main thread's stack builds in a worker with a deeper one (Node).
+  await write('deep.utu', `export main() I32 { ${'('.repeat(100000)}1${')'.repeat(100000)}; }\n`);
+  r = utu('run', 'deep.utu');
+  assert.equal(r.status, 0, r.stderr.slice(0, 300));
+  assert.equal(r.stdout.trim(), '1');
 
   // A module and the least JavaScript that loads it.
   r = utu('build', 'good.utu', '-o', 'out');

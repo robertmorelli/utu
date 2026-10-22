@@ -1,0 +1,10 @@
+// What: a division by zero in an unsafe build, which keeps no source map
+// Flags: -O fastUnsafe
+// Expect: Integer division by zero, no line: the unsafe modes keep no map
+fn ratio(a: I32, b: I32) I32 {
+    a / b;
+}
+
+export main() I32 {
+    ratio(1, 0);
+}

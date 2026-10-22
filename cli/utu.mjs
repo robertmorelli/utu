@@ -4,7 +4,8 @@
 //   utu check <file.utu>                 report what is wrong
 //   utu run <file.utu> [-O mode]             build, then call main
 //   utu test <file.utu> [-O mode]            build the tests, then run each
-//   utu build <file.utu> [-o dir] [-O mode]  NAME.wasm and NAME.mjs (its loader)
+//   utu build <file.utu> [-o dir] [-O mode] [--source-map]
+//                                        NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
 //   utu lsp                              a language server, on stdin and stdout
 //   utu grep <pattern> <paths…>          utu code by syntax, names, and types
@@ -15,16 +16,24 @@
 // Buffer's length, a last alt arm); smallUnsafe and fastUnsafe leave them
 // out; debug is the module as code generation leaves it. `display` and
 // `graph` show stage 0's IR and graphs, so they use stage 0.
+//
+// Source maps (src/selfhost/sourcemap.js): a trap in `run` or `test` is
+// placed at its line, with the utu functions it was in. Debug's are exact;
+// small's and fast's, best effort (code the optimizer made is placed at the
+// code around it, coarser, never elsewhere); the unsafe modes have none.
+// `build` writes NAME.wasm.map in debug, or with --source-map.
 
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { isMainThread, Worker, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
 import { glueSource, loaderSource } from '../src/selfhost/loader.js';
+import { sourceMapJson, wasmFrames, withMapUrl } from '../src/selfhost/sourcemap.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RUNTIME = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
@@ -61,8 +70,10 @@ async function main() {
       if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
       if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
       out = value;
+    } else if (arg === '--source-map') {
+      if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', [`utu ${command} places traps by a map in every mode but the unsafe ones.`]);
     } else if (arg.startsWith('-') && arg !== '-') {
-      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir']);
+      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map']);
     } else files.push(arg);
   }
   if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
@@ -80,8 +91,11 @@ async function main() {
       ['small, fast, smallUnsafe, fastUnsafe, debug']);
   }
   const { optimize, safe } = MODES[mode];
+  // A map where the mode keeps one: always in debug, on asking in small and fast.
+  const asked = args.includes('--source-map');
+  if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, sourceMap: mode === 'debug' || asked, utu: await loadNodeCompiler() });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -102,6 +116,7 @@ const WRITES = new Set(['build', 'build-exe']);
 /** Build, printing the diagnostics; exits on errors. */
 async function buildOrExit(utu, file, options) {
   const result = await compileFile(utu, file, options);
+  if (deepens && result.diagnostics.some(d => d.code === 'nested-too-deeply')) throw new TooDeep();
   if (result.diagnostics.length) {
     const files = new Map(result.files.map(f => [f.key, f.text]));
     // In file order, then by position.
@@ -132,9 +147,9 @@ async function check(file, { utu }) {
 }
 
 async function run(file, { utu, optimize, safe }) {
-  // Named functions, so a trap says which.
-  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe, debugNames: true });
-  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  // Named functions and a source map, so a trap says which and where.
+  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe });
+  const { exports } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   // A main with parameters is for a host that passes them; run passes none.
   if (exports.main.length > 0) {
@@ -146,13 +161,13 @@ async function run(file, { utu, optimize, safe }) {
   try {
     result = await exports.main();
   } catch (error) {
-    trap(error, file);
+    await trap(error, file, built, utu);
   }
   if (result !== undefined) console.log(result);
 }
 
 async function test(file, { utu, optimize, safe }) {
-  const { wasm, spec, tests } = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true });
+  const { wasm, spec, tests, map } = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true, sourceMap: safe });
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   let failed = 0;
@@ -163,9 +178,10 @@ async function test(file, { utu, optimize, safe }) {
       console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${(performance.now() - started).toFixed(1)} ms)`)}`);
     } catch (error) {
       failed++;
-      const { title: what, frames } = trapText(error);
+      const { title: what, frames, at } = trapText(error, map);
+      const place = at?.entry?.file ? paint('2', `  at ${placeText(at.entry)}`) : '';
       const where = frames.length ? paint('2', `  in ${frames.map(f => f.fn).join(' ← ')}`) : '';
-      console.log(`${paint('31', 'FAIL')} ${title}: ${what}${where}`);
+      console.log(`${paint('31', 'FAIL')} ${title}: ${what}${place}${where}`);
     }
   }
   console.log(tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'No tests');
@@ -173,11 +189,20 @@ async function test(file, { utu, optimize, safe }) {
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
-async function build(file, { utu, optimize, safe, out }) {
-  const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
+async function build(file, { utu, optimize, safe, out, sourceMap }) {
+  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap });
+  const { spec } = built;
   const name = path.basename(file, '.utu');
   const dir = path.resolve(out ?? '.');
   await fs.mkdir(dir, { recursive: true });
+  // The map beside the module, which names it (devtools read it).
+  let wasm = built.wasm;
+  if (built.map) {
+    const texts = new Map(built.files.map(f => [f.key, f.text]));
+    const relative = key => key.startsWith('std:') ? key : path.relative(dir, key).split(path.sep).join('/');
+    await fs.writeFile(path.join(dir, `${name}.wasm.map`), sourceMapJson(built.map, { file: `${name}.wasm`, relative, texts }));
+    wasm = withMapUrl(wasm, `${name}.wasm.map`);
+  }
   const glue = glueSource(spec);
   const { build: bundle } = await import('esbuild');
   const loader = loaderSource(spec, wasm, {
@@ -196,6 +221,7 @@ async function build(file, { utu, optimize, safe, out }) {
   const js = await fs.stat(path.join(dir, `${name}.mjs`));
   console.log(`${displayPath(path.join(dir, `${name}.wasm`))}  ${wasm.length} bytes`);
   console.log(`${displayPath(path.join(dir, `${name}.mjs`))}   ${js.size} bytes`);
+  if (built.map) console.log(displayPath(path.join(dir, `${name}.wasm.map`)));
 }
 
 /** The glue module, given to esbuild without being written. */
@@ -399,6 +425,8 @@ function colored(stream) {
   if (process.env.NO_COLOR) return false;
   const force = process.env.FORCE_COLOR;
   if (force != null && force !== '') return force !== '0' && force !== 'false';
+  // In the worker (see STACK_MB), the terminal is the main thread's.
+  if (!isMainThread && workerData?.tty) return workerData.tty[stream === process.stdout ? 'stdout' : 'stderr'];
   return !!stream.isTTY;
 }
 
@@ -409,6 +437,7 @@ function usage(code) {
   run <file> [-O mode]            build it, then call its main
   test <file> [-O mode]           build its tests, then run each
   build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
+    [--source-map]             and NAME.wasm.map (always in debug)
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
   grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']
@@ -475,35 +504,108 @@ const TRAPS = [
   [/Maximum call stack|stack overflow/i, 'Stack overflow'],
 ];
 
-/** A trap, or a JavaScript error from the host, as what happened and the utu functions it was in. */
-function trapText(error) {
+// An `unreachable`, by the syntax it was made for: which trap it is.
+const UNREACHABLE = {
+  assert_expr: 'Failed assert', fatal_expr: 'Reached fatal',
+  match_expr: 'No arm for the value', loop_match_expr: 'No arm for the value', alt_expr: 'No arm for the value',
+};
+
+/**
+ * A trap, or a JavaScript error from the host, as what happened, the utu
+ * functions it was in (each placed, given a source map), and `at`: the
+ * frame to show, the innermost in the program's own files.
+ */
+function trapText(error, map = null) {
   let message = String(error?.message ?? error).split('\n')[0];
   const wasm = error instanceof WebAssembly.RuntimeError || /Maximum call stack/i.test(message);
   // JavaScriptCore says what it was evaluating: not part of the trap.
   if (wasm) message = message.replace(/ \(evaluating '[^']*'\)$/, '');
-  const title = wasm ? (TRAPS.find(([pattern]) => pattern.test(message))?.[1] ?? message) : message;
-  const frames = [];
-  for (const line of String(error?.stack ?? '').split('\n')) {
-    const at = line.match(/^\s*at (?:async )?(\S+) \(wasm:/) ?? line.match(/^\s*at (?:async )?(\S+) .*wasm-function/);
-    // Not the engine's numbers, nor the test runner's own exports.
-    if (at && !/^wasm-function|^__test_/.test(at[1])) frames.push({ fn: at[1].replace(/^[$]/, '') });
+  let frames = wasmFrames(error, map).map(f => ({ ...f, fn: f.fn ?? `function ${f.index}` }));
+  if (!frames.length) {
+    // No offsets (JavaScriptCore's stacks): the names alone.
+    for (const line of String(error?.stack ?? '').split('\n')) {
+      const at = line.match(/^\s*at (?:async )?(\S+) \(wasm:/);
+      if (at) frames.push({ fn: at[1].replace(/^[$]/, '') });
+    }
   }
-  // Endless recursion: one frame, many times; say it once.
-  const folded = frames.filter((f, i) => i === 0 || f.fn !== frames[i - 1].fn);
-  return { title, frames: folded.slice(0, 12), wasm };
+  const inner = frames[0]?.entry;
+  let title = wasm ? (TRAPS.find(([pattern]) => pattern.test(message))?.[1] ?? message) : message;
+  if (wasm && /unreachable/i.test(message) && inner?.kind) {
+    // The standard library's own: a check of how it was used.
+    title = inner.file?.startsWith('std:') ? `Failed check in ${inner.file}` : UNREACHABLE[inner.kind] ?? 'Reached unreachable code';
+  }
+  const at = frames.find(f => f.entry?.file && !f.entry.file.startsWith('std:')) ?? frames.find(f => f.entry?.file) ?? null;
+  // Not the test runner's own exports; endless recursion (one frame, many times) once.
+  frames = frames.filter(f => !/^__test_/.test(f.fn));
+  const folded = frames.filter((f, i) => i === 0 || f.fn !== frames[i - 1].fn || f.entry !== frames[i - 1].entry);
+  return { title, frames: folded.slice(0, 12), wasm, at, placed: !!map && frames.some(f => f.offset != null) };
 }
 
-/** A trap in `utu run`: in the shape of every other problem, with the utu functions it was in. */
-function trap(error, file) {
-  const ink = pen({ color: colored(process.stderr) });
-  const { title, frames, wasm } = trapText(error);
-  const lines = [...heading(ink, wasm ? 'trap' : 'error', title, `${wasm ? 'trap' : 'uncaught-exception'} · ${displayPath(file)}`)];
-  if (frames.length) lines.push('', ...frames.map(f => `  ${ink.paint(ink.palette.dim, 'in')} ${ink.bold}${f.fn}${ink.reset}`));
-  console.error(lines.join('\n'));
+/** An entry's place, as `file:line:col`. */
+function placeText(entry) {
+  return `${displayPath(entry.file)}:${entry.line}:${entry.column}`;
+}
+
+/** A trap in `utu run`: in the shape of every other problem, at its line, with the utu functions it was in. */
+async function trap(error, file, built, utu) {
+  const color = colored(process.stderr);
+  const ink = pen({ color });
+  const { title, frames, wasm, at, placed } = trapText(error, built.map);
+  const stack = frames.map(f => `  ${ink.paint(ink.palette.dim, 'in')} ${ink.bold}${f.fn}${ink.reset}`
+    + (f.entry?.file ? `  ${ink.paint(ink.palette.dim, placeText(f.entry))}` : '')
+    + (f.inlined ? ink.paint(ink.palette.dim, `  (inlined into ${f.inlined})`) : ''));
+  const code = wasm ? 'trap' : 'uncaught-exception';
+  const texts = new Map(built.files.map(f => [f.key, f.text]));
+  if (at && texts.has(at.entry.file)) {
+    const { highlighter } = await import('../src/selfhost/highlight.js');
+    const { entry } = at;
+    const shown = formatDiagnostics([{
+      severity: wasm ? 'trap' : 'error', message: title, code, file: entry.file,
+      start: entry.start, end: entry.end, line: entry.line, column: entry.column, label: at === frames[0] ? 'here' : 'called here',
+    }], texts, { color, relative: displayPath, highlight: highlighter(utu, built.files) });
+    await written(process.stderr, `${[shown, ...stack.length ? ['', ...stack] : []].join('\n')}\n`);
+  } else {
+    const lines = [...heading(ink, wasm ? 'trap' : 'error', title, `${code} · ${displayPath(file)}`)];
+    if (stack.length) lines.push('', ...stack);
+    // A map, and no offsets to place the trap by: JavaScriptCore's stacks (bun) have none.
+    if (wasm && built.map && !placed) lines.push('', ...notes(ink, ["No line: this engine's stack has no Wasm offsets; node's does."]));
+    await written(process.stderr, `${lines.join('\n')}\n`);
+  }
   process.exit(1);
 }
 
-main().catch(error => {
-  console.error(error?.stack || error?.message || String(error));
-  process.exit(1);
-});
+// The compiler recurses as a program nests, so a deep program needs a deep
+// stack. Under Node, a build too deep for the main thread's is done again
+// in a worker with STACK_MB (200k nested parentheses compile in 1 GB), and
+// the language server runs in one. Bun's workers ignore the setting, so
+// under Bun too deep a program is reported as such.
+const STACK_MB = 1024;
+
+/** Whether this thread can hand a command to a worker with a deeper stack. */
+const deepens = isMainThread && !process.versions.bun && !process.env.UTU_NO_WORKER;
+
+/** Thrown when a build was too deep for this thread: the command starts again in a worker. */
+class TooDeep extends Error {}
+
+/** The command, run in a worker with a deep stack; exits as it does. */
+function inWorker() {
+  const worker = new Worker(new URL(import.meta.url), {
+    argv: process.argv.slice(2), stdin: true, resourceLimits: { stackSizeMb: STACK_MB },
+    workerData: { tty: { stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY } },
+  });
+  process.stdin.pipe(worker.stdin);
+  worker.on('error', error => {
+    console.error(error?.stack || error?.message || String(error));
+    process.exit(1);
+  });
+  worker.on('exit', code => process.exit(code));
+}
+
+if (deepens && process.argv[2] === 'lsp') inWorker();
+else {
+  main().catch(error => {
+    if (error instanceof TooDeep) return inWorker();
+    console.error(error?.stack || error?.message || String(error));
+    process.exit(1);
+  });
+}

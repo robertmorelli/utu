@@ -83,6 +83,7 @@ fn fn_instance(decl: I32, inst: I32) I32 {
         let f = defined_func(fi_params[id], fi_result[id]);
         fi_func[id] = f;
         func_debug_name[f] = fn_debug_name(decl);
+        func_src[f] = decl_node[decl];
         // A @wat function's body is its code, which the host assembled.
         let wat = wat_of(body);
         if wat >= 0 { func_code[f] = wat; } else { fi_queue.push(id); };
@@ -272,6 +273,9 @@ fn check_function(fi: I32) void {
 /// A body checked against the result type, as function `f`'s (after
 /// `prologue`, when it is a node: moving boxed parameters into their boxes).
 fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
+    let outer = cur_src[0];
+    cur_src[0] = body_node;
+    func_src[f] = body_node;
     let m = w_mark();
     if prologue >= 0 { w_push(prologue); };
     let t = check_block(body_node, cx.result, cx);
@@ -279,6 +283,7 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     w_node(Op.Seq, repr(cx.result), 0, 0, m);
     func_body[f] = w_pop();
     record_locals(f, cur_params[0]);
+    cur_src[0] = outer;
 }
 
 /// Function `f`'s locals: those of @cur_locals from `first` (past its parameters).
@@ -532,7 +537,11 @@ vec node_ty: I32;
 /// Check an expression against the type expected of it (-1 for none):
 /// push its IR node, record its type in @node_ty, and return the type.
 fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
+    // The code made for it is its (a source map's spans), its parts' their own.
+    let outer = cur_src[0];
+    cur_src[0] = node;
     let t = check_node(node, expect, cx);
+    cur_src[0] = outer;
     if node < node_ty.len() { node_ty[node] = t; };
     t;
 }
@@ -1780,6 +1789,7 @@ fn function_of(fi: I32) I32 {
     let f = defined_func(params, fi_result[fi]);
     fi_func[fi] = f;
     func_debug_name[f] = fn_debug_name(fi_decl[fi]);
+    func_src[f] = decl_node[fi_decl[fi]];
     // (A function being checked names it as a value: its locals are kept aside.)
     let saved = Array[I32].new(cur_locals.len(), 0);
     for (0 ..< cur_locals.len()) |i| { saved[i] = cur_locals[i]; };
@@ -1886,6 +1896,7 @@ fn lazy_stub_func(fi: I32, lazy: I32) I32 {
     let f = defined_func(params, fi_result[fi]);
     lazy_stub_of[fi] = f;
     func_debug_name[f] = fn_debug_name(fi_decl[fi]);
+    func_src[f] = decl_node[fi_decl[fi]];
     // (Made while another function is checked: its locals are kept aside.)
     let saved = Array[I32].new(cur_locals.len(), 0);
     for (0 ..< cur_locals.len()) |i| { saved[i] = cur_locals[i]; };
@@ -2525,6 +2536,7 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
         else { name_add("__test_" + test_index.to_str()); };
     func_field_name[f] = export_name;
     func_debug_name[f] = export_name;
+    func_src[f] = item;
     export_func.push(f);
     export_result.push(result);
     // `export main() I32 { @wat/\ … \/; }`: its code, which the host assembled.

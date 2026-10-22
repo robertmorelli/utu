@@ -9,6 +9,7 @@ mod tooling {
         \\  run <file> [-O mode]            build it, then call its main
         \\  test <file> [-O mode]           build its tests, then run each
         \\  build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
+        \\    [--source-map]             and NAME.wasm.map (always in debug)
         \\  build-exe <file> [-o out]    a standalone executable (needs bun)
         \\  lsp                          a language server on stdin and stdout
         \\  grep <pattern> <paths…>      code by its syntax and types
@@ -55,6 +56,22 @@ mod tooling {
         \\  9 | fn Point.length |self| () F64 {
         \\ 10 |     (self.x * self.x + self.y * self.y).sqrt();
         \\    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ;
+    }
+    fn trap_sample() Str {
+        \\$ utu run boom.utu
+        \\ TRAP  Failed assert
+        \\       trap · boom.utu:2:5
+        \\
+        \\ 1 │ fn boom(x: I32) I32 {
+        \\ 2 │     assert x > 5;
+        \\   │     ━━━━━━━━━━━━
+        \\   │     ╰─ here
+        \\ 3 │     x * 2;
+        \\ 4 │ }
+        \\
+        \\  in boom  boom.utu:2:5
+        \\  in main  boom.utu:8:5
         ;
     }
     fn page() Browser.HTMLElement {
@@ -113,6 +130,69 @@ mod tooling {
                 " warning flags lines dense enough to hurt reading.";
             }
             = code.shell(diagnostic_sample());
+            h2 {
+                "Debugging";
+            }
+            p {
+                "A trap in ";
+                code {
+                    "utu run";
+                }
+                " or ";
+                code {
+                    "utu test";
+                }
+                " is shown at its line, with the utu functions it was in, each at its own line. It says which trap it is: a failed ";
+                code {
+                    "assert";
+                }
+                ", a ";
+                code {
+                    "fatal";
+                }
+                ", a failed check of the standard library's (past a Buffer's length), an index out of bounds, division by zero, null, or a value no arm of a ";
+                code {
+                    "match";
+                }
+                " takes.";
+            }
+            = code.shell(trap_sample());
+            p {
+                "The place comes from a source map: the compiler notes where each instruction came from, and the trap's offset in the module, from the engine's stack, finds it. In ";
+                code {
+                    "-O debug";
+                }
+                " the map is exact. In ";
+                code {
+                    "small";
+                }
+                " and ";
+                code {
+                    "fast";
+                }
+                " it is best effort: code the optimizer made is placed at the code around it, coarser but never elsewhere, and code inlined into another function says so. The unsafe modes have none. Node's stacks give the offsets; Bun's give none, so under Bun a trap says what, not where.";
+            }
+            p {
+                code {
+                    "utu build -O debug";
+                }
+                " writes ";
+                code {
+                    "NAME.wasm.map";
+                }
+                " beside the module: a standard source map, which browsers' devtools read, named by the module's ";
+                code {
+                    "sourceMappingURL";
+                }
+                " section. In small and fast, ";
+                code {
+                    "--source-map";
+                }
+                " asks for it.";
+            }
+            p {
+                "The compiler recurses as a program nests. Under Node, a build too deep for the stack is done again in a worker with a 1 GB stack, so 100,000 nested parentheses compile; under Bun, whose workers keep a small stack, it is reported as nested too deeply.";
+            }
             h2 {
                 "VS Code";
             }
