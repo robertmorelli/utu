@@ -79,16 +79,11 @@ export function walkModuleParam(n, doc, source, dispatch) {
   const node = stamp(el(T.MODULE_PARAM, doc), n);
   node.setAttribute('raw', text(n));
   const raw = text(n).trim();
-  if (raw.startsWith('in ')) {
-    node.setAttribute('variance', 'in');
-    node.setAttribute('name', raw.slice(3));
-  } else if (raw.startsWith('out ')) {
-    node.setAttribute('variance', 'out');
-    node.setAttribute('name', raw.slice(4));
-  } else {
-    const child = namedChildren(n)[0];
-    node.setAttribute('name', child ? text(child) : raw);
-  }
+  if (raw.startsWith('in ')) node.setAttribute('variance', 'in');
+  else if (raw.startsWith('out ')) node.setAttribute('variance', 'out');
+  // The name, not its bounds (`T[Ord]`), which only the self-hosted compiler checks.
+  const child = namedChildren(n).find((c) => c.type === 'type_ident');
+  node.setAttribute('name', child ? text(child) : raw);
   return node;
 }
 

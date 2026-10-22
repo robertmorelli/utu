@@ -326,6 +326,18 @@
         {
           "type": "SYMBOL",
           "name": "type_ident"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "impl_list"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },

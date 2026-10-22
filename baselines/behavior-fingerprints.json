@@ -142,6 +142,17 @@
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
+ "examples/bounds.utu analysis": {
+  "diagnostics": "17e45ec47473665b",
+  "formatted": "e13debaf278cff6a",
+  "entries": "ff66eb386fb20019",
+  "queries": "27d7e13125565398",
+  "graphs": "14354754ab2a4650"
+ },
+ "examples/bounds.utu normal": {
+  "diagnostics": "17e45ec47473665b",
+  "formatted": "e13debaf278cff6a"
+ },
  "examples/browser-board/main.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
@@ -2022,6 +2033,17 @@
   "graphs": "e1dcfcb8ce6451da"
  },
  "std/NumberField.utu normal": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01"
+ },
+ "std/Ord.utu analysis": {
+  "diagnostics": "4f53cda18c2baa0c",
+  "formatted": "12ae32cb1ec02d01",
+  "entries": "4f462b40f41b888b",
+  "queries": "96cf09d0b84d2f29",
+  "graphs": "ff58ce20a03bf097"
+ },
+ "std/Ord.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },

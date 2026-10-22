@@ -621,6 +621,8 @@ fn module_type_param(p: Parser) I32 {
     // `in` and `out` are always variance keywords here, never parameter names.
     if is_kw(p, Kw.In) or is_kw(p, Kw.Out) { advance(p); };
     unreserved_type_ident(p);
+    // `T[Ord]`: the protocols T must implement.
+    if is(p, Tok.LBracket) { impl_list(p); };
     node(p, Node.Module_type_param, at, first);
 }
 

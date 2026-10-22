@@ -699,6 +699,43 @@ mod tour {
         \\}
         ;
     }
+    fn bounds_sample() Str {
+        \\proto Ord:
+        \\    | cmp(&) I32                // & is the implementing type
+        \\
+        \\struct Version[Ord]:
+        \\    | major: I32
+        \\    | minor: I32
+        \\
+        \\fn Ord[Version].cmp |a| (b: Version) I32 {
+        \\    if a.major != b.major { a.major - b.major; } else { a.minor - b.minor; };
+        \\}
+        \\fn Ord[I32].cmp |a| (b: I32) I32 { a - b; }   // a scalar implements it too
+        \\
+        \\mod Largest[T[Ord]] {            // every T implements Ord
+        \\    fn of(xs: Array[T]) T {
+        \\        let best = xs[0];
+        \\        for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };   // T's own cmp
+        \\        best;
+        \\    }
+        \\}
+        \\
+        \\export main() I32 {
+        \\    let v = Largest[Version].of([Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }]);
+        \\    v.major * 10 + Largest[I32].of([3, 9, 4]);   // 29
+        \\}
+        ;
+    }
+    fn std_bounds_sample() Str {
+        \\using Order from std:Ord;
+        \\
+        \\export main() Str {
+        \\    let words = ["pear", "fig", "apple"];
+        \\    Order[Str].sort(words);
+        \\    `${", ".join(words)}: ${Order[F64].max(1.5, 2.5)}`;   // apple, fig, pear: 2.5
+        \\}
+        ;
+    }
     // Strings
     fn strings_sample() Str {
         \\using console from std:Console;
@@ -1325,6 +1362,35 @@ mod tour {
             }
             = code.block(proto_sample());
             = code.block(proto_members_sample());
+            p {
+                "A module's type parameter can be bounded: ";
+                code {
+                    "mod Largest[T[Ord]]";
+                }
+                " takes only types that implement ";
+                code {
+                    "Ord";
+                }
+                ", and its code calls their methods. Each instance calls its own type's, with no dispatch, so scalars implement protocols too. ";
+                code {
+                    "std:Ord";
+                }
+                " has ";
+                code {
+                    "Ord";
+                }
+                " for the numbers and ";
+                code {
+                    "Str";
+                }
+                ", and ";
+                code {
+                    "Order[T[Ord]]";
+                }
+                ": max, min, clamp, sort, search.";
+            }
+            = code.block(bounds_sample());
+            = code.block(std_bounds_sample());
             h2 {
                 "Strings";
             }

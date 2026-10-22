@@ -461,6 +461,8 @@ class Parser {
     const word = this.word();
     if (word === 'in' || word === 'out') children.push(this.token(word));
     children.push(this.unreservedTypeIdent());
+    // `T[Ord]`: the protocols T must implement.
+    if (this.isPunct('[')) children.push(this.implList());
     return this.node('module_type_param', children);
   }
 

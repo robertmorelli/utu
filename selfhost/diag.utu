@@ -219,6 +219,9 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.StorageType { return "storage-type"; };
     if k == Diag.ReturnValueFromVoid { return "type-mismatch"; };
     if k == Diag.ComptimeTrap { return "comptime-trap"; };
+    if k == Diag.BoundMissing { return "unsatisfied-bound"; };
+    if k == Diag.UnboundedCall { return "unknown-method"; };
+    if k == Diag.BoundNotProto or k == Diag.ProtoSelfDynamic { return "invalid-bound"; };
     "type-mismatch";
 }
 
@@ -513,6 +516,13 @@ fn diag_text(i: I32) Str {
             if b == 1 { return w + " returns " + type_text(a) + ", not an element"; };
             w + " takes " + type_text(a) + ", which cannot cross into a lazy module";
         },
+        Diag.BoundMissing => {
+            let what = if a >= 0 { type_text(a); } else { w; };
+            what + " does not implement " + proto_text(b) + " (" + decl_text(decl_owner[diag_c[i]]) + "'s " + decl_text(diag_c[i]) + " needs it)";
+        },
+        Diag.UnboundedCall => decl_text(a) + " has no method " + w + "; bound it: " + bounded_text(diag_c[i], a, b),
+        Diag.BoundNotProto => type_text(decl_type(a, 0)) + " is not a protocol; a bound names one",
+        Diag.ProtoSelfDynamic => type_text(a) + "." + w + " uses &, so only a bounded T calls it: mod M[T[" + type_text(a) + "]]",
         ~> Diag.name(k),
     };
 }

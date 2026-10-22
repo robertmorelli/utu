@@ -16,7 +16,8 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     module_name: ($) => choice($.identifier, $.type_ident),
     module_type_param_list: ($) =>
       seq('[', $.module_type_param, repeat(seq(',', $.module_type_param)), optional(','), ']'),
-    module_type_param: ($) => seq(optional(choice('in', 'out')), $.type_ident),
+    // `T[Ord, Hash]`: T must implement the protocols listed, as a struct lists them.
+    module_type_param: ($) => seq(optional(choice('in', 'out')), $.type_ident, optional($.impl_list)),
     module_ref: ($) => $.module_name,
     instantiated_module_ref: ($) => prec(2, seq($.module_name, $.module_type_arg_list)),
     module_type_arg_list: ($) => seq('[', $._type, repeat(seq(',', $._type)), optional(','), ']'),

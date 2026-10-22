@@ -28,6 +28,9 @@ const INTENDED = {
   // `Pair[I32]` of `mod Pair[A, B]`: stage 0 builds it, reading B as nothing.
   'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal': 'a module given too few type arguments is reported',
   'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test': 'a module given too few type arguments is reported',
+  // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
+  'examples/bounds.utu normal': 'bounded module parameters',
+  'examples/bounds.utu test': 'bounded module parameters',
 };
 
 if (isMainThread) await main();
