@@ -472,6 +472,16 @@ export lib {
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
+  // A std module not imported: the note names the module, and its file.
+  for (const [source, note] of [
+    ['export main() F64 { Time.now(); }\n', 'using time from std:Time; (the module is time)'],
+    ['using Time from std:Time;\nexport main() F64 { time.now(); }\n', 'using time from std:Time; (the module is time)'],
+    ['export main() void { console.log("hi"); }\n', 'using console from std:Console;'],
+  ]) {
+    const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
+    assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
+    checked++;
+  }
 
   // Test names: each test has one, its own.
   const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
