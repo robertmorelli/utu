@@ -30,10 +30,10 @@ From `bun run bench:programs-d8`.
 
 | implementation | time / iteration | Wasm size | gzip |
 |---|---:|---:|---:|
-| utu Wasm, `-O fast` | 10.9 ms | 4,056 B | 1,398 B |
-| utu Wasm, `-O fastUnsafe` | 11.1 ms | 3,840 B | 1,383 B |
-| utu Wasm, `-O small` | 11.1 ms | 339 B | 250 B |
-| utu Wasm, `-O smallUnsafe` | 10.8 ms | 333 B | 248 B |
-| safe Rust Wasm | 42.6 ms | 21,292 B | 9,405 B |
-| unsafe Rust Wasm | 9.3 ms | 21,466 B | 9,507 B |
-| JavaScript | 20.4 ms | | |
+| utu Wasm, `-O fast` | 10.6 ms | 544 B | 295 B |
+| utu Wasm, `-O fastUnsafe` | 10.6 ms | 520 B | 290 B |
+| utu Wasm, `-O small` | 10.7 ms | 315 B | 244 B |
+| utu Wasm, `-O smallUnsafe` | 11.0 ms | 309 B | 241 B |
+| safe Rust Wasm | 40.9 ms | 21,292 B | 9,405 B |
+| unsafe Rust Wasm | 9.1 ms | 21,466 B | 9,507 B |
+| JavaScript | 20.1 ms | | |

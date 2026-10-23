@@ -189,7 +189,7 @@ language stays as it is.
 6. **Bootstrap.** Done: stage 0 builds stage 1, stage 1 builds stage 2,
    stage 2 builds stage 3, and stages 2 and 3 are identical
    (`scripts/selfhost-bootstrap.mjs`, part of `bun run test`). Stage 2
-   builds the compiler in 70 ms; stage 0 takes 3.9 s.
+   builds the compiler in 94 ms; stage 0 takes 3.9 s.
 7. **Shipped.** `bun run build` makes `dist/utu.wasm` by the bootstrap
    (see step 9 for what builds stage 1) and `dist/selfhost/utu.js`,
    its JavaScript API (`src/selfhost/`: the driver for any host, name
@@ -201,7 +201,7 @@ language stays as it is.
    56), jpl 5.5 ms (561), foundry 17 ms (1,466). At -Oz, of the 284 programs
    both build, 262 are smaller, 20 the same, 2 larger by at most 3 bytes:
    16.8% smaller in all (`scripts/selfhost-size-differential.mjs`). At -O3,
-   programs run as fast as stage 0's or faster. The compiler is 372 KB of
+   programs run as fast as stage 0's or faster. The compiler is 430 KB of
    wasm (126 KB brotli); stage 0's bundle is 1.97 MB and a parser.
 
 ### Stays in JavaScript

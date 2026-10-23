@@ -27,10 +27,10 @@ forms. All returned 8629030. From `bun run bench:programs-d8`.
 
 | implementation | time | payload | gzip |
 |---|---:|---:|---:|
-| utu Wasm, `-O fast` | 13.3 ms | 5,240 B | 1,730 B |
-| utu Wasm, `-O fastUnsafe` | 13.2 ms | 5,240 B | 1,730 B |
-| utu Wasm, `-O small` | 14.2 ms | 553 B | 352 B |
-| utu Wasm, `-O smallUnsafe` | 14.3 ms | 553 B | 352 B |
-| safe Rust Wasm | 12.6 ms | 22,760 B | 10,025 B |
-| unsafe Rust Wasm | 13.7 ms | 22,133 B | 9,764 B |
-| JavaScript | 17.7 ms | | |
+| utu Wasm, `-O fast` | 13.1 ms | 1,035 B | 398 B |
+| utu Wasm, `-O fastUnsafe` | 13.1 ms | 1,035 B | 398 B |
+| utu Wasm, `-O small` | 14.2 ms | 537 B | 334 B |
+| utu Wasm, `-O smallUnsafe` | 14.2 ms | 537 B | 334 B |
+| safe Rust Wasm | 12.4 ms | 22,760 B | 10,025 B |
+| unsafe Rust Wasm | 13.5 ms | 22,133 B | 9,764 B |
+| JavaScript | 17.4 ms | | |
