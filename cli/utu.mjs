@@ -320,18 +320,19 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame }) {
     await fs.writeFile(path.join(dir, `${name}.wasm.map`), sourceMapJson(built.map, { file: `${name}.wasm`, relative, texts }));
     wasm = withMapUrl(wasm, `${name}.wasm.map`);
   }
-  const glue = glueSource(spec);
+  const glue = glueSource(spec, wasm);
   const { build: bundle } = await import('esbuild');
   const loader = loaderSource(spec, wasm, {
     runtime: RUNTIME, glue: glue ? './glue.mjs' : null, streaming: false,
-    wasm: `await (typeof process === 'object' && process.versions?.node ? import('node:fs/promises').then(fs => fs.readFile(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url))) : fetch(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url)).then(r => r.arrayBuffer()))`,
+    // Node's fetch reads no file: URL.
+    wasm: `await (url => globalThis.process?.versions?.node ? import('node:fs/promises').then(fs => fs.readFile(url)) : fetch(url).then(r => r.arrayBuffer()))(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url))`,
   });
   // The loader bundled with the runtime pieces and the glue it imports.
   await bundle({
     // (Not named NAME.mjs: esbuild refuses an output that is its input.)
     stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
-    outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: true, format: 'esm', platform: 'neutral',
+    outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: optimize !== 'none', format: 'esm', platform: 'neutral',
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
   });
   await fs.writeFile(path.join(dir, `${name}.wasm`), wasm);
@@ -371,7 +372,7 @@ async function buildExe(file, { utu, optimize, safe, out }) {
   // In the project when it has dependencies, so an `@es` body's imports
   // resolve as its own source's would, and bun bundles them in.
   const dir = await buildDirectory(path.dirname(file));
-  const glue = glueSource(spec);
+  const glue = glueSource(spec, wasm);
   if (glue) await fs.writeFile(path.join(dir, 'glue.mjs'), glue);
   const loader = loaderSource(spec, wasm, {
     runtime: RUNTIME, glue: glue ? './glue.mjs' : null,

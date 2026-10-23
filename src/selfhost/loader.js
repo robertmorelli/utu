@@ -3,65 +3,104 @@
 // A module the compiler builds imports what its spec says the host gives:
 // `@es` bodies (the glue module), closures, promises, hosted mems, and the
 // exception tag. The loader is the least JavaScript that gives exactly
-// those: each runtime piece is imported only when the module uses it, so a
-// bundler leaves the rest out.
+// those: each runtime piece (a closure's `closure_new`, an `await_*`, …) is
+// imported only when the module imports it, so a bundler leaves the rest out.
 
-import { glueModuleSource } from '../runtime/host-imports.js';
+import { glueModuleSource, glueName, splitBody } from '../runtime/host-imports.js';
 
-/** The glue module's source: the bodies of the `@es` imports. Empty when there are none. */
-export function glueSource(spec) {
-  return glueModuleSource(spec.es ?? {});
+/**
+ * The glue module's source: the bodies of the `@es` imports. Empty when there
+ * are none. Given the module's bytes, only the bodies its loader imports.
+ */
+export function glueSource(spec, wasmBytes = null) {
+  if (!wasmBytes) return glueModuleSource(spec.es ?? {});
+  const { firsts } = esImports(spec, moduleImports(wasmBytes));
+  return glueModuleSource(spec.es ?? {}, new Set(firsts.values()));
+}
+
+const moduleImports = wasmBytes => WebAssembly.Module.imports(new WebAssembly.Module(wasmBytes, COMPILE_OPTIONS));
+
+/** The `es` fields the module imports, [field, body] in order, and each body's first field. */
+function esImports(spec, entries) {
+  const imported = new Set(entries.filter(entry => entry.module === 'es').map(entry => entry.name));
+  const fields = Object.entries(Object.assign({}, ...Object.values(spec.es ?? {}))).filter(([field]) => imported.has(field));
+  const firsts = new Map();
+  for (const [field, body] of fields) if (!firsts.has(body)) firsts.set(body, field);
+  return { fields, firsts };
 }
 
 /**
  * An ES module that instantiates the built module and exports its
- * instance's exports (as `exports`, and each by name when `named`).
+ * instance's exports (as `exports`).
  *
  *   runtime  how to import src/runtime/host-imports.js
  *   glue     how to import the glue module, when there is one
  *   wasm     a JS expression for the module's bytes or a Response for them
- *   streaming  whether `wasm` is a Response (WebAssembly.compileStreaming)
+ *   streaming  whether `wasm` is a Response (WebAssembly.instantiateStreaming)
+ *
+ * The import object is a literal of what the module imports, and no more:
+ * the glue's exports by name (each body once, though imports of several
+ * types share it), an array when the fields are numbered (optimized), and
+ * the runtime's pieces each by its own import.
  */
 export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming = false }) {
-  const imported = new Set(WebAssembly.Module.imports(new WebAssembly.Module(wasmBytes, COMPILE_OPTIONS)).map(entry => `${entry.module}.${entry.name}`));
-  const runtimeNames = [];
+  const entries = moduleImports(wasmBytes);
+  const runtimeNames = new Set();
+  const use = name => { runtimeNames.add(name); return name; };
   const lines = [];
-  const body = [];
-  const es = spec.es ?? {};
-  // Only the fields' names: the glue module holds the bodies.
-  const fields = Object.fromEntries(Object.entries(es).map(([module, bindings]) => [module, Object.fromEntries(Object.keys(bindings).map(name => [name, '']))]));
-  if (glue && Object.values(fields).some(bindings => Object.keys(bindings).length)) {
-    runtimeNames.push('importObjectFromGlue');
-    lines.push(`import * as glue from ${JSON.stringify(glue)};`);
-    body.push(`const imports = importObjectFromGlue(${JSON.stringify(fields)}, glue);`);
-  } else {
-    body.push('const imports = {};');
+  const modules = [];
+  const { fields, firsts } = esImports(spec, entries);
+  if (glue && fields.length) {
+    // Each body once: imports of several wasm types may share one.
+    let thunk = false;
+    const values = fields.map(([, body]) => {
+      const name = glueName(firsts.get(body));
+      // A body not plainly a function may be a value: its accessor.
+      if (isFunction(splitBody(body).expr)) return name;
+      thunk = true;
+      return `$utuValue(${name})`;
+    });
+    lines.push(`import { ${[...firsts.values()].map(glueName).join(', ')} } from ${JSON.stringify(glue)};`);
+    if (thunk) lines.push('const $utuValue = value => typeof value === \'function\' ? value : () => value;');
+    const numbered = fields.every(([field], i) => field === String(i));
+    modules.push(`es: ${numbered ? `[${values.join(', ')}]` : `{ ${fields.map(([field], i) => `${field}: ${values[i]}`).join(', ')} }`}`);
   }
-  if (spec.closures) {
-    runtimeNames.push('closureImports');
-    body.push(`imports.utu = closureImports(${JSON.stringify(spec.closures)}, imports.utu);`);
+  const utu = [];
+  for (const { module, name } of entries) {
+    if (module !== 'utu') continue;
+    if (name === 'closure_new') utu.push(`closure_new: ${use('closureNew')}`);
+    else if (name === 'closure_rec') utu.push(`closure_rec: ${use('closureRec')}`);
+    else if (name.startsWith('closure_call_')) utu.push(`${name}: ${use('closureApply')}`);
+    else if (name === 'promise_then') utu.push(`promise_then: ${use('promiseThen')}`);
+    else if (name === 'promise_catch') utu.push(`promise_catch: ${use('promiseCatch')}`);
+    else if (name.startsWith('await_')) utu.push(`${name}: ${use('awaitImport')}()`);
+    else if (name === 'js_tag') utu.push('js_tag: WebAssembly.JSTag');
   }
-  if (spec.mems) {
-    runtimeNames.push('memoryImports');
-    body.push(`imports.utu = memoryImports(${JSON.stringify(spec.mems)}, imports.utu);`);
+  if (utu.length || spec.mems) {
+    const object = `{ ${utu.join(', ')} }`;
+    modules.push(`utu: ${spec.mems ? `${use('memoryImports')}(${JSON.stringify(spec.mems)}, ${object})` : object}`);
   }
-  if (spec.promises) {
-    runtimeNames.push('promiseImports', 'awaitImports', 'promisifyExports');
-    body.push(`imports.utu = awaitImports(${JSON.stringify(spec.promises)}, promiseImports(${JSON.stringify(spec.promises)}, imports.utu));`);
+  const asyncExports = spec.promises?.asyncExports ?? [];
+  let exports = 'instance.exports';
+  if (asyncExports.length) {
+    const each = asyncExports.map(name => `${JSON.stringify(name)}: ${use('promising')}(instance.exports[${JSON.stringify(name)}])`);
+    exports = `{ ...instance.exports, ${each.join(', ')} }`;
   }
-  if (imported.has('utu.js_tag')) {
-    runtimeNames.push('exceptionImports');
-    body.push('imports.utu = exceptionImports(imports.utu);');
-  }
-  if (spec.exports) runtimeNames.push('convertExports');
-  if (runtimeNames.length) lines.unshift(`import { ${runtimeNames.join(', ')} } from ${JSON.stringify(runtime)};`);
-  const compile = streaming ? 'compileStreaming' : 'compile';
-  body.push(`const module = await WebAssembly.${compile}(${wasm}, ${JSON.stringify(COMPILE_OPTIONS)});`);
-  body.push('export const instance = await WebAssembly.instantiate(module, imports);');
-  let exports = spec.promises ? `promisifyExports(instance, ${JSON.stringify(spec.promises)})` : 'instance.exports';
-  if (spec.exports) exports = `convertExports(${exports}, ${JSON.stringify(spec.exports)})`;
-  body.push(`export const exports = ${exports};`);
-  return [...lines, ...body].join('\n') + '\n';
+  if (spec.exports) exports = `${use('convertExports')}(${exports}, ${JSON.stringify(spec.exports)})`;
+  if (runtimeNames.size) lines.unshift(`import { ${[...runtimeNames].join(', ')} } from ${JSON.stringify(runtime)};`);
+  const instantiate = streaming ? 'instantiateStreaming' : 'instantiate';
+  lines.push(`export const { instance } = await WebAssembly.${instantiate}(${wasm}, { ${modules.join(', ')} }, ${JSON.stringify(COMPILE_OPTIONS)});`);
+  lines.push(`export const exports = ${exports};`);
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Whether a body's expression is plainly a function: an arrow, `function`,
+ * or one of host.utu's es_wrap wrappers (which make one of any body).
+ */
+function isFunction(expr) {
+  return /^(async\s+)?(function\b|[\w$]+\s*=>|\([^()]*\)\s*=>)/.test(expr)
+    || /^\((f => \((p\d+(,p\d+)*)?\) => |v => \(\) => v\)\(|v => \(w => \(\) => w\)\()/.test(expr);
 }
 
 const COMPILE_OPTIONS = { builtins: ['js-string'], importedStringConstants: "'" };
