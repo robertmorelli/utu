@@ -295,6 +295,69 @@ export lib {
     checked++;
   }
 
+  // -O small moves every function called once to its call, whatever its body
+  // holds: locals, loops, an early return (from inside a loop), try/catch,
+  // defer, a written parameter, a callee itself moved into; arguments run
+  // in order, and its locals share a caller loop's slots without coming round.
+  const once = await write(`using JS from std:JS;
+vec trail: I32;
+fn tick(v: I32) I32 { trail.push(v); v; }
+fn note(v: I32) void { trail.push(v); }
+fn digits(n: I32, base: I32) I32 {
+    if n == 0 { return 1; };
+    let count = 0;
+    while (n > 0) {
+        n = n / base;
+        count += 1;
+    };
+    count;
+}
+fn squares(k: I32) I32 {
+    let total = 0;
+    for (0 ..< k) |i| {
+        let sq = i * i;
+        total += sq;
+    };
+    total;
+}
+fn parsed(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { "bad"; }; }
+fn first_over(limit: I32, a: I32, b: I32, c: I32) I32 {
+    defer note(0);
+    for ([a, b, c]) |v| { if v > limit { return v; }; };
+    -1;
+}
+fn inner(x: I32) I32 { let y = x * 3; y + 1; }
+fn inner2(x: I32) I32 { x - 1; }
+fn outer(x: I32) I32 { let z = inner(x) + inner2(x); z * 2; }
+fn poly(x: I32, c: I32) I32 { c * x * x + c * x + c; }
+export lib {
+    fn run() I32 {
+        let sum = 0;
+        for (0 ..< 3) |r| { sum += squares(r + 2); };
+        digits(tick(1234), tick(10)) * 100000 + digits(0, 10) * 10000 + sum * 100 + first_over(tick(5), tick(3), tick(9), tick(7));
+    }
+    fn ran() Str {
+        let s = "";
+        for (0 ..< trail.len()) |i| { s = if i == 0 { \`\${trail[i]}\`; } else { \`\${s},\${trail[i]}\`; }; };
+        s;
+    }
+    fn json() Str { parsed("[1,2]") + parsed("{"); }
+    fn nested() I32 { outer(5) + poly(3, 2); }
+}
+`);
+  const onceDebug = functions((await compileFile(utu, once, { mode: 'debug' })).wasm);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, once, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    assert.equal(e.run(), 412009, `${mode}: run`);
+    assert.equal(e.ran(), '1234,10,5,3,9,7,0', `${mode}: ran`);
+    assert.equal(e.json(), '[1,2]bad', `${mode}: json`);
+    assert.equal(e.nested(), 66, `${mode}: nested`);
+    if (mode.startsWith('small')) assert.ok(functions(built.wasm) <= onceDebug - 8, `${mode}: once-called functions not moved`);
+    checked++;
+  }
+
   // Structs returned as their fields (selfhost/inline.utu, -O small and
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.

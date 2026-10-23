@@ -92,18 +92,30 @@ so `-Oz` binaries are 10-25% larger than Binaryen's were.
 ## Inlining that shrinks
 
 At `-O small` (and `smallUnsafe`) a call becomes its callee's body where
-the body encodes to no more bytes than the call, and a function called from
-one place moves there when the call and the body are bigger than the copy
-(`selfhost/inline.utu`). Sizes are bounds (a copy's the most it can take,
-the call's and body's the least), so no inlining grows the module. Callees
-have no locals, loops, `return`s or `try`, and no local is added: a
-parameter the body reads first is its argument, already on the stack; one
-passed a local reads that local; one passed a constant reads it in place.
+the body encodes to no more bytes than the call (`selfhost/inline.utu`).
+Sizes are bounds (a copy's the most it can take, the call's the least), so
+no copy grows the module. Those callees have no locals, loops, `return`s or
+`try`, and no local is added: a parameter the body reads first is its
+argument, already on the stack; one passed a local reads that local; one
+passed a constant reads it in place.
+
+Then every function called from one place, and used nowhere else, moves
+there whatever its body holds, as `wasm-opt -Oz` does: its header, its type's
+use and the call go. Its parameters and locals become the caller's (the
+arguments, in order, set the parameters; one never assigned reads a local or
+small constant argument in place), its labels follow the caller's, and a
+`return` leaves a block around it. Moves chain, callers first, in one pass.
+The merged locals pack: a local set before it is read in a loop does not
+hold its slot through the loop, and a local stored once with a small
+constant is that constant. DeltaBlue goes from 54 functions to 39 (Binaryen:
+36), the compiler from 2601 to 1426, 2.7% fewer bytes; DeltaBlue runs 11%
+faster and Richards 17%.
+
 An exported function, or one used as a value, stays (its calls inline only
 where each alone shrinks); recursive calls and calls a lowering made stay
-calls. A trap in a copy still names the callee's line, `(inlined into
-main)`. Copies at several calls, each bigger than the call, are not made:
-they shifted V8's own inlining (DeltaBlue 6% slower).
+calls. A trap in a copy or a moved body still names the callee's line,
+`(inlined into main)`. Copies at several calls, each bigger than the call,
+are not made: they shifted V8's own inlining (DeltaBlue 6% slower).
 
 ## Structs returned as their fields
 

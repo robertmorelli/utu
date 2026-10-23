@@ -6036,7 +6036,7 @@ ok
  8 │         i += 1;
  9 │     };
 
-  in sum  examples/error_demo/runtime/04_array_index_oob.utu:7:18
+  in sum  examples/error_demo/runtime/04_array_index_oob.utu:7:18  (inlined into main)
   in main  examples/error_demo/runtime/04_array_index_oob.utu:14:5
 --- exit 1
 
@@ -6066,7 +6066,7 @@ ok
    │     ╰─ called here
 11 │ }
 
-  in &.get_index  std:Buffer:32:55
+  in &.get_index  std:Buffer:32:55  (inlined into main)
   in main  examples/error_demo/runtime/06_buffer_past_length.utu:10:5
 --- exit 1
 
@@ -6081,7 +6081,7 @@ ok
    │     ╰─ called here
  9 │ }
 
-  in &.get_index  std:Buffer:32:55
+  in &.get_index  std:Buffer:32:55  (inlined into main)
   in main  examples/error_demo/runtime/07_buffer_past_capacity.utu:8:5
 --- exit 1
 
@@ -6096,7 +6096,7 @@ ok
    │     ╰─ called here
  8 │ }
 
-  in &.pop  std:Buffer:43:44
+  in &.pop  std:Buffer:43:44  (inlined into main)
   in main  examples/error_demo/runtime/08_buffer_pop_empty.utu:7:5
 --- exit 1
 
@@ -6189,7 +6189,7 @@ ok
  5 │     a / b;
  6 │ }
 
-  in checked_div  examples/error_demo/runtime/15_assert_fails.utu:4:5
+  in checked_div  examples/error_demo/runtime/15_assert_fails.utu:4:5  (inlined into main)
   in main  examples/error_demo/runtime/15_assert_fails.utu:9:5
 --- exit 1
 
@@ -6279,7 +6279,7 @@ ok
    │           ╰─ here
  5 │ }
 
-  in get  examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11
+  in get  examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11  (inlined into main)
   in main  examples/error_demo/runtime/22_trap_in_catch_try.utu:8:5
 --- exit 1
 
@@ -6398,7 +6398,7 @@ Node.js v25.8.1
    │                     ━━━━━━━━━━━━━━━
    │                     ╰─ called here
 
-  in &.value  std:Result:42:27
+  in &.value  std:Result:42:27  (inlined into main)
   in main  examples/error_demo/runtime/309_result_value_of_error.utu:8:21
 --- exit 1
 
@@ -6428,7 +6428,6 @@ Node.js v25.8.1
  6 │     tail.len();
  7 │ }
 
-  in array.slice
   in main  examples/error_demo/runtime/31_slice_bad_range.utu:5:16
 --- exit 1
 
@@ -6471,7 +6470,7 @@ Node.js v25.8.1
    │     ╰─ here
  5 │ }
 
-  in make  examples/error_demo/runtime/34_array_new_negative.utu:4:5
+  in make  examples/error_demo/runtime/34_array_new_negative.utu:4:5  (inlined into main)
   in main  examples/error_demo/runtime/34_array_new_negative.utu:8:5
 --- exit 1
 
@@ -6597,7 +6596,6 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  6 │     b.len();
  7 │ }
 
-  in array.slice
   in main  examples/error_demo/runtime/493_reversed_slice.utu:5:13
 --- exit 1
 

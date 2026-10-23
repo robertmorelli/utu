@@ -6,7 +6,9 @@
 //! held for the consumer). Four rewrites remove them, in each function:
 //!
 //! / copies: a local set once, to a parameter never assigned, is that
-//!   parameter: its reads read the parameter.
+//!   parameter: its reads read the parameter. In size builds, one set once
+//!   to a number or a null is that constant, where it is read once or the
+//!   constant is no bigger than a read.
 //! / temporaries: a local set once to a pure value and read once in the next
 //!   statement, outside any loop and before anything assigns what the value
 //!   reads, is that value: it moves to the read.
@@ -15,7 +17,9 @@
 //! / unused: a local never read is not stored (its value is kept, and
 //!   dropped, when it has effects), and is no longer declared.
 //! / coalescing: locals of one type whose live ranges do not overlap share
-//!   one, and the locals are declared grouped by type (one run each).
+//!   one, and the locals are declared grouped by type (one run each). In
+//!   size builds a local set before read in a loop (a moved body's) does
+//!   not hold its slot through it.
 //! / loads (size builds): a field read of a local, read again twice or more
 //!   where nothing can have changed it, is kept in a local.
 //! / logic (size builds): `a and b`, `a or b` whose b is cheap, pure and
@@ -150,6 +154,13 @@ fn pure_opcode(code: I32) Bool {
 
 fn non_null(vt: I32) Bool { vt == vt_extern or (vt >= vt_defined and vt < vt_tuple and (vt - vt_defined) % 2 == 1); }
 
+/// Whether node `n` is a number or a null.
+fn opt_literal(n: I32) Bool {
+    let op = w_op[n];
+    w_count[n] == 0 and (op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32()
+        or op == Op.F64Const.to_i32() or op == Op.RefNull.to_i32());
+}
+
 fn single_value(vt: I32) Bool { vt != vt_none and vt != vt_unreachable and vt < vt_tuple; }
 
 fn set_kid(parent: I32, place: I32, node: I32) void { w_kids[w_first[parent] + place] = node; }
@@ -164,6 +175,9 @@ fn opt_erase(n: I32) void {
 /// By local: the parameter its reads read instead, or -1; and that read's type.
 vec opt_copy_of: I32;
 vec opt_copy_type: I32;
+/// By local (size builds): the constant its one store stores, read in its
+/// place (when read once, or no bigger than a read), or -1.
+vec opt_const_of: I32;
 
 /// The copies rewrite: whether anything changed. Each local is settled in
 /// order (a copy of a copy settled before it is a copy of that parameter),
@@ -172,11 +186,20 @@ fn propagate_copies(params: I32) Bool {
     let changed = false;
     opt_copy_of.resize(opt_gets.len());
     opt_copy_type.resize(opt_gets.len());
-    for (0 ..< opt_gets.len()) |l| { opt_copy_of[l] = -1; };
+    opt_const_of.resize(opt_gets.len());
+    for (0 ..< opt_gets.len()) |l| {
+        opt_copy_of[l] = -1;
+        opt_const_of[l] = -1;
+    };
     for (params ..< opt_gets.len()) |l| {
         if opt_sets[l] == 1 {
             let write = opt_nodes[opt_set_at[l]];
             let source = if w_count[write] == 1 { w_kid(write, 0); } else { -1; };
+            if optimize_level[0] == 1 and w_op[write] == Op.LocalSet.to_i32() and source >= 0 and opt_gets[l] > 0
+                and opt_literal(source) and (opt_gets[l] == 1 or sm_bytes(source, true) <= 2) {
+                opt_const_of[l] = source;
+                changed = true;
+            };
             if w_op[write] == Op.LocalSet.to_i32() and source >= 0 and w_op[source] == Op.LocalGet.to_i32() {
                 let p = w_a[source];
                 let t = w_type[source];
@@ -197,7 +220,15 @@ fn propagate_copies(params: I32) Bool {
     changed = false;
     for (0 ..< opt_nodes.len()) |k| {
         let n = opt_nodes[k];
-        if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
+        if w_op[n] == Op.LocalGet.to_i32() and opt_const_of[w_a[n]] >= 0 {
+            let c = opt_const_of[w_a[n]];
+            opt_gets[w_a[n]] -= 1;
+            w_op[n] = w_op[c];
+            w_type[n] = w_type[c];
+            w_a[n] = w_a[c];
+            w_b[n] = w_b[c];
+            changed = true;
+        } else if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
             let l = w_a[n];
             w_a[n] = opt_copy_of[l];
             w_type[n] = opt_copy_type[l];
@@ -401,12 +432,28 @@ fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) void {
 vec co_first: I32;
 vec co_last: I32;
 vec co_store_first: I32;
-/// By local: the outermost loop around its first and its last mention, or -1.
+/// By local: the innermost loop around its first and its last mention, or -1.
 vec co_loop_first: I32;
 vec co_loop_last: I32;
-/// By loop (in the order they start): the positions it spans.
+/// By loop (in the order they start): the positions it spans, its node, the
+/// loop around it (or -1), and where its locals read before written in it
+/// start in @co_exposed (@co_exposed_count of them).
 vec co_loop_start: I32;
 vec co_loop_end: I32;
+vec co_loop_node: I32;
+vec co_loop_outer: I32;
+vec co_exposed_at: I32;
+vec co_exposed_count: I32;
+vec co_exposed: I32;
+/// While finding a loop's exposed locals: by local, whether written on
+/// every path so far, with the log of those set (to undo a branch's), and
+/// the loop it was last noted exposed in.
+vec co_written: U8;
+vec co_written_log: I32;
+vec co_noted: I32;
+/// By label: whether something branches to it (labels in @co_target_list).
+vec co_targeted: U8;
+vec co_target_list: I32;
 /// The loops around the walk, outermost first.
 vec co_loops: I32;
 /// The nodes that read or write a local.
@@ -427,7 +474,9 @@ vec co_sort: I32;
 
 /// Share locals whose ranges do not overlap: a local is live from its first
 /// mention to its last, and a mention inside a loop makes it live through
-/// the whole outermost loop around it (its value may come round). A local is
+/// the whole outermost loop around it its value may come round in: one it is
+/// mentioned outside of, or read in before written (an inlined body's
+/// locals, set before read, do not come round a caller's loop). A local is
 /// only moved into another's when its first mention stores it: one read
 /// first would rely on starting at zero.
 fn coalesce_locals(f: I32, params: I32) void {
@@ -446,10 +495,15 @@ fn coalesce_locals(f: I32, params: I32) void {
     };
     co_loop_start.clear();
     co_loop_end.clear();
+    co_loop_node.clear();
+    co_loop_outer.clear();
     co_loops.clear();
     co_mentions.clear();
+    for (0 ..< co_target_list.len()) |i| { co_targeted[co_target_list[i]] = 0; };
+    co_target_list.clear();
     co_pos[0] = 0;
     co_walk(func_body[f]);
+    co_find_exposed(total);
     // Each local's range, and the slot it takes: the first of its type free
     // by then (locals in the order their ranges start).
     let start = Array[I32].new(total, 0);
@@ -457,8 +511,10 @@ fn coalesce_locals(f: I32, params: I32) void {
     for (params ..< total) |l| {
         start[l] = co_first[l];
         end[l] = co_last[l];
-        if co_loop_first[l] >= 0 and co_loop_start[co_loop_first[l]] < start[l] { start[l] = co_loop_start[co_loop_first[l]]; };
-        if co_loop_last[l] >= 0 and co_loop_end[co_loop_last[l]] > end[l] { end[l] = co_loop_end[co_loop_last[l]]; };
+        let lf = co_round_loop(l, co_loop_first[l]);
+        let ll = co_round_loop(l, co_loop_last[l]);
+        if lf >= 0 and co_loop_start[lf] < start[l] { start[l] = co_loop_start[lf]; };
+        if ll >= 0 and co_loop_end[ll] > end[l] { end[l] = co_loop_end[ll]; };
     };
     let order = Array[I32].new(n, 0);
     for (0 ..< n) |i| { order[i] = params + i; };
@@ -564,7 +620,14 @@ fn co_walk(node: I32) void {
         span = co_loop_start.len();
         co_loop_start.push(co_pos[0]);
         co_loop_end.push(-1);
+        co_loop_node.push(node);
+        co_loop_outer.push(if co_loops.len() > 0 { co_loops[co_loops.len() - 1]; } else { -1; });
         co_loops.push(span);
+    };
+    if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() {
+        co_target(w_a[node]);
+    } else if op == Op.BrTable.to_i32() {
+        for (0 ..< w_b[node]) |i| { co_target(w_aux[w_a[node] + i]); };
     };
     for (0 ..< w_count[node]) |i| { co_walk(w_kid(node, i)); };
     let at = co_pos[0];
@@ -575,14 +638,105 @@ fn co_walk(node: I32) void {
         if co_first[l] < 0 {
             co_first[l] = at;
             co_store_first[l] = if op == Op.LocalGet.to_i32() { 0; } else { 1; };
-            if co_loops.len() > 0 { co_loop_first[l] = co_loops[0]; };
+            if co_loops.len() > 0 { co_loop_first[l] = co_loops[co_loops.len() - 1]; };
         };
         co_last[l] = at;
-        if co_loops.len() > 0 { co_loop_last[l] = co_loops[0]; };
+        co_loop_last[l] = if co_loops.len() > 0 { co_loops[co_loops.len() - 1]; } else { -1; };
     };
     if span >= 0 {
         co_loop_end[span] = at;
         co_loops.resize(co_loops.len() - 1);
+    };
+}
+
+fn co_target(label: I32) void {
+    if label >= co_targeted.len() {
+        let old = co_targeted.len();
+        co_targeted.resize(label + 1);
+        for (old ..< label + 1) |i| { co_targeted[i] = 0; };
+    };
+    if co_targeted[label] == 0 {
+        co_targeted[label] = 1;
+        co_target_list.push(label);
+    };
+}
+
+/// The outermost loop, from `inner` (a loop around a mention of local `l`)
+/// out, that `l`'s value may come round: `l` is mentioned outside it or
+/// read in it before written; or -1.
+fn co_round_loop(l: I32, inner: I32) I32 {
+    let most = -1;
+    let s = inner;
+    while (s >= 0) {
+        // (Size builds only: -O3 extends through every loop, as it did.)
+        let round = optimize_level[0] != 1 or co_first[l] < co_loop_start[s] or co_last[l] > co_loop_end[s];
+        if not round and co_exposed_at[s] < 0 { co_loop_exposed(s); };
+        let k = co_exposed_at[s];
+        while (not round and k < co_exposed_at[s] + co_exposed_count[s]) {
+            if co_exposed[k] == l { round = true; };
+            k += 1;
+        };
+        if round { most = s; };
+        s = co_loop_outer[s];
+    };
+    most;
+}
+
+/// No loop's exposed locals found yet (each is when asked: co_loop_exposed).
+fn co_find_exposed(total: I32) void {
+    co_written.resize(total);
+    co_noted.resize(total);
+    for (0 ..< total) |l| {
+        co_written[l] = 0;
+        co_noted[l] = -1;
+    };
+    co_exposed.clear();
+    co_exposed_at.resize(co_loop_node.len());
+    co_exposed_count.resize(co_loop_node.len());
+    for (0 ..< co_loop_node.len()) |s| { co_exposed_at[s] = -1; };
+}
+
+/// Loop `s`'s locals read before written in it, onto @co_exposed.
+fn co_loop_exposed(s: I32) void {
+    co_exposed_at[s] = co_exposed.len();
+    let node = co_loop_node[s];
+    for (0 ..< w_count[node]) |i| { co_reads_first(w_kid(node, i), s); };
+    co_undo_written(0);
+    co_exposed_count[s] = co_exposed.len() - co_exposed_at[s];
+}
+
+fn co_undo_written(mark: I32) void {
+    for (mark ..< co_written_log.len()) |i| { co_written[co_written_log[i]] = 0; };
+    co_written_log.resize(mark);
+}
+
+/// Walks `n` in the order it runs, noting reads of locals not yet written
+/// on every path (in loop `s`). What runs maybe (a branch, a loop's body, a
+/// block branched out of, a `try`) writes for itself only.
+fn co_reads_first(n: I32, s: I32) void {
+    let op = w_op[n];
+    if op == Op.LocalGet.to_i32() {
+        let l = w_a[n];
+        if co_written[l] == 0 and co_noted[l] != s {
+            co_noted[l] = s;
+            co_exposed.push(l);
+        };
+        return;
+    };
+    let maybe = op == Op.Loop.to_i32() or op == Op.Try.to_i32()
+        or (op == Op.Block.to_i32() and w_a[n] < co_targeted.len() and co_targeted[w_a[n]] == 1);
+    // (A `try`'s catch runs after any part of its body.)
+    let branches = op == Op.If.to_i32() or op == Op.NullElse.to_i32() or op == Op.CastArms.to_i32() or op == Op.Try.to_i32();
+    let mark = co_written_log.len();
+    for (0 ..< w_count[n]) |i| {
+        if branches and i > 0 { co_undo_written(mark); };
+        co_reads_first(w_kid(n, i), s);
+        if branches and i == 0 and op != Op.Try.to_i32() { mark = co_written_log.len(); };
+    };
+    if maybe or branches { co_undo_written(mark); };
+    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and co_written[w_a[n]] == 0 {
+        co_written[w_a[n]] = 1;
+        co_written_log.push(w_a[n]);
     };
 }
 
