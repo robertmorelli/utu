@@ -523,6 +523,7 @@ let i32_sub: I32 = 107;
 let i32_mul: I32 = 108;
 let i32_div_s: I32 = 109;
 let i32_and: I32 = 113;
+let i32_or: I32 = 114;
 let i32_xor: I32 = 115;
 let i32_shl: I32 = 116;
 let i32_shr_u: I32 = 118;

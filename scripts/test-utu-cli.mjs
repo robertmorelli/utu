@@ -136,7 +136,8 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     divide: ['fn div(a: I32, b: I32) I32 {\n    a / b;\n}\nexport main() I32 { div(7, 0); }\n', 'Integer division by zero', '2:5', 'div'],
     bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:5', 'at'],
     null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Null', '2:5', 'pick'],
-    arm: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'No arm for the value', '5:5', 'name'],
+    // (A safe build stops at from_i32, before the match could miss.)
+    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'Color.from_i32: no variant has this value', '7:26', 'Color.from_i32'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
     await write(`${name}.utu`, source);

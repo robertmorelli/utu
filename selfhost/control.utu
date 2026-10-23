@@ -115,11 +115,19 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let last_arm = arm_nodes.len();
     // A pattern already reported, or an arm naming no variant, is the mistake: what it misses is no news.
     if default_ < 0 and not faulted and not unknown_arm { match_exhaustive(node, st, first_arm, last_arm); };
+    // Arms of different variants: their enum (as for `if`).
+    let want_t = expect;
+    if expect < 0 and not looping {
+        let from = join_nodes.len();
+        for (first_arm ..< last_arm) |k| { join_nodes.push(last_child(arm_nodes[k])); };
+        if default_ >= 0 { join_nodes.push(last_child(default_)); };
+        want_t = branch_join(from, cx);
+    };
     let t = -1;
     if looping {
         t = loop_match(s, st, first_arm, last_arm, default_, cx);
     } else {
-        t = dispatch(s, st, first_arm, last_arm, default_, expect, cx, false);
+        t = dispatch(s, st, first_arm, last_arm, default_, want_t, cx, false);
     };
     arm_nodes.resize(first_arm);
     arm_values.resize(first_arm);
@@ -453,6 +461,60 @@ fn check_null_expr(node: I32, cx: Cx) I32 {
 }
 
 /// Whether a node is the literal `null`.
+/// Branches (blocks or expressions) whose values a choice joins, from a mark.
+vec join_nodes: I32;
+
+/// With nothing expected, the type the branches pushed on `join_nodes` since
+/// `from` join to, when the first alone cannot say: variants of one enum
+/// (`C {…}` and `R {…}` are an Sh), or null beside a reference (a `?T`).
+/// Else -1. Only when a branch is `null` or `T {…}` are any typed first.
+fn branch_join(from: I32, cx: Cx) I32 {
+    let n = join_nodes.len();
+    let shaped = false;
+    for (from ..< n) |k| {
+        let v = branch_value(join_nodes[k]);
+        if is_null_literal(v) or is_kind(v, Node.Struct_init) { shaped = true; };
+    };
+    let has_null = false;
+    let differ = false;
+    let t = -1;
+    let k = from;
+    while (shaped and k < n) {
+        let b = join_nodes[k];
+        if is_null_literal(branch_value(b)) {
+            has_null = true;
+        } else {
+            let bt = type_only(b, -1, cx);
+            if ty_is(bt, Ty.Error) { shaped = false; }
+            else if not ty_is(bt, Ty.Never) and bt != t {
+                if t >= 0 { differ = true; };
+                t = if t < 0 { bt; } else { enum_join(t, bt); };
+                if t < 0 { shaped = false; };
+            };
+        };
+        k += 1;
+    };
+    join_nodes.resize(from);
+    if not shaped or t < 0 or not (has_null or differ) { return -1; };
+    if has_null { return if vt_is_ref(repr(t)) { nullable(t); } else { -1; }; };
+    t;
+}
+
+/// The value of a branch: a block's last expression, or the branch itself.
+fn branch_value(b: I32) I32 { if is_kind(b, Node.Block) { last_child(b); } else { b; }; }
+
+/// The enum two of its variants (or it) belong to, or -1.
+fn enum_join(a: I32, b: I32) I32 {
+    let ea = enum_of(ty_decl(a));
+    if ea < 0 or ea != enum_of(ty_decl(b)) or ty_inst(a) != ty_inst(b) { return -1; };
+    named(ea, ty_inst(a));
+}
+
+fn enum_of(d: I32) I32 {
+    if decl_is(d, Decl.Variant) and decl_is(decl_owner[d], Decl.Enum) { return decl_owner[d]; };
+    if decl_is(d, Decl.Enum) { d; } else { -1; };
+}
+
 fn is_null_literal(node: I32) Bool {
     is_kind(node, Node.Literal) and first_child(node) < 0 and tok_word[node_first[node]] == Kw.Null.to_i32();
 }

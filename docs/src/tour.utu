@@ -1166,7 +1166,11 @@ mod tour {
                 code {
                     "else";
                 }
-                " it is a statement.";
+                " it is a statement. Branches that make different variants of one enum join to the enum, and ";
+                code {
+                    "null";
+                }
+                " beside a reference joins to its nullable type.";
             }
             = code.block(if_sample());
             = code.block(if_statement_sample());
@@ -1299,7 +1303,11 @@ mod tour {
                 code {
                     "match";
                 }
-                ".";
+                ". In a safe build, ";
+                code {
+                    "Level.from_i32(v)";
+                }
+                " traps when no variant has the value v.";
             }
             = code.block(enum_sample());
             = code.block(enum_tag_sample());

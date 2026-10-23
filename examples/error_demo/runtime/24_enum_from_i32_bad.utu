@@ -1,5 +1,5 @@
 // What: converting an out-of-range integer to an int enum
-// Expect: trap: 7 is not a Level (Low=0, Mid=1, High=9)
+// Expect: Level.from_i32: no variant has this value
 enum(U8) Level:
     | Low
     | Mid

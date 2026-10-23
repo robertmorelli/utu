@@ -1,0 +1,12 @@
+// What: a method two protocols both give a type, called on the type
+// Expect: name is both Pa's and Pb's
+proto Pa:
+    | name() Str
+proto Pb:
+    | name() Str
+struct X[Pa, Pb]:
+    | id: I32
+fn Pa[X].name |x| () Str { "a"; }
+fn Pb[X].name |x| () Str { "b"; }
+
+export main() Str { X { id: 1 }.name(); }

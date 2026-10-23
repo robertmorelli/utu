@@ -1,5 +1,5 @@
 // What: a generic module used with no type arguments (Stack instead of Stack[I32])
-// Expect: Module 'Stack' expects 1 type argument(s), got 0
+// Expect: Stack takes 1 type arguments, given 0
 mod Stack[T] {
     struct &:
         | items: Array[T]

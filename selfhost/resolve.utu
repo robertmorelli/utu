@@ -234,6 +234,9 @@ enum(U8) Diag:
     | NewNotHost
     | GeneratorExport
     | HostMissing
+    | UsingTwice
+    | AmbiguousMethod
+    | ImplNothing
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -337,6 +340,7 @@ fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
     diag_a.push(a);
     diag_b.push(b);
     diag_c.push(c);
+    instance_note();
 }
 
 /// The diagnostics with a node, by node, kind, and word: open addressing
@@ -443,7 +447,12 @@ fn members_reset(capacity: I32) void {
     for (0 ..< capacity) |i| { member_key[i] = -1; };
     member_fill.resize(1);
     member_fill[0] = 0;
+    method_twice.clear();
 }
+
+/// Pairs: `fn Pa[T].m` and `fn Pb[T].m`, two protocols' m for one T, which
+/// `t.m()` cannot choose between.
+vec method_twice: I32;
 
 /// Add a member; returns the declaration already there under that name, or -1.
 fn add_member(owner: I32, name: I32, space: Space, decl: I32) I32 {
@@ -1337,6 +1346,7 @@ fn walk_using(item: I32, w: Walk) void {
     // An import's module is in the file it imports (see @bind_import).
     let module = if using_path(item) >= 0 { node_decl[n]; } else { lookup(word_of(n)); };
     if decl_is(module, Decl.Alias) { module = decl_a[module]; };
+    module = module_named(module);
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
         report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
         return;
@@ -1369,7 +1379,13 @@ fn register_method(item: I32, w: Walk) void {
         // `fn P[T].m`: also a method of T, so calls on a T find it.
         if decl_is(owner, Decl.Proto) {
             let n = impl_target(args);
-            if n >= 0 and node_decl[n] >= 0 { add_member(node_decl[n], word_of(method), Space.Method, decl); };
+            if n >= 0 and node_decl[n] >= 0 {
+                let prior = add_member(node_decl[n], word_of(method), Space.Method, decl);
+                if prior >= 0 and decl_is(decl_a[prior], Decl.Proto) and decl_a[prior] != owner {
+                    method_twice.push(prior);
+                    method_twice.push(decl);
+                };
+            };
         };
     };
     if owner >= 0 {
@@ -1425,6 +1441,8 @@ fn walk_type_name(node: I32, w: Walk) I32 {
         if not builtin_type(word) { report_unknown(Diag.UnknownType, n, word, Seek.Type); };
         return -1;
     };
+    // An alias's instance is its type's (see @type_path).
+    if decl_is(decl, Decl.Alias) { node_alias[n] = decl; };
     let t = promoted(decl);
     node_decl[n] = t;
     t;
@@ -1514,13 +1532,18 @@ fn walk_module_name(node: I32) I32 {
         decl = decl_a[decl];
     };
     // Inside `mod G[T]`, G is its type `&`: in `G[T]`, the module.
-    if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl = decl_owner[decl]; };
+    decl = module_named(decl);
     if not decl_is(decl, Decl.Module) and not decl_is(decl, Decl.Foreign) {
         report_unknown(Diag.UnknownModule, n, word, Seek.Module);
         return -1;
     };
     node_decl[n] = decl;
     decl;
+}
+
+/// An open `M` binds M's name to its type `&`; as a module name, it is M.
+fn module_named(decl: I32) I32 {
+    if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl_owner[decl]; } else { decl; };
 }
 
 fn walk_type_item(item: I32, w: Walk) void {
@@ -1999,5 +2022,7 @@ fn static_member(owner: I32, word: I32) I32 {
     found = member(owner, word, Space.Method);
     if found >= 0 { return found; };
     if decl_is(owner, Decl.Module) and decl_a[owner] >= 0 { return static_member(decl_a[owner], word); };
+    // `B.wrap` with B open, where B names its type `&`: B's function.
+    if module_named(owner) != owner { return member(module_named(owner), word, Space.Member); };
     -1;
 }

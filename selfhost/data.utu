@@ -252,9 +252,13 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         if first_elem < 0 { elem = prelude(Prelude.I32); };
         let c = first_elem;
         let has_null = false;
+        let null_at = -1;
         let from = -1;
         while (c >= 0) {
-            if is_null_literal(c) { has_null = true; } else if elem < 0 {
+            if is_null_literal(c) {
+                has_null = true;
+                if null_at < 0 { null_at = c; };
+            } else if elem < 0 {
                 elem = type_only(c, -1, cx);
                 from = c;
             };
@@ -267,6 +271,12 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
             let me = w_mark();
             discard(check_expr(from, -1, cx));
             w_stack.resize(me);
+            return error_value();
+        };
+        if has_null and not vt_is_ref(repr(elem)) {
+            // `[null]`: nothing says what may be null; `[1, null]`: a scalar has no null.
+            if from < 0 { report(Diag.BareNull, null_at, -1); }
+            else { report(Diag.InvalidNullableType, null_at, intern_text(type_text(elem))); };
             return error_value();
         };
         if has_null { elem = nullable(elem); };

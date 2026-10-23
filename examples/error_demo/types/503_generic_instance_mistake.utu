@@ -1,0 +1,10 @@
+// What: a generic function's body wrong for one instance
+// Expect: No + for Bool, with a note: in G[Bool], and the call that made it
+mod G[T] {
+    fn twice(x: T) T { x + x; }
+}
+
+export main() I32 {
+    G[Bool].twice(true);
+    0;
+}

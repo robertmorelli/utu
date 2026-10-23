@@ -1987,6 +1987,18 @@ ok
 12 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/500_unfinished_pipeline_in_chain.utu
+ ERROR  Unfinished pipeline: map
+        iterator-unfinished · examples/error_demo/iterators/500_unfinished_pipeline_in_chain.utu:5:14
+
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3];
+ 5 │     xs chain(xs map |x| { x * 2; }) sum;
+   │              ━━━━━━━━━━━━━━━━━━━━━
+   │              ╰─ here
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/iterators/50_generator_pass_through_transform.utu
  ERROR  depths passes its values straight through
         generator-pass-through · examples/error_demo/iterators/50_generator_pass_through_transform.utu:8:24
@@ -3326,6 +3338,43 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/500_module_opened_twice.utu
+ ERROR  cell[I32] is open already
+        using-twice · examples/error_demo/names/500_module_opened_twice.utu:9:11
+
+ 7 │ }
+ 8 │ using cell[I32];
+ 9 │ using cell[Str];
+   │           ━━━━━
+   │           ╰─ needs |alias|
+10 │
+11 │ export main() I32 { wrap(4).value; }
+--- exit 1
+
+=== utu check examples/error_demo/names/501_method_of_two_protocols.utu
+ ERROR  name is both Pa's and Pb's
+        ambiguous-method · examples/error_demo/names/501_method_of_two_protocols.utu:12:33
+
+10 │ fn Pb[X].name |x| () Str { "b"; }
+11 │
+12 │ export main() Str { X { id: 1 }.name(); }
+   │                                 ━━━━
+   │                                 ╰─ as which protocol?
+--- exit 1
+
+=== utu check examples/error_demo/names/502_impl_for_one_instance.utu
+ ERROR  Box's instances implement P together: fn P[&].m in Box
+        impl-nothing · examples/error_demo/names/502_impl_for_one_instance.utu:9:6
+
+ 7 │         | v: T
+ 8 │ }
+ 9 │ fn P[Box[I32]].m |b| () I32 { b.v; }
+   │      ━━━━━━━━
+   │      ╰─ an instance
+10 │
+11 │ export main() I32 { 0; }
+--- exit 1
+
 === utu check examples/error_demo/names/50_duplicate_local_shadow_param.utu
 ok
 --- exit 0
@@ -3583,18 +3632,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/70_module_arity_missing.utu
- ERROR  depth takes Stack, got Stack[I32]
-        type-mismatch · examples/error_demo/names/70_module_arity_missing.utu:13:11
+ ERROR  Stack takes 1 type arguments, given 0
+        invalid-module-arity · examples/error_demo/names/70_module_arity_missing.utu:10:13
 
+ 8 │ }
+ 9 │
 10 │ fn depth(s: Stack) I32 { s.size; }
-   │          ────────
-   │          ╰─ Stack
+   │             ━━━━━
+   │             ╰─ here
 11 │
 12 │ export main() I32 {
-13 │     depth(Stack[I32].new(0));
-   │           ━━━━━━━━━━━━━━━━━
-   │           ╰─ Stack[I32]
-14 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/71_module_arity_too_many.utu
@@ -5611,8 +5658,20 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/24_enum_from_i32_bad.utu
-?
---- exit 0
+ TRAP  Level.from_i32: no variant has this value
+       trap · examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
+
+ 7 │
+ 8 │ export main() Str {
+ 9 │     let l = Level.from_i32(7);
+   │             ━━━━━━━━━━━━━━━━━
+   │             ╰─ here
+10 │     Level.name(l);
+11 │ }
+
+  in Level.from_i32  examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
+  in main  examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
+--- exit 1
 
 === utu run examples/error_demo/runtime/25_es_returns_wrong_struct.utu
  ERROR  type incompatibility when transforming from/to JS
@@ -5800,18 +5859,18 @@ Node.js v25.8.1
 --- exit 1
 
 === utu run examples/error_demo/runtime/362_match_no_arm.utu
- TRAP  No arm for the value
-       trap · examples/error_demo/runtime/362_match_no_arm.utu:8:5
+ TRAP  Level.from_i32: no variant has this value
+       trap · examples/error_demo/runtime/362_match_no_arm.utu:12:11
 
- 6 │
- 7 │ fn label(l: Level) I32 {
- 8 │     match l { Level.Low => 1, Level.High => 2, };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 9 │ }
+10 │
+11 │ export main() I32 {
+12 │     label(Level.from_i32(7));
+   │           ━━━━━━━━━━━━━━━━━
+   │           ╰─ here
+13 │ }
 
-  in label  examples/error_demo/runtime/362_match_no_arm.utu:8:5
-  in main  examples/error_demo/runtime/362_match_no_arm.utu:12:5
+  in Level.from_i32  examples/error_demo/runtime/362_match_no_arm.utu:12:11
+  in main  examples/error_demo/runtime/362_match_no_arm.utu:12:11
 --- exit 1
 
 === utu test examples/error_demo/runtime/40_test_one_failing.utu
@@ -7569,6 +7628,17 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │              ╰─ on a generic type
  8 │         | v: T
  9 │ }
+
+ ERROR  Box's instances implement Sh together: fn Sh[&].name in Box
+        impl-nothing · examples/error_demo/types/103_generic_lists_protocol.utu:11:7
+
+ 9 │ }
+10 │
+11 │ fn Sh[Box[I32]].name |b| () I32 { 1; }
+   │       ━━━━━━━━
+   │       ╰─ an instance
+12 │
+13 │ export main() I32 { 0; }
 --- exit 1
 
 === utu check examples/error_demo/types/104_proto_get_only_write.utu
@@ -8007,6 +8077,12 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │                           ╰─ T is unbounded
  9 │         best;
 10 │     }
+   ┆
+14 │     Largest[I32].of([3, 9, 4]);
+   │     ──────────────────────────
+   │     ╰─ as Largest[I32] here
+
+  note  in Largest[I32]
 
   fix   bound T by Ord
  5 │ mod Largest[T[Ord]] {
@@ -8342,6 +8418,54 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │     ━━━━━━━━━━━━━
    │     ╰─ no such method
 12 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/501_alias_instance_field_type.utu
+ ERROR  Field v is I32, got Str
+        type-mismatch · examples/error_demo/types/501_alias_instance_field_type.utu:10:23
+
+ 5 │         | v: T
+   │           ────
+   │           ╰─ I32
+   ┆
+ 8 │
+ 9 │ export main() I32 {
+10 │     let c: bi = &{ v: "hello" };
+   │                       ━━━━━━━
+   │                       ╰─ Str
+11 │     c.v;
+12 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/502_array_null_beside_scalar.utu
+ ERROR  I32 cannot be nullable
+        invalid-nullable-type · examples/error_demo/types/502_array_null_beside_scalar.utu:4:9
+
+ 2 │ // Expect: I32 cannot be nullable
+ 3 │ export main() I32 {
+ 4 │     [1, null, 3].len();
+   │         ━━━━
+   │         ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/503_generic_instance_mistake.utu
+ ERROR  No + for Bool
+        unknown-operator · examples/error_demo/types/503_generic_instance_mistake.utu:4:24
+
+ 2 │ // Expect: No + for Bool, with a note: in G[Bool], and the call that made it
+ 3 │ mod G[T] {
+ 4 │     fn twice(x: T) T { x + x; }
+   │                        ━━━━━
+   │                        ╰─ Bool
+ 5 │ }
+ 6 │
+   ┆
+ 8 │     G[Bool].twice(true);
+   │     ───────────────────
+   │     ╰─ as G[Bool] here
+
+  note  in G[Bool]
 --- exit 1
 
 === utu check examples/error_demo/types/50_unknown_method_str.utu

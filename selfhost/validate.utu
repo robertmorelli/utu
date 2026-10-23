@@ -115,6 +115,7 @@ fn validate_program() void {
     int_enum_values();
     validate_protocols();
     validate_bounds();
+    validate_impls();
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
             report2(Diag.ParseError, -1, file, file_error[file], file_wanted[file]);

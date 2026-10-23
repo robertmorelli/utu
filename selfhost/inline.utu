@@ -78,7 +78,19 @@ fn inline_into(f: I32) void {
 /// A function whose body can be copied into a caller.
 fn inlinable(g: I32) Bool {
     func_kind[g] == FuncKind.Defined.to_i32() and func_body[g] >= 0 and func_code[g] < 0
-        and vl_len[ht_b[func_type_of[g]]] <= 1 and not has_op(func_body[g], Op.ReturnCall.to_i32());
+        and vl_len[ht_b[func_type_of[g]]] <= 1 and not has_op(func_body[g], Op.ReturnCall.to_i32())
+        and not traps_by_name(g);
+}
+
+/// Whether a trap in g says what failed by g's name, as a frame of its own
+/// (`Tag.from_i32`: see enum_from_helper).
+fn traps_by_name(g: I32) Bool {
+    let i = 1;
+    while (i < from_helper_enum.len()) {
+        if from_helper_enum[i] == g { return true; };
+        i += 2;
+    };
+    false;
 }
 
 /// Call `c` in `f`, to `g`, becomes a block of g's body. `label` is the

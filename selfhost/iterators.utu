@@ -1112,8 +1112,15 @@ fn other_array(p: Pipe, k: I32, expect: I32, cx: Cx) I32 {
         if not ty_is(ot, Ty.Error) {
             report2(Diag.IteratorSource, param, stage_op(p, k), ot, 1);
             diag_label(type_text(ot));
+        } else {
+            // What is wrong with it (an unfinished pipeline), which type_only dropped.
+            let me = w_mark();
+            discard(check_expr(param, -1, cx));
+            w_stack.resize(me);
         };
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        // The stages after it are not checked: the pipeline has no type to give.
+        p.result_type = ty_error();
         return -1;
     };
     let other = stage_local(p.first_stage + k, 0, repr(ot));
@@ -1449,6 +1456,13 @@ fn add_values(t: I32, m: I32, at: I32, cx: Cx) void { finish_operator(known_word
 /// Both operands on the stack since `m`: apply the type's operator.
 fn finish_operator(word: I32, t: I32, at: I32, cx: Cx, m: I32) void {
     let decl = member(ty_decl(t), word, Space.Operator);
+    // Built in, as binary operators have them: an integer enum's or distinct
+    // type's comparisons, a host value's ==.
+    if decl < 0 and is_scalar_kind(ty_decl(t)) and scalar_compare(ty_decl(t), word, m) { return; };
+    if decl < 0 and is_foreign_or_nullable(t) and word == known_word(Known.Eq) {
+        foreign_equal_op(t, t, true, m);
+        return;
+    };
     if decl < 0 {
         if not ty_is(t, Ty.Error) { report2(Diag.UnknownOperator, at, word, t, -1); };
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
@@ -2355,7 +2369,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let keys = buffer_at(p, slot, 0, kt, -1, false);
     let out = buffer_at(p, slot, 3, group_t, -1, false);
     let lengths = if grouping { buffer_at(p, slot, 6, prelude(Prelude.I32), -1, false); } else { keys; };
-    let hashed = key_hash_kind(key_node);
+    let hashed = key_hash_kind(kt);
     let mask = stage_local(slot, 9, vt_i32);
     let slots = stage_local(slot, 10, repr(array_of(prelude(Prelude.I32))));
     let sheap = vt_heap(cur_locals[slots]);
@@ -2558,12 +2572,13 @@ fn grow_size(size: I32) void {
     select_i32(m);
 }
 
-/// 1: I32 or U32 keys, 2: I64 or U64, 0: others (by the written key type).
-fn key_hash_kind(key_node: I32) I32 {
-    let w = written_word(key_node);
-    if w < 0 { return 0; };
-    if w == intern_text("I32") or w == intern_text("U32") { return 1; };
-    if w == intern_text("I64") or w == intern_text("U64") { return 2; };
+/// 1: 32-bit integer keys, 2: 64-bit ones (I32 … U64, and the integer enums
+/// and distinct types over them), 0: others.
+fn key_hash_kind(kt: I32) I32 {
+    let d = ty_decl(kt);
+    let base = if is_scalar_kind(d) { scalar_base(d); } else { kt; };
+    if base == prelude(Prelude.I32) or base == prelude(Prelude.U32) { return 1; };
+    if base == prelude(Prelude.I64) or base == prelude(Prelude.U64) { return 2; };
     0;
 }
 

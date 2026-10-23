@@ -260,6 +260,9 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.YieldPlace or k == Diag.GeneratorExport { return "invalid-for-source"; };
     if k == Diag.NewNotHost { return "not-callable"; };
     if k == Diag.HostMissing { return "unknown-import"; };
+    if k == Diag.UsingTwice { return "duplicate-declaration"; };
+    if k == Diag.AmbiguousMethod { return "unknown-method"; };
+    if k == Diag.ImplNothing { return "unknown-method"; };
     "type-mismatch";
 }
 
@@ -485,6 +488,9 @@ fn diag_text(i: I32) Str {
         Diag.MainParams => "main takes no parameters",
         Diag.TestName => pick(a == 1, "Empty test name", "Duplicate test " + node_text(node)),
         Diag.TooManyParams => pick(word < 0, "main", w) + " has " + int_text(a) + " parameters (max 1000)",
+        Diag.UsingTwice => w + node_text(a) + " is open already",
+        Diag.AmbiguousMethod => w + " is both " + decl_text(decl_a[a]) + "'s and " + decl_text(decl_a[b]) + "'s",
+        Diag.ImplNothing => decl_text(a) + "'s instances implement " + decl_text(b) + " together: fn " + decl_text(b) + "[&]." + w + " in " + decl_text(a),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -669,6 +675,9 @@ fn diag_default_label(i: I32) Str {
         Diag.TagEnumValue => "no value here",
         Diag.BareNull => "no type",
         Diag.NotCallable => "not a function",
+        Diag.UsingTwice => "needs |alias|",
+        Diag.AmbiguousMethod => "as which protocol?",
+        Diag.ImplNothing => "an instance",
         Diag.ParseError => if b >= 0 { word_text(b) + "?"; } else { "unexpected"; },
         Diag.ProtoGeneric => "on a generic type",
         Diag.SelfUntyped => "type not known yet",
