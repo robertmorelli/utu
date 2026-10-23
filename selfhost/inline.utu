@@ -717,6 +717,8 @@ vec sr_path: I32;
 vec sr_locals: I32;
 /// By function: whether a call in it now gives fields.
 vec sr_changed: U8;
+/// By function: whether it calls a candidate (only those are weighed).
+vec sr_calls: U8;
 
 /// Whether any function now returns fields (the caller sweeps again).
 fn struct_returns() Bool {
@@ -731,6 +733,9 @@ fn struct_returns() Bool {
         sr_twin[f] = -1;
         sr_changed[f] = 0;
     };
+    // (Candidates only drop, so a function calling none never counts.)
+    sr_calls.resize(n);
+    for (0 ..< n) |f| { sr_calls[f] = if optimizable(f) and sr_calls_candidate(func_body[f]) { 1; } else { 0; }; };
     // To a fixpoint: a return of a call is of fields while the callee's is,
     // and a function returns fields where its calls gain by it.
     while (true) {
@@ -792,7 +797,7 @@ fn sr_weigh(n: I32) Bool {
         sr_loss[f] = 0;
     };
     for (0 ..< n) |h| {
-        if optimizable(h) {
+        if sr_calls[h] == 1 {
             // (A candidate's walk notes what it returns.)
             if sr_type[h] < 0 or not sr_returns(h, sr_type[h]) {
                 current_fold_function[0] = h;
@@ -819,6 +824,13 @@ fn sr_weigh(n: I32) Bool {
         };
     };
     dropped;
+}
+
+/// Whether a call under `n` is to a candidate.
+fn sr_calls_candidate(n: I32) Bool {
+    if w_op[n] == Op.Call.to_i32() and sr_type[w_a[n]] >= 0 { return true; };
+    for (0 ..< w_count[n]) |i| { if sr_calls_candidate(w_kid(n, i)) { return true; }; };
+    false;
 }
 
 /// Whether call `c` (at `k` in the walk) would make no struct: it is

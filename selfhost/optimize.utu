@@ -177,10 +177,14 @@ fn propagate_copies(params: I32) Bool {
                 if p < params and opt_sets[p] == 0 and single_value(t) {
                     opt_copy_of[l] = p;
                     opt_copy_type[l] = t;
+                    changed = true;
                 };
             };
         };
     };
+    // (No copy: no walk.)
+    if not changed { return false; };
+    changed = false;
     for (0 ..< opt_nodes.len()) |k| {
         let n = opt_nodes[k];
         if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
@@ -346,7 +350,9 @@ fn remove_unused_locals(f: I32, params: I32, total: I32) void {
             kept += 1;
         };
     };
-    if kept != total - params { func_local_count[f] = kept; };
+    // (Every local read: nothing goes, nothing is renumbered.)
+    if kept == total - params { return; };
+    func_local_count[f] = kept;
     unused_walk(f, func_body[f], -1, 0, params);
 }
 

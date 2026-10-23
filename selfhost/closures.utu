@@ -910,11 +910,15 @@ fn named_fn(written: I32) I32 {
 /// reported when it awaits.
 fn host_callbacks(decl: I32, args: I32, first: I32) void {
     if args < 0 { return; };
-    let decls = if decl >= 0 { param_decls(decl); } else { -1; };
+    // (The parameters, made at the first closure: most calls pass none.)
+    let decls = -1;
     let i = first;
     let a = first_child(args);
     while (a >= 0) {
-        if (closure_node(a) >= 0 or named_fn(a) >= 0) and (decl < 0 or (i < vl_len[decls] and to_host(decl, vl_item(decls, i)))) { host_callback(a); };
+        if closure_node(a) >= 0 or named_fn(a) >= 0 {
+            if decl >= 0 and decls < 0 { decls = param_decls(decl); };
+            if decl < 0 or (i < vl_len[decls] and to_host(decl, vl_item(decls, i))) { host_callback(a); };
+        };
         i += 1;
         a = next_sibling(a);
     };
@@ -1012,6 +1016,14 @@ fn lean_closures() void {
         plain = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m), vl_one(vt_externref)));
         closure_new_func[0] = plain;
     };
+    // (By function, once: a scan of the invokers at every call is slow.)
+    lean_invoker.resize(func_kind.len());
+    for (0 ..< func_kind.len()) |f| { lean_invoker[f] = 0; };
+    let k = 1;
+    while (k < closure_invokers.len()) {
+        lean_invoker[closure_invokers[k]] = 1;
+        k += 2;
+    };
     for (0 ..< func_kind.len()) |f| {
         if func_kind[f] == FuncKind.Defined.to_i32() and func_body[f] >= 0 and f != helper_ and not is_invoker(f) { retarget(func_body[f], helper_, plain); };
     };
@@ -1033,14 +1045,10 @@ fn lean_closures() void {
     closure_parts[2] = -1;
 }
 
-fn is_invoker(f: I32) Bool {
-    let i = 1;
-    while (i < closure_invokers.len()) {
-        if closure_invokers[i] == f { return true; };
-        i += 2;
-    };
-    false;
-}
+/// By function (as @lean_closures sets it): 1 for an invoker.
+vec lean_invoker: U8;
+
+fn is_invoker(f: I32) Bool { f < lean_invoker.len() and lean_invoker[f] == 1; }
 
 /// Under `node`: calls of an invoker go to its closure_call import, and of
 /// @closure_new's helper to `plain`.
