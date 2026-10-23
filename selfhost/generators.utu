@@ -84,6 +84,10 @@ fn reset_generators() void {
     gen_decl.clear();
     gen_defers.clear();
     gen_rec.clear();
+    aside_decls.clear();
+    aside_at.clear();
+    aside_defers.clear();
+    aside_vals.clear();
     own_gens.clear();
     used_gens.clear();
     rec_kind.clear();
@@ -183,22 +187,63 @@ fn generator_decls(gen: I32) I32 {
     vl_end(m);
 }
 
+// What @set_aside kept, innermost last: the list, where its values start
+// in @aside_vals ([local, type] each), and the defers pending then.
+vec aside_decls: I32;
+vec aside_at: I32;
+vec aside_defers: I32;
+vec aside_vals: I32;
+
 /// Set aside the locals and types of declarations `decls` (a list), in case
-/// an outer expansion of their generator is running: [local, type] each.
-fn set_aside(decls: I32) Array[I32] {
-    let saved = Array[I32].new(vl_len[decls] * 2, 0);
+/// an outer expansion of their generator is running.
+fn set_aside(decls: I32) void {
+    aside_decls.push(decls);
+    aside_at.push(aside_vals.len());
+    aside_defers.push(defer_node.len());
     for (0 ..< vl_len[decls]) |i| {
-        saved[i * 2] = decl_local[vl_item(decls, i)];
-        saved[i * 2 + 1] = decl_ty[vl_item(decls, i)];
+        aside_vals.push(decl_local[vl_item(decls, i)]);
+        aside_vals.push(decl_ty[vl_item(decls, i)]);
     };
-    saved;
 }
 
-/// Bring back what @set_aside kept.
-fn bring_back(decls: I32, saved: Array[I32]) void {
+/// Bring back what the innermost @set_aside kept.
+fn bring_back() void {
+    let k = aside_decls.len() - 1;
+    swap_aside(k);
+    aside_vals.resize(aside_at[k]);
+    aside_decls.resize(k);
+    aside_at.resize(k);
+    aside_defers.resize(k);
+}
+
+/// Swap set-aside entry k's values with the declarations' current ones.
+fn swap_aside(k: I32) void {
+    let decls = aside_decls[k];
+    let at = aside_at[k];
     for (0 ..< vl_len[decls]) |i| {
-        decl_local[vl_item(decls, i)] = saved[i * 2];
-        decl_ty[vl_item(decls, i)] = saved[i * 2 + 1];
+        let d = vl_item(decls, i);
+        let l = decl_local[d];
+        let t = decl_ty[d];
+        decl_local[d] = aside_vals[at + i * 2];
+        decl_ty[d] = aside_vals[at + i * 2 + 1];
+        aside_vals[at + i * 2] = l;
+        aside_vals[at + i * 2 + 1] = t;
+    };
+}
+
+/// Defer i runs (at an exit, or in a guard) with the bindings of when it was
+/// noted: an expansion of its generator begun since (in the consumer) has
+/// set its declarations aside, so they come back while it runs (`back`),
+/// innermost first, and go again after (`back` false), outermost first.
+fn defer_bindings(i: I32, back: Bool) void {
+    let n = aside_decls.len();
+    let from = n;
+    while (from > 0 and aside_defers[from - 1] > i) { from -= 1; };
+    if back {
+        let k = n - 1;
+        while (k >= from) { swap_aside(k); k -= 1; };
+    } else {
+        for (from ..< n) |k| { swap_aside(k); };
     };
 }
 
@@ -287,7 +332,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         return check_recursive_loop(node, call, gen, cap, elem, inst, cx);
     };
     let decls = generator_decls(gen);
-    let saved = set_aside(decls);
+    set_aside(decls);
     // Before the parameters are bound: a captured one may be a box.
     mark_boxes(fn_body(gen));
     // The receiver into self.
@@ -316,6 +361,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     if a >= 0 or p >= 0 {
         report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args));
         w_stack.resize(m);
+        bring_back();
         return error_value();
     };
     // The generation.
@@ -331,7 +377,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     show_loops(loops);
     w_node(Op.Block, vt_none, whole, 0, mb);
     end_expansion();
-    bring_back(decls, saved);
+    bring_back();
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
 }
@@ -761,7 +807,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     };
     let np = child_count(params);
     let decls = generator_decls(gen);
-    let saved = set_aside(decls);
+    set_aside(decls);
     let m = w_mark();
     // The parameters' types, and the roots: the call's arguments.
     let mt = vl_begin();
@@ -925,7 +971,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     w_leaf(Op.Br, vt_unreachable, again, 0);
     w_node(Op.Loop, vt_none, again, 0, ml);
     w_node(Op.Block, vt_none, whole, 0, mw);
-    bring_back(decls, saved);
+    bring_back();
     seq_void(m);
     ty_void();
 }
