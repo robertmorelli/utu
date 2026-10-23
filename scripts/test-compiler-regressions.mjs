@@ -677,6 +677,9 @@ export lib {
     // Getter, setter and method dispatch through a protocol value, over two implementers.
     ['proto C:\n    | get set n: I32\n    | step(I32) I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | tag: I32\n    | n: I32\nfn C[A].step |a| (k: I32) I32 { a.n + k; }\nfn C[B].step |b| (k: I32) I32 { b.n * k + b.tag; }\n'
       + 'export lib { fn run() I32 { let xs: Array[C] = [A { n: 1 }, B { tag: 7, n: 2 }]; let t = 0; for (xs) |c| { c.n = c.n + 10; c.n += 1; t = t * 100 + c.step(3) + c.n; }; t; } }\n', 2759],
+    // `| get n` and `| set n` on two lines are one member: read, written, and `op=` (`set` then `get` too).
+    ['proto C:\n    | get n: I32\n    | set n: I32\nstruct S[C]:\n    | n: I32\nexport lib { fn run() I32 { let c: C = S { n: 1 }; c.n = 5; c.n; } }\n', 5],
+    ['proto C:\n    | set n: I32\n    | get n: I32\nstruct S[C]:\n    | n: I32\nexport lib { fn run() I32 { let c: C = S { n: 1 }; c.n = 5; c.n += 4; c.n; } }\n', 9],
     // Struct literal fields run in the order written.
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
@@ -1322,6 +1325,9 @@ export lib {
     // Protocol get and set.
     ['proto Sh:\n    | get size: I32\nstruct Sq[Sh]:\n    | size: I32\nexport lib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size = 5; 0; } }\n', 'Sh.size is get-only'],
     ['proto Sh:\n    | set size: I32\nstruct Sq[Sh]:\n    | size: I32\nexport lib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size; } }\n', 'Sh.size is set-only'],
+    // A getter and a setter of one name on two lines must agree; any other repeat is a duplicate.
+    ['proto Sh:\n    | get size: I32\n    | set size: F64\nstruct Sq[Sh]:\n    | size: I32\nexport lib { fn run() I32 { 0; } }\n', 'Sh.size gets I32 but sets F64'],
+    ['proto Sh:\n    | get size: I32\n    | get set size: I32\nstruct Sq[Sh]:\n    | size: I32\nexport lib { fn run() I32 { 0; } }\n', 'Duplicate declaration size'],
     // A member through a protocol value, an implementer lacking it (getter and setter crashed the compiler).
     ['proto C:\n    | get n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nexport lib { fn run() I32 { let c: C = B { m: 1 }; c.n; } }\n', 'B lacks C.n'],
     ['proto C:\n    | get set n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nexport lib { fn run() I32 { let c: C = B { m: 1 }; c.n = 5; c.n += 1; 0; } }\n', 'B lacks C.n'],

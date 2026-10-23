@@ -1,0 +1,13 @@
+// What: a protocol getter and setter of one name, on two lines, with different types
+// Expect: Sh.size gets I32 but sets F64
+proto Sh:
+    | get size: I32
+    | set size: F64
+
+struct Sq[Sh]:
+    | size: I32
+
+export main() I32 {
+    let s: Sh = Sq { size: 2 };
+    s.size;
+}

@@ -104,7 +104,7 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
-    if is_kind(decl_node[pm], Node.Proto_setter) {
+    if not proto_reads(proto, word_of(name)) {
         report2(Diag.ProtoAccess, parent_of(name), word_of(name), 1, proto);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
@@ -129,9 +129,9 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
         return ty_error();
     };
     // `get x` is not written; `set x` is not read, so takes no `op=`.
-    let set_only = is_kind(decl_node[pm], Node.Proto_setter);
-    if is_kind(decl_node[pm], Node.Proto_getter) or (op >= 0 and set_only) {
-        report2(Diag.ProtoAccess, parent_of(name), word_of(name), if set_only { 1; } else { 0; }, proto);
+    let reads = proto_reads(proto, word_of(name));
+    if not proto_writes(proto, word_of(name)) or (op >= 0 and not reads) {
+        report2(Diag.ProtoAccess, parent_of(name), word_of(name), if reads { 0; } else { 1; }, proto);
         check_expr(value, -1, cx);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
@@ -151,6 +151,58 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
     proto_field_chain(implementers(proto), 0, r, word_of(name), ft, v);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
+}
+
+/// Whether a protocol has a getter (`get x`, `get set x`) for `word`.
+fn proto_reads(proto: I32, word: I32) Bool { proto_has(proto, word, Node.Proto_getter); }
+
+/// Whether a protocol has a setter (`set x`, `get set x`) for `word`;
+/// `| get x: T` and `| set x: T` on two lines make one member.
+fn proto_writes(proto: I32, word: I32) Bool { proto_has(proto, word, Node.Proto_setter); }
+
+fn proto_has(proto: I32, word: I32, kind: Node) Bool {
+    let c = first_child(decl_node[proto]);
+    while (c >= 0) {
+        if is_kind(c, Node.Proto_member) {
+            let m = first_child(c);
+            if word_of(first_child(m)) == word and (is_kind(m, kind) or is_kind(m, Node.Proto_get_setter)) { return true; };
+        };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+/// Each member of a protocol once, but a getter and a setter of one type.
+fn validate_proto_members(proto: I32) void {
+    let self_t = decl_type(proto, 0);
+    let c = first_child(decl_node[proto]);
+    while (c >= 0) {
+        if is_kind(c, Node.Proto_member) {
+            let m = first_child(c);
+            let word = word_of(first_child(m));
+            let o = first_child(decl_node[proto]);
+            while (o != c) {
+                let om = first_child(o);
+                if is_kind(o, Node.Proto_member) and word_of(first_child(om)) == word {
+                    let pair = (is_kind(m, Node.Proto_getter) and is_kind(om, Node.Proto_setter))
+                        or (is_kind(m, Node.Proto_setter) and is_kind(om, Node.Proto_getter));
+                    if not pair {
+                        report2(Diag.DuplicateDeclaration, c, word, 0, -1);
+                        diag_place(Extra.Related, o, "first here");
+                    } else if sig_type(last_child(m), self_t) != sig_type(last_child(om), self_t) {
+                        let g = if is_kind(m, Node.Proto_getter) { m; } else { om; };
+                        let st = if is_kind(m, Node.Proto_getter) { om; } else { m; };
+                        report3(Diag.ProtoPairType, c, word, sig_type(last_child(g), self_t), sig_type(last_child(st), self_t), proto);
+                        diag_place(Extra.Related, o, "first here");
+                    };
+                    o = c;
+                } else {
+                    o = next_sibling(o);
+                };
+            };
+        };
+        c = next_sibling(c);
+    };
 }
 
 /// A member whose type has `&` (the implementer's type) read through a
@@ -308,6 +360,7 @@ fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array
 /// Conformance of each type in the program's own files to the protocols it lists.
 fn validate_protocols() void {
     for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Proto) and is_own_file(file_of_token(node_first[decl_node[d]])) { validate_proto_members(d); };
         if (decl_is(d, Decl.Struct) or decl_is(d, Decl.Enum)) and is_own_file(file_of_token(node_first[decl_node[d]])) {
             let list = impl_list_of(d);
             if list >= 0 {

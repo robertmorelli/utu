@@ -10120,6 +10120,33 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 13 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/795_proto_get_set_types_differ.utu
+ ERROR  Sh.size gets I32 but sets F64
+        proto-pair-type · examples/error_demo/types/795_proto_get_set_types_differ.utu:5:7
+
+ 3 │ proto Sh:
+ 4 │     | get size: I32
+   │       ─────────────
+   │       ╰─ first here
+ 5 │     | set size: F64
+   │       ━━━━━━━━━━━━━
+   │       ╰─ one type for get and set
+ 6 │
+ 7 │ struct Sq[Sh]:
+
+ ERROR  Sq lacks Sh.size
+        proto-missing · examples/error_demo/types/795_proto_get_set_types_differ.utu:7:1
+
+ 5 │     | set size: F64
+ 6 │
+ 7 │ struct Sq[Sh]:
+ 8 │     | size: I32
+   │     ━━━━━━━━━━━
+   │     ╰─ here
+ 9 │
+10 │ export main() I32 {
+--- exit 1
+
 === utu check examples/error_demo/types/79_unknown_field_on_str.utu
  ERROR  Str has no field length; did you mean len()?
         unknown-field · examples/error_demo/types/79_unknown_field_on_str.utu:5:5
