@@ -1,0 +1,12 @@
+// What: a protocol method for a type, of a protocol that was never declared
+// Expect: Unknown type Shape, at the impl
+struct Square:
+    | side: I32
+
+fn Shape[Square].area |self| () I32 {
+    self.side * self.side;
+}
+
+export main() I32 {
+    0;
+}

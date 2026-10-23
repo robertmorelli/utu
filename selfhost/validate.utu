@@ -130,81 +130,25 @@ fn validate_program() void {
 
 //! = Modules of one name
 //!
-//! Stage 0 hoists each module's members into one namespace, as `M__f`,
-//! `M.m`, `M:op` (and `M` for its promoted type), so two modules of one
-//! name (an own module named like one of the standard library's, say) may
-//! not declare a member twice. The later declaration is reported.
+//! A module is its file's: two files' `mod util` are two modules (each
+//! file's `using` names its own). Within one file, a name is one module.
 
-/// Report a member that another module of the same name also declares.
+/// Report a module that an earlier one of its file already names.
 fn validate_module_members() void {
     for (0 ..< decl_kind.len()) |b| {
-        // A generic module is instantiated (`M__I32`), not hoisted as itself.
-        // (One named like a prelude module is reported as that.)
-        if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) and prelude_lookup(decl_name[b]) < 0 {
-            for (0 ..< decl_kind.len()) |a| {
-                // (A module a `using` named twice imports is reported there.)
-                if a != b and decl_is(a, Decl.Module) and not is_generic(a) and decl_name[a] == decl_name[b] and module_before(a, b) and not refused(a) and not refused(b) {
-                    let item = first_child(decl_node[b]);
-                    while (item >= 0) {
-                        let name = hoisted_name(b, item);
-                        if name.len() > 0 and module_declares(a, name) { report2(Diag.DuplicateDeclaration, item, -1, 4, b); };
-                        item = next_sibling(item);
-                    };
+        if decl_is(b, Decl.Module) and is_own_file(file_of_token(node_first[decl_node[b]])) {
+            let file = file_of_token(node_first[decl_node[b]]);
+            let a = 0;
+            while (a < b) {
+                if decl_is(a, Decl.Module) and decl_name[a] == decl_name[b] and file_of_token(node_first[decl_node[a]]) == file {
+                    report_twice(b, a);
+                    a = b;
+                } else {
+                    a += 1;
                 };
             };
         };
     };
-}
-
-/// Whether module a comes before module b in stage 0's program: the
-/// standard library's first, then by place.
-fn module_before(a: I32, b: I32) Bool {
-    let fa = file_of_token(node_first[decl_node[a]]);
-    let fb = file_of_token(node_first[decl_node[b]]);
-    let pa = file_role[fa] == FileRole.Prelude.to_i32();
-    let pb = file_role[fb] == FileRole.Prelude.to_i32();
-    if pa != pb { return pa; };
-    decl_node[a] < decl_node[b];
-}
-
-fn module_declares(module: I32, name: Str) Bool {
-    let item = first_child(decl_node[module]);
-    while (item >= 0) {
-        if hoisted_name(module, item) == name { return true; };
-        item = next_sibling(item);
-    };
-    false;
-}
-
-/// The name stage 0 gives item (of module m's declaration) once hoisted, or
-/// "" for what it does not name (usings, comments, …).
-fn hoisted_name(m: I32, item: I32) Str {
-    let module = word_text(decl_name[m]);
-    if is_kind(item, Node.Op_decl) {
-        return hoisted_receiver(m, first_child(item)) + ":" + node_text(next_sibling(first_child(item)));
-    };
-    if is_kind(item, Node.Fn_decl) {
-        let name = first_child(item);
-        if next_sibling(first_child(name)) < 0 { return module + "__" + node_text(name); };
-        return hoisted_receiver(m, first_child(name)) + "." + node_text(last_child(name));
-    };
-    if is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl) or is_kind(item, Node.Proto_decl)
-        or is_kind(item, Node.Type_decl) or is_kind(item, Node.Distinct_decl) or is_kind(item, Node.Global_decl) {
-        let text = node_text(first_child(item));
-        if text == "&" { return module; };
-        return module + "__" + text;
-    };
-    "";
-}
-
-/// A receiver, hoisted: `&` is the module's type, a type of the module is
-/// `M__T`, and any other keeps its name.
-fn hoisted_receiver(m: I32, receiver: I32) Str {
-    let text = node_text(receiver);
-    if text == "&" { return word_text(decl_name[m]); };
-    let t = member(m, word_of(receiver), Space.Member);
-    if t >= 0 and not decl_is(t, Decl.Fn) and not decl_is(t, Decl.Global) { return word_text(decl_name[m]) + "__" + text; };
-    text;
 }
 
 /// Validate each node of the tree, in order.

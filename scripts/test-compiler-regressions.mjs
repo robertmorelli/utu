@@ -1721,6 +1721,15 @@ export lib {
     [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nexport main() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).to_f64(); }\n' }, 10.5],
     // One file's mod, imported twice (two spellings of its path): one name, one module.
     [{ 'lib/a.utu': 'mod api { fn x() I32 { 7; } }\n', 'main.utu': 'using api from "./lib/a.utu";\nusing api from "./lib/../lib/a.utu";\nexport main() I32 { api.x(); }\n' }, 7],
+    // Two files' mods of one name are two modules (this said "Duplicate util__v").
+    [{ 'x.utu': 'mod util { fn v() I32 { 100; } }\n', 'y.utu': 'mod util { fn v() I32 { 200; } }\n',
+      'main.utu': 'using util |u| from "./x.utu";\nusing util |w| from "./y.utu";\nexport main() I32 { u.v() + w.v(); }\n' }, 300],
+    [{ 'x.utu': 'mod P {\n    struct &:\n        | a: I32\n    fn &.get |self| () I32 { self.a; }\n    fn make() & { &{a: 7}; }\n}\n',
+      'y.utu': 'mod P {\n    struct &:\n        | a: F64\n        | b: I32\n    fn &.get |self| () I32 { self.b; }\n    fn make() & { &{a: 1.5, b: 30}; }\n}\n',
+      'main.utu': 'using P |X| from "./x.utu";\nusing P |Y| from "./y.utu";\nexport main() I32 { X.make().get() + Y.make().get(); }\n' }, 37],
+    [{ 'x.utu': 'mod G[T] {\n    struct &:\n        | v: T\n    fn &.k |self| () I32 { 1; }\n    fn mk(v: T) & { &{v: v}; }\n}\n',
+      'y.utu': 'mod G[T] {\n    struct &:\n        | v: T\n        | w: I32\n    fn &.k |self| () I32 { self.w; }\n    fn mk(v: T) & { &{v: v, w: 300}; }\n}\n',
+      'main.utu': 'using G |A| from "./x.utu";\nusing G |B| from "./y.utu";\nexport main() I32 { A[I32].mk(3).k() + B[I32].mk(4).k(); }\n' }, 301],
     // A computed global of an imported file, read by the entry's: set first.
     [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; a; }\n    let squares: Array[I32] = build();\n}\n',
       'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nexport main() I32 { last; }\n' }, 10],
@@ -1779,6 +1788,11 @@ export main() I32 {
     // One name, two files' mods: said at the second using (it was "Duplicate api__x", in b.utu).
     [{ 'a.utu': 'mod api { fn x() I32 { 1; } }\n', 'b.utu': 'mod api { fn x() I32 { 2; } }\n',
       'main.utu': 'using api from "./a.utu";\nusing api from "./b.utu";\nexport main() I32 { api.x(); }\n' }, 'Duplicate declaration api'],
+    // One file's two mods of one name, said in the user's words (it was "Duplicate util__v").
+    [{ 'main.utu': 'mod util { fn v() I32 { 1; } }\nmod util { fn v() I32 { 2; } }\nexport main() I32 { util.v(); }\n' }, 'Duplicate declaration util'],
+    // A method or impl of an undeclared name (each was dropped, unsaid).
+    [{ 'main.utu': 'export main() I32 { 1; }\nstruct Sq:\n    | s: I32\nfn Nope.area |self| () I32 { 1; }\n' }, 'Unknown type Nope'],
+    [{ 'main.utu': 'export main() I32 { Sq{s:3}.area(); }\nstruct Sq:\n    | s: I32\nfn Zork[Sq].area |self| () I32 { 1; }\n' }, 'Unknown type Zork'],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

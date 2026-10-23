@@ -1,0 +1,12 @@
+// What: a method of a type that was never declared
+// Expect: Unknown type Sqare, at the method's receiver
+struct Square:
+    | side: I32
+
+fn Sqare.area |self| () I32 {
+    self.side * self.side;
+}
+
+export main() I32 {
+    0;
+}
