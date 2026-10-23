@@ -325,7 +325,9 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     // The generator's own loops are its; the consumer's loops are not in reach.
     let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
     let loops = hide_loops();
+    let pg = profile_generator(gen, inst, gen_whole.len() - 1);
     discard(check_block(fn_body(gen), ty_void(), gcx));
+    profile_generator_end(pg, gen_whole.len() - 1, gcx);
     show_loops(loops);
     w_node(Op.Block, vt_none, whole, 0, mb);
     end_expansion();
@@ -448,6 +450,8 @@ fn check_yield(node: I32, cx: Cx) I32 {
     };
     // The consumer's body, as part of the consumer: its loops and its result.
     let ccx = Cx { inst: gen_cx_inst[k], fi: gen_cx_fi[k], result: gen_cx_result[k] };
+    // (Profiling: the body runs in the consumer's frame.)
+    let pg = profile_yield(k);
     // Its break and continue reach this expansion, not the generator's loops.
     enter_loop(gen_whole[k], resume, -1, -1);
     // break leaves the whole generation, so it runs the generator's defers.
@@ -459,7 +463,9 @@ fn check_yield(node: I32, cx: Cx) I32 {
     if gen_body[k] >= 0 { discard(check_block(gen_body[k], ty_void(), ccx)); };
     gen_decl[k] = decl;
     leave_loop();
+    profile_yield_guard(pg, ccx);
     w_node(Op.Block, vt_none, resume, 0, mr);
+    profile_yield_end(pg, k);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
 }
@@ -892,7 +898,9 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
     // The generator's own loops are its; the consumer's loops are not in reach.
     let loops = hide_loops();
+    let pg = profile_generator(gen, inst, gen_whole.len() - 1);
     discard(check_block(fn_body(gen), ty_void(), gcx));
+    profile_generator_end(pg, gen_whole.len() - 1, gcx);
     show_loops(loops);
     w_node(Op.Block, vt_none, frame, 0, mb);
     end_expansion();

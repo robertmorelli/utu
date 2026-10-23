@@ -176,7 +176,7 @@ vec defer_guard: I32;
 fn note_defer_guards(from: I32) void {
     for (from ..< defer_node.len()) |i| {
         let d = defer_node[i];
-        if d >= 0 and not is_kind(d, Node.Errdefer_expr) {
+        if (d >= 0 and not is_kind(d, Node.Errdefer_expr)) or is_profile_defer(d) {
             defer_guard.push(w_mark());
             defer_guard.push(i);
         };
@@ -212,7 +212,8 @@ fn guard_defers(base: I32, vt: I32, cx: Cx) void {
             w_node(Op.Seq, vt, 0, 0, m);
             let mh = w_mark();
             w_leaf(Op.Drop, vt_none, 0, 0);
-            discard(check_statement(defer_node[defer_guard[k + 1]], ty_void(), cx));
+            let d = defer_node[defer_guard[k + 1]];
+            if is_profile_defer(d) { run_profile_defer(d); } else { discard(check_statement(d, ty_void(), cx)); };
             w_leaf(Op.Rethrow, vt_unreachable, label, 0);
             w_node(Op.Seq, vt_unreachable, 0, 0, mh);
             // Code that never ends leaves a try of no value: say so after it.
@@ -240,7 +241,8 @@ fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) void {
     let i = defer_node.len() - 1;
     while (i >= from) {
         let d = defer_node[i];
-        if d < 0 { close_stream(-d - 1, cx); }
+        if is_profile_defer(d) { run_profile_defer(d); }
+        else if d < 0 { close_stream(-d - 1, cx); }
         else if not is_kind(d, Node.Errdefer_expr) { discard(check_statement(d, ty_void(), cx)); }
         else if failed == -2 { discard(check_statement(first_child(d), ty_void(), cx)); }
         else if failed >= 0 {
@@ -479,7 +481,7 @@ fn check_await(node: I32, cx: Cx) I32 {
     // A host promise (`Promise<Response>`): its value, as utu has it.
     let host = host_promise_value(pt);
     if host >= 0 {
-        w_node(Op.Call, repr(host), await_import(host), 0, m);
+        profile_await(await_import(host), repr(host), m);
         return host;
     };
     if not is_promise_type(pt) {
@@ -488,7 +490,7 @@ fn check_await(node: I32, cx: Cx) I32 {
         return ty_error();
     };
     let t = inst_arg(ty_inst(pt), 0);
-    w_node(Op.Call, repr(t), await_import(t), 0, m);
+    profile_await(await_import(t), repr(t), m);
     t;
 }
 
@@ -559,7 +561,7 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     let r = new_local(repr(rt));
     let mr = w_mark();
     stream_call(next_fi, s, st, it, it_t, node, cx);
-    w_node(Op.Call, repr(rt), await_import(rt), 0, mr);
+    profile_await(await_import(rt), repr(rt), mr);
     w_node(Op.LocalSet, vt_none, r, 0, mr);
     let md = w_mark();
     coerce(stream_call(done_fi, s, st, r, rt, node, cx), prelude(Prelude.Bool), node);
