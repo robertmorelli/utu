@@ -33,11 +33,12 @@ fn blame_invert() void {
                 e = struct_next[e];
             };
         };
-        if d < decl_global.len() and decl_global[d] >= 0 { blame_glob_decl[decl_global[d]] = d; };
         if d < mem_len.len() and mem_len[d] >= 0 { blame_glob_decl[mem_len[d]] = d; };
         if d < mem_array.len() and mem_array[d] >= 0 { blame_glob_decl[mem_array[d]] = d; };
         if d < mem_memory.len() and mem_memory[d] >= 0 { blame_mem_decl[mem_memory[d]] = d; };
     };
+    // A global's instances (one per instance of a generic mod) are its declaration's.
+    for (0 ..< gi_decl.len()) |g| { if gi_global[g] >= 0 { blame_glob_decl[gi_global[g]] = gi_decl[g]; }; };
     for (0 ..< es_made_decl.len()) |k| { blame_func_decl[es_made_func[k]] = es_made_decl[k]; };
 }
 
