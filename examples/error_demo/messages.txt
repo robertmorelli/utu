@@ -10001,6 +10001,48 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 11 │     };
 --- exit 1
 
+=== utu check examples/error_demo/types/785_proto_missing_getter_read.utu
+ ERROR  NoField lacks Counter.count
+        proto-missing · examples/error_demo/types/785_proto_missing_getter_read.utu:9:1
+
+ 7 │     | count: I32
+ 8 │
+ 9 │ struct NoField[Counter]:
+10 │     | n: I32
+   │     ━━━━━━━━
+   │     ╰─ here
+11 │
+12 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/types/786_proto_missing_setter_write.utu
+ ERROR  NoField lacks Counter.count
+        proto-missing · examples/error_demo/types/786_proto_missing_setter_write.utu:9:1
+
+ 7 │     | count: I32
+ 8 │
+ 9 │ struct NoField[Counter]:
+10 │     | n: I32
+   │     ━━━━━━━━
+   │     ╰─ here
+11 │
+12 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/types/787_proto_missing_method_call.utu
+ ERROR  NoStep lacks Counter.step
+        proto-missing · examples/error_demo/types/787_proto_missing_method_call.utu:9:1
+
+ 7 │     | n: I32
+ 8 │
+ 9 │ struct NoStep[Counter]:
+10 │     | n: I32
+   │     ━━━━━━━━
+   │     ╰─ here
+11 │
+12 │ fn Counter[Has].step |h| () I32 { h.n + 1; }
+--- exit 1
+
 === utu check examples/error_demo/types/78_unknown_field_proto.utu
  ERROR  Shape has no field r
         unknown-field · examples/error_demo/types/78_unknown_field_proto.utu:12:5

@@ -188,15 +188,21 @@ fn sig_type(node: I32, self_t: I32) I32 {
 
 /// The `if ref.test` chain reading field `word` of receiver local `r` (or,
 /// when `v` is a local, writing `v` to it), from implementer `i` on; past
-/// the last, `unreachable`.
+/// the last, `unreachable`. An implementer without the field (reported in
+/// conformance) has no arm.
 fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32, v: I32) void {
     if i == vl_len[impls] {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return;
     };
     let d = vl_item(impls, i);
+    let fd = member(d, word, Space.Member);
+    if not decl_is(fd, Decl.Field) {
+        proto_field_chain(impls, i + 1, r, word, ft, v);
+        return;
+    };
     let heap = vt_heap(repr(named(d, 0)));
-    let field = decl_a[member(d, word, Space.Member)];
+    let field = decl_a[fd];
     let result = if v >= 0 { vt_none; } else { repr(ft); };
     let m = w_mark();
     let mt = proto_test_cast(r, heap);

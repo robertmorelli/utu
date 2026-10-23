@@ -1,0 +1,15 @@
+// What: a getter read through a protocol value, one implementer lacking its field (it crashed the compiler)
+// Expect: NoField lacks Counter.count
+proto Counter:
+    | get count : I32
+
+struct Has[Counter]:
+    | count: I32
+
+struct NoField[Counter]:
+    | n: I32
+
+export main() I32 {
+    let c: Counter = NoField { n: 1 };
+    c.count;
+}
