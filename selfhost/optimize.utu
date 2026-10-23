@@ -512,9 +512,10 @@ fn coalesce_locals(f: I32, params: I32) void {
             s = co_slot_next[s];
         };
     };
-    let grouped = count < n;
-    for (0 ..< count) |s| { if index[s] != s { grouped = true; }; };
-    if not grouped { return; };
+    // As they are when no two share and each type is one run already.
+    let runs = 1;
+    for (1 ..< n) |i| { if local_types[first + i] != local_types[first + i - 1] { runs += 1; }; };
+    if count == n and runs == co_types.len() { return; };
     for (0 ..< count) |s| { local_types[first + index[s]] = co_slot_type[s]; };
     func_local_count[f] = count;
     for (0 ..< co_mentions.len()) |k| {
