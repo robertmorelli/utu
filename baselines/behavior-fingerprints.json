@@ -2,9 +2,9 @@
  "benchmarks/binarytrees/binarytrees.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "89bce85b86e86f8e",
+  "entries": "2e573e3685511f15",
   "queries": "005b64b7f44eb2aa",
-  "graphs": "f14eddeea350b3d5"
+  "graphs": "da4b0b157243f88f"
  },
  "benchmarks/binarytrees/binarytrees.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -13,9 +13,9 @@
  "benchmarks/deltablue/deltablue.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e2ce84043dc13437",
+  "entries": "5f3c7080f3c4c8d3",
   "queries": "d8520e49486a3495",
-  "graphs": "3243d71ebcf33343"
+  "graphs": "1794285ac049d6d9"
  },
  "benchmarks/deltablue/deltablue.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -24,9 +24,9 @@
  "benchmarks/fannkuch/fannkuch.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "8b17254259dcda36",
+  "entries": "8f7a39400c58a0f2",
   "queries": "559d6e62c1c84270",
-  "graphs": "1185abb9a4981f0f"
+  "graphs": "b61efe0ecb010b38"
  },
  "benchmarks/fannkuch/fannkuch.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -35,9 +35,9 @@
  "benchmarks/loops/loops.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "ecb90781982482b3",
-  "queries": "4ac0e025002d9fa4",
-  "graphs": "64053dea5ab9c01b"
+  "entries": "332406a0358671b9",
+  "queries": "b48fee602a501b7c",
+  "graphs": "b78975b952029b17"
  },
  "benchmarks/loops/loops.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -46,9 +46,9 @@
  "benchmarks/nbody/nbody.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "22dec995712dcdd7",
+  "entries": "5ac881650be49eca",
   "queries": "f4b1ee54fd975c36",
-  "graphs": "740baa7d5d7b66d2"
+  "graphs": "3853400b488a8c00"
  },
  "benchmarks/nbody/nbody.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -57,9 +57,9 @@
  "benchmarks/pantry/kernels.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "b1b86b552d07fc17",
+  "entries": "e1d14df56337a80d",
   "queries": "3c12ef8ce360dc90",
-  "graphs": "466e0f45384ee834"
+  "graphs": "c9efae7e3acccf09"
  },
  "benchmarks/pantry/kernels.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -68,9 +68,9 @@
  "benchmarks/richards/richards.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "2324984f1cfba6cc",
+  "entries": "1f52504b2d01c06d",
   "queries": "19042fdc2cb31e2c",
-  "graphs": "cddaea301c22dbb1"
+  "graphs": "f2fa59063e50e905"
  },
  "benchmarks/richards/richards.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -79,9 +79,9 @@
  "benchmarks/suite/analyzer.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0892df6dfc486cd2",
+  "entries": "3693fb6c6eb5d449",
   "queries": "1b5c087999e7356b",
-  "graphs": "43f82416591dbbe5"
+  "graphs": "6dbc211d8f3f4ad1"
  },
  "benchmarks/suite/analyzer.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -90,9 +90,9 @@
  "benchmarks/suite/scalar.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "02ffbc2617013faf",
-  "queries": "2c373010dd95b6d1",
-  "graphs": "38f2858a5e6a0158"
+  "entries": "b11ea5fb6d9e2b36",
+  "queries": "559488628bc9fb2f",
+  "graphs": "53e6e903110bf7c6"
  },
  "benchmarks/suite/scalar.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -101,9 +101,9 @@
  "benchmarks/suite/sieve.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9c91914bb158e42f",
-  "queries": "31a166f23588e8d8",
-  "graphs": "cd34a4eefc7423cf"
+  "entries": "7bc09c0219f9a96b",
+  "queries": "a168219b3da8b55e",
+  "graphs": "7489e93944e02251"
  },
  "benchmarks/suite/sieve.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -112,9 +112,9 @@
  "benchmarks/suite/strings.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "8f4d126f946056a7",
-  "queries": "9edd1c409e04b8ac",
-  "graphs": "2ac2a900588a952a"
+  "entries": "139caff535c0d97b",
+  "queries": "1f633ece22887248",
+  "graphs": "c2e47821d1833b4e"
  },
  "benchmarks/suite/strings.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -123,9 +123,9 @@
  "benchmarks/tiny/benchmark.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "1c1fefb6eea24dea",
-  "queries": "9ca6b9c6cd49213c",
-  "graphs": "64c6393eb16821cd"
+  "entries": "c158733b6c01b075",
+  "queries": "7a07c8dacc90536f",
+  "graphs": "4ec978dc7a291024"
  },
  "benchmarks/tiny/benchmark.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -134,9 +134,9 @@
  "examples/bench/bench_basic.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9366f7cccb9179d5",
+  "entries": "367f20388755c24f",
   "queries": "2895ba63c622ba4d",
-  "graphs": "1845935b49c490ad"
+  "graphs": "75c37c43c4aefac5"
  },
  "examples/bench/bench_basic.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -145,9 +145,9 @@
  "examples/bounds.utu analysis": {
   "diagnostics": "17e45ec47473665b",
   "formatted": "e13debaf278cff6a",
-  "entries": "dda536a939cc9c97",
-  "queries": "eb620bed4607aebe",
-  "graphs": "56d1115c1c3747f5"
+  "entries": "3868c3aa1cec9a6a",
+  "queries": "7c9b161e6dfac05d",
+  "graphs": "398ae54ac613ebbe"
  },
  "examples/bounds.utu normal": {
   "diagnostics": "17e45ec47473665b",
@@ -156,9 +156,9 @@
  "examples/browser-board/main.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "58294fb692d91f74",
+  "entries": "0fe4f958006ad358",
   "queries": "ada886410e3e6f5d",
-  "graphs": "97deae6935f541a4"
+  "graphs": "a626ac91fa21e412"
  },
  "examples/browser-board/main.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -167,9 +167,9 @@
  "examples/browser-pantry/main.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "87174f6d4f0a0947",
+  "entries": "e12bf520d1c77604",
   "queries": "6b7f2e44ceb01b8e",
-  "graphs": "b300cfa6f362483b"
+  "graphs": "c4ff518a13954e06"
  },
  "examples/browser-pantry/main.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -178,9 +178,9 @@
  "examples/call_simple.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "321384da2fc32e73",
+  "entries": "a3a60f29aaf4b52e",
   "queries": "9c28d16737d60887",
-  "graphs": "f87cb0229da495f2"
+  "graphs": "b6a6be0e9786e826"
  },
  "examples/call_simple.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -189,9 +189,9 @@
  "examples/ci/assert_fail.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "aec26e3642d05f07",
+  "entries": "f8378c6d1bea8194",
   "queries": "b0d172b8fb2ca8b4",
-  "graphs": "f19ff9b13c820328"
+  "graphs": "aa413cfd302c34ac"
  },
  "examples/ci/assert_fail.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -200,9 +200,9 @@
  "examples/ci/assert_pass.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "d59f0133c427dff3",
+  "entries": "f508930f1bfa3521",
   "queries": "8d12c7b4ab646b9d",
-  "graphs": "ef3404bcd931222a"
+  "graphs": "71c4ae9f049a8c09"
  },
  "examples/ci/assert_pass.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -211,9 +211,9 @@
  "examples/ci/codegen_alt_fallback.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "57e0078e61ffcd7c",
-  "queries": "b5f474a9edf93b88",
-  "graphs": "730385dbdc8f6217"
+  "entries": "35ad91fa60d6893a",
+  "queries": "3cbd8e86b100f78b",
+  "graphs": "8fb9071bee38db35"
  },
  "examples/ci/codegen_alt_fallback.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -222,9 +222,9 @@
  "examples/ci/codegen_arithmetic_locals.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "d2a04ea248723275",
-  "queries": "7918a99e152509a4",
-  "graphs": "6385fc1dd87375ca"
+  "entries": "976bc2ec267dfd4f",
+  "queries": "630f6b8cb98fdf7d",
+  "graphs": "a2c43ecb7251799f"
  },
  "examples/ci/codegen_arithmetic_locals.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -233,9 +233,9 @@
  "examples/ci/codegen_arrays.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "143d169da586875a",
+  "entries": "f7e90adbd600e6e9",
   "queries": "13e005da2f7c52b6",
-  "graphs": "5cef080e81647cc2"
+  "graphs": "0d5c357c5a1bc82d"
  },
  "examples/ci/codegen_arrays.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -244,9 +244,9 @@
  "examples/ci/codegen_break_and_call.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "40d04d58e815d73e",
+  "entries": "18bab818e92890a0",
   "queries": "26a5bf9b5820ac5a",
-  "graphs": "aeec95bcca1d242e"
+  "graphs": "7f1802358f16f3bf"
  },
  "examples/ci/codegen_break_and_call.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -255,9 +255,9 @@
  "examples/ci/codegen_closures.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "304a3fa100102346",
+  "entries": "c95235792369fc4a",
   "queries": "3fedabfba2551ee9",
-  "graphs": "05b1e73b82b797eb"
+  "graphs": "7211fa5b5084db92"
  },
  "examples/ci/codegen_closures.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -266,9 +266,9 @@
  "examples/ci/codegen_composition.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "224190c3cea49203",
+  "entries": "d186778b5b3f1e4d",
   "queries": "3c9385b86cc9cd65",
-  "graphs": "8c94b5df58b6ed45"
+  "graphs": "844421e18df4a2cf"
  },
  "examples/ci/codegen_composition.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -277,9 +277,9 @@
  "examples/ci/codegen_control_flow.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "7fc8fa339a7dea9a",
+  "entries": "2803ff2078348530",
   "queries": "d666d033d547e714",
-  "graphs": "03a4001d66275fea"
+  "graphs": "25fdc4d110cd6154"
  },
  "examples/ci/codegen_control_flow.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -288,9 +288,9 @@
  "examples/ci/codegen_globals.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0c72d4d462d42843",
-  "queries": "4fc867277cef9971",
-  "graphs": "a273d61f76b2db5e"
+  "entries": "1990d20b2c1b5ba7",
+  "queries": "2c7614d5686e1a11",
+  "graphs": "ccb483f5b3ecc1d3"
  },
  "examples/ci/codegen_globals.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -299,9 +299,9 @@
  "examples/ci/codegen_import_values.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "f05cd70f6da94b4b",
-  "queries": "728b356c2696bdf9",
-  "graphs": "ecbff58842632a6e"
+  "entries": "89da51533960d70d",
+  "queries": "6ea7411c4da53671",
+  "graphs": "ccec4953b0ff3c15"
  },
  "examples/ci/codegen_import_values.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -310,9 +310,9 @@
  "examples/ci/codegen_imports_exports.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "7e5369e630ba9878",
+  "entries": "e3aad78c087cadcf",
   "queries": "f28bad4713fd236b",
-  "graphs": "50f5901047f57750"
+  "graphs": "4f1b9a27faaed981"
  },
  "examples/ci/codegen_imports_exports.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -321,9 +321,9 @@
  "examples/ci/codegen_jsgen.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "5c45ddc19920c3f6",
+  "entries": "e574336760fa12f9",
   "queries": "9242acc8de987882",
-  "graphs": "f8bcb64ec62d27a0"
+  "graphs": "8b87957b9862e431"
  },
  "examples/ci/codegen_jsgen.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -332,9 +332,9 @@
  "examples/ci/codegen_match.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e12b40f39b9d5167",
+  "entries": "20e878094e17a13e",
   "queries": "d8f747d7eb395c8b",
-  "graphs": "8f7a6e0dbb853e79"
+  "graphs": "4fcbb5aced7716fa"
  },
  "examples/ci/codegen_match.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -343,9 +343,9 @@
  "examples/ci/codegen_nullable.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "f910a555736058b1",
-  "queries": "037a84128a6ec8fd",
-  "graphs": "43f4c1d07a44a2b8"
+  "entries": "2883c5f591f49480",
+  "queries": "944064c3b312d490",
+  "graphs": "cbd5f8e6cd8efeb3"
  },
  "examples/ci/codegen_nullable.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -354,9 +354,9 @@
  "examples/ci/codegen_pipes.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "97036a6912c10bba",
+  "entries": "ab62d1f5b2fe79df",
   "queries": "93dd034ce4d2836f",
-  "graphs": "080dbc7a85b17df5"
+  "graphs": "5d9b879fadd92736"
  },
  "examples/ci/codegen_pipes.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -365,9 +365,9 @@
  "examples/ci/codegen_promote.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0a0ebec356d432ef",
+  "entries": "3e140f949f441446",
   "queries": "f7c515f69d1557ab",
-  "graphs": "49560aa90b0a7607"
+  "graphs": "503211b165517f0c"
  },
  "examples/ci/codegen_promote.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -376,9 +376,9 @@
  "examples/ci/codegen_promote_simple.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9051146d98697e55",
+  "entries": "d6df31736d513ce2",
   "queries": "9aa299ca409f1c5c",
-  "graphs": "0e5a6fef3d43c92b"
+  "graphs": "451c261d74b891d1"
  },
  "examples/ci/codegen_promote_simple.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -387,9 +387,9 @@
  "examples/ci/codegen_protocols.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "b15f8ef2d77f153a",
+  "entries": "dae9f071ab70400d",
   "queries": "4140bfad7b4cd4d9",
-  "graphs": "fcd1b406344d4290"
+  "graphs": "6c60a2ae679a1a74"
  },
  "examples/ci/codegen_protocols.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -398,9 +398,9 @@
  "examples/ci/codegen_scalar_match.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "22d42b1eff3437b8",
-  "queries": "ddc0c6eacd43b08d",
-  "graphs": "45374eff360e41c1"
+  "entries": "2707d09978907e18",
+  "queries": "143c6aeac07bff1f",
+  "graphs": "d94bdb1eb3db90f9"
  },
  "examples/ci/codegen_scalar_match.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -409,9 +409,9 @@
  "examples/ci/codegen_structs.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "4510d40c883063f9",
+  "entries": "265efeaccfed7b77",
   "queries": "64e507772247e43b",
-  "graphs": "cde6ce63aa3c6cc2"
+  "graphs": "dc639914a2158be2"
  },
  "examples/ci/codegen_structs.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -420,9 +420,9 @@
  "examples/ci/codegen_test_surface.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "936aee62d1d82234",
-  "queries": "95cb60a271e32927",
-  "graphs": "131b4f99fa717caa"
+  "entries": "e69452d5175f9c58",
+  "queries": "5f44c262ff5ba09c",
+  "graphs": "a4def5ab8d4200d3"
  },
  "examples/ci/codegen_test_surface.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -431,9 +431,9 @@
  "examples/ci/codegen_traps.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "8f80ea538fa5dc69",
-  "queries": "f06405fc3c247fc7",
-  "graphs": "59c9e340fd5b5063"
+  "entries": "91071231823e5479",
+  "queries": "76e88509366fb111",
+  "graphs": "21cdc6ad8df8c2bd"
  },
  "examples/ci/codegen_traps.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -442,9 +442,9 @@
  "examples/ci/global_string.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "c5ee15614cc84190",
+  "entries": "0215d68bc58a4a2d",
   "queries": "29eca52bd4fd7fe1",
-  "graphs": "f0896cc86bc67b7d"
+  "graphs": "34e10a162d3f8e31"
  },
  "examples/ci/global_string.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -453,9 +453,9 @@
  "examples/ci/hello.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e614d426e60066b6",
+  "entries": "bc5f8bb47eead775",
   "queries": "86f5d9a5183d19f3",
-  "graphs": "ec0fa20bb5da637e"
+  "graphs": "b344930b3cdf86ae"
  },
  "examples/ci/hello.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -464,9 +464,9 @@
  "examples/ci/node_builtin_imports.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "4597ffc2e84a60a8",
+  "entries": "dc2e044bb4ade7f6",
   "queries": "9b509dfc7c3bb39f",
-  "graphs": "12924132d39f2edf"
+  "graphs": "b9211fcf29706c4b"
  },
  "examples/ci/node_builtin_imports.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -475,9 +475,9 @@
  "examples/ci/string_echo.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "93465a2b7c48e9ec",
+  "entries": "c91a4f9661181861",
   "queries": "b7524a609993d691",
-  "graphs": "b5d5ac6d585c38fb"
+  "graphs": "1c61df0353716a8f"
  },
  "examples/ci/string_echo.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -486,9 +486,9 @@
  "examples/ci/string_roundtrip.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "2e367655f157c3c4",
-  "queries": "0e8baf33fb5a37dd",
-  "graphs": "08acc17781fa18a3"
+  "entries": "03d4b77cc70b4bd8",
+  "queries": "620b6ff0654948fa",
+  "graphs": "0607593939928ad0"
  },
  "examples/ci/string_roundtrip.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -497,9 +497,9 @@
  "examples/ci/tests_basic.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "422c455b37ab9d93",
-  "queries": "c607ca552d20b1f4",
-  "graphs": "7c9c0f67b877a93a"
+  "entries": "f364488312ba04b7",
+  "queries": "2ec1193c31469f9f",
+  "graphs": "4d7d45e63f06c7df"
  },
  "examples/ci/tests_basic.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -508,9 +508,9 @@
  "examples/ci/tests_fail.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "560b1369db2667c8",
+  "entries": "6a0c2c4fa8e21d5f",
   "queries": "9a630ff96e314a27",
-  "graphs": "78529c34417b40c6"
+  "graphs": "0c074b6a496d569c"
  },
  "examples/ci/tests_fail.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -519,9 +519,9 @@
  "examples/closures.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "4941f7d0c44427dd",
-  "queries": "2d34f98fd3e0fea6",
-  "graphs": "449dfd73194ec06a"
+  "entries": "6b75443631a36d27",
+  "queries": "1c572924e42fa57f",
+  "graphs": "53e8b8c9a339c81a"
  },
  "examples/closures.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -530,9 +530,9 @@
  "examples/error_demo/01_argument_blame.utu analysis": {
   "diagnostics": "99f98af32d627d1a",
   "formatted": "56f2fed80b0ea6ef",
-  "entries": "30cdcae6a5726e04",
+  "entries": "3b54725c2344930a",
   "queries": "174d459913a16864",
-  "graphs": "9965ac18a4254a2d"
+  "graphs": "ebd4da922b12638f"
  },
  "examples/error_demo/01_argument_blame.utu normal": {
   "diagnostics": "99f98af32d627d1a",
@@ -541,9 +541,9 @@
  "examples/error_demo/02_return_blame.utu analysis": {
   "diagnostics": "e86b10a7ed1a84ab",
   "formatted": "c520d7d1ae1a4e39",
-  "entries": "caf165c33ba5bb71",
+  "entries": "74757f48714aef69",
   "queries": "519a63b817e7d57e",
-  "graphs": "ad8e64b8acbd7924"
+  "graphs": "06b9ae5946ef5222"
  },
  "examples/error_demo/02_return_blame.utu normal": {
   "diagnostics": "e86b10a7ed1a84ab",
@@ -552,9 +552,9 @@
  "examples/error_demo/03_branch_confluence.utu analysis": {
   "diagnostics": "d58f45cf11f48e32",
   "formatted": "c405d2ae62d6e2a3",
-  "entries": "be3d42c05fa66276",
+  "entries": "4fb6dbfabaa3f4d8",
   "queries": "1fc86058285726f3",
-  "graphs": "6615aa34238af3d3"
+  "graphs": "c73d4b8fdcf9a8eb"
  },
  "examples/error_demo/03_branch_confluence.utu normal": {
   "diagnostics": "d58f45cf11f48e32",
@@ -563,9 +563,9 @@
  "examples/error_demo/04_field_assignment_blame.utu analysis": {
   "diagnostics": "95daffa946bcd369",
   "formatted": "0c1af43007c92fe7",
-  "entries": "c2b65102df7356d0",
+  "entries": "b1374e91a03d111c",
   "queries": "5b8cdeef212ff168",
-  "graphs": "c1ff247264c5e830"
+  "graphs": "46d1f22a886b61a5"
  },
  "examples/error_demo/04_field_assignment_blame.utu normal": {
   "diagnostics": "95daffa946bcd369",
@@ -574,9 +574,9 @@
  "examples/error_demo/05_whole_file_recovery.utu analysis": {
   "diagnostics": "eccfd66345e06840",
   "formatted": "31a3a423245ecbf8",
-  "entries": "3f8e9add01b6daf6",
+  "entries": "06d48e8cbc62cb5a",
   "queries": "783af73ac676ef1e",
-  "graphs": "377537eefc6f5d3c"
+  "graphs": "0c32b3d793b81783"
  },
  "examples/error_demo/05_whole_file_recovery.utu normal": {
   "diagnostics": "eccfd66345e06840",
@@ -585,9 +585,9 @@
  "examples/fannkuch.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "008a380183461614",
-  "queries": "b7aa2f5b27dc22bd",
-  "graphs": "e48eb8892cce9836"
+  "entries": "dbe395711eb475b6",
+  "queries": "42109430a2ec1b6f",
+  "graphs": "f94a912428806f15"
  },
  "examples/fannkuch.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -596,9 +596,9 @@
  "examples/float.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "654249d3bcb8e079",
+  "entries": "97a224c4435605ec",
   "queries": "f74201df3221fda9",
-  "graphs": "e21601f7c8532566"
+  "graphs": "127db3f7b1b17ff2"
  },
  "examples/float.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -615,9 +615,9 @@
  "examples/foundry/utu/headless.utu analysis": {
   "diagnostics": "2596ddf21cadebd4",
   "formatted": "305a1c632e1decce",
-  "entries": "0863c420d0cf7036",
-  "queries": "81bbc019402443bd",
-  "graphs": "e43559afb14a5f55"
+  "entries": "99d11b10cfb978dc",
+  "queries": "e72ad5fde265785d",
+  "graphs": "a30c11fe4e6a468a"
  },
  "examples/foundry/utu/headless.utu normal": {
   "diagnostics": "2596ddf21cadebd4",
@@ -642,9 +642,9 @@
  "examples/foundry/utu/sim.utu analysis": {
   "diagnostics": "2596ddf21cadebd4",
   "formatted": "305a1c632e1decce",
-  "entries": "7fc855d8c306bfce",
+  "entries": "81851aec55ded7f2",
   "queries": "c6f8b7130ff0a969",
-  "graphs": "5c92470a5c6a7c7f"
+  "graphs": "bc611f48863791f6"
  },
  "examples/foundry/utu/sim.utu normal": {
   "diagnostics": "2596ddf21cadebd4",
@@ -653,9 +653,9 @@
  "examples/foundry/utu/style.utu analysis": {
   "diagnostics": "e5c6e2d736b9a521",
   "formatted": "95c79ad04b7d9224",
-  "entries": "69c9ba2badebf5cd",
+  "entries": "1695ee2bab10af33",
   "queries": "390fd6682854b2e4",
-  "graphs": "92f5327e4b018e7f"
+  "graphs": "987ab440f08dda67"
  },
  "examples/foundry/utu/style.utu normal": {
   "diagnostics": "e5c6e2d736b9a521",
@@ -672,9 +672,9 @@
  "examples/hello.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "169584e970c31d2d",
+  "entries": "7f25753818752571",
   "queries": "c4d50a568422a824",
-  "graphs": "a100024c1f851b99"
+  "graphs": "697d6f53cf017238"
  },
  "examples/hello.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -683,9 +683,9 @@
  "examples/hello_name.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "03f6b301f91f6d63",
+  "entries": "49210bd0130b7362",
   "queries": "c7840c60e8c357d2",
-  "graphs": "d1765724966c8808"
+  "graphs": "d7bcf4919d3f05a8"
  },
  "examples/hello_name.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -694,9 +694,9 @@
  "examples/hello_world.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "2f6b2232708dd3e1",
+  "entries": "964d52de3109293b",
   "queries": "5575015656ef4f6f",
-  "graphs": "5ff3123cb02ca7d9"
+  "graphs": "1c26ef4aa04bf299"
  },
  "examples/hello_world.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -705,9 +705,9 @@
  "examples/jpl/jpl.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "d3aeef3a66014168",
-  "queries": "b95a3f1a4d36897d",
-  "graphs": "fbe7cbefcf7f7c92"
+  "entries": "b44fc93956f505c1",
+  "queries": "5b5aa1aebcd1e41b",
+  "graphs": "7d90023d6fe7289d"
  },
  "examples/jpl/jpl.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -716,9 +716,9 @@
  "examples/json/json.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "949e810116929ead",
+  "entries": "c43f58bb899239f0",
   "queries": "857e697cefd1bb0c",
-  "graphs": "ae5ce762425e09aa"
+  "graphs": "9d5541079be03df9"
  },
  "examples/json/json.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -727,9 +727,9 @@
  "examples/modules/console.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e4bf23e6291d109b",
-  "queries": "26a46947b3375135",
-  "graphs": "47828bca865d2901"
+  "entries": "b8b47a37f6445091",
+  "queries": "8e630c673d120eab",
+  "graphs": "a0f9e0169d378877"
  },
  "examples/modules/console.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -738,9 +738,9 @@
  "examples/modules/inline_paths.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "de61bed3ec6fbbc0",
-  "queries": "9fcc509ae3561581",
-  "graphs": "dc37ee7d28eba11a"
+  "entries": "158e7e6deea34570",
+  "queries": "4b613bfb72e1a299",
+  "graphs": "6f992ca4de79fcee"
  },
  "examples/modules/inline_paths.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -749,9 +749,9 @@
  "examples/modules/main_and_bench.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "b4694cc4b62411eb",
-  "queries": "1bfe8ae193ff75e5",
-  "graphs": "3dc73f873be0e1ab"
+  "entries": "921030d6ff579e14",
+  "queries": "c8da97b9dbfe754a",
+  "graphs": "26ebbba21c6f0638"
  },
  "examples/modules/main_and_bench.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -760,9 +760,9 @@
  "examples/modules/method_promotion.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e748116cfe28ea14",
-  "queries": "8027d6214dd1e87b",
-  "graphs": "02ab84c8c798e084"
+  "entries": "98e40f5ba532b768",
+  "queries": "c39c890a687051c5",
+  "graphs": "88dd12f1d3dc566b"
  },
  "examples/modules/method_promotion.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -771,9 +771,9 @@
  "examples/modules/multiple_instantiations.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "11eab843832762ac",
-  "queries": "69a622e3a414c25f",
-  "graphs": "2fb07f3f1704bb56"
+  "entries": "ab56673c8a4a6a87",
+  "queries": "1a1b5733e36cfcac",
+  "graphs": "f84702d06e986cc0"
  },
  "examples/modules/multiple_instantiations.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -782,9 +782,9 @@
  "examples/modules/open_constructs.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "02195dcff56a98ba",
-  "queries": "afbc4909fb20f84e",
-  "graphs": "5790ee7260b8edbb"
+  "entries": "dc50d440058a296f",
+  "queries": "e0100e25c1824216",
+  "graphs": "afcd67c1304c0476"
  },
  "examples/modules/open_constructs.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -793,9 +793,9 @@
  "examples/modules/parameterized_aliases.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "13189e5146eb9569",
-  "queries": "ff54f1db7adb3523",
-  "graphs": "549847f36b5da798"
+  "entries": "cc957111ec729abb",
+  "queries": "afa8c4b7bfe3002d",
+  "graphs": "71eca7ab2c3ffbdb"
  },
  "examples/modules/parameterized_aliases.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -804,9 +804,9 @@
  "examples/modules/plain_modules.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "212ea3a1ba0e3799",
+  "entries": "370a2f076aaad982",
   "queries": "df563eb86656d9a1",
-  "graphs": "fe5993ec0d9cd5e1"
+  "graphs": "285da96692380d38"
  },
  "examples/modules/plain_modules.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -815,9 +815,9 @@
  "examples/modules/top_level.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "c90184f2a9c5a730",
-  "queries": "440b1eba863032b8",
-  "graphs": "607cd3737ccf71a9"
+  "entries": "43b65cb47cbcedf8",
+  "queries": "a7d4d1f7c03a69d0",
+  "graphs": "e4cbd42836b77867"
  },
  "examples/modules/top_level.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -826,9 +826,9 @@
  "examples/modules/two_params_and_nullable.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "bdb49b9b981044dc",
-  "queries": "2a3d35fd32a4a22e",
-  "graphs": "8d5d8306545e6046"
+  "entries": "5b883756cf52c32f",
+  "queries": "c37219ed9c927db4",
+  "graphs": "f85a1be52490cca0"
  },
  "examples/modules/two_params_and_nullable.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -837,9 +837,9 @@
  "examples/multi_file/_boxes.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "25c19ad20b9fbf54",
+  "entries": "4c4d379b14cc2889",
   "queries": "619bac4ae3872d02",
-  "graphs": "b395687fa0b203fb"
+  "graphs": "43ed7ff14b05e09c"
  },
  "examples/multi_file/_boxes.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -848,9 +848,9 @@
  "examples/multi_file/_ops.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "220228da459aaef6",
-  "queries": "703bcabcaa33192a",
-  "graphs": "8dba469437a1a436"
+  "entries": "43939a5b5e0edc76",
+  "queries": "936f78ed07d79aec",
+  "graphs": "3e7fd7517ee19d5f"
  },
  "examples/multi_file/_ops.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -859,9 +859,9 @@
  "examples/multi_file/main.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "24050d5b537e4591",
+  "entries": "081ab479a185424c",
   "queries": "8b8bcfd748a28c3f",
-  "graphs": "e10790bfdbe2ba18"
+  "graphs": "e30a9610d79ffdc9"
  },
  "examples/multi_file/main.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -870,9 +870,9 @@
  "examples/multi_file/tests.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0a3b887c89e7a1da",
-  "queries": "ecbec3b219c0946b",
-  "graphs": "cacf02b9605b4f46"
+  "entries": "751349e81f7ead97",
+  "queries": "8f6922ba06decb12",
+  "graphs": "3f45654f18b3ca24"
  },
  "examples/multi_file/tests.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -881,9 +881,9 @@
  "examples/promises.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "af518af25151d32b",
-  "queries": "8e74d6a8b417b68b",
-  "graphs": "d21d2c91318561b2"
+  "entries": "7fbb865451874588",
+  "queries": "f1aa21d8dd168c83",
+  "graphs": "fac7eb98b7ce6fc9"
  },
  "examples/promises.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -892,9 +892,9 @@
  "examples/protocols.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e3ffebb9f781fe7b",
+  "entries": "9cd2652a8ea669c7",
   "queries": "e8e2743ac847545d",
-  "graphs": "8b11c8c839552277"
+  "graphs": "3d0f15620bd471ac"
  },
  "examples/protocols.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -903,9 +903,9 @@
  "examples/queries/indexes.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "8eaae7b2632e82dc",
-  "queries": "51f11f490442b7eb",
-  "graphs": "bc553d5b68942e6c"
+  "entries": "877a57ded54dd8e8",
+  "queries": "4f132940cfc99713",
+  "graphs": "b2f80587d1440c7d"
  },
  "examples/queries/indexes.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -914,9 +914,9 @@
  "examples/queries/iterators.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "9ea20470e04a0a72",
-  "queries": "76f4dc487b98a0cc",
-  "graphs": "fc69db063283c02a"
+  "entries": "8b484419121a1b1b",
+  "queries": "27615b8eb516740d",
+  "graphs": "4d9f90921a3f85ab"
  },
  "examples/queries/iterators.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -933,9 +933,9 @@
  "examples/spectralnorm.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "6fbbe38977d07d54",
+  "entries": "f3f5e862afce7861",
   "queries": "442271a4e16ca3a7",
-  "graphs": "41870d158d16cf0b"
+  "graphs": "9aa9af8591223535"
  },
  "examples/spectralnorm.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -944,9 +944,9 @@
  "examples/stdlib.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "94cac88fe426876d",
-  "queries": "0609d00128201906",
-  "graphs": "b25e2ca45d042e7b"
+  "entries": "98e057c85febb95a",
+  "queries": "0d09c100992190fa",
+  "graphs": "9dc951f98a5a6e53"
  },
  "examples/stdlib.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -955,9 +955,9 @@
  "examples/streams.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0baf36cf17dfa723",
-  "queries": "6a9a3144bf100359",
-  "graphs": "924269334bc37be0"
+  "entries": "ed942ac5dbfacede",
+  "queries": "6d717952d17b8e8d",
+  "graphs": "6c52a24fa0d20314"
  },
  "examples/streams.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -966,9 +966,9 @@
  "examples/templates.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "69ad569d5c8b8154",
+  "entries": "4a580f7f9cd00fdc",
   "queries": "145112cd1c7487e4",
-  "graphs": "bc8edbed9b41f54d"
+  "graphs": "9c8f5e1097b1b9a4"
  },
  "examples/templates.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -977,9 +977,9 @@
  "examples/wat.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "4c311330a69f93a8",
+  "entries": "e5a495ecab9372d7",
   "queries": "879257e3376f52c7",
-  "graphs": "73a9fb6047ac4094"
+  "graphs": "807a4ca58d7c09dd"
  },
  "examples/wat.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -988,9 +988,9 @@
  "examples/working/arrays_and_for.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "65cd7d388475412d",
+  "entries": "c1b7e632c65d0f33",
   "queries": "0013b51258063eb7",
-  "graphs": "6c7dc674bfb7379e"
+  "graphs": "5ceb6e341b1e1e70"
  },
  "examples/working/arrays_and_for.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -999,9 +999,9 @@
  "examples/working/closures.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "f90d2b9e32982f87",
-  "queries": "2e6299866c9c2a77",
-  "graphs": "afddbf21a1d9dc49"
+  "entries": "d1d5968dc19caa5d",
+  "queries": "af3eb57e1f8c1f13",
+  "graphs": "b0002678bdf47205"
  },
  "examples/working/closures.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1010,9 +1010,9 @@
  "examples/working/hello.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "c8ee06d96c532938",
+  "entries": "c1d77b2ab5df6aba",
   "queries": "ff21a55cfe4836be",
-  "graphs": "60a844fa459a1669"
+  "graphs": "eae079b92ae61785"
  },
  "examples/working/hello.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1021,9 +1021,9 @@
  "examples/working/strings.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "528f5fafe167a29b",
+  "entries": "3ffcdc994e465811",
   "queries": "b8700dfdc93c92e9",
-  "graphs": "85b90b3aa3e68d7b"
+  "graphs": "48cc24feba3188e2"
  },
  "examples/working/strings.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1032,9 +1032,9 @@
  "examples/working/structs.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "13353ce965301db5",
+  "entries": "f5cb4c37beb55287",
   "queries": "1dcdbd7ae54ace31",
-  "graphs": "0b094f31036c0c80"
+  "graphs": "ca0a2ed19533878c"
  },
  "examples/working/structs.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1179,9 +1179,9 @@
  "examples/wutu-round-one/theme.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "ebe157057e634aa3",
+  "entries": "3dfe0d521056e5c2",
   "queries": "41af22d725fdc057",
-  "graphs": "a24b692976e54b38"
+  "graphs": "15508de874767df5"
  },
  "examples/wutu-round-one/theme.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1222,9 +1222,9 @@
  "examples/wutu-round-two/theme.utu analysis": {
   "diagnostics": "d7044c71e3eb1b73",
   "formatted": "2762dde8f58f0f52",
-  "entries": "756b4409441c10cf",
+  "entries": "876845b2fef71977",
   "queries": "8376cca73c4237ea",
-  "graphs": "d8ea9e9513e0ab78"
+  "graphs": "e110a6205b8ba5d8"
  },
  "examples/wutu-round-two/theme.utu normal": {
   "diagnostics": "d7044c71e3eb1b73",
@@ -1241,9 +1241,9 @@
  "hand_written_bindings/01_path.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "6cee21c006095355",
-  "queries": "7e163980f0bda053",
-  "graphs": "aeb82dd6587fe436"
+  "entries": "b1ab81a9e1cd1988",
+  "queries": "6539b3bbb57b9b46",
+  "graphs": "d37d9bc2c97556c2"
  },
  "hand_written_bindings/01_path.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1252,9 +1252,9 @@
  "hand_written_bindings/02_ms_overloads.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "31c2a06210809478",
-  "queries": "5e3f6be9222934d4",
-  "graphs": "594f924755ef3fb0"
+  "entries": "ea34407c12f31510",
+  "queries": "f37caf3d864b3836",
+  "graphs": "cf254f31e68ce965"
  },
  "hand_written_bindings/02_ms_overloads.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1263,9 +1263,9 @@
  "hand_written_bindings/03_base64_binary.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0d6f99aba565ffae",
-  "queries": "413f4c4af697017f",
-  "graphs": "30b6caf19dd2c42f"
+  "entries": "65da4a8e264af084",
+  "queries": "e912b7ec74d1bffb",
+  "graphs": "b3ef97b045b58150"
  },
  "hand_written_bindings/03_base64_binary.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1274,9 +1274,9 @@
  "hand_written_bindings/04_semver_options.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "cbc9d924fbe38a86",
-  "queries": "8b52138a18f26a9b",
-  "graphs": "75e51f9a63f00946"
+  "entries": "f9adb5066c2ff9f6",
+  "queries": "c460989b83b10301",
+  "graphs": "f2d3ef068316cde2"
  },
  "hand_written_bindings/04_semver_options.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1285,9 +1285,9 @@
  "hand_written_bindings/05_picocolors.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "fe5dc7faa9a82a80",
-  "queries": "eb260a583b39abcb",
-  "graphs": "415d422000d460ef"
+  "entries": "cc765ed6790ca975",
+  "queries": "167bf70c5da6df21",
+  "graphs": "7af8a22a12a96442"
  },
  "hand_written_bindings/05_picocolors.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1296,9 +1296,9 @@
  "hand_written_bindings/06_color_name_data.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "fc8c9ac45a82c808",
-  "queries": "e87426771aad8d59",
-  "graphs": "53d02c7fc638bdb7"
+  "entries": "96bb210be55db597",
+  "queries": "66a638c536b9fac3",
+  "graphs": "179b56048d561982"
  },
  "hand_written_bindings/06_color_name_data.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1307,9 +1307,9 @@
  "hand_written_bindings/07_yaml_handle.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "1ad7d2cf141b8e4c",
+  "entries": "7d9650504181c0e4",
   "queries": "be2d2205da189886",
-  "graphs": "204ea700b670d331"
+  "graphs": "ebf9b6f86ce6bc03"
  },
  "hand_written_bindings/07_yaml_handle.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1318,9 +1318,9 @@
  "hand_written_bindings/08_minimatch_struct.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "cc369aa32088aea3",
+  "entries": "1704ba7ef6d8ecde",
   "queries": "9b7ff9f19140df18",
-  "graphs": "24457621fe8a982e"
+  "graphs": "ea298e69a50d364b"
  },
  "hand_written_bindings/08_minimatch_struct.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1329,9 +1329,9 @@
  "hand_written_bindings/09_webcrypto_async.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "40e0748ed6ef2a59",
-  "queries": "c84668e57a3ff833",
-  "graphs": "81f7b8bc60204167"
+  "entries": "6fc5e9f03d1f480f",
+  "queries": "e47765e7c9ea1c39",
+  "graphs": "f08924a68e0b6a5c"
  },
  "hand_written_bindings/09_webcrypto_async.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1340,9 +1340,9 @@
  "hand_written_bindings/10_events_callbacks.utu analysis": {
   "diagnostics": "c7e19c3ce7a1462f",
   "formatted": "7c24852e60e67553",
-  "entries": "338903e56e28f6a2",
+  "entries": "112dbcaf7a8cdade",
   "queries": "8ed83e7d34716538",
-  "graphs": "7dd688b22abff34a"
+  "graphs": "9fd2dbb9734aaf6d"
  },
  "hand_written_bindings/10_events_callbacks.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1351,9 +1351,9 @@
  "negative/000 undefined local analysis": {
   "diagnostics": "925db7ad41ab5549",
   "formatted": "3a1fe88732918e46",
-  "entries": "5a0f310c291dad1b",
+  "entries": "f22e02f53faa1f2e",
   "queries": "2b4dea420e32bd65",
-  "graphs": "ff2b1d5e72d0120e"
+  "graphs": "c25be8c13600280c"
  },
  "negative/000 undefined local normal": {
   "diagnostics": "925db7ad41ab5549",
@@ -1362,9 +1362,9 @@
  "negative/001 undefined rhs in let analysis": {
   "diagnostics": "823a27e2b30131a6",
   "formatted": "8ddd27154c2e60ab",
-  "entries": "972ddd243518391e",
+  "entries": "89c50aea811ae714",
   "queries": "947d0310e383855f",
-  "graphs": "aa938168176bf421"
+  "graphs": "741127328f8b7d4f"
  },
  "negative/001 undefined rhs in let normal": {
   "diagnostics": "823a27e2b30131a6",
@@ -1373,9 +1373,9 @@
  "negative/002 undefined rhs in assign analysis": {
   "diagnostics": "56c745c8aea7fe02",
   "formatted": "82819f7c1e627fca",
-  "entries": "7a0a1942a459456e",
+  "entries": "1a1dc0802e4a56f9",
   "queries": "c1acf6cd176033fa",
-  "graphs": "4df4aba88d1d5bfe"
+  "graphs": "a56feb1ac43463fd"
  },
  "negative/002 undefined rhs in assign normal": {
   "diagnostics": "56c745c8aea7fe02",
@@ -1384,9 +1384,9 @@
  "negative/003 unknown type in param analysis": {
   "diagnostics": "81f4a93d4fb7e2f7",
   "formatted": "d7157460f5c7b39c",
-  "entries": "68385b8d99c172a2",
+  "entries": "21b4321167da4fb2",
   "queries": "a061301e2ef8acd8",
-  "graphs": "48622286c29fb9d3"
+  "graphs": "4746b9882f74470e"
  },
  "negative/003 unknown type in param normal": {
   "diagnostics": "81f4a93d4fb7e2f7",
@@ -1395,9 +1395,9 @@
  "negative/004 unknown type in return analysis": {
   "diagnostics": "122e691cac8dff3c",
   "formatted": "c66cdba64bb910fe",
-  "entries": "6d9f0c8d48b1a318",
+  "entries": "2c0ec8f937d230ea",
   "queries": "f0ac247382828428",
-  "graphs": "b42d73bc2b9063f8"
+  "graphs": "3e87cfc1f5047ee7"
  },
  "negative/004 unknown type in return normal": {
   "diagnostics": "122e691cac8dff3c",
@@ -1406,9 +1406,9 @@
  "negative/005 unknown type in struct field analysis": {
   "diagnostics": "d984ed7eacb13804",
   "formatted": "27df375dd4ed71ae",
-  "entries": "e8f9929e55630995",
+  "entries": "f1c4ac9a2692b511",
   "queries": "232de6d02cd63891",
-  "graphs": "75e962ac73602407"
+  "graphs": "611970d34c5f14dc"
  },
  "negative/005 unknown type in struct field normal": {
   "diagnostics": "d984ed7eacb13804",
@@ -1417,9 +1417,9 @@
  "negative/006 unknown field analysis": {
   "diagnostics": "e8e771ea3eda8086",
   "formatted": "97e11f0a8930d414",
-  "entries": "81a0d805e4984abf",
+  "entries": "fe8508bb8acc9d61",
   "queries": "36d39b18432a8d83",
-  "graphs": "18d9f3bad97cf7d2"
+  "graphs": "cbbe72c487487b7c"
  },
  "negative/006 unknown field normal": {
   "diagnostics": "e8e771ea3eda8086",
@@ -1428,9 +1428,9 @@
  "negative/007 unknown method analysis": {
   "diagnostics": "66d4ac7f395dbd85",
   "formatted": "c487038c36f3a2b9",
-  "entries": "9b477721eaa85a8f",
+  "entries": "71d63c65078082f4",
   "queries": "de09bfe755b56ad2",
-  "graphs": "7094d3190843bcd7"
+  "graphs": "b8efc8550e476d37"
  },
  "negative/007 unknown method normal": {
   "diagnostics": "66d4ac7f395dbd85",
@@ -1439,9 +1439,9 @@
  "negative/008 data field is not callable method analysis": {
   "diagnostics": "daf4d3e78ba539b4",
   "formatted": "cf10d0ca2a749b7d",
-  "entries": "bdd38d9bce5a8f91",
+  "entries": "475a0a18e7d416c4",
   "queries": "20f7d0bb19991fbb",
-  "graphs": "c7e8dc011b6dea41"
+  "graphs": "2ad19e31cc858254"
  },
  "negative/008 data field is not callable method normal": {
   "diagnostics": "daf4d3e78ba539b4",
@@ -1450,9 +1450,9 @@
  "negative/009 unknown static method analysis": {
   "diagnostics": "1e1dd7db35b803a6",
   "formatted": "c4f6e97f912c7100",
-  "entries": "e684d70667a8da39",
+  "entries": "e99d38e53afb0934",
   "queries": "e114731f8b349124",
-  "graphs": "9947ca69ce5840ec"
+  "graphs": "793d743c0d0eed32"
  },
  "negative/009 unknown static method normal": {
   "diagnostics": "1e1dd7db35b803a6",
@@ -1461,9 +1461,9 @@
  "negative/010 free call too few args analysis": {
   "diagnostics": "8e3439bad7805237",
   "formatted": "4ad0a2338a5edba7",
-  "entries": "5214d93bed9715fa",
+  "entries": "287d15e60420b5f9",
   "queries": "1d3ce44c29870c33",
-  "graphs": "112c7cbf908a9968"
+  "graphs": "a9663e1b7ae451f9"
  },
  "negative/010 free call too few args normal": {
   "diagnostics": "8e3439bad7805237",
@@ -1472,9 +1472,9 @@
  "negative/011 free call too many args analysis": {
   "diagnostics": "2074e30b70d3d55a",
   "formatted": "52d99ab90939fa88",
-  "entries": "383321f250fd1266",
+  "entries": "1fdc756ea12f9388",
   "queries": "d17a186e2cf64705",
-  "graphs": "dff18de66ce35906"
+  "graphs": "53fd16c9e89eb738"
  },
  "negative/011 free call too many args normal": {
   "diagnostics": "2074e30b70d3d55a",
@@ -1483,9 +1483,9 @@
  "negative/012 static call too few args analysis": {
   "diagnostics": "e8e01422bbe174de",
   "formatted": "52eebc5bf7c17d19",
-  "entries": "1da390e4a523f115",
+  "entries": "cac1f018b32038fa",
   "queries": "9db3de65aba7ee50",
-  "graphs": "4188837a9994b450"
+  "graphs": "b335964748a74a05"
  },
  "negative/012 static call too few args normal": {
   "diagnostics": "e8e01422bbe174de",
@@ -1494,9 +1494,9 @@
  "negative/013 call arg type mismatch analysis": {
   "diagnostics": "65dc0ec1a02a3661",
   "formatted": "73d03fd674a66c05",
-  "entries": "07fc399dbaa7d979",
+  "entries": "240a6da63092b2de",
   "queries": "9b590ca9e19672c5",
-  "graphs": "716e386af7f40993"
+  "graphs": "499c08c30c137119"
  },
  "negative/013 call arg type mismatch normal": {
   "diagnostics": "65dc0ec1a02a3661",
@@ -1505,9 +1505,9 @@
  "negative/014 second call arg type mismatch analysis": {
   "diagnostics": "ce97ae4266513713",
   "formatted": "561ed265db4edbfd",
-  "entries": "d043f35a34817235",
+  "entries": "76d6f93753c62cd0",
   "queries": "79d34c5e82f8f6c1",
-  "graphs": "53c9ed57c11ab90c"
+  "graphs": "dab567a02af5a396"
  },
  "negative/014 second call arg type mismatch normal": {
   "diagnostics": "ce97ae4266513713",
@@ -1516,9 +1516,9 @@
  "negative/015 Bool call arg type mismatch analysis": {
   "diagnostics": "23168b5a59879c27",
   "formatted": "ff33bee20d22a867",
-  "entries": "43292d89a631fce4",
+  "entries": "7d458e3dee07d51d",
   "queries": "9c5abd6f70b2e32f",
-  "graphs": "dcd5bf2c75fe5dc8"
+  "graphs": "e92d57e1d39f0f4e"
  },
  "negative/015 Bool call arg type mismatch normal": {
   "diagnostics": "23168b5a59879c27",
@@ -1527,9 +1527,9 @@
  "negative/016 let type mismatch analysis": {
   "diagnostics": "1c3d848bffb896b7",
   "formatted": "520724bafff9858c",
-  "entries": "86682d57b9807517",
+  "entries": "da9c9eeabbb01505",
   "queries": "7c2c88ce7637cc9e",
-  "graphs": "479d0125bcf8341c"
+  "graphs": "ea18f56cbe886d43"
  },
  "negative/016 let type mismatch normal": {
   "diagnostics": "1c3d848bffb896b7",
@@ -1538,9 +1538,9 @@
  "negative/017 global type mismatch analysis": {
   "diagnostics": "87912d63334664f3",
   "formatted": "a94c9c4a53895ac7",
-  "entries": "ad78ae05fd15f0c5",
+  "entries": "e0aed144c2e28210",
   "queries": "679176e98be35e31",
-  "graphs": "f19a620dfa1cb439"
+  "graphs": "5dd880bf66e6ddf1"
  },
  "negative/017 global type mismatch normal": {
   "diagnostics": "87912d63334664f3",
@@ -1549,9 +1549,9 @@
  "negative/018 return type mismatch analysis": {
   "diagnostics": "706edc9a467cde52",
   "formatted": "a16b2dbf79179cee",
-  "entries": "e96865f23785c3b9",
+  "entries": "8d02a7b6c0d057a6",
   "queries": "fd8f84ad1a31ec3e",
-  "graphs": "29b6ebe5f67f24ca"
+  "graphs": "4f1ae8b78eb4d6f8"
  },
  "negative/018 return type mismatch normal": {
   "diagnostics": "706edc9a467cde52",
@@ -1560,9 +1560,9 @@
  "negative/019 if condition type mismatch analysis": {
   "diagnostics": "136feafa97deb13d",
   "formatted": "97f452056d5fe208",
-  "entries": "855815e468938871",
+  "entries": "f55290da4436876f",
   "queries": "541e824cb8f39782",
-  "graphs": "c4e10bf9e930d15d"
+  "graphs": "3eac5732be960c4e"
  },
  "negative/019 if condition type mismatch normal": {
   "diagnostics": "136feafa97deb13d",
@@ -1571,9 +1571,9 @@
  "negative/020 while condition type mismatch analysis": {
   "diagnostics": "566d6cf3849cf0cb",
   "formatted": "6c513aba64619979",
-  "entries": "f0d19ce2413d354c",
+  "entries": "bbf0bdb95c839ac1",
   "queries": "5f1780818ba96319",
-  "graphs": "04bb3754b6d6f654"
+  "graphs": "4eb24e2d80c65221"
  },
  "negative/020 while condition type mismatch normal": {
   "diagnostics": "566d6cf3849cf0cb",
@@ -1582,9 +1582,9 @@
  "negative/021 if branch type mismatch analysis": {
   "diagnostics": "ee07ac0255dede2d",
   "formatted": "6640fa5d5be072a7",
-  "entries": "6bd1cd59f79e8451",
+  "entries": "eaa6f501ec5ceb9c",
   "queries": "62d4dac967469128",
-  "graphs": "56f978b5ff96cb5b"
+  "graphs": "f18f5103a7b4186e"
  },
  "negative/021 if branch type mismatch normal": {
   "diagnostics": "ee07ac0255dede2d",
@@ -1593,9 +1593,9 @@
  "negative/022 match arm type mismatch analysis": {
   "diagnostics": "ee1465f68e47add2",
   "formatted": "3b658193ad5173f2",
-  "entries": "d8aa5c6f76f18fb4",
+  "entries": "ac80e7d123150c1e",
   "queries": "ee20ed2b8d7194b0",
-  "graphs": "fea4b1b669371bb9"
+  "graphs": "601b52724c2970ae"
  },
  "negative/022 match arm type mismatch normal": {
   "diagnostics": "ee1465f68e47add2",
@@ -1604,9 +1604,9 @@
  "negative/023 enum alt missing variant analysis": {
   "diagnostics": "d282e4820f392e73",
   "formatted": "0083a440263278db",
-  "entries": "22b310dcd78e8045",
+  "entries": "97a97d4472388f65",
   "queries": "b592c1f9c9e2f770",
-  "graphs": "e3824e7e49b61160"
+  "graphs": "06d5d2da226cd899"
  },
  "negative/023 enum alt missing variant normal": {
   "diagnostics": "d282e4820f392e73",
@@ -1615,9 +1615,9 @@
  "negative/024 integer match missing default analysis": {
   "diagnostics": "fcdec86f5dc6bbb5",
   "formatted": "dd8522c227ede5f4",
-  "entries": "3b3933e514d7d71f",
+  "entries": "0cae374579e15f8f",
   "queries": "cadaf7002c73a913",
-  "graphs": "29e02a250ee0a333"
+  "graphs": "7a15f15495ce3fb3"
  },
  "negative/024 integer match missing default normal": {
   "diagnostics": "fcdec86f5dc6bbb5",
@@ -1626,9 +1626,9 @@
  "negative/025 Bool match missing arm analysis": {
   "diagnostics": "fcb0732944b99151",
   "formatted": "03dce831ccdb4c13",
-  "entries": "bc86f097a198f50a",
+  "entries": "2019a9a0acc5b50e",
   "queries": "7d4fb6babf78a658",
-  "graphs": "f73b75c342fffcb9"
+  "graphs": "6c4924426cf35c77"
  },
  "negative/025 Bool match missing arm normal": {
   "diagnostics": "fcb0732944b99151",
@@ -1637,9 +1637,9 @@
  "negative/026 orelse receiver must be nullable analysis": {
   "diagnostics": "cce32b57e4dfb064",
   "formatted": "22b0eab9de0a61e8",
-  "entries": "f485497d9a70a131",
+  "entries": "846b6f358d6cc715",
   "queries": "34e657d6db7b548c",
-  "graphs": "328d8a18a44f5f2f"
+  "graphs": "7669e46a35e2a0e6"
  },
  "negative/026 orelse receiver must be nullable normal": {
   "diagnostics": "cce32b57e4dfb064",
@@ -1648,9 +1648,9 @@
  "negative/027 orelse fallback type mismatch analysis": {
   "diagnostics": "83916885b2b17efa",
   "formatted": "b563ab0ebe1dde75",
-  "entries": "95e12f64777cd8ae",
+  "entries": "40a270a91f8bbbe5",
   "queries": "c2f9b44b5f4935b6",
-  "graphs": "26ebbc775f501f39"
+  "graphs": "e02e4d0f9daa60c6"
  },
  "negative/027 orelse fallback type mismatch normal": {
   "diagnostics": "83916885b2b17efa",
@@ -1659,9 +1659,9 @@
  "negative/028 assign type mismatch analysis": {
   "diagnostics": "fb2d41cb4025e740",
   "formatted": "804de7848c7799fe",
-  "entries": "de14429e888667b0",
+  "entries": "c776344ef6fbc7e0",
   "queries": "7b58647601138170",
-  "graphs": "d031be5ba6a3bb46"
+  "graphs": "17694713ffa5c0d4"
  },
  "negative/028 assign type mismatch normal": {
   "diagnostics": "fb2d41cb4025e740",
@@ -1670,9 +1670,9 @@
  "negative/029 downstream errors fold under their cause analysis": {
   "diagnostics": "5bf7a1eddd5f876e",
   "formatted": "fb64b89a416f9470",
-  "entries": "bd1150dc13a8dfc9",
+  "entries": "bbc6ea622ee6d6ea",
   "queries": "d05f52482c8d3e8e",
-  "graphs": "c8a58f2946846923"
+  "graphs": "c4c8f9260ca80587"
  },
  "negative/029 downstream errors fold under their cause normal": {
   "diagnostics": "5bf7a1eddd5f876e",
@@ -1681,9 +1681,9 @@
  "negative/030 field assign type mismatch analysis": {
   "diagnostics": "01d4bfed30c8cb17",
   "formatted": "b4c4ec41eac0fd42",
-  "entries": "2d0c872c3427d14e",
+  "entries": "dd02cc3b8af361ea",
   "queries": "3b5c56f24fa02809",
-  "graphs": "1873d97440effd8d"
+  "graphs": "195d918b8fc7ca06"
  },
  "negative/030 field assign type mismatch normal": {
   "diagnostics": "01d4bfed30c8cb17",
@@ -1692,9 +1692,9 @@
  "negative/031 struct init missing field analysis": {
   "diagnostics": "cf97fc3353524317",
   "formatted": "2473a3932e0074b8",
-  "entries": "57991e7becd74abf",
+  "entries": "3e9212c2351037a6",
   "queries": "04b9de4be59d7e31",
-  "graphs": "76122831adc89737"
+  "graphs": "b03a6a4d552aaba1"
  },
  "negative/031 struct init missing field normal": {
   "diagnostics": "cf97fc3353524317",
@@ -1703,9 +1703,9 @@
  "negative/032 struct init duplicate field analysis": {
   "diagnostics": "bc3af84861ac713d",
   "formatted": "23a5b0e51fb83881",
-  "entries": "c7f9ead74d437544",
+  "entries": "0bc1937ddaeadbee",
   "queries": "96525ba96fcecef3",
-  "graphs": "8cca0fff8a737011"
+  "graphs": "2ef1c8261ddb012d"
  },
  "negative/032 struct init duplicate field normal": {
   "diagnostics": "bc3af84861ac713d",
@@ -1714,9 +1714,9 @@
  "negative/033 struct init field type mismatch analysis": {
   "diagnostics": "5e3f561fa77224e6",
   "formatted": "a0b914bd42701503",
-  "entries": "c39aacec87b2e7b1",
+  "entries": "96e4ed102c22866f",
   "queries": "8c4b2ee0fbe8bc07",
-  "graphs": "8de05a36c2348946"
+  "graphs": "3c4ea3e67b3db55a"
  },
  "negative/033 struct init field type mismatch normal": {
   "diagnostics": "5e3f561fa77224e6",
@@ -1725,9 +1725,9 @@
  "negative/034 nullable field without promote analysis": {
   "diagnostics": "a28212d81141b3df",
   "formatted": "1fd50d024e68dfd1",
-  "entries": "8ef35ef42ef6aa8b",
+  "entries": "3b48b522689ea3d4",
   "queries": "032fec4541fd854b",
-  "graphs": "78a4ae75cca9145c"
+  "graphs": "9d30d590a371bdf7"
  },
  "negative/034 nullable field without promote normal": {
   "diagnostics": "a28212d81141b3df",
@@ -1736,9 +1736,9 @@
  "negative/035 nullable method without promote analysis": {
   "diagnostics": "f58a24c388f37b62",
   "formatted": "e04632449bc0d990",
-  "entries": "c0ed2669568bbc77",
+  "entries": "2988e0a86d3dc2f8",
   "queries": "92627069d200d40c",
-  "graphs": "98857a8aaccb48cc"
+  "graphs": "2b30aa4b8ce8897b"
  },
  "negative/035 nullable method without promote normal": {
   "diagnostics": "f58a24c388f37b62",
@@ -1747,9 +1747,9 @@
  "negative/036 assign global immutable analysis": {
   "diagnostics": "a12f31a8603f16d8",
   "formatted": "1e4e976f3ec021e5",
-  "entries": "80de4e2d82fb6086",
+  "entries": "4ee2010f2233d66f",
   "queries": "a169e59d2d8bb085",
-  "graphs": "b8c995a0f6a85ed4"
+  "graphs": "78e92b3659721ac2"
  },
  "negative/036 assign global immutable normal": {
   "diagnostics": "a12f31a8603f16d8",
@@ -1758,9 +1758,9 @@
  "negative/037 assign function immutable analysis": {
   "diagnostics": "8ffbcc903771f923",
   "formatted": "ff104eef88420a7c",
-  "entries": "2e2230a00d9eeb33",
+  "entries": "162d74bf78b750b9",
   "queries": "9f8586e56e2e2f2e",
-  "graphs": "c848ff0085c4cd67"
+  "graphs": "9a06a4b0b994f86f"
  },
  "negative/037 assign function immutable normal": {
   "diagnostics": "8ffbcc903771f923",
@@ -1769,9 +1769,9 @@
  "negative/038 es dsl requires typed binding analysis": {
   "diagnostics": "d31362d26e60383b",
   "formatted": "95879bd45c1864d0",
-  "entries": "4e3270d660762aa2",
+  "entries": "be67b1c40cfe6d1c",
   "queries": "7c838c63bc0ae111",
-  "graphs": "86f666b6df73e7c1"
+  "graphs": "e8121a780e7327bc"
  },
  "negative/038 es dsl requires typed binding normal": {
   "diagnostics": "d31362d26e60383b",
@@ -1791,9 +1791,9 @@
  "negative/040 direct recursive struct analysis": {
   "diagnostics": "571d4d6abaca14ec",
   "formatted": "3b5570ecc5c4a024",
-  "entries": "1d89f025a906c557",
+  "entries": "ecd06fe2385d4b67",
   "queries": "1e48e9e48ff66dab",
-  "graphs": "b4941e26889eb53e"
+  "graphs": "9af783b893529a1d"
  },
  "negative/040 direct recursive struct normal": {
   "diagnostics": "571d4d6abaca14ec",
@@ -1802,9 +1802,9 @@
  "negative/041 indirect recursive struct analysis": {
   "diagnostics": "0ae306e0dd991726",
   "formatted": "cea7e418b4e5404e",
-  "entries": "217807f95b4abc64",
+  "entries": "90a82fe6bf140bda",
   "queries": "fa15bc74ce48cfe6",
-  "graphs": "8e939bf5c21ba02b"
+  "graphs": "7b7a4472b4770729"
  },
  "negative/041 indirect recursive struct normal": {
   "diagnostics": "0ae306e0dd991726",
@@ -1813,9 +1813,9 @@
  "negative/042 nullable recursive struct is allowed except missing init field analysis": {
   "diagnostics": "87255d7a1ace7e17",
   "formatted": "df8736809cffd427",
-  "entries": "f84d88b6d8176bcd",
+  "entries": "d916d04dd6bc7bc4",
   "queries": "f302e5f909fdffc9",
-  "graphs": "a58c02bc9d368bb6"
+  "graphs": "962dc60cf7cccb99"
  },
  "negative/042 nullable recursive struct is allowed except missing init field normal": {
   "diagnostics": "87255d7a1ace7e17",
@@ -1824,9 +1824,9 @@
  "negative/043 module function called as a method analysis": {
   "diagnostics": "c1a0d265df7a5efa",
   "formatted": "caf66232363e5727",
-  "entries": "7317c38cc25f91d5",
+  "entries": "ca885768c59e560e",
   "queries": "68e52980a1a2e6f9",
-  "graphs": "cb4b1e138088db30"
+  "graphs": "c48d0a3b6d32f403"
  },
  "negative/043 module function called as a method normal": {
   "diagnostics": "c1a0d265df7a5efa",
@@ -1835,9 +1835,9 @@
  "std/Array.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "120ee8d32755358c",
-  "queries": "3c7fbb40bf485b5b",
-  "graphs": "054a22b4a582b2fd"
+  "entries": "1dd07459de51e9b1",
+  "queries": "81f3f7425eb4557a",
+  "graphs": "b236b84cf0f10ef1"
  },
  "std/Array.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1846,9 +1846,9 @@
  "std/Bool.utu analysis": {
   "diagnostics": "cf5678eaa4c4fbfe",
   "formatted": "2a3145ec632db9c2",
-  "entries": "639b2dd082edb488",
-  "queries": "a3087d22f579a9cb",
-  "graphs": "fbdca585d3b89481"
+  "entries": "3669ab3d5535acfe",
+  "queries": "afbc3ef19afb6418",
+  "graphs": "c5979a2b7b57a2b5"
  },
  "std/Bool.utu normal": {
   "diagnostics": "cf5678eaa4c4fbfe",
@@ -1857,9 +1857,9 @@
  "std/Buffer.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "3522842f0a377261",
+  "entries": "ee2058c618fc5023",
   "queries": "8549cce5207fcb49",
-  "graphs": "9cd447cd172c8aa1"
+  "graphs": "22cb8d2d2000d00b"
  },
  "std/Buffer.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1868,9 +1868,9 @@
  "std/Console.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "fdd16e5bd7f5b428",
+  "entries": "93b6e4c27b8f1a18",
   "queries": "53ac45567eeefb64",
-  "graphs": "7457df170b1e8939"
+  "graphs": "b45b470177f872c8"
  },
  "std/Console.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1879,9 +1879,9 @@
  "std/Externref.utu analysis": {
   "diagnostics": "3f1446367fc2d1ea",
   "formatted": "effb3b51ad80da56",
-  "entries": "a3417fe16e667f6d",
+  "entries": "42dc27690b0aa7cf",
   "queries": "8f411c5a3d588161",
-  "graphs": "fa3e5c9b7f4f2f12"
+  "graphs": "0bfc2779dfa89e75"
  },
  "std/Externref.utu normal": {
   "diagnostics": "3f1446367fc2d1ea",
@@ -1890,9 +1890,9 @@
  "std/F32.utu analysis": {
   "diagnostics": "e28755689e538d6c",
   "formatted": "d7db44d7c88fb87e",
-  "entries": "33744b6d801ede29",
+  "entries": "bf533eba6378d50c",
   "queries": "bee95bef632869cf",
-  "graphs": "3389e11e474432bd"
+  "graphs": "a7d1d4c1f8756b47"
  },
  "std/F32.utu normal": {
   "diagnostics": "e28755689e538d6c",
@@ -1901,9 +1901,9 @@
  "std/F64.utu analysis": {
   "diagnostics": "09be07c6d1116c3b",
   "formatted": "ee96265fe679d34a",
-  "entries": "438fe7f2e6350f50",
+  "entries": "19db3675f5663a65",
   "queries": "1aa5fd7b9655a474",
-  "graphs": "f0906b779d503197"
+  "graphs": "47c8b06d10eccc7f"
  },
  "std/F64.utu normal": {
   "diagnostics": "09be07c6d1116c3b",
@@ -1912,9 +1912,9 @@
  "std/Found.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "ee3b0455e674b172",
+  "entries": "4d0494501ebf0752",
   "queries": "0536b92f3db52ac7",
-  "graphs": "ab7867a2a906dc0d"
+  "graphs": "1fb494641f533cb6"
  },
  "std/Found.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1923,9 +1923,9 @@
  "std/Group.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "ba7ec5792cb38247",
+  "entries": "2a26ce296d46cfaa",
   "queries": "7426537dec5cf42c",
-  "graphs": "5acb9ed6cae9510a"
+  "graphs": "7904df829960957b"
  },
  "std/Group.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1934,9 +1934,9 @@
  "std/I31.utu analysis": {
   "diagnostics": "c42b2e78a5332178",
   "formatted": "3dc2ac36c051bdc8",
-  "entries": "f1d9986a1cdee49c",
+  "entries": "c0d7567f3ab8c1fd",
   "queries": "66d6bbc7a75be68d",
-  "graphs": "f4f4373aece97832"
+  "graphs": "4d66b0e7fc9f7685"
  },
  "std/I31.utu normal": {
   "diagnostics": "c42b2e78a5332178",
@@ -1945,9 +1945,9 @@
  "std/I32.utu analysis": {
   "diagnostics": "72a88968e527721e",
   "formatted": "bc4e5fd991bbe813",
-  "entries": "b0a1d6f3f5485462",
-  "queries": "4d01ed06c385ec8e",
-  "graphs": "78249c155dadb0fd"
+  "entries": "26a1f9080a9cbc12",
+  "queries": "2820835af76bdf65",
+  "graphs": "deb3af50c071e32d"
  },
  "std/I32.utu normal": {
   "diagnostics": "72a88968e527721e",
@@ -1956,9 +1956,9 @@
  "std/I64.utu analysis": {
   "diagnostics": "81959f37642f378d",
   "formatted": "8e318d9a97161e1e",
-  "entries": "4210e82e9dc31e8f",
+  "entries": "f2d8549054e93660",
   "queries": "3b5d31d4998d63e4",
-  "graphs": "04937dcaf687d1dc"
+  "graphs": "9e0b1736f264ffd2"
  },
  "std/I64.utu normal": {
   "diagnostics": "81959f37642f378d",
@@ -1967,9 +1967,9 @@
  "std/IntMap.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "dca897a2847345f7",
-  "queries": "59af91daf6d2ed27",
-  "graphs": "72b75a3eb7168f6c"
+  "entries": "db708e459862a22a",
+  "queries": "66f829bc88646408",
+  "graphs": "80251806ccb9b7cb"
  },
  "std/IntMap.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1978,9 +1978,9 @@
  "std/Interner.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "dd74689779678212",
-  "queries": "e9dd396a2f3936af",
-  "graphs": "504086d493bd263b"
+  "entries": "b8dc406db6c0cc6c",
+  "queries": "a634526a1c643f66",
+  "graphs": "4a898ff28d726ee4"
  },
  "std/Interner.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1989,9 +1989,9 @@
  "std/JsonRuntime.utu analysis": {
   "diagnostics": "4d04b2d3e68faf75",
   "formatted": "6b10d1e5fc188f2f",
-  "entries": "fcf9a3eeb005c46c",
+  "entries": "21c7f3139a861f38",
   "queries": "fa4b2b9c360adbca",
-  "graphs": "406ad1fad80d1246"
+  "graphs": "cdf4988d50abcd1e"
  },
  "std/JsonRuntime.utu normal": {
   "diagnostics": "4d04b2d3e68faf75",
@@ -2000,9 +2000,9 @@
  "std/List.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "a35f78bba8463cee",
+  "entries": "514ddd84549dcd9a",
   "queries": "fbae13153b1f9967",
-  "graphs": "36a456cbeb3b6911"
+  "graphs": "7f6418fcc5964b27"
  },
  "std/List.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2011,9 +2011,9 @@
  "std/LiteralDefaults.utu analysis": {
   "diagnostics": "d6ab1406c8f2cbc7",
   "formatted": "f8d695782ab7a4e6",
-  "entries": "71db641a30a26dac",
+  "entries": "2b39f42a798c2ec0",
   "queries": "c210da0e491cde9a",
-  "graphs": "dd96aa84f0558f70"
+  "graphs": "a94932d77709c0e8"
  },
  "std/LiteralDefaults.utu normal": {
   "diagnostics": "d6ab1406c8f2cbc7",
@@ -2022,9 +2022,9 @@
  "std/M128.utu analysis": {
   "diagnostics": "321b02d5fb61add8",
   "formatted": "4757247cdc91c3c9",
-  "entries": "edb408dba8e974fd",
+  "entries": "8bc708038cbd2ea2",
   "queries": "a9c62d6a06d5d8f8",
-  "graphs": "eb438b6a2850b08b"
+  "graphs": "850fadf1e4a2ed8f"
  },
  "std/M128.utu normal": {
   "diagnostics": "321b02d5fb61add8",
@@ -2033,9 +2033,9 @@
  "std/M32.utu analysis": {
   "diagnostics": "736366443745708a",
   "formatted": "077f011a5acbf792",
-  "entries": "571413707e253e1f",
+  "entries": "cd90d7c1ec4196f9",
   "queries": "502898bfc2b34c2e",
-  "graphs": "ea8b493f4d2c5f94"
+  "graphs": "2f9e2602a607c496"
  },
  "std/M32.utu normal": {
   "diagnostics": "736366443745708a",
@@ -2044,9 +2044,9 @@
  "std/M64.utu analysis": {
   "diagnostics": "7b73048ae5e43331",
   "formatted": "06d5bb20eb44a379",
-  "entries": "7b388f25801e65a8",
+  "entries": "430220c68a25b2c6",
   "queries": "38723dd6d86ba44a",
-  "graphs": "0235ae8e6cf07f76"
+  "graphs": "c7a6e7200a26bb6c"
  },
  "std/M64.utu normal": {
   "diagnostics": "7b73048ae5e43331",
@@ -2055,9 +2055,9 @@
  "std/NumberField.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "7e67e279d773579d",
+  "entries": "4f8d29ec54556269",
   "queries": "85495e4448c3e186",
-  "graphs": "2247121df0853467"
+  "graphs": "c9104b833d8c585b"
  },
  "std/NumberField.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2066,9 +2066,9 @@
  "std/Ord.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "a1ed513b84b17833",
+  "entries": "e208973bd509fb91",
   "queries": "81c1b269f687a7d8",
-  "graphs": "a2a9c25f67932262"
+  "graphs": "1b385e08c8455ecb"
  },
  "std/Ord.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2077,31 +2077,31 @@
  "std/PersistentSegmentTree.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "a867ef3e942337ae",
+  "entries": "fa2713c285e793ed",
   "queries": "eef8081446ca24cc",
-  "graphs": "301cd28c99e87980"
+  "graphs": "5432d9144726bbde"
  },
  "std/PersistentSegmentTree.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01"
  },
  "std/Prelude.utu analysis": {
-  "diagnostics": "7633e7add526d3cb",
-  "formatted": "9ce4fd7d28279e30",
-  "entries": "f50b9bd437538392",
+  "diagnostics": "0ff48b74ab098910",
+  "formatted": "c553970b2676fe4a",
+  "entries": "fa040b95a787e52c",
   "queries": "4e2e493d277a7fee",
-  "graphs": "009d473905a4b173"
+  "graphs": "895178ed24a045d4"
  },
  "std/Prelude.utu normal": {
-  "diagnostics": "7633e7add526d3cb",
-  "formatted": "9ce4fd7d28279e30"
+  "diagnostics": "0ff48b74ab098910",
+  "formatted": "c553970b2676fe4a"
  },
  "std/Promise.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0724390d84a0772b",
+  "entries": "1c4e73b9be3cf1e9",
   "queries": "17ebb3d05190f956",
-  "graphs": "4375a85deab5b189"
+  "graphs": "a922af14b91f7bc1"
  },
  "std/Promise.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2110,9 +2110,9 @@
  "std/Random.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "1fe4075b45fecede",
+  "entries": "458b5010c777e9fc",
   "queries": "de74f862c5ad48dd",
-  "graphs": "f48aff33a1dccbb9"
+  "graphs": "072737c0ffa0b8b6"
  },
  "std/Random.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2121,9 +2121,9 @@
  "std/Result.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "0696f9e6f7cc021e",
+  "entries": "1673db2557905452",
   "queries": "d1ba104bb50918fc",
-  "graphs": "a6c6cace86321626"
+  "graphs": "ec5aec7b807435e2"
  },
  "std/Result.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2132,9 +2132,9 @@
  "std/SegmentTree.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "75d66f3f0e633ec0",
+  "entries": "618e46f6d476a41f",
   "queries": "cc613e848e74b4f1",
-  "graphs": "63680f04bb9be614"
+  "graphs": "00f9e786641e2fe0"
  },
  "std/SegmentTree.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2143,9 +2143,9 @@
  "std/Spatial.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "a1b87658d7664ee8",
-  "queries": "e735fcac511a5921",
-  "graphs": "f070f29c6d2d94ed"
+  "entries": "57b31d223340f415",
+  "queries": "1a847068efef4971",
+  "graphs": "b4e3c16895635bb6"
  },
  "std/Spatial.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2154,9 +2154,9 @@
  "std/Str.utu analysis": {
   "diagnostics": "71eec3ff4cb1e0e2",
   "formatted": "deb058783150c5f1",
-  "entries": "378cde4f733d7526",
+  "entries": "5f4b8c907ae825dc",
   "queries": "869ef7488ce2db4b",
-  "graphs": "11510ca5cd8a6110"
+  "graphs": "c545a8e7aa6667c5"
  },
  "std/Str.utu normal": {
   "diagnostics": "71eec3ff4cb1e0e2",
@@ -2165,9 +2165,9 @@
  "std/StrMap.utu analysis": {
   "diagnostics": "3b1bd22af4805f81",
   "formatted": "78461320eb179068",
-  "entries": "ec0cdc9a72b69954",
+  "entries": "22f833d504059bc2",
   "queries": "969ec33ba2bb7f33",
-  "graphs": "145ad529256637a1"
+  "graphs": "a278444bfe04a3be"
  },
  "std/StrMap.utu normal": {
   "diagnostics": "3b1bd22af4805f81",
@@ -2176,9 +2176,9 @@
  "std/Stream.utu analysis": {
   "diagnostics": "7b46fe954725b6ad",
   "formatted": "11a6ae476cba8216",
-  "entries": "50164a36921b2a77",
+  "entries": "52083c8e5075d667",
   "queries": "e310e741fc506d23",
-  "graphs": "2d576816b969ea2d"
+  "graphs": "e51e6960939c3393"
  },
  "std/Stream.utu normal": {
   "diagnostics": "7b46fe954725b6ad",
@@ -2187,9 +2187,9 @@
  "std/Time.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "e7134861cabd41b8",
+  "entries": "08a567e2ea0148f4",
   "queries": "379fa63141587138",
-  "graphs": "f3af24f4f4d160a3"
+  "graphs": "15fff2af9d661155"
  },
  "std/Time.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2198,9 +2198,9 @@
  "std/U32.utu analysis": {
   "diagnostics": "ec5a69a9cfb3bf73",
   "formatted": "d53e70b5fd88fcbf",
-  "entries": "19a95291242aa519",
+  "entries": "1f66dddc358b123f",
   "queries": "381a75d821426a2d",
-  "graphs": "4a02a494d96b7b1a"
+  "graphs": "eaecebd14fbf8b64"
  },
  "std/U32.utu normal": {
   "diagnostics": "ec5a69a9cfb3bf73",
@@ -2209,9 +2209,9 @@
  "std/U64.utu analysis": {
   "diagnostics": "18bb751a06316591",
   "formatted": "516ad35305988548",
-  "entries": "e789ac212ba5fe1c",
+  "entries": "9b1cf52ea36df7fb",
   "queries": "aa184cbde491d9a1",
-  "graphs": "fa06b4d4ef2978cf"
+  "graphs": "8f2950468a5d5be2"
  },
  "std/U64.utu normal": {
   "diagnostics": "18bb751a06316591",
@@ -2220,23 +2220,23 @@
  "std/V128.utu analysis": {
   "diagnostics": "f2ff07f77d8f9072",
   "formatted": "8e78dc4d7fd726dc",
-  "entries": "81394a3ff3cfba6c",
+  "entries": "c94b7ac09dd43c03",
   "queries": "154481bf2bf55dc1",
-  "graphs": "1c47ec415c58e37e"
+  "graphs": "2901007234635d82"
  },
  "std/V128.utu normal": {
   "diagnostics": "f2ff07f77d8f9072",
   "formatted": "8e78dc4d7fd726dc"
  },
  "std/Wutu.utu analysis": {
-  "diagnostics": "a8c585d6597ad3e8",
-  "formatted": "6ce9b6afe318e764",
-  "entries": "d7bcb9d38abf3fff",
-  "queries": "bddfa60079a8ea89",
-  "graphs": "dd8264ff3a9222c4"
+  "diagnostics": "288dcadb68426e7d",
+  "formatted": "d456eb05876915a8",
+  "entries": "306a62e72d6d77ae",
+  "queries": "a84036d36f32ee12",
+  "graphs": "27ef3712d75e0436"
  },
  "std/Wutu.utu normal": {
-  "diagnostics": "a8c585d6597ad3e8",
-  "formatted": "6ce9b6afe318e764"
+  "diagnostics": "288dcadb68426e7d",
+  "formatted": "d456eb05876915a8"
  }
 }
