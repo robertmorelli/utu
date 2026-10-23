@@ -538,7 +538,7 @@ function seatPrelude(utu, stdlib) {
   }
   // `@json`'s runtime: text the compiler grafts, not a file.
   const runtime = stdlib.get('std:JsonRuntime');
-  if (typeof runtime === 'string') {
+  if (typeof runtime === 'string' && utu.json_runtime_room) {
     const bytes = encoder.encode(runtime);
     const at = utu.json_runtime_room(bytes.length);
     new Uint8Array(utu.src.buffer).set(bytes, at);
