@@ -83,6 +83,12 @@ or `continue`, a return of a value) drops the block's `errdefer`s unrun.
 A JavaScript exception thrown through a block runs its `defer`s, newest
 first, before a `catch` sees it, but no `errdefer`: it is not an error return.
 
+A `defer` that throws does not stop the older ones: they still run, newest
+first, at any exit and while unwinding, and none runs twice. Then the
+exception goes on; when several were thrown, the newest, as JavaScript's
+`finally` does. With `defer a(); defer b();` and `b()` throwing at the
+block's end, `a()` runs, then `b()`'s exception leaves the block.
+
 `errdefer` is legal only in a function, or a closure, that returns a Result.
 
 ## Diagnostics

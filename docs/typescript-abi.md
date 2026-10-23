@@ -214,13 +214,18 @@ Closures remain JS functions and preserve identity; boolean-returning closures
 produce JS booleans. Function pointers remain UTU-internal.
 
 The same holds at the other edges where utu values meet JavaScript: an `@es`
-body's arguments and results, and an export's results. A `Bool` reaches
+body's arguments and results, and an export's arguments and results. A `Bool` reaches
 JavaScript as `true` or `false` and comes back as `!!v`. A `U32` reaches it
 unsigned (`v >>> 0`), and a `U64` as an unsigned BigInt
 (`BigInt.asUintN(64, v)`); on the way in, wasm keeps a value's low bits, so
 `4294967295` and `-1` are the same `U32`. A tuple result is a JS array, each
 element converted so. An `@es` result of a nullable type
 treats `undefined` as `null`.
+
+An `@es` body bound to a `fun` or `cl` type should be a function. One that
+is not plainly one (an arrow or `function`), such as `Math.abs`, is tested
+as the glue loads: a value that is no function throws a `TypeError` naming
+the binding (`f: @es gave number, not a function`) before the program runs.
 
 Safe builds (`-O small`, `fast`, `debug`) also check an `export lib`
 function's arguments: a `Str` must be a string, a `?Str` a string or null, a

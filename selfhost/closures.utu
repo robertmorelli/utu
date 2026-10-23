@@ -370,6 +370,10 @@ vec saved_loops: I32;
 /// Set the enclosing function's checking state aside (its locals, labels,
 /// loops, and defers), to check a closure's body as a function of its own.
 fn save_function() void {
+    saved_marks.push(function_flags[0]);
+    saved_marks.push(function_guards[0]);
+    saved_marks.push(function_running[0]);
+    begin_exit_flag();
     saved_marks.push(function_defers[0]);
     function_defers[0] = defer_node.len();
     saved_marks.push(saved_locals.len());
@@ -421,7 +425,11 @@ fn restore_function() void {
     let params = saved_marks[n - 3];
     let locals_at = saved_marks[n - 4];
     function_defers[0] = saved_marks[n - 5];
-    saved_marks.resize(n - 5);
+    function_running[0] = saved_marks[n - 6];
+    function_guards[0] = saved_marks[n - 7];
+    exit_flags.resize(function_flags[0]);
+    function_flags[0] = saved_marks[n - 8];
+    saved_marks.resize(n - 8);
     cur_locals.clear();
     for (locals_at ..< saved_locals.len()) |i| { cur_locals.push(saved_locals[i]); };
     saved_locals.resize(locals_at);

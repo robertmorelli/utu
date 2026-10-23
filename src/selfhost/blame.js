@@ -26,7 +26,7 @@
 // source and its bytes per line. A bucket's brotli share is an estimate
 // (`estimateCompressed`).
 
-import { glueModuleSource, glueName, splitBody } from '../runtime/host-imports.js';
+import { FUN_CHECK, glueModuleSource, glueName, splitBody } from '../runtime/host-imports.js';
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
@@ -401,16 +401,19 @@ export function blameGlue(spec, esPlaces = new Map()) {
   const size = text => encoder.encode(text).length;
   const hoisted = new Set();
   const parts = [];
+  let check = false;
   for (const fields of Object.values(spec.es ?? {})) {
     for (const [field, body] of Object.entries(fields ?? {})) {
       const { imports, expr } = splitBody(body);
       for (const decl of imports) hoisted.add(decl);
+      check ||= expr.includes('$utuFn(');
       parts.push({ field, bytes: size(`export const ${glueName(field)} = (\n${expr}\n);`) });
     }
   }
   let at = 0;
   const add = (bytes, what, place = -1, field = null) => { if (bytes > 0) records.push({ at, bytes, section: 'glue', what, place, site: -1, fn: -1, helper: -1, field }); at += bytes; };
   if (hoisted.size) add(size(`${[...hoisted].join('\n')}\n\n`), 'glue imports');
+  if (check) add(size(`${FUN_CHECK}\n\n`), 'glue helper');
   parts.forEach((part, i) => {
     add(part.bytes, '@es binding', esPlaces.get(part.field) ?? -1, part.field);
     add(i < parts.length - 1 ? 2 : 1, 'glue joins');

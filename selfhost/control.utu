@@ -580,6 +580,7 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     let handler = last_child(node);
     let m = w_mark();
     let mb = w_mark();
+    let sets = flag_sets[0];
     let t = first_branch(check_block(body_, expect, cx), expect, body_);
     w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mb);
     let mh = w_mark();
@@ -592,6 +593,8 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     } else {
         w_leaf(Op.Drop, vt_none, 0, 0);
     };
+    // An exit in the body whose defer threw left the exit flag set.
+    if flag_sets[0] > sets and exit_flag(false) >= 0 { set_exit_flag(-1); };
     t = other_branch(t, check_block(handler, t, cx), handler);
     w_node(Op.Seq, repr(t), 0, 0, mh);
     w_node(Op.Try, repr(t), new_label(), 0, m);
