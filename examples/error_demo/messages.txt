@@ -9531,36 +9531,6 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 12 │ }
 --- exit 1
 
-=== utu check examples/error_demo/types/603_generic_global_list.utu
- ERROR  A global of generic Stash cannot use T
-        generic-global · examples/error_demo/types/603_generic_global_list.utu:6:21
-
- 4 │
- 5 │ mod Stash[T] {
- 6 │     let items: List[T] = List[T].new();
-   │                     ━
-   │                     ╰─ differs per instance
- 7 │     fn count() I32 { items.len(); }
- 8 │ }
-
-  note  A mod's global is one for all its instances; make it a function's value
---- exit 1
-
-=== utu check examples/error_demo/types/604_generic_global_nullable.utu
- ERROR  A global of generic Box cannot use T
-        generic-global · examples/error_demo/types/604_generic_global_nullable.utu:4:16
-
- 2 │ // Expect: A global of generic Box cannot use T
- 3 │ mod Box[T] {
- 4 │     let item: ?T = null;
-   │                ━
-   │                ╰─ differs per instance
- 5 │     fn empty() Bool { item == null; }
- 6 │ }
-
-  note  A mod's global is one for all its instances; make it a function's value
---- exit 1
-
 === utu check examples/error_demo/types/605_fun_array_global_read.utu
  ERROR  fun() Str cannot be stored; use cl() Str
         fun-in-field · examples/error_demo/types/605_fun_array_global_read.utu:4:34
@@ -9777,6 +9747,41 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │                  ╰─ unexpected
  9 │     p.x.to_i32();
 10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/740_generic_global_cycle.utu
+ ERROR  Globals y0 and x each need the other set first
+        global-cycle · examples/error_demo/types/740_generic_global_cycle.utu:9:19
+
+ 4 │     let x: I32 = Q[Str].y() + 1;
+   │         ─
+   │         ╰─ needs y0
+   ┆
+ 7 │
+ 8 │ mod Q[T] {
+ 9 │     let y0: I32 = P[I32].get() + 1;
+   │                   ━━━━━━━━━━━━━━━━
+   │                   ╰─ needs x
+10 │     fn y() I32 { y0; }
+11 │ }
+
+  note  in Q[Str]
+--- exit 1
+
+=== utu check examples/error_demo/types/741_generic_global_instance.utu
+ ERROR  v is Str, got I32
+        type-mismatch · examples/error_demo/types/741_generic_global_instance.utu:4:16
+
+ 2 │ // Expect: v is Str, got I32
+ 3 │ mod Zero[T] {
+ 4 │     let v: T = 0;
+   │            ─   ━
+   │            │   ╰─ I32
+   │            ╰─ Str
+ 5 │     fn get() T { v; }
+ 6 │ }
+
+  note  in Zero[Str]
 --- exit 1
 
 === utu check examples/error_demo/types/74_unknown_field_read.utu

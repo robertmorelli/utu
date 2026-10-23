@@ -679,7 +679,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
         return es_read(decl, t);
     };
     if decl_es[decl] >= 0 { return es_read(decl, decl_ty[decl]); };
-    if k == Decl.Global.to_i32() { return global_get(decl); };
+    if k == Decl.Global.to_i32() { return global_get(decl, global_inst(decl, cx.inst)); };
     if k == Decl.Fn.to_i32() and is_generator(decl) {
         report(Diag.GeneratorCall, node, decl_name[decl]);
         return error_value();
@@ -1255,8 +1255,46 @@ fn check_let(node: I32, cx: Cx) I32 {
     ty_void();
 }
 
-/// By declaration: its wasm global, or -1.
-vec decl_global: I32;
+//! == Global instances
+//!
+//! A global of a generic mod is one per instance: each instance of the mod
+//! has its own, of its own type, set by its own initializer. A global of
+//! any other module has one instance, 0.
+
+/// By global instance: its declaration and module instance.
+vec gi_decl: I32;
+vec gi_inst: I32;
+/// Its wasm global; -1 not made yet, -2 none (reported).
+vec gi_global: I32;
+/// Its type.
+vec gi_ty: I32;
+/// Its index in @computed_gi, or -1.
+vec gi_init: I32;
+/// The next instance of the same declaration, or -1.
+vec gi_next: I32;
+/// By declaration: its first global instance, or -1.
+vec decl_gi: I32;
+
+/// Global `decl` in module instance `inst`, made when new (not checked).
+fn global_instance(decl: I32, inst: I32) I32 {
+    let g = decl_gi[decl];
+    while (g >= 0) {
+        if gi_inst[g] == inst { return g; };
+        g = gi_next[g];
+    };
+    let id = gi_decl.len();
+    gi_decl.push(decl);
+    gi_inst.push(inst);
+    gi_global.push(-1);
+    gi_ty.push(0);
+    gi_init.push(-1);
+    gi_next.push(decl_gi[decl]);
+    decl_gi[decl] = id;
+    id;
+}
+
+/// The instance a global is read in from code in instance `inst`.
+fn global_inst(decl: I32, inst: I32) I32 { instance_for(module_of(decl), inst); }
 
 fn global_type(decl: I32) I32 { global_type_in(decl, 0); }
 
@@ -1298,53 +1336,60 @@ fn fn_value_in(decl: I32, inst: I32) I32 {
     t;
 }
 
-fn global_get(decl: I32) I32 {
+/// Global `decl` of module instance `inst`, read.
+fn global_get(decl: I32, inst: I32) I32 {
+    let gi = global_instance(decl, inst);
     // Its initializer is checked where its diagnostics are kept.
-    if speculating[0] > 0 and decl_global[decl] == -1 {
+    if speculating[0] > 0 and gi_global[gi] == -1 {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return global_type(decl);
+        return global_type_in(decl, inst);
     };
-    let g = global_of(decl);
+    let g = global_of(gi);
     if g < 0 { return error_value(); };
-    let t = decl_ty[decl];
+    let t = gi_ty[gi];
     w_leaf(Op.GlobalGet, glob_type[g], g, 0);
     // A computed global: noted, and a reference held nullable is read non-null.
-    if decl_init[decl] >= 0 {
-        note_edge(-2 - decl);
+    if gi_init[gi] >= 0 {
+        note_edge(-2 - gi);
         if glob_type[g] != repr(t) { w_node(Op.RefAsNonNull, repr(t), 0, 0, w_mark() - 1); };
     };
     t;
 }
 
-/// A top-level `let`: a wasm global holding its constant value.
-fn global_of(decl: I32) I32 {
-    if decl_global[decl] != -1 { return decl_global[decl]; };
+/// A top-level `let` (global instance gi): a wasm global holding its
+/// constant value, or one its initializer sets.
+fn global_of(gi: I32) I32 {
+    if gi_global[gi] != -1 { return gi_global[gi]; };
+    enter_instance(gi_inst[gi], -1);
+    let g = make_global(gi);
+    leave_instance();
+    g;
+}
+
+/// @global_of's work, in gi's instance.
+fn make_global(gi: I32) I32 {
+    let decl = gi_decl[gi];
     let node = decl_node[decl];
-    // One that differs per instance of its generic mod was reported (see @validate_generic_global).
-    let module = module_of(decl);
-    if module >= 0 and is_generic(module) and per_instance(next_sibling(first_child(node)), module) >= 0 {
-        decl_global[decl] = -2;
-        return -2;
-    };
-    let t = global_type(decl);
+    let t = global_type_in(decl, gi_inst[gi]);
+    gi_ty[gi] = t;
     let init = last_child(node);
     let m = w_mark();
-    let cx = Cx { inst: 0, fi: -1, result: t };
+    let cx = Cx { inst: gi_inst[gi], fi: -1, result: t };
     let actual = constant(init, t, cx);
     if actual < 0 {
         w_stack.resize(m);
         if is_wat(init) and not dsl_has_failed(init) {
-            decl_global[decl] = -2;
+            gi_global[gi] = -2;
             report(Diag.WatPlace, init, -1);
             return -2;
         };
-        return computed_global(decl, t, init);
+        return computed_global(gi, t, init);
     };
     want(init, t, Why.Annotation, next_sibling(first_child(node)), decl_name[decl]);
     coerce(actual, t, init);
     unwant();
     let g = add_global(repr(t), false, w_pop());
-    decl_global[decl] = g;
+    gi_global[gi] = g;
     g;
 }
 
@@ -1357,17 +1402,15 @@ fn global_of(decl: I32) I32 {
 //! called). So no global is read before it is set; a cycle is an error. A
 //! non-null reference is held nullable and read with `ref.as_non_null`.
 
-/// The computed globals, in the order their initializers were made.
-vec computed_decl: I32;
+/// The computed globals (global instances), in the order their initializers were made.
+vec computed_gi: I32;
 /// Each one's initializer function.
 vec computed_init: I32;
-/// By declaration: its index in @computed_decl, or -1.
-vec decl_init: I32;
 /// What the code being checked belongs to: a function instance; -1 an
-/// entry function; -2 - g global g's initializer.
+/// entry function; -2 - g global instance g's initializer.
 vec cur_fn: I32 = [-1];
 /// What code reads or calls, from (as @cur_fn) to (a function instance, or
-/// -2 - g for computed global g).
+/// -2 - g for computed global instance g).
 vec edge_from: I32;
 vec edge_to: I32;
 
@@ -1377,27 +1420,28 @@ fn note_edge(to: I32) void {
     edge_to.push(to);
 }
 
-/// Global `decl` of type t, computed by `init`: its wasm global (zero or
-/// null until set) and its initializer, a function checked now, perhaps
+/// Global instance gi of type t, computed by `init`: its wasm global (zero
+/// or null until set) and its initializer, a function checked now, perhaps
 /// in the middle of another.
-fn computed_global(decl: I32, t: I32, init: I32) I32 {
+fn computed_global(gi: I32, t: I32, init: I32) I32 {
+    let decl = gi_decl[gi];
     let vt = repr(t);
     let st = vt_nullable(vt);
     if vt_is_ref(st) { w_leaf(Op.RefNull, st, heap_of(st), 0); } else { push_number(t, 0.to_i64(), false); };
     let g = add_global(st, true, w_pop());
-    decl_global[decl] = g;
-    decl_init[decl] = computed_decl.len();
-    computed_decl.push(decl);
+    gi_global[gi] = g;
+    gi_init[gi] = computed_gi.len();
+    computed_gi.push(gi);
     let f = defined_func(vl_empty(), t);
     func_debug_name[f] = name_add(word_text(decl_name[decl]) + ".init");
     computed_init.push(f);
     let outer = cur_fn[0];
-    cur_fn[0] = -2 - decl;
+    cur_fn[0] = -2 - gi;
     save_function();
     cur_params[0] = 0;
     mark_boxes(init);
     let m = w_mark();
-    let cx = Cx { inst: 0, fi: -1, result: t };
+    let cx = Cx { inst: gi_inst[gi], fi: -1, result: t };
     // The start function sets it, and a start function cannot suspend.
     let at = awaits_in(init);
     if at >= 0 {
@@ -1419,7 +1463,7 @@ fn computed_global(decl: I32, t: I32, init: I32) I32 {
 /// After checking: the order the computed globals are set in (see above),
 /// cycles reported, and the start function that sets them.
 fn start_globals() void {
-    let n = computed_decl.len();
+    let n = computed_gi.len();
     if n == 0 { return; };
     // The edges by source: function instances, then initializers.
     let nf = fi_decl.len();
@@ -1460,7 +1504,7 @@ fn start_globals() void {
                         top += 1;
                     };
                 } else {
-                    vl_add(decl_init[-2 - t]);
+                    vl_add(gi_init[-2 - t]);
                 };
             };
         };
@@ -1473,7 +1517,7 @@ fn start_globals() void {
     let by_place = Array[I32].new(n, 0);
     for (0 ..< n) |k| {
         let j = k;
-        while (j > 0 and node_first[decl_node[computed_decl[by_place[j - 1]]]] > node_first[decl_node[computed_decl[k]]]) {
+        while (j > 0 and node_first[decl_node[gi_decl[computed_gi[by_place[j - 1]]]]] > node_first[decl_node[gi_decl[computed_gi[k]]]]) {
             by_place[j] = by_place[j - 1];
             j -= 1;
         };
@@ -1492,7 +1536,7 @@ fn start_globals() void {
 fn edge_source(from: I32, nf: I32) I32 {
     if from >= 0 { return from; };
     if from == -1 { return -1; };
-    nf + decl_init[-2 - from];
+    nf + gi_init[-2 - from];
 }
 
 /// Computed global k set (`global.set g (call init)`), after its
@@ -1503,18 +1547,22 @@ fn set_global_after(k: I32, deps: Array[I32], deps_first: Array[I32], state: Arr
     for (deps_first[k] ..< deps_first[k + 1]) |i| {
         let j = deps[i];
         if state[j] == 1 {
-            let d = computed_decl[k];
-            report2(Diag.GlobalCycle, last_child(decl_node[d]), decl_name[d], if j == k { -1; } else { computed_decl[j]; }, -1);
-            if j != k { diag_place(Extra.Related, first_child(decl_node[computed_decl[j]]), "needs " + word_text(decl_name[d])); };
+            let d = gi_decl[computed_gi[k]];
+            let o = gi_decl[computed_gi[j]];
+            // (A generic mod's: which instance, said in a note.)
+            enter_instance(gi_inst[computed_gi[k]], -1);
+            report2(Diag.GlobalCycle, last_child(decl_node[d]), decl_name[d], if j == k { -1; } else { o; }, -1);
+            if j != k { diag_place(Extra.Related, first_child(decl_node[o]), "needs " + word_text(decl_name[d])); };
+            leave_instance();
         } else {
             set_global_after(j, deps, deps_first, state);
         };
     };
     state[k] = 2;
     let m = w_mark();
-    let d = computed_decl[k];
-    w_leaf(Op.Call, repr(decl_ty[d]), computed_init[k], 0);
-    w_node(Op.GlobalSet, vt_none, decl_global[d], 0, m);
+    let gi = computed_gi[k];
+    w_leaf(Op.Call, repr(gi_ty[gi]), computed_init[k], 0);
+    w_node(Op.GlobalSet, vt_none, gi_global[gi], 0, m);
 }
 
 /// A constant expression (a literal, maybe negated), or -1.
@@ -1847,7 +1895,7 @@ fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
     // A `cl` binding is a value: called as any closure is.
     if decl_es[decl] >= 0 and not ty_is(decl_ty[decl], Ty.Closure) { return call_es(decl, args, m, node, cx); };
     if not decl_is(decl, Decl.Fn) {
-        let t = if decl_is(decl, Decl.Global) { global_type(decl); } else { decl_ty[decl]; };
+        let t = if decl_is(decl, Decl.Global) { global_type_in(decl, global_inst(decl, cx.inst)); } else { decl_ty[decl]; };
         if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
         if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, node, cx); };
         if ty_is(t, Ty.Error) { return finish_error(args, m, cx); };
@@ -2015,12 +2063,17 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
         return call_es(decl, args, m, node, cx);
     };
     if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
-    let base = first_child(callee);
-    let inst = if is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module) {
-        module_instance(node_decl[base], node_alias[base], callee, cx);
-    } else { ty_inst(type_path(base, cx.inst)); };
+    let inst = member_instance(callee, cx);
     if inst < 0 { return finish_error(args, m, cx); };
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
+}
+
+/// The module instance `T.x` names x in: M's (`M.x`, `alias.x`), or the
+/// type's (`M[A].x`, `T.x`); -1 reported.
+fn member_instance(node: I32, cx: Cx) I32 {
+    let base = first_child(node);
+    if is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module) { return module_instance(node_decl[base], node_alias[base], node, cx); };
+    ty_inst(type_path(base, cx.inst));
 }
 
 /// The instance of `module` that `M.f` or `alias.f` (`alias` the alias, or
@@ -2508,19 +2561,27 @@ fn not_value(at: I32, decl: I32) I32 {
 
 /// `x.f` (not called): a module's global, or a field.
 fn check_field(node: I32, expect: I32, cx: Cx) I32 {
+    let base = first_child(node);
     if is_module_path(node) {
         let name = last_child(node);
-        if decl_is(node_decl[name], Decl.Global) { return global_get(node_decl[name]); };
+        if decl_is(node_decl[name], Decl.Global) {
+            let inst = module_instance(node_decl[base], node_alias[base], node, cx);
+            return if inst < 0 { error_value(); } else { global_get(node_decl[name], inst); };
+        };
         if node_decl[name] < 0 { return module_member_missing(node_decl[first_child(node)], name); };
         // `m.f`: the function, as a value.
         if decl_is(node_decl[name], Decl.Fn) { return member_fn_value(node, node_decl[name], instance_for(node_decl[first_child(node)], cx.inst)); };
         if is_type_decl(node_decl[name]) { return not_value(node, node_decl[name]); };
         return unsupported(node);
     };
-    // `ints.make` with `using M[A] |ints|`: M's function in M[A], as a value.
-    let base = first_child(node);
+    // `ints.make` with `using M[A] |ints|`: M's function in M[A], as a
+    // value; `ints.x`, M[A]'s global x.
     if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Alias) and decl_is(decl_a[node_decl[base]], Decl.Module) {
         let f = static_member(decl_a[node_decl[base]], word_of(last_child(node)));
+        if decl_is(f, Decl.Global) {
+            node_decl[last_child(node)] = f;
+            return global_get(f, alias_instance(node_decl[base]));
+        };
         if decl_is(f, Decl.Fn) {
             node_decl[last_child(node)] = f;
             return member_fn_value(node, f, alias_instance(node_decl[base]));
@@ -2572,7 +2633,10 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let owner = node_decl[first_child(node)];
     if decl_is(owner, Decl.Foreign) and decl_a[owner] >= 0 { return check_foreign_root(node, decl_a[owner], word_of(last_child(node)), expect); };
     let decl = node_decl[last_child(node)];
-    if decl_is(decl, Decl.Global) { return global_get(decl); };
+    if decl_is(decl, Decl.Global) {
+        let inst = member_instance(node, cx);
+        return if inst < 0 { error_value(); } else { global_get(decl, inst); };
+    };
     if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl); };
     let name = last_child(node);
     if decl < 0 and (decl_is(owner, Decl.IntEnum) or decl_is(owner, Decl.Enum)) and not reported_within(name) {
@@ -2914,10 +2978,15 @@ fn reset_check() void {
     cur_locals.clear();
     decl_local.resize(decl_kind.len());
     decl_ty.resize(decl_kind.len());
-    decl_global.resize(decl_kind.len());
+    decl_gi.resize(decl_kind.len());
     decl_cause.resize(decl_kind.len());
-    decl_init.resize(decl_kind.len());
-    computed_decl.clear();
+    gi_decl.clear();
+    gi_inst.clear();
+    gi_global.clear();
+    gi_ty.clear();
+    gi_init.clear();
+    gi_next.clear();
+    computed_gi.clear();
     computed_init.clear();
     edge_from.clear();
     edge_to.clear();
@@ -2927,9 +2996,8 @@ fn reset_check() void {
     for (0 ..< decl_kind.len()) |d| {
         decl_local[d] = -1;
         decl_ty[d] = 0;
-        decl_global[d] = -1;
+        decl_gi[d] = -1;
         decl_cause[d] = -1;
-        decl_init[d] = -1;
     };
     reset_data();
     reset_mems();
@@ -3135,7 +3203,7 @@ fn check_item(item: I32) void {
         fn_instance(node_decl[next_sibling(first_child(item))], 0);
         return;
     };
-    if is_kind(item, Node.Global_decl) and not is_es(last_child(item)) { global_of(node_decl[first_child(item)]); };
+    if is_kind(item, Node.Global_decl) and not is_es(last_child(item)) { global_of(global_instance(node_decl[first_child(item)], 0)); };
 }
 
 /// Resolution reports on the whole entry file; drop what is in surfaces the

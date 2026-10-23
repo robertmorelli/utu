@@ -642,6 +642,23 @@ mod tour {
         \\}
         ;
     }
+    fn generic_global_sample() Str {
+        \\using Buffer from std:Buffer;
+        \\
+        \\mod Stash[T] {
+        \\    let items: Buffer[T] = Buffer[T].new();   // one per instance
+        \\    fn add(x: T) void { items.push(x); }
+        \\    fn size() I32 { items.len(); }
+        \\}
+        \\
+        \\export main() I32 {
+        \\    Stash[I32].add(1);
+        \\    Stash[I32].add(2);
+        \\    Stash[Str].add("a");
+        \\    Stash[I32].size() * 10 + Stash[Str].size();   // 21
+        \\}
+        ;
+    }
     fn std_generic_sample() Str {
         \\using StrMap from std:StrMap;
         \\
@@ -1461,6 +1478,22 @@ mod tour {
             }
             = code.block(member_values_sample());
             = code.block(generic_sample());
+            p {
+                "A global in a generic module is one per instance: ";
+                code {
+                    "Stash[I32]";
+                }
+                " and ";
+                code {
+                    "Stash[Str]";
+                }
+                " each have their own ";
+                code {
+                    "items";
+                }
+                ", set by its own initializer.";
+            }
+            = code.block(generic_global_sample());
             = code.block(std_generic_sample());
             = code.block(files_multi());
             h2 {
