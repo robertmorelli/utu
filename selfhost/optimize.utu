@@ -349,9 +349,19 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
         };
         // A block's contents come after its opcode, which a value cannot cross.
         if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or op == Op.NullElse.to_i32() or w_count[node] == 0 { return false; };
+        // So does a CastArms' value, its blocks opened: one that takes the
+        // value an arm starts with (a Held) would find it outside them.
+        if op == Op.CastArms.to_i32() and holds_held(write) { return false; };
         holder = node;
         place = 0;
     };
+    false;
+}
+
+/// Whether `node` takes, somewhere in it, the value on the stack an arm starts with.
+fn holds_held(node: I32) Bool {
+    if w_op[node] == Op.Held.to_i32() { return true; };
+    for (0 ..< w_count[node]) |i| { if holds_held(w_kid(node, i)) { return true; }; };
     false;
 }
 
