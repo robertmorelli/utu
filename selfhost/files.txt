@@ -31,4 +31,5 @@ json_runtime.utu
 stored.utu
 wutu_parse.utu
 wutu.utu
+blame.utu
 lib.utu

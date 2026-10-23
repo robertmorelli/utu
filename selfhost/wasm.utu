@@ -160,6 +160,8 @@ vec ht_open: U8;
 vec ht_single: U8;
 /// Per field: storage type, then 1 when mutable.
 vec ht_fields: I32;
+/// The syntax being checked when it was made (@cur_src), or -1: blame.utu's.
+vec ht_src: I32;
 
 /// Function types are interned by signature; arrays by element; structs are
 /// nominal (two structs with the same fields are different types).
@@ -173,6 +175,7 @@ fn ht_new(kind: Heap, a: I32, b: I32) I32 {
     ht_super.push(-1);
     ht_open.push(0);
     ht_single.push(0);
+    ht_src.push(cur_src[0]);
     id;
 }
 
@@ -277,6 +280,8 @@ vec glob_module_name: I32;
 /// Import: field name; defined: export name, or -1.
 vec glob_field_name: I32;
 vec glob_index: I32;
+/// As @ht_src.
+vec glob_src: I32;
 
 /// FuncKind
 vec memory_kind: U8;
@@ -293,6 +298,8 @@ vec data_memory: I32;
 vec data_start: I32;
 vec data_len: I32;
 vec data_bytes: U8;
+/// Its mem's declaration node: blame.utu's.
+vec data_src: I32;
 
 /// At `[0]`: 1 when the JS exception tag is imported.
 vec tag_used: U8;
@@ -367,6 +374,7 @@ fn add_global(t: I32, mutable: Bool, init: I32) I32 {
     glob_module_name.push(-1);
     glob_field_name.push(-1);
     glob_index.push(-1);
+    glob_src.push(cur_src[0]);
     g;
 }
 
@@ -393,6 +401,7 @@ fn reset_wasm() void {
     ht_open.clear();
     ht_single.clear();
     ht_fields.clear();
+    ht_src.clear();
     ht_table.clear();
     func_kind.clear();
     func_type_of.clear();
@@ -413,6 +422,7 @@ fn reset_wasm() void {
     glob_module_name.clear();
     glob_field_name.clear();
     glob_index.clear();
+    glob_src.clear();
     memory_kind.clear();
     memory_pages.clear();
     memory_module_name.clear();
@@ -421,6 +431,7 @@ fn reset_wasm() void {
     data_start.clear();
     data_len.clear();
     data_bytes.clear();
+    data_src.clear();
     tag_used.resize(1);
     tag_used[0] = 0;
     names.clear();
