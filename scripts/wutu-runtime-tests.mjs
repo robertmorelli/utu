@@ -22,6 +22,7 @@ async function withRuntime(body) {
     document: window.document,
     localStorage: memoryStorage(),
     addEventListener: (type, handler) => listeners.set(type, [...(listeners.get(type) ?? []), handler]),
+    __wutuStyles: undefined, // (each test's document starts with no sheets)
   };
   const saved = Object.fromEntries(Object.keys(globals).map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
   Object.assign(globalThis, globals);

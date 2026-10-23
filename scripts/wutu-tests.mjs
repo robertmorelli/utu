@@ -15,6 +15,7 @@ async function withDom(body) {
     Event: window.Event,
     MouseEvent: window.Event,
     addEventListener: () => {},
+    __wutuStyles: undefined, // (a fresh document has no sheets)
   };
   for (const [name, value] of Object.entries(globals)) {
     saved[name] = Object.getOwnPropertyDescriptor(globalThis, name);
