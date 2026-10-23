@@ -197,9 +197,11 @@ fn begin_exit_flag() void {
 fn run_inside(i: I32) void {
     defer_running.push(i);
     running_guards.push(defer_guard.len());
+    defer_bindings(i, true);
 }
 
 fn run_outside() void {
+    defer_bindings(defer_running[defer_running.len() - 1], false);
     defer_running.resize(defer_running.len() - 1);
     running_guards.resize(running_guards.len() - 1);
 }

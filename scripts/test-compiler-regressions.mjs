@@ -756,6 +756,16 @@ export lib {
       + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    total + order * 1000000;\n} }\n', 321393514],
     // A generator's `return;` runs its defers.
     ['fn g(n: I32) yield I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nexport lib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; t + seen[0] * 10; } }\n', 71],
+    // A return or break out of nested expansions of one generator runs each one's defers with its own
+    // parameters and locals (the outer one's ran with the inner one's).
+    ['vec seen: I32;\nfn gen(t: I32, k: I32) yield I32 {\n    let u = t + k;\n    let f = cl() I32 { u; };\n    defer seen.push(t * 10 + k);\n    defer seen.push(f());\n    yield t;\n    yield t + 1;\n}\n'
+      + 'fn three() I32 {\n    for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { for (gen(5, 6)) |c| { if b == 4 and c == 6 { return a * 100 + b * 10 + c; }; }; }; };\n    0;\n}\n'
+      + 'fn left() I32 { out: { for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { if b == 4 { break out a + b; }; }; }; 0; }; }\n'
+      + 'export lib { fn run() Str {\n    let r = three().to_str() + "|" + left().to_str() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].to_str() + ","; };\n    r;\n} }\n', '146|5|11,56,11,56,7,34,3,12,7,34,3,12,'],
+    // And an error return or a failed `try` there, before the function's errdefers.
+    ['vec seen: I32;\nfn gen(t: I32) yield I32 { defer seen.push(t); yield t; yield t + 1; }\nfn digit(c: I32) Result[I32, Str] { if c > 9 { return Result[I32, Str].err("bad"); }; Result[I32, Str].ok(c); }\n'
+      + 'fn f(mode: I32) Result[I32, Str] {\n    errdefer seen.push(0);\n    for (gen(1)) |a| { for (gen(10)) |b| {\n        if b == 11 and mode == 0 { return Result[I32, Str].err("ret"); };\n        if b == 11 { let x = try digit(b); };\n    }; };\n    Result[I32, Str].ok(0);\n}\n'
+      + 'export lib { fn run() Str {\n    let r = f(0).error() + f(1).error() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].to_str() + ","; };\n    r;\n} }\n', 'retbad|10,1,0,10,1,0,'],
     // An alias of a generic module's instance is its type there.
     ['mod B[T] {\n    struct &:\n        | v: T\n    fn of(x: T) & { &{ v: x }; }\n}\nmod L[T] {\n    enum &:\n        | Nil {}\n        | Cons { h: T, t: & }\n    fn cons(h: T, t: &) & { Cons { h: h, t: t }; }\n}\nusing B[I32] |bi|;\nusing B[Str] |bs|;\nusing L[I32] |li|;\nfn f(x: bi) I32 { x.v; }\nfn mk() bs { B[Str].of("in"); }\nfn len(x: li) I32 { alt x { Nil => 0, Cons |c| => 1 + len(c.t), }; }\nexport lib { fn run() I32 { let c: bi = &{ v: 3 }; let n: li = li.Nil {}; f(c) + mk().v.len() + len(L[I32].cons(1, n)); } }\n', 6],
     // `using M;` and `using M[A];` of a module whose type is `&`.
