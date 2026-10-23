@@ -6,7 +6,9 @@
 //! held for the consumer). Four rewrites remove them, in each function:
 //!
 //! / copies: a local set once, to a parameter never assigned, is that
-//!   parameter: its reads read the parameter.
+//!   parameter: its reads read the parameter. In size builds, one set once
+//!   to a number or a null is that constant, where it is read once or the
+//!   constant is no bigger than a read.
 //! / temporaries: a local set once to a pure value and read once in the next
 //!   statement, outside any loop and before anything assigns what the value
 //!   reads, is that value: it moves to the read.
@@ -15,12 +17,16 @@
 //! / unused: a local never read is not stored (its value is kept, and
 //!   dropped, when it has effects), and is no longer declared.
 //! / coalescing: locals of one type whose live ranges do not overlap share
-//!   one, and the locals are declared grouped by type (one run each).
+//!   one, and the locals are declared grouped by type (one run each). In
+//!   size builds a local set before read in a loop (a moved body's) does
+//!   not hold its slot through it.
 //! / loads (size builds): a field read of a local, read again twice or more
 //!   where nothing can have changed it, is kept in a local.
 //! / logic (size builds): `a and b`, `a or b` whose b is cheap, pure and
 //!   cannot trap are `i32.and`, `i32.or`, no `if`; a range test of one local
 //!   against constants is one unsigned comparison.
+//! / constants (first, and again after copies and temporaries): an
+//!   operation of constants is its value, and so on (see below).
 //!
 //! So a consumed generator compiles to what the equivalent loop compiles to.
 //! Every local codegen makes is set before it is read, which is what makes
@@ -55,8 +61,8 @@ fn optimize_module() void {
 
 fn optimizable(f: I32) Bool { func_kind[f] == FuncKind.Defined.to_i32() and func_live[f] == 1 and func_body[f] >= 0; }
 
-/// Copies and temporaries until neither changes anything, then tees, then
-/// unused locals. A body sharing a node with another is left as it is.
+/// Constants, copies and temporaries until none changes anything, then
+/// tees, then unused locals. A body sharing a node with another is left as it is.
 fn optimize_function(f: I32) void {
     let params = vl_len[ht_a[func_type_of[f]]];
     let total = params + func_local_count[f];
@@ -66,8 +72,15 @@ fn optimize_function(f: I32) void {
     if opt_shared[0] == 1 { return; };
     // The rewrites keep the counts, and each local's one read or write
     // (with its parent), as a new walk would find them. None moves a block,
-    // so the blocks stay in the walk's order.
-    while (propagate_copies(params) or sink_temporaries(params)) {};
+    // so the blocks stay in the walk's order. A fold may, so a new walk
+    // follows one.
+    let folded = fold_constants(f);
+    while (true) {
+        if folded { opt_collect(f, total); };
+        while (propagate_copies(params) or sink_temporaries(params)) {};
+        folded = fold_constants(f);
+        if not folded { break; };
+    };
     if optimize_level[0] == 1 and reuse_loads(f) {
         total = params + func_local_count[f];
         opt_collect(f, total);
@@ -150,6 +163,13 @@ fn pure_opcode(code: I32) Bool {
 
 fn non_null(vt: I32) Bool { vt == vt_extern or (vt >= vt_defined and vt < vt_tuple and (vt - vt_defined) % 2 == 1); }
 
+/// Whether node `n` is a number or a null.
+fn opt_literal(n: I32) Bool {
+    let op = w_op[n];
+    w_count[n] == 0 and (op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32()
+        or op == Op.F64Const.to_i32() or op == Op.RefNull.to_i32());
+}
+
 fn single_value(vt: I32) Bool { vt != vt_none and vt != vt_unreachable and vt < vt_tuple; }
 
 fn set_kid(parent: I32, place: I32, node: I32) void { w_kids[w_first[parent] + place] = node; }
@@ -164,6 +184,9 @@ fn opt_erase(n: I32) void {
 /// By local: the parameter its reads read instead, or -1; and that read's type.
 vec opt_copy_of: I32;
 vec opt_copy_type: I32;
+/// By local (size builds): the constant its one store stores, read in its
+/// place (when read once, or no bigger than a read), or -1.
+vec opt_const_of: I32;
 
 /// The copies rewrite: whether anything changed. Each local is settled in
 /// order (a copy of a copy settled before it is a copy of that parameter),
@@ -172,11 +195,20 @@ fn propagate_copies(params: I32) Bool {
     let changed = false;
     opt_copy_of.resize(opt_gets.len());
     opt_copy_type.resize(opt_gets.len());
-    for (0 ..< opt_gets.len()) |l| { opt_copy_of[l] = -1; };
+    opt_const_of.resize(opt_gets.len());
+    for (0 ..< opt_gets.len()) |l| {
+        opt_copy_of[l] = -1;
+        opt_const_of[l] = -1;
+    };
     for (params ..< opt_gets.len()) |l| {
         if opt_sets[l] == 1 {
             let write = opt_nodes[opt_set_at[l]];
             let source = if w_count[write] == 1 { w_kid(write, 0); } else { -1; };
+            if optimize_level[0] == 1 and w_op[write] == Op.LocalSet.to_i32() and source >= 0 and opt_gets[l] > 0
+                and opt_literal(source) and (opt_gets[l] == 1 or sm_bytes(source, true) <= 2) {
+                opt_const_of[l] = source;
+                changed = true;
+            };
             if w_op[write] == Op.LocalSet.to_i32() and source >= 0 and w_op[source] == Op.LocalGet.to_i32() {
                 let p = w_a[source];
                 let t = w_type[source];
@@ -197,7 +229,15 @@ fn propagate_copies(params: I32) Bool {
     changed = false;
     for (0 ..< opt_nodes.len()) |k| {
         let n = opt_nodes[k];
-        if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
+        if w_op[n] == Op.LocalGet.to_i32() and opt_const_of[w_a[n]] >= 0 {
+            let c = opt_const_of[w_a[n]];
+            opt_gets[w_a[n]] -= 1;
+            w_op[n] = w_op[c];
+            w_type[n] = w_type[c];
+            w_a[n] = w_a[c];
+            w_b[n] = w_b[c];
+            changed = true;
+        } else if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
             let l = w_a[n];
             w_a[n] = opt_copy_of[l];
             w_type[n] = opt_copy_type[l];
@@ -401,12 +441,28 @@ fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) void {
 vec co_first: I32;
 vec co_last: I32;
 vec co_store_first: I32;
-/// By local: the outermost loop around its first and its last mention, or -1.
+/// By local: the innermost loop around its first and its last mention, or -1.
 vec co_loop_first: I32;
 vec co_loop_last: I32;
-/// By loop (in the order they start): the positions it spans.
+/// By loop (in the order they start): the positions it spans, its node, the
+/// loop around it (or -1), and where its locals read before written in it
+/// start in @co_exposed (@co_exposed_count of them).
 vec co_loop_start: I32;
 vec co_loop_end: I32;
+vec co_loop_node: I32;
+vec co_loop_outer: I32;
+vec co_exposed_at: I32;
+vec co_exposed_count: I32;
+vec co_exposed: I32;
+/// While finding a loop's exposed locals: by local, whether written on
+/// every path so far, with the log of those set (to undo a branch's), and
+/// the loop it was last noted exposed in.
+vec co_written: U8;
+vec co_written_log: I32;
+vec co_noted: I32;
+/// By label: whether something branches to it (labels in @co_target_list).
+vec co_targeted: U8;
+vec co_target_list: I32;
 /// The loops around the walk, outermost first.
 vec co_loops: I32;
 /// The nodes that read or write a local.
@@ -427,7 +483,9 @@ vec co_sort: I32;
 
 /// Share locals whose ranges do not overlap: a local is live from its first
 /// mention to its last, and a mention inside a loop makes it live through
-/// the whole outermost loop around it (its value may come round). A local is
+/// the whole outermost loop around it its value may come round in: one it is
+/// mentioned outside of, or read in before written (an inlined body's
+/// locals, set before read, do not come round a caller's loop). A local is
 /// only moved into another's when its first mention stores it: one read
 /// first would rely on starting at zero.
 fn coalesce_locals(f: I32, params: I32) void {
@@ -446,10 +504,15 @@ fn coalesce_locals(f: I32, params: I32) void {
     };
     co_loop_start.clear();
     co_loop_end.clear();
+    co_loop_node.clear();
+    co_loop_outer.clear();
     co_loops.clear();
     co_mentions.clear();
+    for (0 ..< co_target_list.len()) |i| { co_targeted[co_target_list[i]] = 0; };
+    co_target_list.clear();
     co_pos[0] = 0;
     co_walk(func_body[f]);
+    co_find_exposed(total);
     // Each local's range, and the slot it takes: the first of its type free
     // by then (locals in the order their ranges start).
     let start = Array[I32].new(total, 0);
@@ -457,8 +520,10 @@ fn coalesce_locals(f: I32, params: I32) void {
     for (params ..< total) |l| {
         start[l] = co_first[l];
         end[l] = co_last[l];
-        if co_loop_first[l] >= 0 and co_loop_start[co_loop_first[l]] < start[l] { start[l] = co_loop_start[co_loop_first[l]]; };
-        if co_loop_last[l] >= 0 and co_loop_end[co_loop_last[l]] > end[l] { end[l] = co_loop_end[co_loop_last[l]]; };
+        let lf = co_round_loop(l, co_loop_first[l]);
+        let ll = co_round_loop(l, co_loop_last[l]);
+        if lf >= 0 and co_loop_start[lf] < start[l] { start[l] = co_loop_start[lf]; };
+        if ll >= 0 and co_loop_end[ll] > end[l] { end[l] = co_loop_end[ll]; };
     };
     let order = Array[I32].new(n, 0);
     for (0 ..< n) |i| { order[i] = params + i; };
@@ -564,7 +629,14 @@ fn co_walk(node: I32) void {
         span = co_loop_start.len();
         co_loop_start.push(co_pos[0]);
         co_loop_end.push(-1);
+        co_loop_node.push(node);
+        co_loop_outer.push(if co_loops.len() > 0 { co_loops[co_loops.len() - 1]; } else { -1; });
         co_loops.push(span);
+    };
+    if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() {
+        co_target(w_a[node]);
+    } else if op == Op.BrTable.to_i32() {
+        for (0 ..< w_b[node]) |i| { co_target(w_aux[w_a[node] + i]); };
     };
     for (0 ..< w_count[node]) |i| { co_walk(w_kid(node, i)); };
     let at = co_pos[0];
@@ -575,14 +647,105 @@ fn co_walk(node: I32) void {
         if co_first[l] < 0 {
             co_first[l] = at;
             co_store_first[l] = if op == Op.LocalGet.to_i32() { 0; } else { 1; };
-            if co_loops.len() > 0 { co_loop_first[l] = co_loops[0]; };
+            if co_loops.len() > 0 { co_loop_first[l] = co_loops[co_loops.len() - 1]; };
         };
         co_last[l] = at;
-        if co_loops.len() > 0 { co_loop_last[l] = co_loops[0]; };
+        co_loop_last[l] = if co_loops.len() > 0 { co_loops[co_loops.len() - 1]; } else { -1; };
     };
     if span >= 0 {
         co_loop_end[span] = at;
         co_loops.resize(co_loops.len() - 1);
+    };
+}
+
+fn co_target(label: I32) void {
+    if label >= co_targeted.len() {
+        let old = co_targeted.len();
+        co_targeted.resize(label + 1);
+        for (old ..< label + 1) |i| { co_targeted[i] = 0; };
+    };
+    if co_targeted[label] == 0 {
+        co_targeted[label] = 1;
+        co_target_list.push(label);
+    };
+}
+
+/// The outermost loop, from `inner` (a loop around a mention of local `l`)
+/// out, that `l`'s value may come round: `l` is mentioned outside it or
+/// read in it before written; or -1.
+fn co_round_loop(l: I32, inner: I32) I32 {
+    let most = -1;
+    let s = inner;
+    while (s >= 0) {
+        // (Size builds only: -O3 extends through every loop, as it did.)
+        let round = optimize_level[0] != 1 or co_first[l] < co_loop_start[s] or co_last[l] > co_loop_end[s];
+        if not round and co_exposed_at[s] < 0 { co_loop_exposed(s); };
+        let k = co_exposed_at[s];
+        while (not round and k < co_exposed_at[s] + co_exposed_count[s]) {
+            if co_exposed[k] == l { round = true; };
+            k += 1;
+        };
+        if round { most = s; };
+        s = co_loop_outer[s];
+    };
+    most;
+}
+
+/// No loop's exposed locals found yet (each is when asked: co_loop_exposed).
+fn co_find_exposed(total: I32) void {
+    co_written.resize(total);
+    co_noted.resize(total);
+    for (0 ..< total) |l| {
+        co_written[l] = 0;
+        co_noted[l] = -1;
+    };
+    co_exposed.clear();
+    co_exposed_at.resize(co_loop_node.len());
+    co_exposed_count.resize(co_loop_node.len());
+    for (0 ..< co_loop_node.len()) |s| { co_exposed_at[s] = -1; };
+}
+
+/// Loop `s`'s locals read before written in it, onto @co_exposed.
+fn co_loop_exposed(s: I32) void {
+    co_exposed_at[s] = co_exposed.len();
+    let node = co_loop_node[s];
+    for (0 ..< w_count[node]) |i| { co_reads_first(w_kid(node, i), s); };
+    co_undo_written(0);
+    co_exposed_count[s] = co_exposed.len() - co_exposed_at[s];
+}
+
+fn co_undo_written(mark: I32) void {
+    for (mark ..< co_written_log.len()) |i| { co_written[co_written_log[i]] = 0; };
+    co_written_log.resize(mark);
+}
+
+/// Walks `n` in the order it runs, noting reads of locals not yet written
+/// on every path (in loop `s`). What runs maybe (a branch, a loop's body, a
+/// block branched out of, a `try`) writes for itself only.
+fn co_reads_first(n: I32, s: I32) void {
+    let op = w_op[n];
+    if op == Op.LocalGet.to_i32() {
+        let l = w_a[n];
+        if co_written[l] == 0 and co_noted[l] != s {
+            co_noted[l] = s;
+            co_exposed.push(l);
+        };
+        return;
+    };
+    let maybe = op == Op.Loop.to_i32() or op == Op.Try.to_i32()
+        or (op == Op.Block.to_i32() and w_a[n] < co_targeted.len() and co_targeted[w_a[n]] == 1);
+    // (A `try`'s catch runs after any part of its body.)
+    let branches = op == Op.If.to_i32() or op == Op.NullElse.to_i32() or op == Op.CastArms.to_i32() or op == Op.Try.to_i32();
+    let mark = co_written_log.len();
+    for (0 ..< w_count[n]) |i| {
+        if branches and i > 0 { co_undo_written(mark); };
+        co_reads_first(w_kid(n, i), s);
+        if branches and i == 0 and op != Op.Try.to_i32() { mark = co_written_log.len(); };
+    };
+    if maybe or branches { co_undo_written(mark); };
+    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and co_written[w_a[n]] == 0 {
+        co_written[w_a[n]] = 1;
+        co_written_log.push(w_a[n]);
     };
 }
 
@@ -906,3 +1069,289 @@ fn ld_reuse(e: I32, n: I32) void {
     w_b[n] = 0;
     w_count[n] = 0;
 }
+
+//! = Constants
+//!
+//! Folded first, and again after copies and temporaries (a value sunk into
+//! place may meet a constant). An `i32` or `i64` operation of constants is
+//! its value, as wasm computes it (wrapping; shift counts mod the width; a
+//! division or remainder only by a positive constant). `(x + c1) + c2` is
+//! `x + (c1 + c2)` and `(c1 - x) + c2` is `(c1 + c2) - x`, for any mix of
+//! add and sub. `x + 0`, `x - 0`, `x * 1`, `x | 0`, `x ^ 0`, `x & -1` and a
+//! shift or rotation by 0 are x; `x * 0` and `x & 0` are 0 when x has no
+//! effects. A global never assigned is its constant. An `if`, `select` or
+//! `br_if` on a constant takes its one way.
+
+vec cf_changed: I32 = [0];
+
+/// Fold function f's body; whether anything changed.
+fn fold_constants(f: I32) Bool {
+    cf_changed[0] = 0;
+    func_body[f] = cf_fold(func_body[f]);
+    cf_changed[0] == 1;
+}
+
+/// Node n folded, its kids first: n (rewritten in place), or what replaces it.
+fn cf_fold(n: I32) I32 {
+    for (0 ..< w_count[n]) |i| {
+        let k = w_kid(n, i);
+        let r = cf_fold(k);
+        if r != k { set_kid(n, i, r); };
+    };
+    let op = w_op[n];
+    let count = w_count[n];
+    // A global never set is its constant (as encoding emits it).
+    if op == Op.GlobalGet.to_i32() and glob_folded(w_a[n]) {
+        let init = glob_init[w_a[n]];
+        return cf_set(n, if w_op[init] == Op.I32Const.to_i32() { vt_i32; } else { vt_i64; }, cf_val(init));
+    };
+    if op == Op.Plain.to_i32() and count == 2 { return cf_binary(n); };
+    if op == Op.Plain.to_i32() and count == 1 { return cf_unary(n); };
+    if op == Op.Select.to_i32() and count == 3 and cf_const(w_kid(n, 2)) { return cf_select(n); };
+    if op == Op.BrIf.to_i32() and count >= 1 and cf_const(w_kid(n, count - 1)) { return cf_br_if(n); };
+    if op == Op.If.to_i32() and count >= 2 and cf_const(w_kid(n, 0)) { cf_if(n); };
+    // What follows a `br` (as a folded `br_if` leaves), `return` or `unreachable` never runs.
+    if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+        let i = 0;
+        while (i + 1 < count) {
+            let k = w_op[w_kid(n, i)];
+            if k == Op.Br.to_i32() or k == Op.Return.to_i32() or k == Op.Unreachable.to_i32() {
+                w_count[n] = i + 1;
+                cf_changed[0] = 1;
+                return n;
+            };
+            i += 1;
+        };
+    };
+    n;
+}
+
+fn cf_const(n: I32) Bool { w_op[n] == Op.I32Const.to_i32() or w_op[n] == Op.I64Const.to_i32(); }
+
+/// A constant's value (an `i32`'s sign-extended).
+fn cf_val(n: I32) I64 {
+    if w_op[n] == Op.I32Const.to_i32() { return w_a[n].to_i64(); };
+    (w_b[n].to_i64() << 32) | (w_a[n].to_i64() & 4294967295);
+}
+
+/// The low 32 bits of v.
+fn cf_low(v: I64) I32 {
+    let lo = v & 4294967295;
+    if lo >= 2147483648 { lo = lo - 4294967296; };
+    lo.to_i32();
+}
+
+/// Node n rewritten as the constant v (of type vt, `i32` or `i64`).
+fn cf_set(n: I32, vt: I32, v: I64) I32 {
+    w_op[n] = if vt == vt_i32 { Op.I32Const.to_i32(); } else { Op.I64Const.to_i32(); };
+    w_type[n] = vt;
+    w_a[n] = cf_low(v);
+    w_b[n] = if vt == vt_i32 { 0; } else { cf_low(v >> 32); };
+    w_count[n] = 0;
+    cf_changed[0] = 1;
+    n;
+}
+
+/// x, replacing a node (a change).
+fn cf_take(x: I32) I32 {
+    cf_changed[0] = 1;
+    x;
+}
+
+/// v shifted right by k (0 to 63), zeros in.
+fn cf_shr_u(v: I64, k: I64) I64 {
+    if k == 0 { return v; };
+    (v >> k) & ((1.to_i64() << (64.to_i64() - k)) - 1);
+}
+
+/// A binary `i32` or `i64` instruction.
+fn cf_binary(n: I32) I32 {
+    let code = w_a[n];
+    let wide = (code >= 81 and code <= 90) or (code >= 124 and code <= 138);
+    if not (wide or (code >= 70 and code <= 79) or (code >= 106 and code <= 120)) { return n; };
+    // In the `i32` instructions' numbering.
+    let op = if code >= 124 { code - 18; } else if code >= 81 and code <= 90 { code - 11; } else { code; };
+    let vt = if wide and op >= 106 { vt_i64; } else { vt_i32; };
+    let l = w_kid(n, 0);
+    let r = w_kid(n, 1);
+    if cf_const(l) and cf_const(r) {
+        let a = cf_val(l);
+        let b = cf_val(r);
+        if op <= 79 { return cf_set(n, vt_i32, if cf_compare(op, a, b, wide) { 1; } else { 0; }); };
+        // A division or remainder that could trap is left to trap.
+        if op >= 109 and op <= 112 and (b <= 0 or (wide and (op == 110 or op == 112))) { return n; };
+        return cf_set(n, vt, cf_arith(op, a, b, wide));
+    };
+    if op <= 79 { return n; };
+    // Identities, the constant on the right (or either side, where the order does not matter).
+    let commutes = op == 106 or op == 108 or op == 113 or op == 114 or op == 115;
+    for (0 ..< 2) |side| {
+        let c = if side == 0 { r; } else { l; };
+        let x = if side == 0 { l; } else { r; };
+        if cf_const(c) and (side == 0 or commutes) {
+            let v = cf_val(c);
+            let shift = op >= 116 and op <= 120 and (if wide { v & 63; } else { v & 31; }) == 0;
+            if (v == 0 and (op == 106 or op == 107 or op == 114 or op == 115)) or shift or (v == 1 and op == 108) or (v == -1 and op == 113) {
+                return cf_take(x);
+            };
+            if v == 0 and (op == 108 or op == 113) and opt_pure(x) { return cf_set(n, vt, 0); };
+        };
+    };
+    if op == 106 or op == 107 { return cf_reassociate(n, op, wide); };
+    n;
+}
+
+/// An `i32` comparison (by its opcode; `wide`, of `i64`s) of a and b.
+fn cf_compare(op: I32, a: I64, b: I64, wide: Bool) Bool {
+    let x = a;
+    let y = b;
+    // Unsigned: as signed, with the sign bit flipped (`i64`) or no sign (`i32`).
+    if op == 73 or op == 75 or op == 77 or op == 79 {
+        let flip = 1.to_i64() << 63;
+        if wide {
+            x = a ^ flip;
+            y = b ^ flip;
+        } else {
+            x = a & 4294967295;
+            y = b & 4294967295;
+        };
+    };
+    if op == 70 { return x == y; };
+    if op == 71 { return x != y; };
+    if op == 72 or op == 73 { return x < y; };
+    if op == 74 or op == 75 { return x > y; };
+    if op == 76 or op == 77 { return x <= y; };
+    x >= y;
+}
+
+/// An `i32` arithmetic instruction (by its opcode; `wide`, of `i64`s) of a
+/// and b: its result's low bits.
+fn cf_arith(op: I32, a: I64, b: I64, wide: Bool) I64 {
+    // a unsigned (an `i32`'s; an `i64`'s unsigned division is not folded).
+    let u = if wide { a; } else { a & 4294967295; };
+    let width: I64 = if wide { 64; } else { 32; };
+    let k = b & (width - 1);
+    if op == 106 { return a + b; };
+    if op == 107 { return a - b; };
+    if op == 108 { return a * b; };
+    if op == 109 { return a / b; };
+    if op == 110 { return u / b; };
+    if op == 111 { return a % b; };
+    if op == 112 { return u % b; };
+    if op == 113 { return a & b; };
+    if op == 114 { return a | b; };
+    if op == 115 { return a ^ b; };
+    if op == 116 { return a << k; };
+    if op == 117 { return a >> k; };
+    if op == 118 { return cf_shr_u(u, k); };
+    // rotr by k is rotl by width - k.
+    let left = if op == 119 { k; } else { (width - k) & (width - 1); };
+    if left == 0 { return a; };
+    (u << left) | cf_shr_u(u, width - left);
+}
+
+/// n an add or sub of a constant and `x ± c` (or `c - x`): x plus a
+/// constant, or a constant minus x.
+fn cf_reassociate(n: I32, op: I32, wide: Bool) I32 {
+    let l = w_kid(n, 0);
+    let r = w_kid(n, 1);
+    let add = if wide { 124; } else { 106; };
+    let sub = add + 1;
+    // n is `k + other`, or `k - other` when negated.
+    let c = if cf_const(r) { r; } else if cf_const(l) { l; } else { -1; };
+    if c < 0 { return n; };
+    let other = if c == r { l; } else { r; };
+    let k = cf_val(c);
+    if c == r and op == 107 { k = 0.to_i64() - k; };
+    let negated = c == l and op == 107;
+    if w_op[other] != Op.Plain.to_i32() or w_count[other] != 2 or (w_a[other] != add and w_a[other] != sub) { return n; };
+    // other is `j + x`, or `j - x` when x is negated.
+    let ol = w_kid(other, 0);
+    let or_ = w_kid(other, 1);
+    let x = -1;
+    let j = 0.to_i64();
+    let x_negated = false;
+    if cf_const(or_) and not cf_const(ol) {
+        x = ol;
+        j = cf_val(or_);
+        if w_a[other] == sub { j = 0.to_i64() - j; };
+    } else if cf_const(ol) and not cf_const(or_) {
+        x = or_;
+        j = cf_val(ol);
+        x_negated = w_a[other] == sub;
+    } else {
+        return n;
+    };
+    cf_set(c, w_type[n], if negated { k - j; } else { k + j; });
+    let minus = negated != x_negated;
+    if not minus and cf_val(c) == 0 { return x; };
+    if minus {
+        w_a[n] = sub;
+        set_kid(n, 0, c);
+        set_kid(n, 1, x);
+    } else {
+        w_a[n] = add;
+        set_kid(n, 0, x);
+        set_kid(n, 1, c);
+    };
+    n;
+}
+
+/// A unary `i32` or `i64` instruction.
+fn cf_unary(n: I32) I32 {
+    let code = w_a[n];
+    let kid = w_kid(n, 0);
+    if not cf_const(kid) { return n; };
+    let a = cf_val(kid);
+    if code == 69 or code == 80 { return cf_set(n, vt_i32, if a == 0 { 1; } else { 0; }); };
+    if code == 167 { return cf_set(n, vt_i32, a); };
+    if code == 172 { return cf_set(n, vt_i64, a); };
+    if code == 173 { return cf_set(n, vt_i64, a & 4294967295); };
+    // extend8_s, extend16_s (`i32`); extend8_s, 16_s, 32_s (`i64`).
+    if code >= 192 and code <= 196 {
+        let drop: I64 = if code == 192 or code == 194 { 56; } else if code == 193 or code == 195 { 48; } else { 32; };
+        return cf_set(n, if code <= 193 { vt_i32; } else { vt_i64; }, (a << drop) >> drop);
+    };
+    n;
+}
+
+/// `select` on a constant: the value taken, when the other has no effects.
+fn cf_select(n: I32) I32 {
+    let on = w_a[w_kid(n, 2)] != 0;
+    if not opt_pure(w_kid(n, if on { 1; } else { 0; })) { return n; };
+    cf_take(w_kid(n, if on { 0; } else { 1; }));
+}
+
+/// `br_if` on a constant: `br`, or nothing (its value, if any).
+fn cf_br_if(n: I32) I32 {
+    let count = w_count[n];
+    cf_changed[0] = 1;
+    if w_a[w_kid(n, count - 1)] != 0 {
+        w_op[n] = Op.Br.to_i32();
+        w_count[n] = count - 1;
+        if count == 1 { w_type[n] = vt_unreachable; };
+        return n;
+    };
+    if count == 1 {
+        opt_erase(n);
+        return n;
+    };
+    w_kid(n, 0);
+}
+
+/// `if` on a constant: the arm taken, in a block of the `if`'s label and
+/// type (a branch to it still leaves it), or nothing.
+fn cf_if(n: I32) void {
+    cf_changed[0] = 1;
+    let on = w_a[w_kid(n, 0)] != 0;
+    if not on and w_count[n] == 2 {
+        opt_erase(n);
+        return;
+    };
+    let arm = w_kid(n, if on { 1; } else { 2; });
+    w_op[n] = if w_a[n] >= 0 { Op.Block.to_i32(); } else { Op.Seq.to_i32(); };
+    w_b[n] = 0;
+    set_kid(n, 0, arm);
+    w_count[n] = 1;
+}
+

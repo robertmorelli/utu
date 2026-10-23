@@ -1119,7 +1119,8 @@ vec sm_found: I32;
 vec sm_found_in: I32;
 /// By function: a call to it that cannot be inlined (recursive, shared).
 vec sm_bad: U8;
-/// By function: its body's greatest label as inlining grows it, or -1.
+/// By function: its body's greatest label as inlining grows it (from
+/// sm_walk), or -1.
 vec sm_label: I32;
 /// By function: how many of its first parameters are their arguments.
 vec sm_prefix: I32;
@@ -1138,13 +1139,320 @@ vec sm_clean: U8 = [1];
 /// While copying: by parameter, the argument its read becomes, or -1.
 vec inl_subst: I32;
 
-/// Rounds until none inlines (each sweeps after it).
+/// Rounds until none inlines (each sweeps after it); then each function
+/// called once moves there.
 fn inline_small() void {
     let rounds = 0;
-    while (rounds < 16 and inline_small_round()) {
-        sweep();
-        rounds += 1;
+    let fresh = false;
+    while (rounds < 16 and not fresh) {
+        if inline_small_round() {
+            sweep();
+            rounds += 1;
+        } else {
+            fresh = true;
+        };
     };
+    // (A round that inlined nothing leaves its walk for the moves.)
+    if not fresh { sm_survey(); };
+    if sm_move_all() { sweep(); };
+}
+
+//! === Moving what is called once
+//!
+//! A function used once, by a call, moves there whatever its body holds:
+//! its header, its type's use and the call go. Its parameters and locals
+//! become the caller's (the arguments, in order, set the parameters), its
+//! labels follow the caller's, and a `return` leaves a block around it, as
+//! at -O3. A parameter the body does not assign reads its argument instead
+//! when that is a local nothing after it assigns, or a constant read once or
+//! no bigger than a read. All move in one pass, callers first: a call in a
+//! body already moved is in the function that body moved into (@sm_owner).
+//! A body moves as it is, its nodes renumbered in place (one sharing a node
+//! with another body stays).
+
+/// By function: the function its body moved into (itself when it has not).
+vec sm_owner: I32;
+/// By function: its one call (in @sm_found), or -1.
+vec sm_once: I32;
+/// By function, while moving: whether it moves (see sm_move_all); its
+/// locals to add; and those, in order, with the functions they are added to.
+vec sm_state: U8;
+vec sm_pending: I32;
+vec sm_pend_root: I32;
+vec sm_pend_vt: I32;
+/// Whether a use may have gone (a constant argument never read).
+vec sm_gone: U8 = [0];
+/// By function (sm_survey): 1 its body returns, 2 it holds a node held
+/// elsewhere too, 4 it returns by a call; where its parameters start in
+/// @sm_assigned (whether the body assigns each) and @sm_param_reads.
+vec sm_flags: U8;
+vec sm_params_at: I32;
+vec sm_assigned: U8;
+vec sm_param_reads: I32;
+
+fn sm_root(f: I32) I32 {
+    let r = f;
+    while (sm_owner[r] != r) { r = sm_owner[r]; };
+    let k = f;
+    while (sm_owner[k] != r) {
+        let next = sm_owner[k];
+        sm_owner[k] = r;
+        k = next;
+    };
+    r;
+}
+
+/// Move each function called once to its call (after sm_survey), keeping
+/// what a sweep finds. Whether a sweep is needed still: a use may have gone
+/// (a function or global passed, never read).
+fn sm_move_all() Bool {
+    let n = func_kind.len();
+    sm_owner.resize(n);
+    sm_once.resize(n);
+    sm_pending.resize(n);
+    for (0 ..< n) |f| {
+        sm_owner[f] = f;
+        sm_once[f] = -1;
+        sm_pending[f] = 0;
+    };
+    for (0 ..< sm_found.len()) |i| { sm_once[w_a[sm_found[i]]] = i; };
+    sm_pend_root.clear();
+    sm_pend_vt.clear();
+    sm_gone[0] = 0;
+    // (1: moves; 2: stays; 3: moved.)
+    sm_state.resize(n);
+    for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and sm_movable(g) { 1; } else { 2; }; };
+    let any = false;
+    for (0 ..< n) |g| { if sm_state[g] == 1 { sm_move_down(g); any = true; }; };
+    if not any { return false; };
+    // The new locals, each function's after its own (moved once to the end).
+    let fill = Array[I32].new(n, 0);
+    for (0 ..< n) |f| {
+        if sm_pending[f] > 0 {
+            let start = local_types.len();
+            for (0 ..< func_local_count[f]) |i| { local_types.push(local_types[func_locals[f] + i]); };
+            fill[f] = local_types.len();
+            for (0 ..< sm_pending[f]) |i| { local_types.push(-1); };
+            func_locals[f] = start;
+            func_local_count[f] += sm_pending[f];
+        };
+    };
+    for (0 ..< sm_pend_root.len()) |i| {
+        let f = sm_pend_root[i];
+        local_types[fill[f]] = sm_pend_vt[i];
+        fill[f] += 1;
+    };
+    // What a sweep would find: the moved are not live, the nodes made are held once.
+    for (0 ..< n) |g| {
+        if sm_state[g] == 3 and sm_owner[g] != g {
+            func_live[g] = 0;
+            func_uses[g] = 0;
+        };
+    };
+    let old = node_holders.len();
+    node_holders.resize(w_op.len());
+    for (old ..< w_op.len()) |k| { node_holders[k] = 1; };
+    sm_gone[0] == 1;
+}
+
+/// Walk each live body (sm_walk), and count each function's calls; one by
+/// itself, or shared, is bad (@sm_bad).
+fn sm_survey() void {
+    let n = func_kind.len();
+    sm_label.resize(n);
+    sm_count.resize(n);
+    sm_bad.resize(n);
+    sm_flags.resize(n);
+    sm_params_at.resize(n);
+    sm_found.clear();
+    sm_found_in.clear();
+    sm_assigned.clear();
+    sm_param_reads.clear();
+    for (0 ..< n) |f| {
+        sm_count[f] = 0;
+        sm_bad[f] = 0;
+        sm_flags[f] = 0;
+        sm_label[f] = -1;
+        sm_params_at[f] = sm_assigned.len();
+        if optimizable(f) and func_code[f] < 0 {
+            let np = vl_len[ht_a[func_type_of[f]]];
+            for (0 ..< np) |i| {
+                sm_assigned.push(0);
+                sm_param_reads.push(0);
+            };
+            sm_label[f] = 0;
+            sm_walk(f, func_body[f], np);
+        };
+    };
+    for (0 ..< sm_found.len()) |i| {
+        let c = sm_found[i];
+        let g = w_a[c];
+        sm_count[g] += 1;
+        if sm_found_in[i] == g or node_holders[c] != 1 { sm_bad[g] = 1; };
+    };
+}
+
+/// A new local of `f` (moved into), of value type `vt`: its index. The
+/// locals are added after the moves (sm_move_all).
+fn sm_add_local(f: I32, vt: I32) I32 {
+    sm_pend_root.push(f);
+    sm_pend_vt.push(vt);
+    sm_pending[f] += 1;
+    vl_len[ht_a[func_type_of[f]]] + func_local_count[f] + sm_pending[f] - 1;
+}
+
+/// Walks body node `n` of `f` (of `np` parameters): its calls, its
+/// greatest label, its parameters' reads and writes, and its @sm_flags.
+fn sm_walk(f: I32, n: I32, np: I32) void {
+    let op = w_op[n];
+    let a = w_a[n];
+    // (The ops to note are all up to LocalTee, but `try` and `rethrow`.)
+    if op <= Op.LocalTee.to_i32() {
+        if op == Op.Call.to_i32() {
+            sm_found.push(n);
+            sm_found_in.push(f);
+        } else if op == Op.Return.to_i32() {
+            sm_flags[f] = sm_flags[f] | 1;
+        } else if op == Op.ReturnCall.to_i32() {
+            sm_flags[f] = sm_flags[f] | 4;
+        } else if op == Op.LocalGet.to_i32() {
+            if a < np { sm_param_reads[sm_params_at[f] + a] += 1; };
+        } else if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+            if a < np { sm_assigned[sm_params_at[f] + a] = 1; };
+        } else if op == Op.BrTable.to_i32() {
+            for (0 ..< w_b[n]) |i| { if w_aux[a + i] > sm_label[f] { sm_label[f] = w_aux[a + i]; }; };
+        } else if is_labelled(op) and a > sm_label[f] {
+            sm_label[f] = a;
+        };
+    } else if (op == Op.Try.to_i32() or op == Op.Rethrow.to_i32()) and a > sm_label[f] {
+        sm_label[f] = a;
+    };
+    if node_holders[n] != 1 { sm_flags[f] = sm_flags[f] | 2; };
+    for (0 ..< w_count[n]) |i| { sm_walk(f, w_kid(n, i), np); };
+}
+
+/// Moves `g` (to move), its caller first when that moves too: so each body
+/// is renumbered once, where it ends.
+fn sm_move_down(g: I32) void {
+    let k = sm_once[g];
+    let caller = sm_found_in[k];
+    sm_state[g] = 3;
+    if sm_state[caller] == 1 { sm_move_down(caller); };
+    let f = sm_root(caller);
+    if f == g { return; };
+    sm_move(f, sm_found[k]);
+    sm_owner[g] = f;
+}
+
+/// Whether `g` (called once, not by itself) may move to its call: not
+/// exported, nor the start; one result; no `return_call`; its body its own;
+/// the call with syntax (as @sm_grows).
+fn sm_movable(g: I32) Bool {
+    func_kind[g] == FuncKind.Defined.to_i32() and func_body[g] >= 0 and func_code[g] < 0 and func_live[g] == 1
+        and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g
+        and vl_len[ht_b[func_type_of[g]]] <= 1 and not traps_by_name(g)
+        and w_src[sm_found[sm_once[g]]] >= 0 and sm_flags[g] & 6 == 0;
+}
+
+/// Call `c` in `f` becomes a block of its callee's body (see above).
+fn sm_move(f: I32, c: I32) void {
+    let g = w_a[c];
+    let body = func_body[g];
+    let params = ht_a[func_type_of[g]];
+    let np = vl_len[params];
+    let nl = func_local_count[g];
+    let at = sm_params_at[g];
+    inl_subst.resize(np);
+    inl_local_map.resize(np + nl);
+    for (0 ..< np) |i| {
+        let arg = w_kid(c, i);
+        inl_subst[i] = -1;
+        inl_local_map[i] = -1;
+        if sm_assigned[at + i] == 0 {
+            if w_op[arg] == Op.LocalGet.to_i32() {
+                inl_local_map[i] = w_a[arg];
+                for (i + 1 ..< np) |j| { if inl_assigns(w_kid(c, j), w_a[arg]) { inl_local_map[i] = -1; }; };
+            } else if w_count[arg] == 0 and sm_constant(arg) and (sm_bytes(arg, true) <= 2 or sm_param_reads[at + i] <= 1) {
+                inl_subst[i] = arg;
+            };
+        };
+        if inl_subst[i] < 0 and inl_local_map[i] < 0 { inl_local_map[i] = sm_add_local(f, vl_item(params, i)); };
+        // A function or global passed: used where it is read.
+        if inl_subst[i] >= 0 {
+            let reads = sm_param_reads[at + i];
+            if w_op[arg] == Op.RefFunc.to_i32() { func_uses[w_a[arg]] += reads - 1; };
+            if w_op[arg] == Op.GlobalGet.to_i32() { glob_uses[w_a[arg]] += reads - 1; };
+            if reads == 0 and (w_op[arg] == Op.RefFunc.to_i32() or w_op[arg] == Op.GlobalGet.to_i32()) { sm_gone[0] = 1; };
+        };
+    };
+    for (0 ..< nl) |i| { inl_local_map[np + i] = sm_add_local(f, local_types[func_locals[g] + i]); };
+    let offset = sm_label[f];
+    let block = 0;
+    sm_label[f] = offset + sm_label[g];
+    if sm_flags[g] & 1 == 1 {
+        sm_label[f] += 1;
+        block = sm_label[f];
+    };
+    inl_label_offset[0] = offset;
+    inl_return_label[0] = block;
+    // The call in the function the trap is in: this one's, or the one its
+    // body moved there by.
+    inl_site[0] = if w_site[c] >= 0 { w_site[c]; } else { w_src[c]; };
+    inl_helper[0] = -1;
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c; }; };
+    let m = w_mark();
+    for (0 ..< np) |i| {
+        let arg = w_kid(c, i);
+        if inl_subst[i] < 0 and not (w_op[arg] == Op.LocalGet.to_i32() and inl_local_map[i] == w_a[arg]) {
+            let ms = w_mark();
+            w_push(arg);
+            w_node(Op.LocalSet, vt_none, inl_local_map[i], 0, ms);
+        };
+    };
+    sm_renumber(body);
+    w_push(body);
+    inl_subst.clear();
+    // The call node becomes the block (its type, the call's result, stays).
+    let count = w_mark() - m;
+    w_first[c] = w_kids.len();
+    for (m ..< m + count) |i| { w_kids.push(w_stack[i]); };
+    w_count[c] = count;
+    w_stack.resize(m);
+    w_op[c] = if block > 0 { Op.Block.to_i32(); } else { Op.Seq.to_i32(); };
+    w_a[c] = block;
+    w_b[c] = 0;
+}
+
+/// Node `n` of a body moving, in place: in the caller's locals and labels,
+/// placed as @inl_copy places a copy.
+fn sm_renumber(n: I32) void {
+    let op = w_op[n];
+    let a = w_a[n];
+    if op == Op.LocalGet.to_i32() and a < inl_subst.len() and inl_subst[a] >= 0 {
+        let arg = inl_subst[a];
+        w_op[n] = w_op[arg];
+        w_type[n] = w_type[arg];
+        w_a[n] = w_a[arg];
+        w_b[n] = w_b[arg];
+    } else if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        w_a[n] = inl_local_map[a];
+    } else if is_labelled(op) {
+        if a > 0 { w_a[n] = a + inl_label_offset[0]; };
+    } else if op == Op.BrTable.to_i32() {
+        let start = w_aux.len();
+        for (0 ..< w_b[n]) |i| { w_aux.push(w_aux[a + i] + inl_label_offset[0]); };
+        w_a[n] = start;
+    } else if op == Op.Return.to_i32() {
+        w_op[n] = Op.Br.to_i32();
+        w_a[n] = inl_return_label[0];
+    };
+    if inl_helper[0] >= 0 {
+        w_src[n] = w_src[inl_helper[0]];
+        w_site[n] = w_site[inl_helper[0]];
+    } else {
+        w_site[n] = inl_site[0];
+    };
+    for (0 ..< w_count[n]) |i| { sm_renumber(w_kid(n, i)); };
 }
 
 fn inline_small_round() Bool {
@@ -1159,21 +1467,9 @@ fn inline_small_round() Bool {
     for (0 ..< n) |f| {
         sm_chosen[f] = 0;
         sm_called[f] = 0;
-        sm_bad[f] = 0;
-        sm_label[f] = -1;
         sm_prefix[f] = 0;
-        sm_count[f] = 0;
     };
-    sm_found.clear();
-    sm_found_in.clear();
-    for (0 ..< n) |f| { if optimizable(f) and func_code[f] < 0 { sm_find_calls(f, func_body[f]); }; };
-    // By callee (a counting sort).
-    for (0 ..< sm_found.len()) |i| {
-        let c = sm_found[i];
-        let g = w_a[c];
-        sm_count[g] += 1;
-        if sm_found_in[i] == g or node_holders[c] != 1 { sm_bad[g] = 1; };
-    };
+    sm_survey();
     let at = 0;
     for (0 ..< n) |g| {
         sm_first[g] = at;
@@ -1196,15 +1492,6 @@ fn inline_small_round() Bool {
     if not any { return false; };
     for (0 ..< sm_call.len()) |k| { if sm_take[k] == 1 { sm_inline(sm_caller[k], sm_call[k]); }; };
     true;
-}
-
-/// The calls under node `n` of function `f`, onto @sm_found.
-fn sm_find_calls(f: I32, n: I32) void {
-    if w_op[n] == Op.Call.to_i32() {
-        sm_found.push(n);
-        sm_found_in.push(f);
-    };
-    for (0 ..< w_count[n]) |i| { sm_find_calls(f, w_kid(n, i)); };
 }
 
 /// Choose which calls to `g` to inline (@sm_take). Whether any.
@@ -1300,7 +1587,6 @@ fn sm_constant(n: I32) Bool {
 fn sm_inline(f: I32, c: I32) void {
     let g = w_a[c];
     let np = vl_len[ht_a[func_type_of[g]]];
-    if sm_label[f] < 0 { sm_label[f] = max_label(func_body[f]); };
     inl_subst.resize(np);
     inl_local_map.resize(np);
     for (0 ..< np) |i| {
@@ -1314,7 +1600,7 @@ fn sm_inline(f: I32, c: I32) void {
         };
     };
     inl_label_offset[0] = sm_label[f];
-    sm_label[f] += max_label(func_body[g]);
+    sm_label[f] += sm_label[g];
     inl_site[0] = w_src[c];
     inl_helper[0] = -1;
     for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c; }; };

@@ -295,6 +295,69 @@ export lib {
     checked++;
   }
 
+  // -O small moves every function called once to its call, whatever its body
+  // holds: locals, loops, an early return (from inside a loop), try/catch,
+  // defer, a written parameter, a callee itself moved into; arguments run
+  // in order, and its locals share a caller loop's slots without coming round.
+  const once = await write(`using JS from std:JS;
+vec trail: I32;
+fn tick(v: I32) I32 { trail.push(v); v; }
+fn note(v: I32) void { trail.push(v); }
+fn digits(n: I32, base: I32) I32 {
+    if n == 0 { return 1; };
+    let count = 0;
+    while (n > 0) {
+        n = n / base;
+        count += 1;
+    };
+    count;
+}
+fn squares(k: I32) I32 {
+    let total = 0;
+    for (0 ..< k) |i| {
+        let sq = i * i;
+        total += sq;
+    };
+    total;
+}
+fn parsed(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { "bad"; }; }
+fn first_over(limit: I32, a: I32, b: I32, c: I32) I32 {
+    defer note(0);
+    for ([a, b, c]) |v| { if v > limit { return v; }; };
+    -1;
+}
+fn inner(x: I32) I32 { let y = x * 3; y + 1; }
+fn inner2(x: I32) I32 { x - 1; }
+fn outer(x: I32) I32 { let z = inner(x) + inner2(x); z * 2; }
+fn poly(x: I32, c: I32) I32 { c * x * x + c * x + c; }
+export lib {
+    fn run() I32 {
+        let sum = 0;
+        for (0 ..< 3) |r| { sum += squares(r + 2); };
+        digits(tick(1234), tick(10)) * 100000 + digits(0, 10) * 10000 + sum * 100 + first_over(tick(5), tick(3), tick(9), tick(7));
+    }
+    fn ran() Str {
+        let s = "";
+        for (0 ..< trail.len()) |i| { s = if i == 0 { \`\${trail[i]}\`; } else { \`\${s},\${trail[i]}\`; }; };
+        s;
+    }
+    fn json() Str { parsed("[1,2]") + parsed("{"); }
+    fn nested() I32 { outer(5) + poly(3, 2); }
+}
+`);
+  const onceDebug = functions((await compileFile(utu, once, { mode: 'debug' })).wasm);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, once, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    assert.equal(e.run(), 412009, `${mode}: run`);
+    assert.equal(e.ran(), '1234,10,5,3,9,7,0', `${mode}: ran`);
+    assert.equal(e.json(), '[1,2]bad', `${mode}: json`);
+    assert.equal(e.nested(), 66, `${mode}: nested`);
+    if (mode.startsWith('small')) assert.ok(functions(built.wasm) <= onceDebug - 8, `${mode}: once-called functions not moved`);
+    checked++;
+  }
+
   // Structs returned as their fields (selfhost/inline.utu, -O small and
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.
@@ -509,6 +572,57 @@ export lib {
     const want = { big: 1e19, below: -18446744073709551615, near: 1.0000001192092896, wide: 2 ** 60 + 2 ** 37,
       tie: 1 + 2 ** -22, negzero: -Infinity, all_ones: 4294967295, variant: 3000000000 | 0 };
     for (const [name, value] of Object.entries(want)) assert.equal(exports[name](), value, `${mode}: ${name}`);
+    checked++;
+  }
+
+  // Constant folding (optimized builds), as wasm computes: wrapping at the
+  // ends, shift counts mod the width, add/sub chains reassociated (negative
+  // constants, wrapping), `x * 0` and `x & 0` keeping x's effects, and an
+  // `if` or loop condition that is constant.
+  const foldFile = await write(`vec calls: I32 = [0];
+fn bump() I32 { calls[0] += 1; calls[0]; }
+let depth: I32 = 14;
+export lib {
+    fn max_plus() I32 { 2147483647 + 1; }
+    fn min_minus() I32 { -2147483648 - 1; }
+    fn min_times() I32 { -2147483648 * -1; }
+    fn big_mul() I32 { 65537 * 65537; }
+    fn max64_plus() I64 { let m: I64 = 9223372036854775807; m + 1; }
+    fn min64_minus() I64 { let m: I64 = -9223372036854775808; m - 1; }
+    fn shl33() I32 { 1 << 33; }
+    fn shr35() I32 { -8 >> 35; }
+    fn shru33() I32 { -1 >>> 33; }
+    fn shl65() I64 { let one: I64 = 1; one << 65; }
+    fn shru64() I64 { let m: I64 = -1; m >>> 64; }
+    fn cmp_u() Bool { let m: I64 = -1; m.to_u64() > 1.to_u64(); }
+    fn global_plus() I32 { depth + 1; }
+    fn reassoc(x: I32) I32 { 1 << (depth - x + 4); }
+    fn reassoc_neg(x: I32) I32 { (x - 5) + -7 - -3; }
+    fn reassoc_wrap(x: I32) I32 { (x + 2147483647) + 2; }
+    fn reassoc64(x: I64) I64 { let a: I64 = -3; (a - x) - 9223372036854775807; }
+    fn times_zero() I32 { let before = calls[0]; let r = bump() * 0; r + (calls[0] - before) * 10; }
+    fn and_zero() I32 { let before = calls[0]; let r = bump() & 0; r + (calls[0] - before) * 10; }
+    fn idents(x: I32) I32 { ((((x + 0) * 1) | 0) ^ 0) & -1 << 32; }
+    fn if_const() I32 { if 3 > 2 { 1; } else { 2; }; }
+    fn if_const_else() I32 { let t = 0; if 1 == 2 { t = bump(); } else { t = 7; }; t; }
+    fn if_no_else() I32 { let t = 1; if 2 < 1 { t = bump(); }; t; }
+    fn while_false() I32 { let n = 0; while (1 > 2) { n += 1; }; n; }
+    fn while_true() I32 { let n = 0; while (true) { n += 1; if n == 5 { break; }; }; n; }
+}
+`);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, foldFile, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    const want = { max_plus: -2147483648, min_minus: 2147483647, min_times: -2147483648, big_mul: 131073,
+      max64_plus: -(2n ** 63n), min64_minus: 2n ** 63n - 1n, shl33: 2, shr35: -1, shru33: 2147483647, shl65: 2n, shru64: -1n,
+      cmp_u: true, global_plus: 15, reassoc: 32768, reassoc_neg: -6, reassoc_wrap: -2147483644, reassoc64: 2n ** 63n - 5n,
+      times_zero: 10, and_zero: 10, idents: 3, if_const: 1, if_const_else: 7, if_no_else: 1, while_false: 0, while_true: 5 };
+    for (const [name, value] of Object.entries(want)) {
+      const fn = exports[name];
+      // (Each one's parameters are of its result's type.)
+      assert.equal(fn(...Array(fn.length).fill(typeof value === 'bigint' ? 3n : 3)), value, `${mode}: ${name}`);
+    }
     checked++;
   }
 
