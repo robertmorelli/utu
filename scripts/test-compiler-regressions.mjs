@@ -1333,6 +1333,11 @@ export lib {
     ['mod M { fn f() I32 { 1; } fn f() I32 { 2; } fn get() I32 { f(); } }\nexport main() I32 { M.get(); }\n', 'Duplicate declaration f'],
     ['mod M { let g: I32 = 3; let g: I32 = 4; fn get() I32 { g; } }\nexport main() I32 { M.get(); }\n', 'Duplicate declaration g'],
     ['mod M[T] { fn f() I32 { 1; } fn f() I32 { 2; } fn get() I32 { f(); } }\nexport main() I32 { M[I32].get(); }\n', 'Duplicate declaration f'],
+    // A using's name is the file's: its own mod, fn, or type of that name is reported (the using won silently).
+    ['using console from std:Console;\nmod console { fn f() I32 { 3; } }\nexport main() I32 { console.f(); }\n', 'Duplicate declaration console'],
+    ['mod console { fn f() I32 { 3; } }\nusing console from std:Console;\nexport main() I32 { console.f(); }\n', 'Duplicate declaration console'],
+    ['mod Stack[T] { fn f() I32 { 1; } }\nusing Stack[I32] |W|;\nstruct W:\n    | a: I32\nexport main() I32 { 0; }\n', 'Duplicate declaration W'],
+    ['mod Stack[T] { fn f() I32 { 1; } }\nusing Stack[I32] |W|;\nusing Stack[Str] |W|;\nexport main() I32 { 0; }\n', 'Duplicate declaration W'],
     ['proto P:\n    | m(&) I32\nstruct S[P]:\n    | v: I32\nfn P[S].m |a| (b: S) I32 { 1; }\nfn P[S].m |a| (b: S) I32 { 2; }\nexport main() I32 { 0; }\n', 'Duplicate method P[S].m'],
     ['using Ord from std:Ord;\nusing Order from std:Ord;\nfn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }\nexport main() Str { Order[Str].max_of(["aaaa", "b", "cc"]); }\n', 'Duplicate method Ord[Str].cmp'],
     [`enum(U8) Many:\n${variants}\nfn f(m: Many) I32 { match m {\n${covered.split('\n').filter(l => !l.includes('V17 ')).join('\n')}\n}; }\nexport main() I32 { f(Many.V1); }\n`, 'match misses Many.V17'],
@@ -1494,7 +1499,10 @@ export lib {
   // modules called through aliases: what each builds to, in every mode.
   const project = async files => {
     const at = await fs.mkdtemp(path.join(dir, 'project-'));
-    for (const [name, text] of Object.entries(files)) await fs.writeFile(path.join(at, name), text);
+    for (const [name, text] of Object.entries(files)) {
+      await fs.mkdir(path.dirname(path.join(at, name)), { recursive: true });
+      await fs.writeFile(path.join(at, name), text);
+    }
     return path.join(at, 'main.utu');
   };
   const tee = Array.from({ length: 3000 }, (_, k) => `    a = a * 3 + ${k % 7};`).join('\n');
@@ -1515,6 +1523,8 @@ export lib {
     [{ 'main.utu': 'mod sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nexport main() I32 { sm.get(sm.new(3)); }\n' }, 3],
     // An @es binding of a generic module, typed in each instance.
     [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nexport main() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).to_f64(); }\n' }, 10.5],
+    // One file's mod, imported twice (two spellings of its path): one name, one module.
+    [{ 'lib/a.utu': 'mod api { fn x() I32 { 7; } }\n', 'main.utu': 'using api from "./lib/a.utu";\nusing api from "./lib/../lib/a.utu";\nexport main() I32 { api.x(); }\n' }, 7],
     // A computed global of an imported file, read by the entry's: set first.
     [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; a; }\n    let squares: Array[I32] = build();\n}\n',
       'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nexport main() I32 { last; }\n' }, 10],
@@ -1570,6 +1580,9 @@ export main() I32 {
     [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nexport main() I32 { t8.n(); }\n' }, "Unexpected ';'"],
     // Only a mod is imported: said at the using.
     [{ 'hf.utu': 'fn helper() I32 { 2; }\n', 'main.utu': 'using helper from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'helper is a function; using imports a mod'],
+    // One name, two files' mods: said at the second using (it was "Duplicate api__x", in b.utu).
+    [{ 'a.utu': 'mod api { fn x() I32 { 1; } }\n', 'b.utu': 'mod api { fn x() I32 { 2; } }\n',
+      'main.utu': 'using api from "./a.utu";\nusing api from "./b.utu";\nexport main() I32 { api.x(); }\n' }, 'Duplicate declaration api'],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

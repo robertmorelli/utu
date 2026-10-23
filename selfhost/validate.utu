@@ -142,7 +142,8 @@ fn validate_module_members() void {
         // (One named like a prelude module is reported as that.)
         if decl_is(b, Decl.Module) and not is_generic(b) and is_own_file(file_of_token(node_first[decl_node[b]])) and prelude_lookup(decl_name[b]) < 0 {
             for (0 ..< decl_kind.len()) |a| {
-                if a != b and decl_is(a, Decl.Module) and not is_generic(a) and decl_name[a] == decl_name[b] and module_before(a, b) {
+                // (A module a `using` named twice imports is reported there.)
+                if a != b and decl_is(a, Decl.Module) and not is_generic(a) and decl_name[a] == decl_name[b] and module_before(a, b) and not refused(a) and not refused(b) {
                     let item = first_child(decl_node[b]);
                     while (item >= 0) {
                         let name = hoisted_name(b, item);

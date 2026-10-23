@@ -1,0 +1,8 @@
+// What: two usings of one file's mod, spelled two ways (not a mistake)
+// Expect: ok
+using helpers from "./lib/489_helper_lib.utu";
+using helpers from "./lib/../lib/489_helper_lib.utu";
+
+export main() I32 {
+    helpers.one();
+}

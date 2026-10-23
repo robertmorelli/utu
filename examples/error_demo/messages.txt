@@ -4059,6 +4059,72 @@ ok
  5 │ export main() I32 {
 --- exit 1
 
+=== utu check examples/error_demo/names/780_using_named_like_own_mod.utu
+ ERROR  Duplicate declaration console
+        duplicate-declaration · examples/error_demo/names/780_using_named_like_own_mod.utu:5:5
+
+ 3 │ using console from std:Console;
+   │       ───────
+   │       ╰─ first here
+ 4 │
+ 5 │ mod console {
+   │     ━━━━━━━
+   │     ╰─ again
+ 6 │     fn f() I32 { 3; }
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/781_own_mod_named_like_using.utu
+ ERROR  Duplicate declaration console
+        duplicate-declaration · examples/error_demo/names/781_own_mod_named_like_using.utu:7:7
+
+ 3 │ mod console {
+   │     ───────
+   │     ╰─ first here
+   ┆
+ 5 │ }
+ 6 │
+ 7 │ using console from std:Console;
+   │       ━━━━━━━
+   │       ╰─ again
+ 8 │
+ 9 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/782_using_one_name_two_files.utu
+ ERROR  Duplicate declaration api
+        duplicate-declaration · examples/error_demo/names/782_using_one_name_two_files.utu:4:7
+
+ 2 │ // Expect: Duplicate declaration api, at the second using
+ 3 │ using api from "./lib/782_api_one.utu";
+   │       ───
+   │       ╰─ first here
+ 4 │ using api from "./lib/782_api_two.utu";
+   │       ━━━
+   │       ╰─ again
+ 5 │
+ 6 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/783_using_alias_named_like_fn.utu
+ ERROR  Duplicate declaration helper
+        duplicate-declaration · examples/error_demo/names/783_using_alias_named_like_fn.utu:5:4
+
+ 3 │ using helpers |helper| from "./lib/489_helper_lib.utu";
+   │                ──────
+   │                ╰─ first here
+ 4 │
+ 5 │ fn helper() I32 { 1; }
+   │    ━━━━━━
+   │    ╰─ again
+ 6 │
+ 7 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/784_using_one_mod_two_spellings.utu
+ok
+--- exit 0
+
 === utu check examples/error_demo/names/78_distinct_bool.utu
  ERROR  distinct wraps I32, U32, I64, U64, F32, or F64
         invalid-distinct · examples/error_demo/names/78_distinct_bool.utu:3:1
@@ -4342,6 +4408,14 @@ ok
 --- exit 0
 
 === utu check examples/error_demo/names/lib/489_helper_lib.utu
+ok
+--- exit 0
+
+=== utu check examples/error_demo/names/lib/782_api_one.utu
+ok
+--- exit 0
+
+=== utu check examples/error_demo/names/lib/782_api_two.utu
 ok
 --- exit 0
 

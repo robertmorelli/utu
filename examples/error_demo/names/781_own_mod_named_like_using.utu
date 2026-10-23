@@ -1,0 +1,11 @@
+// What: the file's own mod, then a using of its name
+// Expect: Duplicate declaration console, at the using
+mod console {
+    fn f() I32 { 3; }
+}
+
+using console from std:Console;
+
+export main() I32 {
+    console.f();
+}
