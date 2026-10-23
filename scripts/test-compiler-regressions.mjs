@@ -256,6 +256,45 @@ export lib {
     checked++;
   }
 
+  // -O small inlines what shrinks (selfhost/inline.utu): arguments with
+  // effects run in their order, a constant or a local moves to its read, an
+  // argument never read is kept, a function called once moves there; and
+  // the small builds have fewer functions than debug.
+  const shrinks = await write(`vec trail: I32;
+fn tick(v: I32) I32 { trail.push(v); v; }
+fn less(a: I32, b: I32) I32 { a - b; }
+fn scaled(a: I32, b: I32) I32 { a * 10 + b; }
+fn second(a: I32, b: I32) I32 { b; }
+fn sign(x: I32) I32 { if x < 0 { -1; } else { 1; }; }
+export lib {
+    fn run() I32 {
+        let x = 7;
+        less(tick(9), tick(4)) * 1000 + scaled(tick(3), x) * 10 + scaled(less(x, 2), 1) + second(tick(2), 5) + sign(x - 10);
+    }
+    fn ran() I32 {
+        let t = 0;
+        for (0 ..< trail.len()) |i| { t = t * 10 + trail[i]; };
+        t;
+    }
+}
+`);
+  const functions = bytes => {
+    let i = 8;
+    const leb = () => { let r = 0, s = 0, b; do { b = bytes[i++]; r += (b & 127) * 2 ** s; s += 7; } while (b & 128); return r; };
+    while (i < bytes.length) { const id = bytes[i++], size = leb(); if (id === 3) return leb(); i += size; }
+    return 0;
+  };
+  const debugFunctions = functions((await compileFile(utu, shrinks, { mode: 'debug' })).wasm);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, shrinks, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    assert.equal(e.run(), 5425, `${mode}: run`);
+    assert.equal(e.ran(), 9432, `${mode}: ran`);
+    if (mode.startsWith('small')) assert.ok(functions(built.wasm) < debugFunctions, `${mode}: nothing inlined`);
+    checked++;
+  }
+
   // Structs returned as their fields (selfhost/inline.utu, -O small and
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.

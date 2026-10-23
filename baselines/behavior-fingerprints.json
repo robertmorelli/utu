@@ -13,9 +13,9 @@
  "benchmarks/deltablue/deltablue.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "095b11a8f1471748",
-  "queries": "5459ac826673bc0e",
-  "graphs": "e6378ad521576bf3"
+  "entries": "e2ce84043dc13437",
+  "queries": "d8520e49486a3495",
+  "graphs": "3243d71ebcf33343"
  },
  "benchmarks/deltablue/deltablue.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -903,9 +903,9 @@
  "examples/queries/indexes.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "21df6f89a62b7a99",
-  "queries": "e402552f1d4b7f3b",
-  "graphs": "fb12c37acc18c85f"
+  "entries": "8eaae7b2632e82dc",
+  "queries": "51f11f490442b7eb",
+  "graphs": "bc553d5b68942e6c"
  },
  "examples/queries/indexes.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -1857,9 +1857,9 @@
  "std/Buffer.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "24fe40bee7bb6483",
-  "queries": "acacfcba338d4e32",
-  "graphs": "bc860b5671aa77c9"
+  "entries": "3522842f0a377261",
+  "queries": "8549cce5207fcb49",
+  "graphs": "9cd447cd172c8aa1"
  },
  "std/Buffer.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",
@@ -2143,9 +2143,9 @@
  "std/Spatial.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "4ac51f7bead51dfa",
-  "queries": "fc50767641e0529e",
-  "graphs": "2b155f3fdd2fe516"
+  "entries": "a1b87658d7664ee8",
+  "queries": "e735fcac511a5921",
+  "graphs": "f070f29c6d2d94ed"
  },
  "std/Spatial.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",

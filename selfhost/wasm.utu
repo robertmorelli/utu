@@ -1678,6 +1678,8 @@ fn encode_module() I32 {
         inline_module();
         sweep();
     };
+    // -O small inlines what shrinks the module (it sweeps as it goes).
+    if optimize_level[0] == 1 { inline_small(); };
     // Structs returned as their fields (inline.utu).
     if optimize_level[0] != 0 and struct_returns() { sweep(); };
     finish_mems();

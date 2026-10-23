@@ -6066,7 +6066,7 @@ ok
    │     ╰─ called here
 11 │ }
 
-  in &.get_index  std:Buffer:36:55
+  in &.get_index  std:Buffer:32:55
   in main  examples/error_demo/runtime/06_buffer_past_length.utu:10:5
 --- exit 1
 
@@ -6081,7 +6081,7 @@ ok
    │     ╰─ called here
  9 │ }
 
-  in &.get_index  std:Buffer:36:55
+  in &.get_index  std:Buffer:32:55
   in main  examples/error_demo/runtime/07_buffer_past_capacity.utu:8:5
 --- exit 1
 
@@ -6096,7 +6096,7 @@ ok
    │     ╰─ called here
  8 │ }
 
-  in &.pop  std:Buffer:47:44
+  in &.pop  std:Buffer:43:44
   in main  examples/error_demo/runtime/08_buffer_pop_empty.utu:7:5
 --- exit 1
 
@@ -6111,7 +6111,7 @@ ok
    │     ╰─ here
  5 │ }
 
-  in average  examples/error_demo/runtime/09_div_by_zero.utu:4:5
+  in average  examples/error_demo/runtime/09_div_by_zero.utu:4:5  (inlined into main)
   in main  examples/error_demo/runtime/09_div_by_zero.utu:9:5
 --- exit 1
 
@@ -6126,7 +6126,7 @@ ok
    │     ╰─ here
  5 │ }
 
-  in bucket  examples/error_demo/runtime/10_rem_by_zero.utu:4:5
+  in bucket  examples/error_demo/runtime/10_rem_by_zero.utu:4:5  (inlined into main)
   in main  examples/error_demo/runtime/10_rem_by_zero.utu:8:5
 --- exit 1
 
@@ -6360,11 +6360,11 @@ ok
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
-wasm://wasm/0b64b376:1
+wasm://wasm/0fa20312:1
 
 
 RuntimeError: divide by zero
-    at closure (wasm://wasm/0b64b376:wasm-function[7]:0xc4)
+    at closure (wasm://wasm/0fa20312:wasm-function[5]:0xb4)
     at invoke
 
 Node.js v25.8.1
