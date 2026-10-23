@@ -1035,7 +1035,9 @@ fn lean_closures() void {
         let f = closure_bodies[i];
         func_type_of[f] = closure_bodies[i + 1];
         let set = closure_bodies[i + 2];
-        w_op[set] = Op.Nop.to_i32();
+        // The cast erased: no code (not even a `nop`).
+        w_op[set] = Op.Seq.to_i32();
+        w_type[set] = vt_none;
         w_count[set] = 0;
         read_param(func_body[f], closure_bodies[i + 3]);
         i += 4;
