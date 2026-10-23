@@ -1,0 +1,7 @@
+// What: `i++`, which utu does not have.
+// Expect: utu has no ++; write += 1
+export main() I32 {
+    let i = 0;
+    i++;
+    i;
+}

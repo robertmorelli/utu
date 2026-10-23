@@ -452,6 +452,7 @@ mod stdlib {
         "& | ^ ~ << >> >>>::bitwise; >> keeps the sign of a signed type, >>> shifts in zeros",
         "== != < <= > >=::comparison, signed or unsigned by type",
         "I32.clz(x) I32.ctz(x) I32.popcnt(x)::leading zeros, trailing zeros, set bits (I32 only)",
+        "I32.min(a, b) max(a, b) abs(x)::also I64's; abs of the least value wraps to itself",
         "x.to_i32() .to_u32() .to_i64() .to_u64()::reinterpret, wrap, or extend; one instruction",
         "x.to_f32() .to_f64()::to a float",
         "x.to_str()::decimal text, as JavaScript's String() spells it"
@@ -475,9 +476,10 @@ mod stdlib {
     fn str_rows() Array[Str] {
         [
         "s.len()::length in UTF-16 code units",
-        "s[i]  s.get(i)::the code unit at i, an I32",
-        "s[a, b]  s.slice(a, b)::the text from a up to b",
+        "s[i]  s.get(i)::the code unit at i, an I32; out of range traps",
+        "s[a, b]  s.slice(a, b)::the text from a up to b; b past the end stops at it; a negative or reversed range is empty",
         "a + b  a == b  a != b::concatenate; compare contents",
+        "a < b  <=  >  >=  Str.compare(a, b)::order by UTF-16 code units, as JavaScript's (\"B\" < \"a\"); compare is -1, 0, or 1",
         "s.index_of(part, from)  s.last_index_of(part)::where part occurs, or -1",
         "s.contains(p) starts_with(p) ends_with(p)::tests, as Bool",
         "s.trim() trim_start() trim_end()::without surrounding white space",
@@ -498,7 +500,7 @@ mod stdlib {
         "Array[T].new_default(n)::n zeros or nulls (T must have a default)",
         "a.len()::the number of elements",
         "a[i]  a.get(i)  a[i] = v  a.set(i, v)::read and write; out of range traps",
-        "a[s, e]  a.slice(s, e)::a copy of elements s up to e",
+        "a[s, e]  a.slice(s, e)::a copy of elements s up to e; out of range, or e before s, traps",
         "a.copy_from(at, source, start, count)::bulk copy, overlap safe"
         ];
     }

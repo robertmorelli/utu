@@ -233,6 +233,13 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) void {
             return;
         };
     };
+    // A name `using` could not import is reported there.
+    for (0 ..< diag_kind.len()) |i| {
+        if diag_kind[i] == Diag.ImportNotModule.to_i32() and diag_word[i] == word {
+            diag_fresh[0] = 0;
+            return;
+        };
+    };
     report(kind, node, word);
     if diag_fresh[0] == 0 { return; };
     let t = word_text(word);
@@ -264,6 +271,21 @@ fn std_file(m: Str) Str {
 /// Suggest the member of `owner` in `space` nearest the name at `at`.
 fn suggest_member(owner: I32, at: I32, space: Space) void {
     if diag_fresh[0] == 1 and at >= 0 { suggest(at, near_member(owner, word_of(at), space), near_decl[0]); };
+}
+
+/// A note for `x.m()` with no method m (and no name suggested): where m is found.
+fn method_note(t: I32, word: I32) void {
+    if diag_fresh[0] == 0 or suggested(diag_kind.len() - 1).len() > 0 { return; };
+    let m = word_text(word);
+    if is_array_type(t) and (m == "push" or m == "append" or m == "pop" or m == "insert") {
+        diag_note("An Array's length is fixed; a Buffer[T] grows: using Buffer from std:Buffer;");
+        return;
+    };
+    let camel = false;
+    for (0 ..< m.len()) |i| { if m.get(i) >= 65 and m.get(i) <= 90 { camel = true; }; };
+    if camel and not has_foreign() and (t == prelude(Prelude.Str) or t == prelude(Prelude.F64)) {
+        diag_note("JavaScript's methods come with using JS from std:JS;");
+    };
 }
 
 /// Suggest the field of `owner` nearest the name at `at`, or a method of
@@ -629,12 +651,41 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         while (tok_kind[brace] != Tok.End.to_i32() and not tok_is(brace, Tok.LBrace)) { brace += 1; };
         if tok_is(brace, Tok.LBrace) and brace > from {
             let until = tok_before(file, brace);
-            let text = "(" + bytes_text(tok_start[from], tok_end[until]) + ") |" + tok_text(n) + "|";
+            let text = "(" + range_text(from, until) + ") |" + tok_text(n) + "|";
             diag_focus(n, until, text);
             diag_fix(tok_start[n], tok_end[until], text, "Use for " + text);
             parse_says("Write for " + text + ", not for " + tok_text(n) + " in");
             return true;
         };
+    };
+    if (tok_says(k, "let") or tok_says(k, "fn")) and tok_is(n, Tok.Word) and lower_byte(src[tok_start[n]]) != src[tok_start[n]] and (t == n or t == tok_after(n)) {
+        // `let INF = 1;`, `fn F() I32`: a capital starts a type's name.
+        let low = lowered(n);
+        diag_focus(n, n, low + "?");
+        diag_fix(tok_start[n], tok_end[n], low, "Use " + low);
+        parse_says("Names of values and functions start lowercase (a capital starts a type)");
+        return true;
+    };
+    if (tok_is(k, Tok.Plus) and tok_is(n, Tok.Plus) or tok_is(k, Tok.Minus) and tok_is(n, Tok.Minus)) and touching(k, n) {
+        // `i++` is `i += 1`.
+        let op = if tok_is(k, Tok.Plus) { "+="; } else { "-="; };
+        diag_focus(k, n, op + " 1");
+        diag_fix(tok_start[k], tok_end[n], " " + op + " 1", "Use " + op + " 1");
+        parse_says("utu has no " + tok_text(k) + tok_text(n) + "; write " + op + " 1");
+        return true;
+    };
+    if k == t and (tok_is(k, Tok.String) or tok_is(k, Tok.TemplateFull)) and tok_is(n, Tok.FatArrow) {
+        // `match s { "+" => … }`
+        diag_focus(k, k, "a string");
+        diag_note("Compare strings with if: if " + match_subject(file, k) + " == " + tok_text(k) + " { … } else if …");
+        parse_says("match takes number, Bool, and enum patterns, not strings");
+        return true;
+    };
+    if two_dots(k) {
+        diag_focus(k, k + 1, "..<");
+        diag_fix(tok_start[k], tok_end[k + 1], "..<", "Use ..<");
+        parse_says("Write ..< (end left out) or ... (end kept), not ..");
+        return true;
     };
     if tok_is(k, Tok.Word) and tok_is(n, Tok.Lt) and touching(k, n) {
         // `Array<I32>` is `Array[I32]`.
@@ -689,6 +740,50 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         return true;
     };
     false;
+}
+
+/// Token t's word lowercased: all of it when it is all capitals (`INF`), else its first letter (`MaxSize`).
+fn lowered(t: I32) Str {
+    let caps = true;
+    for (tok_start[t] ..< tok_end[t]) |i| { if src[i] >= 97 and src[i] <= 122 { caps = false; }; };
+    let text = "";
+    for (tok_start[t] ..< tok_end[t]) |i| {
+        text = text + Str.from_code_point(if caps or i == tok_start[t] { lower_byte(src[i]); } else { src[i]; });
+    };
+    text;
+}
+
+/// The subject of the `match` whose arm token k is in, as written (`x` when not found).
+fn match_subject(file: I32, k: I32) Str {
+    let m = k;
+    while (m > file_tok[file] and m > k - 400 and not tok_says(m, "match")) { m -= 1; };
+    let brace = m;
+    while (brace < k and not tok_is(brace, Tok.LBrace)) { brace += 1; };
+    if not tok_says(m, "match") or brace == m + 1 or brace >= k { return "x"; };
+    bytes_text(tok_start[m + 1], tok_end[brace - 1]);
+}
+
+/// Whether tokens k and k+1 are `..` (two dots, which utu does not have).
+fn two_dots(k: I32) Bool { tok_is(k, Tok.Dot) and tok_is(k + 1, Tok.Dot) and touching(k, k + 1); }
+
+/// Tokens a to b as written, each `..` made ` ..< ` (utu's half-open range).
+fn range_text(a: I32, b: I32) Str {
+    let text = "";
+    let at = tok_start[a];
+    let k = a;
+    while (k < b) {
+        if two_dots(k) {
+            let end_ = tok_start[k];
+            while (end_ > at and src[end_ - 1] == 32) { end_ -= 1; };
+            text = text + bytes_text(at, end_) + " ..< ";
+            at = tok_end[k + 1];
+            while (src[at] == 32) { at += 1; };
+            k += 2;
+        } else {
+            k += 1;
+        };
+    };
+    text + bytes_text(at, tok_end[b]);
 }
 
 /// Report a habit: tokens a to b written where `text` is utu's.

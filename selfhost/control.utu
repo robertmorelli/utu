@@ -446,8 +446,9 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     let t = ty_a[at];
     // A nullable number or Bool from the host: the value is the primitive.
     let boxed = boxed_primitive(t);
-    // `x orelse fatal`: wasm's own null check, with no branch.
-    if is_kind(b, Node.Fatal_expr) {
+    // `x orelse fatal`: wasm's own null check, with no branch, in an unsafe
+    // build; else the branch, so the trap is fatal's, not a null's.
+    if is_kind(b, Node.Fatal_expr) and safe_checks[0] == 0 {
         w_node(Op.RefAsNonNull, repr(t), 0, 0, m);
         if boxed >= 0 {
             foreign_unbox(t, boxed, false);

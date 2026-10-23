@@ -485,7 +485,9 @@ fn unresolved(node: I32) Bool {
 /// Something the compiler cannot do yet: reported, and checking goes on.
 fn unsupported(at: I32) I32 {
     // A mistake already reported inside this code made it unreadable: say nothing more.
-    if not reported_within(at) { report(Diag.Unsupported, at, -1); };
+    // (A host module whose declarations were not found is reported at its using.)
+    let d = if is_kind(at, Node.Identifier) { node_decl[at]; } else { -1; };
+    if not reported_within(at) and not (decl_is(d, Decl.Foreign) and decl_a[d] < 0) { report(Diag.Unsupported, at, -1); };
     error_value();
 }
 
@@ -1803,7 +1805,8 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         };
     };
     if is_foreign(rt) { return check_foreign_method(node, rt, word_of(name), args, m, expect, cx); };
-    if decl_is(ty_decl(rt), Decl.Proto) { return proto_call(rt, name, args, m, node, cx); };
+    // `s.describe()` with `fn Shape.describe |s|`: a function of the protocol, not a member, is called as any method.
+    if decl_is(ty_decl(rt), Decl.Proto) and (protocol_member(ty_decl(rt), word_of(name)) >= 0 or not decl_is(member(ty_decl(rt), word_of(name), Space.Method), Decl.Fn)) { return proto_call(rt, name, args, m, node, cx); };
     if is_scalar_kind(ty_decl(rt)) {
         let scalar = scalar_method(ty_decl(rt), word_of(name));
         if scalar >= 0 and args < 0 { return scalar; };
@@ -1832,6 +1835,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         // `x.sqrt()` with `fn sqrt(x: &)` in the type's module: b says so.
         report2(Diag.UnknownMethod, node, word_of(name), rt, if module_fn_of(rt, word_of(name)) >= 0 { 1; } else { -1; });
         suggest_member(ty_decl(rt), name, Space.Method);
+        method_note(rt, word_of(name));
         return finish_error(args, m, cx);
     };
     // What the name means, for an editor (as a field's is recorded).

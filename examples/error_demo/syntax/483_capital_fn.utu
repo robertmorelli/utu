@@ -1,0 +1,5 @@
+// What: a function whose name starts with a capital.
+// Expect: Names of values and functions start lowercase (a capital starts a type); fix area
+fn Area(w: I32, h: I32) I32 { w * h; }
+
+export main() I32 { Area(2, 3); }

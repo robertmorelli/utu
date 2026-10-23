@@ -1,0 +1,6 @@
+// What: JavaScript's toFixed on an F64, without importing std:JS.
+// Expect: No method F64.toFixed; note: using JS from std:JS
+export main() Str {
+    let n = 3.14159;
+    n.toFixed(2);
+}

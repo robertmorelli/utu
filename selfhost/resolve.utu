@@ -242,6 +242,7 @@ enum(U8) Diag:
     | TryNotResult
     | TryPlace
     | TryErrorMismatch
+    | ImportNotModule
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -880,6 +881,22 @@ fn bind_import(i: I32) void {
     };
 }
 
+/// The node kind of the top-level item named `word` that the file `using`
+/// `item` imports declares, when it is not a mod; else -1.
+fn imported_item_kind(item: I32, word: I32) I32 {
+    for (0 ..< import_node.len()) |i| {
+        let file = import_target[i];
+        if import_node[i] == item and file >= 0 and file_root[file] >= 0 {
+            let c = first_child(file_root[file]);
+            while (c >= 0) {
+                if not is_kind(c, Node.Module_decl) and not is_kind(c, Node.Using_decl) and item_name_node(c) >= 0 and word_of(item_name_node(c)) == word { return node_kind[c]; };
+                c = next_sibling(c);
+            };
+        };
+    };
+    -1;
+}
+
 /// A declaration of a file named like a module of the prelude, reported at
 /// its name: the compiler's own `Str` or `Array` is the prelude's.
 fn standard_name(decl: I32, name_at: I32) void {
@@ -973,7 +990,11 @@ fn declare_program() void {
             // The host found none (an npm package not installed).
             if decl_a[m] < 0 {
                 let path = import_path[i];
-                report(Diag.HostMissing, path, intern_text(bytes_text(tok_start[node_first[path]] + 1, tok_end[node_last[path] - 1] - 1)));
+                // (`"npm:x"` without its quotes; `node:x` as written.)
+                let text = node_text(path);
+                if text.starts_with(Str.from_code_point(34)) { text = text.slice(1, text.len() - 1); };
+                report(Diag.HostMissing, path, intern_text(text));
+                if text.starts_with("node:") { diag_note("node: modules' declarations come from @types/node in node_modules"); };
             };
         };
     };
@@ -1353,7 +1374,12 @@ fn walk_using(item: I32, w: Walk) void {
     let module = if using_path(item) >= 0 { node_decl[n]; } else { lookup(word_of(n)); };
     if decl_is(module, Decl.Alias) { module = decl_a[module]; };
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
-        report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
+        // `using helper from "./lib.utu"` with `fn helper` there: only a mod is imported.
+        let kind = imported_item_kind(item, word_of(n));
+        if kind >= 0 {
+            report2(Diag.ImportNotModule, n, word_of(n), kind, -1);
+            diag_note("Declare it in a mod there (mod m { … }) and import that");
+        } else { report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module); };
         return;
     };
     node_decl[n] = module;

@@ -135,7 +135,9 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    x;\n}\nexport main() I32 { check(-1); }\n', 'Reached fatal', '2:16', 'check'],
     divide: ['fn div(a: I32, b: I32) I32 {\n    a / b;\n}\nexport main() I32 { div(7, 0); }\n', 'Integer division by zero', '2:5', 'div'],
     bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:5', 'at'],
-    null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Null', '2:5', 'pick'],
+    // `orelse fatal` is fatal's trap, not a null's.
+    null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Reached fatal', '2:14', 'pick'],
+    slice: ['fn cut(xs: Array[I32]) I32 {\n    xs[2, 1].len();\n}\nexport main() I32 { cut([1, 2, 3]); }\n', 'Slice ends before it starts', '2:5', 'cut'],
     arm: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'No arm for the value', '5:5', 'name'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
@@ -182,6 +184,13 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.equal(r.status, 0, r.stderr.slice(0, 300));
   assert.equal(r.stdout.trim(), '1');
 
+  // Arguments after -- reach the program as process.argv.slice(2); -- is only run's.
+  await write('args.utu', 'let count: fun() I32 = @es/\\ () => process.argv.length - 2 \\/;\nlet arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;\nexport main() Str { `${count()} ${arg(1)}`; }\n');
+  r = utu('run', 'args.utu', '--', 'a', 'b c');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), '2 b c');
+  assert.match(utu('build', 'args.utu', '--', 'a').stderr, /-- is only for run/);
+
   // A module and the least JavaScript that loads it.
   r = utu('build', 'good.utu', '-o', 'out');
   assert.equal(r.status, 0, r.stderr);
@@ -195,7 +204,8 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   if (spawnSync('bun', ['--version']).status === 0) {
     r = utu('build-exe', 'good.utu', '-o', 'good');
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(spawnSync(path.join(dir, 'good'), { encoding: 'utf8' }).stdout.trim(), '6');
+    // main's I32 is the exit status.
+    assert.equal(spawnSync(path.join(dir, 'good'), { encoding: 'utf8' }).status, 6);
   }
   console.log('utu cli: check, run, test, bench, build, build-exe pass');
 } finally {

@@ -1,0 +1,5 @@
+// What: `using` names a function of another file; only a mod can be imported.
+// Expect: helper is a function; using imports a mod (and nothing more at its use)
+using helper from "./lib/489_helper_lib.utu";
+
+export main() I32 { helper(); }

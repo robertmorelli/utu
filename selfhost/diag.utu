@@ -283,7 +283,19 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.DslEmpty or k == Diag.DslTooDeep or k == Diag.IrInvalid { return "invalid-dsl-usage"; };
     if k == Diag.StdOwnStruct { return "unknown-field"; };
     if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try"; };
+    if k == Diag.ImportNotModule { return "unknown-type"; };
     "type-mismatch";
+}
+
+/// A top-level item, by its node kind, after "is".
+fn item_kind_text(kind: I32) Str {
+    let k = Node.from_i32(kind);
+    if k == Node.Fn_decl { return "a function"; };
+    if k == Node.Struct_decl { return "a struct"; };
+    if k == Node.Enum_decl { return "an enum"; };
+    if k == Node.Proto_decl { return "a protocol"; };
+    if k == Node.Global_decl { return "a global"; };
+    "not a mod";
 }
 
 /// Whether `t` names a number or Bool type: what match takes.
@@ -531,6 +543,7 @@ fn diag_text(i: I32) Str {
             what + " in a function returning " + type_text(b) + ", not a Result";
         },
         Diag.TryErrorMismatch => "try passes on " + type_text(a) + "; the function's errors are " + type_text(b),
+        Diag.ImportNotModule => w + " is " + item_kind_text(a) + "; using imports a mod",
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -631,7 +644,9 @@ fn diag_text(i: I32) Str {
         },
         Diag.IteratorSource => {
             // b: 0 a pipeline's source, 1 a stage's other array, 2 a flat_map body, 3 bisect with other stages,
-            // 4 a range of a type that cannot be counted, 5 sum of non-numbers, 6 bisect over a range not of I32
+            // 4 a range of a type that cannot be counted, 5 sum of non-numbers, 6 bisect over a range not of I32,
+            // 7 a source an operator took (word: the operator)
+            if b == 7 { return "A pipeline binds looser than " + w + ": its source is all of this"; };
             if b == 6 { return "bisect takes a range of I32, not " + type_text(a); };
             if b == 5 { return word_text(word) + " needs numbers, not " + type_text(a); };
             if b == 4 { return "Cannot pipe a range of " + type_text(a); };
@@ -746,6 +761,7 @@ fn diag_default_label(i: I32) Str {
         Diag.NewNotHost => "not a host class",
         Diag.GeneratorExport => "a generator",
         Diag.HostMissing => "not found",
+        Diag.ImportNotModule => "not a mod",
         ~> "here",
     };
 }

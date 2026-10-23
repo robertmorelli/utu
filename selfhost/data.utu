@@ -797,6 +797,18 @@ fn array_slice_helper(heap: I32) I32 {
     w_get(vt_i32, 1);
     w_i32_op(i32_sub, ms);
     w_node(Op.LocalSet, vt_none, 3, 0, ms);
+    // A safe build: a slice ending before it starts traps as itself, not as "array too large".
+    if safe_checks[0] == 1 {
+        let mi = w_mark();
+        let mc = w_mark();
+        w_get(vt_i32, 3);
+        w_i32(0);
+        w_i32_op(i32_lt_s, mc);
+        let mt = w_mark();
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        w_node(Op.Seq, vt_none, 0, 0, mt);
+        w_node(Op.If, vt_none, new_label(), 0, mi);
+    };
     let mn = w_mark();
     w_get(vt_i32, 3);
     w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mn);

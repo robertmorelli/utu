@@ -263,6 +263,7 @@ fn type_of(node: I32, inst: I32) I32 {
         let d = ty_decl(t);
         if is_scalar_kind(d) or (decl_is(d, Decl.TypeDecl) and is_scalar_decl(d)) {
             report(Diag.InvalidNullableType, node, decl_name[d]);
+            in_instance(inst);
             return ty_error();
         };
         return nullable(t);
@@ -559,6 +560,7 @@ fn reset_types() void {
     inst_module.clear();
     inst_args.clear();
     inst_depth.clear();
+    inst_site.clear();
     inst_table.clear();
     struct_inst.clear();
     struct_heap.clear();

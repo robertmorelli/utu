@@ -570,6 +570,16 @@ export lib {
     checked++;
   }
 
+  // A slice ending before it starts traps, and `orelse fatal` on null, in every mode.
+  const traps = await write('export lib {\n    fn reversed() I32 { let a = [1, 2, 3]; a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; (s orelse fatal).len(); }\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, traps, { mode });
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    assert.throws(() => exports.reversed(), WebAssembly.RuntimeError, `${mode}: reversed slice`);
+    assert.throws(() => exports.none(), WebAssembly.RuntimeError, `${mode}: orelse fatal`);
+    checked++;
+  }
+
   // Control flow the self-hosted compiler once got wrong, the same in every build mode.
   const control = await write(`struct N:
     | next: ?N
@@ -665,6 +675,21 @@ mod Box {
     fn u64_max() I32 { let u: U64 = 18446744073709551614; (u ... 18446744073709551615) count; }
     fn to_max_bisect() I32 { let hi = 2147483647; (hi - 3 ... hi) bisect |v| { v < hi; }; }
 }`, { to_max: 3, wide_take: 3, wide_skip: -1, longs: 20000000006n, unsigned: 2, u64_max: 2, to_max_bisect: 3 }],
+    // Str's order (by code units), I32's and I64's min, max, abs, and a protocol's own function called as a method.
+    [`proto Shape:
+    | area() I32
+struct Sq[Shape]:
+    | s: I32
+fn Shape[Sq].area |q| () I32 { q.s * q.s; }
+fn Shape.twice |s| () I32 { s.area() * 2; }
+export lib {
+    fn order() Str { ",".join(["bo", "Al", "al", "b"] sort(Str) |a, b| { a < b; }); }
+    fn cmp() I32 { Str.compare("a", "b") * 100 + Str.compare("b", "b") * 10 + Str.compare("c", "b"); }
+    fn tests() Bool { "a" <= "a" and "b" > "a" and "B" < "a" and "ab" >= "a"; }
+    fn ints() I32 { I32.min(3, -4) * 100 + I32.max(3, -4) * 10 + I32.abs(-7); }
+    fn longs() I64 { I64.abs(-9.to_i64()) + I64.max(2.to_i64(), 5.to_i64()); }
+    fn proto_method() I32 { let s: Shape = Sq { s: 3 }; s.twice(); }
+}`, { order: 'Al,al,b,bo', cmp: -99, tests: true, ints: -363, longs: 14n, proto_method: 18 }],
   ];
   for (const [source, expected] of selfhostPrograms) {
     const file = await write(source);
@@ -734,7 +759,7 @@ export lib {
     fn level() Str { @json/\\ encode L L { l: Level.High } \\/; }
     fn lone() Str { @json/\\ encode Array[Str] [Str.from_code_point(55296)] \\/; }
     fn range() Str { @json/\\ error L "{\\"l\\":\\"Mid\\"}" \\/; }
-}`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant at line 1, column 6' },
+}`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant "Mid" at line 1, column 6' },
       { literal: [['{"a":"q\\"t"}', 'quote'], ['{"q\\"k":1}', 'key'], ['{"b":100000}', 'exp'], ['{"plan":{}}', 'plan'], ['{}', 'x,y']] }],
   ];
   for (const [source, expected, calls = {}] of boundary) {
@@ -923,6 +948,13 @@ export lib {
     ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; g(); }\nexport main() I32 { f().value(); }\n', 'try in defer'],
     ['export main() I32 { let r = Result[I32, Str].ok(1); r._value; }\n', 'Result has no field _value'],
     ['export main() I32 { let r: Result[I32, Str] = &{ _ok: true, _value: 1 }; 0; }\n', 'Result[I32, Str] is made by its own functions'],
+    // Real programs' mistakes, said as what to write.
+    ['fn f() I32 {\n    let t = 0;\n    for i in 0..10 { t += i; };\n    t;\n}\n', 'Write for (0 ..< 10) |i|, not for i in'],
+    ['let INF = 1;\n', 'Names of values and functions start lowercase (a capital starts a type)'],
+    ['fn F() I32 { 1; }\n', 'Names of values and functions start lowercase (a capital starts a type)'],
+    ['fn f() I32 {\n    let i = 0;\n    i++;\n    i;\n}\n', 'utu has no ++; write += 1'],
+    ['fn f(s: Str) I32 { match s { "+" => 1, ~> 0, }; }\n', 'match takes number, Bool, and enum patterns, not strings'],
+    ['fn f() Bool { true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
     ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
@@ -1072,6 +1104,8 @@ export lib {
     [{ 'mf.utu': 'mem m: I32 = [1];\nmod mm { fn f() I32 { m[0]; } }\n', 'main.utu': 'using mm from "./mf.utu";\nexport main() I32 { m[0]; }\n' }, 'Unknown variable m'],
     // A parse error in an imported file is the mistake (it showed as "Unknown module t8").
     [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nexport main() I32 { t8.n(); }\n' }, "Unexpected ';'"],
+    // Only a mod is imported: said at the using.
+    [{ 'hf.utu': 'fn helper() I32 { 2; }\n', 'main.utu': 'using helper from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'helper is a function; using imports a mod'],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});
