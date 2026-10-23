@@ -336,8 +336,114 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     };
     if default_ < 0 { check_alt_exhaustive(node, enum_decl); };
     let t = alt_arms(arms, s, st, expect, default_, cx);
+    if optimize_level[0] == 1 { cast_arms(w_stack[w_stack.len() - 1], s); };
     w_node(Op.Seq, repr(t), 0, 0, m);
     t;
+}
+
+/// In size builds, the arms that bind their variant, from the first, as one
+/// CastArms (wasm.utu) when that is smaller: each arm's `ref.test`, and the
+/// `ref.cast` it binds, become one `br_on_cast`. Rewrites the alt's first
+/// `if`, `n`, in place.
+fn cast_arms(n: I32, s: I32) void {
+    let k = 0;
+    let x = n;
+    while (alt_cast_arm(x, s) >= 0) {
+        k += 1;
+        x = only_kid(w_kid(x, 2));
+    };
+    if k == 0 { return; };
+    let r = w_type[n];
+    let bt = if r >= vt_defined and r < vt_tuple { 2; } else { 1; };
+    // The last arm untested (an unsafe build): its cast takes the value as
+    // it is; nothing else does, so it is dropped, unless it does not complete.
+    let last = -1;
+    let rest = n;
+    for (0 ..< k) |i| { rest = if i == 0 { n; } else { only_kid(w_kid(rest, 2)); }; };
+    rest = w_kid(rest, 2);
+    let first = first_run(rest);
+    if w_op[first] == Op.RefCast.to_i32() and w_count[first] == 1 and is_get(w_kid(first, 0), s) { last = first; };
+    let unreachable_rest = w_count[rest] == 1 and w_op[w_kid(rest, 0)] == Op.Unreachable.to_i32();
+    // (No default and every variant tested, in a safe build: typed as the alt.)
+    if unreachable_rest { w_type[rest] = vt_unreachable; };
+    // Bytes: a test, an if, an else, an end, and a cast an arm, against a
+    // block, a `br_on_cast`, an end, and a branch out.
+    let before = k * (13 + bt) + if last >= 0 { 5; } else { 0; };
+    let after = 4 + bt + k * 10 + if last >= 0 { 3; } else if unreachable_rest { 0; } else { 1; };
+    if w_type[rest] != vt_unreachable { after += 2; };
+    x = n;
+    for (0 ..< k) |i| {
+        if i < k - 1 and w_type[w_kid(x, 1)] != vt_unreachable { after += 2; };
+        x = only_kid(w_kid(x, 2));
+    };
+    if after >= before {
+        if unreachable_rest { w_type[rest] = r; };
+        return;
+    };
+    let subject = w_kid(w_kid(n, 0), 0);
+    let held_e = w_leaf(Op.Held, w_type[subject], 0, 0);
+    w_pop();
+    if last >= 0 {
+        w_kids[w_first[last]] = held_e;
+    } else if not unreachable_rest {
+        let m = w_mark();
+        w_push(held_e);
+        w_node(Op.Drop, vt_none, 0, 0, m);
+        w_push(rest);
+        rest = w_node(Op.Seq, w_type[rest], 0, 0, m);
+        w_pop();
+    };
+    let aux = w_aux.len();
+    let arms = Array[I32].new(k, 0);
+    x = n;
+    for (0 ..< k) |i| {
+        let to = w_a[w_kid(x, 0)];
+        w_aux.push(to);
+        let cast = first_run(w_kid(x, 1));
+        w_op[cast] = Op.Held.to_i32();
+        w_type[cast] = to;
+        w_count[cast] = 0;
+        arms[i] = w_kid(x, 1);
+        x = only_kid(w_kid(x, 2));
+    };
+    w_op[n] = Op.CastArms.to_i32();
+    w_a[n] = aux;
+    w_b[n] = k;
+    w_first[n] = w_kids.len();
+    w_kids.push(subject);
+    for (0 ..< k) |i| { w_kids.push(arms[i]); };
+    w_kids.push(rest);
+    w_count[n] = k + 2;
+}
+
+/// Whether `x` is an alt arm's `if` that binds its variant: `ref.test` of
+/// local s, then a branch that first casts s to it. Its type, or -1.
+fn alt_cast_arm(x: I32, s: I32) I32 {
+    if x < 0 or w_op[x] != Op.If.to_i32() or w_count[x] != 3 { return -1; };
+    let test = w_kid(x, 0);
+    if w_op[test] != Op.RefTest.to_i32() or not is_get(w_kid(test, 0), s) { return -1; };
+    let cast = first_run(w_kid(x, 1));
+    if w_op[cast] != Op.RefCast.to_i32() or w_a[cast] != w_a[test] or not is_get(w_kid(cast, 0), s) { return -1; };
+    w_a[test];
+}
+
+fn is_get(n: I32, local: I32) Bool { w_op[n] == Op.LocalGet.to_i32() and w_a[n] == local; }
+
+/// The one kid of a Seq, or -1.
+fn only_kid(seq: I32) I32 { if w_op[seq] == Op.Seq.to_i32() and w_count[seq] == 1 { w_kid(seq, 0); } else { -1; }; }
+
+/// The instruction that runs first in `n`, inside no block (a value on the
+/// stack before n reaches it), or -1.
+fn first_run(n: I32) I32 {
+    let x = n;
+    while (w_count[x] > 0) {
+        let op = w_op[x];
+        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or op == Op.NullElse.to_i32()
+            or op == Op.CastArms.to_i32() or (op == Op.LocalGet.to_i32()) { return -1; };
+        if op == Op.RefCast.to_i32() { return x; };
+        x = w_kid(x, 0);
+    };
+    if w_op[x] == Op.Seq.to_i32() { -1; } else { x; };
 }
 
 /// The arms from `arm` on, as a chain of ifs; returns the result type.

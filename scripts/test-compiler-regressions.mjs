@@ -564,6 +564,51 @@ export lib {
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
     ['mod m[T] {\n    struct &:\n        | v: T\n        | next: ?m[T]\n    fn &.mk(v: T) m[T] { &{ v: v, next: null }; }\n}\nexport lib { fn run() I32 { let a = m[I32].mk(3); a.next = m[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    // `a orelse b` (`br_on_non_null`): a once, b only when a is null, a `break` for b.
+    ['struct N:\n    | v: I32\n    | next: ?N\nvec hits: I32 = [0];\nfn get(n: N) ?N { hits[0] += 1; n.next; }\n'
+      + 'fn walk(a: ?N) I32 { let t = 0; let cur = a; while (true) { let c = cur orelse { break; }; t += c.v; cur = c.next; }; t; }\n'
+      + 'export lib { fn run() I32 {\n    let a = N { v: 1, next: N { v: 2, next: null } };\n    let b = get(a) orelse a;\n    let z = get(b) orelse N { v: 40, next: null };\n    let w = (get(z) orelse b).v;\n'
+      + '    walk(a) * 100000 + b.v * 1000 + z.v + w * 10 + hits[0] * 10000;\n} }\n', 332060],
+    // `and`/`or` as i32.and/i32.or, range tests as one unsigned comparison (small):
+    // the right side runs after the left (which it may read), bounds at the ends of I32.
+    ['vec seen: I32 = [0];\nfn bump() Bool { seen[0] += 1; seen[0] > 2; }\nfn h(acc: I32, b: Bool) I32 { acc * 31 + if b { 1; } else { 0; }; }\n'
+      + 'fn ranges(x: I32) I32 {\n    let a = 0;\n    a = h(a, x >= 48 and x <= 57);\n    a = h(a, 48 <= x and x <= 57);\n    a = h(a, x > -10 and x < 10);\n'
+      + '    a = h(a, x >= -2147483648 and x <= 5);\n    a = h(a, x >= 0 and x <= 2147483647);\n    a = h(a, x >= -2147483648 and x <= 2147483647);\n'
+      + '    a = h(a, x >= 5 and x <= 5);\n    a = h(a, x >= 6 and x <= 5);\n    a = h(a, x < 65 or x > 90);\n    a = h(a, 90 < x or x < 65);\n'
+      + '    a = h(a, x <= -1 or x >= 100);\n    a = h(a, x >= 0 and x < 2147483647);\n    a = h(a, x > -2147483648 and x <= 0);\n    a;\n}\nstruct B:\n'
+      + '    | ok: Bool\nfn is_ok(b: ?B) Bool { promote b { |o| => o.ok, ~> false, }; }\nfn nonnull(b: ?B) Bool { promote b { |o| => true, ~> false, }; }\n'
+      + 'export lib { fn run() I32 {\n'
+      + '    let xs = [-2147483648, -2147483647, -11, -10, -9, -1, 0, 1, 4, 5, 6, 9, 10, 47, 48, 50, 57, 58, 64, 65, 77, 90, 91, 99, 100, 101, 2147483646, 2147483647];\n'
+      + '    let acc = 0;\n    for (xs) |x| { acc = acc * 7 + ranges(x); };\n    let flag = false;\n    let t = 0;\n    for (0 ..< 5) |i| {\n'
+      + '        if bump() and seen[0] > 3 { t += 1; };\n        flag = i > 2;\n        if i == 1 or flag { t += 10; };\n'
+      + '        if flag and i != 4 { t += 100; };\n    };\n    let b: ?B = B { ok: true };\n    let n: ?B = null;\n'
+      + '    acc + t * 1000 + (if is_ok(b) { 1; } else { 0; }) + (if is_ok(n) { 2; } else { 0; }) + (if nonnull(b) { 4; } else { 0; }) + (if nonnull(n) { 8; } else { 0; }) + seen[0];\n'
+      + '} }\n', 2137102356],
+    // alt arms that bind, as br_on_cast (small): a default, none, an unsafe build's untested last arm,
+    // arms that break, return, or capture (boxed), arms that make the alt's own type.
+    ['enum Sh:\n    | Circle { r: I32 }\n    | Sq { s: I32 }\n    | Rect { w: I32, h: I32 }\n    | Tri { a: I32, b: I32, c: I32 }\n    | Dot {}\n'
+      + 'fn area(x: Sh) I32 {\n    alt x {\n        Circle |c| => c.r * 3,\n        Sq |q| => q.s * q.s,\n        Rect |r| => r.w * r.h,\n'
+      + '        Tri |t| => t.a + t.b + t.c,\n        Dot => 1,\n    };\n}\nfn kind(x: Sh) I32 {\n    alt x {\n        Circle |c| => c.r,\n        Sq |q| => q.s,\n'
+      + '        Rect |r| => r.w,\n        ~> 99,\n    };\n}\nfn first(xs: Array[Sh]) I32 {\n    let t = 0;\n    for (xs) |x| {\n        alt x {\n'
+      + '            Circle |c| => { t += c.r; },\n            Sq |q| => { if q.s > 5 { break; }; t += 1000; },\n'
+      + '            Rect |r| => { if r.w == 0 { return -1; }; t += r.w; },\n            Tri |tr| => { let f: cl() I32 = cl() { tr.a * 2; }; t += f(); },\n'
+      + '            Dot => { t += 7; },\n        };\n    };\n    t;\n}\nfn ret(x: Sh) Sh {\n    alt x {\n        Circle |c| => Sq { s: c.r },\n'
+      + '        Sq |q| => Rect { w: q.s, h: 2 },\n        Rect |r| => r,\n        Tri |t| => { return Dot {}; },\n        Dot => x,\n    };\n}\n'
+      + 'fn boxed(x: Sh) I32 {\n    alt x {\n        Circle |c| => { let g: cl() I32 = cl() { c.r + 1; }; c = Circle { r: 50 }; g(); },\n        Sq |q| => q.s,\n'
+      + '        Rect |r| => r.h,\n        Tri |t| => t.c,\n        Dot => 0,\n    };\n}\nexport lib { fn run() I32 {\n'
+      + '    let xs: Array[Sh] = [Circle { r: 2 }, Sq { s: 3 }, Rect { w: 4, h: 5 }, Tri { a: 1, b: 2, c: 3 }, Dot {}];\n    let t = 0;\n'
+      + '    for (xs) |x| { t = t * 7 + area(x) + kind(x) * 3 + boxed(x) * 11 + area(ret(x)) * 13; };\n'
+      + '    t + first(xs) * 100000 + first([Circle { r: 1 }, Sq { s: 9 }, Dot {}]) * 1000000 + first([Rect { w: 0, h: 1 }]);\n} }\n', 104064628],
+    // A field read again (small): kept in a local only while no call, struct.set of the field,
+    // assignment of the local, or loop writing them, comes between.
+    ['struct P:\n    | x: I32\n    | y: I32\n    | next: ?P\nfn poke(p: P) void { p.x += 100; }\nfn alias(a: P, b: P) I32 {\n    let s = a.x + a.x;\n    b.x = 7;\n'
+      + '    s + a.x + a.x + a.x;\n}\nfn calls(a: P) I32 {\n    let s = a.x + a.x;\n    poke(a);\n    s * 1000 + a.x + a.x + a.x;\n}\nfn loop_write(a: P) I32 {\n'
+      + '    let s = a.y + a.y + a.y;\n    let i = 0;\n    while (i < 3) {\n        s += a.y + a.y;\n        a.y += 1;\n        i += 1;\n    };\n    s + a.y;\n}\n'
+      + 'fn reassign(a: P, b: P) I32 {\n    let p = a;\n    let s = p.x + p.x + p.x;\n    p = b;\n    s * 1000 + p.x + p.x + p.x;\n}\nfn branch(a: P, c: Bool) I32 {\n'
+      + '    let s = 0;\n    if c { s = a.y + a.y; } else { s = 1; };\n    s * 10 + a.y + a.y + a.y;\n}\nfn hoist(a: P) I32 {\n    let s = a.x;\n'
+      + '    for (0 ..< 4) |i| { s += a.x * i + a.y + a.x; };\n    s;\n}\nexport lib { fn run() I32 {\n    let a = P { x: 1, y: 2, next: null };\n'
+      + '    let b = P { x: 3, y: 4, next: a };\n    let r = alias(a, a) * 1 + alias(a, b) * 100;\n    r = r * 7 + calls(b);\n    r = r * 7 + loop_write(a);\n'
+      + '    r = r * 7 + reassign(a, b);\n    r = r * 7 + branch(a, true) + branch(b, false) * 3;\n    r * 7 + hoist(a);\n} }\n', 94651822],
     // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
     ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the

@@ -16,6 +16,11 @@
 //!   dropped, when it has effects), and is no longer declared.
 //! / coalescing: locals of one type whose live ranges do not overlap share
 //!   one, and the locals are declared grouped by type (one run each).
+//! / loads (size builds): a field read of a local, read again twice or more
+//!   where nothing can have changed it, is kept in a local.
+//! / logic (size builds): `a and b`, `a or b` whose b is cheap, pure and
+//!   cannot trap are `i32.and`, `i32.or`, no `if`; a range test of one local
+//!   against constants is one unsigned comparison.
 //!
 //! So a consumed generator compiles to what the equivalent loop compiles to.
 //! Every local codegen makes is set before it is read, which is what makes
@@ -63,6 +68,11 @@ fn optimize_function(f: I32) void {
     // (with its parent), as a new walk would find them. None moves a block,
     // so the blocks stay in the walk's order.
     while (propagate_copies(params) or sink_temporaries(params)) {};
+    if optimize_level[0] == 1 and reuse_loads(f) {
+        total = params + func_local_count[f];
+        opt_collect(f, total);
+    };
+    if optimize_level[0] == 1 and fold_logic() { opt_collect(f, total); };
     tee_stores();
     remove_unused_locals(f, params, total);
     coalesce_locals(f, params);
@@ -298,7 +308,7 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
             return true;
         };
         // A block's contents come after its opcode, which a value cannot cross.
-        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or w_count[node] == 0 { return false; };
+        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or op == Op.NullElse.to_i32() or w_count[node] == 0 { return false; };
         holder = node;
         place = 0;
     };
@@ -573,4 +583,325 @@ fn co_walk(node: I32) void {
         co_loop_end[span] = at;
         co_loops.resize(co_loops.len() - 1);
     };
+}
+
+//! = Logic
+//!
+//! `a and b` is built as `if a { b } else { false }`. When b is a few
+//! instructions that neither trap nor have effects, running it either way
+//! is the same: `a b i32.and` (`a b i32.or`), five bytes fewer. That needs a
+//! and b to be 0 or 1: an `if` marks (@w_b) a condition that is a Bool (1)
+//! and values that are (2); else they must be comparisons. `if c { true }
+//! else { false }` is c. Then `x >= lo and x <= hi`, x a local and lo, hi
+//! constants, is `x - lo <u hi - lo + 1` (`x == lo` when they are one);
+//! `x < lo or x > hi` its opposite.
+
+/// Fold each `if` of the function's walk, operands first. Whether any changed.
+fn fold_logic() Bool {
+    let changed = false;
+    let k = opt_nodes.len();
+    while (k > 0) {
+        k -= 1;
+        let n = opt_nodes[k];
+        if w_op[n] == Op.If.to_i32() and w_type[n] == vt_i32 and w_count[n] == 3 and fold_if(n) { changed = true; };
+    };
+    changed;
+}
+
+fn fold_if(n: I32) Bool {
+    let c = w_kid(n, 0);
+    let x = seq_value(w_kid(n, 1));
+    let y = seq_value(w_kid(n, 2));
+    if x < 0 or y < 0 { return false; };
+    if not ((w_b[n] & 1) == 1 or bool_valued(c)) { return false; };
+    if is_const(x, 1) and is_const(y, 0) { return relink(n, Op.Seq, 0, c, -1); };
+    if is_const(x, 0) and is_const(y, 1) { return relink(n, Op.Plain, i32_eqz, c, -1); };
+    // `if c { x } else { 0 }` is c and x; `if c { 1 } else { y }`, c or y.
+    let and_ = is_const(y, 0);
+    let other = if and_ { x; } else if is_const(x, 1) { y; } else { -1; };
+    if other < 0 or not ((w_b[n] & 2) == 2 or bool_valued(other)) or cheap(other, 6) < 0 { return false; };
+    if range_test(n, c, other, and_) { return true; };
+    relink(n, Op.Plain, if and_ { i32_and; } else { i32_or; }, c, other);
+}
+
+/// Node n rewritten in place as `op a` of kids k1 (and k2, if any), a
+/// Bool (marked so when a Plain).
+fn relink(n: I32, op: Op, a: I32, k1: I32, k2: I32) Bool {
+    w_op[n] = op.to_i32();
+    w_a[n] = a;
+    w_b[n] = 2;
+    w_first[n] = w_kids.len();
+    w_kids.push(k1);
+    w_count[n] = 1;
+    if k2 >= 0 {
+        w_kids.push(k2);
+        w_count[n] = 2;
+    };
+    true;
+}
+
+/// A branch's value: the node a Seq of one value holds, or -1.
+fn seq_value(n: I32) I32 {
+    let v = n;
+    while (w_op[v] == Op.Seq.to_i32()) {
+        if w_count[v] != 1 { return -1; };
+        v = w_kid(v, 0);
+    };
+    if w_type[v] == vt_i32 { v; } else { -1; };
+}
+
+fn is_const(n: I32, value: I32) Bool { w_op[n] == Op.I32Const.to_i32() and w_a[n] == value; }
+
+/// Whether an `i32` is always 0 or 1: a comparison, a null or type test, a
+/// Bool `if` or fold, 0 or 1.
+fn bool_valued(n: I32) Bool {
+    let op = w_op[n];
+    if op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefTest.to_i32() { return true; };
+    if op == Op.I32Const.to_i32() { return w_a[n] == 0 or w_a[n] == 1; };
+    if (op == Op.If.to_i32() or op == Op.Plain.to_i32()) and (w_b[n] & 2) == 2 { return true; };
+    if op == Op.Seq.to_i32() { return w_count[n] == 1 and bool_valued(w_kid(n, 0)); };
+    if op == Op.Plain.to_i32() {
+        let code = w_a[n];
+        if code >= 69 and code <= 102 { return true; };
+        if code == i32_and or code == i32_or or code == i32_xor { return bool_valued(w_kid(n, 0)) and bool_valued(w_kid(n, 1)); };
+    };
+    false;
+}
+
+/// What is left of `budget` instructions after n's, or -1 when n is more,
+/// or may trap or have effects.
+fn cheap(n: I32, budget: I32) I32 {
+    let op = w_op[n];
+    let ok = op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32() or op == Op.F64Const.to_i32()
+        or op == Op.LocalGet.to_i32() or op == Op.GlobalGet.to_i32() or op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32()
+        or (op == Op.Plain.to_i32() and pure_opcode(w_a[n]));
+    if not ok or budget < 1 { return -1; };
+    let left = budget - 1;
+    for (0 ..< w_count[n]) |i| {
+        left = cheap(w_kid(n, i), left);
+        if left < 0 { return -1; };
+    };
+    left;
+}
+
+/// By the last @range_bound: the local compared, and the bound (an `I64`).
+vec rb_local: I32 = [-1];
+vec rb_value: I64 = [0];
+
+/// A signed `i32` comparison of a local and a constant, as a bound of the
+/// local: 0 `x >= v`, 1 `x <= v` (@rb_local, @rb_value); -1 none. `negate`
+/// reads it as its opposite (`x < v` is not `x >= v`).
+fn range_bound(n: I32, negate: Bool) I32 {
+    if w_op[n] != Op.Plain.to_i32() or w_count[n] != 2 { return -1; };
+    let code = w_a[n];
+    // lt_s 72, gt_s 74, le_s 76, ge_s 78.
+    if code != 72 and code != 74 and code != 76 and code != 78 { return -1; };
+    let l = w_kid(n, 0);
+    let r = w_kid(n, 1);
+    // `k < x` is `x > k`.
+    if w_op[l] == Op.I32Const.to_i32() and w_op[r] == Op.LocalGet.to_i32() {
+        code = if code == 72 { 74; } else if code == 74 { 72; } else if code == 76 { 78; } else { 76; };
+        let t = l;
+        l = r;
+        r = t;
+    };
+    if w_op[l] != Op.LocalGet.to_i32() or w_op[r] != Op.I32Const.to_i32() { return -1; };
+    if negate { code = if code == 72 { 78; } else if code == 74 { 76; } else if code == 76 { 74; } else { 72; }; };
+    rb_local[0] = w_a[l];
+    let v = w_a[r].to_i64();
+    if code == 78 { rb_value[0] = v; return 0; };
+    if code == 74 { rb_value[0] = v + 1.to_i64(); return 0; };
+    if code == 76 { rb_value[0] = v; return 1; };
+    rb_value[0] = v - 1.to_i64();
+    1;
+}
+
+/// `x >= lo and x <= hi` as `x - lo <u hi - lo + 1`, and `x < lo or x > hi`
+/// as `x - lo >=u hi - lo + 1`, in node n. Whether it was.
+fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
+    let ka = range_bound(a, not and_);
+    let la = rb_local[0];
+    let va = rb_value[0];
+    let kb = range_bound(b, not and_);
+    if ka < 0 or kb < 0 or ka == kb or la != rb_local[0] { return false; };
+    let lo = if ka == 0 { va; } else { rb_value[0]; };
+    let hi = if ka == 0 { rb_value[0]; } else { va; };
+    let span = hi - lo + 1.to_i64();
+    if lo > hi or span >= 65536.to_i64() * 65536.to_i64() { return false; };
+    let x = if ka == 0 { w_kid(a, 0); } else { w_kid(b, 0); };
+    if w_op[x] != Op.LocalGet.to_i32() { x = if ka == 0 { w_kid(a, 1); } else { w_kid(b, 1); }; };
+    let m = w_mark();
+    w_push(x);
+    if span == 1.to_i64() {
+        w_i32(lo.to_i32());
+        w_i32_op(if and_ { i32_eq; } else { i32_ne; }, m);
+    } else if lo != 0.to_i64() {
+        w_i32(lo.to_i32());
+        w_i32_op(i32_sub, m);
+    };
+    if span != 1.to_i64() {
+        w_i32(span.to_i32());
+        w_i32_op(if and_ { i32_lt_u; } else { i32_ge_u; }, m);
+    };
+    // The new nodes, each held once.
+    let old = node_holders.len();
+    node_holders.resize(w_op.len());
+    for (old ..< w_op.len()) |i| { node_holders[i] = 1; };
+    relink(n, Op.Seq, 0, w_pop(), -1);
+}
+
+//! = Loads
+//!
+//! `x.f` read again, x the same local, where the first read has run on
+//! every way there, x has not been assigned, and nothing that could write
+//! the field has run (a call, or a `struct.set` of that field of any type;
+//! an immutable field only x's assignment changes): the first read is teed
+//! into a new local and the others read that, when there are two others or
+//! more (a read is six bytes, the tee and each read of the local two, and
+//! the local's declaration about as many). A walk in the order the code
+//! runs keeps the reads known; what a branch, block or loop reads is
+//! forgotten after it, and a loop's writes count before it.
+
+/// The reads known: by entry, its read (a node), whether it still holds,
+/// and its number (the order the walk finds it).
+vec ld_node: I32;
+vec ld_ok: U8;
+vec ld_id: I32;
+/// By number: its reads after (counted by the first walk), and its local
+/// (-1 none yet).
+vec ld_reuses: I32;
+vec ld_temp: I32;
+/// The walk's next number; whether it rewrites (the second walk); the function.
+vec ld_next: I32 = [0];
+vec ld_rewrite: I32 = [0];
+vec ld_func: I32 = [0];
+
+/// Reads reused in function f; whether any was.
+fn reuse_loads(f: I32) Bool {
+    ld_reuses.clear();
+    ld_temp.clear();
+    ld_func[0] = f;
+    for (0 ..< 2) |pass| {
+        ld_node.clear();
+        ld_ok.clear();
+        ld_id.clear();
+        ld_next[0] = 0;
+        ld_rewrite[0] = pass;
+        ld_walk(func_body[f]);
+        if pass == 0 {
+            let any = false;
+            for (0 ..< ld_reuses.len()) |e| { if ld_reuses[e] >= 2 { any = true; }; };
+            if not any { return false; };
+        };
+    };
+    // The nodes made, each held once.
+    let old = node_holders.len();
+    node_holders.resize(w_op.len());
+    for (old ..< w_op.len()) |i| { node_holders[i] = 1; };
+    true;
+}
+
+fn ld_walk(n: I32) void {
+    let op = w_op[n];
+    let count = w_count[n];
+    if op == Op.Loop.to_i32() { ld_loop_writes(n); };
+    // Kids from `alone` on run each (or not) from what was known before
+    // them; a block's or loop's, in turn, forgotten after it.
+    let alone = if op == Op.If.to_i32() or op == Op.NullElse.to_i32() or op == Op.CastArms.to_i32() { 1; }
+        else if op == Op.Try.to_i32() { 0; } else { count; };
+    let start = ld_node.len();
+    for (0 ..< count) |i| {
+        let mark = ld_node.len();
+        ld_walk(w_kid(n, i));
+        if i >= alone { ld_forget(mark); };
+    };
+    if op == Op.Block.to_i32() or op == Op.Loop.to_i32() { ld_forget(start); };
+    ld_effect(n);
+}
+
+fn ld_forget(mark: I32) void {
+    ld_node.resize(mark);
+    ld_ok.resize(mark);
+    ld_id.resize(mark);
+}
+
+/// What a loop writes, anywhere in it, as written before it.
+fn ld_loop_writes(n: I32) void {
+    ld_effect_write(n);
+    for (0 ..< w_count[n]) |i| { ld_loop_writes(w_kid(n, i)); };
+}
+
+/// What node n's own instruction does to the reads known.
+fn ld_effect(n: I32) void {
+    let op = w_op[n];
+    if (op == Op.StructGet.to_i32() or op == Op.StructGetS.to_i32() or op == Op.StructGetU.to_i32())
+        and w_op[w_kid(n, 0)] == Op.LocalGet.to_i32() and not non_null(w_type[n]) {
+        ld_read(n);
+    } else {
+        ld_effect_write(n);
+    };
+}
+
+fn ld_effect_write(n: I32) void {
+    let op = w_op[n];
+    let set = op == Op.StructSet.to_i32();
+    let call = op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32();
+    let local = op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32();
+    if not (set or call or local) { return; };
+    for (0 ..< ld_node.len()) |e| {
+        let r = ld_node[e];
+        let mutable = ht_fields[ht_a[w_a[r]] + w_b[r] * 2 + 1] == 1;
+        if (local and w_a[w_kid(r, 0)] == w_a[n]) or (call and mutable) or (set and w_b[r] == w_b[n]) { ld_ok[e] = 0; };
+    };
+}
+
+/// A field read of a local: one known again, or known from here.
+fn ld_read(n: I32) void {
+    let x = w_a[w_kid(n, 0)];
+    for (0 ..< ld_node.len()) |e| {
+        let r = ld_node[e];
+        if ld_ok[e] == 1 and w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == x {
+            ld_reuse(e, n);
+            return;
+        };
+    };
+    ld_node.push(n);
+    ld_ok.push(1);
+    ld_id.push(ld_next[0]);
+    ld_next[0] += 1;
+    if ld_rewrite[0] == 0 {
+        ld_reuses.push(0);
+        ld_temp.push(-1);
+    };
+}
+
+/// Read n reads what known entry e's read did.
+fn ld_reuse(e: I32, n: I32) void {
+    let id = ld_id[e];
+    if ld_rewrite[0] == 0 {
+        ld_reuses[id] += 1;
+        return;
+    };
+    if ld_reuses[id] < 2 { return; };
+    let r = ld_node[e];
+    if ld_temp[id] < 0 {
+        let t = add_local(ld_func[0], w_type[r]);
+        ld_temp[id] = t;
+        // The read, teed: a copy of it in a tee where it was.
+        let m = w_mark();
+        w_push(w_kid(r, 0));
+        let copy = w_node(Op.from_i32(w_op[r]), w_type[r], w_a[r], w_b[r], m);
+        w_pop();
+        w_op[r] = Op.LocalTee.to_i32();
+        w_a[r] = t;
+        w_b[r] = 0;
+        w_first[r] = w_kids.len();
+        w_kids.push(copy);
+        w_count[r] = 1;
+        ld_node[e] = copy;
+    };
+    w_op[n] = Op.LocalGet.to_i32();
+    w_a[n] = ld_temp[id];
+    w_b[n] = 0;
+    w_count[n] = 0;
 }

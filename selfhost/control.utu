@@ -457,7 +457,8 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     // A nullable number or Bool from the host: the value is the primitive.
     let boxed = boxed_primitive(t);
     // `x orelse fatal`: wasm's own null check, with no branch, in an unsafe
-    // build; else the branch, so the trap is fatal's, not a null's.
+    // build; else fatal's own `unreachable` where it is null (below), so the
+    // trap is fatal's, not a null's.
     if is_kind(b, Node.Fatal_expr) and safe_checks[0] == 0 {
         w_node(Op.RefAsNonNull, repr(t), 0, 0, m);
         if boxed >= 0 {
@@ -483,19 +484,9 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
         w_node(Op.Seq, repr(boxed), 0, 0, m);
         return boxed;
     };
-    let s = new_local(repr(at));
-    w_node(Op.LocalSet, vt_none, s, 0, m);
-    let mi = w_mark();
-    w_leaf(Op.LocalGet, repr(at), s, 0);
-    w_node(Op.RefIsNull, vt_i32, 0, 0, mi);
-    let mt = w_mark();
+    // a, kept when not null (`br_on_non_null`), else b: no local, no `if`.
     coerce(check_expr(b, t, cx), t, b);
-    w_node(Op.Seq, repr(t), 0, 0, mt);
-    let me = w_mark();
-    w_leaf(Op.LocalGet, repr(at), s, 0);
-    w_node(Op.Seq, repr(t), 0, 0, me);
-    w_node(Op.If, repr(t), new_label(), 0, mi);
-    w_node(Op.Seq, repr(t), 0, 0, m);
+    w_node(Op.NullElse, repr(t), 0, 0, m);
     t;
 }
 
