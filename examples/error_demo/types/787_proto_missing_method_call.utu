@@ -1,0 +1,17 @@
+// What: a method called through a protocol value, one implementer lacking it
+// Expect: NoStep lacks Counter.step
+proto Counter:
+    | step() I32
+
+struct Has[Counter]:
+    | n: I32
+
+struct NoStep[Counter]:
+    | n: I32
+
+fn Counter[Has].step |h| () I32 { h.n + 1; }
+
+export main() I32 {
+    let c: Counter = NoStep { n: 1 };
+    c.step();
+}

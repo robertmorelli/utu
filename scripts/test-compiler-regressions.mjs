@@ -674,6 +674,9 @@ export lib {
     ['type Id = distinct I32;\nfn Id:eq |a, b| Bool { false; }\nfn Id:add |a, b| Id { Id.from_i32(a.to_i32() + b.to_i32() + 100); }\nexport lib { fn run() I32 { let a = Id.from_i32(3); (a + a).to_i32() + (if a == a { 1000; } else { 0; }); } }\n', 106],
     // `op=` on a protocol member.
     ['proto Sh:\n    | get set k: I32\nstruct Sq[Sh]:\n    | k: I32\nexport lib { fn run() I32 { let s: Sh = Sq { k: 3 }; s.k += 4; s.k; } }\n', 7],
+    // Getter, setter and method dispatch through a protocol value, over two implementers.
+    ['proto C:\n    | get set n: I32\n    | step(I32) I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | tag: I32\n    | n: I32\nfn C[A].step |a| (k: I32) I32 { a.n + k; }\nfn C[B].step |b| (k: I32) I32 { b.n * k + b.tag; }\n'
+      + 'export lib { fn run() I32 { let xs: Array[C] = [A { n: 1 }, B { tag: 7, n: 2 }]; let t = 0; for (xs) |c| { c.n = c.n + 10; c.n += 1; t = t * 100 + c.step(3) + c.n; }; t; } }\n', 2759],
     // Struct literal fields run in the order written.
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
@@ -1302,6 +1305,10 @@ export lib {
     // Protocol get and set.
     ['proto Sh:\n    | get size: I32\nstruct Sq[Sh]:\n    | size: I32\nexport lib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size = 5; 0; } }\n', 'Sh.size is get-only'],
     ['proto Sh:\n    | set size: I32\nstruct Sq[Sh]:\n    | size: I32\nexport lib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size; } }\n', 'Sh.size is set-only'],
+    // A member through a protocol value, an implementer lacking it (getter and setter crashed the compiler).
+    ['proto C:\n    | get n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nexport lib { fn run() I32 { let c: C = B { m: 1 }; c.n; } }\n', 'B lacks C.n'],
+    ['proto C:\n    | get set n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nexport lib { fn run() I32 { let c: C = B { m: 1 }; c.n = 5; c.n += 1; 0; } }\n', 'B lacks C.n'],
+    ['proto C:\n    | step() I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nfn C[A].step |a| () I32 { a.n; }\nexport lib { fn run() I32 { let c: C = B { m: 1 }; c.step(); } }\n', 'B lacks C.step'],
     // Two things `p.f()` could call.
     ['struct P:\n    | f: cl() I32\nfn P.f |p| () I32 { 2; }\nexport lib { fn run() I32 { 0; } }\n', 'P.f is both a field and a method'],
     ['proto Sh:\n    | area() I32\nfn Sh.area |x| () I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'Sh.area is already a protocol member'],
