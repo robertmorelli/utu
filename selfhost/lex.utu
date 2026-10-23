@@ -504,7 +504,7 @@ fn build() Machine {
 
 //! = Lexing
 
-/// Token t, written in the room lex reserved (a word interned, as it is
+/// Token t, written in the room lex made (a word interned, as it is
 /// read); the one after it.
 fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
     tok_kind[t] = kind;
@@ -575,13 +575,14 @@ vec template_braces: I32;
 /// token that cannot be lexed: a byte no token starts with, or a string or
 /// DSL body that does not close). Returns the number of tokens.
 fn lex(first: I32, n: I32) I32 {
-    // Room for the most tokens there can be: one a byte, and the last.
+    // Room for the most tokens there can be: one a byte, and the last
+    // (@tokens_end cuts the mems back to those written).
     let t = tok_kind.len();
     let room = t + n - first + 2;
-    tok_kind.reserve(room);
-    tok_start.reserve(room);
-    tok_end.reserve(room);
-    tok_word.reserve(room);
+    tok_kind.resize(room);
+    tok_start.resize(room);
+    tok_end.resize(room);
+    tok_word.resize(room);
     let i = first;
     let j = first;
     let open = 0;  // template strings in a `${`

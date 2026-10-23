@@ -192,14 +192,14 @@ fn jvalue(key: I32) I32 { jws(jws(jstring_end(key)) + 1); }
 /// Whether the string at `at` is the bytes `src[start ..< end_]` (without escapes).
 fn jstring_is(at: I32, start: I32, end_: I32) Bool {
     let n = end_ - start;
-    if src[at + 1 + n] != 34 { return false; };
+    if at + 1 + n >= src.len() or src[at + 1 + n] != 34 { return false; };
     for (0 ..< n) |k| { if src[at + 1 + k] != src[start + k] { return false; }; };
     true;
 }
 
 /// Whether the string at `at` is `text` (without escapes).
 fn jstring_is_text(at: I32, text: Str) Bool {
-    if src[at] != 34 or src[at + 1 + text.len()] != 34 { return false; };
+    if at + 1 + text.len() >= src.len() or src[at] != 34 or src[at + 1 + text.len()] != 34 { return false; };
     for (0 ..< text.len()) |k| { if src[at + 1 + k] != text.get(k) { return false; }; };
     true;
 }
