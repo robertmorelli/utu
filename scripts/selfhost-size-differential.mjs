@@ -14,6 +14,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = path.join(ROOT, 'baselines', 'stage0-sizes.json');
 const SLACK = 3;
+// Larger on purpose, and why.
+const INTENDED = {
+  // Engines read a negative index differently (V8 unsigned, JSC clamped): the range is checked.
+  'baselines/corpus/468d92cae4849195775dfadf5aef4636071b6e4b.utu': 'a Str slice of a variable range is made empty when out of order',
+  'baselines/corpus/57940c7e7d169dd2167180f2d2ab427288c58114.utu': 'a Str slice of a variable range is made empty when out of order',
+  'benchmarks/suite/strings.utu': 'a Str slice of a variable range is made empty when out of order',
+};
 
 const programs = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, 'baselines', 'run-differential.json'), 'utf8')))
   .filter(key => key.endsWith(' normal')).map(key => key.slice(0, -' normal'.length));
@@ -57,7 +64,7 @@ for (const [rel, size] of Object.entries(baseline)) {
 }
 const seconds = ((performance.now() - started) / 1000).toFixed(1);
 const count = smaller + same + larger.length;
-const over = larger.filter(({ size, now }) => now - size > SLACK);
+const over = larger.filter(({ rel, size, now }) => now - size > SLACK && !INTENDED[rel]);
 for (const { rel, size, now } of over) console.log(`LARGER ${rel}: ${size} → ${now} bytes`);
 console.log(`${count} programs: ${smaller} smaller than stage 0's, ${same} the same, ${larger.length} larger `
   + `(${over.length} by more than ${SLACK} bytes); ${after} bytes against ${before} `

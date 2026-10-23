@@ -138,8 +138,10 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     // `orelse fatal` is fatal's trap, not a null's.
     null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Reached fatal', '2:14', 'pick'],
     slice: ['fn cut(xs: Array[I32]) I32 {\n    xs[2, 1].len();\n}\nexport main() I32 { cut([1, 2, 3]); }\n', 'Slice ends before it starts', '2:5', 'cut'],
+    // In the slice helper every use shares: at this use, not the first.
+    slice2: ['fn n(x: I32) I32 { x; }\nfn ok(xs: Array[I32]) I32 { xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    xs[2, n(1)].len();\n}\nexport main() I32 { let xs = [1, 2, 3]; ok(xs) + cut(xs); }\n', 'Slice ends before it starts', '4:5', 'cut'],
     // (A safe build stops at from_i32, before the match could miss.)
-    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'Color.from_i32: no variant has this value', '7:26', 'Color.from_i32'],
+    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'Color.from_i32: no variant has this value', '7:26', 'main'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
     await write(`${name}.utu`, source);
@@ -154,6 +156,13 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     }
   }
   assert.match(utu('run', 'assert.utu', '-O', 'fast').stderr, /in boom  assert\.utu:2:5  \(inlined into main\)/);
+  // A trap in a global's initializer, as any other (it showed JavaScript's stack).
+  await write('global.utu', 'fn n(x: I32) I32 { x; }\nlet xs: Array[I32] = [1, 2];\nlet g: I32 = xs[n(5)];\nexport main() I32 { g; }\ntest "g" { assert g == 1; }\n');
+  for (const command of ['run', 'test']) {
+    r = utu(command, 'global.utu');
+    assert.equal(r.status, 1, r.stdout);
+    assert.ok(r.stderr.startsWith(' TRAP  Index out of bounds\n       trap · global.utu:3:14\n'), `${command}:\n${r.stderr}`);
+  }
   // The unsafe modes keep no map: what, not where.
   r = utu('run', 'assert.utu', '-O', 'smallUnsafe');
   assert.match(r.stderr, /^ TRAP  fatal, failed assert, or failed check\n {7}trap · assert\.utu\n/);

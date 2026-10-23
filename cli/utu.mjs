@@ -157,7 +157,9 @@ async function check(file, { utu }) {
 async function run(file, { utu, optimize, safe, argv }) {
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe });
-  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
+  // A global's initializer runs here, and may trap.
+  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) })
+    .catch(error => trap(error, file, built, utu));
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   // A main with parameters is for a host that passes them; run passes none.
   // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
@@ -178,8 +180,10 @@ async function run(file, { utu, optimize, safe, argv }) {
 }
 
 async function test(file, { utu, optimize, safe }) {
-  const { wasm, spec, tests, map } = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true, sourceMap: safe });
-  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  const built = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true, sourceMap: safe });
+  const { wasm, spec, tests, map } = built;
+  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) })
+    .catch(error => trap(error, file, built, utu));
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   let failed = 0;
   for (const { export: name, name: title } of tests) {
@@ -588,6 +592,9 @@ const TRAPS = [
   [/Maximum call stack|stack overflow/i, 'Stack overflow'],
 ];
 
+// The functions the compiler makes, shared by every use (selfhost `helper`).
+const HELPERS = /^(array\.slice|Str\.from_codes|closure\.(new|call)|enum\.name|mem\.(reserve|push|resize)|\w+\.from_i32)$/;
+
 // An `unreachable`, by the syntax it was made for: which trap it is.
 const UNREACHABLE = {
   assert_expr: 'Failed assert', fatal_expr: 'Reached fatal',
@@ -620,6 +627,8 @@ function trapText(error, map = null) {
   }
   // A safe build's `Tag.from_i32(v)` (its own function) with no variant of value v.
   if (wasm && /unreachable/i.test(message) && /^\w+\.from_i32$/.test(frames[0]?.fn ?? '')) title = `${frames[0].fn}: no variant has this value`;
+  // A helper the compiler made is shared, and mapped to its first use: placed by its caller.
+  frames = frames.map(f => HELPERS.test(f.fn) ? { ...f, entry: null, helper: true } : f);
   const at = frames.find(f => f.entry?.file && !f.entry.file.startsWith('std:')) ?? frames.find(f => f.entry?.file) ?? null;
   // Not the test runner's own exports; endless recursion (one frame, many times) once.
   frames = frames.filter(f => !/^__test_/.test(f.fn));
@@ -647,7 +656,7 @@ async function trap(error, file, built, utu) {
     const { entry } = at;
     const shown = formatDiagnostics([{
       severity: wasm ? 'trap' : 'error', message: title, code, file: entry.file,
-      start: entry.start, end: entry.end, line: entry.line, column: entry.column, label: at === frames[0] ? 'here' : 'called here',
+      start: entry.start, end: entry.end, line: entry.line, column: entry.column, label: at === frames.find(f => !f.helper) ? 'here' : 'called here',
     }], texts, { color, relative: displayPath, highlight: highlighter(utu, built.files) });
     await written(process.stderr, `${[shown, ...stack.length ? ['', ...stack] : []].join('\n')}\n`);
   } else {

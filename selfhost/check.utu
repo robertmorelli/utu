@@ -345,10 +345,12 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let defers = defer_node.len();
     defer_marks.push(defers);
+    let guards = defer_guard.len();
     let c = first_child(block);
     let t = ty_void();
     while (c >= 0) {
         let next = next_sibling(c);
+        let noted = defer_node.len();
         if next < 0 {
             t = check_statement(c, expect, cx);
         } else {
@@ -356,8 +358,10 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
             // branches of different types are fine there.
             coerce(check_statement(c, ty_void(), cx), ty_void(), c);
         };
+        note_defer_guards(noted);
         c = next;
     };
+    guard_defers(guards, repr(t), cx);
     if defer_node.len() > defers {
         let vt = repr(t);
         // A function's body ends in a return, which may be an error's.
@@ -1815,7 +1819,8 @@ fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
     if decl_is(decl, Decl.Global) and is_es(last_child(decl_node[decl])) {
         es_import(decl, last_child(decl_node[decl]), global_type_in(decl, cx.inst));
     };
-    if decl_es[decl] >= 0 { return call_es(decl, args, m, node, cx); };
+    // A `cl` binding is a value: called as any closure is.
+    if decl_es[decl] >= 0 and not ty_is(decl_ty[decl], Ty.Closure) { return call_es(decl, args, m, node, cx); };
     if not decl_is(decl, Decl.Fn) {
         let t = if decl_is(decl, Decl.Global) { global_type(decl); } else { decl_ty[decl]; };
         if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };

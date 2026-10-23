@@ -169,7 +169,9 @@ async function importGlue(source, root) {
   const modules = findNodeModules(root);
   const dir = modules ? path.join(modules, '.utu') : fs.mkdtempSync(path.join(os.tmpdir(), 'utu-glue-'));
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `glue-${createHash('sha256').update(source).digest('hex').slice(0, 16)}.mjs`);
+  // Its real path: Bun resolves a module's imports from a symlinked
+  // node_modules (a worktree's, a linked install's) differently from Node.
+  const file = path.join(fs.realpathSync(dir), `glue-${createHash('sha256').update(source).digest('hex').slice(0, 16)}.mjs`);
   if (!fs.existsSync(file)) {
     const partial = `${file}.${process.pid}.tmp`;
     fs.writeFileSync(partial, source);

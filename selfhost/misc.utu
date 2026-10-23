@@ -151,6 +151,7 @@ vec function_defers: I32;
 
 fn reset_defers() void {
     defer_node.clear();
+    defer_guard.clear();
     stream_closes.clear();
     defer_marks.clear();
     function_defers.resize(1);
@@ -165,6 +166,67 @@ fn check_defer(node: I32) I32 {
     defer_node.push(first_child(node));
     w_node(Op.Seq, vt_none, 0, 0, w_mark());
     ty_void();
+}
+
+/// Per plain defer of the open blocks, in order: where the code after it
+/// starts (a w mark), then its index in @defer_node.
+vec defer_guard: I32;
+
+/// After a block's statement: the defers it noted (`from` on) guard what follows.
+fn note_defer_guards(from: I32) void {
+    for (from ..< defer_node.len()) |i| {
+        let d = defer_node[i];
+        if d >= 0 and not is_kind(d, Node.Errdefer_expr) {
+            defer_guard.push(w_mark());
+            defer_guard.push(i);
+        };
+    };
+}
+
+vec throw_work: I32;
+
+/// Whether the nodes since `m` call or throw: only then can an exception leave them.
+fn may_throw(m: I32) Bool {
+    throw_work.clear();
+    for (m ..< w_stack.len()) |i| { throw_work.push(w_stack[i]); };
+    while (throw_work.len() > 0) {
+        let n = throw_work[throw_work.len() - 1];
+        throw_work.resize(throw_work.len() - 1);
+        let op = w_op[n];
+        if op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.Throw.to_i32() or op == Op.Rethrow.to_i32() { return true; };
+        for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)); };
+    };
+    false;
+}
+
+/// The code after each guard (`base` on), newest first, so a JS exception
+/// thrown through it runs that defer and goes on: `try { … } catch { d;
+/// rethrow }`, of value type `vt`. Errdefers stay unrun: it is no error return.
+fn guard_defers(base: I32, vt: I32, cx: Cx) void {
+    let k = defer_guard.len() - 2;
+    while (k >= base) {
+        let m = defer_guard[k];
+        if w_mark() > m and may_throw(m) {
+            use_js_tag();
+            let label = new_label();
+            w_node(Op.Seq, vt, 0, 0, m);
+            let mh = w_mark();
+            w_leaf(Op.Drop, vt_none, 0, 0);
+            discard(check_statement(defer_node[defer_guard[k + 1]], ty_void(), cx));
+            w_leaf(Op.Rethrow, vt_unreachable, label, 0);
+            w_node(Op.Seq, vt_unreachable, 0, 0, mh);
+            // Code that never ends leaves a try of no value: say so after it.
+            if vt == vt_unreachable {
+                w_node(Op.Try, vt_none, label, 0, m);
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+                w_node(Op.Seq, vt_unreachable, 0, 0, m);
+            } else {
+                w_node(Op.Try, vt, label, 0, m);
+            };
+        };
+        k -= 2;
+    };
+    defer_guard.resize(base);
 }
 
 /// Run the defers from `from` (an index in `defer_node`) on, newest first,
