@@ -193,28 +193,28 @@ fn is_html_tag(tag: Str) Bool {
 }
 
 fn is_global_attribute(name: Str) Bool {
-    in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize nonce is popover", name);
+    in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref", name);
 }
 
 /// The attributes an element of `tag` may have beyond the global ones (space-separated).
 fn tag_attributes(tag: Str) Str {
-    if tag == "script" { return "src type async defer nonce crossorigin integrity referrerpolicy nomodule"; };
+    if tag == "script" { return "src type async defer nonce crossorigin integrity referrerpolicy nomodule fetchpriority blocking"; };
     if tag == "style" { return "media nonce type"; };
     if tag == "embed" { return "src type width height"; };
     if tag == "param" { return "name value"; };
     if tag == "area" { return "alt coords shape href target download rel"; };
     if tag == "base" { return "href target"; };
-    if tag == "link" { return "href rel type media sizes crossorigin"; };
+    if tag == "link" { return "href rel type media sizes crossorigin as fetchpriority integrity referrerpolicy imagesrcset imagesizes hreflang blocking disabled"; };
     if tag == "meta" { return "name content charset http-equiv"; };
-    if tag == "a" { return "href target rel download hreflang type"; };
-    if tag == "button" { return "type disabled name value form popovertarget popovertargetaction"; };
-    if tag == "input" { return "type name value placeholder required disabled readonly checked min max step minlength maxlength pattern multiple accept autocomplete autofocus size form"; };
-    if tag == "textarea" { return "name placeholder required disabled readonly rows cols minlength maxlength autocomplete form"; };
-    if tag == "form" { return "action method enctype target autocomplete novalidate"; };
+    if tag == "a" { return "href target rel download hreflang type referrerpolicy ping"; };
+    if tag == "button" { return "type disabled name value form popovertarget popovertargetaction formaction formmethod formenctype formtarget formnovalidate command commandfor"; };
+    if tag == "input" { return "type name value placeholder required disabled readonly checked min max step minlength maxlength pattern multiple accept autocomplete size form list capture dirname alt src width height formaction formmethod formenctype formtarget formnovalidate popovertarget popovertargetaction"; };
+    if tag == "textarea" { return "name placeholder required disabled readonly rows cols minlength maxlength autocomplete form wrap dirname"; };
+    if tag == "form" { return "action method enctype target autocomplete novalidate name rel accept-charset"; };
     if tag == "label" { return "for"; };
-    if tag == "img" { return "src alt width height loading decoding srcset sizes"; };
+    if tag == "img" { return "src alt width height loading decoding srcset sizes fetchpriority crossorigin referrerpolicy usemap ismap"; };
     if tag == "source" { return "src srcset sizes type media"; };
-    if tag == "select" { return "name required disabled multiple size form"; };
+    if tag == "select" { return "name required disabled multiple size form autocomplete"; };
     if tag == "option" { return "value selected disabled label"; };
     if tag == "optgroup" { return "label disabled"; };
     if tag == "fieldset" { return "disabled form name"; };
@@ -231,9 +231,9 @@ fn tag_attributes(tag: Str) Str {
     if tag == "canvas" { return "width height"; };
     if tag == "td" { return "colspan rowspan headers"; };
     if tag == "th" { return "colspan rowspan headers scope abbr"; };
-    if tag == "video" { return "src controls autoplay muted loop playsinline poster width height preload"; };
-    if tag == "audio" { return "src controls autoplay muted loop preload"; };
-    if tag == "iframe" { return "src title width height loading allow sandbox referrerpolicy"; };
+    if tag == "video" { return "src controls autoplay muted loop playsinline poster width height preload crossorigin disablepictureinpicture disableremoteplayback"; };
+    if tag == "audio" { return "src controls autoplay muted loop preload crossorigin"; };
+    if tag == "iframe" { return "src srcdoc name title width height loading allow allowfullscreen sandbox referrerpolicy"; };
     "";
 }
 
@@ -627,6 +627,7 @@ fn parse_template(text: Str) I32 {
         tw_global.push(intern_text(wp_css_block(text)));
         wp_trivia(text);
     };
+    if wp_char(text) == 64 { at_directive(text, wp_at[0], false); };
     let root = parse_tnode(text);
     if tn_kind[root] != 4 { wutu_fail("root must be an element", tn_start[root]); };
     wp_trivia(text);
@@ -790,7 +791,10 @@ fn parse_telement(text: Str) I32 {
         let name = text.slice(a, b);
         wp_at[0] = b;
         if shorthand == 46 { add_item(n, 0, intern_text(name), -1, 0, -1, -1, a); }
-        else { add_item(n, 1, intern_text("id"), intern_text(js_string(name)), 0, -1, -1, wp_at[0]); };
+        else {
+            if has_attribute_item(n, "id") { wutu_fail("an element has one id; #" + name + " is a second", a - 1); };
+            add_item(n, 1, intern_text("id"), intern_text(js_string(name)), 0, -1, -1, wp_at[0]);
+        };
     };
     wp_trivia(text);
     if wp_keyword(text, "as") {
@@ -816,6 +820,13 @@ fn parse_telement(text: Str) I32 {
         parse_element_statement(text, n);
     };
     if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start); };
+    let i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 3 and word_text(ti_a[i]) == "values" and not (tag == "select" and has_attribute_item(n, "multiple")) {
+            wutu_fail("bind:values is a multiple select's: select { multiple; bind:values = …; }", ti_at[i]);
+        };
+        i = ti_next[i];
+    };
     if tn_first[n] >= 0 and has_attribute_item(n, "data-wutu-unmanaged") {
         wutu_fail("an @unmanaged " + tag + " has no children in its template: what is inside it is JavaScript's", start);
     };
@@ -846,7 +857,8 @@ fn parse_element_statement(text: Str, n: I32) void {
         return;
     };
     if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
-    if c == 34 or c == 61 or wp_keyword(text, "if") or wp_keyword(text, "for") {
+    // (`for = "x";` is label's attribute: a loop's iterable never starts with `=`.)
+    if c == 34 or c == 61 or wp_keyword(text, "if") or (wp_keyword(text, "for") and not assignment_head(text, p, false)) {
         add_child(n, parse_tnode(text));
         return;
     };
@@ -891,6 +903,8 @@ fn parse_element_statement(text: Str, n: I32) void {
         };
         if q > a and r < text.len() and (text.get(r) == 123 or text.get(r) == 61) {
             let name = text.slice(a, q);
+            let near = near_event(name);
+            if near.len() > 0 { wutu_fail("unknown event " + name + "; did you mean " + near + "?", a); };
             let flags = if quiet { 4; } else { 0; };
             if text.get(r) == 61 {
                 if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) void { … };", r); };
@@ -935,11 +949,66 @@ fn parse_element_statement(text: Str, n: I32) void {
         parse_attribute(text, n, false);
         return;
     };
+    if c == 64 { at_directive(text, p, true); };
     if c == 58 or c == 64 or c == 38 {
         parse_css_rule(text, n);
         return;
     };
     parse_declaration_or_child(text, n);
+}
+
+/// `@name` at p, where an element's body (`inside`) or the template's head
+/// has one: a CSS at-rule inside passes; a directive in the wrong place, or
+/// an unknown one, fails.
+fn at_directive(text: Str, p: I32, inside: Bool) void {
+    let q = p + 1;
+    while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
+    let name = text.slice(p + 1, q);
+    if name.len() == 0 { return; };
+    let head = "@reactive @island @style @document";
+    if inside and in_words("media supports container layer keyframes font-face starting-style scope page property counter-style font-feature-values font-palette-values position-try view-transition", name) { return; };
+    if inside and text_at(name, 0, "-") { return; };
+    if inside and name == "unmanaged" { wutu_fail("expected ; after @unmanaged", q); };
+    if inside and in_words(head, "@" + name) { wutu_fail("@" + name + " goes first in the template, before its root element", p); };
+    if not inside and name == "unmanaged" { wutu_fail("@unmanaged goes inside the element it is for: div { @unmanaged; }", p); };
+    let known = if inside { "@unmanaged"; } else { head; };
+    let near = closest_word(known, "@" + name);
+    wutu_fail("unknown directive @" + name + (if near.len() > 0 { "; did you mean " + near + "?"; } else { "; " + (if inside { "an element takes @unmanaged, or a CSS at-rule"; } else { "a template begins with " + head; }); }), p);
+}
+
+/// A DOM event `name` is likely a typo of (one edit, two for a long name),
+/// or "" for a known event or a custom one.
+fn near_event(name: Str) Str {
+    let known = "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress "
+        + "pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture "
+        + "focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort "
+        + "scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel "
+        + "animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel "
+        + "copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress "
+        + "loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange "
+        + "compositionstart compositionupdate compositionend selectionchange selectstart mount";
+    if in_words(known, name) { return ""; };
+    let near = closest_word(known, name);
+    if near.len() == 0 { return ""; };
+    let d = word_distance(intern_text(near), intern_text(name), 3);
+    if d > 1 and name.len() <= 6 { return ""; };
+    near;
+}
+
+/// The word of `list` (space-separated) within two edits of `w`, or "".
+fn closest_word(list: Str, w: Str) Str {
+    let best = "";
+    let best_d = 3;
+    let i = 0;
+    while (i < list.len()) {
+        let j = i;
+        while (j < list.len() and list.get(j) != 32) { j += 1; };
+        let word = list.slice(i, j);
+        let d = word_distance(intern_text(word), intern_text(w), 3);
+        if d < best_d { best = word; best_d = d; };
+        i = j + 1;
+    };
+    best;
 }
 
 /// `@name =` at p.

@@ -79,7 +79,12 @@ Common attributes are checked per tag. `canvas { padding="10" }` is an error.
 `aria-*`, `data-*`, and custom-element attributes are accepted. Property
 assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
-are rejected: use a closure. Interpolated strings become text, never HTML.
+are rejected: use a closure. `label { for = "name"; }` is label's attribute, not
+a loop. An element has one id. An event name a typo away from a DOM event
+(`on clik`) is an error; another name is a custom event. `@reactive`,
+`@island`, `@style` and `@document` come before the root element; inside an
+element, `@unmanaged;` and CSS at-rules (`@media`, `@container`, …) are the
+only `@` forms, and any other is an error. Interpolated strings become text, never HTML.
 Written strings take Utu's escapes: `"say \"hi\"";`, `"\u2192";`, `"\\";`.
 A number or Bool in a text hole shows as its `to_str()`: `= state.count;`.
 
@@ -175,8 +180,8 @@ Static declarations on the same element still compile to a shared class.
 `@ selector { ... }` is an explicitly scoped selector rule, not an element.
 `@ { ... }` targets the element and its descendants. `@document { ... }` before
 the root contains document-level CSS: tokens, resets, `@font-face`, `@keyframes`,
-layer ordering, and so on. Within raw CSS blocks use CSS comments, or standalone
-`# ` comment lines. URLs retain `//` and fragments unchanged.
+layer ordering, and so on. Within raw CSS blocks use CSS comments (`/* … */`)
+or `// …` lines; `# ` is not a comment. URLs retain `//` and fragments unchanged.
 
 **The nearer rule wins.** `@document` CSS, and sheets installed with `@style`,
 sit in the `wutu.document` cascade layer; element-local styles are unlayered.
@@ -232,7 +237,10 @@ python3 -m http.server 8080 --directory dist/wutu-garden
 Open `http://localhost:8080`. Deployment needs only `index.html`, `app.js`, and
 `app.wasm`. The compiler, declaration catalog, and parser stay on the build side.
 Run `node scripts/test-wutu-browser.mjs` for browser interactions, responsive
-layout, persistence, and the 6 KB gzip Wasm+JS+CSS budget. This uses Playwright
+layout, persistence, and the 9 KB gzip Wasm+JS+CSS budget (about 4 KB of it is
+the reconciler every template runs through; `@style` sheets and lazy modules'
+loader ship only to the pages that use them, and a lazy chunk uses the page's
+runtime). This uses Playwright
 Chromium (`npx playwright install chromium` if needed). The same tests also run
 in WebKit: install it with `npx playwright install webkit`, then run
 `node scripts/test-wutu-browser.mjs --webkit`.
@@ -250,7 +258,9 @@ The warning appears in analysis diagnostics used by `utu check` and the editor. 
 the element and sets the attributes it names, and renders never touch its
 children or any other attribute (an editor widget, a chart, an iframe's
 `srcdoc`). It has no children in its template. `on mount { … }` runs once per
-element, after the render that made it; name the element with `as` to reach it:
+element, after the render that made it; name the element with `as` to reach it.
+A prerendered `@unmanaged` element is emptied when the page starts, and its
+`on mount` draws it again:
 
 ```wutu
 div as chart {
@@ -284,7 +294,28 @@ its markup until the chunk arrives, and the prerenderer waits for chunks.
 Arguments cross into the chunk as they are, so a lazy module's functions take
 numbers, Bool, Str, and host values, and return a host element; anything else
 is a compile error naming the type. A chunk is its own program: share state
-with the page through those arguments, the DOM, the URL, or storage.
+with the page through those arguments, the DOM, the URL, or storage. It uses
+the page's Wutu runtime rather than shipping its own, and `sizes.json` lists
+each chunk under `chunks`, apart from the page's `total`.
+
+Each call site has its own placeholder, made again when its arguments change.
+If a chunk fails to load, its placeholder gets `data-wutu-lazy-error` (style
+it to say so) and the next render tries again.
+
+The file holds a module of the name the `using` gives:
+
+```utu
+// guide.utu
+using Browser from std:Browser;
+
+mod guide {
+    fn page(who: Str) Browser.HTMLElement {
+        @wutu/\
+        article { h1 { = "Hello, " + who; } }
+        \/;
+    }
+}
+```
 
 ```utu
 using guide lazy from "./guide.utu";
@@ -363,10 +394,14 @@ and closure parameters take precedence over aliases.
 
 ## Bindings and typed persistence
 
-- `bind:value = state.text;` binds strings on inputs, textareas, and selects.
+- `bind:value = state.text;` binds strings on inputs, textareas, and selects (a
+  select's value is set again once its options are in place, so an option
+  added in the same render can be chosen).
 - `bind:checked = state.enabled;` binds a checkbox boolean.
 - `bind:number = state.amount;` binds an F64 through `valueAsNumber`. Invalid
-  numeric edits do not overwrite the state with NaN.
+  numeric edits do not overwrite the state with NaN, and an entry the input
+  cannot parse is not overwritten; a value outside `min`, `max` or `step`
+  still shows.
 - `bind:group = state.size;` on radio inputs binds the checked radio's `value` (a Str).
 - `bind:values = state.tags;` on a `select multiple` binds the chosen values (an `Array[Str]`).
 - `bind:files = state.files;` on a file input reads its `?Browser.FileList` (read-only).
@@ -443,8 +478,9 @@ prerender, and replace their snapshot once on startup. Build-time rendering runs
 a clean browser context: render public defaults, never private build credentials
 or user data. The current prerenderer captures synchronous initialization; it is
 not an asynchronous data loader or routing system. `--no-prerender` skips this
-step. Playwright and the compiler are build tools; neither ships in the website.
-The five-site build includes prerendered HTML in its 14 KB gzip per-site budget.
+step. `wutu build` takes `utu build`'s modes: `-O small` (the default) and
+`-O fast` keep the safety checks, `-O smallUnsafe` and `-O fastUnsafe` drop them. Playwright and the compiler are build tools; neither ships in the website.
+The five-site build includes prerendered HTML in its 14.5 KB gzip per-site budget.
 
 
 ## Unrestricted CSS and recursive DSL composition
@@ -474,9 +510,8 @@ This is an editor projection, not yet continuous CSS language-server forwarding.
 
 DSL envelopes are balanced. Wutu can contain Utu expressions that contain Wutu
 again; expansion continues across newly produced DSL nodes. Unclosed envelopes
-and runaway expansion are errors. The raw `/\` and `\/` delimiter pairs are
-reserved even inside a payload's strings; the outer scanner does not interpret
-the inner language's string escapes. This is a known literal-embedding limit.
+and runaway expansion are errors. Strings in a payload are text, so a `/\` or
+`\/` inside one neither opens nor closes an envelope.
 
 ## Scoped state, identity, and effects
 
@@ -495,8 +530,9 @@ produce runtime diagnostics. Unkeyed loops receive positional identities.
 
 `wutu.after_render(callback)` and `wutu.focus(id)` run after the update.
 `wutu.on_cleanup(callback)` registers cleanup for the current view;
-`wutu.interval(key, milliseconds, callback)` updates its owner after each tick and
-cancels on unmount. Register effects consistently while rendering. `wutu.route()`
+`wutu.interval(key, milliseconds, callback)` updates its owner after each tick.
+Like `on_cleanup`, it belongs to the render that registers it: a render that does
+not register it again (its component left) stops it, as does unmounting the view. `wutu.route()`
 reads the hash path, and hash/history changes refresh views. This is a small route
 primitive, not a route table, network loader or authentication framework.
 

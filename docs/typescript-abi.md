@@ -286,7 +286,7 @@ types share one import (`el.append(a, b)` is one import for every element type).
 Each call site keeps its precise declaration signature for type checking.
 Package imports remain named imports so bundlers can discard unused exports. A
 regression requires 1,000 unused declarations to add exactly zero Wasm and
-live-glue bytes. The browser app enforces a 6 KB combined JS/Wasm gzip budget;
+live-glue bytes. The browser app enforces a 9 KB combined JS/Wasm gzip budget;
 catalog metadata never ships with it.
 
 The boundary still costs time. The compiler does not automatically move UTU

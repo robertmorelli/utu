@@ -123,7 +123,7 @@ fn expand_wutu(site: I32) void {
     // Shared sheets install in source order, so later ones win the cascade.
     let prelude = "";
     for (0 ..< tw_style_value.len()) |k| {
-        prelude = prelude + wutu_helper("style") + "(" + wutu_island(word_text(tw_style_value[k]), tw_style_from[k], tw_style_to[k], root) + ");\n";
+        prelude = prelude + "wutu.style(" + wutu_island(word_text(tw_style_value[k]), tw_style_from[k], tw_style_to[k], root) + ");\n";
     };
     let css = "";
     for (0 ..< wu_style_css.len()) |k| { css = css + word_text(wu_style_css[k]); };
@@ -141,9 +141,10 @@ fn expand_wutu(site: I32) void {
     let render = "{ " + declarations + " " + prelude + code + " " + events + "; }";
     let value = render;
     if tw_reactive[0] == 1 {
-        let mount = wutu_helper("mount");
+        let svg = tag == "svg";
+        let mount = wutu_helper(if svg { "mount_svg"; } else { "mount"; });
         let last = word_text(wu_decls[wu_decls.len() - 1]);
-        value = last + " " + mount + "(cl() Browser.HTMLElement " + render + ", " + (if tw_scope[0] >= 0 { word_text(tw_scope[0]); } else { "\"\""; }) + ")";
+        value = last + " " + mount + "(cl() " + (if svg { "Browser.SVGElement "; } else { "Browser.HTMLElement "; }) + render + ", " + (if tw_scope[0] >= 0 { word_text(tw_scope[0]); } else { "\"\""; }) + ")";
     };
     graft_expression(site, "{ wutu.init(); " + value + "; }");
 }
@@ -449,6 +450,10 @@ fn wutu_helper(kind: Str) Str {
         params = "cl() Browser.HTMLElement, Str";
         result = "Browser.HTMLElement";
         js = "(f,k)=>globalThis.__utuWutu.mount(f,k)";
+    } else if kind == "mount_svg" {
+        params = "cl() Browser.SVGElement, Str";
+        result = "Browser.SVGElement";
+        js = "(f,k)=>globalThis.__utuWutu.mount(f,k)";
     } else if kind == "memo_hit" {
         // A reused hole (see memo_reuse): its key's last element, if it is unchanged.
         params = "Str";
@@ -465,30 +470,17 @@ fn wutu_helper(kind: Str) Str {
         params = "Browser.Element, Str";
         // (Applied again after the render: on the first, its options come after it.)
         js = "(n,v)=>{const w=new Set(v===''?[]:v.split('\\u001f'));const a=()=>{for(const o of n.options)o.selected=w.has(o.value)};a();queueMicrotask(a)}";
+    } else if kind == "select_value" {
+        params = "Browser.HTMLSelectElement, Str";
+        js = "(n,v)=>globalThis.__utuWutu.selectValue(n,v)";
     } else if kind == "select_get" {
         params = "Browser.Element";
         result = "Str";
         js = "(n)=>Array.from(n.selectedOptions,o=>o.value).join('\\u001f')";
     } else {
-        params = "Str";
-        js = "(s)=>globalThis.__utuWutu.style(s)";
+        wutu_fail("internal: no Wutu helper " + kind, 0);
     };
     wu_decls.push(intern_text("let " + name + ": fun(" + params + ") " + result + " = @es/\\ " + js + " \\/;"));
-    wu_declared_kind.push(w);
-    wu_declared_name.push(intern_text(name));
-    name;
-}
-
-/// The reconciler's `shell()` or `still()` (`entry`), typed to give the
-/// element's own interface. An element is known by its template's hash and
-/// its index there (`v<hash>:<index>`), put together in the glue.
-fn wutu_element_fn(entry: Str, tag: Str, svg: Bool) Str {
-    let kind = entry + "_" + (if svg { "svg_"; } else { ""; }) + tag;
-    let w = intern_text(kind);
-    for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
-    let type = if svg { "Browser.SVGElement"; } else { "Browser.HTML" + element_interface(tag) + "Element"; };
-    let name = wutu_prefix() + kind;
-    wu_decls.push(intern_text("let " + name + ": fun(Str, Str, I32) " + type + " = @es/\\ (d,h,i)=>globalThis.__utuWutu." + entry + "(d," + (if svg { "true"; } else { "false"; }) + ",\"v\"+h+\":\"+i) \\/;"));
     wu_declared_kind.push(w);
     wu_declared_name.push(intern_text(name));
     name;
@@ -501,11 +493,21 @@ fn wutu_typed_fn(entry: Str, tag: Str, svg: Bool) Str {
     let w = intern_text(kind);
     for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]); }; };
     let type = if svg { "Browser.SVGElement"; } else { "Browser.HTML" + element_interface(tag) + "Element"; };
-    let name = wutu_prefix() + kind;
+    let name = wutu_prefix() + ident_part(kind);
     wu_decls.push(intern_text("let " + name + ": fun() " + type + " = @es/\\ ()=>globalThis.__utuWutu." + entry + "() \\/;"));
     wu_declared_kind.push(w);
     wu_declared_name.push(intern_text(name));
     name;
+}
+
+/// A tag as part of a name: a custom element's `-` is `_x`, `_` is `__`.
+fn ident_part(tag: Str) Str {
+    let out = "";
+    for (0 ..< tag.len()) |i| {
+        let c = tag.get(i);
+        out = out + (if c == 45 { "_x"; } else if c == 95 { "__"; } else { Str.from_code_point(c); });
+    };
+    out;
 }
 
 /// What goes between `HTML` and `Element` in the interface of a tag the
@@ -824,9 +826,16 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
         if ti_kind[i] == 1 and not wutu_baked(i) {
             let name = word_text(ti_a[i]);
             let value = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n);
-            if (ti_flags[i] & 1) != 0 {
-                // An unchanged value is not assigned: selection and caret survive updates.
-                properties = properties + "if " + id + "." + name + " != (" + value + ") { " + id + "." + name + " = (" + value + "); };\n";
+            if (ti_flags[i] & 1) != 0 and name == "value" and tag == "select" {
+                properties = properties + select_value(id, value) + ";\n";
+            } else if (ti_flags[i] & 1) != 0 {
+                // An unchanged value is not assigned: selection and caret
+                // survive updates. (The value is assigned to a local of the
+                // property's type first, so a wrong one says so.)
+                let was = id + "_" + name + "_was";
+                let now = id + "_" + name + "_now";
+                properties = properties + "let " + was + " = " + id + "." + name + "; let " + now + " = " + was + "; " + now + " = (" + value + ");\n"
+                    + "if " + was + " != " + now + " { " + id + "." + name + " = " + now + "; };\n";
             } else if is_boolean_attribute(name) and (ti_flags[i] & 2) != 0 {
                 wd_op(o, "[\"b\"," + wutu_json(name) + "]");
                 code = code + wutu_helper("flag") + "((" + value + "));\n";
@@ -879,8 +888,12 @@ fn wd_binding(n: I32, i: I32) Str {
     let update = located_splice(wu_site[0], binding_update(kind, id, target), ti_at[i], ti_to[i]);
     wx_events.push(intern_text(wutu_helper("on") + "(cl(__wutu_event) void { " + update + "; });\n"));
     wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + binding_event(kind) + "\"]"));
+    if kind == "value" and word_text(tn_text[n]) == "select" { return located_splice(wu_site[0], select_value(id, target), ti_at[i], ti_to[i]) + ";\n"; };
     binding_sync_code(kind, id, target, i);
 }
+
+/// A select's value: set again once its options are in place (they may come with this render).
+fn select_value(id: Str, value: Str) Str { wutu_helper("select_value") + "(" + id + ", (" + value + "))"; }
 
 /// A binding's sync (state into the element, on render), located at the
 /// bind statement; empty for `files`, which is read-only.
@@ -899,7 +912,8 @@ fn values_separator() Str { "\"\\u001f\""; }
 ///   values            a multiple select's chosen values, an Array[Str]
 ///   files             a file input's ?Browser.FileList (read-only: none)
 fn binding_sync(kind: Str, id: Str, target: Str) Str {
-    if kind == "number" { return "if " + id + ".validity.valid and " + id + ".valueAsNumber != (" + target + ") { " + id + ".valueAsNumber = (" + target + "); }"; };
+    // (Only an entry the input cannot parse is kept: a value out of range or step still shows.)
+    if kind == "number" { return "if not " + id + ".validity.badInput and " + id + ".valueAsNumber != (" + target + ") { " + id + ".valueAsNumber = (" + target + "); }"; };
     if kind == "group" { return "if " + id + ".checked != (" + id + ".value == (" + target + ")) { " + id + ".checked = " + id + ".value == (" + target + "); }"; };
     if kind == "values" { return wutu_helper("select_set") + "(" + id + ", " + values_separator() + ".join(" + target + "))"; };
     if kind == "files" { return ""; };
@@ -962,11 +976,12 @@ fn wd_child(child: I32, svg: Bool, o: WOps) Str {
         wd_op(o, "[\"t\"," + wutu_json(source.slice(1, source.len() - 1)) + "]");
         return "";
     };
-    let value = shown(wutu_island(source, tn_from[child], tn_to[child], child), tn_from[child]);
     if tn_from[child] < 0 {
+        // Written text with escapes: utu where it is written (a bad escape is reported there).
         wd_op(o, "[\"w\"]");
-        return wutu_helper("put") + "(" + value + ");\n";
+        return wutu_helper("put") + "((" + wutu_island(source, tn_start[child], tn_start[child] + source.len(), child) + "));\n";
     };
+    let value = shown(wutu_island(source, tn_from[child], tn_to[child], child), tn_from[child]);
     wd_op(o, "[\"x\"," + int_text(tn_from[child]) + "]");
     let reuse = memo_reuse(child, value);
     if reuse.len() > 0 { return wutu_helper("slot") + "();\n" + reuse; };
@@ -1035,7 +1050,7 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
         captures = written + ", " + index;
     };
     let iterable = wutu_island(word_text(tn_text[n]), tn_from[n], tn_to[n], n);
-    let next = if keyed { wutu_helper("item") + "((" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + ").to_str());"; }
+    let next = if keyed { wutu_helper("item") + "(wutu.key_text(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + "));"; }
         else { wutu_helper("item_index") + "(" + index + ");"; };
     let body = WOps { text: "" };
     let fragment = wd_fragment(tn_first[n], svg, body);

@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import {createWutuRuntime,installWutuStorage} from '../src/runtime/wutu.js';
+import {createWutuRuntime,installWutuStorage,wutuStyle} from '../src/runtime/wutu.js';
 export async function syncWutuRuntime() {
  const source=`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
 mod wutu {
@@ -11,6 +11,12 @@ mod wutu {
         init();
         let install: fun() void = @es/\\ () => { (${installWutuStorage.toString()})(globalThis.__utuWutu); } \\/;
         install();
+    }
+    /// A shared stylesheet (\`@style\`, \`@document\`), installed once.
+    fn style(sheet: Str) void {
+        init();
+        let install: fun(Str) void = @es/\\ (${wutuStyle.toString()}) \\/;
+        install(sheet);
     }
     fn invalidate(name: Str) void {
         let call: fun(Str) void = @es/\\ (name)=>globalThis.__utuWutu?.invalidate(name) \\/;
@@ -41,6 +47,12 @@ mod wutu {
     /// x's type; this body is never what runs.
     fn show(value: Externref) Externref {
         value;
+    }
+    /// A keyed loop's key (\`key k\`) as text: a Str is itself, a number or
+    /// a Bool its \`to_str()\`. The compiler picks which; this body is never
+    /// what runs.
+    fn key_text(value: Externref) Str {
+        "";
     }
     /// A text hole's reuse key (\`= f(a, b);\`): the compiler makes it, from
     /// the call and its arguments; this body is never what runs.

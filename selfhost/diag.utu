@@ -284,6 +284,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.StdOwnStruct { return "unknown-field"; };
     if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try"; };
     if k == Diag.ImportNotModule { return "unknown-type"; };
+    if k == Diag.WutuHole or k == Diag.WutuKey { return "type-mismatch"; };
     "type-mismatch";
 }
 
@@ -544,6 +545,8 @@ fn diag_text(i: I32) Str {
         },
         Diag.TryErrorMismatch => "try passes on " + type_text(a) + "; the function's errors are " + type_text(b),
         Diag.ImportNotModule => w + " is " + item_kind_text(a) + "; using imports a mod",
+        Diag.WutuHole => pick(ty_is(a, Ty.Void), "A hole needs a value: this gives none", "A hole shows text, a number, a Bool or a node, not " + type_text(a)),
+        Diag.WutuKey => "A key is text or a number, not " + type_text(a),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -762,6 +765,8 @@ fn diag_default_label(i: I32) Str {
         Diag.GeneratorExport => "a generator",
         Diag.HostMissing => "not found",
         Diag.ImportNotModule => "not a mod",
+        Diag.WutuHole => type_text(a),
+        Diag.WutuKey => type_text(a),
         ~> "here",
     };
 }

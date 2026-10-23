@@ -1,0 +1,20 @@
+// What: an event name one letter from a DOM event
+// Expect: unknown event clik; did you mean click?
+using Browser from std:Browser;
+
+struct State:
+    | n: I32
+    | items: Array[Item]
+    | tags: Array[Str]
+
+struct Item:
+    | id: I32
+
+export main() void {
+    let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
+    let app = @wutu/\
+    @reactive;
+    main { button { "+"; on clik { state.n += 1; } } }
+    \/;
+    Browser.document.body.append(app);
+}

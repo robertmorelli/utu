@@ -1,8 +1,9 @@
 // Small DOM reconciler shared by compiled Wutu views. No virtual DOM or proxy state.
 //
-// Both functions below ship to the browser through Function.prototype.toString
-// (see scripts/sync-wutu-runtime.mjs), so they must stay self-contained: no
-// imports and no references to anything outside their own bodies.
+// The functions below ship to the browser through Function.prototype.toString
+// (see scripts/sync-wutu-runtime.mjs) or the app loader's bundle, so they must
+// stay self-contained: no imports and no references to anything outside their
+// own bodies. Each ships only to the pages that use it.
 //
 // A view is a render callback plus the root element it produced. Rendering
 // walks the template again; enter()/leave() bracket each element and reuse the
@@ -20,53 +21,12 @@ export function createWutuRuntime() {
   const scopes = new Map();         // island name -> WeakRef<view>
   const dirty = new Set();
   const afterRender = [];
-  const installedStyles = new Set();
   const mounted = new WeakSet();    // elements whose `on mount` has run
-  const lazies = new Map();         // lazy call (path, name, arguments) -> its placeholder
   let memoNode = null;              // the element memoHit() found
-  /** Where a reused hole is: its call key and the keys around it. */
-  const memoPlace = () => keys.map(k => k.value).join('|');
-  let loading = 0;                  // chunks loading
+  /** Where a hole is: its call key and the keys around it (each length-prefixed, so none collide). */
+  const here = () => keys.map(k => k.value.length + ':' + k.value).join('|');
   const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
-  const prototypes = new Map();     // description -> [element, its attribute names]
   let frames = [], active = null, keys = [], scheduled = false, generation = 0;
-
-  /** A shared sheet joins the `wutu.document` layer, below element styles; its `@import`s go first. */
-  function layered(css) {
-    // (No regex here: this source ships inside an @es envelope, where a slash
-    // next to a backslash would end it.)
-    let imports = '', rest = '', i = 0;
-    for (let at = css.indexOf('@import', i); at >= 0; at = css.indexOf('@import', i)) {
-      // (The `;` outside strings and parentheses: a font URL may have some.)
-      let end = -1, quote = '', depth = 0;
-      for (let j = at; j < css.length && end < 0; j++) {
-        const c = css[j];
-        if (quote) { if (c === '\\') j++; else if (c === quote) quote = ''; }
-        else if (c === '"' || c === "'") quote = c;
-        else if (c === '(') depth++;
-        else if (c === ')') depth--;
-        else if (c === ';' && depth <= 0) end = j;
-      }
-      if (end < 0) break;
-      const rule = css.slice(at, end);
-      rest += css.slice(i, at);
-      imports += rule.includes('layer(') ? rule + ';' : rule + ' layer(wutu.document);';
-      i = end + 1;
-    }
-    rest += css.slice(i);
-    return imports + (rest.trim() ? '@layer wutu.document{' + rest + '}' : '');
-  }
-
-  function style(sheet) {
-    const css = layered(sheet);
-    if (installedStyles.has(css)) return;
-    installedStyles.add(css);
-    // Prerendered pages already contain their sheets.
-    if ([...document.querySelectorAll('style')].some(node => node.textContent === css)) return;
-    const node = document.createElement('style');
-    node.textContent = css;
-    document.head.append(node);
-  }
 
   function autoSave() {
     api.autoSave?.();
@@ -80,6 +40,13 @@ export function createWutuRuntime() {
   }
 
   const NO_ATTRS = new Set();
+  const selectValues = new WeakMap(); // select -> the value a render gave it
+
+  /** A select's value (`bind:value`): set now, and again once its options are in place. */
+  function selectValue(node, value) {
+    selectValues.set(node, value);
+    if (node.value !== value) node.value = value;
+  }
 
   /** An element's identity, from its attribute the first time (a prerendered one). */
   function identityOfNode(node) {
@@ -193,14 +160,16 @@ export function createWutuRuntime() {
     claimIdentity(parent, identity, global, explicit);
     let node = reusable(parent, identity, tag, global);
     if (node) active?.retained.add(node);
-    // A root reuses its own previous element, or adopts prerendered markup.
+    // A root reuses its own previous element, or adopts prerendered markup:
+    // its controls, disabled until now, take input again (but a lazy
+    // placeholder's, until its chunk replaces them).
     if (!parent) node = active?.root ?? document.querySelector(`[data-wutu-root="${site}"][data-wutu-prerender]`);
-    // (Only an element this runtime has not seen can be prerendered.)
-    if (node && !identities.has(node)) {
+    if (node?.hasAttribute('data-wutu-prerender')) {
       node.removeAttribute('data-wutu-prerender');
-      if (node.hasAttribute('data-wutu-pending')) {
-        node.disabled = false;
-        node.removeAttribute('data-wutu-pending');
+      for (const control of [node, ...node.querySelectorAll('[data-wutu-pending]')]) {
+        if (!control.hasAttribute('data-wutu-pending') || control.parentNode?.closest('[data-wutu-lazy]')) continue;
+        control.disabled = false;
+        control.removeAttribute('data-wutu-pending');
       }
     }
     if (!node || node.localName !== tag) node = make();
@@ -218,15 +187,17 @@ export function createWutuRuntime() {
 
   /**
    * Begin an element's children; `kept` names the attributes it has from its
-   * shell, which no render sets. (`old` is the live child list: they move only
-   * when this frame leaves.)
+   * shell, which no render sets, and `set` (when known) those a render may set.
+   * (`old` is the live child list: they move only when this frame leaves.)
    */
-  function open(node, kept) {
+  function open(node, kept, set) {
     // An element first seen (made, or prerendered) has had no render set its
-    // attributes: those it has now, but its shell's, are what a render may drop.
+    // attributes: those it has now that a render may set (else all but its
+    // shell's) are what this render may drop. (A prerendered style or
+    // property-set attribute stays: no render sets it as an attribute.)
     const meta = metadata.get(node);
     const before = meta ? null : new Set([...node.attributes].map(a => a.name)
-      .filter(name => !name.startsWith('data-wutu') && !kept.includes(name)));
+      .filter(name => set ? set.has(name) : !name.startsWith('data-wutu') && !kept.includes(name)));
     frames.push({ node, meta, before, old: node.childNodes, used: new Set(), wanted: [], attrs: null, byKey: null, keyed: null });
     return node;
   }
@@ -234,13 +205,6 @@ export function createWutuRuntime() {
   function enter(tag, svg, site, key) {
     return open(claim(site, key, tag, () =>
       svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag)), []);
-  }
-
-  /** The element a description makes (cloned from then on), and its attribute names. */
-  function prototype(description, svg) {
-    let entry = prototypes.get(description);
-    if (!entry) prototypes.set(description, entry = prototypeOf(JSON.parse(description), svg));
-    return entry;
   }
 
   // A description already parsed (a template program's): by the array itself.
@@ -261,18 +225,6 @@ export function createWutuRuntime() {
       return element;
     };
     return [build(tree, svg), Object.keys(tree[1])];
-  }
-
-  /** Enter an element made from its shell: its tag and static attributes. */
-  function shell(description, svg, site) {
-    const [element, names] = prototype(description, svg);
-    return open(claim(site, '', element.localName, () => element.cloneNode(false)), names);
-  }
-
-  /** A subtree with nothing dynamic in it: made from its description, then kept as it is. */
-  function still(description, svg, site) {
-    const [element] = prototype(description, svg);
-    return claim(site, '', element.localName, () => element.cloneNode(true));
   }
 
   /** Append a node (a component or slot) or text, reusing the text node in this position. */
@@ -357,6 +309,8 @@ export function createWutuRuntime() {
     const frame = frames.pop(), node = frame.node, attrs = frame.attrs ?? NO_ATTRS;
     // `@unmanaged`: its children, and attributes the template does not set, are JavaScript's.
     if (node.hasAttribute('data-wutu-unmanaged')) {
+      // (Prerendered, what JavaScript drew is drawn again by its `on mount`.)
+      if (!frame.meta) node.replaceChildren();
       metadata.set(node, { ...metadata.get(node), attrs });
       return node;
     }
@@ -366,6 +320,8 @@ export function createWutuRuntime() {
     if (meta) meta.attrs = attrs;
     else metadata.set(node, { attrs });
     place(node, frame.wanted);
+    const value = selectValues.get(node);
+    if (value !== undefined && node.value !== value) node.value = value;
     return node;
   }
 
@@ -407,6 +363,24 @@ export function createWutuRuntime() {
     run = { h: program[1], nodes: [], stack: [{ ops: program[0], pc: 0, kind: 'top' }], outer: run, pending: null };
   }
 
+  /** The attributes the ops after an 'o' (at `pc`) set: its a, m and b ops (by op list, then index). */
+  const settables = new WeakMap();
+  function settable(ops, pc) {
+    let byPc = settables.get(ops);
+    if (!byPc) settables.set(ops, byPc = []);
+    let names = byPc[pc];
+    if (!names) {
+      names = byPc[pc] = new Set();
+      for (let i = pc; i < ops.length; i++) {
+        const [kind, name] = ops[i];
+        if (kind === 'a' || kind === 'b') names.add(name);
+        else if (kind === 'm') names.add('class');
+        else if (kind !== 'n' && kind !== 'y') break;
+      }
+    }
+    return names;
+  }
+
   /** Run static ops up to the next hole, and return it (BODY_END at a loop body's end, null at the end). */
   function advance() {
     for (;;) {
@@ -424,7 +398,7 @@ export function createWutuRuntime() {
         }
         case 'o': {
           const [element, names] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false)), names);
+          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false)), names, settable(top.ops, top.pc));
           break;
         }
         case 'c': leave(); break;
@@ -448,7 +422,7 @@ export function createWutuRuntime() {
       case 'a': attr(node, op[1], value); break;
       case 'm': attr(node, 'class', op[1] + value); break;
       case 'b': attr(node, op[1], !!value); break;
-      case 'y': node.style.setProperty(op[1], value); break;
+      case 'y': (frames.at(-1).attrs ??= new Set()).add('style'); node.style.setProperty(op[1], value); break;
       case 'w': append(value); break;
       case 'v': listen(run.nodes[op[1]], op[2], value); break;
       default: throw new Error('Wutu: a value where the template has ' + JSON.stringify(op?.[0]));
@@ -513,6 +487,7 @@ export function createWutuRuntime() {
     const previous = [frames, active, keys], focused = document.activeElement;
     view.cleanupIndex = 0;
     view.cleanupCallbacks ??= [];
+    view.intervalsSeen = new Set();
     view.removals = new Set();
     view.retained = new Set();
     view.globalNodes = null;
@@ -525,6 +500,8 @@ export function createWutuRuntime() {
       view.root = view.render();
       // cleanup() registrations are positional: ones not repeated this render run now.
       for (const callback of view.cleanupCallbacks.splice(view.cleanupIndex)) callback();
+      // So are intervals: one not started again this render stops.
+      for (const [key, timer] of view.effects) if (!view.intervalsSeen.has(key)) { clearInterval(timer.id); view.effects.delete(key); }
       for (const node of view.removals) {
         if (view.retained.has(node)) continue;
         dispose(node);
@@ -553,7 +530,7 @@ export function createWutuRuntime() {
         return existing.root;
       }
     }
-    const view = { render: factory, root: null, scope, dirty: false, cleanups: [], cleanupCallbacks: [], effects: new Map() };
+    const view = { render: factory, root: null, scope, dirty: false, cleanupCallbacks: [], effects: new Map() };
     const root = render(view);
     views.add(new WeakRef(view));
     if (scope) scopes.set(scope, new WeakRef(view));
@@ -596,7 +573,9 @@ export function createWutuRuntime() {
   function dispose(node) {
     const view = metadata.get(node)?.view;
     if (view) {
-      for (const callback of [...view.cleanups.splice(0), ...view.cleanupCallbacks.splice(0)]) callback();
+      for (const callback of view.cleanupCallbacks.splice(0)) callback();
+      for (const timer of view.effects.values()) clearInterval(timer.id);
+      view.effects.clear();
       if (view.scope) scopes.delete(view.scope);
     }
     for (const child of node.children ?? []) dispose(child);
@@ -607,7 +586,7 @@ export function createWutuRuntime() {
   globalThis.addEventListener?.('popstate', refresh);
 
   const api = {
-    enter, shell, still, append, attr, listen, leave, mount, refresh, invalidate, style,
+    enter, append, attr, listen, leave, mount, refresh, invalidate, selectValue, here,
     put, begin, slot, arm, item, end, node, done,
     storageError: '',
     notify() {
@@ -616,39 +595,19 @@ export function createWutuRuntime() {
         if (view?.root.isConnected) schedule(view);
       }
     },
-    /** A timer owned by the rendering view: started once per key, cleared on removal. */
+    /**
+     * A timer owned by the rendering view: started once per key, stopped by
+     * the first render that does not start it again, or when the view goes.
+     */
     interval(key, milliseconds, callback) {
       const view = active;
-      if (!view || view.effects.has(key)) return;
-      const timer = setInterval(() => { callback(); autoSave(); schedule(view); }, Math.max(16, milliseconds));
-      view.effects.set(key, timer);
-      view.cleanups.push(() => clearInterval(timer));
-    },
-    /**
-     * A lazy module's function (`using m lazy from "…"`), called with `args`:
-     * its placeholder, which the element the function makes fills once the
-     * module's chunk has loaded (a prerendered placeholder keeps its markup
-     * until then). One placeholder per path, name, and arguments. While chunks
-     * load, <html> has data-wutu-loading (a prerenderer waits for it to go).
-     */
-    lazyCall(path, name, args) {
-      const key = path + '|' + name + '|' + args.map(arg => arg !== null && typeof arg === 'object' ? '#' : String(arg)).join('\u001f');
-      let node = lazies.get(key);
-      if (node) return node;
-      node = [...document.querySelectorAll('[data-wutu-lazy]')].find(n => n.getAttribute('data-wutu-lazy') === key) ?? document.createElement('div');
-      node.setAttribute('data-wutu-lazy', key);
-      lazies.set(key, node);
-      const url = globalThis.__wutuChunks?.[path];
-      if (!url) {
-        console.error('Wutu: no chunk was built for ' + path);
-        return node;
-      }
-      loading++;
-      document.documentElement.setAttribute('data-wutu-loading', '');
-      import(url).then(chunk => node.replaceChildren(chunk.exports[name](...args))).catch(error => console.error(error)).finally(() => {
-        if (--loading === 0) document.documentElement.removeAttribute('data-wutu-loading');
-      });
-      return node;
+      if (!view) return;
+      view.intervalsSeen.add(key);
+      const effect = view.effects.get(key);
+      if (effect) { effect.callback = callback; return; }
+      const entry = { callback, id: 0 };
+      entry.id = setInterval(() => { entry.callback(); autoSave(); schedule(view); }, Math.max(16, milliseconds));
+      view.effects.set(key, entry);
     },
     /**
      * A hole that calls a function (`= f(a, b);`) with a key the compiler
@@ -658,13 +617,13 @@ export function createWutuRuntime() {
      */
     memoHit(key) {
       if (!key || !active) return false;
-      const entry = active.memo?.get(memoPlace());
+      const entry = active.memo?.get(here());
       if (entry?.key !== key || !entry.node?.isConnected) return false;
       memoNode = entry.node;
       return true;
     },
     memoLast() { return memoNode; },
-    memoKeep(key, node) { if (key && active) (active.memo ??= new Map()).set(memoPlace(), { key, node }); },
+    memoKeep(key, node) { if (key && active) (active.memo ??= new Map()).set(here(), { key, node }); },
     after(callback) { afterRender.push(callback); schedule(); },
     focus(id) { afterRender.push(() => document.getElementById(id)?.focus()); schedule(); },
     cleanup(callback) { if (active) active.cleanupCallbacks[active.cleanupIndex++] = callback; },
@@ -674,6 +633,93 @@ export function createWutuRuntime() {
     popKey: () => keys.pop(),
   };
   return api;
+}
+
+// A shared stylesheet (`@style`, `@document`): std:Wutu's `style`, shipped
+// only to pages that have one. Self-contained, as the runtime is.
+export function wutuStyle(sheet) {
+  /** A shared sheet joins the `wutu.document` layer, below element styles; its `@import`s go first. */
+  function layered(css) {
+    // (No regex here: this source ships inside an @es envelope, where a slash
+    // next to a backslash would end it.)
+    let imports = '', rest = '', i = 0;
+    for (let at = css.indexOf('@import', i); at >= 0; at = css.indexOf('@import', i)) {
+      // (The `;` outside strings and parentheses: a font URL may have some.)
+      let end = -1, quote = '', depth = 0;
+      for (let j = at; j < css.length && end < 0; j++) {
+        const c = css[j];
+        if (quote) { if (c === '\\') j++; else if (c === quote) quote = ''; }
+        else if (c === '"' || c === "'") quote = c;
+        else if (c === '(') depth++;
+        else if (c === ')') depth--;
+        else if (c === ';' && depth <= 0) end = j;
+      }
+      if (end < 0) break;
+      const rule = css.slice(at, end);
+      rest += css.slice(i, at);
+      imports += rule.includes('layer(') ? rule + ';' : rule + ' layer(wutu.document);';
+      i = end + 1;
+    }
+    rest += css.slice(i);
+    return imports + (rest.trim() ? '@layer wutu.document{' + rest + '}' : '');
+  }
+
+  const installed = globalThis.__wutuStyles ??= new Set();
+  const css = layered(sheet);
+  if (installed.has(css)) return;
+  installed.add(css);
+  // Prerendered pages already contain their sheets.
+  if ([...document.querySelectorAll('style')].some(node => node.textContent === css)) return;
+  const node = document.createElement('style');
+  node.textContent = css;
+  document.head.append(node);
+}
+
+// Lazy modules' calls (`using m lazy from "…"`): the page's loader installs
+// this as globalThis.__wutuLazy when it has chunks. Self-contained.
+export function createWutuLazy() {
+  const lazies = new Map();         // lazy call's place -> { key, node, tries }: its placeholder
+  let loading = 0;                  // chunks loading
+  /**
+   * A lazy module's function (`using m lazy from "…"`), called with `args`:
+   * its placeholder, which the element the function makes fills once the
+   * module's chunk has loaded (a prerendered placeholder keeps its markup
+   * until then). One placeholder per place in the view, made again when
+   * the arguments change. A chunk that fails marks its placeholder
+   * data-wutu-lazy-error and is tried again by the next render. While
+   * chunks load, <html> has data-wutu-loading (a prerenderer waits for it).
+   */
+  return (path, name, args) => {
+    const where = globalThis.__utuWutu.here() + '|' + path + '|' + name;
+    const key = where + '|' + args.map(arg => arg !== null && typeof arg === 'object' ? '#' : String(arg)).join('\u001f');
+    const known = lazies.get(where);
+    if (known?.key === key && !known.node.hasAttribute('data-wutu-lazy-error')) return known.node;
+    const node = known?.key === key ? known.node
+      : [...document.querySelectorAll('[data-wutu-lazy]')].find(n => n.getAttribute('data-wutu-lazy') === key) ?? document.createElement('div');
+    node.setAttribute('data-wutu-lazy', key);
+    node.removeAttribute('data-wutu-lazy-error');
+    lazies.set(where, { key, node });
+    const url = globalThis.__wutuChunks?.[path];
+    if (!url) {
+      console.error('Wutu: no chunk was built for ' + path);
+      return node;
+    }
+    const tries = known?.key === key ? (known.tries ?? 0) + 1 : 0;
+    lazies.get(where).tries = tries;
+    loading++;
+    document.documentElement.setAttribute('data-wutu-loading', '');
+    import(tries ? url + '?retry=' + tries : url).then(chunk => {
+      const make = chunk.exports?.[name];
+      if (typeof make !== 'function') throw chunk.error ?? new Error('Wutu: chunk for ' + path + ' has no ' + name);
+      node.replaceChildren(make(...args));
+    }).catch(error => {
+      node.setAttribute('data-wutu-lazy-error', '');
+      console.error(error);
+    }).finally(() => {
+      if (--loading === 0) document.documentElement.removeAttribute('data-wutu-loading');
+    });
+    return node;
+  };
 }
 
 // Installed only by typed persistence. DOM-only applications do not ship codecs

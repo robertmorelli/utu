@@ -1,0 +1,20 @@
+// What: a text hole whose expression gives no value
+// Expect: A hole needs a value: this gives none
+using Browser from std:Browser;
+
+struct State:
+    | n: I32
+    | items: Array[Item]
+    | tags: Array[Str]
+
+struct Item:
+    | id: I32
+
+export main() void {
+    let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
+    let app = @wutu/\
+    @reactive;
+    main { p { = Browser.console.log("x"); } }
+    \/;
+    Browser.document.body.append(app);
+}

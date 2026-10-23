@@ -1,0 +1,20 @@
+// What: a DOM property given a number where it takes text
+// Expect: Expected Str, got I32
+using Browser from std:Browser;
+
+struct State:
+    | n: I32
+    | items: Array[Item]
+    | tags: Array[Str]
+
+struct Item:
+    | id: I32
+
+export main() void {
+    let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
+    let app = @wutu/\
+    @reactive;
+    main { input { .value = 5; } }
+    \/;
+    Browser.document.body.append(app);
+}

@@ -737,9 +737,49 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
     let m = w_mark();
     let rt = check_expr(a, -1, cx);
     if ty_is(rt, Ty.Error) { return rt; };
-    if not in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(rt)) { return rt; };
-    to_str_of(rt, a, m, cx);
-    prelude(Prelude.Str);
+    if in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(rt)) {
+        to_str_of(rt, a, m, cx);
+        return prelude(Prelude.Str);
+    };
+    if not shows_as_itself(rt) {
+        report2(Diag.WutuHole, unspliced(a), -1, rt, -1);
+        return error_value();
+    };
+    rt;
+}
+
+/// The node a splice holds (where it is written).
+fn unspliced(n: I32) I32 {
+    let x = n;
+    while (is_kind(x, Node.Splice) and first_child(x) >= 0) { x = first_child(x); };
+    x;
+}
+
+/// Whether a hole shows a value of type t as it is: a Str, a host value (a
+/// node), or null.
+fn shows_as_itself(t: I32) Bool {
+    if ty_is(t, Ty.Null) or is_foreign_or_nullable(t) { return true; };
+    ty_is(t, Ty.Named) and in_words("Str Externref", type_text(t));
+}
+
+/// `wutu.key_text(k)`, what a loop's `key k` becomes: a Str is itself, a
+/// number or a Bool its `to_str()`; anything else is no key.
+fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    if a < 0 or next_sibling(a) >= 0 {
+        report2(Diag.WrongArity, node, -1, 1, if args >= 0 { child_count(args); } else { 0; });
+        return error_value();
+    };
+    let m = w_mark();
+    let rt = check_expr(a, -1, cx);
+    if ty_is(rt, Ty.Error) { return rt; };
+    if in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(rt)) {
+        to_str_of(rt, a, m, cx);
+        return prelude(Prelude.Str);
+    };
+    if ty_is(rt, Ty.Named) and type_text(rt) == "Str" { return rt; };
+    report2(Diag.WutuKey, unspliced(a), -1, rt, -1);
+    error_value();
 }
 
 /// Whether `callee` is `wutu.show` (std:Wutu's).
@@ -826,11 +866,28 @@ fn memo_safe_fn(decl: I32) Bool {
     ok;
 }
 
-/// A std function: all are memo-safe but std:Wutu's effects.
+/// A std function: all are memo-safe but those that ask the host for
+/// something new each time (the clock, random seeds, streams) and std:Wutu's effects.
 fn std_memo_safe(decl: I32) Bool {
     let module = module_of(decl);
-    if module < 0 or word_text(decl_name[module]) != "wutu" { return true; };
-    in_words("init show memo_key number money decimal", word_text(decl_name[decl]));
+    if module < 0 { return true; };
+    let m = word_text(decl_name[module]);
+    let w = fn_word(decl);
+    let name = if w >= 0 { word_text(w); } else { ""; };
+    if m == "time" or m == "Stream" or (m == "Random" and name == "from_host") { return false; };
+    if m != "wutu" { return true; };
+    in_words("init show memo_key key_text number money decimal", name);
+}
+
+/// A method call's every candidate (`x.f(…)`: any type's method f, its
+/// receiver's type not yet known here) is memo-safe.
+fn memo_safe_methods(word: I32) Bool {
+    let k = 0;
+    while (k < decl_kind.len()) {
+        if decl_is(k, Decl.Fn) and decl_a[k] >= 0 and fn_word(k) == word and not memo_safe_fn(k) { return false; };
+        k += 1;
+    };
+    true;
 }
 
 /// Whether the code at `n` keeps a function memo-safe.
@@ -865,6 +922,13 @@ fn memo_safe_node(n: I32) Bool {
                 if decl_is(f, Decl.Fn) { return memo_safe_fn(f); };
                 return not (decl_is(f, Decl.Global) or decl_is(f, Decl.Mem));
             };
+        };
+        // `x.f(…)`: a method of x's type.
+        let p = parent_of(n);
+        if is_kind(n, Node.Field_expr) and p >= 0 and is_kind(p, Node.Call_expr) and first_child(p) == n {
+            let m = node_decl[last_child(n)];
+            if decl_is(m, Decl.Fn) { if not memo_safe_fn(m) { return false; }; }
+            else if not memo_safe_methods(word_of(last_child(n))) { return false; };
         };
         return memo_safe_node(base);
     };
@@ -1699,6 +1763,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     if is_wutu_show(callee) { return check_wutu_show(node, args, cx); };
     if is_wutu_fn(callee, "memo_key") { return check_memo_key(node, args, cx); };
+    if is_wutu_fn(callee, "key_text") { return check_wutu_key(node, args, cx); };
     if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx); };
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx); };
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx); };
@@ -2039,7 +2104,7 @@ fn function_of(fi: I32) I32 {
 //!
 //! `using tour lazy from "./tour.utu"` type-checks the module as usual, but
 //! the program does not contain it: each of its functions the program calls
-//! is a stub that asks std:Wutu's runtime (`lazyCall`) for the element the
+//! is a stub that asks the page's loader (`createWutuLazy`) for the element the
 //! function makes. The runtime loads the module's chunk the first time and
 //! fills a placeholder; `wutu build` makes the chunk from what the host
 //! section's `lazy` list says the program calls. Arguments cross into the
@@ -2063,7 +2128,7 @@ fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
     };
     let r = fi_result[fi];
     sig = sig + ") " + type_text(r);
-    let body = "(...a)=>globalThis.__utuWutu.lazyCall(" + word_text(lazy_path[lazy]) + ",\"" + word_text(decl_name[decl]) + "\",a)";
+    let body = "(...a)=>globalThis.__wutuLazy(" + word_text(lazy_path[lazy]) + ",\"" + word_text(decl_name[decl]) + "\",a)";
     let imp = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), func_type_of[f]);
     es_func.push(imp);
     es_start.push(-1);

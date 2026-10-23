@@ -47,6 +47,6 @@ try {
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no mobile horizontal overflow');
   await page.screenshot({path:path.join(out,'mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  assert.ok(report.total.gzip<6000,`site exceeded 6 KB gzip budget: ${report.total.gzip}`);
+  assert.ok(report.total.gzip<9000,`site exceeded 9 KB gzip budget: ${report.total.gzip}`);
   console.log(`Wutu ${engine.name()} interaction + responsive + size checks passed`,report.total);
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

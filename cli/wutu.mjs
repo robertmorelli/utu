@@ -10,10 +10,11 @@ import { formatUtu } from '../src/compiler/wutu-tooling.js';
 import { buildBrowserApp } from '../tools/dts/build-app.mjs';
 import { prerender } from '../tools/dts/prerender.mjs';
 import { initParser } from '../src/index.js';
+import { MODES } from '../src/selfhost/compiler.js';
 
 const USAGE = `wutu format <files...> [--check]
-wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
-wutu dev <entry.utu> [--out dist/wutu] [--port 4176]`;
+wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender] [-O small|fast|smallUnsafe|fastUnsafe|debug]
+wutu dev <entry.utu> [--out dist/wutu] [--port 4176] [-O mode]`;
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -30,14 +31,14 @@ const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', 'dist']);
 const escapeHtml = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
 
 function parseArgs(args) {
-  const valueFlags = new Set(['--out', '--title', '--port']);
+  const valueFlags = new Set(['--out', '--title', '--port', '-O']);
   const positional = [], options = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (valueFlags.has(arg)) {
       if (i + 1 >= args.length) throw new Error(`${arg} needs a value`);
       options[arg] = args[++i];
-    } else if (arg.startsWith('--')) {
+    } else if (arg.startsWith('-')) {
       options[arg] = true;
     } else {
       positional.push(arg);
@@ -76,8 +77,8 @@ function shellHtml(title) {
     + '<script type="module" src="./app.js"></script></body></html>';
 }
 
-async function compileApp({ entry, parser, title }, directory) {
-  const report = await buildBrowserApp({ entry, outDir: directory, parser });
+async function compileApp({ entry, parser, title, mode }, directory) {
+  const report = await buildBrowserApp({ entry, outDir: directory, parser, ...MODES[mode] });
   await fs.writeFile(path.join(directory, 'index.html'), shellHtml(title));
   return report;
 }
@@ -197,8 +198,11 @@ async function main() {
     entry,
     out: path.resolve(options['--out'] ?? 'dist/wutu'),
     title: options['--title'] ?? path.basename(path.dirname(entry)),
+    // Like `utu build`: small (checked) unless asked.
+    mode: options['-O'] ?? 'small',
     parser: await initParser({ wasmDir: fileURLToPath(new URL('../', import.meta.url)) }),
   };
+  if (!MODES[app.mode]) { app.parser.delete(); throw new Error(`unknown mode -O ${app.mode}: small, fast, smallUnsafe, fastUnsafe, debug`); }
   if (command === 'dev') return devCommand(app, { port: options['--port'] });
   try {
     await buildCommand(app, { prerender: !options['--no-prerender'] });
