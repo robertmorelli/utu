@@ -38,6 +38,10 @@ vec gen_decl: I32;
 vec gen_defers: I32;
 /// For a recursive generation, its index in `rec_*`; else -1.
 vec gen_rec: I32;
+/// The generators of the program's own items, checked even when unused.
+vec own_gens: I32;
+/// The generators a `for` expanded.
+vec used_gens: I32;
 
 /// An expansion begins: what its yields need, on the stacks above.
 fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32, rec: I32) void {
@@ -80,6 +84,8 @@ fn reset_generators() void {
     gen_decl.clear();
     gen_defers.clear();
     gen_rec.clear();
+    own_gens.clear();
+    used_gens.clear();
     rec_kind.clear();
     rec_val.clear();
     rec_top.clear();
@@ -236,6 +242,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         gen = node_decl[last_child(first_child(call))];
         receiver = first_child(first_child(call));
     };
+    used_gens.push(gen);
     // A generator that consumes itself would expand without end.
     for (0 ..< gen_decl.len()) |i| {
         if gen_decl[i] == gen {
@@ -327,11 +334,83 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     ty_void();
 }
 
+/// Each generator of the program's own items that no `for` expanded:
+/// checked on its own, as an unused function is.
+fn check_unused_generators() void {
+    for (0 ..< own_gens.len()) |i| {
+        let gen = own_gens[i];
+        let used = false;
+        for (0 ..< used_gens.len()) |j| { if used_gens[j] == gen { used = true; }; };
+        // (One that delegates to itself expands only from a consumer.)
+        if not used and not delegates_to_itself(gen) {
+            check_lone_generator(gen);
+            used_gens.push(gen);
+        };
+    };
+}
+
+/// Generator `gen`'s body, with no consumer (each value dropped), in a
+/// function of its parameters that nothing calls.
+fn check_lone_generator(gen: I32) void {
+    let mp = vl_begin();
+    let method = is_method_generator(decl_node[gen]);
+    if method { vl_add(receiver_type(gen, 0)); };
+    let params = param_list_of(gen);
+    let p = if params >= 0 { first_child(params); } else { -1; };
+    while (p >= 0) {
+        vl_add(type_of(next_sibling(first_child(p)), 0));
+        p = next_sibling(p);
+    };
+    let ptypes = vl_end(mp);
+    let f = defined_func(ptypes, ty_void());
+    func_debug_name[f] = fn_debug_name(gen);
+    begin_function();
+    cur_fn[0] = -1;
+    let decls = param_decls(gen);
+    for (0 ..< vl_len[ptypes]) |i| {
+        let d = vl_item(decls, i);
+        decl_local[d] = new_local(repr(vl_item(ptypes, i)));
+        decl_ty[d] = vl_item(ptypes, i);
+    };
+    cur_params.resize(1);
+    cur_params[0] = cur_locals.len();
+    mark_boxes(fn_body(gen));
+    let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), 0);
+    let cx = Cx { inst: 0, fi: -1, result: ty_void() };
+    let m = w_mark();
+    let prologue = box_params(decls, ptypes);
+    if prologue >= 0 { w_push(prologue); };
+    let mb = w_mark();
+    let whole = new_label();
+    begin_expansion(whole, -1, -1, elem, cx, gen, -1);
+    discard(check_block(fn_body(gen), ty_void(), cx));
+    w_node(Op.Block, vt_none, whole, 0, mb);
+    end_expansion();
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    func_body[f] = w_pop();
+    record_locals(f, cur_params[0]);
+}
+
 /// A function declaration's `Param_list` node, or -1.
 fn param_list_of(decl: I32) I32 { child_of_kind(decl_node[decl], Node.Param_list); }
 
-/// The innermost expansion whose generator the node is in, or -1.
+/// The innermost expansion whose generator the node is in, or -1; a node
+/// in a closure there belongs to the closure's body (its `try`, `errdefer`
+/// and `return` are the closure's).
 fn expansion_of(node: I32) I32 {
+    let k = expansion_around(node);
+    if k < 0 { return -1; };
+    let g = decl_node[gen_decl[k]];
+    let p = parent_of(node);
+    while (p >= 0 and p != g) {
+        if is_kind(p, Node.Closure_expr) { return -1; };
+        p = parent_of(p);
+    };
+    k;
+}
+
+/// The innermost expansion whose generator's text the node is in, or -1.
+fn expansion_around(node: I32) I32 {
     let k = gen_decl.len() - 1;
     let t = node_first[node];
     while (k >= 0) {
@@ -347,7 +426,8 @@ fn expansion_of(node: I32) I32 {
 /// `yield v`: v into the consumer's capture, then its body, which `continue`
 /// leaves (to resume the generator) and `break` ends the whole generation.
 fn check_yield(node: I32, cx: Cx) I32 {
-    let k = expansion_of(node);
+    // (One in a closure there is reported when validated.)
+    let k = expansion_around(node);
     if k < 0 {
         report(Diag.YieldOutside, node, -1);
         return error_value();
@@ -376,7 +456,7 @@ fn check_yield(node: I32, cx: Cx) I32 {
     // it belongs to an outer one).
     let decl = gen_decl[k];
     gen_decl[k] = -1;
-    discard(check_block(gen_body[k], ty_void(), ccx));
+    if gen_body[k] >= 0 { discard(check_block(gen_body[k], ty_void(), ccx)); };
     gen_decl[k] = decl;
     leave_loop();
     w_node(Op.Block, vt_none, resume, 0, mr);

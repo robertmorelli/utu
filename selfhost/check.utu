@@ -1293,6 +1293,11 @@ fn fn_value_in(decl: I32, inst: I32) I32 {
 }
 
 fn global_get(decl: I32) I32 {
+    // Its initializer is checked where its diagnostics are kept.
+    if speculating[0] > 0 and decl_global[decl] == -1 {
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+        return global_type(decl);
+    };
     let g = global_of(decl);
     if g < 0 { return error_value(); };
     let t = decl_ty[decl];
@@ -1309,6 +1314,12 @@ fn global_get(decl: I32) I32 {
 fn global_of(decl: I32) I32 {
     if decl_global[decl] != -1 { return decl_global[decl]; };
     let node = decl_node[decl];
+    // One that differs per instance of its generic mod was reported (see @validate_generic_global).
+    let module = module_of(decl);
+    if module >= 0 and is_generic(module) and per_instance(next_sibling(first_child(node)), module) >= 0 {
+        decl_global[decl] = -2;
+        return -2;
+    };
     let t = global_type(decl);
     let init = last_child(node);
     let m = w_mark();
@@ -1381,6 +1392,13 @@ fn computed_global(decl: I32, t: I32, init: I32) I32 {
     mark_boxes(init);
     let m = w_mark();
     let cx = Cx { inst: 0, fi: -1, result: t };
+    // The start function sets it, and a start function cannot suspend.
+    let at = awaits_in(init);
+    if at >= 0 {
+        report(Diag.AwaitInGlobal, at, -1);
+        diag_label(if is_kind(at, Node.Await_expr) { "suspends"; } else { "may suspend"; });
+        diag_note("Globals are set as the module starts, before anything can suspend; await in a function");
+    };
     want(init, t, Why.Annotation, next_sibling(first_child(decl_node[decl])), decl_name[decl]);
     coerce(check_expr(init, t, cx), t, init);
     unwant();
@@ -1720,11 +1738,16 @@ fn is_number_literal(node: I32) Bool {
     is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit));
 }
 
+/// Above 0 while code is checked only for its type (its diagnostics dropped).
+vec speculating: I32;
+
 /// The type an expression has, without keeping its IR.
 fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark();
     let diags = diag_kind.len();
+    speculating[0] += 1;
     let t = check_expr(node, expect, cx);
+    speculating[0] -= 1;
     w_stack.resize(m);
     diag_truncate(diags);
     t;
@@ -2502,7 +2525,8 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     if decl_is(module, Decl.Module) and not decl_is(decl, Decl.Fn) { module = module_of(module); };
     if not decl_is(decl, Decl.Fn) {
         let m0 = w_mark();
-        if reported_within(node) { return finish_error(args, m0, cx); };
+        // An unknown module was reported where it was resolved (once by name).
+        if module < 0 or reported_within(node) { return finish_error(args, m0, cx); };
         if decl >= 0 and is_type_decl(decl) { not_value(name, decl); }
         else { report3(Diag.UnknownMethod, name, word_of(name), -1, -1, decl_name[module]); };
         return finish_error(args, m0, cx);
@@ -2892,6 +2916,11 @@ fn reset_check() void {
     reset_defers();
     reset_optional();
     reset_promises();
+    // Sized here too: a computed global's initializer may be checked first.
+    cur_params.resize(1);
+    next_label.resize(1);
+    speculating.resize(1);
+    speculating[0] = 0;
     fi_grow();
 }
 
@@ -3021,10 +3050,14 @@ fn compile(target: Target) I32 {
         };
     };
     let next = 0;
-    while (next < fi_queue.len()) {
-        checking_fi[0] = fi_queue[next];
-        check_function(fi_queue[next]);
-        next += 1;
+    // Then the generators no `for` expanded, and what they reach.
+    for (0 ..< 2) |pass| {
+        if pass == 1 { check_unused_generators(); };
+        while (next < fi_queue.len()) {
+            checking_fi[0] = fi_queue[next];
+            check_function(fi_queue[next]);
+            next += 1;
+        };
     };
     checking_fi[0] = -1;
     start_globals();
@@ -3066,9 +3099,9 @@ fn check_item(item: I32) void {
         return;
     };
     if is_kind(item, Node.Fn_decl) {
-        // A generator is checked where it is consumed.
+        // A generator is checked where it is consumed (or, unused, after).
         let decl = node_decl[last_child(first_child(item))];
-        if not is_generator(decl) { fn_instance(decl, 0); };
+        if is_generator(decl) { own_gens.push(decl); } else { fn_instance(decl, 0); };
         return;
     };
     if is_kind(item, Node.Op_decl) {

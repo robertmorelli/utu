@@ -42,6 +42,11 @@ const INTENDED = {
   // `let value: … = f();`: stage 0 wants a literal; a global may be computed.
   'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu normal': 'a global may be computed',
   'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu test': 'a global may be computed',
+  // A test build leaves main out, so the generators it consumes are unused
+  // there: stage 0 never checks them.
+  'baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test': 'a generator nothing consumes is checked',
+  'baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu test': 'a generator nothing consumes is checked',
+  'baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu test': 'a generator nothing consumes is checked',
 };
 
 if (isMainThread) await main();

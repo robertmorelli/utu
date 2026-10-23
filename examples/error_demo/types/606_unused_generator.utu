@@ -1,0 +1,10 @@
+// What: a mistake in a generator nothing consumes.
+// Expect: a is I32, got Str
+fn g() yield I32 {
+    let a: I32 = "s";
+    yield a;
+}
+
+export main() I32 {
+    0;
+}

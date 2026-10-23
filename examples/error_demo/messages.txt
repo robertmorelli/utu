@@ -1023,6 +1023,19 @@ ok
 11 │         };
 --- exit 1
 
+=== utu check examples/error_demo/control/608_negative_zero_pattern.utu
+ ERROR  Duplicate pattern -0.0
+        duplicate-pattern · examples/error_demo/control/608_negative_zero_pattern.utu:4:25
+
+ 2 │ // Expect: Duplicate pattern -0.0
+ 3 │ fn f(x: F64) I32 {
+ 4 │     match x { 0.0 => 1, -0.0 => 2, ~> 3, };
+   │               ───       ━━━━━━━━━━
+   │               │         ╰─ already matched
+   │               ╰─ first here
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/control/60_host_alt_class_dictionary.utu
  ERROR  Browser.AddEventListenerOptions is only a type
         host-alt-class · examples/error_demo/control/60_host_alt_class_dictionary.utu:9:13
@@ -3703,6 +3716,18 @@ ok
  5 │     | Dot {}
 --- exit 1
 
+=== utu check examples/error_demo/names/607_unknown_module_twice.utu
+ ERROR  Unknown module Nope
+        unknown-module · examples/error_demo/names/607_unknown_module_twice.utu:4:5
+
+ 2 │ // Expect: Unknown module Nope
+ 3 │ fn g() I32 {
+ 4 │     Nope[F64].x() + Nope[F64].x();
+   │     ━━━━
+   │     ╰─ no such module
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/names/60_duplicate_field_anon_literal.utu
  ERROR  Duplicate field y
         duplicate-field · examples/error_demo/names/60_duplicate_field_anon_literal.utu:8:20
@@ -5407,6 +5432,50 @@ ok
    │                    ━━━
    │                    ╰─ here
  9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/600_await_in_global.utu
+ ERROR  A global's initializer cannot await
+        await-in-global · examples/error_demo/platform/600_await_in_global.utu:4:18
+
+ 2 │ // Expect: A global's initializer cannot await
+ 3 │ let fetch_n: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+ 4 │ let later: I32 = await fetch_n(4);
+   │                  ━━━━━━━━━━━━━━━━
+   │                  ╰─ suspends
+ 5 │
+ 6 │ export main() I32 {
+
+  note  Globals are set as the module starts, before anything can suspend; await in a function
+--- exit 1
+
+=== utu check examples/error_demo/platform/601_await_in_global_call.utu
+ ERROR  A global's initializer cannot await
+        await-in-global · examples/error_demo/platform/601_await_in_global_call.utu:4:18
+
+ 2 │ // Expect: A global's initializer cannot await
+ 3 │ let fetch_n: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+ 4 │ let later: I32 = helper();
+   │                  ━━━━━━━━
+   │                  ╰─ may suspend
+ 5 │
+ 6 │ fn helper() I32 {
+
+  note  Globals are set as the module starts, before anything can suspend; await in a function
+--- exit 1
+
+=== utu check examples/error_demo/platform/602_awaiting_fn_to_host.utu
+ ERROR  A function the host calls cannot await
+        await-in-closure · examples/error_demo/platform/602_awaiting_fn_to_host.utu:11:10
+
+ 9 │
+10 │ export main() I32 {
+11 │     call(waits);
+   │          ━━━━━
+   │          ╰─ may suspend
+12 │ }
+
+  note  A stack suspends only through utu's calls, not the host's; pass a function that does not await
 --- exit 1
 
 === utu check examples/error_demo/platform/60_json_host_type.utu
@@ -9430,6 +9499,81 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │     ━━━━━━━━━━━
    │     ╰─ no such method
 12 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/603_generic_global_list.utu
+ ERROR  A global of generic Stash cannot use T
+        generic-global · examples/error_demo/types/603_generic_global_list.utu:6:21
+
+ 4 │
+ 5 │ mod Stash[T] {
+ 6 │     let items: List[T] = List[T].new();
+   │                     ━
+   │                     ╰─ differs per instance
+ 7 │     fn count() I32 { items.len(); }
+ 8 │ }
+
+  note  A mod's global is one for all its instances; make it a function's value
+--- exit 1
+
+=== utu check examples/error_demo/types/604_generic_global_nullable.utu
+ ERROR  A global of generic Box cannot use T
+        generic-global · examples/error_demo/types/604_generic_global_nullable.utu:4:16
+
+ 2 │ // Expect: A global of generic Box cannot use T
+ 3 │ mod Box[T] {
+ 4 │     let item: ?T = null;
+   │                ━
+   │                ╰─ differs per instance
+ 5 │     fn empty() Bool { item == null; }
+ 6 │ }
+
+  note  A mod's global is one for all its instances; make it a function's value
+--- exit 1
+
+=== utu check examples/error_demo/types/605_fun_array_global_read.utu
+ ERROR  fun() Str cannot be stored; use cl() Str
+        fun-in-field · examples/error_demo/types/605_fun_array_global_read.utu:4:34
+
+ 2 │ // Expect: fun() Str cannot be stored; use cl() Str
+ 3 │ fn hi() Str { "hi"; }
+ 4 │ let greeters: Array[fun() Str] = [hi];
+   │                                  ━━━━
+   │                                  ╰─ here
+ 5 │
+ 6 │ export main() Str {
+--- exit 1
+
+=== utu check examples/error_demo/types/606_unused_generator.utu
+ ERROR  a is I32, got Str
+        type-mismatch · examples/error_demo/types/606_unused_generator.utu:4:18
+
+ 2 │ // Expect: a is I32, got Str
+ 3 │ fn g() yield I32 {
+ 4 │     let a: I32 = "s";
+   │            ───   ━━━
+   │            │     ╰─ Str
+   │            ╰─ I32
+ 5 │     yield a;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/609_bound_missing_twice.utu
+ ERROR  M does not implement Big (Pick's T needs it)
+        bound-missing · examples/error_demo/types/609_bound_missing_twice.utu:15:10
+
+ 9 │ mod Pick[T[Big]] {
+   │            ───
+   │            ╰─ needs Big
+   ┆
+13 │ export main() I32 {
+14 │     let xs: Array[M] = [M { v: 3 }];
+15 │     Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 20 }, xs).v;
+   │          ━
+   │          ╰─ no biggest
+16 │ }
+
+  note  implement it: fn Big[M].biggest |a| (b: Array[M]) M { … }
 --- exit 1
 
 === utu check examples/error_demo/types/60_unknown_method_nullable.utu

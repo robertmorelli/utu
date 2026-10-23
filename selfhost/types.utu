@@ -255,6 +255,7 @@ fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64
 fn type_of(node: I32, inst: I32) I32 {
     if node < 0 { return ty_error(); };
     let kind = node_kind[node];
+    if kind == Node.Promoted_type.to_i32() and sig_self[0] >= 0 { return sig_self[0]; };
     if kind == Node.Ref_type.to_i32() { return type_path(first_child(node), inst); };
     if kind == Node.Type_ident.to_i32() or kind == Node.Promoted_type.to_i32() { return type_path(node, inst); };
     if kind == Node.Nullable_type.to_i32() {
@@ -299,6 +300,10 @@ fn type_of(node: I32, inst: I32) I32 {
     if not reported_within(node) { report(Diag.Unsupported, node, -1); };
     ty_error();
 }
+
+/// While a protocol member's type is read (see @sig_type): the type `&`
+/// stands for; else -1.
+vec sig_self: I32 = [-1];
 
 /// The type a name or path names: `T`, `&`, `M[A]`, `M.T`, `M[A].T`.
 fn type_path(node: I32, inst: I32) I32 {

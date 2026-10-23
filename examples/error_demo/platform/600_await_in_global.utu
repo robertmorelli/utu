@@ -1,0 +1,8 @@
+// What: awaits in a global's initializer, which the module's start runs.
+// Expect: A global's initializer cannot await
+let fetch_n: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+let later: I32 = await fetch_n(4);
+
+export main() I32 {
+    later;
+}

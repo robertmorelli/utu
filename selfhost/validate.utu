@@ -237,6 +237,7 @@ fn validate_node(node: I32) void {
         Node.Defer_expr => { validate_defer(node); },
         Node.Errdefer_expr => { validate_defer(node); },
         Node.Await_expr => { validate_await(node); },
+        Node.Global_decl => { validate_generic_global(node); },
         ~> {},
     };
 }
@@ -398,6 +399,34 @@ fn validate_tuple_type(node: I32) void {
 fn validate_field_type(node: I32) void {
     let t = next_sibling(first_child(node));
     if is_kind(t, Node.Func_type) { report2(Diag.FunInField, t, -1, type_of(t, 0), 0); };
+}
+
+/// A global of a generic mod is one for all its instances: its type and
+/// initializer may not name what differs between them (the mod's
+/// parameters, `&`, or its types and functions).
+fn validate_generic_global(node: I32) void {
+    let decl = node_decl[first_child(node)];
+    let module = module_of(decl);
+    if module < 0 or not is_generic(module) or is_es(last_child(node)) { return; };
+    let at = per_instance(next_sibling(first_child(node)), module);
+    if at < 0 { return; };
+    report2(Diag.GenericGlobal, at, word_of(at), module, -1);
+    diag_note("A mod's global is one for all its instances; make it a function's value");
+}
+
+/// The first node under `node` naming what differs between instances of
+/// generic `module`; or -1.
+fn per_instance(node: I32, module: I32) I32 {
+    if is_kind(node, Node.Promoted_type) { return node; };
+    let d = node_decl[node];
+    if d >= 0 and module_of(d) == module and (is_type_decl(d) or decl_is(d, Decl.Fn)) { return node; };
+    let c = first_child(node);
+    while (c >= 0) {
+        let at = per_instance(c, module);
+        if at >= 0 { return at; };
+        c = next_sibling(c);
+    };
+    -1;
 }
 
 /// A global's initializer is a literal (maybe negated).

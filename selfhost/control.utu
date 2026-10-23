@@ -29,6 +29,8 @@ fn pattern_value(lit: I32, t: I32) I64 {
     if is_kind(c, Node.Float_lit) {
         if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; return 0; };
         if not literal_fits(c, t, negate) { pattern_fault[0] = 0; };
+        // `-0.0` matches what `0.0` does (they compare equal): the same pattern.
+        if negate and literal_bits(c, t, false) == 0.to_i64() { return 0.to_i64(); };
         return literal_bits(c, t, negate);
     };
     let v = literal_bits(c, t, negate);

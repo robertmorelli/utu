@@ -1,0 +1,8 @@
+// What: a global array of funs, read where it is called.
+// Expect: fun() Str cannot be stored; use cl() Str
+fn hi() Str { "hi"; }
+let greeters: Array[fun() Str] = [hi];
+
+export main() Str {
+    greeters[0]();
+}
