@@ -12,41 +12,44 @@ export function compressedSourceWarnings(source, file) {
   // inside one's `${…}`. A template, interpolations and all, is not code.
   const templates = [];
   for (const [index, line] of source.split('\n').entries()) {
+    // Only a long line can warn: a short one is scanned for the state it leaves.
+    const long = line.length > 160;
     let code = '';
     let quoted = false;
     if (!line.trimStart().startsWith('\\\\')) {
       for (let i = 0; i < line.length; i++) {
-        const pair = line.slice(i, i + 2);
+        const c = line[i];
+        const next = line[i + 1];
         const top = templates.length - 1;
         if (inBlockComment) {
-          if (pair === '*/') { inBlockComment = false; i++; }
+          if (c === '*' && next === '/') { inBlockComment = false; i++; }
         } else if (quoted) {
-          if (line[i] === '\\') i++;
-          else if (line[i] === '"') quoted = false;
+          if (c === '\\') i++;
+          else if (c === '"') quoted = false;
         } else if (templates[top] === 'text') {
-          if (line[i] === '\\') i++;
-          else if (line[i] === '`') templates.pop();
-          else if (pair === '${') { templates.push(0); i++; }
-        } else if (pair === '//') {
+          if (c === '\\') i++;
+          else if (c === '`') templates.pop();
+          else if (c === '$' && next === '{') { templates.push(0); i++; }
+        } else if (c === '/' && next === '/') {
           break;
-        } else if (pair === '/*') {
+        } else if (c === '/' && next === '*') {
           inBlockComment = true; i++;
-        } else if (line[i] === '"') {
+        } else if (c === '"') {
           quoted = true;
-        } else if (line[i] === '`') {
+        } else if (c === '`') {
           templates.push('text');
         } else if (top >= 0) {
-          if (line[i] === '{') templates[top]++;
-          else if (line[i] === '}' && templates[top]-- === 0) templates.pop();
-        } else {
-          code += line[i];
+          if (c === '{') templates[top]++;
+          else if (c === '}' && templates[top]-- === 0) templates.pop();
+        } else if (long) {
+          code += c;
         }
       }
     }
     // An if/else used as a value (`if c { a; } else { b; }`) is one expression,
     // so its single-expression branches do not count as packed statements.
-    const boundaries = (code.replace(IF_VALUE_BRANCH, ' ').match(/[{};]/g) ?? []).length;
-    if (line.length > 160 && code.trim().length > 100 && boundaries >= 5) {
+    const boundaries = () => (code.replace(IF_VALUE_BRANCH, ' ').match(/[{};]/g) ?? []).length;
+    if (long && code.trim().length > 100 && boundaries() >= 5) {
       const col = line.search(/\S/) + 1;
       warnings.push({
         kind: DIAGNOSTIC_KINDS.COMPRESSED_SOURCE, severity: 'warning',
