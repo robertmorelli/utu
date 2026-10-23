@@ -575,6 +575,57 @@ export lib {
     checked++;
   }
 
+  // Constant folding (optimized builds), as wasm computes: wrapping at the
+  // ends, shift counts mod the width, add/sub chains reassociated (negative
+  // constants, wrapping), `x * 0` and `x & 0` keeping x's effects, and an
+  // `if` or loop condition that is constant.
+  const foldFile = await write(`vec calls: I32 = [0];
+fn bump() I32 { calls[0] += 1; calls[0]; }
+let depth: I32 = 14;
+export lib {
+    fn max_plus() I32 { 2147483647 + 1; }
+    fn min_minus() I32 { -2147483648 - 1; }
+    fn min_times() I32 { -2147483648 * -1; }
+    fn big_mul() I32 { 65537 * 65537; }
+    fn max64_plus() I64 { let m: I64 = 9223372036854775807; m + 1; }
+    fn min64_minus() I64 { let m: I64 = -9223372036854775808; m - 1; }
+    fn shl33() I32 { 1 << 33; }
+    fn shr35() I32 { -8 >> 35; }
+    fn shru33() I32 { -1 >>> 33; }
+    fn shl65() I64 { let one: I64 = 1; one << 65; }
+    fn shru64() I64 { let m: I64 = -1; m >>> 64; }
+    fn cmp_u() Bool { let m: I64 = -1; m.to_u64() > 1.to_u64(); }
+    fn global_plus() I32 { depth + 1; }
+    fn reassoc(x: I32) I32 { 1 << (depth - x + 4); }
+    fn reassoc_neg(x: I32) I32 { (x - 5) + -7 - -3; }
+    fn reassoc_wrap(x: I32) I32 { (x + 2147483647) + 2; }
+    fn reassoc64(x: I64) I64 { let a: I64 = -3; (a - x) - 9223372036854775807; }
+    fn times_zero() I32 { let before = calls[0]; let r = bump() * 0; r + (calls[0] - before) * 10; }
+    fn and_zero() I32 { let before = calls[0]; let r = bump() & 0; r + (calls[0] - before) * 10; }
+    fn idents(x: I32) I32 { ((((x + 0) * 1) | 0) ^ 0) & -1 << 32; }
+    fn if_const() I32 { if 3 > 2 { 1; } else { 2; }; }
+    fn if_const_else() I32 { let t = 0; if 1 == 2 { t = bump(); } else { t = 7; }; t; }
+    fn if_no_else() I32 { let t = 1; if 2 < 1 { t = bump(); }; t; }
+    fn while_false() I32 { let n = 0; while (1 > 2) { n += 1; }; n; }
+    fn while_true() I32 { let n = 0; while (true) { n += 1; if n == 5 { break; }; }; n; }
+}
+`);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, foldFile, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    const want = { max_plus: -2147483648, min_minus: 2147483647, min_times: -2147483648, big_mul: 131073,
+      max64_plus: -(2n ** 63n), min64_minus: 2n ** 63n - 1n, shl33: 2, shr35: -1, shru33: 2147483647, shl65: 2n, shru64: -1n,
+      cmp_u: true, global_plus: 15, reassoc: 32768, reassoc_neg: -6, reassoc_wrap: -2147483644, reassoc64: 2n ** 63n - 5n,
+      times_zero: 10, and_zero: 10, idents: 3, if_const: 1, if_const_else: 7, if_no_else: 1, while_false: 0, while_true: 5 };
+    for (const [name, value] of Object.entries(want)) {
+      const fn = exports[name];
+      // (Each one's parameters are of its result's type.)
+      assert.equal(fn(...Array(fn.length).fill(typeof value === 'bigint' ? 3n : 3)), value, `${mode}: ${name}`);
+    }
+    checked++;
+  }
+
   // Bounded module parameters (self-hosted only), in every build mode: a
   // struct T, a scalar T (`fn Ord[I32].cmp`), two bounds, and a T that is a
   // generic module's instance (`fn Ord[&].cmp`) passed on by a bounded T.
