@@ -864,12 +864,8 @@ fn check_for(node: I32, cx: Cx) I32 {
     let top = new_label();
     let next = new_label();
     let d0 = if capture >= 0 { node_decl[first_child(capture)]; } else { -1; };
-    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0)) {
-        let d = d0;
-        if d >= 0 {
-            decl_ty[d] = types[0];
-            decl_local[d] = counters[0];
-        };
+    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0))
+        and unroll_fits(block, d0, types[0], counters[0], brk, cx) {
         unrolled_for(block, counters[0], ends[0], repr(types[0]), types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), brk, top, cx);
         w_node(Op.Seq, vt_none, 0, 0, m);
         return ty_void();
@@ -986,6 +982,48 @@ let unroll_max_nodes: I32 = 64;
 /// A body worth unrolling: small, and neither looping, allocating, nor
 /// branching many ways (those got slower unrolled, measured on V8 in stage 0).
 fn unrollable(block: I32) Bool { unroll_nodes(block) <= unroll_max_nodes; }
+
+/// Calls are pasted into each copy by inlining, so a body is weighed as its
+/// IR (checked once, then dropped) with each call's callee in it: the copies
+/// stay small, and a loop inlined from a callee is not unrolled again.
+let unroll_max_ir: I32 = 48;
+
+/// Whether the body of `for (…) |d|` (d counting in `counter`) weighs at
+/// most @unroll_max_ir. Binds d to the counter.
+fn unroll_fits(block: I32, d: I32, ty: I32, counter: I32, brk: I32, cx: Cx) Bool {
+    if d >= 0 {
+        decl_ty[d] = ty;
+        decl_local[d] = counter;
+    };
+    let m = w_mark();
+    let diags = diag_kind.len();
+    speculating[0] += 1;
+    enter_loop(brk, new_label(), -1, -1);
+    discard(check_block(block, ty_void(), cx));
+    leave_loop();
+    speculating[0] -= 1;
+    let total = 0;
+    for (m ..< w_mark()) |i| { total += unroll_weight(w_stack[i], 0); };
+    w_stack.resize(m);
+    diag_truncate(diags);
+    total <= unroll_max_ir;
+}
+
+/// IR node `n`'s nodes, a direct call's callee's body in them (to depth 3);
+/// more than @unroll_max_ir for a callee not yet checked.
+fn unroll_weight(n: I32, depth: I32) I32 {
+    let total = 1;
+    if w_op[n] == Op.Call.to_i32() and func_kind[w_a[n]] == FuncKind.Defined.to_i32() {
+        let g = w_a[n];
+        if func_body[g] < 0 or depth >= 3 { return unroll_max_ir + 1; };
+        total += unroll_weight(func_body[g], depth + 1);
+    };
+    for (0 ..< w_count[n]) |i| {
+        total += unroll_weight(w_kid(n, i), depth);
+        if total > unroll_max_ir { return total; };
+    };
+    total;
+}
 
 /// The nodes of a body, or more than the most when it may not be unrolled.
 fn unroll_nodes(node: I32) I32 {

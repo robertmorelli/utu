@@ -17,9 +17,9 @@
 //! / unused: a local never read is not stored (its value is kept, and
 //!   dropped, when it has effects), and is no longer declared.
 //! / coalescing: locals of one type whose live ranges do not overlap share
-//!   one, and the locals are declared grouped by type (one run each). In
-//!   size builds a local set before read in a loop (a moved body's) does
-//!   not hold its slot through it.
+//!   one, and the locals are declared grouped by type (one run each). A
+//!   local set before read in a loop (an inlined body's) does not hold its
+//!   slot through it.
 //! / loads (size builds): a field read of a local, read again twice or more
 //!   where nothing can have changed it, is kept in a local.
 //! / logic (size builds): `a and b`, `a or b` whose b is cheap, pure and
@@ -677,8 +677,7 @@ fn co_round_loop(l: I32, inner: I32) I32 {
     let most = -1;
     let s = inner;
     while (s >= 0) {
-        // (Size builds only: -O3 extends through every loop, as it did.)
-        let round = optimize_level[0] != 1 or co_first[l] < co_loop_start[s] or co_last[l] > co_loop_end[s];
+        let round = co_first[l] < co_loop_start[s] or co_last[l] > co_loop_end[s];
         if not round and co_exposed_at[s] < 0 { co_loop_exposed(s); };
         let k = co_exposed_at[s];
         while (not round and k < co_exposed_at[s] + co_exposed_count[s]) {
