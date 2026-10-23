@@ -404,7 +404,6 @@ fn diag_text(i: I32) Str {
         },
         Diag.UnknownModule => "Unknown module " + w + did_you_mean(i),
         Diag.DuplicateDeclaration => {
-            if a == 4 { return "Duplicate " + hoisted_name(b, node); };
             if a == 5 { return "Duplicate method " + node_text(node); };
             if a == 6 { return "Duplicate capture " + w; };
             let what = pick(a == 1, "parameter", pick(a == 2, "variant", pick(a == 3, "local", "declaration")));

@@ -1,0 +1,8 @@
+// What: two files' mods of one name, each imported under its own alias (not a mistake)
+// Expect: ok
+using util |one| from "./lib/823_util_one.utu";
+using util |two| from "./lib/823_util_two.utu";
+
+export main() I32 {
+    one.v() + two.v();
+}

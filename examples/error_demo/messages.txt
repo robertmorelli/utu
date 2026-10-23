@@ -3610,14 +3610,19 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/54_duplicate_module_member.utu
- ERROR  Duplicate geometry__square
-        duplicate-declaration · examples/error_demo/names/54_duplicate_module_member.utu:8:5
+ ERROR  Duplicate declaration geometry
+        duplicate-declaration · examples/error_demo/names/54_duplicate_module_member.utu:7:5
 
+ 3 │ mod geometry {
+   │     ────────
+   │     ╰─ first here
+   ┆
+ 5 │ }
  6 │
  7 │ mod geometry {
+   │     ━━━━━━━━
+   │     ╰─ again
  8 │     fn square(x: F64) F64 { x * x * 1.0; }
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ already declared
  9 │ }
 --- exit 1
 
@@ -4180,6 +4185,59 @@ ok
  3 │ type Meters = distinct I32;
 --- exit 1
 
+=== utu check examples/error_demo/names/820_method_of_unknown_type.utu
+ ERROR  Unknown type Sqare; did you mean Square?
+        unknown-type · examples/error_demo/names/820_method_of_unknown_type.utu:6:4
+
+ 3 │ struct Square:
+   │        ──────
+   │        ╰─ declared here
+ 4 │     | side: I32
+ 5 │
+ 6 │ fn Sqare.area |self| () I32 {
+   │    ━━━━━
+   │    ╰─ no such type
+ 7 │     self.side * self.side;
+ 8 │ }
+
+  fix   Use Square
+ 6 │ fn Square.area |self| () I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/821_impl_of_unknown_protocol.utu
+ ERROR  Unknown type Shape
+        unknown-type · examples/error_demo/names/821_impl_of_unknown_protocol.utu:6:4
+
+ 4 │     | side: I32
+ 5 │
+ 6 │ fn Shape[Square].area |self| () I32 {
+   │    ━━━━━
+   │    ╰─ no such type
+ 7 │     self.side * self.side;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/822_two_mods_one_name_one_file.utu
+ ERROR  Duplicate declaration util
+        duplicate-declaration · examples/error_demo/names/822_two_mods_one_name_one_file.utu:7:5
+
+ 3 │ mod util {
+   │     ────
+   │     ╰─ first here
+   ┆
+ 5 │ }
+ 6 │
+ 7 │ mod util {
+   │     ━━━━
+   │     ╰─ again
+ 8 │     fn v() I32 { 2; }
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/823_mods_of_one_name_two_files.utu
+ok
+--- exit 0
+
 === utu check examples/error_demo/names/82_assign_global.utu
  ERROR  count is immutable
         assignment-to-immutable · examples/error_demo/names/82_assign_global.utu:6:5
@@ -4416,6 +4474,14 @@ ok
 --- exit 0
 
 === utu check examples/error_demo/names/lib/782_api_two.utu
+ok
+--- exit 0
+
+=== utu check examples/error_demo/names/lib/823_util_one.utu
+ok
+--- exit 0
+
+=== utu check examples/error_demo/names/lib/823_util_two.utu
 ok
 --- exit 0
 

@@ -1,5 +1,5 @@
-// What: one module is opened twice in a file and both copies declare the same function
-// Expect: Duplicate top-level declaration 'geometry.square'
+// What: one file declares mod geometry twice, both with the same function
+// Expect: Duplicate declaration geometry, at the second mod
 mod geometry {
     fn square(x: F64) F64 { x * x; }
 }
