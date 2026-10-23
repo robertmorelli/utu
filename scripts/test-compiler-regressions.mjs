@@ -892,6 +892,35 @@ export lib { fn run() Str {
     checked++;
   }
 
+  // An index past a mem's or vec's length (or negative) traps where the build
+  // checks, as an array's does: reads, stores, and `op=` (a store past it once
+  // succeeded, the length unchanged). Unsafe builds check only the capacity.
+  for (const [kind, type] of [['mem', 'U8'], ['mem', 'I32'], ['vec', 'U8'], ['vec', 'I32']]) {
+    const bounded = await write(`${kind} b: ${type};\nfn fill() void { b.clear(); b.reserve(16); b.push(9); b.push(9); b.push(9); }\nexport lib {\n    fn read(i: I32) I32 { fill(); b[i]; }\n    fn store(i: I32) I32 { fill(); b[i] = 77; b[i] + 1000 * b.len(); }\n    fn bump(i: I32) I32 { fill(); b[i] += 5; b[i] + 1000 * b.len(); }\n    fn bump_at(i: I32) I32 { fill(); let k = [i]; b[k[0]] -= 2; b[k[0] + 0] + 1000 * b.len(); }\n}\n`);
+    for (const mode of modes) {
+      const built = await compileFile(utu, bounded, { mode });
+      const { exports } = await instantiateNode(built.wasm, built.spec);
+      const what = `${kind} ${type} ${mode}`;
+      assert.equal(exports.read(2), 9, what);
+      assert.equal(exports.store(2), 3077, what);
+      assert.equal(exports.bump(2), 3014, what);
+      assert.equal(exports.bump_at(2), 3007, what);
+      for (const f of ['read', 'store', 'bump', 'bump_at']) {
+        assert.throws(() => exports[f](-1), /out of bounds/, `${what}: ${f}(-1)`);
+        if (mode.endsWith('Unsafe')) continue;
+        assert.throws(() => exports[f](3), /out of bounds/, `${what}: ${f}(3)`);
+        assert.throws(() => exports[f](15), /out of bounds/, `${what}: ${f}(15)`);
+      }
+      if (mode.endsWith('Unsafe')) {
+        // Unchecked: within the capacity, and the length unchanged.
+        assert.equal(exports.store(3), 3077, what);
+        const before = exports.read(4);
+        assert.equal(exports.bump(4), 3000 + ((before + 5) & (type === 'U8' ? 255 : -1)), what);
+      }
+      checked++;
+    }
+  }
+
   // A slice ending before it starts traps, and `orelse fatal` on null, in every mode.
   const traps = await write('export lib {\n    fn reversed() I32 { let a = [1, 2, 3]; a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; (s orelse fatal).len(); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {

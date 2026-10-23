@@ -135,6 +135,9 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    x;\n}\nexport main() I32 { check(-1); }\n', 'Reached fatal', '2:16', 'check'],
     divide: ['fn div(a: I32, b: I32) I32 {\n    a / b;\n}\nexport main() I32 { div(7, 0); }\n', 'Integer division by zero', '2:5', 'div'],
     bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:5', 'at'],
+    // A mem's or vec's index past its length (within its capacity), as an array's.
+    mem_bounds: ['mem b: U8;\nfn put(i: I32) void {\n    b[i] = 77;\n}\nexport main() I32 { b.push(9); put(1); put(4); b.len(); }\n', 'Index out of bounds', '3:5', 'put'],
+    vec_bounds: ['vec b: I32;\nfn at(i: I32) I32 {\n    b[i] + 1;\n}\nexport main() I32 { b.reserve(8); b.push(9); at(0) + at(3); }\n', 'Index out of bounds', '3:5', 'at'],
     // `orelse fatal` is fatal's trap, not a null's.
     null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Reached fatal', '2:14', 'pick'],
     slice: ['fn cut(xs: Array[I32]) I32 {\n    xs[2, 1].len();\n}\nexport main() I32 { cut([1, 2, 3]); }\n', 'Slice ends before it starts', '2:5', 'cut'],

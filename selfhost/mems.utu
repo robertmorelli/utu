@@ -12,6 +12,11 @@
 //! starts at its initial contents' count and grows to the larger of what is
 //! needed and twice what it was. Wasm checks each access against that.
 //!
+//! A safe build checks an index against the length (@checked_index): one
+//! past it traps as an array's does. An unsafe build checks only the
+//! capacity: a read within it past the length is stale (or 0), a store is
+//! kept but the length is not changed.
+//!
 //! Either way its length is a mutable global, and push and resize are small
 //! functions of their own, made when first used. A memory's reserve is one
 //! too; an array's is `array = grow(array, n)`, one `grow` per array type,
@@ -25,6 +30,10 @@ vec mem_len: I32;
 vec mem_helpers: I32;
 /// By declaration: its memory's reserve function, or -1.
 vec mem_reserve: I32;
+/// By declaration: a size build's index check (@mem_index_helper), or -1.
+vec mem_index_fn: I32;
+/// The index checks made so far (none pushes, so none is a call @w_calls counts).
+vec mem_index_fns: I32;
 /// The grow helpers made so far, in pairs: an array heap type, its function.
 vec mem_grow: I32;
 /// The shared push helpers made so far, in pairs: an array heap type, its function.
@@ -47,6 +56,8 @@ fn reset_mems() void {
     mem_len.resize(decl_kind.len());
     mem_helpers.resize(decl_kind.len());
     mem_reserve.resize(decl_kind.len());
+    mem_index_fn.resize(decl_kind.len());
+    mem_index_fns.clear();
     mem_grow.clear();
     mem_array_push.clear();
     mem_hosted.resize(decl_kind.len());
@@ -61,6 +72,7 @@ fn reset_mems() void {
         mem_len[d] = -1;
         mem_helpers[d] = -1;
         mem_reserve[d] = -1;
+        mem_index_fn[d] = -1;
         mem_hosted[d] = -1;
         mem_host_ops[d] = -1;
     };
@@ -258,10 +270,10 @@ fn array_access(decl: I32, m: I32, op: Op, vt: I32) void {
     w_node(Op.Seq, vt, 0, 0, m);
 }
 
-/// Whether IR node `node` calls a function.
+/// Whether IR node `node` calls a function (an index check pushes nothing).
 fn w_calls(node: I32) Bool {
     let op = w_op[node];
-    if op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() { return true; };
+    if (op == Op.Call.to_i32() and not is_index_fn(w_a[node])) or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() { return true; };
     for (0 ..< w_count[node]) |i| { if w_calls(w_kid(node, i)) { return true; }; };
     false;
 }
@@ -543,6 +555,57 @@ fn mem_address(s: Storage, m: I32) void {
     };
 }
 
+/// A safe build: index i, the node on top since `m`, becomes
+/// `select(i, -1, i <u len)`, so one past the length (or negative) reaches
+/// the access as -1, past any capacity, and traps there as an array's index
+/// does. A size build calls one function of the mem's for it. An unsafe
+/// build's access checks only the capacity.
+fn checked_index(decl: I32, m: I32) void {
+    if safe_checks[0] == 0 { return; };
+    if optimize_level[0] == 1 {
+        w_node(Op.Call, vt_i32, mem_index_helper(decl), 0, m);
+        return;
+    };
+    let i = w_pop();
+    let op = w_op[i];
+    // A local or a constant is read again; else it is kept in a local.
+    let again = op == Op.LocalGet.to_i32() or op == Op.I32Const.to_i32();
+    let t = if again { -1; } else { new_local(vt_i32); };
+    let mt = w_mark();
+    w_push(i);
+    if not again { w_node(Op.LocalTee, vt_i32, t, 0, mt); };
+    w_i32(-1);
+    let mc = w_mark();
+    if op == Op.I32Const.to_i32() { w_i32(w_a[i]); } else { w_get(vt_i32, if again { w_a[i]; } else { t; }); };
+    w_leaf(Op.GlobalGet, vt_i32, mem_len[decl], 0);
+    w_i32_op(i32_lt_u, mc);
+    w_node(Op.Select, vt_i32, 0, 0, m);
+}
+
+/// Mem `decl`'s `(i) → select(i, -1, i <u len)`, made when first used.
+fn mem_index_helper(decl: I32) I32 {
+    if mem_index_fn[decl] >= 0 { return mem_index_fn[decl]; };
+    let f = helper(vl_one(vt_i32), vl_one(vt_i32), vl_empty(), "mem.index");
+    let m = w_mark();
+    w_get(vt_i32, 0);
+    w_i32(-1);
+    let mc = w_mark();
+    w_get(vt_i32, 0);
+    w_leaf(Op.GlobalGet, vt_i32, mem_len[decl], 0);
+    w_i32_op(i32_lt_u, mc);
+    w_node(Op.Select, vt_i32, 0, 0, m);
+    func_body[f] = w_pop();
+    mem_index_fn[decl] = f;
+    mem_index_fns.push(f);
+    f;
+}
+
+/// Whether function `f` is a mem's index check.
+fn is_index_fn(f: I32) Bool {
+    for (0 ..< mem_index_fns.len()) |k| { if mem_index_fns[k] == f { return true; }; };
+    false;
+}
+
 /// `name[i]`.
 fn check_mem_index(node: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(node)];
@@ -557,6 +620,7 @@ fn check_mem_index(node: I32, cx: Cx) I32 {
     let m = w_mark();
     let i32_t = prelude(Prelude.I32);
     coerce(check_expr(last_child(node), i32_t, cx), i32_t, last_child(node));
+    checked_index(decl, m);
     let t = mem_value_type(decl);
     if in_array {
         array_access(decl, m, array_get_op(s), storage_vt(s));
@@ -596,6 +660,7 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     if op == Tok.Eq.to_i32() {
         coerce(check_expr(last_child(target), i32_t, cx), i32_t, last_child(target));
+        checked_index(decl, m);
         if not in_array { mem_address(s, m); };
         coerce(check_expr(value, t, cx), t, value);
         check_narrow_literal(decl, value);
@@ -606,6 +671,7 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let at_local = new_local(vt_i32);
     let mi = w_mark();
     coerce(check_expr(last_child(target), i32_t, cx), i32_t, last_child(target));
+    checked_index(decl, mi);
     w_node(Op.LocalSet, vt_none, at_local, 0, mi);
     let ms = w_mark();
     if not in_array {

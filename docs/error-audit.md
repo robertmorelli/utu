@@ -94,6 +94,9 @@ Wrong behavior, not wording. All fixed (3ac93b8, and the literal check after it)
   syntax differential (602 programs, all alike).
 - **Buffer past its length:** checked by default (`-O small`, `fast`, `debug`
   trap); only `smallUnsafe` and `fastUnsafe` read the stale slot, by design.
+  A mem's or vec's index the same: `m[i]`, `m[i] = v`, and `m[i] op= v` past
+  the length (or negative) trap "Index out of bounds" in the safe modes; they
+  were checked only against the capacity (a store past it kept nothing in the length).
 - **Already fixed before:** the five kinds with no message, `sort`'s
   "expects -1 value binding(s)".
 
