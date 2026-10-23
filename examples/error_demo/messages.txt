@@ -9152,8 +9152,11 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  8 │         };
    ┆
 13 │     G[U32].f(3);
-   │     ──────
-   │     ╰─ in G[U32]
+   │     ───────────
+   │     │╰─ in G[U32]
+   │     ╰─ as G[U32] here
+
+  note  in G[U32]
 --- exit 1
 
 === utu check examples/error_demo/types/52_unknown_method_i32.utu
