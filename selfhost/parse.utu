@@ -269,6 +269,9 @@ export mem node_first: I32;
 export mem node_last: I32;
 export mem node_child: I32;
 export mem node_next: I32;
+/// By node: its parent, or -1. Recorded as nodes are linked: @finish for a
+/// node's children, a comment's (@attach_within), and a graft's (@set_parent).
+vec node_parent: I32;
 /// Nodes made but not yet any node's children: the next node finished takes
 /// those above its mark.
 vec pending: I32;
@@ -456,10 +459,15 @@ fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
     node_kind.push(kind.to_i32());
     node_first.push(first);
     node_last.push(last);
+    node_parent.push(-1);
     if at < n {
         node_child.push(pending[at]);
-        for (at ..< n - 1) |k| { node_next[pending[k]] = pending[k + 1]; };
+        for (at ..< n - 1) |k| {
+            node_next[pending[k]] = pending[k + 1];
+            node_parent[pending[k]] = id;
+        };
         node_next[pending[n - 1]] = -1;
+        node_parent[pending[n - 1]] = id;
     } else {
         node_child.push(-1);
     };
@@ -497,6 +505,7 @@ fn restore(p: Parser, s: Save) void {
     node_last.resize(s.nodes);
     node_child.resize(s.nodes);
     node_next.resize(s.nodes);
+    node_parent.resize(s.nodes);
     pending.resize(s.pending);
 }
 
@@ -2207,6 +2216,7 @@ fn attach_within(parent: I32, comments: Comments) void {
             node_last.push(t + 1);
             node_child.push(-1);
             node_next.push(c);
+            node_parent.push(parent);
             if before < 0 { node_child[parent] = id; } else { node_next[before] = id; };
             before = id;
             comments.next += 1;

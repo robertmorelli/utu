@@ -252,6 +252,7 @@ fn parse_expansion(code: Str) I32 {
     if root < 0 { return -1; };
     let block = last_child(first_child(root));
     let e = first_child(block);
+    node_parent[first_child(root)] = -1;
     node_child[root] = -1;
     node_child[block] = -1;
     node_next[e] = -1;
