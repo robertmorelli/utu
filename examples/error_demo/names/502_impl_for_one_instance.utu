@@ -1,0 +1,11 @@
+// What: a protocol's implementation for one instance of a generic type
+// Expect: Box's instances implement P together: fn P[&].m in Box
+proto P:
+    | m() I32
+mod Box[T] {
+    struct &:
+        | v: T
+}
+fn P[Box[I32]].m |b| () I32 { b.v; }
+
+export main() I32 { 0; }

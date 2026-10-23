@@ -441,23 +441,71 @@ fn json_text_string(text: Str) void {
 
 /// The exports whose results JS reads otherwise than wasm gives them, by
 /// name: `"exports":{"main":"U32"}`. A Bool is true or false, a U32 or U64
-/// unsigned (src/runtime/host-imports.js convertExports).
+/// unsigned; a tuple's elements each so (`{"r":["U32","","Bool"]}`). Safe
+/// builds add what arguments must be (`"p":["Str","?Str","ref","?",""]`)
+/// (src/runtime/host-imports.js convertExports).
 fn write_exports_json() void {
     let first = true;
     for (0 ..< export_func.len()) |k| {
         let f = export_func[k];
         let t = export_result[k];
-        let kind = if t == prelude(Prelude.Bool) { "Bool"; } else if t == prelude(Prelude.U32) { "U32"; } else if t == prelude(Prelude.U64) { "U64"; } else { ""; };
-        if kind.len() > 0 and func_live[f] == 1 and func_field_name[f] >= 0 {
+        let params = export_params[k];
+        let tuple = ty_is(t, Ty.Tuple);
+        let r = if tuple { tuple_result_kinds(ty_a[t]); } else { js_result_kind(t); };
+        let checked = false;
+        if safe_checks[0] == 1 { for (0 ..< vl_len[params]) |i| { if js_param_kind(vl_item(params, i)).len() > 0 { checked = true; }; }; };
+        if (r.len() > 0 or checked) and func_live[f] == 1 and func_field_name[f] >= 0 {
             json_text(if first { "\"exports\":{"; } else { ","; });
             first = false;
             json_byte(34);
             let name = func_field_name[f];
             for (0 ..< name_len[name]) |i| { json_byte(names[name_start[name] + i]); };
-            json_text("\":\"" + kind + "\"");
+            json_text("\":");
+            if not checked and not tuple {
+                json_text_string(r);
+            } else {
+                json_text("{\"r\":");
+                if tuple and r.len() > 0 { json_text(r); } else { json_text_string(r); };
+                if checked {
+                    json_text(",\"p\":[");
+                    for (0 ..< vl_len[params]) |i| {
+                        if i > 0 { json_byte(44); };
+                        json_text_string(js_param_kind(vl_item(params, i)));
+                    };
+                    json_byte(93);
+                };
+                json_byte(125);
+            };
         };
     };
     if not first { json_byte(125); };
+}
+
+/// How JS reads a result of type t: "Bool", "U32", "U64", or "" (as wasm gives it).
+fn js_result_kind(t: I32) Str {
+    if t == prelude(Prelude.Bool) { "Bool"; } else if t == prelude(Prelude.U32) { "U32"; } else if t == prelude(Prelude.U64) { "U64"; } else { ""; };
+}
+
+/// A tuple's elements' kinds, as a JSON array; "" when none converts.
+fn tuple_result_kinds(list: I32) Str {
+    let any = false;
+    let out = "[";
+    for (0 ..< vl_len[list]) |i| {
+        let k = js_result_kind(vl_item(list, i));
+        if k.len() > 0 { any = true; };
+        out = out + (if i > 0 { ","; } else { ""; }) + "\"" + k + "\"";
+    };
+    if any { out + "]"; } else { ""; };
+}
+
+/// What an argument of type t must be: "Str" a string, "?Str" a string or
+/// null, "ref" not null (a struct, array, enum, or closure), "?" null when
+/// undefined; "" anything wasm takes.
+fn js_param_kind(t: I32) Str {
+    if t == prelude(Prelude.Str) { return "Str"; };
+    if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { "?Str"; } else { "?"; }; };
+    if is_foreign(t) or t == prelude(Prelude.Externref) or not vt_is_ref(repr(t)) { return ""; };
+    "ref";
 }
 
 /// The lazy modules' functions the program calls (see lazy_stub), for the

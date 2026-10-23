@@ -325,6 +325,25 @@ fn validate_protocols() void {
     };
 }
 
+/// `fn P[Box[I32]].m`: an instance's implementation, which nothing finds
+/// (a bound or a P takes a module's for every instance, `fn P[&].m` in it).
+/// (`fn P[T].m` for a T that does not list P is T's for bounds.)
+fn validate_impls() void {
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Fn) and decl_is(decl_a[d], Decl.Proto) and is_kind(decl_node[d], Node.Fn_decl)
+            and is_own_file(file_of_token(node_first[decl_node[d]])) {
+            let name = first_child(decl_node[d]);
+            let args = next_sibling(first_child(name));
+            let t = if is_kind(args, Node.Module_type_arg_list) { first_child(args); } else { -1; };
+            let r = if is_kind(t, Node.Ref_type) { first_child(t); } else { t; };
+            if is_kind(r, Node.Instantiated_module_ref) {
+                let module = module_of(node_decl[name_node(first_child(r))]);
+                if decl_is(module, Decl.Module) { report2(Diag.ImplNothing, t, word_of(last_child(name)), module, decl_a[d]); };
+            };
+        };
+    };
+}
+
 /// Reports each member of `proto` that type `t` lacks, or has with another
 /// type or signature.
 fn conforms(t: I32, proto: I32) void {

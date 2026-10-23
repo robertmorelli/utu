@@ -138,7 +138,8 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     // `orelse fatal` is fatal's trap, not a null's.
     null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Reached fatal', '2:14', 'pick'],
     slice: ['fn cut(xs: Array[I32]) I32 {\n    xs[2, 1].len();\n}\nexport main() I32 { cut([1, 2, 3]); }\n', 'Slice ends before it starts', '2:5', 'cut'],
-    arm: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'No arm for the value', '5:5', 'name'],
+    // (A safe build stops at from_i32, before the match could miss.)
+    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'Color.from_i32: no variant has this value', '7:26', 'Color.from_i32'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
     await write(`${name}.utu`, source);

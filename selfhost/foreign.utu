@@ -1678,7 +1678,11 @@ fn is_typed_array(name: Str) Bool {
 
 /// `a == b`, `a != b` on host values: JavaScript's identity, `===`.
 fn check_foreign_equal(left_t: I32, right: I32, equal: Bool, m: I32, cx: Cx) I32 {
-    let rt = check_expr(right, -1, cx);
+    foreign_equal_op(left_t, check_expr(right, -1, cx), equal, m);
+}
+
+/// `a === b` (or `!==`) of two values on the stack since `m`.
+fn foreign_equal_op(left_t: I32, rt: I32, equal: Bool, m: I32) I32 {
     let view = if is_foreign(left_t) { fty_view[left_t]; } else { fty_view[ty_a[left_t]]; };
     let mt = vl_begin();
     vl_add(erased(left_t, view));

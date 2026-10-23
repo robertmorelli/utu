@@ -284,6 +284,9 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.StdOwnStruct { return "unknown-field"; };
     if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try"; };
     if k == Diag.ImportNotModule { return "unknown-type"; };
+    if k == Diag.UsingTwice { return "duplicate-declaration"; };
+    if k == Diag.AmbiguousMethod { return "unknown-method"; };
+    if k == Diag.ImplNothing { return "unknown-method"; };
     "type-mismatch";
 }
 
@@ -544,6 +547,9 @@ fn diag_text(i: I32) Str {
         },
         Diag.TryErrorMismatch => "try passes on " + type_text(a) + "; the function's errors are " + type_text(b),
         Diag.ImportNotModule => w + " is " + item_kind_text(a) + "; using imports a mod",
+        Diag.UsingTwice => w + node_text(a) + " is open already",
+        Diag.AmbiguousMethod => w + " is both " + decl_text(decl_a[a]) + "'s and " + decl_text(decl_a[b]) + "'s",
+        Diag.ImplNothing => decl_text(a) + "'s instances implement " + decl_text(b) + " together: fn " + decl_text(b) + "[&]." + w + " in " + decl_text(a),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -745,6 +751,9 @@ fn diag_default_label(i: I32) Str {
         Diag.TryErrorMismatch => type_text(a) + " errors",
         Diag.TryPlace => pick(a >= 2, "in a generator", "no Result to return"),
         Diag.StdOwnStruct => "use its functions",
+        Diag.UsingTwice => "needs |alias|",
+        Diag.AmbiguousMethod => "as which protocol?",
+        Diag.ImplNothing => "an instance",
         Diag.ProtoGeneric => "on a generic type",
         Diag.SelfUntyped => "type not known yet",
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),

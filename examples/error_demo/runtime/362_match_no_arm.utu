@@ -1,5 +1,5 @@
 // What: a match reached with a value none of its arms takes
-// Expect: No arm for the value, at the match in label
+// Expect: Level.from_i32: no variant has this value (safe builds stop there; unsafe ones reach the match: No arm for the value)
 enum(U8) Level:
     | Low
     | High

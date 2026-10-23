@@ -87,6 +87,8 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
             return error_value();
         };
         coerce(check_expr(a, base, cx), base, a);
+        // A safe build traps on a value no variant has, here: not in a later match.
+        if safe_checks[0] == 1 and decl_is(decl, Decl.IntEnum) { w_node(Op.Call, vt_i32, enum_from_helper(decl), 0, m); };
         return t;
     };
     if not decl_is(decl, Decl.IntEnum) { return -1; };
@@ -104,6 +106,58 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
         return prelude(Prelude.Str);
     };
     -1;
+}
+
+/// Pairs: enum declaration, function.
+vec from_helper_enum: I32;
+
+/// `Tag.from_i32` in a safe build: (value) → value, trapping when no variant
+/// has it. Named `Tag.from_i32`, which a trap's frames show.
+fn enum_from_helper(decl: I32) I32 {
+    let i = 0;
+    while (i < from_helper_enum.len()) {
+        if from_helper_enum[i] == decl { return from_helper_enum[i + 1]; };
+        i += 2;
+    };
+    let f = helper(vl_one(vt_i32), vl_one(vt_i32), vl_empty(), word_text(decl_name[decl]) + ".from_i32");
+    from_helper_enum.push(decl);
+    from_helper_enum.push(f);
+    let .{n, lo, hi} = variant_range(decl);
+    let m = w_mark();
+    let mi = w_mark();
+    if hi - lo + 1 == n {
+        // value - lo <u n
+        let mc = w_mark();
+        w_get(vt_i32, 0);
+        w_i32(lo);
+        w_i32_op(i32_sub, mc);
+        w_i32(n);
+        w_i32_op(i32_lt_u, mi);
+    } else {
+        // value == v0 or value == v1 or …
+        w_i32(0);
+        let c = first_child(decl_node[decl]);
+        while (c >= 0) {
+            if is_kind(c, Node.Variant) {
+                let me = w_mark();
+                w_get(vt_i32, 0);
+                w_i32(variant_value[node_decl[first_child(c)]]);
+                w_i32_op(i32_eq, me);
+                w_i32_op(i32_or, mi);
+            };
+            c = next_sibling(c);
+        };
+    };
+    let mt = w_mark();
+    let mr = w_mark();
+    w_get(vt_i32, 0);
+    w_node(Op.Return, vt_unreachable, 0, 0, mr);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    w_node(Op.Seq, vt_i32, 0, 0, m);
+    func_body[f] = w_pop();
+    f;
 }
 
 /// How many variants an enum declares.
@@ -411,4 +465,7 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
     };
 }
 
-fn reset_enums() void { name_helper_enum.clear(); }
+fn reset_enums() void {
+    name_helper_enum.clear();
+    from_helper_enum.clear();
+}

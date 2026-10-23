@@ -206,25 +206,48 @@ export function promisifyExports(instance, promiseSpec) {
 }
 
 /**
- * Give exports' results as JavaScript has them. Wasm returns a Bool as 1 or
- * 0, and a U32 or U64 as signed; the compiler records which exports return
- * one (`{ main: 'U32' }`). Arguments need nothing: wasm wraps a JS number
- * or BigInt to its bits, and `true` to 1. A promised result converts when
- * it settles.
+ * Give exports' results as JavaScript has them, and check their arguments.
+ * Wasm returns a Bool as 1 or 0, and a U32 or U64 as signed; the compiler
+ * records which exports return one, by name: `{ main: 'U32' }`, or
+ * `{ f: { r: ['U32', '', 'Bool'], p: ['Str', '?'] } }` for a tuple result
+ * (a kind per element) or checked arguments. Wasm wraps a JS number or
+ * BigInt to its bits, and `true` to 1, but takes any value as a reference;
+ * safe builds record what each argument must be:
+ *   'Str'  a string            '?Str'  a string or null (undefined is null)
+ *   'ref'  not null            '?'     anything (undefined is null)
+ * A promised result converts when it settles.
  *
  * @returns {Record<string, Function>} exports, with those results converted
  */
 export function convertExports(exports, exportSpec) {
   if (!exportSpec) return exports;
+  const scalar = { Bool: v => v !== 0, U32: v => v >>> 0, U64: v => BigInt.asUintN(64, v) };
+  const same = v => v;
+  const fail = (name, i, what, v) => {
+    throw new TypeError(`${name}: argument ${i + 1} must be ${what}, not ${v === null ? 'null' : typeof v}`);
+  };
+  const param = (name, kind, i) => {
+    if (kind === 'Str') return v => (typeof v === 'string' ? v : fail(name, i, 'a string', v));
+    if (kind === '?Str') return v => (v == null ? null : typeof v === 'string' ? v : fail(name, i, 'a string or null', v));
+    if (kind === 'ref') return v => (v == null ? fail(name, i, 'a value', v) : v);
+    if (kind === '?') return v => (v === undefined ? null : v);
+    return same;
+  };
   const out = { ...exports };
-  for (const [name, kind] of Object.entries(exportSpec)) {
+  for (const [name, spec] of Object.entries(exportSpec)) {
     const f = exports[name];
     if (typeof f !== 'function') continue;
-    const convert = kind === 'Bool' ? v => v !== 0 : kind === 'U32' ? v => v >>> 0 : v => BigInt.asUintN(64, v);
-    out[name] = Object.defineProperty((...args) => {
+    const r = typeof spec === 'string' ? spec : spec.r;
+    const each = Array.isArray(r) ? r.map(k => scalar[k] ?? same) : null;
+    const convert = each ? v => v.map((x, i) => each[i](x)) : scalar[r] ?? same;
+    const checks = (typeof spec === 'string' ? [] : spec.p ?? []).map((k, i) => param(name, k, i));
+    out[name] = (...args) => {
+      for (let i = 0; i < checks.length; i++) args[i] = checks[i](args[i]);
       const result = f(...args);
       return result instanceof Promise ? result.then(convert) : convert(result);
-    }, 'length', { value: f.length });
+    };
+    // Its parameters, as the export's (a caller may count them).
+    Object.defineProperty(out[name], 'length', { value: f.length });
   }
   return out;
 }

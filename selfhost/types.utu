@@ -342,6 +342,7 @@ fn type_path(node: I32, inst: I32) I32 {
             let named_by = node_alias[name_node(c)];
             at = if decl_is(named_by, Decl.Alias) { alias_instance(named_by); } else { instance_for(owner, inst); };
         };
+        if at == 0 and is_generic(owner) { return no_instance(node, owner); };
         if too_deep(at, node) { return ty_error(); };
         return named(member_decl, at);
     };
@@ -352,7 +353,22 @@ fn type_path(node: I32, inst: I32) I32 {
         report(Diag.StorageType, n, word_of(n));
         return ty_error();
     };
-    decl_type(node_decl[n], inst);
+    // `bi` with `using B[I32] |bi|`: B's type in B[I32].
+    let alias = if kind == Node.Promoted_type.to_i32() { -1; } else { node_alias[n]; };
+    if decl_is(alias, Decl.Alias) and is_generic(decl_a[alias]) { return alias_type(alias); };
+    let d = node_decl[n];
+    if d >= 0 and not decl_is(d, Decl.Alias) and not decl_is(d, Decl.ModuleParam) {
+        let owner = module_of(if decl_is(d, Decl.Module) { decl_a[d]; } else { d; });
+        if is_generic(owner) and instance_for(owner, inst) == 0 { return no_instance(node, owner); };
+    };
+    decl_type(d, inst);
+}
+
+/// A generic module's type named with no type arguments, outside it and
+/// with no `using M[A];` open.
+fn no_instance(node: I32, module: I32) I32 {
+    report2(Diag.InvalidModuleArity, node, decl_name[module], module_arity(module), 0);
+    ty_error();
 }
 
 /// The types a node's children name, as a list: a module's type arguments,
@@ -399,25 +415,50 @@ fn alias_instance(alias: I32) I32 {
     instance(module, type_args(args, 0));
 }
 
-/// The instance `using M[A];` opened, or 0.
-fn open_instance(module: I32) I32 {
+/// `using M[A]; using M[B];`: M's names would mean either instance.
+fn check_open_instances() void {
     for (0 ..< file_root.len()) |file| {
-        if file_root[file] >= 0 {
-            let item = first_child(file_root[file]);
-            while (item >= 0) {
-                if is_kind(item, Node.Using_decl) {
-                    let name_at = first_child(item);
-                    let args = next_sibling(name_at);
-                    if node_decl[name_node(name_at)] == module and is_kind(args, Node.Module_type_arg_list)
-                        and not is_kind(next_sibling(args), Node.Captured_module_name) {
-                        return instance(module, type_args(args, 0));
-                    };
+        let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
+        while (item >= 0) {
+            let module = opened_module(item);
+            if module >= 0 {
+                let inst = open_instance(module);
+                let mine = instance(module, type_args(next_sibling(first_child(item)), 0));
+                if inst != mine {
+                    report2(Diag.UsingTwice, next_sibling(first_child(item)), decl_name[module], first_open(module), -1);
                 };
-                item = next_sibling(item);
             };
+            item = next_sibling(item);
         };
     };
-    0;
+}
+
+/// The module `using M[A];` opens (no alias, no file), or -1.
+fn opened_module(item: I32) I32 {
+    if not is_kind(item, Node.Using_decl) { return -1; };
+    let name_at = first_child(item);
+    let args = next_sibling(name_at);
+    if not is_kind(args, Node.Module_type_arg_list) or is_kind(next_sibling(args), Node.Captured_module_name) { return -1; };
+    let module = node_decl[name_node(name_at)];
+    if decl_is(module, Decl.Module) { module; } else { -1; };
+}
+
+/// The type arguments of the first `using M[A];`.
+fn first_open(module: I32) I32 {
+    for (0 ..< file_root.len()) |file| {
+        let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
+        while (item >= 0) {
+            if opened_module(item) == module { return next_sibling(first_child(item)); };
+            item = next_sibling(item);
+        };
+    };
+    -1;
+}
+
+/// The instance `using M[A];` opened, or 0.
+fn open_instance(module: I32) I32 {
+    let args = first_open(module);
+    if args >= 0 { instance(module, type_args(args, 0)); } else { 0; };
 }
 
 //! = Representation

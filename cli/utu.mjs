@@ -618,6 +618,8 @@ function trapText(error, map = null) {
     // The standard library's own: a check of how it was used.
     title = inner.file?.startsWith('std:') ? `Failed check in ${inner.file}` : UNREACHABLE[inner.kind] ?? 'Reached unreachable code';
   }
+  // A safe build's `Tag.from_i32(v)` (its own function) with no variant of value v.
+  if (wasm && /unreachable/i.test(message) && /^\w+\.from_i32$/.test(frames[0]?.fn ?? '')) title = `${frames[0].fn}: no variant has this value`;
   const at = frames.find(f => f.entry?.file && !f.entry.file.startsWith('std:')) ?? frames.find(f => f.entry?.file) ?? null;
   // Not the test runner's own exports; endless recursion (one frame, many times) once.
   frames = frames.filter(f => !/^__test_/.test(f.fn));

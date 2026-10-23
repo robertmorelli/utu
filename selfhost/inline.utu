@@ -100,7 +100,7 @@ fn inline_into(f: I32) void {
 /// A function whose body can be copied into a caller.
 fn inlinable(g: I32) Bool {
     func_kind[g] == FuncKind.Defined.to_i32() and func_body[g] >= 0 and func_code[g] < 0
-        and vl_len[ht_b[func_type_of[g]]] <= 1 and not returns_by_call(g);
+        and vl_len[ht_b[func_type_of[g]]] <= 1 and not returns_by_call(g) and not traps_by_name(g);
 }
 
 fn returns_by_call(g: I32) Bool {
@@ -123,6 +123,17 @@ fn note_params_set(n: I32, at: I32, np: I32) void {
     let op = w_op[n];
     if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] < np { inl_param_set[at + w_a[n]] = 1; };
     for (0 ..< w_count[n]) |i| { note_params_set(w_kid(n, i), at, np); };
+}
+
+/// Whether a trap in g says what failed by g's name, as a frame of its own
+/// (`Tag.from_i32`: see enum_from_helper).
+fn traps_by_name(g: I32) Bool {
+    let i = 1;
+    while (i < from_helper_enum.len()) {
+        if from_helper_enum[i] == g { return true; };
+        i += 2;
+    };
+    false;
 }
 
 /// Call `c` in `f`, to `g`, becomes a block of g's body. `label` is the

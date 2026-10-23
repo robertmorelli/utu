@@ -550,6 +550,18 @@ export lib {
       + 'fn Range.each |r| () yield I32 { for (r.lo ..< r.hi) |i| { yield i; }; }\nfn Range.below(n: I32) yield I32 { for (0 ..< n) |i| { yield i; }; }\n'
       + 'export lib { fn run() I32 {\n    let total = 0;\n    for (seq.squares(4)) |v| { total += v; };\n    for (s.squares(3)) |v| { total += v * 100; };\n    let st = Stack[I32].new(0);\n    st.push(1);\n    st.push(2);\n    st.push(3);\n    let order = 0;\n    for (st.each()) |v| { order = order * 10 + v; };\n'
       + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    total + order * 1000000;\n} }\n', 321393514],
+    // A generator's `return;` runs its defers.
+    ['fn g(n: I32) yield I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nexport lib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; t + seen[0] * 10; } }\n', 71],
+    // An alias of a generic module's instance is its type there.
+    ['mod B[T] {\n    struct &:\n        | v: T\n    fn of(x: T) & { &{ v: x }; }\n}\nmod L[T] {\n    enum &:\n        | Nil {}\n        | Cons { h: T, t: & }\n    fn cons(h: T, t: &) & { Cons { h: h, t: t }; }\n}\nusing B[I32] |bi|;\nusing B[Str] |bs|;\nusing L[I32] |li|;\nfn f(x: bi) I32 { x.v; }\nfn mk() bs { B[Str].of("in"); }\nfn len(x: li) I32 { alt x { Nil => 0, Cons |c| => 1 + len(c.t), }; }\nexport lib { fn run() I32 { let c: bi = &{ v: 3 }; let n: li = li.Nil {}; f(c) + mk().v.len() + len(L[I32].cons(1, n)); } }\n', 6],
+    // `using M;` and `using M[A];` of a module whose type is `&`.
+    ['mod B[T] {\n    struct &:\n        | v: T\n    fn wrap(x: T) & { &{ v: x }; }\n}\nusing B[I32];\nmod C {\n    struct &:\n        | v: I32\n    fn mk(x: I32) & { &{ v: x }; }\n}\nusing C;\nexport lib { fn run() I32 { B.wrap(3).v + wrap(4).v + C.mk(5).v * 10; } }\n', 57],
+    // group_by and distinct_by keys: distinct types, integer enums, host values, a generic key.
+    ['using JS from std:JS;\ntype Uid = distinct I32;\ntype Big = distinct U64;\nenum(U8) Lv:\n    | Lo\n    | Hi\nmod G[K] {\n    fn count(xs: Array[K]) I32 { (xs group_by(K, K) |r| { r; }).len(); }\n}\nexport lib { fn run() I32 {\n    let g = [Uid.from_i32(1), Uid.from_i32(2), Uid.from_i32(1)] group_by(Uid, Uid) |r| { r; };\n    let gb = [Big.from_u64(5), Big.from_u64(5)] group_by(Big, Big) |r| { r; };\n    let ls = [Lv.Lo, Lv.Hi, Lv.Lo];\n    let d = ls distinct_by(Lv, Lv) |r| { r; };\n    let m = new JS.Map();\n    let ms: Array[JS.Map] = [m, new JS.Map(), m];\n    let hm = ms group_by(JS.Map, JS.Map) |r| { r; };\n    g.len() * 10000 + gb.len() * 1000 + d.len() * 100 + hm.len() * 10 + G[I32].count([1, 2, 1, 3]);\n} }\n', 21223],
+    // Branches of different variants join to their enum; null and a Str to ?Str.
+    ['enum Sh:\n    | C { r: I32 }\n    | R { w: I32 }\n    | T { h: I32 }\nfn area(s: Sh) I32 { alt s { C |c| => c.r, R |r| => r.w * 2, T |t| => t.h * 3, }; }\nfn pick(n: I32) Sh { let s = if n == 0 { C { r: 1 }; } else if n == 1 { R { w: 1 }; } else { T { h: 1 }; }; s; }\nexport lib { fn run() I32 {\n    let k = 2;\n    let m = match k { 1 => C { r: 5 }, 2 => R { w: 5 }, ~> T { h: 5 }, };\n    let s = if k > 5 { null; } else { "a"; };\n    area(pick(0)) + area(pick(1)) + area(pick(2)) + area(m) + (if s == null { 0; } else { 100; });\n} }\n', 116],
+    // Tag.from_i32 of a value a variant has, in an enum with gaps.
+    ['enum(I32) Gap:\n    | A = 1\n    | B = 5\nexport lib { fn run() I32 { Gap.from_i32(5).to_i32() + Gap.from_i32(1).to_i32(); } }\n', 6],
   ];
   for (const [source, value] of everyMode) {
     const file = await write(source);
@@ -791,6 +803,40 @@ export lib {
   const badBench = await compileFile(utu, await write('export main() I32 { 0; }\nbench "sum" {\n    measure { let s: I32 = "x"; }\n}\n'), { target: 'test' });
   assert.deepEqual(badBench.diagnostics.map(d => d.message), ['s is I32, got Str']);
   checked++;
+  // Tuple results convert at the boundary as scalar ones do; safe builds
+  // check export lib arguments and Tag.from_i32; unsafe builds do not.
+  const edges = await write(`struct P:
+    | x: I32
+enum(U8) Lv:
+    | Lo
+    | Hi
+export lib {
+    fn trio() .{U32, Bool, U64} { .{4294967295, true, 18446744073709551615}; }
+    fn keep(s: Str) Str { s; }
+    fn absent(s: ?Str) Bool { s == null; }
+    fn px(p: P) I32 { p.x; }
+    fn mk() P { P { x: 7 }; }
+    fn lv(i: I32) I32 { Lv.from_i32(i).to_i32(); }
+}`);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, edges, { mode });
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    assert.deepEqual(exports.trio(), [4294967295, true, 18446744073709551615n], mode);
+    assert.equal(exports.px(exports.mk()), 7);
+    assert.equal(exports.absent(null), true);
+    if (mode.endsWith('Unsafe')) {
+      assert.equal(exports.keep(42), 42, mode);
+      assert.equal(exports.lv(99), 99, mode);
+    } else {
+      assert.throws(() => exports.keep(42), /keep: argument 1 must be a string, not number/, mode);
+      assert.equal(exports.absent(undefined), true, mode);
+      assert.throws(() => exports.absent(5), /must be a string or null/, mode);
+      assert.throws(() => exports.px(null), /px: argument 1 must be a value, not null/, mode);
+      assert.throws(() => exports.lv(99), WebAssembly.RuntimeError, mode);
+    }
+    assert.equal(exports.lv(1), 1);
+    checked++;
+  }
 
   // Test names with utu escapes that JSON lacks.
   const named = await compileFile(utu, await write('export main() void {}\ntest "it\\\'s \\$5\tok" { assert 1 == 1; }\n'), { target: 'test' });
@@ -979,6 +1025,24 @@ export lib {
     ['struct P:\n    | name: Str\nexport main() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; a.name; }\n', '@stored needs using Browser from std:Browser'],
     ['fn tab() Array[I32] { [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { 5; }\n', 'main is the entry point, not a function: move its body into a fn'],
     ['export lib {\n    fn f(x: ?I32) I32 { promote x { |v| => v, ~> 0 }; }\n}\n', 'Missing , after 0'],
+    // A generic module's type with no type arguments (this built invalid Wasm).
+    ['mod B[T] {\n    struct &:\n        | v: T\n}\nfn f(x: B) I32 { x.v; }\nexport lib { fn run() I32 { 0; } }\n', 'B takes 1 type arguments, given 0'],
+    ['mod cell[T] {\n    struct Cell:\n        | v: T\n}\nfn f(x: cell.Cell) I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'cell takes 1 type arguments, given 0'],
+    // An alias's instance: its fields have its types (this built invalid Wasm).
+    ['mod B[T] {\n    struct &:\n        | v: T\n}\nusing B[I32] |bi|;\nexport lib { fn run() I32 { let c: bi = &{ v: "hello" }; c.v; } }\n', 'Field v is I32, got Str'],
+    // null beside a scalar in an array literal (this built invalid Wasm).
+    ['export lib { fn run() I32 { [1, null].len(); } }\n', 'I32 cannot be nullable'],
+    ['export lib { fn run() I32 { [null].len(); } }\n', 'null needs a nullable type'],
+    // An unfinished pipeline in chain(…).
+    ['export lib { fn run() I32 { let xs = [1, 2]; xs chain(xs map |x| { x; }) sum; } }\n', 'Unfinished pipeline: map'],
+    // A user type named I32 is not hashed as an integer (this built invalid Wasm).
+    ['mod M {\n    struct I32:\n        | z: F64\n    fn mk() I32 { &{ z: 1.5 }; }\n}\nusing M;\nexport lib { fn run() F64 { let q: I32 = mk(); let xs = [q] group_by(I32, I32) |v| { v; }; q.z; } }\n', 'No == for I32'],
+    // Two instances of one module opened.
+    ['mod cell[T] {\n    struct Cell:\n        | value: T\n    fn wrap(value: T) Cell { Cell { value: value }; }\n}\nusing cell[I32];\nusing cell[Str];\nexport lib { fn run() I32 { 0; } }\n', 'cell[I32] is open already'],
+    // x.m() with two protocols' m.
+    ['proto Pa:\n    | name() Str\nproto Pb:\n    | name() Str\nstruct X[Pa, Pb]:\n    | id: I32\nfn Pa[X].name |x| () Str { "a"; }\nfn Pb[X].name |x| () Str { "b"; }\nexport lib { fn run() Str { X { id: 1 }.name(); } }\n', "name is both Pa's and Pb's"],
+    // A protocol's implementation for one instance, which nothing would find.
+    ['proto P:\n    | m() I32\nmod Box[T] {\n    struct &:\n        | v: T\n}\nfn P[Box[I32]].m |b| () I32 { 1; }\nexport lib { fn run() I32 { 0; } }\n', "Box's instances implement P together: fn P[&].m in Box"],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

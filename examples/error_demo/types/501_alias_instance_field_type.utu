@@ -1,0 +1,12 @@
+// What: a value of the wrong type for a field of an alias's instance
+// Expect: Field v is I32, got Str
+mod B[T] {
+    struct &:
+        | v: T
+}
+using B[I32] |bi|;
+
+export main() I32 {
+    let c: bi = &{ v: "hello" };
+    c.v;
+}

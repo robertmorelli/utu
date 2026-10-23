@@ -218,8 +218,16 @@ body's arguments and results, and an export's results. A `Bool` reaches
 JavaScript as `true` or `false` and comes back as `!!v`. A `U32` reaches it
 unsigned (`v >>> 0`), and a `U64` as an unsigned BigInt
 (`BigInt.asUintN(64, v)`); on the way in, wasm keeps a value's low bits, so
-`4294967295` and `-1` are the same `U32`. An `@es` result of a nullable type
-treats `undefined` as `null`. Contextual callbacks
+`4294967295` and `-1` are the same `U32`. A tuple result is a JS array, each
+element converted so. An `@es` result of a nullable type
+treats `undefined` as `null`.
+
+Safe builds (`-O small`, `fast`, `debug`) also check an `export lib`
+function's arguments: a `Str` must be a string, a `?Str` a string or null, a
+struct, array, enum or closure must not be null, and `undefined` for a
+nullable parameter is `null`. A wrong argument throws a `TypeError` naming
+the function and the argument. `smallUnsafe` and `fastUnsafe` pass arguments
+as they come. Contextual callbacks
 derive parameter types from declarations, including DOM event maps.
 
 Host exceptions are caught with `try`:

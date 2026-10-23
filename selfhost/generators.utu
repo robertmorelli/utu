@@ -385,14 +385,18 @@ fn check_yield(node: I32, cx: Cx) I32 {
 }
 
 /// `return;` inside a generator's expansion ends the generation.
-fn generator_return(node: I32) I32 {
+/// It runs the generator's pending defers first.
+fn generator_return(node: I32, cx: Cx) I32 {
     let k = expansion_of(node);
     if k < 0 { return -1; };
     if first_child(node) >= 0 {
         report(Diag.GeneratorReturnValue, node, -1);
         return error_value();
     };
+    let m = w_mark();
+    run_defers(gen_defers[k], cx);
     w_leaf(Op.Br, vt_unreachable, gen_whole[k], 0);
+    w_node(Op.Seq, vt_unreachable, 0, 0, m);
     ty_never();
 }
 

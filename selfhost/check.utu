@@ -76,7 +76,10 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     fi_inst.push(inst);
     fi_func.push(-1);
     fi_ir.push(-1);
+    fi_site.push(-1);
+    enter_instance(inst, -1);
     signature(decl, inst);
+    leave_instance();
     fi_params.push(sig_params[0]);
     fi_result.push(sig_result[0]);
     let body = fn_body(decl);
@@ -95,6 +98,35 @@ fn fn_instance(decl: I32, inst: I32) I32 {
         if wat >= 0 { func_code[f] = wat; } else if not is_generator(decl) { fi_queue.push(id); };
     };
     id;
+}
+
+/// Per function instance: the first call of it, or -1.
+vec fi_site: I32;
+
+/// The generic instances whose code is being checked, innermost last, as
+/// pairs (instance, the call that made it, or -1): a mistake there that
+/// depends on it says so (@instance_note).
+vec checking_inst: I32;
+
+/// Check code in instance `inst` (0: none), from call `site`, until @leave_instance.
+fn enter_instance(inst: I32, site: I32) void {
+    checking_inst.push(inst);
+    checking_inst.push(site);
+}
+
+fn leave_instance() void { checking_inst.resize(checking_inst.len() - 2); }
+
+/// On a mistake just reported in a generic instance's code: which instance,
+/// and where it was first called.
+fn instance_note() void {
+    let n = checking_inst.len();
+    if n == 0 { return; };
+    let inst = checking_inst[n - 2];
+    // (Too deep: the instance is what is wrong, and too long to say.)
+    if inst <= 0 or inst >= inst_module.len() or diag_kind[diag_kind.len() - 1] == Diag.InstanceDepth.to_i32() { return; };
+    let text = word_text(decl_name[inst_module[inst]]) + "[" + type_list_text(inst_args[inst]) + "]";
+    diag_note("in " + text);
+    if checking_inst[n - 1] >= 0 { diag_place(Extra.Related, checking_inst[n - 1], "as " + text + " here"); };
 }
 
 fn fi_grow() void {
@@ -275,9 +307,11 @@ fn check_function(fi: I32) void {
     let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] };
     let outer = cur_inst[0];
     cur_inst[0] = cx.inst;
+    enter_instance(fi_inst[fi], fi_site[fi]);
     want(fn_body(decl), cx.result, Why.Returns, decl, -1);
     finish_function(fi_func[fi], fn_body(decl), cx, box_params(decls, params));
     unwant();
+    leave_instance();
     cur_inst[0] = outer;
 }
 
@@ -1838,6 +1872,15 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         method_note(rt, word_of(name));
         return finish_error(args, m, cx);
     };
+    // `x.m()` with both `fn Pa[X].m` and `fn Pb[X].m`: which is not said.
+    let k = 0;
+    while (k < method_twice.len()) {
+        if method_twice[k] == decl {
+            report2(Diag.AmbiguousMethod, name, word_of(name), decl, method_twice[k + 1]);
+            return finish_error(args, m, cx);
+        };
+        k += 2;
+    };
     // What the name means, for an editor (as a field's is recorded).
     node_decl[name] = decl;
     unbounded_call(rt, word_of(name), decl, node, cx.inst);
@@ -1932,6 +1975,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
     call_site.resize(1);
     call_site[0] = at;
     host_callbacks(fi_decl[fi], args, first_param);
+    if fi_site[fi] < 0 { fi_site[fi] = at; };
     let params = fi_params[fi];
     let i = first_param;
     let a = if args >= 0 { first_child(args); } else { -1; };
@@ -2569,11 +2613,12 @@ fn check_break_label(node: I32, cx: Cx) I32 {
     ty_never();
 }
 
-fn check_if(node: I32, expect: I32, cx: Cx) I32 {
+fn check_if(node: I32, expected: I32, cx: Cx) I32 {
     let cond = first_child(node);
     let then_ = next_sibling(cond);
     let else_ = next_sibling(then_);
     let bool_t = prelude(Prelude.Bool);
+    let expect = expected;
     let m = w_mark();
     want(cond, bool_t, Why.Condition, -1, -1);
     coerce(check_expr(cond, bool_t, cx), bool_t, cond);
@@ -2585,6 +2630,17 @@ fn check_if(node: I32, expect: I32, cx: Cx) I32 {
         w_node(Op.Seq, vt_none, 0, 0, m1);
         w_node(Op.If, vt_none, label, 0, m);
         return ty_void();
+    };
+    // `if c { C {…}; } else { R {…}; }`: an Sh; `if c { null; } else { "a"; }`: a ?Str.
+    if expect < 0 {
+        let from = join_nodes.len();
+        let b = node;
+        while (is_kind(b, Node.If_expr) and next_sibling(next_sibling(first_child(b))) >= 0) {
+            join_nodes.push(next_sibling(first_child(b)));
+            b = next_sibling(next_sibling(first_child(b)));
+        };
+        join_nodes.push(b);
+        expect = branch_join(from, cx);
     };
     // The result: what is expected, else the then branch's type, else
     // (when it does not complete) the else branch's.
@@ -2666,7 +2722,7 @@ fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
 }
 
 fn check_return(node: I32, cx: Cx) I32 {
-    let ended = generator_return(node);
+    let ended = generator_return(node, cx);
     if ended >= 0 { return ended; };
     let value = first_child(node);
     let m = w_mark();
@@ -2722,6 +2778,7 @@ fn reset_check() void {
     lazy_call_fn.clear();
     export_func.clear();
     export_result.clear();
+    export_params.clear();
     lazy_call_sig.clear();
     lazy_call_path.clear();
     lazy_stub_of.clear();
@@ -2731,6 +2788,8 @@ fn reset_check() void {
     fi_params.clear();
     fi_result.clear();
     fi_ir.clear();
+    fi_site.clear();
+    checking_inst.clear();
     fi_table.clear();
     fi_queue.clear();
     user_ir_decl.clear();
@@ -2793,6 +2852,7 @@ fn compile(target: Target) I32 {
         comptime_fuel[0] = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()));
         glob_field_name[comptime_fuel[0]] = name_add("__comptime_fuel");
     };
+    check_open_instances();
     validate_program();
     count_memories();
     report_wat();
@@ -2913,12 +2973,15 @@ fn export_fn(decl: I32) void {
     func_field_name[function_of(fi)] = fn_debug_name(decl);
     export_func.push(function_of(fi));
     export_result.push(fi_result[fi]);
+    export_params.push(fi_params[fi]);
 }
 
 /// The exported functions and their result types, for the host to give
 /// results as JS has them (see write_exports_json).
 vec export_func: I32;
 vec export_result: I32;
+/// Their parameter types (a list), which safe builds check at the boundary.
+vec export_params: I32;
 
 fn has_prefix(word: I32, prefix: Str) Bool {
     if src.interned_size(word) < prefix.len() { return false; };
@@ -3022,6 +3085,7 @@ fn bench_function(item: I32, k: I32) void {
         func_field_name[f] = name;
         export_func.push(f);
         export_result.push(ty_void());
+        export_params.push(vl_one(i32_t));
     };
     begin_function();
     cur_fn[0] = -1;
@@ -3090,6 +3154,7 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     func_src[f] = item;
     export_func.push(f);
     export_result.push(result);
+    export_params.push(params);
     // `export main() I32 { @wat/\ … \/; }`: its code, which the host assembled.
     let wat = wat_of(last_child(item));
     if wat >= 0 {

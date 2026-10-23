@@ -1,0 +1,5 @@
+// What: null beside numbers in an array literal
+// Expect: I32 cannot be nullable
+export main() I32 {
+    [1, null, 3].len();
+}
