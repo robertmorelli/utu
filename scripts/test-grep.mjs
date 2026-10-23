@@ -72,6 +72,11 @@ try {
     .filter(m => m.file.endsWith('uses.utu')).map(m => [m.line, m.column]);
   assert.deepEqual(refsOf('Point'), [[1, 15], [2, 13], [3, 35]]);
   assert.deepEqual(refsOf('shapes'), [[1, 7], [2, 13], [3, 35]]);
+  // A member through a lowercase alias, in another file.
+  await fs.writeFile(path.join(dir, 'ops.utu'), 'mod mathops { fn double(value: I32) I32 { return value * 2; } }\n');
+  await fs.writeFile(path.join(dir, 'calls.utu'), 'using mathops |ops| from "./ops.utu";\nexport main() I32 {\n    return ops.double(5);\n}\n');
+  const doubles = JSON.parse(spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'grep', '--refs', 'double', '--json', path.join(dir, 'calls.utu')], { encoding: 'utf8' }).stdout).map(m => [path.basename(m.file), m.line, Boolean(m.declaration)]);
+  assert.deepEqual(doubles, [['calls.utu', 3, false], ['ops.utu', 1, true]]);
   // Nothing found: exit 1; a pattern that is not utu: exit 2.
   assert.equal(run('nothing($x)').status, 1);
   assert.equal(run('if if').status, 2);

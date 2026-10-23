@@ -774,6 +774,18 @@ export lib {
     ['struct P:\n    | x: I32\nmod Box[T] {\n    struct &:\n        | v: T\n    struct Tag:\n        | k: I32\n    let item: Array[?T] = [null];\n    let all: Array[T] = [];\n    let made: Array[I32] = [0];\n    let base: I32 = start() + 1;\n    let twice: I32 = base * 2;\n    let tag: Tag = Tag { k: twice };\n    let none: ?& = null;\n    fn start() I32 { 10; }\n    fn put(x: T) void { item[0] = x; made[0] += 1; }\n    fn empty() Bool { item[0] == null and none == null; }\n    fn total() I32 { all.len() + made[0] * 1000 + tag.k; }\n}\nexport lib { fn run() I32 {\n    Box[P].put(P { x: 1 });\n    Box[P].put(P { x: 2 });\n    Box[Str].put("a");\n    let e = (if Box[P].empty() { 1; } else { 0; }) + (if Box[Array[I32]].empty() { 10; } else { 0; });\n    Box[P].total() * 10 + Box[Str].total() + e * 100000;\n} }\n', 1021242],
     // A bounded mod's global.
     ['using Ord from std:Ord;\nusing Buffer from std:Buffer;\nmod Best[T[Ord]] {\n    let top: Buffer[T] = Buffer[T].new();\n    fn offer(x: T) void { if top.len() == 0 { top.push(x); } else if x.cmp(top.get_index(0)) > 0 { top.set_index(0, x); }; }\n    fn best(d: T) T { if top.len() == 0 { d; } else { top.get_index(0); }; }\n}\nexport lib { fn run() I32 { Best[I32].offer(3); Best[I32].offer(9); Best[I32].offer(4); Best[Str].offer("bb"); Best[Str].offer("a"); Best[I32].best(0) * 100 + Best[Str].best("").len() * 10 + Best[F64].best(1.0).to_i32(); } }\n', 921],
+    // An iterator word in scope as a value is a value after return, continue, break label, yield and defer.
+    ['let log: Array[I32] = [0];\n'
+      + 'fn count(n: I32) void { log[0] += n; }\n'
+      + 'fn params(count: I32, sum: I32, product: I32) I32 { return count + sum * product; }\n'
+      + 'fn local() I32 { let count: I32 = 5; let sum: I32 = count; return sum; }\n'
+      + 'fn scaled(product: I32) I32 { return product * 2; }\n'
+      + 'fn brk(sum: I32) I32 { outer: { break outer sum; }; }\n'
+      + 'fn gen(count: I32) yield I32 { yield count; }\n'
+      + 'fn steps(count: I32) I32 { let hits = 0; loop match 0 { 0 => { hits += 1; continue count; }, 3 => { hits += 10; break; }, ~> break, }; hits; }\n'
+      + 'fn deferred() I32 { defer count(100); return 1; }\n'
+      + 'fn piped() I32 { let xs = [1, 2, 3]; return xs count; }\n'
+      + 'export lib { fn run() I32 { let t = 0; for (gen(6)) |v| { t += v; }; params(1, 2, 3) + local() + scaled(4) + brk(9) + t + steps(3) + deferred() + piped() + log[0]; } }\n', 150],
   ];
   for (const [source, value] of everyMode) {
     const file = await write(source);

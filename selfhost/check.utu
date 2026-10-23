@@ -1938,6 +1938,7 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
             report(Diag.UnknownMethod, name, word_of(name));
             return finish_error(args, m, cx);
         };
+        node_decl[name] = target;
         let inst = module_instance(decl_a[module], module, callee, cx);
         if inst < 0 { return finish_error(args, m, cx); };
         return call_with(fn_instance(target, inst), args, 0, m, node, cx);
@@ -1971,6 +1972,7 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
             report2(Diag.UnknownMethod, node, word_of(name), st, -1);
             return finish_error(args, m, cx);
         };
+        node_decl[name] = target;
         return call_with(fn_instance(target, ty_inst(st)), args, 0, m, node, cx);
     };
     // `[…].forEach(…)`: a method native arrays lack makes the literal a JS array.

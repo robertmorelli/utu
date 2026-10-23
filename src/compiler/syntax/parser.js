@@ -1110,14 +1110,15 @@ class Parser {
 
   /**
    * Whether the token at the cursor begins `return`'s or `continue`'s
-   * optional value. Words that continue an expression (`and`, `orelse`,
-   * `map`, …) and `-o` instead extend the bare `return`.
+   * optional value. Operator words (`and`, `orelse`, …) and `-o` instead
+   * extend the bare `return`; an iterator word (`count`, `sum`, …) is a name,
+   * since a bare `return` has nothing to pipe.
    */
   startsExpression() {
     const c = this.source[this.pos];
     if (c === undefined) return false;
     const word = this.word();
-    if (word !== null) return !ITERATOR_FORMS.has(word) && !BINARY.has(word) && word !== 'orelse';
+    if (word !== null) return !BINARY.has(word) && word !== 'orelse';
     if ((c >= '0' && c <= '9') || c === '"' || c === '`') return true;
     if (this.source.startsWith('\\\\', this.pos)) return true;
     return ['-', '~', '(', '[', '.', '{', '&', '@'].includes(this.punct(true));
