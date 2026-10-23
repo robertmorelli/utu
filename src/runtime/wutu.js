@@ -27,6 +27,8 @@ export function createWutuRuntime() {
   const here = () => keys.map(k => k.value.length + ':' + k.value).join('|');
   const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
   let frames = [], active = null, keys = [], scheduled = false, generation = 0;
+  // A component's root, claimed loose: { root, index, used } for the render under `root`.
+  let loose = null;
 
   function autoSave() {
     api.autoSave?.();
@@ -137,10 +139,33 @@ export function createWutuRuntime() {
   }
 
   /**
-   * The element for `site` here: last render's, a prerendered one, or what
-   * `make()` makes. It joins its parent's children where it is entered.
+   * A component's root from the last render, wherever it was placed: an
+   * argument to another component lands inside it, not in the frame open
+   * while it is made. (By identity, from the outermost element's subtree.)
    */
-  function claim(site, key, tag, make) {
+  function looseNode(identity, tag) {
+    const root = frames[0]?.node;
+    if (loose?.root !== root) loose = { root, index: null, used: new Set() };
+    if (!loose.index) {
+      loose.index = new Map();
+      for (const node of root?.querySelectorAll('[data-wutu]') ?? []) {
+        const id = identityOfNode(node);
+        if (!loose.index.has(id)) loose.index.set(id, node);
+      }
+    }
+    const node = loose.index.get(identity);
+    if (!node || node.localName !== tag || loose.used.has(node)) return undefined;
+    loose.used.add(node);
+    return node;
+  }
+
+  /**
+   * The element for `site` here: last render's, a prerendered one, or what
+   * `make()` makes. It joins its parent's children where it is entered,
+   * except a component's root (`isLoose`): it joins those of the frame its
+   * value is put in (append()).
+   */
+  function claim(site, key, tag, make, isLoose) {
     const parent = frames.at(-1);
     // Identity: the site, then the keys pushed since the last global key.
     let identity = site + (key ? ':' + key : ''), global = false, explicit = false;
@@ -159,7 +184,8 @@ export function createWutuRuntime() {
     }
     claimIdentity(parent, identity, global, explicit);
     let node = reusable(parent, identity, tag, global);
-    if (node) active?.retained.add(node);
+    if (isLoose && parent) node ??= looseNode(identity, tag);
+    else if (node) active?.retained.add(node);
     // A root reuses its own previous element, or adopts prerendered markup:
     // its controls, disabled until now, take input again (but a lazy
     // placeholder's, until its chunk replaces them).
@@ -173,7 +199,8 @@ export function createWutuRuntime() {
       }
     }
     if (!node || node.localName !== tag) node = make();
-    if (parent) { parent.used.add(node); parent.wanted.push(node); }
+    if (parent) parent.used.add(node);
+    if (parent && !isLoose) parent.wanted.push(node);
     if (identities.get(node) !== identity) {
       node.setAttribute('data-wutu', identity);
       identities.set(node, identity);
@@ -232,6 +259,8 @@ export function createWutuRuntime() {
     const frame = frames.at(-1);
     if (value?.nodeType) {
       if (!frame.wanted.includes(value)) { frame.used.add(value); frame.wanted.push(value); }
+      // (Moved here from its old parent: that parent's place() must not remove it.)
+      active?.retained.add(value);
       return;
     }
     const text = String(value ?? '');
@@ -393,12 +422,12 @@ export function createWutuRuntime() {
       switch (op[0]) {
         case 's': {
           const [element] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(true));
+          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(true), op[1] === 0);
           break;
         }
         case 'o': {
           const [element, names] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false)), names, settable(top.ops, top.pc));
+          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false), op[1] === 0), names, settable(top.ops, top.pc));
           break;
         }
         case 'c': leave(); break;
@@ -480,11 +509,12 @@ export function createWutuRuntime() {
     while (advance() !== null) { /* (only static ops remain) */ }
     const root = run.nodes[0];
     run = run.outer;
+    if (!run) loose = null;
     return root;
   }
 
   function render(view) {
-    const previous = [frames, active, keys], focused = document.activeElement;
+    const previous = [frames, active, keys, loose], focused = document.activeElement;
     view.cleanupIndex = 0;
     view.cleanupCallbacks ??= [];
     view.intervalsSeen = new Set();
@@ -495,6 +525,7 @@ export function createWutuRuntime() {
     frames = [];
     active = view;
     keys = [];
+    loose = null;
     generation++;
     try {
       view.root = view.render();
@@ -509,7 +540,7 @@ export function createWutuRuntime() {
       }
       if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
     } finally {
-      [frames, active, keys] = previous;
+      [frames, active, keys, loose] = previous;
       view.globalNodes = null;
       view.removals.clear();
       view.retained.clear();

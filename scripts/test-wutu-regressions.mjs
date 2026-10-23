@@ -12,6 +12,10 @@ const out = await fs.mkdtemp(path.resolve('.tmp-wutu-regressions-'));
 let server, browser;
 try {
   execFileSync('node', ['cli/wutu.mjs', 'build', 'examples/wutu-regressions/main.utu', '--out', out], { stdio: 'pipe' });
+  // A component passed to another lands inside it, prerendered too.
+  const nested = (await fs.readFile(path.join(out, 'index.html'), 'utf8')).match(/<div id="nested"[^>]*>(.*?)<\/div>/)[1];
+  assert.equal(nested.replace(/ (data-wutu|class)="[^"]*"/g, ''),
+    ['0', 'a', 'a|b'].map(w => `<figure><header>Title</header><span>${w}</span></figure>`).join(''));
   server = http.createServer(async (req, res) => {
     try {
       const name = req.url === '/' ? 'index.html' : req.url.slice(1);
@@ -40,10 +44,15 @@ try {
     o.rows = $$('.row').map(r => r.children.length);
     o.method = $('#method').textContent;
     const clock = $('#clock').textContent;
+    const shape = () => $$('#nested > *').map(f => f.localName + ':' + [...f.children].map(c => c.localName).join(',') + ':' + f.textContent).join(' ');
+    o.nested = shape();
+    const spans = $$('#nested span');
     o.inputs = [$('#number').value, $('#pick').value];
     $('#bump').click(); await sleep(20);
     o.rowsAfter = $$('.row').map(r => r.children.length);
     o.methodAfter = $('#method').textContent;
+    o.nestedAfter = shape();
+    o.nestedKept = $$('#nested span').every((s, i) => s === spans[i]);
     o.clockChanged = $('#clock').textContent !== clock;
     $('#go').click(); await sleep(20);
     o.submitted = $('#n').textContent;
@@ -60,7 +69,9 @@ try {
   });
   assert.deepEqual(result, {
     pending: 0, enabled: true, hydrated: [true, '40%', 'tip'], label: 'q', card: 'custom', chart: 'drawn;', circle: '0',
-    rows: [1, 1], method: 'm0', inputs: ['2.5', 'c'],
+    rows: [1, 1], method: 'm0',
+    nested: 'figure:header,span:Title0 figure:header,span:Titlea figure:header,span:Titlea|b',
+    nestedAfter: 'figure:header,span:Title1 figure:header,span:Titlea figure:header,span:Titlea|b', nestedKept: true, inputs: ['2.5', 'c'],
     rowsAfter: [1, 1], methodAfter: 'm1', clockChanged: true, submitted: '2',
     numbers: ['7', '20'], pickAfter: 'd', beatsStill: true, chartAfter: 'drawn;',
   });

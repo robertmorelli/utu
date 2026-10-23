@@ -33,6 +33,13 @@ fn cell(label: Str) Browser.HTMLElement {
     \/;
 }
 
+/// Takes another component: it lands inside, not beside.
+fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
+    @wutu/\
+    figure { header { "Title"; } = body; }
+    \/;
+}
+
 /// Reused unless what it reads changes: a method that reads a mem does.
 fn byMethod(label: Str) Browser.HTMLElement {
     let r = Reader { k: 0 };
@@ -107,6 +114,10 @@ export main() void {
             on mount { chart.append(Browser.document.createTextNode("drawn;")); }
         }
         = icon(state);
+        div#nested {
+            = framed(cell(state.n.to_str()));
+            for state.rows |row| key row.id { = framed(cell(row.id)); }
+        }
     }
     \/;
     Browser.document.body.append(app);
