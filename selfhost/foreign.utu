@@ -1865,7 +1865,9 @@ fn host_argument_type(call: I32, i: I32, cx: Cx) I32 {
     } else if is_kind(callee, Node.Field_expr) {
         let m = w_mark();
         let diags = diag_kind.len();
+        speculating[0] += 1;
         let rt = check_base(callee, cx);
+        speculating[0] -= 1;
         w_stack.resize(m);
         diag_truncate(diags);
         if not is_foreign(rt) { return -1; };

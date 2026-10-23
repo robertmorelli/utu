@@ -20,6 +20,13 @@ let nums = Stack[I32].new(0);
 using Stack[Str] |Words|;          // an alias for one instance
 ```
 
+A global in a generic module is one for all its instances, so its type and
+initializer may not use what differs between them: T, `&`, or the module's
+own types and functions. `let items: List[T] = …;` inside `mod Stash[T]` is
+an error ("A global of generic Stash cannot use T"); make it a function's
+value, or keep it in a struct the caller holds. A global that does not
+depend on T (`let limit: I32 = 64;`) is fine.
+
 ## Bounds
 
 A type parameter can list protocols its argument must implement, the way a

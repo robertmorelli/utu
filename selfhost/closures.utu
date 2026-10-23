@@ -880,7 +880,14 @@ vec param_to_host: U8;
 /// Report a closure `arg` that awaits, given to the host.
 fn host_callback(arg: I32) void {
     let c = closure_node(arg);
-    if c < 0 { return; };
+    if c < 0 {
+        let d = named_fn(arg);
+        if d < 0 or not fn_awaits(d) { return; };
+        report(Diag.AwaitInClosure, arg, -1);
+        diag_label("may suspend");
+        diag_note("A stack suspends only through utu's calls, not the host's; pass a function that does not await");
+        return;
+    };
     let at = awaits_in(last_child(c));
     if at < 0 { return; };
     report(Diag.AwaitInClosure, at, -1);
@@ -889,15 +896,25 @@ fn host_callback(arg: I32) void {
     diag_note("A stack suspends only through utu's calls, not the host's; await outside the closure");
 }
 
+/// The function declaration an argument names (in parentheses, too); or -1.
+fn named_fn(written: I32) I32 {
+    let arg = written;
+    while (is_kind(arg, Node.Paren_expr)) { arg = first_child(arg); };
+    if not is_kind(arg, Node.Identifier) { return -1; };
+    let d = node_decl[arg];
+    if d >= 0 and decl_is(d, Decl.Fn) { d; } else { -1; };
+}
+
 /// The arguments of a call of function `decl` (-1: a host function's), from
-/// its parameter `first`: each closure the host is given, reported when it awaits.
+/// its parameter `first`: each closure or named function the host is given,
+/// reported when it awaits.
 fn host_callbacks(decl: I32, args: I32, first: I32) void {
     if args < 0 { return; };
     let decls = if decl >= 0 { param_decls(decl); } else { -1; };
     let i = first;
     let a = first_child(args);
     while (a >= 0) {
-        if closure_node(a) >= 0 and (decl < 0 or (i < vl_len[decls] and to_host(decl, vl_item(decls, i)))) { host_callback(a); };
+        if (closure_node(a) >= 0 or named_fn(a) >= 0) and (decl < 0 or (i < vl_len[decls] and to_host(decl, vl_item(decls, i)))) { host_callback(a); };
         i += 1;
         a = next_sibling(a);
     };

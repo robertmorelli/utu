@@ -1,0 +1,12 @@
+// What: hands the host a named function that awaits.
+// Expect: A function the host calls cannot await
+let fetch_n: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+let call: fun(fun() I32) I32 = @es/\ (f) => f() \/;
+
+fn waits() I32 {
+    await fetch_n(3);
+}
+
+export main() I32 {
+    call(waits);
+}

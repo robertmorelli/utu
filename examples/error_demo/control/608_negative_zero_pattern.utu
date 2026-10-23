@@ -1,0 +1,9 @@
+// What: matches 0.0 and then -0.0, which compare equal.
+// Expect: Duplicate pattern -0.0
+fn f(x: F64) I32 {
+    match x { 0.0 => 1, -0.0 => 2, ~> 3, };
+}
+
+export main() I32 {
+    f(1.0);
+}

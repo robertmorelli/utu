@@ -253,7 +253,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.AwaitNotPromise { return "invalid-await"; };
     if k == Diag.EntrySurface { return "entry-surface-conflict"; };
     if k == Diag.InvalidEscape { return "invalid-escape"; };
-    if k == Diag.AwaitInClosure { return "invalid-await"; };
+    if k == Diag.AwaitInClosure or k == Diag.AwaitInGlobal { return "invalid-await"; };
     if k == Diag.InvalidDslUsage or k == Diag.DslError or k == Diag.WatPlace or k == Diag.WatHost { return "invalid-dsl-usage"; };
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     if k == Diag.StorageType { return "storage-type"; };
@@ -497,7 +497,9 @@ fn diag_text(i: I32) Str {
         Diag.ForeignRecordMissing => "Missing property " + w,
         Diag.DslError => w,
         Diag.WatPlace => "@wat must be a function's whole body",
-        Diag.AwaitInClosure => "A closure the host calls cannot await",
+        Diag.AwaitInClosure => pick(is_kind(node, Node.Identifier), "A function", "A closure") + " the host calls cannot await",
+        Diag.AwaitInGlobal => "A global's initializer cannot await",
+        Diag.GenericGlobal => "A global of generic " + word_text(decl_name[a]) + " cannot use " + w,
         Diag.InvalidEscape => {
             if a == 1 { return "Lone surrogate"; };
             if a == 2 { return "Unknown escape " + w; };
@@ -776,6 +778,7 @@ fn diag_default_label(i: I32) Str {
         Diag.ImportNotModule => "not a mod",
         Diag.WutuHole => type_text(a),
         Diag.WutuKey => type_text(a),
+        Diag.GenericGlobal => "differs per instance",
         ~> "here",
     };
 }

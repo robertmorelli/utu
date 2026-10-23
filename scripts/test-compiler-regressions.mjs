@@ -562,6 +562,14 @@ export lib {
     ['enum Sh:\n    | C { r: I32 }\n    | R { w: I32 }\n    | T { h: I32 }\nfn area(s: Sh) I32 { alt s { C |c| => c.r, R |r| => r.w * 2, T |t| => t.h * 3, }; }\nfn pick(n: I32) Sh { let s = if n == 0 { C { r: 1 }; } else if n == 1 { R { w: 1 }; } else { T { h: 1 }; }; s; }\nexport lib { fn run() I32 {\n    let k = 2;\n    let m = match k { 1 => C { r: 5 }, 2 => R { w: 5 }, ~> T { h: 5 }, };\n    let s = if k > 5 { null; } else { "a"; };\n    area(pick(0)) + area(pick(1)) + area(pick(2)) + area(m) + (if s == null { 0; } else { 100; });\n} }\n', 116],
     // Tag.from_i32 of a value a variant has, in an enum with gaps.
     ['enum(I32) Gap:\n    | A = 1\n    | B = 5\nexport lib { fn run() I32 { Gap.from_i32(5).to_i32() + Gap.from_i32(1).to_i32(); } }\n', 6],
+    // A computed global in a program with no `export main` (it crashed the compiler).
+    ['let n: I32 = 1 + 1;\nlet k: cl() I32 = cl() { n * 10; };\nexport lib { fn run() I32 { k() + n; } }\n', 22],
+    // A closure in a generator has its own try, errdefer, and return.
+    ['fn parse(s: Str) Result[I32, Str] { if s == "x" { Result[I32, Str].err("bad"); } else { Result[I32, Str].ok(s.len()); }; }\nfn g(n: I32) yield I32 {\n    let f = cl(s: Str) Result[I32, Str] { errdefer { n; }; let v = try parse(s); Result[I32, Str].ok(v + n); };\n    let r = cl(k: I32) I32 { if k > 1 { return 100; }; k; };\n    yield f("abc").value();\n    yield r(5);\n    yield r(1);\n}\nexport lib { fn run() I32 { let s = 0; for (g(10)) |v| { s += v; }; s; } }\n', 114],
+    // `&` in a protocol member's type arguments.
+    ['proto Big:\n    | biggest(Array[&]) &\nstruct N[Big]:\n    | v: I32\nfn Big[N].biggest |a| (xs: Array[N]) N { let b = a; for (xs) |x| { if x.v > b.v { b = x; }; }; b; }\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nexport lib { fn run() I32 { let xs: Array[N] = [N { v: 3 }, N { v: 9 }]; Pick[N].top(N { v: 1 }, xs).v + Pick[N].top(N { v: 20 }, xs).v; } }\n', 29],
+    // A generic mod's globals that do not depend on T; unused generators, checked and dropped.
+    ['mod Arr[T] {\n    let k: I32 = 3;\n    let s: Str = "ab" + "c";\n    fn count(xs: Array[T]) I32 { xs.len() + k + s.len(); }\n}\nstruct P:\n    | x: I32\nfn g(n: I32, p: P) yield I32 { defer { n; }; let f = cl() I32 { n + p.x; }; for (0 ..< n) |i| { if i > 3 { return; }; yield f() + i; }; }\nfn walk(n: I32) yield I32 { if n > 0 { for (walk(n - 1)) |v| { yield v; }; }; yield n; }\nfn P.each |q| () yield I32 { yield q.x; }\nexport lib { fn run() I32 { Arr[I32].count([1, 2]) + Arr[F64].count([1.0]); } }\n', 15],
   ];
   for (const [source, value] of everyMode) {
     const file = await write(source);
@@ -1043,10 +1051,35 @@ export lib {
     ['proto Pa:\n    | name() Str\nproto Pb:\n    | name() Str\nstruct X[Pa, Pb]:\n    | id: I32\nfn Pa[X].name |x| () Str { "a"; }\nfn Pb[X].name |x| () Str { "b"; }\nexport lib { fn run() Str { X { id: 1 }.name(); } }\n', "name is both Pa's and Pb's"],
     // A protocol's implementation for one instance, which nothing would find.
     ['proto P:\n    | m() I32\nmod Box[T] {\n    struct &:\n        | v: T\n}\nfn P[Box[I32]].m |b| () I32 { 1; }\nexport lib { fn run() I32 { 0; } }\n', "Box's instances implement P together: fn P[&].m in Box"],
+    // await where the module's start runs it, or where the host calls a named function.
+    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet later: I32 = await d(4);\nexport lib { fn run() I32 { later; } }\n', "A global's initializer cannot await"],
+    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet later: I32 = helper();\nfn helper() I32 { await d(3); }\nexport lib { fn run() I32 { later; } }\n', "A global's initializer cannot await"],
+    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet call: fun(fun() I32) I32 = @es/\\ (f) => f() \\/;\nfn waits() I32 { await d(3); }\nexport lib { fn run() I32 { call(waits); } }\n', 'A function the host calls cannot await'],
+    // A generic mod's global that differs per instance (these crashed or built invalid Wasm).
+    ['using List from std:List;\nmod Stash[T] {\n    let items: List[T] = List[T].new();\n    fn count() I32 { items.len(); }\n}\nexport lib { fn run() I32 { Stash[I32].count(); } }\n', 'A global of generic Stash cannot use T'],
+    ['mod Box[T] {\n    let item: ?T = null;\n    fn empty() Bool { item == null; }\n}\nstruct P:\n    | x: I32\nexport lib { fn run() Bool { Box[P].empty(); } }\n', 'A global of generic Box cannot use T'],
+    ['mod Arr[T] {\n    let items: Array[T] = [];\n    fn count() I32 { items.len(); }\n}\nexport lib { fn run() I32 { Arr[I32].count(); } }\n', 'A global of generic Arr cannot use T'],
+    // A global first read where only its type is wanted: its mistakes still said.
+    ['fn hi() Str { "hi"; }\nlet fs: Array[fun() Str] = [hi];\nexport lib { fn run() Str { fs[0](); } }\n', 'fun() Str cannot be stored; use cl() Str'],
+    // An unused generator is checked.
+    ['fn g() yield I32 { let a: I32 = "s"; yield a; }\nexport lib { fn run() I32 { 0; } }\n', 'a is I32, got Str'],
+    // An unknown generic module called twice (it crashed the compiler).
+    ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nexport lib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
+    // -0.0 after 0.0.
+    ['fn f(x: F64) I32 { match x { 0.0 => 1, -0.0 => 2, ~> 3, }; }\nexport lib { fn run() I32 { f(1.0); } }\n', 'Duplicate pattern -0.0'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
+    checked++;
+  }
+  // A missing bound, said once for its type however many places use it; an unknown module once.
+  for (const [source, message] of [
+    ['proto Big:\n    | biggest(Array[&]) &\nstruct M:\n    | v: I32\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nexport lib { fn run() I32 { let xs: Array[M] = [M { v: 3 }]; Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 2 }, xs).v; } }\n', "M does not implement Big (Pick's T needs it)"],
+    ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nexport lib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
+  ]) {
+    const { errors } = await selfhost(await write(source));
+    assert.deepEqual(errors, [message], source);
     checked++;
   }
   // A std module not imported: the note names the module, and its file.

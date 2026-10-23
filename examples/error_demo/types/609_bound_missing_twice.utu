@@ -1,0 +1,16 @@
+// What: a type without the bound's method, used for one instance twice.
+// Expect: M does not implement Big (Pick's T needs it)
+proto Big:
+    | biggest(Array[&]) &
+
+struct M:
+    | v: I32
+
+mod Pick[T[Big]] {
+    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }
+}
+
+export main() I32 {
+    let xs: Array[M] = [M { v: 3 }];
+    Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 20 }, xs).v;
+}

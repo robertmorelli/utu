@@ -174,12 +174,16 @@ fn mentions_self(node: I32) Bool {
 }
 
 /// The type a protocol member's type node names, `&` read as `self_t`, the
-/// implementer's type (`&` as `?&`, or alone).
+/// implementer's type (alone, as `?&`, or in type arguments: `Array[&]`).
 fn sig_type(node: I32, self_t: I32) I32 {
     if is_kind(node, Node.Promoted_type) { return self_t; };
     if is_kind(node, Node.Nullable_type) { return nullable(sig_type(first_child(node), self_t)); };
     if is_kind(node, Node.Paren_type) or is_kind(node, Node.Return_type) { return sig_type(first_child(node), self_t); };
-    type_of(node, 0);
+    let outer = sig_self[0];
+    sig_self[0] = self_t;
+    let t = type_of(node, 0);
+    sig_self[0] = outer;
+    t;
 }
 
 /// The `if ref.test` chain reading field `word` of receiver local `r` (or,
@@ -536,6 +540,7 @@ fn proto_with_method(word: I32) I32 {
 /// its bounds.
 fn validate_bounds() void {
     if not any_bounds() { return; };
+    bounds_missed.clear();
     for (0 ..< node_kind.len()) |n| {
         if node_kind[n] == Node.Module_type_arg_list.to_i32() and is_own_file(file_of_token(node_first[n])) {
             let module = instantiated_module(n);
@@ -587,6 +592,9 @@ fn check_bounds(module: I32, args: I32) void {
     };
 }
 
+/// Bounds reported missing: [type, proto, param] each, reported once.
+vec bounds_missed: I32;
+
 /// Type argument `arg` for `param`, bounded by `proto` (written at `bound`).
 fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) void {
     // A parameter of the module it is written in: bounded by proto too.
@@ -606,6 +614,14 @@ fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) void {
     if ty_is(t, Ty.Error) { return; };
     let lack = bound_lack(t, proto);
     if lack < 0 { return; };
+    let i = 0;
+    while (i < bounds_missed.len()) {
+        if bounds_missed[i] == t and bounds_missed[i + 1] == proto and bounds_missed[i + 2] == param { return; };
+        i += 3;
+    };
+    bounds_missed.push(t);
+    bounds_missed.push(proto);
+    bounds_missed.push(param);
     report3(Diag.BoundMissing, arg, -1, t, proto, param);
     let f = if ty_decl(t) >= 0 { member(ty_decl(t), lack, Space.Method); } else { -1; };
     let own = decl_is(f, Decl.Fn) and decl_a[f] != proto;
