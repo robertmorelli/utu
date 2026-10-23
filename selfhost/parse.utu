@@ -1591,14 +1591,14 @@ fn template_string(p: Parser) I32 {
 }
 
 /// Whether the token at the cursor begins `return`'s or `continue`'s optional
-/// value. Words that continue an expression (`and`, `orelse`, `map`, …) and
-/// `-o` instead extend the bare `return`.
+/// value. Operator words (`and`, `orelse`, …) and `-o` instead extend the
+/// bare `return`; an iterator word (`count`, `sum`, …) is a name, since a
+/// bare `return` has nothing to pipe.
 fn starts_expression(p: Parser) Bool {
     if at_end(p) { return false; };
     if is_word(p) {
         let w = word_id(p);
-        return iterator_form(w) < 0 and w != Kw.And.to_i32() and w != Kw.Or.to_i32() and w != Kw.Xor.to_i32()
-            and w != Kw.Orelse.to_i32();
+        return w != Kw.And.to_i32() and w != Kw.Or.to_i32() and w != Kw.Xor.to_i32() and w != Kw.Orelse.to_i32();
     };
     is(p, Tok.Int) or is(p, Tok.Float) or is(p, Tok.String) or is(p, Tok.TemplateFull) or is(p, Tok.TemplateHead) or is(p, Tok.MultilineLine) or is(p, Tok.Minus)
         or is(p, Tok.Tilde) or is(p, Tok.LParen) or is(p, Tok.LBracket) or is(p, Tok.Dot) or is(p, Tok.LBrace)
