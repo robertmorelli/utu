@@ -14,14 +14,14 @@ languages.
 
 | benchmark | utu | Rust | safe Rust | JavaScript |
 |---|---:|---:|---:|---:|
-| scalar recurrence | **1.553 ms** | 1.836 ms | 1.839 ms | 7.032 ms |
-| midpoint insert: 8 B x 8,192 | 31.287 ms | **6.366 ms** | 214.602 ms | 31.382 ms |
-| midpoint insert: 32 B x 2,048 | 8.010 ms | **1.861 ms** | 54.519 ms | 7.963 ms |
-| midpoint insert: 1,024 B x 64 | **0.223 ms** | 0.674 ms | 2.259 ms | 0.226 ms |
-| source analyzer, 256 KiB | 8.563 ms | **3.314 ms** | 3.315 ms | 7.030 ms |
-| prime sieve, 100,000 flags | 0.177 ms | **0.098 ms** | 0.103 ms | 0.199 ms |
-| DeltaBlue chain, 20 × 1,048 nodes | 6.029 ms | **4.871 ms** | 16.860 ms | 6.344 ms |
-| DeltaBlue projection, 20 × 1,048 nodes | 5.009 ms | **4.124 ms** | 17.490 ms | 5.538 ms |
+| scalar recurrence | **1.554 ms** | 1.788 ms | 1.787 ms | 6.849 ms |
+| midpoint insert: 8 B x 8,192 | 31.246 ms | **6.376 ms** | 212.894 ms | 30.477 ms |
+| midpoint insert: 32 B x 2,048 | 7.783 ms | **1.897 ms** | 53.496 ms | 7.708 ms |
+| midpoint insert: 1,024 B x 64 | **0.223 ms** | 0.619 ms | 2.274 ms | 0.237 ms |
+| source analyzer, 256 KiB | 8.334 ms | **3.156 ms** | 3.221 ms | 6.892 ms |
+| prime sieve, 100,000 flags | 0.164 ms | **0.091 ms** | 0.100 ms | 0.205 ms |
+| DeltaBlue chain, 20 × 1,048 nodes | 5.924 ms | **4.870 ms** | 16.711 ms | 6.140 ms |
+| DeltaBlue projection, 20 × 1,048 nodes | 4.712 ms | **4.130 ms** | 17.546 ms | 5.447 ms |
 
 utu and JavaScript vary by more than their tiny midpoint-insertion differences
 across runs. Their three insertion results track one another closely.
@@ -34,13 +34,13 @@ across runs. Their three insertion results track one another closely.
 | midpoint insertion | 210 B | 360 B | 1,508 B | **122 B** |
 | source analyzer | **2,333 B** | 4,065 B | 4,298 B | 2,553 B |
 | prime sieve | 233 B | 693 B | 775 B | **201 B** |
-| DeltaBlue (both workloads) | 40,423 B | 32,817 B | 38,951 B | **5,974 B** |
+| DeltaBlue (both workloads) | 10,274 B | 32,817 B | 38,951 B | **5,974 B** |
 
 Gzipped sizes were 109 B / 233 B / 257 B / 117 B for scalar,
-174 B / 279 B / 847 B / 120 B for midpoint insertion,
+174 B / 279 B / 849 B / 120 B for midpoint insertion,
 **931 B / 1,747 B / 1,926 B / 909 B for the analyzer**, and
-168 B / 514 B / 560 B / 166 B for sieve respectively. The shared DeltaBlue
-module sizes are 13,726 B gzip for utu (2,107 B at `-O smallUnsafe`, 4,747 B
+168 B / 516 B / 563 B / 166 B for sieve respectively. The shared DeltaBlue
+module sizes are 2,908 B gzip for utu (1,966 B at `-O smallUnsafe`, 4,353 B
 raw), 13,424 B for unsafe Rust, 15,529 B for safe Rust, and 1,879 B for
 minified JavaScript.
 
@@ -102,10 +102,10 @@ lengths outside each utu loop is included in the recorded result.
 ## DeltaBlue constraint solver
 
 The DeltaBlue rows in the consolidated tables exercise a 1,048-node mutable
-constraint graph. With 20 solver iterations per sample, utu measured 6.029 ms
-for chain propagation and 5.009 ms for projection; safe `Rc<RefCell<_>>` Rust
-measured 16.860 ms and 17.490 ms, unsafe arena Rust measured 4.871 ms and
-4.124 ms, and JavaScript measured 6.344 ms and 5.538 ms respectively. All
+constraint graph. With 20 solver iterations per sample, utu measured 5.924 ms
+for chain propagation and 4.712 ms for projection; safe `Rc<RefCell<_>>` Rust
+measured 16.711 ms and 17.546 ms, unsafe arena Rust measured 4.870 ms and
+4.130 ms, and JavaScript measured 6.140 ms and 5.447 ms respectively. All
 four returned zero failures. The ports are the canonical algorithm in each
 language's idiom; see [../deltablue/README.md](../deltablue/README.md) for
 methodology and the earlier fixed-capacity figures.

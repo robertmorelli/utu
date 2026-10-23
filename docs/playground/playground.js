@@ -21,7 +21,7 @@ let listening;
 
 async function loadUtu() {
   const [wasm, spec] = await Promise.all([
-    fetch(new URL('./vendor/utu.wasm?v=bf7581c1e427', import.meta.url)).then(response => response.arrayBuffer()),
+    fetch(new URL('./vendor/utu.wasm?v=ff8e145c048a', import.meta.url)).then(response => response.arrayBuffer()),
     fetch(new URL('./vendor/utu.host.json?v=88592d2be849', import.meta.url)).then(response => response.json()),
   ]);
   return loadCompiler(wasm, spec);

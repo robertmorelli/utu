@@ -129,7 +129,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "2,565 bytes";
+                                "2,299 bytes";
                             }
                             td {
                                 "The browser task board example, JavaScript glue and Wasm together, gzipped at the default size optimization.";
@@ -137,7 +137,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "70 ms";
+                                "94 ms";
                             }
                             td {
                                 "The self-hosted compiler compiling itself. Stage 2 and stage 3 of the bootstrap are byte-identical.";
