@@ -287,59 +287,93 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
 }
 
 /// The arms from `arm` on, as a chain of ifs; returns the result type.
+/// A loop, not a recursion: an alt may have thousands of arms. Each arm's
+/// `if` is closed after the arms past it, innermost first.
 fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
-    let a = arm;
-    while (a >= 0 and not is_kind(a, Node.Alt_arm)) { a = next_sibling(a); };
-    if a < 0 {
-        if default_ >= 0 { return check_expr(first_child(default_), expect, cx); };
-        // No default: every variant has an arm, so this is not reached.
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return ty_never();
-    };
-    let pattern = first_child(a);
-    let variant = alt_variant(pattern, ty_decl(st));
-    let m = w_mark();
-    if variant < 0 {
-        report2(Diag.UnknownVariant, pattern, word_of(pattern), st, -1);
-        suggest_member(ty_decl(st), if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)); } else { pattern; }, Space.Member);
-        w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-        return ty_error();
-    };
-    let vt_ = named(variant, ty_inst(st));
-    let vrepr = repr(vt_);
-    // Without a default, the last arm is the only variant left: it is not
-    // tested (binding it casts, which wasm checks), unless the build is safe.
-    let rest = next_sibling(a);
-    while (rest >= 0 and not is_kind(rest, Node.Alt_arm)) { rest = next_sibling(rest); };
-    let last = default_ < 0 and rest < 0 and safe_checks[0] == 0;
-    if not last {
-        let mc = w_mark();
-        w_get(repr(st), s);
-        w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc);
-    };
-    // The arm: bind, then its expression.
-    let mt = w_mark();
-    let c = next_sibling(pattern);
-    if arm_binding(a) >= 0 {
-        let d = node_decl[c];
-        decl_ty[d] = vt_;
-        let mb = w_mark();
-        w_get(repr(st), s);
-        w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb);
-        bind_value(d, vt_, mb);
+    let n = 0;
+    let c = arm;
+    while (c >= 0) {
+        n += 1;
         c = next_sibling(c);
     };
-    let t1 = check_expr(c, expect, cx);
-    let t = if expect >= 0 { expect; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
-    if t >= 0 { coerce(t1, t, c); };
-    w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mt);
-    if last { return if t >= 0 { t; } else { ty_never(); }; };
-    let me = w_mark();
-    let t2 = alt_arms(next_sibling(a), s, st, if t >= 0 { t; } else { -1; }, default_, cx);
-    if t < 0 { t = t2; } else { coerce(t2, t, a); };
-    w_node(Op.Seq, repr(t), 0, 0, me);
-    w_node(Op.If, repr(t), new_label(), 0, m);
-    t;
+    // By open arm: its mark, its else's mark, its node, its type (-1 not yet known).
+    let ms = Array[I32].new(n, 0);
+    let mes = Array[I32].new(n, 0);
+    let nodes = Array[I32].new(n, 0);
+    let ts = Array[I32].new(n, 0);
+    let open = 0;
+    let exp = expect;
+    let result = -1;
+    let a = arm;
+    while (result < 0) {
+        while (a >= 0 and not is_kind(a, Node.Alt_arm)) { a = next_sibling(a); };
+        if a < 0 {
+            if default_ >= 0 { result = check_expr(first_child(default_), exp, cx); }
+            else {
+                // No default: every variant has an arm, so this is not reached.
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+                result = ty_never();
+            };
+        } else {
+            let pattern = first_child(a);
+            let variant = alt_variant(pattern, ty_decl(st));
+            let m = w_mark();
+            if variant < 0 {
+                report2(Diag.UnknownVariant, pattern, word_of(pattern), st, -1);
+                suggest_member(ty_decl(st), if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)); } else { pattern; }, Space.Member);
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+                result = ty_error();
+            } else {
+                let vt_ = named(variant, ty_inst(st));
+                let vrepr = repr(vt_);
+                // Without a default, the last arm is the only variant left: it is not
+                // tested (binding it casts, which wasm checks), unless the build is safe.
+                let rest = next_sibling(a);
+                while (rest >= 0 and not is_kind(rest, Node.Alt_arm)) { rest = next_sibling(rest); };
+                let last = default_ < 0 and rest < 0 and safe_checks[0] == 0;
+                if not last {
+                    let mc = w_mark();
+                    w_get(repr(st), s);
+                    w_node(Op.RefTest, vt_i32, vt_nullable(vrepr) + 1, 0, mc);
+                };
+                // The arm: bind, then its expression.
+                let mt = w_mark();
+                let b = next_sibling(pattern);
+                if arm_binding(a) >= 0 {
+                    let d = node_decl[b];
+                    decl_ty[d] = vt_;
+                    let mb = w_mark();
+                    w_get(repr(st), s);
+                    w_node(Op.RefCast, vrepr, vt_nullable(vrepr) + 1, 0, mb);
+                    bind_value(d, vt_, mb);
+                    b = next_sibling(b);
+                };
+                let t1 = check_expr(b, exp, cx);
+                let t = if exp >= 0 { exp; } else if ty_is(t1, Ty.Never) { -1; } else { t1; };
+                if t >= 0 { coerce(t1, t, b); };
+                w_node(Op.Seq, if t >= 0 { repr(t); } else { vt_unreachable; }, 0, 0, mt);
+                if last { result = if t >= 0 { t; } else { ty_never(); }; }
+                else {
+                    ms[open] = m;
+                    mes[open] = w_mark();
+                    nodes[open] = a;
+                    ts[open] = t;
+                    open += 1;
+                    exp = if t >= 0 { t; } else { -1; };
+                    a = next_sibling(a);
+                };
+            };
+        };
+    };
+    while (open > 0) {
+        open -= 1;
+        let t = ts[open];
+        if t < 0 { t = result; } else { coerce(result, t, nodes[open]); };
+        w_node(Op.Seq, repr(t), 0, 0, mes[open]);
+        w_node(Op.If, repr(t), new_label(), 0, ms[open]);
+        result = t;
+    };
+    result;
 }
 
 /// The variant an alt arm names (`Circle`, or `Shape.Circle`).

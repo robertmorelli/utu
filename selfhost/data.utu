@@ -525,7 +525,9 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         else if tag == known_word(Known.IrArraySet) { w_node(Op.ArraySet, vt_none, heap, 0, m); }
         else if tag == known_word(Known.IrArrayLen) { w_node(Op.ArrayLen, vt_i32, 0, 0, m); }
         else if tag == known_word(Known.IrArrayNew) {
-            if w_stack.len() - m == 1 and not defaultable(inst_arg(fi_inst[fi], 0)) {
+            // (A tuple element is reported where it is written: TupleMisplaced.)
+            let et = inst_arg(fi_inst[fi], 0);
+            if w_stack.len() - m == 1 and not defaultable(et) and not ty_is(et, Ty.Tuple) {
                 report2(Diag.NonDefaultable, call_site[0], -1, inst_arg(fi_inst[fi], 0), -1);
             };
             if w_stack.len() - m == 2 {

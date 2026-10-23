@@ -265,9 +265,12 @@ fn check_function(fi: I32) void {
     cur_params[0] = cur_locals.len();
     mark_boxes(fn_body(decl));
     let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] };
+    let outer = cur_inst[0];
+    cur_inst[0] = cx.inst;
     want(fn_body(decl), cx.result, Why.Returns, decl, -1);
     finish_function(fi_func[fi], fn_body(decl), cx, box_params(decls, params));
     unwant();
+    cur_inst[0] = outer;
 }
 
 /// A body checked against the result type, as function `f`'s (after
@@ -908,7 +911,10 @@ fn int_value(node: I32) I64 {
 /// when `negate`.
 fn int_literal(node: I32, at: I32, expect: I32, negate: Bool) I32 {
     let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
-    if not literal_fits(node, t, negate) { report2(Diag.IntegerOutOfRange, at, -1, t, if negate { 1; } else { 0; }); };
+    if not literal_fits(node, t, negate) {
+        report2(Diag.IntegerOutOfRange, at, -1, t, if negate { 1; } else { 0; });
+        in_instance(cur_inst[0]);
+    };
     push_number(t, literal_bits(node, t, negate), true);
     t;
 }
