@@ -207,6 +207,8 @@ fn add_local(f: I32, vt: I32) I32 {
 /// A copy of node `n` of the callee being inlined, in the caller's locals
 /// and labels.
 fn inl_copy(n: I32) I32 {
+    // A parameter read as its argument (-O small, @sm_inline).
+    if w_op[n] == Op.LocalGet.to_i32() and w_a[n] < inl_subst.len() and inl_subst[w_a[n]] >= 0 { return inl_subst[w_a[n]]; };
     // (Built in place, as w_node would: its kids' room first, then them.)
     let count = w_count[n];
     let first = w_kids.len();
@@ -1070,4 +1072,427 @@ fn sr_rewrite_calls(f: I32, n: I32, parent: I32) void {
     w_first[n] = w_kids.len();
     w_kids.push(call);
     w_count[n] = 1;
+}
+
+//! == Inlining that shrinks (-O small)
+//!
+//! A call becomes its callee's body where the body encodes to no more than
+//! the call; and a function called from one place, nowhere else used, moves
+//! there when the call and the body are bigger than the copy. Sizes are
+//! bounds: a copy's the most it can encode to, the call's and the body's
+//! the least. Callees are bodies without locals, loops,
+//! `return`s, or `try`, and the arguments stay where they are: a parameter
+//! the body reads first (the first ones, in order, once each) is its
+//! argument, already on the stack; one passed a local reads that local; one
+//! passed a constant (or a function, or a global nothing assigns) reads it
+//! once, or never. No local is added, so the caller's locals encode as
+//! before. In rounds, each inlining functions whose bodies call none
+//! inlined in the same round.
+
+/// By function: chosen this round; called by a body chosen this round.
+vec sm_chosen: U8;
+vec sm_called: U8;
+/// The calls in the live code, by callee (from @sm_first, @sm_count of
+/// them), with their callers; and whether each is inlined.
+vec sm_call: I32;
+vec sm_caller: I32;
+vec sm_first: I32;
+vec sm_count: I32;
+vec sm_take: U8;
+/// The calls as found, and their callers.
+vec sm_found: I32;
+vec sm_found_in: I32;
+/// By function: a call to it that cannot be inlined (recursive, shared).
+vec sm_bad: U8;
+/// By function: its body's greatest label as inlining grows it, or -1.
+vec sm_label: I32;
+/// By function: how many of its first parameters are their arguments.
+vec sm_prefix: I32;
+/// While weighing a callee: by parameter, its reads; the labels it
+/// branches to; and the deepest a branch can be.
+vec sm_reads: I32;
+vec sm_targets: I32;
+vec sm_depth: I32 = [0];
+/// Bodies past this many nodes are not weighed (none would gain).
+let sm_most_nodes: I32 = 200;
+vec sm_nodes: I32 = [0];
+/// While walking a body in order: the next parameter, and whether only
+/// reads of the parameters before it have run.
+vec sm_next: I32 = [0];
+vec sm_clean: U8 = [1];
+/// While copying: by parameter, the argument its read becomes, or -1.
+vec inl_subst: I32;
+
+/// Rounds until none inlines (each sweeps after it).
+fn inline_small() void {
+    let rounds = 0;
+    while (rounds < 16 and inline_small_round()) {
+        sweep();
+        rounds += 1;
+    };
+}
+
+fn inline_small_round() Bool {
+    let n = func_kind.len();
+    sm_chosen.resize(n);
+    sm_called.resize(n);
+    sm_bad.resize(n);
+    sm_label.resize(n);
+    sm_prefix.resize(n);
+    sm_first.resize(n);
+    sm_count.resize(n);
+    for (0 ..< n) |f| {
+        sm_chosen[f] = 0;
+        sm_called[f] = 0;
+        sm_bad[f] = 0;
+        sm_label[f] = -1;
+        sm_prefix[f] = 0;
+        sm_count[f] = 0;
+    };
+    sm_found.clear();
+    sm_found_in.clear();
+    for (0 ..< n) |f| { if optimizable(f) and func_code[f] < 0 { sm_find_calls(f, func_body[f]); }; };
+    // By callee (a counting sort).
+    for (0 ..< sm_found.len()) |i| {
+        let c = sm_found[i];
+        let g = w_a[c];
+        sm_count[g] += 1;
+        if sm_found_in[i] == g or node_holders[c] != 1 { sm_bad[g] = 1; };
+    };
+    let at = 0;
+    for (0 ..< n) |g| {
+        sm_first[g] = at;
+        at += sm_count[g];
+        sm_count[g] = 0;
+    };
+    sm_call.resize(sm_found.len());
+    sm_caller.resize(sm_found.len());
+    sm_take.resize(sm_found.len());
+    for (0 ..< sm_found.len()) |i| {
+        let g = w_a[sm_found[i]];
+        let k = sm_first[g] + sm_count[g];
+        sm_call[k] = sm_found[i];
+        sm_caller[k] = sm_found_in[i];
+        sm_take[k] = 0;
+        sm_count[g] += 1;
+    };
+    let any = false;
+    for (0 ..< n) |g| { if sm_count[g] > 0 and sm_weigh(g) { any = true; }; };
+    if not any { return false; };
+    for (0 ..< sm_call.len()) |k| { if sm_take[k] == 1 { sm_inline(sm_caller[k], sm_call[k]); }; };
+    true;
+}
+
+/// The calls under node `n` of function `f`, onto @sm_found.
+fn sm_find_calls(f: I32, n: I32) void {
+    if w_op[n] == Op.Call.to_i32() {
+        sm_found.push(n);
+        sm_found_in.push(f);
+    };
+    for (0 ..< w_count[n]) |i| { sm_find_calls(f, w_kid(n, i)); };
+}
+
+/// Choose which calls to `g` to inline (@sm_take). Whether any.
+fn sm_weigh(g: I32) Bool {
+    if func_kind[g] != FuncKind.Defined.to_i32() or func_body[g] < 0 or func_code[g] >= 0 or func_live[g] != 1
+        or func_local_count[g] != 0 or vl_len[ht_b[func_type_of[g]]] > 1 or traps_by_name(g) {
+        return false;
+    };
+    let body = func_body[g];
+    if sm_called[g] == 1 { return false; };
+    let np = vl_len[ht_a[func_type_of[g]]];
+    sm_reads.resize(np);
+    for (0 ..< np) |i| { sm_reads[i] = 0; };
+    sm_targets.clear();
+    sm_nodes[0] = 0;
+    if not sm_scan(body, np) { return false; };
+    sm_depth[0] = leb_len(sm_nodes[0]);
+    if sm_calls_chosen(body) { return false; };
+    let hi = sm_bytes(body, true);
+    if hi >= 1000000 { return false; };
+    // The body's least size, with the reads of its parameters.
+    let lo = sm_bytes(body, false);
+    for (0 ..< np) |i| { lo += sm_reads[i] * (1 + leb_len(i)); };
+    // The first parameters, read first, in order, once each.
+    sm_next[0] = 0;
+    sm_clean[0] = 1;
+    sm_order(body);
+    sm_prefix[g] = sm_next[0];
+    // Each call's growth: the copy, less the call, and the arguments' reads.
+    let all = sm_bad[g] == 0;
+    let total = 0;
+    let first = sm_first[g];
+    for (first ..< first + sm_count[g]) |k| {
+        let grows = sm_grows(sm_call[k], g, np, hi);
+        if grows >= 1000000 {
+            all = false;
+        } else {
+            total += grows;
+            if grows <= 0 and sm_caller[k] != g and node_holders[sm_call[k]] == 1 { sm_take[k] = 1; };
+        };
+    };
+    // Its one use a call: the body moves there, when the call and the body
+    // are bigger than the copy. (The function's header, which it saves too,
+    // is not counted: it compresses to almost nothing, and moves gaining
+    // little more break up code brotli matched; the compiler compressed
+    // 0.3% bigger with them. Copies at several calls, each bigger than the
+    // call, shift V8's own inlining: DeltaBlue ran 6% slower.)
+    if all and sm_count[g] == 1 and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g and total < lo {
+        sm_take[first] = 1;
+    };
+    let taken = false;
+    for (first ..< first + sm_count[g]) |k| { if sm_take[k] == 1 { taken = true; }; };
+    if not taken { return false; };
+    sm_chosen[g] = 1;
+    sm_mark_called(body);
+    true;
+}
+
+/// How much inlining call `c` to `g` (a copy of at most `hi` bytes, reads
+/// of parameters aside) grows the code at most; 1000000 when it cannot be.
+fn sm_grows(c: I32, g: I32, np: I32, hi: I32) I32 {
+    // A call without syntax (made by a lowering) could not name the frame
+    // a trap in the copy came from.
+    if w_src[c] < 0 { return 1000000; };
+    // The call: at least `call` and a one-byte index.
+    let grows = hi - 2;
+    for (sm_prefix[g] ..< np) |i| {
+        let arg = w_kid(c, i);
+        if w_op[arg] == Op.LocalGet.to_i32() {
+            grows += (sm_reads[i] - 1) * (1 + leb_len(w_a[arg]));
+        } else if sm_constant(arg) and sm_reads[i] <= 1 {
+            if sm_reads[i] == 0 { grows -= sm_bytes(arg, false); };
+        } else {
+            return 1000000;
+        };
+    };
+    grows;
+}
+
+/// Whether node `n` gives the same value wherever it runs, and runs alone
+/// (a constant, a function, a global nothing assigns).
+fn sm_constant(n: I32) Bool {
+    let op = w_op[n];
+    if op == Op.GlobalGet.to_i32() {
+        let g = w_a[n];
+        return glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] < 0 and glob_sets[g] == 0;
+    };
+    w_count[n] == 0 and (op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32()
+        or op == Op.F64Const.to_i32() or op == Op.RefNull.to_i32() or op == Op.RefFunc.to_i32());
+}
+
+/// Call `c` in `f` becomes the body of its callee.
+fn sm_inline(f: I32, c: I32) void {
+    let g = w_a[c];
+    let np = vl_len[ht_a[func_type_of[g]]];
+    if sm_label[f] < 0 { sm_label[f] = max_label(func_body[f]); };
+    inl_subst.resize(np);
+    inl_local_map.resize(np);
+    for (0 ..< np) |i| {
+        let arg = w_kid(c, i);
+        if i >= sm_prefix[g] and w_op[arg] == Op.LocalGet.to_i32() {
+            inl_subst[i] = -1;
+            inl_local_map[i] = w_a[arg];
+        } else {
+            inl_subst[i] = arg;
+            inl_local_map[i] = -1;
+        };
+    };
+    inl_label_offset[0] = sm_label[f];
+    sm_label[f] += max_label(func_body[g]);
+    inl_site[0] = w_src[c];
+    inl_helper[0] = -1;
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c; }; };
+    let copy = inl_copy(func_body[g]);
+    inl_subst.clear();
+    // The call node becomes the copy (its type, the call's result, stays).
+    w_first[c] = w_kids.len();
+    w_kids.push(copy);
+    w_count[c] = 1;
+    w_op[c] = Op.Seq.to_i32();
+    w_a[c] = 0;
+    w_b[c] = 0;
+}
+
+/// Whether a call under `n` is to a function chosen this round.
+fn sm_calls_chosen(n: I32) Bool {
+    if (w_op[n] == Op.Call.to_i32() or w_op[n] == Op.RefFunc.to_i32()) and sm_chosen[w_a[n]] == 1 { return true; };
+    for (0 ..< w_count[n]) |i| { if sm_calls_chosen(w_kid(n, i)) { return true; }; };
+    false;
+}
+
+fn sm_mark_called(n: I32) void {
+    if w_op[n] == Op.Call.to_i32() or w_op[n] == Op.RefFunc.to_i32() { sm_called[w_a[n]] = 1; };
+    for (0 ..< w_count[n]) |i| { sm_mark_called(w_kid(n, i)); };
+}
+
+/// Notes the reads of parameters (below `np`) and the labels branched to
+/// under `n`; false when the body cannot be copied this way.
+fn sm_scan(n: I32, np: I32) Bool {
+    let op = w_op[n];
+    sm_nodes[0] += 1;
+    if sm_nodes[0] > sm_most_nodes { return false; };
+    if op == Op.Return.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32()
+        or op == Op.Rethrow.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        return false;
+    };
+    if op == Op.LocalGet.to_i32() {
+        if w_a[n] >= np { return false; };
+        sm_reads[w_a[n]] += 1;
+    } else if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() {
+        sm_targets.push(w_a[n]);
+    } else if op == Op.BrTable.to_i32() {
+        for (0 ..< w_b[n]) |i| { sm_targets.push(w_aux[w_a[n] + i]); };
+    };
+    for (0 ..< w_count[n]) |i| { if not sm_scan(w_kid(n, i), np) { return false; }; };
+    true;
+}
+
+fn sm_targeted(label: I32) Bool {
+    for (0 ..< sm_targets.len()) |i| { if sm_targets[i] == label { return true; }; };
+    false;
+}
+
+/// Walks `n` in the order it runs, while only reads of the parameters
+/// before @sm_next have: a read of that one, its only read, is the next.
+fn sm_order(n: I32) void {
+    if sm_clean[0] == 0 { return; };
+    let op = w_op[n];
+    if op == Op.LocalGet.to_i32() {
+        if w_a[n] == sm_next[0] and sm_reads[w_a[n]] == 1 { sm_next[0] += 1; } else { sm_clean[0] = 0; };
+        return;
+    };
+    // (A block nothing branches to encodes as its contents.)
+    let open = op == Op.Seq.to_i32() or (op == Op.Block.to_i32() and not sm_targeted(w_a[n]));
+    if op == Op.If.to_i32() {
+        sm_order(w_kid(n, 0));
+    } else if open or not (op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32()) {
+        for (0 ..< w_count[n]) |i| { sm_order(w_kid(n, i)); };
+    };
+    if not open { sm_clean[0] = 0; };
+}
+
+/// The bytes node `n` encodes to (reads of parameters aside): at most
+/// (`hi`), or at least; 1000000 for what is not weighed.
+fn sm_bytes(n: I32, hi: Bool) I32 {
+    let total = sm_own(n, hi);
+    if total < 0 { return 1000000; };
+    for (0 ..< w_count[n]) |i| {
+        total += sm_bytes(w_kid(n, i), hi);
+        if total >= 1000000 { return 1000000; };
+    };
+    total;
+}
+
+/// The bytes of node `n`'s own instruction, as @sm_bytes; -1 for one not known.
+fn sm_own(n: I32, hi: Bool) I32 {
+    let op = w_op[n];
+    let a = w_a[n];
+    let b = w_b[n];
+    // Indices: at most the bytes of the number of things indexed; at least one.
+    let t = if hi { leb_len(ht_kind.len()); } else { 1; };
+    let fi = if hi { leb_len(func_kind.len()); } else { 1; };
+    let gi = if hi { leb_len(glob_kind.len()); } else { 1; };
+    let mi = if hi { leb_len(memory_kind.len()); } else { 1; };
+    let heap = if a >= vt_defined and hi { sleb_len(ht_kind.len()); } else { 1; };
+    let depth = if hi { sm_depth[0]; } else { 1; };
+    let bt = if hi and w_type[n] > vt_v128 { 4; } else { 1; };
+    let els = if w_count[n] > 2 { 1; } else { 0; };
+    let block = if op == Op.Block.to_i32() and sm_targeted(a) { 2 + bt; } else { 0; };
+    // (`memarg`: alignment, the memory when not the first, offset.)
+    let access = if hi and memory_kind.len() > 1 { 3 + mi; } else { 3; };
+    let i64 = if b == (a >> 31) { 1 + sleb_len(a); } else if hi { 11; } else { 3; };
+    let plain = if a < 256 { 1; } else { 1 + leb_len(a & 255); };
+    match Op.from_i32(op) {
+        Op.Nop => 1,
+        Op.Unreachable => 1,
+        Op.Block => block,
+        Op.If => 2 + bt + els,
+        Op.Seq => 0,
+        Op.Br => 1 + depth,
+        Op.BrIf => 1 + depth,
+        Op.BrTable => 1 + leb_len(b - 1) + b * depth,
+        Op.Drop => 1,
+        Op.Select => 1,
+        Op.Call => 1 + fi,
+        Op.CallRef => 1 + t,
+        Op.LocalGet => 0,
+        Op.GlobalGet => sm_global(a, hi, gi),
+        Op.GlobalSet => 1 + gi,
+        Op.I32Const => 1 + sleb_len(a),
+        Op.I64Const => i64,
+        Op.F32Const => 5,
+        Op.F64Const => 9,
+        Op.Plain => plain,
+        Op.Load => access,
+        Op.Store => access,
+        Op.MemorySize => 1 + mi,
+        Op.MemoryGrow => 1 + mi,
+        Op.MemoryCopy => 2 + mi + mi,
+        Op.MemoryFill => 2 + mi,
+        Op.MemoryInit => 2 + leb_len(b) + mi,
+        Op.StructNew => 2 + t,
+        Op.StructNewDefault => 2 + t,
+        Op.StructGet => 2 + t + leb_len(b),
+        Op.StructGetS => 2 + t + leb_len(b),
+        Op.StructGetU => 2 + t + leb_len(b),
+        Op.StructSet => 2 + t + leb_len(b),
+        Op.ArrayNew => 2 + t,
+        Op.ArrayNewDefault => 2 + t,
+        Op.ArrayNewFixed => 2 + t + leb_len(w_count[n]),
+        Op.ArrayNewData => 2 + t + leb_len(b),
+        Op.ArrayGet => 2 + t,
+        Op.ArrayGetS => 2 + t,
+        Op.ArrayGetU => 2 + t,
+        Op.ArraySet => 2 + t,
+        Op.ArrayLen => 2,
+        Op.ArrayCopy => 2 + t + t,
+        Op.ArrayFill => 2 + t,
+        Op.ArrayInitData => 2 + t + leb_len(b),
+        Op.RefNull => 1 + heap,
+        Op.RefIsNull => 1,
+        Op.RefAsNonNull => 1,
+        Op.RefEq => 1,
+        Op.RefFunc => 1 + fi,
+        Op.RefTest => 2 + heap,
+        Op.RefCast => 2 + heap,
+        Op.RefI31 => 2,
+        Op.I31GetS => 2,
+        Op.I31GetU => 2,
+        Op.AnyConvertExtern => 2,
+        Op.ExternConvertAny => 2,
+        Op.Throw => 2,
+        Op.V128Const => 18,
+        ~> -1,
+    };
+}
+
+/// A global's read, as @sm_own: its index, or the constant it may be folded to.
+fn sm_global(g: I32, hi: Bool, gi: I32) I32 {
+    let init = glob_init[g];
+    let folded = if init >= 0 and (w_op[init] == Op.I32Const.to_i32() or w_op[init] == Op.I64Const.to_i32()) { sm_own(init, hi); } else { 0; };
+    if hi and folded > 1 + gi { return folded; };
+    if hi { 1 + gi; } else { 2; };
+}
+
+/// The bytes of `v` as an unsigned LEB128.
+fn leb_len(v: I32) I32 {
+    let x = v >>> 7;
+    let len = 1;
+    while (x != 0) {
+        x = x >>> 7;
+        len += 1;
+    };
+    len;
+}
+
+/// The bytes of `v` as a signed LEB128.
+fn sleb_len(v: I32) I32 {
+    let x = v;
+    let len = 1;
+    while (x < -64 or x >= 64) {
+        x = x >> 7;
+        len += 1;
+    };
+    len;
 }

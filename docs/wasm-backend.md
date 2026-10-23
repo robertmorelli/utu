@@ -86,8 +86,24 @@ lowerings leave, function by function:
 
 Every local codegen creates is set before it is read, which is what makes
 the first two sound. With it, a consumed generator compiles to what the
-equivalent hand-written loop compiles to. There is no inliner and no loop
-restructuring, so `-Oz` binaries are 10-25% larger than Binaryen's were.
+equivalent hand-written loop compiles to. There is no loop restructuring,
+so `-Oz` binaries are 10-25% larger than Binaryen's were.
+
+## Inlining that shrinks
+
+At `-O small` (and `smallUnsafe`) a call becomes its callee's body where
+the body encodes to no more bytes than the call, and a function called from
+one place moves there when the call and the body are bigger than the copy
+(`selfhost/inline.utu`). Sizes are bounds (a copy's the most it can take,
+the call's and body's the least), so no inlining grows the module. Callees
+have no locals, loops, `return`s or `try`, and no local is added: a
+parameter the body reads first is its argument, already on the stack; one
+passed a local reads that local; one passed a constant reads it in place.
+An exported function, or one used as a value, stays (its calls inline only
+where each alone shrinks); recursive calls and calls a lowering made stay
+calls. A trap in a copy still names the callee's line, `(inlined into
+main)`. Copies at several calls, each bigger than the call, are not made:
+they shifted V8's own inlining (DeltaBlue 6% slower).
 
 ## Structs returned as their fields
 
