@@ -1,0 +1,9 @@
+// What: @ir i32-add given an I64 (small folded it to 6; the other modes failed in the engine)
+// Expect: @ir <ir-i32-add> takes i32, given i64
+fn twice(a: I64) I32 {
+    @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
+}
+
+export main() I32 {
+    twice(3);
+}

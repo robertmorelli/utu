@@ -23,7 +23,7 @@ mod U32 {
     //   neg a  = 0 - a   (well-defined mod 2^32)
     //   bnot a = a xor 0xFFFFFFFF
     fn &:neg  |a| & { @ir/\ <ir-u32-sub><ir-lit kind="int" type-name="U32" value="0"/><ir-ident name="a"/></ir-u32-sub> \/; }
-    fn &:bnot |a| & { @ir/\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="U32" value="-1"/></ir-u32-xor> \/; }
+    fn &:bnot |a| & { @ir/\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="-1"/></ir-u32-xor> \/; }
 
     // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
     fn &.to_i32 |self| () I32 { @ir/\ <ir-i32-or><ir-ident name="self"/><ir-lit kind="int" type-name="I32" value="0"/></ir-i32-or> \/; }

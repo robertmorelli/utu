@@ -251,6 +251,7 @@ enum(U8) Diag:
     | AwaitInGlobal
     | GenericGlobal   // unused: a generic mod's globals are per instance
     | ProtoPairType   // `| get x: A` and `| set x: B`, A not B
+    | IrType          // an `@ir` operand or result of the wrong value type
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
