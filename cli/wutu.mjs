@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { previewClient } from '../tools/dts/preview-client.mjs';
-import { formatUtuSource } from '../src/compiler/wutu-tooling.js';
+import { formatUtu } from '../src/compiler/wutu-tooling.js';
 import { buildBrowserApp } from '../tools/dts/build-app.mjs';
 import { prerender } from '../tools/dts/prerender.mjs';
 import { initParser } from '../src/index.js';
@@ -50,7 +50,13 @@ async function formatCommand(files, { check }) {
   if (!files.length) throw new Error(`no files to format\n\n${USAGE}`);
   for (const name of files) {
     const source = await fs.readFile(name, 'utf8');
-    const formatted = formatUtuSource(source);
+    const { text: formatted, refused } = formatUtu(source);
+    if (refused) {
+      // A file is formatted only when its layout keeps its meaning.
+      console.error(`${name}: left as is: ${refused}`);
+      if (check) process.exitCode = 1;
+      continue;
+    }
     if (source === formatted) continue;
     if (check) {
       console.error(`${name}: needs formatting`);

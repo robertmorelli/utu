@@ -415,8 +415,11 @@ node cli/wutu.mjs build examples/wutu-five/folio/main.utu --out dist/folio
 ```
 
 The formatter lays out surrounding Utu and parsed Wutu islands together, while
-preserving foreign DSL payloads.
-Commented template bodies are conservatively preserved. The VS Code extension
+preserving foreign DSL payloads, strings and templates.
+Commented template bodies are conservatively preserved. It changes only layout:
+a file whose new layout would parse to a different tree, or that does not parse,
+is left as it is (`format` says which), and an island whose layout would change
+more than whitespace keeps its text. The VS Code extension
 registers the same formatter and completions for tags, attributes, bindings, and
 events. Syntax diagnostics point into the original template. CSS values still
 follow browser CSS semantics; this is not a full CSS language server.

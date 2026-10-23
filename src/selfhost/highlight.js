@@ -69,7 +69,21 @@ export function highlighter(utu, files) {
     return sorted;
   };
 
-  return (key, start, end) => piecesOf(key).filter(piece => piece.end > start && piece.start < end);
+  // Pieces don't overlap, so their ends are in order too: the first that
+  // ends past `start` is found by halves (a file of thousands of errors asks
+  // for thousands of lines).
+  return (key, start, end) => {
+    const pieces = piecesOf(key);
+    let lo = 0;
+    let hi = pieces.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (pieces[mid].end > start) hi = mid; else lo = mid + 1;
+    }
+    const out = [];
+    for (let i = lo; i < pieces.length && pieces[i].start < end; i++) out.push(pieces[i]);
+    return out;
+  };
 }
 
 /** By byte of `bytes`: its UTF-16 offset (and one past the end). */

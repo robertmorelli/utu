@@ -190,6 +190,25 @@ export function programIndex(utu, files) {
     typeDeclaration(decl) {
       return utu.decl_checked_type_decl(decl);
     },
+    /**
+     * The declaration of the type of the expression of file `key` that ends
+     * at `offset` (the widest that has one; through `?` when `throughNull`),
+     * or -1: what `e.` there names the members of.
+     */
+    typeDeclarationOfExpressionBefore(key, offset, throughNull = false) {
+      const ending = [];
+      for (let n = 0; n < count; n++) {
+        if (first[n] >= last[n]) continue;
+        const at = place(n);
+        if (at && at.file === key && at.end === offset) ending.push([at.start, n]);
+      }
+      ending.sort((a, b) => a[0] - b[0]);
+      for (const [, n] of ending) {
+        const d = utu.node_type_decl(n, throughNull ? 1 : 0);
+        if (d >= 0) return d;
+      }
+      return -1;
+    },
     /** Every declaration made in file `key` (in every file, for null), each with its kind and owner. */
     declarations(key = null) {
       const out = [];

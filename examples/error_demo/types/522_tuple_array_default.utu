@@ -1,0 +1,6 @@
+// What: an array of tuples made with new_default
+// Expect: A tuple is only a function result (one error, not also "has no default")
+export main() I32 {
+    let a = Array[.{I32, Str}].new_default(2);
+    a.len();
+}

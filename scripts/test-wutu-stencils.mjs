@@ -28,9 +28,9 @@ for(const round of ['one','two'])for(const name of await fs.readdir(`examples/wu
 {
  // Blank lines between statements survive (one at most); `else` stays on its
  // closing brace's line; a `\"` in a string is not its end.
- const source='fn a() Str { "say \\"hi\\" {"; }\n\n\nfn b(x: Bool) I32 {\n    if x { 1; }\n    else { 2; }\n}\n';
+ const source='fn a() Str { "say \\"hi\\" {"; }\n\n\nfn b(x: Bool) I32 {\n    if x { 1; }\n    else { 2; };\n}\n';
  const formatted=formatUtuSource(source);
- assert.equal(formatted,'fn a() Str {\n    "say \\"hi\\" {";\n}\n\nfn b(x: Bool) I32 {\n    if x {\n        1;\n    } else {\n        2;\n    }\n}\n');
+ assert.equal(formatted,'fn a() Str {\n    "say \\"hi\\" {";\n}\n\nfn b(x: Bool) I32 {\n    if x {\n        1;\n    } else {\n        2;\n    };\n}\n');
  assert.equal(formatUtuSource(formatted),formatted,'blank line idempotence');
 }
 console.log('CSS payload/offset preservation, balanced DSL envelopes, and ten-source formatter idempotence passed');

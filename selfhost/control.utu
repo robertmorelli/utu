@@ -99,6 +99,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
                 unknown_arm = true;
             } else if fault >= 0 {
                 report2(Diag.MatchPattern, c, -1, fault, st);
+                in_instance(cx.inst);
             } else {
                 for (first_arm ..< arm_nodes.len()) |k| {
                     if arm_values[k] == v {
@@ -261,30 +262,43 @@ fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     arm_body(default_, t, cx, in_loop);
 }
 
-/// Arms `k` to `last` as a chain of ifs comparing `s` with each value, the
+/// Arms `first` to `last` as a chain of ifs comparing `s` with each value, the
 /// default last.
-fn arm_chain(s: I32, st: I32, k: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool) I32 {
-    if k == last {
-        let m = w_mark();
-        let t = default_body(default_, if in_loop { ty_void(); } else { expect; }, cx, in_loop);
-        if in_loop and default_ >= 0 { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0); };
-        let result = if t >= 0 { t; } else { ty_never(); };
-        w_node(Op.Seq, repr(result), 0, 0, m);
-        return result;
+fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool) I32 {
+    // A loop, not a recursion: a match may have thousands of arms. By arm:
+    // its mark, its else's mark, and its type (-1 when never); each `if` is
+    // closed after the arms past it, innermost first.
+    let n = last - first;
+    let ms = Array[I32].new(n, 0);
+    let mes = Array[I32].new(n, 0);
+    let ts = Array[I32].new(n, 0);
+    let exp = expect;
+    for (first ..< last) |k| {
+        ms[k - first] = w_mark();
+        push_pattern_test(s, st, arm_values[k]);
+        let mt = w_mark();
+        let t = arm_body(arm_nodes[k], if in_loop { ty_void(); } else { exp; }, cx, in_loop);
+        if in_loop { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0); };
+        let tt = if t >= 0 { t; } else { ty_never(); };
+        w_node(Op.Seq, repr(tt), 0, 0, mt);
+        mes[k - first] = w_mark();
+        ts[k - first] = t;
+        if t >= 0 { exp = t; };
     };
     let m = w_mark();
-    push_pattern_test(s, st, arm_values[k]);
-    let mt = w_mark();
-    let t = arm_body(arm_nodes[k], if in_loop { ty_void(); } else { expect; }, cx, in_loop);
-    if in_loop { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0); };
-    let tt = if t >= 0 { t; } else { ty_never(); };
-    w_node(Op.Seq, repr(tt), 0, 0, mt);
-    let me = w_mark();
-    let t2 = arm_chain(s, st, k + 1, last, default_, if t >= 0 { t; } else { expect; }, cx, in_loop);
-    let result = if t >= 0 { t; } else { t2; };
-    if t >= 0 and not in_loop { coerce(t2, t, arm_nodes[k]); };
-    w_node(Op.Seq, repr(result), 0, 0, me);
-    w_node(Op.If, repr(result), new_label(), 0, m);
+    let t = default_body(default_, if in_loop { ty_void(); } else { exp; }, cx, in_loop);
+    if in_loop and default_ >= 0 { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0); };
+    let result = if t >= 0 { t; } else { ty_never(); };
+    w_node(Op.Seq, repr(result), 0, 0, m);
+    let i = n;
+    while (i > 0) {
+        i -= 1;
+        let ti = ts[i];
+        if ti >= 0 and not in_loop { coerce(result, ti, arm_nodes[first + i]); };
+        if ti >= 0 { result = ti; };
+        w_node(Op.Seq, repr(result), 0, 0, mes[i]);
+        w_node(Op.If, repr(result), new_label(), 0, ms[i]);
+    };
     result;
 }
 

@@ -1,0 +1,14 @@
+// What: a pattern that does not fit the type a generic module is instantiated with
+// Expect: -1 is out of range for U32, with G[U32] marked where it is written
+mod G[T] {
+    fn f(v: T) I32 {
+        match v {
+            -1 => 1,
+            ~> 0,
+        };
+    }
+}
+
+export main() I32 {
+    G[U32].f(3);
+}

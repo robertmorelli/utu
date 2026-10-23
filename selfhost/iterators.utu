@@ -2701,7 +2701,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     // (The source's own array, when its elements are of the type written.)
     let direct = k == p.first and not p.range and et == vt;
     let data = -1;
-    let count = new_local(vt_i32);
+    // Stage locals (0 width, 1-3 items): a replay must reuse them.
+    let count = stage_local(slot, 4, vt_i32);
     let base = -1;
     let items = Buffer { array: -1, length: -1, capacity: -1, once: false, bounded: false };
     if direct {
@@ -2723,8 +2724,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let at = array_of(array_of(et));
     let gheap = vt_heap(repr(at));
     let vheap = vt_heap(cur_locals[data]);
-    let total = new_local(vt_i32);
-    let groups = new_local(repr(at));
+    let total = stage_local(slot, 5, vt_i32);
+    let groups = stage_local(slot, 6, repr(at));
     let m = w_mark();
     // total = windows: count >= width ? count - width + 1 : 0; batched: (count + width - 1) / width
     let mt = w_mark();
@@ -2759,7 +2760,7 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     w_i32(0);
     w_i32_op(i32_gt_s, mi);
     let mtt = w_mark();
-    let zero = new_local(vt_i32);
+    let zero = stage_local(slot, 7, vt_i32);
     set_i32(zero, 0);
     let mn = w_mark();
     slice_at(data, base, zero, width, count, vheap);
@@ -2768,8 +2769,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     ls(groups, mn);
     end_if(mi, mtt);
     // for j in 1 ..< total: groups[j] = slice(windows ? j : j * width)
-    let j = new_local(vt_i32);
-    let start = new_local(vt_i32);
+    let j = stage_local(slot, 8, vt_i32);
+    let start = stage_local(slot, 9, vt_i32);
     set_i32(j, 1);
     let lp = loop_open();
     loop_while_lt(lp, j, total);

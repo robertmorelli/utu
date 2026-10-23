@@ -42,7 +42,7 @@ const COMPLETION_KIND = {
 
 const KEYWORDS = ['mod', 'using', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'vec', 'export', 'const', 'type', 'distinct',
   'test', 'bench', 'fun', 'cl', 'await', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote', 'try', 'catch',
-  'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'yield', 'true', 'false', 'null'];
+  'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'yield', 'true', 'false', 'null', 'new'];
 
 // What the prelude offers every program by name: its modules and types.
 const PRELUDE_KINDS = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct']);
@@ -65,7 +65,11 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   let refreshTimer = null;
   const published = new Set();  // keys with diagnostics shown
   const unopened = new Map();    // key → the files not open its last build showed mistakes in
+  const lastGood = new Map();    // key → its text when it last parsed and its imports resolved
   let shutdown = false;
+
+  // An open document's own URI (an unsaved buffer's `untitled:` one too); else the host's.
+  const uriOf = key => docs.get(key)?.uri ?? toUri(key);
 
   // One build at a time: the compiler holds one program.
   const serial = work => {
@@ -84,6 +88,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   // `patch` ({ key, text }), one file's text is another for this build only.
   async function build(key, patch = null) {
     if (!patch && current && current.key === key && current.generation === generation) return current;
+    if (patch && current && current.key === key && current.patch === patch.text && current.patchGeneration === generation) return current;
     const host = overlay(hostFor(key), patch);
     const started = performance.now();
     // The tests' build first: the program built last is the one queried.
@@ -94,17 +99,28 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       const id = `${d.file}\0${d.start}\0${d.end}\0${d.message}`;
       return !seen.has(id) && seen.add(id);
     });
-    const program = { key, generation: patch ? -1 : generation, files: normal.files, index: programIndex(utu, normal.files), diagnostics };
+    const program = {
+      key, generation: patch ? -1 : generation, patch: patch?.text ?? null, patchGeneration: generation,
+      files: normal.files, index: programIndex(utu, normal.files), diagnostics,
+    };
     current = program;
+    if (!patch && analyzed(program, key)) lastGood.set(key, textOf(program, key));
     log(`built ${key}${patch ? ' (patched)' : ''} in ${(performance.now() - started).toFixed(1)} ms`);
     return program;
   }
 
   const textOf = (program, key) => docs.get(key)?.text ?? program.files.find(f => f.key === key)?.text ?? null;
 
+  /** Whether a build analyzed file `key`: it parsed, its imports resolved, it declares something. */
+  const analyzed = (program, key) =>
+    !program.diagnostics.some(d => d.file === key && (d.kind === 'parse-error' || d.kind === 'unknown-import'))
+    && program.index.declarations(key).length > 0;
+
   function publish(key, program) {
     const doc = docs.get(key);
-    if (!doc) return;
+    // A standard library file (where definitions lead) built as a program of
+    // its own would declare the prelude's types twice: its mistakes are not shown.
+    if (!doc || key.startsWith('std:')) return;
     const lines = lineStarts(doc.text);
     // The diagnostic's own kind, its notes after its message, the other
     // places it is about, and its fix (kept for a quick fix: codeAction).
@@ -118,7 +134,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
         const place = location(program, r);
         return place ? [{ location: place, message: r.label || 'related' }] : [];
       }),
-      data: d.fix && toUri(d.fix.file ?? d.file) ? { fix: { ...d.fix, uri: toUri(d.fix.file ?? d.file) } } : undefined,
+      data: d.fix && uriOf(d.fix.file ?? d.file) ? { fix: { ...d.fix, uri: uriOf(d.fix.file ?? d.file) } } : undefined,
     });
     const diagnostics = program.diagnostics.filter(d => d.file === key || d.file == null).map(d => diagnostic(d, lines, d.file === key));
     if (diagnostics.length) published.add(key);
@@ -155,14 +171,36 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     }), 20);
   }
 
-  /** The program for a request's document, and the offset of its position. */
+  /**
+   * The program for a request's document, and the offset of its position.
+   * While the document does not parse (or an import does not resolve), the
+   * answers come from its last text that did (`stale`): `text` and
+   * `offset` are that text's, `current` the document's, and `place(p)`
+   * moves a place of that text to the document's (null for one in what was
+   * edited since; with `clamp`, to the edit's edge).
+   */
   async function at(params) {
     const key = toKey(params.textDocument.uri);
-    const program = await build(key);
-    const text = textOf(program, key);
-    if (text == null) return null;
-    const offset = params.position ? offsetAt(lineStarts(text), params.position, text.length) : 0;
-    return { key, program, text, offset, decl: params.position ? program.index.declarationAt(key, offset) : -1 };
+    let program = await build(key);
+    const current = textOf(program, key);
+    if (current == null) return null;
+    let text = current, moved = null;
+    const good = lastGood.get(key);
+    if (good != null && good !== current && !analyzed(program, key)) {
+      program = await build(key, { key, text: good });
+      text = good;
+      moved = shift(good, current);
+    }
+    const lines = lineStarts(current);
+    const here = params.position ? offsetAt(lines, params.position, current.length) : 0;
+    const offset = moved ? moved.toOld(here) : here;
+    const place = (p, clamp = false) => {
+      if (!moved || !p || p.file !== key) return p;
+      const start = moved.toNew(p.start, clamp && 'start'), end = moved.toNew(p.end, clamp && 'end');
+      return start < 0 || end < 0 ? null : { ...p, start, end };
+    };
+    const decl = params.position && offset >= 0 ? program.index.declarationAt(key, offset) : -1;
+    return { key, program, text, current, lines, offset, decl, stale: !!moved, place };
   }
 
   /**
@@ -177,9 +215,9 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     const spelling = name ? q.text.slice(name.start, name.end) : '';
     if (!/^[A-Za-z_]\w*$/.test(spelling)) return null;
     // An alias is this file's to rename, whatever it names.
-    if (index.declarations(q.key).some(d => d.kind === 'Alias' && index.text(index.definition(d.decl) ?? name) === spelling)) return name;
+    if (isAlias(q, name)) return name;
     const definition = index.definition(q.decl);
-    return definition && toUri(definition.file) && !definition.file.startsWith('std:') ? name : null;
+    return definition && uriOf(definition.file) && !definition.file.startsWith('std:') ? name : null;
   }
 
   /**
@@ -192,7 +230,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   function occurrences(q, name) {
     const { index } = q.program;
     const spelling = q.text.slice(name.start, name.end);
-    const alias = index.declarations(q.key).find(d => d.kind === 'Alias' && index.text(index.definition(d.decl) ?? name) === spelling);
+    const alias = isAlias(q, name);
     if (alias) {
       return index.names(q.key)
         .filter(n => index.text(n.at) === spelling && (n.decl === alias.decl || index.text(index.definition(n.decl) ?? n.at) !== spelling))
@@ -201,10 +239,18 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     return index.references(q.decl).filter(place => index.text(place) === spelling);
   }
 
-  /** A place as an LSP location, or null when no editor can open its file. */
-  function location(program, place) {
+  /** The import alias (`using m |Point| …`) of `q`'s file that the name at `name` spells, or undefined. */
+  function isAlias(q, name) {
+    const { index } = q.program;
+    const spelling = q.text.slice(name.start, name.end);
+    return index.declarations(q.key).find(d => d.kind === 'Alias' && index.text(index.definition(d.decl) ?? name) === spelling);
+  }
+
+  /** A place as an LSP location (moved to the document's text, for `q`), or null when no editor can open its file. */
+  function location(program, place, q = null) {
+    if (q) place = q.place(place);
     if (!place) return null;
-    const uri = toUri(place.file);
+    const uri = uriOf(place.file);
     const text = textOf(program, place.file);
     if (!uri || text == null) return null;
     return { uri, range: range(lineStarts(text), place.start, place.end) };
@@ -235,7 +281,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       for (const d of params.context?.diagnostics ?? []) {
         const fix = d.data?.fix;
         if (!fix) continue;
-        const text = docs.get(toKey(fix.uri))?.text ?? current?.files.find(f => toUri(f.key) === fix.uri)?.text;
+        const text = docs.get(toKey(fix.uri))?.text ?? current?.files.find(f => uriOf(f.key) === fix.uri)?.text;
         if (text == null) continue;
         const lines = lineStarts(text);
         actions.push({
@@ -249,52 +295,68 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     'textDocument/definition': async params => {
       const q = await at(params);
       if (!q || q.decl < 0) return null;
-      return location(q.program, q.program.index.definition(q.decl));
+      return location(q.program, q.program.index.definition(q.decl), q);
     },
 
     'textDocument/references': async params => {
       const q = await at(params);
       if (!q || q.decl < 0) return [];
       const includeDeclaration = params.context?.includeDeclaration ?? true;
-      return q.program.index.references(q.decl, { includeDeclaration }).map(place => location(q.program, place)).filter(Boolean);
+      const here = q.program.index.references(q.decl, { includeDeclaration }).map(place => location(q.program, place, q)).filter(Boolean);
+      return q.stale ? here : unique([...here, ...await importers(q, q.decl, null, includeDeclaration)]);
     },
 
     'textDocument/documentHighlight': async params => {
       const q = await at(params);
       if (!q || q.decl < 0) return [];
-      const lines = lineStarts(q.text);
       const definition = q.program.index.definition(q.decl);
       return q.program.index.references(q.decl)
         .filter(place => place.file === q.key)
-        .map(place => ({ range: range(lines, place.start, place.end), kind: definition && place.start === definition.start && place.file === definition.file ? 3 : 2 }));
+        .map(place => [q.place(place), definition && place.start === definition.start && place.file === definition.file ? 3 : 2])
+        .filter(([place]) => place)
+        .map(([place, kind]) => ({ range: range(q.lines, place.start, place.end), kind }));
     },
 
     'textDocument/hover': async params => {
       const q = await at(params);
       if (!q || q.decl < 0) return null;
-      const contents = hover(q.program, q.decl);
+      const contents = hover(q.program, q.decl, q);
       if (!contents) return null;
-      const name = q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end);
-      return { contents: { kind: 'markdown', value: contents }, ...(name ? { range: range(lineStarts(q.text), name.start, name.end) } : {}) };
+      const name = q.place(q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end));
+      return { contents: { kind: 'markdown', value: contents }, ...(name ? { range: range(q.lines, name.start, name.end) } : {}) };
     },
 
     'textDocument/prepareRename': async params => {
       const q = await at(params);
+      if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
       const name = q && renamed(q);
-      return name ? { range: range(lineStarts(q.text), name.start, name.end), placeholder: q.text.slice(name.start, name.end) } : null;
+      return name ? { range: range(q.lines, name.start, name.end), placeholder: q.text.slice(name.start, name.end) } : null;
     },
 
     'textDocument/rename': async params => {
       const q = await at(params);
+      if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
       const name = q && renamed(q);
       if (!name) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName) || KEYWORDS.includes(params.newName)) {
         throw responseError(-32602, `'${params.newName}' is not a name`);
       }
+      const spelling = q.text.slice(name.start, name.end);
+      const alias = isAlias(q, name);
+      const places = occurrences(q, name);
+      const edits = [...places.map(place => location(q.program, place)), ...alias ? [] : await importers(q, q.decl, spelling, true)];
       const changes = {};
-      for (const place of occurrences(q, name)) {
-        const where = location(q.program, place);
-        if (where) (changes[where.uri] ??= []).push({ range: where.range, newText: params.newName });
+      for (const where of unique(edits.filter(Boolean))) (changes[where.uri] ??= []).push({ range: where.range, newText: params.newName });
+      // A name that would then mean something else (a keyword, a type, a
+      // name already there): the file renamed makes a mistake it did not.
+      const renamedText = applyEdits(q.text, (changes[uriOf(q.key)] ?? []).map(e => e.range), q.lines, params.newName);
+      const errors = program => program.diagnostics.filter(d => d.severity !== 'warning');
+      const before = errors(await build(q.key, { key: q.key, text: q.text }));
+      const known = new Set(before.map(d => d.message));
+      const made = errors(await build(q.key, { key: q.key, text: renamedText }));
+      if (made.length > before.length) {
+        const first = made.find(d => !known.has(d.message)) ?? made[0];
+        throw responseError(-32602, `renaming to '${params.newName}' breaks the program: ${first.message}`);
       }
       return { changes };
     },
@@ -302,21 +364,22 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     'textDocument/documentSymbol': async params => {
       const q = await at(params);
       if (!q) return [];
-      const lines = lineStarts(q.text);
       const { index } = q.program;
       const symbols = new Map();
       const roots = [];
-      for (const { decl, kind, owner, span } of index.declarations(q.key)) {
+      for (const { decl, kind, owner, span: whole } of index.declarations(q.key)) {
         if (!(kind in SYMBOL_KIND)) continue;
-        const name = index.definition(decl);
-        if (!name || name.file !== q.key) continue;
+        const declared = index.definition(decl);
+        if (!declared || declared.file !== q.key) continue;
+        const name = q.place(declared), span = q.place(whole, true);
+        if (!name || !span) continue;
         // A module's own type (`struct &`) is known by the module's name.
         const ownerName = owner >= 0 && index.kind(owner) === 'Module' ? index.definition(owner) : null;
-        const text = index.text(name) === '&' && ownerName ? index.text(ownerName) : index.text(name);
+        const text = index.text(declared) === '&' && ownerName ? index.text(ownerName) : index.text(declared);
         const symbol = {
           name: text, kind: SYMBOL_KIND[kind],
-          range: range(lines, Math.min(span.start, name.start), Math.max(span.end, name.end)),
-          selectionRange: range(lines, name.start, name.end), children: [],
+          range: range(q.lines, Math.min(span.start, name.start), Math.max(span.end, name.end)),
+          selectionRange: range(q.lines, name.start, name.end), children: [],
         };
         symbols.set(decl, symbol);
         const parent = symbols.get(owner);
@@ -336,20 +399,20 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     'textDocument/semanticTokens/full': async params => {
       const q = await at(params);
       if (!q) return { data: [] };
-      const lines = lineStarts(q.text);
       const { index } = q.program;
       const declared = new Map();
       const data = [];
       let line = 0, character = 0;
-      for (const { decl, at: place } of index.names(q.key)) {
+      for (const { decl, at: written } of index.names(q.key)) {
         const type = SEMANTIC_TYPES.indexOf(SEMANTIC_KIND[index.kind(decl)]);
-        if (type < 0) continue;
-        const start = positionAt(lines, place.start);
-        const end = positionAt(lines, place.end);
+        const place = q.place(written);
+        if (type < 0 || !place) continue;
+        const start = positionAt(q.lines, place.start);
+        const end = positionAt(q.lines, place.end);
         if (end.line !== start.line) continue;
         if (!declared.has(decl)) declared.set(decl, index.definition(decl));
         const definition = declared.get(decl);
-        const modifiers = definition && definition.file === q.key && definition.start === place.start ? 1 : 0;
+        const modifiers = definition && definition.file === q.key && definition.start === written.start ? 1 : 0;
         data.push(start.line - line, start.line === line ? start.character - character : start.character, end.character - start.character, type, modifiers);
         line = start.line;
         character = start.character;
@@ -357,6 +420,33 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       return { data };
     },
   };
+
+  /**
+   * Where declaration `decl` (of `q`'s program) is named in the other open
+   * programs that have its file (the files that import it): as locations,
+   * spelled `spelling` (any, for null). Each such program is built, so `q`'s
+   * index is not read after.
+   */
+  async function importers(q, decl, spelling, includeDeclaration) {
+    const definition = q.program.index.definition(decl);
+    if (!definition || definition.file.startsWith('std:')) return [];
+    const out = [];
+    for (const key of [...docs.keys()]) {
+      if (key === q.key) continue;
+      const program = await build(key);
+      if (!program.files.some(f => f.key === definition.file)) continue;
+      const { index } = program;
+      const same = index.declarations(definition.file).find(d => {
+        const p = index.definition(d.decl);
+        return p && p.file === definition.file && p.start === definition.start;
+      });
+      if (!same) continue;
+      for (const place of index.references(same.decl, { includeDeclaration })) {
+        if (spelling == null || index.text(place) === spelling) out.push(location(program, place));
+      }
+    }
+    return out.filter(Boolean);
+  }
 
   /**
    * What may be written at `offset`: after `x.`, the members of x's type (or
@@ -370,7 +460,10 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     if (token && QUIET_TOKENS.has(token.kind)) return [];
     let start = offset;
     while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1])) start--;
-    const member = text[start - 1] === '.';
+    // (`r. ` is `r.` too.)
+    let dot = start;
+    while (dot > 0 && /[ \t]/.test(text[dot - 1])) dot--;
+    const member = text[dot - 1] === '.';
     let program = null;
     for (const tail of ['', ';', ');', ' }']) {
       const patched = `${text.slice(0, start)}${PLACEHOLDER}${tail}${text.slice(offset)}`;
@@ -394,18 +487,25 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       if (name && name !== PLACEHOLDER && /^[A-Za-z_]\w*$/.test(name) && !items.has(name)) items.set(name, item(decl, kind));
     };
     if (member) {
-      let r = start - 1;
+      // `x?.`: the members of what x holds when it is not null.
+      const optional = text[dot - 2] === '?';
+      let r = dot - 1 - (optional ? 1 : 0);
       while (r > 0 && /\s/.test(text[r - 1])) r--;
-      const receiver = index.declarationAt(key, r - 1 >= 0 ? r - 1 : 0);
-      if (receiver < 0) return [];
-      const rkind = index.kind(receiver);
-      // `M.`: what module M holds. `x.`: the fields of x's type, and its module's methods.
-      const owner = rkind === 'Module' ? receiver : LOCAL_KINDS.has(rkind) || rkind === 'Global' ? index.typeDeclaration(receiver) : -1;
+      const receiver = r > 0 ? index.declarationAt(key, r - 1) : -1;
+      const rkind = receiver >= 0 ? index.kind(receiver) : null;
+      // `M.`: what module M holds. `T.`: a type's variants and functions.
+      // Any other `e.`: the fields of e's type, and its module's methods.
+      const statics = rkind === 'Struct' || rkind === 'Enum' || rkind === 'IntEnum';
+      let owner = rkind === 'Module' || statics ? receiver : index.typeDeclarationOfExpressionBefore(key, r, optional);
+      if (owner < 0 && (LOCAL_KINDS.has(rkind) || rkind === 'Global') && (optional || !index.type(receiver).startsWith('?'))) owner = index.typeDeclaration(receiver);
       if (owner < 0) return [];
       const module = rkind === 'Module' ? receiver : moduleOf(index, owner);
+      // A type outside a module has the functions written `fn T.f`: called on a value when they take |self|.
+      const typeName = module < 0 ? label(owner) : null;
       for (const { decl, kind, owner: o } of all) {
-        if (o === owner && (kind === 'Field' || kind === 'Variant' || kind === 'Fn' || kind === 'Global')) add(decl, kind);
-        else if (o === module && module !== owner && kind === 'Fn' && (rkind === 'Module' || isMethod(index, program, decl))) add(decl, kind);
+        if (o === owner && ((kind === 'Field' && !statics) || kind === 'Variant' || kind === 'Fn' || kind === 'Global')) add(decl, kind);
+        else if (typeName && o < 0 && kind === 'Fn' && writtenFor(index, program, decl, typeName) && isMethod(index, program, decl) !== statics) add(decl, kind);
+        else if (module >= 0 && o === module && module !== owner && kind === 'Fn' && (rkind === 'Module' || isMethod(index, program, decl))) add(decl, kind);
         else if (o === module && rkind === 'Module' && (kind === 'Struct' || kind === 'Enum' || kind === 'TypeDecl' || kind === 'Global')) add(decl, kind);
       }
       return [...items.values()];
@@ -428,19 +528,25 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   }
 
   /** What hovering a name shows: its declaration, its type, its doc comment. */
-  function hover(program, decl) {
+  function hover(program, decl, q) {
     const { index } = program;
     const kind = index.kind(decl);
     const definition = index.definition(decl);
     const span = index.span(decl);
-    const text = span ? textOf(program, span.file) : null;
+    const text = !span ? null : span.file === q.key ? q.text : textOf(program, span.file);
     let head;
     if (LOCAL_KINDS.has(kind)) {
       const type = index.type(decl);
       // (A @wat function's body is not checked: its parameters are as written.)
       head = type || !span || text == null ? `${definition ? index.text(definition) : '?'}${type ? `: ${type}` : ''}` : signature(text.slice(span.start, span.end));
     } else if (span && text != null) {
-      head = signature(text.slice(span.start, span.end));
+      head = signature(text.slice(span.start, span.end))
+        // A built-in type's representation is the compiler's business.
+        .replace(/\s*=\s*@ir\s*\/\\[\s\S]*$/, '');
+      // A module's own type, `&`, by the module's name.
+      const module = moduleOf(index, decl);
+      const name = module >= 0 ? index.definition(module) : null;
+      if (name) head = head.replace(/(^|[^&\w])&(?![&\w])/g, `$1${index.text(name)}`);
     }
     if (!head) return null;
     const docs = LOCAL_KINDS.has(kind) ? '' : typstToMarkdown(docComments(utu, program.files).declaration(decl));
@@ -469,8 +575,18 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       const key = toKey(params.textDocument.uri);
       const doc = docs.get(key);
       docs.delete(key);
+      lastGood.delete(key);
       generation++;
       if (doc && published.delete(key)) send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: doc.uri, diagnostics: [] } });
+      // What only this file's builds showed on files not open goes with it.
+      const shown = unopened.get(key) ?? new Set();
+      unopened.delete(key);
+      const still = new Set([...unopened.values()].flatMap(files => [...files]));
+      for (const file of shown) {
+        if (!still.has(file) && !docs.has(file) && toUri(file)) send({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: toUri(file), diagnostics: [] } });
+      }
+      // The other open files saw its unsaved text, or showed its mistakes: built again.
+      if (docs.size) scheduleRefresh([...docs.keys()][0]);
     }
   }
 
@@ -503,6 +619,68 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     /** Builds and answers still running (for tests). */
     idle: () => new Promise(resolve => setTimeout(() => resolve(queue), 30)),
   };
+}
+
+/** Locations, each once. */
+function unique(locations) {
+  const seen = new Set();
+  return locations.filter(l => { const id = JSON.stringify(l); return !seen.has(id) && seen.add(id); });
+}
+
+/** `text` with each of `ranges` (LSP ranges over `lines`) written `newText`. */
+function applyEdits(text, ranges, lines, newText) {
+  const spans = ranges.map(r => [offsetAt(lines, r.start, text.length), offsetAt(lines, r.end, text.length)]).sort((a, b) => b[0] - a[0]);
+  for (const [start, end] of spans) text = text.slice(0, start) + newText + text.slice(end);
+  return text;
+}
+
+/**
+ * Offsets between `before` and `after`, one text edited into the other, by
+ * the lines they share (in order, the longest such run). toOld (of an
+ * offset of `after`) and toNew (of one of `before`) give -1 on a line the
+ * edit changed, or with `clamp` ('start' or 'end') the nearest shared
+ * line's start after it, or end before it.
+ */
+function shift(before, after) {
+  const lines = text => {
+    const starts = lineStarts(text);
+    return { starts, rows: starts.map((s, i) => text.slice(s, i + 1 < starts.length ? starts[i + 1] : text.length)) };
+  };
+  const b = lines(before), a = lines(after);
+  const toA = new Int32Array(b.rows.length).fill(-1), toB = new Int32Array(a.rows.length).fill(-1);
+  let head = 0;
+  while (head < b.rows.length && head < a.rows.length && b.rows[head] === a.rows[head]) { toA[head] = head; toB[head] = head; head++; }
+  let tail = 0;
+  while (tail < b.rows.length - head && tail < a.rows.length - head && b.rows[b.rows.length - 1 - tail] === a.rows[a.rows.length - 1 - tail]) {
+    toA[b.rows.length - 1 - tail] = a.rows.length - 1 - tail;
+    toB[a.rows.length - 1 - tail] = b.rows.length - 1 - tail;
+    tail++;
+  }
+  // The lines between: matched by their longest common run, when that is not too costly.
+  const n = b.rows.length - head - tail, m = a.rows.length - head - tail;
+  if (n > 0 && m > 0 && n * m <= 4e6) {
+    const table = new Int32Array((n + 1) * (m + 1));
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        table[i * (m + 1) + j] = b.rows[head + i] === a.rows[head + j] ? table[(i + 1) * (m + 1) + j + 1] + 1
+          : Math.max(table[(i + 1) * (m + 1) + j], table[i * (m + 1) + j + 1]);
+      }
+    }
+    for (let i = 0, j = 0; i < n && j < m;) {
+      if (b.rows[head + i] === a.rows[head + j]) { toA[head + i] = head + j; toB[head + j] = head + i; i++; j++; }
+      else if (table[(i + 1) * (m + 1) + j] >= table[i * (m + 1) + j + 1]) i++;
+      else j++;
+    }
+  }
+  const lineOf = (starts, o) => positionAt(starts, o).line;
+  const move = (from, to, map, o, clamp) => {
+    const line = lineOf(from.starts, o);
+    if (map[line] >= 0) return to.starts[map[line]] + (o - from.starts[line]);
+    if (clamp === 'start') { for (let k = line + 1; k < map.length; k++) if (map[k] >= 0) return to.starts[map[k]]; }
+    if (clamp === 'end') { for (let k = line - 1; k >= 0; k--) if (map[k] >= 0) return to.starts[map[k]] + to.rows[map[k]].length; }
+    return -1;
+  };
+  return { toOld: o => move(a, b, toB, o), toNew: (o, clamp) => move(b, a, toA, o, clamp) };
 }
 
 function responseError(code, message) {
@@ -562,6 +740,13 @@ function moduleOf(index, decl) {
   let d = decl;
   while (d >= 0 && index.kind(d) !== 'Module') d = index.owner(d);
   return d;
+}
+
+/** A function written `fn T.f …` for type name `T`. */
+function writtenFor(index, program, decl, typeName) {
+  const span = index.span(decl);
+  const text = span && (program.files.find(f => f.key === span.file)?.text);
+  return text != null && new RegExp(`^\\s*(export\\s+)?fn\\s+${typeName}\\.`).test(text.slice(span.start, span.end));
 }
 
 /** A function called on a value: `fn &.f |self| …`. */

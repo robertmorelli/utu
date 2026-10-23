@@ -3035,6 +3035,8 @@ ok
  4 │
  5 │ export main() void {
 
+  note  using console from std:Console;
+
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/32_unknown_import_std_typo.utu:6:5
 
@@ -3044,6 +3046,8 @@ ok
    │     ━━━━━━━
    │     ╰─ not defined
  7 │ }
+
+  note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/33_unknown_import_std_lowercase.utu
@@ -3058,6 +3062,8 @@ ok
  4 │
  5 │ export main() void {
 
+  note  using console from std:Console;
+
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/33_unknown_import_std_lowercase.utu:6:5
 
@@ -3067,6 +3073,8 @@ ok
    │     ━━━━━━━
    │     ╰─ not defined
  7 │ }
+
+  note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/34_unknown_import_std_quoted.utu
@@ -3280,6 +3288,58 @@ ok
    │             ╰─ first here
  4 │     x + y;
  5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/460_std_module_file_name.utu
+ ERROR  Unknown type Time
+        unknown-type · examples/error_demo/names/460_std_module_file_name.utu:3:21
+
+ 1 │ // What: Time.now() with no import; the module in std:Time is time
+ 2 │ // Expect: Unknown type Time; note: using time from std:Time; (the module is time)
+ 3 │ export main() F64 { Time.now(); }
+   │                     ━━━━
+   │                     ╰─ no such type
+
+  note  using time from std:Time; (the module is time)
+--- exit 1
+
+=== utu check examples/error_demo/names/461_console_without_import.utu
+ ERROR  Unknown variable console
+        unknown-variable · examples/error_demo/names/461_console_without_import.utu:3:22
+
+ 1 │ // What: console.log with no import
+ 2 │ // Expect: Unknown variable console; note: using console from std:Console;
+ 3 │ export main() void { console.log("hi"); }
+   │                      ━━━━━━━
+   │                      ╰─ not defined
+
+  note  using console from std:Console;
+--- exit 1
+
+=== utu check examples/error_demo/names/462_std_module_named_as_file.utu
+ ERROR  Unknown module Time
+        unknown-module · examples/error_demo/names/462_std_module_named_as_file.utu:3:7
+
+ 1 │ // What: importing std:Time under its file's name
+ 2 │ // Expect: Unknown module Time; note: using time from std:Time; (the module is time)
+ 3 │ using Time from std:Time;
+   │       ━━━━
+   │       ╰─ no such module
+ 4 │
+ 5 │ export main() F64 { time.now(); }
+
+  note  using time from std:Time; (the module is time)
+
+ ERROR  Unknown variable time
+        unknown-variable · examples/error_demo/names/462_std_module_named_as_file.utu:5:21
+
+ 3 │ using Time from std:Time;
+ 4 │
+ 5 │ export main() F64 { time.now(); }
+   │                     ━━━━
+   │                     ╰─ not defined
+
+  note  using time from std:Time;
 --- exit 1
 
 === utu check examples/error_demo/names/46_duplicate_closure_parameter.utu
@@ -6878,6 +6938,19 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  6 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/520_test_name_escape.utu
+ ERROR  \u needs four hex digits
+        invalid-escape · examples/error_demo/syntax/520_test_name_escape.utu:5:6
+
+ 3 │ export main() void {}
+ 4 │
+ 5 │ test "letter \u{41}" {
+   │      ━━━━━━━━━━━━━━━
+   │      ╰─ here
+ 6 │     assert true;
+ 7 │ }
+--- exit 1
+
 === utu check examples/error_demo/syntax/52_block_comment.utu
  ERROR  Comments start with //; utu has no /* */
         foreign-syntax · examples/error_demo/syntax/52_block_comment.utu:4:5
@@ -7731,8 +7804,8 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  7 │ }
    ┆
 10 │     let b = Box[I32].empty();
-   │             ────────────────
-   │             ╰─ instantiated here
+   │             ────────
+   │             ╰─ in Box[I32]
 --- exit 1
 
 === utu check examples/error_demo/types/103_generic_lists_protocol.utu
@@ -8551,8 +8624,8 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  7 │ }
    ┆
 10 │     let b = Box[I32].empty();
-   │             ────────────────
-   │             ╰─ instantiated here
+   │             ────────
+   │             ╰─ in Box[I32]
 --- exit 1
 
 === utu check examples/error_demo/types/49_unknown_method_struct.utu
@@ -8595,6 +8668,49 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 
   fix   Use len
  5 │     xs.len();
+--- exit 1
+
+=== utu check examples/error_demo/types/521_closure_param_where_str.utu
+ ERROR  m needs a type
+        closure-param-type · examples/error_demo/types/521_closure_param_where_str.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     take(cl(m) Str {
+   │             ━
+   │             ╰─ cl(m: T)
+ 9 │         m;
+10 │     });
+--- exit 1
+
+=== utu check examples/error_demo/types/522_tuple_array_default.utu
+ ERROR  A tuple is only a function result
+        tuple-misplaced · examples/error_demo/types/522_tuple_array_default.utu:4:19
+
+ 2 │ // Expect: A tuple is only a function result (one error, not also "has no default")
+ 3 │ export main() I32 {
+ 4 │     let a = Array[.{I32, Str}].new_default(2);
+   │                   ━━━━━━━━━━━
+   │                   ╰─ here
+ 5 │     a.len();
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/523_generic_literal_instance.utu
+ ERROR  -1 is out of range for U32
+        match-pattern · examples/error_demo/types/523_generic_literal_instance.utu:6:13
+
+ 4 │     fn f(v: T) I32 {
+ 5 │         match v {
+ 6 │             -1 => 1,
+   │             ━━━━━━━━
+   │             ╰─ here
+ 7 │             ~> 0,
+ 8 │         };
+   ┆
+13 │     G[U32].f(3);
+   │     ──────
+   │     ╰─ in G[U32]
 --- exit 1
 
 === utu check examples/error_demo/types/52_unknown_method_i32.utu

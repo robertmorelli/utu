@@ -1,5 +1,5 @@
 // What: a generic module uses ?T, then is instantiated with I32 (a scalar has no null).
-// Expect: I32 cannot be nullable at ?T, and "instantiated here" at Box[I32]
+// Expect: I32 cannot be nullable at ?T, and "in Box[I32]" where it is instantiated
 mod Box[T] {
     struct &:
         | item: ?T

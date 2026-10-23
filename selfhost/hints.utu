@@ -9,21 +9,28 @@
 fn lower_byte(b: I32) I32 { if b >= 65 and b <= 90 { b + 32; } else { b; }; }
 
 /// How far apart two words are: insertions, deletions, changes, and swaps
-/// of two neighbors, one each; a change of case alone costs nothing.
-fn word_distance(a: I32, b: I32) I32 {
+/// of two neighbors, one each; a change of case alone costs nothing. Past
+/// `bound`, some distance past it (a file of many unknown names weighs each
+/// against every name in scope, so most must be cut short).
+fn word_distance(a: I32, b: I32, bound: I32) I32 {
     let sa = src.interned_start(a);
     let na = src.interned_size(a);
     let sb = src.interned_start(b);
     let nb = src.interned_size(b);
+    if na - nb > bound or nb - na > bound { return bound + 1; };
     let w = nb + 1;
     // Three rows of the table: two back, one back, this one.
     let d = Array[I32].new(3 * w, 0);
     for (0 ..< w) |j| { d[w + j] = j; };
+    // The least of the last row and the one before: once both are past
+    // `bound`, every later one is (a swap reaches two rows back).
+    let low1 = 0;
     for (1 ..< na + 1) |i| {
         let row = (i + 1) % 3;
         let up = i % 3;
         let up2 = (i + 2) % 3;
         d[row * w] = i;
+        let low = i;
         for (1 ..< nb + 1) |j| {
             let x = lower_byte(src[sa + i - 1]);
             let y = lower_byte(src[sb + j - 1]);
@@ -35,7 +42,10 @@ fn word_distance(a: I32, b: I32) I32 {
                 best = d[up2 * w + j - 2] + 1;
             };
             d[row * w + j] = best;
+            if best < low { low = best; };
         };
+        if low > bound and low1 > bound { return bound + 1; };
+        low1 = low;
     };
     d[((na + 1) % 3) * w + nb];
 }
@@ -73,7 +83,9 @@ fn near_consider(word: I32, cand: I32, decl: I32) void {
     if cand < 0 or cand == word or cand == near_word[0] { return; };
     // A name the compiler made (`__…`) is not one to suggest.
     if src.interned_size(cand) > 1 and src[src.interned_start(cand)] == 95 and src[src.interned_start(cand) + 1] == 95 { return; };
-    let d = word_distance(word, cand);
+    // Past the bound or past `max_distance`, no distance changes anything.
+    let most = max_distance(word);
+    let d = word_distance(word, cand, if near_dist[0] < most { near_dist[0]; } else { most; });
     if d < near_dist[0] {
         near_word[0] = cand;
         near_dist[0] = d;
@@ -231,18 +243,29 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) void {
     report(kind, node, word);
     if diag_fresh[0] == 0 { return; };
     let t = word_text(word);
-    if seek != Seek.Value and is_std_module(t) {
-        diag_note("using " + t + " from std:" + t + ";");
+    let m = std_module(t);
+    // (A lowercase module is used as a value: `console.log(…)`.)
+    if m.len() > 0 and (seek != Seek.Value or m == t) {
+        let line = "using " + m + " from std:" + std_file(m) + ";";
+        diag_note(if m == t { line; } else { line + " (the module is " + m + ")"; });
         return;
     };
     suggest(node, near_in_scope(word, seek), near_decl[0]);
 }
 
-/// Whether `t` names a standard module a file must import (`using`).
-fn is_std_module(t: Str) Bool {
-    t == "StrMap" or t == "IntMap" or t == "List" or t == "Buffer" or t == "Console" or t == "Interner"
-        or t == "Random" or t == "Time" or t == "SegmentTree" or t == "PersistentSegmentTree" or t == "Spatial"
-        or t == "NumberField";
+/// The standard module a file must import (`using`) that `t` names, by
+/// its name or its file's; empty if none.
+fn std_module(t: Str) Str {
+    if t == "Console" or t == "console" { return "console"; };
+    if t == "Time" or t == "time" { return "time"; };
+    if t == "StrMap" or t == "IntMap" or t == "List" or t == "Buffer" or t == "Interner" or t == "Random"
+        or t == "SegmentTree" or t == "PersistentSegmentTree" or t == "Spatial" or t == "NumberField" { return t; };
+    "";
+}
+
+/// The std file module `m` is in (`console` in std:Console).
+fn std_file(m: Str) Str {
+    if m == "console" { "Console"; } else if m == "time" { "Time"; } else { m; };
 }
 
 /// Suggest the member of `owner` in `space` nearest the name at `at`.
@@ -820,4 +843,19 @@ fn fn_word(decl: I32) I32 {
     let at = decl_name_at(decl);
     if at >= 0 and at != decl_node[decl] and is_kind(at, Node.Identifier) { return word_of(at); };
     decl_name[decl];
+}
+
+//! = Instances
+
+/// The instance of a generic module the function being checked is in (0 none).
+vec cur_inst: I32 = [0];
+
+/// The last diagnostic was found checking instance `inst` (of a generic
+/// module): name it, at the place it was written when known.
+fn in_instance(inst: I32) void {
+    if inst <= 0 { return; };
+    let text = "in " + word_text(decl_name[inst_module[inst]]) + "[" + type_list_text(inst_args[inst]) + "]";
+    let l = inst_site[inst];
+    // `G[U32]`: the name before the list, to its `]`.
+    if l >= 0 { diag_place_tokens(Extra.Related, node_first[l] - 1, node_last[l] - 1, text); } else { diag_note(text); };
 }

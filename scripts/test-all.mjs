@@ -37,6 +37,7 @@ const commands = [
   ['node', './scripts/test-source-warnings.mjs'],
   ['node', './scripts/test-query-features.mjs'],
   ['node', './scripts/test-wutu-stencils.mjs'],
+  ['node', './scripts/test-formatter.mjs'],
   ['node', './scripts/test-wutu-grammar.mjs'],
   ['node', './scripts/test-wutu-cli.mjs'],
   ['node', './scripts/test-utu-cli.mjs'],

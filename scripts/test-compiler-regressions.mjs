@@ -397,6 +397,8 @@ export lib {
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
     ['mod m[T] {\n    struct &:\n        | v: T\n        | next: ?m[T]\n    fn &.mk(v: T) m[T] { &{ v: v, next: null }; }\n}\nexport lib { fn run() I32 { let a = m[I32].mk(3); a.next = m[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
+    ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the
     // block's defers run; the type comes from the tail, else the breaks.
     ['fn find(xs: Array[I32], want: I32) I32 {\n    found: {\n        for (0 ..< xs.len()) |i| { for (0 ..< 3) |j| { if xs[i] + j == want { break found i * 10 + j; }; }; };\n        -1;\n    };\n}\n'
@@ -820,11 +822,55 @@ export lib {
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
+  // A std module not imported: the note names the module, and its file.
+  for (const [source, note] of [
+    ['export main() F64 { Time.now(); }\n', 'using time from std:Time; (the module is time)'],
+    ['using Time from std:Time;\nexport main() F64 { time.now(); }\n', 'using time from std:Time; (the module is time)'],
+    ['export main() void { console.log("hi"); }\n', 'using console from std:Console;'],
+  ]) {
+    const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
+    assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
+    checked++;
+  }
 
   // Test names: each test has one, its own.
   const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
   assert.deepEqual(twice.diagnostics.map(d => d.message), ['Duplicate test "passes"', 'Empty test name']);
   checked++;
+  // A test name's escapes, checked as a string's are.
+  const escaped = await compileFile(utu, await write('export main() void {}\ntest "x\\u{41}" { assert true; }\n'), { target: 'test' });
+  assert.deepEqual(escaped.diagnostics.map(d => d.message), ['\\u needs four hex digits']);
+  checked++;
+  // One mistake, one message: a closure with an untyped parameter where no
+  // closure is wanted (not also "got cl(unknown) Str"); a tuple element
+  // (not also "has no default").
+  for (const [source, message] of [
+    ['fn take(s: Str) I32 { s.len(); }\nexport main() I32 { take(cl(m) Str { m; }); }\n', 'm needs a type'],
+    ['export main() I32 { let a = Array[.{I32, Str}].new_default(2); 0; }\n', 'A tuple is only a function result'],
+  ]) {
+    const one = await compileFile(utu, await write(source), {});
+    assert.deepEqual(one.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], source);
+    checked++;
+  }
+  // A literal out of range in a generic module: the instance named where it was written.
+  const generic = await compileFile(utu, await write('mod G[T] {\n    fn f(v: T) I32 {\n        match v {\n            -1 => 1,\n            ~> 0,\n        };\n    }\n}\nexport main() I32 {\n    G[U32].f(3);\n}\n'), {});
+  assert.equal(generic.diagnostics.length, 1);
+  assert.ok(JSON.stringify(generic.diagnostics[0]).includes('in G[U32]'), JSON.stringify(generic.diagnostics[0]));
+  checked++;
+  // Thousands of alt arms, and of sparse match arms, are checked by a loop
+  // (each arm recursed on the next).
+  const variants = Array.from({ length: 3000 }, (_, k) => `    | V${k} { x: I32 }`).join('\n');
+  const altArms = Array.from({ length: 3000 }, (_, k) => `        V${k} |v| => v.x + ${k},`).join('\n');
+  const matchArms = Array.from({ length: 3000 }, (_, k) => `        ${k * 7} => ${k},`).join('\n');
+  for (const [source, expected] of [
+    [`enum E:\n${variants}\nfn f(e: E) I32 {\n    alt e {\n${altArms}\n    };\n}\nexport main() I32 {\n    f(V2999 { x: 1 });\n}\n`, 3000],
+    [`fn f(x: I32) I32 {\n    match x {\n${matchArms}\n        ~> -1,\n    };\n}\nexport main() I32 {\n    f(7 * 2999);\n}\n`, 2999],
+  ]) {
+    const built = await compileFile(utu, await write(source), { mode: 'debug' });
+    assert.ok(built.wasm, built.diagnostics.map(d => d.message).join('\n'));
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.main(), expected);
+    checked++;
+  }
 
   // Each file's names are its own (only modules cross files), and generic
   // modules called through aliases: what each builds to, in every mode.
