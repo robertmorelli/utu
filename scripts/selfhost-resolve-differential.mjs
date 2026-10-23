@@ -47,6 +47,12 @@ const COMMENT = KIND('comment');
 const MODULE_NAME = KIND('module_name');
 
 const BASELINE = path.join(ROOT, 'baselines', 'definitions.json.gz');
+// Names the self-hosted compiler resolves rightly and stage 0 does not, by
+// `file:offset`, with why.
+const ON_PURPOSE = new Map([
+  // `Order.clamp` with `mod Order[T[Ord]]`: std:Ord's clamp; stage 0 has no bounds and answers I32's.
+  ['examples/bounds.utu:2129', 'bounds'],
+]);
 if (process.argv.includes('--record')) {
   const programs = {};
   for (const dump of fs.readdirSync(DUMPS).filter(name => name.endsWith('_analysis.json.gz')).sort()) {
@@ -196,6 +202,10 @@ async function compare(entry, definitions) {
       continue;
     }
     if (got.file === expected.file && got.start === expected.start && got.end === expected.end) {
+      totals.same++;
+      continue;
+    }
+    if (ON_PURPOSE.has(`${at.file}:${at.start}`)) {
       totals.same++;
       continue;
     }
