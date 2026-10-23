@@ -1,0 +1,16 @@
+// What: a generator method called like a function instead of read by a for
+// Expect: each is a generator: for (each(…)) |v| { … }
+mod Bag {
+    struct &:
+        | n: I32
+    fn &.new() & { &{ n: 3 }; }
+    fn &.each |b| () yield I32 {
+        for (0 ..< b.n) |i| { yield i; };
+    }
+}
+
+export main() I32 {
+    let bag = Bag.new();
+    bag.each();
+    0;
+}

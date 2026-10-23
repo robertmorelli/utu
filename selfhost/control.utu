@@ -628,7 +628,7 @@ fn leave_loop() void {
 /// end  end
 /// ```
 fn check_for(node: I32, cx: Cx) I32 {
-    let call = generator_call(node);
+    let call = generator_source(node, cx);
     if call >= 0 { return check_generator_loop(node, call, cx); };
     let sources = first_child(node);
     let capture = next_sibling(sources);

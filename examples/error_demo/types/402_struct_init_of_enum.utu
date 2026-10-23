@@ -1,0 +1,10 @@
+// What: struct-literal syntax on an enum
+// Expect: E is not a struct: it has no fields to set
+enum(U8) E:
+    | A
+    | B
+
+export main() I32 {
+    let e = E { x: 1 };
+    0;
+}

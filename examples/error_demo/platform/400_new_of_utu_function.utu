@@ -1,0 +1,11 @@
+// What: new used on a utu function, not a host class
+// Expect: new makes host objects; mk is not a host class
+struct P:
+    | x: I32
+
+fn mk() P { P { x: 1 }; }
+
+export main() I32 {
+    let p = new mk();
+    p.x;
+}

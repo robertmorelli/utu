@@ -753,6 +753,8 @@ fn sweep() void {
     for (0 ..< glob_kind.len()) |g| {
         if glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] >= 0 { mark_global(g); };
     };
+    // (The start function the computed globals made; see check.utu.)
+    if start_func[0] >= 0 { mark_func(start_func[0]); };
     while (live_work.len() > 0) {
         let node = live_work[live_work.len() - 1];
         live_work.resize(live_work.len() - 1);
@@ -1104,8 +1106,15 @@ fn sweep_types() void {
     while (live_work.len() > 0) {
         let node = live_work[live_work.len() - 1];
         live_work.resize(live_work.len() - 1);
-        mark_vt(w_type[node]);
         let op = w_op[node];
+        // Only a block's several results need a function type (a call's
+        // are its callee's).
+        let vt = w_type[node];
+        if vt >= vt_tuple and not (op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.If.to_i32() or op == Op.Try.to_i32()) {
+            mark_list(vt - vt_tuple);
+        } else {
+            mark_vt(vt);
+        };
         if op == Op.RefNull.to_i32() or op == Op.RefTest.to_i32() or op == Op.RefCast.to_i32() { mark_vt(w_a[node]); }
         else if op == Op.CallRef.to_i32() or (op >= Op.StructNew.to_i32() and op <= Op.ArrayInitData.to_i32() and op != Op.ArrayLen.to_i32()) {
             mark_type(w_a[node]);
@@ -1587,6 +1596,7 @@ fn encode_names() void {
 fn encode_module() I32 {
     // Nodes made from here (inlining, cleaning up) have no syntax of their own.
     cur_src[0] = -1;
+    lean_closures();
     sweep();
     // -O3 inlines (inline.utu); what is no longer called is then swept out,
     // before the mems' late functions are made (and marked live).
@@ -1594,6 +1604,8 @@ fn encode_module() I32 {
         inline_module();
         sweep();
     };
+    // Structs returned as their fields (inline.utu).
+    if optimize_level[0] != 0 and struct_returns() { sweep(); };
     finish_mems();
     if optimize_level[0] != 0 { optimize_module(); };
     write_host_json();
