@@ -3955,6 +3955,93 @@ ok
  9 │ export main() I32 {
 --- exit 1
 
+=== utu check examples/error_demo/names/760_duplicate_fn_in_module.utu
+ ERROR  Duplicate declaration f
+        duplicate-declaration · examples/error_demo/names/760_duplicate_fn_in_module.utu:5:8
+
+ 3 │ mod M {
+ 4 │     fn f() I32 { 1; }
+   │        ─
+   │        ╰─ first here
+ 5 │     fn f() I32 { 2; }
+   │        ━
+   │        ╰─ again
+ 6 │     fn get() I32 { f(); }
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/761_duplicate_global_in_module.utu
+ ERROR  Duplicate declaration g
+        duplicate-declaration · examples/error_demo/names/761_duplicate_global_in_module.utu:5:9
+
+ 3 │ mod M {
+ 4 │     let g: I32 = 3;
+   │         ─
+   │         ╰─ first here
+ 5 │     let g: I32 = 4;
+   │         ━
+   │         ╰─ again
+ 6 │     fn get() I32 { g; }
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/762_duplicate_in_generic_module.utu
+ ERROR  Duplicate declaration size
+        duplicate-declaration · examples/error_demo/names/762_duplicate_in_generic_module.utu:5:8
+
+ 3 │ mod Box[T] {
+ 4 │     let size: I32 = 1;
+   │         ────
+   │         ╰─ first here
+ 5 │     fn size() I32 { 2; }
+   │        ━━━━
+   │        ╰─ again
+ 6 │ }
+
+ ERROR  No method Box.size
+        unknown-method · examples/error_demo/names/762_duplicate_in_generic_module.utu:9:14
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     Box[I32].size();
+   │              ━━━━
+   │              ╰─ no such method
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/763_duplicate_protocol_impl.utu
+ ERROR  Duplicate method P[S].m
+        duplicate-method · examples/error_demo/names/763_duplicate_protocol_impl.utu:10:4
+
+ 8 │
+ 9 │ fn P[S].m |a| (b: S) I32 { 1; }
+   │         ─
+   │         ╰─ first here
+10 │ fn P[S].m |a| (b: S) I32 { 2; }
+   │    ━━━━━━
+   │    ╰─ already declared
+11 │
+12 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/764_impl_std_already_has.utu
+ ERROR  Duplicate method Ord[Str].cmp
+        duplicate-method · examples/error_demo/names/764_impl_std_already_has.utu:6:4
+
+ 4 │ using Order from std:Ord;
+ 5 │
+ 6 │ fn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }
+   │    ━━━━━━━━━━━━
+   │    ╰─ already declared
+ 7 │
+ 8 │ export main() Str {
+
+   ╭─ std:Ord
+32 │     fn Ord[Str].cmp |a| (b: Str) I32 {
+   │                 ───
+   │                 ╰─ first here
+--- exit 1
+
 === utu check examples/error_demo/names/76_recursive_variant.utu
 ok
 --- exit 0

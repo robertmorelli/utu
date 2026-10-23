@@ -1,0 +1,10 @@
+// What: a generic module declares a global and a function of one name
+// Expect: Duplicate declaration size, at the function
+mod Box[T] {
+    let size: I32 = 1;
+    fn size() I32 { 2; }
+}
+
+export main() I32 {
+    Box[I32].size();
+}

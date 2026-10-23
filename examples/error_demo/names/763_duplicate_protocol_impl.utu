@@ -1,0 +1,14 @@
+// What: one type implements a protocol's method twice
+// Expect: Duplicate method P[S].m, at the second
+proto P:
+    | m(&) I32
+
+struct S[P]:
+    | v: I32
+
+fn P[S].m |a| (b: S) I32 { 1; }
+fn P[S].m |a| (b: S) I32 { 2; }
+
+export main() I32 {
+    S { v: 0 }.m(S { v: 1 });
+}

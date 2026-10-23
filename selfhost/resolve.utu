@@ -760,21 +760,26 @@ fn declare_module(item: I32) I32 {
         let kind = node_kind[c];
         let t = declare_type_item(c, decl);
         if t >= 0 {
-            if names_promoted(c) { decl_a[decl] = t; } else { add_member(decl, decl_name[t], Space.Member, t); };
+            if names_promoted(c) { decl_a[decl] = t; } else { member_once(decl, t); };
             if decl_is(t, Decl.Enum) {
                 for (t + 1 ..< decl_kind.len()) |v| {
                     if decl_owner[v] == t { add_member(decl, decl_name[v], Space.Member, v); };
                 };
             };
         } else if kind == Node.Fn_decl.to_i32() or kind == Node.Op_decl.to_i32() {
-            let f = declare_fn(c, decl);
-            add_member(decl, decl_name[f], Space.Member, f);
+            member_once(decl, declare_fn(c, decl));
         } else if kind == Node.Global_decl.to_i32() {
-            declare_member(Decl.Global, first_child(c), c, decl);
+            member_once(decl, declare_named(Decl.Global, first_child(c), c, decl));
         };
         c = next_sibling(c);
     };
     decl;
+}
+
+/// `d`, a member of `module`; a second of its name is reported.
+fn member_once(module: I32, d: I32) void {
+    let prior = add_member(module, decl_name[d], Space.Member, d);
+    if prior >= 0 and prior != d and file_role[file_of_token(node_first[decl_node[d]])] != FileRole.Generated.to_i32() { report_twice(d, prior); };
 }
 
 /// A module's type parameters and members, in scope for its body.
@@ -1171,15 +1176,18 @@ fn declare_entry_item(item: I32, first_entry: I32) void {
         if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name); }
         else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); }
         else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); }
-        else {
-            report(Diag.DuplicateDeclaration, decl_node[decl], name);
-            let again = decl_name_at(decl);
-            if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again"); };
-            diag_place(Extra.Related, decl_name_at(hidden), "first here");
-        };
+        else { report_twice(decl, hidden); };
     };
     bind(name, decl);
     bind_variants(decl);
+}
+
+/// `decl`, named as `first` is in one scope: reported at `decl`.
+fn report_twice(decl: I32, first: I32) void {
+    report(Diag.DuplicateDeclaration, decl_node[decl], decl_name[decl]);
+    let again = decl_name_at(decl);
+    if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again"); };
+    diag_place(Extra.Related, decl_name_at(first), "first here");
 }
 
 /// An enum's variants are types too, named where the enum is.
@@ -1433,6 +1441,8 @@ fn register_method(item: I32, w: Walk) void {
                 if prior >= 0 and decl_is(decl_a[prior], Decl.Proto) and decl_a[prior] != owner {
                     method_twice.push(prior);
                     method_twice.push(decl);
+                } else if prior >= 0 and prior != decl and decl_a[prior] == owner {
+                    impl_twice(prior, decl);
                 };
             };
         };
@@ -1454,6 +1464,16 @@ fn register_method(item: I32, w: Walk) void {
             report2(Diag.MemberClash, method, word_of(method), owner, 1);
         };
     };
+}
+
+/// `fn P[T].m` twice for one T: reported at the one in the program's own
+/// files (the user's, when std already has it).
+fn impl_twice(a: I32, b: I32) void {
+    let again = if is_own_file(file_of_token(node_first[decl_node[b]])) { b; } else { a; };
+    let first = if again == b { a; } else { b; };
+    let name = first_child(decl_node[again]);
+    report2(Diag.DuplicateDeclaration, name, word_of(last_child(name)), 5, -1);
+    diag_place(Extra.Related, decl_name_at(first), "first here");
 }
 
 /// The node naming T in `fn P[T].m`'s `[T]` (`args`): a name, or `&` (in
