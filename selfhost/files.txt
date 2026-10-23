@@ -28,7 +28,6 @@ diag.utu
 hints.utu
 dsl.utu
 json.utu
-json_runtime.utu
 stored.utu
 wutu_parse.utu
 wutu.utu

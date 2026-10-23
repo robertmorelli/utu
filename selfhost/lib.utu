@@ -26,7 +26,7 @@
 //!   `protocols.utu`, `data.utu`, `strings.utu`, `mems.utu`, `enums.utu`,
 //!   `ir.utu` (the standard library's `@ir` bodies), and `host.utu` (what
 //!   the module imports). `gen.utu` writes parts of the language as utu source.
-//! + DSLs expand into utu source: `dsl.utu`, `json.utu`, `json_runtime.utu`,
+//! + DSLs expand into utu source: `dsl.utu`, `json.utu` (its runtime is `std:JsonRuntime`),
 //!   `stored.utu`, `wutu_parse.utu`, `wutu.utu`.
 //! + `optimize.utu` cleans up each function's IR, and `wasm.utu` encodes the
 //!   module.
@@ -115,6 +115,14 @@ export lib {
     fn abi_offsets_room(n: I32) void { abi_offsets.resize(n); }
 
     fn abi_doc_at(at: I32, n: I32) I32 { abi_add_doc_at(at, n); }
+
+    /// Room for `std:JsonRuntime`, `n` bytes the host writes at the offset
+    /// returned, before `seal()`.
+    fn json_runtime_room(n: I32) I32 {
+        json_rt[0] = abi_reserve(n);
+        json_rt[1] = json_rt[0] + n;
+        json_rt[0];
+    }
 
     /// The host cannot read the import's file, whose path is `n` bytes the
     /// host writes at the offset returned. This ends the build.

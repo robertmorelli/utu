@@ -523,7 +523,7 @@ function startProgram(utu, stdlib) {
   return state.prelude;
 }
 
-/** std:Prelude and the standard library files it imports, added and parsed. */
+/** std:Prelude and the standard library files it imports, added and parsed; and std:JsonRuntime's text. */
 function seatPrelude(utu, stdlib) {
   const files = [];
   const byKey = new Map();
@@ -535,6 +535,13 @@ function seatPrelude(utu, stdlib) {
     const text = stdlib.get(key);
     if (!PLATFORM_PATH.test(key) || typeof text !== 'string') continue;
     utu.import_bind(i, byKey.get(key) ?? addFile(utu, files, byKey, key, text, ROLE.prelude));
+  }
+  // `@json`'s runtime: text the compiler grafts, not a file.
+  const runtime = stdlib.get('std:JsonRuntime');
+  if (typeof runtime === 'string') {
+    const bytes = encoder.encode(runtime);
+    const at = utu.json_runtime_room(bytes.length);
+    new Uint8Array(utu.src.buffer).set(bytes, at);
   }
   return { files, byKey };
 }
