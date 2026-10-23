@@ -1245,6 +1245,12 @@ export lib {
     ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
     // Arms of one value, and enum variants without one, found by value.
     ['fn f(x: I32) I32 { match x { 1 => 1, 2 => 2, 1 => 3, ~> 0, }; }\nexport main() I32 { f(1); }\n', 'Duplicate pattern 1'],
+    // A name twice in one module, or one T's protocol method twice (std's too): last one won.
+    ['mod M { fn f() I32 { 1; } fn f() I32 { 2; } fn get() I32 { f(); } }\nexport main() I32 { M.get(); }\n', 'Duplicate declaration f'],
+    ['mod M { let g: I32 = 3; let g: I32 = 4; fn get() I32 { g; } }\nexport main() I32 { M.get(); }\n', 'Duplicate declaration g'],
+    ['mod M[T] { fn f() I32 { 1; } fn f() I32 { 2; } fn get() I32 { f(); } }\nexport main() I32 { M[I32].get(); }\n', 'Duplicate declaration f'],
+    ['proto P:\n    | m(&) I32\nstruct S[P]:\n    | v: I32\nfn P[S].m |a| (b: S) I32 { 1; }\nfn P[S].m |a| (b: S) I32 { 2; }\nexport main() I32 { 0; }\n', 'Duplicate method P[S].m'],
+    ['using Ord from std:Ord;\nusing Order from std:Ord;\nfn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }\nexport main() Str { Order[Str].max_of(["aaaa", "b", "cc"]); }\n', 'Duplicate method Ord[Str].cmp'],
     [`enum(U8) Many:\n${variants}\nfn f(m: Many) I32 { match m {\n${covered.split('\n').filter(l => !l.includes('V17 ')).join('\n')}\n}; }\nexport main() I32 { f(Many.V1); }\n`, 'match misses Many.V17'],
     // try and errdefer: a Result, in a function returning one with the same error type.
     ['fn f() Result[I32, Str] { let x = try 5; Result[I32, Str].ok(x); }\nexport main() I32 { f().value(); }\n', 'try needs a Result, not I32'],

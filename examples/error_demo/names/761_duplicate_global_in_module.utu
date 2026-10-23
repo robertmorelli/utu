@@ -1,0 +1,11 @@
+// What: one module declares the same global twice
+// Expect: Duplicate declaration g, at the second
+mod M {
+    let g: I32 = 3;
+    let g: I32 = 4;
+    fn get() I32 { g; }
+}
+
+export main() I32 {
+    M.get();
+}

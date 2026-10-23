@@ -1,0 +1,10 @@
+// What: a program implements Ord[Str].cmp, which std already implements
+// Expect: Duplicate method Ord[Str].cmp, pointing at std's
+using Ord from std:Ord;
+using Order from std:Ord;
+
+fn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }
+
+export main() Str {
+    Order[Str].max_of(["aaaa", "b", "cc"]);
+}
