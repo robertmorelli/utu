@@ -634,7 +634,7 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         w_i32_op(i32_eqz, m);
     }
     else if tag == known_word(Known.IrStringMeasure) { call_builtin(Builtin.Length, m); }
-    else if tag == known_word(Known.IrStringSlice) { call_builtin(Builtin.Substring, m); }
+    else if tag == known_word(Known.IrStringSlice) { string_slice(m); }
     else if tag == known_word(Known.IrStringGet) { call_builtin(Builtin.CharCodeAt, m); }
     else if tag == known_word(Known.IrStringFromCodePoint) { call_builtin(Builtin.FromCodePoint, m); }
     else if tag == known_word(Known.IrStringFromCodes) {
@@ -770,11 +770,14 @@ fn reorders(x: I32) Bool {
 vec slice_helper: I32;
 /// The `Str.from_codes` helper, once made: one, as its codes are always an `Array[I32]`.
 vec codes_helper: I32;
+/// Every helper made: one shared by every use, so placed by its call (inline.utu).
+vec helper_funcs: I32;
 
 /// A helper function's locals after its parameters: value types in `local_types`.
 fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {
     let f = new_func(FuncKind.Defined, func_type(params, results));
     func_debug_name[f] = name_add(name);
+    helper_funcs.push(f);
     func_locals[f] = local_types.len();
     func_local_count[f] = vl_len[locals];
     for (0 ..< vl_len[locals]) |i| { local_types.push(vl_item(locals, i)); };
@@ -834,6 +837,38 @@ fn array_slice_helper(heap: I32) I32 {
     w_node(Op.Seq, ref, 0, 0, m);
     func_body[f] = w_pop();
     f;
+}
+
+/// `substring` of the string, start, and end since `m`, a negative or
+/// reversed range empty: engines differ there (one reads an index unsigned,
+/// another clamps it).
+fn string_slice(m: I32) void {
+    let a = if w_stack.len() == m + 3 { w_stack[m + 1]; } else { -1; };
+    let b = if a >= 0 { w_stack[m + 2]; } else { -1; };
+    // Not one, or constants already in order: as they are.
+    if a < 0 or (w_op[a] == Op.I32Const.to_i32() and w_op[b] == Op.I32Const.to_i32() and w_a[a] >= 0 and w_a[b] >= w_a[a]) {
+        call_builtin(Builtin.Substring, m);
+        return;
+    };
+    let la = new_local(vt_i32);
+    let lb = new_local(vt_i32);
+    // (s, a, select(b, a, a >= 0 and b >= a)): out of order, (a, a), empty.
+    w_stack.resize(m + 2);
+    w_node(Op.LocalTee, vt_i32, la, 0, m + 1);
+    w_push(b);
+    w_node(Op.LocalTee, vt_i32, lb, 0, m + 2);
+    w_get(vt_i32, la);
+    let mc = w_mark();
+    w_get(vt_i32, la);
+    w_i32(0);
+    w_i32_op(i32_ge_s, mc);
+    let mo = w_mark();
+    w_get(vt_i32, lb);
+    w_get(vt_i32, la);
+    w_i32_op(i32_ge_s, mo);
+    w_i32_op(i32_and, mc);
+    w_node(Op.Select, vt_i32, 0, 0, m + 2);
+    call_builtin(Builtin.Substring, m);
 }
 
 /// `(codes: Array[I32], count)` → the string of the first `count` code units:
@@ -898,5 +933,6 @@ fn from_codes_helper(heap: I32) I32 {
 fn reset_data() void {
     slice_helper.clear();
     codes_helper.clear();
+    helper_funcs.clear();
     reset_strings();
 }

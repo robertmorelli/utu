@@ -31,6 +31,9 @@ vec inl_label_offset: I32 = [0];
 vec inl_return_label: I32 = [0];
 /// The call's syntax (see w_site).
 vec inl_site: I32 = [-1];
+/// The call, when the callee is a helper (data.utu), else -1: its copy is
+/// the call's syntax, as its own is its first use's.
+vec inl_helper: I32 = [-1];
 /// The calls found in a body.
 vec inl_calls: I32;
 /// How many nodes the calls inlined so far added to the body.
@@ -157,6 +160,8 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
     let block = label + inl_label[g] + 1;
     inl_return_label[0] = block;
     inl_site[0] = w_src[c];
+    inl_helper[0] = -1;
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c; }; };
     // The arguments set the parameters, in order; then the body.
     let m = w_mark();
     for (0 ..< np) |i| {
@@ -230,8 +235,13 @@ fn inl_copy(n: I32) I32 {
     w_op.push(op);
     w_type.push(vt);
     // Its syntax, the callee's, and the call it is inlined at: a source map places it so.
-    w_src.push(w_src[n]);
-    w_site.push(inl_site[0]);
+    if inl_helper[0] >= 0 {
+        w_src.push(w_src[inl_helper[0]]);
+        w_site.push(w_site[inl_helper[0]]);
+    } else {
+        w_src.push(w_src[n]);
+        w_site.push(inl_site[0]);
+    };
     w_a.push(a);
     w_b.push(w_b[n]);
     w_first.push(first);

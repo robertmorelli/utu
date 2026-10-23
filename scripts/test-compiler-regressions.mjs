@@ -1180,6 +1180,25 @@ export lib {
     [{ 'main.utu': 'let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn tab() Array[I32] { [await later(5)]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t.len() * 100 + t[0]; }\n' }, 105],
     // A @wat Bool is 0 or 1, returned or left (6 read as true, and == true was false).
     [{ 'main.utu': 'fn six() Bool { @wat/\\ i32.const 6 \\/; }\nfn nine() Bool { @wat/\\ i32.const 9 return \\/; }\nexport main() I32 { if six() == true and nine() == true { 1; } else { 0; }; }\n' }, 1],
+    // A cl @es binding is the JS function, passed or called (its accessor called it: NaN).
+    [{ 'main.utu': 'let js_double: cl(I32) I32 = @es/\\ (x) => x * 2 \\/;\nfn apply(f: cl(I32) I32, x: I32) I32 { f(x); }\nexport main() I32 { apply(js_double, 4) + js_double(5) * 10; }\n' }, 108],
+    // A JavaScript exception runs the defers it unwinds through, newest first, before the catch; not errdefers.
+    [{ 'main.utu': `let risky: fun(I32) I32 = @es/\\ (x) => { if (x < 0) throw new Error("neg"); return x; } \\/;
+let log: fun(I32) void = @es/\\ (v) => { globalThis.__dlog = (globalThis.__dlog ?? 0) * 10 + v; } \\/;
+let logged: fun() I32 = @es/\\ () => { const v = globalThis.__dlog ?? 0; globalThis.__dlog = 0; return v; } \\/;
+fn inner() I32 { defer log(3); risky(-1); }
+fn outer() I32 { defer log(4); let v = inner(); v + 1; }
+fn res() Result[I32, Str] { defer log(6); errdefer log(7); Result[I32, Str].ok(risky(-1)); }
+export main() I32 {
+    let r = try { log(1); defer log(2); defer log(5); risky(-1); } catch { log(9); 0; };
+    let s = try { outer(); } catch { log(8); 0; };
+    let e = try { res().value_or(0); } catch { log(9); 0; };
+    let ok = try { defer log(1); risky(7); } catch { 0; };
+    r + s + e + ok - 7 + logged();
+}
+` }, 1529348691],
+    // A negative or reversed Str range is empty in every engine; one past the end clamps.
+    [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nexport main() I32 {\n    let s = "hello";\n    s.slice(n(-1), 3).len() + s.slice(3, n(1)).len() * 10 + s[n(-2), 2].len() * 100 + Str.slice(s, 1, 3).len() * 1000 + s.slice(2, 99).len() * 10000;\n}\n' }, 32000],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];

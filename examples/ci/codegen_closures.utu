@@ -53,6 +53,6 @@ test "a nested closure sees captures threaded through the outer one" {
     assert nested(4) == 9;
 }
 
-test "scalars are snapshot, GC references are shared" {
-    assert capture_modes() == 105;
+test "a closure shares every captured binding" {
+    assert capture_modes() == 1004;
 }

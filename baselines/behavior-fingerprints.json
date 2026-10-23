@@ -255,9 +255,9 @@
  "examples/ci/codegen_closures.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
   "formatted": "12ae32cb1ec02d01",
-  "entries": "241b85f5bb999820",
-  "queries": "2a53018277bf2e42",
-  "graphs": "903bc3dcf13c6ede"
+  "entries": "304a3fa100102346",
+  "queries": "3fedabfba2551ee9",
+  "graphs": "05b1e73b82b797eb"
  },
  "examples/ci/codegen_closures.utu normal": {
   "diagnostics": "4f53cda18c2baa0c",

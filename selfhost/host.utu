@@ -258,10 +258,13 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
 /// What an `@es` body is wrapped in, before it and `)`, so values cross as
 /// docs/typescript-abi.md says: a Bool argument as a boolean, a U32 or U64
 /// one unsigned; a Bool result as 1 or 0, an absent one as null. "" for none.
+/// A value's body becomes its accessor.
 fn es_wrap(t: I32) Str {
+    // A value is read through an accessor, made here: a JS function value (a
+    // cl) must not be taken for the accessor itself.
     if not ty_is(t, Ty.Fun) {
         let out = es_out("v", t);
-        return if out == "v" { ""; } else { "(v => " + out + ")("; };
+        return if out == "v" { "(v => () => v)("; } else { "(v => (w => () => w)(" + out + "))("; };
     };
     let params = ty_a[t];
     let names = "";

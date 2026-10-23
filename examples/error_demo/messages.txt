@@ -6310,7 +6310,7 @@ ok
 10 │     Level.name(l);
 11 │ }
 
-  in Level.from_i32  examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
+  in Level.from_i32
   in main  examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
 --- exit 1
 
@@ -6428,7 +6428,7 @@ Node.js v25.8.1
  6 │     tail.len();
  7 │ }
 
-  in array.slice  examples/error_demo/runtime/31_slice_bad_range.utu:5:16
+  in array.slice
   in main  examples/error_demo/runtime/31_slice_bad_range.utu:5:16
 --- exit 1
 
@@ -6524,7 +6524,7 @@ Node.js v25.8.1
    │           ╰─ here
 13 │ }
 
-  in Level.from_i32  examples/error_demo/runtime/362_match_no_arm.utu:12:11
+  in Level.from_i32
   in main  examples/error_demo/runtime/362_match_no_arm.utu:12:11
 --- exit 1
 
@@ -6597,7 +6597,7 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  6 │     b.len();
  7 │ }
 
-  in array.slice  examples/error_demo/runtime/493_reversed_slice.utu:5:13
+  in array.slice
   in main  examples/error_demo/runtime/493_reversed_slice.utu:5:13
 --- exit 1
 
@@ -6694,6 +6694,36 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 === utu run examples/error_demo/runtime/56_main_void_ok.utu
 42
 --- exit 0
+
+=== utu run examples/error_demo/runtime/650_global_init_trap.utu
+ TRAP  Index out of bounds
+       trap · examples/error_demo/runtime/650_global_init_trap.utu:5:14
+
+ 3 │ fn n(x: I32) I32 { x; }
+ 4 │ let xs: Array[I32] = [1, 2];
+ 5 │ let g: I32 = xs[n(5)];
+   │              ━━━━━━━━
+   │              ╰─ here
+ 6 │ export main() I32 { g; }
+
+  in g.init  examples/error_demo/runtime/650_global_init_trap.utu:5:14
+  in start
+--- exit 1
+
+=== utu run examples/error_demo/runtime/651_slice_second_use.utu
+ TRAP  Slice ends before it starts
+       trap · examples/error_demo/runtime/651_slice_second_use.utu:7:16
+
+ 5 │ export main() I32 {
+ 6 │     let xs = [1, 2, 3];
+ 7 │     head(xs) + xs[2, n(1)].len();
+   │                ━━━━━━━━━━━
+   │                ╰─ here
+ 8 │ }
+
+  in array.slice
+  in main  examples/error_demo/runtime/651_slice_second_use.utu:7:16
+--- exit 1
 
 === utu check examples/error_demo/syntax/01_missing_semicolon_after_let.utu
  ERROR  Missing ; after qty

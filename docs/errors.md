@@ -80,6 +80,8 @@ function's last value) whose Result is an error, which is checked where it
 returns. On such a return the pending `errdefer`s and `defer`s run together,
 newest first, as Zig runs them. Any other exit of the block (its end, a `break`
 or `continue`, a return of a value) drops the block's `errdefer`s unrun.
+A JavaScript exception thrown through a block runs its `defer`s, newest
+first, before a `catch` sees it, but no `errdefer`: it is not an error return.
 
 `errdefer` is legal only in a function, or a closure, that returns a Result.
 

@@ -1,0 +1,8 @@
+// What: a reversed slice, the program's second slice of that array type
+// Expect: trap: Slice ends before it starts, at this slice (not the first)
+fn n(x: I32) I32 { x; }
+fn head(xs: Array[I32]) I32 { xs[0, 1].len(); }
+export main() I32 {
+    let xs = [1, 2, 3];
+    head(xs) + xs[2, n(1)].len();
+}

@@ -4177,7 +4177,7 @@
     "printed": []
    },
    "__test_4": {
-    "throws": "RuntimeError: unreachable",
+    "result": null,
     "printed": []
    }
   }
