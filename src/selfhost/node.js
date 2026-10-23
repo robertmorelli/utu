@@ -156,8 +156,8 @@ export async function compileFile(utu, entry, options = {}) {
 }
 
 /** Instantiate a built module in Node, its glue a real ES module. */
-export function instantiateNode(wasm, spec, { root = process.cwd() } = {}) {
-  return instantiate(wasm, spec, { loadGlue: source => importGlue(source, root) });
+export function instantiateNode(wasm, spec, { root = process.cwd(), profiler = null } = {}) {
+  return instantiate(wasm, spec, { loadGlue: source => importGlue(source, root), profiler });
 }
 
 /**

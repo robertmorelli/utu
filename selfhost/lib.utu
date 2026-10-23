@@ -173,6 +173,17 @@ export lib {
     /// Where the function (as map_owner_start) of function `i` of the module (imports first) starts, or -1.
     fn map_function_start(i: I32) I32 { span_start(owner_of(func_src[func_order[i]])); }
 
+    /// Profile builds (1: "Profiling" in profile.utu), or none (0, the default).
+    fn set_profile(on: I32) void { profile_build[0] = on; }
+
+    /// The last profile build's frames: how many, and frame k's name and
+    /// where its function starts in src.
+    fn profile_count() I32 { prof_node.len(); }
+
+    fn profile_name(k: I32) Str { profile_text(k); }
+
+    fn profile_at(k: I32) I32 { span_start(owner_of(prof_node[k])); }
+
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level; }
 

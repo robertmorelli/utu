@@ -68,11 +68,12 @@ export async function loadCompiler(wasm, spec = {}) {
 export async function compile(utu, entry, host) {
   const chosen = host.mode ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false } = { ...host, ...chosen };
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, profile = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
   utu.set_source_map?.(sourceMap ? 1 : 0);
+  utu.set_profile?.(profile ? 1 : 0);
   let files, size;
   try {
     files = await loadProgram(utu, entry, host);
@@ -90,6 +91,51 @@ export async function compile(utu, entry, host) {
     ...builtModule(utu, size), diagnostics, files,
     tests: target === 'test' ? readTests(utu) : [], benches: target === 'bench' ? readBenches(utu) : [],
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
+    ...(profile ? { frames: readFrames(utu, files) } : {}),
+  };
+}
+
+/**
+ * A profile build's frames (selfhost/profile.utu), by id: each one's name
+ * (`Stack[I32].top`, `closure in main`), and the file and line its function
+ * starts at.
+ */
+function readFrames(utu, files) {
+  const where = locator(files);
+  const frames = [];
+  for (let k = 0; k < utu.profile_count(); k++) {
+    const at = utu.profile_at(k);
+    const place = at >= 0 ? where(at) : null;
+    frames.push({ name: utu.profile_name(k), file: place?.file.key ?? null, line: place?.line ?? null });
+  }
+  return frames;
+}
+
+/** A byte of src as its file, line and column (UTF-16), by each file's line starts. */
+function locator(files) {
+  const ordered = files.toSorted((a, b) => a.offset - b.offset);
+  const lines = new Map();
+  return byte => {
+    let lo = 0, hi = ordered.length - 1, file = null;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (ordered[mid].offset <= byte) { file = ordered[mid]; lo = mid + 1; } else hi = mid - 1; }
+    if (!file || byte > file.offset + file.bytes.length) return null;
+    // Each line's start, as a byte and as a UTF-16 offset.
+    let starts = lines.get(file);
+    if (!starts) {
+      starts = { bytes: [0], units: [0] };
+      for (let i = 0; i < file.bytes.length; i++) {
+        if (file.bytes[i] !== 10) continue;
+        const from = starts.bytes.at(-1);
+        starts.units.push(starts.units.at(-1) + decoder.decode(file.bytes.subarray(from, i + 1)).length);
+        starts.bytes.push(i + 1);
+      }
+      lines.set(file, starts);
+    }
+    const local = byte - file.offset;
+    lo = 0; hi = starts.bytes.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts.bytes[mid] <= local) lo = mid; else hi = mid - 1; }
+    const column = decoder.decode(file.bytes.subarray(starts.bytes[lo], local)).length + 1;
+    return { file, line: lo + 1, column, offset: starts.units[lo] + column - 1 };
   };
 }
 
@@ -112,31 +158,7 @@ function readBenches(utu) {
  * function of the module, where it was declared (as `ownerAt`), or null.
  */
 export function readSourceMap(utu, files) {
-  const ordered = files.toSorted((a, b) => a.offset - b.offset);
-  const lines = new Map();
-  // A byte of src as its file, line and column (UTF-16), by each file's line starts.
-  const where = byte => {
-    let lo = 0, hi = ordered.length - 1, file = null;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; if (ordered[mid].offset <= byte) { file = ordered[mid]; lo = mid + 1; } else hi = mid - 1; }
-    if (!file || byte > file.offset + file.bytes.length) return null;
-    // Each line's start, as a byte and as a UTF-16 offset.
-    let starts = lines.get(file);
-    if (!starts) {
-      starts = { bytes: [0], units: [0] };
-      for (let i = 0; i < file.bytes.length; i++) {
-        if (file.bytes[i] !== 10) continue;
-        const from = starts.bytes.at(-1);
-        starts.units.push(starts.units.at(-1) + decoder.decode(file.bytes.subarray(from, i + 1)).length);
-        starts.bytes.push(i + 1);
-      }
-      lines.set(file, starts);
-    }
-    const local = byte - file.offset;
-    lo = 0; hi = starts.bytes.length - 1;
-    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts.bytes[mid] <= local) lo = mid; else hi = mid - 1; }
-    const column = decoder.decode(file.bytes.subarray(starts.bytes[lo], local)).length + 1;
-    return { file, line: lo + 1, column, offset: starts.units[lo] + column - 1 };
-  };
+  const where = locator(files);
   // Entries share syntax: each node's place, kind and owner read once.
   const places = new Map();
   const kinds = new Map();
@@ -745,11 +767,13 @@ function indexOf(file) {
  * that neither import nor await), closures, promises, hosted mems, and the
  * engine's JS string builtins.
  */
-export async function instantiate(wasm, spec = {}, { loadGlue = null } = {}) {
+export async function instantiate(wasm, spec = {}, { loadGlue = null, profiler = null } = {}) {
   const module = await WebAssembly.compile(wasm, COMPILE_OPTIONS);
   const es = spec.es ?? {};
   const source = glueModuleSource(es);
   const imports = !source ? {} : loadGlue ? importObjectFromGlue(es, await loadGlue(source)) : importObjectFromEval(es);
+  // A profile build's (src/runtime/profile.js): its exports enter and leave its shadow stack.
+  if (profiler) imports.profile = profiler.imports;
   if (spec.closures) imports.utu = closureImports(spec.closures, imports.utu ?? {});
   if (spec.mems) imports.utu = memoryImports(spec.mems, imports.utu ?? {});
   if (spec.promises) {
@@ -760,7 +784,8 @@ export async function instantiate(wasm, spec = {}, { loadGlue = null } = {}) {
     imports.utu = exceptionImports(imports.utu ?? {});
   }
   const instance = await WebAssembly.instantiate(module, imports);
-  return { module, instance, exports: convertExports(promisifyExports(instance, spec.promises), spec.exports) };
+  const exports = convertExports(promisifyExports(instance, spec.promises), spec.exports);
+  return { module, instance, exports: profiler ? profiler.attach(instance, exports) : exports };
 }
 
 /** `../b.utu` from `/a/c.utu`: POSIX paths and URLs alike. */

@@ -63,6 +63,10 @@ async function main() {
   let out;
   // `utu run FILE -- a b`: what follows -- is the program's (process.argv.slice(2)).
   let argv = [];
+  // `--profile`: a profile build, sampled every `--interval` ms (src/runtime/profile.js).
+  const ours = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
+  const profile = ours.includes('--profile');
+  let interval;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--') {
@@ -71,17 +75,24 @@ async function main() {
       break;
     }
     if (arg === '-O') given.push(args[++i] ?? '');
-    else if (arg === '-o' || arg === '--out') {
+    else if (arg === '--profile') {
+      if (command !== 'run') fail(`${arg} is only for run`, 'unknown-option', ['utu run FILE --profile samples the program and writes its profile.']);
+    } else if (arg === '--interval') {
+      const value = args[++i];
+      if (!profile) fail(`${arg} is only with --profile`, 'unknown-option', [], `utu run ${files[0] ?? '<file.utu>'} --profile --interval ${value ?? '0.25'}`);
+      interval = Number(value);
+      if (!(interval > 0)) fail(`--interval needs a time in ms, got ${value ?? 'nothing'}`, 'unknown-option', ['The sampler reads the stack every this many milliseconds (0.25 by default).']);
+    } else if (arg === '-o' || arg === '--out') {
       const value = args[++i];
       const what = command === 'build-exe' ? 'file' : 'directory';
-      if (!WRITES.has(command)) fail(`${arg} is only for build and build-exe`, 'unknown-option', [`utu ${command} writes nothing.`]);
+      if (!WRITES.has(command) && !(command === 'run' && profile)) fail(`${arg} is only for build and build-exe`, 'unknown-option', [`utu ${command} writes nothing.`]);
       if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
       if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
       out = value;
     } else if (arg === '--source-map') {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', [`utu ${command} places traps by a map in every mode but the unsafe ones.`]);
     } else if (arg.startsWith('-') && arg !== '-') {
-      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map']);
+      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map, --profile [--interval ms]']);
     } else files.push(arg);
   }
   if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
@@ -103,7 +114,7 @@ async function main() {
   const asked = args.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, profile, interval, utu: await loadNodeCompiler() });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -154,11 +165,12 @@ async function check(file, { utu }) {
   console.log('ok');
 }
 
-async function run(file, { utu, optimize, safe, argv }) {
+async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, out }) {
   // Named functions and a source map, so a trap says which and where.
-  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe });
+  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile });
+  const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
-  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) })
+  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
     .catch(error => trap(error, file, built, utu));
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   // A main with parameters is for a host that passes them; run passes none.
@@ -171,12 +183,38 @@ async function run(file, { utu, optimize, safe, argv }) {
   // The program's arguments where a built one finds them: process.argv.slice(2).
   process.argv = [process.argv[0], file, ...argv];
   let result;
+  await profiler?.start();
   try {
     result = await exports.main();
   } catch (error) {
+    // (What ran until the trap is still a profile.)
+    if (profiler) await writeProfile(file, profiler, out);
     await trap(error, file, built, utu);
   }
+  if (profiler) await writeProfile(file, profiler, out);
   if (result !== undefined) console.log(result);
+}
+
+/** Stop sampling; write NAME.folded, NAME.speedscope.json, and NAME.flame.html (in `out`), and the top functions to stderr. */
+async function writeProfile(file, profiler, out) {
+  const { profileReport } = await import('../src/runtime/profile.js');
+  const name = path.basename(file, '.utu');
+  const report = profileReport(await profiler.stop(), profiler.frames, { title: `${name}.utu` });
+  const dir = path.resolve(out ?? '.');
+  await fs.mkdir(dir, { recursive: true });
+  const outputs = [[`${name}.folded`, report.folded], [`${name}.speedscope.json`, report.speedscope], [`${name}.flame.html`, report.html]];
+  for (const [base, text] of outputs) await fs.writeFile(path.join(dir, base), text);
+  const dim = text => colored(process.stderr) ? `\x1b[2m${text}\x1b[0m` : text;
+  const share = n => report.samples ? `${(100 * n / report.samples).toFixed(1)}%` : '-';
+  const place = new Map(profiler.frames.map(f => [f.name, f.file ? `${displayPath(f.file)}:${f.line}` : '']));
+  const lines = [`profile: ${report.samples} samples over ${(report.elapsed / 1000).toFixed(2)} s${report.dropped ? `, ${report.dropped} dropped` : ''}`];
+  lines.push(dim('   self   total  function'));
+  for (const row of report.top.slice(0, 10)) {
+    lines.push(`${share(row.self).padStart(7)} ${share(row.total).padStart(7)}  ${row.name}${place.get(row.name) ? dim(`  ${place.get(row.name)}`) : ''}`);
+  }
+  lines.push(dim(`wrote ${outputs.slice(0, 2).map(([base]) => displayPath(path.join(dir, base))).join(', ')}`));
+  lines.push(`flame graph: ${displayPath(path.join(dir, outputs[2][0]))}`);
+  await written(process.stderr, `${lines.join('\n')}\n`);
 }
 
 async function test(file, { utu, optimize, safe }) {
@@ -522,6 +560,7 @@ function usage(code) {
 
   check <file>                 report what is wrong with the program
   run <file> [-O mode] [-- args]  build it, then call its main
+    [--profile [--interval ms]]  sampled: NAME.folded, NAME.speedscope.json, NAME.flame.html
   test <file> [-O mode]           build its tests, then run each
   bench <file> [-O mode]          build its benches, then time each (median per iteration)
   build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it

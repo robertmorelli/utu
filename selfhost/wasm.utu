@@ -824,11 +824,13 @@ fn assign_indices() void {
         };
     };
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] != FuncKind.Import.to_i32() {
+        if memory_kind[m] != FuncKind.Import.to_i32() and m != prof_memory[0] {
             memory_index[m] = next_m;
             next_m += 1;
         };
     };
+    // The profiler's is last, so the program's keep their indices.
+    if prof_memory[0] >= 0 { memory_index[prof_memory[0]] = next_m; };
     let n = ht_kind.len();
     sweep_types();
     type_index.resize(n);
@@ -1366,7 +1368,13 @@ fn encode_memories() void {
     if count == 0 { return; };
     leb_u(false, count);
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] == FuncKind.Defined.to_i32() { put_limits(memory_pages[m]); };
+        if memory_kind[m] == FuncKind.Defined.to_i32() and m != prof_memory[0] { put_limits(memory_pages[m]); };
+    };
+    // The profiler's: shared, of a fixed size.
+    if prof_memory[0] >= 0 {
+        sec.push(3);
+        leb_u(false, profile_pages);
+        leb_u(false, profile_pages);
     };
     flush_section(5);
 }

@@ -1,0 +1,53 @@
+let probe: fun(Str) void = @es/\ (label) => globalThis.__probe(label) \/;
+let fail: fun() void = @es/\ () => { throw new Error("boom"); } \/;
+let delay: fun(I32) Promise[I32] = @es/\ (v) => new Promise(r => setTimeout(() => r(v), 1)) \/;
+
+mod Stack[T] {
+    struct &:
+        | items: Array[T]
+        | size: I32
+    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
+    fn &.push |s| (v: T) void { probe("push"); s.items[s.size] = v; s.size += 1; }
+    fn &.each |s| () yield T {
+        for (0 ..< s.size) |i| { probe("gen"); yield s.items[i]; };
+    }
+}
+
+fn down(n: I32) I32 {
+    if n == 0 { probe("bottom"); return 0; };
+    down(n - 1) + 1;
+}
+
+fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+
+fn guarded() void {
+    defer probe("deferred");
+    fail();
+}
+
+fn early(n: I32) I32 {
+    for (0 ..< 10) |i| {
+        if i == n { return i; };
+    };
+    -1;
+}
+
+fn sleepy() I32 {
+    probe("before");
+    let v: I32 = await delay(3);
+    probe("after");
+    v;
+}
+
+export main() I32 {
+    probe("main");
+    down(2);
+    apply(cl(x) { probe("closure"); x + 1; }, 1);
+    let s = Stack[I32].new(0);
+    s.push(1);
+    for (s.each()) |v| { probe("body"); };
+    try { guarded(); } catch { probe("caught"); };
+    early(3);
+    probe("after-early");
+    sleepy();
+}

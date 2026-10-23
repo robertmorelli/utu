@@ -346,6 +346,7 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let defers = defer_node.len();
     defer_marks.push(defers);
     let guards = defer_guard.len();
+    if block == body_block[0] and profiling() { profile_body(block, cx); };
     let c = first_child(block);
     let t = ty_void();
     while (c >= 0) {
@@ -2951,6 +2952,7 @@ fn compile(target: Target) I32 {
         comptime_fuel[0] = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()));
         glob_field_name[comptime_fuel[0]] = name_add("__comptime_fuel");
     };
+    reset_profile();
     check_open_instances();
     validate_program();
     count_memories();
@@ -3207,6 +3209,8 @@ fn bench_function(item: I32, k: I32) void {
     let i = new_local(vt_i32);
     let done = new_label();
     let top = new_label();
+    // Profiling: the measured loop is the bench's frame (the setup has none).
+    let pg = profile_open(c, -1, 0);
     let mb = w_mark();
     let ml = w_mark();
     let mc = w_mark();
@@ -3223,6 +3227,7 @@ fn bench_function(item: I32, k: I32) void {
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, done, 0, mb);
+    profile_close(pg, cx);
     // The setup's defers, once the measuring is done.
     if defer_node.len() > defers {
         run_defers(defers, cx);

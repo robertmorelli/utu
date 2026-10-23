@@ -17,6 +17,7 @@ closures.utu
 generators.utu
 iterators.utu
 misc.utu
+profile.utu
 protocols.utu
 strings.utu
 data.utu

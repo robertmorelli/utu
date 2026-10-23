@@ -615,7 +615,8 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
 /// Whether `t` is std's `Result[T, E]`.
 fn is_result_type(t: I32) Bool {
     let decl = if t >= 0 { ty_decl(t); } else { -1; };
-    decl >= 0 and decl_is(decl, Decl.Struct) and decl_name[module_of(decl)] == known_word(Known.WordResult)
+    // (A struct of no module is not one.)
+    decl >= 0 and decl_is(decl, Decl.Struct) and module_of(decl) >= 0 and decl_name[module_of(decl)] == known_word(Known.WordResult)
         and from_std(decl_node[decl]);
 }
 

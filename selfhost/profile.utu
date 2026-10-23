@@ -1,0 +1,285 @@
+//! = Profiling
+//!
+//! A profile build (`set_profile`, `utu run --profile`) keeps a shadow stack
+//! of the utu functions running, which a sampler thread copies out
+//! (src/runtime/profile.js). It is a shared memory the module exports as
+//! `utu_profile`, its index past the program's own: bytes 0..4 are the stack
+//! pointer, 4..8 a count of pushes, and from 8 a frame per 8 bytes: its id
+//! plus its address, then the count when it was pushed (a frame pushed
+//! after the sampler read the count was rewritten under it). A data segment
+//! sets the pointer to 8.
+//!
+//! A function's body pushes its id on entry; its pop is a defer
+//! (`profile_pop_defer` in @defer_node), so returns, `try`, breaks out of a
+//! generator, and JS exceptions (@guard_defers) all pop. Bodies are
+//! instrumented as they are checked, before inlining, so a function inlined
+//! is still a frame: the stack is the source's. A generator's expansion is
+//! a frame, popped while the consumer's body runs at each `yield`
+//! (`profile_push_defer` pushes it back on that body's exits). At an
+//! `await`, the suspended frames go to the host (`profile.park`) and come
+//! back when it resumes (`profile.resume`), so suspended calls do not stack
+//! on what runs meanwhile.
+
+/// Whether builds are for the profiler (1), or not (0, the default).
+vec profile_build: I32 = [0];
+/// This build's profile memory, or -1.
+vec prof_memory: I32 = [-1];
+/// Its `profile.park` and `profile.resume` imports, or -1.
+vec prof_imports: I32 = [-1, -1];
+/// By id: the body (a block) the frame is, the function declaration it is
+/// in (-1: none) and that one's instance.
+vec prof_node: I32;
+vec prof_decl: I32;
+vec prof_inst: I32;
+/// By generator expansion (as `gen_whole`): its frame's id, or -1.
+vec prof_gen: I32;
+
+/// A defer that pops a frame; below it, `profile_push_defer - id` pushes `id`.
+let profile_pop_defer: I32 = -1000000000;
+let profile_push_defer: I32 = -1000000001;
+/// The memory's pages (4 MiB: a million frames), its least and its most.
+let profile_pages: I32 = 64;
+
+fn reset_profile() void {
+    prof_memory[0] = -1;
+    prof_imports[0] = -1;
+    prof_imports[1] = -1;
+    prof_node.clear();
+    prof_decl.clear();
+    prof_inst.clear();
+    prof_gen.clear();
+}
+
+/// Whether this build profiles: asked for, and not a @comptime build.
+fn profiling() Bool { profile_build[0] == 1 and comptime_fuel[0] < 0; }
+
+/// Whether defer entry `d` is the profiler's.
+fn is_profile_defer(d: I32) Bool { d <= profile_pop_defer; }
+
+/// The profile memory, made when first needed.
+fn prof_mem() I32 {
+    if prof_memory[0] >= 0 { return prof_memory[0]; };
+    let m = memory_kind.len();
+    memory_kind.push(FuncKind.Defined.to_i32());
+    memory_pages.push(profile_pages);
+    memory_module_name.push(-1);
+    memory_field_name.push(name_add("utu_profile"));
+    // The stack pointer, 8; no pushes yet.
+    data_memory.push(m);
+    data_start.push(data_bytes.len());
+    data_len.push(8);
+    for ([8, 0, 0, 0, 0, 0, 0, 0]) |b| { data_bytes.push(b); };
+    prof_memory[0] = m;
+    m;
+}
+
+/// A frame of id `k` for body `block`, in declaration `decl` (instance `inst`).
+fn prof_frame(block: I32, decl: I32, inst: I32) I32 {
+    prof_node.push(block);
+    prof_decl.push(decl);
+    prof_inst.push(inst);
+    prof_node.len() - 1;
+}
+
+/// Push frame `id`. The header `x` is the pointer (low half) and the push
+/// count (high); the frame is `x + id`, so its own address and count, which
+/// the sampler checks:
+/// `x = load64(0); store64(wrap(x), x + id); store64(0, x + 2^32 + 8)`.
+fn prof_push(id: I32) void {
+    let mem = prof_mem();
+    let x = new_local(vt_i64);
+    let m = w_mark();
+    let ma = w_mark();
+    w_i32(0);
+    w_node(Op.Load, vt_i64, mem, 41, ma);
+    w_node(Op.LocalSet, vt_none, x, 0, m);
+    let ms = w_mark();
+    let mw = w_mark();
+    w_get(vt_i64, x);
+    w_node(Op.Plain, vt_i32, 167, 0, mw);
+    let mf = w_mark();
+    w_get(vt_i64, x);
+    w_leaf(Op.I64Const, vt_i64, id, 0);
+    w_node(Op.Plain, vt_i64, 124, 0, mf);
+    w_node(Op.Store, vt_none, mem, 55, ms);
+    let mp = w_mark();
+    w_i32(0);
+    let mx = w_mark();
+    w_get(vt_i64, x);
+    w_leaf(Op.I64Const, vt_i64, 8, 1);
+    w_node(Op.Plain, vt_i64, 124, 0, mx);
+    w_node(Op.Store, vt_none, mem, 55, mp);
+    w_node(Op.Seq, vt_none, 0, 0, m);
+}
+
+/// Pop a frame: `store64(0, load64(0) - 8)`.
+fn prof_pop() void {
+    let mem = prof_mem();
+    let m = w_mark();
+    w_i32(0);
+    let mx = w_mark();
+    let ma = w_mark();
+    w_i32(0);
+    w_node(Op.Load, vt_i64, mem, 41, ma);
+    w_leaf(Op.I64Const, vt_i64, 8, 0);
+    w_node(Op.Plain, vt_i64, 125, 0, mx);
+    w_node(Op.Store, vt_none, mem, 55, m);
+}
+
+/// Run the profiler's defer `d`.
+fn run_profile_defer(d: I32) void {
+    if d == profile_pop_defer { prof_pop(); } else { prof_push(profile_push_defer - d); };
+}
+
+/// Note profiler defer `d`, from the code that follows on (a guard too).
+fn note_profile_defer(d: I32) void {
+    defer_node.push(d);
+    note_defer_guards(defer_node.len() - 1);
+}
+
+/// A function's or closure's body begins (`block`, checked in `cx`): its
+/// frame, popped at each exit.
+fn profile_body(block: I32, cx: Cx) void {
+    let decl = if cx.fi >= 0 { fi_decl[cx.fi]; } else { -1; };
+    prof_push(prof_frame(block, decl, cx.inst));
+    note_profile_defer(profile_pop_defer);
+}
+
+/// Generator `gen` (instance `inst`) is expanded, the expansion `k`: its
+/// frame, until @profile_generator_end. Returns where its guards start, or -1.
+fn profile_generator(gen: I32, inst: I32, k: I32) I32 {
+    let guards = profile_open(fn_body(gen), gen, inst);
+    if guards >= 0 {
+        while (prof_gen.len() <= k) { prof_gen.push(-1); };
+        prof_gen[k] = prof_node.len() - 1;
+    };
+    guards;
+}
+
+/// The expansion's body is checked: as @profile_close.
+fn profile_generator_end(guards: I32, k: I32, cx: Cx) void {
+    if guards < 0 { return; };
+    profile_close(guards, cx);
+    prof_gen[k] = -1;
+}
+
+/// Code that is a frame of its own begins (a generator's expansion, a
+/// bench's measured loop), for `node` in declaration `decl` (instance
+/// `inst`): its frame, until @profile_close. Returns where its guards
+/// start, or -1 when not profiling.
+fn profile_open(node: I32, decl: I32, inst: I32) I32 {
+    if not profiling() { return -1; };
+    let guards = defer_guard.len();
+    prof_push(prof_frame(node, decl, inst));
+    note_profile_defer(profile_pop_defer);
+    guards;
+}
+
+/// The code is checked (void): its frame popped where it ends (a `return`
+/// in it popped it already), and a JS exception from it pops it too.
+fn profile_close(guards: I32, cx: Cx) void {
+    if guards < 0 { return; };
+    guard_defers(guards, vt_none, cx);
+    prof_pop();
+    defer_node.resize(defer_node.len() - 1);
+}
+
+/// A `yield` of expansion `k`, before the consumer's body: the generator's
+/// frame popped, and pushed back on every exit of the body. Returns where
+/// its guards start, or -1.
+fn profile_yield(k: I32) I32 {
+    if k >= prof_gen.len() or prof_gen[k] < 0 { return -1; };
+    let guards = defer_guard.len();
+    prof_pop();
+    note_profile_defer(profile_push_defer - prof_gen[k]);
+    guards;
+}
+
+/// The consumer's body is checked (still in its `continue` block): a JS
+/// exception from it pushes the frame back.
+fn profile_yield_guard(guards: I32, cx: Cx) void { if guards >= 0 { guard_defers(guards, vt_none, cx); }; }
+
+/// After the body's block (where its `continue` goes): the frame back.
+fn profile_yield_end(guards: I32, k: I32) void {
+    if guards < 0 { return; };
+    prof_push(prof_gen[k]);
+    defer_node.resize(defer_node.len() - 1);
+}
+
+/// The `profile.park` (`() → externref`) or `profile.resume` (`(externref) → ()`) import.
+fn prof_import(resume: Bool) I32 {
+    let k = if resume { 1; } else { 0; };
+    if prof_imports[k] >= 0 { return prof_imports[k]; };
+    let t = if resume { func_type(vl_one(vt_externref), vl_empty()); } else { func_type(vl_empty(), vl_one(vt_externref)); };
+    prof_imports[k] = add_import_func(name_add("profile"), name_add(if resume { "resume"; } else { "park"; }), t);
+    prof_imports[k];
+}
+
+/// A call of await import `f` (of result `vt`), its promise on the stack
+/// since `m`. Profiling, the frames set aside while it waits:
+/// `p = promise; s = park(); try { v = await(p) } catch { resume(s); rethrow }; resume(s); v`.
+fn profile_await(f: I32, vt: I32, m: I32) void {
+    if not profiling() {
+        w_node(Op.Call, vt, f, 0, m);
+        return;
+    };
+    use_js_tag();
+    let p = new_local(vt_externref);
+    w_node(Op.LocalSet, vt_none, p, 0, m);
+    let s = new_local(vt_externref);
+    let ms = w_mark();
+    w_leaf(Op.Call, vt_externref, prof_import(false), 0);
+    w_node(Op.LocalSet, vt_none, s, 0, ms);
+    let valued = vt != vt_none and vt != vt_unreachable;
+    let v = if valued { new_local(vt); } else { -1; };
+    let label = new_label();
+    let mt = w_mark();
+    let mc = w_mark();
+    w_get(vt_externref, p);
+    w_node(Op.Call, vt, f, 0, mc);
+    if valued { w_node(Op.LocalSet, vt_none, v, 0, mc); };
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    let mh = w_mark();
+    w_leaf(Op.Drop, vt_none, 0, 0);
+    prof_resume(s);
+    w_leaf(Op.Rethrow, vt_unreachable, label, 0);
+    w_node(Op.Seq, vt_unreachable, 0, 0, mh);
+    w_node(Op.Try, vt_none, label, 0, mt);
+    prof_resume(s);
+    if valued { w_get(vt, v); };
+    w_node(Op.Seq, vt, 0, 0, m);
+}
+
+fn prof_resume(s: I32) void {
+    let m = w_mark();
+    w_get(vt_externref, s);
+    w_node(Op.Call, vt_none, prof_import(true), 0, m);
+}
+
+/// Frame `k`'s name: `Stack[I32].top`, `closure in main`.
+fn profile_text(k: I32) Str { prof_owner_text(owner_of(prof_node[k]), prof_decl[k], prof_inst[k]); }
+
+fn prof_owner_text(owner: I32, decl: I32, inst: I32) Str {
+    if owner < 0 { return "(top level)"; };
+    if is_kind(owner, Node.Closure_expr) { return "closure in " + prof_owner_text(owner_of(parent_of(owner)), decl, inst); };
+    if decl >= 0 and decl_node[decl] == owner { return prof_fn_text(decl, inst); };
+    // `bench "sum loop"`, `test "adds"`: by its name.
+    if is_kind(owner, Node.Bench_decl) or is_kind(owner, Node.Test_decl) { return owner_name(owner) + " " + node_text(first_child(owner)); };
+    owner_name(owner);
+}
+
+/// A function's name, its module's instance first: `Buffer[I32].push`.
+fn prof_fn_text(decl: I32, inst: I32) Str {
+    let node = decl_node[decl];
+    let name = first_child(node);
+    let t0 = node_first[name];
+    let t1 = if is_kind(node, Node.Op_decl) { node_last[next_sibling(name)]; } else { node_last[name]; };
+    let start = tok_start[t0];
+    let module = module_of(decl);
+    if module < 0 { return bytes_text(start, tok_end[t1 - 1]); };
+    let text = word_text(decl_name[module]);
+    if inst > 0 and vl_len[inst_args[inst]] > 0 { text = text + "[" + type_list_text(inst_args[inst]) + "]"; };
+    // `&.push` is the module's type's.
+    if src[start] == 38 { return text + bytes_text(start + 1, tok_end[t1 - 1]); };
+    text + "." + bytes_text(start, tok_end[t1 - 1]);
+}
