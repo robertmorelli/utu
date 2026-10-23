@@ -224,18 +224,29 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) void {
     report(kind, node, word);
     if diag_fresh[0] == 0 { return; };
     let t = word_text(word);
-    if seek != Seek.Value and is_std_module(t) {
-        diag_note("using " + t + " from std:" + t + ";");
+    let m = std_module(t);
+    // (A lowercase module is used as a value: `console.log(…)`.)
+    if m.len() > 0 and (seek != Seek.Value or m == t) {
+        let line = "using " + m + " from std:" + std_file(m) + ";";
+        diag_note(if m == t { line; } else { line + " (the module is " + m + ")"; });
         return;
     };
     suggest(node, near_in_scope(word, seek), near_decl[0]);
 }
 
-/// Whether `t` names a standard module a file must import (`using`).
-fn is_std_module(t: Str) Bool {
-    t == "StrMap" or t == "IntMap" or t == "List" or t == "Buffer" or t == "Console" or t == "Interner"
-        or t == "Random" or t == "Time" or t == "SegmentTree" or t == "PersistentSegmentTree" or t == "Spatial"
-        or t == "NumberField";
+/// The standard module a file must import (`using`) that `t` names, by
+/// its name or its file's; empty if none.
+fn std_module(t: Str) Str {
+    if t == "Console" or t == "console" { return "console"; };
+    if t == "Time" or t == "time" { return "time"; };
+    if t == "StrMap" or t == "IntMap" or t == "List" or t == "Buffer" or t == "Interner" or t == "Random"
+        or t == "SegmentTree" or t == "PersistentSegmentTree" or t == "Spatial" or t == "NumberField" { return t; };
+    "";
+}
+
+/// The std file module `m` is in (`console` in std:Console).
+fn std_file(m: Str) Str {
+    if m == "console" { "Console"; } else if m == "time" { "Time"; } else { m; };
 }
 
 /// Suggest the member of `owner` in `space` nearest the name at `at`.

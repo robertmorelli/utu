@@ -53,6 +53,11 @@ try {
   assert.equal(await fs.readFile(messy, 'utf8'), 'export main() I32 {\n    let a = 1;\n    a;\n}\n');
   assert.equal(run('format', messy, '--check').status, 0, 'formatted file passes --check');
   assert.equal(run('format').status, 1, 'format without files is an error');
+  // A file that does not parse is left as it is, and says so.
+  const misparsed = path.join(dir, 'misparsed.utu');
+  await fs.writeFile(misparsed, 'fn f() I32 { let a = 1 a; }\n');
+  assert.match(run('format', misparsed).stderr, /left as is: it does not parse/);
+  assert.equal(await fs.readFile(misparsed, 'utf8'), 'fn f() I32 { let a = 1 a; }\n');
   assert.equal(run('bogus').status, 1, 'unknown commands fail');
 
   // build

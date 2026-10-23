@@ -493,7 +493,7 @@ class WutuParser {
       if (!name) this.fail('expected class or id');
       this.p += name[0].length;
       if (shorthand === '.') node.classes.push(name[0]);
-      else node.attrs.push({ name: 'id', value: JSON.stringify(name[0]), property: false, dynamic: false, range: null, start: this.p });
+      else node.attrs.push({ name: 'id', value: JSON.stringify(name[0]), property: false, dynamic: false, range: null, start: this.p, shorthand: true });
     }
     this.skipTrivia();
     if (this.peek(/as\s/y)) {
@@ -615,14 +615,15 @@ class WutuParser {
 
   /** Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules. */
   parseCssRule(node) {
+    const start = this.p;
     const selector = this.readCssUntil('{;');
     if (this.text[this.p] === ';') {
       this.p++;
-      node.css.push({ source: selector + ';', css: selector + ';' });
+      node.css.push({ source: selector + ';', css: selector + ';', start });
       return;
     }
     const block = this.readCssBlock();
-    node.css.push({ source: `${selector}{${block}}`, css: `${scopedSelector(selector)}{${block}}` });
+    node.css.push({ source: `${selector}{${block}}`, css: `${scopedSelector(selector)}{${block}}`, start });
   }
 
   parseDeclarationOrChild(node) {
@@ -643,7 +644,7 @@ class WutuParser {
       const expression = this.readBareExpression();
       this.expectSemicolon();
       if (!CSS_PROPERTY.test(head)) this.fail('invalid CSS property', start);
-      node.styles.push({ property: head.trim(), value: expression.source, range: expression.range });
+      node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start });
       return;
     }
     const value = this.readCssUntil(';{}');
@@ -651,7 +652,7 @@ class WutuParser {
     this.p++;
     if (!CSS_PROPERTY.test(head)) this.fail('invalid CSS property', start);
     const declaration = `${head}:${value};`;
-    node.css.push({ source: declaration, css: declaration });
+    node.css.push({ source: this.text.slice(start, this.p), css: declaration, start });
   }
 }
 

@@ -45,8 +45,10 @@ counts. Compare equivalent programs within the same run for size regressions.
   negative and invalid `match` patterns, operator and unknown-type diagnostics,
   and one report per syntax-error offset.
 
-`npm test` also runs two browser-free scripts: `test-wutu-stencils.mjs` (CSS
-projection and formatter idempotence over the example sites) and
+`npm test` also runs three browser-free scripts: `test-wutu-stencils.mjs` (CSS
+projection and formatter idempotence over the example sites),
+`test-formatter.mjs` (every program in examples/, std/ and docs/src formats to
+the same tree, and formatting twice is formatting once) and
 `test-wutu-cli.mjs` (format, build diagnostics, and the dev server's serving,
 live-reload events, path guard, and cleanup). The Playwright suites
 (`test:wutu*`) remain separate because they need installed browsers.

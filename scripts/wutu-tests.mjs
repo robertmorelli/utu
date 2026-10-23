@@ -103,7 +103,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
 
   test('wutu parser: element CSS keeps authored and compiled forms separately', () => {
     const { root } = parseWutu('div { color: red; :hover { color: blue; } @ .x { margin: 0; } @ { padding: 0; } }');
-    assertEq(root.css.map(rule => rule.source).join(' '), 'color:red; :hover{ color: blue; } @ .x{ margin: 0; } @{ padding: 0; }');
+    assertEq(root.css.map(rule => rule.source).join(' '), 'color: red; :hover{ color: blue; } @ .x{ margin: 0; } @{ padding: 0; }');
     assertEq(root.css.map(rule => rule.css).join(' '), 'color:red; &:hover{ color: blue; } .x{ margin: 0; } &, & *{ padding: 0; }');
   });
 

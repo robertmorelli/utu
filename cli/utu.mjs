@@ -275,7 +275,8 @@ async function build(file, { utu, optimize, safe, out, sourceMap }) {
   });
   // The loader bundled with the runtime pieces and the glue it imports.
   await bundle({
-    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: `${name}.mjs`, loader: 'js' },
+    // (Not named NAME.mjs: esbuild refuses an output that is its input.)
+    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
     outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: true, format: 'esm', platform: 'neutral',
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
@@ -351,10 +352,17 @@ async function lsp() {
       if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
       return hosts.get(root);
     },
-    toKey: uri => uri.startsWith('file:') ? fileURLToPath(uri) : uri,
+    // A standard library file is its std: module (as a program importing it sees it).
+    toKey: uri => {
+      if (!uri.startsWith('file:')) return uri;
+      const file = fileURLToPath(uri);
+      const std = path.relative(path.join(ROOT, 'std'), file);
+      return /^[A-Za-z]\w*\.utu$/.test(std) ? `std:${std.slice(0, -4)}` : file;
+    },
     // The standard library's files, where this repository has them.
     toUri: key => {
-      if (!key.startsWith('std:')) return pathToFileURL(key).href;
+      // (A key that is a URI, `untitled:…`, is its own.)
+      if (!key.startsWith('std:')) return /^[a-z][\w+.-]+:/i.test(key) ? key : pathToFileURL(key).href;
       const file = path.join(ROOT, 'std', `${key.slice(4)}.utu`);
       return existsSync(file) ? pathToFileURL(file).href : null;
     },

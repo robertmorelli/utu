@@ -65,6 +65,13 @@ try {
   const refs = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'grep', '--refs', 'count', '--json', file], { encoding: 'utf8' });
   const found = JSON.parse(refs.stdout).map(m => [m.line, m.kind, Boolean(m.declaration)]);
   assert.deepEqual(found, [[5, 'Fn', true], [16, 'Local', true], [17, 'Local', false], [21, 'Fn', false]]);
+  // An import's alias: each place its file names it. A module: also where its type is named by an alias.
+  await fs.writeFile(path.join(dir, 'pt.utu'), 'mod shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n}\n');
+  await fs.writeFile(path.join(dir, 'uses.utu'), 'using shapes |Point| from "./pt.utu";\nfn twice(p: Point) I32 { p.x * 2; }\nexport lib { fn run() I32 { twice(Point.new(1)); } }\n');
+  const refsOf = name => JSON.parse(spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'grep', '--refs', name, '--json', path.join(dir, 'uses.utu')], { encoding: 'utf8' }).stdout)
+    .filter(m => m.file.endsWith('uses.utu')).map(m => [m.line, m.column]);
+  assert.deepEqual(refsOf('Point'), [[1, 15], [2, 13], [3, 35]]);
+  assert.deepEqual(refsOf('shapes'), [[1, 7], [2, 13], [3, 35]]);
   // Nothing found: exit 1; a pattern that is not utu: exit 2.
   assert.equal(run('nothing($x)').status, 1);
   assert.equal(run('if if').status, 2);

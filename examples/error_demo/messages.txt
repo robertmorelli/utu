@@ -3112,6 +3112,8 @@ ok
  4 │
  5 │ export main() void {
 
+  note  using console from std:Console;
+
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/32_unknown_import_std_typo.utu:6:5
 
@@ -3121,6 +3123,8 @@ ok
    │     ━━━━━━━
    │     ╰─ not defined
  7 │ }
+
+  note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/33_unknown_import_std_lowercase.utu
@@ -3135,6 +3139,8 @@ ok
  4 │
  5 │ export main() void {
 
+  note  using console from std:Console;
+
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/33_unknown_import_std_lowercase.utu:6:5
 
@@ -3144,6 +3150,8 @@ ok
    │     ━━━━━━━
    │     ╰─ not defined
  7 │ }
+
+  note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/34_unknown_import_std_quoted.utu
@@ -3357,6 +3365,58 @@ ok
    │             ╰─ first here
  4 │     x + y;
  5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/460_std_module_file_name.utu
+ ERROR  Unknown type Time
+        unknown-type · examples/error_demo/names/460_std_module_file_name.utu:3:21
+
+ 1 │ // What: Time.now() with no import; the module in std:Time is time
+ 2 │ // Expect: Unknown type Time; note: using time from std:Time; (the module is time)
+ 3 │ export main() F64 { Time.now(); }
+   │                     ━━━━
+   │                     ╰─ no such type
+
+  note  using time from std:Time; (the module is time)
+--- exit 1
+
+=== utu check examples/error_demo/names/461_console_without_import.utu
+ ERROR  Unknown variable console
+        unknown-variable · examples/error_demo/names/461_console_without_import.utu:3:22
+
+ 1 │ // What: console.log with no import
+ 2 │ // Expect: Unknown variable console; note: using console from std:Console;
+ 3 │ export main() void { console.log("hi"); }
+   │                      ━━━━━━━
+   │                      ╰─ not defined
+
+  note  using console from std:Console;
+--- exit 1
+
+=== utu check examples/error_demo/names/462_std_module_named_as_file.utu
+ ERROR  Unknown module Time
+        unknown-module · examples/error_demo/names/462_std_module_named_as_file.utu:3:7
+
+ 1 │ // What: importing std:Time under its file's name
+ 2 │ // Expect: Unknown module Time; note: using time from std:Time; (the module is time)
+ 3 │ using Time from std:Time;
+   │       ━━━━
+   │       ╰─ no such module
+ 4 │
+ 5 │ export main() F64 { time.now(); }
+
+  note  using time from std:Time; (the module is time)
+
+ ERROR  Unknown variable time
+        unknown-variable · examples/error_demo/names/462_std_module_named_as_file.utu:5:21
+
+ 3 │ using Time from std:Time;
+ 4 │
+ 5 │ export main() F64 { time.now(); }
+   │                     ━━━━
+   │                     ╰─ not defined
+
+  note  using time from std:Time;
 --- exit 1
 
 === utu check examples/error_demo/names/46_duplicate_closure_parameter.utu

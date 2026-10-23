@@ -1,0 +1,5 @@
+// What: importing std:Time under its file's name
+// Expect: Unknown module Time; note: using time from std:Time; (the module is time)
+using Time from std:Time;
+
+export main() F64 { time.now(); }
