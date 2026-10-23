@@ -2,10 +2,14 @@
 //!
 //! `cl(x) { … }` is a JavaScript function, held as an externref: the host's
 //! `utu.closure_new(fn, env, boolean_result)` closes a JS function over a
-//! wasm function and an environment struct of what the closure captures.
-//! Calling one goes through a `utu.closure_call_N` import per signature
-//! (every one is the same host function: wasm imports are monomorphic).
-//! A `fun` converts to a `cl` with no environment.
+//! wasm function and an environment struct of what the closure captures,
+//! and records both on it. A call from utu asks the host for them back
+//! (`utu.closure_fn`, `utu.closure_env`) and calls the body with `call_ref`,
+//! so no JS frame is between, and an `await` in the body can suspend. A JS
+//! function that utu did not make has no body: it is called through a
+//! `utu.closure_call_N` import per signature (every one is the same host
+//! function: wasm imports are monomorphic). A `fun` converts to a `cl` with
+//! no environment.
 //!
 //! The closure's body is a function of its own, (env, params…) → result,
 //! checked where the closure is, with the enclosing function's state set
@@ -24,6 +28,13 @@ vec box_types: I32;
 vec closure_calls: I32;
 /// At `[0]`: the closure_new import, or -1.
 vec closure_new_func: I32;
+/// Pairs: wasm function type of the call, its invoker (see @closure_invoker).
+vec closure_invokers: I32;
+/// The closure_rec import, the record struct type, and @closure_new's helper, or -1.
+vec closure_parts: I32;
+/// Fours: a closure's body, its type with the environment exact, the
+/// cast of its environment into a local at entry, and that local.
+vec closure_bodies: I32;
 
 fn reset_closures() void {
     decl_boxed.resize(decl_kind.len());
@@ -33,6 +44,12 @@ fn reset_closures() void {
     env_types.clear();
     closure_new_func.resize(1);
     closure_new_func[0] = -1;
+    closure_invokers.clear();
+    closure_bodies.clear();
+    decl_awaits.clear();
+    param_to_host.clear();
+    closure_parts.resize(3);
+    for (0 ..< 3) |k| { closure_parts[k] = -1; };
 }
 
 //! = What closures capture, and which captures are boxes
@@ -469,8 +486,6 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
                 mismatch(node, expect, ty(Ty.Closure, vl_end(mt), if r_node >= 0 { type_of(r_node, cx.inst); } else { ty_error(); }));
                 return error_value();
             };
-            // Host declarations type the closures handed to them.
-            if has_foreign() { return unsupported(node); };
             report(Diag.ClosureParamType, p, word_of(first_child(p)));
             diag_label("cl(" + word_text(word_of(first_child(p))) + ": T)");
             t = ty_error();
@@ -506,16 +521,16 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     // One captured GC reference is the environment itself: no struct.
     let single = ncap == 1 and gc_ref(env_vts[0]);
     let env = if single { -1; } else { env_type(env_vts); };
-    // The body, as a function of its own: (env, params…). It is called only
-    // through the closure the host makes (closure_new), so its environment
-    // is typed exactly: the call from JS checks it, as in stage 0.
+    // The body, as a function of its own: (env, params…). Its environment
+    // is an anyref, cast at entry, so that every body of a signature has one
+    // function type, which a call from utu tests for (@closure_invoker).
     let env_vt = if single { env_vts[0]; } else { vt_ref(env, false); };
     let mp2 = vl_begin();
-    vl_add(env_vt);
+    vl_add(vt_anyref);
     for (0 ..< n) |k| { vl_add(repr(ptypes[k])); };
     let wasm_params = vl_end(mp2);
     save_function();
-    new_local(env_vt);
+    new_local(vt_anyref);
     for (0 ..< n) |k| {
         decl_local[pd[k]] = new_local(repr(ptypes[k]));
         decl_ty[pd[k]] = ptypes[k];
@@ -523,13 +538,18 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     cur_params[0] = cur_locals.len();
     mark_boxes(body_node);
     let mbody = w_mark();
-    // Prologue: each capture, from the environment (one alone is it).
-    if single { decl_local[vl_item(caps, 0)] = 0; };
+    // Prologue: the environment, cast; each capture from it (one alone is it).
+    let env_local = new_local(env_vt);
+    let mc = w_mark();
+    w_leaf(Op.LocalGet, vt_anyref, 0, 0);
+    w_node(Op.RefCast, env_vt, env_vt, 0, mc);
+    let cast = w_node(Op.LocalSet, vt_none, env_local, 0, mc);
+    if single { decl_local[vl_item(caps, 0)] = env_local; };
     for (0 ..< if single { 0; } else { ncap; }) |k| {
         let d = vl_item(caps, k);
         let local = new_local(env_vts[k]);
         let mg = w_mark();
-        w_leaf(Op.LocalGet, env_vt, 0, 0);
+        w_leaf(Op.LocalGet, env_vt, env_local, 0);
         w_node(Op.StructGet, env_vts[k], env, k, mg);
         w_node(Op.LocalSet, vt_none, local, 0, mg);
         decl_local[d] = local;
@@ -556,6 +576,14 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     else { coerce(actual, result, body_node); };
     w_node(Op.Seq, repr(result), 0, 0, mbody);
     let f = new_func(FuncKind.Defined, func_type(wasm_params, vl_of_result(repr(result))));
+    // Its type with the environment exact, for @lean_closures.
+    let me2 = vl_begin();
+    vl_add(env_vt);
+    for (0 ..< n) |k| { vl_add(repr(ptypes[k])); };
+    closure_bodies.push(f);
+    closure_bodies.push(func_type(vl_end(me2), vl_of_result(repr(result))));
+    closure_bodies.push(cast);
+    closure_bodies.push(env_local);
     func_debug_name[f] = name_add("closure");
     func_body[f] = w_pop();
     record_locals(f, cur_params[0]);
@@ -625,16 +653,48 @@ fn closure_syntax_type(node: I32, inst: I32) I32 {
     ty(Ty.Closure, vl_end(m), result);
 }
 
-/// `utu.closure_new(fn: funcref, env: anyref, boolean_result: i32) → externref`.
+/// `(fn: funcref, env: anyref, flags: i32) → externref`: a closure, made by
+/// the host's `utu.closure_new(fn, env, flags, record)`, the record a struct
+/// of fn and env the host keeps on it for @closure_invoker. Flags: 1, the
+/// result is a Bool; 2, the environment is there even when null.
 fn closure_new() I32 {
-    if closure_new_func[0] >= 0 { return closure_new_func[0]; };
+    if closure_parts[2] >= 0 { return closure_parts[2]; };
     let m = vl_begin();
     vl_add(vt_funcref);
     vl_add(vt_anyref);
     vl_add(vt_i32);
-    let f = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m), vl_one(vt_externref)));
-    closure_new_func[0] = f;
+    let ps = vl_end(m);
+    let m4 = vl_begin();
+    vl_add(vt_funcref);
+    vl_add(vt_anyref);
+    vl_add(vt_i32);
+    vl_add(vt_externref);
+    closure_new_func[0] = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m4), vl_one(vt_externref)));
+    let f = helper(ps, vl_one(vt_externref), vl_empty(), "closure.new");
+    closure_parts[2] = f;
+    let rec = closure_record();
+    let mc = w_mark();
+    w_get(vt_funcref, 0);
+    w_get(vt_anyref, 1);
+    w_get(vt_i32, 2);
+    let mr = w_mark();
+    w_get(vt_funcref, 0);
+    w_get(vt_anyref, 1);
+    w_node(Op.StructNew, vt_ref(rec, false), rec, 0, mr);
+    w_node(Op.ExternConvertAny, vt_extern, 0, 0, mr);
+    w_node(Op.Call, vt_externref, closure_new_func[0], 0, mc);
+    func_body[f] = w_pop();
     f;
+}
+
+/// The struct a closure's record is: its funcref and its environment.
+fn closure_record() I32 {
+    if closure_parts[1] >= 0 { return closure_parts[1]; };
+    let h = struct_type(-1, false);
+    struct_field(h, vt_funcref, false);
+    struct_field(h, vt_anyref, false);
+    closure_parts[1] = h;
+    h;
 }
 
 /// The import that calls closures of a signature: (closure, params…) → result.
@@ -655,14 +715,110 @@ fn closure_call(t: I32) I32 {
     f;
 }
 
-/// A call of a closure value: the closure, the arguments, then its import.
+/// A call of a closure value: the closure, the arguments, then its invoker.
 fn call_closure(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     check_expr(callee, t, cx);
     if not check_args(ty_a[t], args, 0, at, cx) {
         return error_since(m);
     };
-    w_node(Op.Call, repr(ty_b[t]), closure_call(t), 0, m);
+    w_node(Op.Call, repr(ty_b[t]), closure_invoker(t), 0, m);
     ty_b[t];
+}
+
+/// `utu.closure_rec(closure: externref) → externref`: the record
+/// @closure_new gave the host, or null for a JS function utu did not make.
+fn closure_rec() I32 {
+    if closure_parts[0] >= 0 { return closure_parts[0]; };
+    let f = add_import_func(name_add("utu"), name_add("closure_rec"), func_type(vl_one(vt_externref), vl_one(vt_externref)));
+    closure_parts[0] = f;
+    f;
+}
+
+/// The function that calls closures of signature `t`, (closure, params…) →
+/// result: a closure utu made runs its body by `call_ref` (with its
+/// environment, or, a decayed `fun`, without), any other JS function through
+/// the closure_call import. The host only hands back the record, so no JS
+/// frame is between the call and the body, and the body can suspend.
+fn closure_invoker(t: I32) I32 {
+    let js = closure_call(t);
+    let ft = func_type_of[js];
+    let i = 0;
+    while (i < closure_invokers.len()) {
+        if closure_invokers[i] == ft { return closure_invokers[i + 1]; };
+        i += 2;
+    };
+    let params = ty_a[t];
+    let np = vl_len[params];
+    let rvt = repr(ty_b[t]);
+    let me = vl_begin();
+    vl_add(vt_anyref);
+    for (0 ..< np) |k| { vl_add(repr(vl_item(params, k))); };
+    let env_sig = func_type(vl_end(me), vl_of_result(rvt));
+    let rec_vt = vt_ref(closure_record(), true);
+    let ml = vl_begin();
+    vl_add(rec_vt);
+    vl_add(vt_funcref);
+    let f = helper(ht_a[ft], ht_b[ft], vl_end(ml), "closure.call");
+    closure_invokers.push(ft);
+    closure_invokers.push(f);
+    let r = np + 1;
+    let m = w_mark();
+    // r = the record (null: not utu's); its funcref, when there is one.
+    let ms = w_mark();
+    w_get(vt_externref, 0);
+    w_node(Op.Call, vt_externref, closure_rec(), 0, ms);
+    w_node(Op.AnyConvertExtern, vt_anyref, 0, 0, ms);
+    w_node(Op.RefCast, rec_vt, rec_vt, 0, ms);
+    w_node(Op.LocalSet, vt_none, r, 0, ms);
+    let mi = w_mark();
+    let mc = w_mark();
+    w_get(rec_vt, r);
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc);
+    w_i32_op(i32_eqz, mc);
+    let mt = w_mark();
+    let mf = w_mark();
+    w_get(rec_vt, r);
+    w_node(Op.StructGet, vt_funcref, closure_record(), 0, mf);
+    w_node(Op.LocalSet, vt_none, r + 1, 0, mf);
+    invoker_arm(env_sig, params, rvt, true);
+    invoker_arm(fun_heap(t), params, rvt, false);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, 1, 0, mi);
+    let mj = w_mark();
+    w_get(vt_externref, 0);
+    for (0 ..< np) |k| { w_get(repr(vl_item(params, k)), k + 1); };
+    w_node(Op.Call, rvt, js, 0, mj);
+    w_node(Op.Seq, rvt, 0, 0, m);
+    func_body[f] = w_pop();
+    f;
+}
+
+/// In @closure_invoker: when the body is of function type `sig`, return its
+/// call (given the environment when `env`).
+fn invoker_arm(sig: I32, params: I32, rvt: I32, env: Bool) void {
+    let np = vl_len[params];
+    let r = np + 1;
+    let fl = np + 2;
+    let vt = vt_ref(sig, false);
+    let mi = w_mark();
+    let mc = w_mark();
+    w_get(vt_funcref, fl);
+    w_node(Op.RefTest, vt_i32, vt, 0, mc);
+    let mt = w_mark();
+    let mr = w_mark();
+    if env {
+        let me = w_mark();
+        w_get(vt_ref(closure_record(), true), r);
+        w_node(Op.StructGet, vt_anyref, closure_record(), 1, me);
+    };
+    for (0 ..< np) |k| { w_get(repr(vl_item(params, k)), k + 1); };
+    let mf = w_mark();
+    w_get(vt_funcref, fl);
+    w_node(Op.RefCast, vt, vt, 0, mf);
+    w_node(Op.CallRef, rvt, sig, 0, mr);
+    w_node(Op.Return, vt_unreachable, 0, 0, mr);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, if env { 2; } else { 3; }, 0, mi);
 }
 
 /// A `fun` (on the stack since `m`) where a `cl` of the same signature is
@@ -701,4 +857,194 @@ fn write_closure_json() void {
         i += 2;
     };
     json_text("]}");
+}
+
+//! = Closures the host calls
+//!
+//! The host calls a closure through its JS function, a frame JSPI cannot
+//! suspend through: such a closure may not await. Reported where a closure
+//! written in the call (or bound by a `let`) is given to the host: an `@es`
+//! or declared host function, or a utu function that hands the parameter on
+//! to one (`Promise.then`, `Stream.map`). A closure value given to the host
+//! that awaits fails when it suspends, at run time.
+
+/// By function declaration: 1 when its body may await (itself, or a function
+/// it calls by name), 2 when not, 3 while it is looked at.
+vec decl_awaits: U8;
+/// By parameter declaration: 1 when its function hands it to the host, 2 when not.
+vec param_to_host: U8;
+
+/// Report a closure `arg` that awaits, given to the host.
+fn host_callback(arg: I32) void {
+    let c = closure_node(arg);
+    if c < 0 { return; };
+    let at = awaits_in(last_child(c));
+    if at < 0 { return; };
+    report(Diag.AwaitInClosure, at, -1);
+    diag_label(if is_kind(at, Node.Await_expr) { "suspends"; } else { "may suspend"; });
+    diag_place_tokens(Extra.Related, node_first[c], node_first[c], "the host calls it");
+    diag_note("A stack suspends only through utu's calls, not the host's; await outside the closure");
+}
+
+/// The arguments of a call of function `decl` (-1: a host function's), from
+/// its parameter `first`: each closure the host is given, reported when it awaits.
+fn host_callbacks(decl: I32, args: I32, first: I32) void {
+    if args < 0 { return; };
+    let decls = if decl >= 0 { param_decls(decl); } else { -1; };
+    let i = first;
+    let a = first_child(args);
+    while (a >= 0) {
+        if closure_node(a) >= 0 and (decl < 0 or (i < vl_len[decls] and to_host(decl, vl_item(decls, i)))) { host_callback(a); };
+        i += 1;
+        a = next_sibling(a);
+    };
+}
+
+/// Whether function `decl` hands its parameter `p` to the host: its body is
+/// `@ir` or `@es`, or it passes p to an `@es` function.
+fn to_host(decl: I32, p: I32) Bool {
+    if p < 0 { return false; };
+    if param_to_host.len() < decl_kind.len() {
+        let n = param_to_host.len();
+        param_to_host.resize(decl_kind.len());
+        for (n ..< decl_kind.len()) |d| { param_to_host[d] = 0; };
+    };
+    if param_to_host[p] == 0 {
+        let body = fn_body(decl);
+        let only = first_child(body);
+        let dsl = only >= 0 and next_sibling(only) < 0 and is_kind(only, Node.Dsl_expr);
+        param_to_host[p] = if dsl or passes_to_es(body, p) { 1; } else { 2; };
+    };
+    param_to_host[p] == 1;
+}
+
+/// Whether, under `node`, an `@es` function is called with `p` as an argument.
+fn passes_to_es(node: I32, p: I32) Bool {
+    if is_kind(node, Node.Call_expr) {
+        let callee = first_child(node);
+        let d = if is_kind(callee, Node.Identifier) { node_decl[callee]; } else { -1; };
+        if d >= 0 and decl_node[d] >= 0 and is_es(last_child(decl_node[d])) {
+            let args = next_sibling(callee);
+            let a = if args >= 0 { first_child(args); } else { -1; };
+            while (a >= 0) {
+                if is_kind(a, Node.Identifier) and node_decl[a] == p { return true; };
+                a = next_sibling(a);
+            };
+        };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        if passes_to_es(c, p) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+/// The first `await` under `node`, or call of a function by name that may
+/// await; -1 when none. (A closure under it is a body of its own.)
+fn awaits_in(node: I32) I32 {
+    if is_kind(node, Node.Await_expr) { return node; };
+    if is_kind(node, Node.Closure_expr) { return -1; };
+    if is_kind(node, Node.Call_expr) and is_kind(first_child(node), Node.Identifier) {
+        let d = node_decl[first_child(node)];
+        if d >= 0 and decl_is(d, Decl.Fn) and fn_awaits(d) { return node; };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        let at = awaits_in(c);
+        if at >= 0 { return at; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+/// Whether function `decl` may await (see @decl_awaits).
+fn fn_awaits(decl: I32) Bool {
+    if decl_awaits.len() < decl_kind.len() {
+        let n = decl_awaits.len();
+        decl_awaits.resize(decl_kind.len());
+        for (n ..< decl_kind.len()) |d| { decl_awaits[d] = 0; };
+    };
+    if decl_awaits[decl] == 0 {
+        decl_awaits[decl] = 3;
+        decl_awaits[decl] = if awaits_in(fn_body(decl)) >= 0 { 1; } else { 2; };
+    };
+    decl_awaits[decl] == 1;
+}
+
+//! = Small builds that never await
+
+/// At `-O small`, a module with no `await` calls closures through the host
+/// (the closure_call imports) and makes them without records, as before the
+/// invokers: nothing can suspend, and that is the smaller module. So does any
+/// module that calls no closure. Before the sweep, so the invokers and
+/// @closure_new's helper are left out.
+fn lean_closures() void {
+    // (With no call of a closure in utu, nothing reads the records, at any level.)
+    if (optimize_level[0] != 1 or await_types.len() > 0) and closure_invokers.len() > 0 { return; };
+    let helper_ = closure_parts[2];
+    let plain = -1;
+    if helper_ >= 0 {
+        let m = vl_begin();
+        vl_add(vt_funcref);
+        vl_add(vt_anyref);
+        vl_add(vt_i32);
+        plain = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m), vl_one(vt_externref)));
+        closure_new_func[0] = plain;
+    };
+    for (0 ..< func_kind.len()) |f| {
+        if func_kind[f] == FuncKind.Defined.to_i32() and func_body[f] >= 0 and f != helper_ and not is_invoker(f) { retarget(func_body[f], helper_, plain); };
+    };
+    for (0 ..< glob_init.len()) |g| { if glob_init[g] >= 0 { retarget(glob_init[g], helper_, plain); }; };
+    // The bodies, called by the host alone, take their environments exact: no cast.
+    // Their reads of the cast's local read the parameter.
+    let i = 0;
+    while (i < closure_bodies.len()) {
+        let f = closure_bodies[i];
+        func_type_of[f] = closure_bodies[i + 1];
+        let set = closure_bodies[i + 2];
+        w_op[set] = Op.Nop.to_i32();
+        w_count[set] = 0;
+        read_param(func_body[f], closure_bodies[i + 3]);
+        i += 4;
+    };
+    closure_bodies.clear();
+    // Once: a second encoding finds nothing left to retarget.
+    closure_parts[2] = -1;
+}
+
+fn is_invoker(f: I32) Bool {
+    let i = 1;
+    while (i < closure_invokers.len()) {
+        if closure_invokers[i] == f { return true; };
+        i += 2;
+    };
+    false;
+}
+
+/// Under `node`: calls of an invoker go to its closure_call import, and of
+/// @closure_new's helper to `plain`.
+fn retarget(node: I32, helper_: I32, plain: I32) void {
+    if w_op[node] == Op.Call.to_i32() {
+        let f = w_a[node];
+        if f == helper_ { w_a[node] = plain; }
+        else if is_invoker(f) { w_a[node] = closure_call_of(func_type_of[f]); };
+    };
+    for (0 ..< w_count[node]) |i| { retarget(w_kid(node, i), helper_, plain); };
+}
+
+/// Under `node`: reads of local `l` read local 0.
+fn read_param(node: I32, l: I32) void {
+    if w_op[node] == Op.LocalGet.to_i32() and w_a[node] == l { w_a[node] = 0; };
+    for (0 ..< w_count[node]) |i| { read_param(w_kid(node, i), l); };
+}
+
+/// The closure_call import of wasm function type `ft`.
+fn closure_call_of(ft: I32) I32 {
+    let i = 0;
+    while (i < closure_calls.len()) {
+        if closure_calls[i] == ft { return closure_calls[i + 1]; };
+        i += 2;
+    };
+    -1;
 }

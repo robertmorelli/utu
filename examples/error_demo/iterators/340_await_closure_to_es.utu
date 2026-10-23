@@ -1,0 +1,8 @@
+// What: a closure that awaits, given to an @es function that calls it
+// Expect: a closure the host calls cannot await: the host's JS frame is between, and JSPI cannot suspend through it
+let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+let each: fun(cl(I32) void) void = @es/\ (f) => { f(1); f(2); } \/;
+
+export main() void {
+    each(cl(v) { let w: I32 = await later(v); });
+}

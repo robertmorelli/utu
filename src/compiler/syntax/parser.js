@@ -461,6 +461,8 @@ class Parser {
     const word = this.word();
     if (word === 'in' || word === 'out') children.push(this.token(word));
     children.push(this.unreservedTypeIdent());
+    // `T[Ord]`: the protocols T must implement.
+    if (this.isPunct('[')) children.push(this.implList());
     return this.node('module_type_param', children);
   }
 
@@ -1076,7 +1078,16 @@ class Parser {
         return this.node(`${word}_expr`, [keyword, value]);
       }
       case 'yield': case 'defer': case 'errdefer': return this.node(`${word}_expr`, [this.token(word), this.expr(0, true)]);
-      case 'break': case 'fatal': case 'prune': {
+      case 'break': {
+        // `break label value`: a label is a name, but not a word that may follow an expression.
+        const keyword = this.token('break');
+        const name = this.word();
+        if (name === null || !IDENTIFIER.test(name) || !this.startsExpression()) return this.node('break_expr', [keyword]);
+        const label = this.identifier();
+        const value = this.startsExpression() ? this.expr(0, true) : null;
+        return this.node('break_expr', [keyword, label, value]);
+      }
+      case 'fatal': case 'prune': {
         const start = this.pos;
         this.pos += word.length;
         const node = this.leaf(`${word}_expr`, start, this.pos, true);

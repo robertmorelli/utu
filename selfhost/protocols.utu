@@ -70,8 +70,8 @@ fn method_impls(proto: I32, word: I32) I32 {
                 let args = next_sibling(first_child(name));
                 // (`P[Nope]`, of no type, was reported: it implements nothing.)
                 // (`P[Box[I32]]` names no plain declaration: see in_generic.)
-                let n = if is_kind(args, Node.Module_type_arg_list) { name_node(first_child(first_child(args))); } else { -1; };
-                let named_decl = if n >= 0 { node_decl[n]; } else { -1; };
+                let target = if is_kind(args, Node.Module_type_arg_list) { impl_target(args); } else { -1; };
+                let named_decl = if target >= 0 { node_decl[target]; } else { -1; };
                 // (A generic type is never a P: see validate_protocols.)
                 if named_decl >= 0 and not in_generic(named_decl) {
                     let t = decl_type(named_decl, 0);
@@ -109,6 +109,7 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
+    if mentions_self(decl_node[pm]) { return proto_self_dynamic(t, name, m); };
     let ft = proto_member_type(pm);
     let r = new_local(vt_anyref);
     w_node(Op.LocalSet, vt_none, r, 0, m);
@@ -135,6 +136,7 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
+    if mentions_self(decl_node[pm]) { return proto_self_dynamic(t, name, m); };
     let ft = proto_member_type(pm);
     let r = new_local(vt_anyref);
     w_node(Op.LocalSet, vt_none, r, 0, m);
@@ -149,6 +151,35 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
     proto_field_chain(implementers(proto), 0, r, word_of(name), ft, v);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
+}
+
+/// A member whose type has `&` (the implementer's type) read through a
+/// protocol value: which type `&` is is not known there.
+fn proto_self_dynamic(t: I32, name: I32, m: I32) I32 {
+    report2(Diag.ProtoSelfDynamic, parent_of(name), word_of(name), t, -1);
+    diag_label("any " + type_text(t));
+    w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+    ty_error();
+}
+
+/// Whether a protocol member's types mention `&`.
+fn mentions_self(node: I32) Bool {
+    if is_kind(node, Node.Promoted_type) { return true; };
+    let c = first_child(node);
+    while (c >= 0) {
+        if mentions_self(c) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+/// The type a protocol member's type node names, `&` read as `self_t`, the
+/// implementer's type (`&` as `?&`, or alone).
+fn sig_type(node: I32, self_t: I32) I32 {
+    if is_kind(node, Node.Promoted_type) { return self_t; };
+    if is_kind(node, Node.Nullable_type) { return nullable(sig_type(first_child(node), self_t)); };
+    if is_kind(node, Node.Paren_type) or is_kind(node, Node.Return_type) { return sig_type(first_child(node), self_t); };
+    type_of(node, 0);
 }
 
 /// The `if ref.test` chain reading field `word` of receiver local `r` (or,
@@ -200,6 +231,11 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or not is_kind(decl_node[pm], Node.Proto_method) {
         report2(Diag.UnknownMethod, at, word_of(name), t, -1);
+        return finish_error(args, m, cx);
+    };
+    if mentions_self(decl_node[pm]) {
+        report2(Diag.ProtoSelfDynamic, at, word_of(name), t, -1);
+        diag_label("any " + type_text(t));
         return finish_error(args, m, cx);
     };
     let rt = proto_member_type(pm);
@@ -307,12 +343,12 @@ fn conforms(t: I32, proto: I32) void {
                 };
                 if found < 0 {
                     report3(Diag.ProtoMissing, decl_node[t], word, t, 0, decl_name[proto]);
-                } else if not same_signature(found, m) {
+                } else if not same_signature(found, m, decl_type(t, 0)) {
                     report3(Diag.ProtoSignature, decl_node[found], word, decl_name[proto], decl_name[t], -1);
                 };
             } else {
                 let field = member(t, word, Space.Member);
-                if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), 0) != type_of(last_child(m), 0) {
+                if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), 0) != sig_type(last_child(m), decl_type(t, 0)) {
                     report3(Diag.ProtoMissing, decl_node[t], word, t, 1, decl_name[proto]);
                 };
             };
@@ -321,14 +357,17 @@ fn conforms(t: I32, proto: I32) void {
     };
 }
 
-/// Whether an implementation's parameters and result are the method's.
-fn same_signature(f: I32, method: I32) Bool {
+/// Whether an implementation's parameters and result are the method's, for
+/// implementer type `self_t` (what `&` is; the instance the implementation
+/// is read in, when it is a generic module's `fn P[&].m`).
+fn same_signature(f: I32, method: I32, self_t: I32) Bool {
+    let inst = instance_for(module_of(f), ty_inst(self_t));
     let list = next_sibling(first_child(method));
     let params = param_list_of(f);
     let p = if params >= 0 { first_child(params); } else { -1; };
     let q = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
     while (p >= 0 and q >= 0) {
-        if type_of(last_child(p), 0) != type_of(q, 0) { return false; };
+        if type_of(last_child(p), inst) != sig_type(q, self_t) { return false; };
         p = next_sibling(p);
         q = next_sibling(q);
     };
@@ -339,5 +378,257 @@ fn same_signature(f: I32, method: I32) Bool {
         if is_kind(c, Node.Return_type) { ret = c; };
         c = next_sibling(c);
     };
-    type_of(ret, 0) == type_of(last_child(method), 0);
+    type_of(ret, inst) == sig_type(last_child(method), self_t);
 }
+
+//! = Bounds
+//!
+//! `mod Sorted[T[Ord]]`: each instance's T implements Ord, so `a.cmp(b)`
+//! on a T is the call of that type's `fn Ord[T].cmp`, settled when the
+//! instance is checked: no dispatch. A type implements a bound with an
+//! implementation `fn P[T].m` of T itself for each method (a scalar's,
+//! `fn Ord[I32].cmp`; a generic module's for its every instance,
+//! `fn Ord[&].cmp`) and a field for each getter and setter.
+
+/// The first member of `proto` type `t` lacks for a bound, or -1.
+fn bound_lack(t: I32, proto: I32) I32 {
+    let d = ty_decl(t);
+    let c = first_child(decl_node[proto]);
+    while (c >= 0) {
+        if is_kind(c, Node.Proto_member) {
+            let m = first_child(c);
+            let word = word_of(first_child(m));
+            if d < 0 { return word; };
+            if is_kind(m, Node.Proto_method) {
+                let f = member(d, word, Space.Method);
+                if not decl_is(f, Decl.Fn) or decl_a[f] != proto or not same_signature(f, m, t) { return word; };
+            } else {
+                let field = member(d, word, Space.Member);
+                if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), ty_inst(t)) != sig_type(last_child(m), t) { return word; };
+            };
+        };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+/// Whether module parameter `param` lists `proto` among its bounds.
+fn has_bound(param: I32, proto: I32) Bool {
+    let bounds = next_sibling(first_child(decl_node[param]));
+    if not is_kind(bounds, Node.Impl_list) { return false; };
+    let b = first_child(bounds);
+    while (b >= 0) {
+        if node_decl[b] == proto { return true; };
+        b = next_sibling(b);
+    };
+    false;
+}
+
+/// A protocol's name as written: a module's promoted protocol by the module's.
+fn proto_text(proto: I32) Str { type_text(decl_type(proto, 0)); }
+
+/// `mod Sorted[T[Ord]]`: `module`'s parameters as written, with `proto`
+/// added to `param`'s bounds.
+fn bounded_text(module: I32, param: I32, proto: I32) Str {
+    let text = "mod " + decl_text(module) + "[";
+    let p = first_child(next_sibling(first_child(decl_node[module])));
+    while (p >= 0) {
+        let name = first_child(p);
+        let bounds = next_sibling(name);
+        let listed = if is_kind(bounds, Node.Impl_list) { child_count(bounds); } else { 0; };
+        text = text + node_text(name);
+        if listed > 0 or node_decl[name] == param {
+            text = text + "[";
+            if listed > 0 {
+                let inner = node_text(bounds);
+                text = text + inner.slice(1, inner.len() - 1);
+            };
+            if node_decl[name] == param {
+                if listed > 0 { text = text + ", "; };
+                text = text + proto_text(proto);
+            };
+            text = text + "]";
+        };
+        p = next_sibling(p);
+        if p >= 0 { text = text + ", "; };
+    };
+    text + "]";
+}
+
+/// A fix for the last diagnostic: `proto` added to `param`'s bounds.
+fn bound_fix(param: I32, proto: I32) void {
+    let name = first_child(decl_node[param]);
+    let bounds = next_sibling(name);
+    let label = "bound " + decl_text(param) + " by " + proto_text(proto);
+    if is_kind(bounds, Node.Impl_list) {
+        let close = tok_start[node_last[bounds] - 1];
+        let sep = if child_count(bounds) > 0 { ", "; } else { ""; };
+        diag_fix(close, close, sep + proto_text(proto), label);
+    } else {
+        let after = tok_end[node_last[name] - 1];
+        diag_fix(after, after, "[" + proto_text(proto) + "]", label);
+    };
+}
+
+/// `a.m(…)` in instance `inst`, `a` of type `rt`, and `f` the method found
+/// (or -1): when `rt` is a type argument and m a protocol's method (f is
+/// `fn P[A].m`, or, with none found, a protocol has m), the parameter must
+/// be bounded by it. Whether that was reported (or, bounded but lacking m,
+/// already was where the module was instantiated).
+fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
+    if inst <= 0 { return false; };
+    let proto = if f >= 0 { decl_a[f]; } else { proto_with_method(word); };
+    if not decl_is(proto, Decl.Proto) { return false; };
+    let module = inst_module[inst];
+    let p = first_child(next_sibling(first_child(decl_node[module])));
+    let found = -1;
+    let i = 0;
+    while (p >= 0) {
+        if inst_arg(inst, i) == rt {
+            let param = node_decl[first_child(p)];
+            // Bounded, but this T lacks m: where it was instantiated said so.
+            if has_bound(param, proto) { return f < 0 and diag_kind.len() > 0; };
+            found = param;
+        };
+        i += 1;
+        p = next_sibling(p);
+    };
+    if found < 0 { return false; };
+    report3(Diag.UnboundedCall, at, word, found, proto, module);
+    diag_label(decl_text(found) + " is unbounded");
+    diag_place(Extra.Related, first_child(decl_node[found]), "no " + proto_text(proto));
+    bound_fix(found, proto);
+    true;
+}
+
+/// A protocol with a method named `word`, or -1.
+fn proto_with_method(word: I32) I32 {
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.Proto) {
+            let pm = protocol_member(d, word);
+            if pm >= 0 and is_kind(decl_node[pm], Node.Proto_method) { return d; };
+        };
+    };
+    -1;
+}
+
+/// Each instantiation in the program's own files (`Sorted[Point]`, `using
+/// Sorted[Point] |S|`) gives each bounded parameter a type that implements
+/// its bounds.
+fn validate_bounds() void {
+    if not any_bounds() { return; };
+    for (0 ..< node_kind.len()) |n| {
+        if node_kind[n] == Node.Module_type_arg_list.to_i32() and is_own_file(file_of_token(node_first[n])) {
+            let module = instantiated_module(n);
+            if module >= 0 { check_bounds(module, n); };
+        };
+    };
+}
+
+/// Whether any module parameter has bounds.
+fn any_bounds() Bool {
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.ModuleParam) and is_kind(next_sibling(first_child(decl_node[d])), Node.Impl_list) { return true; };
+    };
+    false;
+}
+
+/// The generic module type argument list `args` instantiates, or -1 (`fn
+/// P[T].m` names a protocol).
+fn instantiated_module(args: I32) I32 {
+    let c = first_child(parent_of(args));
+    while (c >= 0 and next_sibling(c) != args) { c = next_sibling(c); };
+    if c < 0 { return -1; };
+    let n = name_node(c);
+    if n < 0 { return -1; };
+    let d = node_decl[n];
+    if decl_is(d, Decl.Alias) { d = decl_a[d]; };
+    if d < 0 or decl_is(d, Decl.Proto) { return -1; };
+    let module = if decl_is(d, Decl.Module) { d; } else { module_of(d); };
+    if module < 0 or not is_generic(module) { return -1; };
+    if d != module and decl_a[module] != d { return -1; };
+    module;
+}
+
+/// The bounds of `module`'s parameters, against the arguments `args` gives.
+fn check_bounds(module: I32, args: I32) void {
+    let p = first_child(next_sibling(first_child(decl_node[module])));
+    let arg = first_child(args);
+    while (p >= 0 and arg >= 0) {
+        let bounds = next_sibling(first_child(p));
+        if is_kind(bounds, Node.Impl_list) {
+            let b = first_child(bounds);
+            while (b >= 0) {
+                if decl_is(node_decl[b], Decl.Proto) { check_bound(arg, node_decl[b], b, node_decl[first_child(p)]); };
+                b = next_sibling(b);
+            };
+        };
+        p = next_sibling(p);
+        arg = next_sibling(arg);
+    };
+}
+
+/// Type argument `arg` for `param`, bounded by `proto` (written at `bound`).
+fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) void {
+    // A parameter of the module it is written in: bounded by proto too.
+    let outer = arg_param(arg);
+    if outer >= 0 {
+        if has_bound(outer, proto) { return; };
+        report3(Diag.BoundMissing, arg, decl_name[outer], -1, proto, param);
+        diag_label(decl_text(outer) + " is unbounded");
+        diag_place(Extra.Expected, bound, "needs " + proto_text(proto));
+        diag_note("bound it: " + bounded_text(decl_owner[outer], outer, proto));
+        bound_fix(outer, proto);
+        return;
+    };
+    // `Box[T]`: what T is, each instance says.
+    if names_param(arg) { return; };
+    let t = type_of(arg, 0);
+    if ty_is(t, Ty.Error) { return; };
+    let lack = bound_lack(t, proto);
+    if lack < 0 { return; };
+    report3(Diag.BoundMissing, arg, -1, t, proto, param);
+    let f = if ty_decl(t) >= 0 { member(ty_decl(t), lack, Space.Method); } else { -1; };
+    let own = decl_is(f, Decl.Fn) and decl_a[f] != proto;
+    let mismatched = decl_is(f, Decl.Fn) and decl_a[f] == proto;
+    diag_label(if mismatched { word_text(lack) + " does not match"; } else if own { "its " + word_text(lack) + " is not " + proto_text(proto) + "'s"; } else { "no " + word_text(lack); });
+    diag_place(Extra.Expected, bound, "needs " + proto_text(proto));
+    diag_note("implement it: " + member_text(proto, lack, t));
+}
+
+/// What implements member `word` of `proto` for type `t`, as written:
+/// `fn Ord[Point].cmp |a| (b: Point) I32 { … }`, or a field `name: Str`.
+fn member_text(proto: I32, word: I32, t: I32) Str {
+    let m = decl_node[protocol_member(proto, word)];
+    if not is_kind(m, Node.Proto_method) { return "a field " + word_text(word) + ": " + type_text(sig_type(last_child(m), t)); };
+    let text = "fn " + proto_text(proto) + "[" + type_text(t) + "]." + word_text(word) + " |a| (";
+    let list = next_sibling(first_child(m));
+    let q = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
+    let names = "bcdefgh";
+    let i = 0;
+    while (q >= 0) {
+        if i > 0 { text = text + ", "; };
+        text = text + names.slice(i % 7, i % 7 + 1) + ": " + type_text(sig_type(q, t));
+        i += 1;
+        q = next_sibling(q);
+    };
+    text + ") " + type_text(sig_type(last_child(m), t)) + " { … }";
+}
+
+/// The module parameter a type argument is, by itself (`T`), or -1.
+fn arg_param(arg: I32) I32 {
+    let n = if is_kind(arg, Node.Ref_type) { name_node(first_child(arg)); } else { name_node(arg); };
+    if n >= 0 and decl_is(node_decl[n], Decl.ModuleParam) { node_decl[n]; } else { -1; };
+}
+
+/// Whether a type names a module parameter anywhere in it.
+fn names_param(node: I32) Bool {
+    if decl_is(node_decl[node], Decl.ModuleParam) { return true; };
+    let c = first_child(node);
+    while (c >= 0) {
+        if names_param(c) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+

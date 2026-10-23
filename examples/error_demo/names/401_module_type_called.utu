@@ -1,0 +1,11 @@
+// What: a module's struct called as if it were a function
+// Expect: P is a type, not a value (make one with P { … })
+mod m {
+    struct P:
+        | x: I32
+}
+
+export main() I32 {
+    m.P(1);
+    0;
+}

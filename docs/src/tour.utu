@@ -72,13 +72,14 @@ mod tour {
     fn globals_sample() Str {
         \\let greeting: Str = "hello";
         \\let limit: I32 = 3;
+        \\let loud: Str = shout();         // computed when the module starts
         \\
         \\fn shout() Str {
         \\    greeting.to_upper();
         \\}
         \\
         \\export main() Str {
-        \\    shout().repeat(limit);   // HELLOHELLOHELLO
+        \\    loud.repeat(limit);   // HELLOHELLOHELLO
         \\}
         ;
     }
@@ -231,6 +232,23 @@ mod tour {
         \\        total += i;
         \\    };
         \\    total;                             // 1+2+4+5+7+8+10 = 37
+        \\}
+        ;
+    }
+    fn labeled_sample() Str {
+        \\fn find(rows: Array[Array[I32]], want: I32) I32 {
+        \\    found: {                                 // a block named found
+        \\        for (rows) |row| {
+        \\            for (row) |x| {
+        \\                if x == want { break found x * 10; };   // leaves both loops, with a value
+        \\            };
+        \\        };
+        \\        -1;                                  // the value when nothing breaks
+        \\    };
+        \\}
+        \\
+        \\export main() I32 {
+        \\    find([[1, 2], [3, 4]], 3);               // 30
         \\}
         ;
     }
@@ -584,6 +602,23 @@ mod tour {
         \\}
         ;
     }
+    fn member_values_sample() Str {
+        \\mod temperature {
+        \\    fn to_fahrenheit(c: F64) F64 { c * 9.0 / 5.0 + 32.0; }
+        \\}
+        \\
+        \\struct Point:
+        \\    | x: F64
+        \\fn Point.at(x: F64) Point { Point { x: x }; }
+        \\
+        \\fn convert(f: fun(F64) F64, c: F64) F64 { f(c); }
+        \\
+        \\export main() F64 {
+        \\    let make = Point.at;                     // a type's function, as a value
+        \\    convert(temperature.to_fahrenheit, 100.0) + make(1.0).x;   // 212 + 1
+        \\}
+        ;
+    }
     fn generic_sample() Str {
         \\mod Stack[T] {
         \\    struct &:
@@ -592,6 +627,9 @@ mod tour {
         \\    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
         \\    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }
         \\    fn &.pop |s| () T { s.size -= 1; s.items[s.size]; }
+        \\    fn &.each |s| () yield T {        // a generator method: for (nums.each()) |v|
+        \\        for (0 ..< s.size) |i| { yield s.items[i]; };
+        \\    }
         \\}
         \\
         \\export main() Str {
@@ -696,6 +734,43 @@ mod tour {
         \\    let counters: Array[Counter] = [ByOne { count: 0 }, ByTen { count: 0 }];
         \\    for (counters) |c| { Counter.tick(c); Counter.tick(c); };
         \\    counters[0].count + counters[1].count;   // 22
+        \\}
+        ;
+    }
+    fn bounds_sample() Str {
+        \\proto Ord:
+        \\    | cmp(&) I32                // & is the implementing type
+        \\
+        \\struct Version[Ord]:
+        \\    | major: I32
+        \\    | minor: I32
+        \\
+        \\fn Ord[Version].cmp |a| (b: Version) I32 {
+        \\    if a.major != b.major { a.major - b.major; } else { a.minor - b.minor; };
+        \\}
+        \\fn Ord[I32].cmp |a| (b: I32) I32 { a - b; }   // a scalar implements it too
+        \\
+        \\mod Largest[T[Ord]] {            // every T implements Ord
+        \\    fn of(xs: Array[T]) T {
+        \\        let best = xs[0];
+        \\        for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };   // T's own cmp
+        \\        best;
+        \\    }
+        \\}
+        \\
+        \\export main() I32 {
+        \\    let v = Largest[Version].of([Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }]);
+        \\    v.major * 10 + Largest[I32].of([3, 9, 4]);   // 29
+        \\}
+        ;
+    }
+    fn std_bounds_sample() Str {
+        \\using Order from std:Ord;
+        \\
+        \\export main() Str {
+        \\    let words = ["pear", "fig", "apple"];
+        \\    Order[Str].sort(words);
+        \\    `${", ".join(words)}: ${Order[F64].max(1.5, 2.5)}`;   // apple, fig, pear: 2.5
         \\}
         ;
     }
@@ -927,6 +1002,9 @@ mod tour {
         \\pass addition commutes (1.2 ms)
         \\pass zero is the identity (0.3 ms)
         \\2 passed, 0 failed
+        \\$ utu bench add.utu -O fast
+        \\bench   median  iterations
+        \\adding  0.31 ns  11 × 67108864
         ;
     }
     // Promises
@@ -940,8 +1018,11 @@ mod tour {
         \\    first + second;
         \\}
         \\
+        \\fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+        \\
         \\export main() I32 {
-        \\    total(20, 22);                     // 42
+        \\    let later = cl(n: I32) I32 { await delay(n, 5); };   // a closure may await
+        \\    total(20, 22) + apply(later, 8);   // 50
         \\}
         ;
     }
@@ -1086,7 +1167,7 @@ mod tour {
                 code {
                     "let";
                 }
-                "s are globals.";
+                "s are globals. A global may be computed by any expression: the module sets it when it starts, in the order written, but always after the globals its initializer reads (directly or through the functions it calls). Two globals that need each other are an error.";
             }
             = code.block(let_sample());
             = code.block(globals_sample());
@@ -1151,6 +1232,18 @@ mod tour {
             = code.block(ranges_sample());
             = code.block(for_each_sample());
             = code.block(break_sample());
+            p {
+                "A block can have a name: ";
+                code {
+                    "break name";
+                }
+                " leaves it from anywhere inside it (loops included, closures not), and ";
+                code {
+                    "break name value";
+                }
+                " gives it a value. Its defers run as it is left.";
+            }
+            = code.block(labeled_sample());
             h2 {
                 "match and loop match";
             }
@@ -1339,6 +1432,26 @@ mod tour {
             }
             = code.block(mod_sample());
             = code.block(mod_type_sample());
+            p {
+                "A module's function or a type's, named without a call (";
+                code {
+                    "temperature.to_fahrenheit";
+                }
+                ", ";
+                code {
+                    "Point.at";
+                }
+                "), is a ";
+                code {
+                    "fun";
+                }
+                " value. A method can be a generator, and a generator can be reached through a module or a type: ";
+                code {
+                    "for (nums.each()) |v|";
+                }
+                ".";
+            }
+            = code.block(member_values_sample());
             = code.block(generic_sample());
             = code.block(std_generic_sample());
             = code.block(files_multi());
@@ -1358,6 +1471,35 @@ mod tour {
             }
             = code.block(proto_sample());
             = code.block(proto_members_sample());
+            p {
+                "A module's type parameter can be bounded: ";
+                code {
+                    "mod Largest[T[Ord]]";
+                }
+                " takes only types that implement ";
+                code {
+                    "Ord";
+                }
+                ", and its code calls their methods. Each instance calls its own type's, with no dispatch, so scalars implement protocols too. ";
+                code {
+                    "std:Ord";
+                }
+                " has ";
+                code {
+                    "Ord";
+                }
+                " for the numbers and ";
+                code {
+                    "Str";
+                }
+                ", and ";
+                code {
+                    "Order[T[Ord]]";
+                }
+                ": max, min, clamp, sort, search.";
+            }
+            = code.block(bounds_sample());
+            = code.block(std_bounds_sample());
             h2 {
                 "Strings";
             }
@@ -1493,6 +1635,24 @@ mod tour {
             h2 {
                 "Tests and benchmarks";
             }
+            p {
+                code {
+                    "utu test";
+                }
+                " runs each test. ";
+                code {
+                    "utu bench";
+                }
+                " runs each bench's setup once and its ";
+                code {
+                    "measure";
+                }
+                " block many times: it warms the engine up, doubles the count until a run takes 20 ms, then prints the median time per iteration of 11 runs (less the setup's own time). ";
+                code {
+                    "utu check";
+                }
+                " checks benches as it checks tests.";
+            }
             = code.block(tests_sample());
             = code.shell(tests_shell());
             h2 {
@@ -1510,7 +1670,11 @@ mod tour {
                 code {
                     ".then";
                 }
-                " runs anywhere. ";
+                " runs anywhere. A closure utu calls may await too; one the host calls (a ";
+                code {
+                    ".then";
+                }
+                " callback, an event handler) may not: JSPI cannot suspend through the host's frame. ";
                 code {
                     "await for";
                 }

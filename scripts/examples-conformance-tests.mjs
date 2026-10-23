@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { emitBinary } from '../src/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Programs only the self-hosted compiler builds: bounded module parameters
+// (`mod Sorted[T[Ord]]`) and `&` in a protocol, which stage 0 does not build.
+const SELFHOST_ONLY = new Set(['examples/bounds.utu']);
 
 // One test per file, so the runner can spread them across workers. Codegen is
 // validated at -O0; `wasm-fingerprints.mjs --optimized` builds every example
@@ -12,8 +15,13 @@ export function registerExamplesConformanceTests({ test, assertNoErrors, makeCom
   for (const file of utuFiles(path.join(ROOT, 'examples'))) {
     const name = path.relative(ROOT, file);
     test(`examples: ${name} analyses and emits valid Wasm`, async ({ ROOT }) => {
+      if (SELFHOST_ONLY.has(name)) {
+        await buildWithSelfhost(file, name);
+        return;
+      }
       // Wutu programs, and Result's try and errdefer, are built by the self-hosted compiler alone (stage 0 refuses them).
       const refusesWutu = (error) => String(error?.message ?? '').includes(' are compiled by the self-hosted compiler');
+
       let analyzed;
       try {
         analyzed = await (await makeCompiler({ ROOT, target: 'analysis' })).analyzeFile(file);
@@ -41,7 +49,7 @@ export function registerExamplesConformanceTests({ test, assertNoErrors, makeCom
   }
 }
 
-/** A Wutu program: the self-hosted compiler builds it without errors, and the engine accepts its module. */
+/** A Wutu program (or another only it builds): the self-hosted compiler builds it without errors, and the engine accepts its module. */
 async function buildWithSelfhost(file, name) {
   const { compileFile, loadNodeCompiler } = await import('../src/selfhost/node.js');
   const result = await compileFile(await loadNodeCompiler(), file, { optimize: 'none' });

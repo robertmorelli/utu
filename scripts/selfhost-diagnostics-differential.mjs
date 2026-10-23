@@ -51,6 +51,8 @@ const INTENDED = {
   // `@stored/\ S "k" S { n: missing } \/`: the expansion reads the default
   // twice, and stage 0 reports the unknown name for each reading.
   ...both('baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu', 'one name unknown twice on a line is one mistake'),
+  // `let value: … = f();`: stage 0 wants a literal; a global may be computed.
+  ...both('baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu', 'a global may be computed'),
 };
 
 if (isMainThread) await main();

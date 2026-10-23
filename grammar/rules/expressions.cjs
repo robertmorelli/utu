@@ -232,7 +232,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
     block_expr: ($) => prec.right(seq(optional(seq($.identifier, ':')), $.block)),
     block: ($) => seq('{', repeat(seq($._expr, ';')), '}'),
 
-    break_expr: (_) => 'break',
+    // `break` leaves a loop; `break label value` leaves the block `label: { … }` with a value.
+    break_expr: ($) => prec.right(seq('break', optional(seq($.identifier, optional($._expr))))),
     continue_expr: ($) => prec.right(seq('continue', optional($._expr))),
     // defer expr — run when the enclosing block exits (end, return, break, continue).
     defer_expr: ($) => prec.right(seq('defer', $._expr)),

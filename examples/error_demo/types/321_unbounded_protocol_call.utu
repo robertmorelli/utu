@@ -1,0 +1,15 @@
+// What: a protocol method called on a type parameter no bound promises it for
+// Expect: T has no method cmp; bound it: mod Largest[T[Ord]], with the fix
+using Ord from std:Ord;
+
+mod Largest[T] {
+    fn of(xs: Array[T]) T {
+        let best = xs[0];
+        for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };
+        best;
+    }
+}
+
+export main() I32 {
+    Largest[I32].of([3, 9, 4]);
+}

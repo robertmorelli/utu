@@ -1,0 +1,8 @@
+// What: a closure tries to leave the labeled block it was made in
+// Expect: No block labeled outer around this break, with the block outside the closure marked
+export main() I32 {
+    outer: {
+        let f = cl() I32 { break outer 1; };
+        f();
+    };
+}

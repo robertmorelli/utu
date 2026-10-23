@@ -653,7 +653,10 @@ loop match state {
 // inside a loop match is an error (name the next state); `break` leaves it.
 // Measurements: benchmarks/control-flow/README.md.
 
-// generators: `yield T` as the return type; consumed by for / await for
+// generators: `yield T` as the return type; consumed by for / await for.
+// A generator may be a module's (`for (seq.squares(4))`), a type's
+// (`for (Range.below(3))`), or a method (`fn &.each |s| () yield T`, read
+// with `for (stack.each())`). It is never a value, called, or exported.
 fn squares(n: I32) yield I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
@@ -715,11 +718,16 @@ expr |> foo(&, extra)
 assert cond
 fatal
 
-// break (from loop or block with optional label)
+// break: leave the innermost loop; `break name` leaves the block `name: { … }`
+// around it (loops between included, a closure's body not), and
+// `break name v` gives that block the value v. The block's value is its
+// last statement's, or a break's; its defers run as it is left.
 break
+break found
+break found i * 10
 
 // labeled block
-label: { ... }
+found: { ... }
 ```
 
 ---
@@ -879,6 +887,14 @@ An index or stored value is evaluated before the array is read, so
 // global constant
 let PI: F64 = 3.14159;
 
+// computed global: any expression. A wasm start function sets the computed
+// globals in the order written, each after the globals its initializer reads
+// (directly, or through the functions it calls; a closure it makes counts as
+// called), so none is read before it is set. Globals that need each other
+// are an error. Across files: an imported file's global read by the
+// entry's is set first.
+let TABLE: Array[I32] = build_table();
+
 // DSL expressions — @name/\ body \/
 // builtins: @es (JavaScript), @utu (utu source), @ir (raw IR xml), @wat (WAT, below)
 // body is raw text handed to the named DSL module at compile time
@@ -979,3 +995,8 @@ bench "description" {
     }
 }
 ```
+- `utu bench file.utu [-O mode]` builds each bench as an export `__bench_k(n)`
+  (the setup once, then the measured block n times), warms the engine up,
+  doubles n until a run takes 20 ms, and prints the median time per
+  iteration of 11 runs, less the setup's own time.
+- `utu check` (and a test build) type-checks benches as it does tests.
