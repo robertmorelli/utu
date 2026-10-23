@@ -137,7 +137,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "59 ms";
+                                "70 ms";
                             }
                             td {
                                 "The self-hosted compiler compiling itself. Stage 2 and stage 3 of the bootstrap are byte-identical.";
@@ -145,7 +145,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "122 KB";
+                                "121 KB";
                             }
                             td {
                                 "The whole compiler as brotli-compressed Wasm. It is what the CLI, the editor, and the web playground run.";
