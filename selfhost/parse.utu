@@ -258,8 +258,6 @@ enum(U8) Kw:
 /// The tokens the parser reads (positions of the lexer's tokens, without
 /// comments).
 export mem ptok: I32;
-/// By lexer token: its interned word id, or -1 when it is not a word.
-export mem tok_word: I32;
 
 /// The tree, by node id: its kind (a @Node). The `node_*` mems are its rows:
 /// its first token and the token after its last, its first child, and its next
@@ -2109,16 +2107,13 @@ fn intern_keywords() void {
     };
 }
 
-/// Intern the word tokens from `first` up to `last`, and list those the
-/// parser reads (all but comments) in @ptok.
-fn intern_words(first: I32, last: I32) void {
-    tok_word.resize(last);
+/// List the tokens from `first` up to `last` the parser reads (all but
+/// comments) in @ptok.
+fn parser_tokens(first: I32, last: I32) void {
     ptok.resize(last - first + 4);
     let p = 0;
     for (first ..< last) |t| {
-        let kind = tok_kind[t];
-        tok_word[t] = if kind == Tok.Word.to_i32() { src.intern(tok_start[t], tok_end[t]); } else { -1; };
-        if kind != Tok.Comment.to_i32() {
+        if tok_kind[t] != Tok.Comment.to_i32() {
             ptok[p] = t;
             p += 1;
         };
@@ -2137,7 +2132,7 @@ fn parse(first: I32, last: I32) I32 {
         parse_error_at[0] = last - 1;
         return -1;
     };
-    intern_words(first, last);
+    parser_tokens(first, last);
     let before = node_kind.len();
     pending.clear();
     parse_depth[0] = 0;
@@ -2230,7 +2225,7 @@ fn attach_within(parent: I32, comments: Comments) void {
 /// its place in the source.)
 fn parse_expression(first: I32, last: I32) I32 {
     if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
-    intern_words(first, last);
+    parser_tokens(first, last);
     let before = node_kind.len();
     pending.clear();
     try {
