@@ -16,6 +16,8 @@
 //!   dropped, when it has effects), and is no longer declared.
 //! / coalescing: locals of one type whose live ranges do not overlap share
 //!   one, and the locals are declared grouped by type (one run each).
+//! / loads (size builds): a field read of a local, read again twice or more
+//!   where nothing can have changed it, is kept in a local.
 //! / logic (size builds): `a and b`, `a or b` whose b is cheap, pure and
 //!   cannot trap are `i32.and`, `i32.or`, no `if`; a range test of one local
 //!   against constants is one unsigned comparison.
@@ -66,6 +68,10 @@ fn optimize_function(f: I32) void {
     // (with its parent), as a new walk would find them. None moves a block,
     // so the blocks stay in the walk's order.
     while (propagate_copies(params) or sink_temporaries(params)) {};
+    if optimize_level[0] == 1 and reuse_loads(f) {
+        total = params + func_local_count[f];
+        opt_collect(f, total);
+    };
     if optimize_level[0] == 1 and fold_logic() { opt_collect(f, total); };
     tee_stores();
     remove_unused_locals(f, params, total);
@@ -742,4 +748,160 @@ fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
     node_holders.resize(w_op.len());
     for (old ..< w_op.len()) |i| { node_holders[i] = 1; };
     relink(n, Op.Seq, 0, w_pop(), -1);
+}
+
+//! = Loads
+//!
+//! `x.f` read again, x the same local, where the first read has run on
+//! every way there, x has not been assigned, and nothing that could write
+//! the field has run (a call, or a `struct.set` of that field of any type;
+//! an immutable field only x's assignment changes): the first read is teed
+//! into a new local and the others read that, when there are two others or
+//! more (a read is six bytes, the tee and each read of the local two, and
+//! the local's declaration about as many). A walk in the order the code
+//! runs keeps the reads known; what a branch, block or loop reads is
+//! forgotten after it, and a loop's writes count before it.
+
+/// The reads known: by entry, its read (a node), whether it still holds,
+/// and its number (the order the walk finds it).
+vec ld_node: I32;
+vec ld_ok: U8;
+vec ld_id: I32;
+/// By number: its reads after (counted by the first walk), and its local
+/// (-1 none yet).
+vec ld_reuses: I32;
+vec ld_temp: I32;
+/// The walk's next number; whether it rewrites (the second walk); the function.
+vec ld_next: I32 = [0];
+vec ld_rewrite: I32 = [0];
+vec ld_func: I32 = [0];
+
+/// Reads reused in function f; whether any was.
+fn reuse_loads(f: I32) Bool {
+    ld_reuses.clear();
+    ld_temp.clear();
+    ld_func[0] = f;
+    for (0 ..< 2) |pass| {
+        ld_node.clear();
+        ld_ok.clear();
+        ld_id.clear();
+        ld_next[0] = 0;
+        ld_rewrite[0] = pass;
+        ld_walk(func_body[f]);
+        if pass == 0 {
+            let any = false;
+            for (0 ..< ld_reuses.len()) |e| { if ld_reuses[e] >= 2 { any = true; }; };
+            if not any { return false; };
+        };
+    };
+    // The nodes made, each held once.
+    let old = node_holders.len();
+    node_holders.resize(w_op.len());
+    for (old ..< w_op.len()) |i| { node_holders[i] = 1; };
+    true;
+}
+
+fn ld_walk(n: I32) void {
+    let op = w_op[n];
+    let count = w_count[n];
+    if op == Op.Loop.to_i32() { ld_loop_writes(n); };
+    // Kids from `alone` on run each (or not) from what was known before
+    // them; a block's or loop's, in turn, forgotten after it.
+    let alone = if op == Op.If.to_i32() or op == Op.NullElse.to_i32() or op == Op.CastArms.to_i32() { 1; }
+        else if op == Op.Try.to_i32() { 0; } else { count; };
+    let start = ld_node.len();
+    for (0 ..< count) |i| {
+        let mark = ld_node.len();
+        ld_walk(w_kid(n, i));
+        if i >= alone { ld_forget(mark); };
+    };
+    if op == Op.Block.to_i32() or op == Op.Loop.to_i32() { ld_forget(start); };
+    ld_effect(n);
+}
+
+fn ld_forget(mark: I32) void {
+    ld_node.resize(mark);
+    ld_ok.resize(mark);
+    ld_id.resize(mark);
+}
+
+/// What a loop writes, anywhere in it, as written before it.
+fn ld_loop_writes(n: I32) void {
+    ld_effect_write(n);
+    for (0 ..< w_count[n]) |i| { ld_loop_writes(w_kid(n, i)); };
+}
+
+/// What node n's own instruction does to the reads known.
+fn ld_effect(n: I32) void {
+    let op = w_op[n];
+    if (op == Op.StructGet.to_i32() or op == Op.StructGetS.to_i32() or op == Op.StructGetU.to_i32())
+        and w_op[w_kid(n, 0)] == Op.LocalGet.to_i32() and not non_null(w_type[n]) {
+        ld_read(n);
+    } else {
+        ld_effect_write(n);
+    };
+}
+
+fn ld_effect_write(n: I32) void {
+    let op = w_op[n];
+    let set = op == Op.StructSet.to_i32();
+    let call = op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32();
+    let local = op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32();
+    if not (set or call or local) { return; };
+    for (0 ..< ld_node.len()) |e| {
+        let r = ld_node[e];
+        let mutable = ht_fields[ht_a[w_a[r]] + w_b[r] * 2 + 1] == 1;
+        if (local and w_a[w_kid(r, 0)] == w_a[n]) or (call and mutable) or (set and w_b[r] == w_b[n]) { ld_ok[e] = 0; };
+    };
+}
+
+/// A field read of a local: one known again, or known from here.
+fn ld_read(n: I32) void {
+    let x = w_a[w_kid(n, 0)];
+    for (0 ..< ld_node.len()) |e| {
+        let r = ld_node[e];
+        if ld_ok[e] == 1 and w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == x {
+            ld_reuse(e, n);
+            return;
+        };
+    };
+    ld_node.push(n);
+    ld_ok.push(1);
+    ld_id.push(ld_next[0]);
+    ld_next[0] += 1;
+    if ld_rewrite[0] == 0 {
+        ld_reuses.push(0);
+        ld_temp.push(-1);
+    };
+}
+
+/// Read n reads what known entry e's read did.
+fn ld_reuse(e: I32, n: I32) void {
+    let id = ld_id[e];
+    if ld_rewrite[0] == 0 {
+        ld_reuses[id] += 1;
+        return;
+    };
+    if ld_reuses[id] < 2 { return; };
+    let r = ld_node[e];
+    if ld_temp[id] < 0 {
+        let t = add_local(ld_func[0], w_type[r]);
+        ld_temp[id] = t;
+        // The read, teed: a copy of it in a tee where it was.
+        let m = w_mark();
+        w_push(w_kid(r, 0));
+        let copy = w_node(Op.from_i32(w_op[r]), w_type[r], w_a[r], w_b[r], m);
+        w_pop();
+        w_op[r] = Op.LocalTee.to_i32();
+        w_a[r] = t;
+        w_b[r] = 0;
+        w_first[r] = w_kids.len();
+        w_kids.push(copy);
+        w_count[r] = 1;
+        ld_node[e] = copy;
+    };
+    w_op[n] = Op.LocalGet.to_i32();
+    w_a[n] = ld_temp[id];
+    w_b[n] = 0;
+    w_count[n] = 0;
 }

@@ -560,6 +560,16 @@ export lib {
       + '    let xs: Array[Sh] = [Circle { r: 2 }, Sq { s: 3 }, Rect { w: 4, h: 5 }, Tri { a: 1, b: 2, c: 3 }, Dot {}];\n    let t = 0;\n'
       + '    for (xs) |x| { t = t * 7 + area(x) + kind(x) * 3 + boxed(x) * 11 + area(ret(x)) * 13; };\n'
       + '    t + first(xs) * 100000 + first([Circle { r: 1 }, Sq { s: 9 }, Dot {}]) * 1000000 + first([Rect { w: 0, h: 1 }]);\n} }\n', 104064628],
+    // A field read again (small): kept in a local only while no call, struct.set of the field,
+    // assignment of the local, or loop writing them, comes between.
+    ['struct P:\n    | x: I32\n    | y: I32\n    | next: ?P\nfn poke(p: P) void { p.x += 100; }\nfn alias(a: P, b: P) I32 {\n    let s = a.x + a.x;\n    b.x = 7;\n'
+      + '    s + a.x + a.x + a.x;\n}\nfn calls(a: P) I32 {\n    let s = a.x + a.x;\n    poke(a);\n    s * 1000 + a.x + a.x + a.x;\n}\nfn loop_write(a: P) I32 {\n'
+      + '    let s = a.y + a.y + a.y;\n    let i = 0;\n    while (i < 3) {\n        s += a.y + a.y;\n        a.y += 1;\n        i += 1;\n    };\n    s + a.y;\n}\n'
+      + 'fn reassign(a: P, b: P) I32 {\n    let p = a;\n    let s = p.x + p.x + p.x;\n    p = b;\n    s * 1000 + p.x + p.x + p.x;\n}\nfn branch(a: P, c: Bool) I32 {\n'
+      + '    let s = 0;\n    if c { s = a.y + a.y; } else { s = 1; };\n    s * 10 + a.y + a.y + a.y;\n}\nfn hoist(a: P) I32 {\n    let s = a.x;\n'
+      + '    for (0 ..< 4) |i| { s += a.x * i + a.y + a.x; };\n    s;\n}\nexport lib { fn run() I32 {\n    let a = P { x: 1, y: 2, next: null };\n'
+      + '    let b = P { x: 3, y: 4, next: a };\n    let r = alias(a, a) * 1 + alias(a, b) * 100;\n    r = r * 7 + calls(b);\n    r = r * 7 + loop_write(a);\n'
+      + '    r = r * 7 + reassign(a, b);\n    r = r * 7 + branch(a, true) + branch(b, false) * 3;\n    r * 7 + hoist(a);\n} }\n', 94651822],
     // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
     ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the
