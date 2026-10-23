@@ -6360,11 +6360,11 @@ ok
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
-wasm://wasm/0fa20312:1
+wasm://wasm/913609f2:1
 
 
 RuntimeError: divide by zero
-    at closure (wasm://wasm/0fa20312:wasm-function[5]:0xb4)
+    at closure (wasm://wasm/913609f2:wasm-function[5]:0xb3)
     at invoke
 
 Node.js v25.8.1
