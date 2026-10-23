@@ -48,28 +48,46 @@ export function sourcesHash(text) {
 // The text, its comments out and each run of space one space. Strings,
 // template strings, and DSL bodies are kept as written: when unsure, text is
 // kept, so a change is never missed for a comment.
+// Linear: pieces joined once (appending a character at a time, and asking
+// endsWith of the result, is quadratic in Node).
 function codeOf(text) {
-  let out = '';
+  const out = [];
+  let spaced = true;  // nothing yet, or a space last: no space to add
+  const space = /\s+/y;
+  const plain = /[^\s/"`]+|\//y;
   for (let i = 0; i < text.length;) {
     const c = text[i];
     if (c === '/' && text[i + 1] === '/') {
-      while (i < text.length && text[i] !== '\n') i++;
+      const end = text.indexOf('\n', i);
+      i = end < 0 ? text.length : end;
     } else if (/\s/.test(c)) {
-      while (/\s/.test(text[i] ?? '')) i++;
-      if (out && !out.endsWith(' ')) out += ' ';
+      space.lastIndex = i;
+      space.test(text);
+      i = space.lastIndex;
+      if (!spaced) out.push(' ');
+      spaced = true;
     } else if (c === '"' || c === '`' || (c === '/' && text[i + 1] === '\\')) {
-      const close = c === '/' ? '\\/' : c;
-      let j = i + 1;
-      while (j < text.length && !text.startsWith(close, j)) j += c !== '/' && text[j] === '\\' ? 2 : 1;
-      j += close.length;
-      out += text.slice(i, j);
+      let j;
+      if (c === '/') {
+        j = text.indexOf('\\/', i + 1);
+        j = j < 0 ? text.length + 2 : j + 2;
+      } else {
+        j = i + 1;
+        while (j < text.length && text[j] !== c) j += text[j] === '\\' ? 2 : 1;
+        j += 1;
+      }
+      out.push(text.slice(i, j));
+      spaced = false;
       i = j;
     } else {
-      out += c;
-      i++;
+      plain.lastIndex = i;
+      plain.test(text);
+      out.push(text.slice(i, plain.lastIndex));
+      spaced = false;
+      i = plain.lastIndex;
     }
   }
-  return out.trimEnd();
+  return out.join('').trimEnd();
 }
 
 const SELFHOST = path.join(ROOT, 'selfhost');
@@ -105,7 +123,8 @@ export function sourcesRecord(text) {
 
 // Whether the compiler at `record` was built from selfhost/ as it is (true
 // outside the repository): by the files' stamps, and when one differs (a
-// checkout, a touch) by their hash.
+// checkout, a touch) by their hash, then recording the new stamps so the
+// next run need not hash.
 function builtFromCurrentSources(record) {
   const files = sourceFiles();
   if (!files) return true;
@@ -113,7 +132,13 @@ function builtFromCurrentSources(record) {
   try { recorded = JSON.parse(fs.readFileSync(record, 'utf8')); } catch { return false; }
   const now = sourceStamps(files);
   if (JSON.stringify(now) === JSON.stringify(recorded.stamps)) return true;
-  return currentSources(files) === recorded.hash;
+  if (currentSources(files) !== recorded.hash) return false;
+  try {
+    const partial = `${record}.${process.pid}.tmp`;
+    fs.writeFileSync(partial, `${JSON.stringify({ hash: recorded.hash, stamps: now })}\n`);
+    fs.renameSync(partial, record);
+  } catch {}
+  return true;
 }
 
 function readOr(file, fallback) {
@@ -142,7 +167,7 @@ export function nodeHost({ root = process.cwd(), stdlib = nodeStdlib() } = {}) {
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
     // TypeScript is only needed when a program imports "npm:…" or "node:…".
     resolvePackage: async (specifier, request) => {
-      packages ??= (await import('../../tools/dts/packages.mjs')).nodePackageResolver({ root });
+      packages ??= (await import('../../tools/dts/packages.mjs')).nodePackageResolver({ root, ready: true });
       return packages(specifier, request);
     },
     loadGlue: source => importGlue(source, root),
