@@ -98,6 +98,8 @@ fn inst_hash(module: I32, args: I32) I32 { (module * -1640531535) ^ (args * 4050
 /// The instance of `module` with type arguments `args` (a list of types),
 /// interned.
 fn instance(module: I32, args: I32) I32 {
+    let site = inst_here[0];
+    inst_here[0] = -1;
     if (inst_module.len() + 1) * 2 > inst_table.len() { inst_grow(); };
     let mask = inst_table.len() - 1;
     let h = inst_hash(module, args) & mask;
@@ -109,12 +111,18 @@ fn instance(module: I32, args: I32) I32 {
     let id = inst_module.len();
     inst_module.push(module);
     inst_args.push(args);
+    inst_site.push(site);
     inst_table[h] = id;
     let depth = 0;
     for (0 ..< vl_len[args]) |i| { depth = max_i32(depth, type_depth(vl_item(args, i))); };
     inst_depth.push(depth + 1);
     id;
 }
+
+/// By instance: the `[U32]` of where it was first written (`G[U32]`), or -1.
+vec inst_site: I32;
+/// The type arguments @type_args last read, for @instance to keep as its site.
+vec inst_here: I32 = [-1];
 
 /// By instance: how deep its type arguments nest instances (`m[Array[I32]]` is 2).
 vec inst_depth: I32;
@@ -355,6 +363,7 @@ fn type_args(list: I32, inst: I32) I32 {
         vl_add(type_of(c, inst));
         c = next_sibling(c);
     };
+    inst_here[0] = list;
     vl_end(m);
 }
 

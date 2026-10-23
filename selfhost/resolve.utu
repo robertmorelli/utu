@@ -1080,7 +1080,9 @@ fn check_test_names(root: I32) void {
             let start = tok_start[node_first[name]];
             let end_ = tok_end[node_last[name] - 1];
             // The name as written, quotes and all.
+            lit_bytes.clear();
             if end_ - start <= 2 { report2(Diag.TestName, name, -1, 1, -1); }
+            else if not decode_string(start + 1, end_ - 1) { report_bad_literal(name); }
             else if word_seen(src.intern(start, end_), stamp) { report(Diag.TestName, name, -1); };
         };
         item = next_sibling(item);
