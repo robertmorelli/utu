@@ -530,6 +530,21 @@ export lib {
       + 'fn walk(a: ?N) I32 { let t = 0; let cur = a; while (true) { let c = cur orelse { break; }; t += c.v; cur = c.next; }; t; }\n'
       + 'export lib { fn run() I32 {\n    let a = N { v: 1, next: N { v: 2, next: null } };\n    let b = get(a) orelse a;\n    let z = get(b) orelse N { v: 40, next: null };\n    let w = (get(z) orelse b).v;\n'
       + '    walk(a) * 100000 + b.v * 1000 + z.v + w * 10 + hits[0] * 10000;\n} }\n', 332060],
+    // `and`/`or` as i32.and/i32.or, range tests as one unsigned comparison (small):
+    // the right side runs after the left (which it may read), bounds at the ends of I32.
+    ['vec seen: I32 = [0];\nfn bump() Bool { seen[0] += 1; seen[0] > 2; }\nfn h(acc: I32, b: Bool) I32 { acc * 31 + if b { 1; } else { 0; }; }\n'
+      + 'fn ranges(x: I32) I32 {\n    let a = 0;\n    a = h(a, x >= 48 and x <= 57);\n    a = h(a, 48 <= x and x <= 57);\n    a = h(a, x > -10 and x < 10);\n'
+      + '    a = h(a, x >= -2147483648 and x <= 5);\n    a = h(a, x >= 0 and x <= 2147483647);\n    a = h(a, x >= -2147483648 and x <= 2147483647);\n'
+      + '    a = h(a, x >= 5 and x <= 5);\n    a = h(a, x >= 6 and x <= 5);\n    a = h(a, x < 65 or x > 90);\n    a = h(a, 90 < x or x < 65);\n'
+      + '    a = h(a, x <= -1 or x >= 100);\n    a = h(a, x >= 0 and x < 2147483647);\n    a = h(a, x > -2147483648 and x <= 0);\n    a;\n}\nstruct B:\n'
+      + '    | ok: Bool\nfn is_ok(b: ?B) Bool { promote b { |o| => o.ok, ~> false, }; }\nfn nonnull(b: ?B) Bool { promote b { |o| => true, ~> false, }; }\n'
+      + 'export lib { fn run() I32 {\n'
+      + '    let xs = [-2147483648, -2147483647, -11, -10, -9, -1, 0, 1, 4, 5, 6, 9, 10, 47, 48, 50, 57, 58, 64, 65, 77, 90, 91, 99, 100, 101, 2147483646, 2147483647];\n'
+      + '    let acc = 0;\n    for (xs) |x| { acc = acc * 7 + ranges(x); };\n    let flag = false;\n    let t = 0;\n    for (0 ..< 5) |i| {\n'
+      + '        if bump() and seen[0] > 3 { t += 1; };\n        flag = i > 2;\n        if i == 1 or flag { t += 10; };\n'
+      + '        if flag and i != 4 { t += 100; };\n    };\n    let b: ?B = B { ok: true };\n    let n: ?B = null;\n'
+      + '    acc + t * 1000 + (if is_ok(b) { 1; } else { 0; }) + (if is_ok(n) { 2; } else { 0; }) + (if nonnull(b) { 4; } else { 0; }) + (if nonnull(n) { 8; } else { 0; }) + seen[0];\n'
+      + '} }\n', 2137102356],
     // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
     ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the

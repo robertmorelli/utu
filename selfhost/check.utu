@@ -1830,7 +1830,8 @@ fn check_logical(node: I32, word: I32, cx: Cx) I32 {
         w_node(Op.Seq, vt_i32, 0, 0, m2);
     };
     unwant();
-    w_node(Op.If, vt_i32, new_label(), 0, m);
+    // Its condition and values are Bools (optimize.utu folds it).
+    w_node(Op.If, vt_i32, new_label(), 3, m);
     bool_t;
 }
 
@@ -2827,7 +2828,8 @@ fn check_if(node: I32, expected: I32, cx: Cx) I32 {
     let t2 = if is_kind(else_, Node.If_expr) { check_if(else_, t, cx); } else { check_block(else_, t, cx); };
     t = other_branch(t, t2, else_);
     if expect < 0 and t >= 0 { unwant(); };
-    w_node(Op.If, repr(t), label, 0, m);
+    // Its condition is a Bool, and its values when t is (optimize.utu folds it).
+    w_node(Op.If, repr(t), label, if t == bool_t { 3; } else { 1; }, m);
     t;
 }
 

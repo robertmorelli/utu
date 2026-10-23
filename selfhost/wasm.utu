@@ -523,6 +523,7 @@ enum(U16) Op:
 // The `Plain` instructions written by name, by their opcodes.
 let i32_eqz: I32 = 69;
 let i32_eq: I32 = 70;
+let i32_ne: I32 = 71;
 let i32_lt_s: I32 = 72;
 let i32_lt_u: I32 = 73;
 let i32_gt_s: I32 = 74;

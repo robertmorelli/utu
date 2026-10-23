@@ -200,7 +200,9 @@ tables.
   name a string constant); stage 0's local cleanup (copies, temporaries,
   unused locals) runs on every function, and a store the next statement
   reads first is a `local.tee`; a `match` takes a `br_table` only when that
-  is the smaller. Iterator pipelines fuse across a `collect` whose
+  is the smaller. `a and b` (`or`) with b cheap, pure, and unable to trap is
+  `i32.and` (`i32.or`), no `if`; `x >= lo and x <= hi` of constants is one
+  unsigned comparison. Iterator pipelines fuse across a `collect` whose
   stages cannot tell, and a captured variable is boxed only when a write
   could be seen after the capture, both as in stage 0.
 - **The host contract** (`host.utu`): what the module needs from its host

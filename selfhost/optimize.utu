@@ -16,6 +16,9 @@
 //!   dropped, when it has effects), and is no longer declared.
 //! / coalescing: locals of one type whose live ranges do not overlap share
 //!   one, and the locals are declared grouped by type (one run each).
+//! / logic (size builds): `a and b`, `a or b` whose b is cheap, pure and
+//!   cannot trap are `i32.and`, `i32.or`, no `if`; a range test of one local
+//!   against constants is one unsigned comparison.
 //!
 //! So a consumed generator compiles to what the equivalent loop compiles to.
 //! Every local codegen makes is set before it is read, which is what makes
@@ -63,6 +66,7 @@ fn optimize_function(f: I32) void {
     // (with its parent), as a new walk would find them. None moves a block,
     // so the blocks stay in the walk's order.
     while (propagate_copies(params) or sink_temporaries(params)) {};
+    if optimize_level[0] == 1 and fold_logic() { opt_collect(f, total); };
     tee_stores();
     remove_unused_locals(f, params, total);
     coalesce_locals(f, params);
@@ -573,4 +577,169 @@ fn co_walk(node: I32) void {
         co_loop_end[span] = at;
         co_loops.resize(co_loops.len() - 1);
     };
+}
+
+//! = Logic
+//!
+//! `a and b` is built as `if a { b } else { false }`. When b is a few
+//! instructions that neither trap nor have effects, running it either way
+//! is the same: `a b i32.and` (`a b i32.or`), five bytes fewer. That needs a
+//! and b to be 0 or 1: an `if` marks (@w_b) a condition that is a Bool (1)
+//! and values that are (2); else they must be comparisons. `if c { true }
+//! else { false }` is c. Then `x >= lo and x <= hi`, x a local and lo, hi
+//! constants, is `x - lo <u hi - lo + 1` (`x == lo` when they are one);
+//! `x < lo or x > hi` its opposite.
+
+/// Fold each `if` of the function's walk, operands first. Whether any changed.
+fn fold_logic() Bool {
+    let changed = false;
+    let k = opt_nodes.len();
+    while (k > 0) {
+        k -= 1;
+        let n = opt_nodes[k];
+        if w_op[n] == Op.If.to_i32() and w_type[n] == vt_i32 and w_count[n] == 3 and fold_if(n) { changed = true; };
+    };
+    changed;
+}
+
+fn fold_if(n: I32) Bool {
+    let c = w_kid(n, 0);
+    let x = seq_value(w_kid(n, 1));
+    let y = seq_value(w_kid(n, 2));
+    if x < 0 or y < 0 { return false; };
+    if not ((w_b[n] & 1) == 1 or bool_valued(c)) { return false; };
+    if is_const(x, 1) and is_const(y, 0) { return relink(n, Op.Seq, 0, c, -1); };
+    if is_const(x, 0) and is_const(y, 1) { return relink(n, Op.Plain, i32_eqz, c, -1); };
+    // `if c { x } else { 0 }` is c and x; `if c { 1 } else { y }`, c or y.
+    let and_ = is_const(y, 0);
+    let other = if and_ { x; } else if is_const(x, 1) { y; } else { -1; };
+    if other < 0 or not ((w_b[n] & 2) == 2 or bool_valued(other)) or cheap(other, 6) < 0 { return false; };
+    if range_test(n, c, other, and_) { return true; };
+    relink(n, Op.Plain, if and_ { i32_and; } else { i32_or; }, c, other);
+}
+
+/// Node n rewritten in place as `op a` of kids k1 (and k2, if any), a
+/// Bool (marked so when a Plain).
+fn relink(n: I32, op: Op, a: I32, k1: I32, k2: I32) Bool {
+    w_op[n] = op.to_i32();
+    w_a[n] = a;
+    w_b[n] = 2;
+    w_first[n] = w_kids.len();
+    w_kids.push(k1);
+    w_count[n] = 1;
+    if k2 >= 0 {
+        w_kids.push(k2);
+        w_count[n] = 2;
+    };
+    true;
+}
+
+/// A branch's value: the node a Seq of one value holds, or -1.
+fn seq_value(n: I32) I32 {
+    let v = n;
+    while (w_op[v] == Op.Seq.to_i32()) {
+        if w_count[v] != 1 { return -1; };
+        v = w_kid(v, 0);
+    };
+    if w_type[v] == vt_i32 { v; } else { -1; };
+}
+
+fn is_const(n: I32, value: I32) Bool { w_op[n] == Op.I32Const.to_i32() and w_a[n] == value; }
+
+/// Whether an `i32` is always 0 or 1: a comparison, a null or type test, a
+/// Bool `if` or fold, 0 or 1.
+fn bool_valued(n: I32) Bool {
+    let op = w_op[n];
+    if op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefTest.to_i32() { return true; };
+    if op == Op.I32Const.to_i32() { return w_a[n] == 0 or w_a[n] == 1; };
+    if (op == Op.If.to_i32() or op == Op.Plain.to_i32()) and (w_b[n] & 2) == 2 { return true; };
+    if op == Op.Seq.to_i32() { return w_count[n] == 1 and bool_valued(w_kid(n, 0)); };
+    if op == Op.Plain.to_i32() {
+        let code = w_a[n];
+        if code >= 69 and code <= 102 { return true; };
+        if code == i32_and or code == i32_or or code == i32_xor { return bool_valued(w_kid(n, 0)) and bool_valued(w_kid(n, 1)); };
+    };
+    false;
+}
+
+/// What is left of `budget` instructions after n's, or -1 when n is more,
+/// or may trap or have effects.
+fn cheap(n: I32, budget: I32) I32 {
+    let op = w_op[n];
+    let ok = op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32() or op == Op.F64Const.to_i32()
+        or op == Op.LocalGet.to_i32() or op == Op.GlobalGet.to_i32() or op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32()
+        or (op == Op.Plain.to_i32() and pure_opcode(w_a[n]));
+    if not ok or budget < 1 { return -1; };
+    let left = budget - 1;
+    for (0 ..< w_count[n]) |i| {
+        left = cheap(w_kid(n, i), left);
+        if left < 0 { return -1; };
+    };
+    left;
+}
+
+/// By the last @range_bound: the local compared, and the bound (an `I64`).
+vec rb_local: I32 = [-1];
+vec rb_value: I64 = [0];
+
+/// A signed `i32` comparison of a local and a constant, as a bound of the
+/// local: 0 `x >= v`, 1 `x <= v` (@rb_local, @rb_value); -1 none. `negate`
+/// reads it as its opposite (`x < v` is not `x >= v`).
+fn range_bound(n: I32, negate: Bool) I32 {
+    if w_op[n] != Op.Plain.to_i32() or w_count[n] != 2 { return -1; };
+    let code = w_a[n];
+    // lt_s 72, gt_s 74, le_s 76, ge_s 78.
+    if code != 72 and code != 74 and code != 76 and code != 78 { return -1; };
+    let l = w_kid(n, 0);
+    let r = w_kid(n, 1);
+    // `k < x` is `x > k`.
+    if w_op[l] == Op.I32Const.to_i32() and w_op[r] == Op.LocalGet.to_i32() {
+        code = if code == 72 { 74; } else if code == 74 { 72; } else if code == 76 { 78; } else { 76; };
+        let t = l;
+        l = r;
+        r = t;
+    };
+    if w_op[l] != Op.LocalGet.to_i32() or w_op[r] != Op.I32Const.to_i32() { return -1; };
+    if negate { code = if code == 72 { 78; } else if code == 74 { 76; } else if code == 76 { 74; } else { 72; }; };
+    rb_local[0] = w_a[l];
+    let v = w_a[r].to_i64();
+    if code == 78 { rb_value[0] = v; return 0; };
+    if code == 74 { rb_value[0] = v + 1.to_i64(); return 0; };
+    if code == 76 { rb_value[0] = v; return 1; };
+    rb_value[0] = v - 1.to_i64();
+    1;
+}
+
+/// `x >= lo and x <= hi` as `x - lo <u hi - lo + 1`, and `x < lo or x > hi`
+/// as `x - lo >=u hi - lo + 1`, in node n. Whether it was.
+fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
+    let ka = range_bound(a, not and_);
+    let la = rb_local[0];
+    let va = rb_value[0];
+    let kb = range_bound(b, not and_);
+    if ka < 0 or kb < 0 or ka == kb or la != rb_local[0] { return false; };
+    let lo = if ka == 0 { va; } else { rb_value[0]; };
+    let hi = if ka == 0 { rb_value[0]; } else { va; };
+    let span = hi - lo + 1.to_i64();
+    if lo > hi or span >= 65536.to_i64() * 65536.to_i64() { return false; };
+    let x = if ka == 0 { w_kid(a, 0); } else { w_kid(b, 0); };
+    if w_op[x] != Op.LocalGet.to_i32() { x = if ka == 0 { w_kid(a, 1); } else { w_kid(b, 1); }; };
+    let m = w_mark();
+    w_push(x);
+    if span == 1.to_i64() {
+        w_i32(lo.to_i32());
+        w_i32_op(if and_ { i32_eq; } else { i32_ne; }, m);
+    } else if lo != 0.to_i64() {
+        w_i32(lo.to_i32());
+        w_i32_op(i32_sub, m);
+    };
+    if span != 1.to_i64() {
+        w_i32(span.to_i32());
+        w_i32_op(if and_ { i32_lt_u; } else { i32_ge_u; }, m);
+    };
+    // The new nodes, each held once.
+    let old = node_holders.len();
+    node_holders.resize(w_op.len());
+    for (old ..< w_op.len()) |i| { node_holders[i] = 1; };
+    relink(n, Op.Seq, 0, w_pop(), -1);
 }
