@@ -29,8 +29,19 @@ mod Str {
 
     // -1, 0, or 1: a before, equal to, or after b, by UTF-16 code units.
     fn compare(a: &, b: &) I32 {
-        let f: fun(&, &) I32 = @es/\ (a, b) => a < b ? -1 : a > b ? 1 : 0 \/;
-        f(a, b);
+        let n = len(a);
+        let m = len(b);
+        let i = 0;
+        while (i < n and i < m) {
+            let x = get(a, i);
+            let y = get(b, i);
+            if x != y {
+                if x < y { return -1; };
+                return 1;
+            };
+            i += 1;
+        };
+        if n < m { -1; } else if n > m { 1; } else { 0; };
     }
 
     // Number of UTF-16 code units in the host string.

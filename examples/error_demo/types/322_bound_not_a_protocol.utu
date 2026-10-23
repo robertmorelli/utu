@@ -1,0 +1,12 @@
+// What: a module parameter bounded by a struct, not a protocol
+// Expect: Point is not a protocol; a bound names one
+struct Point:
+    | x: I32
+
+mod Pairs[T[Point]] {
+    fn first(a: T, b: T) T { a; }
+}
+
+export main() I32 {
+    Pairs[I32].first(1, 2);
+}

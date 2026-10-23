@@ -51,6 +51,10 @@ host's own (JavaScript's string methods, `Math`).
 - `std:Stream` (prelude) — `Stream[T]`, a JS async iterable read with
   `await for (s) |v| { … }`: `from_js`, `of`, `generate`, `take`, `skip`,
   `filter`, `map`, `chain`. A stream is read once.
+- `std:Ord` — `Ord`, the protocol `a.cmp(b)` (negative, zero, positive),
+  for the numbers and Str, and `Order[T[Ord]]`: `max`, `min`, `clamp`,
+  `sort` (stable), `is_sorted`, `search`, `max_of`, `min_of`. See
+  [generics](../docs/generics.md).
 - `std:Console` — `using console from std:Console;` then `console.log(text)`,
   `warn`, `error`.
 - `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,

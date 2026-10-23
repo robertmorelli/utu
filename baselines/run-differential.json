@@ -4064,6 +4064,12 @@
  "benchmarks/tiny/benchmark.utu test": {
   "calls": {}
  },
+ "examples/bounds.utu normal": {
+  "diagnostics": true
+ },
+ "examples/bounds.utu test": {
+  "diagnostics": true
+ },
  "examples/browser-board/main.utu normal": {
   "calls": {
    "main": {

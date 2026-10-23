@@ -1,0 +1,8 @@
+// What: a labeled block of type I32 left with a Str
+// Expect: Expected I32, got Str (at the value)
+export main() I32 {
+    let n: I32 = found: {
+        break found "seven";
+    };
+    n;
+}

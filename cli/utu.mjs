@@ -4,6 +4,7 @@
 //   utu check <file.utu>                 report what is wrong
 //   utu run <file.utu> [-O mode]             build, then call main
 //   utu test <file.utu> [-O mode]            build the tests, then run each
+//   utu bench <file.utu> [-O mode]           build the benches, then time each
 //   utu build <file.utu> [-o dir] [-O mode] [--source-map]
 //                                        NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
@@ -46,7 +47,7 @@ async function main() {
   if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest);
   if (command === 'lsp') return lsp();
   if (command === 'grep') return grepCommand(process.argv.slice(3));
-  const commands = { check, run, test, build, 'build-exe': buildExe };
+  const commands = { check, run, test, bench, build, 'build-exe': buildExe };
   if (!commands[command]) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
     // A file given without a command: it was meant for one.
@@ -156,10 +157,11 @@ async function check(file, { utu }) {
 async function run(file, { utu, optimize, safe, argv }) {
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe });
-  const { exports } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
+  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   // A main with parameters is for a host that passes them; run passes none.
-  if (exports.main.length > 0) {
+  // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
+  if (instance.exports.main.length > 0) {
     const params = /export\s+main\s*\(([^)]*)\)/.exec(await fs.readFile(file, 'utf8'))?.[1].trim();
     fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu run calls it with none`, 'main-arguments',
       ['Give main no parameters to run it, or call it from JavaScript (utu build).']);
@@ -195,6 +197,68 @@ async function test(file, { utu, optimize, safe }) {
   }
   console.log(tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'No tests');
   if (failed) process.exitCode = 1;
+}
+
+/**
+ * Each bench, timed: `__bench_k(n)` runs its setup once and its measured
+ * block n times. It runs for BENCH_WARMUP_MS first (the engine compiles
+ * hot code again, optimized); then n doubles until a run takes
+ * BENCH_SAMPLE_MS, and SAMPLES runs are timed, less the median of runs with
+ * n = 0 (the setup alone). Prints the median time per iteration.
+ */
+async function bench(file, { utu, optimize, safe }) {
+  const { wasm, spec, benches } = await buildOrExit(utu, file, { target: 'bench', optimize, safe, debugNames: true });
+  if (!benches.length) {
+    console.log('No benches');
+    return;
+  }
+  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  const time = async (f, n) => {
+    const started = performance.now();
+    await f(n);
+    return performance.now() - started;
+  };
+  const median = values => values.toSorted((a, b) => a - b)[values.length >> 1];
+  const rows = [];
+  for (const { export: name, name: title } of benches) {
+    const f = exports[name];
+    try {
+      const warm = performance.now();
+      while (performance.now() - warm < BENCH_WARMUP_MS) await f(1);
+      let n = 1;
+      while (n < 2 ** 30 && await time(f, n) < BENCH_SAMPLE_MS) n *= 2;
+      const runs = [];
+      const setups = [];
+      for (let k = 0; k < SAMPLES; k++) {
+        setups.push(await time(f, 0));
+        runs.push(await time(f, n));
+      }
+      const per = Math.max(0, median(runs) - median(setups)) / n;
+      rows.push([title, duration(per), `${SAMPLES} × ${n}`]);
+    } catch (error) {
+      const { title: what } = trapText(error);
+      rows.push([title, `FAIL: ${what}`, '']);
+      process.exitCode = 1;
+    }
+  }
+  const header = ['bench', 'median', 'iterations'];
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
+  const line = row => row.map((cell, i) => i === 1 ? cell.padStart(widths[i]) : cell.padEnd(widths[i])).join('  ').trimEnd();
+  const dim = text => colored(process.stdout) ? `\x1b[2m${text}\x1b[0m` : text;
+  console.log(dim(line(header)));
+  for (const row of rows) console.log(line(row));
+}
+
+const BENCH_WARMUP_MS = 100;
+const BENCH_SAMPLE_MS = 20;
+const SAMPLES = 11;
+
+/** A time per iteration in milliseconds, in the unit that suits it. */
+function duration(ms) {
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
+  if (ms >= 1) return `${ms.toFixed(2)} ms`;
+  if (ms >= 1e-3) return `${(ms * 1e3).toFixed(2)} µs`;
+  return `${(ms * 1e6).toFixed(2)} ns`;
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
@@ -447,6 +511,7 @@ function usage(code) {
   check <file>                 report what is wrong with the program
   run <file> [-O mode] [-- args]  build it, then call its main
   test <file> [-O mode]           build its tests, then run each
+  bench <file> [-O mode]          build its benches, then time each (median per iteration)
   build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
     [--source-map]             and NAME.wasm.map (always in debug)
   build-exe <file> [-o out]    a standalone executable (needs bun)

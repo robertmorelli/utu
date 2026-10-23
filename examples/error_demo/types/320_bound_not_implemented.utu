@@ -1,0 +1,13 @@
+// What: a bounded module instantiated with a type that does not implement its bound
+// Expect: Point does not implement Ord (Order's T needs it), marked on the bound
+using Ord from std:Ord;
+using Order from std:Ord;
+
+struct Point:
+    | x: I32
+    | y: I32
+
+export main() I32 {
+    let far = Order[Point].max(Point { x: 1, y: 2 }, Point { x: 5, y: 0 });
+    far.x;
+}

@@ -296,7 +296,11 @@ fn type_of(node: I32, inst: I32) I32 {
         let params = vl_end(m);
         return ty(if kind == Node.Func_type.to_i32() { Ty.Fun; } else { Ty.Closure; }, params, result);
     };
-    // A generator's `yield T` (a method's is reported), and anything else not known yet.
+    if is_kind(node, Node.Yield_type) {
+        if not reported_within(node) { report(Diag.YieldPlace, node, -1); };
+        return ty_error();
+    };
+    // Anything else not known yet.
     if not reported_within(node) { report(Diag.Unsupported, node, -1); };
     ty_error();
 }

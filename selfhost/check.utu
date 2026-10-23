@@ -86,7 +86,7 @@ fn fn_instance(decl: I32, inst: I32) I32 {
         func_src[f] = decl_node[decl];
         // A @wat function's body is its code, which the host assembled.
         let wat = wat_of(body);
-        if wat >= 0 { func_code[f] = wat; } else { fi_queue.push(id); };
+        if wat >= 0 { func_code[f] = wat; } else if not is_generator(decl) { fi_queue.push(id); };
     };
     id;
 }
@@ -169,7 +169,8 @@ fn signature(decl: I32, inst: I32) void {
                 p = next_sibling(p);
             };
         } else if kind == Node.Return_type.to_i32() {
-            result = type_of(c, inst);
+            // A generator has no result: it is expanded, never called (see generators.utu).
+            result = if is_kind(first_child(c), Node.Yield_type) { ty_error(); } else { type_of(c, inst); };
         };
         c = next_sibling(c);
     };
@@ -253,6 +254,7 @@ fn begin_function() void {
 fn check_function(fi: I32) void {
     let decl = fi_decl[fi];
     begin_function();
+    cur_fn[0] = fi;
     let params = fi_params[fi];
     let decls = param_decls(decl);
     for (0 ..< vl_len[decls]) |i| {
@@ -628,12 +630,16 @@ fn check_ident(node: I32, cx: Cx) I32 {
     };
     if decl_es[decl] >= 0 { return es_read(decl, decl_ty[decl]); };
     if k == Decl.Global.to_i32() { return global_get(decl); };
+    if k == Decl.Fn.to_i32() and is_generator(decl) {
+        report(Diag.GeneratorCall, node, decl_name[decl]);
+        return error_value();
+    };
     if k == Decl.Fn.to_i32() { return fn_value(decl, cx); };
     if k == Decl.Mem.to_i32() {
         report(Diag.MemNotValue, node, decl_name[decl]);
         return error_value();
     };
-    if is_type_decl(decl) { return unsupported(node); };
+    if is_type_decl(decl) { return not_value(node, decl); };
     let t = decl_ty[decl];
     read_value(decl, t);
     t;
@@ -1162,8 +1168,12 @@ fn es_binding_type(t: I32) I32 {
 }
 
 /// A function named as a value: a `fun`.
-fn fn_value(decl: I32, cx: Cx) I32 {
-    let fi = fn_instance(decl, instance_for(module_of(decl), cx.inst));
+fn fn_value(decl: I32, cx: Cx) I32 { fn_value_in(decl, instance_for(module_of(decl), cx.inst)); }
+
+/// Function `decl` of module instance `inst` as a value (`f`, `m.f`, `T.f`).
+fn fn_value_in(decl: I32, inst: I32) I32 {
+    let fi = fn_instance(decl, inst);
+    note_edge(fi);
     let f = function_of(fi);
     let t = ty(Ty.Fun, fi_params[fi], fi_result[fi]);
     w_leaf(Op.RefFunc, vt_ref(func_type_of[f], false), f, 0);
@@ -1174,7 +1184,12 @@ fn global_get(decl: I32) I32 {
     let g = global_of(decl);
     if g < 0 { return error_value(); };
     let t = decl_ty[decl];
-    w_leaf(Op.GlobalGet, repr(t), g, 0);
+    w_leaf(Op.GlobalGet, glob_type[g], g, 0);
+    // A computed global: noted, and a reference held nullable is read non-null.
+    if decl_init[decl] >= 0 {
+        note_edge(-2 - decl);
+        if glob_type[g] != repr(t) { w_node(Op.RefAsNonNull, repr(t), 0, 0, w_mark() - 1); };
+    };
     t;
 }
 
@@ -1189,15 +1204,12 @@ fn global_of(decl: I32) I32 {
     let actual = constant(init, t, cx);
     if actual < 0 {
         w_stack.resize(m);
-        decl_global[decl] = -2;
-        // Not a constant: validation has said so, unless it is one we cannot read yet.
         if is_wat(init) and not dsl_has_failed(init) {
+            decl_global[decl] = -2;
             report(Diag.WatPlace, init, -1);
-        } else if not invalid_global_initializer(node) {
-            unsupported(init);
-            w_pop();
+            return -2;
         };
-        return -2;
+        return computed_global(decl, t, init);
     };
     want(init, t, Why.Annotation, next_sibling(first_child(node)), decl_name[decl]);
     coerce(actual, t, init);
@@ -1205,6 +1217,168 @@ fn global_of(decl: I32) I32 {
     let g = add_global(repr(t), false, w_pop());
     decl_global[decl] = g;
     g;
+}
+
+//! == Computed globals
+//!
+//! `let g: T = e;` with e not a literal: a mutable wasm global, set when the
+//! module starts by a function of its own (e's code). The globals are set in
+//! declaration order, but each after the globals its initializer reads,
+//! directly or through the functions it calls (a closure it makes counts as
+//! called). So no global is read before it is set; a cycle is an error. A
+//! non-null reference is held nullable and read with `ref.as_non_null`.
+
+/// The computed globals, in the order their initializers were made.
+vec computed_decl: I32;
+/// Each one's initializer function.
+vec computed_init: I32;
+/// By declaration: its index in @computed_decl, or -1.
+vec decl_init: I32;
+/// What the code being checked belongs to: a function instance; -1 an
+/// entry function; -2 - g global g's initializer.
+vec cur_fn: I32 = [-1];
+/// What code reads or calls, from (as @cur_fn) to (a function instance, or
+/// -2 - g for computed global g).
+vec edge_from: I32;
+vec edge_to: I32;
+
+fn note_edge(to: I32) void {
+    if cur_fn[0] == -1 { return; };
+    edge_from.push(cur_fn[0]);
+    edge_to.push(to);
+}
+
+/// Global `decl` of type t, computed by `init`: its wasm global (zero or
+/// null until set) and its initializer, a function checked now, perhaps
+/// in the middle of another.
+fn computed_global(decl: I32, t: I32, init: I32) I32 {
+    let vt = repr(t);
+    let st = vt_nullable(vt);
+    if vt_is_ref(st) { w_leaf(Op.RefNull, st, heap_of(st), 0); } else { push_number(t, 0.to_i64(), false); };
+    let g = add_global(st, true, w_pop());
+    decl_global[decl] = g;
+    decl_init[decl] = computed_decl.len();
+    computed_decl.push(decl);
+    let f = defined_func(vl_empty(), t);
+    func_debug_name[f] = name_add(word_text(decl_name[decl]) + ".init");
+    computed_init.push(f);
+    let outer = cur_fn[0];
+    cur_fn[0] = -2 - decl;
+    save_function();
+    cur_params[0] = 0;
+    mark_boxes(init);
+    let m = w_mark();
+    let cx = Cx { inst: 0, fi: -1, result: t };
+    want(init, t, Why.Annotation, next_sibling(first_child(decl_node[decl])), decl_name[decl]);
+    coerce(check_expr(init, t, cx), t, init);
+    unwant();
+    w_node(Op.Seq, vt, 0, 0, m);
+    func_body[f] = w_pop();
+    record_locals(f, 0);
+    restore_function();
+    cur_fn[0] = outer;
+    g;
+}
+
+/// After checking: the order the computed globals are set in (see above),
+/// cycles reported, and the start function that sets them.
+fn start_globals() void {
+    let n = computed_decl.len();
+    if n == 0 { return; };
+    // The edges by source: function instances, then initializers.
+    let nf = fi_decl.len();
+    let first = Array[I32].new(nf + n + 1, 0);
+    for (0 ..< edge_from.len()) |e| {
+        let s = edge_source(edge_from[e], nf);
+        if s >= 0 { first[s + 1] += 1; };
+    };
+    for (0 ..< nf + n) |s| { first[s + 1] += first[s]; };
+    let fill = Array[I32].new(nf + n, 0);
+    for (0 ..< nf + n) |s| { fill[s] = first[s]; };
+    let to = Array[I32].new(edge_from.len() + 1, 0);
+    for (0 ..< edge_from.len()) |e| {
+        let s = edge_source(edge_from[e], nf);
+        if s >= 0 {
+            to[fill[s]] = edge_to[e];
+            fill[s] += 1;
+        };
+    };
+    // Each initializer's dependencies: the computed globals its code reaches.
+    let seen = Array[I32].new(nf + n, -1);
+    let deps_first = Array[I32].new(n + 1, 0);
+    let work = Array[I32].new(nf + n + 1, 0);
+    let dep_list = vl_begin();
+    for (0 ..< n) |k| {
+        let top = 1;
+        work[0] = nf + k;
+        seen[nf + k] = k;
+        while (top > 0) {
+            top -= 1;
+            let s = work[top];
+            for (first[s] ..< first[s + 1]) |i| {
+                let t = to[i];
+                if t >= 0 {
+                    if seen[t] != k {
+                        seen[t] = k;
+                        work[top] = t;
+                        top += 1;
+                    };
+                } else {
+                    vl_add(decl_init[-2 - t]);
+                };
+            };
+        };
+        deps_first[k + 1] = vl_pending.len() - dep_list;
+    };
+    let deps = Array[I32].new(deps_first[n] + 1, 0);
+    for (0 ..< deps_first[n]) |i| { deps[i] = vl_pending[dep_list + i]; };
+    vl_pending.resize(dep_list);
+    // Declaration order, each global after its dependencies.
+    let by_place = Array[I32].new(n, 0);
+    for (0 ..< n) |k| {
+        let j = k;
+        while (j > 0 and node_first[decl_node[computed_decl[by_place[j - 1]]]] > node_first[decl_node[computed_decl[k]]]) {
+            by_place[j] = by_place[j - 1];
+            j -= 1;
+        };
+        by_place[j] = k;
+    };
+    let state = Array[I32].new(n, 0);
+    let m = w_mark();
+    for (0 ..< n) |i| { set_global_after(by_place[i], deps, deps_first, state); };
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    let f = helper(vl_empty(), vl_empty(), vl_empty(), "start");
+    func_body[f] = w_pop();
+    start_func[0] = f;
+}
+
+/// Where an edge's source is in @start_globals' arrays, or -1 (an entry function).
+fn edge_source(from: I32, nf: I32) I32 {
+    if from >= 0 { return from; };
+    if from == -1 { return -1; };
+    nf + decl_init[-2 - from];
+}
+
+/// Computed global k set (`global.set g (call init)`), after its
+/// dependencies; one met again while it waits is a cycle, reported.
+fn set_global_after(k: I32, deps: Array[I32], deps_first: Array[I32], state: Array[I32]) void {
+    if state[k] != 0 { return; };
+    state[k] = 1;
+    for (deps_first[k] ..< deps_first[k + 1]) |i| {
+        let j = deps[i];
+        if state[j] == 1 {
+            let d = computed_decl[k];
+            report2(Diag.GlobalCycle, last_child(decl_node[d]), decl_name[d], if j == k { -1; } else { computed_decl[j]; }, -1);
+            if j != k { diag_place(Extra.Related, first_child(decl_node[computed_decl[j]]), "needs " + word_text(decl_name[d])); };
+        } else {
+            set_global_after(j, deps, deps_first, state);
+        };
+    };
+    state[k] = 2;
+    let m = w_mark();
+    let d = computed_decl[k];
+    w_leaf(Op.Call, repr(decl_ty[d]), computed_init[k], 0);
+    w_node(Op.GlobalSet, vt_none, decl_global[d], 0, m);
 }
 
 /// A constant expression (a literal, maybe negated), or -1.
@@ -1236,12 +1410,21 @@ fn check_assign(node: I32, cx: Cx) I32 {
     // `T.Variant = …` or `module.f = …`: a constant, not a variable.
     if is_kind(target, Node.Type_member_expr) or (is_kind(target, Node.Field_expr) and is_module_path(target)) {
         let name = last_child(target);
-        if node_decl[name] < 0 { return unsupported(node); };
+        if node_decl[name] < 0 {
+            let owner = node_decl[first_child(target)];
+            if decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };
+            if reported_within(target) { return error_value(); };
+            report(Diag.NotAssignable, target, -1);
+            return error_value();
+        };
         report(Diag.AssignmentToImmutable, name, word_of(name));
         diag_label(pick(decl_is(node_decl[name], Decl.Variant), "constant", "function"));
         return error_value();
     };
-    if not is_kind(target, Node.Identifier) { return unsupported(node); };
+    if not is_kind(target, Node.Identifier) {
+        report(Diag.NotAssignable, target, -1);
+        return error_value();
+    };
     let decl = node_decl[target];
     if decl < 0 { return error_value(); };
     if decl_is(decl, Decl.Global) or decl_is(decl, Decl.Fn) or decl_is(decl, Decl.Mem) {
@@ -1559,6 +1742,12 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
                 report_module_member_missing(module, name);
                 return finish_error(args, m, cx);
             };
+            // `m.k(…)`: a global, called when it holds a fun or cl.
+            if decl_is(decl, Decl.Global) { return call_value(callee, args, m, node, cx); };
+            if is_type_decl(decl) {
+                not_value(callee, decl);
+                return finish_error(args, m, cx);
+            };
             return unsupported(node);
         };
         node_decl[name] = decl;
@@ -1627,6 +1816,8 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
         let host = primitive_host_type(rt, word_of(name));
         if host >= 0 { return check_foreign_primitive_method(node, rt, host, word_of(name), args, m, expect, cx); };
+        // `a.cmp(b)` on an unbounded T: bound it.
+        if unbounded_call(rt, word_of(name), -1, node, cx.inst) { return finish_error(args, m, cx); };
         // `x.sqrt()` with `fn sqrt(x: &)` in the type's module: b says so.
         report2(Diag.UnknownMethod, node, word_of(name), rt, if module_fn_of(rt, word_of(name)) >= 0 { 1; } else { -1; });
         suggest_member(ty_decl(rt), name, Space.Method);
@@ -1635,6 +1826,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     };
     // What the name means, for an editor (as a field's is recorded).
     node_decl[name] = decl;
+    unbounded_call(rt, word_of(name), decl, node, cx.inst);
     let fi = fn_instance(decl, ty_inst(rt));
     // A function of the type without `self` has no receiver to take.
     if vl_len[fi_params[fi]] == 0 {
@@ -1697,16 +1889,35 @@ fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let t = type_only(callee, -1, cx);
     if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, at, cx); };
     if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, at, cx); };
-    if ty_is(t, Ty.Error) { return unsupported(at); };
+    if ty_is(t, Ty.Error) { return follow_on(callee, args, m, at, cx); };
     report2(Diag.NotCallable, at, -1, t, -1);
     finish_error(args, m, cx);
 }
 
+/// A callee of type Error: checked again, so its mistake is reported (a
+/// type alone drops it); the call is that mistake's consequence.
+fn follow_on(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+    let mc = w_mark();
+    discard(check_expr(callee, -1, cx));
+    w_stack.resize(mc);
+    if not any_reported() { return unsupported(at); };
+    finish_error(args, m, cx);
+}
+
+/// Whether any mistake is reported yet.
+fn any_reported() Bool { diag_kind.len() > 0; }
+
 /// Arguments checked and pushed, after any already pushed since `m`; then
 /// the call (or the intrinsic, expanded).
 fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 {
+    // A generator is expanded by a `for`, never called.
+    if is_generator(fi_decl[fi]) {
+        report(Diag.GeneratorCall, at, word_of(last_child(first_child(decl_node[fi_decl[fi]]))));
+        return finish_error(args, m, cx);
+    };
     call_site.resize(1);
     call_site[0] = at;
+    host_callbacks(fi_decl[fi], args, first_param);
     let params = fi_params[fi];
     let i = first_param;
     let a = if args >= 0 { first_child(args); } else { -1; };
@@ -1736,6 +1947,7 @@ fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         report2(Diag.NotCallable, at, decl_name[decl], t, -1);
         return finish_error(args, m, cx);
     };
+    host_callbacks(-1, args, 0);
     if not check_args(ty_a[t], args, 0, at, cx) {
         return error_since(m);
     };
@@ -1874,6 +2086,7 @@ vec call_site: I32;
 
 /// The arguments are on the stack since `m`: call the function, or expand it.
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
+    note_edge(fi);
     let result = fi_result[fi];
     if fi_ir[fi] >= 0 { return expand(fi, m); };
     // From outside a lazy module, its function is its stub (see lazy_stub).
@@ -1949,10 +2162,17 @@ fn expand(fi: I32, m: I32) I32 {
     };
     let pre = w_mark() - m;
     let result_vt = repr(fi_result[fi]);
+    ir_failed[0] = -1;
     let ok = translate(x, decls, args, locals, direct, fi);
     if not ok {
         w_stack.resize(m);
-        return unsupported(decl_node[fi_decl[fi]]);
+        let bad = ir_failed[0];
+        let body = first_child(fn_body(fi_decl[fi]));
+        if bad < 0 or reported_within(body) { return unsupported(decl_node[fi_decl[fi]]); };
+        let ident = x_tag[bad] == known_word(Known.IrIdent);
+        let named = x_attr(bad, known_word(Known.Name));
+        report2(Diag.IrUnknown, body, if ident { if named >= 0 { attr_word(named); } else { -1; }; } else { x_tag[bad]; }, if ident { 1; } else { 0; }, -1);
+        return error_value();
     };
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
     fi_result[fi];
@@ -1985,12 +2205,18 @@ fn param_index(x: I32, decls: I32) I32 {
     -1;
 }
 
+/// The `@ir` element @translate did not know, or -1.
+vec ir_failed: I32 = [-1];
+
 /// Push the IR of an `@ir` element; false when it is not one the compiler knows.
 fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
     let tag = x_tag[x];
     if tag == known_word(Known.IrIdent) {
         let i = param_index(x, decls);
-        if i < 0 { return false; };
+        if i < 0 {
+            ir_failed[0] = x;
+            return false;
+        };
         if direct { w_push(args[i]); } else { w_leaf(Op.LocalGet, repr(vl_item(fi_params[fi], i)), locals[i], 0); };
         return true;
     };
@@ -2008,7 +2234,10 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     let data = translate_data(x, decls, args, locals, direct, fi);
     if data != 0 { return data > 0; };
     let opcode = tag_opcode(tag);
-    if opcode < 0 { return false; };
+    if opcode < 0 {
+        ir_failed[0] = x;
+        return false;
+    };
     let m = w_mark();
     let c = x_child[x];
     while (c >= 0) {
@@ -2068,15 +2297,46 @@ fn is_module_path(node: I32) Bool {
     is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module);
 }
 
+/// A name of a module or type, used as a value: reported (a host module
+/// whose declarations were not found already is).
+fn not_value(at: I32, decl: I32) I32 {
+    if decl_is(decl, Decl.Foreign) and decl_a[decl] < 0 { return error_value(); };
+    // (An alias of a module that is not there.)
+    if decl_is(decl, Decl.Alias) and not decl_is(decl_a[decl], Decl.Module) and any_reported() { return error_value(); };
+    if not reported_within(at) { report2(Diag.NotValue, at, decl_name[decl], if decl_is(decl, Decl.Module) or decl_is(decl, Decl.Alias) or decl_is(decl, Decl.Foreign) { 1; } else { 0; }, -1); };
+    error_value();
+}
+
 /// `x.f` (not called): a module's global, or a field.
 fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     if is_module_path(node) {
         let name = last_child(node);
         if decl_is(node_decl[name], Decl.Global) { return global_get(node_decl[name]); };
         if node_decl[name] < 0 { return module_member_missing(node_decl[first_child(node)], name); };
+        // `m.f`: the function, as a value.
+        if decl_is(node_decl[name], Decl.Fn) { return member_fn_value(node, node_decl[name], instance_for(node_decl[first_child(node)], cx.inst)); };
+        if is_type_decl(node_decl[name]) { return not_value(node, node_decl[name]); };
         return unsupported(node);
     };
+    // `ints.make` with `using M[A] |ints|`: M's function in M[A], as a value.
+    let base = first_child(node);
+    if is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Alias) and decl_is(decl_a[node_decl[base]], Decl.Module) {
+        let f = static_member(decl_a[node_decl[base]], word_of(last_child(node)));
+        if decl_is(f, Decl.Fn) {
+            node_decl[last_child(node)] = f;
+            return member_fn_value(node, f, alias_instance(node_decl[base]));
+        };
+    };
     check_field_get(node, expect, cx);
+}
+
+/// `m.f` or `T.f` named, not called: a `fun`. A generator is not a value.
+fn member_fn_value(node: I32, decl: I32, inst: I32) I32 {
+    if is_generator(decl) {
+        report(Diag.GeneratorCall, node, word_of(last_child(node)));
+        return error_value();
+    };
+    fn_value_in(decl, inst);
 }
 
 /// `M[A].f(…)`: a function of the instance `M[A]` (a static method of its type).
@@ -2088,7 +2348,13 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     let decl = node_decl[name];
     let module = node_decl[name_node(name_at)];
     if decl_is(module, Decl.Module) and not decl_is(decl, Decl.Fn) { module = module_of(module); };
-    if not decl_is(decl, Decl.Fn) { return unsupported(node); };
+    if not decl_is(decl, Decl.Fn) {
+        let m0 = w_mark();
+        if reported_within(node) { return finish_error(args, m0, cx); };
+        if decl >= 0 and is_type_decl(decl) { not_value(name, decl); }
+        else { report3(Diag.UnknownMethod, name, word_of(name), -1, -1, decl_name[module]); };
+        return finish_error(args, m0, cx);
+    };
     let owner = module_of(decl);
     let targs = type_args(args_types, cx.inst);
     if vl_len[targs] != module_arity(owner) {
@@ -2121,14 +2387,144 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
         report2(Diag.VariantNotValue, node, word_of(name), decl_owner[decl], -1);
         return error_value();
     };
+    // `T.make` named, not called: the function, as a value.
+    if decl_is(decl, Decl.Fn) {
+        let inst = if is_kind(first_child(node), Node.Type_ident) and decl_is(owner, Decl.Module) { instance_for(owner, cx.inst); }
+            else { ty_inst(type_path(first_child(node), cx.inst)); };
+        return member_fn_value(node, decl, inst);
+    };
+    if decl_is(decl, Decl.Field) {
+        report2(Diag.NotValue, node, word_of(name), 2, -1);
+        return error_value();
+    };
+    if decl >= 0 and is_type_decl(decl) { return not_value(node, decl); };
     unsupported(node);
 }
 
 //! = Control
 
+//! == Labeled blocks
+//!
+//! `name: { … }` is a block that `break name` leaves from anywhere inside it
+//! (but a closure's body); `break name v` leaves it with the value v. Its
+//! value is its last statement's or a break's; its defers run as it is left.
+//! ```
+//! block $name (result T)  …  (br $name v)  …  end
+//! ```
+
+/// Per open labeled block, innermost last: its node, its wasm label, where
+/// its defers start, and its type (-1 while it is inferred).
+vec label_node: I32;
+vec label_wasm: I32;
+vec label_defers: I32;
+vec label_type: I32;
+/// Per open labeled block, while its type is inferred: the first break value's type, or -1.
+vec label_seen: I32;
+
 fn check_labeled(node: I32, expect: I32, cx: Cx) I32 {
-    if is_kind(first_child(node), Node.Identifier) { return unsupported(node); };
-    check_block(last_child(node), expect, cx);
+    let block = last_child(node);
+    if not is_kind(first_child(node), Node.Identifier) { return check_block(block, expect, cx); };
+    let t = if expect >= 0 { expect; } else { labeled_type(node, cx); };
+    let m = w_mark();
+    let label = new_label();
+    open_label(node, label, t);
+    coerce(check_block(block, t, cx), t, block);
+    close_label();
+    w_node(Op.Block, repr(t), label, 0, m);
+    t;
+}
+
+/// The type of a labeled block nothing is expected of: its last statement's,
+/// or (when that does not complete) its first break value's, else Void.
+fn labeled_type(node: I32, cx: Cx) I32 {
+    open_label(node, new_label(), -1);
+    let tail = type_only(last_child(node), -1, cx);
+    let seen = label_seen[label_seen.len() - 1];
+    close_label();
+    if not ty_is(tail, Ty.Never) { return tail; };
+    if seen >= 0 { seen; } else { ty_void(); };
+}
+
+fn open_label(node: I32, label: I32, t: I32) void {
+    label_node.push(node);
+    label_wasm.push(label);
+    label_defers.push(defer_node.len());
+    label_type.push(t);
+    label_seen.push(-1);
+}
+
+fn close_label() void {
+    let n = label_node.len() - 1;
+    label_node.resize(n);
+    label_wasm.resize(n);
+    label_defers.resize(n);
+    label_type.resize(n);
+    label_seen.resize(n);
+}
+
+/// The labeled block a `break label` leaves: the nearest around it with
+/// that label, not past a closure or function; or -1.
+fn label_target(brk: I32) I32 {
+    let word = word_of(first_child(brk));
+    let p = parent_of(brk);
+    while (p >= 0 and not is_kind(p, Node.Closure_expr) and not is_kind(p, Node.Fn_decl)) {
+        if is_kind(p, Node.Block_expr) and is_kind(first_child(p), Node.Identifier) and word_of(first_child(p)) == word { return p; };
+        p = parent_of(p);
+    };
+    -1;
+}
+
+/// The block a `break label` in a closure means, outside the closure, or -1.
+fn label_past_closure(brk: I32) I32 {
+    let word = word_of(first_child(brk));
+    let p = parent_of(brk);
+    let crossed = false;
+    while (p >= 0 and not is_kind(p, Node.Fn_decl)) {
+        if is_kind(p, Node.Closure_expr) { crossed = true; };
+        if crossed and is_kind(p, Node.Block_expr) and is_kind(first_child(p), Node.Identifier) and word_of(first_child(p)) == word { return p; };
+        p = parent_of(p);
+    };
+    -1;
+}
+
+/// `break label` and `break label v`: the value (checked against the
+/// block's type), then the block's pending defers, then `br`.
+fn check_break_label(node: I32, cx: Cx) I32 {
+    let name = first_child(node);
+    let value = next_sibling(name);
+    let target = label_target(node);
+    let k = label_node.len() - 1;
+    while (k >= 0 and label_node[k] != target) { k -= 1; };
+    if target < 0 or k < 0 {
+        report(Diag.UnknownLabel, name, word_of(name));
+        let past = label_past_closure(node);
+        if past >= 0 {
+            diag_place(Extra.Related, first_child(past), "outside the closure");
+            diag_note("a closure cannot leave the block it is in");
+        } else if value < 0 {
+            diag_note("a loop's break takes no value; break name v leaves a block name: { … } with v");
+        };
+        let me = w_mark();
+        if value >= 0 { discard(check_expr(value, -1, cx)); };
+        return error_since(me);
+    };
+    let t = label_type[k];
+    let m = w_mark();
+    let carried = false;
+    if value >= 0 {
+        let vt = check_expr(value, t, cx);
+        if t < 0 {
+            if label_seen[k] < 0 and not ty_is(vt, Ty.Never) { label_seen[k] = vt; };
+        } else {
+            coerce(vt, t, value);
+            carried = not ty_is(t, Ty.Void);
+        };
+    } else if t >= 0 and not ty_is(t, Ty.Void) and not ty_is(t, Ty.Error) {
+        mismatch(node, t, ty_void());
+    };
+    if defer_node.len() > label_defers[k] { defers_after_value(if carried { repr(t); } else { vt_none; }, m, label_defers[k], cx); };
+    w_node(Op.Br, vt_unreachable, label_wasm[k], 0, m);
+    ty_never();
 }
 
 fn check_if(node: I32, expect: I32, cx: Cx) I32 {
@@ -2209,6 +2605,7 @@ fn check_while(node: I32, cx: Cx) I32 {
 
 fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
     if not is_break and first_child(node) >= 0 { return check_continue_state(node, cx); };
+    if is_break and first_child(node) >= 0 { return check_break_label(node, cx); };
     if loop_break.len() == 0 {
         report2(Diag.InvalidBreak, node, -1, if is_break { BreakRule.BreakOutside.to_i32(); } else { BreakRule.ContinueOutside.to_i32(); }, -1);
         return error_value();
@@ -2275,6 +2672,7 @@ enum(U8) Target:
     | Normal
     | Tests
     | Comptime
+    | Benches
 
 fn reset_check() void {
     memo_state.clear();
@@ -2297,6 +2695,12 @@ fn reset_check() void {
     decl_ty.resize(decl_kind.len());
     decl_global.resize(decl_kind.len());
     decl_cause.resize(decl_kind.len());
+    decl_init.resize(decl_kind.len());
+    computed_decl.clear();
+    computed_init.clear();
+    edge_from.clear();
+    edge_to.clear();
+    cur_fn[0] = -1;
     node_ty.resize(node_kind.len());
     for (0 ..< node_kind.len()) |n| { node_ty[n] = -1; };
     for (0 ..< decl_kind.len()) |d| {
@@ -2304,6 +2708,7 @@ fn reset_check() void {
         decl_ty[d] = 0;
         decl_global[d] = -1;
         decl_cause[d] = -1;
+        decl_init[d] = -1;
     };
     reset_data();
     reset_mems();
@@ -2355,6 +2760,7 @@ fn compile(target: Target) I32 {
     for (0 ..< file_root.len()) |file| { if file_root[file] < 0 { return -1; }; };
     let tests = 0;
     test_node.clear();
+    bench_node.clear();
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
@@ -2362,7 +2768,8 @@ fn compile(target: Target) I32 {
                 if target == Target.Normal and is_kind(item, Node.Export_lib_decl) {
                     let f = first_child(item);
                     while (f >= 0) {
-                        export_fn(node_decl[last_child(first_child(f))]);
+                        let d = node_decl[last_child(first_child(f))];
+                        if is_generator(d) { report(Diag.GeneratorExport, last_child(first_child(f)), decl_name[d]); } else { export_fn(d); };
                         f = next_sibling(f);
                     };
                 };
@@ -2376,6 +2783,11 @@ fn compile(target: Target) I32 {
                     entry_function(item, -1, tests);
                     test_node.push(item);
                     tests += 1;
+                };
+                // A test build checks the benches too; a bench build exports them.
+                if (target == Target.Tests or target == Target.Benches) and is_kind(item, Node.Bench_decl) {
+                    bench_function(item, if target == Target.Benches { bench_node.len(); } else { -1; });
+                    if target == Target.Benches { bench_node.push(item); };
                 };
                 item = next_sibling(item);
             };
@@ -2421,6 +2833,7 @@ fn compile(target: Target) I32 {
         check_function(fi_queue[next]);
         next += 1;
     };
+    start_globals();
     if diag_kind.len() > 0 { return -1; };
     encode_module();
 }
@@ -2515,9 +2928,73 @@ fn in_target(node: I32, target: Target) Bool {
         if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
         if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };
         if kind == Node.Mem_decl.to_i32() and target == Target.Comptime { return true; };
-        if kind == Node.Bench_decl.to_i32() { return false; };
+        if kind == Node.Bench_decl.to_i32() { return target == Target.Tests or target == Target.Benches; };
     };
     true;
+}
+
+/// A bench build's benches, in the order of their exports (`__bench_0`, …).
+vec bench_node: I32;
+
+/// `bench "name" { setup; measure { body } }`: a function `__bench_k(n)`
+/// that runs the setup once, then the measured block n times. A test build
+/// checks it unexported (k = -1).
+/// ```
+/// setup  block $done  loop $top  (br_if $done (i >= n))  body  i += 1  (br $top)  end  end
+/// ```
+fn bench_function(item: I32, k: I32) void {
+    let i32_t = prelude(Prelude.I32);
+    let mp = vl_begin();
+    vl_add(i32_t);
+    let f = defined_func(vl_end(mp), ty_void());
+    let name = name_add(if k >= 0 { "__bench_" + k.to_str(); } else { "bench"; });
+    func_debug_name[f] = name;
+    if k >= 0 {
+        func_field_name[f] = name;
+        export_func.push(f);
+        export_result.push(ty_void());
+    };
+    begin_function();
+    cur_fn[0] = -1;
+    let n = new_local(vt_i32);
+    cur_params.resize(1);
+    cur_params[0] = cur_locals.len();
+    mark_boxes(item);
+    let cx = Cx { inst: 0, fi: -1, result: ty_void() };
+    let m = w_mark();
+    let defers = defer_node.len();
+    let c = next_sibling(first_child(item));
+    while (c >= 0 and not is_kind(c, Node.Measure_decl)) {
+        coerce(check_statement(c, ty_void(), cx), ty_void(), c);
+        c = next_sibling(c);
+    };
+    let i = new_local(vt_i32);
+    let done = new_label();
+    let top = new_label();
+    let mb = w_mark();
+    let ml = w_mark();
+    let mc = w_mark();
+    w_get(vt_i32, i);
+    w_get(vt_i32, n);
+    w_node(Op.Plain, vt_i32, 78, 0, mc);
+    w_node(Op.BrIf, vt_none, done, 0, mc);
+    discard(check_block(first_child(c), ty_void(), cx));
+    let mi = w_mark();
+    w_get(vt_i32, i);
+    w_i32(1);
+    w_node(Op.Plain, vt_i32, 106, 0, mi);
+    w_node(Op.LocalSet, vt_none, i, 0, mi);
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Loop, vt_none, top, 0, ml);
+    w_node(Op.Block, vt_none, done, 0, mb);
+    // The setup's defers, once the measuring is done.
+    if defer_node.len() > defers {
+        run_defers(defers, cx);
+        defer_node.resize(defers);
+    };
+    w_node(Op.Seq, vt_none, 0, 0, m);
+    func_body[f] = w_pop();
+    record_locals(f, 1);
 }
 
 /// The entry file's items, in place order (see @keep_target_diagnostics).
@@ -2551,6 +3028,7 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
         return;
     };
     begin_function();
+    cur_fn[0] = -1;
     p = if list >= 0 { first_child(list); } else { -1; };
     for (0 ..< vl_len[params]) |i| {
         let d = node_decl[first_child(p)];

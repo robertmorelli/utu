@@ -23,9 +23,9 @@ mod I64 {
     //   neg a  = 0 - a
     //   bnot a = a xor 0xFFFFFFFFFFFFFFFF (-1)
     // The lesser and the greater of two; the size of one (the least I64's is itself: 0 - x wraps).
-    fn min(a: &, b: &) & { if a < b { a; } else { b; }; }
-    fn max(a: &, b: &) & { if a > b { a; } else { b; }; }
-    fn abs(x: &) & { if x < 0 { 0 - x; } else { x; }; }
+    fn min(p: &, q: &) & { if p < q { p; } else { q; }; }
+    fn max(p: &, q: &) & { if q < p { p; } else { q; }; }
+    fn abs(v: &) & { if v < 0 { -v; } else { v; }; }
     fn &:neg  |a| & { @ir/\ <ir-i64-sub><ir-lit kind="int" type-name="I64" value="0"/><ir-ident name="a"/></ir-i64-sub> \/; }
     fn &:bnot |a| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I64" value="-1"/></ir-i64-xor> \/; }
 

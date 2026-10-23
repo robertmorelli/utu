@@ -1,5 +1,0 @@
-// What: a global initialized with an array literal.
-// Expect: Global words needs a literal: a number, string, Bool, or null; note: make it in a function
-let words: Array[Str] = ["a", "b"];
-
-export main() I32 { words.len(); }
