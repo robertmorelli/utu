@@ -538,7 +538,7 @@ fn validate_await(node: I32) void {
 //! a new node's children are new, and where a graft hangs a node somewhere
 //! else, it says so (set_parent).
 
-vec node_parent: I32;
+mem node_parent: I32;
 
 /// A node's parent, or -1: computed for the nodes added since it was last asked.
 fn parent_of(node: I32) I32 {

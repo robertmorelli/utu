@@ -59,9 +59,9 @@ fn vt_tuple_of(list: I32) I32 { vt_tuple + list; }
 //! Interned, so a list is an id and equal lists are equal ids (function
 //! signatures compare as ints).
 
-vec vl_start: I32;
-vec vl_len: I32;
-vec vl_items: I32;
+mem vl_start: I32;
+mem vl_len: I32;
+mem vl_items: I32;
 /// Open addressing over list ids, -1 empty.
 vec vl_table: I32;
 /// The list being built.
@@ -147,11 +147,11 @@ enum(U8) Heap:
     | Array
     | Func
 
-vec ht_kind: U8;
+mem ht_kind: U8;
 /// Struct: first field (in ht_fields); Array: element; Func: parameters (a list)
-vec ht_a: I32;
+mem ht_a: I32;
 /// Struct: field count; Array: 1 when mutable; Func: results (a list)
-vec ht_b: I32;
+mem ht_b: I32;
 /// Supertype, or -1.
 vec ht_super: I32;
 /// 1 when other types may extend it (not final)
@@ -165,7 +165,7 @@ vec ht_src: I32;
 
 /// Function types are interned by signature; arrays by element; structs are
 /// nominal (two structs with the same fields are different types).
-vec ht_table: I32;   // open addressing over func and array types, -1 empty
+mem ht_table: I32;   // open addressing over func and array types, -1 empty
 
 fn ht_new(kind: Heap, a: I32, b: I32) I32 {
     let id = ht_kind.len();
@@ -554,24 +554,24 @@ let i64_extend_i32_s: I32 = 172;
 let i64_extend_i32_u: I32 = 173;
 
 /// By IR node: its instruction. The other `w_*` vecs are its other columns.
-vec w_op: U16;
+mem w_op: U16;
 /// Its value type (vt_none for none).
-vec w_type: I32;
-vec w_a: I32;
-vec w_b: I32;
+mem w_type: I32;
+mem w_a: I32;
+mem w_b: I32;
 /// Its first child, in w_kids.
-vec w_first: I32;
+mem w_first: I32;
 /// Its number of children.
-vec w_count: I32;
-vec w_kids: I32;
+mem w_count: I32;
+mem w_kids: I32;
 /// Br_table targets.
-vec w_aux: I32;
+mem w_aux: I32;
 /// Nodes built and not yet taken.
-vec w_stack: I32;
+mem w_stack: I32;
 /// The syntax node each was made for (@cur_src then), or -1: a source map's spans.
-vec w_src: I32;
+mem w_src: I32;
 /// For a copy inlining made: the syntax of the call it replaced, or -1.
-vec w_site: I32;
+mem w_site: I32;
 /// The syntax node being checked, whose code nodes made now are (-1: none).
 vec cur_src: I32 = [-1];
 
@@ -650,9 +650,9 @@ fn w_i32_op(opcode: I32, mark: I32) I32 { w_node(Op.Plain, vt_i32, opcode, 0, ma
 
 export mem out: U8;
 /// The section being written.
-vec sec: U8;
+mem sec: U8;
 /// The function body being written.
-vec code_bytes: U8;
+mem code_bytes: U8;
 
 fn leb_u(in_body: Bool, value: I32) void {
     let v = value;
@@ -733,11 +733,11 @@ vec func_live: U8;
 vec glob_live: U8;
 vec live_work: I32;
 /// By node: how many places in the live code hold it.
-vec node_holders: I32;
+mem node_holders: I32;
 /// By function: the calls and references to it in the live code.
-vec func_uses: I32;
+mem func_uses: I32;
 /// By global: the reads and writes of it.
-vec glob_uses: I32;
+mem glob_uses: I32;
 /// By global: the writes of it.
 vec glob_sets: I32;
 
@@ -1755,7 +1755,7 @@ vec map_site: I32;
 vec map_code_size: I32 = [0];
 /// While a body is encoded: by IR node, the nearest node with syntax (it, or
 /// one around it), or -1.
-vec w_near: I32;
+mem w_near: I32;
 /// The function being encoded.
 vec map_func: I32 = [-1];
 

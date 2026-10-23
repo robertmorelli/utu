@@ -23,13 +23,13 @@
 //! empty Seq, which emits nothing.
 
 /// The function's nodes, in walk order, each with its parent and its place there.
-vec opt_nodes: I32;
-vec opt_parent: I32;
-vec opt_place: I32;
+mem opt_nodes: I32;
+mem opt_parent: I32;
+mem opt_place: I32;
 /// By local: its reads.
-vec opt_gets: I32;
+mem opt_gets: I32;
 /// By local: its writes.
-vec opt_sets: I32;
+mem opt_sets: I32;
 /// By local: the position (in @opt_nodes) of a read.
 vec opt_get_at: I32;
 /// By local: the position of a write.

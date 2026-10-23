@@ -31,9 +31,9 @@ vec fi_queue: I32;
 
 // The function being checked.
 /// By declaration: its local.
-vec decl_local: I32;
+mem decl_local: I32;
 /// By declaration: its type (locals and parameters).
-vec decl_ty: I32;
+mem decl_ty: I32;
 /// Value types of its locals, parameters first.
 vec cur_locals: I32;
 /// At `[0]`: how many of them are parameters.
@@ -584,7 +584,7 @@ fn error_since(m: I32) I32 {
 
 /// Each expression's type as it was last checked, or -1: for queries
 /// (`utu grep`, the editor), which the compiler does not read.
-vec node_ty: I32;
+mem node_ty: I32;
 
 /// Check an expression against the type expected of it (-1 for none):
 /// push its IR node, record its type in @node_ty, and return the type.
