@@ -121,7 +121,7 @@ mod home {
                     tbody {
                         tr {
                             th {
-                                "2,059 bytes";
+                                "1,979 bytes";
                             }
                             td {
                                 "DeltaBlue, a real constraint solver, compressed with brotli.";
@@ -145,7 +145,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "121 KB";
+                                "124 KB";
                             }
                             td {
                                 "The whole compiler as brotli-compressed Wasm. It is what the CLI, the editor, and the web playground run.";

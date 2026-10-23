@@ -202,7 +202,7 @@ language stays as it is.
    both build, 262 are smaller, 20 the same, 2 larger by at most 3 bytes:
    16.8% smaller in all (`scripts/selfhost-size-differential.mjs`). At -O3,
    programs run as fast as stage 0's or faster. The compiler is 372 KB of
-   wasm (121 KB brotli); stage 0's bundle is 1.97 MB and a parser.
+   wasm (124 KB brotli); stage 0's bundle is 1.97 MB and a parser.
 
 ### Stays in JavaScript
 
