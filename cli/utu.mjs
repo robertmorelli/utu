@@ -168,6 +168,8 @@ async function check(file, { utu }) {
 }
 
 async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, out }) {
+  // A profile build's frames are larger: it runs on a deeper stack (PROFILE_STACK_MB).
+  if (profile && deepens) throw new TooDeep(PROFILE_STACK_MB);
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile });
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
@@ -729,17 +731,21 @@ async function trap(error, file, built, utu) {
 // the language server runs in one. Bun's workers ignore the setting, so
 // under Bun too deep a program is reported as such.
 const STACK_MB = 1024;
+// A profiled program's stack: deeper than the main thread's (its
+// instrumentation takes about a third more per frame), yet overflowing well
+// before the profile memory's million frames run out.
+const PROFILE_STACK_MB = 16;
 
 /** Whether this thread can hand a command to a worker with a deeper stack. */
 const deepens = isMainThread && !process.versions.bun && !process.env.UTU_NO_WORKER;
 
-/** Thrown when a build was too deep for this thread: the command starts again in a worker. */
-class TooDeep extends Error {}
+/** Thrown when a build was too deep for this thread, or a run is profiled: the command starts again in a worker with an `mb` MB stack. */
+class TooDeep extends Error { constructor(mb = STACK_MB) { super(); this.mb = mb; } }
 
 /** The command, run in a worker with a deep stack; exits as it does. */
-function inWorker() {
+function inWorker(mb = STACK_MB) {
   const worker = new Worker(new URL(import.meta.url), {
-    argv: process.argv.slice(2), stdin: true, resourceLimits: { stackSizeMb: STACK_MB },
+    argv: process.argv.slice(2), stdin: true, resourceLimits: { stackSizeMb: mb },
     workerData: { tty: { stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY } },
   });
   process.stdin.pipe(worker.stdin);
@@ -753,7 +759,7 @@ function inWorker() {
 if (deepens && process.argv[2] === 'lsp') inWorker();
 else {
   main().catch(error => {
-    if (error instanceof TooDeep) return inWorker();
+    if (error instanceof TooDeep) return inWorker(error.mb);
     console.error(error?.stack || error?.message || String(error));
     process.exit(1);
   });
