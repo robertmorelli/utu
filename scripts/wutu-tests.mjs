@@ -269,6 +269,67 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     });
   });
 
+  test('wutu: a component passed to a component lands inside it, and stays there on re-render', async ({ ROOT }) => {
+    await withDom(async (document) => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_nested_call.utu', source: `${BROWSER}
+        struct State:
+            | n: I32
+            | words: Array[Str]
+        fn card(body: Browser.HTMLElement) Browser.HTMLElement { @wutu/\\ figure { header { "Title"; } = body; } \\/; }
+        fn tag(word: Str) Browser.HTMLElement { @wutu/\\ em { = word; } \\/; }
+        fn badge(n: I32) Browser.HTMLElement { card(tag(n.to_str())); }
+        fn plain() Browser.HTMLElement { @wutu/\\ main { = card(tag("hello")); } \\/; }
+        fn view() Browser.HTMLElement {
+          let state = State { n: 1, words: ["a", "b"] };
+          @wutu/\\
+          @reactive;
+          main {
+            section#one { = card(tag("hello")); }
+            section#loop { for state.words |w| { = card(tag(w)); } }
+            section#keyed { for state.words |w| key w { = card(tag(w)); } }
+            section#memo { = badge(state.n); }
+            section#still { = badge(5); }
+            button { on click { state.n += 1; state.words = [state.words[1], state.words[0], "c"]; } }
+          }
+          \\/;
+        }
+        export lib {
+            fn once() Browser.HTMLElement { plain(); }
+            fn reactive() Browser.HTMLElement { view(); }
+        }
+      `});
+      const strip = html => html.replace(/ data-wutu(-root)?="[^"]*"/g, '');
+      const fig = word => `<figure><header>Title</header><em>${word}</em></figure>`;
+      assertEq(strip(instance.exports.once().outerHTML), `<main>${fig('hello')}</main>`);
+      const root = instance.exports.reactive();
+      document.body.append(root);
+      const html = s => strip(root.querySelector(s).innerHTML);
+      assertEq(html('#one'), fig('hello'));
+      assertEq(html('#loop'), fig('a') + fig('b'));
+      assertEq(html('#keyed'), fig('a') + fig('b'));
+      assertEq(html('#memo'), fig('1'));
+      assertEq(html('#still'), fig('5'));
+      const still = root.querySelector('#still em');
+      const one = root.querySelector('#one em'), [ka, kb] = root.querySelectorAll('#keyed em');
+      root.querySelector('button').dispatchEvent(new globalThis.Event('click'));
+      await settle();
+      assertEq(html('#one'), fig('hello'));
+      assertEq(html('#loop'), fig('b') + fig('a') + fig('c'));
+      assertEq(html('#keyed'), fig('b') + fig('a') + fig('c'));
+      assertEq(html('#memo'), fig('2'));
+      assertEq(html('#still'), fig('5'));
+      assert(root.querySelector('#still em') === still, 'a reused call keeps its inner component');
+      assert(root.querySelector('#one em') === one, 'the inner component keeps its element');
+      const keyed = root.querySelectorAll('#keyed em');
+      assert(keyed[0] === kb && keyed[1] === ka, 'keyed inner components move with their keys');
+      root.querySelector('button').dispatchEvent(new globalThis.Event('click'));
+      await settle();
+      assertEq(html('#loop'), fig('a') + fig('b') + fig('c'));
+      assertEq(html('#still'), fig('5'));
+      assertEq(root.querySelectorAll('em').length, 1 + 3 + 3 + 1 + 1);
+    });
+  });
+
   test('wutu diagnostics: template errors point at the attribute, alias, binding, or interpolation', async ({ ROOT }) => {
     const cases = [
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; }`, 'invalid-dsl-usage', 'h'],
