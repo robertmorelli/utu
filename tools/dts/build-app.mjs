@@ -155,7 +155,7 @@ async function buildWithSelfhost({ entry, outDir, optimize, safe = true, chunk =
   await fs.mkdir(outDir, { recursive: true });
   const chunks = !chunk && spec.lazy?.length ? await buildChunks({ lazy: spec.lazy, files: result.files, outDir, optimize, safe }) : {};
   await fs.writeFile(path.join(outDir, 'app.wasm'), wasm);
-  const glue = glueSource(spec);
+  const glue = glueSource(spec, wasm);
   const gluePath = path.resolve(outDir, 'glue.mjs');
   if (glue) await fs.writeFile(gluePath, glue);
   const loader = loaderSource(spec, wasm, {

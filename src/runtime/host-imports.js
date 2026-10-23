@@ -31,11 +31,14 @@ import { wasmImports } from './wasm-imports.js';
  */
 export function promiseImports(promiseSpec, utu = {}) {
   for (const op of promiseSpec?.ops ?? []) {
-    if (op === 'promise_then') utu.promise_then = (p, f) => { p.then(f); };
-    if (op === 'promise_catch') utu.promise_catch = (p, f) => { p.catch(f); };
+    if (op === 'promise_then') utu.promise_then = promiseThen;
+    if (op === 'promise_catch') utu.promise_catch = promiseCatch;
   }
   return utu;
 }
+
+export const promiseThen = (p, f) => { p.then(f); };
+export const promiseCatch = (p, f) => { p.catch(f); };
 
 /**
  * `await` — the import is wrapped in WebAssembly.Suspending, which is what
@@ -44,17 +47,20 @@ export function promiseImports(promiseSpec, utu = {}) {
  * work. One import per awaited value type, since wasm imports are monomorphic.
  */
 export function awaitImports(promiseSpec, utu = {}) {
-  for (const type of promiseSpec?.awaits ?? []) {
-    if (typeof WebAssembly.Suspending !== 'function') {
-      throw new Error(
-        'utu: `await` needs JS Promise Integration (WebAssembly.Suspending), ' +
-        'which this host does not provide — use `.then` instead, or run on a ' +
-        'JSPI-capable host (Chrome 126+, Node 23+, Bun)',
-      );
-    }
-    utu[`await_${type}`] = new WebAssembly.Suspending(async (p) => await p);
-  }
+  for (const type of promiseSpec?.awaits ?? []) utu[`await_${type}`] = awaitImport();
   return utu;
+}
+
+/** One `await_*` import. */
+export function awaitImport() {
+  if (typeof WebAssembly.Suspending !== 'function') {
+    throw new Error(
+      'utu: `await` needs JS Promise Integration (WebAssembly.Suspending), ' +
+      'which this host does not provide — use `.then` instead, or run on a ' +
+      'JSPI-capable host (Chrome 126+, Node 23+, Bun)',
+    );
+  }
+  return new WebAssembly.Suspending(async (p) => await p);
 }
 
 /**
@@ -83,21 +89,22 @@ const CLOSURE_REC = Symbol('utu.closure');
 
 export function closureImports(closureSpec, utu = {}) {
   if (!closureSpec) return utu;
-  if (closureSpec.new) {
-    // flags: 1, the result is a Bool; 2, the environment is there even when
-    // null (a closure whose one capture is its environment).
-    utu.closure_new = (fn, env, flags, record) => {
-      const invoke = env == null && !(flags & 2) ? (...args) => fn(...args) : (...args) => fn(env, ...args);
-      const closure = flags & 1 ? (...args) => !!invoke(...args) : invoke;
-      closure[CLOSURE_REC] = record;
-      return closure;
-    };
-  }
-  utu.closure_rec = closure => closure?.[CLOSURE_REC] ?? null;
-  const apply = (closure, ...args) => closure(...args);
-  for (const field of closureSpec.calls ?? []) utu[field] = apply;
+  if (closureSpec.new) utu.closure_new = closureNew;
+  utu.closure_rec = closureRec;
+  for (const field of closureSpec.calls ?? []) utu[field] = closureApply;
   return utu;
 }
+
+// flags: 1, the result is a Bool; 2, the environment is there even when
+// null (a closure whose one capture is its environment).
+export const closureNew = (fn, env, flags, record) => {
+  const invoke = env == null && !(flags & 2) ? (...args) => fn(...args) : (...args) => fn(env, ...args);
+  const closure = flags & 1 ? (...args) => !!invoke(...args) : invoke;
+  closure[CLOSURE_REC] = record;
+  return closure;
+};
+export const closureRec = closure => closure?.[CLOSURE_REC] ?? null;
+export const closureApply = (closure, ...args) => closure(...args);
 
 // The typed array each mem kind reads as.
 const MEM_ARRAYS = {
@@ -197,12 +204,15 @@ export function promisifyExports(instance, promiseSpec) {
   if (names.length === 0) return instance.exports;
   const exports = { ...instance.exports };
   for (const name of names) {
-    if (typeof exports[name] === 'function') {
-      // Its length stays the function's arity (Bun's promising() gives 1).
-      exports[name] = Object.defineProperty(WebAssembly.promising(exports[name]), 'length', { value: exports[name].length });
-    }
+    if (typeof exports[name] === 'function') exports[name] = promising(exports[name]);
   }
   return exports;
+}
+
+/** An export that can await, as a function that returns a promise. */
+export function promising(f) {
+  // Its length stays the function's arity (Bun's promising() gives 1).
+  return Object.defineProperty(WebAssembly.promising(f), 'length', { value: f.length });
 }
 
 /**
@@ -293,8 +303,8 @@ export function splitBody(body) {
 /**
  * Render the `@es` import spec as ES module source, one export per import.
  *
- * Field names are compiler-generated (`__es_1`, …) and therefore already valid
- * identifiers, so they are used as export names directly. Bodies are wrapped in
+ * Field names are compiler-generated (`__es_1`, …; `0`, … when optimized),
+ * so they are export names directly, or by glueName. Bodies are wrapped in
  * parentheses to keep them in expression position, and any leading `import`
  * declarations are hoisted above every export and deduplicated.
  *
@@ -310,12 +320,17 @@ export function glueModuleSource(importSpec, live = null) {
       if (live && !live.has(field)) continue;
       const { imports, expr } = splitBody(body);
       for (const decl of imports) hoisted.add(decl);
-      lines.push(`export const ${field} = (\n${expr}\n);`);
+      lines.push(`export const ${glueName(field)} = (\n${expr}\n);`);
     }
   }
   if (lines.length === 0) return '';
   const prologue = hoisted.size ? `${[...hoisted].join('\n')}\n\n` : '';
   return `${prologue}${lines.join('\n\n')}\n`;
+}
+
+/** A field's export in the glue module: optimized builds number them (`0` is `$0`). */
+export function glueName(field) {
+  return /^\d/.test(field) ? `$${field}` : field;
 }
 
 /**
@@ -355,8 +370,8 @@ export function importObjectFromGlue(importSpec, glue) {
     for (const field of Object.keys(fields ?? {})) {
       // Absent means the binding was shaken out of both the wasm and the glue,
       // so there is nothing for the host to supply.
-      if (!(field in glue)) continue;
-      const value = glue[field];
+      if (!(glueName(field) in glue)) continue;
+      const value = glue[glueName(field)];
       imports[module][field] = typeof value === 'function' ? value : () => value;
     }
   }

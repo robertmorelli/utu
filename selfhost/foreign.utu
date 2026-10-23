@@ -1576,7 +1576,7 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     let mt = vl_begin();
     vl_add(erased(owner, view));
     vl_add(erased(kt, view));
-    foreign_call_op(vl_end(mt), t, "(self,key) => " + js_output("self[key]", t, checked), m);
+    foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), m);
 }
 
 /// `&{ a: x, b: y }` where a host object is expected: a JS object.
@@ -1746,7 +1746,7 @@ fn check_foreign_index_set(owner: I32, key_node: I32, value: I32, m: I32, cx: Cx
     vl_add(erased(owner, view));
     vl_add(erased(kt, view));
     vl_add(erased(vt, view));
-    foreign_call_op(vl_end(mt), ty_void(), "(self,key,value) => { self[key] = " + js_argument(slot, "value", vt) + "; }", m);
+    foreign_call_op(vl_end(mt), ty_void(), "(self,k,value) => { self[k] = " + js_argument(slot, "value", vt) + "; }", m);
 }
 
 /// `x[k] op= v` on a host value (operator `word`): `x` is on the stack since
@@ -1776,7 +1776,7 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
     let mt = vl_begin();
     vl_add(erased(owner, view));
     vl_add(erased(kt, view));
-    foreign_call_op(vl_end(mt), t, "(self,key) => " + js_output("self[key]", t, checked), mv);
+    foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), mv);
     let v = foreign_operate(t, word, value, node, mv, cx);
     if v < 0 { return error_since(m); };
     let ms = w_mark();
@@ -1787,7 +1787,7 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
     vl_add(erased(owner, view));
     vl_add(erased(kt, view));
     vl_add(erased(t, view));
-    foreign_call_op(vl_end(ms2), ty_void(), "(self,key,value) => { self[key] = " + js_argument(slot, "value", t) + "; }", ms);
+    foreign_call_op(vl_end(ms2), ty_void(), "(self,k,value) => { self[k] = " + js_argument(slot, "value", t) + "; }", ms);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
 }

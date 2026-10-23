@@ -26,7 +26,7 @@
 // source and its bytes per line. A bucket's brotli share is an estimate
 // (`estimateCompressed`).
 
-import { glueModuleSource, splitBody } from '../runtime/host-imports.js';
+import { glueModuleSource, glueName, splitBody } from '../runtime/host-imports.js';
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
@@ -405,7 +405,7 @@ export function blameGlue(spec, esPlaces = new Map()) {
     for (const [field, body] of Object.entries(fields ?? {})) {
       const { imports, expr } = splitBody(body);
       for (const decl of imports) hoisted.add(decl);
-      parts.push({ field, bytes: size(`export const ${field} = (\n${expr}\n);`) });
+      parts.push({ field, bytes: size(`export const ${glueName(field)} = (\n${expr}\n);`) });
     }
   }
   let at = 0;

@@ -2,8 +2,9 @@
 //!
 //! What a program needs from its JavaScript host. An `@es` binding
 //! (`let f: fun(I32) I32 = @es/\ (x) => x + 1 \/;`) is an imported function,
-//! `__es_N` of the module `es`; a binding of another type is an imported
-//! function of no arguments that returns its value, called at each read.
+//! `__es_N` of the module `es` (`N` when optimized: @number_es_imports); a
+//! binding of another type is an imported function of no arguments that
+//! returns its value, called at each read.
 //! The bodies go into the module's `utu` custom section as JSON, in the form
 //! `src/runtime/host-imports.js` reads: `{"es":{"es":{"__es_0":"…"}}}`.
 
@@ -386,6 +387,7 @@ fn is_space(c: I32) Bool { c == 32 or c == 10 or c == 9 or c == 13; }
 /// Writes the host section for what the module imports (after the sweep):
 /// `host_json`, empty when there is nothing to say.
 fn write_host_json() void {
+    if optimize_level[0] != 0 { number_es_imports(); };
     host_json.clear();
     json_byte(123);
     json_part(0);
@@ -397,6 +399,19 @@ fn write_host_json() void {
     json_byte(125);
     // Nothing to say: no section.
     if host_json.len() == 2 { host_json.clear(); };
+}
+
+/// Optimized, the live `es` imports are named `0`, `1`, … in order, so the
+/// loader gives them as an array (src/selfhost/loader.js).
+fn number_es_imports() void {
+    let n = 0;
+    for (0 ..< es_func.len()) |i| {
+        let f = es_func[i];
+        if func_live[f] == 1 {
+            func_field_name[f] = name_add(n.to_str());
+            n += 1;
+        };
+    };
 }
 
 /// One part of the host section (es, closures, promises, mems, lazy, exports), after a comma
