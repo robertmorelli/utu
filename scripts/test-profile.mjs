@@ -2,7 +2,8 @@
 // a profile build's shadow stack is the source's at each probe, in -O small
 // and -O fast (inlined), through recursion, closures, generators, defers
 // and exceptions, an early return, and await; the sampler finds the hot
-// function; and a normal build has no trace of it.
+// function, and runs recursion as deep as a normal run does; and a normal
+// build has no trace of it.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -67,6 +68,17 @@ assert.equal(scope.profiles[0].type, 'sampled');
 assert.ok(scope.shared.frames.some(f => f.name === 'fib' && f.line === 1));
 assert.match(run.stderr, /hot\.flame\.html/);
 assert.ok(fs.existsSync(path.join(dir, 'hot.flame.html')));
+// Deep recursion a normal run survives: profiled too (on a deeper stack), in every mode.
+const deep = path.join(dir, 'deep.utu');
+fs.writeFileSync(deep, `fn down(n: I32) I32 { if n == 0 { return 0; }; 1 + down(n - 1); }
+export main() I32 { let t = 0; for (0 ..< 300) |_i| { t = down(13000); }; t; }
+`);
+for (const mode of ['debug', 'small', 'fast']) {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', deep, '-O', mode, '--profile', '-o', dir], { encoding: 'utf8' });
+  assert.equal(r.status, 0, `${mode}: ${r.stderr}`);
+  assert.equal(r.stdout.trim(), '13000', mode);
+  assert.match(fs.readFileSync(path.join(dir, 'deep.folded'), 'utf8'), /^main;down(;down)* \d+$/m, mode);
+}
 fs.rmSync(dir, { recursive: true, force: true });
 
 // The report from samples alone.

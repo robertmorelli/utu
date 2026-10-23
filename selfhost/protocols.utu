@@ -104,6 +104,8 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
+    // What the name means, for an editor (as a field's is recorded).
+    node_decl[name] = pm;
     if not proto_reads(proto, word_of(name)) {
         report2(Diag.ProtoAccess, parent_of(name), word_of(name), 1, proto);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
@@ -128,6 +130,7 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
+    node_decl[name] = pm;
     // `get x` is not written; `set x` is not read, so takes no `op=`.
     let reads = proto_reads(proto, word_of(name));
     if not proto_writes(proto, word_of(name)) or (op >= 0 and not reads) {
@@ -295,6 +298,7 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         report2(Diag.UnknownMethod, at, word_of(name), t, -1);
         return finish_error(args, m, cx);
     };
+    node_decl[name] = pm;
     if mentions_self(decl_node[pm]) {
         report2(Diag.ProtoSelfDynamic, at, word_of(name), t, -1);
         diag_label("any " + type_text(t));
