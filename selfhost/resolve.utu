@@ -252,6 +252,7 @@ enum(U8) Diag:
     | GenericGlobal   // unused: a generic mod's globals are per instance
     | ProtoPairType   // `| get x: A` and `| set x: B`, A not B
     | IrType          // an `@ir` operand or result of the wrong value type
+    | ModNoType       // a mod with no type `&` (or its alias) where a type goes
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -1511,7 +1512,7 @@ fn register_method(item: I32, w: Walk) void {
     // `fn T.m` with no type T: stage 0 takes it for a function named T.m,
     // and says nothing of T (a call `T.m(…)` reports it).
     if is_kind(receiver, Node.Type_ident) and lookup(word_of(receiver)) < 0 and not builtin_type(word_of(receiver)) { return; };
-    let owner = walk_type_name(receiver, w);
+    let owner = as_type(receiver, walk_type_name(receiver, w));
     let decl = node_decl[method];
     decl_a[decl] = owner;
     let args = next_sibling(receiver);
@@ -1572,7 +1573,7 @@ fn impl_target(args: I32) I32 {
 fn register_operator(item: I32, w: Walk) void {
     let receiver = first_child(item);
     let op = next_sibling(receiver);
-    let owner = walk_type_name(receiver, w);
+    let owner = as_type(receiver, walk_type_name(receiver, w));
     let decl = node_decl[op];
     decl_a[decl] = owner;
     if owner >= 0 { add_member(owner, word_of(op), Space.Operator, decl); };
@@ -1601,6 +1602,27 @@ fn walk_type_name(node: I32, w: Walk) I32 {
     t;
 }
 
+/// `t`, named at `node` where a type goes: a mod with no type `&` is not one
+/// (`using geo |Pt|` names mod geo, not geo.Pt).
+fn as_type(node: I32, t: I32) I32 {
+    let m = if decl_is(t, Decl.Alias) { decl_a[t]; } else { t; };
+    if not decl_is(m, Decl.Module) { return t; };
+    let n = if is_kind(node, Node.Instantiated_module_ref) { name_node(first_child(node)); } else { name_node(node); };
+    if n < 0 { n = node; };
+    report2(Diag.ModNoType, n, word_of(n), m, -1);
+    let inner = member(m, word_of(n), Space.Member);
+    let mod_name = word_text(decl_name[m]);
+    let name = word_text(word_of(n));
+    if word_of(n) == decl_name[m] {
+        diag_note("Name a type in it (" + mod_name + ".T), or declare one: struct &: …");
+    } else if inner >= 0 and is_type_decl(inner) {
+        diag_note("|" + name + "| renames the mod; to name its " + name + ", open it: using " + mod_name + ";");
+    } else {
+        diag_note("|" + name + "| renames the mod; name a type in it: " + name + ".T");
+    };
+    -1;
+}
+
 /// A module (or an alias of one) stands for its promoted type, when it has one.
 fn promoted(decl: I32) I32 {
     let d = decl;
@@ -1614,7 +1636,7 @@ fn builtin_type(word: I32) Bool { word >= narrow_word(Narrow.U8) and word <= nar
 
 /// Element kinds of mems and bases of distinct types: builtin names or types.
 fn walk_elem_type(node: I32, w: Walk) void {
-    if not builtin_type(word_of(node)) { walk_type_name(node, w); };
+    if not builtin_type(word_of(node)) { as_type(node, walk_type_name(node, w)); };
 }
 
 fn walk_types(node: I32, w: Walk) void {
@@ -1629,11 +1651,11 @@ fn walk_type(node: I32, w: Walk) void {
     let kind = node_kind[node];
     if kind == Node.Ref_type.to_i32() {
         let c = first_child(node);
-        if is_kind(c, Node.Type_ident) { walk_type_name(c, w); } else { walk_type_path(c, w); };
+        as_type(c, if is_kind(c, Node.Type_ident) { walk_type_name(c, w); } else { walk_type_path(c, w); });
         return;
     };
     if kind == Node.Promoted_type.to_i32() or kind == Node.Type_ident.to_i32() {
-        walk_type_name(node, w);
+        as_type(node, walk_type_name(node, w));
         return;
     };
     if kind != Node.Void_type.to_i32() { walk_types(node, w); };
@@ -1708,7 +1730,7 @@ fn walk_type_item(item: I32, w: Walk) void {
         } else if kind == Node.Impl_list.to_i32() {
             let t = first_child(c);
             while (t >= 0) {
-                walk_type_name(t, w);
+                as_type(t, walk_type_name(t, w));
                 t = next_sibling(t);
             };
         } else if kind == Node.Variant.to_i32() {
@@ -1883,10 +1905,10 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
             node_decl[name] = static_member(module, word_of(name));
             walk_expr(next_sibling(name), w);
         },
-        Node.Null_expr => { walk_type_name(first_child(node), w); },
+        Node.Null_expr => { as_type(first_child(node), walk_type_name(first_child(node), w)); },
         Node.Struct_init => {
             let t = first_child(node);
-            let decl = walk_type_path(t, w);
+            let decl = as_type(t, walk_type_path(t, w));
             walk_field_inits(next_sibling(t), decl, w);
         },
         Node.Implicit_struct_init => { walk_field_inits(next_sibling(first_child(node)), -1, w); },
