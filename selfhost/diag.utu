@@ -287,6 +287,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.UsingTwice { return "duplicate-declaration"; };
     if k == Diag.AmbiguousMethod { return "unknown-method"; };
     if k == Diag.ImplNothing { return "unknown-method"; };
+    if k == Diag.WutuHole or k == Diag.WutuKey { return "type-mismatch"; };
     "type-mismatch";
 }
 
@@ -550,6 +551,8 @@ fn diag_text(i: I32) Str {
         Diag.UsingTwice => w + node_text(a) + " is open already",
         Diag.AmbiguousMethod => w + " is both " + decl_text(decl_a[a]) + "'s and " + decl_text(decl_a[b]) + "'s",
         Diag.ImplNothing => decl_text(a) + "'s instances implement " + decl_text(b) + " together: fn " + decl_text(b) + "[&]." + w + " in " + decl_text(a),
+        Diag.WutuHole => pick(ty_is(a, Ty.Void), "A hole needs a value: this gives none", "A hole shows text, a number, a Bool or a node, not " + type_text(a)),
+        Diag.WutuKey => "A key is text or a number, not " + type_text(a),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -771,6 +774,8 @@ fn diag_default_label(i: I32) Str {
         Diag.GeneratorExport => "a generator",
         Diag.HostMissing => "not found",
         Diag.ImportNotModule => "not a mod",
+        Diag.WutuHole => type_text(a),
+        Diag.WutuKey => type_text(a),
         ~> "here",
     };
 }

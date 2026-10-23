@@ -121,7 +121,10 @@ export function lowerForeignOperations(graph, buildExternFn) {
       op = { ...op, body: key.body, params: insertAt(op.params, key.at, 'Str'), args: insertAt(op.args, key.at, literal) };
     }
     const name = intern(op, node);
-    const call = replaceNodeMeta(doc.createElement('ir-call'), node, 'foreign-abi', op.kind);
+    // A call that wraps the node itself (an unbox) is a new node: the node keeps its id, and its binding.
+    const call = op.args.includes(node)
+      ? createSyntheticNode(doc, 'ir-call', node, 'foreign-abi', op.kind)
+      : replaceNodeMeta(doc.createElement('ir-call'), node, 'foreign-abi', op.kind);
     precise(call, op);
     if (node.attr('data-foreign-error')) call.setAttribute('data-foreign-error', node.attr('data-foreign-error'));
     const callee = createSyntheticNode(doc, 'ir-ident', node, 'foreign-abi', 'foreign-callee');

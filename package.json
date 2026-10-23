@@ -197,6 +197,8 @@
     "docs:build": "node ./scripts/build-docs.mjs",
     "bench:programs-d8": "node ./scripts/benchmark-programs-d8.mjs",
     "bench:deltablue-table": "node ./scripts/benchmark-programs-d8.mjs deltablue",
+    "test:wutu-smoke": "node ./scripts/test-wutu-smoke.mjs",
+    "test:wutu-regressions": "node ./scripts/test-wutu-regressions.mjs && node ./scripts/test-wutu-regressions.mjs --webkit",
     "test:wutu-smooth": "node ./cli/wutu.mjs build examples/wutu-reactive/main.utu --out dist/wutu-reactive && node ./scripts/test-wutu-smooth.mjs && node ./scripts/test-wutu-smooth.mjs --webkit && node ./scripts/test-wutu-static.mjs && node ./scripts/test-wutu-dev.mjs",
     "demo:wutu-more": "node ./scripts/build-wutu-more.mjs",
     "test:wutu-more": "node ./scripts/build-wutu-more.mjs && node ./scripts/test-wutu-more.mjs && node ./scripts/test-wutu-more.mjs --webkit",

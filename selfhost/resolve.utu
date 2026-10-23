@@ -246,6 +246,8 @@ enum(U8) Diag:
     | UsingTwice
     | AmbiguousMethod
     | ImplNothing
+    | WutuHole
+    | WutuKey
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -1389,7 +1391,11 @@ fn walk_using(item: I32, w: Walk) void {
         if kind >= 0 {
             report2(Diag.ImportNotModule, n, word_of(n), kind, -1);
             diag_note("Declare it in a mod there (mod m { … }) and import that");
-        } else { report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module); };
+        } else {
+            report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
+            // (An import names a mod of the file: `mod guide { … }` for `using guide … from`.)
+            if using_path(item) >= 0 { diag_note("The file has no mod " + word_text(word_of(n)) + ": declare one there, mod " + word_text(word_of(n)) + " { … }"); };
+        };
         return;
     };
     node_decl[n] = module;

@@ -1,7 +1,7 @@
 // Unit tests for the Wutu DOM reconciler and typed storage (src/runtime/wutu.js),
 // driven directly the way compiled templates call it, against linkedom.
 import { parseHTML } from 'linkedom/worker';
-import { createWutuRuntime, installWutuStorage } from '../src/runtime/wutu.js';
+import { createWutuRuntime, installWutuStorage, wutuStyle } from '../src/runtime/wutu.js';
 
 function memoryStorage() {
   const data = new Map();
@@ -145,8 +145,8 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
   }));
 
   test('wutu runtime: styles install once, timers stop with their view, and after() runs post-render', () => withRuntime(async ({ api, document }) => {
-    api.style('p{color:red}');
-    api.style('p{color:red}');
+    wutuStyle('p{color:red}');
+    wutuStyle('p{color:red}');
     assertEq(document.querySelectorAll('style').length, 1);
     const cleared = [];
     const realClear = globalThis.clearInterval;
@@ -174,6 +174,75 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
     } finally {
       globalThis.clearInterval = realClear;
     }
+  }));
+
+  test('wutu runtime: an interval stops with the render that no longer starts it; a select takes its value after its options', () => withRuntime(async ({ api, document }) => {
+    const cleared = [];
+    const realClear = globalThis.clearInterval;
+    globalThis.clearInterval = (id) => { cleared.push(id); realClear(id); };
+    try {
+      let show = true;
+      const options = ['a'];
+      let chosen = 'a';
+      const root = api.mount(() => {
+        api.enter('main', false, 'root', '');
+        // (A component in the same view: its interval is the root view's.)
+        if (show) api.interval('tick', 1000, () => {});
+        const select = api.enter('select', false, 'pick', '');
+        // (linkedom's select has no value setter: this one, as a browser's,
+        // takes a value only an option has.)
+        if (!Object.hasOwn(select, 'value')) {
+          let picked = '';
+          Object.defineProperty(select, 'value', {
+            get: () => [...select.children].some(o => o.getAttribute('value') === picked) ? picked : select.children[0]?.getAttribute('value') ?? '',
+            set: value => { picked = [...select.children].some(o => o.getAttribute('value') === value) ? value : ''; },
+          });
+        }
+        api.selectValue(select, chosen);
+        for (const value of options) {
+          api.pushKey(value);
+          const option = api.enter('option', false, 'option', '');
+          api.attr(option, 'value', value);
+          api.append(value);
+          api.leave();
+          api.popKey();
+        }
+        api.leave();
+        return api.leave();
+      }, '');
+      document.body.append(root);
+      show = false;
+      api.refresh();
+      assertEq(cleared.length, 1, 'the interval stops when its component leaves');
+      options.push('b');
+      chosen = 'b';
+      api.refresh();
+      assertEq(root.querySelector('select').value, 'b', 'an option added in the same render can be chosen');
+    } finally {
+      globalThis.clearInterval = realClear;
+    }
+  }));
+
+  test('wutu runtime: hydration enables pending controls and keeps prerendered styles and properties', () => withRuntime(async ({ api, document }) => {
+    const program = JSON.stringify([['o', 0, ['main', {}]], ['s', 1, ['button', {}, 'go']], ['o', 2, ['p', {}]], ['y', 'width'], ['n', 2], ['t', 'x'], ['c'], ['c']]);
+    // (A program is known by its FNV-1a hash, base 36, as begin() names it.)
+    let n = 2166136261;
+    for (let i = 0; i < program.length; i++) n = Math.imul(n ^ program.charCodeAt(i), 16777619);
+    const v = 'v' + (n >>> 0).toString(36);
+    document.body.innerHTML = `<main data-wutu-root="${v}:0" data-wutu-prerender data-wutu="${v}:0"><button data-wutu="${v}:1" disabled data-wutu-pending>go</button>`
+      + `<p data-wutu="${v}:2" hidden title="tip" style="width: 40%">x</p></main>`;
+    const prerendered = document.querySelector('p');
+    const root = api.mount(() => {
+      api.begin(program);
+      api.put('40%');
+      const p = api.node();
+      if (p.hidden !== true) p.hidden = true;
+      return api.done();
+    }, '');
+    assertEq(root.querySelectorAll('[data-wutu-pending],[disabled]').length, 0, 'controls take input once hydrated');
+    const p = root.querySelector('p');
+    assert(p === prerendered, 'the prerendered element is reused');
+    assert(p.hasAttribute('hidden') && p.getAttribute('title') === 'tip' && p.getAttribute('style').replace(/\s/g, '').includes('width:40%'), 'what no render sets as an attribute stays');
   }));
 
   test('wutu runtime: global keys move nodes between parents and reject duplicates', () => withRuntime(async ({ api, document }) => {

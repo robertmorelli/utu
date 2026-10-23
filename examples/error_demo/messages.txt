@@ -3140,6 +3140,7 @@ ok
  5 │ export main() void {
 
   note  using console from std:Console;
+  note  The file has no mod console: declare one there, mod console { … }
 
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/32_unknown_import_std_typo.utu:6:5
@@ -3167,6 +3168,7 @@ ok
  5 │ export main() void {
 
   note  using console from std:Console;
+  note  The file has no mod console: declare one there, mod console { … }
 
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/33_unknown_import_std_lowercase.utu:6:5
@@ -3433,6 +3435,7 @@ ok
  5 │ export main() F64 { time.now(); }
 
   note  using time from std:Time; (the module is time)
+  note  The file has no mod Time: declare one there, mod Time { … }
 
  ERROR  Unknown variable time
         unknown-variable · examples/error_demo/names/462_std_module_named_as_file.utu:5:21
@@ -3603,6 +3606,31 @@ ok
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │     ╰─ already declared
  9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/551_lazy_file_without_mod.utu
+ ERROR  Unknown module gadgets
+        unknown-module · examples/error_demo/names/551_lazy_file_without_mod.utu:4:7
+
+ 2 │ // Expect: Unknown module gadgets, with a note to declare mod gadgets there
+ 3 │ using Browser from std:Browser;
+ 4 │ using gadgets lazy from "./lazy_parts/widgets.utu";
+   │       ━━━━━━━
+   │       ╰─ no such module
+ 5 │
+ 6 │ export main() void {
+
+  note  The file has no mod gadgets: declare one there, mod gadgets { … }
+
+ ERROR  Unknown variable gadgets
+        unknown-variable · examples/error_demo/names/551_lazy_file_without_mod.utu:7:34
+
+ 5 │
+ 6 │ export main() void {
+ 7 │     Browser.document.body.append(gadgets.badge("new"));
+   │                                  ━━━━━━━
+   │                                  ╰─ not defined
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/55_duplicate_hoisted_std_name.utu
@@ -5166,6 +5194,136 @@ ok
  6 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/540_wutu_reactive_inside.utu
+ ERROR  @reactive goes first in the template, before its root element
+        dsl-error · examples/error_demo/platform/540_wutu_reactive_inside.utu:16:12
+
+14 │     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
+15 │     let app = @wutu/\
+16 │     main { @reactive; p { = state.n; } }
+   │            ━
+   │            ╰─ here
+17 │     \/;
+18 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/541_wutu_directive_typo.utu
+ ERROR  unknown directive @reactiv; did you mean @reactive?
+        dsl-error · examples/error_demo/platform/541_wutu_directive_typo.utu:16:5
+
+14 │     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
+15 │     let app = @wutu/\
+16 │     @reactiv;
+   │     ━
+   │     ╰─ here
+17 │     main { p { = state.n; } }
+18 │     \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/542_wutu_unmanaged_typo.utu
+ ERROR  unknown directive @unmanage; did you mean @unmanaged?
+        dsl-error · examples/error_demo/platform/542_wutu_unmanaged_typo.utu:17:18
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { div { @unmanage; } }
+   │                  ━
+   │                  ╰─ here
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/543_wutu_event_typo.utu
+ ERROR  unknown event clik; did you mean click?
+        dsl-error · examples/error_demo/platform/543_wutu_event_typo.utu:17:29
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { button { "+"; on clik { state.n += 1; } } }
+   │                             ━
+   │                             ╰─ here
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/544_wutu_two_ids.utu
+ ERROR  an element has one id; #b is a second
+        dsl-error · examples/error_demo/platform/544_wutu_two_ids.utu:17:17
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { div#a#b { } }
+   │                 ━
+   │                 ╰─ here
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/545_wutu_bind_values_input.utu
+ ERROR  bind:values is a multiple select's: select { multiple; bind:values = …; }
+        dsl-error · examples/error_demo/platform/545_wutu_bind_values_input.utu:17:20
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { input { bind:values = state.tags; } }
+   │                    ━
+   │                    ╰─ here
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/546_wutu_hole_void.utu
+ ERROR  A hole needs a value: this gives none
+        wutu-hole · examples/error_demo/platform/546_wutu_hole_void.utu:17:18
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { p { = Browser.console.log("x"); } }
+   │                  ━━━━━━━━━━━━━━━━━━━━━━━━
+   │                  ╰─ void
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/547_wutu_hole_array.utu
+ ERROR  A hole shows text, a number, a Bool or a node, not Array[Str]
+        wutu-hole · examples/error_demo/platform/547_wutu_hole_array.utu:17:18
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { p { = state.tags; } }
+   │                  ━━━━━━━━━━
+   │                  ╰─ Array[Str]
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/548_wutu_key_struct.utu
+ ERROR  A key is text or a number, not Item
+        wutu-key · examples/error_demo/platform/548_wutu_key_struct.utu:17:42
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { ul { for state.items |it| key it { li { = it.id; } } } }
+   │                                          ━━
+   │                                          ╰─ Item
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/549_wutu_property_type.utu
+ ERROR  Expected Str, got I32
+        type-mismatch · examples/error_demo/platform/549_wutu_property_type.utu:17:29
+
+15 │     let app = @wutu/\
+16 │     @reactive;
+17 │     main { input { .value = 5; } }
+   │                             ━
+   │                             ╰─ I32
+18 │     \/;
+19 │     Browser.document.body.append(app);
+--- exit 1
+
 === utu check examples/error_demo/platform/54_json_bad_text_expression.utu
  ERROR  Invalid text expression
         dsl-error · examples/error_demo/platform/54_json_bad_text_expression.utu:8:25
@@ -5176,6 +5334,19 @@ ok
    │                         ━━━━━━━━━━
    │                         ╰─ here
  9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/550_wutu_text_bad_escape.utu
+ ERROR  Unknown escape \q
+        invalid-escape · examples/error_demo/platform/550_wutu_text_bad_escape.utu:16:16
+
+14 │     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
+15 │     let app = @wutu/\
+16 │     main { p { "a\q"; } }
+   │                ━━━━━
+   │                ╰─ here
+17 │     \/;
+18 │     Browser.document.body.append(app);
 --- exit 1
 
 === utu check examples/error_demo/platform/55_json_nullable_scalar_field.utu
@@ -5712,17 +5883,6 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/97_wutu_property_type.utu
- ERROR  No != for Str and I32
-        operand-mismatch · examples/error_demo/platform/97_wutu_property_type.utu:8:18
-
- 6 │     @wutu/\
- 7 │     input {
- 8 │         .value = items.len();
-   │                  ━━━━━━━━━━━
-   │                  ╰─ I32
- 9 │     }
-10 │     \/;
-
  ERROR  Expected Str, got I32
         type-mismatch · examples/error_demo/platform/97_wutu_property_type.utu:8:18
 

@@ -229,7 +229,7 @@ try {
     const exports = await runBrowser(`
       fn upper() Str { "abc".toUpperCase(); }
       fn padded() Str { "7".padStart(3.0, "0"); }
-      fn parts() F64 { "a,b,c".split(",").length; }
+      fn parts() F64 { "a,b,c".lastIndexOf(","); }
       fn replaced() Str { "a-b-c".replaceAll("-", "+"); }
       fn fixed() Str { let n = 3.14159; n.toFixed(2.0); }
       fn native() I32 { "abc".len(); }

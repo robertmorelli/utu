@@ -1,0 +1,113 @@
+// Wutu behaviors once broken, checked in a browser by
+// scripts/test-wutu-regressions.mjs (built prerendered, then hydrated).
+using Browser from std:Browser;
+using time from std:Time;
+
+mem ticks: I32;
+
+struct Reader:
+    | k: I32
+
+fn Reader.read |self| () I32 { ticks[0] + self.k; }
+
+struct Row:
+    | id: Str
+    | cells: Array[Str]
+
+struct State:
+    | n: I32
+    | rows: Array[Row]
+    | number: F64
+    | capped: F64
+    | pick: Str
+    | options: Array[Str]
+    | timer: Bool
+    | beats: I32
+    | hidden: Bool
+    | width: Str
+    | twice: I32
+
+fn cell(label: Str) Browser.HTMLElement {
+    @wutu/\
+    span.cell { = label; }
+    \/;
+}
+
+/// Reused unless what it reads changes: a method that reads a mem does.
+fn byMethod(label: Str) Browser.HTMLElement {
+    let r = Reader { k: 0 };
+    @wutu/\
+    span#method { = label + r.read().to_str(); }
+    \/;
+}
+
+/// The clock is new each time: never reused.
+fn byClock(label: Str) Browser.HTMLElement {
+    @wutu/\
+    span#clock { = label + time.now().to_str(); }
+    \/;
+}
+
+fn beat(state: State) Browser.HTMLElement {
+    wutu.interval("beat", 20.0, cl() void { state.beats += 1; });
+    @wutu/\
+    p#beat { "beating"; }
+    \/;
+}
+
+fn icon(state: State) Browser.SVGElement {
+    @wutu/\
+    @reactive;
+    svg { viewBox = "0 0 10 10"; circle { r = state.n.to_str(); } }
+    \/;
+}
+
+export main() void {
+    ticks.push(0);
+    let state = State {
+        n: 0,
+        rows: [Row { id: "a", cells: ["b|c"] }, Row { id: "a|b", cells: ["c"] }],
+        number: 2.5, capped: 5.0, pick: "c", options: ["a", "b", "c"],
+        timer: true, beats: 0, hidden: true, width: "40%", twice: 0,
+    };
+    let app = @wutu/\
+    @reactive;
+    main {
+        form#form {
+            input#q { name = "q"; }
+            button#go { type = "submit"; "go"; }
+            on submit { state.n += 1; }
+        }
+        p#n { = state.n; }
+        button#bump { "bump"; on click { state.n += 1; ticks[0] += 1; } }
+        p#hid { .hidden = state.hidden; "secret"; }
+        div { i#fill { width: = state.width; } }
+        p#tip { .title = "tip"; "tip"; }
+        label { for = "q"; "Query"; }
+        my-card as card { "custom"; }
+        for state.rows |row| key row.id {
+            div.row { for row.cells |c| key c { = cell("same"); } }
+        }
+        = byMethod("m");
+        = byClock("t");
+        input#number { type = "number"; bind:number = state.number; }
+        input#capped { type = "number"; max = "10"; bind:number = state.capped; }
+        button#numbers { "numbers"; on click { state.number = 7.0; state.capped = 20.0; } }
+        select#pick {
+            bind:value = state.pick;
+            for state.options |o| { option { value = o; = o; } }
+        }
+        button#more { "more"; on click { state.options = ["a", "b", "c", "d"]; state.pick = "d"; } }
+        button#stop { "stop"; on click { state.timer = false; } }
+        p#beats { = state.beats; }
+        if state.timer { = beat(state); }
+        div as chart {
+            id = "chart";
+            @unmanaged;
+            on mount { chart.append(Browser.document.createTextNode("drawn;")); }
+        }
+        = icon(state);
+    }
+    \/;
+    Browser.document.body.append(app);
+}

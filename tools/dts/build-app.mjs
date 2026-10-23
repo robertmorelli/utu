@@ -17,17 +17,19 @@ const size = bytes => ({ raw: bytes.length, gzip: gzipSync(bytes, { level: 9 }).
 // What the page does once the module is instantiated: drop the static
 // fallback, run main, and say it is ready; or, when it cannot start, say so.
 const START = 'document.querySelectorAll("[data-utu-static]").forEach(n=>n.remove());\nawait exports.main?.();\ndocument.documentElement.setAttribute("data-utu-ready","");';
-// A lazy module's chunk: it only exports; the host page owns readiness.
-const CHUNK_FAILED = 'console.error(error);';
+// A lazy module's chunk: it only exports; the host page owns readiness (and
+// reports a failure, from the error the chunk exports).
+const CHUNK_FAILED = 'chunkError = error;';
 const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error);';
 
 /**
  * Package any UTU main as browser Wasm + minimal generated JS, with no app
  * glue. The self-hosted compiler builds it (`compiler: 'stage0'`, or a
- * custom `stdlib`, uses the JavaScript compiler).
+ * custom `stdlib`, uses the JavaScript compiler), with its safety checks
+ * unless `safe` is false (as `utu build -O small`; `smallUnsafe` drops them).
  */
-export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size', compiler = 'self' }) {
-  if (compiler === 'self' && !stdlib) return buildWithSelfhost({ entry, outDir, optimize });
+export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size', safe = true, compiler = 'self' }) {
+  if (compiler === 'self' && !stdlib) return buildWithSelfhost({ entry, outDir, optimize, safe });
   const parser = suppliedParser ?? await initParser({ wasmDir: `${ROOT}/` });
   const started = performance.now();
   try {
@@ -99,7 +101,7 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
  * they cache safely). Returns each path as written, mapped to its chunk's
  * app.js (relative to the page).
  */
-async function buildChunks({ lazy, files, outDir, optimize }) {
+async function buildChunks({ lazy, files, outDir, optimize, safe }) {
   const chunks = {};
   await fs.rm(path.join(outDir, 'chunks'), { recursive: true, force: true });
   const byFile = new Map();
@@ -121,7 +123,7 @@ async function buildChunks({ lazy, files, outDir, optimize }) {
     });
     await fs.writeFile(wrapper, `using Browser from std:Browser;\nusing ${module} from ${JSON.stringify(file)};\n\nexport lib {\n${exported.join('\n')}\n}\n`);
     try {
-      await buildWithSelfhost({ entry: wrapper, outDir: temp, optimize, chunk: true });
+      await buildWithSelfhost({ entry: wrapper, outDir: temp, optimize, safe, chunk: true });
       const digest = createHash('sha256').update(await fs.readFile(path.join(temp, 'app.wasm'))).update(await fs.readFile(path.join(temp, 'app.js'))).digest('hex').slice(0, 10);
       const name = `${path.basename(file, '.utu')}-${digest}`;
       const target = path.join(outDir, 'chunks', name);
@@ -136,19 +138,22 @@ async function buildChunks({ lazy, files, outDir, optimize }) {
 }
 
 /** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
-async function buildWithSelfhost({ entry, outDir, optimize, chunk = false }) {
+async function buildWithSelfhost({ entry, outDir, optimize, safe = true, chunk = false }) {
   const started = performance.now();
   const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
   const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
   const { formatDiagnostics: format } = await import('../../src/selfhost/format.js');
   const utu = await loadNodeCompiler();
-  const result = await compileFile(utu, path.resolve(entry), { optimize });
+  const result = await compileFile(utu, path.resolve(entry), { optimize, safe });
   // Warnings alone never fail a build.
   const errors = result.diagnostics.filter(d => d.severity !== 'warning');
   if (!result.wasm || errors.length) throw new Error(format(errors, new Map(result.files.map(f => [f.key, f.text]))));
   const { wasm, spec } = result;
+  // A chunk runs in a page that has std:Wutu's runtime already: it does not ship it again.
+  if (chunk) for (const bindings of Object.values(spec.es ?? {}))
+    for (const [name, body] of Object.entries(bindings)) if (typeof body === 'string' && body.includes('function createWutuRuntime')) bindings[name] = '() => {}';
   await fs.mkdir(outDir, { recursive: true });
-  const chunks = !chunk && spec.lazy?.length ? await buildChunks({ lazy: spec.lazy, files: result.files, outDir, optimize }) : {};
+  const chunks = !chunk && spec.lazy?.length ? await buildChunks({ lazy: spec.lazy, files: result.files, outDir, optimize, safe }) : {};
   await fs.writeFile(path.join(outDir, 'app.wasm'), wasm);
   const glue = glueSource(spec);
   const gluePath = path.resolve(outDir, 'glue.mjs');
@@ -161,13 +166,16 @@ async function buildWithSelfhost({ entry, outDir, optimize, chunk = false }) {
   const lines = loader.trimEnd().split('\n');
   const imports = lines.filter(line => line.startsWith('import '));
   const body = lines.filter(line => !line.startsWith('import ')).map(line => line.replace(/^export const /, 'const '));
-  // Where each lazy module's chunk is, for the runtime's lazyCall (relative to this script).
-  const chunkMap = Object.keys(chunks).length
-    ? `globalThis.__wutuChunks={...globalThis.__wutuChunks,${Object.entries(chunks).map(([written, url]) => `${JSON.stringify(written)}:new URL(${JSON.stringify(url)},import.meta.url).href`).join(',')}};`
+  // Where each lazy module's chunk is (relative to this script), and what
+  // calls a lazy module's function (src/runtime/wutu.js's createWutuLazy).
+  const lazy = Object.keys(chunks).length > 0;
+  if (lazy) imports.push(`import { createWutuLazy } from ${JSON.stringify(path.join(ROOT, 'src/runtime/wutu.js'))};`);
+  const chunkMap = lazy
+    ? `globalThis.__wutuChunks={...globalThis.__wutuChunks,${Object.entries(chunks).map(([written, url]) => `${JSON.stringify(written)}:new URL(${JSON.stringify(url)},import.meta.url).href`).join(',')}};globalThis.__wutuLazy??=createWutuLazy();`
     : '';
   // A chunk exports its module's functions (runtime lazyCall calls them).
   const source = chunk
-    ? [...imports, 'let chunkExports = {};', 'try {', ...body, 'chunkExports = exports;', '} catch (error) {', CHUNK_FAILED, '}', 'export { chunkExports as exports };'].join('\n')
+    ? [...imports, 'let chunkExports = null, chunkError = null;', 'try {', ...body, 'chunkExports = exports;', '} catch (error) {', CHUNK_FAILED, '}', 'export { chunkExports as exports, chunkError as error };'].join('\n')
     : [...imports, chunkMap, 'try {', ...body, START, '} catch (error) {', FAILED, '}'].join('\n');
   await build({ stdin: { contents: source, resolveDir: ROOT, sourcefile: 'generated-loader.mjs', loader: 'js' },
     outfile: path.join(outDir, 'app.js'), bundle: true, minify: true, format: 'esm', platform: 'browser', target: 'es2022', legalComments: 'none' });
@@ -178,6 +186,15 @@ async function buildWithSelfhost({ entry, outDir, optimize, chunk = false }) {
   const report = { wasm: size(wasm), javascript: size(javascript), imports: imported.filter(entry => entry.module !== "'").length,
     declaredBindings: Object.values(spec.es ?? {}).reduce((n, m) => n + Object.keys(m).length, 0), compileMs: Math.round(performance.now() - started) };
   report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key]]));
+  // Lazy chunks load later: counted apart from the page's total.
+  if (!chunk && Object.keys(chunks).length) {
+    report.chunks = {};
+    for (const url of new Set(Object.values(chunks))) {
+      const dir = path.join(outDir, path.dirname(url));
+      const bytes = Buffer.concat([await fs.readFile(path.join(dir, 'app.js')), await fs.readFile(path.join(dir, 'app.wasm'))]);
+      report.chunks[path.basename(dir)] = size(bytes);
+    }
+  }
   await fs.writeFile(path.join(outDir, 'sizes.json'), JSON.stringify(report, null, 2) + '\n');
   return report;
 }

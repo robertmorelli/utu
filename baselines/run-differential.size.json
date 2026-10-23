@@ -5155,6 +5155,12 @@
  "examples/wutu-reactive/main.utu test": {
   "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
+ "examples/wutu-regressions/main.utu normal": {
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+ },
+ "examples/wutu-regressions/main.utu test": {
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+ },
  "examples/wutu-round-one/atlas/main.utu normal": {
   "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },

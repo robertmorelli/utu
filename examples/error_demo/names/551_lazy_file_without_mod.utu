@@ -1,0 +1,8 @@
+// What: a lazy import names a mod the file does not declare (widgets.utu has mod widgets)
+// Expect: Unknown module gadgets, with a note to declare mod gadgets there
+using Browser from std:Browser;
+using gadgets lazy from "./lazy_parts/widgets.utu";
+
+export main() void {
+    Browser.document.body.append(gadgets.badge("new"));
+}
