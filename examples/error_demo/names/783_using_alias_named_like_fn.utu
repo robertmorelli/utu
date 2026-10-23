@@ -1,0 +1,9 @@
+// What: a using's alias named like a function of the file
+// Expect: Duplicate declaration helper, at the fn
+using helpers |helper| from "./lib/489_helper_lib.utu";
+
+fn helper() I32 { 1; }
+
+export main() I32 {
+    helper();
+}

@@ -1,0 +1,8 @@
+// What: two usings bind one name to mods of two files
+// Expect: Duplicate declaration api, at the second using
+using api from "./lib/782_api_one.utu";
+using api from "./lib/782_api_two.utu";
+
+export main() I32 {
+    api.x();
+}

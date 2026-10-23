@@ -1,0 +1,5 @@
+// What: one of the files 782_using_one_name_two_files.utu imports (not itself a mistake).
+// Expect: ok
+mod api {
+    fn x() I32 { 2; }
+}

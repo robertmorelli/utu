@@ -1333,7 +1333,7 @@ mod tour {
                 code {
                     "using ... |name|";
                 }
-                " renames a module.";
+                " renames a module. A using's name is its file's: no mod, fn, or type there takes it too.";
             }
             = code.block(distinct_sample());
             = code.block(alias_sample());
