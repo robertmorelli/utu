@@ -965,6 +965,24 @@ export lib {
         total;
     }
 }`, { calls: 1096, last_set: 43, nested: 420 }],
+    // Literals under operators, left of a typed operand, take its type as one
+    // literal does (once I32: "No + for I32 and I64").
+    [`fn a(x: I64) I64 { let k = (1 + 2) + x; k; }
+fn b(x: U32) Bool { (1 + 2) < x; }
+fn c(x: I64) Bool { ((1 ^ 2) | x) == 3; }
+fn d(x: I64) Bool { (0 - 4294967296) + x >= 0; }
+fn e(x: U64) U64 { ((1 << 40) - -(2 * 3)) + x; }
+fn g(x: I64) I64 { -(1 + 2) * x + (4 / 2); }
+export lib {
+    fn sum() I64 { a(5); }
+    fn less() Bool { b(4); }
+    fn bits() Bool { c(1); }
+    fn wide() Bool { d(4294967296) and not d(4294967295); }
+    fn unsigned() U64 { e(1); }
+    fn float() F64 { let x: F64 = 0.5; (1 + 2) * x; }
+    fn negated() I64 { g(2); }
+    fn both() I32 { let k = (1 + 2) + 3; k; }
+}`, { sum: 8n, less: true, bits: true, wide: true, unsigned: 1099511627783n, float: 1.5, negated: -4n, both: 6 }],
   ];
   for (const [source, expected] of selfhostPrograms) {
     const file = await write(source);
@@ -1328,6 +1346,9 @@ export lib {
     ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nexport lib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
     // -0.0 after 0.0.
     ['fn f(x: F64) I32 { match x { 0.0 => 1, -0.0 => 2, ~> 3, }; }\nexport lib { fn run() I32 { f(1.0); } }\n', 'Duplicate pattern -0.0'],
+    // Literals under operators take the other operand's type, and must fit it.
+    ['fn f(x: U32) U32 { (1 + 5000000000) + x; }\nexport lib { fn run() I32 { 0; } }\n', '5000000000 does not fit U32'],
+    ['fn f(x: U64) U64 { (-1 + 2) + x; }\nexport lib { fn run() I32 { 0; } }\n', '-1 does not fit U64'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

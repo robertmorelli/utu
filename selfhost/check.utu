@@ -1688,6 +1688,14 @@ fn is_comparison(word: I32) Bool {
         or word == known_word(Known.Le) or word == known_word(Known.Gt) or word == known_word(Known.Ge);
 }
 
+/// Whether `word` is an arithmetic or bitwise operator (`+` … `>>>`).
+fn is_arith_word(word: I32) Bool {
+    word == known_word(Known.Add) or word == known_word(Known.Sub) or word == known_word(Known.Mul)
+        or word == known_word(Known.Div) or word == known_word(Known.Rem) or word == known_word(Known.Band)
+        or word == known_word(Known.Bor) or word == known_word(Known.Bxor) or word == known_word(Known.Shl)
+        or word == known_word(Known.Shr) or word == known_word(Known.Ushr);
+}
+
 /// The token after a node's last (its operator, in a binary expression).
 fn token_after(node: I32) I32 {
     let t = node_last[node];
@@ -1715,7 +1723,7 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
         w_node(Op.Plain, vt_i32, 115, 0, m);
         return bool_t;
     };
-    // The operand type: the left's, unless it is a literal (`1 + x`, `0 == n`),
+    // The operand type: the left's, unless it is literals (`1 + x`, `(1 + 2) * x`, `0 == n`),
     // which takes the right's.
     // (Only a number or string type types the operands: `x + y` where an
     // Externref is wanted is the operands' sum, widened.)
@@ -1785,9 +1793,14 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     finish_call(fi, m, cx);
 }
 
+/// A number literal, or literals under parens, `-`, `~` and arithmetic or
+/// bitwise operators (`(1 + 2)`, `-(1 << 3)`): typed by what meets it.
 fn is_number_literal(node: I32) Bool {
     if is_kind(node, Node.Paren_expr) or is_kind(node, Node.Splice) { return is_number_literal(first_child(node)); };
-    if is_kind(node, Node.Unary_expr) { return is_number_literal(last_child(node)); };
+    if is_kind(node, Node.Unary_expr) { return tok_word[node_first[node]] != Kw.Not.to_i32() and is_number_literal(last_child(node)); };
+    if is_kind(node, Node.Binary_expr) {
+        return is_arith_word(operator_word(token_after(first_child(node)))) and is_number_literal(first_child(node)) and is_number_literal(last_child(node));
+    };
     let c = first_child(node);
     is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit));
 }
