@@ -525,6 +525,11 @@ export lib {
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
     ['mod m[T] {\n    struct &:\n        | v: T\n        | next: ?m[T]\n    fn &.mk(v: T) m[T] { &{ v: v, next: null }; }\n}\nexport lib { fn run() I32 { let a = m[I32].mk(3); a.next = m[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    // `a orelse b` (`br_on_non_null`): a once, b only when a is null, a `break` for b.
+    ['struct N:\n    | v: I32\n    | next: ?N\nvec hits: I32 = [0];\nfn get(n: N) ?N { hits[0] += 1; n.next; }\n'
+      + 'fn walk(a: ?N) I32 { let t = 0; let cur = a; while (true) { let c = cur orelse { break; }; t += c.v; cur = c.next; }; t; }\n'
+      + 'export lib { fn run() I32 {\n    let a = N { v: 1, next: N { v: 2, next: null } };\n    let b = get(a) orelse a;\n    let z = get(b) orelse N { v: 40, next: null };\n    let w = (get(z) orelse b).v;\n'
+      + '    walk(a) * 100000 + b.v * 1000 + z.v + w * 10 + hits[0] * 10000;\n} }\n', 332060],
     // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
     ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the

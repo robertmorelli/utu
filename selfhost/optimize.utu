@@ -298,7 +298,7 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
             return true;
         };
         // A block's contents come after its opcode, which a value cannot cross.
-        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or w_count[node] == 0 { return false; };
+        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or op == Op.NullElse.to_i32() or w_count[node] == 0 { return false; };
         holder = node;
         place = 0;
     };

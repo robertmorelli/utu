@@ -518,6 +518,7 @@ enum(U16) Op:
     | Throw
     | Rethrow     // a: label of the try
     | V128Const   // a: four words in w_aux
+    | NullElse    // children: a nullable value, then what it is when null; `block (v) (br_on_non_null 0) (else) end`
 
 // The `Plain` instructions written by name, by their opcodes.
 let i32_eqz: I32 = 69;
@@ -1941,6 +1942,15 @@ fn emit_rec(node: I32, d: I32) void {
         close_block();
         return;
     };
+    if op == Op.NullElse.to_i32() {
+        open_block(2, w_type[node], -1);
+        emit_at(w_kid(node, 0), d);
+        op1(214);  // br_on_non_null 0
+        op1(0);
+        emit_at(w_kid(node, 1), d);
+        close_block();
+        return;
+    };
     if op == Op.If.to_i32() {
         emit_at(w_kid(node, 0), d);
         open_block(4, w_type[node], a);
@@ -2056,6 +2066,15 @@ fn emit_step(node: I32) void {
         emit_task(4, 0);
         emit_kids_deep(node);
         emit_open(if op == Op.Block.to_i32() { 2; } else { 3; }, w_type[node], a);
+        return;
+    };
+    if op == Op.NullElse.to_i32() {
+        emit_task(4, 0);
+        emit_task(0, w_kid(node, 1));
+        emit_task(2, 0);
+        emit_task(2, 214);  // br_on_non_null 0
+        emit_task(0, w_kid(node, 0));
+        emit_open(2, w_type[node], -1);
         return;
     };
     if op == Op.If.to_i32() {
