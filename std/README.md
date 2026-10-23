@@ -1,6 +1,10 @@
 Standard library `.utu` files are embedded under `std:<basename>` at build time.
 Basenames must be unique.
 
+`std:JsonRuntime` is not a module: it is the reader and writer `@json` grafts
+into each container that uses it (stage 0's RUNTIME in `src/compiler/json.js`,
+word for word). The host hands its text to the compiler with the prelude.
+
 `std:Browser` is not a `.utu` file. It is the browser and standard JavaScript
 declaration graph, linked from TypeScript's `lib.dom` and `lib.es*` and embedded
 compressed in the compiler. It is decoded on first import. Programs use its

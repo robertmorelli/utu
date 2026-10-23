@@ -7,8 +7,14 @@
 //!
 //! Each type gets a generated reader and writer that run in wasm, over the
 //! string's code units; each container (a module, or a file's top level)
-//! gets the runtime (`json_runtime.utu`), the codecs its sites use, and a name
+//! gets the runtime (`std:JsonRuntime`), the codecs its sites use, and a name
 //! table of the field and variant names they read and write.
+
+/// Where the host wrote `std:JsonRuntime` in `src` (@json_runtime_room): start, end.
+vec json_rt: I32 = [0, 0];
+
+/// The runtime, as utu source text.
+fn json_runtime() Str { "\n" + bytes_text(json_rt[0], json_rt[1]); }
 
 /// The container being expanded: its types, names, and generated functions.
 vec jp_container: I32 = [-1];
