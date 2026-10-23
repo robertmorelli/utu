@@ -823,7 +823,8 @@ fn is_wutu_show(callee: I32) Bool { is_wutu_fn(callee, "show"); }
 fn is_wutu_fn(callee: I32, name: Str) Bool {
     if not is_kind(callee, Node.Field_expr) { return false; };
     let base = first_child(callee);
-    is_kind(base, Node.Identifier) and word_text(word_of(base)) == "wutu" and decl_is(node_decl[base], Decl.Module)
+    // (The declaration first: a module's is rare, and the text is made.)
+    is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module) and word_text(word_of(base)) == "wutu"
         and word_text(word_of(last_child(callee))) == name;
 }
 
