@@ -152,10 +152,90 @@ vec function_defers: I32;
 fn reset_defers() void {
     defer_node.clear();
     defer_guard.clear();
+    defer_running.clear();
+    running_guards.clear();
+    exit_flags.clear();
     stream_closes.clear();
     defer_marks.clear();
     function_defers.resize(1);
     function_defers[0] = 0;
+    begin_exit_flag();
+}
+
+//! == Defers that throw
+//!
+//! A defer that throws still lets the older ones run, newest first; the
+//! newest exception goes on (as `finally` in JS). A guard's handler runs
+//! its defer, so one that throws at an exit, inside that defer's guard,
+//! would run again: while an exit runs its defers, an exit flag holds the
+//! index of the one running, and a handler runs its defer only when the
+//! index is below it (unsigned: -1 is none). Code inside a defer's code
+//! (a block of its own defers) has a flag of its own.
+
+/// Per depth in defers' code (from @function_flags): the exit flag local,
+/// -1 before one is needed.
+vec exit_flags: I32;
+/// Where the current function's entries in @exit_flags, @defer_guard and
+/// @defer_running start.
+vec function_flags: I32 = [0];
+vec function_guards: I32 = [0];
+vec function_running: I32 = [0];
+/// The defers whose code is being written (at an exit or in a handler),
+/// innermost last, and how long @defer_guard was then.
+vec defer_running: I32;
+vec running_guards: I32;
+/// Flag sets and handler reads written so far.
+vec flag_sets: I32 = [0];
+vec flag_reads: I32 = [0];
+
+fn begin_exit_flag() void {
+    function_flags[0] = exit_flags.len();
+    function_guards[0] = defer_guard.len();
+    function_running[0] = defer_running.len();
+}
+
+fn run_inside(i: I32) void {
+    defer_running.push(i);
+    running_guards.push(defer_guard.len());
+}
+
+fn run_outside() void {
+    defer_running.resize(defer_running.len() - 1);
+    running_guards.resize(running_guards.len() - 1);
+}
+
+/// Where this depth's entries in @defer_guard start.
+fn depth_guards() I32 {
+    if defer_running.len() > function_running[0] { running_guards[running_guards.len() - 1]; } else { function_guards[0]; };
+}
+
+/// This depth's exit flag local (-1 none), made when `make`.
+fn exit_flag(make: Bool) I32 {
+    let k = function_flags[0] + defer_running.len() - function_running[0];
+    while (exit_flags.len() <= k) { exit_flags.push(-1); };
+    if make and exit_flags[k] < 0 { exit_flags[k] = new_local(vt_i32); };
+    exit_flags[k];
+}
+
+fn set_exit_flag(v: I32) void {
+    let f = exit_flag(true);
+    let m = w_mark();
+    w_i32(v);
+    w_node(Op.LocalSet, vt_none, f, 0, m);
+}
+
+/// Whether the defer at index `i` or a newer one may have a guard.
+fn guarded_from(i: I32) Bool {
+    let n = defer_guard.len();
+    n > depth_guards() and defer_guard[n - 1] >= i;
+}
+
+/// A block that starts its depth's guards (`guards` its first entry) sets
+/// the flag to none first, when a handler in it reads the flag: the code since `m`.
+fn init_exit_flag(m: I32, guards: I32, reads: I32) void {
+    if flag_reads[0] == reads or guards != depth_guards() or exit_flag(false) < 0 { return; };
+    set_exit_flag(-1);
+    w_insert(m, w_pop());
 }
 
 /// `defer e;`: noted, for @run_defers to check at each exit of its block.
@@ -185,16 +265,19 @@ fn note_defer_guards(from: I32) void {
 
 vec throw_work: I32;
 
-/// Whether the nodes since `m` call or throw: only then can an exception leave them.
-fn may_throw(m: I32) Bool {
+/// Whether the nodes since `m` call or throw: only then can an exception
+/// leave them. An exit's run of a defer up to index `own` is passed over:
+/// what it throws, the guard of defer `own` lets by (see @exit_flags).
+fn may_throw(m: I32, own: I32) Bool {
     throw_work.clear();
     for (m ..< w_stack.len()) |i| { throw_work.push(w_stack[i]); };
     while (throw_work.len() > 0) {
         let n = throw_work[throw_work.len() - 1];
         throw_work.resize(throw_work.len() - 1);
         let op = w_op[n];
-        if op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.Throw.to_i32() or op == Op.Rethrow.to_i32() { return true; };
-        for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)); };
+        let passed = op == Op.Seq.to_i32() and w_a[n] > 0 and w_a[n] <= own + 1;
+        if not passed and (op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.Throw.to_i32() or op == Op.Rethrow.to_i32()) { return true; };
+        if not passed { for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)); }; };
     };
     false;
 }
@@ -206,14 +289,31 @@ fn guard_defers(base: I32, vt: I32, cx: Cx) void {
     let k = defer_guard.len() - 2;
     while (k >= base) {
         let m = defer_guard[k];
-        if w_mark() > m and may_throw(m) {
+        if w_mark() > m and may_throw(m, defer_guard[k + 1]) {
             use_js_tag();
             let label = new_label();
             w_node(Op.Seq, vt, 0, 0, m);
             let mh = w_mark();
             w_leaf(Op.Drop, vt_none, 0, 0);
-            let d = defer_node[defer_guard[k + 1]];
+            let j = defer_guard[k + 1];
+            let d = defer_node[j];
+            let md = w_mark();
+            run_inside(j);
             if is_profile_defer(d) { run_profile_defer(d); } else { discard(check_statement(d, ty_void(), cx)); };
+            run_outside();
+            let f = exit_flag(false);
+            if f >= 0 {
+                // if j <u flag { d }: not one an exit has run.
+                w_node(Op.Seq, vt_none, 0, 0, md);
+                let run = w_pop();
+                let mc = w_mark();
+                w_i32(j);
+                w_get(vt_i32, f);
+                w_i32_op(i32_lt_u, mc);
+                w_push(run);
+                w_node(Op.If, vt_none, new_label(), 0, mc);
+                flag_reads[0] += 1;
+            };
             w_leaf(Op.Rethrow, vt_unreachable, label, 0);
             w_node(Op.Seq, vt_unreachable, 0, 0, mh);
             // Code that never ends leaves a try of no value: say so after it.
@@ -238,8 +338,11 @@ fn run_defers(from: I32, cx: Cx) void { run_exit_defers(from, -1, -1, cx); }
 /// node) runs as `failed` says: -1 never, -2 always (a `try` returning an
 /// error), else when the Result (of type `rt`) in local `failed` is an error.
 fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) void {
+    let sets = flag_sets[0];
     let i = defer_node.len() - 1;
     while (i >= from) {
+        let mi = w_mark();
+        run_inside(i);
         let d = defer_node[i];
         if is_profile_defer(d) { run_profile_defer(d); }
         else if d < 0 { close_stream(-d - 1, cx); }
@@ -256,8 +359,22 @@ fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) void {
             w_node(Op.Seq, vt_none, 0, 0, mt);
             w_node(Op.If, vt_none, new_label(), 0, m);
         };
+        run_outside();
+        // One that may throw says first that it runs (see @exit_flags); its
+        // Seq's `a` says whose run it is, for @may_throw.
+        if w_mark() > mi {
+            let flag = guarded_from(i) and may_throw(mi, -1);
+            w_node(Op.Seq, vt_none, i + 1, 0, mi);
+            if flag {
+                let run = w_pop();
+                set_exit_flag(i);
+                w_push(run);
+                flag_sets[0] += 1;
+            };
+        };
         i -= 1;
     };
+    if flag_sets[0] > sets { set_exit_flag(-1); };
 }
 
 //! = errdefer

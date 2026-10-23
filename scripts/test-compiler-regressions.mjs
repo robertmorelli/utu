@@ -785,6 +785,69 @@ export lib {
     }
   }
 
+  // A defer that throws lets the older ones run, newest first, at every
+  // exit and while unwinding, without running any twice; the newest
+  // exception goes on. Each digit is a mark; e<n> the exception caught.
+  const throwing = await write(String.raw`let boom: fun(I32) void = @es/\ (n) => { if (n >= 0) { globalThis.__err = "e" + n; throw new Error("e" + n); } } \/;
+let mark: fun(I32) void = @es/\ (s) => { globalThis.__log = (globalThis.__log ?? "") + s; } \/;
+let log: fun() Str = @es/\ () => { const s = (globalThis.__err ?? "") + ":" + (globalThis.__log ?? ""); globalThis.__log = ""; globalThis.__err = ""; return s; } \/;
+fn ends() I32 { defer mark(1); defer boom(0); defer mark(3); 5; }
+fn returns(x: I32) I32 { defer mark(1); defer boom(0); defer mark(3); if x > 0 { return 7; }; 5; }
+fn unwinds() I32 { defer mark(1); defer boom(0); defer mark(3); boom(9); 5; }
+fn loops() I32 { let i = 0; while (i < 3) { defer mark(1); defer boom(i); defer mark(3); i += 1; if i == 1 { continue; }; break; }; 5; }
+fn inner() I32 { defer mark(1); { defer boom(2); defer mark(3); mark(4); }; mark(5); 6; }
+fn both() I32 { defer mark(1); defer boom(0); defer boom(1); 5; }
+fn after() I32 { defer mark(1); defer boom(2); boom(3); 5; }
+fn small(i: I32) I32 { defer mark(1); defer boom(if i == 0 { 0; } else { -1; }); if i == 2 { boom(5); }; i; }
+fn rounds() I32 { let n = 0; for (0 ..< 3) |i| { n += try { small(i); } catch |e| { mark(9); 0; }; }; n; }
+fn caught(x: I32) I32 {
+    defer mark(1);
+    let r = try { { defer boom(x); defer mark(2); return 4; }; } catch |e| { mark(7); 8; };
+    mark(6);
+    boom(x + 10);
+    r;
+}
+fn nested() I32 { defer mark(1); defer { defer mark(2); boom(0); mark(3); }; mark(4); 5; }
+fn closure() I32 { let c = cl() I32 { defer mark(1); defer boom(0); defer mark(3); 5; }; c(); }
+fn calm() I32 { let t = 0; defer mark(1); { defer mark(2); t += 1; }; for (0 ..< 2) |i| { defer mark(3); if i == 0 { continue; }; t += 10; }; t; }
+fn run_one(k: I32) I32 {
+    match k {
+        0 => ends(), 1 => returns(1), 2 => unwinds(), 3 => loops(), 4 => inner(), 5 => both(),
+        6 => after(), 7 => rounds(), 8 => caught(0), 9 => nested(), 10 => closure(), ~> calm(),
+    };
+}
+export lib { fn run() Str {
+    let s = "";
+    for (0 ..< 12) |k| { let r = try { run_one(k); } catch |e| { -1; }; s = s + r.to_str() + log() + " "; };
+    s;
+} }
+`);
+  for (const mode of modes) {
+    const built = await compileFile(utu, throwing, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(),
+      '-1e0:31 -1e0:31 -1e0:31 -1e1:31 -1e2:431 -1e0:1 -1e2:1 1e5:19119 -1e10:2761 -1e0:421 -1e0:31 11:2331 ', mode);
+    checked++;
+  }
+
+  // An @es body bound to a fun or cl type that is not plainly a function is
+  // tested as the glue loads: one that is no function fails there, named.
+  for (const [source, message] of [
+    ['let f: fun(I32) I32 = @es/\\ 5 \\/;\nexport lib { fn run() I32 { f(1); } }\n', /f: @es gave number, not a function/],
+    ['let g: fun(Bool) I32 = @es/\\ ({upper: 1}) \\/;\nexport lib { fn run() I32 { g(true); } }\n', /g: @es gave object, not a function/],
+    ['let c: cl(I32) I32 = @es/\\ null \\/;\nexport lib { fn run() I32 { c(1); } }\n', /c: @es gave null, not a function/],
+    ['let a: fun(I32) I32 = @es/\\ Math.abs \\/;\nlet b: fun(Bool) I32 = @es/\\ [b => b ? 2 : 3][0] \\/;\nexport lib { fn run() I32 { a(-5) * 10 + b(true); } }\n', null],
+  ]) {
+    const file = await write(source);
+    for (const mode of ['debug', 'small']) {
+      const built = await compileFile(utu, file, { mode });
+      assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+      if (message) await assert.rejects(() => instantiateNode(built.wasm, built.spec), message, mode);
+      else assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), 52, mode);
+      checked++;
+    }
+  }
+
   // A generic mod's globals from another file, one per instance.
   await fs.writeFile(path.join(dir, 'counter.utu'), 'mod Counter[T] {\n    let n: Array[I32] = [0];\n    let seen: Array[T] = [];\n    fn bump() void { n[0] += 1; }\n    fn get() I32 { n[0] + seen.len(); }\n}\n');
   const counted = await write('using Counter from "./counter.utu";\nexport lib { fn run() I32 { Counter[I32].bump(); Counter[I32].bump(); Counter[Str].bump(); Counter[I32].get() * 10 + Counter[Str].get(); } }\n');
@@ -1080,6 +1143,7 @@ export lib {
     fn px(p: P) I32 { p.x; }
     fn mk() P { P { x: 7 }; }
     fn lv(i: I32) I32 { Lv.from_i32(i).to_i32(); }
+    fn flag(b: Bool) Str { if b { "y"; } else { "n"; }; }
 }`);
   for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
     const built = await compileFile(utu, edges, { mode });
@@ -1098,6 +1162,8 @@ export lib {
       assert.throws(() => exports.lv(99), WebAssembly.RuntimeError, mode);
     }
     assert.equal(exports.lv(1), 1);
+    // A Bool argument is JS truthiness, in every build.
+    assert.equal([0.5, 'x', {}, 1, true, 0, '', null, undefined, NaN, false].map(v => exports.flag(v)).join(''), 'yyyyynnnnnn', mode);
     checked++;
   }
 

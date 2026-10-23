@@ -221,8 +221,9 @@ export function promising(f) {
  * records which exports return one, by name: `{ main: 'U32' }`, or
  * `{ f: { r: ['U32', '', 'Bool'], p: ['Str', '?'] } }` for a tuple result
  * (a kind per element) or checked arguments. Wasm wraps a JS number or
- * BigInt to its bits, and `true` to 1, but takes any value as a reference;
- * safe builds record what each argument must be:
+ * BigInt to its bits, and `true` to 1, but takes any value as a reference.
+ * A Bool argument is any value, by its truthiness ('Bool', in every build);
+ * safe builds record what the others must be:
  *   'Str'  a string            '?Str'  a string or null (undefined is null)
  *   'ref'  not null            '?'     anything (undefined is null)
  * A promised result converts when it settles.
@@ -237,6 +238,7 @@ export function convertExports(exports, exportSpec) {
     throw new TypeError(`${name}: argument ${i + 1} must be ${what}, not ${v === null ? 'null' : typeof v}`);
   };
   const param = (name, kind, i) => {
+    if (kind === 'Bool') return v => !!v;
     if (kind === 'Str') return v => (typeof v === 'string' ? v : fail(name, i, 'a string', v));
     if (kind === '?Str') return v => (v == null ? null : typeof v === 'string' ? v : fail(name, i, 'a string or null', v));
     if (kind === 'ref') return v => (v == null ? fail(name, i, 'a value', v) : v);
@@ -289,6 +291,14 @@ export function convertExports(exports, exportSpec) {
 // exports. See IMPORTANT_MINIFICATION_INFO.md.
 const IMPORT_DECL = /^\s*import\s[^;]*;/;
 
+/**
+ * The glue's one helper, when a body calls it: the compiler wraps a `fun` or
+ * `cl` binding's body that is not plainly a function in `$utuFn("name", …)`,
+ * so a value that is not one fails as the glue loads, naming the binding.
+ */
+export const FUN_CHECK = "const $utuFn = (n, f) => { if (typeof f != 'function') throw new TypeError(`${n}: @es gave ${f === null ? 'null' : typeof f}, not a function`); return f; };";
+const usesFunCheck = expr => expr.includes('$utuFn(');
+
 /** Split a body into its hoistable import declarations and its expression. */
 export function splitBody(body) {
   const imports = [];
@@ -315,16 +325,18 @@ export function splitBody(body) {
 export function glueModuleSource(importSpec, live = null) {
   const hoisted = new Set();
   const lines = [];
+  let check = false;
   for (const fields of Object.values(importSpec ?? {})) {
     for (const [field, body] of Object.entries(fields ?? {})) {
       if (live && !live.has(field)) continue;
       const { imports, expr } = splitBody(body);
       for (const decl of imports) hoisted.add(decl);
+      check ||= usesFunCheck(expr);
       lines.push(`export const ${glueName(field)} = (\n${expr}\n);`);
     }
   }
   if (lines.length === 0) return '';
-  const prologue = hoisted.size ? `${[...hoisted].join('\n')}\n\n` : '';
+  const prologue = (hoisted.size ? `${[...hoisted].join('\n')}\n\n` : '') + (check ? `${FUN_CHECK}\n\n` : '');
   return `${prologue}${lines.join('\n\n')}\n`;
 }
 
@@ -390,7 +402,7 @@ export function importObjectFromEval(importSpec) {
   for (const [module, fields] of Object.entries(importSpec ?? {})) {
     imports[module] = {};
     for (const [field, body] of Object.entries(fields ?? {})) {
-      const value = new Function(`return (${body});`)();
+      const value = new Function(`${usesFunCheck(body) ? FUN_CHECK : ''}return (${body});`)();
       imports[module][field] = typeof value === 'function' ? value : () => value;
     }
   }

@@ -96,11 +96,13 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
 
 /**
  * Whether a body's expression is plainly a function: an arrow, `function`,
- * or one of host.utu's es_wrap wrappers (which make one of any body).
+ * one of host.utu's es_wrap wrappers (which make one of any body), or a
+ * body the glue checks is one (`$utuFn`).
  */
 function isFunction(expr) {
   return /^(async\s+)?(function\b|[\w$]+\s*=>|\([^()]*\)\s*=>)/.test(expr)
-    || /^\((f => \((p\d+(,p\d+)*)?\) => |v => \(\) => v\)\(|v => \(w => \(\) => w\)\()/.test(expr);
+    || /^\((f => \((p\d+(,p\d+)*)?\) => |v => \(\) => v\)\(|v => \(w => \(\) => w\)\()/.test(expr)
+    || expr.startsWith('$utuFn(');
 }
 
 const COMPILE_OPTIONS = { builtins: ['js-string'], importedStringConstants: "'" };

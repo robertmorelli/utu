@@ -225,11 +225,15 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     // this signature is that import: generated code (wutu's) repeats a few.
     let at = dsl_text_start(dsl);
     let end = dsl_text_end(dsl);
-    // Wrapped, when values cross converted: after the body's imports.
+    // Wrapped, when values cross converted: after the body's imports. A
+    // function whose body is not plainly one is tested when the glue loads.
     let made = src.len();
-    if open.len() > 0 {
-        let split = es_imports_end(at, end);
-        gen_text_utf8(bytes_text(at, split) + open + bytes_text(split, end) + ")");
+    let split = es_imports_end(at, end);
+    let unsure = (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) and not es_plain_function(split, end);
+    if open.len() > 0 or unsure {
+        let body = bytes_text(split, end);
+        if unsure { body = "$utuFn(\"" + word_text(decl_name[decl]) + "\", " + body + ")"; };
+        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { open + body + ")"; } else { body; }));
         at = made;
         end = src.len();
     };
@@ -317,6 +321,40 @@ fn es_imports_end(at: I32, end_: I32) I32 {
         done = i;
     };
     done;
+}
+
+/// Whether an `@es` body's expression (`src[at ..< end_]`) is plainly a
+/// function, an arrow or `function`, as src/selfhost/loader.js tells.
+fn es_plain_function(at: I32, end_: I32) Bool {
+    let i = es_space(at, end_);
+    if es_word(i, end_, "async") { i = es_space(i + 5, end_); };
+    if es_word(i, end_, "function") { return true; };
+    if i < end_ and src[i] == 40 {
+        i += 1;
+        while (i < end_ and src[i] != 41) {
+            if src[i] == 40 { return false; };
+            i += 1;
+        };
+        i += 1;
+    } else {
+        let s = i;
+        while (i < end_ and (is_word_byte(src[i]) or src[i] == 36)) { i += 1; };
+        if i == s { return false; };
+    };
+    i = es_space(i, end_);
+    i + 1 < end_ and src[i] == 61 and src[i + 1] == 62;
+}
+
+fn es_space(at: I32, end_: I32) I32 {
+    let i = at;
+    while (i < end_ and is_space(src[i])) { i += 1; };
+    i;
+}
+
+/// Whether word `w` is at `i`, whole.
+fn es_word(i: I32, end_: I32, w: Str) Bool {
+    let n = w.len();
+    i + n <= end_ and bytes_text(i, i + n) == w and (i + n == end_ or not is_word_byte(src[i + n]));
 }
 
 /// A fun type's signature; for another type, `()` → its value.
@@ -459,9 +497,10 @@ fn json_text_string(text: Str) void {
 
 /// The exports whose results JS reads otherwise than wasm gives them, by
 /// name: `"exports":{"main":"U32"}`. A Bool is true or false, a U32 or U64
-/// unsigned; a tuple's elements each so (`{"r":["U32","","Bool"]}`). Safe
-/// builds add what arguments must be (`"p":["Str","?Str","ref","?",""]`)
-/// (src/runtime/host-imports.js convertExports).
+/// unsigned; a tuple's elements each so (`{"r":["U32","","Bool"]}`). What
+/// arguments must be (`"p":["Bool","Str","?Str","ref","?",""]`): a Bool's
+/// truthiness always, the rest in safe builds (src/runtime/host-imports.js
+/// convertExports).
 fn write_exports_json() void {
     let first = true;
     for (0 ..< export_func.len()) |k| {
@@ -471,7 +510,7 @@ fn write_exports_json() void {
         let tuple = ty_is(t, Ty.Tuple);
         let r = if tuple { tuple_result_kinds(ty_a[t]); } else { js_result_kind(t); };
         let checked = false;
-        if safe_checks[0] == 1 { for (0 ..< vl_len[params]) |i| { if js_param_kind(vl_item(params, i)).len() > 0 { checked = true; }; }; };
+        for (0 ..< vl_len[params]) |i| { if js_param_kind(vl_item(params, i)).len() > 0 { checked = true; }; };
         if (r.len() > 0 or checked) and func_live[f] == 1 and func_field_name[f] >= 0 {
             json_text(if first { "\"exports\":{"; } else { ","; });
             first = false;
@@ -516,10 +555,13 @@ fn tuple_result_kinds(list: I32) Str {
     if any { out + "]"; } else { ""; };
 }
 
-/// What an argument of type t must be: "Str" a string, "?Str" a string or
-/// null, "ref" not null (a struct, array, enum, or closure), "?" null when
-/// undefined; "" anything wasm takes.
+/// What an argument of type t must be: "Bool" any value, by its truthiness;
+/// in safe builds "Str" a string, "?Str" a string or null, "ref" not null (a
+/// struct, array, enum, or closure), "?" null when undefined; "" anything
+/// wasm takes.
 fn js_param_kind(t: I32) Str {
+    if t == prelude(Prelude.Bool) { return "Bool"; };
+    if safe_checks[0] != 1 { return ""; };
     if t == prelude(Prelude.Str) { return "Str"; };
     if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { "?Str"; } else { "?"; }; };
     if is_foreign(t) or t == prelude(Prelude.Externref) or not vt_is_ref(repr(t)) { return ""; };

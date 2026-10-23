@@ -286,6 +286,8 @@ fn begin_function() void {
     clear_loops();
     defer_node.clear();
     function_defers[0] = 0;
+    exit_flags.clear();
+    begin_exit_flag();
 }
 
 /// Check a function instance's body into its wasm function.
@@ -346,6 +348,7 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let defers = defer_node.len();
     defer_marks.push(defers);
     let guards = defer_guard.len();
+    let reads = flag_reads[0];
     if block == body_block[0] and profiling() { profile_body(block, cx); };
     let c = first_child(block);
     let t = ty_void();
@@ -362,16 +365,16 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
         note_defer_guards(noted);
         c = next;
     };
-    guard_defers(guards, repr(t), cx);
-    if defer_node.len() > defers {
-        let vt = repr(t);
+    // The defers run inside the guards, so one that throws lets the older run.
+    let vt = repr(t);
+    if defer_node.len() > defers and vt != vt_unreachable {
         // A function's body ends in a return, which may be an error's.
-        if vt != vt_unreachable {
-            if block == body_block[0] { return_defers(t, w_mark() - 1, defers, cx); }
-            else { defers_after_value(vt, w_mark() - 1, defers, cx); };
-        };
-        defer_node.resize(defers);
+        if block == body_block[0] { return_defers(t, w_mark() - 1, defers, cx); }
+        else { defers_after_value(vt, w_mark() - 1, defers, cx); };
     };
+    guard_defers(guards, vt, cx);
+    defer_node.resize(defers);
+    init_exit_flag(m, guards, reads);
     defer_marks.resize(defer_marks.len() - 1);
     w_node(Op.Seq, repr(t), 0, 0, m);
     t;
