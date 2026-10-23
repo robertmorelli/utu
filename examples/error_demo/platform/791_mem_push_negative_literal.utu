@@ -1,0 +1,8 @@
+// What: an I8 mem pushed a literal below -128
+// Expect: -129 does not fit I8
+mem deltas: I8;
+
+export main() I32 {
+    deltas.push(-129);
+    deltas[0];
+}

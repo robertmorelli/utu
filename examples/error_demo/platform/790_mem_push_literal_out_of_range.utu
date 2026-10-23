@@ -1,0 +1,8 @@
+// What: a U8 mem pushed a literal above 255
+// Expect: 256 does not fit U8, at the literal (a computed value wraps)
+mem bytes: U8;
+
+export main() I32 {
+    bytes.push(256);
+    bytes[0];
+}

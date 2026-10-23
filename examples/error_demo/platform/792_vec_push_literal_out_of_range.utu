@@ -1,0 +1,8 @@
+// What: a U16 vec pushed a literal above 65535
+// Expect: 70000 does not fit U16
+vec ports: U16;
+
+export main() I32 {
+    ports.push(70000);
+    ports[0];
+}
