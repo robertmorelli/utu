@@ -1,0 +1,7 @@
+// What: \/ in a single-quoted JavaScript string ends the @es body
+// Expect: Unexpected character '''
+let slash: fun(Str) Str = @es/\ (s) => s.split('\/').join("-") \/;
+
+export main() Str {
+    slash("a/b");
+}

@@ -1,0 +1,3 @@
+// What: console.log with no import
+// Expect: Unknown variable console; note: using console from std:Console;
+export main() void { console.log("hi"); }

@@ -161,12 +161,12 @@ const ITERATOR_FORMS = new Map([
 const KEYWORDS = new Set(['mod', 'using', 'tag', 'rec', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'vec', 'export', 'const',
   'type', 'distinct', 'lib', 'main', 'test', 'bench', 'measure', 'in', 'out', 'get', 'set', 'yield', 'void', 'fun', 'cl',
   'from', ...ITERATOR_FORMS.keys(), 'await', 'new', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote',
-  'try', 'catch', 'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'prune', 'true',
-  'false', 'null']);
+  'try', 'catch', 'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'errdefer', 'return', 'fatal', 'prune',
+  'true', 'false', 'null']);
 
 // Keywords that begin an expression; elsewhere these words are identifiers.
 const EXPRESSION_KEYWORDS = new Set([
-  'if', 'match', 'loop', 'alt', 'promote', 'try', 'for', 'while', 'break', 'continue', 'defer', 'yield', 'return',
+  'if', 'match', 'loop', 'alt', 'promote', 'try', 'for', 'while', 'break', 'continue', 'defer', 'errdefer', 'yield', 'return',
   'let', 'cl', 'fatal', 'prune', 'new', 'await', 'assert', 'not', 'true', 'false', 'null',
 ]);
 
@@ -1077,7 +1077,7 @@ class Parser {
         const value = this.startsExpression() ? this.expr(0, true) : null;
         return this.node(`${word}_expr`, [keyword, value]);
       }
-      case 'yield': case 'defer': return this.node(`${word}_expr`, [this.token(word), this.expr(0, true)]);
+      case 'yield': case 'defer': case 'errdefer': return this.node(`${word}_expr`, [this.token(word), this.expr(0, true)]);
       case 'break': {
         // `break label value`: a label is a name, but not a word that may follow an expression.
         const keyword = this.token('break');
@@ -1439,8 +1439,22 @@ class Parser {
     return this.node('promote_expr', children);
   }
 
+  /** `try { … } catch …` catches what the host throws; `try e` passes on e's error. */
   tryExpr() {
-    const children = [this.token('try'), this.block(), this.expectKeyword('catch')];
+    const keyword = this.token('try');
+    if (!this.isPunct('{')) return this.node('try_result_expr', [keyword, this.expr(13, true)]);
+    const body = this.block();
+    if (!this.isWord('catch')) {
+      // `try {…}` without catch: a block's value, as any other operand.
+      let operand = this.node('block_expr', [body]);
+      for (;;) {
+        const next = this.infix(operand, 13, true);
+        if (next === null) break;
+        operand = next;
+      }
+      return this.node('try_result_expr', [keyword, operand]);
+    }
+    const children = [keyword, body, this.expectKeyword('catch')];
     if (this.isPunct('|')) children.push(this.token('|'), this.identifier(), this.expectPunct('|'));
     children.push(this.block());
     return this.node('try_expr', children);

@@ -300,7 +300,8 @@ fn finish_mems() void {
 /// The `@comptime` mems, in order.
 vec comptime_mem: I32;
 /// Their values, from the host: bytes in `comptime_bytes`, or -1 until given,
-/// or -2 when the evaluation trapped (its count then the reason's code).
+/// or -2 when the evaluation trapped (its count then the reason's code), or
+/// -3 when it waits on itself (its count then the mem it waits on).
 vec comptime_start: I32;
 vec comptime_count: I32;
 export mem comptime_bytes: U8;
@@ -343,12 +344,25 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
             if n % size != 0 { report(Diag.MemEmbed, init, decl_name[decl]); };
             for (0 ..< n) |i| { data_bytes.push(embed_bytes[embed_start[k] + i]); };
             count = n / size;
+            if mem_int_enum(decl) >= 0 {
+                let signed = s == Storage.I8 or s == Storage.I16 or s == Storage.I32;
+                for (0 ..< count) |e| {
+                    let v: I64 = 0;
+                    for (0 ..< size) |b| { v = v | ((embed_bytes[embed_start[k] + e * size + b] & 255).to_i64() << (b * 8).to_i64()); };
+                    let bits = (size * 8).to_i64();
+                    if signed and bits < 64 and (v >> (bits - 1)) & 1 == 1 { v = v - (1.to_i64() << bits); };
+                    check_variant_value(decl, v, init, e);
+                };
+            };
         };
     } else {
         let k = comptime_index(decl);
-        // A number, or @es: not what fills a mem.
-        if k < 0 { report2(Diag.MemInitializer, init, decl_name[decl], 1, -1); };
+        // A number, or @es: not what fills a mem (an empty body is reported already).
+        let dsl = if is_kind(init, Node.Dsl_expr) { word_of(first_child(init)); } else { -1; };
+        let empty = (dsl == known_word(Known.Comptime) or dsl == known_word(Known.Embed)) and dsl_text_start(init) == dsl_text_end(init);
+        if k < 0 and not empty { report2(Diag.MemInitializer, init, decl_name[decl], 1, -1); };
         if k >= 0 and comptime_start[k] == -2 { report2(Diag.ComptimeTrap, init, decl_name[decl], comptime_count[k], -1); };
+        if k >= 0 and comptime_start[k] == -3 { report2(Diag.ComptimeCycle, init, decl_name[decl], comptime_count[k], -1); };
         if k >= 0 and comptime_start[k] >= 0 {
             let value_size = if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
             count = comptime_count[k];
@@ -395,7 +409,7 @@ fn store_literal(decl: I32, lit: I32, negate: Bool, at: I32, i: I32) void {
     if not fits {
         let text = pick(negate, "-", "") + token_text(node_first[lit]);
         report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(text));
-    };
+    } else if s != Storage.F32 and s != Storage.F64 { check_variant_value(decl, bits, at, i); };
     let size = 1 << storage_shift(s);
     for (0 ..< size) |k| { data_bytes.push((bits >> (k * 8).to_i64()).to_i32() & 255); };
 }
@@ -418,8 +432,31 @@ fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
     else if s == Storage.I32 { lo = -2147483648; hi = 2147483647; }
     else if s == Storage.U32 { hi = 4294967295; }
     else { lo = 0 - 9223372036854775807 - 1; hi = 9223372036854775807; };
-    if v < lo or v > hi { report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(v.to_str())); };
+    if v < lo or v > hi { report3(Diag.MemElementRange, at, decl_name[decl], decl, i, intern_text(v.to_str())); }
+    else { check_variant_value(decl, v, at, i); };
     for (0 ..< size) |k| { data_bytes.push((v >> (k * 8).to_i64()).to_i32() & 255); };
+}
+
+/// The integer enum a mem holds, or -1.
+fn mem_int_enum(decl: I32) I32 {
+    let e = node_decl[next_sibling(first_child(decl_node[decl]))];
+    if decl_is(e, Decl.IntEnum) { e; } else { -1; };
+}
+
+/// Element `i` of a mem of an integer enum must be one of its variants'
+/// values (a match over it has no other arm).
+fn check_variant_value(decl: I32, v: I64, at: I32, i: I32) void {
+    let e = mem_int_enum(decl);
+    if e < 0 { return; };
+    let d = e + 1;
+    while (d < decl_kind.len() and decl_owner[d] >= e and decl_owner[d] <= d) {
+        if decl_owner[d] == e and decl_is(d, Decl.Variant) and variant_value[d].to_i64() == v { return; };
+        // (A U32 enum's values above I32's are kept as their bits.)
+        if decl_owner[d] == e and decl_is(d, Decl.Variant) and (variant_value[d].to_i64() & 4294967295) == v { return; };
+        d += 1;
+    };
+    // (b -1: not a variant's value.)
+    report3(Diag.MemElementRange, at, decl_name[decl], decl, -1, intern_text(v.to_str()));
 }
 
 /// Where `decl` is in @comptime_mem, or -1.
@@ -453,17 +490,20 @@ fn find_comptime_mems() void {
     embed_count.clear();
     embed_bytes.clear();
     for (0 ..< file_root.len()) |file| {
-        if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
+        if is_own_file(file) and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
             while (item >= 0) {
                 if is_kind(item, Node.Mem_decl) {
                     let init = last_child(item);
-                    if is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Comptime) {
+                    let dsl = if is_kind(init, Node.Dsl_expr) { word_of(first_child(init)); } else { -1; };
+                    // An empty body is reported here, and fills nothing.
+                    let empty = dsl >= 0 and dsl_text_start(init) == dsl_text_end(init);
+                    if empty and (dsl == known_word(Known.Comptime) or dsl == known_word(Known.Embed)) { report(Diag.DslEmpty, init, dsl); }
+                    else if dsl == known_word(Known.Comptime) {
                         comptime_mem.push(node_decl[first_child(item)]);
                         comptime_start.push(-1);
                         comptime_count.push(0);
-                    };
-                    if is_kind(init, Node.Dsl_expr) and word_of(first_child(init)) == known_word(Known.Embed) {
+                    } else if dsl == known_word(Known.Embed) {
                         embed_mem.push(node_decl[first_child(item)]);
                         embed_start.push(-1);
                         embed_count.push(0);
@@ -493,6 +533,7 @@ fn mem_address(s: Storage, m: I32) void {
 /// `name[i]`.
 fn check_mem_index(node: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(node)];
+    note_mem_use(decl);
     if is_kind(node, Node.Slice_expr) {
         report(Diag.MemIndex, node, decl_name[decl]);
         return error_value();
@@ -516,6 +557,7 @@ fn check_mem_index(node: I32, cx: Cx) I32 {
 /// `name[i] = v`, `name[i] op= v`.
 fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(target)];
+    note_mem_use(decl);
     if mem_is_const(decl) {
         report(Diag.ConstMem, at, decl_name[decl]);
         return error_value();
@@ -562,6 +604,7 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
 /// `name.len()`, `name.push(v)`, … The mem is `decl`; the call's arguments
 /// are `args`.
 fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
+    note_mem_use(decl);
     let word = word_of(name);
     memory_of(decl);  // (any use of a mem makes its memory or array)
     let len_g = mem_len[decl];

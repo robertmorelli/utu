@@ -474,6 +474,98 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/control/300_try_non_result.utu
+ ERROR  try needs a Result, not I32
+        try-not-result · examples/error_demo/control/300_try_non_result.utu:4:17
+
+ 2 │ // Expect: try needs a Result, not I32
+ 3 │ fn count(text: Str) Result[I32, Str] {
+ 4 │     let n = try text.len();
+   │                 ━━━━━━━━━━
+   │                 ╰─ I32
+ 5 │     Result[I32, Str].ok(n);
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/301_try_error_type_mismatch.utu
+ ERROR  try passes on I32; the function's errors are Str
+        try-error-mismatch · examples/error_demo/control/301_try_error_type_mismatch.utu:9:17
+
+ 7 │
+ 8 │ fn label(n: I32) Result[Str, Str] {
+ 9 │     let c = try code(n);
+   │                 ━━━━━━━
+   │                 ╰─ I32 errors
+10 │     Result[Str, Str].ok("code " + c.to_str());
+11 │ }
+
+  note  try returns the error as it is, unconverted
+--- exit 1
+
+=== utu check examples/error_demo/control/302_try_outside_result_function.utu
+ ERROR  try in a function returning I32, not a Result
+        try-place · examples/error_demo/control/302_try_outside_result_function.utu:9:13
+
+ 7 │
+ 8 │ fn quarter(n: I32) I32 {
+ 9 │     let h = try half(n);
+   │             ━━━━━━━━━━━
+   │             ╰─ no Result to return
+10 │     h / 2;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/303_errdefer_outside_result_function.utu
+ ERROR  errdefer in a function returning I32, not a Result
+        try-place · examples/error_demo/control/303_errdefer_outside_result_function.utu:6:5
+
+ 4 │
+ 5 │ fn work(n: I32) I32 {
+ 6 │     errdefer console.log("failed");
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ no Result to return
+ 7 │     n * 2;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/304_try_in_generator.utu
+ ERROR  try in a generator
+        try-place · examples/error_demo/control/304_try_in_generator.utu:9:29
+
+ 7 │
+ 8 │ fn digits(codes: Array[I32]) yield I32 {
+ 9 │     for (codes) |c| { yield try digit(c); };
+   │                             ━━━━━━━━━━━━
+   │                             ╰─ in a generator
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/305_try_in_defer.utu
+ ERROR  try in defer
+        invalid-defer · examples/error_demo/control/305_try_in_defer.utu:6:13
+
+ 4 │
+ 5 │ fn save() Result[I32, Str] {
+ 6 │     defer { try flush(); };
+   │             ━━━━━━━━━━━
+   │             ╰─ here
+ 7 │     Result[I32, Str].ok(1);
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/306_try_in_closure_without_result_type.utu
+ ERROR  try needs a function returning a Result
+        try-place · examples/error_demo/control/306_try_in_closure_without_result_type.utu:9:32
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     let quarter = cl(n: I32) { try half(n); };
+   │                                ━━━━━━━━━━━
+   │                                ╰─ no Result to return
+10 │     0;
+11 │ }
+--- exit 1
+
 === utu check examples/error_demo/control/30_match_bool_missing_true.utu
  ERROR  match misses true
         non-exhaustive · examples/error_demo/control/30_match_bool_missing_true.utu:4:5
@@ -1962,6 +2054,21 @@ ok
  6 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/486_pipeline_after_and.utu
+ ERROR  A pipeline binds looser than and: its source is all of this
+        iterator-source · examples/error_demo/iterators/486_pipeline_after_and.utu:5:5
+
+ 3 │ export main() Bool {
+ 4 │     let ok = true;
+ 5 │     ok and (0 ..< 5) all |i| { i < 9; };
+   │     ━━━━━━━━━━━━━━━━
+   │     │      ╰─ the source meant?
+   │     ╰─ piped
+ 6 │ }
+
+  note  Parenthesize the pipeline: a and (xs all |x| { … })
+--- exit 1
+
 === utu check examples/error_demo/iterators/48_generator_mutual_recursion.utu
  ERROR  Generator evens recurses
         generator-recursion · examples/error_demo/iterators/48_generator_mutual_recursion.utu:9:16
@@ -3032,6 +3139,8 @@ ok
  4 │
  5 │ export main() void {
 
+  note  using console from std:Console;
+
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/32_unknown_import_std_typo.utu:6:5
 
@@ -3041,6 +3150,8 @@ ok
    │     ━━━━━━━
    │     ╰─ not defined
  7 │ }
+
+  note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/33_unknown_import_std_lowercase.utu
@@ -3055,6 +3166,8 @@ ok
  4 │
  5 │ export main() void {
 
+  note  using console from std:Console;
+
  ERROR  Unknown variable console
         unknown-variable · examples/error_demo/names/33_unknown_import_std_lowercase.utu:6:5
 
@@ -3064,6 +3177,8 @@ ok
    │     ━━━━━━━
    │     ╰─ not defined
  7 │ }
+
+  note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/34_unknown_import_std_quoted.utu
@@ -3279,6 +3394,58 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/460_std_module_file_name.utu
+ ERROR  Unknown type Time
+        unknown-type · examples/error_demo/names/460_std_module_file_name.utu:3:21
+
+ 1 │ // What: Time.now() with no import; the module in std:Time is time
+ 2 │ // Expect: Unknown type Time; note: using time from std:Time; (the module is time)
+ 3 │ export main() F64 { Time.now(); }
+   │                     ━━━━
+   │                     ╰─ no such type
+
+  note  using time from std:Time; (the module is time)
+--- exit 1
+
+=== utu check examples/error_demo/names/461_console_without_import.utu
+ ERROR  Unknown variable console
+        unknown-variable · examples/error_demo/names/461_console_without_import.utu:3:22
+
+ 1 │ // What: console.log with no import
+ 2 │ // Expect: Unknown variable console; note: using console from std:Console;
+ 3 │ export main() void { console.log("hi"); }
+   │                      ━━━━━━━
+   │                      ╰─ not defined
+
+  note  using console from std:Console;
+--- exit 1
+
+=== utu check examples/error_demo/names/462_std_module_named_as_file.utu
+ ERROR  Unknown module Time
+        unknown-module · examples/error_demo/names/462_std_module_named_as_file.utu:3:7
+
+ 1 │ // What: importing std:Time under its file's name
+ 2 │ // Expect: Unknown module Time; note: using time from std:Time; (the module is time)
+ 3 │ using Time from std:Time;
+   │       ━━━━
+   │       ╰─ no such module
+ 4 │
+ 5 │ export main() F64 { time.now(); }
+
+  note  using time from std:Time; (the module is time)
+
+ ERROR  Unknown variable time
+        unknown-variable · examples/error_demo/names/462_std_module_named_as_file.utu:5:21
+
+ 3 │ using Time from std:Time;
+ 4 │
+ 5 │ export main() F64 { time.now(); }
+   │                     ━━━━
+   │                     ╰─ not defined
+
+  note  using time from std:Time;
+--- exit 1
+
 === utu check examples/error_demo/names/46_duplicate_closure_parameter.utu
  ERROR  Duplicate parameter a
         duplicate-parameter · examples/error_demo/names/46_duplicate_closure_parameter.utu:4:26
@@ -3306,6 +3473,21 @@ ok
    │       ╰─ already declared
  8 │
  9 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/489_import_a_function.utu
+ ERROR  helper is a function; using imports a mod
+        import-not-module · examples/error_demo/names/489_import_a_function.utu:3:7
+
+ 1 │ // What: `using` names a function of another file; only a mod can be imported.
+ 2 │ // Expect: helper is a function; using imports a mod (and nothing more at its use)
+ 3 │ using helper from "./lib/489_helper_lib.utu";
+   │       ━━━━━━
+   │       ╰─ not a mod
+ 4 │
+ 5 │ export main() I32 { helper(); }
+
+  note  Declare it in a mod there (mod m { … }) and import that
 --- exit 1
 
 === utu check examples/error_demo/names/48_duplicate_variant_struct_enum.utu
@@ -4019,6 +4201,10 @@ ok
 ok
 --- exit 0
 
+=== utu check examples/error_demo/names/lib/489_helper_lib.utu
+ok
+--- exit 0
+
 === utu check examples/error_demo/platform/01_mem_same_name_as_fn.utu
  ERROR  mem scores clashes with a function or global
         mem-clash · examples/error_demo/platform/01_mem_same_name_as_fn.utu:3:1
@@ -4601,8 +4787,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/40_ir_missing_operand.utu
-ok
---- exit 0
+ ERROR  @ir body is empty or not well-formed IR
+        dsl-place · examples/error_demo/platform/40_ir_missing_operand.utu:4:5
+
+ 2 │ // Expect: @ir: <ir-i32-mul> needs two operands / is not closed
+ 3 │ fn square(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+--- exit 1
 
 === utu check examples/error_demo/platform/41_generator_as_value.utu
  ERROR  count is a generator: for (count(…)) |v| { … }
@@ -4643,6 +4837,143 @@ ok
  9 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/440_comptime_reads_itself.utu
+ ERROR  @comptime t reads itself
+        comptime-cycle · examples/error_demo/platform/440_comptime_reads_itself.utu:4:20
+
+ 2 │ // Expect: @comptime t reads itself
+ 3 │ fn tab() Array[I32] { [t.len()]; }
+ 4 │ const mem t: I32 = @comptime/\ tab() \/;
+   │                    ━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ waits on itself
+ 5 │
+ 6 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/441_comptime_cycle.utu
+ ERROR  @comptime t reads u, which waits on it
+        comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:5:20
+
+ 3 │ fn f() Array[I32] { [u.len()]; }
+ 4 │ fn g() Array[I32] { [t.len()]; }
+ 5 │ const mem t: I32 = @comptime/\ f() \/;
+   │                    ━━━━━━━━━━━━━━━━━━
+   │                    ╰─ waits on u
+ 6 │ const mem u: I32 = @comptime/\ g() \/;
+
+ ERROR  @comptime u reads t, which waits on it
+        comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:6:20
+
+ 4 │ fn g() Array[I32] { [t.len()]; }
+ 5 │ const mem t: I32 = @comptime/\ f() \/;
+ 6 │ const mem u: I32 = @comptime/\ g() \/;
+   │                    ━━━━━━━━━━━━━━━━━━
+   │                    ╰─ waits on t
+ 7 │
+ 8 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/442_comptime_never_ends.utu
+ ERROR  @comptime t trapped: it ran too long (a hundred million loop rounds)
+        comptime-trap · examples/error_demo/platform/442_comptime_never_ends.utu:7:20
+
+ 5 │     [1];
+ 6 │ }
+ 7 │ const mem t: I32 = @comptime/\ f() \/;
+   │                    ━━━━━━━━━━━━━━━━━━
+   │                    ╰─ here
+ 8 │
+ 9 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/443_comptime_two_statements.utu
+ ERROR  @comptime takes one expression: Expected ')', got ';'
+        parse-error · examples/error_demo/platform/443_comptime_two_statements.utu:3:38
+
+ 1 │ // What: a @comptime body of two statements
+ 2 │ // Expect: @comptime takes one expression: Expected ')', got ';'
+ 3 │ const mem t: I32 = @comptime/\ [1, 2]; [3] \/;
+   │                                      ━
+   │                                      ╰─ unexpected
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/444_comptime_empty.utu
+ ERROR  @comptime needs an expression
+        dsl-empty · examples/error_demo/platform/444_comptime_empty.utu:3:20
+
+ 1 │ // What: an empty @comptime body
+ 2 │ // Expect: @comptime needs an expression
+ 3 │ const mem t: I32 = @comptime/\  \/;
+   │                    ━━━━━━━━━━━━━━━
+   │                    ╰─ empty
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/445_embed_empty.utu
+ ERROR  @embed needs a file path
+        dsl-empty · examples/error_demo/platform/445_embed_empty.utu:3:23
+
+ 1 │ // What: an empty @embed body
+ 2 │ // Expect: @embed needs a file path
+ 3 │ const mem bytes: U8 = @embed/\ \/;
+   │                       ━━━━━━━━━━━
+   │                       ╰─ empty
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu
+ ERROR  7 is no Color
+        mem-element-range · examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu:4:23
+
+ 2 │ // Expect: 7 is no Color
+ 3 │ enum(U8) Color: | Red | Green | Blue
+ 4 │ const mem cs: Color = [2, 7, 1];
+   │                       ━━━━━━━━━
+   │                       ╰─ here
+ 5 │
+ 6 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/447_ir_array_len_on_i32.utu
+ ERROR  @ir <ir-array-len> is written wrong here
+        ir-unknown · examples/error_demo/platform/447_ir_array_len_on_i32.utu:4:5
+
+ 2 │ // Expect: @ir <ir-array-len> is written wrong here
+ 3 │ fn len(a: I32) I32 {
+ 4 │     @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ malformed
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/448_wat_select_param.utu
+ ERROR  select takes only (result t)
+        dsl-error · examples/error_demo/platform/448_wat_select_param.utu:4:58
+
+ 2 │ // Expect: select takes only (result t)
+ 3 │ fn pick(c: I32, a: I32, b: I32) I32 {
+ 4 │     @wat/\ local.get $a local.get $b local.get $c select (param i32) \/;
+   │                                                          ━━━━━━━━━━━
+   │                                                          ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/449_dsl_nested_too_deeply.utu
+ ERROR  DSLs nested too deeply (max 16)
+        dsl-too-deep · examples/error_demo/platform/449_dsl_nested_too_deeply.utu:4:117
+
+ 2 │ // Expect: DSLs nested too deeply (max 16)
+ 3 │ export main() I32 {
+ 4 │     @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ 1 \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/;
+   │                                                                                                                     ━━━━━━━━━━━
+   │                                                                                                                     ╰─ too deep
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/platform/44_foreign_readonly_write.utu
  ERROR  tagName is readonly
         foreign-readonly · examples/error_demo/platform/44_foreign_readonly_write.utu:7:5
@@ -4653,6 +4984,71 @@ ok
    │     ━━━━━━━━━━
    │     ╰─ here
  8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/450_mem_in_mod.utu
+ ERROR  Unexpected 'mem': a mem goes at the top level of a file
+        parse-error · examples/error_demo/platform/450_mem_in_mod.utu:4:5
+
+ 2 │ // Expect: Unexpected 'mem': a mem goes at the top level of a file
+ 3 │ mod counts {
+ 4 │     mem seen: I32 = [5, 6];
+   │     ━━━
+   │     ╰─ unexpected
+ 5 │     fn second() I32 { seen[1]; }
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/451_stored_without_browser.utu
+ ERROR  @stored needs using Browser from std:Browser
+        dsl-error · examples/error_demo/platform/451_stored_without_browser.utu:7:27
+
+ 5 │
+ 6 │ export main() Str {
+ 7 │     let prefs = @stored/\ Prefs "prefs" Prefs { name: "a" } \/;
+   │                           ━
+   │                           ╰─ here
+ 8 │     prefs.name;
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/452_comptime_calls_main.utu
+ ERROR  main is the entry point, not a function: move its body into a fn
+        unknown-function · examples/error_demo/platform/452_comptime_calls_main.utu:3:24
+
+ 1 │ // What: a @comptime helper calling main
+ 2 │ // Expect: main is the entry point, not a function: move its body into a fn
+ 3 │ fn tab() Array[I32] { [main()]; }
+   │                        ━━━━
+   │                        ╰─ not defined
+ 4 │ const mem t: I32 = @comptime/\ tab() \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/453_es_single_quoted_end.utu
+ ERROR  Unexpected character '''
+        parse-error · examples/error_demo/platform/453_es_single_quoted_end.utu:3:51
+
+ 1 │ // What: \/ in a single-quoted JavaScript string ends the @es body
+ 2 │ // Expect: Unexpected character '''
+ 3 │ let slash: fun(Str) Str = @es/\ (s) => s.split('\/').join("-") \/;
+   │                                                   ━
+   │                                                   ╰─ unexpected
+ 4 │
+ 5 │ export main() Str {
+
+  note  \/ ends a DSL body, except inside "…": write "\/" there, not '\/'
+--- exit 1
+
+=== utu check examples/error_demo/platform/454_ir_close_tag_mismatch.utu
+ ERROR  @ir body is empty or not well-formed IR
+        dsl-place · examples/error_demo/platform/454_ir_close_tag_mismatch.utu:4:5
+
+ 2 │ // Expect: @ir body is empty or not well-formed IR
+ 3 │ fn is_zero(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/45_foreign_record_unknown_field.utu
@@ -4701,6 +5097,21 @@ ok
    │                                       ━━━━━━
    │                                       ╰─ here
  9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/490_node_unknown_module.utu
+ ERROR  No declarations for  is it installed?
+        host-missing · examples/error_demo/platform/490_node_unknown_module.utu:3:15
+
+ 1 │ // What: a  import whose declarations cannot be found (no such module).
+ 2 │ // Expect: No host declarations for  at the using; nothing at its uses
+ 3 │ using fs from
+   │               ━━━━━━━━
+   │               ╰─ not found
+ 4 │
+ 5 │ export main() I32 {
+
+  note   modules' declarations come from @types/node in node_modules
 --- exit 1
 
 === utu check examples/error_demo/platform/49_foreign_wrong_arg_type.utu
@@ -5351,32 +5762,33 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/01_orelse_fatal_null.utu
- TRAP  Null
-       trap · examples/error_demo/runtime/01_orelse_fatal_null.utu:8:16
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/01_orelse_fatal_null.utu:8:36
 
  6 │
  7 │ export main() I32 {
  8 │     let name = find_user(2) orelse fatal;
-   │                ━━━━━━━━━━━━━━━━━━━━━━━━━
-   │                ╰─ here
+   │                                    ━━━━━
+   │                                    ╰─ here
  9 │     name.len();
 10 │ }
 
-  in main  examples/error_demo/runtime/01_orelse_fatal_null.utu:8:16
+  in main  examples/error_demo/runtime/01_orelse_fatal_null.utu:8:36
 --- exit 1
 
 === utu run examples/error_demo/runtime/02_es_returns_null_for_str.utu
- TRAP  Wrong type from JavaScript
-       trap · examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
+ ERROR  Wrong type from JavaScript: a Str, not null
+        uncaught-exception · examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
 
+ 4 │
  5 │ export main() I32 {
  6 │     let lang = read_setting("lang");
+   │                ━━━━━━━━━━━━━━━━━━━━
+   │                ╰─ here
  7 │     lang.len();
-   │     ━━━━━━━━━━
-   │     ╰─ here
  8 │ }
 
-  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
+  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
 --- exit 1
 
 === utu run examples/error_demo/runtime/03_es_returns_wrong_type.utu
@@ -5643,18 +6055,18 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/23_json_decode_fatal.utu
- TRAP  Null
-       trap · examples/error_demo/runtime/23_json_decode_fatal.utu:8:13
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/23_json_decode_fatal.utu:8:57
 
  6 │
  7 │ export main() I32 {
  8 │     let p = @json/\ decode Point "{\"x\": 1}" \/ orelse fatal;
-   │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │             ╰─ here
+   │                                                         ━━━━━
+   │                                                         ╰─ here
  9 │     p.x;
 10 │ }
 
-  in main  examples/error_demo/runtime/23_json_decode_fatal.utu:8:13
+  in main  examples/error_demo/runtime/23_json_decode_fatal.utu:8:57
 --- exit 1
 
 === utu run examples/error_demo/runtime/24_enum_from_i32_bad.utu
@@ -5747,6 +6159,20 @@ Node.js v25.8.1
   in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
 --- exit 1
 
+=== utu run examples/error_demo/runtime/309_result_value_of_error.utu
+ TRAP  Failed check in std:Result
+       trap · examples/error_demo/runtime/309_result_value_of_error.utu:8:21
+
+ 6 │ }
+ 7 │
+ 8 │ export main() I32 { half(3).value(); }
+   │                     ━━━━━━━━━━━━━━━
+   │                     ╰─ called here
+
+  in &.value  std:Result:42:27
+  in main  examples/error_demo/runtime/309_result_value_of_error.utu:8:21
+--- exit 1
+
 === utu run examples/error_demo/runtime/30_string_index_oob.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/30_string_index_oob.utu:5:5
@@ -5821,18 +6247,18 @@ Node.js v25.8.1
 --- exit 1
 
 === utu run examples/error_demo/runtime/35_orelse_fatal_field.utu
- TRAP  Null
-       trap · examples/error_demo/runtime/35_orelse_fatal_field.utu:9:13
+ TRAP  Reached fatal
+       trap · examples/error_demo/runtime/35_orelse_fatal_field.utu:9:30
 
  7 │ export main() Str {
  8 │     let tail = Node { name: "b", next: null };
  9 │     let n = tail.next orelse fatal;
-   │             ━━━━━━━━━━━━━━━━━━━━━━
-   │             ╰─ here
+   │                              ━━━━━
+   │                              ╰─ here
 10 │     n.name;
 11 │ }
 
-  in main  examples/error_demo/runtime/35_orelse_fatal_field.utu:9:13
+  in main  examples/error_demo/runtime/35_orelse_fatal_field.utu:9:30
 --- exit 1
 
 === utu run examples/error_demo/runtime/360_assert_inlined_fast.utu -O fast
@@ -5915,7 +6341,7 @@ pass after (… ms)
 --- exit 0
 
 === utu test examples/error_demo/runtime/46_test_fatal.utu
-FAIL lookup finds bob: Null  at examples/error_demo/runtime/46_test_fatal.utu:8:16
+FAIL lookup finds bob: Reached fatal  at examples/error_demo/runtime/46_test_fatal.utu:8:37
 pass lookup finds ada (… ms)
 1 passed, 1 failed
 --- exit 1
@@ -5928,6 +6354,36 @@ FAIL fetches: offline  at examples/error_demo/runtime/47_test_rejected_promise.u
 === utu test examples/error_demo/runtime/48_test_buffer_safe.utu
 FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_test_buffer_safe.utu:9:12  in &.get_index
 0 passed, 1 failed
+--- exit 1
+
+=== utu run examples/error_demo/runtime/493_reversed_slice.utu
+ TRAP  Slice ends before it starts
+       trap · examples/error_demo/runtime/493_reversed_slice.utu:5:13
+
+ 3 │ export main() I32 {
+ 4 │     let a = [1, 2, 3];
+ 5 │     let b = a[2, 1];
+   │             ━━━━━━━
+   │             ╰─ here
+ 6 │     b.len();
+ 7 │ }
+
+  in array.slice  examples/error_demo/runtime/493_reversed_slice.utu:5:13
+  in main  examples/error_demo/runtime/493_reversed_slice.utu:5:13
+--- exit 1
+
+=== utu run examples/error_demo/runtime/494_string_index_past_end.utu
+ TRAP  Index out of bounds
+       trap · examples/error_demo/runtime/494_string_index_past_end.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let s = "abc";
+ 5 │     s[5];
+   │     ━━━━
+   │     ╰─ here
+ 6 │ }
+
+  in main  examples/error_demo/runtime/494_string_index_past_end.utu:5:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/50_no_main.utu
@@ -6711,6 +7167,100 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  5 │ export main() void {
 --- exit 1
 
+=== utu check examples/error_demo/syntax/480_for_in_two_dots.utu
+ ERROR  Write for (0 ..< 10) |i|, not for i in
+        foreign-syntax · examples/error_demo/syntax/480_for_in_two_dots.utu:5:9
+
+ 3 │ export main() I32 {
+ 4 │     let t = 0;
+ 5 │     for i in 0..10 { t += i; };
+   │         ━━━━━━━━━━
+   │         ╰─ (0 ..< 10) |i|
+ 6 │     t;
+ 7 │ }
+
+  fix   Use for (0 ..< 10) |i|
+ 5 │     for (0 ..< 10) |i| { t += i; };
+--- exit 1
+
+=== utu check examples/error_demo/syntax/481_two_dots_range.utu
+ ERROR  Write ..< (end left out) or ... (end kept), not ..
+        foreign-syntax · examples/error_demo/syntax/481_two_dots_range.utu:4:7
+
+ 2 │ // Expect: Write ..< (end left out) or ... (end kept), not ..
+ 3 │ export main() I32 {
+ 4 │     (0..5) count;
+   │       ━━
+   │       ╰─ ..<
+ 5 │ }
+
+  fix   Use ..<
+ 4 │     (0..<5) count;
+--- exit 1
+
+=== utu check examples/error_demo/syntax/482_capital_let.utu
+ ERROR  Names of values and functions start lowercase (a capital starts a type)
+        foreign-syntax · examples/error_demo/syntax/482_capital_let.utu:3:5
+
+ 1 │ // What: a constant named in capitals, as in other languages.
+ 2 │ // Expect: Names of values and functions start lowercase (a capital starts a type); fix inf
+ 3 │ let INF = 1000000;
+   │     ━━━
+   │     ╰─ inf?
+ 4 │
+ 5 │ export main() I32 { INF; }
+
+  fix   Use inf
+ 3 │ let inf = 1000000;
+--- exit 1
+
+=== utu check examples/error_demo/syntax/483_capital_fn.utu
+ ERROR  Names of values and functions start lowercase (a capital starts a type)
+        foreign-syntax · examples/error_demo/syntax/483_capital_fn.utu:3:4
+
+ 1 │ // What: a function whose name starts with a capital.
+ 2 │ // Expect: Names of values and functions start lowercase (a capital starts a type); fix area
+ 3 │ fn Area(w: I32, h: I32) I32 { w * h; }
+   │    ━━━━
+   │    ╰─ area?
+ 4 │
+ 5 │ export main() I32 { Area(2, 3); }
+
+  fix   Use area
+ 3 │ fn area(w: I32, h: I32) I32 { w * h; }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/484_plus_plus.utu
+ ERROR  utu has no ++; write += 1
+        foreign-syntax · examples/error_demo/syntax/484_plus_plus.utu:5:6
+
+ 3 │ export main() I32 {
+ 4 │     let i = 0;
+ 5 │     i++;
+   │      ━━
+   │      ╰─ += 1
+ 6 │     i;
+ 7 │ }
+
+  fix   Use += 1
+ 5 │     i += 1;
+--- exit 1
+
+=== utu check examples/error_demo/syntax/485_match_string.utu
+ ERROR  match takes number, Bool, and enum patterns, not strings
+        foreign-syntax · examples/error_demo/syntax/485_match_string.utu:5:9
+
+ 3 │ fn apply(op: Str, a: I32, b: I32) I32 {
+ 4 │     match op {
+ 5 │         "+" => a + b,
+   │         ━━━
+   │         ╰─ a string
+ 6 │         "-" => a - b,
+ 7 │         ~> 0,
+
+  note  Compare strings with if: if op == "+" { … } else if …
+--- exit 1
+
 === utu check examples/error_demo/syntax/48_match_last_arm_no_comma.utu
  ERROR  Missing , after "many"
         missing-comma · examples/error_demo/syntax/48_match_last_arm_no_comma.utu:7:12
@@ -6762,6 +7312,19 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │                    ╰─ ']'?
  5 │     xs[0];
  6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/520_test_name_escape.utu
+ ERROR  \u needs four hex digits
+        invalid-escape · examples/error_demo/syntax/520_test_name_escape.utu:5:6
+
+ 3 │ export main() void {}
+ 4 │
+ 5 │ test "letter \u{41}" {
+   │      ━━━━━━━━━━━━━━━
+   │      ╰─ here
+ 6 │     assert true;
+ 7 │ }
 --- exit 1
 
 === utu check examples/error_demo/syntax/52_block_comment.utu
@@ -7275,27 +7838,6 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu check examples/error_demo/syntax/90_error_in_imported_file.utu
- ERROR  Unknown module shapes
-        unknown-module · examples/error_demo/syntax/90_error_in_imported_file.utu:3:7
-
- 1 │ // What: an imported file has a syntax error (missing ';' in lib/broken_shapes.utu).
- 2 │ // Expect: the error is reported in lib/broken_shapes.utu at line 4, not in this file.
- 3 │ using shapes from "./lib/broken_shapes.utu";
-   │       ━━━━━━
-   │       ╰─ no such module
- 4 │
- 5 │ export main() F64 {
-
- ERROR  Unknown variable shapes
-        unknown-variable · examples/error_demo/syntax/90_error_in_imported_file.utu:6:5
-
- 4 │
- 5 │ export main() F64 {
- 6 │     shapes.square(3.0);
-   │     ━━━━━━
-   │     ╰─ not defined
- 7 │ }
-
  ERROR  Missing ; after x
         missing-semicolon · examples/error_demo/syntax/lib/broken_shapes.utu:4:21
 
@@ -7615,6 +8157,10 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │              ╰─ here
  6 │     fn &.empty() & { &{ v: null }; }
  7 │ }
+   ┆
+10 │     let b = Box[I32].empty();
+   │             ────────
+   │             ╰─ in Box[I32]
 --- exit 1
 
 === utu check examples/error_demo/types/103_generic_lists_protocol.utu
@@ -8008,6 +8554,29 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
  6 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/307_result_private_field.utu
+ ERROR  Result has no field _value
+        unknown-field · examples/error_demo/types/307_result_private_field.utu:8:21
+
+ 6 │ }
+ 7 │
+ 8 │ export main() I32 { half(8)._value; }
+   │                     ━━━━━━━━━━━━━━
+   │                     ╰─ no such field
+--- exit 1
+
+=== utu check examples/error_demo/types/308_result_built_by_hand.utu
+ ERROR  Result[I32, Str] is made by its own functions
+        std-own-struct · examples/error_demo/types/308_result_built_by_hand.utu:4:5
+
+ 2 │ // Expect: Result[I32, Str] is made by its own functions (ok, err)
+ 3 │ fn half(n: I32) Result[I32, Str] {
+ 4 │     &{ _ok: true, _value: n / 2 };
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ use its functions
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/types/30_and_operands_not_bool.utu
  ERROR  and takes Bool, got I32
         type-mismatch · examples/error_demo/types/30_and_operands_not_bool.utu:6:8
@@ -8391,6 +8960,35 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 10 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/487_array_push.utu
+ ERROR  No method Array[I32].push
+        unknown-method · examples/error_demo/types/487_array_push.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3];
+ 5 │     xs.push(4);
+   │     ━━━━━━━━━━
+   │     ╰─ no such method
+ 6 │     xs.len();
+ 7 │ }
+
+  note  An Array's length is fixed; a Buffer[T] grows: using Buffer from std:Buffer;
+--- exit 1
+
+=== utu check examples/error_demo/types/488_js_method_without_import.utu
+ ERROR  No method F64.toFixed
+        unknown-method · examples/error_demo/types/488_js_method_without_import.utu:5:5
+
+ 3 │ export main() Str {
+ 4 │     let n = 3.14159;
+ 5 │     n.toFixed(2);
+   │     ━━━━━━━━━━━━
+   │     ╰─ no such method
+ 6 │ }
+
+  note  JavaScript's methods come with using JS from std:JS;
+--- exit 1
+
 === utu check examples/error_demo/types/48_unknown_operator_unknown_operand.utu
  ERROR  Unknown variable totl; did you mean total?
         unknown-variable · examples/error_demo/types/48_unknown_operator_unknown_operand.utu:5:5
@@ -8406,6 +9004,23 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 
   fix   Use total
  5 │     total + 1;
+--- exit 1
+
+=== utu check examples/error_demo/types/492_generic_nullable_scalar.utu
+ ERROR  I32 cannot be nullable
+        invalid-nullable-type · examples/error_demo/types/492_generic_nullable_scalar.utu:5:17
+
+ 3 │ mod Box[T] {
+ 4 │     struct &:
+ 5 │         | item: ?T
+   │                 ━━
+   │                 ╰─ here
+ 6 │     fn &.empty() & { &{ item: null }; }
+ 7 │ }
+   ┆
+10 │     let b = Box[I32].empty();
+   │             ────────
+   │             ╰─ in Box[I32]
 --- exit 1
 
 === utu check examples/error_demo/types/49_unknown_method_struct.utu
@@ -8496,6 +9111,49 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 
   fix   Use len
  5 │     xs.len();
+--- exit 1
+
+=== utu check examples/error_demo/types/521_closure_param_where_str.utu
+ ERROR  m needs a type
+        closure-param-type · examples/error_demo/types/521_closure_param_where_str.utu:8:13
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     take(cl(m) Str {
+   │             ━
+   │             ╰─ cl(m: T)
+ 9 │         m;
+10 │     });
+--- exit 1
+
+=== utu check examples/error_demo/types/522_tuple_array_default.utu
+ ERROR  A tuple is only a function result
+        tuple-misplaced · examples/error_demo/types/522_tuple_array_default.utu:4:19
+
+ 2 │ // Expect: A tuple is only a function result (one error, not also "has no default")
+ 3 │ export main() I32 {
+ 4 │     let a = Array[.{I32, Str}].new_default(2);
+   │                   ━━━━━━━━━━━
+   │                   ╰─ here
+ 5 │     a.len();
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/523_generic_literal_instance.utu
+ ERROR  -1 is out of range for U32
+        match-pattern · examples/error_demo/types/523_generic_literal_instance.utu:6:13
+
+ 4 │     fn f(v: T) I32 {
+ 5 │         match v {
+ 6 │             -1 => 1,
+   │             ━━━━━━━━
+   │             ╰─ here
+ 7 │             ~> 0,
+ 8 │         };
+   ┆
+13 │     G[U32].f(3);
+   │     ──────
+   │     ╰─ in G[U32]
 --- exit 1
 
 === utu check examples/error_demo/types/52_unknown_method_i32.utu
@@ -9051,16 +9709,18 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu check examples/error_demo/types/94_match_on_str_patterns.utu
- ERROR  Unexpected a string
-        parse-error · examples/error_demo/types/94_match_on_str_patterns.utu:5:9
+ ERROR  match takes number, Bool, and enum patterns, not strings
+        foreign-syntax · examples/error_demo/types/94_match_on_str_patterns.utu:5:9
 
  3 │ fn code(cmd: Str) I32 {
  4 │     match cmd {
  5 │         "start" => 1,
    │         ━━━━━━━
-   │         ╰─ unexpected
+   │         ╰─ a string
  6 │         ~> 0,
  7 │     };
+
+  note  Compare strings with if: if cmd == "start" { … } else if …
 --- exit 1
 
 === utu check examples/error_demo/types/95_match_pattern_not_bool.utu

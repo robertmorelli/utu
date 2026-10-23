@@ -38,6 +38,25 @@ vec st_type_len: I32 = [0];
 
 fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]); }
 
+/// Whether a file has `using Browser from std:Browser`.
+fn uses_browser(file: I32) Bool {
+    let item = first_child(file_root[file]);
+    while (item >= 0) {
+        if is_kind(item, Node.Using_decl) {
+            let text = bytes_text(tok_start[node_first[item]], tok_end[node_last[item] - 1]);
+            if text_has(text, "std:Browser") and text_has(text, "using Browser ") { return true; };
+        };
+        item = next_sibling(item);
+    };
+    false;
+}
+
+/// Whether `text` holds `part`.
+fn text_has(text: Str, part: Str) Bool {
+    for (0 ..< text.len() - part.len() + 1) |i| { if text_at(text, i, part) { return true; }; };
+    false;
+}
+
 /// A body not of the form `Type "key" default`.
 fn stored_syntax(raw: Str) void { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1); }
 
@@ -170,6 +189,8 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
 fn stored_code(site: I32, prefix: Str) Str {
     let raw = dsl_body(site);
     let file = file_of_token(node_first[site]);
+    // The state is kept by the host's store, read through Browser.
+    if not uses_browser(file) { dsl_fail("@stored needs using Browser from std:Browser", first_non_space(raw), 1); };
     // Type "key" [manual] [validate fn] default
     let i = skip_spaces(raw, 0);
     let type_start = i;
@@ -181,7 +202,8 @@ fn stored_code(site: I32, prefix: Str) Str {
     if i == gap or i >= raw.len() or raw.get(i) != 34 { stored_syntax(raw); };
     let key_start = i;
     i += 1;
-    while (i < raw.len() and raw.get(i) != 34 and raw.get(i) != 10) { i += 1; };
+    // (A `\"` is part of the key.)
+    while (i < raw.len() and raw.get(i) != 34 and raw.get(i) != 10) { i += if raw.get(i) == 92 { 2; } else { 1; }; };
     if i >= raw.len() or raw.get(i) != 34 or i == key_start + 1 { stored_syntax(raw); };
     i += 1;
     let key = raw.slice(key_start, i);

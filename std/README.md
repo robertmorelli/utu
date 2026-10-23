@@ -43,6 +43,10 @@ host's own (JavaScript's string methods, `Math`).
 - `F64` (prelude): `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`,
   `exp`, `ln`, `log2`, `log10`, `pow`, `cbrt`, `hypot`, `is_nan`,
   `is_finite`; `F64.pi()`, `F64.e()`, `F64.inf()`, `F64.nan()`.
+- `Result` (prelude) — `Result[T, E]`, a value or an expected error:
+  `ok`, `err`, `is_ok`, `is_err`, `value` and `error` (fatal on the other),
+  `value_or`. `try r` passes an error on; `errdefer` runs on one. See
+  [errors](../docs/errors.md).
 - `std:StrMap` — `StrMap[V]`, Str keys to any values: `set`, `get(key,
   missing)`, `has`, `remove`, `len`, `keys`. Open addressing, no tombstones.
 - `std:Random` — `Random.new(seed)` (or `Random.from_host()`), xoshiro128**

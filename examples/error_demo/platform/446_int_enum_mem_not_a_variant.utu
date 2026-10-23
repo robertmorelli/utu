@@ -1,0 +1,8 @@
+// What: an integer enum mem listing a value no variant has
+// Expect: 7 is no Color
+enum(U8) Color: | Red | Green | Blue
+const mem cs: Color = [2, 7, 1];
+
+export main() I32 {
+    match cs[1] { Color.Red => 1, Color.Green => 2, Color.Blue => 3, };
+}

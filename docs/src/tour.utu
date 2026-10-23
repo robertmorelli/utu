@@ -911,6 +911,24 @@ mod tour {
         \\}
         ;
     }
+    fn result_sample() Str {
+        \\fn digit(c: I32) Result[I32, Str] {
+        \\    if c < 48 or c > 57 { return Result[I32, Str].err("not a digit"); };
+        \\    Result[I32, Str].ok(c - 48);
+        \\}
+        \\
+        \\fn two_digits(a: I32, b: I32) Result[I32, Str] {
+        \\    let tens = try digit(a);                // or return digit's error
+        \\    Result[I32, Str].ok(tens * 10 + try digit(b));
+        \\}
+        \\
+        \\export main() I32 {
+        \\    let r = two_digits(52, 50);              // ok 42
+        \\    let bad = two_digits(52, 120);           // err "not a digit"
+        \\    if bad.is_err() { r.value(); } else { 0; };   // 42; bad.value() is fatal
+        \\}
+        ;
+    }
     // defer
     fn defer_sample() Str {
         \\using console from std:Console;
@@ -941,6 +959,21 @@ mod tour {
         \\
         \\export main() I32 {
         \\    find([5, 6, 7], 6);                // searched, then 1
+        \\}
+        ;
+    }
+    fn errdefer_sample() Str {
+        \\using console from std:Console;
+        \\
+        \\fn half(n: I32) Result[I32, Str] {
+        \\    defer console.log("done");             // every return
+        \\    errdefer console.log("failed");        // error returns only
+        \\    if n % 2 != 0 { return Result[I32, Str].err("odd"); };
+        \\    Result[I32, Str].ok(n / 2);
+        \\}
+        \\
+        \\export main() I32 {
+        \\    half(3).value_or(0) + half(8).value_or(0);   // failed, done, done; 4
         \\}
         ;
     }
@@ -1555,11 +1588,58 @@ mod tour {
             = code.block(assert_sample());
             = code.block(try_sample());
             = code.block(try_default_sample());
+            p {
+                "A failure the caller should expect (bad input, a missing key) is a ";
+                code {
+                    "Result[T, E]";
+                }
+                ", made with ";
+                code {
+                    "ok";
+                }
+                " or ";
+                code {
+                    "err";
+                }
+                " and read with ";
+                code {
+                    "is_ok";
+                }
+                ", ";
+                code {
+                    "value";
+                }
+                ", ";
+                code {
+                    "error";
+                }
+                ", or ";
+                code {
+                    "value_or";
+                }
+                ". ";
+                code {
+                    "try r";
+                }
+                " is r's value, or returns r's error from a function whose Result has the same error type.";
+            }
+            = code.block(result_sample());
             h2 {
                 "defer";
             }
             = code.block(defer_sample());
             = code.block(defer_return_sample());
+            p {
+                code {
+                    "errdefer";
+                }
+                " runs only when the function returns an error: a ";
+                code {
+                    "try";
+                }
+                " that fails, or a returned Result that is one.";
+            }
+            = code.block(errdefer_sample());
             h2 {
                 "Tests and benchmarks";
             }

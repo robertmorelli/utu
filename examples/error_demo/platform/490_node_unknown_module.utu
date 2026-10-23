@@ -1,0 +1,8 @@
+// What: a node: import whose declarations cannot be found (no such module).
+// Expect: No host declarations for node:fsx, at the using; nothing at its uses
+using fs from node:fsx;
+
+export main() I32 {
+    fs.readFileSync("x");
+    0;
+}

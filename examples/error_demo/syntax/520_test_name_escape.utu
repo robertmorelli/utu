@@ -1,0 +1,7 @@
+// What: a test name with an escape utu does not have
+// Expect: \u needs four hex digits, as in any string
+export main() void {}
+
+test "letter \u{41}" {
+    assert true;
+}

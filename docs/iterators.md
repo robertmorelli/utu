@@ -16,8 +16,10 @@ export main() I32 {
 Utu blocks retain their usual semicolons. Auxiliary values go in parentheses:
 `fold (initial)`, `take (count)`, `zip (other)`. This separates parameters from
 capture bars and ordinary bitwise-or expressions without grammar conflicts.
-Pipeline precedence is below arithmetic and above assignment. Parenthesize a
-consumed result before starting another pipeline.
+A pipeline binds looser than every operator (arithmetic, comparisons, `and`,
+`or`) and tighter than assignment: `ok and xs all |x| { … }` pipes
+`ok and xs`, so write `ok and (xs all |x| { … })`. Parenthesize a consumed
+result before starting another pipeline.
 
 ## Transformations
 

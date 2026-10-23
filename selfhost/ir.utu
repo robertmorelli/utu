@@ -52,6 +52,9 @@ fn ir_tree(dsl: I32) I32 {
     // The body token is `/\ … \/`.
     let at = XmlAt { pos: tok_start[t] + 2, end: tok_end[t] - 2 };
     let root = x_element(at);
+    // One element, and nothing after it.
+    x_space(at);
+    if at.pos < at.end { root = -1; };
     x_cache[dsl] = root;
     root;
 }
@@ -67,7 +70,9 @@ fn x_space(at: XmlAt) void {
 
 fn x_name_char(c: I32) Bool { (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 45 or c == 95; }
 
-/// The element at `at` and its children, read into the `x_*` rows: its row, or -1.
+/// The element at `at` and its children, read into the `x_*` rows: its row,
+/// or -1 when it is not well formed (unclosed, a close tag of another name,
+/// an attribute without `="…"`).
 fn x_element(at: XmlAt) I32 {
     x_space(at);
     if at.pos >= at.end or src[at.pos] != 60 { return -1; };
@@ -83,9 +88,10 @@ fn x_element(at: XmlAt) I32 {
     // Attributes, up to `/>` or `>`.
     while (true) {
         x_space(at);
-        if at.pos >= at.end { return id; };
+        if at.pos >= at.end { return -1; };
         let c = src[at.pos];
         if c == 47 {
+            if at.pos + 1 >= at.end or src[at.pos + 1] != 62 { return -1; };
             at.pos += 2;
             return id;
         };
@@ -98,11 +104,14 @@ fn x_element(at: XmlAt) I32 {
         if at.pos == a_start { return -1; };
         attr_name.push(src.intern(a_start, at.pos));
         x_space(at);
+        if at.pos >= at.end or src[at.pos] != 61 { return -1; };
         at.pos += 1;   // =
         x_space(at);
+        if at.pos >= at.end or src[at.pos] != 34 { return -1; };
         at.pos += 1;   // "
         let v_start = at.pos;
         while (at.pos < at.end and src[at.pos] != 34) { at.pos += 1; };
+        if at.pos >= at.end { return -1; };
         attr_start.push(v_start);
         attr_end.push(at.pos);
         at.pos += 1;
@@ -112,14 +121,17 @@ fn x_element(at: XmlAt) I32 {
     let last = -1;
     while (true) {
         x_space(at);
-        if at.pos >= at.end { return id; };
-        if src[at.pos] == 60 and src[at.pos + 1] == 47 {
+        if at.pos >= at.end { return -1; };
+        if src[at.pos] == 60 and at.pos + 1 < at.end and src[at.pos + 1] == 47 {
+            // `</name>`, of this element's name.
+            let close = at.pos + 2;
             while (at.pos < at.end and src[at.pos] != 62) { at.pos += 1; };
+            if at.pos >= at.end or src.intern(close, at.pos) != x_tag[id] { return -1; };
             at.pos += 1;
             return id;
         };
         let child = x_element(at);
-        if child < 0 { return id; };
+        if child < 0 { return -1; };
         if last < 0 { x_child[id] = child; } else { x_next[last] = child; };
         last = child;
     };
@@ -232,6 +244,7 @@ enum(U8) Known:
     | ToStr
     | Wat
     | IrSafeChecks
+    | WordResult
 
 fn known_word(k: Known) I32 { known[k.to_i32()]; }
 
@@ -284,7 +297,7 @@ fn intern_known() void {
         "ir-string-get-wtf16", "ir-string-from-code-point", "ir-string-from-codes",
         "ir-array-get", "ir-array-set", "ir-array-len", "ir-array-new", "ir-array-slice", "ir-array-copy",
         "count", "U32", "ir-i31-new", "ir-i31-get-s", "ir-i31-get-u", "ir-ref-eq", "ir-ref-ne",
-        "ir-promise-then", "ir-promise-catch", "ir-v128-const", "to_str", "wat", "ir-safe-checks"];
+        "ir-promise-then", "ir-promise-catch", "ir-v128-const", "to_str", "wat", "ir-safe-checks", "Result"];
     for (0 ..< Known.count()) |k| { known[k] = intern_text(names[k]); };
     // Tags: "ir-" and the name, then its opcode.
     let table = opcode_table();

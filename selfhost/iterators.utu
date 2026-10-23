@@ -513,6 +513,10 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         p.lo = new_local(vt_i32);
         p.hi = new_local(vt_i32);
         let ms = w_mark();
+        if pipe_took_operator(input) {
+            w_stack.resize(m);
+            return error_value();
+        };
         let at = check_expr(input, -1, cx);
         if not is_array_type(at) {
             if not ty_is(at, Ty.Error) {
@@ -584,6 +588,23 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     if p.finish >= 0 { w_push(p.finish); } else if p.result >= 0 { lg(p.result); };
     w_node(Op.Seq, repr(rt), 0, 0, m);
     rt;
+}
+
+/// `ok and xs all |x| {…}`: a pipeline binds looser than every operator, so
+/// its source is `ok and xs`, which a logical or comparison operator makes a
+/// Bool. Reported, naming the operator; true.
+fn pipe_took_operator(input: I32) Bool {
+    if not is_kind(input, Node.Binary_expr) { return false; };
+    let t = token_after(first_child(input));
+    let w = tok_word[t];
+    let k = Tok.from_i32(tok_kind[t]);
+    let logical = w == Kw.And.to_i32() or w == Kw.Or.to_i32() or w == Kw.Xor.to_i32();
+    if not (logical or k == Tok.EqEq or k == Tok.BangEq or k == Tok.Lt or k == Tok.Gt or k == Tok.LtEq or k == Tok.GtEq) { return false; };
+    report2(Diag.IteratorSource, input, intern_text(tok_text(t)), -1, 7);
+    diag_label("piped");
+    diag_place(Extra.Related, last_child(input), "the source meant?");
+    diag_note("Parenthesize the pipeline: a " + tok_text(t) + " (xs all |x| { … })");
+    true;
 }
 
 /// A range `(a ..< b)` or `(a ... b)` of I32, U32, I64, or U64 as a
@@ -2695,7 +2716,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     // (The source's own array, when its elements are of the type written.)
     let direct = k == p.first and not p.range and et == vt;
     let data = -1;
-    let count = new_local(vt_i32);
+    // Stage locals (0 width, 1-3 items): a replay must reuse them.
+    let count = stage_local(slot, 4, vt_i32);
     let base = -1;
     let items = Buffer { array: -1, length: -1, capacity: -1, once: false, bounded: false };
     if direct {
@@ -2717,8 +2739,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let at = array_of(array_of(et));
     let gheap = vt_heap(repr(at));
     let vheap = vt_heap(cur_locals[data]);
-    let total = new_local(vt_i32);
-    let groups = new_local(repr(at));
+    let total = stage_local(slot, 5, vt_i32);
+    let groups = stage_local(slot, 6, repr(at));
     let m = w_mark();
     // total = windows: count >= width ? count - width + 1 : 0; batched: (count + width - 1) / width
     let mt = w_mark();
@@ -2753,7 +2775,7 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     w_i32(0);
     w_i32_op(i32_gt_s, mi);
     let mtt = w_mark();
-    let zero = new_local(vt_i32);
+    let zero = stage_local(slot, 7, vt_i32);
     set_i32(zero, 0);
     let mn = w_mark();
     slice_at(data, base, zero, width, count, vheap);
@@ -2762,8 +2784,8 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     ls(groups, mn);
     end_if(mi, mtt);
     // for j in 1 ..< total: groups[j] = slice(windows ? j : j * width)
-    let j = new_local(vt_i32);
-    let start = new_local(vt_i32);
+    let j = stage_local(slot, 8, vt_i32);
+    let start = stage_local(slot, 9, vt_i32);
     set_i32(j, 1);
     let lp = loop_open();
     loop_while_lt(lp, j, total);
@@ -2880,6 +2902,10 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
         ls(count, mc);
     } else {
         let ms = w_mark();
+        if pipe_took_operator(input) {
+            w_stack.resize(m);
+            return error_value();
+        };
         let at = check_expr(input, -1, cx);
         if not is_array_type(at) {
             if not ty_is(at, Ty.Error) {

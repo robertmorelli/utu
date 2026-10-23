@@ -167,14 +167,81 @@ fn check_defer(node: I32) I32 {
     ty_void();
 }
 
-/// Run the defers from `from` (an index in `defer_node`) on, newest first.
-fn run_defers(from: I32, cx: Cx) void {
+/// Run the defers from `from` (an index in `defer_node`) on, newest first,
+/// at an exit that is not an error return: errdefers stay put.
+fn run_defers(from: I32, cx: Cx) void { run_exit_defers(from, -1, -1, cx); }
+
+/// Run the defers from `from` on, newest first. An errdefer (noted as its
+/// node) runs as `failed` says: -1 never, -2 always (a `try` returning an
+/// error), else when the Result (of type `rt`) in local `failed` is an error.
+fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) void {
     let i = defer_node.len() - 1;
     while (i >= from) {
-        if defer_node[i] < 0 { close_stream(-defer_node[i] - 1, cx); }
-        else { discard(check_statement(defer_node[i], ty_void(), cx)); };
+        let d = defer_node[i];
+        if d < 0 { close_stream(-d - 1, cx); }
+        else if not is_kind(d, Node.Errdefer_expr) { discard(check_statement(d, ty_void(), cx)); }
+        else if failed == -2 { discard(check_statement(first_child(d), ty_void(), cx)); }
+        else if failed >= 0 {
+            // if not failed._ok { e }
+            let m = w_mark();
+            w_get(repr(rt), failed);
+            w_node(Op.StructGet, vt_i32, vt_heap(repr(rt)), 0, m);
+            w_i32_op(i32_eqz, m);
+            let mt = w_mark();
+            discard(check_statement(first_child(d), ty_void(), cx));
+            w_node(Op.Seq, vt_none, 0, 0, mt);
+            w_node(Op.If, vt_none, new_label(), 0, m);
+        };
         i -= 1;
     };
+}
+
+//! = errdefer
+//!
+//! `errdefer e;` is a defer that runs only when the function returns an
+//! error: at a `try` that returns one, and at a `return` (or the function's
+//! end) whose Result is an error, which is tested where it returns. Other
+//! exits of its block drop it unrun. Only a function returning a Result has
+//! one.
+
+/// The function body being checked (a closure's, in a closure).
+vec body_block: I32 = [-1];
+
+/// `errdefer e;`: noted, for @run_exit_defers.
+fn check_errdefer(node: I32, cx: Cx) I32 {
+    if expansion_of(node) >= 0 {
+        report2(Diag.TryPlace, node, -1, 3, -1);
+        return error_value();
+    };
+    if not is_result_type(cx.result) {
+        if cx.result < 0 or not ty_is(cx.result, Ty.Error) { report2(Diag.TryPlace, node, -1, 1, cx.result); };
+        return error_value();
+    };
+    if deferred_exit(first_child(node), false) >= 0 { return error_value(); };
+    defer_node.push(node);
+    w_node(Op.Seq, vt_none, 0, 0, w_mark());
+    ty_void();
+}
+
+/// Whether an errdefer is among the defers from `from` on.
+fn errdefer_pending(from: I32) Bool {
+    for (from ..< defer_node.len()) |i| { if defer_node[i] >= 0 and is_kind(defer_node[i], Node.Errdefer_expr) { return true; }; };
+    false;
+}
+
+/// Run the defers pending since `from` after a value of type `t` (on the
+/// stack since `m`) that the function returns: an errdefer among them runs
+/// when the value is a Result's error.
+fn return_defers(t: I32, m: I32, from: I32, cx: Cx) void {
+    let vt = repr(t);
+    if vt == vt_unreachable or not is_result_type(t) or not errdefer_pending(from) {
+        defers_after_value(vt, m, from, cx);
+        return;
+    };
+    let local = new_local(vt);
+    w_node(Op.LocalSet, vt_none, local, 0, m);
+    run_exit_defers(from, local, t, cx);
+    w_leaf(Op.LocalGet, vt, local, 0);
 }
 
 // The defers between here and a loop being left (loop_defers holds their

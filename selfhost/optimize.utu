@@ -36,6 +36,12 @@ vec opt_get_at: I32;
 vec opt_set_at: I32;
 /// The locals a value being sunk reads.
 vec opt_reads: I32;
+/// The Seqs, Blocks and Loops of @opt_nodes, in its order.
+vec opt_blocks: I32;
+/// Whether a node of the walk is held in more than one place.
+vec opt_shared: U8 = [0];
+/// By local: its index once unused locals are gone.
+vec opt_renumber: I32;
 
 /// The cleanup, over each live function with a body, after the sweep.
 fn optimize_module() void {
@@ -52,9 +58,12 @@ fn optimize_function(f: I32) void {
     opt_collect(f, total);
     // A node held in two places (in one body or two; see sweep) would be
     // rewritten for both, so a body with one is left as it is.
-    for (0 ..< opt_nodes.len()) |k| { if node_holders[opt_nodes[k]] != 1 { return; }; };
-    while (propagate_copies(params) or sink_temporaries(params)) { opt_collect(f, total); };
-    if tee_stores() { opt_collect(f, total); };
+    if opt_shared[0] == 1 { return; };
+    // The rewrites keep the counts, and each local's one read or write
+    // (with its parent), as a new walk would find them. None moves a block,
+    // so the blocks stay in the walk's order.
+    while (propagate_copies(params) or sink_temporaries(params)) {};
+    tee_stores();
     remove_unused_locals(f, params, total);
     coalesce_locals(f, params);
 }
@@ -72,6 +81,8 @@ fn opt_collect(f: I32, total: I32) void {
         opt_gets[l] = 0;
         opt_sets[l] = 0;
     };
+    opt_blocks.clear();
+    opt_shared[0] = 0;
     opt_nodes.push(func_body[f]);
     opt_parent.push(-1);
     opt_place.push(-1);
@@ -79,12 +90,15 @@ fn opt_collect(f: I32, total: I32) void {
     while (k < opt_nodes.len()) {
         let node = opt_nodes[k];
         let op = w_op[node];
+        if node_holders[node] != 1 { opt_shared[0] = 1; };
         if op == Op.LocalGet.to_i32() {
             opt_gets[w_a[node]] += 1;
             opt_get_at[w_a[node]] = k;
         } else if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
             opt_sets[w_a[node]] += 1;
             opt_set_at[w_a[node]] = k;
+        } else if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+            opt_blocks.push(node);
         };
         for (0 ..< w_count[node]) |i| {
             opt_nodes.push(w_kid(node, i));
@@ -173,6 +187,9 @@ fn propagate_copies(params: I32) Bool {
             let l = w_a[n];
             w_a[n] = opt_copy_of[l];
             w_type[n] = opt_copy_type[l];
+            opt_gets[l] -= 1;
+            opt_gets[w_a[n]] += 1;
+            opt_get_at[w_a[n]] = k;
             changed = true;
         };
     };
@@ -183,8 +200,8 @@ fn propagate_copies(params: I32) Bool {
 /// statement after it): whether anything changed.
 fn sink_temporaries(params: I32) Bool {
     let changed = false;
-    for (0 ..< opt_nodes.len()) |k| {
-        let block = opt_nodes[k];
+    for (0 ..< opt_blocks.len()) |b| {
+        let block = opt_blocks[b];
         let op = w_op[block];
         if op == Op.Seq.to_i32() or op == Op.Block.to_i32() {
             let i = 0;
@@ -230,8 +247,8 @@ fn sink_temporaries(params: I32) Bool {
 /// a run stops at @tee_run_max (which code generation's recursion bears).
 fn tee_stores() Bool {
     let changed = false;
-    for (0 ..< opt_nodes.len()) |k| {
-        let block = opt_nodes[k];
+    for (0 ..< opt_blocks.len()) |b| {
+        let block = opt_blocks[b];
         let op = w_op[block];
         if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
             let run = 0;
@@ -270,6 +287,7 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
             set_kid(holder, place, write);
             w_op[write] = Op.LocalTee.to_i32();
             w_type[write] = w_type[node];
+            opt_gets[w_a[write]] -= 1;
             // The read is now nothing, where the store was.
             opt_erase(node);
             set_kid(parent, from - 1, node);
@@ -316,53 +334,48 @@ fn sink_visit(node: I32, target: I32, in_loop: Bool) I32 {
 /// The unused rewrite: each store to a local never read goes (or becomes a
 /// drop, or its value), and the locals still read are renumbered.
 fn remove_unused_locals(f: I32, params: I32, total: I32) void {
-    // Inner stores first: one moved out of its parent leaves the parent's
-    // place in opt_parent stale for anything it holds.
-    let k = opt_nodes.len();
-    while (k > 0) {
-        k -= 1;
-        let n = opt_nodes[k];
-        let op = w_op[n];
-        if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
-            // A store with no operand takes its value from the stack (a
-            // multi-value result, taken apart): it is dropped there.
-            if w_count[n] == 0 {
-                // (A tee would leave it there: it is nothing.)
-                if op == Op.LocalTee.to_i32() { opt_erase(n); } else { w_op[n] = Op.Drop.to_i32(); };
-                continue;
-            };
-            let value = w_kid(n, 0);
-            if op == Op.LocalSet.to_i32() and opt_pure(value) {
-                opt_erase(n);
-            } else if op == Op.LocalSet.to_i32() and single_value(w_type[value]) {
-                w_op[n] = Op.Drop.to_i32();
-            } else if opt_parent[k] >= 0 {
-                set_kid(opt_parent[k], opt_place[k], value);
-            } else {
-                func_body[f] = value;
-            };
-        };
-    };
-    // Renumber the locals still read.
     let first = func_locals[f];
     let kept = 0;
-    let renumber = Array[I32].new(total, -1);
+    opt_renumber.resize(total);
+    for (0 ..< total) |l| { opt_renumber[l] = l; };
     for (params ..< total) |l| {
+        opt_renumber[l] = -1;
         if opt_gets[l] > 0 {
-            renumber[l] = params + kept;
+            opt_renumber[l] = params + kept;
             local_types[first + kept] = local_types[first + l - params];
             kept += 1;
         };
     };
-    if kept == total - params { return; };
-    func_local_count[f] = kept;
-    for (0 ..< opt_nodes.len()) |k| {
-        let n = opt_nodes[k];
-        let op = w_op[n];
-        if (op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params {
-            w_a[n] = renumber[w_a[n]];
+    if kept != total - params { func_local_count[f] = kept; };
+    unused_walk(f, func_body[f], -1, 0, params);
+}
+
+/// The unused rewrite under `n`, kid `place` of `parent`: inner stores first
+/// (one moved out of its parent would leave what it holds a stale parent).
+fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) void {
+    for (0 ..< w_count[n]) |i| { unused_walk(f, w_kid(n, i), n, i, params); };
+    let op = w_op[n];
+    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
+        // A store with no operand takes its value from the stack (a
+        // multi-value result, taken apart): it is dropped there.
+        if w_count[n] == 0 {
+            // (A tee would leave it there: it is nothing.)
+            if op == Op.LocalTee.to_i32() { opt_erase(n); } else { w_op[n] = Op.Drop.to_i32(); };
+            return;
         };
+        let value = w_kid(n, 0);
+        if op == Op.LocalSet.to_i32() and opt_pure(value) {
+            opt_erase(n);
+        } else if op == Op.LocalSet.to_i32() and single_value(w_type[value]) {
+            w_op[n] = Op.Drop.to_i32();
+        } else if parent >= 0 {
+            set_kid(parent, place, value);
+        } else {
+            func_body[f] = value;
+        };
+        return;
     };
+    if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() { w_a[n] = opt_renumber[w_a[n]]; };
 }
 
 //! = Coalescing
@@ -383,6 +396,18 @@ vec co_loops: I32;
 /// The nodes that read or write a local.
 vec co_mentions: I32;
 vec co_pos: I32 = [0];
+/// The slots locals share: each one's type, the end of the range it holds
+/// last, and the next slot of its type.
+vec co_slot_type: I32;
+vec co_slot_end: I32;
+vec co_slot_next: I32;
+/// The slots' types, in the order they first appear, with each one's first
+/// and last slot.
+vec co_types: I32;
+vec co_type_head: I32;
+vec co_type_tail: I32;
+/// Scratch for sorting.
+vec co_sort: I32;
 
 /// Share locals whose ranges do not overlap: a local is live from its first
 /// mention to its last, and a mention inside a loop makes it live through
@@ -421,59 +446,95 @@ fn coalesce_locals(f: I32, params: I32) void {
     };
     let order = Array[I32].new(n, 0);
     for (0 ..< n) |i| { order[i] = params + i; };
-    // (Insertion sort by start: functions have tens of locals.)
-    for (1 ..< n) |i| {
-        let l = order[i];
-        let j = i;
-        while (j > 0 and start[order[j - 1]] > start[l]) {
-            order[j] = order[j - 1];
-            j -= 1;
-        };
-        order[j] = l;
-    };
+    sort_by_key(order, start);
     let first = func_locals[f];
     let slot_of = Array[I32].new(total, -1);
-    let slot_type: Array[I32] = [];
-    let slot_end: Array[I32] = [];
+    co_slot_type.clear();
+    co_slot_end.clear();
+    co_slot_next.clear();
+    co_types.clear();
+    co_type_head.clear();
+    co_type_tail.clear();
     for (order) |l| {
         let vt = local_types[first + l - params];
+        let t = 0;
+        while (t < co_types.len() and co_types[t] != vt) { t += 1; };
+        if t == co_types.len() {
+            co_types.push(vt);
+            co_type_head.push(-1);
+            co_type_tail.push(-1);
+        };
         let slot = -1;
         if co_first[l] >= 0 and co_store_first[l] == 1 {
-            for (0 ..< slot_type.len()) |s| {
-                if slot < 0 and slot_type[s] == vt and slot_end[s] < start[l] { slot = s; };
+            let s = co_type_head[t];
+            while (s >= 0 and slot < 0) {
+                if co_slot_end[s] < start[l] { slot = s; };
+                s = co_slot_next[s];
             };
         };
         if slot < 0 {
-            slot = slot_type.len();
-            slot_type = slot_type chain([vt]) collect(I32);
-            slot_end = slot_end chain([end[l]]) collect(I32);
+            slot = co_slot_type.len();
+            co_slot_type.push(vt);
+            co_slot_end.push(end[l]);
+            co_slot_next.push(-1);
+            if co_type_tail[t] >= 0 { co_slot_next[co_type_tail[t]] = slot; } else { co_type_head[t] = slot; };
+            co_type_tail[t] = slot;
         } else {
-            slot_end[slot] = end[l];
+            co_slot_end[slot] = end[l];
         };
         slot_of[l] = slot;
     };
     // The slots, declared grouped by type (in the order types first appear).
-    let count = slot_type.len();
+    let count = co_slot_type.len();
     let index = Array[I32].new(count, -1);
     let next = 0;
-    for (0 ..< count) |s| {
-        if index[s] < 0 {
-            for (s ..< count) |t| {
-                if index[t] < 0 and slot_type[t] == slot_type[s] {
-                    index[t] = next;
-                    next += 1;
-                };
-            };
+    for (0 ..< co_types.len()) |t| {
+        let s = co_type_head[t];
+        while (s >= 0) {
+            index[s] = next;
+            next += 1;
+            s = co_slot_next[s];
         };
     };
     let grouped = count < n;
     for (0 ..< count) |s| { if index[s] != s { grouped = true; }; };
     if not grouped { return; };
-    for (0 ..< count) |s| { local_types[first + index[s]] = slot_type[s]; };
+    for (0 ..< count) |s| { local_types[first + index[s]] = co_slot_type[s]; };
     func_local_count[f] = count;
     for (0 ..< co_mentions.len()) |k| {
         let node = co_mentions[k];
         if w_a[node] >= params { w_a[node] = params + index[slot_of[w_a[node]]]; };
+    };
+}
+
+/// Sort `order` by `key` (of each item), keeping the order of equal ones (a
+/// merge sort).
+fn sort_by_key(order: Array[I32], key: Array[I32]) void {
+    let n = order.len();
+    co_sort.resize(n);
+    let width = 1;
+    while (width < n) {
+        let lo = 0;
+        while (lo < n) {
+            let mid = if lo + width < n { lo + width; } else { n; };
+            let hi = if mid + width < n { mid + width; } else { n; };
+            let i = lo;
+            let j = mid;
+            let k = lo;
+            while (k < hi) {
+                if j >= hi or (i < mid and key[order[i]] <= key[order[j]]) {
+                    co_sort[k] = order[i];
+                    i += 1;
+                } else {
+                    co_sort[k] = order[j];
+                    j += 1;
+                };
+                k += 1;
+            };
+            lo = hi;
+        };
+        for (0 ..< n) |k| { order[k] = co_sort[k]; };
+        width = width * 2;
     };
 }
 

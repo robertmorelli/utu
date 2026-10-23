@@ -17,6 +17,7 @@
 //
 // Generic collections:
 //   Array              — mutable GC Array, parameterised by element type
+//   Result[T, E]       — a value or an error; `try` passes the error on
 //
 // Compiler directives:
 //   Promise[T]        — a real JavaScript promise, held as an externref
@@ -43,4 +44,5 @@ using Stream           from std:Stream;
 using LiteralDefaults from std:LiteralDefaults;
 using Found from std:Found;
 using Group from std:Group;
+using Result from std:Result;
 using wutu from std:Wutu;

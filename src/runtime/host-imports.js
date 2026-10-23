@@ -198,7 +198,8 @@ export function promisifyExports(instance, promiseSpec) {
   const exports = { ...instance.exports };
   for (const name of names) {
     if (typeof exports[name] === 'function') {
-      exports[name] = WebAssembly.promising(exports[name]);
+      // Its length stays the function's arity (Bun's promising() gives 1).
+      exports[name] = Object.defineProperty(WebAssembly.promising(exports[name]), 'length', { value: exports[name].length });
     }
   }
   return exports;

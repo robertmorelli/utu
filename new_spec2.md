@@ -443,7 +443,7 @@ mod I32 {
 
 Rules:
 - A `mod` body may contain `type` declarations, structs, protocols, enums, functions, globals, tests, and benches.
-- A `mod` body may **not** contain another `mod`.
+- A `mod` body may **not** contain another `mod`, or a `mem` (a mem is one memory of the program, declared at a file's top level).
 
 ---
 
@@ -693,6 +693,20 @@ for (walk(root)) |n| {
     use(handle);
 }
 
+// Result[T, E] (std/Result.utu, in the prelude): a value or an expected error.
+// `try r` is r's value when it is ok; else the function returns r's error.
+// The function must return Result[U, E], the same E (never converted).
+// `try { … } catch …` stays the host form; `try` before anything else is this.
+// errdefer: a defer that runs only on an error return (a try returning, or a
+// return or final value whose Result is an error, tested where it returns),
+// with the pending defers, newest first. Only in a function returning a Result.
+// Neither is allowed in a generator. See docs/errors.md.
+fn quarter(n: I32) Result[I32, Str] {
+    errdefer log("failed");
+    let h = try half(n);
+    half(h);
+}
+
 // bind (let)
 let x: I32 = expr
 
@@ -802,9 +816,15 @@ mem props: U16 = @embed/\ tables/props.bin \/;    // a file's bytes, beside the 
 const mem dfa: U8 = @comptime/\ build_dfa() \/;   // runs during compilation
 ```
 
-`@comptime` compiles a copy of the entry file (without its exports, tests, and
-other `@comptime` mems), evaluates the expression to an `Array` of the element's
-value type (`Array[I32]` for the narrow kinds), and embeds the result. A
+`@comptime` compiles a copy of the program (without its exports and tests),
+evaluates the expression (one expression; it may `await`) to an `Array` of the
+element's value type (`Array[I32]` for the narrow kinds), and embeds the result.
+An expression may read another `@comptime` mem, which is evaluated first; one
+that reads itself, or a mem that reads it back, is an error, and so is one that
+runs over a hundred million loop rounds. An integer enum mem's values must be
+its variants'. A `@embed` path is relative to the file that declares the mem.
+A mem is declared at the top level of a file, and an imported file's mems are
+its own (its functions and modules see them; the importer does not). A
 `const mem` rejects writes, `push`, `reserve`, `resize`, `clear`, and `copy_in`.
 
 The host reaches a mem through two methods; a mem that uses either is created by

@@ -385,14 +385,16 @@ export function assembleWat({ params, result, text, method = false }) {
     params: params.map(param => ({ name: param.name, type: wasmType(param.type) })),
     result: result === 'void' ? null : wasmType(result),
     text,
+    // A Bool is 0 or 1: any other i32 the body leaves is made 1.
+    bool: result === 'Bool',
   });
 }
 
 // ── Checking and encoding ────────────────────────────────────────────────────
 
-export function assembleFunction({ params, result, text }) {
+export function assembleFunction({ params, result, text, bool = false }) {
   try {
-    return { code: assemble(params, result, text) };
+    return { code: assemble(params, result, text, bool) };
   } catch (error) {
     // Folded instructions are read recursively: thousands deep exhaust the stack.
     if (error instanceof RangeError) return { error: { message: 'this @wat body nests too deeply', start: 0, end: Math.min(text.length, 1) } };
@@ -401,7 +403,7 @@ export function assembleFunction({ params, result, text }) {
   }
 }
 
-function assemble(params, result, text) {
+function assemble(params, result, text, bool = false) {
   const { locals: decls, instrs } = flatten(parse(tokenize(text)));
   const types = params.map(param => param.type);
   const names = new Map(params.map((param, i) => [`$${param.name}`, i]));
@@ -425,6 +427,9 @@ function assemble(params, result, text) {
   }
   code.push(...leb128(runs.length));
   for (const [n, t] of runs) code.push(...leb128(n), VALTYPE[t]);
+  // A Bool body runs in a block whose value is then compared with 0; a
+  // return leaves that block (a branch to the function's depth does already).
+  if (bool) code.push(0x02, VALTYPE.i32);
 
   const stack = [];
   const frames = [{ kind: 'function', label: null, out: result ? [result] : [], height: 0, unreachable: false }];
@@ -526,10 +531,16 @@ function assemble(params, result, text) {
         unreachable();
         break;
       }
-      case 'return': popAll(frames[0].out, ins, 'return'); code.push(0x0f); unreachable(); break;
+      case 'return':
+        popAll(frames[0].out, ins, 'return');
+        if (bool) code.push(0x0c, ...leb128(frames.length - 1)); else code.push(0x0f);
+        unreachable();
+        break;
       case 'drop': pop(null, ins, 'drop'); code.push(0x1a); break;
       case 'select': {
         const results = imms.filter(imm => head(imm) === 'result');
+        const other = imms.find(imm => head(imm) !== 'result');
+        if (other) throw new WatError('select takes only (result t)', other.start, other.end);
         if (results.length > 1 || results[0]?.list.length > 2) throw new WatError('select has one result type: (result t)', results[0].start, results.at(-1).end);
         const typed = results[0];
         pop('i32', ins, 'select');
@@ -560,6 +571,7 @@ function assemble(params, result, text) {
   const last = instrs.at(-1) ?? { start: 0, end: text.length };
   if (frames.length > 1) throw new WatError(`this ${frame().kind} has no end`, last.start, last.end);
   endFrame({ start: last.start, end: last.end });
+  if (bool) code.push(0x0b, 0x41, 0x00, 0x47);
   code.push(0x0b);
   return Uint8Array.from(code);
 }

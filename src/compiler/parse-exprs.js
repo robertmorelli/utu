@@ -1,4 +1,5 @@
 import { stamp, el } from './parse-helpers.js';
+import { compilerError, DIAGNOSTIC_KINDS } from './diagnostics.js';
 // parse-exprs.js — expression walker registry
 
 import {
@@ -58,6 +59,9 @@ export const walkers = {
   'null_expr':                   walkNullExpr,
   'if_expr':                     walkIfExpr,
   'try_expr':                    walkTryExpr,
+  // Result's `try r` and `errdefer` are the self-hosted compiler's alone.
+  'try_result_expr':             refuseResult,
+  'errdefer_expr':               refuseResult,
   'while_expr':                  walkWhileExpr,
   'for_expr':                    walkForExpr,
   'match_expr':                  walkMatchExpr,
@@ -91,3 +95,8 @@ export const walkers = {
   'field_init':                  walkFieldInit,
   'arg_list':                    walkArgList,
 };
+
+function refuseResult(n, doc) {
+  throw compilerError(DIAGNOSTIC_KINDS.INVALID_DSL_USAGE, 'Result try and errdefer are compiled by the self-hosted compiler (utu), not stage 0',
+    stamp(el('ir-block', doc), n));
+}

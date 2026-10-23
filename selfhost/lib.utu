@@ -216,6 +216,27 @@ export lib {
 
     fn embed_path_end(k: I32) I32 { dsl_text_end(last_child(decl_node[embed_mem[k]])); }
 
+    /// How many functions of the program's own are @ir in the last build
+    /// (the host validates a module with any).
+    fn user_ir_count() I32 { user_ir_decl.len(); }
+
+    /// The module is not valid Wasm, for the reason the engine gives (`n`
+    /// bytes, which the host writes at the offset returned in src): reported
+    /// at each @ir body of the program's (`ir_invalid_report`).
+    fn ir_invalid_room(n: I32) I32 {
+        let at = src.len();
+        src.resize(at + n);
+        at;
+    }
+
+    fn ir_invalid_report(at: I32, n: I32) void {
+        let word = src.intern(at, at + n);
+        report_invalid_ir(word);
+    }
+
+    /// The file that declares embed k's mem, which its path is relative to.
+    fn embed_file(k: I32) I32 { file_of_token(node_first[decl_node[embed_mem[k]]]); }
+
     /// Room for a file's `n` bytes, written by the host at the offset returned in `embed_bytes`.
     fn embed_set(k: I32, n: I32) I32 {
         let at = embed_bytes.len();
@@ -232,6 +253,20 @@ export lib {
     fn comptime_value_size(k: I32) I32 {
         let s = mem_storage(comptime_mem[k]);
         if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8; } else { 4; };
+    }
+
+    /// Whether mem k's expression is still to be evaluated (1) or not (0).
+    fn comptime_waiting(k: I32) I32 { if comptime_start[k] == -1 { 1; } else { 0; }; }
+
+    /// Whether the @comptime build just made can evaluate mem k (1): it
+    /// waits, and reaches no mem that waits (see `comptime_ready`).
+    fn comptime_can_run(k: I32) I32 { if comptime_ready(k) { 1; } else { 0; }; }
+
+    /// Mem k waits on itself, or on a mem that waits on it: reported.
+    fn comptime_cycle(k: I32) void {
+        comptime_ready(k);
+        comptime_start[k] = -3;
+        comptime_count[k] = comptime_blocker[0];
     }
 
     /// Mem k's evaluation trapped, for the reason `code` names (see ComptimeTrap's message).
@@ -365,6 +400,19 @@ export lib {
         if decl_local[decl] < 0 { return -1; };
         let t = decl_ty[decl];
         if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+        ty_decl(t);
+    }
+
+    /// The declaration of expression n's type, as the last build checked
+    /// it (through `?` when `through_null` is 1), or -1: what `e.` can name.
+    fn node_type_decl(n: I32, through_null: I32) I32 {
+        if n >= node_ty.len() { return -1; };
+        let t = node_ty[n];
+        if t < 0 { return -1; };
+        if ty_is(t, Ty.Nullable) {
+            if through_null == 0 { return -1; };
+            t = ty_a[t];
+        };
         ty_decl(t);
     }
 

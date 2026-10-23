@@ -1,0 +1,7 @@
+// What: a @comptime body of two statements
+// Expect: @comptime takes one expression: Expected ')', got ';'
+const mem t: I32 = @comptime/\ [1, 2]; [3] \/;
+
+export main() I32 {
+    t.len();
+}

@@ -583,6 +583,8 @@ fn w_mark() I32 { w_stack.len(); }
 
 /// A node of the nodes built since `mark`, pushed in their place.
 fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
+    // A @comptime build's loops burn fuel, so one that never ends stops.
+    if op == Op.Loop and comptime_fuel[0] >= 0 { w_insert(mark, fuel_check()); };
     let id = w_op.len();
     // A block with several results is typed by a function type, which must
     // exist before encoding numbers the types.
@@ -970,14 +972,28 @@ fn unit_ready(u: I32, n: I32) Bool {
 
 /// The group's types, the most used first, each after its supertype.
 fn place_group(n: I32) void {
-    while (true) {
-        let best = -1;
-        for (0 ..< n) |t| {
-            if type_unit[t] == n and type_index[t] < 0 and (ht_super[t] < 0 or type_index[ht_super[t]] >= 0)
-                and (best < 0 or type_uses[t] > type_uses[best]) { best = t; };
+    let count = 0;
+    for (0 ..< n) |t| { if type_unit[t] == n and type_index[t] < 0 { count += 1; }; };
+    let order = Array[I32].new(count, 0);
+    let key = Array[I32].new(n, 0);
+    let k = 0;
+    for (0 ..< n) |t| {
+        if type_unit[t] == n and type_index[t] < 0 {
+            order[k] = t;
+            key[t] = 0 - type_uses[t];
+            k += 1;
         };
-        if best < 0 { return; };
-        place_type(best);
+    };
+    // The most used first (of equals, the first); each time, the first of
+    // them whose supertype has its index.
+    sort_by_key(order, key);
+    let lo = 0;
+    while (true) {
+        while (lo < count and type_index[order[lo]] >= 0) { lo += 1; };
+        let i = lo;
+        while (i < count and not (type_index[order[i]] < 0 and (ht_super[order[i]] < 0 or type_index[ht_super[order[i]]] >= 0))) { i += 1; };
+        if i >= count { return; };
+        place_type(order[i]);
     };
 }
 
@@ -1614,6 +1630,8 @@ fn encode_module() I32 {
     out.clear();
     sec.clear();
     labels.clear();
+    label_at.clear();
+    label_outer.clear();
     map_at.clear();
     map_node.clear();
     map_site.clear();
@@ -1730,8 +1748,13 @@ fn map_note(node: I32) void {
 
 /// The labels of the blocks around the instruction being encoded.
 vec labels: I32;
+/// By label: its place in @labels (the innermost), or -1; and by place,
+/// the place its label had before.
+vec label_at: I32;
+vec label_outer: I32;
 
 fn depth_of(label: I32) I32 {
+    if label >= 0 and label < label_at.len() and label_at[label] >= 0 { return labels.len() - 1 - label_at[label]; };
     let i = labels.len() - 1;
     while (i >= 0) {
         if labels[i] == label { return labels.len() - 1 - i; };
@@ -1776,11 +1799,25 @@ fn exits_only_loop(block: I32) Bool {
 fn open_block(code: I32, vt: I32, label: I32) void {
     op1(code);
     block_type(vt);
+    if label >= 0 {
+        if label >= label_at.len() {
+            let old = label_at.len();
+            label_at.resize(label + 1);
+            for (old ..< label + 1) |l| { label_at[l] = -1; };
+        };
+        label_outer.push(label_at[label]);
+        label_at[label] = labels.len();
+    } else {
+        label_outer.push(-1);
+    };
     labels.push(label);
 }
 
 fn close_block() void {
+    let label = labels[labels.len() - 1];
+    if label >= 0 { label_at[label] = label_outer[labels.len() - 1]; };
     labels.resize(labels.len() - 1);
+    label_outer.resize(labels.len());
     op1(11);
 }
 

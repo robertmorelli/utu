@@ -1,0 +1,51 @@
+// Result, try, and errdefer: reading "name=number" settings, where a bad
+// line is an error the caller handles, not a crash.
+//
+//   utu run examples/results.utu
+using console from std:Console;
+
+/// A whole number, or why the text is not one.
+fn parse_number(text: Str) Result[I32, Str] {
+    if text.len() == 0 { return Result[I32, Str].err("no number"); };
+    let n = 0;
+    for (0 ..< text.len()) |i| {
+        let c = text.get(i);
+        if c < 48 or c > 57 { return Result[I32, Str].err("not a number: " + text); };
+        n = n * 10 + c - 48;
+    };
+    Result[I32, Str].ok(n);
+}
+
+/// The number of a "name=number" line.
+fn setting(line: Str) Result[I32, Str] {
+    let at = line.index_of("=", 0);
+    if at < 0 { return Result[I32, Str].err("no '=' in " + line); };
+    // try: the number, or parse_number's error returned as this function's.
+    let n = try parse_number(line.slice(at + 1, line.len()));
+    Result[I32, Str].ok(n);
+}
+
+/// The sum of every line's number; the first bad line's error, if any.
+fn total(lines: Array[Str]) Result[I32, Str] {
+    console.log("reading " + lines.len().to_str() + " lines");
+    defer console.log("done");                        // runs on every return
+    errdefer console.log("gave up");                  // runs only on an error
+    let sum = 0;
+    for (lines) |line| {
+        sum += try setting(line);
+    };
+    Result[I32, Str].ok(sum);
+}
+
+fn report(lines: Array[Str]) void {
+    let r = total(lines);
+    if r.is_ok() { console.log("total " + r.value().to_str()); }
+    else { console.log("error: " + r.error()); };
+}
+
+export main() I32 {
+    report(["width=640", "height=480"]);    // reading 2 lines, done, total 1120
+    report(["width=640", "height=tall"]);   // reading 2 lines, gave up, done, error: not a number: tall
+    report(["depth"]);                      // reading 1 lines, gave up, done, error: no '=' in depth
+    total(["x=7"]).value_or(0) + total(["x=?"]).value_or(0);   // 7
+}

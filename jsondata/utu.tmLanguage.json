@@ -277,7 +277,7 @@
         },
         {
           "name": "keyword.control.utu",
-          "match": "\\b(?:if|else|match|alt|for|while|loop|break|continue|defer|yield|prune|return|let|mem|vec|distinct|export|lib|fn|using|from|get|set|struct|enum|type|proto|test|bench|measure|assert|and(?!\\=)|or(?!\\=)|not|void|mod|rec|promote|tag|in|out)\\b"
+          "match": "\\b(?:if|else|match|alt|for|while|loop|break|continue|defer|errdefer|yield|prune|return|let|mem|vec|distinct|export|lib|fn|using|from|get|set|struct|enum|type|proto|test|bench|measure|assert|and(?!\\=)|or(?!\\=)|not|void|mod|rec|promote|tag|in|out)\\b"
         },
         {
           "name": "constant.language.boolean.utu",
@@ -347,7 +347,7 @@
       "patterns": [
         {
           "name": "support.function.call.utu",
-          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|while\\b|loop\\b|break\\b|continue\\b|defer\\b|yield\\b|prune\\b|mem\\b|vec\\b|return\\b|let\\b|export\\b|lib\\b|fn\\b|using\\b|from\\b|get\\b|set\\b|struct\\b|enum\\b|type\\b|proto\\b|test\\b|bench\\b|measure\\b|assert\\b|and\\b|or\\b|not\\b|void\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "match": "\\b(?!if\\b|else\\b|match\\b|alt\\b|for\\b|while\\b|loop\\b|break\\b|continue\\b|defer\\b|errdefer\\b|yield\\b|prune\\b|mem\\b|vec\\b|return\\b|let\\b|export\\b|lib\\b|fn\\b|using\\b|from\\b|get\\b|set\\b|struct\\b|enum\\b|type\\b|proto\\b|test\\b|bench\\b|measure\\b|assert\\b|and\\b|or\\b|not\\b|void\\b|mod\\b|rec\\b|promote\\b|tag\\b)([a-z_][a-zA-Z0-9_]*)\\s*(?=\\()",
           "captures": {
             "1": {
               "name": "entity.name.function.utu"

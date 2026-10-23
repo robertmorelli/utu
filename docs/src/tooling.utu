@@ -6,7 +6,7 @@ mod tooling {
         \\usage: utu <command> <file.utu> [options]
         \\
         \\  check <file>                 report what is wrong with the program
-        \\  run <file> [-O mode]            build it, then call its main
+        \\  run <file> [-O mode] [-- args]  build it, then call its main
         \\  test <file> [-O mode]           build its tests, then run each
         \\  build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
         \\    [--source-map]             and NAME.wasm.map (always in debug)
@@ -92,6 +92,41 @@ mod tooling {
                 ". It checks, runs, tests, and builds programs, and serves the language server.";
             }
             = code.shell(cli_sample());
+            p {
+                "A program's arguments go after ";
+                code {
+                    "--";
+                }
+                ": ";
+                code {
+                    "utu run tool.utu -- a b";
+                }
+                ". The program reads them from the host, as a built one run by Node or Bun does: ";
+                code {
+                    "process.argv.slice(2)";
+                }
+                ", through ";
+                code {
+                    "@es";
+                }
+                " (";
+                code {
+                    "let arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;";
+                }
+                "). An executable from ";
+                code {
+                    "build-exe";
+                }
+                " whose main returns ";
+                code {
+                    "I32";
+                }
+                " exits with that status; any other result is printed. ";
+                code {
+                    "utu run";
+                }
+                " prints main's result, whatever its type, and exits 0.";
+            }
             p {
                 code {
                     "utu grep";

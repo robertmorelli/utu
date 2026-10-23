@@ -1,0 +1,9 @@
+// What: a @wat select with a (param …)
+// Expect: select takes only (result t)
+fn pick(c: I32, a: I32, b: I32) I32 {
+    @wat/\ local.get $a local.get $b local.get $c select (param i32) \/;
+}
+
+export main() I32 {
+    pick(1, 2, 3);
+}

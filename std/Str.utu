@@ -9,6 +9,7 @@
 //   s1 + s2    → Str:add(s1, s2)   — concatenation
 //   s1 == s2   → Str:eq(s1, s2)    — equality
 //   s1 != s2   → Str:ne(s1, s2)    — inequality
+//   s1 < s2 (<=, >, >=) → Str:lt(s1, s2) … — order by UTF-16 code units
 
 mod Str {
     type & = @ir/\ <ir-wasm-ref type-repr="wasm-stringref"/> \/
@@ -19,6 +20,29 @@ mod Str {
     // Equality — structural (content) comparison.
     fn &:eq |a, b| Bool { @ir/\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \/; }
     fn &:ne |a, b| Bool { @ir/\ <ir-string-ne><ir-ident name="a"/><ir-ident name="b"/></ir-string-ne> \/; }
+
+    // Order: by UTF-16 code units, as JavaScript compares strings ("B" < "a").
+    fn &:lt |a, b| Bool { compare(a, b) < 0; }
+    fn &:le |a, b| Bool { compare(a, b) <= 0; }
+    fn &:gt |a, b| Bool { compare(a, b) > 0; }
+    fn &:ge |a, b| Bool { compare(a, b) >= 0; }
+
+    // -1, 0, or 1: a before, equal to, or after b, by UTF-16 code units.
+    fn compare(a: &, b: &) I32 {
+        let n = len(a);
+        let m = len(b);
+        let i = 0;
+        while (i < n and i < m) {
+            let x = get(a, i);
+            let y = get(b, i);
+            if x != y {
+                if x < y { return -1; };
+                return 1;
+            };
+            i += 1;
+        };
+        if n < m { -1; } else if n > m { 1; } else { 0; };
+    }
 
     // Number of UTF-16 code units in the host string.
     fn len(s: &) I32 {

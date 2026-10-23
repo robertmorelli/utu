@@ -235,6 +235,7 @@ fn validate_node(node: I32) void {
         Node.Distinct_decl => { validate_distinct(node); },
         Node.Yield_expr => { validate_yield(node); },
         Node.Defer_expr => { validate_defer(node); },
+        Node.Errdefer_expr => { validate_defer(node); },
         Node.Await_expr => { validate_await(node); },
         ~> {},
     };
@@ -466,6 +467,7 @@ fn validate_defer(node: I32) void {
     let exit = deferred_exit(first_child(node), false);
     if exit >= 0 {
         let rule = if is_kind(exit, Node.Return_expr) { BreakRule.ReturnInDefer; }
+            else if is_kind(exit, Node.Try_result_expr) { BreakRule.TryInDefer; }
             else if is_kind(exit, Node.Break_expr) { BreakRule.BreakInDefer; }
             else { BreakRule.ContinueInDefer; };
         report2(Diag.InvalidDefer, exit, -1, rule.to_i32(), -1);
@@ -476,7 +478,7 @@ fn validate_defer(node: I32) void {
 /// defer's code: the first, or -1. Closures are not looked into.
 fn deferred_exit(node: I32, in_loop: Bool) I32 {
     if node < 0 or is_kind(node, Node.Closure_expr) { return -1; };
-    if is_kind(node, Node.Return_expr) { return node; };
+    if is_kind(node, Node.Return_expr) or is_kind(node, Node.Try_result_expr) { return node; };
     // `break label`: an exit when its block is outside the defer.
     if is_kind(node, Node.Break_expr) and first_child(node) >= 0 { return if leaves_defer(node) { node; } else { -1; }; };
     if (is_kind(node, Node.Break_expr) or is_kind(node, Node.Continue_expr)) and not in_loop { return node; };

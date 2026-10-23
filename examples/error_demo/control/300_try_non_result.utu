@@ -1,0 +1,8 @@
+// What: applies try to an I32, which is not a Result.
+// Expect: try needs a Result, not I32
+fn count(text: Str) Result[I32, Str] {
+    let n = try text.len();
+    Result[I32, Str].ok(n);
+}
+
+export main() I32 { count("abc").value(); }

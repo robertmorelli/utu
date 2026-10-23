@@ -334,6 +334,9 @@ fn words(m: Machine) void {
         keyword_path(m, start_before, word, start_before);
         keyword_path(m, start_after, word, start_before);
     };
+    // `errdefer` begins a statement, so only where an expression does not
+    // end (the table has room for few more states).
+    keyword_path(m, start_before, "errdefer", start_before);
     // The keyword operators, and `else`, follow an expression; where one
     // begins, they are names (`assert or >>>= 1`).
     for (["and", "or", "xor", "orelse", "else"]) |word| { keyword_path(m, start_after, word, start_before); };

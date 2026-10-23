@@ -4883,6 +4883,12 @@
  "examples/queries/iterators.utu test": {
   "calls": {}
  },
+ "examples/results.utu normal": {
+  "compile": "Error: Result try and errdefer are compiled by the self-hosted compiler (utu), not stage 0"
+ },
+ "examples/results.utu test": {
+  "compile": "Error: Result try and errdefer are compiled by the self-hosted compiler (utu), not stage 0"
+ },
  "examples/stdlib.utu normal": {
   "calls": {
    "dice": {

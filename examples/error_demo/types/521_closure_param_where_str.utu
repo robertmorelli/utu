@@ -1,0 +1,11 @@
+// What: a closure with an untyped parameter, passed where a Str is wanted
+// Expect: m needs a type (one error, not also "got cl(unknown) Str")
+fn take(s: Str) I32 {
+    s.len();
+}
+
+export main() I32 {
+    take(cl(m) Str {
+        m;
+    });
+}

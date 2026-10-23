@@ -128,6 +128,134 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
+  // Long matches and deep literals, in every build mode: each once took time
+  // the square of its size (a 16,384-deep literal trapped, out of memory).
+  const arms = Array.from({ length: 3000 }, (_, i) => `        ${i * 2} => ${i},`).join('\n');
+  const variants = Array.from({ length: 40 }, (_, i) => `    | V${i}`).join('\n');
+  const covered = Array.from({ length: 40 }, (_, i) => `        Many.V${i} => ${i * i},`).join('\n');
+  const deep = '['.repeat(300) + '[null, [7, 8]], [[9]]' + ']'.repeat(300);
+  const large = await write(`enum(U8) Many:
+${variants}
+fn dense(x: I32) I32 {
+    match x {
+${arms}
+        ~> -1,
+    };
+}
+fn sparse(x: I32) I32 { match x { 5 => 1, 500 => 2, 50000 => 3, -7 => 4, ~> 0, }; }
+fn square(m: Many) I32 {
+    match m {
+${covered}
+    };
+}
+fn deep_len() I32 {
+    let a = ${deep};
+    let inner = a${'[0]'.repeat(300)};
+    inner.len() * 100 + (inner[1] orelse fatal).len() * 10 + (inner[1] orelse fatal)[1];
+}
+export lib {
+    fn run() I32 {
+        dense(5998) * 10000 + dense(4) * 1000 + dense(3) + 2 + sparse(-7) * 100 + sparse(50000) * 10 + square(Many.V39) + deep_len();
+    }
+}
+`);
+  const want = 2999 * 10000 + 2 * 1000 + -1 + 2 + 4 * 100 + 3 * 10 + 39 * 39 + (2 * 100 + 2 * 10 + 8);
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, large, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), want, mode);
+    checked++;
+  }
+
+  // Result, try, and errdefer, in every build mode (the self-hosted compiler's
+  // alone). Each letter is a defer (d, D, i) or errdefer (e, E, T, p, c, j, o) run;
+  // a labeled block's break runs its defers, not its errdefers.
+  const results = await write(`// What ran, in order: one letter each.
+vec trail: I32;
+fn note(s: Str) void { trail.push(s.get(0)); }
+fn taken() Str {
+    let s = "";
+    for (0 ..< trail.len()) |i| { s = s + Str.from_code_point(trail[i]); };
+    trail.clear();
+    s;
+}
+fn digit(c: I32) Result[I32, Str] {
+    if c < 48 or c > 57 { return Result[I32, Str].err("bad " + c.to_str()); };
+    Result[I32, Str].ok(c - 48);
+}
+fn sum(codes: Array[I32]) Result[I32, Str] {
+    defer note("D");
+    errdefer note("E");
+    let t = 0;
+    for (codes) |c| {
+        defer note("d");
+        errdefer note("e");
+        t += try digit(c);
+    };
+    Result[I32, Str].ok(t);
+}
+fn twice(codes: Array[I32]) Result[Str, Str] {
+    errdefer note("T");
+    let a = try sum(codes);
+    let b = try sum(codes);
+    Result[Str, Str].ok((a + b).to_str());
+}
+fn picky(n: I32) Result[I32, Str] {
+    errdefer note("p");
+    if n == 0 { return Result[I32, Str].err("zero"); };
+    let r = if n > 9 { Result[I32, Str].err("big"); } else { Result[I32, Str].ok(n); };
+    r;
+}
+fn via_closure(c: I32) Result[I32, Str] {
+    let f = cl(k: I32) Result[I32, Str] {
+        errdefer note("c");
+        let v = try digit(k);
+        Result[I32, Str].ok(v * 2);
+    };
+    let v = try f(c);
+    Result[I32, Str].ok(v + 1);
+}
+fn labeled(c: I32, leave: Bool) Result[I32, Str] {
+    errdefer note("o");
+    let v = found: {
+        defer note("i");
+        errdefer note("j");
+        if leave { break found 7; };
+        try digit(c);
+    };
+    Result[I32, Str].ok(v);
+}
+fn show(r: Result[I32, Str]) Str {
+    taken() + "|" + if r.is_ok() { r.value().to_str(); } else { r.error(); };
+}
+export lib {
+    fn ok_sum() Str { show(sum([49, 50, 51])); }
+    fn err_sum() Str { show(sum([49, 120, 51])); }
+    fn nested_ok() Str {
+        let r = twice([52]);
+        taken() + "|" + r.value();
+    }
+    fn nested_err() Str {
+        let r = twice([97]);
+        taken() + "|" + r.error();
+    }
+    fn returns() Str { show(picky(0)) + "," + show(picky(5)) + "," + show(picky(12)); }
+    fn closure() Str { show(via_closure(51)) + "," + show(via_closure(65)); }
+    fn defaults() I32 { digit(55).value_or(-1) * 10 + digit(1).value_or(-1); }
+    fn labels() Str { show(labeled(50, true)) + "," + show(labeled(50, false)) + "," + show(labeled(120, false)); }
+}
+`);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, results, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    const expected = { ok_sum: 'dddD|6', err_sum: 'dedED|bad 120', nested_ok: 'dDdD|8', nested_err: 'edEDT|bad 97',
+      returns: 'p|zero,|5,p|big', closure: '|7,c|bad 65', defaults: 69,
+      labels: 'i|7,i|2,jio|bad 120' };
+    for (const [name, value] of Object.entries(expected)) assert.equal(e[name](), value, `${mode}: ${name}`);
+    checked++;
+  }
+
   // Structs returned as their fields (selfhost/inline.utu, -O small and
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.
@@ -397,6 +525,8 @@ export lib {
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nexport lib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
     ['mod m[T] {\n    struct &:\n        | v: T\n        | next: ?m[T]\n    fn &.mk(v: T) m[T] { &{ v: v, next: null }; }\n}\nexport lib { fn run() I32 { let a = m[I32].mk(3); a.next = m[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
+    ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the
     // block's defers run; the type comes from the tail, else the breaks.
     ['fn find(xs: Array[I32], want: I32) I32 {\n    found: {\n        for (0 ..< xs.len()) |i| { for (0 ..< 3) |j| { if xs[i] + j == want { break found i * 10 + j; }; }; };\n        -1;\n    };\n}\n'
@@ -449,6 +579,16 @@ export lib {
     const built = await compileFile(utu, resized, { mode });
     const { exports } = await instantiateNode(built.wasm, built.spec);
     assert.throws(() => exports.run(), `${mode}: resize(-1)`);
+    checked++;
+  }
+
+  // A slice ending before it starts traps, and `orelse fatal` on null, in every mode.
+  const traps = await write('export lib {\n    fn reversed() I32 { let a = [1, 2, 3]; a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; (s orelse fatal).len(); }\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, traps, { mode });
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    assert.throws(() => exports.reversed(), WebAssembly.RuntimeError, `${mode}: reversed slice`);
+    assert.throws(() => exports.none(), WebAssembly.RuntimeError, `${mode}: orelse fatal`);
     checked++;
   }
 
@@ -547,6 +687,21 @@ mod Box {
     fn u64_max() I32 { let u: U64 = 18446744073709551614; (u ... 18446744073709551615) count; }
     fn to_max_bisect() I32 { let hi = 2147483647; (hi - 3 ... hi) bisect |v| { v < hi; }; }
 }`, { to_max: 3, wide_take: 3, wide_skip: -1, longs: 20000000006n, unsigned: 2, u64_max: 2, to_max_bisect: 3 }],
+    // Str's order (by code units), I32's and I64's min, max, abs, and a protocol's own function called as a method.
+    [`proto Shape:
+    | area() I32
+struct Sq[Shape]:
+    | s: I32
+fn Shape[Sq].area |q| () I32 { q.s * q.s; }
+fn Shape.twice |s| () I32 { s.area() * 2; }
+export lib {
+    fn order() Str { ",".join(["bo", "Al", "al", "b"] sort(Str) |a, b| { a < b; }); }
+    fn cmp() I32 { Str.compare("a", "b") * 100 + Str.compare("b", "b") * 10 + Str.compare("c", "b"); }
+    fn tests() Bool { "a" <= "a" and "b" > "a" and "B" < "a" and "ab" >= "a"; }
+    fn ints() I32 { I32.min(3, -4) * 100 + I32.max(3, -4) * 10 + I32.abs(-7); }
+    fn longs() I64 { I64.abs(-9.to_i64()) + I64.max(2.to_i64(), 5.to_i64()); }
+    fn proto_method() I32 { let s: Shape = Sq { s: 3 }; s.twice(); }
+}`, { order: 'Al,al,b,bo', cmp: -99, tests: true, ints: -363, longs: 14n, proto_method: 18 }],
   ];
   for (const [source, expected] of selfhostPrograms) {
     const file = await write(source);
@@ -616,7 +771,7 @@ export lib {
     fn level() Str { @json/\\ encode L L { l: Level.High } \\/; }
     fn lone() Str { @json/\\ encode Array[Str] [Str.from_code_point(55296)] \\/; }
     fn range() Str { @json/\\ error L "{\\"l\\":\\"Mid\\"}" \\/; }
-}`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant at line 1, column 6' },
+}`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant "Mid" at line 1, column 6' },
       { literal: [['{"a":"q\\"t"}', 'quote'], ['{"q\\"k":1}', 'key'], ['{"b":100000}', 'exp'], ['{"plan":{}}', 'plan'], ['{}', 'x,y']] }],
   ];
   for (const [source, expected, calls = {}] of boundary) {
@@ -825,9 +980,51 @@ export lib {
     // Where an expected type came from: a parameter, a result.
     ['fn g(n: I32) I32 { n; }\nfn f() I32 { g("x"); }\n', 'g takes I32, got Str'],
     ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
+    // Arms of one value, and enum variants without one, found by value.
+    ['fn f(x: I32) I32 { match x { 1 => 1, 2 => 2, 1 => 3, ~> 0, }; }\nexport main() I32 { f(1); }\n', 'Duplicate pattern 1'],
+    [`enum(U8) Many:\n${variants}\nfn f(m: Many) I32 { match m {\n${covered.split('\n').filter(l => !l.includes('V17 ')).join('\n')}\n}; }\nexport main() I32 { f(Many.V1); }\n`, 'match misses Many.V17'],
+    // try and errdefer: a Result, in a function returning one with the same error type.
+    ['fn f() Result[I32, Str] { let x = try 5; Result[I32, Str].ok(x); }\nexport main() I32 { f().value(); }\n', 'try needs a Result, not I32'],
+    ['fn g() Result[I32, I32] { Result[I32, I32].ok(1); }\nfn f() Result[I32, Str] { Result[I32, Str].ok(try g()); }\nexport main() I32 { f().value(); }\n',
+      "try passes on I32; the function's errors are Str"],
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() I32 { try g(); }\nexport main() I32 { f(); }\n', 'try in a function returning I32, not a Result'],
+    ['fn f() I32 { errdefer f(); 2; }\nexport main() I32 { f(); }\n', 'errdefer in a function returning I32, not a Result'],
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn gen() yield I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; Result[I32, Str].ok(s); }\nexport main() I32 { f().value(); }\n',
+      'try in a generator'],
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; g(); }\nexport main() I32 { f().value(); }\n', 'try in defer'],
+    ['export main() I32 { let r = Result[I32, Str].ok(1); r._value; }\n', 'Result has no field _value'],
+    ['export main() I32 { let r: Result[I32, Str] = &{ _ok: true, _value: 1 }; 0; }\n', 'Result[I32, Str] is made by its own functions'],
+    // Real programs' mistakes, said as what to write.
+    ['fn f() I32 {\n    let t = 0;\n    for i in 0..10 { t += i; };\n    t;\n}\n', 'Write for (0 ..< 10) |i|, not for i in'],
+    ['let INF = 1;\n', 'Names of values and functions start lowercase (a capital starts a type)'],
+    ['fn F() I32 { 1; }\n', 'Names of values and functions start lowercase (a capital starts a type)'],
+    ['fn f() I32 {\n    let i = 0;\n    i++;\n    i;\n}\n', 'utu has no ++; write += 1'],
+    ['fn f(s: Str) I32 { match s { "+" => 1, ~> 0, }; }\n', 'match takes number, Bool, and enum patterns, not strings'],
+    ['fn f() Bool { true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
     ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
+    // @comptime and the other DSLs (each crashed, hung, or passed silently).
+    ['fn tab() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads itself'],
+    ['fn f() Array[I32] { [u.len()]; }\nfn g() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nconst mem u: I32 = @comptime/\\ g() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads u, which waits on it'],
+    ['fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nexport main() I32 { t.len(); }\n', '@comptime t trapped: it ran too long (a hundred million loop rounds)'],
+    ['const mem t: I32 = @comptime/\\ [1, 2] ; __comptime_t.push(99) \\/;\nexport main() I32 { t.len(); }\n', "@comptime takes one expression: Expected ')', got ';'"],
+    ['const mem a: U8 = @comptime/\\  \\/;\nexport main() I32 { a.len(); }\n', '@comptime needs an expression'],
+    ['const mem a: U8 = @embed/\\ \\/;\nexport main() I32 { a.len(); }\n', '@embed needs a file path'],
+    ['enum(U8) Color: | Red | Green | Blue\nconst mem cs: Color = [2, 7, 1];\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    ['enum(U8) Color: | Red | Green | Blue\nfn cs_() Array[I32] { [2, 7]; }\nconst mem cs: Color = @comptime/\\ cs_() \\/;\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    // A program's @ir: what the compiler would crash on, or not see, is a mistake at the body.
+    ['fn f(a: I32) I32 { @ir/\\ <ir-array-len><ir-ident name="a"/></ir-array-len> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-array-len> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-string-from-codes><ir-ident name="a"/></ir-string-from-codes> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-string-from-codes> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-lit value="1"/> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { f(1); }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-ident name="a"/> junk \\/; }\nexport main() I32 { f(1); }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(c: I32, a: I32) I32 { @wat/\\ local.get $a local.get $a local.get $c select (param i32) \\/; }\nexport main() I32 { f(1, 2); }\n', 'select takes only (result t)'],
+    [`export main() I32 { ${'@utu/\\ '.repeat(17)}1${' \\/'.repeat(17)}; }\n`, 'DSLs nested too deeply (max 16)'],
+    ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nexport main() I32 { 1; }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
+    ['struct P:\n    | name: Str\nexport main() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; a.name; }\n', '@stored needs using Browser from std:Browser'],
+    ['fn tab() Array[I32] { [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { 5; }\n', 'main is the entry point, not a function: move its body into a fn'],
+    ['export lib {\n    fn f(x: ?I32) I32 { promote x { |v| => v, ~> 0 }; }\n}\n', 'Missing , after 0'],
     // A generic module's type with no type arguments (this built invalid Wasm).
     ['mod B[T] {\n    struct &:\n        | v: T\n}\nfn f(x: B) I32 { x.v; }\nexport lib { fn run() I32 { 0; } }\n', 'B takes 1 type arguments, given 0'],
     ['mod cell[T] {\n    struct Cell:\n        | v: T\n}\nfn f(x: cell.Cell) I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'cell takes 1 type arguments, given 0'],
@@ -852,11 +1049,65 @@ export lib {
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
+  // A std module not imported: the note names the module, and its file.
+  for (const [source, note] of [
+    ['export main() F64 { Time.now(); }\n', 'using time from std:Time; (the module is time)'],
+    ['using Time from std:Time;\nexport main() F64 { time.now(); }\n', 'using time from std:Time; (the module is time)'],
+    ['export main() void { console.log("hi"); }\n', 'using console from std:Console;'],
+  ]) {
+    const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
+    assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
+    checked++;
+  }
+
+  // A program's @ir that makes invalid Wasm: said at the body, before the engine fails.
+  const badIr = await selfhost(await write('fn f(a: F64, b: F64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }\nexport main() I32 { f(1.0, 2.0); }\n'));
+  assert.ok(badIr.errors?.some(e => e.startsWith('@ir in f does not make valid Wasm: ')), String(badIr.errors));
+  checked++;
+
+  // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
+  const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));
+  assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);
+  checked++;
 
   // Test names: each test has one, its own.
   const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
   assert.deepEqual(twice.diagnostics.map(d => d.message), ['Duplicate test "passes"', 'Empty test name']);
   checked++;
+  // A test name's escapes, checked as a string's are.
+  const escaped = await compileFile(utu, await write('export main() void {}\ntest "x\\u{41}" { assert true; }\n'), { target: 'test' });
+  assert.deepEqual(escaped.diagnostics.map(d => d.message), ['\\u needs four hex digits']);
+  checked++;
+  // One mistake, one message: a closure with an untyped parameter where no
+  // closure is wanted (not also "got cl(unknown) Str"); a tuple element
+  // (not also "has no default").
+  for (const [source, message] of [
+    ['fn take(s: Str) I32 { s.len(); }\nexport main() I32 { take(cl(m) Str { m; }); }\n', 'm needs a type'],
+    ['export main() I32 { let a = Array[.{I32, Str}].new_default(2); 0; }\n', 'A tuple is only a function result'],
+  ]) {
+    const one = await compileFile(utu, await write(source), {});
+    assert.deepEqual(one.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], source);
+    checked++;
+  }
+  // A literal out of range in a generic module: the instance named where it was written.
+  const generic = await compileFile(utu, await write('mod G[T] {\n    fn f(v: T) I32 {\n        match v {\n            -1 => 1,\n            ~> 0,\n        };\n    }\n}\nexport main() I32 {\n    G[U32].f(3);\n}\n'), {});
+  assert.equal(generic.diagnostics.length, 1);
+  assert.ok(JSON.stringify(generic.diagnostics[0]).includes('in G[U32]'), JSON.stringify(generic.diagnostics[0]));
+  checked++;
+  // Thousands of alt arms, and of sparse match arms, are checked by a loop
+  // (each arm recursed on the next).
+  const altVariants = Array.from({ length: 3000 }, (_, k) => `    | V${k} { x: I32 }`).join('\n');
+  const altArms = Array.from({ length: 3000 }, (_, k) => `        V${k} |v| => v.x + ${k},`).join('\n');
+  const matchArms = Array.from({ length: 3000 }, (_, k) => `        ${k * 7} => ${k},`).join('\n');
+  for (const [source, expected] of [
+    [`enum E:\n${altVariants}\nfn f(e: E) I32 {\n    alt e {\n${altArms}\n    };\n}\nexport main() I32 {\n    f(V2999 { x: 1 });\n}\n`, 3000],
+    [`fn f(x: I32) I32 {\n    match x {\n${matchArms}\n        ~> -1,\n    };\n}\nexport main() I32 {\n    f(7 * 2999);\n}\n`, 2999],
+  ]) {
+    const built = await compileFile(utu, await write(source), { mode: 'debug' });
+    assert.ok(built.wasm, built.diagnostics.map(d => d.message).join('\n'));
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.main(), expected);
+    checked++;
+  }
 
   // Each file's names are its own (only modules cross files), and generic
   // modules called through aliases: what each builds to, in every mode.
@@ -886,6 +1137,16 @@ export lib {
     // A computed global of an imported file, read by the entry's: set first.
     [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; a; }\n    let squares: Array[I32] = build();\n}\n',
       'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nexport main() I32 { last; }\n' }, 10],
+    // An imported file's own mems, read by its functions and modules; a
+    // @comptime mem there; an @embed path relative to that file (each was "Unknown variable").
+    [{ 'lib.utu': 'mem m: I32 = [5, 6];\nfn top() I32 { m[1]; }\nfn sq() Array[I32] { [0, 1, 4, 9]; }\nconst mem tab: I32 = @comptime/\\ sq() \\/;\nconst mem raw: U8 = @embed/\\ data.bin \\/;\nmod t { fn n() I32 { top() + m[0] + tab[3] * 10 + raw.len() * 100; } }\n',
+      'data.bin': 'abc', 'main.utu': 'using t from "./lib.utu";\nexport main() I32 { t.n(); }\n' }, 401],
+    // A @comptime mem read by another's expression is evaluated first (the second read it empty).
+    [{ 'main.utu': 'fn sq() Array[I32] { [0, 1, 4, 9, 16]; }\nfn plus() Array[I32] { let a = Array[I32].new(first.len(), 0); for (0 ..< first.len()) |i| { a[i] = first[i] + 1; }; a; }\nconst mem second: I32 = @comptime/\\ plus() \\/;\nconst mem first: I32 = @comptime/\\ sq() \\/;\nexport main() I32 { second.len() * 100 + second[4]; }\n' }, 517],
+    // A @comptime expression that awaits (its run gave a promise, read as nothing).
+    [{ 'main.utu': 'let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn tab() Array[I32] { [await later(5)]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t.len() * 100 + t[0]; }\n' }, 105],
+    // A @wat Bool is 0 or 1, returned or left (6 read as true, and == true was false).
+    [{ 'main.utu': 'fn six() Bool { @wat/\\ i32.const 6 \\/; }\nfn nine() Bool { @wat/\\ i32.const 9 return \\/; }\nexport main() I32 { if six() == true and nine() == true { 1; } else { 0; }; }\n' }, 1],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
@@ -903,6 +1164,12 @@ export lib {
     [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { 1; } }\n', 'main.utu': 'using hm from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'Unknown function helper'],
     [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n', 'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f() I32 { 1; } }\n',
       'main.utu': 'using boxes from "./boxes.utu";\nexport main() I32 { ops.double(21); }\n' }, 'Unknown variable ops'],
+    // An imported file's mem is its own too.
+    [{ 'mf.utu': 'mem m: I32 = [1];\nmod mm { fn f() I32 { m[0]; } }\n', 'main.utu': 'using mm from "./mf.utu";\nexport main() I32 { m[0]; }\n' }, 'Unknown variable m'],
+    // A parse error in an imported file is the mistake (it showed as "Unknown module t8").
+    [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nexport main() I32 { t8.n(); }\n' }, "Unexpected ';'"],
+    // Only a mod is imported: said at the using.
+    [{ 'hf.utu': 'fn helper() I32 { 2; }\n', 'main.utu': 'using helper from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'helper is a function; using imports a mod'],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

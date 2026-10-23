@@ -61,8 +61,15 @@ async function main() {
   const given = [];
   const files = [];
   let out;
+  // `utu run FILE -- a b`: what follows -- is the program's (process.argv.slice(2)).
+  let argv = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === '--') {
+      if (command !== 'run') fail('-- is only for run', 'unknown-option', ['utu run FILE -- ARGS… gives the program ARGS as process.argv.slice(2).']);
+      argv = args.slice(i + 1);
+      break;
+    }
     if (arg === '-O') given.push(args[++i] ?? '');
     else if (arg === '-o' || arg === '--out') {
       const value = args[++i];
@@ -96,7 +103,7 @@ async function main() {
   const asked = args.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, sourceMap: mode === 'debug' || asked, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, utu: await loadNodeCompiler() });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -147,7 +154,7 @@ async function check(file, { utu }) {
   console.log('ok');
 }
 
-async function run(file, { utu, optimize, safe }) {
+async function run(file, { utu, optimize, safe, argv }) {
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe });
   const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file) });
@@ -159,6 +166,8 @@ async function run(file, { utu, optimize, safe }) {
     fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu run calls it with none`, 'main-arguments',
       ['Give main no parameters to run it, or call it from JavaScript (utu build).']);
   }
+  // The program's arguments where a built one finds them: process.argv.slice(2).
+  process.argv = [process.argv[0], file, ...argv];
   let result;
   try {
     result = await exports.main();
@@ -275,7 +284,8 @@ async function build(file, { utu, optimize, safe, out, sourceMap }) {
   });
   // The loader bundled with the runtime pieces and the glue it imports.
   await bundle({
-    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: `${name}.mjs`, loader: 'js' },
+    // (Not named NAME.mjs: esbuild refuses an output that is its input.)
+    stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
     outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: true, format: 'esm', platform: 'neutral',
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
@@ -312,7 +322,10 @@ async function buildExe(file, { utu, optimize, safe, out }) {
     wasm: `Uint8Array.from(atob(${JSON.stringify(Buffer.from(wasm).toString('base64'))}), c => c.charCodeAt(0))`,
   });
   const runner = path.join(dir, 'runner.mjs');
-  await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  if (result !== undefined) console.log(result);\n}\n`);
+  // A main that returns I32 gives the exit status; any other result is printed.
+  const status = /export\s+main\s*\([^)]*\)\s*I32\b/.test(await fs.readFile(file, 'utf8'));
+  const finish = status ? 'process.exitCode = result' : 'if (result !== undefined) console.log(result)';
+  await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  ${finish};\n}\n`);
   const result = spawnSync('bun', ['build', runner, '--compile', '--outfile', target], { cwd: process.cwd(), stdio: 'inherit' });
   await fs.rm(dir, { recursive: true, force: true });
   if (result.error) throw result.error;
@@ -351,10 +364,17 @@ async function lsp() {
       if (!hosts.has(root)) hosts.set(root, nodeHost({ root }));
       return hosts.get(root);
     },
-    toKey: uri => uri.startsWith('file:') ? fileURLToPath(uri) : uri,
+    // A standard library file is its std: module (as a program importing it sees it).
+    toKey: uri => {
+      if (!uri.startsWith('file:')) return uri;
+      const file = fileURLToPath(uri);
+      const std = path.relative(path.join(ROOT, 'std'), file);
+      return /^[A-Za-z]\w*\.utu$/.test(std) ? `std:${std.slice(0, -4)}` : file;
+    },
     // The standard library's files, where this repository has them.
     toUri: key => {
-      if (!key.startsWith('std:')) return pathToFileURL(key).href;
+      // (A key that is a URI, `untitled:…`, is its own.)
+      if (!key.startsWith('std:')) return /^[a-z][\w+.-]+:/i.test(key) ? key : pathToFileURL(key).href;
       const file = path.join(ROOT, 'std', `${key.slice(4)}.utu`);
       return existsSync(file) ? pathToFileURL(file).href : null;
     },
@@ -497,7 +517,7 @@ function usage(code) {
   console.log(`usage: utu <command> <file.utu> [options]
 
   check <file>                 report what is wrong with the program
-  run <file> [-O mode]            build it, then call its main
+  run <file> [-O mode] [-- args]  build it, then call its main
   test <file> [-O mode]           build its tests, then run each
   bench <file> [-O mode]          build its benches, then time each (median per iteration)
   build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
@@ -571,7 +591,7 @@ const TRAPS = [
 // An `unreachable`, by the syntax it was made for: which trap it is.
 const UNREACHABLE = {
   assert_expr: 'Failed assert', fatal_expr: 'Reached fatal',
-  match_expr: 'No arm for the value', loop_match_expr: 'No arm for the value', alt_expr: 'No arm for the value',
+  slice_expr: 'Slice ends before it starts', match_expr: 'No arm for the value', loop_match_expr: 'No arm for the value', alt_expr: 'No arm for the value',
 };
 
 /**

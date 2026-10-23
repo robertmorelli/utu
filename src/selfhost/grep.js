@@ -212,10 +212,24 @@ export function findReferences(utu, files, name) {
   const index = programIndex(utu, files);
   const own = new Set(files.filter(f => f.role !== 2 && !f.key.startsWith('std:')).map(f => f.key));
   const out = [];
-  for (const { decl, kind } of index.declarations()) {
+  const all = index.declarations();
+  for (const { decl, kind } of all) {
     const definition = index.definition(decl);
     if (!definition || !own.has(definition.file) || index.text(definition) !== name) continue;
-    out.push({ kind, definition, references: index.references(decl, { includeDeclaration: false }) });
+    let references = index.references(decl, { includeDeclaration: false });
+    if (kind === 'Alias') {
+      // An import's alias (`using m |Point| …`): each place its file spells
+      // it so, whatever that resolves to through it (the module, its type).
+      references = index.names(definition.file)
+        .filter(n => n.at.start !== definition.start && index.text(n.at) === name && (n.decl === decl || index.text(index.definition(n.decl) ?? n.at) !== name))
+        .map(n => n.at);
+    } else if (kind === 'Module') {
+      // A module's own type (`struct &`), where it is named: by an alias.
+      for (const own of all.filter(d => d.owner === decl && index.text(index.definition(d.decl) ?? definition) === '&')) {
+        references = references.concat(index.references(own.decl, { includeDeclaration: false }).filter(at => index.text(at) !== '&'));
+      }
+    }
+    out.push({ kind, definition, references });
   }
   return out;
 }

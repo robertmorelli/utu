@@ -193,6 +193,17 @@ function strCases() {
     stdCase('Str', 'slice', 'std_str_slice_roundtrip', '', 'I32', 'if Str.slice("hello", 1, 3) == "el" { 1; } else { 0; }', [], 1),
     stdCase('Str', 'get', 'std_str_get', '', 'I32', 'Str.get("hello", 4)', [], 111),
     stdCase('Str', 'from_code_point', 'std_str_from_code_point', '', 'I32', 'if Str.from_code_point(65) + Str.from_code_point(128512) == "A😀" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'lt', 'std_str_lt', '', 'I32', 'if "B" < "a" and "ab" < "b" and not ("a" < "a") { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'le', 'std_str_le', '', 'I32', 'if "a" <= "a" and "a" <= "ab" and not ("b" <= "a") { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'gt', 'std_str_gt', '', 'I32', 'if "b" > "ab" and not ("a" > "a") { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'ge', 'std_str_ge', '', 'I32', 'if "ab" >= "a" and "a" >= "a" and not ("A" >= "a") { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'compare', 'std_str_compare', '', 'I32', 'Str.compare("a", "b") * 100 + Str.compare("b", "b") * 10 + Str.compare("c", "b")', [], -99),
+    stdCase('I32', 'min', 'std_i32_min', 'a: I32, b: I32', 'I32', 'I32.min(a, b)', [3, -4], -4),
+    stdCase('I32', 'max', 'std_i32_max', 'a: I32, b: I32', 'I32', 'I32.max(a, b)', [3, -4], 3),
+    stdCase('I32', 'abs', 'std_i32_abs', 'a: I32', 'I32', 'I32.abs(a)', [-7], 7),
+    stdCase('I64', 'min', 'std_i64_min', 'a: I64, b: I64', 'I64', 'I64.min(a, b)', [3n, -4n], -4n),
+    stdCase('I64', 'max', 'std_i64_max', 'a: I64, b: I64', 'I64', 'I64.max(a, b)', [3n, -4n], 3n),
+    stdCase('I64', 'abs', 'std_i64_abs', 'a: I64', 'I64', 'I64.abs(a)', [-9n], 9n),
     stdCase('Str', 'from_codes', 'std_str_from_codes', '', 'I32', 'if Str.from_codes([72, 105, 33, 0], 3) == "Hi!" and Str.from_codes([1], 0) == "" { 1; } else { 0; }', [], 1),
   ];
 }
