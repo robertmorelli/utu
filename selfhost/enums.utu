@@ -362,7 +362,7 @@ fn cast_arms(n: I32, s: I32) void {
     for (0 ..< k) |i| { rest = if i == 0 { n; } else { only_kid(w_kid(rest, 2)); }; };
     rest = w_kid(rest, 2);
     let first = first_run(rest);
-    if w_op[first] == Op.RefCast.to_i32() and w_count[first] == 1 and is_get(w_kid(first, 0), s) { last = first; };
+    if first >= 0 and w_op[first] == Op.RefCast.to_i32() and w_count[first] == 1 and is_get(w_kid(first, 0), s) { last = first; };
     let unreachable_rest = w_count[rest] == 1 and w_op[w_kid(rest, 0)] == Op.Unreachable.to_i32();
     // (No default and every variant tested, in a safe build: typed as the alt.)
     if unreachable_rest { w_type[rest] = vt_unreachable; };
@@ -423,7 +423,7 @@ fn alt_cast_arm(x: I32, s: I32) I32 {
     let test = w_kid(x, 0);
     if w_op[test] != Op.RefTest.to_i32() or not is_get(w_kid(test, 0), s) { return -1; };
     let cast = first_run(w_kid(x, 1));
-    if w_op[cast] != Op.RefCast.to_i32() or w_a[cast] != w_a[test] or not is_get(w_kid(cast, 0), s) { return -1; };
+    if cast < 0 or w_op[cast] != Op.RefCast.to_i32() or w_a[cast] != w_a[test] or not is_get(w_kid(cast, 0), s) { return -1; };
     w_a[test];
 }
 

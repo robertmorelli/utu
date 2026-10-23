@@ -1143,6 +1143,16 @@ export lib {
     fn range() Str { @json/\\ error L "{\\"l\\":\\"Mid\\"}" \\/; }
 }`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant "Mid" at line 1, column 6' },
       { literal: [['{"a":"q\\"t"}', 'quote'], ['{"q\\"k":1}', 'key'], ['{"b":100000}', 'exp'], ['{"plan":{}}', 'plan'], ['{}', 'x,y']] }],
+    // A recursive enum's encode: past its alt's tested arms, no instruction runs first (first_run -1); size builds indexed it and trapped.
+    [`enum Expr:
+    | Num { v: I32 }
+    | Add { l: Expr }
+    | Many { xs: Array[Expr] }
+export lib {
+    fn num() Str { @json/\\ encode Expr Num { v: 2 } \\/; }
+    fn deep() Str { @json/\\ encode Expr Add { l: Add { l: Num { v: 3 } } } \\/; }
+    fn many() Str { @json/\\ encode Expr Many { xs: Array[Expr].new(1, Num { v: 4 }) } \\/; }
+}`, { num: '{"kind":"Num","v":2}', deep: '{"kind":"Add","l":{"kind":"Add","l":{"kind":"Num","v":3}}}', many: '{"kind":"Many","xs":[{"kind":"Num","v":4}]}' }],
   ];
   for (const [source, expected, calls = {}] of boundary) {
     const file = await write(source);
