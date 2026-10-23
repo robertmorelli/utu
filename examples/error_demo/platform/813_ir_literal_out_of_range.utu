@@ -1,0 +1,9 @@
+// What: an @ir literal past its type's range (it wrapped to -2147483648)
+// Expect: 2147483648 does not fit I32
+fn big() I32 {
+    @ir/\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \/;
+}
+
+export main() I32 {
+    big();
+}

@@ -2196,26 +2196,26 @@
   "formatted": "12ae32cb1ec02d01"
  },
  "std/U32.utu analysis": {
-  "diagnostics": "ec5a69a9cfb3bf73",
-  "formatted": "d53e70b5fd88fcbf",
+  "diagnostics": "77942dd9ec62f6a9",
+  "formatted": "9d54760a8a3152e5",
   "entries": "1f66dddc358b123f",
-  "queries": "381a75d821426a2d",
+  "queries": "7602f182b65093d5",
   "graphs": "eaecebd14fbf8b64"
  },
  "std/U32.utu normal": {
-  "diagnostics": "ec5a69a9cfb3bf73",
-  "formatted": "d53e70b5fd88fcbf"
+  "diagnostics": "77942dd9ec62f6a9",
+  "formatted": "9d54760a8a3152e5"
  },
  "std/U64.utu analysis": {
-  "diagnostics": "18bb751a06316591",
-  "formatted": "516ad35305988548",
+  "diagnostics": "3a963712013bb00d",
+  "formatted": "55a0ddaa8b1de5ae",
   "entries": "9b1cf52ea36df7fb",
-  "queries": "aa184cbde491d9a1",
+  "queries": "3b3d277d5a37cc20",
   "graphs": "8f2950468a5d5be2"
  },
  "std/U64.utu normal": {
-  "diagnostics": "18bb751a06316591",
-  "formatted": "516ad35305988548"
+  "diagnostics": "3a963712013bb00d",
+  "formatted": "55a0ddaa8b1de5ae"
  },
  "std/V128.utu analysis": {
   "diagnostics": "f2ff07f77d8f9072",

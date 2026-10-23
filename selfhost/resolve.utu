@@ -250,6 +250,7 @@ enum(U8) Diag:
     | WutuKey
     | AwaitInGlobal
     | GenericGlobal   // unused: a generic mod's globals are per instance
+    | IrType          // an `@ir` operand or result of the wrong value type
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from

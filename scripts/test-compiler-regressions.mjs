@@ -1483,9 +1483,43 @@ export lib {
   }
 
   // A program's @ir that makes invalid Wasm: said at the body, before the engine fails.
-  const badIr = await selfhost(await write('fn f(a: F64, b: F64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }\nexport main() I32 { f(1.0, 2.0); }\n'));
+  const badIr = await selfhost(await write('fn f(a: I32) I32 { @ir/\\ <ir-i31-get-s><ir-ident name="a"/></ir-i31-get-s> \\/; }\nexport main() I32 { f(1); }\n'));
   assert.ok(badIr.errors?.some(e => e.startsWith('@ir in f does not make valid Wasm: ')), String(badIr.errors));
   checked++;
+  // A plain instruction's operands, the result, and a literal: checked by the
+  // compiler, so in every mode (small folded `i32.add` of two i64s to a number).
+  for (const [source, message] of [
+    ['fn f(a: I64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { f(3); }\n', '@ir <ir-i32-add> takes i32, given i64'],
+    ['fn f(a: I32, b: I32) I64 { @ir/\\ <ir-i64-add><ir-ident name="a"/><ir-ident name="b"/></ir-i64-add> \\/; }\nexport main() I64 { f(1, 2); }\n', '@ir <ir-i64-add> takes i64, given i32'],
+    ['fn f(a: F64, b: F64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }\nexport main() I32 { f(1.0, 2.0); }\n', '@ir <ir-i32-add> takes i32, given f64'],
+    ['fn f(a: I64) I32 { @ir/\\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \\/; }\nexport main() I32 { f(3); }\n', '@ir gives i64, not I32'],
+    ['fn f(a: I32) Bool { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \\/; }\nexport main() Bool { f(3); }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { f(3); }\n', '@ir <ir-i32-add> is written wrong here'],
+    ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \\/; }\nexport main() I32 { f(); }\n', '2147483648 does not fit I32'],
+    ['fn f() U32 { @ir/\\ <ir-lit kind="int" type-name="U32" value="-1"/> \\/; }\nexport main() U32 { f(); }\n', '-1 does not fit U32'],
+    ['fn f() U64 { @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551616"/> \\/; }\nexport main() U64 { f(); }\n', '18446744073709551616 does not fit U64'],
+  ]) {
+    const file = await write(source);
+    for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+      const { diagnostics } = await compileFile(utu, file, { mode });
+      assert.deepEqual(diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], `${mode}: ${source}`);
+      checked++;
+    }
+  }
+  // What @ir may give: a comparison, Bools and'ed, a Bool literal for Bool; literals at their types' edges.
+  const goodIr = await write('fn lt(a: I32, b: I32) Bool { @ir/\\ <ir-i32-lt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-lt-s> \\/; }\n'
+    + 'fn both(a: Bool, b: Bool) Bool { @ir/\\ <ir-i32-and><ir-ident name="a"/><ir-ident name="b"/></ir-i32-and> \\/; }\n'
+    + 'fn yes() Bool { @ir/\\ <ir-lit kind="int" type-name="Bool" value="1"/> \\/; }\n'
+    + 'fn lo() I32 { @ir/\\ <ir-lit kind="int" type-name="I32" value="-2147483648"/> \\/; }\n'
+    + 'fn hi() U64 { @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551615"/> \\/; }\n'
+    + 'fn wide(a: I32) I64 { @ir/\\ <ir-i64-extend-s><ir-ident name="a"/></ir-i64-extend-s> \\/; }\n'
+    + 'export main() Str { lt(1, 2).to_str() + " " + both(true, lt(3, 2)).to_str() + " " + yes().to_str() + " " + lo().to_str() + " " + hi().to_str() + " " + wide(-5).to_str(); }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, goodIr, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 'true false true -2147483648 18446744073709551615 -5', mode);
+    checked++;
+  }
 
   // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
   const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));

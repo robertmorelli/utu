@@ -2407,14 +2407,101 @@ fn expand(fi: I32, m: I32) I32 {
         let bad = ir_failed[0];
         let body = first_child(fn_body(fi_decl[fi]));
         if bad < 0 or reported_within(body) { return unsupported(decl_node[fi_decl[fi]]); };
+        if ir_failed_shape[0] == 3 {
+            report3(Diag.IrType, body, x_tag[bad], ir_fault[0], ir_fault[1], 0);
+            return error_value();
+        };
+        if ir_failed_shape[0] == 4 {
+            report3(Diag.IntegerOutOfRange, body, ir_fault[1], ir_fault[0], 0, -1);
+            return error_value();
+        };
         let ident = x_tag[bad] == known_word(Known.IrIdent);
         let named = x_attr(bad, known_word(Known.Name));
         let why = if ir_failed_shape[0] == 1 { 2; } else if ident { 1; } else { 0; };
         report2(Diag.IrUnknown, body, if ident and why == 1 { if named >= 0 { attr_word(named); } else { -1; }; } else { x_tag[bad]; }, why, -1);
         return error_value();
     };
+    let got = ir_vt(x, decls, fi, w_stack[w_stack.len() - 1]);
+    let bool_t = prelude(Prelude.Bool);
+    if (vt_scalar(result_vt) and vt_scalar(got) and got != result_vt) or (fi_result[fi] == bool_t and got == vt_i32 and not ir_bool(x, decls, fi)) {
+        w_stack.resize(m);
+        report3(Diag.IrType, first_child(fn_body(fi_decl[fi])), -1, fi_result[fi], got, 1);
+        return error_value();
+    };
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
     fi_result[fi];
+}
+
+fn vt_scalar(vt: I32) Bool { vt >= vt_i32 and vt <= vt_v128; }
+
+/// The value type an `@ir` element `x` gives (pushed as `node`): a
+/// parameter's by its type, not its argument's at this call.
+fn ir_vt(x: I32, decls: I32, fi: I32, node: I32) I32 {
+    if x_tag[x] == known_word(Known.IrIdent) { return repr(vl_item(fi_params[fi], param_index(x, decls))); };
+    w_type[node];
+}
+
+/// Whether an `@ir` element gives a Bool: a comparison, a Bool parameter
+/// or literal, `and`, `or`, `xor` of Bools, or an element the plain
+/// instructions are not (whose type its function's says).
+fn ir_bool(x: I32, decls: I32, fi: I32) Bool {
+    let tag = x_tag[x];
+    let bool_t = prelude(Prelude.Bool);
+    if tag == known_word(Known.IrIdent) { return vl_item(fi_params[fi], param_index(x, decls)) == bool_t; };
+    if tag == known_word(Known.IrLit) {
+        let tn = x_attr(x, known_word(Known.TypeName));
+        let d = if tn >= 0 { prelude_lookup(attr_word(tn)); } else { -1; };
+        return d >= 0 and decl_type(promoted(d), 0) == bool_t;
+    };
+    if tag == known_word(Known.IrSafeChecks) or tag == known_word(Known.IrRefEq) or tag == known_word(Known.IrRefNe)
+        or tag == known_word(Known.IrStringEq) or tag == known_word(Known.IrStringNe) { return true; };
+    let op = tag_opcode(tag);
+    if (op >= 69 and op <= 102) or op == 64851 { return true; };
+    // (An array's element, a string's length: as the type says.)
+    if op < 0 { return true; };
+    if op < 113 or op > 115 { return false; };
+    let c = x_child[x];
+    while (c >= 0) {
+        if not ir_bool(c, decls, fi) { return false; };
+        c = x_next[c];
+    };
+    true;
+}
+
+/// An `@ir` operand of the wrong value type: `want`, given `got`.
+fn ir_mistyped(x: I32, want: I32, got: I32) Bool {
+    ir_failed[0] = x;
+    ir_failed_shape[0] = 3;
+    ir_fault[0] = want;
+    ir_fault[1] = got;
+    false;
+}
+
+/// The value type a plain instruction's operands take.
+fn opcode_operand(op: I32) I32 {
+    if op <= 79 { return vt_i32; };
+    if op <= 90 { return vt_i64; };
+    if op <= 96 { return vt_f32; };
+    if op <= 102 { return vt_f64; };
+    if op <= 120 { return vt_i32; };
+    if op <= 138 { return vt_i64; };
+    if op <= 152 { return vt_f32; };
+    if op <= 166 { return vt_f64; };
+    if op == 167 or op == 180 or op == 181 or op == 185 or op == 186 or op == 191 { return vt_i64; };
+    if op == 172 or op == 173 or op == 178 or op == 179 or op == 183 or op == 184 or op == 190 { return vt_i32; };
+    if op == 182 or op == 189 or op == 170 or op == 171 or op == 176 or op == 177 { return vt_f64; };
+    if op <= 191 { return vt_f32; };
+    if op >= 64512 and op <= 64519 { return if (op - 64512) % 4 < 2 { vt_f32; } else { vt_f64; }; };
+    vt_v128;
+}
+
+/// How many operands a plain instruction takes.
+fn opcode_arity(op: I32) I32 {
+    if op == 69 or op == 80 or (op >= 103 and op <= 105) or (op >= 121 and op <= 123) { return 1; };
+    if (op >= 139 and op <= 145) or (op >= 153 and op <= 159) or (op >= 167 and op <= 191) { return 1; };
+    if (op >= 64512 and op <= 64519) or op == 64845 or op == 64851 { return 1; };
+    if op == 64850 { return 3; };
+    2;
 }
 
 /// By function instance, for @expand: its parameter declarations (-1: not
@@ -2451,8 +2538,11 @@ fn param_index(x: I32, decls: I32) I32 {
 
 /// The `@ir` element @translate did not know, or -1.
 vec ir_failed: I32 = [-1];
-/// Why: 0 an element the compiler does not know (or a name no parameter has), 1 one it knows written wrong.
+/// Why: 0 an element the compiler does not know (or a name no parameter has), 1 one it knows written wrong,
+/// 3 an operand of the wrong value type, 4 a literal out of range.
 vec ir_failed_shape: I32 = [0];
+/// For 3: the value type wanted, and given; for 4: the type, and the literal as a word.
+vec ir_fault: I32 = [0, 0];
 /// The functions of a program's own files whose bodies are @ir, in the last build.
 vec user_ir_decl: I32;
 
@@ -2464,7 +2554,7 @@ fn ir_malformed(x: I32) Bool {
 }
 
 /// The engine found the module invalid (`message`, a word): reported at
-/// each @ir body of the program's own, which the compiler does not check.
+/// each @ir body of the program's own, whose plain instructions alone the compiler checks.
 fn report_invalid_ir(message: I32) void {
     for (0 ..< user_ir_decl.len()) |k| {
         let d = user_ir_decl[k];
@@ -2497,6 +2587,13 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
         };
         let t = decl_type(promoted(named_t), 0);
         let neg = src[attr_start[v]] == 45;
+        if not ir_lit_fits(attr_start[v] + if neg { 1; } else { 0; }, attr_end[v], neg, t) {
+            ir_failed[0] = x;
+            ir_failed_shape[0] = 4;
+            ir_fault[0] = t;
+            ir_fault[1] = attr_word(v);
+            return false;
+        };
         let value: I64 = 0;
         for ((attr_start[v] + if neg { 1; } else { 0; }) ..< attr_end[v]) |i| { value = value * 10 + (src[i] - 48).to_i64(); };
         push_number(t, if neg { 0 - value; } else { value; }, false);
@@ -2511,12 +2608,43 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     };
     let m = w_mark();
     let c = x_child[x];
+    let n = 0;
+    let want = opcode_operand(opcode);
     while (c >= 0) {
         if not translate(c, decls, args, locals, direct, fi) { return false; };
+        let got = ir_vt(c, decls, fi, w_stack[w_stack.len() - 1]);
+        if got != want and got != vt_unreachable { return ir_mistyped(x, want, got); };
+        n += 1;
         c = x_next[c];
     };
+    if n != opcode_arity(opcode) { return ir_malformed(x); };
     w_node(Op.Plain, opcode_result(opcode), opcode, 0, m);
     true;
+}
+
+/// Whether an `@ir` literal's digits `s ..< e` (after its minus, when
+/// `neg`) fit integer type `t`, as `literal_fits` has a literal fit it.
+fn ir_lit_fits(s: I32, e: I32, neg: Bool, t: I32) Bool {
+    let bits = if t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { 32; }
+        else if t == prelude(Prelude.I64) or t == prelude(Prelude.U64) or t == prelude(Prelude.M64) { 64; } else { 0; };
+    if bits == 0 { return true; };
+    let signed = t == prelude(Prelude.I32) or t == prelude(Prelude.I64);
+    let i = s;
+    while (i < e - 1 and src[i] == 48) { i += 1; };
+    let max = "18446744073709551615";
+    if e - i > max.len() { return false; };
+    if e - i == max.len() {
+        if signed or bits == 32 or neg { return false; };
+        for (0 ..< max.len()) |k| { if src[i + k] != max[k] { return src[i + k] < max[k]; }; };
+        return true;
+    };
+    let v: U64 = 0;
+    for (i ..< e) |k| { v = v * 10 + (src[k] - 48).to_u64(); };
+    let one: U64 = 1;
+    let top = one << (bits - 1).to_u64();
+    if neg and not signed { return v == 0; };
+    if signed { return v <= if neg { top; } else { top - one; }; };
+    v <= top - one + top;
 }
 
 /// The value type a plain instruction leaves.

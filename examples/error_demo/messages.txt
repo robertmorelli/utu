@@ -5987,6 +5987,54 @@ ok
 10 │     \/;
 --- exit 1
 
+=== utu check examples/error_demo/platform/810_ir_operand_type.utu
+ ERROR  @ir <ir-i32-add> takes i32, given i64
+        ir-type · examples/error_demo/platform/810_ir_operand_type.utu:4:5
+
+ 2 │ // Expect: @ir <ir-i32-add> takes i32, given i64
+ 3 │ fn twice(a: I64) I32 {
+ 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ i64
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/811_ir_result_not_bool.utu
+ ERROR  @ir gives an i32, not a comparison's Bool
+        ir-type · examples/error_demo/platform/811_ir_result_not_bool.utu:4:5
+
+ 2 │ // Expect: @ir gives an i32, not a comparison's Bool
+ 3 │ fn odd(a: I32) Bool {
+ 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ not Bool
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/812_ir_result_type.utu
+ ERROR  @ir gives i64, not I32
+        ir-type · examples/error_demo/platform/812_ir_result_type.utu:4:5
+
+ 2 │ // Expect: @ir gives i64, not I32
+ 3 │ fn twice(a: I64) I32 {
+ 4 │     @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ not I32
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/813_ir_literal_out_of_range.utu
+ ERROR  2147483648 does not fit I32
+        integer-out-of-range · examples/error_demo/platform/813_ir_literal_out_of_range.utu:4:5
+
+ 2 │ // Expect: 2147483648 does not fit I32
+ 3 │ fn big() I32 {
+ 4 │     @ir/\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ I32
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/platform/81_wutu_css_missing_semicolon.utu
 ok
 --- exit 0
