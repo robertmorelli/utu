@@ -255,7 +255,9 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         let from = -1;
         while (c >= 0) {
             if is_null_literal(c) { has_null = true; } else if elem < 0 {
-                elem = type_only(c, -1, cx);
+                // (A nested literal's type checked as a whole, at each depth,
+                // would take time the square of the depth.)
+                elem = if is_kind(c, Node.Array_expr) and plain_array_literal(c) { plain_array_type(c, cx); } else { type_only(c, -1, cx); };
                 from = c;
             };
             c = next_sibling(c);
@@ -296,6 +298,44 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     let vt = repr(t);
     w_node(Op.ArrayNewFixed, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m);
     t;
+}
+
+/// Whether array literal `node` holds only number and Bool literals, nulls,
+/// and literals like it (none longer than `array.new_fixed` takes): checking
+/// it does nothing but make its code.
+fn plain_array_literal(node: I32) Bool {
+    if child_count(node) > max_new_fixed { return false; };
+    let c = first_child(node);
+    while (c >= 0) {
+        if is_kind(c, Node.Array_expr) {
+            if not plain_array_literal(c) { return false; };
+        } else {
+            let k = first_child(c);
+            if not (is_kind(c, Node.Literal) and (k < 0 or is_kind(k, Node.Int_lit) or is_kind(k, Node.Float_lit))) { return false; };
+        };
+        c = next_sibling(c);
+    };
+    true;
+}
+
+/// The type @check_array_lit gives plain array literal `node` (see
+/// @plain_array_literal) with nothing expected, found as it finds it.
+fn plain_array_type(node: I32, cx: Cx) I32 {
+    let elem = -1;
+    let has_null = false;
+    let c = first_child(node);
+    if c < 0 { elem = prelude(Prelude.I32); };
+    while (c >= 0) {
+        if is_null_literal(c) { has_null = true; } else if elem < 0 {
+            elem = if is_kind(c, Node.Array_expr) { plain_array_type(c, cx); } else { type_only(c, -1, cx); };
+        };
+        c = next_sibling(c);
+    };
+    if elem < 0 { elem = prelude(Prelude.I32); };
+    if ty_is(elem, Ty.Error) { return ty_error(); };
+    if has_null { elem = nullable(elem); };
+    if ty_is(elem, Ty.Error) { return ty_error(); };
+    array_of(elem);
 }
 
 /// The most elements `array.new_fixed` may make (wasm's limit).
