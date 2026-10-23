@@ -269,7 +269,7 @@ export mem node_child: I32;
 export mem node_next: I32;
 /// By node: its parent, or -1. Recorded as nodes are linked: @finish for a
 /// node's children, a comment's (@attach_within), and a graft's (@set_parent).
-mem node_parent: I32;
+vec node_parent: I32;
 /// Nodes made but not yet any node's children: the next node finished takes
 /// those above its mark.
 vec pending: I32;

@@ -63,9 +63,9 @@ enum(U8) Decl:
     | Ambiguous
 
 /// By declaration (its id): its Decl.
-mem decl_kind: U8;
+vec decl_kind: U8;
 /// Its name's word id, or -1.
-mem decl_name: I32;
+vec decl_name: I32;
 /// The node that declares it.
 export mem decl_node: I32;
 /// The declaration it is part of (module, struct, enum, function), or -1.
@@ -74,12 +74,12 @@ export mem decl_owner: I32;
 /// type it is a method or operator of, or -1. Alias: the module it names.
 /// Field: its index. Ambiguous (a name two opened modules have): one of
 /// them, and its owner the other.
-mem decl_a: I32;
+vec decl_a: I32;
 
 /// The declaration a name node refers to, by node; -1 for none.
 export mem node_decl: I32;
 /// By node: the alias a module name was written as (`ints` in `ints.Box`), or -1.
-mem node_alias: I32;
+vec node_alias: I32;
 
 /// A new declaration: its id.
 fn declare(kind: Decl, name: I32, node: I32, owner: I32) I32 {

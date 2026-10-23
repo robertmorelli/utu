@@ -25,11 +25,11 @@ enum(U8) Ty:
     | Foreign   // a host value (foreign.utu); a: its canonical spelling, a word
 
 /// By type: its @Ty, then its operands in @ty_a and @ty_b. One id per triple.
-mem ty_kind: U8;
-mem ty_a: I32;
-mem ty_b: I32;
+vec ty_kind: U8;
+vec ty_a: I32;
+vec ty_b: I32;
 /// Open addressing over types, -1 empty.
-mem ty_table: I32;
+vec ty_table: I32;
 
 vec inst_module: I32;
 /// A list of types.
