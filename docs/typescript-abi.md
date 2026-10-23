@@ -285,8 +285,8 @@ because bundlers need them for tree shaking.
 
 | App | `-O small` total gzip | `-O fast` total gzip |
 |---|---:|---:|
-| browser task board | 2,572 B | 2,640 B |
-| Pantry dashboard | 4,867 B | 5,198 B |
+| browser task board | 2,565 B | 3,063 B |
+| Pantry dashboard | 4,658 B | 5,816 B |
 
 Only used operations become Wasm imports and live JavaScript. Host references
 share one Wasm representation, so operations that differ only in declaration

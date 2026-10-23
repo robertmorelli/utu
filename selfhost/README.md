@@ -143,7 +143,7 @@ The compiler compiles itself. `scripts/selfhost-bootstrap.mjs` builds stage 1
 (this source, built by stage 0, the JavaScript compiler), stage 2 (built by
 stage 1), and stage 3 (built by stage 2), and checks that stages 2 and 3 are
 the same bytes. Stage 0 takes 3.9 s to build the compiler; stage 2 builds it
-in 69 ms. Every differential runs on any stage (`UTU_STAGE=2 node
+in 59 ms. Every differential runs on any stage (`UTU_STAGE=2 node
 scripts/selfhost-…`), and stage 2 agrees with stage 1 everywhere.
 
 ## Checking and code

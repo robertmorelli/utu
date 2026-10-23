@@ -3,10 +3,10 @@
 // builds runs in the page's sandboxed iframe (#play-preview), which loads
 // preview-runtime.js. build-docs copies this file to docs/playground/ and
 // stamps the ./vendor and ./preview-runtime.js references with content hashes.
-import { PLATFORM_SOURCES, catalogStdlib, compile, formatDiagnostics, loadCompiler } from './vendor/selfhost/utu.js?v=a61fae9824dd';
+import { PLATFORM_SOURCES, catalogStdlib, compile, formatDiagnostics, loadCompiler } from './vendor/selfhost/utu.js?v=430393cbd03a';
 
 const FILENAME = 'file:///playground/main.utu';
-const RUNTIME = new URL('./preview-runtime.js?v=d3f12baa252a', import.meta.url).href;
+const RUNTIME = new URL('./preview-runtime.js?v=c5727cf6aae9', import.meta.url).href;
 
 // The browser's declarations, fetched as a program needs them.
 const stdlib = catalogStdlib(PLATFORM_SOURCES, name =>
@@ -21,8 +21,8 @@ let listening;
 
 async function loadUtu() {
   const [wasm, spec] = await Promise.all([
-    fetch(new URL('./vendor/utu.wasm?v=53b5cc2df9cd', import.meta.url)).then(response => response.arrayBuffer()),
-    fetch(new URL('./vendor/utu.host.json?v=3b3197852e3b', import.meta.url)).then(response => response.json()),
+    fetch(new URL('./vendor/utu.wasm?v=ea7e192ec2eb', import.meta.url)).then(response => response.arrayBuffer()),
+    fetch(new URL('./vendor/utu.host.json?v=f2b00a7b738b', import.meta.url)).then(response => response.json()),
   ]);
   return loadCompiler(wasm, spec);
 }
