@@ -16,11 +16,7 @@ mod Buffer[T] {
             if checks() and self.length > 536870911 { fatal; };
             let capacity = if self.length == 0 { 8; } else { self.length * 2; };
             let grown = Array[T].new(capacity, value);
-            let i = 0;
-            while (i < self.length) {
-                grown[i] = self.values[i];
-                i += 1;
-            };
+            grown.copy_from(0, self.values, 0, self.length);
             self.values = grown;
         };
         self.values[self.length] = value;
