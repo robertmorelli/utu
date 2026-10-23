@@ -4,7 +4,7 @@
 //!
 //! A state machine, built during compilation (@build) into const vecs (@dfa):
 //! lexing is one table load per byte in a `loop match`. Each token's kind and
-//! byte span go into three mems.
+//! byte span go into three mems, and a word's interned id into a fourth.
 //!
 //! The lexer does not know the grammar: every word is a `Word` (the parser
 //! decides which are keywords, which are identifiers, and which are type
@@ -138,6 +138,8 @@ export mem src: U8;
 export mem tok_kind: U8;
 export mem tok_start: I32;
 export mem tok_end: I32;
+/// By token: a word's interned id, or -1 when it is not a word.
+export mem tok_word: I32;
 
 //! = The state machine, built at compile time
 
@@ -502,11 +504,13 @@ fn build() Machine {
 
 //! = Lexing
 
-/// Token t, written in the room lex reserved; the one after it.
+/// Token t, written in the room lex reserved (a word interned, as it is
+/// read); the one after it.
 fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
     tok_kind[t] = kind;
     tok_start[t] = start;
     tok_end[t] = end_;
+    tok_word[t] = if kind == Tok.Word.to_i32() { src.intern(start, end_); } else { -1; };
     t + 1;
 }
 
@@ -515,6 +519,7 @@ fn tokens_end(t: I32) I32 {
     tok_kind.resize(t);
     tok_start.resize(t);
     tok_end.resize(t);
+    tok_word.resize(t);
     t;
 }
 
@@ -576,6 +581,7 @@ fn lex(first: I32, n: I32) I32 {
     tok_kind.reserve(room);
     tok_start.reserve(room);
     tok_end.reserve(room);
+    tok_word.reserve(room);
     let i = first;
     let j = first;
     let open = 0;  // template strings in a `${`

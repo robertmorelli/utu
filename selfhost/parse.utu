@@ -258,8 +258,6 @@ enum(U8) Kw:
 /// The tokens the parser reads (positions of the lexer's tokens, without
 /// comments).
 export mem ptok: I32;
-/// By lexer token: its interned word id, or -1 when it is not a word.
-export mem tok_word: I32;
 
 /// The tree, by node id: its kind (a @Node). The `node_*` mems are its rows:
 /// its first token and the token after its last, its first child, and its next
@@ -269,6 +267,9 @@ export mem node_first: I32;
 export mem node_last: I32;
 export mem node_child: I32;
 export mem node_next: I32;
+/// By node: its parent, or -1. Recorded as nodes are linked: @finish for a
+/// node's children, a comment's (@attach_within), and a graft's (@set_parent).
+mem node_parent: I32;
 /// Nodes made but not yet any node's children: the next node finished takes
 /// those above its mark.
 vec pending: I32;
@@ -456,10 +457,15 @@ fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
     node_kind.push(kind.to_i32());
     node_first.push(first);
     node_last.push(last);
+    node_parent.push(-1);
     if at < n {
         node_child.push(pending[at]);
-        for (at ..< n - 1) |k| { node_next[pending[k]] = pending[k + 1]; };
+        for (at ..< n - 1) |k| {
+            node_next[pending[k]] = pending[k + 1];
+            node_parent[pending[k]] = id;
+        };
         node_next[pending[n - 1]] = -1;
+        node_parent[pending[n - 1]] = id;
     } else {
         node_child.push(-1);
     };
@@ -497,6 +503,7 @@ fn restore(p: Parser, s: Save) void {
     node_last.resize(s.nodes);
     node_child.resize(s.nodes);
     node_next.resize(s.nodes);
+    node_parent.resize(s.nodes);
     pending.resize(s.pending);
 }
 
@@ -2100,16 +2107,13 @@ fn intern_keywords() void {
     };
 }
 
-/// Intern the word tokens from `first` up to `last`, and list those the
-/// parser reads (all but comments) in @ptok.
-fn intern_words(first: I32, last: I32) void {
-    tok_word.resize(last);
+/// List the tokens from `first` up to `last` the parser reads (all but
+/// comments) in @ptok.
+fn parser_tokens(first: I32, last: I32) void {
     ptok.resize(last - first + 4);
     let p = 0;
     for (first ..< last) |t| {
-        let kind = tok_kind[t];
-        tok_word[t] = if kind == Tok.Word.to_i32() { src.intern(tok_start[t], tok_end[t]); } else { -1; };
-        if kind != Tok.Comment.to_i32() {
+        if tok_kind[t] != Tok.Comment.to_i32() {
             ptok[p] = t;
             p += 1;
         };
@@ -2128,7 +2132,7 @@ fn parse(first: I32, last: I32) I32 {
         parse_error_at[0] = last - 1;
         return -1;
     };
-    intern_words(first, last);
+    parser_tokens(first, last);
     let before = node_kind.len();
     pending.clear();
     parse_depth[0] = 0;
@@ -2207,6 +2211,7 @@ fn attach_within(parent: I32, comments: Comments) void {
             node_last.push(t + 1);
             node_child.push(-1);
             node_next.push(c);
+            node_parent.push(parent);
             if before < 0 { node_child[parent] = id; } else { node_next[before] = id; };
             before = id;
             comments.next += 1;
@@ -2220,7 +2225,7 @@ fn attach_within(parent: I32, comments: Comments) void {
 /// its place in the source.)
 fn parse_expression(first: I32, last: I32) I32 {
     if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
-    intern_words(first, last);
+    parser_tokens(first, last);
     let before = node_kind.len();
     pending.clear();
     try {

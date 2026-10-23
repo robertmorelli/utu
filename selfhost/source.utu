@@ -93,8 +93,6 @@ fn reset_program() void {
     dsl_failed.clear();
     jp_serial[0] = 0;
     st_serial[0] = 0;
-    // The kept nodes' parents are the same (nothing grafts into the prelude).
-    if node_parent.len() > kept[2] { node_parent.resize(kept[2]); };
     dsl_cursor[0] = -1;
     splice_start.clear();
     splice_end.clear();
@@ -122,6 +120,8 @@ fn reset_program() void {
     node_last.resize(nodes);
     node_child.resize(nodes);
     node_next.resize(nodes);
+    // The kept nodes' parents are the same (nothing grafts into the prelude).
+    node_parent.resize(nodes);
     let files = kept[3];
     file_start.resize(files);
     file_end.resize(files);
