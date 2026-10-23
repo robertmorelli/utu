@@ -406,6 +406,10 @@ fn cast_arms(n: I32, s: I32) void {
         arms[i] = w_kid(x, 1);
         x = only_kid(w_kid(x, 2));
     };
+    // The value's type now: the casts' input. Passes later may put a value
+    // of a subtype in its place (an inlined argument), which the casts to
+    // its siblings would not be within.
+    w_aux.push(w_type[subject]);
     w_op[n] = Op.CastArms.to_i32();
     w_a[n] = aux;
     w_b[n] = k;

@@ -519,7 +519,7 @@ enum(U16) Op:
     | Rethrow     // a: label of the try
     | V128Const   // a: four words in w_aux
     | NullElse    // children: a nullable value, then what it is when null; `block (v) (br_on_non_null 0) (else) end`
-    | CastArms    // a: the k types cast to, in w_aux; b: k; children: a value, k arms, the rest (see emit_cast_arms)
+    | CastArms    // a: the k types cast to, then the value's, in w_aux; b: k; children: a value, k arms, the rest (see emit_cast_arms)
     | Held        // the value a CastArms arm (or its rest) starts with, on the stack: emits nothing
 
 // The `Plain` instructions written by name, by their opcodes.
@@ -1188,7 +1188,7 @@ fn sweep_types() void {
             mark_vt(vt);
         };
         if op == Op.RefNull.to_i32() or op == Op.RefTest.to_i32() or op == Op.RefCast.to_i32() { mark_vt(w_a[node]); }
-        else if op == Op.CastArms.to_i32() { for (0 ..< w_b[node]) |i| { mark_vt(w_aux[w_a[node] + i]); }; }
+        else if op == Op.CastArms.to_i32() { for (0 ..< w_b[node] + 1) |i| { mark_vt(w_aux[w_a[node] + i]); }; }
         else if op == Op.CallRef.to_i32() or (op >= Op.StructNew.to_i32() and op <= Op.ArrayInitData.to_i32() and op != Op.ArrayLen.to_i32()) {
             mark_type(w_a[node]);
             if op == Op.ArrayCopy.to_i32() { mark_type(w_b[node]); };
@@ -2260,7 +2260,8 @@ fn emit_own(node: I32) void {
 
 /// `CastArms`, of a value (kid 0) of a reference type, k arms (kids 1 to
 /// k, cast to the types in w_aux), and the rest (kid k + 1): the value is
-/// cast to each type in turn (`br_on_cast`); the first that holds runs its
+/// cast to each type in turn (`br_on_cast`, from the type in w_aux after
+/// them, the value's when it was made); the first that holds runs its
 /// arm, given the cast value (a `Held` it starts with), and none, the rest,
 /// given the value as it was. One test and cast where a chain of `if`s
 /// tests (`ref.test`), then casts (`ref.cast`).
@@ -2276,7 +2277,7 @@ fn emit_own(node: I32) void {
 /// ```
 fn emit_casts(node: I32) void {
     let k = w_b[node];
-    let from = w_type[w_kid(node, 0)];
+    let from = w_aux[w_a[node] + k];
     for (0 ..< k) |i| {
         let to = w_aux[w_a[node] + i];
         op_fb(24);

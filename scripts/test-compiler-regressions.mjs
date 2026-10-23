@@ -1182,6 +1182,77 @@ export lib {
     fn deep() Str { @json/\\ encode Expr Add { l: Add { l: Num { v: 3 } } } \\/; }
     fn many() Str { @json/\\ encode Expr Many { xs: Array[Expr].new(1, Num { v: 4 }) } \\/; }
 }`, { num: '{"kind":"Num","v":2}', deep: '{"kind":"Add","l":{"kind":"Add","l":{"kind":"Num","v":3}}}', many: '{"kind":"Many","xs":[{"kind":"Num","v":4}]}' }],
+    // An alt in a function called once, given a variant: inlined, the value's type narrowed to it, and size builds' br_on_cast took that as its input (not a supertype of the other arms' casts).
+    [`enum E:
+    | A { x: I32 }
+    | B { y: I32 }
+fn f(e: E) I32 {
+    alt e {
+        A |a| => a.x,
+        B |b| => b.y,
+    };
+}
+export main() I32 { f(A { x: 1 }); }`, { main: 1 }],
+    [`enum E:
+    | A { x: I32 }
+    | B { y: I32 }
+    | C { z: I32 }
+    | D { w: I32 }
+fn f(e: E) I32 {
+    alt e {
+        A |a| => a.x,
+        B |b| => b.y,
+        C |c| => c.z,
+        D |d| => {
+            let t = d.w * 2;
+            t + 1;
+        },
+    };
+}
+export main() I32 { f(D { w: 4 }); }`, { main: 9 }],
+    [`enum E:
+    | A { x: I32 }
+    | B { y: I32 }
+fn f(e: ?E) I32 {
+    alt e orelse A { x: 9 } {
+        A |a| => a.x,
+        B |b| => b.y,
+    };
+}
+export main() I32 { let o: ?E = B { y: 6 }; f(o); }`, { main: 6 }],
+    [`proto P:
+    | get x: I32
+    | total() I32
+enum E[P]:
+    | A { x: I32 }
+    | B { x: I32, y: I32 }
+fn P[A].total |self| () I32 { self.x; }
+fn P[B].total |self| () I32 { self.x + self.y; }
+fn g(e: E) I32 {
+    alt e {
+        A |a| => a.x,
+        B |b| => b.y * 10,
+    };
+}
+fn f(p: P, e: E) I32 { p.total() + p.x + g(e); }
+export main() I32 { let b = B { x: 2, y: 5 }; f(b, b); }`, { main: 59 }],
+    // An alt on an arm's binding: the arm's value (on the stack, its br_on_cast's) was teed into the inner alt's value, inside its blocks.
+    [`enum E:
+    | A { x: I32 }
+    | B { y: I32 }
+enum F:
+    | G { e: E }
+    | H { n: I32 }
+fn f(v: F) I32 {
+    alt v {
+        G |g| => alt g.e {
+            A |a| => a.x,
+            B |b| => b.y,
+        },
+        H |h| => h.n,
+    };
+}
+export main() I32 { f(G { e: B { y: 7 } }); }`, { main: 7 }],
   ];
   for (const [source, expected, calls = {}] of boundary) {
     const file = await write(source);
