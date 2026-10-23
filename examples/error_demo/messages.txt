@@ -5896,6 +5896,71 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/790_mem_push_literal_out_of_range.utu
+ ERROR  256 does not fit U8
+        mem-element-range · examples/error_demo/platform/790_mem_push_literal_out_of_range.utu:6:16
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     bytes.push(256);
+   │                ━━━
+   │                ╰─ here
+ 7 │     bytes[0];
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/791_mem_push_negative_literal.utu
+ ERROR  -129 does not fit I8
+        mem-element-range · examples/error_demo/platform/791_mem_push_negative_literal.utu:6:17
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     deltas.push(-129);
+   │                 ━━━━
+   │                 ╰─ here
+ 7 │     deltas[0];
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/792_vec_push_literal_out_of_range.utu
+ ERROR  70000 does not fit U16
+        mem-element-range · examples/error_demo/platform/792_vec_push_literal_out_of_range.utu:6:16
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     ports.push(70000);
+   │                ━━━━━
+   │                ╰─ here
+ 7 │     ports[0];
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/793_mem_index_store_literal_out_of_range.utu
+ ERROR  256 does not fit U8
+        mem-element-range · examples/error_demo/platform/793_mem_index_store_literal_out_of_range.utu:7:16
+
+ 5 │ export main() I32 {
+ 6 │     bytes.push(0);
+ 7 │     bytes[0] = 256;
+   │                ━━━
+   │                ╰─ here
+ 8 │     bytes[0];
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/794_mem_compound_literal_out_of_range.utu
+ ERROR  300 does not fit U8
+        mem-element-range · examples/error_demo/platform/794_mem_compound_literal_out_of_range.utu:7:17
+
+ 5 │ export main() I32 {
+ 6 │     bytes.push(0);
+ 7 │     bytes[0] += 300;
+   │                 ━━━
+   │                 ╰─ here
+ 8 │     bytes[0];
+ 9 │ }
+--- exit 1
+
 === utu check examples/error_demo/platform/79_wutu_hash_comment.utu
  ERROR  Wutu comments are written // …
         dsl-error · examples/error_demo/platform/79_wutu_hash_comment.utu:8:9

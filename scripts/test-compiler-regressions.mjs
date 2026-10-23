@@ -872,6 +872,14 @@ export lib { fn run() Str {
     checked++;
   }
 
+  // A computed value stored into a narrow mem wraps (a literal past it is an error).
+  const wrapped = await write('mem m: U8;\nmem n: I8;\nvec v: U16;\nvec w: U8;\nexport lib { fn run() I32 {\n    let big = 256;\n    m.push(big); m.push(0 - 1); n.push(big - 385); v.push(big * 273 + 112); w.push(-big + 255);\n    m[0] += 250; m[0] += 250; w[0] = big + 3;\n    m[0] * 1000000 + m[1] * 10000 + n[0] + 1000 + v[0] + w[0];\n} }\n');
+  for (const mode of modes) {
+    const built = await compileFile(utu, wrapped, { mode });
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), 246555594, `${mode}: ${built.diagnostics?.map(d => d.message)}`);
+    checked++;
+  }
+
   // A mem resized below zero traps, where the build checks.
   const resized = await write('mem m: I32;\nexport lib { fn run() I32 { m.push(1); m.resize(-1); m.len(); } }\n');
   for (const mode of ['debug', 'small', 'fast']) {
@@ -1282,6 +1290,15 @@ export lib {
     ['const mem t: I32 = [~5, 3];\nexport lib { fn run() I32 { t[0]; } }\n', 'mem t: numbers only'],
     ['const mem t: I32 = [not 5];\nexport lib { fn run() I32 { t[0]; } }\n', 'mem t: numbers only'],
     ['const mem t: I32 = [4294967296];\nexport lib { fn run() I32 { t[0]; } }\n', '4294967296 does not fit I32'],
+    // A literal stored into a narrow mem must fit it, as in its initializer.
+    ['mem m: U8;\nexport lib { fn run() I32 { m.push(256); m[0]; } }\n', '256 does not fit U8'],
+    ['mem m: U8;\nexport lib { fn run() I32 { m.push(-1); m[0]; } }\n', '-1 does not fit U8'],
+    ['mem m: I8;\nexport lib { fn run() I32 { m.push(-129); m[0]; } }\n', '-129 does not fit I8'],
+    ['vec v: U16;\nexport lib { fn run() I32 { v.push(70000); v[0]; } }\n', '70000 does not fit U16'],
+    ['vec v: U8;\nexport lib { fn run() I32 { v.push(-1); v[0]; } }\n', '-1 does not fit U8'],
+    ['mem m: I16;\nexport lib { fn run() I32 { m.push(0); m[0] = 32768; m[0]; } }\n', '32768 does not fit I16'],
+    ['vec v: U8;\nexport lib { fn run() I32 { v.push(0); v[0] = 256; v[0]; } }\n', '256 does not fit U8'],
+    ['mem m: U8;\nexport lib { fn run() I32 { m.push(0); m[0] += 300; m[0]; } }\n', '300 does not fit U8'],
     // Integer enums: counted in 64 bits, over an integer of at most 32.
     ['enum(I32) E:\n    | A = 2147483647\n    | B\nexport lib { fn run() I32 { E.A.to_i32(); } }\n', '2147483648 does not fit I32'],
     ['enum(I32) E:\n    | A = 4294967296\nexport lib { fn run() I32 { E.A.to_i32(); } }\n', '4294967296 does not fit I32'],

@@ -567,6 +567,19 @@ fn check_mem_index(node: I32, cx: Cx) I32 {
     t;
 }
 
+/// A number literal `value` (or `-` and one) stored into narrow mem `decl`
+/// must fit its element type; a computed value wraps.
+fn check_narrow_literal(decl: I32, value: I32) void {
+    let s = mem_storage(decl);
+    if value < 0 or storage_shift(s) > 1 or mem_value_type(decl) != prelude(Prelude.I32) { return; };
+    let negate = is_kind(value, Node.Unary_expr) and tok_kind[node_first[value]] == Tok.Minus.to_i32();
+    let e = if negate { last_child(value); } else { value; };
+    let lit = if is_kind(e, Node.Literal) { first_child(e); } else { -1; };
+    if lit < 0 or not is_kind(lit, Node.Int_lit) { return; };
+    if int_fits(lit, negate, 8 << storage_shift(s), s == Storage.I8 or s == Storage.I16) { return; };
+    report3(Diag.MemElementRange, value, decl_name[decl], decl, 0, intern_text(pick(negate, "-", "") + token_text(node_first[lit])));
+}
+
 /// `name[i] = v`, `name[i] op= v`.
 fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let decl = node_decl[first_child(target)];
@@ -585,6 +598,7 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
         coerce(check_expr(last_child(target), i32_t, cx), i32_t, last_child(target));
         if not in_array { mem_address(s, m); };
         coerce(check_expr(value, t, cx), t, value);
+        check_narrow_literal(decl, value);
         if in_array { array_access(decl, m, Op.ArraySet, vt_none); } else { w_node(Op.Store, vt_none, mem_id, store_opcode(s), m); };
         return ty_void();
     };
@@ -605,6 +619,8 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
         w_node(Op.Load, storage_vt(s), mem_id, load_opcode(s), mg);
     };
     apply_operator(compound_word(op, node_last[target]), t, value, at, cx, mg);
+    // (A shift's count is no element.)
+    if op != Tok.ShlEq.to_i32() and op != Tok.ShrEq.to_i32() and op != Tok.Shr3Eq.to_i32() { check_narrow_literal(decl, value); };
     if in_array {
         w_get(vt_i32, at_local);
         w_insert(ms, w_pop());
@@ -665,6 +681,7 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
     if method == MemMethod.Push.to_i32() {
         let t = mem_value_type(decl);
         coerce(check_expr(a, t, cx), t, a);
+        check_narrow_literal(decl, a);
         w_node(Op.Call, vt_none, helpers, 0, m);
         return ty_void();
     };

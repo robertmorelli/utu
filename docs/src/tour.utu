@@ -1592,7 +1592,7 @@ mod tour {
                 code {
                     "vec";
                 }
-                " are top-level growable arrays of scalars for hot loops.";
+                " are top-level growable arrays of scalars for hot loops. A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error.";
             }
             = code.block(arrays_sample());
             = code.block(generator_sample());
