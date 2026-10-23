@@ -62,6 +62,29 @@ fn push_pattern_test(s: I32, t: I32, v: I64) void {
 /// The arms of a match, with their values (in `arm_values`) and the default.
 vec arm_nodes: I32;
 vec arm_values: I64;
+/// The arms' distinct values while a match's arms are read: a hash table
+/// of the first and last arm with each (-1 empty); by arm, the next with
+/// its value, or -1.
+vec arm_slots: I32;
+vec arm_slot_last: I32;
+vec arm_same: I32;
+
+/// Make @arm_slots room for `n` values, empty.
+fn arm_table(n: I32) void {
+    let size = 16;
+    while (size < n * 2) { size *= 2; };
+    arm_slots.resize(size);
+    arm_slot_last.resize(size);
+    for (0 ..< size) |i| { arm_slots[i] = -1; };
+}
+
+/// The slot of value `v` in @arm_slots: its own, or the empty one it goes in.
+fn arm_slot(v: I64) I32 {
+    let mask = arm_slots.len() - 1;
+    let i = ((v.to_i32() ^ (v >> 32).to_i32()) * -1640531535) & mask;
+    while (arm_slots[i] >= 0 and arm_values[arm_slots[i]] != v) { i = (i + 1) & mask; };
+    i;
+}
 
 /// `match e { p => a, …, ~> d }` and `loop match`.
 fn check_match(node: I32, expect: I32, cx: Cx) I32 {
@@ -84,6 +107,13 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let faulted = false;
     let unknown_arm = false;
     let c = next_sibling(scrutinee);
+    let count = 0;
+    while (c >= 0) {
+        count += 1;
+        c = next_sibling(c);
+    };
+    arm_table(count);
+    c = next_sibling(scrutinee);
     pattern_fault.resize(1);
     while (c >= 0) {
         if is_kind(c, Node.Match_default) { default_ = c; }
@@ -101,12 +131,18 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
                 report2(Diag.MatchPattern, c, -1, fault, st);
                 in_instance(cx.inst);
             } else {
-                for (first_arm ..< arm_nodes.len()) |k| {
-                    if arm_values[k] == v {
-                        report(Diag.DuplicatePattern, c, -1);
-                        diag_place(Extra.Related, first_child(arm_nodes[k]), "first here");
-                    };
+                // Reported once for each arm before with the value, there.
+                let slot = arm_slot(v);
+                let k = arm_slots[slot];
+                while (k >= 0) {
+                    report(Diag.DuplicatePattern, c, -1);
+                    diag_place(Extra.Related, first_child(arm_nodes[k]), "first here");
+                    k = arm_same[k];
                 };
+                if arm_slots[slot] < 0 { arm_slots[slot] = arm_nodes.len(); } else { arm_same[arm_slot_last[slot]] = arm_nodes.len(); };
+                arm_slot_last[slot] = arm_nodes.len();
+                arm_same.resize(arm_nodes.len() + 1);
+                arm_same[arm_nodes.len()] = -1;
                 arm_nodes.push(c);
                 arm_values.push(v);
             };
@@ -144,9 +180,7 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
         while (c >= 0) {
             if is_kind(c, Node.Variant) {
                 let v = variant_value[node_decl[first_child(c)]].to_i64();
-                let covered = false;
-                for (first_arm ..< last_arm) |k| { if arm_values[k] == v { covered = true; }; };
-                if not covered {
+                if arm_slots[arm_slot(v)] < 0 {
                     report2(Diag.NonExhaustive, node, decl_name[node_decl[first_child(c)]], 2, st);
                     return;
                 };
@@ -196,16 +230,12 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     // br_table targets, for each value from lo to hi.
     let targets = w_aux.len();
     let span = (hi - lo).to_i32() + 1;
-    for (0 ..< span) |i| {
-        let target = def;
-        let k = first;
-        while (k < last) {
-            if arm_values[k] == lo + i.to_i64() {
-                target = labels[k - first];
-                k = last;
-            } else { k += 1; };
-        };
-        w_aux.push(target);
+    for (0 ..< span) |i| { w_aux.push(def); };
+    // (The first arm with a value takes it.)
+    let k = last - 1;
+    while (k >= first) {
+        w_aux[targets + (arm_values[k] - lo).to_i32()] = labels[k - first];
+        k -= 1;
     };
     w_aux.push(def);
     let m_end = w_mark();

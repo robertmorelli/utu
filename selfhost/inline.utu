@@ -15,6 +15,15 @@
 vec inl_state: U8;
 /// By function: its body's size in nodes, once done.
 vec inl_size: I32;
+/// By function: its body's greatest label, once done.
+vec inl_label: I32;
+/// By function: whether its body has a `return_call` (0 not known yet, 1
+/// no, 2 yes). Inlining neither adds nor removes one.
+vec inl_return_call: U8;
+/// By function: where in @inl_param_set its parameters' flags start (-1
+/// not known yet); each is 1 when the body assigns that parameter.
+vec inl_params_at: I32;
+vec inl_param_set: U8;
 /// While copying a callee: its locals' indices in the caller.
 vec inl_local_map: I32;
 /// While copying: how far its labels move, and where a `return` goes.
@@ -24,6 +33,8 @@ vec inl_return_label: I32 = [0];
 vec inl_site: I32 = [-1];
 /// The calls found in a body.
 vec inl_calls: I32;
+/// How many nodes the calls inlined so far added to the body.
+vec inl_grown: I32 = [0];
 
 /// Inlined at every call (-O3 may be big). The limits are the fastest found
 /// for the programs in benchmarks/ (in d8) and the compiler building itself:
@@ -38,9 +49,16 @@ let inline_caller_nodes: I32 = 20000;
 fn inline_module() void {
     inl_state.resize(func_kind.len());
     inl_size.resize(func_kind.len());
+    inl_label.resize(func_kind.len());
+    inl_return_call.resize(func_kind.len());
+    inl_params_at.resize(func_kind.len());
+    inl_param_set.clear();
     for (0 ..< func_kind.len()) |f| {
         inl_state[f] = 0;
         inl_size[f] = 0;
+        inl_label[f] = 0;
+        inl_return_call[f] = 0;
+        inl_params_at[f] = -1;
     };
     for (0 ..< func_kind.len()) |f| { if optimizable(f) and func_code[f] < 0 { inline_into(f); }; };
     for (0 ..< func_kind.len()) |f| {
@@ -63,6 +81,8 @@ fn inline_into(f: I32) void {
     for (calls) |c| { if inlinable(w_a[c]) { inline_into(w_a[c]); }; };
     let size = inl_nodes(func_body[f]);
     let label = max_label(func_body[f]);
+    inl_grown[0] = 0;
+    let before = size;
     for (calls) |c| {
         let g = w_a[c];
         if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and size + inl_size[g] <= inline_caller_nodes
@@ -72,13 +92,37 @@ fn inline_into(f: I32) void {
         };
     };
     inl_state[f] = 2;
-    inl_size[f] = inl_nodes(func_body[f]);
+    inl_size[f] = before + inl_grown[0];
+    // Each copy's labels are past those before it, and its block past them.
+    inl_label[f] = label;
 }
 
 /// A function whose body can be copied into a caller.
 fn inlinable(g: I32) Bool {
     func_kind[g] == FuncKind.Defined.to_i32() and func_body[g] >= 0 and func_code[g] < 0
-        and vl_len[ht_b[func_type_of[g]]] <= 1 and not has_op(func_body[g], Op.ReturnCall.to_i32());
+        and vl_len[ht_b[func_type_of[g]]] <= 1 and not returns_by_call(g);
+}
+
+fn returns_by_call(g: I32) Bool {
+    if inl_return_call[g] == 0 { inl_return_call[g] = if has_op(func_body[g], Op.ReturnCall.to_i32()) { 2; } else { 1; }; };
+    inl_return_call[g] == 2;
+}
+
+/// Whether done function `g` assigns its parameter `i`.
+fn assigns_param(g: I32, i: I32) Bool {
+    if inl_params_at[g] < 0 {
+        inl_params_at[g] = inl_param_set.len();
+        for (0 ..< vl_len[ht_a[func_type_of[g]]]) |k| { inl_param_set.push(0); };
+        note_params_set(func_body[g], inl_params_at[g], vl_len[ht_a[func_type_of[g]]]);
+    };
+    inl_param_set[inl_params_at[g] + i] == 1;
+}
+
+/// Flags the parameters (below `np`) assigned under node `n`, at `at`.
+fn note_params_set(n: I32, at: I32, np: I32) void {
+    let op = w_op[n];
+    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] < np { inl_param_set[at + w_a[n]] = 1; };
+    for (0 ..< w_count[n]) |i| { note_params_set(w_kid(n, i), at, np); };
 }
 
 /// Call `c` in `f`, to `g`, becomes a block of g's body. `label` is the
@@ -93,13 +137,13 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
     // caller's own type tests of it still hold inside).
     for (0 ..< np) |i| {
         let arg = w_kid(c, i);
-        let same = w_op[arg] == Op.LocalGet.to_i32() and not inl_assigns(func_body[g], i);
+        let same = w_op[arg] == Op.LocalGet.to_i32() and not assigns_param(g, i);
         if same { for (i + 1 ..< np) |j| { if inl_assigns(w_kid(c, j), w_a[arg]) { same = false; }; }; };
         inl_local_map[i] = if same { w_a[arg]; } else { add_local(f, vl_item(params, i)); };
     };
     for (0 ..< nl) |i| { inl_local_map[np + i] = add_local(f, local_types[func_locals[g] + i]); };
     inl_label_offset[0] = label;
-    let block = label + max_label(func_body[g]) + 1;
+    let block = label + inl_label[g] + 1;
     inl_return_label[0] = block;
     inl_site[0] = w_src[c];
     // The arguments set the parameters, in order; then the body.
@@ -110,9 +154,13 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
             let ms = w_mark();
             w_push(arg);
             w_node(Op.LocalSet, vt_none, inl_local_map[i], 0, ms);
+            inl_grown[0] += 1;
+        } else {
+            inl_grown[0] -= 1;
         };
     };
     w_push(inl_copy(func_body[g]));
+    inl_grown[0] += inl_size[g];
     // The call node becomes the block (its type, the call's result, stays).
     let n = w_mark() - m;
     w_first[c] = w_kids.len();
@@ -143,8 +191,14 @@ fn add_local(f: I32, vt: I32) I32 {
 /// A copy of node `n` of the callee being inlined, in the caller's locals
 /// and labels.
 fn inl_copy(n: I32) I32 {
-    let m = w_mark();
-    for (0 ..< w_count[n]) |i| { w_push(inl_copy(w_kid(n, i))); };
+    // (Built in place, as w_node would: its kids' room first, then them.)
+    let count = w_count[n];
+    let first = w_kids.len();
+    for (0 ..< count) |i| { w_kids.push(-1); };
+    for (0 ..< count) |i| {
+        let kid = inl_copy(w_kid(n, i));
+        w_kids[first + i] = kid;
+    };
     let op = w_op[n];
     let a = w_a[n];
     if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
@@ -159,11 +213,19 @@ fn inl_copy(n: I32) I32 {
         op = Op.Br.to_i32();
         a = inl_return_label[0];
     };
-    let copy = w_node(Op.from_i32(op), w_type[n], a, w_b[n], m);
+    let vt = w_type[n];
+    if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple); };
+    let id = w_op.len();
+    w_op.push(op);
+    w_type.push(vt);
     // Its syntax, the callee's, and the call it is inlined at: a source map places it so.
-    w_src[copy] = w_src[n];
-    w_site[copy] = inl_site[0];
-    w_pop();
+    w_src.push(w_src[n]);
+    w_site.push(inl_site[0]);
+    w_a.push(a);
+    w_b.push(w_b[n]);
+    w_first.push(first);
+    w_count.push(count);
+    id;
 }
 
 /// An op whose `a` is a label: a block it opens, or one it branches to.
@@ -406,8 +468,8 @@ fn h_walk_function(f: I32) void {
     h_place.clear();
     h_set.resize(total);
     for (0 ..< total) |i| { h_set[i] = -1; };
-    h_targeted.resize(max_label(func_body[f]) + 1);
-    for (0 ..< h_targeted.len()) |l| { h_targeted[l] = 0; };
+    // (Grown to the labels targeted, as the walk finds them.)
+    h_targeted.clear();
     h_walk(func_body[f], -1, 0);
 }
 
@@ -426,7 +488,15 @@ fn h_walk(n: I32, parent: I32, place: I32) void {
     for (0 ..< w_count[n]) |i| { h_walk(w_kid(n, i), n, i); };
 }
 
-fn h_target(label: I32) void { if label >= 0 and label < h_targeted.len() { h_targeted[label] = 1; }; }
+fn h_target(label: I32) void {
+    if label < 0 { return; };
+    if label >= h_targeted.len() {
+        let old = h_targeted.len();
+        h_targeted.resize(label + 1);
+        for (old ..< label + 1) |l| { h_targeted[l] = 0; };
+    };
+    h_targeted[label] = 1;
+}
 
 /// The struct.new whose value `n` is, through blocks nothing branches to
 /// and sequences (whose other parts run first), or -1.

@@ -128,6 +128,45 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
+  // Long matches and deep literals, in every build mode: each once took time
+  // the square of its size (a 16,384-deep literal trapped, out of memory).
+  const arms = Array.from({ length: 3000 }, (_, i) => `        ${i * 2} => ${i},`).join('\n');
+  const variants = Array.from({ length: 40 }, (_, i) => `    | V${i}`).join('\n');
+  const covered = Array.from({ length: 40 }, (_, i) => `        Many.V${i} => ${i * i},`).join('\n');
+  const deep = '['.repeat(300) + '[null, [7, 8]], [[9]]' + ']'.repeat(300);
+  const large = await write(`enum(U8) Many:
+${variants}
+fn dense(x: I32) I32 {
+    match x {
+${arms}
+        ~> -1,
+    };
+}
+fn sparse(x: I32) I32 { match x { 5 => 1, 500 => 2, 50000 => 3, -7 => 4, ~> 0, }; }
+fn square(m: Many) I32 {
+    match m {
+${covered}
+    };
+}
+fn deep_len() I32 {
+    let a = ${deep};
+    let inner = a${'[0]'.repeat(300)};
+    inner.len() * 100 + (inner[1] orelse fatal).len() * 10 + (inner[1] orelse fatal)[1];
+}
+export lib {
+    fn run() I32 {
+        dense(5998) * 10000 + dense(4) * 1000 + dense(3) + 2 + sparse(-7) * 100 + sparse(50000) * 10 + square(Many.V39) + deep_len();
+    }
+}
+`);
+  const want = 2999 * 10000 + 2 * 1000 + -1 + 2 + 4 * 100 + 3 * 10 + 39 * 39 + (2 * 100 + 2 * 10 + 8);
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, large, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), want, mode);
+    checked++;
+  }
+
   // Structs returned as their fields (selfhost/inline.utu, -O small and
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.
@@ -781,6 +820,9 @@ export lib {
     // Where an expected type came from: a parameter, a result.
     ['fn g(n: I32) I32 { n; }\nfn f() I32 { g("x"); }\n', 'g takes I32, got Str'],
     ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
+    // Arms of one value, and enum variants without one, found by value.
+    ['fn f(x: I32) I32 { match x { 1 => 1, 2 => 2, 1 => 3, ~> 0, }; }\nexport main() I32 { f(1); }\n', 'Duplicate pattern 1'],
+    [`enum(U8) Many:\n${variants}\nfn f(m: Many) I32 { match m {\n${covered.split('\n').filter(l => !l.includes('V17 ')).join('\n')}\n}; }\nexport main() I32 { f(Many.V1); }\n`, 'match misses Many.V17'],
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
     ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
