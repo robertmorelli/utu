@@ -105,6 +105,20 @@ calls. A trap in a copy still names the callee's line, `(inlined into
 main)`. Copies at several calls, each bigger than the call, are not made:
 they shifted V8's own inlining (DeltaBlue 6% slower).
 
+## Inlining for speed
+
+At `-O fast` (and `fastUnsafe`) a call becomes its callee's body when the
+callee is small (300 IR nodes, after its own calls are inlined), when the
+call is inside a loop (2000), or when it is the callee's only call (2000).
+The callee's parameters and locals become the caller's. Bigger copies at
+calls outside loops made DeltaBlue's module twice the size for no speed.
+
+A `for` over a range is unrolled four ways only when its body, with each
+direct call counted as its callee's body (as inlining will paste it into
+every copy), is at most 48 IR nodes: a loop around a call to a function
+with its own loop is not unrolled. DeltaBlue's module went from 45 KB to
+11 KB at the same speed.
+
 ## Structs returned as their fields
 
 At `-O small` and `-O fast` (and their unsafe forms), a function that

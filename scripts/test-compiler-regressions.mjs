@@ -809,6 +809,48 @@ export lib {
     fn longs() I64 { I64.abs(-9.to_i64()) + I64.max(2.to_i64(), 5.to_i64()); }
     fn proto_method() I32 { let s: Shape = Sq { s: 3 }; s.twice(); }
 }`, { order: 'Al,al,b,bo', cmp: -99, tests: true, ints: -363, longs: 14n, proto_method: 18 }],
+    // Calls in a loop's body (unrolled -O fast only when the inlined copies
+    // stay small), and locals sharing slots through loops (-O fast's coalescing).
+    [`fn step(x: I32) I32 {
+    let t = x * 3;
+    t ^ (t >> 2);
+}
+fn spread(x: I32) I32 {
+    let s = 0;
+    for (0 ..< 4) |k| { s += step(x + k); };
+    s;
+}
+export lib {
+    fn calls() I32 {
+        let s = 0;
+        for (0 ..< 11) |i| { s += step(i) + spread(i); };
+        s;
+    }
+    fn last_set() I32 {
+        let found = -1;
+        for (0 ..< 10) |i| {
+            if i > 6 { break; };
+            let v = i * 7;
+            let w = v + 1;
+            found = w;
+        };
+        found;
+    }
+    fn nested() I32 {
+        let total = 0;
+        for (0 ..< 5) |i| {
+            let base = i * 10;
+            for (0 ..< 3) |j| {
+                let x = base + j;
+                let y = x * 2;
+                total += y - x;
+            };
+            let after = base + 1;
+            total += after;
+        };
+        total;
+    }
+}`, { calls: 1096, last_set: 43, nested: 420 }],
   ];
   for (const [source, expected] of selfhostPrograms) {
     const file = await write(source);

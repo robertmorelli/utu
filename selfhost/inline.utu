@@ -1,7 +1,7 @@
 //! = Inlining (-O3)
 //!
-//! A call to a small function, or to one called from one place, becomes its
-//! body: the arguments set the callee's parameters, which become locals of
+//! A call to a small function, to a bigger one from inside a loop, or to one
+//! called from one place, becomes its body: the arguments set the callee's parameters, which become locals of
 //! the caller (as its locals do), its labels are numbered past the caller's,
 //! and each `return` leaves a block around the copy. V8 inlines wasm only
 //! within a budget, which utu's many small functions (an enum method each,
@@ -34,15 +34,19 @@ vec inl_site: I32 = [-1];
 /// The call, when the callee is a helper (data.utu), else -1: its copy is
 /// the call's syntax, as its own is its first use's.
 vec inl_helper: I32 = [-1];
-/// The calls found in a body.
+/// The calls found in a body, and whether each is inside a loop (1) or not (0).
 vec inl_calls: I32;
+vec inl_call_loop: U8;
 /// How many nodes the calls inlined so far added to the body.
 vec inl_grown: I32 = [0];
 
-/// Inlined at every call (-O3 may be big). The limits are the fastest found
-/// for the programs in benchmarks/ (in d8) and the compiler building itself:
-/// below 2000 DeltaBlue slows, above it nothing gains and the code grows.
-let inline_always_nodes: I32 = 2000;
+/// Inlined at every call. The limits are the smallest code found as fast as
+/// any for the programs in benchmarks/ (V8): below 300 DeltaBlue slows
+/// (Constraint.execute, 2.4x at 40), and copies of what is bigger, at calls
+/// outside loops, made its module 2x for nothing.
+let inline_always_nodes: I32 = 300;
+/// Inlined at a call inside a loop (DeltaBlue's recalculate: 7% at 300).
+let inline_loop_nodes: I32 = 2000;
 /// Inlined where it is called from one place.
 let inline_once_nodes: I32 = 2000;
 /// Inlining stops growing a function past this many nodes.
@@ -78,18 +82,25 @@ fn inline_into(f: I32) void {
     // The calls first: inlining rewrites the body, and the callees' own
     // inlining reuses @inl_calls.
     inl_calls.clear();
-    calls_in(func_body[f]);
+    inl_call_loop.clear();
+    calls_in(func_body[f], false);
     let calls = Array[I32].new(inl_calls.len(), 0);
-    for (0 ..< inl_calls.len()) |i| { calls[i] = inl_calls[i]; };
+    let looped = Array[Bool].new(inl_calls.len(), false);
+    for (0 ..< inl_calls.len()) |i| {
+        calls[i] = inl_calls[i];
+        looped[i] = inl_call_loop[i] == 1;
+    };
     for (calls) |c| { if inlinable(w_a[c]) { inline_into(w_a[c]); }; };
     let size = inl_nodes(func_body[f]);
     let label = max_label(func_body[f]);
     inl_grown[0] = 0;
     let before = size;
-    for (calls) |c| {
+    for (0 ..< calls.len()) |i| {
+        let c = calls[i];
         let g = w_a[c];
         if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and size + inl_size[g] <= inline_caller_nodes
-            and (inl_size[g] <= inline_always_nodes or (func_uses[g] == 1 and inl_size[g] <= inline_once_nodes)) {
+            and (inl_size[g] <= inline_always_nodes or (looped[i] and inl_size[g] <= inline_loop_nodes)
+                or (func_uses[g] == 1 and inl_size[g] <= inline_once_nodes)) {
             label = inline_call(f, c, g, label);
             size += inl_size[g];
         };
@@ -285,10 +296,14 @@ fn has_op(n: I32, op: I32) Bool {
     false;
 }
 
-/// The calls under node `n`, onto @inl_calls.
-fn calls_in(n: I32) void {
-    if w_op[n] == Op.Call.to_i32() { inl_calls.push(n); };
-    for (0 ..< w_count[n]) |i| { calls_in(w_kid(n, i)); };
+/// The calls under node `n` (`looped`: inside a loop), onto @inl_calls.
+fn calls_in(n: I32, looped: Bool) void {
+    if w_op[n] == Op.Call.to_i32() {
+        inl_calls.push(n);
+        if looped { inl_call_loop.push(1); } else { inl_call_loop.push(0); };
+    };
+    let inner = looped or w_op[n] == Op.Loop.to_i32();
+    for (0 ..< w_count[n]) |i| { calls_in(w_kid(n, i), inner); };
 }
 
 /// Whether anything under node `n` assigns local `local`.
