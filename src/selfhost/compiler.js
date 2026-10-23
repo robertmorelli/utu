@@ -248,7 +248,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   // written first, where they stay for the programs after.
   if (!await bindForeign(utu, foreign, host)) return loadProgram(utu, entry, host, texts);
   files.diagnostics = utu.resolve();
-  await loadEmbeds(utu, entry, host);
+  await loadEmbeds(utu, entry, files, host);
   await assembleWat(utu);
   return files;
 }
@@ -528,12 +528,13 @@ async function bindForeign(utu, foreign, { stdlib, resolvePackage }) {
   return true;
 }
 
-/** @embed: the files' bytes, read relative to the entry file. */
-async function loadEmbeds(utu, entry, { resolvePath = defaultResolvePath, readBinaryFile }) {
+/** @embed: the files' bytes, read relative to the file that declares the mem. */
+async function loadEmbeds(utu, entry, files, { resolvePath = defaultResolvePath, readBinaryFile }) {
   for (let k = 0; k < utu.embed_files(); k++) {
     const rel = textAt(utu.src, utu.embed_path_start(k), utu.embed_path_end(k));
+    const from = utu.embed_file ? files[utu.embed_file(k)]?.key ?? entry : entry;
     let bytes;
-    try { bytes = await readBinaryFile(resolvePath(entry, rel)); } catch { utu.embed_fail(k); continue; }
+    try { bytes = await readBinaryFile(resolvePath(from, rel)); } catch { utu.embed_fail(k); continue; }
     const at = utu.embed_set(k, bytes.length);
     new Uint8Array(utu.embed_bytes.buffer).set(bytes, at);
   }
@@ -542,22 +543,35 @@ async function loadEmbeds(utu, entry, { resolvePath = defaultResolvePath, readBi
 /**
  * Compile the loaded program for a target. A program with @comptime mems is
  * first built for evaluating them; that build runs here, and its values go
- * back to the compiler as the mems' contents. Returns the module's size in
- * `out`, or -1 when there are diagnostics.
+ * back to the compiler as the mems' contents. A mem read by another's
+ * expression goes first: each round builds again with the values so far and
+ * runs what no waiting mem holds up; a round that can run none reports the
+ * rest as cycles. Returns the module's size in `out`, or -1 when there are
+ * diagnostics.
  */
 export async function compileProgram(utu, target, host = {}) {
   const count = utu.comptime_mems();
-  if (count > 0) {
+  for (let round = 0; round <= count; round++) {
+    const waiting = [];
+    // (A compiler before these rounds evaluates all in one.)
+    for (let k = 0; k < count; k++) if (utu.comptime_waiting ? utu.comptime_waiting(k) : round === 0) waiting.push(k);
+    if (waiting.length === 0) break;
     const size = utu.compile_program(TARGET.comptime);
     if (size < 0) return -1;
+    const ready = waiting.filter(k => !utu.comptime_can_run || utu.comptime_can_run(k));
+    if (ready.length === 0) {
+      for (const k of waiting) utu.comptime_cycle(k);
+      break;
+    }
     const { wasm, spec } = builtModule(utu, size);
     const { exports } = await instantiate(wasm, spec, host);
-    for (let k = 0; k < count; k++) {
+    for (const k of ready) {
       const name = utu.comptime_name(k);
       let n;
-      try { n = exports[`__comptime_run_${name}`](); } catch (error) {
+      // (An expression that awaits gives a promise.)
+      try { n = await exports[`__comptime_run_${name}`](); } catch (error) {
         // Reported at the mem, as a diagnostic.
-        utu.comptime_fail(k, comptimeTrapCode(error));
+        utu.comptime_fail(k, exports.__comptime_fuel?.value === 0 ? 8 : comptimeTrapCode(error));
         continue;
       }
       const bytes = new Uint8Array(exports[`__comptime_${name}`].buffer, 0, n * utu.comptime_value_size(k)).slice();
@@ -565,7 +579,27 @@ export async function compileProgram(utu, target, host = {}) {
       new Uint8Array(utu.comptime_bytes.buffer).set(bytes, at);
     }
   }
-  return utu.compile_program(target);
+  return validIr(utu, utu.compile_program(target));
+}
+
+/**
+ * A program's own @ir is not checked by the compiler: a module with any is
+ * compiled once here, and the engine's reason it is not valid Wasm is
+ * reported at each such body. Size `size` of the module just built, or -1.
+ */
+async function validIr(utu, size) {
+  if (size < 0 || !utu.user_ir_count?.()) return size;
+  try {
+    await WebAssembly.compile(new Uint8Array(utu.out.buffer, 0, size).slice(), COMPILE_OPTIONS);
+    return size;
+  } catch (error) {
+    if (!(error instanceof WebAssembly.CompileError)) throw error;
+    const bytes = encoder.encode(String(error.message).replace(/^WebAssembly\.\w+(\(\): | doesn't validate: )/, ''));
+    const at = utu.ir_invalid_room(bytes.length);
+    new Uint8Array(utu.src.buffer).set(bytes, at);
+    utu.ir_invalid_report(at, bytes.length);
+    return -1;
+  }
 }
 
 /** Why a `@comptime` evaluation threw, as the compiler's code for it (comptime_trap_text). */

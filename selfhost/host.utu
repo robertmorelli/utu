@@ -292,6 +292,10 @@ fn es_in(name: Str, t: I32) Str {
 fn es_out(expr: Str, t: I32) Str {
     if t == prelude(Prelude.Bool) { return expr + " ? 1 : 0"; };
     if ty_is(t, Ty.Nullable) { return expr + " ?? null"; };
+    // A Str must be a string: anything else would pass as one, and trap later.
+    if t == prelude(Prelude.Str) {
+        return "(s => typeof s === \"string\" ? s : (() => { throw new TypeError(`Wrong type from JavaScript: a Str, not ${s === null ? \"null\" : s instanceof Promise ? \"a Promise (await it: Promise[Str])\" : typeof s}`); })())(" + expr + ")";
+    };
     expr;
 }
 
@@ -369,7 +373,7 @@ fn dsl_text_start(dsl: I32) I32 {
 fn dsl_text_end(dsl: I32) I32 {
     let t = node_first[last_child(dsl)];
     let i = tok_end[t] - 2;
-    let start = tok_start[t] + 2;
+    let start = dsl_text_start(dsl);
     while (i > start and is_space(src[i - 1])) { i -= 1; };
     i;
 }

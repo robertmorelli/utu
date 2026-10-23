@@ -1,0 +1,9 @@
+// What: @stored with no using Browser
+// Expect: @stored needs using Browser from std:Browser
+struct Prefs:
+    | name: Str
+
+export main() Str {
+    let prefs = @stored/\ Prefs "prefs" Prefs { name: "a" } \/;
+    prefs.name;
+}

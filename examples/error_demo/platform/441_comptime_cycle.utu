@@ -1,0 +1,10 @@
+// What: two @comptime mems, each reading the other
+// Expect: @comptime t reads u, which waits on it
+fn f() Array[I32] { [u.len()]; }
+fn g() Array[I32] { [t.len()]; }
+const mem t: I32 = @comptime/\ f() \/;
+const mem u: I32 = @comptime/\ g() \/;
+
+export main() I32 {
+    t[0] + u[0];
+}

@@ -1,0 +1,7 @@
+// What: an empty @embed body
+// Expect: @embed needs a file path
+const mem bytes: U8 = @embed/\ \/;
+
+export main() I32 {
+    bytes.len();
+}

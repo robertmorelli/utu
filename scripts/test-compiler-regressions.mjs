@@ -826,6 +826,27 @@ export lib {
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
     ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
+    // @comptime and the other DSLs (each crashed, hung, or passed silently).
+    ['fn tab() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads itself'],
+    ['fn f() Array[I32] { [u.len()]; }\nfn g() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nconst mem u: I32 = @comptime/\\ g() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads u, which waits on it'],
+    ['fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nexport main() I32 { t.len(); }\n', '@comptime t trapped: it ran too long (a hundred million loop rounds)'],
+    ['const mem t: I32 = @comptime/\\ [1, 2] ; __comptime_t.push(99) \\/;\nexport main() I32 { t.len(); }\n', "@comptime takes one expression: Expected ')', got ';'"],
+    ['const mem a: U8 = @comptime/\\  \\/;\nexport main() I32 { a.len(); }\n', '@comptime needs an expression'],
+    ['const mem a: U8 = @embed/\\ \\/;\nexport main() I32 { a.len(); }\n', '@embed needs a file path'],
+    ['enum(U8) Color: | Red | Green | Blue\nconst mem cs: Color = [2, 7, 1];\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    ['enum(U8) Color: | Red | Green | Blue\nfn cs_() Array[I32] { [2, 7]; }\nconst mem cs: Color = @comptime/\\ cs_() \\/;\nexport main() I32 { cs.len(); }\n', '7 is no Color'],
+    // A program's @ir: what the compiler would crash on, or not see, is a mistake at the body.
+    ['fn f(a: I32) I32 { @ir/\\ <ir-array-len><ir-ident name="a"/></ir-array-len> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-array-len> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-string-from-codes><ir-ident name="a"/></ir-string-from-codes> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-string-from-codes> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-lit value="1"/> \\/; }\nexport main() I32 { f(1); }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { f(1); }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-ident name="a"/> junk \\/; }\nexport main() I32 { f(1); }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(c: I32, a: I32) I32 { @wat/\\ local.get $a local.get $a local.get $c select (param i32) \\/; }\nexport main() I32 { f(1, 2); }\n', 'select takes only (result t)'],
+    [`export main() I32 { ${'@utu/\\ '.repeat(17)}1${' \\/'.repeat(17)}; }\n`, 'DSLs nested too deeply (max 16)'],
+    ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nexport main() I32 { 1; }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
+    ['struct P:\n    | name: Str\nexport main() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; a.name; }\n', '@stored needs using Browser from std:Browser'],
+    ['fn tab() Array[I32] { [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { 5; }\n', 'main is the entry point, not a function: move its body into a fn'],
+    ['export lib {\n    fn f(x: ?I32) I32 { promote x { |v| => v, ~> 0 }; }\n}\n', 'Missing , after 0'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
@@ -842,6 +863,16 @@ export lib {
     assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
     checked++;
   }
+
+  // A program's @ir that makes invalid Wasm: said at the body, before the engine fails.
+  const badIr = await selfhost(await write('fn f(a: F64, b: F64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }\nexport main() I32 { f(1.0, 2.0); }\n'));
+  assert.ok(badIr.errors?.some(e => e.startsWith('@ir in f does not make valid Wasm: ')), String(badIr.errors));
+  checked++;
+
+  // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
+  const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));
+  assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);
+  checked++;
 
   // Test names: each test has one, its own.
   const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
@@ -910,6 +941,16 @@ export lib {
     // A computed global of an imported file, read by the entry's: set first.
     [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; a; }\n    let squares: Array[I32] = build();\n}\n',
       'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nexport main() I32 { last; }\n' }, 10],
+    // An imported file's own mems, read by its functions and modules; a
+    // @comptime mem there; an @embed path relative to that file (each was "Unknown variable").
+    [{ 'lib.utu': 'mem m: I32 = [5, 6];\nfn top() I32 { m[1]; }\nfn sq() Array[I32] { [0, 1, 4, 9]; }\nconst mem tab: I32 = @comptime/\\ sq() \\/;\nconst mem raw: U8 = @embed/\\ data.bin \\/;\nmod t { fn n() I32 { top() + m[0] + tab[3] * 10 + raw.len() * 100; } }\n',
+      'data.bin': 'abc', 'main.utu': 'using t from "./lib.utu";\nexport main() I32 { t.n(); }\n' }, 401],
+    // A @comptime mem read by another's expression is evaluated first (the second read it empty).
+    [{ 'main.utu': 'fn sq() Array[I32] { [0, 1, 4, 9, 16]; }\nfn plus() Array[I32] { let a = Array[I32].new(first.len(), 0); for (0 ..< first.len()) |i| { a[i] = first[i] + 1; }; a; }\nconst mem second: I32 = @comptime/\\ plus() \\/;\nconst mem first: I32 = @comptime/\\ sq() \\/;\nexport main() I32 { second.len() * 100 + second[4]; }\n' }, 517],
+    // A @comptime expression that awaits (its run gave a promise, read as nothing).
+    [{ 'main.utu': 'let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn tab() Array[I32] { [await later(5)]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t.len() * 100 + t[0]; }\n' }, 105],
+    // A @wat Bool is 0 or 1, returned or left (6 read as true, and == true was false).
+    [{ 'main.utu': 'fn six() Bool { @wat/\\ i32.const 6 \\/; }\nfn nine() Bool { @wat/\\ i32.const 9 return \\/; }\nexport main() I32 { if six() == true and nine() == true { 1; } else { 0; }; }\n' }, 1],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
@@ -927,6 +968,10 @@ export lib {
     [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { 1; } }\n', 'main.utu': 'using hm from "./hf.utu";\nexport main() I32 { helper(); }\n' }, 'Unknown function helper'],
     [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n', 'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f() I32 { 1; } }\n',
       'main.utu': 'using boxes from "./boxes.utu";\nexport main() I32 { ops.double(21); }\n' }, 'Unknown variable ops'],
+    // An imported file's mem is its own too.
+    [{ 'mf.utu': 'mem m: I32 = [1];\nmod mm { fn f() I32 { m[0]; } }\n', 'main.utu': 'using mm from "./mf.utu";\nexport main() I32 { m[0]; }\n' }, 'Unknown variable m'],
+    // A parse error in an imported file is the mistake (it showed as "Unknown module t8").
+    [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nexport main() I32 { t8.n(); }\n' }, "Unexpected ';'"],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

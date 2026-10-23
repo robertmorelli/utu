@@ -544,6 +544,11 @@ fn parse_says(text: Str) void {
 /// What a ParseError at token t (in `file`, the parser wanting `wanted`)
 /// recognizes; see the section's comment.
 fn parse_hint(file: I32, t: I32, wanted: I32) void {
+    // `'\/'` in a DSL body: its `\/` ended the body (only a "…" string keeps one).
+    if diag_fresh[0] == 1 and t > 0 and tok_kind[t] == Tok.Error.to_i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.to_i32() {
+        diag_note("\\/ ends a DSL body, except inside \"…\": write \"\\/\" there, not '\\/'");
+        return;
+    };
     if diag_fresh[0] == 0 or t < 0 or tok_kind[t] == Tok.Error.to_i32() { return; };
     let first = line_first(file, t);
     // The line of the error.
@@ -665,7 +670,7 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         parse_says("export fn is not a declaration");
         return true;
     };
-    if tok_says(k, "fn") and indented(k) and k == line_first(file, k) {
+    if tok_says(k, "fn") and indented(k) and k == line_first(file, k) and (k == t or tok_after(k) == t) {
         diag_focus(k, k, "nested");
         diag_note("Use a closure: let f = cl(x: I32) I32 { … };");
         parse_says("A function cannot be declared inside another");

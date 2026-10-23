@@ -2192,13 +2192,13 @@
  },
  "std/Wutu.utu analysis": {
   "diagnostics": "bb2e10849fd2b421",
-  "formatted": "ef977ea67567b7a2",
+  "formatted": "075a39d84ab61d4e",
   "entries": "b749982bf772f5cd",
   "queries": "6457c6901c5af47f",
   "graphs": "874e31742764ff44"
  },
  "std/Wutu.utu normal": {
   "diagnostics": "bb2e10849fd2b421",
-  "formatted": "ef977ea67567b7a2"
+  "formatted": "075a39d84ab61d4e"
  }
 }

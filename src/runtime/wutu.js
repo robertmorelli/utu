@@ -728,7 +728,7 @@ export function installWutuStorage(api) {
   };
   api.store = (key, encode, manual = false, apply = null) => {
     let last = null;
-    try { last = localStorage.getItem(key); } catch { /* unavailable storage reads as empty */ }
+    try { last = localStorage.getItem(key); } catch { /* no store: reads '' */ }
     stores.set(key, { encode, manual, apply, last, dirty: false });
   };
   api.reload = key => {
@@ -747,9 +747,9 @@ export function installWutuStorage(api) {
     }
   };
 
-  addEventListener('pagehide', flush);
-  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
-  addEventListener('storage', event => {
+  const on = (...a) => globalThis.addEventListener?.(...a); on('pagehide', flush);
+  on('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  on('storage', event => {
     const store = stores.get(event.key);
     if (!store) return;
     if (store.dirty) {

@@ -175,9 +175,27 @@ fn comptime_site(i: I32) I32 {
     if node < 0 { return -1; };
     let b = tok_start[node_first[node]];
     for (0 ..< comptime_text_start.len()) |k| {
-        if b >= comptime_text_start[k] and b < comptime_text_end[k] { return k; };
+        // (From the `(` written before the expression.)
+        if b >= comptime_text_start[k] - 1 and b < comptime_text_end[k] { return k; };
     };
     -1;
+}
+
+/// The `@comptime` expression a parse error is in, or -1: the generated
+/// text from its start to the next one's (its expression did not end).
+fn comptime_parse_site(i: I32) I32 {
+    if diag_kind[i] != Diag.ParseError.to_i32() or diag_a[i] < 0 { return -1; };
+    let b = tok_start[diag_a[i]];
+    let k = comptime_text_start.len() - 1;
+    while (k >= 0 and comptime_text_start[k] > b) { k -= 1; };
+    k;
+}
+
+/// Byte `b` of @comptime expression k's generated text, as the place in its
+/// mem's body (past its end: the body's end).
+fn comptime_byte(k: I32, b: I32) I32 {
+    let at = if b < comptime_text_end[k] { b; } else { comptime_text_end[k]; };
+    dsl_text_start(comptime_text_node[k]) + at - comptime_text_start[k];
 }
 
 /// The kind's name, as stage 0 spells it.
@@ -189,6 +207,7 @@ fn diag_kind_name(i: I32) Str {
 /// A diagnostic's message for the host: one in a `@comptime` expression
 /// says so, and on which line of it.
 fn diag_message(i: I32) Str {
+    if comptime_parse_site(i) >= 0 { return "@comptime takes one expression: " + diag_text(i); };
     let k = comptime_site(i);
     if k < 0 { return diag_text(i); };
     let line = 4;
@@ -238,7 +257,6 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.ImplicitStructInit { return "implicit-struct-init"; };
     if k == Diag.StorageType { return "storage-type"; };
     if k == Diag.ReturnValueFromVoid { return "type-mismatch"; };
-    if k == Diag.ComptimeTrap { return "comptime-trap"; };
     if k == Diag.FloatOutOfRange { return "float-literal-out-of-range"; };
     if k == Diag.EnumBase or k == Diag.TagEnumValue { return "invalid-enum"; };
     if k == Diag.ProtoGeneric { return "unsupported"; };
@@ -260,6 +278,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.YieldPlace or k == Diag.GeneratorExport { return "invalid-for-source"; };
     if k == Diag.NewNotHost { return "not-callable"; };
     if k == Diag.HostMissing { return "unknown-import"; };
+    if k == Diag.ComptimeTrap or k == Diag.ComptimeCycle { return "comptime-trap"; };
+    if k == Diag.DslEmpty or k == Diag.DslTooDeep or k == Diag.IrInvalid { return "invalid-dsl-usage"; };
     "type-mismatch";
 }
 
@@ -305,6 +325,7 @@ fn comptime_trap_text(code: I32) Str {
         5 => "a null value",
         6 => "the stack overflowed",
         7 => "JavaScript threw",
+        8 => "it ran too long (a hundred million loop rounds)",
         ~> "a trap",
     };
 }
@@ -339,7 +360,11 @@ fn diag_text(i: I32) Str {
     let b = diag_b[i];
     let node = diag_node[i];
     match k {
-        Diag.UnknownVariable => pick(is_callee(node), "Unknown function ", "Unknown variable ") + w + did_you_mean(i),
+        Diag.UnknownVariable => {
+            // `export main` is the module's entry, not a function the program (or a @comptime build) can call.
+            if w == "main" and is_callee(node) { return "main is the entry point, not a function: move its body into a fn"; };
+            pick(is_callee(node), "Unknown function ", "Unknown variable ") + w + did_you_mean(i);
+        },
         Diag.UnknownType => "Unknown type " + w + did_you_mean(i),
         Diag.UnknownImport => {
             let path = import_path[missing_import[0]];
@@ -485,6 +510,12 @@ fn diag_text(i: I32) Str {
         Diag.MainParams => "main takes no parameters",
         Diag.TestName => pick(a == 1, "Empty test name", "Duplicate test " + node_text(node)),
         Diag.TooManyParams => pick(word < 0, "main", w) + " has " + int_text(a) + " parameters (max 1000)",
+        Diag.DslEmpty => "@" + w + pick(w == "embed", " needs a file path", " needs an expression"),
+        Diag.ComptimeCycle => {
+            if a < 0 or decl_name[a] == word { return "@comptime " + w + " reads itself"; };
+            "@comptime " + w + " reads " + word_text(decl_name[a]) + ", which waits on it";
+        },
+        Diag.DslTooDeep => "DSLs nested too deeply (max " + int_text(a) + ")",
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -497,7 +528,8 @@ fn diag_text(i: I32) Str {
             else { "Globals " + w + " and " + word_text(decl_name[a]) + " each need the other set first"; },
         Diag.NotValue => if a == 2 { w + " is a field: read it from a value"; } else { w + " is a " + pick(a == 1, "module", "type") + ", not a value"; },
         Diag.NotAssignable => "Only a variable, field, or index can be assigned",
-        Diag.IrUnknown => if a == 1 { "@ir names no parameter " + w; } else { "No @ir element <" + w + ">"; },
+        Diag.IrUnknown => if a == 1 { "@ir names no parameter " + w; } else if a == 2 { "@ir <" + w + "> is written wrong here"; } else { "No @ir element <" + w + ">"; },
+        Diag.IrInvalid => "@ir in " + w + " does not make valid Wasm: " + word_text(a),
         Diag.YieldPlace => "yield T is only a generator's result type",
         Diag.NotStruct => type_text(a) + " is not a struct: it has no fields to set",
         Diag.NewNotHost => "new makes host objects; " + w + " is not a host class",
@@ -523,7 +555,10 @@ fn diag_text(i: I32) Str {
         Diag.AwaitNotPromise => "Cannot await " + type_text(a),
         Diag.ProtoMissing => decl_text(a) + " lacks " + word_text(diag_c[i]) + "." + w,
         Diag.ProtoSignature => word_text(a) + "[" + word_text(b) + "]." + w + " does not match the protocol",
-        Diag.MemElementRange => word_text(diag_c[i]) + " does not fit " + Storage.name(mem_storage(a)),
+        Diag.MemElementRange => {
+            if b == -1 and mem_int_enum(a) >= 0 { return word_text(diag_c[i]) + " is no " + word_text(decl_name[mem_int_enum(a)]); };
+            word_text(diag_c[i]) + " does not fit " + Storage.name(mem_storage(a));
+        },
         Diag.MemInitializer => {
             if a == 1 {
                 let head = mem_word(word) + " " + w + " takes a list, @embed, or @comptime";
@@ -563,12 +598,15 @@ fn diag_text(i: I32) Str {
             if b >= 0 and semicolon_in_multiline(a - 1) and word_text(b) == "';'" { return "Expected ';', got " + found + " (a \\\\ line's ';' is text)"; };
             if b >= 0 { return "Expected " + word_text(b) + ", got " + found; };
             if tok_kind[a] == Tok.End.to_i32() { return "Unexpected end of file"; };
+            // A mem is one program's memory: not a module's (made per instance) or a function's.
+            if found == "'mem'" or found == "'vec'" { return "Unexpected " + found + ": a " + found.slice(1, 4) + " goes at the top level of a file"; };
             "Unexpected " + found;
         },
         Diag.Unsupported => "Not supported yet",
         Diag.UnknownMember => word_text(diag_c[i]) + " has no member " + w,
         Diag.DslPlace => {
             if w == "embed" or w == "comptime" { return "@" + w + " only fills a mem"; };
+            if w == "ir" { return "@ir body is empty or not well-formed IR"; };
             "No DSL @" + w;
         },
         Diag.AltNotEnum => {
@@ -669,7 +707,10 @@ fn diag_default_label(i: I32) Str {
         Diag.TagEnumValue => "no value here",
         Diag.BareNull => "no type",
         Diag.NotCallable => "not a function",
-        Diag.ParseError => if b >= 0 { word_text(b) + "?"; } else { "unexpected"; },
+        Diag.ParseError => if b >= 0 and comptime_parse_site(i) < 0 { word_text(b) + "?"; } else { "unexpected"; },
+        Diag.DslEmpty => "empty",
+        Diag.ComptimeCycle => if a >= 0 and decl_name[a] != diag_word[i] { "waits on " + word_text(decl_name[a]); } else { "waits on itself"; },
+        Diag.DslTooDeep => "too deep",
         Diag.ProtoGeneric => "on a generic type",
         Diag.SelfUntyped => "type not known yet",
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),
@@ -679,7 +720,8 @@ fn diag_default_label(i: I32) Str {
         Diag.GlobalCycle => if a < 0 { "reads " + w; } else { "needs " + word_text(decl_name[a]); },
         Diag.NotValue => "not a value",
         Diag.NotAssignable => "not a variable",
-        Diag.IrUnknown => "unknown",
+        Diag.IrUnknown => if diag_a[i] == 2 { "malformed"; } else { "unknown"; },
+        Diag.IrInvalid => "unchecked",
         Diag.YieldPlace => "not a type here",
         Diag.NotStruct => "no fields",
         Diag.NewNotHost => "not a host class",
@@ -691,6 +733,7 @@ fn diag_default_label(i: I32) Str {
 
 /// The span a diagnostic points at: its node's, as byte offsets.
 fn diag_start(i: I32) I32 {
+    if comptime_parse_site(i) >= 0 { return comptime_byte(comptime_parse_site(i), tok_start[diag_a[i]]); };
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_a[i]; };
     let f = located_file(i);
@@ -702,6 +745,7 @@ fn diag_start(i: I32) I32 {
 
 /// Where a diagnostic's span ends (see @diag_start).
 fn diag_end(i: I32) I32 {
+    if comptime_parse_site(i) >= 0 { return comptime_byte(comptime_parse_site(i), tok_end[diag_a[i]]); };
     if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
     if diag_kind[i] == Diag.DslError.to_i32() { return diag_b[i]; };
     let f = located_file(i);
@@ -737,6 +781,8 @@ fn diag_at(i: I32) I32 {
 fn diag_file(i: I32) I32 {
     let node = diag_at(i);
     if node < 0 {
+        let k = comptime_parse_site(i);
+        if k >= 0 { return file_of_token(node_first[comptime_text_node[k]]); };
         if diag_kind[i] == Diag.ParseError.to_i32() { return diag_word[i]; };
         return -1;
     };

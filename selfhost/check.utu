@@ -63,10 +63,14 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     let h = fi_hash(decl, inst) & mask;
     while (fi_table[h] >= 0) {
         let f = fi_table[h];
-        if fi_decl[f] == decl and fi_inst[f] == inst { return f; };
+        if fi_decl[f] == decl and fi_inst[f] == inst {
+            note_reach(f);
+            return f;
+        };
         h = (h + 1) & mask;
     };
     let id = fi_decl.len();
+    note_reach(id);
     fi_table[h] = id;
     fi_decl.push(decl);
     fi_inst.push(inst);
@@ -79,6 +83,8 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     let ir = intrinsic_body(body);
     if ir >= 0 {
         fi_ir[id] = ir;
+        // A program's own @ir is unchecked: the host validates the module it is in.
+        if file_std[file_of_token(node_first[body])] != 1 { user_ir_decl.push(decl); };
     } else {
         let f = defined_func(fi_params[id], fi_result[id]);
         fi_func[id] = f;
@@ -2160,6 +2166,7 @@ fn expand(fi: I32, m: I32) I32 {
     let pre = w_mark() - m;
     let result_vt = repr(fi_result[fi]);
     ir_failed[0] = -1;
+    ir_failed_shape[0] = 0;
     let ok = translate(x, decls, args, locals, direct, fi);
     if not ok {
         w_stack.resize(m);
@@ -2168,7 +2175,8 @@ fn expand(fi: I32, m: I32) I32 {
         if bad < 0 or reported_within(body) { return unsupported(decl_node[fi_decl[fi]]); };
         let ident = x_tag[bad] == known_word(Known.IrIdent);
         let named = x_attr(bad, known_word(Known.Name));
-        report2(Diag.IrUnknown, body, if ident { if named >= 0 { attr_word(named); } else { -1; }; } else { x_tag[bad]; }, if ident { 1; } else { 0; }, -1);
+        let why = if ir_failed_shape[0] == 1 { 2; } else if ident { 1; } else { 0; };
+        report2(Diag.IrUnknown, body, if ident and why == 1 { if named >= 0 { attr_word(named); } else { -1; }; } else { x_tag[bad]; }, why, -1);
         return error_value();
     };
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
@@ -2204,6 +2212,28 @@ fn param_index(x: I32, decls: I32) I32 {
 
 /// The `@ir` element @translate did not know, or -1.
 vec ir_failed: I32 = [-1];
+/// Why: 0 an element the compiler does not know (or a name no parameter has), 1 one it knows written wrong.
+vec ir_failed_shape: I32 = [0];
+/// The functions of a program's own files whose bodies are @ir, in the last build.
+vec user_ir_decl: I32;
+
+/// The element being translated is malformed (an attribute or operand missing, of the wrong kind).
+fn ir_malformed(x: I32) Bool {
+    ir_failed[0] = x;
+    ir_failed_shape[0] = 1;
+    false;
+}
+
+/// The engine found the module invalid (`message`, a word): reported at
+/// each @ir body of the program's own, which the compiler does not check.
+fn report_invalid_ir(message: I32) void {
+    for (0 ..< user_ir_decl.len()) |k| {
+        let d = user_ir_decl[k];
+        let seen = false;
+        for (0 ..< k) |j| { if user_ir_decl[j] == d { seen = true; }; };
+        if not seen { report2(Diag.IrInvalid, first_child(fn_body(d)), decl_name[d], message, -1); };
+    };
+}
 
 /// Push the IR of an `@ir` element; false when it is not one the compiler knows.
 fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
@@ -2220,8 +2250,13 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     if tag == known_word(Known.IrLit) {
         let tn = x_attr(x, known_word(Known.TypeName));
         let v = x_attr(x, known_word(Known.Value));
-        if tn < 0 or v < 0 { return false; };
-        let t = decl_type(promoted(prelude_lookup(attr_word(tn))), 0);
+        if tn < 0 or v < 0 or attr_end[v] <= attr_start[v] { return ir_malformed(x); };
+        let named_t = prelude_lookup(attr_word(tn));
+        if named_t < 0 { return ir_malformed(x); };
+        for (attr_start[v] ..< attr_end[v]) |i| {
+            if (src[i] < 48 or src[i] > 57) and not (i == attr_start[v] and src[i] == 45) { return ir_malformed(x); };
+        };
+        let t = decl_type(promoted(named_t), 0);
         let neg = src[attr_start[v]] == 45;
         let value: I64 = 0;
         for ((attr_start[v] + if neg { 1; } else { 0; }) ..< attr_end[v]) |i| { value = value * 10 + (src[i] - 48).to_i64(); };
@@ -2686,6 +2721,10 @@ fn reset_check() void {
     fi_ir.clear();
     fi_table.clear();
     fi_queue.clear();
+    user_ir_decl.clear();
+    reach_from.clear();
+    reach_to.clear();
+    checking_fi[0] = -1;
     cur_locals.clear();
     decl_local.resize(decl_kind.len());
     decl_ty.resize(decl_kind.len());
@@ -2737,6 +2776,11 @@ fn compile(target: Target) I32 {
     intern_known();
     find_prelude_types();
     reset_check();
+    comptime_fuel[0] = -1;
+    if target == Target.Comptime {
+        comptime_fuel[0] = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()));
+        glob_field_name[comptime_fuel[0]] = name_add("__comptime_fuel");
+    };
     validate_program();
     count_memories();
     report_wat();
@@ -2753,7 +2797,21 @@ fn compile(target: Target) I32 {
     };
     // A file that does not parse ends the build; other mistakes do not stop
     // checking, which finds what else is wrong.
-    for (0 ..< file_root.len()) |file| { if file_root[file] < 0 { return -1; }; };
+    // Its parse error is the mistake: what resolving did not find in it
+    // (an imported module, …) follows from that, and is dropped.
+    for (0 ..< file_root.len()) |file| {
+        if file_root[file] < 0 {
+            let kept = 0;
+            for (0 ..< diag_kind.len()) |i| {
+                if diag_kind[i] == Diag.ParseError.to_i32() {
+                    diag_move(i, kept);
+                    kept += 1;
+                };
+            };
+            diag_truncate(kept);
+            return -1;
+        };
+    };
     let tests = 0;
     test_node.clear();
     bench_node.clear();
@@ -2810,6 +2868,7 @@ fn compile(target: Target) I32 {
             let entry = file_role[file] == FileRole.Entry.to_i32();
             while (item >= 0) {
                 if entry and (target == Target.Normal or not is_kind(item, Node.Export_lib_decl)) { check_item(item); };
+                if not entry and declares_item(file, item) { check_item(item); };
                 if is_kind(item, Node.Module_decl) {
                     let module = node_decl[name_node(first_child(item))];
                     if not is_generic(module) {
@@ -2826,9 +2885,11 @@ fn compile(target: Target) I32 {
     };
     let next = 0;
     while (next < fi_queue.len()) {
+        checking_fi[0] = fi_queue[next];
         check_function(fi_queue[next]);
         next += 1;
     };
+    checking_fi[0] = -1;
     start_globals();
     if diag_kind.len() > 0 { return -1; };
     encode_module();

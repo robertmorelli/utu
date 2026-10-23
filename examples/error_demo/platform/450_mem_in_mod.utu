@@ -1,0 +1,10 @@
+// What: a mem declared in a mod
+// Expect: Unexpected 'mem': a mem goes at the top level of a file
+mod counts {
+    mem seen: I32 = [5, 6];
+    fn second() I32 { seen[1]; }
+}
+
+export main() I32 {
+    counts.second();
+}

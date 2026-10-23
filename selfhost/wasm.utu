@@ -582,6 +582,8 @@ fn w_mark() I32 { w_stack.len(); }
 
 /// A node of the nodes built since `mark`, pushed in their place.
 fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
+    // A @comptime build's loops burn fuel, so one that never ends stops.
+    if op == Op.Loop and comptime_fuel[0] >= 0 { w_insert(mark, fuel_check()); };
     let id = w_op.len();
     // A block with several results is typed by a function type, which must
     // exist before encoding numbers the types.

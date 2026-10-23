@@ -1,0 +1,9 @@
+// What: @ir array-len on an I32 (the compiler crashed)
+// Expect: @ir <ir-array-len> is written wrong here
+fn len(a: I32) I32 {
+    @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/;
+}
+
+export main() I32 {
+    len(7);
+}

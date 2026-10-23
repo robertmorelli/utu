@@ -16,6 +16,20 @@
 fn expand_dsls() void {
     let rounds = 0;
     while (rounds < 16 and expand_dsl_round()) { rounds += 1; };
+    if rounds < 16 { return; };
+    // Sites still unexpanded are nested too deeply: reported once, the rest left as failed.
+    let reported = false;
+    let k = own_sites();
+    while (k < dsl_sites.len()) {
+        let n = dsl_sites[k];
+        let w = word_text(word_of(first_child(n)));
+        if node_kind[n] == Node.Dsl_expr.to_i32() and dsl_in_program(n) and (w == "utu" or w == "css" or w == "stored" or w == "json" or w == "wutu") {
+            if not reported { report2(Diag.DslTooDeep, n, -1, 16, -1); };
+            reported = true;
+            dsl_failed.push(n);
+        };
+        k += 1;
+    };
 }
 
 /// One round, in stage 0's order: `@utu` and `@css`, then `@stored`, then each

@@ -4614,8 +4614,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/40_ir_missing_operand.utu
-ok
---- exit 0
+ ERROR  @ir body is empty or not well-formed IR
+        dsl-place · examples/error_demo/platform/40_ir_missing_operand.utu:4:5
+
+ 2 │ // Expect: @ir: <ir-i32-mul> needs two operands / is not closed
+ 3 │ fn square(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
+--- exit 1
 
 === utu check examples/error_demo/platform/41_generator_as_value.utu
  ERROR  count is a generator: for (count(…)) |v| { … }
@@ -4656,6 +4664,143 @@ ok
  9 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/440_comptime_reads_itself.utu
+ ERROR  @comptime t reads itself
+        comptime-cycle · examples/error_demo/platform/440_comptime_reads_itself.utu:4:20
+
+ 2 │ // Expect: @comptime t reads itself
+ 3 │ fn tab() Array[I32] { [t.len()]; }
+ 4 │ const mem t: I32 = @comptime/\ tab() \/;
+   │                    ━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ waits on itself
+ 5 │
+ 6 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/441_comptime_cycle.utu
+ ERROR  @comptime t reads u, which waits on it
+        comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:5:20
+
+ 3 │ fn f() Array[I32] { [u.len()]; }
+ 4 │ fn g() Array[I32] { [t.len()]; }
+ 5 │ const mem t: I32 = @comptime/\ f() \/;
+   │                    ━━━━━━━━━━━━━━━━━━
+   │                    ╰─ waits on u
+ 6 │ const mem u: I32 = @comptime/\ g() \/;
+
+ ERROR  @comptime u reads t, which waits on it
+        comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:6:20
+
+ 4 │ fn g() Array[I32] { [t.len()]; }
+ 5 │ const mem t: I32 = @comptime/\ f() \/;
+ 6 │ const mem u: I32 = @comptime/\ g() \/;
+   │                    ━━━━━━━━━━━━━━━━━━
+   │                    ╰─ waits on t
+ 7 │
+ 8 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/442_comptime_never_ends.utu
+ ERROR  @comptime t trapped: it ran too long (a hundred million loop rounds)
+        comptime-trap · examples/error_demo/platform/442_comptime_never_ends.utu:7:20
+
+ 5 │     [1];
+ 6 │ }
+ 7 │ const mem t: I32 = @comptime/\ f() \/;
+   │                    ━━━━━━━━━━━━━━━━━━
+   │                    ╰─ here
+ 8 │
+ 9 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/443_comptime_two_statements.utu
+ ERROR  @comptime takes one expression: Expected ')', got ';'
+        parse-error · examples/error_demo/platform/443_comptime_two_statements.utu:3:38
+
+ 1 │ // What: a @comptime body of two statements
+ 2 │ // Expect: @comptime takes one expression: Expected ')', got ';'
+ 3 │ const mem t: I32 = @comptime/\ [1, 2]; [3] \/;
+   │                                      ━
+   │                                      ╰─ unexpected
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/444_comptime_empty.utu
+ ERROR  @comptime needs an expression
+        dsl-empty · examples/error_demo/platform/444_comptime_empty.utu:3:20
+
+ 1 │ // What: an empty @comptime body
+ 2 │ // Expect: @comptime needs an expression
+ 3 │ const mem t: I32 = @comptime/\  \/;
+   │                    ━━━━━━━━━━━━━━━
+   │                    ╰─ empty
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/445_embed_empty.utu
+ ERROR  @embed needs a file path
+        dsl-empty · examples/error_demo/platform/445_embed_empty.utu:3:23
+
+ 1 │ // What: an empty @embed body
+ 2 │ // Expect: @embed needs a file path
+ 3 │ const mem bytes: U8 = @embed/\ \/;
+   │                       ━━━━━━━━━━━
+   │                       ╰─ empty
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu
+ ERROR  7 is no Color
+        mem-element-range · examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu:4:23
+
+ 2 │ // Expect: 7 is no Color
+ 3 │ enum(U8) Color: | Red | Green | Blue
+ 4 │ const mem cs: Color = [2, 7, 1];
+   │                       ━━━━━━━━━
+   │                       ╰─ here
+ 5 │
+ 6 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/447_ir_array_len_on_i32.utu
+ ERROR  @ir <ir-array-len> is written wrong here
+        ir-unknown · examples/error_demo/platform/447_ir_array_len_on_i32.utu:4:5
+
+ 2 │ // Expect: @ir <ir-array-len> is written wrong here
+ 3 │ fn len(a: I32) I32 {
+ 4 │     @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ malformed
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/448_wat_select_param.utu
+ ERROR  select takes only (result t)
+        dsl-error · examples/error_demo/platform/448_wat_select_param.utu:4:58
+
+ 2 │ // Expect: select takes only (result t)
+ 3 │ fn pick(c: I32, a: I32, b: I32) I32 {
+ 4 │     @wat/\ local.get $a local.get $b local.get $c select (param i32) \/;
+   │                                                          ━━━━━━━━━━━
+   │                                                          ╰─ here
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/449_dsl_nested_too_deeply.utu
+ ERROR  DSLs nested too deeply (max 16)
+        dsl-too-deep · examples/error_demo/platform/449_dsl_nested_too_deeply.utu:4:117
+
+ 2 │ // Expect: DSLs nested too deeply (max 16)
+ 3 │ export main() I32 {
+ 4 │     @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ 1 \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/;
+   │                                                                                                                     ━━━━━━━━━━━
+   │                                                                                                                     ╰─ too deep
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/platform/44_foreign_readonly_write.utu
  ERROR  tagName is readonly
         foreign-readonly · examples/error_demo/platform/44_foreign_readonly_write.utu:7:5
@@ -4666,6 +4811,71 @@ ok
    │     ━━━━━━━━━━
    │     ╰─ here
  8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/450_mem_in_mod.utu
+ ERROR  Unexpected 'mem': a mem goes at the top level of a file
+        parse-error · examples/error_demo/platform/450_mem_in_mod.utu:4:5
+
+ 2 │ // Expect: Unexpected 'mem': a mem goes at the top level of a file
+ 3 │ mod counts {
+ 4 │     mem seen: I32 = [5, 6];
+   │     ━━━
+   │     ╰─ unexpected
+ 5 │     fn second() I32 { seen[1]; }
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/451_stored_without_browser.utu
+ ERROR  @stored needs using Browser from std:Browser
+        dsl-error · examples/error_demo/platform/451_stored_without_browser.utu:7:27
+
+ 5 │
+ 6 │ export main() Str {
+ 7 │     let prefs = @stored/\ Prefs "prefs" Prefs { name: "a" } \/;
+   │                           ━
+   │                           ╰─ here
+ 8 │     prefs.name;
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/452_comptime_calls_main.utu
+ ERROR  main is the entry point, not a function: move its body into a fn
+        unknown-function · examples/error_demo/platform/452_comptime_calls_main.utu:3:24
+
+ 1 │ // What: a @comptime helper calling main
+ 2 │ // Expect: main is the entry point, not a function: move its body into a fn
+ 3 │ fn tab() Array[I32] { [main()]; }
+   │                        ━━━━
+   │                        ╰─ not defined
+ 4 │ const mem t: I32 = @comptime/\ tab() \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/453_es_single_quoted_end.utu
+ ERROR  Unexpected character '''
+        parse-error · examples/error_demo/platform/453_es_single_quoted_end.utu:3:51
+
+ 1 │ // What: \/ in a single-quoted JavaScript string ends the @es body
+ 2 │ // Expect: Unexpected character '''
+ 3 │ let slash: fun(Str) Str = @es/\ (s) => s.split('\/').join("-") \/;
+   │                                                   ━
+   │                                                   ╰─ unexpected
+ 4 │
+ 5 │ export main() Str {
+
+  note  \/ ends a DSL body, except inside "…": write "\/" there, not '\/'
+--- exit 1
+
+=== utu check examples/error_demo/platform/454_ir_close_tag_mismatch.utu
+ ERROR  @ir body is empty or not well-formed IR
+        dsl-place · examples/error_demo/platform/454_ir_close_tag_mismatch.utu:4:5
+
+ 2 │ // Expect: @ir body is empty or not well-formed IR
+ 3 │ fn is_zero(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
+ 5 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/45_foreign_record_unknown_field.utu
@@ -5379,17 +5589,18 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/02_es_returns_null_for_str.utu
- TRAP  Wrong type from JavaScript
-       trap · examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
+ ERROR  Wrong type from JavaScript: a Str, not null
+        uncaught-exception · examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
 
+ 4 │
  5 │ export main() I32 {
  6 │     let lang = read_setting("lang");
+   │                ━━━━━━━━━━━━━━━━━━━━
+   │                ╰─ here
  7 │     lang.len();
-   │     ━━━━━━━━━━
-   │     ╰─ here
  8 │ }
 
-  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:7:5
+  in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
 --- exit 1
 
 === utu run examples/error_demo/runtime/03_es_returns_wrong_type.utu
@@ -7289,27 +7500,6 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu check examples/error_demo/syntax/90_error_in_imported_file.utu
- ERROR  Unknown module shapes
-        unknown-module · examples/error_demo/syntax/90_error_in_imported_file.utu:3:7
-
- 1 │ // What: an imported file has a syntax error (missing ';' in lib/broken_shapes.utu).
- 2 │ // Expect: the error is reported in lib/broken_shapes.utu at line 4, not in this file.
- 3 │ using shapes from "./lib/broken_shapes.utu";
-   │       ━━━━━━
-   │       ╰─ no such module
- 4 │
- 5 │ export main() F64 {
-
- ERROR  Unknown variable shapes
-        unknown-variable · examples/error_demo/syntax/90_error_in_imported_file.utu:6:5
-
- 4 │
- 5 │ export main() F64 {
- 6 │     shapes.square(3.0);
-   │     ━━━━━━
-   │     ╰─ not defined
- 7 │ }
-
  ERROR  Missing ; after x
         missing-semicolon · examples/error_demo/syntax/lib/broken_shapes.utu:4:21
 
