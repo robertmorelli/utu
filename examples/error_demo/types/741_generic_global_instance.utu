@@ -1,0 +1,8 @@
+// What: a generic mod's global whose initializer fits one instance and not another
+// Expect: v is Str, got I32
+mod Zero[T] {
+    let v: T = 0;
+    fn get() T { v; }
+}
+
+export main() I32 { Zero[I32].get() + Zero[Str].get().len(); }

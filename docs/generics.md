@@ -20,12 +20,32 @@ let nums = Stack[I32].new(0);
 using Stack[Str] |Words|;          // an alias for one instance
 ```
 
-A global in a generic module is one for all its instances, so its type and
-initializer may not use what differs between them: T, `&`, or the module's
-own types and functions. `let items: List[T] = …;` inside `mod Stash[T]` is
-an error ("A global of generic Stash cannot use T"); make it a function's
-value, or keep it in a struct the caller holds. A global that does not
-depend on T (`let limit: I32 = 64;`) is fine.
+A global in a generic module is one per instance, as its functions are:
+each instance has its own, of its own type, set by its own initializer. The
+type and initializer can use T, `&`, and the module's own types and
+functions. A global that uses none of them (`let limit: I32 = 64;`) is
+still one per instance.
+
+```utu
+using Buffer from std:Buffer;
+
+mod Stash[T] {
+    let items: Buffer[T] = Buffer[T].new();
+    fn add(x: T) void { items.push(x); }
+    fn size() I32 { items.len(); }
+}
+
+Stash[I32].add(1);
+Stash[Str].add("a");
+Stash[I32].size();                 // 1: Stash[Str] has its own items
+```
+
+Only the instances the program names are made. Globals are set as the
+program starts, each after the globals its initializer reads, across
+instances too; a cycle is an error ("Globals b and a each need the other
+set first", with a note naming the instance). An `@es` binding is host
+code, not a value the module holds: it is not copied per instance, and
+each instance imports it at its own type.
 
 ## Bounds
 

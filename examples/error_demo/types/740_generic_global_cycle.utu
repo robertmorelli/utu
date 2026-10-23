@@ -1,0 +1,13 @@
+// What: a generic mod's globals, one per instance, each needing another instance's set first
+// Expect: Globals y0 and x each need the other set first
+mod P[T] {
+    let x: I32 = Q[Str].y() + 1;
+    fn get() I32 { x; }
+}
+
+mod Q[T] {
+    let y0: I32 = P[I32].get() + 1;
+    fn y() I32 { y0; }
+}
+
+export main() I32 { P[I32].get(); }
