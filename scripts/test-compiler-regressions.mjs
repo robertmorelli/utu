@@ -545,6 +545,21 @@ export lib {
       + '        if flag and i != 4 { t += 100; };\n    };\n    let b: ?B = B { ok: true };\n    let n: ?B = null;\n'
       + '    acc + t * 1000 + (if is_ok(b) { 1; } else { 0; }) + (if is_ok(n) { 2; } else { 0; }) + (if nonnull(b) { 4; } else { 0; }) + (if nonnull(n) { 8; } else { 0; }) + seen[0];\n'
       + '} }\n', 2137102356],
+    // alt arms that bind, as br_on_cast (small): a default, none, an unsafe build's untested last arm,
+    // arms that break, return, or capture (boxed), arms that make the alt's own type.
+    ['enum Sh:\n    | Circle { r: I32 }\n    | Sq { s: I32 }\n    | Rect { w: I32, h: I32 }\n    | Tri { a: I32, b: I32, c: I32 }\n    | Dot {}\n'
+      + 'fn area(x: Sh) I32 {\n    alt x {\n        Circle |c| => c.r * 3,\n        Sq |q| => q.s * q.s,\n        Rect |r| => r.w * r.h,\n'
+      + '        Tri |t| => t.a + t.b + t.c,\n        Dot => 1,\n    };\n}\nfn kind(x: Sh) I32 {\n    alt x {\n        Circle |c| => c.r,\n        Sq |q| => q.s,\n'
+      + '        Rect |r| => r.w,\n        ~> 99,\n    };\n}\nfn first(xs: Array[Sh]) I32 {\n    let t = 0;\n    for (xs) |x| {\n        alt x {\n'
+      + '            Circle |c| => { t += c.r; },\n            Sq |q| => { if q.s > 5 { break; }; t += 1000; },\n'
+      + '            Rect |r| => { if r.w == 0 { return -1; }; t += r.w; },\n            Tri |tr| => { let f: cl() I32 = cl() { tr.a * 2; }; t += f(); },\n'
+      + '            Dot => { t += 7; },\n        };\n    };\n    t;\n}\nfn ret(x: Sh) Sh {\n    alt x {\n        Circle |c| => Sq { s: c.r },\n'
+      + '        Sq |q| => Rect { w: q.s, h: 2 },\n        Rect |r| => r,\n        Tri |t| => { return Dot {}; },\n        Dot => x,\n    };\n}\n'
+      + 'fn boxed(x: Sh) I32 {\n    alt x {\n        Circle |c| => { let g: cl() I32 = cl() { c.r + 1; }; c = Circle { r: 50 }; g(); },\n        Sq |q| => q.s,\n'
+      + '        Rect |r| => r.h,\n        Tri |t| => t.c,\n        Dot => 0,\n    };\n}\nexport lib { fn run() I32 {\n'
+      + '    let xs: Array[Sh] = [Circle { r: 2 }, Sq { s: 3 }, Rect { w: 4, h: 5 }, Tri { a: 1, b: 2, c: 3 }, Dot {}];\n    let t = 0;\n'
+      + '    for (xs) |x| { t = t * 7 + area(x) + kind(x) * 3 + boxed(x) * 11 + area(ret(x)) * 13; };\n'
+      + '    t + first(xs) * 100000 + first([Circle { r: 1 }, Sq { s: 9 }, Dot {}]) * 1000000 + first([Rect { w: 0, h: 1 }]);\n} }\n', 104064628],
     // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
     ['export lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the

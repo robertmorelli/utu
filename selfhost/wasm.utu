@@ -519,6 +519,8 @@ enum(U16) Op:
     | Rethrow     // a: label of the try
     | V128Const   // a: four words in w_aux
     | NullElse    // children: a nullable value, then what it is when null; `block (v) (br_on_non_null 0) (else) end`
+    | CastArms    // a: the k types cast to, in w_aux; b: k; children: a value, k arms, the rest (see emit_cast_arms)
+    | Held        // the value a CastArms arm (or its rest) starts with, on the stack: emits nothing
 
 // The `Plain` instructions written by name, by their opcodes.
 let i32_eqz: I32 = 69;
@@ -1186,6 +1188,7 @@ fn sweep_types() void {
             mark_vt(vt);
         };
         if op == Op.RefNull.to_i32() or op == Op.RefTest.to_i32() or op == Op.RefCast.to_i32() { mark_vt(w_a[node]); }
+        else if op == Op.CastArms.to_i32() { for (0 ..< w_b[node]) |i| { mark_vt(w_aux[w_a[node] + i]); }; }
         else if op == Op.CallRef.to_i32() or (op >= Op.StructNew.to_i32() and op <= Op.ArrayInitData.to_i32() and op != Op.ArrayLen.to_i32()) {
             mark_type(w_a[node]);
             if op == Op.ArrayCopy.to_i32() { mark_type(w_b[node]); };
@@ -1943,6 +1946,11 @@ fn emit_rec(node: I32, d: I32) void {
         close_block();
         return;
     };
+    // (Planned by emit_step.)
+    if op == Op.CastArms.to_i32() {
+        emit_deep(node);
+        return;
+    };
     if op == Op.NullElse.to_i32() {
         open_block(2, w_type[node], -1);
         emit_at(w_kid(node, 0), d);
@@ -1989,7 +1997,8 @@ fn emit_rec(node: I32, d: I32) void {
 /// The encoder's work, as pairs (an argument, then a task): 0 encode a
 /// node, 1 a node's own instruction (after its kids), 2 a byte, 3 open a
 /// block (its type and label pushed below the pair), 4 close a block, 5 an
-/// unsigned LEB. Explicit, so a deep tree does not deepen the call stack.
+/// unsigned LEB, 6 a CastArms' casts. Explicit, so a deep tree does not
+/// deepen the call stack.
 vec emit_tasks: I32;
 
 fn emit_task(task: I32, x: I32) void {
@@ -2038,6 +2047,8 @@ fn emit_deep(node: I32) void {
             open_block(x, vt, label);
         } else if task == 4 {
             close_block();
+        } else if task == 6 {
+            emit_casts(x);
         } else {
             leb_u(true, x);
         };
@@ -2067,6 +2078,31 @@ fn emit_step(node: I32) void {
         emit_task(4, 0);
         emit_kids_deep(node);
         emit_open(if op == Op.Block.to_i32() { 2; } else { 3; }, w_type[node], a);
+        return;
+    };
+    if op == Op.CastArms.to_i32() {
+        let k = w_b[node];
+        emit_task(4, 0);
+        let i = k;
+        while (i >= 1) {
+            if i < k and w_type[w_kid(node, i)] != vt_unreachable {
+                emit_task(5, k - i);
+                emit_task(2, 12);
+            };
+            emit_task(0, w_kid(node, i));
+            emit_task(4, 0);
+            i -= 1;
+        };
+        let rest = w_kid(node, k + 1);
+        if w_type[rest] != vt_unreachable {
+            emit_task(5, k);
+            emit_task(2, 12);
+        };
+        emit_task(0, rest);
+        emit_task(6, node);
+        emit_task(0, w_kid(node, 0));
+        for (0 ..< k) |j| { emit_open(2, w_aux[a + j], -1); };
+        emit_open(2, w_type[node], -1);
         return;
     };
     if op == Op.NullElse.to_i32() {
@@ -2214,10 +2250,42 @@ fn emit_own(node: I32) void {
             for (0 ..< 4) |i| { put_u32le(true, w_aux[a + i]); };
         },
         Op.Rethrow => { op1(9); leb_u(true, depth_of(a)); },
+        Op.Held => {},
         ~> { fatal; },
     };
 }
 
+
+/// `CastArms`, of a value (kid 0) of a reference type, k arms (kids 1 to
+/// k, cast to the types in w_aux), and the rest (kid k + 1): the value is
+/// cast to each type in turn (`br_on_cast`); the first that holds runs its
+/// arm, given the cast value (a `Held` it starts with), and none, the rest,
+/// given the value as it was. One test and cast where a chain of `if`s
+/// tests (`ref.test`), then casts (`ref.cast`).
+/// ```
+/// block (result r)
+///   block (ref tk) … block (ref t1)
+///     value  br_on_cast 0 t1  …  br_on_cast k-1 tk
+///     rest  br k
+///   end  arm 1  br k-1
+///   …
+///   end  arm k
+/// end
+/// ```
+fn emit_casts(node: I32) void {
+    let k = w_b[node];
+    let from = w_type[w_kid(node, 0)];
+    for (0 ..< k) |i| {
+        let to = w_aux[w_a[node] + i];
+        op_fb(24);
+        // Bit 0: the value may be null; bit 1: the cast's type may.
+        let nullable_to = (to - vt_defined) % 2 == 0;
+        op1(if nullable_to { 3; } else { 1; });
+        leb_u(true, i);
+        put_heap(true, from);
+        put_heap(true, to);
+    };
+}
 
 /// A load or store (opcode `code`) of memory m, and its memarg: the
 /// alignment (with bit 6 set when a memory index follows), the memory, offset 0.
