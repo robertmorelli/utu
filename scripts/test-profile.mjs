@@ -55,7 +55,7 @@ assert.ok(!WebAssembly.Module.exports(new WebAssembly.Module(plain.wasm, { built
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-profile-'));
 const hot = path.join(dir, 'hot.utu');
 fs.writeFileSync(hot, `fn fib(n: I32) I32 { if n < 2 { return n; }; fib(n - 1) + fib(n - 2); }
-fn spin() I32 { let t = 0; for (0 ..< 40) |_i| { t += fib(20); }; t; }
+fn spin() I32 { let t = 0; for (0 ..< 400) |_i| { t += fib(20); }; t; }
 export main() I32 { spin(); }
 `);
 const run = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', hot, '--profile', '-o', dir], { encoding: 'utf8' });
