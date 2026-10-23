@@ -103,12 +103,16 @@ fn outer_decl(node: I32) I32 {
     found;
 }
 
-/// A declaration's name, as written (its first part), or its kind's.
+/// A declaration's name, as written (its first part, or a struct's or enum's
+/// name), or its kind's.
 fn decl_label(node: I32) Str {
     if is_kind(node, Node.Test_decl) or is_kind(node, Node.Bench_decl) or is_kind(node, Node.Export_main_decl) {
         return owner_name(node);
     };
-    let c = first_child(node);
+    // A struct's or enum's name, past `tag`/`rec` and an enum's representation.
+    let c = if is_kind(node, Node.Enum_decl) { enum_name(node); }
+        else if is_kind(node, Node.Struct_decl) { after_qualifier(node); }
+        else { first_child(node); };
     if c < 0 { return ""; };
     let start = tok_start[node_first[c]];
     let end_ = tok_end[node_last[c] - 1];

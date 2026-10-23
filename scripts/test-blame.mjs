@@ -3,6 +3,8 @@
 //
 //   node scripts/test-blame.mjs
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
@@ -29,4 +31,26 @@ for (const name of ['closures.utu', 'protocols.utu', 'stdlib.utu', 'promises.utu
     checked++;
   }
 }
-console.log(`blame: ${checked} builds, every byte blamed once, modules unchanged`);
+// Declarations by name, past `tag`.
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-blame-'));
+const named = path.join(dir, 'named.utu');
+fs.writeFileSync(named, `tag enum Tok:
+    | Num { value: I32 }
+    | End {}
+
+tag struct Pair:
+    | x: I32
+    | y: I32
+
+fn toks() Array[Tok] { [Num { value: 3 }, End {}]; }
+
+export main() I32 {
+    let p = Pair { x: 1, y: 2 };
+    toks().len() + p.x + p.y;
+}
+`);
+const labels = new Set((await compileFile(utu, named, { ...MODES.small, blame: true })).blame.decls.map(d => d.name));
+fs.rmSync(dir, { recursive: true, force: true });
+for (const name of ['Tok', 'Pair', 'toks', 'main']) assert.ok(labels.has(name), `a declaration named ${name}: ${[...labels]}`);
+assert.ok(!labels.has('tag'), `none named for its modifier: ${[...labels]}`);
+console.log(`blame: ${checked} builds, every byte blamed once, modules unchanged, declarations by name`);
