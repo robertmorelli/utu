@@ -21,12 +21,13 @@ Each port exports `bench(iterations)`, which runs fannkuch-redux with `n = 9`
 
 ## Snapshot
 
-d8 on arm64 macOS, 5 warmups then the median of 20 samples of `bench(5)`; utu
-built at `-O3`. All four returned 43145150.
+d8 15.6 on arm64 macOS, 5 warmups then the median of 20 samples of `bench(1)`;
+utu built at `-O fastUnsafe`. All four returned 8629030. From
+`bun run bench:programs-d8`.
 
 | utu Wasm | safe Rust Wasm | unsafe Rust Wasm | JavaScript |
 |---:|---:|---:|---:|
-| 69.8 ms | 65.4 ms | 71.2 ms | 91.7 ms |
+| 13.1 ms | 12.4 ms | 13.5 ms | 17.6 ms |
 
 | implementation | payload | gzip |
 |---|---:|---:|

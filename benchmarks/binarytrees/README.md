@@ -24,12 +24,12 @@ over all iterations: 3,222,190 per iteration (stretch 65,535, the depth loop
 
 ## Snapshot
 
-d8 on arm64 macOS, 5 warmups, median of 20 samples of `bench(5)`, per
-iteration; utu built at `-O3`.
+d8 15.6 on arm64 macOS, 5 warmups, median of 20 samples of `bench(1)`; utu
+built at `-O fastUnsafe`. From `bun run bench:programs-d8`.
 
 | implementation | time / iteration | Wasm size | gzip |
 |---|---:|---:|---:|
-| utu Wasm | 11.0 ms | 3,840 B | 1,391 B |
-| safe Rust Wasm | 43.1 ms | 21,292 B | 9,273 B |
-| unsafe Rust Wasm | 9.7 ms | 21,466 B | 9,387 B |
-| JavaScript | 20.4 ms | | |
+| utu Wasm | 10.7 ms | 3,840 B | 1,391 B |
+| safe Rust Wasm | 41.6 ms | 21,292 B | 9,273 B |
+| unsafe Rust Wasm | 9.1 ms | 21,466 B | 9,387 B |
+| JavaScript | 20.3 ms | | |

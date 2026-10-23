@@ -41,12 +41,13 @@ failures.
 
 | workload | utu Wasm | safe Rust Wasm | unsafe Rust Wasm | JavaScript |
 |---|---:|---:|---:|---:|
-| chain | 11.212 ms | 17.596 ms | **5.184 ms** | 6.663 ms |
-| projection | 8.595 ms | 17.993 ms | **4.382 ms** | 6.283 ms |
+| chain | 6.029 ms | 16.860 ms | **4.871 ms** | 6.344 ms |
+| projection | 5.009 ms | 17.490 ms | **4.124 ms** | 5.538 ms |
 
 | implementation | payload | gzip |
 |---|---:|---:|
-| utu Wasm | 5.29 KiB | 2.21 KiB |
+| utu Wasm | 39.48 KiB | 13.40 KiB |
+| utu Wasm, `-O smallUnsafe` | 4.64 KiB | 2.06 KiB |
 | safe Rust Wasm | 38.04 KiB | 15.17 KiB |
 | unsafe Rust Wasm | 32.05 KiB | 13.11 KiB |
 | minified JavaScript | 5.83 KiB | 1.83 KiB |
