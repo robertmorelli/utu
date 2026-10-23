@@ -1,0 +1,117 @@
+//! = Size blame
+//!
+//! Every byte of a module, blamed on the source it came from
+//! (src/selfhost/blame.js reads the module, and these). Code is placed by the
+//! source map (wasm.utu); the rest by these: by entity of the last module
+//! (its index there), the syntax node it was made for, or -1. A declaration's
+//! own node when one made it (a struct's type, a `let`'s global, a mem's
+//! memory, globals and data, an `@es` import), else the syntax being checked
+//! when it was made (@ht_src, @glob_src): its first use. Reading them changes
+//! nothing built.
+
+/// By heap type, global, function, and memory: the declaration that made it, or -1.
+vec blame_ht_decl: I32;
+vec blame_glob_decl: I32;
+vec blame_func_decl: I32;
+vec blame_mem_decl: I32;
+
+/// The declarations' entities, inverted.
+fn blame_invert() void {
+    blame_ht_decl.resize(ht_kind.len());
+    for (0 ..< ht_kind.len()) |t| { blame_ht_decl[t] = -1; };
+    blame_glob_decl.resize(glob_kind.len());
+    for (0 ..< glob_kind.len()) |g| { blame_glob_decl[g] = -1; };
+    blame_func_decl.resize(func_kind.len());
+    for (0 ..< func_kind.len()) |f| { blame_func_decl[f] = -1; };
+    blame_mem_decl.resize(memory_kind.len());
+    for (0 ..< memory_kind.len()) |m| { blame_mem_decl[m] = -1; };
+    for (0 ..< decl_kind.len()) |d| {
+        if d < struct_first.len() {
+            let e = struct_first[d];
+            while (e >= 0) {
+                blame_ht_decl[struct_heap[e]] = d;
+                e = struct_next[e];
+            };
+        };
+        if d < decl_global.len() and decl_global[d] >= 0 { blame_glob_decl[decl_global[d]] = d; };
+        if d < mem_len.len() and mem_len[d] >= 0 { blame_glob_decl[mem_len[d]] = d; };
+        if d < mem_array.len() and mem_array[d] >= 0 { blame_glob_decl[mem_array[d]] = d; };
+        if d < mem_memory.len() and mem_memory[d] >= 0 { blame_mem_decl[mem_memory[d]] = d; };
+    };
+    for (0 ..< es_made_decl.len()) |k| { blame_func_decl[es_made_func[k]] = es_made_decl[k]; };
+}
+
+fn decl_syntax(d: I32) I32 { if d < 0 { -1; } else { decl_node[d]; }; }
+
+/// Type `i` of the module.
+fn type_syntax(i: I32) I32 {
+    let t = type_order[i];
+    if blame_ht_decl[t] >= 0 { decl_syntax(blame_ht_decl[t]); } else { ht_src[t]; };
+}
+
+/// Function `i` of the module (imports first).
+fn func_syntax(i: I32) I32 {
+    let f = func_order[i];
+    if blame_func_decl[f] >= 0 { decl_syntax(blame_func_decl[f]); } else { func_src[f]; };
+}
+
+/// Function `i`: 0 defined, 1 imported, 2 a helper the compiler made (data.utu), 3 `@wat`.
+fn func_role(i: I32) I32 {
+    let f = func_order[i];
+    if func_kind[f] == FuncKind.Import.to_i32() { return 1; };
+    if func_code[f] >= 0 { return 3; };
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == f { return 2; }; };
+    0;
+}
+
+/// Function `i`'s name (as the name section has it): its UTF-8 bytes, a code unit each; "" for none.
+fn func_name_text(i: I32) Str {
+    let n = func_debug_name[func_order[i]];
+    if n < 0 { return ""; };
+    let codes = Array[I32].new(name_len[n], 0);
+    for (0 ..< name_len[n]) |k| { codes[k] = names[name_start[n] + k]; };
+    Str.from_codes(codes, name_len[n]);
+}
+
+/// Global `i` of the module (imports first).
+fn glob_syntax(i: I32) I32 {
+    let g = glob_order[i];
+    if blame_glob_decl[g] >= 0 { decl_syntax(blame_glob_decl[g]); } else { glob_src[g]; };
+}
+
+/// Memory `i` of the module (imports first).
+fn memory_syntax(i: I32) I32 {
+    for (0 ..< memory_kind.len()) |m| { if memory_index[m] == i { return decl_syntax(blame_mem_decl[m]); }; };
+    -1;
+}
+
+/// The declaration a node is in: the outermost one, short of a module or
+/// an `export lib` block (whose items are declarations of their own), or -1.
+fn outer_decl(node: I32) I32 {
+    let n = node;
+    let found = -1;
+    while (n >= 0) {
+        let k = node_kind[n];
+        if k == Node.Fn_decl.to_i32() or k == Node.Op_decl.to_i32() or k == Node.Struct_decl.to_i32()
+            or k == Node.Enum_decl.to_i32() or k == Node.Proto_decl.to_i32() or k == Node.Global_decl.to_i32()
+            or k == Node.Mem_decl.to_i32() or k == Node.Distinct_decl.to_i32() or k == Node.Type_decl.to_i32()
+            or k == Node.Using_decl.to_i32() or k == Node.Export_main_decl.to_i32() or k == Node.Test_decl.to_i32()
+            or k == Node.Bench_decl.to_i32() or k == Node.Measure_decl.to_i32() { found = n; };
+        n = parent_of(n);
+    };
+    found;
+}
+
+/// A declaration's name, as written (its first part), or its kind's.
+fn decl_label(node: I32) Str {
+    if is_kind(node, Node.Test_decl) or is_kind(node, Node.Bench_decl) or is_kind(node, Node.Export_main_decl) {
+        return owner_name(node);
+    };
+    let c = first_child(node);
+    if c < 0 { return ""; };
+    let start = tok_start[node_first[c]];
+    let end_ = tok_end[node_last[c] - 1];
+    // A long first part (a `using` list) is cut short.
+    if end_ - start > 60 { return bytes_text(start, start + 60) + "…"; };
+    bytes_text(start, end_);
+}

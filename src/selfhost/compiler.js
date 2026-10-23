@@ -68,11 +68,12 @@ export async function loadCompiler(wasm, spec = {}) {
 export async function compile(utu, entry, host) {
   const chosen = host.mode ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false } = { ...host, ...chosen };
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
-  utu.set_source_map?.(sourceMap ? 1 : 0);
+  // Blame reads the source map: keeping one changes nothing built.
+  utu.set_source_map?.(sourceMap || blame ? 1 : 0);
   let files, size;
   try {
     files = await loadProgram(utu, entry, host);
@@ -90,6 +91,7 @@ export async function compile(utu, entry, host) {
     ...builtModule(utu, size), diagnostics, files,
     tests: target === 'test' ? readTests(utu) : [], benches: target === 'bench' ? readBenches(utu) : [],
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
+    blame: blame && utu.blame_prepare ? readBlameTables(utu, files) : null,
   };
 }
 
@@ -103,19 +105,13 @@ function readBenches(utu) {
 }
 
 /**
- * The last module's source map (see src/selfhost/sourcemap.js): by entry,
- * in offset order, an instruction's byte offset in the module and the
- * syntax it was made for (file, 1-based line and column, UTF-16 span in the
- * file, node kind), with the function that syntax is in (`owner`, and
- * `ownerAt`, where it starts in the compiler's source) and, for code inlined
- * from it, the call it is at (`site`: file, line, column, span); and by
- * function of the module, where it was declared (as `ownerAt`), or null.
+ * A byte of the compiler's src as its file, 1-based line and column
+ * (UTF-16), and UTF-16 offset in the file; null outside the files.
  */
-export function readSourceMap(utu, files) {
+export function placer(files) {
   const ordered = files.toSorted((a, b) => a.offset - b.offset);
   const lines = new Map();
-  // A byte of src as its file, line and column (UTF-16), by each file's line starts.
-  const where = byte => {
+  return byte => {
     let lo = 0, hi = ordered.length - 1, file = null;
     while (lo <= hi) { const mid = (lo + hi) >> 1; if (ordered[mid].offset <= byte) { file = ordered[mid]; lo = mid + 1; } else hi = mid - 1; }
     if (!file || byte > file.offset + file.bytes.length) return null;
@@ -137,6 +133,19 @@ export function readSourceMap(utu, files) {
     const column = decoder.decode(file.bytes.subarray(starts.bytes[lo], local)).length + 1;
     return { file, line: lo + 1, column, offset: starts.units[lo] + column - 1 };
   };
+}
+
+/**
+ * The last module's source map (see src/selfhost/sourcemap.js): by entry,
+ * in offset order, an instruction's byte offset in the module and the
+ * syntax it was made for (file, 1-based line and column, UTF-16 span in the
+ * file, node kind), with the function that syntax is in (`owner`, and
+ * `ownerAt`, where it starts in the compiler's source) and, for code inlined
+ * from it, the call it is at (`site`: file, line, column, span); and by
+ * function of the module, where it was declared (as `ownerAt`), or null.
+ */
+export function readSourceMap(utu, files) {
+  const where = placer(files);
   // Entries share syntax: each node's place, kind and owner read once.
   const places = new Map();
   const kinds = new Map();
@@ -174,6 +183,65 @@ export function readSourceMap(utu, files) {
     functions.push(at >= 0 ? at : null);
   }
   return { entries, functions };
+}
+
+/** Function roles, as blame_func_role numbers them (selfhost/blame.utu). */
+const ROLES = ['defined', 'import', 'helper', 'wat'];
+
+/**
+ * What the last module's entities were made for, for blaming its bytes on
+ * them (src/selfhost/blame.js): `places`, each syntax node's (file, line,
+ * column, UTF-16 span, kind, and its declaration, an index in `decls`); the
+ * source map's `entries` (offset in the module, place, and the call it was
+ * inlined at), and by index in the module each function's (with its role
+ * and name), type's, global's, memory's and data segment's place; -1 for none.
+ */
+export function readBlameTables(utu, files) {
+  utu.blame_prepare();
+  const where = placer(files);
+  const places = [], decls = [];
+  const placeOf = new Map(), declOf = new Map(), kinds = new Map();
+  const kindName = node => {
+    const kind = utu.blame_node_kind(node);
+    if (!kinds.has(kind)) kinds.set(kind, kind >= 0 ? utu.node_kind_name(kind) : null);
+    return kinds.get(kind);
+  };
+  const span = node => {
+    const at = where(utu.blame_node_start(node));
+    return at && { file: at.file.key, line: at.line, column: at.column, start: at.offset, end: where(utu.blame_node_end(node))?.offset ?? at.offset };
+  };
+  const declIndex = node => {
+    if (node < 0) return -1;
+    if (!declOf.has(node)) {
+      const at = span(node);
+      declOf.set(node, at ? decls.push({ name: utu.blame_decl_name(node), kind: kindName(node), ...at }) - 1 : -1);
+    }
+    return declOf.get(node);
+  };
+  const place = node => {
+    if (node < 0) return -1;
+    if (!placeOf.has(node)) {
+      const at = span(node);
+      placeOf.set(node, at ? places.push({ ...at, kind: kindName(node), decl: declIndex(utu.blame_decl(node)) }) - 1 : -1);
+    }
+    return placeOf.get(node);
+  };
+  const entries = [];
+  for (let k = 0; k < utu.map_count(); k++) entries.push({ at: utu.map_offset(k), place: place(utu.blame_map_node(k)), site: place(utu.blame_map_site(k)) });
+  const funcs = [];
+  for (let i = 0; i < utu.map_function_count(); i++) {
+    // The name's UTF-8 bytes, a code unit each.
+    const name = decoder.decode(Uint8Array.from(utu.blame_func_name(i), c => c.charCodeAt(0)));
+    funcs.push({ place: place(utu.blame_func_node(i)), role: ROLES[utu.blame_func_role(i)], name: name || null });
+  }
+  const each = (count, node) => Array.from({ length: count }, (_, i) => place(node(i)));
+  return {
+    places, decls, entries, funcs,
+    types: each(utu.blame_type_count(), i => utu.blame_type_node(i)),
+    globals: each(utu.blame_glob_count(), i => utu.blame_glob_node(i)),
+    data: each(utu.blame_data_count(), i => utu.blame_data_node(i)),
+    memories: each(utu.blame_memory_count(), i => utu.blame_memory_node(i)),
+  };
 }
 
 /** A test build's tests: each one's export and name. */

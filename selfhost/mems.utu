@@ -317,6 +317,7 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
     let d = data_memory.len();
     // A mem in an array is filled from a passive segment.
     data_memory.push(m);
+    data_src.push(node);
     data_start.push(data_bytes.len());
     let count = 0;
     if is_kind(init, Node.Array_expr) {

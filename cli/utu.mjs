@@ -5,7 +5,7 @@
 //   utu run <file.utu> [-O mode]             build, then call main
 //   utu test <file.utu> [-O mode]            build the tests, then run each
 //   utu bench <file.utu> [-O mode]           build the benches, then time each
-//   utu build <file.utu> [-o dir] [-O mode] [--source-map]
+//   utu build <file.utu> [-o dir] [-O mode] [--source-map] [--blame]
 //                                        NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
 //   utu lsp                              a language server, on stdin and stdout
@@ -78,10 +78,12 @@ async function main() {
       if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
       if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
       out = value;
+    } else if (arg === '--blame') {
+      if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', ['utu build FILE --blame writes NAME.blame.json and NAME.blame.html.']);
     } else if (arg === '--source-map') {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', [`utu ${command} places traps by a map in every mode but the unsafe ones.`]);
     } else if (arg.startsWith('-') && arg !== '-') {
-      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map']);
+      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map, --blame']);
     } else files.push(arg);
   }
   if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
@@ -103,7 +105,7 @@ async function main() {
   const asked = args.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), utu: await loadNodeCompiler() });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -266,8 +268,8 @@ function duration(ms) {
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
-async function build(file, { utu, optimize, safe, out, sourceMap }) {
-  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap });
+async function build(file, { utu, optimize, safe, out, sourceMap, blame }) {
+  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame });
   const { spec } = built;
   const name = path.basename(file, '.utu');
   const dir = path.resolve(out ?? '.');
@@ -299,6 +301,18 @@ async function build(file, { utu, optimize, safe, out, sourceMap }) {
   console.log(`${displayPath(path.join(dir, `${name}.wasm`))}  ${wasm.length} bytes`);
   console.log(`${displayPath(path.join(dir, `${name}.mjs`))}   ${js.size} bytes`);
   if (built.map) console.log(displayPath(path.join(dir, `${name}.wasm.map`)));
+  if (built.blame) await writeBlame(built, wasm, dir, name);
+}
+
+/** NAME.blame.json and NAME.blame.html: each byte of the module on its source (src/selfhost/blame.js); the top printed. */
+async function writeBlame(built, wasm, dir, name) {
+  const B = await import('../src/selfhost/blame.js');
+  const blamed = B.blameModule(wasm, built.blame);
+  B.checkTiling(blamed.records, wasm.length);
+  const rep = B.report({ wasm, tables: built.blame, blamed, compressed: await B.estimateCompressed(wasm), glue: B.blameGlue(built.spec, blamed.esPlaces), name: `${name}.wasm` });
+  await fs.writeFile(path.join(dir, `${name}.blame.json`), JSON.stringify(rep));
+  await fs.writeFile(path.join(dir, `${name}.blame.html`), B.blameHtml(rep, new Map(built.files.map(f => [f.key, f.text])), { relative: displayPath }));
+  console.log(`${displayPath(path.join(dir, `${name}.blame.json`))}\n${displayPath(path.join(dir, `${name}.blame.html`))}\n\n${B.formatTop(rep, { relative: displayPath })}`);
 }
 
 /** The glue module, given to esbuild without being written. */

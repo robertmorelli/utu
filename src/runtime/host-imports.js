@@ -280,7 +280,7 @@ export function convertExports(exports, exportSpec) {
 const IMPORT_DECL = /^\s*import\s[^;]*;/;
 
 /** Split a body into its hoistable import declarations and its expression. */
-function splitBody(body) {
+export function splitBody(body) {
   const imports = [];
   let rest = body;
   for (let m = rest.match(IMPORT_DECL); m; m = rest.match(IMPORT_DECL)) {

@@ -173,6 +173,49 @@ export lib {
     /// Where the function (as map_owner_start) of function `i` of the module (imports first) starts, or -1.
     fn map_function_start(i: I32) I32 { span_start(owner_of(func_src[func_order[i]])); }
 
+    /// Size blame (blame.utu): after blame_prepare, by entity of the last
+    /// module (its index there), the syntax node it was made for, or -1.
+    fn blame_prepare() void { blame_invert(); }
+
+    fn blame_type_count() I32 { type_order.len(); }
+
+    /// Source map entry k's syntax node, and its call's (as map_site_start), or -1.
+    fn blame_map_node(k: I32) I32 { map_node[k]; }
+
+    fn blame_map_site(k: I32) I32 { map_site[k]; }
+
+    fn blame_type_node(i: I32) I32 { type_syntax(i); }
+
+    fn blame_func_node(i: I32) I32 { func_syntax(i); }
+
+    fn blame_func_role(i: I32) I32 { func_role(i); }
+
+    fn blame_func_name(i: I32) Str { func_name_text(i); }
+
+    fn blame_glob_count() I32 { glob_order.len(); }
+
+    fn blame_glob_node(i: I32) I32 { glob_syntax(i); }
+
+    fn blame_memory_count() I32 { memory_kind.len(); }
+
+    fn blame_memory_node(i: I32) I32 { memory_syntax(i); }
+
+    fn blame_data_count() I32 { data_src.len(); }
+
+    fn blame_data_node(d: I32) I32 { data_src[d]; }
+
+    /// A node's byte span in src, its kind (as node_kind_name takes it), and
+    /// the declaration it is in (outer_decl in blame.utu), with that one's name.
+    fn blame_node_start(node: I32) I32 { span_start(node); }
+
+    fn blame_node_end(node: I32) I32 { if node < 0 { -1; } else { tok_end[node_last[node] - 1]; }; }
+
+    fn blame_node_kind(node: I32) I32 { if node < 0 { -1; } else { node_kind[node]; }; }
+
+    fn blame_decl(node: I32) I32 { outer_decl(node); }
+
+    fn blame_decl_name(node: I32) Str { decl_label(node); }
+
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level; }
 

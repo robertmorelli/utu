@@ -43,6 +43,7 @@ const commands = [
   // Browsers: Wutu's regressions and hydration (Playwright Chromium and WebKit).
   ['node', './scripts/test-wutu-smoke.mjs'],
   ['node', './scripts/test-utu-cli.mjs'],
+  ['node', './scripts/test-blame.mjs'],
   ['node', './scripts/test-error-messages.mjs'],
   ['node', './scripts/test-lsp.mjs'],
   ['node', './scripts/test-grep.mjs'],

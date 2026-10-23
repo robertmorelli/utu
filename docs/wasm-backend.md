@@ -127,3 +127,7 @@ benchmarks/ have no such calls and build as before.
 - `scripts/wasm-fingerprints.mjs`: the bytes of every build, re-recorded
   when the backend replaced Binaryen.
 - The suite, which runs programs and inspects their text.
+
+## Size blame
+
+`utu build app.utu --blame` writes `app.blame.json` and `app.blame.html` beside the module and prints the top of each list: sections, declarations, lines, functions, files, shared helpers, inlined callees, and the buckets with no source. Every byte is blamed once (the tests check the records tile the file): code by the source map, with locals and body sizes on the function, inlined copies on the callee's line and their call; a compiler helper (`array.slice`, `mem.push`, `Tag.from_i32`, …) split among its calls; types, imports, globals, data and exports on the declaration that made them (else where first needed, a string constant on its literal); headers, counts and custom sections in named buckets. `@es` glue is blamed per binding, before bundling. Brotli shares are estimates (one stream flushed per 2 KB chunk, scaled to the real total). Asking for blame changes nothing built. `node scripts/blame-compiler.mjs` blames the compiler itself, checking the rebuild equals `dist/utu.wasm`. Implementation: `selfhost/blame.utu`, `src/selfhost/blame.js`.
