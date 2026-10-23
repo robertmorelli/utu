@@ -47,7 +47,9 @@ failures.
 | implementation | payload | gzip |
 |---|---:|---:|
 | utu Wasm | 39.48 KiB | 13.40 KiB |
-| utu Wasm, `-O smallUnsafe` | 4.64 KiB | 2.06 KiB |
+| utu Wasm, `-O fast` | 43.98 KiB | 13.92 KiB |
+| utu Wasm, `-O small` | 4.72 KiB | 2.09 KiB |
+| utu Wasm, `-O smallUnsafe` | 4.64 KiB | 2.08 KiB |
 | safe Rust Wasm | 38.04 KiB | 15.17 KiB |
 | unsafe Rust Wasm | 32.05 KiB | 13.11 KiB |
 | minified JavaScript | 5.83 KiB | 1.83 KiB |

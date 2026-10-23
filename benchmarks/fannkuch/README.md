@@ -22,15 +22,15 @@ Each port exports `bench(iterations)`, which runs fannkuch-redux with `n = 9`
 ## Snapshot
 
 d8 15.6 on arm64 macOS, 5 warmups then the median of 20 samples of `bench(1)`;
-utu built at `-O fastUnsafe`. All four returned 8629030. From
-`bun run bench:programs-d8`.
+utu built at `-O fast` and `-O small` (with the checks) and their `Unsafe`
+forms. All returned 8629030. From `bun run bench:programs-d8`.
 
-| utu Wasm | safe Rust Wasm | unsafe Rust Wasm | JavaScript |
-|---:|---:|---:|---:|
-| 13.1 ms | 12.4 ms | 13.5 ms | 17.6 ms |
-
-| implementation | payload | gzip |
-|---|---:|---:|
-| utu Wasm | 5,240 B | 1,702 B |
-| safe Rust Wasm | 22,760 B | 9,876 B |
-| unsafe Rust Wasm | 22,133 B | 9,641 B |
+| implementation | time | payload | gzip |
+|---|---:|---:|---:|
+| utu Wasm, `-O fast` | 13.3 ms | 5,240 B | 1,730 B |
+| utu Wasm, `-O fastUnsafe` | 13.2 ms | 5,240 B | 1,730 B |
+| utu Wasm, `-O small` | 14.2 ms | 553 B | 352 B |
+| utu Wasm, `-O smallUnsafe` | 14.3 ms | 553 B | 352 B |
+| safe Rust Wasm | 12.6 ms | 22,760 B | 10,025 B |
+| unsafe Rust Wasm | 13.7 ms | 22,133 B | 9,764 B |
+| JavaScript | 17.7 ms | | |

@@ -10,7 +10,7 @@
 // The first engine is the one the sizes and builds are reported with.
 //
 // Ports, where a program has them (benchmarks/NAME/<dir>):
-//   utu        fastUnsafe and smallUnsafe (DeltaBlue also fast and small, with the checks), the shipped
+//   utu        fast and small (with the checks), fastUnsafe and smallUnsafe, the shipped
 //              self-hosted compiler, warm: the median of 20 builds after 5
 //   Rust       rust/ (safe; Rc Rust for DeltaBlue) and rust-unsafe/,
 //              `cargo build --release`
@@ -122,9 +122,7 @@ for (const name of names) {
   const program = PROGRAMS[name];
   const dir = path.join(ROOT, 'benchmarks', name);
   const has = sub => existsSync(path.join(dir, sub));
-  const utuPorts = name === 'deltablue'
-    ? [['fast', 'speed', true], ['fastUnsafe', 'speed', false], ['small', 'size', true], ['smallUnsafe', 'size', false]]
-    : [['fastUnsafe', 'speed', false], ['smallUnsafe', 'size', false]];
+  const utuPorts = [['fast', 'speed', true], ['fastUnsafe', 'speed', false], ['small', 'size', true], ['smallUnsafe', 'size', false]];
   const ports = [];
   for (const [label, optimize, safe] of utuPorts) ports.push({ port: `utu ${label}`, kind: 'utu', ...await compileUtu(path.join(dir, `${name}.utu`), optimize, safe), js: utuLoader(dir, name, optimize, safe) });
   ports.push({ port: name === 'deltablue' ? 'Rc Rust' : 'safe Rust', kind: 'wasm', ...buildRust(dir, 'rust', `rust_${name}`), js: await plainLoader(name, '{}') });

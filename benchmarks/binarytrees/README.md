@@ -25,11 +25,15 @@ over all iterations: 3,222,190 per iteration (stretch 65,535, the depth loop
 ## Snapshot
 
 d8 15.6 on arm64 macOS, 5 warmups, median of 20 samples of `bench(1)`; utu
-built at `-O fastUnsafe`. From `bun run bench:programs-d8`.
+built at `-O fast` and `-O small` (with the checks) and their `Unsafe` forms.
+From `bun run bench:programs-d8`.
 
 | implementation | time / iteration | Wasm size | gzip |
 |---|---:|---:|---:|
-| utu Wasm | 10.7 ms | 3,840 B | 1,391 B |
-| safe Rust Wasm | 41.6 ms | 21,292 B | 9,273 B |
-| unsafe Rust Wasm | 9.1 ms | 21,466 B | 9,387 B |
-| JavaScript | 20.3 ms | | |
+| utu Wasm, `-O fast` | 10.9 ms | 4,056 B | 1,398 B |
+| utu Wasm, `-O fastUnsafe` | 11.1 ms | 3,840 B | 1,383 B |
+| utu Wasm, `-O small` | 11.1 ms | 339 B | 250 B |
+| utu Wasm, `-O smallUnsafe` | 10.8 ms | 333 B | 248 B |
+| safe Rust Wasm | 42.6 ms | 21,292 B | 9,405 B |
+| unsafe Rust Wasm | 9.3 ms | 21,466 B | 9,507 B |
+| JavaScript | 20.4 ms | | |
