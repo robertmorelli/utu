@@ -2286,15 +2286,27 @@ fn lazy_stub_func(fi: I32, lazy: I32) I32 {
 /// once, in order; else they are stored in locals first.
 fn expand(fi: I32, m: I32) I32 {
     let x = fi_ir[fi];
-    let decls = param_decls(fi_decl[fi]);
+    // (Once an instance: its parameters, and whether its body uses each once, in order.)
+    if fi >= expand_decls.len() {
+        let old = expand_decls.len();
+        expand_decls.resize(fi + 1);
+        expand_direct.resize(fi + 1);
+        for (old ..< fi + 1) |k| { expand_decls[k] = -1; };
+    };
+    if expand_decls[fi] < 0 {
+        let decls = param_decls(fi_decl[fi]);
+        let uses = ident_uses(x, decls);
+        let direct = vl_len[uses] == vl_len[decls] and not reorders(x);
+        for (0 ..< vl_len[uses]) |i| { if vl_item(uses, i) != i { direct = false; }; };
+        expand_decls[fi] = decls;
+        expand_direct[fi] = if direct { 1; } else { 0; };
+    };
+    let decls = expand_decls[fi];
+    let direct = expand_direct[fi] == 1;
     let n = vl_len[decls];
     let args = Array[I32].new(n, 0);
     for (0 ..< n) |i| { args[i] = w_stack[m + i]; };
     w_stack.resize(m);
-    // In order, once each?
-    let uses = ident_uses(x, decls);
-    let direct = vl_len[uses] == n and not reorders(x);
-    for (0 ..< vl_len[uses]) |i| { if vl_item(uses, i) != i { direct = false; }; };
     let locals = Array[I32].new(n, -1);
     if not direct {
         for (0 ..< n) |i| {
@@ -2325,6 +2337,11 @@ fn expand(fi: I32, m: I32) I32 {
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
     fi_result[fi];
 }
+
+/// By function instance, for @expand: its parameter declarations (-1: not
+/// yet found), and 1 when its `@ir` body uses each once, in order.
+vec expand_decls: I32;
+vec expand_direct: U8;
 
 /// The parameter indices of the `ir-ident`s of a tree, in order.
 fn ident_uses(x: I32, decls: I32) I32 {
@@ -2881,6 +2898,8 @@ fn reset_check() void {
     checking_inst.clear();
     fi_table.clear();
     fi_queue.clear();
+    expand_decls.clear();
+    expand_direct.clear();
     user_ir_decl.clear();
     reach_from.clear();
     reach_to.clear();
