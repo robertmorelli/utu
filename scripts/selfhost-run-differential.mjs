@@ -98,8 +98,8 @@ async function main() {
   for (const key of keys) {
     const result = results[key];
     if (INTENDED[key]) { count.intended++; continue; }
-    // Wutu templates are the self-hosted compiler's alone: stage 0 refuses them.
-    if (JSON.stringify(recorded[key] ?? '').includes('Wutu templates are compiled by the self-hosted compiler')) { count.intended++; continue; }
+    // Wutu templates, and Result's try and errdefer, are the self-hosted compiler's alone: stage 0 refuses them.
+    if (JSON.stringify(recorded[key] ?? '').includes(' are compiled by the self-hosted compiler')) { count.intended++; continue; }
     if (result?.unsupported) {
       count.unsupported++;
       for (const snippet of result.snippets ?? []) whys.push(snippet);

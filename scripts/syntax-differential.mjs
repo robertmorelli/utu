@@ -66,7 +66,7 @@ const KEYWORDS = ['mod', 'using', 'tag', 'rec', 'struct', 'proto', 'enum', 'fn',
   'fold', 'scan', 'skip', 'take', 'chain', 'repeat', 'zip', 'sort', 'min_by', 'max_by', 'first_where', 'reduce', 'partition',
   'collect', 'group_by', 'distinct_by', 'batched', 'windows', 'bisect', 'sum', 'fast_sum', 'product', 'count',
   'await', 'new', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote', 'try', 'catch', 'match', 'loop',
-  'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'prune', 'true', 'false', 'null'];
+  'alt', 'for', 'while', 'break', 'continue', 'defer', 'errdefer', 'return', 'fatal', 'prune', 'true', 'false', 'null'];
 
 function mutants(source, count) {
   const tokens = source.match(TOKEN) ?? [];

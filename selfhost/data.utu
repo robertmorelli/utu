@@ -47,8 +47,16 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
 
 /// `struct.new` of `t` from the initializers from `first_init` on, each
 /// checked as its field's type and run in the order written. An unknown, repeated, or
-/// missing field is reported (a missing one's value is `unreachable`).
+/// missing field is reported (a missing one's value is `unreachable`). In
+/// std, a field of std's own (see @std_own) may be left out: it holds Wasm's
+/// default, zero or null. Outside std, a struct with such fields is built by
+/// its own functions.
 fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
+    let in_std = from_std(at);
+    if not in_std and has_std_own(decl) {
+        report2(Diag.StdOwnStruct, at, -1, t, -1);
+        return error_value();
+    };
     // Each initializer names a field once, and each field has one.
     let unknown = false;
     let f = first_init;
@@ -102,7 +110,9 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
             let field = node_decl[first_child(c)];
             let init = init_for(first_init, decl_name[field]);
             let ft = field_type(field, ty_inst(t));
-            if init < 0 {
+            if init < 0 and in_std and std_own(field) {
+                w_default(storage(repr(ft)));
+            } else if init < 0 {
                 // A misnamed field (reported) is the mistake, not the one it meant.
                 if not missing and not unknown {
                     report2(Diag.MissingField, at, decl_name[field], decl, -1);
@@ -125,6 +135,41 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     w_node(Op.StructNew, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m);
     if m > mt { w_node(Op.Seq, vt_ref(vt_heap(vt), false), 0, 0, mt); };
     t;
+}
+
+/// Whether a node is in the standard library's code.
+fn from_std(node: I32) Bool { file_std[file_of_token(node_first[node])] == 1; }
+
+/// A field of std's own: one a std struct declares with a name starting
+/// with `_`. Only std's code names it (Result's `_ok`, `_value`, `_error`).
+fn std_own(field: I32) Bool {
+    let name = first_child(decl_node[field]);
+    src[tok_start[node_first[name]]] == 95 and from_std(name);
+}
+
+/// Whether a struct has a field of std's own.
+fn has_std_own(decl: I32) Bool {
+    let holder = fields_holder(decl);
+    let c = if holder >= 0 { first_child(holder); } else { -1; };
+    while (c >= 0) {
+        if is_kind(c, Node.Field) and std_own(node_decl[first_child(c)]) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+/// Push Wasm's default value of a field's storage `vt`: zero, or null.
+fn w_default(vt: I32) void {
+    if vt == vt_i32 { w_i32(0); }
+    else if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 0, 0); }
+    else if vt == vt_f32 { w_leaf(Op.F32Const, vt_f32, 0, 0); }
+    else if vt == vt_f64 { w_leaf(Op.F64Const, vt_f64, 0, 0); }
+    else if vt == vt_v128 {
+        let at = w_aux.len();
+        for (0 ..< 4) |i| { w_aux.push(0); };
+        w_leaf(Op.V128Const, vt_v128, at, 0);
+    }
+    else { w_leaf(Op.RefNull, vt_nullable(vt), heap_of(vt), 0); };
 }
 
 /// Whether the initializers from `first_init` on name the fields of
@@ -165,6 +210,10 @@ fn field_of(t: I32, name: I32) I32 {
         return -1;
     };
     let field = member(decl, word_of(name), Space.Member);
+    if decl_is(field, Decl.Field) and std_own(field) and not from_std(name) {
+        report2(Diag.UnknownField, parent_of(name), word_of(name), decl, -1);
+        return -1;
+    };
     if not decl_is(field, Decl.Field) or not (decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Variant)) {
         report2(Diag.UnknownField, parent_of(name), word_of(name), decl, -1);
         suggest_field(decl, name);

@@ -42,7 +42,7 @@ const COMPLETION_KIND = {
 
 const KEYWORDS = ['mod', 'using', 'struct', 'proto', 'enum', 'fn', 'let', 'mem', 'vec', 'export', 'const', 'type', 'distinct',
   'test', 'bench', 'fun', 'cl', 'await', 'assert', 'not', 'and', 'or', 'xor', 'orelse', 'if', 'else', 'promote', 'try', 'catch',
-  'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'return', 'fatal', 'yield', 'true', 'false', 'null', 'new'];
+  'match', 'loop', 'alt', 'for', 'while', 'break', 'continue', 'defer', 'errdefer', 'return', 'fatal', 'yield', 'true', 'false', 'null', 'new'];
 
 // What the prelude offers every program by name: its modules and types.
 const PRELUDE_KINDS = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', 'TypeDecl', 'Distinct']);
@@ -503,6 +503,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       // A type outside a module has the functions written `fn T.f`: called on a value when they take |self|.
       const typeName = module < 0 ? label(owner) : null;
       for (const { decl, kind, owner: o } of all) {
+        // (A std struct's `_` fields are std's own: see data.utu's std_own.)
+        if (kind === 'Field' && label(decl).startsWith('_') && index.span(decl)?.file.startsWith('std:')) continue;
         if (o === owner && ((kind === 'Field' && !statics) || kind === 'Variant' || kind === 'Fn' || kind === 'Global')) add(decl, kind);
         else if (typeName && o < 0 && kind === 'Fn' && writtenFor(index, program, decl, typeName) && isMethod(index, program, decl) !== statics) add(decl, kind);
         else if (module >= 0 && o === module && module !== owner && kind === 'Fn' && (rkind === 'Module' || isMethod(index, program, decl))) add(decl, kind);

@@ -542,6 +542,85 @@ fn check_try(node: I32, expect: I32, cx: Cx) I32 {
     t;
 }
 
+//! = Result
+//!
+//! `Result[T, E]` is std's struct (std/Result.utu): `_ok`, `_value`, and
+//! `_error`, its fields 0, 1, and 2.
+
+/// Whether `t` is std's `Result[T, E]`.
+fn is_result_type(t: I32) Bool {
+    let decl = if t >= 0 { ty_decl(t); } else { -1; };
+    decl >= 0 and decl_is(decl, Decl.Struct) and decl_name[module_of(decl)] == known_word(Known.WordResult)
+        and from_std(decl_node[decl]);
+}
+
+/// `try r`: r's value when it is ok. Else the function returns r's error,
+/// as its own Result (whose error type must be the same), after its pending
+/// errdefers and defers, newest first:
+/// ```
+/// let r = …; if not r._ok { return r (or Result[U, E] { _error: r._error }); }; r._value
+/// ```
+fn check_try_result(node: I32, cx: Cx) I32 {
+    let operand = first_child(node);
+    let m = w_mark();
+    if expansion_of(node) >= 0 {
+        report2(Diag.TryPlace, node, -1, 2, -1);
+        drop_value(check_expr(operand, -1, cx));
+        return error_since(m);
+    };
+    let rt = check_expr(operand, -1, cx);
+    if ty_is(rt, Ty.Error) { return error_since(m); };
+    if not is_result_type(rt) {
+        report2(Diag.TryNotResult, operand, -1, rt, -1);
+        return error_since(m);
+    };
+    let ft = cx.result;
+    if not is_result_type(ft) {
+        if ft < 0 or not ty_is(ft, Ty.Error) { report2(Diag.TryPlace, node, -1, 0, ft); };
+        return error_since(m);
+    };
+    let value_t = inst_arg(ty_inst(rt), 0);
+    let error_t = inst_arg(ty_inst(rt), 1);
+    let fn_error = inst_arg(ty_inst(ft), 1);
+    if error_t != fn_error {
+        report2(Diag.TryErrorMismatch, operand, -1, error_t, fn_error);
+        diag_note("try returns the error as it is, unconverted");
+        return error_since(m);
+    };
+    let rvt = repr(rt);
+    let heap = vt_heap(rvt);
+    let r = new_local(rvt);
+    w_node(Op.LocalSet, vt_none, r, 0, m);
+    let mi = w_mark();
+    w_get(rvt, r);
+    w_node(Op.StructGet, vt_i32, heap, 0, mi);
+    w_i32_op(i32_eqz, mi);
+    let mt = w_mark();
+    if ft == rt { w_get(rvt, r); } else {
+        let fheap = vt_heap(repr(ft));
+        let mn = w_mark();
+        w_i32(0);
+        w_default(storage(repr(inst_arg(ty_inst(ft), 0))));
+        let me = w_mark();
+        w_get(rvt, r);
+        w_node(Op.StructGet, repr(error_t), heap, 2, me);
+        w_node(Op.StructNew, vt_ref(fheap, false), fheap, 0, mn);
+    };
+    if defer_node.len() > function_defers[0] {
+        let local = new_local(repr(ft));
+        w_node(Op.LocalSet, vt_none, local, 0, mt);
+        run_exit_defers(function_defers[0], -2, ft, cx);
+        w_leaf(Op.LocalGet, repr(ft), local, 0);
+    };
+    w_node(Op.Return, vt_unreachable, 0, 0, mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+    let mv = w_mark();
+    w_get(rvt, r);
+    w_node(Op.StructGet, repr(value_t), heap, 1, mv);
+    w_node(Op.Seq, repr(value_t), 0, 0, m);
+    value_t;
+}
+
 //! = Tuples
 
 /// `.{a, b}`: several values at once.

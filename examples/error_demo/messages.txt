@@ -474,6 +474,98 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/control/300_try_non_result.utu
+ ERROR  try needs a Result, not I32
+        try-not-result · examples/error_demo/control/300_try_non_result.utu:4:17
+
+ 2 │ // Expect: try needs a Result, not I32
+ 3 │ fn count(text: Str) Result[I32, Str] {
+ 4 │     let n = try text.len();
+   │                 ━━━━━━━━━━
+   │                 ╰─ I32
+ 5 │     Result[I32, Str].ok(n);
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/301_try_error_type_mismatch.utu
+ ERROR  try passes on I32; the function's errors are Str
+        try-error-mismatch · examples/error_demo/control/301_try_error_type_mismatch.utu:9:17
+
+ 7 │
+ 8 │ fn label(n: I32) Result[Str, Str] {
+ 9 │     let c = try code(n);
+   │                 ━━━━━━━
+   │                 ╰─ I32 errors
+10 │     Result[Str, Str].ok("code " + c.to_str());
+11 │ }
+
+  note  try returns the error as it is, unconverted
+--- exit 1
+
+=== utu check examples/error_demo/control/302_try_outside_result_function.utu
+ ERROR  try in a function returning I32, not a Result
+        try-place · examples/error_demo/control/302_try_outside_result_function.utu:9:13
+
+ 7 │
+ 8 │ fn quarter(n: I32) I32 {
+ 9 │     let h = try half(n);
+   │             ━━━━━━━━━━━
+   │             ╰─ no Result to return
+10 │     h / 2;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/303_errdefer_outside_result_function.utu
+ ERROR  errdefer in a function returning I32, not a Result
+        try-place · examples/error_demo/control/303_errdefer_outside_result_function.utu:6:5
+
+ 4 │
+ 5 │ fn work(n: I32) I32 {
+ 6 │     errdefer console.log("failed");
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ no Result to return
+ 7 │     n * 2;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/304_try_in_generator.utu
+ ERROR  try in a generator
+        try-place · examples/error_demo/control/304_try_in_generator.utu:9:29
+
+ 7 │
+ 8 │ fn digits(codes: Array[I32]) yield I32 {
+ 9 │     for (codes) |c| { yield try digit(c); };
+   │                             ━━━━━━━━━━━━
+   │                             ╰─ in a generator
+10 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/305_try_in_defer.utu
+ ERROR  try in defer
+        invalid-defer · examples/error_demo/control/305_try_in_defer.utu:6:13
+
+ 4 │
+ 5 │ fn save() Result[I32, Str] {
+ 6 │     defer { try flush(); };
+   │             ━━━━━━━━━━━
+   │             ╰─ here
+ 7 │     Result[I32, Str].ok(1);
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/control/306_try_in_closure_without_result_type.utu
+ ERROR  try needs a function returning a Result
+        try-place · examples/error_demo/control/306_try_in_closure_without_result_type.utu:9:32
+
+ 7 │
+ 8 │ export main() I32 {
+ 9 │     let quarter = cl(n: I32) { try half(n); };
+   │                                ━━━━━━━━━━━
+   │                                ╰─ no Result to return
+10 │     0;
+11 │ }
+--- exit 1
+
 === utu check examples/error_demo/control/30_match_bool_missing_true.utu
  ERROR  match misses true
         non-exhaustive · examples/error_demo/control/30_match_bool_missing_true.utu:4:5
@@ -5959,6 +6051,20 @@ Node.js v25.8.1
   in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
 --- exit 1
 
+=== utu run examples/error_demo/runtime/309_result_value_of_error.utu
+ TRAP  Failed check in std:Result
+       trap · examples/error_demo/runtime/309_result_value_of_error.utu:8:21
+
+ 6 │ }
+ 7 │
+ 8 │ export main() I32 { half(3).value(); }
+   │                     ━━━━━━━━━━━━━━━
+   │                     ╰─ called here
+
+  in &.value  std:Result:42:27
+  in main  examples/error_demo/runtime/309_result_value_of_error.utu:8:21
+--- exit 1
+
 === utu run examples/error_demo/runtime/30_string_index_oob.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/30_string_index_oob.utu:5:5
@@ -8199,6 +8305,29 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
    │        ━
    │        ╰─ I32
  6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/307_result_private_field.utu
+ ERROR  Result has no field _value
+        unknown-field · examples/error_demo/types/307_result_private_field.utu:8:21
+
+ 6 │ }
+ 7 │
+ 8 │ export main() I32 { half(8)._value; }
+   │                     ━━━━━━━━━━━━━━
+   │                     ╰─ no such field
+--- exit 1
+
+=== utu check examples/error_demo/types/308_result_built_by_hand.utu
+ ERROR  Result[I32, Str] is made by its own functions
+        std-own-struct · examples/error_demo/types/308_result_built_by_hand.utu:4:5
+
+ 2 │ // Expect: Result[I32, Str] is made by its own functions (ok, err)
+ 3 │ fn half(n: I32) Result[I32, Str] {
+ 4 │     &{ _ok: true, _value: n / 2 };
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ use its functions
+ 5 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/30_and_operands_not_bool.utu

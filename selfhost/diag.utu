@@ -152,6 +152,7 @@ enum(U8) BreakRule:
     | ContinueInDefer
     | ReturnInDefer
     | DeferNotStatement
+    | TryInDefer
 
 /// The JS typed array a mem's view is.
 fn view_array_name(s: Storage) Str {
@@ -280,6 +281,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.HostMissing { return "unknown-import"; };
     if k == Diag.ComptimeTrap or k == Diag.ComptimeCycle { return "comptime-trap"; };
     if k == Diag.DslEmpty or k == Diag.DslTooDeep or k == Diag.IrInvalid { return "invalid-dsl-usage"; };
+    if k == Diag.StdOwnStruct { return "unknown-field"; };
+    if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try"; };
     "type-mismatch";
 }
 
@@ -340,6 +343,7 @@ fn break_rule_text(a: I32) Str {
     if r == BreakRule.BreakInDefer { return "break in defer"; };
     if r == BreakRule.ContinueInDefer { return "continue in defer"; };
     if r == BreakRule.ReturnInDefer { return "return in defer"; };
+    if r == BreakRule.TryInDefer { return "try in defer"; };
     "defer must be a statement";
 }
 
@@ -516,6 +520,17 @@ fn diag_text(i: I32) Str {
             "@comptime " + w + " reads " + word_text(decl_name[a]) + ", which waits on it";
         },
         Diag.DslTooDeep => "DSLs nested too deeply (max " + int_text(a) + ")",
+        Diag.StdOwnStruct => type_text(a) + " is made by its own functions",
+        Diag.TryNotResult => "try needs a Result, not " + type_text(a),
+        Diag.TryPlace => {
+            // a: 0 try, 1 errdefer, outside a function returning a Result (b: its result);
+            // 2 try, 3 errdefer, in a generator
+            let what = pick(a == 0 or a == 2, "try", "errdefer");
+            if a >= 2 { return what + " in a generator"; };
+            if b < 0 { return what + " needs a function returning a Result"; };
+            what + " in a function returning " + type_text(b) + ", not a Result";
+        },
+        Diag.TryErrorMismatch => "try passes on " + type_text(a) + "; the function's errors are " + type_text(b),
         Diag.WatHost => "@wat needs an assembler",
         Diag.HostAltArm => "Each arm must name a class",
         Diag.HostAltClass => word_text(view_prefix[a]) + "." + w + " is only a type",
@@ -711,6 +726,10 @@ fn diag_default_label(i: I32) Str {
         Diag.DslEmpty => "empty",
         Diag.ComptimeCycle => if a >= 0 and decl_name[a] != diag_word[i] { "waits on " + word_text(decl_name[a]); } else { "waits on itself"; },
         Diag.DslTooDeep => "too deep",
+        Diag.TryNotResult => type_text(a),
+        Diag.TryErrorMismatch => type_text(a) + " errors",
+        Diag.TryPlace => pick(a >= 2, "in a generator", "no Result to return"),
+        Diag.StdOwnStruct => "use its functions",
         Diag.ProtoGeneric => "on a generic type",
         Diag.SelfUntyped => "type not known yet",
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),

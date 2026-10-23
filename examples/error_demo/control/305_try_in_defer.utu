@@ -1,0 +1,10 @@
+// What: uses try inside deferred code, which must not leave its block.
+// Expect: try in defer
+fn flush() Result[I32, Str] { Result[I32, Str].ok(0); }
+
+fn save() Result[I32, Str] {
+    defer { try flush(); };
+    Result[I32, Str].ok(1);
+}
+
+export main() I32 { save().value(); }

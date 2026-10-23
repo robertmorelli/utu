@@ -272,7 +272,8 @@ fn suggest_field(owner: I32, at: I32) void {
     if diag_fresh[0] == 0 or at < 0 { return; };
     let word = word_of(at);
     let f = near_member(owner, word, Space.Member);
-    if f >= 0 and decl_is(near_decl[0], Decl.Field) {
+    // (Not a field of std's own: a program cannot name it.)
+    if f >= 0 and decl_is(near_decl[0], Decl.Field) and not std_own(near_decl[0]) {
         suggest(at, f, near_decl[0]);
         return;
     };

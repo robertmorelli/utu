@@ -289,6 +289,7 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
     func_src[f] = body_node;
     let m = w_mark();
     if prologue >= 0 { w_push(prologue); };
+    body_block[0] = body_node;
     let t = check_block(body_node, cx.result, cx);
     if ty_is(cx.result, Ty.Void) { drop_value(t); } else { coerce(t, cx.result, body_node); };
     w_node(Op.Seq, repr(cx.result), 0, 0, m);
@@ -325,7 +326,11 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     };
     if defer_node.len() > defers {
         let vt = repr(t);
-        if vt != vt_unreachable { defers_after_value(vt, w_mark() - 1, defers, cx); };
+        // A function's body ends in a return, which may be an error's.
+        if vt != vt_unreachable {
+            if block == body_block[0] { return_defers(t, w_mark() - 1, defers, cx); }
+            else { defers_after_value(vt, w_mark() - 1, defers, cx); };
+        };
         defer_node.resize(defers);
     };
     defer_marks.resize(defer_marks.len() - 1);
@@ -601,6 +606,8 @@ fn check_node(node: I32, expect: I32, cx: Cx) I32 {
         Node.Iterator_expr => check_iterator(node, expect, cx),
         Node.Pipe_expr => check_pipe(node, expect, cx),
         Node.Defer_expr => check_defer(node),
+        Node.Errdefer_expr => check_errdefer(node, cx),
+        Node.Try_result_expr => check_try_result(node, cx),
         Node.Optional_field_expr => check_field_get(node, expect, cx),
         Node.Await_expr => check_await(node, cx),
         Node.Dsl_expr => {
@@ -2674,7 +2681,8 @@ fn check_return(node: I32, cx: Cx) I32 {
     };
     // The value first, then every pending defer of the function.
     if defer_node.len() > function_defers[0] {
-        defers_after_value(if value >= 0 { repr(cx.result); } else { vt_none; }, m, function_defers[0], cx);
+        if value >= 0 { return_defers(cx.result, m, function_defers[0], cx); }
+        else { defers_after_value(vt_none, m, function_defers[0], cx); };
     };
     w_node(Op.Return, vt_unreachable, 0, 0, m);
     ty_never();

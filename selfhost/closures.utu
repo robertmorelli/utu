@@ -560,7 +560,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     let boxed_params = box_params(types_list(pd, n), types_list(ptypes, n));
     if boxed_params >= 0 { w_push(boxed_params); };
     let lcx = Cx { inst: cx.inst, fi: cx.fi, result: if result >= 0 { result; } else { -1; } };
+    let outer_body = body_block[0];
+    body_block[0] = body_node;
     let actual = check_block(body_node, lcx.result, lcx);
+    body_block[0] = outer_body;
     if result < 0 { result = if ty_is(actual, Ty.Never) { ty_void(); } else { actual; }; }
     else if ty_is(result, Ty.Void) {
         // A closure that says nothing of its result, where `cl(…) void` is

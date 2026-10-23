@@ -693,6 +693,20 @@ for (walk(root)) |n| {
     use(handle);
 }
 
+// Result[T, E] (std/Result.utu, in the prelude): a value or an expected error.
+// `try r` is r's value when it is ok; else the function returns r's error.
+// The function must return Result[U, E], the same E (never converted).
+// `try { … } catch …` stays the host form; `try` before anything else is this.
+// errdefer: a defer that runs only on an error return (a try returning, or a
+// return or final value whose Result is an error, tested where it returns),
+// with the pending defers, newest first. Only in a function returning a Result.
+// Neither is allowed in a generator. See docs/errors.md.
+fn quarter(n: I32) Result[I32, Str] {
+    errdefer log("failed");
+    let h = try half(n);
+    half(h);
+}
+
 // bind (let)
 let x: I32 = expr
 

@@ -167,6 +167,95 @@ export lib {
     checked++;
   }
 
+  // Result, try, and errdefer, in every build mode (the self-hosted compiler's
+  // alone). Each letter is a defer (d, D, i) or errdefer (e, E, T, p, c, j, o) run;
+  // a labeled block's break runs its defers, not its errdefers.
+  const results = await write(`// What ran, in order: one letter each.
+vec trail: I32;
+fn note(s: Str) void { trail.push(s.get(0)); }
+fn taken() Str {
+    let s = "";
+    for (0 ..< trail.len()) |i| { s = s + Str.from_code_point(trail[i]); };
+    trail.clear();
+    s;
+}
+fn digit(c: I32) Result[I32, Str] {
+    if c < 48 or c > 57 { return Result[I32, Str].err("bad " + c.to_str()); };
+    Result[I32, Str].ok(c - 48);
+}
+fn sum(codes: Array[I32]) Result[I32, Str] {
+    defer note("D");
+    errdefer note("E");
+    let t = 0;
+    for (codes) |c| {
+        defer note("d");
+        errdefer note("e");
+        t += try digit(c);
+    };
+    Result[I32, Str].ok(t);
+}
+fn twice(codes: Array[I32]) Result[Str, Str] {
+    errdefer note("T");
+    let a = try sum(codes);
+    let b = try sum(codes);
+    Result[Str, Str].ok((a + b).to_str());
+}
+fn picky(n: I32) Result[I32, Str] {
+    errdefer note("p");
+    if n == 0 { return Result[I32, Str].err("zero"); };
+    let r = if n > 9 { Result[I32, Str].err("big"); } else { Result[I32, Str].ok(n); };
+    r;
+}
+fn via_closure(c: I32) Result[I32, Str] {
+    let f = cl(k: I32) Result[I32, Str] {
+        errdefer note("c");
+        let v = try digit(k);
+        Result[I32, Str].ok(v * 2);
+    };
+    let v = try f(c);
+    Result[I32, Str].ok(v + 1);
+}
+fn labeled(c: I32, leave: Bool) Result[I32, Str] {
+    errdefer note("o");
+    let v = found: {
+        defer note("i");
+        errdefer note("j");
+        if leave { break found 7; };
+        try digit(c);
+    };
+    Result[I32, Str].ok(v);
+}
+fn show(r: Result[I32, Str]) Str {
+    taken() + "|" + if r.is_ok() { r.value().to_str(); } else { r.error(); };
+}
+export lib {
+    fn ok_sum() Str { show(sum([49, 50, 51])); }
+    fn err_sum() Str { show(sum([49, 120, 51])); }
+    fn nested_ok() Str {
+        let r = twice([52]);
+        taken() + "|" + r.value();
+    }
+    fn nested_err() Str {
+        let r = twice([97]);
+        taken() + "|" + r.error();
+    }
+    fn returns() Str { show(picky(0)) + "," + show(picky(5)) + "," + show(picky(12)); }
+    fn closure() Str { show(via_closure(51)) + "," + show(via_closure(65)); }
+    fn defaults() I32 { digit(55).value_or(-1) * 10 + digit(1).value_or(-1); }
+    fn labels() Str { show(labeled(50, true)) + "," + show(labeled(50, false)) + "," + show(labeled(120, false)); }
+}
+`);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, results, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    const expected = { ok_sum: 'dddD|6', err_sum: 'dedED|bad 120', nested_ok: 'dDdD|8', nested_err: 'edEDT|bad 97',
+      returns: 'p|zero,|5,p|big', closure: '|7,c|bad 65', defaults: 69,
+      labels: 'i|7,i|2,jio|bad 120' };
+    for (const [name, value] of Object.entries(expected)) assert.equal(e[name](), value, `${mode}: ${name}`);
+    checked++;
+  }
+
   // Structs returned as their fields (selfhost/inline.utu, -O small and
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.
@@ -823,6 +912,17 @@ export lib {
     // Arms of one value, and enum variants without one, found by value.
     ['fn f(x: I32) I32 { match x { 1 => 1, 2 => 2, 1 => 3, ~> 0, }; }\nexport main() I32 { f(1); }\n', 'Duplicate pattern 1'],
     [`enum(U8) Many:\n${variants}\nfn f(m: Many) I32 { match m {\n${covered.split('\n').filter(l => !l.includes('V17 ')).join('\n')}\n}; }\nexport main() I32 { f(Many.V1); }\n`, 'match misses Many.V17'],
+    // try and errdefer: a Result, in a function returning one with the same error type.
+    ['fn f() Result[I32, Str] { let x = try 5; Result[I32, Str].ok(x); }\nexport main() I32 { f().value(); }\n', 'try needs a Result, not I32'],
+    ['fn g() Result[I32, I32] { Result[I32, I32].ok(1); }\nfn f() Result[I32, Str] { Result[I32, Str].ok(try g()); }\nexport main() I32 { f().value(); }\n',
+      "try passes on I32; the function's errors are Str"],
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() I32 { try g(); }\nexport main() I32 { f(); }\n', 'try in a function returning I32, not a Result'],
+    ['fn f() I32 { errdefer f(); 2; }\nexport main() I32 { f(); }\n', 'errdefer in a function returning I32, not a Result'],
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn gen() yield I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; Result[I32, Str].ok(s); }\nexport main() I32 { f().value(); }\n',
+      'try in a generator'],
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; g(); }\nexport main() I32 { f().value(); }\n', 'try in defer'],
+    ['export main() I32 { let r = Result[I32, Str].ok(1); r._value; }\n', 'Result has no field _value'],
+    ['export main() I32 { let r: Result[I32, Str] = &{ _ok: true, _value: 1 }; 0; }\n', 'Result[I32, Str] is made by its own functions'],
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
     ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
@@ -900,11 +1000,11 @@ export lib {
   checked++;
   // Thousands of alt arms, and of sparse match arms, are checked by a loop
   // (each arm recursed on the next).
-  const variants = Array.from({ length: 3000 }, (_, k) => `    | V${k} { x: I32 }`).join('\n');
+  const altVariants = Array.from({ length: 3000 }, (_, k) => `    | V${k} { x: I32 }`).join('\n');
   const altArms = Array.from({ length: 3000 }, (_, k) => `        V${k} |v| => v.x + ${k},`).join('\n');
   const matchArms = Array.from({ length: 3000 }, (_, k) => `        ${k * 7} => ${k},`).join('\n');
   for (const [source, expected] of [
-    [`enum E:\n${variants}\nfn f(e: E) I32 {\n    alt e {\n${altArms}\n    };\n}\nexport main() I32 {\n    f(V2999 { x: 1 });\n}\n`, 3000],
+    [`enum E:\n${altVariants}\nfn f(e: E) I32 {\n    alt e {\n${altArms}\n    };\n}\nexport main() I32 {\n    f(V2999 { x: 1 });\n}\n`, 3000],
     [`fn f(x: I32) I32 {\n    match x {\n${matchArms}\n        ~> -1,\n    };\n}\nexport main() I32 {\n    f(7 * 2999);\n}\n`, 2999],
   ]) {
     const built = await compileFile(utu, await write(source), { mode: 'debug' });

@@ -121,7 +121,7 @@ async function main() {
   const count = { same: 0, differ: 0, intended: 0, unsupported: 0 };
   const onlyParseErrors = list => list.length > 0 && list.every(d => d[0] === 'parse-error');
   // Wutu templates are the self-hosted compiler's alone: stage 0 refuses them.
-  const refusesWutu = list => list.some(d => String(d[1]).startsWith('Wutu templates are compiled by the self-hosted compiler'));
+  const refusesWutu = list => list.some(d => String(d[1]).includes(' are compiled by the self-hosted compiler'));
   // A file declaring a prelude module's name (a standard module's source,
   // compiled as a program) is told so, once, where stage 0 reports each
   // member its hoisting duplicates (or, for a generic one, nothing).

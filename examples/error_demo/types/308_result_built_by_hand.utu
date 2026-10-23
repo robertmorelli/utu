@@ -1,0 +1,7 @@
+// What: builds a Result with &{ } instead of ok or err.
+// Expect: Result[I32, Str] is made by its own functions (ok, err)
+fn half(n: I32) Result[I32, Str] {
+    &{ _ok: true, _value: n / 2 };
+}
+
+export main() I32 { half(8).value(); }
