@@ -89,6 +89,16 @@ the first two sound. With it, a consumed generator compiles to what the
 equivalent hand-written loop compiles to. There is no loop restructuring,
 so `-Oz` binaries are 10-25% larger than Binaryen's were.
 
+Before those rewrites, and again after them (a value moved into place may
+meet a constant), constants are folded (`selfhost/optimize.utu`, in every
+build but debug): an `i32` or `i64` operation of constants is its value,
+computed as wasm does (wrapping, shift counts mod the width; a division or
+remainder only by a positive constant, so a trap stays a trap); `(x + 3) + 4`
+is `x + 7` and `(14 - x) + 4` is `18 - x`; `x + 0`, `x * 1`, `x & -1` and
+the like are x, and `x * 0`, `x & 0` are 0 when x has no effects; a global
+never assigned is its value; an `if`, `select` or `br_if` on a constant
+takes its one way. Floats are not folded.
+
 ## Inlining that shrinks
 
 At `-O small` (and `smallUnsafe`) a call becomes its callee's body where
