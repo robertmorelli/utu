@@ -89,10 +89,16 @@ try {
   const failed = run('build', broken, '--out', path.join(dir, 'broken-out'), '--no-prerender');
   assert.equal(failed.status, 1);
   assert.match(failed.stderr, /broken\.utu:\d+:\d+/, 'build errors are positioned diagnostics');
+  // A user's own file in --out stays through a build.
+  await fs.writeFile(path.join(out, 'mine.txt'), 'kept');
+  assert.equal(run('build', entry, '--out', out, '--no-prerender').status, 0);
+  assert.equal(await fs.readFile(path.join(out, 'mine.txt'), 'utf8'), 'kept');
   // A failed build leaves the last good one as it was.
+  const listed = (await fs.readdir(out)).sort();
   const before = await fs.readFile(path.join(out, 'app.wasm'));
   assert.equal(run('build', broken, '--out', out, '--no-prerender').status, 1);
   assert.deepEqual(await fs.readFile(path.join(out, 'app.wasm')), before);
+  assert.deepEqual((await fs.readdir(out)).sort(), listed);
   assert.deepEqual((await fs.readdir(dir)).filter(name => name.includes('.building-')), [], 'no build directory is left');
 
   // dev

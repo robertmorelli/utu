@@ -96,21 +96,45 @@ async function compileApp({ entry, parser, title, mode }, directory) {
   return report;
 }
 
-/** Build into a fresh directory beside `out`, and put it in out's place only once all of it (prerendered) is done. */
+/**
+ * Build (and prerender) into a fresh directory beside `out`, then move what
+ * it made into out, all or none: each file first to a temporary beside its
+ * place, then each renamed over its name. Out's other files stay.
+ */
 async function buildCommand(app, { prerender: shouldPrerender }) {
   const candidate = path.join(path.dirname(app.out), `.${path.basename(app.out)}.building-${process.pid}`);
-  const old = `${candidate}.old`;
   if ((await fs.stat(app.out).catch(() => null))?.isDirectory() === false) throw new Error(`cannot write ${app.out}: a file is in the way`);
   try {
     const report = await compileApp(app, candidate);
     if (shouldPrerender) await prerender(candidate);
-    await fs.rename(app.out, old).catch(error => { if (error.code !== 'ENOENT') throw error; });
-    await fs.rename(candidate, app.out);
+    await moveInto(candidate, app.out);
     console.log(`${app.out}: ${report.total.gzip} bytes gzip for JS + Wasm`);
   } finally {
     await fs.rm(candidate, { recursive: true, force: true });
-    await fs.rm(old, { recursive: true, force: true });
   }
+}
+
+/** Each file under `from` to its place under `to`, all or none; on a failure, `to` is as it was (the directories made for it removed). */
+async function moveInto(from, to) {
+  const files = (await fs.readdir(from, { recursive: true, withFileTypes: true })).filter(entry => !entry.isDirectory())
+    .map(entry => path.relative(from, path.join(entry.parentPath, entry.name)));
+  const made = [], moved = [];
+  try {
+    for (const name of files) {
+      const target = path.join(to, name);
+      if ((await fs.stat(target).catch(() => null))?.isDirectory()) throw new Error(`cannot write ${target}: it is a directory`);
+      const first = await fs.mkdir(path.dirname(target), { recursive: true });
+      if (first) made.push(first);
+      const temp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.tmp`);
+      await fs.rename(path.join(from, name), temp);
+      moved.push([temp, target]);
+    }
+  } catch (error) {
+    await Promise.all(moved.map(([temp]) => fs.rm(temp, { force: true })));
+    for (const dir of made.reverse()) await fs.rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+  for (const [temp, target] of moved) await fs.rename(temp, target);
 }
 
 /**
