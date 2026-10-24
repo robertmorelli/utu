@@ -46,7 +46,7 @@ compiler, a compile host per program, the mapping between URIs and file keys,
 a function to send messages, and the `.utu` files under the workspace's
 folders (else the open files' folders; not in `node_modules` or a hidden
 folder; a link to a folder is followed, each folder once). Rename and
-references read those once each (again only when one changed), for the files
+references read those once each, for the files
 importing the name's file (by their `using … from "…"` paths, not one in a
 comment), and build only those. A file outside the workspace's folders that
 imports the name's file is not found: rename does not edit it. Rename is

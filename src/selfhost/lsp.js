@@ -11,7 +11,7 @@
 // `key`, as nodeHost makes), `toKey(uri)` and `toUri(key)` (null for a file
 // an editor cannot open), `send(message)`, and optionally `listFiles(dirs)`
 // (the keys of the .utu files under directories `dirs`, for what imports a
-// file renamed: an array, or { files, unlisted, stamps } as node.js's
+// file renamed: an array, or { files, unlisted } as node.js's
 // utuFiles gives); it calls `handle(message)` with each message the editor sends.
 
 import { compile } from './compiler.js';
@@ -72,7 +72,6 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
   const lastGood = new Map();    // key → its text when it last parsed and its imports resolved
   let shutdown = false;
   let roots = [];                // the workspace's folders, as keys
-  const scanned = new Map();     // file on disk → { stamp, targets: the files it imports }
 
   // An open document's own URI (an unsaved buffer's `untitled:` one too); else the host's.
   const uriOf = key => docs.get(key)?.uri ?? toUri(key);
@@ -580,8 +579,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
    * another: of the .utu files under the workspace's folders (else the open
    * files' folders), each whose `using … from "…"` leads to it. `unread`:
    * those that cannot be read; `unlisted`: the folders that cannot be listed.
-   * None when the host lists no files. A file's imports are kept while the
-   * host's stamp for it (`stamps`, as listFiles gives) is the same.
+   * None when the host lists no files.
    */
   async function onDisk(file) {
     if (!listFiles) return { files: [], unread: [], unlisted: [] };
@@ -590,18 +588,13 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     const importedBy = new Map();  // file → the files importing it
     const unread = [];
     const listed = await listFiles(dirs);
-    const { files, unlisted = [], stamps = null } = Array.isArray(listed) ? { files: listed } : listed;
+    const { files, unlisted = [] } = Array.isArray(listed) ? { files: listed } : listed;
     for (const key of new Set([...files, ...[...docs.keys()].filter(dirOf)])) {
       const host = hostFor(key);
-      let text = docs.get(key)?.text, targets;
-      const stamp = text == null ? stamps?.get(key) : null;
-      if (stamp != null && scanned.get(key)?.stamp === stamp) targets = scanned.get(key).targets;
-      else {
-        if (text == null) try { text = await host.readFile(key); } catch { unread.push(key); continue; }
-        targets = importPaths(String(text)).filter(path => !/^[a-z][\w+.-]+:/i.test(path))
-          .map(path => host.resolvePath ? host.resolvePath(key, path) : path);
-        if (stamp != null) scanned.set(key, { stamp, targets });
-      }
+      let text = docs.get(key)?.text;
+      if (text == null) try { text = await host.readFile(key); } catch { unread.push(key); continue; }
+      const targets = importPaths(String(text)).filter(path => !/^[a-z][\w+.-]+:/i.test(path))
+        .map(path => host.resolvePath ? host.resolvePath(key, path) : path);
       for (const target of targets) {
         if (!importedBy.has(target)) importedBy.set(target, new Set());
         importedBy.get(target).add(key);
