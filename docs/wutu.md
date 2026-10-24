@@ -528,7 +528,9 @@ a clean browser context: render public defaults, never private build credentials
 or user data. The current prerenderer captures synchronous initialization; it is
 not an asynchronous data loader or routing system. `--no-prerender` skips this
 step. `wutu build` takes `utu build`'s modes: `-O small` (the default) and
-`-O fast` keep the safety checks, `-O smallUnsafe` and `-O fastUnsafe` drop them. Playwright and the compiler are build tools; neither ships in the website.
+`-O fast` keep the safety checks, `-O smallUnsafe` and `-O fastUnsafe` drop them. It builds
+beside `--out` and replaces it whole once the build and prerender succeed: a failed build leaves
+the last good one. Playwright and the compiler are build tools; neither ships in the website.
 The five-site build includes prerendered HTML in its 14.5 KB gzip per-site budget.
 
 

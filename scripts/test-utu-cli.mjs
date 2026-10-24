@@ -399,6 +399,66 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.match(utu('build', 'nano.utu', '--target', 'deno').stderr, /--target needs browser or node, got deno/);
   assert.match(utu('run', 'nano.utu', '--target', 'node').stderr, /--target is only for build/);
 
+  // How utu was run: said, exit 2 (a program's problem is 1); names of Object.prototype are no command or mode.
+  for (const [args, said] of [
+    [['__proto__', 'good.utu'], /Unknown command __proto__/],
+    [['constructor', 'good.utu'], /Unknown command constructor/],
+    [['toString'], /Unknown command toString/],
+    [['run', 'good.utu', '-O', 'constructor'], /Unknown build mode constructor/],
+    [['build', 'good.utu', '-O', '__proto__'], /Unknown build mode __proto__/],
+    [['build', 'good.utu', '--target', 'node', '--target', 'browser'], /Two targets: node, browser/],
+    [['build', 'good.utu', '-o', 'a', '-o', 'b'], /Two outputs: a, b/],
+    [['run', 'good.utu', 'more.utu'], /Extra argument more\.utu/],
+    [['run', 'good.utu', '--bogus'], /Unknown option --bogus/],
+    [['lsp', 'extra'], /Extra argument extra/],
+    [['check'], /No file/],
+  ]) {
+    r = utu(...args);
+    assert.equal(r.status, 2, `${args.join(' ')}: ${r.stderr}`);
+    assert.match(r.stderr, said, args.join(' '));
+    assert.doesNotMatch(r.stderr, /\n\s+at /, `${args.join(' ')}: no stack`);
+  }
+  // What follows -- is the program's, --source-map and --blame too.
+  r = utu('run', 'args.utu', '-O', 'smallUnsafe', '--', '--source-map', '--blame');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), '2 --blame');
+  // A file that cannot be read is a read error; a place that cannot be written, a write error, without esbuild's stack.
+  if (process.getuid?.() !== 0) {
+    await write('unread.utu', 'export main() I32 { 1; }\n');
+    await fs.chmod(path.join(dir, 'unread.utu'), 0o000);
+    r = utu('check', 'unread.utu');
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /cannot read unread\.utu: permission denied/);
+    await fs.mkdir(path.join(dir, 'ro'));
+    await fs.chmod(path.join(dir, 'ro'), 0o555);
+    r = utu('build', 'good.utu', '-o', 'ro');
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /cannot write ro\/good\.\w+: permission denied/);
+    assert.doesNotMatch(r.stderr, /\n\s+at /);
+    // build-exe does not replace a file that is not to be written.
+    await write('roexe', 'keep');
+    await fs.chmod(path.join(dir, 'roexe'), 0o444);
+    r = utu('build-exe', 'good.utu', '-o', 'roexe');
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /cannot write roexe: permission denied/);
+    assert.equal(await fs.readFile(path.join(dir, 'roexe'), 'utf8'), 'keep');
+  }
+  // All of a build or none: NAME.mjs a directory, so no map, no module, and what was there stays.
+  await fs.mkdir(path.join(dir, 'half', 'good.mjs'), { recursive: true });
+  await write('half/good.wasm', 'old');
+  r = utu('build', 'good.utu', '-O', 'debug', '-o', 'half');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /cannot write half\/good\.mjs: it is a directory/);
+  assert.doesNotMatch(r.stderr, /\n\s+at /);
+  assert.deepEqual((await fs.readdir(path.join(dir, 'half'))).sort(), ['good.mjs', 'good.wasm']);
+  assert.equal(await fs.readFile(path.join(dir, 'half', 'good.wasm'), 'utf8'), 'old');
+  // Without bun, build-exe says so.
+  r = spawnSync(process.execPath, [cli, 'build-exe', 'good.utu', '-o', 'nobun'], { encoding: 'utf8', cwd: dir, env: { ...process.env, PATH: '/usr/bin:/bin' } });
+  if (spawnSync('bun', ['--version'], { env: { PATH: '/usr/bin:/bin' } }).error) {
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.stderr, /bun was not found/);
+  }
+
   // Stage 0's views: a mistake in the command is said, not thrown.
   await write('lost.utu', 'using nothere from "./nothere.utu";\nexport main() I32 { 1; }\n');
   // A byte that is not UTF-8, in the file or in one it imports: the self-hosted compiler's error, at the byte.
@@ -408,11 +468,17 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   await write('unknown-module.utu', 'using geometri |Point|;\nexport main() I32 { 1; }\n');
   // A @comptime loop that never ends: stopped, as the self-hosted compiler stops it.
   await write('forever.utu', 'fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nexport main() I32 { t.len(); }\n');
-  for (const [args, said] of [
-    [['display'], /No file/],
-    [['display', 'nope.utu'], /No file nope\.utu/],
-    [['display', '.'], /\. is a directory/],
-    [['graph', 'good.utu', '-o'], /-o needs a file/],
+  // How it was run (2), or the program (1).
+  for (const [args, said, status = 1] of [
+    [['display'], /No file/, 2],
+    [['display', 'nope.utu'], /No file nope\.utu/, 2],
+    [['display', '.'], /\. is a directory/, 2],
+    [['graph', 'good.utu', '-o'], /-o needs a file/, 2],
+    // Options before the file; nothing extra.
+    [['display', '-O', 'bogus', 'good.utu'], /Unknown option -O/, 2],
+    [['display', 'good.utu', 'extra'], /Extra argument extra/, 2],
+    [['graph', 'good.utu', '--noln'], /Unknown option --noln/, 2],
+    [['graph', 'good.utu', '-o', 'a.html', '-o', 'b.html'], /Two outputs: a\.html, b\.html/, 2],
     [['display:modules', 'lost.utu'], /Cannot import "\.\/nothere\.utu"/],
     [['display', 'latin1.utu'], /Not UTF-8[^]*latin1\.utu:2:11/],
     [['graph', 'latin1.utu', '-o', 'l.html'], /Not UTF-8[^]*latin1\.utu:2:11/],
@@ -422,7 +488,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     [['graph', 'forever.utu', '-o', 'f.html'], /ran too long/],
   ]) {
     r = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', cwd: dir, timeout: 60000 });
-    assert.equal(r.status, 1, args.join(' '));
+    assert.equal(r.status, status, args.join(' '));
     assert.match(r.stderr, said, args.join(' '));
     assert.doesNotMatch(r.stderr, /\n\s+at /, `${args.join(' ')}: no stack`);
   }
