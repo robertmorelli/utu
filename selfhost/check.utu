@@ -17,6 +17,9 @@
 /// are its other columns; @fn_instance makes one.
 vec fi_decl: I32;
 vec fi_inst: I32;
+/// The receiver's type when it is not the declaration's own: a protocol's
+/// `fn P.m` checked for a bounded T (@fn_instance_on), else -1.
+vec fi_self: I32;
 /// Its wasm function, or -1 for an intrinsic.
 vec fi_func: I32;
 /// A list of parameter types (self first).
@@ -52,18 +55,22 @@ struct Cx:
 
 //! = Function instances
 
-fn fi_hash(decl: I32, inst: I32) I32 { (decl * -1640531535) ^ (inst * 40503); }
+fn fi_hash(decl: I32, inst: I32, self_t: I32) I32 { (decl * -1640531535) ^ (inst * 40503) ^ (self_t * 97); }
 
 /// The function instance of `decl` in module instance `inst`: made when
 /// new, with its wasm function, and queued to be checked (an intrinsic, or
 /// a `@wat` function, is not).
-fn fn_instance(decl: I32, inst: I32) I32 {
+fn fn_instance(decl: I32, inst: I32) I32 { fn_instance_on(decl, inst, -1); }
+
+/// @fn_instance with the receiver a `self_t` (-1: the declaration's own):
+/// a protocol's `fn P.m` for a bounded T, so its body calls T's members.
+fn fn_instance_on(decl: I32, inst: I32, self_t: I32) I32 {
     if (fi_decl.len() + 1) * 2 > fi_table.len() { fi_grow(); };
     let mask = fi_table.len() - 1;
-    let h = fi_hash(decl, inst) & mask;
+    let h = fi_hash(decl, inst, self_t) & mask;
     while (fi_table[h] >= 0) {
         let f = fi_table[h];
-        if fi_decl[f] == decl and fi_inst[f] == inst {
+        if fi_decl[f] == decl and fi_inst[f] == inst and fi_self[f] == self_t {
             note_reach(f);
             return f;
         };
@@ -74,12 +81,14 @@ fn fn_instance(decl: I32, inst: I32) I32 {
     fi_table[h] = id;
     fi_decl.push(decl);
     fi_inst.push(inst);
+    fi_self.push(self_t);
     fi_func.push(-1);
     fi_ir.push(-1);
     fi_site.push(-1);
     enter_instance(inst, -1);
     signature(decl, inst);
     leave_instance();
+    if self_t >= 0 { sig_params[0] = with_first(sig_params[0], self_t); };
     fi_params.push(sig_params[0]);
     fi_result.push(sig_result[0]);
     let body = fn_body(decl);
@@ -135,10 +144,18 @@ fn fi_grow() void {
     for (0 ..< n) |i| { fi_table[i] = -1; };
     let mask = n - 1;
     for (0 ..< fi_decl.len()) |f| {
-        let h = fi_hash(fi_decl[f], fi_inst[f]) & mask;
+        let h = fi_hash(fi_decl[f], fi_inst[f], fi_self[f]) & mask;
         while (fi_table[h] >= 0) { h = (h + 1) & mask; };
         fi_table[h] = f;
     };
+}
+
+/// List `list` with its first type `t`.
+fn with_first(list: I32, t: I32) I32 {
+    let m = vl_begin();
+    vl_add(t);
+    for (1 ..< vl_len[list]) |i| { vl_add(vl_item(list, i)); };
+    vl_end(m);
 }
 
 /// A function's block (its last child).
@@ -2035,6 +2052,8 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         // `c.tick()` on a T bounded by P, with `fn P.tick`: P's.
         decl = bound_default(rt, word_of(name), node, cx.inst);
         if decl == -2 { return finish_error(args, m, cx); };
+        // `t.m()` in a `fn P.m2 |t|` checked for T: P's m too.
+        if decl < 0 and cx.fi >= 0 and fi_self[cx.fi] == rt { decl = proto_default(decl_a[fi_decl[cx.fi]], word_of(name)); };
         via_bound = decl >= 0;
     };
     if decl < 0 {
@@ -2058,8 +2077,8 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     // What the name means, for an editor (as a field's is recorded).
     node_decl[name] = decl;
     unbounded_call(rt, word_of(name), decl, node, cx.inst);
-    // (A bound's `fn P.m` is in P's module, not the type's.)
-    let fi = fn_instance(decl, if via_bound { instance_for(module_of(decl), cx.inst); } else { ty_inst(rt); });
+    // (A bound's `fn P.m` is in P's module, and checked for this T: a scalar, Str or enum is no P value.)
+    let fi = if via_bound { fn_instance_on(decl, instance_for(module_of(decl), cx.inst), rt); } else { fn_instance(decl, ty_inst(rt)); };
     // A function of the type without `self` has no receiver to take.
     if vl_len[fi_params[fi]] == 0 {
         report2(Diag.WrongArity, node, -1, 0, 1 + if args >= 0 { child_count(args); } else { 0; });
@@ -2097,6 +2116,13 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
     if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
     let inst = member_instance(callee, cx);
     if inst < 0 { return finish_error(args, m, cx); };
+    // `P.m(x)` with x a T bounded by P (or the receiver of a `fn P.m2` checked for T): checked for T.
+    if args >= 0 and decl_is(owner_decl, Decl.Proto) and proto_default(owner_decl, word_of(last_child(callee))) == decl {
+        let rt = type_only(first_child(args), -1, cx);
+        if bound_by(rt, owner_decl, cx.inst) or (cx.fi >= 0 and fi_self[cx.fi] == rt) {
+            return call_with(fn_instance_on(decl, inst, rt), args, 0, m, node, cx);
+        };
+    };
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
@@ -3122,6 +3148,7 @@ fn reset_check() void {
     lazy_stub_of.clear();
     fi_decl.clear();
     fi_inst.clear();
+    fi_self.clear();
     fi_func.clear();
     fi_params.clear();
     fi_result.clear();

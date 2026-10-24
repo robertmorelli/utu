@@ -648,6 +648,14 @@ export lib {
       + `fn Counter.tick |c| () void { c.count = c.count + c.step(); }\nmod Run[T[Counter]] {\n    fn twice(c: T) I32 { c.tick(); Counter.tick(c); c.count; }\n}\n`
       + `fn on(c: Counter) I32 { c.tick(); c.count; }\n`
       + `export lib { fn run() I32 { Run[ByOne].twice(ByOne { count: 4 }) * 1000 + Run[Own].twice(Own { count: 1 }) * 10 + on(ByOne { count: 0 }); } }\n`, 6000 + 1030 + 1],
+    // `x.label()` and `Tag.label(x)` on a bounded T that is a scalar, Str or enum (it was "Expected Tag, got I32"):
+    // the default is checked for T, so `t.tagv()`, `t.base()` and `Tag.base(t)` in it call T's.
+    [`proto Tag:\n    | tagv() I32\nfn Tag.base |t|() I32 { t.tagv() * 10; }\nfn Tag.label |t|() I32 { t.base() + Tag.base(t) + t.tagv() + 7; }\n`
+      + `fn Tag[I32].tagv |t|() I32 { t; }\nfn Tag[Str].tagv |t|() I32 { t.len(); }\nstruct P[Tag]:\n    | v: I32\nfn Tag[P].tagv |t|() I32 { t.v; }\n`
+      + `tag enum Shape:\n    | Sq\n    | Ci\nfn Tag[Shape].tagv |t|() I32 { alt t { Sq => 1, Ci => 2, }; }\n`
+      + `mod Use[T[Tag]] {\n    fn go(x: T) I32 { x.label(); }\n    fn go2(x: T) I32 { Tag.label(x); }\n}\n`
+      + `export lib { fn run() I32 { Use[I32].go(5) * 1000000 + Use[Str].go("ab") * 10000 + Use[P].go(P { v: 3 }) * 100 + Use[Shape].go(Ci {}) + Use[I32].go2(1) - Use[Shape].go2(Sq {}); } }\n`,
+      112000000 + 490000 + 7000 + 49 + 28 - 28],
   ];
   for (const [source, expected] of bounded) {
     const file = await write(source);

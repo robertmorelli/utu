@@ -516,6 +516,19 @@ fn has_bound(param: I32, proto: I32) Bool {
     false;
 }
 
+/// Whether `t` is a type argument of instance `inst` bounded by `proto`.
+fn bound_by(t: I32, proto: I32, inst: I32) Bool {
+    if inst <= 0 { return false; };
+    let p = first_child(next_sibling(first_child(decl_node[inst_module[inst]])));
+    let i = 0;
+    while (p >= 0) {
+        if inst_arg(inst, i) == t and has_bound(node_decl[first_child(p)], proto) { return true; };
+        i += 1;
+        p = next_sibling(p);
+    };
+    false;
+}
+
 /// A protocol's name as written: a module's promoted protocol by the module's.
 fn proto_text(proto: I32) Str { type_text(decl_type(proto, 0)); }
 
