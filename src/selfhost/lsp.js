@@ -378,6 +378,9 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       const q = await at(params);
       if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
       if (q && entryPoint(q)) throw responseError(-32602, ENTRY_POINT);
+      // Names resolve past an import not found, but are not checked: a rename could not be.
+      const stop = q?.program.diagnostics.find(d => d.kind === 'unknown-import');
+      if (stop) throw responseError(-32602, `the program does not build (${stop.message}): no rename`);
       const name = q && renamed(q);
       if (!name) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName) || KEYWORDS.includes(params.newName)) {
@@ -555,7 +558,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       if (strict && (has || importing.has(key))) {
         const imports = `${nameOf(key)}, which imports ${nameOf(definition.file)},`;
         if (program.diagnostics.some(d => d.file === key && d.kind === 'parse-error')) throw refuse(`${imports} does not parse`);
-        const stop = !has && program.diagnostics.find(d => d.kind === 'unknown-import');
+        // (Its names resolve, but are not checked.)
+        const stop = program.diagnostics.find(d => d.kind === 'unknown-import');
         if (stop) throw refuse(`${imports} does not build (${stop.message})`);
       }
       if (!has) continue;
@@ -966,9 +970,10 @@ function range(lines, start, end) {
   return { start: positionAt(lines, start), end: positionAt(lines, end) };
 }
 
-/** A declaration's first line, without its body: `fn area(self: Shape) F64`. */
+/** A declaration's first line, without its body: `fn area(self: Shape) F64`; an enum's or struct's whole (it has no body). */
 function signature(source) {
   const text = source.replace(/\/\/[^\n]*/g, '');
+  if (/^\s*(export\s+)?(enum|struct)\b/.test(text)) return collapse(text);
   let depth = 0;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];

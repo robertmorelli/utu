@@ -1421,11 +1421,6 @@ struct Walk:
 /// method headers then bodies walked. Returns the number of diagnostics.
 fn resolve_names() I32 {
     diag_reset();
-    if missing_import[0] >= 0 {
-        report(Diag.UnknownImport, import_node[missing_import[0]], -1);
-        save_diagnostics();
-        return 1;
-    };
     intern_known();
     // DSLs expand first: their expansions add nodes, words, and files.
     expand_dsls();
@@ -1448,6 +1443,12 @@ fn resolve_names() I32 {
     let entry = entry_file();
     if entry >= 0 { enter_file(entry); };
     find_comptime_mems();
+    // An import the host could not read ends the build, but names resolve
+    // (for an editor): its mistake is the one said.
+    if missing_import[0] >= 0 {
+        diag_reset();
+        report(Diag.UnknownImport, import_node[missing_import[0]], -1);
+    };
     save_diagnostics();
     diag_kind.len();
 }

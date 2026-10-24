@@ -496,6 +496,8 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
                 result = ty_error();
             } else {
+                // A bare variant two enums have is the tested one's: said on it (for an editor).
+                if not is_kind(pattern, Node.Qualified_type_ref) { node_decl[pattern] = variant; };
                 let vt_ = named(variant, ty_inst(st));
                 let vrepr = repr(vt_);
                 // Without a default, the last arm is the only variant left: it is not
