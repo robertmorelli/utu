@@ -234,8 +234,10 @@ export function promising(f) {
  * `{ f: { r: ['U32', '', 'Bool'], p: ['Str', '?'] } }` for a tuple result
  * (a kind per element) or checked arguments. Wasm wraps a JS number or
  * BigInt to its bits, and `true` to 1, but takes any value as a reference.
- * A Bool argument is any value, by its truthiness ('Bool', in every build);
- * safe builds record what the others must be:
+ * Unsafe builds take a Bool argument as any value, by its truthiness
+ * ('Bool'); safe builds record what each argument must be:
+ *   'bool' a boolean           'int'   an integer number (I32, U32: low bits kept)
+ *   'big'  a BigInt (I64, U64)  'num'   a number (F32, F64)
  *   'Str'  a string            '?Str'  a string or null (undefined is null)
  *   'ref'  not null            '?'     anything (undefined is null)
  * A promised result converts when it settles.
@@ -247,10 +249,15 @@ export function convertExports(exports, exportSpec) {
   const scalar = { Bool: v => v !== 0, U32: v => v >>> 0, U64: v => BigInt.asUintN(64, v) };
   const same = v => v;
   const fail = (name, i, what, v) => {
-    throw new TypeError(`${name}: argument ${i + 1} must be ${what}, not ${v === null ? 'null' : typeof v}`);
+    // A number that is no integer by its value (`not 1.5`), anything else by its kind.
+    throw new TypeError(`${name}: argument ${i + 1} must be ${what}, not ${v === null ? 'null' : what === 'an integer' && typeof v === 'number' ? v : typeof v}`);
   };
   const param = (name, kind, i) => {
     if (kind === 'Bool') return v => !!v;
+    if (kind === 'bool') return v => (typeof v === 'boolean' ? v : fail(name, i, 'a boolean', v));
+    if (kind === 'int') return v => (Number.isInteger(v) ? v : fail(name, i, 'an integer', v));
+    if (kind === 'big') return v => (typeof v === 'bigint' ? v : fail(name, i, 'a BigInt', v));
+    if (kind === 'num') return v => (typeof v === 'number' ? v : fail(name, i, 'a number', v));
     if (kind === 'Str') return v => (typeof v === 'string' ? v : fail(name, i, 'a string', v));
     if (kind === '?Str') return v => (v == null ? null : typeof v === 'string' ? v : fail(name, i, 'a string or null', v));
     if (kind === 'ref') return v => (v == null ? fail(name, i, 'a value', v) : v);

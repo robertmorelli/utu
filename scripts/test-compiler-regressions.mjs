@@ -1453,6 +1453,12 @@ export lib {
     fn mk() P { P { x: 7 }; }
     fn lv(i: I32) I32 { Lv.from_i32(i).to_i32(); }
     fn flag(b: Bool) Str { if b { "y"; } else { "n"; }; }
+    fn inc(x: I32) I32 { x + 1; }
+    fn uinc(x: U32) U32 { x + 1; }
+    fn half(x: F64) F64 { x / 2.0; }
+    fn third(x: F32) F32 { x / 3.0; }
+    fn wide(x: I64) I64 { x + 1; }
+    fn uwide(x: U64) U64 { x + 1; }
 }`);
   for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
     const built = await compileFile(utu, edges, { mode });
@@ -1471,8 +1477,25 @@ export lib {
       assert.throws(() => exports.lv(99), WebAssembly.RuntimeError, mode);
     }
     assert.equal(exports.lv(1), 1);
-    // A Bool argument is JS truthiness, in every build.
-    assert.equal([0.5, 'x', {}, 1, true, 0, '', null, undefined, NaN, false].map(v => exports.flag(v)).join(''), 'yyyyynnnnnn', mode);
+    assert.equal(exports.flag(true) + exports.flag(false), 'yn', mode);
+    // An integer wraps to its low bits; a float is any number; an I64 a BigInt.
+    assert.deepEqual([exports.inc(-1), exports.inc(4294967295), exports.uinc(4294967295), exports.half(NaN), exports.half(5), exports.wide(1n), exports.uwide(-1n)],
+      [0, 0, 0, NaN, 2.5, 2n, 0n], mode);
+    if (mode.endsWith('Unsafe')) {
+      // A Bool argument is JS truthiness; a number, what wasm makes of it.
+      assert.equal([0.5, 'x', {}, 1, true, 0, '', null, undefined, NaN, false].map(v => exports.flag(v)).join(''), 'yyyyynnnnnn', mode);
+      assert.deepEqual([exports.inc('x'), exports.inc(1.5), exports.inc({}), exports.half('4')], [1, 2, 1, 2], mode);
+    } else {
+      for (const v of [1, 'x', null, undefined]) assert.throws(() => exports.flag(v), /flag: argument 1 must be a boolean, not /, mode);
+      assert.throws(() => exports.inc('x'), /inc: argument 1 must be an integer, not string/, mode);
+      assert.throws(() => exports.inc(1.5), /inc: argument 1 must be an integer, not 1\.5/, mode);
+      for (const v of [{}, null, undefined, true, NaN, Infinity, 1n]) assert.throws(() => exports.inc(v), /inc: argument 1 must be an integer/, mode);
+      assert.throws(() => exports.uinc(-0.5), /uinc: argument 1 must be an integer, not -0\.5/, mode);
+      for (const v of ['4', true, null, 2n]) assert.throws(() => exports.half(v), /half: argument 1 must be a number/, mode);
+      assert.throws(() => exports.third('3'), /third: argument 1 must be a number, not string/, mode);
+      for (const v of [1, '1', true]) assert.throws(() => exports.wide(v), /wide: argument 1 must be a BigInt/, mode);
+      assert.throws(() => exports.uwide(1), /uwide: argument 1 must be a BigInt, not number/, mode);
+    }
     checked++;
   }
 

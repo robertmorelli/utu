@@ -183,6 +183,12 @@ package's declarations directly. TypeScript's own module resolution finds them:
 `Path.join` works as `import { join } from "node:path"` does. The glue imports
 the same specifier, so the package must be resolvable by the bundler or runtime.
 
+`utu build` bundles a package's browser build (package.json's `browser`
+field or condition), as `wutu build` does: the module then loads in a browser,
+and in Node, which has the web APIs such builds use. A Node build may not load
+in a browser (nanoid's needs `Buffer`). `utu build --target node` bundles Node
+builds instead, for a module only Node runs.
+
 The compiler itself never touches a file system or TypeScript. The host passes
 `createCompiler({ resolvePackage })`:
 
@@ -287,11 +293,15 @@ as the glue loads: a value that is no function throws a `TypeError` naming
 the binding (`f: @es gave number, not a function`) before the program runs.
 
 Safe builds (`-O small`, `fast`, `debug`) also check an `export lib`
-function's arguments: a `Str` must be a string, a `?Str` a string or null, a
-struct, array, enum or closure must not be null, and `undefined` for a
-nullable parameter is `null`. A wrong argument throws a `TypeError` naming
-the function and the argument. `smallUnsafe` and `fastUnsafe` pass arguments
-as they come. Contextual callbacks
+function's arguments: a `Bool` must be a boolean; an `I32`, `U32` or
+`enum(I32)` an integer number (wasm keeps its low bits, as above), not `1.5`;
+an `I64` or `U64` a BigInt; an `F32` or `F64` a number (`NaN` included); a
+`Str` a string, a `?Str` a string or null; a struct, array, enum or closure
+must not be null, and `undefined` for a nullable parameter is `null`. A wrong
+argument throws a `TypeError` naming the function and the argument
+(`inc: argument 1 must be an integer, not string`). `smallUnsafe` and
+`fastUnsafe` pass arguments as they come: a `Bool` by its truthiness, a
+number as wasm converts it (`"x"` is 0). Contextual callbacks
 derive parameter types from declarations, including DOM event maps.
 
 Host exceptions are caught with `try`:

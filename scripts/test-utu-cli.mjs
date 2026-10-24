@@ -356,6 +356,19 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.equal(r.status, 0, r.stderr);
   assert.equal((await import(pathToFileURL(path.join(dir, 'good.mjs')).href)).exports.main(), 6);
 
+  // An npm package's browser build, which Node runs too (nanoid's Node build needs
+  // Buffer, which a browser lacks); --target node, its Node build.
+  await write('nano.utu', 'using Nano from "npm:nanoid";\nexport main() I32 { Nano.nanoid(8).len(); }\n');
+  for (const [target, buffer] of [[[], false], [['--target', 'browser'], false], [['--target', 'node'], true]]) {
+    const where = `nano-${target[1] ?? 'default'}`;
+    r = utu('build', 'nano.utu', '-o', where, ...target);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal((await fs.readFile(path.join(dir, where, 'nano.mjs'), 'utf8')).includes('Buffer.'), buffer, where);
+    assert.equal((await import(pathToFileURL(path.join(dir, where, 'nano.mjs')).href)).exports.main(), 8, where);
+  }
+  assert.match(utu('build', 'nano.utu', '--target', 'deno').stderr, /--target needs browser or node, got deno/);
+  assert.match(utu('run', 'nano.utu', '--target', 'node').stderr, /--target is only for build/);
+
   // Stage 0's views: a mistake in the command is said, not thrown.
   await write('lost.utu', 'using nothere from "./nothere.utu";\nexport main() I32 { 1; }\n');
   // A byte that is not UTF-8, in the file or in one it imports: the self-hosted compiler's error, at the byte.
@@ -389,6 +402,12 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.equal(r.status, 0, r.stderr);
     // main's I32 is the exit status.
     assert.equal(spawnSync(path.join(dir, 'good'), { encoding: 'utf8' }).status, 6);
+    // No main, no executable: it would do nothing.
+    await write('lib.utu', 'export lib {\n    fn inc(x: I32) I32 { x + 1; }\n}\n');
+    r = utu('build-exe', 'lib.utu', '-o', 'lib');
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /No export main in lib\.utu/);
+    await assert.rejects(fs.access(path.join(dir, 'lib')));
   }
   console.log('utu cli: check, run, test, bench, build, build-exe, stage 0 mistakes pass');
 } finally {

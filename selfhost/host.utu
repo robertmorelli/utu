@@ -590,15 +590,20 @@ fn tuple_result_kinds(list: I32) Str {
 }
 
 /// What an argument of type t must be: "Bool" any value, by its truthiness;
-/// in safe builds "Str" a string, "?Str" a string or null, "ref" not null (a
-/// struct, array, enum, or closure), "?" null when undefined; "" anything
-/// wasm takes.
+/// in safe builds "bool" a boolean, "int" an integer number (an i32: wasm
+/// keeps its low bits), "big" a BigInt (an i64), "num" a number (an f32 or
+/// f64), "Str" a string, "?Str" a string or null, "ref" not null (a struct,
+/// array, enum, or closure), "?" null when undefined; "" anything wasm takes.
 fn js_param_kind(t: I32) Str {
-    if t == prelude(Prelude.Bool) { return "Bool"; };
-    if safe_checks[0] != 1 { return ""; };
+    if safe_checks[0] != 1 { return if t == prelude(Prelude.Bool) { "Bool"; } else { ""; }; };
+    if t == prelude(Prelude.Bool) { return "bool"; };
     if t == prelude(Prelude.Str) { return "Str"; };
     if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { "?Str"; } else { "?"; }; };
-    if is_foreign(t) or t == prelude(Prelude.Externref) or not vt_is_ref(repr(t)) { return ""; };
+    let vt = repr(t);
+    if vt == vt_i32 { return "int"; };
+    if vt == vt_i64 { return "big"; };
+    if vt == vt_f32 or vt == vt_f64 { return "num"; };
+    if is_foreign(t) or t == prelude(Prelude.Externref) or not vt_is_ref(vt) { return ""; };
     "ref";
 }
 

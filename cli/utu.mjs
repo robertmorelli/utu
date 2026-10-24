@@ -5,7 +5,7 @@
 //   utu run <file.utu> [-O mode]             build, then call main
 //   utu test <file.utu> [-O mode]            build the tests, then run each
 //   utu bench <file.utu> [-O mode]           build the benches, then time each
-//   utu build <file.utu> [-o dir] [-O mode] [--source-map] [--blame]
+//   utu build <file.utu> [-o dir] [-O mode] [--source-map] [--blame] [--target browser|node]
 //                                        NAME.wasm and NAME.mjs (its loader)
 //   utu build-exe <file.utu> [-o out]    a standalone executable (bun)
 //   utu lsp                              a language server, on stdin and stdout
@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
-import { glueSource, loaderSource } from '../src/selfhost/loader.js';
+import { glueSource, loaderSource, moduleFunctions } from '../src/selfhost/loader.js';
 import { sourceMapJson, wasmFrames, withMapUrl } from '../src/selfhost/sourcemap.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -61,6 +61,8 @@ async function main() {
   const given = [];
   const files = [];
   let out;
+  // `--target node`: build bundles npm packages' Node builds, not their browser ones.
+  let target;
   // `utu run FILE -- a b`: what follows -- is the program's (process.argv.slice(2)).
   let argv = [];
   // `--profile`: a profile build, sampled every `--interval` ms (src/runtime/profile.js).
@@ -89,12 +91,17 @@ async function main() {
       if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
       if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
       out = value;
+    } else if (arg === '--target') {
+      const value = args[++i];
+      if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', ['utu build FILE --target node bundles npm packages for Node.']);
+      if (value !== 'browser' && value !== 'node') fail(`--target needs browser or node, got ${value ?? 'nothing'}`, 'unknown-option', ['browser (the default) bundles npm packages\' browser builds, which Node runs too; node, their Node builds.']);
+      target = value;
     } else if (arg === '--blame') {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', ['utu build FILE --blame writes NAME.blame.json and NAME.blame.html.']);
     } else if (arg === '--source-map') {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', [`utu ${command} places traps by a map in every mode but the unsafe ones.`]);
     } else if (arg.startsWith('-') && arg !== '-') {
-      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map, --blame, --profile [--interval ms]']);
+      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map, --blame, --target browser|node, --profile [--interval ms]']);
     } else files.push(arg);
   }
   if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
@@ -116,7 +123,7 @@ async function main() {
   const asked = args.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), profile, interval, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler() });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -459,7 +466,7 @@ function duration(ms) {
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
-async function build(file, { utu, optimize, safe, out, sourceMap, blame }) {
+async function build(file, { utu, optimize, safe, out, sourceMap, blame, target }) {
   const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame });
   const { spec } = built;
   const name = path.basename(file, '.utu');
@@ -485,7 +492,10 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame }) {
     // (Not named NAME.mjs: esbuild refuses an output that is its input.)
     stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
-    outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: optimize !== 'none', format: 'esm', platform: 'neutral',
+    // An npm package's browser build (package.json's "browser" field or
+    // condition) unless --target node: it runs in Node too, where a Node
+    // build does not run in a browser (nanoid's needs Buffer).
+    outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: optimize !== 'none', format: 'esm', platform: target ?? 'browser',
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
   });
   await fs.writeFile(path.join(dir, `${name}.wasm`), wasm);
@@ -521,6 +531,10 @@ function virtualGlue(source) {
 /** A standalone executable: bun compiles the loader, the glue, and the module. */
 async function buildExe(file, { utu, optimize, safe, out }) {
   const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
+  // The executable calls main: without one it would do nothing (utu run says so too).
+  if (!moduleFunctions(wasm).includes('main')) {
+    fail(`No export main in ${displayPath(file)}`, 'no-main', ['An executable runs main; utu build makes a module for a library.']);
+  }
   const target = path.resolve(out ?? path.basename(file, '.utu'));
   // In the project when it has dependencies, so an `@es` body's imports
   // resolve as its own source's would, and bun bundles them in.
@@ -746,6 +760,7 @@ function usage(code) {
   bench <file> [-O mode]          build its benches, then time each (median per iteration)
   build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
     [--source-map]             and NAME.wasm.map (always in debug)
+    [--target browser|node]    npm packages' browser builds (the default), or Node's
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
   grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']

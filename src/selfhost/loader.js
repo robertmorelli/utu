@@ -20,6 +20,9 @@ export function glueSource(spec, wasmBytes = null) {
 
 const moduleImports = wasmBytes => WebAssembly.Module.imports(new WebAssembly.Module(wasmBytes, COMPILE_OPTIONS));
 
+/** The module's exported functions' names. */
+export const moduleFunctions = wasmBytes => WebAssembly.Module.exports(new WebAssembly.Module(wasmBytes, COMPILE_OPTIONS)).filter(e => e.kind === 'function').map(e => e.name);
+
 /** The `es` fields the module imports, [field, body] in order, and each body's first field. */
 function esImports(spec, entries) {
   const imported = new Set(entries.filter(entry => entry.module === 'es').map(entry => entry.name));
