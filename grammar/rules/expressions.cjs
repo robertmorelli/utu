@@ -110,13 +110,13 @@ exports.buildExpressionRules = function buildExpressionRules() {
     // TypeIdent.method or Module[T].method
     type_member_expr: ($) =>
       prec.left(14, seq(
-        choice($.instantiated_module_ref, $.inline_module_type_path, $.qualified_type_ref, $.type_ident),
+        choice($.instantiated_module_ref, $.inline_module_type_path, $.qualified_type_ref, $._type_head),
         '.',
         choice($.identifier, $.type_ident),
       )),
 
     // T1.null — null reference for type T1
-    null_expr: ($) => prec(15, seq($.type_ident, '.', 'null')),
+    null_expr: ($) => prec(15, seq($._type_head, '.', 'null')),
 
     promoted_module_call_expr: ($) =>
       prec.left(15, seq(
@@ -180,7 +180,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
         optional(','),
       ),
 
-    global_member_expr: ($) => prec.left(14, seq($.type_ident, '.', choice($.identifier, $.type_ident))),
+    global_member_expr: ($) => prec.left(14, seq($._type_head, '.', choice($.identifier, $.type_ident))),
 
     assign_expr: ($) =>
       prec.right(0, seq(
@@ -251,12 +251,27 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // Explicit struct init: T1 { field: expr, ... }
     struct_init: ($) =>
-      seq(
-        choice($.type_ident, $.qualified_type_ref),
-        '{',
-        optional(seq($.field_init, repeat(seq(',', $.field_init)), optional(','))),
-        '}',
+      choice(
+        seq(
+          choice($.type_ident, $.qualified_type_ref),
+          '{',
+          optional(seq($.field_init, repeat(seq(',', $.field_init)), optional(','))),
+          '}',
+        ),
+        // `M.T { x: 1 }` from a capitalized module M: a field at least, since
+        // `M.T {}` is the member `M.T` before an empty block.
+        seq(
+          alias($._capital_qualified_type_ref, $.qualified_type_ref),
+          '{',
+          seq($.field_init, repeat(seq(',', $.field_init)), optional(',')),
+          '}',
+        ),
       ),
+    _capital_qualified_type_ref: ($) => seq(alias($._capital_module_ref, $.module_ref), '.', $.type_ident),
+    _capital_module_ref: ($) => alias($._capital_module_name, $.module_name),
+    _capital_module_name: ($) => prec(1, $.type_ident),
+    // `T` before `.member`, `.null`, or a struct's `M.T {`: the conflict waits for `{`.
+    _type_head: ($) => prec.dynamic(1, prec(1, $.type_ident)),
     // Implicit struct init (type inferred from &): &{ field: expr, ... }
     implicit_struct_init: ($) =>
       seq(

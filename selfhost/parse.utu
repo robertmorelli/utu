@@ -657,15 +657,27 @@ fn impl_list(p: Parser) I32 {
     let first = p.pos;
     expect(p, Tok.LBracket);
     if not is(p, Tok.RBracket) {
-        type_ident_or_promoted(p);
+        impl_name(p);
         while (is(p, Tok.Comma)) {
             advance(p);
             if is(p, Tok.RBracket) { break; };
-            type_ident_or_promoted(p);
+            impl_name(p);
         };
     };
     expect(p, Tok.RBracket);
     node(p, Node.Impl_list, at, first);
+}
+
+/// A protocol in an impl or bound list: `P`, `&`, or `m.P` from module m.
+fn impl_name(p: Parser) I32 {
+    if not (is_word(p) and is_at(p, 1, Tok.Dot)) { return type_ident_or_promoted(p); };
+    let at = mark();
+    let first = p.pos;
+    module_name(p);
+    node(p, Node.Module_ref, at, first);
+    advance(p);
+    type_ident(p);
+    node(p, Node.Qualified_type_ref, at, first);
 }
 
 fn type_ident_or_promoted(p: Parser) I32 {
@@ -1608,6 +1620,9 @@ fn starts_expression(p: Parser) Bool {
 fn word_expression(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
+    // `m.T { field: … }` and `M.T { field: … }` build a struct from module m or M.
+    let qualified = qualified_struct_init(p);
+    if qualified >= 0 { return qualified; };
     if shaped(p) {
         // `label: { … }`
         if is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.LBrace) {
@@ -1616,9 +1631,6 @@ fn word_expression(p: Parser) I32 {
             block(p);
             return node(p, Node.Block_expr, at, first);
         };
-        // `m.T { field: … }` builds a struct from module m.
-        let qualified = qualified_struct_init(p);
-        if qualified >= 0 { return qualified; };
         // `m[i]` indexes; `m[A]…` names an instantiated module only when the
         // brackets do not hold an index.
         if index_ahead(p) { return identifier(p); };
@@ -1652,20 +1664,23 @@ fn word_expression(p: Parser) I32 {
         advance(p);
         return node(p, Node.Null_expr, at, first);
     };
-    // `M.T { … }` is the member `M.T` before a block, never a struct: the
-    // member rule's precedence wins. (`M.T.member` is a field of `M.T`.)
+    // `M.T {}` is the member `M.T` before an empty block, never a struct.
+    // (`M.T.member` is a field of `M.T`.)
     identifier_or_type(p);
     node(p, Node.Type_member_expr, at, first);
 }
 
-/// `m.T { field: … }` at the cursor (`m` a lowercase module), or -1 without consuming.
+/// `m.T { field: … }` at the cursor, or -1 without consuming. Braces that fail
+/// as fields are a block (`if x == m.T { … }`); so are empty braces after a
+/// capitalized `M`, as in `if c == Color.Red {}`.
 fn qualified_struct_init(p: Parser) I32 {
-    if not (is_at(p, 1, Tok.Dot) and is_at(p, 2, Tok.Word) and is_at(p, 3, Tok.LBrace)) { return -1; };
+    if not (is_word(p) and is_at(p, 1, Tok.Dot) and is_at(p, 2, Tok.Word) and is_at(p, 3, Tok.LBrace)) { return -1; };
+    if not shaped(p) and is_at(p, 4, Tok.RBrace) { return -1; };
     let s = save(p);
     let made = try {
         let at = mark();
         let first = p.pos;
-        identifier(p);
+        identifier_or_type(p);
         node(p, Node.Module_name, at, first);
         node(p, Node.Module_ref, at, first);
         advance(p);

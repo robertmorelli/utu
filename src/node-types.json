@@ -5137,6 +5137,10 @@
           "named": true
         },
         {
+          "type": "qualified_type_ref",
+          "named": true
+        },
+        {
           "type": "type_ident",
           "named": true
         }

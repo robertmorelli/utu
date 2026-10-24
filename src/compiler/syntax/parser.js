@@ -481,15 +481,27 @@ class Parser {
   implList() {
     const children = [this.expectPunct('[')];
     if (!this.isPunct(']')) {
-      children.push(this.typeIdentOrPromoted());
+      children.push(this.implName());
       while (this.isPunct(',')) {
         children.push(this.token(','));
         if (this.isPunct(']')) break;
-        children.push(this.typeIdentOrPromoted());
+        children.push(this.implName());
       }
     }
     children.push(this.expectPunct(']'));
     return this.node('impl_list', children);
+  }
+
+  /** A protocol in an impl or bound list: `P`, `&`, or `m.P` from module m. */
+  implName() {
+    if (this.word() === null) return this.typeIdentOrPromoted();
+    const save = this.save();
+    const name = this.moduleName();
+    if (!this.isPunct('.')) {
+      this.restore(save);
+      return this.typeIdent();
+    }
+    return this.node('qualified_type_ref', [this.node('module_ref', [name]), this.token('.'), this.typeIdent()]);
   }
 
   typeIdentOrPromoted() {
@@ -1125,6 +1137,9 @@ class Parser {
   }
 
   wordExpression(word) {
+    // `m.T { field: … }` and `M.T { field: … }` build a struct from module m or M.
+    const qualified = this.qualifiedStructInit();
+    if (qualified) return qualified;
     if (IDENTIFIER.test(word)) {
       // `label: { … }`
       const save = this.save();
@@ -1133,10 +1148,6 @@ class Parser {
         const colon = this.token(':');
         if (this.isPunct('{')) return this.node('block_expr', [name, colon, this.block()]);
       }
-      this.restore(save);
-      // `m.T { field: … }` builds a struct from module m.
-      const qualified = this.qualifiedStructInit();
-      if (qualified) return qualified;
       this.restore(save);
       // `m[i]` indexes; `m[A]…` names an instantiated module only when the
       // brackets do not hold an index.
@@ -1161,21 +1172,33 @@ class Parser {
     if (type.type !== 'type_ident' || !this.isPunct('.')) this.fail();
     const dot = this.token('.');
     if (this.isWord('null')) return this.node('null_expr', [type, dot, this.token('null')]);
-    // `M.T { … }` is the member `M.T` before a block, never a struct: the
-    // member rule's precedence wins. (`M.T.member` is a field of `M.T`.)
+    // `M.T {}` is the member `M.T` before an empty block, never a struct.
+    // (`M.T.member` is a field of `M.T`.)
     return this.node('type_member_expr', [type, dot, this.identifierOrType()]);
   }
 
-  /** `m.T { field: … }` at the cursor (m a lowercase module), or null without consuming. */
+  /**
+   * `m.T { field: … }` at the cursor, or null without consuming. Braces that fail
+   * as fields are a block (`if x == m.T { … }`); so are empty braces after a
+   * capitalized `M`, as in `if c == Color.Red {}`.
+   */
   qualifiedStructInit() {
     const save = this.save();
     try {
-      const name = this.identifier();
-      if (!this.isPunct('.')) return this.restoreNull(save);
+      const capital = !this.isIdentifierShaped();
+      const name = this.identifierOrType();
+      if (!this.isPunct('.') || this.isPunct('...') || this.isPunct('..<')) return this.restoreNull(save);
       const dot = this.token('.');
       if (this.word() === null) return this.restoreNull(save);
       const member = this.typeIdent();
       if (!this.isPunct('{')) return this.restoreNull(save);
+      if (capital) {
+        const brace = this.save();
+        this.token('{');
+        const empty = this.isPunct('}');
+        this.restore(brace);
+        if (empty) return this.restoreNull(save);
+      }
       const qualified = this.node('qualified_type_ref', [this.node('module_ref', [this.node('module_name', [name])]), dot, member]);
       return this.node('struct_init', [qualified, ...this.fieldInits()]);
     } catch (error) {

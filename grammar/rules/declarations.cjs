@@ -29,12 +29,15 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
       seq(
         '[',
         optional(seq(
-          choice($.type_ident, $.promoted_type),
-          repeat(seq(',', choice($.type_ident, $.promoted_type))),
+          $._impl_name,
+          repeat(seq(',', $._impl_name)),
           optional(','),
         )),
         ']',
       ),
+    // `P`, `&`, or `m.P` from module m.
+    _impl_name: ($) => choice($.type_ident, $.promoted_type, alias($._module_qualified_name, $.qualified_type_ref)),
+    _module_qualified_name: ($) => seq($.module_ref, '.', $.type_ident),
 
     // Structs: nom? struct (TypeIdent | &) impl_list? : | field ...
     struct_decl: ($) =>

@@ -108,6 +108,9 @@ there.
 A bounded parameter passes its bounds on: in `mod Ranking[T[Ord, Named]]`,
 `Order[T]` is an instance whose T implements Ord.
 
+A protocol declared in a mod is named by its path, in a bound or in a
+struct's list alike: `mod Sorted[T[m.Ord]]`, `struct Tri[shapes.Area]:`.
+
 ## What is checked
 
 Each instantiation in your files is checked against the bounds:
