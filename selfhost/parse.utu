@@ -505,6 +505,9 @@ fn restore(p: Parser, s: Save) void {
     node_next.resize(s.nodes);
     node_parent.resize(s.nodes);
     pending.resize(s.pending);
+    let k = dsl_sites.len();
+    while (k > 0 and dsl_sites[k - 1] >= s.nodes) { k -= 1; };
+    dsl_sites.resize(k);
 }
 
 //! = Words
@@ -1848,7 +1851,9 @@ fn dsl_expr(p: Parser) I32 {
     identifier(p);
     if not is(p, Tok.DslBody) { fail(p); };
     leaf(p, Node.Dsl_body);
-    node(p, Node.Dsl_expr, at, first);
+    let n = node(p, Node.Dsl_expr, at, first);
+    dsl_sites.push(n);
+    n;
 }
 
 fn bind_expr(p: Parser) I32 {
@@ -2177,7 +2182,6 @@ fn parse(first: I32, last: I32) I32 {
         let root = source_file(Parser { pos: 0 });
         token_spans(before, root, first, last - 1);
         if comment_nodes[0] == 1 { attach_comments(root); };
-        note_dsl_sites(before);
         root;
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]];
@@ -2271,7 +2275,6 @@ fn parse_expression(first: I32, last: I32) I32 {
             node_first[id] = ptok[a];
             node_last[id] = if b > a { ptok[b - 1] + 1; } else { ptok[a]; };
         };
-        note_dsl_sites(before);
         e;
     } catch {
         restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0 });
