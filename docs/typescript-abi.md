@@ -307,12 +307,13 @@ derive parameter types from declarations, including DOM event maps.
 Host exceptions are caught with `try`:
 
 ```utu
-let parsed = try { JS.JSON.parse(text); } catch |e| { Browser.console.warn(e.message); null; };
+let parsed = try { JS.JSON.parse(text); } catch |e| { Browser.console.warn(JS.String(e)); null; };
 ```
 
-`try { … } catch |e| { … }` is an expression whose branches meet like `if`.
-`e` is the thrown JavaScript value, so its members are available; the binding
-is optional. It lowers to one Wasm `try` that catches on the host's
+`try { … } catch |e| { … }` is an expression whose branches meet like `if`
+(here `null` beside an `Externref` makes a `?Externref`). `e` is the thrown
+JavaScript value, an `Externref` with no members; `JS.String(e)` reads it as
+text. The binding is optional. It lowers to one Wasm `try` that catches on the host's
 `WebAssembly.JSTag`. Wasm traps (`fatal`, a failed `assert`, a null
 dereference) are not exceptions and are never caught.
 
@@ -329,8 +330,8 @@ promotion, then unboxed when a numeric result is required.
 
 ```utu
 promote Browser.localStorage.getItem("key") {
-    |stored| => { /* stored is Str */ },
-    ~> { /* missing value */ },
+    |stored| => Browser.console.log(stored), // stored is Str
+    ~> Browser.console.log("missing"),
 };
 ```
 

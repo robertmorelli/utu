@@ -2163,6 +2163,19 @@ export main() I32 {
     r + s + e + ok - 7 + logged();
 }
 ` }, 1529348691],
+    // try/catch's branches meet as an if's: null in either beside a reference is a ?T ("null needs a nullable type").
+    [{ 'main.utu': `using JS from std:JS;
+fn parse(text: Str) ?Externref { let p = try { JS.JSON.parse(text); } catch |e| { null; }; p; }
+fn parse2(text: Str) ?Externref { let p = try { null; } catch { JS.JSON.parse(text); }; p; }
+fn bad(text: Str) ?Externref { let p = try { JS.JSON.parse(text); JS.JSON.parse("{"); } catch { null; }; p; }
+export main() I32 {
+    let a = if parse("[1]") == null { 0; } else { 1; };
+    let b = if parse("[") == null { 0; } else { 10; };
+    let c = if parse2("[1]") == null { 0; } else { 100; };
+    let d = if bad("[1]") == null { 0; } else { 1000; };
+    a + b + c + d;
+}
+` }, 1],
     // A negative or reversed Str range is empty in every engine; one past the end clamps.
     [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nexport main() I32 {\n    let s = "hello";\n    s.slice(n(-1), 3).len() + s.slice(3, n(1)).len() * 10 + s[n(-2), 2].len() * 100 + Str.slice(s, 1, 3).len() * 1000 + s.slice(2, 99).len() * 10000;\n}\n' }, 32000],
     // A mod's own named struct and protocol, opened (in its file, and imported then opened).

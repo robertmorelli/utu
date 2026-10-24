@@ -445,13 +445,17 @@ Unchanged property values are not rewritten, preserving the input caret.
 Richer validation uses explicit events and browser properties.
 
 ```utu
+using Browser from std:Browser;
+
 struct Preferences:
     | name: Str
     | enabled: Bool
 
-let preferences = @stored/\
-    Preferences "preferences-v1" Preferences { name: "", enabled: true }
-\/;
+export main() void {
+    let preferences = @stored/\
+        Preferences "preferences-v1" Preferences { name: "", enabled: true }
+    \/;
+}
 ```
 
 `@stored` generates native/JSON conversion and validates the full stored shape

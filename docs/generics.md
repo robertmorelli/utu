@@ -35,9 +35,11 @@ mod Stash[T] {
     fn size() I32 { items.len(); }
 }
 
-Stash[I32].add(1);
-Stash[Str].add("a");
-Stash[I32].size();                 // 1: Stash[Str] has its own items
+export main() I32 {
+    Stash[I32].add(1);
+    Stash[Str].add("a");
+    Stash[I32].size();             // 1: Stash[Str] has its own items
+}
 ```
 
 Only the instances the program names are made. Globals are set as the
@@ -84,8 +86,11 @@ mod Largest[T[Ord]] {
     }
 }
 
-Largest[Version].of(versions);
-Largest[I32].of([3, 9, 4]);        // 9
+export main() I32 {
+    let versions = [Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }];
+    Largest[Version].of(versions).major * 100   // 2
+        + Largest[I32].of([3, 9, 4]);           // 9: 209
+}
 ```
 
 A type implements a bound when it has, for each method, an implementation

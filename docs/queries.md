@@ -51,10 +51,11 @@ freeze/deep-copy mutable user objects or prevent direct mutation of public
 implementation fields.
 
 ```utu
-let before = PersistentSegmentTree[I32].new([2, 3, 5], 0, add);
-let after = before.set(1, 10, add);
-// before.query(0, 3, add) == 10
-// after.query(0, 3, add) == 17
+fn versions() I32 {
+    let before = PersistentSegmentTree[I32].new([2, 3, 5], 0, add);
+    let after = before.set(1, 10, add);
+    before.query(0, 3, add) * 100 + after.query(0, 3, add); // 10, 17: 1017
+}
 ```
 
 ## Priority search tree and geometric queries
@@ -62,15 +63,17 @@ let after = before.set(1, 10, add);
 ```utu
 using Spatial from std:Spatial;
 
-let points = [
-    Spatial.point(0.0, 0.0, 10),
-    Spatial.point(1.0, 2.0, 20),
-    Spatial.point(3.0, 1.0, 30)
-];
-let index = Spatial.new(points);
-let ids = index.below(0.0, 3.0, 2.0); // x interval, y ceiling
-let nearby = index.radius(0.0, 0.0, 2.5);
-let closest = index.nearest(2.9, 1.0); // ?Found[I32]
+fn lookups() void {
+    let points = [
+        Spatial.point(0.0, 0.0, 10),
+        Spatial.point(1.0, 2.0, 20),
+        Spatial.point(3.0, 1.0, 30)
+    ];
+    let index = Spatial.new(points);
+    let ids = index.below(0.0, 3.0, 2.0); // x interval, y ceiling
+    let nearby = index.radius(0.0, 0.0, 2.5);
+    let closest = index.nearest(2.9, 1.0); // ?Found[I32]
+}
 ```
 
 This is a static, balanced-by-x priority search tree with minimum-y nodes and

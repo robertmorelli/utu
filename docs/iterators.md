@@ -74,8 +74,10 @@ fn rows() Array[Row] {
 Use a typed initial variable for a nondefault fold accumulator:
 
 ```utu
-let zero: U64 = 0;
-let index_total = numbers fold(zero) |total, value, i| { total + i; };
+fn index_total(numbers: Array[I32]) U64 {
+    let zero: U64 = 0;
+    numbers fold(zero) |total, value, i| { total + i; };
+}
 ```
 
 ## Evaluation and cost
@@ -128,19 +130,21 @@ depth-first order.
 ## Additional operators
 
 ```utu
-let totals = [1, 2, 3] scan(0) |acc, value| {
-    acc + value;
-} collect(I32); // [1, 3, 6]
+fn additions() void {
+    let totals = [1, 2, 3] scan(0) |acc, value| {
+        acc + value;
+    } collect(I32); // [1, 3, 6]
 
-let groups = [1, 2, 3, 4] group_by(I32, I32) |value| {
-    value % 2;
-};
-// Array[Group[I32, I32]]: key 1 -> [1, 3], then key 0 -> [2, 4].
+    let groups = [1, 2, 3, 4] group_by(I32, I32) |value| {
+        value % 2;
+    };
+    // Array[Group[I32, I32]]: key 1 -> [1, 3], then key 0 -> [2, 4].
 
-let first = [4, 2, 3] first_where(I32) |value| {
-    value < 4;
-};
-let value = (first orelse fatal).value;
+    let first = [4, 2, 3] first_where(I32) |value| {
+        value < 4;
+    };
+    let value = (first orelse fatal).value; // 2
+}
 ```
 
 | Operator | Result and empty-input behavior |
@@ -182,12 +186,14 @@ same evaluation and cancellation rules as other pipelines.
 ## Binary partition search (`bisect`)
 
 ```utu
-let lower = [1, 2, 2, 4] bisect |value| {
-    value < 2;
-}; // 1
-let upper = [1, 2, 2, 4] bisect |value| {
-    value <= 2;
-}; // 3
+fn bounds() void {
+    let lower = [1, 2, 2, 4] bisect |value| {
+        value < 2;
+    }; // 1
+    let upper = [1, 2, 2, 4] bisect |value| {
+        value <= 2;
+    }; // 3
+}
 ```
 
 `bisect` searches a **materialized array**, returning the first position where a
