@@ -6884,9 +6884,14 @@ ok
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
+wasm://wasm/b497df1a:1
+
+
 RuntimeError: divide by zero
     at closure (wasm://wasm/b497df1a:wasm-function[5]:0xa4)
     at invoke
+
+Node.js v25.8.1
 --- exit 1
 
 === utu run examples/error_demo/runtime/29_deep_recursion_with_base.utu

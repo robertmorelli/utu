@@ -115,8 +115,6 @@ async function main() {
   // A map where the mode keeps one: always in debug, on asking in small and fast.
   const asked = args.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
-  // A program runs on RUN_STACK_MB, profiled or not: --profile changes no output.
-  if (command === 'run' && deepens) throw new TooDeep(RUN_STACK_MB);
   try {
     await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), profile, interval, utu: await loadNodeCompiler() });
   } catch (error) {
@@ -139,11 +137,7 @@ const WRITES = new Set(['build', 'build-exe']);
 /** Build, printing the diagnostics; exits on errors. */
 async function buildOrExit(utu, file, options) {
   const result = await compileFile(utu, file, options);
-  if (result.diagnostics.some(d => d.code === 'nested-too-deeply')) {
-    if (deepens) throw new TooDeep();
-    // A run's worker, too shallow for the build: again, in one deep enough.
-    if (!isMainThread && workerData?.mb < STACK_MB) process.exit(DEEPER);
-  }
+  if (deepens && result.diagnostics.some(d => d.code === 'nested-too-deeply')) throw new TooDeep();
   if (result.diagnostics.length) {
     const files = new Map(result.files.map(f => [f.key, f.text]));
     // In file order, then by position.
@@ -174,6 +168,8 @@ async function check(file, { utu }) {
 }
 
 async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, out }) {
+  // Profiled, on the stack a plain run has, so --profile changes no output but at
+  // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile });
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
@@ -836,37 +832,25 @@ async function trap(error, file, built, utu) {
 // the language server runs in one. Bun's workers ignore the setting, so
 // under Bun too deep a program is reported as such.
 const STACK_MB = 1024;
-// `utu run`'s stack, profiled or not, so a program recurses as deep either
-// way (a profiled one a few thousand frames less, of about 260 thousand in
-// -O debug): deeper than the main thread's, yet overflowing before the
-// profile memory's 512Ki frames run out.
-const RUN_STACK_MB = 16;
-
-/** A worker's exit status asking for the command again on STACK_MB. */
-const DEEPER = 75;
 
 /** Whether this thread can hand a command to a worker with a deeper stack. */
 const deepens = isMainThread && !process.versions.bun && !process.env.UTU_NO_WORKER;
 
-/** Thrown when a build was too deep for this thread, or for a run: the command starts again in a worker with an `mb` MB stack. */
+/** Thrown when a build was too deep for this thread: the command starts again in a worker with an `mb` MB stack. */
 class TooDeep extends Error { constructor(mb = STACK_MB) { super(); this.mb = mb; } }
 
 /** The command, run in a worker with a deep stack; exits as it does. */
 function inWorker(mb = STACK_MB) {
   const worker = new Worker(new URL(import.meta.url), {
     argv: process.argv.slice(2), stdin: true, resourceLimits: { stackSizeMb: mb },
-    workerData: { mb, tty: { stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY } },
+    workerData: { tty: { stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY } },
   });
   process.stdin.pipe(worker.stdin);
   worker.on('error', error => {
     console.error(error?.stack || error?.message || String(error));
     process.exit(1);
   });
-  worker.on('exit', code => {
-    if (code !== DEEPER || mb >= STACK_MB) process.exit(code);
-    process.stdin.unpipe(worker.stdin);
-    inWorker(STACK_MB);
-  });
+  worker.on('exit', code => process.exit(code));
 }
 
 if (deepens && process.argv[2] === 'lsp') inWorker();

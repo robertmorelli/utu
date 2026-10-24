@@ -39,11 +39,11 @@ to where that call began; resumed, they are put back on whatever stack it
 resumes on. Interleaved suspensions never stack on each other.
 
 A normal build is unchanged: the instrumentation exists only in profile
-builds. `--profile` changes no output: under Node, `utu run` runs a program
-in a worker with a 16 MB stack, profiled or not, so a recursion that fits
-one way fits the other (the profiled one holds a few thousand frames fewer
-of about 260 thousand in `-O debug`; `-O small` can fold a recursion a
-profile build keeps, and go deeper still).
+builds. A profiled run is on the same stack as a plain one (the main
+thread's), so `--profile` changes no output but at the edge of it: the
+instrumentation takes about 3100 frames (under Node, `-O debug`, a
+recursion of 15600 frames runs plain, of 12480 profiled), and `-O small`
+can fold a recursion a profile build keeps.
 
 ## Limits
 
@@ -52,8 +52,6 @@ profile build keeps, and go deeper still).
   `Cross-Origin-Embedder-Policy: require-corp`); src/runtime/profile.js
   starts its sampler there from a Blob worker, but no command sets that up yet.
 - The shadow stack holds 512Ki frames; deeper recursion traps.
-- Under Bun (whose workers ignore a stack size) both run on the main
-  thread's stack, where a profiled recursion can overflow sooner.
 - A global's initializer runs as the module is instantiated, before the
   sampler can start: it is not sampled. If it traps, the profile files are
   still written, empty.
