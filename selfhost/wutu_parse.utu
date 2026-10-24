@@ -820,10 +820,12 @@ fn parse_telement(text: Str) I32 {
         parse_element_statement(text, n);
     };
     if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start); };
-    if tag == "script" {
+    if tag == "script" or is_raw_text_tag(tag) {
         let c = tn_first[n];
         while (c >= 0) {
-            if tn_kind[c] != 0 { wutu_fail("a script's text is code, so Wutu writes it only as written: script { \"…\"; }", tn_start[c]); };
+            // (An element's text and attributes are escaped.)
+            if tn_kind[c] != 0 and tn_kind[c] != 4 and tag != "script" { wutu_fail(raw_text_error(tag), tn_start[c]); };
+            if tn_kind[c] != 0 and tag == "script" { wutu_fail("a script's text is code, so Wutu writes it only as written: script { \"…\"; }", tn_start[c]); };
             c = tn_next[c];
         };
     };
@@ -838,6 +840,14 @@ fn parse_telement(text: Str) I32 {
         wutu_fail("an @unmanaged " + tag + " has no children in its template: what is inside it is JavaScript's", start);
     };
     n;
+}
+
+/// Elements whose text HTML holds unescaped (raw text; a script's is code):
+/// prerendered, a value there could close the element and start markup.
+fn is_raw_text_tag(tag: Str) Bool { in_words("style noscript iframe xmp noembed noframes plaintext", tag); }
+
+fn raw_text_error(tag: Str) Str {
+    (if tag == "iframe" { "an "; } else { "a "; }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\"; }";
 }
 
 /// Whether element n has an attribute item named `name`.
@@ -1084,8 +1094,20 @@ fn literal_value(text: Str, q: I32) Bool {
     after < text.len() and text.get(after) == 59;
 }
 
-/// Whether `name` starts with "on" in any case: an event handler's attribute.
-fn is_on_name(name: Str) Bool { name.len() >= 2 and (name.get(0) | 32) == 111 and (name.get(1) | 32) == 110; }
+/// Whether `name` is "on" and an event's name, in any case: an event
+/// handler's attribute. (A browser runs no other `on…` one, so `one`, `only`
+/// and a custom element's `onfoo` are attributes.)
+fn is_on_name(name: Str) Bool {
+    if name.len() < 3 or (name.get(0) | 32) != 111 or (name.get(1) | 32) != 110 { return false; };
+    let rest = "";
+    for (2 ..< name.len()) |i| { let c = name.get(i); rest = rest + Str.from_code_point(if c >= 65 and c <= 90 { c + 32; } else { c; }); };
+    is_event_name(rest);
+}
+
+/// The DOM events with a handler attribute (`on` + the name), in any browser.
+fn is_event_name(w: Str) Bool {
+    in_words("abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom", w);
+}
 
 /// `name = value;` or `name;` (an attribute), `.name = value;` (a property);
 /// the cursor is on the name. A value that is one string literal is written
@@ -1121,6 +1143,9 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     let tag = word_text(tn_text[n]);
     if is_on_name(name) { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start); };
     if dynamic and tag == "script" { wutu_fail("a script's attributes are code or load it, so Wutu sets them only as written: src = \"…\";", name_start); };
+    if dynamic and tag == "base" and name == "href" { wutu_fail("a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = \"/\";", name_start); };
+    if dynamic and is_property and name == "protocol" { wutu_fail(".protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;", name_start); };
+    if dynamic and is_property and is_raw_text_tag(tag) and in_words("textContent innerText", name) { wutu_fail(raw_text_error(tag), name_start); };
     if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\"; (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start); };
     if not is_property and not is_allowed_attribute(tag, name) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);

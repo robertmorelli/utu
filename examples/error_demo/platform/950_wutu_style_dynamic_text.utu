@@ -1,0 +1,15 @@
+// What: a style's text from a value (prerendered, it could close the style and start markup)
+// Expect: a style's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: style { "…"; }
+using Browser from std:Browser;
+
+fn view(css: Str) Browser.HTMLElement {
+    @wutu/\
+    div {
+        style { = css; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("p { color: red; }"));
+}

@@ -101,15 +101,22 @@ DOM these renders made, so it holds the same. `srcdoc` is HTML, so a value
 there (`srcdoc = html;`, `.srcdoc = html;`) is an error; a written one stays.
 A `meta`'s `content` from a value (a refresh's URL) with any of those schemes
 anywhere goes too. An event handler is never an attribute: `onclick = …;` is
-an error in any case (`oNclick`, on a custom element too), and at run time an
-`on…` attribute is not set. A `script` is code, so its attributes and text are
-only as written (`src = "/app.js";`, `"…";`): `src = url;` or `= code;` in a
-script is an error.
+an error in any case (`oNclick`, on a custom element too), and at run time
+such an attribute is not set. (One is `on` and a DOM event's name; `one`,
+`only` and `onfoo` run nothing, so they are attributes.) A `script` is code,
+so its attributes and text are only as written (`src = "/app.js";`, `"…";`):
+`src = url;` or `= code;` in a script is an error. HTML holds the text of
+`style`, `noscript`, `iframe` (and `xmp`, `noembed`, `noframes`, `plaintext`)
+unescaped, so prerendered, a value there could close the element and start
+markup (`</style><img onerror=…>`): their text is only as written too
+(`style { "…"; }`); `= css;`, an `if` or `for` there, or `.textContent = …;`
+on one is an error. (Elements inside them are escaped as anywhere.) A
+`base`'s `href` moves every relative URL, scripts' too, so `href = url;` on
+`base` is an error; and `.protocol = …;` could turn a link's URL into
+`javascript:` past the check, so from a value it is an error: set `.href`.
 What the author writes is not checked: `href = "javascript:…";` is kept.
 `.innerHTML = expr;` and `.outerHTML = expr;` set HTML, unescaped, by the
-author's choice; give them only trusted text. So does a `style`'s text from a
-value (`style { = css; }`): CSS runs no script, but it can load URLs and read
-the page through selectors.
+author's choice; give them only trusted text.
 
 Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`

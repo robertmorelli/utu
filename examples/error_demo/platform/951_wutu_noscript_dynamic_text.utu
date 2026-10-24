@@ -1,0 +1,15 @@
+// What: a noscript's text from a value (prerendered, it could close the noscript and start markup)
+// Expect: a noscript's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: noscript { "…"; }
+using Browser from std:Browser;
+
+fn view(note: Str) Browser.HTMLElement {
+    @wutu/\
+    div {
+        noscript { = note; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("Turn on JavaScript"));
+}

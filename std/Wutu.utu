@@ -282,9 +282,11 @@ mod wutu {
     'background', 'codebase', 'longdesc', 'manifest']);
   // Attributes that hold several URLs, apart at whitespace (or commas).
   const LISTS = new Set(['ping', 'srcset', 'imagesrcset']);
+  // The DOM events with a handler attribute (`on` + the name), in any browser.
+  const EVENTS = new Set('abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom'.split(' '));
   /**
    * Whether a value from a render may go in attribute `name`: an event
-   * handler's (`on…`, any case) and srcdoc (HTML) take none; a URL one takes
+   * handler's (`on` and an event's name, any case) and srcdoc (HTML) take none; a URL one takes
    * no javascript: or vbscript: URL, and a data: URL only of an image, audio
    * or video (an SVG one only in an img or SVG image, where it runs no
    * script); ping and srcset check each of theirs; a meta's content (a
@@ -293,7 +295,7 @@ mod wutu {
    */
   function safe(node, name, value) {
     name = name.toLowerCase();
-    if (name.startsWith('on') || name === 'srcdoc') return false;
+    if ((name.startsWith('on') && EVENTS.has(name.slice(2))) || name === 'srcdoc') return false;
     if (value === true) return true;
     if (URLS.has(name)) return scheme(node, String(value));
     if (LISTS.has(name)) return String(value).split(/[\s,]+/).every(u => scheme(node, u));
