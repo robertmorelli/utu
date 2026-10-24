@@ -181,6 +181,19 @@ button as toggle {
 }
 ```
 
+**Under `@reactive`, don't write to an element the template manages.** A
+handler's `toggle.textContent = …` holds only until the next render, which
+sets the node back to what the template says. Change state and let the
+template show it:
+
+```utu
+p { = s.msg; }
+button {
+    on click { s.msg = "Saved"; }
+    = "Save";
+}
+```
+
 Listeners are attached directly to nodes. There are no global subscriptions to
 unsubscribe and no framework-owned cache keeping removed nodes alive. Normal
 DOM event propagation, promises, and Utu closures remain available.
@@ -473,8 +486,8 @@ export main() void {
 before accepting it. Supported schemas are acyclic local structs containing
 `Str`, `Bool`, `I32`, `F64`, and nested `Array[T]`. Arrays decode in linear time
 with a preallocated native array. Invalid or unavailable storage returns the
-defaults. Data is wrapped in a versioned envelope; change the key when changing
-an incompatible schema. Imported/recursive/optional schema types and automatic
+defaults. Data is stored as `{"version":1,"data":…}`; `version` is the envelope's
+format, not your schema's, so change the key when changing an incompatible schema. Imported/recursive/optional schema types and automatic
 migration are not currently supported.
 
 Create stored state before mounting its reactive root. Automatic stores save after
@@ -579,15 +592,37 @@ produce runtime diagnostics. Unkeyed loops receive positional identities.
 
 `wutu.after_render(callback)` and `wutu.focus(id)` run after the update.
 `wutu.on_cleanup(callback)` registers cleanup for the current view;
-`wutu.interval(key, milliseconds, callback)` updates its owner after each tick.
-Like `on_cleanup`, it belongs to the render that registers it: a render that does
-not register it again (its component left) stops it, as does unmounting the view. `wutu.route()`
+`wutu.interval(key, milliseconds, callback)` updates its owner after each tick;
+one key runs one timer. Started during a render, it belongs to that render, like
+`on_cleanup`: a render that does not start it again (its component left) stops it.
+Started from `on mount` or an event handler, it belongs to that element: it stops
+once the element is gone. Unmounting the view stops either.
+
+```utu
+p.clock {
+    on mount { wutu.interval("tick", 1000.0, cl() void { s.seconds = s.seconds + 1; }); }
+    = "Uptime " + s.seconds.to_str() + "s";
+}
+``` `wutu.route()`
 reads the hash path, and hash/history changes refresh views. This is a small route
 primitive, not a route table, network loader or authentication framework.
 
 Optional `std:NumberField` keeps numeric draft text separate from validated
-numbers. Optional `std:List[T]` provides `append` and `remove_at`; both return copied
-arrays. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
+numbers. Arrays have a fixed length; a list that grows is an `Array[T]` in state,
+replaced by `std:List[T]`'s `append` and `remove_at`, which return copies:
+
+```utu
+using List[Todo] |todos| from std:List;
+
+button {
+    on click { s.todos = todos.append(s.todos, Todo { text: s.draft, done: false }); }
+    = "Add";
+}
+```
+
+A closure is `cl(params) Type { … }`: `wutu.after_render(cl() void { s.ready = true; })`.
+In a function body, a plain Utu `if`, `for` or `while` statement ends with `;`
+(`if s.busy { return; };`); Wutu's own `if` and `for`, among elements, do not. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
 simple display without shipping a formatting library.
 
 The [two new five-site batches](wutu-round-two-review.md) exercise these APIs.
