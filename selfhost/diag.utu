@@ -433,6 +433,7 @@ fn diag_text(i: I32) Str {
             if a == 5 { return "Duplicate method " + node_text(node); };
             if a == 6 { return "Duplicate capture " + w; };
             if a == 7 { return "Duplicate protocol " + w; };
+            if a == 8 { return "Duplicate local " + w + ": already a parameter"; };
             let what = pick(a == 1, "parameter", pick(a == 2, "variant", pick(a == 3, "local", "declaration")));
             "Duplicate " + what + " " + w;
         },
@@ -468,7 +469,7 @@ fn diag_text(i: I32) Str {
             if named_word(word) { return w + " takes " + int_text(a) + ", given " + int_text(b); };
             "Takes " + int_text(a) + ", given " + int_text(b);
         },
-        Diag.AssignmentToImmutable => w + " is immutable",
+        Diag.AssignmentToImmutable => pick(a == 1, "Cannot assign to capture " + w, w + " is immutable"),
         Diag.InvalidBreak => break_rule_text(a),
         Diag.InvalidDefer => break_rule_text(a),
         Diag.DuplicateField => "Duplicate field " + w,
@@ -603,7 +604,7 @@ fn diag_text(i: I32) Str {
         Diag.ForeignOverload => "No overload takes " + int_text(a),
         Diag.PruneInClosure => "prune in a closure",
         Diag.GeneratorMethod => "A method cannot be a generator",
-        Diag.UnknownLabel => "No block labeled " + w + " around this break",
+        Diag.UnknownLabel => if a == 1 { "break takes no value"; } else { "No block labeled " + w + " around this break"; },
         Diag.GlobalCycle => if a < 0 { "Global " + w + " is read while it is being set"; }
             else { "Globals " + w + " and " + word_text(decl_name[a]) + " each need the other set first"; },
         Diag.NotValue => if a == 2 { w + " is a field: read it from a value"; } else { w + " is a " + pick(a == 1, "module", "type") + ", not a value"; },
@@ -632,7 +633,7 @@ fn diag_text(i: I32) Str {
         Diag.YieldInClosure => "yield in a closure",
         Diag.GeneratorReturnValue => "A generator returns no value",
         Diag.GeneratorCall => w + " is a generator: for (" + w + "(…)) |v| { … }",
-        Diag.AwaitForSource => "await for needs a generator call or a stream",
+        Diag.AwaitForSource => if a == 1 { "await for reads a stream, not " + type_text(b) + ": use a plain for"; } else { "await for needs a generator call or a stream"; },
         Diag.AwaitForCapture => "A stream loop binds one value",
         Diag.IteratorUnfinished => "Unfinished pipeline: " + w,
         Diag.IteratorCaptures => {
@@ -813,7 +814,7 @@ fn diag_default_label(i: I32) Str {
         Diag.ProtoPairType => "one type for get and set",
         Diag.MemberClash => pick(b == 1, "also in the protocol", "also a field"),
         Diag.VariantNotValue => "make one: " + w + " {…}",
-        Diag.UnknownLabel => "no such label",
+        Diag.UnknownLabel => pick(a == 1, "a value, not a label", "no such label"),
         Diag.GlobalCycle => if a < 0 { "reads " + w; } else { "needs " + word_text(decl_name[a]); },
         Diag.NotValue => "not a value",
         Diag.NotAssignable => "not a variable",

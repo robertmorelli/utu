@@ -1,5 +1,5 @@
 // What: `utu run` on a main that returns a struct
-// Expect: something readable printed (its to_str, or the fields), not an opaque object
+// Expect: by design, an opaque handle: JavaScript cannot read a struct (docs/typescript-abi.md); return to_str() to print it
 struct Point:
     | x: I32
     | y: I32

@@ -650,6 +650,11 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     };
     let s = new_local(repr(st));
     w_node(Op.LocalSet, vt_none, s, 0, m);
+    // An array is read by a plain for.
+    if is_array_type(st) {
+        report2(Diag.AwaitForSource, node, -1, 1, st);
+        return finish_error(-1, m, cx);
+    };
     // Not a stream: its first call is reported, as stage 0 does.
     let it_fi = stream_method(st, "iterator", node);
     if it_fi < 0 { return finish_error(-1, m, cx); };

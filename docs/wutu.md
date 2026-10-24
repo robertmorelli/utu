@@ -200,6 +200,12 @@ button {
 }
 ```
 
+An element's own declaration whose property is one edit from a standard one
+(two for a long name) is a typo and fails: `colr: red;` says "did you mean
+color?". Custom (`--x`) and prefixed (`-webkit-…`) properties, and ones near no
+standard name, pass as written. A value that runs onto the next line's
+declaration (`padding: 1rem` then `gap: 2rem;`) is a missing `;`.
+
 A declaration whose value is `= ...` is computed when the template renders
 and applied with `style.setProperty`, which a strict `style-src` policy allows:
 

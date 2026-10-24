@@ -833,7 +833,13 @@ fn check_for(node: I32, cx: Cx) I32 {
             kinds[i] = if tok_kind[token_after(lo)] == Tok.DotDotDot.to_i32() { 1; } else { 0; };
             let t = if is_number_literal(lo) and not is_number_literal(hi) { type_only(hi, -1, cx); } else { type_only(lo, -1, cx); };
             if not is_numeric(t) or is_float(t) {
-                report2(Diag.InvalidForSource, s, -1, 0, t);
+                // A bound with a mistake of its own (`xs.len()` on a ?Array) says that one.
+                if ty_is(t, Ty.Error) {
+                    check_expr(lo, -1, cx);
+                    check_expr(hi, -1, cx);
+                } else {
+                    report2(Diag.InvalidForSource, s, -1, 0, t);
+                };
                 w_stack.resize(m);
                 return error_value();
             };

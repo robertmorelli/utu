@@ -702,8 +702,8 @@ export lib {
     ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { alt p { Ka => 1, Kc => q, }; }\nexport lib { fn run() I32 { f(Kc {}, 5); } }\n', 5],
     // A parameter assigned after an alt tested it: the inner test still runs.
     ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nexport lib { fn run() I32 { let fp: fun(Shape) I32 = f; fp(Circle {}); } }\n', 2],
-    // Closures see writes to captured for, alt, and promote bindings, and their own.
-    ['enum E:\n    | A { n: I32 }\n    | B {}\nexport lib { fn run() I32 {\n    let t = 0;\n    for ([1, 2]) |x| { let f = cl() { x += 10; }; f(); t += x; };\n    for (0 ..< 5) |i| { let g = cl() I32 { i; }; i = i + 1; t += g() * 100; };\n    let e: E = A { n: 3 };\n    t += alt e { A |a| => { let h = cl() { a = A { n: 9 }; }; h(); a.n * 1000; }, B => 0, };\n    let s: ?Str = "hi";\n    promote s { |v| => { let h = cl() { v = v + "!"; }; h(); t += v.len() * 100000; }, ~> {}, };\n    let c = 0;\n    let inc = cl() { c += 1; };\n    inc(); inc();\n    t + c * 10000;\n} }\n', 23 + 900 + 9000 + 20000 + 300000],
+    // Closures see writes to captured range counts, alt, and promote bindings, and their own (an element is a copy: no writes).
+    ['enum E:\n    | A { n: I32 }\n    | B {}\nexport lib { fn run() I32 {\n    let t = 0;\n    for ([1, 2]) |x0| { let x = x0; let f = cl() { x += 10; }; f(); t += x; };\n    for (0 ..< 5) |i| { let g = cl() I32 { i; }; i = i + 1; t += g() * 100; };\n    let e: E = A { n: 3 };\n    t += alt e { A |a| => { let h = cl() { a = A { n: 9 }; }; h(); a.n * 1000; }, B => 0, };\n    let s: ?Str = "hi";\n    promote s { |v| => { let h = cl() { v = v + "!"; }; h(); t += v.len() * 100000; }, ~> {}, };\n    let c = 0;\n    let inc = cl() { c += 1; };\n    inc(); inc();\n    t + c * 10000;\n} }\n', 23 + 900 + 9000 + 20000 + 300000],
     // A write in a loop match, after the closure.
     ['export lib { fn run() I32 { let n = 10; let f = cl() I32 { n; }; let k = 0; loop match k { 0 => { n = 30; continue 1; }, ~> break, }; f(); } }\n', 30],
     // A recursive closure assigned with `=`.
@@ -1844,6 +1844,8 @@ export lib {
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
+  const wutuHead = 'using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n';
+  const wutuTail = '        "x";\n    }\n    \\/;\n}\nexport main() void { Browser.document.body.append(view()); }\n';
   // A missing bound, said once for its type however many places use it; an unknown module once.
   for (const [source, message] of [
     ['proto Big:\n    | biggest(Array[&]) &\nstruct M:\n    | v: I32\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nexport lib { fn run() I32 { let xs: Array[M] = [M { v: 3 }]; Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 2 }, xs).v; } }\n', "M does not implement Big (Pick's T needs it)"],
@@ -1859,9 +1861,30 @@ export lib {
     ['using pad from "npm:missing";\nexport main() I32 { pad.f(); 0; }\n', 'No declarations for npm:missing; is it installed?'],
     // copy_in of a value not from the host, with no std:JS loaded (it crashed the compiler).
     ['mem text: U8;\nexport lib { fn load(x: I32) I32 { text.copy_in(x); text.len(); } }\n', 'Expected Externref, got I32'],
+    // An element's or a generator's value, captured, is a copy: a write to it was lost (accepted).
+    ['export main() I32 { let xs = [1, 2]; for (xs) |x| { x = x * 2; }; xs[0]; }\n', 'Cannot assign to capture x'],
+    ['fn g() yield I32 { yield 1; }\nexport main() I32 { let t = 0; for (g()) |v| { v += 1; t += v; }; t; }\n', 'Cannot assign to capture v'],
+    // A let in a function's body of a parameter's name (accepted).
+    ['fn clamp(n: I32) I32 { let n = 3; n; }\nexport main() I32 { clamp(4); }\n', 'Duplicate local n: already a parameter'],
+    // A Str where a host Node is wanted: `appendChild<T extends Node>(node: T)` bound T to Str (accepted).
+    ['using Browser from std:Browser;\nexport main() void { Browser.document.body.appendChild("hello"); }\n', 'Expected Browser.Node, got Str'],
+    // Wutu CSS: a declaration without its `;` before the next, and a property's typo (accepted).
+    [`${wutuHead}        padding: 1rem\n        gap: 2rem;\n${wutuTail}`, 'CSS declarations require a semicolon'],
+    [`${wutuHead}        colr: red;\n${wutuTail}`, 'invalid CSS property colr; did you mean color?'],
   ]) {
     const { errors } = await selfhost(await write(source));
     assert.deepEqual(errors, [message], source);
+    checked++;
+  }
+  // Their neighbours stay right: a parameter assigned, a parameter's name in an inner block, an element
+  // where `T extends Node` is wanted, custom, prefixed and unlisted CSS properties, a value over lines.
+  for (const source of [
+    'fn f(n: I32) I32 { n = n + 1; if n > 0 { let n = 2; n; } else { n; }; }\nexport main() I32 { f(1); }\n',
+    'using Browser from std:Browser;\nexport main() void { let d = Browser.document.createElement("div"); Browser.document.body.appendChild(d); }\n',
+    `${wutuHead}        --gap: 1rem;\n        -webkit-line-clamp: 2;\n        anchor-name: --a;\n        grid-template-columns:\n            repeat(2, 1fr);\n        font-family: a,\n            b;\n${wutuTail}`,
+  ]) {
+    const built = await compileFile(utu, await write(source), { optimize: 'size' });
+    assert.deepEqual(built.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [], source);
     checked++;
   }
   // A std module not imported: the note names the module, and its file.

@@ -115,6 +115,87 @@ function isAllowedAttribute(tag, name) {
 
 const CSS_PROPERTY = /^--[\w-]+$|^-?[a-z][\w-]*$/;
 
+/** The standard CSS properties (lib.dom's CSSStyleDeclaration, and newer ones). */
+const CSS_PROPERTIES = words(`accent-color align-content align-items align-self alignment-baseline all anchor-name anchor-scope animation animation-composition animation-delay `
+  + `animation-direction animation-duration animation-fill-mode animation-iteration-count animation-name animation-play-state animation-range `
+  + `animation-range-end animation-range-start animation-timeline animation-timing-function appearance aspect-ratio backdrop-filter backface-visibility `
+  + `background background-attachment background-blend-mode background-clip background-color background-image background-origin background-position `
+  + `background-position-x background-position-y background-repeat background-size baseline-shift baseline-source block-size border border-block `
+  + `border-block-color border-block-end border-block-end-color border-block-end-style border-block-end-width border-block-start border-block-start-color `
+  + `border-block-start-style border-block-start-width border-block-style border-block-width border-bottom border-bottom-color border-bottom-left-radius `
+  + `border-bottom-right-radius border-bottom-style border-bottom-width border-collapse border-color border-end-end-radius border-end-start-radius `
+  + `border-image border-image-outset border-image-repeat border-image-slice border-image-source border-image-width border-inline border-inline-color `
+  + `border-inline-end border-inline-end-color border-inline-end-style border-inline-end-width border-inline-start border-inline-start-color `
+  + `border-inline-start-style border-inline-start-width border-inline-style border-inline-width border-left border-left-color border-left-style `
+  + `border-left-width border-radius border-right border-right-color border-right-style border-right-width border-spacing border-start-end-radius `
+  + `border-start-start-radius border-style border-top border-top-color border-top-left-radius border-top-right-radius border-top-style border-top-width `
+  + `border-width bottom box-decoration-break box-shadow box-sizing break-after break-before break-inside caption-side caret-color clear clip clip-path `
+  + `clip-rule color color-interpolation color-interpolation-filters color-scheme column-count column-fill column-gap column-rule column-rule-color `
+  + `column-rule-style column-rule-width column-span column-width columns contain contain-intrinsic-block-size contain-intrinsic-height `
+  + `contain-intrinsic-inline-size contain-intrinsic-size contain-intrinsic-width container container-name container-type content content-visibility `
+  + `counter-increment counter-reset counter-set cursor cx cy d direction display dominant-baseline dynamic-range-limit empty-cells field-sizing fill `
+  + `fill-opacity fill-rule filter flex flex-basis flex-direction flex-flow flex-grow flex-shrink flex-wrap float flood-color flood-opacity font `
+  + `font-family font-feature-settings font-kerning font-optical-sizing font-palette font-size font-size-adjust font-stretch font-style font-synthesis `
+  + `font-synthesis-small-caps font-synthesis-style font-synthesis-weight font-variant font-variant-alternates font-variant-caps font-variant-east-asian `
+  + `font-variant-ligatures font-variant-numeric font-variant-position font-variation-settings font-weight forced-color-adjust gap grid grid-area `
+  + `grid-auto-columns grid-auto-flow grid-auto-rows grid-column grid-column-end grid-column-gap grid-column-start grid-gap grid-row grid-row-end `
+  + `grid-row-gap grid-row-start grid-template grid-template-areas grid-template-columns grid-template-rows height hyphenate-character `
+  + `hyphenate-limit-chars hyphens image-orientation image-rendering initial-letter inline-size inset inset-block inset-block-end inset-block-start `
+  + `inset-inline inset-inline-end inset-inline-start interpolate-size isolation justify-content justify-items justify-self left letter-spacing `
+  + `lighting-color line-break line-clamp line-height list-style list-style-image list-style-position list-style-type margin margin-block margin-block-end `
+  + `margin-block-start margin-bottom margin-inline margin-inline-end margin-inline-start margin-left margin-right margin-top marker marker-end marker-mid `
+  + `marker-start mask mask-clip mask-composite mask-image mask-mode mask-origin mask-position mask-repeat mask-size mask-type math-depth math-style `
+  + `max-block-size max-height max-inline-size max-width min-block-size min-height min-inline-size min-width mix-blend-mode object-fit object-position `
+  + `offset offset-anchor offset-distance offset-path offset-position offset-rotate opacity order orphans outline outline-color outline-offset `
+  + `outline-style outline-width overflow overflow-anchor overflow-block overflow-clip-margin overflow-inline overflow-wrap overflow-x overflow-y overlay `
+  + `overscroll-behavior overscroll-behavior-block overscroll-behavior-inline overscroll-behavior-x overscroll-behavior-y padding padding-block `
+  + `padding-block-end padding-block-start padding-bottom padding-inline padding-inline-end padding-inline-start padding-left padding-right padding-top `
+  + `page page-break-after page-break-before page-break-inside paint-order perspective perspective-origin place-content place-items place-self `
+  + `pointer-events position position-anchor position-area position-try position-try-fallbacks position-try-order position-visibility print-color-adjust `
+  + `quotes r reading-flow reading-order resize right rotate row-gap ruby-align ruby-position rx ry scale scroll-behavior scroll-margin scroll-margin-block `
+  + `scroll-margin-block-end scroll-margin-block-start scroll-margin-bottom scroll-margin-inline scroll-margin-inline-end scroll-margin-inline-start `
+  + `scroll-margin-left scroll-margin-right scroll-margin-top scroll-padding scroll-padding-block scroll-padding-block-end scroll-padding-block-start `
+  + `scroll-padding-bottom scroll-padding-inline scroll-padding-inline-end scroll-padding-inline-start scroll-padding-left scroll-padding-right `
+  + `scroll-padding-top scroll-snap-align scroll-snap-stop scroll-snap-type scroll-timeline scroll-timeline-axis scroll-timeline-name scrollbar-color `
+  + `scrollbar-gutter scrollbar-width shape-image-threshold shape-margin shape-outside shape-rendering stop-color stop-opacity stroke stroke-dasharray `
+  + `stroke-dashoffset stroke-linecap stroke-linejoin stroke-miterlimit stroke-opacity stroke-width tab-size table-layout text-align text-align-last `
+  + `text-anchor text-autospace text-box text-box-edge text-box-trim text-combine-upright text-decoration text-decoration-color text-decoration-line `
+  + `text-decoration-skip-ink text-decoration-style text-decoration-thickness text-emphasis text-emphasis-color text-emphasis-position text-emphasis-style `
+  + `text-indent text-orientation text-overflow text-rendering text-shadow text-size-adjust text-spacing-trim text-transform text-underline-offset `
+  + `text-underline-position text-wrap text-wrap-mode text-wrap-style timeline-scope top touch-action transform transform-box transform-origin `
+  + `transform-style transition transition-behavior transition-delay transition-duration transition-property transition-timing-function translate `
+  + `unicode-bidi user-select vector-effect vertical-align view-timeline view-timeline-axis view-timeline-inset view-timeline-name view-transition-class `
+  + `view-transition-name visibility white-space white-space-collapse widows width will-change word-break word-spacing word-wrap writing-mode x y z-index `
+  + `zoom`);
+
+/** Edit distance, up to `bound`. */
+function editDistance(a, b, bound) {
+  if (Math.abs(a.length - b.length) >= bound) return bound;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return Math.min(prev[b.length], bound);
+}
+
+/**
+ * A standard CSS property `name` is likely a typo of (one edit, two for a
+ * long name), or '' for a known one, a prefixed or custom one, or one near
+ * none (a property newer than the list).
+ */
+function nearCssProperty(name) {
+  if (!name || name[0] === '-' || CSS_PROPERTIES.has(name)) return '';
+  let best = '', bestD = 3;
+  for (const p of CSS_PROPERTIES) {
+    const d = editDistance(p, name, 3);
+    if (d < bestD) { best = p; bestD = d; }
+  }
+  if (bestD > 1 && name.length <= 6) return '';
+  return best;
+}
+
 export class WutuSyntaxError extends Error {
   /** @param {number} offset template-relative offset of the problem */
   constructor(message, offset) {
@@ -649,6 +730,34 @@ class WutuParser {
     node.css.push({ source: `${selector}{${block}}`, css: `${scopedSelector(selector)}{${block}}`, start });
   }
 
+  /** A typo of a standard property fails, saying which. */
+  cssPropertyKnown(name, at) {
+    const near = nearCssProperty(name);
+    if (near) this.fail(`invalid CSS property ${name}; did you mean ${near}?`, at);
+  }
+
+  /**
+   * A value (`text[from, to)`) that runs onto the next line's declaration or
+   * rule (`padding: 1rem` then `gap: 2rem;`): its `;` is missing, at its line's end.
+   */
+  cssValueRunsOn(from, to) {
+    const text = this.text;
+    let parens = 0;
+    for (let i = from; i < to; i++) {
+      const c = text[i];
+      if (c === '"' || c === "'") {
+        i++;
+        while (i < to && text[i] !== c) i += text[i] === '\\' ? 2 : 1;
+      } else if (c === '(') parens++;
+      else if (c === ')') parens--;
+      else if (c === '\n' && parens === 0 && /^\s*(--|-?[a-z])[\w-]*\s*[:{]/.test(text.slice(i + 1, i + 200))) {
+        let end = i;
+        while (end > from && /\s/.test(text[end - 1])) end--;
+        this.fail('CSS declarations require a semicolon', end);
+      }
+    }
+  }
+
   parseDeclarationOrChild(node) {
     const start = this.p;
     const head = this.readCssUntil(':{};');
@@ -667,13 +776,17 @@ class WutuParser {
       const expression = this.readBareExpression();
       this.expectSemicolon();
       if (!CSS_PROPERTY.test(head)) this.fail('invalid CSS property', start);
+      this.cssPropertyKnown(head.trim(), start);
       node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start });
       return;
     }
+    const valueFrom = this.p;
     const value = this.readCssUntil(';{}');
+    this.cssValueRunsOn(valueFrom, this.p);
     if (this.text[this.p] !== ';') this.fail('CSS declarations require a semicolon');
     this.p++;
     if (!CSS_PROPERTY.test(head)) this.fail('invalid CSS property', start);
+    this.cssPropertyKnown(head.trim(), start);
     const declaration = `${head}:${value};`;
     node.css.push({ source: this.text.slice(start, this.p), css: declaration, start });
   }
