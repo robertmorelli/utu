@@ -6423,6 +6423,90 @@ ok
 13 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/930_ir_bool_from_length.utu
+ ERROR  @ir gives an i32, not a comparison's Bool
+        ir-type · examples/error_demo/platform/930_ir_bool_from_length.utu:4:5
+
+ 2 │ // Expect: @ir gives an i32, not a comparison's Bool
+ 3 │ fn nonempty(s: Str) Bool {
+ 4 │     @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ not Bool
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/931_ir_uncalled.utu
+ ERROR  @ir names no parameter b
+        ir-unknown · examples/error_demo/platform/931_ir_uncalled.utu:4:5
+
+ 2 │ // Expect: @ir names no parameter b
+ 3 │ fn twice(a: I32) I32 {
+ 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ unknown
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/932_ir_v128_byte.utu
+ ERROR  256 does not fit a byte
+        integer-out-of-range · examples/error_demo/platform/932_ir_v128_byte.utu:4:5
+
+ 2 │ // Expect: 256 does not fit a byte
+ 3 │ fn lanes() V128 {
+ 4 │     @ir/\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ out of range
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/933_ir_bool_literal.utu
+ ERROR  2 does not fit Bool
+        integer-out-of-range · examples/error_demo/platform/933_ir_bool_literal.utu:4:5
+
+ 2 │ // Expect: 2 does not fit Bool
+ 3 │ fn yes() Bool {
+ 4 │     @ir/\ <ir-lit kind="bool" type-name="Bool" value="2"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ Bool
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/934_ir_string_op_on_number.utu
+ ERROR  @ir <ir-string-measure-utf16> takes externref, given i32
+        ir-type · examples/error_demo/platform/934_ir_string_op_on_number.utu:4:5
+
+ 2 │ // Expect: @ir <ir-string-measure-utf16> takes externref, given i32
+ 3 │ fn len(n: I32) I32 {
+ 4 │     @ir/\ <ir-string-measure-utf16><ir-ident name="n"/></ir-string-measure-utf16> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ i32
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/935_ir_ref_eq_on_str.utu
+ ERROR  @ir <ir-ref-eq> takes eqref, given externref
+        ir-type · examples/error_demo/platform/935_ir_ref_eq_on_str.utu:4:5
+
+ 2 │ // Expect: @ir <ir-ref-eq> takes eqref, given externref
+ 3 │ fn same(a: Str, b: Str) Bool {
+ 4 │     @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ externref
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/936_ir_number_for_str.utu
+ ERROR  @ir gives i32, not Str
+        ir-type · examples/error_demo/platform/936_ir_number_for_str.utu:4:5
+
+ 2 │ // Expect: @ir gives i32, not Str
+ 3 │ fn name(a: I32) Str {
+ 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ not Str
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/platform/93_wutu_ambiguous_alias.utu
  ERROR  Ambiguous element alias 'label'; reference it inside its own subtree
         dsl-error · examples/error_demo/platform/93_wutu_ambiguous_alias.utu:10:35

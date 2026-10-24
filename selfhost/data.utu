@@ -612,7 +612,6 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
     if not is_data_tag(tag) { return 0; };
     let m = w_mark();
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
-    // What a program's @ir gives them is not checked: no crash on what they cannot take.
     let from_codes = tag == known_word(Known.IrStringFromCodes);
     let string_tag = from_codes or tag == known_word(Known.IrStringConcat) or tag == known_word(Known.IrStringEq)
         or tag == known_word(Known.IrStringNe) or tag == known_word(Known.IrStringMeasure) or tag == known_word(Known.IrStringSlice)
@@ -625,6 +624,10 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
     if not string_tag and not intrinsic_array_fi(fi) {
         w_stack.resize(m);
         ir_malformed(x);
+        return -1;
+    };
+    if not ir_kids_typed(x, decls, fi, m, data_sig(tag)) {
+        w_stack.resize(m);
         return -1;
     };
     if tag == known_word(Known.IrStringConcat) { call_builtin(Builtin.Concat, m); }
@@ -698,15 +701,37 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
             ir_malformed(x);
             return -1;
         };
-        // Up to sixteen bytes, each written in decimal, separated by commas.
+        // Sixteen bytes, each written in decimal, separated by commas.
         let commas = 0;
-        for (attr_start[a] ..< attr_end[a]) |i| {
-            if src[i] == 44 { commas += 1; } else if src[i] < 48 or src[i] > 57 {
+        let digits = 0;
+        let from = attr_start[a];
+        for (attr_start[a] ... attr_end[a]) |i| {
+            if i == attr_end[a] or src[i] == 44 {
+                if digits == 0 {
+                    ir_malformed(x);
+                    return -1;
+                };
+                // (More than 255, or leading zeros past three digits.)
+                let value = 0;
+                for (from ..< i) |j| { if value <= 255 { value = value * 10 + src[j] - 48; }; };
+                if value > 255 {
+                    ir_failed[0] = x;
+                    ir_failed_shape[0] = 4;
+                    ir_fault[0] = -1;
+                    ir_fault[1] = src.intern(from, i);
+                    return -1;
+                };
+                if i < attr_end[a] { commas += 1; };
+                digits = 0;
+                from = i + 1;
+            } else if src[i] < 48 or src[i] > 57 {
                 ir_malformed(x);
                 return -1;
+            } else {
+                digits += 1;
             };
         };
-        if commas > 15 {
+        if commas != 15 {
             ir_malformed(x);
             return -1;
         };
@@ -729,6 +754,9 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
         return 1;
     };
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
+    let sig = if k == Known.IrI31New.to_i32() { "i"; } else if k == Known.IrI31GetS.to_i32() or k == Known.IrI31GetU.to_i32() { "3"; }
+        else if k == Known.IrRefEq.to_i32() or k == Known.IrRefNe.to_i32() { "ee"; } else { ""; };
+    if sig.len() > 0 and not ir_kids_typed(x, decls, fi, m, sig) { return -1; };
     // (A `ref.i31` makes a `(ref i31)`: a nullable i31 local holds it.)
     if k == Known.IrI31New.to_i32() { w_node(Op.RefI31, vt_i31ref, 0, 0, m); }
     else if k == Known.IrI31GetS.to_i32() { w_node(Op.I31GetS, vt_i32, 0, 0, m); }
@@ -741,6 +769,45 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
     else if k == Known.IrPromiseThen.to_i32() { w_node(Op.Call, vt_none, promise_op(false), 0, m); }
     else { w_node(Op.Call, vt_none, promise_op(true), 0, m); };
     1;
+}
+
+/// What a string or array element's operands are, one letter each: `i` an
+/// i32, `s` a string, `3` an i31, `r` another reference, `e` one `ref.eq`
+/// compares, `*` any; `n` for `array.new`, one or two.
+fn data_sig(tag: I32) Str {
+    if tag == known_word(Known.IrStringConcat) or tag == known_word(Known.IrStringEq) or tag == known_word(Known.IrStringNe) { return "ss"; };
+    if tag == known_word(Known.IrStringMeasure) { return "s"; };
+    if tag == known_word(Known.IrArrayLen) { return "r"; };
+    if tag == known_word(Known.IrStringSlice) { return "sii"; };
+    if tag == known_word(Known.IrArraySlice) { return "rii"; };
+    if tag == known_word(Known.IrStringGet) { return "si"; };
+    if tag == known_word(Known.IrStringFromCodes) or tag == known_word(Known.IrArrayGet) { return "ri"; };
+    if tag == known_word(Known.IrStringFromCodePoint) { return "i"; };
+    if tag == known_word(Known.IrArraySet) { return "ri*"; };
+    if tag == known_word(Known.IrArrayCopy) { return "ririi"; };
+    "n";
+}
+
+/// Whether an `@ir` element's operands, on the stack since `m`, are as
+/// `sig` (see data_sig) says: else it is reported as mistyped or malformed.
+fn ir_kids_typed(x: I32, decls: I32, fi: I32, m: I32, sig: Str) Bool {
+    let n = w_stack.len() - m;
+    let want = if sig != "n" { sig; } else if n == 1 { "i"; } else { "i*"; };
+    if n != want.len() { return ir_malformed(x); };
+    let c = x_child[x];
+    for (0 ..< n) |i| {
+        let got = ir_vt(c, decls, fi, w_stack[m + i]);
+        let s = want.get(i);
+        if got != vt_unreachable and s == 105 and got != vt_i32 { return ir_mistyped(x, vt_i32, got); };
+        // (A string's, an i31's, or another reference.)
+        let want_ref = if s == 115 { vt_extern; } else if s == 51 { vt_i31ref; } else if s == 114 { vt_anyref; } else { -1; };
+        if got != vt_unreachable and want_ref >= 0 and not vt_is_ref(got) { return ir_mistyped(x, want_ref, got); };
+        // (A host value, a function reference: not comparable by `ref.eq`.)
+        let eq = vt_is_ref(got) and got != vt_extern and got != vt_externref and got != vt_funcref and got != vt_anyref;
+        if got != vt_unreachable and s == 101 and not eq { return ir_mistyped(x, vt_eqref, got); };
+        c = x_next[c];
+    };
+    true;
 }
 
 fn is_data_tag(tag: I32) Bool {
