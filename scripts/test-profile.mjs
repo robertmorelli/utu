@@ -100,6 +100,20 @@ const trapped = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 
 assert.equal(trapped.status, 1);
 assert.match(trapped.stderr, /Index out of bounds/);
 for (const ext of ['folded', 'speedscope.json', 'flame.html']) assert.ok(fs.existsSync(path.join(dir, `early.${ext}`)), ext);
+// A trap in a `.then`'s callback, after main: the profile is written before the trap's exit.
+const later = path.join(dir, 'later.utu');
+fs.writeFileSync(later, `let delay: fun(I32, I32) Promise[I32] =
+    @es/\\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \\/;
+fn subscribe(n: I32) void { delay(n, 0).then(cl(v) void { let z = v - v; 10 / z; }); }
+export main() I32 { subscribe(3); 1; }
+`);
+for (let i = 0; i < 3; i++) {
+  for (const ext of ['folded', 'speedscope.json', 'flame.html']) fs.rmSync(path.join(dir, `later.${ext}`), { force: true });
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', later, '--profile', '-o', dir], { encoding: 'utf8', timeout: 30000 });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /Integer division by zero/);
+  for (const ext of ['folded', 'speedscope.json', 'flame.html']) assert.ok(fs.existsSync(path.join(dir, `later.${ext}`)), `${i}: ${ext}`);
+}
 fs.rmSync(dir, { recursive: true, force: true });
 
 // The report from samples alone.
@@ -108,4 +122,4 @@ const report = profileReport({ counts: [['0,1', 3], ['', 1]], runs: [['0,1', 3],
 assert.equal(report.folded, '(idle) 1\nmain;f 3\n');
 assert.deepEqual(report.top.map(r => [r.name, r.self, r.total]), [['f', 3, 3], ['(idle)', 1, 1], ['main', 0, 3]]);
 
-console.log('profile: stacks in small, fast and debug; sampling; output as unprofiled at depth; a trap in an initializer; reports');
+console.log('profile: stacks in small, fast and debug; sampling; output as unprofiled at depth; a trap in an initializer and in a callback; reports');

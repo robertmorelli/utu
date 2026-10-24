@@ -109,6 +109,20 @@ try {
   assert.deepEqual(typed('$f($_, $_)', '--where', '_: I32'), [[6, 3]]);
   assert.deepEqual(typed('$f($_)', '--where', '_: Str'), [[7, 3]]);
   assert.deepEqual(typed('$e', '--where', 'e: void'), [[5, 14]], 'the assignment, not the let or the if');
+  // A typed run in a statement's body takes no statement, though the test build leaves main untyped.
+  await fs.writeFile(path.join(dir, 'nested.utu'), 'fn g(x: I32) void { x; }\nexport main() I32 {\n    let c = true;\n    if c {\n        g(3);\n        if c {\n            g(4);\n        };\n    };\n    1;\n}\n');
+  const nested = (...args) => {
+    const r = cli(...args, '--json', path.join(dir, 'nested.utu'));
+    return r.stdout.trim() ? JSON.parse(r.stdout).map(m => [m.line, m.column]) : [];
+  };
+  assert.deepEqual(nested('if $c { $...b; }', '--where', 'b: *'), [[6, 9]]);
+  // An empty run matches no arguments: the call has no argument list.
+  await fs.writeFile(path.join(dir, 'empty.utu'), 'fn e0() void { }\nfn k(a: I32) I32 { a; }\nexport main() I32 {\n    e0();\n    let xs: Array[I32] = [];\n    k(1);\n}\n');
+  const emptyRun = pattern => JSON.parse(cli(pattern, '--json', path.join(dir, 'empty.utu')).stdout || '[]').map(m => [m.line, m.column]);
+  assert.deepEqual(emptyRun('e0($...xs)'), [[4, 5]]);
+  assert.deepEqual(emptyRun('$f($...xs)'), [[4, 5], [6, 5]]);
+  assert.deepEqual(emptyRun('[$...xs]'), [[5, 26]]);
+  assert.deepEqual(emptyRun('k($...xs, $...ys)'), [[6, 5]]);
   // One --where a hole; --refs needs a name.
   const twice = cli('$e', '--where', 'e: I32', '--where', 'e: Str', path.join(dir, 'typed.utu'));
   assert.equal(twice.status, 2);

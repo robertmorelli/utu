@@ -69,6 +69,8 @@ function parseSource(utu, text) {
     const node = { kind: kinds[n], own, text, children };
     if (!children.length && text.startsWith(HOLE)) node.hole = text.slice(HOLE.length);
     if (!children.length && text.startsWith(MANY)) node.many = text.slice(MANY.length);
+    // Runs alone (`f($...xs)`'s arguments) may be empty, and the code then has no node there (`f()`).
+    if (own.every(t => t === ',' || t === ';') && children.length && children.every(c => c.many !== undefined)) node.optional = true;
     // `$x` as a statement is the expression in it.
     return node;
   };
@@ -110,6 +112,8 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
   };
   const typeMatches = (n, want) => {
     const got = utu.node_type(n);
+    // A node this build did not type (a test build's main) has no type to meet; the build that typed it decides.
+    if (!got) return false;
     const re = new RegExp(`^${want.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
     return re.test(got) || re.test(got.replace(/\s+/g, ''));
   };
@@ -176,8 +180,15 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
       }
       return false;
     }
-    if (j >= ns.length) return false;
     const saved = new Map(env);
+    if (p.optional && p.children.every(c => !env.get(`...${c.many}`)?.length)) {
+      // Each run empty, the node absent.
+      for (const c of p.children) if (c.many !== '_') env.set(`...${c.many}`, []);
+      if (matchList(ps, ns, env, i + 1, j)) return true;
+      env.clear();
+      for (const [key, value] of saved) env.set(key, value);
+    }
+    if (j >= ns.length) return false;
     if (matchNode(p, ns[j], env) && matchList(ps, ns, env, i + 1, j + 1)) return true;
     env.clear();
     for (const [key, value] of saved) env.set(key, value);
@@ -211,7 +222,11 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
     }
   }
   // An expression wrapped in another of the same span (a statement) is one match.
-  return matches.filter((m, i) => !matches.slice(0, i).some(o => o.at.file === m.at.file && o.at.start === m.at.start && o.at.end === m.at.end));
+  const spans = new Set();
+  return matches.filter(({ at }) => {
+    const key = `${at.file}\0${at.start}\0${at.end}`;
+    return !spans.has(key) && spans.add(key);
+  });
 }
 
 function bindings(env, index) {

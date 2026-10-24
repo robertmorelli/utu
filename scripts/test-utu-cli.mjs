@@ -358,14 +358,27 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
 
   // Stage 0's views: a mistake in the command is said, not thrown.
   await write('lost.utu', 'using nothere from "./nothere.utu";\nexport main() I32 { 1; }\n');
+  // A byte that is not UTF-8, in the file or in one it imports: the self-hosted compiler's error, at the byte.
+  await fs.writeFile(path.join(dir, 'latin1.utu'), Buffer.concat([Buffer.from('export main() I32 {\n    // caf'), Buffer.from([0xe9]), Buffer.from('\n    1;\n}\n')]));
+  await write('uses-latin1.utu', 'using l from "./latin1.utu";\nexport main() I32 { 1; }\n');
+  // Errors stage 0 throws without a diagnostic: said, not a stack.
+  await write('unknown-module.utu', 'using geometri |Point|;\nexport main() I32 { 1; }\n');
+  // A @comptime loop that never ends: stopped, as the self-hosted compiler stops it.
+  await write('forever.utu', 'fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nexport main() I32 { t.len(); }\n');
   for (const [args, said] of [
     [['display'], /No file/],
     [['display', 'nope.utu'], /No file nope\.utu/],
     [['display', '.'], /\. is a directory/],
     [['graph', 'good.utu', '-o'], /-o needs a file/],
     [['display:modules', 'lost.utu'], /Cannot import "\.\/nothere\.utu"/],
+    [['display', 'latin1.utu'], /Not UTF-8[^]*latin1\.utu:2:11/],
+    [['graph', 'latin1.utu', '-o', 'l.html'], /Not UTF-8[^]*latin1\.utu:2:11/],
+    [['display:debug', 'uses-latin1.utu'], /Not UTF-8[^]*latin1\.utu:2:11/],
+    [['display', 'unknown-module.utu'], /geometri/],
+    [['display', 'forever.utu'], /ran too long/],
+    [['graph', 'forever.utu', '-o', 'f.html'], /ran too long/],
   ]) {
-    r = utu(...args);
+    r = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', cwd: dir, timeout: 60000 });
     assert.equal(r.status, 1, args.join(' '));
     assert.match(r.stderr, said, args.join(' '));
     assert.doesNotMatch(r.stderr, /\n\s+at /, `${args.join(' ')}: no stack`);
