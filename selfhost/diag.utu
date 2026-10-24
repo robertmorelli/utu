@@ -311,8 +311,15 @@ fn vt_text(vt: I32) Str {
     if vt == vt_v128 { return "v128"; };
     if vt == vt_none { return "nothing"; };
     if vt == vt_eqref { return "eqref"; };
+    if vt == vt_i8 { return "i8"; };
+    if vt == vt_i16 { return "i16"; };
     if vt == vt_i31ref { return "i31ref"; };
     if vt == vt_extern or vt == vt_externref { return "externref"; };
+    if vt >= vt_defined and vt < vt_tuple {
+        let k = ht_kind[vt_heap(vt)];
+        if k == Heap.Array.to_i32() { return "an array of " + vt_text(ht_a[vt_heap(vt)]); };
+        if k == Heap.Struct.to_i32() { return "a struct"; };
+    };
     "a reference";
 }
 
@@ -596,7 +603,8 @@ fn diag_text(i: I32) Str {
             else { "Globals " + w + " and " + word_text(decl_name[a]) + " each need the other set first"; },
         Diag.NotValue => if a == 2 { w + " is a field: read it from a value"; } else { w + " is a " + pick(a == 1, "module", "type") + ", not a value"; },
         Diag.NotAssignable => "Only a variable, field, or index can be assigned",
-        Diag.IrUnknown => if a == 1 { "@ir names no parameter " + w; } else if a == 2 { "@ir <" + w + "> is written wrong here"; } else { "No @ir element <" + w + ">"; },
+        Diag.IrUnknown => if a == 1 { "@ir names no parameter " + w; } else if a == 2 { "@ir <" + w + "> is written wrong here"; }
+            else if a == 3 { "No @ir type-repr " + w; } else if a == 4 { "@ir array element " + w + " is not its mod's parameter or a standard type"; } else { "No @ir element <" + w + ">"; },
         Diag.IrInvalid => "@ir in " + w + " does not make valid Wasm: " + word_text(a),
         Diag.IrType => if diag_c[i] == 1 { "@ir gives " + pick(b == vt_i32 and a == prelude(Prelude.Bool), "an i32, not a comparison's", vt_text(b) + ", not") + " " + type_text(a); } else { "@ir <" + w + "> takes " + vt_text(a) + ", given " + vt_text(b); },
         Diag.CallbackArity => "Callback takes " + int_text(a) + " parameters; JS passes " + int_text(b),

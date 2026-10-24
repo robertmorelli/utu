@@ -1,0 +1,17 @@
+// What: an Array[I32]'s element given as a Bool (it held 5 in small)
+// Expect: @ir gives an i32, not a comparison's Bool
+mod Flags[T1] {
+    type & = @ir/\ <ir-wasm-array type-repr="wasm-array:elem=T1:mut=true"/> \/
+
+    fn &.new(n: I32, fill: T1) & {
+        @ir/\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \/;
+    }
+
+    fn &.on |self| (i: I32) Bool {
+        @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
+    }
+}
+
+export main() Bool {
+    Flags[I32].new(2, 5).on(0);
+}

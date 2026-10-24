@@ -1,0 +1,9 @@
+// What: a string from an Array[I64]'s codes (the engine said only "not valid Wasm")
+// Expect: @ir <ir-string-from-codes> takes an array of i32, given an array of i64
+fn text(codes: Array[I64], n: I32) Str {
+    @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="n"/></ir-string-from-codes> \/;
+}
+
+export main() Str {
+    text(Array[I64].new(2, 65), 2);
+}

@@ -1,0 +1,9 @@
+// What: a type-repr the compiler does not know (it was an i32)
+// Expect: No @ir type-repr wasm-i33
+mod Wide {
+    type & = @ir/\ <ir-wasm-scalar type-repr="wasm-i33"/> \/
+}
+
+export main() I32 {
+    1;
+}

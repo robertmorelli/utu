@@ -1,0 +1,9 @@
+// What: an integer literal past F32's range (a float's digits are rounded once; these are infinite)
+// Expect: 1000000000000000000000000000000000000000 does not fit F32
+fn huge() F32 {
+    @ir/\ <ir-lit kind="int" type-name="F32" value="1000000000000000000000000000000000000000"/> \/;
+}
+
+export main() F32 {
+    huge();
+}

@@ -557,6 +557,18 @@ fn type_decl_repr(decl: I32, inst: I32) I32 {
     let x = ir_tree(last_child(last_child(decl_node[decl])));
     let r = x_attr(x, attr_type_repr());
     if r < 0 { return vt_i32; };
+    let named_vt = repr_named(r);
+    if named_vt >= 0 { return named_vt; };
+    // wasm-array:elem=T1:mut=true
+    let elem = type_decl_elem(decl, inst);
+    // (An instance's element of a type already reported: as an i32's.)
+    if elem >= 0 and (inst > 0 or not ty_is(elem, Ty.Error)) { return vt_ref(array_type(storage(repr(elem)), true), true); };
+    // (Another is reported where it is declared: check_ir_types.)
+    vt_i32;
+}
+
+/// The value type a `type-repr` names (all but an array's), or -1.
+fn repr_named(r: I32) I32 {
     if attr_is(r, "wasm-i32") { return vt_i32; };
     if attr_is(r, "wasm-i64") { return vt_i64; };
     if attr_is(r, "wasm-f32") { return vt_f32; };
@@ -564,9 +576,43 @@ fn type_decl_repr(decl: I32, inst: I32) I32 {
     if attr_is(r, "wasm-v128") { return vt_v128; };
     if attr_is(r, "wasm-externref") or attr_is(r, "wasm-stringref") { return vt_externref; };
     if attr_is(r, "wasm-i31") { return vt_i31ref; };
-    // wasm-array:elem=T1:mut=true
-    if inst > 0 { return vt_ref(array_type(storage(repr(inst_arg(inst, 0))), true), true); };
-    vt_i32;
+    -1;
+}
+
+/// `wasm-array:elem=T:mut=true`'s T, as a word; else -1.
+fn array_elem_word(r: I32) I32 {
+    let head = "wasm-array:elem=";
+    let tail = ":mut=true";
+    let s = attr_start[r];
+    let e = attr_end[r];
+    if e - s <= head.len() + tail.len() { return -1; };
+    for (0 ..< head.len()) |i| { if src[s + i] != head.get(i) { return -1; }; };
+    for (0 ..< tail.len()) |i| { if src[e - tail.len() + i] != tail.get(i) { return -1; }; };
+    src.intern(s + head.len(), e - tail.len());
+}
+
+/// An array type declaration's element type in instance `inst`: a
+/// parameter of its module, or a standard type. -1 when it is no array or
+/// names neither.
+fn type_decl_elem(decl: I32, inst: I32) I32 {
+    let x = ir_tree(last_child(last_child(decl_node[decl])));
+    let r = x_attr(x, attr_type_repr());
+    let w = if r >= 0 { array_elem_word(r); } else { -1; };
+    if w < 0 { return -1; };
+    let module = module_of(decl);
+    let list = if module >= 0 { next_sibling(first_child(decl_node[module])); } else { -1; };
+    if is_kind(list, Node.Module_type_param_list) {
+        let i = 0;
+        let p = first_child(list);
+        while (p >= 0) {
+            if word_of(first_child(p)) == w { return if inst > 0 { inst_arg(inst, i); } else { ty_error(); }; };
+            i += 1;
+            p = next_sibling(p);
+        };
+    };
+    let d = prelude_lookup(w);
+    if d < 0 or not decl_is(promoted(d), Decl.TypeDecl) { return -1; };
+    decl_type(promoted(d), 0);
 }
 
 /// A field or element's storage: refs as nullable, everything else as is.

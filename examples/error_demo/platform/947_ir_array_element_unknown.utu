@@ -1,0 +1,9 @@
+// What: an array type whose element names no type here
+// Expect: @ir array element Item is not its mod's parameter or a standard type
+mod Bag {
+    type & = @ir/\ <ir-wasm-array type-repr="wasm-array:elem=Item:mut=true"/> \/
+}
+
+export main() I32 {
+    1;
+}

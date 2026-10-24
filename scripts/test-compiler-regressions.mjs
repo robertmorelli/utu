@@ -1689,9 +1689,12 @@ export lib {
     checked++;
   }
 
-  // A program's @ir that makes invalid Wasm: said at the body, before the engine fails.
+  // A generic array mod of a program's own, for the @ir cases below (its methods follow).
+  const IR_ARR = 'mod Arr[T1] {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=T1:mut=true"/> \\/\n'
+    + '    fn &.new(n: I32, fill: T1) & { @ir/\\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \\/; }\n';
+  // A program's @ir giving one reference for another: said by the compiler (it once reached the engine).
   const badIr = await selfhost(await write('fn f(a: Str) I31 { @ir/\\ <ir-ident name="a"/> \\/; }\nexport main() I32 { I31.get_s(f("x")); }\n'));
-  assert.ok(badIr.errors?.some(e => e.startsWith('@ir in f does not make valid Wasm: ')), String(badIr.errors));
+  assert.ok(badIr.errors?.includes('@ir gives externref, not I31'), String(badIr.errors));
   checked++;
   // A plain instruction's operands, the result, and a literal: checked by the
   // compiler, so in every mode (small folded `i32.add` of two i64s to a number).
@@ -1725,6 +1728,29 @@ export lib {
     ['fn f(a: I32) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\nexport main() I32 { f(3); }\n', '@ir <ir-string-measure-utf16> takes externref, given i32'],
     ['fn f(a: I32, b: I32) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-ref-eq> takes eqref, given i32'],
     ['fn f(a: Str, b: Str) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-ref-eq> takes eqref, given externref'],
+    // An Array[I32]'s element is no Bool: it held 5 in small.
+    [IR_ARR + '    fn &.bget |self| (i: I32) Bool { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n}\n'
+      + 'export main() I32 { if Arr[I32].new(2, 5).bget(0) { 1; } else { 0; }; }\n', "@ir gives an i32, not a comparison's Bool"],
+    // A literal's type is a number's or Bool's (Str, V128 were an i32); a float's, past F32.
+    ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="Str" value="42"/> \\/; }\nexport main() I32 { f(); }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="V128" value="5"/> \\/; }\nexport main() I32 { f(); }\n', '@ir <ir-lit> is written wrong here'],
+    [`fn f() F32 { @ir/\\ <ir-lit kind="int" type-name="F32" value="1${'0'.repeat(39)}"/> \\/; }\nexport main() F32 { f(); }\n`, `1${'0'.repeat(39)} does not fit F32`],
+    // Each reference operand of its kind (each reached the engine).
+    ['struct Pt:\n    | x: I32\nfn f(p: Pt) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \\/; }\nexport main() I32 { f(Pt { x: 1 }); }\n', '@ir <ir-string-measure-utf16> takes externref, given a struct'],
+    ['fn f(s: Str) I32 { @ir/\\ <ir-i31-get-s><ir-ident name="s"/></ir-i31-get-s> \\/; }\nexport main() I32 { f("x"); }\n', '@ir <ir-i31-get-s> takes i31ref, given externref'],
+    ['fn f(a: Array[I64], n: I32) Str { @ir/\\ <ir-string-from-codes><ir-ident name="a"/><ir-ident name="n"/></ir-string-from-codes> \\/; }\nexport main() I32 { f(Array[I64].new(2, 65), 2).len(); }\n', '@ir <ir-string-from-codes> takes an array of i32, given an array of i64'],
+    [IR_ARR + '    fn &.put |self| (i: I32, v: Str) void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n}\n'
+      + 'export main() I32 { Arr[I32].new(2, 0).put(0, "x"); 1; }\n', '@ir <ir-array-set> takes i32, given externref'],
+    [IR_ARR + '    fn &.size |self| (x: Str) I32 { @ir/\\ <ir-array-len><ir-ident name="x"/></ir-array-len> \\/; }\n}\n'
+      + 'export main() I32 { Arr[I32].new(2, 0).size("x"); }\n', '@ir <ir-array-len> takes an array of i32, given externref'],
+    ['fn f(a: I32, b: I32) void { @ir/\\ <ir-promise-then><ir-ident name="a"/><ir-ident name="b"/></ir-promise-then> \\/; }\nexport main() I32 { f(1, 2); 1; }\n', '@ir <ir-promise-then> takes externref, given i32'],
+    ['fn f(a: I32) void { @ir/\\ <ir-promise-catch><ir-ident name="a"/></ir-promise-catch> \\/; }\nexport main() I32 { f(1); 1; }\n', '@ir <ir-promise-catch> is written wrong here'],
+    // A reference result by its type: an array is no Str.
+    ['fn f(a: Array[I32]) Str { @ir/\\ <ir-ident name="a"/> \\/; }\nexport main() I32 { f([1]).len(); }\n', '@ir gives an array of i32, not Str'],
+    // A type-repr the compiler does not know (it was an i32), an array element naming no type; an operand of a nullary element.
+    ['mod W {\n    type & = @ir/\\ <ir-wasm-scalar type-repr="wasm-foo"/> \\/\n}\nexport main() I32 { 1; }\n', 'No @ir type-repr wasm-foo'],
+    ['mod W {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=Nope:mut=true"/> \\/\n}\nexport main() I32 { 1; }\n', "@ir array element Nope is not its mod's parameter or a standard type"],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-safe-checks><ir-ident name="zzz"/></ir-safe-checks> \\/; }\nexport main() I32 { 1; }\n', '@ir <ir-safe-checks> is written wrong here'],
   ]) {
     const file = await write(source);
     for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
@@ -1749,6 +1775,26 @@ export lib {
     const result = await compileFile(utu, goodIr, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
     assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 'true false true -2147483648 18446744073709551615 -5 true 3 true', mode);
+    checked++;
+  }
+  // Integer literals of a float type past I64, rounded once from their digits (they wrapped: 1e20 was
+  // 7766279631452242000); an array type of a fixed element in a mod not generic (it was an i32); a Bool element.
+  const goodIr2 = await write('fn big() F64 { @ir/\\ <ir-lit kind="int" type-name="F64" value="99999999999999999999"/> \\/; }\n'
+    + 'fn top() F64 { @ir/\\ <ir-lit kind="int" type-name="F64" value="18446744073709551615"/> \\/; }\n'
+    + 'fn low() F64 { @ir/\\ <ir-lit kind="int" type-name="F64" value="-9223372036854775809"/> \\/; }\n'
+    + 'fn odd() F32 { @ir/\\ <ir-lit kind="int" type-name="F32" value="16777217"/> \\/; }\n'
+    + 'mod Words {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=I64:mut=true"/> \\/\n'
+    + '    fn new(n: I32) & { @ir/\\ <ir-array-new><ir-ident name="n"/></ir-array-new> \\/; }\n'
+    + '    fn &.get |self| (i: I32) I64 { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n'
+    + '    fn &.set |self| (i: I32, v: I64) void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n'
+    + '    fn &.len |self| () I32 { @ir/\\ <ir-array-len><ir-ident name="self"/></ir-array-len> \\/; }\n}\n'
+    + IR_ARR + '    fn &.bget |self| (i: I32) Bool { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n}\n'
+    + 'export main() Str {\n    let w = Words.new(3);\n    w.set(1, 40);\n    let b = Arr[Bool].new(2, true);\n'
+    + '    big().to_str() + " " + top().to_str() + " " + low().to_str() + " " + odd().to_str() + " " + (w.get(1) + w.len().to_i64()).to_str() + " " + b.bget(1).to_str();\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, goodIr2, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), '100000000000000000000 18446744073709552000 -9223372036854776000 16777216 43 true', mode);
     checked++;
   }
 

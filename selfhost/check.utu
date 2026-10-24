@@ -2485,12 +2485,35 @@ fn expand(fi: I32, m: I32) I32 {
 fn vt_scalar(vt: I32) Bool { vt >= vt_i32 and vt <= vt_v128; }
 
 /// Whether an `@ir` value of value type `got` can be a `want`: nothing for
-/// nothing, a scalar for the same, any reference for a reference (which
-/// the engine checks).
+/// nothing, a scalar for the same, a reference for one it is a subtype of.
 fn ir_fits(want: I32, got: I32) Bool {
     let a = vt_class(want);
     let b = vt_class(got);
-    a < 0 or b < 0 or a == b;
+    if a < 0 or b < 0 { return true; };
+    if a == 6 and b == 6 { return ref_fits(want, got); };
+    a == b;
+}
+
+/// Whether a reference of value type `got` is a `want`: the same, or its
+/// non-null form; any but a host's or a function's for an anyref; an i31,
+/// struct, or array for an eqref; a struct for one it extends.
+fn ref_fits(want: I32, got: I32) Bool {
+    if got == want or vt_nullable(got) == want { return true; };
+    let defined = got >= vt_defined and got < vt_tuple;
+    let kind = if defined { ht_kind[vt_heap(got)]; } else { -1; };
+    let func = kind == Heap.Func.to_i32();
+    if want == vt_anyref { return got == vt_eqref or got == vt_i31ref or (defined and not func); };
+    if want == vt_eqref { return got == vt_i31ref or (defined and not func); };
+    if want == vt_funcref { return func; };
+    if not defined or want < vt_defined or want >= vt_tuple { return false; };
+    // (A nullable one is no non-null one.)
+    if want != vt_nullable(want) and got == vt_nullable(got) { return false; };
+    let h = vt_heap(got);
+    while (h >= 0) {
+        if h == vt_heap(want) { return true; };
+        h = ht_super[h];
+    };
+    false;
 }
 
 /// Nothing, each scalar, or a reference; -1 another (unreachable, a tuple).
@@ -2524,6 +2547,25 @@ fn check_own_ir() void {
     cur_locals.clear();
 }
 
+/// Report each `@ir` type declaration of the program's own whose
+/// `type-repr` the compiler does not know, or whose array element names
+/// neither a parameter of its module nor a standard type.
+fn check_ir_types() void {
+    for (0 ..< decl_kind.len()) |d| {
+        if decl_is(d, Decl.TypeDecl) and file_std[file_of_token(node_first[decl_node[d]])] != 1 {
+            let dsl = last_child(decl_node[d]);
+            let x = if is_kind(dsl, Node.Dsl_expr) and word_of(first_child(dsl)) == known_word(Known.Ir) { ir_tree(dsl); } else { -1; };
+            let r = x_attr(x, attr_type_repr());
+            if x >= 0 and r < 0 { report2(Diag.IrUnknown, dsl, x_tag[x], 2, -1); }
+            else if x >= 0 and repr_named(r) < 0 {
+                let w = array_elem_word(r);
+                if w < 0 { report2(Diag.IrUnknown, dsl, attr_word(r), 3, -1); }
+                else if type_decl_elem(d, 0) < 0 { report2(Diag.IrUnknown, dsl, w, 4, -1); };
+            };
+        };
+    };
+}
+
 /// The value type an `@ir` element `x` gives (pushed as `node`): a
 /// parameter's by its type, not its argument's at this call.
 fn ir_vt(x: I32, decls: I32, fi: I32, node: I32) I32 {
@@ -2546,7 +2588,9 @@ fn ir_bool(x: I32, decls: I32, fi: I32) Bool {
     if tag == known_word(Known.IrSafeChecks) or tag == known_word(Known.IrRefEq) or tag == known_word(Known.IrRefNe)
         or tag == known_word(Known.IrStringEq) or tag == known_word(Known.IrStringNe) { return true; };
     // (An array's element: as its type says.)
-    if tag == known_word(Known.IrArrayGet) { return true; };
+    if tag == known_word(Known.IrArrayGet) {
+        return intrinsic_array_fi(fi) and intrinsic_array_elem(fi) == bool_t;
+    };
     let op = tag_opcode(tag);
     if (op >= 69 and op <= 102) or op == 64851 { return true; };
     if op < 113 or op > 115 { return false; };
@@ -2659,6 +2703,8 @@ fn report_invalid_ir(message: I32) void {
 /// Push the IR of an `@ir` element; false when it is not one the compiler knows.
 fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {
     let tag = x_tag[x];
+    // (A name or a literal has no operands.)
+    if x_child[x] >= 0 and (tag == known_word(Known.IrIdent) or tag == known_word(Known.IrLit)) { return ir_malformed(x); };
     if tag == known_word(Known.IrIdent) {
         let i = param_index(x, decls);
         if i < 0 {
@@ -2678,16 +2724,31 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
             if (src[i] < 48 or src[i] > 57) and not (i == attr_start[v] and src[i] == 45) { return ir_malformed(x); };
         };
         let t = decl_type(promoted(named_t), 0);
+        // (An integer, a float, or Bool: not Str, V128, a reference.)
+        if not is_numeric(t) and t != prelude(Prelude.Bool) { return ir_malformed(x); };
         let neg = src[attr_start[v]] == 45;
         // (A lone minus has no digits.)
         if neg and attr_end[v] - attr_start[v] == 1 { return ir_malformed(x); };
         let bool_ok = t != prelude(Prelude.Bool) or (attr_end[v] - attr_start[v] == 1 and src[attr_start[v]] <= 49);
-        if not bool_ok or not ir_lit_fits(attr_start[v] + if neg { 1; } else { 0; }, attr_end[v], neg, t) {
+        // A float's digits, rounded once: any length.
+        let bits: I64 = 0;
+        let finite = true;
+        if is_float(t) {
+            let text = word_text(attr_word(v));
+            let d = if t == prelude(Prelude.F32) { parse_f32(text); } else { parse_number(text); };
+            finite = d - d == 0.0;
+            bits = if t == prelude(Prelude.F32) { d.to_f32().bits().to_i64() & 4294967295; } else { d.bits(); };
+        };
+        if not bool_ok or not finite or (not is_float(t) and not ir_lit_fits(attr_start[v] + if neg { 1; } else { 0; }, attr_end[v], neg, t)) {
             ir_failed[0] = x;
             ir_failed_shape[0] = 4;
             ir_fault[0] = t;
             ir_fault[1] = attr_word(v);
             return false;
+        };
+        if is_float(t) {
+            push_number(t, bits, true);
+            return true;
         };
         let value: I64 = 0;
         for ((attr_start[v] + if neg { 1; } else { 0; }) ..< attr_end[v]) |i| { value = value * 10 + (src[i] - 48).to_i64(); };
@@ -2718,11 +2779,11 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
 }
 
 /// Whether an `@ir` literal's digits `s ..< e` (after its minus, when
-/// `neg`) fit integer type `t`, as `literal_fits` has a literal fit it.
+/// `neg`) fit integer type `t` (Bool's are checked first), as `literal_fits` has a literal fit it.
 fn ir_lit_fits(s: I32, e: I32, neg: Bool, t: I32) Bool {
     let bits = if t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { 32; }
         else if t == prelude(Prelude.I64) or t == prelude(Prelude.U64) or t == prelude(Prelude.M64) { 64; } else { 0; };
-    if bits == 0 { return true; };
+    if bits == 0 { return t == prelude(Prelude.Bool); };
     let signed = t == prelude(Prelude.I32) or t == prelude(Prelude.I64);
     let i = s;
     while (i < e - 1 and src[i] == 48) { i += 1; };
@@ -3407,6 +3468,7 @@ fn compile(target: Target) I32 {
     };
     checking_fi[0] = -1;
     check_own_ir();
+    check_ir_types();
     start_globals();
     if diag_kind.len() > 0 { return -1; };
     encode_module();

@@ -1,0 +1,9 @@
+// What: an array given where Str is declared (the engine said only "not valid Wasm")
+// Expect: @ir gives an array of i32, not Str
+fn name(a: Array[I32]) Str {
+    @ir/\ <ir-ident name="a"/> \/;
+}
+
+export main() Str {
+    name([1, 2]);
+}

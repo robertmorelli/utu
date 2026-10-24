@@ -1,0 +1,9 @@
+// What: an operand inside an element that takes none (it was never read)
+// Expect: @ir <ir-safe-checks> is written wrong here
+fn checks(a: I32) Bool {
+    @ir/\ <ir-safe-checks><ir-ident name="nothing"/></ir-safe-checks> \/;
+}
+
+export main() Bool {
+    checks(1);
+}
