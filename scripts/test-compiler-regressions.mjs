@@ -1966,6 +1966,34 @@ export main() Str {
     Plain.one("{\"name\":\"a\"}") + "/" + Plain.tint(Green {}) + Pager[I32].two("{\"items\":[{\"name\":\"b\"}]}");
 }
 ` }, '/["Green"]b{"items":[{"name":"b"}]}'],
+    // `using m;` of a mod with type & keeps m the mod (`m.f()` was "m is a type, not a value"); `S.S.new`,
+    // a mod's type of its own name ("S is a type"); `fn P[geo.Sq].m`, an impl of a mod's type (dropped).
+    [{ 'main.utu': `mod m {
+    fn f() I32 { 4; }
+    let g: I32 = 5;
+    struct &:
+        | a: I32
+    fn &.new(a: I32) & { &{ a: a }; }
+    fn twice() I32 { m.f() * 2; }
+}
+using m;
+mod S {
+    struct S:
+        | a: I32
+    fn S.new(a: I32) S { S { a: a }; }
+}
+mod geo { struct Sq:
+    | s: I32
+}
+proto Area:
+    | area() I32
+fn Area[geo.Sq].area |q| () I32 { q.s * 3; }
+mod Tot[T[Area]] { fn of(x: T) I32 { x.area(); } }
+export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 100 + geo.Sq { s: 4 }.area() * 1000 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 100000; }
+` }, 312492],
+    [{ 'lib.utu': 'mod m {\n    fn f() I32 { 4; }\n    struct &:\n        | a: I32\n    fn &.new(a: I32) & { &{ a: a }; }\n}\nmod S {\n    struct S:\n        | a: I32\n    fn S.new(a: I32) S { S { a: a }; }\n}\nmod geo { struct Sq:\n    | s: I32\n}\n',
+      'impl.utu': 'using geo from "./lib.utu";\nmod shapes {\n    proto Area:\n        | area() I32\n    fn Area[geo.Sq].area |q| () I32 { q.s * 3; }\n}\n',
+      'main.utu': 'using m from "./lib.utu";\nusing S from "./lib.utu";\nusing geo from "./lib.utu";\nusing shapes from "./impl.utu";\nusing m;\nmod Tot[T[shapes.Area]] { fn of(x: T) I32 { x.area(); } }\nexport main() I32 { m.f() + m.new(3).a + S.S.new(4).a * 10 + geo.Sq { s: 4 }.area() * 100 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 10000; }\n' }, 31247],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
@@ -2009,6 +2037,12 @@ export main() Str {
     [{ 'main.utu': 'mod shapes { proto Area:\n    | get area : I32\n}\nstruct Sq[shapes.Nope]:\n    | area: I32\nexport main() I32 { 1; }\n' }, 'Unknown type Nope'],
     [{ 'main.utu': 'mod shapes { struct Pt:\n    | x: I32\n}\nmod M[T[shapes.Pt]] { fn f(a: T) T { a; } }\nexport main() I32 { 1; }\n' }, 'Pt is not a protocol; a bound names one'],
     [{ 'main.utu': 'mod Geo { struct Pt:\n    | x: I32\n}\nexport main() I32 { let p = Geo.Pt { x: 1 }; let q = Geo.Pt {}; 1; }\n' }, "Expected ';', got '{'"],
+    // A mod and a function (or type) of one name (it was "No method fun() I32.f" at a use).
+    [{ 'main.utu': 'mod m { fn f() I32 { 1; } }\nfn m() I32 { 2; }\nexport main() I32 { m.f(); }\n' }, 'Duplicate declaration m'],
+    [{ 'lib.utu': 'mod m { fn f() I32 { 1; } }\nstruct m:\n    | a: I32\n', 'main.utu': 'using m from "./lib.utu";\nexport main() I32 { m.f(); }\n' }, 'Duplicate declaration m'],
+    // A mod called (it trapped at run time).
+    [{ 'main.utu': 'mod m { fn f() I32 { 1; } }\nexport main() I32 { m() + 2; }\n' }, 'm is a module, not a value'],
+    [{ 'u.utu': 'mod util { fn f() I32 { 1; } }\n', 'main.utu': 'using util |helper| from "./u.utu";\nexport main() I32 { helper() + 1; }\n' }, 'helper is a module, not a value'],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

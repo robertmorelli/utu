@@ -4318,6 +4318,35 @@ ok
 ok
 --- exit 0
 
+=== utu check examples/error_demo/names/860_mod_and_fn_one_name.utu
+ ERROR  Duplicate declaration m
+        duplicate-declaration · examples/error_demo/names/860_mod_and_fn_one_name.utu:7:4
+
+ 3 │ mod m {
+   │     ─
+   │     ╰─ first here
+   ┆
+ 5 │ }
+ 6 │
+ 7 │ fn m() I32 { 2; }
+   │    ━
+   │    ╰─ again
+ 8 │
+ 9 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/names/861_mod_called.utu
+ ERROR  m is a module, not a value
+        not-value · examples/error_demo/names/861_mod_called.utu:8:5
+
+ 6 │
+ 7 │ export main() I32 {
+ 8 │     m() + 2;
+   │     ━
+   │     ╰─ not a value
+ 9 │ }
+--- exit 1
+
 === utu check examples/error_demo/names/86_assign_enum_variant.utu
  ERROR  Low is immutable
         assignment-to-immutable · examples/error_demo/names/86_assign_enum_variant.utu:8:11

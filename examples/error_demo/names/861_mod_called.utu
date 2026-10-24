@@ -1,0 +1,9 @@
+// What: a mod called as a function
+// Expect: m is a module, not a value
+mod m {
+    fn f() I32 { 1; }
+}
+
+export main() I32 {
+    m() + 2;
+}

@@ -1,0 +1,11 @@
+// What: a mod and a function of one name, in one file
+// Expect: Duplicate declaration m, at the function
+mod m {
+    fn f() I32 { 1; }
+}
+
+fn m() I32 { 2; }
+
+export main() I32 {
+    m.f();
+}
