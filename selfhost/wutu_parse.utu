@@ -69,6 +69,9 @@ vec tw_global: I32;
 
 /// The cursor: an offset in the template's text.
 vec wp_at: I32 = [0];
+/// Whether the element being parsed is SVG ([1]), and its children ([0]:
+/// not a foreignObject's).
+vec wp_svg: I32 = [0, 0];
 
 /// A syntax error in the template, at `offset` in its text.
 fn wutu_fail(message: Str, offset: I32) void { dsl_fail(message, offset, 1); }
@@ -107,6 +110,8 @@ fn reset_template() void {
     tw_style_from.clear();
     tw_style_to.clear();
     tw_global.clear();
+    wp_svg[0] = 0;
+    wp_svg[1] = 0;
 }
 
 fn new_tnode(kind: I32, start: I32) I32 {
@@ -180,12 +185,11 @@ fn is_boolean_attribute(name: Str) Bool {
 
 fn is_void_tag(tag: Str) Bool { in_words("area base br col embed hr img input link meta param source track wbr", tag); }
 
+/// SVG's elements (but `a`, `script`, `style`): `fe…` filter primitives,
+/// and the rest. (Inside `svg { }` any name is one: see parse_telement.)
 fn is_svg_tag(tag: Str) Bool {
-    in_words("svg g path circle ellipse line polyline polygon rect text tspan defs use symbol linearGradient radialGradient stop clipPath mask pattern marker title desc foreignObject", tag);
-}
-
-fn is_svg_attribute(name: Str) Bool {
-    in_words("viewBox xmlns width height x y x1 y1 x2 y2 cx cy r rx ry d points fill fill-rule fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-dashoffset stroke-opacity opacity transform href offset stop-color stop-opacity gradientUnits gradientTransform preserveAspectRatio clip-path mask xlink:href xlink:title xml:space xmlns:xlink", name);
+    (text_at(tag, 0, "fe") and tag.len() > 2 and is_upper_code(tag.get(2)))
+        or in_words("svg g path circle ellipse line polyline polygon rect text tspan textPath defs use symbol image switch view linearGradient radialGradient stop clipPath mask pattern marker filter title desc metadata foreignObject animate animateMotion animateTransform set mpath discard hatch hatchpath", tag);
 }
 
 fn is_html_tag(tag: Str) Bool {
@@ -233,7 +237,7 @@ fn tag_attributes(tag: Str) Str {
     if tag == "th" { return "colspan rowspan headers scope abbr"; };
     if tag == "video" { return "src controls autoplay muted loop playsinline poster width height preload crossorigin disablepictureinpicture disableremoteplayback"; };
     if tag == "audio" { return "src controls autoplay muted loop preload crossorigin"; };
-    if tag == "object" { return "data type name width height form usemap"; };
+    if tag == "object" { return "data type name width height form usemap typemustmatch"; };
     if tag == "iframe" { return "src srcdoc name title width height loading allow allowfullscreen sandbox referrerpolicy"; };
     "";
 }
@@ -242,11 +246,11 @@ fn is_custom_element(tag: Str) Bool { text_index(tag, "-", 0) >= 0; }
 
 fn is_known_tag(tag: Str) Bool { is_html_tag(tag) or is_svg_tag(tag) or is_custom_element(tag); }
 
-/// Global, `aria-` and `data-` attributes, the tag's own, SVG's on an SVG
-/// tag, and anything on a custom element.
-fn is_allowed_attribute(tag: Str, name: Str) Bool {
-    is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
-        or (is_svg_tag(tag) and is_svg_attribute(name)) or is_custom_element(tag);
+/// Global, `aria-` and `data-` attributes, the tag's own, and anything on
+/// an SVG element (`svg`) or a custom one.
+fn is_allowed_attribute(tag: Str, name: Str, svg: Bool) Bool {
+    svg or is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
+        or is_custom_element(tag);
 }
 
 fn is_name_code(c: I32) Bool { is_word_code(c) or c == 45; }
@@ -282,7 +286,7 @@ fn css_properties() Str {
     \\border-start-start-radius border-style border-top border-top-color border-top-left-radius border-top-right-radius border-top-style border-top-width
     \\border-width bottom box-decoration-break box-shadow box-sizing break-after break-before break-inside caption-side caret-color clear clip clip-path
     \\clip-rule color color-interpolation color-interpolation-filters color-scheme column-count column-fill column-gap column-rule column-rule-color
-    \\column-rule-style column-rule-width column-span column-width columns contain contain-intrinsic-block-size contain-intrinsic-height
+    \\column-rule-style column-rule-width column-span column-width column-wrap columns contain contain-intrinsic-block-size contain-intrinsic-height
     \\contain-intrinsic-inline-size contain-intrinsic-size contain-intrinsic-width container container-name container-type content content-visibility
     \\counter-increment counter-reset counter-set cursor cx cy d direction display dominant-baseline dynamic-range-limit empty-cells field-sizing fill
     \\fill-opacity fill-rule filter flex flex-basis flex-direction flex-flow flex-grow flex-shrink flex-wrap float flood-color flood-opacity font
@@ -294,7 +298,7 @@ fn css_properties() Str {
     \\hyphenate-limit-chars hyphens image-orientation image-rendering initial-letter inline-size inset inset-block inset-block-end inset-block-start
     \\inset-inline inset-inline-end inset-inline-start interpolate-size isolation justify-content justify-items justify-self left letter-spacing
     \\lighting-color line-break line-clamp line-height list-style list-style-image list-style-position list-style-type margin margin-block margin-block-end
-    \\margin-block-start margin-bottom margin-inline margin-inline-end margin-inline-start margin-left margin-right margin-top marker marker-end marker-mid
+    \\margin-block-start margin-bottom margin-inline margin-inline-end margin-inline-start margin-left margin-right margin-top marker marker-end marker-mid marker-side
     \\marker-start mask mask-clip mask-composite mask-image mask-mode mask-origin mask-position mask-repeat mask-size mask-type math-depth math-style
     \\max-block-size max-height max-inline-size max-width min-block-size min-height min-inline-size min-width mix-blend-mode object-fit object-position
     \\offset offset-anchor offset-distance offset-path offset-position offset-rotate opacity order orphans outline outline-color outline-offset
@@ -321,45 +325,65 @@ fn css_properties() Str {
     ;
 }
 
-/// A standard CSS property `name` is likely a typo of (one edit, two for a
-/// long name), or "" for a known one, a prefixed or custom one (`-webkit-…`,
-/// `--x`), or one near none (a property newer than the list).
-fn near_css_property(name: Str) Str {
-    if name.len() == 0 or name.get(0) == 45 or in_words(css_properties(), name) { return ""; };
-    let near = closest_word(css_properties(), name);
-    if near.len() == 0 { return ""; };
-    if word_distance(intern_text(near), intern_text(name), 3) > 1 and name.len() <= 6 { return ""; };
+/// The word of `list` one edit (or swap of neighbors) from `w`, unless `w`
+/// is in it, or "": a typo. (Two edits from a known word is likely a real
+/// word the list lacks: `marker-side`, `column-wrap`, an event `unmount`.)
+fn typo_of(list: Str, w: Str) Str {
+    if in_words(list, w) { return ""; };
+    let near = closest_word(list, w);
+    if near.len() > 0 and word_distance(intern_text(near), intern_text(w), 3) > 1 { return ""; };
     near;
 }
 
-/// A typo of a standard property fails, saying which.
-fn css_property_known(name: Str, at: I32) void {
-    let near = near_css_property(name);
-    if near.len() > 0 { wutu_fail("invalid CSS property " + name + "; did you mean " + near + "?", at); };
+/// An invalid property name fails; so does a typo of a standard one (names
+/// are ASCII case-insensitive; a prefixed or custom one, `-webkit-…` or
+/// `--x`, is not checked).
+fn css_property_known(head: Str, at: I32) void {
+    let name = if text_at(head, 0, "--") { head; } else { lower_text(head); };
+    if not is_css_property(name) { wutu_fail("invalid CSS property", at); };
+    let near = if name.get(0) == 45 { ""; } else { typo_of(css_properties(), name); };
+    if near.len() > 0 { wutu_fail("invalid CSS property " + head + "; did you mean " + near + "?", at); };
 }
 
-/// A value (`text[from ..< to]`) that runs onto the next line's declaration or
-/// rule (`padding: 1rem` then `gap: 2rem;`): its `;` is missing, at its line's end.
-fn css_value_runs_on(text: Str, from: I32, to: I32) void {
-    let parens = 0;
+/// A value (`text[from ..< to]`) that runs on into the next statement: its
+/// `;` is missing, there. The next is a declaration on its line (`red
+/// margin: 0`; a standard property's value has no `:` outside `()`), or on
+/// the next: a declaration or rule, an attribute (`href = …`), a boolean one
+/// (`hidden;`), or text when the value has no string (else it may be
+/// `grid-template-areas`'s next row). A custom property's (`custom`) may hold
+/// anything balanced.
+fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) void {
+    let depth = 0;
+    let quoted = custom;
     let i = from;
     while (i < to) {
         let c = text.get(i);
+        let end = -1;
         if c == 34 or c == 39 {
+            quoted = true;
             i += 1;
             while (i < to and text.get(i) != c) { i += if text.get(i) == 92 { 2; } else { 1; }; };
-        } else if c == 40 { parens += 1; }
-        else if c == 41 { parens -= 1; }
-        else if c == 10 and parens == 0 {
+        } else if text_at(text, i, "/*") {
+            let close = text_index(text, "*/", i + 2);
+            i = if close < 0 { to; } else { close + 1; };
+        } else if c == 40 or c == 91 or c == 123 { depth += 1; }
+        else if c == 41 or c == 93 or c == 125 { depth -= 1; }
+        else if c == 58 and depth == 0 and not custom {
+            end = i;
+            while (end > from and is_name_code(text.get(end - 1))) { end -= 1; };
+        } else if c == 10 and depth == 0 {
             let j = skip_spaces(text, i + 1);
             let k = j;
             while (k < text.len() and is_name_code(text.get(k))) { k += 1; };
             let after = skip_spaces(text, k);
-            if k > j and (is_lower_code(text.get(j)) or text.get(j) == 45) and after < text.len() and (text.get(after) == 58 or text.get(after) == 123) {
-                let end = i;
-                while (end > from and is_space_code(text.get(end - 1))) { end -= 1; };
-                wutu_fail("CSS declarations require a semicolon", end);
-            };
+            let next = if after < text.len() { text.get(after); } else { 0; };
+            let named = k > j and (is_lower_code(text.get(j)) or text.get(j) == 45);
+            if (named and (next == 58 or next == 123 or (next == 61 and not text_at(text, after, "==")) or (next == 59 and is_boolean_attribute(text.slice(j, k)))))
+                or (not quoted and j < to and text.get(j) == 34) { end = i; };
+        };
+        if end >= 0 {
+            while (end > from and is_space_code(text.get(end - 1))) { end -= 1; };
+            wutu_fail("CSS declarations require a semicolon", end);
         };
         i += 1;
     };
@@ -607,17 +631,21 @@ fn wp_utu_block(text: Str) Str {
 
 //! = CSS
 
-/// Up to a delimiter outside strings, functions, and attribute selectors.
+/// Up to a delimiter outside strings, comments, and (), [] and {} (a
+/// function, an attribute selector, a custom property's block).
 fn wp_css_until(text: Str, delimiters: Str) Str {
     let start = wp_at[0];
-    let parens = 0;
-    let brackets = 0;
+    let depth = 0;
     while (not wp_done(text)) {
         let c = text.get(wp_at[0]);
         if c == 34 or c == 39 { wp_quoted(text); }
-        else {
-            if parens == 0 and brackets == 0 and text_index(delimiters, Str.from_code_point(c), 0) >= 0 { break; };
-            if c == 40 { parens += 1; } else if c == 41 { parens -= 1; } else if c == 91 { brackets += 1; } else if c == 93 { brackets -= 1; };
+        else if wp_at_text(text, "/*") {
+            let end = text_index(text, "*/", wp_at[0] + 2);
+            if end < 0 { wutu_fail("unterminated comment", wp_at[0]); };
+            wp_at[0] = end + 2;
+        } else {
+            if depth == 0 and text_index(delimiters, Str.from_code_point(c), 0) >= 0 { break; };
+            if c == 40 or c == 91 or c == 123 { depth += 1; } else if c == 41 or c == 93 or c == 125 { depth -= 1; };
             wp_at[0] += 1;
         };
     };
@@ -879,7 +907,9 @@ fn parse_telement(text: Str) I32 {
     let q = p;
     while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
     let tag = text.slice(p, q);
-    if not is_known_tag(tag) { wutu_fail("expected an HTML tag, found unknown element '" + tag + "' (custom element names need a hyphen)", p); };
+    let outer = wp_svg[0];
+    let outer_el = wp_svg[1];
+    if outer == 0 and not is_known_tag(tag) { wutu_fail("expected an HTML tag, found unknown element '" + tag + "' (custom element names need a hyphen)", p); };
     wp_at[0] = q;
     let n = new_tnode(4, start);
     tn_text[n] = intern_text(tag);
@@ -912,6 +942,9 @@ fn parse_telement(text: Str) I32 {
     };
     if wp_char(text) != 123 { wutu_fail("expected { after element head", wp_at[0]); };
     wp_at[0] += 1;
+    let svg = outer == 1 or is_svg_tag(tag) and not is_html_tag(tag);
+    wp_svg[1] = if svg { 1; } else { 0; };
+    wp_svg[0] = if svg and tag != "foreignObject" { 1; } else { 0; };
     while (true) {
         wp_trivia(text);
         if wp_done(text) { wutu_fail("unterminated element '" + tag + "'", start); };
@@ -921,6 +954,8 @@ fn parse_telement(text: Str) I32 {
         };
         parse_element_statement(text, n);
     };
+    wp_svg[0] = outer;
+    wp_svg[1] = outer_el;
     if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start); };
     if tag == "script" or is_raw_text_tag(tag) {
         let c = tn_first[n];
@@ -1095,24 +1130,13 @@ fn at_directive(text: Str, p: I32, inside: Bool) void {
     wutu_fail("unknown directive @" + name + (if near.len() > 0 { "; did you mean " + near + "?"; } else { "; " + (if inside { "an element takes @unmanaged, or a CSS at-rule"; } else { "a template begins with " + head; }); }), p);
 }
 
-/// A DOM event `name` is likely a typo of (one edit, two for a long name),
-/// or "" for a known event or a custom one. One that adds to an event's
-/// name (`changed`, `resized`, `clicks`) is custom.
+/// A DOM event `name` is a typo of (one edit or swap from a common one:
+/// `clik`, `chnage`), or "" for a known event or a custom one: two edits
+/// from one (`unmount`), or one that adds to one's name (`changed`, `clicks`).
 fn near_event(name: Str) Str {
-    let known = "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress "
-        + "pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture "
-        + "focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort "
-        + "scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel "
-        + "animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel "
-        + "copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress "
-        + "loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange "
-        + "compositionstart compositionupdate compositionend selectionchange selectstart mount";
-    if in_words(known, name) { return ""; };
-    let near = closest_word(known, name);
-    if near.len() == 0 or extends_word(known, name) { return ""; };
-    let d = word_distance(intern_text(near), intern_text(name), 3);
-    if d > 1 and name.len() <= 6 { return ""; };
-    near;
+    let known = "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange compositionstart compositionupdate compositionend selectionchange selectstart mount";
+    if extends_word(known, name) { return ""; };
+    typo_of(known, name);
 }
 
 /// Whether `w` is a word of `list` (space-separated) and more.
@@ -1214,9 +1238,14 @@ fn literal_value(text: Str, q: I32) Bool {
 /// and a custom element's `onfoo` are attributes.)
 fn is_on_name(name: Str) Bool {
     if name.len() < 3 or (name.get(0) | 32) != 111 or (name.get(1) | 32) != 110 { return false; };
-    let rest = "";
-    for (2 ..< name.len()) |i| { let c = name.get(i); rest = rest + Str.from_code_point(if c >= 65 and c <= 90 { c + 32; } else { c; }); };
-    is_event_name(rest);
+    is_event_name(lower_text(name.slice(2, name.len())));
+}
+
+/// `text` in ASCII lowercase.
+fn lower_text(text: Str) Str {
+    let out = "";
+    for (0 ..< text.len()) |i| { out = out + Str.from_code_point(lower_byte(text.get(i))); };
+    out;
 }
 
 /// The DOM events with a handler attribute (`on` + the name), in any browser.
@@ -1262,7 +1291,7 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     if dynamic and is_property and name == "protocol" { wutu_fail(".protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;", name_start); };
     if dynamic and is_property and is_raw_text_tag(tag) and in_words("textContent innerText", name) { wutu_fail(raw_text_error(tag), name_start); };
     if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\"; (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start); };
-    if not is_property and not is_allowed_attribute(tag, name) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
+    if not is_property and not is_allowed_attribute(tag, name, wp_svg[1] == 1) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);
 }
 
@@ -1311,18 +1340,17 @@ fn parse_declaration_or_child(text: Str, n: I32) void {
         let from = wx_from[0];
         let to = wx_to[0];
         wp_semicolon(text);
-        if not is_css_property(head) { wutu_fail("invalid CSS property", start); };
-        css_property_known(trim_text(head), start);
-        add_item(n, 5, intern_text(trim_text(head)), intern_text(source), 0, from, to, start);
+        css_property_known(head, start);
+        add_item(n, 5, intern_text(head), intern_text(source), 0, from, to, start);
         return;
     };
     let value_from = wp_at[0];
-    let value = wp_css_until(text, ";{}");
-    css_value_runs_on(text, value_from, wp_at[0]);
+    let custom = text_at(head, 0, "--");
+    let value = wp_css_until(text, if custom { ";}"; } else { ";{}"; });
+    css_value_runs_on(text, value_from, wp_at[0], custom);
     if wp_char(text) != 59 { wutu_fail("CSS declarations require a semicolon", wp_at[0]); };
     wp_at[0] += 1;
-    if not is_css_property(head) { wutu_fail("invalid CSS property", start); };
-    css_property_known(trim_text(head), start);
+    css_property_known(head, start);
     let declaration = head + ":" + value + ";";
     let i = add_item(n, 4, -1, intern_text(declaration), 0, -1, -1, start);
     ti_c[i] = intern_text(declaration);

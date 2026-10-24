@@ -80,9 +80,10 @@ Common attributes are checked per tag. `canvas { padding="10" }` is an error.
 assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
 are rejected: use a closure. `label { for = "name"; }` is label's attribute, not
-a loop. An element has one id. An event name a typo away from a DOM event
-(`on clik`) is an error; another name is a custom event, one that adds to a
-DOM event's name too (`on changed`, `on resized`). `@reactive`,
+a loop. An element has one id. An event name one edit (or swap) from a common
+DOM event (`on clik`, `on chnage`) is an error; another name is a custom
+event: two edits from one (`on unmount`), or one that adds to a DOM event's
+name (`on changed`, `on resized`). `@reactive`,
 `@island`, `@style` and `@document` come before the root element; inside an
 element, `@unmanaged;` and CSS at-rules (`@media`, `@container`, …) are the
 only `@` forms, and any other is an error. Interpolated strings become text, never HTML.
@@ -124,9 +125,11 @@ author's choice; give them only trusted text.
 
 Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
-children switch back to HTML. A root tag only SVG has (`circle`, `g`) is SVG
-too, a `Browser.SVGElement`; `a`, `title`, `script` and `style` are HTML. SVG attributes such as `viewBox`, `d`, and
-`stroke-width` keep their original spelling. A namespaced one,
+children switch back to HTML. A root tag only SVG has (`circle`, `g`, `image`,
+`feGaussianBlur`) is SVG too, a `Browser.SVGElement`; `a`, `title`, `script`
+and `style` are HTML. Inside `svg { }` any name is an SVG element, and an SVG
+element takes any attribute (`on…` handlers and URL checks still apply),
+spelled as written: `viewBox`, `stdDeviation`, `stroke-width`. A namespaced one,
 `xlink:href = …;`, `xml:lang = …;` or `xmlns:xlink = …;`, is an attribute (no
 CSS property has those prefixes), set in its namespace.
 
@@ -200,11 +203,14 @@ button {
 }
 ```
 
-An element's own declaration whose property is one edit from a standard one
-(two for a long name) is a typo and fails: `colr: red;` says "did you mean
-color?". Custom (`--x`) and prefixed (`-webkit-…`) properties, and ones near no
-standard name, pass as written. A value that runs onto the next line's
-declaration (`padding: 1rem` then `gap: 2rem;`) is a missing `;`.
+An element's own declaration whose property (ASCII case-insensitive) is one
+edit or swap from a standard one is a typo and fails: `colr: red;` says "did
+you mean color?". Custom (`--x`) and prefixed (`-webkit-…`) properties, and
+ones further from a standard name, pass as written. A custom property's value
+is any balanced run (`--cfg: { "a": 1 };`); comments in a value are skipped.
+A value that runs on into the next statement is a missing `;`: a declaration
+on its line (`color: red margin: 0;`) or the next, or an attribute, boolean
+attribute or text there (`color: red` then `hidden;`).
 
 A declaration whose value is `= ...` is computed when the template renders
 and applied with `style.setProperty`, which a strict `style-src` policy allows:
