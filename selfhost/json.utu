@@ -36,6 +36,15 @@ vec jp_serial: I32 = [0];
 /// (@bind_json_pins), so no same-named type or variant hides it.
 vec jp_pin_word: I32;
 vec jp_pin_name: I32;
+/// By name node: 1 + its pin (when @jp_pin_name says so).
+vec jp_pin_of: I32;
+/// The struct and enum names of the container (slot 0) and its file (slot
+/// 1), indexed once each: by `word * 2 + slot`, 1 + the first of that name,
+/// when stamped with the slot's stamp (`jd_stamp[1 + slot]`, 0 for none yet;
+/// `[0]` counts).
+vec jd_item: I32;
+vec jd_at: I32;
+vec jd_stamp: I32 = [0, 0, 0];
 
 /// The type span of the site being expanded, for a codec's mistakes.
 vec jc_type_at: I32 = [0];
@@ -50,6 +59,8 @@ vec jc_site: I32 = [-1];
 /// table added to the container.
 fn json_expand_container(container: I32, json: I32, count: I32) void {
     jp_container[0] = container;
+    jd_stamp[1] = 0;
+    jd_stamp[2] = 0;
     for (0 ..< jp_name_words.len()) |k| { jp_name_at[jp_name_words[k]] = 0; };
     for (0 ..< jp_defined.len()) |k| { jp_word_defined[jp_defined[k]] = 0; };
     jp_name_words.clear();
@@ -259,22 +270,45 @@ fn shape_kind(written: Str) Shape {
 fn declared_type(type: Str) I32 {
     let w = intern_text(type);
     if is_kind(jp_container[0], Node.Module_decl) {
-        let own = json_declared_in(jp_container[0], w);
+        let own = json_declared_in(jp_container[0], w, 0);
         if own >= 0 { return own; };
         let file = parent_of(jp_container[0]);
-        return if file >= 0 { json_declared_in(file, w); } else { -1; };
+        return if file >= 0 { json_declared_in(file, w, 1); } else { -1; };
     };
-    json_declared_in(jp_container[0], w);
+    json_declared_in(jp_container[0], w, 0);
 }
 
-/// The first struct or enum of that name directly in `node`, or -1.
-fn json_declared_in(node: I32, w: I32) I32 {
-    let item = first_child(node);
-    while (item >= 0) {
-        if (is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl)) and type_word(item) == w { return item; };
-        item = next_sibling(item);
+/// The first struct or enum of that name directly in `node` (indexed in
+/// `slot`), or -1.
+fn json_declared_in(node: I32, w: I32, slot: I32) I32 {
+    if jd_stamp[1 + slot] == 0 {
+        jd_stamp[0] += 1;
+        jd_stamp[1 + slot] = jd_stamp[0];
+        let item = first_child(node);
+        while (item >= 0) {
+            if is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl) {
+                let x = type_word(item) * 2 + slot;
+                if x >= 0 {
+                    jd_room(x);
+                    if jd_at[x] != jd_stamp[0] {
+                        jd_at[x] = jd_stamp[0];
+                        jd_item[x] = item;
+                    };
+                };
+            };
+            item = next_sibling(item);
+        };
     };
-    -1;
+    let x = w * 2 + slot;
+    if x >= 0 and x < jd_at.len() and jd_at[x] == jd_stamp[1 + slot] { jd_item[x]; } else { -1; };
+}
+
+/// @jd_item and @jd_at reach `x`.
+fn jd_room(x: I32) void {
+    if x >= jd_at.len() {
+        jd_at.resize(x * 2 + 2);
+        jd_item.resize(x * 2 + 2);
+    };
 }
 
 /// The last of that name in the file, in order, as stage 0's table keeps it.
@@ -299,8 +333,14 @@ fn type_word(node: I32) I32 { word_of(type_name_at(node)); }
 
 /// The pinned name of the declaration named at `name_at` (`name` as written).
 fn json_pin(name_at: I32, name: Str) Str {
-    for (0 ..< jp_pin_name.len()) |k| { if jp_pin_name[k] == name_at { return word_text(jp_pin_word[k]); }; };
+    if name_at < jp_pin_of.len() {
+        let k = jp_pin_of[name_at] - 1;
+        if k >= 0 and k < jp_pin_name.len() and jp_pin_name[k] == name_at { return word_text(jp_pin_word[k]); };
+    } else {
+        jp_pin_of.resize(name_at * 2 + 2);
+    };
     let text = name + "__json" + int_text(jp_pin_name.len());
+    jp_pin_of[name_at] = jp_pin_name.len() + 1;
     jp_pin_word.push(intern_text(text));
     jp_pin_name.push(name_at);
     text;
