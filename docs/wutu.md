@@ -88,6 +88,20 @@ only `@` forms, and any other is an error. Interpolated strings become text, nev
 Written strings take Utu's escapes: `"say \"hi\"";`, `"\u2192";`, `"\\";`.
 A number or Bool in a text hole shows as its `to_str()`: `= state.count;`.
 
+A URL from a value is checked on every render, first and update alike, as an
+attribute (`href = link;`) or a property (`.href = link;`): `href`, `src`,
+`action`, `formaction`, `poster`, `cite`, `data`, `background`, `codebase`,
+`longdesc`, `manifest` (and `xlink:href` at run time). One whose scheme is
+`javascript:` or `vbscript:`, read as a browser reads it (any case, whitespace
+and control characters dropped: `" JaVa\tScript:"`), is not set: the attribute
+goes. So is a `data:` URL, except an image, audio or video one; an SVG image
+(`data:image/svg+xml`) only in an `img` or SVG `image`. Prerendered HTML is the
+DOM these renders made, so it holds the same. `srcdoc` is HTML, so a value
+there (`srcdoc = html;`, `.srcdoc = html;`) is an error; a written one stays.
+What the author writes is not checked: `href = "javascript:…";` is kept.
+`.innerHTML = expr;` and `.outerHTML = expr;` set HTML, unescaped, by the
+author's choice; give them only trusted text.
+
 Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
 children switch back to HTML. SVG attributes such as `viewBox`, `d`, and
@@ -538,7 +552,7 @@ primitive, not a route table, network loader or authentication framework.
 
 Optional `std:NumberField` keeps numeric draft text separate from validated
 numbers. Optional `std:List[T]` provides `append` and `remove_at`; both return copied
-arrays. `wutu.number`, `wutu.money` (integer USD cents), and `wutu.decimal` cover
+arrays. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
 simple display without shipping a formatting library.
 
 The [two new five-site batches](wutu-round-two-review.md) exercise these APIs.

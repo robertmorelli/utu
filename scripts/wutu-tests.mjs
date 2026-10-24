@@ -94,6 +94,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       ['div { p { onclick = f; } }', 'events are written on click', 'onclick'],
       ['p { $[x]; }', 'no longer writes $[', '$[x]'],
       ['p { # note\n "x"; }', 'comments are written //', '# note'],
+      ['iframe { srcdoc = html; }', 'srcdoc is HTML', 'srcdoc'],
+      ['iframe { .srcdoc = html; }', 'srcdoc is HTML', 'srcdoc'],
     ];
     for (const [text, message, at] of cases) {
       const error = syntaxError(text);
@@ -435,6 +437,76 @@ export main() Browser.HTMLElement {
         throw new Error(`${error.message} for mutation ${k}: ${mutated}`);
       }
     }
+  });
+
+  test('wutu: a URL set from a value takes no javascript:, vbscript: or non-media data:, on first render and update, in every mode', async ({ ROOT }) => {
+    const { MODES } = await import('../src/selfhost/compiler.js');
+    const source = `${BROWSER}
+      struct St:
+          | u: Str
+      fn view(st: St) Browser.HTMLElement {
+          @wutu/\\
+          @reactive;
+          main {
+              input { type = "text"; bind:value = st.u; }
+              a#attr { href = st.u; "link"; }
+              a#prop { .href = st.u; "link"; }
+              form { action = st.u; button { formaction = st.u; "go"; } }
+              iframe { src = st.u; }
+              img { src = st.u; }
+              a#lit { href = "javascript:void 0"; "kept"; }
+              svg { a { href = st.u; } use { href = st.u; } }
+              p#money { = wutu.money(-123) + " " + wutu.money(-1) + " " + wutu.money(123456) + " " + wutu.money(0); }
+          }
+          \\/;
+      }
+      export main() Browser.HTMLElement { view(St { u: "/safe" }); }
+    `;
+    const BAD = ['javascript:window.__pwned=1', 'JAVASCRIPT:alert(1)', ' javascript:alert(1)', 'java\tscript:alert(1)',
+      '\u0001javascript:alert(1)', 'jav\nascript:x', 'vbscript:msgbox', 'data:text/html,<script>alert(1)</script>'];
+    for (const mode of Object.keys(MODES)) {
+      await withDom(async (document) => {
+        const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: `wutu_url_${mode}.utu`, source, mode });
+        const root = instance.exports.main();
+        document.body.append(root);
+        const $ = s => root.querySelector(s);
+        const urls = () => [$('#attr').getAttribute('href'), $('#prop').getAttribute('href'), $('form').getAttribute('action'),
+          $('button').getAttribute('formaction'), $('iframe').getAttribute('src'), $('img').getAttribute('src'),
+          $('svg a').getAttribute('href'), $('use').getAttribute('href')];
+        assertEq(urls().join(' '), Array(8).fill('/safe').join(' '), `${mode}: first render`);
+        assertEq($('#lit').getAttribute('href'), 'javascript:void 0', `${mode}: a written literal stays`);
+        const type = async (text) => {
+          $('input').value = text;
+          $('input').dispatchEvent(new globalThis.Event('input'));
+          await settle();
+        };
+        for (const bad of BAD) {
+          await type(bad);
+          assertEq(urls().join(' '), Array(8).fill(null).join(' '), `${mode}: ${JSON.stringify(bad)} dropped`);
+          await type('/back');
+          assertEq(urls().join(' '), Array(8).fill('/back').join(' '), `${mode}: a safe URL after ${JSON.stringify(bad)}`);
+        }
+        // A media data: URL passes; an SVG one only into an image.
+        await type('data:image/png;base64,AAAA');
+        assertEq($('#attr').getAttribute('href'), 'data:image/png;base64,AAAA', `${mode}: data:image/png`);
+        await type('data:image/svg+xml,<svg onload=alert(1)>');
+        assertEq($('img').getAttribute('src'), 'data:image/svg+xml,<svg onload=alert(1)>', `${mode}: svg data in img`);
+        assertEq($('iframe').getAttribute('src'), null, `${mode}: svg data in iframe`);
+        assertEq($('#money').textContent, '-$1.23 -$0.01 $1234.56 $0.00', `${mode}: money's sign goes before the $`);
+      });
+    }
+  });
+
+  test('wutu: a srcdoc from a value is an error (it is HTML); a written one stays', async ({ ROOT }) => {
+    for (const item of ['srcdoc = h;', '.srcdoc = h;']) {
+      const source = `${BROWSER}export main() Browser.HTMLElement { let h = "<b>x</b>"; @wutu/\\ iframe { ${item} } \\/; }`;
+      const diagnostics = await selfhostDiagnostics({ ROOT, source });
+      const match = diagnostics.find(d => d.severity === 'error' && d.message.includes('srcdoc is HTML'));
+      assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
+      assertEq(source.slice(match.start, match.start + 6), 'srcdoc', `${item}: located at the name`);
+    }
+    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ iframe { srcdoc = "<b>x</b>"; } \\/; }` });
+    assertEq(written.filter(d => d.severity === 'error').length, 0);
   });
 
   test('wutu parser: legacy surface still parses', () => {

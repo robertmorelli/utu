@@ -261,12 +261,41 @@ mod wutu {
   /** Set an attribute for this render; null/false remove it, true sets it empty. */
   function attr(node, name, value) {
     (frames.at(-1).attrs ??= new Set()).add(name);
-    if (value === null || value === false) {
+    if (value === null || value === false || !safe(node, name, value)) {
       node.removeAttribute(name);
       return;
     }
     const text = value === true ? '' : String(value);
     if (node.getAttribute(name) !== text) node.setAttribute(name, text);
+  }
+
+  // Attributes (and their properties) a browser follows or loads as a URL.
+  const URLS = new Set(['href', 'xlink:href', 'src', 'action', 'formaction', 'poster', 'cite', 'data',
+    'background', 'codebase', 'longdesc', 'manifest']);
+  /**
+   * Whether a value from a render may go in attribute `name`: a URL one takes
+   * no javascript: or vbscript: URL, and a data: URL only of an image, audio
+   * or video (an SVG one only in an img or SVG image, where it runs no
+   * script); srcdoc takes none (it is HTML). The scheme is read as a browser
+   * reads it: in any case, whitespace and control characters dropped.
+   */
+  function safe(node, name, value) {
+    name = name.toLowerCase();
+    if (name === 'srcdoc') return false;
+    if (!URLS.has(name) || value === true) return true;
+    value = String(value);
+    let s = '';
+    for (let i = 0; i < value.length && s.length < 16; i++) if (value.charCodeAt(i) > 32) s += value[i].toLowerCase();
+    if (s.startsWith('javascript:') || s.startsWith('vbscript:')) return false;
+    if (!s.startsWith('data:')) return true;
+    if (s.startsWith('data:image/svg')) return node.localName === 'img' || node.localName === 'image';
+    return s.startsWith('data:image/') || s.startsWith('data:audio/') || s.startsWith('data:video/');
+  }
+
+  /** A URL property set by a render (`.href = …`): as its attribute is, else the attribute goes. */
+  function url(node, name, value) {
+    if (safe(node, name, value)) node[name] = value;
+    else node.removeAttribute(name.toLowerCase());
   }
 
   /**
@@ -604,7 +633,7 @@ mod wutu {
   globalThis.addEventListener?.('popstate', refresh);
 
   const api = {
-    enter, append, attr, listen, leave, mount, refresh, invalidate, selectValue, here,
+    enter, append, attr, url, listen, leave, mount, refresh, invalidate, selectValue, here,
     put, begin, slot, arm, item, end, node, done,
     storageError: '',
     notify() {
@@ -835,7 +864,7 @@ mod wutu {
         format(value);
     }
     fn money(cents: I32) Str {
-        let format: fun(I32) Str = @es/\ cents=>"$"+(cents/100).toFixed(2) \/;
+        let format: fun(I32) Str = @es/\ cents=>(cents<0?"-$":"$")+(Math.abs(cents)/100).toFixed(2) \/;
         format(cents);
     }
     fn decimal(value: F64, digits: I32) Str {
