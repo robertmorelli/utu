@@ -267,7 +267,8 @@ try {
     assert.match(await capture('y:', 0, 'a'), /^renaming to 'a' changes what a name means: 'a' on line 8 would name the closure param on line 8, not the param on line 7$/);
     assert.match(await capture('v =', 0, 'g'), /'g' on line 13 would name the local on line 12, not the global on line 1/, 'a local over a global');
     assert.match(await capture('g:', 0, 'v'), /'v' on line 13 would name the local on line 12, not the global on line 1/, 'a global under a local');
-    assert.match(await capture('i|', 0, 'n'), /'n' on line 17 would name the capture on line 17, not the local on line 16/, 'a for binding');
+    // (A capture is read-only, so the rename also breaks `n = n + i`; either refusal is right.)
+    assert.match(await capture('i|', 0, 'n'), /'n' on line 17 would name the capture on line 17, not the local on line 16|breaks the program: Cannot assign to capture n/, 'a for binding');
     // Where no other declaration is in sight, the same new name is fine.
     assert.equal((await call('textDocument/rename', { ...at(K, 'x:', 0, k), newName: 'y' })).changes[k].length, 2);
     assert.equal((await call('textDocument/rename', { ...at(K, 'a:', 0, k), newName: 'base' })).changes[k].length, 2);
