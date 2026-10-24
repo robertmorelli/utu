@@ -158,7 +158,7 @@ fn validate_tree(node: I32) void {
         for (0 ..< Node.count()) |k| { validated_kinds[k] = 0; };
         for ([Node.Param_list, Node.Struct_decl, Node.Field_list, Node.Enum_decl, Node.Block, Node.Closure_param_list, Node.Tuple_pattern,
             Node.Capture, Node.Alt_expr, Node.Nullable_type, Node.Tuple_type, Node.Field, Node.Distinct_decl, Node.Yield_expr,
-            Node.Defer_expr, Node.Errdefer_expr, Node.Await_expr, Node.Global_decl, Node.Bench_decl]) |k| { validated_kinds[k.to_i32()] = 1; };
+            Node.Defer_expr, Node.Errdefer_expr, Node.Await_expr, Node.Global_decl, Node.Bench_decl, Node.Module_type_param_list]) |k| { validated_kinds[k.to_i32()] = 1; };
     };
     validate_within(node);
 }
@@ -186,6 +186,7 @@ fn validate_node(node: I32) void {
         Node.Enum_decl => { duplicate_names(node, Diag.DuplicateDeclaration, 2); },
         Node.Block => { duplicate_lets(node); },
         Node.Closure_param_list => { duplicate_words(node, 1); },
+        Node.Module_type_param_list => { duplicate_words(node, 1); },
         Node.Tuple_pattern => { duplicate_words(node, 3); },
         Node.Capture => { duplicate_words(node, 6); },
         Node.Alt_expr => { duplicate_alt_arms(node); },
@@ -256,12 +257,12 @@ fn duplicate_words(node: I32, what: I32) void {
     };
 }
 
-/// The name a listed child declares: itself, or a closure parameter's first child.
-fn name_of_listed(c: I32) I32 { if is_kind(c, Node.Closure_param) { first_child(c); } else { c; }; }
+/// The name a listed child declares: itself, or a closure or mod type parameter's first child.
+fn name_of_listed(c: I32) I32 { if is_kind(c, Node.Closure_param) or is_kind(c, Node.Module_type_param) { first_child(c); } else { c; }; }
 
 fn list_word(c: I32) I32 {
     let n = name_of_listed(c);
-    if is_kind(n, Node.Identifier) { word_of(n); } else { -1; };
+    if is_kind(n, Node.Identifier) or is_kind(c, Node.Module_type_param) { word_of(n); } else { -1; };
 }
 
 /// By alt arm: the next arm of its alt whose pattern ends in the same word.

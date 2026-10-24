@@ -761,6 +761,10 @@ export lib {
       1 + 10 + 100 + 7 + 1000 + 9 + 2000 + 30000 + 50],
     ['using geo |g|;\nmod geo {\n    enum(U8) Level:\n        | Low\n        | Mid\n        | High\n}\nfn label(l: geo.Level) I32 { match l { geo.Level.Low => 1, g.Level.Mid => 20, ~> 300, }; }\n'
       + 'export lib { fn run() I32 { label(geo.Level.Low) + label(geo.Level.Mid) + label(g.Level.High); } }\n', 321],
+    // A file's own variant hides an opened mod's of one name: the type wanted picks the mod's (a let, a return, a parameter).
+    ['mod geo {\n    enum Form:\n        | Blob { n: I32 }\n        | Dot\n}\nusing geo;\nenum Shape:\n    | Blob { n: I32 }\n'
+      + 'fn mk() geo.Form { Blob { n: 5 }; }\nfn take(f: geo.Form) I32 { alt f { Blob |b| => b.n, ~> 0, }; }\n'
+      + 'export lib { fn run() I32 { let t: geo.Form = Blob { n: 4 }; let s: Shape = Blob { n: 10 }; let k = alt s { Blob |b| => b.n, }; alt t { geo.Form.Blob |b| => b.n, ~> 0, } + take(mk()) + k + take(Blob { n: 100 }); } }\n', 119],
     // A parameter assigned after an alt tested it: the inner test still runs.
     ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nexport lib { fn run() I32 { let fp: fun(Shape) I32 = f; fp(Circle {}); } }\n', 2],
     // Closures see writes to a captured let moved in a loop, alt and promote bindings, and their own (a for's capture takes no writes).
@@ -1680,6 +1684,9 @@ export lib {
     ['let d: cl() I32 = cl() I32 { e; };\nlet e: I32 = d();\nexport lib { fn run() I32 { e; } }\n', 'Globals e and d each need the other set first'],
     // Names that are not values, and other plain mistakes (once "Not supported yet").
     ['mod m { fn f() I32 { 1; } }\nexport lib { fn run() I32 { let x = m; 0; } }\n', 'm is a module, not a value'],
+    ['mod m { fn f() I32 { 1; } }\nexport lib { fn run() I32 { m = 3; 0; } }\n', 'm is a module, not a value'],
+    ['mod geo { fn g() I32 { 1; } }\nusing geo;\nexport lib { fn run() I32 { for (0..<3) |i| { geo += 1; }; geo.g(); } }\n', 'geo is a module, not a value'],
+    ['mod M[T, T] { fn g(x: T) T { x; } }\nexport lib { fn run() I32 { M[I32, I32].g(3); } }\n', 'Duplicate parameter T'],
     ['mod m {\n    struct P:\n        | x: I32\n}\nexport lib { fn run() I32 { m.P(1); 0; } }\n', 'P is a type, not a value'],
     ['struct P:\n    | x: I32\nexport lib { fn run() I32 { let v = P.x; 0; } }\n', 'x is a field: read it from a value'],
     ['mod m { let k: I32 = 3; }\nexport lib { fn run() I32 { m.k(1); } }\n', 'I32 is not callable'],
