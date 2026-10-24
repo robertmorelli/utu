@@ -3280,12 +3280,15 @@ fn compile(target: Target) I32 {
             while (item >= 0) {
                 if entry and (target == Target.Normal or not is_kind(item, Node.Export_lib_decl)) { check_item(item); };
                 if not entry and declares_item(file, item) { check_item(item); };
+                // An imported file's tests and benches: checked, not run.
+                if not entry { test_or_bench(item, Target.Normal); };
                 if is_kind(item, Node.Module_decl) {
                     let module = node_decl[name_node(first_child(item))];
                     if not is_generic(module) {
                         let c = first_child(item);
                         while (c >= 0) {
                             check_item(c);
+                            if not entry { test_or_bench(c, Target.Normal); };
                             c = next_sibling(c);
                         };
                     };
@@ -3310,8 +3313,8 @@ fn compile(target: Target) I32 {
     encode_module();
 }
 
-/// A test or bench of the entry file: every build checks it; a test build
-/// exports its tests, a bench build its benches.
+/// A test or bench: every build checks it; a test build exports the entry
+/// file's tests, a bench build its benches.
 fn test_or_bench(item: I32, target: Target) void {
     if target == Target.Comptime { return; };
     if is_kind(item, Node.Test_decl) {
