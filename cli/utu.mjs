@@ -524,6 +524,21 @@ async function lsp() {
       return existsSync(file) ? pathToFileURL(file).href : null;
     },
     send: write,
+    // The .utu files under folders (not in node_modules or a hidden folder): what may import a file renamed.
+    listFiles: async dirs => {
+      const { readdirSync } = await import('node:fs');
+      const found = new Set();
+      const walk = dir => {
+        let entries;
+        try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+          if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'node_modules') walk(path.join(dir, e.name)); }
+          else if (e.name.endsWith('.utu')) found.add(path.join(dir, e.name));
+        }
+      };
+      for (const dir of dirs) walk(dir);
+      return [...found];
+    },
     log: text => process.stderr.write(`[utu lsp] ${text}\n`),
   });
   let buffer = Buffer.alloc(0);

@@ -9,8 +9,9 @@
 // Nothing here touches a file system or a stream. The host gives the
 // compiler, `hostFor(key)` (a compile host for a program whose entry is file
 // `key`, as nodeHost makes), `toKey(uri)` and `toUri(key)` (null for a file
-// an editor cannot open), and `send(message)`; it calls `handle(message)`
-// with each message the editor sends.
+// an editor cannot open), `send(message)`, and optionally `listFiles(dirs)`
+// (the keys of the .utu files under directories `dirs`, for what imports a
+// file renamed); it calls `handle(message)` with each message the editor sends.
 
 import { compile } from './compiler.js';
 import { programIndex } from './query.js';
@@ -54,10 +55,12 @@ const QUIET_TOKENS = new Set([5, 6, 7, 8, 9, 10, 11, 12]);
 // The name written where one is being typed, for completion's build.
 const PLACEHOLDER = '__utu_completing';
 
+const ENTRY_POINT = "main is the program's entry point: it is not renamed";
+
 // Declarations of values that live in a function: their hover shows the type checked.
 const LOCAL_KINDS = new Set(['Param', 'SelfParam', 'ClosureParam', 'Local', 'Capture', 'ArmBinding', 'Promoted', 'Caught']);
 
-export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = () => {} }) {
+export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFiles = null, log = () => {} }) {
   const docs = new Map();  // key → { uri, text, version }
   let generation = 0;
   let current = null;      // the program the compiler holds: { key, generation, index, files, diagnostics }
@@ -67,6 +70,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   const unopened = new Map();    // key → the files not open its last build showed mistakes in
   const lastGood = new Map();    // key → its text when it last parsed and its imports resolved
   let shutdown = false;
+  let roots = [];                // the workspace's folders, as keys
 
   // An open document's own URI (an unsaved buffer's `untitled:` one too); else the host's.
   const uriOf = key => docs.get(key)?.uri ?? toUri(key);
@@ -205,6 +209,13 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     return { key, program, text, current, lines, offset, decl, stale: !!moved, place };
   }
 
+  /** Whether the name at a request's position is the program's `export main`. */
+  const entryPoint = q => q.program.index.declarations(q.key).some(({ kind, span }) => {
+    const head = kind === 'Main' && /^export\s+main\b/.exec(q.text.slice(span.start, span.end));
+    const start = head && span.start + head[0].length - 4;
+    return head && start <= q.offset && q.offset <= start + 4;
+  });
+
   /**
    * The name at a request's position, when renaming it is allowed: it is
    * spelled as a name, and declared in a file the editor can change (not
@@ -278,21 +289,24 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
   }
 
   const requests = {
-    initialize: () => ({
-      capabilities: {
-        textDocumentSync: { openClose: true, change: 1, save: false },
-        definitionProvider: true,
-        referencesProvider: true,
-        documentHighlightProvider: true,
-        hoverProvider: true,
-        renameProvider: { prepareProvider: true },
-        documentSymbolProvider: true,
-        completionProvider: { triggerCharacters: ['.'] },
-        semanticTokensProvider: { legend: { tokenTypes: SEMANTIC_TYPES, tokenModifiers: SEMANTIC_MODIFIERS }, full: true },
-        codeActionProvider: { codeActionKinds: ['quickfix'] },
-      },
-      serverInfo: { name: 'utu' },
-    }),
+    initialize: params => {
+      roots = (params.workspaceFolders ?? (params.rootUri ? [{ uri: params.rootUri }] : [])).map(f => toKey(f.uri)).filter(Boolean);
+      return {
+        capabilities: {
+          textDocumentSync: { openClose: true, change: 1, save: false },
+          definitionProvider: true,
+          referencesProvider: true,
+          documentHighlightProvider: true,
+          hoverProvider: true,
+          renameProvider: { prepareProvider: true },
+          documentSymbolProvider: true,
+          completionProvider: { triggerCharacters: ['.'] },
+          semanticTokensProvider: { legend: { tokenTypes: SEMANTIC_TYPES, tokenModifiers: SEMANTIC_MODIFIERS }, full: true },
+          codeActionProvider: { codeActionKinds: ['quickfix'] },
+        },
+        serverInfo: { name: 'utu' },
+      };
+    },
 
     shutdown: () => { shutdown = true; return null; },
 
@@ -350,6 +364,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     'textDocument/prepareRename': async params => {
       const q = await at(params);
       if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
+      if (q && entryPoint(q)) throw responseError(-32602, ENTRY_POINT);
       const name = q && renamed(q);
       return name ? { range: range(q.lines, name.start, name.end), placeholder: q.text.slice(name.start, name.end) } : null;
     },
@@ -357,6 +372,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
     'textDocument/rename': async params => {
       const q = await at(params);
       if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
+      if (q && entryPoint(q)) throw responseError(-32602, ENTRY_POINT);
       const name = q && renamed(q);
       if (!name) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params.newName) || KEYWORDS.includes(params.newName)) {
@@ -373,7 +389,13 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
         spans.get(place.file).set(place.start, place.end);
       };
       for (const place of occurrences(q, name)) add(place, place.file === q.key ? q.text : textOf(q.program, place.file));
-      if (!isAlias(q, name)) for (const found of await importers(q, q.decl, spelling, true)) add(found, found.text);
+      // The programs edited: this file's, and each importing the name's file.
+      const entries = new Map([[q.key, q.text]]);
+      if (!isAlias(q, name)) {
+        const found = await importers(q, q.decl, spelling, true, true);
+        for (const place of found) add(place, place.text);
+        for (const [key, text] of found.entries) entries.set(key, text);
+      }
       const changes = {}, renamedTexts = new Map();
       for (const [file, list] of spans) {
         const sorted = [...list].sort((a, b) => a[0] - b[0]);
@@ -391,9 +413,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
         return offset + by;
       };
       const errors = program => program.diagnostics.filter(d => d.severity !== 'warning');
-      // Each open program the rename edits, built before it and after.
-      for (const key of [q.key, ...[...renamedTexts.keys()].filter(k => k !== q.key && docs.has(k))]) {
-        const text = key === q.key ? q.text : docs.get(key).text;
+      // Each program the rename edits, built before it and after.
+      for (const [key, text] of entries) {
         const before = await build(key, { key, text });
         const edited = [...renamedTexts.keys()].filter(file => before.files.some(f => f.key === file));
         const was = edited.map(file => bindings(before, file));
@@ -491,19 +512,39 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
 
   /**
    * Where declaration `decl` (of `q`'s program, with its family) is named in
-   * the other open programs that have its file (the files that import it),
-   * spelled `spelling` (any, for null): each place, with its `location` and
-   * the `text` of its file. Each such program is built, so `q`'s index is
-   * not read after.
+   * the other programs that have its file: each open file's, and each file's
+   * on disk that imports it (see onDisk). Spelled `spelling` (any, for
+   * null): each place, with its `location` and the `text` of its file; and
+   * `entries`, each such program's entry → its text. With `strict` (a
+   * rename), a file that cannot be read or analyzed is an error, not
+   * skipped. Each such program is built, so `q`'s index is not read after.
    */
-  async function importers(q, decl, spelling, includeDeclaration) {
-    const definition = q.program.index.definition(decl);
-    if (!definition || definition.file.startsWith('std:')) return [];
-    const out = [];
-    for (const key of [...docs.keys()]) {
+  async function importers(q, decl, spelling, includeDeclaration, strict = false) {
+    // (A protocol's implementations import its file: found from the member's.)
+    const root = family(q.program, decl)[0];
+    const definition = q.program.index.definition(root);
+    const out = Object.assign([], { entries: new Map() });
+    if (!definition || definition.file.startsWith('std:')) return out;
+    const disk = await onDisk(definition.file);
+    const refuse = why => responseError(-32602, `${why}: no rename`);
+    if (strict && disk.unread.length) throw refuse(`${nameOf(disk.unread[0])} cannot be read`);
+    for (const key of new Set([...docs.keys(), ...disk.files])) {
       if (key === q.key) continue;
-      const program = await build(key);
-      if (!program.files.some(f => f.key === definition.file)) continue;
+      let program;
+      if (docs.has(key)) program = await build(key);
+      else {
+        let text;
+        try { text = await hostFor(key).readFile(key); } catch {
+          if (strict) throw refuse(`${nameOf(key)} cannot be read`);
+          continue;
+        }
+        program = await build(key, { key, text });
+      }
+      // (One that does not parse may import it: its `using` says so.)
+      const has = program.files.some(f => f.key === definition.file);
+      if (strict && (has || disk.files.includes(key)) && !analyzed(program, key)) throw refuse(`${nameOf(key)}, which imports ${nameOf(definition.file)}, does not parse`);
+      if (!has) continue;
+      out.entries.set(key, textOf(program, key));
       const { index } = program;
       const same = index.declarations(definition.file).find(d => {
         const p = index.definition(d.decl);
@@ -516,6 +557,37 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, log = (
       }
     }
     return out;
+  }
+
+  /**
+   * The files on disk (open or not) that import `file`, directly or through
+   * another: of the .utu files under the workspace's folders (else the open
+   * files' folders), each whose `using … from "…"` leads to it. `unread`:
+   * those that cannot be read. None when the host lists no files.
+   */
+  async function onDisk(file) {
+    if (!listFiles) return { files: [], unread: [] };
+    const dirOf = key => /^[a-z][\w+.-]+:/i.test(key) ? null : key.replace(/[\\/][^\\/]*$/, '');
+    const dirs = roots.length ? roots : [...new Set([file, ...docs.keys()].map(dirOf).filter(Boolean))];
+    const importedBy = new Map();  // file → the files importing it
+    const unread = [];
+    for (const key of await listFiles(dirs)) {
+      const host = hostFor(key);
+      let text = docs.get(key)?.text;
+      if (text == null) try { text = await host.readFile(key); } catch { unread.push(key); continue; }
+      for (const [, literal] of String(text).matchAll(/\busing\b[^;]*?\bfrom\s*("(?:[^"\\\n]|\\.)*")/g)) {
+        let path;
+        try { path = JSON.parse(literal); } catch { continue; }
+        if (/^[a-z][\w+.-]+:/i.test(path)) continue;
+        const target = host.resolvePath ? host.resolvePath(key, path) : path;
+        if (!importedBy.has(target)) importedBy.set(target, new Set());
+        importedBy.get(target).add(key);
+      }
+    }
+    const found = new Set([file]);
+    for (const f of found) for (const by of importedBy.get(f) ?? []) found.add(by);
+    found.delete(file);
+    return { files: [...found], unread };
   }
 
   /**
@@ -740,6 +812,28 @@ function protocolLinks(index) {
     const member = members.get(protocol)?.get(index.text(at));
     if (member != null) links.set(decl, member);
   }
+  // A struct's field satisfying a getter or setter of a protocol named in
+  // its head (`struct S[P]`, before its first field).
+  const accessor = member => {
+    const span = index.span(member), at = index.definition(member);
+    return /\b(get|set)\b/.test(index.text({ file: at.file, start: span.start, end: at.start }));
+  };
+  const fields = new Map();  // struct → its fields
+  for (const d of all) if (d.kind === 'Field') (fields.get(d.owner) ?? fields.set(d.owner, []).get(d.owner)).push(d);
+  for (const { decl, kind, span } of all) {
+    const at = kind === 'Struct' && index.definition(decl);
+    const own = at && fields.get(decl);
+    if (!own || at.file !== span.file) continue;
+    const end = Math.min(...own.map(f => index.definition(f.decl)?.start ?? span.end));
+    const named = (protocols.get(span.file) ?? []).filter(n => n.at.start >= at.end && n.at.start < end).map(n => n.decl);
+    for (const field of own) {
+      const name = index.definition(field.decl);
+      for (const p of named) {
+        const member = name && members.get(p)?.get(index.text(name));
+        if (member != null && accessor(member)) { links.set(field.decl, member); break; }
+      }
+    }
+  }
   return links;
 }
 
@@ -790,6 +884,11 @@ function shift(before, after) {
     return -1;
   };
   return { toOld: o => move(a, b, toB, o), toNew: (o, clamp) => move(b, a, toA, o, clamp) };
+}
+
+/** A file's name, without its folder. */
+function nameOf(key) {
+  return key.split(/[\\/]/).at(-1);
 }
 
 function responseError(code, message) {

@@ -307,6 +307,26 @@ try {
     const both = await call('textDocument/rename', { ...at(PS, 'area', 0, ps), newName: 'size' });
     assert.deepEqual([both.changes[ps].length, both.changes[pm].length], [1, 2]);
 
+    // A getter satisfied by a struct's field: one name with the field.
+    const G = [
+      'proto Pm:',
+      '    | get w : I32',
+      'tag struct Sa[Pm]:',
+      '    | w : I32',
+      'fn f(p: Pm) I32 { p.w; }',
+      'export main() I32 { let s = Sa { w: 1 }; s.w + f(s); }',
+      '',
+    ].join('\n');
+    const g = await file('g.utu', G);
+    await note('textDocument/didOpen', { textDocument: { uri: g, version: 1, text: G } });
+    const glines = async (method, marker, skip, context) => (await call(method, { ...at(G, marker, skip, g), ...context })).map(r => r.range.start.line).sort();
+    assert.deepEqual(await glines('textDocument/references', 'w :', 0, { context: { includeDeclaration: true } }), [1, 3, 4, 5, 5], 'from the getter');
+    assert.deepEqual(await glines('textDocument/references', 'w :', 1, { context: { includeDeclaration: true } }), [1, 3, 4, 5, 5], 'from the field');
+    assert.deepEqual(await glines('textDocument/documentHighlight', 'w; }', 0, {}), [1, 3, 4, 5, 5]);
+    assert.deepEqual((await call('textDocument/rename', { ...at(G, 'w :', 0, g), newName: 'wd' })).changes[g].map(e => e.range.start.line), [1, 3, 4, 5, 5]);
+    // `export main` is the entry point.
+    assert.equal((await call('textDocument/rename', { ...at(G, 'main', 0, g), newName: 'start' })).error, "main is the program's entry point: it is not renamed");
+
     // Closing a file: the others are built again (on its text on disk), and
     // what only its builds showed on files not open is cleared.
     await note('textDocument/didChange', { textDocument: { uri: sh, version: 2 }, contentChanges: [{ text: SH.replace('fn &.sum', 'fn &.add') }] });
@@ -349,6 +369,56 @@ try {
     await note('textDocument/didOpen', { textDocument: { uri: h, version: 1, text: H } });
     assert.match((await call('textDocument/hover', at(H, 'Array', 0, h))).contents.value, /^```utu\ntype Array\n```/);
     assert.match((await call('textDocument/hover', at(H, 'new(1)', 0, h))).contents.value, /fn shapes\.new\(x: I32\) shapes/);
+  }
+
+  // Rename reaches the files on disk that import the file renamed in, open or not.
+  {
+    const ws = path.join(dir, 'ws');
+    await fs.mkdir(path.join(ws, 'sub'), { recursive: true });
+    const out = [];
+    const listFiles = async dirs => {
+      const found = [];
+      for (const d of dirs) for (const f of await fs.readdir(d, { recursive: true })) if (f.endsWith('.utu')) found.push(path.join(d, f));
+      return found;
+    };
+    const server = createLanguageServer({
+      utu: await loadNodeCompiler(), hostFor: () => host, send: message => out.push(message), listFiles,
+      toKey: uri => fileURLToPath(uri), toUri: key => key.startsWith('std:') ? null : pathToFileURL(key).href,
+    });
+    const call = async (method, params) => {
+      const n = out.length;
+      await server.handle({ jsonrpc: '2.0', id: ++id, method, params });
+      const answer = out.slice(n).find(m => m.id === id);
+      return answer.error ? { error: answer.error.message } : answer.result;
+    };
+    const file = async (name, text) => { await fs.writeFile(path.join(ws, name), text); return pathToFileURL(path.join(ws, name)).href; };
+    await call('initialize', { capabilities: {}, rootUri: pathToFileURL(ws).href });
+    const AX = 'mod ax {\n    fn addx(n: I32) I32 { n + 1; }\n    struct Box:\n        | v: I32\n    proto Sized:\n        | size() I32\n}\n';
+    const MAINX = 'using ax from "./ax.utu";\nusing ax;\nstruct Tri[Sized]:\n    | b: I32\nfn Sized[Tri].size |t| () I32 { t.b; }\nfn get(b: Box) I32 { b.v; }\nexport main() I32 { let s: Sized = Tri { b: 2 }; ax.addx(s.size()) + get(Box { v: 1 }); }\n';
+    // (Through another file: deep imports mid, which imports ax.)
+    const MID = 'using ax from "../ax.utu";\nmod mid { fn one() I32 { ax.addx(0); } }\n';
+    const DEEP = 'using mid from "./mid.utu";\nexport lib { fn d() I32 { mid.one(); } }\n';
+    const ax = await file('ax.utu', AX);
+    await file('main.utu', MAINX);
+    await file('sub/mid.utu', MID);
+    await file('sub/deep.utu', DEEP);
+    await server.handle({ jsonrpc: '2.0', method: 'textDocument/didOpen', params: { textDocument: { uri: ax, version: 1, text: AX } } });
+    await server.idle();
+    const renaming = async (marker, skip, newName) => {
+      const result = await call('textDocument/rename', { ...at(AX, marker, skip, ax), newName });
+      return result.error ?? Object.fromEntries(Object.entries(result.changes).map(([uri, edits]) => [path.basename(fileURLToPath(uri)), edits.map(e => e.range.start.line)]));
+    };
+    assert.deepEqual(await renaming('addx', 0, 'plusx'), { 'ax.utu': [1], 'main.utu': [6], 'mid.utu': [1] }, 'a function');
+    assert.deepEqual(await renaming('Box', 0, 'Crate'), { 'ax.utu': [2], 'main.utu': [5, 6] }, 'a struct');
+    assert.deepEqual(await renaming('size', 0, 'area'), { 'ax.utu': [5], 'main.utu': [4, 6] }, "a protocol's member, with an implementation not open");
+    const refs = await call('textDocument/references', { ...at(AX, 'addx', 0, ax), context: { includeDeclaration: true } });
+    assert.deepEqual(refs.map(r => path.basename(fileURLToPath(r.uri))).sort(), ['ax.utu', 'main.utu', 'mid.utu']);
+    // A name an importer not open already declares (`using ax;` brings ax's names in).
+    assert.equal(await renaming('Box', 0, 'Tri'), "renaming to 'Tri' breaks the program: Tri has no field v");
+    // An importer that does not parse: no rename, rather than part of one.
+    await fs.writeFile(path.join(ws, 'main.utu'), MAINX.replace('{ t.b; }', '{ t.b }'));
+    assert.equal(await renaming('addx', 0, 'plusx'), 'main.utu, which imports ax.utu, does not parse: no rename');
+    await fs.writeFile(path.join(ws, 'main.utu'), MAINX);
   }
 
   // `utu lsp`: the same server, framed on stdin and stdout.
@@ -394,7 +464,7 @@ try {
   assert.ok(answers.find(a => a.id === 6).result.length > 0);
   assert.ok(!answers.some(a => a.method === 'textDocument/publishDiagnostics' && a.params.uri === strUri && a.params.diagnostics.length));
 
-  console.log('lsp: hover, definitions, references, rename (aliases, refusals, captures, importers), protocol members with their implementations, symbols, tokens, completion (members of any expression, statics, ?.; not in comments or strings), answers while a file does not parse, diagnostics as text changes, on close, and in unopened imports, unsaved buffers; `utu lsp` on stdio, std files, past bad messages');
+  console.log('lsp: hover, definitions, references, rename (aliases, refusals, captures, importers open and not, main), protocol members with their implementations and the fields satisfying getters, symbols, tokens, completion (members of any expression, statics, ?.; not in comments or strings), answers while a file does not parse, diagnostics as text changes, on close, and in unopened imports, unsaved buffers; `utu lsp` on stdio, std files, past bad messages');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

@@ -15,8 +15,8 @@ node cli/utu.mjs lsp
 | diagnostics | both builds `utu check` makes (the exports' and the tests'), on every edit; an edit to an open file, or closing one, also rechecks the other open files |
 | hover | a declaration's first line (a module's type `&` by the module's name), a local's or parameter's checked type, and its `///` doc comment |
 | go to definition | names, fields, and methods (a method by its receiver's type, as checked) |
-| find references, highlights | every name that resolves to the declaration, in the program and in the open files that import its file; a protocol's member and the functions implementing it (`fn P[T].m`) are one name |
-| rename | the same names; refused when the file would then make a mistake it did not (a keyword, a type's name, a name already there), or when a name would then mean another declaration (one renamed, captured by a closure's parameter or a local nearer it; another's, captured by the renamed one); the standard library is not renamed |
+| find references, highlights | every name that resolves to the declaration, in the program and in the files that import its file (open or not, directly or through another); a protocol's member, the functions implementing it (`fn P[T].m`), and the fields satisfying a getter or setter (`struct S[P]: \| w: I32` for `get w`) are one name |
+| rename | the same names; refused when the file would then make a mistake it did not (a keyword, a type's name, a name already there), or when a name would then mean another declaration (one renamed, captured by a closure's parameter or a local nearer it; another's, captured by the renamed one), in every program it edits; refused, not made in part, when a file that imports the name's file cannot be read or does not parse; the standard library and `export main` are not renamed |
 | outline | the file's types, functions, globals, fields, and variants, nested |
 | semantic tokens | each name colored by what it names (function, parameter, field, …) |
 | completion | after `e.` (a name, a field, a call, an index), the fields of e's type and its methods; after `e?.`, those of what a nullable e holds; after `M.`, what module M holds; after `T.`, a type's variants, functions and methods; elsewhere, the function's locals, the file's declarations, the prelude's types, and the keywords |
@@ -43,7 +43,10 @@ it takes to parse), and reads the receiver's type from that build.
 
 `src/selfhost/lsp.js` touches no file system or stream: the host gives it the
 compiler, a compile host per program, the mapping between URIs and file keys,
-and a function to send messages. `cli/utu.mjs` is the host for Node (LSP's
+a function to send messages, and the `.utu` files under the workspace's
+folders (else the open files' folders; not in `node_modules` or a hidden
+folder). Rename and references read those once each, for the files importing
+the name's file (by their `using … from "…"` paths). `cli/utu.mjs` is the host for Node (LSP's
 framing on stdio). Definitions in the standard library open its file in
 `std/` when this repository is where the server runs; that file is its `std:`
 module (its mistakes are not shown: built alone, it would declare the
