@@ -118,7 +118,8 @@ let start_type: I32 = 11;
 /// For a token's next start state: the one it started in (as after a comment).
 let same_start: I32 = 0;
 
-/// The source ends with this byte, which UTF-8 never uses.
+/// The source ends with this byte, which UTF-8 never uses; @lex puts it on
+/// the first byte that is not UTF-8 too, an error there.
 let end_byte: I32 = 255;
 
 /// `next = dfa[state * 256 + byte]`. A token ending in a state has kind
@@ -572,9 +573,24 @@ vec template_braces: I32;
 
 /// Lex the bytes of `src` from `first` to the end byte at `n`, appending
 /// their tokens. The last token is `End`, or `Error` (at the start of the
-/// token that cannot be lexed: a byte no token starts with, or a string or
-/// DSL body that does not close). Returns the number of tokens.
+/// token that cannot be lexed: a byte no token starts with, a string or
+/// DSL body that does not close, or the first byte that is not UTF-8,
+/// which @lex_to sees as @end_byte). Returns the number of tokens.
 fn lex(first: I32, n: I32) I32 {
+    let k = first;
+    while (k < n) {
+        let size = utf8_char_size(k, n);
+        if size < 0 { break; };
+        k += size;
+    };
+    let byte = src[k];
+    src[k] = end_byte;
+    let t = lex_to(first, n);
+    src[k] = byte;
+    t;
+}
+
+fn lex_to(first: I32, n: I32) I32 {
     // Room for the most tokens there can be: one a byte, and the last
     // (@tokens_end cuts the mems back to those written).
     let t = tok_kind.len();
@@ -664,6 +680,7 @@ fn lex(first: I32, n: I32) I32 {
             continue next;
         },
         6 => {  // done_code
+            if j < n { return tokens_end(put_token(t, Tok.Error.to_i32(), j, j)); };
             return tokens_end(put_token(t, Tok.End.to_i32(), n, n));
         },
         7 => {  // template_code

@@ -110,6 +110,8 @@ export function createProfiler({ frames = [], interval = 0.25 } = {}) {
     },
     /** Stop sampling: the samples (see the sampler) and how long it ran. */
     async stop() {
+      // Never started (the instance trapped as it began): no samples.
+      if (!worker) return { counts: [], runs: [], dropped: 0, total: 0, elapsed: 0, interval };
       Atomics.store(control, 0, 1);
       const result = await done;
       worker.terminate();

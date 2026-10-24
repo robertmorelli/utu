@@ -114,18 +114,36 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
     return re.test(got) || re.test(got.replace(/\s+/g, ''));
   };
 
+  // A statement, which a typed hole never is: a `let`, or an `if`, loop,
+  // `match`, or `alt` in a block that gives no value.
+  const STATEMENTS = new Set(['if_expr', 'for_expr', 'while_expr', 'match_expr', 'loop_match_expr', 'alt_expr', 'defer_expr', 'errdefer_expr']);
+  let parent = null;
+  const isStatement = n => {
+    const kind = utu.node_kind_name(kinds[n]);
+    if (kind === 'bind_expr') return true;
+    if (!STATEMENTS.has(kind) || utu.node_type(n) !== 'void') return false;
+    if (!parent) {
+      parent = new Int32Array(utu.node_count()).fill(-1);
+      for (let m = 0; m < parent.length; m++) for (let c = child[m]; c >= 0; c = next[c]) parent[c] = m;
+    }
+    return parent[n] >= 0 && utu.node_kind_name(kinds[parent[n]]) === 'block';
+  };
+  // Whether node n meets hole `name`'s `--where` (none: it does); noted in `seen`.
+  const meets = (name, n) => {
+    if (!where[name]) return true;
+    const ok = !isStatement(n) && typeMatches(n, where[name]);
+    if (seen) {
+      // What each constrained hole met: whether any had the type, and the types.
+      if (!seen.has(name)) seen.set(name, { matched: false, types: new Set() });
+      const s = seen.get(name);
+      if (ok) s.matched = true; else if (!isStatement(n)) s.types.add(utu.node_type(n));
+    }
+    return ok;
+  };
+
   const matchNode = (p, n, env) => {
     if (p.hole !== undefined) {
-      if (p.hole !== '_' && where[p.hole]) {
-        // What each constrained hole met (`seen`): whether any had the type, and the types.
-        const ok = typeMatches(n, where[p.hole]);
-        if (seen) {
-          if (!seen.has(p.hole)) seen.set(p.hole, { matched: false, types: new Set() });
-          const s = seen.get(p.hole);
-          if (ok) s.matched = true; else s.types.add(utu.node_type(n));
-        }
-        if (!ok) return false;
-      }
+      if (!meets(p.hole, n)) return false;
       if (p.hole === '_') return true;
       if (env.has(p.hole)) return code(env.get(p.hole)) === code(n);
       env.set(p.hole, n);
@@ -147,6 +165,8 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
       // A run named twice is the same code both times.
       const bound = env.get(`...${p.many}`);
       for (let k = j; k <= ns.length; k++) {
+        // A typed run: every element has the type.
+        if (k > j && !meets(p.many, ns[k - 1])) break;
         if (bound && (bound.length !== k - j || bound.some((b, i) => code(b) !== code(ns[j + i])))) continue;
         const saved = new Map(env);
         if (p.many !== '_') env.set(`...${p.many}`, ns.slice(j, k));
@@ -174,7 +194,7 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
     if (!at || !own.has(at.file)) continue;
     const env = new Map();
     if (lone) {
-      if (any ? !utu.node_type(n) : kinds[n] !== lone.kind) continue;
+      if (any ? !utu.node_type(n) || isStatement(n) : kinds[n] !== lone.kind) continue;
       if (!matchNode(lone, n, env)) continue;
       matches.push({ at, bindings: bindings(env, index) });
     } else {

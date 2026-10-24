@@ -44,7 +44,7 @@ const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 
 async function main() {
   const [command, fileArg, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') usage(0);
-  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest);
+  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest, fail);
   if (command === 'lsp') return lsp();
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
@@ -168,14 +168,18 @@ async function check(file, { utu }) {
 }
 
 async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, out }) {
-  // A profile build's frames are larger: it runs on a deeper stack (PROFILE_STACK_MB).
-  if (profile && deepens) throw new TooDeep(PROFILE_STACK_MB);
+  // Profiled, on the stack a plain run has, so --profile changes no output but at
+  // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
   // Named functions and a source map, so a trap says which and where.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile });
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
+  // (It runs before the sampler can start: its profile is empty, but written.)
   const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
-    .catch(error => trap(error, file, built, utu));
+    .catch(async error => {
+      if (profiler) await writeProfile(file, profiler, out);
+      return trap(error, file, built, utu);
+    });
   if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
   // A main with parameters is for a host that passes them; run passes none.
   // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
@@ -596,8 +600,19 @@ async function grepCommand(args) {
         console.error(`utu grep: --where needs a name and a type: --where '${hole || 'x'}: I32'`);
         process.exit(2);
       }
+      // One type a hole: a second would only say which one wins.
+      if (hole in where) {
+        console.error(`utu grep: --where gives $${hole} twice`);
+        process.exit(2);
+      }
       where[hole] = type.join(':').trim();
-    } else if (args[i] === '--refs') references = args[++i];
+    } else if (args[i] === '--refs') {
+      references = args[++i];
+      if (!references?.trim()) {
+        console.error('utu grep: --refs needs a name');
+        process.exit(2);
+      }
+    }
     else if (args[i] === '--json') json = true;
     else rest.push(args[i]);
   }
@@ -839,15 +854,11 @@ async function trap(error, file, built, utu) {
 // the language server runs in one. Bun's workers ignore the setting, so
 // under Bun too deep a program is reported as such.
 const STACK_MB = 1024;
-// A profiled program's stack: deeper than the main thread's (its
-// instrumentation takes about a third more per frame), yet overflowing well
-// before the profile memory's million frames run out.
-const PROFILE_STACK_MB = 16;
 
 /** Whether this thread can hand a command to a worker with a deeper stack. */
 const deepens = isMainThread && !process.versions.bun && !process.env.UTU_NO_WORKER;
 
-/** Thrown when a build was too deep for this thread, or a run is profiled: the command starts again in a worker with an `mb` MB stack. */
+/** Thrown when a build was too deep for this thread: the command starts again in a worker with an `mb` MB stack. */
 class TooDeep extends Error { constructor(mb = STACK_MB) { super(); this.mb = mb; } }
 
 /** The command, run in a worker with a deep stack; exits as it does. */

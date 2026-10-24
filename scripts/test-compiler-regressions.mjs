@@ -1388,6 +1388,18 @@ export lib {
   await fs.writeFile(bad, Buffer.concat([Buffer.from('export main() I32 {\n    let s = \\\\a'), Buffer.from([0xc0, 0xaf]), Buffer.from('b\n    ;\n    s.len();\n}\n')]));
   assert.deepEqual((await selfhost(bad)).errors, ['Not UTF-8']);
   checked++;
+  // A byte that is not UTF-8 (0xFF, the lexer's end of input, too), in code or a comment, is
+  // said so: it does not end the file early.
+  for (const [before, after] of [['fn g() I32 { 1; }\n', '\nfn g() I32 { 2; }\nexport main() I32 { g(); }\n'],
+    ['export main() I32 { let x', ' = 3; x; }\n'], ['// a ', ' comment\nexport main() I32 { 1; }\n'], ['export main() I32 { 1; }\n', '']]) {
+    for (const byte of [0xff, 0xfe, 0x80]) {
+      const file = path.join(dir, 'ff.utu');
+      await fs.writeFile(file, Buffer.concat([Buffer.from(before), Buffer.from([byte]), Buffer.from(after)]));
+      const { errors } = await selfhost(file);
+      assert.deepEqual(errors, ['Not UTF-8'], `${byte} ${JSON.stringify(before)}`);
+      checked++;
+    }
+  }
   const crlf = await selfhost(await write('export lib {\r\n    fn m() Str { let m = \\\\a\r\n        \\\\b\r\n    ; m; }\r\n    fn t() Str { `a\r\nb`; }\r\n}\r\n'));
   assert.equal(crlf.exports?.m(), 'a\nb', crlf.errors?.join('\n'));
   assert.equal(crlf.exports.t(), 'a\nb');

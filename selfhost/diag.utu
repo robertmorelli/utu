@@ -655,12 +655,14 @@ fn diag_text(i: I32) Str {
             if diag_c[i] >= 0 { return word_text(diag_c[i]); };
             // The lexer stops at a quote or backtick it finds no end for.
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 34 {
-                // A 0xFF byte (never UTF-8) is where the lexer sees the file end.
+                // A byte that is not UTF-8 is where the lexer saw the file end.
+                let end_ = file_end[file_of_token(a)];
                 let j = tok_start[a] + 1;
-                while (src[j] != 10 and src[j] != 34 and src[j] != 255) { j += 1; };
-                return if src[j] == 255 and j < file_end[file_of_token(a)] { "Not UTF-8"; } else { "Unclosed string"; };
+                while (j < end_ and src[j] != 10 and src[j] != 34 and utf8_char_size(j, end_) > 0) { j += utf8_char_size(j, end_); };
+                return if j < end_ and src[j] != 10 and src[j] != 34 { "Not UTF-8"; } else { "Unclosed string"; };
             };
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 96 { return "Unclosed template string"; };
+            if tok_kind[a] == Tok.Error.to_i32() and utf8_char_size(tok_start[a], file_end[file_of_token(a)]) < 0 { return "Not UTF-8"; };
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 47 and src[tok_start[a] + 1] == 92 {
                 let inner = first_bare_opener(tok_start[a] + 2, file_end[file_of_token(a)]);
                 if inner >= 0 { return "No \\/ ends this body: the /\\ at line " + int_text(line_of_byte(inner)) + " opens another"; };

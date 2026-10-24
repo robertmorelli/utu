@@ -68,17 +68,38 @@ assert.equal(scope.profiles[0].type, 'sampled');
 assert.ok(scope.shared.frames.some(f => f.name === 'fib' && f.line === 1));
 assert.match(run.stderr, /hot\.flame\.html/);
 assert.ok(fs.existsSync(path.join(dir, 'hot.flame.html')));
-// Deep recursion a normal run survives: profiled too (on a deeper stack), in every mode.
+// Deep recursion a normal run survives: profiled too, in every mode.
 const deep = path.join(dir, 'deep.utu');
 fs.writeFileSync(deep, `fn down(n: I32) I32 { if n == 0 { return 0; }; 1 + down(n - 1); }
-export main() I32 { let t = 0; for (0 ..< 300) |_i| { t = down(13000); }; t; }
+export main() I32 { let t = 0; for (0 ..< 300) |_i| { t = down(10000); }; t; }
 `);
 for (const mode of ['debug', 'small', 'fast']) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', deep, '-O', mode, '--profile', '-o', dir], { encoding: 'utf8' });
   assert.equal(r.status, 0, `${mode}: ${r.stderr}`);
-  assert.equal(r.stdout.trim(), '13000', mode);
+  assert.equal(r.stdout.trim(), '10000', mode);
   assert.match(fs.readFileSync(path.join(dir, 'deep.folded'), 'utf8'), /^main;down(;down)* \d+$/m, mode);
 }
+// --profile changes no output: a recursion too deep traps both ways, one that fits runs both ways.
+for (const n of [10000, 10000000]) {
+  const file = path.join(dir, `rec${n}.utu`);
+  fs.writeFileSync(file, `fn deep(n: I32) I32 { if n == 0 { 0; } else { 1 + deep(n - 1); }; }\nexport main() I32 { deep(${n}); }\n`);
+  for (const mode of ['debug', 'small', 'fast']) {
+    const go = (...more) => spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', file, '-O', mode, ...more], { encoding: 'utf8' });
+    const plain = go();
+    const profiled = go('--profile', '-o', dir);
+    assert.equal(profiled.status, plain.status, `${n} ${mode}: ${plain.stderr} / ${profiled.stderr}`);
+    assert.equal(profiled.stdout, plain.stdout, `${n} ${mode}`);
+    if (n === 10000) assert.equal(plain.stdout.trim(), '10000', mode);
+    else assert.match(plain.stderr, /Stack overflow/, mode);
+  }
+}
+// A trap in a global's initializer, before sampling can start: an empty profile, written.
+const early = path.join(dir, 'early.utu');
+fs.writeFileSync(early, 'fn pick(xs: Array[I32], i: I32) I32 { xs[i]; }\nlet v: I32 = pick([1], 4);\nexport main() I32 { v; }\n');
+const trapped = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', early, '--profile', '-o', dir], { encoding: 'utf8' });
+assert.equal(trapped.status, 1);
+assert.match(trapped.stderr, /Index out of bounds/);
+for (const ext of ['folded', 'speedscope.json', 'flame.html']) assert.ok(fs.existsSync(path.join(dir, `early.${ext}`)), ext);
 fs.rmSync(dir, { recursive: true, force: true });
 
 // The report from samples alone.
@@ -87,4 +108,4 @@ const report = profileReport({ counts: [['0,1', 3], ['', 1]], runs: [['0,1', 3],
 assert.equal(report.folded, '(idle) 1\nmain;f 3\n');
 assert.deepEqual(report.top.map(r => [r.name, r.self, r.total]), [['f', 3, 3], ['(idle)', 1, 1], ['main', 0, 3]]);
 
-console.log('profile: stacks in small, fast and debug; sampling; reports');
+console.log('profile: stacks in small, fast and debug; sampling; output as unprofiled at depth; a trap in an initializer; reports');
