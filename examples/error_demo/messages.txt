@@ -6620,6 +6620,127 @@ ok
 12 │     \/;
 --- exit 1
 
+=== utu check examples/error_demo/platform/940_ir_array_element_as_bool.utu
+ ERROR  @ir gives an i32, not a comparison's Bool
+        ir-type · examples/error_demo/platform/940_ir_array_element_as_bool.utu:11:9
+
+ 9 │
+10 │     fn &.on |self| (i: I32) Bool {
+11 │         @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
+   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │         ╰─ not Bool
+12 │     }
+13 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/941_ir_literal_of_str.utu
+ ERROR  @ir <ir-lit> is written wrong here
+        ir-unknown · examples/error_demo/platform/941_ir_literal_of_str.utu:4:5
+
+ 2 │ // Expect: @ir <ir-lit> is written wrong here
+ 3 │ fn answer() I32 {
+ 4 │     @ir/\ <ir-lit kind="int" type-name="Str" value="42"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ malformed
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/942_ir_float_literal_too_big.utu
+ ERROR  1000000000000000000000000000000000000000 does not fit F32
+        integer-out-of-range · examples/error_demo/platform/942_ir_float_literal_too_big.utu:4:5
+
+ 2 │ // Expect: 1000000000000000000000000000000000000000 does not fit F32
+ 3 │ fn huge() F32 {
+ 4 │     @ir/\ <ir-lit kind="int" type-name="F32" value="1000000000000000000000000000000000000000"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ F32
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/943_ir_string_op_on_struct.utu
+ ERROR  @ir <ir-string-measure-utf16> takes externref, given a struct
+        ir-type · examples/error_demo/platform/943_ir_string_op_on_struct.utu:7:5
+
+ 5 │
+ 6 │ fn size(p: Pt) I32 {
+ 7 │     @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ a struct
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/944_ir_codes_of_i64.utu
+ ERROR  @ir <ir-string-from-codes> takes an array of i32, given an array of i64
+        ir-type · examples/error_demo/platform/944_ir_codes_of_i64.utu:4:5
+
+ 2 │ // Expect: @ir <ir-string-from-codes> takes an array of i32, given an array of i64
+ 3 │ fn text(codes: Array[I64], n: I32) Str {
+ 4 │     @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="n"/></ir-string-from-codes> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ an array of i64
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/945_ir_array_for_str.utu
+ ERROR  @ir gives an array of i32, not Str
+        ir-type · examples/error_demo/platform/945_ir_array_for_str.utu:4:5
+
+ 2 │ // Expect: @ir gives an array of i32, not Str
+ 3 │ fn name(a: Array[I32]) Str {
+ 4 │     @ir/\ <ir-ident name="a"/> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ not Str
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/946_ir_unknown_type_repr.utu
+ ERROR  No @ir type-repr wasm-i33
+        ir-unknown · examples/error_demo/platform/946_ir_unknown_type_repr.utu:4:14
+
+ 2 │ // Expect: No @ir type-repr wasm-i33
+ 3 │ mod Wide {
+ 4 │     type & = @ir/\ <ir-wasm-scalar type-repr="wasm-i33"/> \/
+   │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │              ╰─ unknown
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/947_ir_array_element_unknown.utu
+ ERROR  @ir array element Item is not its mod's parameter or a standard type
+        ir-unknown · examples/error_demo/platform/947_ir_array_element_unknown.utu:4:14
+
+ 2 │ // Expect: @ir array element Item is not its mod's parameter or a standard type
+ 3 │ mod Bag {
+ 4 │     type & = @ir/\ <ir-wasm-array type-repr="wasm-array:elem=Item:mut=true"/> \/
+   │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │              ╰─ unknown
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/948_ir_promise_then_operands.utu
+ ERROR  @ir <ir-promise-then> takes externref, given i32
+        ir-type · examples/error_demo/platform/948_ir_promise_then_operands.utu:4:5
+
+ 2 │ // Expect: @ir <ir-promise-then> takes externref, given i32
+ 3 │ fn listen(p: I32, f: I32) void {
+ 4 │     @ir/\ <ir-promise-then><ir-ident name="p"/><ir-ident name="f"/></ir-promise-then> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ i32
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/949_ir_operand_of_nullary.utu
+ ERROR  @ir <ir-safe-checks> is written wrong here
+        ir-unknown · examples/error_demo/platform/949_ir_operand_of_nullary.utu:4:5
+
+ 2 │ // Expect: @ir <ir-safe-checks> is written wrong here
+ 3 │ fn checks(a: I32) Bool {
+ 4 │     @ir/\ <ir-safe-checks><ir-ident name="nothing"/></ir-safe-checks> \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ malformed
+ 5 │ }
+--- exit 1
+
 === utu check examples/error_demo/platform/94_wutu_bad_interpolation.utu
  ERROR  Invalid Utu interpolation at offset 236: title +
         dsl-error · examples/error_demo/platform/94_wutu_bad_interpolation.utu:7:12

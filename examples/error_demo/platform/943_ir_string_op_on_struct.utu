@@ -1,0 +1,12 @@
+// What: a string's length of a struct (the engine said only "not valid Wasm")
+// Expect: @ir <ir-string-measure-utf16> takes externref, given a struct
+struct Pt:
+    | x: I32
+
+fn size(p: Pt) I32 {
+    @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
+}
+
+export main() I32 {
+    size(Pt { x: 1 });
+}

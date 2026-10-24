@@ -157,7 +157,10 @@ tables.
   nullable, tuple, `fun`, and `cl` types are built from ids. Instances
   (`inst_*`) are interned the same way. A type's wasm representation comes
   from the declarations: a module's `type & = @ir/\ <ir-wasm-scalar
-  type-repr="wasm-i32"/> \/` says what `I32` is.
+  type-repr="wasm-i32"/> \/` says what `I32` is. An array's
+  `type-repr="wasm-array:elem=T:mut=true"` names its element: a parameter
+  of the module (Array's `T1`) or a standard type (`elem=I64`, in a module
+  not generic). Another `type-repr` is a mistake.
 - **Checking** (`check.utu`, with `control.utu`, `data.utu`, `enums.utu`,
   `mems.utu`, `strings.utu`, `host.utu`): monomorphization on demand. Each
   function is checked once per instance it is reached in, against the types
