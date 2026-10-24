@@ -1182,6 +1182,11 @@ vec sm_pend_root: I32;
 vec sm_pend_vt: I32;
 /// Whether a use may have gone (a constant argument never read).
 vec sm_gone: U8 = [0];
+/// The most nodes a body grows to by moves (0, the default: no limit; see
+/// set_move_limit), and by function while moving, its nodes with what moved
+/// into it.
+vec sm_cap: I32 = [0];
+vec sm_size: I32;
 /// By function (sm_survey): 1 its body returns, 2 it holds a node held
 /// elsewhere too, 4 it returns by a call; where its parameters start in
 /// @sm_assigned (whether the body assigns each) and @sm_param_reads.
@@ -1222,6 +1227,8 @@ fn sm_move_all() Bool {
     // (1: moves; 2: stays; 3: moved.)
     sm_state.resize(n);
     for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and sm_movable(g) { 1; } else { 2; }; };
+    sm_size.resize(n);
+    for (0 ..< n) |f| { sm_size[f] = if sm_cap[0] > 0 and func_body[f] >= 0 { inl_nodes(func_body[f]); } else { 0; }; };
     let any = false;
     for (0 ..< n) |g| { if sm_state[g] == 1 { sm_move_down(g); any = true; }; };
     if not any { return false; };
@@ -1340,8 +1347,13 @@ fn sm_move_down(g: I32) void {
     if sm_state[caller] == 1 { sm_move_down(caller); };
     let f = sm_root(caller);
     if f == g { return; };
+    if sm_cap[0] > 0 and sm_size[f] + sm_size[g] > sm_cap[0] {
+        sm_state[g] = 2;
+        return;
+    };
     sm_move(f, sm_found[k]);
     sm_owner[g] = f;
+    sm_size[f] += sm_size[g];
 }
 
 /// Whether `g` (called once, not by itself) may move to its call: not

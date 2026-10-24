@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compile } from '../src/selfhost/compiler.js';
+import { compile, SELF_MOVE_LIMIT } from '../src/selfhost/compiler.js';
 import { loadNodeCompiler, nodeHost } from '../src/selfhost/node.js';
 import { blameGlue, blameHtml, blameModule, checkTiling, estimateCompressed, formatTop, report } from '../src/selfhost/blame.js';
 
@@ -41,7 +41,7 @@ const text = parts.map(part => part.text).join('');
 
 const utu = await loadNodeCompiler();
 const host = nodeHost({ root: ROOT });
-const built = await compile(utu, joined, { ...host, readFile: async file => file === joined ? text : fs.readFileSync(file, 'utf8'), blame: true });
+const built = await compile(utu, joined, { ...host, readFile: async file => file === joined ? text : fs.readFileSync(file, 'utf8'), blame: true, moveLimit: SELF_MOVE_LIMIT });
 if (!built.wasm) {
   console.error(`selfhost does not build: ${built.diagnostics.slice(0, 5).map(d => `${d.file}:${d.line}: ${d.message}`).join('\n')}`);
   process.exit(1);
