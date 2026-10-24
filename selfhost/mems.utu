@@ -32,6 +32,8 @@ vec mem_helpers: I32;
 vec mem_reserve: I32;
 /// By declaration: a size build's index check (@mem_index_helper), or -1.
 vec mem_index_fn: I32;
+/// By declaration: a size build's checked store (@mem_store_helper), or -1.
+vec mem_store_fn: I32;
 /// The index checks made so far (none pushes, so none is a call @w_calls counts).
 vec mem_index_fns: I32;
 /// The grow helpers made so far, in pairs: an array heap type, its function.
@@ -57,6 +59,7 @@ fn reset_mems() void {
     mem_helpers.resize(decl_kind.len());
     mem_reserve.resize(decl_kind.len());
     mem_index_fn.resize(decl_kind.len());
+    mem_store_fn.resize(decl_kind.len());
     mem_index_fns.clear();
     mem_grow.clear();
     mem_array_push.clear();
@@ -73,6 +76,7 @@ fn reset_mems() void {
         mem_helpers[d] = -1;
         mem_reserve[d] = -1;
         mem_index_fn[d] = -1;
+        mem_store_fn[d] = -1;
         mem_hosted[d] = -1;
         mem_host_ops[d] = -1;
     };
@@ -275,6 +279,16 @@ fn w_calls(node: I32) Bool {
     let op = w_op[node];
     if (op == Op.Call.to_i32() and not is_index_fn(w_a[node])) or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() { return true; };
     for (0 ..< w_count[node]) |i| { if w_calls(w_kid(node, i)) { return true; }; };
+    false;
+}
+
+/// Whether IR node `node` may change the length global `len_g`: it calls a
+/// function, or sets it (`clear()`).
+fn changes_len(node: I32, len_g: I32) Bool {
+    let op = w_op[node];
+    if op == Op.GlobalSet.to_i32() and w_a[node] == len_g { return true; };
+    if (op == Op.Call.to_i32() and not is_index_fn(w_a[node])) or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() { return true; };
+    for (0 ..< w_count[node]) |i| { if changes_len(w_kid(node, i), len_g) { return true; }; };
     false;
 }
 
@@ -600,6 +614,30 @@ fn mem_index_helper(decl: I32) I32 {
     f;
 }
 
+/// Mem `decl`'s `(i, v) → element checked(i) = v` (@checked_index), made
+/// when first used: a size build's store whose value may change the length.
+fn mem_store_helper(decl: I32) I32 {
+    if mem_store_fn[decl] >= 0 { return mem_store_fn[decl]; };
+    let s = mem_storage(decl);
+    let vt = storage_vt(s);
+    let mp = vl_begin();
+    vl_add(vt_i32);
+    vl_add(vt);
+    let f = helper(vl_end(mp), vl_empty(), vl_empty(), "mem.set");
+    let m = w_mark();
+    let in_array = mem_array[decl] >= 0;
+    if in_array { w_mem_array(decl); };
+    let mc = w_mark();
+    w_get(vt_i32, 0);
+    checked_index(decl, mc);
+    if not in_array { mem_address(s, mc); };
+    w_get(vt, 1);
+    if in_array { w_node(Op.ArraySet, vt_none, mem_array_heap(s), 0, m); } else { w_node(Op.Store, vt_none, memory_of(decl), store_opcode(s), m); };
+    func_body[f] = w_pop();
+    mem_store_fn[decl] = f;
+    f;
+}
+
 /// Whether function `f` is a mem's index check.
 fn is_index_fn(f: I32) Bool {
     for (0 ..< mem_index_fns.len()) |k| { if mem_index_fns[k] == f { return true; }; };
@@ -660,10 +698,45 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     if op == Tok.Eq.to_i32() {
         coerce(check_expr(last_child(target), i32_t, cx), i32_t, last_child(target));
-        checked_index(decl, m);
-        if not in_array { mem_address(s, m); };
+        let mv = w_mark();
         coerce(check_expr(value, t, cx), t, value);
         check_narrow_literal(decl, value);
+        // The index is checked against the length at the store: when the
+        // value may change it, index and value are kept in locals first (a
+        // size build passes them to a function of the mem's).
+        if safe_checks[0] == 1 and w_stack.len() == mv + 1 and changes_len(w_stack[mv], mem_len[decl]) {
+            if optimize_level[0] == 1 {
+                w_node(Op.Call, vt_none, mem_store_helper(decl), 0, m);
+                return ty_void();
+            };
+            let v = w_pop();
+            let i = w_pop();
+            let ti = new_local(vt_i32);
+            let tv = new_local(w_type[v]);
+            let mi = w_mark();
+            w_push(i);
+            w_node(Op.LocalSet, vt_none, ti, 0, mi);
+            let mvs = w_mark();
+            w_push(v);
+            w_node(Op.LocalSet, vt_none, tv, 0, mvs);
+            let ms = w_mark();
+            if in_array { w_mem_array(decl); };
+            let mc = w_mark();
+            w_get(vt_i32, ti);
+            checked_index(decl, mc);
+            if not in_array { mem_address(s, mc); };
+            w_get(w_type[v], tv);
+            if in_array { w_node(Op.ArraySet, vt_none, mem_array_heap(s), 0, ms); } else { w_node(Op.Store, vt_none, mem_id, store_opcode(s), ms); };
+            w_node(Op.Seq, vt_none, 0, 0, m);
+            return ty_void();
+        };
+        // Else nothing in the value changes the length: it is checked first.
+        let n = w_stack.len() - mv;
+        let vs = Array[I32].new(n, 0);
+        for (0 ..< n) |k| { vs[n - 1 - k] = w_pop(); };
+        checked_index(decl, m);
+        if not in_array { mem_address(s, m); };
+        for (0 ..< n) |k| { w_push(vs[k]); };
         if in_array { array_access(decl, m, Op.ArraySet, vt_none); } else { w_node(Op.Store, vt_none, mem_id, store_opcode(s), m); };
         return ty_void();
     };
@@ -1092,7 +1165,8 @@ fn array_push_helper(h: I32, vt: I32) I32 {
     push;
 }
 
-/// `resize(n)`: `reserve(n); len = n` (a safe build traps on a negative n).
+/// `resize(n)`: `reserve(n); if n > len { elements [len, n) = 0 }; len = n`
+/// (a safe build traps on a negative n).
 fn mem_resize_helper(decl: I32) void {
     let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize");
     let r = w_mark();
@@ -1110,9 +1184,29 @@ fn mem_resize_helper(decl: I32) void {
     w_reserve_start(decl);
     w_get(vt_i32, 0);
     w_reserve_end(decl, rr);
+    // if n > len { elements [len, n) = 0 }
+    let s = mem_storage(decl);
+    let len_g = mem_len[decl];
+    let mg = w_mark();
+    w_get(vt_i32, 0);
+    w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
+    w_i32_op(i32_gt_s, mg);
+    let mf = w_mark();
+    if mem_array[decl] >= 0 { w_mem_array(decl); };
+    let ma = w_mark();
+    w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
+    if mem_array[decl] < 0 { mem_address(s, ma); };
+    if mem_array[decl] >= 0 { w_default(storage_vt(s)); } else { w_i32(0); };
+    let mn = w_mark();
+    w_get(vt_i32, 0);
+    w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
+    w_i32_op(i32_sub, mn);
+    if mem_array[decl] < 0 { mem_address(s, mn); };
+    if mem_array[decl] >= 0 { w_node(Op.ArrayFill, vt_none, mem_array_heap(s), 0, mf); } else { w_node(Op.MemoryFill, vt_none, memory_of(decl), 0, mf); };
+    w_node(Op.If, vt_none, 1, 0, mg);
     let rl = w_mark();
     w_get(vt_i32, 0);
-    w_node(Op.GlobalSet, vt_none, mem_len[decl], 0, rl);
+    w_node(Op.GlobalSet, vt_none, len_g, 0, rl);
     w_node(Op.Seq, vt_none, 0, 0, r);
     func_body[resize] = w_pop();
 }

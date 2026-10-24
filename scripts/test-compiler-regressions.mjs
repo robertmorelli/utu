@@ -941,6 +941,34 @@ export lib { fn run() Str {
     }
   }
 
+  // resize(n) zero-fills what it exposes (stale elements once showed), and a
+  // store checks its index against the length after its value: a value that
+  // pushes (a vec's array then replaced) can make the index valid.
+  for (const [kind, type, init] of [['mem', 'U8', ''], ['mem', 'I32', ' = [3, 4]'], ['mem', 'I64', ''], ['mem', 'F64', ''], ['vec', 'U8', ' = [1, 2]'], ['vec', 'I16', ''], ['vec', 'I32', ''], ['vec', 'F32', '']]) {
+    const five = type.startsWith('F') ? '5.0' : '5';
+    const zero = type.startsWith('F') ? '0.0' : '0';
+    const value = type === 'U8' || type === 'I16' ? 'I32' : type;
+    const grown = await write(`${kind} b: ${type}${init};\nfn bump() ${value} { for (0 ..< 40) |k| { b.push(${zero}); }; ${five}; }\nexport lib {\n    fn regrow() I32 { b.clear(); b.resize(3); let a = b[0] == ${zero} and b[2] == ${zero}; b[1] = ${five}; b.resize(1); b.resize(2); if a and b[1] == ${zero} and b.len() == 2 { 1; } else { 0; }; }\n    fn late() I32 { b.clear(); b.push(${zero}); b[1] = bump(); b[40] = ${five}; if b[1] == ${five} and b[40] == ${five} { b.len(); } else { 0; }; }\n}\n`);
+    for (const mode of modes) {
+      const built = await compileFile(utu, grown, { mode });
+      const { exports } = await instantiateNode(built.wasm, built.spec);
+      const what = `${kind} ${type}${init} ${mode}`;
+      assert.equal(exports.regrow(), 1, `${what}: regrow`);
+      assert.equal(exports.late(), 41, `${what}: late`);
+      assert.equal(exports.regrow(), 1, `${what}: regrow after late`);
+      checked++;
+    }
+  }
+  // The same of a mem the host makes (copy_in).
+  const hosted = await write('using JS from std:JS;\nmem text: U8;\nexport lib {\n    fn load(bytes: JS.Uint8Array) I32 { text.copy_in(bytes); text.len(); }\n    fn regrow() I32 { text.clear(); text.resize(4); text[0] + text[3] + text.len(); }\n}\n');
+  for (const mode of modes) {
+    const built = await compileFile(utu, hosted, { mode });
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    assert.equal(exports.load(new Uint8Array(100).fill(32)), 100, `${mode}: copy_in`);
+    assert.equal(exports.regrow(), 4, `${mode}: a hosted mem's resize zero-fills`);
+    checked++;
+  }
+
   // A slice ending before it starts traps, and `orelse fatal` on null, in every mode.
   const traps = await write('export lib {\n    fn reversed() I32 { let a = [1, 2, 3]; a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; (s orelse fatal).len(); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
