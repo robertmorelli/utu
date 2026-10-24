@@ -1163,8 +1163,11 @@ fn ld_same(r: I32, n: I32) Bool {
     w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == w_a[w_kid(n, 0)];
 }
 
+/// (Mixed: reads of locals and types numbered in steps would fill runs of
+/// slots, which a probe walks to the end.)
 fn ld_hash(n: I32) I32 {
-    ((w_op[n] * 31 + w_a[n]) * 31 + w_b[n]) * 31 + w_a[w_kid(n, 0)];
+    let h = (((w_op[n] * 31 + w_a[n]) * 31 + w_b[n]) * 31 + w_a[w_kid(n, 0)]) * -1640531527;
+    h ^ (h >>> 15);
 }
 
 /// The entry that holds and reads what n does, or -1.
