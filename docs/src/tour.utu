@@ -1454,7 +1454,7 @@ mod tour {
                 code {
                     "geo.Shape.Circle";
                 }
-                " from mod geo. Where two enums have a variant of one name, the bare name is an error, unless the alt's value or the type wanted says which.";
+                " from mod geo. Where two enums have a variant of one name, the bare name is an error, unless the alt's value or the type wanted says which. A declaration of that name (a struct, an enum, the enum itself) keeps it: the variant is then Shape.Circle, or bare where a Shape is wanted.";
             }
             = code.block(enum_qualified_sample());
             = code.block(enum_tag_sample());

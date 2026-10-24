@@ -312,8 +312,10 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     let scrutinee = first_child(node);
     let m = w_mark();
     let st = check_expr(scrutinee, -1, cx);
-    let enum_decl = ty_decl(st);
     if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
+    // A variant's value is its enum's.
+    let enum_decl = enum_of(ty_decl(st));
+    if enum_decl >= 0 and not ty_is(st, Ty.Nullable) { st = named(enum_decl, ty_inst(st)); } else { enum_decl = ty_decl(st); };
     if is_foreign_or_nullable(st) { return check_host_alt(node, st, m, expect, cx); };
     if not decl_is(enum_decl, Decl.Enum) {
         report2(Diag.AltNotEnum, scrutinee, -1, st, -1);
