@@ -23,16 +23,14 @@ export const BOOLEAN_ATTRIBUTES = words(`
 
 export const VOID_TAGS = words('area base br col embed hr img input link meta param source track wbr');
 
+// SVG's elements (but `a`, `script`, `style`): `fe…` filter primitives, and
+// the rest. (Inside `svg { }` any name is one: see parseElement.)
 export const SVG_TAGS = words(`
-  svg g path circle ellipse line polyline polygon rect text tspan defs use symbol
-  linearGradient radialGradient stop clipPath mask pattern marker title desc foreignObject`);
-
-const SVG_ATTRIBUTES = words(`
-  viewBox xmlns width height x y x1 y1 x2 y2 cx cy r rx ry d points fill fill-rule
-  fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray
-  stroke-dashoffset stroke-opacity opacity transform href offset stop-color stop-opacity
-  gradientUnits gradientTransform preserveAspectRatio clip-path mask
-  xlink:href xlink:title xml:space xmlns:xlink`);
+  svg g path circle ellipse line polyline polygon rect text tspan textPath defs use symbol
+  image switch view linearGradient radialGradient stop clipPath mask pattern marker filter
+  title desc metadata foreignObject animate animateMotion animateTransform set mpath
+  discard hatch hatchpath`);
+const isSvgTag = (tag) => SVG_TAGS.has(tag) || /^fe[A-Z]/.test(tag);
 
 // The DOM events with a handler attribute (`on` + the name), in any browser.
 const EVENT_NAMES = words(`abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom`);
@@ -96,20 +94,21 @@ const TAG_ATTRIBUTES = Object.fromEntries(Object.entries({
   video: 'src controls autoplay muted loop playsinline poster width height preload',
   audio: 'src controls autoplay muted loop preload',
   iframe: 'src title width height loading allow sandbox referrerpolicy',
-  object: 'data type name width height form usemap',
+  object: 'data type name width height form usemap typemustmatch',
 }).map(([tag, names]) => [tag, words(names)]));
 
 /** Vocabulary shared with editor completions. */
 export const wutuVocabulary = { tags: HTML_TAGS, globals: GLOBAL_ATTRIBUTES, attrs: TAG_ATTRIBUTES };
 
 const isCustomElement = (tag) => tag.includes('-');
-const isKnownTag = (tag) => HTML_TAGS.has(tag) || SVG_TAGS.has(tag) || isCustomElement(tag);
+const isKnownTag = (tag) => HTML_TAGS.has(tag) || isSvgTag(tag) || isCustomElement(tag);
 
-function isAllowedAttribute(tag, name) {
-  return GLOBAL_ATTRIBUTES.has(name)
+/** Global, `aria-` and `data-` attributes, the tag's own, and anything on an SVG element (`svg`) or a custom one. */
+function isAllowedAttribute(tag, name, svg) {
+  return svg
+    || GLOBAL_ATTRIBUTES.has(name)
     || /^(aria|data)-/.test(name)
     || TAG_ATTRIBUTES[tag]?.has(name)
-    || (SVG_TAGS.has(tag) && SVG_ATTRIBUTES.has(name))
     || isCustomElement(tag);
 }
 
@@ -131,7 +130,7 @@ const CSS_PROPERTIES = words(`accent-color align-content align-items align-self 
   + `border-start-start-radius border-style border-top border-top-color border-top-left-radius border-top-right-radius border-top-style border-top-width `
   + `border-width bottom box-decoration-break box-shadow box-sizing break-after break-before break-inside caption-side caret-color clear clip clip-path `
   + `clip-rule color color-interpolation color-interpolation-filters color-scheme column-count column-fill column-gap column-rule column-rule-color `
-  + `column-rule-style column-rule-width column-span column-width columns contain contain-intrinsic-block-size contain-intrinsic-height `
+  + `column-rule-style column-rule-width column-span column-width column-wrap columns contain contain-intrinsic-block-size contain-intrinsic-height `
   + `contain-intrinsic-inline-size contain-intrinsic-size contain-intrinsic-width container container-name container-type content content-visibility `
   + `counter-increment counter-reset counter-set cursor cx cy d direction display dominant-baseline dynamic-range-limit empty-cells field-sizing fill `
   + `fill-opacity fill-rule filter flex flex-basis flex-direction flex-flow flex-grow flex-shrink flex-wrap float flood-color flood-opacity font `
@@ -143,7 +142,7 @@ const CSS_PROPERTIES = words(`accent-color align-content align-items align-self 
   + `hyphenate-limit-chars hyphens image-orientation image-rendering initial-letter inline-size inset inset-block inset-block-end inset-block-start `
   + `inset-inline inset-inline-end inset-inline-start interpolate-size isolation justify-content justify-items justify-self left letter-spacing `
   + `lighting-color line-break line-clamp line-height list-style list-style-image list-style-position list-style-type margin margin-block margin-block-end `
-  + `margin-block-start margin-bottom margin-inline margin-inline-end margin-inline-start margin-left margin-right margin-top marker marker-end marker-mid `
+  + `margin-block-start margin-bottom margin-inline margin-inline-end margin-inline-start margin-left margin-right margin-top marker marker-end marker-mid marker-side `
   + `marker-start mask mask-clip mask-composite mask-image mask-mode mask-origin mask-position mask-repeat mask-size mask-type math-depth math-style `
   + `max-block-size max-height max-inline-size max-width min-block-size min-height min-inline-size min-width mix-blend-mode object-fit object-position `
   + `offset offset-anchor offset-distance offset-path offset-position offset-rotate opacity order orphans outline outline-color outline-offset `
@@ -168,33 +167,60 @@ const CSS_PROPERTIES = words(`accent-color align-content align-items align-self 
   + `view-transition-name visibility white-space white-space-collapse widows width will-change word-break word-spacing word-wrap writing-mode x y z-index `
   + `zoom`);
 
-/** Edit distance, up to `bound`. */
+/**
+ * Edit distance, up to `bound`: insertions, deletions, changes and swaps of
+ * two neighbors, one each; a change of case alone costs nothing (as the
+ * self-hosted compiler's word_distance).
+ */
 function editDistance(a, b, bound) {
+  a = a.toLowerCase(); b = b.toLowerCase();
   if (Math.abs(a.length - b.length) >= bound) return bound;
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  let prev2 = [], prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     const row = [i];
-    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) row[j] = Math.min(row[j], prev2[j - 2] + 1);
+    }
+    prev2 = prev;
     prev = row;
   }
   return Math.min(prev[b.length], bound);
 }
 
 /**
- * A standard CSS property `name` is likely a typo of (one edit, two for a
- * long name), or '' for a known one, a prefixed or custom one, or one near
- * none (a property newer than the list).
+ * The word of `set` one edit (or swap of neighbors) from `w`, unless `w`
+ * is in it, or '': a typo. (Two edits from a known word is likely a real
+ * word the list lacks: `marker-side`, `column-wrap`, an event `unmount`.)
  */
-function nearCssProperty(name) {
-  if (!name || name[0] === '-' || CSS_PROPERTIES.has(name)) return '';
-  let best = '', bestD = 3;
-  for (const p of CSS_PROPERTIES) {
-    const d = editDistance(p, name, 3);
+function typoOf(set, w) {
+  if (set.has(w)) return '';
+  let best = '', bestD = 2;
+  for (const p of set) {
+    const d = editDistance(p, w, 3);
     if (d < bestD) { best = p; bestD = d; }
   }
-  if (bestD > 1 && name.length <= 6) return '';
   return best;
 }
+
+// The common DOM events: a name one edit from one is a typo, unless it adds to one's name (`changed`).
+const COMMON_EVENTS = words(`click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress
+  pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture
+  focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort
+  scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel
+  animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel
+  copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress
+  loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange
+  compositionstart compositionupdate compositionend selectionchange selectstart mount`);
+
+/** A DOM event `name` is a typo of, or '' for a known or custom one (see near_event). */
+function nearEvent(name) {
+  for (const e of COMMON_EVENTS) if (e.length < name.length && name.startsWith(e)) return '';
+  return typoOf(COMMON_EVENTS, name);
+}
+
+// CSS at-rules an element's body may hold (with `@-vendor-…`).
+const AT_RULES = words('media supports container layer keyframes font-face starting-style scope page property counter-style font-feature-values font-palette-values position-try view-transition');
 
 export class WutuSyntaxError extends Error {
   /** @param {number} offset template-relative offset of the problem */
@@ -383,20 +409,25 @@ class WutuParser {
   // ── CSS ────────────────────────────────────────────────────────────────────
 
   /**
-   * Balanced CSS scan: delimiters inside strings, functions, and attribute
-   * selectors are data, including semicolons in url(data:...).
+   * Balanced CSS scan: delimiters inside strings, comments, and (), [] and
+   * {} (a function, an attribute selector, a custom property's block) are
+   * data, including semicolons in url(data:...).
    */
   readCssUntil(delimiters) {
     const start = this.p;
-    let parens = 0, brackets = 0;
+    let depth = 0;
     while (!this.done) {
       const c = this.text[this.p];
       if (c === '"' || c === "'") { this.readQuoted(); continue; }
-      if (!parens && !brackets && delimiters.includes(c)) break;
-      if (c === '(') parens++;
-      else if (c === ')') parens--;
-      else if (c === '[') brackets++;
-      else if (c === ']') brackets--;
+      if (this.at('/*')) {
+        const end = this.text.indexOf('*/', this.p + 2);
+        if (end < 0) this.fail('unterminated comment');
+        this.p = end + 2;
+        continue;
+      }
+      if (!depth && delimiters.includes(c)) break;
+      if ('([{'.includes(c)) depth++;
+      else if (')]}'.includes(c)) depth--;
       this.p++;
     }
     return this.text.slice(start, this.p).trim();
@@ -576,7 +607,8 @@ class WutuParser {
     const head = this.peek(/[a-z][\w-]*/y);
     if (!head) this.fail('expected an HTML tag (class-only heads do not create elements)');
     const tag = head[0];
-    if (!isKnownTag(tag)) this.fail(`expected an HTML tag, found unknown element '${tag}' (custom element names need a hyphen)`);
+    const outer = this.svg ?? false, outerElement = this.svgElement ?? false;
+    if (!outer && !isKnownTag(tag)) this.fail(`expected an HTML tag, found unknown element '${tag}' (custom element names need a hyphen)`);
     this.p += tag.length;
     const node = { kind: 'element', tag, classes: [], binding: null, attrs: [], events: [], twoWay: [], css: [], styles: [], children: [], start };
 
@@ -600,13 +632,17 @@ class WutuParser {
     }
     if (this.text[this.p] !== '{') this.fail('expected { after element head');
     this.p++;
-
+    // Whether this element is SVG, and its children (not a foreignObject's).
+    this.svgElement = outer || (isSvgTag(tag) && !HTML_TAGS.has(tag));
+    this.svg = this.svgElement && tag !== 'foreignObject';
     for (;;) {
       this.skipTrivia();
       if (this.done) this.fail(`unterminated element '${tag}'`, start);
       if (this.text[this.p] === '}') { this.p++; break; }
       this.parseElementStatement(node);
     }
+    this.svg = outer;
+    this.svgElement = outerElement;
     if (VOID_TAGS.has(tag) && node.children.length) this.fail(`${tag} cannot have children`, start);
     const code = tag === 'script' && node.children.find(c => c.kind !== 'text');
     if (code) this.fail('a script\'s text is code, so Wutu writes it only as written: script { "…"; }', code.start);
@@ -637,6 +673,8 @@ class WutuParser {
       // `on click [quiet] [|e|] { … }` or `on click = handler;`
       const start = this.p;
       this.p += match[0].length;
+      const near = nearEvent(match[1]);
+      if (near) this.fail(`unknown event ${match[1]}; did you mean ${near}?`, start + match[0].indexOf(match[1], 2));
       const event = { name: match[1], quiet: !!match[2], param: match[3] ?? null, start };
       if (this.text[this.p] === '=') {
         if (event.param) this.fail('a handler value names its own parameter: on click = cl(e) void { … };');
@@ -665,10 +703,25 @@ class WutuParser {
       // (`xlink:href = …;`: a namespaced attribute; no CSS property has those prefixes.)
       this.parseAttribute(node, false);
     } else if (c === ':' || c === '@' || c === '&') {
+      if (c === '@') this.atDirective();
       this.parseCssRule(node);
     } else {
       this.parseDeclarationOrChild(node);
     }
+  }
+
+  /**
+   * `@name` in an element's body: a CSS at-rule passes; `@unmanaged`
+   * without `;`, a template's head directive, or an unknown one fails.
+   */
+  atDirective() {
+    const name = this.peek(/@([\w-]*)/y)[1];
+    if (!name || AT_RULES.has(name) || name[0] === '-') return;
+    if (name === 'unmanaged') this.fail('expected ; after @unmanaged', this.p + 1 + name.length);
+    const head = '@reactive @island @style @document';
+    if (head.split(' ').includes('@' + name)) this.fail(`@${name} goes first in the template, before its root element`);
+    const near = editDistance('@unmanaged', '@' + name, 3) < 3 ? '@unmanaged' : '';
+    this.fail(`unknown directive @${name}${near ? `; did you mean ${near}?` : '; an element takes @unmanaged, or a CSS at-rule'}`);
   }
 
   /** `<name = value;`, the spelling before attributes lost their `<`: say the new one. */
@@ -713,7 +766,7 @@ class WutuParser {
     if (dynamic && isProperty && name === 'protocol') this.fail('.protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;', nameStart);
     if (dynamic && isProperty && RAW_TEXT_TAGS.has(node.tag) && (name === 'textContent' || name === 'innerText')) this.fail(rawTextError(node.tag), nameStart);
     if (dynamic && name === 'srcdoc') this.fail('srcdoc is HTML, so Wutu sets it only as written: srcdoc = "…"; (trusted HTML from a value: an `as` element\'s .srcdoc, in code)', nameStart);
-    if (!isProperty && !isAllowedAttribute(node.tag, name)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
+    if (!isProperty && !isAllowedAttribute(node.tag, name, this.svgElement)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
     node.attrs.push({ name, value, property: isProperty, dynamic, range, start: nameStart });
   }
 
@@ -730,28 +783,45 @@ class WutuParser {
     node.css.push({ source: `${selector}{${block}}`, css: `${scopedSelector(selector)}{${block}}`, start });
   }
 
-  /** A typo of a standard property fails, saying which. */
-  cssPropertyKnown(name, at) {
-    const near = nearCssProperty(name);
-    if (near) this.fail(`invalid CSS property ${name}; did you mean ${near}?`, at);
+  /**
+   * An invalid property name fails; so does a typo of a standard one (names
+   * are ASCII case-insensitive; a prefixed or custom one is not checked).
+   */
+  cssPropertyKnown(head, at) {
+    const name = head.startsWith('--') ? head : head.toLowerCase();
+    if (!CSS_PROPERTY.test(name)) this.fail('invalid CSS property', at);
+    const near = name[0] === '-' ? '' : typoOf(CSS_PROPERTIES, name);
+    if (near) this.fail(`invalid CSS property ${head}; did you mean ${near}?`, at);
   }
 
   /**
    * A value (`text[from, to)`) that runs onto the next line's declaration or
    * rule (`padding: 1rem` then `gap: 2rem;`): its `;` is missing, at its line's end.
    */
-  cssValueRunsOn(from, to) {
+  cssValueRunsOn(from, to, custom) {
     const text = this.text;
-    let parens = 0;
+    let depth = 0, quoted = custom;
     for (let i = from; i < to; i++) {
       const c = text[i];
+      let end = -1;
       if (c === '"' || c === "'") {
+        quoted = true;
         i++;
         while (i < to && text[i] !== c) i += text[i] === '\\' ? 2 : 1;
-      } else if (c === '(') parens++;
-      else if (c === ')') parens--;
-      else if (c === '\n' && parens === 0 && /^\s*(--|-?[a-z])[\w-]*\s*[:{]/.test(text.slice(i + 1, i + 200))) {
-        let end = i;
+      } else if (text.startsWith('/*', i)) {
+        const close = text.indexOf('*/', i + 2);
+        i = close < 0 ? to : close + 1;
+      } else if ('([{'.includes(c)) depth++;
+      else if (')]}'.includes(c)) depth--;
+      else if (c === ':' && !depth && !custom) {
+        end = i;
+        while (end > from && /[\w-]/.test(text[end - 1])) end--;
+      } else if (c === '\n' && !depth) {
+        const next = text.slice(i + 1, i + 200);
+        const m = /^\s*((?:--|-?[a-z])[\w-]*)\s*([:{]|=(?!=)|;)/.exec(next);
+        if ((m && (m[2] !== ';' || BOOLEAN_ATTRIBUTES.has(m[1]))) || (!quoted && /^\s*"/.test(next) && i + 1 + next.search(/\S/) < to)) end = i;
+      }
+      if (end >= 0) {
         while (end > from && /\s/.test(text[end - 1])) end--;
         this.fail('CSS declarations require a semicolon', end);
       }
@@ -775,18 +845,17 @@ class WutuParser {
       this.p++;
       const expression = this.readBareExpression();
       this.expectSemicolon();
-      if (!CSS_PROPERTY.test(head)) this.fail('invalid CSS property', start);
-      this.cssPropertyKnown(head.trim(), start);
+      this.cssPropertyKnown(head, start);
       node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start });
       return;
     }
     const valueFrom = this.p;
-    const value = this.readCssUntil(';{}');
-    this.cssValueRunsOn(valueFrom, this.p);
+    const custom = head.startsWith('--');
+    const value = this.readCssUntil(custom ? ';}' : ';{}');
+    this.cssValueRunsOn(valueFrom, this.p, custom);
     if (this.text[this.p] !== ';') this.fail('CSS declarations require a semicolon');
     this.p++;
-    if (!CSS_PROPERTY.test(head)) this.fail('invalid CSS property', start);
-    this.cssPropertyKnown(head.trim(), start);
+    this.cssPropertyKnown(head, start);
     const declaration = `${head}:${value};`;
     node.css.push({ source: this.text.slice(start, this.p), css: declaration, start });
   }

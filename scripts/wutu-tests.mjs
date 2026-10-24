@@ -628,6 +628,52 @@ export main() Browser.HTMLElement {
     assert(typo.some(d => d.severity === 'error' && d.message.includes('unknown event clik; did you mean click?')), typo.map(d => d.message).join('; '));
   });
 
+  test('wutu parser: CSS comments and custom blocks, SVG names, case and near-names pass; missing ; and typos fail (both parsers)', async ({ ROOT }) => {
+    const ok = `section {
+      margin: 1px /* a; */ 2px;
+      padding: 1px /* note
+        color: red */ 2px;
+      --cfg: { "a": 1 };
+      --deep: {
+        a: 1;
+        b: [2, 3]
+      };
+      COLOR: red;
+      marker-side: match-self;
+      column-wrap: wrap;
+      grid-template-areas: "a"
+        "b";
+      on unmount { }
+      on changed { }
+      object { typemustmatch; data = "/a.svg"; }
+      svg { filter { feGaussianBlur { stdDeviation = "2"; } } image { href = "/a.png"; } text { font-size = "3"; text-anchor = "middle"; }
+        animate { attributeName = "x"; dur = "1s"; values = "0;1"; repeatCount = "indefinite"; } textPath { } switch { } set { }
+        foreignObject { div { } } }
+      "x";
+    }`;
+    parseWutu(ok);
+    const okDiagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ ${ok} \\/; }` });
+    assertEq(okDiagnostics.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
+    const bad = [
+      ['div { color: red margin: 0; }', 'CSS declarations require a semicolon'],
+      ['div { color: red\n href = "/x"; }', 'CSS declarations require a semicolon'],
+      ['div { color: red\n hidden; }', 'CSS declarations require a semicolon'],
+      ['div { color: red\n "x"; }', 'CSS declarations require a semicolon'],
+      ['div { widht: 1px; }', 'invalid CSS property widht; did you mean width?'],
+      ['div { marign: 0; }', 'invalid CSS property marign; did you mean margin?'],
+      ['div { on chnage { } }', 'unknown event chnage; did you mean change?'],
+      ['div { on scrol { } }', 'unknown event scrol; did you mean scroll?'],
+      ['div { svg { rect { onclick = f; } } }', 'events are written on click'],
+      ['div { @import "a.css"; }', 'unknown directive @import'],
+      ['div { foo { } }', "unknown element 'foo'"],
+    ];
+    for (const [text, message] of bad) {
+      assert(syntaxError(text).message.includes(message), `js ${text}: ${syntaxError(text).message}`);
+      const diagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { let f = 1; @wutu/\\ ${text} \\/; }` });
+      assert(diagnostics.some(d => d.severity === 'error' && d.message.includes(message)), `selfhost ${text}: ${diagnostics.map(d => d.message).join('; ')}`);
+    }
+  });
+
   test('wutu parser: legacy surface still parses', () => {
     assertThrows(() => parseWutu('div { aria-hidden = "true" aspect-ratio: 0.68; }'), 'expected ;');
     const tree = parseWutu('section.a#b { data-x = x; hidden; svg { viewBox = "0 0 1 1"; } my-widget { anything = "ok"; } }');
