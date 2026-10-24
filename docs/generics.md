@@ -108,7 +108,8 @@ there.
 A protocol's own function, `fn Counter.tick |c|`, is a method of a T
 bounded by Counter, as of a Counter value: `c.tick()` calls the T's own
 `tick` if it has one, else Counter's (when two bounds both have one, say
-which: `Counter.tick(c)`).
+which: `Counter.tick(c)`). Counter's is checked for each T, as the module
+is, so a scalar, Str or enum T works too, and `c.step()` in it is T's.
 
 A bounded parameter passes its bounds on: in `mod Ranking[T[Ord, Named]]`,
 `Order[T]` is an instance whose T implements Ord.
