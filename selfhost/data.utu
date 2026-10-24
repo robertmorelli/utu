@@ -774,6 +774,7 @@ vec codes_helper: I32;
 vec helper_funcs: I32;
 
 /// A helper function's locals after its parameters: value types in `local_types`.
+/// Its body sets each local before reading it: inlined, a local need not start at zero.
 fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {
     let f = new_func(FuncKind.Defined, func_type(params, results));
     func_debug_name[f] = name_add(name);
@@ -895,6 +896,10 @@ fn from_codes_helper(heap: I32) I32 {
     w_get(vt_i32, 1);
     w_node(Op.ArrayNewDefault, vt_ref(units, false), units, 0, mn);
     w_node(Op.LocalSet, vt_none, 2, 0, mn);
+    // i = 0: set, not assumed (an inlined copy's locals come round the caller's loop).
+    let mz = w_mark();
+    w_i32(0);
+    w_node(Op.LocalSet, vt_none, 3, 0, mz);
     // for i in 0 ..< count: narrow[i] = codes[i]
     let mb = w_mark();
     let mloop = w_mark();

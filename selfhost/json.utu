@@ -214,18 +214,27 @@ fn shape_kind(written: Str) Shape {
 }
 
 /// The struct or enum declaration a type names in the container (any of
-/// the file's, at its top level), or -1.
+/// the file's, at its top level), or -1. In a module: its own, else the
+/// file's top-level one of that name.
 fn declared_type(type: Str) I32 {
     let w = intern_text(type);
     if is_kind(jp_container[0], Node.Module_decl) {
-        let item = first_child(jp_container[0]);
-        while (item >= 0) {
-            if (is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl)) and type_word(item) == w { return item; };
-            item = next_sibling(item);
-        };
-        return -1;
+        let own = json_declared_in(jp_container[0], w);
+        if own >= 0 { return own; };
+        let file = parent_of(jp_container[0]);
+        return if file >= 0 { json_declared_in(file, w); } else { -1; };
     };
     find_declared(jp_container[0], w);
+}
+
+/// The first struct or enum of that name directly in `node`, or -1.
+fn json_declared_in(node: I32, w: I32) I32 {
+    let item = first_child(node);
+    while (item >= 0) {
+        if (is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl)) and type_word(item) == w { return item; };
+        item = next_sibling(item);
+    };
+    -1;
 }
 
 /// The last of that name in the file, in order, as stage 0's table keeps it.

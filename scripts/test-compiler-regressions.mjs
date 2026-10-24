@@ -1585,6 +1585,11 @@ export lib {
     // Literals under operators take the other operand's type, and must fit it.
     ['fn f(x: U32) U32 { (1 + 5000000000) + x; }\nexport lib { fn run() I32 { 0; } }\n', '5000000000 does not fit U32'],
     ['fn f(x: U64) U64 { (-1 + 2) + x; }\nexport lib { fn run() I32 { 0; } }\n', '-1 does not fit U64'],
+    // @json in a mod sees the file's top-level types, not a type parameter or another mod's types.
+    ['mod Pager[T] {\n    fn two(x: T) Str { @json/\\ encode T x \\/; }\n}\nexport lib { fn run() Str { Pager[I32].two(1); } }\n',
+      '@json cannot use T: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
+    ['mod geo {\n    struct Pt:\n        | x: I32\n}\nmod M {\n    fn f(p: geo.Pt) Str { @json/\\ encode Pt p \\/; }\n}\nexport lib { fn run() I32 { 1; } }\n',
+      '@json cannot use Pt: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
@@ -1881,6 +1886,65 @@ export main() I32 {
     p.sum() * 100000 + q.sum() * 10000 + b.v * 1000 + total(t) * 100 + Pick[Tri].big(t, Tri { area: 8 }) * 10 + tone(Color.Red) + tone(Color.Green);
 }
 ` }, 597391],
+    // Str.from_codes inlined into a loop: its index started where the last call left it (each string
+    // after the first was its length of NULs). @json encode and Interner.ascii build on it.
+    [{ 'main.utu': String.raw`using Interner from std:Interner;
+struct P:
+    | a: I32
+struct Q:
+    | s: Str
+fn enc(k: I32) Str { @json/\ encode P P { a: k } \/; }
+export main() Str {
+    let out = "";
+    for (0..<3) |k| {
+        let e = @json/\ encode P P { a: k } \/;
+        out += e + "|";
+    };
+    for (0..<2) |i| { for (0..<2) |j| { out += enc(i * 2 + j); }; };
+    let i = 0;
+    while (i < 2) {
+        out += @json/\ encode Q Q { s: "x" } \/;
+        out += enc(i) + @json/\ error P "{\"a\":7}" \/;
+        let d = @json/\ decode P "{\"a\":5}" \/ orelse fatal;
+        out += d.a.to_str();
+        i += 1;
+    };
+    let n = 0;
+    for (0..<1000) |k| { if enc(k) == "{\"a\":" + k.to_str() + "}" { n += 1; }; };
+    let a = [107, 48, 107, 49];
+    for (0 ..< 3) |q| { out += Str.from_codes(a, 2); };
+    let names = Interner.new();
+    for (0 ..< 3) |k| {
+        names.begin();
+        names.byte(97 + k);
+        names.byte(98);
+        out += names.ascii(names.finish());
+    };
+    out + n.to_str();
+}
+` }, '{"a":0}|{"a":1}|{"a":2}|{"a":0}{"a":1}{"a":2}{"a":3}{"s":"x"}{"a":0}5{"s":"x"}{"a":1}5k0k0k0abbbcb1000'],
+    // @json in a mod uses the file's top-level structs and enums (it said "@json cannot use Item").
+    [{ 'main.utu': String.raw`struct Item:
+    | name: Str
+enum Color:
+    | Red
+    | Green
+mod Plain {
+    fn one(text: Str) Str { @json/\ error Item text \/; }
+    fn tint(c: Color) Str { @json/\ encode Array[Color] [c] \/; }
+}
+mod Pager[T] {
+    struct Page:
+        | items: Array[Item]
+    fn two(text: Str) Str {
+        let p = @json/\ decode Page text \/ orelse fatal;
+        p.items[0].name + @json/\ encode Page p \/;
+    }
+}
+export main() Str {
+    Plain.one("{\"name\":\"a\"}") + "/" + Plain.tint(Green {}) + Pager[I32].two("{\"items\":[{\"name\":\"b\"}]}");
+}
+` }, '/["Green"]b{"items":[{"name":"b"}]}'],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
