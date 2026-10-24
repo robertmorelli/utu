@@ -1,0 +1,9 @@
+// What: a v128 constant's byte past 255 (it spilled into the next lane)
+// Expect: 256 does not fit a byte
+fn lanes() V128 {
+    @ir/\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/;
+}
+
+export main() Bool {
+    V128.any_true(lanes());
+}

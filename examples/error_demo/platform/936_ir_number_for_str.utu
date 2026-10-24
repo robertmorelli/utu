@@ -1,0 +1,9 @@
+// What: @ir arithmetic for a Str result (the engine said only "not valid Wasm")
+// Expect: @ir gives i32, not Str
+fn name(a: I32) Str {
+    @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
+}
+
+export main() Str {
+    name(1);
+}

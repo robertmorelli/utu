@@ -1,0 +1,9 @@
+// What: a Bool @ir literal other than 0 or 1
+// Expect: 2 does not fit Bool
+fn yes() Bool {
+    @ir/\ <ir-lit kind="bool" type-name="Bool" value="2"/> \/;
+}
+
+export main() Bool {
+    yes();
+}

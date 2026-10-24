@@ -1,0 +1,9 @@
+// What: a string's length as a Bool (it was a Bool holding 3 in small)
+// Expect: @ir gives an i32, not a comparison's Bool
+fn nonempty(s: Str) Bool {
+    @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
+}
+
+export main() I32 {
+    if nonempty("abc") { 1; } else { 0; };
+}

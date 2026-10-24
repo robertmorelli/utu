@@ -1666,7 +1666,7 @@ export lib {
   }
 
   // A program's @ir that makes invalid Wasm: said at the body, before the engine fails.
-  const badIr = await selfhost(await write('fn f(a: I32) I32 { @ir/\\ <ir-i31-get-s><ir-ident name="a"/></ir-i31-get-s> \\/; }\nexport main() I32 { f(1); }\n'));
+  const badIr = await selfhost(await write('fn f(a: Str) I31 { @ir/\\ <ir-ident name="a"/> \\/; }\nexport main() I32 { I31.get_s(f("x")); }\n'));
   assert.ok(badIr.errors?.some(e => e.startsWith('@ir in f does not make valid Wasm: ')), String(badIr.errors));
   checked++;
   // A plain instruction's operands, the result, and a literal: checked by the
@@ -1681,6 +1681,26 @@ export lib {
     ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \\/; }\nexport main() I32 { f(); }\n', '2147483648 does not fit I32'],
     ['fn f() U32 { @ir/\\ <ir-lit kind="int" type-name="U32" value="-1"/> \\/; }\nexport main() U32 { f(); }\n', '-1 does not fit U32'],
     ['fn f() U64 { @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551616"/> \\/; }\nexport main() U64 { f(); }\n', '18446744073709551616 does not fit U64'],
+    // Only a comparison or Bools make a Bool: a string's length was a Bool holding 3 in small.
+    ['fn ln(a: Str) Bool { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\nexport main() I32 { if ln("abc") { 1; } else { 0; }; }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn g(a: Str) Bool { @ir/\\ <ir-string-get-wtf16><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="0"/></ir-string-get-wtf16> \\/; }\nexport main() I32 { if g("a") { 1; } else { 0; }; }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn g(a: I31) Bool { @ir/\\ <ir-i31-get-s><ir-ident name="a"/></ir-i31-get-s> \\/; }\nexport main() I32 { if g(I31.from_i32(5)) { 1; } else { 0; }; }\n', "@ir gives an i32, not a comparison's Bool"],
+    // Checked though nothing calls it.
+    ['fn f(a: I32) Bool { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { 0; }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-bogus><ir-ident name="a"/></ir-bogus> \\/; }\nexport main() I32 { 0; }\n', 'No @ir element <ir-bogus>'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-ident name="zz"/> \\/; }\nexport main() I32 { 0; }\n', '@ir names no parameter zz'],
+    // A v128 constant's bytes (256 spilled into the next lane), a Bool literal, a lone minus.
+    ['fn f() V128 { @ir/\\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \\/; }\nexport main() I32 { 0; }\n', '256 does not fit a byte'],
+    ['fn f() V128 { @ir/\\ <ir-v128-const data-type-name="V128" bytes="1,2,3"/> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-v128-const> is written wrong here'],
+    ['fn f() Bool { @ir/\\ <ir-lit kind="bool" type-name="Bool" value="2"/> \\/; }\nexport main() I32 { 0; }\n', '2 does not fit Bool'],
+    ['fn f() Bool { @ir/\\ <ir-lit kind="bool" type-name="Bool" value="-7"/> \\/; }\nexport main() I32 { 0; }\n', '-7 does not fit Bool'],
+    ['fn f() F64 { @ir/\\ <ir-lit kind="float" type-name="F64" value="-"/> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-lit> is written wrong here'],
+    // References and nothing: said by the compiler, not the engine.
+    ['fn f(a: I32) Str { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { 0; }\n', '@ir gives i32, not Str'],
+    ['fn f(a: I32) void { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { 0; }\n', '@ir gives i32, not void'],
+    ['fn f(a: I32) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\nexport main() I32 { f(3); }\n', '@ir <ir-string-measure-utf16> takes externref, given i32'],
+    ['fn f(a: I32, b: I32) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-ref-eq> takes eqref, given i32'],
+    ['fn f(a: Str, b: Str) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-ref-eq> takes eqref, given externref'],
   ]) {
     const file = await write(source);
     for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
@@ -1689,18 +1709,22 @@ export lib {
       checked++;
     }
   }
-  // What @ir may give: a comparison, Bools and'ed, a Bool literal for Bool; literals at their types' edges.
+  // What @ir may give: a comparison, Bools and'ed, a Bool literal, string equality for Bool; literals at their types' edges.
   const goodIr = await write('fn lt(a: I32, b: I32) Bool { @ir/\\ <ir-i32-lt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-lt-s> \\/; }\n'
     + 'fn both(a: Bool, b: Bool) Bool { @ir/\\ <ir-i32-and><ir-ident name="a"/><ir-ident name="b"/></ir-i32-and> \\/; }\n'
     + 'fn yes() Bool { @ir/\\ <ir-lit kind="int" type-name="Bool" value="1"/> \\/; }\n'
     + 'fn lo() I32 { @ir/\\ <ir-lit kind="int" type-name="I32" value="-2147483648"/> \\/; }\n'
     + 'fn hi() U64 { @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551615"/> \\/; }\n'
     + 'fn wide(a: I32) I64 { @ir/\\ <ir-i64-extend-s><ir-ident name="a"/></ir-i64-extend-s> \\/; }\n'
-    + 'export main() Str { lt(1, 2).to_str() + " " + both(true, lt(3, 2)).to_str() + " " + yes().to_str() + " " + lo().to_str() + " " + hi().to_str() + " " + wide(-5).to_str(); }\n');
+    + 'fn same(a: Str, b: Str) Bool { @ir/\\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \\/; }\n'
+    + 'fn len(a: Str) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\n'
+    + 'fn top() V128 { @ir/\\ <ir-v128-const data-type-name="V128" bytes="255,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \\/; }\n'
+    + 'export main() Str { lt(1, 2).to_str() + " " + both(true, lt(3, 2)).to_str() + " " + yes().to_str() + " " + lo().to_str() + " " + hi().to_str() + " " + wide(-5).to_str()'
+    + ' + " " + same("a", "a").to_str() + " " + len("abc").to_str() + " " + V128.any_true(top()).to_str(); }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, goodIr, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
-    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 'true false true -2147483648 18446744073709551615 -5', mode);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 'true false true -2147483648 18446744073709551615 -5 true 3 true', mode);
     checked++;
   }
 

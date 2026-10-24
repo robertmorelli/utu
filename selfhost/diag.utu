@@ -302,7 +302,7 @@ fn awaited_type(t: I32) I32 {
 /// Whether t is a `fun` type, or a nullable one.
 fn es_fun_type(t: I32) Bool { ty_is(t, Ty.Fun) or (ty_is(t, Ty.Nullable) and ty_is(ty_a[t], Ty.Fun)); }
 
-/// A scalar value type's name, as `@ir` tags spell it.
+/// A value type's name, as `@ir` tags spell it.
 fn vt_text(vt: I32) Str {
     if vt == vt_i32 { return "i32"; };
     if vt == vt_i64 { return "i64"; };
@@ -310,6 +310,9 @@ fn vt_text(vt: I32) Str {
     if vt == vt_f64 { return "f64"; };
     if vt == vt_v128 { return "v128"; };
     if vt == vt_none { return "nothing"; };
+    if vt == vt_eqref { return "eqref"; };
+    if vt == vt_i31ref { return "i31ref"; };
+    if vt == vt_extern or vt == vt_externref { return "externref"; };
     "a reference";
 }
 
@@ -471,7 +474,7 @@ fn diag_text(i: I32) Str {
         },
         Diag.InvalidGlobalInitializer => "Global " + w + " needs a literal",
         Diag.RecursiveType => w + " contains itself; make the field nullable",
-        Diag.IntegerOutOfRange => (if word >= 0 { w; } else { node_text(node); }) + " does not fit " + type_text(a),
+        Diag.IntegerOutOfRange => (if word >= 0 { w; } else { node_text(node); }) + " does not fit " + (if a >= 0 { type_text(a); } else { "a byte"; }),
         Diag.InvalidDistinct => "distinct wraps I32, U32, I64, U64, F32, or F64",
         Diag.EnumValueRange => word_text(b) + " does not fit " + word_text(diag_c[i]),
         Diag.EnumValueTwice => word_text(a) + "." + w + " and ." + word_text(b) + " are both " + word_text(diag_c[i]),

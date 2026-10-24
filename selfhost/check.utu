@@ -96,7 +96,10 @@ fn fn_instance_on(decl: I32, inst: I32, self_t: I32) I32 {
     if ir >= 0 {
         fi_ir[id] = ir;
         // A program's own @ir is unchecked: the host validates the module it is in.
-        if file_std[file_of_token(node_first[body])] != 1 { user_ir_decl.push(decl); };
+        if file_std[file_of_token(node_first[body])] != 1 {
+            user_ir_decl.push(decl);
+            user_ir_fi.push(id);
+        };
     } else {
         let f = defined_func(fi_params[id], fi_result[id]);
         fi_func[id] = f;
@@ -2460,11 +2463,12 @@ fn expand(fi: I32, m: I32) I32 {
         report2(Diag.IrUnknown, body, if ident and why == 1 { if named >= 0 { attr_word(named); } else { -1; }; } else { x_tag[bad]; }, why, -1);
         return error_value();
     };
-    let got = ir_vt(x, decls, fi, w_stack[w_stack.len() - 1]);
+    let got = if w_stack.len() > m { ir_vt(x, decls, fi, w_stack[w_stack.len() - 1]); } else { vt_none; };
     let bool_t = prelude(Prelude.Bool);
-    if (vt_scalar(result_vt) and vt_scalar(got) and got != result_vt) or (fi_result[fi] == bool_t and got == vt_i32 and not ir_bool(x, decls, fi)) {
+    if not ir_fits(result_vt, got) or (fi_result[fi] == bool_t and got == vt_i32 and not ir_bool(x, decls, fi)) {
         w_stack.resize(m);
-        report3(Diag.IrType, first_child(fn_body(fi_decl[fi])), -1, fi_result[fi], got, 1);
+        let body = first_child(fn_body(fi_decl[fi]));
+        if not reported_within(body) { report3(Diag.IrType, body, -1, fi_result[fi], got, 1); };
         return error_value();
     };
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m); };
@@ -2472,6 +2476,46 @@ fn expand(fi: I32, m: I32) I32 {
 }
 
 fn vt_scalar(vt: I32) Bool { vt >= vt_i32 and vt <= vt_v128; }
+
+/// Whether an `@ir` value of value type `got` can be a `want`: nothing for
+/// nothing, a scalar for the same, any reference for a reference (which
+/// the engine checks).
+fn ir_fits(want: I32, got: I32) Bool {
+    let a = vt_class(want);
+    let b = vt_class(got);
+    a < 0 or b < 0 or a == b;
+}
+
+/// Nothing, each scalar, or a reference; -1 another (unreachable, a tuple).
+fn vt_class(vt: I32) I32 {
+    if vt == vt_none or vt_scalar(vt) { return vt; };
+    if vt_is_ref(vt) { 6; } else { -1; };
+}
+
+/// Check each `@ir` body of the program's own once, its parameters for
+/// arguments, though nothing calls it.
+fn check_own_ir() void {
+    for (0 ..< user_ir_fi.len()) |k| {
+        let fi = user_ir_fi[k];
+        let params = fi_params[fi];
+        let typed = not ty_is(fi_result[fi], Ty.Error);
+        for (0 ..< vl_len[params]) |i| { if ty_is(vl_item(params, i), Ty.Error) { typed = false; }; };
+        if typed {
+            begin_function();
+            cur_fn[0] = -1;
+            let m = w_mark();
+            for (0 ..< vl_len[params]) |i| {
+                let vt = repr(vl_item(params, i));
+                w_leaf(Op.LocalGet, vt, new_local(vt), 0);
+            };
+            enter_instance(fi_inst[fi], -1);
+            expand(fi, m);
+            leave_instance();
+            w_stack.resize(m);
+        };
+    };
+    cur_locals.clear();
+}
 
 /// The value type an `@ir` element `x` gives (pushed as `node`): a
 /// parameter's by its type, not its argument's at this call.
@@ -2481,8 +2525,8 @@ fn ir_vt(x: I32, decls: I32, fi: I32, node: I32) I32 {
 }
 
 /// Whether an `@ir` element gives a Bool: a comparison, a Bool parameter
-/// or literal, `and`, `or`, `xor` of Bools, or an element the plain
-/// instructions are not (whose type its function's says).
+/// or literal, `and`, `or`, `xor` of Bools, string or reference equality,
+/// or an array's element (whose type its function's says).
 fn ir_bool(x: I32, decls: I32, fi: I32) Bool {
     let tag = x_tag[x];
     let bool_t = prelude(Prelude.Bool);
@@ -2494,10 +2538,10 @@ fn ir_bool(x: I32, decls: I32, fi: I32) Bool {
     };
     if tag == known_word(Known.IrSafeChecks) or tag == known_word(Known.IrRefEq) or tag == known_word(Known.IrRefNe)
         or tag == known_word(Known.IrStringEq) or tag == known_word(Known.IrStringNe) { return true; };
+    // (An array's element: as its type says.)
+    if tag == known_word(Known.IrArrayGet) { return true; };
     let op = tag_opcode(tag);
     if (op >= 69 and op <= 102) or op == 64851 { return true; };
-    // (An array's element, a string's length: as the type says.)
-    if op < 0 { return true; };
     if op < 113 or op > 115 { return false; };
     let c = x_child[x];
     while (c >= 0) {
@@ -2584,6 +2628,8 @@ vec ir_failed_shape: I32 = [0];
 vec ir_fault: I32 = [0, 0];
 /// The functions of a program's own files whose bodies are @ir, in the last build.
 vec user_ir_decl: I32;
+/// Their function instances.
+vec user_ir_fi: I32;
 
 /// The element being translated is malformed (an attribute or operand missing, of the wrong kind).
 fn ir_malformed(x: I32) Bool {
@@ -2626,7 +2672,10 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
         };
         let t = decl_type(promoted(named_t), 0);
         let neg = src[attr_start[v]] == 45;
-        if not ir_lit_fits(attr_start[v] + if neg { 1; } else { 0; }, attr_end[v], neg, t) {
+        // (A lone minus has no digits.)
+        if neg and attr_end[v] - attr_start[v] == 1 { return ir_malformed(x); };
+        let bool_ok = t != prelude(Prelude.Bool) or (attr_end[v] - attr_start[v] == 1 and src[attr_start[v]] <= 49);
+        if not bool_ok or not ir_lit_fits(attr_start[v] + if neg { 1; } else { 0; }, attr_end[v], neg, t) {
             ir_failed[0] = x;
             ir_failed_shape[0] = 4;
             ir_fault[0] = t;
@@ -3160,6 +3209,7 @@ fn reset_check() void {
     expand_decls.clear();
     expand_direct.clear();
     user_ir_decl.clear();
+    user_ir_fi.clear();
     reach_from.clear();
     reach_to.clear();
     checking_fi[0] = -1;
@@ -3348,6 +3398,7 @@ fn compile(target: Target) I32 {
         };
     };
     checking_fi[0] = -1;
+    check_own_ir();
     start_globals();
     if diag_kind.len() > 0 { return -1; };
     encode_module();
