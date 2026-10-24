@@ -98,6 +98,24 @@ try {
   // A run named twice is the same code both times.
   await fs.writeFile(path.join(dir, 'runs.utu'), 'fn f(a: I32, b: I32) I32 { a + b; }\nfn g() I32 { f(1, 2) + f(3, 4); }\nfn h() I32 { f(1, 2) + f(1, 2); }\n');
   assert.deepEqual(JSON.parse(cli('f($...a) + f($...a)', '--json', path.join(dir, 'runs.utu')).stdout).map(m => m.line), [3]);
+  // A typed run: every element has the type. `$_` takes a type too. A typed hole is never a statement.
+  await fs.writeFile(path.join(dir, 'typed.utu'), 'fn add(a: I32, b: I32) I32 { a + b; }\nfn name(s: Str) Str { s; }\nfn run(n: I32) I32 {\n  let s: Str = "abc";\n  if n > 0 { n = 1; };\n  add(1, n);\n  name(s);\n  n;\n}\nexport main() I32 { run(3); }\n');
+  const typed = (...args) => {
+    const r = cli(...args, '--json', path.join(dir, 'typed.utu'));
+    return r.stdout.trim() ? JSON.parse(r.stdout).map(m => [m.line, m.column]) : [];
+  };
+  assert.deepEqual(typed('$f($...args)', '--where', 'args: Str'), [[7, 3]]);
+  assert.deepEqual(typed('$f($...args)', '--where', 'args: I32'), [[6, 3], [10, 21]]);
+  assert.deepEqual(typed('$f($_, $_)', '--where', '_: I32'), [[6, 3]]);
+  assert.deepEqual(typed('$f($_)', '--where', '_: Str'), [[7, 3]]);
+  assert.deepEqual(typed('$e', '--where', 'e: void'), [[5, 14]], 'the assignment, not the let or the if');
+  // One --where a hole; --refs needs a name.
+  const twice = cli('$e', '--where', 'e: I32', '--where', 'e: Str', path.join(dir, 'typed.utu'));
+  assert.equal(twice.status, 2);
+  assert.match(twice.stderr, /--where gives \$e twice/);
+  const empty = cli('--refs', '', path.join(dir, 'typed.utu'));
+  assert.equal(empty.status, 2);
+  assert.match(empty.stderr, /--refs needs a name/);
   console.log('grep: holes, recurring holes and runs, type filters, statements, references by resolution (through a protocol too), exit status, skipped and missing files');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });

@@ -38,6 +38,12 @@ call of something named `count`); `--refs` matches by resolution.
 compiler checked it and writes it (`I32`, `?Str`, `Array[I32]`, `Stream[Str]`,
 `fun(I32) Bool`). `*` stands for any run of characters: `Array[*]`. A
 pattern that is only a hole (`$e`) matches every expression of that type.
+A run's type is each element's: `--where 'args: Str'` on `$f($...args)`
+keeps the calls whose arguments are all strings (no arguments included).
+`--where '_: T'` types every `$_`. A hole takes one `--where`; a second for
+the same hole is an error. A typed hole matches expressions, never
+statements: not a `let`, nor an `if`, loop, or `match` in a block that
+gives no value.
 Types come from both builds `utu check` makes (the exports' and the
 tests'); code neither reaches has none.
 
@@ -54,4 +60,5 @@ uses.
 `file:line:column: line`, the match highlighted on a terminal; with
 `--json`, each match's file, line, column, UTF-16 offsets, and the places
 its holes bound. The exit status is 0 when something matched, 1 when
-nothing did, and 2 when the pattern is not utu.
+nothing did, and 2 when the pattern is not utu or an option is wrong
+(`--refs` with no name, a `--where` without a type).
