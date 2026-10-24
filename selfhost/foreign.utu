@@ -321,7 +321,13 @@ fn union_type(d: Ref, union: I32, view: I32) I32 {
     };
     if absent {
         // (`"start" | "end" | undefined` is a ?Str)
-        let value = if npresent == 1 { foreign_type(Ref { doc: d.doc, at: present, env: d.env }, view); } else if same >= 0 { same; } else { foreign_named(d, view); };
+        let value = if npresent == 1 {
+            foreign_type(Ref { doc: d.doc, at: present, env: d.env }, view);
+        } else if same >= 0 {
+            same;
+        } else {
+            foreign_named(d, view);
+        };
         if ty_is(value, Ty.Nullable) { return value; };
         // A nullable number or Bool is a host value until it is promoted.
         if value == prelude(Prelude.F64) or value == prelude(Prelude.Bool) { return nullable(boxed_type(value, view)); };

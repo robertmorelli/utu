@@ -335,7 +335,12 @@ fn es_out(expr: Str, t: I32) Str {
 /// caller must not pass null for (src/runtime/host-imports.js closureNew).
 fn js_handle_bits(params: I32) I32 {
     let bits = 0;
-    if safe_checks[0] == 1 { for (0 ..< if vl_len[params] < 29 { vl_len[params]; } else { 29; }) |k| { if js_handle(vl_item(params, k)) { bits = bits | (4 << k); }; }; };
+    if safe_checks[0] == 1 {
+        let n = if vl_len[params] < 29 { vl_len[params]; } else { 29; };
+        for (0 ..< n) |k| {
+            if js_handle(vl_item(params, k)) { bits = bits | (4 << k); };
+        };
+    };
     bits;
 }
 
