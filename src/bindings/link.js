@@ -1,7 +1,7 @@
 import { declarationSchema } from './schema.js';
 
 /** Bump when linking or the schema changes, so cached declaration graphs are rebuilt. */
-export const LINK_REVISION = 2;
+export const LINK_REVISION = 3;
 
 /**
  * Host-neutral declaration linker. The caller supplies a TypeScript API and a

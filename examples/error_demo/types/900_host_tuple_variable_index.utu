@@ -1,0 +1,8 @@
+// What: a variable index into a host tuple whose elements differ in type (`corner(): [number, string]`).
+// Expect: the tuple takes a constant index, each giving its own element's type.
+using Shapes from "./bindings/Shapes.abi.json";
+
+export main(i: I32) F64 {
+    let c = Shapes.corner();
+    c[i];
+}

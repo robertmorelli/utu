@@ -1,0 +1,7 @@
+// What: a string that is none of a host union of literals (`ScrollBehavior` is "auto" | "instant" | "smooth").
+// Expect: the union has no value "fast".
+using Browser from std:Browser;
+
+export main() void {
+    let b: Browser.ScrollBehavior = "fast";
+}

@@ -77,6 +77,19 @@ fn binding_of(env: I32, word: I32) I32 {
     -1;
 }
 
+/// The generic parameter a reference is, past its bindings to another
+/// parameter, when it is unbound (its JSON), or -1.
+fn open_param(r: Ref) I32 {
+    let x = r;
+    for (0 ..< 16) |_k| {
+        if not jis_object(x.at) or jget(x.at, "parameter") < 0 { return -1; };
+        let bound = binding_of(x.env, jstring_word(jget(x.at, "parameter")));
+        if bound < 0 { return x.at; };
+        x = Ref { doc: x.doc, at: bound, env: bind_env[0] };
+    };
+    -1;
+}
+
 /// What a reference denotes, past parameters (to their binding, or their
 /// constraint) and indexed access (to the property): a reference whose JSON
 /// is a string, a number, a template, a literal, or a symbol.
@@ -339,7 +352,8 @@ fn boxed_primitive(t: I32) I32 {
 /// `Browser.HTMLInputElement`, `Browser.Map<Str, F64>`.
 fn foreign_text(t: I32) Str {
     let view = fty_view[t];
-    let prefix = if view >= 0 { word_text(view_prefix[view]) + "."; } else { ""; };
+    // (a boxed number is utu's F64, of no view)
+    let prefix = if view >= 0 and boxed_primitive(t) < 0 { word_text(view_prefix[view]) + "."; } else { ""; };
     prefix + display(ref_of(t), 0);
 }
 
@@ -367,19 +381,33 @@ fn display(r: Ref, depth: I32) Str {
     let d = describe(r);
     if jis_object(d.at) {
         let union = jget(d.at, "union");
-        if union >= 0 and jget(d.at, "name") < 0 {
+        // (an alias names its union; TypeScript's spelling of another, `? | ?`, is not utu's)
+        if union >= 0 and (jget(d.at, "name") < 0 or has_byte(decl_name_text(d.at), 124)) {
             let text = "";
+            let absent = false;
+            let n = 0;
             let m = jfirst(union);
             while (m >= 0) {
-                if text.len() > 0 { text = text + " | "; };
-                text = text + display(Ref { doc: d.doc, at: m, env: d.env }, depth + 1);
+                if is_absence(m) { absent = true; }
+                else {
+                    if text.len() > 0 { text = text + " | "; };
+                    text = text + display(Ref { doc: d.doc, at: m, env: d.env }, depth + 1);
+                    n += 1;
+                };
                 m = jnext(m);
             };
+            if absent and n == 1 { return "?" + text; };
+            if absent { return "?(" + text + ")"; };
             return text;
         };
         return decl_name_text(d.at);
     };
     bytes_text(at, jend(at));
+}
+
+fn has_byte(s: Str, b: I32) Bool {
+    for (0 ..< s.len()) |i| { if s.get(i) == b { return true; }; };
+    false;
 }
 
 fn decl_name_text(decl: I32) Str {
@@ -688,6 +716,7 @@ fn host_assignable(actual: I32, expected: I32) Bool {
         if (name == "Object" or name == "object" or name == "{}") and (is_foreign(a) or ty_is(a, Ty.Closure)) { return true; };
         if is_foreign(a) and same_template_any(a, e) { return true; };
         if is_foreign(a) and structurally(a, e) { return true; };
+        if is_foreign(a) and calls_fit(a, e) { return true; };
         if a == prelude(Prelude.Str) and string_like(e) { return true; };
         let union = desc_get(describe(ref_of(e)), "union");
         if union >= 0 {
@@ -761,6 +790,47 @@ fn structurally(a: I32, e: I32) Bool {
         p = jnext(p);
     };
     required > 0;
+}
+
+/// A function type is structural, as in TypeScript: `(x: number) => number`
+/// of one declaration is that of another, by its first call signature. A
+/// value of it takes no more required parameters than wanted, each of a type
+/// the wanted one passes, and gives a result the wanted one takes.
+vec fit_depth: I32 = [0];
+
+fn calls_fit(a: I32, e: I32) Bool {
+    let da = describe(ref_of(a));
+    let de = describe(ref_of(e));
+    let sa = jfirst(desc_get(da, "calls"));
+    let se = jfirst(desc_get(de, "calls"));
+    if sa < 0 or se < 0 or jlen(desc_get(de, "properties")) > 0 or fit_depth[0] > 8 { return false; };
+    fit_depth[0] += 1;
+    let fits = sig_fits(da, sa, de, se, fty_view[e]);
+    fit_depth[0] -= 1;
+    fits;
+}
+
+fn sig_fits(da: Ref, sa: I32, de: Ref, se: I32, view: I32) Bool {
+    let pa = jget(sa, "params");
+    let pe = jget(se, "params");
+    let i = 0;
+    let p = jfirst(pa);
+    while (p >= 0) {
+        let q = jitem(pe, i);
+        let optional = jis_true(jget(p, "optional")) or jis_true(jget(p, "rest"));
+        if q < 0 and not optional { return false; };
+        if q >= 0 and not jis_true(jget(p, "rest")) and not jis_true(jget(q, "rest")) {
+            let ta = foreign_type(Ref { doc: da.doc, at: jget(p, "type"), env: da.env }, view);
+            let te = foreign_type(Ref { doc: de.doc, at: jget(q, "type"), env: de.env }, view);
+            if not (ta == te or is_dynamic(ta) or host_assignable(te, ta)) { return false; };
+        };
+        i += 1;
+        p = jnext(p);
+    };
+    let re = foreign_type(Ref { doc: de.doc, at: jget(se, "result"), env: de.env }, view);
+    if ty_is(re, Ty.Void) or is_dynamic(re) { return true; };
+    let ra = foreign_type(Ref { doc: da.doc, at: jget(sa, "result"), env: da.env }, view);
+    ra == re or host_assignable(ra, re) or (ty_is(re, Ty.Nullable) and boxed_primitive(ty_a[re]) == ra);
 }
 
 fn has_member_named(t: I32, key: I32, depth: I32) Bool {
@@ -1090,6 +1160,8 @@ fn element_of(slot: Ref, depth: I32) I32 {
 /// argument is, a callback's closure type, the argument's own type in a
 /// dynamic slot; else the slot's type.
 fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
+    // `&{…}` for a generic `T extends { name: string }` is T: it may have more fields.
+    if is_record(arg) and open_param(slot) >= 0 { open_record[0] = arg; };
     let s = resolved(slot);
     if ref_dynamic(s) {
         if is_null_literal(arg) { return nullable(foreign_any(view)); };
@@ -1157,9 +1229,65 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
 /// Checks `arg` as the type it takes in `slot` (see @accept): that type.
 fn check_argument(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     host_callback(arg);
+    host_literal(slot, arg, view);
     let t = accept(slot, arg, view, cx);
     coerce(check_expr(arg, t, cx), t, arg);
     t;
+}
+
+/// A literal where a union of literals (an enum) is wanted is one of them,
+/// as TypeScript 5 has it: `99.0` is no `Color` of `enum Color { Red,
+/// Green = 5 }`, and no string literal is a string enum's member.
+fn host_literal(slot: Ref, arg: I32, view: I32) void {
+    let d = describe(slot);
+    let union = desc_get(d, "union");
+    if union < 0 { return; };
+    let lit = arg;
+    let negate = false;
+    if is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.to_i32() {
+        lit = last_child(lit);
+        negate = true;
+    };
+    if not is_kind(lit, Node.Literal) { return; };
+    let c = first_child(lit);
+    let text = is_kind(c, Node.String_lit) and not negate;
+    let number = is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit);
+    if not text and not number { return; };
+    let x = if is_kind(c, Node.Int_lit) { int_value(c).to_u64().to_f64(); } else if number { parse_number(token_text(node_first[c])); } else { 0.0; };
+    if negate { x = 0.0 - x; };
+    let m = jfirst(union);
+    while (m >= 0) {
+        if not is_absence(m) {
+            let value = jget(m, "literal");
+            if value < 0 { return; };
+            if text and jis_string(value) and not jis_true(jget(d.at, "enum")) and bytes_equal(value, jend(value), tok_start[node_first[c]], tok_end[node_last[c] - 1]) { return; };
+            if number and jis_number(value) and json_number(value) == x { return; };
+        };
+        m = jnext(m);
+    };
+    // (an alias by its view's name; `"x" | "y"` as it is)
+    let alias = not has_byte(decl_name_text(d.at), 124);
+    let named = intern_text((if alias { word_text(view_prefix[view]) + "."; } else { ""; }) + display(slot, 0));
+    report3(Diag.HostLiteral, arg, named, intern_text(node_text(arg)), -1, if text and jis_true(jget(d.at, "enum")) { 1; } else { 0; });
+}
+
+/// A JSON number's value.
+fn json_number(at: I32) F64 { parse_number(bytes_text(at, jend(at))); }
+
+/// `let c: Api.Color = 99.0`: a literal for a host union of literals (see @host_literal).
+fn host_literal_let(type_node: I32, init: I32) void {
+    let n = type_node;
+    while (n >= 0 and not is_kind(n, Node.Qualified_type_ref) and not is_kind(n, Node.Inline_module_type_path)) {
+        if child_count(n) != 1 { return; };
+        n = first_child(n);
+    };
+    if n < 0 { return; };
+    let named = name_node(first_child(n));
+    let host = if named >= 0 { node_decl[named]; } else { -1; };
+    if not decl_is(host, Decl.Foreign) or decl_a[host] < 0 { return; };
+    let view = decl_a[host];
+    let at = jget_word(jget(view_json[view], "names"), word_of(name_node(last_child(n))));
+    if at >= 0 { host_literal(Ref { doc: view_doc[view], at: at, env: -1 }, init, view); };
 }
 
 fn wrap_nullable(t: I32, nullable_: Bool, arg_type: I32) I32 {
@@ -1252,8 +1380,10 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
         let r = callback_slot(d, params, i, fixed, rest);
         let annotated = param_annotation(own, cx);
         let t = if annotated >= 0 and ref_dynamic(r) { annotated; } else { foreign_type(r, view); };
-        // An optional parameter is never absent when the host calls back.
-        if i < fixed and jis_true(jget(jitem(params, i), "optional")) and ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+        // An optional parameter may be absent when the host calls back.
+        if i < fixed and jis_true(jget(jitem(params, i), "optional")) and not ty_is(t, Ty.Nullable) and not is_dynamic(t) and not ty_is(t, Ty.Void) {
+            t = nullable(if t == prelude(Prelude.F64) or t == prelude(Prelude.Bool) { boxed_type(t, view); } else { t; });
+        };
         vl_add(t);
         if own >= 0 { own = next_sibling(own); };
     };
@@ -1261,6 +1391,9 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let x = resolved(result);
     let loose = ref_is(x, "void") or ref_dynamic(x) or jget(x.at, "parameter") >= 0;
     let ret = if loose { closure_written_result(c, cx); } else { foreign_type(result, view); };
+    // A result that is never absent is one that may be (as TypeScript has it).
+    let written = closure_written_result(c, cx);
+    if written >= 0 and ret >= 0 and ty_is(ret, Ty.Nullable) and (written == ty_a[ret] or boxed_primitive(ty_a[ret]) == written) { ret = written; };
     ty(Ty.Closure, vl_end(m), ret);
 }
 
@@ -1452,6 +1585,28 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 };
             };
         };
+        // `[1.0, 2.0]` or a host array where `T[]` is wanted: `T` is its element's type.
+        if p < 0 and closure_node(args[k]) < 0 {
+            let el = element_of(slot, 0);
+            let ep = if el >= 0 { open_param(Ref { doc: d.doc, at: el, env: element_env[0] }); } else { -1; };
+            if ep >= 0 and not bound_in_pending(m, jstring_word(jget(ep, "parameter"))) {
+                if is_untyped_array(args[k]) and first_child(args[k]) >= 0 {
+                    if ref_of_type(type_only(first_child(args[k]), -1, cx)) {
+                        vl_add(jstring_word(jget(ep, "parameter")));
+                        vl_add(typed_ref_at[0]);
+                        vl_add(typed_ref_env[0]);
+                    };
+                } else if not is_untyped_array(args[k]) {
+                    let at_ = type_only(args[k], -1, cx);
+                    let ae = if is_foreign(at_) and not is_dynamic(at_) and fty_doc[at_] == d.doc { element_of(ref_of(at_), 0); } else { -1; };
+                    if ae >= 0 {
+                        vl_add(jstring_word(jget(ep, "parameter")));
+                        vl_add(ae);
+                        vl_add(element_env[0]);
+                    };
+                };
+            };
+        };
         // A string where an array-like or iterable of `T` is wanted: `T` is Str.
         if p < 0 and not is_untyped_array(args[k]) and closure_node(args[k]) < 0 and type_only(args[k], -1, cx) == prelude(Prelude.Str) {
             let el = element_of(slot, 0);
@@ -1527,7 +1682,7 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
         vl_add(erased(pt, view));
         let name = "p" + int_text(i);
         if i > 0 { invocation = invocation + ","; };
-        invocation = invocation + if receiver_closure(a[i]) { "function (...a) { return " + name + "(this, ...a); }"; } else { js_argument(slot, name, pt); };
+        invocation = invocation + if receiver_closure(a[i]) { "function (...a) { return " + name + "(this, ...a); }"; } else { js_callback(name, pt, js_argument(slot, name, pt)); };
     };
     if sig >= 0 { env = bind_from_context(jget(sig, "result"), d.doc, env, expect); };
     let result_ref = if sig >= 0 { Ref { doc: d.doc, at: jget(sig, "result"), env: env }; } else { any_slot(d.doc); };
@@ -1537,6 +1692,31 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
     let body = prologue + "(" + self_ + param_names(n) + ") => " + js_output((if construct or use_ctors { "new "; } else { ""; }) + access + "(" + invocation + ")", t, checked);
     if key >= 0 { return foreign_member_op(vl_end(mt), t, body, m, key, receiver < 0); };
     foreign_call_op(vl_end(mt), t, body, m);
+}
+
+/// `f(args)`: a host value of a function type, `callee` (its type `t`), called.
+fn check_foreign_value_call(node: I32, callee: I32, t: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    check_expr(callee, t, cx);
+    check_foreign_invoke(node, ref_of(t), fty_view[t], args, t, -1, "self", "", false, m, expect, cx);
+}
+
+/// Whether a host type is a function's (has a call signature).
+fn foreign_callable(t: I32) Bool { is_foreign(t) and jlen(desc_get(describe(ref_of(t)), "calls")) > 0; }
+
+/// A closure whose parameter may be absent receives JS's undefined as null
+/// (a parameter the host leaves out is undefined); any other argument is `plain`.
+fn js_callback(name: Str, pt: I32, plain: Str) Str {
+    if not ty_is(pt, Ty.Closure) { return plain; };
+    let params = ty_a[pt];
+    let absent = false;
+    for (0 ..< vl_len[params]) |k| { if ty_is(vl_item(params, k), Ty.Nullable) { absent = true; }; };
+    if not absent { return plain; };
+    let args = "";
+    for (0 ..< vl_len[params]) |k| {
+        if k > 0 { args = args + ","; };
+        args = args + "a[" + int_text(k) + "]" + if ty_is(vl_item(params, k), Ty.Nullable) { " ?? null"; } else { ""; };
+    };
+    "(...a) => " + name + "(" + args + ")";
 }
 
 /// `cl(this, event) {…}` receives the JS receiver first.
@@ -1599,7 +1779,21 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
-    let t = foreign_result(index_slot(d, info), view, expect);
+    // A tuple's element is its own type at a constant index; a variable
+    // index needs elements of one type.
+    let slot = index_slot(d, info);
+    if is_tuple(d) {
+        let prop = if is_kind(key_node, Node.Literal) and is_kind(first_child(key_node), Node.Int_lit) {
+            jget_word(desc_get(d, "properties"), intern_text(node_text(key_node)));
+        } else { -1; };
+        if prop >= 0 { slot = Ref { doc: d.doc, at: jget(prop, "type"), env: d.env }; }
+        else if not tuple_uniform(d, view) {
+            report2(Diag.TupleIndex, key_node, -1, owner, -1);
+            w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+            return ty_error();
+        };
+    };
+    let t = foreign_result(slot, view, expect);
     let checked = result_checked[0] == 1;
     let mt = vl_begin();
     vl_add(erased(owner, view));
@@ -1607,12 +1801,36 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), m);
 }
 
+/// Whether a declaration is a tuple's (`[T0, T1]`).
+fn is_tuple(d: Ref) Bool {
+    let name = decl_name_text(d.at);
+    jget(d.at, "element") >= 0 and name.len() > 0 and name.get(0) == 91;
+}
+
+/// Whether a tuple's elements are all of one utu type.
+fn tuple_uniform(d: Ref, view: I32) Bool {
+    let first = -2;
+    let p = jfirst(desc_get(d, "properties"));
+    while (p >= 0) {
+        let k = jstring_text(p);
+        if k.len() > 0 and k.get(0) >= 48 and k.get(0) <= 57 {
+            let t = foreign_type(Ref { doc: d.doc, at: jget(jvalue(p), "type"), env: d.env }, view);
+            if first == -2 { first = t; } else if first != t { return false; };
+        };
+        p = jnext(p);
+    };
+    true;
+}
+
+/// The record last given a generic parameter's slot (see @accept).
+vec open_record: I32 = [-1];
+
 /// `&{ a: x, b: y }` where a host object is expected: a JS object.
 fn check_foreign_record(node: I32, t: I32, cx: Cx) I32 {
     let view = fty_view[t];
     let d = describe(ref_of(t));
     let props = desc_get(d, "properties");
-    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t));
+    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t)) or open_record[0] == node;
     let m = w_mark();
     let mt = vl_begin();
     let fields = "";
@@ -1935,6 +2153,7 @@ fn display_generic(r: Ref, depth: I32) Str {
         p = jnext(p);
     };
     if n == 1 and base.len() >= 2 and base.slice(base.len() - 2, base.len()) == "[]" { return args + "[]"; };
+    if base.len() > 0 and base.get(0) == 91 { return "[" + args + "]"; };
     base + "<" + args + ">";
 }
 

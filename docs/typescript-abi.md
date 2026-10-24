@@ -71,6 +71,8 @@ Declaration shapes map onto ordinary UTU syntax:
 | `"abc".toUpperCase()`, `n.toFixed(2)` | same: `Str` and `F64` use declared `String` and `Number` members |
 | `Shape.Square` (any `enum`, const or not) | same: folds to a literal, with no import or host read |
 | `mean(new Float64Array([2, 4]))` | `Geom.mean([2, 4])`: typed-array slots receive that typed array |
+| `const [n, s] = pair()` (`[number, string]`) | `let t = Api.pair(); t[0]; t[1]`: each constant index has its element's type; a variable index needs elements of one type |
+| `const f = getFn(); f(3)` (`(x: number) => number`) | same: a host function value is callable, and so is a callback's function parameter (`cl(g) Str { g("a"); }`) |
 
 Records (`&{...}`) and arrays (`[...]`) take their shape from the declaration
 slot they are passed to and become real JS objects and arrays, including when
@@ -82,7 +84,17 @@ language notes in `docs/arrays.md`).
 Closures take parameter types from the slot they reach: an argument, a record
 field, an assigned property such as `button.onclick`, or the first use of a
 `let`-bound closure (`let handler = cl(e) void {...}; a.addEventListener("x", handler);`).
-If no context exists, the compiler asks for an annotation.
+If no context exists, the compiler asks for an annotation. An optional callback
+parameter (`(a: number, b?: number) => number`) is nullable, `?F64`: `promote`
+it, since JS may leave it out. A closure whose result is never absent fits a
+callback whose result may be (`() => string | null` takes `cl() Str {...}`).
+
+A literal where a union of literals is wanted is one of its values, as in
+TypeScript: `let b: Browser.ScrollBehavior = "fast"` is an error, and so is
+`99.0` for `enum Mode { Off = 0, On = 5 }`. A string enum takes only its
+members (`Api.Tag.A`, not `"a"`). An ambient enum whose members have no
+initializer (`declare enum Color { Red, Green = 5 }`) is computed, and takes any
+number, as TypeScript has it.
 
 `alt` over a host value tests each arm with `instanceof` against the declared
 runtime class, using one generated import per class. Arms naming interface-only
@@ -97,7 +109,9 @@ A generic parameter that only the result mentions takes the expected type,
 within its constraint, as in TypeScript:
 `let input: ?Browser.HTMLInputElement = document.querySelector("#search")`.
 Host values compare by identity with `==` and `!=` (JavaScript's `===`).
-Declared interfaces are structural: a `Set` is an `Iterable`.
+Declared interfaces are structural: a `Set` is an `Iterable`. So are function
+types: `(x: number) => number` of one declaration or package is that of
+another.
 
 Dynamic values (`any`, parsed JSON) follow JavaScript where UTU needs a
 primitive: arithmetic and orderings between two dynamic values are numeric,
@@ -110,9 +124,13 @@ a dynamic slot receives dynamic arguments.
 
 ## Identity and inference
 
-Generic calls infer bindings from arguments, rest elements, tuple elements, and
-callback results, and they respect declared constraints: `appendChild("text")`
-is rejected because `T extends Node`. Relations such as `S extends T` are kept,
+Generic calls infer bindings from arguments, array elements (`firstOf([1.0])`
+of `firstOf<T>(xs: T[]): T | undefined` is `?F64`), rest elements, tuple
+elements, and callback results, and they respect declared constraints:
+`appendChild("text")` is rejected because `T extends Node`. A record for a
+constrained `T` may have more fields than the constraint names, as a fresh
+TypeScript literal may (`pick([&{ name: "a", n: 1.0 }])` for
+`T extends { name: string }`). Relations such as `S extends T` are kept,
 so `words.find(...)` on `Str[]` returns `?Str` and `filter` returns `Str[]`.
 Literal types are inferred only for keyed or literal-constrained parameters
 (`createElement("input")`), so `Array.of("a", "b")` is `Str[]`.

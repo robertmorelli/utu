@@ -1,0 +1,8 @@
+// What: a string literal for a host string enum (`enum Tag { A = "a", B = "b" }`); TypeScript takes only its members.
+// Expect: a string enum takes its members (Shapes.Tag.A), not "a".
+using Shapes from "./bindings/Shapes.abi.json";
+
+export main() Str {
+    let t: Shapes.Tag = "a";
+    t;
+}

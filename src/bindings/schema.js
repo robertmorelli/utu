@@ -1,6 +1,11 @@
 /** Serialize the checker's resolved declaration graph, without imposing TS source semantics. */
 export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifier }) {
   const types = [], ids = new Map(), pending = [], constraining = new Set();
+  // A tuple's element parameters have no symbol: they are T0, T1, … by position.
+  const isTuple = type => !!(type.objectFlags & ts.ObjectFlags.Tuple);
+  const paramName = type => type.symbol?.name ?? tupleParams.get(type) ?? 'T';
+  const tupleParams = new Map();
+  const nameTuple = target => (target.typeParameters ?? []).forEach((p, i) => tupleParams.set(p, `T${i}`));
   function ref(type) {
     if (!type) return 'any';
     const f = type.flags;
@@ -21,7 +26,7 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
     if (f & ts.TypeFlags.TypeParameter) {
       // The declared constraint keeps relations such as `S extends T`; F-bounded
       // constraints (`T extends Foo<T>`) stop at the recursive mention.
-      const name = type.symbol?.name ?? 'T';
+      const name = paramName(type);
       if (constraining.has(type)) return { parameter: name };
       constraining.add(type);
       try {
@@ -32,6 +37,7 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
       } finally { constraining.delete(type); }
     }
     if (type.objectFlags & ts.ObjectFlags.Reference && type.target && type.target !== type) {
+      if (isTuple(type.target)) nameTuple(type.target);
       return { template: ref(type.target), arguments: checker.getTypeArguments(type).map(ref) };
     }
     if (ids.has(type)) return ids.get(type);
@@ -66,14 +72,21 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
     const type = pending[i];
     const node = { name: checker.typeToString(type), properties: Object.create(null) };
     types[ids.get(type)] = node;
-    if (type.isUnion()) { node.union = type.types.map(ref); continue; }
+    if (type.isUnion()) {
+      node.union = type.types.map(ref);
+      // (an enum's members are nominal: TypeScript takes no bare string for one)
+      if (type.symbol?.flags & ts.SymbolFlags.Enum) node.enum = true;
+      continue;
+    }
     const args = type.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(type) : [];
     if (checker.isArrayType(type) || checker.isTupleType(type)) node.element = ref(checker.getIndexTypeOfType(type, ts.IndexKind.Number));
     if (type.target && type.target !== type && args.length) {
       node.template = ref(type.target);
       node.arguments = args.map(ref);
     }
-    if (args.length) node.parameters = args.map(t => t.symbol?.name ?? 'T');
+    if (isTuple(type)) nameTuple(type);
+    if (args.length) node.parameters = args.map(paramName);
+    if (isTuple(type)) node.name = `[${args.map((t, i) => paramName(t) + (type.elementFlags[i] & ts.ElementFlags.Optional ? '?' : '')).join(', ')}]`;
     if (type.isClassOrInterface?.()) node.bases = (checker.getBaseTypes(type) ?? []).map(ref);
     // Standard-library declarations (lib.dom, lib.es*) are one identity across every ABI.
     const origins = type.symbol?.declarations ?? [];
@@ -101,7 +114,9 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
         else if (computed && ts.isIdentifier(computed)) key = `@@${checker.getSymbolAtLocation(computed)?.name ?? computed.text}`;
         else continue;
       }
-      node.properties[key] = { type: ref(at(prop)), optional: !!(prop.flags & ts.SymbolFlags.Optional), readonly: declarations.some(d => d.modifiers?.some(m => m.kind === ts.SyntaxKind.ReadonlyKeyword))
+      // (a tuple's elements are declared nowhere: each is its parameter)
+      const propType = isTuple(type) && /^\d+$/.test(key) ? checker.getTypeOfSymbol(prop) : at(prop);
+      node.properties[key] = { type: ref(propType), optional: !!(prop.flags & ts.SymbolFlags.Optional), readonly: declarations.some(d => d.modifiers?.some(m => m.kind === ts.SyntaxKind.ReadonlyKeyword))
         || !!(prop.flags & ts.SymbolFlags.GetAccessor) && !(prop.flags & ts.SymbolFlags.SetAccessor) };
     }
   }
