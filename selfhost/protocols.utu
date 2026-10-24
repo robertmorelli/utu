@@ -394,7 +394,8 @@ fn validate_protocols() void {
 
 /// `fn P[Box[I32]].m`: an instance's implementation, which nothing finds
 /// (a bound or a P takes a module's for every instance, `fn P[&].m` in it).
-/// (`fn P[T].m` for a T that does not list P is T's for bounds.)
+/// (`fn P[T].m` for a T that does not list P is T's for bounds.) An m P
+/// does not declare is reported.
 fn validate_impls() void {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Fn) and decl_is(decl_a[d], Decl.Proto) and is_kind(decl_node[d], Node.Fn_decl)
@@ -403,6 +404,11 @@ fn validate_impls() void {
             let args = next_sibling(first_child(name));
             let t = if is_kind(args, Node.Module_type_arg_list) { first_child(args); } else { -1; };
             let r = if is_kind(t, Node.Ref_type) { first_child(t); } else { t; };
+            // `fn Area[Sq].extra`: what Area does not declare.
+            let word = word_of(last_child(name));
+            if t >= 0 and protocol_member(decl_a[d], word) < 0 {
+                report2(Diag.ProtoNoMember, last_child(name), word, decl_a[d], -1);
+            };
             if is_kind(r, Node.Instantiated_module_ref) {
                 let module = module_of(node_decl[name_node(first_child(r))]);
                 if decl_is(module, Decl.Module) { report2(Diag.ImplNothing, t, word_of(last_child(name)), module, decl_a[d]); };
@@ -585,6 +591,42 @@ fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
     diag_place(Extra.Related, first_child(decl_node[found]), "no " + proto_text(proto));
     bound_fix(found, proto);
     true;
+}
+
+/// `c.m()` on a type argument bounded by P, with no m of its own: P's
+/// `fn P.m`, as on a P (two bounds with one: reported, -2), or -1.
+fn bound_default(rt: I32, word: I32, at: I32, inst: I32) I32 {
+    if inst <= 0 { return -1; };
+    let found = -1;
+    let p = first_child(next_sibling(first_child(decl_node[inst_module[inst]])));
+    let i = 0;
+    while (p >= 0) {
+        let bounds = next_sibling(first_child(p));
+        if inst_arg(inst, i) == rt and is_kind(bounds, Node.Impl_list) {
+            let b = first_child(bounds);
+            while (b >= 0) {
+                let f = proto_default(node_decl[b], word);
+                if f >= 0 and found >= 0 and f != found {
+                    report2(Diag.AmbiguousMethod, at, word, found, f);
+                    return -2;
+                };
+                if f >= 0 { found = f; };
+                b = next_sibling(b);
+            };
+        };
+        i += 1;
+        p = next_sibling(p);
+    };
+    found;
+}
+
+/// Protocol `proto`'s own function `fn P.word` (not a member's `fn P[T].word`), or -1.
+fn proto_default(proto: I32, word: I32) I32 {
+    if not decl_is(proto, Decl.Proto) or protocol_member(proto, word) >= 0 { return -1; };
+    let f = member(proto, word, Space.Method);
+    if not decl_is(f, Decl.Fn) or decl_a[f] != proto or not is_kind(decl_node[f], Node.Fn_decl) { return -1; };
+    if is_kind(next_sibling(first_child(first_child(decl_node[f]))), Node.Module_type_arg_list) { return -1; };
+    f;
 }
 
 /// A protocol with a method named `word`, or -1.

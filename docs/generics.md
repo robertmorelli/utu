@@ -105,6 +105,11 @@ Version. Only a bounded T can call a member that uses `&`; a protocol value
 (an `Array[Ord]` element) cannot, since which type `&` is is not known
 there.
 
+A protocol's own function, `fn Counter.tick |c|`, is a method of a T
+bounded by Counter, as of a Counter value: `c.tick()` calls the T's own
+`tick` if it has one, else Counter's (when two bounds both have one, say
+which: `Counter.tick(c)`).
+
 A bounded parameter passes its bounds on: in `mod Ranking[T[Ord, Named]]`,
 `Order[T]` is an instance whose T implements Ord.
 

@@ -288,7 +288,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.ImportNotModule or k == Diag.ModNoType { return "unknown-type"; };
     if k == Diag.UsingTwice { return "duplicate-declaration"; };
     if k == Diag.AmbiguousMethod { return "unknown-method"; };
-    if k == Diag.ImplNothing { return "unknown-method"; };
+    if k == Diag.ImplNothing or k == Diag.ProtoNoMember { return "unknown-method"; };
     if k == Diag.WutuHole or k == Diag.WutuKey { return "type-mismatch"; };
     "type-mismatch";
 }
@@ -411,6 +411,7 @@ fn diag_text(i: I32) Str {
         Diag.DuplicateDeclaration => {
             if a == 5 { return "Duplicate method " + node_text(node); };
             if a == 6 { return "Duplicate capture " + w; };
+            if a == 7 { return "Duplicate protocol " + w; };
             let what = pick(a == 1, "parameter", pick(a == 2, "variant", pick(a == 3, "local", "declaration")));
             "Duplicate " + what + " " + w;
         },
@@ -703,7 +704,8 @@ fn diag_text(i: I32) Str {
             what + " does not implement " + proto_text(b) + " (" + decl_text(decl_owner[diag_c[i]]) + "'s " + decl_text(diag_c[i]) + " needs it)";
         },
         Diag.UnboundedCall => decl_text(a) + " has no method " + w + "; bound it: " + bounded_text(diag_c[i], a, b),
-        Diag.BoundNotProto => type_text(decl_type(a, 0)) + " is not a protocol; a bound names one",
+        Diag.BoundNotProto => type_text(decl_type(a, 0)) + " is not a protocol" + pick(b == 1, "; a struct lists protocols", pick(b == 2, "; an enum lists protocols", pick(b == 3, "", "; a bound names one"))),
+        Diag.ProtoNoMember => decl_text(a) + " has no member " + w,
         Diag.ProtoSelfDynamic => type_text(a) + "." + w + " uses &, so only a bounded T calls it: mod M[T[" + type_text(a) + "]]",
         ~> Diag.name(k),
     };
@@ -755,7 +757,7 @@ fn diag_default_label(i: I32) Str {
         Diag.UnknownOperator => if a >= 0 { type_text(a); } else { "here"; },
         Diag.WrongArity => if named_word(diag_word[i]) { "given " + int_text(b); } else { "takes " + int_text(a) + ", given " + int_text(b); },
         Diag.MissingField => w + "?",
-        Diag.DuplicateDeclaration => "already declared",
+        Diag.DuplicateDeclaration => pick(a == 7, "already listed", "already declared"),
         Diag.AmbiguousName => "ambiguous",
         Diag.StandardName => "a prelude name",
         Diag.InstanceDepth => "one more level",
@@ -780,6 +782,7 @@ fn diag_default_label(i: I32) Str {
         Diag.UsingTwice => "needs |alias|",
         Diag.AmbiguousMethod => "as which protocol?",
         Diag.ImplNothing => "an instance",
+        Diag.ProtoNoMember => "not in " + decl_text(a),
         Diag.ProtoGeneric => "on a generic type",
         Diag.SelfUntyped => "type not known yet",
         Diag.ProtoAccess => pick(a == 1, "set-only", "get-only"),

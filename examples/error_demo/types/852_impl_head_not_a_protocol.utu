@@ -1,0 +1,15 @@
+// What: an implementation's head names a struct, not a protocol
+// Expect: Rec is not a protocol
+struct Rec:
+    | x: I32
+
+struct Sq:
+    | s: I32
+
+fn Rec[Sq].area |self| () I32 {
+    self.s * self.s;
+}
+
+export main() I32 {
+    Sq { s: 2 }.s;
+}
