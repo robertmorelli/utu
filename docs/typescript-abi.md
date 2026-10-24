@@ -77,14 +77,20 @@ Declaration shapes map onto ordinary UTU syntax:
 Records (`&{...}`) and arrays (`[...]`) take their shape from the declaration
 slot they are passed to and become real JS objects and arrays, including when
 nested. Array literals satisfy arrays, typed arrays, `ArrayLike<T>`,
-`Iterable<T>`, and `any`, and bind `T` when every element has the same type.
-Without a declaration slot, `[...]` is a native WasmGC `Array[T]` (see the
-language notes in `docs/arrays.md`).
+`Iterable<T>` (TypeScript 5.9's `Iterable<T, TReturn, TNext>` too), and `any`,
+and bind `T` when every element has the same type. A record binds `T` of an
+index signature `{ [k: string]: T }` from its first field, so
+`get(&{ a: 1.0 }, "z")` of `get<T>(o: { [k: string]: T }, k: string): T | undefined`
+is `?F64`. Without a declaration slot, `[...]` is a native WasmGC `Array[T]`
+(see the language notes in `docs/arrays.md`); a `let` bound to a literal waits
+for its first use, so `let xs = [1.0, 2.0]; Api.sum(xs);` passes a JS array
+(not a tuple slot, as TypeScript's `let xs = [1]` is a `number[]`).
 
 Closures take parameter types from the slot they reach: an argument, a record
 field, an assigned property such as `button.onclick`, or the first use of a
 `let`-bound closure (`let handler = cl(e) void {...}; a.addEventListener("x", handler);`).
-If no context exists, the compiler asks for an annotation. An optional callback
+If no context exists, the compiler asks for an annotation; so does a `Function`
+slot (`fnLike(cl(x: F64) F64 {...})`). An optional callback
 parameter (`(a: number, b?: number) => number`) is nullable, `?F64`: `promote`
 it, since JS may leave it out. The host gets such a closure (and a `cl(this, …)`
 one) wrapped, once per closure: the wrapper is kept on it, so
@@ -96,7 +102,8 @@ callback whose result may be (`() => string | null` takes `cl() Str {...}`).
 A literal where a union of literals is wanted is one of its values, as in
 TypeScript: `let b: Browser.ScrollBehavior = "fast"` is an error, and so is
 `99.0` for `enum Mode { Off = 0, On = 5 }`. A string enum takes only its
-members (`Api.Tag.A`, not `"a"`). An ambient enum whose members have no
+members (`Api.Tag.A`, not `"a"`). `K extends keyof Events` takes Events'
+keys alone (`bus.on("nope", ...)` is an error). An ambient enum whose members have no
 initializer (`declare enum Color { Red, Green = 5 }`) is computed, and takes any
 number, as TypeScript has it.
 
@@ -115,7 +122,11 @@ within its constraint, as in TypeScript:
 Host values compare by identity with `==` and `!=` (JavaScript's `===`).
 Declared interfaces are structural: a `Set` is an `Iterable`. So are function
 types: `(x: number) => number` of one declaration or package is that of
-another.
+another; and index signatures: a value of `{ [k: string]: number }` is one of
+another such declaration. A host `?F64` (`T | undefined`) is no `F64`:
+`promote` it, or pass it where absence is taken (`defaultTo(v, 7.0)` of
+`defaultTo<T>(v: T | null | undefined, d: T)` gives the host undefined as it
+is). `new` of an `abstract class` is an error.
 
 Dynamic values (`any`, parsed JSON) follow JavaScript where UTU needs a
 primitive: arithmetic and orderings between two dynamic values are numeric,
@@ -152,8 +163,8 @@ parameters where a rest is, a rest's element compared. A closure's result may
 be any one member of a union result (`cl() F64` for `() => number | string`).
 A `Str` that is not a literal (a variable's, a utu call's, a closure's written
 `Str` result) is no union of string literals (`litU(x: "x" | "y")`), as in
-TypeScript; one read from the host (`litU(Api.pick())`) is taken, since utu
-keeps no literal types to tell.
+TypeScript; one read from the host (`litU(Api.pick())`, or a `let` of it that
+nothing assigns again) is taken, since utu keeps no literal types to tell.
 
 Types declared by TypeScript's standard libraries (`lib.dom`, `lib.es*`) have one
 identity across every imported ABI. An element from `std:Browser` is accepted

@@ -789,7 +789,31 @@ fn structurally(a: I32, e: I32) Bool {
         };
         p = jnext(p);
     };
+    // Each index signature, by one of the value's of its key and a value it takes.
+    let index = jfirst(desc_get(want, "indexes"));
+    while (index >= 0) {
+        required += 1;
+        if not has_index(a, Ref { doc: want.doc, at: index, env: want.env }, fty_view[e]) { return false; };
+        index = jnext(index);
+    };
     required > 0;
+}
+
+/// Whether host type `t` has an index signature of `want`'s key (its own),
+/// of a value type `want`'s takes.
+fn has_index(t: I32, want: Ref, view: I32) Bool {
+    let d = describe(ref_of(t));
+    let kt = foreign_type(Ref { doc: want.doc, at: jget(want.at, "key"), env: want.env }, view);
+    let vt = foreign_type(Ref { doc: want.doc, at: jget(want.at, "type"), env: want.env }, view);
+    let index = jfirst(desc_get(d, "indexes"));
+    while (index >= 0) {
+        if foreign_type(Ref { doc: d.doc, at: jget(index, "key"), env: d.env }, view) == kt {
+            let at = foreign_type(Ref { doc: d.doc, at: jget(index, "type"), env: d.env }, view);
+            return at == vt or is_dynamic(vt) or host_assignable(at, vt);
+        };
+        index = jnext(index);
+    };
+    false;
 }
 
 /// A function type is structural, as in TypeScript: `(x: number) => number`
@@ -1156,6 +1180,18 @@ fn element_of(slot: Ref, depth: I32) I32 {
         element_env[0] = d.env;
         return element;
     };
+    // `Iterable<T, TReturn, TNext>`: T, its first parameter.
+    let lib = desc_get(d, "lib");
+    let first = jfirst(desc_get(d, "parameters"));
+    if lib >= 0 and first >= 0 and jstring_is_text(lib, "Iterable") {
+        let bound = binding_of(d.env, jstring_word(first));
+        if bound >= 0 {
+            element_env[0] = bind_env[0];
+            return bound;
+        };
+        element_env[0] = -1;
+        return any_ref();
+    };
     let index = jfirst(desc_get(d, "indexes"));
     while (index >= 0) {
         if jstring_is_text(jget(index, "key"), "F64") {
@@ -1196,8 +1232,18 @@ fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let union = desc_get(d, "union");
     if union >= 0 { return accept_union(s, d, union, arg, view, cx); };
     if jlen(desc_get(d, "calls")) > 0 and is_closure_arg(arg, cx) { return callback_type(d, arg, view, cx); };
-    if decl_name_text(d.at) == "Function" and is_closure_arg(arg, cx) { return type_only(arg, -1, cx); };
+    if decl_name_text(d.at) == "Function" and is_closure_arg(arg, cx) {
+        // (a parameter of no written type: checked as `Function`, which reports it)
+        let t = type_only(arg, -1, cx);
+        if ty_is(t, Ty.Closure) and not untyped_params(t) { return t; };
+    };
     foreign_type(s, view);
+}
+
+/// Whether closure type `t` has a parameter of no type (an error).
+fn untyped_params(t: I32) Bool {
+    for (0 ..< vl_len[ty_a[t]]) |i| { if ty_is(vl_item(ty_a[t], i), Ty.Error) { return true; }; };
+    false;
 }
 
 fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
@@ -1237,7 +1283,8 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
             let mt = wrap_nullable(accept(Ref { doc: d.doc, at: m, env: d.env }, arg, view, cx), nullable_, t);
             let plain = if ty_is(mt, Ty.Nullable) { ty_a[mt]; } else { mt; };
             if int_literal and plain == prelude(Prelude.F64) { return mt; };
-            if is_dynamic(t) and typeof_name(plain).len() > 0 { return plain; };
+            // (a dynamic value where absence is taken passes as it is: undefined stays)
+            if is_dynamic(t) and typeof_name(plain).len() > 0 { return if nullable_ { t; } else { plain; }; };
             if t >= 0 and not ty_is(t, Ty.Error) and assignable_to(t, mt) { return t; };
         };
         m = jnext(m);
@@ -1263,7 +1310,11 @@ fn check_argument(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
 /// A literal where a union of literals (an enum) is wanted is one of them,
 /// as TypeScript 5 has it: `99.0` is no `Color` of `enum Color { Red,
 /// Green = 5 }`, and no string literal is a string enum's member.
-fn host_literal(slot: Ref, arg: I32, view: I32, cx: Cx) void {
+fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) void {
+    // `K extends keyof M`: K's literals are its constraint's, whatever the argument bound it to.
+    let constraint = if jis_object(given.at) and jget(given.at, "parameter") >= 0 { jget(given.at, "constraint"); } else { -1; };
+    let bound = Ref { doc: given.doc, at: constraint, env: given.env };
+    let slot = if constraint >= 0 and literal_members(bound) >= 0 { bound; } else { given; };
     let d = describe(slot);
     let union = desc_get(d, "union");
     if union < 0 { return; };
@@ -1312,8 +1363,12 @@ fn literal_result(slot: Ref, arg: I32, view: I32, cx: Cx) void {
 
 /// A union of literals by name: an alias by its view's name; `"x" | "y"` as it is.
 fn literal_union_name(slot: Ref, d: Ref, view: I32) I32 {
-    let alias = not has_byte(decl_name_text(d.at), 124);
-    intern_text((if alias { word_text(view_prefix[view]) + "."; } else { ""; }) + display(slot, 0));
+    let name = decl_name_text(d.at);
+    let prefix = word_text(view_prefix[view]) + ".";
+    // (`keyof M` names M: `keyof Api.M`)
+    if name.len() > 6 and name.slice(0, 6) == "keyof " { return intern_text("keyof " + prefix + name.slice(6, name.len())); };
+    let alias = not has_byte(name, 124);
+    intern_text((if alias { prefix; } else { ""; }) + display(slot, 0));
 }
 
 /// Whether an expression is read from the host (`Api.f()`, `x.name` of a
@@ -1324,7 +1379,23 @@ fn host_rooted(arg: I32, cx: Cx) Bool {
         if is_kind(n, Node.Paren_expr) or is_kind(n, Node.Call_expr) or is_kind(n, Node.Index_expr) { n = first_child(n); }
         else if is_kind(n, Node.Type_member_expr) { return decl_is(node_decl[first_child(n)], Decl.Foreign); }
         else if is_kind(n, Node.Field_expr) { return is_foreign_or_nullable(type_only(first_child(n), -1, cx)); }
+        else if is_kind(n, Node.Identifier) and decl_is(node_decl[n], Decl.Local) {
+            // `let k = Api.f(); … k`: its value, while nothing assigns it another.
+            let let_node = decl_node[node_decl[n]];
+            if not is_kind(let_node, Node.Bind_expr) or next_sibling(first_child(let_node)) != last_child(let_node) or assigned_after(let_node, node_decl[n]) { return false; };
+            n = last_child(let_node);
+        }
         else { return false; };
+    };
+    false;
+}
+
+/// Whether a statement after `let_node` (in its block) assigns local `decl`.
+fn assigned_after(let_node: I32, decl: I32) Bool {
+    let s = next_sibling(let_node);
+    while (s >= 0) {
+        if assigns(s, decl) { return true; };
+        s = next_sibling(s);
     };
     false;
 }
@@ -1365,6 +1436,8 @@ fn host_literal_let(type_node: I32, init: I32, cx: Cx) void {
 }
 
 fn wrap_nullable(t: I32, nullable_: Bool, arg_type: I32) I32 {
+    // (a host `?F64`, a JS number or null, passes as it is)
+    if nullable_ and ty_is(arg_type, Ty.Nullable) and boxed_primitive(ty_a[arg_type]) == t { return arg_type; };
     if nullable_ and not ty_is(t, Ty.Nullable) and (ty_is(arg_type, Ty.Null) or ty_is(arg_type, Ty.Nullable)) { return nullable(t); };
     t;
 }
@@ -1682,6 +1755,15 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
         };
         // `[1.0, 2.0]` where `T[]` or `[T, T]` is wanted: `T` is its (first) element's type.
         if p < 0 and is_untyped_array(args[k]) { unify_elements(slot, args[k], m, d, 0, cx); };
+        // `&{ a: 1.0 }` where `{ [k: string]: T }` is wanted: `T` is its first field's type.
+        if p < 0 and is_record(args[k]) {
+            let sd = describe(slot);
+            let index = jfirst(desc_get(sd, "indexes"));
+            let ep = if index >= 0 { open_param(Ref { doc: sd.doc, at: jget(index, "type"), env: sd.env }); } else { -1; };
+            let f = first_child(args[k]);
+            while (f >= 0 and not is_kind(f, Node.Field_init)) { f = next_sibling(f); };
+            if ep >= 0 and f >= 0 { bind_param(ep, last_child(f), m, d, cx); };
+        };
         // A host array where `T[]` is wanted: `T` is its element's type.
         if p < 0 and closure_node(args[k]) < 0 {
             let el = element_of(slot, 0);
@@ -1804,6 +1886,9 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
         return error_value();
     };
     let env = if sig >= 0 { unify_args(sig, a, n, d, cx); } else { -1; };
+    if sig >= 0 and use_ctors and jis_true(jget(sig, "abstract")) {
+        report2(Diag.HostAbstract, node, -1, foreign_type(Ref { doc: d.doc, at: jget(sig, "result"), env: env }, view), -1);
+    };
     let mt = vl_begin();
     if receiver >= 0 { vl_add(erased(receiver, view)); };
     let invocation = "";
@@ -2250,6 +2335,55 @@ fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
         };
     };
     -1;
+}
+
+//! = Arrays bound by let
+//!
+//! `let xs = [1.0, 2.0];` waits for its first use (docs/arrays.md): passed
+//! to the host, or read through a JS array member native arrays lack
+//! (`xs.join(",")`), it is a JS array of that type.
+
+/// The JS array type the first use of `let`-bound literal `init` (local
+/// `decl`) makes it, or -1 (a native array).
+fn first_js_array_use(decl: I32, let_node: I32, init: I32, cx: Cx) I32 {
+    let s = next_sibling(let_node);
+    while (s >= 0) {
+        let u = first_ref(s, decl);
+        if u >= 0 { return js_array_use(u, init, cx); };
+        s = next_sibling(s);
+    };
+    -1;
+}
+
+/// The first identifier under `node` (in source order) that names `decl`, or -1.
+fn first_ref(node: I32, decl: I32) I32 {
+    if is_kind(node, Node.Identifier) and node_decl[node] == decl { return node; };
+    let c = first_child(node);
+    while (c >= 0) {
+        let u = first_ref(c, decl);
+        if u >= 0 { return u; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+fn js_array_use(u: I32, init: I32, cx: Cx) I32 {
+    let p = node_parent[u];
+    if p < 0 { return -1; };
+    if is_kind(p, Node.Field_expr) and first_child(p) == u {
+        return if first_child(init) >= 0 { js_array_receiver(init, word_of(last_child(p)), cx); } else { -1; };
+    };
+    let call = node_parent[p];
+    if call < 0 or not is_kind(call, Node.Call_expr) or next_sibling(first_child(call)) != p { return -1; };
+    let i = 0;
+    let a = first_child(p);
+    while (a >= 0 and a != u) {
+        i += 1;
+        a = next_sibling(a);
+    };
+    let t = host_argument_type(call, i, cx);
+    // (no tuple: TypeScript's `let xs = [1]` is a `number[]`, no `[number]`)
+    if is_foreign(t) and element_of(ref_of(t), 0) >= 0 and not is_tuple(describe(ref_of(t))) { t; } else { -1; };
 }
 
 //! = Closures bound by let

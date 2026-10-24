@@ -284,7 +284,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.NotAssignable { return "assignment-to-immutable"; };
     if k == Diag.IrUnknown { return "invalid-dsl-usage"; };
     if k == Diag.YieldPlace or k == Diag.GeneratorExport { return "invalid-for-source"; };
-    if k == Diag.NewNotHost { return "not-callable"; };
+    if k == Diag.NewNotHost or k == Diag.HostAbstract { return "not-callable"; };
     if k == Diag.HostMissing { return "unknown-import"; };
     if k == Diag.ComptimeTrap or k == Diag.ComptimeCycle { return "comptime-trap"; };
     if k == Diag.DslEmpty or k == Diag.DslTooDeep or k == Diag.IrInvalid or k == Diag.IrType or k == Diag.EsNative { return "invalid-dsl-usage"; };
@@ -617,6 +617,7 @@ fn diag_text(i: I32) Str {
         Diag.TupleIndex => type_text(a) + " takes a constant index: its elements differ in type",
         Diag.HostLiteral => if diag_c[i] == 1 { w + " is a string enum: it takes its members, not " + word_text(a); } else if diag_c[i] == 2 { w + " takes its values, not any Str"; } else { w + " has no value " + word_text(a); },
         Diag.TupleLength => type_text(a) + " takes " + tuple_counts(a) + ", given " + int_text(b),
+        Diag.HostAbstract => type_text(a) + " is abstract: make one of a class that extends it",
         Diag.EsNative => if b > 0 { w + " passes " + type_text(a) + " to JS, which cannot read it"; } else if es_fun_type(a) { w + " gets a JS function: that is a cl, not " + type_text(a); } else { w + " gets " + type_text(a) + " from JS, which cannot make one"; },
         Diag.YieldPlace => "yield T is only a generator's result type",
         Diag.NotStruct => type_text(a) + " is not a struct: it has no fields to set",
@@ -824,6 +825,7 @@ fn diag_default_label(i: I32) Str {
         Diag.TupleIndex => "not a constant",
         Diag.HostLiteral => if diag_c[i] == 1 { "a string"; } else if diag_c[i] == 2 { "any Str"; } else { "not one of its values"; },
         Diag.TupleLength => int_text(diag_b[i]) + " elements",
+        Diag.HostAbstract => "abstract",
         Diag.EsNative => if diag_b[i] > 0 { "opaque to JS"; } else if es_fun_type(diag_a[i]) { "a cl"; } else { "JS cannot make it"; },
         Diag.YieldPlace => "not a type here",
         Diag.NotStruct => "no fields",

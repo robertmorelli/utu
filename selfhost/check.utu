@@ -1217,6 +1217,11 @@ fn check_let(node: I32, cx: Cx) I32 {
     let annotated = next_sibling(name) != init;
     let t = if annotated { type_of(next_sibling(name), cx.inst); } else { -1; };
     if not annotated and is_empty_array(init) { t = later_array_type(decl, node, cx); };
+    // `let xs = [1.0]; Api.sum(xs);`: its first use by the host makes it a JS array.
+    if not annotated and is_kind(init, Node.Array_expr) and has_foreign() {
+        let js = first_js_array_use(decl, node, init, cx);
+        if js >= 0 { t = js; };
+    };
     // `let f = cl(e) void {…}; el.addEventListener("x", f);`: its first use as a host argument types it.
     if not annotated and is_kind(init, Node.Closure_expr) and has_foreign() { t = first_host_use(decl, node, cx); };
     if is_es(init) and annotated {
