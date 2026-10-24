@@ -516,17 +516,52 @@ fn has_bound(param: I32, proto: I32) Bool {
     false;
 }
 
-/// Whether `t` is a type argument of instance `inst` bounded by `proto`.
-fn bound_by(t: I32, proto: I32, inst: I32) Bool {
+/// Whether `t`, the type of expression `e`, is a type argument of instance
+/// `inst` bounded by `proto`: `e`'s parameter's bounds (see @declared_param).
+fn bound_by(t: I32, proto: I32, inst: I32, e: I32) Bool {
     if inst <= 0 { return false; };
+    let declared = declared_param(e, inst);
+    if declared == -1 { return false; };
     let p = first_child(next_sibling(first_child(decl_node[inst_module[inst]])));
     let i = 0;
     while (p >= 0) {
-        if inst_arg(inst, i) == t and has_bound(node_decl[first_child(p)], proto) { return true; };
+        let param = node_decl[first_child(p)];
+        if inst_arg(inst, i) == t and (declared < 0 or declared == param) and has_bound(param, proto) { return true; };
         i += 1;
         p = next_sibling(p);
     };
     false;
+}
+
+/// The parameter of instance `inst`'s module that expression `e` is
+/// declared as (`x` with `x: T`, `let y = x;`, `f()` with `fn f() T`); -1
+/// for a type named otherwise (`Pt { … }`, `p: Pt`): its type is no
+/// parameter's, whatever the instance's arguments are; -2 not known.
+fn declared_param(e: I32, inst: I32) I32 {
+    if inst <= 0 { return -2; };
+    if is_kind(e, Node.Paren_expr) { return declared_param(first_child(e), inst); };
+    if is_kind(e, Node.Struct_init) or is_kind(e, Node.Literal) { return -1; };
+    if is_kind(e, Node.Call_expr) and is_kind(first_child(e), Node.Identifier) and decl_is(node_decl[first_child(e)], Decl.Fn) {
+        let ret = child_of_kind(decl_node[node_decl[first_child(e)]], Node.Return_type);
+        return if ret >= 0 { typed_param(first_child(ret), inst); } else { -2; };
+    };
+    if not is_kind(e, Node.Identifier) { return -2; };
+    let d = node_decl[e];
+    let at = if d >= 0 { first_child(decl_node[d]); } else { -1; };
+    if at < 0 { return -2; };
+    if decl_is(d, Decl.Param) and next_sibling(at) >= 0 { return typed_param(next_sibling(at), inst); };
+    if decl_is(d, Decl.Local) and is_kind(decl_node[d], Node.Bind_expr) and not is_kind(at, Node.Tuple_pattern) {
+        let init = last_child(decl_node[d]);
+        return if next_sibling(at) != init { typed_param(next_sibling(at), inst); } else { declared_param(init, inst); };
+    };
+    -2;
+}
+
+/// @declared_param of a type as written.
+fn typed_param(tn: I32, inst: I32) I32 {
+    let p = arg_param(tn);
+    if p < 0 { return -1; };
+    if decl_owner[p] == inst_module[inst] { p; } else { -2; };
 }
 
 /// A protocol's name as written: a module's promoted protocol by the module's.
@@ -607,15 +642,20 @@ fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
 }
 
 /// `c.m()` on a type argument bounded by P, with no m of its own: P's
-/// `fn P.m`, as on a P (two bounds with one: reported, -2), or -1.
-fn bound_default(rt: I32, word: I32, at: I32, inst: I32) I32 {
+/// `fn P.m`, as on a P (two bounds with one: reported, -2), or -1. The
+/// bounds are those of the parameter receiver `c` is declared as (see
+/// @declared_param), not of each parameter given rt: a concrete type has none.
+fn bound_default(rt: I32, word: I32, at: I32, inst: I32, c: I32) I32 {
     if inst <= 0 { return -1; };
+    let declared = declared_param(c, inst);
+    if declared == -1 { return -1; };
     let found = -1;
     let p = first_child(next_sibling(first_child(decl_node[inst_module[inst]])));
     let i = 0;
     while (p >= 0) {
         let bounds = next_sibling(first_child(p));
-        if inst_arg(inst, i) == rt and is_kind(bounds, Node.Impl_list) {
+        let mine = declared < 0 or declared == node_decl[first_child(p)];
+        if inst_arg(inst, i) == rt and mine and is_kind(bounds, Node.Impl_list) {
             let b = first_child(bounds);
             while (b >= 0) {
                 let f = proto_default(node_decl[b], word);
