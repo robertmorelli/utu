@@ -2550,6 +2550,66 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
     checked++;
   }
+  // Host types, as TypeScript has them: index signatures compared by shape; a `let`-bound
+  // literal passed to the host a JS array (empty too); an `Iterable<T>` (of TS 5.9's three
+  // parameters) takes an array; a Str a `let` reads from the host may be of a union of
+  // literals; `K extends keyof M` takes M's keys alone; `T` from a record for
+  // `{ [k: string]: T }` (so `U` from a callback's result), a host `?F64` into
+  // `T | null | undefined` as it is; no `new` of an abstract class; a closure for
+  // `Function` writes its parameters' types.
+  const hostD = 'export declare const counts: { [k: string]: number };\n'
+    + 'export declare function total(m: { [k: string]: number }): number;\n'
+    + 'export declare function sum(xs: number[]): number;\n'
+    + 'export declare function iter(xs: Iterable<number>): number;\n'
+    + 'export type Key = "port" | "host";\nexport declare function ks(): Key[];\nexport declare function keyName(k: Key): string;\n'
+    + 'export interface Events { data: number; msg: string; }\n'
+    + 'export declare class Bus {\n  on<K extends keyof Events>(k: K, f: (e: Events[K]) => void): this;\n  emit<K extends keyof Events>(k: K, e: Events[K]): boolean;\n}\n'
+    + 'export declare function get<T>(o: { [k: string]: T }, k: string): T | undefined;\n'
+    + 'export declare function defaultTo<T>(v: T | null | undefined, d: T): T;\n'
+    + 'export declare function mapVals<T, U>(o: { [k: string]: T }, f: (v: T) => U): { [k: string]: U };\n'
+    + 'export declare abstract class Shape { abstract area(): number; }\n'
+    + 'export declare class Sq extends Shape { constructor(s: number); area(): number; }\n'
+    + 'export declare function fnLike(f: Function): number;\n';
+  const hostDJs = 'export const counts = { a: 1, b: 2 };\n'
+    + 'export function total(m) { let s = 0; for (const k in m) s += m[k]; return s; }\n'
+    + 'export function sum(xs) { return xs.reduce((a, b) => a + b, 0); }\n'
+    + 'export function iter(xs) { let s = 0; for (const x of xs) s += x; return s; }\n'
+    + 'export function ks() { return ["port", "host"]; }\nexport function keyName(k) { return k; }\n'
+    + 'export class Bus {\n  constructor() { this.l = {}; }\n  on(k, f) { (this.l[k] ??= []).push(f); return this; }\n'
+    + '  emit(k, e) { (this.l[k] ?? []).forEach(f => f(e)); return true; }\n}\n'
+    + 'export function get(o, k) { return o[k]; }\nexport function defaultTo(v, d) { return v ?? d; }\n'
+    + 'export function mapVals(o, f) { const r = {}; for (const k in o) r[k] = f(o[k]); return r; }\n'
+    + 'export class Shape {}\nexport class Sq extends Shape { constructor(s) { super(); this.s = s; } area() { return this.s * this.s; } }\n'
+    + 'export function fnLike(f) { return f(2); }\n';
+  const hostDHead = 'using D from "npm:hostd";\n';
+  const hostDTypes = await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': hostDHead + 'export main() F64 {\n'
+    + '    let xs = [1.0, 2.0, 3.0];\n    let e = [];\n    let ys = [4.0];\n    let k = D.ks()[1];\n    let n = 0.0;\n'
+    + '    let b = new D.Bus();\n    b.on("data", cl(v) void { n += v; });\n    b.emit("data", 5.0);\n'
+    + '    let v = D.get(&{ a: 1.0 }, "z");\n    let m = D.mapVals(&{ a: 1.0 }, cl(x) Str { `#${x}`; });\n'
+    + '    D.total(D.counts) + D.sum(xs) + D.sum(e) + D.iter([1.0, 2.0]) + D.iter(ys) + D.keyName(k).len().to_f64() + n\n'
+    + '        + D.defaultTo(v, 7.0) + D.defaultTo(D.get(&{ a: 1.0 }, "a"), 7.0) + m["a"].len().to_f64() + new D.Sq(3.0).area()\n'
+    + '        + D.fnLike(cl(x: F64) F64 { x * 2.0; });\n}\n' });
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, hostDTypes, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    // 3 + 6 + 0 + 3 + 4 + 4 + 5 + 7 + 1 + 2 + 9 + 4
+    assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(hostDTypes) })).exports.main(), 48, mode);
+    checked++;
+  }
+  for (const [body, messages] of [
+    ['let n: F64 = D.get(&{ a: 1.0 }, "z"); n', ['n is F64, got ?F64']],
+    ['D.total(&{ a: "s" })', ['Expected F64, got Str']],
+    ['new D.Bus().emit("nope", 1.0); 0.0', ['keyof D.Events has no value "nope"']],
+    ['let s = "data"; new D.Bus().on(s, cl(v) void { }); 0.0', ['keyof D.Events takes its values, not any Str']],
+    ['let k = D.ks()[0]; k = "x"; D.keyName(k).len().to_f64()', ['D.Key takes its values, not any Str']],
+    ['let xs = [1.0]; let n = xs.len(); D.sum(xs)', ['Expected D.F64[], got Array[F64]']],
+    ['new D.Shape(); 0.0', ['D.Shape is abstract: make one of a class that extends it']],
+    ['D.fnLike(cl(x) F64 { x * 2.0; })', ['x needs a type']],
+  ]) {
+    const result = await compileFile(utu, await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': `${hostDHead}export main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
+    assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
+    checked++;
+  }
   // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
   const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nexport lib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {

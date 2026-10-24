@@ -52,6 +52,8 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
         rest: !!p.valueDeclaration?.dotDotDotToken })),
       result: ref(checker.getReturnTypeOfSignature(sig)),
       ...(sig.thisParameter ? { receiver: ref(at(sig.thisParameter)) } : {}),
+      // (an abstract class's constructor: `new` of it is a mistake)
+      ...(sig.flags & ts.SignatureFlags.Abstract ? { abstract: true } : {}),
     };
   }
   const exports = Object.create(null), names = Object.create(null), mutableGlobals = [], ecmascript = [];

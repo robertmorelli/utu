@@ -262,6 +262,7 @@ enum(U8) Diag:
     | TupleIndex      // a variable index into a host tuple of mixed elements
     | HostLiteral     // a literal no member of a host union of literals (an enum)
     | TupleLength     // `[…]` of more or fewer elements than a host tuple takes
+    | HostAbstract    // `new` of a host abstract class
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
