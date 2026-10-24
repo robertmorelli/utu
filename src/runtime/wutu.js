@@ -750,7 +750,8 @@ export function createWutuLazy() {
    * chunks load, <html> has data-wutu-loading (a prerenderer waits for it).
    */
   return (path, name, args) => {
-    const where = globalThis.__utuWutu.here() + '|' + path + '|' + name;
+    // Outside a render (or before any template ran) the call's place is the page.
+    const where = (globalThis.__utuWutu?.here() ?? '') + '|' + path + '|' + name;
     const key = where + '|' + args.map(arg => arg !== null && typeof arg === 'object' ? '#' : String(arg)).join('\u001f');
     const known = lazies.get(where);
     if (known?.key === key && !known.node.hasAttribute('data-wutu-lazy-error')) return known.node;

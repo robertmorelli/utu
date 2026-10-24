@@ -2066,6 +2066,56 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.ok(result.diagnostics.some(d => d.message === message), `${files['main.utu']}\n  reported: ${result.diagnostics.map(d => d.message)}`);
     checked++;
   }
+  // A host callback takes no more parameters than JS passes (as in TypeScript; fewer
+  // is fine, a rest takes any number). It was accepted, and JS passed undefined.
+  const callbacks = 'export declare function cb(f: (x: number) => number): number;\n'
+    + 'export declare function many(f: (...xs: number[]) => number): number;\n'
+    + 'export declare function opt(f: (x: number, y?: number) => number): number;\n';
+  const callbacksJs = 'export function cb(f) { return f(2); }\nexport function many(f) { return f(1, 2, 3); }\nexport function opt(f) { return f(5); }\n';
+  const apifix = { 'node_modules/apifix/package.json': '{"name":"apifix","version":"1.0.0","type":"module","main":"index.js","types":"index.d.ts"}',
+    'node_modules/apifix/index.d.ts': callbacks, 'node_modules/apifix/index.js': callbacksJs };
+  for (const [body, message] of [
+    ['Api.cb(cl(x, y, z) F64 { x + z; })', 'Callback takes 3 parameters; JS passes 1'],
+    ['let f: cl(F64, F64) F64 = cl(x, y) { x + y; };\n    Api.cb(f)', 'Callback takes 2 parameters; JS passes 1'],
+    ['Api.opt(cl(x, y, z) F64 { x; })', 'Callback takes 3 parameters; JS passes 2'],
+  ]) {
+    const result = await compileFile(utu, await project({ ...apifix, 'main.utu': `using Api from "npm:apifix";\nexport main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
+    assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], body);
+    checked++;
+  }
+  const fewer = await project({ ...apifix, 'main.utu': 'using Api from "npm:apifix";\n'
+    + 'export main() F64 {\n    Api.cb(cl(x) F64 { x + 1.0; }) + Api.cb(cl() F64 { 7.0; }) + Api.many(cl(a, b, c) F64 { a + b + c; }) + Api.opt(cl(x, y) F64 { x; });\n}\n' });
+  // A linked declaration file (`tools/dts/cli.mjs` writes it) is imported as a package is;
+  // a relative module is from the program's directory.
+  const { linkFiles } = await import('../tools/dts/link.mjs');
+  const linked = await project({ 'api.d.ts': callbacks, 'api.js': callbacksJs, 'main.utu': 'using Api from "./bindings/Api.abi.json";\n'
+    + 'export main() F64 {\n    Api.cb(cl(x) F64 { x + 1.0; }) + Api.many(cl(a, b, c) F64 { a + b + c; });\n}\n' });
+  const abi = linkFiles({ files: [path.join(path.dirname(linked), 'api.d.ts')], prefix: 'Api', moduleSpecifier: './api.js' });
+  await fs.mkdir(path.join(path.dirname(linked), 'bindings'));
+  await fs.writeFile(path.join(path.dirname(linked), 'bindings/Api.abi.json'), JSON.stringify(abi));
+  for (const [file, expected] of [[fewer, 21], [linked, 9]]) {
+    for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+      const result = await compileFile(utu, file, { mode });
+      assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+      assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(file) })).exports.main(), expected, mode);
+      checked++;
+    }
+  }
+  await fs.writeFile(path.join(path.dirname(linked), 'bindings/Bad.abi.json'), '{"version":2}');
+  await fs.writeFile(path.join(path.dirname(linked), 'bad.utu'), 'using Bad from "./bindings/Bad.abi.json";\nexport main() F64 { 1.0; }\n');
+  const badAbi = await compileFile(utu, path.join(path.dirname(linked), 'bad.utu'), {});
+  assert.deepEqual(badAbi.diagnostics.map(d => d.message), ['No ABI in ./bindings/Bad.abi.json: missing, or not one tools/dts/cli.mjs wrote']);
+  // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
+  const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nexport lib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, handles, { mode });
+    const { exports } = await instantiateNode(result.wasm, result.spec);
+    const p = exports.make();
+    assert.equal(exports.norm(p), 5, mode);
+    assert.equal(p.x, undefined, mode);
+    assert.throws(() => exports.norm({ x: 3, y: 4 }), TypeError, mode);
+    checked++;
+  }
   // A source map changes no byte of the module, in any mode; its entries
   // are in offset order, each in the code, and the program's own lines are
   // where they are.

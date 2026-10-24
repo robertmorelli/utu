@@ -1219,12 +1219,21 @@ fn closure_written_result(c: I32, cx: Cx) I32 {
 fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let sig = jfirst(desc_get(d, "calls"));
     let c = closure_node(arg);
-    if c < 0 { return type_only(arg, -1, cx); };
+    if c < 0 {
+        let t = type_only(arg, -1, cx);
+        // (its first parameter may be the receiver)
+        let receiver = if jget(sig, "receiver") >= 0 { 1; } else { 0; };
+        if ty_is(t, Ty.Closure) { callback_arity(sig, vl_len[ty_a[t]] - receiver, arg); };
+        return t;
+    };
     let list = first_child(c);
     let own = if is_kind(list, Node.Closure_param_list) { first_child(list); } else { -1; };
     let receiver = own >= 0 and word_text(word_of(first_child(own))) == "this";
     let arity = if is_kind(list, Node.Closure_param_list) { child_count(list); } else { 0; };
     if receiver { arity -= 1; };
+    // (once reported, a `let`'s closure is checked as its own type: the mistake is said once)
+    callback_arity(sig, arity, arg);
+    if callback_extra(sig, arity) and is_kind(arg, Node.Identifier) { return type_only(arg, -1, cx); };
     let params = jget(sig, "params");
     let m = vl_begin();
     if receiver {
@@ -1253,6 +1262,25 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let loose = ref_is(x, "void") or ref_dynamic(x) or jget(x.at, "parameter") >= 0;
     let ret = if loose { closure_written_result(c, cx); } else { foreign_type(result, view); };
     ty(Ty.Closure, vl_end(m), ret);
+}
+
+/// A callback of more parameters than the host passes is reported (as in
+/// TypeScript; fewer is fine).
+fn callback_arity(sig: I32, arity: I32, arg: I32) void {
+    if callback_extra(sig, arity) { report2(Diag.CallbackArity, arg, -1, arity, jlen(jget(sig, "params"))); };
+}
+
+/// Whether a callback of `arity` parameters takes more than the host passes
+/// (a rest parameter passes any number).
+fn callback_extra(sig: I32, arity: I32) Bool {
+    let n = 0;
+    let p = jfirst(jget(sig, "params"));
+    while (p >= 0) {
+        if jis_true(jget(p, "rest")) { return false; };
+        n += 1;
+        p = jnext(p);
+    };
+    arity > n;
 }
 
 /// Parameter `i` of a callback signature: a fixed one's, or its rest's element.

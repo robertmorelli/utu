@@ -4384,6 +4384,19 @@ ok
 12 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/882_abi_json_missing.utu
+ ERROR  No ABI in ./bindings/api.abi.json: missing, or not one tools/dts/cli.mjs wrote
+        host-missing · examples/error_demo/names/882_abi_json_missing.utu:3:16
+
+ 1 │ // What: a linked declaration file (`tools/dts/cli.mjs --out bindings`) that is not there
+ 2 │ // Expect: No ABI in ./bindings/api.abi.json: missing, or not one tools/dts/cli.mjs wrote
+ 3 │ using api from "./bindings/api.abi.json";
+   │                ━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                ╰─ not found
+ 4 │
+ 5 │ export main() F64 {
+--- exit 1
+
 === utu check examples/error_demo/names/88_lazy_struct_argument.utu
  ERROR  badge takes Options, which cannot cross into a lazy module
         lazy-value · examples/error_demo/names/lazy_parts/widgets.utu:8:5
@@ -6328,6 +6341,30 @@ ok
    │         ╰─ here
  9 │         = title;
 10 │     }
+--- exit 1
+
+=== utu check examples/error_demo/platform/880_callback_extra_param.utu
+ ERROR  Callback takes 2 parameters; JS passes 1
+        callback-arity · examples/error_demo/platform/880_callback_extra_param.utu:6:42
+
+ 4 │
+ 5 │ export main() void {
+ 6 │     Browser.window.requestAnimationFrame(cl(time, frame) void { Browser.console.log(time + frame); });
+   │                                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                          ╰─ JS passes 1
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/881_callback_extra_param_let.utu
+ ERROR  Callback takes 3 parameters; JS passes 1
+        callback-arity · examples/error_demo/platform/881_callback_extra_param_let.utu:7:42
+
+ 5 │ export main() void {
+ 6 │     let draw: cl(F64, F64, F64) void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
+ 7 │     Browser.window.requestAnimationFrame(draw);
+   │                                          ━━━━
+   │                                          ╰─ JS passes 1
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/88_wutu_onclick_attribute.utu

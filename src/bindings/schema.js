@@ -107,3 +107,11 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
   }
   return { version: 1, prefix, moduleSpecifier, exports, names, mutableGlobals, types, ...(ecmascript.length ? { ecmascript } : {}) };
 }
+
+/** A linked declaration file's ABI (`tools/dts/cli.mjs` writes `Name.abi.json`), or null when the text is not one. */
+export function abiFromJson(text) {
+  let abi = null;
+  try { abi = JSON.parse(text); } catch { return null; }
+  const valid = abi?.version === 1 && Array.isArray(abi.types) && abi.exports && abi.names && /^[A-Z][A-Za-z0-9_]*$/.test(abi.prefix);
+  return valid ? abi : null;
+}
