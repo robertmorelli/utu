@@ -410,6 +410,19 @@ export lib {
 
     fn diagnostic_extra_label(i: I32, k: I32) Str { word_text(extra_label[diag_extra[i] + k]); }
 
+    /// DSL sites (`dsl.utu`), for the host to check an `@es` body's syntax:
+    /// how many; site k's span, and its body's (in src) when it is an `@es`
+    /// in the program's own files, else -1.
+    fn dsl_count() I32 { dsl_sites.len(); }
+
+    fn dsl_site_start(k: I32) I32 { span_start(dsl_sites[k]); }
+
+    fn dsl_site_end(k: I32) I32 { tok_end[node_last[dsl_sites[k]] - 1]; }
+
+    fn es_body_start(k: I32) I32 { if is_es(dsl_sites[k]) and dsl_in_program(dsl_sites[k]) { dsl_text_start(dsl_sites[k]); } else { -1; }; }
+
+    fn es_body_end(k: I32) I32 { dsl_text_end(dsl_sites[k]); }
+
     /// `@wat` functions (`host.utu`): how many the loaded program has; site k's
     /// function (its node: name, parameters, result) and text (between `/\`
     /// and `\/`, in src). The host gives back k's code (`n` bytes it writes

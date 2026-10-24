@@ -895,10 +895,10 @@ function responseError(code, message) {
   return Object.assign(new Error(message), { code });
 }
 
-/** Where each line of `text` starts (UTF-16 offsets). */
+/** Where each line of `text` starts (UTF-16 offsets): a line ends at \n, \r\n, or a lone \r. */
 function lineStarts(text) {
   const starts = [0];
-  for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) starts.push(i + 1);
+  for (const m of text.matchAll(/\r\n?|\n/g)) starts.push(m.index + m[0].length);
   return starts;
 }
 

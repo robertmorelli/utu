@@ -209,6 +209,10 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     // In the slice helper every use shares: at this use, not the first.
     slice2: ['fn n(x: I32) I32 { x; }\nfn ok(xs: Array[I32]) I32 { xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    xs[2, n(1)].len();\n}\nexport main() I32 { let xs = [1, 2, 3]; ok(xs) + cut(xs); }\n', 'Slice ends before it starts', '4:5', 'cut'],
     // (A safe build stops at from_i32, before the match could miss.)
+    // A column counts characters, as check's do (an emoji is one, not two UTF-16 units).
+    emoji: ['fn at(xs: Array[I32], i: I32) I32 {\n    let s = "😀😀"; xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:19', 'at'],
+    // A lone \r ends a line, as \n and \r\n do.
+    cr: ['fn at(xs: Array[I32], i: I32) I32 {\r    xs[i];\r}\rexport main() I32 { at([1, 2, 3], 5); }\r', 'Index out of bounds', '2:5', 'at'],
     range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'Color.from_i32: no variant has this value', '7:26', 'main'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
@@ -231,6 +235,19 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.equal(r.status, 1, r.stdout);
     assert.ok(r.stderr.startsWith(' TRAP  Index out of bounds\n       trap · global.utu:3:14\n'), `${command}:\n${r.stderr}`);
   }
+  // A callback's trap after main returned (a `.then`'s), placed as main's are.
+  await write('later.utu', 'let delay: fun(I32) Promise[I32] = @es/\\ (v) => new Promise(r => setTimeout(() => r(v), 1)) \\/;\nexport main() void {\n    delay(0).then(cl(v) { let n = 10 / v; });\n}\n');
+  r = utu('run', 'later.utu');
+  assert.equal(r.status, 1, r.stdout);
+  assert.ok(r.stderr.startsWith(' TRAP  Integer division by zero\n       trap · later.utu:3:35\n'), r.stderr);
+  // @json's place in the text counts characters, and a lone \r ends a line.
+  await write('json.utu', 'struct P:\n    | s: Str\n    | x: I32\nexport main() Str {\n    @json/\\ error P "{\\"s\\": \\"😀\\",\\r\\"x\\": q}" \\/;\n}\n');
+  assert.match(utu('run', 'json.utu').stdout, /at line 2, column 6$/m);
+  // An @es body that is not JavaScript: at its block, when checked.
+  await write('es.utu', 'let f: fun(I32) I32 = @es/\\ (a) => a +* 1 \\/;\nexport main() I32 { f(1); }\n');
+  r = utu('check', 'es.utu');
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /^ ERROR  @es body is not JavaScript: .+\n {8}es-syntax · es\.utu:1:23\n/);
   // The unsafe modes keep no map: what, not where.
   r = utu('run', 'assert.utu', '-O', 'smallUnsafe');
   assert.match(r.stderr, /^ TRAP  fatal, failed assert, or failed check\n {7}trap · assert\.utu\n/);

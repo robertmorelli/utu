@@ -410,11 +410,11 @@ ok
  7 │
  8 │ fn area(shape: Shape) F64 {
  9 │     alt shape {
+   │     ━━━━━━━━━━━
+   │     ╰─ no Dot
 10 │         Circle |c| => 3.0 * c.r * c.r,
 11 │         Rect |r| => r.w * r.h,
 12 │     };
-   │     ━
-   │     ╰─ no Dot
 13 │ }
 --- exit 1
 
@@ -425,11 +425,11 @@ ok
  8 │
  9 │ fn weight(t: Token) I32 {
 10 │     alt t {
+   │     ━━━━━━━
+   │     ╰─ no Minus
 11 │         Num |n| => n.value,
 12 │         Plus => 1,
 13 │     };
-   │     ━
-   │     ╰─ no Minus
 14 │ }
 --- exit 1
 
@@ -440,10 +440,10 @@ ok
  8 │
  9 │ fn run(c: Command) void {
 10 │     alt c {
+   │     ━━━━━━━
+   │     ╰─ no Quit
 11 │         Say |s| => console.log(s.text),
 12 │     };
-   │     ━
-   │     ╰─ no Quit
 13 │ }
 --- exit 1
 
@@ -454,11 +454,11 @@ ok
  2 │ // Expect: Match over I32 requires a default arm (~> ...)
  3 │ fn describe(n: I32) Str {
  4 │     match n {
+   │     ━━━━━━━━━
+   │     ╰─ no ~>
  5 │         0 => "zero",
  6 │         1 => "one",
  7 │     };
-   │     ━
-   │     ╰─ no ~>
  8 │ }
 --- exit 1
 
@@ -4430,12 +4430,12 @@ ok
  6 │         | title: Str
  7 │         | count: I32
  8 │     fn badge(o: Options) Browser.HTMLElement {
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
  9 │         let el = Browser.document.createElement("span");
 10 │         el.textContent = o.title;
 11 │         el;
 12 │     }
-   │     ━
-   │     ╰─ here
 13 │     fn tally(counts: Array[I32]) Browser.HTMLElement {
 14 │         let el = Browser.document.createElement("span");
 --- exit 1
@@ -4459,12 +4459,12 @@ ok
 11 │         el;
 12 │     }
 13 │     fn tally(counts: Array[I32]) Browser.HTMLElement {
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
 14 │         let el = Browser.document.createElement("span");
 15 │         el.textContent = counts.len().to_str();
 16 │         el;
 17 │     }
-   │     ━
-   │     ╰─ here
 18 │     fn total(n: I32) I32 { n * 2; }
 19 │ }
 --- exit 1
@@ -4952,10 +4952,10 @@ ok
  1 │ // What: two export main declarations (an old one left behind)
  2 │ // Expect: entry surface: multiple export main declarations (second at line 7, first at line 3)
  3 │ export main() I32 {
+   │ ━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  4 │     1;
  5 │ }
-   │ ━
-   │ ╰─ here
  6 │
  7 │ export main() I32 {
 --- exit 1
@@ -4967,10 +4967,10 @@ ok
  1 │ // What: two export lib blocks in one file
  2 │ // Expect: entry surface: multiple export lib declarations; merge them into one export lib { … } (pointing at the second)
  3 │ export lib {
+   │ ━━━━━━━━━━━━
+   │ ╰─ here
  4 │     fn add(a: I32, b: I32) I32 { a + b; }
  5 │ }
-   │ ━
-   │ ╰─ here
  6 │
  7 │ export lib {
 --- exit 1
@@ -4982,10 +4982,10 @@ ok
  1 │ // What: a file with both export lib and export main
  2 │ // Expect: entry surface: export lib and export main are mutually exclusive
  3 │ export lib {
+   │ ━━━━━━━━━━━━
+   │ ╰─ here
  4 │     fn double(x: I32) I32 { x * 2; }
  5 │ }
-   │ ━
-   │ ╰─ here
  6 │
  7 │ export main() I32 {
 --- exit 1
@@ -5016,8 +5016,17 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/28_es_syntax_error.utu
-ok
---- exit 0
+ ERROR  @es body is not JavaScript: Unexpected token ';'
+        es-syntax · examples/error_demo/platform/28_es_syntax_error.utu:3:27
+
+ 1 │ // What: an @es body that is not valid JavaScript (unbalanced paren)
+ 2 │ // Expect: es-syntax at the @es block (3:27), at build time: "Unexpected token ';'"
+ 3 │ let parse: fun(Str) F64 = @es/\ (s) => Number(s \/;
+   │                           ━━━━━━━━━━━━━━━━━━━━━━━━
+   │                           ╰─ here
+ 4 │
+ 5 │ export main() F64 {
+--- exit 1
 
 === utu check examples/error_demo/platform/29_wat_after_statement.utu
  ERROR  @wat must be a function's whole body
@@ -6868,37 +6877,30 @@ ok
 
 === utu run examples/error_demo/runtime/16_wat_unreachable.utu
  TRAP  Reached unreachable code
-       trap · examples/error_demo/runtime/16_wat_unreachable.utu:3:1
+       trap · examples/error_demo/runtime/16_wat_unreachable.utu:4:5
 
- 1 │ // What: an `unreachable` instruction in inline wat is reached
  2 │ // Expect: trap: unreachable at 16_wat_unreachable.utu:4
  3 │ fn never(x: I32) I32 {
  4 │     @wat/\ unreachable \/;
+   │     ━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ here
  5 │ }
-   │ ━
-   │ ╰─ here
- 6 │
- 7 │ export main() I32 {
 
-  in never  examples/error_demo/runtime/16_wat_unreachable.utu:3:1
+  in never  examples/error_demo/runtime/16_wat_unreachable.utu:4:5
   in main  examples/error_demo/runtime/16_wat_unreachable.utu:8:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/17_stack_overflow.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/17_stack_overflow.utu:3:27
+       trap · examples/error_demo/runtime/17_stack_overflow.utu:4:5
 
- 1 │ // What: a recursive function with no base case
  2 │ // Expect: stack overflow in `count_down` (recursion too deep) at 17_stack_overflow.utu:4
  3 │ fn count_down(n: I32) I32 {
  4 │     count_down(n - 1) + 1;
+   │     ━━━━━━━━━━━━━━━━━
+   │     ╰─ here
  5 │ }
-   │ ━
-   │ ╰─ here
- 6 │
- 7 │ export main() I32 {
 
-  in count_down  examples/error_demo/runtime/17_stack_overflow.utu:3:27
   in count_down  examples/error_demo/runtime/17_stack_overflow.utu:4:5
 --- exit 1
 
@@ -7033,31 +7035,31 @@ ok
 
 === utu run examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
-wasm://wasm/b497df1a:1
+ TRAP  Integer division by zero
+       trap · examples/error_demo/runtime/28_then_callback_traps.utu:9:45
 
+ 7 │
+ 8 │ export main() void {
+ 9 │     delay(0, 5).then(cl(v) { console.log(`${10 / v}`); });
+   │                                             ━━━━━━
+   │                                             ╰─ here
+10 │     console.log("scheduled");
+11 │ }
 
-RuntimeError: divide by zero
-    at closure (wasm://wasm/b497df1a:wasm-function[5]:0xa4)
-    at invoke
-
-Node.js v25.8.1
+  in closure  examples/error_demo/runtime/28_then_callback_traps.utu:9:45
 --- exit 1
 
 === utu run examples/error_demo/runtime/29_deep_recursion_with_base.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:3:23
+       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
 
- 1 │ // What: correct-looking recursion that is simply too deep (summing a list recursively)
  2 │ // Expect: stack overflow in `sum_to` at 29_deep_recursion_with_base.utu:4; a short trace, not 10,000 frames
  3 │ fn sum_to(n: I32) I64 {
  4 │     if n == 0 { 0.to_i64(); } else { n.to_i64() + sum_to(n - 1); };
+   │                                                   ━━━━━━━━━━━━━
+   │                                                   ╰─ here
  5 │ }
-   │ ━
-   │ ╰─ here
- 6 │
- 7 │ export main() I64 {
 
-  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:3:23
   in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
 --- exit 1
 
@@ -7232,7 +7234,7 @@ pass still runs (… ms)
 --- exit 1
 
 === utu test examples/error_demo/runtime/44_test_stack_overflow.utu
-FAIL forever: Stack overflow  at examples/error_demo/runtime/44_test_stack_overflow.utu:3:29  in loop_forever ← loop_forever
+FAIL forever: Stack overflow  at examples/error_demo/runtime/44_test_stack_overflow.utu:4:5  in loop_forever
 pass after (… ms)
 1 passed, 1 failed
 --- exit 1
@@ -8690,10 +8692,10 @@ FAIL after tests: boom
  3 │ fn area(w: F64, h: F64) F64 { w * h; }
  4 │
  5 │ export lib {
+   │ ━━━━━━━━━━━━
+   │ ╰─ here
  6 │     fn rect_area(w: F64, h: F64) F64 { area(w, h); }
  7 │ }
-   │ ━
-   │ ╰─ here
  8 │
  9 │ export lib {
 --- exit 1
@@ -8705,10 +8707,10 @@ FAIL after tests: boom
  1 │ // What: two `export main` entry points in one file.
  2 │ // Expect: entry surface: multiple export main declarations.
  3 │ export main() I32 {
+   │ ━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  4 │     1;
  5 │ }
-   │ ━
-   │ ╰─ here
  6 │
  7 │ export main() I32 {
 --- exit 1
@@ -8720,10 +8722,10 @@ FAIL after tests: boom
  3 │ fn area(w: F64, h: F64) F64 { w * h; }
  4 │
  5 │ export lib {
+   │ ━━━━━━━━━━━━
+   │ ╰─ here
  6 │     fn rect_area(w: F64, h: F64) F64 { area(w, h); }
  7 │ }
-   │ ━
-   │ ╰─ here
  8 │
  9 │ export main() F64 {
 --- exit 1
@@ -10532,9 +10534,9 @@ FAIL after tests: boom
  7 │     | count: I32
  8 │
  9 │ struct NoField[Counter]:
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
 10 │     | n: I32
-   │     ━━━━━━━━
-   │     ╰─ here
 11 │
 12 │ export main() I32 {
 --- exit 1
@@ -10546,9 +10548,9 @@ FAIL after tests: boom
  7 │     | count: I32
  8 │
  9 │ struct NoField[Counter]:
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
 10 │     | n: I32
-   │     ━━━━━━━━
-   │     ╰─ here
 11 │
 12 │ export main() I32 {
 --- exit 1
@@ -10560,9 +10562,9 @@ FAIL after tests: boom
  7 │     | n: I32
  8 │
  9 │ struct NoStep[Counter]:
+   │ ━━━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
 10 │     | n: I32
-   │     ━━━━━━━━
-   │     ╰─ here
 11 │
 12 │ fn Counter[Has].step |h| () I32 { h.n + 1; }
 --- exit 1
@@ -10599,9 +10601,9 @@ FAIL after tests: boom
  5 │     | set size: F64
  6 │
  7 │ struct Sq[Sh]:
+   │ ━━━━━━━━━━━━━━
+   │ ╰─ here
  8 │     | size: I32
-   │     ━━━━━━━━━━━
-   │     ╰─ here
  9 │
 10 │ export main() I32 {
 --- exit 1
@@ -10676,9 +10678,9 @@ FAIL after tests: boom
  4 │     | area() F64
  5 │
  6 │ struct Square[Shape]:
+   │ ━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  7 │     | side: F64
-   │     ━━━━━━━━━━━
-   │     ╰─ here
  8 │
  9 │ fn total(s: Shape) F64 { s.area(); }
 --- exit 1
@@ -10690,9 +10692,9 @@ FAIL after tests: boom
  5 │     | area() F64
  6 │
  7 │ struct Square[Shape]:
+   │ ━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  8 │     | side: F64
-   │     ━━━━━━━━━━━
-   │     ╰─ here
  9 │
 10 │ fn Shape[Square].area |s| () F64 { s.side * s.side; }
 --- exit 1
@@ -10786,9 +10788,9 @@ FAIL after tests: boom
  4 │     | get name : Str
  5 │
  6 │ struct Square[Shape]:
+   │ ━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  7 │     | name: I32
-   │     ━━━━━━━━━━━
-   │     ╰─ here
  8 │
  9 │ export main() I32 { 0; }
 --- exit 1

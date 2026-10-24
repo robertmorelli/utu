@@ -183,10 +183,11 @@ function formatOne(d, files, ink, relative, highlight) {
  * gaps where lines are skipped. Each row knows the marks on it.
  */
 function view(text, file, marks, primaryFile) {
+  // A line ends at \n, \r\n, or a lone \r.
   const starts = [0];
-  for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) starts.push(i + 1);
+  for (const m of text.matchAll(/\r\n?|\n/g)) starts.push(m.index + m[0].length);
   const lineOf = offset => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= offset) lo = mid; else hi = mid - 1; } return lo; };
-  const lineText = i => text.slice(starts[i], (starts[i + 1] ?? text.length + 1) - 1).replace(/\r$/, '');
+  const lineText = i => text.slice(starts[i], starts[i + 1] ?? text.length).replace(/\r?\n?$/, '');
   const shown = new Set();
   for (const m of marks) {
     m.first = lineOf(m.start);
@@ -207,10 +208,12 @@ function view(text, file, marks, primaryFile) {
     if (previous != null && line > previous + 1) rows.push({ gap: true });
     previous = line;
     const raw = lineText(line);
+    // A mark is drawn and labelled on its first line, where the header
+    // places it (to that line's end, when it runs on); later lines are tinted.
     const on = marks.filter(m => m.first <= line && line <= m.last).map(m => {
       const from = line === m.first ? m.start - starts[line] : raw.length - raw.trimStart().length;
       const to = line === m.last ? Math.min(raw.length, Math.max(from + 1, m.end - starts[line])) : raw.length;
-      return { mark: m, from, to: Math.max(to, from + (raw.length > from ? 1 : 0)), ends: line === m.last };
+      return { mark: m, from, to: Math.max(to, from + (raw.length > from ? 1 : 0)), drawn: line === m.first };
     });
     rows.push({ line, raw, offset: starts[line], marks: on });
   }
@@ -245,12 +248,12 @@ function codeLine(row, v, ink, sev, highlight) {
 }
 
 /**
- * What hangs below a line: for each mark ending on it, its label on a hook,
+ * What hangs below a line: for each mark drawn on it, its label on a hook,
  * the marks to its left running down past it. Without color the marks are
  * drawn first, as rules under the code (heavy for the error).
  */
 function labelRows(row, ink, sev) {
-  const ending = row.marks.filter(m => m.ends).sort((a, b) => a.from - b.from);
+  const ending = row.marks.filter(m => m.drawn).sort((a, b) => a.from - b.from);
   if (!ending.length) return [];
   const col = i => columns(row.raw.slice(0, i));
   const tone = m => m.mark.role === 'primary' ? sev : ink.palette[m.mark.role];
@@ -282,22 +285,26 @@ function labelRows(row, ink, sev) {
 
 /** A fix: what it does, then the corrected line with its edit highlighted. */
 function fixLines(fix, text, ink, gutter) {
-  const lineStart = text.lastIndexOf('\n', fix.start - 1) + 1;
-  const lineEnd = (() => { const e = text.indexOf('\n', fix.end); return e < 0 ? text.length : e; })();
+  // A line ends at \n, \r\n, or a lone \r.
+  const breaks = /\r\n?|\n/g;
+  const head = text.slice(0, fix.start);
+  const lineStart = Math.max(head.lastIndexOf('\n'), head.lastIndexOf('\r')) + 1;
+  const rest = text.slice(fix.end).search(/[\r\n]/);
+  const lineEnd = rest < 0 ? text.length : fix.end + rest;
   const before = text.slice(lineStart, lineEnd);
   const after = text.slice(lineStart, fix.start) + fix.text + text.slice(fix.end, lineEnd);
-  const line = text.slice(0, lineStart).split('\n').length;
+  const line = (text.slice(0, lineStart).match(breaks) ?? []).length + 1;
   const out = [`  ${ink.paint(ink.palette.add, `${ink.bold}fix`)}   ${fix.label ?? ''}`];
   if (!ink.on) {
     // Only the corrected lines, when an edit cannot be shown inline.
-    after.split('\n').forEach((l, k) => out.push(gutter(line + k) + l));
+    after.split(/\r\n?|\n/).forEach((l, k) => out.push(gutter(line + k) + l));
     return out;
   }
   const runs = diff(before, after);
   const drawn = runs.map(r => r.k === '=' ? ink.paint(ink.palette.fg, r.t)
     : r.k === '+' ? `${ink.tint(ink.palette.add, 0.28)}${ink.fg(ink.palette.add)}${r.t}${ink.reset}`
     : `${ink.fg(ink.palette.del)}${ink.strike}${r.t}${ink.reset}`).join('');
-  drawn.split('\n').forEach((l, k) => out.push(gutter(line + k) + l));
+  drawn.split(/\r\n?|\n/).forEach((l, k) => out.push(gutter(line + k) + l));
   return out;
 }
 
