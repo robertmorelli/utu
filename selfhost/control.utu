@@ -572,12 +572,20 @@ fn check_null_compare(other: I32, equal: Bool, cx: Cx) I32 {
 //! = try
 
 /// `try { a } catch |e| { b }`: b runs when a throws, with e what was thrown.
-fn check_try(node: I32, expect: I32, cx: Cx) I32 {
+fn check_try(node: I32, expected: I32, cx: Cx) I32 {
     use_js_tag();
     let body_ = first_child(node);
     let c = next_sibling(body_);
     let binding = if is_kind(c, Node.Identifier) { c; } else { -1; };
     let handler = last_child(node);
+    // As an `if`'s: `try { a; } catch { null; }` is a ?A.
+    let expect = expected;
+    if expect < 0 {
+        let from = join_nodes.len();
+        join_nodes.push(body_);
+        join_nodes.push(handler);
+        expect = branch_join(from, cx);
+    };
     let m = w_mark();
     let mb = w_mark();
     let sets = flag_sets[0];
