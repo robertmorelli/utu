@@ -81,7 +81,8 @@ assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
 are rejected: use a closure. `label { for = "name"; }` is label's attribute, not
 a loop. An element has one id. An event name a typo away from a DOM event
-(`on clik`) is an error; another name is a custom event. `@reactive`,
+(`on clik`) is an error; another name is a custom event, one that adds to a
+DOM event's name too (`on changed`, `on resized`). `@reactive`,
 `@island`, `@style` and `@document` come before the root element; inside an
 element, `@unmanaged;` and CSS at-rules (`@media`, `@container`, …) are the
 only `@` forms, and any other is an error. Interpolated strings become text, never HTML.
@@ -92,17 +93,20 @@ A URL from a value is checked on every render, first and update alike, as an
 attribute (`href = link;`) or a property (`.href = link;`): `href`, `src`,
 `action`, `formaction`, `poster`, `cite`, `data`, `background`, `codebase`,
 `longdesc`, `manifest`, `xlink:href`; `ping`, `srcset` and
-`imagesrcset` check each URL in the list. One whose scheme is
+`imagesrcset` check each URL in the list (apart at spaces or commas, each read
+as a single one is). One whose scheme is
 `javascript:` or `vbscript:`, read as a browser reads it (any case, whitespace
 and control characters dropped: `" JaVa\tScript:"`), is not set: the attribute
 goes. So is a `data:` URL, except an image, audio or video one; an SVG image
-(`data:image/svg+xml`) only in an `img` or SVG `image`. Prerendered HTML is the
+(`data:image/svg+xml`) only in an `img` or SVG `image`. An `a` or `area` with
+a `download` (written, so set before the `href`) takes any `data:` href: it is
+saved, not opened (`a { href = calendar; download = "agenda.ics"; }`). Prerendered HTML is the
 DOM these renders made, so it holds the same. `srcdoc` is HTML, so a value
 there (`srcdoc = html;`, `.srcdoc = html;`) is an error; a written one stays.
 A `meta`'s `content` from a value (a refresh's URL) with any of those schemes
 anywhere goes too. An event handler is never an attribute: `onclick = …;` is
-an error in any case (`oNclick`, on a custom element too), and at run time
-such an attribute is not set. (One is `on` and a DOM event's name; `one`,
+an error in any case (`oNclick`, on a custom element too); an attribute's
+name is always written, so the run time needs no check. (One is `on` and a DOM event's name; `one`,
 `only` and `onfoo` run nothing, so they are attributes.) A `script` is code,
 so its attributes and text are only as written (`src = "/app.js";`, `"…";`):
 `src = url;` or `= code;` in a script is an error. HTML holds the text of
@@ -120,7 +124,8 @@ author's choice; give them only trusted text.
 
 Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
-children switch back to HTML. SVG attributes such as `viewBox`, `d`, and
+children switch back to HTML. A root tag only SVG has (`circle`, `g`) is SVG
+too, a `Browser.SVGElement`; `a`, `title`, `script` and `style` are HTML. SVG attributes such as `viewBox`, `d`, and
 `stroke-width` keep their original spelling. A namespaced one,
 `xlink:href = …;`, `xml:lang = …;` or `xmlns:xlink = …;`, is an attribute (no
 CSS property has those prefixes), set in its namespace.

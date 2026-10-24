@@ -68,13 +68,23 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
     assert(!root.hasAttribute('title'), 'attributes not set on this render are removed');
   }));
 
-  test('wutu runtime: attr() sets no on… attribute, in any case', () => withRuntime(async ({ api }) => {
-    const root = api.mount(() => {
-      const box = api.enter('x-box', false, 'root', '');
-      for (const name of ['onclick', 'oNclick', 'ONMOUSEOVER', 'title']) api.attr(box, name, 'alert(1)');
+  test('wutu runtime: a list URL is read as a single one is; a non-media data: URL only downloads', () => withRuntime(async ({ api }) => {
+    const bad = ' JaVa\tScript:alert(4)', cal = 'data:text/calendar,BEGIN';
+    const got = [];
+    api.mount(() => {
+      api.enter('div', false, 'root', '');
+      for (const [tag, name, value, download] of [['a', 'href', bad], ['a', 'ping', bad], ['img', 'srcset', 'a.png 1x,' + bad],
+        ['link', 'imagesrcset', bad], ['a', 'href', cal, true], ['area', 'href', cal, true], ['a', 'href', cal], ['iframe', 'src', cal],
+        ['object', 'data', cal], ['a', 'ping', 'https://x/a https://x/b']]) {
+        const node = api.enter(tag, false, 'n' + got.length, '');
+        if (download) node.setAttribute('download', 'x.ics');
+        api.attr(node, name, value);
+        got.push(node.getAttribute(name) === null ? '-' : '+');
+        api.leave();
+      }
       return api.leave();
     }, '');
-    assertEq(root.getAttributeNames().filter(n => !n.startsWith('data-wutu')).join(' '), 'title');
+    assertEq(got.join(''), '----++---+');
   }));
 
   test('wutu runtime: keyed children reorder in place and duplicate keys are rejected', () => withRuntime(async ({ api, document }) => {

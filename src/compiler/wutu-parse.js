@@ -96,6 +96,7 @@ const TAG_ATTRIBUTES = Object.fromEntries(Object.entries({
   video: 'src controls autoplay muted loop playsinline poster width height preload',
   audio: 'src controls autoplay muted loop preload',
   iframe: 'src title width height loading allow sandbox referrerpolicy',
+  object: 'data type name width height form usemap',
 }).map(([tag, names]) => [tag, words(names)]));
 
 /** Vocabulary shared with editor completions. */
