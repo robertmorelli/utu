@@ -39,25 +39,31 @@ fn store(save: Save) Str {
 
 `T` is a struct, an enum, or an `Array`. Its structs and enums are named bare and
 are the file's: in a mod, the mod's own, then the file's top-level ones (not
-a type parameter, nor another mod's).
+a type parameter, nor another mod's). A variant another enum shares a name
+with is still this enum's. An `enum(U8)` cannot be null, so it is no `decode`
+root and no `?T`: read one with `error`, a `match` capture (`|c| Col => c`), or
+as a field.
 
 ## Types
 
 | utu | JSON |
 | --- | --- |
-| `I32`, `U32`, `I64` | integers, read exactly and range-checked (`I64` keeps precision past 2^53) |
+| `I32`, `U32`, `I64` | integers, read exactly and range-checked (`I64` keeps precision past 2^53); `1.0` and `1e2` are not integers |
 | `F32`, `F64` | numbers |
-| `Bool`, `Str` | `true`/`false`, strings (all escapes, including surrogate pairs) |
-| `?T` (reference types) | `null` or a missing field |
+| `Bool`, `Str` | `true`/`false`, strings (all escapes read, including surrogate pairs) |
+| `?T` (reference types, not `enum(U8)`) | `null` or a missing field |
 | `Array[T]` | arrays |
 | local structs | objects; unknown fields are skipped, field order is free |
 | enums with no fields, `enum(U8)` ones included | strings: `"Red"` |
 | other enums | objects whose first field is `"kind"`: `{"kind": "Circle", "r": 2}` |
 
 Types may be recursive through `?T` or `Array[T]`. Non-optional fields must be
-present. Encoding writes fields in declaration order, and `?T` fields that are
-`null` are written as `null`. F64 values print as JavaScript does (`1e+300`,
-`0.1`); non-finite numbers print as `null`.
+present. Objects and arrays nest at most 512 deep, in skipped fields too.
+Encoding writes fields in declaration order, and `?T` fields that are `null`
+are written as `null`. F64 values print as JavaScript does (`1e+300`,
+`0.1`); non-finite numbers print as `null`. Strings escape `"`, `\`, `\n`, `\r`,
+and `\t` by letter, other control characters (`\b` and `\f` included) as
+`\u0008`, and lone surrogates as `\ud800`.
 
 ## Structural patterns
 
