@@ -2787,7 +2787,7 @@ ok
  7 │ export main() I32 {
  8 │     let c = Color.R;
    │             ━━━━━━━
-   │             ╰─ make one: R {…}
+   │             ╰─ make one: Color.R {…}
  9 │     0;
 10 │ }
 --- exit 1
@@ -4571,6 +4571,32 @@ ok
    │              ╰─ no such method
  7 │     0;
  8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/960_ambiguous_variant.utu
+ ERROR  Circle is a variant of Shape and of Lens: write Shape.Circle or Lens.Circle
+        ambiguous-variant · examples/error_demo/names/960_ambiguous_variant.utu:11:13
+
+ 9 │
+10 │ export main() F64 {
+11 │     let c = Circle { r: 1.0 };
+   │             ━━━━━━
+   │             ╰─ ambiguous
+12 │     c.r;
+13 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/961_variant_of_other_enum.utu
+ ERROR  Expected Shape, got Circle
+        type-mismatch · examples/error_demo/names/961_variant_of_other_enum.utu:12:9
+
+10 │ fn area(s: Shape) F64 {
+11 │     alt s {
+12 │         Lens.Circle |c| => c.focus,
+   │         ━━━━━━━━━━━
+   │         ╰─ Circle
+13 │         ~> 0.0,
+14 │     };
 --- exit 1
 
 === utu check examples/error_demo/names/96_duplicate_test_name.utu

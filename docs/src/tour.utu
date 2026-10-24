@@ -413,6 +413,28 @@ mod tour {
         \\}
         ;
     }
+    fn enum_qualified_sample() Str {
+        \\enum Shape:
+        \\    | Circle { r: F64 }
+        \\    | Dot {}
+        \\
+        \\enum Lens:
+        \\    | Circle { focus: F64 }   // Circle again: Shape.Circle or Lens.Circle
+        \\
+        \\fn area(shape: Shape) F64 {
+        \\    alt shape {
+        \\        Circle |c| => 3.0 * c.r * c.r,   // shape is a Shape: Shape's Circle
+        \\        Shape.Dot => 0.0,
+        \\    };
+        \\}
+        \\
+        \\export main() F64 {
+        \\    let lens = Lens.Circle { focus: 1.5 };
+        \\    let c: Shape = Circle { r: 1.0 };   // a Shape is wanted: Shape's Circle
+        \\    area(c) + area(Shape.Circle { r: 2.0 }) + area(Shape.Dot) + lens.focus;   // 16.5
+        \\}
+        ;
+    }
     fn enum_tag_sample() Str {
         \\tag enum Token:            // tag: alt compiles to a jump table
         \\    | Num { value: I32 }
@@ -1360,6 +1382,26 @@ mod tour {
                 " traps when no variant has the value v.";
             }
             = code.block(enum_sample());
+            p {
+                "A variant is named by its enum too: ";
+                code {
+                    "Shape.Circle { r: 2.0 }";
+                }
+                ", ";
+                code {
+                    "Shape.Dot";
+                }
+                " (a variant without fields is a value), ";
+                code {
+                    "Shape.Dot => …";
+                }
+                " in an alt, and ";
+                code {
+                    "geo.Shape.Circle";
+                }
+                " from mod geo. Where two enums have a variant of one name, the bare name is an error, unless the alt's value or the type wanted says which.";
+            }
+            = code.block(enum_qualified_sample());
             = code.block(enum_tag_sample());
             = code.block(int_enum_sample());
             h2 {

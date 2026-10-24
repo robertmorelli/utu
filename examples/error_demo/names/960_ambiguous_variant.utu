@@ -1,0 +1,13 @@
+// What: a bare variant name two enums declare, where nothing says which (it once meant the later enum's)
+// Expect: Circle is a variant of Shape and of Lens: write Shape.Circle or Lens.Circle
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+enum Lens:
+    | Circle { focus: F64 }
+
+export main() F64 {
+    let c = Circle { r: 1.0 };
+    c.r;
+}

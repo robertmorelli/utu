@@ -700,6 +700,19 @@ export lib {
     ['mem text: U8;\nlet bytes: fun() Externref = @es/\\ () => new Uint8Array([5, 6, 7]) \\/;\nexport lib { fn run() I32 { text.copy_in(bytes()); text.len() * 100 + text[2]; } }\n', 307],
     // An alt arm whose value is a bare name (it was read as the arm's binding).
     ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { alt p { Ka => 1, Kc => q, }; }\nexport lib { fn run() I32 { f(Kc {}, 5); } }\n', 5],
+    // Variants named by their enum (and mod): literals, field-less values, alt arms, types; a bare name
+    // two enums have, where the alt's value or the type wanted says which.
+    ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\n    | Z {}\n'
+      + 'fn f(a: A) I32 { alt a { V |v| => v.x, A.W => 100, }; }\nfn g(b: B) I32 { alt b { B.V |v| => v.y * 10, B.Z => 1000, }; }\n'
+      + 'fn h(v: B.V) I32 { v.y; }\nfn mk() A { V { x: 4 }; }\n'
+      + 'export lib { fn run() I32 { let a: A = V { x: 1 }; let n: ?B = V { y: 6 }; f(a) + g(B.V { y: 2 }) + f(A.W) + g(B.Z) + h(B.V { y: 3 }) + f(mk()) + f(A.V { x: 5 }); } }\n', 1 + 20 + 100 + 1000 + 3 + 4 + 5],
+    ['using m |mm|;\nmod m {\n    enum(U8) L:\n        | Lo\n        | Hi\n    enum S:\n        | C { r: I32 }\n        | D {}\n    enum T:\n        | C { s: I32 }\n        | E {}\n'
+      + '    fn s(v: S) I32 { alt v { C |c| => c.r, D => 7, }; }\n}\nmod Geo {\n    enum S:\n        | P { q: I32 }\n        | O {}\n    fn s(v: S) I32 { alt v { P |p| => p.q, O => 50, }; }\n}\n'
+      + 'fn t(v: m.T) I32 { alt v { m.T.C |c| => c.s, m.T.E => 9, }; }\nfn tc(c: m.T.C) I32 { c.s; }\n'
+      + 'export lib { fn run() I32 { m.L.Hi.to_i32() + mm.L.Hi.to_i32() * 10 + m.s(m.S.C { r: 100 }) + m.s(m.S.D) + t(m.T.C { s: 1000 }) + t(mm.T.E) + tc(mm.T.C { s: 2000 }) + Geo.s(Geo.S.P { q: 30000 }) + Geo.s(Geo.S.O); } }\n',
+      1 + 10 + 100 + 7 + 1000 + 9 + 2000 + 30000 + 50],
+    ['using geo |g|;\nmod geo {\n    enum(U8) Level:\n        | Low\n        | Mid\n        | High\n}\nfn label(l: geo.Level) I32 { match l { geo.Level.Low => 1, g.Level.Mid => 20, ~> 300, }; }\n'
+      + 'export lib { fn run() I32 { label(geo.Level.Low) + label(geo.Level.Mid) + label(g.Level.High); } }\n', 321],
     // A parameter assigned after an alt tested it: the inner test still runs.
     ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nexport lib { fn run() I32 { let fp: fun(Shape) I32 = f; fp(Circle {}); } }\n', 2],
     // Closures see writes to captured range counts, alt, and promote bindings, and their own (an element is a copy: no writes).
@@ -1699,7 +1712,16 @@ export lib {
     // Two things `p.f()` could call.
     ['struct P:\n    | f: cl() I32\nfn P.f |p| () I32 { 2; }\nexport lib { fn run() I32 { 0; } }\n', 'P.f is both a field and a method'],
     ['proto Sh:\n    | area() I32\nfn Sh.area |x| () I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'Sh.area is already a protocol member'],
-    ['enum Color:\n    | R\n    | G\nexport lib { fn run() I32 { let c = Color.R; 0; } }\n', 'Color.R is a type, not a value'],
+    ['enum Color:\n    | R { v: I32 }\n    | G\nexport lib { fn run() I32 { let c = Color.R; 0; } }\n', 'Color.R is a type, not a value'],
+    // A bare variant two enums declare, where nothing says which (it meant the later's); another enum's in an alt; one E lacks.
+    ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nexport lib { fn run() I32 { let v = V { x: 1 }; v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nfn f(v: V) I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    ['mod m {\n    enum A:\n        | V { x: I32 }\n    enum B:\n        | V { y: I32 }\n}\nexport lib { fn run() I32 { let v = m.V { x: 1 }; v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\nfn f(a: A) I32 { alt a { B.V |v| => v.y, ~> 0, }; }\nexport lib { fn run() I32 { 0; } }\n', 'Expected A, got V'],
+    ['enum A:\n    | V { x: I32 }\nexport lib { fn run() I32 { let v = A.Q { x: 1 }; 0; } }\n', 'A has no variant Q'],
+    ['mod geo {\n    enum(U8) L:\n        | Lo\n}\nfn f(l: geo.L) I32 { match l { geo.M.Lo => 1, ~> 0, }; }\nexport lib { fn run() I32 { 0; } }\n', 'Unknown type M'],
+    ['enum A:\n    | V { x: I32 }\n    | W {}\nfn f(a: A) I32 { alt a { V |v| => v.x, A.V => 5, ~> 0, }; }\nexport lib { fn run() I32 { 0; } }\n', 'Duplicate arm A.V: never runs'],
+    ['mod m {\n    enum(U8) L:\n        | Lo\n}\nexport lib { fn run() I32 { m.L.Hi.to_i32(); } }\n', 'L has no variant Hi'],
     // `?.` guards a call or an assignment, not a return, an assert, a jump, or a value inside one.
     ...['if c { return a.next?.v; }; -1;', 'assert a.next?.v == 1; 0;', 'let x = 0; x = if a.next?.v == 1 { 5; } else { 6; }; x;',
       'let s = "i"; s = a.next?.s orelse "d"; 0;', 'loop match 0 { 0 => { continue a.next?.v; }, ~> { break; }, }; 0;'].map(body =>

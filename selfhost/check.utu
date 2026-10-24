@@ -2916,9 +2916,42 @@ fn not_value(at: I32, decl: I32) I32 {
     error_value();
 }
 
+/// `E.V` of an enum whose variants are structs: the variant `V {}`, when it
+/// has no fields; else a type, made by `E.V {…}`.
+fn fieldless_variant(node: I32, v: I32, inst: I32, cx: Cx) I32 {
+    let holder = fields_holder(v);
+    if holder >= 0 and first_child(holder) >= 0 {
+        report2(Diag.VariantNotValue, node, word_of(last_child(node)), decl_owner[v], -1);
+        return error_value();
+    };
+    build_struct(named(v, inst), v, -1, node, cx);
+}
+
+/// The enum `m.E` or `M.E` (a path before `.V`) names, or -1.
+fn path_enum(base: I32) I32 {
+    if not is_kind(base, Node.Field_expr) and not is_kind(base, Node.Type_member_expr) { return -1; };
+    let e = node_decl[last_child(base)];
+    if decl_is(e, Decl.Enum) or decl_is(e, Decl.IntEnum) { e; } else { -1; };
+}
+
 /// `x.f` (not called): a module's global, or a field.
 fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     let base = first_child(node);
+    // `m.E.V`, `M.E.V`: a variant of a mod's enum.
+    let e = path_enum(base);
+    let v = node_decl[last_child(node)];
+    if e >= 0 and decl_is(v, Decl.Variant) and decl_owner[v] == e {
+        if decl_is(e, Decl.IntEnum) { return enum_variant_value(v); };
+        let alias = if is_kind(first_child(base), Node.Identifier) { node_decl[first_child(base)]; } else { -1; };
+        let inst = if is_kind(base, Node.Type_member_expr) and not is_kind(first_child(base), Node.Type_ident) { ty_inst(type_path(first_child(base), cx.inst)); }
+            else if decl_is(alias, Decl.Alias) { alias_instance(alias); } else { instance_for(module_of(v), cx.inst); };
+        return fieldless_variant(node, v, inst, cx);
+    };
+    if e >= 0 and v < 0 and not reported_within(node) {
+        report2(Diag.UnknownVariant, last_child(node), word_of(last_child(node)), named(e, 0), -1);
+        suggest_member(e, last_child(node), Space.Member);
+        return error_value();
+    };
     if is_module_path(node) {
         let name = last_child(node);
         if decl_is(node_decl[name], Decl.Global) {
@@ -3003,10 +3036,10 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
         return error_value();
     };
     if decl < 0 and decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };
-    // `Color.R` of an enum whose variants are structs: a type, made by `R {…}`.
     if decl_is(decl, Decl.Variant) {
-        report2(Diag.VariantNotValue, node, word_of(name), decl_owner[decl], -1);
-        return error_value();
+        let inst = if is_kind(first_child(node), Node.Type_ident) { instance_for(module_of(decl), cx.inst); }
+            else { ty_inst(type_path(first_child(node), cx.inst)); };
+        return fieldless_variant(node, decl, inst, cx);
     };
     // `T.make` named, not called: the function, as a value.
     if decl_is(decl, Decl.Fn) {
