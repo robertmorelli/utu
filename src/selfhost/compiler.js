@@ -903,14 +903,14 @@ function indexOf(file) {
 }
 
 /**
- * Instantiate a module the compiler built, with its spec: the `@es` bodies
+ * Instantiate a module the compiler built (its bytes, or compiled), with its spec: the `@es` bodies
  * (through `loadGlue`, which turns the glue module's source into its
  * exports; by default each body is evaluated alone, which serves bodies
  * that neither import nor await), closures, promises, hosted mems, and the
  * engine's JS string builtins.
  */
 export async function instantiate(wasm, spec = {}, { loadGlue = null, profiler = null } = {}) {
-  const module = await WebAssembly.compile(wasm, COMPILE_OPTIONS);
+  const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm, COMPILE_OPTIONS);
   const es = spec.es ?? {};
   const source = glueModuleSource(es);
   const imports = !source ? {} : loadGlue ? importObjectFromGlue(es, await loadGlue(source)) : importObjectFromEval(es);

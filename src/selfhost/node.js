@@ -22,16 +22,17 @@ export const COMPILER_WASM = path.join(ROOT, 'dist', 'utu.wasm');
 /**
  * The compiler's exports, from dist/utu.wasm (or the given bytes and spec).
  * In this repository, one built from other sources than selfhost/'s is
- * refused: it is not the compiler they are.
+ * refused: it is not the compiler they are. `module`: dist/utu.wasm's,
+ * compiling already (or null), as cli/utu.mjs starts it.
  */
-export async function loadNodeCompiler({ wasm, spec } = {}) {
+export async function loadNodeCompiler({ wasm, spec, module = null } = {}) {
   if (!wasm) {
     const base = COMPILER_WASM.replace(/\.wasm$/, '');
     if (!fs.existsSync(COMPILER_WASM)) throw new Error(`${COMPILER_WASM} is missing: run \`bun run build\``);
     if (!builtFromCurrentSources(`${base}.sources`)) {
       throw new Error(`${COMPILER_WASM} was built from other sources than selfhost/: run \`bun run build\``);
     }
-    wasm = fs.readFileSync(COMPILER_WASM);
+    wasm = await module ?? fs.readFileSync(COMPILER_WASM);
     spec = JSON.parse(fs.readFileSync(`${base}.host.json`, 'utf8'));
   }
   return loadCompiler(wasm, spec);

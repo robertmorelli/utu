@@ -25,13 +25,11 @@
 // `build` writes NAME.wasm.map in debug, or with --source-map.
 
 import fs from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
-import { MODES } from '../src/selfhost/compiler.js';
 import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
-import { glueSource, loaderSource, moduleFunctions } from '../src/selfhost/loader.js';
 import { sourceMapJson, wasmFrames, withMapUrl } from '../src/selfhost/sourcemap.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -42,6 +40,21 @@ const RUNTIME = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
 const WORKER_TTY = process.env.UTU_WORKER_TTY;
 delete process.env.UTU_WORKER_TTY;
 
+// A command that builds needs the compiler: it compiles (off this thread)
+// from here, as what drives it loads. loadNodeCompiler still checks it was
+// built from selfhost/ as it is.
+const COMPILING = ['check', 'run', 'test', 'bench', 'build', 'build-exe'].includes(process.argv[2]) ? compileEarly() : null;
+
+function compileEarly() {
+  try {
+    const bytes = readFileSync(path.join(ROOT, 'dist', 'utu.wasm'));
+    return WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" }).catch(() => null);
+  } catch { return null; }
+}
+
+/** The compiler's Node host (src/selfhost/node.js): loaded by a command that builds. */
+const selfhost = () => import('../src/selfhost/node.js');
+
 const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'display:modules', 'display:exports', 'display:debug', 'graph']);
 
 async function main() {
@@ -51,6 +64,7 @@ async function main() {
   if (command === 'lsp') return lsp();
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
+  const [{ MODES }, { loadNodeCompiler }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
   if (!commands[command]) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
     // A file given without a command: it was meant for one.
@@ -126,7 +140,7 @@ async function main() {
   const asked = args.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -146,7 +160,7 @@ const WRITES = new Set(['build', 'build-exe']);
 
 /** Build, printing the diagnostics; exits on errors. */
 async function buildOrExit(utu, file, options) {
-  const result = await compileFile(utu, file, options);
+  const result = await (await selfhost()).compileFile(utu, file, options);
   if (deepens && result.diagnostics.some(d => d.code === 'nested-too-deeply')) throw new TooDeep();
   if (result.diagnostics.length) await report(utu, result, result.diagnostics);
   if (!result.wasm) process.exit(1);
@@ -169,6 +183,7 @@ async function report(utu, result, diagnostics) {
 
 /** A stage 0 view of a program with a file that is not UTF-8: the self-hosted compiler's "Not UTF-8", at the byte; exits 1. */
 async function notUtf8(file) {
+  const { compileFile, loadNodeCompiler } = await selfhost();
   const utu = await loadNodeCompiler();
   const result = await compileFile(utu, file, { target: 'normal' });
   const bad = result.diagnostics.filter(d => d.message === 'Not UTF-8');
@@ -198,7 +213,7 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
   // (It runs before the sampler can start: its profile is empty, but written.)
-  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
+  const { exports, instance } = await (await selfhost()).instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
     .catch(async error => {
       if (profiler) await writeProfile(file, profiler, out);
       return trap(error, file, built, utu);
@@ -281,7 +296,7 @@ async function writeProfile(file, profiler, out) {
 async function test(file, { utu, optimize, safe }) {
   const built = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true, sourceMap: safe });
   const { wasm, spec, tests, map } = built;
-  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) })
+  const { exports } = await (await selfhost()).instantiateNode(wasm, spec, { root: path.dirname(file) })
     .catch(error => trap(error, file, built, utu));
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   const report = (title, error, times = 1) => {
@@ -411,7 +426,7 @@ async function bench(file, { utu, optimize, safe }) {
     console.log('No benches');
     return;
   }
-  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  const { exports } = await (await selfhost()).instantiateNode(wasm, spec, { root: path.dirname(file) });
   // A run that awaits ends as a test must (see @settled).
   const run = (f, n) => {
     const result = f(n);
@@ -498,6 +513,7 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
     await fs.writeFile(path.join(dir, `${name}.wasm.map`), sourceMapJson(built.map, { file: `${name}.wasm`, relative, texts }));
     wasm = withMapUrl(wasm, `${name}.wasm.map`);
   }
+  const { glueSource, loaderSource } = await import('../src/selfhost/loader.js');
   const glue = glueSource(spec, wasm);
   const loader = loaderSource(spec, wasm, {
     runtime: RUNTIME, glue: glue ? './glue.mjs' : null, streaming: false,
@@ -550,6 +566,7 @@ function virtualGlue(source) {
 /** A standalone executable: bun compiles the loader, the glue, and the module. */
 async function buildExe(file, { utu, optimize, safe, out }) {
   const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
+  const { glueSource, loaderSource, moduleFunctions } = await import('../src/selfhost/loader.js');
   // The executable calls main: without one it would do nothing (utu run says so too).
   if (!moduleFunctions(wasm).includes('main')) {
     fail(`No export main in ${displayPath(file)}`, 'no-main', ['An executable runs main; utu build makes a module for a library.']);
@@ -592,7 +609,7 @@ async function buildDirectory(from) {
 /** The language server (src/selfhost/lsp.js), speaking LSP's framing on stdin and stdout. */
 async function lsp() {
   const { createLanguageServer } = await import('../src/selfhost/lsp.js');
-  const { nodeHost, utuFiles } = await import('../src/selfhost/node.js');
+  const { loadNodeCompiler, nodeHost, utuFiles } = await import('../src/selfhost/node.js');
   const { fileURLToPath, pathToFileURL } = await import('node:url');
   const { existsSync } = await import('node:fs');
   const hosts = new Map();
@@ -664,7 +681,7 @@ async function lsp() {
  */
 async function grepCommand(args) {
   const { grep } = await import('../src/selfhost/grep.js');
-  const { nodeHost } = await import('../src/selfhost/node.js');
+  const { loadNodeCompiler, nodeHost } = await import('../src/selfhost/node.js');
   const where = {};
   let references = null;
   let json = false;
