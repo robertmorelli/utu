@@ -174,6 +174,34 @@ export function nodeHost({ root = process.cwd(), stdlib = nodeStdlib() } = {}) {
   };
 }
 
+/**
+ * The .utu files under folders `dirs` (not in node_modules or a hidden
+ * folder), following links to folders (each folder once, by its real path);
+ * `unlisted`: the folders that cannot be listed. A link leading nowhere is
+ * no file.
+ */
+export function utuFiles(dirs) {
+  const files = new Set(), unlisted = [], seen = new Set();
+  const walk = dir => {
+    let real, entries;
+    try { real = fs.realpathSync(dir); entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { unlisted.push(dir); return; }
+    if (seen.has(real)) return;
+    seen.add(real);
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      const utu = e.name.endsWith('.utu');
+      let folder = e.isDirectory(), file = e.isFile();
+      if (e.isSymbolicLink()) {
+        try { const stat = fs.statSync(full); folder = stat.isDirectory(); file = stat.isFile(); } catch { continue; }
+      }
+      if (folder) { if (!e.name.startsWith('.') && e.name !== 'node_modules') walk(full); }
+      else if (file && utu && !files.has(full)) files.add(full);
+    }
+  };
+  for (const dir of dirs) walk(dir);
+  return { files: [...files], unlisted };
+}
+
 /** Build `entry` (see compile in compiler.js), with files from disk. */
 export async function compileFile(utu, entry, options = {}) {
   const file = path.resolve(entry);

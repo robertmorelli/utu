@@ -535,7 +535,7 @@ async function buildDirectory(from) {
 /** The language server (src/selfhost/lsp.js), speaking LSP's framing on stdin and stdout. */
 async function lsp() {
   const { createLanguageServer } = await import('../src/selfhost/lsp.js');
-  const { nodeHost } = await import('../src/selfhost/node.js');
+  const { nodeHost, utuFiles } = await import('../src/selfhost/node.js');
   const { fileURLToPath, pathToFileURL } = await import('node:url');
   const { existsSync } = await import('node:fs');
   const hosts = new Map();
@@ -566,21 +566,8 @@ async function lsp() {
       return existsSync(file) ? pathToFileURL(file).href : null;
     },
     send: write,
-    // The .utu files under folders (not in node_modules or a hidden folder): what may import a file renamed.
-    listFiles: async dirs => {
-      const { readdirSync } = await import('node:fs');
-      const found = new Set();
-      const walk = dir => {
-        let entries;
-        try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-        for (const e of entries) {
-          if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'node_modules') walk(path.join(dir, e.name)); }
-          else if (e.name.endsWith('.utu')) found.add(path.join(dir, e.name));
-        }
-      };
-      for (const dir of dirs) walk(dir);
-      return [...found];
-    },
+    // The .utu files under the workspace's folders: what may import a file renamed.
+    listFiles: async dirs => utuFiles(dirs),
     log: text => process.stderr.write(`[utu lsp] ${text}\n`),
   });
   let buffer = Buffer.alloc(0);

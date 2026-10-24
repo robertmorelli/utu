@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { loadNodeCompiler, nodeHost } from '../src/selfhost/node.js';
+import { loadNodeCompiler, nodeHost, utuFiles } from '../src/selfhost/node.js';
 import { createLanguageServer } from '../src/selfhost/lsp.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -376,11 +376,8 @@ try {
     const ws = path.join(dir, 'ws');
     await fs.mkdir(path.join(ws, 'sub'), { recursive: true });
     const out = [];
-    const listFiles = async dirs => {
-      const found = [];
-      for (const d of dirs) for (const f of await fs.readdir(d, { recursive: true })) if (f.endsWith('.utu')) found.push(path.join(d, f));
-      return found;
-    };
+    // (As `utu lsp` lists them.)
+    const listFiles = async dirs => utuFiles(dirs);
     const server = createLanguageServer({
       utu: await loadNodeCompiler(), hostFor: () => host, send: message => out.push(message), listFiles,
       toKey: uri => fileURLToPath(uri), toUri: key => key.startsWith('std:') ? null : pathToFileURL(key).href,
@@ -419,6 +416,43 @@ try {
     await fs.writeFile(path.join(ws, 'main.utu'), MAINX.replace('{ t.b; }', '{ t.b }'));
     assert.equal(await renaming('addx', 0, 'plusx'), 'main.utu, which imports ax.utu, does not parse: no rename');
     await fs.writeFile(path.join(ws, 'main.utu'), MAINX);
+    // One whose build stops at another import: refused (its names are not known), and said so.
+    await file('other.utu', 'using nope from "./nope.utu";\nusing ax from "./ax.utu";\nexport lib { fn o() I32 { ax.addx(2); } }\n');
+    assert.match(await renaming('addx', 0, 'plusx'), /^other\.utu, which imports ax\.utu, does not build \(No file \.\/nope\.utu .*\): no rename$/);
+    await fs.rm(path.join(ws, 'other.utu'));
+    // Not refused: a file that only imports it, one naming it in a comment
+    // only (no import), a link to no file.
+    await file('only.utu', 'using ax from "./ax.utu";\n');
+    await file('said.utu', '// using ax from "./ax.utu";\nfn f() I32 { 1 }\n');
+    await fs.symlink(path.join(ws, 'nowhere.utu'), path.join(ws, 'gone.utu'));
+    // Through a link to a folder (one leading back is walked once).
+    await fs.mkdir(path.join(dir, 'outside'));
+    await fs.writeFile(path.join(dir, 'outside', 'far.utu'), 'using ax from "../ax.utu";\nexport lib { fn far() I32 { ax.addx(3); } }\n');
+    await fs.symlink(path.join(dir, 'outside'), path.join(ws, 'linked'));
+    await fs.symlink(ws, path.join(ws, 'sub', 'loop'));
+    assert.deepEqual(await renaming('addx', 0, 'plusx'), { 'ax.utu': [1], 'main.utu': [6], 'mid.utu': [1], 'far.utu': [1] }, 'past what is not an importer');
+    // A folder that cannot be listed, a file that cannot be read: either may import it.
+    if (process.getuid?.() !== 0) {
+      await fs.mkdir(path.join(ws, 'shut'));
+      await fs.chmod(path.join(ws, 'shut'), 0);
+      assert.equal(await renaming('addx', 0, 'plusx'), `folder ${path.join(ws, 'shut')} cannot be listed: no rename`);
+      await fs.chmod(path.join(ws, 'shut'), 0o755);
+      await fs.chmod(path.join(ws, 'only.utu'), 0);
+      assert.equal(await renaming('addx', 0, 'plusx'), 'only.utu cannot be read: no rename');
+      await fs.chmod(path.join(ws, 'only.utu'), 0o644);
+    }
+    // A protocol's getter: without declarations, neither its own nor the field's satisfying it.
+    const PR = 'mod pr {\n    proto Named:\n        | get label : I32\n}\n';
+    const FR = 'using pr from "./pr.utu";\nusing pr;\nstruct F[Named]:\n    | label: I32\nfn g(n: Named) I32 { n.label; }\nexport main() I32 { g(F { label: 1 }); }\n';
+    await file('pr.utu', PR);
+    const fr = await file('fr.utu', FR);
+    await server.handle({ jsonrpc: '2.0', method: 'textDocument/didOpen', params: { textDocument: { uri: fr, version: 1, text: FR } } });
+    await server.idle();
+    const lines = async (skip, includeDeclaration) => (await call('textDocument/references', { ...at(FR, 'label', skip, fr), context: { includeDeclaration } }))
+      .map(r => `${path.basename(fileURLToPath(r.uri))}:${r.range.start.line}`).sort();
+    assert.deepEqual(await lines(0, false), ['fr.utu:4', 'fr.utu:5'], 'from the field');
+    assert.deepEqual(await lines(1, false), ['fr.utu:4', 'fr.utu:5'], 'from a use');
+    assert.deepEqual(await lines(0, true), ['fr.utu:3', 'fr.utu:4', 'fr.utu:5', 'pr.utu:2']);
   }
 
   // `utu lsp`: the same server, framed on stdin and stdout.

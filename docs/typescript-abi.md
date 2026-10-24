@@ -139,6 +139,22 @@ so `words.find(...)` on `Str[]` returns `?Str` and `filter` returns `Str[]`.
 Literal types are inferred only for keyed or literal-constrained parameters
 (`createElement("input")`), so `Array.of("a", "b")` is `Str[]`.
 
+A tuple's `T` comes from its first element of type `T` (nested tuples too, and
+`U extends T[]`'s elements); the others are checked against it, so
+`tupOf<T>(t: [T, T])` given `[1.0, "a"]` is a mistake, not a union. A
+constrained `T` is the elements' type, not its constraint (`[1.0, 2.0]` for
+`<T extends number | string>(xs: [T, T])` makes `T` F64). A tuple literal has
+each element of its own type and as many as the tuple takes (`[number,
+string]` takes 2; `[number, ...string[]]`, at least 1, the rest strings); an
+index past a rest's start reads the rest's type. A function type fits another
+as in TypeScript: an optional parameter where a required one is wanted, fixed
+parameters where a rest is, a rest's element compared. A closure's result may
+be any one member of a union result (`cl() F64` for `() => number | string`).
+A `Str` that is not a literal (a variable's, a utu call's, a closure's written
+`Str` result) is no union of string literals (`litU(x: "x" | "y")`), as in
+TypeScript; one read from the host (`litU(Api.pick())`) is taken, since utu
+keeps no literal types to tell.
+
 Types declared by TypeScript's standard libraries (`lib.dom`, `lib.es*`) have one
 identity across every imported ABI. An element from `std:Browser` is accepted
 directly by a package whose declarations reference DOM `Element`, and a
