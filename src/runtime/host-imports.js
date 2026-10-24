@@ -96,11 +96,18 @@ export function closureImports(closureSpec, utu = {}) {
 }
 
 // flags: 1, the result is a Bool; 2, the environment is there even when
-// null (a closure whose one capture is its environment).
+// null (a closure whose one capture is its environment). A decayed `fun` is
+// one closure per function (a funcref is one JS function per wasm function),
+// so `removeEventListener` finds the one `addEventListener` was given.
+const DECAYED = new WeakMap();
 export const closureNew = (fn, env, flags, record) => {
-  const invoke = env == null && !(flags & 2) ? (...args) => fn(...args) : (...args) => fn(env, ...args);
+  const fun = env == null && !(flags & 2);
+  const known = fun && DECAYED.get(fn);
+  if (known) return known;
+  const invoke = fun ? (...args) => fn(...args) : (...args) => fn(env, ...args);
   const closure = flags & 1 ? (...args) => !!invoke(...args) : invoke;
   closure[CLOSURE_REC] = record;
+  if (fun) DECAYED.set(fn, closure);
   return closure;
 };
 export const closureRec = closure => closure?.[CLOSURE_REC] ?? null;

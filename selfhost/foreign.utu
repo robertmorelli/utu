@@ -1231,7 +1231,11 @@ fn check_argument(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     host_callback(arg);
     host_literal(slot, arg, view);
     let t = accept(slot, arg, view, cx);
-    coerce(check_expr(arg, t, cx), t, arg);
+    let actual = check_expr(arg, t, cx);
+    // A callback whose result the host leaves to it (`any`, `void`, a type
+    // parameter) and the closure does not write: the result its body has.
+    if ty_is(t, Ty.Closure) and ty_b[t] < 0 and ty_is(actual, Ty.Closure) and ty_a[actual] == ty_a[t] { return actual; };
+    coerce(actual, t, arg);
     t;
 }
 
@@ -1682,7 +1686,7 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
         vl_add(erased(pt, view));
         let name = "p" + int_text(i);
         if i > 0 { invocation = invocation + ","; };
-        invocation = invocation + if receiver_closure(a[i]) { "function (...a) { return " + name + "(this, ...a); }"; } else { js_callback(name, pt, js_argument(slot, name, pt)); };
+        invocation = invocation + if receiver_closure(a[i]) { kept_callback(name, "this", "function (...a) { return " + name + "(this, ...a); }"); } else { js_callback(name, pt, js_argument(slot, name, pt)); };
     };
     if sig >= 0 { env = bind_from_context(jget(sig, "result"), d.doc, env, expect); };
     let result_ref = if sig >= 0 { Ref { doc: d.doc, at: jget(sig, "result"), env: env }; } else { any_slot(d.doc); };
@@ -1704,7 +1708,8 @@ fn check_foreign_value_call(node: I32, callee: I32, t: I32, args: I32, m: I32, e
 fn foreign_callable(t: I32) Bool { is_foreign(t) and jlen(desc_get(describe(ref_of(t)), "calls")) > 0; }
 
 /// A closure whose parameter may be absent receives JS's undefined as null
-/// (a parameter the host leaves out is undefined); any other argument is `plain`.
+/// (a parameter the host leaves out is undefined), through a wrapper (see
+/// @kept_callback); any other argument is `plain`.
 fn js_callback(name: Str, pt: I32, plain: Str) Str {
     if not ty_is(pt, Ty.Closure) { return plain; };
     let params = ty_a[pt];
@@ -1716,7 +1721,13 @@ fn js_callback(name: Str, pt: I32, plain: Str) Str {
         if k > 0 { args = args + ","; };
         args = args + "a[" + int_text(k) + "]" + if ty_is(vl_item(params, k), Ty.Nullable) { " ?? null"; } else { ""; };
     };
-    "(...a) => " + name + "(" + args + ")";
+    kept_callback(name, "js", "(...a) => " + name + "(" + args + ")");
+}
+
+/// A JS function wrapping closure `name`, made once per closure and kept on
+/// it (under `utu.<key>`): `removeEventListener` finds what `add…` was given.
+fn kept_callback(name: Str, key: Str, wrapper: Str) Str {
+    "(" + name + "[Symbol.for('utu." + key + "')] ??= " + wrapper + ")";
 }
 
 /// `cl(this, event) {…}` receives the JS receiver first.
