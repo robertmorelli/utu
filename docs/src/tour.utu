@@ -1592,7 +1592,7 @@ mod tour {
                 code {
                     "vec";
                 }
-                " are top-level growable arrays of scalars for hot loops. A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error. An index past the length (or negative) traps, as an array's does; smallUnsafe and fastUnsafe check only the capacity.";
+                " are top-level growable arrays of scalars for hot loops. A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error. Growing with resize(n) zero-fills the new elements. An index past the length (or negative) traps, as an array's does; smallUnsafe and fastUnsafe check only the capacity.";
             }
             = code.block(arrays_sample());
             = code.block(generator_sample());

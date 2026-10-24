@@ -17,7 +17,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KINDS = [['U8', 200], ['I8', -100], ['U16', 60000], ['I16', -30000], ['I32', -2000000000], ['U32', 4000000000], ['I64', -9000000000], ['F32', 1.5], ['F64', -2.25]];
 
 // For each kind: initial contents, pushes past 64 KiB, writes, compound
-// writes, resize (keeping old contents), and clear.
+// writes, resize (keeping old contents; the new ones are zero in the
+// self-hosted compiler, stale in stage 0: test-compiler-regressions), and clear.
 const widen = kind => kind === 'I64' || kind === 'F64' ? '' : kind === 'F32' ? '.to_f64()' : '.to_i64()';
 const exercise = word => KINDS.map(([kind, value], k) => {
   const float = kind.startsWith('F');
@@ -34,7 +35,7 @@ fn run${k}() ${float ? 'F64' : 'I64'} {
     let total = m${k}[0]${w} + m${k}[6]${w};
     m${k}.resize(10);
     m${k}.resize(70000);
-    let kept = m${k}[69999]${w};
+    let kept = m${k}[9]${w};
     m${k}.clear();
     total + kept + ${n('before')} + ${n(`m${k}.len()`)};
 }`;
