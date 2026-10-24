@@ -320,7 +320,31 @@ fn es_out(expr: Str, t: I32) Str {
     if t == prelude(Prelude.Str) {
         return "(s => typeof s === \"string\" ? s : (() => { throw new TypeError(`Wrong type from JavaScript: a Str, not ${s === null ? \"null\" : s instanceof Promise ? \"a Promise (await it: Promise[Str])\" : typeof s}`); })())(" + expr + ")";
     };
+    // A handle must not be null (wasm would take it, and trap later); a
+    // protocol's must be a wasm object (wasm would take any as an anyref).
+    if js_handle(t) {
+        let name = type_text(t);
+        let proto = decl_is(ty_decl(t), Decl.Proto);
+        return "(h => h != null" + (if proto { " && Object.getPrototypeOf(h) === null && !Object.isExtensible(h)"; } else { ""; })
+            + " ? h : (() => { throw new TypeError(`Wrong type from JavaScript: a" + (if name.get(0) == 65 or name.get(0) == 69 or name.get(0) == 73 or name.get(0) == 79 or name.get(0) == 85 { "n "; } else { " "; }) + name + ", not ${h === null ? \"null\" : typeof h}`); })())(" + expr + ")";
+    };
     expr;
+}
+
+/// A closure's flags, in safe builds: bit 2 + k for each parameter k a JS
+/// caller must not pass null for (src/runtime/host-imports.js closureNew).
+fn js_handle_bits(params: I32) I32 {
+    let bits = 0;
+    if safe_checks[0] == 1 { for (0 ..< if vl_len[params] < 29 { vl_len[params]; } else { 29; }) |k| { if js_handle(vl_item(params, k)) { bits = bits | (4 << k); }; }; };
+    bits;
+}
+
+/// Whether t crosses as a handle that is never null: a struct, array, enum,
+/// protocol, or closure (not a host value, Externref, or Str).
+fn js_handle(t: I32) Bool {
+    if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Closure) { return ty_is(t, Ty.Closure); };
+    let vt = repr(t);
+    vt_is_ref(vt) and vt != vt_externref and t != prelude(Prelude.Str);
 }
 
 /// Where the `import …;` declarations an `@es` body opens with end (as

@@ -231,10 +231,10 @@ export lib {
     fn set_run(on: I32) void { run_build[0] = on; }
 
     /// The last run build's array levels (0: none), and its innermost one's
-    /// element type, as written.
+    /// element type, as written (a tuple or handle main's own; "" none).
     fn run_levels() I32 { run_depth[0]; }
 
-    fn run_leaf() Str { if run_depth[0] > 0 { type_text(run_elem[0]); } else { ""; }; }
+    fn run_leaf() Str { if run_elem[0] >= 0 { type_text(run_elem[0]); } else { ""; }; }
 
     /// The last profile build's frames: how many, and frame k's name and
     /// where its function starts in src.

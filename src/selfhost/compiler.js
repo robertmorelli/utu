@@ -109,7 +109,7 @@ export async function compile(utu, entry, host) {
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
     blame: blame && utu.blame_prepare ? readBlameTables(utu, files) : null,
     ...(profile ? { frames: readFrames(utu, files) } : {}),
-    ...(run && utu.run_levels?.() > 0 ? { array: { levels: utu.run_levels(), leaf: utu.run_leaf() } } : {}),
+    ...(run && utu.run_leaf?.() ? { array: { levels: utu.run_levels(), leaf: utu.run_leaf() } } : {}),
   };
 }
 

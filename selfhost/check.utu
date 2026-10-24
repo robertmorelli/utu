@@ -3483,6 +3483,7 @@ fn compile(target: Target) I32 {
     test_node.clear();
     bench_node.clear();
     run_depth[0] = 0;
+    run_elem[0] = -1;
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
@@ -3821,12 +3822,14 @@ vec run_elem: I32 = [-1];
 /// `export main() Array[…]` (or `?Array`, nested) in a run build: for each
 /// array level k, `run:len:k` and `run:at:k`, its `len()` and `[i]`, so
 /// `utu run` prints the result as `[[1, 2], []]`. (`:` is in no utu name.)
+/// A tuple or handle main's type is @run_elem too: printed `[1, P]`, `P`.
 fn run_readers(item: I32) void {
     run_depth[0] = 0;
     let ret = child_of_kind(item, Node.Return_type);
     if ret < 0 { return; };
     let t = type_of(ret, 0);
     if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+    if ty_is(t, Ty.Tuple) or js_handle(t) { run_elem[0] = t; };
     while (is_array_type(t)) {
         let k = run_depth[0].to_str();
         run_reader(t, intern_text("len"), "run:len:" + k);

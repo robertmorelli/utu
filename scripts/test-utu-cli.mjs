@@ -340,7 +340,14 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   await write('nullable.utu', 'export main() ?Array[?Array[Bool]] { [[true, false], null, []]; }\n');
   await write('u32s.utu', 'export main() Array[U32] { [4000000000, 0]; }\n');
   await write('arraytrap.utu', 'fn at(xs: Array[I32], i: I32) I32 { xs[i]; }\nexport main() Array[I32] { [at([1], 3)]; }\n');
+  // A struct, Result, or ?P main by its type's name; a tuple as `[…]` (were node's inspect).
+  await write('struct.utu', 'struct P:\n    | x: I32\nexport main() ?P { P { x: 1 }; }\n');
+  await write('result.utu', 'export main() Result[I32, Str] { Result[I32, Str].ok(3); }\n');
+  await write('tuple.utu', 'struct P:\n    | x: I32\nexport main() .{I32, Str, P, Bool, ?P, U32} { .{1, "a", P { x: 1 }, true, null, 4000000000}; }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    assert.equal(utu('run', 'struct.utu', '-O', mode).stdout, 'P\n', mode);
+    assert.equal(utu('run', 'result.utu', '-O', mode).stdout, 'Result[I32, Str]\n', mode);
+    assert.equal(utu('run', 'tuple.utu', '-O', mode).stdout, '[1, "a", P, true, null, 4000000000]\n', mode);
     assert.equal(utu('run', 'arrays.utu', '-O', mode).stdout, '[[1, 2, 3], [], [4]]\n', mode);
     assert.equal(utu('run', 'empty.utu', '-O', mode).stdout, '[]\n', mode);
     assert.equal(utu('run', 'strs.utu', '-O', mode).stdout, '["a", "b\\"c", ""]\n', mode);

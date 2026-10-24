@@ -7578,7 +7578,7 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu run examples/error_demo/runtime/55_main_returns_struct.utu
-[Object: null prototype] {}
+Point
 --- exit 0
 
 === utu run examples/error_demo/runtime/56_main_void_ok.utu
