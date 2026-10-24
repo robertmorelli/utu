@@ -1,0 +1,6 @@
+// What: two benches with one name
+// Expect: Duplicate bench "adds": a bench's name is its row
+fn add(a: I32, b: I32) I32 { a + b; }
+
+bench "adds" { let s = 0; measure { s = add(s, 1); } }
+bench "adds" { let s = 0; measure { s = add(s, 2); } }

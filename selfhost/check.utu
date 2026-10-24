@@ -3221,7 +3221,6 @@ fn compile(target: Target) I32 {
             return -1;
         };
     };
-    let tests = 0;
     test_node.clear();
     bench_node.clear();
     for (0 ..< file_root.len()) |file| {
@@ -3242,15 +3241,18 @@ fn compile(target: Target) I32 {
                     let d = node_decl[first_child(item)];
                     if not mem_kind_ok(d) { report(Diag.MemKind, item, decl_name[d]); } else { memory_of(d); };
                 };
-                if target == Target.Tests and is_kind(item, Node.Test_decl) {
-                    entry_function(item, -1, tests);
-                    test_node.push(item);
-                    tests += 1;
-                };
-                // A test build checks the benches too; a bench build exports them.
-                if (target == Target.Tests or target == Target.Benches) and is_kind(item, Node.Bench_decl) {
-                    bench_function(item, if target == Target.Benches { bench_node.len(); } else { -1; });
-                    if target == Target.Benches { bench_node.push(item); };
+                test_or_bench(item, target);
+                // A mod's tests and benches too (a generic mod's run in no instance).
+                if is_kind(item, Node.Module_decl) and target != Target.Comptime {
+                    let module = node_decl[name_node(first_child(item))];
+                    let c = first_child(item);
+                    while (c >= 0) {
+                        if not is_generic(module) { test_or_bench(c, target); }
+                        else if is_kind(c, Node.Test_decl) or is_kind(c, Node.Bench_decl) {
+                            report2(Diag.TestInGeneric, first_child(c), decl_name[module], if is_kind(c, Node.Bench_decl) { 1; } else { 0; }, -1);
+                        };
+                        c = next_sibling(c);
+                    };
                 };
                 item = next_sibling(item);
             };
@@ -3306,6 +3308,20 @@ fn compile(target: Target) I32 {
     start_globals();
     if diag_kind.len() > 0 { return -1; };
     encode_module();
+}
+
+/// A test or bench of the entry file: every build checks it; a test build
+/// exports its tests, a bench build its benches.
+fn test_or_bench(item: I32, target: Target) void {
+    if target == Target.Comptime { return; };
+    if is_kind(item, Node.Test_decl) {
+        entry_function(item, -1, if target == Target.Tests { test_node.len(); } else { -1; });
+        if target == Target.Tests { test_node.push(item); };
+    };
+    if is_kind(item, Node.Bench_decl) {
+        bench_function(item, if target == Target.Benches { bench_node.len(); } else { -1; });
+        if target == Target.Benches { bench_node.push(item); };
+    };
 }
 
 /// Export a function of the program under its name.
@@ -3399,9 +3415,9 @@ fn in_target(node: I32, target: Target) Bool {
     if tok_start[node_first[item]] <= at and at < tok_end[node_last[item] - 1] {
         let kind = node_kind[item];
         if kind == Node.Export_lib_decl.to_i32() or kind == Node.Export_main_decl.to_i32() { return target == Target.Normal; };
-        if kind == Node.Test_decl.to_i32() { return target == Target.Tests; };
         if kind == Node.Mem_decl.to_i32() and target == Target.Comptime { return true; };
-        if kind == Node.Bench_decl.to_i32() { return target == Target.Tests or target == Target.Benches; };
+        // Tests and benches: in every build but a @comptime one.
+        if kind == Node.Test_decl.to_i32() or kind == Node.Bench_decl.to_i32() { return target != Target.Comptime; };
     };
     true;
 }
@@ -3477,7 +3493,8 @@ fn bench_function(item: I32, k: I32) void {
 /// The entry file's items, in place order (see @keep_target_diagnostics).
 vec target_items: I32;
 
-/// `export main(…)` and tests: functions of their own, exported.
+/// `export main(…)` and tests: functions of their own, exported (a test
+/// only in a test build: `test_index` -1 checks it).
 fn entry_function(item: I32, name: I32, test_index: I32) void {
     let list = child_of_kind(item, Node.Param_list);
     let m = vl_begin();
@@ -3492,13 +3509,15 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     let params = vl_end(m);
     let f = defined_func(params, result);
     let export_name = if name >= 0 { name_from_src(src.interned_start(name), src.interned_start(name) + src.interned_size(name)); }
-        else { name_add("__test_" + test_index.to_str()); };
-    func_field_name[f] = export_name;
+        else if test_index >= 0 { name_add("__test_" + test_index.to_str()); } else { name_add("test"); };
     func_debug_name[f] = export_name;
     func_src[f] = item;
-    export_func.push(f);
-    export_result.push(result);
-    export_params.push(params);
+    if name >= 0 or test_index >= 0 {
+        func_field_name[f] = export_name;
+        export_func.push(f);
+        export_result.push(result);
+        export_params.push(params);
+    };
     // `export main() I32 { @wat/\ … \/; }`: its code, which the host assembled.
     let wat = wat_of(last_child(item));
     if wat >= 0 {

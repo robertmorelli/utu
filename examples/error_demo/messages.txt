@@ -1333,6 +1333,19 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/control/832_return_in_bench.utu
+ ERROR  return in a bench
+        return-in-bench · examples/error_demo/control/832_return_in_bench.utu:6:35
+
+ 4 │     let xs = [3, -1, 4];
+ 5 │     measure {
+ 6 │         for (xs) |x| { if x > 0 { return; }; };
+   │                                   ━━━━━━
+   │                                   ╰─ would end the timing
+ 7 │     }
+ 8 │ }
+--- exit 1
+
 === utu check examples/error_demo/control/83_nullable_len_in_range.utu
  ERROR  for needs an array or range, not unknown
         invalid-for-source · examples/error_demo/control/83_nullable_len_in_range.utu:5:10
@@ -4250,6 +4263,40 @@ ok
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/830_duplicate_bench_name.utu
+ ERROR  Duplicate bench "adds"
+        test-name · examples/error_demo/names/830_duplicate_bench_name.utu:6:7
+
+ 4 │
+ 5 │ bench "adds" { let s = 0; measure { s = add(s, 1); } }
+ 6 │ bench "adds" { let s = 0; measure { s = add(s, 2); } }
+   │       ━━━━━━
+   │       ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/831_empty_bench_name.utu
+ ERROR  Empty bench name
+        test-name · examples/error_demo/names/831_empty_bench_name.utu:3:7
+
+ 1 │ // What: a bench with an empty name
+ 2 │ // Expect: Empty bench name
+ 3 │ bench "" { let s = 0; measure { s += 1; } }
+   │       ━━
+   │       ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/833_test_in_generic_mod.utu
+ ERROR  Test in generic mod Stack
+        test-in-generic · examples/error_demo/names/833_test_in_generic_mod.utu:5:10
+
+ 3 │ mod Stack[T] {
+ 4 │     fn top(xs: Array[T]) T { xs[xs.len() - 1]; }
+ 5 │     test "top" { assert true; }
+   │          ━━━━━
+   │          ╰─ runs in no instance
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/names/83_assign_function.utu
  ERROR  handler is immutable
         assignment-to-immutable · examples/error_demo/names/83_assign_function.utu:7:5
@@ -7061,6 +7108,18 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 
   in array.slice
   in main  examples/error_demo/runtime/651_slice_second_use.utu:7:16
+--- exit 1
+
+=== utu test examples/error_demo/runtime/834_test_never_settles.utu
+FAIL waits: Never settled: nothing left to wait for
+pass after (… ms)
+1 passed, 1 failed
+--- exit 1
+
+=== utu test examples/error_demo/runtime/835_callback_throws_after_tests.utu
+pass schedules (… ms)
+FAIL after tests: boom
+1 passed, 0 failed, 1 uncaught error
 --- exit 1
 
 === utu check examples/error_demo/syntax/01_missing_semicolon_after_let.utu

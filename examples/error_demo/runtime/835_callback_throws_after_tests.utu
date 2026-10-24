@@ -1,0 +1,5 @@
+// What: a callback a test left throws after the tests passed (a raw stack, sometimes no summary)
+// Expect: FAIL after tests: boom; 1 passed, 0 failed, 1 uncaught error
+let later: fun() void = @es/\ () => { setTimeout(() => { throw new Error("boom"); }, 5); } \/;
+
+test "schedules" { later(); assert true; }

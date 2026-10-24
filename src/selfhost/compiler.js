@@ -117,7 +117,7 @@ function readFrames(utu, files) {
 function readBenches(utu) {
   const benches = [];
   for (let k = 0; k < utu.bench_count(); k++) {
-    benches.push({ export: `__bench_${k}`, name: stringValue(textAt(utu.src, utu.bench_name_start(k), utu.bench_name_end(k))) });
+    benches.push({ export: `__bench_${k}`, name: modPrefix(utu, utu.bench_mod_start(k), utu.bench_mod_end(k)) + stringValue(textAt(utu.src, utu.bench_name_start(k), utu.bench_name_end(k))) });
   }
   return benches;
 }
@@ -266,10 +266,13 @@ export function readBlameTables(utu, files) {
 function readTests(utu) {
   const tests = [];
   for (let k = 0; k < utu.test_count(); k++) {
-    tests.push({ export: `__test_${k}`, name: stringValue(textAt(utu.src, utu.test_name_start(k), utu.test_name_end(k))) });
+    tests.push({ export: `__test_${k}`, name: modPrefix(utu, utu.test_mod_start(k), utu.test_mod_end(k)) + stringValue(textAt(utu.src, utu.test_name_start(k), utu.test_name_end(k))) });
   }
   return tests;
 }
+
+/** A test or bench in mod `geo` is `geo: name`. */
+const modPrefix = (utu, start, end) => start < 0 ? '' : `${textAt(utu.src, start, end)}: `;
 
 const ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' };
 

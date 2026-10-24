@@ -1,0 +1,6 @@
+// What: a test in a generic mod, which runs in no instance of it
+// Expect: Test in generic mod Stack
+mod Stack[T] {
+    fn top(xs: Array[T]) T { xs[xs.len() - 1]; }
+    test "top" { assert true; }
+}

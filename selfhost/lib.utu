@@ -256,6 +256,15 @@ export lib {
 
     fn bench_name_end(k: I32) I32 { tok_end[node_first[first_child(bench_node[k])]]; }
 
+    /// The mod test (or bench) k is in: where its name is in src, or -1.
+    fn test_mod_start(k: I32) I32 { mod_name_at(test_node[k], false); }
+
+    fn test_mod_end(k: I32) I32 { mod_name_at(test_node[k], true); }
+
+    fn bench_mod_start(k: I32) I32 { mod_name_at(bench_node[k], false); }
+
+    fn bench_mod_end(k: I32) I32 { mod_name_at(bench_node[k], true); }
+
     fn file_count() I32 { file_root.len(); }
 
     fn diagnostic_count() I32 { diag_kind.len(); }
@@ -526,4 +535,12 @@ fn owner_name(node: I32) Str {
     if is_kind(node, Node.Export_main_decl) { return "main"; };
     let name = first_child(node);
     bytes_text(tok_start[node_first[name]], tok_end[node_last[name] - 1]);
+}
+
+/// Where the name of the mod an item is in starts (or ends), or -1.
+fn mod_name_at(item: I32, end_: Bool) I32 {
+    let p = parent_of(item);
+    if p < 0 or not is_kind(p, Node.Module_decl) { return -1; };
+    let n = name_node(first_child(p));
+    if end_ { tok_end[node_first[n]]; } else { tok_start[node_first[n]]; };
 }
