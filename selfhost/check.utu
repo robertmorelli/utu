@@ -3449,6 +3449,7 @@ fn compile(target: Target) I32 {
     };
     test_node.clear();
     bench_node.clear();
+    run_depth[0] = 0;
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
@@ -3461,7 +3462,10 @@ fn compile(target: Target) I32 {
                         f = next_sibling(f);
                     };
                 };
-                if target == Target.Normal and is_kind(item, Node.Export_main_decl) { entry_function(item, intern_text("main"), -1); };
+                if target == Target.Normal and is_kind(item, Node.Export_main_decl) {
+                    entry_function(item, intern_text("main"), -1);
+                    if run_build[0] == 1 { run_readers(item); };
+                };
                 // Every mem of the entry file is a memory of the module, as in stage 0.
                 if is_kind(item, Node.Mem_decl) {
                     let d = node_decl[first_child(item)];
@@ -3772,6 +3776,60 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     cur_params[0] = cur_locals.len();
     mark_boxes(last_child(item));
     finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result }, -1);
+}
+
+/// `utu run`'s builds (1), which export readers of an array main's result.
+vec run_build: I32 = [0];
+/// The last run build's array levels (0: main returns no array), and the
+/// type in its innermost one.
+vec run_depth: I32 = [0];
+vec run_elem: I32 = [-1];
+
+/// `export main() Array[…]` (or `?Array`, nested) in a run build: for each
+/// array level k, `run:len:k` and `run:at:k`, its `len()` and `[i]`, so
+/// `utu run` prints the result as `[[1, 2], []]`. (`:` is in no utu name.)
+fn run_readers(item: I32) void {
+    run_depth[0] = 0;
+    let ret = child_of_kind(item, Node.Return_type);
+    if ret < 0 { return; };
+    let t = type_of(ret, 0);
+    if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+    while (is_array_type(t)) {
+        let k = run_depth[0].to_str();
+        run_reader(t, intern_text("len"), "run:len:" + k);
+        let elem = run_reader(t, known_word(Known.GetIndex), "run:at:" + k);
+        run_depth[0] += 1;
+        run_elem[0] = elem;
+        t = if ty_is(elem, Ty.Nullable) { ty_a[elem]; } else { elem; };
+    };
+}
+
+/// An exported function `name` that calls array type t's method `word`
+/// with its own parameters; its result type.
+fn run_reader(t: I32, word: I32, name: Str) I32 {
+    let fi = fn_instance(member(ty_decl(t), word, Space.Method), ty_inst(t));
+    let params = fi_params[fi];
+    let result = fi_result[fi];
+    let f = defined_func(params, result);
+    let n = name_add(name);
+    func_debug_name[f] = n;
+    func_field_name[f] = n;
+    export_func.push(f);
+    export_result.push(result);
+    export_params.push(params);
+    begin_function();
+    cur_fn[0] = -1;
+    for (0 ..< vl_len[params]) |i| { new_local(repr(vl_item(params, i))); };
+    cur_params.resize(1);
+    cur_params[0] = cur_locals.len();
+    let m = w_mark();
+    let args = w_mark();
+    for (0 ..< vl_len[params]) |i| { w_get(cur_locals[i], i); };
+    finish_call(fi, args, Cx { inst: 0, fi: -1, result: result });
+    w_node(Op.Seq, repr(result), 0, 0, m);
+    func_body[f] = w_pop();
+    record_locals(f, cur_params[0]);
+    result;
 }
 
 /// `fn T.f` of an own file whose receiver T names no type, or -1.

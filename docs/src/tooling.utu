@@ -125,7 +125,27 @@ mod tooling {
                 code {
                     "utu run";
                 }
-                " prints main's result, whatever its type, and exits 0.";
+                " prints main's result, whatever its type, and exits 0; an array as one (";
+                code {
+                    "[[1, 2], []]";
+                }
+                ", strings quoted, null as ";
+                code {
+                    "null";
+                }
+                "), a struct in it by its type's name. (Its build exports readers of the array, ";
+                code {
+                    "run:len:0";
+                }
+                " and ";
+                code {
+                    "run:at:0";
+                }
+                " a level; ";
+                code {
+                    "utu build";
+                }
+                " does not.)";
             }
             p {
                 code {
