@@ -17,7 +17,7 @@
 
 import {
   awaitImports, closureImports, exceptionImports, glueModuleSource, importObjectFromEval, importObjectFromGlue,
-  convertExports, memoryImports, promiseImports, promisifyExports,
+  convertExports, memoryImports, promiseImports, promisifyExports, splitBody,
 } from '../runtime/host-imports.js';
 import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
 import { abiFromJson } from '../bindings/schema.js';
@@ -87,8 +87,9 @@ export async function compile(utu, entry, host) {
     files = loading.get(utu) ?? [];
     return { wasm: null, spec: null, diagnostics: [tooDeep(utu, files, error)], files };
   }
-  const diagnostics = readDiagnostics(utu, files).concat(sourceWarnings(files));
-  if (size < 0) return { wasm: null, spec: null, diagnostics, files };
+  const wrongEs = esSyntax(utu, files);
+  const diagnostics = readDiagnostics(utu, files).concat(wrongEs, sourceWarnings(files));
+  if (size < 0 || wrongEs.length) return { wasm: null, spec: null, diagnostics, files };
   return {
     ...builtModule(utu, size), diagnostics, files,
     tests: target === 'test' ? readTests(utu) : [], benches: target === 'bench' ? readBenches(utu) : [],
@@ -124,8 +125,10 @@ function readBenches(utu) {
 }
 
 /**
- * A byte of the compiler's src as its file, 1-based line and column
- * (UTF-16), and UTF-16 offset in the file; null outside the files.
+ * A byte of the compiler's src as its file, 1-based line and column (a
+ * column counts characters, as a terminal shows them; `unit` counts UTF-16
+ * units, as editors and source maps do; a line ends at \n, \r\n, or a lone
+ * \r), and UTF-16 offset in the file; null outside the files.
  */
 export function placer(files) {
   const ordered = files.toSorted((a, b) => a.offset - b.offset);
@@ -138,10 +141,11 @@ export function placer(files) {
     let starts = lines.get(file);
     if (!starts) {
       starts = { bytes: [0], units: [0] };
-      for (let i = 0; i < file.bytes.length; i++) {
-        if (file.bytes[i] !== 10) continue;
+      const { bytes } = file;
+      for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] !== 10 && (bytes[i] !== 13 || bytes[i + 1] === 10)) continue;
         const from = starts.bytes.at(-1);
-        starts.units.push(starts.units.at(-1) + decoder.decode(file.bytes.subarray(from, i + 1)).length);
+        starts.units.push(starts.units.at(-1) + decoder.decode(bytes.subarray(from, i + 1)).length);
         starts.bytes.push(i + 1);
       }
       lines.set(file, starts);
@@ -149,8 +153,10 @@ export function placer(files) {
     const local = byte - file.offset;
     lo = 0; hi = starts.bytes.length - 1;
     while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts.bytes[mid] <= local) lo = mid; else hi = mid - 1; }
-    const column = decoder.decode(file.bytes.subarray(starts.bytes[lo], local)).length + 1;
-    return { file, line: lo + 1, column, offset: starts.units[lo] + column - 1 };
+    const before = decoder.decode(file.bytes.subarray(starts.bytes[lo], local));
+    let column = 1;
+    for (let i = 0; i < before.length; i++) { const c = before.charCodeAt(i); if (c < 0xdc00 || c > 0xdfff) column++; }
+    return { file, line: lo + 1, column, unit: before.length + 1, offset: starts.units[lo] + before.length };
   };
 }
 
@@ -182,7 +188,7 @@ export function readSourceMap(utu, files) {
       const ownerAt = utu.map_owner_start(k);
       if (ownerAt >= 0 && !owners.has(ownerAt)) owners.set(ownerAt, utu.map_owner_name(k));
       syntax = {
-        file: at?.file.key ?? null, line: at?.line ?? null, column: at?.column ?? null,
+        file: at?.file.key ?? null, line: at?.line ?? null, column: at?.column ?? null, unit: at?.unit ?? null,
         start: at?.offset ?? null, end: at ? where(endByte)?.offset ?? at.offset : null, kind: kinds.get(kind),
         owner: ownerAt >= 0 ? owners.get(ownerAt) : null, ownerAt: ownerAt >= 0 ? ownerAt : null,
       };
@@ -775,6 +781,39 @@ export function readDiagnostics(utu, files) {
     // Every mark has its tag: the report's label, or the kind's own.
     if (utu.diagnostic_default_label && diagnostic.label == null && diagnostic.file) diagnostic.label = utu.diagnostic_default_label(i);
     out.push(diagnostic);
+  }
+  return out;
+}
+
+const AsyncFunction = (async () => {}).constructor;
+
+/**
+ * Each `@es` body in the program's own files that is not JavaScript, at
+ * its block: the host's parser checks it (as the glue module will hold it),
+ * where the host has one (`new Function`; a page whose policy forbids it
+ * checks nothing). An `import.meta` is a module's alone: left to the load.
+ */
+function esSyntax(utu, files) {
+  if (!utu.dsl_count) return [];
+  const ordered = files.toSorted((a, b) => a.offset - b.offset);
+  const fileAt = byte => ordered.findLast(f => f.offset <= byte && byte <= f.offset + f.bytes.length) ?? null;
+  const out = [];
+  for (let k = 0; k < utu.dsl_count(); k++) {
+    const at = utu.es_body_start(k);
+    if (at < 0) continue;
+    const { expr } = splitBody(textAt(utu.src, at, utu.es_body_end(k)));
+    const body = `return (\n${expr}\n);`;
+    let wrong = null;
+    try { new Function(body); } catch (error) {
+      if (!(error instanceof SyntaxError)) continue;
+      try { new AsyncFunction(body); } catch (again) { if (again instanceof SyntaxError && !/import\.meta/.test(again.message)) wrong = again; }
+    }
+    const file = wrong && fileAt(utu.dsl_site_start(k));
+    if (!file) continue;
+    out.push({
+      kind: 'es-syntax', code: 'es-syntax', message: `@es body is not JavaScript: ${wrong.message}`, severity: 'error',
+      file: file.key, ...place(file, utu.dsl_site_start(k), utu.dsl_site_end(k)), label: 'here',
+    });
   }
   return out;
 }

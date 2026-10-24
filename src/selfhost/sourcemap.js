@@ -64,8 +64,10 @@ export function sourceMapJson(map, { file = null, relative = key => key, texts =
     if (!index.has(entry.file)) { index.set(entry.file, sources.length); sources.push(entry.file); }
     const source = index.get(entry.file);
     if (mappings) mappings += ',';
-    mappings += vlq(entry.at - last.at) + vlq(source - last.source) + vlq(entry.line - 1 - last.line) + vlq(entry.column - 1 - last.column);
-    last = { at: entry.at, source, line: entry.line - 1, column: entry.column - 1 };
+    // A source map's column counts UTF-16 units.
+    const column = (entry.unit ?? entry.column) - 1;
+    mappings += vlq(entry.at - last.at) + vlq(source - last.source) + vlq(entry.line - 1 - last.line) + vlq(column - last.column);
+    last = { at: entry.at, source, line: entry.line - 1, column };
   }
   return JSON.stringify({
     version: 3, ...(file ? { file } : {}), sources: sources.map(relative),

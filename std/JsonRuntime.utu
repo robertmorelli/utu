@@ -489,11 +489,14 @@ fn __json_describe(r: JsonReader__) Str {
     };
     let line = 1;
     let column = 1;
+    // A line ends at \n, \r\n, or a lone \r; a column counts characters
+    // (not a surrogate pair's second half).
     for (0..<(r.failed - 1)) |i| {
-        if r.text[i] == 10 {
+        let c = r.text[i];
+        if c == 10 or (c == 13 and (i + 1 >= r.text.len() or r.text[i + 1] != 10)) {
             line += 1;
             column = 1;
-        } else {
+        } else if c < 56320 or c > 57343 {
             column += 1;
         };
     };

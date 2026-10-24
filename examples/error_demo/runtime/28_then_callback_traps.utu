@@ -1,5 +1,5 @@
 // What: a .then callback divides by zero after main has returned
-// Expect: the trap is reported (and the exit code is nonzero)
+// Expect: trap at 28_then_callback_traps.utu:9 (`10 / v`), placed as main's traps are; exit 1
 using console from std:Console;
 
 let delay: fun(I32, I32) Promise[I32] =

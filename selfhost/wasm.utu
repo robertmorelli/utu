@@ -1548,10 +1548,10 @@ fn encode_code() void {
             // Assembled already: locals, instructions, and end.
             let k = func_code[f];
             leb_u(false, wat_len[k]);
-            // One entry, its function's place: its code is the host's.
+            // One entry, the `@wat` text's place: its code is the host's.
             if source_map[0] == 1 {
                 map_at.push(sec.len());
-                map_node.push(func_src[f]);
+                map_node.push(wat_site[k]);
                 map_site.push(-1);
             };
             for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]); };

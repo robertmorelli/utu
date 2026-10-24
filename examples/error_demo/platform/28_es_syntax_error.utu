@@ -1,5 +1,5 @@
 // What: an @es body that is not valid JavaScript (unbalanced paren)
-// Expect: @es: JavaScript syntax error in the body (or at least a build-time error, not a load-time one)
+// Expect: es-syntax at the @es block (3:27), at build time: "Unexpected token ';'"
 let parse: fun(Str) F64 = @es/\ (s) => Number(s \/;
 
 export main() F64 {

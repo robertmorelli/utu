@@ -186,6 +186,11 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   }
   // The program's arguments where a built one finds them: process.argv.slice(2).
   process.argv = [process.argv[0], file, ...argv];
+  // A callback's trap, after main returned (a `.then`'s, a timer's): placed as main's are.
+  // (Bun ends with 0 if the handler's exit comes after an await: the code is set first.)
+  const later = error => { process.exitCode = 1; return trap(error, file, built, utu); };
+  process.on('uncaughtException', later);
+  process.on('unhandledRejection', later);
   let result;
   await profiler?.start();
   try {
@@ -769,6 +774,8 @@ function trapText(error, map = null) {
   }
   // A safe build's `Tag.from_i32(v)` (its own function) with no variant of value v.
   if (wasm && /unreachable/i.test(message) && /^\w+\.from_i32$/.test(frames[0]?.fn ?? '')) title = `${frames[0].fn}: no variant has this value`;
+  // A stack overflows as a function is entered (placed at its body): the call that entered it is the place.
+  if (title === 'Stack overflow' && frames.length > 1 && /^(block|fn_decl)$/.test(frames[0].entry?.kind ?? '')) frames = frames.slice(1);
   // A helper the compiler made is shared, and mapped to its first use: placed by its caller.
   frames = frames.map(f => HELPERS.test(f.fn) ? { ...f, entry: null, helper: true } : f);
   const at = frames.find(f => f.entry?.file && !f.entry.file.startsWith('std:')) ?? frames.find(f => f.entry?.file) ?? null;
