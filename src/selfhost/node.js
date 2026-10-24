@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { isBuiltin } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PLATFORM_SOURCES } from '../compiler/platform-sources.generated.js';
 import { compile, instantiate, loadCompiler } from './compiler.js';
@@ -167,6 +168,8 @@ export function nodeHost({ root = process.cwd(), stdlib = nodeStdlib() } = {}) {
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
     // TypeScript is only needed when a program imports "npm:…" or "node:…".
     resolvePackage: async (specifier, request) => {
+      // `node:fss`: no module of Node's (the compiler says so), and nothing to load or cache.
+      if (specifier.startsWith('node:') && !isBuiltin(specifier)) throw new Error(`No Node module ${specifier}`);
       packages ??= (await import('../../tools/dts/packages.mjs')).nodePackageResolver({ root, ready: true });
       return packages(specifier, request);
     },
@@ -209,8 +212,8 @@ export async function compileFile(utu, entry, options = {}) {
 }
 
 /** Instantiate a built module in Node, its glue a real ES module. */
-export function instantiateNode(wasm, spec, { root = process.cwd(), profiler = null } = {}) {
-  return instantiate(wasm, spec, { loadGlue: source => importGlue(source, root), profiler });
+export function instantiateNode(wasm, spec, { root = process.cwd(), profiler = null, wrap = null } = {}) {
+  return instantiate(wasm, spec, { loadGlue: source => importGlue(source, root), profiler, wrap });
 }
 
 /**

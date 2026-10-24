@@ -490,8 +490,13 @@ fn conforms(t: I32, proto: I32) void {
                 };
             } else {
                 let field = member(t, word, Space.Member);
-                if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), 0) != sig_type(last_child(m), decl_type(t, 0)) {
+                if not decl_is(field, Decl.Field) {
                     report3(Diag.ProtoMissing, decl_node[t], word, t, 1, decl_name[proto]);
+                } else {
+                    // A field of another type: "Shape.name is Str, got I32" at the field's type.
+                    let got = type_of(last_child(decl_node[field]), 0);
+                    let want = sig_type(last_child(m), decl_type(t, 0));
+                    if got != want { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(decl_text(proto) + "." + word_text(word)), want, got, Why.Annotation.to_i32() * 65536); };
                 };
             };
         };

@@ -236,8 +236,16 @@
 --- exit 1
 
 === utu check examples/error_demo/control/11_compare_non_nullable_to_null.utu
-ok
---- exit 0
+ ERROR  name is Str, which is never null
+        not-nullable · examples/error_demo/control/11_compare_non_nullable_to_null.utu:4:5
+
+ 2 │ // Expect: name is Str, which is never null; this comparison is always false
+ 3 │ fn has_name(name: Str) Bool {
+ 4 │     name != null;
+   │     ━━━━
+   │     ╰─ never null
+ 5 │ }
+--- exit 1
 
 === utu check examples/error_demo/control/12_optional_chain_non_nullable.utu
  ERROR  Expected nullable, got Point
@@ -367,7 +375,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/22_null_compare_i32.utu
- ERROR  Expected nullable, got I32
+ ERROR  count is I32, which is never null
         not-nullable · examples/error_demo/control/22_null_compare_i32.utu:4:5
 
  2 │ // Expect: count is I32, which is never null; comparing it with null is always false
@@ -1900,7 +1908,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/35_for_value_and_index.utu
- ERROR  for needs an array or range, not unknown
+ ERROR  for over 1 source binds 1 value, got 2; for an index add a range: (xs, 0 ..< n)
         invalid-for-source · examples/error_demo/iterators/35_for_value_and_index.utu:6:14
 
  4 │     let xs = [10, 20, 30];
@@ -1913,7 +1921,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/36_for_two_sources_one_capture.utu
- ERROR  for needs an array or range, not unknown
+ ERROR  for over 2 sources bind 2 values, got 1
         invalid-for-source · examples/error_demo/iterators/36_for_two_sources_one_capture.utu:7:16
 
  5 │     let b = [4, 5, 6];
@@ -3262,15 +3270,19 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/36_unknown_import_node_typo.utu
- ERROR  No member Fs.existsSync
-        unknown-foreign-member · examples/error_demo/names/36_unknown_import_node_typo.utu:6:5
+ ERROR  No Node module  did you mean
+        host-missing · examples/error_demo/names/36_unknown_import_node_typo.utu:3:15
 
+ 1 │ // What: imports a Node builtin with a misspelled name , and calls it
+ 2 │ // Expect: Cannot import " no such Node module; did you mean "
+ 3 │ using Fs from "
+   │               ━━━━━━━━━━
+   │               ╰─ not found
  4 │
  5 │ export main() Bool {
- 6 │     Fs.existsSync("README.md");
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 7 │ }
+
+  fix   Use
+ 3 │ using Fs from "
 --- exit 1
 
 === utu check examples/error_demo/names/37_unknown_import_no_extension.utu
@@ -3287,14 +3299,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/38_not_a_module_using_struct.utu
- ERROR  Unknown module Point
-        unknown-module · examples/error_demo/names/38_not_a_module_using_struct.utu:7:7
+ ERROR  Point is a struct; using imports a mod
+        import-not-module · examples/error_demo/names/38_not_a_module_using_struct.utu:7:7
 
  5 │     | y: I32
  6 │
  7 │ using Point |P|;
    │       ━━━━━
-   │       ╰─ no such module
+   │       ╰─ not a mod
  8 │
  9 │ export main() I32 {
 --- exit 1
@@ -4860,7 +4872,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/13_mem_embed_size_mismatch.utu
- ERROR  @embed cannot read odd_size.bin
+ ERROR  odd_size.bin is 5 bytes, not a whole number of 4-byte I32s
         mem-embed · examples/error_demo/platform/13_mem_embed_size_mismatch.utu:3:18
 
  1 │ // What: @embed of a 5-byte file into an I32 mem (not a whole number of elements)
@@ -5561,7 +5573,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/490_node_unknown_module.utu
- ERROR  No declarations for  is it installed?
+ ERROR  No Node module  did you mean
         host-missing · examples/error_demo/platform/490_node_unknown_module.utu:3:15
 
  1 │ // What: a  import whose declarations cannot be found (no such module).
@@ -5572,7 +5584,8 @@ ok
  4 │
  5 │ export main() I32 {
 
-  note   modules' declarations come from @types/node in node_modules
+  fix   Use
+ 3 │ using fs from
 --- exit 1
 
 === utu check examples/error_demo/platform/49_foreign_wrong_arg_type.utu
@@ -6037,13 +6050,13 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/71_stored_array_state.utu
- ERROR  @stored expects Type "storage-key" default-expression
+ ERROR  @stored state must be a struct so updates can apply in place; wrap Array[Str] in a struct field
         dsl-error · examples/error_demo/platform/71_stored_array_state.utu:6:26
 
  4 │
  5 │ export main() void {
  6 │     let tags = @stored/\ Array[Str] "tags" ["a"] \/;
-   │                          ━
+   │                          ━━━━━━━━━━
    │                          ╰─ here
  7 │     Browser.console.log(tags.len());
  8 │ }
@@ -6825,14 +6838,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/95_wutu_property_without_value.utu
- ERROR  expected an HTML tag (class-only heads do not create elements)
-        dsl-error · examples/error_demo/platform/95_wutu_property_without_value.utu:8:9
+ ERROR  a property takes a value: .name = value;
+        dsl-error · examples/error_demo/platform/95_wutu_property_without_value.utu:8:10
 
  6 │     @wutu/\
  7 │     input {
  8 │         .value;
-   │         ━
-   │         ╰─ here
+   │          ━
+   │          ╰─ here
  9 │     }
 10 │     \/;
 --- exit 1
@@ -6955,7 +6968,7 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/06_buffer_past_length.utu
- TRAP  Failed check in std:Buffer
+ TRAP  Buffer index out of range
        trap · examples/error_demo/runtime/06_buffer_past_length.utu:10:5
 
  8 │     b.push(20);
@@ -6970,7 +6983,7 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/07_buffer_past_capacity.utu
- TRAP  Failed check in std:Buffer
+ TRAP  Buffer index out of range
        trap · examples/error_demo/runtime/07_buffer_past_capacity.utu:8:5
 
  6 │     let b = Buffer[I32].new();
@@ -6985,7 +6998,7 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/08_buffer_pop_empty.utu
- TRAP  Failed check in std:Buffer
+ TRAP  pop of an empty Buffer
        trap · examples/error_demo/runtime/08_buffer_pop_empty.utu:7:5
 
  5 │ export main() I32 {
@@ -7122,7 +7135,7 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/18_out_of_memory.utu
- TRAP  Array too large
+ TRAP  Array length negative or too large
        trap · examples/error_demo/runtime/18_out_of_memory.utu:4:14
 
  2 │ // Expect: out of memory: could not allocate Array[I64] of 2000000000 elements
@@ -7152,12 +7165,31 @@ ok
 
 === utu run examples/error_demo/runtime/20_es_throws_string.utu
  ERROR  negative
-        uncaught-exception · examples/error_demo/runtime/20_es_throws_string.utu
+        uncaught-exception · examples/error_demo/runtime/20_es_throws_string.utu:6:5
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     risky(-5);
+   │     ━━━━━━━━━
+   │     ╰─ here
+ 7 │ }
+
+  in main  examples/error_demo/runtime/20_es_throws_string.utu:6:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/21_rejected_promise.utu
  ERROR  connection refused
-        uncaught-exception · examples/error_demo/runtime/21_rejected_promise.utu
+        uncaught-exception · examples/error_demo/runtime/21_rejected_promise.utu:7:13
+
+ 5 │
+ 6 │ export main() I32 {
+ 7 │     let n = await fetch_count(5);
+   │             ━━━━━━━━━━━━━━━━━━━━
+   │             ╰─ here
+ 8 │     n + 1;
+ 9 │ }
+
+  in main  examples/error_demo/runtime/21_rejected_promise.utu:7:13
 --- exit 1
 
 === utu run examples/error_demo/runtime/22_trap_in_catch_try.utu
@@ -7352,7 +7384,7 @@ scheduled
 --- exit 1
 
 === utu run examples/error_demo/runtime/34_array_new_negative.utu
- TRAP  Array too large
+ TRAP  Array length negative or too large
        trap · examples/error_demo/runtime/34_array_new_negative.utu:4:5
 
  2 │ // Expect: trap: negative array length -1 in Array[I32].new
@@ -7472,7 +7504,7 @@ FAIL fetches: offline  at examples/error_demo/runtime/47_test_rejected_promise.u
 --- exit 1
 
 === utu test examples/error_demo/runtime/48_test_buffer_safe.utu
-FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_test_buffer_safe.utu:9:12  in &.get_index
+FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_test_buffer_safe.utu:9:12  in &.get_index
 0 passed, 1 failed
 --- exit 1
 
@@ -7508,11 +7540,15 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 === utu run examples/error_demo/runtime/50_no_main.utu
  ERROR  No export main in examples/error_demo/runtime/50_no_main.utu
         no-main
+
+  note  It exports rect_area: utu build makes a module of them.
 --- exit 1
 
 === utu run examples/error_demo/runtime/51_main_not_exported.utu
- ERROR  No export main in examples/error_demo/runtime/51_main_not_exported.utu
+ ERROR  fn main at examples/error_demo/runtime/51_main_not_exported.utu:3 is not exported
         no-main
+
+  note  Write export main() to run it.
 --- exit 1
 
 === utu run examples/error_demo/runtime/52_syntax_error_run.utu
@@ -7820,16 +7856,16 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/11_keyword_as_name.utu
- ERROR  Unexpected '<'
-        parse-error · examples/error_demo/syntax/11_keyword_as_name.utu:6:34
+ ERROR  'match' is a keyword
+        foreign-syntax · examples/error_demo/syntax/11_keyword_as_name.utu:4:9
 
+ 2 │ // Expect: 'match' is a keyword and cannot name a variable, pointing at the `let match`.
+ 3 │ fn first_match(xs: Array[I32], target: I32) I32 {
  4 │     let match = -1;
+   │         ━━━━━
+   │         ╰─ a keyword
  5 │     for (xs, 0 ..< xs.len()) |x, i| {
  6 │         if x == target and match < 0 { match = i; };
-   │                                  ━
-   │                                  ╰─ unexpected
- 7 │     };
- 8 │     match;
 --- exit 1
 
 === utu check examples/error_demo/syntax/12_js_arrow_return_type.utu
@@ -8164,16 +8200,19 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/36_semicolon_before_else.utu
- ERROR  Expected ';', got '{'
-        parse-error · examples/error_demo/syntax/36_semicolon_before_else.utu:7:10
+ ERROR  The ; before else ends the if
+        foreign-syntax · examples/error_demo/syntax/36_semicolon_before_else.utu:6:6
 
+ 4 │     if n < 0 {
  5 │         -1;
  6 │     };
+   │      ━
+   │      ╰─ no ;
  7 │     else {
-   │          ━
-   │          ╰─ ';'?
  8 │         1;
- 9 │     };
+
+  fix   Drop ;
+ 6 │     }
 --- exit 1
 
 === utu check examples/error_demo/syntax/37_logical_and_or.utu
@@ -10386,25 +10425,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/57_unknown_method_static_as_method.utu
- ERROR  Expected F64, got Rect
-        type-mismatch · examples/error_demo/types/57_unknown_method_static_as_method.utu:10:13
-
- 8 │ export main() I32 {
- 9 │     let r = Rect { w: 1.0 };
-10 │     let s = r.square(2.0);
-   │             ━
-   │             ╰─ Rect
-11 │     s.w.to_i32();
-12 │ }
-
- ERROR  Takes 0, given 1
-        wrong-arity · examples/error_demo/types/57_unknown_method_static_as_method.utu:10:13
+ ERROR  Rect.square is a function, not a method: Rect.square(value)
+        static-as-method · examples/error_demo/types/57_unknown_method_static_as_method.utu:10:13
 
  8 │ export main() I32 {
  9 │     let r = Rect { w: 1.0 };
 10 │     let s = r.square(2.0);
    │             ━━━━━━━━━━━━━
-   │             ╰─ takes 0, given 1
+   │             ╰─ no such method
 11 │     s.w.to_i32();
 12 │ }
 --- exit 1
@@ -10812,15 +10840,14 @@ FAIL after tests: boom
  6 │
  7 │ struct Sq[Sh]:
 
- ERROR  Sq lacks Sh.size
-        proto-missing · examples/error_demo/types/795_proto_get_set_types_differ.utu:7:1
+ ERROR  Sh.size is F64, got I32
+        type-mismatch · examples/error_demo/types/795_proto_get_set_types_differ.utu:8:13
 
- 5 │     | set size: F64
  6 │
  7 │ struct Sq[Sh]:
-   │ ━━━━━━━━━━━━━━
-   │ ╰─ here
  8 │     | size: I32
+   │             ━━━
+   │             ╰─ I32
  9 │
 10 │ export main() I32 {
 --- exit 1
@@ -10999,15 +11026,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/85_proto_getter_wrong_type.utu
- ERROR  Square lacks Shape.name
-        proto-missing · examples/error_demo/types/85_proto_getter_wrong_type.utu:6:1
+ ERROR  Shape.name is Str, got I32
+        type-mismatch · examples/error_demo/types/85_proto_getter_wrong_type.utu:7:13
 
- 4 │     | get name : Str
  5 │
  6 │ struct Square[Shape]:
-   │ ━━━━━━━━━━━━━━━━━━━━━
-   │ ╰─ here
  7 │     | name: I32
+   │             ━━━
+   │             ╰─ I32
  8 │
  9 │ export main() I32 { 0; }
 --- exit 1

@@ -195,12 +195,19 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
   // (It runs before the sampler can start: its profile is empty, but written.)
-  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
+  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler, wrap: placeThrows })
     .catch(async error => {
       if (profiler) await writeProfile(file, profiler, out);
       return trap(error, file, built, utu);
     });
-  if (typeof exports.main !== 'function') fail(`No export main in ${displayPath(file)}`, 'no-main');
+  if (typeof exports.main !== 'function') {
+    // `fn main` without export: that one; a library: what it exports.
+    const text = await fs.readFile(file, 'utf8');
+    const at = /^[ \t]*fn\s+main\s*\(/m.exec(text);
+    const names = Object.keys(exports).filter(name => typeof exports[name] === 'function');
+    if (at) fail(`fn main at ${displayPath(file)}:${text.slice(0, at.index).split('\n').length} is not exported`, 'no-main', ['Write export main() to run it.']);
+    fail(`No export main in ${displayPath(file)}`, 'no-main', names.length ? [`It exports ${names.join(', ')}: utu build makes a module of them.`] : []);
+  }
   // A main with parameters is for a host that passes them; run passes none.
   // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
   if (instance.exports.main.length > 0) {
@@ -838,9 +845,15 @@ const TRAPS = [
   [/integer overflow|divide result unrepresentable|unrepresentable in integer|out of bounds trunc/i, 'Integer overflow'],
   [/out of bounds/i, 'Index out of bounds'],
   [/illegal cast|type incompatibility|failed to cast/i, 'Wrong type from JavaScript'],
-  [/array (is )?too large|requested new array is too large|failed to allocate new array/i, 'Array too large'],
+  [/array (is )?too large|requested new array is too large|failed to allocate new array/i, 'Array length negative or too large'],
   [/Maximum call stack|stack overflow/i, 'Stack overflow'],
 ];
+
+// A standard library check, by its file and function: what was misused.
+const STD_CHECKS = {
+  'std:Buffer &.get_index': 'Buffer index out of range', 'std:Buffer &.set_index': 'Buffer index out of range',
+  'std:Buffer &.pop': 'pop of an empty Buffer', 'std:Buffer &.truncate': 'Buffer truncated past its length',
+};
 
 // The functions the compiler makes, shared by every use (selfhost `helper`).
 const HELPERS = /^(array\.slice|Str\.from_codes|closure\.(new|call)|enum\.name|mem\.(reserve|push|resize)|\w+\.from_i32)$/;
@@ -877,12 +890,37 @@ function valueText(value) {
   }
 }
 
+/**
+ * Where the last value thrown into utu without a utu stack of its own (a
+ * thrown string, an awaited promise's rejection) was thrown or awaited: the
+ * value, and a stack taken at the `@es` call or the `await`.
+ */
+let thrownAt = null;
+
+/** `utu run`'s imports: each `@es` binding and each await notes where its throw entered utu. */
+function placeThrows(imports) {
+  const note = (value, stack) => { if (thrownAt?.value !== value) thrownAt = { value, stack }; };
+  for (const [name, f] of Object.entries(imports.es ?? {})) {
+    if (typeof f === 'function') imports.es[name] = (...args) => { try { return f(...args); } catch (e) { note(e, new Error().stack); throw e; } };
+  }
+  for (const name of Object.keys(imports.utu ?? {})) {
+    if (!name.startsWith('await_')) continue;
+    const absent = name.startsWith('await_null_');
+    imports.utu[name] = new WebAssembly.Suspending(async p => {
+      const at = new Error();
+      try { return absent ? (await p) ?? null : await p; } catch (e) { note(e, at.stack); throw e; }
+    });
+  }
+}
+
 function trapParts(error, map) {
   let message = valueText(error);
   const wasm = error instanceof WebAssembly.RuntimeError || /Maximum call stack/i.test(message);
   // JavaScriptCore says what it was evaluating: not part of the trap.
   if (wasm) message = message.replace(/ \(evaluating '[^']*'\)$/, '');
-  let frames = wasmFrames(error, map).map(f => ({ ...f, fn: f.fn ?? `function ${f.index}` }));
+  let frames = wasmFrames(error, map);
+  if (!frames.length && thrownAt?.value === error) frames = wasmFrames(thrownAt, map);
+  frames = frames.map(f => ({ ...f, fn: f.fn ?? `function ${f.index}` }));
   if (!frames.length) {
     // No offsets (JavaScriptCore's stacks): the names alone.
     for (const line of String(error?.stack ?? '').split('\n')) {
@@ -894,7 +932,7 @@ function trapParts(error, map) {
   let title = wasm ? (TRAPS.find(([pattern]) => pattern.test(message))?.[1] ?? message) : message;
   if (wasm && /unreachable/i.test(message) && inner?.kind) {
     // The standard library's own: a check of how it was used.
-    title = inner.file?.startsWith('std:') ? `Failed check in ${inner.file}` : UNREACHABLE[inner.kind] ?? 'Reached unreachable code';
+    title = inner.file?.startsWith('std:') ? STD_CHECKS[`${inner.file} ${frames[0].fn}`] ?? `Failed check in ${inner.file}` : UNREACHABLE[inner.kind] ?? 'Reached unreachable code';
   }
   // A safe build's `Tag.from_i32(v)` (its own function) with no variant of value v.
   if (wasm && /unreachable/i.test(message) && /^\w+\.from_i32$/.test(frames[0]?.fn ?? '')) title = `${frames[0].fn}: no variant has this value`;

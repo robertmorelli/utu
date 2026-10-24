@@ -196,7 +196,14 @@ fn stored_code(site: I32, prefix: Str) Str {
     let type_start = i;
     if i >= raw.len() or not is_upper_code(raw.get(i)) { stored_syntax(raw); };
     while (i < raw.len() and is_word_code(raw.get(i))) { i += 1; };
+    // `Array[Str]` (to the space after it): no struct either.
+    if i < raw.len() and raw.get(i) == 91 { while (i < raw.len() and not is_space_code(raw.get(i))) { i += 1; }; };
     let type = raw.slice(type_start, i);
+    st_type_at[0] = type_start;
+    st_type_len[0] = type.len();
+    if is_stored_scalar(type) or text_at(type, 0, "Array[") {
+        stored_fail("@stored state must be a struct so updates can apply in place; wrap " + type + " in a struct field");
+    };
     let gap = i;
     i = skip_spaces(raw, i);
     if i == gap or i >= raw.len() or raw.get(i) != 34 { stored_syntax(raw); };
@@ -238,12 +245,7 @@ fn stored_code(site: I32, prefix: Str) Str {
         };
     };
     let default_source = raw.slice(i, raw.len());
-    st_type_at[0] = type_start;
-    st_type_len[0] = type.len();
     stored_shape(type, -1, file);
-    if is_stored_scalar(type) or text_at(type, 0, "Array[") {
-        stored_fail("@stored state must be a struct so updates can apply in place; wrap " + type + " in a struct field");
-    };
     if not splice_parses(site, i, default_source) { dsl_fail("Invalid @stored default expression", i, trim_end(default_source).len()); };
     let fallback = dsl_splice(site, i, default_source);
     if validator.len() > 0 { validator = dsl_splice(site, validator_at, validator); };

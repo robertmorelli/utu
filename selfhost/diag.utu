@@ -449,7 +449,7 @@ fn diag_text(i: I32) Str {
             if b == 2 { return "A closure cannot capture tuple " + w; };
             "Tuple " + type_text(a) + " has " + int_text(vl_len[ty_a[a]]) + " values";
         },
-        Diag.NotNullable => "Expected nullable, got " + type_text(a),
+        Diag.NotNullable => if b == 1 { pick(w.len() > 0, w, "It") + " is " + type_text(a) + ", which is never null"; } else { "Expected nullable, got " + type_text(a); },
         Diag.TypeMismatch => mismatch_text(i),
         Diag.UnknownMethod => {
             if a >= 0 and ty_is(a, Ty.Nullable) { return "No method " + type_text(ty_a[a]) + "." + w; };
@@ -527,6 +527,8 @@ fn diag_text(i: I32) Str {
         Diag.UnknownVariant => type_text(a) + " has no variant " + w + did_you_mean(i),
         Diag.InvalidForSource => {
             if a == 1 { return "A generator loop binds one value"; };
+            // `for (xs) |x, i|`: one name per source; an index is a range's.
+            if a == 2 { return "for over " + int_text(b) + pick(b == 1, " source binds ", " sources bind ") + int_text(b) + pick(b == 1, " value", " values") + ", got " + int_text(diag_c[i]) + pick(diag_c[i] > b, "; for an index add a range: (xs, 0 ..< n)", ""); };
             "for needs an array or range, not " + type_text(b);
         },
         Diag.UnknownForeignMember => "No member " + word_text(view_prefix[a]) + "." + word_text(diag_c[i]) + w,
@@ -625,7 +627,7 @@ fn diag_text(i: I32) Str {
         Diag.NotStruct => type_text(a) + " is not a struct: it has no fields to set",
         Diag.NewNotHost => "new makes host objects; " + w + " is not a host class",
         Diag.GeneratorExport => w + " is a generator: it expands into each for that reads it, so it cannot be exported",
-        Diag.HostMissing => if text_index(w, ".abi.json", 0) >= 0 { "No ABI in " + w + ": missing, or not one tools/dts/cli.mjs wrote"; } else { "No declarations for " + w + "; is it installed?"; },
+        Diag.HostMissing => if a == 1 { "No Node module " + w + did_you_mean(i); } else if text_index(w, ".abi.json", 0) >= 0 { "No ABI in " + w + ": missing, or not one tools/dts/cli.mjs wrote"; } else { "No declarations for " + w + "; is it installed?"; },
         Diag.PruneOutside => "prune outside a recursive generator loop",
         Diag.GeneratorPassThrough => w + " passes its values straight through",
         Diag.GeneratorArity => w + " takes " + int_text(a) + ", given " + int_text(b),
@@ -659,7 +661,11 @@ fn diag_text(i: I32) Str {
             };
             mem_word(word) + " " + w + ": numbers only";
         },
-        Diag.MemEmbed => "@embed cannot read " + bytes_text(dsl_text_start(node), dsl_text_end(node)),
+        Diag.MemEmbed => {
+            let file = bytes_text(dsl_text_start(node), dsl_text_end(node));
+            if b > 0 { return file + " is " + int_text(a) + " bytes, not a whole number of " + int_text(b) + "-byte " + Storage.name(Storage.from_i32(diag_c[i])) + "s"; };
+            "@embed cannot read " + file;
+        },
         Diag.MemView => "view() needs using JS from std:JS",
         Diag.MemNoMethod => {
             let name = word_of(first_child(node));

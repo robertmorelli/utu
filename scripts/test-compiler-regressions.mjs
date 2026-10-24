@@ -1700,7 +1700,22 @@ export lib {
     ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'Two export main'],
     ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'export lib and export main together'],
     // A function of a type without self, called on a value of it.
-    ['struct P:\n    | x : I32\nfn P.make() I32 { 1; }\nexport lib { fn run() I32 { P { x: 1 }.make(); } }\n', 'Takes 0, given 1'],
+    ['struct P:\n    | x : I32\nfn P.make() I32 { 1; }\nexport lib { fn run() I32 { P { x: 1 }.make(); } }\n', 'P.make is a function, not a method: P.make(value)'],
+    ['struct R:\n    | w: F64\nfn R.sq(s: F64) R { R { w: s }; }\nexport main() I32 { let r = R { w: 1.0 }; r.sq(2.0).w.to_i32(); }\n', 'R.sq is a function, not a method: R.sq(value)'],
+    // A protocol getter's field of another type.
+    ['proto S:\n    | get name : Str\nstruct Q[S]:\n    | name: I32\nexport main() I32 { 0; }\n', 'S.name is Str, got I32'],
+    // A for's names, one per source.
+    ['export main() I32 { let t = 0; for ([1, 2]) |x, i| { t += x * i; }; t; }\n', 'for over 1 source binds 1 value, got 2; for an index add a range: (xs, 0 ..< n)'],
+    ['export main() I32 { let t = 0; for ([1], [2]) |x| { t += x; }; t; }\n', 'for over 2 sources bind 2 values, got 1'],
+    // A Node module that is none.
+    ['using Fs from "node:fss";\nexport main() Bool { Fs.existsSync("x"); }\n', 'No Node module node:fss; did you mean node:fs?'],
+    // null compared with what is never null.
+    ['fn f(name: Str) Bool { name != null; }\nexport main() I32 { if f("x") { 1; } else { 0; }; }\n', 'name is Str, which is never null'],
+    // A keyword as a name; a ; before else.
+    ['export main() I32 { let match = 1; 0; }\n', "'match' is a keyword"],
+    ['fn s(n: I32) I32 {\n    if n < 0 {\n        -1;\n    };\n    else {\n        1;\n    };\n}\nexport main() I32 { s(5); }\n', 'The ; before else ends the if'],
+    // using of a struct.
+    ['struct Pt:\n    | x: I32\nusing Pt |P|;\nexport main() I32 { 0; }\n', 'Pt is a struct; using imports a mod'],
     // An implementation of a protocol for a type that is not there (this trapped).
     ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { 0.0; }\nfn sum(l: Array[P]) F32 { l[0].perimeter(); }\nexport lib { fn run() I32 { 0; } }\n',
       'Unknown type Nope'],
