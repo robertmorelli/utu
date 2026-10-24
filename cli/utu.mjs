@@ -190,7 +190,8 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   // Profiled, on the stack a plain run has, so --profile changes no output but at
   // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
   // Named functions and a source map, so a trap says which and where.
-  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile });
+  // An array main's result is read by the build's readers (`run`), to print as one.
+  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile, run: true });
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
   // (It runs before the sampler can start: its profile is empty, but written.)
@@ -235,7 +236,21 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
     await trap(error, file, built, utu);
   }
   await profileOnce();
-  if (result !== undefined) console.log(result);
+  if (result !== undefined) console.log(built.array ? shown(exports, built.array, result) : result);
+}
+
+/**
+ * An array main's result as text: `[[1, 2], []]`, `["a", "b\"c"]`, null as
+ * `null`, any other value of the innermost type by that type's name (`P`).
+ * Read by the build's exports `run:len:k` and `run:at:k`, for level k.
+ */
+function shown(exports, { levels, leaf }, value, k = 0) {
+  if (value === null) return 'null';
+  if (k === levels) return typeof value === 'string' ? JSON.stringify(value)
+    : typeof value === 'object' || typeof value === 'function' ? leaf.replace(/^\?/, '') : String(value);
+  const items = [];
+  for (let i = 0, n = exports[`run:len:${k}`](value); i < n; i++) items.push(shown(exports, { levels, leaf }, exports[`run:at:${k}`](value, i), k + 1));
+  return `[${items.join(', ')}]`;
 }
 
 /** Stop sampling; write NAME.folded, NAME.speedscope.json, and NAME.flame.html (in `out`), and the top functions to stderr. */

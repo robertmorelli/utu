@@ -69,13 +69,15 @@ export async function loadCompiler(wasm, spec = {}) {
 export async function compile(utu, entry, host) {
   const chosen = host.mode ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false } = { ...host, ...chosen };
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
   // Blame reads the source map: keeping one changes nothing built.
   utu.set_source_map?.(sourceMap || blame ? 1 : 0);
   utu.set_profile?.(profile ? 1 : 0);
+  // utu run's: readers of an array main's result (`run:len:k`, `run:at:k`).
+  utu.set_run?.(run ? 1 : 0);
   let files, size;
   try {
     files = await loadProgram(utu, entry, host);
@@ -96,6 +98,7 @@ export async function compile(utu, entry, host) {
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
     blame: blame && utu.blame_prepare ? readBlameTables(utu, files) : null,
     ...(profile ? { frames: readFrames(utu, files) } : {}),
+    ...(run && utu.run_levels?.() > 0 ? { array: { levels: utu.run_levels(), leaf: utu.run_leaf() } } : {}),
   };
 }
 

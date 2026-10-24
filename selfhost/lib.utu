@@ -227,6 +227,15 @@ export lib {
     /// Profile builds (1: "Profiling" in profile.utu), or none (0, the default).
     fn set_profile(on: I32) void { profile_build[0] = on; }
 
+    /// Run builds (1: `run_readers` in check.utu), or none (0, the default).
+    fn set_run(on: I32) void { run_build[0] = on; }
+
+    /// The last run build's array levels (0: none), and its innermost one's
+    /// element type, as written.
+    fn run_levels() I32 { run_depth[0]; }
+
+    fn run_leaf() Str { if run_depth[0] > 0 { type_text(run_elem[0]); } else { ""; }; }
+
     /// The last profile build's frames: how many, and frame k's name and
     /// where its function starts in src.
     fn profile_count() I32 { prof_node.len(); }

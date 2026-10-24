@@ -330,6 +330,36 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.equal(r.stdout.trim(), '2 b c');
   assert.match(utu('build', 'args.utu', '--', 'a').stderr, /-- is only for run/);
 
+  // A main's array prints as one (it was `[Object: null prototype] {}`), read by
+  // the run build's `run:len:k`/`run:at:k`: nested, empty, of strings, of structs
+  // (by name), of ?Array, of Bool and U32 (as JS has them); a trap is still main's.
+  await write('arrays.utu', 'export main() Array[Array[I32]] { [[1, 2, 3], [], [4]]; }\n');
+  await write('empty.utu', 'export main() Array[F64] { []; }\n');
+  await write('strs.utu', 'export main() Array[Str] { ["a", "b\\"c", ""]; }\n');
+  await write('structs.utu', 'struct P:\n    | x: I32\nexport main() Array[?P] { [P { x: 1 }, null]; }\n');
+  await write('nullable.utu', 'export main() ?Array[?Array[Bool]] { [[true, false], null, []]; }\n');
+  await write('u32s.utu', 'export main() Array[U32] { [4000000000, 0]; }\n');
+  await write('arraytrap.utu', 'fn at(xs: Array[I32], i: I32) I32 { xs[i]; }\nexport main() Array[I32] { [at([1], 3)]; }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    assert.equal(utu('run', 'arrays.utu', '-O', mode).stdout, '[[1, 2, 3], [], [4]]\n', mode);
+    assert.equal(utu('run', 'empty.utu', '-O', mode).stdout, '[]\n', mode);
+    assert.equal(utu('run', 'strs.utu', '-O', mode).stdout, '["a", "b\\"c", ""]\n', mode);
+    assert.equal(utu('run', 'structs.utu', '-O', mode).stdout, '[P, null]\n', mode);
+    assert.equal(utu('run', 'nullable.utu', '-O', mode).stdout, '[[true, false], null, []]\n', mode);
+    assert.equal(utu('run', 'u32s.utu', '-O', mode).stdout, '[4000000000, 0]\n', mode);
+  }
+  for (const mode of ['debug', 'fast']) {
+    r = utu('run', 'arraytrap.utu', '-O', mode);
+    assert.ok(r.stderr.startsWith(' TRAP  Index out of bounds\n       trap · arraytrap.utu:1:37\n'), `${mode}:\n${r.stderr}`);
+    assert.match(r.stderr, /in main  arraytrap\.utu:2:29/, `${mode}:\n${r.stderr}`);
+    assert.doesNotMatch(r.stderr, /run:/, mode);
+  }
+  // A build has no readers.
+  r = utu('build', 'arrays.utu', '-o', 'arrays');
+  assert.equal(r.status, 0, r.stderr);
+  const arrayExports = WebAssembly.Module.exports(new WebAssembly.Module(await fs.readFile(path.join(dir, 'arrays', 'arrays.wasm'))));
+  assert.deepEqual(arrayExports.map(e => e.name).filter(n => n.startsWith('run:')), []);
+
   // A declaration file linked by tools/dts/cli.mjs (`using Api from "./bindings/Api.abi.json"`):
   // checked, run and built; its relative module is from the program's directory.
   await write('api.d.ts', 'export declare function twice(n: number): number;\n');
