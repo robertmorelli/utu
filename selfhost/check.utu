@@ -2037,6 +2037,9 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
     // `m.T.f(…)`, `M.T.f(…)`: a static function of a module's (or alias's) type.
     let st = static_type_path(base, cx);
     if st >= 0 {
+        // `m.Tag.from_i32(i)`: as `Tag.from_i32(i)`.
+        let r = if is_scalar_kind(ty_decl(st)) { scalar_static(ty_decl(st), word_of(name), args, node, cx); } else { -1; };
+        if r >= 0 { return r; };
         let target = static_member(ty_decl(st), word_of(name));
         if not decl_is(target, Decl.Fn) {
             report2(Diag.UnknownMethod, node, word_of(name), st, -1);
