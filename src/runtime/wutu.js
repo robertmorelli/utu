@@ -285,18 +285,32 @@ export function createWutuRuntime() {
   // Attributes (and their properties) a browser follows or loads as a URL.
   const URLS = new Set(['href', 'xlink:href', 'src', 'action', 'formaction', 'poster', 'cite', 'data',
     'background', 'codebase', 'longdesc', 'manifest']);
+  // Attributes that hold several URLs, apart at whitespace (or commas).
+  const LISTS = new Set(['ping', 'srcset', 'imagesrcset']);
   /**
-   * Whether a value from a render may go in attribute `name`: a URL one takes
+   * Whether a value from a render may go in attribute `name`: an event
+   * handler's (`on…`, any case) and srcdoc (HTML) take none; a URL one takes
    * no javascript: or vbscript: URL, and a data: URL only of an image, audio
    * or video (an SVG one only in an img or SVG image, where it runs no
-   * script); srcdoc takes none (it is HTML). The scheme is read as a browser
-   * reads it: in any case, whitespace and control characters dropped.
+   * script); ping and srcset check each of theirs; a meta's content (a
+   * refresh's URL) has none of these schemes anywhere. The scheme is read as
+   * a browser reads it: in any case, whitespace and control characters dropped.
    */
   function safe(node, name, value) {
     name = name.toLowerCase();
-    if (name === 'srcdoc') return false;
-    if (!URLS.has(name) || value === true) return true;
-    value = String(value);
+    if (name.startsWith('on') || name === 'srcdoc') return false;
+    if (value === true) return true;
+    if (URLS.has(name)) return scheme(node, String(value));
+    if (LISTS.has(name)) return String(value).split(/[\s,]+/).every(u => scheme(node, u));
+    if (name === 'content' && node.localName === 'meta') {
+      const s = String(value).replace(/[\x00-\x20]+/g, '').toLowerCase();
+      return !s.includes('javascript:') && !s.includes('vbscript:') && !s.includes('data:');
+    }
+    return true;
+  }
+
+  /** Whether one URL's scheme may go in node (see safe). */
+  function scheme(node, value) {
     let s = '';
     for (let i = 0; i < value.length && s.length < 16; i++) if (value.charCodeAt(i) > 32) s += value[i].toLowerCase();
     if (s.startsWith('javascript:') || s.startsWith('vbscript:')) return false;

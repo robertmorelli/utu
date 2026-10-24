@@ -713,7 +713,7 @@ fn wutu_json(text: Str) Str {
 }
 
 /// Whether property `name` is a URL a browser follows or loads (see `safe` in src/runtime/wutu.js).
-fn is_url_property(name: Str) Bool { in_words("href src action formAction poster cite data background codeBase longDesc", name); }
+fn is_url_property(name: Str) Bool { in_words("href src action formAction poster cite data background codeBase longDesc ping srcset imageSrcset content", name); }
 
 /// Whether attribute item i is known when compiling (written, not a property),
 /// so it comes in the element's shell. A written class merges, so it does not.

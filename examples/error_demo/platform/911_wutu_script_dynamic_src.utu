@@ -1,0 +1,15 @@
+// What: a script's src from a value (it loads and runs that code)
+// Expect: a script's attributes are code or load it, so Wutu sets them only as written: src = "…";
+using Browser from std:Browser;
+
+fn view(url: Str) Browser.HTMLElement {
+    @wutu/\
+    div {
+        script { src = url; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("/app.js"));
+}

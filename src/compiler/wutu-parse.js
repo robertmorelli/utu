@@ -515,6 +515,8 @@ class WutuParser {
       this.parseElementStatement(node);
     }
     if (VOID_TAGS.has(tag) && node.children.length) this.fail(`${tag} cannot have children`, start);
+    const code = tag === 'script' && node.children.find(c => c.kind !== 'text');
+    if (code) this.fail('a script\'s text is code, so Wutu writes it only as written: script { "…"; }', code.start);
     if (node.unmanaged && node.children.length) this.fail(`an @unmanaged ${tag} has no children in its template: what is inside it is JavaScript's`, start);
     return node;
   }
@@ -608,7 +610,8 @@ class WutuParser {
       this.fail('a property takes a value: .name = value;');
     }
     this.expectSemicolon();
-    if (name.startsWith('on')) this.fail(`events are written on ${name.slice(2)} { … }, not as an attribute`, nameStart);
+    if (/^on/i.test(name)) this.fail(`events are written on ${name.slice(2)} { … }, not as an attribute`, nameStart);
+    if (dynamic && node.tag === 'script') this.fail('a script\'s attributes are code or load it, so Wutu sets them only as written: src = "…";', nameStart);
     if (dynamic && name === 'srcdoc') this.fail('srcdoc is HTML, so Wutu sets it only as written: srcdoc = "…"; (trusted HTML from a value: an `as` element\'s .srcdoc, in code)', nameStart);
     if (!isProperty && !isAllowedAttribute(node.tag, name)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
     node.attrs.push({ name, value, property: isProperty, dynamic, range, start: nameStart });

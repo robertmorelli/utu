@@ -1,0 +1,16 @@
+// What: an event handler as an attribute in mixed case, on a custom element (a browser lowercases it and runs it)
+// Expect: events are written on click { … }, not as an attribute
+using Browser from std:Browser;
+
+fn view(note: Str) Browser.HTMLElement {
+    @wutu/\
+    x-note {
+        oNclick = note;
+        "click me";
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("alert(1)"));
+}

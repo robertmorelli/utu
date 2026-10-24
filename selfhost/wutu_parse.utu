@@ -820,6 +820,13 @@ fn parse_telement(text: Str) I32 {
         parse_element_statement(text, n);
     };
     if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start); };
+    if tag == "script" {
+        let c = tn_first[n];
+        while (c >= 0) {
+            if tn_kind[c] != 0 { wutu_fail("a script's text is code, so Wutu writes it only as written: script { \"…\"; }", tn_start[c]); };
+            c = tn_next[c];
+        };
+    };
     let i = tn_items[n];
     while (i >= 0) {
         if ti_kind[i] == 3 and word_text(ti_a[i]) == "values" and not (tag == "select" and has_attribute_item(n, "multiple")) {
@@ -1068,6 +1075,9 @@ fn literal_value(text: Str, q: I32) Bool {
     after < text.len() and text.get(after) == 59;
 }
 
+/// Whether `name` starts with "on" in any case: an event handler's attribute.
+fn is_on_name(name: Str) Bool { name.len() >= 2 and (name.get(0) | 32) == 111 and (name.get(1) | 32) == 110; }
+
 /// `name = value;` or `name;` (an attribute), `.name = value;` (a property);
 /// the cursor is on the name. A value that is one string literal is written
 /// into the element; anything else is an expression.
@@ -1100,7 +1110,8 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     };
     wp_semicolon(text);
     let tag = word_text(tn_text[n]);
-    if text_at(name, 0, "on") { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start); };
+    if is_on_name(name) { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start); };
+    if dynamic and tag == "script" { wutu_fail("a script's attributes are code or load it, so Wutu sets them only as written: src = \"…\";", name_start); };
     if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\"; (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start); };
     if not is_property and not is_allowed_attribute(tag, name) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);

@@ -1,0 +1,15 @@
+// What: a script's text from a value (it runs as code)
+// Expect: a script's text is code, so Wutu writes it only as written: script { "…"; }
+using Browser from std:Browser;
+
+fn view(code: Str) Browser.HTMLElement {
+    @wutu/\
+    div {
+        script { = code; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("console.log(1)"));
+}
