@@ -2192,6 +2192,58 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   await fs.writeFile(path.join(path.dirname(linked), 'bad.utu'), 'using Bad from "./bindings/Bad.abi.json";\nexport main() F64 { 1.0; }\n');
   const badAbi = await compileFile(utu, path.join(path.dirname(linked), 'bad.utu'), {});
   assert.deepEqual(badAbi.diagnostics.map(d => d.message), ['No ABI in ./bindings/Bad.abi.json: missing, or not one tools/dts/cli.mjs wrote']);
+  // Host declarations' types as TypeScript has them: a tuple's elements each of its own type
+  // (`t[1]` read element 0's type, NaN); an optional callback parameter may be absent (it read
+  // NaN); `T` of `firstOf<T>(xs: T[])` is the array's element; a host function value is
+  // callable, and one of another package's identical type is that type; a callback's result
+  // that is never absent fits a nullable one; a record for a constrained `T` may have more
+  // fields; a literal enum or union takes only its values (a string enum, only its members).
+  const hostA = 'export declare function mixed(): [number, string, boolean];\n'
+    + 'export declare function getFn(): (x: number) => number;\n'
+    + 'export declare function withCb(f: (g: (s: string) => string) => string): string;\n'
+    + 'export declare function cbOpt(f: (a: number, b?: number) => number): number;\n'
+    + 'export declare function firstOf<T>(xs: T[]): T | undefined;\n'
+    + 'export declare function named<T extends { name: string }>(xs: T[]): string;\n'
+    + 'export declare function strMaybe(f: () => string | null): string;\n'
+    + 'export declare enum Mode { Off = 0, On = 5 }\nexport declare enum Tag { A = "a", B = "b" }\n'
+    + 'export declare function useMode(m: Mode): number;\n';
+  const hostAJs = 'export function mixed() { return [1, "two", true]; }\nexport function getFn() { return x => x * 7; }\n'
+    + 'export function withCb(f) { return f(s => s + "?"); }\nexport function cbOpt(f) { return f(1); }\n'
+    + 'export function firstOf(xs) { return xs[0]; }\nexport function named(xs) { return xs[0].name; }\n'
+    + 'export function strMaybe(f) { return f() ?? "null"; }\nexport const Mode = { Off: 0, On: 5 };\n'
+    + 'export const Tag = { A: "a", B: "b" };\nexport function useMode(m) { return m + 1; }\n';
+  const hostB = 'export declare function callIt(f: (x: number) => number): number;\n'
+    + 'export declare function callLoose(f: (x: number) => number | undefined): number;\n';
+  const hostBJs = 'export function callIt(f) { return f(3); }\nexport function callLoose(f) { return f(4) ?? -1; }\n';
+  const pkg = (name, dts, js) => ({ [`node_modules/${name}/package.json`]: `{"name":"${name}","version":"1.0.0","type":"module","main":"index.js","types":"index.d.ts"}`,
+    [`node_modules/${name}/index.d.ts`]: dts, [`node_modules/${name}/index.js`]: js });
+  const hosts = { ...pkg('hosta', hostA, hostAJs), ...pkg('hostb', hostB, hostBJs) };
+  const hostHead = 'using A from "npm:hosta";\nusing B from "npm:hostb";\n';
+  const hostTypes = await project({ ...hosts, 'main.utu': hostHead + 'export main() F64 {\n'
+    + '    let t = A.mixed();\n    let f = A.getFn();\n    let m: A.Mode = 5.0;\n'
+    + '    t[0] + t[1].len().to_f64() + f(2.0) + B.callIt(f)\n'
+    + '        + A.cbOpt(cl(a, b) F64 { promote b { |v| => v, ~> 100.0, }; }) + B.callLoose(cl(x) F64 { x * 2.0; })\n'
+    + '        + (promote A.firstOf([4.0, 5.0]) { |v| => v, ~> 0.0, }) + A.named([&{ name: "ab", n: 1.0 }]).len().to_f64()\n'
+    + '        + A.withCb(cl(g) Str { g("q"); }).len().to_f64() + A.strMaybe(cl() Str { "s"; }).len().to_f64() + A.useMode(m);\n}\n' });
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, hostTypes, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(hostTypes) })).exports.main(), 162, mode);
+    checked++;
+  }
+  for (const [body, message] of [
+    ['let t = A.mixed(); let x: F64 = t[1]; x', 'x is F64, got Str'],
+    ['let i = 1; let t = A.mixed(); t[i]', 'A.[F64, Str, Bool] takes a constant index: its elements differ in type'],
+    ['A.cbOpt(cl(a, b) F64 { b; })', 'Expected F64, got ?F64'],
+    ['let s: Str = A.firstOf([1.0]); 0.0', 's is Str, got ?F64'],
+    ['let m: A.Mode = 99.0; 0.0', 'A.Mode has no value 99.0'],
+    ['A.useMode(3.0)', 'A.Mode has no value 3.0'],
+    ['let t: A.Tag = "a"; 0.0', 'A.Tag is a string enum: it takes its members, not "a"'],
+  ]) {
+    const result = await compileFile(utu, await project({ ...hosts, 'main.utu': `${hostHead}export main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
+    assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], body);
+    checked++;
+  }
   // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
   const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nexport lib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {

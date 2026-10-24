@@ -10847,6 +10847,43 @@ FAIL after tests: boom
  6 │ export main() I32 { 0; }
 --- exit 1
 
+=== utu check examples/error_demo/types/900_host_tuple_variable_index.utu
+ ERROR  Shapes.[F64, Str] takes a constant index: its elements differ in type
+        tuple-index · examples/error_demo/types/900_host_tuple_variable_index.utu:7:7
+
+ 5 │ export main(i: I32) F64 {
+ 6 │     let c = Shapes.corner();
+ 7 │     c[i];
+   │       ━
+   │       ╰─ not a constant
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/901_host_string_enum_literal.utu
+ ERROR  Shapes.Tag is a string enum: it takes its members, not "a"
+        host-literal · examples/error_demo/types/901_host_string_enum_literal.utu:6:25
+
+ 4 │
+ 5 │ export main() Str {
+ 6 │     let t: Shapes.Tag = "a";
+   │                         ━━━
+   │                         ╰─ a string
+ 7 │     t;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/902_host_literal_union_value.utu
+ ERROR  Browser.ScrollBehavior has no value "fast"
+        host-literal · examples/error_demo/types/902_host_literal_union_value.utu:6:37
+
+ 4 │
+ 5 │ export main() void {
+ 6 │     let b: Browser.ScrollBehavior = "fast";
+   │                                     ━━━━━━
+   │                                     ╰─ not one of its values
+ 7 │ }
+--- exit 1
+
 === utu check examples/error_demo/types/90_fun_in_array.utu
  ERROR  fun(I32) I32 cannot be stored; use cl(I32) I32
         fun-in-field · examples/error_demo/types/90_fun_in_array.utu:7:36

@@ -74,6 +74,21 @@ try {
     const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
     assert.equal(instance.exports.run(), 42);
   });
+  await test('a tuple names its element parameters by position, and a union enum is marked', async () => {
+    const file = path.join(ROOT, '.tmp/tuples.d.ts');
+    await fs.writeFile(file, 'export declare function pair(): [number, string?];\n'
+      + 'export declare enum Tag { A = "a", B = "b" }\nexport declare enum Loose { Red, Green = 5 }\n');
+    const abi = linkFiles({ files: [file], prefix: 'Tup', moduleSpecifier: './tup.js' });
+    const result = abi.types[abi.exports.pair].calls[0].result;
+    const tuple = abi.types[result.template];
+    // (an optional element is its type or undefined)
+    assert.deepEqual([result.arguments[0], abi.types[result.arguments[1]].union], ['F64', ['undefined', 'Str']]);
+    assert.deepEqual([tuple.name, tuple.parameters], ['[T0, T1?]', ['T0', 'T1']]);
+    assert.deepEqual([tuple.properties[0].type.parameter, tuple.properties[1].type.parameter], ['T0', 'T1']);
+    assert.equal(abi.types[abi.names.Tag].enum, true);
+    // (ambient members with no initializer are computed: TypeScript takes any number for Loose)
+    assert.deepEqual(abi.types[abi.names.Loose].union, ['F64', { literal: 5, base: 'F64' }]);
+  });
   await test('"npm:" and "node:" imports link packages from node_modules and cache them', async () => {
     const cacheDir = path.join(ROOT, '.tmp/package-cache');
     await fs.rm(cacheDir, { recursive: true, force: true });

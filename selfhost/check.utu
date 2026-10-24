@@ -1249,7 +1249,10 @@ fn check_let(node: I32, cx: Cx) I32 {
         return ty_void();
     };
     let before = diag_kind.len();
-    if annotated { want(init, t, Why.Annotation, next_sibling(name), decl_name[decl]); };
+    if annotated {
+        want(init, t, Why.Annotation, next_sibling(name), decl_name[decl]);
+        if has_foreign() { host_literal_let(next_sibling(name), init); };
+    };
     let actual = check_expr(init, t, cx);
     if annotated {
         coerce(actual, t, init);
@@ -1940,6 +1943,7 @@ fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
         let t = if decl_is(decl, Decl.Global) { global_type_in(decl, global_inst(decl, cx.inst)); } else { decl_ty[decl]; };
         if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, node, cx); };
         if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, node, cx); };
+        if foreign_callable(t) { return check_foreign_value_call(node, callee, t, args, m, -1, cx); };
         if ty_is(t, Ty.Error) { return finish_error(args, m, cx); };
         report2(Diag.NotCallable, node, word_of(callee), t, -1);
         return finish_error(args, m, cx);
@@ -2155,6 +2159,7 @@ fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let t = type_only(callee, -1, cx);
     if ty_is(t, Ty.Fun) { return call_ref(callee, t, args, m, at, cx); };
     if ty_is(t, Ty.Closure) { return call_closure(callee, t, args, m, at, cx); };
+    if foreign_callable(t) { return check_foreign_value_call(at, callee, t, args, m, -1, cx); };
     if ty_is(t, Ty.Error) { return follow_on(callee, args, m, at, cx); };
     report2(Diag.NotCallable, at, -1, t, -1);
     finish_error(args, m, cx);

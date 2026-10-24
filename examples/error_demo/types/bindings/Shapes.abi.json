@@ -1,0 +1,7 @@
+{"version":1,"prefix":"Shapes","moduleSpecifier":"./shapes.js","exports":{"corner":0,"Tag":3},"names":{"Tag":2},"mutableGlobals":[],"types":[
+{"name":"() => [number, string]","properties":{},"calls":[{"params":[],"result":{"template":1,"arguments":["F64","Str"]}}],"constructors":[],"indexes":[]},
+{"name":"[T0, T1]","properties":{"0":{"type":{"parameter":"T0","constraint":"any"},"optional":false,"readonly":false},"1":{"type":{"parameter":"T1","constraint":"any"},"optional":false,"readonly":false},"length":{"type":"F64","optional":false,"readonly":true}},"element":4,"parameters":["T0","T1"],"calls":[],"constructors":[],"indexes":[{"key":"F64","type":4,"readonly":false}]},
+{"name":"Tag","properties":{},"union":[{"literal":"a","base":"Str"},{"literal":"b","base":"Str"}],"enum":true},
+{"name":"typeof Tag","properties":{"A":{"type":{"literal":"a","base":"Str"},"optional":false,"readonly":true},"B":{"type":{"literal":"b","base":"Str"},"optional":false,"readonly":true}},"constants":{"A":"a","B":"b"},"calls":[],"constructors":[],"indexes":[]},
+{"name":"T0 | T1","properties":{},"union":[{"parameter":"T0","constraint":"any"},{"parameter":"T1","constraint":"any"}]}
+]}
