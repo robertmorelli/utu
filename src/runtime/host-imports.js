@@ -37,8 +37,13 @@ export function promiseImports(promiseSpec, utu = {}) {
   return utu;
 }
 
-export const promiseThen = (p, f) => { p.then(f); };
-export const promiseCatch = (p, f) => { p.catch(f); };
+// `then` returns nothing to utu, so its derived promise is unreachable. A
+// rejection of `p` passes through it only when `p` has no `catch`: with one,
+// the derived promise would reject unhandled although the user handled it.
+// A throw inside `f` (a trap) still rejects the derived promise unhandled.
+const caught = new WeakSet();
+export const promiseThen = (p, f) => { p.then(f, e => { if (!caught.has(p)) throw e; }); };
+export const promiseCatch = (p, f) => { caught.add(p); p.catch(f); };
 
 /**
  * `await` — the import is wrapped in WebAssembly.Suspending, which is what

@@ -199,20 +199,21 @@ mod stdlib {
     fn interner_sample() Str {
         \\using Interner from std:Interner;
         \\
-        \\fn intern(names: Interner, word: Str) I32 {
+        \\fn intern(names: Interner, bytes: Array[I32]) I32 {
         \\    names.begin();
-        \\    for (0 ..< word.len()) |i| { names.byte(word[i]); };
+        \\    for (0 ..< bytes.len()) |i| { names.byte(bytes[i]); };   // each 0 to 255
         \\    names.finish();
         \\}
         \\
         \\export main() Str {
         \\    let names = Interner.new();
-        \\    let a = intern(names, "alpha");
-        \\    let b = intern(names, "beta");
-        \\    let again = intern(names, "alpha");     // the same bytes, the same id
-        \\    `${a} ${b} ${again} ${names.len()} ${names.size(b)} ${names.byte_at(b, 0)} ${names.ascii(b)}`;
+        \\    let a = names.str("alpha");
+        \\    let b = names.str("beta");
+        \\    let again = intern(names, [97, 108, 112, 104, 97]);   // the same bytes, the same id
+        \\    let euro = names.str("€");             // UTF-8: 3 bytes
+        \\    `${a} ${b} ${again} ${names.len()} ${names.size(b)} ${names.byte_at(b, 0)} ${names.ascii(b)} ${names.size(euro)}`;
         \\}
-        \\// 0 1 0 2 4 98 beta
+        \\// 0 1 0 3 4 98 beta 3
         ;
     }
     fn found_sample() Str {
@@ -538,7 +539,7 @@ mod stdlib {
         [
         "a.cmp(b) I32::negative, zero, or positive: I32 U32 I64 U64 F32 F64 Str, and what implements Ord",
         "Order[T].max(a, b)  Order[T].min(a, b)::the greater, the lesser (a, when they tie)",
-        "Order[T].clamp(x, low, high)::x, or the nearer end",
+        "Order[T].clamp(x, low, high)::x, or the nearer end (low after high: low when x is before it, else high)",
         "Order[T].sort(xs)  Order[T].is_sorted(xs)::in place, stable, O(n log n)",
         "Order[T].search(xs, x) I32::where x is in sorted xs, or -1",
         "Order[T].max_of(xs)  Order[T].min_of(xs)::the greatest, the least"
@@ -554,7 +555,8 @@ mod stdlib {
     fn interner_rows() Array[Str] {
         [
         "Interner.new()::an empty table",
-        "t.begin()  t.byte(b)  t.finish() I32::feed one key a byte at a time; its id, 0, 1, 2, ... in first-seen order",
+        "t.begin()  t.byte(b)  t.finish() I32::feed one key a byte (0 to 255) at a time; its id, 0, 1, 2, ... in first-seen order",
+        "t.str(s) I32::a string's id, as its UTF-8 bytes",
         "t.len()::distinct keys so far",
         "t.size(id)  t.byte_at(id, k)  t.ascii(id)::read a key back: its length, a byte, as text"
         ];
@@ -582,8 +584,8 @@ mod stdlib {
     fn async_rows() Array[Str] {
         [
         "await p::the value of a Promise[T], suspending until it settles (JSPI)",
-        "p.then(cl(v) { ... })::subscribe to fulfilment; works on any JS host",
-        "p.catch(cl(reason) { ... })::subscribe to rejection; reason is an Externref",
+        "p.then(cl(v) { ... })::subscribe to fulfilment; works on any JS host. A rejection with no catch on p is reported unhandled",
+        "p.catch(cl(reason) { ... })::subscribe to rejection; reason is an Externref. Attach it before p settles",
         "await for (s) |v| { ... }::read a Stream[T]; break or return closes it",
         "Stream[T].of(array)  generate(n, make)  from_js(iterable)::make a stream",
         "s.take(n) skip(n) filter(keep) map(f) chain(other)::new lazy streams over this one"
@@ -758,7 +760,7 @@ mod stdlib {
             = api(float_rows());
             = module("Bool", "true and false, with and, or, xor, not. An integer is not a Bool.", "prelude");
             = code.block(bool_sample());
-            = module("M32 M64 M128 V128", "Bit masks and 128-bit SIMD vectors: bitwise operators, zero(), ones(), andnot, bitselect, any_true.", "prelude");
+            = module("M32 M64 M128 V128", "Bit masks and 128-bit SIMD vectors: bitwise operators, zero(), ones(), andnot, bitselect, any_true. On a mask, >> shifts zeros in, as >>> does.", "prelude");
             = code.block(masks_sample());
             = module("I31 Externref", "A 31-bit integer in a GC reference (from_i32, get_s, get_u), and an opaque host value.", "prelude");
             = code.block(i31_sample());
@@ -783,7 +785,7 @@ mod stdlib {
             = module("IntMap", "I32 keys to I32 values, without a host call.", "using IntMap from std:IntMap;");
             = code.block(intmap_sample());
             = api(intmap_rows());
-            = module("Interner", "Byte strings to dense ids. Keys arrive a byte at a time, from a string, an array, or a mem.", "using Interner from std:Interner;");
+            = module("Interner", "Byte strings to dense ids. A key is a string (its UTF-8 bytes), or bytes fed one at a time from an array or a mem.", "using Interner from std:Interner;");
             = code.block(interner_sample());
             = api(interner_rows());
             = module("Ord  Order[T[Ord]]", "An order: a.cmp(b) for the numbers and Str, and a bounded module of what to do with one. Implement it for your own type with fn Ord[T].cmp.", "using Order from std:Ord;");

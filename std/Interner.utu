@@ -1,13 +1,17 @@
 // std/Interner.utu — byte strings to dense I32 ids: 0, 1, 2, … in first-seen order.
 //
 //   let names = Interner.new();
+//   let id = names.str("café");   // a string: its UTF-8 bytes
 //   names.begin();
-//   for (start ..< end) |i| { names.byte(src[i]); };   // src can be a mem
+//   for (start ..< end) |i| { names.byte(src[i]); };   // bytes: from a mem, an array
 //   let id = names.finish();      // the same bytes always get the same id
 //   names.size(id); names.byte_at(id, 0); names.ascii(id);
 //
-// Keys arrive a byte at a time, so they can come from a mem, an array, or a
-// string. The bytes of a new key are kept; a repeated key's are dropped.
+// A key is bytes, 0 to 255. `byte` traps on anything else in safe builds
+// (unsafe builds keep the low 8 bits), so feed it bytes, not a string's
+// UTF-16 code units: `str` encodes a string as UTF-8, the same bytes a hosted
+// mem's `copy_in` writes, so a string and its bytes from a mem get one id.
+// The bytes of a new key are kept; a repeated key's are dropped.
 // FNV-1a hashing, linear probing over a power-of-two table at most half full.
 mod Interner {
     struct &:
@@ -35,7 +39,9 @@ mod Interner {
         self.hash = -2128831035;
     }
 
+    // One byte of the key, 0 to 255.
     fn &.byte |self| (b: I32) void {
+        if checks() and (b < 0 or b > 255) { fatal; };
         if self.used == self.bytes.len() {
             let grown = Array[I32].new(self.used * 2, 0);
             grown.copy_from(0, self.bytes, 0, self.used);
@@ -44,6 +50,39 @@ mod Interner {
         self.bytes[self.used] = b & 255;
         self.used += 1;
         self.hash = (self.hash ^ (b & 255)) * 16777619;
+    }
+
+    // The id of `s` as UTF-8, adding it if it is new: begin, its bytes, finish.
+    // A lone surrogate is 3 bytes of its own (WTF-8), so distinct strings
+    // always get distinct ids.
+    fn &.str |self| (s: Str) I32 {
+        self.begin();
+        let n = s.len();
+        let i = 0;
+        while (i < n) {
+            let c = s[i];
+            i += 1;
+            if c >= 55296 and c <= 56319 and i < n and s[i] >= 56320 and s[i] <= 57343 {
+                c = 65536 + ((c - 55296) << 10) + (s[i] - 56320);
+                i += 1;
+            };
+            if c < 128 {
+                self.byte(c);
+            } else if c < 2048 {
+                self.byte(192 | (c >> 6));
+                self.byte(128 | (c & 63));
+            } else if c < 65536 {
+                self.byte(224 | (c >> 12));
+                self.byte(128 | ((c >> 6) & 63));
+                self.byte(128 | (c & 63));
+            } else {
+                self.byte(240 | (c >> 18));
+                self.byte(128 | ((c >> 12) & 63));
+                self.byte(128 | ((c >> 6) & 63));
+                self.byte(128 | (c & 63));
+            };
+        };
+        self.finish();
     }
 
     // The id of the bytes since begin(), adding them if they are new.
@@ -106,7 +145,10 @@ mod Interner {
         self.bytes[self.starts[id] + k];
     }
 
-    // The key as a string, one character per byte (exact for ASCII).
+    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
+
+    // The key as a string, one character per byte: exact for ASCII; a
+    // multi-byte UTF-8 character shows as its bytes.
     fn &.ascii |self| (id: I32) Str {
         Str.from_codes(self.bytes.slice(self.starts[id], self.starts[id + 1]), self.size(id));
     }
