@@ -657,6 +657,25 @@ export lib {
       + `export lib { fn run() I32 { Use[I32].go(5) * 1000000 + Use[Str].go("ab") * 10000 + Use[P].go(P { v: 3 }) * 100 + Use[Shape].go(Ci {}) + Use[I32].go2(1) - Use[Shape].go2(Sq {}); } }\n`,
       112000000 + 490000 + 7000 + 49 + 28 - 28],
   ];
+  // A default is the receiver's parameter's bounds', decided where it is written (both were by the
+  // type argument: `y.twice()` took X's A.twice for M[Pt, Pt], and X's and Y's twice were ambiguous).
+  const twiceAB = `proto A:\n    | get v : I32\nproto B:\n    | get w : I32\nstruct Pt[A, B]:\n    | v: I32\n    | w: I32\nfn A.twice |t| () I32 { t.v * 2; }\n`;
+  bounded.push([`${twiceAB}fn B.twice |t| () I32 { t.w * 3; }\nmod M[X[A], Y[B]] {\n    fn id(y: Y) Y { y; }\n`
+    + `    fn run(x: X, y: Y) I32 { let a = x; let b: Y = y; (a).twice() + b.twice() * 100 + id(y).twice() * 10000 + A.twice(x) * 1000000; }\n}\n`
+    + `export lib { fn run() I32 { M[Pt, Pt].run(Pt { v: 1, w: 2 }, Pt { v: 5, w: 7 }); } }\n`, 2212102]);
+  for (const source of [
+    // Y is bounded by B, which has no twice.
+    `${twiceAB}mod M[X[A], Y[B]] {\n    fn run(x: X, y: Y) I32 { y.twice(); }\n}\nexport lib { fn run() I32 { M[Pt, Pt].run(Pt { v: 1, w: 2 }, Pt { v: 5, w: 7 }); } }\n`,
+    // A concrete type has no defaults, in a bounded mod as outside.
+    `${twiceAB}mod M[X[A]] {\n    fn run(x: X) I32 { let p = Pt { v: 9, w: 0 }; p.twice(); }\n}\nexport lib { fn run() I32 { M[Pt].run(Pt { v: 1, w: 2 }); } }\n`,
+  ]) {
+    const file = await write(source);
+    for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+      const built = await compileFile(utu, file, { mode });
+      assert.ok(!built.wasm && built.diagnostics?.some(d => d.message === 'No method Pt.twice'), `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+      checked++;
+    }
+  }
   for (const [source, expected] of bounded) {
     const file = await write(source);
     for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
