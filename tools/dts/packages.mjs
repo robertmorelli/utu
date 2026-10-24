@@ -79,8 +79,8 @@ async function readyEntry(cacheDir, key, graph) {
   const { files, abi } = await graph();
   const { typesDocument } = await import('../../src/selfhost/compiler.js');
   const document = typesDocument(abi.types);
-  const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
-  const view = new TextEncoder().encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals }));
+  const { prefix, moduleSpecifier, exports, names, mutableGlobals, exportAssignment } = abi;
+  const view = new TextEncoder().encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals, exportAssignment }));
   try {
     fs.mkdirSync(path.dirname(base), { recursive: true });
     const write = (name, bytes) => {
