@@ -38,6 +38,8 @@ const INTENDED = {
   'baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu test': 'an array of a protocol has no default',
   // `fn Box.make(…)` with no type Box: stage 0 drops it (its test build never calls it).
   'baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu test': 'a method of an unknown type is reported',
+  // A test's `cl(v) { v + 1; }` where a void closure goes: stage 0 checks test bodies only in test builds.
+  'baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu normal': 'test bodies are checked in every build',
   // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
   'examples/bounds.utu normal': 'bounded module parameters',
   'examples/bounds.utu test': 'bounded module parameters',
