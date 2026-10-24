@@ -585,18 +585,17 @@ vec scope_decl: I32;
 vec file_scope: I32;
 vec file_scope_end: I32;
 
-/// The file whose scope a file's items are in: a generated file's is the entry file's.
-fn scope_file(file: I32) I32 {
+/// The file whose scope a file's items are in: a generated file's is the
+/// entry file's (`entry`, or -1 for none).
+fn scope_file(file: I32, entry: I32) I32 {
     if file_role[file] != FileRole.Generated.to_i32() { return file; };
     // What is generated for an imported file's mems is in its scope.
     if gen_owner_of(file) >= 0 { return gen_owner_of(file); };
-    for (0 ..< file_role.len()) |f| { if file_role[f] == FileRole.Entry.to_i32() { return f; }; };
-    file;
+    if entry >= 0 { entry; } else { file; };
 }
 
-/// Bring a file's scope into scope (on top of the prelude's).
-fn enter_file(file: I32) void {
-    let f = scope_file(file);
+/// Bring file `f`'s scope into scope (on top of the prelude's).
+fn enter_file(f: I32) void {
     if f >= file_scope.len() or file_scope[f] < 0 { return; };
     for (file_scope[f] ..< file_scope_end[f]) |k| { bind(scope_word[k], scope_decl[k]); };
 }
@@ -1527,11 +1526,21 @@ fn restore_diagnostics() void {
 /// members in scope. The header pass (`headers`) registers methods and
 /// aliases; the next resolves bodies.
 fn walk_program(headers: Bool) void {
+    let entry = entry_file();
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry, FileRole.Generated]) |role| {
+        // A scope entered stays for the next file in it (generated files
+        // share their owner's): the bindings are as if entered again.
+        let outer = scope_mark();
+        let entered = -1;
         for (0 ..< file_root.len()) |file| {
             if file_role[file] == role.to_i32() and file_root[file] >= 0 {
+                let scope = scope_file(file, entry);
+                if scope != entered {
+                    scope_pop(outer);
+                    enter_file(scope);
+                    entered = scope;
+                };
                 let file_mark = scope_mark();
-                enter_file(file);
                 let item = first_child(file_root[file]);
                 while (item >= 0) {
                     if is_kind(item, Node.Module_decl) {
@@ -1552,6 +1561,7 @@ fn walk_program(headers: Bool) void {
                 scope_pop(file_mark);
             };
         };
+        scope_pop(outer);
     };
 }
 
