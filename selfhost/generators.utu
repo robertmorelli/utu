@@ -40,8 +40,13 @@ vec gen_defers: I32;
 vec gen_rec: I32;
 /// The generators of the program's own items, checked even when unused.
 vec own_gens: I32;
-/// The generators a `for` expanded.
-vec used_gens: I32;
+/// By declaration: 1 for a generator a `for` expanded.
+vec gen_used: U8;
+
+fn mark_used(gen: I32) void {
+    if gen_used.len() <= gen { gen_used.resize(decl_kind.len()); };
+    gen_used[gen] = 1;
+}
 
 /// An expansion begins: what its yields need, on the stacks above.
 fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32, rec: I32) void {
@@ -89,7 +94,10 @@ fn reset_generators() void {
     aside_defers.clear();
     aside_vals.clear();
     own_gens.clear();
-    used_gens.clear();
+    gen_used.clear();
+    fl_first.clear();
+    fl_last.clear();
+    fl_next.clear();
     rec_kind.clear();
     rec_val.clear();
     rec_top.clear();
@@ -174,17 +182,41 @@ fn generator_inst(call: I32, gen: I32, cx: Cx) I32 {
 }
 
 /// The declarations of a generator (its parameters and locals): those
-/// whose node is inside it.
+/// whose node is inside it, in order.
 fn generator_decls(gen: I32) I32 {
-    let node = decl_node[gen];
+    file_locals();
     let m = vl_begin();
-    for (0 ..< decl_kind.len()) |d| {
-        if is_local_decl(d) and decl_node[d] >= 0 {
-            let t = node_first[decl_node[d]];
-            if t >= node_first[node] and t < node_last[node] { vl_add(d); };
-        };
+    let d = fl_first[decl_node[gen]];
+    while (d > 0) {
+        vl_add(d - 1);
+        d = fl_next[d - 1];
     };
     vl_end(m);
+}
+
+/// By node: a function's first and last local declaration, plus one (0 for
+/// none); by declaration: the next local of its function, plus one.
+vec fl_first: I32;
+vec fl_last: I32;
+vec fl_next: I32;
+
+/// File the declarations not yet filed under their functions (see @fl_first).
+fn file_locals() void {
+    fl_first.resize(node_kind.len());
+    fl_last.resize(node_kind.len());
+    let d = fl_next.len();
+    fl_next.resize(decl_kind.len());
+    while (d < decl_kind.len()) {
+        if is_local_decl(d) and decl_node[d] >= 0 {
+            let f = node_parent[decl_node[d]];
+            while (f >= 0 and not is_kind(f, Node.Fn_decl)) { f = node_parent[f]; };
+            if f >= 0 {
+                if fl_last[f] > 0 { fl_next[fl_last[f] - 1] = d + 1; } else { fl_first[f] = d + 1; };
+                fl_last[f] = d + 1;
+            };
+        };
+        d += 1;
+    };
 }
 
 // What @set_aside kept, innermost last: the list, where its values start
@@ -287,7 +319,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         gen = node_decl[last_child(first_child(call))];
         receiver = first_child(first_child(call));
     };
-    used_gens.push(gen);
+    mark_used(gen);
     // A generator that consumes itself would expand without end.
     for (0 ..< gen_decl.len()) |i| {
         if gen_decl[i] == gen {
@@ -385,14 +417,13 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
 /// Each generator of the program's own items that no `for` expanded:
 /// checked on its own, as an unused function is.
 fn check_unused_generators() void {
+    gen_used.resize(decl_kind.len());
     for (0 ..< own_gens.len()) |i| {
         let gen = own_gens[i];
-        let used = false;
-        for (0 ..< used_gens.len()) |j| { if used_gens[j] == gen { used = true; }; };
         // (One that delegates to itself expands only from a consumer.)
-        if not used and not delegates_to_itself(gen) {
+        if gen_used[gen] == 0 and not delegates_to_itself(gen) {
             check_lone_generator(gen);
-            used_gens.push(gen);
+            mark_used(gen);
         };
     };
 }
