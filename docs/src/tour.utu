@@ -61,7 +61,7 @@ mod tour {
         \\export main() I32 {
         \\    let total = 10;          // inferred: I32
         \\    let scale: F64 = 0.5;    // annotated
-        \\    total = total + 1;       // every binding is mutable
+        \\    total = total + 1;       // a local binding is mutable
         \\    total += 4;
         \\    total *= 2;
         \\    total <<= 1;
@@ -80,6 +80,20 @@ mod tour {
         \\
         \\export main() Str {
         \\    loud.repeat(limit);   // HELLOHELLOHELLO
+        \\}
+        ;
+    }
+    fn global_state_sample() Str {
+        \\struct Tally:
+        \\    | hits: I32
+        \\let tally: Tally = Tally { hits: 0 };   // set once; its fields still change
+        \\
+        \\fn hit() void { tally.hits += 1; }     // `tally = …` would be an error
+        \\
+        \\export main() I32 {
+        \\    hit();
+        \\    hit();
+        \\    tally.hits;                          // 2
         \\}
         ;
     }
@@ -890,6 +904,22 @@ mod tour {
         \\}
         ;
     }
+    fn generator_index_sample() Str {
+        \\fn evens(n: I32) yield I32 {
+        \\    for (0 ..< n) |i| { yield i * 2; };
+        \\}
+        \\
+        \\export main() I32 {
+        \\    let sum = 0;
+        \\    let i = 0;
+        \\    for (evens(4)) |v| {
+        \\        sum += v * i;
+        \\        i += 1;
+        \\    };
+        \\    sum;                     // 0*0 + 2*1 + 4*2 + 6*3 = 28
+        \\}
+        ;
+    }
     fn mem_sample() Str {
         \\mem bytes: U8;          // a linear memory of its own, starts empty
         \\vec stack: I32;         // a growable WasmGC array
@@ -1202,14 +1232,31 @@ mod tour {
                 code {
                     "let";
                 }
-                " infers a type or takes an annotation. Bindings can be reassigned; top-level ";
+                " infers a type or takes an annotation. A local binding can be reassigned. A top-level ";
                 code {
                     "let";
                 }
-                "s are globals. A global may be computed by any expression: the module sets it when it starts, in the order written, but always after the globals its initializer reads (directly or through the functions it calls). Two globals that need each other are an error.";
+                " is a global: it needs a type annotation (";
+                code {
+                    "let g: I32 = 5;";
+                }
+                ", not ";
+                code {
+                    "let g = 5;";
+                }
+                ") and is set once, so assigning to it is an error. For state that changes, keep a struct in a global and set its fields, or use a ";
+                code {
+                    "mem";
+                }
+                " or ";
+                code {
+                    "vec";
+                }
+                ". A global may be computed by any expression: the module sets it when it starts, in the order written, but always after the globals its initializer reads (directly or through the functions it calls). Two globals that need each other are an error.";
             }
             = code.block(let_sample());
             = code.block(globals_sample());
+            = code.block(global_state_sample());
             h2 {
                 "Functions";
             }
@@ -1257,7 +1304,7 @@ mod tour {
                 code {
                     "for";
                 }
-                " over ranges and arrays (zipped when given several), ";
+                " over ranges and arrays (zipped when given several: arrays and ranges only, stopping at the shortest; a generator is looped alone), ";
                 code {
                     "break";
                 }
@@ -1558,7 +1605,15 @@ mod tour {
                 code {
                     "Array[Proto]";
                 }
-                " holds any mix of implementors.";
+                " holds any mix of implementors. A protocol method lists parameter types only, ";
+                code {
+                    "| hit(Vec3, Vec3) F64";
+                }
+                ", not ";
+                code {
+                    "| hit(a: Vec3, b: Vec3) F64";
+                }
+                "; each implementation names them.";
             }
             = code.block(proto_sample());
             = code.block(proto_members_sample());
@@ -1642,10 +1697,22 @@ mod tour {
                 code {
                     "vec";
                 }
-                " are top-level growable arrays of scalars for hot loops. A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error. Growing with resize(n) zero-fills the new elements. An index past the length (or negative) traps, as an array's does; smallUnsafe and fastUnsafe check only the capacity.";
+                " are top-level growable arrays of scalars for hot loops. An element is U8, I8, U16, I16, I32, U32, I64, U64, F32, F64, an integer enum, or a distinct type over one of these; not Bool, Str, or a struct (for flags, use U8 and store 0 or 1). A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error. Growing with resize(n) zero-fills the new elements. An index past the length (or negative) traps, as an array's does; smallUnsafe and fastUnsafe check only the capacity.";
             }
             = code.block(arrays_sample());
             = code.block(generator_sample());
+            p {
+                "A generator cannot be zipped: ";
+                code {
+                    "for (evens(4), 0 ..< 4) |v, i|";
+                }
+                " is an error. To number its values, count with a ";
+                code {
+                    "let";
+                }
+                ":";
+            }
+            = code.block(generator_index_sample());
             = code.block(mem_sample());
             h2 {
                 "Errors";
