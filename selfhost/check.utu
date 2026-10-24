@@ -3413,6 +3413,7 @@ fn reset_check() void {
     reset_control();
     reset_closures();
     reset_generators();
+    reset_protocols();
     reset_iterators();
     reset_defers();
     reset_optional();

@@ -194,8 +194,10 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
     for (m ..< m + n) |i| { w_kids.push(w_stack[i]); };
     w_count[c] = n;
     w_stack.resize(m);
-    w_op[c] = Op.Block.to_i32();
-    w_a[c] = block;
+    // No `return` to leave it by: no block (which a tee cannot reach into).
+    let returns = has_op(func_body[g], Op.Return.to_i32());
+    w_op[c] = if returns { Op.Block.to_i32(); } else { Op.Seq.to_i32(); };
+    w_a[c] = if returns { block; } else { 0; };
     w_b[c] = 0;
     block;
 }
