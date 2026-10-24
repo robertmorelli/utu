@@ -506,9 +506,10 @@ fn build() Machine {
 
 //! = Lexing
 
-/// Token t, written in the room lex made (a word interned, as it is
-/// read); the one after it.
+/// Token t, written in the room lex made (doubled when full; a word
+/// interned, as it is read); the one after it.
 fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
+    if t == tok_kind.len() { tokens_room(t * 2); };
     tok_kind[t] = kind;
     tok_start[t] = start;
     tok_end[t] = end_;
@@ -518,11 +519,16 @@ fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
 
 /// The tokens up to t are the mems' contents; their number.
 fn tokens_end(t: I32) I32 {
-    tok_kind.resize(t);
-    tok_start.resize(t);
-    tok_end.resize(t);
-    tok_word.resize(t);
+    tokens_room(t);
     t;
+}
+
+/// The token mems resized to `n`.
+fn tokens_room(n: I32) void {
+    tok_kind.resize(n);
+    tok_start.resize(n);
+    tok_end.resize(n);
+    tok_word.resize(n);
 }
 
 /// The end of the DSL body at `i` (a `/\`), with nested `/\ … \/` pairs
@@ -624,14 +630,10 @@ fn runs_to(s: I32, k: I32) Bool {
 }
 
 fn lex_to(first: I32, n: I32) I32 {
-    // Room for the most tokens there can be: one a byte, and the last
+    // Room for a token every 4 bytes, and more as @put_token needs it
     // (@tokens_end cuts the mems back to those written).
     let t = tok_kind.len();
-    let room = t + n - first + 2;
-    tok_kind.resize(room);
-    tok_start.resize(room);
-    tok_end.resize(room);
-    tok_word.resize(room);
+    tokens_room(t + (n - first) / 4 + 16);
     let i = first;
     let j = first;
     let open = 0;  // template strings in a `${`

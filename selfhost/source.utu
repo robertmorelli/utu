@@ -111,11 +111,7 @@ fn reset_program() void {
         intern_keywords();
         for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow.from_i32(k))); };
     };
-    let tokens = kept[1];
-    tok_kind.resize(tokens);
-    tok_start.resize(tokens);
-    tok_end.resize(tokens);
-    tok_word.resize(tokens);
+    tokens_room(kept[1]);
     let nodes = kept[2];
     node_kind.resize(nodes);
     node_first.resize(nodes);
