@@ -245,10 +245,11 @@ fn whitespace(m: Machine) void {
     set(m, ef_bb, 191, skip_code);
 }
 
-/// A token running to the end of its line: `// …` and `\\ …`.
+/// A token running to the end of its line (`\n`, `\r\n` or a lone `\r`): `// …` and `\\ …`.
 fn to_line_end(m: Machine, state: I32) void {
     for (0 ..< 256) |c| { set(m, state, c, state); };
     set(m, state, 10, accept_code);
+    set(m, state, 13, accept_code);
     set(m, state, end_byte, accept_code);
 }
 
