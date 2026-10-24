@@ -1,7 +1,11 @@
 // Unit tests for the Wutu DOM reconciler and typed storage (src/runtime/wutu.js),
 // driven directly the way compiled templates call it, against linkedom.
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { parseHTML } from 'linkedom/worker';
-import { createWutuRuntime, installWutuStorage, wutuStyle } from '../src/runtime/wutu.js';
+import { createWutuLazy, createWutuRuntime, installWutuStorage, wutuStyle } from '../src/runtime/wutu.js';
 
 function memoryStorage() {
   const data = new Map();
@@ -299,5 +303,23 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
     api.autoSave();
     dispatch('pagehide');
     assertEq(storage.getItem('auto'), 'local', 'automatic stores save and flush on page hide');
+  }));
+
+  test('wutu lazy: a call before any template ran (no runtime yet) gets a placeholder the chunk fills', () => withRuntime(async ({ document }) => {
+    const saved = [globalThis.__utuWutu, globalThis.__wutuChunks];
+    delete globalThis.__utuWutu;
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wutu-lazy-'));
+    const chunk = path.join(dir, 'app.mjs');
+    await fs.writeFile(chunk, 'export const exports = { page: who => Object.assign(document.createElement("h1"), { textContent: "Hi " + who }) };');
+    globalThis.__wutuChunks = { '"./guide.utu"': pathToFileURL(chunk).href };
+    try {
+      const node = createWutuLazy()('"./guide.utu"', 'page', ['you']);
+      assertEq(node.getAttribute('data-wutu-lazy'), '|"./guide.utu"|page|you');
+      for (let i = 0; i < 20 && !node.firstChild; i++) await settle();
+      assertEq(node.textContent, 'Hi you', 'the chunk fills the placeholder');
+    } finally {
+      [globalThis.__utuWutu, globalThis.__wutuChunks] = saved;
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   }));
 }

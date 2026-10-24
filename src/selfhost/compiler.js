@@ -20,6 +20,7 @@ import {
   convertExports, memoryImports, promiseImports, promisifyExports,
 } from '../runtime/host-imports.js';
 import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
+import { abiFromJson } from '../bindings/schema.js';
 
 /** How a file joins the program. */
 export const ROLE = { entry: 0, import: 1, prelude: 2 };
@@ -305,9 +306,11 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
     const from = files[utu.import_from(i)];
     const raw = textAt(utu.src, utu.import_path_start(i), utu.import_path_end(i));
     const platform = PLATFORM_PATH.test(raw);
-    if (/^"?(npm|node):/.test(raw) || platform && typeof stdlib.get(raw) === 'function') {
+    // A linked declaration file (`tools/dts/cli.mjs` writes `Name.abi.json`).
+    const abiFile = !platform && /\.abi\.json"$/.test(raw) ? resolvePath(from.key, JSON.parse(raw)) : null;
+    if (/^"?(npm|node):/.test(raw) || abiFile || platform && typeof stdlib.get(raw) === 'function') {
       utu.import_foreign(i);
-      foreign.push({ i, raw, from: from.key, name: textAt(utu.src, utu.import_name_start(i), utu.import_name_end(i)) });
+      foreign.push({ i, raw, from: from.key, abiFile, name: textAt(utu.src, utu.import_name_start(i), utu.import_name_end(i)) });
       continue;
     }
     const key = platform ? raw : resolvePath(from.key, JSON.parse(raw));
@@ -335,7 +338,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   }
   // Host declarations the compiler does not hold yet: start again with them
   // written first, where they stay for the programs after.
-  if (!await bindForeign(utu, foreign, host)) return loadProgram(utu, entry, host, texts);
+  if (!await bindForeign(utu, foreign, host, readFile)) return loadProgram(utu, entry, host, texts);
   files.diagnostics = utu.resolve();
   await loadEmbeds(utu, entry, files, host);
   await assembleWat(utu);
@@ -596,16 +599,16 @@ function writeView(utu, decl, doc) {
  * (written at the program's start). False when some it does not: they are
  * then wanted, and the program must start again.
  */
-async function bindForeign(utu, foreign, { stdlib, resolvePackage }) {
+async function bindForeign(utu, foreign, { stdlib, resolvePackage }, readFile) {
   const state = residentOf(utu);
   const bindings = [];
   let missing = false;
-  for (const { i, raw, from, name } of foreign) {
+  for (const { i, raw, from, abiFile, name } of foreign) {
     let decl;
     try {
       // A platform module gives its declarations ready ({ document, view }), or an ABI.
-      const given = /^"?(npm|node):/.test(raw)
-        ? await resolvePackage(JSON.parse(raw), { prefix: name, from })
+      const given = abiFile ? abiOfFile(await readFile(abiFile))
+        : /^"?(npm|node):/.test(raw) ? await resolvePackage(JSON.parse(raw), { prefix: name, from })
         : await stdlib.get(raw)();
       decl = given.document ? given : prepare(given.abi ?? given);
     } catch {
@@ -622,6 +625,17 @@ async function bindForeign(utu, foreign, { stdlib, resolvePackage }) {
   if (missing) return false;
   for (const [i, decl] of bindings) utu.abi_bind(i, state.views.get(decl));
   return true;
+}
+
+/** By text: an .abi.json file's ABI, the same object each time it is read (so @prepare's too). */
+const abiFiles = new Map();
+
+function abiOfFile(bytes) {
+  const text = typeof bytes === 'string' ? bytes : decoder.decode(bytes);
+  if (!abiFiles.has(text)) abiFiles.set(text, abiFromJson(text));
+  const abi = abiFiles.get(text);
+  if (!abi) throw new Error('Invalid declaration ABI');
+  return abi;
 }
 
 /** @embed: the files' bytes, read relative to the file that declares the mem. */

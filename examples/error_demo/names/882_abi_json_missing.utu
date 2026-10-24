@@ -1,0 +1,7 @@
+// What: a linked declaration file (`tools/dts/cli.mjs --out bindings`) that is not there
+// Expect: No ABI in ./bindings/api.abi.json: missing, or not one tools/dts/cli.mjs wrote
+using api from "./bindings/api.abi.json";
+
+export main() F64 {
+    api.twice(2.0);
+}

@@ -1,0 +1,8 @@
+// What: a closure bound by a let, of more parameters than the host callback passes
+// Expect: Callback takes 3 parameters; JS passes 1
+using Browser from std:Browser;
+
+export main() void {
+    let draw: cl(F64, F64, F64) void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
+    Browser.window.requestAnimationFrame(draw);
+}

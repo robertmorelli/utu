@@ -190,7 +190,11 @@ export function instantiateNode(wasm, spec, { root = process.cwd(), profiler = n
  * stage 0's loader does) so its imports resolve as the project's would,
  * named by its hash so concurrent builds share it.
  */
-async function importGlue(source, root) {
+async function importGlue(written, root) {
+  // A relative import (`--module ./api.js` in an .abi.json) is from the
+  // program's directory, as `utu build` bundles it.
+  const source = written.replace(/(\bfrom\s*|\bimport\s*\(\s*)(["'])(\.\.?\/[^"']*)\2/g,
+    (_, lead, quote, specifier) => lead + JSON.stringify(pathToFileURL(path.resolve(root, specifier)).href));
   const modules = findNodeModules(root);
   const dir = modules ? path.join(modules, '.utu') : fs.mkdtempSync(path.join(os.tmpdir(), 'utu-glue-'));
   fs.mkdirSync(dir, { recursive: true });

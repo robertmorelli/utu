@@ -165,6 +165,10 @@ node tools/dts/cli.mjs --input path/to/api.d.ts --module ./api.js --prefix Api -
 using Api from "./bindings/Api.abi.json";
 ```
 
+The path is from the importing file, as any `using` path is. A relative
+`--module` is from the program's directory: `utu build` bundles it from there,
+and `utu run` imports it from there.
+
 Rust crates work the same way through wasm-bindgen's declarations:
 
 ```sh
@@ -229,6 +233,15 @@ Point from JS, which cannot make one`). Pass fields, a `Str` from `@json
 encode`, or host values instead. A JS function is a closure: type a function
 result `cl(I32) I32`, not `fun(I32) I32`. A `fun` argument is given as a closure.
 std's own bindings are exempt: `std:Stream` hands back the values utu gave it.
+
+An `export lib` function is the other way round: its arguments and results may
+be structs, `Result`s, payload enums and arrays. JavaScript gets each as an
+opaque wasm object, a handle: it cannot read its fields or make one, but can
+keep it and pass it back to another export, which can. So `make() Point` and
+`norm(p: Point) F64` work together from JS (`lib.norm(lib.make())`), while
+`p.x` is `undefined` there and `lib.norm({ x: 3, y: 4 })` throws a
+`TypeError`. Export what JS should read as numbers, `Str` (`@json encode` for
+whole values), or host objects.
 
 An `@es` body bound to a `fun` or `cl` type should be a function. One that
 is not plainly one (an arrow or `function`), such as `Math.abs`, is tested
@@ -319,6 +332,10 @@ operation. Ergonomic syntax does not remove that cost.
 
 - A callback receives at most as many arguments as its closure declares; an
   unbounded `...args` list is not collected into one value.
+- A closure may declare fewer parameters than its callback type, as in
+  TypeScript, but not more: `Api.cb(cl(x, y) F64 { … })` where the host passes
+  one is an error (`Callback takes 2 parameters; JS passes 1`). A rest
+  parameter passes any number. A `fun` is not a host callback; give a `cl`.
 - A type the checker could not resolve arrives as a host value. Narrow it with
   `alt`, read it through a primitive context, or pass it along.
 

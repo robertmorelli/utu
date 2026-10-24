@@ -240,6 +240,22 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.equal(r.stdout.trim(), '2 b c');
   assert.match(utu('build', 'args.utu', '--', 'a').stderr, /-- is only for run/);
 
+  // A declaration file linked by tools/dts/cli.mjs (`using Api from "./bindings/Api.abi.json"`):
+  // checked, run and built; its relative module is from the program's directory.
+  await write('api.d.ts', 'export declare function twice(n: number): number;\n');
+  await write('api.js', 'export function twice(n) { return n * 2; }\n');
+  r = spawnSync(process.execPath, [path.resolve('tools/dts/cli.mjs'), '--input', 'api.d.ts', '--module', './api.js', '--prefix', 'Api', '--out', 'bindings'], { encoding: 'utf8', cwd: dir });
+  assert.equal(r.status, 0, r.stderr);
+  await write('abi.utu', 'using Api from "./bindings/Api.abi.json";\nexport main() F64 { Api.twice(21.0); }\n');
+  r = utu('check', 'abi.utu');
+  assert.equal(r.status, 0, r.stderr);
+  r = utu('run', 'abi.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), '42');
+  r = utu('build', 'abi.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal((await import(pathToFileURL(path.join(dir, 'abi.mjs')).href)).exports.main(), 42);
+
   // A module and the least JavaScript that loads it.
   r = utu('build', 'good.utu', '-o', 'out');
   assert.equal(r.status, 0, r.stderr);

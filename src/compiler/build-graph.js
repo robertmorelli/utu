@@ -10,6 +10,7 @@ import { parseToIR, createIRDocument } from './parse.js';
 import { clipFileIRTree } from './clip-file-ir-tree.js';
 import { stampOriginFile } from './ir-helpers.js';
 import { DIAGNOSTIC_KINDS, compilerError } from './diagnostics.js';
+import { abiFromJson } from '../bindings/schema.js';
 
 /**
  * @param {string} entryPath - absolute path or URL of the entry file
@@ -59,9 +60,8 @@ export async function buildModuleGraph(entryPath, { parser, readFile, resolvePat
       }
     }
     if (filePath.endsWith('.abi.json')) {
-      let abi = null;
-      try { abi = JSON.parse(source); } catch { /* reported below */ }
-      if (abi?.version !== 1 || !Array.isArray(abi.types) || !abi.exports || !abi.names || !/^[A-Z][A-Za-z0-9_]*$/.test(abi.prefix)) {
+      const abi = abiFromJson(source);
+      if (!abi) {
         throw compilerError(DIAGNOSTIC_KINDS.UNKNOWN_IMPORT, `Invalid declaration ABI: ${filePath}`, via?.node, { importPath: filePath, importKind: 'file' });
       }
       foreign.set(filePath, abi);

@@ -1,0 +1,7 @@
+// What: a closure given to a host callback takes more parameters than the host passes
+// Expect: Callback takes 2 parameters; JS passes 1
+using Browser from std:Browser;
+
+export main() void {
+    Browser.window.requestAnimationFrame(cl(time, frame) void { Browser.console.log(time + frame); });
+}

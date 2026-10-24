@@ -299,6 +299,8 @@ the page's Wutu runtime rather than shipping its own, and `sizes.json` lists
 each chunk under `chunks`, apart from the page's `total`.
 
 Each call site has its own placeholder, made again when its arguments change.
+A call outside any template (in `main`, say, before the first render) works
+too: its placeholder belongs to the page.
 If a chunk fails to load, its placeholder gets `data-wutu-lazy-error` (style
 it to say so) and the next render tries again.
 
