@@ -116,7 +116,21 @@ fn instance(module: I32, args: I32) I32 {
     let depth = 0;
     for (0 ..< vl_len[args]) |i| { depth = max_i32(depth, type_depth(vl_item(args, i))); };
     inst_depth.push(depth + 1);
+    inst_bad.push(if stream_of_promise(module, args) { 1; } else { 0; });
     id;
+}
+
+/// By instance: 1 when its type arguments are wrong in a way @too_deep
+/// reports where it is first written (see @stream_of_promise), 2 once reported.
+vec inst_bad: I32;
+
+/// `Stream[Promise[T]]` or `Stream[?Promise[T]]`: a stream is a JS async
+/// generator, whose `yield` awaits a promise, so its values are never promises.
+fn stream_of_promise(module: I32, args: I32) Bool {
+    if module < 0 or vl_len[args] != 1 or decl_name[module] != intern_text("Stream") or not from_std(decl_node[module]) { return false; };
+    let t = vl_item(args, 0);
+    if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+    ty_is(t, Ty.Named) and is_promise_type(t);
 }
 
 /// By instance: the `[U32]` of where it was first written (`G[U32]`), or -1.
@@ -147,8 +161,14 @@ fn max_i32(a: I32, b: I32) I32 { if a > b { a; } else { b; }; }
 let inst_depth_max: I32 = 64;
 
 /// Whether instance `inst` nests too deeply, which is reported at `node`
-/// (its module's name the word) where it first does.
+/// (its module's name the word) where it first does; or is otherwise wrong
+/// (@inst_bad).
 fn too_deep(inst: I32, node: I32) Bool {
+    if inst_bad[inst] > 0 {
+        if inst_bad[inst] == 1 { report2(Diag.StreamPromise, node, -1, inst_arg(inst, 0), -1); };
+        inst_bad[inst] = 2;
+        return true;
+    };
     if inst_depth[inst] <= inst_depth_max { return false; };
     if inst_depth[inst] == inst_depth_max + 1 { report2(Diag.InstanceDepth, node, decl_name[inst_module[inst]], inst_depth_max, -1); };
     true;
@@ -606,6 +626,7 @@ fn reset_types() void {
     inst_module.clear();
     inst_args.clear();
     inst_depth.clear();
+    inst_bad.clear();
     inst_site.clear();
     inst_table.clear();
     struct_inst.clear();

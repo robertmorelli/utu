@@ -1,0 +1,9 @@
+// What: a stream of promises: a stream's values are awaited as they are read
+// Expect: A stream's values are awaited as they are read: use Stream[I32], not Stream[Promise[I32]]
+let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
+
+export main() I32 {
+    let total = 0;
+    await for (Stream[Promise[I32]].of([later(1), later(2)])) |p| { total += await p; };
+    total;
+}

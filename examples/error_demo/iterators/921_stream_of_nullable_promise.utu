@@ -1,0 +1,9 @@
+// What: a stream of nullable promises, as a parameter's type
+// Expect: A stream's values are awaited as they are read: use Stream[?I32], not Stream[?Promise[I32]]
+fn count(s: Stream[?Promise[I32]]) I32 {
+    let n = 0;
+    await for (s) |p| { n += 1; };
+    n;
+}
+
+export main() I32 { 0; }

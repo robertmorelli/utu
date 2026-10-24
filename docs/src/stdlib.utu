@@ -806,7 +806,7 @@ mod stdlib {
             = group("std-async", "Async");
             = module("Promise[T]", "A real JavaScript promise. Await it, or subscribe with then and catch.", "prelude");
             = code.block(promise_sample());
-            = module("Stream[T]", "A real JavaScript async iterable, read once with await for.", "prelude");
+            = module("Stream[T]", "A real JavaScript async iterable, read once with await for. Its values are awaited as they are read, so T is never a Promise: Stream[I32], not Stream[Promise[I32]].", "prelude");
             = code.block(stream_sample());
             = code.block(stream_js_sample());
             = api(async_rows());

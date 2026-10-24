@@ -1635,6 +1635,12 @@ export lib {
   for (const [source, message] of [
     ['proto Big:\n    | biggest(Array[&]) &\nstruct M:\n    | v: I32\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nexport lib { fn run() I32 { let xs: Array[M] = [M { v: 3 }]; Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 2 }, xs).v; } }\n', "M does not implement Big (Pick's T needs it)"],
     ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nexport lib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
+    // A stream's values are awaited as read (JS async generators): never a promise (it typed Promise[I32] and held the number).
+    ['let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn f(s: Stream[Promise[I32]]) I32 { 0; }\n'
+      + 'export main() I32 { let t = 0; await for (Stream[Promise[I32]].of([later(5)])) |p| { t += await p; }; t; }\n',
+      "A stream's values are awaited as they are read: use Stream[I32], not Stream[Promise[I32]]"],
+    ['fn f(s: Stream[?Promise[Str]]) I32 { 0; }\nexport main() I32 { 0; }\n',
+      "A stream's values are awaited as they are read: use Stream[?Str], not Stream[?Promise[Str]]"],
   ]) {
     const { errors } = await selfhost(await write(source));
     assert.deepEqual(errors, [message], source);
@@ -1721,6 +1727,15 @@ export lib {
     const result = await compileFile(utu, clResult, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
     assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 3, mode);
+    checked++;
+  }
+  // A promise inside a stream's value is not awaited: Stream[Array[Promise[I32]]] is fine.
+  const arrayOfPromises = await write('let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\n'
+    + 'export main() I32 { let t = 0; await for (Stream[Array[Promise[I32]]].of([[later(5)], [later(7)]])) |a| { t += await a[0]; }; t; }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, arrayOfPromises, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 12, mode);
     checked++;
   }
 

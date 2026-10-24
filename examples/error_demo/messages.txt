@@ -2581,6 +2581,32 @@ ok
  6 │ }
 --- exit 1
 
+=== utu check examples/error_demo/iterators/920_stream_of_promise.utu
+ ERROR  A stream's values are awaited as they are read: use Stream[I32], not Stream[Promise[I32]]
+        stream-promise · examples/error_demo/iterators/920_stream_of_promise.utu:7:16
+
+ 5 │ export main() I32 {
+ 6 │     let total = 0;
+ 7 │     await for (Stream[Promise[I32]].of([later(1), later(2)])) |p| { total += await p; };
+   │                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                ╰─ values awaited
+ 8 │     total;
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/iterators/921_stream_of_nullable_promise.utu
+ ERROR  A stream's values are awaited as they are read: use Stream[?I32], not Stream[?Promise[I32]]
+        stream-promise · examples/error_demo/iterators/921_stream_of_nullable_promise.utu:3:13
+
+ 1 │ // What: a stream of nullable promises, as a parameter's type
+ 2 │ // Expect: A stream's values are awaited as they are read: use Stream[?I32], not Stream[?Promise[I32]]
+ 3 │ fn count(s: Stream[?Promise[I32]]) I32 {
+   │             ━━━━━━━━━━━━━━━━━━━━━
+   │             ╰─ values awaited
+ 4 │     let n = 0;
+ 5 │     await for (s) |p| { n += 1; };
+--- exit 1
+
 === utu check examples/error_demo/names/01_unknown_variable_typo.utu
  ERROR  Unknown variable lengh; did you mean length?
         unknown-variable · examples/error_demo/names/01_unknown_variable_typo.utu:6:5
