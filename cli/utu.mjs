@@ -25,6 +25,7 @@
 // `build` writes NAME.wasm.map in debug, or with --source-map.
 
 import fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -44,11 +45,17 @@ const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 
 async function main() {
   const [command, fileArg, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') usage(0);
-  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest, fail, notUtf8);
-  if (command === 'lsp') return lsp();
+  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, [fileArg, ...rest].filter(a => a !== undefined), fail, notUtf8);
+  if (command === 'lsp') {
+    // (`--stdio`: what an editor's client may add.)
+    const extra = [fileArg, ...rest].find(a => a !== undefined && a !== '--stdio');
+    if (extra !== undefined) fail(extra.startsWith('-') ? `Unknown option ${extra}` : `Extra argument ${extra}`, extra.startsWith('-') ? 'unknown-option' : 'extra-argument', ['utu lsp takes nothing: it speaks on stdin and stdout.']);
+    return lsp();
+  }
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
-  if (!commands[command]) {
+  // (Own names only: `utu constructor` is no command.)
+  if (!Object.hasOwn(commands, command)) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
     // A file given without a command: it was meant for one.
     if (command.endsWith('.utu')) fail(`No command for ${command}`, 'unknown-command', [], `utu check ${command}`);
@@ -69,6 +76,8 @@ async function main() {
   const ours = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
   const profile = ours.includes('--profile');
   let interval;
+  // A second of an option that takes one value: which was meant?
+  const once = (now, value, what) => { if (now !== undefined) fail(`Two ${what}: ${now}, ${value}`, 'unknown-option'); };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--') {
@@ -82,6 +91,7 @@ async function main() {
     } else if (arg === '--interval') {
       const value = args[++i];
       if (!profile) fail(`${arg} is only with --profile`, 'unknown-option', [], `utu run ${files[0] ?? '<file.utu>'} --profile --interval ${value ?? '0.25'}`);
+      once(interval, value, 'intervals');
       interval = Number(value);
       if (!(interval > 0)) fail(`--interval needs a time in ms, got ${value ?? 'nothing'}`, 'unknown-option', ['The sampler reads the stack every this many milliseconds (0.25 by default).']);
     } else if (arg === '-o' || arg === '--out') {
@@ -89,12 +99,13 @@ async function main() {
       const what = command === 'build-exe' ? 'file' : 'directory';
       if (!WRITES.has(command) && !(command === 'run' && profile)) fail(`${arg} is only for build and build-exe`, 'unknown-option', [`utu ${command} writes nothing.`]);
       if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
-      if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
+      once(out, value, 'outputs');
       out = value;
     } else if (arg === '--target') {
       const value = args[++i];
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', ['utu build FILE --target node bundles npm packages for Node.']);
       if (value !== 'browser' && value !== 'node') fail(`--target needs browser or node, got ${value ?? 'nothing'}`, 'unknown-option', ['browser (the default) bundles npm packages\' browser builds, which Node runs too; node, their Node builds.']);
+      once(target, value, 'targets');
       target = value;
     } else if (arg === '--blame') {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', ['utu build FILE --blame writes NAME.blame.json and NAME.blame.html.']);
@@ -113,21 +124,22 @@ async function main() {
   if (stat.isDirectory()) fail(`${files[0]} is a directory`, 'not-a-file');
   if (given.length > 1) fail(`Two build modes: ${given.join(', ')}`, 'build-mode');
   const mode = given[0] ?? 'small';
-  if (!MODES[mode]) {
+  if (!Object.hasOwn(MODES, mode)) {
     const near = closest(mode, Object.keys(MODES));
     fail(mode ? `Unknown build mode ${mode}${near ? `; did you mean ${near}?` : ''}` : '-O needs a build mode', 'build-mode',
       ['small, fast, smallUnsafe, fastUnsafe, debug']);
   }
   const { optimize, safe } = MODES[mode];
   // A map where the mode keeps one: always in debug, on asking in small and fast.
-  const asked = args.includes('--source-map');
+  // (Ours: what follows -- is the program's.)
+  const asked = ours.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: args.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler() });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
-    fail(`cannot write ${displayPath(error.path)}: ${FS_REASONS[error.code]}`, 'write-failed', ['-o names the directory build writes into.']);
+    fail(`cannot write ${displayPath(error.path)}: ${FS_REASONS[error.code]}`, 'write-failed', [`-o names where utu ${command} writes.`]);
   }
 }
 
@@ -143,7 +155,11 @@ const WRITES = new Set(['build', 'build-exe']);
 
 /** Build, printing the diagnostics; exits on errors. */
 async function buildOrExit(utu, file, options) {
-  const result = await compileFile(utu, file, options);
+  const result = await compileFile(utu, file, options).catch(error => {
+    // A file of the program that cannot be read (no permission, say).
+    if (!FS_REASONS[error?.code] || !error.path) throw error;
+    fail(`cannot read ${displayPath(error.path)}: ${FS_REASONS[error.code]}`, 'read-failed');
+  });
   if (deepens && result.diagnostics.some(d => d.code === 'nested-too-deeply')) throw new TooDeep();
   if (result.diagnostics.length) await report(utu, result, result.diagnostics);
   if (!result.wasm) process.exit(1);
@@ -486,13 +502,14 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
   const { spec } = built;
   const name = path.basename(file, '.utu');
   const dir = path.resolve(out ?? '.');
-  await fs.mkdir(dir, { recursive: true });
+  // What build writes, as [file, contents]: all of it, or (on a failure) none.
+  const outputs = [];
   // The map beside the module, which names it (devtools read it).
   let wasm = built.wasm;
   if (built.map) {
     const texts = new Map(built.files.map(f => [f.key, f.text]));
     const relative = key => key.startsWith('std:') ? key : path.relative(dir, key).split(path.sep).join('/');
-    await fs.writeFile(path.join(dir, `${name}.wasm.map`), sourceMapJson(built.map, { file: `${name}.wasm`, relative, texts }));
+    outputs.push([path.join(dir, `${name}.wasm.map`), sourceMapJson(built.map, { file: `${name}.wasm`, relative, texts })]);
     wasm = withMapUrl(wasm, `${name}.wasm.map`);
   }
   const glue = glueSource(spec, wasm);
@@ -503,7 +520,7 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
     wasm: `await (url => globalThis.process?.versions?.node ? import('node:fs/promises').then(fs => fs.readFile(url)) : fetch(url).then(r => r.arrayBuffer()))(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url))`,
   });
   // The loader bundled with the runtime pieces and the glue it imports.
-  await bundle({
+  const bundled = await bundle({
     // (Not named NAME.mjs: esbuild refuses an output that is its input.)
     stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
@@ -512,24 +529,50 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
     // build does not run in a browser (nanoid's needs Buffer).
     outfile: path.join(dir, `${name}.mjs`), bundle: true, minify: optimize !== 'none', format: 'esm', platform: target ?? 'browser',
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
+    // Written below, with the rest.
+    write: false,
   });
-  await fs.writeFile(path.join(dir, `${name}.wasm`), wasm);
-  const js = await fs.stat(path.join(dir, `${name}.mjs`));
+  const js = bundled.outputFiles[0].contents;
+  outputs.push([path.join(dir, `${name}.mjs`), js], [path.join(dir, `${name}.wasm`), wasm]);
+  const top = built.blame ? await blameOutputs(built, wasm, dir, name, outputs) : null;
+  await fs.mkdir(dir, { recursive: true });
+  await writeAll(outputs);
   console.log(`${displayPath(path.join(dir, `${name}.wasm`))}  ${wasm.length} bytes`);
-  console.log(`${displayPath(path.join(dir, `${name}.mjs`))}   ${js.size} bytes`);
+  console.log(`${displayPath(path.join(dir, `${name}.mjs`))}   ${js.length} bytes`);
   if (built.map) console.log(displayPath(path.join(dir, `${name}.wasm.map`)));
-  if (built.blame) await writeBlame(built, wasm, dir, name);
+  if (top) console.log(top);
 }
 
-/** NAME.blame.json and NAME.blame.html: each byte of the module on its source (src/selfhost/blame.js); the top printed. */
-async function writeBlame(built, wasm, dir, name) {
+/** NAME.blame.json and NAME.blame.html (to `outputs`): each byte of the module on its source (src/selfhost/blame.js); returns what to print, the top. */
+async function blameOutputs(built, wasm, dir, name, outputs) {
   const B = await import('../src/selfhost/blame.js');
   const blamed = B.blameModule(wasm, built.blame);
   B.checkTiling(blamed.records, wasm.length);
   const rep = B.report({ wasm, tables: built.blame, blamed, compressed: await B.estimateCompressed(wasm), glue: B.blameGlue(built.spec, blamed.esPlaces), name: `${name}.wasm` });
-  await fs.writeFile(path.join(dir, `${name}.blame.json`), JSON.stringify(rep));
-  await fs.writeFile(path.join(dir, `${name}.blame.html`), B.blameHtml(rep, new Map(built.files.map(f => [f.key, f.text])), { relative: displayPath }));
-  console.log(`${displayPath(path.join(dir, `${name}.blame.json`))}\n${displayPath(path.join(dir, `${name}.blame.html`))}\n\n${B.formatTop(rep, { relative: displayPath })}`);
+  outputs.push([path.join(dir, `${name}.blame.json`), JSON.stringify(rep)]);
+  outputs.push([path.join(dir, `${name}.blame.html`), B.blameHtml(rep, new Map(built.files.map(f => [f.key, f.text])), { relative: displayPath })]);
+  return `${displayPath(path.join(dir, `${name}.blame.json`))}\n${displayPath(path.join(dir, `${name}.blame.html`))}\n\n${B.formatTop(rep, { relative: displayPath })}`;
+}
+
+/**
+ * Write each [file, contents] of `outputs`, all or none (as far as a file
+ * system allows): each to a temporary file beside it, then each renamed
+ * over its name. An error names the file that could not be written.
+ */
+async function writeAll(outputs) {
+  const temps = [];
+  try {
+    for (const [file, data] of outputs) {
+      // (A rename would put a file in a directory's place, or fail later.)
+      if ((await fs.stat(file).catch(() => null))?.isDirectory()) throw Object.assign(new Error(`${file} is a directory`), { code: 'EISDIR', path: file });
+      const temp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.tmp`);
+      temps.push(temp);
+      await fs.writeFile(temp, data).catch(error => { throw Object.assign(error, { path: file }); });
+    }
+    for (const [i, [file]] of outputs.entries()) await fs.rename(temps[i], file).catch(error => { throw Object.assign(error, { path: file }); });
+  } finally {
+    await Promise.all(temps.map(temp => fs.rm(temp, { force: true })));
+  }
 }
 
 /** The glue module, given to esbuild without being written. */
@@ -551,6 +594,10 @@ async function buildExe(file, { utu, optimize, safe, out }) {
     fail(`No export main in ${displayPath(file)}`, 'no-main', ['An executable runs main; utu build makes a module for a library.']);
   }
   const target = path.resolve(out ?? path.basename(file, '.utu'));
+  // Not over a directory, nor a file that is not to be written (bun would replace it).
+  const there = await fs.stat(target).catch(() => null);
+  if (there?.isDirectory()) throw Object.assign(new Error(), { code: 'EISDIR', path: target });
+  if (there) await fs.access(target, fsConstants.W_OK).catch(error => { throw Object.assign(error, { path: target }); });
   // In the project when it has dependencies, so an `@es` body's imports
   // resolve as its own source's would, and bun bundles them in.
   const dir = await buildDirectory(path.dirname(file));
@@ -567,6 +614,7 @@ async function buildExe(file, { utu, optimize, safe, out }) {
   await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  ${finish};\n}\n`);
   const result = spawnSync('bun', ['build', runner, '--compile', '--outfile', target], { cwd: process.cwd(), stdio: 'inherit' });
   await fs.rm(dir, { recursive: true, force: true });
+  if (result.error?.code === 'ENOENT') fail('bun was not found', 'no-bun', ['build-exe compiles with bun: install it (https://bun.sh), or put it on PATH.']);
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
   console.error(`wrote ${displayPath(target)}`);
@@ -770,11 +818,12 @@ function usage(code) {
 
   check <file>                 report what is wrong with the program
   run <file> [-O mode] [-- args]  build it, then call its main
-    [--profile [--interval ms]]  sampled: NAME.folded, NAME.speedscope.json, NAME.flame.html
+    [--profile [--interval ms] [-o dir]]  sampled: NAME.folded, NAME.speedscope.json, NAME.flame.html
   test <file> [-O mode]           build its tests, then run each
   bench <file> [-O mode]          build its benches, then time each (median per iteration)
   build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
     [--source-map]             and NAME.wasm.map (always in debug)
+    [--blame]                  and NAME.blame.json, NAME.blame.html: each byte on its source
     [--target browser|node]    npm packages' browser builds (the default), or Node's
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
@@ -788,28 +837,36 @@ function usage(code) {
   -O debug        the module as code generation leaves it, checked
 
   display[:tests|:benches|:modules|:exports|:debug] <file>, graph <file> [-o out.html]
-                               stage 0's IR and graphs`);
+                               stage 0's IR and graphs
+
+  exit status: 0 done; 1 the program is wrong, failed, or could not be
+  read or written (grep: nothing matched); 2 utu was run wrong (a command,
+  an option, a file)`);
   process.exit(code);
 }
 
-/**
- * Report a problem with how utu was run, in the shape of every other problem
- * it reports, with the corrected command when there is one; then exit 1.
- */
-/** What a file-system error code means, for a command that could not write. */
+/** What a file-system error code means, for a command that could not read or write. */
 const FS_REASONS = {
   EACCES: 'permission denied', EPERM: 'permission denied', EROFS: 'the file system is read-only',
   ENOTDIR: 'a part of the path is a file, not a directory', EISDIR: 'it is a directory',
   ENOSPC: 'the disk is full', EEXIST: 'a file is in the way', ENOENT: 'a part of the path does not exist',
 };
 
+/** The problems with how utu was run (not with the program): they exit 2, as grep's do. */
+const USAGE = new Set(['unknown-command', 'unknown-option', 'missing-output', 'missing-file', 'extra-argument', 'file-not-found', 'not-a-file', 'build-mode', 'source-map']);
+
+/**
+ * Report a problem, in the shape of every other problem utu reports, with
+ * the corrected command when there is one; then exit 2 for one with how utu
+ * was run (USAGE), 1 for any other.
+ */
 function fail(title, code, list = [], command = null) {
   const ink = pen({ color: colored(process.stderr) });
   const lines = [...heading(ink, 'error', title, code)];
   if (list.length) lines.push('', ...notes(ink, list));
   if (command) lines.push('', `  ${ink.paint(ink.palette.add, `${ink.bold}try`)}   ${ink.paint(ink.palette.add, `$ ${command}`)}`);
   console.error(lines.join('\n'));
-  process.exit(1);
+  process.exit(USAGE.has(code) ? 2 : 1);
 }
 
 /** The closest of `names` to a mistyped `word` (at most two edits away), or null. */

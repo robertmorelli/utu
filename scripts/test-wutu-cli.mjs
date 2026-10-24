@@ -52,13 +52,29 @@ try {
   assert.equal(run('format', messy).status, 0);
   assert.equal(await fs.readFile(messy, 'utf8'), 'export main() I32 {\n    let a = 1;\n    a;\n}\n');
   assert.equal(run('format', messy, '--check').status, 0, 'formatted file passes --check');
-  assert.equal(run('format').status, 1, 'format without files is an error');
+  assert.equal(run('format').status, 2, 'format without files is a usage error');
   // A file that does not parse is left as it is, and says so.
   const misparsed = path.join(dir, 'misparsed.utu');
   await fs.writeFile(misparsed, 'fn f() I32 { let a = 1 a; }\n');
   assert.match(run('format', misparsed).stderr, /left as is: it does not parse/);
   assert.equal(await fs.readFile(misparsed, 'utf8'), 'fn f() I32 { let a = 1 a; }\n');
-  assert.equal(run('bogus').status, 1, 'unknown commands fail');
+  // How wutu was run: exit 2, said with the usage, before anything is built or served.
+  for (const [args, said] of [
+    [['bogus'], /unknown command bogus/],
+    [['constructor'], /unknown command constructor/],
+    [['build', messy, '-O', 'constructor'], /unknown build mode -O constructor/],
+    [['build', messy, messy], /extra argument/],
+    [['build', messy, '--bogus'], /unknown option --bogus/],
+    [['build', messy, '--out', 'a', '--out', 'b'], /two outputs: a, b/],
+    [['build', path.join(dir, 'none.utu')], /no file .*none\.utu/],
+    [['dev', messy, '--port', 'abc'], /--port needs a port/],
+    [['dev', messy, '--port', '99999'], /--port needs a port/],
+    [['dev', path.join(dir, 'none.utu')], /no file/],
+  ]) {
+    const r = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', timeout: 30000 });
+    assert.equal(r.status, 2, `${args.join(' ')}: ${r.stderr}`);
+    assert.match(r.stderr, said, args.join(' '));
+  }
 
   // build
   const entry = path.join(dir, 'main.utu');
@@ -73,6 +89,17 @@ try {
   const failed = run('build', broken, '--out', path.join(dir, 'broken-out'), '--no-prerender');
   assert.equal(failed.status, 1);
   assert.match(failed.stderr, /broken\.utu:\d+:\d+/, 'build errors are positioned diagnostics');
+  // A user's own file in --out stays through a build.
+  await fs.writeFile(path.join(out, 'mine.txt'), 'kept');
+  assert.equal(run('build', entry, '--out', out, '--no-prerender').status, 0);
+  assert.equal(await fs.readFile(path.join(out, 'mine.txt'), 'utf8'), 'kept');
+  // A failed build leaves the last good one as it was.
+  const listed = (await fs.readdir(out)).sort();
+  const before = await fs.readFile(path.join(out, 'app.wasm'));
+  assert.equal(run('build', broken, '--out', out, '--no-prerender').status, 1);
+  assert.deepEqual(await fs.readFile(path.join(out, 'app.wasm')), before);
+  assert.deepEqual((await fs.readdir(out)).sort(), listed);
+  assert.deepEqual((await fs.readdir(dir)).filter(name => name.includes('.building-')), [], 'no build directory is left');
 
   // dev
   const previewOut = path.join(dir, 'preview');
@@ -102,6 +129,12 @@ try {
   await fs.writeFile(entry, app('Third'));
   await waitFor(() => events.find(event => event.reload), 'a reload event');
   stream.destroy();
+
+  // A port in use ends a second server, with the reason.
+  const port = new URL(origin).port;
+  const second = spawnSync(process.execPath, [cli, 'dev', entry, '--out', path.join(dir, 'preview2'), '--port', port], { cwd: dir, encoding: 'utf8', timeout: 60000 });
+  assert.equal(second.status, 1, second.stderr);
+  assert.match(second.stderr, /cannot serve on 127\.0\.0\.1:\d+: the port is in use/);
 
   child.kill('SIGINT');
   await new Promise(resolve => (child.exitCode !== null ? resolve() : child.once('exit', resolve)));

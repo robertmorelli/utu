@@ -77,7 +77,8 @@ export async function loadCompiler(wasm, spec = {}) {
  * a Map from `std:Name` to text or to an async thunk of a host ABI).
  */
 export async function compile(utu, entry, host) {
-  const chosen = host.mode ? MODES[host.mode] : null;
+  // (Own names only: `constructor` is no mode.)
+  const chosen = host.mode && Object.hasOwn(MODES, host.mode) ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
   const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
