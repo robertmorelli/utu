@@ -760,6 +760,31 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     apply_operator(compound_word(op, node_last[target]), t, value, at, cx, mg);
     // (A shift's count is no element.)
     if op != Tok.ShlEq.to_i32() and op != Tok.ShrEq.to_i32() and op != Tok.Shr3Eq.to_i32() { check_narrow_literal(decl, value); };
+    // When the value may change the length, the index is checked again at
+    // the store (as `name[i] = v` does): v = value; name[checked(at)] = v.
+    if safe_checks[0] == 1 and w_stack.len() == mg + 1 and changes_len(w_stack[mg], mem_len[decl]) {
+        let v = w_pop();
+        while (w_stack.len() > ms) { w_pop(); };  // (the unchecked address)
+        if optimize_level[0] == 1 {
+            w_get(vt_i32, at_local);
+            w_push(v);
+            w_node(Op.Call, vt_none, mem_store_helper(decl), 0, ms);
+        } else {
+            let tv = new_local(w_type[v]);
+            w_push(v);
+            w_node(Op.LocalSet, vt_none, tv, 0, ms);
+            let mt = w_mark();
+            if in_array { w_mem_array(decl); };
+            let mc = w_mark();
+            w_get(vt_i32, at_local);
+            checked_index(decl, mc);
+            if not in_array { mem_address(s, mc); };
+            w_get(w_type[v], tv);
+            if in_array { w_node(Op.ArraySet, vt_none, mem_array_heap(s), 0, mt); } else { w_node(Op.Store, vt_none, mem_id, store_opcode(s), mt); };
+        };
+        w_node(Op.Seq, vt_none, 0, 0, m);
+        return ty_void();
+    };
     if in_array {
         w_get(vt_i32, at_local);
         w_insert(ms, w_pop());

@@ -983,6 +983,26 @@ export lib { fn run() Str {
     assert.equal(exports.regrow(), 4, `${mode}: a hosted mem's resize zero-fills`);
     checked++;
   }
+  // `b[i] op= v` checks i again at the store when v may change the length
+  // (it was checked only at the load): a v that shrinks it traps a safe build.
+  for (const [kind, type] of [['mem', 'I32'], ['mem', 'I8'], ['mem', 'I64'], ['mem', 'F64'], ['vec', 'I32'], ['vec', 'U8'], ['vec', 'F64']]) {
+    const two = type.startsWith('F') ? '2.0' : '2';
+    const value = type === 'U8' || type === 'I8' ? 'I32' : type;
+    const shrunk = await write(`${kind} b: ${type};\nfn cut() ${value} { b.resize(1); ${two}; }\nfn wipe() ${value} { b.clear(); ${two}; }\nfn grow() ${value} { b.push(${two}); ${two}; }\nexport lib {\n    fn fill() void { b.clear(); b.push(${two}); b.push(${two}); b.push(${two}); }\n    fn times() I32 { b[1] *= cut(); b.len(); }\n    fn plus() I32 { b[0] += wipe(); b.len(); }\n    fn ok() I32 { b[2] += grow(); if b[2] == ${two} + ${two} { b.len(); } else { 0; }; }\n}\n`);
+    for (const mode of modes) {
+      const built = await compileFile(utu, shrunk, { mode });
+      const { exports } = await instantiateNode(built.wasm, built.spec);
+      const what = `${kind} ${type} ${mode}`;
+      exports.fill();
+      assert.equal(exports.ok(), 4, `${what}: op= with a push`);
+      for (const [f, len] of [['times', 1], ['plus', 0]]) {
+        exports.fill();
+        if (mode.endsWith('Unsafe')) assert.equal(exports[f](), len, `${what}: ${f}`);
+        else assert.throws(() => exports[f](), /out of bounds/i, `${what}: ${f}`);
+      }
+      checked++;
+    }
+  }
 
   // A slice ending before it starts traps, and `orelse fatal` on null, in every mode.
   const traps = await write('export lib {\n    fn reversed() I32 { let a = [1, 2, 3]; a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; (s orelse fatal).len(); }\n}\n');
