@@ -609,6 +609,7 @@ class WutuParser {
     }
     this.expectSemicolon();
     if (name.startsWith('on')) this.fail(`events are written on ${name.slice(2)} { … }, not as an attribute`, nameStart);
+    if (dynamic && name === 'srcdoc') this.fail('srcdoc is HTML, so Wutu sets it only as written: srcdoc = "…"; (trusted HTML from a value: an `as` element\'s .srcdoc, in code)', nameStart);
     if (!isProperty && !isAllowedAttribute(node.tag, name)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
     node.attrs.push({ name, value, property: isProperty, dynamic, range, start: nameStart });
   }

@@ -68,7 +68,7 @@ mod wutu {
         format(value);
     }
     fn money(cents: I32) Str {
-        let format: fun(I32) Str = @es/\\ cents=>"$"+(cents/100).toFixed(2) \\/;
+        let format: fun(I32) Str = @es/\\ cents=>(cents<0?"-$":"$")+(Math.abs(cents)/100).toFixed(2) \\/;
         format(cents);
     }
     fn decimal(value: F64, digits: I32) Str {

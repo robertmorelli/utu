@@ -105,12 +105,12 @@ export async function selfhostDiagnostics({ ROOT, name = 'selfhost_diagnostics.u
 }
 
 /** Build `source` with the self-hosted compiler and instantiate it (its exports as `instance.exports`). */
-export async function compileAndInstantiateSelfhost({ ROOT, name, source }) {
+export async function compileAndInstantiateSelfhost({ ROOT, name, source, mode }) {
   const { compileFile } = await import('../src/selfhost/node.js');
   const { instantiate } = await import('../src/selfhost/compiler.js');
   const utu = await selfhostCompiler();
   return withTempUtu(ROOT, name, source, async (file) => {
-    const result = await compileFile(utu, file);
+    const result = await compileFile(utu, file, mode ? { mode } : {});
     const errors = result.diagnostics.filter(d => d.severity !== 'warning');
     if (!result.wasm || errors.length) throw new Error(errors.map(d => `${d.kind}: ${d.message} at ${source.slice(d.start, d.end)}`).join('\n') || 'no module');
     return { instance: await instantiate(result.wasm, result.spec), diagnostics: result.diagnostics, spec: result.spec };

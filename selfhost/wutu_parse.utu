@@ -1101,6 +1101,7 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     wp_semicolon(text);
     let tag = word_text(tn_text[n]);
     if text_at(name, 0, "on") { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start); };
+    if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\"; (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start); };
     if not is_property and not is_allowed_attribute(tag, name) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);
 }

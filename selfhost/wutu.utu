@@ -397,6 +397,9 @@ fn wutu_helper(kind: Str) Str {
     } else if kind == "put_text" {
         params = "Str";
         js = "(v)=>globalThis.__utuWutu.put(v)";
+    } else if kind == "url" {
+        params = "Browser.Element, Str, Str";
+        js = "(n,k,v)=>globalThis.__utuWutu.url(n,k,v)";
     } else if kind == "flag" {
         params = "Bool";
         js = "(v)=>globalThis.__utuWutu.put(v)";
@@ -709,6 +712,9 @@ fn wutu_json(text: Str) Str {
     out + "\"";
 }
 
+/// Whether property `name` is a URL a browser follows or loads (see `safe` in src/runtime/wutu.js).
+fn is_url_property(name: Str) Bool { in_words("href src action formAction poster cite data background codeBase longDesc", name); }
+
 /// Whether attribute item i is known when compiling (written, not a property),
 /// so it comes in the element's shell. A written class merges, so it does not.
 fn wutu_baked(i: I32) Bool {
@@ -834,8 +840,10 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
                 // property's type first, so a wrong one says so.)
                 let was = id + "_" + name + "_was";
                 let now = id + "_" + name + "_now";
+                // (A URL one goes through the runtime's check, as its attribute does.)
+                let set = if is_url_property(name) { wutu_helper("url") + "(" + id + ", \"" + name + "\", " + now + ")"; } else { id + "." + name + " = " + now; };
                 properties = properties + "let " + was + " = " + id + "." + name + "; let " + now + " = " + was + "; " + now + " = (" + value + ");\n"
-                    + "if " + was + " != " + now + " { " + id + "." + name + " = " + now + "; };\n";
+                    + "if " + was + " != " + now + " { " + set + "; };\n";
             } else if is_boolean_attribute(name) and (ti_flags[i] & 2) != 0 {
                 wd_op(o, "[\"b\"," + wutu_json(name) + "]");
                 code = code + wutu_helper("flag") + "((" + value + "));\n";
