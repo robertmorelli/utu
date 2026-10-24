@@ -16,7 +16,7 @@ mod Stack[T] {
     fn &.pop |s| () T { s.size -= 1; s.items[s.size]; }
 }
 
-let nums = Stack[I32].new(0);
+let nums: Stack[I32] = Stack[I32].new(0);
 using Stack[Str] |Words|;          // an alias for one instance
 ```
 
@@ -110,6 +110,8 @@ A bounded parameter passes its bounds on: in `mod Ranking[T[Ord, Named]]`,
 
 A protocol declared in a mod is named by its path, in a bound or in a
 struct's list alike: `mod Sorted[T[m.Ord]]`, `struct Tri[shapes.Area]:`.
+A type declared in a mod is too, where it implements one:
+`fn Area[geo.Sq].area |q| () I32 { … }`.
 
 ## What is checked
 
@@ -159,7 +161,7 @@ using Order from std:Ord;
 
 fn Ord[Version].cmp |a| (b: Version) I32 { … }
 
-let words = ["pear", "fig", "apple"];
+let words: Array[Str] = ["pear", "fig", "apple"];
 Order[Str].sort(words);            // apple fig pear
 Order[Version].max_of(versions);
 ```

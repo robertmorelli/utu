@@ -803,12 +803,14 @@ fn bind_module(module: I32) void {
     bind_module_members(module);
 }
 
-/// A module's members (and the variants of its enums), by their names.
+/// A module's members (and the variants of its enums), by their names. Its
+/// promoted type is not bound: its name stays the module's, which stands
+/// for it as a type.
 fn bind_module_members(module: I32) void {
     // In declaration order: each declaration's id follows the module's.
     let d = module + 1;
     while (d < decl_kind.len() and is_part_of(d, module)) {
-        if decl_owner[d] == module and decl_kind[d] != Decl.ModuleParam.to_i32() and decl_name[d] >= 0 {
+        if decl_owner[d] == module and decl_kind[d] != Decl.ModuleParam.to_i32() and decl_name[d] >= 0 and d != decl_a[module] {
             if decl_kind[d] != Decl.Fn.to_i32() or free_fn_word(decl_node[d]) >= 0 { bind(decl_name[d], d); };
         } else if decl_is(d, Decl.Variant) and decl_is(decl_owner[d], Decl.Enum) {
             bind(decl_name[d], d);
@@ -1104,8 +1106,9 @@ fn refused(m: I32) Bool {
 vec top_name: I32;
 vec top_item: I32;
 
-/// A `using`'s name is the file's: one that names what a declaration of the
-/// file (or another `using`) names is reported at the later one. Two
+/// A `using`'s or `mod`'s name is the file's: one that names what a
+/// declaration of the file (or another `using`) names is reported at the
+/// later one. Two
 /// `using`s of one module (one file, two spellings) are not.
 fn check_using_names(root: I32) void {
     top_name.clear();
@@ -1124,7 +1127,7 @@ fn check_using_names(root: I32) void {
         while (k < j) {
             let a = top_item[k];
             let b = top_item[j];
-            if word_of(top_name[k]) == word and (is_kind(a, Node.Using_decl) or is_kind(b, Node.Using_decl)) and not same_import(a, b) {
+            if word_of(top_name[k]) == word and (is_kind(a, Node.Using_decl) or is_kind(b, Node.Using_decl) or mod_clash(a, b) or mod_clash(b, a)) and not same_import(a, b) {
                 report(Diag.DuplicateDeclaration, b, word);
                 if top_name[j] != b { diag_focus(node_first[top_name[j]], node_last[top_name[j]] - 1, "again"); };
                 diag_place(Extra.Related, top_name[k], "first here");
@@ -1138,6 +1141,12 @@ fn check_using_names(root: I32) void {
             k += 1;
         };
     };
+}
+
+/// Whether a file's `mod` and another of its items (not a method) share a name.
+fn mod_clash(m: I32, item: I32) Bool {
+    is_kind(m, Node.Module_decl) and not is_kind(item, Node.Module_decl) and not is_kind(item, Node.Using_decl)
+        and (not is_kind(item, Node.Fn_decl) or free_fn_word(item) >= 0);
 }
 
 /// `item`'s name node, kept when it has one (a `using`'s: its alias, or the
@@ -1571,12 +1580,15 @@ fn impl_twice(a: I32, b: I32) void {
     diag_place(Extra.Related, decl_name_at(first), "first here");
 }
 
-/// The node naming T in `fn P[T].m`'s `[T]` (`args`): a name, or `&` (in
-/// a module, every instance of its type), or -1.
+/// The node naming T in `fn P[T].m`'s `[T]` (`args`): a name (`T`, the
+/// `T` of `m.T`), or `&` (in a module, every instance of its type), or -1.
 fn impl_target(args: I32) I32 {
     let t = first_child(args);
     if is_kind(t, Node.Promoted_type) { return t; };
-    if is_kind(t, Node.Ref_type) { name_node(first_child(t)); } else { name_node(t); };
+    if is_kind(t, Node.Ref_type) { t = first_child(t); };
+    // `m.T`; not `M[A].T`, an instance's.
+    if is_kind(t, Node.Qualified_type_ref) and not is_kind(first_child(t), Node.Instantiated_module_ref) and not is_kind(next_sibling(first_child(t)), Node.Module_type_arg_list) { return name_node(last_child(t)); };
+    name_node(t);
 }
 
 /// `fn T:add |a, b|`: an operator of T.

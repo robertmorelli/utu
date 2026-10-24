@@ -1902,6 +1902,11 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
 fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
     let decl = node_decl[callee];
     if decl < 0 { return error_value(); };
+    // `m()`: a module (or its alias) is not a value.
+    if decl_is(decl, Decl.Module) or decl_is(decl, Decl.Alias) or decl_is(decl, Decl.Foreign) {
+        not_value(callee, decl);
+        return finish_error(args, m, cx);
+    };
     if is_generator(decl) {
         report(Diag.GeneratorCall, node, decl_name[decl]);
         return finish_error(args, m, cx);
@@ -1964,7 +1969,7 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
         if inst < 0 { return finish_error(args, m, cx); };
         return call_with(fn_instance(decl, inst), args, 0, m, node, cx);
     };
-    // `m.T.f(…)`: a static function of a module's (or alias's) type.
+    // `m.T.f(…)`, `M.T.f(…)`: a static function of a module's (or alias's) type.
     let st = static_type_path(base, cx);
     if st >= 0 {
         let target = static_member(ty_decl(st), word_of(name));
@@ -2667,12 +2672,12 @@ fn opcode_result(op: I32) I32 {
     vt_v128;
 }
 
-/// `m.T` (a field access naming a type of module or alias `m`): that
-/// type, in the module's instance; else -1.
+/// `m.T` or `M.T` (naming a type of module or alias `m`): that type, in
+/// the module's instance; else -1.
 fn static_type_path(node: I32, cx: Cx) I32 {
-    if not is_kind(node, Node.Field_expr) { return -1; };
+    if not is_kind(node, Node.Field_expr) and not is_kind(node, Node.Type_member_expr) { return -1; };
     let base = first_child(node);
-    if not is_kind(base, Node.Identifier) { return -1; };
+    if not is_kind(base, Node.Identifier) and not is_kind(base, Node.Type_ident) { return -1; };
     let d = node_decl[base];
     let inst = 0;
     let module = -1;
