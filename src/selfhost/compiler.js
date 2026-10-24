@@ -596,8 +596,8 @@ const prepared = new WeakMap();
 function prepare(abi) {
   let decl = prepared.get(abi);
   if (!decl) {
-    const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
-    decl = { document: typesDocument(abi.types), view: encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals })) };
+    const { prefix, moduleSpecifier, exports, names, mutableGlobals, exportAssignment } = abi;
+    decl = { document: typesDocument(abi.types), view: encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals, exportAssignment })) };
     prepared.set(abi, decl);
   }
   return decl;

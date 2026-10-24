@@ -2824,6 +2824,56 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
     checked++;
   }
+  // Type algebra: a union of objects (picked by its discriminant, read by a common
+  // property), single literals and patterns, Readonly<T>, `B extends A`, never, Promise<Promise<T>>.
+  const hostE = 'export type Shape = { kind: "circle"; r: number } | { kind: "sq"; s: number };\n'
+    + 'export declare function area(s: Shape): number;\nexport declare function mkShape(k: number): Shape;\n'
+    + 'export declare function lit(x: "b"): string;\nexport declare function ovl(x: "a"): number;\nexport declare function ovl(x: "b"): string;\n'
+    + 'export declare function excl(x: Exclude<"a" | "b", "a">): string;\nexport declare function tl(x: `id-${number}`): string;\n'
+    + 'export interface Opt { name: string; }\nexport declare function mkRo(): Readonly<Opt>;\n'
+    + 'export declare function gen<A extends number, B extends A>(a: A, b: B): B;\n'
+    + 'export declare function nev(): never;\nexport declare function pp(): Promise<Promise<string>>;\n'
+    + 'export interface Bus<Ev> { on<K extends keyof Ev>(k: K, f: (e: Ev[K]) => void): void; }\nexport declare function bus<Ev>(): Bus<Ev>;\n'
+    + 'export declare function align(): "start" | "end" | undefined;\nexport declare function later(): Promise<number>;\n'
+    + 'export declare function unwrap<T>(v: T | { value: T }): T;\nexport declare function trio(): [number, number, number];\n';
+  const hostEJs = 'export function area(s) { return s.kind === "circle" ? s.r * 3 : s.s * s.s; }\n'
+    + 'export function mkShape(k) { return k === 0 ? { kind: "circle", r: 2 } : { kind: "sq", s: 3 }; }\n'
+    + 'export function lit(x) { return x; }\nexport function ovl(x) { return x === "a" ? 1 : "two"; }\nexport function excl(x) { return x; }\n'
+    + 'export function tl(x) { return x; }\nexport function mkRo() { return { name: "ro" }; }\nexport function gen(a, b) { return b; }\n'
+    + 'export function nev() { throw new Error("never"); }\nexport function pp() { return Promise.resolve(Promise.resolve("deep")); }\n';
+  const hostEHead = 'using E from "npm:hoste";\n';
+  const hostETypes = await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': hostEHead
+    + 'fn f(b: Bool) F64 { if b { return 1.0; }; E.nev(); }\n'
+    + 'export main() F64 {\n    let s = E.mkShape(1.0);\n    let k: Str = s.kind;\n'
+    + '    E.area(&{ kind: "sq", s: 2.0 }) + E.area(&{ kind: "circle", r: 1.0 }) + E.area(s) + E.ovl("a") + E.gen(1.0, 2.0) + f(true)\n'
+    + '        + (k + E.lit("b") + E.excl("b") + E.tl("id-1.5") + E.mkRo().name).len().to_f64();\n}\n' });
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, hostETypes, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    // 4 + 3 + 9 + 1 + 2 + 1 + len("sqbbid-1.5ro") 12
+    assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(hostETypes) })).exports.main(), 32, mode);
+    checked++;
+  }
+  for (const [body, messages] of [
+    ['E.area(&{ kind: "sq", r: 2.0 })', ['No property r', 'Missing property s']],
+    ['E.area(&{ kind: "tri", r: 2.0 })', ['"circle" has no value "tri"']],
+    ['E.lit("a").len().to_f64()', ['"b" has no value "a"']],
+    ['E.ovl("c"); 0.0', ['"a" has no value "c"']],
+    ['E.excl("a").len().to_f64()', ['"b" has no value "a"']],
+    ['let v = "id-3"; E.tl("id-x").len().to_f64() + E.tl(v).len().to_f64()', ['`id-${number}` has no value "id-x"', '`id-${number}` takes its values, not any Str']],
+    ['let o = E.mkRo(); o.name = "x"; 0.0', ['name is readonly']],
+    ['E.gen(1.0, "x"); 0.0', ['Expected F64, got Str']],
+    ['let s = E.mkShape(0.0); s.r', ['No member E.Shape.r']],
+    ['let n: F64 = E.nev(); let s: Str = await E.pp(); n + s.len().to_f64()', []],
+    // `keyof E` of a generic E is a string; a nullable literal union is a ?Str; utu's Promise[T] is the host's
+    ['E.bus().on("ping", cl(n: F64) void { }); let a: Str = promote E.align() { |v| => v, ~> "none", }; let p: Promise[F64] = E.later(); await p', []],
+    ['let s: Str = E.unwrap(5.0); 0.0', ['s is Str, got F64']],
+    ['E.trio()[3]', ['E.[F64, F64, F64] has no element 3: it has 3 elements']],
+  ]) {
+    const result = await compileFile(utu, await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': `${hostEHead}export main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
+    assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
+    checked++;
+  }
   // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
   const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nexport lib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
