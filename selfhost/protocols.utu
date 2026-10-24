@@ -51,39 +51,92 @@ fn converts_to_proto(actual: I32, expected: I32) Bool {
 
 /// The struct types (and variants) implementing a protocol, in declaration order.
 fn implementers(proto: I32) I32 {
-    let m = vl_begin();
-    for (0 ..< decl_kind.len()) |d| {
-        if decl_is(d, Decl.Struct) and implements(d, proto) { vl_add(d); };
-        if decl_is(d, Decl.Variant) and implements(d, proto) { vl_add(d); };
-    };
-    vl_end(m);
+    proto_index();
+    if px_list[proto] >= 0 { px_list[proto]; } else { vl_empty(); };
 }
 
 /// The implementations of a protocol method: `fn P[T].name`, in declaration
 /// order, as pairs (function, the type T's declaration).
 fn method_impls(proto: I32, word: I32) I32 {
-    let m = vl_begin();
-    for (0 ..< decl_kind.len()) |d| {
-        if decl_is(d, Decl.Fn) and decl_a[d] == proto and is_kind(decl_node[d], Node.Fn_decl) {
+    proto_index();
+    let pm = protocol_member(proto, word);
+    if pm >= 0 and px_list[pm] >= 0 { px_list[pm]; } else { vl_empty(); };
+}
+
+/// By protocol, its implementers; by method, its implementations (see
+/// above): lists (-1 for none), found in one pass over the declarations
+/// when first wanted.
+vec px_list: I32;
+
+fn proto_index() void {
+    if px_list.len() > 0 { return; };
+    let n = decl_kind.len();
+    let head = Array[I32].new(n + 1, -1);
+    let tail = Array[I32].new(n + 1, -1);
+    let next = Array[I32].new(16, -1);
+    let pair = Array[I32].new(16, 0);
+    let count = 0;
+    for (0 ..< n) |d| {
+        let key = -1;
+        let a = d;
+        let b = -1;
+        if decl_is(d, Decl.Fn) and decl_is(decl_a[d], Decl.Proto) and is_kind(decl_node[d], Node.Fn_decl) {
             let name = first_child(decl_node[d]);
-            if word_of(last_child(name)) == word {
-                let args = next_sibling(first_child(name));
-                // (`P[Nope]`, of no type, was reported: it implements nothing.)
-                // (`P[Box[I32]]` names no plain declaration: see in_generic.)
-                let target = if is_kind(args, Node.Module_type_arg_list) { impl_target(args); } else { -1; };
-                let named_decl = if target >= 0 { node_decl[target]; } else { -1; };
-                // (A generic type is never a P: see validate_protocols.)
-                if named_decl >= 0 and not in_generic(named_decl) {
-                    let t = decl_type(named_decl, 0);
-                    if ty_decl(t) >= 0 {
-                        vl_add(d);
-                        vl_add(ty_decl(t));
-                    };
+            let args = next_sibling(first_child(name));
+            // (`P[Nope]`, of no type, was reported: it implements nothing.)
+            // (`P[Box[I32]]` names no plain declaration: see in_generic.)
+            let target = if is_kind(args, Node.Module_type_arg_list) { impl_target(args); } else { -1; };
+            let named_decl = if target >= 0 { node_decl[target]; } else { -1; };
+            // (A generic type is never a P: see validate_protocols.)
+            if named_decl >= 0 and not in_generic(named_decl) {
+                b = ty_decl(decl_type(named_decl, 0));
+                if b >= 0 { key = protocol_member(decl_a[d], word_of(last_child(name))); };
+            };
+        };
+        let o = if decl_is(d, Decl.Variant) { decl_owner[d]; } else if decl_is(d, Decl.Struct) { d; } else { -1; };
+        let list = if o >= 0 { impl_list_of(o); } else { -1; };
+        let c = if list >= 0 and not in_generic(o) { first_child(list); } else { -1; };
+        while (key >= 0 or c >= 0) {
+            if c >= 0 {
+                key = node_decl[c];
+                c = next_sibling(c);
+                // (Listed twice, one entry.)
+                if not decl_is(key, Decl.Proto) or (tail[key] >= 0 and pair[tail[key] * 2] == d) { key = -1; };
+            };
+            if key >= 0 {
+                if count * 2 >= pair.len() {
+                    next = grown(next, count * 2);
+                    pair = grown(pair, count * 4);
                 };
+                next[count] = -1;
+                pair[count * 2] = a;
+                pair[count * 2 + 1] = b;
+                if tail[key] >= 0 { next[tail[key]] = count; } else { head[key] = count; };
+                tail[key] = count;
+                count += 1;
+                key = -1;
             };
         };
     };
-    vl_end(m);
+    px_list.resize(n + 1);
+    for (0 ..< n + 1) |k| {
+        let m = vl_begin();
+        let e = head[k];
+        px_list[k] = -1;
+        while (e >= 0) {
+            vl_add(pair[e * 2]);
+            if pair[e * 2 + 1] >= 0 { vl_add(pair[e * 2 + 1]); };
+            e = next[e];
+        };
+        if head[k] >= 0 { px_list[k] = vl_end(m); };
+    };
+}
+
+/// `a`, in an array of length `n` (or more).
+fn grown(a: Array[I32], n: I32) Array[I32] {
+    let b = Array[I32].new(n, -1);
+    for (0 ..< a.len()) |i| { b[i] = a[i]; };
+    b;
 }
 
 /// The protocol member a word names, or -1.
@@ -115,7 +168,7 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     let ft = proto_member_type(pm);
     let r = new_local(vt_anyref);
     w_node(Op.LocalSet, vt_none, r, 0, m);
-    proto_field_chain(implementers(proto), 0, r, word_of(name), ft, -1);
+    proto_field_site(proto, pm, r, ft, -1);
     w_node(Op.Seq, repr(ft), 0, 0, m);
     ft;
 }
@@ -147,11 +200,11 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
     let mv = w_mark();
     if op < 0 { coerce(check_expr(value, ft, cx), ft, value); }
     else {
-        proto_field_chain(implementers(proto), 0, r, word_of(name), ft, -1);
+        proto_field_site(proto, pm, r, ft, -1);
         apply_operator(op, ft, value, at, cx, mv);
     };
     w_node(Op.LocalSet, vt_none, v, 0, mv);
-    proto_field_chain(implementers(proto), 0, r, word_of(name), ft, v);
+    proto_field_site(proto, pm, r, ft, v);
     w_node(Op.Seq, vt_none, 0, 0, m);
     ty_void();
 }
@@ -239,6 +292,108 @@ fn sig_type(node: I32, self_t: I32) I32 {
     let t = type_of(node, 0);
     sig_self[0] = outer;
     t;
+}
+
+//! A protocol member's dispatch is a function of its own, made once and
+//! called from each use (inlined where it is small or called once): its
+//! chain at every use grew a program by uses times implementers.
+
+/// By protocol member: its dispatch function reading (or calling) it, and
+/// writing it (-1 not made yet); the function instance its calls were last
+/// noted from (see note_edge).
+vec pd_read: I32;
+vec pd_write: I32;
+vec pd_from: I32;
+
+fn reset_protocols() void {
+    px_list.clear();
+    pd_read.clear();
+    pd_write.clear();
+    pd_from.clear();
+}
+
+/// Whether a member's dispatch can be a function, of parameters `params`
+/// (value types) and result `rt`: not where a lazy module's function may be
+/// its stub instead (finish_call decides that by caller).
+fn dispatch_ok(pm: I32, params: I32, rt: I32) Bool {
+    if lazy_module.len() > 0 or rt == vt_unreachable or rt >= vt_tuple { return false; };
+    for (0 ..< vl_len[params]) |i| {
+        let vt = vl_item(params, i);
+        if vt == vt_none or vt == vt_unreachable or vt >= vt_tuple { return false; };
+    };
+    while (pd_read.len() <= pm) {
+        pd_read.push(-1);
+        pd_write.push(-1);
+        pd_from.push(-1);
+    };
+    true;
+}
+
+/// A dispatch function of `params` and result `rt`, named `P.word`.
+fn dispatch_fn(proto: I32, pm: I32, params: I32, rt: I32) I32 {
+    helper(params, vl_of_result(rt), vl_empty(), word_text(decl_name[proto]) + "." + word_text(decl_name[pm]));
+}
+
+/// Field `pm` of receiver local `r` read (or, when `v` is a local, `v`
+/// written to it), by its dispatch function.
+fn proto_field_site(proto: I32, pm: I32, r: I32, ft: I32, v: I32) void {
+    let vt = repr(ft);
+    let mp = vl_begin();
+    vl_add(vt_anyref);
+    if v >= 0 { vl_add(vt); };
+    let params = vl_end(mp);
+    let word = decl_name[pm];
+    if not dispatch_ok(pm, params, vt) {
+        proto_field_chain(implementers(proto), 0, r, word, ft, v);
+        return;
+    };
+    let f = if v >= 0 { pd_write[pm]; } else { pd_read[pm]; };
+    if f < 0 {
+        f = dispatch_fn(proto, pm, params, if v >= 0 { vt_none; } else { vt; });
+        proto_field_chain(implementers(proto), 0, 0, word, ft, if v >= 0 { 1; } else { -1; });
+        func_body[f] = w_pop();
+        if v >= 0 { pd_write[pm] = f; } else { pd_read[pm] = f; };
+    };
+    let m = w_mark();
+    w_get(vt_anyref, r);
+    if v >= 0 { w_get(vt, v); };
+    w_node(Op.Call, if v >= 0 { vt_none; } else { vt; }, f, 0, m);
+}
+
+/// Method `pm` called on receiver local `r` with the `n` arguments in
+/// `locals`, by its dispatch function.
+fn proto_call_site(proto: I32, pm: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) void {
+    let impls = method_impls(proto, decl_name[pm]);
+    let mp = vl_begin();
+    vl_add(vt_anyref);
+    for (0 ..< n) |k| { vl_add(repr(types[k])); };
+    let params = vl_end(mp);
+    if not dispatch_ok(pm, params, repr(rt)) {
+        proto_call_chain(impls, 0, r, locals, types, n, rt, cx);
+        return;
+    };
+    let f = pd_read[pm];
+    if f < 0 {
+        f = dispatch_fn(proto, pm, params, repr(rt));
+        pd_read[pm] = f;
+        pd_from[pm] = cur_fn[0];
+        let args = Array[I32].new(n + 1, 0);
+        for (0 ..< n) |k| { args[k] = k + 1; };
+        proto_call_chain(impls, 0, 0, args, types, n, rt, cx);
+        func_body[f] = w_pop();
+    } else if pd_from[pm] != cur_fn[0] {
+        // What this function calls, through it.
+        pd_from[pm] = cur_fn[0];
+        let i = 0;
+        while (i < vl_len[impls]) {
+            note_edge(fn_instance(vl_item(impls, i), 0));
+            i += 2;
+        };
+    };
+    let m = w_mark();
+    w_get(vt_anyref, r);
+    for (0 ..< n) |k| { w_get(repr(types[k]), locals[k]); };
+    w_node(Op.Call, repr(rt), f, 0, m);
 }
 
 /// The `if ref.test` chain reading field `word` of receiver local `r` (or,
@@ -332,7 +487,7 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
-    proto_call_chain(method_impls(proto, word_of(name)), 0, r, locals, types, n, rt, cx);
+    proto_call_site(proto, pm, r, locals, types, n, rt, cx);
     w_node(Op.Seq, repr(rt), 0, 0, m);
     rt;
 }

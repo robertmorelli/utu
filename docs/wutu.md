@@ -80,9 +80,10 @@ Common attributes are checked per tag. `canvas { padding="10" }` is an error.
 assignments use the browser declaration graph, so type errors come from the
 same compiler as ordinary Utu code. String event-handler attributes (`onclick`)
 are rejected: use a closure. `label { for = "name"; }` is label's attribute, not
-a loop. An element has one id. An event name a typo away from a DOM event
-(`on clik`) is an error; another name is a custom event, one that adds to a
-DOM event's name too (`on changed`, `on resized`). `@reactive`,
+a loop. An element has one id. An event name one edit (or swap) from a common
+DOM event (`on clik`, `on chnage`) is an error; another name is a custom
+event: two edits from one (`on unmount`), or one that adds to a DOM event's
+name (`on changed`, `on resized`). `@reactive`,
 `@island`, `@style` and `@document` come before the root element; inside an
 element, `@unmanaged;` and CSS at-rules (`@media`, `@container`, …) are the
 only `@` forms, and any other is an error. Interpolated strings become text, never HTML.
@@ -124,9 +125,11 @@ author's choice; give them only trusted text.
 
 Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
-children switch back to HTML. A root tag only SVG has (`circle`, `g`) is SVG
-too, a `Browser.SVGElement`; `a`, `title`, `script` and `style` are HTML. SVG attributes such as `viewBox`, `d`, and
-`stroke-width` keep their original spelling. A namespaced one,
+children switch back to HTML. A root tag only SVG has (`circle`, `g`, `image`,
+`feGaussianBlur`) is SVG too, a `Browser.SVGElement`; `a`, `title`, `script`
+and `style` are HTML. Inside `svg { }` any name is an SVG element, and an SVG
+element takes any attribute (`on…` handlers and URL checks still apply),
+spelled as written: `viewBox`, `stdDeviation`, `stroke-width`. A namespaced one,
 `xlink:href = …;`, `xml:lang = …;` or `xmlns:xlink = …;`, is an attribute (no
 CSS property has those prefixes), set in its namespace.
 
@@ -181,6 +184,19 @@ button as toggle {
 }
 ```
 
+**Under `@reactive`, don't write to an element the template manages.** A
+handler's `toggle.textContent = …` holds only until the next render, which
+sets the node back to what the template says. Change state and let the
+template show it:
+
+```utu
+p { = s.msg; }
+button {
+    on click { s.msg = "Saved"; }
+    = "Save";
+}
+```
+
 Listeners are attached directly to nodes. There are no global subscriptions to
 unsubscribe and no framework-owned cache keeping removed nodes alive. Normal
 DOM event propagation, promises, and Utu closures remain available.
@@ -200,11 +216,14 @@ button {
 }
 ```
 
-An element's own declaration whose property is one edit from a standard one
-(two for a long name) is a typo and fails: `colr: red;` says "did you mean
-color?". Custom (`--x`) and prefixed (`-webkit-…`) properties, and ones near no
-standard name, pass as written. A value that runs onto the next line's
-declaration (`padding: 1rem` then `gap: 2rem;`) is a missing `;`.
+An element's own declaration whose property (ASCII case-insensitive) is one
+edit or swap from a standard one is a typo and fails: `colr: red;` says "did
+you mean color?". Custom (`--x`) and prefixed (`-webkit-…`) properties, and
+ones further from a standard name, pass as written. A custom property's value
+is any balanced run (`--cfg: { "a": 1 };`); comments in a value are skipped.
+A value that runs on into the next statement is a missing `;`: a declaration
+on its line (`color: red margin: 0;`) or the next, or an attribute, boolean
+attribute or text there (`color: red` then `hidden;`).
 
 A declaration whose value is `= ...` is computed when the template renders
 and applied with `style.setProperty`, which a strict `style-src` policy allows:
@@ -473,8 +492,8 @@ export main() void {
 before accepting it. Supported schemas are acyclic local structs containing
 `Str`, `Bool`, `I32`, `F64`, and nested `Array[T]`. Arrays decode in linear time
 with a preallocated native array. Invalid or unavailable storage returns the
-defaults. Data is wrapped in a versioned envelope; change the key when changing
-an incompatible schema. Imported/recursive/optional schema types and automatic
+defaults. Data is stored as `{"version":1,"data":…}`; `version` is the envelope's
+format, not your schema's, so change the key when changing an incompatible schema. Imported/recursive/optional schema types and automatic
 migration are not currently supported.
 
 Create stored state before mounting its reactive root. Automatic stores save after
@@ -528,7 +547,9 @@ a clean browser context: render public defaults, never private build credentials
 or user data. The current prerenderer captures synchronous initialization; it is
 not an asynchronous data loader or routing system. `--no-prerender` skips this
 step. `wutu build` takes `utu build`'s modes: `-O small` (the default) and
-`-O fast` keep the safety checks, `-O smallUnsafe` and `-O fastUnsafe` drop them. Playwright and the compiler are build tools; neither ships in the website.
+`-O fast` keep the safety checks, `-O smallUnsafe` and `-O fastUnsafe` drop them. It builds
+beside `--out` and moves its files in only once the build and prerender succeed: a failed build
+leaves `--out` as it was, and other files there are kept. Playwright and the compiler are build tools; neither ships in the website.
 The five-site build includes prerendered HTML in its 14.5 KB gzip per-site budget.
 
 
@@ -579,15 +600,37 @@ produce runtime diagnostics. Unkeyed loops receive positional identities.
 
 `wutu.after_render(callback)` and `wutu.focus(id)` run after the update.
 `wutu.on_cleanup(callback)` registers cleanup for the current view;
-`wutu.interval(key, milliseconds, callback)` updates its owner after each tick.
-Like `on_cleanup`, it belongs to the render that registers it: a render that does
-not register it again (its component left) stops it, as does unmounting the view. `wutu.route()`
+`wutu.interval(key, milliseconds, callback)` updates its owner after each tick;
+one key runs one timer. Started during a render, it belongs to that render, like
+`on_cleanup`: a render that does not start it again (its component left) stops it.
+Started from `on mount` or an event handler, it belongs to that element: it stops
+once the element is gone. Unmounting the view stops either.
+
+```utu
+p.clock {
+    on mount { wutu.interval("tick", 1000.0, cl() void { s.seconds = s.seconds + 1; }); }
+    = "Uptime " + s.seconds.to_str() + "s";
+}
+``` `wutu.route()`
 reads the hash path, and hash/history changes refresh views. This is a small route
 primitive, not a route table, network loader or authentication framework.
 
 Optional `std:NumberField` keeps numeric draft text separate from validated
-numbers. Optional `std:List[T]` provides `append` and `remove_at`; both return copied
-arrays. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
+numbers. Arrays have a fixed length; a list that grows is an `Array[T]` in state,
+replaced by `std:List[T]`'s `append` and `remove_at`, which return copies:
+
+```utu
+using List[Todo] |todos| from std:List;
+
+button {
+    on click { s.todos = todos.append(s.todos, Todo { text: s.draft, done: false }); }
+    = "Add";
+}
+```
+
+A closure is `cl(params) Type { … }`: `wutu.after_render(cl() void { s.ready = true; })`.
+In a function body, a plain Utu `if`, `for` or `while` statement ends with `;`
+(`if s.busy { return; };`); Wutu's own `if` and `for`, among elements, do not. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
 simple display without shipping a formatting library.
 
 The [two new five-site batches](wutu-round-two-review.md) exercise these APIs.

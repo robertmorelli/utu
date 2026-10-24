@@ -80,8 +80,8 @@ export async function writeCatalog(stdlib) {
       files.set(`${name}.offsets`, le);
       names.set(abi.types, name);
     }
-    const { prefix, moduleSpecifier, exports, names: typeNames, mutableGlobals } = abi;
-    files.set(`${view}.view.json`, encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names: typeNames, mutableGlobals })));
+    const { prefix, moduleSpecifier, exports, names: typeNames, mutableGlobals, exportAssignment } = abi;
+    files.set(`${view}.view.json`, encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names: typeNames, mutableGlobals, exportAssignment })));
     manifest[key] = { document: names.get(abi.types), view };
   }
   files.set('catalog.json', encoder.encode(JSON.stringify(manifest)));

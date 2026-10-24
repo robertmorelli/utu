@@ -1,0 +1,14 @@
+// What: a bare name an enum and another enum's variant share, as a literal with no Shape wanted
+// Expect: Circle is not a struct: it has no fields to set
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+enum Circle:
+    | Big { r: F64 }
+    | Small {}
+
+export main() F64 {
+    let c = Circle { r: 1.0 };   // the enum Circle: Shape.Circle { r: 1.0 }
+    0.0;
+}

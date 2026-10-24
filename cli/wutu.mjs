@@ -14,7 +14,9 @@ import { MODES } from '../src/selfhost/compiler.js';
 
 const USAGE = `wutu format <files...> [--check]
 wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender] [-O small|fast|smallUnsafe|fastUnsafe|debug]
-wutu dev <entry.utu> [--out dist/wutu] [--port 4176] [-O mode]`;
+wutu dev <entry.utu> [--out dist/wutu] [--title Title] [--port 4176] [-O mode]
+
+exit status: 0 done; 1 the program is wrong or the build failed; 2 wutu was run wrong`;
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -30,16 +32,27 @@ const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', 'dist']);
 
 const escapeHtml = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
 
-function parseArgs(args) {
-  const valueFlags = new Set(['--out', '--title', '--port', '-O']);
+/** A mistake in how wutu was run: said with the usage, exit 2. */
+class Usage extends Error {}
+
+/** Each command's options: what each takes (a value, or none: true). */
+const OPTIONS = {
+  format: { '--check': true },
+  build: { '--out': 'outputs', '--title': 'titles', '-O': 'build modes', '--no-prerender': true },
+  dev: { '--out': 'outputs', '--title': 'titles', '-O': 'build modes', '--port': 'ports' },
+};
+
+function parseArgs(command, args) {
+  const known = OPTIONS[command];
   const positional = [], options = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (valueFlags.has(arg)) {
-      if (i + 1 >= args.length) throw new Error(`${arg} needs a value`);
+    if (arg.startsWith('-') && arg !== '-') {
+      if (!Object.hasOwn(known, arg)) throw new Usage(`unknown option ${arg} for wutu ${command}`);
+      if (known[arg] === true) { options[arg] = true; continue; }
+      if (i + 1 >= args.length) throw new Usage(`${arg} needs a value`);
+      if (options[arg] !== undefined) throw new Usage(`two ${known[arg]}: ${options[arg]}, ${args[i + 1]}`);
       options[arg] = args[++i];
-    } else if (arg.startsWith('-')) {
-      options[arg] = true;
     } else {
       positional.push(arg);
     }
@@ -48,7 +61,7 @@ function parseArgs(args) {
 }
 
 async function formatCommand(files, { check }) {
-  if (!files.length) throw new Error(`no files to format\n\n${USAGE}`);
+  if (!files.length) throw new Usage('no files to format');
   for (const name of files) {
     const source = await fs.readFile(name, 'utf8');
     const { text: formatted, refused } = formatUtu(source);
@@ -83,10 +96,45 @@ async function compileApp({ entry, parser, title, mode }, directory) {
   return report;
 }
 
+/**
+ * Build (and prerender) into a fresh directory beside `out`, then move what
+ * it made into out, all or none: each file first to a temporary beside its
+ * place, then each renamed over its name. Out's other files stay.
+ */
 async function buildCommand(app, { prerender: shouldPrerender }) {
-  const report = await compileApp(app, app.out);
-  if (shouldPrerender) await prerender(app.out);
-  console.log(`${app.out}: ${report.total.gzip} bytes gzip for JS + Wasm`);
+  const candidate = path.join(path.dirname(app.out), `.${path.basename(app.out)}.building-${process.pid}`);
+  if ((await fs.stat(app.out).catch(() => null))?.isDirectory() === false) throw new Error(`cannot write ${app.out}: a file is in the way`);
+  try {
+    const report = await compileApp(app, candidate);
+    if (shouldPrerender) await prerender(candidate);
+    await moveInto(candidate, app.out);
+    console.log(`${app.out}: ${report.total.gzip} bytes gzip for JS + Wasm`);
+  } finally {
+    await fs.rm(candidate, { recursive: true, force: true });
+  }
+}
+
+/** Each file under `from` to its place under `to`, all or none; on a failure, `to` is as it was (the directories made for it removed). */
+async function moveInto(from, to) {
+  const files = (await fs.readdir(from, { recursive: true, withFileTypes: true })).filter(entry => !entry.isDirectory())
+    .map(entry => path.relative(from, path.join(entry.parentPath, entry.name)));
+  const made = [], moved = [];
+  try {
+    for (const name of files) {
+      const target = path.join(to, name);
+      if ((await fs.stat(target).catch(() => null))?.isDirectory()) throw new Error(`cannot write ${target}: it is a directory`);
+      const first = await fs.mkdir(path.dirname(target), { recursive: true });
+      if (first) made.push(first);
+      const temp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.tmp`);
+      await fs.rename(path.join(from, name), temp);
+      moved.push([temp, target]);
+    }
+  } catch (error) {
+    await Promise.all(moved.map(([temp]) => fs.rm(temp, { force: true })));
+    for (const dir of made.reverse()) await fs.rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+  for (const [temp, target] of moved) await fs.rename(temp, target);
 }
 
 /**
@@ -177,33 +225,44 @@ async function devCommand(app, { port }) {
     process.exit(0);
   });
 
+  // A server that cannot start (the port taken, say) ends the command.
+  server.on('error', async error => {
+    console.error(`cannot serve on 127.0.0.1:${port}: ${error.code === 'EADDRINUSE' ? 'the port is in use' : error.message}`);
+    watcher.close();
+    if (active) await fs.rm(active, { recursive: true, force: true });
+    process.exit(1);
+  });
   await rebuild();
-  server.listen(Number(port ?? 4176), '127.0.0.1', () => {
+  server.listen(port, '127.0.0.1', () => {
     console.log(`Wutu preview: http://127.0.0.1:${server.address().port}`);
   });
 }
 
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
-  const { positional, options } = parseArgs(rest);
+  if (!command || command === '--help' || command === '-h') return console.log(USAGE);
+  if (!Object.hasOwn(OPTIONS, command)) throw new Usage(`unknown command ${command}`);
+  const { positional, options } = parseArgs(command, rest);
   if (command === 'format') return formatCommand(positional, { check: options['--check'] === true });
-  if (command !== 'build' && command !== 'dev') {
-    console.log(USAGE);
-    if (command && command !== '--help' && command !== '-h') process.exitCode = 1;
-    return;
-  }
-
+  if (positional.length > 1) throw new Usage(`extra argument ${positional[1]}: wutu ${command} takes one entry`);
   const entry = path.resolve(positional[0] ?? 'main.utu');
+  const stat = await fs.stat(entry).catch(() => null);
+  if (!stat) throw new Usage(`no file ${positional[0] ?? 'main.utu'}`);
+  if (stat.isDirectory()) throw new Usage(`${positional[0]} is a directory`);
+  const mode = options['-O'] ?? 'small';
+  if (!Object.hasOwn(MODES, mode)) throw new Usage(`unknown build mode -O ${mode}: small, fast, smallUnsafe, fastUnsafe, debug`);
+  const port = options['--port'] ?? '4176';
+  // 0: any free port.
+  if (command === 'dev' && !(/^\d+$/.test(port) && Number(port) <= 65535)) throw new Usage(`--port needs a port, 0 to 65535, got ${port}`);
   const app = {
     entry,
     out: path.resolve(options['--out'] ?? 'dist/wutu'),
     title: options['--title'] ?? path.basename(path.dirname(entry)),
     // Like `utu build`: small (checked) unless asked.
-    mode: options['-O'] ?? 'small',
+    mode,
     parser: await initParser({ wasmDir: fileURLToPath(new URL('../', import.meta.url)) }),
   };
-  if (!MODES[app.mode]) { app.parser.delete(); throw new Error(`unknown mode -O ${app.mode}: small, fast, smallUnsafe, fastUnsafe, debug`); }
-  if (command === 'dev') return devCommand(app, { port: options['--port'] });
+  if (command === 'dev') return devCommand(app, { port: Number(port) });
   try {
     await buildCommand(app, { prerender: !options['--no-prerender'] });
   } finally {
@@ -212,6 +271,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
+  console.error(error instanceof Usage ? `wutu: ${error.message}\n\n${USAGE}` : error.message);
+  process.exitCode = error instanceof Usage ? 2 : 1;
 });

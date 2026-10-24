@@ -370,6 +370,27 @@ try {
     await note('textDocument/didOpen', { textDocument: { uri: h, version: 1, text: H } });
     assert.match((await call('textDocument/hover', at(H, 'Array', 0, h))).contents.value, /^```utu\ntype Array\n```/);
     assert.match((await call('textDocument/hover', at(H, 'new(1)', 0, h))).contents.value, /fn shapes\.new\(x: I32\) shapes/);
+
+    // An alt arm's bare variant two enums have is the tested enum's; an enum's hover shows its variants.
+    const V = 'enum Shape:\n    | Circle { r: F64 }\n    | Dot {}\nenum Lens:\n    | Circle { f: F64 }\nfn a(s: Shape) F64 {\n    alt s {\n        Circle |c| => c.r,\n        Dot => 0.0,\n    };\n}\nfn b(l: Lens) F64 {\n    alt l {\n        Circle |c| => c.f,\n    };\n}\nexport lib { fn run() F64 { a(Shape.Dot) + b(Lens.Circle { f: 1.0 }); } }\n';
+    const vu = await file('v.utu', V);
+    await note('textDocument/didOpen', { textDocument: { uri: vu, version: 1, text: V } });
+    assert.equal((await call('textDocument/definition', at(V, 'Circle |c|', 0, vu))).range.start.line, 1);
+    assert.equal((await call('textDocument/definition', at(V, 'Circle |c|', 1, vu))).range.start.line, 4);
+    assert.match((await call('textDocument/hover', at(V, 'Circle |c|', 0, vu))).contents.value, /variant/);
+    assert.deepEqual((await call('textDocument/rename', { ...at(V, 'Circle {', 0, vu), newName: 'Ring' })).changes[vu].map(e => e.range.start.line), [1, 7]);
+    assert.match((await call('textDocument/hover', at(V, 'Shape', 0, vu))).contents.value, /enum Shape: \| Circle \{ r: F64 \} \| Dot \{\}/);
+
+    // An import that cannot be read: the rest of the file's names still answer.
+    const X = 'using helpers from "./nope.utu";\nfn twice(x: I32) I32 {\n    x * 2;\n}\nexport main() I32 {\n    helpers.double(21) + twice(1);\n}\n';
+    const xu = await file('x.utu', X);
+    await note('textDocument/didOpen', { textDocument: { uri: xu, version: 1, text: X } });
+    assert.match((await call('textDocument/hover', at(X, 'twice', 0, xu))).contents.value, /fn twice\(x: I32\) I32/);
+    assert.equal((await call('textDocument/definition', at(X, 'twice(1)', 0, xu))).range.start.line, 1);
+    assert.deepEqual((await call('textDocument/references', { ...at(X, 'twice', 0, xu), context: { includeDeclaration: true } })).map(r => r.range.start.line), [1, 5]);
+    assert.equal(await call('textDocument/definition', at(X, 'helpers.double', 0, xu)), null);
+    assert.equal(await call('textDocument/hover', at(X, 'helpers.double', 0, xu)), null);
+    assert.match((await call('textDocument/rename', { ...at(X, 'twice', 0, xu), newName: 'x' })).error, /^the program does not build \(No file .*\): no rename$/);
   }
 
   // Rename reaches the files on disk that import the file renamed in, open or not.
@@ -417,7 +438,7 @@ try {
     await fs.writeFile(path.join(ws, 'main.utu'), MAINX.replace('{ t.b; }', '{ t.b }'));
     assert.equal(await renaming('addx', 0, 'plusx'), 'main.utu, which imports ax.utu, does not parse: no rename');
     await fs.writeFile(path.join(ws, 'main.utu'), MAINX);
-    // One whose build stops at another import: refused (its names are not known), and said so.
+    // One whose build stops at another import: refused (its names are not checked), and said so.
     await file('other.utu', 'using nope from "./nope.utu";\nusing ax from "./ax.utu";\nexport lib { fn o() I32 { ax.addx(2); } }\n');
     assert.match(await renaming('addx', 0, 'plusx'), /^other\.utu, which imports ax\.utu, does not build \(No file \.\/nope\.utu .*\): no rename$/);
     await fs.rm(path.join(ws, 'other.utu'));

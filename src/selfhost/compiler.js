@@ -77,7 +77,8 @@ export async function loadCompiler(wasm, spec = {}) {
  * a Map from `std:Name` to text or to an async thunk of a host ABI).
  */
 export async function compile(utu, entry, host) {
-  const chosen = host.mode ? MODES[host.mode] : null;
+  // (Own names only: `constructor` is no mode.)
+  const chosen = host.mode && Object.hasOwn(MODES, host.mode) ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
   const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
@@ -109,7 +110,7 @@ export async function compile(utu, entry, host) {
     map: sourceMap && utu.map_count ? readSourceMap(utu, files) : null,
     blame: blame && utu.blame_prepare ? readBlameTables(utu, files) : null,
     ...(profile ? { frames: readFrames(utu, files) } : {}),
-    ...(run && utu.run_levels?.() > 0 ? { array: { levels: utu.run_levels(), leaf: utu.run_leaf() } } : {}),
+    ...(run && utu.run_leaf?.() ? { array: { levels: utu.run_levels(), leaf: utu.run_leaf() } } : {}),
   };
 }
 
@@ -321,6 +322,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   loading.set(utu, files);
   const byKey = new Map(prelude.byKey);
   const foreign = [];
+  let missing = false;
   addFile(utu, files, byKey, entry, await readFile(entry), ROLE.entry);
   for (let i = 0; i < utu.import_count(); i++) {
     const from = files[utu.import_from(i)];
@@ -346,10 +348,14 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
         try {
           text = await readFile(key);
         } catch {
-          // A file that cannot be read ends the build, as in stage 0.
-          const bytes = encoder.encode(key);
-          new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
-          break;
+          // A file that cannot be read (the first) ends the build, as in
+          // stage 0, after the rest load: names still resolve, for an editor.
+          if (!missing) {
+            const bytes = encoder.encode(key);
+            new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
+            missing = true;
+          }
+          continue;
         }
         file = addFile(utu, files, byKey, key, text, role);
       }
@@ -590,8 +596,8 @@ const prepared = new WeakMap();
 function prepare(abi) {
   let decl = prepared.get(abi);
   if (!decl) {
-    const { prefix, moduleSpecifier, exports, names, mutableGlobals } = abi;
-    decl = { document: typesDocument(abi.types), view: encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals })) };
+    const { prefix, moduleSpecifier, exports, names, mutableGlobals, exportAssignment } = abi;
+    decl = { document: typesDocument(abi.types), view: encoder.encode(JSON.stringify({ prefix, moduleSpecifier, exports, names, mutableGlobals, exportAssignment })) };
     prepared.set(abi, decl);
   }
   return decl;

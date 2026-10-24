@@ -102,14 +102,9 @@ fn expand_site(n: I32, name: Str) void {
     };
 }
 
-/// The DSL sites (`@name/\ … \/`), in node order: each parse notes those it
-/// made (`note_dsl_sites`). The kept prelude's are the first.
+/// The DSL sites (`@name/\ … \/`), in node order: the parser notes each it
+/// makes (and forgets those it gives up). The kept prelude's are the first.
 vec dsl_sites: I32;
-
-/// Add the DSL sites among the nodes from `from` on to @dsl_sites.
-fn note_dsl_sites(from: I32) void {
-    for (from ..< node_kind.len()) |n| { if node_kind[n] == Node.Dsl_expr.to_i32() { dsl_sites.push(n); }; };
-}
 
 /// The first of @dsl_sites that is not the kept prelude's.
 fn own_sites() I32 { kept[5]; }

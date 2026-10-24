@@ -15,6 +15,8 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
     if (f & ts.TypeFlags.Undefined) return 'undefined';
     if (f & ts.TypeFlags.Any) return 'any';
     if (f & ts.TypeFlags.Unknown) return 'unknown';
+    // `id-${number}`: its texts with each hole's kind between (`["id-", "F64", ""]`).
+    if (f & ts.TypeFlags.TemplateLiteral) return { pattern: type.texts.flatMap((text, i) => i ? [hole(type.types[i - 1]), text] : [text]), name: checker.typeToString(type), base: 'Str' };
     if (f & ts.TypeFlags.StringLike) return type.isStringLiteral() ? { literal: type.value, base: 'Str' } : 'Str';
     if (f & ts.TypeFlags.NumberLike) return type.isNumberLiteral() ? { literal: type.value, base: 'F64' } : 'F64';
     if (f & ts.TypeFlags.BooleanLike) return 'Bool';
@@ -45,6 +47,8 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
     ids.set(type, id); types.push(null); pending.push(type);
     return id;
   }
+  // A template hole: a number, a bigint's digits, or any string.
+  const hole = type => type.flags & ts.TypeFlags.Number ? 'F64' : type.flags & ts.TypeFlags.BigInt ? 'bigint' : 'Str';
   const at = symbol => checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration ?? symbol.declarations?.[0]);
   function signature(sig) {
     return {
@@ -119,6 +123,8 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
       // (a tuple's elements are declared nowhere: each is its parameter)
       const propType = isTuple(type) && /^\d+$/.test(key) ? checker.getTypeOfSymbol(prop) : at(prop);
       node.properties[key] = { type: ref(propType), optional: !!(prop.flags & ts.SymbolFlags.Optional), readonly: declarations.some(d => d.modifiers?.some(m => m.kind === ts.SyntaxKind.ReadonlyKeyword))
+        // (a mapped type's, `Readonly<T>`, is readonly by its check flags)
+        || !!(ts.getCheckFlags?.(prop) & ts.CheckFlags.Readonly)
         || !!(prop.flags & ts.SymbolFlags.GetAccessor) && !(prop.flags & ts.SymbolFlags.SetAccessor) };
     }
   }

@@ -632,9 +632,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         else { read_value(d, cap_types[k]); };
     };
     if not single { w_node(Op.StructNew, vt_ref(env, false), env, 0, me); };
-    w_i32((if result == prelude(Prelude.Bool) { 1; } else { 0; }) + (if single { 2; } else { 0; }));
+    let t = ty(Ty.Closure, types_list(ptypes, n), result);
+    w_i32((if result == prelude(Prelude.Bool) { 1; } else { 0; }) + (if single { 2; } else { 0; }) + js_handle_bits(ty_a[t]));
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
-    ty(Ty.Closure, types_list(ptypes, n), result);
+    t;
 }
 
 /// Whether a value type is a reference to a struct or an array (an `anyref`,
@@ -854,7 +855,7 @@ fn invoker_arm(sig: I32, params: I32, rvt: I32, env: Bool) void {
 /// expected: a closure of it with no environment.
 fn decay_fun(fun_t: I32, m: I32) void {
     w_leaf(Op.RefNull, vt_anyref, vt_anyref, 0);
-    w_i32(if ty_b[fun_t] == prelude(Prelude.Bool) { 1; } else { 0; });
+    w_i32((if ty_b[fun_t] == prelude(Prelude.Bool) { 1; } else { 0; }) + js_handle_bits(ty_a[fun_t]));
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
 }
 

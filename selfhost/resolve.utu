@@ -791,6 +791,11 @@ fn declare_module(item: I32) I32 {
     decl;
 }
 
+/// Whether `d` (what a name is bound to) is a variant, or variants.
+fn is_variant_name(d: I32) Bool {
+    decl_is(d, Decl.Variant) or (decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant));
+}
+
 /// Variant `v`, a member of `module` by its name: a name two of its enums'
 /// variants have is ambiguous (`m.E.V` says which).
 fn add_variant_member(module: I32, v: I32) void {
@@ -804,9 +809,14 @@ fn add_variant_member(module: I32, v: I32) void {
     };
 }
 
-/// `d`, a member of `module`; a second of its name is reported.
+/// `d`, a member of `module`; a second of its name is reported. (A
+/// variant's name is a declaration's: the variant is `m.E.V`.)
 fn member_once(module: I32, d: I32) void {
     let prior = add_member(module, decl_name[d], Space.Member, d);
+    if is_variant_name(prior) {
+        member_decl[member_slot(module, decl_name[d] * 4 + Space.Member.to_i32())] = d;
+        return;
+    };
     if prior >= 0 and prior != d and file_role[file_of_token(node_first[decl_node[d]])] != FileRole.Generated.to_i32() { report_twice(d, prior); };
 }
 
@@ -1352,7 +1362,7 @@ fn declare_entry_item(item: I32, first_entry: I32) void {
     let hidden = lookup(name);
     // What is generated for a mem is generated again for its twin: the
     // twin is the mistake.
-    if hidden >= first_entry and hidden < decl and file_role[file_of_token(node_first[item])] != FileRole.Generated.to_i32() {
+    if hidden >= first_entry and hidden < decl and not is_variant_name(hidden) and file_role[file_of_token(node_first[item])] != FileRole.Generated.to_i32() {
         // A mem's name is its own: reported at the mem.
         if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name); }
         else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); mem_clashes.push(name); }
@@ -1395,12 +1405,15 @@ vec items_since: I32 = [0];
 
 /// Variant `v` in scope by its name. A name a variant of another enum bound
 /// since `since` (one file's, one mod's) has is ambiguous: `E.V` says which.
+/// A declaration's name (its enum's too) is the declaration's: the variant
+/// is then `E.V`.
 fn bind_variant(v: I32, since: I32) void {
     let word = decl_name[v];
     if word < 0 { return; };
     let b = word_top[word];
     let p = if b >= since { bind_decl[b]; } else { -1; };
     while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p]; };
+    if p >= 0 and not decl_is(p, Decl.Variant) { return; };
     if decl_is(p, Decl.Variant) and decl_owner[p] != decl_owner[v] {
         let both = declare(Decl.Ambiguous, word, -1, v);
         decl_a[both] = bind_decl[b];
@@ -1421,11 +1434,6 @@ struct Walk:
 /// method headers then bodies walked. Returns the number of diagnostics.
 fn resolve_names() I32 {
     diag_reset();
-    if missing_import[0] >= 0 {
-        report(Diag.UnknownImport, import_node[missing_import[0]], -1);
-        save_diagnostics();
-        return 1;
-    };
     intern_known();
     // DSLs expand first: their expansions add nodes, words, and files.
     expand_dsls();
@@ -1448,6 +1456,12 @@ fn resolve_names() I32 {
     let entry = entry_file();
     if entry >= 0 { enter_file(entry); };
     find_comptime_mems();
+    // An import the host could not read ends the build, but names resolve
+    // (for an editor): its mistake is the one said.
+    if missing_import[0] >= 0 {
+        diag_reset();
+        report(Diag.UnknownImport, import_node[missing_import[0]], -1);
+    };
     save_diagnostics();
     diag_kind.len();
 }

@@ -76,7 +76,13 @@ Declaration shapes map onto ordinary UTU syntax:
 
 Records (`&{...}`) and arrays (`[...]`) take their shape from the declaration
 slot they are passed to and become real JS objects and arrays, including when
-nested. Array literals satisfy arrays, typed arrays, `ArrayLike<T>`,
+nested. A record for a union of object types is checked against the member it
+fits best, its literals first: for `{ kind: "circle"; r: number } | { kind:
+"sq"; s: number }`, `&{ kind: "sq", r: 2.0 }` is the `sq` member's, so `r` is
+no property and `s` is missing. A value of such a union has the properties
+every member has (`shape.kind`, of the members' types' union); one whose
+members' types differ is read-only, as TypeScript writes only what all accept.
+`Readonly<T>`'s properties are read-only. Array literals satisfy arrays, typed arrays, `ArrayLike<T>`,
 `Iterable<T>` (TypeScript 5.9's `Iterable<T, TReturn, TNext>` too), and `any`,
 and bind `T` when every element has the same type. A record binds `T` of an
 index signature `{ [k: string]: T }` from its first field, so
@@ -102,7 +108,12 @@ callback whose result may be (`() => string | null` takes `cl() Str {...}`).
 A literal where a union of literals is wanted is one of its values, as in
 TypeScript: `let b: Browser.ScrollBehavior = "fast"` is an error, and so is
 `99.0` for `enum Mode { Off = 0, On = 5 }`. A string enum takes only its
-members (`Api.Tag.A`, not `"a"`). `K extends keyof Events` takes Events'
+members (`Api.Tag.A`, not `"a"`). A single literal type is one value
+(`lit(x: "b")` takes `"b"` alone, as does `Exclude<"a" | "b", "a">`), and an
+overload of literal parameters given none of its literals is an error. A
+template literal type takes the strings it matches: `` `id-${number}` `` takes
+`"id-1.5"`, not `"id-x"` (a `${string}` hole takes any text; a `Str` that is
+no literal is taken only from the host, as for a union). `K extends keyof Events` takes Events'
 keys alone (`bus.on("nope", ...)` is an error). An ambient enum whose members have no
 initializer (`declare enum Color { Red, Green = 5 }`) is computed, and takes any
 number, as TypeScript has it.
@@ -146,7 +157,8 @@ elements, and callback results, and they respect declared constraints:
 constrained `T` may have more fields than the constraint names, as a fresh
 TypeScript literal may (`pick([&{ name: "a", n: 1.0 }])` for
 `T extends { name: string }`). Relations such as `S extends T` are kept,
-so `words.find(...)` on `Str[]` returns `?Str` and `filter` returns `Str[]`.
+so `words.find(...)` on `Str[]` returns `?Str` and `filter` returns `Str[]`,
+and `gen<A extends number, B extends A>(1.0, "x")` is an error.
 Literal types are inferred only for keyed or literal-constrained parameters
 (`createElement("input")`), so `Array.of("a", "b")` is `Str[]`.
 
@@ -157,7 +169,7 @@ constrained `T` is the elements' type, not its constraint (`[1.0, 2.0]` for
 `<T extends number | string>(xs: [T, T])` makes `T` F64). A tuple literal has
 each element of its own type and as many as the tuple takes (`[number,
 string]` takes 2; `[number, ...string[]]`, at least 1, the rest strings); an
-index past a rest's start reads the rest's type. A function type fits another
+index past a rest's start reads the rest's type; one past a tuple without a rest is an error. A function type fits another
 as in TypeScript: an optional parameter where a required one is wanted, fixed
 parameters where a rest is, a rest's element compared. A closure's result may
 be any one member of a union result (`cl() F64` for `() => number | string`).
@@ -191,7 +203,8 @@ export main() void {
 package's declarations directly. TypeScript's own module resolution finds them:
 `types` and `exports` conditions, `@types/*` packages, and Node's ambient
 `node:*` modules. Members of an `export =` module are importable by name, so
-`Path.join` works as `import { join } from "node:path"` does. The glue imports
+`Path.join` works as `import { join } from "node:path"` does; the glue reads
+them from the module's default export, as a CommonJS module has no named ones. The glue imports
 the same specifier, so the package must be resolvable by the bundler or runtime.
 
 `utu build` bundles a package's browser build (package.json's `browser`
@@ -291,7 +304,14 @@ can keep one and give it back, where utu reads it. So `make() Point` and
 `p.x` is `undefined`, `a.length` of an `Array[Str]` too, and a value of the
 wrong kind where a struct is wanted (`lib.norm({ x: 3, y: 4 })`, or an `@es`
 body's `({ x: 3 })` for a `Point` result) throws a `TypeError` where it
-crosses. Give JS what it should read as numbers, `Str` (`@json encode` for
+crosses. So does null (or `undefined`) from an `@es` binding for a handle
+that is not nullable, in every build (`Wrong type from JavaScript: a Point,
+not null`); a `?Point` takes both, as null. A protocol value (`fun() Shape`)
+must be a wasm object: a plain JS object with an `area` method is no `Shape`
+(`a Shape, not object`); a utu struct that does not implement it still
+traps where it is used. A closure JS calls is given no null for a handle
+argument in safe builds (`a closure's argument 1 is null`), as an `export
+lib` function's arguments below. Give JS what it should read as numbers, `Str` (`@json encode` for
 whole values), or host objects. A `fun` argument reaches JS as a function it
 can call. A JS function is a closure: type a function result `cl(I32) I32`;
 `fun(I32) I32` is an error (`add gets a JS function: that is a cl, not
@@ -331,7 +351,9 @@ dereference) are not exceptions and are never caught.
 Reading a dynamic value (`any`, `unknown`, or a primitive union such as
 `string | number`) where UTU expects `F64`, `Str`, or `Bool` converts it at the
 boundary after checking its JavaScript `typeof`; a mismatch throws a
-`TypeError` instead of producing a wrong value.
+`TypeError` instead of producing a wrong value. `unknown` is taken as `any` is
+(TypeScript asks for a narrowing first; `alt` narrows to classes only, so the
+`typeof` check is utu's narrowing of a primitive).
 
 Nullable references retain their foreign identity through `promote`. Both
 `null` and `undefined` mean absence: host results normalize to null at the
@@ -346,7 +368,11 @@ promote Browser.localStorage.getItem("key") {
 };
 ```
 
-Typed host promises work with UTU `await` on engines supporting JSPI. Boundary
+Typed host promises work with UTU `await` on engines supporting JSPI;
+`Promise<Promise<T>>` gives `T`, as JavaScript's `await` (and TypeScript's
+`Awaited`) has it. A host `Promise<number>` is utu's `Promise[F64]`, both
+ways (a closure's result too). A call whose result is `never` does not return: it fits
+any type, and wasm traps should the host return after all. Boundary
 calls preserve host exceptions. Accessing a method as a value keeps JavaScript's
 normal unbound-method behavior; calling `object.method(...)` retains `object`
 as the receiver. There are no automatically bound proxy objects.

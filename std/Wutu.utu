@@ -14,6 +14,9 @@ mod wutu {
   const here = () => keys.map(k => k.value.length + ':' + k.value).join('|');
   const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
   let frames = [], active = null, keys = [], scheduled = false, generation = 0;
+  // The element (and its view) whose `on mount` or event handler is running: interval()'s owner outside a render.
+  let owner = null;
+  const timers = new Map();         // intervals no view owns
   // A component's root, claimed loose: { root, index, used } for the render under `root`.
   let loose = null;
 
@@ -339,7 +342,9 @@ mod wutu {
       mounted.add(node);
       const view = active;
       queueMicrotask(() => {
-        handler(new Event('mount'));
+        const outer = owner;
+        owner = [node, view];
+        try { handler(new Event('mount')); } finally { owner = outer; }
         autoSave();
         if (view) schedule(view);
       });
@@ -355,6 +360,8 @@ mod wutu {
       map.set(event, record);
       node.addEventListener(event, e => {
         let loud = false;
+        const outer = owner;
+        owner = [node, record.view];
         try {
           for (const [current, isQuiet] of [...record.handlers]) {
             if (!isQuiet) loud = true;
@@ -362,6 +369,7 @@ mod wutu {
             if (result?.then) result.then(refresh, error => { refresh(); setTimeout(() => { throw error; }); });
           }
         } finally {
+          owner = outer;
           if (loud) {
             autoSave();
             if (record.view) schedule(record.view);
@@ -575,7 +583,7 @@ mod wutu {
       // cleanup() registrations are positional: ones not repeated this render run now.
       for (const callback of view.cleanupCallbacks.splice(view.cleanupIndex)) callback();
       // So are intervals: one not started again this render stops.
-      for (const [key, timer] of view.effects) if (!view.intervalsSeen.has(key)) { clearInterval(timer.id); view.effects.delete(key); }
+      for (const [key, timer] of view.effects) if (!timer.node && !view.intervalsSeen.has(key)) { clearInterval(timer.id); view.effects.delete(key); }
       for (const node of view.removals) {
         if (view.retained.has(node)) continue;
         dispose(node);
@@ -670,18 +678,27 @@ mod wutu {
       }
     },
     /**
-     * A timer owned by the rendering view: started once per key, stopped by
-     * the first render that does not start it again, or when the view goes.
+     * A timer, started once per key. Started by a render, the view owns it:
+     * the first render that does not start it again stops it. Started by an
+     * `on mount` or event handler, its element does: it stops once the
+     * element is gone. Either stops when the view goes.
      */
     interval(key, milliseconds, callback) {
-      const view = active;
-      if (!view) return;
-      view.intervalsSeen.add(key);
-      const effect = view.effects.get(key);
-      if (effect) { effect.callback = callback; return; }
-      const entry = { callback, id: 0 };
-      entry.id = setInterval(() => { entry.callback(); autoSave(); schedule(view); }, Math.max(16, milliseconds));
-      view.effects.set(key, entry);
+      const [node, view] = active ? [null, active] : owner ?? [];
+      if (!node) {
+        if (!view) return;
+        view.intervalsSeen.add(key);
+      }
+      const effects = view?.effects ?? timers, effect = effects.get(key);
+      if (effect?.node === node) { effect.callback = callback; return; }
+      // (Another element's is replaced: the same `on mount`, on an element made again.)
+      if (effect) clearInterval(effect.id);
+      const entry = { callback, id: 0, node };
+      entry.id = setInterval(() => {
+        if (node && !node.isConnected) { clearInterval(entry.id); effects.delete(key); return; }
+        entry.callback(); autoSave(); schedule(view);
+      }, Math.max(16, milliseconds));
+      effects.set(key, entry);
     },
     /**
      * A hole that calls a function (`= f(a, b);`) with a key the compiler

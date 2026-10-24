@@ -3420,18 +3420,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/44_duplicate_enum_and_struct.utu
- ERROR  Duplicate declaration Circle
-        duplicate-declaration · examples/error_demo/names/44_duplicate_enum_and_struct.utu:7:8
+ ERROR  Circle has no field r
+        unknown-field · examples/error_demo/names/44_duplicate_enum_and_struct.utu:11:22
 
- 4 │     | Circle { r: F64 }
-   │       ──────
-   │       ╰─ first here
- 5 │     | Square { side: F64 }
- 6 │
- 7 │ struct Circle:
-   │        ━━━━━━
-   │        ╰─ again
- 8 │     | radius: F64
+ 9 │
+10 │ export main() F64 {
+11 │     let c = Circle { r: 1.0 };   // the struct: Shape.Circle { r: 1.0 }, or let c: Shape = …
+   │                      ━━━━━━
+   │                      ╰─ no such field
+12 │     0.0;
+13 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/45_duplicate_parameter.utu
@@ -4608,6 +4606,19 @@ ok
  6 │ test "adds" { assert add(2, 2) == 4; }
    │      ━━━━━━
    │      ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/names/970_declaration_hides_variant.utu
+ ERROR  Circle is not a struct: it has no fields to set
+        not-struct · examples/error_demo/names/970_declaration_hides_variant.utu:12:13
+
+10 │
+11 │ export main() F64 {
+12 │     let c = Circle { r: 1.0 };   // the enum Circle: Shape.Circle { r: 1.0 }
+   │             ━━━━━━
+   │             ╰─ no fields
+13 │     0.0;
+14 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/97_empty_test_name.utu
@@ -7578,7 +7589,7 @@ FAIL third item: Failed check in std:Buffer  at examples/error_demo/runtime/48_t
 --- exit 1
 
 === utu run examples/error_demo/runtime/55_main_returns_struct.utu
-[Object: null prototype] {}
+Point
 --- exit 0
 
 === utu run examples/error_demo/runtime/56_main_void_ok.utu

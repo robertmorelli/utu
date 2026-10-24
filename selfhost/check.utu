@@ -1670,6 +1670,8 @@ fn check_assign(node: I32, cx: Cx) I32 {
     };
     let decl = node_decl[target];
     if decl < 0 { return error_value(); };
+    // `m = 3`: a module or type has no storage.
+    if is_type_decl(decl) { return not_value(target, decl); };
     if decl_is(decl, Decl.Global) or decl_is(decl, Decl.Fn) or decl_is(decl, Decl.Mem) {
         report(Diag.AssignmentToImmutable, target, word_of(target));
         // The value is still checked against what it would replace.
@@ -2037,6 +2039,9 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
     // `m.T.f(…)`, `M.T.f(…)`: a static function of a module's (or alias's) type.
     let st = static_type_path(base, cx);
     if st >= 0 {
+        // `m.Tag.from_i32(i)`: as `Tag.from_i32(i)`.
+        let r = if is_scalar_kind(ty_decl(st)) { scalar_static(ty_decl(st), word_of(name), args, node, cx); } else { -1; };
+        if r >= 0 { return r; };
         let target = static_member(ty_decl(st), word_of(name));
         if not decl_is(target, Decl.Fn) {
             report2(Diag.UnknownMethod, node, word_of(name), st, -1);
@@ -3413,6 +3418,7 @@ fn reset_check() void {
     reset_control();
     reset_closures();
     reset_generators();
+    reset_protocols();
     reset_iterators();
     reset_defers();
     reset_optional();
@@ -3483,6 +3489,7 @@ fn compile(target: Target) I32 {
     test_node.clear();
     bench_node.clear();
     run_depth[0] = 0;
+    run_elem[0] = -1;
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
@@ -3821,12 +3828,14 @@ vec run_elem: I32 = [-1];
 /// `export main() Array[…]` (or `?Array`, nested) in a run build: for each
 /// array level k, `run:len:k` and `run:at:k`, its `len()` and `[i]`, so
 /// `utu run` prints the result as `[[1, 2], []]`. (`:` is in no utu name.)
+/// A tuple or handle main's type is @run_elem too: printed `[1, P]`, `P`.
 fn run_readers(item: I32) void {
     run_depth[0] = 0;
     let ret = child_of_kind(item, Node.Return_type);
     if ret < 0 { return; };
     let t = type_of(ret, 0);
     if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
+    if ty_is(t, Ty.Tuple) or js_handle(t) { run_elem[0] = t; };
     while (is_array_type(t)) {
         let k = run_depth[0].to_str();
         run_reader(t, intern_text("len"), "run:len:" + k);

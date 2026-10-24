@@ -1084,62 +1084,40 @@ fn glob_folded(g: I32) Bool {
 // greatest first), then the others as they were.
 vec sort_items: I32;
 vec sort_keys: I32;
-vec sort_spare: I32;
 vec sort_rest: I32;
 
 /// Reorders @sort_items by @sort_keys: the `room` greatest first, then the
 /// others in the order they were.
 fn most_used_first(room: I32) void {
+    // Sorted by the keys negated (equals keep their order), as @sort_rest.
+    let n = sort_items.len();
+    let key = Array[I32].new(sort_keys.len(), 0);
+    for (0 ..< sort_keys.len()) |k| { key[k] = 0 - sort_keys[k]; };
+    let order = Array[I32].new(n, 0);
     sort_rest.clear();
-    for (0 ..< sort_items.len()) |i| { sort_rest.push(sort_items[i]); };
-    sort_by_keys();
+    for (0 ..< n) |i| {
+        order[i] = sort_items[i];
+        sort_rest.push(sort_items[i]);
+    };
+    sort_by_key(order, key);
+    for (0 ..< n) |i| { sort_items[i] = order[i]; };
     let front = if room < sort_items.len() { if room > 0 { room; } else { 0; }; } else { sort_items.len(); };
     // The front is the first `front` of the sorted ones; the rest follow in their order.
     for (0 ..< sort_rest.len()) |i| { if sort_rest[i] >= sort_front.len() { sort_front.resize(sort_rest[i] + 1); }; };
     for (0 ..< sort_rest.len()) |i| { sort_front[sort_rest[i]] = 0; };
     for (0 ..< front) |i| { sort_front[sort_items[i]] = 1; };
-    let n = front;
+    let at = front;
     for (0 ..< sort_rest.len()) |i| {
         let item = sort_rest[i];
         if sort_front[item] == 0 {
-            sort_items[n] = item;
-            n += 1;
+            sort_items[at] = item;
+            at += 1;
         };
     };
 }
 
 /// By item: 1 for those among the first `front` of @sort_items.
 vec sort_front: U8;
-
-// sort_items by sort_keys[item], greatest first; equal keys keep their
-// order. A merge sort, bottom up, through sort_spare.
-
-fn sort_by_keys() void {
-    let n = sort_items.len();
-    sort_spare.resize(n);
-    let width = 1;
-    while (width < n) {
-        let lo = 0;
-        while (lo < n) {
-            let mid = if lo + width < n { lo + width; } else { n; };
-            let hi = if mid + width < n { mid + width; } else { n; };
-            let i = lo;
-            let j = mid;
-            for (lo ..< hi) |k| {
-                if j >= hi or (i < mid and sort_keys[sort_items[i]] >= sort_keys[sort_items[j]]) {
-                    sort_spare[k] = sort_items[i];
-                    i += 1;
-                } else {
-                    sort_spare[k] = sort_items[j];
-                    j += 1;
-                };
-            };
-            lo = hi;
-        };
-        for (0 ..< n) |k| { sort_items[k] = sort_spare[k]; };
-        width *= 2;
-    };
-}
 
 // The types the module uses: those of its live functions (signatures,
 // locals, and every instruction's result and type immediate), globals, and

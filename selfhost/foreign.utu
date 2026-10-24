@@ -11,6 +11,7 @@
 //!   {"template": 3, "arguments": [r…]}   a generic type, instantiated
 //!   {"parameter": "T", "constraint": r}  a generic parameter
 //!   {"literal": "x", "base": "Str"}      a literal type
+//!   {"pattern": ["id-", "F64", ""], "name": n, "base": "Str"}   `id-${number}`
 //!   {"indexed": r, "key": r}             T[K]
 //!   {"symbol": "iterator"}               a well-known symbol
 //! ```
@@ -117,6 +118,8 @@ fn resolved(r: Ref) Ref {
             if index >= 0 { return resolved(Ref { doc: r.doc, at: jget(index, "type"), env: object.env }); };
             return any_slot(r.doc);
         };
+        // `keyof E` of a generic E (TypeScript spells a known one's as its literals): a string.
+        if jget(at, "keys") >= 0 { return Ref { doc: r.doc, at: prim_ref(prelude(Prelude.Str)), env: -1 }; };
     };
     if jis_object(at) {
         // A generic instance is its declaration with its parameters bound.
@@ -317,7 +320,8 @@ fn union_type(d: Ref, union: I32, view: I32) I32 {
         m = jnext(m);
     };
     if absent {
-        let value = if npresent == 1 { foreign_type(Ref { doc: d.doc, at: present, env: d.env }, view); } else { foreign_named(d, view); };
+        // (`"start" | "end" | undefined` is a ?Str)
+        let value = if npresent == 1 { foreign_type(Ref { doc: d.doc, at: present, env: d.env }, view); } else if same >= 0 { same; } else { foreign_named(d, view); };
         if ty_is(value, Ty.Nullable) { return value; };
         // A nullable number or Bool is a host value until it is promoted.
         if value == prelude(Prelude.F64) or value == prelude(Prelude.Bool) { return nullable(boxed_type(value, view)); };
@@ -454,7 +458,33 @@ fn foreign_member(t: I32, key: I32, view: I32) Bool {
     };
     // A dynamic value has every member, of dynamic type.
     if ref_dynamic(ref_of(t)) { return found_member(d.doc, any_ref(), -1, false); };
+    let union = desc_get(d, "union");
+    if union >= 0 { return union_member(d, union, key); };
     false;
+}
+
+/// A union's (`{ kind: "a" } | { kind: "b" }`) property every member has:
+/// of their types' union, read-only where they differ.
+fn union_member(d: Ref, union: I32, key: I32) Bool {
+    let first = -1;
+    let text = "";
+    let readonly = false;
+    let m = jfirst(union);
+    while (m >= 0) {
+        if not is_absence(m) {
+            let md = describe(Ref { doc: d.doc, at: m, env: d.env });
+            let prop = jget_word(desc_get(md, "properties"), key);
+            if prop < 0 or md.env != d.env { return false; };
+            let pt = jget(prop, "type");
+            readonly = readonly or jis_true(jget(prop, "readonly"));
+            if first < 0 { first = pt; }
+            else if not bytes_equal(first, jend(first), pt, jend(pt)) { readonly = true; };
+            text = text + (if text.len() > 0 { ","; } else { ""; }) + bytes_text(pt, jend(pt));
+        };
+        m = jnext(m);
+    };
+    if first < 0 { return false; };
+    found_member(d.doc, if readonly { abi_text("{\"union\":[" + text + "]}"); } else { first; }, d.env, readonly);
 }
 
 /// Whether a view exports `key`; the export is then in the `member_*` vecs (see @member_ref).
@@ -706,7 +736,9 @@ fn host_assignable(actual: I32, expected: I32) Bool {
     if ty_is(actual, Ty.Nullable) and not ty_is(expected, Ty.Nullable) { return false; };
     let a = if ty_is(actual, Ty.Nullable) { ty_a[actual]; } else { actual; };
     let e = if ty_is(expected, Ty.Nullable) { ty_a[expected]; } else { expected; };
-    if a == e { return true; };
+    if a == e or same_promise(a, e) or same_promise(e, a) { return true; };
+    // (a closure's result too: `cl(F64) Promise[F64]` for `(x: number) => Promise<number>`)
+    if ty_is(a, Ty.Closure) and ty_is(e, Ty.Closure) and ty_a[a] == ty_a[e] and ty_b[a] >= 0 and ty_b[e] >= 0 and (same_promise(ty_b[a], ty_b[e]) or same_promise(ty_b[e], ty_b[a])) { return true; };
     if is_foreign(a) and is_foreign(e) and has_base(a, e, 0) { return true; };
     if is_foreign(e) {
         let host = is_host_value(a);
@@ -733,6 +765,9 @@ fn host_assignable(actual: I32, expected: I32) Bool {
     if e == prelude(Prelude.Externref) and is_host_value(a) { return true; };
     false;
 }
+
+/// Whether utu's `Promise[T]` (`u`) and host `Promise<T>` (`h`) are one: a JS promise of T.
+fn same_promise(u: I32, h: I32) Bool { is_promise_type(u) and host_promise_value(h) == inst_arg(ty_inst(u), 0); }
 
 /// Whether a string is one: an `ArrayLike` or `Iterable` of strings.
 fn string_like(e: I32) Bool {
@@ -958,9 +993,12 @@ fn member_access(view: I32, key: I32, root: Bool) Str {
     if not jis_string(spec) { return "globalThis[" + js_key(key) + "]"; };
     // Named by the import (numbered among the program's host declaration
     // imports), not the view, which may have been kept from an earlier program.
-    let alias = "__abi" + int_text(foreign_ordinal(view_import[view])) + "_" + hex_name(word_text(key));
-    access_prologue[0] = intern_text("import { " + js_key(key) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ");
-    alias;
+    // (an `export =` module's members are its default export's: CommonJS has no named ones)
+    let assigned = jis_true(jget(view_json[view], "exportAssignment")) and word_text(key) != "default";
+    let name = if assigned { intern_text("default"); } else { key; };
+    let alias = "__abi" + int_text(foreign_ordinal(view_import[view])) + "_" + hex_name(word_text(name));
+    access_prologue[0] = intern_text("import { " + js_key(name) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ");
+    if assigned { alias + "[" + js_key(key) + "]"; } else { alias; };
 }
 
 /// Which of the program's imports of host declarations import `i` is (0 for the first).
@@ -1262,20 +1300,26 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
     if is_null_literal(arg) and nullable_ { return foreign_type(s, view); };
     let t = if is_null_literal(arg) { ty_null(); } else { type_only(arg, -1, cx); };
     // A member the argument's shape picks: an array-like for `[…]`, a
-    // callable for a closure, an object with its fields for `&{…}`.
+    // callable for a closure, the object `&{…}` fits best (see @record_fit).
+    let best = -1;
+    let best_fit = 0;
     m = jfirst(union);
     while (m >= 0) {
         if not is_absence(m) {
             let r = Ref { doc: d.doc, at: m, env: d.env };
             let md = describe(r);
-            let picked = if is_untyped_array(arg) { element_of(r, 0) >= 0; }
-                else if is_closure_arg(arg, cx) { jlen(desc_get(md, "calls")) > 0 or decl_name_text(md.at) == "Function"; }
-                else if is_record(arg) { jlen(desc_get(md, "calls")) == 0 and record_fits(md, arg); }
-                else { false; };
-            if picked { return wrap_nullable(accept(r, arg, view, cx), nullable_, t); };
+            let fit = if is_untyped_array(arg) { if element_of(r, 0) >= 0 { 9; } else { 0; }; }
+                else if is_closure_arg(arg, cx) { if jlen(desc_get(md, "calls")) > 0 or decl_name_text(md.at) == "Function" { 9; } else { 0; }; }
+                else if is_record(arg) and jlen(desc_get(md, "calls")) == 0 { record_fit(md, arg); }
+                else { 0; };
+            if fit > best_fit {
+                best = m;
+                best_fit = fit;
+            };
         };
         m = jnext(m);
     };
+    if best >= 0 { return wrap_nullable(accept(Ref { doc: d.doc, at: best, env: d.env }, arg, view, cx), nullable_, t); };
     let int_literal = is_kind(arg, Node.Literal) and is_kind(first_child(arg), Node.Int_lit);
     m = jfirst(union);
     while (m >= 0) {
@@ -1316,37 +1360,100 @@ fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) void {
     let bound = Ref { doc: given.doc, at: constraint, env: given.env };
     let slot = if constraint >= 0 and literal_members(bound) >= 0 { bound; } else { given; };
     let d = describe(slot);
-    let union = desc_get(d, "union");
-    if union < 0 { return; };
+    if desc_get(d, "union") < 0 and literal_fit(d.at, d, false, -1, -1) < 0 { return; };
     let lit = arg;
-    let negate = false;
-    if is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.to_i32() {
-        lit = last_child(lit);
-        negate = true;
-    };
+    if is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.to_i32() { lit = last_child(lit); };
     if not is_kind(lit, Node.Literal) {
         // Nor is any Str one (a variable's, a call's), as TypeScript has it; one
         // from the host may be (utu keeps no literal types).
-        if not negate and string_literals(d) and type_only(arg, -1, cx) == prelude(Prelude.Str) and not host_rooted(arg, cx) { report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), -1, -1, 2); };
+        if lit == arg and string_literals(d) and type_only(arg, -1, cx) == prelude(Prelude.Str) and not host_rooted(arg, cx) { report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), -1, -1, 2); };
         return;
     };
+    if literal_in(d, arg) != 0 { return; };
+    let text = is_kind(first_child(lit), Node.String_lit) and lit == arg;
+    report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), intern_text(node_text(arg)), -1, if text and jis_true(jget(d.at, "enum")) { 1; } else { 0; });
+}
+
+/// A number literal's value, for @literal_fit.
+vec fit_x: F64 = [0.0];
+
+/// Whether literal `arg` (`"x"`, `2.0`, `-1`) is a value of literal type `d`
+/// (a literal, a pattern, a union of them): 1; 0 not; -1 when `d` has a
+/// member of no literal type, or `arg` is no literal.
+fn literal_in(d: Ref, arg: I32) I32 {
+    let lit = arg;
+    let negate = is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.to_i32();
+    if negate { lit = last_child(lit); };
+    if not is_kind(lit, Node.Literal) { return -1; };
     let c = first_child(lit);
     let text = is_kind(c, Node.String_lit) and not negate;
     let number = is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit);
-    if not text and not number { return; };
-    let x = if is_kind(c, Node.Int_lit) { int_value(c).to_u64().to_f64(); } else if number { parse_number(token_text(node_first[c])); } else { 0.0; };
-    if negate { x = 0.0 - x; };
+    if not text and not number { return -1; };
+    fit_x[0] = if is_kind(c, Node.Int_lit) { int_value(c).to_u64().to_f64(); } else if number { parse_number(token_text(node_first[c])); } else { 0.0; };
+    if negate { fit_x[0] = 0.0 - fit_x[0]; };
+    let lo = tok_start[node_first[c]];
+    let hi = tok_end[node_last[c] - 1];
+    let union = desc_get(d, "union");
+    if union < 0 { return literal_fit(d.at, d, text, lo, hi); };
     let m = jfirst(union);
     while (m >= 0) {
         if not is_absence(m) {
-            let value = jget(m, "literal");
-            if value < 0 { return; };
-            if text and jis_string(value) and not jis_true(jget(d.at, "enum")) and bytes_equal(value, jend(value), tok_start[node_first[c]], tok_end[node_last[c] - 1]) { return; };
-            if number and jis_number(value) and json_number(value) == x { return; };
+            let r = literal_fit(m, d, text, lo, hi);
+            if r != 0 { return r; };
         };
         m = jnext(m);
     };
-    report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), intern_text(node_text(arg)), -1, if text and jis_true(jget(d.at, "enum")) { 1; } else { 0; });
+    0;
+}
+
+/// Whether a literal (a string, `src[lo ..< hi]` with its quotes; else the
+/// number `fit_x`) is member `m`'s value (of union, or literal, `d`): 1; 0
+/// not; -1 when `m` is no literal type.
+fn literal_fit(m: I32, d: Ref, text: Bool, lo: I32, hi: I32) I32 {
+    let pattern = jget(m, "pattern");
+    if pattern >= 0 { return if text and pattern_fits(jfirst(pattern), lo + 1, hi - 1) { 1; } else { 0; }; };
+    let value = jget(m, "literal");
+    if value < 0 { return -1; };
+    if text and jis_string(value) and not jis_true(jget(d.at, "enum")) and bytes_equal(value, jend(value), lo, hi) { return 1; };
+    if not text and jis_number(value) and json_number(value) == fit_x[0] { return 1; };
+    0;
+}
+
+/// Whether `src[i ..< end_]` matches a template's parts from `part` on: its
+/// text, then a hole (`"F64"` a number, `"bigint"` an integer, `"Str"` any
+/// text) and the rest.
+fn pattern_fits(part: I32, i: I32, end_: I32) Bool {
+    let n = jstring_end(part) - part - 2;
+    if i + n > end_ or not bytes_equal(part + 1, part + 1 + n, i, i + n) { return false; };
+    let hole = jnext(part);
+    if hole < 0 { return i + n == end_; };
+    for (i + n ..< end_ + 1) |j| {
+        let fits = jstring_is_text(hole, "Str") or number_text(i + n, j, jstring_is_text(hole, "bigint"));
+        if fits and pattern_fits(jnext(hole), j, end_) { return true; };
+    };
+    false;
+}
+
+/// Whether `src[i ..< end_]` is a JS number (`-1.5e3`), or an integer.
+fn number_text(i: I32, end_: I32, integer: Bool) Bool {
+    let k = if i < end_ and (src[i] == 45 or src[i] == 43 and not integer) { i + 1; } else { i; };
+    let digits = 0;
+    let dot = integer;
+    let exp = integer;
+    while (k < end_) {
+        let b = src[k];
+        if b >= 48 and b <= 57 { digits += 1; }
+        else if b == 46 and not dot { dot = true; }
+        else if (b == 101 or b == 69) and not exp and digits > 0 {
+            exp = true;
+            dot = true;
+            digits = 0;
+            if k + 1 < end_ and (src[k + 1] == 45 or src[k + 1] == 43) { k += 1; };
+        }
+        else { return false; };
+        k += 1;
+    };
+    digits > 0;
 }
 
 /// A closure whose written result is Str, for a callback whose result is a
@@ -1367,7 +1474,8 @@ fn literal_union_name(slot: Ref, d: Ref, view: I32) I32 {
     let prefix = word_text(view_prefix[view]) + ".";
     // (`keyof M` names M: `keyof Api.M`)
     if name.len() > 6 and name.slice(0, 6) == "keyof " { return intern_text("keyof " + prefix + name.slice(6, name.len())); };
-    let alias = not has_byte(name, 124);
+    // (a literal, `"b"`, and a pattern, `` `id-${number}` ``, as they are)
+    let alias = not has_byte(name, 124) and jget(d.at, "base") < 0;
     intern_text((if alias { prefix; } else { ""; }) + display(slot, 0));
 }
 
@@ -1400,15 +1508,15 @@ fn assigned_after(let_node: I32, decl: I32) Bool {
     false;
 }
 
-/// Whether union `d`'s members (but absence) are all string literals.
+/// Whether `d` (a union's members but absence) are all string literals or patterns.
 fn string_literals(d: Ref) Bool {
     let union = desc_get(d, "union");
+    if union < 0 { return jis_string(jget(d.at, "literal")) or jget(d.at, "pattern") >= 0; };
     let any = false;
     let m = jfirst(union);
     while (m >= 0) {
         if not is_absence(m) {
-            let value = jget(m, "literal");
-            if value < 0 or not jis_string(value) { return false; };
+            if not jis_string(jget(m, "literal")) and jget(m, "pattern") < 0 { return false; };
             any = true;
         };
         m = jnext(m);
@@ -1451,16 +1559,31 @@ fn assignable_to(actual: I32, expected: I32) Bool {
     host_assignable(actual, expected);
 }
 
-/// Whether `&{…}` fits an object declaration: each field a property (or an index signature).
-fn record_fits(d: Ref, arg: I32) Bool {
+/// How well `&{…}` fits an object declaration (0 not one): its literals the
+/// properties' values (`kind: "sq"`, a discriminant) 4, each field a property
+/// (or an index signature) 2, each required property given 1, plus 1.
+fn record_fit(d: Ref, arg: I32) I32 {
     let props = desc_get(d, "properties");
+    if props < 0 { return 0; };
     let indexed = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(d);
+    let fields = true;
+    let literals = true;
     let f = first_child(arg);
     while (f >= 0) {
-        if is_kind(f, Node.Field_init) and jget_word(props, word_of(first_child(f))) < 0 and not indexed { return false; };
+        if is_kind(f, Node.Field_init) {
+            let prop = jget_word(props, word_of(first_child(f)));
+            if prop < 0 and not indexed { fields = false; };
+            if prop >= 0 and literal_in(describe(Ref { doc: d.doc, at: jget(prop, "type"), env: d.env }), last_child(f)) == 0 { literals = false; };
+        };
         f = next_sibling(f);
     };
-    true;
+    let p = jfirst(props);
+    let given = true;
+    while (p >= 0) {
+        if not jis_true(jget(jvalue(p), "optional")) and not record_names(arg, p) { given = false; };
+        p = jnext(p);
+    };
+    1 + (if literals { 4; } else { 0; }) + (if fields { 2; } else { 0; }) + if given { 1; } else { 0; };
 }
 
 /// A closure given to a dynamic slot receives dynamic arguments.
@@ -1732,7 +1855,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
         i += 1;
     };
     for (0 ..< n) |k| {
-        let slot = sig_slot(sig, k, d.env, d.doc);
+        let slot = union_slot(sig_slot(sig, k, d.env, d.doc), args[k], cx);
         let p = jget(slot.at, "parameter");
         if p >= 0 and not bound_in_pending(m, jstring_word(p)) {
             let literals = literal_members(Ref { doc: d.doc, at: jget(slot.at, "constraint"), env: d.env });
@@ -1746,8 +1869,10 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 if c >= 0 { unify_elements(Ref { doc: d.doc, at: c, env: d.env }, args[k], m, d, 0, cx); };
             } else if not is_null_literal(args[k]) and closure_node(args[k]) < 0 {
                 let t = type_only(args[k], -1, cx);
-                // (Outside its constraint, `T` stays unbound: the slot is the constraint, which rejects it.)
-                if ref_of_type(t) and within_constraint(t, slot, d) {
+                // (Outside its constraint, `T` stays unbound: the slot is the constraint, which rejects it.
+                // `B extends A` reads A's binding so far.)
+                let senv = if jget(jget(slot.at, "constraint"), "parameter") >= 0 { pending_env(m); } else { slot.env; };
+                if ref_of_type(t) and within_constraint(t, Ref { doc: slot.doc, at: slot.at, env: senv }, d) {
                     vl_add(jstring_word(p));
                     vl_add(typed_ref_at[0]);
                     vl_add(typed_ref_env[0]);
@@ -1855,6 +1980,33 @@ fn bind_param(ep: I32, arg: I32, m: I32, d: Ref, cx: Cx) void {
     };
 }
 
+/// The member of a union slot an argument binds through: `T` of `T | { value: T }`
+/// for a value (not a record, nor a nullable), `(p: P) => T` of `T | ((p: P) => T)`
+/// for a closure; else the slot.
+fn union_slot(slot: Ref, arg: I32, cx: Cx) Ref {
+    if jget(slot.at, "parameter") >= 0 { return slot; };
+    let d = describe(slot);
+    let union = desc_get(d, "union");
+    let closure = closure_node(arg) >= 0;
+    if union < 0 or is_record(arg) or is_untyped_array(arg) or is_null_literal(arg) or not closure and ty_is(type_only(arg, -1, cx), Ty.Nullable) { return slot; };
+    let m = jfirst(union);
+    while (m >= 0) {
+        let r = Ref { doc: d.doc, at: m, env: d.env };
+        let fits = if closure { jlen(desc_get(describe(r), "calls")) > 0; } else { jget(m, "parameter") >= 0; };
+        if fits { return r; };
+        m = jnext(m);
+    };
+    slot;
+}
+
+/// The bindings pending since `m`, as a list (they stay pending).
+fn pending_env(m: I32) I32 {
+    let end_ = vl_pending.len();
+    let m2 = vl_begin();
+    for (m ..< end_) |i| { vl_add(vl_pending[i]); };
+    vl_end(m2);
+}
+
 fn vl_len_safe(list: I32) I32 { if list < 0 { 0; } else { vl_len[list]; }; }
 
 /// Whether the pending list (begun at `m`) binds parameter word `w`.
@@ -1907,8 +2059,12 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
     let checked = result_checked[0] == 1;
     let self_ = if receiver >= 0 { if n > 0 { "self,"; } else { "self"; }; } else { ""; };
     let body = prologue + "(" + self_ + param_names(n) + ") => " + js_output((if construct or use_ctors { "new "; } else { ""; }) + access + "(" + invocation + ")", t, checked);
-    if key >= 0 { return foreign_member_op(vl_end(mt), t, body, m, key, receiver < 0); };
-    foreign_call_op(vl_end(mt), t, body, m);
+    let r = if key >= 0 { foreign_member_op(vl_end(mt), t, body, m, key, receiver < 0); } else { foreign_call_op(vl_end(mt), t, body, m); };
+    // A `never` result does not return: it fits any type.
+    if not ref_is(resolved(result_ref), "never") { return r; };
+    w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+    w_node(Op.Seq, vt_unreachable, 0, 0, m);
+    ty_never();
 }
 
 /// `f(args)`: a host value of a function type, `callee` (its type `t`), called.
@@ -2011,9 +2167,11 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
         let at = if is_kind(key_node, Node.Literal) and is_kind(first_child(key_node), Node.Int_lit) and int_value(first_child(key_node)) < 1000000 {
             tuple_slot(d, int_value(first_child(key_node)).to_i32()).at;
         } else { -1; };
+        let constant = is_kind(key_node, Node.Literal) and is_kind(first_child(key_node), Node.Int_lit);
         if at >= 0 { slot = tuple_slot(d, int_value(first_child(key_node)).to_i32()); }
-        else if not tuple_uniform(d, view) {
-            report2(Diag.TupleIndex, key_node, -1, owner, -1);
+        else if constant and not tuple_has_rest(d) or not tuple_uniform(d, view) {
+            // (`[number, number][2]`: past its end)
+            report2(Diag.TupleIndex, key_node, -1, owner, if constant { int_value(first_child(key_node)).to_i32(); } else { -1; });
             w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
             return ty_error();
         };
@@ -2496,7 +2654,10 @@ fn host_promise_value(t: I32) I32 {
     if p < 0 { return foreign_any(fty_view[t]); };
     let bound = binding_of(r.env, jstring_word(p));
     if bound < 0 { return foreign_any(fty_view[t]); };
-    foreign_type(Ref { doc: r.doc, at: bound, env: bind_env[0] }, fty_view[t]);
+    let v = foreign_type(Ref { doc: r.doc, at: bound, env: bind_env[0] }, fty_view[t]);
+    // (`Promise<Promise<T>>` resolves to T, as JS and TypeScript's Awaited have it)
+    let inner = host_promise_value(v);
+    if inner >= 0 { inner; } else { v; };
 }
 
 /// A generic parameter only the result mentions takes the type the context
@@ -2523,7 +2684,9 @@ fn within_constraint(t: I32, slot: Ref, d: Ref) Bool {
     let c = jget(slot.at, "constraint");
     if c < 0 or ty_is(t, Ty.Error) { return true; };
     let ct = foreign_type(Ref { doc: slot.doc, at: c, env: slot.env }, view_of_doc(d.doc));
-    not is_foreign(ct) or is_dynamic(ct) or host_assignable(t, ct);
+    // (`B extends A`, A bound to F64: B's is F64)
+    if not is_foreign(ct) { return ty_is(ct, Ty.Void) or assignable_to(t, ct); };
+    is_dynamic(ct) or host_assignable(t, ct);
 }
 
 fn bind_open(param: I32, doc: I32, env: I32, wanted: I32) I32 {

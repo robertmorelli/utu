@@ -19,21 +19,35 @@ const DISPLAY_FILTERS = new Map([
 ]);
 
 /**
- * `fail(title, code, notes, command)`: utu.mjs's, which says what went wrong and exits 1.
+ * `fail(title, code, notes, command)`: utu.mjs's, which says what went wrong and exits (2 for a usage error, else 1).
  * `notUtf8(file)`: utu.mjs's, which says where a program's file is not UTF-8 and exits 1.
  */
-export async function main(command, fileArg, args, fail, notUtf8) {
-  if (!fileArg || fileArg.startsWith('-')) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
+export async function main(command, given, fail, notUtf8) {
+  // Options anywhere: graph's -o, a section view's --noln; then one file.
+  const files = [];
+  const args = [];
+  let at = -1;
+  for (let i = 0; i < given.length; i++) {
+    const arg = given[i];
+    if (arg === '-o' || arg === '--out') {
+      if (command !== 'graph') fail(`${arg} is only for graph`, 'unknown-option', [`utu ${command} writes nothing.`]);
+      if (at >= 0) fail(`Two outputs: ${args[at + 1]}, ${given[i + 1]}`, 'unknown-option');
+      if (given[i + 1] === undefined || given[i + 1].startsWith('-')) fail(`${arg} needs a file`, 'missing-output', [], `utu graph ${files[0] ?? '<file.utu>'} ${arg} <out.html>`);
+      at = args.length;
+      args.push(arg, given[++i]);
+    } else if (arg === '--noln' && DISPLAY_FILTERS.has(command)) args.push(arg);
+    else if (arg.startsWith('-') && arg !== '-') {
+      fail(`Unknown option ${arg}`, 'unknown-option', [command === 'graph' ? 'utu graph FILE [-o out.html]' : `utu ${command} FILE${DISPLAY_FILTERS.has(command) ? ' [--noln]' : ''}: stage 0's view, with no build mode`]);
+    } else files.push(arg);
+  }
+  if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
+  if (files.length > 1) fail(`Extra argument ${files[1]}`, 'extra-argument', [`utu ${command} takes one file.`]);
+  const [fileArg] = files;
   const file = path.resolve(fileArg);
   let stat = null;
   try { stat = await fs.stat(file); } catch {}
   if (!stat) fail(`No file ${fileArg}`, 'file-not-found');
   if (stat.isDirectory()) fail(`${fileArg} is a directory`, 'not-a-file');
-  const at = Math.max(args.indexOf('-o'), args.indexOf('--out'));
-  if (at >= 0 && command !== 'graph') fail(`${args[at]} is only for graph`, 'unknown-option', [`utu ${command} writes nothing.`]);
-  if (at >= 0 && (args[at + 1] === undefined || args[at + 1].startsWith('-'))) {
-    fail(`${args[at]} needs a file`, 'missing-output', [], `utu graph ${fileArg} ${args[at]} <out.html>`);
-  }
   try {
     await show(command, file, args, at);
   } catch (error) {

@@ -247,6 +247,44 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
     }
   }));
 
+  test('wutu runtime: an interval started by `on mount` or a handler ticks, survives renders, and stops with its element', () => withRuntime(async ({ api, document, window }) => {
+    const ticks = new Map(), realSet = globalThis.setInterval, realClear = globalThis.clearInterval;
+    let next = 0;
+    globalThis.setInterval = (f) => { ticks.set(++next, f); return next; };
+    globalThis.clearInterval = (id) => { ticks.delete(id); };
+    try {
+      let show = true, mounts = 0, clicks = 0;
+      const root = api.mount(() => {
+        api.enter('main', false, 'root', '');
+        if (show) {
+          const p = api.enter('p', false, 'clock', '');
+          api.listen(p, 'mount', () => api.interval('m', 100, () => mounts++));
+          api.leave();
+        }
+        const b = api.enter('button', false, 'go', '');
+        api.listen(b, 'click', () => api.interval('c', 100, () => clicks++));
+        api.leave();
+        return api.leave();
+      }, '');
+      document.body.append(root);
+      await settle();
+      click(window, root.querySelector('button'));
+      click(window, root.querySelector('button'));
+      await settle();
+      assertEq(ticks.size, 2, 'one timer per key, from `on mount` and from a click');
+      api.refresh();
+      for (const f of [...ticks.values()]) f();
+      assertEq([mounts, clicks].join(), '1,1', 'both tick after a render');
+      show = false;
+      api.refresh();
+      for (const f of [...ticks.values()]) f();
+      assertEq([mounts, ticks.size].join(), '1,1', 'the mount timer stops once its element is gone');
+    } finally {
+      globalThis.setInterval = realSet;
+      globalThis.clearInterval = realClear;
+    }
+  }));
+
   test('wutu runtime: hydration enables pending controls and keeps prerendered styles and properties', () => withRuntime(async ({ api, document }) => {
     const program = JSON.stringify([['o', 0, ['main', {}]], ['s', 1, ['button', {}, 'go']], ['o', 2, ['p', {}]], ['y', 'width'], ['n', 2], ['t', 'x'], ['c'], ['c']]);
     // (A program is known by its FNV-1a hash, base 36, as begin() names it.)

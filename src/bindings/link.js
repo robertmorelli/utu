@@ -1,7 +1,7 @@
 import { declarationSchema } from './schema.js';
 
 /** Bump when linking or the schema changes, so cached declaration graphs are rebuilt. */
-export const LINK_REVISION = 3;
+export const LINK_REVISION = 4;
 
 /**
  * Host-neutral declaration linker. The caller supplies a TypeScript API and a
@@ -25,9 +25,11 @@ export function linkDeclarations(ts, program, { files, prefix, moduleSpecifier =
     throw new Error('ambient declarations require a matching JavaScript moduleSpecifier (--module)');
   }
   const symbols = new Map();
+  let assigned = false;
   for (const source of roots) {
     const moduleSymbol = source.symbol ?? ambient;
     const assignment = moduleSymbol?.exports?.get('export=');
+    if (assignment) assigned = true;
     const exported = assignment ? [assignment] : moduleSymbol ? checker.getExportsOfModule(moduleSymbol)
       : checker.getSymbolsInScope(source, ts.SymbolFlags.Type | ts.SymbolFlags.Value);
     for (let symbol of exported) {
@@ -48,7 +50,9 @@ export function linkDeclarations(ts, program, { files, prefix, moduleSpecifier =
       }
     }
   }
-  return declarationSchema(ts, checker, symbols, { prefix, moduleSpecifier });
+  const abi = declarationSchema(ts, checker, symbols, { prefix, moduleSpecifier });
+  // (`export =`: JS reaches its members through the default export, as a CommonJS module has no named ones)
+  return assigned && moduleSpecifier ? { ...abi, exportAssignment: true } : abi;
 }
 
 /** `declare module "pkg"` or the most specific matching wildcard (`declare module "*.css"`). */

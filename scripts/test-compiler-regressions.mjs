@@ -761,6 +761,19 @@ export lib {
       1 + 10 + 100 + 7 + 1000 + 9 + 2000 + 30000 + 50],
     ['using geo |g|;\nmod geo {\n    enum(U8) Level:\n        | Low\n        | Mid\n        | High\n}\nfn label(l: geo.Level) I32 { match l { geo.Level.Low => 1, g.Level.Mid => 20, ~> 300, }; }\n'
       + 'export lib { fn run() I32 { label(geo.Level.Low) + label(geo.Level.Mid) + label(g.Level.High); } }\n', 321],
+    // A file's own variant hides an opened mod's of one name: the type wanted picks the mod's (a let, a return, a parameter).
+    ['mod geo {\n    enum Form:\n        | Blob { n: I32 }\n        | Dot\n}\nusing geo;\nenum Shape:\n    | Blob { n: I32 }\n'
+      + 'fn mk() geo.Form { Blob { n: 5 }; }\nfn take(f: geo.Form) I32 { alt f { Blob |b| => b.n, ~> 0, }; }\n'
+      + 'export lib { fn run() I32 { let t: geo.Form = Blob { n: 4 }; let s: Shape = Blob { n: 10 }; let k = alt s { Blob |b| => b.n, }; alt t { geo.Form.Blob |b| => b.n, ~> 0, } + take(mk()) + k + take(Blob { n: 100 }); } }\n', 119],
+    // A variant named like a declaration (its own enum, another enum, a struct; in a mod too): the name is the
+    // declaration's, the variant is E.V (or bare where E is wanted); m.E's static operations; joins to the enum.
+    ["enum Shape:\n    | Shape { r: I32 }\n    | Dot\nfn r(s: Shape) I32 { alt s { Shape |c| => c.r, Dot => 1, }; }\nexport lib { fn run() I32 {\n    let s: Shape = Shape.Dot;\n    let t: Shape = Shape { r: 4 };\n    let u = Shape.Shape { r: 30 };\n    r(s) + r(t) * 10 + alt u { Shape.Shape |c| => c.r, ~> 0, } * 100;\n} }\n", 3041],
+    ["enum Dot:\n    | Circle { r: I32 }\n    | Blank\nenum Shape:\n    | Dot { r: I32 }\n    | Other\nexport lib { fn run() I32 {\n    let d: Dot = Dot.Circle { r: 4 };\n    let s: Shape = Shape.Dot { r: 5 };\n    let s2: Shape = Dot { r: 6 };\n    alt d { Dot.Circle |c| => c.r, ~> 0, } + alt s { Dot |x| => x.r, ~> 0, } * 10 + alt s2 { Shape.Dot |x| => x.r, ~> 0, } * 100;\n} }\n", 654],
+    ["enum Shape:\n    | Dot { r: I32 }\n    | Other\nenum Dot:\n    | Circle { r: I32 }\n    | Blank\nexport lib { fn run() I32 {\n    let d: Dot = Dot.Circle { r: 4 };\n    let s: Shape = Shape.Dot { r: 5 };\n    alt d { Dot.Circle |c| => c.r, ~> 0, } + alt s { Dot |x| => x.r, ~> 0, } * 10;\n} }\n", 54],
+    ["enum Shape:\n    | Circle { r: I32 }\n    | Other\nenum Circle:\n    | Big { r: I32 }\n    | Small\nfn f(c: Circle) I32 { alt c { Big |b| => b.r, Small => 2, }; }\nexport lib { fn run() I32 {\n    let s: Shape = Circle { r: 3 };\n    let q = Shape.Circle { r: 4 };\n    f(Circle.Big { r: 5 }) * 100 + alt s { Circle |c| => c.r, ~> 0, } + q.r * 10;\n} }\n", 543],
+    ["mod geo {\n    struct Circle:\n        | q: I32\n    enum Shape:\n        | Circle { r: I32 }\n        | Other\n    enum Lens:\n        | Lens { r: I32 }\n        | Flat\n    fn mk() Shape { Circle { r: 7 }; }\n}\nexport lib { fn run() I32 {\n    let s: geo.Shape = geo.Shape.Circle { r: 3 };\n    let c = geo.Circle { q: 4 };\n    let l: geo.Lens = geo.Lens.Lens { r: 9 };\n    alt s { geo.Shape.Circle |x| => x.r, ~> 0, } + c.q * 10 + alt geo.mk() { Circle |x| => x.r, ~> 0, } * 100 + alt l { Lens |x| => x.r, ~> 0, } * 1000;\n} }\n", 9743],
+    ["mod m {\n    enum(U8) Y:\n        | P\n        | Q = 1\n        | R\n}\nusing m |mm|;\nexport lib { fn run() I32 {\n    let y = m.Y.from_i32(2);\n    let z = mm.Y.from_i32(1);\n    match y { m.Y.R => 7, ~> 0, } + m.Y.count() * 10 + mm.Y.name(z).len() * 100 + y.to_i32() * 1000;\n} }\n", 2137],
+    ["enum Shape:\n    | Circle { r: I32 }\n    | Dot\nfn r(s: Shape) I32 { alt s { Circle |c| => c.r, Dot => 1, }; }\nexport lib { fn run() I32 {\n    let arr = [Shape.Circle { r: 4 }, Shape.Dot];\n    let b = [Shape.Circle { r: 4 }, Shape.Circle { r: 5 }];\n    let s = Shape.Circle { r: 6 };\n    let k = alt s { Circle |c| => c.r, Dot => 0, };\n    r(arr[0]) + r(arr[1]) * 10 + b[1].r * 100 + k * 1000;\n} }\n", 6514],
     // A parameter assigned after an alt tested it: the inner test still runs.
     ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nexport lib { fn run() I32 { let fp: fun(Shape) I32 = f; fp(Circle {}); } }\n', 2],
     // Closures see writes to a captured let moved in a loop, alt and promote bindings, and their own (a for's capture takes no writes).
@@ -1680,6 +1693,9 @@ export lib {
     ['let d: cl() I32 = cl() I32 { e; };\nlet e: I32 = d();\nexport lib { fn run() I32 { e; } }\n', 'Globals e and d each need the other set first'],
     // Names that are not values, and other plain mistakes (once "Not supported yet").
     ['mod m { fn f() I32 { 1; } }\nexport lib { fn run() I32 { let x = m; 0; } }\n', 'm is a module, not a value'],
+    ['mod m { fn f() I32 { 1; } }\nexport lib { fn run() I32 { m = 3; 0; } }\n', 'm is a module, not a value'],
+    ['mod geo { fn g() I32 { 1; } }\nusing geo;\nexport lib { fn run() I32 { for (0..<3) |i| { geo += 1; }; geo.g(); } }\n', 'geo is a module, not a value'],
+    ['mod M[T, T] { fn g(x: T) T { x; } }\nexport lib { fn run() I32 { M[I32, I32].g(3); } }\n', 'Duplicate parameter T'],
     ['mod m {\n    struct P:\n        | x: I32\n}\nexport lib { fn run() I32 { m.P(1); 0; } }\n', 'P is a type, not a value'],
     ['struct P:\n    | x: I32\nexport lib { fn run() I32 { let v = P.x; 0; } }\n', 'x is a field: read it from a value'],
     ['mod m { let k: I32 = 3; }\nexport lib { fn run() I32 { m.k(1); } }\n', 'I32 is not callable'],
@@ -1764,6 +1780,9 @@ export lib {
     ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nexport lib { fn run() I32 { let v = V { x: 1 }; v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
     ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nfn f(v: V) I32 { 0; }\nexport lib { fn run() I32 { 0; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
     ['mod m {\n    enum A:\n        | V { x: I32 }\n    enum B:\n        | V { y: I32 }\n}\nexport lib { fn run() I32 { let v = m.V { x: 1 }; v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    // A declaration keeps a variant's name: with no Shape wanted, the bare name is the declaration's.
+    ["enum Shape:\n    | Circle { r: I32 }\n    | Other\nenum Circle:\n    | Big { r: I32 }\n    | Small\nexport lib { fn run() I32 {\n    let x = Circle { r: 3 };\n    5;\n} }\n", "Circle is not a struct: it has no fields to set"],
+    ["mod geo {\n    enum Shape:\n        | Circle { r: I32 }\n        | Other\n    struct Circle:\n        | q: I32\n}\nexport lib { fn run() I32 {\n    let c = geo.Circle { q: 4 };\n    let s: geo.Shape = geo.Circle { r: 4 };\n    c.q;\n} }\n", "s is Shape, got Circle"],
     ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\nfn f(a: A) I32 { alt a { B.V |v| => v.y, ~> 0, }; }\nexport lib { fn run() I32 { 0; } }\n', 'Expected A, got V'],
     ['enum A:\n    | V { x: I32 }\nexport lib { fn run() I32 { let v = A.Q { x: 1 }; 0; } }\n', 'A has no variant Q'],
     ['mod geo {\n    enum(U8) L:\n        | Lo\n}\nfn f(l: geo.L) I32 { match l { geo.M.Lo => 1, ~> 0, }; }\nexport lib { fn run() I32 { 0; } }\n', 'Unknown type M'],
@@ -2151,6 +2170,36 @@ export lib {
   // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
   const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));
   assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);
+  checked++;
+  // A handle (struct, array, protocol) from JS is not null, and a protocol's is a wasm
+  // object: checked where it crosses, in every build (wasm took null, and a protocol any
+  // object, and trapped later). ?P takes null and undefined. A closure JS calls is given
+  // no null for a handle in safe builds (as an export's arguments are checked).
+  const shapes = 'proto Shape:\n    | area() F64\nstruct Circle[Shape]:\n    | r: F64\nfn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }\nstruct P:\n    | x: I32\n';
+  const nullHandles = await write(shapes
+    + 'let p: fun() P = @es/\\ () => null \\/;\nlet a: fun() Array[I32] = @es/\\ () => null \\/;\n'
+    + 'let s: fun() Shape = @es/\\ () => null \\/;\nlet o: fun() Shape = @es/\\ () => ({ area() { return 9; } }) \\/;\n'
+    + 'let np: fun() ?P = @es/\\ () => null \\/;\nlet nu: fun() ?P = @es/\\ () => undefined \\/;\nlet ns: fun() ?Shape = @es/\\ () => null \\/;\n'
+    + 'let id: fun(Shape) Shape = @es/\\ (v) => v \\/;\nlet ida: fun(Array[I32]) Array[I32] = @es/\\ (v) => v \\/;\nlet idp: fun(P) P = @es/\\ (v) => v \\/;\n'
+    + 'let call: fun(cl(P) I32) I32 = @es/\\ (g) => g(null) \\/;\n'
+    + 'export lib {\n    fn p_() I32 { p().x; }\n    fn a_() I32 { a().len(); }\n    fn s_() F64 { s().area(); }\n    fn o_() F64 { o().area(); }\n    fn cl_() I32 { call(cl(q) { q.x; }); }\n'
+    + '    fn ok() F64 {\n        let x = np() orelse P { x: 1 };\n        let y = nu() orelse P { x: 2 };\n        let z: Shape = ns() orelse Circle { r: 1.0 };\n'
+    + '        (x.x + y.x + ida([4, 5])[1] + idp(P { x: 10 }).x).to_f64() + z.area() + id(Circle { r: 2.0 }).area();\n    }\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, nullHandles, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(result.wasm, result.spec);
+    assert.throws(() => exports.p_(), /Wrong type from JavaScript: a P, not null/, mode);
+    assert.throws(() => exports.a_(), /Wrong type from JavaScript: an Array\[I32\], not null/, mode);
+    assert.throws(() => exports.s_(), /Wrong type from JavaScript: a Shape, not null/, mode);
+    assert.throws(() => exports.o_(), /Wrong type from JavaScript: a Shape, not object/, mode);
+    assert.throws(() => exports.cl_(), mode.endsWith('Unsafe') ? WebAssembly.RuntimeError : /Wrong type from JavaScript: a closure's argument 1 is null/, mode);
+    assert.equal(exports.ok(), 33, mode);
+    checked++;
+  }
+  // A value binding's, as the glue loads.
+  const nullValue = await compileFile(utu, await write('struct P:\n    | x: I32\nlet v: P = @es/\\ null \\/;\nexport main() I32 { v.x; }\n'), { mode: 'small' });
+  await assert.rejects(async () => (await instantiateNode(nullValue.wasm, nullValue.spec)).exports.main(), /Wrong type from JavaScript: a P, not null/);
   checked++;
 
   // Test names: each test has one, its own.
@@ -2772,6 +2821,56 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     ['D.fnLike(cl(x) F64 { x * 2.0; })', ['x needs a type']],
   ]) {
     const result = await compileFile(utu, await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': `${hostDHead}export main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
+    assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
+    checked++;
+  }
+  // Type algebra: a union of objects (picked by its discriminant, read by a common
+  // property), single literals and patterns, Readonly<T>, `B extends A`, never, Promise<Promise<T>>.
+  const hostE = 'export type Shape = { kind: "circle"; r: number } | { kind: "sq"; s: number };\n'
+    + 'export declare function area(s: Shape): number;\nexport declare function mkShape(k: number): Shape;\n'
+    + 'export declare function lit(x: "b"): string;\nexport declare function ovl(x: "a"): number;\nexport declare function ovl(x: "b"): string;\n'
+    + 'export declare function excl(x: Exclude<"a" | "b", "a">): string;\nexport declare function tl(x: `id-${number}`): string;\n'
+    + 'export interface Opt { name: string; }\nexport declare function mkRo(): Readonly<Opt>;\n'
+    + 'export declare function gen<A extends number, B extends A>(a: A, b: B): B;\n'
+    + 'export declare function nev(): never;\nexport declare function pp(): Promise<Promise<string>>;\n'
+    + 'export interface Bus<Ev> { on<K extends keyof Ev>(k: K, f: (e: Ev[K]) => void): void; }\nexport declare function bus<Ev>(): Bus<Ev>;\n'
+    + 'export declare function align(): "start" | "end" | undefined;\nexport declare function later(): Promise<number>;\n'
+    + 'export declare function unwrap<T>(v: T | { value: T }): T;\nexport declare function trio(): [number, number, number];\n';
+  const hostEJs = 'export function area(s) { return s.kind === "circle" ? s.r * 3 : s.s * s.s; }\n'
+    + 'export function mkShape(k) { return k === 0 ? { kind: "circle", r: 2 } : { kind: "sq", s: 3 }; }\n'
+    + 'export function lit(x) { return x; }\nexport function ovl(x) { return x === "a" ? 1 : "two"; }\nexport function excl(x) { return x; }\n'
+    + 'export function tl(x) { return x; }\nexport function mkRo() { return { name: "ro" }; }\nexport function gen(a, b) { return b; }\n'
+    + 'export function nev() { throw new Error("never"); }\nexport function pp() { return Promise.resolve(Promise.resolve("deep")); }\n';
+  const hostEHead = 'using E from "npm:hoste";\n';
+  const hostETypes = await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': hostEHead
+    + 'fn f(b: Bool) F64 { if b { return 1.0; }; E.nev(); }\n'
+    + 'export main() F64 {\n    let s = E.mkShape(1.0);\n    let k: Str = s.kind;\n'
+    + '    E.area(&{ kind: "sq", s: 2.0 }) + E.area(&{ kind: "circle", r: 1.0 }) + E.area(s) + E.ovl("a") + E.gen(1.0, 2.0) + f(true)\n'
+    + '        + (k + E.lit("b") + E.excl("b") + E.tl("id-1.5") + E.mkRo().name).len().to_f64();\n}\n' });
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, hostETypes, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    // 4 + 3 + 9 + 1 + 2 + 1 + len("sqbbid-1.5ro") 12
+    assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(hostETypes) })).exports.main(), 32, mode);
+    checked++;
+  }
+  for (const [body, messages] of [
+    ['E.area(&{ kind: "sq", r: 2.0 })', ['No property r', 'Missing property s']],
+    ['E.area(&{ kind: "tri", r: 2.0 })', ['"circle" has no value "tri"']],
+    ['E.lit("a").len().to_f64()', ['"b" has no value "a"']],
+    ['E.ovl("c"); 0.0', ['"a" has no value "c"']],
+    ['E.excl("a").len().to_f64()', ['"b" has no value "a"']],
+    ['let v = "id-3"; E.tl("id-x").len().to_f64() + E.tl(v).len().to_f64()', ['`id-${number}` has no value "id-x"', '`id-${number}` takes its values, not any Str']],
+    ['let o = E.mkRo(); o.name = "x"; 0.0', ['name is readonly']],
+    ['E.gen(1.0, "x"); 0.0', ['Expected F64, got Str']],
+    ['let s = E.mkShape(0.0); s.r', ['No member E.Shape.r']],
+    ['let n: F64 = E.nev(); let s: Str = await E.pp(); n + s.len().to_f64()', []],
+    // `keyof E` of a generic E is a string; a nullable literal union is a ?Str; utu's Promise[T] is the host's
+    ['E.bus().on("ping", cl(n: F64) void { }); let a: Str = promote E.align() { |v| => v, ~> "none", }; let p: Promise[F64] = E.later(); await p', []],
+    ['let s: Str = E.unwrap(5.0); 0.0', ['s is Str, got F64']],
+    ['E.trio()[3]', ['E.[F64, F64, F64] has no element 3: it has 3 elements']],
+  ]) {
+    const result = await compileFile(utu, await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': `${hostEHead}export main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
     checked++;
   }
