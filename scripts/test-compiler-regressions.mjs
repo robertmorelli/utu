@@ -702,8 +702,8 @@ export lib {
     ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { alt p { Ka => 1, Kc => q, }; }\nexport lib { fn run() I32 { f(Kc {}, 5); } }\n', 5],
     // A parameter assigned after an alt tested it: the inner test still runs.
     ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nexport lib { fn run() I32 { let fp: fun(Shape) I32 = f; fp(Circle {}); } }\n', 2],
-    // Closures see writes to captured range counts, alt, and promote bindings, and their own (an element is a copy: no writes).
-    ['enum E:\n    | A { n: I32 }\n    | B {}\nexport lib { fn run() I32 {\n    let t = 0;\n    for ([1, 2]) |x0| { let x = x0; let f = cl() { x += 10; }; f(); t += x; };\n    for (0 ..< 5) |i| { let g = cl() I32 { i; }; i = i + 1; t += g() * 100; };\n    let e: E = A { n: 3 };\n    t += alt e { A |a| => { let h = cl() { a = A { n: 9 }; }; h(); a.n * 1000; }, B => 0, };\n    let s: ?Str = "hi";\n    promote s { |v| => { let h = cl() { v = v + "!"; }; h(); t += v.len() * 100000; }, ~> {}, };\n    let c = 0;\n    let inc = cl() { c += 1; };\n    inc(); inc();\n    t + c * 10000;\n} }\n', 23 + 900 + 9000 + 20000 + 300000],
+    // Closures see writes to a captured let moved in a loop, alt and promote bindings, and their own (a for's capture takes no writes).
+    ['enum E:\n    | A { n: I32 }\n    | B {}\nexport lib { fn run() I32 {\n    let t = 0;\n    for ([1, 2]) |x0| { let x = x0; let f = cl() { x += 10; }; f(); t += x; };\n    let i = 0;\n    while (i < 5) { let g = cl() I32 { i; }; i = i + 1; t += g() * 100; i += 1; };\n    let e: E = A { n: 3 };\n    t += alt e { A |a| => { let h = cl() { a = A { n: 9 }; }; h(); a.n * 1000; }, B => 0, };\n    let s: ?Str = "hi";\n    promote s { |v| => { let h = cl() { v = v + "!"; }; h(); t += v.len() * 100000; }, ~> {}, };\n    let c = 0;\n    let inc = cl() { c += 1; };\n    inc(); inc();\n    t + c * 10000;\n} }\n', 23 + 900 + 9000 + 20000 + 300000],
     // A write in a loop match, after the closure.
     ['export lib { fn run() I32 { let n = 10; let f = cl() I32 { n; }; let k = 0; loop match k { 0 => { n = 30; continue 1; }, ~> break, }; f(); } }\n', 30],
     // A recursive closure assigned with `=`.
@@ -1078,11 +1078,11 @@ export lib {
         for ((-2).to_u32() ... (-1).to_u32()) |u| { e += 1; if e > 9 { break; }; };
         c * 100 + d * 10 + e;
     }
-    // A body that moves its count is not unrolled.
-    fn capture_write() I32 { let t = 0; for (0 ..< 8) |i| { t += i; i += 2; }; t; }
+    // A loop that moves its count twice a pass.
+    fn count_moved() I32 { let t = 0; let i = 0; while (i < 8) { t += i; i += 2; i += 1; }; t; }
 }
 `);
-  const controlWant = { state_defers: 1233, optional_defer: 9, tuples: 2000 + 200 + 20 + 4 + 5, inclusive_max: 322, capture_write: 9 };
+  const controlWant = { state_defers: 1233, optional_defer: 9, tuples: 2000 + 200 + 20 + 4 + 5, inclusive_max: 322, count_moved: 9 };
   for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
     const built = await compileFile(utu, control, { mode });
     assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
@@ -1864,6 +1864,10 @@ export lib {
     // An element's or a generator's value, captured, is a copy: a write to it was lost (accepted).
     ['export main() I32 { let xs = [1, 2]; for (xs) |x| { x = x * 2; }; xs[0]; }\n', 'Cannot assign to capture x'],
     ['fn g() yield I32 { yield 1; }\nexport main() I32 { let t = 0; for (g()) |v| { v += 1; t += v; }; t; }\n', 'Cannot assign to capture v'],
+    // A range's count, set by the range: a write moved it (accepted), in the body or a closure.
+    ['export main() I32 { let t = 0; for (0 ..< 8) |i| { t += i; i += 2; }; t; }\n', 'Cannot assign to capture i'],
+    ['export main() I32 { let t = 0; for (0 ..< 5) |i| { let f = cl() { i = i + 1; }; f(); t += i; }; t; }\n', 'Cannot assign to capture i'],
+    ['export main() I32 { let t = 0; for ([1, 2], 0 ..< 2) |x, k| { k = 1; t += x; }; t; }\n', 'Cannot assign to capture k'],
     // A let in a function's body of a parameter's name (accepted).
     ['fn clamp(n: I32) I32 { let n = 3; n; }\nexport main() I32 { clamp(4); }\n', 'Duplicate local n: already a parameter'],
     // A Str where a host Node is wanted: `appendChild<T extends Node>(node: T)` bound T to Str (accepted).

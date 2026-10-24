@@ -1247,6 +1247,14 @@ mod tour {
                 code {
                     "I32";
                 }
+                ". A capture is read-only: to move a count, use ";
+                code {
+                    "while";
+                }
+                " and a ";
+                code {
+                    "let";
+                }
                 ".";
             }
             = code.block(while_sample());

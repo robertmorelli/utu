@@ -104,8 +104,8 @@ Now errors: a Str where a host `Node` is wanted (`platform/49`: a generic
 parameter outside its constraint stays unbound), a Wutu declaration without
 its `;` or a typo of a standard CSS property (`platform/81`, `90`), a let of a
 parameter's name in a function's body (`names/50`), and a write to a captured
-element, generator or stream value (`names/85`; a range's count may still be
-moved). Still accepted, open: `@es` and `@ir` bodies that do not parse
+element, generator or stream value or a range's count (`names/85`; to move
+a count, a while loop with a let). Still accepted, open: `@es` and `@ir` bodies that do not parse
 (`platform/28`, `40`). Accepted by choice, so far: shadowing a parameter in an
 inner block or an outer local, assigning to a parameter, a non-nullable
 recursive variant, comparing a non-nullable to null, and code after `return`

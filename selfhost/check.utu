@@ -171,12 +171,12 @@ fn child_of_kind(node: I32, kind: Node) I32 {
     c;
 }
 
-/// Whether capture `decl` is a copy (an array's element, a generator's,
-/// stream's or pipeline's value), not a range's count, which a write moves.
-fn capture_is_copy(decl: I32) Bool {
+/// Whether capture `decl` is a range's count, not a copy (an array's element,
+/// a generator's, stream's or pipeline's value).
+fn capture_is_count(decl: I32) Bool {
     let capture = decl_node[decl];
     let loop_ = parent_of(capture);
-    if not is_kind(loop_, Node.For_expr) or is_kind(parent_of(loop_), Node.Await_expr) { return true; };
+    if not is_kind(loop_, Node.For_expr) or is_kind(parent_of(loop_), Node.Await_expr) { return false; };
     let k = 0;
     let c = first_child(capture);
     while (c >= 0 and node_decl[c] != decl) {
@@ -185,7 +185,7 @@ fn capture_is_copy(decl: I32) Bool {
     };
     // A range has its two ends.
     let source = nth_child(first_child(loop_), k);
-    not (source >= 0 and next_sibling(first_child(source)) >= 0);
+    source >= 0 and next_sibling(first_child(source)) >= 0;
 }
 
 /// Child `i` of `node` (from 0), or -1.
@@ -1681,11 +1681,12 @@ fn check_assign(node: I32, cx: Cx) I32 {
         };
         return error_value();
     };
-    // `for (xs) |x| { x = … }`: the capture is a copy; the write would be lost.
-    if decl_is(decl, Decl.Capture) and capture_is_copy(decl) {
+    // `for (xs) |x| { x = … }`: an element's copy, so the write would be lost;
+    // `for (0..<n) |i| { i += 2; }`: the range sets the count.
+    if decl_is(decl, Decl.Capture) {
         report2(Diag.AssignmentToImmutable, target, word_of(target), 1, -1);
         diag_place(Extra.Related, decl_node[decl], "the capture");
-        diag_note("a capture is a copy: write to the array (xs[i]) or a let");
+        diag_note(pick(capture_is_count(decl), "the range sets the count: use a while loop with a let to move it", "a capture is a copy: write to the array (xs[i]) or a let"));
         return error_value();
     };
     let t = decl_ty[decl];
