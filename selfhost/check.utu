@@ -2135,7 +2135,12 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     unbounded_call(rt, word_of(name), decl, node, cx.inst);
     // (A bound's `fn P.m` is in P's module, and checked for this T: a scalar, Str or enum is no P value.)
     let fi = if via_bound { fn_instance_on(decl, instance_for(module_of(decl), cx.inst), rt); } else { fn_instance(decl, ty_inst(rt)); };
-    // A function of the type without `self` has no receiver to take.
+    // A function of the type without `self` has no receiver to take: `Rect.square(value)`.
+    let after = next_sibling(first_child(decl_node[decl]));
+    if is_kind(decl_node[decl], Node.Fn_decl) and not is_kind(after, Node.Self_param) and not is_kind(after, Node.Capture) {
+        report2(Diag.UnknownMethod, node, word_of(name), rt, 1);
+        return finish_error(args, m, cx);
+    };
     if vl_len[fi_params[fi]] == 0 {
         report2(Diag.WrongArity, node, -1, 0, 1 + if args >= 0 { child_count(args); } else { 0; });
         return finish_error(args, m, cx);

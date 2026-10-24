@@ -224,7 +224,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     r = utu('run', 'past.utu', ...mode);
     assert.notEqual(r.status, 0);
     // The standard library's check, shown where the program used it.
-    assert.match(r.stderr, /TRAP  Failed check in std:Buffer\n {7}trap · past\.utu:2:59/);
+    assert.match(r.stderr, /TRAP  Buffer index out of range\n {7}trap · past\.utu:2:59/);
     assert.match(r.stderr, /in main  past\.utu:2:59/);
   }
   for (const mode of ['smallUnsafe', 'fastUnsafe']) {

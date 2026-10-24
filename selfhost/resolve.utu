@@ -1048,14 +1048,23 @@ fn declare_program() void {
             for (0 ..< import_file.len()) |j| {
                 if decl_a[m] < 0 and import_target[j] == -2 and same_path(i, j) { decl_a[m] = view_of_import(j); };
             };
-            // The host found none (an npm package not installed).
-            if decl_a[m] < 0 {
-                let path = import_path[i];
-                // (`"npm:x"` without its quotes; `node:x` as written.)
-                let text = node_text(path);
-                if text.starts_with(Str.from_code_point(34)) { text = text.slice(1, text.len() - 1); };
+            let path = import_path[i];
+            // (`"npm:x"` without its quotes; `node:x` as written.)
+            let text = node_text(path);
+            if text.starts_with(Str.from_code_point(34)) { text = text.slice(1, text.len() - 1); };
+            // `"node:fss"`: no module of Node's, whatever the host found.
+            let node_name = if text.starts_with("node:") { text.slice(5, text.len()); } else { ""; };
+            if node_name.len() > 0 and not in_words(node_modules(), node_name) {
+                decl_a[m] = -1;
+                report2(Diag.HostMissing, path, intern_text(text), 1, -1);
+                let near = near_in_words(intern_text(node_name), node_modules());
+                // (Inside the quotes: the fix's text is the name's.)
+                let e = tok_end[node_last[path] - 1] - (node_text(path).len() - text.len()) / 2;
+                if near >= 0 { diag_fix(e - text.len(), e, "node:" + word_text(near), "Use node:" + word_text(near)); };
+            } else if decl_a[m] < 0 {
+                // The host found none (an npm package not installed).
                 report(Diag.HostMissing, path, intern_text(text));
-                if text.starts_with("node:") { diag_note("node: modules' declarations come from @types/node in node_modules"); };
+                if node_name.len() > 0 { diag_note("node: modules' declarations come from @types/node in node_modules"); };
             };
         };
     };
@@ -1620,9 +1629,12 @@ fn walk_using(item: I32, w: Walk) void {
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
         // `using helper from "./lib.utu"` with `fn helper` there: only a mod is imported.
         let kind = imported_item_kind(item, word_of(n));
+        // `using Point |P|` with `struct Point`: the same, in this file.
+        let found = lookup(word_of(n));
+        if kind < 0 and using_path(item) < 0 and found >= 0 and decl_node[found] >= 0 and item_kind_text(node_kind[decl_node[found]]) != "not a mod" { kind = node_kind[decl_node[found]]; };
         if kind >= 0 {
             report2(Diag.ImportNotModule, n, word_of(n), kind, -1);
-            diag_note("Declare it in a mod there (mod m { … }) and import that");
+            if using_path(item) >= 0 { diag_note("Declare it in a mod there (mod m { … }) and import that"); };
         } else {
             report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
             // (An import names a mod of the file: `mod guide { … }` for `using guide … from`.)

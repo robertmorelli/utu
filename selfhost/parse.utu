@@ -1874,6 +1874,8 @@ fn bind_expr(p: Parser) I32 {
         expect(p, Tok.RBrace);
         node(p, Node.Tuple_pattern, pattern, start);
     } else {
+        // `let match = …`: a name `match` could not be read back by.
+        if is_expression_keyword(word_id(p)) { fail(p); };
         identifier(p);
         if is(p, Tok.Colon) {
             advance(p);

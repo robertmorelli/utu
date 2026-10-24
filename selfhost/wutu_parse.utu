@@ -1094,7 +1094,7 @@ fn parse_element_statement(text: Str, n: I32) void {
         let name = text.slice(p + 1, q);
         wutu_fail("events are written on " + name + " = handler; (or on " + name + " { … })", p);
     };
-    if c == 46 and assignment_head(text, p + 1, false) {
+    if c == 46 and assignment_head(text, p + 1, true) {
         wp_at[0] += 1;
         parse_attribute(text, n, true);
         return;
@@ -1281,7 +1281,7 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
             to = wx_to[0];
         };
     } else if is_property {
-        wutu_fail("a property takes a value: .name = value;", wp_at[0]);
+        wutu_fail("a property takes a value: .name = value;", name_start);
     };
     wp_semicolon(text);
     let tag = word_text(tn_text[n]);

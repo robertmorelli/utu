@@ -380,7 +380,7 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
         else if embed_start[k] >= 0 {
             let n = embed_count[k];
             let size = 1 << storage_shift(s);
-            if n % size != 0 { report(Diag.MemEmbed, init, decl_name[decl]); };
+            if n % size != 0 { report3(Diag.MemEmbed, init, decl_name[decl], n, size, s.to_i32()); };
             for (0 ..< n) |i| { data_bytes.push(embed_bytes[embed_start[k] + i]); };
             count = n / size;
             if mem_int_enum(decl) >= 0 {

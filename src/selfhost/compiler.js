@@ -915,7 +915,7 @@ function indexOf(file) {
  * that neither import nor await), closures, promises, hosted mems, and the
  * engine's JS string builtins.
  */
-export async function instantiate(wasm, spec = {}, { loadGlue = null, profiler = null } = {}) {
+export async function instantiate(wasm, spec = {}, { loadGlue = null, profiler = null, wrap = null } = {}) {
   const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm, COMPILE_OPTIONS);
   const es = spec.es ?? {};
   const source = glueModuleSource(es);
@@ -931,6 +931,8 @@ export async function instantiate(wasm, spec = {}, { loadGlue = null, profiler =
   if (WebAssembly.Module.imports(module).some(entry => entry.module === 'utu' && entry.name === 'js_tag')) {
     imports.utu = exceptionImports(imports.utu ?? {});
   }
+  // `utu run`'s: what places a JS throw (see cli/utu.mjs).
+  wrap?.(imports);
   const instance = await WebAssembly.instantiate(module, imports);
   const exports = convertExports(promisifyExports(instance, spec.promises), spec.exports);
   return { module, instance, exports: profiler ? profiler.attach(instance, exports) : exports };

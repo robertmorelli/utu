@@ -96,6 +96,22 @@ fn near_consider(word: I32, cand: I32, decl: I32) void {
     };
 }
 
+/// The word of `list` (words between spaces) nearest `word`, or -1.
+fn near_in_words(word: I32, list: Str) I32 {
+    near_start(word);
+    let i = 0;
+    while (i < list.len()) {
+        let end_ = text_index(list, " ", i);
+        if end_ < 0 { end_ = list.len(); };
+        near_consider(word, intern_text(list.slice(i, end_)), -1);
+        i = end_ + 1;
+    };
+    near_found();
+}
+
+/// Node's modules (`module.builtinModules`, Node 24, without `_…`).
+fn node_modules() Str { "assert assert/strict async_hooks buffer child_process cluster console constants crypto dgram diagnostics_channel dns dns/promises domain events fs fs/promises http http2 https inspector inspector/promises module net os path path/posix path/win32 perf_hooks process punycode querystring readline readline/promises repl stream stream/consumers stream/promises stream/web string_decoder sys timers timers/promises tls trace_events tty url util util/types v8 vm wasi worker_threads zlib sea sqlite test test/reporters"; }
+
 /// The word found, or -1 when none is close, or two are as close.
 fn near_found() I32 {
     if near_tie[0] == 1 { return -1; };
@@ -584,6 +600,19 @@ fn parse_hint(file: I32, t: I32, wanted: I32) void {
     };
     let prev = tok_before(file, t);
     let w = word_text(wanted);
+    if tok_says(prev, "let") and tok_is(t, Tok.Word) and is_expression_keyword(intern_text(tok_text(t))) {
+        parse_says("'" + tok_text(t) + "' is a keyword");
+        diag_label("a keyword");
+        return;
+    };
+    // `if c { … }; else { … }`: the `;` ended the if; `else` was read as a name.
+    let semi = tok_before(file, prev);
+    if tok_says(prev, "else") and tok_is(semi, Tok.Semi) {
+        parse_says("The ; before else ends the if");
+        diag_focus(semi, semi, "no ;");
+        diag_fix(tok_start[semi], tok_end[semi], "", "Drop ;");
+        return;
+    };
     // One token missing at the end of a line (or of a block): after the token before.
     // (A `\\` line's `;` is its text: diag_text says so.)
     if prev >= 0 and not tok_is(prev, Tok.MultilineLine) and (w == "';'" or w == "','") and (lines_apart(prev, t) or tok_is(t, Tok.RBrace) or tok_is(t, Tok.End)) {
