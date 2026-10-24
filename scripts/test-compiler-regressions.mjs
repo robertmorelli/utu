@@ -1337,6 +1337,43 @@ export lib {
     fn deep() Str { @json/\\ encode Expr Add { l: Add { l: Num { v: 3 } } } \\/; }
     fn many() Str { @json/\\ encode Expr Many { xs: Array[Expr].new(1, Num { v: 4 }) } \\/; }
 }`, { num: '{"kind":"Num","v":2}', deep: '{"kind":"Add","l":{"kind":"Add","l":{"kind":"Num","v":3}}}', many: '{"kind":"Many","xs":[{"kind":"Num","v":4}]}' }],
+    // @json builds each type and variant by its declaration: E0's and E1's Circle, not E2's; the file's P, not mod m's.
+    // An enum(U8) root reads through error and match, and encodes.
+    [`enum E0:
+    | Circle
+enum E1:
+    | Circle { zed: I64 }
+    | Dot
+enum E2:
+    | Circle
+    | Dot
+enum(U8) Col:
+    | Red
+    | Green
+struct S:
+    | zed: E0
+    | e1: E1
+    | c: Col
+    | n: I32
+struct P:
+    | a: I32
+mod m {
+    struct P:
+        | b: Str
+}
+export lib {
+    fn n() I32 { promote @json/\\ decode S "{\\"zed\\":\\"Circle\\",\\"e1\\":{\\"kind\\":\\"Dot\\"},\\"c\\":\\"Red\\",\\"n\\":4}" \\/ { |v| => v.n, ~> 0, }; }
+    fn round(text: Str) Str { promote @json/\\ decode S text \\/ { |v| => @json/\\ encode S v \\/, ~> "none", }; }
+    fn top() I32 { promote @json/\\ decode P "{\\"a\\":5}" \\/ { |v| => v.a, ~> 0, }; }
+    fn col(text: Str) Str { let c = @json/\\ match text { |c| Col => c, ~> Col.Red, }\\/; @json/\\ encode Col c \\/; }
+    fn colerr() Str { @json/\\ error Col "\\"Blue\\"" \\/; }
+    // Integers are read exactly; nesting stops at 512, in a skipped field too; \\b and \\f encode as \\u00XX.
+    fn whole() Str { @json/\\ error P "{\\"a\\":1.0}" \\/ + "; " + @json/\\ error P "{\\"a\\":1e2}" \\/; }
+    fn skipped() Str { let d = ""; for (0 ..< 513) |i| { d = d + "["; }; for (0 ..< 513) |i| { d = d + "]"; }; @json/\\ error P "{\\"x\\":" + d + ",\\"a\\":1}" \\/; }
+    fn escapes() Str { @json/\\ encode Array[Str] [Str.from_code_point(8) + Str.from_code_point(12) + Str.from_code_point(9)] \\/; }
+}`, { n: 4, top: 5, colerr: 'unknown Col variant "Blue" at line 1, column 1', whole: 'expected an integer at line 1, column 6; expected an integer at line 1, column 6', skipped: 'nested too deeply at line 1, column 518', escapes: '["\\u0008\\u000c\\t"]' },
+      { round: [['{"zed":"Circle","e1":{"kind":"Circle","zed":7},"c":"Green","n":-2}', '{"zed":"Circle","e1":{"kind":"Circle","zed":7},"c":"Green","n":-2}']],
+        col: [['"Green"', '"Green"'], ['"Blue"', '"Red"']] }],
     // An alt in a function called once, given a variant: inlined, the value's type narrowed to it, and size builds' br_on_cast took that as its input (not a supertype of the other arms' casts).
     [`enum E:
     | A { x: I32 }
@@ -1794,6 +1831,13 @@ export lib {
       '@json cannot use T: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
     ['mod geo {\n    struct Pt:\n        | x: I32\n}\nmod M {\n    fn f(p: geo.Pt) Str { @json/\\ encode Pt p \\/; }\n}\nexport lib { fn run() I32 { 1; } }\n',
       '@json cannot use Pt: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
+    ['mod geo {\n    struct Pt:\n        | x: I32\n}\nfn f(p: geo.Pt) Str { @json/\\ encode Pt p \\/; }\nexport lib { fn run() I32 { 1; } }\n',
+      '@json cannot use Pt: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
+    // decode gives ?T, and an enum(U8) cannot be null.
+    ['enum(U8) Col:\n    | Red\n    | Green\nexport lib { fn run() I32 { let d = @json/\\ decode Col "1" \\/; 0; } }\n',
+      '@json decode gives ?Col, and an enum(U8) cannot be null: decode a struct with a Col field, or use error or match'],
+    ['enum(U8) Col:\n    | Red\nstruct T:\n    | c: ?Col\nexport lib { fn run() Str { @json/\\ error T "{}" \\/; } }\n',
+      '?Col is not supported: an enum(U8) cannot be null; use Col'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));

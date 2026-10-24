@@ -92,6 +92,8 @@ fn reset_program() void {
     };
     dsl_failed.clear();
     jp_serial[0] = 0;
+    jp_pin_word.clear();
+    jp_pin_name.clear();
     st_serial[0] = 0;
     dsl_cursor[0] = -1;
     splice_start.clear();

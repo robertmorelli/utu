@@ -1052,6 +1052,7 @@ fn declare_program() void {
             scope_pop(mark);
         };
     };
+    bind_json_pins();
 }
 
 /// A file's scope, declared and bound: its modules, the modules it imports
