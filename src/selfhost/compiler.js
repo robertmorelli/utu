@@ -321,6 +321,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   loading.set(utu, files);
   const byKey = new Map(prelude.byKey);
   const foreign = [];
+  let missing = false;
   addFile(utu, files, byKey, entry, await readFile(entry), ROLE.entry);
   for (let i = 0; i < utu.import_count(); i++) {
     const from = files[utu.import_from(i)];
@@ -346,10 +347,14 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
         try {
           text = await readFile(key);
         } catch {
-          // A file that cannot be read ends the build, as in stage 0.
-          const bytes = encoder.encode(key);
-          new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
-          break;
+          // A file that cannot be read (the first) ends the build, as in
+          // stage 0, after the rest load: names still resolve, for an editor.
+          if (!missing) {
+            const bytes = encoder.encode(key);
+            new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
+            missing = true;
+          }
+          continue;
         }
         file = addFile(utu, files, byKey, key, text, role);
       }
