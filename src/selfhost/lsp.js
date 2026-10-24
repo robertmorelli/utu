@@ -11,7 +11,8 @@
 // `key`, as nodeHost makes), `toKey(uri)` and `toUri(key)` (null for a file
 // an editor cannot open), `send(message)`, and optionally `listFiles(dirs)`
 // (the keys of the .utu files under directories `dirs`, for what imports a
-// file renamed); it calls `handle(message)` with each message the editor sends.
+// file renamed: an array, or { files, unlisted, stamps } as node.js's
+// utuFiles gives); it calls `handle(message)` with each message the editor sends.
 
 import { compile } from './compiler.js';
 import { programIndex } from './query.js';
@@ -71,6 +72,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
   const lastGood = new Map();    // key → its text when it last parsed and its imports resolved
   let shutdown = false;
   let roots = [];                // the workspace's folders, as keys
+  const scanned = new Map();     // file on disk → { stamp, targets: the files it imports }
 
   // An open document's own URI (an unsaved buffer's `untitled:` one too); else the host's.
   const uriOf = key => docs.get(key)?.uri ?? toUri(key);
@@ -247,9 +249,13 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     return [member, ...[...links].filter(([, m]) => m === member).map(([fn]) => fn)];
   }
 
-  /** Where `decl`'s family (see family) is named; without the member's own name, unless `includeDeclaration`. */
+  /**
+   * Where `decl`'s family (see family) is named; without the member's own
+   * name and the fields satisfying it (declarations too), unless `includeDeclaration`.
+   */
   function linkedReferences(program, decl, includeDeclaration = true) {
-    return family(program, decl).flatMap((d, i) => program.index.references(d, { includeDeclaration: includeDeclaration || i > 0 }));
+    const { index } = program;
+    return family(program, decl).flatMap((d, i) => index.references(d, { includeDeclaration: includeDeclaration || (i > 0 && index.kind(d) !== 'Field') }));
   }
 
   /**
@@ -390,11 +396,11 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       };
       for (const place of occurrences(q, name)) add(place, place.file === q.key ? q.text : textOf(q.program, place.file));
       // The programs edited: this file's, and each importing the name's file.
-      const entries = new Map([[q.key, q.text]]);
+      const entries = new Map([[q.key, { text: q.text, before: null }]]);
       if (!isAlias(q, name)) {
         const found = await importers(q, q.decl, spelling, true, true);
         for (const place of found) add(place, place.text);
-        for (const [key, text] of found.entries) entries.set(key, text);
+        for (const [key, entry] of found.entries) entries.set(key, entry);
       }
       const changes = {}, renamedTexts = new Map();
       for (const [file, list] of spans) {
@@ -412,17 +418,17 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
         for (const [start, end] of spans.get(file) ?? []) if (end <= offset) by += newName.length - (end - start);
         return offset + by;
       };
-      const errors = program => program.diagnostics.filter(d => d.severity !== 'warning');
-      // Each program the rename edits, built before it and after.
-      for (const [key, text] of entries) {
-        const before = await build(key, { key, text });
-        const edited = [...renamedTexts.keys()].filter(file => before.files.some(f => f.key === file));
-        const was = edited.map(file => bindings(before, file));
-        const failed = errors(before);
-        const after = await build(key, { key, text: renamedTexts.get(key) ?? text, more: renamedTexts });
+      // Each program the rename edits, as it was (an importer's, as found) and built after.
+      for (const [key, entry] of entries) {
+        const { text } = entry;
+        const { errors: failed, files, was: bound } = entry.before ?? before(await build(key, { key, text }));
+        const edited = [...renamedTexts.keys()].filter(file => bound.has(file));
+        const was = edited.map(file => bound.get(file));
+        const more = new Map([...renamedTexts].filter(([file]) => files.has(file)));
+        const after = await build(key, { key, text: renamedTexts.get(key) ?? text, more });
         // A name that would then mean something else (a keyword, a type, a
         // name already there): the file renamed makes a mistake it did not.
-        const made = errors(after);
+        const made = after.diagnostics.filter(d => d.severity !== 'warning');
         if (made.length > failed.length) {
           const known = new Set(failed.map(d => d.message));
           const first = made.find(d => !known.has(d.message)) ?? made[0];
@@ -515,9 +521,11 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
    * the other programs that have its file: each open file's, and each file's
    * on disk that imports it (see onDisk). Spelled `spelling` (any, for
    * null): each place, with its `location` and the `text` of its file; and
-   * `entries`, each such program's entry → its text. With `strict` (a
-   * rename), a file that cannot be read or analyzed is an error, not
-   * skipped. Each such program is built, so `q`'s index is not read after.
+   * `entries`, each such program's entry → its text and (see before) what
+   * it is before the rename. With `strict` (a rename), a folder that cannot
+   * be listed, or a file that cannot be read or (importing it) parsed, is an
+   * error, not skipped. Each such program is built, so `q`'s index is not
+   * read after.
    */
   async function importers(q, decl, spelling, includeDeclaration, strict = false) {
     // (A protocol's implementations import its file: found from the member's.)
@@ -527,7 +535,9 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     if (!definition || definition.file.startsWith('std:')) return out;
     const disk = await onDisk(definition.file);
     const refuse = why => responseError(-32602, `${why}: no rename`);
+    if (strict && disk.unlisted.length) throw refuse(`folder ${disk.unlisted[0]} cannot be listed`);
     if (strict && disk.unread.length) throw refuse(`${nameOf(disk.unread[0])} cannot be read`);
+    const importing = new Set(disk.files);
     for (const key of new Set([...docs.keys(), ...disk.files])) {
       if (key === q.key) continue;
       let program;
@@ -540,11 +550,17 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
         }
         program = await build(key, { key, text });
       }
-      // (One that does not parse may import it: its `using` says so.)
+      // (One that does not parse, or whose build stops at an import, may
+      // import it: its `using` says so.)
       const has = program.files.some(f => f.key === definition.file);
-      if (strict && (has || disk.files.includes(key)) && !analyzed(program, key)) throw refuse(`${nameOf(key)}, which imports ${nameOf(definition.file)}, does not parse`);
+      if (strict && (has || importing.has(key))) {
+        const imports = `${nameOf(key)}, which imports ${nameOf(definition.file)},`;
+        if (program.diagnostics.some(d => d.file === key && d.kind === 'parse-error')) throw refuse(`${imports} does not parse`);
+        const stop = !has && program.diagnostics.find(d => d.kind === 'unknown-import');
+        if (stop) throw refuse(`${imports} does not build (${stop.message})`);
+      }
       if (!has) continue;
-      out.entries.set(key, textOf(program, key));
+      out.entries.set(key, { text: textOf(program, key), before: strict ? before(program) : null });
       const { index } = program;
       const same = index.declarations(definition.file).find(d => {
         const p = index.definition(d.decl);
@@ -563,23 +579,30 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
    * The files on disk (open or not) that import `file`, directly or through
    * another: of the .utu files under the workspace's folders (else the open
    * files' folders), each whose `using … from "…"` leads to it. `unread`:
-   * those that cannot be read. None when the host lists no files.
+   * those that cannot be read; `unlisted`: the folders that cannot be listed.
+   * None when the host lists no files. A file's imports are kept while the
+   * host's stamp for it (`stamps`, as listFiles gives) is the same.
    */
   async function onDisk(file) {
-    if (!listFiles) return { files: [], unread: [] };
+    if (!listFiles) return { files: [], unread: [], unlisted: [] };
     const dirOf = key => /^[a-z][\w+.-]+:/i.test(key) ? null : key.replace(/[\\/][^\\/]*$/, '');
     const dirs = roots.length ? roots : [...new Set([file, ...docs.keys()].map(dirOf).filter(Boolean))];
     const importedBy = new Map();  // file → the files importing it
     const unread = [];
-    for (const key of await listFiles(dirs)) {
+    const listed = await listFiles(dirs);
+    const { files, unlisted = [], stamps = null } = Array.isArray(listed) ? { files: listed } : listed;
+    for (const key of new Set([...files, ...[...docs.keys()].filter(dirOf)])) {
       const host = hostFor(key);
-      let text = docs.get(key)?.text;
-      if (text == null) try { text = await host.readFile(key); } catch { unread.push(key); continue; }
-      for (const [, literal] of String(text).matchAll(/\busing\b[^;]*?\bfrom\s*("(?:[^"\\\n]|\\.)*")/g)) {
-        let path;
-        try { path = JSON.parse(literal); } catch { continue; }
-        if (/^[a-z][\w+.-]+:/i.test(path)) continue;
-        const target = host.resolvePath ? host.resolvePath(key, path) : path;
+      let text = docs.get(key)?.text, targets;
+      const stamp = text == null ? stamps?.get(key) : null;
+      if (stamp != null && scanned.get(key)?.stamp === stamp) targets = scanned.get(key).targets;
+      else {
+        if (text == null) try { text = await host.readFile(key); } catch { unread.push(key); continue; }
+        targets = importPaths(String(text)).filter(path => !/^[a-z][\w+.-]+:/i.test(path))
+          .map(path => host.resolvePath ? host.resolvePath(key, path) : path);
+        if (stamp != null) scanned.set(key, { stamp, targets });
+      }
+      for (const target of targets) {
         if (!importedBy.has(target)) importedBy.set(target, new Set());
         importedBy.get(target).add(key);
       }
@@ -587,7 +610,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     const found = new Set([file]);
     for (const f of found) for (const by of importedBy.get(f) ?? []) found.add(by);
     found.delete(file);
-    return { files: [...found], unread };
+    return { files: [...found], unread, unlisted };
   }
 
   /**
@@ -597,6 +620,17 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
   function bindings(program, key) {
     const { index } = program;
     return program.index.names(key).map(n => ({ at: n.at, meant: index.definition(n.decl), kind: index.kind(n.decl) }));
+  }
+
+  /**
+   * What a rename checks a program (the one the compiler holds) against
+   * after: its `errors`, its `files`, and the bindings of each file an
+   * editor can change (`was`, file → bindings).
+   */
+  function before(program) {
+    const files = new Set(program.files.map(f => f.key));
+    const was = new Map([...files].filter(f => !f.startsWith('std:') && uriOf(f)).map(f => [f, bindings(program, f)]));
+    return { errors: program.diagnostics.filter(d => d.severity !== 'warning'), files, was };
   }
 
   /**
@@ -884,6 +918,22 @@ function shift(before, after) {
     return -1;
   };
   return { toOld: o => move(a, b, toB, o), toNew: (o, clamp) => move(b, a, toA, o, clamp) };
+}
+
+/** The paths of `text`'s `using … from "…"` (not in a comment or another string). */
+function importPaths(text) {
+  // Comments blanked, and strings but for their quotes (each string kept by where it is).
+  const strings = new Map();
+  const plain = text.replace(/\/\/[^\n]*|"(?:[^"\\\n]|\\.)*"/g, (m, at) => {
+    if (m[0] === '/') return ' '.repeat(m.length);
+    strings.set(at, m);
+    return `"${' '.repeat(m.length - 2)}"`;
+  });
+  const paths = [];
+  for (const m of plain.matchAll(/\busing\b[^;"]*?\bfrom\s*"/g)) {
+    try { paths.push(JSON.parse(strings.get(m.index + m[0].length - 1))); } catch {}
+  }
+  return paths;
 }
 
 /** A file's name, without its folder. */
