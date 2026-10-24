@@ -27,8 +27,6 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { isMainThread, Worker, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
@@ -38,6 +36,11 @@ import { sourceMapJson, wasmFrames, withMapUrl } from '../src/selfhost/sourcemap
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RUNTIME = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
+
+// In inWorker's worker: the main thread's terminals (`o` stdout, `e`
+// stderr), kept from what the command spawns.
+const WORKER_TTY = process.env.UTU_WORKER_TTY;
+delete process.env.UTU_WORKER_TTY;
 
 const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'display:modules', 'display:exports', 'display:debug', 'graph']);
 
@@ -566,6 +569,7 @@ async function buildExe(file, { utu, optimize, safe, out }) {
   const status = /export\s+main\s*\([^)]*\)\s*I32\b/.test(await fs.readFile(file, 'utf8'));
   const finish = status ? 'process.exitCode = result' : 'if (result !== undefined) console.log(result)';
   await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  ${finish};\n}\n`);
+  const { spawnSync } = await import('node:child_process');
   const result = spawnSync('bun', ['build', runner, '--compile', '--outfile', target], { cwd: process.cwd(), stdio: 'inherit' });
   await fs.rm(dir, { recursive: true, force: true });
   if (result.error) throw result.error;
@@ -762,7 +766,7 @@ function colored(stream) {
   const force = process.env.FORCE_COLOR;
   if (force != null && force !== '') return force !== '0' && force !== 'false';
   // In the worker (see STACK_MB), the terminal is the main thread's.
-  if (!isMainThread && workerData?.tty) return workerData.tty[stream === process.stdout ? 'stdout' : 'stderr'];
+  if (WORKER_TTY != null) return WORKER_TTY.includes(stream === process.stdout ? 'o' : 'e');
   return !!stream.isTTY;
 }
 
@@ -951,16 +955,18 @@ async function trap(error, file, built, utu) {
 const STACK_MB = 1024;
 
 /** Whether this thread can hand a command to a worker with a deeper stack. */
-const deepens = isMainThread && !process.versions.bun && !process.env.UTU_NO_WORKER;
+const deepens = WORKER_TTY == null && !process.versions.bun && !process.env.UTU_NO_WORKER;
 
 /** Thrown when a build was too deep for this thread: the command starts again in a worker with an `mb` MB stack. */
 class TooDeep extends Error { constructor(mb = STACK_MB) { super(); this.mb = mb; } }
 
 /** The command, run in a worker with a deep stack; exits as it does. */
-function inWorker(mb = STACK_MB) {
+async function inWorker(mb = STACK_MB) {
+  const { Worker } = await import('node:worker_threads');
+  const tty = (process.stdout.isTTY ? 'o' : '') + (process.stderr.isTTY ? 'e' : '');
   const worker = new Worker(new URL(import.meta.url), {
     argv: process.argv.slice(2), stdin: true, resourceLimits: { stackSizeMb: mb },
-    workerData: { tty: { stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY } },
+    env: { ...process.env, UTU_WORKER_TTY: tty },
   });
   process.stdin.pipe(worker.stdin);
   worker.on('error', error => {
