@@ -258,6 +258,7 @@ enum(U8) Diag:
     | EsNative        // an `@es` argument or result that is a wasm struct, array, or fun
     | ProtoNoMember   // `fn P[T].m` with no member m in P
     | CallbackArity   // a closure of more parameters than the host callback passes
+    | StreamPromise   // `Stream[Promise[T]]`: a stream's values are awaited as read
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from

@@ -2026,7 +2026,15 @@ mod iterators {
                     code {
                         "await for";
                     }
-                    " reads it, suspending at each value (JSPI).";
+                    " reads it, suspending at each value (JSPI). A value that is a promise is awaited as it is read, as JS's async generators do, so ";
+                    code {
+                        "Stream[Promise[I32]]";
+                    }
+                    " is an error: write ";
+                    code {
+                        "Stream[I32]";
+                    }
+                    ".";
                 }
                 = code.block(stream_sample());
                 h3 {
