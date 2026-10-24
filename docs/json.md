@@ -37,7 +37,9 @@ fn store(save: Save) Str {
 | `encode T value` | `Str`: compact JSON |
 | `match text { … }` | the value of the matching arm (below) |
 
-`T` is a struct, an enum, or an `Array`.
+`T` is a struct, an enum, or an `Array`. Its structs and enums are named bare and
+are the file's: in a mod, the mod's own, then the file's top-level ones (not
+a type parameter, nor another mod's).
 
 ## Types
 
