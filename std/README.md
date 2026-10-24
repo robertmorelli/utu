@@ -30,8 +30,9 @@ To intern spans of a byte mem without copying them, use the mem's own
 
 `std:IntMap` maps `I32` keys to `I32` values (`set`, `get(key, missing)`, `has`,
 `len`). `std:Interner` gives byte strings dense ids in first-seen order: call
-`begin()`, `byte(b)` for each byte (from a mem, an array, or a string), then
-`finish()`; the same bytes always get the same id. `size`, `byte_at`, and `ascii`
+`begin()`, `byte(b)` for each byte 0 to 255 (from a mem or an array; safe builds
+trap on others), then `finish()`; the same bytes always get the same id.
+`str(s)` interns a string as its UTF-8 bytes. `size`, `byte_at`, and `ascii`
 read a key back.
 
 ## Everyday modules

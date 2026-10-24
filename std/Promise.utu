@@ -24,11 +24,15 @@ mod Promise[T1] {
     // function — the host hands it straight to `p.then` with nothing between.
     // Both operands are externref whatever T1 is, so this needs one host
     // import rather than one per instantiation.
+    // On rejection: with a `catch` on the same promise, attached before it
+    // settles, only that `catch` runs. Without one, the rejection is reported
+    // as unhandled, as JS's `p.then(f)` would. A trap in `on_value` is reported.
     fn &.then |self| (on_value: cl(T1) void) void {
         @ir/\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \/;
     }
 
-    // Subscribe to rejection. The reason is an opaque host value.
+    // Subscribe to rejection. The reason is an opaque host value. Marks the
+    // promise handled, so a `then` on it no longer reports the rejection.
     fn &.catch |self| (on_error: cl(Externref) void) void {
         @ir/\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \/;
     }

@@ -46,6 +46,7 @@ mod Order[T[Ord]] {
     fn min(a: T, b: T) T { if b.cmp(a) < 0 { b; } else { a; }; }
 
     /// `x`, or the nearer of `low` and `high` when it is outside them.
+    /// With `low` after `high`: `low` when `x` is before `low`, else `high`.
     fn clamp(x: T, low: T, high: T) T {
         if x.cmp(low) < 0 { low; } else if x.cmp(high) > 0 { high; } else { x; };
     }

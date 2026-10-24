@@ -2,6 +2,7 @@
 // & is a 32-bit bitmask value (same wasm representation as I32).
 // Intended for use as a lane-selection mask, not a general integer.
 // Supports bitwise and comparison ops; arithmetic (add/sub/mul) is excluded.
+// A mask has no sign: `>>` is a logical shift, the same as `>>>` (zeros in).
 
 mod M32 {
     type & = @ir/\ <ir-wasm-scalar type-repr="wasm-i32"/> \/

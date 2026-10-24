@@ -1182,6 +1182,58 @@ export lib {
   await assert.rejects(async () => (await instantiateNode(trapping.wasm, trapping.spec)).exports.run());
   checked++;
 
+  // Interner: `str` keys a string by its UTF-8 bytes (a string's UTF-16 units fed to `byte` once
+  // masked to 8 bits, so "€" and "¬" got one id); `byte` past 255 traps in safe builds, masks in unsafe.
+  const interning = await write(`using Interner from std:Interner;
+export lib {
+    fn ids() Str {
+        let names = Interner.new();
+        let a = names.str("€");
+        let b = names.str("¬");
+        names.begin();
+        for ([226, 130, 172]) |v| { names.byte(v); };
+        let c = names.finish();
+        let d = names.str("a😀b");
+        let e = names.str(Str.from_codes([55296], 1));
+        let f = names.str(Str.from_codes([55297], 1));
+        \`\${a} \${b} \${c} \${d} \${e} \${f} \${names.size(d)} \${names.byte_at(d, 1)} \${names.size(e)} \${names.ascii(names.str("ok"))}\`;
+    }
+    fn wide() I32 { let names = Interner.new(); names.begin(); names.byte(8364); names.finish(); }
+}`);
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, interning, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    assert.equal(exports.ids(), '0 1 0 2 3 4 6 240 3 ok', `${mode} Interner.str`);
+    if (mode.endsWith('Unsafe')) assert.equal(exports.wide(), 0, `${mode} Interner.byte masks`);
+    else assert.throws(() => exports.wide(), WebAssembly.RuntimeError, `${mode} Interner.byte(8364) traps`);
+    checked++;
+  }
+
+  // A `then` on a promise that also has a `catch` does not report the rejection as unhandled (its
+  // derived promise rejected with no way to catch it); a `then` alone still does.
+  const rejecting = await write(`let fail: fun() Promise[I32] = @es/\\ () => Promise.reject(new Error("boom")) \\/;
+let note: fun(Str) void = @es/\\ (s) => { (globalThis.__seen ??= []).push(s); } \\/;
+export lib {
+    fn both() void { let q = fail(); q.then(cl(v) { note("value"); }); q.catch(cl(e) { note("caught"); }); }
+    fn alone() void { fail().then(cl(v) { note("value"); }); }
+}`);
+  const settled = await compileFile(utu, rejecting);
+  assert.ok(settled.wasm, settled.diagnostics?.map(d => d.message).join('\n'));
+  const { exports: rejects } = await instantiateNode(settled.wasm, settled.spec);
+  for (const [name, unhandled] of [['both', 0], ['alone', 1]]) {
+    let count = 0;
+    const listener = () => { count++; };
+    process.on('unhandledRejection', listener);
+    globalThis.__seen = [];
+    rejects[name]();
+    await new Promise(done => setTimeout(done, 20));
+    process.off('unhandledRejection', listener);
+    assert.equal(count, unhandled, `Promise then/catch ${name}: unhandled rejections`);
+    assert.deepEqual(globalThis.__seen, name === 'both' ? ['caught'] : [], `Promise then/catch ${name}`);
+    checked++;
+  }
+
   // Values at the JavaScript boundary, and @json, in the self-hosted compiler,
   // in every build mode: what each export returns.
   const boundary = [
