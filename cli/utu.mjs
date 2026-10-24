@@ -256,12 +256,24 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
 }
 
 /**
- * An array main's result as text: `[[1, 2], []]`, `["a", "b\"c"]`, null as
- * `null`, any other value of the innermost type by that type's name (`P`).
- * Read by the build's exports `run:len:k` and `run:at:k`, for level k.
+ * An array, tuple, or handle main's result as text: `[[1, 2], []]`,
+ * `["a", "b\"c"]`, `[1, P]`, null as `null`, any other value of the innermost
+ * type by that type's name (`P`). Read by the build's exports `run:len:k` and
+ * `run:at:k`, for level k.
  */
 function shown(exports, { levels, leaf }, value, k = 0) {
   if (value === null) return 'null';
+  if (k === levels && Array.isArray(value)) {
+    // A tuple: leaf is `.{T1, T2}`; split at its top-level commas.
+    const types = [];
+    let depth = 0, from = 2;
+    for (let i = 2; i < leaf.length - 1; i++) {
+      depth += '([{'.includes(leaf[i]) ? 1 : ')]}'.includes(leaf[i]) ? -1 : 0;
+      if (!depth && leaf[i] === ',') types.push(leaf.slice(from, i).trim()), from = i + 1;
+    }
+    types.push(leaf.slice(from, -1).trim());
+    return `[${value.map((v, i) => shown(exports, { levels, leaf: types[i] ?? '' }, v, k)).join(', ')}]`;
+  }
   if (k === levels) return typeof value === 'string' ? JSON.stringify(value)
     : typeof value === 'object' || typeof value === 'function' ? leaf.replace(/^\?/, '') : String(value);
   const items = [];

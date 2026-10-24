@@ -2159,6 +2159,36 @@ export lib {
   const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));
   assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);
   checked++;
+  // A handle (struct, array, protocol) from JS is not null, and a protocol's is a wasm
+  // object: checked where it crosses, in every build (wasm took null, and a protocol any
+  // object, and trapped later). ?P takes null and undefined. A closure JS calls is given
+  // no null for a handle in safe builds (as an export's arguments are checked).
+  const shapes = 'proto Shape:\n    | area() F64\nstruct Circle[Shape]:\n    | r: F64\nfn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }\nstruct P:\n    | x: I32\n';
+  const nullHandles = await write(shapes
+    + 'let p: fun() P = @es/\\ () => null \\/;\nlet a: fun() Array[I32] = @es/\\ () => null \\/;\n'
+    + 'let s: fun() Shape = @es/\\ () => null \\/;\nlet o: fun() Shape = @es/\\ () => ({ area() { return 9; } }) \\/;\n'
+    + 'let np: fun() ?P = @es/\\ () => null \\/;\nlet nu: fun() ?P = @es/\\ () => undefined \\/;\nlet ns: fun() ?Shape = @es/\\ () => null \\/;\n'
+    + 'let id: fun(Shape) Shape = @es/\\ (v) => v \\/;\nlet ida: fun(Array[I32]) Array[I32] = @es/\\ (v) => v \\/;\nlet idp: fun(P) P = @es/\\ (v) => v \\/;\n'
+    + 'let call: fun(cl(P) I32) I32 = @es/\\ (g) => g(null) \\/;\n'
+    + 'export lib {\n    fn p_() I32 { p().x; }\n    fn a_() I32 { a().len(); }\n    fn s_() F64 { s().area(); }\n    fn o_() F64 { o().area(); }\n    fn cl_() I32 { call(cl(q) { q.x; }); }\n'
+    + '    fn ok() F64 {\n        let x = np() orelse P { x: 1 };\n        let y = nu() orelse P { x: 2 };\n        let z: Shape = ns() orelse Circle { r: 1.0 };\n'
+    + '        (x.x + y.x + ida([4, 5])[1] + idp(P { x: 10 }).x).to_f64() + z.area() + id(Circle { r: 2.0 }).area();\n    }\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, nullHandles, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(result.wasm, result.spec);
+    assert.throws(() => exports.p_(), /Wrong type from JavaScript: a P, not null/, mode);
+    assert.throws(() => exports.a_(), /Wrong type from JavaScript: an Array\[I32\], not null/, mode);
+    assert.throws(() => exports.s_(), /Wrong type from JavaScript: a Shape, not null/, mode);
+    assert.throws(() => exports.o_(), /Wrong type from JavaScript: a Shape, not object/, mode);
+    assert.throws(() => exports.cl_(), mode.endsWith('Unsafe') ? WebAssembly.RuntimeError : /Wrong type from JavaScript: a closure's argument 1 is null/, mode);
+    assert.equal(exports.ok(), 33, mode);
+    checked++;
+  }
+  // A value binding's, as the glue loads.
+  const nullValue = await compileFile(utu, await write('struct P:\n    | x: I32\nlet v: P = @es/\\ null \\/;\nexport main() I32 { v.x; }\n'), { mode: 'small' });
+  await assert.rejects(async () => (await instantiateNode(nullValue.wasm, nullValue.spec)).exports.main(), /Wrong type from JavaScript: a P, not null/);
+  checked++;
 
   // Test names: each test has one, its own.
   const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });

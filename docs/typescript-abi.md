@@ -291,7 +291,14 @@ can keep one and give it back, where utu reads it. So `make() Point` and
 `p.x` is `undefined`, `a.length` of an `Array[Str]` too, and a value of the
 wrong kind where a struct is wanted (`lib.norm({ x: 3, y: 4 })`, or an `@es`
 body's `({ x: 3 })` for a `Point` result) throws a `TypeError` where it
-crosses. Give JS what it should read as numbers, `Str` (`@json encode` for
+crosses. So does null (or `undefined`) from an `@es` binding for a handle
+that is not nullable, in every build (`Wrong type from JavaScript: a Point,
+not null`); a `?Point` takes both, as null. A protocol value (`fun() Shape`)
+must be a wasm object: a plain JS object with an `area` method is no `Shape`
+(`a Shape, not object`); a utu struct that does not implement it still
+traps where it is used. A closure JS calls is given no null for a handle
+argument in safe builds (`a closure's argument 1 is null`), as an `export
+lib` function's arguments below. Give JS what it should read as numbers, `Str` (`@json encode` for
 whole values), or host objects. A `fun` argument reaches JS as a function it
 can call. A JS function is a closure: type a function result `cl(I32) I32`;
 `fun(I32) I32` is an error (`add gets a JS function: that is a cl, not
