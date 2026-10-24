@@ -1,5 +1,5 @@
 // What: an @es binding declared to return an enum gives back a plain JS object
-// Expect: load_shape gets Shape from JS, which cannot make one (a compile error)
+// Expect: TypeError at the boundary: `load_shape` returned a value that is not a Shape
 enum Shape:
     | Circle { r: F64 }
     | Square { side: F64 }

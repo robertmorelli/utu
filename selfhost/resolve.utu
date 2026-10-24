@@ -255,7 +255,7 @@ enum(U8) Diag:
     | ModNoType       // a mod with no type `&` (or its alias) where a type goes
     | ReturnInBench   // `return` in a bench's setup or measure: no time to report
     | TestInGeneric   // a test or bench in a generic mod: it runs in no instance
-    | EsNative        // an `@es` argument or result that is a wasm struct, array, or fun
+    | EsNative        // an `@es` binding typed to give a `fun` (JS gives a `cl`)
     | ProtoNoMember   // `fn P[T].m` with no member m in P
     | CallbackArity   // a closure of more parameters than the host callback passes
     | StreamPromise   // `Stream[Promise[T]]`: a stream's values are awaited as read

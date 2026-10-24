@@ -262,36 +262,18 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     f;
 }
 
-/// Report an `@es` binding's type that crosses as a wasm struct, array, or
-/// `fun`: JavaScript reads none of them, nor makes one. std's own bindings
-/// may hand one back that utu gave (std:Stream's values).
+/// Report an `@es` binding typed to give a `fun`: JavaScript gives a
+/// function, which is a `cl`. Structs, arrays and enums cross as opaque
+/// handles (docs/typescript-abi.md); a `fun` argument crosses as a closure.
 fn es_check_native(decl: I32, t: I32) void {
     let n = decl_node[decl];
-    if n >= 0 and from_std(n) { return; };
     let at = if n >= 0 and next_sibling(first_child(n)) != last_child(n) { next_sibling(first_child(n)); } else { n; };
-    if not (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) {
-        if js_native(t) { es_native(at, decl, t, 0); };
-        return;
+    let r = if ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure) { ty_b[t]; } else { t; };
+    if es_fun_type(r) {
+        report3(Diag.EsNative, at, decl_name[decl], r, 0, -1);
+        let u = if ty_is(r, Ty.Nullable) { ty_a[r]; } else { r; };
+        diag_note("A JS function is a closure: type it " + type_text(ty(Ty.Closure, ty_a[u], ty_b[u])) + ".");
     };
-    let params = ty_a[t];
-    for (0 ..< vl_len[params]) |i| { if js_native(vl_item(params, i)) { es_native(at, decl, vl_item(params, i), i + 1); }; };
-    if js_native(ty_b[t]) { es_native(at, decl, ty_b[t], 0); };
-}
-
-/// Whether a value of type t is a wasm GC reference (a struct, array, or
-/// function), not a host value: JavaScript sees it opaque.
-fn js_native(t: I32) Bool {
-    let vt = repr(t);
-    vt >= vt_defined and vt < vt_tuple;
-}
-
-/// Diag.EsNative on `at`: argument k (from 1) of type t, or the result (0).
-fn es_native(at: I32, decl: I32, t: I32, k: I32) void {
-    report3(Diag.EsNative, at, decl_name[decl], t, k, -1);
-    let u = if ty_is(t, Ty.Nullable) { ty_a[t]; } else { t; };
-    if ty_is(u, Ty.Fun) { diag_note("A JS function is a closure: type it " + type_text(ty(Ty.Closure, ty_a[u], ty_b[u])) + "."); }
-    else if k > 0 { diag_note("JS reads numbers, Str, Bool, closures and host values: pass its fields, or a Str from @json encode."); }
-    else { diag_note("JS gives numbers, Str, Bool, closures and host values: give its fields, or a Str to @json decode."); };
 }
 
 /// What an `@es` body is wrapped in, before it and `)`, so values cross as
@@ -589,14 +571,14 @@ fn tuple_result_kinds(list: I32) Str {
     if any { out + "]"; } else { ""; };
 }
 
-/// What an argument of type t must be: "Bool" any value, by its truthiness;
-/// in safe builds "bool" a boolean, "int" an integer number (an i32: wasm
+/// What an argument of type t must be: "Bool" any value, by its truthiness,
+/// in every build; in safe builds "int" an integer number (an i32: wasm
 /// keeps its low bits), "big" a BigInt (an i64), "num" a number (an f32 or
 /// f64), "Str" a string, "?Str" a string or null, "ref" not null (a struct,
 /// array, enum, or closure), "?" null when undefined; "" anything wasm takes.
 fn js_param_kind(t: I32) Str {
-    if safe_checks[0] != 1 { return if t == prelude(Prelude.Bool) { "Bool"; } else { ""; }; };
-    if t == prelude(Prelude.Bool) { return "bool"; };
+    if t == prelude(Prelude.Bool) { return "Bool"; };
+    if safe_checks[0] != 1 { return ""; };
     if t == prelude(Prelude.Str) { return "Str"; };
     if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { "?Str"; } else { "?"; }; };
     let vt = repr(t);

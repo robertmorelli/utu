@@ -281,22 +281,21 @@ unsigned (`v >>> 0`), and a `U64` as an unsigned BigInt
 element converted so. An `@es` result of a nullable type
 treats `undefined` as `null`, and so does `await` of a `Promise[?T]`.
 
-A struct, array, enum (but not an `enum(I32)`), or `fun` is a wasm object JavaScript
-cannot read or make, so an `@es` binding whose arguments or result include
-one is an error (`len passes Array[Str] to JS, which cannot read it`; `mk gets
-Point from JS, which cannot make one`). Pass fields, a `Str` from `@json
-encode`, or host values instead. A JS function is a closure: type a function
-result `cl(I32) I32`, not `fun(I32) I32`. A `fun` argument is given as a closure.
-std's own bindings are exempt: `std:Stream` hands back the values utu gave it.
-
-An `export lib` function is the other way round: its arguments and results may
-be structs, `Result`s, payload enums and arrays. JavaScript gets each as an
-opaque wasm object, a handle: it cannot read its fields or make one, but can
-keep it and pass it back to another export, which can. So `make() Point` and
-`norm(p: Point) F64` work together from JS (`lib.norm(lib.make())`), while
-`p.x` is `undefined` there and `lib.norm({ x: 3, y: 4 })` throws a
-`TypeError`. Export what JS should read as numbers, `Str` (`@json encode` for
-whole values), or host objects.
+Structs, `Result`s, payload enums and arrays cross both edges, an `@es`
+binding's arguments and results and an `export lib` function's, as opaque
+wasm objects, handles: JavaScript cannot read their fields or make one, but
+can keep one and give it back, where utu reads it. So `make() Point` and
+`norm(p: Point) F64` work together from JS (`lib.norm(lib.make())`), and an
+`@es` binding `fun(Point) Externref` may store a `Point` that another,
+`fun(Externref) Point`, gives back (`std:Stream` holds its values so). In JS
+`p.x` is `undefined`, `a.length` of an `Array[Str]` too, and a value of the
+wrong kind where a struct is wanted (`lib.norm({ x: 3, y: 4 })`, or an `@es`
+body's `({ x: 3 })` for a `Point` result) throws a `TypeError` where it
+crosses. Give JS what it should read as numbers, `Str` (`@json encode` for
+whole values), or host objects. A `fun` argument reaches JS as a function it
+can call. A JS function is a closure: type a function result `cl(I32) I32`;
+`fun(I32) I32` is an error (`add gets a JS function: that is a cl, not
+fun(I32) I32`).
 
 An `@es` body bound to a `fun` or `cl` type should be a function. One that
 is not plainly one (an arrow or `function`), such as `Math.abs`, is tested
@@ -304,15 +303,16 @@ as the glue loads: a value that is no function throws a `TypeError` naming
 the binding (`f: @es gave number, not a function`) before the program runs.
 
 Safe builds (`-O small`, `fast`, `debug`) also check an `export lib`
-function's arguments: a `Bool` must be a boolean; an `I32`, `U32` or
+function's arguments: an `I32`, `U32` or
 `enum(I32)` an integer number (wasm keeps its low bits, as above), not `1.5`;
 an `I64` or `U64` a BigInt; an `F32` or `F64` a number (`NaN` included); a
 `Str` a string, a `?Str` a string or null; a struct, array, enum or closure
 must not be null, and `undefined` for a nullable parameter is `null`. A wrong
 argument throws a `TypeError` naming the function and the argument
 (`inc: argument 1 must be an integer, not string`). `smallUnsafe` and
-`fastUnsafe` pass arguments as they come: a `Bool` by its truthiness, a
-number as wasm converts it (`"x"` is 0). Contextual callbacks
+`fastUnsafe` pass arguments as they come: a number as wasm converts it
+(`"x"` is 0). Every build takes a `Bool` argument by its truthiness (`flag(1)`,
+`flag("x")` are true; `flag(0)`, `flag(null)` false). Contextual callbacks
 derive parameter types from declarations, including DOM event maps.
 
 Host exceptions are caught with `try`:
