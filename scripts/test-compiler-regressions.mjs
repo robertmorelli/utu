@@ -2256,6 +2256,68 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], body);
     checked++;
   }
+  // Tuples, as TypeScript has them: `T` from a tuple's elements (nested too, and
+  // through `U extends T[]`), a constrained `T` the elements' type (not its
+  // constraint); a tuple literal each element of its own type, as many as it
+  // takes; a rest tuple's later elements of the rest's type. Function types:
+  // a rest's element compared, an optional parameter fits a required one, a
+  // rest takes fixed ones. A callback's result one of a union's members. Any
+  // Str is no union of string literals.
+  const hostC = 'export declare function tupOf<T>(t: [T, T]): T;\n'
+    + 'export declare function pairs<T extends number | string>(xs: [T, T]): T;\n'
+    + 'export declare function nested<T>(t: [[T, number]]): T;\n'
+    + 'export declare function firstU<T, U extends T[]>(xs: U): T;\n'
+    + 'export declare function inTup(t: [number, string]): string;\n'
+    + 'export declare function inRest(t: [number, ...string[]]): number;\n'
+    + 'export declare function rest(): [number, ...string[]];\n'
+    + 'export declare function fixed2(): (a: number, b: number) => number;\n'
+    + 'export declare function opt2(): (a: number, b?: number) => number;\n'
+    + 'export declare function nums(): (...a: number[]) => number;\n'
+    + 'export declare function applyRest(f: (...a: number[]) => number): number;\n'
+    + 'export declare function applyStrRest(f: (...a: string[]) => number): number;\n'
+    + 'export declare function applyTwo(f: (a: number, b: number) => number): number;\n'
+    + 'export declare function cbU(f: () => number | string): string;\n'
+    + 'export declare function litU(x: "x" | "y"): string;\n'
+    + 'export declare function cbLit(f: () => "p" | "q"): string;\n'
+    + 'export declare function pick(): "x" | "y";\n';
+  const hostCJs = 'export function tupOf(t) { return t[1]; }\nexport function pairs(xs) { return xs[0]; }\n'
+    + 'export function nested(t) { return t[0][0]; }\nexport function firstU(xs) { return xs[0]; }\n'
+    + 'export function inTup(t) { return t[1] + t[0]; }\nexport function inRest(t) { return t.length; }\n'
+    + 'export function rest() { return [1, "a", "bcd"]; }\nexport function fixed2() { return (a, b) => a * b; }\n'
+    + 'export function opt2() { return (a, b) => a + (b ?? 0); }\nexport function nums() { return (...a) => a.length; }\n'
+    + 'export function applyRest(f) { return f(2, 3); }\nexport function applyStrRest(f) { return f("a"); }\n'
+    + 'export function applyTwo(f) { return f(4, 5); }\nexport function cbU(f) { return String(f()); }\n'
+    + 'export function litU(x) { return x; }\nexport function cbLit(f) { return f(); }\nexport function pick() { return "y"; }\n';
+  const tupleHead = 'using C from "npm:hostc";\n';
+  const tuples = await project({ ...pkg('hostc', hostC, hostCJs), 'main.utu': tupleHead + 'export main() F64 {\n'
+    + '    let t = C.rest();\n'
+    + '    C.tupOf([1.0, 2.0]) + C.pairs([3.0, 4.0]) + C.nested([["ab", 1.0]]).len().to_f64() + C.firstU([5.0, 6.0])\n'
+    + '        + C.inTup([1.0, "a"]).len().to_f64() + C.inRest([1.0, "a", "b"]) + t[2].len().to_f64()\n'
+    + '        + C.applyRest(C.fixed2()) + C.applyTwo(C.opt2()) + C.applyRest(C.nums())\n'
+    + '        + C.cbU(cl() F64 { 4.0; }).len().to_f64() + C.litU("x").len().to_f64() + C.litU(C.pick()).len().to_f64();\n}\n' });
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, tuples, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    // 2 + 3 + 2 + 5 + 2 + 3 + 3 + 6 + 9 + 2 + 1 + 1 + 1
+    assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(tuples) })).exports.main(), 40, mode);
+    checked++;
+  }
+  for (const [body, messages] of [
+    ['let s: Str = C.tupOf([1.0, 2.0]); 0.0', ['s is Str, got F64']],
+    ['C.nested([["s", 1.0]])', ['Expected F64, got Str']],
+    ['C.firstU([1.0, "x"])', ['Expected F64, got Str']],
+    ['C.inTup(["a", "b"]).len().to_f64()', ['Expected F64, got Str']],
+    ['C.inTup([1.0]).len().to_f64()', ['C.[F64, Str] takes 2 elements, given 1']],
+    ['C.inTup([1.0, "a", "b"]).len().to_f64()', ['C.[F64, Str] takes 2 elements, given 3']],
+    ['C.inRest([3.0, 4.0])', ['Expected Str, got F64']],
+    ['C.applyStrRest(C.nums())', ['Expected C.(...a: string[]) => number, got C.(...a: number[]) => number']],
+    ['let s = "x"; C.litU(s).len().to_f64()', ['"x" | "y" takes its values, not any Str']],
+    ['C.cbLit(cl() Str { "p"; }).len().to_f64()', ['"p" | "q" takes its values, not any Str']],
+  ]) {
+    const result = await compileFile(utu, await project({ ...pkg('hostc', hostC, hostCJs), 'main.utu': `${tupleHead}export main() F64 {\n    ${body};\n}\n` }), { mode: 'small' });
+    assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
+    checked++;
+  }
   // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
   const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nexport lib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {

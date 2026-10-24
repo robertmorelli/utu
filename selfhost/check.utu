@@ -1251,7 +1251,7 @@ fn check_let(node: I32, cx: Cx) I32 {
     let before = diag_kind.len();
     if annotated {
         want(init, t, Why.Annotation, next_sibling(name), decl_name[decl]);
-        if has_foreign() { host_literal_let(next_sibling(name), init); };
+        if has_foreign() { host_literal_let(next_sibling(name), init, cx); };
     };
     let actual = check_expr(init, t, cx);
     if annotated {
