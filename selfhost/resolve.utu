@@ -255,6 +255,7 @@ enum(U8) Diag:
     | ModNoType       // a mod with no type `&` (or its alias) where a type goes
     | ReturnInBench   // `return` in a bench's setup or measure: no time to report
     | TestInGeneric   // a test or bench in a generic mod: it runs in no instance
+    | EsNative        // an `@es` argument or result that is a wasm struct, array, or fun
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from

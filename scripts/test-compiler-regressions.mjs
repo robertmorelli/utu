@@ -1650,6 +1650,40 @@ export lib {
     checked++;
   }
 
+  // An awaited ?T is null when the promise gives undefined, as a sync @es result is; a T is unchanged.
+  const awaitUndefined = await write('let s: fun() Promise[?Str] = @es/\\ () => Promise.resolve(undefined) \\/;\n'
+    + 'let t: fun() Promise[Str] = @es/\\ () => Promise.resolve("t") \\/;\n'
+    + 'export main() Str {\n    let x: ?Str = await s();\n    let y: Str = await t();\n    promote x { |v| => "got [" + v + "]", ~> "absent " + y, };\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, awaitUndefined, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 'absent t', mode);
+    checked++;
+  }
+  // A wasm struct, array, or fun crossing an @es binding: JS can read none nor make one.
+  for (const [source, message] of [
+    ['let len: fun(Array[Str]) F64 = @es/\\ (a) => a.length \\/;\nexport main() F64 { len(["a", "b"]); }\n', 'len passes Array[Str] to JS, which cannot read it'],
+    ['struct P:\n    | x: F64\nlet px: fun(F64, ?P) F64 = @es/\\ (n, p) => p.x \\/;\nexport main() F64 { px(1.0, P { x: 1.0 }); }\n', 'px passes ?P to JS, which cannot read it'],
+    ['struct P:\n    | x: F64\nlet px: cl(P) F64 = @es/\\ (p) => p.x \\/;\nexport main() F64 { px(P { x: 1.0 }); }\n', 'px passes P to JS, which cannot read it'],
+    ['struct P:\n    | x: F64\nlet mk: fun(F64) P =@es/\\ (x) => ({ x }) \\/;\nexport main() F64 { mk(3.0).x; }\n', 'mk gets P from JS, which cannot make one'],
+    ['let add: fun(I32) fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nexport main() I32 { add(1)(2); }\n', 'add gets a JS function: that is a cl, not fun(I32) I32'],
+  ]) {
+    const file = await write(source);
+    const { diagnostics } = await compileFile(utu, file, { mode: 'small' });
+    assert.deepEqual(diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], source);
+    checked++;
+  }
+  // What the fun result is instead: a cl. std's own bindings hand back what utu gave (a Stream of structs).
+  const clResult = await write('using Stream from std:Stream;\nstruct P:\n    | x: I32\n'
+    + 'let add: fun(I32) cl(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\n'
+    + 'export main() I32 { let f = add(1); let t = 0; await for (Stream[P].of([P { x: 10 }, P { x: 20 }])) |p| { t += p.x; }; f(2) + t - 30; }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, clResult, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 3, mode);
+    checked++;
+  }
+
   // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
   const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nexport lib { fn run() I32 { f().len(); } }\n'));
   assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);

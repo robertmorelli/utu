@@ -1,0 +1,7 @@
+// What: a utu array passed to an @es function
+// Expect: len passes Array[Str] to JS, which cannot read it
+let len: fun(Array[Str]) F64 = @es/\ (a) => a.length \/;
+
+export main() F64 {
+    len(["a", "b"]);
+}

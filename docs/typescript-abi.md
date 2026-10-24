@@ -220,7 +220,15 @@ unsigned (`v >>> 0`), and a `U64` as an unsigned BigInt
 (`BigInt.asUintN(64, v)`); on the way in, wasm keeps a value's low bits, so
 `4294967295` and `-1` are the same `U32`. A tuple result is a JS array, each
 element converted so. An `@es` result of a nullable type
-treats `undefined` as `null`.
+treats `undefined` as `null`, and so does `await` of a `Promise[?T]`.
+
+A struct, array, enum (but not an `enum(I32)`), or `fun` is a wasm object JavaScript
+cannot read or make, so an `@es` binding whose arguments or result include
+one is an error (`len passes Array[Str] to JS, which cannot read it`; `mk gets
+Point from JS, which cannot make one`). Pass fields, a `Str` from `@json
+encode`, or host values instead. A JS function is a closure: type a function
+result `cl(I32) I32`, not `fun(I32) I32`. A `fun` argument is given as a closure.
+std's own bindings are exempt: `std:Stream` hands back the values utu gave it.
 
 An `@es` body bound to a `fun` or `cl` type should be a function. One that
 is not plainly one (an arrow or `function`), such as `Math.abs`, is tested
