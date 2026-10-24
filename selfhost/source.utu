@@ -165,6 +165,22 @@ fn intern_kept() void {
     for (0 ..< n) |w| { src.intern(starts[w], ends[w]); };
 }
 
+/// A node noted by word, in one of four slots, -1 none: scratch for a walk
+/// that finds each name's first (cleared after it, by the walk).
+vec word_notes: I32;
+
+fn word_note(word: I32, slot: I32) I32 {
+    let i = word * 4 + slot;
+    if word >= 0 and i < word_notes.len() { word_notes[i]; } else { -1; };
+}
+
+fn set_word_note(word: I32, slot: I32, node: I32) void {
+    if word < 0 { return; };
+    let i = word * 4 + slot;
+    while (word_notes.len() <= i) { word_notes.push(-1); };
+    word_notes[i] = node;
+}
+
 /// Intern a name that is not in any file (pushed onto `src`).
 fn intern_text(text: Str) I32 {
     let start = src.len();

@@ -57,7 +57,8 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
         report2(Diag.StdOwnStruct, at, -1, t, -1);
         return error_value();
     };
-    // Each initializer names a field once, and each field has one.
+    // Each initializer names a field once, and each field has one. (Each
+    // name's first initializer is noted by word until the fields have theirs.)
     let unknown = false;
     let f = first_init;
     while (f >= 0) {
@@ -70,28 +71,51 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
         }
         else {
             node_decl[name] = field;
-            let other = first_init;
-            while (other != f) {
-                if word_of(first_child(other)) == word_of(name) {
-                    report(Diag.DuplicateField, f, word_of(name));
-                    diag_place(Extra.Related, first_child(other), "first here");
-                    other = f;
-                } else { other = next_sibling(other); };
+            let other = word_note(word_of(name), 0);
+            if other >= 0 {
+                report(Diag.DuplicateField, f, word_of(name));
+                diag_place(Extra.Related, first_child(other), "first here");
             };
         };
+        if word_note(word_of(name), 0) < 0 { set_word_note(word_of(name), 0, f); };
         f = next_sibling(f);
     };
     let mt = w_mark();
     let holder = fields_holder(decl);
+    // By field (its place in the holder): its initializer, or -1.
+    let field_init = Array[I32].new(if holder >= 0 { child_count(holder); } else { 0; }, -1);
+    let c = if holder >= 0 { first_child(holder); } else { -1; };
+    let at_c = 0;
+    while (c >= 0) {
+        if is_kind(c, Node.Field) { field_init[at_c] = word_note(decl_name[node_decl[first_child(c)]], 0); };
+        at_c += 1;
+        c = next_sibling(c);
+    };
+    // Whether each initializer is the first of its name.
+    let firsts = Array[Bool].new(child_count_from(first_init), false);
+    f = first_init;
+    let at_f = 0;
+    while (f >= 0) {
+        let field = node_decl[first_child(f)];
+        firsts[at_f] = decl_is(field, Decl.Field) and word_note(decl_name[field], 0) == f;
+        at_f += 1;
+        f = next_sibling(f);
+    };
+    f = first_init;
+    while (f >= 0) {
+        set_word_note(word_of(first_child(f)), 0, -1);
+        f = next_sibling(f);
+    };
     // Initializers run in the order written: when that is not the fields'
     // order, each (but a literal) goes first into a local.
     let temps = Array[I32].new(if holder >= 0 { child_count(holder); } else { 0; }, -1);
     if not inits_in_order(holder, first_init) {
-        let f = first_init;
+        f = first_init;
+        at_f = 0;
         while (f >= 0) {
             let field = node_decl[first_child(f)];
             let value = last_child(f);
-            if decl_is(field, Decl.Field) and init_for(first_init, decl_name[field]) == f and not plain_init(value) {
+            if firsts[at_f] and not plain_init(value) {
                 let ft = field_type(field, ty_inst(t));
                 let local = new_local(repr(ft));
                 let ml = w_mark();
@@ -99,16 +123,18 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
                 w_node(Op.LocalSet, vt_none, local, 0, ml);
                 temps[decl_a[field]] = local;
             };
+            at_f += 1;
             f = next_sibling(f);
         };
     };
     let m = w_mark();
-    let c = if holder >= 0 { first_child(holder); } else { -1; };
+    c = if holder >= 0 { first_child(holder); } else { -1; };
+    at_c = 0;
     let missing = false;
     while (c >= 0) {
         if is_kind(c, Node.Field) {
             let field = node_decl[first_child(c)];
-            let init = init_for(first_init, decl_name[field]);
+            let init = field_init[at_c];
             let ft = field_type(field, ty_inst(t));
             if init < 0 and in_std and std_own(field) {
                 w_default(storage(repr(ft)));
@@ -129,6 +155,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
                 unwant();
             };
         };
+        at_c += 1;
         c = next_sibling(c);
     };
     let vt = repr(t);
@@ -189,14 +216,15 @@ fn inits_in_order(holder: I32, first_init: I32) Bool {
 /// Whether an initializer neither has effects nor sees them: a literal.
 fn plain_init(value: I32) Bool { is_kind(value, Node.Literal); }
 
-/// The initializer from `first_init` on that names field `word`, or -1.
-fn init_for(first_init: I32, word: I32) I32 {
-    let f = first_init;
-    while (f >= 0) {
-        if word_of(first_child(f)) == word { return f; };
-        f = next_sibling(f);
+/// Nodes from `node` on, it and its next siblings.
+fn child_count_from(node: I32) I32 {
+    let n = 0;
+    let c = node;
+    while (c >= 0) {
+        n += 1;
+        c = next_sibling(c);
     };
-    -1;
+    n;
 }
 
 /// A struct field of the value on the stack (of type `t`), named by node `name`.

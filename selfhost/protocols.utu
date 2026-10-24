@@ -361,8 +361,64 @@ fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array
 //! for each of its getters and setters, and an implementation P[T].m with
 //! the method's signature for each of its methods.
 
+/// Each protocol method's implementations (@method_impls), found once while
+/// conformance is checked: by protocol, its first method found; by method
+/// found, its word, the next, and its implementations' list.
+vec pm_head: I32;
+vec pm_word: I32;
+vec pm_next: I32;
+/// By type declaration, its first implementation noted; by note, the method
+/// found it is of, the function (the last declared), and the next.
+vec pt_head: I32;
+vec pt_method: I32;
+vec pt_fn: I32;
+vec pt_next: I32;
+
+/// Type t's implementation of method `word` of `proto`, or -1.
+fn impl_of(proto: I32, word: I32, t: I32) I32 {
+    let k = pm_head[proto];
+    while (k >= 0 and pm_word[k] != word) { k = pm_next[k]; };
+    if k < 0 {
+        k = pm_word.len();
+        pm_word.push(word);
+        pm_next.push(pm_head[proto]);
+        pm_head[proto] = k;
+        let impls = method_impls(proto, word);
+        let i = 0;
+        while (i < vl_len[impls]) {
+            let ty = vl_item(impls, i + 1);
+            let e = pt_head[ty];
+            while (e >= 0 and pt_method[e] != k) { e = pt_next[e]; };
+            if e >= 0 { pt_fn[e] = vl_item(impls, i); } else {
+                pt_method.push(k);
+                pt_fn.push(vl_item(impls, i));
+                pt_next.push(pt_head[ty]);
+                pt_head[ty] = pt_method.len() - 1;
+            };
+            i += 2;
+        };
+    };
+    let e = pt_head[t];
+    while (e >= 0) {
+        if pt_method[e] == k { return pt_fn[e]; };
+        e = pt_next[e];
+    };
+    -1;
+}
+
 /// Conformance of each type in the program's own files to the protocols it lists.
 fn validate_protocols() void {
+    pm_head.resize(decl_kind.len());
+    pt_head.resize(decl_kind.len());
+    for (0 ..< decl_kind.len()) |d| {
+        pm_head[d] = -1;
+        pt_head[d] = -1;
+    };
+    pm_word.clear();
+    pm_next.clear();
+    pt_method.clear();
+    pt_fn.clear();
+    pt_next.clear();
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Proto) and is_own_file(file_of_token(node_first[decl_node[d]])) { validate_proto_members(d); };
         if (decl_is(d, Decl.Struct) or decl_is(d, Decl.Enum)) and is_own_file(file_of_token(node_first[decl_node[d]])) {
@@ -426,13 +482,7 @@ fn conforms(t: I32, proto: I32) void {
             let m = first_child(c);
             let word = word_of(first_child(m));
             if is_kind(m, Node.Proto_method) {
-                let impls = method_impls(proto, word);
-                let found = -1;
-                let i = 0;
-                while (i < vl_len[impls]) {
-                    if vl_item(impls, i + 1) == t { found = vl_item(impls, i); };
-                    i += 2;
-                };
+                let found = impl_of(proto, word, t);
                 if found < 0 {
                     report3(Diag.ProtoMissing, decl_node[t], word, t, 0, decl_name[proto]);
                 } else if not same_signature(found, m, decl_type(t, 0)) {

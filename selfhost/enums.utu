@@ -556,24 +556,33 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
         if is_kind(a0, Node.Alt_arm) and alt_variant(first_child(a0), enum_decl) < 0 { return; };
         a0 = next_sibling(a0);
     };
+    // The variants the arms name, marked by declaration (and unmarked after).
+    if alt_covered.len() < decl_kind.len() {
+        let old = alt_covered.len();
+        alt_covered.resize(decl_kind.len());
+        for (old ..< decl_kind.len()) |d| { alt_covered[d] = 0; };
+    };
+    let a = next_sibling(first_child(node));
+    while (a >= 0) {
+        if is_kind(a, Node.Alt_arm) { alt_covered[alt_variant(first_child(a), enum_decl)] = 1; };
+        a = next_sibling(a);
+    };
+    let missing = -1;
     let c = first_child(decl_node[enum_decl]);
-    while (c >= 0) {
-        if is_kind(c, Node.Variant) {
-            let v = node_decl[first_child(c)];
-            let covered = false;
-            let a = next_sibling(first_child(node));
-            while (a >= 0) {
-                if is_kind(a, Node.Alt_arm) and alt_variant(first_child(a), enum_decl) == v { covered = true; };
-                a = next_sibling(a);
-            };
-            if not covered {
-                report2(Diag.NonExhaustive, node, decl_name[v], 3, named(enum_decl, 0));
-                return;
-            };
-        };
+    while (c >= 0 and missing < 0) {
+        if is_kind(c, Node.Variant) and alt_covered[node_decl[first_child(c)]] == 0 { missing = node_decl[first_child(c)]; };
         c = next_sibling(c);
     };
+    a = next_sibling(first_child(node));
+    while (a >= 0) {
+        if is_kind(a, Node.Alt_arm) { alt_covered[alt_variant(first_child(a), enum_decl)] = 0; };
+        a = next_sibling(a);
+    };
+    if missing >= 0 { report2(Diag.NonExhaustive, node, decl_name[missing], 3, named(enum_decl, 0)); };
 }
+
+/// By declaration: 1 for a variant an alt's arms name, while checking it.
+vec alt_covered: U8;
 
 fn reset_enums() void {
     name_helper_enum.clear();

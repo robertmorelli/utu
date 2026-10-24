@@ -22,6 +22,11 @@ vec jp_container: I32 = [-1];
 vec jp_name_words: I32;
 /// Words of the functions generated (or the container's own)
 vec jp_defined: I32;
+/// By word: 1 + its offset in the name table (0 not in it), and 1 when in
+/// @jp_defined; the table's length so far.
+vec jp_name_at: I32;
+vec jp_word_defined: U8;
+vec jp_names_len: I32 = [0];
 /// The generated functions' sources, as words, in order.
 vec jp_functions: I32;
 /// A counter for each site's fresh names (`__json0_`).
@@ -45,13 +50,16 @@ vec jc_site: I32 = [-1];
 /// table added to the container.
 fn json_expand_container(container: I32, json: I32, count: I32) void {
     jp_container[0] = container;
+    for (0 ..< jp_name_words.len()) |k| { jp_name_at[jp_name_words[k]] = 0; };
+    for (0 ..< jp_defined.len()) |k| { jp_word_defined[jp_defined[k]] = 0; };
     jp_name_words.clear();
     jp_defined.clear();
+    jp_names_len[0] = 0;
     jp_functions.clear();
     let has_runtime = false;
     let item = first_child(container);
     while (item >= 0) {
-        if is_kind(item, Node.Fn_decl) and next_sibling(first_child(first_child(item))) < 0 { jp_defined.push(word_of(first_child(first_child(item)))); };
+        if is_kind(item, Node.Fn_decl) and next_sibling(first_child(first_child(item))) < 0 { jp_define_word(word_of(first_child(first_child(item)))); };
         if is_kind(item, Node.Struct_decl) and word_text(word_of(first_child(item))) == "JsonReader__" { has_runtime = true; };
         item = next_sibling(item);
     };
@@ -88,13 +96,35 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
 /// `offset, length` of a name in the container's table.
 fn name_ref(name: Str) Str {
     let w = intern_text(name);
-    let offset = 0;
-    for (0 ..< jp_name_words.len()) |k| {
-        if jp_name_words[k] == w { return int_text(offset) + ", " + int_text(name.len()); };
-        offset += word_text(jp_name_words[k]).len();
+    jp_word_room(w);
+    if jp_name_at[w] == 0 {
+        jp_name_words.push(w);
+        jp_name_at[w] = jp_names_len[0] + 1;
+        jp_names_len[0] += word_text(w).len();
     };
-    jp_name_words.push(w);
-    int_text(offset) + ", " + int_text(name.len());
+    int_text(jp_name_at[w] - 1) + ", " + int_text(name.len());
+}
+
+/// @jp_name_at and @jp_word_defined reach word w.
+fn jp_word_room(w: I32) void {
+    let old = jp_name_at.len();
+    if w < old { return; };
+    let n = src.interned();
+    jp_name_at.resize(n);
+    jp_word_defined.resize(n);
+    for (old ..< n) |k| {
+        jp_name_at[k] = 0;
+        jp_word_defined[k] = 0;
+    };
+}
+
+/// Word w on @jp_defined; whether it was not yet.
+fn jp_define_word(w: I32) Bool {
+    jp_word_room(w);
+    if jp_word_defined[w] == 1 { return false; };
+    jp_word_defined[w] = 1;
+    jp_defined.push(w);
+    true;
 }
 
 //! = A site
@@ -364,10 +394,7 @@ fn scalar_write(type: Str, v: Str, w: Str) Str {
 /// Generate a function once, by name, unless the container already has it:
 /// whether to generate it now.
 fn json_define(name: Str) Bool {
-    let w = intern_text(name);
-    for (0 ..< jp_defined.len()) |k| { if jp_defined[k] == w { return false; }; };
-    jp_defined.push(w);
-    true;
+    jp_define_word(intern_text(name));
 }
 
 fn json_emit(source: Str) void { jc_pending.push(intern_text(source)); }
