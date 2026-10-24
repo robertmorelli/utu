@@ -496,14 +496,15 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
     wasm = withMapUrl(wasm, `${name}.wasm.map`);
   }
   const glue = glueSource(spec, wasm);
-  const { build: bundle } = await import('esbuild');
   const loader = loaderSource(spec, wasm, {
     runtime: RUNTIME, glue: glue ? './glue.mjs' : null, streaming: false,
     // Node's fetch reads no file: URL.
-    wasm: `await (url => globalThis.process?.versions?.node ? import('node:fs/promises').then(fs => fs.readFile(url)) : fetch(url).then(r => r.arrayBuffer()))(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url))`,
+    wasm: `await(u=>globalThis.process?.versions?.node?import('node:fs/promises').then(f=>f.readFile(u)):fetch(u).then(r=>r.arrayBuffer()))(new URL(${JSON.stringify(`./${name}.wasm`)},import.meta.url))`,
   });
-  // The loader bundled with the runtime pieces and the glue it imports.
-  await bundle({
+  // The loader bundled with the runtime pieces and the glue it imports;
+  // one that imports neither is written as it is (esbuild costs 18 ms).
+  if (!loader.startsWith('import ')) await fs.writeFile(path.join(dir, `${name}.mjs`), loader);
+  else await (await import('esbuild')).build({
     // (Not named NAME.mjs: esbuild refuses an output that is its input.)
     stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],

@@ -77,10 +77,10 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
     else if (name === 'promise_then') utu.push(`promise_then: ${use('promiseThen')}`);
     else if (name === 'promise_catch') utu.push(`promise_catch: ${use('promiseCatch')}`);
     else if (name.startsWith('await_')) utu.push(`${name}: ${use('awaitImport')}(${name.startsWith('await_null_') ? 'true' : ''})`);
-    else if (name === 'js_tag') utu.push('js_tag: WebAssembly.JSTag');
+    else if (name === 'js_tag') utu.push('js_tag:WebAssembly.JSTag');
   }
   if (utu.length || spec.mems) {
-    const object = `{ ${utu.join(', ')} }`;
+    const object = `{${utu.join(',')}}`;
     modules.push(`utu: ${spec.mems ? `${use('memoryImports')}(${JSON.stringify(spec.mems)}, ${object})` : object}`);
   }
   const asyncExports = spec.promises?.asyncExports ?? [];
@@ -92,8 +92,9 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
   if (spec.exports) exports = `${use('convertExports')}(${exports}, ${JSON.stringify(spec.exports)})`;
   if (runtimeNames.size) lines.unshift(`import { ${[...runtimeNames].join(', ')} } from ${JSON.stringify(runtime)};`);
   const instantiate = streaming ? 'instantiateStreaming' : 'instantiate';
-  lines.push(`export const { instance } = await WebAssembly.${instantiate}(${wasm}, { ${modules.join(', ')} }, ${JSON.stringify(COMPILE_OPTIONS)});`);
-  lines.push(`export const exports = ${exports};`);
+  // Compact: written as it is when nothing is bundled (cli/utu.mjs's build).
+  lines.push(`export const {instance}=await WebAssembly.${instantiate}(${wasm},{${modules.join(',')}},${JSON.stringify(COMPILE_OPTIONS)});`);
+  lines.push(`export const exports=${exports};`);
   return lines.join('\n') + '\n';
 }
 
