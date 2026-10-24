@@ -1762,6 +1762,38 @@ export main() I32 {
 ` }, 1529348691],
     // A negative or reversed Str range is empty in every engine; one past the end clamps.
     [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nexport main() I32 {\n    let s = "hello";\n    s.slice(n(-1), 3).len() + s.slice(3, n(1)).len() * 10 + s[n(-2), 2].len() * 100 + Str.slice(s, 1, 3).len() * 1000 + s.slice(2, 99).len() * 10000;\n}\n' }, 32000],
+    // A struct literal from a capitalized module or alias (`Geo.Pt { … }` was "Expected ';'"), and a
+    // module's protocol in an impl or bound list (`[shapes.Area]` was "Expected ']'"); `Color.Red {}`
+    // and `Color.Red { … }` after if are still a member before a block.
+    [{ 'lib.utu': 'mod Geo {\n    struct Pt:\n        | x: I32\n        | y: I32\n    fn Pt.sum |p| () I32 { p.x + p.y; }\n}\nmod shapes {\n    proto Area:\n        | get area : I32\n}\n',
+      'main.utu': `using Geo from "./lib.utu";
+using Geo |G| from "./lib.utu";
+using shapes from "./lib.utu";
+enum(U8) Color:
+    | Red
+    | Green
+mod Local {
+    struct Box:
+        | v: I32
+}
+struct Tri[shapes.Area]:
+    | area: I32
+mod Pick[T[shapes.Area]] { fn big(a: T, b: T) I32 { if a.area > b.area { a.area; } else { b.area; }; } }
+fn total(a: shapes.Area) I32 { a.area; }
+fn tone(c: Color) I32 {
+    let n = 0;
+    if c == Color.Red {};
+    if c == Color.Red { n = 1; };
+    n + match c == Color.Green { true => 10, ~> 0, };
+}
+export main() I32 {
+    let p = Geo.Pt { x: 2, y: 3 };
+    let q = G.Pt { x: 4, y: 5 };
+    let b = Local.Box { v: 7 };
+    let t = Tri { area: 3 };
+    p.sum() * 100000 + q.sum() * 10000 + b.v * 1000 + total(t) * 100 + Pick[Tri].big(t, Tri { area: 8 }) * 10 + tone(Color.Red) + tone(Color.Green);
+}
+` }, 597391],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
@@ -1793,6 +1825,10 @@ export main() I32 {
     // A method or impl of an undeclared name (each was dropped, unsaid).
     [{ 'main.utu': 'export main() I32 { 1; }\nstruct Sq:\n    | s: I32\nfn Nope.area |self| () I32 { 1; }\n' }, 'Unknown type Nope'],
     [{ 'main.utu': 'export main() I32 { Sq{s:3}.area(); }\nstruct Sq:\n    | s: I32\nfn Zork[Sq].area |self| () I32 { 1; }\n' }, 'Unknown type Zork'],
+    // A module's protocol in an impl or bound list resolves as a type path does.
+    [{ 'main.utu': 'mod shapes { proto Area:\n    | get area : I32\n}\nstruct Sq[shapes.Nope]:\n    | area: I32\nexport main() I32 { 1; }\n' }, 'Unknown type Nope'],
+    [{ 'main.utu': 'mod shapes { struct Pt:\n    | x: I32\n}\nmod M[T[shapes.Pt]] { fn f(a: T) T { a; } }\nexport main() I32 { 1; }\n' }, 'Pt is not a protocol; a bound names one'],
+    [{ 'main.utu': 'mod Geo { struct Pt:\n    | x: I32\n}\nexport main() I32 { let p = Geo.Pt { x: 1 }; let q = Geo.Pt {}; 1; }\n' }, "Expected ';', got '{'"],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

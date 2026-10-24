@@ -1705,7 +1705,7 @@ fn walk_type_item(item: I32, w: Walk) void {
         } else if kind == Node.Impl_list.to_i32() {
             let t = first_child(c);
             while (t >= 0) {
-                walk_type_name(t, w);
+                walk_impl_name(t, w);
                 t = next_sibling(t);
             };
         } else if kind == Node.Variant.to_i32() {
@@ -1744,6 +1744,15 @@ fn self_types(node: I32, proto: I32) void {
     };
 }
 
+/// A protocol in `[P, m.Q]`, recorded on the entry itself as well (where
+/// conformance and bounds read it).
+fn walk_impl_name(node: I32, w: Walk) I32 {
+    if not is_kind(node, Node.Qualified_type_ref) { return walk_type_name(node, w); };
+    let d = walk_type_path(node, w);
+    node_decl[node] = d;
+    d;
+}
+
 /// `mod M[T[P, Q]]`: each bound names a protocol.
 fn walk_bounds(list: I32, w: Walk) void {
     let param = first_child(list);
@@ -1752,7 +1761,7 @@ fn walk_bounds(list: I32, w: Walk) void {
         if is_kind(bounds, Node.Impl_list) {
             let b = first_child(bounds);
             while (b >= 0) {
-                let d = walk_type_name(b, w);
+                let d = walk_impl_name(b, w);
                 if d >= 0 and not decl_is(d, Decl.Proto) {
                     report2(Diag.BoundNotProto, b, -1, d, -1);
                     diag_label("not a protocol");
