@@ -611,6 +611,7 @@ fn reset_resolve() void {
     bind_decl.clear();
     bind_prev.clear();
     word_top.clear();
+    mem_clashes.clear();
     members_reset(1024);
 }
 
@@ -1307,12 +1308,21 @@ fn declare_entry_item(item: I32, first_entry: I32) void {
     if hidden >= first_entry and hidden < decl and file_role[file_of_token(node_first[item])] != FileRole.Generated.to_i32() {
         // A mem's name is its own: reported at the mem.
         if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name); }
-        else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); }
-        else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); }
+        else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); mem_clashes.push(name); }
+        else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); mem_clashes.push(name); }
         else { report_twice(decl, hidden); };
     };
     bind(name, decl);
     bind_variants(decl);
+}
+
+/// The words a mem and a function or global both name (MemClash): a use
+/// of one as the other is that mistake again, not reported twice.
+vec mem_clashes: I32;
+
+fn clashes_mem(word: I32) Bool {
+    for (0 ..< mem_clashes.len()) |i| { if mem_clashes[i] == word { return true; }; };
+    false;
 }
 
 /// `decl`, named as `first` is in one scope: reported at `decl`.

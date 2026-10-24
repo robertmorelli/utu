@@ -1,5 +1,5 @@
 // What: an @es binding declared to return I32 returns a string
-// Expect: TypeError: `count` returned "12" (a string), but its type says I32
+// Expect: accepted by design: an @es result converts to its declared type ("12" is 12; docs/typescript-abi.md), so 13
 let count: fun() I32 = @es/\ () => "12" \/;
 
 export main() I32 {

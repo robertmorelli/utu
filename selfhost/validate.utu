@@ -301,15 +301,25 @@ fn word_seen(word: I32, stamp: I32) Bool {
     false;
 }
 
-/// The lets of a block, each name once.
+/// The lets of a block, each name once; a function's body also not a parameter's.
 fn duplicate_lets(block: I32) void {
     let stamp = word_stamp();
+    let params = body_params(block);
+    if params >= 0 {
+        let p = first_child(params);
+        while (p >= 0) {
+            if is_kind(p, Node.Param) { word_seen(word_of(first_child(p)), stamp); };
+            p = next_sibling(p);
+        };
+    };
     let c = first_child(block);
     while (c >= 0) {
         if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
             let word = word_of(first_child(c));
             if word_seen(word, stamp) {
-                report2(Diag.DuplicateDeclaration, c, word, 3, -1);
+                let param = param_named(params, word);
+                report2(Diag.DuplicateDeclaration, c, word, if param >= 0 { 8; } else { 3; }, -1);
+                if param >= 0 { diag_place(Extra.Related, first_child(param), "the parameter"); };
                 // The first: looked for only once there is a mistake.
                 let other = first_child(block);
                 while (other != c) {
@@ -324,6 +334,29 @@ fn duplicate_lets(block: I32) void {
         };
         c = next_sibling(c);
     };
+}
+
+/// The parameter list of the function whose body is `block`, or -1.
+fn body_params(block: I32) I32 {
+    let f = parent_of(block);
+    if f < 0 or last_child(f) != block { return -1; };
+    let c = first_child(f);
+    while (c >= 0 and c != block) {
+        if is_kind(c, Node.Param_list) { return c; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+/// The parameter of `params` (a Param_list, or -1) named `word`, or -1.
+fn param_named(params: I32, word: I32) I32 {
+    if params < 0 { return -1; };
+    let p = first_child(params);
+    while (p >= 0) {
+        if is_kind(p, Node.Param) and word_of(first_child(p)) == word { return p; };
+        p = next_sibling(p);
+    };
+    -1;
 }
 
 /// `?I32`: a scalar has no null.

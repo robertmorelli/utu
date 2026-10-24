@@ -573,6 +573,13 @@ fn template_text_end(i: I32, n: I32) I32 {
 /// in its current `${ … }` (a `}` with none open continues its text).
 vec template_braces: I32;
 
+/// By each template string open as it is lexed: its opening backtick.
+vec template_opens: I32;
+
+/// 1 when the last lex's Error is a template's backtick whose text after a
+/// `${ … }` ran to the end (see @runs_to).
+vec template_ran_out: I32 = [0];
+
 /// Lex the bytes of `src` from `first` to the end byte at `n`, appending
 /// their tokens. The last token is `End`, or `Error` (at the start of the
 /// token that cannot be lexed: a byte no token starts with, a string or
@@ -612,7 +619,7 @@ fn runs_to(s: I32, k: I32) Bool {
         };
         return j >= k;
     };
-    if c == 96 or c == 125 { return template_text_end(s + 1, k) == -1; };
+    if c == 96 or c == 125 { return template_text_end(s + 1, k) == -1 or template_ran_out[0] == 1; };
     c == 47 and src[s + 1] == 92;
 }
 
@@ -629,6 +636,8 @@ fn lex_to(first: I32, n: I32) I32 {
     let j = first;
     let open = 0;  // template strings in a `${`
     template_braces.clear();
+    template_opens.clear();
+    template_ran_out[0] = 0;
     let start = start_before;
     let state = start;
     let next = dfa[start * 256 + src[first]];
@@ -641,12 +650,18 @@ fn lex_to(first: I32, n: I32) I32 {
             if open > 0 and kind == Tok.RBrace.to_i32() and template_braces[open - 1] == 0 {
                 // The `}` that ends a `${`: the template's text goes on.
                 j = template_text_end(i + 1, n);
+                // (A template the source ends in is unclosed at its backtick.)
+                if j == -1 {
+                    template_ran_out[0] = 1;
+                    return tokens_end(put_token(t, Tok.Error.to_i32(), template_opens[open - 1], template_opens[open - 1]));
+                };
                 if j < 0 { return tokens_end(put_token(t, Tok.Error.to_i32(), i, i)); };
                 if src[j] == 96 {
                     j += 1;
                     t = put_token(t, Tok.TemplateTail.to_i32(), i, j);
                     open -= 1;
                     template_braces.resize(open);
+                    template_opens.resize(open);
                     start = start_after;
                 } else {
                     j += 2;
@@ -720,6 +735,7 @@ fn lex_to(first: I32, n: I32) I32 {
                 j += 2;
                 t = put_token(t, Tok.TemplateHead.to_i32(), i, j);
                 template_braces.push(0);
+                template_opens.push(i);
                 open += 1;
                 start = start_before;
             };

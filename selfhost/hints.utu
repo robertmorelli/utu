@@ -593,6 +593,12 @@ fn parse_hint(file: I32, t: I32, wanted: I32) void {
         diag_fix(tok_end[prev], tok_end[prev], mark, "Add " + mark);
         return;
     };
+    // `| y` then a new line: a field without its type.
+    if prev >= 0 and w == "':'" and tok_is(prev, Tok.Word) and tok_is(tok_before(file, prev), Tok.Pipe) and lines_apart(prev, t) {
+        parse_says("Field " + tok_text(prev) + " needs ': Type'");
+        diag_focus(prev, prev, "no type");
+        return;
+    };
     // The end of the file, or a declaration where a body goes on: a brace left open.
     let open = unclosed_brace(file);
     if open >= 0 and (tok_is(t, Tok.End) or tok_says(t, "export") or tok_says(t, "fn") or tok_says(t, "using")) {
@@ -822,13 +828,14 @@ fn diag_code(i: I32) Str {
         if t.len() > 8 and t.slice(0, 9) == "Missing ;" { return "MissingSemicolon"; };
         if t.len() > 8 and t.slice(0, 9) == "Missing ," { return "MissingComma"; };
         if t.len() > 7 and t.slice(0, 8) == "Unclosed" { return "UnclosedDelimiter"; };
+        if t.len() > 5 and t.slice(0, 6) == "Field " { return "ParseError"; };
         return "ForeignSyntax";
     };
     if k == Diag.UnknownVariable and is_callee(diag_node[i]) { return "UnknownFunction"; };
     if k == Diag.DuplicateDeclaration {
         if a == 1 { return "DuplicateParameter"; };
         if a == 2 { return "DuplicateVariant"; };
-        if a == 3 or a == 6 { return "DuplicateLocal"; };
+        if a == 3 or a == 6 or a == 8 { return "DuplicateLocal"; };
         if a == 5 { return "DuplicateMethod"; };
     };
     if k == Diag.UnknownMethod and diag_b[i] == 1 { return "StaticAsMethod"; };

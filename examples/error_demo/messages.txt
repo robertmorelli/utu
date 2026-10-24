@@ -1254,14 +1254,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/77_break_with_value.utu
- ERROR  No block labeled x around this break
+ ERROR  break takes no value
         unknown-label · examples/error_demo/control/77_break_with_value.utu:5:31
 
  3 │ fn first_even(xs: Array[I32]) I32 {
  4 │     for (xs) |x| {
  5 │         if x % 2 == 0 { break x; };
    │                               ━
-   │                               ╰─ no such label
+   │                               ╰─ a value, not a label
  6 │     };
  7 │     -1;
 
@@ -1347,14 +1347,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/83_nullable_len_in_range.utu
- ERROR  for needs an array or range, not unknown
-        invalid-for-source · examples/error_demo/control/83_nullable_len_in_range.utu:5:10
+ ERROR  .len on nullable ?Array[I32]
+        nullable-access · examples/error_demo/control/83_nullable_len_in_range.utu:5:16
 
  3 │ fn total(xs: ?Array[I32]) I32 {
  4 │     let t = 0;
  5 │     for (0 ..< xs.len()) |i| { t += i; };
-   │          ━━━━━━━━━━━━━━
-   │          ╰─ here
+   │                ━━━━━━
+   │                ╰─ may be null
  6 │     t;
  7 │ }
 --- exit 1
@@ -2274,14 +2274,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/61_await_for_array.utu
- ERROR  No method Array[I32].iterator
-        unknown-method · examples/error_demo/iterators/61_await_for_array.utu:6:11
+ ERROR  await for reads a stream, not Array[I32]: use a plain for
+        await-for-source · examples/error_demo/iterators/61_await_for_array.utu:6:11
 
  4 │     let xs = [1, 2, 3];
  5 │     let total = 0;
  6 │     await for (xs) |v| { total += v; };
    │           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │           ╰─ no such method
+   │           ╰─ here
  7 │     total;
  8 │ }
 --- exit 1
@@ -3613,8 +3613,19 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/50_duplicate_local_shadow_param.utu
-ok
---- exit 0
+ ERROR  Duplicate local n: already a parameter
+        duplicate-local · examples/error_demo/names/50_duplicate_local_shadow_param.utu:4:5
+
+ 2 │ // Expect: Duplicate local binding 'n': 'n' is already a parameter
+ 3 │ fn clamp(n: I32) I32 {
+   │          ─
+   │          ╰─ the parameter
+ 4 │     let n = if n > 10 { 10; } else { n; };
+   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │     ╰─ already declared
+ 5 │     n;
+ 6 │ }
+--- exit 1
 
 === utu check examples/error_demo/names/51_duplicate_local_nested_shadow.utu
 ok
@@ -4341,8 +4352,20 @@ ok
 --- exit 0
 
 === utu check examples/error_demo/names/85_assign_loop_capture.utu
-ok
---- exit 0
+ ERROR  Cannot assign to capture x
+        assignment-to-immutable · examples/error_demo/names/85_assign_loop_capture.utu:5:20
+
+ 3 │ export main() I32 {
+ 4 │     let xs = [1, 2, 3];
+ 5 │     for (xs) |x| { x = x * 2; };
+   │              ───   ━
+   │              │     ╰─ cannot be assigned
+   │              ╰─ the capture
+ 6 │     xs[0];
+ 7 │ }
+
+  note  a capture is a copy: write to the array (xs[i]) or a let
+--- exit 1
 
 === utu check examples/error_demo/names/860_mod_and_fn_one_name.utu
  ERROR  Duplicate declaration m
@@ -4425,19 +4448,19 @@ ok
 
 === utu check examples/error_demo/names/88_lazy_struct_argument.utu
  ERROR  badge takes Options, which cannot cross into a lazy module
-        lazy-value · examples/error_demo/names/lazy_parts/widgets.utu:8:5
+        lazy-value · examples/error_demo/names/88_lazy_struct_argument.utu:7:34
 
- 6 │         | title: Str
- 7 │         | count: I32
+ 5 │
+ 6 │ export main() void {
+ 7 │     Browser.document.body.append(widgets.badge(&{ title: "new", count: 3 }));
+   │                                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                  ╰─ here
+ 8 │ }
+
+   ╭─ examples/error_demo/names/lazy_parts/widgets.utu
  8 │     fn badge(o: Options) Browser.HTMLElement {
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 9 │         let el = Browser.document.createElement("span");
-10 │         el.textContent = o.title;
-11 │         el;
-12 │     }
-13 │     fn tally(counts: Array[I32]) Browser.HTMLElement {
-14 │         let el = Browser.document.createElement("span");
+   │              ──────────
+   │              ╰─ declared here
 --- exit 1
 
 === utu check examples/error_demo/names/890_unknown_import_capitalized.utu
@@ -4455,31 +4478,37 @@ ok
 
 === utu check examples/error_demo/names/89_lazy_number_result.utu
  ERROR  total returns I32, not an element
-        lazy-value · examples/error_demo/names/lazy_parts/widgets.utu:18:5
+        lazy-value · examples/error_demo/names/89_lazy_number_result.utu:7:13
 
-16 │         el;
-17 │     }
+ 5 │
+ 6 │ export main() void {
+ 7 │     let n = widgets.total(4);
+   │             ━━━━━━━━━━━━━━━━
+   │             ╰─ here
+ 8 │     Browser.document.title = n.to_str();
+ 9 │ }
+
+   ╭─ examples/error_demo/names/lazy_parts/widgets.utu
 18 │     fn total(n: I32) I32 { n * 2; }
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
-19 │ }
+   │     ───────────────────────────────
+   │     ╰─ declared here
 --- exit 1
 
 === utu check examples/error_demo/names/90_lazy_array_argument.utu
  ERROR  tally takes Array[I32], which cannot cross into a lazy module
-        lazy-value · examples/error_demo/names/lazy_parts/widgets.utu:13:5
+        lazy-value · examples/error_demo/names/90_lazy_array_argument.utu:7:34
 
-11 │         el;
-12 │     }
+ 5 │
+ 6 │ export main() void {
+ 7 │     Browser.document.body.append(widgets.tally([1, 2, 3]));
+   │                                  ━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                  ╰─ here
+ 8 │ }
+
+   ╭─ examples/error_demo/names/lazy_parts/widgets.utu
 13 │     fn tally(counts: Array[I32]) Browser.HTMLElement {
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
-14 │         let el = Browser.document.createElement("span");
-15 │         el.textContent = counts.len().to_str();
-16 │         el;
-17 │     }
-18 │     fn total(n: I32) I32 { n * 2; }
-19 │ }
+   │              ──────────────────
+   │              ╰─ declared here
 --- exit 1
 
 === utu check examples/error_demo/names/91_ambiguous_opened_name.utu
@@ -4635,28 +4664,6 @@ ok
    │ ╰─ here
  4 │
  5 │ fn scores() I32 { scores.len(); }
-
- ERROR  No method fun() I32.len
-        unknown-method · examples/error_demo/platform/01_mem_same_name_as_fn.utu:5:19
-
- 3 │ mem scores: I32;
- 4 │
- 5 │ fn scores() I32 { scores.len(); }
-   │                   ━━━━━━━━━━━━
-   │                   ╰─ no such method
- 6 │
- 7 │ export main() I32 {
-
- ERROR  No method fun() I32.push
-        unknown-method · examples/error_demo/platform/01_mem_same_name_as_fn.utu:8:5
-
- 6 │
- 7 │ export main() I32 {
- 8 │     scores.push(10);
-   │     ━━━━━━━━━━━━━━━
-   │     ╰─ no such method
- 9 │     scores();
-10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/02_mem_declared_twice.utu
@@ -5543,8 +5550,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/49_foreign_wrong_arg_type.utu
-ok
---- exit 0
+ ERROR  Expected Browser.Node, got Str
+        type-mismatch · examples/error_demo/platform/49_foreign_wrong_arg_type.utu:6:39
+
+ 4 │
+ 5 │ export main() void {
+ 6 │     Browser.document.body.appendChild("hello");
+   │                                       ━━━━━━━
+   │                                       ╰─ Str
+ 7 │ }
+--- exit 1
 
 === utu check examples/error_demo/platform/50_json_misspelled_op.utu
  ERROR  @json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`
@@ -6250,8 +6265,17 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/81_wutu_css_missing_semicolon.utu
-ok
---- exit 0
+ ERROR  CSS declarations require a semicolon
+        dsl-error · examples/error_demo/platform/81_wutu_css_missing_semicolon.utu:8:22
+
+ 6 │     @wutu/\
+ 7 │     section {
+ 8 │         padding: 1rem
+   │                      ━
+   │                      ╰─ here
+ 9 │         gap: 2rem;
+10 │         h2 { = title; }
+--- exit 1
 
 === utu check examples/error_demo/platform/82_wutu_unknown_tag.utu
  ERROR  expected an HTML tag, found unknown element 'card' (custom element names need a hyphen)
@@ -6455,8 +6479,17 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/90_wutu_invalid_css_property.utu
-ok
---- exit 0
+ ERROR  invalid CSS property colr; did you mean color?
+        dsl-error · examples/error_demo/platform/90_wutu_invalid_css_property.utu:8:9
+
+ 6 │     @wutu/\
+ 7 │     section {
+ 8 │         colr: red;
+   │         ━
+   │         ╰─ here
+ 9 │         h2 { = title; }
+10 │     }
+--- exit 1
 
 === utu check examples/error_demo/platform/910_wutu_event_attribute_mixed_case.utu
  ERROR  events are written on click { … }, not as an attribute
@@ -7710,14 +7743,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/08_unclosed_template_string.utu
- ERROR  Unexpected character '}'
-        parse-error · examples/error_demo/syntax/08_unclosed_template_string.utu:7:31
+ ERROR  Unclosed template string
+        parse-error · examples/error_demo/syntax/08_unclosed_template_string.utu:7:17
 
  5 │ export main() void {
  6 │     let name = "Ada";
  7 │     console.log(`hello, ${name});
-   │                               ━
-   │                               ╰─ unexpected
+   │                 ━
+   │                 ╰─ unexpected
  8 │ }
 --- exit 1
 
@@ -7914,16 +7947,16 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/19_struct_field_missing_type.utu
- ERROR  Expected ':', got 'export'
-        parse-error · examples/error_demo/syntax/19_struct_field_missing_type.utu:7:1
+ ERROR  Field y needs ': Type'
+        parse-error · examples/error_demo/syntax/19_struct_field_missing_type.utu:5:7
 
+ 3 │ struct Point:
+ 4 │     | x: F64
  5 │     | y
+   │       ━
+   │       ╰─ no type
  6 │
  7 │ export main() F64 {
-   │ ━━━━━━
-   │ ╰─ ':'?
- 8 │     let p = Point { x: 1.0, y: 2.0 };
- 9 │     p.x;
 --- exit 1
 
 === utu check examples/error_demo/syntax/20_enum_tuple_variant.utu

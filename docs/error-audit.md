@@ -100,13 +100,16 @@ Wrong behavior, not wording. All fixed (3ac93b8, and the literal check after it)
 - **Already fixed before:** the five kinds with no message, `sort`'s
   "expects -1 value binding(s)".
 
-Still accepted, open: a Str passed where a host `Node` is expected
-(`platform/49`); `@es` and `@ir` bodies that do not parse (`platform/28`,
-`40`); Wutu CSS mistakes (`platform/81`, `90`, `99`). Accepted by choice, so
-far: shadowing a parameter or outer local, assigning to a parameter or loop
-capture, a non-nullable recursive variant, comparing a non-nullable to null,
-and code after `return` or `break` (`names/50`, `51`, `76`, `84`, `85`;
-`control/11`, `74`, `75`).
+Now errors: a Str where a host `Node` is wanted (`platform/49`: a generic
+parameter outside its constraint stays unbound), a Wutu declaration without
+its `;` or a typo of a standard CSS property (`platform/81`, `90`), a let of a
+parameter's name in a function's body (`names/50`), and a write to a captured
+element, generator or stream value (`names/85`; a range's count may still be
+moved). Still accepted, open: `@es` and `@ir` bodies that do not parse
+(`platform/28`, `40`). Accepted by choice, so far: shadowing a parameter in an
+inner block or an outer local, assigning to a parameter, a non-nullable
+recursive variant, comparing a non-nullable to null, and code after `return`
+or `break` (`names/51`, `76`, `84`; `control/11`, `74`, `75`).
 
 ## The redesign
 

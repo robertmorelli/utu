@@ -1673,7 +1673,8 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 if c >= 0 { unify_elements(Ref { doc: d.doc, at: c, env: d.env }, args[k], m, d, 0, cx); };
             } else if not is_null_literal(args[k]) and closure_node(args[k]) < 0 {
                 let t = type_only(args[k], -1, cx);
-                if ref_of_type(t) {
+                // (Outside its constraint, `T` stays unbound: the slot is the constraint, which rejects it.)
+                if ref_of_type(t) and within_constraint(t, slot, d) {
                     vl_add(jstring_word(p));
                     vl_add(typed_ref_at[0]);
                     vl_add(typed_ref_env[0]);
@@ -2381,6 +2382,14 @@ fn bind_from_context(result: I32, doc: I32, env: I32, expect: I32) I32 {
         };
     };
     out;
+}
+
+/// Whether a value of type `t` may bind parameter slot `slot` (`T extends Node`).
+fn within_constraint(t: I32, slot: Ref, d: Ref) Bool {
+    let c = jget(slot.at, "constraint");
+    if c < 0 or ty_is(t, Ty.Error) { return true; };
+    let ct = foreign_type(Ref { doc: slot.doc, at: c, env: slot.env }, view_of_doc(d.doc));
+    not is_foreign(ct) or is_dynamic(ct) or host_assignable(t, ct);
 }
 
 fn bind_open(param: I32, doc: I32, env: I32, wanted: I32) I32 {
