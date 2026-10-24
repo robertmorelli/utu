@@ -44,8 +44,13 @@ vec own_gens: I32;
 vec gen_used: U8;
 
 fn mark_used(gen: I32) void {
-    if gen_used.len() <= gen { gen_used.resize(decl_kind.len()); };
+    grow_used();
     gen_used[gen] = 1;
+}
+
+/// @gen_used to every declaration, new ones 0.
+fn grow_used() void {
+    while (gen_used.len() < decl_kind.len()) { gen_used.push(0); };
 }
 
 /// An expansion begins: what its yields need, on the stacks above.
@@ -202,11 +207,14 @@ vec fl_next: I32;
 
 /// File the declarations not yet filed under their functions (see @fl_first).
 fn file_locals() void {
-    fl_first.resize(node_kind.len());
-    fl_last.resize(node_kind.len());
+    // (Pushed, not resized: a vec's resize can bring back a past build's values.)
+    while (fl_first.len() < node_kind.len()) {
+        fl_first.push(0);
+        fl_last.push(0);
+    };
     let d = fl_next.len();
-    fl_next.resize(decl_kind.len());
     while (d < decl_kind.len()) {
+        fl_next.push(0);
         if is_local_decl(d) and decl_node[d] >= 0 {
             let f = node_parent[decl_node[d]];
             while (f >= 0 and not is_kind(f, Node.Fn_decl)) { f = node_parent[f]; };
@@ -417,7 +425,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
 /// Each generator of the program's own items that no `for` expanded:
 /// checked on its own, as an unused function is.
 fn check_unused_generators() void {
-    gen_used.resize(decl_kind.len());
+    grow_used();
     for (0 ..< own_gens.len()) |i| {
         let gen = own_gens[i];
         // (One that delegates to itself expands only from a consumer.)
