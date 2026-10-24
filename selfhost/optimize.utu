@@ -45,8 +45,20 @@ vec opt_sets: I32;
 vec opt_get_at: I32;
 /// By local: the position of a write.
 vec opt_set_at: I32;
-/// The locals a value being sunk reads.
+/// The locals a value being sunk reads, once each.
 vec opt_reads: I32;
+/// The sink pass (a stamp), and the value's reads (a stamp: @opt_rd_mark).
+vec opt_pass: I32 = [0, 0];
+/// By node: `pass * 2 + pure` for a value whose purity a sink pass found.
+vec opt_memo: I32;
+/// By node: the pass its reads were noted in, and where in @opt_rd_pool.
+vec opt_rd_at: I32;
+vec opt_rd_from: I32;
+vec opt_rd_len: I32;
+/// The reads of the values noted, in runs.
+vec opt_rd_pool: I32;
+/// By local: the reads (their stamp) it is already in.
+vec opt_rd_mark: I32;
 /// The Seqs, Blocks and Loops of @opt_nodes, in its order.
 vec opt_blocks: I32;
 /// Whether a node of the walk is held in more than one place.
@@ -146,6 +158,24 @@ fn opt_room(n: I32) void {
 
 /// Computes a value without effects or traps, reading at most locals.
 fn opt_pure(node: I32) Bool {
+    if not pure_op(node) { return false; };
+    for (0 ..< w_count[node]) |i| { if not opt_pure(w_kid(node, i)) { return false; }; };
+    true;
+}
+
+/// @opt_pure, noted by node for the sink pass: a value sunk into the next
+/// one is not walked again (a sink only puts a pure value where a read was).
+fn sink_pure(node: I32) Bool {
+    let pass = opt_pass[0];
+    if opt_memo[node] >> 1 == pass { return opt_memo[node] & 1 == 1; };
+    let pure = pure_op(node);
+    for (0 ..< w_count[node]) |i| { if pure and not sink_pure(w_kid(node, i)) { pure = false; }; };
+    opt_memo[node] = pass * 2 + if pure { 1; } else { 0; };
+    pure;
+}
+
+/// Whether node `node`'s own operation is one @opt_pure allows.
+fn pure_op(node: I32) Bool {
     let op = w_op[node];
     if op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32() or op == Op.F64Const.to_i32()
         or op == Op.LocalGet.to_i32() or op == Op.RefNull.to_i32() or op == Op.RefFunc.to_i32() or op == Op.Nop.to_i32() {
@@ -155,11 +185,8 @@ fn opt_pure(node: I32) Bool {
     // capture, from its environment) neither traps nor changes.
     let immutable_read = (op == Op.StructGet.to_i32() or op == Op.StructGetS.to_i32() or op == Op.StructGetU.to_i32())
         and ht_fields[ht_a[w_a[node]] + w_b[node] * 2 + 1] == 0 and non_null(w_type[w_kid(node, 0)]);
-    let ok = op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefI31.to_i32() or op == Op.I31GetS.to_i32()
+    op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefI31.to_i32() or op == Op.I31GetS.to_i32()
         or op == Op.I31GetU.to_i32() or op == Op.Select.to_i32() or (op == Op.Plain.to_i32() and pure_opcode(w_a[node])) or immutable_read;
-    if not ok { return false; };
-    for (0 ..< w_count[node]) |i| { if not opt_pure(w_kid(node, i)) { return false; }; };
-    true;
 }
 
 /// A numeric instruction that cannot trap (not a division, remainder, or
@@ -266,6 +293,16 @@ fn propagate_copies(params: I32) Bool {
 /// statement after it): whether anything changed.
 fn sink_temporaries(params: I32) Bool {
     let changed = false;
+    // (The notes grow with the nodes; an older pass's are stale.)
+    opt_pass[0] += 1;
+    opt_rd_pool.clear();
+    if opt_memo.len() < w_op.len() {
+        opt_memo.resize(w_op.len());
+        opt_rd_at.resize(w_op.len());
+        opt_rd_from.resize(w_op.len());
+        opt_rd_len.resize(w_op.len());
+    };
+    if opt_rd_mark.len() < opt_gets.len() { opt_rd_mark.resize(opt_gets.len()); };
     for (0 ..< opt_blocks.len()) |b| {
         let block = opt_blocks[b];
         let op = w_op[block];
@@ -278,9 +315,14 @@ fn sink_temporaries(params: I32) Bool {
                     let value = w_kid(write, 0);
                     let at = opt_get_at[l];
                     let read = opt_nodes[at];
-                    if opt_pure(value) and single_value(w_type[value]) and opt_parent[at] >= 0 {
+                    if sink_pure(value) and single_value(w_type[value]) and opt_parent[at] >= 0 {
                         opt_reads.clear();
+                        opt_pass[1] += 1;
                         reads_of(value);
+                        opt_rd_at[value] = opt_pass[0];
+                        opt_rd_from[value] = opt_rd_pool.len();
+                        opt_rd_len[value] = opt_reads.len();
+                        for (0 ..< opt_reads.len()) |r| { opt_rd_pool.push(opt_reads[r]); };
                         if sink_visit(w_kid(block, i + 1), read, false) == 1 {
                             set_kid(opt_parent[at], opt_place[at], value);
                             opt_erase(write);
@@ -384,10 +426,23 @@ fn emits_nothing(node: I32) Bool {
     true;
 }
 
-/// The locals `node` reads, into @opt_reads.
+/// The locals `node` reads, into @opt_reads, once each; a value of this
+/// pass already sunk there is not walked again.
 fn reads_of(node: I32) void {
-    if w_op[node] == Op.LocalGet.to_i32() { opt_reads.push(w_a[node]); };
+    if opt_rd_at[node] == opt_pass[0] {
+        let from = opt_rd_from[node];
+        for (0 ..< opt_rd_len[node]) |r| { read_once(opt_rd_pool[from + r]); };
+        return;
+    };
+    if w_op[node] == Op.LocalGet.to_i32() { read_once(w_a[node]); };
     for (0 ..< w_count[node]) |i| { reads_of(w_kid(node, i)); };
+}
+
+fn read_once(l: I32) void {
+    if opt_rd_mark[l] != opt_pass[1] {
+        opt_rd_mark[l] = opt_pass[1];
+        opt_reads.push(l);
+    };
 }
 
 /// Whether `target` is reached in `node` (1) before anything assigns a local
@@ -1108,8 +1163,11 @@ fn ld_same(r: I32, n: I32) Bool {
     w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == w_a[w_kid(n, 0)];
 }
 
+/// (Mixed: reads of locals and types numbered in steps would fill runs of
+/// slots, which a probe walks to the end.)
 fn ld_hash(n: I32) I32 {
-    ((w_op[n] * 31 + w_a[n]) * 31 + w_b[n]) * 31 + w_a[w_kid(n, 0)];
+    let h = (((w_op[n] * 31 + w_a[n]) * 31 + w_b[n]) * 31 + w_a[w_kid(n, 0)]) * -1640531527;
+    h ^ (h >>> 15);
 }
 
 /// The entry that holds and reads what n does, or -1.
