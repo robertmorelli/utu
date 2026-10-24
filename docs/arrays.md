@@ -21,7 +21,9 @@
    An empty `[]` nothing constrains holds nothing, so it is `Array[I32]`.
 
 A native Wasm array is opaque to JavaScript, so an array literal never reaches
-a JS slot as one: `JSON.stringify([1, 2])` receives a real JS array.
+a JS slot as one: `JSON.stringify([1, 2])` receives a real JS array. An
+`@es` binding cannot take or give an `Array[T]` (`fun(Array[Str]) F64` is an
+error): pass its elements, or a `Str` from `@json encode`.
 
 Generic module instances are created before types are known. When typing
 finds an array literal whose element type has no `Array[T]` instance yet, the

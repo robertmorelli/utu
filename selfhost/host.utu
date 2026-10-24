@@ -211,6 +211,8 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     let ft = es_signature(t);
     let open = es_wrap(t);
     let wrap = intern_text(open);
+    // Each time: a speculative check may have dropped the report.
+    es_check_native(decl, t);
     if decl_es[decl] >= 0 and func_type_of[decl_es[decl]] == ft and decl_es_wrap[decl] == wrap { return decl_es[decl]; };
     decl_es_wrap[decl] = wrap;
     // In a module's instances a binding has a type each, and an import each:
@@ -258,6 +260,38 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     es_start.push(at);
     es_end.push(end);
     f;
+}
+
+/// Report an `@es` binding's type that crosses as a wasm struct, array, or
+/// `fun`: JavaScript reads none of them, nor makes one. std's own bindings
+/// may hand one back that utu gave (std:Stream's values).
+fn es_check_native(decl: I32, t: I32) void {
+    let n = decl_node[decl];
+    if n >= 0 and from_std(n) { return; };
+    let at = if n >= 0 and next_sibling(first_child(n)) != last_child(n) { next_sibling(first_child(n)); } else { n; };
+    if not (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) {
+        if js_native(t) { es_native(at, decl, t, 0); };
+        return;
+    };
+    let params = ty_a[t];
+    for (0 ..< vl_len[params]) |i| { if js_native(vl_item(params, i)) { es_native(at, decl, vl_item(params, i), i + 1); }; };
+    if js_native(ty_b[t]) { es_native(at, decl, ty_b[t], 0); };
+}
+
+/// Whether a value of type t is a wasm GC reference (a struct, array, or
+/// function), not a host value: JavaScript sees it opaque.
+fn js_native(t: I32) Bool {
+    let vt = repr(t);
+    vt >= vt_defined and vt < vt_tuple;
+}
+
+/// Diag.EsNative on `at`: argument k (from 1) of type t, or the result (0).
+fn es_native(at: I32, decl: I32, t: I32, k: I32) void {
+    report3(Diag.EsNative, at, decl_name[decl], t, k, -1);
+    let u = if ty_is(t, Ty.Nullable) { ty_a[t]; } else { t; };
+    if ty_is(u, Ty.Fun) { diag_note("A JS function is a closure: type it " + type_text(ty(Ty.Closure, ty_a[u], ty_b[u])) + "."); }
+    else if k > 0 { diag_note("JS reads numbers, Str, Bool, closures and host values: pass its fields, or a Str from @json encode."); }
+    else { diag_note("JS gives numbers, Str, Bool, closures and host values: give its fields, or a Str to @json decode."); };
 }
 
 /// What an `@es` body is wrapped in, before it and `)`, so values cross as

@@ -1,0 +1,8 @@
+// What: an @es function typed to give a fun
+// Expect: mkAdder gets a JS function: that is a cl, not fun(I32) I32
+let mkAdder: fun(I32) fun(I32) I32 = @es/\ (n) => (x) => x + n \/;
+
+export main() I32 {
+    let f = mkAdder(1);
+    f(2);
+}

@@ -564,7 +564,7 @@ fn check_base(field_node: I32, cx: Cx) I32 {
 //! `utu.await_N`, which the host wraps in WebAssembly.Suspending; exports
 //! that can reach an await are wrapped in WebAssembly.promising.
 
-/// Pairs: value type, its import.
+/// Pairs: value type (times 2, plus 1 when nullable), its import.
 vec await_types: I32;
 /// [then, catch] imports, or -1.
 vec promise_ops: I32;
@@ -743,16 +743,20 @@ fn stream_call(fi: I32, s: I32, st: I32, x: I32, xt: I32, at: I32, cx: Cx) I32 {
     finish_call(fi, m, cx);
 }
 
+/// `utu.await_N`, or `await_null_N` for a nullable value, whose host import
+/// gives an undefined result as null (as an `@es` result is).
 fn await_import(t: I32) I32 {
     let vt = repr(t);
+    let absent = ty_is(t, Ty.Nullable);
+    let key = vt * 2 + (if absent { 1; } else { 0; });
     let i = 0;
     while (i < await_types.len()) {
-        if await_types[i] == vt { return await_types[i + 1]; };
+        if await_types[i] == key { return await_types[i + 1]; };
         i += 2;
     };
-    let f = add_import_func(name_add("utu"), name_add("await_" + (await_types.len() / 2).to_str()),
+    let f = add_import_func(name_add("utu"), name_add("await_" + (if absent { "null_"; } else { ""; }) + (await_types.len() / 2).to_str()),
         func_type(vl_one(vt_externref), vl_of_result(vt)));
-    await_types.push(vt);
+    await_types.push(key);
     await_types.push(f);
     f;
 }

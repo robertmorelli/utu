@@ -280,7 +280,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.NewNotHost { return "not-callable"; };
     if k == Diag.HostMissing { return "unknown-import"; };
     if k == Diag.ComptimeTrap or k == Diag.ComptimeCycle { return "comptime-trap"; };
-    if k == Diag.DslEmpty or k == Diag.DslTooDeep or k == Diag.IrInvalid or k == Diag.IrType { return "invalid-dsl-usage"; };
+    if k == Diag.DslEmpty or k == Diag.DslTooDeep or k == Diag.IrInvalid or k == Diag.IrType or k == Diag.EsNative { return "invalid-dsl-usage"; };
     if k == Diag.StdOwnStruct { return "unknown-field"; };
     if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try"; };
     if k == Diag.ImportNotModule { return "unknown-type"; };
@@ -290,6 +290,9 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.WutuHole or k == Diag.WutuKey { return "type-mismatch"; };
     "type-mismatch";
 }
+
+/// Whether t is a `fun` type, or a nullable one.
+fn es_fun_type(t: I32) Bool { ty_is(t, Ty.Fun) or (ty_is(t, Ty.Nullable) and ty_is(ty_a[t], Ty.Fun)); }
 
 /// A scalar value type's name, as `@ir` tags spell it.
 fn vt_text(vt: I32) Str {
@@ -582,6 +585,7 @@ fn diag_text(i: I32) Str {
         Diag.IrUnknown => if a == 1 { "@ir names no parameter " + w; } else if a == 2 { "@ir <" + w + "> is written wrong here"; } else { "No @ir element <" + w + ">"; },
         Diag.IrInvalid => "@ir in " + w + " does not make valid Wasm: " + word_text(a),
         Diag.IrType => if diag_c[i] == 1 { "@ir gives " + pick(b == vt_i32 and a == prelude(Prelude.Bool), "an i32, not a comparison's", vt_text(b) + ", not") + " " + type_text(a); } else { "@ir <" + w + "> takes " + vt_text(a) + ", given " + vt_text(b); },
+        Diag.EsNative => if b > 0 { w + " passes " + type_text(a) + " to JS, which cannot read it"; } else if es_fun_type(a) { w + " gets a JS function: that is a cl, not " + type_text(a); } else { w + " gets " + type_text(a) + " from JS, which cannot make one"; },
         Diag.YieldPlace => "yield T is only a generator's result type",
         Diag.NotStruct => type_text(a) + " is not a struct: it has no fields to set",
         Diag.NewNotHost => "new makes host objects; " + w + " is not a host class",
@@ -785,6 +789,7 @@ fn diag_default_label(i: I32) Str {
         Diag.IrUnknown => if diag_a[i] == 2 { "malformed"; } else { "unknown"; },
         Diag.IrInvalid => "unchecked",
         Diag.IrType => if diag_c[i] == 1 { "not " + type_text(diag_a[i]); } else { vt_text(diag_b[i]); },
+        Diag.EsNative => if diag_b[i] > 0 { "opaque to JS"; } else if es_fun_type(diag_a[i]) { "a cl"; } else { "JS cannot make it"; },
         Diag.YieldPlace => "not a type here",
         Diag.NotStruct => "no fields",
         Diag.NewNotHost => "not a host class",

@@ -47,12 +47,12 @@ export const promiseCatch = (p, f) => { p.catch(f); };
  * work. One import per awaited value type, since wasm imports are monomorphic.
  */
 export function awaitImports(promiseSpec, utu = {}) {
-  for (const type of promiseSpec?.awaits ?? []) utu[`await_${type}`] = awaitImport();
+  for (const type of promiseSpec?.awaits ?? []) utu[`await_${type}`] = awaitImport(type.startsWith('null_'));
   return utu;
 }
 
-/** One `await_*` import. */
-export function awaitImport() {
+/** One `await_*` import; `await_null_N`'s value is nullable, so undefined is null. */
+export function awaitImport(absent = false) {
   if (typeof WebAssembly.Suspending !== 'function') {
     throw new Error(
       'utu: `await` needs JS Promise Integration (WebAssembly.Suspending), ' +
@@ -60,7 +60,7 @@ export function awaitImport() {
       'JSPI-capable host (Chrome 126+, Node 23+, Bun)',
     );
   }
-  return new WebAssembly.Suspending(async (p) => await p);
+  return new WebAssembly.Suspending(absent ? async (p) => (await p) ?? null : async (p) => await p);
 }
 
 /**

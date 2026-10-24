@@ -73,7 +73,7 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
     else if (name.startsWith('closure_call_')) utu.push(`${name}: ${use('closureApply')}`);
     else if (name === 'promise_then') utu.push(`promise_then: ${use('promiseThen')}`);
     else if (name === 'promise_catch') utu.push(`promise_catch: ${use('promiseCatch')}`);
-    else if (name.startsWith('await_')) utu.push(`${name}: ${use('awaitImport')}()`);
+    else if (name.startsWith('await_')) utu.push(`${name}: ${use('awaitImport')}(${name.startsWith('await_null_') ? 'true' : ''})`);
     else if (name === 'js_tag') utu.push('js_tag: WebAssembly.JSTag');
   }
   if (utu.length || spec.mems) {
