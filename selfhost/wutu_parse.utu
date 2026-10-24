@@ -185,7 +185,7 @@ fn is_svg_tag(tag: Str) Bool {
 }
 
 fn is_svg_attribute(name: Str) Bool {
-    in_words("viewBox xmlns width height x y x1 y1 x2 y2 cx cy r rx ry d points fill fill-rule fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-dashoffset stroke-opacity opacity transform href offset stop-color stop-opacity gradientUnits gradientTransform preserveAspectRatio clip-path mask", name);
+    in_words("viewBox xmlns width height x y x1 y1 x2 y2 cx cy r rx ry d points fill fill-rule fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-dashoffset stroke-opacity opacity transform href offset stop-color stop-opacity gradientUnits gradientTransform preserveAspectRatio clip-path mask xlink:href xlink:title xml:space xmlns:xlink", name);
 }
 
 fn is_html_tag(tag: Str) Bool {
@@ -193,7 +193,7 @@ fn is_html_tag(tag: Str) Bool {
 }
 
 fn is_global_attribute(name: Str) Bool {
-    in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref", name);
+    in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref xml:lang", name);
 }
 
 /// The attributes an element of `tag` may have beyond the global ones (space-separated).
@@ -952,7 +952,7 @@ fn parse_element_statement(text: Str, n: I32) void {
         parse_attribute(text, n, true);
         return;
     };
-    if c >= 97 and c <= 122 and assignment_head(text, p, true) {
+    if c >= 97 and c <= 122 and (assignment_head(text, p, true) or namespace_prefix(text, p) > 0 and assignment_head(text, namespace_prefix(text, p), true)) {
         parse_attribute(text, n, false);
         return;
     };
@@ -1041,6 +1041,15 @@ fn assignment_head(text: Str, q: I32, bare: Bool) Bool {
     (c == 61 and not (i + 1 < text.len() and text.get(i + 1) == 61)) or (bare and (c == 59 or c == 125));
 }
 
+/// Past `xlink:`, `xml:` or `xmlns:` at q (a namespaced attribute's prefix,
+/// never a CSS property's), or 0.
+fn namespace_prefix(text: Str, q: I32) I32 {
+    for (["xlink:", "xmlns:", "xml:"]) |prefix| {
+        if text_at(text, q, prefix) { return q + prefix.len(); };
+    };
+    0;
+}
+
 /// `<name = value;`, the spelling before attributes lost their `<`: the new one.
 fn old_attribute_text(text: Str, p: I32) Str {
     let q = p + 1;
@@ -1083,7 +1092,7 @@ fn is_on_name(name: Str) Bool { name.len() >= 2 and (name.get(0) | 32) == 111 an
 /// into the element; anything else is an expression.
 fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     let name_start = wp_at[0];
-    let q = name_start;
+    let q = if is_property or namespace_prefix(text, name_start) == 0 { name_start; } else { namespace_prefix(text, name_start); };
     while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
     let name = text.slice(name_start, q);
     wp_at[0] = q;

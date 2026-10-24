@@ -65,7 +65,7 @@ fn beat(state: State) Browser.HTMLElement {
 fn icon(state: State) Browser.SVGElement {
     @wutu/\
     @reactive;
-    svg { viewBox = "0 0 10 10"; circle { r = state.n.to_str(); } }
+    svg { viewBox = "0 0 10 10"; circle { r = state.n.to_str(); } use#ns { xlink:href = "#c" + state.n.to_str(); xml:space = "preserve"; } }
     \/;
 }
 

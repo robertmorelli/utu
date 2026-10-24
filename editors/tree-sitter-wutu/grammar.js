@@ -57,7 +57,8 @@ module.exports = grammar({
       seq($.attribute_name, choice(';', seq('=', $.expression, ';'))),
       seq(alias('for', $.attribute_name), '=', $.expression, ';'),
     ),
-    attribute_name: $ => $.name,
+    // (`xlink:href`: a namespaced attribute; no CSS property has those prefixes.)
+    attribute_name: $ => choice($.name, /(xlink|xmlns|xml):[a-zA-Z][a-zA-Z0-9_-]*/),
     property: $ => seq('.', alias($.name, $.property_name), '=', $.expression, ';'),
     binding: $ => seq(alias(/bind:[a-z]+/, $.binding_name), '=', $.expression, ';'),
     event: $ => seq('on', alias($.name, $.event_name), optional('quiet'), optional($.capture),

@@ -670,7 +670,14 @@ export lib {
   // Programs only the self-hosted compiler builds as it should, in every
   // build mode: what `run` returns.
   const modes = ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe'];
+  // How deep closures recurse below. Under bun (JavaScriptCore), a debug
+  // build's first, interpreted call takes larger frames: 2500 overflows its
+  // main thread, and its workers ignore stackSizeMb. (The host path overflowed
+  // near 800.)
+  const closureDepth = process.versions.bun ? 1500 : 3000;
   const everyMode = [
+    // A hosted mem's copy_in takes an Externref, with no std:JS loaded (it crashed the compiler).
+    ['mem text: U8;\nlet bytes: fun() Externref = @es/\\ () => new Uint8Array([5, 6, 7]) \\/;\nexport lib { fn run() I32 { text.copy_in(bytes()); text.len() * 100 + text[2]; } }\n', 307],
     // An alt arm whose value is a bare name (it was read as the arm's binding).
     ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { alt p { Ka => 1, Kc => q, }; }\nexport lib { fn run() I32 { f(Kc {}, 5); } }\n', 5],
     // A parameter assigned after an alt tested it: the inner test still runs.
@@ -682,8 +689,8 @@ export lib {
     // A recursive closure assigned with `=`.
     ['export lib { fn run() I32 { let fact: cl(I32) I32 = cl(x) { 0; }; fact = cl(x) { if x <= 1 { 1; } else { x * fact(x - 1); }; }; fact(5); } }\n', 120],
     // Closures that recurse 3000 deep: small called them through the host, JS frames each level (overflowed near 800).
-    ['export lib { fn run() I32 { let d: cl(I32) I32 = cl(n) { 0; }; d = cl(n) { if n == 0 { 0; } else { 1 + d(n - 1); }; }; d(3000); } }\n', 3000],
-    ['fn f(n: I32) I32 { let c = cl(k: I32) I32 { if k == 0 { 0; } else { 1 + f(k - 1); }; }; c(n); }\nexport lib { fn run() I32 { f(3000); } }\n', 3000],
+    [`export lib { fn run() I32 { let d: cl(I32) I32 = cl(n) { 0; }; d = cl(n) { if n == 0 { 0; } else { 1 + d(n - 1); }; }; d(${closureDepth}); } }\n`, closureDepth],
+    [`fn f(n: I32) I32 { let c = cl(k: I32) I32 { if k == 0 { 0; } else { 1 + f(k - 1); }; }; c(n); }\nexport lib { fn run() I32 { f(${closureDepth}); } }\n`, closureDepth],
     // A generator's parameter, captured, then assigned.
     ['fn g(a: I32) yield I32 { let c: cl(I32) I32 = cl(x) { x + a; }; a = 5; yield c(1); }\nexport lib { fn run() I32 { let t = 0; for (g(1)) |v| { t += v; }; t; } }\n', 6],
     // A name from a tuple, captured, then assigned.
@@ -934,10 +941,10 @@ export lib { fn run() Str {
       assert.equal(exports.bump(2), 3014, what);
       assert.equal(exports.bump_at(2), 3007, what);
       for (const f of ['read', 'store', 'bump', 'bump_at']) {
-        assert.throws(() => exports[f](-1), /out of bounds/, `${what}: ${f}(-1)`);
+        assert.throws(() => exports[f](-1), /out of bounds/i, `${what}: ${f}(-1)`);
         if (mode.endsWith('Unsafe')) continue;
-        assert.throws(() => exports[f](3), /out of bounds/, `${what}: ${f}(3)`);
-        assert.throws(() => exports[f](15), /out of bounds/, `${what}: ${f}(15)`);
+        assert.throws(() => exports[f](3), /out of bounds/i, `${what}: ${f}(3)`);
+        assert.throws(() => exports[f](15), /out of bounds/i, `${what}: ${f}(15)`);
       }
       if (mode.endsWith('Unsafe')) {
         // Unchecked: within the capacity, and the length unchanged.
@@ -1661,6 +1668,11 @@ export lib {
       "A stream's values are awaited as they are read: use Stream[I32], not Stream[Promise[I32]]"],
     ['fn f(s: Stream[?Promise[Str]]) I32 { 0; }\nexport main() I32 { 0; }\n',
       "A stream's values are awaited as they are read: use Stream[?Str], not Stream[?Promise[Str]]"],
+    // A host module not found, said at its using only (a capitalized one's uses said "Not supported yet").
+    ['using Pad from "npm:missing";\nexport main() I32 { let a = Pad.x; let b: Pad.T = Pad.f(); Pad.g().h(); 0; }\n', 'No declarations for npm:missing; is it installed?'],
+    ['using pad from "npm:missing";\nexport main() I32 { pad.f(); 0; }\n', 'No declarations for npm:missing; is it installed?'],
+    // copy_in of a value not from the host, with no std:JS loaded (it crashed the compiler).
+    ['mem text: U8;\nexport lib { fn load(x: I32) I32 { text.copy_in(x); text.len(); } }\n', 'Expected Externref, got I32'],
   ]) {
     const { errors } = await selfhost(await write(source));
     assert.deepEqual(errors, [message], source);

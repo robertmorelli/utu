@@ -91,7 +91,7 @@ A number or Bool in a text hole shows as its `to_str()`: `= state.count;`.
 A URL from a value is checked on every render, first and update alike, as an
 attribute (`href = link;`) or a property (`.href = link;`): `href`, `src`,
 `action`, `formaction`, `poster`, `cite`, `data`, `background`, `codebase`,
-`longdesc`, `manifest` (and `xlink:href` at run time); `ping`, `srcset` and
+`longdesc`, `manifest`, `xlink:href`; `ping`, `srcset` and
 `imagesrcset` check each URL in the list. One whose scheme is
 `javascript:` or `vbscript:`, read as a browser reads it (any case, whitespace
 and control characters dropped: `" JaVa\tScript:"`), is not set: the attribute
@@ -114,7 +114,9 @@ the page through selectors.
 Classes from `class = classes;` are combined with authored shorthand and
 compiler style classes. SVG trees use `createElementNS`; `foreignObject`
 children switch back to HTML. SVG attributes such as `viewBox`, `d`, and
-`stroke-width` keep their original spelling.
+`stroke-width` keep their original spelling. A namespaced one,
+`xlink:href = …;`, `xml:lang = …;` or `xmlns:xlink = …;`, is an attribute (no
+CSS property has those prefixes), set in its namespace.
 
 ## Components, slots, lists, and conditions
 

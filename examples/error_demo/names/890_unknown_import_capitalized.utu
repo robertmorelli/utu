@@ -1,0 +1,7 @@
+// What: imports an npm package that is not installed under a capitalized name, and calls it
+// Expect: No declarations for npm:left-pad-xyz; is it installed? (once, at the using; not again at Pad.leftPad)
+using Pad from "npm:left-pad-xyz";
+
+export main() Str {
+    Pad.leftPad("7", 3);
+}

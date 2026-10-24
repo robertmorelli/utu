@@ -246,7 +246,7 @@ export function createWutuRuntime() {
     const build = ([tag, attributes, ...children], svg) => {
       svg = svg || tag === 'svg';
       const element = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
-      for (const name in attributes) element.setAttribute(name, attributes[name]);
+      for (const name in attributes) setAttr(element, name, attributes[name]);
       const childSvg = svg && tag !== 'foreignObject';
       for (const child of children) element.append(typeof child === 'string' ? child : build(child, childSvg));
       return element;
@@ -279,7 +279,15 @@ export function createWutuRuntime() {
       return;
     }
     const text = value === true ? '' : String(value);
-    if (node.getAttribute(name) !== text) node.setAttribute(name, text);
+    if (node.getAttribute(name) !== text) setAttr(node, name, text);
+  }
+
+  /** setAttribute, in its namespace for `xlink:href`, `xml:lang`, `xmlns:xlink`. */
+  function setAttr(node, name, text) {
+    const ns = { xlink: 'http://www.w3.org/1999/xlink', xml: 'http://www.w3.org/XML/1998/namespace',
+      xmlns: 'http://www.w3.org/2000/xmlns/' }[name.split(':', 1)[0]];
+    if (ns && name.includes(':')) node.setAttributeNS(ns, name, text);
+    else node.setAttribute(name, text);
   }
 
   // Attributes (and their properties) a browser follows or loads as a URL.

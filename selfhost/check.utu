@@ -2101,6 +2101,8 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
     if decl_is(owner_decl, Decl.Foreign) and decl_a[owner_decl] >= 0 {
         return check_foreign_root_call(node, decl_a[owner_decl], word_of(last_child(callee)), args, false, m, expect, cx);
     };
+    // A host module whose declarations were not found is reported at its using.
+    if decl_is(owner_decl, Decl.Foreign) { return finish_error(args, m, cx); };
     if is_scalar_kind(owner_decl) {
         let r = scalar_static(owner_decl, word_of(last_child(callee)), args, node, cx);
         if r >= 0 { return r; };
@@ -2872,6 +2874,7 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
 fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     let owner = node_decl[first_child(node)];
     if decl_is(owner, Decl.Foreign) and decl_a[owner] >= 0 { return check_foreign_root(node, decl_a[owner], word_of(last_child(node)), expect); };
+    if decl_is(owner, Decl.Foreign) { return error_value(); };
     let decl = node_decl[last_child(node)];
     if decl_is(decl, Decl.Global) {
         let inst = member_instance(node, cx);
