@@ -233,6 +233,80 @@ try {
     assert.deepEqual(Object.keys(across.changes).sort(), [m, sh].sort());
     assert.deepEqual((await call('textDocument/references', { ...at(SH, 'shapes', 0, sh), context: { includeDeclaration: true } })).map(r => r.uri).filter((u, i, all) => all.indexOf(u) === i).sort(), [m, sh].sort());
 
+    // A rename that would make a name mean another declaration, with no
+    // mistake, is refused: a renamed name captured by one declared nearer
+    // it, or another's name captured by the renamed one.
+    const K = [
+      'let g: I32 = 5;',
+      'fn one() I32 {',
+      '    let base = 10;',
+      '    let add = cl(x: I32) I32 { x + base; };',
+      '    add(1);',
+      '}',
+      'fn two(y: I32) I32 {',
+      '    let f = cl(a: I32) I32 { a + y; };',
+      '    f(1);',
+      '}',
+      'fn three() I32 {',
+      '    let v = 1;',
+      '    v + g;',
+      '}',
+      'fn four() I32 {',
+      '    let n = 0;',
+      '    for (0 ..< 3) |i| { n = n + i; };',
+      '    n;',
+      '}',
+      'export lib { fn run() I32 { one() + two(1) + three() + four(); } }',
+      '',
+    ].join('\n');
+    const k = await file('k.utu', K);
+    await note('textDocument/didOpen', { textDocument: { uri: k, version: 1, text: K } });
+    const capture = async (marker, skip, newName) => (await call('textDocument/rename', { ...at(K, marker, skip, k), newName })).error;
+    assert.equal(await capture('x:', 0, 'base'),
+      "renaming to 'base' changes what a name means: 'base' on line 4 would name the closure param on line 4, not the local on line 3");
+    assert.match(await capture('y:', 0, 'a'), /^renaming to 'a' changes what a name means: 'a' on line 8 would name the closure param on line 8, not the param on line 7$/);
+    assert.match(await capture('v =', 0, 'g'), /'g' on line 13 would name the local on line 12, not the global on line 1/, 'a local over a global');
+    assert.match(await capture('g:', 0, 'v'), /'v' on line 13 would name the local on line 12, not the global on line 1/, 'a global under a local');
+    assert.match(await capture('i|', 0, 'n'), /'n' on line 17 would name the capture on line 17, not the local on line 16/, 'a for binding');
+    // Where no other declaration is in sight, the same new name is fine.
+    assert.equal((await call('textDocument/rename', { ...at(K, 'x:', 0, k), newName: 'y' })).changes[k].length, 2);
+    assert.equal((await call('textDocument/rename', { ...at(K, 'a:', 0, k), newName: 'base' })).changes[k].length, 2);
+
+    // A protocol's member and the functions implementing it are one name:
+    // referenced, highlighted, and renamed together.
+    const P = [
+      'proto Shape:',
+      '    | area() F64',
+      'struct Circle[Shape]:',
+      '    | r: F64',
+      'fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }',
+      'fn big(s: Shape) F64 { s.area(); }',
+      'fn direct(c: Circle) F64 { c.area(); }',
+      'export lib { fn run() F64 { big(Circle { r: 1.0 }) + direct(Circle { r: 1.0 }); } }',
+      '',
+    ].join('\n');
+    const pr = await file('pr.utu', P);
+    await note('textDocument/didOpen', { textDocument: { uri: pr, version: 1, text: P } });
+    const lines = async (method, marker, skip, context) => (await call(method, { ...at(P, marker, skip, pr), ...context })).map(r => r.range.start.line).sort();
+    const all = [1, 4, 5, 6];
+    assert.deepEqual(await lines('textDocument/references', 'area', 0, { context: { includeDeclaration: true } }), all, 'from the protocol');
+    assert.deepEqual(await lines('textDocument/references', 'area', 1, { context: { includeDeclaration: true } }), all, 'from an implementation');
+    assert.deepEqual(await lines('textDocument/references', 'area', 3, { context: { includeDeclaration: true } }), all, 'from a call');
+    assert.deepEqual(await lines('textDocument/references', 'area', 0, { context: { includeDeclaration: false } }), [4, 5, 6], 'its implementations are not its declaration');
+    assert.deepEqual((await call('textDocument/documentHighlight', at(P, 'area', 2, pr))).map(h => [h.range.start.line, h.kind]).sort(), [[1, 3], [4, 3], [5, 2], [6, 2]]);
+    const protoRename = await call('textDocument/rename', { ...at(P, 'area', 1, pr), newName: 'size' });
+    assert.deepEqual(protoRename.changes[pr].map(e => e.range.start.line), all);
+    // The protocol in one file, implemented in an open file importing it.
+    const PS = 'mod shapes {\n    proto Area:\n        | area() I32\n}\n';
+    const PM = 'using shapes from "./ps.utu";\nusing shapes;\nstruct Tri[Area]:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nexport main() I32 { let x: Area = Tri { base: 2 }; x.area(); }\n';
+    const ps = await file('ps.utu', PS), pm = await file('pm.utu', PM);
+    await note('textDocument/didOpen', { textDocument: { uri: pm, version: 1, text: PM } });
+    await note('textDocument/didOpen', { textDocument: { uri: ps, version: 1, text: PS } });
+    const found = await call('textDocument/references', { ...at(PS, 'area', 0, ps), context: { includeDeclaration: true } });
+    assert.deepEqual(found.map(r => [r.uri === ps ? 'ps' : 'pm', r.range.start.line]).sort(), [['pm', 4], ['pm', 5], ['ps', 2]]);
+    const both = await call('textDocument/rename', { ...at(PS, 'area', 0, ps), newName: 'size' });
+    assert.deepEqual([both.changes[ps].length, both.changes[pm].length], [1, 2]);
+
     // Closing a file: the others are built again (on its text on disk), and
     // what only its builds showed on files not open is cleared.
     await note('textDocument/didChange', { textDocument: { uri: sh, version: 2 }, contentChanges: [{ text: SH.replace('fn &.sum', 'fn &.add') }] });
@@ -263,7 +337,7 @@ try {
       await note('textDocument/didChange', { textDocument: { uri: c, version: ++v }, contentChanges: [{ text: text.replace('¦', '') }] });
       return (await call('textDocument/completion', at(text, '¦', 0, c))).map(item => item.label);
     };
-    assert.deepEqual(await offered('Rect.'), ['square']);
+    assert.deepEqual(await offered('Rect.'), ['square', 'area'], 'its methods too, as after a module type (`Point.`)');
     assert.deepEqual(await offered('Shape.'), ['Circle', 'Square']);
     assert.deepEqual(await offered('r.inner.'), ['v']);
     for (const typed of ['mk().', 'arr[0].', 'Rect.square(1.0).', 'opt?.', 'r. ']) assert.deepEqual(await offered(typed), ['w', 'inner', 'area'], typed);
@@ -320,7 +394,7 @@ try {
   assert.ok(answers.find(a => a.id === 6).result.length > 0);
   assert.ok(!answers.some(a => a.method === 'textDocument/publishDiagnostics' && a.params.uri === strUri && a.params.diagnostics.length));
 
-  console.log('lsp: hover, definitions, references, rename (aliases, refusals, importers), symbols, tokens, completion (members of any expression, statics, ?.; not in comments or strings), answers while a file does not parse, diagnostics as text changes, on close, and in unopened imports, unsaved buffers; `utu lsp` on stdio, std files, past bad messages');
+  console.log('lsp: hover, definitions, references, rename (aliases, refusals, captures, importers), protocol members with their implementations, symbols, tokens, completion (members of any expression, statics, ?.; not in comments or strings), answers while a file does not parse, diagnostics as text changes, on close, and in unopened imports, unsaved buffers; `utu lsp` on stdio, std files, past bad messages');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

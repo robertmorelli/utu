@@ -15,11 +15,11 @@ node cli/utu.mjs lsp
 | diagnostics | both builds `utu check` makes (the exports' and the tests'), on every edit; an edit to an open file, or closing one, also rechecks the other open files |
 | hover | a declaration's first line (a module's type `&` by the module's name), a local's or parameter's checked type, and its `///` doc comment |
 | go to definition | names, fields, and methods (a method by its receiver's type, as checked) |
-| find references, highlights | every name that resolves to the declaration, in the program and in the open files that import its file |
-| rename | the same names; refused when the file would then make a mistake it did not (a keyword, a type's name, a name already there); the standard library is not renamed |
+| find references, highlights | every name that resolves to the declaration, in the program and in the open files that import its file; a protocol's member and the functions implementing it (`fn P[T].m`) are one name |
+| rename | the same names; refused when the file would then make a mistake it did not (a keyword, a type's name, a name already there), or when a name would then mean another declaration (one renamed, captured by a closure's parameter or a local nearer it; another's, captured by the renamed one); the standard library is not renamed |
 | outline | the file's types, functions, globals, fields, and variants, nested |
 | semantic tokens | each name colored by what it names (function, parameter, field, …) |
-| completion | after `e.` (a name, a field, a call, an index), the fields of e's type and its methods; after `e?.`, those of what a nullable e holds; after `M.`, what module M holds; after `T.`, a type's variants and functions; elsewhere, the function's locals, the file's declarations, the prelude's types, and the keywords |
+| completion | after `e.` (a name, a field, a call, an index), the fields of e's type and its methods; after `e?.`, those of what a nullable e holds; after `M.`, what module M holds; after `T.`, a type's variants, functions and methods; elsewhere, the function's locals, the file's declarations, the prelude's types, and the keywords |
 
 ## How it works
 

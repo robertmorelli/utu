@@ -219,18 +219,18 @@ export function programIndex(utu, files) {
       }
       return out;
     },
-    /** Every name in file `key` that resolves, with its declaration, in source order. */
+    /** Every name in file `key` (in every file, for null) that resolves, with its declaration, in source order. */
     names(key) {
       const out = [];
       for (let n = 0; n < count; n++) {
         if (!named(n)) continue;
         const at = place(n);
-        if (at && at.file === key) out.push({ decl: nodeDecl[n], at });
+        if (at && (key == null || at.file === key)) out.push({ decl: nodeDecl[n], at });
       }
-      for (const [decl, places] of watUses()) for (const at of places) if (at.file === key) out.push({ decl, at });
+      for (const [decl, places] of watUses()) for (const at of places) if (key == null || at.file === key) out.push({ decl, at });
       // A name node may wrap another of the same token: each place once.
-      out.sort((a, b) => a.at.start - b.at.start);
-      return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start);
+      out.sort((a, b) => a.at.file < b.at.file ? -1 : a.at.file > b.at.file ? 1 : a.at.start - b.at.start);
+      return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start || name.at.file !== out[i - 1].at.file);
     },
     /** The token of file `key` that `offset` (UTF-16) is inside: { kind (lex.utu's Tok), start, end }, or null. */
     tokenAt(key, offset) {
