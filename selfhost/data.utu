@@ -24,6 +24,12 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     let path = first_child(node);
     let name = name_node(if is_kind(path, Node.Qualified_type_ref) { last_child(path); } else { path; });
     if decl_is(node_decl[name], Decl.Ambiguous) and not expected_variant(name, expect) { return error_value(); };
+    // `Blob {…}` where a file's own enum's Blob hides the expected (opened) enum's: the expected one's.
+    let want = expected_decl(expect);
+    if path == name and decl_is(node_decl[name], Decl.Variant) and decl_is(want, Decl.Enum) and decl_owner[node_decl[name]] != want {
+        let v = member(want, word_of(name), Space.Member);
+        if decl_is(v, Decl.Variant) { node_decl[name] = v; };
+    };
     let t = type_path(path, cx.inst);
     let decl = ty_decl(t);
     if not decl_is(decl, Decl.Struct) and not decl_is(decl, Decl.Variant) {
@@ -36,11 +42,16 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     return build_struct(t, decl, inits, node, cx);
 }
 
+/// The declaration of the named type expected (through `?`), or -1.
+fn expected_decl(expect: I32) I32 {
+    let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+    if t >= 0 and ty_is(t, Ty.Named) { ty_decl(t); } else { -1; };
+}
+
 /// A variant name two enums have, in a literal: the variant of the enum (or
 /// the variant) expected, recorded on it. Without one, it is reported.
 fn expected_variant(name: I32, expect: I32) Bool {
-    let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
-    let want = if t >= 0 and ty_is(t, Ty.Named) { ty_decl(t); } else { -1; };
+    let want = expected_decl(expect);
     let d = node_decl[name];
     while (decl_is(d, Decl.Ambiguous)) {
         let v = decl_owner[d];

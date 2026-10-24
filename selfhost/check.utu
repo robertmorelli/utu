@@ -1670,6 +1670,8 @@ fn check_assign(node: I32, cx: Cx) I32 {
     };
     let decl = node_decl[target];
     if decl < 0 { return error_value(); };
+    // `m = 3`: a module or type has no storage.
+    if is_type_decl(decl) { return not_value(target, decl); };
     if decl_is(decl, Decl.Global) or decl_is(decl, Decl.Fn) or decl_is(decl, Decl.Mem) {
         report(Diag.AssignmentToImmutable, target, word_of(target));
         // The value is still checked against what it would replace.
