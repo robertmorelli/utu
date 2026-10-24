@@ -1,0 +1,14 @@
+// What: a struct and an array handed to @es and back, as opaque handles (not a mistake)
+// Expect: ok
+struct Point:
+    | x: F64
+    | y: F64
+
+let hold: fun(Point, Array[Str]) Externref = @es/\ (p, names) => ({ p, names }) \/;
+let point: fun(Externref) Point = @es/\ (o) => o.p \/;
+let names: fun(Externref) Array[Str] = @es/\ (o) => o.names \/;
+
+export main() F64 {
+    let box = hold(Point { x: 1.0, y: 2.0 }, ["a", "b"]);
+    point(box).x + names(box).len().to_f64();
+}

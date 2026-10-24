@@ -234,9 +234,9 @@ export function promising(f) {
  * `{ f: { r: ['U32', '', 'Bool'], p: ['Str', '?'] } }` for a tuple result
  * (a kind per element) or checked arguments. Wasm wraps a JS number or
  * BigInt to its bits, and `true` to 1, but takes any value as a reference.
- * Unsafe builds take a Bool argument as any value, by its truthiness
- * ('Bool'); safe builds record what each argument must be:
- *   'bool' a boolean           'int'   an integer number (I32, U32: low bits kept)
+ * A Bool argument is any value, by its truthiness ('Bool', in every build);
+ * safe builds record what the others must be:
+ *   'int'  an integer number (I32, U32: low bits kept)
  *   'big'  a BigInt (I64, U64)  'num'   a number (F32, F64)
  *   'Str'  a string            '?Str'  a string or null (undefined is null)
  *   'ref'  not null            '?'     anything (undefined is null)
@@ -254,7 +254,6 @@ export function convertExports(exports, exportSpec) {
   };
   const param = (name, kind, i) => {
     if (kind === 'Bool') return v => !!v;
-    if (kind === 'bool') return v => (typeof v === 'boolean' ? v : fail(name, i, 'a boolean', v));
     if (kind === 'int') return v => (Number.isInteger(v) ? v : fail(name, i, 'an integer', v));
     if (kind === 'big') return v => (typeof v === 'bigint' ? v : fail(name, i, 'a BigInt', v));
     if (kind === 'num') return v => (typeof v === 'number' ? v : fail(name, i, 'a number', v));

@@ -6303,50 +6303,9 @@ ok
 10 │     \/;
 --- exit 1
 
-=== utu check examples/error_demo/platform/840_es_array_argument.utu
- ERROR  len passes Array[Str] to JS, which cannot read it
-        es-native · examples/error_demo/platform/840_es_array_argument.utu:3:10
-
- 1 │ // What: a utu array passed to an @es function
- 2 │ // Expect: len passes Array[Str] to JS, which cannot read it
- 3 │ let len: fun(Array[Str]) F64 = @es/\ (a) => a.length \/;
-   │          ━━━━━━━━━━━━━━━━━━━
-   │          ╰─ opaque to JS
- 4 │
- 5 │ export main() F64 {
-
-  note  JS reads numbers, Str, Bool, closures and host values: pass its fields, or a Str from @json encode.
---- exit 1
-
-=== utu check examples/error_demo/platform/841_es_struct_argument.utu
- ERROR  px passes Point to JS, which cannot read it
-        es-native · examples/error_demo/platform/841_es_struct_argument.utu:7:9
-
- 5 │     | y: F64
- 6 │
- 7 │ let px: fun(Point) F64 = @es/\ (p) => p.x \/;
-   │         ━━━━━━━━━━━━━━
-   │         ╰─ opaque to JS
- 8 │
- 9 │ export main() F64 {
-
-  note  JS reads numbers, Str, Bool, closures and host values: pass its fields, or a Str from @json encode.
---- exit 1
-
-=== utu check examples/error_demo/platform/842_es_struct_result.utu
- ERROR  mk gets Point from JS, which cannot make one
-        es-native · examples/error_demo/platform/842_es_struct_result.utu:7:9
-
- 5 │     | y: F64
- 6 │
- 7 │ let mk: fun(F64) Point = @es/\ (x) => ({ x: x, y: 2 }) \/;
-   │         ━━━━━━━━━━━━━━
-   │         ╰─ JS cannot make it
- 8 │
- 9 │ export main() F64 {
-
-  note  JS gives numbers, Str, Bool, closures and host values: give its fields, or a Str to @json decode.
---- exit 1
+=== utu check examples/error_demo/platform/841_es_struct_handle.utu
+ok
+--- exit 0
 
 === utu check examples/error_demo/platform/843_es_fun_result.utu
  ERROR  mkAdder gets a JS function: that is a cl, not fun(I32) I32
@@ -7222,33 +7181,33 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/25_es_returns_wrong_struct.utu
- ERROR  load_shape gets Shape from JS, which cannot make one
-        es-native · examples/error_demo/runtime/25_es_returns_wrong_struct.utu:7:17
+ ERROR  type incompatibility when transforming from/to JS
+        uncaught-exception · examples/error_demo/runtime/25_es_returns_wrong_struct.utu:10:9
 
- 5 │     | Square { side: F64 }
- 6 │
- 7 │ let load_shape: fun() Shape = @es/\ () => ({ r: 2 }) \/;
-   │                 ━━━━━━━━━━━
-   │                 ╰─ JS cannot make it
  8 │
  9 │ export main() F64 {
+10 │     alt load_shape() {
+   │         ━━━━━━━━━━━━
+   │         ╰─ here
+11 │         Circle |c| => c.r,
+12 │         Square |s| => s.side,
 
-  note  JS gives numbers, Str, Bool, closures and host values: give its fields, or a Str to @json decode.
+  in main  examples/error_demo/runtime/25_es_returns_wrong_struct.utu:10:9
 --- exit 1
 
 === utu run examples/error_demo/runtime/26_es_callback_traps.utu
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/26_es_callback_traps.utu:6:21
+       trap · examples/error_demo/runtime/26_es_callback_traps.utu:7:25
 
- 4 │
  5 │ export main() I32 {
- 6 │     map_all(cl(i) { 100 / (i - 1); });
-   │                     ━━━━━━━━━━━━━
-   │                     ╰─ here
- 7 │ }
+ 6 │     let xs = [10, 20, 30];
+ 7 │     map_all(xs, cl(i) { 100 / (i - 1); });
+   │                         ━━━━━━━━━━━━━
+   │                         ╰─ here
+ 8 │ }
 
-  in closure  examples/error_demo/runtime/26_es_callback_traps.utu:6:21
-  in main  examples/error_demo/runtime/26_es_callback_traps.utu:6:5
+  in closure  examples/error_demo/runtime/26_es_callback_traps.utu:7:25
+  in main  examples/error_demo/runtime/26_es_callback_traps.utu:7:5
 --- exit 1
 
 === utu run examples/error_demo/runtime/27_async_trap_after_await.utu

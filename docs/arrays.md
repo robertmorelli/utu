@@ -24,8 +24,9 @@
 
 A native Wasm array is opaque to JavaScript, so an array literal never reaches
 a JS slot as one: `JSON.stringify([1, 2])` receives a real JS array. An
-`@es` binding cannot take or give an `Array[T]` (`fun(Array[Str]) F64` is an
-error): pass its elements, or a `Str` from `@json encode`.
+`@es` binding typed to take or give an `Array[T]` passes it as an opaque
+handle JS can hold and give back, but not read (docs/typescript-abi.md): pass
+its elements, or a `Str` from `@json encode`, for JS to read.
 
 Generic module instances are created before types are known. When typing
 finds an array literal whose element type has no `Array[T]` instance yet, the

@@ -1514,16 +1514,15 @@ export lib {
       assert.throws(() => exports.lv(99), WebAssembly.RuntimeError, mode);
     }
     assert.equal(exports.lv(1), 1);
-    assert.equal(exports.flag(true) + exports.flag(false), 'yn', mode);
+    // A Bool argument is JS truthiness, in every build.
+    assert.equal([0.5, 'x', {}, 1, true, 0, '', null, undefined, NaN, false].map(v => exports.flag(v)).join(''), 'yyyyynnnnnn', mode);
     // An integer wraps to its low bits; a float is any number; an I64 a BigInt.
     assert.deepEqual([exports.inc(-1), exports.inc(4294967295), exports.uinc(4294967295), exports.half(NaN), exports.half(5), exports.wide(1n), exports.uwide(-1n)],
       [0, 0, 0, NaN, 2.5, 2n, 0n], mode);
     if (mode.endsWith('Unsafe')) {
-      // A Bool argument is JS truthiness; a number, what wasm makes of it.
-      assert.equal([0.5, 'x', {}, 1, true, 0, '', null, undefined, NaN, false].map(v => exports.flag(v)).join(''), 'yyyyynnnnnn', mode);
+      // A number is what wasm makes of it.
       assert.deepEqual([exports.inc('x'), exports.inc(1.5), exports.inc({}), exports.half('4')], [1, 2, 1, 2], mode);
     } else {
-      for (const v of [1, 'x', null, undefined]) assert.throws(() => exports.flag(v), /flag: argument 1 must be a boolean, not /, mode);
       assert.throws(() => exports.inc('x'), /inc: argument 1 must be an integer, not string/, mode);
       assert.throws(() => exports.inc(1.5), /inc: argument 1 must be an integer, not 1\.5/, mode);
       for (const v of [{}, null, undefined, true, NaN, Infinity, 1n]) assert.throws(() => exports.inc(v), /inc: argument 1 must be an integer/, mode);
@@ -2021,20 +2020,45 @@ export lib {
     assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 'absent t', mode);
     checked++;
   }
-  // A wasm struct, array, or fun crossing an @es binding: JS can read none nor make one.
+  // Structs, arrays and enums cross an @es binding as opaque handles, both ways; a fun argument as a closure.
+  const esHandles = await write('struct P:\n    | x: F64\nenum Shape:\n    | Circle { r: F64 }\n    | Square { side: F64 }\n'
+    + 'let keep: fun(P, Array[Str]) Externref = @es/\\ (p, a) => ({ p, a }) \\/;\n'
+    + 'let p_of: fun(Externref) P = @es/\\ (o) => o.p \\/;\n'
+    + 'let a_of: cl(Externref) Array[Str] = @es/\\ (o) => o.a \\/;\n'
+    + 'let peek: fun(Array[Str]) F64 = @es/\\ (a) => a.length === undefined ? -1 : 0 \\/;\n'
+    + 'let same: fun(Shape) Shape = @es/\\ (s) => s \\/;\n'
+    + 'let maybe: fun(Bool, P) ?P = @es/\\ (b, p) => b ? p : undefined \\/;\n'
+    + 'let apply: fun(fun(I32) I32, I32) I32 = @es/\\ (f, n) => f(n) + 1 \\/;\n'
+    + 'fn twice(i: I32) I32 { i * 2; }\n'
+    + 'export main() F64 {\n    let o = keep(P { x: 3.0 }, ["a", "b"]);\n    let side = alt same(Square { side: 5.0 }) { Circle |c| => c.r, Square |q| => q.side, };\n'
+    + '    let m = promote maybe(false, p_of(o)) { |v| => v.x, ~> 100.0, };\n'
+    + '    p_of(o).x + a_of(o).len().to_f64() * 10.0 + side * 1000.0 + peek(a_of(o)) + m + apply(twice, 10).to_f64() * 10000.0;\n}\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, esHandles, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 3 + 20 + 5000 - 1 + 100 + 210000, mode);
+    checked++;
+  }
+  // JS gives a struct it made: the boundary's TypeError, not a wrong value.
+  const madeStruct = await write('struct P:\n    | x: F64\nlet mk: fun(F64) P = @es/\\ (x) => ({ x }) \\/;\nexport main() F64 { mk(3.0).x; }\n');
+  for (const mode of ['small', 'fastUnsafe']) {
+    const result = await compileFile(utu, madeStruct, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(result.wasm, result.spec);
+    assert.throws(() => exports.main(), TypeError, mode);
+    checked++;
+  }
+  // JS gives a function: a fun result is an error naming the cl it is.
   for (const [source, message] of [
-    ['let len: fun(Array[Str]) F64 = @es/\\ (a) => a.length \\/;\nexport main() F64 { len(["a", "b"]); }\n', 'len passes Array[Str] to JS, which cannot read it'],
-    ['struct P:\n    | x: F64\nlet px: fun(F64, ?P) F64 = @es/\\ (n, p) => p.x \\/;\nexport main() F64 { px(1.0, P { x: 1.0 }); }\n', 'px passes ?P to JS, which cannot read it'],
-    ['struct P:\n    | x: F64\nlet px: cl(P) F64 = @es/\\ (p) => p.x \\/;\nexport main() F64 { px(P { x: 1.0 }); }\n', 'px passes P to JS, which cannot read it'],
-    ['struct P:\n    | x: F64\nlet mk: fun(F64) P =@es/\\ (x) => ({ x }) \\/;\nexport main() F64 { mk(3.0).x; }\n', 'mk gets P from JS, which cannot make one'],
     ['let add: fun(I32) fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nexport main() I32 { add(1)(2); }\n', 'add gets a JS function: that is a cl, not fun(I32) I32'],
+    ['let add: cl(I32) ?fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nexport main() I32 { let f = add(1); 0; }\n', 'add gets a JS function: that is a cl, not ?fun(I32) I32'],
   ]) {
     const file = await write(source);
     const { diagnostics } = await compileFile(utu, file, { mode: 'small' });
     assert.deepEqual(diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], source);
     checked++;
   }
-  // What the fun result is instead: a cl. std's own bindings hand back what utu gave (a Stream of structs).
+  // What the fun result is instead: a cl. std:Stream hands back what utu gave (a Stream of structs).
   const clResult = await write('using Stream from std:Stream;\nstruct P:\n    | x: I32\n'
     + 'let add: fun(I32) cl(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\n'
     + 'export main() I32 { let f = add(1); let t = 0; await for (Stream[P].of([P { x: 10 }, P { x: 20 }])) |p| { t += p.x; }; f(2) + t - 30; }\n');
