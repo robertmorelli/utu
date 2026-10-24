@@ -641,6 +641,13 @@ export lib {
       + `export lib { fn run() Str { Best[P].best(P { name: "a", x: 7 }, P { name: "b", x: 2 }); } }\n`, 'a'],
     [`${ord}mod Box[T[Ord]] {\n    struct &:\n        | v: T\n    fn &.new(v: T) & { &{ v: v }; }\n    fn Ord[&].cmp |a| (b: &) I32 { a.v.cmp(b.v); }\n}\n`
       + `export lib { fn run() I32 { Sorted[Box[I32]].max(Box[I32].new(4), Box[I32].new(8)).v; } }\n`, 8],
+    // `c.tick()` on a T bounded by Counter is Counter's `fn Counter.tick` (it was "No method ByOne.tick"),
+    // as on a Counter and as `Counter.tick(c)`; a T's own tick comes first.
+    [`proto Counter:\n    | get set count : I32\n    | step() I32\nstruct ByOne[Counter]:\n    | count: I32\nstruct Own[Counter]:\n    | count: I32\n`
+      + `fn Counter[ByOne].step |c| () I32 { 1; }\nfn Counter[Own].step |c| () I32 { 2; }\nfn Own.tick |c| () void { c.count = c.count + 100; }\n`
+      + `fn Counter.tick |c| () void { c.count = c.count + c.step(); }\nmod Run[T[Counter]] {\n    fn twice(c: T) I32 { c.tick(); Counter.tick(c); c.count; }\n}\n`
+      + `fn on(c: Counter) I32 { c.tick(); c.count; }\n`
+      + `export lib { fn run() I32 { Run[ByOne].twice(ByOne { count: 4 }) * 1000 + Run[Own].twice(Own { count: 1 }) * 10 + on(ByOne { count: 0 }); } }\n`, 6000 + 1030 + 1],
   ];
   for (const [source, expected] of bounded) {
     const file = await write(source);
@@ -2043,6 +2050,16 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     // A mod called (it trapped at run time).
     [{ 'main.utu': 'mod m { fn f() I32 { 1; } }\nexport main() I32 { m() + 2; }\n' }, 'm is a module, not a value'],
     [{ 'u.utu': 'mod util { fn f() I32 { 1; } }\n', 'main.utu': 'using util |helper| from "./u.utu";\nexport main() I32 { helper() + 1; }\n' }, 'helper is a module, not a value'],
+    // An impl list, an impl's head, and an impl's member name protocols and their members (each was accepted).
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nstruct B[Rec]:\n    | x: I32\nexport main() I32 { B { x: 1 }.x; }\n' }, 'Rec is not a protocol; a struct lists protocols'],
+    [{ 'main.utu': 'struct B[I32]:\n    | x: I32\nexport main() I32 { B { x: 1 }.x; }\n' }, 'I32 is not a protocol; a struct lists protocols'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nmod Box {\n    struct &[Rec]:\n        | x: I32\n}\nexport main() I32 { 1; }\n' }, 'Rec is not a protocol; a struct lists protocols'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nenum E[Rec]:\n    | P\n    | Q\nexport main() I32 { 1; }\n' }, 'Rec is not a protocol; an enum lists protocols'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nstruct Sq:\n    | s: I32\nfn Rec[Sq].area |self| () I32 { 1; }\nexport main() I32 { Sq { s: 1 }.s; }\n' }, 'Rec is not a protocol'],
+    [{ 'main.utu': 'proto Area:\n    | area() I32\nstruct Sq[Area]:\n    | s: I32\nfn Area[Sq].area |self| () I32 { self.s; }\nfn Area[Sq].extra |self| () I32 { 1; }\nexport main() I32 { Sq { s: 1 }.extra(); }\n' }, 'Area has no member extra'],
+    [{ 'main.utu': 'proto Area:\n    | area() I32\nstruct A[Area, Area]:\n    | s: I32\nfn Area[A].area |self| () I32 { self.s; }\nexport main() I32 { A { s: 1 }.area(); }\n' }, 'Duplicate protocol Area'],
+    // Two bounds' `fn P.t`: which one is not said.
+    [{ 'main.utu': 'proto A:\n    | get n : I32\nproto B:\n    | get n : I32\nstruct S[A, B]:\n    | n: I32\nfn A.t |c| () I32 { 1; }\nfn B.t |c| () I32 { 2; }\nmod Run[T[A, B]] {\n    fn go(c: T) I32 { c.t(); }\n}\nexport main() I32 { Run[S].go(S { n: 0 }); }\n' }, "t is both A's and B's"],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});

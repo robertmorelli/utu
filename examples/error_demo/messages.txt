@@ -10511,6 +10511,88 @@ FAIL after tests: boom
 10 │ fn Shape[Square].area |s| () F64 { s.side * s.side; }
 --- exit 1
 
+=== utu check examples/error_demo/types/850_impl_list_not_a_protocol.utu
+ ERROR  Rec is not a protocol; a struct lists protocols
+        bound-not-proto · examples/error_demo/types/850_impl_list_not_a_protocol.utu:6:12
+
+ 4 │     | x: I32
+ 5 │
+ 6 │ struct Box[Rec]:
+   │            ━━━
+   │            ╰─ not a protocol
+ 7 │     | x: I32
+--- exit 1
+
+=== utu check examples/error_demo/types/851_enum_impl_list_not_a_protocol.utu
+ ERROR  I32 is not a protocol; an enum lists protocols
+        bound-not-proto · examples/error_demo/types/851_enum_impl_list_not_a_protocol.utu:3:12
+
+ 1 │ // What: an enum lists a scalar where its protocols go
+ 2 │ // Expect: I32 is not a protocol; an enum lists protocols
+ 3 │ enum Light[I32]:
+   │            ━━━
+   │            ╰─ not a protocol
+ 4 │     | Red
+ 5 │     | Green
+--- exit 1
+
+=== utu check examples/error_demo/types/852_impl_head_not_a_protocol.utu
+ ERROR  Rec is not a protocol
+        bound-not-proto · examples/error_demo/types/852_impl_head_not_a_protocol.utu:9:4
+
+ 7 │     | s: I32
+ 8 │
+ 9 │ fn Rec[Sq].area |self| () I32 {
+   │    ━━━
+   │    ╰─ not a protocol
+10 │     self.s * self.s;
+11 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/853_impl_member_not_in_protocol.utu
+ ERROR  Area has no member extra
+        proto-no-member · examples/error_demo/types/853_impl_member_not_in_protocol.utu:13:13
+
+11 │ }
+12 │
+13 │ fn Area[Sq].extra |self| () I32 {
+   │             ━━━━━
+   │             ╰─ not in Area
+14 │     1;
+15 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/854_protocol_listed_twice.utu
+ ERROR  Duplicate protocol Area
+        duplicate-declaration · examples/error_demo/types/854_protocol_listed_twice.utu:6:17
+
+ 4 │     | area() I32
+ 5 │
+ 6 │ struct Sq[Area, Area]:
+   │                 ━━━━
+   │                 ╰─ already listed
+ 7 │     | s: I32
+--- exit 1
+
+=== utu check examples/error_demo/types/855_bound_default_ambiguous.utu
+ ERROR  t is both A's and B's
+        ambiguous-method · examples/error_demo/types/855_bound_default_ambiguous.utu:16:23
+
+14 │
+15 │ mod Run[T[A, B]] {
+16 │     fn go(c: T) I32 { c.t(); }
+   │                       ━━━━━
+   │                       ╰─ as which protocol?
+17 │ }
+18 │
+   ┆
+20 │     Run[S].go(S { n: 0 });
+   │     ─────────────────────
+   │     ╰─ as Run[S] here
+
+  note  in Run[S]
+--- exit 1
+
 === utu check examples/error_demo/types/85_proto_getter_wrong_type.utu
  ERROR  Square lacks Shape.name
         proto-missing · examples/error_demo/types/85_proto_getter_wrong_type.utu:6:1

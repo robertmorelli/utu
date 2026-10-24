@@ -2013,6 +2013,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         if scalar >= 0 and args < 0 { return scalar; };
     };
     let decl = member(ty_decl(rt), word_of(name), Space.Method);
+    let via_bound = false;
     if ty_is(rt, Ty.Nullable) {
         report2(Diag.NullableAccess, callee, word_of(name), rt, -1);
         return finish_error(args, m, cx);
@@ -2031,6 +2032,12 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         // Host declarations add methods to scalars and strings (`x.toFixed(1)`).
         let host = primitive_host_type(rt, word_of(name));
         if host >= 0 { return check_foreign_primitive_method(node, rt, host, word_of(name), args, m, expect, cx); };
+        // `c.tick()` on a T bounded by P, with `fn P.tick`: P's.
+        decl = bound_default(rt, word_of(name), node, cx.inst);
+        if decl == -2 { return finish_error(args, m, cx); };
+        via_bound = decl >= 0;
+    };
+    if decl < 0 {
         // `a.cmp(b)` on an unbounded T: bound it.
         if unbounded_call(rt, word_of(name), -1, node, cx.inst) { return finish_error(args, m, cx); };
         // `x.sqrt()` with `fn sqrt(x: &)` in the type's module: b says so.
@@ -2051,7 +2058,8 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     // What the name means, for an editor (as a field's is recorded).
     node_decl[name] = decl;
     unbounded_call(rt, word_of(name), decl, node, cx.inst);
-    let fi = fn_instance(decl, ty_inst(rt));
+    // (A bound's `fn P.m` is in P's module, not the type's.)
+    let fi = fn_instance(decl, if via_bound { instance_for(module_of(decl), cx.inst); } else { ty_inst(rt); });
     // A function of the type without `self` has no receiver to take.
     if vl_len[fi_params[fi]] == 0 {
         report2(Diag.WrongArity, node, -1, 0, 1 + if args >= 0 { child_count(args); } else { 0; });

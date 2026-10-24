@@ -1,0 +1,19 @@
+// What: an implementation of a method the protocol does not declare
+// Expect: Area has no member extra
+proto Area:
+    | area() I32
+
+struct Sq[Area]:
+    | s: I32
+
+fn Area[Sq].area |self| () I32 {
+    self.s * self.s;
+}
+
+fn Area[Sq].extra |self| () I32 {
+    1;
+}
+
+export main() I32 {
+    Sq { s: 2 }.area();
+}

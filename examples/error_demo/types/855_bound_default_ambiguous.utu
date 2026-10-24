@@ -1,0 +1,21 @@
+// What: two bounds each give a function of one name
+// Expect: t is both A's and B's
+proto A:
+    | get n : I32
+
+proto B:
+    | get n : I32
+
+struct S[A, B]:
+    | n: I32
+
+fn A.t |c| () I32 { c.n; }
+fn B.t |c| () I32 { c.n + 1; }
+
+mod Run[T[A, B]] {
+    fn go(c: T) I32 { c.t(); }
+}
+
+export main() I32 {
+    Run[S].go(S { n: 0 });
+}

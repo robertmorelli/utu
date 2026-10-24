@@ -222,7 +222,7 @@ enum(U8) Diag:
     | TooManyParams
     | BoundMissing     // `Sorted[Point]` when Point does not implement Sorted's T's bound
     | UnboundedCall    // `a.cmp(b)` on a T no protocol bounds
-    | BoundNotProto    // `mod M[T[Point]]`: a bound must be a protocol
+    | BoundNotProto    // `mod M[T[Point]]`, `struct B[Point]`, `fn Point[B].m`: not a protocol (b: where)
     | ProtoSelfDynamic // a protocol member that takes `&`, used through a protocol value
     | UnknownLabel
     | GlobalCycle
@@ -256,6 +256,7 @@ enum(U8) Diag:
     | ReturnInBench   // `return` in a bench's setup or measure: no time to report
     | TestInGeneric   // a test or bench in a generic mod: it runs in no instance
     | EsNative        // an `@es` argument or result that is a wasm struct, array, or fun
+    | ProtoNoMember   // `fn P[T].m` with no member m in P
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -1557,6 +1558,14 @@ fn register_method(item: I32, w: Walk) void {
     let args = next_sibling(receiver);
     if is_kind(args, Node.Module_type_arg_list) {
         walk_types(args, w);
+        // `fn Rec[Sq].m`: the head names a protocol (read on as Sq's, said once).
+        if owner >= 0 and not decl_is(owner, Decl.Proto) {
+            report2(Diag.BoundNotProto, receiver, -1, owner, 3);
+            diag_label("not a protocol");
+            let n = impl_target(args);
+            owner = if n >= 0 { node_decl[n]; } else { -1; };
+            decl_a[decl] = owner;
+        };
         // `fn P[T].m`: also a method of T, so calls on a T find it.
         if decl_is(owner, Decl.Proto) {
             let n = impl_target(args);
@@ -1772,7 +1781,13 @@ fn walk_type_item(item: I32, w: Walk) void {
         } else if kind == Node.Impl_list.to_i32() {
             let t = first_child(c);
             while (t >= 0) {
-                as_type(t, walk_impl_name(t, w));
+                let d = as_type(t, walk_impl_name(t, w));
+                if d >= 0 and not decl_is(d, Decl.Proto) {
+                    report2(Diag.BoundNotProto, t, -1, d, if is_kind(item, Node.Enum_decl) { 2; } else { 1; });
+                    diag_label("not a protocol");
+                } else if d >= 0 and listed_before(c, t, d) {
+                    report2(Diag.DuplicateDeclaration, t, decl_name[d], 7, -1);
+                };
                 t = next_sibling(t);
             };
         } else if kind == Node.Variant.to_i32() {
@@ -1797,6 +1812,16 @@ fn walk_type_item(item: I32, w: Walk) void {
         };
         c = next_sibling(c);
     };
+}
+
+/// Whether an entry of impl list `list` before `t` names `d` too.
+fn listed_before(list: I32, t: I32, d: I32) Bool {
+    let c = first_child(list);
+    while (c >= 0 and c != t) {
+        if node_decl[c] == d { return true; };
+        c = next_sibling(c);
+    };
+    false;
 }
 
 /// `&` in a protocol's member (`cmp(&) I32`) is the type implementing it:

@@ -1,0 +1,11 @@
+// What: a struct lists a struct where its protocols go
+// Expect: Rec is not a protocol; a struct lists protocols
+struct Rec:
+    | x: I32
+
+struct Box[Rec]:
+    | x: I32
+
+export main() I32 {
+    Box { x: 1 }.x;
+}

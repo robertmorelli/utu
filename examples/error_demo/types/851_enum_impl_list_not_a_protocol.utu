@@ -1,0 +1,9 @@
+// What: an enum lists a scalar where its protocols go
+// Expect: I32 is not a protocol; an enum lists protocols
+enum Light[I32]:
+    | Red
+    | Green
+
+export main() I32 {
+    1;
+}
