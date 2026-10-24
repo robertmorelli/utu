@@ -86,7 +86,11 @@ field, an assigned property such as `button.onclick`, or the first use of a
 `let`-bound closure (`let handler = cl(e) void {...}; a.addEventListener("x", handler);`).
 If no context exists, the compiler asks for an annotation. An optional callback
 parameter (`(a: number, b?: number) => number`) is nullable, `?F64`: `promote`
-it, since JS may leave it out. A closure whose result is never absent fits a
+it, since JS may leave it out. The host gets such a closure (and a `cl(this, …)`
+one) wrapped, once per closure: the wrapper is kept on it, so
+`removeEventListener` finds what `addEventListener` was given. A closure that
+writes no result, where the callback's result is `any` or `void`, has its
+body's (`cl(e: Web.Event) { n += 1; }`). A closure whose result is never absent fits a
 callback whose result may be (`() => string | null` takes `cl() Str {...}`).
 
 A literal where a union of literals is wanted is one of its values, as in

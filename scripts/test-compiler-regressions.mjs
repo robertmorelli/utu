@@ -2308,6 +2308,37 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], body);
     checked++;
   }
+  // A callback is one JS function each time it is given, so removeEventListener finds it: a
+  // decayed `fun` (a new closure at every decay: 2 hits), a closure the host wraps for an
+  // optional parameter or a `this`. A closure that writes no result fits a callback whose
+  // result is `any` ("Expected cl(Web.Event) unknown").
+  const decayed = await write('let et: fun() Externref = @es/\\ () => new EventTarget() \\/;\n'
+    + 'let on: fun(Externref, Str, cl(I32) void) void = @es/\\ (t, ev, f) => t.addEventListener(ev, f) \\/;\n'
+    + 'let off: fun(Externref, Str, cl(I32) void) void = @es/\\ (t, ev, f) => t.removeEventListener(ev, f) \\/;\n'
+    + 'let fire: fun(Externref, Str) void = @es/\\ (t, ev) => t.dispatchEvent(new Event(ev)) \\/;\n'
+    + 'let reset: fun() void = @es/\\ () => { globalThis.__decayHits = 0; } \\/;\n'
+    + 'let hits: fun() I32 = @es/\\ () => globalThis.__decayHits \\/;\n'
+    + 'let bump: fun() void = @es/\\ () => { globalThis.__decayHits += 1; } \\/;\n'
+    + 'fn tick(x: I32) void { bump(); }\n'
+    + 'export main() I32 {\n    reset();\n    let t: Externref = et();\n    let f: fun(I32) void = tick;\n'
+    + '    on(t, "x", f);\n    fire(t, "x");\n    off(t, "x", f);\n    fire(t, "x");\n'
+    + '    on(t, "y", tick);\n    fire(t, "y");\n    off(t, "y", tick);\n    fire(t, "y");\n    hits();\n}\n');
+  const hostC = 'export declare function add(f: (a: number, b?: number) => void): void;\n'
+    + 'export declare function remove(f: (a: number, b?: number) => void): boolean;\n';
+  const hostCJs = 'const fs = new Set();\nexport function add(f) { fs.add(f); }\nexport function remove(f) { return fs.delete(f); }\n';
+  const kept = await project({ ...pkg('hostc', hostC, hostCJs), 'main.utu': 'using C from "npm:hostc";\nusing Web from std:Web;\n'
+    + 'export main() I32 {\n    let n = 0;\n    let h = cl(a, b) void { n += 1; };\n    let g = cl(this, a) void { n += 1; };\n'
+    + '    C.add(h);\n    C.add(g);\n    let r = (if C.remove(h) { 1; } else { 0; }) + (if C.remove(g) { 10; } else { 0; });\n'
+    + '    let t = new Web.EventTarget();\n    t.addEventListener("x", cl(e: Web.Event) { n += 100; });\n'
+    + '    t.dispatchEvent(new Web.Event("x"));\n    r + n;\n}\n' });
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    for (const [file, expected] of [[decayed, 2], [kept, 111]]) {
+      const result = await compileFile(utu, file, { mode });
+      assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+      assert.equal(await (await instantiateNode(result.wasm, result.spec, { root: path.dirname(file) })).exports.main(), expected, mode);
+      checked++;
+    }
+  }
   // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
   const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nexport lib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {

@@ -4,8 +4,9 @@
 so its identity is the function's (`===`, `removeEventListener`). A callback
 returned to JavaScript needs no adapter at the call site. `fun(...) R` is the
 UTU-only function-pointer representation, using Wasm function references and
-`call_ref`. Converting `fun` to `cl` creates a JavaScript wrapper with a null
-environment.
+`call_ref`. Converting `fun` to `cl` gives a JavaScript wrapper with a null
+environment, one per function (the host keeps it in a `WeakMap` by funcref), so
+a decayed `fun` is the same `cl` at every conversion.
 
 ## Calling a closure (self-hosted compiler)
 
