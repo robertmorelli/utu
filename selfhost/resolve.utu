@@ -1110,9 +1110,13 @@ fn refused(m: I32) Bool {
     false;
 }
 
-/// The names a file's top-level items declare, in order (see @check_using_names).
+/// The names a file's top-level items declare, in order (see @check_using_names),
+/// and by each, the next of the same word and the next of the same word
+/// that is a `using` or `mod` (-1 none).
 vec top_name: I32;
 vec top_item: I32;
+vec top_same: I32;
+vec top_same_module: I32;
 
 /// A `using`'s or `mod`'s name is the file's: one that names what a
 /// declaration of the file (or another `using`) names is reported at the
@@ -1129,10 +1133,26 @@ fn check_using_names(root: I32) void {
         } else { add_top_name(item, item); };
         item = next_sibling(item);
     };
+    // Each word's names chained in order, and its `using`s and `mod`s (their
+    // first and last noted by word): two names clash only when one is either.
+    top_same.resize(top_name.len());
+    top_same_module.resize(top_name.len());
+    for (0 ..< top_name.len()) |j| {
+        let word = word_of(top_name[j]);
+        top_same[j] = -1;
+        top_same_module[j] = -1;
+        if word_note(word, 0) < 0 { set_word_note(word, 0, j); } else { top_same[word_note(word, 1)] = j; };
+        set_word_note(word, 1, j);
+        if is_module_item(top_item[j]) {
+            if word_note(word, 2) < 0 { set_word_note(word, 2, j); } else { top_same_module[word_note(word, 3)] = j; };
+            set_word_note(word, 3, j);
+        };
+    };
     for (1 ..< top_name.len()) |j| {
         let word = word_of(top_name[j]);
-        let k = 0;
-        while (k < j) {
+        let all = is_module_item(top_item[j]);
+        let k = word_note(word, if all { 0; } else { 2; });
+        while (k >= 0 and k < j) {
             let a = top_item[k];
             let b = top_item[j];
             if word_of(top_name[k]) == word and (is_kind(a, Node.Using_decl) or is_kind(b, Node.Using_decl) or mod_clash(a, b) or mod_clash(b, a)) and not same_import(a, b) {
@@ -1145,11 +1165,18 @@ fn check_using_names(root: I32) void {
                 // The later import's mod is refused, not compared with the earlier's.
                 if is_kind(b, Node.Using_decl) and using_path(b) >= 0 and node_decl[name_node(first_child(b))] >= 0 { refused_module.push(node_decl[name_node(first_child(b))]); };
                 k = j;
+            } else {
+                k = if all { top_same[k]; } else { top_same_module[k]; };
             };
-            k += 1;
         };
     };
+    for (0 ..< top_name.len()) |j| {
+        for (0 ..< 4) |slot| { set_word_note(word_of(top_name[j]), slot, -1); };
+    };
 }
+
+/// A `using` or a `mod`.
+fn is_module_item(item: I32) Bool { is_kind(item, Node.Using_decl) or is_kind(item, Node.Module_decl); }
 
 /// Whether a file's `mod` and another of its items (not a method) share a name.
 fn mod_clash(m: I32, item: I32) Bool {

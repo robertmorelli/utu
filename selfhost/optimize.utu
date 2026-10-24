@@ -490,6 +490,15 @@ vec co_type_head: I32;
 vec co_type_tail: I32;
 /// Scratch for sorting.
 vec co_sort: I32;
+/// By type, a tree of its slots' ends (each node the least below it; a slot
+/// not made yet, the most), to find the first slot free by a given start:
+/// where its tree starts, its leaves (a power of two), the slots made, and
+/// at its leaves' places, each slot.
+vec co_tree: I32;
+vec co_tree_at: I32;
+vec co_tree_leaves: I32;
+vec co_tree_made: I32;
+vec co_tree_slot: I32;
 
 /// Share locals whose ranges do not overlap: a local is live from its first
 /// mention to its last, and a mention inside a loop makes it live through
@@ -546,6 +555,9 @@ fn coalesce_locals(f: I32, params: I32) void {
     co_types.clear();
     co_type_head.clear();
     co_type_tail.clear();
+    // Each local's type (in the order types first appear), and a tree per type.
+    let type_of = Array[I32].new(total, 0);
+    co_tree_leaves.clear();
     for (order) |l| {
         let vt = local_types[first + l - params];
         let t = 0;
@@ -554,14 +566,33 @@ fn coalesce_locals(f: I32, params: I32) void {
             co_types.push(vt);
             co_type_head.push(-1);
             co_type_tail.push(-1);
+            co_tree_leaves.push(0);
         };
+        type_of[l] = t;
+        co_tree_leaves[t] += 1;
+    };
+    co_tree_at.clear();
+    co_tree_made.clear();
+    let size = 0;
+    for (0 ..< co_types.len()) |t| {
+        let leaves = 1;
+        while (leaves < co_tree_leaves[t]) { leaves *= 2; };
+        co_tree_leaves[t] = leaves;
+        co_tree_at.push(size);
+        co_tree_made.push(0);
+        size += leaves * 2;
+    };
+    co_tree.resize(size);
+    co_tree_slot.resize(size);
+    for (0 ..< size) |i| { co_tree[i] = 2147483647; };
+    for (order) |l| {
+        let vt = local_types[first + l - params];
+        let t = type_of[l];
         let slot = -1;
+        let leaf = -1;
         if co_first[l] >= 0 and co_store_first[l] == 1 {
-            let s = co_type_head[t];
-            while (s >= 0 and slot < 0) {
-                if co_slot_end[s] < start[l] { slot = s; };
-                s = co_slot_next[s];
-            };
+            leaf = co_first_free(t, start[l]);
+            if leaf >= 0 { slot = co_tree_slot[co_tree_at[t] + leaf]; };
         };
         if slot < 0 {
             slot = co_slot_type.len();
@@ -570,9 +601,13 @@ fn coalesce_locals(f: I32, params: I32) void {
             co_slot_next.push(-1);
             if co_type_tail[t] >= 0 { co_slot_next[co_type_tail[t]] = slot; } else { co_type_head[t] = slot; };
             co_type_tail[t] = slot;
+            leaf = co_tree_made[t];
+            co_tree_made[t] += 1;
+            co_tree_slot[co_tree_at[t] + leaf] = slot;
         } else {
             co_slot_end[slot] = end[l];
         };
+        co_tree_set(t, leaf, end[l]);
         slot_of[l] = slot;
     };
     // The slots, declared grouped by type (in the order types first appear).
@@ -596,6 +631,32 @@ fn coalesce_locals(f: I32, params: I32) void {
     for (0 ..< co_mentions.len()) |k| {
         let node = co_mentions[k];
         if w_a[node] >= params { w_a[node] = params + index[slot_of[w_a[node]]]; };
+    };
+}
+
+/// Type t's first slot (as made) whose end is before `start`, as its leaf, or -1.
+fn co_first_free(t: I32, start: I32) I32 {
+    let at = co_tree_at[t];
+    let leaves = co_tree_leaves[t];
+    if co_tree[at + 1] >= start { return -1; };
+    let i = 1;
+    while (i < leaves) {
+        i = if co_tree[at + i * 2] < start { i * 2; } else { i * 2 + 1; };
+    };
+    i - leaves;
+}
+
+/// Type t's slot at `leaf` ends at `end`.
+fn co_tree_set(t: I32, leaf: I32, end: I32) void {
+    let at = co_tree_at[t];
+    let i = co_tree_leaves[t] + leaf;
+    co_tree[at + i] = end;
+    i = i / 2;
+    while (i >= 1) {
+        let a = co_tree[at + i * 2];
+        let b = co_tree[at + i * 2 + 1];
+        co_tree[at + i] = if a < b { a; } else { b; };
+        i = i / 2;
     };
 }
 
@@ -935,11 +996,27 @@ fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
 //! runs keeps the reads known; what a branch, block or loop reads is
 //! forgotten after it, and a loop's writes count before it.
 
-/// The reads known: by entry, its read (a node), whether it still holds,
-/// and its number (the order the walk finds it).
+/// The reads known: by entry, its read (a node) and its number (the order
+/// the walk finds it). It still holds while nothing that writes it has run
+/// since: its local's, its field's, and (a mutable field) the calls' counts
+/// of writes are those it was known at.
 vec ld_node: I32;
-vec ld_ok: U8;
 vec ld_id: I32;
+vec ld_at_local: I32;
+vec ld_at_field: I32;
+vec ld_at_call: I32;
+vec ld_mutable: U8;
+/// Writes so far: by local, by field index, and calls (at `[0]`).
+vec ld_local_writes: I32;
+vec ld_field_writes: I32;
+vec ld_call_writes: I32 = [0];
+/// The reads known by what they read (op, field, local): open addressing
+/// over entries, a slot empty unless stamped with this walk's @ld_stamp;
+/// the slots filled.
+vec ld_slot: I32;
+vec ld_slot_stamp: I32;
+vec ld_stamp: I32 = [0];
+vec ld_filled: I32 = [0];
 /// By number: its reads after (counted by the first walk), and its local
 /// (-1 none yet).
 vec ld_reuses: I32;
@@ -955,9 +1032,9 @@ fn reuse_loads(f: I32) Bool {
     ld_temp.clear();
     ld_func[0] = f;
     for (0 ..< 2) |pass| {
-        ld_node.clear();
-        ld_ok.clear();
-        ld_id.clear();
+        ld_forget(0);
+        ld_stamp[0] += 1;
+        ld_filled[0] = 0;
         ld_next[0] = 0;
         ld_rewrite[0] = pass;
         ld_walk(func_body[f]);
@@ -994,8 +1071,83 @@ fn ld_walk(n: I32) void {
 
 fn ld_forget(mark: I32) void {
     ld_node.resize(mark);
-    ld_ok.resize(mark);
     ld_id.resize(mark);
+    ld_at_local.resize(mark);
+    ld_at_field.resize(mark);
+    ld_at_call.resize(mark);
+    ld_mutable.resize(mark);
+}
+
+/// Count `i` of @ld_local_writes or @ld_field_writes (0 when past its end).
+fn ld_count(counts: I32, i: I32) I32 {
+    if counts == 0 { return if i < ld_local_writes.len() { ld_local_writes[i]; } else { 0; }; };
+    if i < ld_field_writes.len() { ld_field_writes[i]; } else { 0; };
+}
+
+/// Entry e still holds.
+fn ld_holds(e: I32) Bool {
+    let r = ld_node[e];
+    ld_at_local[e] == ld_count(0, w_a[w_kid(r, 0)]) and ld_at_field[e] == ld_count(1, w_b[r])
+        and (ld_mutable[e] == 0 or ld_at_call[e] == ld_call_writes[0]);
+}
+
+/// Reads r and n read the same: op, field, and local.
+fn ld_same(r: I32, n: I32) Bool {
+    w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == w_a[w_kid(n, 0)];
+}
+
+fn ld_hash(n: I32) I32 {
+    ((w_op[n] * 31 + w_a[n]) * 31 + w_b[n]) * 31 + w_a[w_kid(n, 0)];
+}
+
+/// The entry that holds and reads what n does, or -1.
+fn ld_find(n: I32) I32 {
+    if ld_slot.len() == 0 { return -1; };
+    let mask = ld_slot.len() - 1;
+    let h = ld_hash(n) & mask;
+    while (ld_slot_stamp[h] == ld_stamp[0]) {
+        let e = ld_slot[h];
+        if e < ld_node.len() and ld_same(ld_node[e], n) and ld_holds(e) { return e; };
+        h = (h + 1) & mask;
+    };
+    -1;
+}
+
+/// Entry e in the slots: in an empty one, one whose entry is forgotten, or
+/// one of an entry reading the same (which no longer holds).
+fn ld_place(e: I32) void {
+    if (ld_filled[0] + 1) * 2 > ld_slot.len() {
+        let size = if ld_slot.len() == 0 { 64; } else { ld_slot.len() * 2; };
+        ld_slot.resize(size);
+        ld_slot_stamp.resize(size);
+        for (0 ..< size) |k| { ld_slot_stamp[k] = -1; };
+        ld_filled[0] = 0;
+        for (0 ..< e) |k| { ld_place(k); };
+    };
+    let mask = ld_slot.len() - 1;
+    let h = ld_hash(ld_node[e]) & mask;
+    while (ld_slot_stamp[h] == ld_stamp[0]) {
+        let o = ld_slot[h];
+        if o >= ld_node.len() or o == e or ld_same(ld_node[o], ld_node[e]) {
+            ld_slot[h] = e;
+            return;
+        };
+        h = (h + 1) & mask;
+    };
+    ld_slot_stamp[h] = ld_stamp[0];
+    ld_slot[h] = e;
+    ld_filled[0] += 1;
+}
+
+/// One more write to counts `counts` (as @ld_count) at i.
+fn ld_bump(counts: I32, i: I32) void {
+    if counts == 0 {
+        while (ld_local_writes.len() <= i) { ld_local_writes.push(0); };
+        ld_local_writes[i] += 1;
+    } else {
+        while (ld_field_writes.len() <= i) { ld_field_writes.push(0); };
+        ld_field_writes[i] += 1;
+    };
 }
 
 /// What a loop writes, anywhere in it, as written before it.
@@ -1020,27 +1172,25 @@ fn ld_effect_write(n: I32) void {
     let set = op == Op.StructSet.to_i32();
     let call = op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32();
     let local = op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32();
-    if not (set or call or local) { return; };
-    for (0 ..< ld_node.len()) |e| {
-        let r = ld_node[e];
-        let mutable = ht_fields[ht_a[w_a[r]] + w_b[r] * 2 + 1] == 1;
-        if (local and w_a[w_kid(r, 0)] == w_a[n]) or (call and mutable) or (set and w_b[r] == w_b[n]) { ld_ok[e] = 0; };
-    };
+    if local { ld_bump(0, w_a[n]); };
+    if call { ld_call_writes[0] += 1; };
+    if set { ld_bump(1, w_b[n]); };
 }
 
 /// A field read of a local: one known again, or known from here.
 fn ld_read(n: I32) void {
-    let x = w_a[w_kid(n, 0)];
-    for (0 ..< ld_node.len()) |e| {
-        let r = ld_node[e];
-        if ld_ok[e] == 1 and w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == x {
-            ld_reuse(e, n);
-            return;
-        };
+    let e = ld_find(n);
+    if e >= 0 {
+        ld_reuse(e, n);
+        return;
     };
     ld_node.push(n);
-    ld_ok.push(1);
     ld_id.push(ld_next[0]);
+    ld_at_local.push(ld_count(0, w_a[w_kid(n, 0)]));
+    ld_at_field.push(ld_count(1, w_b[n]));
+    ld_at_call.push(ld_call_writes[0]);
+    ld_mutable.push(if ht_fields[ht_a[w_a[n]] + w_b[n] * 2 + 1] == 1 { 1; } else { 0; });
+    ld_place(ld_node.len() - 1);
     ld_next[0] += 1;
     if ld_rewrite[0] == 0 {
         ld_reuses.push(0);

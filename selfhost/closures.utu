@@ -38,7 +38,11 @@ vec closure_bodies: I32;
 
 fn reset_closures() void {
     decl_boxed.resize(decl_kind.len());
-    for (0 ..< decl_kind.len()) |d| { decl_boxed[d] = 0; };
+    cap_seen.resize(decl_kind.len());
+    for (0 ..< decl_kind.len()) |d| { decl_boxed[d] = 0; cap_seen[d] = 0; };
+    cap_inside.resize(node_kind.len());
+    boxes_marked.resize(node_kind.len());
+    for (0 ..< node_kind.len()) |n| { cap_inside[n] = 0; boxes_marked[n] = 0; };
     box_types.clear();
     closure_calls.clear();
     env_types.clear();
@@ -54,17 +58,6 @@ fn reset_closures() void {
 
 //! = What closures capture, and which captures are boxes
 
-/// Whether declaration `d` is inside `scope` (in the tree: a DSL's splice has
-/// tokens of its own, outside its expansion's).
-fn declared_in(d: I32, scope: I32) Bool {
-    let n = decl_node[d];
-    while (n >= 0) {
-        if n == scope { return true; };
-        n = parent_of(n);
-    };
-    false;
-}
-
 /// Whether a declaration is a variable of a function body: a local, a
 /// parameter, or a name a capture, arm, or `catch` binds.
 fn is_local_decl(d: I32) Bool {
@@ -73,28 +66,46 @@ fn is_local_decl(d: I32) Bool {
         or k == Decl.ClosureParam.to_i32() or k == Decl.ArmBinding.to_i32() or k == Decl.Promoted.to_i32() or k == Decl.Caught.to_i32();
 }
 
+/// By node: 1 while @captures_of walks a closure it is in.
+vec cap_inside: U8;
+/// By declaration: 1 while @captures_of has it in the list it builds.
+vec cap_seen: U8;
+
 /// The variables a closure captures: locals and parameters named inside it
 /// and declared outside it, each once, in the order first named.
 fn captures_of(closure: I32) I32 {
     let m = vl_begin();
-    collect_captures(closure, closure, m);
+    mark_inside(closure, true);
+    collect_captures(closure);
+    mark_inside(closure, false);
+    for (m ..< vl_pending.len()) |i| { cap_seen[vl_pending[i]] = 0; };
     vl_end(m);
 }
 
-/// Add the captures under `node` to the list being built since `m`.
-fn collect_captures(node: I32, closure: I32, m: I32) void {
+/// Set @cap_inside (to 1 when `v`) for `node` and every node under it.
+fn mark_inside(node: I32, v: Bool) void {
+    cap_inside[node] = if v { 1; } else { 0; };
+    let c = first_child(node);
+    while (c >= 0) {
+        mark_inside(c, v);
+        c = next_sibling(c);
+    };
+}
+
+/// Add the captures under `node` to the list being built: a
+/// declaration outside the closure (its node not in @cap_inside).
+fn collect_captures(node: I32) void {
     if is_kind(node, Node.Identifier) {
         let d = node_decl[node];
-        if d >= 0 and is_local_decl(d) and not declared_in(d, closure) and decl_es[d] < 0 {
-            let seen = false;
-            for (m ..< vl_pending.len()) |i| { if vl_pending[i] == d { seen = true; }; };
-            if not seen { vl_add(d); };
+        if d >= 0 and is_local_decl(d) and not (decl_node[d] >= 0 and cap_inside[decl_node[d]] == 1) and decl_es[d] < 0 and cap_seen[d] == 0 {
+            cap_seen[d] = 1;
+            vl_add(d);
         };
         return;
     };
     let c = first_child(node);
     while (c >= 0) {
-        collect_captures(c, closure, m);
+        collect_captures(c);
         c = next_sibling(c);
     };
 }
@@ -105,8 +116,14 @@ fn collect_captures(node: I32, closure: I32, m: I32) void {
 /// loop around the closure. A variable assigned only before it is captured
 /// is copied into the closure, as any other.
 fn mark_boxes(body: I32) void {
+    // A closure's body, marked already by the body around it: its search
+    // covered this one's.
+    if boxes_marked[body] == 1 { return; };
     find_closures(body, body);
 }
+
+/// By node: 1 for a closure's body that @find_closures has been through.
+vec boxes_marked: U8;
 
 /// By node: 1 when a closure is in it (itself included), counted once for
 /// the nodes there are; `find_closures` skips what has none.
@@ -150,6 +167,7 @@ fn find_closures(node: I32, body: I32) void {
         };
     };
     if is_kind(node, Node.Closure_expr) {
+        boxes_marked[last_child(node)] = 1;
         let list = captures_of(node);
         for (0 ..< vl_len[list]) |i| {
             let d = vl_item(list, i);

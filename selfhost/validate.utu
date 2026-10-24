@@ -206,21 +206,28 @@ fn validate_node(node: I32) void {
 /// once. `what` is the diagnostic's argument: which names (1 parameters, 2
 /// variants), or the type whose fields they are.
 fn duplicate_names(node: I32, kind: Diag, what: I32) void {
+    // Each name's first, noted by word (and kind) while the names are walked.
     let c = first_child(node);
     while (c >= 0) {
         let k = node_kind[c];
+        let slot = if k == Node.Param.to_i32() { 0; } else if k == Node.Field.to_i32() { 1; } else { 2; };
         if k == Node.Param.to_i32() or k == Node.Field.to_i32() or k == Node.Variant.to_i32() {
             let word = word_of(first_child(c));
-            let other = first_child(node);
-            while (other != c) {
-                if node_kind[other] == k and word_of(first_child(other)) == word {
-                    report2(kind, c, word, what, -1);
-                    diag_place(Extra.Related, first_child(other), "first here");
-                    other = c;
-                } else {
-                    other = next_sibling(other);
-                };
+            let other = word_note(word, slot);
+            if other >= 0 {
+                report2(kind, c, word, what, -1);
+                diag_place(Extra.Related, first_child(other), "first here");
+            } else {
+                set_word_note(word, slot, c);
             };
+        };
+        c = next_sibling(c);
+    };
+    c = first_child(node);
+    while (c >= 0) {
+        let k = node_kind[c];
+        if k == Node.Param.to_i32() or k == Node.Field.to_i32() or k == Node.Variant.to_i32() {
+            set_word_note(word_of(first_child(c)), if k == Node.Param.to_i32() { 0; } else if k == Node.Field.to_i32() { 1; } else { 2; }, -1);
         };
         c = next_sibling(c);
     };
@@ -257,25 +264,55 @@ fn list_word(c: I32) I32 {
     if is_kind(n, Node.Identifier) { word_of(n); } else { -1; };
 }
 
+/// By alt arm: the next arm of its alt whose pattern ends in the same word.
+vec arm_same_end: I32;
+
 /// An alt's arms, each variant once: a second arm for one can never run.
+/// (Two patterns of one text end in one word: an arm is compared with the
+/// earlier ones that do, chained by that word, first and last noted.)
 fn duplicate_alt_arms(node: I32) void {
+    if arm_same_end.len() < node_kind.len() {
+        let old = arm_same_end.len();
+        arm_same_end.resize(node_kind.len());
+        for (old ..< node_kind.len()) |n| { arm_same_end[n] = -1; };
+    };
     let c = first_child(node);
     while (c >= 0) {
         if is_kind(c, Node.Alt_arm) {
             let text = node_text(first_child(c));
-            let other = first_child(node);
-            while (other != c) {
+            let w = end_word(first_child(c));
+            let other = if w >= 0 { word_note(w, 0); } else { first_child(node); };
+            while (other >= 0 and other != c) {
                 if is_kind(other, Node.Alt_arm) and node_text(first_child(other)) == text {
                     report2(Diag.DuplicatePattern, c, -1, 1, -1);
                     diag_place(Extra.Related, first_child(other), "first here");
                     other = c;
                 } else {
-                    other = next_sibling(other);
+                    other = if w >= 0 { arm_same_end[other]; } else { next_sibling(other); };
                 };
+            };
+            if w >= 0 {
+                arm_same_end[c] = -1;
+                if word_note(w, 0) < 0 { set_word_note(w, 0, c); } else { arm_same_end[word_note(w, 1)] = c; };
+                set_word_note(w, 1, c);
             };
         };
         c = next_sibling(c);
     };
+    c = first_child(node);
+    while (c >= 0) {
+        if is_kind(c, Node.Alt_arm) and end_word(first_child(c)) >= 0 {
+            set_word_note(end_word(first_child(c)), 0, -1);
+            set_word_note(end_word(first_child(c)), 1, -1);
+        };
+        c = next_sibling(c);
+    };
+}
+
+/// The word of a node's last token, or -1.
+fn end_word(node: I32) I32 {
+    if node < 0 or node_last[node] <= node_first[node] { return -1; };
+    tok_word[node_last[node] - 1];
 }
 
 /// By word: the stamp of the block whose lets last named it; and the last stamp.

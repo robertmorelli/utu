@@ -168,6 +168,54 @@ export lib {
     checked++;
   }
 
+  // Wide and deep programs, in every build mode: each once took time the
+  // square (closures nested: the fourth power) of its size. 120 closures
+  // nested (each capturing the last's variable), an alt over 2,500 variants,
+  // 1,500 types of one protocol, and @json over a struct of 1,500 fields.
+  const nest = depth => {
+    const body = (i, ind) => i === depth ? `${ind}v${depth - 1} + 0;\n`
+      : `${ind}let v${i} = v${i - 1} + 1;\n${ind}let f${i + 1} = cl() I32 {\n${body(i + 1, ind + '    ')}${ind}};\n${ind}f${i + 1}();\n`;
+    return `fn nest() I32 {\n    let v0 = 1;\n${body(1, '    ')}}\n`;
+  };
+  const many = (n, f, sep = '\n') => Array.from({ length: n }, (_, i) => f(i)).join(sep);
+  const wide = await write(`${nest(120)}
+enum E:
+${many(2500, i => `    | V${i} {}`)}
+fn pick(e: E) I32 {
+    alt e {
+${many(2500, i => `        V${i} => ${i},`)}
+    };
+}
+proto Shape:
+    | area() I32
+${many(1500, i => `struct C${i}[Shape]:\n    | k: I32\nfn Shape[C${i}].area |c| () I32 { c.k * ${i}; }`)}
+struct Big:
+${many(1500, i => `    | f${i}: I32`)}
+export lib {
+    fn deep() I32 { nest(); }
+    fn last() I32 { pick(V2499 {}); }
+    fn shapes() I32 {
+        let xs: Array[Shape] = [${many(1500, i => `C${i} { k: 1 }`, ', ')}];
+        let t = 0;
+        for (xs) |s| { t += s.area(); };
+        t;
+    }
+    fn json() I32 {
+        let b = Big { ${many(1500, i => `f${i}: ${i}`, ', ')} };
+        let s = @json/\\ encode Big b \\/;
+        let r = @json/\\ decode Big s \\/ orelse fatal;
+        r.f1499;
+    }
+}
+`);
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, wide, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const { exports } = await instantiateNode(built.wasm, built.spec);
+    assert.deepEqual([exports.deep(), exports.last(), exports.shapes(), exports.json()], [120, 2499, 1500 * 1499 / 2, 1499], mode);
+    checked++;
+  }
+
   // Result, try, and errdefer, in every build mode (the self-hosted compiler's
   // alone). Each letter is a defer (d, D, i) or errdefer (e, E, T, p, c, j, o) run;
   // a labeled block's break runs its defers, not its errdefers.
