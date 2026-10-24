@@ -83,6 +83,8 @@ export function unknownIslandWarnings(sources) {
   const islands = new Set();
   const calls = [];
   for (const [file, source] of sources) {
+    // Neither an island nor a call: nothing to blank or match.
+    if (!source.includes('@island') && !source.includes('invalidate')) continue;
     const code = codeOnly(source);
     for (const match of code.matchAll(/@island\s+"/g)) {
       const start = match.index + match[0].length;

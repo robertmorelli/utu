@@ -841,7 +841,8 @@ function sourceWarnings(files) {
   const own = files.filter(file => !/^(std|node|npm):/.test(file.key));
   const found = [
     ...own.flatMap(file => compressedSourceWarnings(file.text, file.key)),
-    ...unknownIslandWarnings(files.map(file => [file.key, file.text])),
+    // std declares no @island; node:/npm: files are declarations.
+    ...unknownIslandWarnings(own.map(file => [file.key, file.text])),
   ];
   return found.map(({ kind, message, primary }) => ({
     kind, message, severity: 'warning', file: primary.file, start: primary.start, end: primary.end, line: primary.row, column: primary.col,
