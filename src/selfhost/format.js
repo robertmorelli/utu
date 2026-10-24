@@ -144,10 +144,29 @@ const ROLE_TINT = { primary: 0.32, expected: 0.24, found: 0.24, related: 0.2 };
  */
 export function formatDiagnostics(diagnostics, files, { color = false, relative = key => key, highlight = null, theme, truecolor } = {}) {
   const ink = pen({ color, theme, truecolor });
-  return diagnostics.map(d => formatOne(d, files, ink, relative, highlight)).join('\n\n');
+  const starts = new Map();
+  return diagnostics.map(d => formatOne(d, files, ink, relative, highlight, starts)).join('\n\n');
 }
 
-function formatOne(d, files, ink, relative, highlight) {
+/** Where each line of `text` starts, once per text in `cache`. A line ends at \n, \r\n, or a lone \r. */
+function lineStarts(text, cache) {
+  let starts = cache.get(text);
+  if (!starts) {
+    starts = [0];
+    for (const m of text.matchAll(/\r\n?|\n/g)) starts.push(m.index + m[0].length);
+    cache.set(text, starts);
+  }
+  return starts;
+}
+
+/** The line (from 0) that `offset` is on. */
+function lineOf(starts, offset) {
+  let lo = 0, hi = starts.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= offset) lo = mid; else hi = mid - 1; }
+  return lo;
+}
+
+function formatOne(d, files, ink, relative, highlight, starts) {
   const severity = d.severity ?? 'error';
   const sev = ink.palette[severity] ?? ink.palette.error;
   const code = d.code ?? d.kind ?? '';
@@ -160,7 +179,7 @@ function formatOne(d, files, ink, relative, highlight) {
   if (d.file != null && d.start != null && files.get(d.file) != null) marks.push({ file: d.file, start: d.focus?.start ?? d.start, end: d.focus?.end ?? d.end, role: 'primary', label: d.label });
   for (const r of d.related ?? []) if (files.get(r.file) != null) marks.push({ file: r.file, start: r.start, end: r.end, role: r.role, label: r.label });
   const order = [...new Set(marks.map(m => m.file))];
-  const views = order.map(file => view(files.get(file), file, marks.filter(m => m.file === file), d.file === file));
+  const views = order.map(file => view(files.get(file), lineStarts(files.get(file), starts), file, marks.filter(m => m.file === file), d.file === file));
   const width = Math.max(2, ...views.flatMap(v => v.rows.filter(r => r.line != null).map(r => String(r.line + 1).length)));
   const gutter = n => `${ink.paint(ink.palette.dim, String(n ?? '').padStart(width))} ${ink.paint(ink.palette.rail, '│')} `;
   for (const v of views) {
@@ -173,7 +192,7 @@ function formatOne(d, files, ink, relative, highlight) {
     }
   }
   if (d.notes?.length) out.push('', ...notes(ink, d.notes));
-  if (d.fix && files.get(d.fix.file ?? d.file) != null) out.push('', ...fixLines(d.fix, files.get(d.fix.file ?? d.file), ink, gutter, width));
+  if (d.fix && files.get(d.fix.file ?? d.file) != null) out.push('', ...fixLines(d.fix, files.get(d.fix.file ?? d.file), starts, ink, gutter, width));
   return out.join('\n');
 }
 
@@ -182,17 +201,13 @@ function formatOne(d, files, ink, relative, highlight) {
  * first and last two), the line before the primary mark for context, and
  * gaps where lines are skipped. Each row knows the marks on it.
  */
-function view(text, file, marks, primaryFile) {
-  // A line ends at \n, \r\n, or a lone \r.
-  const starts = [0];
-  for (const m of text.matchAll(/\r\n?|\n/g)) starts.push(m.index + m[0].length);
-  const lineOf = offset => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= offset) lo = mid; else hi = mid - 1; } return lo; };
+function view(text, starts, file, marks, primaryFile) {
   const lineText = i => text.slice(starts[i], starts[i + 1] ?? text.length).replace(/\r?\n?$/, '');
   const shown = new Set();
   for (const m of marks) {
-    m.first = lineOf(m.start);
+    m.first = lineOf(starts, m.start);
     // A span ending at a line's start ends on the line before.
-    m.last = Math.max(m.first, lineOf(Math.max(m.start, m.end - 1)));
+    m.last = Math.max(m.first, lineOf(starts, Math.max(m.start, m.end - 1)));
     for (let i = m.first; i <= m.last; i++) if (m.last - m.first + 1 <= LONG || i < m.first + 2 || i > m.last - 2) shown.add(i);
   }
   // A window of about five lines: two before the primary mark and two after.
@@ -284,16 +299,15 @@ function labelRows(row, ink, sev) {
 }
 
 /** A fix: what it does, then the corrected line with its edit highlighted. */
-function fixLines(fix, text, ink, gutter) {
-  // A line ends at \n, \r\n, or a lone \r.
-  const breaks = /\r\n?|\n/g;
+function fixLines(fix, text, cache, ink, gutter) {
   const head = text.slice(0, fix.start);
   const lineStart = Math.max(head.lastIndexOf('\n'), head.lastIndexOf('\r')) + 1;
   const rest = text.slice(fix.end).search(/[\r\n]/);
   const lineEnd = rest < 0 ? text.length : fix.end + rest;
   const before = text.slice(lineStart, lineEnd);
   const after = text.slice(lineStart, fix.start) + fix.text + text.slice(fix.end, lineEnd);
-  const line = (text.slice(0, lineStart).match(breaks) ?? []).length + 1;
+  // (A \r\n that lineStart splits counts as its \r.)
+  const line = lineOf(lineStarts(text, cache), lineStart) + (text[lineStart - 1] === '\r' && text[lineStart] === '\n' ? 2 : 1);
   const out = [`  ${ink.paint(ink.palette.add, `${ink.bold}fix`)}   ${fix.label ?? ''}`];
   if (!ink.on) {
     // Only the corrected lines, when an edit cannot be shown inline.
