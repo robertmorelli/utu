@@ -1987,15 +1987,15 @@
   "formatted": "12ae32cb1ec02d01"
  },
  "std/JsonRuntime.utu analysis": {
-  "diagnostics": "4d04b2d3e68faf75",
-  "formatted": "6b10d1e5fc188f2f",
-  "entries": "9fc109ef961c6ab7",
-  "queries": "fa4b2b9c360adbca",
-  "graphs": "6b5bb7b7280155e3"
+  "diagnostics": "447a03d59cc8e5a7",
+  "formatted": "468dec577f7df1ad",
+  "entries": "3906473a26ae95ba",
+  "queries": "2a1ef2de7e91bccf",
+  "graphs": "e06478ed0f2794f0"
  },
  "std/JsonRuntime.utu normal": {
-  "diagnostics": "4d04b2d3e68faf75",
-  "formatted": "6b10d1e5fc188f2f"
+  "diagnostics": "447a03d59cc8e5a7",
+  "formatted": "468dec577f7df1ad"
  },
  "std/List.utu analysis": {
   "diagnostics": "4f53cda18c2baa0c",
