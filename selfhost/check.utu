@@ -3477,6 +3477,10 @@ fn bench_function(item: I32, k: I32) void {
     let i = new_local(vt_i32);
     let done = new_label();
     let top = new_label();
+    // The count starts at 0 here, not by a new local's zero (see `helper`).
+    let m0 = w_mark();
+    w_i32(0);
+    w_node(Op.LocalSet, vt_none, i, 0, m0);
     // Profiling: the measured loop is the bench's frame (the setup has none).
     let pg = profile_open(c, -1, 0);
     let mb = w_mark();
