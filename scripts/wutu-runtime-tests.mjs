@@ -68,6 +68,15 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
     assert(!root.hasAttribute('title'), 'attributes not set on this render are removed');
   }));
 
+  test('wutu runtime: attr() sets no on… attribute, in any case', () => withRuntime(async ({ api }) => {
+    const root = api.mount(() => {
+      const box = api.enter('x-box', false, 'root', '');
+      for (const name of ['onclick', 'oNclick', 'ONMOUSEOVER', 'title']) api.attr(box, name, 'alert(1)');
+      return api.leave();
+    }, '');
+    assertEq(root.getAttributeNames().filter(n => !n.startsWith('data-wutu')).join(' '), 'title');
+  }));
+
   test('wutu runtime: keyed children reorder in place and duplicate keys are rejected', () => withRuntime(async ({ api, document }) => {
     let items = ['a', 'b', 'c'];
     const render = () => {

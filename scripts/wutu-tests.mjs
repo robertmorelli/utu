@@ -96,6 +96,11 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       ['p { # note\n "x"; }', 'comments are written //', '# note'],
       ['iframe { srcdoc = html; }', 'srcdoc is HTML', 'srcdoc'],
       ['iframe { .srcdoc = html; }', 'srcdoc is HTML', 'srcdoc'],
+      ['x-note { oNclick = f; }', 'events are written on click', 'oNclick'],
+      ['div { .ONCLICK = f; }', 'events are written on CLICK', 'ONCLICK'],
+      ['div { script { src = u; } }', "a script's attributes are code", 'src'],
+      ['div { script { = code; } }', "a script's text is code", '= code'],
+      ['div { script { if a { "x"; } } }', "a script's text is code", 'if a'],
     ];
     for (const [text, message, at] of cases) {
       const error = syntaxError(text);
@@ -507,6 +512,55 @@ export main() Browser.HTMLElement {
     }
     const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ iframe { srcdoc = "<b>x</b>"; } \\/; }` });
     assertEq(written.filter(d => d.severity === 'error').length, 0);
+  });
+
+  test('wutu: an on… attribute in any case, and a script\'s value src or text, are errors; a written script stays', async ({ ROOT }) => {
+    for (const [item, message, at] of [['x-note { oNclick = h; }', 'events are written on click', 'oNclick'], ['div { ONCLICK = h; }', 'expected an HTML tag', 'ONCLICK'],
+      ['p { OnMouseOver = h; }', 'expected an HTML tag', 'OnMouseOver'], ['x-note { .oNmouseover = h; }', 'events are written on mouseover', 'oNmouseover'],
+      ['script { src = h; }', "a script's attributes are code", 'src'], ['script { .src = h; }', "a script's attributes are code", 'src'],
+      ['script { = h; }', "a script's text is code", '= h'], ['script { for ([h]) |x| { "a"; } }', "a script's text is code", 'for']]) {
+      const source = `${BROWSER}export main() Browser.HTMLElement { let h = "alert(1)"; @wutu/\\ div { ${item} } \\/; }`;
+      const diagnostics = await selfhostDiagnostics({ ROOT, source });
+      const match = diagnostics.find(d => d.severity === 'error' && d.message.includes(message));
+      assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
+      assertEq(source.slice(match.start, match.start + at.length), at, `${item}: located`);
+    }
+    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { script { src = "/a.js"; type = "module"; "let a = 1;"; } } \\/; }` });
+    assertEq(written.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
+  });
+
+  test('wutu: ping, srcset and a meta\'s content from a value drop javascript: anywhere in them', async ({ ROOT }) => {
+    const source = `${BROWSER}
+      fn view(u: Str) Browser.HTMLElement {
+          @wutu/\\
+          div {
+              a { ping = u; "p"; }
+              img { srcset = u; }
+              link { imagesrcset = u; }
+              meta { http-equiv = "refresh"; content = u; }
+              x-box { ping = u; srcset = u; }
+          }
+          \\/;
+      }
+      export lib { fn render(u: Str) Browser.HTMLElement { view(u); } }
+    `;
+    const { MODES } = await import('../src/selfhost/compiler.js');
+    for (const mode of Object.keys(MODES)) {
+      await withDom(async (document) => {
+        const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: `wutu_lists_${mode}.utu`, source, mode });
+        const got = (u) => {
+          const root = instance.exports.render(u);
+          return ['a ping', 'img srcset', 'link imagesrcset', 'meta content', 'x-box ping', 'x-box srcset']
+            .map(s => { const [tag, name] = s.split(' '); return root.querySelector(tag).getAttribute(name); });
+        };
+        for (const bad of ['javascript:alert(1)', 'a.png 1x, javascript:alert(1) 2x', 'a.png 1x,JaVaScRiPt:alert(1)', 'https://ok/a \u0001vbscript:x'])
+          assertEq(got(bad).slice(0, 3).concat(got(bad).slice(4)).join(' '), Array(5).fill(null).join(' '), `${mode}: ${JSON.stringify(bad)} dropped`);
+        for (const bad of ['0; url=javascript:alert(1)', "0;URL='java\nscript:alert(1)'", '0;javascript:alert(1)', '0; url=data:text/html,x'])
+          assertEq(got(bad)[3], null, `${mode}: meta content ${JSON.stringify(bad)} dropped`);
+        assertEq(got('a.png 1x, b.png 2x').join('|'), Array(6).fill('a.png 1x, b.png 2x').join('|'), `${mode}: safe lists stay`);
+        assertEq(got('5; url=https://ok.example/')[3], '5; url=https://ok.example/', `${mode}: a safe refresh stays`);
+      });
+    }
   });
 
   test('wutu parser: legacy surface still parses', () => {
