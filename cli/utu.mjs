@@ -225,23 +225,70 @@ async function test(file, { utu, optimize, safe }) {
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) })
     .catch(error => trap(error, file, built, utu));
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
+  const report = (title, error) => {
+    const { title: what, frames, at } = trapText(error, map);
+    const place = at?.entry?.file ? paint('2', `  at ${placeText(at.entry)}`) : '';
+    const where = frames.length ? paint('2', `  in ${frames.map(f => f.fn).join(' ← ')}`) : '';
+    console.log(`${paint('31', 'FAIL')} ${title}: ${what}${place}${where}`);
+  };
+  // An error nothing awaited (a callback's, thrown later): it fails the test
+  // running then, or is one more failure, by when it came.
+  let running = null;
+  const strays = [];
+  const stray = error => strays.push({ error, during: running });
+  process.on('uncaughtException', stray);
+  process.on('unhandledRejection', stray);
   let failed = 0;
+  let uncaught = 0;
+  const reportStrays = () => {
+    for (const { error, during } of strays.splice(0)) {
+      uncaught++;
+      report(during ?? 'after tests', error);
+    }
+  };
   for (const { export: name, name: title } of tests) {
     const started = performance.now();
+    running = title;
     try {
-      await exports[name]();
+      await settled(exports[name](), TEST_TIMEOUT_MS);
+      if (strays.length) throw strays.shift().error;
       console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${(performance.now() - started).toFixed(1)} ms)`)}`);
     } catch (error) {
       failed++;
-      const { title: what, frames, at } = trapText(error, map);
-      const place = at?.entry?.file ? paint('2', `  at ${placeText(at.entry)}`) : '';
-      const where = frames.length ? paint('2', `  in ${frames.map(f => f.fn).join(' ← ')}`) : '';
-      console.log(`${paint('31', 'FAIL')} ${title}: ${what}${place}${where}`);
+      report(title, error);
     }
+    running = null;
+    reportStrays();
   }
-  console.log(tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'No tests');
-  if (failed) process.exitCode = 1;
+  // A moment for what the tests left running to throw; then the run ends,
+  // whatever is still pending (an interval would keep it alive).
+  await settled(new Promise(() => {}), TEST_GRACE_MS).catch(() => {});
+  reportStrays();
+  const summary = tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'No tests';
+  await written(process.stdout, `${summary}${uncaught ? `, ${uncaught} uncaught error${uncaught > 1 ? 's' : ''}` : ''}\n`);
+  process.exit(failed || uncaught ? 1 : 0);
 }
+
+/** A test's run, or why it never ended: the event loop emptied while it waited, or `ms` went by. */
+function settled(result, ms) {
+  let drained, timer;
+  const stuck = new Promise((_, reject) => {
+    // (Bun runs no promise job after beforeExit: a task, then.)
+    drained = () => setImmediate(() => reject(new Error('Never settled: nothing left to wait for')));
+    process.once('beforeExit', drained);
+    timer = setTimeout(() => reject(new Error(`No result after ${ms / 1000} s`)), ms);
+    timer.unref();
+  });
+  return Promise.race([result, stuck]).finally(() => {
+    process.off('beforeExit', drained);
+    clearTimeout(timer);
+  });
+}
+
+/** How long a test may wait (on a timer, say) before it fails. */
+const TEST_TIMEOUT_MS = 10000;
+/** How long after the last test its callbacks may still throw. */
+const TEST_GRACE_MS = 50;
 
 /**
  * Each bench, timed: `__bench_k(n)` runs its setup once and its measured
@@ -289,8 +336,9 @@ async function bench(file, { utu, optimize, safe }) {
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
   const line = row => row.map((cell, i) => i === 1 ? cell.padStart(widths[i]) : cell.padEnd(widths[i])).join('  ').trimEnd();
   const dim = text => colored(process.stdout) ? `\x1b[2m${text}\x1b[0m` : text;
-  console.log(dim(line(header)));
-  for (const row of rows) console.log(line(row));
+  await written(process.stdout, `${[dim(line(header)), ...rows.map(line)].join('\n')}\n`);
+  // Done, whatever a bench left running.
+  process.exit(process.exitCode ?? 0);
 }
 
 const BENCH_WARMUP_MS = 100;

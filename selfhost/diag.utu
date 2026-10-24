@@ -267,6 +267,8 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.InstanceDepth { return "instantiation-depth"; };
     if k == Diag.MainParams { return "entry-surface-conflict"; };
     if k == Diag.TestName { return "duplicate-declaration"; };
+    if k == Diag.ReturnInBench { return "invalid-break"; };
+    if k == Diag.TestInGeneric { return "unsupported"; };
     if k == Diag.TooManyParams { return "too-many-parameters"; };
     if k == Diag.BoundMissing { return "unsatisfied-bound"; };
     if k == Diag.UnboundedCall { return "unknown-method"; };
@@ -542,7 +544,9 @@ fn diag_text(i: I32) Str {
         Diag.StandardName => w + " is a standard type",
         Diag.InstanceDepth => w + "'s instances nest more than " + int_text(a) + " deep",
         Diag.MainParams => "main takes no parameters",
-        Diag.TestName => pick(a == 1, "Empty test name", "Duplicate test " + node_text(node)),
+        Diag.ReturnInBench => "return in a bench",
+        Diag.TestInGeneric => pick(a == 1, "Bench", "Test") + " in generic mod " + w,
+        Diag.TestName => pick(a == 1 or a == 3, "Empty ", "Duplicate ") + pick(a >= 2, "bench", "test") + pick(a == 1 or a == 3, " name", " " + node_text(node)),
         Diag.TooManyParams => pick(word < 0, "main", w) + " has " + int_text(a) + " parameters (max 1000)",
         Diag.DslEmpty => "@" + w + pick(w == "embed", " needs a file path", " needs an expression"),
         Diag.ComptimeCycle => {
@@ -794,6 +798,8 @@ fn diag_default_label(i: I32) Str {
         Diag.WutuHole => type_text(a),
         Diag.WutuKey => type_text(a),
         Diag.GenericGlobal => "differs per instance",
+        Diag.ReturnInBench => "would end the timing",
+        Diag.TestInGeneric => "runs in no instance",
         ~> "here",
     };
 }

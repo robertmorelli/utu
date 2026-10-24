@@ -1,0 +1,6 @@
+// What: a test awaits a promise nothing settles; the run went quiet (no summary, exit 0)
+// Expect: FAIL waits: Never settled: nothing left to wait for; the next test runs
+let never: fun() Promise[I32] = @es/\ () => new Promise(() => {}) \/;
+
+test "waits" { let a = await never(); assert a == 1; }
+test "after" { assert true; }

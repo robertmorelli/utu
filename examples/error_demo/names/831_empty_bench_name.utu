@@ -1,0 +1,3 @@
+// What: a bench with an empty name
+// Expect: Empty bench name
+bench "" { let s = 0; measure { s += 1; } }

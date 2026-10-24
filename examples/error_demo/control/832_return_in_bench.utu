@@ -1,0 +1,8 @@
+// What: a return in a bench's measure ends the timed run (it timed "0.00 ns")
+// Expect: return in a bench
+bench "first positive" {
+    let xs = [3, -1, 4];
+    measure {
+        for (xs) |x| { if x > 0 { return; }; };
+    }
+}

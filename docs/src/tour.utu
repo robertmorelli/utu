@@ -1680,19 +1680,31 @@ mod tour {
                 code {
                     "utu test";
                 }
-                " runs each test. ";
+                " runs each test, a mod's too (named ";
+                code {
+                    "geo: name";
+                }
+                "). A test whose await waits on nothing (or on anything for 10 s) fails; what a callback throws after the tests is one more failure; the run ends after its summary, whatever timers are left. ";
                 code {
                     "utu bench";
                 }
-                " runs each bench's setup once and its ";
+                " runs each bench in timed runs: each run does the setup once (its ";
+                code {
+                    "defer";
+                }
+                "s after), then the ";
                 code {
                     "measure";
                 }
-                " block many times: it warms the engine up, doubles the count until a run takes 20 ms, then prints the median time per iteration of 11 runs (less the setup's own time). ";
+                " block n times. It warms the engine up, doubles n until a run takes 20 ms, then prints the median time per iteration of 11 runs, less the median of runs of the setup alone. A bench does not ";
                 code {
-                    "utu check";
+                    "return";
                 }
-                " checks benches as it checks tests.";
+                ". Every command checks tests and benches, not only ";
+                code {
+                    "utu test";
+                }
+                ".";
             }
             = code.block(tests_sample());
             = code.shell(tests_shell());

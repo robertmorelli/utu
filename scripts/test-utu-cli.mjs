@@ -105,6 +105,42 @@ bench "trapping" {
   r = utu('bench', 'good.utu');
   assert.equal(r.stdout.trim(), 'No benches');
 
+  // A mod's tests and benches run, named by the mod (they were dropped).
+  await write('mods.utu', `mod geo {
+    fn two() I32 { 2; }
+    test "two" { assert two() == 3; }
+    bench "two" { let s = 0; measure { s += two(); } }
+}
+test "top" { assert true; }
+`);
+  r = utu('test', 'mods.utu');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /^FAIL geo: two: /m);
+  assert.match(r.stdout, /1 passed, 1 failed/);
+  assert.match(utu('bench', 'mods.utu').stdout, /^geo: two +[0-9.]+ /m);
+
+  // A test that waits on nothing fails, and the rest run; one that leaves
+  // an interval ends the run all the same; what a callback throws after
+  // the tests is a failure after them; the summary is always there.
+  await write('waits.utu', `let never: fun() Promise[I32] = @es/\\ () => new Promise(() => {}) \\/;
+let tick: fun() void = @es/\\ () => { setInterval(() => {}, 1000); } \\/;
+let later: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("boom"); }, 5); } \\/;
+test "first" { assert true; }
+test "hangs" { let a = await never(); assert a == 1; }
+test "ticks" { tick(); assert true; }
+test "last" { later(); assert true; }
+`);
+  r = spawnSync(process.execPath, [cli, 'test', 'waits.utu'], { encoding: 'utf8', cwd: dir, timeout: 30000 });
+  assert.equal(r.status, 1, r.stderr);
+  assert.equal(r.stdout.replace(/ \([0-9.]+ ms\)/g, ''), `pass first
+FAIL hangs: Never settled: nothing left to wait for
+pass ticks
+pass last
+FAIL after tests: boom
+3 passed, 1 failed, 1 uncaught error
+`);
+  assert.equal(r.stderr, '');
+
   // The build modes: small (the default) and fast keep the checks Wasm does
   // not make itself, so past a Buffer's length is a trap; the unsafe ones
   // leave them out, and it reaches the capacity beyond.

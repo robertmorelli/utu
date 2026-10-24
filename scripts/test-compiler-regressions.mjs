@@ -1550,6 +1550,52 @@ export lib {
   const escaped = await compileFile(utu, await write('export main() void {}\ntest "x\\u{41}" { assert true; }\n'), { target: 'test' });
   assert.deepEqual(escaped.diagnostics.map(d => d.message), ['\\u needs four hex digits']);
   checked++;
+  // Benches too; a test's and a bench's names are of their own kinds, and a mod's of its own.
+  const benchTwice = await compileFile(utu, await write('bench "b" { measure {} }\nbench "b" { measure {} }\nbench "" { measure {} }\ntest "b" { assert true; }\nmod m { test "b" { assert true; } }\n'), { target: 'bench' });
+  assert.deepEqual(benchTwice.diagnostics.map(d => d.message), ['Duplicate bench "b"', 'Empty bench name']);
+  checked++;
+  // A mod's tests and benches run, named by their mod (they were dropped);
+  // a generic mod's run in no instance.
+  const modTests = await write('let calls: Array[I32] = [0];\nmod geo {\n    fn two() I32 { 2; }\n    test "two" { assert two() == 2; }\n    test "fails" { assert two() == 3; }\n    bench "adds" { let k = two(); measure { calls[0] += k; } }\n}\ntest "two" { assert geo.two() == 2; }\n');
+  for (const mode of modes) {
+    const tested = await compileFile(utu, modTests, { target: 'test', mode });
+    assert.deepEqual(tested.tests.map(t => t.name), ['geo: two', 'geo: fails', 'two'], `${mode}: ${tested.diagnostics?.map(d => d.message)}`);
+    const { exports } = await instantiateNode(tested.wasm, tested.spec);
+    await exports.__test_0();
+    await assert.rejects(async () => exports.__test_1(), WebAssembly.RuntimeError);
+    await exports.__test_2();
+    const benched = await compileFile(utu, modTests, { target: 'bench', mode });
+    assert.deepEqual(benched.benches, [{ export: '__bench_0', name: 'geo: adds' }], mode);
+    checked++;
+  }
+  const genericTests = await compileFile(utu, await write('mod Box[T] {\n    fn id(x: T) T { x; }\n    test "id" { assert true; }\n    bench "id" { measure {} }\n}\nexport main() I32 { 0; }\n'), {});
+  assert.deepEqual(genericTests.diagnostics.map(d => d.message), ['Test in generic mod Box', 'Bench in generic mod Box']);
+  checked++;
+  // A bench returns from neither its setup nor its measure (the run timed
+  // nothing: "0.00 ns"); a closure in it may.
+  for (const body of ['let x = 1; if x > 0 { return; }; measure {}', 'measure { return; }']) {
+    const returns = await compileFile(utu, await write(`bench "r" { ${body} }\nexport main() I32 { 0; }\n`), { target: 'bench' });
+    assert.deepEqual(returns.diagnostics.map(d => d.message), ['return in a bench'], body);
+    checked++;
+  }
+  assert.deepEqual((await compileFile(utu, await write('bench "r" { measure { let f = cl() I32 { return 1; }; f(); } }\n'), { target: 'bench' })).diagnostics, []);
+  // A defer in a bench's setup runs once its measuring is done.
+  const deferred = await write('let note: fun(I32) void = @es/\\ (n) => { globalThis.deferred.push(n); } \\/;\nbench "d" {\n    let n = 0;\n    defer note(n);\n    measure { n += 1; }\n}\n');
+  for (const mode of modes) {
+    const benched = await compileFile(utu, deferred, { target: 'bench', mode });
+    assert.ok(benched.wasm, `${mode}: ${benched.diagnostics.map(d => d.message)}`);
+    const { exports } = await instantiateNode(benched.wasm, benched.spec);
+    globalThis.deferred = [];
+    exports.__bench_0(4);
+    assert.deepEqual(globalThis.deferred, [4], mode);
+    checked++;
+  }
+  // Every build checks the tests (and benches), not only a test build.
+  for (const target of ['normal', 'test', 'bench']) {
+    const typed = await compileFile(utu, await write('export main() I32 { 1; }\ntest "bad" { let a: I32 = 1.5; assert a == 1; }\nbench "worse" { measure { let b: Str = 2; } }\n'), { target });
+    assert.deepEqual(typed.diagnostics.map(d => d.message), ['a is I32, got F64', 'b is Str, got I32'], target);
+    checked++;
+  }
   // One mistake, one message: a closure with an untyped parameter where no
   // closure is wanted (not also "got cl(unknown) Str"); a tuple element
   // (not also "has no default").

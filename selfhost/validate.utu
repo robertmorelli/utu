@@ -214,7 +214,7 @@ fn validate_tree(node: I32) void {
         for (0 ..< Node.count()) |k| { validated_kinds[k] = 0; };
         for ([Node.Param_list, Node.Struct_decl, Node.Field_list, Node.Enum_decl, Node.Block, Node.Closure_param_list, Node.Tuple_pattern,
             Node.Capture, Node.Alt_expr, Node.Nullable_type, Node.Tuple_type, Node.Field, Node.Distinct_decl, Node.Yield_expr,
-            Node.Defer_expr, Node.Errdefer_expr, Node.Await_expr, Node.Global_decl]) |k| { validated_kinds[k.to_i32()] = 1; };
+            Node.Defer_expr, Node.Errdefer_expr, Node.Await_expr, Node.Global_decl, Node.Bench_decl]) |k| { validated_kinds[k.to_i32()] = 1; };
     };
     validate_within(node);
 }
@@ -253,6 +253,7 @@ fn validate_node(node: I32) void {
         Node.Defer_expr => { validate_defer(node); },
         Node.Errdefer_expr => { validate_defer(node); },
         Node.Await_expr => { validate_await(node); },
+        Node.Bench_decl => { validate_bench(node); },
         ~> {},
     };
 }
@@ -473,10 +474,29 @@ fn validate_yield(node: I32) void {
     report(Diag.YieldOutside, node, -1);
 }
 
-/// A defer is a statement of a block, and its code does not leave it
-/// (return, or a break or continue not of a loop inside it).
+/// A bench's code does not return: the timing would end with it.
+fn validate_bench(node: I32) void {
+    let r = bench_return(node);
+    if r >= 0 { report(Diag.ReturnInBench, r, -1); };
+}
+
+/// The first `return` in a bench's code, closures aside, or -1.
+fn bench_return(node: I32) I32 {
+    if is_kind(node, Node.Closure_expr) { return -1; };
+    if is_kind(node, Node.Return_expr) { return node; };
+    let c = first_child(node);
+    while (c >= 0) {
+        let found = bench_return(c);
+        if found >= 0 { return found; };
+        c = next_sibling(c);
+    };
+    -1;
+}
+
+/// A defer is a statement of a block (or of a bench's setup), and its code
+/// does not leave it (return, or a break or continue not of a loop inside it).
 fn validate_defer(node: I32) void {
-    if not is_kind(parent_of(node), Node.Block) {
+    if not is_kind(parent_of(node), Node.Block) and not is_kind(parent_of(node), Node.Bench_decl) {
         report2(Diag.InvalidDefer, node, -1, BreakRule.DeferNotStatement.to_i32(), -1);
         return;
     };
