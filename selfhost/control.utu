@@ -14,7 +14,7 @@ vec pattern_fault: I32;
 fn pattern_value(lit: I32, t: I32) I64 {
     let c = first_child(lit);
     if is_kind(c, Node.Type_ident) {
-        let variant = node_decl[next_sibling(c)];
+        let variant = node_decl[last_child(lit)];
         if not decl_is(variant, Decl.Variant) or named(decl_owner[variant], 0) != t {
             pattern_fault[0] = 4;
             return 0;
@@ -125,9 +125,12 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
             let fault = pattern_fault[0];
             if fault >= 0 { faulted = true; };
             if fault == 4 {
-                let p = first_child(first_child(c));
-                report2(Diag.UnknownVariant, c, word_of(next_sibling(p)), st, -1);
-                suggest_member(ty_decl(st), next_sibling(p), Space.Member);
+                let name = last_child(first_child(c));
+                // (An unknown `m.Tag` was reported where it was resolved.)
+                if not reported_within(first_child(c)) {
+                    report2(Diag.UnknownVariant, c, word_of(name), st, -1);
+                    suggest_member(ty_decl(st), name, Space.Member);
+                };
                 unknown_arm = true;
             } else if fault >= 0 {
                 report2(Diag.MatchPattern, c, -1, fault, st);

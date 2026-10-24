@@ -263,6 +263,7 @@ enum(U8) Diag:
     | HostLiteral     // a literal no member of a host union of literals (an enum)
     | TupleLength     // `[…]` of more or fewer elements than a host tuple takes
     | HostAbstract    // `new` of a host abstract class
+    | AmbiguousVariant // a bare variant two enums in scope declare (a: one enum, b: the other)
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -777,7 +778,7 @@ fn declare_module(item: I32) I32 {
             if names_promoted(c) { decl_a[decl] = t; } else { member_once(decl, t); };
             if decl_is(t, Decl.Enum) {
                 for (t + 1 ..< decl_kind.len()) |v| {
-                    if decl_owner[v] == t { add_member(decl, decl_name[v], Space.Member, v); };
+                    if decl_owner[v] == t { add_variant_member(decl, v); };
                 };
             };
         } else if kind == Node.Fn_decl.to_i32() or kind == Node.Op_decl.to_i32() {
@@ -788,6 +789,19 @@ fn declare_module(item: I32) I32 {
         c = next_sibling(c);
     };
     decl;
+}
+
+/// Variant `v`, a member of `module` by its name: a name two of its enums'
+/// variants have is ambiguous (`m.E.V` says which).
+fn add_variant_member(module: I32, v: I32) void {
+    let prior = add_member(module, decl_name[v], Space.Member, v);
+    let p = prior;
+    while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p]; };
+    if decl_is(p, Decl.Variant) and decl_owner[p] != decl_owner[v] {
+        let both = declare(Decl.Ambiguous, decl_name[v], -1, v);
+        decl_a[both] = prior;
+        member_decl[member_slot(module, decl_name[v] * 4 + Space.Member.to_i32())] = both;
+    };
 }
 
 /// `d`, a member of `module`; a second of its name is reported.
@@ -815,13 +829,14 @@ fn bind_module(module: I32) void {
 /// promoted type is not bound: its name stays the module's, which stands
 /// for it as a type.
 fn bind_module_members(module: I32) void {
+    let since = scope_mark();
     // In declaration order: each declaration's id follows the module's.
     let d = module + 1;
     while (d < decl_kind.len() and is_part_of(d, module)) {
         if decl_owner[d] == module and decl_kind[d] != Decl.ModuleParam.to_i32() and decl_name[d] >= 0 and d != decl_a[module] {
             if decl_kind[d] != Decl.Fn.to_i32() or free_fn_word(decl_node[d]) >= 0 { bind(decl_name[d], d); };
         } else if decl_is(d, Decl.Variant) and decl_is(decl_owner[d], Decl.Enum) {
-            bind(decl_name[d], d);
+            bind_variant(d, since);
         };
         d += 1;
     };
@@ -896,7 +911,9 @@ fn ambiguous(decl: I32, node: I32) Bool {
     if not decl_is(decl, Decl.Ambiguous) { return false; };
     let a = decl_a[decl];
     while (decl_is(a, Decl.Ambiguous)) { a = decl_a[a]; };
-    report2(Diag.AmbiguousName, node, decl_name[decl], a, decl_owner[decl]);
+    if decl_is(a, Decl.Variant) and decl_is(decl_owner[decl], Decl.Variant) {
+        report2(Diag.AmbiguousVariant, node, decl_name[decl], decl_owner[a], decl_owner[decl_owner[decl]]);
+    } else { report2(Diag.AmbiguousName, node, decl_name[decl], a, decl_owner[decl]); };
     true;
 }
 
@@ -1087,6 +1104,7 @@ fn declare_file_scope(file: I32) void {
         item = next_sibling(item);
     };
     let entry = file_role[file] == FileRole.Entry.to_i32();
+    items_since[0] = scope_mark();
     for (file ..< file_root.len()) |f| {
         let owner = if entry { -1; } else { file; };
         let generated = file_role[f] == FileRole.Generated.to_i32() and gen_owner_of(f) == owner;
@@ -1367,9 +1385,27 @@ fn bind_variants(decl: I32) void {
     if not decl_is(decl, Decl.Enum) { return; };
     let d = decl + 1;
     while (d < decl_kind.len() and decl_owner[d] >= decl and decl_owner[d] <= d) {
-        if decl_owner[d] == decl { bind(decl_name[d], d); };
+        if decl_owner[d] == decl { bind_variant(d, items_since[0]); };
         d += 1;
     };
+}
+
+/// Where a file's (or mod's) own declarations begin to be bound.
+vec items_since: I32 = [0];
+
+/// Variant `v` in scope by its name. A name a variant of another enum bound
+/// since `since` (one file's, one mod's) has is ambiguous: `E.V` says which.
+fn bind_variant(v: I32, since: I32) void {
+    let word = decl_name[v];
+    if word < 0 { return; };
+    let b = word_top[word];
+    let p = if b >= since { bind_decl[b]; } else { -1; };
+    while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p]; };
+    if decl_is(p, Decl.Variant) and decl_owner[p] != decl_owner[v] {
+        let both = declare(Decl.Ambiguous, word, -1, v);
+        decl_a[both] = bind_decl[b];
+        bind(word, both);
+    } else { bind(word, v); };
 }
 
 //! = Resolving
@@ -1756,9 +1792,32 @@ fn walk_type(node: I32, w: Walk) void {
     if kind != Node.Void_type.to_i32() { walk_types(node, w); };
 }
 
-/// A path to a type: `M[A]`, `M.T`, `M[A].T`, or a name. Returns the
-/// declaration it names (a module's promoted type for `M[A]`).
+/// A path to a type: `M[A]`, `M.T`, `M[A].T`, `E.V` (enum E's variant),
+/// `M.E.V`, or a name. Returns the declaration it names (a module's
+/// promoted type for `M[A]`).
 fn walk_type_path(node: I32, w: Walk) I32 {
+    let t = walk_variant_path(node, w);
+    if decl_is(t, Decl.Ambiguous) {
+        let n = name_node(if is_kind(node, Node.Qualified_type_ref) { last_child(node); } else { node; });
+        ambiguous(t, n);
+        node_decl[n] = -1;
+        return -1;
+    };
+    t;
+}
+
+/// A type path (as @walk_type_path walks it) where a variant goes, a
+/// struct literal's or an alt arm's: a variant name two enums have is
+/// returned (Ambiguous, recorded on the name) for the type expected or the
+/// value tested to decide.
+fn walk_variant_path(node: I32, w: Walk) I32 {
+    if is_kind(node, Node.Type_ident) {
+        let d = lookup(word_of(node));
+        if decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant) {
+            node_decl[node] = d;
+            return d;
+        };
+    };
     let kind = node_kind[node];
     if kind == Node.Type_ident.to_i32() or kind == Node.Promoted_type.to_i32() { return walk_type_name(node, w); };
     if kind == Node.Instantiated_module_ref.to_i32() {
@@ -1773,15 +1832,34 @@ fn walk_type_path(node: I32, w: Walk) I32 {
     if kind == Node.Qualified_type_ref.to_i32() or kind == Node.Inline_module_type_path.to_i32() {
         let c = first_child(node);
         let module = -1;
+        let mid = next_sibling(c);
         if is_kind(c, Node.Instantiated_module_ref) {
             module = walk_module_name(first_child(c));
             walk_types(next_sibling(first_child(c)), w);
+        } else if is_kind(c, Node.Module_ref) and enum_named(name_node(c)) >= 0 {
+            // `E.V`: enum E's variant.
+            module = enum_named(name_node(c));
+            node_decl[name_node(c)] = module;
         } else {
             module = walk_module_name(c);
-            let args = next_sibling(c);
-            if is_kind(args, Node.Module_type_arg_list) { walk_types(args, w); };
+            if is_kind(mid, Node.Module_type_arg_list) {
+                walk_types(mid, w);
+                mid = next_sibling(mid);
+            };
         };
         let member_at = last_child(node);
+        // `M.E.V`: M's enum E, then its variant.
+        if mid >= 0 and mid != member_at {
+            let e = member(module, word_of(mid), Space.Member);
+            if not decl_is(e, Decl.Enum) {
+                // (A type but not an enum: it has no variants.)
+                let at = if e >= 0 { name_node(member_at); } else { mid; };
+                if decl_is(module, Decl.Module) { report(Diag.UnknownType, at, word_of(at)); };
+                return -1;
+            };
+            node_decl[mid] = e;
+            module = e;
+        };
         let n = name_node(member_at);
         let t = member(module, word_of(n), Space.Member);
         if t < 0 and decl_is(module, Decl.Module) { report(Diag.UnknownType, n, word_of(n)); };
@@ -1789,6 +1867,12 @@ fn walk_type_path(node: I32, w: Walk) I32 {
         return t;
     };
     -1;
+}
+
+/// The enum of variants a name before `.V` names, or -1.
+fn enum_named(n: I32) I32 {
+    let d = lookup(word_of(n));
+    if decl_is(d, Decl.Enum) { d; } else { -1; };
 }
 
 /// A module name: the module (through an alias), recorded on it.
@@ -2028,7 +2112,8 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
         Node.Null_expr => { as_type(first_child(node), walk_type_name(first_child(node), w)); },
         Node.Struct_init => {
             let t = first_child(node);
-            let decl = as_type(t, walk_type_path(t, w));
+            let decl = as_type(t, walk_variant_path(t, w));
+            if decl_is(decl, Decl.Ambiguous) { decl = -1; };
             walk_field_inits(next_sibling(t), decl, w);
         },
         Node.Implicit_struct_init => { walk_field_inits(next_sibling(first_child(node)), -1, w); },
@@ -2106,9 +2191,21 @@ fn walk_field(node: I32, w: Walk) void {
     let base = first_child(node);
     walk_expr(base, w);
     let module = node_decl[base];
+    let name = next_sibling(base);
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
-        let name = next_sibling(base);
         node_decl[name] = member(module, word_of(name), Space.Member);
+        return;
+    };
+    // `m.E.V`, `M.E.V`, `alias.E.V`: a variant of the enum the path names.
+    if not is_kind(base, Node.Field_expr) and not is_kind(base, Node.Type_member_expr) { return; };
+    let e = node_decl[last_child(base)];
+    let head = first_child(base);
+    if e < 0 and is_kind(head, Node.Identifier) and decl_is(node_decl[head], Decl.Alias) {
+        e = static_member(decl_a[node_decl[head]], word_of(last_child(base)));
+    };
+    if decl_is(e, Decl.Enum) or decl_is(e, Decl.IntEnum) {
+        node_decl[last_child(base)] = e;
+        node_decl[name] = member(e, word_of(name), Space.Member);
     };
 }
 
@@ -2216,7 +2313,7 @@ fn is_type_node(kind: I32) Bool {
 /// the arm with the binding in scope.
 fn walk_alt_arm(arm: I32, w: Walk) void {
     let pattern = first_child(arm);
-    if is_kind(pattern, Node.Qualified_type_ref) { walk_type_path(pattern, w); }
+    if is_kind(pattern, Node.Qualified_type_ref) { walk_variant_path(pattern, w); }
     else {
         let decl = lookup(word_of(pattern));
         if decl >= 0 and is_type_decl(decl) { node_decl[pattern] = decl; };
@@ -2238,14 +2335,21 @@ fn arm_binding(arm: I32) I32 {
     if is_kind(c, Node.Identifier) and next_sibling(c) >= 0 { c; } else { -1; };
 }
 
-/// `Tag.Leaf` in a match: the integer enum and its variant.
+/// `Tag.Leaf` (or `m.Tag.Leaf`) in a match: the integer enum and its variant.
 fn walk_match_lit(lit: I32, w: Walk) void {
     let t = first_child(lit);
-    if is_kind(t, Node.Type_ident) {
-        let owner = walk_type_name(t, w);
-        let v = next_sibling(t);
-        node_decl[v] = member(owner, word_of(v), Space.Member);
-    };
+    if not is_kind(t, Node.Type_ident) { return; };
+    let v = last_child(lit);
+    let owner = -1;
+    if next_sibling(t) != v {
+        // `m.Tag`: mod m's enum.
+        let module = walk_owner_name(t);
+        let e = next_sibling(t);
+        owner = if decl_is(module, Decl.Module) { member(module, word_of(e), Space.Member); } else { -1; };
+        if decl_is(module, Decl.Module) and owner < 0 { report(Diag.UnknownType, e, word_of(e)); };
+        node_decl[e] = owner;
+    } else { owner = walk_type_name(t, w); };
+    node_decl[v] = member(owner, word_of(v), Space.Member);
 }
 
 /// `T { a: e, … }`: each field name recorded as `owner`'s field.

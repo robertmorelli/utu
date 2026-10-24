@@ -1,0 +1,17 @@
+// What: an alt arm naming another enum's variant by its enum
+// Expect: Expected Shape, got Circle
+enum Shape:
+    | Circle { r: F64 }
+    | Dot {}
+
+enum Lens:
+    | Circle { focus: F64 }
+
+fn area(s: Shape) F64 {
+    alt s {
+        Lens.Circle |c| => c.focus,
+        ~> 0.0,
+    };
+}
+
+export main() F64 { area(Shape.Dot); }

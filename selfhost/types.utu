@@ -355,7 +355,18 @@ fn type_path(node: I32, inst: I32) I32 {
             return t;
         };
         let member_decl = node_decl[name_node(last_child(node))];
-        if member_decl < 0 { return ty_error(); };
+        if member_decl < 0 {
+            // `E.X` where enum E has no variant X.
+            let mid = next_sibling(c);
+            if is_kind(mid, Node.Module_type_arg_list) { mid = next_sibling(mid); };
+            let e = if mid != last_child(node) { node_decl[mid]; } else if is_kind(c, Node.Module_ref) { node_decl[name_node(c)]; } else { -1; };
+            if decl_is(e, Decl.Enum) and not reported_within(node) {
+                let n = name_node(last_child(node));
+                report2(Diag.UnknownVariant, n, word_of(n), named(e, 0), -1);
+                suggest_member(e, n, Space.Member);
+            };
+            return ty_error();
+        };
         let owner = module_of(member_decl);
         let at = 0;
         if is_kind(c, Node.Instantiated_module_ref) {

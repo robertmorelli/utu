@@ -7,6 +7,7 @@ exports.buildGrammarOptions = function buildGrammarOptions() {
       [$.module_name, $._expr],
       [$.module_name, $._capital_module_name, $._type_head],
       [$.pipe_expr, $.bind_expr],
+      [$.qualified_type_ref, $._variant_type_ref],
     ],
   };
 };

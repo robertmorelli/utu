@@ -129,6 +129,12 @@ tag enum Result[P1]:
     | Err { message : Str }
 ```
 
+A variant is named bare (`Ok { value: 1 }`) or by its enum: `Result.Ok { value: 1 }`,
+`Color.Red` (a variant without fields is a value), `Color.Red => …` in an alt, and
+`m.Color.Red` from mod m. A bare name two enums' variants have is an error
+("Red is a variant of Color and of Light: write Color.Red or Light.Red"), except
+where the alt's value or the type wanted is one of the enums.
+
 ---
 
 ## Functions

@@ -21,8 +21,8 @@ exports.buildLiteralRules = function buildLiteralRules() {
         seq(optional('-'), $.float_lit),
         alias('true', $.bool_lit),
         alias('false', $.bool_lit),
-        // An integer enum's variant: `Tag.Leaf`.
-        seq($.type_ident, '.', $.type_ident),
+        // An integer enum's variant: `Tag.Leaf`, or `m.Tag.Leaf` of mod m.
+        seq(choice($.type_ident, alias($.identifier, $.type_ident)), '.', $.type_ident, optional(seq('.', $.type_ident))),
       ),
     int_lit: (_) => token(choice(/[0-9]+/, /0x[0-9a-fA-F]+/, /0b[01]+/)),
     float_lit: (_) => token(/[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/),

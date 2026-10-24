@@ -1,7 +1,7 @@
-// What: a struct variant named as if it were a value
-// Expect: Color.R is a type, not a value (make one: R {})
+// What: a variant with fields named as if it were a value (a field-less one, Color.G, is one)
+// Expect: Color.R is a type, not a value (make one: Color.R {…})
 enum Color:
-    | R
+    | R { shade: I32 }
     | G
 
 export main() I32 {

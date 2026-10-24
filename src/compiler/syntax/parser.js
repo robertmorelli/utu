@@ -492,6 +492,18 @@ class Parser {
     return this.node('impl_list', children);
   }
 
+  /** `.V` after `M.E` in a path (the variant V of M's enum E): its nodes, or none. */
+  variantStep() {
+    if (!this.isPunct('.') || this.isPunct('...') || this.isPunct('..<')) return [];
+    const save = this.save();
+    const dot = this.token('.');
+    if (this.word() === null) {
+      this.restore(save);
+      return [];
+    }
+    return [dot, this.typeIdent()];
+  }
+
   /** A protocol in an impl or bound list: `P`, `&`, or `m.P` from module m. */
   implName() {
     if (this.word() === null) return this.typeIdentOrPromoted();
@@ -783,18 +795,18 @@ class Parser {
     return this.node('ref_type', [this.refType()]);
   }
 
-  /** The inside of a ref_type: a type name, `M.T`, `M[A]`, or `M[A].T`. */
+  /** The inside of a ref_type: a type name, `M.T`, `M[A]`, `M[A].T`, or a variant of a mod's enum, `M.E.V`. */
   refType() {
     if (this.word() === null) this.fail();
     const save = this.save();
     const name = this.moduleName();
     if (this.isPunct('[')) {
       const instantiated = this.node('instantiated_module_ref', [name, this.moduleTypeArgList()]);
-      if (this.isPunct('.')) return this.node('qualified_type_ref', [instantiated, this.token('.'), this.typeIdent()]);
+      if (this.isPunct('.')) return this.node('qualified_type_ref', [instantiated, this.token('.'), this.typeIdent(), ...this.variantStep()]);
       return instantiated;
     }
     if (this.isPunct('.') && !this.isPunct('...') && !this.isPunct('..<')) {
-      return this.node('qualified_type_ref', [this.node('module_ref', [name]), this.token('.'), this.typeIdent()]);
+      return this.node('qualified_type_ref', [this.node('module_ref', [name]), this.token('.'), this.typeIdent(), ...this.variantStep()]);
     }
     this.restore(save);
     return this.typeIdent();
@@ -1190,7 +1202,16 @@ class Parser {
       if (!this.isPunct('.') || this.isPunct('...') || this.isPunct('..<')) return this.restoreNull(save);
       const dot = this.token('.');
       if (this.word() === null) return this.restoreNull(save);
+      const capitalMember = !this.isIdentifierShaped();
       const member = this.typeIdent();
+      // `m.E.V {`: a variant of m's enum E (E and V capitalized).
+      let step = [];
+      if (capitalMember && this.isPunct('.') && !this.isPunct('...') && !this.isPunct('..<')) {
+        const before = this.save();
+        const stepDot = this.token('.');
+        if (this.word() !== null && !this.isIdentifierShaped()) step = [stepDot, this.typeIdent()];
+        else this.restore(before);
+      }
       if (!this.isPunct('{')) return this.restoreNull(save);
       if (capital) {
         const brace = this.save();
@@ -1199,7 +1220,7 @@ class Parser {
         this.restore(brace);
         if (empty) return this.restoreNull(save);
       }
-      const qualified = this.node('qualified_type_ref', [this.node('module_ref', [this.node('module_name', [name])]), dot, member]);
+      const qualified = this.node('qualified_type_ref', [this.node('module_ref', [this.node('module_name', [name])]), dot, member, ...step]);
       return this.node('struct_init', [qualified, ...this.fieldInits()]);
     } catch (error) {
       if (error instanceof Unsupported) return this.restoreNull(save);
@@ -1419,7 +1440,8 @@ class Parser {
       this.skip();
       return this.node('match_lit', [leaf]);
     }
-    if (word !== null) return this.node('match_lit', [this.unreservedTypeIdent(), this.expectPunct('.'), this.typeIdent()]);
+    // `Tag.Leaf`, or `m.Tag.Leaf` of mod m.
+    if (word !== null) return this.node('match_lit', [this.unreservedTypeIdent(), this.expectPunct('.'), this.typeIdent(), ...this.variantStep()]);
     const children = [];
     if (this.isPunct('-')) children.push(this.token('-'));
     const c = this.source[this.pos];
@@ -1448,7 +1470,7 @@ class Parser {
       let ref;
       if (this.isPunct('[')) ref = this.node('instantiated_module_ref', [name, this.moduleTypeArgList()]);
       else ref = this.node('module_ref', [name]);
-      return this.node('qualified_type_ref', [ref, this.expectPunct('.'), this.typeIdent()]);
+      return this.node('qualified_type_ref', [ref, this.expectPunct('.'), this.typeIdent(), ...this.variantStep()]);
     }
     this.restore(save);
     // A bare variant name cannot be a keyword; a module before `.` can.

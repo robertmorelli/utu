@@ -12,12 +12,19 @@ exports.buildTypeRules = function buildTypeRules() {
       choice(
         typeName($),
         $.qualified_type_ref,
+        alias($._variant_type_ref, $.qualified_type_ref),
         $.instantiated_module_ref,
       ),
     qualified_type_ref: ($) =>
       choice(
         seq($.module_ref, '.', typeName($)),
         seq($.instantiated_module_ref, '.', typeName($)),
+      ),
+    // M.E.V: the variant V of M's enum E, where a type or variant goes.
+    _variant_type_ref: ($) =>
+      choice(
+        seq($.module_ref, '.', typeName($), '.', $.type_ident),
+        seq($.instantiated_module_ref, '.', typeName($), '.', $.type_ident),
       ),
     // fun(...) — function pointer.  Has no environment and cannot be written
     // inline; a `fun` value is produced by naming a declared `fn`, or by an

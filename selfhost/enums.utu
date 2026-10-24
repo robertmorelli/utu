@@ -335,6 +335,7 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
         c = next_sibling(c);
     };
     if default_ < 0 { check_alt_exhaustive(node, enum_decl); };
+    same_variant_arms(arms, enum_decl);
     let t = alt_arms(arms, s, st, expect, default_, cx);
     if optimize_level[0] == 1 { cast_arms(w_stack[w_stack.len() - 1], s); };
     w_node(Op.Seq, repr(t), 0, 0, m);
@@ -482,9 +483,16 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
             let pattern = first_child(a);
             let variant = alt_variant(pattern, ty_decl(st));
             let m = w_mark();
-            if variant < 0 {
-                report2(Diag.UnknownVariant, pattern, word_of(pattern), st, -1);
-                suggest_member(ty_decl(st), if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)); } else { pattern; }, Space.Member);
+            let other = if is_kind(pattern, Node.Qualified_type_ref) { node_decl[name_node(last_child(pattern))]; } else { -1; };
+            if variant < 0 and decl_is(other, Decl.Variant) {
+                // `E1.V` tested against an E0: another enum's variant.
+                report2(Diag.TypeMismatch, pattern, -1, st, named(other, 0));
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+                result = ty_error();
+            } else if variant < 0 {
+                let n = if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)); } else { pattern; };
+                report2(Diag.UnknownVariant, n, word_of(n), st, -1);
+                suggest_member(ty_decl(st), n, Space.Member);
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
                 result = ty_error();
             } else {
@@ -543,8 +551,35 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
 /// The variant an alt arm names (`Circle`, or `Shape.Circle`).
 fn alt_variant(pattern: I32, enum_decl: I32) I32 {
     let word = if is_kind(pattern, Node.Qualified_type_ref) { word_of(name_node(last_child(pattern))); } else { word_of(pattern); };
+    // `E.V`: E's variant V (E the enum tested); a name two enums have is the tested one's.
+    if is_kind(pattern, Node.Qualified_type_ref) {
+        let named = node_decl[name_node(last_child(pattern))];
+        if decl_is(named, Decl.Variant) and decl_owner[named] != enum_decl { return -1; };
+    };
     let v = member(enum_decl, word, Space.Member);
     if decl_is(v, Decl.Variant) { v; } else { -1; };
+}
+
+/// Two arms for one variant written differently, one by its enum (`Circle`,
+/// `Shape.Circle`): the later can never run. (Arms written alike are
+/// validate's.)
+fn same_variant_arms(arms: I32, enum_decl: I32) void {
+    let q = arms;
+    while (q >= 0 and not (is_kind(q, Node.Alt_arm) and is_kind(first_child(q), Node.Qualified_type_ref))) { q = next_sibling(q); };
+    if q < 0 { return; };
+    let later = next_sibling(arms);
+    while (later >= 0) {
+        let v = if is_kind(later, Node.Alt_arm) { alt_variant(first_child(later), enum_decl); } else { -1; };
+        let e = arms;
+        while (v >= 0 and e != later) {
+            if is_kind(e, Node.Alt_arm) and alt_variant(first_child(e), enum_decl) == v and node_text(first_child(e)) != node_text(first_child(later)) {
+                report2(Diag.DuplicatePattern, later, -1, 1, -1);
+                diag_place(Extra.Related, first_child(e), "first here");
+                e = later;
+            } else { e = next_sibling(e); };
+        };
+        later = next_sibling(later);
+    };
 }
 
 /// An `alt` without a default arm names every variant: the first missing one

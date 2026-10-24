@@ -21,7 +21,10 @@ fn field_type(field: I32, inst: I32) I32 { type_of(next_sibling(first_child(decl
 /// `T { a: x, b: y }`: the initializers in the order written, then
 /// `struct.new` of the fields in declaration order.
 fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
-    let t = type_path(first_child(node), cx.inst);
+    let path = first_child(node);
+    let name = name_node(if is_kind(path, Node.Qualified_type_ref) { last_child(path); } else { path; });
+    if decl_is(node_decl[name], Decl.Ambiguous) and not expected_variant(name, expect) { return error_value(); };
+    let t = type_path(path, cx.inst);
     let decl = ty_decl(t);
     if not decl_is(decl, Decl.Struct) and not decl_is(decl, Decl.Variant) {
         // An unknown name was already reported; otherwise it names something that is not a struct.
@@ -31,6 +34,28 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
     };
     let inits = next_sibling(first_child(node));
     return build_struct(t, decl, inits, node, cx);
+}
+
+/// A variant name two enums have, in a literal: the variant of the enum (or
+/// the variant) expected, recorded on it. Without one, it is reported.
+fn expected_variant(name: I32, expect: I32) Bool {
+    let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
+    let want = if t >= 0 and ty_is(t, Ty.Named) { ty_decl(t); } else { -1; };
+    let d = node_decl[name];
+    while (decl_is(d, Decl.Ambiguous)) {
+        let v = decl_owner[d];
+        if want >= 0 and (v == want or decl_owner[v] == want) {
+            node_decl[name] = v;
+            return true;
+        };
+        d = decl_a[d];
+    };
+    if want >= 0 and (d == want or decl_owner[d] == want) {
+        node_decl[name] = d;
+        return true;
+    };
+    ambiguous(node_decl[name], name);
+    false;
 }
 
 /// `&{ a: x }`: the struct type expected.

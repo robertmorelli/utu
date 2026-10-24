@@ -680,6 +680,14 @@ fn impl_name(p: Parser) I32 {
     node(p, Node.Qualified_type_ref, at, first);
 }
 
+/// `.V` after `M.E` in a path: the variant V of M's enum E. Returns its
+/// name node, or -1.
+fn variant_step(p: Parser) I32 {
+    if not (is(p, Tok.Dot) and is_at(p, 1, Tok.Word)) { return -1; };
+    advance(p);
+    type_ident(p);
+}
+
 fn type_ident_or_promoted(p: Parser) I32 {
     if is(p, Tok.Amp) { promoted_type(p); } else { type_ident(p); };
 }
@@ -1118,7 +1126,8 @@ fn base_type(p: Parser) I32 {
     node(p, Node.Ref_type, at, first);
 }
 
-/// The inside of a `ref_type`: a type name, `M.T`, `M[A]`, or `M[A].T`.
+/// The inside of a `ref_type`: a type name, `M.T`, `M[A]`, `M[A].T`, or
+/// a variant of a mod's enum, `M.E.V`.
 fn ref_type(p: Parser) I32 {
     if not is_word(p) { fail(p); };
     let s = save(p);
@@ -1131,6 +1140,7 @@ fn ref_type(p: Parser) I32 {
         if is(p, Tok.Dot) {
             advance(p);
             type_ident(p);
+            variant_step(p);
             return node(p, Node.Qualified_type_ref, at, first);
         };
         return instantiated;
@@ -1139,6 +1149,7 @@ fn ref_type(p: Parser) I32 {
         node(p, Node.Module_ref, at, first);
         advance(p);
         type_ident(p);
+        variant_step(p);
         return node(p, Node.Qualified_type_ref, at, first);
     };
     restore(p, s);
@@ -1670,12 +1681,15 @@ fn word_expression(p: Parser) I32 {
     node(p, Node.Type_member_expr, at, first);
 }
 
-/// `m.T { field: … }` at the cursor, or -1 without consuming. Braces that fail
-/// as fields are a block (`if x == m.T { … }`); so are empty braces after a
-/// capitalized `M`, as in `if c == Color.Red {}`.
+/// `m.T { field: … }` or `m.E.V { field: … }` at the cursor, or -1 without
+/// consuming. Braces that fail as fields are a block (`if x == m.T { … }`);
+/// so are empty braces after a capitalized `M`, as in `if c == Color.Red {}`.
 fn qualified_struct_init(p: Parser) I32 {
-    if not (is_word(p) and is_at(p, 1, Tok.Dot) and is_at(p, 2, Tok.Word) and is_at(p, 3, Tok.LBrace)) { return -1; };
-    if not shaped(p) and is_at(p, 4, Tok.RBrace) { return -1; };
+    if not (is_word(p) and is_at(p, 1, Tok.Dot) and is_at(p, 2, Tok.Word)) { return -1; };
+    // (The brace: after `m.T`, or after `m.E.V`, E and V capitalized.)
+    let b = if is_at(p, 3, Tok.Dot) and is_at(p, 4, Tok.Word) and not shaped_at(p, 2) and not shaped_at(p, 4) { 5; } else { 3; };
+    if not is_at(p, b, Tok.LBrace) { return -1; };
+    if not shaped(p) and is_at(p, b + 1, Tok.RBrace) { return -1; };
     let s = save(p);
     let made = try {
         let at = mark();
@@ -1685,6 +1699,7 @@ fn qualified_struct_init(p: Parser) I32 {
         node(p, Node.Module_ref, at, first);
         advance(p);
         type_ident(p);
+        variant_step(p);
         node(p, Node.Qualified_type_ref, at, first);
         field_inits(p);
         node(p, Node.Struct_init, at, first);
@@ -1947,9 +1962,11 @@ fn match_lit(p: Parser) I32 {
     if is_kw(p, Kw.True) or is_kw(p, Kw.False) {
         leaf(p, Node.Bool_lit);
     } else if is_word(p) {
+        // `Tag.Leaf`, or `m.Tag.Leaf` of mod m.
         unreserved_type_ident(p);
         expect(p, Tok.Dot);
         type_ident(p);
+        variant_step(p);
     } else {
         if is(p, Tok.Minus) { advance(p); };
         number(p);
@@ -2003,6 +2020,7 @@ fn alt_pattern(p: Parser) I32 {
         };
         expect(p, Tok.Dot);
         type_ident(p);
+        variant_step(p);
         return node(p, Node.Qualified_type_ref, at, first);
     };
     restore(p, s);

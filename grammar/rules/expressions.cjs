@@ -219,7 +219,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     // alt on enum variants; ~> is the default arm
     alt_expr: ($) => seq('alt', $._expr, '{', repeat($.alt_arm), optional($.alt_default), '}'),
-    alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref), optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
+    alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)), optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
     alt_default: ($) => seq('~>', $._expr, ','),
 
     for_expr: ($) => seq('for', '(', $.for_sources, ')', optional($.capture), $.block),
@@ -253,7 +253,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
     struct_init: ($) =>
       choice(
         seq(
-          choice($.type_ident, $.qualified_type_ref),
+          choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)),
           '{',
           optional(seq($.field_init, repeat(seq(',', $.field_init)), optional(','))),
           '}',
@@ -267,7 +267,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
           '}',
         ),
       ),
-    _capital_qualified_type_ref: ($) => seq(alias($._capital_module_ref, $.module_ref), '.', $.type_ident),
+    _capital_qualified_type_ref: ($) => seq(alias($._capital_module_ref, $.module_ref), '.', $.type_ident, optional(seq('.', $.type_ident))),
     _capital_module_ref: ($) => alias($._capital_module_name, $.module_name),
     _capital_module_name: ($) => prec(1, $.type_ident),
     // `T` before `.member`, `.null`, or a struct's `M.T {`: the conflict waits for `{`.
