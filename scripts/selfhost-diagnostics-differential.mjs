@@ -40,6 +40,9 @@ const INTENDED = {
   // A test's `cl(v) { v + 1; }` where a void closure goes: stage 0 checks
   // test bodies only in test builds.
   ...both('baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu', 'test bodies are checked in every build'),
+  // A copy of std's LiteralDefaults: its @ir type, read only from std, is now checked
+  // in a program's own files too.
+  ...both('baselines/corpus/349529cf8d5a5dbfe2e3d4eb224f220211c9ca2b.utu', 'a program\'s own @ir types are checked'),
   // A copy of the prelude, importing std:Bool and the rest again: stage 0
   // loads them a second time, and reports each member twice.
   ...both('baselines/corpus/5aabd8136804de511d3694a2bbd4878ea74032ba.utu', 'a standard module imported again is the same module'),
