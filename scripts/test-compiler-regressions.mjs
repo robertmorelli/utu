@@ -2,6 +2,7 @@
 // the mistake each reports (where only the self-hosted compiler reports it
 // as it should, that is said).
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -1406,6 +1407,33 @@ export lib {
       assert.deepEqual(errors, ['Not UTF-8'], `${byte} ${JSON.stringify(before)}`);
       checked++;
     }
+  }
+  // In a string, a template, or a DSL body too (@es, @css, @wutu text): said once, at the byte
+  // (not the opening quote; a DSL body is not re-sliced around it, nor crashes the compiler).
+  for (const [before, bytes, after] of [
+    ['let f: fun(F64) F64 = @es/\\Math.sq', [0xff], 'rt\\/;\nexport main() F64 { f(4.0); }\n'],
+    ['let f: fun() Str = @es/\\() => "x', [0xc3], 'ABCy"\\/;\nexport main() Str { f(); }\n'],
+    ['let c: Str = @css/\\ a { color: r', [0xe2, 0x82], 'ed; } \\/;\nexport main() Str { c; }\n'],
+    ['using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab', [0xf4, 0x90, 0x80, 0x80], 'cd"; }\n    }\n    \\/;\n}\nexport main() void { Browser.document.body.append(view()); }\n'],
+    ['export main() I32 {\n    let s = "ab', [0xc3], '";\n    s.len();\n}\n'],
+    ['export main() I32 {\n    let s = "ab\\', [0xc3], '";\n    s.len();\n}\n'],
+    ['export main() Str { `a${1}b', [0xed, 0xa0, 0x80], 'c`; }\n'],
+  ]) {
+    const file = path.join(dir, 'bad_byte.utu');
+    await fs.writeFile(file, Buffer.concat([Buffer.from(before), Buffer.from(bytes), Buffer.from(after)]));
+    const built = await compileFile(utu, file, { optimize: 'size' });
+    assert.deepEqual(built.diagnostics.map(d => [d.message, d.start]), [['Not UTF-8', Buffer.byteLength(before)]], before);
+    checked++;
+  }
+  // A Wutu template that once expanded again each round (1024 copies of one mistake, and a
+  // larger file ran for minutes): checked in a child, under a time limit.
+  {
+    const file = path.join(dir, 'bad_wutu.utu');
+    await fs.writeFile(file, Buffer.concat([Buffer.from('using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab'), Buffer.from([0xf4, 0xbf, 0xbf, 0xbf]), Buffer.from('cd"; }\n    }\n    \\/;\n}\nexport main() void { Browser.document.body.append(view()); }\n')]));
+    const run = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'check', file], { encoding: 'utf8', timeout: 60000 });
+    assert.equal(run.signal, null, 'timed out');
+    assert.equal((run.stdout + run.stderr).match(/ERROR/g)?.length, 1, run.stdout + run.stderr);
+    checked++;
   }
   const crlf = await selfhost(await write('export lib {\r\n    fn m() Str { let m = \\\\a\r\n        \\\\b\r\n    ; m; }\r\n    fn t() Str { `a\r\nb`; }\r\n}\r\n'));
   assert.equal(crlf.exports?.m(), 'a\nb', crlf.errors?.join('\n'));
