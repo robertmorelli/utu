@@ -464,7 +464,8 @@ ${types.map(type => `    fn __utu_comptime_len_${type}(values: Array[${type}]) I
       throw fail(`@comptime: ${problems[0].message}${row != null ? ` (line ${row})` : ''}`, site);
     }
     const { emitBinary, buildImportObject, instantiateLowered } = await import('../index.js');
-    const wasm = emitBinary(built);
+    // As the self-hosted compiler's: a hundred million loop rounds, then a trap.
+    const wasm = emitBinary(built, { fuel: 100000000 });
     const { instance } = await instantiateLowered(wasm, await buildImportObject(built, { wasm }));
     const exports = instance.exports;
     const results = items.map(({ expression, valueType, site }, k) => {
@@ -474,6 +475,7 @@ ${types.map(type => `    fn __utu_comptime_len_${type}(values: Array[${type}]) I
         const elements = Array.from({ length: count }, (_, i) => exports[`__utu_comptime_at_${valueType}`](values, i));
         return valueType === 'U32' ? elements.map(value => value >>> 0) : elements;
       } catch (error) {
+        if (exports.__comptime_fuel?.() === 0) throw fail(`@comptime ${expression} failed: it ran too long (a hundred million loop rounds)`, site);
         throw fail(`@comptime ${expression} failed: ${error.message}`, site);
       }
     });

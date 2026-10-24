@@ -44,7 +44,7 @@ const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 
 async function main() {
   const [command, fileArg, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') usage(0);
-  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest, fail);
+  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, fileArg, rest, fail, notUtf8);
   if (command === 'lsp') return lsp();
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
@@ -138,21 +138,33 @@ const WRITES = new Set(['build', 'build-exe']);
 async function buildOrExit(utu, file, options) {
   const result = await compileFile(utu, file, options);
   if (deepens && result.diagnostics.some(d => d.code === 'nested-too-deeply')) throw new TooDeep();
-  if (result.diagnostics.length) {
-    const files = new Map(result.files.map(f => [f.key, f.text]));
-    // In file order, then by position.
-    const order = new Map(result.files.map((f, i) => [f.key, i]));
-    const sorted = result.diagnostics.toSorted((a, b) => (order.get(a.file) ?? -1) - (order.get(b.file) ?? -1) || (a.start ?? 0) - (b.start ?? 0));
-    // Colored as the compiler reads it: it still holds this build's program.
-    const { highlighter } = await import('../src/selfhost/highlight.js');
-    // All of it written before exiting: a pipe takes it in pieces.
-    await written(process.stderr, `${formatDiagnostics(sorted, files, {
-      color: colored(process.stderr), relative: displayPath,
-      highlight: highlighter(utu, result.files),
-    })}\n`);
-  }
+  if (result.diagnostics.length) await report(utu, result, result.diagnostics);
   if (!result.wasm) process.exit(1);
   return result;
+}
+
+/** Write `diagnostics` (of the build `result`) to stderr, in file order, then by position. */
+async function report(utu, result, diagnostics) {
+  const files = new Map(result.files.map(f => [f.key, f.text]));
+  const order = new Map(result.files.map((f, i) => [f.key, i]));
+  const sorted = diagnostics.toSorted((a, b) => (order.get(a.file) ?? -1) - (order.get(b.file) ?? -1) || (a.start ?? 0) - (b.start ?? 0));
+  // Colored as the compiler reads it: it still holds this build's program.
+  const { highlighter } = await import('../src/selfhost/highlight.js');
+  // All of it written before exiting: a pipe takes it in pieces.
+  await written(process.stderr, `${formatDiagnostics(sorted, files, {
+    color: colored(process.stderr), relative: displayPath,
+    highlight: highlighter(utu, result.files),
+  })}\n`);
+}
+
+/** A stage 0 view of a program with a file that is not UTF-8: the self-hosted compiler's "Not UTF-8", at the byte; exits 1. */
+async function notUtf8(file) {
+  const utu = await loadNodeCompiler();
+  const result = await compileFile(utu, file, { target: 'normal' });
+  const bad = result.diagnostics.filter(d => d.message === 'Not UTF-8');
+  if (!bad.length) fail(`${displayPath(file)} is not UTF-8`, 'parse-error');
+  await report(utu, result, bad);
+  process.exit(1);
 }
 
 /** Write `text` to `stream`, resolving once the stream has taken it all. */
@@ -190,9 +202,20 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   }
   // The program's arguments where a built one finds them: process.argv.slice(2).
   process.argv = [process.argv[0], file, ...argv];
+  // The profile, written once: after main, or before a trap's exit (main's, or a callback's).
+  let profiled = null;
+  const profileOnce = () => (profiler ? (profiled ??= writeProfile(file, profiler, out)) : null);
   // A callback's trap, after main returned (a `.then`'s, a timer's): placed as main's are.
   // (Bun ends with 0 if the handler's exit comes after an await: the code is set first.)
-  const later = error => { process.exitCode = 1; return trap(error, file, built, utu); };
+  // The first only: reporting one that fails (stderr closed) is not reported again.
+  let failing = false;
+  const later = async error => {
+    process.exitCode = 1;
+    if (failing) return;
+    failing = true;
+    await profileOnce();
+    return trap(error, file, built, utu);
+  };
   process.on('uncaughtException', later);
   process.on('unhandledRejection', later);
   let result;
@@ -201,10 +224,10 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
     result = await exports.main();
   } catch (error) {
     // (What ran until the trap is still a profile.)
-    if (profiler) await writeProfile(file, profiler, out);
+    await profileOnce();
     await trap(error, file, built, utu);
   }
-  if (profiler) await writeProfile(file, profiler, out);
+  await profileOnce();
   if (result !== undefined) console.log(result);
 }
 

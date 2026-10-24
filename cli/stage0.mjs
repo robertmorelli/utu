@@ -18,8 +18,11 @@ const DISPLAY_FILTERS = new Map([
   ['display:exports', new Set(['ir-export-lib', 'ir-export-main'])],
 ]);
 
-/** `fail(title, code, notes, command)`: utu.mjs's, which says what went wrong and exits 1. */
-export async function main(command, fileArg, args, fail) {
+/**
+ * `fail(title, code, notes, command)`: utu.mjs's, which says what went wrong and exits 1.
+ * `notUtf8(file)`: utu.mjs's, which says where a program's file is not UTF-8 and exits 1.
+ */
+export async function main(command, fileArg, args, fail, notUtf8) {
   if (!fileArg || fileArg.startsWith('-')) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
   const file = path.resolve(fileArg);
   let stat = null;
@@ -34,10 +37,28 @@ export async function main(command, fileArg, args, fail) {
   try {
     await show(command, file, args, at);
   } catch (error) {
+    // A file the self-hosted compiler would not read: its "Not UTF-8", at the byte.
+    if (unreadable) return notUtf8(file);
     // Stage 0's own errors (an import it cannot find, a module a file lacks) carry a diagnostic.
     if (error?.diagnostic) fail(error.message, error.diagnostic.kind ?? 'error');
     if (error?.code && error.path) fail(`cannot ${error.syscall ?? 'use'} ${error.path}: ${error.code}`, 'file-error');
-    throw error;
+    // Any other: what stage 0 says, without its stack.
+    if (error instanceof RangeError && /call stack/i.test(error.message)) fail('Nested too deeply for stage 0', 'nested-too-deeply');
+    fail(String(error?.message ?? error).split('\n')[0] || 'stage 0 failed', 'stage0-error');
+  }
+}
+
+/** A file of the program that is not UTF-8 (stage 0 may wrap the error, as a failed import). */
+let unreadable = null;
+
+/** A file's text, which must be UTF-8 (as the self-hosted compiler requires): a byte-order mark kept, as Node's 'utf8' does. */
+async function readUtf8(file) {
+  const bytes = await fs.readFile(file);
+  try {
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    unreadable = file;
+    throw new Error(`${file} is not UTF-8`);
   }
 }
 
@@ -45,13 +66,13 @@ async function show(command, file, args, at) {
   const parser = await initParser({ wasmDir: `${ROOT}/` });
   const compiler = createCompiler({
     parser, target: 'analysis',
-    readFile: f => fs.readFile(f, 'utf8'),
+    readFile: readUtf8,
     readBinaryFile: f => fs.readFile(f),
     resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
     resolvePackage: async (specifier, request) =>
       (await import('../tools/dts/packages.mjs')).nodePackageResolver({ root: process.cwd() })(specifier, request),
   });
-  const source = await fs.readFile(file, 'utf8');
+  const source = await readUtf8(file);
   if (command === 'graph') {
     const { renderGraphHtml } = await import('../src/compiler/graph-html.js');
     const out = at >= 0 ? path.resolve(args[at + 1]) : path.resolve(`${path.basename(file, '.utu')}.graph.html`);
@@ -60,13 +81,14 @@ async function show(command, file, args, at) {
       ({ doc } = await compiler.analyzeFile(file));
     } catch (error) {
       doc = error.doc;
-      if (!doc) throw error;
+      if (!doc || unreadable) throw error;
     }
     await fs.writeFile(out, renderGraphHtml(doc, source, file));
     console.error(`wrote ${out}`);
     return;
   }
   const analysis = await compiler.analyzeFile(file);
+  if (unreadable) throw new Error(`${unreadable} is not UTF-8`);
   if (command === 'display:debug' && analysis.artifacts.diagnostics.length) {
     console.log(await formatDiagnostics(analysis.artifacts.diagnostics, { readFile: f => fs.readFile(f, 'utf8'), snapshot: analysis.snapshot, color: colored() }));
     process.exitCode = 1;

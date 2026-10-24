@@ -40,12 +40,32 @@ import { childrenOf } from '../ir-helpers.js';
  * @param {{ artifacts?: object }} [opts]
  * @returns {import('../wasm/module.js').Module}
  */
-export function buildModule(doc, { artifacts = null, sourceMap = false } = {}) {
+export function buildModule(doc, { artifacts = null, sourceMap = false, fuel = 0 } = {}) {
   const m = moduleWithMemories(readMems(doc.body.firstChild));
+  if (fuel) addFuel(m, fuel);
   populateModule(m, doc, { artifacts, sourceMap });
   // -Oz and -O3 clean up the locals lowerings leave; -O0 emits codegen's output as is.
   if ((doc.body.firstChild?.attr?.('data-optimize') ?? 'size') !== 'none') optimizeModule(m);
   return m;
+}
+
+/**
+ * A @comptime build's fuel (as the self-hosted compiler's): every loop round
+ * takes one from a global and traps at zero; `__comptime_fuel` (exported)
+ * reads it, so the host can say why.
+ */
+function addFuel(m, fuel) {
+  const name = '__comptime_fuel';
+  m.addGlobal(name, wasm.i32, true, m.i32.const(fuel));
+  const get = () => m.global.get(name, wasm.i32);
+  const loop = m.loop.bind(m);
+  m.loop = (label, body) => loop(label, m.block(null, [
+    m.global.set(name, m.i32.sub(get(), m.i32.const(1))),
+    m.if(m.i32.eqz(get()), m.unreachable()),
+    body,
+  ], body.type));
+  m.addFunction(name, wasm.createType([]), wasm.i32, [], get());
+  m.addFunctionExport(name, name);
 }
 
 function populateModule(m, doc, { artifacts, sourceMap }) {
@@ -199,8 +219,8 @@ function readDslWasmImports(root) {
  * @param {{ artifacts?: object, sourceMap?: boolean | string }} [opts]
  * @returns {Uint8Array | { binary: Uint8Array, sourceMap: string }}
  */
-export function emitBinary(doc, { artifacts = null, sourceMap = false } = {}) {
-  const m = buildModule(doc, { artifacts, sourceMap });
+export function emitBinary(doc, { artifacts = null, sourceMap = false, fuel = 0 } = {}) {
+  const m = buildModule(doc, { artifacts, sourceMap, fuel });
   const sourceMapUrl = sourceMap ? (sourceMap === true ? 'module.wasm.map' : sourceMap) : undefined;
   const emitted = m.emitBinary(sourceMapUrl);
   const binary = sourceMap ? emitted.binary : emitted;
