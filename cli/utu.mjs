@@ -236,20 +236,21 @@ async function test(file, { utu, optimize, safe }) {
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) })
     .catch(error => trap(error, file, built, utu));
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
-  const report = (title, error) => {
+  const report = (title, error, times = 1) => {
     const { title: what, frames, at } = trapText(error, map);
     const place = at?.entry?.file ? paint('2', `  at ${placeText(at.entry)}`) : '';
     const where = frames.length ? paint('2', `  in ${frames.map(f => f.fn).join(' ← ')}`) : '';
-    console.log(`${paint('31', 'FAIL')} ${title}: ${what}${place}${where}`);
+    console.log(`${paint('31', 'FAIL')} ${title}: ${what}${times > 1 ? ` (${times} times)` : ''}${place}${where}`);
   };
   const strays = strayErrors();
   let failed = 0;
   let uncaught = 0;
-  const reportStrays = () => {
-    for (const { error, during } of strays.list.splice(0)) {
-      uncaught++;
-      report(during ?? 'after tests', error);
-    }
+  // Each distinct error once, with how often it came; the first of a passing test's fails it.
+  const reportStrays = (failing = false) => {
+    const { groups, more } = strays.take();
+    for (const { error, during, times } of groups) report(during ?? 'after tests', error, times);
+    for (const [during, n] of more) console.log(`${paint('31', 'FAIL')} ${during ?? 'after tests'}: and ${n} more`);
+    uncaught += groups.reduce((n, g) => n + g.times, 0) + [...more.values()].reduce((a, b) => a + b, 0) - (failing ? 1 : 0);
   };
   for (const { export: name, name: title } of tests) {
     const started = performance.now();
@@ -259,7 +260,12 @@ async function test(file, { utu, optimize, safe }) {
       const ms = performance.now() - started;
       // What it scheduled for now runs (and throws) before the next test.
       await nextTask();
-      if (strays.list.length) throw strays.list.shift().error;
+      strays.running = null;
+      if (strays.count) {
+        failed++;
+        reportStrays(true);
+        continue;
+      }
       console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${ms.toFixed(1)} ms)`)}`);
     } catch (error) {
       failed++;
@@ -269,9 +275,7 @@ async function test(file, { utu, optimize, safe }) {
     strays.running = null;
     reportStrays();
   }
-  // A moment for what the tests left running to throw; then the run ends,
-  // whatever is still pending (an interval would keep it alive).
-  await settled(new Promise(() => {}), TEST_GRACE_MS).catch(() => {});
+  await drain();
   reportStrays();
   const summary = tests.length ? `${tests.length - failed} passed, ${failed} failed` : 'No tests';
   await written(process.stdout, `${summary}${uncaught ? `, ${uncaught} uncaught error${uncaught > 1 ? 's' : ''}` : ''}\n`);
@@ -283,12 +287,44 @@ async function test(file, { utu, optimize, safe }) {
  * bench `running` when it came: it fails that one, or is one more failure.
  */
 function strayErrors() {
-  const strays = { running: null, list: [] };
-  const add = error => strays.list.push({ error, during: strays.running });
+  // By test and text: the first error of each and a count (a callback can throw millions);
+  // past STRAY_KINDS texts, a count by test alone.
+  let groups = new Map();
+  let more = new Map();
+  const strays = {
+    running: null,
+    count: 0,
+    take() {
+      const taken = { groups: [...groups.values()], more };
+      groups = new Map();
+      more = new Map();
+      strays.count = 0;
+      return taken;
+    },
+  };
+  const add = error => {
+    const during = strays.running;
+    const key = `${during}\0${valueText(error)}`;
+    const group = groups.get(key);
+    strays.count++;
+    if (group) group.times++;
+    else if (groups.size < STRAY_KINDS) groups.set(key, { error, during, times: 1 });
+    else more.set(during, (more.get(during) ?? 0) + 1);
+  };
   process.on('uncaughtException', add);
   process.on('unhandledRejection', add);
   return strays;
 }
+
+/** How many distinct stray errors are kept (and shown) at a time. */
+const STRAY_KINDS = 20;
+
+/**
+ * After the last test or bench: until nothing but the runner is left (its
+ * callbacks have thrown, or not), at most DRAIN_MS; then the run ends,
+ * whatever is still pending (an interval would keep it alive).
+ */
+const drain = () => settled(new Promise(() => {}), DRAIN_MS).catch(() => {});
 
 /** After the callbacks already due (a `setTimeout(f, 0)`'s). */
 const nextTask = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -311,8 +347,8 @@ function settled(result, ms) {
 
 /** How long a test may wait (on a timer, say) before it fails. */
 const TEST_TIMEOUT_MS = 10000;
-/** How long after the last test its callbacks may still throw. */
-const TEST_GRACE_MS = 50;
+/** How long after the last test its callbacks may still throw, if they keep the event loop busy. */
+const DRAIN_MS = 2000;
 
 /**
  * Each bench, timed: `__bench_k(n)` runs its setup once and its measured
@@ -346,14 +382,11 @@ async function bench(file, { utu, optimize, safe }) {
     rows.push([title, `FAIL: ${trapText(error).title}${times > 1 ? ` (${times} times)` : ''}`, '']);
     failed = true;
   };
-  // A bench's setup runs many times: its stray errors are one row.
+  // A bench's setup runs many times: each distinct stray error is one row.
   const reportStrays = () => {
-    const by = new Map();
-    for (const { error, during } of strays.list.splice(0)) {
-      const title = during ?? 'after benches';
-      by.set(title, { error: by.get(title)?.error ?? error, times: (by.get(title)?.times ?? 0) + 1 });
-    }
-    for (const [title, { error, times }] of by) fail(title, error, times);
+    const { groups, more } = strays.take();
+    for (const { error, during, times } of groups) fail(during ?? 'after benches', error, times);
+    for (const [during, n] of more) rows.push([during ?? 'after benches', `FAIL: and ${n} more`, '']);
   };
   for (const { export: name, name: title } of benches) {
     const f = exports[name];
@@ -371,7 +404,7 @@ async function bench(file, { utu, optimize, safe }) {
       }
       const per = Math.max(0, median(runs) - median(setups)) / n;
       await nextTask();
-      if (!strays.list.length) rows.push([title, duration(per), `${SAMPLES} × ${n}`]);
+      if (!strays.count) rows.push([title, duration(per), `${SAMPLES} × ${n}`]);
     } catch (error) {
       fail(title, error);
       await nextTask();
@@ -379,7 +412,7 @@ async function bench(file, { utu, optimize, safe }) {
     strays.running = null;
     reportStrays();
   }
-  await settled(new Promise(() => {}), TEST_GRACE_MS).catch(() => {});
+  await drain();
   reportStrays();
   const header = ['bench', 'median', 'iterations'];
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
@@ -784,7 +817,28 @@ const UNREACHABLE = {
  * frame to show, the innermost in the program's own files.
  */
 function trapText(error, map = null) {
-  let message = String(error?.message ?? error).split('\n')[0];
+  try {
+    return trapParts(error, map);
+  } catch {
+    // A value no stack or text can be read from (a revoked proxy, say).
+    return { title: valueText(error), frames: [], wasm: false, at: null, placed: false };
+  }
+}
+
+/** A thrown value's first line, whatever it is: `String` throws for some (no prototype, a throwing toString). */
+function valueText(value) {
+  try {
+    return String(value?.message ?? value).split('\n')[0];
+  } catch {}
+  try {
+    return Object.prototype.toString.call(value);
+  } catch {
+    return '[object]';
+  }
+}
+
+function trapParts(error, map) {
+  let message = valueText(error);
   const wasm = error instanceof WebAssembly.RuntimeError || /Maximum call stack/i.test(message);
   // JavaScriptCore says what it was evaluating: not part of the trap.
   if (wasm) message = message.replace(/ \(evaluating '[^']*'\)$/, '');

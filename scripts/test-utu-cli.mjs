@@ -175,6 +175,45 @@ bench "ok last" { let s = 0; measure { s = s + 1; } }
     assert.match(rows[3], /^ok last  [0-9.]+ (ns|µs|ms|s) /, runtime);
   }
 
+  // A thrown value with no text (no prototype, a throwing toString) fails its test, and the rest run;
+  // a callback 300 ms after the last test is still a failure after them; a stray error thrown
+  // thousands of times is one line, and past 20 distinct ones the rest are a count.
+  await write('strange.utu', `let rej: fun(I32) void = @es/\\ (k) => { Promise.reject(k ? {toString() { throw new Error("ts"); }} : Object.create(null)); } \\/;
+let thr: fun() void = @es/\\ () => { throw {toString() { throw new Error("ts"); }}; } \\/;
+let many: fun() void = @es/\\ () => {
+    for (let i = 0; i < 3000; i++) setTimeout(() => { throw new Error("same"); }, 0);
+    for (let i = 0; i < 25; i++) setTimeout(() => { throw new Error("e" + i); }, 0);
+} \\/;
+let later: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("late"); }, 300); } \\/;
+test "no prototype" { rej(0); }
+test "throwing toString" { rej(1); }
+test "throws it" { thr(); }
+test "many" { many(); }
+test "last" { later(); }
+bench "many" { many(); measure { } }
+`);
+  for (const runtime of [process.execPath, ...(hasBun ? ['bun'] : [])]) {
+    r = spawnSync(runtime, [cli, 'test', 'strange.utu'], { encoding: 'utf8', cwd: dir, timeout: 30000 });
+    assert.equal(r.status, 1, `${runtime}: ${r.stderr}`);
+    assert.equal(r.stderr, '', runtime);
+    assert.equal(r.stdout.replace(/ \([0-9.]+ ms\)/g, ''), `FAIL no prototype: [object Object]
+FAIL throwing toString: [object Object]
+FAIL throws it: [object Object]
+FAIL many: same (3000 times)
+${Array.from({ length: 19 }, (_, i) => `FAIL many: e${i}\n`).join('')}FAIL many: and 6 more
+pass last
+FAIL after tests: late
+1 passed, 4 failed, 3025 uncaught errors
+`, runtime);
+    r = spawnSync(runtime, [cli, 'bench', 'strange.utu'], { encoding: 'utf8', cwd: dir, timeout: 60000 });
+    assert.equal(r.status, 1, `${runtime}: ${r.stderr}`);
+    const rows = r.stdout.split('\n').slice(1, -1).map(row => row.replace(/ {2,}/g, '  ').trim());
+    assert.match(rows[0], /^many  FAIL: same \([0-9]+ times\)$/, runtime);
+    assert.match(rows[19], /^many  FAIL: e18 \([0-9]+ times\)$/, runtime);
+    assert.match(rows[20], /^many  FAIL: and [0-9]+ more$/, runtime);
+    assert.equal(rows.length, 21, runtime);
+  }
+
   // The build modes: small (the default) and fast keep the checks Wasm does
   // not make itself, so past a Buffer's length is a trap; the unsafe ones
   // leave them out, and it reaches the capacity beyond.
