@@ -113,13 +113,15 @@ fn expand_wutu(site: I32) void {
     wx_event_ops.clear();
     // The template as a program (its structure, as data) and the code that supplies its values.
     let ops = WOps { text: "" };
-    let code = wd_element(root, false, ops);
+    let tag = word_text(tn_text[root]);
+    // (A root `circle` or `g` is SVG; `a`, `title`, `script`, `style` are HTML.)
+    let svg = is_svg_tag(tag) and not is_html_tag(tag);
+    let code = wd_element(root, svg, ops);
     let events = "";
     for (0 ..< wx_events.len()) |k| { events = events + word_text(wx_events[k]); };
     for (0 ..< wx_event_ops.len()) |k| { wd_op(ops, word_text(wx_event_ops[k])); };
-    let tag = word_text(tn_text[root]);
     code = wutu_helper("begin") + "(" + js_string("[" + ops.text + "]") + ");\n" + code;
-    events = events + wutu_typed_fn("done", tag, tag == "svg") + "()";
+    events = events + wutu_typed_fn("done", tag, svg) + "()";
     // Shared sheets install in source order, so later ones win the cascade.
     let prelude = "";
     for (0 ..< tw_style_value.len()) |k| {
@@ -141,7 +143,6 @@ fn expand_wutu(site: I32) void {
     let render = "{ " + declarations + " " + prelude + code + " " + events + "; }";
     let value = render;
     if tw_reactive[0] == 1 {
-        let svg = tag == "svg";
         let mount = wutu_helper(if svg { "mount_svg"; } else { "mount"; });
         let last = word_text(wu_decls[wu_decls.len() - 1]);
         value = last + " " + mount + "(cl() " + (if svg { "Browser.SVGElement "; } else { "Browser.HTMLElement "; }) + render + ", " + (if tw_scope[0] >= 0 { word_text(tw_scope[0]); } else { "\"\""; }) + ")";

@@ -233,6 +233,7 @@ fn tag_attributes(tag: Str) Str {
     if tag == "th" { return "colspan rowspan headers scope abbr"; };
     if tag == "video" { return "src controls autoplay muted loop playsinline poster width height preload crossorigin disablepictureinpicture disableremoteplayback"; };
     if tag == "audio" { return "src controls autoplay muted loop preload crossorigin"; };
+    if tag == "object" { return "data type name width height form usemap"; };
     if tag == "iframe" { return "src srcdoc name title width height loading allow allowfullscreen sandbox referrerpolicy"; };
     "";
 }
@@ -994,7 +995,8 @@ fn at_directive(text: Str, p: I32, inside: Bool) void {
 }
 
 /// A DOM event `name` is likely a typo of (one edit, two for a long name),
-/// or "" for a known event or a custom one.
+/// or "" for a known event or a custom one. One that adds to an event's
+/// name (`changed`, `resized`, `clicks`) is custom.
 fn near_event(name: Str) Str {
     let known = "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress "
         + "pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture "
@@ -1006,10 +1008,22 @@ fn near_event(name: Str) Str {
         + "compositionstart compositionupdate compositionend selectionchange selectstart mount";
     if in_words(known, name) { return ""; };
     let near = closest_word(known, name);
-    if near.len() == 0 { return ""; };
+    if near.len() == 0 or extends_word(known, name) { return ""; };
     let d = word_distance(intern_text(near), intern_text(name), 3);
     if d > 1 and name.len() <= 6 { return ""; };
     near;
+}
+
+/// Whether `w` is a word of `list` (space-separated) and more.
+fn extends_word(list: Str, w: Str) Bool {
+    let i = 0;
+    while (i < list.len()) {
+        let j = i;
+        while (j < list.len() and list.get(j) != 32) { j += 1; };
+        if j - i < w.len() and text_at(w, 0, list.slice(i, j)) { return true; };
+        i = j + 1;
+    };
+    false;
 }
 
 /// The word of `list` (space-separated) within two edits of `w`, or "".

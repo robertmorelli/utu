@@ -282,38 +282,41 @@ mod wutu {
     'background', 'codebase', 'longdesc', 'manifest']);
   // Attributes that hold several URLs, apart at whitespace (or commas).
   const LISTS = new Set(['ping', 'srcset', 'imagesrcset']);
-  // The DOM events with a handler attribute (`on` + the name), in any browser.
-  const EVENTS = new Set('abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom'.split(' '));
   /**
-   * Whether a value from a render may go in attribute `name`: an event
-   * handler's (`on` and an event's name, any case) and srcdoc (HTML) take none; a URL one takes
-   * no javascript: or vbscript: URL, and a data: URL only of an image, audio
-   * or video (an SVG one only in an img or SVG image, where it runs no
-   * script); ping and srcset check each of theirs; a meta's content (a
-   * refresh's URL) has none of these schemes anywhere. The scheme is read as
-   * a browser reads it: in any case, whitespace and control characters dropped.
+   * Whether a value from a render may go in attribute `name` (a name the
+   * compiler checked: no event handler's): srcdoc (HTML) takes none; a URL
+   * one takes no javascript: or vbscript: URL, and a data: URL only of an
+   * image, audio or video (an SVG one only in an img or SVG image, where it
+   * runs no script), or any in the href of an a or area with a download (it
+   * is saved, not opened);
+   * ping and srcset check each of theirs; a meta's content (a refresh's URL)
+   * has none of these schemes anywhere. A URL is read as a browser reads it:
+   * in any case, whitespace and control characters dropped.
    */
   function safe(node, name, value) {
     name = name.toLowerCase();
-    if ((name.startsWith('on') && EVENTS.has(name.slice(2))) || name === 'srcdoc') return false;
+    if (name === 'srcdoc') return false;
     if (value === true) return true;
-    if (URLS.has(name)) return scheme(node, String(value));
-    if (LISTS.has(name)) return String(value).split(/[\s,]+/).every(u => scheme(node, u));
-    if (name === 'content' && node.localName === 'meta') {
-      const s = String(value).replace(/[\x00-\x20]+/g, '').toLowerCase();
-      return !s.includes('javascript:') && !s.includes('vbscript:') && !s.includes('data:');
-    }
-    return true;
+    value = String(value);
+    if (URLS.has(name)) return scheme(node, name, value);
+    if (LISTS.has(name)) return value.split(/[ ,]+/).every(u => scheme(node, name, u));
+    return name !== 'content' || node.localName !== 'meta' || !/javascript:|vbscript:|data:/.test(bare(value));
   }
 
-  /** Whether one URL's scheme may go in node (see safe). */
-  function scheme(node, value) {
+  /** value's first n characters past whitespace and controls, which it drops, in lower case. */
+  function bare(value, n = 1 / 0) {
     let s = '';
-    for (let i = 0; i < value.length && s.length < 16; i++) if (value.charCodeAt(i) > 32) s += value[i].toLowerCase();
-    if (s.startsWith('javascript:') || s.startsWith('vbscript:')) return false;
-    if (!s.startsWith('data:')) return true;
-    if (s.startsWith('data:image/svg')) return node.localName === 'img' || node.localName === 'image';
-    return s.startsWith('data:image/') || s.startsWith('data:audio/') || s.startsWith('data:video/');
+    for (const c of value) if (c > ' ' && (s += c).length >= n) break;
+    return s.toLowerCase();
+  }
+
+  /** Whether one URL's scheme may go in node's attribute `name` (see safe). */
+  function scheme(node, name, value) {
+    const s = bare(value, 16), tag = node.localName;
+    if (/^(java|vb)script:/.test(s)) return false;
+    if (!s.startsWith('data:') || name === 'href' && (tag === 'a' || tag === 'area') && node.hasAttribute('download')) return true;
+    if (s.startsWith('data:image/svg')) return tag === 'img' || tag === 'image';
+    return /^data:(image|audio|video)[/]/.test(s);
   }
 
   /** A URL property set by a render (`.href = …`): as its attribute is, else the attribute goes. */

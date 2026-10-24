@@ -587,7 +587,7 @@ export main() Browser.HTMLElement {
           return ['a ping', 'img srcset', 'link imagesrcset', 'meta content', 'x-box ping', 'x-box srcset']
             .map(s => { const [tag, name] = s.split(' '); return root.querySelector(tag).getAttribute(name); });
         };
-        for (const bad of ['javascript:alert(1)', 'a.png 1x, javascript:alert(1) 2x', 'a.png 1x,JaVaScRiPt:alert(1)', 'https://ok/a \u0001vbscript:x'])
+        for (const bad of ['javascript:alert(1)', 'a.png 1x, javascript:alert(1) 2x', 'a.png 1x,JaVaScRiPt:alert(1)', 'https://ok/a \u0001vbscript:x', ' JaVa\tScript:alert(4)'])
           assertEq(got(bad).slice(0, 3).concat(got(bad).slice(4)).join(' '), Array(5).fill(null).join(' '), `${mode}: ${JSON.stringify(bad)} dropped`);
         for (const bad of ['0; url=javascript:alert(1)', "0;URL='java\nscript:alert(1)'", '0;javascript:alert(1)', '0; url=data:text/html,x'])
           assertEq(got(bad)[3], null, `${mode}: meta content ${JSON.stringify(bad)} dropped`);
@@ -595,6 +595,37 @@ export main() Browser.HTMLElement {
         assertEq(got('5; url=https://ok.example/')[3], '5; url=https://ok.example/', `${mode}: a safe refresh stays`);
       });
     }
+  });
+
+  test('wutu: a root SVG-only tag is SVG; object takes data, checked as a URL; on changed is a custom event', async ({ ROOT }) => {
+    const source = `${BROWSER}
+      fn dot(k: I32) Browser.SVGElement { @wutu/\\ circle.dot { r = k.to_str(); } \\/; }
+      fn grp() Browser.SVGElement { @wutu/\\ g { rect { width = "2"; } } \\/; }
+      fn link() Browser.HTMLElement { @wutu/\\ a { href = "/x"; "x"; } \\/; }
+      fn obj(u: Str) Browser.HTMLElement { @wutu/\\ object#ob { data = u; } \\/; }
+      fn custom() Browser.HTMLElement {
+          @wutu/\\ div { on changed { } on resized { } on closed { } on scrolled { } on paused { } on toggled { } on selected { } } \\/;
+      }
+      export lib {
+          fn d() Browser.SVGElement { dot(3); }
+          fn g() Browser.SVGElement { grp(); }
+          fn a() Browser.HTMLElement { link(); }
+          fn o(u: Str) Browser.HTMLElement { obj(u); }
+          fn c() Browser.HTMLElement { custom(); }
+      }
+    `;
+    await withDom(async () => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_root_svg.utu', source, mode: 'debug' });
+      const x = instance.exports, SVG = 'http://www.w3.org/2000/svg';
+      assertEq([x.d(), x.g(), x.g().firstChild, x.a()].map(n => n.localName + ':' + (n.namespaceURI === SVG)).join(' '), 'circle:true g:true rect:true a:false');
+      assertEq(x.d().getAttribute('r'), '3');
+      assertEq(x.o('/a.svg').getAttribute('data'), '/a.svg');
+      assertEq(x.o('javascript:alert(1)').getAttribute('data'), null);
+      assertEq(x.o('data:text/html,x').getAttribute('data'), null);
+      x.c();
+    });
+    const typo = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { on clik { } } \\/; }` });
+    assert(typo.some(d => d.severity === 'error' && d.message.includes('unknown event clik; did you mean click?')), typo.map(d => d.message).join('; '));
   });
 
   test('wutu parser: legacy surface still parses', () => {
