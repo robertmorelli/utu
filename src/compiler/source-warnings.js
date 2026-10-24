@@ -6,6 +6,7 @@ const IF_VALUE_BRANCH = /(?<=\b(?:if\b[^{};]*|else\s*))\{[^{};]*;?\s*\}/g;
 // Author-facing source checks. Never inspect generated Wutu/iterator expansions.
 export function compressedSourceWarnings(source, file) {
   const warnings = [];
+  if (!hasLongLine(source)) return warnings;
   let offset = 0;
   let inBlockComment = false;
   // Open template strings: 'text' inside one's text, or the brace depth
@@ -14,6 +15,11 @@ export function compressedSourceWarnings(source, file) {
   for (const [index, line] of source.split('\n').entries()) {
     // Only a long line can warn: a short one is scanned for the state it leaves.
     const long = line.length > 160;
+    // A short line, with nothing open, that opens nothing (or is a comment) leaves no state.
+    if (!long && !inBlockComment && !templates.length && (!line.includes('`') && !line.includes('/*') || /^\s*\/\//.test(line))) {
+      offset += line.length + 1;
+      continue;
+    }
     let code = '';
     let quoted = false;
     if (!line.trimStart().startsWith('\\\\')) {
@@ -64,6 +70,16 @@ export function compressedSourceWarnings(source, file) {
   return warnings;
 }
 
+/** Whether a line is over 160 characters (only such a line can warn). */
+function hasLongLine(source) {
+  for (let i = 0, j; i < source.length; i = j + 1) {
+    j = source.indexOf('\n', i);
+    if (j < 0) j = source.length;
+    if (j - i > 160) return true;
+  }
+  return false;
+}
+
 // Comments and string contents blanked to spaces, so offsets are preserved.
 // Utu line comments are `//` and `\\`; strings never span lines.
 function codeOnly(source) {
@@ -83,6 +99,8 @@ export function unknownIslandWarnings(sources) {
   const islands = new Set();
   const calls = [];
   for (const [file, source] of sources) {
+    // Neither an island nor a call: nothing to blank or match.
+    if (!source.includes('@island') && !source.includes('invalidate')) continue;
     const code = codeOnly(source);
     for (const match of code.matchAll(/@island\s+"/g)) {
       const start = match.index + match[0].length;

@@ -25,20 +25,35 @@
 // `build` writes NAME.wasm.map in debug, or with --source-map.
 
 import fs from 'node:fs/promises';
-import { constants as fsConstants } from 'node:fs';
+import { constants as fsConstants, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { isMainThread, Worker, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
-import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
-import { MODES } from '../src/selfhost/compiler.js';
 import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
-import { glueSource, loaderSource, moduleFunctions } from '../src/selfhost/loader.js';
 import { sourceMapJson, wasmFrames, withMapUrl } from '../src/selfhost/sourcemap.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RUNTIME = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
+
+// In inWorker's worker: the main thread's terminals (`o` stdout, `e`
+// stderr), kept from what the command spawns.
+const WORKER_TTY = process.env.UTU_WORKER_TTY;
+delete process.env.UTU_WORKER_TTY;
+
+// A command that builds needs the compiler: it compiles (off this thread)
+// from here, as what drives it loads. loadNodeCompiler still checks it was
+// built from selfhost/ as it is.
+const COMPILING = ['check', 'run', 'test', 'bench', 'build', 'build-exe'].includes(process.argv[2]) ? compileEarly() : null;
+
+function compileEarly() {
+  try {
+    const bytes = readFileSync(path.join(ROOT, 'dist', 'utu.wasm'));
+    return WebAssembly.compile(bytes, { builtins: ['js-string'], importedStringConstants: "'" }).catch(() => null);
+  } catch { return null; }
+}
+
+/** The compiler's Node host (src/selfhost/node.js): loaded by a command that builds. */
+const selfhost = () => import('../src/selfhost/node.js');
 
 const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'display:modules', 'display:exports', 'display:debug', 'graph']);
 
@@ -54,6 +69,7 @@ async function main() {
   }
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
+  const [{ MODES }, { loadNodeCompiler }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
   // (Own names only: `utu constructor` is no command.)
   if (!Object.hasOwn(commands, command)) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
@@ -135,7 +151,7 @@ async function main() {
   const asked = ours.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler() });
+    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -155,7 +171,7 @@ const WRITES = new Set(['build', 'build-exe']);
 
 /** Build, printing the diagnostics; exits on errors. */
 async function buildOrExit(utu, file, options) {
-  const result = await compileFile(utu, file, options).catch(error => {
+  const result = await (await selfhost()).compileFile(utu, file, options).catch(error => {
     // A file of the program that cannot be read (no permission, say).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
     fail(`cannot read ${displayPath(error.path)}: ${FS_REASONS[error.code]}`, 'read-failed');
@@ -182,6 +198,7 @@ async function report(utu, result, diagnostics) {
 
 /** A stage 0 view of a program with a file that is not UTF-8: the self-hosted compiler's "Not UTF-8", at the byte; exits 1. */
 async function notUtf8(file) {
+  const { compileFile, loadNodeCompiler } = await selfhost();
   const utu = await loadNodeCompiler();
   const result = await compileFile(utu, file, { target: 'normal' });
   const bad = result.diagnostics.filter(d => d.message === 'Not UTF-8');
@@ -211,7 +228,7 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
   // (It runs before the sampler can start: its profile is empty, but written.)
-  const { exports, instance } = await instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
+  const { exports, instance } = await (await selfhost()).instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler })
     .catch(async error => {
       if (profiler) await writeProfile(file, profiler, out);
       return trap(error, file, built, utu);
@@ -306,7 +323,7 @@ async function writeProfile(file, profiler, out) {
 async function test(file, { utu, optimize, safe }) {
   const built = await buildOrExit(utu, file, { target: 'test', optimize, safe, debugNames: true, sourceMap: safe });
   const { wasm, spec, tests, map } = built;
-  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) })
+  const { exports } = await (await selfhost()).instantiateNode(wasm, spec, { root: path.dirname(file) })
     .catch(error => trap(error, file, built, utu));
   const paint = (code, text) => colored(process.stdout) ? `\x1b[${code}m${text}\x1b[0m` : text;
   const report = (title, error, times = 1) => {
@@ -436,7 +453,7 @@ async function bench(file, { utu, optimize, safe }) {
     console.log('No benches');
     return;
   }
-  const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  const { exports } = await (await selfhost()).instantiateNode(wasm, spec, { root: path.dirname(file) });
   // A run that awaits ends as a test must (see @settled).
   const run = (f, n) => {
     const result = f(n);
@@ -524,15 +541,16 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
     outputs.push([path.join(dir, `${name}.wasm.map`), sourceMapJson(built.map, { file: `${name}.wasm`, relative, texts })]);
     wasm = withMapUrl(wasm, `${name}.wasm.map`);
   }
+  const { glueSource, loaderSource } = await import('../src/selfhost/loader.js');
   const glue = glueSource(spec, wasm);
-  const { build: bundle } = await import('esbuild');
   const loader = loaderSource(spec, wasm, {
     runtime: RUNTIME, glue: glue ? './glue.mjs' : null, streaming: false,
     // Node's fetch reads no file: URL.
-    wasm: `await (url => globalThis.process?.versions?.node ? import('node:fs/promises').then(fs => fs.readFile(url)) : fetch(url).then(r => r.arrayBuffer()))(new URL(${JSON.stringify(`./${name}.wasm`)}, import.meta.url))`,
+    wasm: `await(u=>globalThis.process?.versions?.node?import('node:fs/promises').then(f=>f.readFile(u)):fetch(u).then(r=>r.arrayBuffer()))(new URL(${JSON.stringify(`./${name}.wasm`)},import.meta.url))`,
   });
-  // The loader bundled with the runtime pieces and the glue it imports.
-  const bundled = await bundle({
+  // The loader bundled with the runtime pieces and the glue it imports;
+  // one that imports neither is as it is (esbuild costs 18 ms).
+  const js = !loader.startsWith('import ') ? Buffer.from(loader) : (await (await import('esbuild')).build({
     // (Not named NAME.mjs: esbuild refuses an output that is its input.)
     stdin: { contents: loader, resolveDir: path.dirname(file), sourcefile: '<utu loader>', loader: 'js' },
     plugins: glue ? [virtualGlue(glue)] : [],
@@ -543,8 +561,7 @@ async function build(file, { utu, optimize, safe, out, sourceMap, blame, target 
     target: 'es2022', legalComments: 'none', logLevel: 'error', external: ['node:*'],
     // Written below, with the rest.
     write: false,
-  });
-  const js = bundled.outputFiles[0].contents;
+  })).outputFiles[0].contents;
   outputs.push([path.join(dir, `${name}.mjs`), js], [path.join(dir, `${name}.wasm`), wasm]);
   const top = built.blame ? await blameOutputs(built, wasm, dir, name, outputs) : null;
   await fs.mkdir(dir, { recursive: true });
@@ -601,6 +618,7 @@ function virtualGlue(source) {
 /** A standalone executable: bun compiles the loader, the glue, and the module. */
 async function buildExe(file, { utu, optimize, safe, out }) {
   const { wasm, spec } = await buildOrExit(utu, file, { optimize, safe });
+  const { glueSource, loaderSource, moduleFunctions } = await import('../src/selfhost/loader.js');
   // The executable calls main: without one it would do nothing (utu run says so too).
   if (!moduleFunctions(wasm).includes('main')) {
     fail(`No export main in ${displayPath(file)}`, 'no-main', ['An executable runs main; utu build makes a module for a library.']);
@@ -624,6 +642,7 @@ async function buildExe(file, { utu, optimize, safe, out }) {
   const status = /export\s+main\s*\([^)]*\)\s*I32\b/.test(await fs.readFile(file, 'utf8'));
   const finish = status ? 'process.exitCode = result' : 'if (result !== undefined) console.log(result)';
   await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  ${finish};\n}\n`);
+  const { spawnSync } = await import('node:child_process');
   const result = spawnSync('bun', ['build', runner, '--compile', '--outfile', target], { cwd: process.cwd(), stdio: 'inherit' });
   await fs.rm(dir, { recursive: true, force: true });
   if (result.error?.code === 'ENOENT') fail('bun was not found', 'no-bun', ['build-exe compiles with bun: install it (https://bun.sh), or put it on PATH.']);
@@ -647,7 +666,7 @@ async function buildDirectory(from) {
 /** The language server (src/selfhost/lsp.js), speaking LSP's framing on stdin and stdout. */
 async function lsp() {
   const { createLanguageServer } = await import('../src/selfhost/lsp.js');
-  const { nodeHost, utuFiles } = await import('../src/selfhost/node.js');
+  const { loadNodeCompiler, nodeHost, utuFiles } = await import('../src/selfhost/node.js');
   const { fileURLToPath, pathToFileURL } = await import('node:url');
   const { existsSync } = await import('node:fs');
   const hosts = new Map();
@@ -719,7 +738,7 @@ async function lsp() {
  */
 async function grepCommand(args) {
   const { grep } = await import('../src/selfhost/grep.js');
-  const { nodeHost } = await import('../src/selfhost/node.js');
+  const { loadNodeCompiler, nodeHost } = await import('../src/selfhost/node.js');
   const where = {};
   let references = null;
   let json = false;
@@ -821,7 +840,7 @@ function colored(stream) {
   const force = process.env.FORCE_COLOR;
   if (force != null && force !== '') return force !== '0' && force !== 'false';
   // In the worker (see STACK_MB), the terminal is the main thread's.
-  if (!isMainThread && workerData?.tty) return workerData.tty[stream === process.stdout ? 'stdout' : 'stderr'];
+  if (WORKER_TTY != null) return WORKER_TTY.includes(stream === process.stdout ? 'o' : 'e');
   return !!stream.isTTY;
 }
 
@@ -1019,16 +1038,18 @@ async function trap(error, file, built, utu) {
 const STACK_MB = 1024;
 
 /** Whether this thread can hand a command to a worker with a deeper stack. */
-const deepens = isMainThread && !process.versions.bun && !process.env.UTU_NO_WORKER;
+const deepens = WORKER_TTY == null && !process.versions.bun && !process.env.UTU_NO_WORKER;
 
 /** Thrown when a build was too deep for this thread: the command starts again in a worker with an `mb` MB stack. */
 class TooDeep extends Error { constructor(mb = STACK_MB) { super(); this.mb = mb; } }
 
 /** The command, run in a worker with a deep stack; exits as it does. */
-function inWorker(mb = STACK_MB) {
+async function inWorker(mb = STACK_MB) {
+  const { Worker } = await import('node:worker_threads');
+  const tty = (process.stdout.isTTY ? 'o' : '') + (process.stderr.isTTY ? 'e' : '');
   const worker = new Worker(new URL(import.meta.url), {
     argv: process.argv.slice(2), stdin: true, resourceLimits: { stackSizeMb: mb },
-    workerData: { tty: { stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY } },
+    env: { ...process.env, UTU_WORKER_TTY: tty },
   });
   process.stdin.pipe(worker.stdin);
   worker.on('error', error => {
