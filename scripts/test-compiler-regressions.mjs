@@ -1762,6 +1762,10 @@ export main() I32 {
 ` }, 1529348691],
     // A negative or reversed Str range is empty in every engine; one past the end clamps.
     [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nexport main() I32 {\n    let s = "hello";\n    s.slice(n(-1), 3).len() + s.slice(3, n(1)).len() * 10 + s[n(-2), 2].len() * 100 + Str.slice(s, 1, 3).len() * 1000 + s.slice(2, 99).len() * 10000;\n}\n' }, 32000],
+    // A mod's own named struct and protocol, opened (in its file, and imported then opened).
+    [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo;\nexport main() I32 { let p = Pt { x: 2 }; let q: geo.Pt = p; q.x; }\n' }, 2],
+    [{ 'shp.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\n',
+      'main.utu': 'using shapes from "./shp.utu";\nusing shapes;\nstruct Tri[Area]:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nexport main() I32 { let x: Area = Tri { base: 2 }; x.area(); }\n' }, 2],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `export main() I32 {\n    let a = 1;\n${tee}\n    a;\n}\n` }, teed],
   ];
@@ -1793,6 +1797,14 @@ export main() I32 {
     // A method or impl of an undeclared name (each was dropped, unsaid).
     [{ 'main.utu': 'export main() I32 { 1; }\nstruct Sq:\n    | s: I32\nfn Nope.area |self| () I32 { 1; }\n' }, 'Unknown type Nope'],
     [{ 'main.utu': 'export main() I32 { Sq{s:3}.area(); }\nstruct Sq:\n    | s: I32\nfn Zork[Sq].area |self| () I32 { 1; }\n' }, 'Unknown type Zork'],
+    // `using geo |Pt|` renames mod geo; a mod with no type & is not a type (these trapped or built invalid Wasm).
+    [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo |Pt|;\nexport main() I32 { let p = Pt { x: 2 }; p.x; }\n' }, 'Pt names mod geo, which has no type &'],
+    [{ 'geo.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\n', 'main.utu': 'using geo |Pt| from "./geo.utu";\nexport main() I32 { let p = Pt { x: 2 }; p.x; }\n' }, 'Pt names mod geo, which has no type &'],
+    [{ 'main.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\nusing shapes |Area|;\nstruct Tri[Area]:\n    | base: I32\nexport main() I32 { let t = Tri { base: 2 }; let x: Area = t; 2; }\n' }, 'Area names mod shapes, which has no type &'],
+    [{ 'shp.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\n',
+      'main.utu': 'using shapes |Area| from "./shp.utu";\nstruct Tri:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nexport main() I32 { 2; }\n' }, 'Area names mod shapes, which has no type &'],
+    [{ 'main.utu': 'mod Geo {\n    struct Pt:\n        | x: I32\n}\nexport main() I32 { let p = Geo { x: 2 }; p.x; }\n' }, 'Geo is a mod with no type &'],
+    [{ 'main.utu': 'mod Box[T] {\n    fn one() I32 { 1; }\n}\nfn Box[I32].two() I32 { 2; }\nexport main() I32 { 2; }\n' }, 'Box is a mod with no type &'],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});
