@@ -132,13 +132,18 @@ test "last" { later(); assert true; }
 `);
   r = spawnSync(process.execPath, [cli, 'test', 'waits.utu'], { encoding: 'utf8', cwd: dir, timeout: 30000 });
   assert.equal(r.status, 1, r.stderr);
-  assert.equal(r.stdout.replace(/ \([0-9.]+ ms\)/g, ''), `pass first
-FAIL hangs: Never settled: nothing left to wait for
-pass ticks
-pass last
+  // The 5 ms timer lands after the last test, or (on a loaded machine) during it.
+  const waits = r.stdout.replace(/ \([0-9.]+ ms\)/g, '');
+  const late = `pass last
 FAIL after tests: boom
 3 passed, 1 failed, 1 uncaught error
-`);
+`, during = `FAIL last: boom
+2 passed, 2 failed
+`;
+  assert.ok([late, during].some(end => waits === `pass first
+FAIL hangs: Never settled: nothing left to wait for
+pass ticks
+` + end), waits);
   assert.equal(r.stderr, '');
 
   // A callback a test scheduled for now fails that test, not the next.
