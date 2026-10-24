@@ -1317,7 +1317,8 @@ fn check_mem_host_op(decl: I32, method: I32, args: I32, m: I32, cx: Cx) I32 {
     let a = if args >= 0 { first_child(args); } else { -1; };
     if method == MemMethod.Copy_in.to_i32() {
         let t = check_expr(a, -1, cx);
-        if not is_host_value(t) and not ty_is(t, Ty.Error) { mismatch(a, foreign_any(0), t); };
+        let any = prelude(Prelude.Externref);
+        if not is_host_value(t) and t != any and not ty_is(t, Ty.Error) { mismatch(a, any, t); };
         w_node(Op.Call, vt_i32, mem_host_ops[decl], 0, m);
         w_node(Op.GlobalSet, vt_none, mem_len[decl], 0, m);
         return ty_void();

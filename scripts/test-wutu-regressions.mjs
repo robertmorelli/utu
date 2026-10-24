@@ -41,6 +41,7 @@ try {
     o.card = $('my-card').textContent;
     o.chart = $('#chart').textContent;
     o.circle = $('circle').getAttribute('r');
+    o.xlink = [$('#ns').getAttributeNS('http://www.w3.org/1999/xlink', 'href'), $('#ns').getAttributeNS('http://www.w3.org/XML/1998/namespace', 'space')];
     o.rows = $$('.row').map(r => r.children.length);
     o.method = $('#method').textContent;
     const clock = $('#clock').textContent;
@@ -68,7 +69,7 @@ try {
     return o;
   });
   assert.deepEqual(result, {
-    pending: 0, enabled: true, hydrated: [true, '40%', 'tip'], label: 'q', card: 'custom', chart: 'drawn;', circle: '0',
+    pending: 0, enabled: true, hydrated: [true, '40%', 'tip'], label: 'q', card: 'custom', chart: 'drawn;', circle: '0', xlink: ['#c0', 'preserve'],
     rows: [1, 1], method: 'm0',
     nested: 'figure:header,span:Title0 figure:header,span:Titlea figure:header,span:Titlea|b',
     nestedAfter: 'figure:header,span:Title1 figure:header,span:Titlea figure:header,span:Titlea|b', nestedKept: true, inputs: ['2.5', 'c'],

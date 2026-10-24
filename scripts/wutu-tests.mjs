@@ -455,7 +455,7 @@ export main() Browser.HTMLElement {
               iframe { src = st.u; }
               img { src = st.u; }
               a#lit { href = "javascript:void 0"; "kept"; }
-              svg { a { href = st.u; } use { href = st.u; } }
+              svg { a { href = st.u; } use { href = st.u; } use#x { xlink:href = st.u; } }
               p#money { = wutu.money(-123) + " " + wutu.money(-1) + " " + wutu.money(123456) + " " + wutu.money(0); }
           }
           \\/;
@@ -472,8 +472,8 @@ export main() Browser.HTMLElement {
         const $ = s => root.querySelector(s);
         const urls = () => [$('#attr').getAttribute('href'), $('#prop').getAttribute('href'), $('form').getAttribute('action'),
           $('button').getAttribute('formaction'), $('iframe').getAttribute('src'), $('img').getAttribute('src'),
-          $('svg a').getAttribute('href'), $('use').getAttribute('href')];
-        assertEq(urls().join(' '), Array(8).fill('/safe').join(' '), `${mode}: first render`);
+          $('svg a').getAttribute('href'), $('use').getAttribute('href'), $('#x').getAttribute('xlink:href')];
+        assertEq(urls().join(' '), Array(9).fill('/safe').join(' '), `${mode}: first render`);
         assertEq($('#lit').getAttribute('href'), 'javascript:void 0', `${mode}: a written literal stays`);
         const type = async (text) => {
           $('input').value = text;
@@ -482,9 +482,9 @@ export main() Browser.HTMLElement {
         };
         for (const bad of BAD) {
           await type(bad);
-          assertEq(urls().join(' '), Array(8).fill(null).join(' '), `${mode}: ${JSON.stringify(bad)} dropped`);
+          assertEq(urls().join(' '), Array(9).fill(null).join(' '), `${mode}: ${JSON.stringify(bad)} dropped`);
           await type('/back');
-          assertEq(urls().join(' '), Array(8).fill('/back').join(' '), `${mode}: a safe URL after ${JSON.stringify(bad)}`);
+          assertEq(urls().join(' '), Array(9).fill('/back').join(' '), `${mode}: a safe URL after ${JSON.stringify(bad)}`);
         }
         // A media data: URL passes; an SVG one only into an image.
         await type('data:image/png;base64,AAAA');
@@ -514,5 +514,14 @@ export main() Browser.HTMLElement {
     const tree = parseWutu('section.a#b { data-x = x; hidden; svg { viewBox = "0 0 1 1"; } my-widget { anything = "ok"; } }');
     assertEq(tree.root.attrs.find(a => a.name === 'id').value, '"b"');
     assertEq(tree.root.children.length, 2);
+  });
+
+  test('wutu parser: xlink:href, xml:lang and xmlns:xlink are attributes, not CSS declarations', () => {
+    const { root } = parseWutu('svg { xmlns:xlink = "http://www.w3.org/1999/xlink"; xml:lang = "en"; color: red; use { xlink:href = u; } }');
+    assertEq(root.attrs.map(a => a.name).join(' '), 'xmlns:xlink xml:lang');
+    assertEq(root.css.map(rule => rule.css).join(' '), 'color:red;');
+    const use = root.children[0];
+    assertEq(`${use.attrs[0].name} ${use.attrs[0].value} ${use.attrs[0].dynamic}`, 'xlink:href u true');
+    assertThrows(() => parseWutu('div { xlink:href = u; }'), 'unknown attribute xlink:href on div');
   });
 }

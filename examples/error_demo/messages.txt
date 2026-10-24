@@ -4414,6 +4414,19 @@ ok
 14 │         let el = Browser.document.createElement("span");
 --- exit 1
 
+=== utu check examples/error_demo/names/890_unknown_import_capitalized.utu
+ ERROR  No declarations for npm:left-pad-xyz; is it installed?
+        host-missing · examples/error_demo/names/890_unknown_import_capitalized.utu:3:16
+
+ 1 │ // What: imports an npm package that is not installed under a capitalized name, and calls it
+ 2 │ // Expect: No declarations for npm:left-pad-xyz; is it installed? (once, at the using; not again at Pad.leftPad)
+ 3 │ using Pad from "npm:left-pad-xyz";
+   │                ━━━━━━━━━━━━━━━━━━
+   │                ╰─ not found
+ 4 │
+ 5 │ export main() Str {
+--- exit 1
+
 === utu check examples/error_demo/names/89_lazy_number_result.utu
  ERROR  total returns I32, not an element
         lazy-value · examples/error_demo/names/lazy_parts/widgets.utu:18:5
@@ -6378,6 +6391,19 @@ ok
    │         ╰─ here
  9 │         "Go";
 10 │     }
+--- exit 1
+
+=== utu check examples/error_demo/platform/891_mem_copy_in_number.utu
+ ERROR  Expected Externref, got I32
+        type-mismatch · examples/error_demo/platform/891_mem_copy_in_number.utu:7:22
+
+ 5 │ export lib {
+ 6 │     fn load(n: I32) I32 {
+ 7 │         text.copy_in(n);
+   │                      ━
+   │                      ╰─ I32
+ 8 │         text.len();
+ 9 │     }
 --- exit 1
 
 === utu check examples/error_demo/platform/89_wutu_old_interpolation.utu

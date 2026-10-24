@@ -31,7 +31,8 @@ const SVG_ATTRIBUTES = words(`
   viewBox xmlns width height x y x1 y1 x2 y2 cx cy r rx ry d points fill fill-rule
   fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray
   stroke-dashoffset stroke-opacity opacity transform href offset stop-color stop-opacity
-  gradientUnits gradientTransform preserveAspectRatio clip-path mask`);
+  gradientUnits gradientTransform preserveAspectRatio clip-path mask
+  xlink:href xlink:title xml:space xmlns:xlink`);
 
 const HTML_TAGS = words(`
   html head embed param script area base link meta a abbr address article aside audio
@@ -44,7 +45,7 @@ const HTML_TAGS = words(`
 
 const GLOBAL_ATTRIBUTES = words(`
   id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck
-  translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize nonce is popover`);
+  translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize nonce is popover xml:lang`);
 
 const TAG_ATTRIBUTES = Object.fromEntries(Object.entries({
   script: 'src type async defer nonce crossorigin integrity referrerpolicy nomodule',
@@ -563,7 +564,8 @@ class WutuParser {
     } else if (this.peek(/\.[\w-]+\s*=(?!=)/y)) {
       this.p++;
       this.parseAttribute(node, true);
-    } else if (this.peek(/[a-z][\w-]*\s*(?:=(?!=)|;|\})/y)) {
+    } else if (this.peek(/(?:(?:xlink|xmlns|xml):)?[a-z][\w-]*\s*(?:=(?!=)|;|\})/y)) {
+      // (`xlink:href = …;`: a namespaced attribute; no CSS property has those prefixes.)
       this.parseAttribute(node, false);
     } else if (c === ':' || c === '@' || c === '&') {
       this.parseCssRule(node);
@@ -586,7 +588,7 @@ class WutuParser {
    */
   parseAttribute(node, isProperty) {
     const nameStart = this.p;
-    const name = this.peek(/[\w-]+/y)[0];
+    const name = this.peek(isProperty ? /[\w-]+/y : /(?:(?:xlink|xmlns|xml):)?[\w-]+/y)[0];
     this.p += name.length;
     this.skipTrivia();
     let value = '""', dynamic = false, range = null;
