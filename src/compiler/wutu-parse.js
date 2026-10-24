@@ -442,6 +442,8 @@ class WutuParser {
   readCssBlock() {
     const open = this.p;
     let start = ++this.p, body = '', depth = 1, parens = 0;
+    // The last character outside comments, strings counting as their quote.
+    let last = ';';
     while (!this.done) {
       if (this.at('/*')) {
         const end = this.text.indexOf('*/', this.p + 2);
@@ -450,7 +452,7 @@ class WutuParser {
         continue;
       }
       const c = this.text[this.p];
-      if (c === '"' || c === "'") { this.readQuoted(); continue; }
+      if (c === '"' || c === "'") { this.readQuoted(); last = c; continue; }
       if (c === '/' && this.at('//') && parens === 0 && this.afterBlank(this.p)) {
         body += this.text.slice(start, this.p);
         this.skipLine();
@@ -462,10 +464,10 @@ class WutuParser {
       else if (c === ')') parens--;
       if (c === '{') depth++;
       if (c === '}') {
-        const before = (body + this.text.slice(start, this.p)).replace(/\/\*[\s\S]*?\*\//g, '').trimEnd();
-        if (before && !/[;{}]$/.test(before)) this.fail('CSS declarations require a semicolon');
+        if (!';{}'.includes(last)) this.fail('CSS declarations require a semicolon');
         if (--depth === 0) return body + this.text.slice(start, this.p++);
       }
+      if (!/\s/.test(c)) last = c;
       this.p++;
     }
     this.fail('unterminated CSS block', open);

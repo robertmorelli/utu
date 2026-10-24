@@ -663,6 +663,8 @@ fn wp_css_block(text: Str) Str {
     let body = "";
     let depth = 1;
     let parens = 0;
+    // The last character outside comments, strings counting as their quote.
+    let last = 59;
     while (not wp_done(text)) {
         let p = wp_at[0];
         if wp_at_text(text, "/*") {
@@ -675,14 +677,14 @@ fn wp_css_block(text: Str) Str {
             start = wp_at[0];
         } else {
             let c = text.get(p);
-            if c == 34 or c == 39 { wp_quoted(text); }
-            else {
+            if c == 34 or c == 39 {
+                wp_quoted(text);
+                last = c;
+            } else {
                 if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) { wutu_fail("Wutu comments are written // …", p); };
                 if c == 40 { parens += 1; } else if c == 41 { parens -= 1; };
                 if c == 123 { depth += 1; };
                 if c == 125 {
-                    let before = trim_end(without_css_comments(body + text.slice(start, p)));
-                    let last = if before.len() > 0 { before.get(before.len() - 1); } else { 59; };
                     if not (last == 59 or last == 123 or last == 125) { wutu_fail("CSS declarations require a semicolon", p); };
                     depth -= 1;
                     if depth == 0 {
@@ -691,28 +693,13 @@ fn wp_css_block(text: Str) Str {
                         return block;
                     };
                 };
+                if not is_space_code(c) { last = c; };
                 wp_at[0] += 1;
             };
         };
     };
     wutu_fail("unterminated CSS block", open);
     "";
-}
-
-fn without_css_comments(text: Str) Str {
-    let out = "";
-    let i = 0;
-    while (i < text.len()) {
-        if text_at(text, i, "/*") {
-            let end = text_index(text, "*/", i + 2);
-            if end < 0 { return out + text.slice(i, text.len()); };
-            i = end + 2;
-        } else {
-            out = out + Str.from_code_point(text.get(i));
-            i += 1;
-        };
-    };
-    out;
 }
 
 //! = Template structure
