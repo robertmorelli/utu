@@ -20,6 +20,8 @@ const INTENDED = {
   'baselines/corpus/468d92cae4849195775dfadf5aef4636071b6e4b.utu': 'a Str slice of a variable range is made empty when out of order',
   'baselines/corpus/57940c7e7d169dd2167180f2d2ab427288c58114.utu': 'a Str slice of a variable range is made empty when out of order',
   'benchmarks/suite/strings.utu': 'a Str slice of a variable range is made empty when out of order',
+  // Through the host, each level of a closure's recursion held JS frames: the stack overflowed at a tenth of the depth.
+  'baselines/corpus/b53a6f3724f67a6c591fd0aea8fa1bc5a76bb444.utu': 'closures that recurse are called by call_ref, not through the host',
 };
 
 const programs = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, 'baselines', 'run-differential.json'), 'utf8')))

@@ -666,6 +666,9 @@ export lib {
     ['export lib { fn run() I32 { let n = 10; let f = cl() I32 { n; }; let k = 0; loop match k { 0 => { n = 30; continue 1; }, ~> break, }; f(); } }\n', 30],
     // A recursive closure assigned with `=`.
     ['export lib { fn run() I32 { let fact: cl(I32) I32 = cl(x) { 0; }; fact = cl(x) { if x <= 1 { 1; } else { x * fact(x - 1); }; }; fact(5); } }\n', 120],
+    // Closures that recurse 3000 deep: small called them through the host, JS frames each level (overflowed near 800).
+    ['export lib { fn run() I32 { let d: cl(I32) I32 = cl(n) { 0; }; d = cl(n) { if n == 0 { 0; } else { 1 + d(n - 1); }; }; d(3000); } }\n', 3000],
+    ['fn f(n: I32) I32 { let c = cl(k: I32) I32 { if k == 0 { 0; } else { 1 + f(k - 1); }; }; c(n); }\nexport lib { fn run() I32 { f(3000); } }\n', 3000],
     // A generator's parameter, captured, then assigned.
     ['fn g(a: I32) yield I32 { let c: cl(I32) I32 = cl(x) { x + a; }; a = 5; yield c(1); }\nexport lib { fn run() I32 { let t = 0; for (g(1)) |v| { t += v; }; t; } }\n', 6],
     // A name from a tuple, captured, then assigned.
