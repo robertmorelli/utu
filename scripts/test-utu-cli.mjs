@@ -295,13 +295,28 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
   assert.equal(r.status, 0, r.stderr);
   assert.equal((await import(pathToFileURL(path.join(dir, 'good.mjs')).href)).exports.main(), 6);
 
+  // Stage 0's views: a mistake in the command is said, not thrown.
+  await write('lost.utu', 'using nothere from "./nothere.utu";\nexport main() I32 { 1; }\n');
+  for (const [args, said] of [
+    [['display'], /No file/],
+    [['display', 'nope.utu'], /No file nope\.utu/],
+    [['display', '.'], /\. is a directory/],
+    [['graph', 'good.utu', '-o'], /-o needs a file/],
+    [['display:modules', 'lost.utu'], /Cannot import "\.\/nothere\.utu"/],
+  ]) {
+    r = utu(...args);
+    assert.equal(r.status, 1, args.join(' '));
+    assert.match(r.stderr, said, args.join(' '));
+    assert.doesNotMatch(r.stderr, /\n\s+at /, `${args.join(' ')}: no stack`);
+  }
+
   if (spawnSync('bun', ['--version']).status === 0) {
     r = utu('build-exe', 'good.utu', '-o', 'good');
     assert.equal(r.status, 0, r.stderr);
     // main's I32 is the exit status.
     assert.equal(spawnSync(path.join(dir, 'good'), { encoding: 'utf8' }).status, 6);
   }
-  console.log('utu cli: check, run, test, bench, build, build-exe pass');
+  console.log('utu cli: check, run, test, bench, build, build-exe, stage 0 mistakes pass');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }
