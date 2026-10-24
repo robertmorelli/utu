@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject } from '../src/index.js';
-import { builtModule, compileProgram as driverCompileProgram, instantiate, loadProgram as driverLoadProgram } from '../src/selfhost/compiler.js';
+import { builtModule, compileProgram as driverCompileProgram, instantiate, loadProgram as driverLoadProgram, SELF_MOVE_LIMIT } from '../src/selfhost/compiler.js';
 import { nodeHost } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -135,7 +135,10 @@ export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) 
 export async function buildWith(compiler) {
   const { text } = joinSelfhost();
   const files = await loadProgram(compiler, JOINED, { readFile: async file => file === JOINED ? text : host.readFile(file) });
+  // (A compiler older than the limit builds without it.)
+  compiler.set_move_limit?.(SELF_MOVE_LIMIT);
   const size = await compileProgram(compiler, 0);
+  compiler.set_move_limit?.(0);
   if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
   return builtModule(compiler, size);
 }

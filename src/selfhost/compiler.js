@@ -47,6 +47,16 @@ export const MODES = {
   debug: { optimize: 'none', safe: true },
 };
 
+/**
+ * The compiler's own build grows no body past this many nodes by moving
+ * in what is called once (-O small; `moveLimit`, other builds: no limit).
+ * V8 optimizes a hot function whole, on another thread, and a process ends
+ * only once the function being optimized is: `compile_program` and
+ * `check_expr`, 35 KB each so, took 60 to 190 ms, past the end of most
+ * builds (and compile_program runs once: its optimized code never ran).
+ */
+export const SELF_MOVE_LIMIT = 3000;
+
 // The engine provides the JS string builtins, and string constants as
 // imports from module `'`.
 const COMPILE_OPTIONS = Object.freeze({ builtins: ['js-string'], importedStringConstants: "'" });
@@ -73,6 +83,7 @@ export async function compile(utu, entry, host) {
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
+  utu.set_move_limit?.(host.moveLimit ?? 0);
   // Blame reads the source map: keeping one changes nothing built.
   utu.set_source_map?.(sourceMap || blame ? 1 : 0);
   utu.set_profile?.(profile ? 1 : 0);
