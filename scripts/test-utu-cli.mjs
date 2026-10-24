@@ -141,6 +141,35 @@ FAIL after tests: boom
 `);
   assert.equal(r.stderr, '');
 
+  // A callback a test scheduled for now fails that test, not the next.
+  await write('soon.utu', `let soon: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("soon"); }, 0); } \\/;
+let wait: fun() Promise[I32] = @es/\\ () => new Promise(r => setTimeout(() => r(1), 20)) \\/;
+test "schedules" { soon(); }
+test "waits" { let x = await wait(); assert x == 1; }
+`);
+  // Benches as tests: one that waits on nothing fails (the rows before it
+  // print); a callback's error fails its bench, once however often setup ran.
+  await write('benchwaits.utu', `let never: fun() Promise[I32] = @es/\\ () => new Promise(() => {}) \\/;
+let later: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("late"); }, 0); } \\/;
+bench "ok first" { let s = 0; measure { s = s + 1; } }
+bench "never later" { let s = 0; let x = await never(); measure { s = s + x; } }
+bench "throws later" { let s = 0; later(); measure { s = s + 1; } }
+bench "ok last" { let s = 0; measure { s = s + 1; } }
+`);
+  const hasBun = spawnSync('bun', ['--version']).status === 0;
+  for (const runtime of [process.execPath, ...(hasBun ? ['bun'] : [])]) {
+    r = spawnSync(runtime, [cli, 'test', 'soon.utu'], { encoding: 'utf8', cwd: dir, timeout: 30000 });
+    assert.equal(r.stdout.replace(/ \([0-9.]+ ms\)/g, ''), 'FAIL schedules: soon\npass waits\n1 passed, 1 failed\n', runtime);
+    r = spawnSync(runtime, [cli, 'bench', 'benchwaits.utu'], { encoding: 'utf8', cwd: dir, timeout: 30000 });
+    assert.equal(r.status, 1, `${runtime}: ${r.stderr}`);
+    const rows = r.stdout.split('\n').slice(1, -1).map(row => row.replace(/ {2,}/g, '  ').trim());
+    assert.equal(rows.length, 4, `${runtime}: ${r.stdout}`);
+    assert.match(rows[0], /^ok first  [0-9.]+ (ns|µs|ms|s) /, runtime);
+    assert.equal(rows[1], 'never later  FAIL: Never settled: nothing left to wait for', runtime);
+    assert.match(rows[2], /^throws later  FAIL: late( \([0-9]+ times\))?$/, runtime);
+    assert.match(rows[3], /^ok last  [0-9.]+ (ns|µs|ms|s) /, runtime);
+  }
+
   // The build modes: small (the default) and fast keep the checks Wasm does
   // not make itself, so past a Buffer's length is a trap; the unsafe ones
   // leave them out, and it reaches the capacity beyond.

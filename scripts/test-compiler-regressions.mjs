@@ -1748,6 +1748,27 @@ export lib {
     assert.deepEqual(typed.diagnostics.map(d => d.message), ['a is I32, got F64', 'b is Str, got I32'], target);
     checked++;
   }
+  // An imported file's tests and benches (its mods' too) are checked, not run.
+  const lib = await write('mod geo {\n    fn dbl(x: I32) I32 { x * 2; }\n    test "x" { let s: Str = dbl(1); }\n    bench "y" { measure { let t: Str = dbl(1); } }\n}\ntest "top" { let u: Str = 3; }\n');
+  for (const target of ['normal', 'test', 'bench']) {
+    const typed = await compileFile(utu, await write(`using geo from "./${path.basename(lib)}";\nexport main() I32 { geo.dbl(2); }\n`), { target });
+    assert.deepEqual(typed.diagnostics.map(d => d.message), ['s is Str, got I32', 't is Str, got I32', 'u is Str, got I32'], target);
+    checked++;
+  }
+  const goodLib = await write('mod geo {\n    fn dbl(x: I32) I32 { x * 2; }\n    test "x" { assert dbl(1) == 2; }\n    bench "y" { let s = 0; measure { s += dbl(1); } }\n}\ntest "top" { assert true; }\n');
+  const usesGood = await write(`using geo from "./${path.basename(goodLib)}";\nexport main() I32 { geo.dbl(2); }\ntest "mine" { assert geo.dbl(1) == 2; }\n`);
+  for (const mode of modes) {
+    const tested = await compileFile(utu, usesGood, { target: 'test', mode });
+    assert.deepEqual(tested.tests.map(t => t.name), ['mine'], `${mode}: ${tested.diagnostics?.map(d => d.message)}`);
+    assert.deepEqual((await compileFile(utu, usesGood, { target: 'bench', mode })).benches, [], mode);
+    const built = await compileFile(utu, usesGood, { mode });
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports.main(), 4, mode);
+    checked++;
+  }
+  // Names are compared as `utu test` shows them: a mod geo's "dbl" is "geo: dbl".
+  const shown = await compileFile(utu, await write('mod geo { test "dbl" { assert true; } bench "b" { measure {} } }\ntest "geo: dbl" { assert true; }\nbench "geo: b" { measure {} }\ntest "geo: \\u0064bl" { assert true; }\n'), { target: 'test' });
+  assert.deepEqual(shown.diagnostics.map(d => d.message), ['Duplicate test "geo: dbl"', 'Duplicate test "geo: dbl"', 'Duplicate bench "geo: b"']);
+  checked++;
   // One mistake, one message: a closure with an untyped parameter where no
   // closure is wanted (not also "got cl(unknown) Str"); a tuple element
   // (not also "has no default").

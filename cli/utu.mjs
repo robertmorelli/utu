@@ -233,33 +233,31 @@ async function test(file, { utu, optimize, safe }) {
     const where = frames.length ? paint('2', `  in ${frames.map(f => f.fn).join(' ← ')}`) : '';
     console.log(`${paint('31', 'FAIL')} ${title}: ${what}${place}${where}`);
   };
-  // An error nothing awaited (a callback's, thrown later): it fails the test
-  // running then, or is one more failure, by when it came.
-  let running = null;
-  const strays = [];
-  const stray = error => strays.push({ error, during: running });
-  process.on('uncaughtException', stray);
-  process.on('unhandledRejection', stray);
+  const strays = strayErrors();
   let failed = 0;
   let uncaught = 0;
   const reportStrays = () => {
-    for (const { error, during } of strays.splice(0)) {
+    for (const { error, during } of strays.list.splice(0)) {
       uncaught++;
       report(during ?? 'after tests', error);
     }
   };
   for (const { export: name, name: title } of tests) {
     const started = performance.now();
-    running = title;
+    strays.running = title;
     try {
       await settled(exports[name](), TEST_TIMEOUT_MS);
-      if (strays.length) throw strays.shift().error;
-      console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${(performance.now() - started).toFixed(1)} ms)`)}`);
+      const ms = performance.now() - started;
+      // What it scheduled for now runs (and throws) before the next test.
+      await nextTask();
+      if (strays.list.length) throw strays.list.shift().error;
+      console.log(`${paint('32', 'pass')} ${title} ${paint('2', `(${ms.toFixed(1)} ms)`)}`);
     } catch (error) {
       failed++;
       report(title, error);
+      await nextTask();
     }
-    running = null;
+    strays.running = null;
     reportStrays();
   }
   // A moment for what the tests left running to throw; then the run ends,
@@ -270,6 +268,21 @@ async function test(file, { utu, optimize, safe }) {
   await written(process.stdout, `${summary}${uncaught ? `, ${uncaught} uncaught error${uncaught > 1 ? 's' : ''}` : ''}\n`);
   process.exit(failed || uncaught ? 1 : 0);
 }
+
+/**
+ * Errors nothing awaited (a callback's, thrown later), each with the test or
+ * bench `running` when it came: it fails that one, or is one more failure.
+ */
+function strayErrors() {
+  const strays = { running: null, list: [] };
+  const add = error => strays.list.push({ error, during: strays.running });
+  process.on('uncaughtException', add);
+  process.on('unhandledRejection', add);
+  return strays;
+}
+
+/** After the callbacks already due (a `setTimeout(f, 0)`'s). */
+const nextTask = () => new Promise(resolve => setTimeout(resolve, 0));
 
 /** A test's run, or why it never ended: the event loop emptied while it waited, or `ms` went by. */
 function settled(result, ms) {
@@ -306,18 +319,39 @@ async function bench(file, { utu, optimize, safe }) {
     return;
   }
   const { exports } = await instantiateNode(wasm, spec, { root: path.dirname(file) });
+  // A run that awaits ends as a test must (see @settled).
+  const run = (f, n) => {
+    const result = f(n);
+    return typeof result?.then === 'function' ? settled(result, TEST_TIMEOUT_MS) : result;
+  };
   const time = async (f, n) => {
     const started = performance.now();
-    await f(n);
+    await run(f, n);
     return performance.now() - started;
   };
   const median = values => values.toSorted((a, b) => a - b)[values.length >> 1];
   const rows = [];
+  const strays = strayErrors();
+  let failed = false;
+  const fail = (title, error, times = 1) => {
+    rows.push([title, `FAIL: ${trapText(error).title}${times > 1 ? ` (${times} times)` : ''}`, '']);
+    failed = true;
+  };
+  // A bench's setup runs many times: its stray errors are one row.
+  const reportStrays = () => {
+    const by = new Map();
+    for (const { error, during } of strays.list.splice(0)) {
+      const title = during ?? 'after benches';
+      by.set(title, { error: by.get(title)?.error ?? error, times: (by.get(title)?.times ?? 0) + 1 });
+    }
+    for (const [title, { error, times }] of by) fail(title, error, times);
+  };
   for (const { export: name, name: title } of benches) {
     const f = exports[name];
+    strays.running = title;
     try {
       const warm = performance.now();
-      while (performance.now() - warm < BENCH_WARMUP_MS) await f(1);
+      while (performance.now() - warm < BENCH_WARMUP_MS) await run(f, 1);
       let n = 1;
       while (n < 2 ** 30 && await time(f, n) < BENCH_SAMPLE_MS) n *= 2;
       const runs = [];
@@ -327,20 +361,24 @@ async function bench(file, { utu, optimize, safe }) {
         runs.push(await time(f, n));
       }
       const per = Math.max(0, median(runs) - median(setups)) / n;
-      rows.push([title, duration(per), `${SAMPLES} × ${n}`]);
+      await nextTask();
+      if (!strays.list.length) rows.push([title, duration(per), `${SAMPLES} × ${n}`]);
     } catch (error) {
-      const { title: what } = trapText(error);
-      rows.push([title, `FAIL: ${what}`, '']);
-      process.exitCode = 1;
+      fail(title, error);
+      await nextTask();
     }
+    strays.running = null;
+    reportStrays();
   }
+  await settled(new Promise(() => {}), TEST_GRACE_MS).catch(() => {});
+  reportStrays();
   const header = ['bench', 'median', 'iterations'];
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
   const line = row => row.map((cell, i) => i === 1 ? cell.padStart(widths[i]) : cell.padEnd(widths[i])).join('  ').trimEnd();
   const dim = text => colored(process.stdout) ? `\x1b[2m${text}\x1b[0m` : text;
   await written(process.stdout, `${[dim(line(header)), ...rows.map(line)].join('\n')}\n`);
   // Done, whatever a bench left running.
-  process.exit(process.exitCode ?? 0);
+  process.exit(failed ? 1 : 0);
 }
 
 const BENCH_WARMUP_MS = 100;

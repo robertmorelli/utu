@@ -1684,7 +1684,7 @@ mod tour {
                 code {
                     "geo: name";
                 }
-                "). A test whose await waits on nothing (or on anything for 10 s) fails; what a callback throws after the tests is one more failure; the run ends after its summary, whatever timers are left. ";
+                "); no two show one name. A test whose await waits on nothing (or on anything for 10 s) fails; so does one whose callback throws (one scheduled for now, before the next test starts); what throws after the tests is one more failure; the run ends after its summary, whatever timers are left. ";
                 code {
                     "utu bench";
                 }
@@ -1696,11 +1696,11 @@ mod tour {
                 code {
                     "measure";
                 }
-                " block n times. It warms the engine up, doubles n until a run takes 20 ms, then prints the median time per iteration of 11 runs, less the median of runs of the setup alone. A bench does not ";
+                " block n times. It warms the engine up, doubles n until a run takes 20 ms, then prints the median time per iteration of 11 runs, less the median of runs of the setup alone. A bench fails as a test does (an await that never ends, a callback's error) and the other rows still print. A bench does not ";
                 code {
                     "return";
                 }
-                ". Every command checks tests and benches, not only ";
+                ". Every command checks tests and benches, an imported file's too (they run only from their own file), not only ";
                 code {
                     "utu test";
                 }

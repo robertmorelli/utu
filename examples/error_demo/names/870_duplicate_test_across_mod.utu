@@ -1,0 +1,8 @@
+// What: a mod's test and a top-level test shown under one name
+// Expect: Duplicate test "geo: dbl": mod geo's "dbl" runs as "geo: dbl"
+mod geo {
+    fn dbl(x: I32) I32 { x * 2; }
+    test "dbl" { assert dbl(2) == 4; }
+}
+
+test "geo: dbl" { assert geo.dbl(3) == 6; }

@@ -548,7 +548,7 @@ fn diag_text(i: I32) Str {
         Diag.MainParams => "main takes no parameters",
         Diag.ReturnInBench => "return in a bench",
         Diag.TestInGeneric => pick(a == 1, "Bench", "Test") + " in generic mod " + w,
-        Diag.TestName => pick(a == 1 or a == 3, "Empty ", "Duplicate ") + pick(a >= 2, "bench", "test") + pick(a == 1 or a == 3, " name", " " + node_text(node)),
+        Diag.TestName => pick(a == 1 or a == 3, "Empty ", "Duplicate ") + pick(a >= 2, "bench", "test") + pick(a == 1 or a == 3, " name", " " + pick(word >= 0, "\"" + w + "\"", node_text(node))),
         Diag.TooManyParams => pick(word < 0, "main", w) + " has " + int_text(a) + " parameters (max 1000)",
         Diag.DslEmpty => "@" + w + pick(w == "embed", " needs a file path", " needs an expression"),
         Diag.ComptimeCycle => {
