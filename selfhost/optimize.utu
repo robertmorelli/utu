@@ -93,9 +93,6 @@ fn optimize_function(f: I32) void {
 
 /// Walk the body, noting each node's parent, and each local's reads and writes.
 fn opt_collect(f: I32, total: I32) void {
-    opt_nodes.clear();
-    opt_parent.clear();
-    opt_place.clear();
     opt_gets.resize(total);
     opt_sets.resize(total);
     opt_get_at.resize(total);
@@ -106,11 +103,14 @@ fn opt_collect(f: I32, total: I32) void {
     };
     opt_blocks.clear();
     opt_shared[0] = 0;
-    opt_nodes.push(func_body[f]);
-    opt_parent.push(-1);
-    opt_place.push(-1);
+    // (Written in place, in room doubled as it fills, and cut to the walk at the end.)
+    opt_room(64);
+    opt_nodes[0] = func_body[f];
+    opt_parent[0] = -1;
+    opt_place[0] = -1;
+    let n = 1;
     let k = 0;
-    while (k < opt_nodes.len()) {
+    while (k < n) {
         let node = opt_nodes[k];
         let op = w_op[node];
         if node_holders[node] != 1 { opt_shared[0] = 1; };
@@ -123,13 +123,25 @@ fn opt_collect(f: I32, total: I32) void {
         } else if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
             opt_blocks.push(node);
         };
-        for (0 ..< w_count[node]) |i| {
-            opt_nodes.push(w_kid(node, i));
-            opt_parent.push(node);
-            opt_place.push(i);
+        let c = w_count[node];
+        if n + c > opt_nodes.len() { opt_room((n + c) * 2); };
+        let first = w_first[node];
+        for (0 ..< c) |i| {
+            opt_nodes[n] = w_kids[first + i];
+            opt_parent[n] = node;
+            opt_place[n] = i;
+            n += 1;
         };
         k += 1;
     };
+    opt_room(n);
+}
+
+/// @opt_nodes, @opt_parent and @opt_place resized to `n`.
+fn opt_room(n: I32) void {
+    opt_nodes.resize(n);
+    opt_parent.resize(n);
+    opt_place.resize(n);
 }
 
 /// Computes a value without effects or traps, reading at most locals.
