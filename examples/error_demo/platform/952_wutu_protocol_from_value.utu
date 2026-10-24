@@ -1,0 +1,15 @@
+// What: a link's .protocol from a value (it could make the URL javascript:)
+// Expect: .protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;
+using Browser from std:Browser;
+
+fn view(scheme: Str) Browser.HTMLElement {
+    @wutu/\
+    div {
+        a { href = "mailto:me@example.com"; .protocol = scheme; "mail"; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("https:"));
+}

@@ -101,12 +101,25 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       ['div { script { src = u; } }', "a script's attributes are code", 'src'],
       ['div { script { = code; } }', "a script's text is code", '= code'],
       ['div { script { if a { "x"; } } }', "a script's text is code", 'if a'],
+      ['div { style { = css; } }', "a style's text is unescaped in HTML", '= css'],
+      ['div { noscript { if a { "x"; } } }', "a noscript's text is unescaped", 'if a'],
+      ['div { iframe { = v; } }', "an iframe's text is unescaped", '= v'],
+      ['div { style { .textContent = v; } }', "a style's text is unescaped", 'textContent'],
+      ['div { a { .protocol = p; } }', '.protocol from a value', 'protocol'],
+      ['div { base { href = u; } }', "a base's href moves every relative URL", 'href'],
+      ['div { base { .href = u; } }', "a base's href moves every relative URL", 'href'],
+      ['x-note { oNmouseover = f; }', 'events are written on mouseover', 'oNmouseover'],
+      ['x-note { ononline = f; }', 'events are written on online', 'ononline'],
     ];
     for (const [text, message, at] of cases) {
       const error = syntaxError(text);
       assert(error.message.includes(message), `${text}: ${error.message}`);
       assert(error.at.startsWith(at), `${text}: error at ${JSON.stringify(error.at.slice(0, 12))}, expected ${JSON.stringify(at)}`);
     }
+    // Not handlers: `on` and no event's name; written values; elements inside raw text.
+    parseWutu('x-note { one = a; online = b; only; onfoo = c; .only = d; } ');
+    parseWutu('div { style { "p { color: red; }"; } noscript { p { title = v; = v; } } a { href = u; .protocol = "https:"; } }');
+    parseWutu('div { base { href = "/"; } }');
   });
 
   test('wutu parser: element CSS keeps authored and compiled forms separately', () => {
@@ -527,6 +540,27 @@ export main() Browser.HTMLElement {
     }
     const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { script { src = "/a.js"; type = "module"; "let a = 1;"; } } \\/; }` });
     assertEq(written.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
+  });
+
+  test('wutu: raw text, .protocol and a base\'s href from a value are errors; on… names that are no event are attributes', async ({ ROOT }) => {
+    for (const [item, message, at] of [['style { = h; }', "a style's text is unescaped in HTML", '= h'], ['noscript { = h; }', "a noscript's text is unescaped", '= h'],
+      ['iframe { if true { = h; } }', "an iframe's text is unescaped", 'if true'], ['noscript { .textContent = h; }', "a noscript's text is unescaped", 'textContent'],
+      ['a { href = "mailto:x"; .protocol = h; }', '.protocol from a value', 'protocol'], ['base { href = h; }', "a base's href moves every relative URL", 'href'],
+      ['x-note { onClick = h; }', 'events are written on Click', 'onClick'], ['x-note { .ONLOAD = h; }', 'events are written on LOAD', 'ONLOAD']]) {
+      const source = `${BROWSER}export main() Browser.HTMLElement { let h = "</style><img src=x onerror=alert(1)>"; @wutu/\\ div { ${item} } \\/; }`;
+      const diagnostics = await selfhostDiagnostics({ ROOT, source });
+      const match = diagnostics.find(d => d.severity === 'error' && d.message.includes(message));
+      assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
+      assertEq(source.slice(match.start, match.start + at.length), at, `${item}: located`);
+    }
+    const fine = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { let h = "x"; @wutu/\\ div { x-note { one = h; online = h; only; onfoo = h; } style { "p { color: red; }"; } noscript { p { title = h; = h; } } base { href = "/"; } a { href = h; .protocol = "https:"; } } \\/; }` });
+    assertEq(fine.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
+    await withDom(async () => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_on_names.utu', mode: 'debug',
+        source: `${BROWSER}export main() Browser.HTMLElement { let h = "x"; @wutu/\\ x-note { one = h; online = h; onfoo = h; } \\/; }` });
+      const root = instance.exports.main();
+      assertEq(['one', 'online', 'onfoo'].map(n => root.getAttribute(n)).join(' '), 'x x x', 'set at run time');
+    });
   });
 
   test('wutu: ping, srcset and a meta\'s content from a value drop javascript: anywhere in them', async ({ ROOT }) => {

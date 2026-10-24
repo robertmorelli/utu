@@ -34,6 +34,16 @@ const SVG_ATTRIBUTES = words(`
   gradientUnits gradientTransform preserveAspectRatio clip-path mask
   xlink:href xlink:title xml:space xmlns:xlink`);
 
+// The DOM events with a handler attribute (`on` + the name), in any browser.
+const EVENT_NAMES = words(`abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom`);
+
+/** Whether `name` is "on" and an event's name, in any case: an event handler's attribute. */
+const isOnName = name => /^on/i.test(name) && EVENT_NAMES.has(name.slice(2).toLowerCase());
+
+// Elements whose text HTML holds unescaped (raw text; a script's is code).
+const RAW_TEXT_TAGS = words('style noscript iframe xmp noembed noframes plaintext');
+const rawTextError = tag => `${tag === 'iframe' ? 'an' : 'a'} ${tag}'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: ${tag} { "…"; }`;
+
 const HTML_TAGS = words(`
   html head embed param script area base link meta a abbr address article aside audio
   b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist
@@ -518,6 +528,9 @@ class WutuParser {
     if (VOID_TAGS.has(tag) && node.children.length) this.fail(`${tag} cannot have children`, start);
     const code = tag === 'script' && node.children.find(c => c.kind !== 'text');
     if (code) this.fail('a script\'s text is code, so Wutu writes it only as written: script { "…"; }', code.start);
+    // (An element's text and attributes are escaped.)
+    const raw = RAW_TEXT_TAGS.has(tag) && node.children.find(c => c.kind !== 'text' && c.kind !== 'element');
+    if (raw) this.fail(rawTextError(tag), raw.start);
     if (node.unmanaged && node.children.length) this.fail(`an @unmanaged ${tag} has no children in its template: what is inside it is JavaScript's`, start);
     return node;
   }
@@ -612,8 +625,11 @@ class WutuParser {
       this.fail('a property takes a value: .name = value;');
     }
     this.expectSemicolon();
-    if (/^on/i.test(name)) this.fail(`events are written on ${name.slice(2)} { … }, not as an attribute`, nameStart);
+    if (isOnName(name)) this.fail(`events are written on ${name.slice(2)} { … }, not as an attribute`, nameStart);
     if (dynamic && node.tag === 'script') this.fail('a script\'s attributes are code or load it, so Wutu sets them only as written: src = "…";', nameStart);
+    if (dynamic && node.tag === 'base' && name === 'href') this.fail('a base\'s href moves every relative URL (scripts\' too), so Wutu sets it only as written: href = "/";', nameStart);
+    if (dynamic && isProperty && name === 'protocol') this.fail('.protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;', nameStart);
+    if (dynamic && isProperty && RAW_TEXT_TAGS.has(node.tag) && (name === 'textContent' || name === 'innerText')) this.fail(rawTextError(node.tag), nameStart);
     if (dynamic && name === 'srcdoc') this.fail('srcdoc is HTML, so Wutu sets it only as written: srcdoc = "…"; (trusted HTML from a value: an `as` element\'s .srcdoc, in code)', nameStart);
     if (!isProperty && !isAllowedAttribute(node.tag, name)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
     node.attrs.push({ name, value, property: isProperty, dynamic, range, start: nameStart });

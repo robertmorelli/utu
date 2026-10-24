@@ -6633,6 +6633,58 @@ ok
  9 │ }
 --- exit 1
 
+=== utu check examples/error_demo/platform/950_wutu_style_dynamic_text.utu
+ ERROR  a style's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: style { "…"; }
+        dsl-error · examples/error_demo/platform/950_wutu_style_dynamic_text.utu:8:17
+
+ 6 │     @wutu/\
+ 7 │     div {
+ 8 │         style { = css; }
+   │                 ━
+   │                 ╰─ here
+ 9 │     }
+10 │     \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu
+ ERROR  a noscript's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: noscript { "…"; }
+        dsl-error · examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu:8:20
+
+ 6 │     @wutu/\
+ 7 │     div {
+ 8 │         noscript { = note; }
+   │                    ━
+   │                    ╰─ here
+ 9 │     }
+10 │     \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/952_wutu_protocol_from_value.utu
+ ERROR  .protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;
+        dsl-error · examples/error_demo/platform/952_wutu_protocol_from_value.utu:8:46
+
+ 6 │     @wutu/\
+ 7 │     div {
+ 8 │         a { href = "mailto:me@example.com"; .protocol = scheme; "mail"; }
+   │                                              ━
+   │                                              ╰─ here
+ 9 │     }
+10 │     \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/953_wutu_base_dynamic_href.utu
+ ERROR  a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = "/";
+        dsl-error · examples/error_demo/platform/953_wutu_base_dynamic_href.utu:8:16
+
+ 6 │     @wutu/\
+ 7 │     div {
+ 8 │         base { href = root; }
+   │                ━
+   │                ╰─ here
+ 9 │     }
+10 │     \/;
+--- exit 1
+
 === utu check examples/error_demo/platform/95_wutu_property_without_value.utu
  ERROR  expected an HTML tag (class-only heads do not create elements)
         dsl-error · examples/error_demo/platform/95_wutu_property_without_value.utu:8:9

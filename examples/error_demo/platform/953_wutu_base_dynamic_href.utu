@@ -1,0 +1,15 @@
+// What: a base's href from a value (it moves every relative URL, scripts' too)
+// Expect: a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = "/";
+using Browser from std:Browser;
+
+fn view(root: Str) Browser.HTMLElement {
+    @wutu/\
+    div {
+        base { href = root; }
+    }
+    \/;
+}
+
+export main() void {
+    Browser.document.body.append(view("/app/"));
+}
