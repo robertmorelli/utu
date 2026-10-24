@@ -23,6 +23,11 @@ fn bytes_text(start: I32, end_: I32) Str {
             codes[k] = b;
             k += 1;
             i += 1;
+        } else if utf8_char_size(i, end_) < 0 {
+            // A byte that is not UTF-8 (or a character cut by `end_`): U+FFFD.
+            codes[k] = 65533;
+            k += 1;
+            i += 1;
         } else {
             let cp = b;
             let n = 1;
@@ -656,13 +661,7 @@ fn diag_text(i: I32) Str {
             // What the parser wanted, and what it found; or what @parse_hint saw.
             if diag_c[i] >= 0 { return word_text(diag_c[i]); };
             // The lexer stops at a quote or backtick it finds no end for.
-            if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 34 {
-                // A byte that is not UTF-8 is where the lexer saw the file end.
-                let end_ = file_end[file_of_token(a)];
-                let j = tok_start[a] + 1;
-                while (j < end_ and src[j] != 10 and src[j] != 34 and utf8_char_size(j, end_) > 0) { j += utf8_char_size(j, end_); };
-                return if j < end_ and src[j] != 10 and src[j] != 34 { "Not UTF-8"; } else { "Unclosed string"; };
-            };
+            if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 34 { return "Unclosed string"; };
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 96 { return "Unclosed template string"; };
             if tok_kind[a] == Tok.Error.to_i32() and utf8_char_size(tok_start[a], file_end[file_of_token(a)]) < 0 { return "Not UTF-8"; };
             if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 47 and src[tok_start[a] + 1] == 92 {

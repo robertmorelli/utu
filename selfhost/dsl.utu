@@ -238,7 +238,8 @@ fn dsl_site_of(node: I32) I32 {
 fn graft_expression(site: I32, code: Str) void {
     dsl_current_site[0] = site;
     let expr = parse_expansion(code);
-    if expr < 0 { return; };
+    // Reported once, as its generated file; not expanded again each round.
+    if expr < 0 { dsl_failed.push(site); return; };
     node_kind[site] = Node.Paren_expr.to_i32();
     node_child[site] = expr;
     set_parent(expr, site);
