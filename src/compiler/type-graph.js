@@ -820,7 +820,10 @@ function callResult(graph, call) {
 }
 
 function resolveCall(graph, call) {
-  const known = functionOf(graph, call);
+  // A method is looked up again: a rewrite may retype its receiver
+  // (`let xs = []; xs = [1.5];` makes `xs.len()` Array[F64]'s).
+  const method = call.firstElementChild?.localName === 'ir-field-access' ? memberCall(graph, call) : null;
+  const known = method ?? functionOf(graph, call);
   const direct = bindingOf(graph, call.firstElementChild);
   const fn = known ?? (isFunctionDecl(direct) ? direct : directCalleeDecl(call, graph.doc)) ?? memberCall(graph, call);
   if (!fn) return null;

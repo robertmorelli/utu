@@ -397,6 +397,17 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
             if j >= 0 { elem = j; };
             c = if j >= 0 and decl_is(ty_decl(elem), Decl.Variant) { next_sibling(c); } else { -1; };
         };
+        // `[1, 2.5]`, `[1, x]`: integer literals join the first other number.
+        c = if from >= 0 and elem == prelude(Prelude.I32) and is_number_literal(from) { next_sibling(from); } else { -1; };
+        while (c >= 0) {
+            if is_null_literal(c) or (is_kind(c, Node.Literal) and is_kind(first_child(c), Node.Int_lit)) {
+                c = next_sibling(c);
+            } else {
+                let ct = type_only(c, -1, cx);
+                if is_numeric(ct) { elem = ct; };
+                c = if ct == prelude(Prelude.I32) and is_number_literal(c) { next_sibling(c); } else { -1; };
+            };
+        };
         if elem < 0 { elem = prelude(Prelude.I32); };
         if ty_is(elem, Ty.Error) {
             // The element it was read from is a mistake (`&{…}`, with no
@@ -469,6 +480,8 @@ fn plain_array_type(node: I32, cx: Cx) I32 {
     while (c >= 0) {
         if is_null_literal(c) { has_null = true; } else if elem < 0 {
             elem = if is_kind(c, Node.Array_expr) { plain_array_type(c, cx); } else { type_only(c, -1, cx); };
+        } else if elem == prelude(Prelude.I32) and is_kind(first_child(c), Node.Float_lit) {
+            elem = prelude(Prelude.F64);
         };
         c = next_sibling(c);
     };
@@ -546,7 +559,14 @@ fn later_array_type(decl: I32, let_node: I32, cx: Cx) I32 {
 fn array_use_type(node: I32, decl: I32, cx: Cx) I32 {
     if is_kind(node, Node.Assign_expr) and is_kind(first_child(node), Node.Identifier) and node_decl[first_child(node)] == decl
         and not is_empty_array(last_child(node)) {
-        let t = type_only(last_child(node), -1, cx);
+        // (a local declared later is not typed yet: its annotation says it)
+        let t = annotated_type(last_child(node), cx);
+        if t < 0 { t = type_only(last_child(node), -1, cx); };
+        if is_array_type(t) { return t; };
+    };
+    // `let ys: Array[F64] = xs;`
+    if is_kind(node, Node.Bind_expr) and is_kind(last_child(node), Node.Identifier) and node_decl[last_child(node)] == decl {
+        let t = let_annotation(node, cx);
         if is_array_type(t) { return t; };
     };
     if is_kind(node, Node.Call_expr) and is_kind(first_child(node), Node.Identifier) and decl_is(node_decl[first_child(node)], Decl.Fn) {
@@ -571,6 +591,24 @@ fn array_use_type(node: I32, decl: I32, cx: Cx) I32 {
         c = next_sibling(c);
     };
     -1;
+}
+
+/// The type `let` node `node` is annotated with, or -1.
+fn let_annotation(node: I32, cx: Cx) I32 {
+    let name = first_child(node);
+    let t = next_sibling(name);
+    if is_kind(name, Node.Tuple_pattern) or t == last_child(node) { return -1; };
+    let diags = diag_kind.len();
+    let at = type_of(t, cx.inst);
+    diag_truncate(diags);
+    at;
+}
+
+/// The annotated type of the local identifier `node` names, or -1.
+fn annotated_type(node: I32, cx: Cx) I32 {
+    if not is_kind(node, Node.Identifier) or not decl_is(node_decl[node], Decl.Local) { return -1; };
+    let let_node = decl_node[node_decl[node]];
+    if is_kind(let_node, Node.Bind_expr) { let_annotation(let_node, cx); } else { -1; };
 }
 
 /// Whether `t` is an `Array[T]`.
