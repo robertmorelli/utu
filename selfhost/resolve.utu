@@ -2139,6 +2139,8 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
         Node.Type_member_expr => {
             let base = first_child(node);
             let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base); } else { walk_type_path(base, w); };
+            // `M[A].x`: a member of M (a global), or of its type.
+            if is_kind(base, Node.Instantiated_module_ref) { owner = module_named(node_decl[name_node(first_child(base))]); };
             let name = next_sibling(base);
             node_decl[name] = static_member(owner, word_of(name));
         },

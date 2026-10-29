@@ -2077,7 +2077,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     };
     if is_foreign(rt) { return check_foreign_method(node, rt, word_of(name), args, m, expect, cx); };
     // `s.describe()` with `fn Shape.describe |s|`: a function of the protocol, not a member, is called as any method.
-    if decl_is(ty_decl(rt), Decl.Proto) and (protocol_member(ty_decl(rt), word_of(name)) >= 0 or not decl_is(member(ty_decl(rt), word_of(name), Space.Method), Decl.Fn)) { return proto_call(rt, name, args, m, node, cx); };
+    if decl_is(ty_decl(rt), Decl.Proto) and (protocol_member(ty_decl(rt), word_of(name)) >= 0 or not decl_is(member(ty_decl(rt), word_of(name), Space.Method), Decl.Fn)) { return proto_call(rt, name, args, 0, m, node, cx); };
     if is_scalar_kind(ty_decl(rt)) {
         let scalar = scalar_method(ty_decl(rt), word_of(name));
         if scalar >= 0 and args < 0 { return scalar; };
@@ -2121,12 +2121,18 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         method_note(rt, word_of(name));
         return finish_error(args, m, cx);
     };
-    // `x.m()` with both `fn Pa[X].m` and `fn Pb[X].m`: which is not said.
+    // `x.m()` with both `fn Pa[X].m` and `fn Pb[X].m`: which is not said,
+    // unless x is known as one of them (see @known_as).
     let k = 0;
     while (k < method_twice.len()) {
         if method_twice[k] == decl {
-            report2(Diag.AmbiguousMethod, name, word_of(name), decl, method_twice[k + 1]);
-            return finish_error(args, m, cx);
+            let chosen = known_as(decl, rt, first_child(callee), cx);
+            if chosen < 0 {
+                report2(Diag.AmbiguousMethod, name, word_of(name), decl, method_twice[k + 1]);
+                return finish_error(args, m, cx);
+            };
+            decl = chosen;
+            k = method_twice.len();
         };
         k += 2;
     };
@@ -2147,6 +2153,25 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     };
     coerce(rt, vl_item(fi_params[fi], 0), first_child(callee));
     call_with(fi, args, 1, m, node, cx);
+}
+
+/// `x.m()`, where x's type has `fn P[X].m` (`decl`) and other protocols'
+/// m too: the one of the protocol x is known as, or -1. In a `fn P.m2 |x|`
+/// checked for T, x is a P; a T's x, of the one bound with an m.
+fn known_as(decl: I32, rt: I32, recv: I32, cx: Cx) I32 {
+    let proto = if cx.fi >= 0 and fi_self[cx.fi] == rt { decl_a[fi_decl[cx.fi]]; } else { -1; };
+    let param = declared_param(recv, cx.inst);
+    let chosen = -1;
+    let k = -2;
+    while (k < method_twice.len()) {
+        let c = if k < 0 { decl; } else if method_twice[k] == decl { method_twice[k + 1]; } else { -1; };
+        if c >= 0 and (decl_a[c] == proto or (param >= 0 and has_bound(param, decl_a[c]))) {
+            if chosen >= 0 { return -1; };
+            chosen = c;
+        };
+        k += 2;
+    };
+    chosen;
 }
 
 /// `T.f(…)`: a static function of a type, a host root's, or a scalar's.
@@ -2176,6 +2201,22 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
         es_import(decl, last_child(decl_node[decl]), global_type(decl));
         return call_es(decl, args, m, node, cx);
     };
+    // `Ord.cmp(a, b)`, cmp a method of Ord: as `a.cmp(b)`, a's `fn Ord[A].cmp`
+    // (or, a an Ord, whichever type's it is).
+    if args >= 0 and decl_is(owner_decl, Decl.Proto) and decl_is(decl, Decl.ProtoMember) {
+        let rt = type_only(first_child(args), -1, cx);
+        if ty_decl(rt) == owner_decl {
+            return proto_call(check_expr(first_child(args), -1, cx), last_child(callee), args, 1, m, node, cx);
+        };
+        let word = word_of(last_child(callee));
+        let f = method_of(owner_decl, rt, word);
+        if unbounded_call(rt, word, f, node, cx.inst) or ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
+        if f < 0 {
+            report2(Diag.UnknownMethod, node, word, rt, -1);
+            return finish_error(args, m, cx);
+        };
+        return call_with(fn_instance(f, ty_inst(rt)), args, 0, m, node, cx);
+    };
     if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
     let inst = member_instance(callee, cx);
     if inst < 0 { return finish_error(args, m, cx); };
@@ -2189,12 +2230,27 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
-/// The module instance `T.x` names x in: M's (`M.x`, `alias.x`), or the
-/// type's (`M[A].x`, `T.x`); -1 reported.
+/// The module instance `T.x` names x in: M's (`M.x`, `alias.x`, `M[A].x`),
+/// or the type's (`m.T[A].x`, `T.x`); -1 reported.
 fn member_instance(node: I32, cx: Cx) I32 {
     let base = first_child(node);
     if is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module) { return module_instance(node_decl[base], node_alias[base], node, cx); };
+    if is_kind(base, Node.Instantiated_module_ref) {
+        let module = module_named(node_decl[name_node(first_child(base))]);
+        if decl_is(module, Decl.Module) { return instance_of_args(module, next_sibling(first_child(base)), base, cx); };
+    };
     ty_inst(type_path(base, cx.inst));
+}
+
+/// `module`'s instance for type arguments `args` (`M[A]` at `at`); -1 reported.
+fn instance_of_args(module: I32, args: I32, at: I32, cx: Cx) I32 {
+    let targs = type_args(args, cx.inst);
+    if vl_len[targs] != module_arity(module) {
+        report2(Diag.InvalidModuleArity, at, decl_name[module], module_arity(module), vl_len[targs]);
+        return -1;
+    };
+    let inst = instance(module, targs);
+    if too_deep(inst, at) { -1; } else { inst; };
 }
 
 /// The instance of `module` that `M.f` or `alias.f` (`alias` the alias, or
@@ -3017,21 +3073,16 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
         else { report3(Diag.UnknownMethod, name, word_of(name), -1, -1, decl_name[module]); };
         return finish_error(args, m0, cx);
     };
-    let owner = module_of(decl);
-    let targs = type_args(args_types, cx.inst);
-    if vl_len[targs] != module_arity(owner) {
-        report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[targs]);
-        return error_value();
-    };
-    let inst = instance(owner, targs);
-    if too_deep(inst, node) { return error_value(); };
+    let inst = instance_of_args(module_of(decl), args_types, node, cx);
+    if inst < 0 { return error_value(); };
     let m = w_mark();
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
 }
 
 /// `T.x` (not called): a module's global, or an integer enum's variant.
 fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
-    let owner = node_decl[first_child(node)];
+    let base = first_child(node);
+    let owner = if is_kind(base, Node.Instantiated_module_ref) { module_named(node_decl[name_node(first_child(base))]); } else { node_decl[base]; };
     if decl_is(owner, Decl.Foreign) and decl_a[owner] >= 0 { return check_foreign_root(node, decl_a[owner], word_of(last_child(node)), expect); };
     if decl_is(owner, Decl.Foreign) { return error_value(); };
     let decl = node_decl[last_child(node)];
@@ -3054,9 +3105,9 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     };
     // `T.make` named, not called: the function, as a value.
     if decl_is(decl, Decl.Fn) {
-        let inst = if is_kind(first_child(node), Node.Type_ident) and decl_is(owner, Decl.Module) { instance_for(owner, cx.inst); }
-            else { ty_inst(type_path(first_child(node), cx.inst)); };
-        return member_fn_value(node, decl, inst);
+        let inst = if is_kind(base, Node.Type_ident) and decl_is(owner, Decl.Module) { instance_for(owner, cx.inst); }
+            else { member_instance(node, cx); };
+        return if inst < 0 { error_value(); } else { member_fn_value(node, decl, inst); };
     };
     if decl_is(decl, Decl.Field) {
         report2(Diag.NotValue, node, word_of(name), 2, -1);

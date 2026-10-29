@@ -1341,7 +1341,7 @@ fn assignment(p: Parser, left: I32, operator_tokens: I32) I32 {
     let target = node_kind[left];
     let assignable = target == Node.Identifier.to_i32() or target == Node.Field_expr.to_i32()
         or target == Node.Optional_field_expr.to_i32() or target == Node.Index_expr.to_i32()
-        or (target == Node.Type_member_expr.to_i32() and node_kind[node_child[left]] == Node.Type_ident.to_i32());
+        or (target == Node.Type_member_expr.to_i32() and (node_kind[node_child[left]] == Node.Type_ident.to_i32() or node_kind[node_child[left]] == Node.Instantiated_module_ref.to_i32()));
     if not assignable { return -1; };
     let at = mark_below(left);
     p.pos += operator_tokens;
@@ -1661,11 +1661,17 @@ fn word_expression(p: Parser) I32 {
     };
     if is(p, Tok.LBracket) {
         restore(p, s);
-        // After `M[A]`, only `.T.member` is left (`.f(…)` was a module call).
+        // After `M[A]`, `.x` (a global of M[A]) or `.T.member` is left
+        // (`.f(…)` was a module call).
         module_name(p);
         module_type_arg_list(p);
+        if is(p, Tok.Dot) and shaped_at(p, 1) {
+            node(p, Node.Instantiated_module_ref, at, first);
+            advance(p);
+            identifier(p);
+            return node(p, Node.Type_member_expr, at, first);
+        };
         expect(p, Tok.Dot);
-        if shaped(p) { fail(p); };
         type_ident(p);
         node(p, Node.Inline_module_type_path, at, first);
         expect(p, Tok.Dot);

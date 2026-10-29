@@ -445,8 +445,9 @@ fn proto_test_cast(r: I32, heap: I32) I32 {
     mt;
 }
 
-/// `p.foo(args)`: the receiver is on the stack since `m`.
-fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+/// `p.foo(args)`: the receiver is on the stack since `m`; the arguments
+/// from the `first`th (1 for `P.foo(p, …)`, whose first is p).
+fn proto_call(t: I32, name: I32, args: I32, first: I32, m: I32, at: I32, cx: Cx) I32 {
     let proto = ty_decl(t);
     let pm = protocol_member(proto, word_of(name));
     if pm < 0 or not is_kind(decl_node[pm], Node.Proto_method) {
@@ -466,6 +467,7 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let list = next_sibling(first_child(decl_node[pm]));
     let n = 0;
     let a = if args >= 0 { first_child(args); } else { -1; };
+    if first > 0 { a = next_sibling(a); };
     let p = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
     let locals = Array[I32].new(16, 0);
     let types = Array[I32].new(16, 0);
@@ -483,7 +485,7 @@ fn proto_call(t: I32, name: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     };
     if a >= 0 or p >= 0 {
         let want = if is_kind(list, Node.Type_list) { child_count(list); } else { 0; };
-        report2(Diag.WrongArity, at, -1, want, child_count(args));
+        report2(Diag.WrongArity, at, -1, want, child_count(args) - first);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
         return ty_error();
     };
@@ -702,14 +704,26 @@ fn bound_lack(t: I32, proto: I32) I32 {
             let word = word_of(first_child(m));
             if d < 0 { return word; };
             if is_kind(m, Node.Proto_method) {
-                let f = member(d, word, Space.Method);
-                if not decl_is(f, Decl.Fn) or decl_a[f] != proto or not same_signature(f, m, t) { return word; };
+                let f = method_of(proto, t, word);
+                if not decl_is(f, Decl.Fn) or not same_signature(f, m, t) { return word; };
             } else {
                 let field = member(d, word, Space.Member);
                 if not decl_is(field, Decl.Field) or type_of(last_child(decl_node[field]), ty_inst(t)) != sig_type(last_child(m), t) { return word; };
             };
         };
         c = next_sibling(c);
+    };
+    -1;
+}
+
+/// Type `rt`'s `fn P[X].word` for protocol `proto` (not another's word), or -1.
+fn method_of(proto: I32, rt: I32, word: I32) I32 {
+    let d = member(ty_decl(rt), word, Space.Method);
+    if d < 0 or decl_a[d] == proto { return d; };
+    let k = 0;
+    while (k < method_twice.len()) {
+        if method_twice[k] == d and decl_a[method_twice[k + 1]] == proto { return method_twice[k + 1]; };
+        k += 2;
     };
     -1;
 }
