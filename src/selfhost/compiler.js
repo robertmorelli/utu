@@ -322,8 +322,17 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   loading.set(utu, files);
   const byKey = new Map(prelude.byKey);
   const foreign = [];
+  // The first import that ends the build (see import_missing in lib.utu).
   let missing = false;
-  addFile(utu, files, byKey, entry, await readFile(entry), ROLE.entry);
+  const stop = (i, path, why) => {
+    if (missing) return;
+    const bytes = encoder.encode(path);
+    new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length, why));
+    missing = true;
+  };
+  // Each file's imports of files, as [import, file] pairs.
+  const uses = [];
+  const main = addFile(utu, files, byKey, entry, await readFile(entry), ROLE.entry);
   for (let i = 0; i < utu.import_count(); i++) {
     const from = files[utu.import_from(i)];
     const raw = textAt(utu.src, utu.import_path_start(i), utu.import_path_end(i));
@@ -341,7 +350,7 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
       const role = from.role === ROLE.prelude ? ROLE.prelude : ROLE.import;
       if (platform) {
         const text = stdlib.get(key);
-        if (typeof text !== 'string') continue;
+        if (typeof text !== 'string') { stop(i, key, 2); continue; }
         file = addFile(utu, files, byKey, key, text, role);
       } else {
         let text;
@@ -350,18 +359,19 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
         } catch {
           // A file that cannot be read (the first) ends the build, as in
           // stage 0, after the rest load: names still resolve, for an editor.
-          if (!missing) {
-            const bytes = encoder.encode(key);
-            new Uint8Array(utu.src.buffer).set(bytes, utu.import_missing(i, bytes.length));
-            missing = true;
-          }
+          stop(i, key, 0);
           continue;
         }
         file = addFile(utu, files, byKey, key, text, role);
       }
     }
     utu.import_bind(i, file);
+    (uses[utu.import_from(i)] ??= []).push([i, file]);
   }
+  // An import cycle ends the build at the `using` that closes it, found
+  // depth-first from the entry, as stage 0 does.
+  const cycle = closingImport(uses, main);
+  if (cycle) stop(cycle[0], files[cycle[1]].key, 1);
   // Host declarations the compiler does not hold yet: start again with them
   // written first, where they stay for the programs after.
   if (!await bindForeign(utu, foreign, host, readFile)) return loadProgram(utu, entry, host, texts);
@@ -369,6 +379,24 @@ export async function loadProgram(utu, entry, host, texts = new Map()) {
   await loadEmbeds(utu, entry, files, host);
   await assembleWat(utu);
   return files;
+}
+
+/**
+ * The [import, file] that closes a cycle of files, depth-first from `file`
+ * over `uses` (each file's [import, file] pairs, in source order), or null.
+ */
+function closingImport(uses, file) {
+  const state = []; // 1: on the path, 2: done
+  const path = [[file, 0]];
+  state[file] = 1;
+  while (path.length) {
+    const top = path.at(-1);
+    const next = uses[top[0]]?.[top[1]++];
+    if (!next) { state[top[0]] = 2; path.pop(); continue; }
+    if (state[next[1]] === 1) return next;
+    if (!state[next[1]]) { state[next[1]] = 1; path.push([next[1], 0]); }
+  }
+  return null;
 }
 
 /**

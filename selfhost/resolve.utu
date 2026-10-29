@@ -264,6 +264,7 @@ enum(U8) Diag:
     | TupleLength     // `[…]` of more or fewer elements than a host tuple takes
     | HostAbstract    // `new` of a host abstract class
     | AmbiguousVariant // a bare variant two enums in scope declare (a: one enum, b: the other)
+    | ImportCycle     // the `using` that closes an import cycle
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -1468,7 +1469,11 @@ fn resolve_names() I32 {
     // (for an editor): its mistake is the one said.
     if missing_import[0] >= 0 {
         diag_reset();
-        report(Diag.UnknownImport, import_node[missing_import[0]], -1);
+        let at = import_node[missing_import[0]];
+        report2(if missing_why[0] == 1 { Diag.ImportCycle; } else { Diag.UnknownImport; }, at, -1, missing_why[0], -1);
+        // (`using console from std:Consle`: the std module it names.)
+        let m = std_module(node_text(name_node(first_child(at))));
+        if missing_why[0] == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";"); };
     };
     save_diagnostics();
     diag_kind.len();

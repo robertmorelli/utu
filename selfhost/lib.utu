@@ -124,10 +124,11 @@ export lib {
         json_rt[0];
     }
 
-    /// The host cannot read the import's file, whose path is `n` bytes the
-    /// host writes at the offset returned. This ends the build.
-    fn import_missing(i: I32, n: I32) I32 {
+    /// The host cannot read the import's file (`why` as `missing_why`), whose
+    /// path is `n` bytes the host writes at the offset returned. This ends the build.
+    fn import_missing(i: I32, n: I32, why: I32) I32 {
         missing_import[0] = i;
+        missing_why[0] = why;
         missing_start[0] = src.len();
         src.resize(src.len() + n);
         missing_end[0] = src.len();

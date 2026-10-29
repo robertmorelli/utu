@@ -379,7 +379,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       if (q?.stale) throw responseError(-32602, 'the file does not parse: rename once it does');
       if (q && entryPoint(q)) throw responseError(-32602, ENTRY_POINT);
       // Names resolve past an import not found, but are not checked: a rename could not be.
-      const stop = q?.program.diagnostics.find(d => d.kind === 'unknown-import');
+      const stop = q?.program.diagnostics.find(d => d.kind === 'unknown-import' || d.kind === 'import-cycle');
       if (stop) throw responseError(-32602, `the program does not build (${stop.message}): no rename`);
       const name = q && renamed(q);
       if (!name) throw responseError(-32602, 'only a name declared in a file the editor can change is renamed');
@@ -559,7 +559,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
         const imports = `${nameOf(key)}, which imports ${nameOf(definition.file)},`;
         if (program.diagnostics.some(d => d.file === key && d.kind === 'parse-error')) throw refuse(`${imports} does not parse`);
         // (Its names resolve, but are not checked.)
-        const stop = program.diagnostics.find(d => d.kind === 'unknown-import');
+        const stop = program.diagnostics.find(d => d.kind === 'unknown-import' || d.kind === 'import-cycle');
         if (stop) throw refuse(`${imports} does not build (${stop.message})`);
       }
       if (!has) continue;

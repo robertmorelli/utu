@@ -227,6 +227,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.UnknownVariable { return "unknown-variable"; };
     if k == Diag.UnknownType or k == Diag.NotAModule or k == Diag.UnknownModule or k == Diag.UnknownVariant or k == Diag.MemKind or k == Diag.InvalidDistinct or k == Diag.MemView { return "unknown-type"; };
     if k == Diag.UnknownImport { return "unknown-import"; };
+    if k == Diag.ImportCycle { return "import-cycle"; };
     if k == Diag.DuplicateDeclaration or k == Diag.DuplicatePattern or k == Diag.MemTwice or k == Diag.MemClash or k == Diag.EnumValueTwice { return "duplicate-declaration"; };
     if k == Diag.UnknownMember { return "unknown-method"; };
     if k == Diag.DslPlace { return "invalid-dsl-usage"; };
@@ -391,7 +392,7 @@ fn break_rule_text(a: I32) Str {
     let r = BreakRule.from_i32(if a < 0 { 0; } else { a; });
     if r == BreakRule.BreakOutside { return "break outside a loop"; };
     if r == BreakRule.ContinueOutside { return "continue outside a loop"; };
-    if r == BreakRule.ContinueStateOutside { return "continue with a state outside loop match"; };
+    if r == BreakRule.ContinueStateOutside { return "continue with a state only works inside loop match"; };
     if r == BreakRule.ContinueWithoutState { return "continue needs the next state"; };
     if r == BreakRule.BreakInDefer { return "break in defer"; };
     if r == BreakRule.ContinueInDefer { return "continue in defer"; };
@@ -424,10 +425,12 @@ fn diag_text(i: I32) Str {
         },
         Diag.UnknownType => "Unknown type " + w + did_you_mean(i),
         Diag.UnknownImport => {
+            if a == 2 { return "Unknown platform import: " + bytes_text(missing_start[0], missing_end[0]); };
             let path = import_path[missing_import[0]];
             let spelled = bytes_text(tok_start[node_first[path]] + 1, tok_end[node_last[path] - 1] - 1);
             "No file " + spelled + " (" + bytes_text(missing_start[0], missing_end[0]) + ")";
         },
+        Diag.ImportCycle => "Import cycle detected at: " + bytes_text(missing_start[0], missing_end[0]),
         Diag.UnknownModule => "Unknown module " + w + did_you_mean(i),
         Diag.DuplicateDeclaration => {
             if a == 5 { return "Duplicate method " + node_text(node); };
@@ -485,7 +488,7 @@ fn diag_text(i: I32) Str {
             let t = type_text(a);
             t + " cannot be stored; use cl" + t.slice(3, t.len());
         },
-        Diag.InvalidGlobalInitializer => "Global " + w + " needs a literal",
+        Diag.InvalidGlobalInitializer => "return in the initializer of global " + w,
         Diag.RecursiveType => w + " contains itself; make the field nullable",
         Diag.IntegerOutOfRange => (if word >= 0 { w; } else { node_text(node); }) + " does not fit " + (if a >= 0 { type_text(a); } else { "a byte"; }),
         Diag.InvalidDistinct => "distinct wraps I32, U32, I64, U64, F32, or F64",
@@ -553,7 +556,8 @@ fn diag_text(i: I32) Str {
         },
         Diag.StorageType => w + " is a storage type: use I32",
         Diag.ReturnValueFromVoid => {
-            if word < 0 { return "This closure returns void"; };
+            // (No name: a closure's return, or a test's.)
+            if word < 0 { return pick(in_closure(node), "This closure returns void", "A test returns nothing"); };
             w + " returns void";
         },
         Diag.VoidLet => w + " would hold no value",

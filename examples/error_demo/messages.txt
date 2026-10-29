@@ -863,7 +863,7 @@
 --- exit 1
 
 === utu check examples/error_demo/control/47_continue_state_outside_loop_match.utu
- ERROR  continue with a state outside loop match
+ ERROR  continue with a state only works inside loop match
         invalid-break · examples/error_demo/control/47_continue_state_outside_loop_match.utu:6:20
 
  4 │     let t = 0;
@@ -876,7 +876,7 @@
 --- exit 1
 
 === utu check examples/error_demo/control/48_continue_state_in_plain_match.utu
- ERROR  continue with a state outside loop match
+ ERROR  continue with a state only works inside loop match
         invalid-break · examples/error_demo/control/48_continue_state_in_plain_match.utu:6:28
 
  4 │     let count = 0;
@@ -3188,57 +3188,31 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/32_unknown_import_std_typo.utu
- ERROR  Unknown module console
-        unknown-module · examples/error_demo/names/32_unknown_import_std_typo.utu:3:7
+ ERROR  Unknown platform import: std:Consle
+        unknown-import · examples/error_demo/names/32_unknown_import_std_typo.utu:3:1
 
  1 │ // What: a std module name misspelled (std:Consle)
  2 │ // Expect: Unknown std module 'std:Consle'; did you mean std:Console?
  3 │ using console from std:Consle;
-   │       ━━━━━━━
-   │       ╰─ no such module
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  4 │
  5 │ export main() void {
-
-  note  using console from std:Console;
-  note  The file has no mod console: declare one there, mod console { … }
-
- ERROR  Unknown variable console
-        unknown-variable · examples/error_demo/names/32_unknown_import_std_typo.utu:6:5
-
- 4 │
- 5 │ export main() void {
- 6 │     console.log("hi");
-   │     ━━━━━━━
-   │     ╰─ not defined
- 7 │ }
 
   note  using console from std:Console;
 --- exit 1
 
 === utu check examples/error_demo/names/33_unknown_import_std_lowercase.utu
- ERROR  Unknown module console
-        unknown-module · examples/error_demo/names/33_unknown_import_std_lowercase.utu:3:7
+ ERROR  Unknown platform import: std:console
+        unknown-import · examples/error_demo/names/33_unknown_import_std_lowercase.utu:3:1
 
  1 │ // What: a std module written in lowercase (std:console)
  2 │ // Expect: Unknown std module 'std:console'; did you mean std:Console?
  3 │ using console from std:console;
-   │       ━━━━━━━
-   │       ╰─ no such module
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
  4 │
  5 │ export main() void {
-
-  note  using console from std:Console;
-  note  The file has no mod console: declare one there, mod console { … }
-
- ERROR  Unknown variable console
-        unknown-variable · examples/error_demo/names/33_unknown_import_std_lowercase.utu:6:5
-
- 4 │
- 5 │ export main() void {
- 6 │     console.log("hi");
-   │     ━━━━━━━
-   │     ╰─ not defined
- 7 │ }
 
   note  using console from std:Console;
 --- exit 1
