@@ -2482,10 +2482,14 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
 /// The JS array type an array literal is as the receiver of method `key`
 /// native arrays lack (`["a", "b"].forEach(…)`), or -1.
 fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
-    let elem = type_only(first_child(literal), -1, cx);
-    if ty_is(elem, Ty.Error) { return -1; };
-    let native = array_of(elem);
-    if member(ty_decl(native), key, Space.Method) >= 0 { return -1; };
+    let lt = type_only(literal, -1, cx);
+    if not is_array_type(lt) { return -1; };
+    let elem = inst_arg(ty_inst(lt), 0);
+    if member(ty_decl(lt), key, Space.Method) >= 0 { return -1; };
+    // `[1, 2]`: integer literals are JS numbers.
+    let c = if elem == prelude(Prelude.I32) { first_child(literal); } else { -1; };
+    while (c >= 0 and is_number_literal(c)) { c = next_sibling(c); };
+    if elem == prelude(Prelude.I32) and c < 0 { elem = prelude(Prelude.F64); };
     let w = intern_text("Array");
     for (0 ..< view_doc.len()) |v| {
         let at = if view_live(v) { jget_word(jget(view_json[v], "names"), w); } else { -1; };
