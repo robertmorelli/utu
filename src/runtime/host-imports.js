@@ -246,6 +246,7 @@ export function promising(f) {
  *   'big'  a BigInt (I64, U64)  'num'   a number (F32, F64)
  *   'Str'  a string            '?Str'  a string or null (undefined is null)
  *   'ref'  not null            '?'     anything (undefined is null)
+ *   'cl'   a function (a closure)
  * A promised result converts when it settles.
  *
  * @returns {Record<string, Function>} exports, with those results converted
@@ -266,6 +267,7 @@ export function convertExports(exports, exportSpec) {
     if (kind === 'Str') return v => (typeof v === 'string' ? v : fail(name, i, 'a string', v));
     if (kind === '?Str') return v => (v == null ? null : typeof v === 'string' ? v : fail(name, i, 'a string or null', v));
     if (kind === 'ref') return v => (v == null ? fail(name, i, 'a value', v) : v);
+    if (kind === 'cl') return v => (typeof v === 'function' ? v : fail(name, i, 'a function', v));
     if (kind === '?') return v => (v === undefined ? null : v);
     return same;
   };

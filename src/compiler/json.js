@@ -1190,7 +1190,8 @@ function expandMatch(site, parsed, program, prefix, parser, createDocument) {
       const check = typeof pattern.value === 'string'
         ? `__json_span(${r}); if ${r}.failed == 0 and not __json_is(${r}, ${program.nameRef(pattern.value)}) { __json_fail(${r}, ${expected}); };`
         : typeof pattern.value === 'number'
-          ? `if __json_f64(${r}) != ${Number.isInteger(pattern.value) ? `${pattern.value}.0` : pattern.value} { __json_fail(${r}, ${expected}); };`
+          // An integer literal matches only an integer token (kl: no fraction or exponent).
+          ? `if __json_f64(${r}) != ${Number.isInteger(pattern.value) ? `${pattern.value}.0` : pattern.value}${/^-?\d+$/.test(pattern.text) ? ` or ${r}.kl != 0` : ''} { __json_fail(${r}, ${expected}); };`
           : typeof pattern.value === 'boolean'
             ? `if __json_bool(${r}) != ${pattern.value} { __json_fail(${r}, ${expected}); };`
             : `if not __json_null(${r}) { __json_fail(${r}, ${expected}); };`;
