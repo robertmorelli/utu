@@ -1185,7 +1185,9 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
         } else if c == 110 {
             "if not __json_null(" + r + ") { __json_fail(" + r + ", " + expected + "); };";
         } else {
-            "if __json_f64(" + r + ") != " + float_text(text) + " { __json_fail(" + r + ", " + expected + "); };";
+            // An integer literal matches only an integer token (kl: no fraction or exponent).
+            let integer = float_text(text) == text + ".0";
+            "if __json_f64(" + r + ") != " + float_text(text) + (if integer { " or " + r + ".kl != 0"; } else { ""; }) + " { __json_fail(" + r + ", " + expected + "); };";
         };
         return "let " + ok + " = " + r + ".failed == 0; " + check + " __json_at(" + r + ", " + ok + ", " + where + ");";
     };

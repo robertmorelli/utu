@@ -3611,6 +3611,16 @@ fn export_fn(decl: I32) void {
     export_func.push(function_of(fi));
     export_result.push(fi_result[fi]);
     export_params.push(fi_params[fi]);
+    // JS has no fun to pass: a JS function is a cl (docs/typescript-abi.md).
+    let list = child_of_kind(decl_node[decl], Node.Param_list);
+    for (0 ..< vl_len[fi_params[fi]]) |i| {
+        let t = vl_item(fi_params[fi], i);
+        if es_fun_type(t) and list >= 0 {
+            report3(Diag.ExportFun, last_child(nth_child(list, i)), decl_name[decl], t, i + 1, -1);
+            let u = if ty_is(t, Ty.Nullable) { ty_a[t]; } else { t; };
+            diag_note("A JS function is a closure: type it " + type_text(ty(Ty.Closure, ty_a[u], ty_b[u])) + ".");
+        };
+    };
 }
 
 /// The exported functions and their result types, for the host to give

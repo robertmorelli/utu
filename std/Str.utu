@@ -49,8 +49,16 @@ mod Str {
         @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
     }
 
-    // Substring [start, end) — returns a new string.
+    // Substring [start, end) — returns a new string. An end past the string
+    // stops at its end, as in JavaScript; a negative start or an end before
+    // start traps in --safe builds, as Array's slice does.
     fn slice(s: &, start: I32, end_: I32) & {
+        if checks() and (start < 0 or end_ < start) { fatal; };
+        slice_unchecked(s, start, end_);
+    }
+
+    // `slice` without the --safe check: a negative index reads as unsigned.
+    fn slice_unchecked(s: &, start: I32, end_: I32) & {
         @ir/\ <ir-string-slice-wtf16>
             <ir-ident name="s"/>
             <ir-ident name="start"/>
@@ -79,26 +87,17 @@ mod Str {
     fn &.len |self| () I32 {
         @ir/\ <ir-string-measure-utf16><ir-ident name="self"/></ir-string-measure-utf16> \/;
     }
-    fn &.slice |self| (start: I32, end_: I32) & {
-        @ir/\ <ir-string-slice-wtf16>
-            <ir-ident name="self"/>
-            <ir-ident name="start"/>
-            <ir-ident name="end_"/>
-        </ir-string-slice-wtf16> \/;
-    }
+    fn &.slice |self| (start: I32, end_: I32) & { slice(self, start, end_); }
     fn &.get |self| (i: I32) I32 {
         @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
     }
     fn &.get_index |self| (i: I32) I32 {
         @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
     }
-    fn &.get_slice |self| (start: I32, end_: I32) & {
-        @ir/\ <ir-string-slice-wtf16>
-            <ir-ident name="self"/>
-            <ir-ident name="start"/>
-            <ir-ident name="end_"/>
-        </ir-string-slice-wtf16> \/;
-    }
+    fn &.get_slice |self| (start: I32, end_: I32) & { slice(self, start, end_); }
+
+    // Whether the build is --safe.
+    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
 
     // The string itself: what `${s}` in a template string calls.
     fn &.to_str |self| () & { @ir/\ <ir-ident name="self"/> \/; }

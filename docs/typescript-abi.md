@@ -315,7 +315,8 @@ lib` function's arguments below. Give JS what it should read as numbers, `Str` (
 whole values), or host objects. A `fun` argument reaches JS as a function it
 can call. A JS function is a closure: type a function result `cl(I32) I32`;
 `fun(I32) I32` is an error (`add gets a JS function: that is a cl, not
-fun(I32) I32`).
+fun(I32) I32`), as is an `export lib` parameter typed `fun` (`call: argument 1
+comes from JS, which gives a cl, not fun(I32) I32`).
 
 An `@es` body bound to a `fun` or `cl` type should be a function. One that
 is not plainly one (an arrow or `function`), such as `Math.abs`, is tested
@@ -326,10 +327,11 @@ Safe builds (`-O small`, `fast`, `debug`) also check an `export lib`
 function's arguments: an `I32`, `U32` or
 `enum(I32)` an integer number (wasm keeps its low bits, as above), not `1.5`;
 an `I64` or `U64` a BigInt; an `F32` or `F64` a number (`NaN` included); a
-`Str` a string, a `?Str` a string or null; a struct, array, enum or closure
-must not be null, and `undefined` for a nullable parameter is `null`. A wrong
-argument throws a `TypeError` naming the function and the argument
-(`inc: argument 1 must be an integer, not string`). `smallUnsafe` and
+`Str` a string, a `?Str` a string or null; a closure a function; a struct,
+array or enum must not be null, and `undefined` for a nullable parameter is
+`null`. A wrong argument throws a `TypeError` naming the function and the
+argument (`inc: argument 1 must be an integer, not string`, `apply: argument
+1 must be a function, not number`). `smallUnsafe` and
 `fastUnsafe` pass arguments as they come: a number as wasm converts it
 (`"x"` is 0). Every build takes a `Bool` argument by its truthiness (`flag(1)`,
 `flag("x")` are true; `flag(0)`, `flag(null)` false). Contextual callbacks

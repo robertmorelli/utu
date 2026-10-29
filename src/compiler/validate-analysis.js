@@ -439,6 +439,16 @@ function validateFunctionReferenceStorage(root, program) {
     const element = [...array.children].map(child => child.attr('data-type-name')).find(type => type?.startsWith('fun('));
     if (element && /^Array__fun_/.test(array.attr('data-type-name') ?? '')) report(array, element, 'an array');
   }
+  // JS has no fun to pass an `export lib` function: a JS function is a cl.
+  for (const fn of root.querySelectorAll('ir-fn[data-export="wasm"]')) {
+    paramsOf(fn).forEach((param, i) => {
+      const type = declaredTypeStr(param);
+      if (!/^\??fun\(/.test(type ?? '')) return;
+      stampDiagnostic(param.firstElementChild ?? param, DIAGNOSTIC_KINDS.TYPE_MISMATCH,
+        `${fn.getAttribute('name')}: argument ${i + 1} comes from JS, which gives a cl, not ${type}; type it ${type.replace('fun(', 'cl(')}`,
+        { actual: type });
+    });
+  }
 }
 
 /**

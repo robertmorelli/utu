@@ -603,8 +603,8 @@ fn tuple_result_kinds(list: I32) Str {
 /// What an argument of type t must be: "Bool" any value, by its truthiness,
 /// in every build; in safe builds "int" an integer number (an i32: wasm
 /// keeps its low bits), "big" a BigInt (an i64), "num" a number (an f32 or
-/// f64), "Str" a string, "?Str" a string or null, "ref" not null (a struct,
-/// array, enum, or closure), "?" null when undefined; "" anything wasm takes.
+/// f64), "Str" a string, "?Str" a string or null, "cl" a function, "ref" not
+/// null (a struct, array, or enum), "?" null when undefined; "" anything wasm takes.
 fn js_param_kind(t: I32) Str {
     if t == prelude(Prelude.Bool) { return "Bool"; };
     if safe_checks[0] != 1 { return ""; };
@@ -614,6 +614,7 @@ fn js_param_kind(t: I32) Str {
     if vt == vt_i32 { return "int"; };
     if vt == vt_i64 { return "big"; };
     if vt == vt_f32 or vt == vt_f64 { return "num"; };
+    if ty_is(t, Ty.Closure) { return "cl"; };
     if is_foreign(t) or t == prelude(Prelude.Externref) or not vt_is_ref(vt) { return ""; };
     "ref";
 }

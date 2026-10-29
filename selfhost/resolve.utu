@@ -264,6 +264,7 @@ enum(U8) Diag:
     | TupleLength     // `[…]` of more or fewer elements than a host tuple takes
     | HostAbstract    // `new` of a host abstract class
     | AmbiguousVariant // a bare variant two enums in scope declare (a: one enum, b: the other)
+    | ExportFun       // an `export lib` parameter typed `fun` (JS gives a `cl`; a: its type, b: its number)
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
