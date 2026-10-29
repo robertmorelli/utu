@@ -24,7 +24,8 @@ A global in a generic module is one per instance, as its functions are:
 each instance has its own, of its own type, set by its own initializer. The
 type and initializer can use T, `&`, and the module's own types and
 functions. A global that uses none of them (`let limit: I32 = 64;`) is
-still one per instance.
+still one per instance. Outside, an instance's global is read by its path,
+`Stash[I32].items`, as a plain module's is by `M.items`.
 
 ```utu
 using Buffer from std:Buffer;
@@ -108,13 +109,17 @@ In a protocol, `&` is the implementing type: `cmp(&) I32` takes another of
 the same type, so `Ord[I32].cmp` takes an I32 and `Ord[Version].cmp` a
 Version. Only a bounded T can call a member that uses `&`; a protocol value
 (an `Array[Ord]` element) cannot, since which type `&` is is not known
-there.
+there. `P.m(x, …)` is `x.m(…)`, said by protocol: `Ord.cmp(a, b)` calls
+a's `fn Ord[A].cmp`, a T, a struct or a scalar, and `Shape.area(s)`, s a
+Shape value, whichever type's s is.
 
 A protocol's own function, `fn Counter.tick |c|`, is a method of a T
 bounded by Counter, as of a Counter value: `c.tick()` calls the T's own
 `tick` if it has one, else Counter's (when two bounds both have one, say
 which: `Counter.tick(c)`). Counter's is checked for each T, as the module
-is, so a scalar, Str or enum T works too, and `c.step()` in it is T's.
+is, so a scalar, Str or enum T works too, and `c.step()` in it is T's
+`fn Counter[T].step`, even when T has another protocol's step as well. So
+is `x.step()` on an `x: T` whose bounds have one step between them.
 `Counter.tick(x)` works on any implementor. On a value of a concrete
 struct, say `b` of `struct ByOne[Counter]`, `b.tick()` is "No method
 ByOne.tick": write `Counter.tick(b)`, or hold it as a Counter
