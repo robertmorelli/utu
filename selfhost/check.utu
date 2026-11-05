@@ -477,31 +477,48 @@ fn drop_value(t: I32) void {
 
 /// Make the value on top of the stack (of type `actual`) a value of
 /// `expected`, or report that it is not one.
+/// Successful implicit conversions, by expression node. Kinds: nullable (1),
+/// variant (2), protocol (3), closure (4), null (5), host (6).
+vec co_node: I32;
+vec co_from: I32;
+vec co_to: I32;
+vec co_kind: I32;
+
+fn note_coercion(at: I32, actual: I32, expected: I32, kind: I32) I32 {
+    if at >= 0 and at < node_kind.len() {
+        co_node.push(at);
+        co_from.push(actual);
+        co_to.push(expected);
+        co_kind.push(kind);
+    };
+    expected;
+}
+
 fn coerce(actual: I32, expected: I32, at: I32) I32 {
     if expected < 0 or actual == expected { return actual; };
     if ty_is(actual, Ty.Error) or ty_is(expected, Ty.Error) or ty_is(actual, Ty.Never) { return expected; };
-    if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return expected; };
-    if is_variant_of(actual, expected) { return expected; };
-    if converts_to_proto(actual, expected) { return expected; };
-    if ty_is(expected, Ty.Nullable) and converts_to_proto(actual, ty_a[expected]) { return expected; };
+    if ty_is(expected, Ty.Nullable) and ty_a[expected] == actual { return note_coercion(at, actual, expected, 1); };
+    if is_variant_of(actual, expected) { return note_coercion(at, actual, expected, 2); };
+    if converts_to_proto(actual, expected) { return note_coercion(at, actual, expected, 3); };
+    if ty_is(expected, Ty.Nullable) and converts_to_proto(actual, ty_a[expected]) { return note_coercion(at, actual, expected, 3); };
     let target = if ty_is(expected, Ty.Nullable) { ty_a[expected]; } else { expected; };
     if ty_is(actual, Ty.Fun) and ty_is(target, Ty.Closure) and ty_a[actual] == ty_a[target] and ty_b[actual] == ty_b[target] {
         decay_fun(actual, w_mark() - 1);
-        return expected;
+        return note_coercion(at, actual, expected, 4);
     };
-    if ty_is(expected, Ty.Nullable) and is_variant_of(actual, ty_a[expected]) { return expected; };
+    if ty_is(expected, Ty.Nullable) and is_variant_of(actual, ty_a[expected]) { return note_coercion(at, actual, expected, 2); };
     // ?V to ?E, ?T to ?P: the same reference, as V to E and T to P.
-    if ty_is(expected, Ty.Nullable) and ty_is(actual, Ty.Nullable) and (is_variant_of(ty_a[actual], ty_a[expected]) or converts_to_proto(ty_a[actual], ty_a[expected])) { return expected; };
+    if ty_is(expected, Ty.Nullable) and ty_is(actual, Ty.Nullable) and (is_variant_of(ty_a[actual], ty_a[expected]) or converts_to_proto(ty_a[actual], ty_a[expected])) { return note_coercion(at, actual, expected, 1); };
     if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) {
         w_pop();
         w_leaf(Op.RefNull, repr(expected), heap_of(repr(expected)), 0);
-        return expected;
+        return note_coercion(at, actual, expected, 5);
     };
     if ty_is(expected, Ty.Void) {
         drop_value(actual);
         return expected;
     };
-    if host_coerce(actual, expected) { return expected; };
+    if host_coerce(actual, expected) { return note_coercion(at, actual, expected, 6); };
     // A type made of an unknown one (`Array[I32Z]`) was said once.
     if ty_has_error(actual) or ty_has_error(expected) { return expected; };
     mismatch(at, expected, actual);
@@ -644,6 +661,8 @@ fn error_since(m: I32) I32 {
 /// Each expression's type as it was last checked, or -1: for queries
 /// (`utu grep`, the editor), which the compiler does not read.
 vec node_ty: I32;
+/// Expected type at each expression site, or -1.
+vec node_expect: I32;
 
 /// Check an expression against the type expected of it (-1 for none):
 /// push its IR node, record its type in @node_ty, and return the type.
@@ -653,7 +672,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     cur_src[0] = node;
     let t = check_node(node, expect, cx);
     cur_src[0] = outer;
-    if node < node_ty.len() { node_ty[node] = t; };
+    if node < node_ty.len() { node_ty[node] = t; node_expect[node] = expect; };
     t;
 }
 
@@ -1396,7 +1415,7 @@ fn fn_value(decl: I32, cx: Cx) I32 { fn_value_in(decl, instance_for(module_of(de
 /// Function `decl` of module instance `inst` as a value (`f`, `m.f`, `T.f`).
 fn fn_value_in(decl: I32, inst: I32) I32 {
     let fi = fn_instance(decl, inst);
-    note_edge(fi);
+    note_edge(fi, -1);
     let f = function_of(fi);
     let t = ty(Ty.Fun, fi_params[fi], fi_result[fi]);
     w_leaf(Op.RefFunc, vt_ref(func_type_of[f], false), f, 0);
@@ -1417,7 +1436,7 @@ fn global_get(decl: I32, inst: I32) I32 {
     w_leaf(Op.GlobalGet, glob_type[g], g, 0);
     // A computed global: noted, and a reference held nullable is read non-null.
     if gi_init[gi] >= 0 {
-        note_edge(-2 - gi);
+        note_edge(-2 - gi, -1);
         if glob_type[g] != repr(t) { w_node(Op.RefAsNonNull, repr(t), 0, 0, w_mark() - 1); };
     };
     t;
@@ -1480,11 +1499,14 @@ vec cur_fn: I32 = [-1];
 /// -2 - g for computed global instance g).
 vec edge_from: I32;
 vec edge_to: I32;
+/// Call syntax node for each edge; -1 for a value reference.
+vec edge_site: I32;
 
-fn note_edge(to: I32) void {
+fn note_edge(to: I32, site: I32) void {
     if cur_fn[0] == -1 { return; };
     edge_from.push(cur_fn[0]);
     edge_to.push(to);
+    edge_site.push(site);
 }
 
 /// Global instance gi of type t, computed by `init`: its wasm global (zero
@@ -2496,7 +2518,7 @@ vec call_site: I32;
 
 /// The arguments are on the stack since `m`: call the function, or expand it.
 fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
-    note_edge(fi);
+    note_edge(fi, if call_site.len() > 0 { call_site[0]; } else { -1; });
     let result = fi_result[fi];
     if fi_ir[fi] >= 0 { return expand(fi, m); };
     // From outside a lazy module, its function is its stub (see lazy_stub).
@@ -3434,6 +3456,7 @@ enum(U8) Target:
     | Tests
     | Comptime
     | Benches
+    | Analysis
 
 fn reset_check() void {
     memo_state.clear();
@@ -3477,9 +3500,15 @@ fn reset_check() void {
     computed_init.clear();
     edge_from.clear();
     edge_to.clear();
+    edge_site.clear();
+    co_node.clear();
+    co_from.clear();
+    co_to.clear();
+    co_kind.clear();
     cur_fn[0] = -1;
     node_ty.resize(node_kind.len());
-    for (0 ..< node_kind.len()) |n| { node_ty[n] = -1; };
+    node_expect.resize(node_kind.len());
+    for (0 ..< node_kind.len()) |n| { node_ty[n] = -1; node_expect[n] = -1; };
     for (0 ..< decl_kind.len()) |d| {
         decl_local[d] = -1;
         decl_ty[d] = 0;
@@ -3569,7 +3598,7 @@ fn compile(target: Target) I32 {
         if file_role[file] == FileRole.Entry.to_i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file]);
             while (item >= 0) {
-                if target == Target.Normal and is_kind(item, Node.Export_lib_decl) {
+                if (target == Target.Normal or target == Target.Analysis) and is_kind(item, Node.Export_lib_decl) {
                     let f = first_child(item);
                     while (f >= 0) {
                         let d = node_decl[last_child(first_child(f))];
@@ -3577,7 +3606,7 @@ fn compile(target: Target) I32 {
                         f = next_sibling(f);
                     };
                 };
-                if target == Target.Normal and is_kind(item, Node.Export_main_decl) {
+                if (target == Target.Normal or target == Target.Analysis) and is_kind(item, Node.Export_main_decl) {
                     entry_function(item, intern_text("main"), -1);
                     if run_build[0] == 1 { run_readers(item); };
                 };
@@ -3623,7 +3652,7 @@ fn compile(target: Target) I32 {
             let item = first_child(file_root[file]);
             let entry = file_role[file] == FileRole.Entry.to_i32();
             while (item >= 0) {
-                if entry and (target == Target.Normal or not is_kind(item, Node.Export_lib_decl)) { check_item(item); };
+                if entry and (target == Target.Normal or target == Target.Analysis or not is_kind(item, Node.Export_lib_decl)) { check_item(item); };
                 if not entry and declares_item(file, item) { check_item(item); };
                 // An imported file's tests and benches: checked, not run.
                 if not entry { test_or_bench(item, Target.Normal); };
@@ -3657,6 +3686,7 @@ fn compile(target: Target) I32 {
     check_ir_types();
     start_globals();
     if diag_kind.len() > 0 { return -1; };
+    if target == Target.Analysis { return 0; };
     encode_module();
 }
 

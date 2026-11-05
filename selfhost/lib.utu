@@ -483,6 +483,69 @@ export lib {
         type_text(node_ty[n]);
     }
 
+    /// Analysis only: check all own declarations, without emitting a module.
+    /// Pass target 4 to compile_program.
+
+    /// Calls and computed-global reads in the last build. A call edge has
+    /// a site; value references and global reads have site -1.
+    fn edge_count() I32 { edge_from.len(); }
+    fn edge_from_decl(k: I32) I32 {
+        let from = edge_from[k];
+        if from >= 0 and from < fi_decl.len() { fi_decl[from]; } else { from; };
+    }
+    fn edge_to_decl(k: I32) I32 {
+        let to = edge_to[k];
+        if to >= 0 and to < fi_decl.len() { fi_decl[to]; } else { to; };
+    }
+    fn edge_site_start(k: I32) I32 { span_start(edge_site[k]); }
+    fn edge_site_end(k: I32) I32 { if edge_site[k] < 0 { -1; } else { tok_end[node_last[edge_site[k]] - 1]; }; }
+
+    /// Successful implicit conversions from the last build.
+    fn coercion_count() I32 { co_node.len(); }
+    fn coercion_node(k: I32) I32 { co_node[k]; }
+    fn coercion_from_text(k: I32) Str { type_text(co_from[k]); }
+    fn coercion_to_text(k: I32) Str { type_text(co_to[k]); }
+    fn coercion_kind(k: I32) I32 { co_kind[k]; }
+    fn node_expected_type(n: I32) Str {
+        if n < 0 or n >= node_expect.len() or node_expect[n] < 0 { return ""; };
+        type_text(node_expect[n]);
+    }
+
+    /// A closure's captured declarations in source order.
+    fn closure_capture_count(node: I32) I32 {
+        if node < 0 or node >= node_kind.len() or not is_kind(node, Node.Closure_expr) { return 0; };
+        vl_len[captures_of(node)];
+    }
+    fn closure_capture_decl(node: I32, k: I32) I32 {
+        if node < 0 or node >= node_kind.len() or not is_kind(node, Node.Closure_expr) { return -1; };
+        let list = captures_of(node);
+        if k < 0 or k >= vl_len[list] { -1; } else { vl_item(list, k); };
+    }
+
+    /// Direct effects: await=1, host=2, throws=4, traps=8.
+    fn decl_effects(decl: I32) I32 {
+        if decl < 0 or decl >= decl_kind.len() or not decl_is(decl, Decl.Fn) { return 0; };
+        effects_in(fn_body(decl));
+    }
+
+    /// Wasm value representation of an expression, or "" if unchecked.
+    fn node_wasm_type(n: I32) Str {
+        if n < 0 or n >= node_ty.len() or node_ty[n] < 0 { return ""; };
+        wasm_type_text(repr(node_ty[n]));
+    }
+
+    /// A struct field's owner declaration and zero-based slot.
+    fn node_field_owner(n: I32) I32 {
+        if n < 0 or n >= node_kind.len() or not is_kind(n, Node.Field_expr) { return -1; };
+        let d = node_decl[last_child(n)];
+        if decl_is(d, Decl.Field) { decl_owner[d]; } else { -1; };
+    }
+    fn node_field_index(n: I32) I32 {
+        if n < 0 or n >= node_kind.len() or not is_kind(n, Node.Field_expr) { return -1; };
+        let d = node_decl[last_child(n)];
+        if decl_is(d, Decl.Field) { decl_a[d]; } else { -1; };
+    }
+
     /// A local's or parameter's type, as the last build checked it ("" when
     /// it was not checked: not a local, or in a function no export reaches).
     fn decl_checked_type(decl: I32) Str {
@@ -570,4 +633,42 @@ fn mod_name_at(item: I32, end_: Bool) I32 {
     if p < 0 or not is_kind(p, Node.Module_decl) { return -1; };
     let n = name_node(first_child(p));
     if end_ { tok_end[node_first[n]]; } else { tok_start[node_first[n]]; };
+}
+
+/// The direct effects in one body; nested closures own their own effects.
+fn effects_in(node: I32) I32 {
+    if node < 0 or is_kind(node, Node.Closure_expr) { return 0; };
+    let flags = 0;
+    if is_kind(node, Node.Await_expr) { flags = flags | 1; };
+    if is_kind(node, Node.Fatal_expr) or is_kind(node, Node.Assert_expr) { flags = flags | 8; };
+    if is_kind(node, Node.Try_expr) or is_kind(node, Node.Try_result_expr) { flags = flags | 4; };
+    if is_kind(node, Node.Call_expr) {
+        let callee = first_child(node);
+        let d = if is_kind(callee, Node.Identifier) { node_decl[callee]; } else if is_kind(callee, Node.Field_expr) { node_decl[last_child(callee)]; } else { -1; };
+        if d >= 0 and decl_es[d] >= 0 { flags = flags | 2; };
+    };
+    let c = first_child(node);
+    while (c >= 0) { flags = flags | effects_in(c); c = next_sibling(c); };
+    flags;
+}
+
+fn wasm_type_text(vt: I32) Str {
+    if vt == vt_none { return "void"; };
+    if vt == vt_i32 { return "i32"; };
+    if vt == vt_i64 { return "i64"; };
+    if vt == vt_f32 { return "f32"; };
+    if vt == vt_f64 { return "f64"; };
+    if vt == vt_v128 { return "v128"; };
+    if vt == vt_externref { return "(ref null extern)"; };
+    if vt == vt_extern { return "(ref extern)"; };
+    if vt == vt_i31ref { return "(ref null i31)"; };
+    if vt == vt_funcref { return "(ref null func)"; };
+    if vt == vt_eqref { return "(ref null eq)"; };
+    if vt == vt_anyref { return "(ref null any)"; };
+    if vt == vt_unreachable { return "unreachable"; };
+    if vt >= vt_defined and vt < vt_tuple {
+        return if vt_nullable(vt) == vt { "(ref null type " + vt_heap(vt).to_str() + ")"; }
+            else { "(ref type " + vt_heap(vt).to_str() + ")"; };
+    };
+    "value " + vt.to_str();
 }
