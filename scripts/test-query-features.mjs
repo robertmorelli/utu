@@ -1,8 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { compileAndInstantiate, makeCompiler, assertEq } from './test-harness.mjs';
+import { compileAndInstantiate, makeCompiler, assertEq, assertNoErrors } from './test-harness.mjs';
 const ROOT=path.resolve('.');
-const assertNoErrors=doc=>{const errors=[...doc.querySelectorAll('[data-error]')];if(errors.length)throw Error(errors.map(n=>(n.dataset.errorMessage??n.dataset.error)+' at '+n.dataset.row+':'+n.dataset.col).join('\n'));};
 for (const file of ['iterators', 'indexes']) {
  const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:`query-${file}.utu`,source:await fs.readFile(`examples/queries/${file}.utu`,'utf8')});
  assertEq(instance.exports.main(),1,file);
