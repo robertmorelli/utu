@@ -1630,7 +1630,8 @@ fn start_globals() void {
 /// Where an edge's source is in @start_globals' arrays, or -1 (an entry function).
 fn edge_source(from: I32, nf: I32) I32 {
     if from >= 0 { return from; };
-    if from == -1 { return -1; };
+    // (Neither `export main`'s calls, -1000000 - its declaration, nor none.)
+    if from == -1 or from <= -1000000 { return -1; };
     nf + gi_init[-2 - from];
 }
 
