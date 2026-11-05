@@ -190,7 +190,7 @@ async function bundlePackage() {
 async function bundleSelfhost() {
   await fs.rm(path.join(DIST_DIR, 'selfhost'), { recursive: true, force: true });
   await build({
-    plugins: [{
+    plugins: [wasmToolsBrowserPlugin(), {
       name: 'catalog-json',
       setup(api) {
         api.onLoad({ filter: /browser-catalog\.generated\.js$/ }, async ({ path: file }) => {
@@ -212,6 +212,25 @@ async function bundleSelfhost() {
     legalComments: 'none',
     chunkNames: '[name]-[hash]',
   });
+  // wasm-tools is a lazy WAT viewer dependency. Its WebAssembly payloads are
+  // loaded only when the WAT view opens, beside the generated JS chunk.
+  const vendor = path.join(ROOT, 'node_modules', '@bytecodealliance', 'jco-transpile', 'vendor');
+  await Promise.all(['wasm-tools.core.wasm', 'wasm-tools.core2.wasm'].map(name =>
+    fs.copyFile(path.join(vendor, name), path.join(DIST_DIR, 'selfhost', name))));
+}
+
+function wasmToolsBrowserPlugin() {
+  return {
+    name: 'wasm-tools-browser',
+    setup(api) {
+      api.onResolve({ filter: /^node:process$/ }, () => ({ path: 'process', namespace: 'utu-wat-browser' }));
+      api.onResolve({ filter: /^node:fs\/promises$/ }, () => ({ path: 'fs', namespace: 'utu-wat-browser' }));
+      api.onLoad({ filter: /.*/, namespace: 'utu-wat-browser' }, ({ path: name }) => ({
+        loader: 'js',
+        contents: name === 'process' ? "export const platform = 'browser';" : "export async function readFile() { throw new Error('WAT printer assets are unavailable'); }",
+      }));
+    },
+  };
 }
 
 async function bundleVscodeExtension() {
