@@ -7,30 +7,26 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { initParser, createCompiler, emitBinary } from '../src/index.js';
-import { glueModuleSource, liveGlueFields } from '../src/runtime/host-imports.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
+import { glueSource } from '../src/selfhost/loader.js';
+import { formatDiagnostics } from '../src/selfhost/format.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(ROOT, 'dist/compare-pantry');
 await fs.mkdir(out, { recursive: true });
-const parser = await initParser({ wasmDir: `${ROOT}/` });
+const utu = await loadNodeCompiler();
 const entry = path.join(ROOT, 'benchmarks/pantry/kernels.utu');
 const modules = {};
-try {
-  for (const [mode, optimize] of [['oz', 'size'], ['o3', 'speed']]) {
-    const compiler = createCompiler({ parser, target: 'normal', optimize, readFile: f => fs.readFile(f, 'utf8'),
-      resolvePath: (from, r) => path.resolve(path.dirname(from), r) });
-    const doc = await compiler.compileFile(entry);
-    const error = doc.querySelector('[data-error]');
-    if (error) throw new Error(error.dataset.errorMessage);
-    const wasm = emitBinary(doc);
-    const root = doc.body.firstChild;
-    const glue = glueModuleSource(JSON.parse(root.dataset.dslImportsJs), await liveGlueFields(wasm));
-    const gluePath = path.join(out, `kernels-${mode}-glue.mjs`);
-    await fs.writeFile(gluePath, glue);
-    modules[mode] = { wasm: [...wasm], gluePath, spec: JSON.parse(root.dataset.dslImportsJs), closure: JSON.parse(root.dataset.closureRuntime ?? 'null') };
-  }
-} finally { parser.delete(); }
+for (const [mode, optimize] of [['oz', 'size'], ['o3', 'speed']]) {
+  const result = await compileFile(utu, entry, { optimize });
+  const errors = result.diagnostics.filter(d => d.severity !== 'warning');
+  if (!result.wasm || errors.length) throw new Error(formatDiagnostics(errors, new Map(result.files.map(f => [f.key, f.text]))));
+  const { wasm, spec } = result;
+  // Every body, by field, as instantiate gives them: bodies shared by several imports are exported once by the live glue.
+  const gluePath = path.join(out, `kernels-${mode}-glue.mjs`);
+  await fs.writeFile(gluePath, glueSource(spec));
+  modules[mode] = { wasm: [...wasm], gluePath, spec: spec.es ?? {}, closure: spec.closures ?? null };
+}
 
 const runtime = JSON.stringify(path.join(ROOT, 'src/runtime/host-imports.js'));
 const source = `
