@@ -1208,14 +1208,12 @@ export lib {
     }
     // A name bound to a value that never arrives.
     fn never_let(c: I32) I32 { if c > 0 { let z = return 3; z; } else { 4; }; }
-    // Tuples past a defer, dropped whole, and held by one name.
+    // Tuples past a defer, dropped whole, and destructured.
     fn tuples() I32 {
         pair();
         triple(true);
         let .{a, b} = pair();
-        let held = triple(false);
-        held = if a > 0 { held; } else { triple(true); };
-        let .{x, y, z} = held;
+        let .{x, y, z} = triple(false);
         a * 1000 + b.len() * 100 + y.len() * 10 + z + (x * 2.0).to_i32();
     }
     // An inclusive range through the type's largest value ends.
@@ -1761,7 +1759,7 @@ export lib {
     ['export lib {\n    fn squares(n: I32) yield I32 { yield n; }\n}\n', 'squares is a generator: it expands into each for that reads it, so it cannot be exported'],
     // Labeled blocks.
     ['export lib { fn run() I32 { outer: { break nowhere 1; 2; }; } }\n', 'No block labeled nowhere around this break'],
-    ['export lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'No block labeled outer around this break'],
+    ['export lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'break cannot leave a closure'],
     ['export lib { fn run() I32 { let b: I32 = outer: { break outer "x"; }; b; } }\n', 'Expected I32, got Str'],
     ['export lib { fn run() I32 { outer: { defer { break outer; }; }; 0; } }\n', 'break in defer'],
     // Computed globals that need each other.
@@ -1886,8 +1884,8 @@ export lib {
       [`struct N:\n    | next: ?N\n    | v: I32\n    | s: ?Str\nfn f(a: N, c: Bool) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }\n`, '?. only in a statement']),
     // A let of no value (it crashed the compiler).
     ['fn nothing() void {}\nexport main() I32 { let x = nothing(); x; 0; }\n', 'x would hold no value'],
-    // A tuple bound to one name is its values, which a closure cannot hold.
-    ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 'A closure cannot capture tuple t'],
+    // A tuple result must be destructured when bound.
+    ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 't would hold tuple .{I32, I32}: name its values with let .{…}'],
     // An integer is no variant of an integer enum.
     ['enum(U8) A:\n    | X\n    | Y\nexport main() I32 { match A.X { 0 => 10, 1 => 20, }; }\n', '0 cannot match A'],
     // Two opened modules with one name: neither is meant (this said "Unknown variable v").
@@ -2698,6 +2696,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   const { linkFiles } = await import('../tools/dts/link.mjs');
   const linked = await project({ 'api.d.ts': callbacks, 'api.js': callbacksJs, 'main.utu': 'using Api from "./bindings/Api.abi.json";\n'
     + 'export main() F64 {\n    Api.cb(cl(x) F64 { x + 1.0; }) + Api.many(cl(a, b, c) F64 { a + b + c; });\n}\n' });
+  await fs.mkdir(path.join(path.dirname(linked), 'node_modules'));
   const abi = linkFiles({ files: [path.join(path.dirname(linked), 'api.d.ts')], prefix: 'Api', moduleSpecifier: './api.js' });
   await fs.mkdir(path.join(path.dirname(linked), 'bindings'));
   await fs.writeFile(path.join(path.dirname(linked), 'bindings/Api.abi.json'), JSON.stringify(abi));
