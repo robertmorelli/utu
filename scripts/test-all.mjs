@@ -25,6 +25,7 @@ const commands = [
   ['node', './scripts/test-templates.mjs'],
   ['node', './scripts/test-streams.mjs'],
   ['node', './scripts/test-wat.mjs'],
+  ['node', './scripts/test-loader-conversions.mjs'],
   ['node', './scripts/test-stdlib.mjs'],
   ['node', './scripts/test-compiler-regressions.mjs'],
   ['node', './scripts/test-profile.mjs'],
