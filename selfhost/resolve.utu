@@ -2047,7 +2047,10 @@ fn walk_params(list: I32, owner: I32, w: Walk) void {
     while (p >= 0) {
         let name_at = first_child(p);
         walk_type(next_sibling(name_at), w);
-        declare_in_scope(Decl.Param, name_at, p, owner);
+        let prev = lookup(word_of(name_at));
+        let d = declare_in_scope(Decl.Param, name_at, p, owner);
+        // A repeated name (reported by validate) still names the first.
+        if owner >= 0 and decl_is(prev, Decl.Param) and decl_owner[prev] == owner { bind(decl_name[d], prev); };
         p = next_sibling(p);
     };
 }

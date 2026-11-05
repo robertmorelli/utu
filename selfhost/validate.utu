@@ -60,7 +60,10 @@ fn enum_values(decl: I32) void {
     if repr_word == narrow_word(Narrow.U8) or repr_word == narrow_word(Narrow.I8) { bits = 8; };
     if repr_word == narrow_word(Narrow.U16) or repr_word == narrow_word(Narrow.I16) { bits = 16; };
     if repr_word == narrow_word(Narrow.U8) or repr_word == narrow_word(Narrow.U16) { signed = false; };
-    if own and bits == 32 and repr_word != known_word(Known.WordI32) and repr_word != known_word(Known.WordU32) {
+    let base = after_qualifier(node);
+    // (A base already reported unknown is the mistake.)
+    let unknown = node_decl[base] < 0 and not builtin_type(repr_word);
+    if own and bits == 32 and repr_word != known_word(Known.WordI32) and repr_word != known_word(Known.WordU32) and not unknown {
         report(Diag.EnumBase, after_qualifier(node), repr_word);
         own = false;
     };

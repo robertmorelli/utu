@@ -3622,7 +3622,10 @@ fn compile(target: Target) I32 {
                 // Every mem of the entry file is a memory of the module, as in stage 0.
                 if is_kind(item, Node.Mem_decl) {
                     let d = node_decl[first_child(item)];
-                    if not mem_kind_ok(d) { report(Diag.MemKind, item, decl_name[d]); } else { memory_of(d); };
+                    let elem = next_sibling(first_child(decl_node[d]));
+                    // (An element already reported unknown is the mistake.)
+                    let unknown = is_kind(elem, Node.Type_ident) and node_decl[elem] < 0 and not builtin_type(word_of(elem));
+                    if unknown { } else if not mem_kind_ok(d) { report(Diag.MemKind, item, decl_name[d]); } else { memory_of(d); };
                 };
                 test_or_bench(item, target);
                 // A mod's tests and benches too (a generic mod's run in no instance).

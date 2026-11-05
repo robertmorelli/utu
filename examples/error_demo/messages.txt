@@ -2986,6 +2986,18 @@ ok
  5 │     a.len();
 --- exit 1
 
+=== utu check examples/error_demo/names/1242_duplicate_parameter_body.utu
+ ERROR  Duplicate parameter x
+        duplicate-parameter · examples/error_demo/names/1242_duplicate_parameter_body.utu:3:14
+
+ 1 │ // What: a repeated parameter name still names the first in the body.
+ 2 │ // Expect: Duplicate parameter x
+ 3 │ fn f(x: I32, x: Str) I32 { x; }
+   │      ─       ━━━━━━
+   │      │       ╰─ already declared
+   │      ╰─ first here
+--- exit 1
+
 === utu check examples/error_demo/names/12_unknown_type_lowercase_i32.utu
  ERROR  Unknown type i32; did you mean I32?
         unknown-type · examples/error_demo/names/12_unknown_type_lowercase_i32.utu:3:11
@@ -9962,6 +9974,28 @@ FAIL after tests: boom
  4 │ export main() I32 { let x: X = X.from_i32(1); x.to_i32(1); }
    │                                               ━━━━━━━━━━━
    │                                               ╰─ takes 0, given 1
+--- exit 1
+
+=== utu check examples/error_demo/types/1240_mem_of_unknown_type.utu
+ ERROR  Unknown type Missing
+        unknown-type · examples/error_demo/types/1240_mem_of_unknown_type.utu:3:8
+
+ 1 │ // What: a mem of an unknown type is reported once.
+ 2 │ // Expect: Unknown type Missing
+ 3 │ mem m: Missing;
+   │        ━━━━━━━
+   │        ╰─ no such type
+--- exit 1
+
+=== utu check examples/error_demo/types/1241_enum_of_unknown_base.utu
+ ERROR  Unknown type Missing
+        unknown-type · examples/error_demo/types/1241_enum_of_unknown_base.utu:3:6
+
+ 1 │ // What: an enum over an unknown base is reported once.
+ 2 │ // Expect: Unknown type Missing
+ 3 │ enum(Missing) E: | A
+   │      ━━━━━━━
+   │      ╰─ no such type
 --- exit 1
 
 === utu check examples/error_demo/types/12_array_literal_mixed.utu
