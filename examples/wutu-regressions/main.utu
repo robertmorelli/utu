@@ -112,6 +112,7 @@ export main() void {
             option { value = ""; "none"; }
             option { value = "x"; "x"; }
         }
+        p#tpl { = `a${`b;`}`; }
         p#picks { = state.picks.len().to_str(); }
         button#stop { "stop"; on click { state.timer = false; } }
         p#beats { = state.beats; }

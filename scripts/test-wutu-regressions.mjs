@@ -63,7 +63,8 @@ try {
     o.pickAfter = $('#pick').value;
     // A multiple select with only the empty value chosen is one pick, not none.
     const multi = $('#multi'), optionsOf = () => [...multi.options].map(o => o.selected);
-    o.multiStart = [optionsOf(), $('#picks').textContent];
+    o.template = $('#tpl').textContent;
+    o.multiStart =[optionsOf(), $('#picks').textContent];
     multi.options[0].selected = false; multi.dispatchEvent(new Event('change')); await sleep(20);
     o.multiNone = [optionsOf(), $('#picks').textContent];
     multi.options[0].selected = true; multi.dispatchEvent(new Event('change')); await sleep(20);
@@ -82,7 +83,7 @@ try {
     nestedAfter: 'figure:header,span:Title1 figure:header,span:Titlea figure:header,span:Titlea|b', nestedKept: true, inputs: ['2.5', 'c'],
     rowsAfter: [1, 1], methodAfter: 'm1', clockChanged: true, submitted: '2',
     numbers: ['7', '20'], pickAfter: 'd',
-    multiStart: [[true, false], '1'], multiNone: [[false, false], '0'], multiEmpty: [[true, false], '1'], beatsStill: true, chartAfter: 'drawn;',
+    template: 'ab;', multiStart: [[true, false], '1'], multiNone: [[false, false], '0'], multiEmpty: [[true, false], '1'], beatsStill: true, chartAfter: 'drawn;',
   });
   assert.deepEqual(errors, []);
   console.log(`${engine.name()}: Wutu regressions (hydration, reuse, bindings, timers, @unmanaged, custom elements, SVG roots) passed`);
