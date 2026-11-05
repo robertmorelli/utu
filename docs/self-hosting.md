@@ -229,19 +229,26 @@ test that compiles the same program repeatedly.
 
 ## Stage 0 in Wasm
 
-Stage 0 is now a self-hosted compiler checked in as Wasm, `stage0/utu.wasm`
-(with its host spec beside it); the JavaScript compiler, called stage 0
-above, is stage -1. Stage 0 builds stage 1 in about 0.1 s where stage -1
-takes 13 to 100 s, so `bun run build` and every self-hosted differential
-start at once. Stage -1 is the last resort: when stage 0 cannot build
-`selfhost/` (it uses something newer than stage 0 understands), the build
-says so and builds stage 1 with stage -1 instead; `UTU_STAGE0=js` asks for
-it. Once that build passes, `bun run stage0` makes the compiler just built
-the new stage 0.
+`stage0/utu.wasm` is the checked-in self-hosted compiler. It builds stage 1
+from `selfhost/`; stage 1 builds stage 2; stage 2 builds stage 3. The build
+requires stage 2 and stage 3 to have identical Wasm and host specs. There is
+no JavaScript compiler fallback. For recovery, `UTU_STAGE0=/path/to/utu.wasm`
+selects a different compiler and its adjacent `.host.json` spec.
 
-Stage -1 keeps vouching: `bun run test` runs the bootstrap with `--stage-1`,
-which also builds stage 1 with stage -1 and requires the stage 2 it builds
-to be the same bytes. Two unrelated compilers, one in JavaScript and one in
-Wasm, then agree on the compiler shipped, so stage 0 hides nothing it did
-not get from `selfhost/`. Stage -1 remains the reference the differentials
-compare behavior against.
+Refresh stage 0 only from committed compiler sources:
+
+```sh
+node scripts/stage0.mjs --reason "describe why"
+```
+
+This writes stage 2 to `stage0/` and records its source commit and tree,
+source hash, output hash and size, previous stage 0 hash, Node version, date,
+and reason in `stage0/stage0.json`. Commit the refresh separately from any
+`selfhost/` change. Refresh when the old compiler cannot build the current
+source, or optionally when it is more than roughly 200 commits behind.
+
+`node scripts/stage0.mjs --verify` rebuilds the recorded source from the
+checked-in stage 0 and requires identical Wasm and host spec. `--verify-chain`
+rebuilds each recorded refresh with the previous checked-in stage 0. Older
+history predates provenance records; the chain begins with the first recorded
+refresh.
