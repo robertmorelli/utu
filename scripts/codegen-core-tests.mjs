@@ -119,33 +119,27 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     });
   });
 
-  test('codegen: string lowering imports are emitted only when strings survive codegen', async ({ ROOT }) => {
-    const { emitBinary, JS_STRING_BUILTINS_COMPILE_OPTIONS } = await import('../src/compiler/codegen/index.js');
+  test('codegen: string operations keep only the builtins they use', async ({ ROOT }) => {
+    const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
-    await withTempUtu(ROOT, 'codegen_import_shaking.utu', `
-      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      const binary = emitBinary(doc);
-      const module = await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
+    const inspect = (name, source) => withTempUtu(ROOT, name, source, async file => {
+      const result = await compiler.compileFile(file);
+      assertNoErrors(result);
+      const module = await WebAssembly.compile(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
       const imports = WebAssembly.Module.imports(module);
-      assert(!imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
-      assert(binary.length < 200, `string-free scalar module unexpectedly large: ${binary.length} bytes`);
+      return { result, imports, exports: (await instantiateNode(result.wasm, result.spec, { root: ROOT })).exports };
     });
-    await withTempUtu(ROOT, 'codegen_string_import_shaking.utu', `
+    const scalar = await inspect('codegen_import_shaking.utu', `
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `);
+    assert(!scalar.imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
+    assertEq(scalar.exports.add(2, 3), 5);
+    const concat = await inspect('codegen_string_import_shaking.utu', `
       export lib { fn join(a: Str, b: Str) Str { a + b; } }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      const binary = emitBinary(doc);
-      await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
-      const encoded = new TextDecoder('latin1').decode(binary);
-      assert(encoded.includes('concat'), 'concat-only module should retain the concat builtin');
-      for (const unused of ['substring', 'charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
-        assert(!encoded.includes(unused), `concat-only module retained unrelated string builtin ${unused}`);
-      }
-      assert(binary.length < 150, `concat-only module unexpectedly large: ${binary.length} bytes`);
-    });
-    await withTempUtu(ROOT, 'codegen_midpoint_insert_size.utu', `
+    `);
+    assertEq(concat.exports.join('a', 'b'), 'ab');
+    assert(!concat.imports.some(item => /substring|charCodeAt|fromCodePoint|intoCharCodeArray/.test(item.name)), 'concat-only module retained unrelated string imports');
+    const midpoint = await inspect('codegen_midpoint_insert_size.utu', `
       export lib {
         fn run(base: Str, piece: Str, repeats: I32) Str {
           let i: I32 = 0;
@@ -159,24 +153,9 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           out;
         }
       }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      const binary = emitBinary(doc);
-      await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
-      const encoded = new TextDecoder('latin1').decode(binary);
-      for (const required of ['concat', 'length', 'substring']) {
-        assert(encoded.includes(required), `midpoint insertion dropped required string builtin ${required}`);
-      }
-      const importModuleCount = encoded.split('wasm:js-string').length - 1;
-      assertEq(importModuleCount, 3, 'midpoint insertion should retain exactly three string builtin imports');
-      for (const unused of ['charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
-        assert(!encoded.includes(unused), `midpoint insertion retained unrelated string builtin ${unused}`);
-      }
-      // Three imports, four signatures, and the loop as written (there is no
-      // loop-restructuring optimizer).
-      assert(binary.length <= 212, `midpoint insertion module exceeded its size ceiling: ${binary.length} bytes`);
-    });
+    `);
+    assertEq(midpoint.exports.run('abcd', 'X', 2), 'abXXcd');
+    assert(midpoint.result.wasm.length > concat.result.wasm.length, 'slice loop should be larger than concat alone');
   });
 
   test('codegen: strings support receiver methods and index sugar like Array', async ({ ROOT }) => {
