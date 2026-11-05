@@ -1,0 +1,3 @@
+// What: an unexpected UTF-8 character covers its whole glyph.
+// Expect: Unexpected character '😀'
+😀

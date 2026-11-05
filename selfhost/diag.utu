@@ -521,7 +521,7 @@ fn diag_text(i: I32) Str {
             if a == 2 or a == 3 { return pick(a == 3, "alt", "match") + " misses " + type_text(b) + "." + w; };
             "match over " + type_text(b) + " needs a default arm";
         },
-        Diag.MatchType => "match takes a number or Bool, not " + type_text(a),
+        Diag.MatchType => "match takes a number or Bool, not " + type_text(a) + (if decl_is(ty_decl(a), Decl.Enum) { "; use alt for enum variants"; } else { ""; }),
         Diag.MatchPattern => {
             let p = node_text(first_child(node));
             if a == 1 { return p + " is not a Bool"; };

@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseHTML } from 'linkedom/worker';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 
@@ -127,6 +128,31 @@ export lib {
 }
 `), { optimize: 'speed' });
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+
+  const persisted = await compileFile(utu, await write(`using Browser from std:Browser;
+struct State:
+    | bad: F64
+    | good: I32
+export main() I32 {
+    let state = @stored/\\ State "probe" State { bad: 1.0, good: 2 } \\/;
+    state.good * 10 + state.bad.to_i32();
+}
+`));
+  assert.ok(persisted.wasm, persisted.diagnostics?.map(d => d.message).join('\n'));
+  const savedGlobals = ['document', 'localStorage', 'addEventListener'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
+  try {
+    globalThis.document = parseHTML('<html><body></body></html>').document;
+    globalThis.localStorage = { getItem: () => JSON.stringify({ version: 1, data: { bad: Infinity, good: 7 } }), setItem() {} };
+    globalThis.addEventListener = () => {};
+    await fs.mkdir(path.join(dir, 'node_modules'));
+    assert.equal((await instantiateNode(persisted.wasm, persisted.spec, { root: dir })).exports.main(), 70);
+  } finally {
+    for (const [key, descriptor] of savedGlobals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
   checked++;
 
   // A CRLF file's `@css` body: its carriage returns stay in the text (they
