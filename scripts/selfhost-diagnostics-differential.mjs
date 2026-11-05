@@ -70,6 +70,16 @@ const INTENDED = {
   'baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test': 'a generator nothing consumes is checked',
   'baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu test': 'a generator nothing consumes is checked',
   'baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu test': 'a generator nothing consumes is checked',
+  // Stage -1 wants a literal; a global may be computed (the Benchmarks Game ports).
+  ...both('benchmarks/bg/fasta/fasta.utu', 'a global may be computed'),
+  ...both('benchmarks/bg/regexredux/alt/regexredux-backtrack.utu', 'a global may be computed'),
+  ...both('benchmarks/bg/regexredux/regexredux.host.utu', 'a global may be computed'),
+  ...both('benchmarks/bg/regexredux/regexredux.utu', 'a global may be computed'),
+  ...both('benchmarks/bg/revcomp/alt/revcomp-bytewise.utu', 'a global may be computed'),
+  ...both('benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu', 'a global may be computed'),
+  ...both('benchmarks/bg/revcomp/revcomp.utu', 'a global may be computed'),
+  // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
+  ...both('examples/bounds.utu', 'bounded module parameters'),
 };
 
 if (isMainThread) await main();
@@ -112,7 +122,7 @@ async function main() {
   const queue = list.flatMap(p => ['normal', 'test'].map(target => ({ ...p, target })));
   const jobs = Math.min(Number(flag('jobs') ?? os.availableParallelism()), queue.length);
   // Built once here, so the workers load it from the cache.
-  if (!record) await (await import('./selfhost.mjs')).loadSelfhost();
+  await (await import('./selfhost.mjs')).loadSelfhost();
   const results = {};
   const started = performance.now();
   await Promise.all(Array.from({ length: jobs }, async () => {
@@ -178,33 +188,8 @@ async function main() {
 
 // One build's diagnostics: [kind, message, file, start, end] each, sorted.
 async function worker() {
-  const { ROOT, record } = workerData;
+  const { ROOT } = workerData;
   const relative = file => file.startsWith('std:') ? file : path.relative(ROOT, file).replace(/^\.tmp\/diagnostics-negative\//, 'negative/');
-  if (record) {
-    const { createCompiler, initParser, collectAnalysisDiagnostics } = await import('../src/index.js');
-    const { nodePackageResolver } = await import('../tools/dts/packages.mjs');
-    const parser = await initParser({ wasmDir: `${ROOT}/` });
-    const compilers = {};
-    const compilerFor = target => compilers[target] ??= createCompiler({
-      parser, target, optimize: 'none',
-      readFile: file => fs.promises.readFile(file, 'utf8'),
-      readBinaryFile: file => fs.promises.readFile(file),
-      resolvePath: (from, rel) => path.resolve(path.dirname(from), rel),
-      resolvePackage: nodePackageResolver({ root: ROOT }),
-    });
-    parentPort.on('message', async ({ file, target }) => {
-      let diagnostics;
-      try {
-        diagnostics = collectAnalysisDiagnostics(await compilerFor(target).compileFile(file));
-      } catch (error) {
-        diagnostics = error.artifacts?.diagnostics ?? [{ kind: 'compile', message: String(error.message).split('\n')[0] }];
-      }
-      parentPort.postMessage(diagnostics.filter(d => (d.severity ?? 'error') === 'error')
-        .map(d => [d.kind, d.message, d.primary?.file ? relative(d.primary.file) : null, d.primary?.start ?? null, d.primary?.end ?? null])
-        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
-    });
-    return;
-  }
   const { loadProgram, loadSelfhost, compileProgram } = await import('./selfhost.mjs');
   const utu = await loadSelfhost();
   utu.set_optimize(0);
