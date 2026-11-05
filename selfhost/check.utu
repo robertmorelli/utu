@@ -1221,11 +1221,12 @@ let parse_number: fun(Str) F64 = @es/\ (s) => Number(s) \/;
 /// F32s; then the literal's digits pick the side.
 let parse_f32: fun(Str) F64 = @es/\ (s) => {
     const d = Number(s), f = Math.fround(d);
-    if (f === d || !Number.isFinite(f)) return f;
+    const top = d === 3.4028235677973366e38;
+    if (f === d || !Number.isFinite(f) && !top) return f;
     const b = new Float32Array([f]), u = new Uint32Array(b.buffer);
     u[0] += f < d ? 1 : -1;
-    const g = b[0];
-    if ((f + g) / 2 !== d) return f;
+    const g = top ? 3.4028234663852886e38 : b[0];
+    if (!top && (f + g) / 2 !== d) return f;
     let m = d, e = 0n;
     while (!Number.isInteger(m)) { m *= 2; e += 1n; }
     const t = s.toLowerCase(), k = t.indexOf("e"), mant = k < 0 ? t : t.slice(0, k), dot = mant.indexOf(".");
@@ -1674,7 +1675,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
             return error_value();
         };
         report(Diag.AssignmentToImmutable, name, word_of(name));
-        diag_label(pick(decl_is(node_decl[name], Decl.Variant), "constant", "function"));
+        diag_label(pick(decl_is(node_decl[name], Decl.Fn), "function", "constant"));
         return error_value();
     };
     if not is_kind(target, Node.Identifier) {
@@ -1890,8 +1891,26 @@ fn is_number_literal(node: I32) Bool {
 /// Above 0 while code is checked only for its type (its diagnostics dropped).
 vec speculating: I32;
 
+/// Each node's last speculated type (plus 1; 0 for none), with the expected
+/// type and instances it was found for: a right operand typed first and then
+/// checked would be checked twice at every nesting level.
+vec spec_ty: I32;
+vec spec_expect: I32;
+vec spec_inst: I32;
+vec spec_fi: I32;
+
 /// The type an expression has, without keeping its IR.
 fn type_only(node: I32, expect: I32, cx: Cx) I32 {
+    if spec_ty.len() <= node {
+        let n = node_first.len();
+        while (spec_ty.len() < n) {
+            spec_ty.push(0);
+            spec_expect.push(0);
+            spec_inst.push(0);
+            spec_fi.push(0);
+        };
+    };
+    if spec_ty[node] > 0 and spec_expect[node] == expect and spec_inst[node] == cx.inst and spec_fi[node] == cx.fi { return spec_ty[node] - 1; };
     let m = w_mark();
     let diags = diag_kind.len();
     speculating[0] += 1;
@@ -1899,6 +1918,10 @@ fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     speculating[0] -= 1;
     w_stack.resize(m);
     diag_truncate(diags);
+    spec_ty[node] = t + 1;
+    spec_expect[node] = expect;
+    spec_inst[node] = cx.inst;
+    spec_fi[node] = cx.fi;
     t;
 }
 
@@ -2097,6 +2120,10 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
     if is_scalar_kind(ty_decl(rt)) {
         let scalar = scalar_method(ty_decl(rt), word_of(name));
         if scalar >= 0 and args < 0 { return scalar; };
+        if scalar >= 0 {
+            report2(Diag.WrongArity, node, -1, 0, child_count(args));
+            return finish_error(args, m, cx);
+        };
     };
     let decl = member(ty_decl(rt), word_of(name), Space.Method);
     let via_bound = false;
@@ -2227,7 +2254,7 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
     // `P.m(x)` with x a T bounded by P (or the receiver of a `fn P.m2` checked for T): checked for T.
     if args >= 0 and decl_is(owner_decl, Decl.Proto) and proto_default(owner_decl, word_of(last_child(callee))) == decl {
         let rt = type_only(first_child(args), -1, cx);
-        if bound_by(rt, owner_decl, cx.inst, first_child(args)) or (cx.fi >= 0 and fi_self[cx.fi] == rt) or (not ty_is(rt, Ty.Error) and not (repr(rt) >= vt_defined and repr(rt) < vt_tuple)) {
+        if bound_by(rt, owner_decl, cx.inst, first_child(args)) or (cx.fi >= 0 and fi_self[cx.fi] == rt) or (not ty_is(rt, Ty.Error) and not (repr(rt) >= vt_defined and repr(rt) < vt_tuple) and has_impl(rt, owner_decl)) {
             return call_with(fn_instance_on(decl, inst, rt), args, 0, m, node, cx);
         };
     };
@@ -3509,6 +3536,10 @@ fn reset_check() void {
     next_label.resize(1);
     speculating.resize(1);
     speculating[0] = 0;
+    spec_ty.clear();
+    spec_expect.clear();
+    spec_inst.clear();
+    spec_fi.clear();
     fi_grow();
 }
 

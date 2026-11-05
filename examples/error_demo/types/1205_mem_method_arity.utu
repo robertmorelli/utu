@@ -1,0 +1,5 @@
+// What: mem and vec methods with the wrong count of arguments
+// Expect: Takes 1, given 0 (push, push, resize); Takes 0, given 1 (len)
+mem a: I32;
+vec v: I32;
+export main() I32 { a.push(); v.push(); a.resize(); a.len(1); 0; }

@@ -3027,6 +3027,24 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.ok(built.wasm?.length > 0, built.diagnostics?.map(d => d.message).join('\n'));
     checked++;
   }
+  // Generation 1 fixes: each program builds and returns what it should in every mode.
+  const gen1 = async (source, want) => {
+    const file = await write(source);
+    for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+      const result = await compileFile(utu, file, { mode });
+      assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+      assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), want, mode);
+      checked++;
+    }
+  };
+  // A literal just under the F32 overflow midpoint rounds to the largest F32.
+  await gen1('export main() F32 {\n    3.4028235677973366e38;\n}\n', 3.4028234663852886e38);
+  // A protocol method of 17 parameters called through a protocol value.
+  await gen1('proto P:\n | f(I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32) I32\nstruct S[P]: | n: I32\n'
+    + 'fn P[S].f |s| (a0: I32, a1: I32, a2: I32, a3: I32, a4: I32, a5: I32, a6: I32, a7: I32, a8: I32, a9: I32, a10: I32, a11: I32, a12: I32, a13: I32, a14: I32, a15: I32, a16: I32) I32 { a16; }\n'
+    + 'export main() I32 { let s: P = S {n: 0}; s.f(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16); }\n', 16);
+  // Right-nested literal-led operators are checked once per level, not twice.
+  await gen1('export main() I32 { let x = 3; 1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (x)))))))))))))))))))))))); }\n', 27);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
