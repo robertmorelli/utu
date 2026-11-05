@@ -224,10 +224,12 @@ function wasmToolsBrowserPlugin() {
     name: 'wasm-tools-browser',
     setup(api) {
       api.onResolve({ filter: /^node:process$/ }, () => ({ path: 'process', namespace: 'utu-wat-browser' }));
-      api.onResolve({ filter: /^node:fs\/promises$/ }, () => ({ path: 'fs', namespace: 'utu-wat-browser' }));
+      // The vendor reaches this dynamic import only in Node; leaving it
+      // external lets the same emitted chunk read its assets in Node.
+      api.onResolve({ filter: /^node:fs\/promises$/ }, () => ({ path: 'node:fs/promises', external: true }));
       api.onLoad({ filter: /.*/, namespace: 'utu-wat-browser' }, ({ path: name }) => ({
         loader: 'js',
-        contents: name === 'process' ? "export const platform = 'browser';" : "export async function readFile() { throw new Error('WAT printer assets are unavailable'); }",
+        contents: "export const platform = 'browser';",
       }));
     },
   };
