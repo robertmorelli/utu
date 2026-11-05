@@ -1,0 +1,173 @@
+// Mandelbrot, hand-tuned: BG mandelbrot gcc #6's algorithm (Kevin Miller) with
+// f64x2 through @wat (reported apart from the idiomatic mandelbrot.utu):
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/mandelbrot-gcc-6.html
+//
+// As in C, 8 pixels are four f64x2 pairs (r, i, sum); 6 x 8 steps, stopping when
+// all 8 have escaped (none has |z|² <= 4), then 2 more and a bit per pixel. The
+// whole of C's mand8 is one @wat function (all its state in locals), one call a
+// byte. C writes 64 pixels at a time; here each byte is hashed as it is made, in
+// the same order. One thread (C used OpenMP).
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "P4\n<n> <n>\n" and the bitmap.
+
+fn pair(a: F64, b: F64) V128 { @wat/\ (f64x2.replace_lane 1 (f64x2.splat (local.get $a)) (local.get $b)) \/; }
+fn splat(x: F64) V128 { @wat/\ (f64x2.splat (local.get $x)) \/; }
+
+// C's mand8: the byte for pixels c0..c3 (two each) on the row ci.
+fn mand8(c0: V128, c1: V128, c2: V128, c3: V128, ci: V128) I32 {
+    @wat/\
+        (local $r0 v128) (local $r1 v128) (local $r2 v128) (local $r3 v128)
+        (local $i0 v128) (local $i1 v128) (local $i2 v128) (local $i3 v128)
+        (local $s0 v128) (local $s1 v128) (local $s2 v128) (local $s3 v128)
+        (local $a v128) (local $b v128) (local $c v128) (local $four v128)
+        (local $j i32) (local $k i32) (local $pix i32)
+        (local.set $r0 (local.get $c0)) (local.set $r1 (local.get $c1))
+        (local.set $r2 (local.get $c2)) (local.set $r3 (local.get $c3))
+        (local.set $i0 (local.get $ci)) (local.set $i1 (local.get $ci))
+        (local.set $i2 (local.get $ci)) (local.set $i3 (local.get $ci))
+        (local.set $four (f64x2.splat (f64.const 4)))
+        (local.set $pix (i32.const 0xff))
+        (block $done
+          (loop $outer
+            (local.set $k (i32.const 0))
+            (loop $inner
+              (local.set $a (f64x2.mul (local.get $r0) (local.get $r0)))
+              (local.set $b (f64x2.mul (local.get $i0) (local.get $i0)))
+              (local.set $c (f64x2.mul (local.get $r0) (local.get $i0)))
+              (local.set $s0 (f64x2.add (local.get $a) (local.get $b)))
+              (local.set $r0 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c0)))
+              (local.set $i0 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+              (local.set $a (f64x2.mul (local.get $r1) (local.get $r1)))
+              (local.set $b (f64x2.mul (local.get $i1) (local.get $i1)))
+              (local.set $c (f64x2.mul (local.get $r1) (local.get $i1)))
+              (local.set $s1 (f64x2.add (local.get $a) (local.get $b)))
+              (local.set $r1 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c1)))
+              (local.set $i1 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+              (local.set $a (f64x2.mul (local.get $r2) (local.get $r2)))
+              (local.set $b (f64x2.mul (local.get $i2) (local.get $i2)))
+              (local.set $c (f64x2.mul (local.get $r2) (local.get $i2)))
+              (local.set $s2 (f64x2.add (local.get $a) (local.get $b)))
+              (local.set $r2 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c2)))
+              (local.set $i2 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+              (local.set $a (f64x2.mul (local.get $r3) (local.get $r3)))
+              (local.set $b (f64x2.mul (local.get $i3) (local.get $i3)))
+              (local.set $c (f64x2.mul (local.get $r3) (local.get $i3)))
+              (local.set $s3 (f64x2.add (local.get $a) (local.get $b)))
+              (local.set $r3 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c3)))
+              (local.set $i3 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+              (local.set $k (i32.add (local.get $k) (i32.const 1)))
+              (br_if $inner (i32.lt_u (local.get $k) (i32.const 8))))
+            ;; C's vec_nle: no sum <= 4, so all 8 escaped
+            (if (i32.eqz (v128.any_true (v128.or
+                  (v128.or (f64x2.le (local.get $s0) (local.get $four)) (f64x2.le (local.get $s1) (local.get $four)))
+                  (v128.or (f64x2.le (local.get $s2) (local.get $four)) (f64x2.le (local.get $s3) (local.get $four))))))
+              (then (local.set $pix (i32.const 0)) (br $done)))
+            (local.set $j (i32.add (local.get $j) (i32.const 1)))
+            (br_if $outer (i32.lt_u (local.get $j) (i32.const 6)))) ;; end loop; the block also holds the last steps
+        (local.set $a (f64x2.mul (local.get $r0) (local.get $r0)))
+        (local.set $b (f64x2.mul (local.get $i0) (local.get $i0)))
+        (local.set $c (f64x2.mul (local.get $r0) (local.get $i0)))
+        (local.set $s0 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r0 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c0)))
+        (local.set $i0 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r1) (local.get $r1)))
+        (local.set $b (f64x2.mul (local.get $i1) (local.get $i1)))
+        (local.set $c (f64x2.mul (local.get $r1) (local.get $i1)))
+        (local.set $s1 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r1 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c1)))
+        (local.set $i1 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r2) (local.get $r2)))
+        (local.set $b (f64x2.mul (local.get $i2) (local.get $i2)))
+        (local.set $c (f64x2.mul (local.get $r2) (local.get $i2)))
+        (local.set $s2 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r2 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c2)))
+        (local.set $i2 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r3) (local.get $r3)))
+        (local.set $b (f64x2.mul (local.get $i3) (local.get $i3)))
+        (local.set $c (f64x2.mul (local.get $r3) (local.get $i3)))
+        (local.set $s3 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r3 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c3)))
+        (local.set $i3 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r0) (local.get $r0)))
+        (local.set $b (f64x2.mul (local.get $i0) (local.get $i0)))
+        (local.set $c (f64x2.mul (local.get $r0) (local.get $i0)))
+        (local.set $s0 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r0 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c0)))
+        (local.set $i0 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r1) (local.get $r1)))
+        (local.set $b (f64x2.mul (local.get $i1) (local.get $i1)))
+        (local.set $c (f64x2.mul (local.get $r1) (local.get $i1)))
+        (local.set $s1 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r1 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c1)))
+        (local.set $i1 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r2) (local.get $r2)))
+        (local.set $b (f64x2.mul (local.get $i2) (local.get $i2)))
+        (local.set $c (f64x2.mul (local.get $r2) (local.get $i2)))
+        (local.set $s2 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r2 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c2)))
+        (local.set $i2 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (local.set $a (f64x2.mul (local.get $r3) (local.get $r3)))
+        (local.set $b (f64x2.mul (local.get $i3) (local.get $i3)))
+        (local.set $c (f64x2.mul (local.get $r3) (local.get $i3)))
+        (local.set $s3 (f64x2.add (local.get $a) (local.get $b)))
+        (local.set $r3 (f64x2.add (f64x2.sub (local.get $a) (local.get $b)) (local.get $c3)))
+        (local.set $i3 (f64x2.add (f64x2.add (local.get $c) (local.get $c)) (local.get $ci)))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 0 (local.get $s0)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 127)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 1 (local.get $s0)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 191)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 0 (local.get $s1)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 223)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 1 (local.get $s1)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 239)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 0 (local.get $s2)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 247)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 1 (local.get $s2)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 251)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 0 (local.get $s3)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 253)))))
+        (if (i32.eqz (f64.le (f64x2.extract_lane 1 (local.get $s3)) (f64.const 4))) (then (local.set $pix (i32.and (local.get $pix) (i32.const 254))))))
+        (local.get $pix)
+    \/;
+}
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let p = 1;
+    while (p * 10 <= x) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + x / p % 10);
+        p = p / 10;
+    };
+    h;
+}
+
+fn mandelbrot(n: I32) I32 {
+    let wid = (n + 7) & ~7;
+    let r0 = Array[V128].new(wid >> 1, splat(0.0));
+    let i0 = Array[F64].new(wid, 0.0);
+    let xy = 0;
+    while (xy < wid) {
+        let a = 2.0 / wid.to_f64();
+        r0[xy >> 1] = pair(a * xy.to_f64() - 1.5, a * (xy + 1).to_f64() - 1.5);
+        i0[xy] = a * xy.to_f64() - 1.0;
+        i0[xy + 1] = a * (xy + 1).to_f64() - 1.0;
+        xy += 2;
+    };
+    // "P4\n<wid> <wid>\n"
+    let h = fnv(fnv(fnv(-2128831035, 80), 52), 10);
+    h = fnv(fnv_int(fnv(fnv_int(h, wid), 32), wid), 10);
+    for (0..<wid) |y| {
+        let ci = splat(i0[y]);
+        let x = 0;
+        while (x < wid) {
+            let k = x >> 1;
+            h = fnv(h, mand8(r0[k], r0[k + 1], r0[k + 2], r0[k + 3], ci));
+            x += 8;
+        };
+    };
+    h;
+}
+
+test "mandelbrot draws BG's 200 x 200 bitmap" {
+    assert mandelbrot(200) == -248892225;
+}
+
+export lib {
+    fn bench(n: I32) I32 { mandelbrot(n); }
+}

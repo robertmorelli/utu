@@ -1,0 +1,117 @@
+// Spectral norm, hand-tuned: BG spectralnorm Rust #6's f64x2 algorithm through
+// @wat (reported apart from the idiomatic spectralnorm.utu):
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/spectralnorm-rust-6.html
+//
+// Vectors are Array[V128] of pairs. Each output pair (i, i+1) keeps two f64x2
+// sums; for each input pair x = (u[j], u[j+1]) they add x / (A(i, j), A(i, j+1))
+// and x / (A(i+1, j), A(i+1, j+1)) (transposed: A(j, i), A(j+1, i)), then hadd.
+// One @wat per term: the A pair, its convert, the divide and the add, so the
+// inner loop is two calls. n must be even (as Rust asserts).
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "%.9f\n" of the norm.
+
+fn zero() V128 { @wat/\ (f64x2.splat (f64.const 0)) \/; }
+fn splat(x: F64) V128 { @wat/\ (f64x2.splat (local.get $x)) \/; }
+fn mul_add(acc: V128, a: V128, b: V128) V128 { @wat/\ (f64x2.add (local.get $acc) (f64x2.mul (local.get $a) (local.get $b))) \/; }
+fn sum(v: V128) F64 { @wat/\ (f64.add (f64x2.extract_lane 0 (local.get $v)) (f64x2.extract_lane 1 (local.get $v))) \/; }
+fn hadd(a: V128, b: V128) V128 {
+    @wat/\
+        (f64x2.add
+          (i8x16.shuffle 0 1 2 3 4 5 6 7 16 17 18 19 20 21 22 23 (local.get $a) (local.get $b))
+          (i8x16.shuffle 8 9 10 11 12 13 14 15 24 25 26 27 28 29 30 31 (local.get $a) (local.get $b)))
+    \/;
+}
+
+// sum + x / (A(i, j), A(i, j+1)), A(i, j) = (i+j)(i+j+1)/2 + i + 1, or, when
+// tr is 1, the transpose: sum + x / (A(j, i), A(j+1, i)). One function for both,
+// so V8 sees its one call site warm (a second, transposed function's calls ran
+// in a loop compiled before they had feedback, and were not inlined).
+fn term(sum: V128, x: V128, i: I32, j: I32, tr: I32) V128 {
+    @wat/\
+        (local $s i32) (local $t i32) (local $c0 i32) (local $c1 i32)
+        (local.set $s (i32.add (local.get $i) (local.get $j)))
+        (local.set $t (i32.add (local.get $s) (i32.const 1)))
+        (local.set $c0 (select (i32.add (local.get $j) (i32.const 1)) (i32.add (local.get $i) (i32.const 1)) (local.get $tr)))
+        (local.set $c1 (i32.add (local.get $c0) (local.get $tr)))
+        (f64x2.add (local.get $sum)
+          (f64x2.div (local.get $x)
+            (f64x2.replace_lane 1
+              (f64x2.splat (f64.convert_i32_s
+                (i32.add (i32.shr_u (i32.mul (local.get $s) (local.get $t)) (i32.const 1)) (local.get $c0))))
+              (f64.convert_i32_s
+                (i32.add (i32.shr_u (i32.mul (local.get $t) (i32.add (local.get $t) (i32.const 1))) (i32.const 1)) (local.get $c1))))))
+    \/;
+}
+
+// out = A·v (tr = 0) or Aᵀ·v (tr = 1), a pair of rows at a time.
+fn mult(v: Array[V128], out: Array[V128], tr: I32) void {
+    for (0..<out.len()) |k| {
+        let i = 2 * k;
+        let sum0 = zero();
+        let sum1 = zero();
+        for (0..<v.len()) |jj| {
+            let x = v[jj];
+            sum0 = term(sum0, x, i, 2 * jj, tr);
+            sum1 = term(sum1, x, i + 1, 2 * jj, tr);
+        };
+        out[k] = hadd(sum0, sum1);
+    };
+}
+
+fn dot(v: Array[V128], u: Array[V128]) F64 {
+    let r = zero();
+    for (0..<v.len()) |i| { r = mul_add(r, u[i], v[i]); };
+    sum(r);
+}
+
+fn spectralnorm(n: I32) F64 {
+    let u = Array[V128].new(n / 2, splat(1.0));
+    let v = Array[V128].new(n / 2, zero());
+    let tmp = Array[V128].new(n / 2, zero());
+    // Ten times v = AᵀA·u, u = AᵀA·v, as forty passes through one call of mult
+    // (u→tmp, tmp→v by Aᵀ, v→tmp, tmp→u by Aᵀ), so its loop is compiled once
+    // (utu -O fast inlines each call: four copies, three of them cold when V8
+    // compiled bench, and their term calls left out of line).
+    for (0..<40) |k| {
+        let q = k & 3;
+        let src = if q == 0 { u; } else { if q == 2 { v; } else { tmp; }; };
+        let dst = if q == 1 { v; } else { if q == 3 { u; } else { tmp; }; };
+        mult(src, dst, k & 1);
+    };
+    F64.sqrt(dot(u, v) / dot(v, v));
+}
+
+// ---- output: FNV-1a over the bytes of "%.9f\n"
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_fixed9(h0: I32, x: F64) I32 {
+    let h = h0;
+    if x < 0.0 { h = fnv(h, 45); };
+    let nanos = F64.floor(F64.abs(x) * 1.0e9 + 0.5).to_i64();
+    let whole = nanos / 1000000000;
+    let frac = nanos % 1000000000;
+    let p: I64 = 1;
+    while (p * 10 <= whole) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (whole / p % 10).to_i32());
+        p = p / 10;
+    };
+    h = fnv(h, 46);
+    let d: I64 = 100000000;
+    while (d > 0) {
+        h = fnv(h, 48 + (frac / d % 10).to_i32());
+        d = d / 10;
+    };
+    fnv(h, 10);
+}
+
+test "spectralnorm prints BG's 1.274219991 for n = 100" {
+    assert fnv_fixed9(-2128831035, spectralnorm(100)) == 890904276;
+}
+
+export lib {
+    fn bench(n: I32) I32 {
+        fnv_fixed9(-2128831035, spectralnorm(n));
+    }
+}

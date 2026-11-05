@@ -1,0 +1,96 @@
+// Spectral norm, the algorithm of BG spectralnorm Go #4 / Node #6 / Java #3
+// (the scalar BG programs), in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/spectralnorm-go-4.html
+//
+// u = 1; ten times v = AᵀA·u, u = AᵀA·v, where A(i, j) = 1 / ((i+j)(i+j+1)/2 + i + 1)
+// is computed on the fly (an integer, then u[j] divided by it); the result is
+// sqrt(u·v / v·v). Single-threaded (the BG programs split rows across threads).
+// The fastest BG program (gcc #6) does a 4x4 block at a time with AVX and an
+// approximate reciprocal; that needs SIMD, which utu has only through @wat.
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "%.9f\n" of the norm.
+
+fn a(i: I32, j: I32) I32 { ((i + j) * (i + j + 1) >>> 1) + i + 1; }
+
+// v = A·u
+fn times(v: Array[F64], u: Array[F64]) void {
+    let n = u.len();
+    for (0..<v.len()) |i| {
+        let t = 0.0;
+        for (0..<n) |j| {
+            t += u[j] / a(i, j).to_f64();
+        };
+        v[i] = t;
+    };
+}
+
+// v = Aᵀ·u
+fn times_transp(v: Array[F64], u: Array[F64]) void {
+    let n = u.len();
+    for (0..<v.len()) |i| {
+        let t = 0.0;
+        for (0..<n) |j| {
+            t += u[j] / a(j, i).to_f64();
+        };
+        v[i] = t;
+    };
+}
+
+// v = AᵀA·u, through x
+fn a_times_transp(v: Array[F64], u: Array[F64], x: Array[F64]) void {
+    times(x, u);
+    times_transp(v, x);
+}
+
+fn spectralnorm(n: I32) F64 {
+    let u = Array[F64].new(n, 1.0);
+    let v = Array[F64].new(n, 0.0);
+    let x = Array[F64].new(n, 0.0);
+    for (0..<10) {
+        a_times_transp(v, u, x);
+        a_times_transp(u, v, x);
+    };
+    let vbv = 0.0;
+    let vv = 0.0;
+    for (0..<n) |i| {
+        vbv += u[i] * v[i];
+        vv += v[i] * v[i];
+    };
+    F64.sqrt(vbv / vv);
+}
+
+// ---- output: FNV-1a over the bytes of "%.9f\n"
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+// x rounded to nanos, then its digits.
+fn fnv_fixed9(h0: I32, x: F64) I32 {
+    let h = h0;
+    if x < 0.0 { h = fnv(h, 45); };
+    let nanos = F64.floor(F64.abs(x) * 1.0e9 + 0.5).to_i64();
+    let whole = nanos / 1000000000;
+    let frac = nanos % 1000000000;
+    let p: I64 = 1;
+    while (p * 10 <= whole) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (whole / p % 10).to_i32());
+        p = p / 10;
+    };
+    h = fnv(h, 46);
+    let d: I64 = 100000000;
+    while (d > 0) {
+        h = fnv(h, 48 + (frac / d % 10).to_i32());
+        d = d / 10;
+    };
+    fnv(h, 10);
+}
+
+test "spectralnorm prints BG's 1.274219991 for n = 100" {
+    assert fnv_fixed9(-2128831035, spectralnorm(100)) == 890904276;
+}
+
+export lib {
+    fn bench(n: I32) I32 {
+        fnv_fixed9(-2128831035, spectralnorm(n));
+    }
+}

@@ -1,0 +1,388 @@
+// Pi digits, BG pidigits gcc #2's algorithm (Mr Ledrug's, via Mike Pall's Lua
+// and Oleksii Prudkyi's PHP; the fastest BG C program, also Java GraalVM #5):
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/pidigits-gcc-2.html
+//
+// gcc #2 calls GMP. utu has no bignum library, so this file has its own: just
+// the mpz calls gcc #2 makes (mul_si, add, mul, tdiv_q, cmp, get_si), signed
+// magnitudes in 32-bit limbs (Array[U32]) with 64-bit intermediates, as
+// mini-gmp does on wasm32. tdiv_q is Knuth's algorithm D (one-limb divisors
+// divided directly). Every other port gets its bignum from a library: mini-gmp
+// (C, C++, Swift), num-bigint (Rust), math/big (Go), the language's own BigInt
+// (Haskell, Dart, JS, MoonBit), ionspin bignum (Kotlin).
+//
+// bench(n) returns the FNV-1a hash of the bytes gcc #2 prints for n digits.
+
+// A signed integer: d[0..n) little-endian limbs, d[n-1] != 0; zero is n = 0.
+struct Big:
+    | d: Array[U32]
+    | n: I32
+    | neg: Bool
+
+fn big(v: I32) Big {
+    let d = Array[U32].new(16, 0);
+    d[0] = I32.abs(v).to_u32();
+    let n = 1;
+    if v == 0 { n = 0; };
+    &{ d: d, n: n, neg: v < 0 };
+}
+
+// Room for cap limbs, keeping the value.
+fn reserve(a: Big, cap: I32) void {
+    if a.d.len() < cap {
+        let d = Array[U32].new(cap * 2, 0);
+        let old = a.d;
+        for (0..<a.n) |i| { d[i] = old[i]; };
+        a.d = d;
+    };
+}
+
+// The used length of d[0..n) without its top zero limbs.
+fn norm(d: Array[U32], n0: I32) I32 {
+    let n = n0;
+    while (n > 0 and d[n - 1] == 0) { n -= 1; };
+    n;
+}
+
+fn set_zero(r: Big) void {
+    r.n = 0;
+    r.neg = false;
+}
+
+// |a| vs |b|: -1, 0, 1.
+fn cmp_mag(a: Big, b: Big) I32 {
+    if a.n != b.n {
+        if a.n < b.n { -1; } else { 1; };
+    } else {
+        let ad = a.d;
+        let bd = b.d;
+        let i = a.n - 1;
+        let c = 0;
+        while (c == 0 and i >= 0) {
+            if ad[i] != bd[i] {
+                if ad[i] < bd[i] { c = -1; } else { c = 1; };
+            };
+            i -= 1;
+        };
+        c;
+    };
+}
+
+// mpz_cmp
+fn cmp(a: Big, b: Big) I32 {
+    if a.neg != b.neg {
+        if a.neg { -1; } else { 1; };
+    } else {
+        let c = cmp_mag(a, b);
+        if a.neg { -c; } else { c; };
+    };
+}
+
+// mpz_get_si (for values that fit)
+fn get_si(a: Big) I32 {
+    if a.n == 0 {
+        0;
+    } else {
+        let v = a.d[0].to_i32();
+        if a.neg { -v; } else { v; };
+    };
+}
+
+// |r| = |a| + |b|, a.n >= b.n
+fn add_mag(r: Big, a: Big, b: Big) void {
+    let an = a.n;
+    let bn = b.n;
+    reserve(r, an + 1);
+    let ad = a.d;
+    let bd = b.d;
+    let rd = r.d;
+    let carry: U64 = 0;
+    for (0..<bn) |i| {
+        let s = ad[i].to_u64() + bd[i].to_u64() + carry;
+        rd[i] = s.to_u32();
+        carry = s >> 32;
+    };
+    for (bn..<an) |i| {
+        let s = ad[i].to_u64() + carry;
+        rd[i] = s.to_u32();
+        carry = s >> 32;
+    };
+    let n = an;
+    if carry != 0 {
+        rd[an] = carry.to_u32();
+        n = an + 1;
+    };
+    r.n = n;
+}
+
+// |r| = |a| - |b|, |a| >= |b|
+fn sub_mag(r: Big, a: Big, b: Big) void {
+    let an = a.n;
+    let bn = b.n;
+    reserve(r, an);
+    let ad = a.d;
+    let bd = b.d;
+    let rd = r.d;
+    let borrow: I64 = 0;
+    for (0..<bn) |i| {
+        let t = ad[i].to_i64() - bd[i].to_i64() - borrow;
+        rd[i] = t.to_u32();
+        borrow = -(t >> 32);
+    };
+    for (bn..<an) |i| {
+        let t = ad[i].to_i64() - borrow;
+        rd[i] = t.to_u32();
+        borrow = -(t >> 32);
+    };
+    r.n = norm(rd, an);
+}
+
+// mpz_add: r = a + b (r may be a or b)
+fn add(r: Big, a: Big, b: Big) void {
+    let aneg = a.neg;
+    let bneg = b.neg;
+    if aneg == bneg {
+        if a.n >= b.n { add_mag(r, a, b); } else { add_mag(r, b, a); };
+        r.neg = aneg and r.n != 0;
+    } else {
+        if cmp_mag(a, b) >= 0 {
+            sub_mag(r, a, b);
+            r.neg = aneg and r.n != 0;
+        } else {
+            sub_mag(r, b, a);
+            r.neg = bneg and r.n != 0;
+        };
+    };
+}
+
+// mpz_mul_si: r = a * s (r may be a)
+fn mul_si(r: Big, a: Big, s: I32) void {
+    let an = a.n;
+    if s == 0 or an == 0 {
+        set_zero(r);
+    } else {
+        let neg = a.neg != (s < 0);
+        let m = I32.abs(s).to_u32().to_u64();
+        reserve(r, an + 1);
+        let ad = a.d;
+        let rd = r.d;
+        let carry: U64 = 0;
+        for (0..<an) |i| {
+            let p = ad[i].to_u64() * m + carry;
+            rd[i] = p.to_u32();
+            carry = p >> 32;
+        };
+        let n = an;
+        if carry != 0 {
+            rd[an] = carry.to_u32();
+            n = an + 1;
+        };
+        r.n = n;
+        r.neg = neg;
+    };
+}
+
+// mpz_mul: r = a * b (schoolbook, into a new array; r may be a or b)
+fn mul(r: Big, a: Big, b: Big) void {
+    let an = a.n;
+    let bn = b.n;
+    if an == 0 or bn == 0 {
+        set_zero(r);
+    } else {
+        let neg = a.neg != b.neg;
+        let ad = a.d;
+        let bd = b.d;
+        let rd = Array[U32].new(an + bn + 16, 0);
+        for (0..<bn) |j| {
+            let m = bd[j].to_u64();
+            let carry: U64 = 0;
+            for (0..<an) |i| {
+                let p = ad[i].to_u64() * m + rd[i + j].to_u64() + carry;
+                rd[i + j] = p.to_u32();
+                carry = p >> 32;
+            };
+            rd[an + j] = carry.to_u32();
+        };
+        r.d = rd;
+        r.n = norm(rd, an + bn);
+        r.neg = neg;
+    };
+}
+
+// mpz_tdiv_q: q = a / b truncated (q is neither a nor b). Knuth's algorithm
+// D (TAOCP 4.3.1) on b and a shifted so b's top limb has its high bit set;
+// un and vn hold the shifted copies.
+fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) void {
+    let n = b.n;
+    let an = a.n;
+    let m = an - n;
+    let neg = a.neg != b.neg;
+    if m < 0 {
+        set_zero(q);
+    } else if n == 1 {
+        let v = b.d[0].to_u64();
+        reserve(q, an);
+        let ad = a.d;
+        let qd = q.d;
+        let rem: U64 = 0;
+        let i = an - 1;
+        while (i >= 0) {
+            let cur = (rem << 32) | ad[i].to_u64();
+            let qi = cur / v;
+            qd[i] = qi.to_u32();
+            rem = cur - qi * v;
+            i -= 1;
+        };
+        q.n = norm(qd, an);
+        q.neg = neg and q.n != 0;
+    } else {
+        let s = I32.clz(b.d[n - 1].to_i32()).to_u64();
+        reserve(vn, n);
+        reserve(un, an + 1);
+        reserve(q, m + 1);
+        let ad = a.d;
+        let bd = b.d;
+        let vd = vn.d;
+        let ud = un.d;
+        let qd = q.d;
+        let i = n - 1;
+        while (i > 0) {
+            vd[i] = ((((bd[i].to_u64() << 32) | bd[i - 1].to_u64()) << s) >> 32).to_u32();
+            i -= 1;
+        };
+        vd[0] = (bd[0].to_u64() << s).to_u32();
+        ud[an] = ((ad[an - 1].to_u64() << s) >> 32).to_u32();
+        i = an - 1;
+        while (i > 0) {
+            ud[i] = ((((ad[i].to_u64() << 32) | ad[i - 1].to_u64()) << s) >> 32).to_u32();
+            i -= 1;
+        };
+        ud[0] = (ad[0].to_u64() << s).to_u32();
+
+        let base: U64 = 4294967296;
+        let low: U64 = 4294967295;
+        let vtop = vd[n - 1].to_u64();
+        let vnext = vd[n - 2].to_u64();
+        let j = m;
+        while (j >= 0) {
+            // Estimate the quotient limb from the top two limbs, then correct it.
+            let num = (ud[j + n].to_u64() << 32) | ud[j + n - 1].to_u64();
+            let qhat = num / vtop;
+            let rhat = num - qhat * vtop;
+            let adjusting = true;
+            while (adjusting) {
+                if qhat >= base or qhat * vnext > ((rhat << 32) | ud[j + n - 2].to_u64()) {
+                    qhat -= 1;
+                    rhat += vtop;
+                    if rhat >= base { adjusting = false; };
+                } else {
+                    adjusting = false;
+                };
+            };
+            // u[j..j+n] -= qhat * v
+            let borrow: I64 = 0;
+            let carry: U64 = 0;
+            for (0..<n) |k| {
+                let p = qhat * vd[k].to_u64() + carry;
+                carry = p >> 32;
+                let t = ud[k + j].to_i64() - borrow - (p & low).to_i64();
+                ud[k + j] = t.to_u32();
+                borrow = -(t >> 32);
+            };
+            let t = ud[j + n].to_i64() - borrow - carry.to_i64();
+            ud[j + n] = t.to_u32();
+            if t < 0 {
+                // qhat was one too big: add v back.
+                qhat -= 1;
+                let c: U64 = 0;
+                for (0..<n) |k| {
+                    let sum = ud[k + j].to_u64() + vd[k].to_u64() + c;
+                    ud[k + j] = sum.to_u32();
+                    c = sum >> 32;
+                };
+                ud[j + n] = (ud[j + n].to_u64() + c).to_u32();
+            };
+            qd[j] = qhat.to_u32();
+            j -= 1;
+        };
+        q.n = norm(qd, m + 1);
+        q.neg = neg and q.n != 0;
+    };
+}
+
+// ---- output: FNV-1a over the bytes gcc #2 prints
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+// "\t:<i>\n"
+fn fnv_count(h0: I32, i: I32) I32 {
+    let h = fnv(fnv(h0, 9), 58);
+    let p = 1;
+    while (p * 10 <= i) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + i / p % 10);
+        p = p / 10;
+    };
+    fnv(h, 10);
+}
+
+fn pidigits(n: I32) I32 {
+    let n1 = big(4);
+    let n2 = big(3);
+    let d = big(1);
+    let u = big(0);
+    let v = big(0);
+    let w = big(0);
+    let un = big(0);
+    let vn = big(0);
+    let k = 1;
+    let i = 0;
+    let h = -2128831035;
+    let going = true;
+    while (going) {
+        tdiv_q(u, n1, d, un, vn);
+        tdiv_q(v, n2, d, un, vn);
+        if cmp(u, v) == 0 {
+            h = fnv(h, 48 + get_si(u));
+            i += 1;
+            if i % 10 == 0 { h = fnv_count(h, i); };
+            if i == n {
+                going = false;
+            } else {
+                // extract
+                mul_si(u, u, -10);
+                mul(u, d, u);
+                mul_si(n1, n1, 10);
+                add(n1, n1, u);
+                mul_si(n2, n2, 10);
+                add(n2, n2, u);
+            };
+        } else {
+            // produce
+            let k2 = k * 2;
+            mul_si(u, n1, k2 - 1);
+            add(v, n2, n2);
+            mul_si(w, n1, k - 1);
+            add(n1, u, v);
+            mul_si(u, n2, k + 2);
+            add(n2, w, u);
+            mul_si(d, d, k2 + 1);
+            k += 1;
+        };
+    };
+    if i % 10 != 0 {
+        for (0..<(10 - n % 10)) { h = fnv(h, 32); };
+        h = fnv_count(h, n);
+    };
+    h;
+}
+
+test "pidigits prints BG's digits" {
+    // BG's output for n = 27: "3141592653\t:10\n5897932384\t:20\n6264338   \t:27\n"
+    assert pidigits(27) == 1564184215;
+    assert pidigits(100) == 2141273922;
+    assert pidigits(1000) == -258501286;
+}
+
+export lib {
+    fn bench(n: I32) I32 { pidigits(n); }
+}

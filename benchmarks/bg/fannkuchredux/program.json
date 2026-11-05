@@ -1,0 +1,7 @@
+{
+  "n": 10,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "c": ["-msse4.1"], "cpp": ["-msse4.1", "-std=c++17"] },
+  "notes": "bench(n): fannkuch-redux over all n! permutations; result = FNV-1a of the bytes BG prints (\"%d\\nPfannkuchen(%d) = %d\\n\"). BG runs n=12."
+}

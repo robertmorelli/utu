@@ -1,0 +1,353 @@
+// Reverse complement, the algorithm of BG revcomp Rust #1 (Ryohei Machida; the
+// fastest BG program) in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/revcomp-rust-1.html
+//
+// A SequenceReader reads the input 64 KiB at a time into a growing buffer until
+// the next '>' (or the end); the sequence, header first, is then reverse-
+// complemented in place: its content (between the header and the last newline)
+// is cut into a left and a right part that swap, block by block from the ends,
+// and the line structure is kept by swapping the right lengths around newlines.
+// Each swap complements through a 256-entry table: Rust's scalar `fallback`
+// reverse_chunks (its SSSE3 one needs SIMD, which utu has only through @wat).
+// Copies are byte loops: a mem has no bulk copy. Single-threaded (Rust's rayon
+// spawns run in order).
+//
+// setup(n) generates the input: fasta gcc #3's generator (fasta.utu's, copied
+// below) with its out_* functions appending to `input`. bench(n) returns the
+// FNV-1a hash of the bytes BG prints.
+
+mem input: U8;      // the fasta output: what stdin would hold
+mem sbuf: U8;       // the reader's growing buffer
+mem mapping: U8;    // complement of each byte
+
+// ---- input: the fasta output setup(n) generates
+
+fn out_str(s: Str) void {
+    for (0..<s.len()) |i| { input.push(s[i]); };
+}
+
+fn out_buf(len: I32) void {
+    for (0..<len) |i| { input.push(buf[i]); };
+}
+
+fn out_rep(len: I32) void {
+    for (0..<len) |i| { input.push(rep[i]); };
+}
+
+// ---- fasta generator: copy from here to "end of the fasta generator"
+
+let im: I32 = 139968;
+let ia: I32 = 3877;
+let ic: I32 = 29573;
+let linelen: I32 = 60;
+let buflines: I32 = 100;
+
+mem hash: U8;    // the symbol for each random number
+mem buf: U8;     // buflines lines of random symbols
+mem rep: U8;     // the repeated sequence, len lines
+
+// The generator's state: the random seed, and the output hash.
+struct State:
+    | seed: I32
+    | h: I32
+
+let st: State = &{ seed: 42, h: 0 };
+
+
+fn alu() Str {
+    "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
+}
+
+// seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
+fn repeat_fasta(seq: Str, n: I32) void {
+    let len = seq.len();
+    let line = linelen + 1;
+    rep.resize(line * len);
+    for (0..<len) |i| {
+        for (0..<linelen) |k| {
+            rep[i * line + k] = seq[(i * linelen + k) % len];
+        };
+        rep[i * line + linelen] = 10;
+    };
+    let whole_buffers = n / (len * linelen);
+    for (0..<whole_buffers) { out_rep(line * len); };
+    let data_remaining = n - whole_buffers * len * linelen;
+    out_rep(data_remaining + data_remaining / linelen);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+// hash[i] = the symbol whose cumulative probability first exceeds i / im.
+fn build_hash(symb: Str, p: Array[F32]) void {
+    hash.resize(im);
+    let len = symb.len();
+    let sum = p[0];
+    let j = 0;
+    let i = 0;
+    while (i < im and j < len) {
+        let r = (i.to_f64() / im.to_f64()).to_f32();
+        if r >= sum {
+            j += 1;
+            if j < len { sum = sum + p[j]; };
+        };
+        hash[i] = if j < len { symb[j]; } else { 0; };
+        i += 1;
+    };
+}
+
+fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+    build_hash(symb, p);
+    let line = linelen + 1;
+    buf.resize(line * buflines);
+    for (0..<buflines) |i| { buf[i * line + linelen] = 10; };
+    let seed = st.seed;
+
+    // whole buffers: fixed loops, no decisions
+    let buffers = n / linelen / buflines;
+    for (0..<buffers) {
+        for (0..<buflines) |j| {
+            for (0..<linelen) |k| {
+                seed = (seed * ia + ic) % im;
+                buf[j * line + k] = hash[seed];
+            };
+        };
+        st.seed = seed;
+        out_buf(line * buflines);
+    };
+
+    // the remaining whole lines, then the partial one
+    let lines = n / linelen - buffers * buflines;
+    for (0..<lines) |j| {
+        for (0..<linelen) |k| {
+            seed = (seed * ia + ic) % im;
+            buf[j * line + k] = hash[seed];
+        };
+    };
+    let partials = n - linelen * lines - buffers * buflines * linelen;
+    for (0..<partials) |k| {
+        seed = (seed * ia + ic) % im;
+        buf[lines * line + k] = hash[seed];
+    };
+    st.seed = seed;
+    out_buf(lines * line + partials);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+fn fasta(n: I32) void {
+    st.seed = 42;
+    let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02];
+    let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008];
+
+    out_str(">ONE Homo sapiens alu\n");
+    repeat_fasta(alu(), n * 2);
+
+    out_str(">TWO IUB ambiguity codes\n");
+    random_fasta("acgtBDHKMNRSVWY", iub_p, n * 3);
+
+    out_str(">THREE Homo sapiens frequency\n");
+    random_fasta("acgt", homosapiens_p, n * 5);
+}
+// ---- end of the fasta generator
+
+// ---- output: FNV-1a over what the program writes
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn write(h0: I32, len: I32) I32 {
+    let h = h0;
+    for (0..<len) |i| { h = fnv(h, sbuf[i]); };
+    h;
+}
+
+// ---- reverse complement
+
+let read_size: I32 = 65536;
+let line_len: I32 = 60;     // a line, without its newline
+let block_rows: I32 = 4096; // rows done in one left/right pair
+
+fn init_mapping() void {
+    mapping.resize(256);
+    for (0..<256) |i| { mapping[i] = i; };
+    let from = "ABCDGHKMNRSTUVWYabcdghkmnrstuvwy";
+    let to = "TVGHCDMKNYSAABWRTVGHCDMKNYSAABWR";
+    for (0..<from.len()) |i| { mapping[from[i]] = to[i]; };
+}
+
+// sbuf[left + i] and sbuf[right + len - 1 - i] swap, complemented.
+fn reverse_chunks(left: I32, right: I32, len: I32) void {
+    let pl = left;
+    let pr = right + len;
+    for (0..<len) {
+        pr -= 1;
+        let l = sbuf[pl];
+        let r = sbuf[pr];
+        sbuf[pr] = mapping[l];
+        sbuf[pl] = mapping[r];
+        pl += 1;
+    };
+}
+
+// The left part (ls, ll) and the right part (rs, rl) of a sequence's content;
+// trailing_len is the length of the last line (newline included).
+fn reverse_complement_left_right(ls0: I32, ll0: I32, rs: I32, rl0: I32, trailing_len: I32) void {
+    let ls = ls0;
+    let ll = ll0;
+    let rl = rl0;
+    while (ll >= trailing_len) {
+        let a = ls;
+        let m = rl - trailing_len;
+        ls += trailing_len;
+        ll -= trailing_len;
+        rl = m - 1;
+        reverse_chunks(a, rs + m, trailing_len);
+
+        let n = line_len - trailing_len;
+        if rl <= n { break; };
+        let a2 = ls;
+        let m2 = rl - n;
+        ls += n + 1;
+        ll -= n + 1;
+        rl = m2;
+        reverse_chunks(a2, rs + m2, n);
+    };
+    let n = if ll < rl { ll; } else { rl; };
+    reverse_chunks(ls, rs + rl - n, n);
+
+    // the character at the middle of the sequence
+    if ll > rl {
+        sbuf[ls + ll - 1] = mapping[sbuf[ls + ll - 1]];
+    } else if rl > ll {
+        sbuf[rs] = mapping[sbuf[rs]];
+    };
+}
+
+// The sequence sbuf[0 ..< len], header first.
+fn reverse_complement(len: I32) void {
+    let content = 0;
+    while (sbuf[content] != 10) { content += 1; };
+    content += 1;
+    // the content: no header, no last newline
+    let cstart = content;
+    let clen = len - 1 - content;
+    let block_bytes = block_rows * (line_len + 1);
+    let trailing_len = clen % (line_len + 1);
+    while (clen >= block_bytes * 2) {
+        let left = cstart;
+        let right = cstart + clen - block_bytes;
+        cstart += block_bytes;
+        clen -= 2 * block_bytes;
+        reverse_complement_left_right(left, block_bytes, right, block_bytes, trailing_len);
+    };
+    let n = clen / 2;
+    reverse_complement_left_right(cstart, n, cstart + n, clen - n, trailing_len);
+}
+
+// Copies input[src ..< src + count] to sbuf[dst ..]: 8 bytes a step, each 8
+// tested for '>' at once (4 bytes to a word, xor '>>>>', has-zero-byte).
+// The index of the first '>' after sbuf[0], or -1.
+fn read_into(dst: I32, src: I32, count: I32) I32 {
+    let found = -1;
+    let i = 0;
+    while (i + 8 <= count) {
+        let s = src + i;
+        let d = dst + i;
+        let b0 = input[s];
+        let b1 = input[s + 1];
+        let b2 = input[s + 2];
+        let b3 = input[s + 3];
+        let b4 = input[s + 4];
+        let b5 = input[s + 5];
+        let b6 = input[s + 6];
+        let b7 = input[s + 7];
+        sbuf[d] = b0;
+        sbuf[d + 1] = b1;
+        sbuf[d + 2] = b2;
+        sbuf[d + 3] = b3;
+        sbuf[d + 4] = b4;
+        sbuf[d + 5] = b5;
+        sbuf[d + 6] = b6;
+        sbuf[d + 7] = b7;
+        let w = (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) ^ 1044266558;
+        let v = (b4 | (b5 << 8) | (b6 << 16) | (b7 << 24)) ^ 1044266558;
+        if (((w - 16843009) & ~w) | ((v - 16843009) & ~v)) & -2139062144 != 0 and found < 0 {
+            found = find_header(if d > 0 { d; } else { 1; }, d + 8);
+        };
+        i += 8;
+    };
+    while (i < count) {
+        let d = dst + i;
+        let b = input[src + i];
+        sbuf[d] = b;
+        if b == 62 and found < 0 and d > 0 { found = d; };
+        i += 1;
+    };
+    found;
+}
+
+
+// The reader: where it is in the input, and where the sequence it gave ends.
+struct Reader:
+    | pos: I32
+    | next_pos: I32
+    | eof: Bool
+
+fn find_header(from: I32, to: I32) I32 {
+    let i = from;
+    while (i < to and sbuf[i] != 62) { i += 1; };
+    if i < to { i; } else { -1; };
+}
+
+// The next sequence is sbuf[0 ..< next(r)], or -1 at the end.
+fn next(r: Reader) I32 {
+    let found = -1;
+    if sbuf.len() > 0 {
+        if r.next_pos >= sbuf.len() { return -1; };
+        // drop the sequence given last time
+        let rest = sbuf.len() - r.next_pos;
+        for (0..<rest) |i| { sbuf[i] = sbuf[r.next_pos + i]; };
+        sbuf.resize(rest);
+        // the next header in the buffer
+        found = find_header(1, rest);
+        if found < 0 and r.eof { found = rest; };
+    };
+    while (found < 0) {
+        let old_len = sbuf.len();
+        // read at most read_size bytes
+        let count = if input.len() - r.pos < read_size { input.len() - r.pos; } else { read_size; };
+        sbuf.resize(old_len + count);
+        found = read_into(old_len, r.pos, count);
+        r.pos += count;
+        r.eof = count != read_size;
+        if found < 0 and r.eof { found = sbuf.len(); };
+    };
+    r.next_pos = found;
+    found;
+}
+
+fn revcomp() I32 {
+    init_mapping();
+    sbuf.clear();
+    let r: Reader = &{ pos: 0, next_pos: 0, eof: false };
+    let h = -2128831035;
+    let end = next(r);
+    while (end >= 0) {
+        reverse_complement(end);
+        h = write(h, end);
+        end = next(r);
+    };
+    h;
+}
+
+fn setup_input(n: I32) void {
+    input.clear();
+    fasta(n);
+}
+
+test "revcomp of fasta 1000 is BG's output" {
+    setup_input(1000);
+    assert revcomp() == -752769756;
+}
+
+export lib {
+    fn setup(n: I32) void { setup_input(n); }
+    fn bench(n: I32) I32 { revcomp(); }
+}

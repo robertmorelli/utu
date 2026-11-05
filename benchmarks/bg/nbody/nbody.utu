@@ -1,0 +1,164 @@
+// N-body, BG nbody Node #6 (Isaac Gouy; Andrey Filatkin) in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-node-6.html
+// The fastest BG source that fits scalar code: gcc #9's algorithm (f32 rsqrt,
+// pair arrays) pays off only with SIMD, which utu has only through @wat (that
+// version is nbody.tuned.utu; gcc #9 in plain utu is alt/nbody-gcc9.utu, slower).
+// MoonBit and JavaScript run this same source. Five bodies in an Array; advance
+// keeps body i's velocity in locals, as Node #6 does.
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "%.9f\n" of the energy
+// before and after n steps, hashed as it is formatted.
+
+struct Body:
+    | x: F64
+    | y: F64
+    | z: F64
+    | vx: F64
+    | vy: F64
+    | vz: F64
+    | mass: F64
+
+fn pi() F64 { 3.141592653589793; }
+fn solar_mass() F64 { 4.0 * pi() * pi(); }
+fn days_per_year() F64 { 365.24; }
+
+fn body(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
+    &{
+        x: x,
+        y: y,
+        z: z,
+        vx: vx * days_per_year(),
+        vy: vy * days_per_year(),
+        vz: vz * days_per_year(),
+        mass: mass * solar_mass(),
+    };
+}
+
+fn create() Array[Body] {
+    let bodies: Array[Body] = [
+        body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        body(4.84143144246472090e+00, -1.16032004402742839e+00, -1.03622044471123109e-01,
+            1.66007664274403694e-03, 7.69901118419740425e-03, -6.90460016972063023e-05, 9.54791938424326609e-04),
+        body(8.34336671824457987e+00, 4.12479856412430479e+00, -4.03523417114321381e-01,
+            -2.76742510726862411e-03, 4.99852801234917238e-03, 2.30417297573763929e-05, 2.85885980666130812e-04),
+        body(1.28943695621391310e+01, -1.51111514016986312e+01, -2.23307578892655734e-01,
+            2.96460137564761618e-03, 2.37847173959480950e-03, -2.96589568540237556e-05, 4.36624404335156298e-05),
+        body(1.53796971148509165e+01, -2.59193146099879641e+01, 1.79258772950371181e-01,
+            2.68067772490389322e-03, 1.62824170038242295e-03, -9.51592254519715870e-05, 5.15138902046611451e-05),
+    ];
+    // offset momentum
+    let px = 0.0;
+    let py = 0.0;
+    let pz = 0.0;
+    for (0..<bodies.len()) |i| {
+        let b = bodies[i];
+        let mass = b.mass;
+        px += b.vx * mass;
+        py += b.vy * mass;
+        pz += b.vz * mass;
+    };
+    let b0 = bodies[0];
+    b0.vx = 0.0 - px / solar_mass();
+    b0.vy = 0.0 - py / solar_mass();
+    b0.vz = 0.0 - pz / solar_mass();
+    bodies;
+}
+
+fn advance(bodies: Array[Body], dt: F64) void {
+    let size = bodies.len();
+    for (0..<size) |i| {
+        let bodyi = bodies[i];
+        let vxi = bodyi.vx;
+        let vyi = bodyi.vy;
+        let vzi = bodyi.vz;
+        for ((i + 1)..<size) |j| {
+            let bodyj = bodies[j];
+            let dx = bodyi.x - bodyj.x;
+            let dy = bodyi.y - bodyj.y;
+            let dz = bodyi.z - bodyj.z;
+
+            let d2 = dx * dx + dy * dy + dz * dz;
+            let mag = dt / (d2 * F64.sqrt(d2));
+
+            let massj = bodyj.mass;
+            vxi -= dx * massj * mag;
+            vyi -= dy * massj * mag;
+            vzi -= dz * massj * mag;
+
+            let massi = bodyi.mass;
+            bodyj.vx += dx * massi * mag;
+            bodyj.vy += dy * massi * mag;
+            bodyj.vz += dz * massi * mag;
+        };
+        bodyi.vx = vxi;
+        bodyi.vy = vyi;
+        bodyi.vz = vzi;
+    };
+    for (0..<size) |i| {
+        let body = bodies[i];
+        body.x += dt * body.vx;
+        body.y += dt * body.vy;
+        body.z += dt * body.vz;
+    };
+}
+
+fn energy(bodies: Array[Body]) F64 {
+    let e = 0.0;
+    let size = bodies.len();
+    for (0..<size) |i| {
+        let bodyi = bodies[i];
+        e += 0.5 * bodyi.mass * (bodyi.vx * bodyi.vx + bodyi.vy * bodyi.vy + bodyi.vz * bodyi.vz);
+        for ((i + 1)..<size) |j| {
+            let bodyj = bodies[j];
+            let dx = bodyi.x - bodyj.x;
+            let dy = bodyi.y - bodyj.y;
+            let dz = bodyi.z - bodyj.z;
+            let distance = F64.sqrt(dx * dx + dy * dy + dz * dz);
+            e -= bodyi.mass * bodyj.mass / distance;
+        };
+    };
+    e;
+}
+
+// ---- output: FNV-1a over the bytes of "%.9f\n"
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+// x rounded to nanos, then its digits.
+fn fnv_fixed9(h0: I32, x: F64) I32 {
+    let h = h0;
+    if x < 0.0 { h = fnv(h, 45); };
+    let nanos = F64.floor(F64.abs(x) * 1.0e9 + 0.5).to_i64();
+    let whole = nanos / 1000000000;
+    let frac = nanos % 1000000000;
+    let p: I64 = 1;
+    while (p * 10 <= whole) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (whole / p % 10).to_i32());
+        p = p / 10;
+    };
+    h = fnv(h, 46);
+    let d: I64 = 100000000;
+    while (d > 0) {
+        h = fnv(h, 48 + (frac / d % 10).to_i32());
+        d = d / 10;
+    };
+    fnv(h, 10);
+}
+
+test "nbody prints BG's energies" {
+    // -0.169075164 and, after 1000 steps, -0.169087605
+    let bodies = create();
+    let h = fnv_fixed9(-2128831035, energy(bodies));
+    for (0..<1000) { advance(bodies, 0.01); };
+    assert fnv_fixed9(h, energy(bodies)) == 661152772;
+}
+
+export lib {
+    fn bench(n: I32) I32 {
+        let bodies = create();
+        let h = fnv_fixed9(-2128831035, energy(bodies));
+        for (0..<n) { advance(bodies, 0.01); };
+        fnv_fixed9(h, energy(bodies));
+    }
+}

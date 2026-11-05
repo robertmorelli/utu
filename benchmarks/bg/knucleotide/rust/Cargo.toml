@@ -1,0 +1,19 @@
+[package]
+name = "bg_knucleotide"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+hashbrown = "0.15"
+itertools = "0.14"
+num-traits = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

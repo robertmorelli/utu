@@ -1,0 +1,8 @@
+{
+  "n": 5000000,
+  "setup": true,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "c": ["-msse4.1"], "cpp": ["-DSIMD", "-msse4.1"] },
+  "notes": "setup(n): the fasta output for n (BG fasta's algorithm, 10.2 n bytes), untimed. bench(n): BG revcomp of it; result = FNV-1a of the bytes BG prints. BG runs fasta 25,000,000's output (n = 25,000,000)."
+}

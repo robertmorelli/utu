@@ -1,0 +1,423 @@
+// nbody, TUNED variant (reported as "utu tuned"; the idiomatic port is nbody.utu):
+// BG nbody gcc #9's algorithm (Miles; also g++ #0 and Rust #9, the
+// fastest BG programs) in utu with Wasm SIMD:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-gcc-9.html
+//
+// As in C, a body's position and velocity are AVX vectors of lanes (0, x, y, z):
+// here each is two V128s, lo = (0, x) and hi = (y, z), the layout Emscripten's
+// AVX emulation gives the C port. A step computes the ten pairs' differences,
+// their squared distances two pairs to a vector (C's hadd/permute/blend), 1/sqrt
+// of four at a time in f32 (C's vrsqrtps; Wasm has only sqrt and div, as
+// Emscripten emulates it) refined in f64 by C's Goldschmidt step, then
+// mag = dt/d^3, every velocity and every position. The pairs are unrolled,
+// as g++ #0 unrolls them with templates, and the system lives in locals
+// during the steps. The f64x2 instructions are @wat functions; utu does not
+// inline those, so a step's are fused into 33 calls, few enough that V8
+// inlines them all (one per instruction was 230 calls, and 3x slower). Each
+// velocity takes its four pairs in C's order, so the arithmetic is C's.
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "%.9f\n" of the energy
+// before and after n steps, hashed as it is formatted.
+
+// ---- f64x2 (and f32x4) instructions
+
+fn add(a: V128, b: V128) V128 { @wat/\ (f64x2.add (local.get $a) (local.get $b)) \/; }
+fn sub(a: V128, b: V128) V128 { @wat/\ (f64x2.sub (local.get $a) (local.get $b)) \/; }
+fn mul(a: V128, b: V128) V128 { @wat/\ (f64x2.mul (local.get $a) (local.get $b)) \/; }
+fn splat(x: F64) V128 { @wat/\ (f64x2.splat (local.get $x)) \/; }
+fn lanes(a: F64, b: F64) V128 { @wat/\ (f64x2.replace_lane 1 (f64x2.splat (local.get $a)) (local.get $b)) \/; }
+fn lane0(v: V128) F64 { @wat/\ (f64x2.extract_lane 0 (local.get $v)) \/; }
+fn lane1(v: V128) F64 { @wat/\ (f64x2.extract_lane 1 (local.get $v)) \/; }
+
+// The squared lengths of two vectors (alo, ahi) and (blo, bhi), lanes (0, x)
+// and (y, z): C's hadd, permute2f128, blend, and add, which sum (y² + z²) + x².
+fn dist2(alo: V128, ahi: V128, blo: V128, bhi: V128) V128 {
+    @wat/\
+        (local $a v128) (local $b v128)
+        (local.set $a (f64x2.mul (local.get $ahi) (local.get $ahi)))
+        (local.set $b (f64x2.mul (local.get $bhi) (local.get $bhi)))
+        (f64x2.add
+          (f64x2.add
+            (i8x16.shuffle 0 1 2 3 4 5 6 7 16 17 18 19 20 21 22 23 (local.get $a) (local.get $b))
+            (i8x16.shuffle 8 9 10 11 12 13 14 15 24 25 26 27 28 29 30 31 (local.get $a) (local.get $b)))
+          (i8x16.shuffle 8 9 10 11 12 13 14 15 24 25 26 27 28 29 30 31
+            (f64x2.mul (local.get $alo) (local.get $alo))
+            (f64x2.mul (local.get $blo) (local.get $blo))))
+    \/;
+}
+
+// _mm_rsqrt_ps of four squared distances (two in a, two in b), in f32.
+fn rsqrt4(a: V128, b: V128) V128 {
+    @wat/\
+        (f32x4.div (f32x4.splat (f32.const 1))
+          (f32x4.sqrt (i8x16.shuffle 0 1 2 3 4 5 6 7 16 17 18 19 20 21 22 23
+            (f32x4.demote_f64x2_zero (local.get $a))
+            (f32x4.demote_f64x2_zero (local.get $b)))))
+    \/;
+}
+fn promote_lo(q: V128) V128 { @wat/\ (f64x2.promote_low_f32x4 (local.get $q)) \/; }
+fn promote_hi(q: V128) V128 {
+    @wat/\ (f64x2.promote_low_f32x4 (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $q) (local.get $q))) \/;
+}
+
+// C's _mm256_rsqrt_pd refinement of x ≈ 1/sqrt(s): y = s·x·x;
+// x·(0.375·y·y − (1.25·y − 1.875)).
+fn refine(s: V128, x: V128) V128 {
+    @wat/\
+        (local $y v128)
+        (local.set $y (f64x2.mul (f64x2.mul (local.get $s) (local.get $x)) (local.get $x)))
+        (f64x2.mul (local.get $x)
+          (f64x2.sub
+            (f64x2.mul (f64x2.mul (local.get $y) (f64x2.splat (f64.const 0.375))) (local.get $y))
+            (f64x2.sub (f64x2.mul (local.get $y) (f64x2.splat (f64.const 1.25))) (f64x2.splat (f64.const 1.875)))))
+    \/;
+}
+
+// ---- the system
+
+fn pi() F64 { 3.141592653589793; }
+fn solar_mass() F64 { 4.0 * pi() * pi(); }
+fn days_per_year() F64 { 365.24; }
+
+// Body i's position (p{i}l, p{i}h), velocity (v{i}l, v{i}h), and mass.
+struct Sys:
+    | p0l: V128
+    | p0h: V128
+    | p1l: V128
+    | p1h: V128
+    | p2l: V128
+    | p2h: V128
+    | p3l: V128
+    | p3h: V128
+    | p4l: V128
+    | p4h: V128
+    | v0l: V128
+    | v0h: V128
+    | v1l: V128
+    | v1h: V128
+    | v2l: V128
+    | v2h: V128
+    | v3l: V128
+    | v3h: V128
+    | v4l: V128
+    | v4h: V128
+    | m0: F64
+    | m1: F64
+    | m2: F64
+    | m3: F64
+    | m4: F64
+
+
+fn create() Sys {
+    let d = days_per_year();
+    let sm = solar_mass();
+    let s: Sys = &{
+        p0l: splat(0.0),
+        p0h: splat(0.0),
+        p1l: lanes(0.0, 4.84143144246472090e+00),
+        p1h: lanes(-1.16032004402742839e+00, -1.03622044471123109e-01),
+        p2l: lanes(0.0, 8.34336671824457987e+00),
+        p2h: lanes(4.12479856412430479e+00, -4.03523417114321381e-01),
+        p3l: lanes(0.0, 1.28943695621391310e+01),
+        p3h: lanes(-1.51111514016986312e+01, -2.23307578892655734e-01),
+        p4l: lanes(0.0, 1.53796971148509165e+01),
+        p4h: lanes(-2.59193146099879641e+01, 1.79258772950371181e-01),
+        v0l: splat(0.0),
+        v0h: splat(0.0),
+        v1l: lanes(0.0, 1.66007664274403694e-03 * d),
+        v1h: lanes(7.69901118419740425e-03 * d, -6.90460016972063023e-05 * d),
+        v2l: lanes(0.0, -2.76742510726862411e-03 * d),
+        v2h: lanes(4.99852801234917238e-03 * d, 2.30417297573763929e-05 * d),
+        v3l: lanes(0.0, 2.96460137564761618e-03 * d),
+        v3h: lanes(2.37847173959480950e-03 * d, -2.96589568540237556e-05 * d),
+        v4l: lanes(0.0, 2.68067772490389322e-03 * d),
+        v4h: lanes(1.62824170038242295e-03 * d, -9.51592254519715870e-05 * d),
+        m0: sm,
+        m1: 9.54791938424326609e-04 * sm,
+        m2: 2.85885980666130812e-04 * sm,
+        m3: 4.36624404335156298e-05 * sm,
+        m4: 5.15138902046611451e-05 * sm,
+    };
+    // offset momentum: v0 = -(Σ m·v) / SOLAR_MASS
+    let ol = mul(splat(s.m0), s.v0l);
+    let oh = mul(splat(s.m0), s.v0h);
+    ol = add(ol, mul(splat(s.m1), s.v1l));
+    oh = add(oh, mul(splat(s.m1), s.v1h));
+    ol = add(ol, mul(splat(s.m2), s.v2l));
+    oh = add(oh, mul(splat(s.m2), s.v2h));
+    ol = add(ol, mul(splat(s.m3), s.v3l));
+    oh = add(oh, mul(splat(s.m3), s.v3h));
+    ol = add(ol, mul(splat(s.m4), s.v4l));
+    oh = add(oh, mul(splat(s.m4), s.v4h));
+    let k = splat(-1.0 / sm);
+    s.v0l = mul(ol, k);
+    s.v0h = mul(oh, k);
+    s;
+}
+
+// Σ ½·m·|v|² − Σ m_i·m_j / |p_i − p_j|, the distances as a step finds them.
+fn energy(s: Sys) F64 {
+    let k01 = dist2(s.v0l, s.v0h, s.v1l, s.v1h);
+    let k23 = dist2(s.v2l, s.v2h, s.v3l, s.v3h);
+    let k4 = dist2(s.v4l, s.v4h, s.v4l, s.v4h);
+    let e = 0.0;
+    e += 0.5 * s.m0 * lane0(k01);
+    e += 0.5 * s.m1 * lane1(k01);
+    e += 0.5 * s.m2 * lane0(k23);
+    e += 0.5 * s.m3 * lane1(k23);
+    e += 0.5 * s.m4 * lane0(k4);
+
+    // pairs (1,0) (2,0) (2,1) (3,0) (3,1) (3,2) (4,0) (4,1) (4,2) (4,3)
+    let d0 = dist2(sub(s.p1l, s.p0l), sub(s.p1h, s.p0h), sub(s.p2l, s.p0l), sub(s.p2h, s.p0h));
+    let d1 = dist2(sub(s.p2l, s.p1l), sub(s.p2h, s.p1h), sub(s.p3l, s.p0l), sub(s.p3h, s.p0h));
+    let d2 = dist2(sub(s.p3l, s.p1l), sub(s.p3h, s.p1h), sub(s.p3l, s.p2l), sub(s.p3h, s.p2h));
+    let d3 = dist2(sub(s.p4l, s.p0l), sub(s.p4h, s.p0h), sub(s.p4l, s.p1l), sub(s.p4h, s.p1h));
+    let d4 = dist2(sub(s.p4l, s.p2l), sub(s.p4h, s.p2h), sub(s.p4l, s.p3l), sub(s.p4h, s.p3h));
+    let q01 = rsqrt4(d0, d1);
+    let q23 = rsqrt4(d2, d3);
+    let q4 = rsqrt4(d4, d4);
+    let w0 = refine(d0, promote_lo(q01));
+    let w1 = refine(d1, promote_hi(q01));
+    let w2 = refine(d2, promote_lo(q23));
+    let w3 = refine(d3, promote_hi(q23));
+    let w4 = refine(d4, promote_lo(q4));
+    e -= s.m1 * s.m0 * lane0(w0);
+    e -= s.m2 * s.m0 * lane1(w0);
+    e -= s.m2 * s.m1 * lane0(w1);
+    e -= s.m3 * s.m0 * lane1(w1);
+    e -= s.m3 * s.m1 * lane0(w2);
+    e -= s.m3 * s.m2 * lane1(w2);
+    e -= s.m4 * s.m0 * lane0(w3);
+    e -= s.m4 * s.m1 * lane1(w3);
+    e -= s.m4 * s.m2 * lane0(w4);
+    e -= s.m4 * s.m3 * lane1(w4);
+    e;
+}
+
+// The step's fused instructions: one call each, few enough calls a step
+// that V8 inlines them all (utu does not inline @wat functions).
+
+// Squared lengths of a − b and c − d.
+fn pdist2(al: V128, ah: V128, bl: V128, bh: V128, cl: V128, ch: V128, dl: V128, dh: V128) V128 {
+    @wat/\
+        (local $x v128) (local $y v128) (local $u v128) (local $v v128)
+        (local.set $x (f64x2.sub (local.get $ah) (local.get $bh)))
+        (local.set $y (f64x2.sub (local.get $ch) (local.get $dh)))
+        (local.set $u (f64x2.sub (local.get $al) (local.get $bl)))
+        (local.set $v (f64x2.sub (local.get $cl) (local.get $dl)))
+        (local.set $x (f64x2.mul (local.get $x) (local.get $x)))
+        (local.set $y (f64x2.mul (local.get $y) (local.get $y)))
+        (f64x2.add
+          (f64x2.add
+            (i8x16.shuffle 0 1 2 3 4 5 6 7 16 17 18 19 20 21 22 23 (local.get $x) (local.get $y))
+            (i8x16.shuffle 8 9 10 11 12 13 14 15 24 25 26 27 28 29 30 31 (local.get $x) (local.get $y)))
+          (i8x16.shuffle 8 9 10 11 12 13 14 15 24 25 26 27 28 29 30 31
+            (f64x2.mul (local.get $u) (local.get $u))
+            (f64x2.mul (local.get $v) (local.get $v))))
+    \/;
+}
+
+// dt/d³ for the squared distances s, from q's low (w_lo) or high (w_hi) two
+// f32 approximations of 1/sqrt(s): refine, then (w·w)·(w·dt).
+fn w_lo(s: V128, q: V128, rt: V128) V128 {
+    @wat/\
+        (local $x v128) (local $y v128)
+        (local.set $x (f64x2.promote_low_f32x4 (local.get $q)))
+        (local.set $y (f64x2.mul (f64x2.mul (local.get $s) (local.get $x)) (local.get $x)))
+        (local.set $x (f64x2.mul (local.get $x)
+          (f64x2.sub
+            (f64x2.mul (f64x2.mul (local.get $y) (f64x2.splat (f64.const 0.375))) (local.get $y))
+            (f64x2.sub (f64x2.mul (local.get $y) (f64x2.splat (f64.const 1.25))) (f64x2.splat (f64.const 1.875))))))
+        (f64x2.mul (f64x2.mul (local.get $x) (local.get $x)) (f64x2.mul (local.get $x) (local.get $rt)))
+    \/;
+}
+fn w_hi(s: V128, q: V128, rt: V128) V128 {
+    @wat/\
+        (local $x v128) (local $y v128)
+        (local.set $x (f64x2.promote_low_f32x4 (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $q) (local.get $q))))
+        (local.set $y (f64x2.mul (f64x2.mul (local.get $s) (local.get $x)) (local.get $x)))
+        (local.set $x (f64x2.mul (local.get $x)
+          (f64x2.sub
+            (f64x2.mul (f64x2.mul (local.get $y) (f64x2.splat (f64.const 0.375))) (local.get $y))
+            (f64x2.sub (f64x2.mul (local.get $y) (f64x2.splat (f64.const 1.25))) (f64x2.splat (f64.const 1.875))))))
+        (f64x2.mul (f64x2.mul (local.get $x) (local.get $x)) (f64x2.mul (local.get $x) (local.get $rt)))
+    \/;
+}
+
+// Body b's velocity (one half) after its four pairs, in pair order as C
+// updates it: v −= (p_b − p_j)·w·m_j where b is the pair's first body,
+// v += (p_i − p_b)·w·m_i where it is the second (w a lane of the pair's vector).
+
+fn vel0(v: V128, a0: V128, b0: V128, w0: V128, m0: V128, a1: V128, b1: V128, w1: V128, m1: V128, a2: V128, b2: V128, w2: V128, m2: V128, a3: V128, b3: V128, w3: V128, m3: V128) V128 {
+    @wat/\ (f64x2.add (f64x2.add (f64x2.add (f64x2.add (local.get $v)
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a0) (local.get $b0)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w0) (local.get $w0))) (local.get $m0)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a1) (local.get $b1)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w1) (local.get $w1))) (local.get $m1)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a2) (local.get $b2)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w2) (local.get $w2))) (local.get $m2)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a3) (local.get $b3)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w3) (local.get $w3))) (local.get $m3))) \/;
+}
+
+fn vel1(v: V128, a0: V128, b0: V128, w0: V128, m0: V128, a1: V128, b1: V128, w1: V128, m1: V128, a2: V128, b2: V128, w2: V128, m2: V128, a3: V128, b3: V128, w3: V128, m3: V128) V128 {
+    @wat/\ (f64x2.add (f64x2.add (f64x2.add (f64x2.sub (local.get $v)
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a0) (local.get $b0)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w0) (local.get $w0))) (local.get $m0)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a1) (local.get $b1)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w1) (local.get $w1))) (local.get $m1)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a2) (local.get $b2)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w2) (local.get $w2))) (local.get $m2)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a3) (local.get $b3)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w3) (local.get $w3))) (local.get $m3))) \/;
+}
+
+fn vel2(v: V128, a0: V128, b0: V128, w0: V128, m0: V128, a1: V128, b1: V128, w1: V128, m1: V128, a2: V128, b2: V128, w2: V128, m2: V128, a3: V128, b3: V128, w3: V128, m3: V128) V128 {
+    @wat/\ (f64x2.add (f64x2.add (f64x2.sub (f64x2.sub (local.get $v)
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a0) (local.get $b0)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w0) (local.get $w0))) (local.get $m0)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a1) (local.get $b1)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w1) (local.get $w1))) (local.get $m1)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a2) (local.get $b2)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w2) (local.get $w2))) (local.get $m2)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a3) (local.get $b3)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w3) (local.get $w3))) (local.get $m3))) \/;
+}
+
+fn vel3(v: V128, a0: V128, b0: V128, w0: V128, m0: V128, a1: V128, b1: V128, w1: V128, m1: V128, a2: V128, b2: V128, w2: V128, m2: V128, a3: V128, b3: V128, w3: V128, m3: V128) V128 {
+    @wat/\ (f64x2.add (f64x2.sub (f64x2.sub (f64x2.sub (local.get $v)
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a0) (local.get $b0)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w0) (local.get $w0))) (local.get $m0)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a1) (local.get $b1)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w1) (local.get $w1))) (local.get $m1)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a2) (local.get $b2)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w2) (local.get $w2))) (local.get $m2)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a3) (local.get $b3)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w3) (local.get $w3))) (local.get $m3))) \/;
+}
+
+fn vel4(v: V128, a0: V128, b0: V128, w0: V128, m0: V128, a1: V128, b1: V128, w1: V128, m1: V128, a2: V128, b2: V128, w2: V128, m2: V128, a3: V128, b3: V128, w3: V128, m3: V128) V128 {
+    @wat/\ (f64x2.sub (f64x2.sub (f64x2.sub (f64x2.sub (local.get $v)
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a0) (local.get $b0)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w0) (local.get $w0))) (local.get $m0)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a1) (local.get $b1)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w1) (local.get $w1))) (local.get $m1)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a2) (local.get $b2)) (i8x16.shuffle 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 (local.get $w2) (local.get $w2))) (local.get $m2)))
+          (f64x2.mul (f64x2.mul (f64x2.sub (local.get $a3) (local.get $b3)) (i8x16.shuffle 8 9 10 11 12 13 14 15 8 9 10 11 12 13 14 15 (local.get $w3) (local.get $w3))) (local.get $m3))) \/;
+}
+
+// v·dt added to p
+fn moved(p: V128, v: V128, rt: V128) V128 { @wat/\ (f64x2.add (local.get $p) (f64x2.mul (local.get $v) (local.get $rt))) \/; }
+
+// n steps of dt, the system in locals throughout.
+fn advance(s: Sys, n: I32, dt: F64) void {
+    let p0l = s.p0l;
+    let p0h = s.p0h;
+    let p1l = s.p1l;
+    let p1h = s.p1h;
+    let p2l = s.p2l;
+    let p2h = s.p2h;
+    let p3l = s.p3l;
+    let p3h = s.p3h;
+    let p4l = s.p4l;
+    let p4h = s.p4h;
+    let v0l = s.v0l;
+    let v0h = s.v0h;
+    let v1l = s.v1l;
+    let v1h = s.v1h;
+    let v2l = s.v2l;
+    let v2h = s.v2h;
+    let v3l = s.v3l;
+    let v3h = s.v3h;
+    let v4l = s.v4l;
+    let v4h = s.v4h;
+    let m0 = splat(s.m0);
+    let m1 = splat(s.m1);
+    let m2 = splat(s.m2);
+    let m3 = splat(s.m3);
+    let m4 = splat(s.m4);
+    let rt = splat(dt);
+    for (0..<n) {
+        // w[k] = dt / |p[i] − p[j]|³ for the pairs (1,0) (2,0) (2,1) (3,0) (3,1) (3,2) (4,0) (4,1) (4,2) (4,3), two to a vector
+        let d0 = pdist2(p1l, p1h, p0l, p0h, p2l, p2h, p0l, p0h);
+        let d1 = pdist2(p2l, p2h, p1l, p1h, p3l, p3h, p0l, p0h);
+        let d2 = pdist2(p3l, p3h, p1l, p1h, p3l, p3h, p2l, p2h);
+        let d3 = pdist2(p4l, p4h, p0l, p0h, p4l, p4h, p1l, p1h);
+        let d4 = pdist2(p4l, p4h, p2l, p2h, p4l, p4h, p3l, p3h);
+        let q01 = rsqrt4(d0, d1);
+        let q23 = rsqrt4(d2, d3);
+        let q4 = rsqrt4(d4, d4);
+        let w0 = w_lo(d0, q01, rt);
+        let w1 = w_hi(d1, q01, rt);
+        let w2 = w_lo(d2, q23, rt);
+        let w3 = w_hi(d3, q23, rt);
+        let w4 = w_lo(d4, q4, rt);
+        // each velocity after its four pairs, from the positions before the step
+        v0l = vel0(v0l, p1l, p0l, w0, m1, p2l, p0l, w0, m2, p3l, p0l, w1, m3, p4l, p0l, w3, m4);
+        v0h = vel0(v0h, p1h, p0h, w0, m1, p2h, p0h, w0, m2, p3h, p0h, w1, m3, p4h, p0h, w3, m4);
+        v1l = vel1(v1l, p1l, p0l, w0, m0, p2l, p1l, w1, m2, p3l, p1l, w2, m3, p4l, p1l, w3, m4);
+        v1h = vel1(v1h, p1h, p0h, w0, m0, p2h, p1h, w1, m2, p3h, p1h, w2, m3, p4h, p1h, w3, m4);
+        v2l = vel2(v2l, p2l, p0l, w0, m0, p2l, p1l, w1, m1, p3l, p2l, w2, m3, p4l, p2l, w4, m4);
+        v2h = vel2(v2h, p2h, p0h, w0, m0, p2h, p1h, w1, m1, p3h, p2h, w2, m3, p4h, p2h, w4, m4);
+        v3l = vel3(v3l, p3l, p0l, w1, m0, p3l, p1l, w2, m1, p3l, p2l, w2, m2, p4l, p3l, w4, m4);
+        v3h = vel3(v3h, p3h, p0h, w1, m0, p3h, p1h, w2, m1, p3h, p2h, w2, m2, p4h, p3h, w4, m4);
+        v4l = vel4(v4l, p4l, p0l, w3, m0, p4l, p1l, w3, m1, p4l, p2l, w4, m2, p4l, p3l, w4, m3);
+        v4h = vel4(v4h, p4h, p0h, w3, m0, p4h, p1h, w3, m1, p4h, p2h, w4, m2, p4h, p3h, w4, m3);
+        // p[i] += v[i]·dt
+        p0l = moved(p0l, v0l, rt);
+        p0h = moved(p0h, v0h, rt);
+        p1l = moved(p1l, v1l, rt);
+        p1h = moved(p1h, v1h, rt);
+        p2l = moved(p2l, v2l, rt);
+        p2h = moved(p2h, v2h, rt);
+        p3l = moved(p3l, v3l, rt);
+        p3h = moved(p3h, v3h, rt);
+        p4l = moved(p4l, v4l, rt);
+        p4h = moved(p4h, v4h, rt);
+    };
+    s.p0l = p0l;
+    s.p0h = p0h;
+    s.p1l = p1l;
+    s.p1h = p1h;
+    s.p2l = p2l;
+    s.p2h = p2h;
+    s.p3l = p3l;
+    s.p3h = p3h;
+    s.p4l = p4l;
+    s.p4h = p4h;
+    s.v0l = v0l;
+    s.v0h = v0h;
+    s.v1l = v1l;
+    s.v1h = v1h;
+    s.v2l = v2l;
+    s.v2h = v2h;
+    s.v3l = v3l;
+    s.v3h = v3h;
+    s.v4l = v4l;
+    s.v4h = v4h;
+}
+
+// ---- output: FNV-1a over the bytes of "%.9f\n"
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+// x rounded to nanos, then its digits.
+fn fnv_fixed9(h0: I32, x: F64) I32 {
+    let h = h0;
+    if x < 0.0 { h = fnv(h, 45); };
+    let nanos = F64.floor(F64.abs(x) * 1.0e9 + 0.5).to_i64();
+    let whole = nanos / 1000000000;
+    let frac = nanos % 1000000000;
+    let p: I64 = 1;
+    while (p * 10 <= whole) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (whole / p % 10).to_i32());
+        p = p / 10;
+    };
+    h = fnv(h, 46);
+    let d: I64 = 100000000;
+    while (d > 0) {
+        h = fnv(h, 48 + (frac / d % 10).to_i32());
+        d = d / 10;
+    };
+    fnv(h, 10);
+}
+
+test "nbody prints BG's energies" {
+    // -0.169075164 and, after 1000 steps, -0.169087605
+    let s = create();
+    let h = fnv_fixed9(-2128831035, energy(s));
+    advance(s, 1000, 0.01);
+    assert fnv_fixed9(h, energy(s)) == 661152772;
+}
+
+export lib {
+    fn bench(n: I32) I32 {
+        let s = create();
+        let h = fnv_fixed9(-2128831035, energy(s));
+        advance(s, n, 0.01);
+        fnv_fixed9(h, energy(s));
+    }
+}

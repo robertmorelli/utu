@@ -1,0 +1,79 @@
+// Pi digits with the host's BigInt: "utu (host BigInt)", reported apart from
+// pidigits.utu (utu's own bignum, the headline port). The same gcc #2 loop
+// (https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/pidigits-gcc-2.html),
+// but every mpz call is one JavaScript BigInt operation through @es: the
+// numbers live in the host as Externref, as the JS and Dart ports' BigInts
+// live in their engines.
+//
+// bench(n) returns the FNV-1a hash of the bytes gcc #2 prints for n digits.
+
+let from_i32: fun(I32) Externref = @es/\ (v) => BigInt(v) \/;
+let add: fun(Externref, Externref) Externref = @es/\ (a, b) => a + b \/;
+let mul: fun(Externref, Externref) Externref = @es/\ (a, b) => a * b \/;
+let mul_si: fun(Externref, I32) Externref = @es/\ (a, s) => a * BigInt(s) \/;
+let tdiv_q: fun(Externref, Externref) Externref = @es/\ (a, b) => a / b \/;
+let equal: fun(Externref, Externref) Bool = @es/\ (a, b) => a === b \/;
+let get_si: fun(Externref) I32 = @es/\ (a) => Number(a) \/;
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+// "\t:<i>\n"
+fn fnv_count(h0: I32, i: I32) I32 {
+    let h = fnv(fnv(h0, 9), 58);
+    let p = 1;
+    while (p * 10 <= i) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + i / p % 10);
+        p = p / 10;
+    };
+    fnv(h, 10);
+}
+
+fn pidigits(n: I32) I32 {
+    let n1 = from_i32(4);
+    let n2 = from_i32(3);
+    let d = from_i32(1);
+    let k = 1;
+    let i = 0;
+    let h = -2128831035;
+    let going = true;
+    while (going) {
+        let u = tdiv_q(n1, d);
+        let v = tdiv_q(n2, d);
+        if equal(u, v) {
+            h = fnv(h, 48 + get_si(u));
+            i += 1;
+            if i % 10 == 0 { h = fnv_count(h, i); };
+            if i == n {
+                going = false;
+            } else {
+                // extract
+                let t = mul(d, mul_si(u, -10));
+                n1 = add(mul_si(n1, 10), t);
+                n2 = add(mul_si(n2, 10), t);
+            };
+        } else {
+            // produce
+            let k2 = k * 2;
+            let w = mul_si(n1, k - 1);
+            n1 = add(mul_si(n1, k2 - 1), add(n2, n2));
+            n2 = add(w, mul_si(n2, k + 2));
+            d = mul_si(d, k2 + 1);
+            k += 1;
+        };
+    };
+    if i % 10 != 0 {
+        for (0..<(10 - n % 10)) { h = fnv(h, 32); };
+        h = fnv_count(h, n);
+    };
+    h;
+}
+
+test "pidigits prints BG's digits" {
+    assert pidigits(27) == 1564184215;
+    assert pidigits(100) == 2141273922;
+}
+
+export lib {
+    fn bench(n: I32) I32 { pidigits(n); }
+}

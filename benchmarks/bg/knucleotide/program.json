@@ -1,0 +1,21 @@
+{
+  "n": 500000,
+  "setup": true,
+  "samples": 10,
+  "warmups": 3,
+  "notes": "setup(n): BG fasta's output for n (untimed). bench(n): k-nucleotide over it (find >THREE, encode, count 1-, 2-mers and the 5 fragments); result = FNV-1a of the bytes BG prints. n=1000 -> 2506903540 (BG's knucleotide-output.txt). BG runs fasta 25,000,000.",
+  "flags": {
+    "cpp": [
+      "-std=c++17",
+      "-Ibenchmarks/bg/knucleotide/cpp/pbds"
+    ],
+    "haskell": [
+      "-package-db",
+      "/Users/robertmorelli/.ghc-wasm/.cabal/store/ghc-9.14.1.20260731-70e7/package.db",
+      "-package",
+      "hashtables",
+      "-package",
+      "hashable"
+    ]
+  }
+}

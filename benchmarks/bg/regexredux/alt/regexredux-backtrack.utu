@@ -1,0 +1,418 @@
+// Regex-redux, the steps of BG regexredux gcc #5 (Jeremy Zerfas, Zoltan
+// Herczeg), in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/regexredux-gcc-5.html
+//
+// NOT a general regex library: utu has none, so this file carries a small
+// backtracking matcher for the subset the program's patterns use: literal
+// bytes, `\c` escapes (`\n` is a newline), `.` (any byte but a newline),
+// classes `[...]` and `[^...]`, `*` (greedy) after one of those, and `|`
+// between alternatives at the top level. Like PCRE (what gcc #5 uses) it
+// finds the leftmost match, the first alternative that matches there, and
+// backtracks a `*`. A pattern compiles to one 256-bit set per atom (8 I32
+// words), a star flag, where each alternative starts, and the set of bytes a
+// match can start with (to skip positions quickly). The compiled form is
+// built each bench call, as gcc #5 compiles each pattern.
+//
+// gcc #5: strip the headers and newlines (`>.*\n|\n` -> ""), count the nine
+// variants in the result, apply the five replacements one after another.
+// Single-threaded. All text is in one byte mem: the input setup(n) wrote at
+// [0, ilen) (the fasta generator below, copied from fasta.utu), then the
+// cleaned sequence and two buffers the replacements alternate between.
+//
+// bench(n) returns the FNV-1a hash of the bytes gcc #5 prints.
+
+mem heap: U8;
+
+// A compiled pattern.
+struct Regex:
+    | sets: Array[I32]    // atom k's bytes: bit c of sets[k * 8 + c / 32]
+    | star: Array[I32]    // 1 if atom k repeats (`*`)
+    | alts: Array[I32]    // alternative a is atoms alts[a] ..< alts[a + 1]
+    | first: Array[I32]   // 1 for each byte a match can start with
+    | from_any: Bool      // an alternative can start anywhere (it starts with a star)
+
+fn set_bit(sets: Array[I32], k: I32, c: I32) void {
+    let w = k * 8 + (c >>> 5);
+    sets[w] = sets[w] | (1 << (c & 31));
+}
+
+fn has_bit(sets: Array[I32], k: I32, c: I32) Bool {
+    ((sets[k * 8 + (c >>> 5)] >>> (c & 31)) & 1) != 0;
+}
+
+// The byte an escape `\c` stands for.
+fn unescape(c: I32) I32 { if c == 110 { 10; } else { c; }; }
+
+fn compile(p: Str) Regex {
+    let len = p.len();
+    // At most one atom per pattern byte, one alternative per `|` plus one.
+    let sets = Array[I32].new(len * 8 + 8, 0);
+    let star = Array[I32].new(len + 1, 0);
+    let alts = Array[I32].new(len + 2, 0);
+    let atoms = 0;
+    let nalts = 1;
+    let i = 0;
+    while (i < len) {
+        let c = p[i];
+        if c == 124 {                       // `|`
+            alts[nalts] = atoms;
+            nalts += 1;
+            i += 1;
+        } else if c == 42 {                 // `*`: the atom before repeats
+            star[atoms - 1] = 1;
+            i += 1;
+        } else {
+            let k = atoms;
+            atoms += 1;
+            if c == 91 {                    // `[...]` or `[^...]`
+                i += 1;
+                let negate = p[i] == 94;
+                if negate { i += 1; };
+                let start = i;
+                while (p[i] != 93 or i == start) {
+                    let b = p[i];
+                    if b == 92 { i += 1; b = unescape(p[i]); };
+                    set_bit(sets, k, b);
+                    i += 1;
+                };
+                i += 1;
+                if negate {
+                    for (0..<8) |w| { sets[k * 8 + w] = ~sets[k * 8 + w]; };
+                };
+            } else if c == 46 {             // `.`: any byte but a newline
+                for (0..<256) |b| { if b != 10 { set_bit(sets, k, b); }; };
+                i += 1;
+            } else if c == 92 {             // `\c`
+                set_bit(sets, k, unescape(p[i + 1]));
+                i += 2;
+            } else {
+                set_bit(sets, k, c);
+                i += 1;
+            };
+        };
+    };
+    alts[nalts] = atoms;
+    let first = Array[I32].new(256, 0);
+    let from_any = false;
+    for (0..<nalts) |a| {
+        let k = alts[a];
+        if k == alts[a + 1] or star[k] == 1 {
+            from_any = true;
+        } else {
+            for (0..<256) |b| { if has_bit(sets, k, b) { first[b] = 1; }; };
+        };
+    };
+    &{ sets: sets, star: star, alts: alts.slice(0, nalts + 1), first: first, from_any: from_any };
+}
+
+// Atoms k ..< stop matched from heap[p], text ending at end: where the match
+// ends, or -1.
+fn match_seq(re: Regex, k0: I32, stop: I32, p0: I32, end: I32) I32 {
+    let sets = re.sets;
+    let k = k0;
+    let p = p0;
+    let result = -2;
+    while (result == -2) {
+        if k == stop {
+            result = p;
+        } else if re.star[k] == 1 {
+            // greedy: as many as match, then give back one at a time
+            let q = p;
+            while (q < end and has_bit(sets, k, heap[q])) { q += 1; };
+            result = -1;
+            while (result < 0 and q >= p) {
+                result = match_seq(re, k + 1, stop, q, end);
+                q -= 1;
+            };
+        } else if p < end and has_bit(sets, k, heap[p]) {
+            k += 1;
+            p += 1;
+        } else {
+            result = -1;
+        };
+    };
+    result;
+}
+
+// The first match in heap[from ..< end]: its start and end, or -1, -1.
+fn find(re: Regex, from: I32, end: I32) .{I32, I32} {
+    let first = re.first;
+    let alts = re.alts;
+    let nalts = alts.len() - 1;
+    let p = from;
+    let start = -1;
+    let stop = -1;
+    while (start < 0 and p < end) {
+        if re.from_any or first[heap[p]] == 1 {
+            let a = 0;
+            while (stop < 0 and a < nalts) {
+                stop = match_seq(re, alts[a], alts[a + 1], p, end);
+                a += 1;
+            };
+            if stop >= 0 { start = p; };
+        };
+        p += 1;
+    };
+    .{start, stop};
+}
+
+// Copy heap[from ..< from + len) to heap[to ..].
+fn copy(from: I32, to: I32, len: I32) void {
+    for (0..<len) |i| { heap[to + i] = heap[from + i]; };
+}
+
+// gcc #5's replace(): the text heap[src ..< src + len) with every match of
+// pattern replaced, written at dst; returns its length.
+fn replace(pattern: Str, replacement: Str, src: I32, len: I32, dst: I32) I32 {
+    let re = compile(pattern);
+    let end = src + len;
+    let size = 0;
+    let pos = src;
+    let going = true;
+    while (going) {
+        let .{start, stop} = find(re, pos, end);
+        if start < 0 {
+            going = false;
+        } else {
+            copy(pos, dst + size, start - pos);
+            size += start - pos;
+            for (0..<replacement.len()) |i| { heap[dst + size + i] = replacement[i]; };
+            size += replacement.len();
+            pos = stop;
+        };
+    };
+    copy(pos, dst + size, end - pos);
+    size + end - pos;
+}
+
+fn count(pattern: Str, src: I32, len: I32) I32 {
+    let re = compile(pattern);
+    let end = src + len;
+    let n = 0;
+    let pos = src;
+    let going = true;
+    while (going) {
+        let .{start, stop} = find(re, pos, end);
+        if start < 0 { going = false; } else { n += 1; pos = stop; };
+    };
+    n;
+}
+
+// ---- output: FNV-1a over the bytes gcc #5 prints
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_str(h0: I32, s: Str) I32 {
+    let h = h0;
+    for (0..<s.len()) |i| { h = fnv(h, s[i]); };
+    h;
+}
+
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let p = 1;
+    while (p <= x / 10) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + x / p % 10);
+        p = p / 10;
+    };
+    h;
+}
+
+// The input's length (setup(n) writes heap[0 ..< ilen]).
+struct Input:
+    | len: I32
+
+let input: Input = &{ len: 0 };
+
+fn regexredux() I32 {
+    let variants: Array[Str] = [
+        "agggtaaa|tttaccct",
+        "[cgt]gggtaaa|tttaccc[acg]",
+        "a[act]ggtaaa|tttacc[agt]t",
+        "ag[act]gtaaa|tttac[agt]ct",
+        "agg[act]taaa|ttta[agt]cct",
+        "aggg[acg]aaa|ttt[cgt]ccct",
+        "agggt[cgt]aa|tt[acg]accct",
+        "agggta[cgt]a|t[acg]taccct",
+        "agggtaa[cgt]|[acg]ttaccct",
+    ];
+    let patterns: Array[Str] = ["tHa[Nt]", "aND|caN|Ha[DS]|WaS", "a[NSt]|BY", "<[^>]*>", "\\|[^|][^|]*\\|"];
+    let replacements: Array[Str] = ["<4>", "<3>", "<2>", "|", "-"];
+
+    // Regions: the input, the sequences, and two buffers for the
+    // replacements (which grow the text by at most half).
+    let ilen = input.len;
+    let seq = ilen;
+    let buf_a = seq + ilen;
+    let buf_b = buf_a + ilen * 2;
+    heap.resize(buf_b + ilen * 2);
+
+    // Find all sequence descriptions and new lines in input, replace them
+    // with empty strings, and store the result in the sequences region.
+    let slen = replace(">.*\n|\n", "", 0, ilen, seq);
+
+    // All the replacements, one after another, alternating buffers.
+    copy(seq, buf_a, slen);
+    let pre = buf_a;
+    let post = buf_b;
+    let size = slen;
+    for (0..<patterns.len()) |i| {
+        size = replace(patterns[i], replacements[i], pre, size, post);
+        let t = pre;
+        pre = post;
+        post = t;
+    };
+
+    let h = -2128831035;
+    for (variants) |v| {
+        h = fnv(fnv_int(fnv(fnv_str(h, v), 32), count(v, seq, slen)), 10);
+    };
+    h = fnv(fnv_int(fnv(h, 10), ilen), 10);
+    h = fnv(fnv_int(h, slen), 10);
+    fnv(fnv_int(h, size), 10);
+}
+
+// ---- input: setup(n) writes BG fasta's output for n at heap[0 ..)
+
+fn out_str(s: Str) void {
+    for (0..<s.len()) |i| { heap.push(s[i]); };
+}
+
+fn out_buf(len: I32) void {
+    for (0..<len) |i| { heap.push(buf[i]); };
+}
+
+fn out_rep(len: I32) void {
+    for (0..<len) |i| { heap.push(rep[i]); };
+}
+
+// ---- fasta generator: copy from here to "end of the fasta generator"
+
+let im: I32 = 139968;
+let ia: I32 = 3877;
+let ic: I32 = 29573;
+let linelen: I32 = 60;
+let buflines: I32 = 100;
+
+mem hash: U8;    // the symbol for each random number
+mem buf: U8;     // buflines lines of random symbols
+mem rep: U8;     // the repeated sequence, len lines
+
+// The generator's state: the random seed, and the output hash.
+struct State:
+    | seed: I32
+    | h: I32
+
+let st: State = &{ seed: 42, h: 0 };
+
+
+fn alu() Str {
+    "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
+}
+
+// seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
+fn repeat_fasta(seq: Str, n: I32) void {
+    let len = seq.len();
+    let line = linelen + 1;
+    rep.resize(line * len);
+    for (0..<len) |i| {
+        for (0..<linelen) |k| {
+            rep[i * line + k] = seq[(i * linelen + k) % len];
+        };
+        rep[i * line + linelen] = 10;
+    };
+    let whole_buffers = n / (len * linelen);
+    for (0..<whole_buffers) { out_rep(line * len); };
+    let data_remaining = n - whole_buffers * len * linelen;
+    out_rep(data_remaining + data_remaining / linelen);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+// hash[i] = the symbol whose cumulative probability first exceeds i / im.
+fn build_hash(symb: Str, p: Array[F32]) void {
+    hash.resize(im);
+    let len = symb.len();
+    let sum = p[0];
+    let j = 0;
+    let i = 0;
+    while (i < im and j < len) {
+        let r = (i.to_f64() / im.to_f64()).to_f32();
+        if r >= sum {
+            j += 1;
+            if j < len { sum = sum + p[j]; };
+        };
+        hash[i] = if j < len { symb[j]; } else { 0; };
+        i += 1;
+    };
+}
+
+fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+    build_hash(symb, p);
+    let line = linelen + 1;
+    buf.resize(line * buflines);
+    for (0..<buflines) |i| { buf[i * line + linelen] = 10; };
+    let seed = st.seed;
+
+    // whole buffers: fixed loops, no decisions
+    let buffers = n / linelen / buflines;
+    for (0..<buffers) {
+        for (0..<buflines) |j| {
+            for (0..<linelen) |k| {
+                seed = (seed * ia + ic) % im;
+                buf[j * line + k] = hash[seed];
+            };
+        };
+        st.seed = seed;
+        out_buf(line * buflines);
+    };
+
+    // the remaining whole lines, then the partial one
+    let lines = n / linelen - buffers * buflines;
+    for (0..<lines) |j| {
+        for (0..<linelen) |k| {
+            seed = (seed * ia + ic) % im;
+            buf[j * line + k] = hash[seed];
+        };
+    };
+    let partials = n - linelen * lines - buffers * buflines * linelen;
+    for (0..<partials) |k| {
+        seed = (seed * ia + ic) % im;
+        buf[lines * line + k] = hash[seed];
+    };
+    st.seed = seed;
+    out_buf(lines * line + partials);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+fn fasta(n: I32) void {
+    st.seed = 42;
+    let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02];
+    let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008];
+
+    out_str(">ONE Homo sapiens alu\n");
+    repeat_fasta(alu(), n * 2);
+
+    out_str(">TWO IUB ambiguity codes\n");
+    random_fasta("acgtBDHKMNRSVWY", iub_p, n * 3);
+
+    out_str(">THREE Homo sapiens frequency\n");
+    random_fasta("acgt", homosapiens_p, n * 5);
+}
+// ---- end of the fasta generator
+
+fn setup_input(n: I32) void {
+    heap.clear();
+    fasta(n);
+    input.len = heap.len();
+}
+
+test "regexredux 1000 is BG's output" {
+    setup_input(1000);
+    assert regexredux() == -1698654446;
+}
+
+export lib {
+    fn setup(n: I32) void { setup_input(n); }
+    fn bench(n: I32) I32 { regexredux(); }
+}

@@ -1,0 +1,555 @@
+{
+ "n": 500000,
+ "setup": 500000,
+ "samples": 10,
+ "warmups": 3,
+ "result": "3755826591",
+ "notes": "setup(n): BG fasta's output for n (untimed). bench(n): regex-redux over it (strip headers/newlines, count the 9 variants, the 5 replacements, the three lengths); result = FNV-1a of the bytes BG prints. n=1000 -> 2596312850 (BG's regexredux-output.txt). BG runs fasta 5,000,000.",
+ "date": "2026-11-05T12:35:09.501Z",
+ "ports": [
+  {
+   "key": "utu-fast",
+   "name": "utu fast",
+   "compileMs": 81,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 9638,
+   "js": 964,
+   "bytes": 10602,
+   "gzip": 3911,
+   "jsFiles": [
+    ".tmp/bg/regexredux/regexredux-utu-fast/regexredux.mjs"
+   ],
+   "result": "3755826591",
+   "median": 125.09750000000008,
+   "best": 124.7170000000001,
+   "times": [
+    125.56500000000005,
+    125.49599999999998,
+    124.94299999999998,
+    125.16799999999989,
+    124.7170000000001,
+    125.02099999999996,
+    125.13900000000012,
+    125.24400000000014,
+    124.79700000000003,
+    125.05600000000004
+   ]
+  },
+  {
+   "key": "utu-fastUnsafe",
+   "name": "utu fastUnsafe",
+   "compileMs": 81,
+   "flags": [
+    "-O",
+    "fastUnsafe"
+   ],
+   "wasm": 8448,
+   "js": 328,
+   "bytes": 8776,
+   "gzip": 3489,
+   "jsFiles": [
+    ".tmp/bg/regexredux/regexredux-utu-fastUnsafe/regexredux.mjs"
+   ],
+   "result": "3755826591",
+   "median": 108.29150000000004,
+   "best": 107.89999999999986,
+   "times": [
+    108.00299999999993,
+    108.31100000000004,
+    108.44900000000007,
+    107.96000000000004,
+    108.53599999999994,
+    108.38599999999997,
+    107.89999999999986,
+    108.24000000000001,
+    108.30200000000013,
+    108.28099999999995
+   ]
+  },
+  {
+   "key": "utu-small",
+   "name": "utu small",
+   "compileMs": 78,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 5076,
+   "js": 964,
+   "bytes": 6040,
+   "gzip": 3109,
+   "jsFiles": [
+    ".tmp/bg/regexredux/regexredux-utu-small/regexredux.mjs"
+   ],
+   "result": "3755826591",
+   "median": 125.572,
+   "best": 125.25200000000007,
+   "times": [
+    125.59900000000005,
+    125.54499999999996,
+    125.25200000000007,
+    125.44600000000003,
+    125.99700000000007,
+    125.3739999999998,
+    125.69200000000001,
+    125.8639999999998,
+    126.14100000000008,
+    125.50500000000011
+   ]
+  },
+  {
+   "key": "utu-smallUnsafe",
+   "name": "utu smallUnsafe",
+   "compileMs": 78,
+   "flags": [
+    "-O",
+    "smallUnsafe"
+   ],
+   "wasm": 4892,
+   "js": 328,
+   "bytes": 5220,
+   "gzip": 2782,
+   "jsFiles": [
+    ".tmp/bg/regexredux/regexredux-utu-smallUnsafe/regexredux.mjs"
+   ],
+   "result": "3755826591",
+   "median": 104.80450000000002,
+   "best": 104.50999999999999,
+   "times": [
+    104.88300000000004,
+    105.19799999999998,
+    104.98400000000004,
+    104.80100000000004,
+    104.89999999999998,
+    104.6389999999999,
+    104.72000000000003,
+    104.80799999999999,
+    104.50999999999999,
+    104.74400000000014
+   ]
+  },
+  {
+   "key": "utu-host-fast",
+   "name": "utu host fast",
+   "compileMs": 99,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 5684,
+   "js": 2696,
+   "bytes": 8380,
+   "gzip": 3465,
+   "jsFiles": [
+    ".tmp/bg/regexredux/regexredux-host-utu-fast/regexredux.host.mjs"
+   ],
+   "result": "3755826591",
+   "median": 126.21049999999997,
+   "best": 125.23000000000002,
+   "times": [
+    126.14999999999998,
+    126.27099999999996,
+    126.62900000000002,
+    127.06500000000005,
+    126.65100000000007,
+    132.3449999999998,
+    125.96199999999999,
+    125.56200000000013,
+    125.23000000000002,
+    125.548
+   ]
+  },
+  {
+   "key": "utu-host-small",
+   "name": "utu host small",
+   "compileMs": 99,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 3096,
+   "js": 2696,
+   "bytes": 5792,
+   "gzip": 3081,
+   "jsFiles": [
+    ".tmp/bg/regexredux/regexredux-host-utu-small/regexredux.host.mjs"
+   ],
+   "result": "3755826591",
+   "median": 125.69100000000009,
+   "best": 123.53700000000003,
+   "times": [
+    128.082,
+    127.47799999999995,
+    126.29199999999992,
+    125.85700000000008,
+    124.53500000000008,
+    131.12000000000012,
+    125.52500000000009,
+    124.93600000000015,
+    123.53700000000003,
+    124.12900000000013
+   ]
+  },
+  {
+   "key": "c",
+   "name": "C",
+   "compileMs": 2516,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench,_setup"
+   ],
+   "wasm": 119680,
+   "js": 390,
+   "bytes": 120070,
+   "gzip": 50387,
+   "jsFiles": [
+    ".tmp/bg/regexredux/c-loader.mjs"
+   ],
+   "result": "3755826591",
+   "median": 1399.1004999999996,
+   "best": 1387.7839999999997,
+   "times": [
+    1392.692,
+    1403.4560000000001,
+    1405.3770000000004,
+    1387.7839999999997,
+    1403.2620000000006,
+    1398.7790000000005,
+    1404.664999999999,
+    1398.996000000001,
+    1394.0499999999993,
+    1399.204999999998
+   ]
+  },
+  {
+   "key": "cpp",
+   "name": "C++",
+   "compileMs": 3749,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench,_setup",
+    "-std=c++17"
+   ],
+   "wasm": 249999,
+   "js": 1690,
+   "bytes": 251689,
+   "gzip": 99983,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3755826591",
+   "median": 1399.6605000000004,
+   "best": 1384.692,
+   "times": [
+    1384.692,
+    1401.4759999999997,
+    1392.5139999999992,
+    1385.563,
+    1390.4169999999995,
+    1397.8450000000012,
+    1415.5079999999998,
+    1411.0340000000015,
+    1405.6549999999988,
+    1406.196
+   ]
+  },
+  {
+   "key": "rust",
+   "name": "Rust",
+   "compileMs": 21942,
+   "flags": [
+    "--release",
+    "-C",
+    "target-feature=+simd128"
+   ],
+   "wasm": 1232886,
+   "js": 355,
+   "bytes": 1233241,
+   "gzip": 394342,
+   "jsFiles": [
+    ".tmp/bg/regexredux/rust-loader.mjs"
+   ],
+   "result": "3755826591",
+   "median": 251.09300000000007,
+   "best": 250.12300000000005,
+   "times": [
+    252.3739999999998,
+    252.06400000000008,
+    250.91099999999983,
+    250.12300000000005,
+    250.34400000000005,
+    251.13900000000012,
+    251.80600000000004,
+    251.04700000000003,
+    250.904,
+    251.2779999999998
+   ]
+  },
+  {
+   "key": "go",
+   "name": "Go",
+   "compileMs": 3124,
+   "flags": [
+    "-buildmode=c-shared",
+    "-trimpath",
+    "-ldflags=-s -w"
+   ],
+   "wasm": 3008650,
+   "js": 1690,
+   "bytes": 3010340,
+   "gzip": 862455,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3755826591",
+   "median": 18421.91750000001,
+   "best": 18188.538,
+   "times": [
+    18461.152000000002,
+    18350.284,
+    18467.502999999997,
+    18349.670999999988,
+    18462.690000000002,
+    18314.144,
+    18382.68300000002,
+    18188.538,
+    22328.23000000001,
+    22769.889000000025
+   ]
+  },
+  {
+   "key": "swift",
+   "name": "Swift",
+   "compileMs": 44742,
+   "flags": [
+    "-c",
+    "release",
+    "--swift-sdk",
+    "swift-6.4.1-RELEASE_wasm",
+    "-Xlinker",
+    "--strip-all"
+   ],
+   "wasm": 53790966,
+   "js": 1690,
+   "bytes": 53792656,
+   "gzip": 19968339,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3755826591",
+   "median": 2544.7625,
+   "best": 2538.946,
+   "times": [
+    2543.622000000001,
+    2543.937,
+    2543.288999999999,
+    2545.7299999999996,
+    2548.127999999997,
+    2548.1500000000015,
+    2543.411,
+    2545.5879999999997,
+    2538.946,
+    2548.010000000002
+   ]
+  },
+  {
+   "key": "haskell",
+   "name": "Haskell",
+   "compileMs": 3517,
+   "flags": [
+    "-O2",
+    "-optc-O3"
+   ],
+   "wasm": 1765232,
+   "js": 1690,
+   "bytes": 1766922,
+   "gzip": 499192,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3755826591",
+   "median": 1753.146499999999,
+   "best": 1739.875,
+   "times": [
+    1748.7259999999997,
+    1756.312,
+    1749.6799999999985,
+    1755.6509999999998,
+    1752.8679999999986,
+    1756.601999999999,
+    1757.737000000001,
+    1752.3549999999996,
+    1753.4249999999993,
+    1739.875
+   ]
+  },
+  {
+   "key": "dart",
+   "name": "Dart",
+   "compileMs": 1211,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 39222,
+   "js": 6613,
+   "bytes": 45835,
+   "gzip": 18401,
+   "jsFiles": [
+    ".tmp/bg/regexredux/dart/regexredux.mjs"
+   ],
+   "result": "3755826591",
+   "median": 181.36900000000014,
+   "best": 165.08399999999983,
+   "times": [
+    165.08399999999983,
+    169.45699999999988,
+    175.7729999999999,
+    192.15699999999993,
+    175.69500000000016,
+    181.19700000000012,
+    182.66900000000032,
+    181.54100000000017,
+    182.23599999999988,
+    197.54700000000003
+   ]
+  },
+  {
+   "key": "js",
+   "name": "JavaScript",
+   "compileMs": 1,
+   "flags": [],
+   "wasm": 0,
+   "js": 1899,
+   "bytes": 1899,
+   "gzip": 984,
+   "jsFiles": [
+    "benchmarks/bg/regexredux/js/regexredux.js"
+   ],
+   "result": "3755826591",
+   "median": 160.639,
+   "best": 158.33000000000015,
+   "times": [
+    160.46800000000007,
+    160.98900000000003,
+    160.86300000000006,
+    160.80999999999995,
+    162.15599999999995,
+    168.14599999999996,
+    158.53999999999996,
+    158.33000000000015,
+    160.43399999999974,
+    160.20600000000013
+   ]
+  },
+  {
+   "key": "kotlin",
+   "name": "Kotlin",
+   "compileMs": 6955,
+   "flags": [
+    "compileProductionExecutableKotlinWasmJsOptimize"
+   ],
+   "wasm": 176350,
+   "js": 5442,
+   "bytes": 181792,
+   "gzip": 77725,
+   "jsFiles": [
+    ".tmp/bg/regexredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/regexredux.import-object.mjs",
+    ".tmp/bg/regexredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/regexredux.js-builtins.mjs",
+    ".tmp/bg/regexredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/regexredux.mjs"
+   ],
+   "result": "3755826591",
+   "median": 4219.449500000001,
+   "best": 4203.094000000005,
+   "times": [
+    4219.123000000003,
+    4234.220000000001,
+    4227.6839999999975,
+    4217.166999999998,
+    4215.277999999998,
+    4219.775999999998,
+    4218.481,
+    4203.094000000005,
+    4228.296999999999,
+    4226.067000000003
+   ]
+  },
+  {
+   "key": "moonbit",
+   "name": "MoonBit",
+   "compileMs": 238,
+   "flags": [
+    "--target",
+    "wasm-gc",
+    "--release"
+   ],
+   "wasm": 81447,
+   "js": 349,
+   "bytes": 81796,
+   "gzip": 24937,
+   "jsFiles": [
+    ".tmp/bg/regexredux/moonbit-loader.mjs"
+   ],
+   "result": "3755826591",
+   "median": 371.56050000000005,
+   "best": 367.9410000000007,
+   "times": [
+    372.5140000000001,
+    370.9939999999999,
+    373.4359999999997,
+    372.02800000000025,
+    371.3880000000004,
+    371.25700000000006,
+    371.7329999999997,
+    367.9410000000007,
+    368.96000000000004,
+    372.83899999999994
+   ]
+  },
+  {
+   "key": "assemblyscript",
+   "name": "AssemblyScript",
+   "compileMs": 1806,
+   "flags": [
+    "-O3",
+    "--enable",
+    "simd",
+    "--runtime",
+    "incremental"
+   ],
+   "wasm": 14332,
+   "js": 388,
+   "bytes": 14720,
+   "gzip": 6382,
+   "jsFiles": [
+    ".tmp/bg/regexredux/assemblyscript-loader.mjs"
+   ],
+   "result": "3755826591",
+   "median": 1183.2614999999992,
+   "best": 1175.5220000000008,
+   "times": [
+    1192.5600000000004,
+    1183.9829999999993,
+    1178.045,
+    1187.005000000001,
+    1182.539999999999,
+    1181.7939999999999,
+    1180.3050000000003,
+    1175.5220000000008,
+    1191.2360000000008,
+    1186.0960000000014
+   ]
+  }
+ ],
+ "d8": "15.6.75.16"
+}

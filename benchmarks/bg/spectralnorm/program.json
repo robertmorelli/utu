@@ -1,0 +1,7 @@
+{
+  "n": 2000,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "c": ["-mavx", "-sSTACK_SIZE=1048576"], "cpp": ["-msse3", "-sSTACK_SIZE=1048576"] },
+  "notes": "bench(n): the BG program for n; result = FNV-1a of the \"%.9f\\n\" line BG prints. BG runs n=5,500."
+}

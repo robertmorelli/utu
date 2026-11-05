@@ -1,0 +1,7 @@
+{
+  "n": 3200,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "c": ["-msse2", "-sSTACK_SIZE=4194304"], "cpp": ["-mavx", "-std=c++17", "-sSTACK_SIZE=4194304"] },
+  "notes": "bench(n): the BG program for an n x n bitmap; result = FNV-1a of the bytes BG prints (\"P4\\n<n> <n>\\n\" and the bitmap). BG runs n=16,000."
+}

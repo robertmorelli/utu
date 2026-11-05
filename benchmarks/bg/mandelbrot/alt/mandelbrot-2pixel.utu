@@ -1,0 +1,93 @@
+// Mandelbrot, the algorithm of BG mandelbrot Go #4 / Node #3 / Dart #4 (the
+// scalar BG programs), in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/mandelbrot-go-4.html
+//
+// A size x size bitmap of [-1.5, 0.5] x [-1, 1], 8 pixels to a byte; each byte
+// iterates its pixels two at a time, up to 50 steps, until both escape (|z|² > 4).
+// Single-threaded (the BG programs render rows on several threads).
+// The fastest BG programs (gcc #6, g++ #4) step 8 pixels at once with SIMD; that
+// needs @wat in utu.
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "P4\n<n> <n>\n" and the
+// bitmap, each byte hashed as it is made.
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let p = 1;
+    while (p * 10 <= x) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + x / p % 10);
+        p = p / 10;
+    };
+    h;
+}
+
+// The row y's bytes, hashed into h.
+fn render_row(h0: I32, y: I32, initial_r: Array[F64], initial_i: Array[F64]) I32 {
+    let h = h0;
+    let ci = initial_i[y];
+    for (0..<(initial_r.len() >> 3)) |x_byte| {
+        let res = 0;
+        let i = 0;
+        while (i < 8) {
+            let x = x_byte << 3;
+            let cr1 = initial_r[x + i];
+            let cr2 = initial_r[x + i + 1];
+            let zr1 = cr1;
+            let zi1 = ci;
+            let zr2 = cr2;
+            let zi2 = ci;
+            let b = 0;
+            for (0..<50) {
+                let tr1 = zr1 * zr1;
+                let ti1 = zi1 * zi1;
+                zi1 = 2.0 * zr1 * zi1 + ci;
+                zr1 = tr1 - ti1 + cr1;
+                if tr1 + ti1 > 4.0 {
+                    b = b | 2;
+                    if b == 3 { break; };
+                };
+                let tr2 = zr2 * zr2;
+                let ti2 = zi2 * zi2;
+                zi2 = 2.0 * zr2 * zi2 + ci;
+                zr2 = tr2 - ti2 + cr2;
+                if tr2 + ti2 > 4.0 {
+                    b = b | 1;
+                    if b == 3 { break; };
+                };
+            };
+            res = (res << 2) | b;
+            i += 2;
+        };
+        h = fnv(h, ~res & 255);
+    };
+    h;
+}
+
+fn mandelbrot(size: I32) I32 {
+    let initial_r = Array[F64].new(size, 0.0);
+    let initial_i = Array[F64].new(size, 0.0);
+    let inv = 2.0 / size.to_f64();
+    for (0..<size) |xy| {
+        let i = inv * xy.to_f64();
+        initial_r[xy] = i - 1.5;
+        initial_i[xy] = i - 1.0;
+    };
+    // "P4\n<size> <size>\n"
+    let h = fnv(fnv(fnv(-2128831035, 80), 52), 10);
+    h = fnv(fnv_int(fnv(fnv_int(h, size), 32), size), 10);
+    for (0..<size) |y| {
+        h = render_row(h, y, initial_r, initial_i);
+    };
+    h;
+}
+
+test "mandelbrot draws BG's 200 x 200 bitmap" {
+    assert mandelbrot(200) == -248892225;
+}
+
+export lib {
+    fn bench(n: I32) I32 { mandelbrot(n); }
+}
