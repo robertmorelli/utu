@@ -399,7 +399,7 @@ fn proto_call_site(proto: I32, pm: I32, r: I32, locals: Array[I32], types: Array
         pd_from[pm] = cur_fn[0];
         let i = 0;
         while (i < vl_len[impls]) {
-            note_edge(fn_instance(vl_item(impls, i), 0));
+            note_edge(fn_instance(vl_item(impls, i), 0), -1);
             i += 2;
         };
     };

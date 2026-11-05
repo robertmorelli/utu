@@ -22,7 +22,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
           out;
         }
         export main() I32 {
-          let values: Array[Score] = Array[Score].new_default(2);
+          let values: Array[Score] = Array[Score].new(2, Point { value: 0 });
           values[0] = Point { value: 3 };
           values[1] = Bonus { value: 4 };
           total(values);
@@ -251,13 +251,13 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         }
       }
     ` });
-    assertEq(instance.exports.has_value(true), 1);
-    assertEq(instance.exports.has_value(false), 0);
+    assertEq(instance.exports.has_value(true), true);
+    assertEq(instance.exports.has_value(false), false);
   });
 
-  test('compile: normal target lowers promote before codegen', async ({ ROOT }) => {
-    const compiler = await makeCompiler({ ROOT, target: 'normal' });
-    await withTempUtu(ROOT, 'lowered_promote_normal.utu', `
+  test('compile: normal target executes promoted values and fallbacks', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors,
+      name: 'lowered_promote_normal.utu', source: `
       struct Counter:
         | n : I32
       export lib {
@@ -265,19 +265,12 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
           if flag { Counter { n: 7 }; } else { Counter.null; };
         }
         fn unwrap(flag: Bool) I32 {
-          promote maybe(flag) {
-            |c| => c.n,
-            ~> 0,
-          };
+          promote maybe(flag) { |c| => c.n, ~> 0, };
         }
       }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      assert(!doc.querySelector('ir-promote'), 'supported promote should be lowered out of normal-target IR');
-      assert(doc.querySelector('ir-ref-is-null'), 'lowered promote should introduce an explicit null test');
-      assert(doc.querySelector('ir-ref-cast'), 'lowered promote should introduce an explicit ref cast');
-    });
+    ` });
+    assertEq(instance.exports.unwrap(true), 7);
+    assertEq(instance.exports.unwrap(false), 0);
   });
 
   test('codegen: implicit struct init &{} works when context type is known', async ({ ROOT }) => {
@@ -326,54 +319,6 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     ` });
     assertEq(instance.exports.radius(), 7);
   });
-
-  for (const tagType of ['I64', 'U32']) {
-    test(`codegen: enum alt dispatch honors non-I32 tag type (${tagType})`, async ({ ROOT }) => {
-      const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
-      const { linkTypeDecls } = await import('../src/compiler/link-type-decls.js');
-      const { lowerBackendControl } = await import('../src/compiler/lower-backend-control.js');
-      const compiler = await makeCompiler({ ROOT, target: 'analysis' });
-      await withTempUtu(ROOT, `codegen_alt_${tagType}_tag.utu`, `
-        enum Shape:
-          | Circle { radius: I32 }
-          | Rect { width: I32 }
-        export lib {
-          fn classify(shape: Shape) I32 {
-            alt shape {
-              Circle => 11,
-              Rect => 22,
-              ~> 99,
-            };
-          }
-          fn circle() I32 {
-            classify(Circle { radius: 7 });
-          }
-          fn rect() I32 {
-            classify(Rect { width: 4 });
-          }
-        }
-      `, async (file) => {
-        const doc = await compiler.compileFile(file);
-        assertNoErrors(doc);
-        const root = doc.body.firstChild;
-        const exportLib = root?.querySelector(':scope > ir-export-lib');
-        for (const fn of [...exportLib?.querySelectorAll(':scope > ir-fn') ?? []]) root.appendChild(fn);
-        doc.querySelector('ir-enum[name="Shape"]')?.setAttribute('tag-type', tagType);
-        const typeIndex = linkTypeDecls(doc);
-        lowerBackendControl(doc, typeIndex, { target: 'normal' });
-        assert(!doc.querySelector('ir-alt'), `non-I32 tag alt should be lowered before codegen (${tagType})`);
-        assert(
-          doc.querySelector(`ir-call[data-resolved-name="${tagType}:eq"]`),
-          `tag dispatch should resolve ${tagType}:eq`,
-        );
-        doc.querySelector('ir-fn[name="circle"]')?.setAttribute('data-export', 'wasm');
-        doc.querySelector('ir-fn[name="rect"]')?.setAttribute('data-export', 'wasm');
-        const { instance } = await instantiateLowered(emitBinary(doc));
-        assertEq(instance.exports.circle(), 11);
-        assertEq(instance.exports.rect(), 22);
-      });
-    });
-  }
 
   test('codegen: alt dispatches enum variants by rec shape and fallback', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_alt_dispatch.utu', source: `

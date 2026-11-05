@@ -8,12 +8,7 @@
 // must be identical: a compiler that changes what it builds when it is
 // rebuilt by itself is miscompiling itself. --out writes stage 2, the compiler
 // to ship, and beside it (as NAME.host.json) the spec of what it needs from
-// its host. Stage -1, the JavaScript compiler, builds stage 1 only when stage 0
-// cannot (or UTU_STAGE0=js).
-//
-// --stage-1 also builds stage 1 by stage -1 and requires the stage 2 it builds
-// to be the same: stage 0 and the JavaScript compiler, two different
-// compilers, then vouch for the same compiler.
+// its host. UTU_STAGE0=/path/to/utu.wasm selects a recovery compiler.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,15 +62,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const stage2 = await bootstrap();
     if (out) writeCompiler(out, stage2);
     console.log('stage 2 and stage 3 are identical');
-    if (process.argv.includes('--stage-1')) {
-      process.env.UTU_STAGE0 = 'js';
-      const started = performance.now();
-      const { exports: stage1 } = await loadStage1();
-      const again = await buildWith(stage1);
-      console.log(`stage 2 from stage -1's stage 1: ${again.wasm.length} bytes (${hash(again.wasm)}) in ${(performance.now() - started).toFixed(0)} ms`);
-      if (Buffer.compare(Buffer.from(stage2.wasm), Buffer.from(again.wasm)) !== 0) throw new Error('stage 0 and stage -1 build different compilers');
-      console.log('stage 0 and stage -1 build the same compiler');
-    }
   } catch (error) {
     console.log(error.message);
     process.exit(1);

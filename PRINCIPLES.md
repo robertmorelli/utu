@@ -19,7 +19,7 @@ stdlib `.utu` sources are baked into the compiler at build time
 
 ## 3. Zero runtime dependencies
 
-The wasm backend is utu's own and tree-sitter wasm is embedded. The published package
+The compiler is itself a wasm module, built by utu (`dist/utu.wasm`). The published package
 has no `dependencies` field. `bun add utu` and you have the entire
 language.
 

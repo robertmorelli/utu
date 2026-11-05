@@ -959,6 +959,22 @@ fn imported_item_kind(item: I32, word: I32) I32 {
     -1;
 }
 
+/// The mods the file `using` `item` imports declares: "'a', 'b'", or "no modules".
+fn imported_modules_text(item: I32) Str {
+    let out = "";
+    for (0 ..< import_node.len()) |i| {
+        let file = import_target[i];
+        if import_node[i] == item and file >= 0 and file_root[file] >= 0 {
+            let c = first_child(file_root[file]);
+            while (c >= 0) {
+                if is_kind(c, Node.Module_decl) { out = out + pick(out.len() == 0, "'", ", '") + word_text(name_word(first_child(c))) + "'"; };
+                c = next_sibling(c);
+            };
+        };
+    };
+    if out.len() == 0 { "no modules"; } else { out; };
+}
+
 /// A declaration of a file named like a module of the prelude, reported at
 /// its name: the compiler's own `Str` or `Array` is the prelude's.
 fn standard_name(decl: I32, name_at: I32) void {
@@ -1654,6 +1670,7 @@ fn walk_using(item: I32, w: Walk) void {
         } else {
             report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
             // (An import names a mod of the file: `mod guide { … }` for `using guide … from`.)
+            if using_path(item) >= 0 and diag_fresh[0] == 1 { diag_a[diag_a.len() - 1] = item; };
             if using_path(item) >= 0 { diag_note("The file has no mod " + word_text(word_of(n)) + ": declare one there, mod " + word_text(word_of(n)) + " { … }"); };
         };
         return;
@@ -2250,6 +2267,15 @@ fn walk_field(node: I32, w: Walk) void {
     let name = next_sibling(base);
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
         node_decl[name] = member(module, word_of(name), Space.Member);
+        return;
+    };
+    // `api.Counter` with `using Api |api| from …`: the host module's member,
+    // as `Api.Counter` is.
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Foreign) {
+        node_alias[base] = module;
+        node_decl[base] = decl_a[module];
+        node_kind[base] = Node.Type_ident.to_i32();
+        node_kind[node] = Node.Type_member_expr.to_i32();
         return;
     };
     // `m.E.V`, `M.E.V`, `alias.E.V`: a variant of the enum the path names.

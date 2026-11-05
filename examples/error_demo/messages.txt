@@ -3588,7 +3588,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/462_std_module_named_as_file.utu
- ERROR  Unknown module Time
+ ERROR  Unknown module Time; the file defines 'time'
         unknown-module · examples/error_demo/names/462_std_module_named_as_file.utu:3:7
 
  1 │ // What: importing std:Time under its file's name
@@ -3790,7 +3790,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/551_lazy_file_without_mod.utu
- ERROR  Unknown module gadgets
+ ERROR  Unknown module gadgets; the file defines 'widgets'
         unknown-module · examples/error_demo/names/551_lazy_file_without_mod.utu:4:7
 
  2 │ // Expect: Unknown module gadgets, with a note to declare mod gadgets there

@@ -137,8 +137,8 @@ export function registerIteratorDifferentialTests({ test, assertEq, assertNoErro
         same(readNested(e.windows_direct(xs, w)), windows(xsJs, w), where(`windows(${w})`));
         same(readNested(e.windows_filtered(xs, w)), windows(xsJs.filter(x => x !== 0), w), where(`filter windows(${w})`));
       }
-      assertEq(e.any_big(xs), xsJs.some(x => x > 95) ? 1 : 0, where('any'));
-      assertEq(e.all_small(xs), xsJs.every(x => x < 99) ? 1 : 0, where('all'));
+      assertEq(e.any_big(xs), xsJs.some(x => x > 95), where('any'));
+      assertEq(e.all_small(xs), xsJs.every(x => x < 99), where('all'));
       assertEq(e.first_neg(xs), xsJs.findIndex(x => x < -95), where('first_index'));
       assertEq(e.last_neg(xs), xsJs.findLastIndex(x => x < -95), where('last_index'));
       assertEq(e.min_or(xs), firstBy(xsJs, (x, best) => x < best) ?? 999, where('min_by'));

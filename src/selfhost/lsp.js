@@ -15,7 +15,7 @@
 // utuFiles gives); it calls `handle(message)` with each message the editor sends.
 
 import { compile } from './compiler.js';
-import { programIndex } from './query.js';
+import { programIndex, renderEditorHover } from './query.js';
 import { docComments, typstToMarkdown } from './docs.js';
 
 const SEMANTIC_TYPES = ['namespace', 'type', 'enum', 'enumMember', 'struct', 'property', 'function', 'method', 'variable', 'parameter', 'interface', 'typeParameter'];
@@ -101,14 +101,15 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     // The tests' build first: the program built last is the one queried.
     const tests = patch ? null : await compile(utu, key, { ...host, target: 'test', optimize: 'none' });
     const normal = await compile(utu, key, { ...host, target: 'normal', optimize: 'none' });
+    const analysis = await compile(utu, key, { ...host, target: 'analysis', optimize: 'none' });
     const seen = new Set();
-    const diagnostics = [...normal.diagnostics, ...tests?.diagnostics ?? []].filter(d => {
+    const diagnostics = [...normal.diagnostics, ...analysis.diagnostics, ...tests?.diagnostics ?? []].filter(d => {
       const id = `${d.file}\0${d.start}\0${d.end}\0${d.message}`;
       return !seen.has(id) && seen.add(id);
     });
     const program = {
       key, generation: patch ? -1 : generation, patch: signature, patchGeneration: generation,
-      files: normal.files, index: programIndex(utu, normal.files), diagnostics,
+      files: analysis.files, index: programIndex(utu, analysis.files), diagnostics,
     };
     current = program;
     if (!patch && analyzed(program, key)) lastGood.set(key, textOf(program, key));
@@ -293,6 +294,25 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     return { uri, range: range(lineStarts(text), place.start, place.end) };
   }
 
+  function hierarchyItem(program, item, q = null) {
+    const span = location(program, item.span, q), selection = location(program, item.selection, q);
+    if (!span || !selection) return null;
+    return { name: item.name, kind: 12, detail: item.effects.labels.join(', '), uri: span.uri,
+      range: span.range, selectionRange: selection.range,
+      data: { entry: program.key, file: item.selection.file, start: item.selection.start } };
+  }
+
+  async function hierarchyQuery(item) {
+    const key = item?.data?.entry ?? item?.data?.file ?? toKey(item?.uri);
+    if (!key) return null;
+    const program = await build(key);
+    const match = program.index.declarations().find(({ decl }) => {
+      const definition = program.index.definition(decl);
+      return definition?.file === item.data?.file && definition.start === item.data?.start;
+    });
+    return match ? { program, decl: match.decl } : null;
+  }
+
   const requests = {
     initialize: params => {
       roots = (params.workspaceFolders ?? (params.rootUri ? [{ uri: params.rootUri }] : [])).map(f => toKey(f.uri)).filter(Boolean);
@@ -303,6 +323,8 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
           referencesProvider: true,
           documentHighlightProvider: true,
           hoverProvider: true,
+          inlayHintProvider: true,
+          callHierarchyProvider: true,
           renameProvider: { prepareProvider: true },
           documentSymbolProvider: true,
           completionProvider: { triggerCharacters: ['.'] },
@@ -365,6 +387,44 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       if (!contents) return null;
       const name = q.place(q.program.index.references(q.decl).find(place => place.file === q.key && place.start <= q.offset && q.offset <= place.end));
       return { contents: { kind: 'markdown', value: contents }, ...(name ? { range: range(q.lines, name.start, name.end) } : {}) };
+    },
+
+    'textDocument/inlayHint': async params => {
+      const q = await at(params);
+      if (!q) return [];
+      const start = params.range ? offsetAt(q.lines, params.range.start, q.current.length) : 0;
+      const end = params.range ? offsetAt(q.lines, params.range.end, q.current.length) : q.current.length;
+      return q.program.index.inlayHints(q.key).flatMap(hint => {
+        const moved = q.place({ file: q.key, start: hint.position, end: hint.position });
+        if (!moved || moved.start < start || moved.start > end) return [];
+        return [{ position: positionAt(q.lines, moved.start), label: hint.label, kind: hint.kind === 'type' ? 1 : 2,
+          paddingLeft: hint.kind !== 'type' }];
+      });
+    },
+
+    'textDocument/prepareCallHierarchy': async params => {
+      const q = await at(params);
+      return q ? q.program.index.prepareCallHierarchy(q.key, q.offset).map(item => hierarchyItem(q.program, item, q)).filter(Boolean) : [];
+    },
+
+    'callHierarchy/incomingCalls': async params => {
+      const found = await hierarchyQuery(params.item);
+      if (!found) return [];
+      return found.program.index.incomingCalls(found.decl).flatMap(call => {
+        const from = hierarchyItem(found.program, call.from);
+        const fromRanges = call.sites.map(site => location(found.program, site)?.range).filter(Boolean);
+        return from && fromRanges.length ? [{ from, fromRanges }] : [];
+      });
+    },
+
+    'callHierarchy/outgoingCalls': async params => {
+      const found = await hierarchyQuery(params.item);
+      if (!found) return [];
+      return found.program.index.outgoingCalls(found.decl).flatMap(call => {
+        const to = hierarchyItem(found.program, call.to);
+        const fromRanges = call.sites.map(site => location(found.program, site)?.range).filter(Boolean);
+        return to && fromRanges.length ? [{ to, fromRanges }] : [];
+      });
     },
 
     'textDocument/prepareRename': async params => {
@@ -737,7 +797,7 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     if (!head) return null;
     const docs = LOCAL_KINDS.has(kind) ? '' : typstToMarkdown(docComments(utu, program.files).declaration(decl));
     const where = span?.file.startsWith('std:') ? ` · ${span.file}` : '';
-    return `\`\`\`utu\n${head}\n\`\`\`\n*${kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}*${where}${docs ? `\n\n---\n\n${docs}` : ''}`;
+    return renderEditorHover(index.explainAt(q.key, q.offset), { signature: head, kind, where, docs });
   }
 
   async function notify(message) {

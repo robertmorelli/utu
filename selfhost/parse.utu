@@ -13,7 +13,7 @@
 //! it in their place. Trying a parse and giving it up (@save, @restore)
 //! truncates the node mems and the stack.
 //!
-//! The grammar is stage 0's (`src/compiler/syntax/parser.js`), function by
+//! The grammar is stage 0's (`syntax/parser.js at stage-1-final`), function by
 //! function, which in turn is tree-sitter-utu's: the nodes are the named nodes
 //! of its syntax tree, with the same spans, for every program it accepts
 //! (`scripts/selfhost-parser-differential.mjs`). A program it does not accept

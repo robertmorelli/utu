@@ -239,8 +239,11 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop); };
     let end_ = new_label();
     let def = new_label();
-    let labels = Array[I32].new(n, 0);
-    for (0 ..< n) |k| { labels[k] = new_label(); };
+    // In a loop match a speed build lays the arms out twice (see @threaded_continue).
+    let copies = if in_loop and optimize_level[0] == 2 { 2; } else { 1; };
+    let total = n * copies;
+    let labels = Array[I32].new(total, 0);
+    for (0 ..< total) |k| { labels[k] = new_label(); };
     // br_table targets, for each value from lo to hi.
     let targets = w_aux.len();
     let span = (hi - lo).to_i32() + 1;
@@ -255,8 +258,8 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     let m_end = w_mark();
     let m_def = w_mark();
     // Open the arm blocks from the last arm in, so arm 0's is innermost.
-    let marks = Array[I32].new(n, 0);
-    for (0 ..< n) |i| { marks[i] = w_mark(); };
+    let marks = Array[I32].new(total, 0);
+    for (0 ..< total) |i| { marks[i] = w_mark(); };
     let mt = w_mark();
     w_leaf(Op.LocalGet, vt_i32, s, 0);
     if lo != 0 {
@@ -265,13 +268,18 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     };
     w_node(Op.BrTable, vt_unreachable, targets, span + 1, mt);
     let t = if in_loop { ty_void(); } else { expect; };
-    for (0 ..< n) |i| {
-        // Close arm i's block, then its code.
-        w_node(Op.Block, vt_none, labels[i], 0, marks[n - 1 - i]);
-        t = arm_body(arm_nodes[first + i], t, cx, in_loop);
+    // (Labels are numbered in order: arm p's is labels[0] + p.)
+    let lm = loop_matches.len();
+    if in_loop { for ([s, lo.to_i32(), span, n, copies, def, labels[0], first, -1]) |x| { loop_matches.push(x); }; };
+    for (0 ..< total) |p| {
+        // Close arm p's block, then its code.
+        w_node(Op.Block, vt_none, labels[p], 0, marks[total - 1 - p]);
+        if in_loop { loop_matches[lm + 8] = p; };
+        t = arm_body(arm_nodes[first + p % n], t, cx, in_loop);
         if not in_loop { w_node(Op.Br, vt_unreachable, end_, 0, w_mark() - 1); }
         else { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0); };
     };
+    loop_matches.resize(lm);
     w_node(Op.Block, vt_none, def, 0, m_def);
     t = default_body(default_, t, cx, in_loop);
     let result = if t >= 0 { t; } else { ty_never(); };
@@ -380,11 +388,70 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     let t = loop_state_type[k];
     let m = w_mark();
     coerce(check_expr(first_child(node), t, cx), t, first_child(node));
+    // In an arm of a table dispatch: threaded (see @threaded_continue).
+    let lm = loop_matches.len() - 9;
+    while (lm >= 0 and loop_matches[lm] != loop_state[k]) { lm -= 9; };
+    if lm >= 0 and loop_matches[lm + 8] < 0 { lm = -1; };
+    if lm >= 0 and w_mark() == m + 1 and w_op[w_stack[m]] == Op.I32Const.to_i32() {
+        // A constant state: straight to its arm when that is ahead.
+        let label = lm_target(lm, w_a[w_stack[m]]);
+        if label >= 0 {
+            w_stack.resize(m);
+            run_defers(loop_defers[k], cx);
+            w_leaf(Op.Br, vt_unreachable, label, 0);
+            w_node(Op.Seq, vt_unreachable, 0, 0, m);
+            return ty_never();
+        };
+    };
     w_node(Op.LocalSet, vt_none, loop_state[k], 0, m);
     run_defers(loop_defers[k], cx);
-    w_leaf(Op.Br, vt_unreachable, loop_continue[k], 0);
+    if lm >= 0 {
+        // Threaded dispatch: each site's own table, straight to every arm
+        // ahead (whose block encloses the site), else back through the
+        // head, so the engine predicts each site's transitions apart (a
+        // computed goto). A speed build lays the arms out twice: from the
+        // first copy every arm is ahead.
+        let targets = w_aux.len();
+        for (0 ..< loop_matches[lm + 2]) |v| {
+            let label = lm_target(lm, v + loop_matches[lm + 1]);
+            w_aux.push(if label >= 0 { label; } else { loop_continue[k]; });
+        };
+        w_aux.push(loop_matches[lm + 5]);
+        let mt = w_mark();
+        w_leaf(Op.LocalGet, vt_i32, loop_state[k], 0);
+        if loop_matches[lm + 1] != 0 {
+            w_i32(loop_matches[lm + 1]);
+            w_node(Op.Plain, vt_i32, 107, 0, mt);
+        };
+        w_node(Op.BrTable, vt_unreachable, targets, loop_matches[lm + 2] + 1, mt);
+    } else { w_leaf(Op.Br, vt_unreachable, loop_continue[k], 0); };
     w_node(Op.Seq, vt_unreachable, 0, 0, m);
     ty_never();
+}
+
+/// Per loop match dispatched by a table, while its arms are checked, nine
+/// words: its state local, lowest value, values, arms, arm copies, default
+/// label, first arm's label, first arm (in @arm_nodes), and the arm (by copy
+/// then arm) being checked, or -1.
+vec loop_matches: I32;
+
+/// Where `continue v` in the arm being checked of loop match `lm` (at
+/// `loop_matches[lm]`) can branch straight to: the label of v's arm when
+/// that encloses the arm (an arm after it, or of the next copy), the
+/// default's when no arm has v; else -1.
+fn lm_target(lm: I32, v: I32) I32 {
+    let n = loop_matches[lm + 3];
+    let first = loop_matches[lm + 7];
+    let arm = -1;
+    if v >= loop_matches[lm + 1] and v - loop_matches[lm + 1] < loop_matches[lm + 2] {
+        // (The first arm with a value takes it.)
+        for (0 ..< n) |a| { if arm < 0 and arm_values[first + a] == v.to_i64() { arm = a; }; };
+    };
+    if arm < 0 { return loop_matches[lm + 5]; };
+    let at = loop_matches[lm + 8];
+    let copy = at / n;
+    if arm <= at % n { copy += 1; };
+    if copy >= loop_matches[lm + 4] { -1; } else { loop_matches[lm + 6] + copy * n + arm; };
 }
 
 //! = Nullable values
@@ -763,6 +830,7 @@ fn reset_control() void {
     arm_values.clear();
     loop_state.clear();
     loop_state_type.clear();
+    loop_matches.clear();
 }
 
 //! = for

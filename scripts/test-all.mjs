@@ -1,11 +1,9 @@
 // `bun run test`: the compiler suite in both debug modes, the wasm
 // fingerprints at every optimization level, what every program does when run
-// (the run differential, at -Oz), the behavior fingerprints (diagnostics,
-// editor queries, graphs), utu's parser against tree-sitter, the self-hosted
-// lexer, parser, name resolution, and what its builds do against stage 0,
-// its bootstrap (it builds itself to the same bytes), and the tool tests,
-// all at once. Each command's
-// output prints when it finishes.
+// (at every level), its diagnostics, its sizes, the editor queries at every
+// name, the lexer and parser against tree-sitter-utu, the bootstrap (the
+// compiler builds itself to the same bytes) and stage 0's provenance, and the
+// tool tests, all at once. Each command's output prints when it finishes.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,13 +12,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const commands = [
   ['bun', './scripts/run-tests.mjs', '--both-debug-modes'],
   ['node', './scripts/wasm-fingerprints.mjs', '--optimized'],
-  ['node', './scripts/run-differential.mjs', '--optimize=size'],
-  ['node', './scripts/behavior-fingerprints.mjs'],
-  ['node', './scripts/syntax-differential.mjs', '--fuzz=10'],
+  ['node', './scripts/editor-query-fingerprints.mjs'],
   ['node', './scripts/selfhost-lexer-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
-  ['node', './scripts/selfhost-resolve-differential.mjs'],
-  ['node', './scripts/selfhost-bootstrap.mjs', '--stage-1'],
+  ['node', './scripts/selfhost-bootstrap.mjs'],
+  ['node', './scripts/stage0.mjs', '--verify'],
   ['node', './scripts/test-vec.mjs'],
   ['node', './scripts/test-templates.mjs'],
   ['node', './scripts/test-streams.mjs'],

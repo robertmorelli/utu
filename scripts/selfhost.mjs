@@ -8,7 +8,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectAnalysisDiagnostics, createCompiler, emitBinary, initParser, instantiateLowered, buildImportObject } from '../src/index.js';
 import { builtModule, compileProgram as driverCompileProgram, instantiate, loadProgram as driverLoadProgram, SELF_MOVE_LIMIT } from '../src/selfhost/compiler.js';
 import { nodeHost } from '../src/selfhost/node.js';
 
@@ -37,37 +36,6 @@ function placeOf(parts, line) {
   return `${part.name}:${line - part.line + 1}`;
 }
 
-/**
- * Stage -1: selfhost/ built by the JavaScript compiler. The compiled module's
- * bytes; throws with every error, placed in its file.
- */
-export async function buildSelfhost() {
-  const { text, parts } = joinSelfhost();
-  const relocate = message => message
-    .replace(/\(line (\d+)\)/g, (_, line) => `(${placeOf(parts, Number(line))})`)
-    .replace(/ at (\d+):(\d+)/g, (_, line, col) => ` at ${placeOf(parts, Number(line))}:${col}`);
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser, target: 'normal', optimize: 'speed',
-    readFile: file => file === JOINED ? Promise.resolve(text) : fs.promises.readFile(file, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  let doc;
-  try {
-    doc = await compiler.compileFile(JOINED);
-  } catch (error) {
-    const row = error.diagnostic?.primary?.row;
-    if (!row) throw error;
-    throw new Error(`${placeOf(parts, row)}: ${relocate(error.message)}`);
-  }
-  const errors = collectAnalysisDiagnostics(doc).filter(diagnostic => diagnostic.severity === 'error').map(({ message, primary }) =>
-    primary?.row ? `${placeOf(parts, primary.row)}: ${relocate(message)}` : relocate(message));
-  if (errors.length) throw new Error(errors.join('\n'));
-  // With a source map, the binary also names its functions, so a trap in
-  // the compiler says where it happened.
-  return { doc, wasm: emitBinary(doc, { sourceMap: true }).binary };
-}
-
 // The program side of the driver is the shipped one (src/selfhost/), with
 // packages resolved from this repository.
 const host = nodeHost({ root: ROOT });
@@ -89,31 +57,19 @@ export function instantiateBuilt(wasm, spec = {}) {
   return instantiate(wasm, spec, host);
 }
 
-// Stage 0 is a self-hosted compiler checked in as Wasm (stage0/utu.wasm, and
-// its host spec beside it). Stage -1, the JavaScript compiler, is the last
-// resort: it builds stage 1 only when stage 0 cannot (selfhost/ uses something
-// newer than stage 0 understands), or when UTU_STAGE0=js asks for it.
+// A checked-in compiler builds stage 1. UTU_STAGE0 can point to another
+// compiler Wasm for recovery.
 export const STAGE0 = path.join(ROOT, 'stage0', 'utu.wasm');
-const STAGE0_SPEC = path.join(ROOT, 'stage0', 'utu.host.json');
 
 /**
- * Stage 1, the compiler as stage 0 builds it from selfhost/ (or stage -1, the
- * JavaScript compiler, when stage 0 cannot): its exports, and which built it.
+ * Stage 1, the compiler as stage 0 builds it from selfhost/.
  */
-export async function loadStage1({ log = message => console.error(message) } = {}) {
-  if (process.env.UTU_STAGE0 !== 'js' && fs.existsSync(STAGE0)) {
-    try {
-      const stage0 = (await instantiateBuilt(fs.readFileSync(STAGE0), JSON.parse(fs.readFileSync(STAGE0_SPEC, 'utf8')))).instance.exports;
-      const { wasm, spec } = await buildWith(stage0);
-      return { exports: (await instantiateBuilt(wasm, spec)).instance.exports, builder: 'stage 0' };
-    } catch (error) {
-      log(`stage 0 (stage0/utu.wasm) does not build selfhost/: ${error.message.split('\n')[0]}\n`
-        + 'falling back to stage -1, the JavaScript compiler; once the build passes, run `bun run stage0` to update stage 0');
-    }
-  }
-  const { doc, wasm } = await buildSelfhost();
-  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc, { wasm, projectRoot: ROOT }));
-  return { exports: instance.exports, builder: 'stage -1' };
+export async function loadStage1() {
+  const selected = process.env.UTU_STAGE0 ? path.resolve(process.env.UTU_STAGE0) : STAGE0;
+  const specPath = selected.replace(/\.wasm$/, '.host.json');
+  const stage0 = (await instantiateBuilt(fs.readFileSync(selected), JSON.parse(fs.readFileSync(specPath, 'utf8')))).instance.exports;
+  const { wasm, spec } = await buildWith(stage0);
+  return { exports: (await instantiateBuilt(wasm, spec)).instance.exports, builder: selected };
 }
 
 /**
@@ -132,8 +88,8 @@ export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) 
 }
 
 /** The self-hosted compiler (its bytes and host spec), built by a loaded self-hosted compiler. */
-export async function buildWith(compiler) {
-  const { text } = joinSelfhost();
+export async function buildWith(compiler, { source } = {}) {
+  const text = source ?? joinSelfhost().text;
   const files = await loadProgram(compiler, JOINED, { readFile: async file => file === JOINED ? text : host.readFile(file) });
   // (A compiler older than the limit builds without it.)
   compiler.set_move_limit?.(SELF_MOVE_LIMIT);
@@ -146,7 +102,8 @@ export async function buildWith(compiler) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = process.argv.find(arg => arg.startsWith('--out='))?.slice(6);
   try {
-    const { wasm } = await buildSelfhost();
+    const stage0 = (await instantiateBuilt(fs.readFileSync(STAGE0), JSON.parse(fs.readFileSync(STAGE0.replace(/\.wasm$/, '.host.json'), 'utf8')))).instance.exports;
+    const { wasm } = await buildWith(stage0);
     if (out) fs.writeFileSync(out, wasm);
     console.log(`selfhost: ${wasm.length} bytes${out ? ` → ${out}` : ''}`);
   } catch (error) {

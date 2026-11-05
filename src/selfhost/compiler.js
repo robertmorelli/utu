@@ -26,7 +26,7 @@ import { abiFromJson } from '../bindings/schema.js';
 export const ROLE = { entry: 0, import: 1, prelude: 2 };
 
 /** What a build is for: a module's exports, its tests, @comptime values, or its benches. */
-export const TARGET = { normal: 0, test: 1, comptime: 2, bench: 3 };
+export const TARGET = { normal: 0, test: 1, comptime: 2, bench: 3, analysis: 4 };
 
 /** How builds are optimized; size (-Oz) is the default, as in stage 0. */
 export const OPTIMIZE = { none: 0, size: 1, speed: 2 };

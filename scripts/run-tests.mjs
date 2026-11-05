@@ -12,7 +12,6 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { initParser } from '../src/index.js';
 import {
   assert,
   assertEq,
@@ -21,16 +20,11 @@ import {
   createCompilerEnv,
   makeCompiler as makeCompilerBase,
 } from './test-harness.mjs';
-import { registerParserLifecycleTests } from './parser-lifecycle-tests.mjs';
-import { registerRangeIndexTests } from './range-index-tests.mjs';
-import { registerCompilerQualityTests } from './compiler-quality-tests.mjs';
 import { registerAdversarialCompilerTests } from './adversarial-compiler-tests.mjs';
 import { registerCodegenCoreTests } from './codegen-core-tests.mjs';
 import { registerCodegenHeapTests } from './codegen-heap-tests.mjs';
 import { registerExamplesConformanceTests } from './examples-conformance-tests.mjs';
-import { registerIrStructureTests } from './ir-structure-tests.mjs';
 import { registerNegativeDiagnosticTests } from './negative-diagnostic-tests.mjs';
-import { registerParserAnalysisTests } from './parser-analysis-tests.mjs';
 import { registerStdlibConformanceTests } from './stdlib-conformance-tests.mjs';
 import { registerWutuTests } from './wutu-tests.mjs';
 import { registerWutuRuntimeTests } from './wutu-runtime-tests.mjs';
@@ -67,11 +61,6 @@ const suiteContext = {
   makeCompiler,
 };
 
-registerParserLifecycleTests(suiteContext);
-registerRangeIndexTests(suiteContext);
-registerCompilerQualityTests(suiteContext);
-registerParserAnalysisTests(suiteContext);
-registerIrStructureTests({ test, assertThrows });
 registerCodegenCoreTests(suiteContext);
 registerIteratorWutuTests(suiteContext);
 registerWutuTests(suiteContext);
@@ -90,17 +79,16 @@ const RESULT = '\u001eutu-test-result ';
 
 /** Worker: read `{ index, debug }` lines, run each test, write one result line. */
 async function worker() {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
   const compilers = new Map();
   const lines = readline.createInterface({ input: process.stdin });
   for await (const line of lines) {
     const { index, debug } = JSON.parse(line);
     DEBUG_ASSERTIONS = debug;
-    if (!compilers.has(debug)) compilers.set(debug, createCompilerEnv({ parser, debugAssertions: debug }));
+    if (!compilers.has(debug)) compilers.set(debug, await createCompilerEnv({ ROOT, debugAssertions: debug }));
     const started = performance.now();
     let error = null;
     try {
-      await tests[index].run({ compiler: compilers.get(debug), parser, ROOT });
+      await tests[index].run({ compiler: compilers.get(debug), ROOT });
     } catch (err) {
       error = err?.message ?? String(err);
     }

@@ -7,3 +7,6 @@ export { catalogStdlib } from './catalog.js';
 export { formatDiagnostics } from './format.js';
 export { glueSource, loaderSource } from './loader.js';
 export { PLATFORM_SOURCES } from './platform-sources.generated.js';
+export { syntaxTree, parseSyntaxTree } from './syntax.js';
+export { graphData, renderGraphHtml } from './graphs.js';
+export { printWat } from './wat.js';

@@ -19,7 +19,7 @@ export function registerStdlibConformanceTests({ test, makeCompiler, assert, ass
 }
 
 async function compileCases(ROOT, makeCompiler, assertNoErrors, cases, name, imports = {}) {
-  const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
+  const { instantiateNode } = await import('../src/selfhost/node.js');
   const compiler = await makeCompiler({ ROOT, target: 'normal' });
   const tmp = `${testTmp(ROOT)}/${name}.utu`;
   const { default: fs } = await import('node:fs/promises');
@@ -32,8 +32,8 @@ async function compileCases(ROOT, makeCompiler, assertNoErrors, cases, name, imp
   try {
     const doc = await compiler.compileFile(tmp);
     assertNoErrors(doc);
-    const { instance } = await instantiateLowered(emitBinary(doc), imports);
-    return { instance };
+    const { exports } = await instantiateNode(doc.wasm, doc.spec, { root: ROOT });
+    return { instance: { exports } };
   } finally {
     if (!process.env.KEEP_TEST_TMP) await fs.unlink(tmp).catch(() => {});
   }
@@ -278,7 +278,7 @@ function typedCases(type, returnType, cases, approx = null, stdlib = null) {
       params: body.params,
       expr: boolReturn ? `if ${body.expr} { 1; } else { 0; }` : body.expr,
       args: body.args,
-      expected: boolReturn ? (expected ? 1 : 0) : expected,
+      expected: boolReturn ? (expected ? 1 : 0) : type === 'U32' ? expected >>> 0 : type === 'U64' ? BigInt.asUintN(64, expected) : expected,
       approx,
     };
   });

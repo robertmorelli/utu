@@ -4,7 +4,7 @@
 //! an object: the whole pipeline becomes one loop over the source (an array,
 //! or a range `(a ..< b)`), each stage handing its value to the next, the
 //! terminal accumulating. `docs/iterators.md` says what each operator does;
-//! this follows stage 0's lowering (`src/compiler/lower-iterators.js`) step by
+//! this follows stage 0's lowering (`lower-iterators.js at stage-1-final`) step by
 //! step, so evaluation order, indexes, cancellation, and the sort are the
 //! same:
 //!

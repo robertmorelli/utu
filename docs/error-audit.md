@@ -166,7 +166,7 @@ the parser's habits, and finer codes):
 2. **Where an expected type came from.** `coerce` in `selfhost/check.utu`
    knows the two types but not the parameter, annotation, field, return
    type, or first arm that set the expectation. Stage 0's type graph
-   (`src/compiler/type-graph.js`) already tracks this (`edge.site`,
+   (`type-graph.js at stage-1-final`) already tracks this (`edge.site`,
    `actualOrigin`).
 3. **One did-you-mean helper**: edit distance over names in scope, members,
    variants, std modules, and CLI commands, with a small table of other

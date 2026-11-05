@@ -21,8 +21,8 @@
 //! is always a name (`Box.new -o f`, `row.cl >>>= 1`): that has a start
 //! state of its own too.
 //!
-//! The JavaScript compiler's parser is the reference: for every program it
-//! accepts, these tokens are exactly the leaves of its syntax tree
+//! The editors' grammar, tree-sitter-utu, is the reference: for every program
+//! it accepts, these tokens are exactly the leaves of its syntax tree
 //! (`scripts/selfhost-lexer-differential.mjs`).
 
 /// A token's kind. Every word is a `Word`: which are keywords is the parser's to say.

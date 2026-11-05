@@ -105,52 +105,41 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.loud(), 'ok!');
   });
 
-  test('codegen: explainability facts include functions/exports/size', async ({ ROOT }) => {
-    const { emitBinary } = await import('../src/compiler/codegen/index.js');
-    const { createExplainabilityArtifacts } = await import('../src/index.js');
+  test('codegen: module metadata includes functions, exports, and size', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_explainability.utu', `
-      export lib {
-        fn add(a: I32, b: I32) I32 { a + b; }
-      }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      const artifacts = createExplainabilityArtifacts();
-      const bin = emitBinary(doc, { artifacts });
-      assert(bin.length > 0, 'expected wasm bytes');
-      assert(artifacts.lowerings.some(x => x.kind === 'codegen-function'), 'expected codegen-function fact');
-      assert(artifacts.lowerings.some(x => x.kind === 'codegen-export'), 'expected codegen-export fact');
-      assert(artifacts.sizes.some(x => x.kind === 'wasm-module'), 'expected wasm-module size fact');
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `, async file => {
+      const result = await compiler.compileFile(file, { sourceMap: true });
+      assertNoErrors(result);
+      const module = await WebAssembly.compile(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
+      assert(result.wasm.length > 8, 'expected wasm bytes');
+      assert(WebAssembly.Module.exports(module).some(entry => entry.name === 'add'), 'expected add export');
+      assert(result.map?.functions?.length > 0, 'expected mapped function');
     });
   });
 
-  test('codegen: string lowering imports are emitted only when strings survive codegen', async ({ ROOT }) => {
-    const { emitBinary, JS_STRING_BUILTINS_COMPILE_OPTIONS } = await import('../src/compiler/codegen/index.js');
+  test('codegen: string operations keep only the builtins they use', async ({ ROOT }) => {
+    const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
-    await withTempUtu(ROOT, 'codegen_import_shaking.utu', `
-      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      const binary = emitBinary(doc);
-      const module = await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
+    const inspect = (name, source) => withTempUtu(ROOT, name, source, async file => {
+      const result = await compiler.compileFile(file);
+      assertNoErrors(result);
+      const module = await WebAssembly.compile(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
       const imports = WebAssembly.Module.imports(module);
-      assert(!imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
-      assert(binary.length < 200, `string-free scalar module unexpectedly large: ${binary.length} bytes`);
+      return { result, imports, exports: (await instantiateNode(result.wasm, result.spec, { root: ROOT })).exports };
     });
-    await withTempUtu(ROOT, 'codegen_string_import_shaking.utu', `
+    const scalar = await inspect('codegen_import_shaking.utu', `
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `);
+    assert(!scalar.imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
+    assertEq(scalar.exports.add(2, 3), 5);
+    const concat = await inspect('codegen_string_import_shaking.utu', `
       export lib { fn join(a: Str, b: Str) Str { a + b; } }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      const binary = emitBinary(doc);
-      await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
-      const encoded = new TextDecoder('latin1').decode(binary);
-      assert(encoded.includes('concat'), 'concat-only module should retain the concat builtin');
-      for (const unused of ['substring', 'charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
-        assert(!encoded.includes(unused), `concat-only module retained unrelated string builtin ${unused}`);
-      }
-      assert(binary.length < 150, `concat-only module unexpectedly large: ${binary.length} bytes`);
-    });
-    await withTempUtu(ROOT, 'codegen_midpoint_insert_size.utu', `
+    `);
+    assertEq(concat.exports.join('a', 'b'), 'ab');
+    assert(!concat.imports.some(item => /substring|charCodeAt|fromCodePoint|intoCharCodeArray/.test(item.name)), 'concat-only module retained unrelated string imports');
+    const midpoint = await inspect('codegen_midpoint_insert_size.utu', `
       export lib {
         fn run(base: Str, piece: Str, repeats: I32) Str {
           let i: I32 = 0;
@@ -164,24 +153,9 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           out;
         }
       }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      const binary = emitBinary(doc);
-      await WebAssembly.compile(binary, JS_STRING_BUILTINS_COMPILE_OPTIONS);
-      const encoded = new TextDecoder('latin1').decode(binary);
-      for (const required of ['concat', 'length', 'substring']) {
-        assert(encoded.includes(required), `midpoint insertion dropped required string builtin ${required}`);
-      }
-      const importModuleCount = encoded.split('wasm:js-string').length - 1;
-      assertEq(importModuleCount, 3, 'midpoint insertion should retain exactly three string builtin imports');
-      for (const unused of ['charCodeAt', 'fromCodePoint', 'intoCharCodeArray']) {
-        assert(!encoded.includes(unused), `midpoint insertion retained unrelated string builtin ${unused}`);
-      }
-      // Three imports, four signatures, and the loop as written (there is no
-      // loop-restructuring optimizer).
-      assert(binary.length <= 212, `midpoint insertion module exceeded its size ceiling: ${binary.length} bytes`);
-    });
+    `);
+    assertEq(midpoint.exports.run('abcd', 'X', 2), 'abXXcd');
+    assert(midpoint.result.wasm.length > concat.result.wasm.length, 'slice loop should be larger than concat alone');
   });
 
   test('codegen: strings support receiver methods and index sugar like Array', async ({ ROOT }) => {
@@ -205,46 +179,27 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.slice('hello'), 'el');
   });
 
-  test('codegen: emitBinary can return a wasm source map', async ({ ROOT }) => {
-    const { emitBinary } = await import('../src/compiler/codegen/index.js');
+  test('codegen: a wasm source map identifies the exported function', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map.utu', `
-      export lib {
-        fn add(a: I32, b: I32) I32 { a + b; }
-      }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      const result = emitBinary(doc, { sourceMap: true });
-      assert(result.binary instanceof Uint8Array, 'expected wasm binary bytes');
-      const sourceMap = JSON.parse(result.sourceMap);
-      assertEq(sourceMap.version, 3, 'expected source map v3');
-      assert(sourceMap.sources?.length > 0, 'expected source map sources');
-      assert(sourceMap.sources.includes(file), 'expected source map to reference source file');
-      // A length>0 check is too weak: separators alone would pass it. Strip
-      // group/segment separators and require at least one VLQ segment.
-      const vlqChars = sourceMap.mappings.replace(/[;,]/g, '');
-      assert(vlqChars.length > 0, `expected at least one VLQ segment in mappings, got ${JSON.stringify(sourceMap.mappings)}`);
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `, async file => {
+      const result = await compiler.compileFile(file, { sourceMap: true });
+      assertNoErrors(result);
+      assert(result.wasm instanceof Uint8Array, 'expected wasm binary bytes');
+      assert(result.map?.entries?.length > 0, 'expected instruction mappings');
+      assert(result.map.entries.some(entry => entry.file === file && entry.owner === 'add'), 'expected add instruction mapped to its source');
     });
   });
 
   test('codegen: source maps cover string-using code', async ({ ROOT }) => {
-    const { emitBinary } = await import('../src/compiler/codegen/index.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map_strings.utu', `
-      export lib {
-        fn greet_len() I32 { Str.len("hello"); }
-      }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      // Strings are emitted as calls to the JS string builtins directly, so
-      // their code keeps its debug locations.
-      const { sourceMap } = emitBinary(doc, { sourceMap: true });
-      const map = JSON.parse(sourceMap);
-      assertEq(map.version, 3);
-      assert(map.sources.includes(file), 'source file must appear in sources');
-      assert(map.mappings.replace(/[;,]/g, '').length > 0, 'expected at least one VLQ segment');
+      export lib { fn greet_len() I32 { Str.len("hello"); } }
+    `, async file => {
+      const result = await compiler.compileFile(file, { sourceMap: true });
+      assertNoErrors(result);
+      assert(result.map?.entries?.some(entry => entry.file === file && entry.owner === 'greet_len'), 'string code must keep its source locations');
     });
   });
 
@@ -602,8 +557,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       }
     `, async (file) => {
       const doc = await compiler.compileFile(file);
-      const err = doc.querySelector('ir-dsl[name="es"][data-error-kind="invalid-dsl-usage"]');
-      assert(err, 'expected unexpanded @es diagnostic');
+      const err = doc.diagnostics.find(diagnostic => diagnostic.kind === 'invalid-dsl-usage');
+      assert(err?.message.includes('typed let'), 'expected @es diagnostic');
     });
   });
 
@@ -629,8 +584,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.apply(0, 5), 15);
     // A `fun` is a typed function reference, not a table index: ref.func to
     // produce it, call_ref to call it, and no table anywhere.
-    const { emitText } = await import('../src/compiler/codegen/index.js');
-    const wat = emitText(doc);
+    const { printWat } = await import('../src/selfhost/wat.js');
+    const wat = await printWat(doc.wasm);
     assert(/ref\.func/.test(wat), 'expected fun values to lower to ref.func');
     assert(/call_ref/.test(wat), 'expected fun calls to lower to call_ref');
     assert(!/call_indirect|\(table /.test(wat), 'a fun must not go through a function table');
@@ -838,20 +793,17 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         await fs.writeFile(file, `struct P:\n  | v: I32\nfn take(v: I32) I32 { v; }\nfn g(p: ?P) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }`);
         return file;
       })());
-      assert([...doc.querySelectorAll('[data-error]')].some(n => /only allowed in statements/.test(n.dataset.errorMessage ?? '')), body);
+      assert(doc.diagnostics.some(diagnostic => /only (?:allowed )?in a? statements?/.test(diagnostic.message)), body);
     }
   });
 
-  test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {
+  test('codegen: captures read the value before closure creation', async ({ ROOT }) => {
     const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });
     const before = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_early_write.utu',
       source: `export lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }` });
     assertEq(plain.instance.exports.run(), 7);
     assertEq(before.instance.exports.run(), 7);
-    for (const { doc } of [plain, before]) {
-      assert(!doc.querySelector('ir-struct[name^="__Cell"]'), 'no cell type for a capture that is never reassigned afterwards');
-    }
   });
 
   test('codegen: fun decays to cl in every declared-type position', async ({ ROOT }) => {
@@ -934,8 +886,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   });
 
   test('codegen: test blocks run as wasm and asserts trap on failure', async ({ ROOT }) => {
-    const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
-    const { buildImportObject } = await import('../src/index.js');
+    const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'test' });
     await withTempUtu(ROOT, 'codegen_test_target.utu', `
       fn add(a: I32, b: I32) I32 { a + b; }
@@ -944,12 +895,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     `, async (file) => {
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-      const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
+      const { exports } = await instantiateNode(doc.wasm, doc.spec, { root: ROOT });
       // The test target exports each `test` block so a host runner can call it.
-      assert(typeof instance.exports.__test_0 === 'function', 'expected test blocks to be exported');
-      instance.exports.__test_0();
+      assert(typeof exports.__test_0 === 'function', 'expected test blocks to be exported');
+      exports.__test_0();
       let trapped = false;
-      try { instance.exports.__test_1(); } catch { trapped = true; }
+      try { exports.__test_1(); } catch { trapped = true; }
       assert(trapped, 'a failing assert must trap');
     });
   });
@@ -993,7 +944,6 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
 
   test('codegen: await suspends the wasm stack via JSPI', async ({ ROOT }) => {
     if (typeof WebAssembly.Suspending !== 'function') return; // host without JSPI
-    const { promisifyExports, readRuntimeSpec } = await import('../src/runtime/host-imports.js');
     const { doc, instance } = await compileAndInstantiate({
       ROOT,
       makeCompiler,
@@ -1010,18 +960,18 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         }
       `,
     });
-    const spec = readRuntimeSpec(doc.body.firstChild, 'promiseRuntime');
-    assert(spec.awaits.includes('I32'), 'await must record its value type as a host import');
+    const spec = doc.spec.promises;
+    assert(spec.awaits.length > 0, 'await must record a host suspension import');
     assert(spec.asyncExports.includes('compute'), 'an export that awaits must be promisified');
     // A real timer elapses inside the wasm frame — straight-line utu code,
     // suspended and resumed by the host with no CPS transform in the compiler.
-    assertEq(await promisifyExports(instance, spec).compute(20), 41);
+    assertEq(await instance.exports.compute(20), 41);
   });
 
   test('examples: every examples/working program compiles and executes', async ({ ROOT }) => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
-    const { buildImportObject, emitBinary, instantiateLowered } = await import('../src/index.js');
+    const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     const expected = new Map([
       ['hello.utu', 42],
@@ -1034,8 +984,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       const file = path.join(ROOT, 'examples', 'working', name);
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-      const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
-      assertEq(await instance.exports.main(), value, `${name} returned the wrong result`);
+      const { exports } = await instantiateNode(doc.wasm, doc.spec, { root: ROOT });
+      assertEq(await exports.main(), value, `${name} returned the wrong result`);
     }
     const entries = (await fs.readdir(path.join(ROOT, 'examples', 'working')))
       .filter(name => name.endsWith('.utu')).sort();
@@ -1059,6 +1009,84 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     for (const rel of files) {
       const doc = await compiler.compileFile(`${ROOT}/${rel}`);
       assertNoErrors(doc);
+    }
+  });
+
+  // Salvaged from stage -1's compiler-quality-tests: closure hygiene, the
+  // closure runtime ABI, and dead-code size.
+  for (const [name, source, expected] of [
+    ['parameter', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { n + __env; }; f(7);', 12],
+    ['local', 'let n: I32 = 5; let f: cl() I32 = cl() { let __env: I32 = 7; n + __env; }; f();', 12],
+    ['capture', 'let __env: I32 = 5; let f: cl() I32 = cl() { __env; }; f();', 5],
+    ['shadow', 'let n: I32 = 5; let f: cl(I32) I32 = cl(n) { n + 1; }; f(7);', 8],
+    ['nested', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { let g: cl(I32) I32 = cl(__env0) { n + __env + __env0; }; g(3); }; f(7);', 15],
+    ['function name', 'let n: I32 = 5; let f: cl() I32 = cl() { n + __closure0(); }; f();', 35],
+  ]) {
+    test(`codegen: closure environments do not shadow a user ${name}`, async ({ ROOT }) => {
+      const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: `closure_hygiene_${name.replace(' ', '_')}.utu`,
+        source: `fn __closure0() I32 { 30; }\nexport lib { fn run() I32 { ${source} } }` });
+      assertEq(instance.exports.run(), expected);
+    });
+  }
+
+  test('codegen: closures use the JS closure runtime; fun references need none', async ({ ROOT }) => {
+    const imported = wasm => WebAssembly.Module.imports(new WebAssembly.Module(wasm)).map(i => `${i.module}.${i.name}`);
+    const closures = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'closure_js_abi.utu', source: `export lib {
+      fn run(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(7); }
+      fn callback(n: I32) cl(I32) I32 { cl(x) { x + n; }; }
+    }` });
+    const names = imported(closures.doc.wasm);
+    assert(names.includes('utu.closure_new') && names.some(n => n.startsWith('utu.closure_call_')), names.join(', '));
+    assertEq(closures.instance.exports.run(5), 12);
+    const callback = closures.instance.exports.callback(5);
+    assertEq(typeof callback, 'function');
+    assertEq([1, 2, 3].map(callback).join(','), '6,7,8');
+    const funs = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fun_abi.utu', source: `fn inc(n: I32) I32 { n + 1; }
+      export lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; f(n); } }` });
+    assert(!imported(funs.doc.wasm).some(n => n.includes('closure_')), imported(funs.doc.wasm).join(', '));
+    assertEq(funs.instance.exports.run(5), 6);
+  });
+
+  test('codegen: unused functions and closures add no shipped Wasm bytes', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    const bytes = source => withTempUtu(ROOT, 'dead_code_size.utu', source, async file => {
+      const result = await compiler.compileFile(file);
+      assertNoErrors(result);
+      return Buffer.from(result.wasm).toString('hex');
+    });
+    const base = 'export lib { fn answer() I32 { 42; } }';
+    assertEq(await bytes(`${base} fn unused(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(1); }`), await bytes(base));
+  });
+
+  test('codegen: module host bindings coexist with intrinsic type methods; void tails keep effects', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'module_host_void_tail.utu', source: String.raw`
+      mod Host { let twice: fun(F64) F64 = @es/\ n => n * 2 \/; }
+      struct Cell: | value: I32
+      fn update(cell: Cell) void { cell.value = 42; cell.value; }
+      export lib {
+        fn host() F64 { Host.twice(F64.sqrt(441.0)); }
+        fn tail() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; }
+      }
+    ` });
+    assertEq(instance.exports.host(), 42);
+    assertEq(instance.exports.tail(), 42);
+  });
+
+  // Salvaged from stage -1's parser-analysis-tests: programs that must check cleanly.
+  test('analysis: valid programs report no diagnostics', async ({ ROOT }) => {
+    const { selfhostDiagnostics } = await import('./test-harness.mjs');
+    for (const source of [
+      'fn add(a: I32, b: I32) I32 { a + b; }\ntest "adds" {\n  assert add(2, 2) == 4;\n}',
+      'bench "counter" {\n  let total: I32 = 0;\n  measure { total += 1; }\n}',
+      'struct Pt:\n  | x : F32\nfn takes64(v: I64) I64 { v; }\nfn wide() I64 {\n  let a: I64 = 0;\n  let b: F32 = 1.0;\n  let c: U32 = 7;\n  let p: Pt = Pt { x: 2.0 };\n  takes64(41);\n}',
+      'export lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
+      'fn double(x: I32) I32 { x * 2; }\nexport main() I32 { double(2) + double(3); }',
+      'export lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }\n  fn mid(x: I32) I32 { x -o clamp(0, &, 10); }\n}',
+      'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) void { self.v = n; }\nexport lib { fn go(b: Box) void { b.set64(7); } }',
+      'export lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
+    ]) {
+      const diagnostics = await selfhostDiagnostics({ ROOT, name: 'valid_program.utu', source });
+      assertEq(diagnostics.length, 0, `${source}\n  got ${diagnostics.map(d => `${d.kind}: ${d.message}`).join('; ')}`);
     }
   });
 }

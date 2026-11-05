@@ -1,4 +1,4 @@
-// Streams in both compilers: examples/streams.utu's values (made in utu,
+// Streams in the self-hosted compiler: examples/streams.utu's values (made in utu,
 // transformed, adopted from a host async generator, closed by `break`), a
 // stream utu returns read by JS's `for await`, and what an `await for` that
 // cannot run is reported as.
@@ -10,63 +10,43 @@ import { fileURLToPath } from 'node:url';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
-const parser = await initParser({ wasmDir: `${ROOT}/` });
 const utu = await loadNodeCompiler();
 
-/** Both compilers' builds of `file`: each its exports (async ones entered through promising) or its errors. */
-async function both(file) {
-  const out = {};
-  const compiler = createCompiler({ parser, target: 'normal', optimize: 'size', readFile: f => fs.readFile(f, 'utf8'), resolvePath: (a, b) => path.resolve(path.dirname(a), b) });
-  try {
-    const doc = await compiler.compileFile(file);
-    const errors = collectAnalysisDiagnostics(doc).filter(d => d.severity === 'error');
-    if (errors.length) out.stage0 = { errors: errors.map(e => e.message) };
-    else {
-      const wasm = emitBinary(doc);
-      const { exports } = (await instantiateLowered(wasm, await buildImportObject(doc, { wasm }))).instance;
-      out.stage0 = { exports: Object.fromEntries(Object.entries(exports).map(([k, v]) => [k, typeof v === 'function' ? WebAssembly.promising(v) : v])) };
-    }
-  } catch (error) {
-    out.stage0 = { errors: [error.message] };
-  }
+/** Build `file`: exports or errors. */
+async function build(file) {
   const built = await compileFile(utu, file, { optimize: 'size' });
-  out.selfhost = built.wasm
+  return built.wasm
     ? { exports: (await instantiateNode(built.wasm, built.spec)).exports }
     : { errors: built.diagnostics.map(d => d.message) };
-  return out;
 }
 
-const example = await both(path.join(ROOT, 'examples', 'streams.utu'));
-for (const compiler of ['stage0', 'selfhost']) {
-  const { exports, errors } = example[compiler];
-  assert.ok(exports, `${compiler}: ${errors}`);
-  assert.equal(await exports.evens(), 120, `${compiler}: of, filter, map`);
-  assert.equal(await exports.pieces(), 114, `${compiler}: generate, skip, take, chain`);
-  assert.equal(await exports.joined(), 'alpha gamma delta ', `${compiler}: a host async generator, with continue`);
-  assert.equal(Boolean(await exports.stopped()), true, `${compiler}: break closes the stream`);
+const example = await build(path.join(ROOT, 'examples', 'streams.utu'));
+{
+  const { exports, errors } = example;
+  assert.ok(exports, String(errors));
+  assert.equal(await exports.evens(), 120, `of, filter, map`);
+  assert.equal(await exports.pieces(), 114, `generate, skip, take, chain`);
+  assert.equal(await exports.joined(), 'alpha gamma delta ', `a host async generator, with continue`);
+  assert.equal(Boolean(await exports.stopped()), true, `break closes the stream`);
   const values = [];
   for await (const v of await exports.handed()) values.push(v);
-  assert.deepEqual(values, [7, 8, 9], `${compiler}: JS reads a stream utu returns`);
+  assert.deepEqual(values, [7, 8, 9], `JS reads a stream utu returns`);
 }
 
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-streams-'));
 try {
-  // Each case: the body, then stage 0's message and the self-hosted compiler's.
+  // Each case: the body and its diagnostic.
   const cases = [
-    ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; t; }', "Unknown method 'I32.iterator'", 'No method I32.iterator'],
-    ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for reads a generator call or a stream: `await for (ticks()) |t| { … }`', 'await for needs a generator call or a stream'],
-    ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'a stream loop binds one value: await for (s) |value| { … }', 'A stream loop binds one value'],
-    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', "Cannot access field 'iterator' on nullable ?Stream[I32]", '?Stream[I32] may be null'],
-    // (A closure utu calls may await: the self-hosted compiler calls its body by call_ref. Stage 0 still reports it.)
+    ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; t; }', 'No method I32.iterator'],
+    ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for needs a generator call or a stream'],
+    ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'A stream loop binds one value'],
+    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', '?Stream[I32] may be null'],
   ];
-  for (const [i, [body, stage0, selfhost]] of cases.entries()) {
+  for (const [i, [body, message]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);
     await fs.writeFile(file, `export lib { ${body} }\n`);
-    const built = await both(file);
-    // Stage 0 counts the calls the first one's failure causes (`(+4 caused by this)`), and names Stream[I32] Stream__I32.
-    assert.equal(built.stage0.errors?.[0].replace(/ \(\+\d+ caused by this\)$/, '').replace(/(\w)__(\w+)/g, '$1[$2]'), stage0, `stage 0: ${body}`);
-    assert.deepEqual(built.selfhost.errors, [selfhost], `self-hosted: ${body}`);
+    const built = await build(file);
+    assert.deepEqual(built.errors, [message], body);
   }
   // Nested loops; a type of its own with the stream's methods (not
   // externrefs); and the source's `return()`, called when the loop is left
@@ -99,19 +79,19 @@ export lib {
     fn passed() I32 { apply(first, source()) + closed(); }
 }
 `);
-  const more = await both(file);
-  for (const compiler of ['stage0', 'selfhost']) {
-    const { exports, errors } = more[compiler];
-    assert.ok(exports, `${compiler}: ${errors}`);
-    assert.equal(await exports.nested(), 90, `${compiler}: nested loops`);
-    assert.equal(await exports.custom(), 60, `${compiler}: a type with the stream's methods`);
-    assert.equal(await exports.returned(), 11, `${compiler}: return closes the stream`);
-    assert.equal(await exports.broken(), 1, `${compiler}: break closes the stream`);
+  const more = await build(file);
+  {
+    const { exports, errors } = more;
+    assert.ok(exports, `${errors}`);
+    assert.equal(await exports.nested(), 90, `nested loops`);
+    assert.equal(await exports.custom(), 60, `a type with the stream's methods`);
+    assert.equal(await exports.returned(), 11, `return closes the stream`);
+    assert.equal(await exports.broken(), 1, `break closes the stream`);
     // (Run out, it is closed too, which a finished generator ignores.)
-    assert.equal(await exports.finished(), 61, `${compiler}: a stream run out`);
-    assert.equal(await exports.passed(), 101, `${compiler}: a function that awaits, called as a fun value`);
+    assert.equal(await exports.finished(), 61, `a stream run out`);
+    assert.equal(await exports.passed(), 101, `a function that awaits, called as a fun value`);
   }
-  console.log(`streams: examples/streams.utu alike in both compilers, JS reads a stream utu returns, nested loops, types with the methods, closing on break and return, awaiting through a fun value, and ${cases.length} mistakes reported by both`);
+  console.log(`streams: examples/streams.utu, JS reading a stream utu returns, nested loops, closing on break and return, awaiting through a fun value, and ${cases.length} diagnostics`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

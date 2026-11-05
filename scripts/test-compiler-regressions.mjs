@@ -1,6 +1,4 @@
-// Programs that once went wrong, in both compilers: what each builds to, or
-// the mistake each reports (where only the self-hosted compiler reports it
-// as it should, that is said).
+// Programs that once went wrong: what the self-hosted compiler builds or reports.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -12,22 +10,7 @@ import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/
 import { MODES } from '../src/selfhost/compiler.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
-const parser = await initParser({ wasmDir: `${ROOT}/` });
 const utu = await loadNodeCompiler();
-
-async function stage0(file) {
-  const compiler = createCompiler({ parser, target: 'normal', optimize: 'size', readFile: f => fs.readFile(f, 'utf8'), resolvePath: (a, b) => path.resolve(path.dirname(a), b) });
-  try {
-    const doc = await compiler.compileFile(file);
-    const errors = collectAnalysisDiagnostics(doc).filter(d => d.severity === 'error');
-    if (errors.length) return { errors: errors.map(e => e.message) };
-    const wasm = emitBinary(doc);
-    return { exports: (await instantiateLowered(wasm, await buildImportObject(doc, { wasm }))).instance.exports };
-  } catch (error) {
-    return { errors: [error.message] };
-  }
-}
 
 /** How many function types in a module's type section have several results. */
 function severalResults(bytes) {
@@ -73,7 +56,7 @@ try {
   let n = 0;
   const write = async text => { const file = path.join(dir, `case${n++}.utu`); await fs.writeFile(file, text); return file; };
 
-  // Programs both compilers build, and what their exports return.
+  // Programs the compiler builds, and what their exports return.
   const literal = Array.from({ length: 25000 }, (_, i) => i % 7).join(', ');
   const programs = [
     // Wasm makes at most 10,000 elements with one array.new_fixed.
@@ -86,12 +69,10 @@ try {
   ];
   for (const [source, expected] of programs) {
     const file = await write(source);
-    for (const [compiler, build] of [['stage0', stage0], ['selfhost', selfhost]]) {
-      const { exports, errors } = await build(file);
-      assert.ok(exports, `${compiler}: ${errors?.join('\n')}`);
-      for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, `${compiler}: ${source.slice(0, 60)}`);
-      checked++;
-    }
+    const { exports, errors } = await selfhost(file);
+    assert.ok(exports, errors?.join('\n'));
+    for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, source.slice(0, 60));
+    checked++;
   }
 
   // An @ir function named as a value, in the middle of another function's

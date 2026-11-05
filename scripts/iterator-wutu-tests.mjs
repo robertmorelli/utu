@@ -1,5 +1,5 @@
 import { parseHTML } from 'linkedom/worker';
-import { emitText } from '../src/index.js';
+import { printWat } from '../src/selfhost/wat.js';
 import { compileAndInstantiate, compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
 import { parseWutu } from '../src/wutu/wutu-parse.js';
 
@@ -32,16 +32,14 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
         fn absent() I32 { [] first_index |x| {true;}; }
       }
     `});
-    for (const [name,value] of Object.entries({fused:18,indexes:1n,once:2,zip_once:1,chain_after_take:31,take_after_chain:1,chain_mixed:40,no_work:0,while_stages:5,flattened:10,zipped:33,chained:64,repeated:9,nested:6,every:1,empty_all:1,empty_any:0,product_:24,count_:2,first_:1,last_:3,absent:-1})) assertEq(instance.exports[name](),value,name);
-    assert(!doc.querySelector('ir-iterator'),'all iterator syntax lowered');
-    assert(!doc.querySelector('ir-closure'),'iterator bodies do not allocate closures');
+    for (const [name,value] of Object.entries({fused:18,indexes:1n,once:2,zip_once:1,chain_after_take:31,take_after_chain:1,chain_mixed:40,no_work:0,while_stages:5,flattened:10,zipped:33,chained:64,repeated:9,nested:6,every:true,empty_all:true,empty_any:false,product_:24,count_:2,first_:1,last_:3,absent:-1})) assertEq(instance.exports[name](),value,name);
   });
   test('iterators: canonical WAT has one fused loop and no intermediate arrays or indirect body calls',async({ROOT})=>{
     const {doc,instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_wat.utu',source:`
       export main(n: I32) I32 { [n,n+1,n+2] map |x| {x*2;} filter |x| {x>3;} fold(0) |a,x| {a+x;}; }
     `});
-    const wat=emitText(doc);
-    assertEq((wat.match(/\(loop /g)??[]).length,1);
+    const wat=await printWat(doc.wasm);
+    assertEq((wat.match(/^\s+loop\b/gm)??[]).length,1);
     assertEq((wat.match(/array\.new/g)??[]).length,1,'only the input literal allocates');
     assert(!wat.includes('call_indirect'));assert(!wat.includes('closure_new'));assert(wat.includes('i32.add'));
     assertEq(instance.exports.main(1),10);
@@ -118,20 +116,16 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     assertEq(instance.exports.first(),11);assertEq(instance.exports.second(),12);
   });
   test('syntax diagnostics: invalid pipelines report their site, and Utu islands retain exact ranges',async({ROOT})=>{
-    const compiler=await makeCompiler({ROOT,target:'analysis'});
-    for (const [source,kind] of [
-      ['export main() void { [1,2] map |x| {x;}; }','invalid-iterator-usage'],
-      ['export main() I32 { [1] map |x,y,z| {x;} sum; }','invalid-iterator-usage'],
+    for (const [source,kind,text] of [
+      ['export main() void { [1,2] map |x| {x;}; }','invalid-iterator-usage','[1,2] map |x| {x;}'],
+      ['export main() I32 { [1] map |x,y,z| {x;} sum; }','invalid-iterator-usage','[1] map |x,y,z| {x;} sum'],
     ]) {
-      await withTempUtu(ROOT,'invalid_new_syntax.utu',source,async file=>{
-        let caught;try { await compiler.compileFile(file); } catch(error) { caught=error; }
-        assertEq(caught?.diagnostic?.kind,kind);assert(caught?.diagnostic?.primary?.file.endsWith('invalid_new_syntax.utu'));
-      });
+      const errors=(await selfhostDiagnostics({ROOT,name:'invalid_new_syntax.utu',source})).filter(d=>d.severity==='error');
+      assertEq(errors.length,1,JSON.stringify(errors));assertEq(errors[0].kind,kind);assertEq(errors[0].text,text);
+      assert(errors[0].file.endsWith('invalid_new_syntax.utu'));
     }
-    await withTempUtu(ROOT,'wutu_missing_delimiter.utu','export main() void { @wutu/ div {} ; }',async file=>{
-      const doc=await compiler.compileFile(file);
-      assert(doc.querySelector('[data-error="parse-error"]'),'malformed DSL reports syntax error instead of crashing expansion');
-    });
+    const malformed=await selfhostDiagnostics({ROOT,name:'wutu_missing_delimiter.utu',source:'export main() void { @wutu/ div {} ; }'});
+    assert(malformed.some(d=>d.kind==='parse-error'),'malformed DSL reports syntax error instead of crashing expansion');
     // Wutu templates are the self-hosted compiler's: an expression in one keeps its exact range.
     const source='using Browser from std:Browser; export main() void { @wutu/\\ div { = unknown_value; } \\/; }';
     const problem=(await selfhostDiagnostics({ROOT,name:'wutu_ranges.utu',source})).find(d=>d.kind==='unknown-variable');

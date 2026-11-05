@@ -1,27 +1,28 @@
-function ie(e,n={}){for(let t of e?.ops??[])t==="promise_then"&&(n.promise_then=Je),t==="promise_catch"&&(n.promise_catch=Le);return n}var Je=(e,n)=>{e.then(n)},Le=(e,n)=>{e.catch(n)};function se(e,n={}){for(let t of e?.awaits??[])n[`await_${t}`]=ze();return n}function ze(){if(typeof WebAssembly.Suspending!="function")throw new Error("utu: `await` needs JS Promise Integration (WebAssembly.Suspending), which this host does not provide \u2014 use `.then` instead, or run on a JSPI-capable host (Chrome 126+, Node 23+, Bun)");return new WebAssembly.Suspending(async e=>await e)}var ae=Symbol("utu.closure");function oe(e,n={}){if(!e)return n;e.new&&(n.closure_new=Ve),n.closure_rec=Ge;for(let t of e.calls??[])n[t]=Ke;return n}var Ve=(e,n,t,r)=>{let s=n==null&&!(t&2)?(...a)=>e(...a):(...a)=>e(n,...a),l=t&1?(...a)=>!!s(...a):s;return l[ae]=r,l},Ge=e=>e?.[ae]??null,Ke=(e,...n)=>e(...n),Ye={U8:"Uint8Array",I8:"Int8Array",U16:"Uint16Array",I16:"Int16Array",I32:"Int32Array",U32:"Uint32Array",I64:"BigInt64Array",U64:"BigUint64Array",F32:"Float32Array",F64:"Float64Array"};function le(e,n={}){for(let{name:r,kind:s,host:l,data:a}of e??[]){if(!l)continue;let i=Math.max(1,Math.ceil((a?a.length*3/4:0)/65536)),o=new WebAssembly.Memory({initial:i,maximum:65535}),u=globalThis[Ye[s]],d=u.BYTES_PER_ELEMENT,f=c=>{let p=Math.ceil(c/65536)-o.buffer.byteLength/65536;p>0&&o.grow(p)};n[`mem_${r}`]=o,n[`mem_copy_in_${r}`]=c=>{if(typeof c=="string")return f(c.length*3),Math.floor(new TextEncoder().encodeInto(c,new Uint8Array(o.buffer)).written/d);let p=c instanceof ArrayBuffer?new Uint8Array(c):new Uint8Array(c.buffer,c.byteOffset,c.byteLength);return f(p.byteLength),new Uint8Array(o.buffer).set(p),Math.floor(p.byteLength/d)},n[`mem_view_${r}`]=(c,p)=>new u(o.buffer,c*d,p-c)}return n}function fe(e={}){return e.js_tag=WebAssembly.JSTag,e}function de(e,n){let t=n?.asyncExports??[];if(t.length===0)return e.exports;let r={...e.exports};for(let s of t)typeof r[s]=="function"&&(r[s]=He(r[s]));return r}function He(e){return Object.defineProperty(WebAssembly.promising(e),"length",{value:e.length})}function ce(e,n){if(!n)return e;let t={Bool:i=>i!==0,U32:i=>i>>>0,U64:i=>BigInt.asUintN(64,i)},r=i=>i,s=(i,o,u,d)=>{throw new TypeError(`${i}: argument ${o+1} must be ${u}, not ${d===null?"null":typeof d}`)},l=(i,o,u)=>o==="Str"?d=>typeof d=="string"?d:s(i,u,"a string",d):o==="?Str"?d=>d==null?null:typeof d=="string"?d:s(i,u,"a string or null",d):o==="ref"?d=>d??s(i,u,"a value",d):o==="?"?d=>d===void 0?null:d:r,a={...e};for(let[i,o]of Object.entries(n)){let u=e[i];if(typeof u!="function")continue;let d=typeof o=="string"?o:o.r,f=Array.isArray(d)?d.map(_=>t[_]??r):null,c=f?_=>_.map((m,h)=>f[h](m)):t[d]??r,p=(typeof o=="string"?[]:o.p??[]).map((_,m)=>l(i,_,m));a[i]=(..._)=>{for(let h=0;h<p.length;h++)_[h]=p[h](_[h]);let m=u(..._);return m instanceof Promise?m.then(c):c(m)},Object.defineProperty(a[i],"length",{value:u.length})}return a}var re=/^\s*import\s[^;]*;/;function K(e){let n=[],t=e;for(let r=t.match(re);r;r=t.match(re))n.push(r[0].trim()),t=t.slice(r[0].length);return{imports:n,expr:t.trim()}}function C(e,n=null){let t=new Set,r=[];for(let l of Object.values(e??{}))for(let[a,i]of Object.entries(l??{})){if(n&&!n.has(a))continue;let{imports:o,expr:u}=K(i);for(let d of o)t.add(d);r.push(`export const ${U(a)} = (
-${u}
-);`)}return r.length===0?"":`${t.size?`${[...t].join(`
+function ve(e,n={}){for(let t of e?.ops??[])t==="promise_then"&&(n.promise_then=vn),t==="promise_catch"&&(n.promise_catch=xn);return n}var xe=new WeakSet,vn=(e,n)=>{e.then(n,t=>{if(!xe.has(e))throw t})},xn=(e,n)=>{xe.add(e),e.catch(n)};function ke(e,n={}){for(let t of e?.awaits??[])n[`await_${t}`]=kn(t.startsWith("null_"));return n}function kn(e=!1){if(typeof WebAssembly.Suspending!="function")throw new Error("utu: `await` needs JS Promise Integration (WebAssembly.Suspending), which this host does not provide \u2014 use `.then` instead, or run on a JSPI-capable host (Chrome 126+, Node 23+, Bun)");return new WebAssembly.Suspending(e?async n=>await n??null:async n=>await n)}var Ie=Symbol("utu.closure");function Se(e,n={}){if(!e)return n;e.new&&(n.closure_new=In),n.closure_rec=Sn;for(let t of e.calls??[])n[t]=An;return n}var ge=new WeakMap,In=(e,n,t,r)=>{let i=n==null&&!(t&2),l=i&&ge.get(e);if(l)return l;let d=i?(...a)=>e(...a):(...a)=>e(n,...a),f=t>>4&8191,s=t>>17&8191,m=f|s?(...a)=>{for(let u=0,h=f,w=s;h|w;u++,h>>=1,w>>=1)if(w&1&&a[u]===void 0)a[u]=null;else if(h&1&&a[u]==null)throw new TypeError(`Wrong type from JavaScript: a closure's argument ${u+1} is ${a[u]}`);return d(...a)}:d,o=t&1?(...a)=>!!m(...a):t&4?(...a)=>m(...a)>>>0:t&8?(...a)=>BigInt.asUintN(64,m(...a)):m;return o[Ie]=r,i&&ge.set(e,o),o},Sn=e=>e?.[Ie]??null,An=(e,...n)=>e(...n),Tn={U8:"Uint8Array",I8:"Int8Array",U16:"Uint16Array",I16:"Int16Array",I32:"Int32Array",U32:"Uint32Array",I64:"BigInt64Array",U64:"BigUint64Array",F32:"Float32Array",F64:"Float64Array"};function Ae(e,n={}){for(let{name:r,kind:i,host:l,data:d}of e??[]){if(!l)continue;let f=Math.max(1,Math.ceil((d?d.length*3/4:0)/65536)),s=new WebAssembly.Memory({initial:f,maximum:65535}),m=globalThis[Tn[i]],o=m.BYTES_PER_ELEMENT,a=u=>{let h=Math.ceil(u/65536)-s.buffer.byteLength/65536;h>0&&s.grow(h)};n[`mem_${r}`]=s,n[`mem_copy_in_${r}`]=u=>{if(typeof u=="string")return a(u.length*3),Math.floor(new TextEncoder().encodeInto(u,new Uint8Array(s.buffer)).written/o);let h=u instanceof ArrayBuffer?new Uint8Array(u):new Uint8Array(u.buffer,u.byteOffset,u.byteLength);return a(h.byteLength),new Uint8Array(s.buffer).set(h),Math.floor(h.byteLength/o)},n[`mem_view_${r}`]=(u,h)=>new m(s.buffer,u*o,h-u)}return n}function Te(e={}){return e.js_tag=WebAssembly.JSTag,e}function je(e,n){let t=n?.asyncExports??[];if(t.length===0)return e.exports;let r={...e.exports};for(let i of t)typeof r[i]=="function"&&(r[i]=jn(r[i]));return r}function jn(e){return Object.defineProperty(WebAssembly.promising(e),"length",{value:e.length})}function Me(e,n){if(!n)return e;let t={Bool:f=>f!==0,U32:f=>f>>>0,U64:f=>BigInt.asUintN(64,f)},r=f=>f,i=(f,s,m,o)=>{throw new TypeError(`${f}: argument ${s+1} must be ${m}, not ${o===null?"null":m==="an integer"&&typeof o=="number"?o:typeof o}`)},l=(f,s,m)=>s==="Bool"?o=>!!o:s==="int"?o=>Number.isInteger(o)?o:i(f,m,"an integer",o):s==="big"?o=>typeof o=="bigint"?o:i(f,m,"a BigInt",o):s==="num"?o=>typeof o=="number"?o:i(f,m,"a number",o):s==="Str"?o=>typeof o=="string"?o:i(f,m,"a string",o):s==="?Str"?o=>o==null?null:typeof o=="string"?o:i(f,m,"a string or null",o):s==="ref"?o=>o??i(f,m,"a value",o):s==="cl"?o=>typeof o=="function"?o:i(f,m,"a function",o):s==="?"?o=>o===void 0?null:o:r,d={...e};for(let[f,s]of Object.entries(n)){let m=e[f];if(typeof m!="function")continue;let o=typeof s=="string"?s:s.r,a=Array.isArray(o)?o.map(w=>t[w]??r):null,u=a?w=>w.map((y,c)=>a[c](y)):t[o]??r,h=(typeof s=="string"?[]:s.p??[]).map((w,y)=>l(f,w,y));d[f]=(...w)=>{for(let c=0;c<h.length;c++)w[c]=h[c](w[c]);let y=m(...w);return y instanceof Promise?y.then(u):u(y)},Object.defineProperty(d[f],"length",{value:m.length})}return d}var we=/^\s*import\s[^;]*;/,$e="const $utuFn = (n, f) => { if (typeof f != 'function') throw new TypeError(`${n}: @es gave ${f === null ? 'null' : typeof f}, not a function`); return f; };",Fe=e=>e.includes("$utuFn(");function V(e){let n=[],t=e;for(let r=t.match(we);r;r=t.match(we))n.push(r[0].trim()),t=t.slice(r[0].length);return{imports:n,expr:t.trim()}}function G(e,n=null){let t=new Set,r=[],i=!1;for(let d of Object.values(e??{}))for(let[f,s]of Object.entries(d??{})){if(n&&!n.has(f))continue;let{imports:m,expr:o}=V(s);for(let a of m)t.add(a);i||=Fe(o),r.push(`export const ${L(f)} = (
+${o}
+);`)}return r.length===0?"":`${(t.size?`${[...t].join(`
 `)}
 
-`:""}${r.join(`
+`:"")+(i?`${$e}
+
+`:"")}${r.join(`
 
 `)}
-`}function U(e){return/^\d/.test(e)?`$${e}`:e}function ue(e,n){let t={};for(let[r,s]of Object.entries(e??{})){t[r]={};for(let l of Object.keys(s??{})){if(!(U(l)in n))continue;let a=n[U(l)];t[r][l]=typeof a=="function"?a:()=>a}}return t}function me(e){let n={};for(let[t,r]of Object.entries(e??{})){n[t]={};for(let[s,l]of Object.entries(r??{})){let a=new Function(`return (${l});`)();n[t][s]=typeof a=="function"?a:()=>a}}return n}var Y={PARSE_ERROR:"parse-error",COMPRESSED_SOURCE:"compressed-source",UNKNOWN_ISLAND:"unknown-island",IMPORT_CYCLE:"import-cycle",UNKNOWN_IMPORT:"unknown-import",ENTRY_SURFACE_CONFLICT:"entry-surface-conflict",MODULE_VARIANCE:"module-variance",INVALID_MODULE_ARITY:"invalid-module-arity",DUPLICATE_DECLARATION:"duplicate-declaration",NON_DEFAULTABLE_TYPE:"non-defaultable-type",INVALID_NULLABLE_TYPE:"invalid-nullable-type",INTEGER_LITERAL_OUT_OF_RANGE:"integer-literal-out-of-range",INVALID_ESCAPE:"invalid-escape",UNKNOWN_TYPE:"unknown-type",UNKNOWN_VARIABLE:"unknown-variable",UNKNOWN_FIELD:"unknown-field",UNKNOWN_METHOD:"unknown-method",UNKNOWN_OPERATOR:"unknown-operator",NOT_CALLABLE:"not-callable",INVALID_AWAIT:"invalid-await",WRONG_ARITY:"wrong-arity",TYPE_MISMATCH:"type-mismatch",INVALID_ASSIGNMENT_TARGET:"invalid-assignment-target",INVALID_BREAK:"invalid-break",INVALID_GLOBAL_INITIALIZER:"invalid-global-initializer",INVALID_FOR_SOURCE:"invalid-for-source",ASSIGNMENT_TO_IMMUTABLE:"assignment-to-immutable",NULLABLE_ACCESS:"nullable-access",MISSING_FIELD:"missing-field",DUPLICATE_FIELD:"duplicate-field",RECURSIVE_TYPE:"recursive-type",NON_EXHAUSTIVE_MATCH:"non-exhaustive-match",IMPLICIT_STRUCT_INIT:"implicit-struct-init",REWRITE_INVARIANT:"rewrite-invariant",INVALID_DSL_USAGE:"invalid-dsl-usage",INVALID_ITERATOR_USAGE:"invalid-iterator-usage"};var Ze=/(?<=\b(?:if\b[^{};]*|else\s*))\{[^{};]*;?\s*\}/g;function he(e,n){let t=[],r=0,s=!1,l=[];for(let[a,i]of e.split(`
-`).entries()){let o=i.length>160,u="",d=!1;if(!i.trimStart().startsWith("\\\\"))for(let c=0;c<i.length;c++){let p=i[c],_=i[c+1],m=l.length-1;if(s)p==="*"&&_==="/"&&(s=!1,c++);else if(d)p==="\\"?c++:p==='"'&&(d=!1);else if(l[m]==="text")p==="\\"?c++:p==="`"?l.pop():p==="$"&&_==="{"&&(l.push(0),c++);else{if(p==="/"&&_==="/")break;p==="/"&&_==="*"?(s=!0,c++):p==='"'?d=!0:p==="`"?l.push("text"):m>=0?p==="{"?l[m]++:p==="}"&&l[m]--===0&&l.pop():o&&(u+=p)}}let f=()=>(u.replace(Ze," ").match(/[{};]/g)??[]).length;if(o&&u.trim().length>100&&f()>=5){let c=i.search(/\S/)+1;t.push({kind:Y.COMPRESSED_SOURCE,severity:"warning",message:"This line packs multiple statements or blocks together. Put statements and block contents on separate, indented lines; keep source readable and minify build output instead.",primary:{file:n,row:a+1,col:c,endRow:a+1,endCol:i.length+1,start:r+c-1,end:r+i.length},related:[],notes:[],fixes:[]})}r+=i.length+1}return t}function Xe(e){return e.replace(/"[^"\n]*"|\/\/[^\n]*|\\\\[^\n]*/g,n=>n[0]==='"'?`"${" ".repeat(n.length-2)}"`:" ".repeat(n.length))}function pe(e,n){let t=e.slice(0,n).split(`
-`);return{row:t.length,col:t.at(-1).length+1}}function _e(e){let n=new Set,t=[];for(let[r,s]of e){let l=Xe(s);for(let a of l.matchAll(/@island\s+"/g)){let i=a.index+a[0].length;n.add(s.slice(i,s.indexOf('"',i)))}if(!/^(std|node|npm):/.test(r))for(let a of l.matchAll(/\bwutu\s*\.\s*invalidate\s*\(\s*"/g)){let i=a.index+a[0].length-1,o=s.indexOf('"',i+1)+1;t.push({file:r,source:s,start:i,end:o,name:s.slice(i+1,o-1)})}}return t.filter(r=>!n.has(r.name)).map(({file:r,source:s,start:l,end:a,name:i})=>{let o=pe(s,l),u=pe(s,a),d=[...n].sort();return{kind:Y.UNKNOWN_ISLAND,severity:"warning",message:`No @island named "${i}" exists, so this invalidate refreshes nothing.${d.length?` Known islands: ${d.map(f=>`"${f}"`).join(", ")}.`:""}`,primary:{file:r,row:o.row,col:o.col,endRow:u.row,endCol:u.col,start:l,end:a},related:[],notes:[],fixes:[]}})}var R={entry:0,import:1,prelude:2},z={normal:0,test:1,comptime:2,bench:3},H={none:0,size:1,speed:2},Z={small:{optimize:"size",safe:!0},fast:{optimize:"speed",safe:!0},smallUnsafe:{optimize:"size",safe:!1},fastUnsafe:{optimize:"speed",safe:!1},debug:{optimize:"none",safe:!0}},ve=Object.freeze({builtins:["js-string"],importedStringConstants:"'"}),V=new TextDecoder,B=new TextEncoder,N=(e,n,t)=>V.decode(new Uint8Array(e.buffer,n,t-n));async function Qe(e,n={}){return(await ne(e,n)).exports}async function en(e,n,t){let r=t.mode?Z[t.mode]:null;if(t.mode&&!r)throw new Error(`no build mode ${t.mode}: ${Object.keys(Z).join(", ")}`);let{target:s="normal",optimize:l="size",debugNames:a=!1,safe:i=!1,sourceMap:o=!1,blame:u=!1,profile:d=!1}={...t,...r};e.set_optimize(H[l]??H.size),e.set_safe(i?1:0),e.set_debug_names(a?1:0),e.set_source_map?.(o||u?1:0),e.set_profile?.(d?1:0);let f,c;try{f=await Q(e,n,t),c=await je(e,z[s]??z.normal,t)}catch(_){if(!dn(_))throw _;return f=Ie.get(e)??[],{wasm:null,spec:null,diagnostics:[cn(e,f,_)],files:f}}let p=Me(e,f).concat(xn(f));return c<0?{wasm:null,spec:null,diagnostics:p,files:f}:{...ee(e,c),diagnostics:p,files:f,tests:s==="test"?on(e):[],benches:s==="bench"?tn(e):[],map:o&&e.map_count?rn(e,f):null,blame:u&&e.blame_prepare?an(e,f):null,...d?{frames:nn(e,f)}:{}}}function nn(e,n){let t=X(n),r=[];for(let s=0;s<e.profile_count();s++){let l=e.profile_at(s),a=l>=0?t(l):null;r.push({name:e.profile_name(s),file:a?.file.key??null,line:a?.line??null})}return r}function tn(e){let n=[];for(let t=0;t<e.bench_count();t++)n.push({export:`__bench_${t}`,name:xe(N(e.src,e.bench_name_start(t),e.bench_name_end(t)))});return n}function X(e){let n=e.toSorted((r,s)=>r.offset-s.offset),t=new Map;return r=>{let s=0,l=n.length-1,a=null;for(;s<=l;){let d=s+l>>1;n[d].offset<=r?(a=n[d],s=d+1):l=d-1}if(!a||r>a.offset+a.bytes.length)return null;let i=t.get(a);if(!i){i={bytes:[0],units:[0]};for(let d=0;d<a.bytes.length;d++){if(a.bytes[d]!==10)continue;let f=i.bytes.at(-1);i.units.push(i.units.at(-1)+V.decode(a.bytes.subarray(f,d+1)).length),i.bytes.push(d+1)}t.set(a,i)}let o=r-a.offset;for(s=0,l=i.bytes.length-1;s<l;){let d=s+l+1>>1;i.bytes[d]<=o?s=d:l=d-1}let u=V.decode(a.bytes.subarray(i.bytes[s],o)).length+1;return{file:a,line:s+1,column:u,offset:i.units[s]+u-1}}}function rn(e,n){let t=X(n),r=new Map,s=new Map,l=new Map,a=[];for(let o=0;o<e.map_count();o++){let u=e.map_start(o),d=e.map_end(o),f=`${u}:${d}`,c=r.get(f);if(!c){let m=u>=0?t(u):null,h=e.map_kind(o);s.has(h)||s.set(h,h>=0?e.node_kind_name(h):null);let v=e.map_owner_start(o);v>=0&&!l.has(v)&&l.set(v,e.map_owner_name(o)),c={file:m?.file.key??null,line:m?.line??null,column:m?.column??null,start:m?.offset??null,end:m?t(d)?.offset??m.offset:null,kind:s.get(h),owner:v>=0?l.get(v):null,ownerAt:v>=0?v:null},r.set(f,c)}let p=e.map_site_start?.(o)??-1,_=p>=0?t(p):null;a.push({at:e.map_offset(o),...c,site:_&&{file:_.file.key,line:_.line,column:_.column,start:_.offset,end:t(e.map_site_end(o))?.offset??_.offset}})}let i=[];for(let o=0;o<e.map_function_count();o++){let u=e.map_function_start(o);i.push(u>=0?u:null)}return{entries:a,functions:i}}var sn=["defined","import","helper","wat"];function an(e,n){e.blame_prepare();let t=X(n),r=[],s=[],l=new Map,a=new Map,i=new Map,o=m=>{let h=e.blame_node_kind(m);return i.has(h)||i.set(h,h>=0?e.node_kind_name(h):null),i.get(h)},u=m=>{let h=t(e.blame_node_start(m));return h&&{file:h.file.key,line:h.line,column:h.column,start:h.offset,end:t(e.blame_node_end(m))?.offset??h.offset}},d=m=>{if(m<0)return-1;if(!a.has(m)){let h=u(m);a.set(m,h?s.push({name:e.blame_decl_name(m),kind:o(m),...h})-1:-1)}return a.get(m)},f=m=>{if(m<0)return-1;if(!l.has(m)){let h=u(m);l.set(m,h?r.push({...h,kind:o(m),decl:d(e.blame_decl(m))})-1:-1)}return l.get(m)},c=[];for(let m=0;m<e.map_count();m++)c.push({at:e.map_offset(m),place:f(e.blame_map_node(m)),site:f(e.blame_map_site(m))});let p=[];for(let m=0;m<e.map_function_count();m++){let h=V.decode(Uint8Array.from(e.blame_func_name(m),v=>v.charCodeAt(0)));p.push({place:f(e.blame_func_node(m)),role:sn[e.blame_func_role(m)],name:h||null})}let _=(m,h)=>Array.from({length:m},(v,I)=>f(h(I)));return{places:r,decls:s,entries:c,funcs:p,types:_(e.blame_type_count(),m=>e.blame_type_node(m)),globals:_(e.blame_glob_count(),m=>e.blame_glob_node(m)),data:_(e.blame_data_count(),m=>e.blame_data_node(m)),memories:_(e.blame_memory_count(),m=>e.blame_memory_node(m))}}function on(e){let n=[];for(let t=0;t<e.test_count();t++)n.push({export:`__test_${t}`,name:xe(N(e.src,e.test_name_start(t),e.test_name_end(t)))});return n}var ln={n:`
-`,t:"	",r:"\r",b:"\b",f:"\f"};function xe(e){return e.slice(1,-1).replace(/\\(u[0-9a-fA-F]{4}|.)/g,(n,t)=>t.length>1?String.fromCharCode(parseInt(t.slice(1),16)):ln[t]??t)}async function Q(e,n,t,r=new Map){let{resolvePath:s=Ee,stdlib:l}=t,a=async f=>(r.has(f)||r.set(f,await(t.readFile.bytes??t.readFile)(f)),r.get(f)),i=mn(e,l),o=[...i.files];Ie.set(e,o);let u=new Map(i.byKey),d=[];q(e,o,u,n,await a(n),R.entry);for(let f=0;f<e.import_count();f++){let c=o[e.import_from(f)],p=N(e.src,e.import_path_start(f),e.import_path_end(f)),_=ke.test(p);if(/^"?(npm|node):/.test(p)||_&&typeof l.get(p)=="function"){e.import_foreign(f),d.push({i:f,raw:p,from:c.key,name:N(e.src,e.import_name_start(f),e.import_name_end(f))});continue}let m=_?p:s(c.key,JSON.parse(p)),h=u.get(m);if(h===void 0){let v=c.role===R.prelude?R.prelude:R.import;if(_){let I=l.get(m);if(typeof I!="string")continue;h=q(e,o,u,m,I,v)}else{let I;try{I=await a(m)}catch{let T=B.encode(m);new Uint8Array(e.src.buffer).set(T,e.import_missing(f,T.length));break}h=q(e,o,u,m,I,v)}}e.import_bind(f,h)}return await yn(e,d,t)?(o.diagnostics=e.resolve(),await wn(e,n,o,t),await fn(e),o):Q(e,n,t,r)}async function fn(e){let n=e.wat_count();if(n===0)return;let{assembleWat:t}=await import("./assemble-QBZS4KRV.js"),r=a=>e.node_kind_name(new Uint8Array(e.node_kind.buffer)[a]),s=a=>{let i=new Int32Array(e.node_child.buffer),o=new Int32Array(e.node_next.buffer),u=[];for(let d=i[a];d>=0;d=o[d])u.push(d);return u},l=a=>{let i=new Int32Array(e.node_first.buffer)[a],o=new Int32Array(e.node_last.buffer)[a];return N(e.src,new Int32Array(e.tok_start.buffer)[i],new Int32Array(e.tok_end.buffer)[o-1])};for(let a=0;a<n;a++){let i=s(e.wat_function(a)),o=i.filter(p=>r(p)==="param_list").flatMap(s).map(p=>{let[_,m]=[s(p)[0],s(p).at(-1)];return{name:l(_),type:l(m)}}),u=i.find(p=>r(p)==="return_type"),d=r(s(u)[0])==="void_type"?"void":l(u),f=i.some(p=>r(p)==="self_param")||r(s(u)[0])==="yield_type",c=t({params:o,result:d,method:f,text:N(e.src,e.wat_text_start(a),e.wat_text_end(a))});if(c.code){let p=e.wat_set(a,c.code.length);new Uint8Array(e.wat_bytes.buffer).set(c.code,p)}else{let{message:p,start:_,end:m}=c.error,h=B.encode(p),v=e.wat_fail(a,_??-1,m??-1,h.length);new Uint8Array(e.src.buffer).set(h,v)}}}var ke=/^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;function q(e,n,t,r,s,l){let a=typeof s=="string"?B.encode(s):new Uint8Array(s),i=typeof s=="string"?s:new TextDecoder("utf-8",{ignoreBOM:!0}).decode(a),o=e.file_add(a.length,l);return r.startsWith("std:")&&e.file_mark_std?.(o),new Uint8Array(e.src.buffer).set(a,e.file_offset(o)),n.push({key:r,role:l,text:i,offset:e.file_offset(o),bytes:a}),t.set(r,o),n.parsing=!0,e.file_parse(o),n.parsing=!1,o}var Ie=new WeakMap;function dn(e){return e instanceof RangeError&&/call stack/i.test(e.message)}function cn(e,n,t){let r={kind:"nested-too-deeply",code:"nested-too-deeply",severity:"error",file:null,message:"Program nested too deeply",notes:["The compiler recurses on nesting; split the expression, or the chain, into smaller ones."]},s=n.parsing?e.parse_deepest_at?.()??-1:-1;s<0&&(s=un(e,n));let l=s<0?null:n.findLast(i=>i.offset<=s&&s<=i.offset+i.bytes.length);if(!l)return{...r,message:`${r.message} (${t.message})`};let a=L(l,s,s);return{...r,file:l.key,...a,end:a.start+1,label:"nested too deeply",message:`${r.message} (at about line ${a.line})`}}function un(e,n){let t,r,s,l,a;try{a=e.node_count(),[t,r,s]=["node_child","node_next","node_first"].map(m=>new Int32Array(e[m].buffer,0,a)),l=new Int32Array(e.tok_start.buffer)}catch{return-1}let i=n.filter(m=>m.role===R.entry||m.role===R.import),o=m=>i.some(h=>h.offset<=m&&m<h.offset+h.bytes.length),u=new Uint8Array(a);for(let m=0;m<a;m++)for(let h=t[m];h>=0&&h<a&&!u[h];h=r[h])u[h]=1;let d=new Int32Array(a),f=-1,c=-1,p=0;for(let m=0;m<a;m++){if(u[m]||!o(l[s[m]]))continue;let h=[m];for(;h.length;){let v=h.pop(),I=0;for(let T=t[v];T>=0&&T<a;T=r[T])d[T]=d[v]+1,h.push(T),I++;(f<0||d[v]>d[f])&&(f=v),I>p&&(p=I,c=v)}}let _=f>=0&&d[f]>=200?f:c;return _<0?-1:l[s[_]]}var be=new WeakMap;function Se(e){let n=be.get(e);if(!n){let t=e.map(a=>B.encode(JSON.stringify(a))),r=new Int32Array(t.length),s=new Uint8Array(t.reduce((a,i)=>a+i.length+1,1)),l=0;s[l++]=91,t.forEach((a,i)=>{i>0&&(s[l++]=44),r[i]=l,s.set(a,l),l+=a.length}),s[l++]=93,n={bytes:s.subarray(0,l),offsets:r},be.set(e,n)}return n}var ye=new WeakMap;function Ae(e){let n=ye.get(e);return n||ye.set(e,n={docs:new Map,views:new Map,wanted:new Set,prelude:null,rebuild:!1}),n}function mn(e,n){let t=Ae(e);if(!t.rebuild&&t.prelude?.files.every(r=>n.get(r.key)===r.text))return e.reset_keep(),t.prelude;e.reset(),t.docs.clear(),t.views.clear();for(let r of t.wanted){let s=bn(e,r,_n(e,r,t.docs));t.views.set(r,e.abi_resident_view(s.doc,s.at))}return t.prelude=pn(e,n),e.seal(),t.rebuild=!1,t.prelude}function pn(e,n){let t=[],r=new Map,s=n.get("std:Prelude");if(typeof s!="string")return{files:t,byKey:r};q(e,t,r,"std:Prelude",s,R.prelude);for(let a=0;a<e.import_count();a++){let i=N(e.src,e.import_path_start(a),e.import_path_end(a)),o=n.get(i);!ke.test(i)||typeof o!="string"||e.import_bind(a,r.get(i)??q(e,t,r,i,o,R.prelude))}let l=n.get("std:JsonRuntime");if(typeof l=="string"&&e.json_runtime_room){let a=B.encode(l),i=e.json_runtime_room(a.length);new Uint8Array(e.src.buffer).set(a,i)}return{files:t,byKey:r}}function Te(e,n){let t=e.abi_room(n.length);return new Uint8Array(e.src.buffer).set(n,t),t}var we=new WeakMap;function hn(e){let n=we.get(e);if(!n){let{prefix:t,moduleSpecifier:r,exports:s,names:l,mutableGlobals:a}=e;n={document:Se(e.types),view:B.encode(JSON.stringify({prefix:t,moduleSpecifier:r,exports:s,names:l,mutableGlobals:a}))},we.set(e,n)}return n}function _n(e,n,t){if(!t.has(n.document)){let{bytes:r,offsets:s}=n.document,l=Te(e,r);e.abi_offsets_room(s.length),new Int32Array(e.abi_offsets.buffer,0,s.length).set(s),t.set(n.document,e.abi_doc_at(l,s.length))}return t.get(n.document)}function bn(e,n,t){return{doc:t,at:Te(e,n.view)}}async function yn(e,n,{stdlib:t,resolvePackage:r}){let s=Ae(e),l=[],a=!1;for(let{i,raw:o,from:u,name:d}of n){let f;try{let c=/^"?(npm|node):/.test(o)?await r(JSON.parse(o),{prefix:d,from:u}):await t.get(o)();f=c.document?c:hn(c.abi??c)}catch{continue}s.views.has(f)||(s.wanted.add(f),s.rebuild=!0,a=!0),l.push([i,f])}if(a)return!1;for(let[i,o]of l)e.abi_bind(i,s.views.get(o));return!0}async function wn(e,n,t,{resolvePath:r=Ee,readBinaryFile:s}){for(let l=0;l<e.embed_files();l++){let a=N(e.src,e.embed_path_start(l),e.embed_path_end(l)),i=e.embed_file?t[e.embed_file(l)]?.key??n:n,o;try{o=await s(r(i,a))}catch{e.embed_fail(l);continue}let u=e.embed_set(l,o.length);new Uint8Array(e.embed_bytes.buffer).set(o,u)}}async function je(e,n,t={}){let r=e.comptime_mems();for(let s=0;s<=r;s++){let l=[];for(let f=0;f<r;f++)(e.comptime_waiting?e.comptime_waiting(f):s===0)&&l.push(f);if(l.length===0)break;let a=e.compile_program(z.comptime);if(a<0)return-1;let i=l.filter(f=>!e.comptime_can_run||e.comptime_can_run(f));if(i.length===0){for(let f of l)e.comptime_cycle(f);break}let{wasm:o,spec:u}=ee(e,a),{exports:d}=await ne(o,u,t);for(let f of i){let c=e.comptime_name(f),p;try{p=await d[`__comptime_run_${c}`]()}catch(h){e.comptime_fail(f,d.__comptime_fuel?.value===0?8:vn(h));continue}let _=new Uint8Array(d[`__comptime_${c}`].buffer,0,p*e.comptime_value_size(f)).slice(),m=e.comptime_set(f,p);new Uint8Array(e.comptime_bytes.buffer).set(_,m)}}return gn(e,e.compile_program(n))}async function gn(e,n){if(n<0||!e.user_ir_count?.())return n;try{return await WebAssembly.compile(new Uint8Array(e.out.buffer,0,n).slice(),ve),n}catch(t){if(!(t instanceof WebAssembly.CompileError))throw t;let r=B.encode(String(t.message).replace(/^WebAssembly\.\w+(\(\): | doesn't validate: )/,"")),s=e.ir_invalid_room(r.length);return new Uint8Array(e.src.buffer).set(r,s),e.ir_invalid_report(s,r.length),-1}}function vn(e){let n=String(e?.message??e);return!(e instanceof WebAssembly.RuntimeError)&&!/call stack|recursion/i.test(n)?7:/out of bounds/i.test(n)?1:/unreachable/i.test(n)?2:/divi.*zero|by zero/i.test(n)?3:/overflow/i.test(n)&&!/stack/i.test(n)?4:/null/i.test(n)?5:/call stack|recursion|stack/i.test(n)?6:0}function ee(e,n){let t=new Uint8Array(e.out.buffer,0,n).slice(),r=e.host_json_size(),s=r?JSON.parse(N(e.host_json,0,r)):{};return{wasm:t,spec:s}}function Me(e,n){let t=[];for(let r=0;r<e.diagnostic_count();r++){let s=e.diagnostic_file(r),l=s>=0?n[s]:null,a={kind:e.diagnostic_kind(r),message:e.diagnostic_message(r),severity:"error",file:l?.key??null};if(l&&Object.assign(a,L(l,e.diagnostic_start(r),e.diagnostic_end(r))),e.diagnostic_code){a.code=e.diagnostic_code(r).replace(/(?<=[a-z0-9])(?=[A-Z])/g,"-").toLowerCase();for(let i=0;i<e.diagnostic_extras(r);i++){let o=kn[e.diagnostic_extra_kind(r,i)],u=e.diagnostic_extra_text(r,i);if(o==="note")(a.notes??=[]).push(u);else if(o==="label"){a.label=u;let d=e.diagnostic_extra_start(r,i),f=e.diagnostic_extra_end(r,i);l&&(d!==e.diagnostic_start(r)||f!==e.diagnostic_end(r))&&(a.focus=L(l,d,f))}else{let d=n[e.diagnostic_extra_file(r,i)];if(!d)continue;let f={file:d.key,...L(d,e.diagnostic_extra_start(r,i),e.diagnostic_extra_end(r,i))};o==="fix"?a.fix={...f,text:u,label:e.diagnostic_extra_label(r,i)}:(a.related??=[]).push({...f,role:o,label:u})}}}e.diagnostic_default_label&&a.label==null&&a.file&&(a.label=e.diagnostic_default_label(r)),t.push(a)}return t}function xn(e){return[...e.filter(r=>!/^(std|node|npm):/.test(r.key)).flatMap(r=>he(r.text,r.key)),..._e(e.map(r=>[r.key,r.text]))].map(({kind:r,message:s,primary:l})=>({kind:r,message:s,severity:"warning",file:l.file,start:l.start,end:l.end,line:l.row,column:l.col}))}var kn=["label","expected","found","related","note","fix"];function L(e,n,t){let{units:r,lines:s}=In(e),l=f=>r[Math.min(Math.max(0,f-e.offset),r.length-1)],a=l(n),i=l(t),o=0,u=s.length-1;for(;o<u;){let f=o+u+1>>1;s[f]<=a?o=f:u=f-1}let d=1;for(let f=s[o];f<a;f++){let c=e.text.charCodeAt(f);(c<56320||c>57343)&&d++}return{start:a,end:i,line:o+1,column:d}}var ge=new WeakMap;function In(e){let n=ge.get(e);if(!n){let{bytes:t,text:r}=e,s=new Uint32Array(t.length+1),l=0;for(let i=0;i<t.length;i++){s[i]=l;let o=t[i];(o&192)!==128&&(l+=o>=240?2:1)}s[t.length]=l;let a=[0];for(let i=0;i<r.length;i++){let o=r.charCodeAt(i);(o===10||o===13&&r.charCodeAt(i+1)!==10)&&a.push(i+1)}n={units:s,lines:a},ge.set(e,n)}return n}async function ne(e,n={},{loadGlue:t=null,profiler:r=null}={}){let s=await WebAssembly.compile(e,ve),l=n.es??{},a=C(l),i=a?t?ue(l,await t(a)):me(l):{};r&&(i.profile=r.imports),n.closures&&(i.utu=oe(n.closures,i.utu??{})),n.mems&&(i.utu=le(n.mems,i.utu??{})),n.promises&&(i.utu=ie(n.promises,i.utu??{}),i.utu=se(n.promises,i.utu)),WebAssembly.Module.imports(s).some(d=>d.module==="utu"&&d.name==="js_tag")&&(i.utu=fe(i.utu??{}));let o=await WebAssembly.instantiate(s,i),u=ce(de(o,n.promises),n.exports);return{module:s,instance:o,exports:r?r.attach(o,u):u}}function Ee(e,n){if(/^[a-z]+:\/\//i.test(e))return new URL(n,e).href;let t=e.split("/").slice(0,-1);for(let r of n.split("/"))r===".."?t.pop():r!=="."&&t.push(r);return t.join("/")}var Sn=/[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/,An=new Set(["export","mod","struct","tag","enum","proto","fn","type","distinct","let","const","mem","vec","using"]);function Tn(e,n){let t=(b,w)=>new w(b.buffer),r=t(e.node_first,Int32Array),s=t(e.node_last,Int32Array),l=t(e.tok_start,Int32Array),a=t(e.tok_end,Int32Array),i=t(e.tok_kind,Uint8Array),o=t(e.node_decl,Int32Array),u=t(e.decl_node,Int32Array),d=t(e.decl_owner,Int32Array),f=e.node_count(),c=new Map,p=b=>{for(let w=n.length-1;w>=0;w--)if(n[w].offset<=b)return b<n[w].offset+n[w].bytes.length?n[w]:null;return null},_=(b,w)=>{let y=c.get(b);if(!y){y=new Int32Array(b.bytes.length+1);let g=0;for(let x=0;x<b.bytes.length;){let A=b.bytes[x],j=A<128?1:A<224?2:A<240?3:4;for(let O=0;O<j;O++)y[x+O]=g;x+=j,g+=j===4?2:1}y[b.bytes.length]=g,c.set(b,y)}return y[w-b.offset]},m=b=>{let w=l[r[b]],y=p(w);return y?{file:y.key,start:_(y,w),end:_(y,a[s[b]-1])}:null},h=null,v=()=>{if(h)return h;h=new Int32Array(e.decl_count()).fill(-1);for(let b=0;b<f;b++){let w=o[b];if(w<0||w>=h.length||!I(b)||u[w]<0)continue;let y=l[r[b]];if(y<l[r[u[w]]]||y>=a[s[u[w]]-1])continue;let g=h[w];(g<0||y<l[r[g]])&&(h[w]=b)}return h},I=b=>o[b]>=0&&r[b]<s[b]&&s[b]-r[b]===1,T=null,E=()=>{if(T)return T;T=new Map;let b=new Uint8Array(e.src.buffer);for(let w=0,y=e.wat_count?.()??0;w<y;w++){let g=e.wat_function(w),x=-1;for(let S=0,W=e.decl_count();S<W&&x<0;S++)u[S]===g&&(x=S);let A=new Map;for(let S=0,W=e.decl_count();S<W;S++){if(d[S]!==x||e.decl_kind_name(S)!=="Param")continue;let M=m(v()[S]>=0?v()[S]:u[S]);M&&A.set(n.find($=>$.key===M.file)?.text.slice(M.start,M.end),S)}let j=e.wat_text_start(w),O=e.wat_text_end(w),J=p(j);if(!(!J||!A.size))for(let S=j;S<O;S++){let W=b[S];if(W===59&&b[S+1]===59){for(;S<O&&b[S]!==10;)S++;continue}if(W===40&&b[S+1]===59){let G=0;for(;S<O;S++)if(b[S]===40&&b[S+1]===59)G++,S++;else if(b[S]===59&&b[S+1]===41&&(G--,S++,!G))break;continue}if(W!==36)continue;let M=S+1;for(;M<O&&Sn.test(String.fromCharCode(b[M]));)M++;let $=A.get(new TextDecoder().decode(b.subarray(S+1,M)));$!==void 0&&(T.has($)||T.set($,[]),T.get($).push({file:J.key,start:_(J,S+1),end:_(J,M)})),S=M-1}}return T},F=new TextDecoder,Pe=b=>{for(let w=r[b];w<s[b];w++){if(i[w]===8)continue;let y=p(l[w]);if(!y)return null;let g=F.decode(y.bytes.subarray(l[w]-y.offset,a[w]-y.offset));if(!An.has(g))return g!=="&"&&!/^[A-Za-z_]\w*$/.test(g)?null:{file:y.key,start:_(y,l[w]),end:_(y,a[w])}}return null};return{at:m,declarationAt(b,w){for(let y=0;y<f;y++){if(!I(y))continue;let g=m(y);if(g&&g.file===b&&g.start<=w&&w<=g.end)return o[y]}for(let[y,g]of E())if(g.some(x=>x.file===b&&x.start-1<=w&&w<=x.end))return y;return-1},definition(b){let w=u[b];if(w<0)return null;let y=v()[b];return y>=0?m(y):Pe(w)??m(w)},references(b,{includeDeclaration:w=!0}={}){let y=this.definition(b),g=[];for(let x=0;x<f;x++){if(o[x]!==b||!I(x))continue;let A=m(x);if(!A)continue;let j=y&&A.file===y.file&&A.start===y.start;j&&!w||(j?g.unshift(A):g.push(A))}return[...g,...E().get(b)??[]]},span(b){return u[b]>=0?m(u[b]):null},kind(b){return e.decl_kind_name(b)},owner(b){return d[b]},type(b){return e.decl_checked_type(b)},typeDeclaration(b){return e.decl_checked_type_decl(b)},typeDeclarationOfExpressionBefore(b,w,y=!1){let g=[];for(let x=0;x<f;x++){if(r[x]>=s[x])continue;let A=m(x);A&&A.file===b&&A.end===w&&g.push([A.start,x])}g.sort((x,A)=>x[0]-A[0]);for(let[,x]of g){let A=e.node_type_decl(x,y?1:0);if(A>=0)return A}return-1},declarations(b=null){let w=[];for(let y=0,g=e.decl_count();y<g;y++){if(u[y]<0)continue;let x=m(u[y]);x&&(b==null||x.file===b)&&w.push({decl:y,kind:e.decl_kind_name(y),owner:d[y],span:x})}return w},names(b){let w=[];for(let y=0;y<f;y++){if(!I(y))continue;let g=m(y);g&&g.file===b&&w.push({decl:o[y],at:g})}for(let[y,g]of E())for(let x of g)x.file===b&&w.push({decl:y,at:x});return w.sort((y,g)=>y.at.start-g.at.start),w.filter((y,g)=>g===0||y.at.start!==w[g-1].at.start)},tokenAt(b,w){let y=n.findIndex(g=>g.key===b);if(y<0)return null;for(let g=e.file_first_token(y),x=e.file_end_token(y);g<x;g++){let A=_(n[y],l[g]);if(A>=w)return null;let j=_(n[y],a[g]);if(w<j||w===j&&i[g]===8)return{kind:i[g],start:A,end:j}}return null},text(b){let w=n.find(y=>y.key===b.file);return w?w.text.slice(b.start,b.end):""}}}function jn(e,n){let t=new Map,r,s=i=>(t.has(i)||t.set(i,(async()=>{let[o,u]=await Promise.all([n(`${i}.types.json`),n(`${i}.offsets`)]);return{bytes:o,offsets:Mn(u)}})()),t.get(i)),l=new Map(e),a=new Map;for(let i of["std:Browser","std:JS","std:Web","std:Worker"])typeof e.get(i)=="function"&&l.set(i,()=>(a.has(i)||a.set(i,(async()=>{r??=JSON.parse(new TextDecoder().decode(await n("catalog.json")));let{document:o,view:u}=r[i],[d,f]=await Promise.all([s(o),n(`${u}.view.json`)]);return{document:d,view:f}})()),a.get(i)));return l}function Mn(e){let n=new DataView(e.buffer,e.byteOffset,e.byteLength),t=new Int32Array(e.byteLength/4);for(let r=0;r<t.length;r++)t[r]=n.getInt32(r*4,!0);return t}function En(e){let n=0;for(let t of e){let r=t.codePointAt(0);if(t==="	")n+=4;else{if(r>=768&&r<=879||r>=8203&&r<=8207||r>=65024&&r<=65039)continue;r>=4352&&r<=4447||r>=11904&&r<=42191||r>=44032&&r<=55203||r>=63744&&r<=64255||r>=65072&&r<=65103||r>=65280&&r<=65376||r>=65504&&r<=65510||r>=127744&&r<=128591||r>=129280&&r<=129535||r>=131072&&r<=262141?n+=2:n+=1}}return n}var Re={dark:{bg:[18,20,26],fg:[215,218,224],dim:[118,124,138],rail:[62,67,80],error:[255,107,107],warning:[245,185,66],trap:[199,146,234],expected:[108,182,255],found:[240,166,74],related:[154,163,178],add:[95,211,141],del:[255,123,123],keyword:[179,157,243],string:[158,206,106],number:[232,169,106],type:[125,207,255],function:[130,170,255],comment:[100,108,122],dsl:[158,206,106]},light:{bg:[253,252,249],fg:[43,46,54],dim:[128,133,144],rail:[200,196,186],error:[214,58,58],warning:[183,121,31],trap:[142,68,173],expected:[31,111,209],found:[184,98,11],related:[107,114,128],add:[31,138,76],del:[192,57,43],keyword:[124,77,204],string:[77,124,15],number:[180,83,9],type:[14,116,144],function:[37,99,235],comment:[156,163,175],dsl:[77,124,15]}};function Rn(e=globalThis.process?.env??{}){if(e.UTU_THEME==="light"||e.UTU_THEME==="dark")return e.UTU_THEME;let n=Number(e.COLORFGBG?.split(";").pop());return n===7||n===15?"light":"dark"}function Nn(e=globalThis.process?.env??{}){return/truecolor|24bit/i.test(e.COLORTERM??"")||["iTerm.app","WezTerm","vscode","ghostty","kitty"].includes(e.TERM_PROGRAM)}function Fn([e,n,t]){let r=f=>f<48?0:f<115?1:Math.min(5,Math.floor((f-35)/40)),s=16+36*r(e)+6*r(n)+r(t),l=f=>f===0?0:55+f*40,a=(l(r(e))-e)**2+(l(r(n))-n)**2+(l(r(t))-t)**2,i=Math.round(((e+n+t)/3-8)/10),o=232+Math.max(0,Math.min(23,i)),u=8+10*(o-232);return(u-e)**2+(u-n)**2+(u-t)**2<a?o:s}function On({color:e=!1,theme:n=Rn(),truecolor:t=Nn()}={}){let r=Re[n]??Re.dark,s=(i,o)=>t?`\x1B[${i};2;${o.join(";")}m`:`\x1B[${i};5;${Fn(o)}m`,l=(i,o)=>i.map((u,d)=>Math.round(r.bg[d]+(u-r.bg[d])*o)),a=!!e;return{on:a,palette:r,fg:i=>a?s(38,i):"",bg:i=>a?s(48,i):"",tint:(i,o)=>a?s(48,l(i,o)):"",bold:a?"\x1B[1m":"",italic:a?"\x1B[3m":"",strike:a?"\x1B[9m":"",reset:a?"\x1B[0m":"",paint(i,o){return a?`${s(38,i)}${o}\x1B[0m`:o}}}function Wn(e,n,t,r){let s=n.toUpperCase(),l=e.palette[n]??e.palette.error,i=[`${e.on?`${e.bg(l)}${e.fg(e.palette.bg)}${e.bold} ${s} ${e.reset}`:` ${s} `} ${e.bold}${t}${e.reset}`];return r&&i.push(`${" ".repeat(s.length+3)}${e.paint(e.palette.dim,r)}`),i}function Bn(e,n){return(n??[]).map(t=>`  ${e.paint(e.palette.dim,"note")}  ${t}`)}var $n={primary:.32,expected:.24,found:.24,related:.2};function Un(e,n,{color:t=!1,relative:r=i=>i,highlight:s=null,theme:l,truecolor:a}={}){let i=On({color:t,theme:l,truecolor:a});return e.map(o=>Cn(o,n,i,r,s)).join(`
+`}function L(e){return/^\d/.test(e)?`$${e}`:e}function Ee(e,n){let t={};for(let[r,i]of Object.entries(e??{})){t[r]={};for(let l of Object.keys(i??{})){if(!(L(l)in n))continue;let d=n[L(l)];t[r][l]=typeof d=="function"?d:()=>d}}return t}function Re(e){let n={};for(let[t,r]of Object.entries(e??{})){n[t]={};for(let[i,l]of Object.entries(r??{})){let d=new Function(`${Fe(l)?$e:""}return (${l});`)();n[t][i]=typeof d=="function"?d:()=>d}}return n}var Mn=/(?<=\b(?:if\b[^{};]*|else\s*))\{[^{};]*;?\s*\}/g;function Oe(e,n){let t=[];if(!$n(e))return t;let r=0,i=!1,l=[];for(let[d,f]of e.split(`
+`).entries()){let s=f.length>160;if(!s&&!i&&!l.length&&(!f.includes("`")&&!f.includes("/*")||/^\s*\/\//.test(f))){r+=f.length+1;continue}let m="",o=!1;if(!f.trimStart().startsWith("\\\\"))for(let u=0;u<f.length;u++){let h=f[u],w=f[u+1],y=l.length-1;if(i)h==="*"&&w==="/"&&(i=!1,u++);else if(o)h==="\\"?u++:h==='"'&&(o=!1);else if(l[y]==="text")h==="\\"?u++:h==="`"?l.pop():h==="$"&&w==="{"&&(l.push(0),u++);else{if(h==="/"&&w==="/")break;h==="/"&&w==="*"?(i=!0,u++):h==='"'?o=!0:h==="`"?l.push("text"):y>=0?h==="{"?l[y]++:h==="}"&&l[y]--===0&&l.pop():s&&(m+=h)}}let a=()=>(m.replace(Mn," ").match(/[{};]/g)??[]).length;if(s&&m.trim().length>100&&a()>=5){let u=f.search(/\S/)+1;t.push({kind:"compressed-source",severity:"warning",message:"This line packs multiple statements or blocks together. Put statements and block contents on separate, indented lines; keep source readable and minify build output instead.",primary:{file:n,row:d+1,col:u,endRow:d+1,endCol:f.length+1,start:r+u-1,end:r+f.length},related:[],notes:[],fixes:[]})}r+=f.length+1}return t}function $n(e){for(let n=0,t;n<e.length;n=t+1)if(t=e.indexOf(`
+`,n),t<0&&(t=e.length),t-n>160)return!0;return!1}function Fn(e){return e.replace(/"[^"\n]*"|\/\/[^\n]*|\\\\[^\n]*/g,n=>n[0]==='"'?`"${" ".repeat(n.length-2)}"`:" ".repeat(n.length))}function We(e,n){let t=e.slice(0,n).split(`
+`);return{row:t.length,col:t.at(-1).length+1}}function Ne(e){let n=new Set,t=[];for(let[r,i]of e){if(!i.includes("@island")&&!i.includes("invalidate"))continue;let l=Fn(i);for(let d of l.matchAll(/@island\s+"/g)){let f=d.index+d[0].length;n.add(i.slice(f,i.indexOf('"',f)))}if(!/^(std|node|npm):/.test(r))for(let d of l.matchAll(/\bwutu\s*\.\s*invalidate\s*\(\s*"/g)){let f=d.index+d[0].length-1,s=i.indexOf('"',f+1)+1;t.push({file:r,source:i,start:f,end:s,name:i.slice(f+1,s-1)})}}return t.filter(r=>!n.has(r.name)).map(({file:r,source:i,start:l,end:d,name:f})=>{let s=We(i,l),m=We(i,d),o=[...n].sort();return{kind:"unknown-island",severity:"warning",message:`No @island named "${f}" exists, so this invalidate refreshes nothing.${o.length?` Known islands: ${o.map(a=>`"${a}"`).join(", ")}.`:""}`,primary:{file:r,row:s.row,col:s.col,endRow:m.row,endCol:m.col,start:l,end:d},related:[],notes:[],fixes:[]}})}function Be(e){let n=null;try{n=JSON.parse(e)}catch{return null}return n?.version===1&&Array.isArray(n.types)&&n.exports&&n.names&&/^[A-Z][A-Za-z0-9_]*$/.test(n.prefix)?n:null}var J={entry:0,import:1,prelude:2},re={normal:0,test:1,comptime:2,bench:3,analysis:4},le={none:0,size:1,speed:2},te={small:{optimize:"size",safe:!0},fast:{optimize:"speed",safe:!0},smallUnsafe:{optimize:"size",safe:!1},fastUnsafe:{optimize:"speed",safe:!1},debug:{optimize:"none",safe:!0}};var Pe=Object.freeze({builtins:["js-string"],importedStringConstants:"'"}),Y=new TextDecoder,P=new TextEncoder,U=(e,n,t)=>Y.decode(new Uint8Array(e.buffer,n,t-n));async function En(e,n={}){return(await ce(e,n)).exports}async function Rn(e,n,t){let r=t.mode&&Object.hasOwn(te,t.mode)?te[t.mode]:null;if(t.mode&&!r)throw new Error(`no build mode ${t.mode}: ${Object.keys(te).join(", ")}`);let{target:i="normal",optimize:l="size",debugNames:d=!1,safe:f=!1,sourceMap:s=!1,blame:m=!1,profile:o=!1,run:a=!1}={...t,...r};e.set_optimize(le[l]??le.size),e.set_safe(f?1:0),e.set_debug_names(d?1:0),e.set_move_limit?.(t.moveLimit??0),e.set_source_map?.(s||m?1:0),e.set_profile?.(o?1:0),e.set_run?.(a?1:0);let u,h;try{u=await fe(e,n,t),h=await Ye(e,re[i]??re.normal,t)}catch(c){if(!Dn(c))throw c;return u=Ve.get(e)??[],{wasm:null,spec:null,diagnostics:[Ln(e,u,c)],files:u}}let w=rt(e,u),y=Ze(e,u).concat(w,it(u));return h<0||w.length?{wasm:null,spec:null,diagnostics:y,files:u}:{...de(e,h),diagnostics:y,files:u,tests:i==="test"?Un(e):[],benches:i==="bench"?On(e):[],map:s&&e.map_count?Nn(e,u):null,blame:m&&e.blame_prepare?Cn(e,u):null,...o?{frames:Wn(e,u)}:{},...a&&e.run_leaf?.()?{array:{levels:e.run_levels(),leaf:e.run_leaf()}}:{}}}function Wn(e,n){let t=Z(n),r=[];for(let i=0;i<e.profile_count();i++){let l=e.profile_at(i),d=l>=0?t(l):null;r.push({name:e.profile_name(i),file:d?.file.key??null,line:d?.line??null})}return r}function On(e){let n=[];for(let t=0;t<e.bench_count();t++)n.push({export:`__bench_${t}`,name:De(e,e.bench_mod_start(t),e.bench_mod_end(t))+Le(U(e.src,e.bench_name_start(t),e.bench_name_end(t)))});return n}function Z(e){let n=e.toSorted((r,i)=>r.offset-i.offset),t=new Map;return r=>{let i=0,l=n.length-1,d=null;for(;i<=l;){let a=i+l>>1;n[a].offset<=r?(d=n[a],i=a+1):l=a-1}if(!d||r>d.offset+d.bytes.length)return null;let f=t.get(d);if(!f){f={bytes:[0],units:[0]};let{bytes:a}=d;for(let u=0;u<a.length;u++){if(a[u]!==10&&(a[u]!==13||a[u+1]===10))continue;let h=f.bytes.at(-1);f.units.push(f.units.at(-1)+Y.decode(a.subarray(h,u+1)).length),f.bytes.push(u+1)}t.set(d,f)}let s=r-d.offset;for(i=0,l=f.bytes.length-1;i<l;){let a=i+l+1>>1;f.bytes[a]<=s?i=a:l=a-1}let m=Y.decode(d.bytes.subarray(f.bytes[i],s)),o=1;for(let a=0;a<m.length;a++){let u=m.charCodeAt(a);(u<56320||u>57343)&&o++}return{file:d,line:i+1,column:o,unit:m.length+1,offset:f.units[i]+m.length}}}function Nn(e,n){let t=Z(n),r=new Map,i=new Map,l=new Map,d=[];for(let s=0;s<e.map_count();s++){let m=e.map_start(s),o=e.map_end(s),a=`${m}:${o}`,u=r.get(a);if(!u){let y=m>=0?t(m):null,c=e.map_kind(s);i.has(c)||i.set(c,c>=0?e.node_kind_name(c):null);let g=e.map_owner_start(s);g>=0&&!l.has(g)&&l.set(g,e.map_owner_name(s)),u={file:y?.file.key??null,line:y?.line??null,column:y?.column??null,unit:y?.unit??null,start:y?.offset??null,end:y?t(o)?.offset??y.offset:null,kind:i.get(c),owner:g>=0?l.get(g):null,ownerAt:g>=0?g:null},r.set(a,u)}let h=e.map_site_start?.(s)??-1,w=h>=0?t(h):null;d.push({at:e.map_offset(s),...u,site:w&&{file:w.file.key,line:w.line,column:w.column,start:w.offset,end:t(e.map_site_end(s))?.offset??w.offset}})}let f=[];for(let s=0;s<e.map_function_count();s++){let m=e.map_function_start(s);f.push(m>=0?m:null)}return{entries:d,functions:f}}var Bn=["defined","import","helper","wat"];function Cn(e,n){e.blame_prepare();let t=Z(n),r=[],i=[],l=new Map,d=new Map,f=new Map,s=y=>{let c=e.blame_node_kind(y);return f.has(c)||f.set(c,c>=0?e.node_kind_name(c):null),f.get(c)},m=y=>{let c=t(e.blame_node_start(y));return c&&{file:c.file.key,line:c.line,column:c.column,start:c.offset,end:t(e.blame_node_end(y))?.offset??c.offset}},o=y=>{if(y<0)return-1;if(!d.has(y)){let c=m(y);d.set(y,c?i.push({name:e.blame_decl_name(y),kind:s(y),...c})-1:-1)}return d.get(y)},a=y=>{if(y<0)return-1;if(!l.has(y)){let c=m(y);l.set(y,c?r.push({...c,kind:s(y),decl:o(e.blame_decl(y))})-1:-1)}return l.get(y)},u=[];for(let y=0;y<e.map_count();y++)u.push({at:e.map_offset(y),place:a(e.blame_map_node(y)),site:a(e.blame_map_site(y))});let h=[];for(let y=0;y<e.map_function_count();y++){let c=Y.decode(Uint8Array.from(e.blame_func_name(y),g=>g.charCodeAt(0)));h.push({place:a(e.blame_func_node(y)),role:Bn[e.blame_func_role(y)],name:c||null})}let w=(y,c)=>Array.from({length:y},(g,x)=>a(c(x)));return{places:r,decls:i,entries:u,funcs:h,types:w(e.blame_type_count(),y=>e.blame_type_node(y)),globals:w(e.blame_glob_count(),y=>e.blame_glob_node(y)),data:w(e.blame_data_count(),y=>e.blame_data_node(y)),memories:w(e.blame_memory_count(),y=>e.blame_memory_node(y))}}function Un(e){let n=[];for(let t=0;t<e.test_count();t++)n.push({export:`__test_${t}`,name:De(e,e.test_mod_start(t),e.test_mod_end(t))+Le(U(e.src,e.test_name_start(t),e.test_name_end(t)))});return n}var De=(e,n,t)=>n<0?"":`${U(e.src,n,t)}: `,qn={n:`
+`,t:"	",r:"\r",b:"\b",f:"\f"};function Le(e){return e.slice(1,-1).replace(/\\(u[0-9a-fA-F]{4}|.)/g,(n,t)=>t.length>1?String.fromCharCode(parseInt(t.slice(1),16)):qn[t]??t)}async function fe(e,n,t,r=new Map){let{resolvePath:i=Xe,stdlib:l}=t,d=async c=>(r.has(c)||r.set(c,await(t.readFile.bytes??t.readFile)(c)),r.get(c)),f=Vn(e,l),s=[...f.files];Ve.set(e,s);let m=new Map(f.byKey),o=[],a=!1,u=(c,g,x)=>{if(a)return;let k=P.encode(g);new Uint8Array(e.src.buffer).set(k,e.import_missing(c,k.length,x)),a=!0},h=[],w=K(e,s,m,n,await d(n),J.entry);for(let c=0;c<e.import_count();c++){let g=s[e.import_from(c)],x=U(e.src,e.import_path_start(c),e.import_path_end(c)),k=ze.test(x),E=!k&&/\.abi\.json"$/.test(x)?i(g.key,JSON.parse(x)):null;if(/^"?(npm|node):/.test(x)||E||k&&typeof l.get(x)=="function"){e.import_foreign(c),o.push({i:c,raw:x,from:g.key,abiFile:E,name:U(e.src,e.import_name_start(c),e.import_name_end(c))});continue}let S=k?x:i(g.key,JSON.parse(x)),T=m.get(S);if(T===void 0){let O=g.role===J.prelude?J.prelude:J.import;if(k){let R=l.get(S);if(typeof R!="string"){u(c,S,2);continue}T=K(e,s,m,S,R,O)}else{let R;try{R=await d(S)}catch{u(c,S,0);continue}T=K(e,s,m,S,R,O)}}e.import_bind(c,T),(h[e.import_from(c)]??=[]).push([c,T])}let y=Jn(h,w);return y&&u(y[0],s[y[1]].key,1),await Zn(e,o,t,d)?(s.diagnostics=e.resolve(),await Qn(e,n,s,t),await Pn(e),s):fe(e,n,t,r)}function Jn(e,n){let t=[],r=[[n,0]];for(t[n]=1;r.length;){let i=r.at(-1),l=e[i[0]]?.[i[1]++];if(!l){t[i[0]]=2,r.pop();continue}if(t[l[1]]===1)return l;t[l[1]]||(t[l[1]]=1,r.push([l[1],0]))}return null}async function Pn(e){let n=e.wat_count();if(n===0)return;let{assembleWat:t}=await import("./assemble-QBZS4KRV.js"),r=d=>e.node_kind_name(new Uint8Array(e.node_kind.buffer)[d]),i=d=>{let f=new Int32Array(e.node_child.buffer),s=new Int32Array(e.node_next.buffer),m=[];for(let o=f[d];o>=0;o=s[o])m.push(o);return m},l=d=>{let f=new Int32Array(e.node_first.buffer)[d],s=new Int32Array(e.node_last.buffer)[d];return U(e.src,new Int32Array(e.tok_start.buffer)[f],new Int32Array(e.tok_end.buffer)[s-1])};for(let d=0;d<n;d++){let f=i(e.wat_function(d)),s=f.filter(h=>r(h)==="param_list").flatMap(i).map(h=>{let[w,y]=[i(h)[0],i(h).at(-1)];return{name:l(w),type:l(y)}}),m=f.find(h=>r(h)==="return_type"),o=r(i(m)[0])==="void_type"?"void":l(m),a=f.some(h=>r(h)==="self_param")||r(i(m)[0])==="yield_type",u=t({params:s,result:o,method:a,text:U(e.src,e.wat_text_start(d),e.wat_text_end(d))});if(u.code){let h=e.wat_set(d,u.code.length);new Uint8Array(e.wat_bytes.buffer).set(u.code,h)}else{let{message:h,start:w,end:y}=u.error,c=P.encode(h),g=e.wat_fail(d,w??-1,y??-1,c.length);new Uint8Array(e.src.buffer).set(c,g)}}}var ze=/^[a-z][a-zA-Z0-9_]*:[A-Za-z][a-zA-Z0-9_]*$/;function K(e,n,t,r,i,l){let d=typeof i=="string"?P.encode(i):new Uint8Array(i),f=typeof i=="string"?i:new TextDecoder("utf-8",{ignoreBOM:!0}).decode(d),s=e.file_add(d.length,l);return r.startsWith("std:")&&e.file_mark_std?.(s),new Uint8Array(e.src.buffer).set(d,e.file_offset(s)),n.push({key:r,role:l,text:f,offset:e.file_offset(s),bytes:d}),t.set(r,s),n.parsing=!0,e.file_parse(s),n.parsing=!1,s}var Ve=new WeakMap;function Dn(e){return e instanceof RangeError&&/call stack/i.test(e.message)}function Ln(e,n,t){let r={kind:"nested-too-deeply",code:"nested-too-deeply",severity:"error",file:null,message:"Program nested too deeply",notes:["The compiler recurses on nesting; split the expression, or the chain, into smaller ones."]},i=n.parsing?e.parse_deepest_at?.()??-1:-1;i<0&&(i=zn(e,n));let l=i<0?null:n.findLast(f=>f.offset<=i&&i<=f.offset+f.bytes.length);if(!l)return{...r,message:`${r.message} (${t.message})`};let d=H(l,i,i);return{...r,file:l.key,...d,end:d.start+1,label:"nested too deeply",message:`${r.message} (at about line ${d.line})`}}function zn(e,n){let t,r,i,l,d;try{d=e.node_count(),[t,r,i]=["node_child","node_next","node_first"].map(y=>new Int32Array(e[y].buffer,0,d)),l=new Int32Array(e.tok_start.buffer)}catch{return-1}let f=n.filter(y=>y.role===J.entry||y.role===J.import),s=y=>f.some(c=>c.offset<=y&&y<c.offset+c.bytes.length),m=new Uint8Array(d);for(let y=0;y<d;y++)for(let c=t[y];c>=0&&c<d&&!m[c];c=r[c])m[c]=1;let o=new Int32Array(d),a=-1,u=-1,h=0;for(let y=0;y<d;y++){if(m[y]||!s(l[i[y]]))continue;let c=[y];for(;c.length;){let g=c.pop(),x=0;for(let k=t[g];k>=0&&k<d;k=r[k])o[k]=o[g]+1,c.push(k),x++;(a<0||o[g]>o[a])&&(a=g),x>h&&(h=x,u=g)}}let w=a>=0&&o[a]>=200?a:u;return w<0?-1:l[i[w]]}var Ce=new WeakMap;function Ge(e){let n=Ce.get(e);if(!n){let t=e.map(d=>P.encode(JSON.stringify(d))),r=new Int32Array(t.length),i=new Uint8Array(t.reduce((d,f)=>d+f.length+1,1)),l=0;i[l++]=91,t.forEach((d,f)=>{f>0&&(i[l++]=44),r[f]=l,i.set(d,l),l+=d.length}),i[l++]=93,n={bytes:i.subarray(0,l),offsets:r},Ce.set(e,n)}return n}var Ue=new WeakMap;function Ke(e){let n=Ue.get(e);return n||Ue.set(e,n={docs:new Map,views:new Map,wanted:new Set,prelude:null,rebuild:!1}),n}function Vn(e,n){let t=Ke(e);if(!t.rebuild&&t.prelude?.files.every(r=>n.get(r.key)===r.text))return e.reset_keep(),t.prelude;e.reset(),t.docs.clear(),t.views.clear();for(let r of t.wanted){let i=Yn(e,r,Hn(e,r,t.docs));t.views.set(r,e.abi_resident_view(i.doc,i.at))}return t.prelude=Gn(e,n),e.seal(),t.rebuild=!1,t.prelude}function Gn(e,n){let t=[],r=new Map,i=n.get("std:Prelude");if(typeof i!="string")return{files:t,byKey:r};K(e,t,r,"std:Prelude",i,J.prelude);for(let d=0;d<e.import_count();d++){let f=U(e.src,e.import_path_start(d),e.import_path_end(d)),s=n.get(f);!ze.test(f)||typeof s!="string"||e.import_bind(d,r.get(f)??K(e,t,r,f,s,J.prelude))}let l=n.get("std:JsonRuntime");if(typeof l=="string"&&e.json_runtime_room){let d=P.encode(l),f=e.json_runtime_room(d.length);new Uint8Array(e.src.buffer).set(d,f)}return{files:t,byKey:r}}function He(e,n){let t=e.abi_room(n.length);return new Uint8Array(e.src.buffer).set(n,t),t}var qe=new WeakMap;function Kn(e){let n=qe.get(e);if(!n){let{prefix:t,moduleSpecifier:r,exports:i,names:l,mutableGlobals:d,exportAssignment:f}=e;n={document:Ge(e.types),view:P.encode(JSON.stringify({prefix:t,moduleSpecifier:r,exports:i,names:l,mutableGlobals:d,exportAssignment:f}))},qe.set(e,n)}return n}function Hn(e,n,t){if(!t.has(n.document)){let{bytes:r,offsets:i}=n.document,l=He(e,r);e.abi_offsets_room(i.length),new Int32Array(e.abi_offsets.buffer,0,i.length).set(i),t.set(n.document,e.abi_doc_at(l,i.length))}return t.get(n.document)}function Yn(e,n,t){return{doc:t,at:He(e,n.view)}}async function Zn(e,n,{stdlib:t,resolvePackage:r},i){let l=Ke(e),d=[],f=!1;for(let{i:s,raw:m,from:o,abiFile:a,name:u}of n){let h;try{let w=a?Xn(await i(a)):/^"?(npm|node):/.test(m)?await r(JSON.parse(m),{prefix:u,from:o}):await t.get(m)();h=w.document?w:Kn(w.abi??w)}catch{continue}l.views.has(h)||(l.wanted.add(h),l.rebuild=!0,f=!0),d.push([s,h])}if(f)return!1;for(let[s,m]of d)e.abi_bind(s,l.views.get(m));return!0}var oe=new Map;function Xn(e){let n=typeof e=="string"?e:Y.decode(e);oe.has(n)||oe.set(n,Be(n));let t=oe.get(n);if(!t)throw new Error("Invalid declaration ABI");return t}async function Qn(e,n,t,{resolvePath:r=Xe,readBinaryFile:i}){for(let l=0;l<e.embed_files();l++){let d=U(e.src,e.embed_path_start(l),e.embed_path_end(l)),f=e.embed_file?t[e.embed_file(l)]?.key??n:n,s;try{s=await i(r(f,d))}catch{e.embed_fail(l);continue}let m=e.embed_set(l,s.length);new Uint8Array(e.embed_bytes.buffer).set(s,m)}}async function Ye(e,n,t={}){let r=e.comptime_mems();for(let i=0;i<=r;i++){let l=[];for(let a=0;a<r;a++)(e.comptime_waiting?e.comptime_waiting(a):i===0)&&l.push(a);if(l.length===0)break;let d=e.compile_program(re.comptime);if(d<0)return-1;let f=l.filter(a=>!e.comptime_can_run||e.comptime_can_run(a));if(f.length===0){for(let a of l)e.comptime_cycle(a);break}let{wasm:s,spec:m}=de(e,d),{exports:o}=await ce(s,m,t);for(let a of f){let u=e.comptime_name(a),h;try{h=await o[`__comptime_run_${u}`]()}catch(c){e.comptime_fail(a,o.__comptime_fuel?.value===0?8:nt(c));continue}let w=new Uint8Array(o[`__comptime_${u}`].buffer,0,h*e.comptime_value_size(a)).slice(),y=e.comptime_set(a,h);new Uint8Array(e.comptime_bytes.buffer).set(w,y)}}return et(e,e.compile_program(n))}async function et(e,n){if(n<0||!e.user_ir_count?.())return n;try{return await WebAssembly.compile(new Uint8Array(e.out.buffer,0,n).slice(),Pe),n}catch(t){if(!(t instanceof WebAssembly.CompileError))throw t;let r=P.encode(String(t.message).replace(/^WebAssembly\.\w+(\(\): | doesn't validate: )/,"")),i=e.ir_invalid_room(r.length);return new Uint8Array(e.src.buffer).set(r,i),e.ir_invalid_report(i,r.length),-1}}function nt(e){let n=String(e?.message??e);return!(e instanceof WebAssembly.RuntimeError)&&!/call stack|recursion/i.test(n)?7:/out of bounds/i.test(n)?1:/unreachable/i.test(n)?2:/divi.*zero|by zero/i.test(n)?3:/overflow/i.test(n)&&!/stack/i.test(n)?4:/null/i.test(n)?5:/call stack|recursion|stack/i.test(n)?6:0}function de(e,n){let t=new Uint8Array(e.out.buffer,0,n).slice(),r=e.host_json_size(),i=r?JSON.parse(U(e.host_json,0,r)):{};return{wasm:t,spec:i}}function Ze(e,n){let t=[],r=new Set;for(let i=0;i<e.diagnostic_count();i++){let l=e.diagnostic_file(i),d=`${l}\0${e.diagnostic_start(i)}\0${e.diagnostic_end(i)}\0${e.diagnostic_message(i)}`;if(r.has(d))continue;r.add(d);let f=l>=0?n[l]:null,s={kind:e.diagnostic_kind(i),message:e.diagnostic_message(i),severity:"error",file:f?.key??null};if(f&&Object.assign(s,H(f,e.diagnostic_start(i),e.diagnostic_end(i))),e.diagnostic_code){s.code=e.diagnostic_code(i).replace(/(?<=[a-z0-9])(?=[A-Z])/g,"-").toLowerCase();for(let m=0;m<e.diagnostic_extras(i);m++){let o=st[e.diagnostic_extra_kind(i,m)],a=e.diagnostic_extra_text(i,m);if(o==="note")(s.notes??=[]).push(a);else if(o==="label"){s.label=a;let u=e.diagnostic_extra_start(i,m),h=e.diagnostic_extra_end(i,m);f&&(u!==e.diagnostic_start(i)||h!==e.diagnostic_end(i))&&(s.focus=H(f,u,h))}else{let u=n[e.diagnostic_extra_file(i,m)];if(!u)continue;let h={file:u.key,...H(u,e.diagnostic_extra_start(i,m),e.diagnostic_extra_end(i,m))};o==="fix"?s.fix={...h,text:a,label:e.diagnostic_extra_label(i,m)}:(s.related??=[]).push({...h,role:o,label:a})}}}e.diagnostic_default_label&&s.label==null&&s.file&&(s.label=e.diagnostic_default_label(i)),t.push(s)}return t}var tt=(async()=>{}).constructor;function rt(e,n){if(!e.dsl_count)return[];let t=n.toSorted((l,d)=>l.offset-d.offset),r=l=>t.findLast(d=>d.offset<=l&&l<=d.offset+d.bytes.length)??null,i=[];for(let l=0;l<e.dsl_count();l++){let d=e.es_body_start(l);if(d<0)continue;let{expr:f}=V(U(e.src,d,e.es_body_end(l))),s=`return (
+${f}
+);`,m=null;try{new Function(s)}catch(a){if(!(a instanceof SyntaxError))continue;try{new tt(s)}catch(u){u instanceof SyntaxError&&!/import\.meta/.test(u.message)&&(m=u)}}let o=m&&r(e.dsl_site_start(l));o&&i.push({kind:"es-syntax",code:"es-syntax",message:`@es body is not JavaScript: ${m.message}`,severity:"error",file:o.key,...H(o,e.dsl_site_start(l),e.dsl_site_end(l)),label:"here"})}return i}function it(e){let n=e.filter(r=>!/^(std|node|npm):/.test(r.key));return[...n.flatMap(r=>Oe(r.text,r.key)),...Ne(n.map(r=>[r.key,r.text]))].map(({kind:r,message:i,primary:l})=>({kind:r,message:i,severity:"warning",file:l.file,start:l.start,end:l.end,line:l.row,column:l.col}))}var st=["label","expected","found","related","note","fix"];function H(e,n,t){let{units:r,lines:i}=at(e),l=a=>r[Math.min(Math.max(0,a-e.offset),r.length-1)],d=l(n),f=l(t),s=0,m=i.length-1;for(;s<m;){let a=s+m+1>>1;i[a]<=d?s=a:m=a-1}let o=1;for(let a=i[s];a<d;a++){let u=e.text.charCodeAt(a);(u<56320||u>57343)&&o++}return{start:d,end:f,line:s+1,column:o}}var Je=new WeakMap;function at(e){let n=Je.get(e);if(!n){let{bytes:t,text:r}=e,i=new Uint32Array(t.length+1),l=0;for(let f=0;f<t.length;f++){i[f]=l;let s=t[f];(s&192)!==128&&(l+=s>=240?2:1)}i[t.length]=l;let d=[0];for(let f=0;f<r.length;f++){let s=r.charCodeAt(f);(s===10||s===13&&r.charCodeAt(f+1)!==10)&&d.push(f+1)}n={units:i,lines:d},Je.set(e,n)}return n}async function ce(e,n={},{loadGlue:t=null,profiler:r=null,wrap:i=null}={}){let l=e instanceof WebAssembly.Module?e:await WebAssembly.compile(e,Pe),d=n.es??{},f=G(d),s=f?t?Ee(d,await t(f)):Re(d):{};r&&(s.profile=r.imports),n.closures&&(s.utu=Se(n.closures,s.utu??{})),n.mems&&(s.utu=Ae(n.mems,s.utu??{})),n.promises&&(s.utu=ve(n.promises,s.utu??{}),s.utu=ke(n.promises,s.utu)),WebAssembly.Module.imports(l).some(a=>a.module==="utu"&&a.name==="js_tag")&&(s.utu=Te(s.utu??{})),i?.(s);let m=await WebAssembly.instantiate(l,s),o=Me(je(m,n.promises),n.exports);return{module:l,instance:m,exports:r?r.attach(m,o):o}}function Xe(e,n){if(/^[a-z]+:\/\//i.test(e))return new URL(n,e).href;let t=e.split("/").slice(0,-1);for(let r of n.split("/"))r===".."?t.pop():r!=="."&&t.push(r);return t.join("/")}var ot=/[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/,lt=new Set(["export","mod","struct","tag","enum","proto","fn","type","distinct","let","const","mem","vec","using"]);function ue(e,n){let t=(b,_)=>new _(b.buffer),r=t(e.node_first,Int32Array),i=t(e.node_last,Int32Array),l=t(e.tok_start,Int32Array),d=t(e.tok_end,Int32Array),f=t(e.tok_kind,Uint8Array),s=t(e.node_decl,Int32Array),m=t(e.decl_node,Int32Array),o=t(e.decl_owner,Int32Array),a=e.node_count(),u=new Map,h=b=>{for(let _=n.length-1;_>=0;_--)if(n[_].offset<=b)return b<n[_].offset+n[_].bytes.length?n[_]:null;return null},w=(b,_)=>{let p=u.get(b);if(!p){p=new Int32Array(b.bytes.length+1);let v=0;for(let I=0;I<b.bytes.length;){let A=b.bytes[I],$=A<128?1:A<224?2:A<240?3:4;for(let W=0;W<$;W++)p[I+W]=v;I+=$,v+=$===4?2:1}p[b.bytes.length]=v,u.set(b,p)}return p[_-b.offset]},y=new Array(a),c=b=>{if(b>=0&&b<a&&y[b]!==void 0)return y[b];let _=l[r[b]],p=h(_),v=p?{file:p.key,start:w(p,_),end:w(p,d[i[b]-1])}:null;return b>=0&&b<a&&(y[b]=v),v},g=null,x=b=>{if(!g){g=new Map;for(let _=0;_<a;_++){if(r[_]>=i[_])continue;let p=c(_);p&&(g.has(p.file)||g.set(p.file,[]),g.get(p.file).push(_))}}return g.get(b)??[]},k=null,E=b=>{if(!k){k=new Map;for(let _=0;_<a;_++)O(_)&&(k.has(s[_])||k.set(s[_],[]),k.get(s[_]).push(_))}return k.get(b)??[]},S=null,T=()=>{if(S)return S;S=new Int32Array(e.decl_count()).fill(-1);for(let b=0;b<a;b++){let _=s[b];if(_<0||_>=S.length||!O(b)||m[_]<0)continue;let p=l[r[b]];if(p<l[r[m[_]]]||p>=d[i[m[_]]-1])continue;let v=S[_];(v<0||p<l[r[v]])&&(S[_]=b)}return S},O=b=>s[b]>=0&&r[b]<i[b]&&i[b]-r[b]===1,R=null,N=()=>{if(R)return R;R=new Map;let b=new Uint8Array(e.src.buffer);for(let _=0,p=e.wat_count?.()??0;_<p;_++){let v=e.wat_function(_),I=-1;for(let j=0,B=e.decl_count();j<B&&I<0;j++)m[j]===v&&(I=j);let A=new Map;for(let j=0,B=e.decl_count();j<B;j++){if(o[j]!==I||e.decl_kind_name(j)!=="Param")continue;let F=c(T()[j]>=0?T()[j]:m[j]);F&&A.set(n.find(C=>C.key===F.file)?.text.slice(F.start,F.end),j)}let $=e.wat_text_start(_),W=e.wat_text_end(_),q=h($);if(!(!q||!A.size))for(let j=$;j<W;j++){let B=b[j];if(B===59&&b[j+1]===59){for(;j<W&&b[j]!==10;)j++;continue}if(B===40&&b[j+1]===59){let ae=0;for(;j<W;j++)if(b[j]===40&&b[j+1]===59)ae++,j++;else if(b[j]===59&&b[j+1]===41&&(ae--,j++,!ae))break;continue}if(B!==36)continue;let F=j+1;for(;F<W&&ot.test(String.fromCharCode(b[F]));)F++;let C=A.get(new TextDecoder().decode(b.subarray(j+1,F)));C!==void 0&&(R.has(C)||R.set(C,[]),R.get(C).push({file:q.key,start:w(q,j+1),end:w(q,F)})),j=F-1}}return R},pn=new TextDecoder,hn=b=>{for(let _=r[b];_<i[b];_++){if(f[_]===8)continue;let p=h(l[_]);if(!p)return null;let v=pn.decode(p.bytes.subarray(l[_]-p.offset,d[_]-p.offset));if(!lt.has(v))return v!=="&"&&!/^[A-Za-z_]\w*$/.test(v)?null:{file:p.key,start:w(p,l[_]),end:w(p,d[_])}}return null},ye=t(e.node_kind,Uint8Array),yn=(b,_)=>{if(b<0||_<b)return null;let p=h(b);return p&&_<=p.offset+p.bytes.length?{file:p.key,start:w(p,b),end:w(p,_)}:null},ee=(b,_,p)=>b?.file===_&&b.start<=p&&p<=b.end,be=(b,_,p=!1)=>{let v=-1,I=1/0;for(let A of x(b)){let $=c(A);if(!ee($,b,_))continue;let W=$.end-$.start;W<I&&!(p&&!e.node_type(A))&&(v=A,I=W)}return v},bn,ne=()=>bn??=(()=>{let b=[];for(let _=0;_<(e.edge_count?.()??0);_++){let p=e.edge_from_decl(_),v=yn(e.edge_site_start(_),e.edge_site_end(_)),I=p>=0&&m[p]>=0?c(m[p]):null;v&&I&&!(v.file===I.file&&I.start<=v.start&&v.end<=I.end)&&(v=null),b.push({from:p,to:e.edge_to_decl(_),site:v})}return b})(),_n,_e=()=>_n??=(()=>{let b=[];for(let _=0;_<(e.coercion_count?.()??0);_++){let p=e.coercion_node(_);p<0||p>=a||r[p]>=i[p]||b.push({node:p,at:c(p),from:e.coercion_from_text(_),to:e.coercion_to_text(_),kind:e.coercion_kind(_)})}return b})(),gn,wn=()=>gn??=(()=>{let b=new Map;for(let _ of ne())b.has(_.from)||b.set(_.from,[]),b.get(_.from).push(_);return b})(),ie=new Map,z=b=>{if(ie.has(b))return ie.get(b);let _=new Set,p=A=>{if(A<0||_.has(A))return 0;_.add(A);let $=e.decl_effects?.(A)??0;for(let W of wn().get(A)??[])$|=p(W.to);return $},v=p(b),I={mask:v,labels:["await","host","throws","traps"].filter((A,$)=>v&1<<$)};return ie.set(b,I),I},se=(b,_)=>{if(_<0||_>=e.decl_count())return null;let p=b.span(_),v=b.definition(_);return!p||!v?null:{decl:_,name:b.text(v),kind:b.kind(_),span:p,selection:v,effects:z(_)}};return{at:c,declarationAt(b,_){for(let p of x(b)){if(!O(p))continue;let v=c(p);if(v&&v.file===b&&v.start<=_&&_<=v.end)return s[p]}for(let[p,v]of N())if(v.some(I=>I.file===b&&I.start-1<=_&&_<=I.end))return p;return-1},definition(b){let _=m[b];if(_<0)return null;let p=T()[b];return p>=0?c(p):hn(_)??c(_)},references(b,{includeDeclaration:_=!0}={}){let p=this.definition(b),v=[];for(let I of E(b)){let A=c(I);if(!A)continue;let $=p&&A.file===p.file&&A.start===p.start;$&&!_||($?v.unshift(A):v.push(A))}return[...v,...N().get(b)??[]]},span(b){return m[b]>=0?c(m[b]):null},kind(b){return e.decl_kind_name(b)},owner(b){return o[b]},type(b){return e.decl_checked_type(b)},typeDeclaration(b){return e.decl_checked_type_decl(b)},typeDeclarationOfExpressionBefore(b,_,p=!1){let v=[];for(let I of x(b)){let A=c(I);A&&A.file===b&&A.end===_&&v.push([A.start,I])}v.sort((I,A)=>I[0]-A[0]);for(let[,I]of v){let A=e.node_type_decl(I,p?1:0);if(A>=0)return A}return-1},declarations(b=null){let _=[];for(let p=0,v=e.decl_count();p<v;p++){if(m[p]<0)continue;let I=c(m[p]);I&&(b==null||I.file===b)&&_.push({decl:p,kind:e.decl_kind_name(p),owner:o[p],span:I})}return _},names(b){let _=[];for(let p of b==null?Array.from({length:a},(v,I)=>I):x(b)){if(!O(p))continue;let v=c(p);v&&(b==null||v.file===b)&&_.push({decl:s[p],at:v})}for(let[p,v]of N())for(let I of v)(b==null||I.file===b)&&_.push({decl:p,at:I});return _.sort((p,v)=>p.at.file<v.at.file?-1:p.at.file>v.at.file?1:p.at.start-v.at.start),_.filter((p,v)=>v===0||p.at.start!==_[v-1].at.start||p.at.file!==_[v-1].at.file)},explainAt(b,_){let p=be(b,_,!0);if(p<0)return null;let v=c(p),I=be(b,_),A=I>=0?s[I]:-1,W=ne().filter(F=>F.site&&ee(F.site,b,_)).sort((F,C)=>F.site.end-F.site.start-(C.site.end-C.site.start))[0]?.to??-1,q=e.node_field_owner?.(p)??-1,j=[];for(let F=0,C=e.closure_capture_count?.(p)??0;F<C;F++)j.push(e.closure_capture_decl(p,F));let B=[];if(A>=0){let F=this.definition(A);B.push({kind:"binding",decl:A,at:F,type:this.type(A)})}return W>=0&&B.push({kind:"call result",decl:W,at:this.definition(W)}),{node:p,at:v,kind:e.node_kind_name(ye[p]),type:e.node_type(p),expectedType:e.node_expected_type?.(p)||"",declaration:A,callTarget:W,field:q>=0?{owner:q,index:e.node_field_index(p)}:null,conversions:_e().filter(F=>F.node===p||ee(F.at,b,_)),captures:j,effects:A>=0?z(A):W>=0?z(W):{mask:0,labels:[]},wasmType:e.node_wasm_type?.(p)||"",trace:B}},typeTrace(b,_){return this.explainAt(b,_)?.trace??[]},inlayHints(b){let _=[];for(let p=0;p<e.decl_count();p++){if(e.decl_kind_name(p)!=="Local")continue;let v=this.definition(p),I=this.span(p),A=this.type(p);if(!v||!I||v.file!==b||!A)continue;let $=this.text({file:b,start:v.end,end:I.end});/^\s*:/.test($)||_.push({position:v.end,label:`: ${A}`,kind:"type",at:v})}for(let p of x(b)){if(e.node_kind_name(ye[p])!=="closure_expr")continue;let v=c(p);if(v?.file!==b)continue;let I=[];for(let A=0,$=e.closure_capture_count(p);A<$;A++){let W=e.closure_capture_decl(p,A),q=this.definition(W);q&&I.push(this.text(q))}I.length&&_.push({position:v.end,label:` captures ${I.join(", ")}`,kind:"capture",at:v})}for(let p of _e())p.at?.file===b&&_.push({position:p.at.end,label:` \u2192 ${p.to}`,kind:"conversion",at:p.at});for(let p=0;p<e.decl_count();p++){if(m[p]<0||!["Fn","Main"].includes(this.kind(p)))continue;let v=this.definition(p);if(v?.file!==b)continue;let I=z(p);I.mask&&_.push({position:v.end,label:` !${I.labels.join(", ")}`,kind:"effect",at:v})}return _.sort((p,v)=>p.position-v.position)},effects(b){return z(b)},prepareCallHierarchy(b,_){let p=this.declarationAt(b,_);p<0&&(p=this.declarations(b).find(I=>ee(this.definition(I.decl),b,_))?.decl??-1);let v=se(this,p);return v&&["Fn","Main","ProtoMember"].includes(v.kind)?[v]:[]},incomingCalls(b){let _=new Map;for(let p of ne())p.to===b&&p.from>=0&&(_.has(p.from)||_.set(p.from,[]),p.site&&_.get(p.from).push(p.site));return[..._].flatMap(([p,v])=>{let I=se(this,p);return I?[{from:I,sites:v}]:[]})},outgoingCalls(b){let _=new Map;for(let p of ne())p.from===b&&p.to>=0&&(_.has(p.to)||_.set(p.to,[]),p.site&&_.get(p.to).push(p.site));return[..._].flatMap(([p,v])=>{let I=se(this,p);return I?[{to:I,sites:v}]:[]})},tokenAt(b,_){let p=n.findIndex(v=>v.key===b);if(p<0)return null;for(let v=e.file_first_token(p),I=e.file_end_token(p);v<I;v++){let A=w(n[p],l[v]);if(A>=_)return null;let $=w(n[p],d[v]);if(_<$||_===$&&f[v]===8)return{kind:f[v],start:A,end:$}}return null},text(b){let _=n.find(p=>p.key===b.file);return _?_.text.slice(b.start,b.end):""}}}function ft(e,n){let t=new Map,r,i=f=>(t.has(f)||t.set(f,(async()=>{let[s,m]=await Promise.all([n(`${f}.types.json`),n(`${f}.offsets`)]);return{bytes:s,offsets:dt(m)}})()),t.get(f)),l=new Map(e),d=new Map;for(let f of["std:Browser","std:JS","std:Web","std:Worker"])typeof e.get(f)=="function"&&l.set(f,()=>(d.has(f)||d.set(f,(async()=>{r??=JSON.parse(new TextDecoder().decode(await n("catalog.json")));let{document:s,view:m}=r[f],[o,a]=await Promise.all([i(s),n(`${m}.view.json`)]);return{document:o,view:a}})()),d.get(f)));return l}function dt(e){let n=new DataView(e.buffer,e.byteOffset,e.byteLength),t=new Int32Array(e.byteLength/4);for(let r=0;r<t.length;r++)t[r]=n.getInt32(r*4,!0);return t}function ct(e){let n=0;for(let t of e){let r=t.codePointAt(0);if(t==="	")n+=4;else{if(r>=768&&r<=879||r>=8203&&r<=8207||r>=65024&&r<=65039)continue;r>=4352&&r<=4447||r>=11904&&r<=42191||r>=44032&&r<=55203||r>=63744&&r<=64255||r>=65072&&r<=65103||r>=65280&&r<=65376||r>=65504&&r<=65510||r>=127744&&r<=128591||r>=129280&&r<=129535||r>=131072&&r<=262141?n+=2:n+=1}}return n}var Qe={dark:{bg:[18,20,26],fg:[215,218,224],dim:[118,124,138],rail:[62,67,80],error:[255,107,107],warning:[245,185,66],trap:[199,146,234],expected:[108,182,255],found:[240,166,74],related:[154,163,178],add:[95,211,141],del:[255,123,123],keyword:[179,157,243],string:[158,206,106],number:[232,169,106],type:[125,207,255],function:[130,170,255],comment:[100,108,122],dsl:[158,206,106]},light:{bg:[253,252,249],fg:[43,46,54],dim:[128,133,144],rail:[200,196,186],error:[214,58,58],warning:[183,121,31],trap:[142,68,173],expected:[31,111,209],found:[184,98,11],related:[107,114,128],add:[31,138,76],del:[192,57,43],keyword:[124,77,204],string:[77,124,15],number:[180,83,9],type:[14,116,144],function:[37,99,235],comment:[156,163,175],dsl:[77,124,15]}};function ut(e=globalThis.process?.env??{}){if(e.UTU_THEME==="light"||e.UTU_THEME==="dark")return e.UTU_THEME;let n=Number(e.COLORFGBG?.split(";").pop());return n===7||n===15?"light":"dark"}function mt(e=globalThis.process?.env??{}){return/truecolor|24bit/i.test(e.COLORTERM??"")||["iTerm.app","WezTerm","vscode","ghostty","kitty"].includes(e.TERM_PROGRAM)}function pt([e,n,t]){let r=a=>a<48?0:a<115?1:Math.min(5,Math.floor((a-35)/40)),i=16+36*r(e)+6*r(n)+r(t),l=a=>a===0?0:55+a*40,d=(l(r(e))-e)**2+(l(r(n))-n)**2+(l(r(t))-t)**2,f=Math.round(((e+n+t)/3-8)/10),s=232+Math.max(0,Math.min(23,f)),m=8+10*(s-232);return(m-e)**2+(m-n)**2+(m-t)**2<d?s:i}function ht({color:e=!1,theme:n=ut(),truecolor:t=mt()}={}){let r=Qe[n]??Qe.dark,i=(f,s)=>t?`\x1B[${f};2;${s.join(";")}m`:`\x1B[${f};5;${pt(s)}m`,l=(f,s)=>f.map((m,o)=>Math.round(r.bg[o]+(m-r.bg[o])*s)),d=!!e;return{on:d,palette:r,fg:f=>d?i(38,f):"",bg:f=>d?i(48,f):"",tint:(f,s)=>d?i(48,l(f,s)):"",bold:d?"\x1B[1m":"",italic:d?"\x1B[3m":"",strike:d?"\x1B[9m":"",reset:d?"\x1B[0m":"",paint(f,s){return d?`${i(38,f)}${s}\x1B[0m`:s}}}function yt(e,n,t,r){let i=n.toUpperCase(),l=e.palette[n]??e.palette.error,f=[`${e.on?`${e.bg(l)}${e.fg(e.palette.bg)}${e.bold} ${i} ${e.reset}`:` ${i} `} ${e.bold}${t}${e.reset}`];return r&&f.push(`${" ".repeat(i.length+3)}${e.paint(e.palette.dim,r)}`),f}function bt(e,n){return(n??[]).map(t=>`  ${e.paint(e.palette.dim,"note")}  ${t}`)}var _t={primary:.32,expected:.24,found:.24,related:.2};function gt(e,n,{color:t=!1,relative:r=f=>f,highlight:i=null,theme:l,truecolor:d}={}){let f=ht({color:t,theme:l,truecolor:d}),s=new Map;return e.map(m=>wt(m,n,f,r,i,s)).join(`
 
-`)}function Cn(e,n,t,r,s){let l=e.severity??"error",a=t.palette[l]??t.palette.error,i=e.code??e.kind??"",o=e.focus??e,u=e.file!=null?`${r(e.file)}${o.line!=null?`:${o.line}:${o.column}`:""}`:"",d=Wn(t,l,e.message,[i,u].filter(Boolean).join(" \xB7 ")),f=[];e.file!=null&&e.start!=null&&n.get(e.file)!=null&&f.push({file:e.file,start:e.focus?.start??e.start,end:e.focus?.end??e.end,role:"primary",label:e.label});for(let h of e.related??[])n.get(h.file)!=null&&f.push({file:h.file,start:h.start,end:h.end,role:h.role,label:h.label});let p=[...new Set(f.map(h=>h.file))].map(h=>qn(n.get(h),h,f.filter(v=>v.file===h),e.file===h)),_=Math.max(2,...p.flatMap(h=>h.rows.filter(v=>v.line!=null).map(v=>String(v.line+1).length))),m=h=>`${t.paint(t.palette.dim,String(h??"").padStart(_))} ${t.paint(t.palette.rail,"\u2502")} `;for(let h of p){d.push(""),h.file!==e.file&&d.push(`${" ".repeat(_)} ${t.paint(t.palette.rail,"\u256D\u2500")} ${t.paint(t.palette.dim,r(h.file))}`);for(let v of h.rows){if(v.gap){d.push(`${" ".repeat(_)} ${t.paint(t.palette.rail,"\u2506")}`);continue}d.push(m(v.line+1)+Dn(v,h,t,a,s));for(let I of Pn(v,t,a))d.push(m()+I)}}return e.notes?.length&&d.push("",...Bn(t,e.notes)),e.fix&&n.get(e.fix.file??e.file)!=null&&d.push("",...Jn(e.fix,n.get(e.fix.file??e.file),t,m,_)),d.join(`
-`)}function qn(e,n,t,r){let s=[0];for(let f=e.indexOf(`
-`);f>=0;f=e.indexOf(`
-`,f+1))s.push(f+1);let l=f=>{let c=0,p=s.length-1;for(;c<p;){let _=c+p+1>>1;s[_]<=f?c=_:p=_-1}return c},a=f=>e.slice(s[f],(s[f+1]??e.length+1)-1).replace(/\r$/,""),i=new Set;for(let f of t){f.first=l(f.start),f.last=Math.max(f.first,l(Math.max(f.start,f.end-1)));for(let c=f.first;c<=f.last;c++)(f.last-f.first+1<=6||c<f.first+2||c>f.last-2)&&i.add(c)}let o=t.find(f=>f.role==="primary");if(o&&r){for(let f=Math.max(0,o.first-2);f<=Math.min(s.length-1,o.last+2);f++)i.add(f);for(;i.size>1&&!a(Math.max(...i)).trim()&&Math.max(...i)>o.last;)i.delete(Math.max(...i))}let u=[],d=null;for(let f of[...i].sort((c,p)=>c-p)){d!=null&&f>d+1&&u.push({gap:!0}),d=f;let c=a(f),p=t.filter(_=>_.first<=f&&f<=_.last).map(_=>{let m=f===_.first?_.start-s[f]:c.length-c.trimStart().length,h=f===_.last?Math.min(c.length,Math.max(m+1,_.end-s[f])):c.length;return{mark:_,from:m,to:Math.max(h,m+(c.length>m?1:0)),ends:f===_.last}});u.push({line:f,raw:c,offset:s[f],marks:p})}return{file:n,rows:u}}function Dn(e,n,t,r,s){let l=e.raw,a=c=>c.replace(/\t/g,"    ");if(!t.on)return a(l);let i=s?s(n.file,e.offset,e.offset+l.length):[],o=new Array(l.length).fill(null);for(let{mark:c,from:p,to:_}of e.marks)for(let m=p;m<_&&m<l.length;m++)o[m]=c.role;let u=new Array(l.length).fill(null);for(let c of i)for(let p=Math.max(0,c.start-e.offset);p<Math.min(l.length,c.end-e.offset);p++)u[p]=c.class;let d="",f=0;for(;f<l.length;){let c=f+1;for(;c<l.length&&o[c]===o[f]&&u[c]===u[f];)c++;let p=o[f],_=u[f],m=t.palette[_]??t.palette.fg,h=(p?t.tint(p==="primary"?r:t.palette[p],$n[p]):"")+(p==="primary"?t.bold:"")+(_==="comment"||_==="parameter"?t.italic:"")+t.fg(_==="comment"?t.palette.comment:m);d+=`${h}${a(l.slice(f,c))}${t.reset}`,f=c}return d}function Pn(e,n,t){let r=e.marks.filter(o=>o.ends).sort((o,u)=>o.from-u.from);if(!r.length)return[];let s=o=>En(e.raw.slice(0,o)),l=o=>o.mark.role==="primary"?t:n.palette[o.mark.role],a=[];if(!n.on){let o="",u=0;for(let d of r){let f=s(d.from),c=Math.max(f+1,s(d.to));f<u||(o+=" ".repeat(f-u)+(d.mark.role==="primary"?"\u2501":"\u2500").repeat(c-f),u=c)}a.push(o)}let i=r.filter(o=>o.mark.label);for(let o=i.length-1;o>=0;o--){let u="",d=0;for(let c=0;c<o;c++){let p=s(i[c].from);u+=" ".repeat(Math.max(0,p-d))+n.paint(l(i[c]),"\u2502"),d=p+1}let f=s(i[o].from);u+=" ".repeat(Math.max(0,f-d))+n.paint(l(i[o]),"\u2570\u2500")+" "+i[o].mark.label,a.push(u)}return a}function Jn(e,n,t,r){let s=n.lastIndexOf(`
-`,e.start-1)+1,l=(()=>{let c=n.indexOf(`
-`,e.end);return c<0?n.length:c})(),a=n.slice(s,l),i=n.slice(s,e.start)+e.text+n.slice(e.end,l),o=n.slice(0,s).split(`
-`).length,u=[`  ${t.paint(t.palette.add,`${t.bold}fix`)}   ${e.label??""}`];return t.on?(Ln(a,i).map(c=>c.k==="="?t.paint(t.palette.fg,c.t):c.k==="+"?`${t.tint(t.palette.add,.28)}${t.fg(t.palette.add)}${c.t}${t.reset}`:`${t.fg(t.palette.del)}${t.strike}${c.t}${t.reset}`).join("").split(`
-`).forEach((c,p)=>u.push(r(o+p)+c)),u):(i.split(`
-`).forEach((c,p)=>u.push(r(o+p)+c)),u)}function Ln(e,n){let t=c=>c.match(/[A-Za-z0-9_]+|\s+|./gs)??[],r=t(e),s=t(n),l=r.length,a=s.length,i=Array.from({length:l+1},()=>new Uint16Array(a+1));for(let c=l-1;c>=0;c--)for(let p=a-1;p>=0;p--)i[c][p]=r[c]===s[p]?i[c+1][p+1]+1:Math.max(i[c+1][p],i[c][p+1]);let o=[],u=(c,p)=>{let _=o[o.length-1];_?.k===c?_.t+=p:o.push({k:c,t:p})},d=0,f=0;for(;d<l&&f<a;)r[d]===s[f]?(u("=",r[d]),d++,f++):i[d+1][f]>=i[d][f+1]?u("-",r[d++]):u("+",s[f++]);for(;d<l;)u("-",r[d++]);for(;f<a;)u("+",s[f++]);return o}function zn(e,n=null){if(!n)return C(e.es??{});let{firsts:t}=Fe(e,Ne(n));return C(e.es??{},new Set(t.values()))}var Ne=e=>WebAssembly.Module.imports(new WebAssembly.Module(e,Oe));function Fe(e,n){let t=new Set(n.filter(l=>l.module==="es").map(l=>l.name)),r=Object.entries(Object.assign({},...Object.values(e.es??{}))).filter(([l])=>t.has(l)),s=new Map;for(let[l,a]of r)s.has(a)||s.set(a,l);return{fields:r,firsts:s}}function Vn(e,n,{runtime:t,glue:r,wasm:s,streaming:l=!1}){let a=Ne(n),i=new Set,o=v=>(i.add(v),v),u=[],d=[],{fields:f,firsts:c}=Fe(e,a);if(r&&f.length){let v=!1,I=f.map(([,E])=>{let F=U(c.get(E));return Gn(K(E).expr)?F:(v=!0,`$utuValue(${F})`)});u.push(`import { ${[...c.values()].map(U).join(", ")} } from ${JSON.stringify(r)};`),v&&u.push("const $utuValue = value => typeof value === 'function' ? value : () => value;");let T=f.every(([E],F)=>E===String(F));d.push(`es: ${T?`[${I.join(", ")}]`:`{ ${f.map(([E],F)=>`${E}: ${I[F]}`).join(", ")} }`}`)}let p=[];for(let{module:v,name:I}of a)v==="utu"&&(I==="closure_new"?p.push(`closure_new: ${o("closureNew")}`):I==="closure_rec"?p.push(`closure_rec: ${o("closureRec")}`):I.startsWith("closure_call_")?p.push(`${I}: ${o("closureApply")}`):I==="promise_then"?p.push(`promise_then: ${o("promiseThen")}`):I==="promise_catch"?p.push(`promise_catch: ${o("promiseCatch")}`):I.startsWith("await_")?p.push(`${I}: ${o("awaitImport")}()`):I==="js_tag"&&p.push("js_tag: WebAssembly.JSTag"));if(p.length||e.mems){let v=`{ ${p.join(", ")} }`;d.push(`utu: ${e.mems?`${o("memoryImports")}(${JSON.stringify(e.mems)}, ${v})`:v}`)}let _=e.promises?.asyncExports??[],m="instance.exports";_.length&&(m=`{ ...instance.exports, ${_.map(I=>`${JSON.stringify(I)}: ${o("promising")}(instance.exports[${JSON.stringify(I)}])`).join(", ")} }`),e.exports&&(m=`${o("convertExports")}(${m}, ${JSON.stringify(e.exports)})`),i.size&&u.unshift(`import { ${[...i].join(", ")} } from ${JSON.stringify(t)};`);let h=l?"instantiateStreaming":"instantiate";return u.push(`export const { instance } = await WebAssembly.${h}(${s}, { ${d.join(", ")} }, ${JSON.stringify(Oe)});`),u.push(`export const exports = ${m};`),u.join(`
+`)}function en(e,n){let t=n.get(e);if(!t){t=[0];for(let r of e.matchAll(/\r\n?|\n/g))t.push(r.index+r[0].length);n.set(e,t)}return t}function me(e,n){let t=0,r=e.length-1;for(;t<r;){let i=t+r+1>>1;e[i]<=n?t=i:r=i-1}return t}function wt(e,n,t,r,i,l){let d=e.severity??"error",f=t.palette[d]??t.palette.error,s=e.code??e.kind??"",m=e.focus??e,o=e.file!=null?`${r(e.file)}${m.line!=null?`:${m.line}:${m.column}`:""}`:"",a=yt(t,d,e.message,[s,o].filter(Boolean).join(" \xB7 ")),u=[];e.file!=null&&e.start!=null&&n.get(e.file)!=null&&u.push({file:e.file,start:e.focus?.start??e.start,end:e.focus?.end??e.end,role:"primary",label:e.label});for(let g of e.related??[])n.get(g.file)!=null&&u.push({file:g.file,start:g.start,end:g.end,role:g.role,label:g.label});let w=[...new Set(u.map(g=>g.file))].map(g=>vt(n.get(g),en(n.get(g),l),g,u.filter(x=>x.file===g),e.file===g)),y=Math.max(2,...w.flatMap(g=>g.rows.filter(x=>x.line!=null).map(x=>String(x.line+1).length))),c=g=>`${t.paint(t.palette.dim,String(g??"").padStart(y))} ${t.paint(t.palette.rail,"\u2502")} `;for(let g of w){a.push(""),g.file!==e.file&&a.push(`${" ".repeat(y)} ${t.paint(t.palette.rail,"\u256D\u2500")} ${t.paint(t.palette.dim,r(g.file))}`);for(let x of g.rows){if(x.gap){a.push(`${" ".repeat(y)} ${t.paint(t.palette.rail,"\u2506")}`);continue}a.push(c(x.line+1)+xt(x,g,t,f,i));for(let k of kt(x,t,f))a.push(c()+k)}}return e.notes?.length&&a.push("",...bt(t,e.notes)),e.fix&&n.get(e.fix.file??e.file)!=null&&a.push("",...It(e.fix,n.get(e.fix.file??e.file),l,t,c,y)),a.join(`
+`)}function vt(e,n,t,r,i){let l=o=>e.slice(n[o],n[o+1]??e.length).replace(/\r?\n?$/,""),d=new Set;for(let o of r){o.first=me(n,o.start),o.last=Math.max(o.first,me(n,Math.max(o.start,o.end-1)));for(let a=o.first;a<=o.last;a++)(o.last-o.first+1<=6||a<o.first+2||a>o.last-2)&&d.add(a)}let f=r.find(o=>o.role==="primary");if(f&&i){for(let o=Math.max(0,f.first-2);o<=Math.min(n.length-1,f.last+2);o++)d.add(o);for(;d.size>1&&!l(Math.max(...d)).trim()&&Math.max(...d)>f.last;)d.delete(Math.max(...d))}let s=[],m=null;for(let o of[...d].sort((a,u)=>a-u)){m!=null&&o>m+1&&s.push({gap:!0}),m=o;let a=l(o),u=r.filter(h=>h.first<=o&&o<=h.last).map(h=>{let w=o===h.first?h.start-n[o]:a.length-a.trimStart().length,y=o===h.last?Math.min(a.length,Math.max(w+1,h.end-n[o])):a.length;return{mark:h,from:w,to:Math.max(y,w+(a.length>w?1:0)),drawn:o===h.first}});if(a.length>240){let h=Math.min(a.length,...u.map(k=>k.from)),w=Math.min(Math.max(h+1,...u.map(k=>k.to)),h+240),y=Math.max(0,h-80),c=Math.min(a.length,w+80),g=y>0?"\u2026":"",x=k=>Math.min(Math.max(k,y),c)-y+g.length;s.push({line:o,raw:g+a.slice(y,c)+(c<a.length?"\u2026":""),offset:n[o]+y-g.length,marks:u.map(k=>({...k,from:x(k.from),to:Math.max(x(k.to),x(k.from)+1)}))});continue}s.push({line:o,raw:a,offset:n[o],marks:u})}return{file:t,rows:s}}function xt(e,n,t,r,i){let l=e.raw,d=u=>u.replace(/\t/g,"    ");if(!t.on)return d(l);let f=i?i(n.file,e.offset,e.offset+l.length):[],s=new Array(l.length).fill(null);for(let{mark:u,from:h,to:w}of e.marks)for(let y=h;y<w&&y<l.length;y++)s[y]=u.role;let m=new Array(l.length).fill(null);for(let u of f)for(let h=Math.max(0,u.start-e.offset);h<Math.min(l.length,u.end-e.offset);h++)m[h]=u.class;let o="",a=0;for(;a<l.length;){let u=a+1;for(;u<l.length&&s[u]===s[a]&&m[u]===m[a];)u++;let h=s[a],w=m[a],y=t.palette[w]??t.palette.fg,c=(h?t.tint(h==="primary"?r:t.palette[h],_t[h]):"")+(h==="primary"?t.bold:"")+(w==="comment"||w==="parameter"?t.italic:"")+t.fg(w==="comment"?t.palette.comment:y);o+=`${c}${d(l.slice(a,u))}${t.reset}`,a=u}return o}function kt(e,n,t){let r=e.marks.filter(s=>s.drawn).sort((s,m)=>s.from-m.from);if(!r.length)return[];let i=s=>ct(e.raw.slice(0,s)),l=s=>s.mark.role==="primary"?t:n.palette[s.mark.role],d=[];if(!n.on){let s="",m=0;for(let o of r){let a=i(o.from),u=Math.max(a+1,i(o.to));a<m||(s+=" ".repeat(a-m)+(o.mark.role==="primary"?"\u2501":"\u2500").repeat(u-a),m=u)}d.push(s)}let f=r.filter(s=>s.mark.label);for(let s=f.length-1;s>=0;s--){let m="",o=0;for(let u=0;u<s;u++){let h=i(f[u].from);m+=" ".repeat(Math.max(0,h-o))+n.paint(l(f[u]),"\u2502"),o=h+1}let a=i(f[s].from);m+=" ".repeat(Math.max(0,a-o))+n.paint(l(f[s]),"\u2570\u2500")+" "+f[s].mark.label,d.push(m)}return d}function It(e,n,t,r,i){let l=n.slice(0,e.start),d=Math.max(l.lastIndexOf(`
+`),l.lastIndexOf("\r"))+1,f=n.slice(e.end).search(/[\r\n]/),s=f<0?n.length:e.end+f,m=n.slice(d,e.start),o=n.slice(e.end,s),a=m.length>240?"\u2026"+m.slice(-80):m,u=o.length>240?o.slice(0,80)+"\u2026":o,h=a+n.slice(e.start,e.end)+u,w=a+e.text+u,y=me(en(n,t),d)+(n[d-1]==="\r"&&n[d]===`
+`?2:1),c=[`  ${r.paint(r.palette.add,`${r.bold}fix`)}   ${e.label??""}`];return r.on?(St(h,w).map(k=>k.k==="="?r.paint(r.palette.fg,k.t):k.k==="+"?`${r.tint(r.palette.add,.28)}${r.fg(r.palette.add)}${k.t}${r.reset}`:`${r.fg(r.palette.del)}${r.strike}${k.t}${r.reset}`).join("").split(/\r\n?|\n/).forEach((k,E)=>c.push(i(y+E)+k)),c):(w.split(/\r\n?|\n/).forEach((k,E)=>c.push(i(y+E)+k)),c)}function St(e,n){let t=u=>u.match(/[A-Za-z0-9_]+|\s+|./gs)??[],r=t(e),i=t(n),l=r.length,d=i.length,f=Array.from({length:l+1},()=>new Uint16Array(d+1));for(let u=l-1;u>=0;u--)for(let h=d-1;h>=0;h--)f[u][h]=r[u]===i[h]?f[u+1][h+1]+1:Math.max(f[u+1][h],f[u][h+1]);let s=[],m=(u,h)=>{let w=s[s.length-1];w?.k===u?w.t+=h:s.push({k:u,t:h})},o=0,a=0;for(;o<l&&a<d;)r[o]===i[a]?(m("=",r[o]),o++,a++):f[o+1][a]>=f[o][a+1]?m("-",r[o++]):m("+",i[a++]);for(;o<l;)m("-",r[o++]);for(;a<d;)m("+",i[a++]);return s}function At(e,n=null){if(!n)return G(e.es??{});let{firsts:t}=tn(e,nn(n));return G(e.es??{},new Set(t.values()))}var nn=e=>WebAssembly.Module.imports(new WebAssembly.Module(e,$t));function tn(e,n){let t=new Set(n.filter(l=>l.module==="es").map(l=>l.name)),r=Object.entries(Object.assign({},...Object.values(e.es??{}))).filter(([l])=>t.has(l)),i=new Map;for(let[l,d]of r)i.has(d)||i.set(d,l);return{fields:r,firsts:i}}function Tt(e,n,{runtime:t,glue:r,wasm:i,streaming:l=!1}){let d=nn(n),f=new Set,s=S=>(f.add(S),S),m=[],o=[],{fields:a,firsts:u}=tn(e,d);if(r&&a.length){let S=!1,T=a.map(([,R])=>{let N=L(u.get(R));return Mt(V(R).expr)?N:(S=!0,`$utuValue(${N})`)});m.push(`import { ${[...u.values()].map(L).join(", ")} } from ${JSON.stringify(r)};`),S&&m.push("const $utuValue = value => typeof value === 'function' ? value : () => value;");let O=a.every(([R],N)=>R===String(N));o.push(`es: ${O?`[${T.join(", ")}]`:`{ ${a.map(([R],N)=>`${R}: ${T[N]}`).join(", ")} }`}`)}let h=[];for(let{module:S,name:T}of d)S==="utu"&&(T==="closure_new"?h.push(`closure_new: ${s("closureNew")}`):T==="closure_rec"?h.push(`closure_rec: ${s("closureRec")}`):T.startsWith("closure_call_")?h.push(`${T}: ${s("closureApply")}`):T==="promise_then"?h.push(`promise_then: ${s("promiseThen")}`):T==="promise_catch"?h.push(`promise_catch: ${s("promiseCatch")}`):T.startsWith("await_")?h.push(`${T}: ${s("awaitImport")}(${T.startsWith("await_null_")?"true":""})`):T==="js_tag"&&h.push("js_tag:WebAssembly.JSTag"));if(h.length||e.mems){let S=`{${h.join(",")}}`;o.push(`utu: ${e.mems?`${s("memoryImports")}(${JSON.stringify(e.mems)}, ${S})`:S}`)}let w=e.promises?.asyncExports??[],y="instance.exports",c="";if(w.length&&(y=`{ ...instance.exports, ${w.map(T=>`${JSON.stringify(T)}: ${s("promising")}(instance.exports[${JSON.stringify(T)}])`).join(", ")} }`),e.exports){let S=jt(e.exports,y,w);S?(c=S.source,y=S.name):y=`${s("convertExports")}(${y}, ${JSON.stringify(e.exports)})`}f.size&&m.unshift(`import { ${[...f].join(", ")} } from ${JSON.stringify(t)};`);let g=l?"instantiateStreaming":"instantiate",x=WebAssembly.Module.imports(new WebAssembly.Module(n)).map(S=>S.module),k={};x.includes("wasm:js-string")&&(k.builtins=["js-string"]),x.includes("'")&&(k.importedStringConstants="'");let E=Object.keys(k).length?`,${JSON.stringify(k)}`:"";return m.push(`export const {instance}=await WebAssembly.${g}(${i},{${o.join(",")}}${E});`),c&&m.push(c),m.push(`export const exports=${y};`),m.join(`
 `)+`
-`}function Gn(e){return/^(async\s+)?(function\b|[\w$]+\s*=>|\([^()]*\)\s*=>)/.test(e)||/^\((f => \((p\d+(,p\d+)*)?\) => |v => \(\) => v\)\(|v => \(w => \(\) => w\)\()/.test(e)}var Oe={builtins:["js-string"],importedStringConstants:"'"};var We=()=>import("./browser-catalog.generated-2OMWPVRO.js");async function Be(e,n,t){let r=e[`${n}_JSON`];if(r===void 0){let l=Uint8Array.from(atob(e[`${n}_GZIP`]),i=>i.charCodeAt(0)),a=new Blob([l]).stream().pipeThrough(new DecompressionStream("gzip"));r=await new Response(a).text()}let s=JSON.parse(r);if(s.version!==1)throw new Error(`Unsupported ${t} declaration ABI version`);return s}function D(e){let n;return()=>n??=e().catch(t=>{throw n=void 0,t})}var te=D(async()=>Be(await We(),"BROWSER_ABI","browser")),Kn=D(async()=>Be(await We(),"WORKER_ABI","worker"));function $e(e,n,t){let r=s=>Object.fromEntries(Object.entries(s).filter(([l])=>t(l)));return{source:`mod ${e} {}`,abi:{...n,prefix:e,exports:r(n.exports),names:r(n.names),mutableGlobals:n.mutableGlobals.filter(t)}}}async function Ue(){return{source:"mod Browser {}",abi:await te()}}var Ce=D(async()=>{let e=await te(),n=new Set(e.ecmascript??[]);return $e("JS",e,t=>n.has(t))}),Yn=["AbortController","AbortSignal","Blob","ByteLengthQueuingStrategy","CompressionStream","CountQueuingStrategy","Crypto","CryptoKey","CustomEvent","DOMException","DecompressionStream","Event","EventTarget","File","FormData","Headers","MessageChannel","MessageEvent","MessagePort","ReadableByteStreamController","ReadableStream","ReadableStreamBYOBReader","ReadableStreamBYOBRequest","ReadableStreamDefaultController","ReadableStreamDefaultReader","Request","RequestInit","Response","ResponseInit","SubtleCrypto","TextDecoder","TextDecoderStream","TextEncoder","TextEncoderStream","TransformStream","TransformStreamDefaultController","URL","URLSearchParams","WebAssembly","WritableStream","WritableStreamDefaultController","WritableStreamDefaultWriter","atob","btoa","clearInterval","clearTimeout","console","crypto","fetch","navigator","performance","queueMicrotask","reportError","setInterval","setTimeout","structuredClone"],qe=D(async()=>{let e=new Set(Yn);return $e("Web",await te(),n=>e.has(n))}),De=D(async()=>({source:"mod Worker {}",abi:await Kn()}));var k="ir-wasm-",P=new Map([["std:Array",`// std/Array.utu \u2014 Array[T1]
+`}function jt(e,n,t=[]){let r={Bool:o=>`!!${o}`,int:o=>`Number.isInteger(${o})`,big:o=>`typeof ${o}==="bigint"`,num:o=>`typeof ${o}==="number"`,Str:o=>`typeof ${o}==="string"`,"?Str":o=>`${o}==null||typeof ${o}==="string"`,ref:o=>`${o}!=null`,cl:o=>`typeof ${o}==="function"`,"?":o=>`${o}===undefined?null:${o}`},i={int:"an integer",big:"a BigInt",num:"a number",Str:"a string","?Str":"a string or null",ref:"a value",cl:"a function"},l=(o,a)=>o==="Bool"?`${a}!==0`:o==="U32"?`${a}>>>0`:o==="U64"?`BigInt.asUintN(64,${a})`:a,d=o=>typeof o=="string",f=!1,s=[];for(let[o,a]of Object.entries(e)){let u=typeof a=="string"?a:a.r,h=typeof a=="string"?null:a.p??null;if(!(Array.isArray(u)?u.every(d):d(u))||h?.some(S=>!(S in r)))return null;let w=JSON.stringify(o),y=h?h.map((S,T)=>`a${T}`):null,c=[];h?.forEach((S,T)=>{let O=y[T];S==="Bool"||S==="?"?c.push(`${O}=${r[S](O)}`):(f=!0,c.push(`${r[S](O)}||$utuFail(${w},${T},${JSON.stringify(i[S])},${O})`),S==="?Str"&&c.push(`${O}??=null`))});let g=`$utuIn[${w}](${y?y.join(","):"...a"})`,x=S=>Array.isArray(u)?(S==="x"?"":"(v=>")+`${S==="x"?"x":"v"}.map((x,i)=>[${u.map(T=>`x=>${l(T,"x")}`).join(",")}][i](x))`+(S==="x"?"":`)(${S})`):l(u,S),k=t.includes(o)?x("x")==="x"?g:`${g}.then(x=>${x("x")})`:x(g),E=c.length?`(${[...c,k].join(",")})`:k;y?s.push(`${w}:(${y.join(",")})=>${E}`):s.push(`${w}:Object.defineProperty((...a)=>${E},"length",{value:$utuIn[${w}].length})`)}let m=[`const $utuIn=${n},$utuExports={...$utuIn,${s.join(",")}};`];return f&&m.unshift('const $utuFail=(name,i,what,v)=>{throw new TypeError(`${name}: argument ${i+1} must be ${what}, not ${v===null?"null":what==="an integer"&&typeof v==="number"?v:typeof v}`)};'),{source:m.join(`
+`),name:"$utuExports"}}function Mt(e){return/^(async\s+)?(function\b|[\w$]+\s*=>|\([^()]*\)\s*=>)/.test(e)||/^\((f => \((p\d+(,p\d+)*)?\) => |v => \(\) => v\)\(|v => \(w => \(\) => w\)\()/.test(e)||e.startsWith("$utuFn(")}var $t={builtins:["js-string"],importedStringConstants:"'"};var rn=()=>import("./browser-catalog.generated-TVPIZNWR.js");async function sn(e,n,t){let r=e[`${n}_JSON`];if(r===void 0){let l=Uint8Array.from(atob(e[`${n}_GZIP`]),f=>f.charCodeAt(0)),d=new Blob([l]).stream().pipeThrough(new DecompressionStream("gzip"));r=await new Response(d).text()}let i=JSON.parse(r);if(i.version!==1)throw new Error(`Unsupported ${t} declaration ABI version`);return i}function X(e){let n;return()=>n??=e().catch(t=>{throw n=void 0,t})}var pe=X(async()=>sn(await rn(),"BROWSER_ABI","browser")),Ft=X(async()=>sn(await rn(),"WORKER_ABI","worker"));function an(e,n,t){let r=i=>Object.fromEntries(Object.entries(i).filter(([l])=>t(l)));return{source:`mod ${e} {}`,abi:{...n,prefix:e,exports:r(n.exports),names:r(n.names),mutableGlobals:n.mutableGlobals.filter(t)}}}async function on(){return{source:"mod Browser {}",abi:await pe()}}var ln=X(async()=>{let e=await pe(),n=new Set(e.ecmascript??[]);return an("JS",e,t=>n.has(t))}),Et=["AbortController","AbortSignal","Blob","ByteLengthQueuingStrategy","CompressionStream","CountQueuingStrategy","Crypto","CryptoKey","CustomEvent","DOMException","DecompressionStream","Event","EventTarget","File","FormData","Headers","MessageChannel","MessageEvent","MessagePort","ReadableByteStreamController","ReadableStream","ReadableStreamBYOBReader","ReadableStreamBYOBRequest","ReadableStreamDefaultController","ReadableStreamDefaultReader","Request","RequestInit","Response","ResponseInit","SubtleCrypto","TextDecoder","TextDecoderStream","TextEncoder","TextEncoderStream","TransformStream","TransformStreamDefaultController","URL","URLSearchParams","WebAssembly","WritableStream","WritableStreamDefaultController","WritableStreamDefaultWriter","atob","btoa","clearInterval","clearTimeout","console","crypto","fetch","navigator","performance","queueMicrotask","reportError","setInterval","setTimeout","structuredClone"],fn=X(async()=>{let e=new Set(Et);return an("Web",await pe(),n=>e.has(n))}),dn=X(async()=>({source:"mod Worker {}",abi:await Ft()}));var M="ir-wasm-",Q=new Map([["std:Array",`// std/Array.utu \u2014 Array[T1]
 //
 // & maps to a WasmGC mutable array type with element type T1.
 //
@@ -94,7 +95,7 @@ mod Array[T1] {
         </ir-array-copy> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Bool",`// std/Bool.utu \u2014 Bool scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:Bool",`// std/Bool.utu \u2014 Bool scalar type module
 // & is a WasmGC I32 used as boolean (0 = false, 1 = true).
 // Logical operators live here like every other operator; the compiler lowers
 // \`and\`, \`or\`, \`xor\`, and \`not\` through this module instead of hardcoding them.
@@ -115,7 +116,7 @@ mod Bool {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Buffer",`// Geometrically growing native buffer, including non-defaultable element types.
+`.replaceAll("@@IR_WASM@@",M)],["std:Buffer",`// Geometrically growing native buffer, including non-defaultable element types.
 // Its checks are kept only in a --safe build: otherwise an index past the
 // length reaches the capacity beyond (and past that, the array's own bounds
 // trap).
@@ -177,7 +178,7 @@ mod Buffer[T] {
         self.values.slice(0, self.length);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Console",`//! The host's console: \`using console from std:Console;\`, then
+`.replaceAll("@@IR_WASM@@",M)],["std:Console",`//! The host's console: \`using console from std:Console;\`, then
 //! \`console.log("hello")\`. Text in, nothing out; each function ships only
 //! when used.
 
@@ -200,7 +201,7 @@ mod console {
         f(text);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Externref",`// std/Externref.utu \u2014 Externref opaque external reference type module
+`.replaceAll("@@IR_WASM@@",M)],["std:Externref",`// std/Externref.utu \u2014 Externref opaque external reference type module
 // & maps to the WebAssembly Externref type: an opaque, garbage-collected
 // reference to a host (JavaScript) object.
 // Externrefs ARE nullable: ?Externref is valid.
@@ -211,7 +212,7 @@ mod console {
 mod Externref {
     type & = @ir/\\ <@@IR_WASM@@ref type-repr="wasm-externref"/> \\/
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:F32",`// std/F32.utu \u2014 F32 scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:F32",`// std/F32.utu \u2014 F32 scalar type module
 // & is a WasmGC F32 value (stack-only, never heap-allocated, never nullable).
 
 mod F32 {
@@ -255,7 +256,7 @@ mod F32 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:F64",`// std/F64.utu \u2014 F64 scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:F64",`// std/F64.utu \u2014 F64 scalar type module
 // & is a WasmGC F64 value (stack-only, never heap-allocated, never nullable).
 
 mod F64 {
@@ -403,7 +404,7 @@ mod F64 {
     /// Not a number.
     fn nan() & { 0.0 / 0.0; }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Found",`// Optional iterator result: null means empty; a present wrapper holds any T,
+`.replaceAll("@@IR_WASM@@",M)],["std:Found",`// Optional iterator result: null means empty; a present wrapper holds any T,
 // including non-nullable scalar types. Use \`promote\` or \`orelse\` to unwrap.
 mod Found[T] {
     struct &:
@@ -412,7 +413,7 @@ mod Found[T] {
         &{ value: value };
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Group",`mod Group[K, T] {
+`.replaceAll("@@IR_WASM@@",M)],["std:Group",`mod Group[K, T] {
     struct &:
         | key: K
         | values: Array[T]
@@ -420,7 +421,7 @@ mod Found[T] {
         &{ key: key, values: [] };
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:I31",`// std/I31.utu \u2014 I31 WasmGC reference type module
+`.replaceAll("@@IR_WASM@@",M)],["std:I31",`// std/I31.utu \u2014 I31 WasmGC reference type module
 // & maps to WasmGC i31ref: a 31-bit signed integer packed into a GC reference.
 // I31 IS nullable: ?I31 is valid (it is a heap reference).
 //
@@ -451,7 +452,7 @@ mod I31 {
     fn &:eq |a, b| Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }
     fn &:ne |a, b| Bool { @ir/\\ <ir-ref-ne><ir-ident name="a"/><ir-ident name="b"/></ir-ref-ne> \\/; }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:I32",`// std/I32.utu \u2014 I32 scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:I32",`// std/I32.utu \u2014 I32 scalar type module
 // & is a WasmGC I32 value (stack-only, never heap-allocated, never nullable).
 
 mod I32 {
@@ -500,7 +501,7 @@ mod I32 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:I64",`// std/I64.utu \u2014 I64 scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:I64",`// std/I64.utu \u2014 I64 scalar type module
 mod I64 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i64"/> \\/
 
@@ -544,7 +545,7 @@ mod I64 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:IntMap",`// std/IntMap.utu \u2014 I32 keys to I32 values, open addressing.
+`.replaceAll("@@IR_WASM@@",M)],["std:IntMap",`// std/IntMap.utu \u2014 I32 keys to I32 values, open addressing.
 //
 //   let m = IntMap.new();
 //   m.set(7, 70);
@@ -620,16 +621,20 @@ mod IntMap {
         };
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Interner",`// std/Interner.utu \u2014 byte strings to dense I32 ids: 0, 1, 2, \u2026 in first-seen order.
+`.replaceAll("@@IR_WASM@@",M)],["std:Interner",`// std/Interner.utu \u2014 byte strings to dense I32 ids: 0, 1, 2, \u2026 in first-seen order.
 //
 //   let names = Interner.new();
+//   let id = names.str("caf\xE9");   // a string: its UTF-8 bytes
 //   names.begin();
-//   for (start ..< end) |i| { names.byte(src[i]); };   // src can be a mem
+//   for (start ..< end) |i| { names.byte(src[i]); };   // bytes: from a mem, an array
 //   let id = names.finish();      // the same bytes always get the same id
 //   names.size(id); names.byte_at(id, 0); names.ascii(id);
 //
-// Keys arrive a byte at a time, so they can come from a mem, an array, or a
-// string. The bytes of a new key are kept; a repeated key's are dropped.
+// A key is bytes, 0 to 255. \`byte\` traps on anything else in safe builds
+// (unsafe builds keep the low 8 bits), so feed it bytes, not a string's
+// UTF-16 code units: \`str\` encodes a string as UTF-8, the same bytes a hosted
+// mem's \`copy_in\` writes, so a string and its bytes from a mem get one id.
+// The bytes of a new key are kept; a repeated key's are dropped.
 // FNV-1a hashing, linear probing over a power-of-two table at most half full.
 mod Interner {
     struct &:
@@ -657,7 +662,9 @@ mod Interner {
         self.hash = -2128831035;
     }
 
+    // One byte of the key, 0 to 255.
     fn &.byte |self| (b: I32) void {
+        if checks() and (b < 0 or b > 255) { fatal; };
         if self.used == self.bytes.len() {
             let grown = Array[I32].new(self.used * 2, 0);
             grown.copy_from(0, self.bytes, 0, self.used);
@@ -666,6 +673,39 @@ mod Interner {
         self.bytes[self.used] = b & 255;
         self.used += 1;
         self.hash = (self.hash ^ (b & 255)) * 16777619;
+    }
+
+    // The id of \`s\` as UTF-8, adding it if it is new: begin, its bytes, finish.
+    // A lone surrogate is 3 bytes of its own (WTF-8), so distinct strings
+    // always get distinct ids.
+    fn &.str |self| (s: Str) I32 {
+        self.begin();
+        let n = s.len();
+        let i = 0;
+        while (i < n) {
+            let c = s[i];
+            i += 1;
+            if c >= 55296 and c <= 56319 and i < n and s[i] >= 56320 and s[i] <= 57343 {
+                c = 65536 + ((c - 55296) << 10) + (s[i] - 56320);
+                i += 1;
+            };
+            if c < 128 {
+                self.byte(c);
+            } else if c < 2048 {
+                self.byte(192 | (c >> 6));
+                self.byte(128 | (c & 63));
+            } else if c < 65536 {
+                self.byte(224 | (c >> 12));
+                self.byte(128 | ((c >> 6) & 63));
+                self.byte(128 | (c & 63));
+            } else {
+                self.byte(240 | (c >> 18));
+                self.byte(128 | ((c >> 12) & 63));
+                self.byte(128 | ((c >> 6) & 63));
+                self.byte(128 | (c & 63));
+            };
+        };
+        self.finish();
     }
 
     // The id of the bytes since begin(), adding them if they are new.
@@ -728,12 +768,15 @@ mod Interner {
         self.bytes[self.starts[id] + k];
     }
 
-    // The key as a string, one character per byte (exact for ASCII).
+    fn checks() Bool { @ir/\\ <ir-safe-checks/> \\/; }
+
+    // The key as a string, one character per byte: exact for ASCII; a
+    // multi-byte UTF-8 character shows as its bytes.
     fn &.ascii |self| (id: I32) Str {
         Str.from_codes(self.bytes.slice(self.starts[id], self.starts[id + 1]), self.size(id));
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:JsonRuntime",`struct JsonReader__:
+`.replaceAll("@@IR_WASM@@",M)],["std:JsonRuntime",`struct JsonReader__:
     | text: Str
     | at: I32
     | n: I32
@@ -1224,11 +1267,14 @@ fn __json_describe(r: JsonReader__) Str {
     };
     let line = 1;
     let column = 1;
+    // A line ends at \\n, \\r\\n, or a lone \\r; a column counts characters
+    // (not a surrogate pair's second half).
     for (0..<(r.failed - 1)) |i| {
-        if r.text[i] == 10 {
+        let c = r.text[i];
+        if c == 10 or (c == 13 and (i + 1 >= r.text.len() or r.text[i + 1] != 10)) {
             line += 1;
             column = 1;
-        } else {
+        } else if c < 56320 or c > 57343 {
             column += 1;
         };
     };
@@ -1397,7 +1443,7 @@ fn __json_put_f32(w: JsonWriter__, x: F32) void {
         };
     };
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:List",`mod List[T] {
+`.replaceAll("@@IR_WASM@@",M)],["std:List",`mod List[T] {
     // Persistent edits; the input remains unchanged.
     fn append(self: Array[T], value: T) Array[T] {
         let result = Array[T].new(self.len() + 1, value);
@@ -1414,7 +1460,7 @@ fn __json_put_f32(w: JsonWriter__, x: F32) void {
         };
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:LiteralDefaults",`// std/LiteralDefaults.utu \u2014 default static type for each literal syntax kind
+`.replaceAll("@@IR_WASM@@",M)],["std:LiteralDefaults",`// std/LiteralDefaults.utu \u2014 default static type for each literal syntax kind
 //
 // The compiler reads <ir-literal-defaults> during type inference to decide
 // what \`data-type-name\` to stamp on every literal.  Each <ir-default kind="X"
@@ -1448,7 +1494,7 @@ mod LiteralDefaults {
       </ir-literal-defaults>
     \\/
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:M128",`// std/M128.utu \u2014 M128 bitmask type module
+`.replaceAll("@@IR_WASM@@",M)],["std:M128",`// std/M128.utu \u2014 M128 bitmask type module
 // & is a 128-bit SIMD mask value (same wasm representation as V128).
 // Used for lane-selection in SIMD operations.
 // Supports bitwise ops; interpreted as four 32-bit lanes of all-zeros/all-ones.
@@ -1485,10 +1531,11 @@ mod M128 {
         @ir/\\ <ir-v128-any-true><ir-ident name="a"/></ir-v128-any-true> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:M32",`// std/M32.utu \u2014 M32 bitmask type module
+`.replaceAll("@@IR_WASM@@",M)],["std:M32",`// std/M32.utu \u2014 M32 bitmask type module
 // & is a 32-bit bitmask value (same wasm representation as I32).
 // Intended for use as a lane-selection mask, not a general integer.
 // Supports bitwise and comparison ops; arithmetic (add/sub/mul) is excluded.
+// A mask has no sign: \`>>\` is a logical shift, the same as \`>>>\` (zeros in).
 
 mod M32 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i32"/> \\/
@@ -1504,10 +1551,11 @@ mod M32 {
     fn &:eq   |a, b| Bool { @ir/\\ <ir-i32-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i32-eq> \\/; }
     fn &:ne   |a, b| Bool { @ir/\\ <ir-i32-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i32-ne> \\/; }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:M64",`// std/M64.utu \u2014 M64 bitmask type module
+`.replaceAll("@@IR_WASM@@",M)],["std:M64",`// std/M64.utu \u2014 M64 bitmask type module
 // & is a 64-bit bitmask value (same wasm representation as I64).
 // Intended for use as a lane-selection mask, not a general integer.
 // Supports bitwise and comparison ops; arithmetic (add/sub/mul) is excluded.
+// A mask has no sign: \`>>\` is a logical shift, the same as \`>>>\` (zeros in).
 
 mod M64 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i64"/> \\/
@@ -1523,7 +1571,7 @@ mod M64 {
     fn &:eq   |a, b| Bool { @ir/\\ <ir-i64-eq><ir-ident name="a"/><ir-ident name="b"/></ir-i64-eq> \\/; }
     fn &:ne   |a, b| Bool { @ir/\\ <ir-i64-ne><ir-ident name="a"/><ir-ident name="b"/></ir-i64-ne> \\/; }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:NumberField",`// Keep the user's draft, including empty/invalid text, separate from a number.
+`.replaceAll("@@IR_WASM@@",M)],["std:NumberField",`// Keep the user's draft, including empty/invalid text, separate from a number.
 mod NumberField {
     struct &:
         | text: Str
@@ -1540,7 +1588,7 @@ mod NumberField {
         if self.valid(min,max) { ""; } else { "Enter a number within the allowed range."; };
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Ord",`//! An order, for bounded modules: \`using Ord from std:Ord;\` and
+`.replaceAll("@@IR_WASM@@",M)],["std:Ord",`//! An order, for bounded modules: \`using Ord from std:Ord;\` and
 //! \`using Order from std:Ord;\`.
 //!
 //! \`Ord\` is a protocol: \`a.cmp(b)\` is negative when a comes first, zero
@@ -1588,6 +1636,7 @@ mod Order[T[Ord]] {
     fn min(a: T, b: T) T { if b.cmp(a) < 0 { b; } else { a; }; }
 
     /// \`x\`, or the nearer of \`low\` and \`high\` when it is outside them.
+    /// With \`low\` after \`high\`: \`low\` when \`x\` is before \`low\`, else \`high\`.
     fn clamp(x: T, low: T, high: T) T {
         if x.cmp(low) < 0 { low; } else if x.cmp(high) > 0 { high; } else { x; };
     }
@@ -1663,7 +1712,7 @@ mod Order[T[Ord]] {
         best;
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:PersistentSegmentTree",`// Immutable versions of an ordered monoid index. Point updates share untouched
+`.replaceAll("@@IR_WASM@@",M)],["std:PersistentSegmentTree",`// Immutable versions of an ordered monoid index. Point updates share untouched
 // branches, allocating O(log n) new nodes. combine must be pure and associative.
 mod PersistentSegmentTree[T] {
     struct Node:
@@ -1731,7 +1780,7 @@ mod PersistentSegmentTree[T] {
         range(self.root, 0, self.length, start, end_, self.identity, combine);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Prelude",`// std/prelude.utu \u2014 automatically injected into every compilation
+`.replaceAll("@@IR_WASM@@",M)],["std:Prelude",`// std/prelude.utu \u2014 automatically injected into every compilation
 //
 // Every name listed here is visible in user code without an explicit \`using\`.
 // The compiler prepends these modules before processing any file.
@@ -1779,7 +1828,7 @@ using Found from std:Found;
 using Group from std:Group;
 using Result from std:Result;
 using wutu from std:Wutu;
-`.replaceAll("@@IR_WASM@@",k)],["std:Promise",`// std/Promise.utu \u2014 Promise[T]
+`.replaceAll("@@IR_WASM@@",M)],["std:Promise",`// std/Promise.utu \u2014 Promise[T]
 //
 // & maps to WebAssembly externref, so a \`Promise[T]\` IS a real JavaScript
 // promise. Nothing is wrapped, boxed, or marshalled: a promise obtained from
@@ -1805,16 +1854,20 @@ mod Promise[T1] {
     // function \u2014 the host hands it straight to \`p.then\` with nothing between.
     // Both operands are externref whatever T1 is, so this needs one host
     // import rather than one per instantiation.
+    // On rejection: with a \`catch\` on the same promise, attached before it
+    // settles, only that \`catch\` runs. Without one, the rejection is reported
+    // as unhandled, as JS's \`p.then(f)\` would. A trap in \`on_value\` is reported.
     fn &.then |self| (on_value: cl(T1) void) void {
         @ir/\\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \\/;
     }
 
-    // Subscribe to rejection. The reason is an opaque host value.
+    // Subscribe to rejection. The reason is an opaque host value. Marks the
+    // promise handled, so a \`then\` on it no longer reports the rejection.
     fn &.catch |self| (on_error: cl(Externref) void) void {
         @ir/\\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Random",`//! Seeded random numbers: \`using Random from std:Random;\`.
+`.replaceAll("@@IR_WASM@@",M)],["std:Random",`//! Seeded random numbers: \`using Random from std:Random;\`.
 //!
 //! xoshiro128\\*\\* (Blackman and Vigna), in utu: the same seed gives the
 //! same numbers on every host, and nothing crosses to JavaScript (unless
@@ -1896,7 +1949,7 @@ mod Random {
 
     fn rotl(x: I32, k: I32) I32 { (x << k) | (x >>> (32 - k)); }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Result",`//! \`Result[T, E]\`: a value of type T, or the error E that kept it from being
+`.replaceAll("@@IR_WASM@@",M)],["std:Result",`//! \`Result[T, E]\`: a value of type T, or the error E that kept it from being
 //! made. It is for failures a caller should expect (input that does not
 //! parse, a key that is missing); a bug stays \`fatal\` or \`assert\`.
 //!
@@ -1950,7 +2003,7 @@ mod Result[T, E] {
     /// The value, or \`fallback\` when it is an error.
     fn &.value_or |self| (fallback: T) T { if self._ok { self._value; } else { fallback; }; }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:SegmentTree",`// An ordered monoid index. combine must be associative and identity neutral.
+`.replaceAll("@@IR_WASM@@",M)],["std:SegmentTree",`// An ordered monoid index. combine must be associative and identity neutral.
 // Build O(n), point replacement / half-open range query O(log n), space O(n).
 mod SegmentTree[T] {
     struct &:
@@ -2026,7 +2079,7 @@ mod SegmentTree[T] {
         i - self.size;
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Spatial",`using Buffer from std:Buffer;
+`.replaceAll("@@IR_WASM@@",M)],["std:Spatial",`using Buffer from std:Buffer;
 
 // Static priority search tree: minimum y at each node, balanced x partitions.
 // Coordinates are copied at construction. Query results are caller-supplied IDs.
@@ -2216,7 +2269,7 @@ mod Spatial {
         };
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Str",`// std/Str.utu \u2014 Str string reference type module
+`.replaceAll("@@IR_WASM@@",M)],["std:Str",`// std/Str.utu \u2014 Str string reference type module
 // & maps to Binaryen's stringref-backed host string model.
 // This is a deliberate Binaryen feature, not a core Wasm GC heap type like
 // arrays or structs. Utu treats it as a first-class type because Binaryen is
@@ -2267,8 +2320,16 @@ mod Str {
         @ir/\\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \\/;
     }
 
-    // Substring [start, end) \u2014 returns a new string.
+    // Substring [start, end) \u2014 returns a new string. An end past the string
+    // stops at its end, as in JavaScript; a negative start or an end before
+    // start traps in --safe builds, as Array's slice does.
     fn slice(s: &, start: I32, end_: I32) & {
+        if checks() and (start < 0 or end_ < start) { fatal; };
+        slice_unchecked(s, start, end_);
+    }
+
+    // \`slice\` without the --safe check: a negative index reads as unsigned.
+    fn slice_unchecked(s: &, start: I32, end_: I32) & {
         @ir/\\ <ir-string-slice-wtf16>
             <ir-ident name="s"/>
             <ir-ident name="start"/>
@@ -2297,26 +2358,17 @@ mod Str {
     fn &.len |self| () I32 {
         @ir/\\ <ir-string-measure-utf16><ir-ident name="self"/></ir-string-measure-utf16> \\/;
     }
-    fn &.slice |self| (start: I32, end_: I32) & {
-        @ir/\\ <ir-string-slice-wtf16>
-            <ir-ident name="self"/>
-            <ir-ident name="start"/>
-            <ir-ident name="end_"/>
-        </ir-string-slice-wtf16> \\/;
-    }
+    fn &.slice |self| (start: I32, end_: I32) & { slice(self, start, end_); }
     fn &.get |self| (i: I32) I32 {
         @ir/\\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \\/;
     }
     fn &.get_index |self| (i: I32) I32 {
         @ir/\\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \\/;
     }
-    fn &.get_slice |self| (start: I32, end_: I32) & {
-        @ir/\\ <ir-string-slice-wtf16>
-            <ir-ident name="self"/>
-            <ir-ident name="start"/>
-            <ir-ident name="end_"/>
-        </ir-string-slice-wtf16> \\/;
-    }
+    fn &.get_slice |self| (start: I32, end_: I32) & { slice(self, start, end_); }
+
+    // Whether the build is --safe.
+    fn checks() Bool { @ir/\\ <ir-safe-checks/> \\/; }
 
     // The string itself: what \`\${s}\` in a template string calls.
     fn &.to_str |self| () & { @ir/\\ <ir-ident name="self"/> \\/; }
@@ -2453,7 +2505,7 @@ mod Str {
         f(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:StrMap",`//! Str keys to values of any type: \`using StrMap from std:StrMap;\`.
+`.replaceAll("@@IR_WASM@@",M)],["std:StrMap",`//! Str keys to values of any type: \`using StrMap from std:StrMap;\`.
 //!
 //! \`\`\`
 //! let ages = StrMap[I32].new();
@@ -2594,7 +2646,7 @@ mod StrMap[V] {
         f(key);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Stream",`//! \`Stream[T]\`: a JavaScript async iterable, held as an externref. An async
+`.replaceAll("@@IR_WASM@@",M)],["std:Stream",`//! \`Stream[T]\`: a JavaScript async iterable, held as an externref. An async
 //! generator, a \`ReadableStream\`, a Node stream: anything with
 //! \`[Symbol.asyncIterator]\`. As with \`Promise[T]\`, nothing is wrapped: a
 //! stream utu returns is one JS reads with \`for await\`, and one from the host
@@ -2703,7 +2755,7 @@ mod Stream[T1] {
         await f(iterator);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Time",`//! Clocks: \`using time from std:Time;\`, then \`time.now()\`. Each function ships only when used.
+`.replaceAll("@@IR_WASM@@",M)],["std:Time",`//! Clocks: \`using time from std:Time;\`, then \`time.now()\`. Each function ships only when used.
 
 mod time {
     /// Milliseconds since an arbitrary start, with sub-millisecond precision
@@ -2719,7 +2771,7 @@ mod time {
         f();
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:U32",`// std/U32.utu \u2014 U32 scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:U32",`// std/U32.utu \u2014 U32 scalar type module
 mod U32 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i32"/> \\/
 
@@ -2744,7 +2796,7 @@ mod U32 {
     //   neg a  = 0 - a   (well-defined mod 2^32)
     //   bnot a = a xor 0xFFFFFFFF
     fn &:neg  |a| & { @ir/\\ <ir-u32-sub><ir-lit kind="int" type-name="U32" value="0"/><ir-ident name="a"/></ir-u32-sub> \\/; }
-    fn &:bnot |a| & { @ir/\\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="U32" value="-1"/></ir-u32-xor> \\/; }
+    fn &:bnot |a| & { @ir/\\ <ir-u32-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="-1"/></ir-u32-xor> \\/; }
 
     // Conversions are one wasm instruction each. Float \u2192 int saturates (NaN \u2192 0), like Rust \`as\`.
     fn &.to_i32 |self| () I32 { @ir/\\ <ir-i32-or><ir-ident name="self"/><ir-lit kind="int" type-name="I32" value="0"/></ir-i32-or> \\/; }
@@ -2759,7 +2811,7 @@ mod U32 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:U64",`// std/U64.utu \u2014 U64 scalar type module
+`.replaceAll("@@IR_WASM@@",M)],["std:U64",`// std/U64.utu \u2014 U64 scalar type module
 mod U64 {
     type & = @ir/\\ <@@IR_WASM@@scalar type-repr="wasm-i64"/> \\/
 
@@ -2784,7 +2836,7 @@ mod U64 {
     //   neg a  = 0 - a   (well-defined mod 2^64)
     //   bnot a = a xor 0xFFFFFFFFFFFFFFFF
     fn &:neg  |a| & { @ir/\\ <ir-u64-sub><ir-lit kind="int" type-name="U64" value="0"/><ir-ident name="a"/></ir-u64-sub> \\/; }
-    fn &:bnot |a| & { @ir/\\ <ir-u64-xor><ir-ident name="a"/><ir-lit kind="int" type-name="U64" value="-1"/></ir-u64-xor> \\/; }
+    fn &:bnot |a| & { @ir/\\ <ir-u64-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I64" value="-1"/></ir-u64-xor> \\/; }
 
     // Conversions are one wasm instruction each. Float \u2192 int saturates (NaN \u2192 0), like Rust \`as\`.
     fn &.to_u32 |self| () U32 { @ir/\\ <ir-u32-wrap><ir-ident name="self"/></ir-u32-wrap> \\/; }
@@ -2799,7 +2851,7 @@ mod U64 {
         format(self);
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:V128",`// std/V128.utu \u2014 V128 SIMD vector type module
+`.replaceAll("@@IR_WASM@@",M)],["std:V128",`// std/V128.utu \u2014 V128 SIMD vector type module
 // & is the WebAssembly 128-bit SIMD vector type.
 // Interpreted as different lane types depending on the operation:
 //   i8x16, i16x8, i32x4, i64x2, f32x4, f64x2
@@ -2840,7 +2892,7 @@ mod V128 {
         @ir/\\ <ir-v128-any-true><ir-ident name="a"/></ir-v128-any-true> \\/;
     }
 }
-`.replaceAll("@@IR_WASM@@",k)],["std:Wutu",`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
+`.replaceAll("@@IR_WASM@@",M)],["std:Wutu",`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
 mod wutu {
     fn init() void {
         let install: fun() void = @es/\\ () => { globalThis.__utuWutu ??= (function createWutuRuntime() {
@@ -2856,6 +2908,11 @@ mod wutu {
   const here = () => keys.map(k => k.value.length + ':' + k.value).join('|');
   const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
   let frames = [], active = null, keys = [], scheduled = false, generation = 0;
+  // The element (and its view) whose \`on mount\` or event handler is running: interval()'s owner outside a render.
+  let owner = null;
+  const timers = new Map();         // intervals no view owns
+  // A component's root, claimed loose: { root, index, used } for the render under \`root\`.
+  let loose = null;
 
   function autoSave() {
     api.autoSave?.();
@@ -2966,10 +3023,33 @@ mod wutu {
   }
 
   /**
-   * The element for \`site\` here: last render's, a prerendered one, or what
-   * \`make()\` makes. It joins its parent's children where it is entered.
+   * A component's root from the last render, wherever it was placed: an
+   * argument to another component lands inside it, not in the frame open
+   * while it is made. (By identity, from the outermost element's subtree.)
    */
-  function claim(site, key, tag, make) {
+  function looseNode(identity, tag) {
+    const root = frames[0]?.node;
+    if (loose?.root !== root) loose = { root, index: null, used: new Set() };
+    if (!loose.index) {
+      loose.index = new Map();
+      for (const node of root?.querySelectorAll('[data-wutu]') ?? []) {
+        const id = identityOfNode(node);
+        if (!loose.index.has(id)) loose.index.set(id, node);
+      }
+    }
+    const node = loose.index.get(identity);
+    if (!node || node.localName !== tag || loose.used.has(node)) return undefined;
+    loose.used.add(node);
+    return node;
+  }
+
+  /**
+   * The element for \`site\` here: last render's, a prerendered one, or what
+   * \`make()\` makes. It joins its parent's children where it is entered,
+   * except a component's root (\`isLoose\`): it joins those of the frame its
+   * value is put in (append()).
+   */
+  function claim(site, key, tag, make, isLoose) {
     const parent = frames.at(-1);
     // Identity: the site, then the keys pushed since the last global key.
     let identity = site + (key ? ':' + key : ''), global = false, explicit = false;
@@ -2988,7 +3068,8 @@ mod wutu {
     }
     claimIdentity(parent, identity, global, explicit);
     let node = reusable(parent, identity, tag, global);
-    if (node) active?.retained.add(node);
+    if (isLoose && parent) node ??= looseNode(identity, tag);
+    else if (node) active?.retained.add(node);
     // A root reuses its own previous element, or adopts prerendered markup:
     // its controls, disabled until now, take input again (but a lazy
     // placeholder's, until its chunk replaces them).
@@ -3002,7 +3083,8 @@ mod wutu {
       }
     }
     if (!node || node.localName !== tag) node = make();
-    if (parent) { parent.used.add(node); parent.wanted.push(node); }
+    if (parent) parent.used.add(node);
+    if (parent && !isLoose) parent.wanted.push(node);
     if (identities.get(node) !== identity) {
       node.setAttribute('data-wutu', identity);
       identities.set(node, identity);
@@ -3048,7 +3130,7 @@ mod wutu {
     const build = ([tag, attributes, ...children], svg) => {
       svg = svg || tag === 'svg';
       const element = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
-      for (const name in attributes) element.setAttribute(name, attributes[name]);
+      for (const name in attributes) setAttr(element, name, attributes[name]);
       const childSvg = svg && tag !== 'foreignObject';
       for (const child of children) element.append(typeof child === 'string' ? child : build(child, childSvg));
       return element;
@@ -3061,6 +3143,8 @@ mod wutu {
     const frame = frames.at(-1);
     if (value?.nodeType) {
       if (!frame.wanted.includes(value)) { frame.used.add(value); frame.wanted.push(value); }
+      // (Moved here from its old parent: that parent's place() must not remove it.)
+      active?.retained.add(value);
       return;
     }
     const text = String(value ?? '');
@@ -3074,12 +3158,68 @@ mod wutu {
   /** Set an attribute for this render; null/false remove it, true sets it empty. */
   function attr(node, name, value) {
     (frames.at(-1).attrs ??= new Set()).add(name);
-    if (value === null || value === false) {
+    if (value === null || value === false || !safe(node, name, value)) {
       node.removeAttribute(name);
       return;
     }
     const text = value === true ? '' : String(value);
-    if (node.getAttribute(name) !== text) node.setAttribute(name, text);
+    if (node.getAttribute(name) !== text) setAttr(node, name, text);
+  }
+
+  /** setAttribute, in its namespace for \`xlink:href\`, \`xml:lang\`, \`xmlns:xlink\`. */
+  function setAttr(node, name, text) {
+    const ns = { xlink: 'http://www.w3.org/1999/xlink', xml: 'http://www.w3.org/XML/1998/namespace',
+      xmlns: 'http://www.w3.org/2000/xmlns/' }[name.split(':', 1)[0]];
+    if (ns && name.includes(':')) node.setAttributeNS(ns, name, text);
+    else node.setAttribute(name, text);
+  }
+
+  // Attributes (and their properties) a browser follows or loads as a URL.
+  const URLS = new Set(['href', 'xlink:href', 'src', 'action', 'formaction', 'poster', 'cite', 'data',
+    'background', 'codebase', 'longdesc', 'manifest']);
+  // Attributes that hold several URLs, apart at whitespace (or commas).
+  const LISTS = new Set(['ping', 'srcset', 'imagesrcset']);
+  /**
+   * Whether a value from a render may go in attribute \`name\` (a name the
+   * compiler checked: no event handler's): srcdoc (HTML) takes none; a URL
+   * one takes no javascript: or vbscript: URL, and a data: URL only of an
+   * image, audio or video (an SVG one only in an img or SVG image, where it
+   * runs no script), or any in the href of an a or area with a download (it
+   * is saved, not opened);
+   * ping and srcset check each of theirs; a meta's content (a refresh's URL)
+   * has none of these schemes anywhere. A URL is read as a browser reads it:
+   * in any case, whitespace and control characters dropped.
+   */
+  function safe(node, name, value) {
+    name = name.toLowerCase();
+    if (name === 'srcdoc') return false;
+    if (value === true) return true;
+    value = String(value);
+    if (URLS.has(name)) return scheme(node, name, value);
+    if (LISTS.has(name)) return value.split(/[ ,]+/).every(u => scheme(node, name, u));
+    return name !== 'content' || node.localName !== 'meta' || !/javascript:|vbscript:|data:/.test(bare(value));
+  }
+
+  /** value's first n characters past whitespace and controls, which it drops, in lower case. */
+  function bare(value, n = 1 / 0) {
+    let s = '';
+    for (const c of value) if (c > ' ' && (s += c).length >= n) break;
+    return s.toLowerCase();
+  }
+
+  /** Whether one URL's scheme may go in node's attribute \`name\` (see safe). */
+  function scheme(node, name, value) {
+    const s = bare(value, 16), tag = node.localName;
+    if (/^(java|vb)script:/.test(s)) return false;
+    if (!s.startsWith('data:') || name === 'href' && (tag === 'a' || tag === 'area') && node.hasAttribute('download')) return true;
+    if (s.startsWith('data:image/svg')) return tag === 'img' || tag === 'image';
+    return /^data:(image|audio|video)[/]/.test(s);
+  }
+
+  /** A URL property set by a render (\`.href = \u2026\`): as its attribute is, else the attribute goes. */
+  function url(node, name, value) {
+    if (safe(node, name, value)) node[name] = value;
+    else node.removeAttribute(name.toLowerCase());
   }
 
   /**
@@ -3096,7 +3236,9 @@ mod wutu {
       mounted.add(node);
       const view = active;
       queueMicrotask(() => {
-        handler(new Event('mount'));
+        const outer = owner;
+        owner = [node, view];
+        try { handler(new Event('mount')); } finally { owner = outer; }
         autoSave();
         if (view) schedule(view);
       });
@@ -3112,6 +3254,8 @@ mod wutu {
       map.set(event, record);
       node.addEventListener(event, e => {
         let loud = false;
+        const outer = owner;
+        owner = [node, record.view];
         try {
           for (const [current, isQuiet] of [...record.handlers]) {
             if (!isQuiet) loud = true;
@@ -3119,6 +3263,7 @@ mod wutu {
             if (result?.then) result.then(refresh, error => { refresh(); setTimeout(() => { throw error; }); });
           }
         } finally {
+          owner = outer;
           if (loud) {
             autoSave();
             if (record.view) schedule(record.view);
@@ -3222,12 +3367,12 @@ mod wutu {
       switch (op[0]) {
         case 's': {
           const [element] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = claim(\`v\${run.h}:\${op[1]}\`, '', element.localName, () => element.cloneNode(true));
+          run.nodes[op[1]] = claim(\`v\${run.h}:\${op[1]}\`, '', element.localName, () => element.cloneNode(true), op[1] === 0);
           break;
         }
         case 'o': {
           const [element, names] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = open(claim(\`v\${run.h}:\${op[1]}\`, '', element.localName, () => element.cloneNode(false)), names, settable(top.ops, top.pc));
+          run.nodes[op[1]] = open(claim(\`v\${run.h}:\${op[1]}\`, '', element.localName, () => element.cloneNode(false), op[1] === 0), names, settable(top.ops, top.pc));
           break;
         }
         case 'c': leave(); break;
@@ -3309,11 +3454,12 @@ mod wutu {
     while (advance() !== null) { /* (only static ops remain) */ }
     const root = run.nodes[0];
     run = run.outer;
+    if (!run) loose = null;
     return root;
   }
 
   function render(view) {
-    const previous = [frames, active, keys], focused = document.activeElement;
+    const previous = [frames, active, keys, loose], focused = document.activeElement;
     view.cleanupIndex = 0;
     view.cleanupCallbacks ??= [];
     view.intervalsSeen = new Set();
@@ -3324,13 +3470,14 @@ mod wutu {
     frames = [];
     active = view;
     keys = [];
+    loose = null;
     generation++;
     try {
       view.root = view.render();
       // cleanup() registrations are positional: ones not repeated this render run now.
       for (const callback of view.cleanupCallbacks.splice(view.cleanupIndex)) callback();
       // So are intervals: one not started again this render stops.
-      for (const [key, timer] of view.effects) if (!view.intervalsSeen.has(key)) { clearInterval(timer.id); view.effects.delete(key); }
+      for (const [key, timer] of view.effects) if (!timer.node && !view.intervalsSeen.has(key)) { clearInterval(timer.id); view.effects.delete(key); }
       for (const node of view.removals) {
         if (view.retained.has(node)) continue;
         dispose(node);
@@ -3338,7 +3485,7 @@ mod wutu {
       }
       if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
     } finally {
-      [frames, active, keys] = previous;
+      [frames, active, keys, loose] = previous;
       view.globalNodes = null;
       view.removals.clear();
       view.retained.clear();
@@ -3415,7 +3562,7 @@ mod wutu {
   globalThis.addEventListener?.('popstate', refresh);
 
   const api = {
-    enter, append, attr, listen, leave, mount, refresh, invalidate, selectValue, here,
+    enter, append, attr, url, listen, leave, mount, refresh, invalidate, selectValue, here,
     put, begin, slot, arm, item, end, node, done,
     storageError: '',
     notify() {
@@ -3425,18 +3572,27 @@ mod wutu {
       }
     },
     /**
-     * A timer owned by the rendering view: started once per key, stopped by
-     * the first render that does not start it again, or when the view goes.
+     * A timer, started once per key. Started by a render, the view owns it:
+     * the first render that does not start it again stops it. Started by an
+     * \`on mount\` or event handler, its element does: it stops once the
+     * element is gone. Either stops when the view goes.
      */
     interval(key, milliseconds, callback) {
-      const view = active;
-      if (!view) return;
-      view.intervalsSeen.add(key);
-      const effect = view.effects.get(key);
-      if (effect) { effect.callback = callback; return; }
-      const entry = { callback, id: 0 };
-      entry.id = setInterval(() => { entry.callback(); autoSave(); schedule(view); }, Math.max(16, milliseconds));
-      view.effects.set(key, entry);
+      const [node, view] = active ? [null, active] : owner ?? [];
+      if (!node) {
+        if (!view) return;
+        view.intervalsSeen.add(key);
+      }
+      const effects = view?.effects ?? timers, effect = effects.get(key);
+      if (effect?.node === node) { effect.callback = callback; return; }
+      // (Another element's is replaced: the same \`on mount\`, on an element made again.)
+      if (effect) clearInterval(effect.id);
+      const entry = { callback, id: 0, node };
+      entry.id = setInterval(() => {
+        if (node && !node.isConnected) { clearInterval(entry.id); effects.delete(key); return; }
+        entry.callback(); autoSave(); schedule(view);
+      }, Math.max(16, milliseconds));
+      effects.set(key, entry);
     },
     /**
      * A hole that calls a function (\`= f(a, b);\`) with a key the compiler
@@ -3469,6 +3625,8 @@ mod wutu {
         init();
         let install: fun() void = @es/\\ () => { (function installWutuStorage(api) {
   if (api.store) return;
+  // A non-finite F64 becomes null in JSON; keep the other stored fields.
+  api.storageReviveF64 = value => value === null ? 0 : value;
   const stores = new Map();
   const DEBOUNCE_MS = 180;
   let timer;
@@ -3481,7 +3639,7 @@ mod wutu {
   }
 
   function flush() {
-    clearTimeout(timer);
+    clearTimeout(timer); timer = 0;
     for (const [key, store] of stores) {
       if (!store.dirty || store.conflict) continue;
       try {
@@ -3502,8 +3660,8 @@ mod wutu {
     if (!store) return;
     store.conflict = false;
     store.dirty = true;
-    clearTimeout(timer);
-    timer = setTimeout(flush, DEBOUNCE_MS);
+    // (A timer already waiting is kept: one every render restarts never fires while a clock ticks.)
+    if (!timer) timer = setTimeout(flush, DEBOUNCE_MS);
   }
 
   api.flush = flush;
@@ -3535,24 +3693,34 @@ mod wutu {
   const on = (...a) => globalThis.addEventListener?.(...a); on('pagehide', flush);
   on('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   on('storage', event => {
-    const store = stores.get(event.key);
-    if (!store) return;
-    if (store.dirty) {
-      store.conflict = true;
-      clearTimeout(timer);
-      report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
-      return;
-    }
-    try {
-      store.apply?.(event.newValue ?? '');
-      store.last = event.newValue;
-      api.refresh();
-    } catch (cause) {
-      report(cause);
+    // A null key is another tab's clear(): every store is removed.
+    for (const store of event.key === null ? [...stores.values()] : [stores.get(event.key)]) {
+      if (!store) continue;
+      if (store.dirty) {
+        store.conflict = true;
+        clearTimeout(timer); timer = 0;
+        report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
+        continue;
+      }
+      try {
+        store.apply?.(event.newValue ?? '');
+        store.last = event.newValue;
+        api.refresh();
+      } catch (cause) {
+        report(cause);
+      }
     }
   });
 })(globalThis.__utuWutu); } \\/;
         install();
+    }
+    fn stored_load(key: Str) Str {
+        let load: fun(Str) Str = @es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;
+        load(key);
+    }
+    fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) void) void {
+        let register: fun(Str,cl() Str,Bool,cl(Str) void) void = @es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;
+        register(key,encode,manual,apply);
     }
     /// A shared stylesheet (\`@style\`, \`@document\`), installed once.
     fn style(sheet: Str) void {
@@ -3646,7 +3814,7 @@ mod wutu {
         format(value);
     }
     fn money(cents: I32) Str {
-        let format: fun(I32) Str = @es/\\ cents=>"$"+(cents/100).toFixed(2) \\/;
+        let format: fun(I32) Str = @es/\\ cents=>(cents<0?"-$":"$")+(Math.abs(cents)/100).toFixed(2) \\/;
         format(cents);
     }
     fn decimal(value: F64, digits: I32) Str {
@@ -3670,4 +3838,16 @@ mod wutu {
         update();
     }
 }
-`.replaceAll("@@IR_WASM@@",k)]]);P.set("std:Browser",Ue);P.set("std:JS",Ce);P.set("std:Web",qe);P.set("std:Worker",De);export{Z as MODES,H as OPTIMIZE,P as PLATFORM_SOURCES,R as ROLE,z as TARGET,ee as builtModule,jn as catalogStdlib,en as compile,je as compileProgram,Un as formatDiagnostics,zn as glueSource,ne as instantiate,Qe as loadCompiler,Q as loadProgram,Vn as loaderSource,Tn as programIndex,Me as readDiagnostics};
+`.replaceAll("@@IR_WASM@@",M)]]);Q.set("std:Browser",on);Q.set("std:JS",ln);Q.set("std:Web",fn);Q.set("std:Worker",dn);function cn(e,n,t){let r=n.findIndex(y=>y.key===t);if(r<0)throw new Error(`no loaded file ${t}`);let i=e.file_first_token(r),l=e.file_end_token(r),d=new Uint8Array(e.node_kind.buffer),f=new Int32Array(e.node_first.buffer),s=new Int32Array(e.node_last.buffer),m=new Int32Array(e.node_child.buffer),o=new Int32Array(e.node_next.buffer),a=-1;for(let y=0,c=e.node_count();y<c;y++)if(d[y]===0&&f[y]>=i&&s[y]<=l){a=y;break}if(a<0)throw new Error(`no syntax tree for ${t}`);let u=new Map,h=y=>{let c=d[y];return u.has(c)||u.set(c,e.node_kind_name(c)),u.get(c)},w=y=>{let c=[];for(let g=m[y];g>=0;g=o[g])c.push(w(g));return`(${h(y)}${c.length?` ${c.join(" ")}`:""})`};return w(a)}function Rt(e,n){let t=new TextEncoder().encode(n),r=e.source(t.length);return new Uint8Array(e.src.buffer).set(t,r),e.tokens(t.length),e.nodes(t.length)<0?null:cn(e,[{key:"<source>"}],"<source>")}var he={binding:"#2563eb",call:"#059669",import:"#d97706",type:"#7c3aed"},un={binding:"name resolves to declaration",call:"call reaches function",import:"module imports file",type:"expression uses type"};function mn(e,n,t){let r=ue(e,n),i=Z(n),l=n.find(c=>c.key===t);if(!l)throw new Error(`no loaded file ${t}`);let d=[],f=new Set,s=(c,g,x,k="")=>{if(!g||!x)return;let E=`${c}:${g.file}:${g.start}:${x.file}:${x.start}`;f.has(E)||(f.add(E),d.push({kind:c,from:g,to:x,label:k||un[c]}))};for(let{decl:c,at:g}of r.names(t)){let x=r.definition(c);x&&!(g.file===x.file&&g.start===x.start)&&s("binding",g,x)}let m=new Uint8Array(e.node_kind.buffer),o=new Int32Array(e.node_first.buffer),a=new Int32Array(e.node_last.buffer),u=new Int32Array(e.tok_start.buffer),h=new Int32Array(e.node_child.buffer),w=new Int32Array(e.node_next.buffer),y=new Int32Array(e.node_decl.buffer);for(let c=0,g=e.node_count();c<g;c++){if(o[c]>=a[c]||u[o[c]]<l.offset||u[o[c]]>=l.offset+l.bytes.length)continue;let x=r.at(c);if(!x||x.file!==t)continue;if(e.node_kind_name(m[c])==="call_expr"){let E=h[c];if(E>=0){let S=y[E];if(S<0)for(let T=h[E];T>=0;T=w[T])y[T]>=0&&(S=y[T]);S>=0&&s("call",x,r.definition(S))}}let k=e.node_type_decl?.(c,1)??-1;k>=0&&s("type",x,r.definition(k))}for(let c=0,g=e.import_count();c<g;c++){if(n[e.import_from(c)]?.key!==t)continue;let k=i(e.import_path_start(c)),E=i(e.import_path_end(c)),S=k&&{file:k.file.key,start:k.offset,end:E?.offset??k.offset},T=new TextDecoder().decode(new Uint8Array(e.src.buffer,e.import_path_start(c),e.import_path_end(c)-e.import_path_start(c))).replace(/^['"]|['"]$/g,""),R={file:n.find(N=>N.key===T||N.key.endsWith(`/${T.replace(/^\.\//,"")}`))?.key??T,start:0,end:0};s("import",S,R,`imports ${R.file}`)}return{key:t,source:l.text,edges:d}}var D=e=>String(e).replace(/[&<>"']/g,n=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[n]);function Wt(e,n,t){let{source:r,edges:i}=mn(e,n,t),l=r.split(`
+`),d=[0];for(let c=0;c<r.length;c++)r[c]===`
+`&&d.push(c+1);let f=c=>{let g=0,x=d.length-1;for(;g<x;){let k=g+x+1>>1;d[k]<=c?g=k:x=k-1}return{x:64+(c-d[g])*8.4,y:24+g*20}},s=i.filter(c=>c.from.file===t&&c.to.file===t),m=i.filter(c=>c.from.file===t&&c.to.file!==t),o=Math.max(720,64+Math.max(40,...l.map(c=>c.length))*8.4+180),a=32+l.length*20,u=s.map(c=>{let g=f(c.from.start),x=f(c.to.start),k=Math.min(120,24+Math.abs(g.y-x.y)*.35);return`<path class="edge ${c.kind}" d="M${g.x} ${g.y-5} C${g.x+k} ${g.y-24},${x.x+k} ${x.y-24},${x.x} ${x.y-5}" stroke="${he[c.kind]}"><title>${D(c.label)}</title></path>`}).join(`
+`),h=l.map((c,g)=>`<text class="ln" x="8" y="${24+g*20}">${g+1}</text><text class="src" x="64" y="${24+g*20}">${D(c)}</text>`).join(`
+`),w=Object.keys(he).map(c=>`<label><input type="checkbox" data-kind="${c}" checked><span style="color:${he[c]}">\u25CF</span> ${D(un[c])} (${i.filter(g=>g.kind===c).length})</label>`).join(" "),y=m.map(c=>`<li>${D(c.label)} \u2014 ${D(c.to.file)}</li>`).join("");return`<!doctype html><meta charset="utf-8"><title>utu graphs \u2014 ${D(t)}</title>
+<style>body{font:13px system-ui,sans-serif;color:CanvasText;background:Canvas;margin:24px}h1{font-size:16px}.legend{display:flex;gap:16px;flex-wrap:wrap;margin:12px 0}.wrap{overflow:auto;border:1px solid #8886;border-radius:6px}svg{display:block;font:12px ui-monospace,monospace;white-space:pre}.ln{fill:#888}.src{fill:CanvasText}.edge{fill:none;stroke-width:1.5;opacity:.7}.edge:hover{opacity:1;stroke-width:2.5}.edge.off{display:none}</style>
+<h1>Compiler graphs</h1><p>${D(t)}</p><div class="legend">${w}</div>
+<div class="wrap"><svg width="${o}" height="${a}" viewBox="0 0 ${o} ${a}">${u}${h}</svg></div>
+${y?`<h2>Other files</h2><ul>${y}</ul>`:""}
+<script>for(const box of document.querySelectorAll('input[data-kind]'))box.addEventListener('change',()=>{for(const edge of document.querySelectorAll('.edge.'+box.dataset.kind))edge.classList.toggle('off',!box.checked)})</script>`}async function Ot(e,{map:n=null,files:t=[],source:r=!1}={}){let{print:i}=await import("./wasm-tools-Z5CCSMNW.js"),l=await i(e);if(!r||!n?.functions?.length||!t.length)return l;let d=new Map(t.map(a=>[a.key,a])),f=new Map(t.map(a=>[a.key,a.text.split(/\r?\n/)])),s=new Map;for(let a of n.entries??[])a.ownerAt==null||!a.file||!a.line||(s.has(a.ownerAt)||s.set(a.ownerAt,[]),s.get(a.ownerAt).push(a));let m=new Map,o=a=>{for(let u=t.length-1;u>=0;u--){let h=t[u];if(a<h.offset||a>=h.offset+h.bytes.length)continue;let w=new TextDecoder().decode(h.bytes.subarray(0,a-h.offset));return{file:h,line:w.split(`
+`).length}}return null};for(let a=0;a<n.functions.length;a++){let u=n.functions[a];if(u==null)continue;let h=o(u);if(!h)continue;let w=s.get(u)??[],y=new Map([[`${h.file.key}:${h.line}`,h.line]]);for(let g of w)y.set(`${g.file}:${g.line}`,g.line);let c=[];for(let g of[...y.keys()].sort((x,k)=>x.localeCompare(k,void 0,{numeric:!0})).slice(0,80)){let x=g.lastIndexOf(":"),k=d.get(g.slice(0,x)),E=Number(g.slice(x+1));if(!k)continue;let S=f.get(k.key)?.[E-1]?.trim()??"";c.push(`  ;; ${g.replace(/[\r\n]/g," ")} ${S.replace(/[\r\n]/g," ")}`)}m.set(a,c.join(`
+`))}return l.replace(/^(\s*)\(func (?:\$[^\s]+ )?\(;([0-9]+);\)/gm,(a,u,h)=>{let w=m.get(Number(h));return w?`${w}
+${a}`:a})}export{te as MODES,le as OPTIMIZE,Q as PLATFORM_SOURCES,J as ROLE,re as TARGET,de as builtModule,ft as catalogStdlib,Rn as compile,Ye as compileProgram,gt as formatDiagnostics,At as glueSource,mn as graphData,ce as instantiate,En as loadCompiler,fe as loadProgram,Tt as loaderSource,Rt as parseSyntaxTree,Ot as printWat,ue as programIndex,Ze as readDiagnostics,Wt as renderGraphHtml,cn as syntaxTree};

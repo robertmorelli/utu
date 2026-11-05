@@ -2,28 +2,26 @@
 // patterns, operator and type diagnostics, and syntax-error reporting.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
-import { buildImportObject, createCompiler, emitBinary, emitText, initParser, instantiateLowered } from '../src/index.js';
-import { liveGlueFields } from '../src/runtime/host-imports.js';
-import { testTmp } from './test-harness.mjs';
+import { compileAndInstantiate, testTmp, withTempUtu } from './test-harness.mjs';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { programIndex } from '../src/selfhost/query.js';
+import { printWat } from '../src/selfhost/wat.js';
 
-/** Compile and instantiate at an explicit optimize level ('size' = -Oz, 'speed' = -O3). */
-async function instantiateAt(ROOT, name, source, optimize) {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser, target: 'normal', optimize,
-    readFile: file => fs.readFile(file, 'utf8'),
-    readBinaryFile: file => fs.readFile(file),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  return withTempUtu(ROOT, name, source, async (file) => {
-    const doc = await compiler.compileFile(file);
-    const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.dataset.errorMessage ?? node.dataset.error);
-    if (errors.length) throw new Error(`${name}: ${errors.join('; ')}`);
-    const wasm = emitBinary(doc);
-    const { instance } = await instantiateLowered(wasm, await buildImportObject(doc));
-    return { instance, doc, wasm };
-  });
+/** Build and instantiate at an explicit optimize level ('size' = -Oz, 'speed' = -O3); `wat()` prints it. */
+async function instantiateAt(ROOT, name, source, optimize, overrides = {}) {
+  return withTempUtu(ROOT, name, source, file => instantiateFile(ROOT, file, optimize, overrides));
+}
+
+// The runner's makeCompiler (it follows the test's debug-assertion mode), set at registration.
+let makeCompilerAt = null;
+
+async function instantiateFile(ROOT, file, optimize = 'size', overrides = {}) {
+  const compiler = await makeCompilerAt({ ROOT, target: 'normal', optimize });
+  const result = await compiler.compileFile(file, overrides);
+  const errors = result.diagnostics.filter(d => d.severity !== 'warning').map(d => `${d.kind}: ${d.message}`);
+  if (errors.length || !result.wasm) throw new Error(`${path.basename(file)}: ${errors.join('; ') || 'no module'}`);
+  const { exports } = await instantiateNode(result.wasm, result.spec, { root: ROOT });
+  return { instance: { exports }, wasm: result.wasm, spec: result.spec, wat: () => printWat(result.wasm) };
 }
 
 /** Error-level diagnostics for a program, each with the source text it covers. */
@@ -41,7 +39,8 @@ async function errorsOf(compiler, ROOT, source) {
   });
 }
 
-export function registerLanguageRegressionTests({ test, assert, assertEq, assertNoErrors, makeCompiler }) {
+export function registerLanguageRegressionTests({ test, assert, assertEq, assertNoErrors, assertThrows, makeCompiler }) {
+  makeCompilerAt = makeCompiler;
   const describe = errors => errors.map(e => `${e.kind}@${JSON.stringify(e.text)}: ${e.message}`).join('; ');
 
   test('modules: generic calls nest as arguments to other generic calls', async ({ ROOT }) => {
@@ -119,7 +118,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       const errors = await errorsOf(compiler, ROOT, source);
       const match = errors.find(e => e.text === text);
       assert(match, `${source}\n  got ${describe(errors)}`);
-      assert(match.message.includes(`cannot be stored in ${where}`) && match.message.includes('use cl(I32) I32'), match.message);
+      assert(match.message.includes('cannot be stored') && match.message.includes('use cl(I32) I32'), `${where}: ${match.message}`);
     }
   });
 
@@ -191,9 +190,9 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('loops: invalid continue and non-array for sources explain themselves', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['export main() I32 { continue; 1; }', 'invalid-break', 'continue', 'continue must appear inside a loop'],
-      ['export main() I32 { for (5) |x| { x; }; 1; }', 'invalid-for-source', '5', 'can only iterate an array, got I32'],
-      ['export main() I32 { for ("abc") |x| { x; }; 1; }', 'invalid-for-source', '"abc"', 'got Str'],
+      ['export main() I32 { continue; 1; }', 'invalid-break', 'continue', 'continue outside a loop'],
+      ['export main() I32 { for (5) |x| { x; }; 1; }', 'invalid-for-source', '5', 'for needs an array or range, not I32'],
+      ['export main() I32 { for ("abc") |x| { x; }; 1; }', 'invalid-for-source', '"abc"', 'not Str'],
     ];
     for (const [source, kind, text, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -208,9 +207,11 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const source = 'export main() I32 { let xs = [1, 2]; let s = 0; for (xs) |x| { s += x; }; xs each |y| { s += y; }; s; }';
     await withTempUtu(ROOT, 'loop_hints.utu', source, async (file) => {
-      const { snapshot } = await compiler.analyzeFile(file);
-      const hinted = snapshot.inlayHintsForFile(file).map(hint => source.slice(0, hint.position).match(/let (\w+) = [^;]*$/)?.[1]);
-      assertEq(hinted.join(','), 'xs,s', `hints: ${JSON.stringify(snapshot.inlayHintsForFile(file).map(h => [h.position, h.label]))}`);
+      const utu = await loadNodeCompiler();
+      const { files } = await compileFile(utu, file, { root: ROOT });
+      const hints = programIndex(utu, files).inlayHints(file);
+      const hinted = hints.map(hint => source.slice(0, hint.position).match(/let (\w+)$/)?.[1]);
+      assertEq(hinted.join(','), 'xs,s', `hints: ${JSON.stringify(hints.map(h => [h.position, h.label]))}`);
     });
   });
 
@@ -252,9 +253,9 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('defer: deferred code cannot leave its block', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['fn f() I32 { defer return; 1; }\nexport main() I32 { f(); }', 'return', 'return cannot appear inside deferred code'],
-      ['export main() I32 { while (true) { defer break; }; 1; }', 'break', 'break cannot appear inside deferred code'],
-      ['export main() I32 { let x = defer 1; 1; }', 'defer 1', 'defer must be a statement in a block'],
+      ['fn f() I32 { defer return; 1; }\nexport main() I32 { f(); }', 'return', 'return in defer'],
+      ['export main() I32 { while (true) { defer break; }; 1; }', 'break', 'break in defer'],
+      ['export main() I32 { let x = defer 1; 1; }', 'defer 1', 'defer must be a statement'],
     ];
     for (const [source, text, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -323,7 +324,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const expected = { signed: '-42', unsigned: '4294967295', wide: '-9000000000', wide_unsigned: '18446744073709551615', single: '0.1', double: '2.5', truth: 'false' };
     for (const [name, value] of Object.entries(expected)) assertEq(instance.exports[name](), value, name);
     const { wasm } = await instantiateAt(ROOT, 'no_to_str.utu', 'export main() I32 { 42; }', 'size');
-    assertEq((await liveGlueFields(wasm)).size, 0, 'an unused to_str adds no imports');
+    assertEq(WebAssembly.Module.imports(new WebAssembly.Module(wasm)).length, 0, 'an unused to_str adds no imports');
   });
 
   test('calls: type-associated functions without self check their arity', async ({ ROOT }) => {
@@ -406,8 +407,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       }
     }`;
     for (const [optimize, copies] of [['size', 1], ['speed', 2]]) {
-      const { doc } = await instantiateAt(ROOT, `loop_match_shape_${optimize}.utu`, source, optimize);
-      const tables = (emitText(doc).match(/\(br_table /g) ?? []).length;
+      const { wat } = await instantiateAt(ROOT, `loop_match_shape_${optimize}.utu`, source, optimize);
+      const tables = ((await wat()).match(/\bbr_table\b/g) ?? []).length;
       // One table at the loop head plus one per continue site, per arm copy.
       assertEq(tables, 1 + 3 * copies, `${optimize}: br_table count`);
     }
@@ -416,11 +417,11 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('loop match: misuse of continue is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['export main() I32 { loop match 0 { 0 => { continue; }, ~> {}, }; 1; }', 'continue in a loop match needs the next state'],
+      ['export main() I32 { loop match 0 { 0 => { continue; }, ~> {}, }; 1; }', 'continue needs the next state'],
       ['export main() I32 { while (true) { continue 3; }; 1; }', 'continue with a state only works inside loop match'],
-      ['export main() I32 { loop match 0 { 0 => { continue "x"; }, ~> {}, }; 1; }', 'expected I32, got Str'],
-      ['export main() I32 { loop match 0 { 0 => { break; }, 0x0 => { break; }, ~> {}, }; 1; }', 'Duplicate match pattern'],
-      ['export main() I32 { loop match 1 { 1.5 => { break; }, ~> {}, }; 1; }', 'not an integer'],
+      ['export main() I32 { loop match 0 { 0 => { continue "x"; }, ~> {}, }; 1; }', 'Expected I32, got Str'],
+      ['export main() I32 { loop match 0 { 0 => { break; }, 0x0 => { break; }, ~> {}, }; 1; }', 'Duplicate pattern 0x0'],
+      ['export main() I32 { loop match 1 { 1.5 => { break; }, ~> {}, }; 1; }', '1.5 cannot match I32'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -506,8 +507,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const source = 'export lib { fn total(xs: Array[I32]) I32 { xs sum; } }';
     const gets = {};
     for (const optimize of ['size', 'speed']) {
-      const { doc } = await instantiateAt(ROOT, `unroll_shape_${optimize}.utu`, source, optimize);
-      gets[optimize] = (emitText(doc).match(/\(array\.get /g) ?? []).length;
+      const { wat } = await instantiateAt(ROOT, `unroll_shape_${optimize}.utu`, source, optimize);
+      gets[optimize] = ((await wat()).match(/\barray\.get\b/g) ?? []).length;
     }
     assertEq(gets.size, 1, '-Oz: one array.get');
     assertEq(gets.speed, 5, '-O3: four unrolled reads plus the tail');
@@ -561,8 +562,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('generators: async generators await inside the consuming loop (JSPI)', async ({ ROOT }) => {
     if (typeof WebAssembly.Suspending !== 'function') return; // host without JSPI
-    const { promisifyExports, readRuntimeSpec } = await import('../src/runtime/host-imports.js');
-    const { doc, instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'async_generator.utu', source: `
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'async_generator.utu', source: `
       let later: fun(I32) Promise[I32] = @es/\\ (v) => new Promise(r => setTimeout(() => r(v * 10), 2)) \\/;
       fn ticks(n: I32) yield I32 {
           for (0..<n) |i| {
@@ -574,8 +574,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           fn total(n: I32) I32 { let s = 0; await for (ticks(n)) |t| { s += t; }; s; }
       }
     `});
-    const spec = readRuntimeSpec(doc.body.firstChild, 'promiseRuntime');
-    assertEq(await promisifyExports(instance, spec).total(4), 60);
+    assertEq(await instance.exports.total(4), 60);
   });
 
   test('mem: module-level scalar arrays are linear memories that grow, narrow, and reach the host', async ({ ROOT }) => {
@@ -592,9 +591,9 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           fn count(c: I32) I32 { let k = 0; for (0..<text.len()) |i| { if text[i] == c { k += 1; }; }; k; }
           fn set_len(n: I32) void { text.resize(n); }
           fn capacity(n: I32) I32 { text.reserve(n); text.cap(); }
-          fn truncate() I32 { text.resize(3); text[0] = 300; text[1] += 10; text[2] = text[text[0] - 44]; text[0] * 10000 + text[1] * 100 + text[2]; }
-          fn sign() I32 { signed.resize(2); signed[0] = 200; signed[1] = -3; signed[0] * 1000 + signed[1]; }
-          fn halves() I32 { half.clear(); half.push(70000); half.push(65535); half[0] * 100000 + half[1]; }
+          fn truncate() I32 { text.resize(3); let wide_byte = 300; text[0] = wide_byte; text[1] += 10; text[2] = text[text[0] - 44]; text[0] * 10000 + text[1] * 100 + text[2]; }
+          fn sign() I32 { signed.resize(2); let unsigned_byte = 200; signed[0] = unsigned_byte; signed[1] = -3; signed[0] * 1000 + signed[1]; }
+          fn halves() I32 { half.clear(); let wide_half = 70000; half.push(wide_half); half.push(65535); half[0] * 100000 + half[1]; }
           fn floaty() F32 { floats.clear(); floats.push(1.25); floats[0] += 2.5; floats[0]; }
           fn unsigned() U32 { ids.clear(); ids.push(7); ids[0]; }
           fn big() I64 { wide.resize(4); wide[3] = 1 << 40; wide[3] + wide.len().to_i64(); }
@@ -738,7 +737,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           }
           fn values() I32 { Tag.Eof.to_i32() * 100 + Sign.Minus.to_i32() * 10 + Sign.Plus.to_i32() + Tag.count() * 100000; }
           fn ordered() Bool { Tag.Leaf < Tag.Eof and Sign.Minus < Sign.Zero and Tag.Unary == Tag.from_i32(1); }
-          fn names() I32 { Tag.name(Tag.Binary).len() * 10 + Tag.name(Tag.from_i32(9)).len(); }
+          fn names() I32 { Tag.name(Tag.Binary).len() * 10 + Tag.name(Tag.Eof).len(); }
+          fn unknown(i: I32) I32 { Tag.name(Tag.from_i32(i)).len(); }
       }
     `;
     for (const optimize of ['size', 'speed']) {
@@ -747,9 +747,14 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       assertEq(e.stored(), 1101, `stored at ${optimize}`);
       assertEq(e.machine(), 111, `loop match at ${optimize}`);
       assertEq(e.values(), 25500 - 10 + 1 + 400000, `values at ${optimize}`);
-      assertEq(e.ordered(), 1, `ordering at ${optimize}`);
-      assertEq(e.names(), 61, `names at ${optimize}`);
+      assertEq(e.ordered(), true, `ordering at ${optimize}`);
+      assertEq(e.names(), 63, `names at ${optimize}`);
     }
+    // No variant is 9: a safe build traps in from_i32; an unsafe one names it "?".
+    const safe = await instantiateAt(ROOT, 'int_enums_safe.utu', source, 'size', { safe: true });
+    assertThrows(() => safe.instance.exports.unknown(9), 'nreachable');
+    const unsafe = await instantiateAt(ROOT, 'int_enums_unsafe.utu', source, 'size', { safe: false });
+    assertEq(unsafe.instance.exports.unknown(9), 1, 'an unsafe build names an unknown value');
   });
 
   test('distinct: distinct types keep their representation and are not their base', async ({ ROOT }) => {
@@ -775,7 +780,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       const { instance } = await instantiateAt(ROOT, `distinct_${optimize}.utu`, source, optimize);
       assertEq(instance.exports.walk(), 1, `walk at ${optimize}`);
       assertEq(instance.exports.zero(), -Infinity, `-0 survives at ${optimize}`);
-      assertEq(instance.exports.unsigned(), 1, `unsigned order at ${optimize}`);
+      assertEq(instance.exports.unsigned(), true, `unsigned order at ${optimize}`);
     }
   });
 
@@ -929,15 +934,15 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const f = 'fn f() .{I32, I32} { .{1, 2}; }\n';
     const cases = [
-      [`${f}export main() I32 { let .{a, b, c} = f(); a; }`, 'This tuple has 2 values'],
-      [`${f}export main() I32 { let .{a} = f(); a; }`, 'This tuple has 2 values'],
-      ['export main() I32 { let .{a, b} = 5; a; }', 'let .{…} takes apart a tuple, but this value is I32'],
-      [`${f}export main() I32 { let xs = [f(), f()]; 1; }`, 'Tuples cannot be stored in arrays'],
-      ['fn f() .{I32, .{I32, I32}} { .{1, .{2, 3}}; }\nexport main() I32 { 1; }', 'A tuple cannot hold another tuple'],
-      ['fn f(t: .{I32, I32}) I32 { 1; }\nexport main() I32 { 1; }', 'A tuple type is only a function result'],
-      ['struct S:\n    | t: .{I32, I32}\nexport main() I32 { 1; }', 'A tuple type is only a function result'],
-      ['export main() I32 { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { .{a, a}; }; 1; }', 'cannot return a tuple'],
-      ['fn f() .{I32, I32} { .{1, 2.5}; }\nexport main() I32 { 1; }', 'expected I32, got F64'],
+      [`${f}export main() I32 { let .{a, b, c} = f(); a; }`, 'Tuple .{I32, I32} has 2 values'],
+      [`${f}export main() I32 { let .{a} = f(); a; }`, 'Tuple .{I32, I32} has 2 values'],
+      ['export main() I32 { let .{a, b} = 5; a; }', 'let .{…} needs a tuple, got I32'],
+      [`${f}export main() I32 { let xs = [f(), f()]; 1; }`, 'Tuple in an array'],
+      ['fn f() .{I32, .{I32, I32}} { .{1, .{2, 3}}; }\nexport main() I32 { 1; }', 'Tuple inside a tuple'],
+      ['fn f(t: .{I32, I32}) I32 { 1; }\nexport main() I32 { 1; }', 'A tuple is only a function result'],
+      ['struct S:\n    | t: .{I32, I32}\nexport main() I32 { 1; }', 'A tuple is only a function result'],
+      ['export main() I32 { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { .{a, a}; }; 1; }', 'A closure cannot return a tuple'],
+      ['fn f() .{I32, I32} { .{1, 2.5}; }\nexport main() I32 { 1; }', 'Expected I32, got F64'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -948,28 +953,28 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('mem: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['mem s: Str;\nexport main() I32 { 1; }', 'a mem holds an integer enum, a distinct type, or one of'],
-      ['mem s: U8;\nmem s: U8;\nexport main() I32 { 1; }', 'mem s is declared twice'],
-      ['mem s: U8;\nfn s() I32 { 1; }\nexport main() I32 { 1; }', 'mem s has the same name as a top-level function'],
-      ['mem s: U8;\nexport main() I32 { s.pop(); 1; }', "mem s has no method 'pop'"],
-      ['mem s: I32;\nexport main() I32 { s.intern(0, 1); }', 'only byte mems (U8, I8) intern spans'],
+      ['mem s: Str;\nexport main() I32 { 1; }', 'mem s cannot store Str'],
+      ['mem s: U8;\nmem s: U8;\nexport main() I32 { 1; }', 'Duplicate mem s'],
+      ['mem s: U8;\nfn s() I32 { 1; }\nexport main() I32 { 1; }', 'mem s clashes with a function or global'],
+      ['mem s: U8;\nexport main() I32 { s.pop(); 1; }', 'mem s has no method pop'],
+      ['mem s: I32;\nexport main() I32 { s.intern(0, 1); }', 'Only U8 and I8 mems intern'],
       ['mem s: U8;\nexport main() I32 { let t = s; 1; }', 'mem s is not a value'],
       ['mem s: U8;\nexport main() I32 { s[0, 1]; 1; }', 'mem s takes one index'],
-      ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'expected I32, got F64'],
-      ['const mem s: U8 = [1];\nexport main() I32 { s[0] = 2; 1; }', 'mem s is const; it cannot be written'],
-      ['const mem s: U8 = [1];\nexport main() I32 { s.push(2); 1; }', 'mem s is const; it has no push'],
-      ['mem s: U8 = [256];\nexport main() I32 { 1; }', 'element 0 (256) does not fit in U8'],
-      ['mem s: U8 = [x];\nexport main() I32 { 1; }', 'an initializer list holds number literals'],
-      ['mem s: U8 = @comptime/\\ nope() \\/;\nexport main() I32 { 1; }', "@comptime: Unknown variable 'nope'"],
-      ['mem s: U8 = @embed/\\ missing.bin \\/;\nexport main() I32 { 1; }', '@embed cannot read missing.bin: ENOENT'],
-      ['mem s: U8;\nexport main() I32 { s.view(0, 1); 1; }', 'add `using JS from std:JS;`'],
-      ['enum(U8) T:\n    | A\n    | B\nfn f(t: T) I32 { match t { T.A => 1, }; }\nexport main() I32 { 1; }', "Missing variant 'B' in match over T"],
+      ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'Expected I32, got F64'],
+      ['const mem s: U8 = [1];\nexport main() I32 { s[0] = 2; 1; }', 'mem s is const'],
+      ['const mem s: U8 = [1];\nexport main() I32 { s.push(2); 1; }', 'mem s is const: no push'],
+      ['mem s: U8 = [256];\nexport main() I32 { 1; }', '256 does not fit U8'],
+      ['mem s: U8 = [x];\nexport main() I32 { 1; }', 'mem s: numbers only'],
+      ['mem s: U8 = @comptime/\\ nope() \\/;\nexport main() I32 { 1; }', '@comptime: Unknown function nope'],
+      ['mem s: U8 = @embed/\\ missing.bin \\/;\nexport main() I32 { 1; }', '@embed cannot read missing.bin'],
+      ['mem s: U8;\nexport main() I32 { s.view(0, 1); 1; }', 'view() needs using JS from std:JS'],
+      ['enum(U8) T:\n    | A\n    | B\nfn f(t: T) I32 { match t { T.A => 1, }; }\nexport main() I32 { 1; }', 'match misses T.B'],
       ['enum(U8) T:\n    | A\nfn f(t: T) I32 { match t { T.A => 1, T.C => 2, ~> 3, }; }\nexport main() I32 { 1; }', 'T has no variant C'],
-      ['enum(U8) T:\n    | A = 300\nexport main() I32 { 1; }', 'T.A = 300 does not fit in U8'],
-      ['enum(U8) T:\n    | A = 1\n    | B = 1\nexport main() I32 { 1; }', 'T.B and T.A are both 1'],
-      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { 1; }\nexport main() I32 { f(0); }', 'expected T, got I32'],
-      ['type N = distinct I32;\nfn f(n: N) I32 { 1; }\nexport main() I32 { f(3); }', 'expected N, got I32'],
-      ['type N = distinct Str;\nexport main() I32 { 1; }', 'a distinct type wraps one of'],
+      ['enum(U8) T:\n    | A = 300\nexport main() I32 { 1; }', '300 does not fit U8'],
+      ['enum(U8) T:\n    | A = 1\n    | B = 1\nexport main() I32 { 1; }', 'T.B and .A are both 1'],
+      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { 1; }\nexport main() I32 { f(0); }', 'f takes T, got I32'],
+      ['type N = distinct I32;\nfn f(n: N) I32 { 1; }\nexport main() I32 { f(3); }', 'f takes N, got I32'],
+      ['type N = distinct Str;\nexport main() I32 { 1; }', 'distinct wraps I32, U32, I64, U64, F32, or F64'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -1074,20 +1079,20 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('generators: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['fn f() I32 { yield 1; 1; }\nexport main() I32 { f(); }', 'yield can only appear in a generator'],
-      ['fn g() yield I32 { yield 1; }\nexport main() I32 { let x = g(); 1; }', 'g is a generator: consume it with'],
-      ['fn a() yield I32 { for (b()) |x| { yield x; }; }\nfn b() yield I32 { for (a()) |x| { yield x; }; }\nexport main() I32 { for (a()) |x| { x; }; 1; }', 'cannot recurse'],
-      ['fn g(n: I32) yield I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nexport main() I32 { for (g(3)) |x| { x; }; 1; }', 'passes its own values straight through'],
-      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x| { prune; }; 1; }', 'prune skips a subtree of a recursive generator'],
-      ['export main() I32 { prune; 1; }', 'prune skips a subtree of a recursive generator'],
-      ['fn g(n: I32) yield I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nexport main() I32 { for (g(3)) |x| { let f = cl() void { prune; }; }; 1; }', 'prune cannot appear inside a closure'],
-      ['fn g() yield I32 { return 5; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'ends with `return;`'],
-      ['fn g() yield I32 { let f = cl() void { yield 1; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'inside a closure'],
-      ['export main() I32 { await for ([1, 2]) |x| { x; }; 1; }', "Unknown method 'Array__I32.iterator'"],
-      ['export main() I32 { await for (0 ..< 2) |x| { x; }; 1; }', 'await for reads a generator call or a stream'],
-      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x, i| { x; }; 1; }', 'binds one value'],
-      ['fn g(n: I32) yield I32 { yield n; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'expects 1 argument(s), got 0'],
-      ['fn g() yield I32 { yield "s"; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'expected I32, got Str'],
+      ['fn f() I32 { yield 1; 1; }\nexport main() I32 { f(); }', 'yield outside a generator'],
+      ['fn g() yield I32 { yield 1; }\nexport main() I32 { let x = g(); 1; }', 'g is a generator: for (g(…)) |v| { … }'],
+      ['fn a() yield I32 { for (b()) |x| { yield x; }; }\nfn b() yield I32 { for (a()) |x| { yield x; }; }\nexport main() I32 { for (a()) |x| { x; }; 1; }', 'Generator a recurses'],
+      ['fn g(n: I32) yield I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nexport main() I32 { for (g(3)) |x| { x; }; 1; }', 'g passes its values straight through'],
+      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x| { prune; }; 1; }', 'prune outside a recursive generator loop'],
+      ['export main() I32 { prune; 1; }', 'prune outside a recursive generator loop'],
+      ['fn g(n: I32) yield I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nexport main() I32 { for (g(3)) |x| { let f = cl() void { prune; }; }; 1; }', 'prune in a closure'],
+      ['fn g() yield I32 { return 5; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'A generator returns no value'],
+      ['fn g() yield I32 { let f = cl() void { yield 1; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'yield in a closure'],
+      ['export main() I32 { await for ([1, 2]) |x| { x; }; 1; }', 'await for reads a stream, not Array[I32]: use a plain for'],
+      ['export main() I32 { await for (0 ..< 2) |x| { x; }; 1; }', 'await for needs a generator call or a stream'],
+      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x, i| { x; }; 1; }', 'A generator loop binds one value'],
+      ['fn g(n: I32) yield I32 { yield n; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'g takes 1, given 0'],
+      ['fn g() yield I32 { yield "s"; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'Expected I32, got Str'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -1199,13 +1204,13 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }`;
     const results = {};
     for (const optimize of ['size', 'speed']) {
-      const { instance, doc } = await instantiateAt(ROOT, `counted_while_${optimize}.utu`, source, optimize);
+      const { instance, wat } = await instantiateAt(ROOT, `counted_while_${optimize}.utu`, source, optimize);
       const e = instance.exports;
       const out = [];
       for (let n = -1; n <= 11; n++) out.push(e.sum(Math.max(0, n)), e.early(11, n), String(e.wide(BigInt(n))), e.start(n, 6), e.moving(n));
       results[optimize] = JSON.stringify(out);
       if (optimize === 'speed') {
-        assert((emitText(doc).match(/\(array\.get /g) ?? []).length >= 5, 'the counted while loop is unrolled');
+        assert(((await wat()).match(/\barray\.get\b/g) ?? []).length >= 5, 'the counted while loop is unrolled');
       }
     }
     assertEq(results.speed, results.size, 'unrolled loops give the same results, counters included');
@@ -1320,12 +1325,7 @@ export lib {
     }
 }
 `);
-    const parser = await initParser({ wasmDir: `${ROOT}/` });
-    const compiler = createCompiler({ parser, target: 'normal', readFile: file => fs.readFile(file, 'utf8'), resolvePath: (from, relative) => path.resolve(path.dirname(from), relative) });
-    const doc = await compiler.compileFile(path.join(dir, 'main.utu'));
-    const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.dataset.errorMessage ?? node.dataset.error);
-    assertEq(errors.join('; '), '', 'no duplicate or unresolved declarations');
-    const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
+    const { instance } = await instantiateFile(ROOT, path.join(dir, 'main.utu'));
     const bag = instance.exports.make(5);
     assertEq(instance.exports.run(bag), 110, 'structs with Str fields cross the export boundary as handles');
   });
@@ -1383,13 +1383,13 @@ export lib {
   test('match: invalid scrutinees and patterns are diagnosed instead of crashing codegen', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['export main() I32 { match "x" { 1 => 1, ~> 0, }; }', 'type-mismatch', '"x"', 'use alt for enums'],
-      ['export main() I32 { match 1 { 1.5 => 1, ~> 0, }; }', 'type-mismatch', '1.5 => 1,', 'not an integer'],
-      ['export main() I32 { match 1 { true => 1, ~> 0, }; }', 'type-mismatch', 'true => 1,', 'cannot match values of type I32'],
-      ['export main() I32 { match true { 1 => 1, ~> 0, }; }', 'type-mismatch', '1 => 1,', 'not a Bool'],
+      ['export main() I32 { match "x" { 1 => 1, ~> 0, }; }', 'type-mismatch', '"x"', 'match takes a number or Bool, not Str'],
+      ['export main() I32 { match 1 { 1.5 => 1, ~> 0, }; }', 'type-mismatch', '1.5 => 1,', '1.5 cannot match I32'],
+      ['export main() I32 { match 1 { true => 1, ~> 0, }; }', 'type-mismatch', 'true => 1,', 'true cannot match I32'],
+      ['export main() I32 { match true { 1 => 1, ~> 0, }; }', 'type-mismatch', '1 => 1,', '1 is not a Bool'],
       ['export main() I32 { match 1 { 99999999999 => 1, ~> 0, }; }', 'type-mismatch', '99999999999 => 1,', 'out of range for I32'],
       ['export main() I32 { let x: U32 = 1; match x { -1 => 1, ~> 0, }; }', 'type-mismatch', '-1 => 1,', 'out of range for U32'],
-      ['export main() I32 { match 1 { 1 => 1, 0x1 => 2, ~> 0, }; }', 'duplicate-declaration', '0x1 => 2,', "Duplicate match pattern '0x1'"],
+      ['export main() I32 { match 1 { 1 => 1, 0x1 => 2, ~> 0, }; }', 'duplicate-declaration', '0x1 => 2,', 'Duplicate pattern 0x1'],
     ];
     for (const [source, kind, text, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -1403,10 +1403,10 @@ export lib {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const struct = 'struct Box:\n    | value: I32\n';
     const cases = [
-      ['Bool', 'b == b', "Box has no '==' operator (Box.eq)"],
-      ['I32', 'b + 1', "Box has no '+' operator (Box.add)"],
-      ['Bool', 'b < b', "Box has no '<' operator"],
-      ['I32', 'b[0]', "Box has no '[]' operator (Box.get_index)"],
+      ['Bool', 'b == b', 'No == for Box'],
+      ['I32', 'b + 1', 'No + for Box'],
+      ['Bool', 'b < b', 'No < for Box'],
+      ['I32', 'b[0]', 'No [] for Box'],
     ];
     for (const [type, expression, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, `${struct}export main() ${type} { let b = Box { value: 1 }; ${expression}; }`);

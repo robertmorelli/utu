@@ -1,11 +1,11 @@
-// `vec` and `mem`, in both compilers (stage 0 and the self-hosted one).
+// `vec` and `mem` in the self-hosted compiler.
 //
 // The same operations on every storage kind, declared once as mems and once
 // as vecs, give the same values; a vec's capacity grows to the larger of
 // what is needed and twice what it was; an access whose index or value
 // calls a function that grows the vec reaches its new array; a module may
 // have any number of vecs; and the 101st mem is an error (a module has at
-// most 100 memories), reported alike by both compilers.
+// most 100 memories), reported by the compiler.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -63,62 +63,40 @@ const tooMany = `${Array.from({ length: 101 }, (_, i) => `mem m${i}: U8;`).join(
 export lib { fn f() I32 { m0.len(); } }
 `;
 
-const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
-const parser = await initParser({ wasmDir: `${ROOT}/` });
 const utu = await loadNodeCompiler();
 
-/** Both compilers' builds of `text`: { stage0, selfhost }, each { exports, memories } or { error }. */
-async function both(file, text) {
+/** The self-hosted build of `text`: exports and memories, or an error. */
+async function build(file, text) {
   await fs.writeFile(file, text);
-  const out = {};
-  try {
-    const compiler = createCompiler({ parser, target: 'normal', optimize: 'speed', readFile: f => fs.readFile(f, 'utf8'), resolvePath: (a, b) => path.resolve(path.dirname(a), b) });
-    const doc = await compiler.compileFile(file);
-    const errors = collectAnalysisDiagnostics(doc).filter(d => d.severity === 'error');
-    if (errors.length) out.stage0 = { error: errors[0].message };
-    else {
-      const wasm = emitBinary(doc);
-      out.stage0 = { exports: (await instantiateLowered(wasm, await buildImportObject(doc, { wasm }))).instance.exports, memories: section(wasm, 5) };
-    }
-  } catch (error) {
-    out.stage0 = { error: error.message };
-  }
-  const built = await compileFile(utu, file, { optimize: 'speed' });
-  out.selfhost = built.wasm
-    ? { exports: (await instantiateNode(built.wasm, built.spec)).exports, memories: section(built.wasm, 5) }
-    : { error: built.diagnostics[0].message };
-  return out;
+  const result = await compileFile(utu, file, { optimize: 'speed' });
+  return result.wasm
+    ? { exports: (await instantiateNode(result.wasm, result.spec)).exports, memories: section(result.wasm, 5) }
+    : { error: result.diagnostics[0].message };
 }
 
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-vec-'));
 try {
   const run = ({ exports }) => KINDS.map((_, k) => String(exports[`run${k}_`]()));
-  const mems = await both(path.join(dir, 'mems.utu'), kinds('mem'));
-  const vecs = await both(path.join(dir, 'vecs.utu'), kinds('vec'));
-  for (const compiler of ['stage0', 'selfhost']) {
-    assert.ok(mems[compiler].exports && vecs[compiler].exports, `${compiler}: ${mems[compiler].error ?? vecs[compiler].error}`);
-    assert.equal(mems[compiler].memories, KINDS.length, `${compiler}: a memory for each mem`);
-    assert.equal(vecs[compiler].memories, 0, `${compiler}: no memory for a vec`);
-    assert.deepEqual(run(vecs[compiler]), run(mems[compiler]), `${compiler}: vecs behave as mems`);
-  }
-  assert.deepEqual(run(vecs.selfhost), run(vecs.stage0));
+  const mems = await build(path.join(dir, 'mems.utu'), kinds('mem'));
+  const vecs = await build(path.join(dir, 'vecs.utu'), kinds('vec'));
+  assert.ok(mems.exports && vecs.exports, mems.error ?? vecs.error);
+  assert.equal(mems.memories, KINDS.length, 'a memory for each mem');
+  assert.equal(vecs.memories, 0, 'no memory for a vec');
+  assert.deepEqual(run(vecs), run(mems), 'vecs behave as mems');
 
-  const grown = await both(path.join(dir, 'growth.utu'), growth);
-  for (const compiler of ['stage0', 'selfhost']) {
-    const { exports } = grown[compiler];
-    assert.equal(exports.caps(), 30620, `${compiler}: capacity 3, then 6 (twice), then 20 (what is needed)`);
-    assert.equal(exports.read(), 4, `${compiler}: an index that grows the vec reads its new array`);
-    assert.equal(exports.write(), 5101, `${compiler}: a value that grows the vec is stored in its new array`);
-    assert.equal(exports.compound(), 6, `${compiler}: v[0] += grow() reads v[0] first`);
-  }
+  const grown = await build(path.join(dir, 'growth.utu'), growth);
+  const { exports } = grown;
+  assert.equal(exports.caps(), 30620, 'capacity 3, then 6 (twice), then 20 (what is needed)');
+  assert.equal(exports.read(), 4, 'an index that grows the vec reads its new array');
+  assert.equal(exports.write(), 5101, 'a value that grows the vec is stored in its new array');
+  assert.equal(exports.compound(), 6, 'v[0] += grow() reads v[0] first');
 
-  const lots = await both(path.join(dir, 'many.utu'), many(150));
-  for (const compiler of ['stage0', 'selfhost']) assert.equal(lots[compiler].exports?.total(), 149, `${compiler}: 150 vecs`);
+  const lots = await build(path.join(dir, 'many.utu'), many(150));
+  assert.equal(lots.exports?.total(), 149, '150 vecs');
 
-  const over = await both(path.join(dir, 'over.utu'), tooMany);
-  assert.equal(over.stage0.error, 'mem m100 is one mem too many: a module has at most 100 memories; declare the others as vec');
-  assert.equal(over.selfhost.error, 'Too many mems (max 100): make m100 a vec');
-  console.log(`vec: ${KINDS.length} storage kinds behave as mems in both compilers; growth, 150 vecs, and the 101st mem reported by both`);
+  const over = await build(path.join(dir, 'over.utu'), tooMany);
+  assert.equal(over.error, 'Too many mems (max 100): make m100 a vec');
+  console.log(`vec: ${KINDS.length} storage kinds behave as mems; growth, 150 vecs, and the 101st mem reported`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

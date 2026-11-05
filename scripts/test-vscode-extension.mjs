@@ -8,7 +8,7 @@ const packageFile = path.join(vscodeDir, 'package.json');
 const stubFile = path.join(vscodeDir, 'index.cjs');
 
 await assertManifest();
-await fs.access(path.join(ROOT, 'dist', 'utu.js'));
+await fs.access(path.join(ROOT, 'dist', 'selfhost', 'utu.js'));
 await fs.access(path.join(ROOT, 'dist', 'node', 'extension.cjs'));
 await fs.access(path.join(ROOT, 'dist', 'web', 'extension.cjs'));
 await fs.access(path.join(ROOT, 'jsondata', 'utu.tmLanguage.json'));
@@ -38,7 +38,7 @@ try {
   const api = await nodeActivate(context);
   if (!await api.compiler.selfhosted()) throw new Error('the self-hosted compiler did not load');
   const commands = globalThis.__utuVscodeStub.commands;
-  for (const name of ['utu.compileCurrentFile', 'utu.runMain', 'utu.showGeneratedWat', 'utu.showSyntaxTree', 'utu.showCompilerIR', 'utu.showSemanticXray', 'utu.showCompilerGraphs', 'utu.createWutuWebsite', 'utu.previewWutuWebsite']) {
+  for (const name of ['utu.compileCurrentFile', 'utu.runMain', 'utu.showGeneratedWat', 'utu.showSyntaxTree', 'utu.showSemanticXray', 'utu.showCompilerGraphs', 'utu.createWutuWebsite', 'utu.previewWutuWebsite']) {
     if (!commands.has(name)) throw new Error(`activation did not register ${name}`);
   }
 
@@ -46,8 +46,8 @@ try {
   const document = makeDocument(vscode.Uri.parse('file:///activation.utu'), source);
   globalThis.__utuVscodeStub.textDocuments.push(document);
   const providers = globalThis.__utuVscodeStub.providers;
-  const template=makeDocument(vscode.Uri.parse('file:///format.utu'), 'let node=@wutu/\\ main {button {"Go";}} \\/;');
-  const edits=providers.format.provideDocumentFormattingEdits(template);
+  const template=makeDocument(vscode.Uri.parse('file:///format.utu'), 'fn page() void { let node=@wutu/\\ main {button {"Go";}} \\/; }');
+  const edits=await providers.format.provideDocumentFormattingEdits(template);
   if(edits.length!==1||!edits[0].newText.includes('\n'))throw Error('Wutu formatter did not provide an edit');
   const completions=providers.completion.provideCompletionItems(template,template.positionAt(template.getText().indexOf('button')));
   if(!completions.some(c=>c.label==='bind:value'))throw Error('Wutu completions missing');
@@ -65,6 +65,28 @@ try {
   if (summary !== 'type-mismatch 33-37, unknown-variable 43-50') throw new Error(`diagnostics were ${summary}`);
   const hierarchy = await providers.calls.prepareCallHierarchy(document, document.positionAt(source.indexOf('main')));
   if (hierarchy?.name !== 'main') throw new Error('call hierarchy did not resolve main');
+  // Inferred types, calls both ways, and the views, from the self-hosted compiler.
+  const callsSource = 'fn twice(n: I32) I32 { n * 2; }\nexport main() I32 { let y = twice(20); y + 2; }';
+  const callsDocument = makeDocument(vscode.Uri.parse('file:///calls.utu'), callsSource);
+  globalThis.__utuVscodeStub.textDocuments.push(callsDocument);
+  const whole = new vscode.Range(callsDocument.positionAt(0), callsDocument.positionAt(callsSource.length));
+  const inlays = await providers.inlays.provideInlayHints(callsDocument, whole);
+  if (!inlays.some(hint => hint.label === ': I32')) throw new Error(`inlay hints were ${inlays.map(hint => hint.label).join(', ')}`);
+  const twice = await providers.calls.prepareCallHierarchy(callsDocument, callsDocument.positionAt(callsSource.indexOf('twice')));
+  if (twice?.name !== 'twice') throw new Error('call hierarchy did not resolve twice');
+  const incoming = await providers.calls.provideCallHierarchyIncomingCalls(twice);
+  if (incoming.map(call => call.from.name).join() !== 'main' || incoming[0].fromRanges.length !== 1) throw new Error('incoming calls of twice were not main, once');
+  const main = await providers.calls.prepareCallHierarchy(callsDocument, callsDocument.positionAt(callsSource.indexOf('main')));
+  const outgoing = await providers.calls.provideCallHierarchyOutgoingCalls(main);
+  if (outgoing.map(call => call.to.name).join() !== 'twice') throw new Error('outgoing calls of main were not twice');
+  const callHover = await providers.hover.provideHover(callsDocument, callsDocument.positionAt(callsSource.indexOf('twice(20)')));
+  if (!callHover?.contents?.value?.includes('Call target')) throw new Error(`call hover was ${callHover?.contents?.value}`);
+  const compiler = api.compiler;
+  const info = await compiler.explain(callsDocument, callsSource.indexOf('n * 2'));
+  if (info?.function !== 'twice' || !/i32\.mul/.test(await compiler.emission(callsDocument, info.function) ?? '')) throw new Error('X-Ray emission did not show twice');
+  if (!/^\(module/.test(await compiler.wat(callsDocument))) throw new Error('generated WAT is not a module');
+  if (!(await compiler.syntax(callsDocument)).startsWith('(source_file')) throw new Error('syntax tree did not start at source_file');
+  if (!(await compiler.graphs(callsDocument)).includes('twice')) throw new Error('graphs did not draw twice');
   const binary = await commands.get('utu.compileCurrentFile')(document);
   if (!(binary instanceof Uint8Array) || binary.length === 0) throw new Error('compile command did not return Wasm');
   const result = await commands.get('utu.runMain')(document);

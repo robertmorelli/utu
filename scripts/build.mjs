@@ -2,28 +2,20 @@ import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
 // scripts/build.mjs — Utu build script
 //
 // Usage:
-//   bun run build           — regenerate platform-sources.generated.js only
-//   bun run build --grammar — also regenerate grammar.json + parser.c from
-//                             grammar.cjs (requires the tree-sitter CLI)
+//   bun run build           — the self-hosted compiler (dist/utu.wasm, bootstrapped
+//                             from stage0/), its JS API (dist/selfhost/), the
+//                             host catalog, and the VS Code extension
+//   bun run build --grammar — also regenerate the editor grammar's grammar.json
+//                             + parser.c (requires the tree-sitter CLI)
 //   bun run build --wasm    — the above, plus rebuild tree-sitter-utu.wasm
 //                             (requires emscripten)
 //   bun run build --docs    — also document the compiler: dist/compiler.pdf
 //                             (requires typst; dist/compiler.typ without it)
 //
-// Grammar source of truth — `grammar.cjs` + `grammar/rules/*.cjs`, and nothing
-// else.  `tree-sitter generate` reads them through `grammar.js` and emits
-// src/grammar.json, src/parser.c, and src/node-types.json; `--wasm` then builds
-// tree-sitter-utu.wasm from parser.c.  All four are generated, and all four are
-// committed so a clone needs no tree-sitter toolchain.
-//
-//   grammar.cjs + grammar/rules/*.cjs
-//        ↓  (--grammar)  tree-sitter generate
-//   src/grammar.json, src/parser.c, src/node-types.json
-//        ↓  (--wasm)
-//   tree-sitter-utu.wasm
-//
-// After changing the grammar, run `bun run build --wasm`. Do not hand-edit
-// src/grammar.json — it is output, not input.
+// The editor grammar lives in editors/tree-sitter-utu/. Its grammar.cjs and
+// grammar/rules/*.cjs generate src/grammar.json, src/parser.c, and
+// src/node-types.json there. --wasm also rebuilds tree-sitter-utu.wasm.
+// These artifacts are committed for editor installs without a parser toolchain.
 
 import fs from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
@@ -36,7 +28,6 @@ const ROOT = process.cwd();
 const STD_DIR = path.join(ROOT, 'std');
 const OUT_FILE = path.join(ROOT, 'src', 'selfhost', 'platform-sources.generated.js');
 const DIST_DIR = path.join(ROOT, 'dist');
-const BUNDLE_FILE = path.join(DIST_DIR, 'utu.js');
 
 const args = new Set(process.argv.slice(2));
 const buildGrammar = args.has('--grammar') || args.has('--wasm');
@@ -50,7 +41,6 @@ async function main() {
   buildCompiler();
   await bundleSelfhost();
   execSync(`node ${path.join('scripts', 'build-catalog.mjs')}`, { cwd: ROOT, stdio: 'inherit' });
-  await bundlePackage();
   await bundleVscodeExtension();
   if (buildDocs) documentCompiler();
 }
@@ -59,20 +49,20 @@ async function main() {
 
 async function generateParser() {
   // Use the project-bundled tree-sitter CLI so the emitted grammar's ABI
-  // version matches the `web-tree-sitter` runtime we ship with.  Falling
+  // version matches the editor grammar runtime. Falling
   // back to a system-wide `tree-sitter` often pins a newer/older ABI and
   // silently produces wasm that the runtime refuses to load.
   const cli = path.join(ROOT, 'node_modules', 'tree-sitter-cli', 'tree-sitter');
   // No argument: the CLI resolves grammar.js → grammar.cjs → grammar/rules/*.
   // Passing src/grammar.json instead would make the generated file its own
   // input, so a rule change in the .cjs sources would be silently ignored.
-  console.log('Regenerating parser from grammar.cjs…');
-  execSync(`${cli} generate`, { cwd: ROOT, stdio: 'inherit' });
+  console.log('Regenerating editor grammar from grammar.cjs…');
+  execSync(`${cli} generate`, { cwd: path.join(ROOT, 'editors', 'tree-sitter-utu'), stdio: 'inherit' });
 
   if (buildWasm) {
     console.log('Building wasm…');
     try {
-      execSync(`${cli} build --wasm`, { cwd: ROOT, stdio: 'inherit' });
+      execSync(`${cli} build --wasm`, { cwd: path.join(ROOT, 'editors', 'tree-sitter-utu'), stdio: 'inherit' });
     } catch {
       console.warn('Warning: wasm build failed (emscripten may not be installed). Skipping.');
     }
@@ -171,27 +161,6 @@ async function loadStdEntries() {
 
 // ── Published bundle ─────────────────────────────────────────────────────────
 
-async function bundlePackage() {
-  await fs.mkdir(DIST_DIR, { recursive: true });
-  await build({
-    entryPoints: [path.join(ROOT, 'src', 'index.js')],
-    outfile: BUNDLE_FILE,
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    target: 'es2022',
-    minify: true,
-    charset: 'utf8',
-    sourcemap: false,
-    legalComments: 'none',
-    define: {
-      process: 'undefined',
-      'globalThis.process': 'undefined',
-    },
-    plugins: [embeddedWasmPlugin(), hostNeutralDependencyPlugin(), nodeBranchStubPlugin()],
-  });
-}
-
 // dist/selfhost/utu.js: the self-hosted compiler's JavaScript API (the
 // driver, the standard library's sources), for editors and pages. The
 // browser catalog is a chunk of its own, loaded only by programs that
@@ -200,7 +169,7 @@ async function bundlePackage() {
 async function bundleSelfhost() {
   await fs.rm(path.join(DIST_DIR, 'selfhost'), { recursive: true, force: true });
   await build({
-    plugins: [{
+    plugins: [wasmToolsBrowserPlugin(), {
       name: 'catalog-json',
       setup(api) {
         api.onLoad({ filter: /browser-catalog\.generated\.js$/ }, async ({ path: file }) => {
@@ -222,6 +191,27 @@ async function bundleSelfhost() {
     legalComments: 'none',
     chunkNames: '[name]-[hash]',
   });
+  // wasm-tools is a lazy WAT viewer dependency. Its WebAssembly payloads are
+  // loaded only when the WAT view opens, beside the generated JS chunk.
+  const vendor = path.join(ROOT, 'node_modules', '@bytecodealliance', 'jco-transpile', 'vendor');
+  await Promise.all(['wasm-tools.core.wasm', 'wasm-tools.core2.wasm'].map(name =>
+    fs.copyFile(path.join(vendor, name), path.join(DIST_DIR, 'selfhost', name))));
+}
+
+function wasmToolsBrowserPlugin() {
+  return {
+    name: 'wasm-tools-browser',
+    setup(api) {
+      api.onResolve({ filter: /^node:process$/ }, () => ({ path: 'process', namespace: 'utu-wat-browser' }));
+      // The vendor reaches this dynamic import only in Node; leaving it
+      // external lets the same emitted chunk read its assets in Node.
+      api.onResolve({ filter: /^node:fs\/promises$/ }, () => ({ path: 'node:fs/promises', external: true }));
+      api.onLoad({ filter: /.*/, namespace: 'utu-wat-browser' }, ({ path: name }) => ({
+        loader: 'js',
+        contents: "export const platform = 'browser';",
+      }));
+    },
+  };
 }
 
 async function bundleVscodeExtension() {
@@ -255,102 +245,5 @@ async function bundleVscodeExtension() {
   await fs.writeFile(path.join(DIST_DIR, 'web', 'package.json'), '{"type":"commonjs"}\n');
 }
 
-function embeddedWasmPlugin() {
-  return {
-    name: 'utu-embedded-wasm',
-    setup(buildApi) {
-      buildApi.onResolve({ filter: /\/embedded-wasm\.js$/ }, () => ({
-        path: 'embedded-wasm',
-        namespace: 'utu-embedded',
-      }));
-      buildApi.onLoad({ filter: /^embedded-wasm$/, namespace: 'utu-embedded' }, async () => {
-        const [treeSitterUtu, webTreeSitter] = await Promise.all([
-          fs.readFile(path.join(ROOT, 'tree-sitter-utu.wasm')),
-          fs.readFile(path.join(ROOT, 'web-tree-sitter.wasm')),
-        ]);
-        return {
-          loader: 'js',
-          contents: [
-            `export const TREE_SITTER_UTU_WASM_BASE64 = ${JSON.stringify(treeSitterUtu.toString('base64'))};`,
-            `export const WEB_TREE_SITTER_WASM_BASE64 = ${JSON.stringify(webTreeSitter.toString('base64'))};`,
-          ].join('\n'),
-        };
-      });
-    },
-  };
-}
-
-function hostNeutralDependencyPlugin() {
-  return {
-    name: 'utu-host-neutral-dependencies',
-    setup(buildApi) {
-      buildApi.onLoad({ filter: /node_modules\/web-tree-sitter\/web-tree-sitter\.js$/ }, async ({ path: file }) => {
-        let contents = await fs.readFile(file, 'utf8');
-        contents = replaceOnce(
-          contents,
-          `  var ENVIRONMENT_IS_NODE = typeof process == "object" && process.versions?.node && process.type != "renderer";
-  if (ENVIRONMENT_IS_NODE) {
-    const { createRequire } = await import("module");
-    var require = createRequire(import.meta.url);
-  }`,
-          '  var ENVIRONMENT_IS_NODE = false;',
-          'web-tree-sitter node environment branch',
-        );
-        contents = replaceOnce(
-          contents,
-          `    } else if (globalThis.process?.versions.node) {
-      const fs2 = await import("fs/promises");
-      binary2 = await fs2.readFile(input);
-    } else {`,
-          `    } else if (false) {
-      throw new Error("Language.load file paths are disabled in the utu bundle; pass embedded bytes");
-    } else {`,
-          'web-tree-sitter Language.load node file branch',
-        );
-        return { loader: 'js', contents };
-      });
-    },
-  };
-}
-
-function nodeBranchStubPlugin() {
-  return {
-    name: 'utu-node-branch-stubs',
-    setup(buildApi) {
-      // Both bare and `node:`-prefixed spellings; dependencies use either,
-      // and an unmatched one fails the bundle outright.
-      buildApi.onResolve({ filter: /^(node:)?(module|fs|fs\/promises|path|url|os)$/ }, ({ path: importPath }) => ({
-        path: importPath.replace(/^node:/, ''),
-        namespace: 'utu-node-stub',
-      }));
-      buildApi.onLoad({ filter: /.*/, namespace: 'utu-node-stub' }, ({ path: importPath }) => ({
-        loader: 'js',
-        contents: importPath === 'module'
-          ? 'export function createRequire() { return () => { throw new Error("Node require is not available in the utu bundle"); }; }'
-          : nodeStubModule(importPath),
-      }));
-    },
-  };
-}
-
-function nodeStubModule(importPath) {
-  if (importPath === 'fs/promises') {
-    return 'export async function readFile() { throw new Error("fs/promises is not available in the utu bundle"); }';
-  }
-  if (importPath === 'fs') {
-    return 'export function readFileSync() { throw new Error("fs is not available in the utu bundle"); }';
-  }
-  if (importPath === 'path') {
-    return 'export function dirname() { throw new Error("path is not available in the utu bundle"); }';
-  }
-  return 'export function fileURLToPath() { throw new Error("url is not available in the utu bundle"); }';
-}
-
-function replaceOnce(contents, from, to, label) {
-  if (!contents.includes(from)) {
-    throw new Error(`build: could not patch ${label}`);
-  }
-  return contents.replace(from, to);
-}
 
 await main();

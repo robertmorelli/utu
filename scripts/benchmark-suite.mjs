@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { transform } from 'esbuild';
 import { exportFunctions } from './wasm-exports.mjs';
-import { createCompiler, emitBinary, initParser } from '../src/index.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SUITE = path.join(ROOT, 'benchmarks', 'suite');
@@ -15,13 +15,7 @@ const SAMPLES = Number(process.env.BENCH_SAMPLES ?? 20);
 const WARMUPS = Number(process.env.BENCH_WARMUPS ?? 5);
 await fs.mkdir(TMP, { recursive: true });
 
-const parser = await initParser({ wasmDir: `${ROOT}/` });
-const compiler = createCompiler({
-  parser,
-  target: 'normal',
-  readFile: file => fs.readFile(file, 'utf8'),
-  resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-});
+const compiler = await loadNodeCompiler();
 
 // Each case only describes its inputs. All execution, warmups and timing
 // happen in a fresh d8 process per implementation (see DRIVER below).
@@ -244,10 +238,9 @@ function runInD8(configPath, label) {
 
 async function compileUtu(stem) {
   const file = path.join(SUITE, `${stem}.utu`);
-  const doc = await compiler.compileFile(file);
-  const errors = [...doc.querySelectorAll('[data-error]')];
-  if (errors.length) throw new Error(`${stem}.utu: ${errors.map(node => node.dataset.errorMessage).join('; ')}`);
-  return emitBinary(doc);
+  const built = await compileFile(compiler, file, { root: ROOT });
+  if (!built.wasm) throw new Error(`${stem}.utu: ${built.diagnostics.map(diagnostic => diagnostic.message).join('; ')}`);
+  return built.wasm;
 }
 
 function compileRust(stem, { safe = false } = {}) {

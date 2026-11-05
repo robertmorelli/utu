@@ -440,7 +440,7 @@ fn diag_text(i: I32) Str {
             "No file " + spelled + " (" + bytes_text(missing_start[0], missing_end[0]) + ")";
         },
         Diag.ImportCycle => "Import cycle detected at: " + bytes_text(missing_start[0], missing_end[0]),
-        Diag.UnknownModule => "Unknown module " + w + did_you_mean(i),
+        Diag.UnknownModule => "Unknown module " + w + did_you_mean(i) + (if a >= 0 { "; the file defines " + imported_modules_text(a); } else { ""; }),
         Diag.DuplicateDeclaration => {
             if a == 5 { return "Duplicate method " + node_text(node); };
             if a == 6 { return "Duplicate capture " + w; };

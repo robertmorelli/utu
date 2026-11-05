@@ -1,6 +1,6 @@
 //! = `@json`
 //!
-//! Typed JSON, as stage 0 writes it (`src/compiler/json.js`), function by
+//! Typed JSON, as stage 0 writes it (`json.js at stage-1-final`), function by
 //! function: `@json/\ decode T text \/` (→ ?T), `@json/\ error T text \/` (→
 //! Str, "" when it matches), `@json/\ encode T value \/` (→ Str), and
 //! `@json/\ match text { pattern => value, …, ~> fallback }`.

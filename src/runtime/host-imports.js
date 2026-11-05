@@ -2,12 +2,11 @@ import { wasmImports } from './wasm-imports.js';
 
 // runtime/host-imports.js — the host half of utu's runtime contract
 //
-// The backend plan owns what the runtime needs and compatibility projection
-// stamps that plan onto the document; this builds the matching
-// import object. Kept dependency-free and separate from the compiler because
-// two very different callers need it:
+// The compiler's spec of a module says what runtime it needs; this builds the
+// matching import object. Kept dependency-free and separate from the compiler
+// because very different callers need it:
 //
-//   • `buildImportObject` in src/index.js, for embedders and tests
+//   • the self-hosted driver's `instantiate` (src/selfhost/compiler.js)
 //   • the standalone launcher `utu build-exe` generates, which is compiled by
 //     `bun build --compile` and must not drag the compiler in
 //

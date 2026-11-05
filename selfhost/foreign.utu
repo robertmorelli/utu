@@ -536,7 +536,7 @@ fn foreign_named_type(view: I32, key: I32) I32 {
 //! = Operations
 //!
 //! An operation on host values is an imported function whose body is the
-//! JavaScript stage 0 writes for it (src/compiler/foreign-abi.js), one per
+//! JavaScript stage 0 writes for it (foreign-abi.js at stage-1-final), one per
 //! signature and body: `(self) => self["value"]`.
 
 /// By operation: its signature and body, a word.
@@ -746,7 +746,7 @@ fn foreign_result(r: Ref, view: I32, expect: I32) I32 {
 
 //! = Assignability
 //!
-//! As in stage 0 (src/compiler/type-rules.js): a host type is any of its
+//! As in stage 0 (type-rules.js at stage-1-final): a host type is any of its
 //! bases; `any` meets every host value (and Str, and closures, which are JS
 //! values too); `Function` takes closures, `Object` any host value; a generic
 //! instance of `any` arguments takes any instance; a declared interface
@@ -982,6 +982,11 @@ fn host_coerce(actual: I32, expected: I32) Bool {
         foreign_unbox(a, expected, true);
         return true;
     };
+    // (`string | number` where a Str is wanted: checked, as a dynamic value is)
+    if is_foreign(a) and typeof_name(expected).len() > 0 and desc_get(describe(ref_of(a)), "union") >= 0 and union_admits(describe(ref_of(a)), expected, fty_view[a]) {
+        foreign_unbox(a, expected, true);
+        return true;
+    };
     let boxed = boxed_primitive(a);
     if boxed >= 0 and boxed == expected {
         foreign_unbox(a, expected, false);
@@ -1102,6 +1107,52 @@ fn check_foreign_root(node: I32, view: I32, key: I32, expect: I32) I32 {
     let access = member_access(view, key, true);
     let m = w_mark();
     foreign_member_op(vl_empty(), t, word_text(access_prologue[0]) + "() => " + js_output(access, t, checked), m, key, true);
+}
+
+/// `Api.Mode.On`: an enum member (const or not) is its literal, with no
+/// host read (a const enum has no runtime value), or -1 when `node` is none.
+fn check_foreign_constant(node: I32) I32 {
+    let base = first_child(node);
+    if not is_kind(base, Node.Type_member_expr) { return -1; };
+    let owner = node_decl[first_child(base)];
+    if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 or not root_member(decl_a[owner], word_of(last_child(base))) { return -1; };
+    let value = jget_word(desc_get(describe(member_ref()), "constants"), word_of(last_child(node)));
+    if jis_string(value) {
+        w_leaf(Op.GlobalGet, vt_extern, string_global(jstring_word(value)), 0);
+        return prelude(Prelude.Str);
+    };
+    if not jis_number(value) { return -1; };
+    let bits = json_number(value).bits();
+    w_leaf(Op.F64Const, vt_f64, (bits & 4294967295).to_i32(), (bits >> 32).to_i32());
+    prelude(Prelude.F64);
+}
+
+/// `Api.counter = v` (`op=` with operator `word`, else -1): a view's
+/// mutable global written; a `const` one is readonly.
+fn check_foreign_root_set(node: I32, view: I32, key: I32, value: I32, word: I32, cx: Cx) I32 {
+    if not root_member(view, key) {
+        check_expr(value, -1, cx);
+        w_pop();
+        return unknown_member(node, view, -1, key);
+    };
+    if member_readonly[0] == 1 {
+        report2(Diag.ForeignReadonly, node, key, -1, -1);
+        return error_value();
+    };
+    let slot = member_ref();
+    let m = w_mark();
+    let vt = if word < 0 { check_argument(slot, value, view, cx); } else {
+        let ft = check_foreign_root(node, view, key, -1);
+        let v = foreign_operate(ft, word, value, node, m, cx);
+        if v < 0 { return error_since(m); };
+        w_get(repr(ft), v);
+        ft;
+    };
+    let ms = if word < 0 { m; } else { w_mark() - 1; };
+    let access = member_access(view, key, true);
+    foreign_member_op(one_type(vt), ty_void(), word_text(access_prologue[0]) + "(value) => { " + access + " = " + js_argument(slot, "value", vt) + "; }", ms, key, true);
+    if word >= 0 { w_node(Op.Seq, vt_none, 0, 0, m); };
+    ty_void();
 }
 
 /// `x.key`: the value of host type `owner` is on the stack since `m`.
@@ -2124,6 +2175,8 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
 
 /// `f(args)`: a host value of a function type, `callee` (its type `t`), called.
 fn check_foreign_value_call(node: I32, callee: I32, t: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let r = check_foreign_symbol_call(node, callee, t, args, m, expect, cx);
+    if r >= 0 { return r; };
     check_expr(callee, t, cx);
     check_foreign_invoke(node, ref_of(t), fty_view[t], args, t, -1, "self", "", false, m, expect, cx);
 }
@@ -2208,6 +2261,15 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     let view = fty_view[owner];
     let d = describe(ref_of(owner));
     let kt = check_expr(key_node, -1, cx);
+    // (`x[Api.token]`, a `unique symbol` key: the member it names)
+    let symbolic = symbol_member(d, kt);
+    if symbolic >= 0 {
+        let st = foreign_result(Ref { doc: d.doc, at: symbolic, env: d.env }, view, expect);
+        let mt = vl_begin();
+        vl_add(erased(owner, view));
+        vl_add(erased(kt, view));
+        return foreign_call_op(vl_end(mt), st, "(self,k) => " + js_output("self[k]", st, result_checked[0] == 1), m);
+    };
     let info = index_for(d, kt, view);
     if info < 0 and not ref_dynamic(ref_of(owner)) {
         report2(Diag.UnknownOperator, node, known_word(Known.GetIndex), owner, -1);
@@ -2237,6 +2299,31 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     vl_add(erased(owner, view));
     vl_add(erased(kt, view));
     foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), m);
+}
+
+/// The type of `d`'s member keyed by `unique symbol` type `kt`
+/// (`[token](): string`), or -1.
+fn symbol_member(d: Ref, kt: I32) I32 {
+    let sym = if is_foreign(kt) { jget(fty_at[kt], "symbol"); } else { -1; };
+    if not jis_string(sym) { return -1; };
+    let prop = jget_word(desc_get(d, "properties"), intern_text("@@" + jstring_text(sym)));
+    if prop >= 0 { jget(prop, "type"); } else { -1; };
+}
+
+/// `x[Api.token](args)`: a symbol-keyed method, called with `x` its
+/// receiver (its call type `t`), or -1 when `callee` is no such member.
+fn check_foreign_symbol_call(node: I32, callee: I32, t: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    if not is_kind(callee, Node.Index_expr) { return -1; };
+    let rt = type_only(first_child(callee), -1, cx);
+    let kt = type_only(last_child(callee), -1, cx);
+    if not is_foreign(rt) or symbol_member(describe(ref_of(rt)), kt) < 0 { return -1; };
+    let sym = jget(fty_at[kt], "symbol");
+    let view = fty_view[kt];
+    // (the symbol is its declaration's export: the key, imported, needs no value)
+    if not root_member(view, jstring_word(sym)) { return -1; };
+    check_expr(first_child(callee), rt, cx);
+    let access = "self[" + member_access(view, jstring_word(sym), true) + "]";
+    check_foreign_invoke(node, ref_of(t), fty_view[t], args, rt, -1, access, word_text(access_prologue[0]), false, m, expect, cx);
 }
 
 /// Whether a declaration is a tuple's (`[T0, T1]`).
@@ -2573,7 +2660,7 @@ fn first_js_array_use(decl: I32, let_node: I32, init: I32, cx: Cx) I32 {
     let s = next_sibling(let_node);
     while (s >= 0) {
         let u = first_ref(s, decl);
-        if u >= 0 { return js_array_use(u, init, cx); };
+        if u >= 0 { return js_array_use(u, init, node_first[let_node], cx); };
         s = next_sibling(s);
     };
     -1;
@@ -2591,7 +2678,7 @@ fn first_ref(node: I32, decl: I32) I32 {
     -1;
 }
 
-fn js_array_use(u: I32, init: I32, cx: Cx) I32 {
+fn js_array_use(u: I32, init: I32, after: I32, cx: Cx) I32 {
     let p = node_parent[u];
     if p < 0 { return -1; };
     if is_kind(p, Node.Field_expr) and first_child(p) == u {
@@ -2605,7 +2692,7 @@ fn js_array_use(u: I32, init: I32, cx: Cx) I32 {
         i += 1;
         a = next_sibling(a);
     };
-    let t = host_argument_type(call, i, cx);
+    let t = host_argument_type(call, i, after, cx);
     // (no tuple: TypeScript's `let xs = [1]` is a `number[]`, no `[number]`)
     if is_foreign(t) and element_of(ref_of(t), 0) >= 0 and not is_tuple(describe(ref_of(t))) { t; } else { -1; };
 }
@@ -2617,21 +2704,21 @@ fn js_array_use(u: I32, init: I32, cx: Cx) I32 {
 fn first_host_use(decl: I32, let_node: I32, cx: Cx) I32 {
     let s = next_sibling(let_node);
     while (s >= 0) {
-        let t = host_use_in(s, decl, cx);
+        let t = host_use_in(s, decl, node_first[let_node], cx);
         if t >= 0 { return t; };
         s = next_sibling(s);
     };
     -1;
 }
 
-fn host_use_in(node: I32, decl: I32, cx: Cx) I32 {
+fn host_use_in(node: I32, decl: I32, after: I32, cx: Cx) I32 {
     if is_kind(node, Node.Call_expr) {
         let args = next_sibling(first_child(node));
         let a = if args >= 0 { first_child(args); } else { -1; };
         let i = 0;
         while (a >= 0) {
             if is_kind(a, Node.Identifier) and node_decl[a] == decl {
-                let t = host_argument_type(node, i, cx);
+                let t = host_argument_type(node, i, after, cx);
                 if t >= 0 { return t; };
             };
             i += 1;
@@ -2640,15 +2727,31 @@ fn host_use_in(node: I32, decl: I32, cx: Cx) I32 {
     };
     let c = first_child(node);
     while (c >= 0) {
-        let t = host_use_in(c, decl, cx);
+        let t = host_use_in(c, decl, after, cx);
         if t >= 0 { return t; };
         c = next_sibling(c);
     };
     -1;
 }
 
-/// The type argument `i` of a call of a host function takes, or -1.
-fn host_argument_type(call: I32, i: I32, cx: Cx) I32 {
+/// The type local `decl` will have when it is declared after token
+/// `after`, and so not checked yet: its `let`'s annotation or initializer's,
+/// or a `promote` binding's subject's (`input` in `promote q { |input| => … }`); else -1.
+fn later_local_type(decl: I32, after: I32, cx: Cx) I32 {
+    let n = decl_node[decl];
+    if n < 0 or node_first[n] <= after { return -1; };
+    if decl_is(decl, Decl.Local) and is_kind(n, Node.Bind_expr) {
+        let t = let_annotation(n, cx);
+        return if t >= 0 { t; } else { type_only(last_child(n), -1, cx); };
+    };
+    if not decl_is(decl, Decl.Promoted) or not is_kind(n, Node.Promote_expr) { return -1; };
+    let et = type_only(first_child(n), -1, cx);
+    if et >= 0 and ty_is(et, Ty.Nullable) { ty_a[et]; } else { -1; };
+}
+
+/// The type argument `i` of a call of a host function takes, or -1 (a
+/// local the call names that is declared after token `after` is not checked yet).
+fn host_argument_type(call: I32, i: I32, after: I32, cx: Cx) I32 {
     let callee = first_child(call);
     let args = next_sibling(callee);
     let view = -1;
@@ -2658,13 +2761,17 @@ fn host_argument_type(call: I32, i: I32, cx: Cx) I32 {
         view = decl_a[owner];
         if not root_member(view, word_of(last_child(callee))) { return -1; };
     } else if is_kind(callee, Node.Field_expr) {
-        let m = w_mark();
-        let diags = diag_kind.len();
-        speculating[0] += 1;
-        let rt = check_base(callee, cx);
-        speculating[0] -= 1;
-        w_stack.resize(m);
-        diag_truncate(diags);
+        let base = first_child(callee);
+        let rt = if is_kind(base, Node.Identifier) and node_decl[base] >= 0 { later_local_type(node_decl[base], after, cx); } else { -1; };
+        if rt < 0 {
+            let m = w_mark();
+            let diags = diag_kind.len();
+            speculating[0] += 1;
+            rt = check_base(callee, cx);
+            speculating[0] -= 1;
+            w_stack.resize(m);
+            diag_truncate(diags);
+        };
         if not is_foreign(rt) { return -1; };
         view = fty_view[rt];
         if not foreign_member(rt, word_of(last_child(callee)), view) { return -1; };

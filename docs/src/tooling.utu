@@ -259,7 +259,7 @@ mod tooling {
                     "Compile Current File, Run Main, Show Generated WAT";
                 }
                 li {
-                    "Show Syntax Tree, Show Compiler IR, Open Semantic X-Ray, Explore Compiler Graphs";
+                    "Show Syntax Tree, Open Semantic X-Ray, Explore Compiler Graphs";
                 }
                 li {
                     "Show CSS Stencil, Create Wutu Website, Preview Wutu Website";

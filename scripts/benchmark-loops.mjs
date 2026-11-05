@@ -15,7 +15,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { buildImportObject, createCompiler, emitBinary, initParser, instantiateLowered } from '../src/index.js';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BENCH = path.join(ROOT, 'benchmarks', 'loops');
@@ -36,18 +36,10 @@ function compileRust() {
 }
 
 async function compileUtu(optimize) {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser, target: 'normal', optimize,
-    readFile: file => fs.readFile(file, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  const doc = await compiler.compileFile(path.join(BENCH, 'loops.utu'));
-  const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.dataset.errorMessage ?? node.dataset.error);
-  if (errors.length) throw new Error(errors.join('\n'));
-  const wasm = emitBinary(doc);
-  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc));
-  return { exports: instance.exports, wasm };
+  const built = await compileFile(await loadNodeCompiler(), path.join(BENCH, 'loops.utu'), { root: ROOT, optimize });
+  if (!built.wasm) throw new Error(built.diagnostics.map(diagnostic => diagnostic.message).join('\n'));
+  const { instance } = await instantiateNode(built.wasm, built.spec, { root: ROOT });
+  return { exports: instance.exports, wasm: built.wasm };
 }
 
 const ns = ms => (ms * 1e6 / N).toFixed(2).padStart(7);
