@@ -9830,14 +9830,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/1182_alt_other_instance.utu
- ERROR  Expected E, got A
+ ERROR  Expected M[I32].E, got M[Str].E
         type-mismatch · examples/error_demo/types/1182_alt_other_instance.utu:10:13
 
  8 │ export main() I32 {
  9 │     let e: MI.E = MI.E.A { value: 7 };
 10 │     alt e { MS.E.A |a| => a.value, };
    │             ━━━━━━
-   │             ╰─ A
+   │             ╰─ E
 11 │ }
 --- exit 1
 
@@ -10098,6 +10098,37 @@ FAIL after tests: boom
    │               ╰─ I32
  5 │     xs.len();
  6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1300_match_pattern_other_instance.utu
+ ERROR  Expected cell[I32].K, got cell[Str].K
+        type-mismatch · examples/error_demo/types/1300_match_pattern_other_instance.utu:9:47
+
+ 7 │ using cell[I32] |a|;
+ 8 │ using cell[Str] |b|;
+ 9 │ export main() I32 { let x = a.k(1); match x { b.K.A => 1, b.K.B => 2, }; }
+   │                                               ━━━━━
+   │                                               ╰─ K
+
+ ERROR  Expected cell[I32].K, got cell[Str].K
+        type-mismatch · examples/error_demo/types/1300_match_pattern_other_instance.utu:9:59
+
+ 7 │ using cell[I32] |a|;
+ 8 │ using cell[Str] |b|;
+ 9 │ export main() I32 { let x = a.k(1); match x { b.K.A => 1, b.K.B => 2, }; }
+   │                                                           ━━━━━
+   │                                                           ╰─ K
+--- exit 1
+
+=== utu check examples/error_demo/types/1301_alt_pattern_other_instance.utu
+ ERROR  Expected cell[I32].E, got cell[Str].E
+        type-mismatch · examples/error_demo/types/1301_alt_pattern_other_instance.utu:11:46
+
+ 9 │ using cell[I32] |a|;
+10 │ using cell[Str] |b|;
+11 │ export main() I32 { let x = a.mk(7); alt x { b.E.A |p| => p.v.len(), b.E.B => 2, }; }
+   │                                              ━━━━━
+   │                                              ╰─ E
 --- exit 1
 
 === utu check examples/error_demo/types/13_if_else_branches.utu
