@@ -3371,6 +3371,8 @@ fn check_return(node: I32, cx: Cx) I32 {
     let m = w_mark();
     if value >= 0 {
         let t = check_expr(value, cx.result, cx);
+        // A closure whose result is not written: its first `return` settles it.
+        if cx.result < 0 { cx.result = if ty_is(t, Ty.Never) { ty_void(); } else { t; }; };
         if ty_is(cx.result, Ty.Void) and not ty_is(t, Ty.Void) and not ty_is(t, Ty.Never) and not ty_is(t, Ty.Error) {
             // The function's name, unless the return is a closure's.
             let name = if cx.fi >= 0 and not in_closure(node) { decl_name[fi_decl[cx.fi]]; } else { -1; };
@@ -3379,6 +3381,8 @@ fn check_return(node: I32, cx: Cx) I32 {
         want(value, cx.result, Why.Returns, if cx.fi >= 0 and not in_closure(node) { fi_decl[cx.fi]; } else { -1; }, -1);
         coerce(t, cx.result, value);
         unwant();
+    } else if cx.result < 0 {
+        cx.result = ty_void();
     } else if not ty_is(cx.result, Ty.Void) {
         mismatch(node, cx.result, ty_void());
     };

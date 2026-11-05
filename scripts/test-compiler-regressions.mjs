@@ -873,6 +873,11 @@ export lib {
       + 'fn Range.each |r| () yield I32 { for (r.lo ..< r.hi) |i| { yield i; }; }\nfn Range.below(n: I32) yield I32 { for (0 ..< n) |i| { yield i; }; }\n'
       + 'export lib { fn run() I32 {\n    let total = 0;\n    for (seq.squares(4)) |v| { total += v; };\n    for (s.squares(3)) |v| { total += v * 100; };\n    let st = Stack[I32].new(0);\n    st.push(1);\n    st.push(2);\n    st.push(3);\n    let order = 0;\n    for (st.each()) |v| { order = order * 10 + v; };\n'
       + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    total + order * 1000000;\n} }\n', 321393514],
+    // An unconditional break after a defer in a generator's consumer: the second yield's expansion is dead code,
+    // left out (JavaScriptCore: "rethrow doesn't refer to a catch block" for a try there).
+    ['vec seen: I32;\nfn items() yield I64 { yield 1; yield 2; }\nexport lib { fn run() I32 { for (items()) |x| { defer seen.push(7); seen.push(1); break; }; seen[0] * 10 + seen[1]; } }\n', 17],
+    // A closure whose result is not written takes it from its first `return` (the compiler crashed: Out of bounds array.get).
+    ['fn a() I32 { let k = cl(x: I32) { if x > 1 { return x * 2; }; x; }; k(1) + k(5); }\nexport lib { fn run() I32 { cl() { return; }; a(); } }\n', 11],
     // A generator's `return;` runs its defers.
     ['fn g(n: I32) yield I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nexport lib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; t + seen[0] * 10; } }\n', 71],
     // A return or break out of nested expansions of one generator runs each one's defers with its own
@@ -2538,7 +2543,9 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
       const result = await compileFile(utu, file, { mode });
       assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}\n${files['main.utu'].slice(0, 200)}`);
-      assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), expected, `${mode}: ${files['main.utu'].slice(0, 200)}`);
+      let got;
+      try { got = await (await instantiateNode(result.wasm, result.spec)).exports.main(); } catch (error) { error.message = `${mode}: ${files['main.utu'].slice(0, 200)}: ${error.message}`; throw error; }
+      assert.equal(got, expected, `${mode}: ${files['main.utu'].slice(0, 200)}`);
       checked++;
     }
   }
