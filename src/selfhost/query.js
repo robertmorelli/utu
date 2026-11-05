@@ -49,11 +49,42 @@ export function programIndex(utu, files) {
     }
     return table[byte - file.offset];
   };
+  const placed = new Array(count);
   const place = node => {
+    if (node >= 0 && node < count && placed[node] !== undefined) return placed[node];
     const start = tokStart[first[node]];
     const file = fileOf(start);
-    if (!file) return null;
-    return { file: file.key, start: toUnits(file, start), end: toUnits(file, tokEnd[last[node] - 1]) };
+    const at = file ? { file: file.key, start: toUnits(file, start), end: toUnits(file, tokEnd[last[node] - 1]) } : null;
+    if (node >= 0 && node < count) placed[node] = at;
+    return at;
+  };
+  // By file key: its nodes with tokens, made when first asked.
+  let fileNodes = null;
+  const nodesOf = key => {
+    if (!fileNodes) {
+      fileNodes = new Map();
+      for (let n = 0; n < count; n++) {
+        if (first[n] >= last[n]) continue;
+        const at = place(n);
+        if (!at) continue;
+        if (!fileNodes.has(at.file)) fileNodes.set(at.file, []);
+        fileNodes.get(at.file).push(n);
+      }
+    }
+    return fileNodes.get(key) ?? [];
+  };
+  // By declaration: the names resolving to it, made when first asked.
+  let usesOf = null;
+  const uses = decl => {
+    if (!usesOf) {
+      usesOf = new Map();
+      for (let n = 0; n < count; n++) {
+        if (!named(n)) continue;
+        if (!usesOf.has(nodeDecl[n])) usesOf.set(nodeDecl[n], []);
+        usesOf.get(nodeDecl[n]).push(n);
+      }
+    }
+    return usesOf.get(decl) ?? [];
   };
   // By declaration: the first name inside it that resolves to it (its own
   // name), or -1. One pass over the nodes, made when first asked.
@@ -143,12 +174,11 @@ export function programIndex(utu, files) {
   const inside = (at, key, offset) => at?.file === key && at.start <= offset && offset <= at.end;
   const nodeAt = (key, offset, typed = false) => {
     let best = -1, width = Infinity;
-    for (let n = 0; n < count; n++) {
-      if (first[n] >= last[n] || typed && !utu.node_type(n)) continue;
+    for (const n of nodesOf(key)) {
       const at = place(n);
       if (!inside(at, key, offset)) continue;
       const size = at.end - at.start;
-      if (size < width) { best = n; width = size; }
+      if (size < width && !(typed && !utu.node_type(n))) { best = n; width = size; }
     }
     return best;
   };
@@ -177,6 +207,15 @@ export function programIndex(utu, files) {
     }
     return out;
   })();
+  let fromCache;
+  const callsFrom = () => fromCache ??= (() => {
+    const out = new Map();
+    for (const edge of calls()) {
+      if (!out.has(edge.from)) out.set(edge.from, []);
+      out.get(edge.from).push(edge);
+    }
+    return out;
+  })();
   const effectCache = new Map();
   const effectsOf = decl => {
     if (effectCache.has(decl)) return effectCache.get(decl);
@@ -185,7 +224,7 @@ export function programIndex(utu, files) {
       if (d < 0 || seen.has(d)) return 0;
       seen.add(d);
       let mask = utu.decl_effects?.(d) ?? 0;
-      for (const edge of calls()) if (edge.from === d) mask |= visit(edge.to);
+      for (const edge of callsFrom().get(d) ?? []) mask |= visit(edge.to);
       return mask;
     };
     const mask = visit(decl);
@@ -205,7 +244,7 @@ export function programIndex(utu, files) {
     at: place,
     /** The declaration the name at `offset` (UTF-16) of file `key` resolves to, or -1. */
     declarationAt(key, offset) {
-      for (let n = 0; n < count; n++) {
+      for (const n of nodesOf(key)) {
         if (!named(n)) continue;
         const at = place(n);
         if (at && at.file === key && at.start <= offset && offset <= at.end) return nodeDecl[n];
@@ -227,8 +266,7 @@ export function programIndex(utu, files) {
     references(decl, { includeDeclaration = true } = {}) {
       const definition = this.definition(decl);
       const out = [];
-      for (let n = 0; n < count; n++) {
-        if (nodeDecl[n] !== decl || !named(n)) continue;
+      for (const n of uses(decl)) {
         const at = place(n);
         if (!at) continue;
         const declaring = definition && at.file === definition.file && at.start === definition.start;
@@ -264,8 +302,7 @@ export function programIndex(utu, files) {
      */
     typeDeclarationOfExpressionBefore(key, offset, throughNull = false) {
       const ending = [];
-      for (let n = 0; n < count; n++) {
-        if (first[n] >= last[n]) continue;
+      for (const n of nodesOf(key)) {
         const at = place(n);
         if (at && at.file === key && at.end === offset) ending.push([at.start, n]);
       }
@@ -289,7 +326,7 @@ export function programIndex(utu, files) {
     /** Every name in file `key` (in every file, for null) that resolves, with its declaration, in source order. */
     names(key) {
       const out = [];
-      for (let n = 0; n < count; n++) {
+      for (const n of key == null ? Array.from({ length: count }, (_, n) => n) : nodesOf(key)) {
         if (!named(n)) continue;
         const at = place(n);
         if (at && (key == null || at.file === key)) out.push({ decl: nodeDecl[n], at });
@@ -338,8 +375,8 @@ export function programIndex(utu, files) {
         const head = this.text({ file: key, start: definition.end, end: span.end });
         if (!/^\s*:/.test(head)) hints.push({ position: definition.end, label: `: ${type}`, kind: 'type', at: definition });
       }
-      for (let n = 0; n < count; n++) {
-        if (first[n] >= last[n] || utu.node_kind_name(nodeKind[n]) !== 'closure_expr') continue;
+      for (const n of nodesOf(key)) {
+        if (utu.node_kind_name(nodeKind[n]) !== 'closure_expr') continue;
         const at = place(n);
         if (at?.file !== key) continue;
         const captures = [];
@@ -351,8 +388,11 @@ export function programIndex(utu, files) {
       }
       for (const co of coercions()) if (co.at?.file === key) hints.push({ position: co.at.end, label: ` → ${co.to}`, kind: 'conversion', at: co.at });
       for (let d = 0; d < utu.decl_count(); d++) {
-        const definition = this.definition(d), effect = effectsOf(d);
-        if (definition?.file === key && effect.mask && ['Fn', 'Main'].includes(this.kind(d)))
+        if (declNode[d] < 0 || !['Fn', 'Main'].includes(this.kind(d))) continue;
+        const definition = this.definition(d);
+        if (definition?.file !== key) continue;
+        const effect = effectsOf(d);
+        if (effect.mask)
           hints.push({ position: definition.end, label: ` !${effect.labels.join(', ')}`, kind: 'effect', at: definition });
       }
       return hints.sort((a, b) => a.position - b.position);
