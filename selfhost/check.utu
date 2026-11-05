@@ -3807,7 +3807,7 @@ fn drop_located_repeats() void {
         if located_file(i) < 0 and start >= 0 {
             let end_ = diag_end(i);
             for (0 ..< n) |j| {
-                if located_file(j) >= 0 and start >= diag_start(j) and end_ <= diag_end(j) { located_repeat[i] = 1; };
+                if located_file(j) >= 0 and diag_file(j) == diag_file(i) and start >= diag_start(j) and end_ <= diag_end(j) { located_repeat[i] = 1; };
             };
         };
     };
