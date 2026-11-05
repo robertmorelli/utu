@@ -142,6 +142,28 @@ Bench should also be leveraged as a tooling feature:
 
 That makes performance work feel built in, not bolted on.
 
+### Editor views dropped with stage -1 (revisit)
+
+Stage -1 (the JavaScript compiler in `src/compiler/`, deleted in favor of the
+self-hosted compiler) powered four Semantic X-Ray / Compiler Graphs views that
+had no self-hosted equivalent. They were dropped rather than approximated; the
+last version with them is tagged `stage-1-final`.
+
+- **"Why this type" trace**: for any expression, the chain of type-graph
+  constraints that produced its type (where an expectation came from, which
+  unification fixed it). Self-hosted would need the checker to record a reason
+  per inferred type, e.g. an origin node in `coerce` and each inference step.
+- **Rewrite lineage (provenance)**: which compiler pass rewrote a node and what
+  it came from (closure lowering, operator lowering, DSL expansion, inlining).
+  The self-hosted compiler does not rewrite a DOM, so this would be a log of
+  lowering decisions keyed by source span.
+- **Expectation edges**: in the graph explorer, edges from each expression to
+  the type expected of it and the site that imposed the expectation. Needs the
+  checker to keep expected types per node (`node_expect`) and their sources.
+- **HTML IR view**: stage -1's IR as an inspectable HTML tree. The self-hosted
+  IR is close to Wasm, so the nearest view is annotated WAT; a structured,
+  clickable view of the self-hosted node tables would replace it.
+
 ### Formatter
 
 A canonical formatter (`utufmt` or equivalent) should ship with the compiler.
