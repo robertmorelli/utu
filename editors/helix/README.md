@@ -21,7 +21,7 @@ The installer:
   marker lines, keeping everything else (the file is backed up to
   `languages.toml.bak.utu` first);
 - copies `queries/utu/` and `queries/wutu/` to `~/.config/helix/runtime/queries/`;
-- builds the two tree-sitter grammars, utu's (this repository's `src/`) and
+- builds the two tree-sitter grammars, utu's (`editors/tree-sitter-utu/src/`) and
   Wutu's (`editors/tree-sitter-wutu/src/`), into
   `~/.config/helix/runtime/grammars/` (it needs a C compiler, `cc` or `$CC`).
 

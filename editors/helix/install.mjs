@@ -19,8 +19,8 @@ const repo = path.resolve(here, '../..');
 const config = path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'), 'helix');
 const languages = path.join(config, 'languages.toml');
 const queryDirs = ['utu', 'wutu'].map(name => path.join(config, 'runtime', 'queries', name));
-// utu's grammar (the repository root), and Wutu's, injected into `@wutu/\ … \/`.
-const grammarSources = { utu: repo, wutu: path.join(repo, 'editors', 'tree-sitter-wutu') };
+// utu's editor grammar and Wutu's, injected into `@wutu/\ … \/`.
+const grammarSources = { utu: path.join(repo, 'editors', 'tree-sitter-utu'), wutu: path.join(repo, 'editors', 'tree-sitter-wutu') };
 const BEGIN = '# >>> utu (editors/helix/install.mjs) >>>';
 const END = '# <<< utu <<<';
 const remove = process.argv.includes('--remove');

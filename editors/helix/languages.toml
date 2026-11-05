@@ -22,7 +22,7 @@ language-servers = ["utu"]
 
 [[grammar]]
 name = "utu"
-source = { path = "@REPO@" }
+source = { path = "@REPO@/editors/tree-sitter-utu" }
 
 # Wutu templates, injected into `@wutu/\ … \/` (and into Wutu's own utu).
 [[language]]

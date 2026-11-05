@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 process.chdir(new URL('..', import.meta.url).pathname);
 await Parser.init();
-const utu = await Language.load('./tree-sitter-utu.wasm');
+const utu = await Language.load('./editors/tree-sitter-utu/tree-sitter-utu.wasm');
 const wutu = await Language.load('./editors/tree-sitter-wutu/tree-sitter-wutu.wasm');
 const pu = new Parser(); pu.setLanguage(utu);
 const pw = new Parser(); pw.setLanguage(wutu);

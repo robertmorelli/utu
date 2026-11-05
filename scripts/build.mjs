@@ -10,20 +10,10 @@ import { syncWutuRuntime } from './sync-wutu-runtime.mjs';
 //   bun run build --docs    — also document the compiler: dist/compiler.pdf
 //                             (requires typst; dist/compiler.typ without it)
 //
-// Grammar source of truth — `grammar.cjs` + `grammar/rules/*.cjs`, and nothing
-// else.  `tree-sitter generate` reads them through `grammar.js` and emits
-// src/grammar.json, src/parser.c, and src/node-types.json; `--wasm` then builds
-// tree-sitter-utu.wasm from parser.c.  All four are generated, and all four are
-// committed so a clone needs no tree-sitter toolchain.
-//
-//   grammar.cjs + grammar/rules/*.cjs
-//        ↓  (--grammar)  tree-sitter generate
-//   src/grammar.json, src/parser.c, src/node-types.json
-//        ↓  (--wasm)
-//   tree-sitter-utu.wasm
-//
-// After changing the grammar, run `bun run build --wasm`. Do not hand-edit
-// src/grammar.json — it is output, not input.
+// The editor grammar lives in editors/tree-sitter-utu/. Its grammar.cjs and
+// grammar/rules/*.cjs generate src/grammar.json, src/parser.c, and
+// src/node-types.json there. --wasm also rebuilds tree-sitter-utu.wasm.
+// These artifacts are committed for editor installs without a parser toolchain.
 
 import fs from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
@@ -59,20 +49,20 @@ async function main() {
 
 async function generateParser() {
   // Use the project-bundled tree-sitter CLI so the emitted grammar's ABI
-  // version matches the `web-tree-sitter` runtime we ship with.  Falling
+  // version matches the editor grammar runtime. Falling
   // back to a system-wide `tree-sitter` often pins a newer/older ABI and
   // silently produces wasm that the runtime refuses to load.
   const cli = path.join(ROOT, 'node_modules', 'tree-sitter-cli', 'tree-sitter');
   // No argument: the CLI resolves grammar.js → grammar.cjs → grammar/rules/*.
   // Passing src/grammar.json instead would make the generated file its own
   // input, so a rule change in the .cjs sources would be silently ignored.
-  console.log('Regenerating parser from grammar.cjs…');
-  execSync(`${cli} generate`, { cwd: ROOT, stdio: 'inherit' });
+  console.log('Regenerating editor grammar from grammar.cjs…');
+  execSync(`${cli} generate`, { cwd: path.join(ROOT, 'editors', 'tree-sitter-utu'), stdio: 'inherit' });
 
   if (buildWasm) {
     console.log('Building wasm…');
     try {
-      execSync(`${cli} build --wasm`, { cwd: ROOT, stdio: 'inherit' });
+      execSync(`${cli} build --wasm`, { cwd: path.join(ROOT, 'editors', 'tree-sitter-utu'), stdio: 'inherit' });
     } catch {
       console.warn('Warning: wasm build failed (emscripten may not be installed). Skipping.');
     }
@@ -265,8 +255,8 @@ function embeddedWasmPlugin() {
       }));
       buildApi.onLoad({ filter: /^embedded-wasm$/, namespace: 'utu-embedded' }, async () => {
         const [treeSitterUtu, webTreeSitter] = await Promise.all([
-          fs.readFile(path.join(ROOT, 'tree-sitter-utu.wasm')),
-          fs.readFile(path.join(ROOT, 'web-tree-sitter.wasm')),
+          fs.readFile(path.join(ROOT, 'editors', 'tree-sitter-utu', 'tree-sitter-utu.wasm')),
+          fs.readFile(path.join(ROOT, 'editors', 'tree-sitter-utu', 'web-tree-sitter.wasm')),
         ]);
         return {
           loader: 'js',
