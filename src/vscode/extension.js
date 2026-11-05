@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { cssProjection } from '../compiler/css-stencil.js';
-import { formatUtuSource, wutuCompletions } from '../compiler/wutu-tooling.js';
+import { cssProjection } from '../wutu/css-stencil.js';
+import { formatUtuSource, wutuCompletions } from '../wutu/wutu-tooling.js';
 
 const LANGUAGE_ID = 'utu';
 const DOCUMENT_SELECTOR = Object.freeze({ language: LANGUAGE_ID, scheme: '*' });

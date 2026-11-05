@@ -31,7 +31,7 @@ jobs:
         run: |
           bun run bindings:browser
           bun run build
-          git diff --exit-code -- src/bindings/browser-catalog.generated.js src/compiler/platform-sources.generated.js
+          git diff --exit-code -- src/bindings/browser-catalog.generated.js src/selfhost/platform-sources.generated.js
       - name: Node ABI coverage
         run: |
           node scripts/dts-abi-tests.mjs

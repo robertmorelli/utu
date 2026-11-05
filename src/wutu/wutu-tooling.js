@@ -4,7 +4,8 @@
 // formatting is driven by the Wutu parser rather than regex rewrites of
 // executable expressions. Bodies with comments are left untouched.
 import { dslLiterals, dslOpenerAt, skipDsl } from './dsl-envelope.js';
-import { parseSyntax } from './syntax/parser.js';
+// Stage -1's tree-sitter parser, for the formatter's syntaxShape, until the formatter moves onto the self-hosted parser.
+import { parseSyntax } from '../compiler/syntax/parser.js';
 import { parseWutu, wutuVocabulary } from './wutu-parse.js';
 
 const INDENT = '    ';

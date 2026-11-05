@@ -1,5 +1,3 @@
-import { DIAGNOSTIC_KINDS } from './diagnostics.js';
-
 // A branch of an if/else expression holding one expression: `{ value; }`.
 const IF_VALUE_BRANCH = /(?<=\b(?:if\b[^{};]*|else\s*))\{[^{};]*;?\s*\}/g;
 
@@ -58,7 +56,7 @@ export function compressedSourceWarnings(source, file) {
     if (long && code.trim().length > 100 && boundaries() >= 5) {
       const col = line.search(/\S/) + 1;
       warnings.push({
-        kind: DIAGNOSTIC_KINDS.COMPRESSED_SOURCE, severity: 'warning',
+        kind: 'compressed-source', severity: 'warning',
         message: 'This line packs multiple statements or blocks together. Put statements and block contents on separate, indented lines; keep source readable and minify build output instead.',
         primary: { file, row: index + 1, col, endRow: index + 1, endCol: line.length + 1,
           start: offset + col - 1, end: offset + line.length },
@@ -117,7 +115,7 @@ export function unknownIslandWarnings(sources) {
     const from = rowCol(source, start), to = rowCol(source, end);
     const known = [...islands].sort();
     return {
-      kind: DIAGNOSTIC_KINDS.UNKNOWN_ISLAND, severity: 'warning',
+      kind: 'unknown-island', severity: 'warning',
       message: `No @island named "${name}" exists, so this invalidate refreshes nothing.${known.length ? ` Known islands: ${known.map(n => `"${n}"`).join(', ')}.` : ''}`,
       primary: { file, row: from.row, col: from.col, endRow: to.row, endCol: to.col, start, end },
       related: [], notes: [], fixes: [],

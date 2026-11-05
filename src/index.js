@@ -42,7 +42,7 @@ export { assertGraphRevision, replaceRetainedGraphs } from './compiler/graph-sto
 export { createDslArtifactState, collectDslArtifacts, stampDslArtifacts } from './compiler/collect-dsl-artifacts.js';
 export { expandDsls } from './compiler/expand-dsls.js';
 export { createStandardDsls } from './compiler/standard-dsls.js';
-export { PLATFORM_SOURCES } from './compiler/platform-sources.generated.js';
+export { PLATFORM_SOURCES } from './selfhost/platform-sources.generated.js';
 export {
   createExplainabilityArtifacts,
   pushDiagnostic,

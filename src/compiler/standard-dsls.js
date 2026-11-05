@@ -1,4 +1,4 @@
-import {stencilCss} from './css-stencil.js';
+import {stencilCss} from '../wutu/css-stencil.js';
 import { callableParts } from './type-strings.js';
 import { parseXmlFragment } from './ir-document.js';
 import { parseToIR } from './parse.js';

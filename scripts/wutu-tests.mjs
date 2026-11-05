@@ -1,8 +1,8 @@
 // Wutu parser, formatter, expansion, diagnostics, and @stored regressions.
 import { parseHTML } from 'linkedom/worker';
 import { compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
-import { parseWutu, WutuSyntaxError } from '../src/compiler/wutu-parse.js';
-import { formatWutuBody, formatWutuSource, wutuIslands } from '../src/compiler/wutu-tooling.js';
+import { parseWutu, WutuSyntaxError } from '../src/wutu/wutu-parse.js';
+import { formatWutuBody, formatWutuSource, wutuIslands } from '../src/wutu/wutu-tooling.js';
 
 const BROWSER = 'using Browser from std:Browser;\n';
 

@@ -24,7 +24,7 @@
 
 // ── Syntax nodes ─────────────────────────────────────────────────────────────
 
-import { dslEnd } from '../dsl-envelope.js';
+import { dslEnd } from '../../wutu/dsl-envelope.js';
 
 let nextId = 1;
 
@@ -1354,7 +1354,7 @@ class Parser {
   dslExpr() {
     const at = this.expectPunct('@');
     const name = this.identifier();
-    // The body is an external token: `/\ … \/`, nested pairs balanced (see dsl-envelope.js).
+    // The body is an external token: `/\ … \/`, nested pairs balanced (see src/wutu/dsl-envelope.js).
     const source = this.source;
     if (!source.startsWith('/\\', this.pos)) this.fail();
     const start = this.pos;

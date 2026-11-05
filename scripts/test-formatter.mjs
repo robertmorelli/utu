@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { formatUtu, formatUtuSource } from '../src/compiler/wutu-tooling.js';
+import { formatUtu, formatUtuSource } from '../src/wutu/wutu-tooling.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

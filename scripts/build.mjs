@@ -34,7 +34,7 @@ import { build } from 'esbuild';
 
 const ROOT = process.cwd();
 const STD_DIR = path.join(ROOT, 'std');
-const OUT_FILE = path.join(ROOT, 'src', 'compiler', 'platform-sources.generated.js');
+const OUT_FILE = path.join(ROOT, 'src', 'selfhost', 'platform-sources.generated.js');
 const DIST_DIR = path.join(ROOT, 'dist');
 const BUNDLE_FILE = path.join(DIST_DIR, 'utu.js');
 

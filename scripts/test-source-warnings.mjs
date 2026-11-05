@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { compressedSourceWarnings } from '../src/compiler/source-warnings.js';
+import { compressedSourceWarnings } from '../src/selfhost/source-warnings.js';
 import { initParser, createCompiler, emitBinary } from '../src/index.js';
 const dense = 'export main() I32 { let first_value = 1; let second_value = 2; let third_value = 3; let fourth_value = 4; let fifth_value = 5; first_value + second_value + third_value + fourth_value + fifth_value; }';
 const warnings = compressedSourceWarnings('\n'+dense, 'test.utu');

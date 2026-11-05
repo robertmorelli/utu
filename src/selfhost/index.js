@@ -6,4 +6,4 @@ export { programIndex } from './query.js';
 export { catalogStdlib } from './catalog.js';
 export { formatDiagnostics } from './format.js';
 export { glueSource, loaderSource } from './loader.js';
-export { PLATFORM_SOURCES } from '../compiler/platform-sources.generated.js';
+export { PLATFORM_SOURCES } from './platform-sources.generated.js';

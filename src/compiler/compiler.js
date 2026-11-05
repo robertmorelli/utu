@@ -58,7 +58,7 @@ import { expandDsls } from './expand-dsls.js';
 import { lowerBackendControl } from './lower-backend-control.js';
 import { validateAnalysis } from './validate-analysis.js';
 import { createStandardDsls } from './standard-dsls.js';
-import { PLATFORM_SOURCES } from './platform-sources.generated.js';
+import { PLATFORM_SOURCES } from '../selfhost/platform-sources.generated.js';
 import { paramsOf, stampOriginFile } from './ir-helpers.js';
 import { createExplainabilityArtifacts, pushDiagnostic } from './explainability.js';
 import { compilerError, diagnosticFacts, DIAGNOSTIC_KINDS, stampDiagnostic } from './diagnostics.js';

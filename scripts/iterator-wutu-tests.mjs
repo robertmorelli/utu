@@ -1,7 +1,7 @@
 import { parseHTML } from 'linkedom/worker';
 import { emitText } from '../src/index.js';
 import { compileAndInstantiate, compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
-import { parseWutu } from '../src/compiler/wutu-parse.js';
+import { parseWutu } from '../src/wutu/wutu-parse.js';
 
 export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,assertNoErrors,makeCompiler}) {
   test('iterators: fused stages, independent indexes, short circuit, and nested pipelines',async({ROOT})=>{
