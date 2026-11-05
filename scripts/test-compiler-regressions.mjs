@@ -3084,6 +3084,8 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     + 'export main() I32 { let c = IC {}; let .{q, r} = c.divmod(17, 5); q * 100 + r + use(c); }\n', 334);
   // A closure with no written result whose body is an if or match where every arm returns.
   await gen1('export main() I32 { let n = cl(x: I32) { if x > 0 { return 1; } else { return 2; }; }; let k = cl(x: I32) { match x { 0 => { return 5; }, ~> { return 6; }, }; }; n(1) + k(0) * 10 + k(3) * 100; }\n', 651);
+  // An alt whose arms of different variants include one that binds.
+  await gen1('enum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n    | Pt\nfn f(s: Sh) I32 { let a = alt s { Ci |c| => Sh.Sq { s: c.r }, Sq => Sh.Pt, Pt => Sh.Pt, }; alt a { Sq |q| => q.s, Ci => 0, Pt => 7, }; }\nexport main() I32 { f(Sh.Ci { r: 4 }) * 10 + f(Sh.Sq { s: 1 }); }\n', 47);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });

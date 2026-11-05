@@ -342,18 +342,29 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     };
     if default_ < 0 { check_alt_exhaustive(node, enum_decl); };
     same_variant_arms(arms, enum_decl);
-    // Arms of different variants (none binding, so each types alone): their enum.
+    // Arms of different variants: their enum (a binding arm is typed with its variant declared).
     let want_t = expect;
     if expect < 0 {
         let from = join_nodes.len();
-        let binds = false;
+        let unknown = false;
         c = arms;
         while (c >= 0) {
-            if is_kind(c, Node.Alt_arm) { binds = binds or arm_binding(c) >= 0; join_nodes.push(last_child(c)); };
+            if is_kind(c, Node.Alt_arm) {
+                if arm_binding(c) >= 0 {
+                    let variant = alt_variant(first_child(c), ty_decl(st));
+                    if variant < 0 { unknown = true; }
+                    else {
+                        let d = node_decl[next_sibling(first_child(c))];
+                        decl_ty[d] = named(variant, ty_inst(st));
+                        decl_local[d] = s;
+                    };
+                };
+                join_nodes.push(last_child(c));
+            };
             c = next_sibling(c);
         };
         if default_ >= 0 { join_nodes.push(first_child(default_)); };
-        if binds { join_nodes.resize(from); } else { want_t = branch_join(from, cx); };
+        if unknown { join_nodes.resize(from); } else { want_t = branch_join(from, cx); };
     };
     let t = alt_arms(arms, s, st, want_t, default_, cx);
     if optimize_level[0] == 1 { cast_arms(w_stack[w_stack.len() - 1], s); };
