@@ -2436,8 +2436,8 @@ export main() I32 {
     a + b + c + d;
 }
 ` }, 1],
-    // A negative or reversed Str range is empty in every engine; one past the end clamps.
-    [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nexport main() I32 {\n    let s = "hello";\n    s.slice(n(-1), 3).len() + s.slice(3, n(1)).len() * 10 + s[n(-2), 2].len() * 100 + Str.slice(s, 1, 3).len() * 1000 + s.slice(2, 99).len() * 10000;\n}\n' }, 32000],
+    // An end past the string clamps (a negative or reversed range traps in safe builds, as Array's slice does: d0756ea).
+    [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nexport main() I32 {\n    let s = "hello";\n    Str.slice(s, 1, 3).len() * 1000 + s.slice(2, n(99)).len() * 10000;\n}\n' }, 32000],
     // A mod's own named struct and protocol, opened (in its file, and imported then opened).
     [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo;\nexport main() I32 { let p = Pt { x: 2 }; let q: geo.Pt = p; q.x; }\n' }, 2],
     [{ 'shp.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\n',
