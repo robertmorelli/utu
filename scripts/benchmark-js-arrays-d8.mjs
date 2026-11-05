@@ -6,20 +6,21 @@ import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 
 /** Node only builds the fixture. Every warmup and timing runs inside d8. */
-export async function measureInD8({ root, wasm, doc, glue }) {
+export async function measureInD8({ root, wasm, spec: built, glue, liveGlue = glue }) {
   const out = path.join(root, 'dist/benchmarks');
   await fs.mkdir(out, { recursive: true });
   const gluePath = path.join(out, 'array-glue.mjs');
   await fs.writeFile(gluePath, glue);
-  const spec = JSON.parse(doc.body.firstChild.dataset.dslImportsJs);
-  const closure = JSON.parse(doc.body.firstChild.dataset.closureRuntime);
+  // The self-hosted compiler's spec: its @es bodies, and the closures it hands JavaScript.
+  const spec = built.es ?? {};
+  const closure = built.closures ?? null;
   const source = `
     import * as glue from ${JSON.stringify(gluePath)};
     import { importObjectFromGlue, closureImports } from ${JSON.stringify(path.join(root,'src/runtime/host-imports.js'))};
     import { sum } from ${JSON.stringify(path.join(root,'benchmarks/abi/arrays.mjs'))};
     import { measureArrays } from ${JSON.stringify(path.join(root,'benchmarks/abi/measure.mjs'))};
     const imports=importObjectFromGlue(${JSON.stringify(spec)},glue);
-    imports.utu=closureImports(${JSON.stringify(closure)},imports.utu);
+    if(${JSON.stringify(closure)})imports.utu=closureImports(${JSON.stringify(closure)},imports.utu);
     const module=new WebAssembly.Module(new Uint8Array(${JSON.stringify([...wasm])}),{builtins:['js-string'],importedStringConstants:"'"});
     const {exports:e}=new WebAssembly.Instance(module,imports);
     const result=measureArrays({javascript:sum,javascriptReduce:v=>v.reduce((a,b)=>a+b,0),utuIndexed:e.indexed,utuGeneric:e.generic,utuCallback:e.callback,utuBatch:e.batch});
@@ -37,7 +38,7 @@ export async function measureInD8({ root, wasm, doc, glue }) {
   if (!line) throw new Error(`d8 produced no results: ${run.stdout}`);
   const report = { engine:version.stdout.trim(), flags:[], platform:process.platform,arch:process.arch,
     methodology:'15 rotating-order samples after 10 warmup rounds. Same JS arrays and sums; setup/compilation excluded. Median and p10/p90 nanoseconds per element. Batch makes one crossing per entire sum.',
-    wasmBytes:wasm.length,wasmGzip:gzipSync(wasm).length,liveGlueBytes:Buffer.byteLength(glue),...JSON.parse(line.slice(7)) };
+    wasmBytes:wasm.length,wasmGzip:gzipSync(wasm).length,liveGlueBytes:Buffer.byteLength(liveGlue),...JSON.parse(line.slice(7)) };
   await fs.writeFile(path.join(out,'js-arrays-d8.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify(report,null,2));
 }
