@@ -1705,7 +1705,7 @@ fn register_method(item: I32, w: Walk) void {
     if owner >= 0 {
         let prior = add_member(owner, word_of(method), Space.Method, decl);
         // A protocol's `fn P[T].m` is one method per T, all members of P.
-        if prior >= 0 and prior != decl and not decl_is(owner, Decl.Proto) {
+        if prior >= 0 and prior != decl and (not decl_is(owner, Decl.Proto) or (not is_kind(args, Node.Module_type_arg_list) and not is_kind(next_sibling(first_child(first_child(decl_node[prior]))), Node.Module_type_arg_list))) {
             report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1);
             diag_place(Extra.Related, decl_name_at(prior), "first here");
         };

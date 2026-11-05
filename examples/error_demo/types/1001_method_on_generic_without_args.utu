@@ -1,0 +1,7 @@
+// What: a method declared on a generic module's type without its type argument
+// Expect: Array takes 1 type arguments, given 0
+fn Array.first |xs| () I32 { xs[0]; }
+
+export main() I32 {
+    0;
+}

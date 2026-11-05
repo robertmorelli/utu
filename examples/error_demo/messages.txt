@@ -9372,6 +9372,34 @@ FAIL after tests: boom
  7 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/1000_proto_default_twice.utu
+ ERROR  Duplicate method P.dflt
+        duplicate-method · examples/error_demo/types/1000_proto_default_twice.utu:11:4
+
+ 9 │ fn P[A].n |a| () I32 { a.x; }
+10 │ fn P.dflt |p| () I32 { p.n(); }
+   │      ────
+   │      ╰─ first here
+11 │ fn P.dflt |p| () I32 { 99; }
+   │    ━━━━━━
+   │    ╰─ already declared
+12 │
+13 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/types/1001_method_on_generic_without_args.utu
+ ERROR  Array takes 1 type arguments, given 0
+        invalid-module-arity · examples/error_demo/types/1001_method_on_generic_without_args.utu:3:4
+
+ 1 │ // What: a method declared on a generic module's type without its type argument
+ 2 │ // Expect: Array takes 1 type arguments, given 0
+ 3 │ fn Array.first |xs| () I32 { xs[0]; }
+   │    ━━━━━
+   │    ╰─ here
+ 4 │
+ 5 │ export main() I32 {
+--- exit 1
+
 === utu check examples/error_demo/types/100_host_value_as_str.utu
  ERROR  s is Str, got JS.Map<any, any>
         type-mismatch · examples/error_demo/types/100_host_value_as_str.utu:6:18
