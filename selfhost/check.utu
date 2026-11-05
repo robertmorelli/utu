@@ -1306,11 +1306,6 @@ fn check_let(node: I32, cx: Cx) I32 {
         report(Diag.TypeMismatch, init, -1);
         t = ty_error();
     };
-    if not annotated and ty_is(t, Ty.Tuple) {
-        report2(Diag.TupleLet, name, word_of(name), t, 3);
-        decl_ty[decl] = ty_error();
-        return error_since(m);
-    };
     decl_ty[decl] = t;
     if ty_is(t, Ty.Void) {
         // (After a mistake in the value, its being void is no news; a

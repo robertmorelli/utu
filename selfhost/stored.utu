@@ -187,7 +187,8 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
 fn stored_sanitize(type: Str, v: Str, file: I32) Str {
     let t = trim_text(type);
     if t == "F64" { return "globalThis.__utuWutu.storageReviveF64(" + v + ")"; };
-    if text_at(t, 0, "Array[") { return "(" + v + ").map(v=>" + stored_sanitize(t.slice(6, t.len() - 1), "v", file) + ")"; };
+    // (A value of the wrong shape is left as it is: validation then reports the mismatch.)
+    if text_at(t, 0, "Array[") { return "(Array.isArray(" + v + ")?" + v + ".map(v=>" + stored_sanitize(t.slice(6, t.len() - 1), "v", file) + "):" + v + ")"; };
     if is_stored_scalar(t) { return v; };
     let fields = "";
     for (stored_fields(stored_struct(t, file))) |f| {
@@ -195,7 +196,7 @@ fn stored_sanitize(type: Str, v: Str, file: I32) Str {
         let name = js_string(field_name(f));
         fields = fields + name + ":" + stored_sanitize(field_type_text(f), v + "[" + name + "]", file);
     };
-    "({..." + v + "," + fields + "})";
+    "(" + v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")?{..." + v + "," + fields + "}:" + v + ")";
 }
 
 /// The expansion of a `@stored` site: its body parsed as

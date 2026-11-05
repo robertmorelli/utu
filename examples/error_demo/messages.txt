@@ -235,19 +235,6 @@
  5 │ }
 --- exit 1
 
-=== utu check examples/error_demo/control/1180_let_of_tuple.utu
- ERROR  both would hold tuple .{I32, I32}: name its values with let .{…}
-        tuple-let · examples/error_demo/control/1180_let_of_tuple.utu:6:9
-
- 4 │
- 5 │ export main() I32 {
- 6 │     let both = pair();
-   │         ━━━━
-   │         ╰─ here
- 7 │     0;
- 8 │ }
---- exit 1
-
 === utu check examples/error_demo/control/1181_break_leaves_closure.utu
  ERROR  break cannot leave a closure
         unknown-label · examples/error_demo/control/1181_break_leaves_closure.utu:5:44
@@ -1442,16 +1429,16 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/85_closure_captures_tuple.utu
- ERROR  pair would hold tuple .{I32, I32}: name its values with let .{…}
-        tuple-let · examples/error_demo/control/85_closure_captures_tuple.utu:6:9
+ ERROR  A closure cannot capture tuple pair
+        tuple-let · examples/error_demo/control/85_closure_captures_tuple.utu:7:17
 
- 4 │
  5 │ export main() I32 {
  6 │     let pair = swap(3, 4);
-   │         ━━━━
-   │         ╰─ here
  7 │     let first = cl() I32 { let .{a, b} = pair; a; };
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                 ╰─ here
  8 │     first();
+ 9 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/86_int_pattern_on_int_enum.utu

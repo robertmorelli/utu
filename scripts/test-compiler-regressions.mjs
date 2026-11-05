@@ -1911,7 +1911,7 @@ export lib {
     // A let of no value (it crashed the compiler).
     ['fn nothing() void {}\nexport main() I32 { let x = nothing(); x; 0; }\n', 'x would hold no value'],
     // A tuple result must be destructured when bound.
-    ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 't would hold tuple .{I32, I32}: name its values with let .{…}'],
+    ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 'A closure cannot capture tuple t'],
     // An integer is no variant of an integer enum.
     ['enum(U8) A:\n    | X\n    | Y\nexport main() I32 { match A.X { 0 => 10, 1 => 20, }; }\n', '0 cannot match A'],
     // Two opened modules with one name: neither is meant (this said "Unknown variable v").
