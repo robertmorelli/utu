@@ -1,7 +1,6 @@
 import path from 'node:path';
 
 import { negativeDiagnosticCases } from './negative-diagnostic-cases.mjs';
-import { formatDiagnostics } from '../src/index.js';
 import { testTmp } from './test-harness.mjs';
 
 export function registerNegativeDiagnosticTests({ test, makeCompiler, assert }) {
@@ -18,7 +17,7 @@ export function registerNegativeDiagnosticTests({ test, makeCompiler, assert }) 
         await fs.writeFile(file, src);
         const diagnostics = await diagnosticsFor(compiler, file);
         const found = diagnostics.find(d => d.kind === kind && d.message.includes(message));
-        assert(found, `${name}: expected ${kind} containing ${JSON.stringify(message)}, got:\n${await formatDiagnostics(diagnostics, { readFile: (p) => fs.readFile(p, 'utf8') })}`);
+        assert(found, `${name}: expected ${kind} containing ${JSON.stringify(message)}, got:\n${diagnostics.map(d => `  ${d.kind}@${d.line}:${d.column} ${JSON.stringify(src.slice(d.start, d.end))}: ${d.message}`).join('\n')}`);
       }
     } finally {
       await fs.rm(dir, { recursive: true, force: true });

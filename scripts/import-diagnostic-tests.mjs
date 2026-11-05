@@ -50,7 +50,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
       'main.utu': 'using shapes from "./lib.utu";\nexport main() I32 { 1; }\n',
       'lib.utu': 'mod shape {\n    fn one() I32 { 1; }\n}\nmod color {\n    fn two() I32 { 2; }\n}\n',
     });
-    const missing = diagnostics.find(d => d.kind === 'unknown-import');
+    const missing = diagnostics.find(d => d.kind === 'unknown-type' && /Unknown module shapes/.test(d.message));
     assert(missing, kinds(diagnostics));
     assertEq(missing.fileName, 'main.utu');
     assert(missing.message.includes("defines 'shape', 'color'"), missing.message);
