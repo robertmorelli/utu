@@ -509,13 +509,13 @@ vec join_nodes: I32;
 /// With nothing expected, the type the branches pushed on `join_nodes` since
 /// `from` join to, when the first alone cannot say: variants of one enum
 /// (`C {…}` and `R {…}` are an Sh), or null beside a reference (a `?T`).
-/// Else -1. Only when a branch is `null` or `T {…}` are any typed first.
+/// Else -1. Only when a branch is `null`, `T {…}` or `E.V` are any typed first.
 fn branch_join(from: I32, cx: Cx) I32 {
     let n = join_nodes.len();
     let shaped = false;
     for (from ..< n) |k| {
         let v = branch_value(join_nodes[k]);
-        if is_null_literal(v) or is_kind(v, Node.Struct_init) { shaped = true; };
+        if is_null_literal(v) or is_kind(v, Node.Struct_init) or is_kind(v, Node.Type_member_expr) { shaped = true; };
     };
     let has_null = false;
     let differ = false;

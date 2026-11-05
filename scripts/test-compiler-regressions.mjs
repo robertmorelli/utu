@@ -3071,6 +3071,8 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     + 'export main() I32 { let s: P = S {n: 0}; s.f(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16); }\n', 16);
   // Right-nested literal-led operators are checked once per level, not twice.
   await gen1('export main() I32 { let x = 3; 1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (x)))))))))))))))))))))))); }\n', 27);
+  // Unannotated joins of one enum's variants: if, match, and alt.
+  await gen1('enum E: | A | B\nexport main() I32 {\n    let c = true;\n    let e = if c { E.A; } else { E.B; };\n    let f = match c { true => E.A, false => E.B, };\n    let g = alt E.B { A => E.A, B => E.B, };\n    alt e { A => 1, B => 2, } + alt f { A => 10, B => 20, } + alt g { A => 100, B => 200, };\n}\n', 211);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
