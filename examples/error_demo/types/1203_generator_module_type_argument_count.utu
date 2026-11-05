@@ -1,0 +1,4 @@
+// What: a generator called through P[I32] of a two-parameter module
+// Expect: P takes 2 type arguments, given 1; no crash
+mod P[A, B] { fn gen(a: A, b: B) yield A { yield a; } }
+export main() I32 { let t = 0; for (P[I32].gen(1, 2)) |x| { t += x; }; t; }

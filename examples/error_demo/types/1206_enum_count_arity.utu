@@ -1,0 +1,5 @@
+// What: E.count(1) on an enum
+// Expect: Takes 0, given 1
+enum(U8) E:
+    | A
+export main() I32 { E.count(1); }

@@ -93,6 +93,10 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
     };
     if not decl_is(decl, Decl.IntEnum) { return -1; };
     if word == known_word(Known.Count) {
+        if a >= 0 {
+            report2(Diag.WrongArity, at, -1, 0, child_count(args));
+            return error_value();
+        };
         w_i32(variant_count(decl));
         return prelude(Prelude.I32);
     };

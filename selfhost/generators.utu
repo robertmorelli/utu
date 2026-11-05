@@ -178,10 +178,11 @@ fn generator_source(for_node: I32, cx: Cx) I32 {
 fn generator_inst(call: I32, gen: I32, cx: Cx) I32 {
     let callee = first_child(call);
     let base = first_child(callee);
-    if is_kind(call, Node.Promoted_module_call_expr) { return instance(module_of(gen), type_args(next_sibling(callee), cx.inst)); };
+    if is_kind(call, Node.Promoted_module_call_expr) { return instance_checked(module_of(gen), next_sibling(callee), cx.inst, call); };
     if is_kind(callee, Node.Field_expr) and decl_is(node_decl[base], Decl.Alias) { return alias_instance(node_decl[base]); };
     if is_kind(callee, Node.Type_member_expr) and not (is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module)) {
-        return ty_inst(type_path(base, cx.inst));
+        let t = type_path(base, cx.inst);
+        return if ty_is(t, Ty.Error) { -1; } else { ty_inst(t); };
     };
     instance_for(module_of(gen), cx.inst);
 }
@@ -360,6 +361,8 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     let rt = if receiver >= 0 { check_expr(receiver, -1, cx); } else { -1; };
     if receiver >= 0 and ty_is(rt, Ty.Error) { return error_since(m); };
     let inst = if receiver >= 0 { ty_inst(rt); } else { generator_inst(call, gen, cx); };
+    // (A module named with the wrong count of type arguments was reported.)
+    if inst < 0 { return error_since(m); };
     // Its element type: `yield T`.
     let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), inst);
     if delegates_to_itself(gen) {

@@ -815,6 +815,13 @@ fn check_mem_method(decl: I32, name: I32, args: I32, at: I32, cx: Cx) I32 {
         return error_value();
     };
     let a = if args >= 0 { first_child(args); } else { -1; };
+    let want = if method == MemMethod.Push.to_i32() or method == MemMethod.Reserve.to_i32() or method == MemMethod.Resize.to_i32() { 1; }
+        else if method == MemMethod.Len.to_i32() or method == MemMethod.Cap.to_i32() or method == MemMethod.Clear.to_i32() { 0; } else { -1; };
+    let given = if args >= 0 { child_count(args); } else { 0; };
+    if want >= 0 and given != want {
+        report2(Diag.WrongArity, at, -1, want, given);
+        return error_value();
+    };
     if method == MemMethod.Len.to_i32() {
         w_leaf(Op.GlobalGet, vt_i32, len_g, 0);
         return i32_t;

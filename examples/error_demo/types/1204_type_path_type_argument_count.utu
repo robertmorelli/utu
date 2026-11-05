@@ -1,0 +1,5 @@
+// What: P[I32].Pr naming a type of a two-parameter module
+// Expect: P takes 2 type arguments, given 1
+mod P[A, B] { struct Pr: | a : A | b : B }
+fn f(x: ?P[I32].Pr) I32 { promote x { |p| => p.b, ~> 0, }; }
+export main() I32 { f(null); }

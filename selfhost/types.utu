@@ -387,9 +387,11 @@ fn type_path(node: I32, inst: I32) I32 {
         let owner = module_of(member_decl);
         let at = 0;
         if is_kind(c, Node.Instantiated_module_ref) {
-            at = instance(owner, type_args(next_sibling(first_child(c)), inst));
+            at = instance_checked(owner, next_sibling(first_child(c)), inst, c);
+            if at < 0 { return ty_error(); };
         } else if is_kind(next_sibling(c), Node.Module_type_arg_list) {
-            at = instance(owner, type_args(next_sibling(c), inst));
+            at = instance_checked(owner, next_sibling(c), inst, next_sibling(c));
+            if at < 0 { return ty_error(); };
         } else {
             // `ints.Box` with `using boxy[I32] |ints|`: Box in boxy[I32].
             let named_by = node_alias[name_node(c)];
@@ -437,6 +439,30 @@ fn type_args(list: I32, inst: I32) I32 {
     vl_end(m);
 }
 
+/// `module`'s instance for the type arguments `list` (written at `at`), seen
+/// from instance `inst`; -1 when their count is not the module's (reported).
+fn instance_checked(module: I32, list: I32, inst: I32, at: I32) I32 {
+    let args = type_args(list, inst);
+    if vl_len[args] != module_arity(module) {
+        report2(Diag.InvalidModuleArity, at, decl_name[module], module_arity(module), vl_len[args]);
+        return -1;
+    };
+    instance(module, args);
+}
+
+/// `type_args`, but exactly `n` of them: more are dropped, fewer end in
+/// error types (a wrong count is reported where it is written).
+fn fit_args(list: I32, n: I32) I32 {
+    let m = vl_begin();
+    let c = first_child(list);
+    for (0 ..< n) |i| {
+        vl_add(if c >= 0 { type_of(c, 0); } else { ty_error(); });
+        if c >= 0 { c = next_sibling(c); };
+    };
+    inst_here[0] = list;
+    vl_end(m);
+}
+
 /// The type a type declaration names, seen from instance `inst`.
 fn decl_type(decl: I32, inst: I32) I32 {
     if decl < 0 { return ty_error(); };
@@ -465,7 +491,7 @@ fn alias_instance(alias: I32) I32 {
     let using = decl_node[alias];
     let args = next_sibling(first_child(using));
     if not is_kind(args, Node.Module_type_arg_list) { return 0; };
-    instance(module, type_args(args, 0));
+    instance(module, fit_args(args, module_arity(module)));
 }
 
 /// `using M[A]; using M[B];`: M's names would mean either instance.
@@ -473,10 +499,18 @@ fn check_open_instances() void {
     for (0 ..< file_root.len()) |file| {
         let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
         while (item >= 0) {
+            // `using M[A] |q|;` / `using M[A];` with another count of arguments than M has.
+            let named = if is_kind(item, Node.Using_decl) { node_decl[name_node(first_child(item))]; } else { -1; };
+            let given = if named >= 0 { next_sibling(first_child(item)); } else { -1; };
+            if decl_is(named, Decl.Module) and is_kind(given, Node.Module_type_arg_list) and child_count(given) != module_arity(named) {
+                report2(Diag.InvalidModuleArity, given, decl_name[named], module_arity(named), child_count(given));
+                item = next_sibling(item);
+                continue;
+            };
             let module = opened_module(item);
             if module >= 0 {
                 let inst = open_instance(module);
-                let mine = instance(module, type_args(next_sibling(first_child(item)), 0));
+                let mine = instance(module, fit_args(next_sibling(first_child(item)), module_arity(module)));
                 if inst != mine {
                     report2(Diag.UsingTwice, next_sibling(first_child(item)), decl_name[module], first_open(module), -1);
                 };
@@ -511,7 +545,7 @@ fn first_open(module: I32) I32 {
 /// The instance `using M[A];` opened, or 0.
 fn open_instance(module: I32) I32 {
     let args = first_open(module);
-    if args >= 0 { instance(module, type_args(args, 0)); } else { 0; };
+    if args >= 0 { instance(module, fit_args(args, module_arity(module))); } else { 0; };
 }
 
 //! = Representation
