@@ -10131,6 +10131,27 @@ FAIL after tests: boom
    │                                              ╰─ E
 --- exit 1
 
+=== utu check examples/error_demo/types/1302_using_alias_type_arguments.utu
+ ERROR  a takes 0 type arguments, given 1
+        invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:5:10
+
+ 3 │ mod m[T] { struct S: | x : T  fn mk(x: T) S { S { x: x }; } }
+ 4 │ using m[I32] |a|;
+ 5 │ fn h(v: a[Str].S) I32 { 1; }
+   │          ━━━━━
+   │          ╰─ here
+ 6 │ export main() I32 { a[Str].mk(1).x; }
+
+ ERROR  a takes 0 type arguments, given 1
+        invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:6:22
+
+ 4 │ using m[I32] |a|;
+ 5 │ fn h(v: a[Str].S) I32 { 1; }
+ 6 │ export main() I32 { a[Str].mk(1).x; }
+   │                      ━━━━━
+   │                      ╰─ here
+--- exit 1
+
 === utu check examples/error_demo/types/1303_type_named_as_type_parameter.utu
  ERROR  Duplicate declaration T
         duplicate-declaration · examples/error_demo/types/1303_type_named_as_type_parameter.utu:3:19

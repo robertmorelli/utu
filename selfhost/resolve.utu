@@ -1644,7 +1644,7 @@ fn walk_using(item: I32, w: Walk) void {
     let n = name_node(name_at);
     // An import's module is in the file it imports (see @bind_import).
     let module = if using_path(item) >= 0 { node_decl[n]; } else { lookup(word_of(n)); };
-    if decl_is(module, Decl.Alias) { module = decl_a[module]; };
+    if decl_is(module, Decl.Alias) { node_alias[n] = module; module = decl_a[module]; };
     module = module_named(module);
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
         // `using helper from "./lib.utu"` with `fn helper` there: only a mod is imported.

@@ -2281,7 +2281,10 @@ fn member_instance(node: I32, cx: Cx) I32 {
     if is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module) { return module_instance(node_decl[base], node_alias[base], node, cx); };
     if is_kind(base, Node.Instantiated_module_ref) {
         let module = module_named(node_decl[name_node(first_child(base))]);
-        if decl_is(module, Decl.Module) { return instance_of_args(module, next_sibling(first_child(base)), base, cx); };
+        if decl_is(module, Decl.Module) {
+            if alias_given_args(first_child(base), next_sibling(first_child(base))) { return -1; };
+            return instance_of_args(module, next_sibling(first_child(base)), base, cx);
+        };
     };
     let sp = static_type_path(base, cx);
     ty_inst(if sp >= 0 { sp; } else { type_path(base, cx.inst); });
@@ -3121,6 +3124,7 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
         else { report3(Diag.UnknownMethod, name, word_of(name), -1, -1, decl_name[module]); };
         return finish_error(args, m0, cx);
     };
+    if alias_given_args(name_at, args_types) { return error_value(); };
     let inst = instance_of_args(module_of(decl), args_types, node, cx);
     if inst < 0 { return error_value(); };
     let m = w_mark();
