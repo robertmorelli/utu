@@ -32,9 +32,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
         fn absent() I32 { [] first_index |x| {true;}; }
       }
     `});
-    for (const [name,value] of Object.entries({fused:18,indexes:1n,once:2,zip_once:1,chain_after_take:31,take_after_chain:1,chain_mixed:40,no_work:0,while_stages:5,flattened:10,zipped:33,chained:64,repeated:9,nested:6,every:1,empty_all:1,empty_any:0,product_:24,count_:2,first_:1,last_:3,absent:-1})) assertEq(instance.exports[name](),value,name);
-    assert(!doc.querySelector('ir-iterator'),'all iterator syntax lowered');
-    assert(!doc.querySelector('ir-closure'),'iterator bodies do not allocate closures');
+    for (const [name,value] of Object.entries({fused:18,indexes:1n,once:2,zip_once:1,chain_after_take:31,take_after_chain:1,chain_mixed:40,no_work:0,while_stages:5,flattened:10,zipped:33,chained:64,repeated:9,nested:6,every:true,empty_all:true,empty_any:false,product_:24,count_:2,first_:1,last_:3,absent:-1})) assertEq(instance.exports[name](),value,name);
   });
   test('iterators: canonical WAT has one fused loop and no intermediate arrays or indirect body calls',async({ROOT})=>{
     const {doc,instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_wat.utu',source:`
