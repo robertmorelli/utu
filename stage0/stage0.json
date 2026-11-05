@@ -1,0 +1,11 @@
+{
+  "commit": "763a83cdf849b153d78ada94f78ade0653ef1ef5",
+  "selfhostTree": "e263de0d4d0422e5e8cbdbf925079883ce089e42",
+  "sourcesHash": "ccd4e0e0c4f8e4b27e3498bcd61aefb66f81d4b111e6e9d827efe784e6ec19a1",
+  "sha256": "8719e1d2c6cdd8aded574d99fe8b1d8ab91837190bcfe57ec3d21a631cabfbbf",
+  "bytes": 510153,
+  "builtBy": "8dfaaf7705025dd2e05b4183147bd527a10c3fd78b35257ff71f4c86c43b01a6",
+  "node": "v25.8.1",
+  "date": "2026-11-05T13:11:44.095Z",
+  "reason": "establish reproducible self-hosted bootstrap provenance"
+}
