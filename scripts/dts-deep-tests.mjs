@@ -34,17 +34,6 @@ async function run(body, abi = fixture) {
 }
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log(`✓ ${name}`); }
-// A case the self-hosted compiler does not build right yet: run, reported, and
-// not failing the suite; one that passes says so, to be made a test again.
-const gaps = [];
-async function gap(name, why, fn) {
-  try { await fn(); } catch (error) {
-    gaps.push(name);
-    console.log(`✗ KNOWN GAP (selfhost: ${why}): ${name}\n    ${Array.isArray(error.actual) ? error.actual.join(' | ') : String(error.message ?? error).split('\n')[0]}`);
-    return;
-  }
-  throw new Error(`known gap now passes, make it a test again: ${name}`);
-}
 await test('constructors, inferred locals, inherited members and deep returned properties', async () => {
   const { exports } = await run(`fn run() F64 {
     let c = Fixture.Counter(2.0); c.label = "counter";
@@ -317,11 +306,15 @@ await test('array literals become JS arrays for array, array-like, iterable and 
   const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().to_f64(); }`);
   assert.equal(native.dates(), 4);
   // A literal given to JavaScript, or used through JS array members, is a JS array.
-  await gap('array literals used through JS array members are JS arrays', 'array literals are UTU arrays, never JS arrays: No method Array[I32].push', async () => {
+  // An empty `[]` nothing constrains is a native Array[I32], JS members or not
+  // (docs/arrays.md, rule 4: "a literal with elements"); Browser.Array() is an empty JS one.
+  await test('array literals used through JS array members are JS arrays', async () => {
+    const empty = await compile('using Browser from std:Browser; export main() void { let items = []; items.push("a"); }');
+    assert.deepEqual(empty.errors, ['No method Array[I32].push']);
     const host = await runBrowser(`
       fn direct() Str { Browser.JSON.stringify([1, 2]); }
       fn bound() Str { let xs = [3, 1, 2]; xs.sort(); Browser.JSON.stringify(xs); }
-      fn pushed() F64 { let items = []; items.push("a"); items.push("b"); items.length; }
+      fn pushed() F64 { let items = Browser.Array(); items.push("a"); items.push("b"); items.length; }
       fn logged() F64 { let xs = [1, 2]; Browser.console.debug(xs); xs[1]; }
     `);
     assert.equal(host.direct(), '[1,2]'); assert.equal(host.bound(), '[1,2,3]');
@@ -530,8 +523,8 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
   `);
   assert.equal(exports.total(), 9); assert.equal(exports.count(), 3); assert.equal(exports.same(), true);
   assert.equal(exports.from_set(), 'xy'); assert.equal(exports.dataset(), 'z');
-  await gap('web friction: array literals take JS array members', 'array literals are UTU arrays, never JS arrays: No method Array[I32].push', async () => {
-    const chips = await runBrowser('fn chips() Str { let out = []; ["a", "b"].forEach(cl(name) void { out.push(name + "!"); }); out.join(","); }');
+  await test('web friction: array literals take JS array members', async () => {
+    const chips = await runBrowser('fn chips() Str { let out = Browser.Array(); ["a", "b"].forEach(cl(name) void { out.push(name + "!"); }); out.join(","); }');
     assert.equal(chips.chips(), 'a!,b!');
   });
   const typed = await compile(`using Browser from std:Browser; export main() void {
@@ -579,4 +572,4 @@ await test('closure parameters without any context are diagnosed instead of cras
   const doc = await compile('using Browser from std:Browser; export main() void { let h = cl(e) void {}; }');
   assert(doc.errors.some(m => /^e needs a type$/.test(m)));
 });
-console.log(`${passed} deep ABI tests passed${gaps.length ? `, ${gaps.length} known selfhost gaps` : ''}`);
+console.log(`${passed} deep ABI tests passed`);
