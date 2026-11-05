@@ -78,7 +78,7 @@ try {
   };
 
   const capabilities = (await ask('initialize', { capabilities: {} })).capabilities;
-  for (const c of ['definitionProvider', 'referencesProvider', 'hoverProvider', 'renameProvider', 'completionProvider', 'documentSymbolProvider', 'semanticTokensProvider']) {
+  for (const c of ['definitionProvider', 'referencesProvider', 'hoverProvider', 'renameProvider', 'completionProvider', 'documentSymbolProvider', 'semanticTokensProvider', 'inlayHintProvider', 'callHierarchyProvider']) {
     assert.ok(capabilities[c], c);
   }
   await tell('textDocument/didOpen', { textDocument: { uri: main, languageId: 'utu', version: 1, text: MAIN } });
@@ -92,6 +92,18 @@ try {
   assert.match(fn.contents.value, /Twice the \*\*sum\*\*\nof a point's coordinates\./);
   const param = await ask('textDocument/hover', at(MAIN, 'p.sum'));
   assert.doesNotMatch(param.contents.value, /Twice/, 'a parameter has no doc comment of its function');
+
+  const hints = await ask('textDocument/inlayHint', { textDocument: { uri: main }, range: {
+    start: { line: 0, character: 0 }, end: { line: MAIN.split('\n').length, character: 0 },
+  } });
+  assert.ok(hints.some(h => h.label === ': I32'), 'inferred local type');
+  const hierarchy = await ask('textDocument/prepareCallHierarchy', at(MAIN, 'twice(Point'));
+  assert.equal(hierarchy[0].name, 'twice');
+  const incoming = await ask('callHierarchy/incomingCalls', { item: hierarchy[0] });
+  assert.ok(incoming.some(call => call.from.name === 'run' && call.fromRanges.length), 'run calls twice');
+  const runHierarchy = await ask('textDocument/prepareCallHierarchy', at(MAIN, 'run()'));
+  const outgoing = await ask('callHierarchy/outgoingCalls', { item: runHierarchy[0] });
+  assert.ok(outgoing.some(call => call.to.name === 'twice' && call.fromRanges.length), 'run calls twice');
 
   // Definitions: a function, and a method resolved by its receiver's type.
   const twiceDef = await ask('textDocument/definition', at(MAIN, 'twice(Point'));
