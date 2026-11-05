@@ -1,17 +1,17 @@
 # The utu compiler, in utu
 
-A new compiler, written in utu from the start: flat data in vecs and mems,
-no DOM, no string-typed facts. The JavaScript compiler (tagged `stage0`) is the
-reference: every piece here is checked against what it does, and the
-finished compiler must reproduce `baselines/` exactly. The plan is in
-docs/self-hosting.md (Plan B).
+The compiler, written in utu from the start: flat data in vecs and mems,
+no DOM, no string-typed facts. It was checked piece by piece against the
+JavaScript compiler it replaced (stage -1, deleted; tag `stage-1-final`),
+and `baselines/` now holds what it does itself. The plan is in
+docs/history/self-hosting-plan.md (Plan B); docs/self-hosting.md is how it is built and kept honest now.
 
 | piece | file | checked by |
 |---|---|---|
 | lexer | `lex.utu` | `scripts/selfhost-lexer-differential.mjs` |
 | parser | `parse.utu` | `scripts/selfhost-parser-differential.mjs` |
 | sources (files, imports) | `source.utu` | all of them |
-| names | `resolve.utu` | `scripts/selfhost-resolve-differential.mjs` |
+| names | `resolve.utu` | `scripts/editor-query-fingerprints.mjs` |
 | checking and code | `check.utu` and the rest | `scripts/selfhost-run-differential.mjs` |
 | diagnostics | `diag.utu` | `scripts/selfhost-diagnostics-differential.mjs` |
 | host declarations | `abi.utu`, `foreign.utu` | the run and diagnostics differentials |
@@ -216,24 +216,18 @@ tables.
   beside the module, not in it; `src/selfhost/loader.js` writes the least
   JavaScript that provides it.
 
-## How far it is
+## How it is checked
 
 `scripts/selfhost-run-differential.mjs` builds every program in
 `examples/`, `benchmarks/`, and `baselines/corpus` (for its exports and its
-tests), runs each zero-argument export and test, and compares what it does
-with what stage 0's builds did (`baselines/run-differential.json`). 954 of
-956 builds behave the same, and none differs; the other two differ on
-purpose, where stage 0 builds a module given too few type arguments.
-
-`scripts/selfhost-diagnostics-differential.mjs` does the same for programs
-that do not build: for those programs and the negative corpus, every
-diagnostic's kind, message, and span must be stage 0's
-(`baselines/diagnostics.json.gz`). 1208 of 1242 builds diagnose the same,
-and none differs. The others differ on purpose: a program that does not parse
-is reported at the furthest token the parser reached, with what it wanted
-there (`Syntax error: expected ';', got 'x'`), where stage 0 reported
-tree-sitter's error recovery as `Parse error at 3:5`; and a few of stage
-0's quirks are listed in the script with what this compiler does instead.
+tests), at every optimization level, runs each zero-argument export and
+test, and compares what it does with what it did when recorded
+(`baselines/run-differential.json`). `scripts/selfhost-diagnostics-differential.mjs`
+does the same for diagnostics (`baselines/diagnostics.json.gz`), and
+`scripts/editor-query-fingerprints.mjs` for what an editor is told at every
+name. Until the handoff these baselines were stage -1's, and every build
+behaved and diagnosed as stage -1's did, or differed on purpose
+(baselines/README.md).
 
 A diagnostic is recorded as a kind, a node, and up to four arguments (a
 word, types, counts, declarations); `diag.utu` makes its name, message, and

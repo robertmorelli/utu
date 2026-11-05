@@ -25,13 +25,10 @@ counts. Compare equivalent programs within the same run for size regressions.
 
 ## Focused compiler regressions
 
-- `compiler-quality-tests.mjs`: closure hygiene and ABI, dead-code size equality,
-  and invalid modules reported with the engine's reason.
-- `parser-lifecycle-tests.mjs`: owned versus borrowed CST lifetime, cleanup on
-  conversion failure, diamond imports, and cycles without duplicate reads.
-- `range-index-tests.mjs`: half-open interval semantics, empty/invalid ranges,
-  duplicate-key stress, file/kind filtering, insertion-order independence, and
-  seeded comparisons against an independent brute-force oracle.
+- `codegen-core-tests.mjs` and `codegen-heap-tests.mjs`: code generation,
+  closure hygiene and ABI, dead-code size equality, and module shapes, read
+  from the printed WAT (`src/selfhost/wat.js`).
+
 - `wutu-tests.mjs`: the Wutu parser (else-if, comments, located syntax errors,
   seeded mutation fuzzing), formatter round trips, static and reactive
   rendering against linkedom, template diagnostics, island-name warnings, and
@@ -53,7 +50,7 @@ the same tree, and formatting twice is formatting once) and
 live-reload events, path guard, and cleanup). The Playwright suites
 (`test:wutu*`) remain separate because they need installed browsers.
 
-Runtime execution tests complement structural checks: a well-shaped IR can
+Runtime execution tests complement structural checks: well-shaped WAT can
 still miscompile, and successful execution alone does not prove that a closure
 kept its required JavaScript representation. Test both when the ABI matters.
 
@@ -73,3 +70,12 @@ The TypeScript ABI workflow runs the declaration suites on Node and Bun on Linux
 and macOS, checks regeneration against the committed corpus, then exercises the
 Worker and demo in Chromium. It saves size measurements and screenshots as CI
 artifacts. Local checks do not substitute for a successful remote workflow run.
+
+## Goldens
+
+`bun run test` also holds the compiler to what it did before
+(baselines/README.md): every program's behavior when run at every
+optimization level, its diagnostics, its wasm fingerprints, its sizes, and
+the editor's answers at every name. The lexer and parser are held to the
+editors' grammar, tree-sitter-utu. Stage -1, the JavaScript compiler these
+goldens were first recorded from, is gone (tag `stage-1-final`).

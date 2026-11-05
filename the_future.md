@@ -144,7 +144,7 @@ That makes performance work feel built in, not bolted on.
 
 ### Editor views dropped with stage -1 (revisit)
 
-Stage -1 (the JavaScript compiler in `src/compiler/`, deleted in favor of the
+Stage -1 (the JavaScript compiler, deleted in favor of the
 self-hosted compiler) powered four Semantic X-Ray / Compiler Graphs views that
 had no self-hosted equivalent. They were dropped rather than approximated; the
 last version with them is tagged `stage-1-final`.

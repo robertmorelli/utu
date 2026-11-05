@@ -10496,7 +10496,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. Here the source is the let annotation, which check_let already holds when it calls coerce. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. Here the source is the let annotation, which check_let already holds when it calls coerce. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10563,7 +10563,7 @@
    }
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The source is the function's return type node, known when checking the return statement. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The source is the function's return type node, known when checking the return statement. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10622,7 +10622,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. Today each branch tail is coerced separately and reported twice; when every branch of an if fails against the same expectation, report once at the if node and fold the rest. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. Today each branch tail is coerced separately and reported twice; when every branch of an if fails against the same expectation, report once at the if node and fold the rest. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10702,7 +10702,7 @@
    }
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. call_with passes the parameter type pt but not the parameter node; pass vl index i so the param decl can be the expected span, and follow the argument identifier to its let (node_decl) for the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. call_with passes the parameter type pt but not the parameter node; pass vl index i so the param decl can be the expected span, and follow the argument identifier to its let (node_decl) for the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10762,7 +10762,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. As for function arguments, call_with knows the parameter index; record the method's parameter node as the expected span. A string literal whose text parses as a number makes the fix knowable. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. As for function arguments, call_with knows the parameter index; record the method's parameter node as the expected span. A string literal whose text parses as a number makes the fix knowable. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10820,7 +10820,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The struct-literal checker in selfhost/data.utu resolves the field decl before coercing its value; pass that decl node as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The struct-literal checker in selfhost/data.utu resolves the field decl before coercing its value; pass that decl node as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10881,7 +10881,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. check_assign resolves the field decl of the target; record it as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. check_assign resolves the field decl of the target; record it as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -10942,7 +10942,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The element type comes from the array's type; follow the target identifier to its let initializer (actualOrigin in stage 0 does this walk) for the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The element type comes from the array's type; follow the target identifier to its let initializer (actualOrigin in stage 0 does this walk) for the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11003,7 +11003,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The expected type is the local's, which it took from its initializer literal; record the let's initializer as the expected span (decl -> init node is known in check_let). Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The expected type is the local's, which it took from its initializer literal; record the let's initializer as the expected span (decl -> init node is known in check_let). Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11062,7 +11062,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. check_assign knows the local's decl; its let initializer is the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. check_assign knows the local's decl; its let initializer is the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11114,7 +11114,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The global's annotation node is at hand where the global initializer is checked. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The global's annotation node is at hand where the global initializer is checked. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11169,7 +11169,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The array-literal checker coerces each element to the first one's type; pass the first element node as the expected span (stage 0 chains confluence the same way, docs/type-graph.md). Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The array-literal checker coerces each element to the first one's type; pass the first element node as the expected span (stage 0 chains confluence the same way, docs/history/type-graph.md). Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11225,7 +11225,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The else tail is coerced to the then tail's type; record the then tail as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The else tail is coerced to the then tail's type; record the then tail as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11296,7 +11296,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The alt checker coerces each arm to the expected (return) type; record both the return type node and the first arm as related spans. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The alt checker coerces each arm to the expected (return) type; record both the return type node and the first arm as related spans. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11366,7 +11366,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. Same as alt arms: the match checker has the expected type and the earlier arms; record the return type node. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. Same as alt arms: the match checker has the expected type and the earlier arms; record the return type node. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11424,7 +11424,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The tuple checker coerces element i against the i-th type of the result tuple; record that type node. The \"(+1 caused by this)\" fold in mismatch()/fold_into() should stay silent (or name the folded site as a related span) instead of a bare count. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The tuple checker coerces element i against the i-th type of the result tuple; record that type node. The \"(+1 caused by this)\" fold in mismatch()/fold_into() should stay silent (or name the folded site as a related span) instead of a bare count. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11495,7 +11495,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. For a generic module the expected type is a substituted T; record both the parameter node and the instantiation site (ty_inst of the receiver), as stage 0 does with substitutedTypeParam / instantiatedFrom. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. For a generic module the expected type is a substituted T; record both the parameter node and the instantiation site (ty_inst of the receiver), as stage 0 does with substitutedTypeParam / instantiatedFrom. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11553,7 +11553,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The parameter is in std/StrMap.utu, so the useful expected span is the instantiation in the user's file (the receiver's let initializer), not the std declaration. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The parameter is in std/StrMap.utu, so the useful expected span is the instantiation in the user's file (the receiver's let initializer), not the std declaration. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11605,7 +11605,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The let annotation is the source. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The let annotation is the source. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11657,7 +11657,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The closure checker in selfhost/closures.utu has the return type node when it coerces the body tail. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The closure checker in selfhost/closures.utu has the return type node when it coerces the body tail. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11718,7 +11718,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. When both sides are closure types, compare part by part and point the primary mark at the first differing parameter node instead of the whole closure. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. When both sides are closure types, compare part by part and point the primary mark at the first differing parameter node instead of the whole closure. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11776,7 +11776,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. call_ref/check_args has the closure type; record the local's annotation (its decl's type node) as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. call_ref/check_args has the closure type; record the local's annotation (its decl's type node) as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -11846,7 +11846,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The argument identifier resolves to a fn decl (node_decl); that decl's signature is the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The argument identifier resolves to a fn decl (node_decl); that decl's signature is the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12255,7 +12255,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The expectation is the language rule for conditions (no source node); a site kind \"condition\" lets the renderer print the rule as a note, and a numeric found type gets the \"!= 0\" fix. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The expectation is the language rule for conditions (no source node); a site kind \"condition\" lets the renderer print the rule as a note, and a numeric found type gets the \"!= 0\" fix. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "notes",
     "type origin tracking"
@@ -12315,7 +12315,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The and/or branch of the binary checker coerces left and right separately; when both fail, report one diagnostic at the binary node instead of two. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The and/or branch of the binary checker coerces left and right separately; when both fail, report one diagnostic at the binary node instead of two. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "follow-on suppression",
     "notes"
@@ -12375,7 +12375,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The call resolves to a fn decl whose return type node is the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The call resolves to a fn decl whose return type node is the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12448,7 +12448,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. converts_to_proto fails silently; when expected is a protocol, record the actual type's decl node as related and use a protocol-specific title. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. converts_to_proto fails silently; when expected is a protocol, record the actual type's decl node as related and use a protocol-specific title. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12516,7 +12516,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. As for 32, plus the let annotation as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. As for 32, plus the let annotation as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12596,7 +12596,7 @@
    }
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. When actual is Nullable(expected), use a nullable-specific title and the orelse fix with a zero value of the payload type. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. When actual is Nullable(expected), use a nullable-specific title and the orelse fix with a zero value of the payload type. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12746,7 +12746,7 @@
    }
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The found side is a field access; its field decl node is resolved in data.utu and can be the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The found side is a field access; its field decl node is resolved in data.utu and can be the found span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12806,7 +12806,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The orelse checker coerces the default to the payload type; record the left operand's decl annotation as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The orelse checker coerces the default to the payload type; record the left operand's decl annotation as the expected span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12870,7 +12870,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The call resolves to a fn decl whose return type node is the found span; a void actual gets its own title. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. The call resolves to a fn decl whose return type node is the found span; a void actual gets its own title. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -12949,7 +12949,7 @@
    }
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. When expected is a distinct type over actual, add the type decl as related and the from_<base> wrap as the fix. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. When expected is a distinct type over actual, add the type decl as related and the from_<base> wrap as the fix. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",
@@ -13022,7 +13022,7 @@
    ]
   },
   "provide": {
-   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. For an enum expected type, add the enum decl (with its variant names) as a related span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in src/compiler/type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
+   "how": "coerce(actual, expected, at) in selfhost/check.utu raises Diag.TypeMismatch through mismatch() with only the value node and the two types; it does not know where `expected` came from. For an enum expected type, add the enum decl (with its variant names) as a related span. Thread an expectation source (the declaring node plus a site kind: binding, argument, field, return, assign, arm) into coerce, as stage 0 does with expectation edges (edge.site, edgeSource, actualOrigin in stage -1's type-graph.js, labelled by SITE_LABEL in type-graph-diagnostics.js), and store it on the record as related spans (new diag_rel_node / diag_rel_role / diag_rel_label vecs beside diag_a..diag_c in resolve.utu) for the renderer.",
    "needs": [
     "secondary spans",
     "labels",

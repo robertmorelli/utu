@@ -1,7 +1,7 @@
 //! = `@stored`, `@utu`, `@css`
 //!
 //! `@stored/\ Type "key" [manual] [validate fn] default \/`: typed local
-//! storage, as stage 0 writes it (`src/compiler/stored.js`). Incoming JSON is
+//! storage, as stage 0 writes it (`stored.js at stage-1-final`). Incoming JSON is
 //! validated in the host before it is converted, so bad data never
 //! half-updates state; a valid value is copied field by field into the
 //! state, which keeps references views hold current.

@@ -535,7 +535,7 @@ fn foreign_named_type(view: I32, key: I32) I32 {
 //! = Operations
 //!
 //! An operation on host values is an imported function whose body is the
-//! JavaScript stage 0 writes for it (src/compiler/foreign-abi.js), one per
+//! JavaScript stage 0 writes for it (foreign-abi.js at stage-1-final), one per
 //! signature and body: `(self) => self["value"]`.
 
 /// By operation: its signature and body, a word.
@@ -745,7 +745,7 @@ fn foreign_result(r: Ref, view: I32, expect: I32) I32 {
 
 //! = Assignability
 //!
-//! As in stage 0 (src/compiler/type-rules.js): a host type is any of its
+//! As in stage 0 (type-rules.js at stage-1-final): a host type is any of its
 //! bases; `any` meets every host value (and Str, and closures, which are JS
 //! values too); `Function` takes closures, `Object` any host value; a generic
 //! instance of `any` arguments takes any instance; a declared interface
