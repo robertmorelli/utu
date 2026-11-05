@@ -2979,6 +2979,16 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.throws(() => exports.norm({ x: 3, y: 4 }), TypeError, mode);
     checked++;
   }
+  // A write inside a pipeline body, or in a defer, is seen by a closure that captured the variable: it is shared, not copied.
+  const sharedWrites = await write('fn z() I32 { 0; }\nfn each_loop() I32 {\n    let fs: Array[cl() I32] = Array[cl() I32].new(3, z);\n    let x = 0; let k = 0;\n    [10, 20, 30] each |v| { x = v; fs[k] = cl() { x; }; k += 1; };\n    fs[0]() + fs[1]() * 1000 + fs[2]() * 1000000;\n}\n'
+    + 'fn deferred() cl() I32 { let x = 1; defer x += 5; let f: cl() I32 = cl() { x; }; f; }\n'
+    + 'export main() I32 { each_loop() + deferred()() * 100000000; }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, sharedWrites, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 30030030 + 600000000, mode);
+    checked++;
+  }
   // A source map changes no byte of the module, in any mode; its entries
   // are in offset order, each in the code, and the program's own lines are
   // where they are.
