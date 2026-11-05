@@ -1,0 +1,10 @@
+// What: @style inside an element
+// Expect: @style goes first in the template
+using Browser from std:Browser;
+
+export main() void {
+    let app = @wutu/\
+    div { @style = "p { color: red }"; "x"; }
+    \/;
+    Browser.document.body.append(app);
+}

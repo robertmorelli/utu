@@ -3694,6 +3694,7 @@ fn compile(target: Target) I32 {
     check_own_ir();
     check_ir_types();
     start_globals();
+    drop_located_repeats();
     if diag_kind.len() > 0 { return -1; };
     encode_module();
 }
@@ -3783,6 +3784,36 @@ fn keep_target_diagnostics(target: Target) void {
     let kept = 0;
     for (0 ..< diag_kind.len()) |i| {
         if in_target(diag_node[i], target) {
+            diag_move(i, kept);
+            kept += 1;
+        };
+    };
+    diag_truncate(kept);
+}
+
+vec located_repeat: U8;
+
+/// A mistake inside the place of generated code (a Wutu binding's) that
+/// another diagnostic is at is dropped: the one at the binding names it.
+fn drop_located_repeats() void {
+    let located = false;
+    for (0 ..< diag_kind.len()) |j| { if located_file(j) >= 0 { located = true; }; };
+    if not located { return; };
+    let n = diag_kind.len();
+    located_repeat.resize(n);
+    for (0 ..< n) |i| {
+        located_repeat[i] = 0;
+        let start = diag_start(i);
+        if located_file(i) < 0 and start >= 0 {
+            let end_ = diag_end(i);
+            for (0 ..< n) |j| {
+                if located_file(j) >= 0 and start >= diag_start(j) and end_ <= diag_end(j) { located_repeat[i] = 1; };
+            };
+        };
+    };
+    let kept = 0;
+    for (0 ..< n) |i| {
+        if located_repeat[i] == 0 {
             diag_move(i, kept);
             kept += 1;
         };

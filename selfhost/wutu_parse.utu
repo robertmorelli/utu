@@ -739,6 +739,7 @@ fn parse_template(text: Str) I32 {
         wp_at[0] += 6;
         wp_trivia(text);
         if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e;", wp_at[0]); };
         let source = wp_bare_expression(text);
         let from = wx_from[0];
         let to = wx_to[0];
@@ -1090,6 +1091,7 @@ fn parse_element_statement(text: Str, n: I32) void {
         let q = p + 1;
         while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
         let name = text.slice(p + 1, q);
+        if in_words("reactive island style document", name) { wutu_fail("@" + name + " goes first in the template, before its root element", p); };
         wutu_fail("events are written on " + name + " = handler; (or on " + name + " { … })", p);
     };
     if c == 46 and assignment_head(text, p + 1, true) {

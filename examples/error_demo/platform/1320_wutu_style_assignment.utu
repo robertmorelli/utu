@@ -1,0 +1,11 @@
+// What: @style written as an assignment
+// Expect: @style takes one expression
+using Browser from std:Browser;
+
+export main() void {
+    let app = @wutu/\
+    @style = "p { color: red }";
+    div { "x"; }
+    \/;
+    Browser.document.body.append(app);
+}

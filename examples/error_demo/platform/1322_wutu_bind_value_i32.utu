@@ -1,0 +1,15 @@
+// What: bind:value on an I32 state field
+// Expect: Field n is I32, got Str
+using Browser from std:Browser;
+
+struct State:
+    | n: I32
+
+export main() void {
+    let state = State { n: 0 };
+    let app = @wutu/\
+    @reactive;
+    main { input { bind:value = state.n; } }
+    \/;
+    Browser.document.body.append(app);
+}

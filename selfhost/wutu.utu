@@ -296,7 +296,10 @@ fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
     if e < 0 {
         let absolute = bytes_text(file_start[file_of_token(node_first[site])], start).len();
         let shown = if source.len() > 100 { source.slice(0, 100); } else { source; };
-        wutu_fail("Invalid Utu interpolation at offset " + int_text(absolute) + ": " + shown, from);
+        // (A range needs parentheses here: `for (0 ..< n) |i|`.)
+        let range = false;
+        for (0 ..< source.len()) |k| { if text_at(source, k, "..") { range = true; }; };
+        wutu_fail("Invalid Utu interpolation at offset " + int_text(absolute) + ": " + shown + (if range and not (source.get(0) == 40) { " (a range needs parentheses: for (0 ..< n) |i|)"; } else { ""; }), from);
     };
     let placeholder = dsl_splice(site, from, text);
     let k = splice_start.len() - 1;
