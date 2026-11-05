@@ -81,7 +81,7 @@ await test('index getters and setters, nested namespaces and constant enums', as
     Fixture.dictionary["deep"] + Fixture.Util.Nested.answer;
   }`);
   assert.equal(exports.run(), 50);
-  await gap('a constant enum member adds as its literal', 'enum members are host reads, not literals: a const enum has no runtime export', async () => {
+  await test('a constant enum member adds as its literal', async () => {
     const { exports } = await run(`fn run() F64 {
       Fixture.dictionary["deep"] = 8.0;
       Fixture.dictionary["deep"] + Fixture.Util.Nested.answer + Fixture.ConstMode.Second;
@@ -393,12 +393,12 @@ await test('default exports, booleans, unions, never, namespaces and const enums
     const { exports } = await run('fn number() F64 { Fixture.union(42.0); } fn text() Str { Fixture.union("choice"); }');
     assert.equal(exports.number(), 42); assert.equal(exports.text(), 'choice');
   });
-  await gap('const enum members read naturally', 'enum members are host reads, not literals: a const enum has no runtime export', async () => {
+  await test('const enum members read naturally', async () => {
     const { exports } = await run('fn constant() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }');
     assert.equal(exports.constant(), 42);
   });
 });
-await gap('enum members of every kind are literals with no host read', 'enum members are host reads, not literals: a const enum has no runtime export', async () => {
+await test('enum members of every kind are literals with no host read', async () => {
   const { exports, glue } = await run(`
     fn number() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }
     fn text() Str { Fixture.Tone.Warm; }
@@ -406,7 +406,7 @@ await gap('enum members of every kind are literals with no host read', 'enum mem
   assert.equal(exports.number(), 42); assert.equal(exports.text(), 'warm');
   assert.equal(glue, '', 'enum members must not become imports');
 });
-await gap('a Rust crate links through its wasm-bindgen declarations', 'enum members are host reads, not literals', async () => {
+await test('a Rust crate links through its wasm-bindgen declarations', async () => {
   const pkg = path.join(ROOT, 'scripts/fixtures/rust-geom/pkg');
   const geom = linkFiles({ files: [path.join(pkg, 'geom.d.ts')], prefix: 'Geom', moduleSpecifier: path.join(pkg, 'geom.js') });
   const { exports, glue } = await run(`

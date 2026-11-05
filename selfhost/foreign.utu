@@ -1098,6 +1098,24 @@ fn check_foreign_root(node: I32, view: I32, key: I32, expect: I32) I32 {
     foreign_member_op(vl_empty(), t, word_text(access_prologue[0]) + "() => " + js_output(access, t, checked), m, key, true);
 }
 
+/// `Api.Mode.On`: an enum member (const or not) is its literal, with no
+/// host read (a const enum has no runtime value), or -1 when `node` is none.
+fn check_foreign_constant(node: I32) I32 {
+    let base = first_child(node);
+    if not is_kind(base, Node.Type_member_expr) { return -1; };
+    let owner = node_decl[first_child(base)];
+    if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 or not root_member(decl_a[owner], word_of(last_child(base))) { return -1; };
+    let value = jget_word(desc_get(describe(member_ref()), "constants"), word_of(last_child(node)));
+    if jis_string(value) {
+        w_leaf(Op.GlobalGet, vt_extern, string_global(jstring_word(value)), 0);
+        return prelude(Prelude.Str);
+    };
+    if not jis_number(value) { return -1; };
+    let bits = json_number(value).bits();
+    w_leaf(Op.F64Const, vt_f64, (bits & 4294967295).to_i32(), (bits >> 32).to_i32());
+    prelude(Prelude.F64);
+}
+
 /// `x.key`: the value of host type `owner` is on the stack since `m`.
 fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
     let view = fty_view[owner];
