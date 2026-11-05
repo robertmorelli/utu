@@ -1,0 +1,9 @@
+// What: a closure breaks out to a block outside it.
+// Expect: break cannot leave a closure
+export main() I32 {
+    done: {
+        let stop: cl() void = cl() { break done; };
+        stop();
+        1;
+    };
+}

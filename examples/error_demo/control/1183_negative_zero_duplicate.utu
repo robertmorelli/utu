@@ -1,0 +1,9 @@
+// What: -0 and 0.0 patterns on a float subject are the same value.
+// Expect: Duplicate pattern 0.0
+export main() I32 {
+    match 0.0 {
+        -0 => 1,
+        0.0 => 2,
+        ~> 3,
+    };
+}

@@ -1,0 +1,11 @@
+// What: an alt arm names a variant of another instance of the same generic enum.
+// Expect: Expected E, got A
+mod M[T] {
+    enum E: | A { value: T }
+}
+using M[I32] |MI|;
+using M[Str] |MS|;
+export main() I32 {
+    let e: MI.E = MI.E.A { value: 7 };
+    alt e { MS.E.A |a| => a.value, };
+}

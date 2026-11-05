@@ -1,0 +1,7 @@
+// What: a negation whose value is discarded still negates a value.
+// Expect: no error
+export main() I32 {
+    let p0 = 3;
+    (-(if true { p0; } else { 8; }));
+    p0;
+}

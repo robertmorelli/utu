@@ -1,0 +1,8 @@
+// What: a let binds a function's tuple result to one name.
+// Expect: both would hold tuple .{I32, I32}: name its values with let .{…}
+fn pair() .{I32, I32} { .{1, 2}; }
+
+export main() I32 {
+    let both = pair();
+    0;
+}

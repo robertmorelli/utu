@@ -1,0 +1,14 @@
+// What: a generator method consumes itself (recursion is for generator functions only).
+// Expect: Generator walk recurses (a method generator cannot consume itself)
+mod M {
+    struct &: | n: I32
+    fn &.walk |s| () yield I32 {
+        yield s.n;
+        if s.n > 0 { for ((M { n: s.n - 1 }).walk()) |x| { yield x; }; };
+    }
+}
+export main() I32 {
+    let total = 0;
+    for ((M { n: 1 }).walk()) |x| { total += x; };
+    total;
+}
