@@ -12,6 +12,14 @@ mod wutu {
         let install: fun() void = @es/\\ () => { (${installWutuStorage.toString()})(globalThis.__utuWutu); } \\/;
         install();
     }
+    fn stored_load(key: Str) Str {
+        let load: fun(Str) Str = @es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;
+        load(key);
+    }
+    fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) void) void {
+        let register: fun(Str,cl() Str,Bool,cl(Str) void) void = @es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;
+        register(key,encode,manual,apply);
+    }
     /// A shared stylesheet (\`@style\`, \`@document\`), installed once.
     fn style(sheet: Str) void {
         init();

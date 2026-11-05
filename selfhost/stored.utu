@@ -251,8 +251,6 @@ fn stored_code(site: I32, prefix: Str) Str {
     if validator.len() > 0 { validator = dsl_splice(site, validator_at, validator); };
     let state = prefix + "state";
     let data = prefix + "data";
-    let load = prefix + "load";
-    let register = prefix + "register";
     let apply_raw = prefix + "decode";
     let copies = "";
     for (stored_fields(stored_struct(type, file))) |f| { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; "; };
@@ -260,7 +258,6 @@ fn stored_code(site: I32, prefix: Str) Str {
     "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1||!("
         + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="
         + prefix + "check(raw);let candidate:" + type + "=" + fallback + ";\n      if json.len()>0 {let " + data + "=Browser.JSON.parse(json);candidate=" + stored_decode(type, data, file, prefix) + ";};\n      " + check + "\n      "
-        + trim_end(copies) + "\n    };\n    let " + load + ":fun(Str) Str=@es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n    "
-        + apply_raw + "(" + load + "(" + key + "));\n    let " + register + ":fun(Str,cl() Str, Bool,cl(Str) void) void=@es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;\n    "
-        + register + "(" + key + ",cl() Str {Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true"; } else { "false"; }) + "," + apply_raw + ");\n    " + state + ";}";
+        + trim_end(copies) + "\n    };\n    " + apply_raw + "(wutu.stored_load(" + key + "));\n    wutu.stored_register("
+        + key + ",cl() Str {Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true"; } else { "false"; }) + "," + apply_raw + ");\n    " + state + ";}";
 }
