@@ -296,6 +296,18 @@ ok
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/control/1223_match_data_enum.utu
+ ERROR  match takes a number or Bool, not A; use alt for enum variants
+        match-type · examples/error_demo/control/1223_match_data_enum.utu:7:11
+
+ 5 │ export main() I32 {
+ 6 │     let a: A = B {};
+ 7 │     match a { ~> 1, };
+   │           ━
+   │           ╰─ here
+ 8 │ }
+--- exit 1
+
 === utu check examples/error_demo/control/12_optional_chain_non_nullable.utu
  ERROR  Expected nullable, got Point
         not-nullable · examples/error_demo/control/12_optional_chain_non_nullable.utu:11:17
@@ -2959,6 +2971,21 @@ ok
  9 │ }
 --- exit 1
 
+=== utu check examples/error_demo/names/1220_method_lenght.utu
+ ERROR  No method Array[I32].lenght; did you mean len?
+        unknown-method · examples/error_demo/names/1220_method_lenght.utu:5:5
+
+ 3 │ export main() I32 {
+ 4 │     let a: Array[I32] = [1];
+ 5 │     a.lenght();
+   │     ━━━━━━━━━━
+   │     ╰─ no such method
+ 6 │ }
+
+  fix   Use len
+ 5 │     a.len();
+--- exit 1
+
 === utu check examples/error_demo/names/12_unknown_type_lowercase_i32.utu
  ERROR  Unknown type i32; did you mean I32?
         unknown-type · examples/error_demo/names/12_unknown_type_lowercase_i32.utu:3:11
@@ -4909,26 +4936,26 @@ ok
 
 === utu check examples/error_demo/platform/101_mem_element_past_u64.utu
  ERROR  18446744073709551616 does not fit U32
-        mem-element-range · examples/error_demo/platform/101_mem_element_past_u64.utu:3:24
+        mem-element-range · examples/error_demo/platform/101_mem_element_past_u64.utu:3:28
 
  1 │ // What: a U32 mem element past 64 bits
  2 │ // Expect: 18446744073709551616 does not fit U32
  3 │ const mem table: U32 = [3, 18446744073709551616];
-   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━
-   │                        ╰─ here
+   │                            ━━━━━━━━━━━━━━━━━━━━
+   │                            ╰─ here
  4 │
  5 │ export main() I32 {
 --- exit 1
 
 === utu check examples/error_demo/platform/10_mem_element_out_of_range.utu
  ERROR  300 does not fit U8
-        mem-element-range · examples/error_demo/platform/10_mem_element_out_of_range.utu:3:18
+        mem-element-range · examples/error_demo/platform/10_mem_element_out_of_range.utu:3:27
 
  1 │ // What: a U8 mem initialized with a value above 255
  2 │ // Expect: mem levels: element 2 (300) does not fit in U8
  3 │ mem levels: U8 = [0, 128, 300];
-   │                  ━━━━━━━━━━━━━
-   │                  ╰─ here
+   │                           ━━━
+   │                           ╰─ here
  4 │
  5 │ export main() I32 {
 --- exit 1
@@ -4998,15 +5025,28 @@ ok
 10 │     Browser.document.body.append(app);
 --- exit 1
 
+=== utu check examples/error_demo/platform/1160_json_match_too_many_arms.utu
+ ERROR  @json match supports at most 64 pattern arms
+        dsl-error · examples/error_demo/platform/1160_json_match_too_many_arms.utu:70:26
+
+68 │             { a62: 1 } => 62,
+69 │             { a63: 1 } => 63,
+70 │             { a64: 1 } => 64,
+   │                          ━
+   │                          ╰─ here
+71 │             ~> 99,
+72 │         } \/;
+--- exit 1
+
 === utu check examples/error_demo/platform/11_mem_float_in_int.utu
  ERROR  0.5 does not fit I32
-        mem-element-range · examples/error_demo/platform/11_mem_float_in_int.utu:3:20
+        mem-element-range · examples/error_demo/platform/11_mem_float_in_int.utu:3:24
 
  1 │ // What: a float literal in an I32 mem initializer
  2 │ // Expect: mem weights: element 1 (0.5) is not an integer; I32 holds integers
  3 │ mem weights: I32 = [1, 0.5];
-   │                    ━━━━━━━━
-   │                    ╰─ here
+   │                        ━━━
+   │                        ╰─ here
  4 │
  5 │ export main() I32 {
 --- exit 1
@@ -5553,13 +5593,13 @@ ok
 
 === utu check examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu
  ERROR  7 is no Color
-        mem-element-range · examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu:4:23
+        mem-element-range · examples/error_demo/platform/446_int_enum_mem_not_a_variant.utu:4:27
 
  2 │ // Expect: 7 is no Color
  3 │ enum(U8) Color: | Red | Green | Blue
  4 │ const mem cs: Color = [2, 7, 1];
-   │                       ━━━━━━━━━
-   │                       ╰─ here
+   │                           ━
+   │                           ╰─ here
  5 │
  6 │ export main() I32 {
 --- exit 1
@@ -8061,6 +8101,28 @@ FAIL after tests: boom
  6 │         if x == target and match < 0 { match = i; };
 --- exit 1
 
+=== utu check examples/error_demo/syntax/1221_unexpected_emoji.utu
+ ERROR  Unexpected character '😀'
+        parse-error · examples/error_demo/syntax/1221_unexpected_emoji.utu:3:1
+
+ 1 │ // What: an unexpected UTF-8 character covers its whole glyph.
+ 2 │ // Expect: Unexpected character '😀'
+ 3 │ 😀
+   │ ━━
+   │ ╰─ unexpected
+--- exit 1
+
+=== utu check examples/error_demo/syntax/1222_unfinished_proto.utu
+ ERROR  Protocol members begin with |, followed by a name and signature
+        foreign-syntax · examples/error_demo/syntax/1222_unfinished_proto.utu:4:5
+
+ 2 │ // Expect: Protocol members begin with |, followed by a name and signature
+ 3 │ proto P:
+ 4 │     fn
+   │     ━━
+   │     ╰─ unfinished protocol
+--- exit 1
+
 === utu check examples/error_demo/syntax/12_js_arrow_return_type.utu
  ERROR  No -> before a return type
         foreign-syntax · examples/error_demo/syntax/12_js_arrow_return_type.utu:3:24
@@ -9755,6 +9817,17 @@ FAIL after tests: boom
 
   fix   Use F32
  4 │     | get x : F32
+--- exit 1
+
+=== utu check examples/error_demo/types/1161_main_returns_value.utu
+ ERROR  main returns void
+        return-value-from-void · examples/error_demo/types/1161_main_returns_value.utu:3:29
+
+ 1 │ // What: a value returned from export main, which returns void
+ 2 │ // Expect: main returns void (pointing at the value)
+ 3 │ export main() void { return 1; }
+   │                             ━
+   │                             ╰─ here
 --- exit 1
 
 === utu check examples/error_demo/types/1182_alt_other_instance.utu
@@ -11538,7 +11611,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/93_match_type_enum.utu
- ERROR  match takes a number or Bool, not Shape
+ ERROR  match takes a number or Bool, not Shape; use alt for enum variants
         match-type · examples/error_demo/types/93_match_type_enum.utu:8:11
 
  6 │
