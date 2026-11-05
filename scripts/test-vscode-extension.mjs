@@ -35,7 +35,8 @@ try {
   }
 
   const context = { subscriptions: [], extensionUri: vscode.Uri.parse(`${pathToFileURL(ROOT).href}/`) };
-  await nodeActivate(context);
+  const api = await nodeActivate(context);
+  if (!await api.compiler.selfhosted()) throw new Error('the self-hosted compiler did not load');
   const commands = globalThis.__utuVscodeStub.commands;
   for (const name of ['utu.compileCurrentFile', 'utu.runMain', 'utu.showGeneratedWat', 'utu.showSyntaxTree', 'utu.showCompilerIR', 'utu.showSemanticXray', 'utu.showCompilerGraphs', 'utu.createWutuWebsite', 'utu.previewWutuWebsite']) {
     if (!commands.has(name)) throw new Error(`activation did not register ${name}`);
@@ -56,6 +57,12 @@ try {
   if (!definition?.range) throw new Error('go to definition did not resolve a local');
   const references = await providers.references.provideReferences(document, document.positionAt(source.indexOf('x +')), { includeDeclaration: true });
   if (references.length !== 2) throw new Error(`find references returned ${references.length} entries instead of 2`);
+  // Diagnostics from the self-hosted compiler: stage 0's kinds, located in the file.
+  const broken = makeDocument(vscode.Uri.parse('file:///broken.utu'), 'export main() I32 { let x: I32 = "no"; x + missing; }');
+  globalThis.__utuVscodeStub.textDocuments.push(broken);
+  const found = await api.compiler.diagnostics(broken);
+  const summary = found.map(d => `${d.code} ${d.primary.start}-${d.primary.end}`).sort().join(', ');
+  if (summary !== 'type-mismatch 33-37, unknown-variable 43-50') throw new Error(`diagnostics were ${summary}`);
   const hierarchy = await providers.calls.prepareCallHierarchy(document, document.positionAt(source.indexOf('main')));
   if (hierarchy?.name !== 'main') throw new Error('call hierarchy did not resolve main');
   const binary = await commands.get('utu.compileCurrentFile')(document);
@@ -153,7 +160,13 @@ const workspace = {
     async stat(uri) { if (uri.fsPath.endsWith('/cli/wutu.mjs') || state.files.has(uri.toString())) return {}; throw Object.assign(new Error('missing'), { code: 'FileNotFound' }); },
     async createDirectory() {},
     async writeFile(uri, bytes) { state.files.set(uri.toString(), new TextDecoder().decode(bytes)); },
-    async readFile(uri) { const source = state.files.get(uri.toString()); if (source === undefined) throw new Error('unexpected workspace file read'); return new TextEncoder().encode(source); },
+    async readFile(uri) {
+      const source = state.files.get(uri.toString());
+      if (source !== undefined) return new TextEncoder().encode(source);
+      // The extension's own files (dist/utu.wasm, …) are on disk.
+      if (uri.scheme === 'file') return new Uint8Array(require('node:fs').readFileSync(uri.fsPath));
+      throw new Error('unexpected workspace file read');
+    },
   },
   registerTextDocumentContentProvider: event,
   onDidOpenTextDocument: event, onDidChangeTextDocument: event, onDidSaveTextDocument: event,
@@ -182,16 +195,21 @@ const commands = {
   async executeCommand() {},
 };
 const provider = key => (_selector, value) => { state.providers[key] = value; return new Disposable(() => delete state.providers[key]); };
+class CodeAction { constructor(title, kind) { this.title = title; this.kind = kind; } }
+const CodeActionKind = { QuickFix: 'quickfix' };
+class WorkspaceEdit { constructor() { this.edits = []; } replace(uri, range, text) { this.edits.push({ uri, range, text }); } }
 const languages = {
   createDiagnosticCollection() { return { set() {}, delete() {}, clear() {}, dispose() {} }; },
   registerDocumentFormattingEditProvider: provider('format'), registerCompletionItemProvider: provider('completion'),
   registerHoverProvider: provider('hover'), registerDefinitionProvider: provider('definition'), registerReferenceProvider: provider('references'),
   registerInlayHintsProvider: provider('inlays'), registerCallHierarchyProvider: provider('calls'),
+  registerCodeActionsProvider: provider('codeActions'),
   async setTextDocumentLanguage(document) { return document; },
 };
 module.exports = {
   Disposable, EventEmitter, Position, Range, Diagnostic, DiagnosticRelatedInformation, Location,
   Hover, MarkdownString, InlayHint, CallHierarchyItem, CallHierarchyIncomingCall, CallHierarchyOutgoingCall, Uri,
+  CodeAction, CodeActionKind, WorkspaceEdit,
   workspace, window, commands, languages,
   DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
   InlayHintKind: { Type: 1, Parameter: 2 }, SymbolKind: { Function: 11 },

@@ -201,7 +201,8 @@ async function compileUtu(file, optimize, safe) {
   }
   const { wasm, spec, diagnostics } = built;
   if (!wasm) throw new Error(`${file}: ${diagnostics.map(d => d.message).join('; ')}`);
-  if (Object.keys(spec ?? {}).length) throw new Error(`${file}: a benchmark module must import nothing from its host`);
+  // `exports` and `promises` describe the module's own exports, not imports.
+  if (Object.keys(spec ?? {}).some(k => k !== 'exports' && k !== 'promises')) throw new Error(`${file}: a benchmark module must import nothing from its host`);
   return { bytes: wasm, compile: median(times) };
 }
 

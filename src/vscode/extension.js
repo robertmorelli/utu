@@ -9,15 +9,17 @@ const decoder = new TextDecoder('utf-8');
 
 let activeService;
 let compilerModuleSpecifier = COMPILER_MODULE;
+let extensionRoot;
 
 export async function activate(context) {
+  extensionRoot = context.extensionUri;
   compilerModuleSpecifier = context.extensionUri
     ? vscode.Uri.joinPath(context.extensionUri, 'dist', 'utu.js').toString()
     : COMPILER_MODULE;
   const output = vscode.window.createOutputChannel('UTU');
   const diagnostics = vscode.languages.createDiagnosticCollection(LANGUAGE_ID);
   const generated = new GeneratedDocuments();
-  const service = createCompilerService();
+  const service = createCompilerService(output);
   const xray = new SemanticXrayPanel(service, output);
   activeService = service;
 
@@ -74,6 +76,7 @@ export async function activate(context) {
       },
     }, '<', ':', '@'),
     vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, semanticHoverProvider(service)),
+    vscode.languages.registerCodeActionsProvider(DOCUMENT_SELECTOR, quickFixes, { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }),
     vscode.languages.registerDefinitionProvider(DOCUMENT_SELECTOR, definitionProvider(service)),
     vscode.languages.registerReferenceProvider(DOCUMENT_SELECTOR, referenceProvider(service)),
     vscode.languages.registerInlayHintsProvider(DOCUMENT_SELECTOR, inlayHintsProvider(service)),
@@ -86,13 +89,52 @@ export async function activate(context) {
     await revealGenerated(generated, document, 'css', cssProjection(document.getText()), 'css');
   });
 
+  registerCommand(context, output, 'utu.createWutuWebsite', async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) throw new Error('Open a workspace folder to create a Wutu website.');
+    const name = await vscode.window.showInputBox({
+      prompt: 'Name for the new Wutu website folder',
+      value: 'my-wutu-site',
+      validateInput: value => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(value)
+        ? undefined : 'Use letters, numbers, underscores, or hyphens; start with a letter.',
+    });
+    if (!name) return;
+    const directory = vscode.Uri.joinPath(folder.uri, name);
+    const entry = vscode.Uri.joinPath(directory, 'main.utu');
+    try {
+      await vscode.workspace.fs.stat(entry);
+      throw new Error(`${name}/main.utu already exists.`);
+    } catch (error) {
+      if (error?.code !== 'FileNotFound') throw error;
+    }
+    await vscode.workspace.fs.createDirectory(directory);
+    await vscode.workspace.fs.writeFile(entry, new TextEncoder().encode(wutuStarter(name)));
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(entry));
+    return entry;
+  });
+
+  registerCommand(context, output, 'utu.previewWutuWebsite', async target => {
+    const document = await utuDocument(target);
+    if (!document) return;
+    if (document.uri.scheme !== 'file') throw new Error('Save the Wutu entry file locally before previewing it.');
+    if (document.isDirty && !await document.save()) return;
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder) throw new Error('Open the Wutu website folder as a VS Code workspace.');
+    const cli = vscode.Uri.joinPath(folder.uri, 'cli', 'wutu.mjs');
+    try { await vscode.workspace.fs.stat(cli); }
+    catch { throw new Error('Open the utu repository as the VS Code workspace to preview Wutu websites.'); }
+    const terminal = vscode.window.createTerminal({ name: 'Wutu Website', cwd: folder.uri.fsPath });
+    const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
+    terminal.sendText(`node ${quote(cli.fsPath)} dev ${quote(document.uri.fsPath)} --out ${quote(vscode.Uri.joinPath(folder.uri, 'dist', 'wutu-preview').fsPath)} --port 0`);
+    terminal.show();
+    output.appendLine(`[wutu] Previewing ${displayName(document)}; open the localhost link in the Wutu Website terminal.`);
+    return terminal;
+  });
+
   registerCommand(context, output, 'utu.compileCurrentFile', async target => {
     const document = await utuDocument(target);
     if (!document) return;
-    const analysis = await service.analyze(document, 'normal');
-    throwOnDiagnostics(analysis.artifacts.diagnostics);
-    const { emitBinary } = await loadUtu();
-    const binary = emitBinary(analysis.doc);
+    const { wasm: binary } = await service.build(document);
     output.appendLine(`[utu] Compiled ${displayName(document)}: ${binary.byteLength} wasm bytes`);
     vscode.window.setStatusBarMessage(`UTU compiled ${displayName(document)}`, 3000);
     return binary;
@@ -149,15 +191,11 @@ export async function activate(context) {
   registerCommand(context, output, 'utu.runMain', async target => {
     const document = await utuDocument(target);
     if (!document) return;
-    const analysis = await service.analyze(document, 'normal');
-    throwOnDiagnostics(analysis.artifacts.diagnostics);
-    const { buildImportObject, emitBinary, instantiateLowered } = await loadUtu();
-    const binary = emitBinary(analysis.doc);
-    const { instance } = await instantiateLowered(binary, await buildImportObject(analysis.doc));
-    if (typeof instance.exports.main !== 'function') {
+    const { exports } = await service.instantiate(document);
+    if (typeof exports.main !== 'function') {
       throw new Error('The active file does not export main().');
     }
-    const result = await instance.exports.main();
+    const result = await exports.main();
     output.appendLine(`[utu] ${displayName(document)} main${result === undefined ? '' : ` => ${String(result)}`}`);
     output.show(true);
     return result;
@@ -176,11 +214,20 @@ export function deactivate() {
   activeService = undefined;
 }
 
-export function createCompilerService() {
+/**
+ * Diagnostics, builds, runs, definitions and references come from the
+ * self-hosted compiler (dist/utu.wasm): a build takes milliseconds. Hover,
+ * inlay hints, call hierarchy, the X-Ray and the IR and graph views read
+ * stage 0's semantic analysis, loaded the first time one is used. When the
+ * engine cannot run the self-hosted compiler (it needs WasmGC and the JS
+ * string builtins), stage 0 does everything.
+ */
+export function createCompilerService(output = null) {
   let parserPromise;
   const compilers = new Map();
   const analyses = new Map();
   const parser = () => (parserPromise ??= loadUtu().then(({ initParser }) => initParser()));
+  const selfhost = createSelfhostService(output);
 
   async function compiler(target) {
     if (!compilers.has(target)) {
@@ -197,18 +244,62 @@ export function createCompilerService() {
     return compilers.get(target);
   }
 
+  // Stage 0's build of a document, as the self-hosted one is: its module and spec.
+  async function stage0Build(document) {
+    const analysis = await analyze(document, 'normal');
+    throwOnDiagnostics(analysis.artifacts.diagnostics);
+    const { emitBinary } = await loadUtu();
+    return { wasm: emitBinary(analysis.doc), doc: analysis.doc };
+  }
+
+  function analyze(document, target = 'analysis') {
+    const key = `${target}\u0000${document.uri.toString()}\u0000${document.version}`;
+    let pending = analyses.get(key);
+    if (!pending) {
+      pending = compiler(target).then(instance => instance.analyzeFile(document.uri.toString()));
+      analyses.set(key, pending);
+      pending.catch(() => analyses.delete(key));
+    }
+    return pending;
+  }
+
   return {
     parser,
-    analyze(document, target = 'analysis') {
-      const key = `${target}\u0000${document.uri.toString()}\u0000${document.version}`;
-      let pending = analyses.get(key);
-      if (!pending) {
-        pending = compiler(target).then(instance => instance.analyzeFile(document.uri.toString()));
-        analyses.set(key, pending);
-        pending.catch(() => analyses.delete(key));
+    selfhosted: () => selfhost.available(),
+    async diagnostics(document) {
+      if (await selfhost.available()) return selfhost.diagnostics(document);
+      try {
+        return (await analyze(document, 'analysis')).artifacts.diagnostics;
+      } catch (error) {
+        if (error?.artifacts?.diagnostics?.length) return error.artifacts.diagnostics;
+        throw error;
       }
-      return pending;
     },
+    async build(document) {
+      if (await selfhost.available()) return selfhost.build(document);
+      return stage0Build(document);
+    },
+    async instantiate(document) {
+      if (await selfhost.available()) return selfhost.instantiate(document);
+      const { wasm, doc } = await stage0Build(document);
+      const { buildImportObject, instantiateLowered } = await loadUtu();
+      const { instance } = await instantiateLowered(wasm, await buildImportObject(doc));
+      return { exports: instance.exports };
+    },
+    async definition(document, offset) {
+      if (await selfhost.available()) return selfhost.query(document, index => index.definition(index.declarationAt(document.uri.toString(), offset)));
+      return (await analyze(document)).snapshot.definitionAt(document.uri.toString(), offset);
+    },
+    async references(document, offset, includeDeclaration) {
+      if (await selfhost.available()) {
+        return selfhost.query(document, index => {
+          const decl = index.declarationAt(document.uri.toString(), offset);
+          return decl < 0 ? [] : index.references(decl, { includeDeclaration });
+        });
+      }
+      return (await analyze(document)).snapshot.referencesAt(document.uri.toString(), offset, { includeDeclaration });
+    },
+    analyze,
     invalidate(uri) {
       const marker = `\u0000${uri.toString()}\u0000`;
       for (const key of analyses.keys()) if (key.includes(marker)) analyses.delete(key);
@@ -217,6 +308,90 @@ export function createCompilerService() {
       parserPromise?.then(value => value.delete?.()).catch(() => {});
       analyses.clear();
       compilers.clear();
+    },
+  };
+}
+
+/** The self-hosted compiler, one program at a time (it holds the program in its memories). */
+function createSelfhostService(output) {
+  let loading;
+  let queue = Promise.resolve();
+  const load = () => (loading ??= (async () => {
+    const dist = extensionRoot ? vscode.Uri.joinPath(extensionRoot, 'dist') : null;
+    if (!dist) throw new Error('no extension directory');
+    const read = name => vscode.workspace.fs.readFile(vscode.Uri.joinPath(dist, name));
+    const [api, wasm, spec] = await Promise.all([
+      import(vscode.Uri.joinPath(dist, 'selfhost', 'utu.js').toString()),
+      read('utu.wasm'),
+      read('utu.host.json').then(bytes => JSON.parse(decoder.decode(bytes))),
+    ]);
+    const utu = await api.loadCompiler(wasm, spec);
+    const host = {
+      // The platform's declarations, read ready from dist/selfhost/catalog.
+      stdlib: api.catalogStdlib(api.PLATFORM_SOURCES, async name => new Uint8Array(await read(`selfhost/catalog/${name}`))),
+      readFile: readWorkspaceFile,
+      readBinaryFile: file => vscode.workspace.fs.readFile(vscode.Uri.parse(file, true)),
+      resolvePath: resolveImport,
+    };
+    return { api, utu, host };
+  })().catch(error => {
+    output?.appendLine(`[utu] The self-hosted compiler is not available here (${firstErrorLine(error)}); using stage 0.`);
+    throw error;
+  }));
+  // Each use runs alone, after the ones before it.
+  const exclusive = task => {
+    const run = queue.then(() => load().then(task));
+    queue = run.catch(() => {});
+    return run;
+  };
+  const build = (document, target = 'normal') => exclusive(({ api, utu, host }) =>
+    api.compile(utu, document.uri.toString(), { ...host, target }));
+  const throwOn = ({ wasm, diagnostics }) => {
+    if (!wasm) throw new Error(diagnostics[0]?.message ?? 'Compilation failed');
+  };
+  return {
+    available: () => load().then(() => true, () => false),
+    // What the program's exports and its tests need, in this file.
+    async diagnostics(document) {
+      const uri = document.uri.toString();
+      const seen = new Set();
+      const out = [];
+      for (const target of ['normal', 'test']) {
+        for (const d of (await build(document, target)).diagnostics) {
+          const key = `${d.file}\u0000${d.start}\u0000${d.end}\u0000${d.message}`;
+          if (d.file !== uri || seen.has(key)) continue;
+          seen.add(key);
+          // The diagnostic's own kind, its notes after the message, the other
+          // places it is about, and its fix (a quick fix, below).
+          out.push({
+            severity: d.severity,
+            message: [d.message, ...(d.notes ?? []).map(note => `note: ${note}`)].join('\n'),
+            code: d.code ?? d.kind,
+            primary: { start: d.focus?.start ?? d.start, end: d.focus?.end ?? d.end },
+            related: (d.related ?? []).map(r => ({ file: r.file, start: r.start, end: r.end, label: r.label })),
+            fix: d.fix && d.fix.file === uri ? { start: d.fix.start, end: d.fix.end, text: d.fix.text, label: d.fix.label } : null,
+          });
+        }
+      }
+      return out;
+    },
+    async build(document) {
+      const built = await build(document);
+      throwOn(built);
+      return built;
+    },
+    async instantiate(document) {
+      const built = await build(document);
+      throwOn(built);
+      const { api } = await load();
+      return api.instantiate(built.wasm, built.spec);
+    },
+    // `answer(index)` over the document's program, its names resolved.
+    query(document, answer) {
+      return exclusive(async ({ api, utu, host }) => {
+        const files = await api.loadProgram(utu, document.uri.toString(), host);
+        return answer(api.programIndex(utu, files));
+      });
     },
   };
 }
@@ -258,8 +433,7 @@ function semanticHoverProvider(service) {
 function definitionProvider(service) {
   return {
     async provideDefinition(document, position) {
-      const analysis = await service.analyze(document, 'analysis');
-      return sourceLocation(analysis.snapshot.definitionAt(document.uri.toString(), document.offsetAt(position)), document);
+      return sourceLocation(await service.definition(document, document.offsetAt(position)), document);
     },
   };
 }
@@ -267,10 +441,7 @@ function definitionProvider(service) {
 function referenceProvider(service) {
   return {
     async provideReferences(document, position, context) {
-      const analysis = await service.analyze(document, 'analysis');
-      const refs = analysis.snapshot.referencesAt(document.uri.toString(), document.offsetAt(position), {
-        includeDeclaration: context.includeDeclaration,
-      });
+      const refs = await service.references(document, document.offsetAt(position), context.includeDeclaration);
       return Promise.all(refs.map(ref => sourceLocation(ref, document))).then(values => values.filter(Boolean));
     },
   };
@@ -450,20 +621,34 @@ function rangeForRef(document, ref) {
 async function validateDocument(document, service, collection, output) {
   const { uri, version } = document;
   try {
-    const analysis = await service.analyze(document, 'analysis');
+    const found = await service.diagnostics(document);
     if (document.version !== version) return;
-    collection.set(uri, analysis.artifacts.diagnostics.map(diagnostic => toVscodeDiagnostic(document, diagnostic)));
+    collection.set(uri, found.map(diagnostic => toVscodeDiagnostic(document, diagnostic)));
   } catch (error) {
     if (document.version !== version) return;
-    const compilerDiagnostics = error?.artifacts?.diagnostics ?? [];
-    if (compilerDiagnostics.length) {
-      collection.set(uri, compilerDiagnostics.map(diagnostic => toVscodeDiagnostic(document, diagnostic)));
-    } else {
-      collection.set(uri, [new vscode.Diagnostic(fullRange(document), firstErrorLine(error), vscode.DiagnosticSeverity.Error)]);
-      output.appendLine(`[utu] Validation failed for ${uri.toString()}: ${error?.stack || error}`);
-    }
+    collection.set(uri, [new vscode.Diagnostic(fullRange(document), firstErrorLine(error), vscode.DiagnosticSeverity.Error)]);
+    output.appendLine(`[utu] Validation failed for ${uri.toString()}: ${error?.stack || error}`);
   }
 }
+
+/** The fix the compiler gave each diagnostic it shows: an edit, offered as a quick fix. */
+const FIXES = new WeakMap();
+
+/** Quick fixes: each diagnostic's fix in the range asked about, as one edit. */
+const quickFixes = {
+  provideCodeActions(document, _range, context) {
+    return context.diagnostics.flatMap(diagnostic => {
+      const fix = FIXES.get(diagnostic);
+      if (!fix) return [];
+      const action = new vscode.CodeAction(fix.label || 'Apply the fix', vscode.CodeActionKind.QuickFix);
+      action.edit = new vscode.WorkspaceEdit();
+      action.edit.replace(document.uri, new vscode.Range(document.positionAt(fix.start), document.positionAt(fix.end)), fix.text);
+      action.diagnostics = [diagnostic];
+      action.isPreferred = true;
+      return [action];
+    });
+  },
+};
 
 function toVscodeDiagnostic(document, diagnostic) {
   const primary = diagnostic.primary ?? {};
@@ -481,6 +666,7 @@ function toVscodeDiagnostic(document, diagnostic) {
   );
   value.source = 'utu';
   value.code = diagnostic.code || diagnostic.kind || undefined;
+  if (diagnostic.fix) FIXES.set(value, diagnostic.fix);
   value.relatedInformation = (diagnostic.related ?? []).flatMap(related => {
     if (!related?.file) return [];
     const uri = vscode.Uri.parse(related.file, true);
@@ -506,6 +692,24 @@ function registerCommand(context, output, name, handler) {
       return undefined;
     }
   }));
+}
+
+function wutuStarter(name) {
+  return `using Browser from std:Browser;
+
+export main() void {
+    Browser.document.body.append(@wutu/\\
+    main {
+        font-family: system-ui;
+        max-width: 40rem;
+        margin: 4rem auto;
+        padding: 1rem;
+        h1 { "${name}"; }
+        p { "Edit main.utu and watch this page update."; }
+    }
+    \\/);
+}
+`;
 }
 
 async function utuDocument(target) {

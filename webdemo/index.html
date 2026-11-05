@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wutu Playground</title>
+<link rel="stylesheet" href="./style.css">
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark">w</span><strong>Wutu</strong></div>
+    <span id="status" role="status">Loading…</span>
+  </header>
+  <main class="workspace">
+    <section class="pane code-pane" aria-label="Wutu editor">
+      <div class="pane-heading"><strong>main.utu</strong></div>
+      <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Wutu source code"></textarea>
+      <pre id="diagnostics" aria-live="polite"></pre>
+    </section>
+    <section class="pane preview-pane" aria-label="Website preview">
+      <div class="pane-heading"><strong>Preview</strong></div>
+      <iframe id="preview" title="Wutu website preview" sandbox="allow-scripts"></iframe>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

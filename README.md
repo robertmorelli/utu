@@ -15,6 +15,11 @@ code --install-extension dist/utu-vscode.vsix
 
 Open any `.utu` file or run a command from the **UTU** command palette group.
 
+To try Wutu in VS Code, open this repository as your workspace and run
+**UTU: Create Wutu Website**. Edit the generated `main.utu`, then run
+**UTU: Preview Wutu Website**. The Wutu Website terminal prints a local URL;
+open it to see the page, and keep the terminal running for live reload.
+
 ## JavaScript, the browser, and npm
 
 TypeScript declarations are utu's foreign-function interface. `std:Browser`
@@ -59,6 +64,9 @@ node cli/wutu.mjs build examples/wutu-five/folio/main.utu --out dist/folio
 
 The five-site gallery is built with `bun run demo:wutu-five`. Its source viewers
 show the exact readable Utu source; deployed JS/Wasm are optimized separately.
+
+For a browser-only editor and live preview, run `npm run demo:webdemo`, then
+serve [webdemo/](webdemo/README.md) with a local HTTP server.
 
 Three more complete examples—Dispatch, Supper, and Split—are built with
 `bun run demo:wutu-more` and tested with `bun run test:wutu-more`.
