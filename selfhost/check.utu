@@ -1304,6 +1304,11 @@ fn check_let(node: I32, cx: Cx) I32 {
         report(Diag.TypeMismatch, init, -1);
         t = ty_error();
     };
+    if not annotated and ty_is(t, Ty.Tuple) {
+        report2(Diag.TupleLet, name, word_of(name), t, 3);
+        decl_ty[decl] = ty_error();
+        return error_since(m);
+    };
     decl_ty[decl] = t;
     if ty_is(t, Ty.Void) {
         // (After a mistake in the value, its being void is no news; a
@@ -1943,7 +1948,8 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
         return bool_t;
     };
     let word = if op == Tok.Minus.to_i32() { known_word(Known.Neg); } else { known_word(Known.Bnot); };
-    let t = check_expr(operand, expect, cx);
+    // (A discarded `-e` still has a value to negate: the operand is not void.)
+    let t = check_expr(operand, if expect >= 0 and ty_is(expect, Ty.Void) { -1; } else { expect; }, cx);
     if ty_is(t, Ty.Error) { return t; };
     let decl = member(ty_decl(t), word, Space.Operator);
     if decl < 0 {
@@ -3240,7 +3246,7 @@ fn check_break_label(node: I32, cx: Cx) I32 {
         let past = label_past_closure(node);
         // `break x` in a loop with no labeled block around: a value, not a label.
         let valued = value < 0 and past < 0 and not labeled_around(node);
-        report2(Diag.UnknownLabel, name, word_of(name), if valued { 1; } else { -1; }, -1);
+        report2(Diag.UnknownLabel, name, word_of(name), if past >= 0 { 2; } else if valued { 1; } else { -1; }, -1);
         if past >= 0 {
             diag_place(Extra.Related, first_child(past), "outside the closure");
             diag_note("a closure cannot leave the block it is in");

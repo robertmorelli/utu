@@ -491,6 +491,11 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                 report2(Diag.TypeMismatch, pattern, -1, st, named(other, 0));
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
                 result = ty_error();
+            } else if variant >= 0 and is_kind(pattern, Node.Qualified_type_ref) and ty_inst(type_path(pattern, cx.inst)) != ty_inst(st) {
+                // `MS.E.A` tested against an `MI.E`: another instance's variant.
+                report2(Diag.TypeMismatch, pattern, -1, st, type_path(pattern, cx.inst));
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+                result = ty_error();
             } else if variant < 0 {
                 let n = if is_kind(pattern, Node.Qualified_type_ref) { name_node(last_child(pattern)); } else { pattern; };
                 report2(Diag.UnknownVariant, n, word_of(n), st, -1);

@@ -450,6 +450,7 @@ fn diag_text(i: I32) Str {
             if not ty_is(a, Ty.Tuple) { return "let .{…} needs a tuple, got " + type_text(a); };
             // b == 2: a closure captures a tuple
             if b == 2 { return "A closure cannot capture tuple " + w; };
+            if b == 3 { return w + " would hold tuple " + type_text(a) + ": name its values with let .{…}"; };
             "Tuple " + type_text(a) + " has " + int_text(vl_len[ty_a[a]]) + " values";
         },
         Diag.NotNullable => if b == 1 { pick(w.len() > 0, w, "It") + " is " + type_text(a) + ", which is never null"; } else { "Expected nullable, got " + type_text(a); },
@@ -610,7 +611,7 @@ fn diag_text(i: I32) Str {
         Diag.ForeignOverload => "No overload takes " + int_text(a),
         Diag.PruneInClosure => "prune in a closure",
         Diag.GeneratorMethod => "A method cannot be a generator",
-        Diag.UnknownLabel => if a == 1 { "break takes no value"; } else { "No block labeled " + w + " around this break"; },
+        Diag.UnknownLabel => if a == 1 { "break takes no value"; } else if a == 2 { "break cannot leave a closure"; } else { "No block labeled " + w + " around this break"; },
         Diag.GlobalCycle => if a < 0 { "Global " + w + " is read while it is being set"; }
             else { "Globals " + w + " and " + word_text(decl_name[a]) + " each need the other set first"; },
         Diag.NotValue => if a == 2 { w + " is a field: read it from a value"; } else { w + " is a " + pick(a == 1, "module", "type") + ", not a value"; },
@@ -826,7 +827,7 @@ fn diag_default_label(i: I32) Str {
         Diag.ProtoPairType => "one type for get and set",
         Diag.MemberClash => pick(b == 1, "also in the protocol", "also a field"),
         Diag.VariantNotValue => "make one: " + word_text(decl_name[diag_a[i]]) + "." + w + " {…}",
-        Diag.UnknownLabel => pick(a == 1, "a value, not a label", "no such label"),
+        Diag.UnknownLabel => if a == 2 { "block " + w + " is outside the closure"; } else { pick(a == 1, "a value, not a label", "no such label"); },
         Diag.GlobalCycle => if a < 0 { "reads " + w; } else { "needs " + word_text(decl_name[a]); },
         Diag.NotValue => "not a value",
         Diag.NotAssignable => "not a variable",

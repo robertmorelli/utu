@@ -33,6 +33,7 @@ fn pattern_value(lit: I32, t: I32) I64 {
         if negate and literal_bits(c, t, false) == 0.to_i64() { return 0.to_i64(); };
         return literal_bits(c, t, negate);
     };
+    if negate and is_float(t) and literal_bits(c, t, false) == 0.to_i64() { return 0.to_i64(); };
     let v = literal_bits(c, t, negate);
     if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v; };
     if decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };

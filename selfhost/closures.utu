@@ -207,6 +207,8 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
     let p = parent_of(write);
     while (p >= 0) {
         if is_kind(p, Node.Closure_expr) and not node_contains(p, decl) { return true; };
+        // In a defer: it runs at the end of the scope, after the capture.
+        if (is_kind(p, Node.Defer_expr) or is_kind(p, Node.Errdefer_expr)) and not node_contains(p, decl) { return true; };
         p = parent_of(p);
     };
     // After the capture (or in the closure), or of the closure itself (`f = cl() { … f … }`).
@@ -214,7 +216,7 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
     // In a loop around the closure, within d's scope.
     p = parent_of(closure);
     while (p >= 0 and not node_contains(p, decl)) {
-        if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr) or is_kind(p, Node.Loop_match_expr)) and node_contains(p, write) { return true; };
+        if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr) or is_kind(p, Node.Loop_match_expr) or is_kind(p, Node.Iterator_expr)) and node_contains(p, write) { return true; };
         p = parent_of(p);
     };
     false;
