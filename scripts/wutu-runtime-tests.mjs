@@ -362,6 +362,18 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
     assertEq(storage.getItem('auto'), 'local', 'automatic stores save and flush on page hide');
   }));
 
+  test('wutu storage: saves land while renders keep coming (a ticking clock does not starve the debounce)', () => withRuntime(async ({ api, storage }) => {
+    installWutuStorage(api);
+    let value = 'one';
+    api.store('tick', () => value, false, () => {});
+    for (let i = 0; i < 12; i++) {
+      if (i == 1) value = 'two';
+      api.autoSave();
+      await new Promise(r => setTimeout(r, 40));
+    }
+    assertEq(storage.getItem('tick'), 'two', 'written within the debounce, with renders every 40 ms');
+  }));
+
   test('wutu lazy: a call before any template ran (no runtime yet) gets a placeholder the chunk fills', () => withRuntime(async ({ document }) => {
     const saved = [globalThis.__utuWutu, globalThis.__wutuChunks];
     delete globalThis.__utuWutu;

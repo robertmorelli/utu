@@ -1,0 +1,11 @@
+// What: a property assigned twice on one element
+// Expect: .value is assigned twice (not a duplicate generated local)
+using Browser from std:Browser;
+
+export main() void {
+    let app = @wutu/\
+    @reactive;
+    main { input { .value = "a"; .value = "b"; } }
+    \/;
+    Browser.document.body.append(app);
+}

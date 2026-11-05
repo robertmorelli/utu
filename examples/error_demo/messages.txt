@@ -4830,6 +4830,45 @@ ok
  5 │ export main() I32 {
 --- exit 1
 
+=== utu check examples/error_demo/platform/1140_wutu_directive_repeated.utu
+ ERROR  @reactive is repeated or out of order: a template begins with @reactive @island @style @document, in that order, @reactive and @island at most once
+        dsl-error · examples/error_demo/platform/1140_wutu_directive_repeated.utu:8:5
+
+ 6 │     let app = @wutu/\
+ 7 │     @reactive;
+ 8 │     @reactive;
+   │     ━
+   │     ╰─ here
+ 9 │     main { div { } }
+10 │     \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/1141_wutu_property_twice.utu
+ ERROR  .value is assigned twice on this element
+        dsl-error · examples/error_demo/platform/1141_wutu_property_twice.utu:8:35
+
+ 6 │     let app = @wutu/\
+ 7 │     @reactive;
+ 8 │     main { input { .value = "a"; .value = "b"; } }
+   │                                   ━
+   │                                   ╰─ here
+ 9 │     \/;
+10 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/1142_wutu_id_twice.utu
+ ERROR  an element has one id; this is a second
+        dsl-error · examples/error_demo/platform/1142_wutu_id_twice.utu:8:20
+
+ 6 │     let app = @wutu/\
+ 7 │     @reactive;
+ 8 │     main { div#a { id = "b"; } }
+   │                    ━
+   │                    ╰─ here
+ 9 │     \/;
+10 │     Browser.document.body.append(app);
+--- exit 1
+
 === utu check examples/error_demo/platform/11_mem_float_in_int.utu
  ERROR  0.5 does not fit I32
         mem-element-range · examples/error_demo/platform/11_mem_float_in_int.utu:3:20

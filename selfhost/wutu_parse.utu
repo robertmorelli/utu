@@ -1112,6 +1112,7 @@ fn at_directive(text: Str, p: I32, inside: Bool) void {
     if inside and name == "unmanaged" { wutu_fail("expected ; after @unmanaged", q); };
     if inside and in_words(head, "@" + name) { wutu_fail("@" + name + " goes first in the template, before its root element", p); };
     if not inside and name == "unmanaged" { wutu_fail("@unmanaged goes inside the element it is for: div { @unmanaged; }", p); };
+    if not inside and in_words(head, "@" + name) { wutu_fail("@" + name + " is repeated or out of order: a template begins with " + head + ", in that order, @reactive and @island at most once", p); };
     let known = if inside { "@unmanaged"; } else { head; };
     let near = closest_word(known, "@" + name);
     wutu_fail("unknown directive @" + name + (if near.len() > 0 { "; did you mean " + near + "?"; } else { "; " + (if inside { "an element takes @unmanaged, or a CSS at-rule"; } else { "a template begins with " + head; }); }), p);
@@ -1279,7 +1280,18 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
     if dynamic and is_property and is_raw_text_tag(tag) and in_words("textContent innerText", name) { wutu_fail(raw_text_error(tag), name_start); };
     if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\"; (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start); };
     if not is_property and not is_allowed_attribute(tag, name, wp_svg[1] == 1) { wutu_fail("unknown attribute " + name + " on " + tag, name_start); };
+    if name != "class" and has_item_named(n, name, is_property) { wutu_fail((if is_property { "." + name + " is assigned twice on this element"; } else { "an element has one " + name + "; this is a second"; }), name_start); };
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1; } else { 0; }) + (if dynamic { 2; } else { 0; }), from, to, name_start);
+}
+
+/// Whether element n has a property (or an attribute) item named `name`.
+fn has_item_named(n: I32, name: Str, is_property: Bool) Bool {
+    let i = tn_items[n];
+    while (i >= 0) {
+        if ti_kind[i] == 1 and (ti_flags[i] & 1) == (if is_property { 1; } else { 0; }) and word_text(ti_a[i]) == name { return true; };
+        i = ti_next[i];
+    };
+    false;
 }
 
 /// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.

@@ -1,0 +1,11 @@
+// What: an id from #, then an id attribute
+// Expect: an element has one id
+using Browser from std:Browser;
+
+export main() void {
+    let app = @wutu/\
+    @reactive;
+    main { div#a { id = "b"; } }
+    \/;
+    Browser.document.body.append(app);
+}
