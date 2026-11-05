@@ -2996,6 +2996,28 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   const commented = await compileFile(utu, await write('let flip: fun(Bool) Bool = @es/\\ (b) => !b // negate\n\\/;\nlet five: fun() I32 = @es/\\ (() => 5) // thunk\n\\/;\nexport lib { fn run() I32 { if flip(false) { five(); } else { 0; }; } }\n'));
   assert.equal((await instantiateNode(commented.wasm, commented.spec)).exports?.run(), 5, commented.diagnostics?.map(d => d.message).join('\n'));
   checked++;
+  // A closure called from `@es`: a U32 or U64 result is unsigned there, and `undefined` for a nullable parameter is null.
+  const fromJs = await write('let big: fun(cl() U32) Str = @es/\\ f => String(f()) \\/;\nlet wide: fun(cl() U64) Str = @es/\\ f => String(f()) \\/;\nlet none: fun(cl(?Str) Str) Str = @es/\\ f => f(undefined) \\/;\nexport lib { fn run() Str { big(cl() U32 { 4294967295; }) + " " + wide(cl() U64 { 18446744073709551615; }) + " " + none(cl(z: ?Str) Str { z orelse "none"; }); } }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, fromJs, { mode });
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports?.run(), '4294967295 18446744073709551615 none', mode);
+    checked++;
+  }
+  // An integer @json pattern beyond F64's exact range compares the token's text too.
+  const bigJson = await compileFile(utu, await write('export lib {\n    fn result(text: Str) Str {\n        @json/\\ match text {\n            9007199254740992 => "matched",\n            ~> "different",\n        } \\/;\n    }\n}\n'));
+  const largeLib = (await instantiateNode(bigJson.wasm, bigJson.spec)).exports;
+  assert.deepEqual([largeLib.result('9007199254740992'), largeLib.result('9007199254740993')], ['matched', 'different'], bigJson.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+  // `using Browser` and `from std:Browser` on two lines, an empty @stored struct, and a Wutu text in backticks with a semicolon.
+  for (const source of [
+    'using Browser\nfrom std:Browser;\nstruct S:\n    | x: I32\nexport main() void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
+    'using Browser from std:Browser;\nstruct S:\nexport main() void {\n    @stored/\\ S "s" S {} \\/;\n}\n',
+    'using Browser from std:Browser;\nexport main() void {\n    @wutu/\\ p { = `;`; } \\/;\n}\n',
+  ]) {
+    const built = await compileFile(utu, await write(source));
+    assert.ok(built.wasm?.length > 0, built.diagnostics?.map(d => d.message).join('\n'));
+    checked++;
+  }
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
