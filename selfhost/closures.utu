@@ -590,7 +590,9 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     body_block[0] = body_node;
     let actual = check_block(body_node, lcx.result, lcx);
     body_block[0] = outer_body;
-    if result < 0 { result = if ty_is(actual, Ty.Never) { ty_void(); } else { actual; }; }
+    // (A `return` in the body settled an unwritten result.)
+    if result < 0 and lcx.result >= 0 { result = lcx.result; coerce(actual, result, body_node); }
+    else if result < 0 { result = if ty_is(actual, Ty.Never) { ty_void(); } else { actual; }; }
     else if ty_is(result, Ty.Void) {
         // A closure that says nothing of its result, where `cl(…) void` is
         // expected, ends without a value (with `void` written, a value is dropped).

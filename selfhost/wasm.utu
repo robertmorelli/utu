@@ -1894,6 +1894,31 @@ fn emit_kids_rec(node: I32, d: I32) void {
     for (0 ..< w_count[node]) |i| { emit_at(w_kid(node, i), d); };
 }
 
+/// How many of a sequence's kids are encoded: what follows one that never
+/// ends is dead and left out (a `try` there, in JavaScriptCore, has no catch
+/// to rethrow from: "rethrow doesn't refer to a catch block").
+fn live_kids(node: I32) I32 {
+    let n = w_count[node];
+    for (0 ..< n) |i| {
+        if never_ends(w_kid(node, i)) { return i + 1; };
+    };
+    n;
+}
+
+/// Whether a node surely never completes: a branch, return, throw or
+/// `unreachable`, or a sequence that ends in one.
+fn never_ends(k: I32) Bool {
+    let op = w_op[k];
+    if op == Op.Seq.to_i32() or ((op == Op.Block.to_i32() or op == Op.Loop.to_i32()) and not targeted(w_a[k])) {
+        return w_count[k] > 0 and never_ends(w_kid(k, live_kids(k) - 1));
+    };
+    w_type[k] == vt_unreachable and (op == Op.Unreachable.to_i32() or op == Op.Br.to_i32() or op == Op.Return.to_i32() or op == Op.Throw.to_i32() or op == Op.Rethrow.to_i32());
+}
+
+fn emit_body_rec(node: I32, d: I32) void {
+    for (0 ..< live_kids(node)) |i| { emit_at(w_kid(node, i), d); };
+}
+
 /// Recursion while shallow (calls are cheap), the explicit stack below a depth.
 fn emit_at(node: I32, d: I32) void { if d < 1000 { emit_rec(node, d + 1); } else { emit_deep(node); }; }
 
@@ -1905,7 +1930,7 @@ fn emit_rec(node: I32, d: I32) void {
     let op = w_op[node];
     let a = w_a[node];
     let b = w_b[node];
-    if op == Op.Seq.to_i32() { emit_kids_rec(node, d); return; };
+    if op == Op.Seq.to_i32() { emit_body_rec(node, d); return; };
     if op == Op.Block.to_i32() and exits_only_loop(node) {
         emit_while_rec(node, d);
         return;
@@ -1918,11 +1943,11 @@ fn emit_rec(node: I32, d: I32) void {
         // A block nothing branches to is its contents (a loop's `continue`
         // target when nothing continues, …).
         if not targeted(a) {
-            emit_kids_rec(node, d);
+            emit_body_rec(node, d);
             return;
         };
         open_block(if op == Op.Block.to_i32() { 2; } else { 3; }, w_type[node], a);
-        emit_kids_rec(node, d);
+        emit_body_rec(node, d);
         close_block();
         return;
     };
@@ -2003,6 +2028,14 @@ fn emit_kids_from(node: I32, from: I32) void {
 
 fn emit_kids_deep(node: I32) void { emit_kids_from(node, 0); }
 
+fn emit_body_deep(node: I32) void {
+    let i = live_kids(node);
+    while (i > 0) {
+        i -= 1;
+        emit_task(0, w_kid(node, i));
+    };
+}
+
 /// Encode a node into @code_bytes. `f` is the function (only passed along:
 /// kept for the locals of a function a lowering may need).
 fn emit_deep(node: I32) void {
@@ -2039,7 +2072,7 @@ fn emit_deep(node: I32) void {
 fn emit_step(node: I32) void {
     let op = w_op[node];
     let a = w_a[node];
-    if op == Op.Seq.to_i32() { emit_kids_deep(node); return; };
+    if op == Op.Seq.to_i32() { emit_body_deep(node); return; };
     if op == Op.Block.to_i32() and exits_only_loop(node) {
         emit_while_deep(node);
         return;
