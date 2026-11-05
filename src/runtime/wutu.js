@@ -901,20 +901,22 @@ export function installWutuStorage(api) {
   const on = (...a) => globalThis.addEventListener?.(...a); on('pagehide', flush);
   on('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   on('storage', event => {
-    const store = stores.get(event.key);
-    if (!store) return;
-    if (store.dirty) {
-      store.conflict = true;
-      clearTimeout(timer); timer = 0;
-      report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
-      return;
-    }
-    try {
-      store.apply?.(event.newValue ?? '');
-      store.last = event.newValue;
-      api.refresh();
-    } catch (cause) {
-      report(cause);
+    // A null key is another tab's clear(): every store is removed.
+    for (const store of event.key === null ? [...stores.values()] : [stores.get(event.key)]) {
+      if (!store) continue;
+      if (store.dirty) {
+        store.conflict = true;
+        clearTimeout(timer); timer = 0;
+        report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
+        continue;
+      }
+      try {
+        store.apply?.(event.newValue ?? '');
+        store.last = event.newValue;
+        api.refresh();
+      } catch (cause) {
+        report(cause);
+      }
     }
   });
 }

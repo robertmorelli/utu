@@ -469,7 +469,7 @@ fn wp_opaque(text: Str) Bool {
             wp_at[0] = end;
             return true;
         };
-    } else if c == 34 {
+    } else if c == 34 or c == 96 {
         wp_quoted(text);
         return true;
     } else if text_at(text, p, "//") {

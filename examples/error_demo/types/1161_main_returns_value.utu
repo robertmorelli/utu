@@ -1,0 +1,3 @@
+// What: a value returned from export main, which returns void
+// Expect: main returns void (pointing at the value)
+export main() void { return 1; }

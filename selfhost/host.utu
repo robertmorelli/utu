@@ -234,8 +234,8 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     let unsure = (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) and not es_plain_function(split, end);
     if open.len() > 0 or unsure {
         let body = bytes_text(split, end);
-        if unsure { body = "$utuFn(\"" + word_text(decl_name[decl]) + "\", " + body + ")"; };
-        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { open + body + ")"; } else { body; }));
+        if unsure { body = "$utuFn(\"" + word_text(decl_name[decl]) + "\", " + body + "\n)"; };
+        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { open + body + "\n)"; } else { body; }));
         at = made;
         end = src.len();
     };
@@ -350,15 +350,20 @@ fn es_out(expr: Str, t: I32) Str {
     expr;
 }
 
-/// A closure's flags, in safe builds: bit 2 + k for each parameter k a JS
-/// caller must not pass null for (src/runtime/host-imports.js closureNew).
-fn js_handle_bits(params: I32) I32 {
+/// A closure's flags besides its environment (src/runtime/host-imports.js
+/// closureNew): 1, a Bool result; 4, a U32 result; 8, a U64 one (JS gets them
+/// unsigned); 16 << k (safe builds), parameter k is a handle a JS caller must
+/// not pass null for; 131072 << k, parameter k is nullable (undefined is null).
+fn closure_bits(params: I32, result: I32) I32 {
     let bits = 0;
-    if safe_checks[0] == 1 {
-        let n = if vl_len[params] < 29 { vl_len[params]; } else { 29; };
-        for (0 ..< n) |k| {
-            if js_handle(vl_item(params, k)) { bits = bits | (4 << k); };
-        };
+    if result == prelude(Prelude.Bool) { bits = 1; };
+    if result == prelude(Prelude.U32) { bits = 4; };
+    if result == prelude(Prelude.U64) { bits = 8; };
+    let n = if vl_len[params] < 13 { vl_len[params]; } else { 13; };
+    for (0 ..< n) |k| {
+        let p = vl_item(params, k);
+        if safe_checks[0] == 1 and js_handle(p) { bits = bits | (16 << k); };
+        if ty_is(p, Ty.Nullable) { bits = bits | (131072 << k); };
     };
     bits;
 }

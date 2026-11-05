@@ -345,6 +345,8 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
 
     dispatch('storage', { key: 'notes', newValue: 'remote' });
     assertEq(applied, 'remote', 'clean state accepts another tab’s value');
+    dispatch('storage', { key: null, newValue: null });
+    assertEq(applied, '', 'another tab’s clear() resets every store');
 
     value = 'local';
     api.save('notes');

@@ -44,7 +44,7 @@ fn uses_browser(file: I32) Bool {
     while (item >= 0) {
         if is_kind(item, Node.Using_decl) {
             let text = bytes_text(tok_start[node_first[item]], tok_end[node_last[item] - 1]);
-            if text_has(text, "std:Browser") and text_has(text, "using Browser ") { return true; };
+            if text_has(text, "std:Browser") and text_at(text, 0, "using Browser") and text.get(13) <= 32 { return true; };
         };
         item = next_sibling(item);
     };
@@ -138,7 +138,7 @@ fn stored_validate(type: Str, v: Str, file: I32) Str {
         if fields.len() > 0 { fields = fields + "&&"; };
         fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")";
     };
-    v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")&&" + fields;
+    v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")" + (if fields.len() > 0 { "&&" + fields; } else { ""; });
 }
 
 /// Utu converting validated JS data `v` into a native value.

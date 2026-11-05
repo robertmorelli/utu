@@ -624,6 +624,16 @@ fn in_closure(node: I32) Bool {
     false;
 }
 
+/// Whether a node is inside `export main`.
+fn in_main(node: I32) Bool {
+    let p = parent_of(node);
+    while (p >= 0) {
+        if is_kind(p, Node.Export_main_decl) { return true; };
+        p = parent_of(p);
+    };
+    false;
+}
+
 /// `await for (s) |v| { body }` over a `Stream[T]` (`std:Stream`), or any type
 /// with its methods, as stage 0 lowers it:
 ///
