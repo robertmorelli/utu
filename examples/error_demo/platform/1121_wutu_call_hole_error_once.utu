@@ -1,0 +1,25 @@
+// What: an error in an argument of a Wutu `= f(x);` hole (the call is expanded twice, for its reuse key and for the call)
+// Expect: Stock has no field nope, reported once
+using Browser from std:Browser;
+
+struct Stock:
+    | id: Str
+
+struct State:
+    | items: Array[Stock]
+
+fn workspace(state: State) Browser.HTMLElement {
+    @wutu/\
+    @island "w";
+    section {
+        for state.items |item| key item.id {
+            p {
+                = wutu.number(item.nope);
+            }
+        }
+    }
+    \/;
+}
+
+export main() void {
+}
