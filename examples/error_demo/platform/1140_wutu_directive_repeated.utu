@@ -1,0 +1,12 @@
+// What: a directive written twice
+// Expect: @reactive is repeated or out of order, not "unknown directive @reactive"
+using Browser from std:Browser;
+
+export main() void {
+    let app = @wutu/\
+    @reactive;
+    @reactive;
+    main { div { } }
+    \/;
+    Browser.document.body.append(app);
+}

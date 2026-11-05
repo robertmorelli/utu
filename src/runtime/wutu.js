@@ -847,7 +847,7 @@ export function installWutuStorage(api) {
   }
 
   function flush() {
-    clearTimeout(timer);
+    clearTimeout(timer); timer = 0;
     for (const [key, store] of stores) {
       if (!store.dirty || store.conflict) continue;
       try {
@@ -868,8 +868,8 @@ export function installWutuStorage(api) {
     if (!store) return;
     store.conflict = false;
     store.dirty = true;
-    clearTimeout(timer);
-    timer = setTimeout(flush, DEBOUNCE_MS);
+    // (A timer already waiting is kept: one every render restarts never fires while a clock ticks.)
+    if (!timer) timer = setTimeout(flush, DEBOUNCE_MS);
   }
 
   api.flush = flush;
@@ -905,7 +905,7 @@ export function installWutuStorage(api) {
     if (!store) return;
     if (store.dirty) {
       store.conflict = true;
-      clearTimeout(timer);
+      clearTimeout(timer); timer = 0;
       report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
       return;
     }

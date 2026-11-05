@@ -129,6 +129,12 @@ export lib {
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
+  // A CRLF file's `@css` body: its carriage returns stay in the text (they
+  // once ended the JS string literal it became, "Unterminated string literal").
+  const crlfCss = await compileFile(utu, await write('export lib {\n    fn sheet() Str { @css/\\\r\n.a { color: red; }\r\n.b { margin: 0; }\r\n\\/; }\n}\n'));
+  assert.equal((await instantiateNode(crlfCss.wasm, crlfCss.spec)).exports.sheet(), '\r\n.a { color: red; }\r\n.b { margin: 0; }\r\n', crlfCss.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+
   // Long matches and deep literals, in every build mode: each once took time
   // the square of its size (a 16,384-deep literal trapped, out of memory).
   const arms = Array.from({ length: 3000 }, (_, i) => `        ${i * 2} => ${i},`).join('\n');

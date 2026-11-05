@@ -670,6 +670,7 @@ fn js_string(text: Str) Str {
         if c == 34 { out = out + "\\\""; }
         else if c == 92 { out = out + "\\\\"; }
         else if c == 10 { out = out + "\\n"; }
+        else if c == 13 { out = out + "\\r"; }
         else { out = out + Str.from_code_point(c); };
     };
     out + "\"";

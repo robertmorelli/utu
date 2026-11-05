@@ -350,11 +350,12 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
       const q = await at(params);
       if (!q || q.decl < 0) return [];
       const definitions = family(q.program, q.decl).map(d => q.program.index.definition(d)).filter(Boolean);
-      return linkedReferences(q.program, q.decl)
+      // (A name in a DSL body can be expanded into more than one place of the program: one highlight.)
+      return unique(linkedReferences(q.program, q.decl)
         .filter(place => place.file === q.key)
         .map(place => [q.place(place), definitions.some(d => place.start === d.start && place.file === d.file) ? 3 : 2])
         .filter(([place]) => place)
-        .map(([place, kind]) => ({ range: range(q.lines, place.start, place.end), kind }));
+        .map(([place, kind]) => ({ range: range(q.lines, place.start, place.end), kind })));
     },
 
     'textDocument/hover': async params => {
