@@ -8,20 +8,18 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { initParser, createCompiler, emitBinary } from '../src/index.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(ROOT, 'dist/compare-programs');
 await fs.mkdir(out, { recursive: true });
 const programs = { scalar: 'suite/scalar', strings: 'suite/strings', analyzer: 'suite/analyzer', sieve: 'suite/sieve', deltablue: 'deltablue/deltablue' };
-const parser = await initParser({ wasmDir: `${ROOT}/` });
-try {
-  for (const [stem, file] of Object.entries(programs)) {
-    const compiler = createCompiler({ parser, target: 'normal', readFile: f => fs.readFile(f, 'utf8'), resolvePath: (from, r) => path.resolve(path.dirname(from), r) });
-    const doc = await compiler.compileFile(path.join(ROOT, 'benchmarks', `${file}.utu`));
-    await fs.writeFile(path.join(out, `${stem}.wasm`), emitBinary(doc));
-  }
-} finally { parser.delete(); }
+const utu = await loadNodeCompiler();
+for (const [stem, file] of Object.entries(programs)) {
+  const built = await compileFile(utu, path.join(ROOT, 'benchmarks', `${file}.utu`), { root: ROOT });
+  if (!built.wasm) throw new Error(built.diagnostics.map(diagnostic => diagnostic.message).join('\n'));
+  await fs.writeFile(path.join(out, `${stem}.wasm`), built.wasm);
+}
 
 const js = stem => JSON.stringify(path.join(ROOT, 'benchmarks', `${programs[stem]}.js`));
 const harness = `
