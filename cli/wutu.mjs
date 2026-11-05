@@ -4,12 +4,11 @@ import fs from 'node:fs/promises';
 import { watch } from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
 import { previewClient } from '../tools/dts/preview-client.mjs';
-import { formatUtu } from '../src/wutu/wutu-tooling.js';
+import { createSyntaxShape, formatUtu } from '../src/wutu/wutu-tooling.js';
 import { buildBrowserApp } from '../tools/dts/build-app.mjs';
 import { prerender } from '../tools/dts/prerender.mjs';
-import { initParser } from '../src/index.js';
+import { loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 
 const USAGE = `wutu format <files...> [--check]
@@ -62,6 +61,7 @@ function parseArgs(command, args) {
 
 async function formatCommand(files, { check }) {
   if (!files.length) throw new Usage('no files to format');
+  const shape = createSyntaxShape(await loadNodeCompiler());
   for (const name of files) {
     let source;
     try { source = await fs.readFile(name, 'utf8'); }
@@ -71,7 +71,7 @@ async function formatCommand(files, { check }) {
       process.exitCode = 1;
       continue;
     }
-    const { text: formatted, refused } = formatUtu(source);
+    const { text: formatted, refused } = await formatUtu(source, { shape });
     if (refused) {
       // A file is formatted only when its layout keeps its meaning.
       console.error(`${name}: left as is: ${refused}`);
@@ -97,8 +97,8 @@ function shellHtml(title) {
     + '<script type="module" src="./app.js"></script></body></html>';
 }
 
-async function compileApp({ entry, parser, title, mode }, directory) {
-  const report = await buildBrowserApp({ entry, outDir: directory, parser, ...MODES[mode] });
+async function compileApp({ entry, title, mode }, directory) {
+  const report = await buildBrowserApp({ entry, outDir: directory, ...MODES[mode] });
   await fs.writeFile(path.join(directory, 'index.html'), shellHtml(title));
   return report;
 }
@@ -228,7 +228,6 @@ async function devCommand(app, { port }) {
     server.close();
     for (const client of clients) client.end();
     if (active) await fs.rm(active, { recursive: true, force: true });
-    app.parser.delete();
     process.exit(0);
   });
 
@@ -267,14 +266,9 @@ async function main() {
     title: options['--title'] ?? path.basename(path.dirname(entry)),
     // Like `utu build`: small (checked) unless asked.
     mode,
-    parser: await initParser({ wasmDir: fileURLToPath(new URL('../', import.meta.url)) }),
   };
   if (command === 'dev') return devCommand(app, { port: Number(port) });
-  try {
-    await buildCommand(app, { prerender: !options['--no-prerender'] });
-  } finally {
-    app.parser.delete();
-  }
+  await buildCommand(app, { prerender: !options['--no-prerender'] });
 }
 
 main().catch((error) => {

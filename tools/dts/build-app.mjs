@@ -6,9 +6,6 @@ import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 import { build } from 'esbuild';
-import { initParser, createCompiler, emitBinary, formatDiagnostics } from '../../src/index.js';
-import { glueModuleSource, liveGlueFields } from '../../src/runtime/host-imports.js';
-import { nodePackageResolver } from './packages.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -22,75 +19,9 @@ const START = 'document.querySelectorAll("[data-utu-static]").forEach(n=>n.remov
 const CHUNK_FAILED = 'chunkError = error;';
 const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error);';
 
-/**
- * Package any UTU main as browser Wasm + minimal generated JS, with no app
- * glue. The self-hosted compiler builds it (`compiler: 'stage0'`, or a
- * custom `stdlib`, uses the JavaScript compiler), with its safety checks
- * unless `safe` is false (as `utu build -O small`; `smallUnsafe` drops them).
- */
-export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedParser, optimize = 'size', safe = true, compiler = 'self' }) {
-  if (compiler === 'self' && !stdlib) return buildWithSelfhost({ entry, outDir, optimize, safe });
-  const parser = suppliedParser ?? await initParser({ wasmDir: `${ROOT}/` });
-  const started = performance.now();
-  try {
-    const compiler = createCompiler({ parser, target: 'normal', optimize, ...(stdlib ? { stdlib } : {}),
-      readFile: file => fs.readFile(file, 'utf8'), resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-      resolvePackage: nodePackageResolver({ root: path.dirname(path.resolve(entry)) }) });
-    const doc = await compiler.compileFile(path.resolve(entry));
-    const errors = [...doc.querySelectorAll('[data-error]')];
-    if (errors.length) {
-      const { artifacts, snapshot } = await compiler.analyzeFile(path.resolve(entry));
-      throw Object.assign(new Error(describeErrorNodes(errors)), { artifacts, snapshot });
-    }
-    const wasm = emitBinary(doc);
-    const live = await liveGlueFields(wasm);
-    const root = doc.body.firstChild;
-    const spec = JSON.parse(root.dataset.dslImportsJs ?? '{}');
-    const glue = glueModuleSource(spec, live);
-    const fields = Object.fromEntries(Object.entries(spec).map(([module, bindings]) =>
-      [module, Object.fromEntries(Object.keys(bindings).filter(name => live.has(name)).map(name => [name, '']))]));
-    const closures = { new: live.has('closure_new'), calls: [...live].filter(n => n.startsWith('closure_call_')) };
-    const declaredPromises = JSON.parse(root.dataset.promiseRuntime ?? '{}');
-    const promises = { ops: (declaredPromises.ops ?? []).filter(n => live.has(n)),
-      awaits: (declaredPromises.awaits ?? []).filter(n => live.has(`await_${n}`)),
-      asyncExports: declaredPromises.asyncExports ?? [] };
-    await fs.mkdir(outDir, { recursive: true });
-    const gluePath = path.resolve(outDir, 'glue.mjs');
-    await fs.writeFile(gluePath, glue);
-    await fs.writeFile(path.join(outDir, 'app.wasm'), wasm);
-    const runtime = JSON.stringify(path.join(ROOT, 'src/runtime/host-imports.js'));
-    const lines = [];
-    if (glue) lines.push(`import * as glue from ${JSON.stringify(gluePath)};`, `import { importObjectFromGlue } from ${runtime};`, `const imports = importObjectFromGlue(${JSON.stringify(fields)}, glue);`);
-    else lines.push('const imports = {};');
-    if (closures.new || closures.calls.length) lines.push(`import { closureImports } from ${runtime};`, `imports.utu = closureImports(${JSON.stringify(closures)}, imports.utu);`);
-    if (live.has('js_tag')) lines.push(`import { exceptionImports } from ${runtime};`, 'imports.utu = exceptionImports(imports.utu);');
-    if (promises.ops.length) lines.push(`import { promiseImports } from ${runtime};`, `imports.utu = promiseImports(${JSON.stringify(promises)}, imports.utu);`);
-    if (promises.awaits.length) lines.push(`import { awaitImports } from ${runtime};`, `imports.utu = awaitImports(${JSON.stringify(promises)}, imports.utu);`);
-    lines.push('try {', `const module = await WebAssembly.compileStreaming(fetch(new URL('./app.wasm', import.meta.url)), {builtins:['js-string'],importedStringConstants:"'"});`,
-      'const instance = await WebAssembly.instantiate(module, imports);');
-    if (promises.asyncExports.length) {lines.unshift(`import { promisifyExports } from ${runtime};`);lines.push(`const exports = promisifyExports(instance, ${JSON.stringify(promises)});`);}
-    else lines.push('const exports = instance.exports;');
-    lines.push('document.querySelectorAll("[data-utu-static]").forEach(n=>n.remove());', 'await exports.main?.();', 'document.documentElement.setAttribute("data-utu-ready","");', '} catch(error) { document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error); }');
-    await build({ stdin: { contents: lines.join('\n'), resolveDir: ROOT, sourcefile: 'generated-loader.mjs', loader: 'js' },
-      outfile: path.join(outDir, 'app.js'), bundle: true, minify: true, format: 'esm', platform: 'browser', target: 'es2022', legalComments: 'none' });
-    // The intermediate module is not a deployed asset.
-    await fs.unlink(gluePath);
-    const javascript = await fs.readFile(path.join(outDir, 'app.js'));
-    const report = { wasm: size(wasm), javascript: size(javascript), imports: live.size,
-      declaredBindings: Object.values(spec).reduce((n, m) => n + Object.keys(m).length, 0), compileMs: Math.round(performance.now() - started) };
-    report.total = Object.fromEntries(['raw', 'gzip', 'brotli'].map(key => [key, report.wasm[key] + report.javascript[key]]));
-    await fs.writeFile(path.join(outDir, 'sizes.json'), JSON.stringify(report, null, 2) + '\n');
-    return report;
-  } catch (error) {
-    // Warnings alone never fail a build, so only report when an error is present.
-    const diagnostics = error.artifacts?.diagnostics ?? [];
-    if (diagnostics.some(d => d.severity !== 'warning')) {
-      throw new Error(await formatDiagnostics(diagnostics, { readFile: file => fs.readFile(file, 'utf8'), snapshot: error.snapshot, color: false }));
-    }
-    throw error;
-  } finally {
-    if (!suppliedParser) parser.delete();
-  }
+/** Package any UTU main as browser Wasm and its generated JS loader. */
+export async function buildBrowserApp({ entry, outDir, stdlib, optimize = 'size', safe = true }) {
+  return buildWithSelfhost({ entry, outDir, stdlib, optimize, safe });
 }
 
 /**
@@ -101,7 +32,7 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
  * they cache safely). Returns each path as written, mapped to its chunk's
  * app.js (relative to the page).
  */
-async function buildChunks({ lazy, files, outDir, optimize, safe }) {
+async function buildChunks({ lazy, files, outDir, stdlib, optimize, safe }) {
   const chunks = {};
   await fs.rm(path.join(outDir, 'chunks'), { recursive: true, force: true });
   const byFile = new Map();
@@ -123,7 +54,7 @@ async function buildChunks({ lazy, files, outDir, optimize, safe }) {
     });
     await fs.writeFile(wrapper, `using Browser from std:Browser;\nusing ${module} from ${JSON.stringify(file)};\n\nexport lib {\n${exported.join('\n')}\n}\n`);
     try {
-      await buildWithSelfhost({ entry: wrapper, outDir: temp, optimize, safe, chunk: true });
+      await buildWithSelfhost({ entry: wrapper, outDir: temp, stdlib, optimize, safe, chunk: true });
       const digest = createHash('sha256').update(await fs.readFile(path.join(temp, 'app.wasm'))).update(await fs.readFile(path.join(temp, 'app.js'))).digest('hex').slice(0, 10);
       const name = `${path.basename(file, '.utu')}-${digest}`;
       const target = path.join(outDir, 'chunks', name);
@@ -138,13 +69,13 @@ async function buildChunks({ lazy, files, outDir, optimize, safe }) {
 }
 
 /** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
-async function buildWithSelfhost({ entry, outDir, optimize, safe = true, chunk = false }) {
+async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true, chunk = false }) {
   const started = performance.now();
   const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
   const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
   const { formatDiagnostics: format } = await import('../../src/selfhost/format.js');
   const utu = await loadNodeCompiler();
-  const result = await compileFile(utu, path.resolve(entry), { optimize, safe });
+  const result = await compileFile(utu, path.resolve(entry), { optimize, safe, ...(stdlib ? { stdlib } : {}) });
   // Warnings alone never fail a build.
   const errors = result.diagnostics.filter(d => d.severity !== 'warning');
   if (!result.wasm || errors.length) throw new Error(format(errors, new Map(result.files.map(f => [f.key, f.text]))));
@@ -153,7 +84,7 @@ async function buildWithSelfhost({ entry, outDir, optimize, safe = true, chunk =
   if (chunk) for (const bindings of Object.values(spec.es ?? {}))
     for (const [name, body] of Object.entries(bindings)) if (typeof body === 'string' && body.includes('function createWutuRuntime')) bindings[name] = '() => {}';
   await fs.mkdir(outDir, { recursive: true });
-  const chunks = !chunk && spec.lazy?.length ? await buildChunks({ lazy: spec.lazy, files: result.files, outDir, optimize, safe }) : {};
+  const chunks = !chunk && spec.lazy?.length ? await buildChunks({ lazy: spec.lazy, files: result.files, outDir, stdlib, optimize, safe }) : {};
   await fs.writeFile(path.join(outDir, 'app.wasm'), wasm);
   const glue = glueSource(spec, wasm);
   const gluePath = path.resolve(outDir, 'glue.mjs');
@@ -197,16 +128,6 @@ async function buildWithSelfhost({ entry, outDir, optimize, safe = true, chunk =
   }
   await fs.writeFile(path.join(outDir, 'sizes.json'), JSON.stringify(report, null, 2) + '\n');
   return report;
-}
-
-/** Fallback when no structured diagnostic exists: name each error and where it is. */
-function describeErrorNodes(nodes) {
-  const lines = nodes.slice(0, 20).map(node => {
-    const { file, originFile, row, col } = node.dataset;
-    const where = (file ?? originFile) && row ? `${file ?? originFile}:${row}:${col ?? 1}: ` : '';
-    return `  ${where}${node.dataset.errorMessage ?? node.dataset.error}`;
-  });
-  return ['Compilation failed:', ...lines].join('\n');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
