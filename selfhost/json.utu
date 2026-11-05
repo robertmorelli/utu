@@ -27,6 +27,9 @@ vec jp_defined: I32;
 vec jp_name_at: I32;
 vec jp_word_defined: U8;
 vec jp_names_len: I32 = [0];
+/// By container, the name table (as a word) an earlier round grafted.
+vec jp_prev_container: I32;
+vec jp_prev_names: I32;
 /// The generated functions' sources, as words, in order.
 vec jp_functions: I32;
 /// A counter for each site's fresh names (`__json0_`).
@@ -68,12 +71,22 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
     jp_names_len[0] = 0;
     jp_functions.clear();
     let has_runtime = false;
+    let old_slot = -1;
+    for (0 ..< jp_prev_container.len()) |k| { if jp_prev_container[k] == container { old_slot = k; }; };
+    let names_fn = -1;
+    let before = -1;
     let item = first_child(container);
     while (item >= 0) {
+        if is_kind(item, Node.Fn_decl) and word_text(word_of(first_child(first_child(item)))) == "__json_names" { names_fn = item; };
+        if names_fn < 0 { before = item; };
         if is_kind(item, Node.Fn_decl) and next_sibling(first_child(first_child(item))) < 0 { jp_define_word(word_of(first_child(first_child(item)))); };
         if is_kind(item, Node.Struct_decl) and word_text(word_of(first_child(item))) == "JsonReader__" { has_runtime = true; };
         item = next_sibling(item);
     };
+    // An earlier round's name table: this round's extends it.
+    let old_names = "";
+    if names_fn >= 0 and old_slot >= 0 { old_names = word_text(jp_prev_names[old_slot]); };
+    jp_names_len[0] = old_names.len();
     let first_site = -1;
     let s = own_sites();
     while (s < dsl_sites.len() and dsl_sites[s] < count) {
@@ -97,8 +110,18 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
     if first_site < 0 { return; };
     let source = if has_runtime { ""; } else { json_runtime(); };
     for (0 ..< jp_functions.len()) |k| { source = source + word_text(jp_functions[k]) + "\n"; };
-    let names = "";
+    let names = old_names;
     for (0 ..< jp_name_words.len()) |k| { names = names + word_text(jp_name_words[k]); };
+    if old_slot < 0 {
+        jp_prev_container.push(container);
+        jp_prev_names.push(intern_text(names));
+    } else {
+        jp_prev_names[old_slot] = intern_text(names);
+    };
+    // One table per container: this round's replaces the earlier round's.
+    if names_fn >= 0 {
+        if before >= 0 { node_next[before] = node_next[names_fn]; } else { node_child[container] = node_next[names_fn]; };
+    };
     source = source + "fn __json_names() Str {\n    " + js_string(names) + ";\n}\n";
     dsl_current_site[0] = first_site;
     graft_declarations(container, source);

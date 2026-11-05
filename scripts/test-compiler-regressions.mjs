@@ -3081,6 +3081,11 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   await gen1('proto Calc:\n | divmod(I32, I32) .{I32, I32}\nstruct IC[Calc]:\nfn Calc[IC].divmod |s| (a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }\n'
     + 'fn use(c: Calc) I32 { let .{q, r} = c.divmod(17, 5); q * 10 + r; }\n'
     + 'export main() I32 { let c = IC {}; let .{q, r} = c.divmod(17, 5); q * 100 + r + use(c); }\n', 334);
+  // @json in round 1 and nested two @utu deep (round 3): one name table across rounds.
+  await gen1('struct P:\n    | x: I32\n    | y: I32\nstruct Q:\n    | alpha: Str\n    | beta: Bool\n'
+    + 'export main() Str {\n    let a = @json/\\ encode P P{ x: 1, y: 2 } \\/;\n'
+    + '    let c = @utu/\\ @utu/\\ @json/\\ decode Q "{\\"alpha\\":\\"k\\",\\"beta\\":true}" \\/ \\/ \\/;\n'
+    + '    a + (promote c { |q| => q.alpha, ~> "none", });\n}\n', '{"x":1,"y":2}k');
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
