@@ -85,17 +85,63 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
   }
   const asyncExports = spec.promises?.asyncExports ?? [];
   let exports = 'instance.exports';
+  let conversionSource = '';
   if (asyncExports.length) {
     const each = asyncExports.map(name => `${JSON.stringify(name)}: ${use('promising')}(instance.exports[${JSON.stringify(name)}])`);
     exports = `{ ...instance.exports, ${each.join(', ')} }`;
   }
-  if (spec.exports) exports = `${use('convertExports')}(${exports}, ${JSON.stringify(spec.exports)})`;
+  if (spec.exports) {
+    const converted = exportConversionSource(spec.exports, exports);
+    if (converted) {
+      conversionSource = converted.source;
+      exports = converted.name;
+    } else exports = `${use('convertExports')}(${exports}, ${JSON.stringify(spec.exports)})`;
+  }
   if (runtimeNames.size) lines.unshift(`import { ${[...runtimeNames].join(', ')} } from ${JSON.stringify(runtime)};`);
   const instantiate = streaming ? 'instantiateStreaming' : 'instantiate';
   // Compact: written as it is when nothing is bundled (cli/utu.mjs's build).
   lines.push(`export const {instance}=await WebAssembly.${instantiate}(${wasm},{${modules.join(',')}},${JSON.stringify(COMPILE_OPTIONS)});`);
+  if (conversionSource) lines.push(conversionSource);
   lines.push(`export const exports=${exports};`);
   return lines.join('\n') + '\n';
+}
+
+/** Specialize the export boundary to the kinds in this module's spec. */
+function exportConversionSource(spec, input) {
+  const checks = {
+    Bool: v => `!!${v}`, int: v => `Number.isInteger(${v})`,
+    big: v => `typeof ${v}==="bigint"`, num: v => `typeof ${v}==="number"`,
+    Str: v => `typeof ${v}==="string"`, '?Str': v => `${v}==null||typeof ${v}==="string"`,
+    ref: v => `${v}!=null`, cl: v => `typeof ${v}==="function"`,
+    '?': v => `${v}===undefined?null:${v}`,
+  };
+  const descriptions = { int: 'an integer', big: 'a BigInt', num: 'a number', Str: 'a string', '?Str': 'a string or null', ref: 'a value', cl: 'a function' };
+  const result = (kind, v) => kind === 'Bool' ? `${v}!==0` : kind === 'U32' ? `${v}>>>0` : kind === 'U64' ? `BigInt.asUintN(64,${v})` : v;
+  // The generic converter leaves every other result kind unchanged.
+  const validResult = kind => typeof kind === 'string';
+  let needsFail = false;
+  const lines = [`const $utuExports={...${input}};`];
+  for (const [name, entry] of Object.entries(spec)) {
+    const r = typeof entry === 'string' ? entry : entry.r;
+    const params = typeof entry === 'string' ? [] : entry.p ?? [];
+    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params.some(k => !(k in checks))) return null;
+    const key = JSON.stringify(name);
+    const body = [];
+    params.forEach((kind, i) => {
+      const v = `a[${i}]`;
+      if (kind === 'Bool' || kind === '?') body.push(`${v}=${checks[kind](v)};`);
+      else {
+        needsFail = true;
+        body.push(`${checks[kind](v)}||$utuFail(${key},${i},${JSON.stringify(descriptions[kind])},${v});`);
+        if (kind === '?Str') body.push(`${v}=${v}==null?null:${v};`);
+      }
+    });
+    const converted = Array.isArray(r) ? `v.map((x,i)=>[${r.map(k => `x=>${result(k, 'x')}`).join(',')}][i](x))` : result(r, 'v');
+    body.push(`const v=f(...a);return v instanceof Promise?v.then(x=>${converted.replaceAll(/\bv\b/g, 'x')}):${converted};`);
+    lines.push(`{const f=${input}[${key}];if(typeof f==="function"){$utuExports[${key}]=(...a)=>{${body.join('')}};Object.defineProperty($utuExports[${key}],"length",{value:f.length});}}`);
+  }
+  if (needsFail) lines.unshift('const $utuFail=(name,i,what,v)=>{throw new TypeError(`${name}: argument ${i+1} must be ${what}, not ${v===null?"null":what==="an integer"&&typeof v==="number"?v:typeof v}`)};');
+  return { source: lines.join('\n'), name: '$utuExports' };
 }
 
 /**
