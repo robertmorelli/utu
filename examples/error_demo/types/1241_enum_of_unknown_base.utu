@@ -1,0 +1,3 @@
+// What: an enum over an unknown base is reported once.
+// Expect: Unknown type Missing
+enum(Missing) E: | A

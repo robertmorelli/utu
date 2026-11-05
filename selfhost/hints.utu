@@ -503,6 +503,11 @@ fn mismatch_text(i: I32) Str {
         qualify_types[0] = 1;
         e = type_text(diag_a[i]);
         g = type_text(diag_b[i]);
+        if e == g {
+            qualify_types[0] = 2;
+            e = type_text(diag_a[i]);
+            g = type_text(diag_b[i]);
+        };
         qualify_types[0] = 0;
         if e == g { g = g + " (another type of that name)"; };
     };

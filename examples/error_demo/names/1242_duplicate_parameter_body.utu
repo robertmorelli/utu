@@ -1,0 +1,3 @@
+// What: a repeated parameter name still names the first in the body.
+// Expect: Duplicate parameter x
+fn f(x: I32, x: Str) I32 { x; }

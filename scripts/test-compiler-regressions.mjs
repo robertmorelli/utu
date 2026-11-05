@@ -3071,6 +3071,12 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     + 'export main() I32 { let s: P = S {n: 0}; s.f(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16); }\n', 16);
   // Right-nested literal-led operators are checked once per level, not twice.
   await gen1('export main() I32 { let x = 3; 1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (x)))))))))))))))))))))))); }\n', 27);
+  // Unannotated joins of one enum's variants: if, match, and alt.
+  await gen1('enum E: | A | B\nexport main() I32 {\n    let c = true;\n    let e = if c { E.A; } else { E.B; };\n    let f = match c { true => E.A, false => E.B, };\n    let g = alt E.B { A => E.A, B => E.B, };\n    alt e { A => 1, B => 2, } + alt f { A => 10, B => 20, } + alt g { A => 100, B => 200, };\n}\n', 211);
+  // Variants of an enum in a generic mod, named from outside (by alias, by `M[A]`): int enums, tag enums, and construction.
+  await gen1('mod M[T] {\n    enum(U8) E: | A | B = 5\n    fn f(e: E) I32 { match e { E.A => 1, E.B => 2, }; }\n    fn g() I32 { f(E.B); }\n}\nusing M[I32] |MI|;\nexport main() I32 { M[I32].f(M[I32].E.A) + MI.f(MI.E.B) * 10 + M[Str].g() * 100 + M[I32].g() * 1000; }\n', 2221);
+  await gen1('mod Opt[T] {\n    tag enum &:\n        | Some { v: T }\n        | None\n    fn get(o: &) T { alt o { Some |s| => s.v, None => 0, }; }\n}\nusing Opt[I32] |IntOpt|;\nmod M[T] {\n    enum E: | A | B\n    fn f(e: E) I32 { alt e { A => 1, B => 2, }; }\n}\nusing M[I32] |MI|;\n'
+    + 'export main() I32 {\n    let n: IntOpt = IntOpt.None;\n    let o: Opt[I32] = Opt[I32].Some { v: 3 };\n    Opt[I32].get(o) + Opt[I32].get(n) + MI.f(MI.E.B) * 10 + M[I32].f(M[I32].E.A) * 100;\n}\n', 123);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
