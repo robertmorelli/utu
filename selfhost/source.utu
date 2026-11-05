@@ -94,6 +94,8 @@ fn reset_program() void {
     };
     dsl_failed.clear();
     jp_serial[0] = 0;
+    jp_prev_container.clear();
+    jp_prev_names.clear();
     jp_pin_word.clear();
     jp_pin_name.clear();
     st_serial[0] = 0;

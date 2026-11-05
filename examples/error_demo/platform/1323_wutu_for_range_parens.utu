@@ -1,0 +1,15 @@
+// What: for over an unparenthesized range
+// Expect: a range needs parentheses
+using Browser from std:Browser;
+
+struct State:
+    | n: I32
+
+export main() void {
+    let state = State { n: 3 };
+    let app = @wutu/\
+    @reactive;
+    main { for 0..<state.n |i| { p { = i; } } }
+    \/;
+    Browser.document.body.append(app);
+}

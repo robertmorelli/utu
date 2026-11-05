@@ -5063,6 +5063,58 @@ ok
  5 │ export main() I32 {
 --- exit 1
 
+=== utu check examples/error_demo/platform/1320_wutu_style_assignment.utu
+ ERROR  @style takes one expression, not an assignment: @style e;
+        dsl-error · examples/error_demo/platform/1320_wutu_style_assignment.utu:7:12
+
+ 5 │ export main() void {
+ 6 │     let app = @wutu/\
+ 7 │     @style = "p { color: red }";
+   │            ━
+   │            ╰─ here
+ 8 │     div { "x"; }
+ 9 │     \/;
+--- exit 1
+
+=== utu check examples/error_demo/platform/1321_wutu_style_in_element.utu
+ ERROR  @style goes first in the template, before its root element
+        dsl-error · examples/error_demo/platform/1321_wutu_style_in_element.utu:7:11
+
+ 5 │ export main() void {
+ 6 │     let app = @wutu/\
+ 7 │     div { @style = "p { color: red }"; "x"; }
+   │           ━
+   │           ╰─ here
+ 8 │     \/;
+ 9 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/1322_wutu_bind_value_i32.utu
+ ERROR  Field n is I32, got Str
+        type-mismatch · examples/error_demo/platform/1322_wutu_bind_value_i32.utu:12:20
+
+10 │     let app = @wutu/\
+11 │     @reactive;
+12 │     main { input { bind:value = state.n; } }
+   │                    ━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ Str
+13 │     \/;
+14 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/1323_wutu_for_range_parens.utu
+ ERROR  Invalid Utu interpolation at offset 246: 0..<state.n (a range needs parentheses: for (0 ..< n) |i|)
+        dsl-error · examples/error_demo/platform/1323_wutu_for_range_parens.utu:12:16
+
+10 │     let app = @wutu/\
+11 │     @reactive;
+12 │     main { for 0..<state.n |i| { p { = i; } } }
+   │                ━
+   │                ╰─ here
+13 │     \/;
+14 │     Browser.document.body.append(app);
+--- exit 1
+
 === utu check examples/error_demo/platform/13_mem_embed_size_mismatch.utu
  ERROR  odd_size.bin is 5 bytes, not a whole number of 4-byte I32s
         mem-embed · examples/error_demo/platform/13_mem_embed_size_mismatch.utu:3:18

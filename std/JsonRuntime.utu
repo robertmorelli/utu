@@ -364,12 +364,24 @@ fn __json_f64(r: JsonReader__) F64 {
         };
         if negative { v * -1.0; } else { v; };
     } else {
-        __json_number(r.text.slice(start, end));
+        let v = __json_number(r.text.slice(start, end));
+        // (v - v is NaN for an infinity.)
+        if v - v != 0.0 {
+            r.at = start;
+            __json_fail(r, "number out of range");
+        };
+        v;
     };
 }
 
 fn __json_f32(r: JsonReader__) F32 {
-    __json_f64(r).to_f32();
+    let start = r.at;
+    let v = __json_f64(r).to_f32();
+    if v - v != 0.0 {
+        r.at = start;
+        __json_fail(r, "number out of range");
+    };
+    v;
 }
 
 // Integers are read exactly, digit by digit, on the negative side so that

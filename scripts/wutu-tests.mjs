@@ -404,7 +404,8 @@ export main() Browser.HTMLElement {
 }`;
     const diagnostics = (await selfhostDiagnostics({ ROOT, source })).filter(d => d.kind === 'type-mismatch');
     const texts = diagnostics.map(d => d.text);
-    assert(diagnostics.length >= 5, texts.join(' | '));
+    // (A binding reports once, at the bind statement.)
+    assert(diagnostics.length >= 4, texts.join(' | '));
     assert(texts.every(text => !text.includes('@wutu')), `no diagnostic covers the whole template: ${texts.join(' | ')}`);
     // (`= 7;` is text: a number shows as its to_str.)
     for (const expected of ['42', 's.n']) assert(texts.includes(expected), `expected a diagnostic at ${expected}: ${texts.join(' | ')}`);

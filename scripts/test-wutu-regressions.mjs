@@ -61,6 +61,14 @@ try {
     o.numbers = [$('#number').value, $('#capped').value];
     $('#more').click(); await sleep(20);
     o.pickAfter = $('#pick').value;
+    // A multiple select with only the empty value chosen is one pick, not none.
+    const multi = $('#multi'), optionsOf = () => [...multi.options].map(o => o.selected);
+    o.template = $('#tpl').textContent;
+    o.multiStart =[optionsOf(), $('#picks').textContent];
+    multi.options[0].selected = false; multi.dispatchEvent(new Event('change')); await sleep(20);
+    o.multiNone = [optionsOf(), $('#picks').textContent];
+    multi.options[0].selected = true; multi.dispatchEvent(new Event('change')); await sleep(20);
+    o.multiEmpty = [optionsOf(), $('#picks').textContent];
     $('#stop').click(); await sleep(30);
     const beats = $('#beats').textContent;
     await sleep(150);
@@ -74,7 +82,8 @@ try {
     nested: 'figure:header,span:Title0 figure:header,span:Titlea figure:header,span:Titlea|b',
     nestedAfter: 'figure:header,span:Title1 figure:header,span:Titlea figure:header,span:Titlea|b', nestedKept: true, inputs: ['2.5', 'c'],
     rowsAfter: [1, 1], methodAfter: 'm1', clockChanged: true, submitted: '2',
-    numbers: ['7', '20'], pickAfter: 'd', beatsStill: true, chartAfter: 'drawn;',
+    numbers: ['7', '20'], pickAfter: 'd',
+    template: 'ab;', multiStart: [[true, false], '1'], multiNone: [[false, false], '0'], multiEmpty: [[true, false], '1'], beatsStill: true, chartAfter: 'drawn;',
   });
   assert.deepEqual(errors, []);
   console.log(`${engine.name()}: Wutu regressions (hydration, reuse, bindings, timers, @unmanaged, custom elements, SVG roots) passed`);

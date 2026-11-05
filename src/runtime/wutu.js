@@ -916,6 +916,7 @@ export function installWutuStorage(api) {
       try {
         store.apply?.(event.newValue ?? '');
         store.last = event.newValue;
+        api.storageError = '';
         api.refresh();
       } catch (cause) {
         report(cause);

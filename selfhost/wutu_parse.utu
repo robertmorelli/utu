@@ -60,7 +60,7 @@ vec ti_at: I32;
 vec tw_reactive: I32 = [0];
 /// `@island "name"`: the quoted name (a word), or -1.
 vec tw_scope: I32 = [-1];
-/// `@style = e;`: the sources (words), and their ranges.
+/// `@style e;`: the sources (words), and their ranges.
 vec tw_style_value: I32;
 vec tw_style_from: I32;
 vec tw_style_to: I32;
@@ -449,6 +449,17 @@ fn wp_quoted(text: Str) Str {
         let c = text.get(wp_at[0]);
         if c == 92 {
             wp_at[0] += 2;
+        } else if quote == 96 and c == 36 and wp_at[0] + 1 < text.len() and text.get(wp_at[0] + 1) == 123 {
+            // A template's `${ … }` holds an expression: strings and templates in it nest.
+            wp_at[0] += 2;
+            let depth = 1;
+            while (wp_at[0] < text.len() and depth > 0) {
+                if not wp_opaque(text) {
+                    let d = text.get(wp_at[0]);
+                    if d == 123 { depth += 1; } else if d == 125 { depth -= 1; };
+                    wp_at[0] += 1;
+                };
+            };
         } else {
             wp_at[0] += 1;
             if c == quote { return text.slice(start, wp_at[0]); };
@@ -728,6 +739,7 @@ fn parse_template(text: Str) I32 {
         wp_at[0] += 6;
         wp_trivia(text);
         if wp_at_text(text, "$[") { wp_fail_interpolation(text); };
+        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e;", wp_at[0]); };
         let source = wp_bare_expression(text);
         let from = wx_from[0];
         let to = wx_to[0];
@@ -1079,6 +1091,7 @@ fn parse_element_statement(text: Str, n: I32) void {
         let q = p + 1;
         while (q < text.len() and is_name_code(text.get(q))) { q += 1; };
         let name = text.slice(p + 1, q);
+        if in_words("reactive island style document", name) { wutu_fail("@" + name + " goes first in the template, before its root element", p); };
         wutu_fail("events are written on " + name + " = handler; (or on " + name + " { … })", p);
     };
     if c == 46 and assignment_head(text, p + 1, true) {
