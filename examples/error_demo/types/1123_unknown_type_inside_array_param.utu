@@ -1,0 +1,11 @@
+// What: a parameter typed with an unknown type inside Array[...], called with a real array
+// Expect: Unknown type I32Z (once); the calls do not add "takes Array[unknown], got Array[I32]"
+fn swap(values: Array[I32Z], left: I32) void {
+}
+
+export main() I32 {
+    let xs: Array[I32] = Array[I32].new_default(3);
+    swap(xs, 0);
+    swap(xs, 1);
+    1;
+}

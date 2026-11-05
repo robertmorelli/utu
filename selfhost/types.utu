@@ -79,6 +79,23 @@ fn nullable(t: I32) I32 { if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { t; } 
 
 fn ty_error() I32 { ty(Ty.Error, 0, 0); }
 
+/// Whether a type is, or is made of, the error type (`Array[I32Z]`): a mistake already reported.
+fn ty_has_error(t: I32) Bool {
+    if t < 0 { return false; };
+    if ty_is(t, Ty.Error) { return true; };
+    if ty_is(t, Ty.Nullable) { return ty_has_error(ty_a[t]); };
+    if ty_is(t, Ty.Tuple) or ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure) {
+        let list = ty_a[t];
+        for (0 ..< vl_len[list]) |i| { if ty_has_error(vl_item(list, i)) { return true; }; };
+        return if ty_is(t, Ty.Tuple) { false; } else { ty_has_error(ty_b[t]); };
+    };
+    if ty_is(t, Ty.Named) and ty_b[t] > 0 {
+        let list = inst_args[ty_b[t]];
+        for (0 ..< vl_len[list]) |i| { if ty_has_error(vl_item(list, i)) { return true; }; };
+    };
+    false;
+}
+
 fn ty_void() I32 { ty(Ty.Void, 0, 0); }
 
 fn ty_never() I32 { ty(Ty.Never, 0, 0); }

@@ -498,6 +498,8 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         let t = if t_node >= 0 { type_of(t_node, cx.inst); }
             else if expected >= 0 and i < vl_len[ty_a[expected]] { vl_item(ty_a[expected], i); }
             else { -1; };
+        // (Wanted by a call that is not there: its mistake was said.)
+        if t < 0 and exp >= 0 and ty_is(exp, Ty.Error) { t = ty_error(); };
         if t < 0 {
             // In a file with host declarations, a closure where something
             // else is wanted (as `Str`): that mismatch, not "unsupported".

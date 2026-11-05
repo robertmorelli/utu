@@ -1,0 +1,6 @@
+// What: a closure with an untyped parameter passed to a method of an unknown call's result
+// Expect: Unknown function nope (once); no "v needs a type" for the closure
+export main() I32 {
+    nope(1).then(cl(v) { v; });
+    1;
+}
