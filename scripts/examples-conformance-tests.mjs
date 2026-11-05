@@ -1,61 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { emitBinary } from '../src/index.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-// Programs only the self-hosted compiler builds: bounded module parameters
-// (`mod Sorted[T[Ord]]`) and `&` in a protocol, which stage 0 does not build.
-const SELFHOST_ONLY = new Set(['examples/bounds.utu']);
-
 // One test per file, so the runner can spread them across workers. Codegen is
 // validated at -O0; `wasm-fingerprints.mjs --optimized` builds every example
 // at -Oz and -O3 too.
-export function registerExamplesConformanceTests({ test, assertNoErrors, makeCompiler }) {
+export function registerExamplesConformanceTests({ test }) {
   for (const file of utuFiles(path.join(ROOT, 'examples'))) {
     const name = path.relative(ROOT, file);
-    test(`examples: ${name} analyses and emits valid Wasm`, async ({ ROOT }) => {
-      if (SELFHOST_ONLY.has(name)) {
-        await buildWithSelfhost(file, name);
-        return;
-      }
-      // Wutu programs, and Result's try and errdefer, are built by the self-hosted compiler alone (stage 0 refuses them).
-      const refusesWutu = (error) => String(error?.message ?? '').includes(' are compiled by the self-hosted compiler');
-
-      let analyzed;
-      try {
-        analyzed = await (await makeCompiler({ ROOT, target: 'analysis' })).analyzeFile(file);
-      } catch (error) {
-        if (!refusesWutu(error)) throw error;
-      }
-      if (!analyzed || analyzed.artifacts?.diagnostics?.some(refusesWutu)) {
-        await buildWithSelfhost(file, name);
-        return;
-      }
-      try {
-        assertNoErrors(analyzed.doc);
-      } catch (error) {
-        throw new Error(`${name} (analysis): ${error.message}`);
-      }
-
-      const compiled = await (await makeCompiler({ ROOT, target: 'normal', optimize: 'none' })).analyzeFile(file);
-      try {
-        assertNoErrors(compiled.doc);
-        emitBinary(compiled.doc);
-      } catch (error) {
-        throw new Error(`${name} (codegen): ${error.message}`);
-      }
+    test(`examples: ${name} analyses and emits valid Wasm`, async () => {
+      const result = await compileFile(await loadNodeCompiler(), file, { optimize: 'none' });
+      const errors = result.diagnostics.filter(diagnostic => diagnostic.severity === 'error');
+      if (!result.wasm || errors.length) throw new Error(`${name}: ${errors.map(diagnostic => diagnostic.message).join('; ')}`);
+      await WebAssembly.compile(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
     });
   }
-}
-
-/** A Wutu program (or another only it builds): the self-hosted compiler builds it without errors, and the engine accepts its module. */
-async function buildWithSelfhost(file, name) {
-  const { compileFile, loadNodeCompiler } = await import('../src/selfhost/node.js');
-  const result = await compileFile(await loadNodeCompiler(), file, { optimize: 'none' });
-  const errors = result.diagnostics.filter(d => d.severity !== 'warning');
-  if (!result.wasm || errors.length) throw new Error(`${name} (self-hosted): ${errors.map(d => d.message).join('; ')}`);
-  new WebAssembly.Module(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
 }
 
 function utuFiles(directory) {
