@@ -183,7 +183,7 @@ fn validate_within(node: I32) void {
 /// are @validated_kinds).
 fn validate_node(node: I32) void {
     match Node.from_i32(node_kind[node]) {
-        Node.Param_list => { duplicate_names(node, Diag.DuplicateDeclaration, 1); },
+        Node.Param_list => { duplicate_names(node, Diag.DuplicateDeclaration, 1); self_clash(node); },
         Node.Struct_decl => { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(node)]); },
         Node.Field_list => { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(parent_of(node))]); },
         Node.Enum_decl => { duplicate_names(node, Diag.DuplicateDeclaration, 2); },
@@ -343,6 +343,23 @@ fn word_seen(word: I32, stamp: I32) Bool {
     false;
 }
 
+/// The `|self|` capture of method node `fn_node`, or -1.
+fn self_of(fn_node: I32) I32 {
+    let c = next_sibling(first_child(fn_node));
+    if is_kind(c, Node.Self_param) { c; } else { -1; };
+}
+
+/// A parameter named as the method's `|self|` capture hides it.
+fn self_clash(params: I32) void {
+    let sp = self_of(parent_of(params));
+    if sp < 0 { return; };
+    let p = param_named(params, word_of(first_child(sp)));
+    if p >= 0 and p != sp {
+        report2(Diag.DuplicateDeclaration, p, word_of(first_child(p)), 1, -1);
+        diag_place(Extra.Related, first_child(sp), "first here");
+    };
+}
+
 /// The lets of a block, each name once; a function's body also not a parameter's.
 fn duplicate_lets(block: I32) void {
     let stamp = word_stamp();
@@ -354,6 +371,8 @@ fn duplicate_lets(block: I32) void {
             p = next_sibling(p);
         };
     };
+    let sp = self_of(parent_of(block));
+    if sp >= 0 and last_child(parent_of(block)) == block { word_seen(word_of(first_child(sp)), stamp); };
     let c = first_child(block);
     while (c >= 0) {
         if is_kind(c, Node.Bind_expr) and is_kind(first_child(c), Node.Identifier) {
@@ -398,7 +417,8 @@ fn param_named(params: I32, word: I32) I32 {
         if is_kind(p, Node.Param) and word_of(first_child(p)) == word { return p; };
         p = next_sibling(p);
     };
-    -1;
+    let sp = self_of(parent_of(params));
+    if sp >= 0 and word_of(first_child(sp)) == word { sp; } else { -1; };
 }
 
 /// `?I32`: a scalar has no null.
@@ -421,7 +441,7 @@ fn validate_tuple_type(node: I32) void {
     let parent = parent_of(node);
     if is_kind(parent, Node.Return_type) {
         let owner = parent_of(parent);
-        if is_kind(owner, Node.Fn_decl) or is_kind(owner, Node.Func_type) or is_kind(owner, Node.Export_main_decl) { return; };
+        if is_kind(owner, Node.Fn_decl) or is_kind(owner, Node.Func_type) or is_kind(owner, Node.Export_main_decl) or is_kind(owner, Node.Proto_method) { return; };
         if is_kind(owner, Node.Closure_expr) or is_kind(owner, Node.Closure_type) {
             report2(Diag.TupleMisplaced, node, -1, 2, -1);
             return;

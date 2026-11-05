@@ -1,0 +1,8 @@
+// What: an operator overload (not neg/bnot) declares one capture
+// Expect: Takes 2, given 1
+struct Vec2:
+    | x: I32
+
+fn Vec2:add |a| Vec2 { a; }
+
+export main() I32 { 1; }

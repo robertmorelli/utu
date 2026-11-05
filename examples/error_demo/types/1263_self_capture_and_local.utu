@@ -1,0 +1,11 @@
+// What: a method's local has the name of its |self| capture
+// Expect: Duplicate local s
+struct S:
+    | x: I32
+
+fn S.g |s| () I32 {
+    let s = 7;
+    s;
+}
+
+export main() I32 { 1; }

@@ -1,0 +1,8 @@
+// What: a method's parameter has the name of its |self| capture
+// Expect: Duplicate parameter s
+struct S:
+    | x: I32
+
+fn S.f |s| (s: I32) I32 { s; }
+
+export main() I32 { 1; }

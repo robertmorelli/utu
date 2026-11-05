@@ -3077,6 +3077,10 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   await gen1('mod M[T] {\n    enum(U8) E: | A | B = 5\n    fn f(e: E) I32 { match e { E.A => 1, E.B => 2, }; }\n    fn g() I32 { f(E.B); }\n}\nusing M[I32] |MI|;\nexport main() I32 { M[I32].f(M[I32].E.A) + MI.f(MI.E.B) * 10 + M[Str].g() * 100 + M[I32].g() * 1000; }\n', 2221);
   await gen1('mod Opt[T] {\n    tag enum &:\n        | Some { v: T }\n        | None\n    fn get(o: &) T { alt o { Some |s| => s.v, None => 0, }; }\n}\nusing Opt[I32] |IntOpt|;\nmod M[T] {\n    enum E: | A | B\n    fn f(e: E) I32 { alt e { A => 1, B => 2, }; }\n}\nusing M[I32] |MI|;\n'
     + 'export main() I32 {\n    let n: IntOpt = IntOpt.None;\n    let o: Opt[I32] = Opt[I32].Some { v: 3 };\n    Opt[I32].get(o) + Opt[I32].get(n) + MI.f(MI.E.B) * 10 + M[I32].f(M[I32].E.A) * 100;\n}\n', 123);
+  // A protocol method returning a tuple, called on the type and through a protocol value.
+  await gen1('proto Calc:\n | divmod(I32, I32) .{I32, I32}\nstruct IC[Calc]:\nfn Calc[IC].divmod |s| (a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }\n'
+    + 'fn use(c: Calc) I32 { let .{q, r} = c.divmod(17, 5); q * 10 + r; }\n'
+    + 'export main() I32 { let c = IC {}; let .{q, r} = c.divmod(17, 5); q * 100 + r + use(c); }\n', 334);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });

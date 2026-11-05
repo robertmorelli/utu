@@ -1684,7 +1684,8 @@ fn register_method(item: I32, w: Walk) void {
         if owner >= 0 and not decl_is(owner, Decl.Proto) {
             report2(Diag.BoundNotProto, receiver, -1, owner, 3);
             diag_label("not a protocol");
-            let n = impl_target(args);
+            // (A generic type's `[I32]` is its instance, not the type read on.)
+            let n = if is_generic(module_of(owner)) { -1; } else { impl_target(args); };
             owner = if n >= 0 { node_decl[n]; } else { -1; };
             decl_a[decl] = owner;
         };
@@ -1950,6 +1951,11 @@ fn walk_type_item(item: I32, w: Walk) void {
             walk_type(next_sibling(first_child(c)), w);
         } else if kind == Node.Impl_list.to_i32() {
             let t = first_child(c);
+            // An integer enum is a bare scalar: it is never boxed as a protocol.
+            if is_kind(item, Node.Enum_decl) and is_int_enum(item) {
+                report2(Diag.BoundNotProto, c, -1, node_decl[enum_name(item)], 4);
+                t = -1;
+            };
             while (t >= 0) {
                 let d = as_type(t, walk_impl_name(t, w));
                 if d >= 0 and not decl_is(d, Decl.Proto) {
@@ -2084,6 +2090,9 @@ fn walk_op(item: I32, w: Walk) void {
     let c = next_sibling(op);
     while (c >= 0) {
         if is_kind(c, Node.Capture) {
+            // An operator takes two (the left and the right operand); neg, bnot and not, one.
+            let want = if word_of(op) == known_word(Known.Neg) or word_of(op) == known_word(Known.Bnot) or node_text(op) == "not" { 1; } else { 2; };
+            if child_count(c) != want { report2(Diag.WrongArity, c, -1, want, child_count(c)); };
             let n = first_child(c);
             while (n >= 0) {
                 declare_in_scope(Decl.Param, n, n, decl);

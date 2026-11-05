@@ -1,0 +1,10 @@
+// What: an integer enum lists a protocol
+// Expect: Status is an integer enum; it lists no protocols
+proto Describable:
+    | describe() Str
+
+enum(U8) Status[Describable]:
+    | Active = 1
+    | Inactive = 2
+
+export main() I32 { 1; }

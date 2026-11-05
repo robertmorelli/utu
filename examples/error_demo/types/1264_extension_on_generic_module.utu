@@ -1,0 +1,9 @@
+// What: a method head names a generic std type, not a protocol
+// Expect: Array is not a protocol
+fn Array[I32].sum |a| () I32 {
+    let t = 0;
+    for (a) |x| { t += x; };
+    t;
+}
+
+export main() I32 { 1; }

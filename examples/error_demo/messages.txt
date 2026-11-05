@@ -9998,6 +9998,94 @@ FAIL after tests: boom
    │                       ╰─ Cell
 --- exit 1
 
+=== utu check examples/error_demo/types/1260_operator_one_capture.utu
+ ERROR  Takes 2, given 1
+        wrong-arity · examples/error_demo/types/1260_operator_one_capture.utu:6:13
+
+ 4 │     | x: I32
+ 5 │
+ 6 │ fn Vec2:add |a| Vec2 { a; }
+   │             ━━━
+   │             ╰─ takes 2, given 1
+ 7 │
+ 8 │ export main() I32 { 1; }
+--- exit 1
+
+=== utu check examples/error_demo/types/1261_int_enum_lists_protocol.utu
+ ERROR  Status is an integer enum; it lists no protocols
+        bound-not-proto · examples/error_demo/types/1261_int_enum_lists_protocol.utu:6:16
+
+ 4 │     | describe() Str
+ 5 │
+ 6 │ enum(U8) Status[Describable]:
+   │                ━━━━━━━━━━━━━
+   │                ╰─ here
+ 7 │     | Active = 1
+ 8 │     | Inactive = 2
+--- exit 1
+
+=== utu check examples/error_demo/types/1262_self_capture_and_parameter.utu
+ ERROR  Duplicate parameter s
+        duplicate-parameter · examples/error_demo/types/1262_self_capture_and_parameter.utu:6:13
+
+ 4 │     | x: I32
+ 5 │
+ 6 │ fn S.f |s| (s: I32) I32 { s; }
+   │         ─   ━━━━━━
+   │         │   ╰─ already declared
+   │         ╰─ first here
+ 7 │
+ 8 │ export main() I32 { 1; }
+--- exit 1
+
+=== utu check examples/error_demo/types/1263_self_capture_and_local.utu
+ ERROR  Duplicate local s
+        duplicate-local · examples/error_demo/types/1263_self_capture_and_local.utu:7:5
+
+ 5 │
+ 6 │ fn S.g |s| () I32 {
+ 7 │     let s = 7;
+   │     ━━━━━━━━━
+   │     ╰─ already declared
+ 8 │     s;
+ 9 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1264_extension_on_generic_module.utu
+ ERROR  Array is not a protocol
+        bound-not-proto · examples/error_demo/types/1264_extension_on_generic_module.utu:3:4
+
+ 1 │ // What: a method head names a generic std type, not a protocol
+ 2 │ // Expect: Array is not a protocol
+ 3 │ fn Array[I32].sum |a| () I32 {
+   │    ━━━━━
+   │    ╰─ not a protocol
+ 4 │     let t = 0;
+ 5 │     for (a) |x| { t += x; };
+--- exit 1
+
+=== utu check examples/error_demo/types/1265_using_generic_without_args.utu
+ ERROR  cell takes 1 type arguments, given 0
+        invalid-module-arity · examples/error_demo/types/1265_using_generic_without_args.utu:7:7
+
+ 5 │ }
+ 6 │
+ 7 │ using cell;
+   │       ━━━━
+   │       ╰─ here
+ 8 │
+ 9 │ export main() I32 { mk(3); }
+
+ ERROR  Unknown function mk
+        unknown-function · examples/error_demo/types/1265_using_generic_without_args.utu:9:21
+
+ 7 │ using cell;
+ 8 │
+ 9 │ export main() I32 { mk(3); }
+   │                     ━━
+   │                     ╰─ not defined
+--- exit 1
+
 === utu check examples/error_demo/types/12_array_literal_mixed.utu
  ERROR  Elements are I32, got Str
         type-mismatch · examples/error_demo/types/12_array_literal_mixed.utu:4:21

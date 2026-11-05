@@ -1,0 +1,9 @@
+// What: a generic mod is opened with no type arguments
+// Expect: cell takes 1 type arguments, given 0
+mod cell[T] {
+    fn mk(v: T) T { v; }
+}
+
+using cell;
+
+export main() I32 { mk(3); }

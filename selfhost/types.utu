@@ -507,6 +507,10 @@ fn check_open_instances() void {
                 item = next_sibling(item);
                 continue;
             };
+            // `using M;` of a generic M: it opens no instance.
+            if decl_is(named, Decl.Module) and given < 0 and module_arity(named) > 0 {
+                report2(Diag.InvalidModuleArity, first_child(item), decl_name[named], module_arity(named), 0);
+            };
             let module = opened_module(item);
             if module >= 0 {
                 let inst = open_instance(module);
