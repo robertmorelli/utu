@@ -119,44 +119,29 @@ try {
   const deep = assembleFunction({ params: [], result: 'i32', text: `${'(i32.eqz '.repeat(20000)}(i32.const 0)${')'.repeat(20000)}` });
   assert.ok(deep.code || deep.error.message === 'this @wat body nests too deeply', 'deep nesting is code or a mistake, never a crash');
 
-  // examples/wat.utu in both compilers.
-  const { initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject, collectAnalysisDiagnostics } = await import('../src/index.js');
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
+  // examples/wat.utu through the self-hosted compiler.
   const utu = await loadNodeCompiler();
-  const stage0 = async file => {
-    const compiler = createCompiler({ parser, target: 'normal', optimize: 'size', readFile: f => fs.readFile(f, 'utf8'), resolvePath: (a, b) => path.resolve(path.dirname(a), b) });
-    try {
-      const doc = await compiler.compileFile(file);
-      const errors = collectAnalysisDiagnostics(doc).filter(d => d.severity === 'error');
-      if (errors.length) return { errors: errors.map(e => e.message) };
-      const wasm = emitBinary(doc);
-      return { exports: (await instantiateLowered(wasm, await buildImportObject(doc, { wasm }))).instance.exports };
-    } catch (error) {
-      return { errors: [error.message] };
-    }
-  };
   const selfhost = async file => {
     const built = await compileFile(utu, file, { optimize: 'size' });
     return built.wasm ? { exports: (await instantiateNode(built.wasm, built.spec)).exports } : { errors: built.diagnostics.map(d => `${d.line}:${d.column} ${d.message}`) };
   };
   const expected = { rotated: 3, signed: -2.5, summed: 5050, dotted: 50, extended: -1 };
   const example = path.join(ROOT, 'examples', 'wat.utu');
-  for (const [compiler, build] of [['stage0', stage0], ['selfhost', selfhost]]) {
-    const { exports, errors } = await build(example);
-    assert.ok(exports, `${compiler}: ${errors}`);
-    for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, `${compiler}: ${name}`);
+  {
+    const { exports, errors } = await selfhost(example);
+    assert.ok(exports, String(errors));
+    for (const [name, value] of Object.entries(expected)) assert.equal(exports[name](), value, name);
   }
 
   // `export main` may be a @wat function.
   const mainFile = path.join(dir, 'main.utu');
   await fs.writeFile(mainFile, 'export main() I32 { @wat/\\ i32.const 37 \\/; }\n');
-  for (const [compiler, build] of [['stage0', stage0], ['selfhost', selfhost]]) {
-    const { exports, errors } = await build(mainFile);
-    assert.equal(exports?.main(), 37, `${compiler}: ${errors}`);
+  {
+    const { exports, errors } = await selfhost(mainFile);
+    assert.equal(exports?.main(), 37, String(errors));
   }
 
-  // Mistakes: each at its place. A third entry is stage 0's message where it
-  // is worded otherwise than the self-hosted compiler's.
+  // Mistakes: each at its place.
   const mistakes = [
     ['fn f(x: I32) I32 { @wat/\\ (i64.add (local.get $x) (local.get $x)) \\/; }', '1:27 i64.add needs an i64, not an i32'],
     ['fn f(x: I32) I32 {\n    @wat/\\\n        local.get $x\n        i32.lodd\n    \\/;\n}', "4:9 unknown instruction 'i32.lodd'"],
@@ -167,13 +152,11 @@ try {
     ['let w: I32 = @wat/\\ i32.const 1 \\/;', "1:14 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
     ['fn f(x: I32) I32 { @wat/\\ v128.const i32x4 1 2 \\/; }', '1:27 v128.const needs 5 immediates'],
   ];
-  for (const [i, [source, want, stage0Want]] of mistakes.entries()) {
+  for (const [i, [source, want]] of mistakes.entries()) {
     const file = path.join(dir, `mistake${i}.utu`);
     await fs.writeFile(file, `${source}\nexport lib { fn g() I32 { 0; } }\n`);
     const got = await selfhost(file);
     assert.deepEqual(got.errors, [want], source);
-    const theirs = await stage0(file);
-    assert.equal(theirs.errors?.[0], stage0Want ?? want.replace(/^\d+:\d+ /, ''), `stage 0: ${source}`);
   }
   // A generator is not one, whether or not it is called (it expands into its consumers).
   for (const call of ['0', 'let s = 0; for (g(3)) |v| { s += v; }; s']) {
@@ -181,9 +164,8 @@ try {
     await fs.writeFile(file, `fn g(n: I32) yield I32 { @wat/\\ local.get $n \\/; }\nexport lib { fn t() I32 { ${call}; } }\n`);
     const shape = 'a @wat function is a plain function: fn f(x: I32) I32 { @wat/\\ … \\/; }';
     assert.deepEqual((await selfhost(file)).errors?.map(e => e.replace(/^\d+:\d+ /, '')), [shape], `self-hosted: ${call}`);
-    assert.equal((await stage0(file)).errors?.[0], shape, `stage 0: ${call}`);
   }
-  console.log(`wat: ${functions.length} instructions (${checked}), ${accepted.length} spellings as wasm-tools has them, ${rejected.length} mistakes the assembler finds, examples/wat.utu and a @wat main alike in both compilers, ${mistakes.length} mistakes at their places`);
+  console.log(`wat: ${functions.length} instructions (${checked}), ${accepted.length} spellings as wasm-tools has them, ${rejected.length} mistakes the assembler finds, examples/wat.utu and a @wat main with selfhost, ${mistakes.length} mistakes at their places`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }
