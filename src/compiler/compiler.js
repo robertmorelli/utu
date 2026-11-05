@@ -543,9 +543,14 @@ export async function initParser({ wasmDir } = {}) {
   let languageInput;
 
   if (wasmDir != null) {
+    // (The grammar now lives in editors/tree-sitter-utu; a repository root
+    // given as wasmDir still finds it there.)
+    const { existsSync } = await import('node:fs');
     const resolveWasmPath = (name) => {
-      if (wasmDir instanceof URL) return fileUrlToPath(new URL(name, wasmDir));
-      return `${wasmDir}${name}`;
+      const at = wasmDir instanceof URL ? fileUrlToPath(new URL(name, wasmDir)) : `${wasmDir}${name}`;
+      if (existsSync(at)) return at;
+      const moved = wasmDir instanceof URL ? fileUrlToPath(new URL(`editors/tree-sitter-utu/${name}`, wasmDir)) : `${wasmDir}editors/tree-sitter-utu/${name}`;
+      return existsSync(moved) ? moved : at;
     };
 
     await Parser.init({
