@@ -491,7 +491,7 @@ export lib {
     fn edge_count() I32 { edge_from.len(); }
     fn edge_from_decl(k: I32) I32 {
         let from = edge_from[k];
-        if from >= 0 and from < fi_decl.len() { fi_decl[from]; } else { from; };
+        if from <= -1000000 { -1000000 - from; } else if from >= 0 and from < fi_decl.len() { fi_decl[from]; } else { from; };
     }
     fn edge_to_decl(k: I32) I32 {
         let to = edge_to[k];

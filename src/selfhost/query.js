@@ -156,8 +156,14 @@ export function programIndex(utu, files) {
   const calls = () => callCache ??= (() => {
     const out = [];
     for (let k = 0; k < (utu.edge_count?.() ?? 0); k++) {
-      const site = bytePlace(utu.edge_site_start(k), utu.edge_site_end(k));
-      if (site) out.push({ from: utu.edge_from_decl(k), to: utu.edge_to_decl(k), site });
+      const from = utu.edge_from_decl(k);
+      let site = bytePlace(utu.edge_site_start(k), utu.edge_site_end(k));
+      // The checker's current call is the site of a call it makes, not of an
+      // operator or of a function checked while it waits: a site outside the
+      // caller is none.
+      const caller = from >= 0 && declNode[from] >= 0 ? place(declNode[from]) : null;
+      if (site && caller && !(site.file === caller.file && caller.start <= site.start && site.end <= caller.end)) site = null;
+      out.push({ from, to: utu.edge_to_decl(k), site });
     }
     return out;
   })();
@@ -300,7 +306,7 @@ export function programIndex(utu, files) {
       const at = place(node);
       const name = nodeAt(key, offset);
       const declaration = name >= 0 ? nodeDecl[name] : -1;
-      const siteCalls = calls().filter(edge => inside(edge.site, key, offset));
+      const siteCalls = calls().filter(edge => edge.site && inside(edge.site, key, offset));
       const callTarget = siteCalls.sort((a, b) => (a.site.end - a.site.start) - (b.site.end - b.site.start))[0]?.to ?? -1;
       const owner = utu.node_field_owner?.(node) ?? -1;
       const captures = [];
@@ -355,7 +361,9 @@ export function programIndex(utu, files) {
     effects(decl) { return effectsOf(decl); },
     /** Function containing the name at the cursor. */
     prepareCallHierarchy(key, offset) {
-      const decl = this.declarationAt(key, offset);
+      let decl = this.declarationAt(key, offset);
+      // A name no node resolves to (`export main`): the declaration it names.
+      if (decl < 0) decl = this.declarations(key).find(d => inside(this.definition(d.decl), key, offset))?.decl ?? -1;
       const item = callItem(this, decl);
       return item && ['Fn', 'Main', 'ProtoMember'].includes(item.kind) ? [item] : [];
     },
@@ -363,7 +371,7 @@ export function programIndex(utu, files) {
       const groups = new Map();
       for (const edge of calls()) if (edge.to === decl && edge.from >= 0) {
         if (!groups.has(edge.from)) groups.set(edge.from, []);
-        groups.get(edge.from).push(edge.site);
+        if (edge.site) groups.get(edge.from).push(edge.site);
       }
       return [...groups].flatMap(([from, sites]) => { const item = callItem(this, from); return item ? [{ from: item, sites }] : []; });
     },
@@ -371,7 +379,7 @@ export function programIndex(utu, files) {
       const groups = new Map();
       for (const edge of calls()) if (edge.from === decl && edge.to >= 0) {
         if (!groups.has(edge.to)) groups.set(edge.to, []);
-        groups.get(edge.to).push(edge.site);
+        if (edge.site) groups.get(edge.to).push(edge.site);
       }
       return [...groups].flatMap(([to, sites]) => { const item = callItem(this, to); return item ? [{ to: item, sites }] : []; });
     },

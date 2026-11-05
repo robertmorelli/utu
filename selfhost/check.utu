@@ -332,6 +332,7 @@ fn new_label() I32 {
 /// A function's checking starts: no locals, labels, loops, or defers yet.
 fn begin_function() void {
     want_reset();
+    cur_entry.clear();
     cur_locals.clear();
     next_label.resize(1);
     next_label[0] = 0;
@@ -1504,9 +1505,12 @@ vec edge_to: I32;
 /// Call syntax node for each edge; -1 for a value reference.
 vec edge_site: I32;
 
+/// `export main` while it is checked: its declaration, for its calls' edges.
+vec cur_entry: I32;
+
 fn note_edge(to: I32, site: I32) void {
-    if cur_fn[0] == -1 { return; };
-    edge_from.push(cur_fn[0]);
+    let from = if cur_fn[0] != -1 { cur_fn[0]; } else if cur_entry.len() > 0 { -1000000 - cur_entry[0]; } else { return; };
+    edge_from.push(from);
     edge_to.push(to);
     edge_site.push(site);
 }
@@ -3958,6 +3962,9 @@ fn entry_function(item: I32, name: I32, test_index: I32) void {
     };
     begin_function();
     cur_fn[0] = -1;
+    if name >= 0 {
+        for (0 ..< decl_node.len()) |d| { if decl_node[d] == item and decl_is(d, Decl.Main) { cur_entry.push(d); }; };
+    };
     p = if list >= 0 { first_child(list); } else { -1; };
     for (0 ..< vl_len[params]) |i| {
         let d = node_decl[first_child(p)];
