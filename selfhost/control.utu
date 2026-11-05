@@ -954,11 +954,18 @@ fn check_for(node: I32, cx: Cx) I32 {
     let top = new_label();
     let next = new_label();
     let d0 = if capture >= 0 { node_decl[first_child(capture)]; } else { -1; };
-    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0))
-        and unroll_fits(block, d0, types[0], counters[0], brk, cx) {
-        unrolled_for(block, counters[0], ends[0], repr(types[0]), types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), brk, top, cx);
-        w_node(Op.Seq, vt_none, 0, 0, m);
-        return ty_void();
+    if optimize_level[0] == 2 and n == 1 and kinds[0] != 1 and unrollable(block) {
+        // A range's capture is its counter, which the body must leave alone;
+        // an array's, a local of its own.
+        let elem = if kinds[0] == 2 and d0 >= 0 and decl_boxed[d0] == 0 { new_local(repr(types[0])); } else { -1; };
+        if (if kinds[0] == 2 { d0 < 0 or elem >= 0; } else { not (d0 >= 0 and assigns(block, d0)); })
+            and unroll_fits(block, d0, types[0], if kinds[0] == 2 { elem; } else { counters[0]; }, brk, cx) {
+            let array = if kinds[0] == 2 { arrays[0]; } else { -1; };
+            let vt = if kinds[0] == 2 { vt_i32; } else { repr(types[0]); };
+            unrolled_for(block, counters[0], ends[0], vt, types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), array, elem, brk, top, cx);
+            w_node(Op.Seq, vt_none, 0, 0, m);
+            return ty_void();
+        };
     };
     let mb = w_mark();
     let ml = w_mark();
@@ -1149,7 +1156,8 @@ fn allocating_method(word: I32) Bool {
 }
 
 /// The unrolled loop of `for (a ..< b) |i|`, counting in local `counter` to local `end_`.
-fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, brk: I32, top: I32, cx: Cx) void {
+/// Of `for (xs) |x|`: counting through array local `array` (else -1), x in local `elem` (or -1).
+fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, array: I32, elem: I32, brk: I32, top: I32, cx: Cx) void {
     let wide = vt == vt_i64;
     let mb = w_mark();
     let ml = w_mark();
@@ -1168,18 +1176,26 @@ fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, br
     if wide { w_leaf(Op.I64Const, vt_i64, unroll_copies, 0); } else { w_i32(unroll_copies); };
     w_node(Op.Plain, vt_i32, past_end_op(vt, true, false), 0, mr);
     let mt = w_mark();
-    for (0 ..< unroll_copies) |_k| { unrolled_step(block, counter, vt, brk, cx); };
+    for (0 ..< unroll_copies) |_k| { unrolled_step(block, counter, vt, array, elem, brk, cx); };
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Seq, vt_none, 0, 0, mt);
     w_node(Op.If, vt_none, new_label(), 0, mi);
-    unrolled_step(block, counter, vt, brk, cx);
+    unrolled_step(block, counter, vt, array, elem, brk, cx);
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, mb);
 }
 
 /// One iteration: the body (its continue goes to the end of this copy), then i += 1.
-fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) void {
+fn unrolled_step(block: I32, counter: I32, vt: I32, array: I32, elem: I32, brk: I32, cx: Cx) void {
+    if elem >= 0 {
+        let mg = w_mark();
+        w_leaf(Op.LocalGet, cur_locals[array], array, 0);
+        w_leaf(Op.LocalGet, vt_i32, counter, 0);
+        let heap = vt_heap(cur_locals[array]);
+        w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
+        w_node(Op.LocalSet, vt_none, elem, 0, mg);
+    };
     let next = new_label();
     let mn = w_mark();
     enter_loop(brk, next, -1, -1);
