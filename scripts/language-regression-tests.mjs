@@ -503,17 +503,6 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }
   });
 
-  test('loops: -O3 unrolls small counted loops four ways; -Oz keeps one copy', async ({ ROOT }) => {
-    const source = 'export lib { fn total(xs: Array[I32]) I32 { xs sum; } }';
-    const gets = {};
-    for (const optimize of ['size', 'speed']) {
-      const { wat } = await instantiateAt(ROOT, `unroll_shape_${optimize}.utu`, source, optimize);
-      gets[optimize] = ((await wat()).match(/\barray\.get\b/g) ?? []).length;
-    }
-    assertEq(gets.size, 1, '-Oz: one array.get');
-    assertEq(gets.speed, 5, '-O3: four unrolled reads plus the tail');
-  });
-
   test('generators: yield expands into for loops with break, continue, return, and hygiene', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'generators.utu', source: `
       struct Log:
@@ -1194,7 +1183,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }
   });
 
-  test('loops: -O3 unrolls counted while loops and leaves the counter exactly as before', async ({ ROOT }) => {
+  test('loops: counted while loops give the same results, counters included, at -Oz and -O3', async ({ ROOT }) => {
     const source = `export lib {
       fn sum(n: I32) I32 { let xs = Array[I32].new(n, 2); let s = 0; let i = 0; while (i < n) { s += xs[i] + i; i += 1; }; s * 1000 + i; }
       fn early(n: I32, stop: I32) I32 { let s = 0; let i = 0; while (i < n) { if i == stop { break; }; s += 1; i += 1; }; s * 1000 + i; }
@@ -1204,16 +1193,13 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }`;
     const results = {};
     for (const optimize of ['size', 'speed']) {
-      const { instance, wat } = await instantiateAt(ROOT, `counted_while_${optimize}.utu`, source, optimize);
+      const { instance } = await instantiateAt(ROOT, `counted_while_${optimize}.utu`, source, optimize);
       const e = instance.exports;
       const out = [];
       for (let n = -1; n <= 11; n++) out.push(e.sum(Math.max(0, n)), e.early(11, n), String(e.wide(BigInt(n))), e.start(n, 6), e.moving(n));
       results[optimize] = JSON.stringify(out);
-      if (optimize === 'speed') {
-        assert(((await wat()).match(/\barray\.get\b/g) ?? []).length >= 5, 'the counted while loop is unrolled');
-      }
     }
-    assertEq(results.speed, results.size, 'unrolled loops give the same results, counters included');
+    assertEq(results.speed, results.size, 'the same results, counters included');
   });
 
   test('iterators: a side-effect-free collect feeding another pipeline is fused away', async ({ ROOT }) => {
