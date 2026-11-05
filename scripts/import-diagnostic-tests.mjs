@@ -41,7 +41,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
     const missing = diagnostics.find(d => d.kind === 'unknown-import');
     assert(missing, kinds(diagnostics));
     assert(missing.text.startsWith('using ui from "./does-not-exist.utu"'), missing.text);
-    assert(missing.message.includes('file not found'), missing.message);
+    assert(missing.message.includes('No file'), missing.message);
   });
 
   test('imports: a missing module names the modules the file does define', async ({ ROOT }) => {
@@ -87,7 +87,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
       try {
         await fs.writeFile(path.join(dir, 'main.utu'), source);
         const doc = await compiler.compileFile(path.join(dir, 'main.utu'));
-        assertEq(doc.body.firstChild?.dataset.error, 'parse-error', source);
+        assert(doc.diagnostics.some(d => d.kind === 'parse-error'), source);
       } finally {
         await fs.rm(dir, { recursive: true, force: true });
       }

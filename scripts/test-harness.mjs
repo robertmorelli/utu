@@ -40,7 +40,14 @@ export async function makeCompiler({ ROOT, target = 'normal', debugAssertions = 
   const options = { root: ROOT, target: target === 'analysis' ? 'normal' : target, optimize, safe: debugAssertions };
   const compile = async file => {
     const result = await compileFile(utu, file, options);
-    return { ...result, artifacts: { diagnostics: result.diagnostics } };
+    const diagnostics = result.diagnostics.map(diagnostic => ({
+      ...diagnostic,
+      primary: diagnostic.file ? {
+        file: diagnostic.file, row: diagnostic.line,
+        column: diagnostic.column, start: diagnostic.start, end: diagnostic.end,
+      } : null,
+    }));
+    return { ...result, diagnostics, artifacts: { diagnostics } };
   };
   return { compileFile: compile, analyzeFile: compile };
 }
