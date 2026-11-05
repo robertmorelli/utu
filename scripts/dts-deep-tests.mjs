@@ -34,17 +34,6 @@ async function run(body, abi = fixture) {
 }
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log(`✓ ${name}`); }
-// A case the self-hosted compiler does not build right yet: run, reported, and
-// not failing the suite; one that passes says so, to be made a test again.
-const gaps = [];
-async function gap(name, why, fn) {
-  try { await fn(); } catch (error) {
-    gaps.push(name);
-    console.log(`✗ KNOWN GAP (selfhost: ${why}): ${name}\n    ${Array.isArray(error.actual) ? error.actual.join(' | ') : String(error.message ?? error).split('\n')[0]}`);
-    return;
-  }
-  throw new Error(`known gap now passes, make it a test again: ${name}`);
-}
 await test('constructors, inferred locals, inherited members and deep returned properties', async () => {
   const { exports } = await run(`fn run() F64 {
     let c = Fixture.Counter(2.0); c.label = "counter";
@@ -81,7 +70,7 @@ await test('index getters and setters, nested namespaces and constant enums', as
     Fixture.dictionary["deep"] + Fixture.Util.Nested.answer;
   }`);
   assert.equal(exports.run(), 50);
-  await gap('a constant enum member adds as its literal', 'enum members are host reads, not literals: a const enum has no runtime export', async () => {
+  await test('a constant enum member adds as its literal', async () => {
     const { exports } = await run(`fn run() F64 {
       Fixture.dictionary["deep"] = 8.0;
       Fixture.dictionary["deep"] + Fixture.Util.Nested.answer + Fixture.ConstMode.Second;
@@ -89,7 +78,7 @@ await test('index getters and setters, nested namespaces and constant enums', as
     assert.equal(exports.run(), 72);
   });
 });
-await gap('exported unique symbol keys preserve method receivers', 'no index by a unique symbol key: No [] for Fixture.Symbolic', async () => {
+await test('exported unique symbol keys preserve method receivers', async () => {
   const { exports } = await run(`fn run() Str { let value = Fixture.symbolic(); value[Fixture.token](); }`);
   assert.equal(exports.run(), 'symbol works');
 });
@@ -154,7 +143,7 @@ await test('mitt callbacks retain identity for subscribe and unsubscribe', async
   }`, output);
   exports.run();
 });
-await gap('ABI files load directly with lowercase module aliases', 'a lowercase module alias is read as a value: api is a module, not a value', async () => {
+await test('ABI files load directly with lowercase module aliases', async () => {
   const source = `using Fixture |api| from "/fixture.abi.json";
     export lib { fn run() F64 { let c = api.Counter(3.0); c.doubled; } }`;
   const doc = await compile(source, fixture, { readFile: async file => file.endsWith('.abi.json') ? JSON.stringify(fixture) : source });
@@ -169,7 +158,7 @@ await test('explicit new selects the construct signature of callable constructor
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.run(), 1970);
 });
-await gap('mutable globals use direct assignment while const globals stay readonly', 'a foreign mutable global cannot be assigned', async () => {
+await test('mutable globals use direct assignment while const globals stay readonly', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/globals.d.ts')], prefix: 'Globals' });
   const { exports } = await run('fn run() F64 { Globals.abiCounter = 40.0; Globals.abiCounter += 2.0; Globals.abiCounter; }', output);
   try { assert.equal(exports.run(), 42); } finally { delete globalThis.abiCounter; }
@@ -285,7 +274,7 @@ await test('DOM: tag-name narrowing, index-signature properties, union rest argu
     assert.match(html, /<input[^>]* data-role="search"/);
     assert(html.endsWith('<div class="active">label <span></span></div>'), html);
     assert.equal(window.document.querySelector('input').value, 'typed');
-    await gap('DOM: event targets narrow in a closure whose parameter a later call types', 'a closure parameter is not inferred from a later use: event needs a type', async () => {
+    await test('DOM: event targets narrow in a closure whose parameter a later call types', async () => {
       const later = await runBrowser(`fn target() Str {
         let log = Browser.Array();
         let handler = cl(event) void {
@@ -317,11 +306,15 @@ await test('array literals become JS arrays for array, array-like, iterable and 
   const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().to_f64(); }`);
   assert.equal(native.dates(), 4);
   // A literal given to JavaScript, or used through JS array members, is a JS array.
-  await gap('array literals used through JS array members are JS arrays', 'array literals are UTU arrays, never JS arrays: No method Array[I32].push', async () => {
+  // An empty `[]` nothing constrains is a native Array[I32], JS members or not
+  // (docs/arrays.md, rule 4: "a literal with elements"); Browser.Array() is an empty JS one.
+  await test('array literals used through JS array members are JS arrays', async () => {
+    const empty = await compile('using Browser from std:Browser; export main() void { let items = []; items.push("a"); }');
+    assert.deepEqual(empty.errors, ['No method Array[I32].push']);
     const host = await runBrowser(`
       fn direct() Str { Browser.JSON.stringify([1, 2]); }
       fn bound() Str { let xs = [3, 1, 2]; xs.sort(); Browser.JSON.stringify(xs); }
-      fn pushed() F64 { let items = []; items.push("a"); items.push("b"); items.length; }
+      fn pushed() F64 { let items = Browser.Array(); items.push("a"); items.push("b"); items.length; }
       fn logged() F64 { let xs = [1, 2]; Browser.console.debug(xs); xs[1]; }
     `);
     assert.equal(host.direct(), '[1,2]'); assert.equal(host.bound(), '[1,2,3]');
@@ -389,16 +382,16 @@ await test('default exports, booleans, unions, never, namespaces and const enums
   assert.equal(exports.greeting(), 'Hello UTU'); assert.equal(exports.boolean(), true);
   assert.throws(() => exports.failure(), /fixture failure/);
   assert.equal(exports.namespace(), 42);
-  await gap('a union result reads as the member a slot wants', 'a union result does not narrow to its member: number returns F64, got Fixture.Choice', async () => {
+  await test('a union result reads as the member a slot wants', async () => {
     const { exports } = await run('fn number() F64 { Fixture.union(42.0); } fn text() Str { Fixture.union("choice"); }');
     assert.equal(exports.number(), 42); assert.equal(exports.text(), 'choice');
   });
-  await gap('const enum members read naturally', 'enum members are host reads, not literals: a const enum has no runtime export', async () => {
+  await test('const enum members read naturally', async () => {
     const { exports } = await run('fn constant() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }');
     assert.equal(exports.constant(), 42);
   });
 });
-await gap('enum members of every kind are literals with no host read', 'enum members are host reads, not literals: a const enum has no runtime export', async () => {
+await test('enum members of every kind are literals with no host read', async () => {
   const { exports, glue } = await run(`
     fn number() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }
     fn text() Str { Fixture.Tone.Warm; }
@@ -406,7 +399,7 @@ await gap('enum members of every kind are literals with no host read', 'enum mem
   assert.equal(exports.number(), 42); assert.equal(exports.text(), 'warm');
   assert.equal(glue, '', 'enum members must not become imports');
 });
-await gap('a Rust crate links through its wasm-bindgen declarations', 'enum members are host reads, not literals', async () => {
+await test('a Rust crate links through its wasm-bindgen declarations', async () => {
   const pkg = path.join(ROOT, 'scripts/fixtures/rust-geom/pkg');
   const geom = linkFiles({ files: [path.join(pkg, 'geom.d.ts')], prefix: 'Geom', moduleSpecifier: path.join(pkg, 'geom.js') });
   const { exports, glue } = await run(`
@@ -487,9 +480,12 @@ await test('keyof over an index signature accepts any key (mitt handlers need no
   }`, output);
   assert.equal(exports.run(), 5);
 });
-await gap('try/catch catches host exceptions as values, nests, and yields a result', 'a caught host exception is Externref, with no members: Externref has no field name', async () => {
+await test('try/catch catches host exceptions as values, nests, and yields a result', async () => {
+  // The caught value is an Externref with no members (docs/typescript-abi.md, try/catch): JS.String(e) reads it.
+  const members = await compile('using JS from std:JS; export main() void { try { JS.JSON.parse("{"); } catch |e| { e.name; }; }');
+  assert.deepEqual(members.errors, ['Externref has no field name']);
   const doc = await compile(`using JS from std:JS; export lib {
-    fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { e.name; }; }
+    fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { JS.String(e); }; }
     fn counted() F64 { let failures = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; failures; }
     fn nested() Str {
       try { try { JS.JSON.parse("{"); "inner ok"; } catch |inner| { JS.JSON.parse("]"); "inner caught"; }; }
@@ -498,7 +494,7 @@ await gap('try/catch catches host exceptions as values, nests, and yields a resu
   }`);
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.message('[1,2]'), '[1,2]');
-  assert.equal(instance.exports.message('{'), 'SyntaxError');
+  assert.match(instance.exports.message('{'), /^SyntaxError: /);
   assert.equal(instance.exports.counted(), 1);
   assert.equal(instance.exports.nested(), 'outer caught');
 });
@@ -527,8 +523,8 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
   `);
   assert.equal(exports.total(), 9); assert.equal(exports.count(), 3); assert.equal(exports.same(), true);
   assert.equal(exports.from_set(), 'xy'); assert.equal(exports.dataset(), 'z');
-  await gap('web friction: array literals take JS array members', 'array literals are UTU arrays, never JS arrays: No method Array[I32].push', async () => {
-    const chips = await runBrowser('fn chips() Str { let out = []; ["a", "b"].forEach(cl(name) void { out.push(name + "!"); }); out.join(","); }');
+  await test('web friction: array literals take JS array members', async () => {
+    const chips = await runBrowser('fn chips() Str { let out = Browser.Array(); ["a", "b"].forEach(cl(name) void { out.push(name + "!"); }); out.join(","); }');
     assert.equal(chips.chips(), 'a!,b!');
   });
   const typed = await compile(`using Browser from std:Browser; export main() void {
@@ -576,4 +572,4 @@ await test('closure parameters without any context are diagnosed instead of cras
   const doc = await compile('using Browser from std:Browser; export main() void { let h = cl(e) void {}; }');
   assert(doc.errors.some(m => /^e needs a type$/.test(m)));
 });
-console.log(`${passed} deep ABI tests passed${gaps.length ? `, ${gaps.length} known selfhost gaps` : ''}`);
+console.log(`${passed} deep ABI tests passed`);

@@ -302,6 +302,8 @@ fn field_of(t: I32, name: I32) I32 {
 /// `x.f`: a field.
 fn check_field_get(node: I32, expect: I32, cx: Cx) I32 {
     let name = last_child(node);
+    let k = check_foreign_constant(node);
+    if k >= 0 { return k; };
     let m = w_mark();
     let t = check_base(node, cx);
     if is_foreign(t) { return check_foreign_get(node, t, word_of(name), m, expect); };
