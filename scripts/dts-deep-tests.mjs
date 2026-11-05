@@ -285,7 +285,7 @@ await test('DOM: tag-name narrowing, index-signature properties, union rest argu
     assert.match(html, /<input[^>]* data-role="search"/);
     assert(html.endsWith('<div class="active">label <span></span></div>'), html);
     assert.equal(window.document.querySelector('input').value, 'typed');
-    await gap('DOM: event targets narrow in a closure whose parameter a later call types', 'a closure parameter is not inferred from a later use: event needs a type', async () => {
+    await test('DOM: event targets narrow in a closure whose parameter a later call types', async () => {
       const later = await runBrowser(`fn target() Str {
         let log = Browser.Array();
         let handler = cl(event) void {
