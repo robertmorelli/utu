@@ -1,0 +1,14 @@
+// What: a variant with no fields written bare where a value goes (it parsed as "Unexpected ';'")
+// Expect: Dot is a type: write Dot { … }, or Enum.Dot for a variant
+enum Shape:
+    | Circle { r: I32 }
+    | Dot
+
+fn origin() Shape {
+    Dot;
+}
+
+export main() I32 {
+    origin();
+    0;
+}

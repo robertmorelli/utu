@@ -311,6 +311,52 @@ export lib {
     checked++;
   }
 
+  // Code after a constant-true `if` that returns is dropped: a guarded
+  // defer's `rethrow` there was left outside its try (JavaScriptCore: "rethrow
+  // doesn't refer to a catch block"), in every mode.
+  const dead = await write(`fn bump(p: I32) I32 { p + 1; }
+export lib {
+    fn run(p: I32) I32 {
+        let h = 17;
+        let c = p;
+        if 12 <= 13 { return h * 7 + 6; };
+        loop match 1 {
+            ~> {
+                match (c & 3) {
+                    1 => {
+                        defer { };
+                        h = h * 31 + bump(p);
+                    },
+                    ~> { },
+                };
+            },
+        };
+        h;
+    }
+    fn labeled(p: I32) I32 {
+        let h = 17;
+        lb: {
+            if 7 < 12 { return h * 7 + p; };
+        };
+        defer { };
+        h + p;
+    }
+    fn valued(p: I32) I32 {
+        let h = 17;
+        let v = if 1 <= 14 { return h * 3 + p; } else { bump(p); };
+        defer { };
+        bump(h + v);
+    }
+}
+`);
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
+    const built = await compileFile(utu, dead, { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    assert.deepEqual([e.run(5), e.labeled(5), e.valued(5)], [125, 124, 56], mode);
+    checked++;
+  }
+
   // -O small inlines what shrinks (selfhost/inline.utu): arguments with
   // effects run in their order, a constant or a local moves to its read, an
   // argument never read is kept, a function called once moves there; and

@@ -613,6 +613,15 @@ fn parse_hint(file: I32, t: I32, wanted: I32) void {
         diag_fix(tok_start[semi], tok_end[semi], "", "Drop ;");
         return;
     };
+    // `Dot;` or `mk(B)`: a capitalized name where a value goes builds with braces, or is a variant by its enum.
+    let before = tok_before(file, prev);
+    if prev >= 0 and tok_is(prev, Tok.Word) and src[tok_start[prev]] >= 65 and src[tok_start[prev]] <= 90
+        and (tok_is(t, Tok.Semi) or tok_is(t, Tok.RParen) or tok_is(t, Tok.Comma))
+        and (tok_is(before, Tok.Eq) or tok_is(before, Tok.LParen) or tok_is(before, Tok.Comma) or tok_is(before, Tok.LBrace) or tok_is(before, Tok.Semi) or tok_says(before, "return")) {
+        parse_says(tok_text(prev) + " is a type: write " + tok_text(prev) + " { … }, or Enum." + tok_text(prev) + " for a variant");
+        diag_focus(prev, prev, "a type");
+        return;
+    };
     // One token missing at the end of a line (or of a block): after the token before.
     // (A `\\` line's `;` is its text: diag_text says so.)
     if prev >= 0 and not tok_is(prev, Tok.MultilineLine) and (w == "';'" or w == "','") and (lines_apart(prev, t) or tok_is(t, Tok.RBrace) or tok_is(t, Tok.End)) {

@@ -1343,8 +1343,7 @@ fn cf_fold(n: I32) I32 {
     if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
         let i = 0;
         while (i + 1 < count) {
-            let k = w_op[w_kid(n, i)];
-            if k == Op.Br.to_i32() or k == Op.Return.to_i32() or k == Op.Unreachable.to_i32() {
+            if cf_diverges(w_kid(n, i)) {
                 w_count[n] = i + 1;
                 cf_changed[0] = 1;
                 return n;
@@ -1353,6 +1352,29 @@ fn cf_fold(n: I32) I32 {
         };
     };
     n;
+}
+
+/// Whether node n never completes: a `br`, `return` or `unreachable`, or
+/// what its last operand or statement ends in one (a Block, if no branch
+/// leaves it by its label). The last only: one path, not the tree.
+fn cf_diverges(n: I32) Bool {
+    let k = w_op[n];
+    if k == Op.Br.to_i32() or k == Op.Return.to_i32() or k == Op.Unreachable.to_i32() { return true; };
+    let count = w_count[n];
+    if count == 0 or k == Op.Loop.to_i32() or k == Op.If.to_i32() or k == Op.Try.to_i32() or k == Op.NullElse.to_i32() or k == Op.CastArms.to_i32() { return false; };
+    if not cf_diverges(w_kid(n, count - 1)) { return false; };
+    k != Op.Block.to_i32() or not cf_branches_to(n, w_a[n]);
+}
+
+/// Whether a `br`, `br_if` or `br_table` to `label` is in node n.
+fn cf_branches_to(n: I32, label: I32) Bool {
+    let k = w_op[n];
+    if (k == Op.Br.to_i32() or k == Op.BrIf.to_i32()) and w_a[n] == label { return true; };
+    if k == Op.BrTable.to_i32() {
+        for (0 ..< w_b[n]) |i| { if w_aux[w_a[n] + i] == label { return true; }; };
+    };
+    for (0 ..< w_count[n]) |i| { if cf_branches_to(w_kid(n, i), label) { return true; }; };
+    false;
 }
 
 fn cf_const(n: I32) Bool { w_op[n] == Op.I32Const.to_i32() or w_op[n] == Op.I64Const.to_i32(); }
@@ -1578,7 +1600,8 @@ fn cf_if(n: I32) void {
         return;
     };
     let arm = w_kid(n, if on { 1; } else { 2; });
-    w_op[n] = if w_a[n] >= 0 { Op.Block.to_i32(); } else { Op.Seq.to_i32(); };
+    // A block only when a branch leaves it by its label.
+    w_op[n] = if w_a[n] >= 0 and cf_branches_to(arm, w_a[n]) { Op.Block.to_i32(); } else { Op.Seq.to_i32(); };
     w_b[n] = 0;
     set_kid(n, 0, arm);
     w_count[n] = 1;
