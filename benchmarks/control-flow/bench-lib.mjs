@@ -3,28 +3,20 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { buildImportObject, createCompiler, emitBinary, initParser, instantiateLowered } from '../../src/index.js';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../../src/selfhost/node.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const engine = typeof Bun !== 'undefined' ? `JSC (Bun ${Bun.version})` : `V8 (Node ${process.versions.node})`;
-const parser = await initParser({ wasmDir: `${ROOT}/` });
 const TMP = path.join(ROOT, '.tmp', 'control-flow-bench');
 await fs.mkdir(TMP, { recursive: true });
 
 export async function compileUtu(name, source, optimize = 'size') {
-  const compiler = createCompiler({
-    parser, target: 'normal', optimize,
-    readFile: file => fs.readFile(file, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
   const file = path.join(TMP, `${name}.utu`);
   await fs.writeFile(file, source);
-  const doc = await compiler.compileFile(file);
-  const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.dataset.errorMessage ?? node.dataset.error);
-  if (errors.length) throw new Error(`${name}: ${errors.join('; ')}`);
-  const wasm = emitBinary(doc);
-  const { instance } = await instantiateLowered(wasm, await buildImportObject(doc));
-  return { exports: instance.exports, bytes: wasm.length, gzip: gzipSync(wasm, { level: 9 }).length };
+  const result = await compileFile(await loadNodeCompiler(), file, { root: ROOT, optimize });
+  if (!result.wasm) throw new Error(`${name}: ${result.diagnostics.map(diagnostic => diagnostic.message).join('; ')}`);
+  const { instance } = await instantiateNode(result.wasm, result.spec, { root: ROOT });
+  return { exports: instance.exports, bytes: result.wasm.length, gzip: gzipSync(result.wasm, { level: 9 }).length };
 }
 
 /** Median wall time in milliseconds over `rounds`, after warmup. */
