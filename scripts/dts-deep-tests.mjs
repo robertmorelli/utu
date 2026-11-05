@@ -89,7 +89,7 @@ await test('index getters and setters, nested namespaces and constant enums', as
     assert.equal(exports.run(), 72);
   });
 });
-await gap('exported unique symbol keys preserve method receivers', 'no index by a unique symbol key: No [] for Fixture.Symbolic', async () => {
+await test('exported unique symbol keys preserve method receivers', async () => {
   const { exports } = await run(`fn run() Str { let value = Fixture.symbolic(); value[Fixture.token](); }`);
   assert.equal(exports.run(), 'symbol works');
 });

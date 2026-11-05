@@ -2136,6 +2136,8 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
 
 /// `f(args)`: a host value of a function type, `callee` (its type `t`), called.
 fn check_foreign_value_call(node: I32, callee: I32, t: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    let r = check_foreign_symbol_call(node, callee, t, args, m, expect, cx);
+    if r >= 0 { return r; };
     check_expr(callee, t, cx);
     check_foreign_invoke(node, ref_of(t), fty_view[t], args, t, -1, "self", "", false, m, expect, cx);
 }
@@ -2220,6 +2222,15 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     let view = fty_view[owner];
     let d = describe(ref_of(owner));
     let kt = check_expr(key_node, -1, cx);
+    // (`x[Api.token]`, a `unique symbol` key: the member it names)
+    let symbolic = symbol_member(d, kt);
+    if symbolic >= 0 {
+        let st = foreign_result(Ref { doc: d.doc, at: symbolic, env: d.env }, view, expect);
+        let mt = vl_begin();
+        vl_add(erased(owner, view));
+        vl_add(erased(kt, view));
+        return foreign_call_op(vl_end(mt), st, "(self,k) => " + js_output("self[k]", st, result_checked[0] == 1), m);
+    };
     let info = index_for(d, kt, view);
     if info < 0 and not ref_dynamic(ref_of(owner)) {
         report2(Diag.UnknownOperator, node, known_word(Known.GetIndex), owner, -1);
@@ -2249,6 +2260,31 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     vl_add(erased(owner, view));
     vl_add(erased(kt, view));
     foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), m);
+}
+
+/// The type of `d`'s member keyed by `unique symbol` type `kt`
+/// (`[token](): string`), or -1.
+fn symbol_member(d: Ref, kt: I32) I32 {
+    let sym = if is_foreign(kt) { jget(fty_at[kt], "symbol"); } else { -1; };
+    if not jis_string(sym) { return -1; };
+    let prop = jget_word(desc_get(d, "properties"), intern_text("@@" + jstring_text(sym)));
+    if prop >= 0 { jget(prop, "type"); } else { -1; };
+}
+
+/// `x[Api.token](args)`: a symbol-keyed method, called with `x` its
+/// receiver (its call type `t`), or -1 when `callee` is no such member.
+fn check_foreign_symbol_call(node: I32, callee: I32, t: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
+    if not is_kind(callee, Node.Index_expr) { return -1; };
+    let rt = type_only(first_child(callee), -1, cx);
+    let kt = type_only(last_child(callee), -1, cx);
+    if not is_foreign(rt) or symbol_member(describe(ref_of(rt)), kt) < 0 { return -1; };
+    let sym = jget(fty_at[kt], "symbol");
+    let view = fty_view[kt];
+    // (the symbol is its declaration's export: the key, imported, needs no value)
+    if not root_member(view, jstring_word(sym)) { return -1; };
+    check_expr(first_child(callee), rt, cx);
+    let access = "self[" + member_access(view, jstring_word(sym), true) + "]";
+    check_foreign_invoke(node, ref_of(t), fty_view[t], args, rt, -1, access, word_text(access_prologue[0]), false, m, expect, cx);
 }
 
 /// Whether a declaration is a tuple's (`[T0, T1]`).
