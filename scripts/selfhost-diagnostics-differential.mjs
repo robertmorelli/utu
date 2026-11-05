@@ -1,22 +1,15 @@
-// The self-hosted compiler's diagnostics against stage 0's: for every
-// program (examples/, benchmarks/, baselines/corpus, and the negative
-// corpus), for its exports and its tests, the diagnostics' kinds and spans
-// must be stage 0's (the words are the self-hosted compiler's own).
+// The self-hosted compiler's diagnostics, against what they were when
+// recorded: for every program (examples/, benchmarks/, baselines/corpus, and
+// the negative corpus), for its exports and its tests, the diagnostics'
+// kinds and spans.
 //
 //   node scripts/selfhost-diagnostics-differential.mjs [--only=substring] [--show=N] [--dump=file.json]
 //   node scripts/selfhost-diagnostics-differential.mjs --record
 //
-// Stage 0's are in baselines/diagnostics.json.gz (--record writes them). A
-// program the self-hosted compiler cannot build yet (it reports something
-// unsupported) is counted, not compared.
-//
-// One difference is on purpose: a program that does not parse. Stage 0
-// reports where tree-sitter's error recovery put its error nodes; the
-// self-hosted parser reports one error, at the furthest token it reached.
-// Both must reject the program with parse errors alone. So is a program
-// declaring a prelude module's name: one "X is a standard type" where stage
-// 0 reports each member its hoisting duplicates. The others are listed in
-// INTENDED, each with what the self-hosted compiler does.
+// They are in baselines/diagnostics.json.gz (--record writes them; stage -1
+// recorded them until the handoff, see baselines/README.md). A program the
+// compiler cannot build yet (it reports something unsupported) is counted,
+// not compared.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,59 +21,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = path.join(ROOT, 'baselines', 'diagnostics.json.gz');
 const SCRATCH = path.join(ROOT, '.tmp', 'diagnostics-negative');
 
-const both = (file, reason) => ({ [`${file} normal`]: reason, [`${file} test`]: reason });
-const INTENDED = {
-  // `const mem s: U8 = [256, …]`: the self-hosted compiler points at the element ("256 does not fit U8").
-  ...both('baselines/corpus/d8932a6de0a164a686a4d4da45b268bae6819f76.utu', 'the out-of-range element is underlined, not the list'),
-  // `fn f() ?Nope { Nope.null; }`: stage 0 takes Nope for a type once
-  // `Nope.null` names it.
-  ...both('baselines/corpus/61a23f4f9972b16194f2eaa17f55d78f0d0e7f5d.utu', 'an unknown type is reported wherever it is named'),
-  // `fn Box.make(…)` with no type Box: stage 0 takes it for a function
-  // named Box.make, and drops it.
-  ...both('baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu', 'a method of an unknown type is reported'),
-  ...both('negative/negative-012.utu', 'a method of an unknown type is reported'),
-  // A test's `cl(v) { v + 1; }` where a void closure goes: stage 0 checks
-  // test bodies only in test builds.
-  ...both('baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu', 'test bodies are checked in every build'),
-  // A copy of std's LiteralDefaults: its @ir type, read only from std, is now checked
-  // in a program's own files too.
-  ...both('baselines/corpus/349529cf8d5a5dbfe2e3d4eb224f220211c9ca2b.utu', 'a program\'s own @ir types are checked'),
-  // A copy of the prelude, importing std:Bool and the rest again: stage 0
-  // loads them a second time, and reports each member twice.
-  ...both('baselines/corpus/5aabd8136804de511d3694a2bbd4878ea74032ba.utu', 'a standard module imported again is the same module'),
-  // A copy of std:U64 (std:U32) beside the standard one: stage 0 merges the
-  // two, and reports a literal of the merged module's out of range.
-  ...both('baselines/corpus/7e83ae64a131f755c065e24dfd0da2700a8194d4.utu', 'a module named like a standard one keeps its own members'),
-  ...both('baselines/corpus/c02ee1fa0bf1ffbd68045c13ca9ab0871d172597.utu', 'a module named like a standard one keeps its own members'),
-  // `await for ([1, 2])`: an array is no stream. Stage 0 names its type
-  // as it mangles it, `Array__I32`.
-  ...both('baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu', 'a type is named as it is written'),
-  // `Array[P].new_default(n)` of a protocol P: stage 0 fills it with null,
-  // which a P is never.
-  ...both('baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu', 'an array of a protocol has no default'),
-  ...both('baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu', 'an array of a protocol has no default'),
-  ...both('baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu', 'an array of a protocol has no default'),
-  // `@stored/\ S "k" S { n: missing } \/`: the expansion reads the default
-  // twice, and stage 0 reports the unknown name for each reading.
-  ...both('baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu', 'one name unknown twice on a line is one mistake'),
-  // `let value: … = f();`: stage 0 wants a literal; a global may be computed.
-  ...both('baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu', 'a global may be computed'),
-  // A test build leaves main out, so the generators it consumes are unused
-  // there: stage 0 never checks them.
-  'baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test': 'a generator nothing consumes is checked',
-  'baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu test': 'a generator nothing consumes is checked',
-  'baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu test': 'a generator nothing consumes is checked',
-  // Stage -1 wants a literal; a global may be computed (the Benchmarks Game ports).
-  ...both('benchmarks/bg/fasta/fasta.utu', 'a global may be computed'),
-  ...both('benchmarks/bg/regexredux/alt/regexredux-backtrack.utu', 'a global may be computed'),
-  ...both('benchmarks/bg/regexredux/regexredux.host.utu', 'a global may be computed'),
-  ...both('benchmarks/bg/regexredux/regexredux.utu', 'a global may be computed'),
-  ...both('benchmarks/bg/revcomp/alt/revcomp-bytewise.utu', 'a global may be computed'),
-  ...both('benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu', 'a global may be computed'),
-  ...both('benchmarks/bg/revcomp/revcomp.utu', 'a global may be computed'),
-  // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
-  ...both('examples/bounds.utu', 'bounded module parameters'),
-};
 
 if (isMainThread) await main();
 else await worker();
@@ -145,44 +85,23 @@ async function main() {
     return;
   }
   const baseline = JSON.parse(zlib.gunzipSync(fs.readFileSync(BASELINE)));
-  const count = { same: 0, differ: 0, intended: 0, unsupported: 0 };
-  const onlyParseErrors = list => list.length > 0 && list.every(d => d[0] === 'parse-error');
-  // Wutu templates are the self-hosted compiler's alone: stage 0 refuses them.
-  const refusesWutu = list => list.some(d => String(d[1]).includes(' are compiled by the self-hosted compiler'));
-  // A file declaring a prelude module's name (a standard module's source,
-  // compiled as a program) is told so, once, where stage 0 reports each
-  // member its hoisting duplicates (or, for a generic one, nothing).
-  const standardName = (want, got) => want.every(d => d[0] === 'duplicate-declaration')
-    && got.length > 0 && got.every(d => / is a standard type$/.test(d[1]));
+  const count = { same: 0, differ: 0, unsupported: 0 };
+  // Kinds and places, not words: examples/error_demo/messages.txt keeps the
+  // words (scripts/test-error-messages.mjs).
+  const where = list => JSON.stringify(list.map(([kind, , file, start, end]) => [kind, file, start, end]));
   const lines = [];
   for (const key of Object.keys(results).sort()) {
     const got = results[key];
     if (got === 'unsupported') { count.unsupported++; continue; }
-    if (INTENDED[key]) { count.intended++; continue; }
     const want = baseline[key] ?? [];
-    // Kinds and places, not words: the self-hosted compiler words its
-    // messages its own way (tersely); examples/error_demo/messages.txt keeps them.
-    // Nor the follow-on "Cannot resolve operator for unknown", which the
-    // self-hosted compiler leaves out: the unknown operand is reported already.
-    const followOn = d => d[0] === 'unknown-operator' && d[1] === 'Cannot resolve operator for unknown';
-    // (Sorted by place: the lists come sorted by their words.)
-    const where = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => [kind, file, start, end])
-      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
     if (where(want) === where(got)) { count.same++; continue; }
-    // A struct that contains itself: stage 0 marks the struct, the
-    // self-hosted compiler the field the cycle goes through.
-    const unplaced = list => JSON.stringify(list.filter(d => !followOn(d)).map(([kind, , file, start, end]) => kind === 'recursive-type' ? [kind, file] : [kind, file, start, end]));
-    if (unplaced(want) === unplaced(got)) { count.intended++; continue; }
-    if (refusesWutu(want)) { count.intended++; continue; }
-    if (standardName(want, got)) { count.intended++; continue; }
-    if (onlyParseErrors(want) && onlyParseErrors(got)) { count.intended++; continue; }
     count.differ++;
-    if (lines.length < show) lines.push(`DIFFERS ${key}\n  stage 0: ${JSON.stringify(want).slice(0, 300)}\n  now:     ${JSON.stringify(got).slice(0, 300)}`);
+    if (lines.length < show) lines.push(`DIFFERS ${key}\n  was: ${JSON.stringify(want).slice(0, 300)}\n  now: ${JSON.stringify(got).slice(0, 300)}`);
   }
   for (const line of lines) console.log(line);
   const dump = flag('dump');
   if (dump) fs.writeFileSync(dump, JSON.stringify(Object.fromEntries(Object.entries(results).map(([k, v]) => [k, { want: baseline[k] ?? [], got: v }]))));
-  console.log(`${Object.keys(results).length} builds: ${count.same} diagnose as stage 0 does, ${count.differ} differ, ${count.intended} differ on purpose, ${count.unsupported} not supported yet, in ${seconds} s`);
+  console.log(`${Object.keys(results).length} builds: ${count.same} diagnose as recorded, ${count.differ} differ, ${count.unsupported} not supported yet, in ${seconds} s`);
   if (count.differ) process.exit(1);
 }
 

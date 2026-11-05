@@ -11,7 +11,9 @@
   "calls": {}
  },
  "baselines/corpus/0203ee6613a5325fc47d7f1462fc7707ba364c6f.utu normal": {
-  "compile": "Error: a generator loop binds one value: for (gen()) |value| { … }"
+  "diagnostics": [
+   "invalid-for-source for_expr"
+  ]
  },
  "baselines/corpus/0203ee6613a5325fc47d7f1462fc7707ba364c6f.utu test": {
   "calls": {}
@@ -34,28 +36,42 @@
   "calls": {}
  },
  "baselines/corpus/033063ab4a248a185cd4470ef7c5e6e76eabd257.utu normal": {
-  "compile": "Error: @json match needs at least one pattern arm"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/033063ab4a248a185cd4470ef7c5e6e76eabd257.utu test": {
   "calls": {}
  },
  "baselines/corpus/03862733c8148a2bfdb2f3baf3ab42bdbda6cb1e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/03862733c8148a2bfdb2f3baf3ab42bdbda6cb1e.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/04c4b0af5926a939192d51ad92bae6d63b2c938e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch optional_field_expr"
+  ]
  },
  "baselines/corpus/04c4b0af5926a939192d51ad92bae6d63b2c938e.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch optional_field_expr"
+  ]
  },
  "baselines/corpus/04d7dd53d0f5cd5e0d56fd625ce053b652d9b6c0.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/04d7dd53d0f5cd5e0d56fd625ce053b652d9b6c0.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/05023cacc73995d60598c1f403b9fe8a94a2a8e6.utu normal": {
   "calls": {
@@ -69,10 +85,14 @@
   "calls": {}
  },
  "baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu normal": {
-  "compile": "Error: generator a consumes itself; generators expand inline, so they cannot recurse"
+  "diagnostics": [
+   "invalid-for-source for_expr"
+  ]
  },
  "baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test": {
-  "calls": {}
+  "diagnostics": [
+   "invalid-for-source for_expr"
+  ]
  },
  "baselines/corpus/053e5278dd9db341ae2a1c51339580d709e1abc4.utu normal": {
   "calls": {
@@ -86,22 +106,30 @@
   "calls": {}
  },
  "baselines/corpus/063108d1eea3794be165582ec81399da19f3778d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "integer-literal-out-of-range int_lit"
+  ]
  },
  "baselines/corpus/063108d1eea3794be165582ec81399da19f3778d.utu test": {
   "calls": {}
  },
  "baselines/corpus/063bb5aea7d50b30daf42e51989c922c4137f71d.utu normal": {
-  "compile": "Error: @json cannot use Missing: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/063bb5aea7d50b30daf42e51989c922c4137f71d.utu test": {
   "calls": {}
  },
  "baselines/corpus/065a2dcafb9de42537d8f4402cdebf9b25106f56.utu normal": {
-  "compile": "Error: T has no variant C"
+  "diagnostics": [
+   "unknown-type match_arm"
+  ]
  },
  "baselines/corpus/065a2dcafb9de42537d8f4402cdebf9b25106f56.utu test": {
-  "compile": "Error: T has no variant C"
+  "diagnostics": [
+   "unknown-type match_arm"
+  ]
  },
  "baselines/corpus/073730b978563f1c34c18c4539282f3da973b461.utu normal": {
   "calls": {}
@@ -134,13 +162,20 @@
   }
  },
  "baselines/corpus/085669870f99609554259256d1ba9a706f5d96de.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/085669870f99609554259256d1ba9a706f5d96de.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/08667123610fb4b702c1e47b0a27294e670c8619.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/08667123610fb4b702c1e47b0a27294e670c8619.utu test": {
   "calls": {}
@@ -157,7 +192,9 @@
   "calls": {}
  },
  "baselines/corpus/09e6ebe20446e5323e9af828bbb27598f9d36120.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/09e6ebe20446e5323e9af828bbb27598f9d36120.utu test": {
   "calls": {}
@@ -185,7 +222,9 @@
   "calls": {}
  },
  "baselines/corpus/0cbba9c46fc57329d6d71b3af2a1003a28067927.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch match_arm"
+  ]
  },
  "baselines/corpus/0cbba9c46fc57329d6d71b3af2a1003a28067927.utu test": {
   "calls": {}
@@ -216,7 +255,9 @@
   "calls": {}
  },
  "baselines/corpus/1419f7d207da76b301e988d62175b8b65d1eb822.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "non-exhaustive-match match_expr"
+  ]
  },
  "baselines/corpus/1419f7d207da76b301e988d62175b8b65d1eb822.utu test": {
   "calls": {}
@@ -239,22 +280,32 @@
   "calls": {}
  },
  "baselines/corpus/15cf80206d3f96655d0a7e99a0fb06627f920545.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-field field_expr"
+  ]
  },
  "baselines/corpus/15cf80206d3f96655d0a7e99a0fb06627f920545.utu test": {
   "calls": {}
  },
  "baselines/corpus/16feba558db50b2c47e31e163eca74654dc593cc.utu normal": {
-  "compile": "Error: mem s is const; it cannot be written"
+  "diagnostics": [
+   "type-mismatch assign_expr"
+  ]
  },
  "baselines/corpus/16feba558db50b2c47e31e163eca74654dc593cc.utu test": {
   "calls": {}
  },
  "baselines/corpus/179d1a6084d6ace8eb4443be19bcb3194b6834e8.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal",
+   "type-mismatch identifier",
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/179d1a6084d6ace8eb4443be19bcb3194b6834e8.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/17de5499650ecf582f30d01268a91fe16f3f6a57.utu normal": {
   "calls": {}
@@ -263,7 +314,9 @@
   "calls": {}
  },
  "baselines/corpus/181f74979ad874696c95634697e658f29dc85fb3.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/181f74979ad874696c95634697e658f29dc85fb3.utu test": {
   "calls": {}
@@ -290,19 +343,27 @@
   "calls": {}
  },
  "baselines/corpus/195338277b247a0992070343e813bc0f6514eaae.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method call_expr"
+  ]
  },
  "baselines/corpus/195338277b247a0992070343e813bc0f6514eaae.utu test": {
   "calls": {}
  },
  "baselines/corpus/1a0dba1b8c746998e8e996a016b6b14f20a8d08e.utu normal": {
-  "compile": "Error: type N = distinct Str: a distinct type wraps one of I32, U32, I64, U64, F32, F64"
+  "diagnostics": [
+   "unknown-type distinct_decl"
+  ]
  },
  "baselines/corpus/1a0dba1b8c746998e8e996a016b6b14f20a8d08e.utu test": {
-  "compile": "Error: type N = distinct Str: a distinct type wraps one of I32, U32, I64, U64, F32, F64"
+  "diagnostics": [
+   "unknown-type distinct_decl"
+  ]
  },
  "baselines/corpus/1b0cdf11505558885a28d66dabb01b383d55baea.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break continue_expr"
+  ]
  },
  "baselines/corpus/1b0cdf11505558885a28d66dabb01b383d55baea.utu test": {
   "calls": {}
@@ -319,30 +380,33 @@
   }
  },
  "baselines/corpus/1ca2d24b5a5f2885e2400fb1603592a805d5f1ec.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-field field_init"
+  ]
  },
  "baselines/corpus/1ca2d24b5a5f2885e2400fb1603592a805d5f1ec.utu test": {
   "calls": {}
  },
  "baselines/corpus/1ca78f9e20a96304bfb2207f034e258dafe1fb95.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "nullable-access field_expr"
+  ]
  },
  "baselines/corpus/1ca78f9e20a96304bfb2207f034e258dafe1fb95.utu test": {
   "calls": {}
  },
  "baselines/corpus/1d409c83fb9278f98199ae416d92f49117722816.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-declaration param"
+  ]
  },
  "baselines/corpus/1d409c83fb9278f98199ae416d92f49117722816.utu test": {
   "calls": {}
  },
  "baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu normal": {
-  "calls": {
-   "main": {
-    "result": 5,
-    "printed": []
-   }
-  }
+  "diagnostics": [
+   "non-defaultable-type promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu test": {
   "calls": {}
@@ -354,34 +418,50 @@
   "calls": {}
  },
  "baselines/corpus/1e24e09fc39540c2a7e3cebcaa8157510466ad4e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch match_arm"
+  ]
  },
  "baselines/corpus/1e24e09fc39540c2a7e3cebcaa8157510466ad4e.utu test": {
   "calls": {}
  },
  "baselines/corpus/1ef0e0275d1864ea4936206ea5f91e6ddb9c73a6.utu normal": {
-  "compile": "Error: prune cannot appear inside a closure"
+  "diagnostics": [
+   "invalid-for-source prune_expr"
+  ]
  },
  "baselines/corpus/1ef0e0275d1864ea4936206ea5f91e6ddb9c73a6.utu test": {
   "calls": {}
  },
  "baselines/corpus/1f78162f9072c60e0369ea08a963a3eda88eaef4.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/1f78162f9072c60e0369ea08a963a3eda88eaef4.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/217f6adc132aa507c420eb73c228ff68628096a9.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/217f6adc132aa507c420eb73c228ff68628096a9.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/2202db89126008e2944fadf60183ad9d65ec942d.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2202db89126008e2944fadf60183ad9d65ec942d.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2406b67a9a1bedadd0916bf7d747cbcfeac1f247.utu normal": {
   "calls": {}
@@ -421,16 +501,22 @@
   }
  },
  "baselines/corpus/252aa881c130f54d10d5771e9c5034b255099e73.utu normal": {
-  "compile": "Error: Iterator pipeline must end with fold, each, collect(Type), or a scalar terminal; found map"
+  "diagnostics": [
+   "invalid-iterator-usage iterator_expr"
+  ]
  },
  "baselines/corpus/252aa881c130f54d10d5771e9c5034b255099e73.utu test": {
   "calls": {}
  },
  "baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu test": {
-  "calls": {}
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/26d41b9688ba61edb3eabc01d56317cfb1ef8ffd.utu normal": {
   "calls": {}
@@ -448,21 +534,22 @@
   }
  },
  "baselines/corpus/274c5dd8e06bd065eff54034a8bbd7e088b1dc6a.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/274c5dd8e06bd065eff54034a8bbd7e088b1dc6a.utu test": {
   "calls": {}
  },
  "baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu normal": {
-  "calls": {
-   "main": {
-    "result": 0,
-    "printed": []
-   }
-  }
+  "diagnostics": [
+   "type-mismatch binary_expr"
+  ]
  },
  "baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch binary_expr"
+  ]
  },
  "baselines/corpus/2808ed975861a6caef565ed510159f095d27cd35.utu normal": {
   "calls": {
@@ -541,7 +628,9 @@
   "calls": {}
  },
  "baselines/corpus/289b1dfd1b6d07d2fc27c430e3598386bfe80241.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch match_arm"
+  ]
  },
  "baselines/corpus/289b1dfd1b6d07d2fc27c430e3598386bfe80241.utu test": {
   "calls": {}
@@ -564,22 +653,32 @@
   "calls": {}
  },
  "baselines/corpus/2a9b109e0dfbf3d2b60876ce39b79de6cde63246.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/2a9b109e0dfbf3d2b60876ce39b79de6cde63246.utu test": {
   "calls": {}
  },
  "baselines/corpus/2c955c8924ff9477781c581913ee0823dab775ae.utu normal": {
-  "compile": "Error: Cannot import \"../sim.utu\": file not found (<root>/baselines/sim.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2c955c8924ff9477781c581913ee0823dab775ae.utu test": {
-  "compile": "Error: Cannot import \"../sim.utu\": file not found (<root>/baselines/sim.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2d7fbb04c93342bcb1dcf703cbc3e9b97e214922.utu normal": {
-  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2d7fbb04c93342bcb1dcf703cbc3e9b97e214922.utu test": {
-  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2d906d778959733a2d5aac8bf9a07d22d6776dde.utu normal": {
   "calls": {
@@ -606,25 +705,35 @@
   }
  },
  "baselines/corpus/2dc0ab65492273d7cbb422486282833bc30dd4d0.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-nullable-type nullable_type"
+  ]
  },
  "baselines/corpus/2dc0ab65492273d7cbb422486282833bc30dd4d0.utu test": {
   "calls": {}
  },
  "baselines/corpus/2ddd76d0ed0b2f10f72c4617a7c0e83d9c980574.utu normal": {
-  "compile": "Error: Cannot import \"./_boxes.utu\": file not found (<root>/baselines/corpus/_boxes.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2ddd76d0ed0b2f10f72c4617a7c0e83d9c980574.utu test": {
-  "compile": "Error: Cannot import \"./_boxes.utu\": file not found (<root>/baselines/corpus/_boxes.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2def47a8f2158234984e77b80c0201cfd869c892.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/2def47a8f2158234984e77b80c0201cfd869c892.utu test": {
   "calls": {}
  },
  "baselines/corpus/2dfcf44154c44678f663200b1986d85e743f54a8.utu normal": {
-  "compile": "Error: s.view() returns a JS.Uint8Array; add `using JS from std:JS;`"
+  "diagnostics": [
+   "unknown-type field_expr"
+  ]
  },
  "baselines/corpus/2dfcf44154c44678f663200b1986d85e743f54a8.utu test": {
   "calls": {}
@@ -636,13 +745,22 @@
   "calls": {}
  },
  "baselines/corpus/2f22369ee92f8e581a49e0768436ab23eaba620b.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2f22369ee92f8e581a49e0768436ab23eaba620b.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/2f303e7fa3e96d8847380416aa1af6c06263f443.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/2f303e7fa3e96d8847380416aa1af6c06263f443.utu test": {
   "calls": {}
@@ -659,10 +777,14 @@
   "calls": {}
  },
  "baselines/corpus/3115eddca71f7f7fc41a0808a9962ae6c82e6de7.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/3115eddca71f7f7fc41a0808a9962ae6c82e6de7.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/317785458b671c0c57dd89c92fb3ff230fa64aa2.utu normal": {
   "calls": {
@@ -704,7 +826,9 @@
   "calls": {}
  },
  "baselines/corpus/318cc7d06871b91068da229e3a180c03b6eee03b.utu normal": {
-  "compile": "Error: prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself"
+  "diagnostics": [
+   "invalid-for-source prune_expr"
+  ]
  },
  "baselines/corpus/318cc7d06871b91068da229e3a180c03b6eee03b.utu test": {
   "calls": {}
@@ -727,16 +851,23 @@
   "calls": {}
  },
  "baselines/corpus/32fbdaff9548f268c0dfed324aa89fd0405cbd1c.utu normal": {
-  "compile": "Error: @json cannot use Missing: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/32fbdaff9548f268c0dfed324aa89fd0405cbd1c.utu test": {
   "calls": {}
  },
  "baselines/corpus/3310c158cfa2087a62318981437f2d979cbbfd8b.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "TypeError: self.getItem is not a function",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/3310c158cfa2087a62318981437f2d979cbbfd8b.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/333f12471002e694fdd978840b802b0c97c19c56.utu normal": {
   "calls": {}
@@ -745,13 +876,18 @@
   "calls": {}
  },
  "baselines/corpus/3398c4c5a3db29c9ed478fd2db07b0e0e4e682ba.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "assignment-to-immutable identifier"
+  ]
  },
  "baselines/corpus/3398c4c5a3db29c9ed478fd2db07b0e0e4e682ba.utu test": {
   "calls": {}
  },
  "baselines/corpus/33bc22a4558f23543a81b79e22bebcf003d0bc6f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "assignment-to-immutable identifier",
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/33bc22a4558f23543a81b79e22bebcf003d0bc6f.utu test": {
   "calls": {}
@@ -768,25 +904,35 @@
   "calls": {}
  },
  "baselines/corpus/35a612845f9c6b2f3c0523b5d7f792e8d50d44f1.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "non-defaultable-type promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/35a612845f9c6b2f3c0523b5d7f792e8d50d44f1.utu test": {
   "calls": {}
  },
  "baselines/corpus/38043bac22b8bd22c8462df1cf81f8dae03a0d8a.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break return_expr"
+  ]
  },
  "baselines/corpus/38043bac22b8bd22c8462df1cf81f8dae03a0d8a.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break return_expr"
+  ]
  },
  "baselines/corpus/3c7252654b2804bba026571652a894399cf71228.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-operator binary_expr"
+  ]
  },
  "baselines/corpus/3c7252654b2804bba026571652a894399cf71228.utu test": {
   "calls": {}
  },
  "baselines/corpus/3d34304de3950320b3c455124450465a14c251d9.utu normal": {
-  "compile": "Error: @json decode needs a text expression after the type"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/3d34304de3950320b3c455124450465a14c251d9.utu test": {
   "calls": {}
@@ -842,7 +988,9 @@
   }
  },
  "baselines/corpus/3ed727b21d690763fc765008cbba4cfdedd0341a.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method call_expr"
+  ]
  },
  "baselines/corpus/3ed727b21d690763fc765008cbba4cfdedd0341a.utu test": {
   "calls": {}
@@ -867,13 +1015,22 @@
   }
  },
  "baselines/corpus/3f3fc3ffb2e5c18823d4cb0cb3d99b88e8fe2d17.utu normal": {
-  "compile": "Error: yield can only appear in a generator: declare the function with `yield T` as its return type"
+  "diagnostics": [
+   "invalid-for-source yield_expr"
+  ]
  },
  "baselines/corpus/3f3fc3ffb2e5c18823d4cb0cb3d99b88e8fe2d17.utu test": {
-  "compile": "Error: yield can only appear in a generator: declare the function with `yield T` as its return type"
+  "diagnostics": [
+   "invalid-for-source yield_expr"
+  ]
  },
  "baselines/corpus/3f66f8154618f139351897edabc797391174b480.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/3f66f8154618f139351897edabc797391174b480.utu test": {
   "calls": {}
@@ -904,7 +1061,9 @@
   "calls": {}
  },
  "baselines/corpus/4039a3082e189bcc66d074a2a304bb4441969b7d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-operator binary_expr"
+  ]
  },
  "baselines/corpus/4039a3082e189bcc66d074a2a304bb4441969b7d.utu test": {
   "calls": {}
@@ -916,7 +1075,9 @@
   "calls": {}
  },
  "baselines/corpus/43620e32fb726baa4b06da70d2e1f4013d7d6467.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-declaration match_arm"
+  ]
  },
  "baselines/corpus/43620e32fb726baa4b06da70d2e1f4013d7d6467.utu test": {
   "calls": {}
@@ -951,7 +1112,9 @@
   "calls": {}
  },
  "baselines/corpus/467780d6560c84cd2d2c8244dc6fd396713eaf2b.utu normal": {
-  "compile": "Error: mem s is const; it has no push"
+  "diagnostics": [
+   "type-mismatch field_expr"
+  ]
  },
  "baselines/corpus/467780d6560c84cd2d2c8244dc6fd396713eaf2b.utu test": {
   "calls": {}
@@ -963,22 +1126,31 @@
   "calls": {}
  },
  "baselines/corpus/472ec8ed5d2996e7b89b005330126e12f16f5d5b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-operator binary_expr"
+  ]
  },
  "baselines/corpus/472ec8ed5d2996e7b89b005330126e12f16f5d5b.utu test": {
   "calls": {}
  },
  "baselines/corpus/4768534649de9f9485311072ae1b9edc7d4fb251.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/4768534649de9f9485311072ae1b9edc7d4fb251.utu test": {
   "calls": {}
  },
  "baselines/corpus/48289f11f8fe6858bcbfea5cbeefb6c41bdf1f49.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/48289f11f8fe6858bcbfea5cbeefb6c41bdf1f49.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/48486bdd707202c0765b6dfc2a61e2298fab3b65.utu normal": {
   "calls": {}
@@ -1002,7 +1174,12 @@
   }
  },
  "baselines/corpus/4b3c14f2c7ce885cfd06414bb66a2197a81839c5.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal",
+   "type-mismatch literal",
+   "type-mismatch literal",
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/4b3c14f2c7ce885cfd06414bb66a2197a81839c5.utu test": {
   "calls": {}
@@ -1027,34 +1204,42 @@
   }
  },
  "baselines/corpus/4c129bc507fbb892cafd1d6070f5e3520d2bb734.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/4c129bc507fbb892cafd1d6070f5e3520d2bb734.utu test": {
   "calls": {}
  },
  "baselines/corpus/4c96d22434788c99767c27c347950480311c7bcb.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch match_arm"
+  ]
  },
  "baselines/corpus/4c96d22434788c99767c27c347950480311c7bcb.utu test": {
   "calls": {}
  },
  "baselines/corpus/4cdf1abae144503b347baf2855fddccb1ab385ab.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "missing-field struct_init"
+  ]
  },
  "baselines/corpus/4cdf1abae144503b347baf2855fddccb1ab385ab.utu test": {
   "calls": {}
  },
  "baselines/corpus/4cf5e2447d40243124feb69a8a08d33f37f6fceb.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break continue_expr"
+  ]
  },
  "baselines/corpus/4cf5e2447d40243124feb69a8a08d33f37f6fceb.utu test": {
   "calls": {}
  },
  "baselines/corpus/4dc01d74ad0e9889e6fc5390909b3f193f6a882c.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/4dc01d74ad0e9889e6fc5390909b3f193f6a882c.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/4e2e51882c7b84989f4f467b92bdc0528da0b8ff.utu normal": {
   "calls": {}
@@ -1084,7 +1269,9 @@
   }
  },
  "baselines/corpus/4f2183783faf947eef80533032d114bc7df5c21f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch match_arm"
+  ]
  },
  "baselines/corpus/4f2183783faf947eef80533032d114bc7df5c21f.utu test": {
   "calls": {}
@@ -1158,22 +1345,31 @@
   }
  },
  "baselines/corpus/51a157c35974ccaa801e3e2cb7d195a6bdfe6f98.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/51a157c35974ccaa801e3e2cb7d195a6bdfe6f98.utu test": {
   "calls": {}
  },
  "baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/5336c98965b164f064a84949f3308f968583f80a.utu test": {
   "calls": {}
  },
  "baselines/corpus/5486af2ca7d386a53acffe658a9d9b8756d656fd.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/5486af2ca7d386a53acffe658a9d9b8756d656fd.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/54e1810b301541e910b7d6da9d25655cd3becc6f.utu normal": {
   "calls": {
@@ -1191,10 +1387,14 @@
   "calls": {}
  },
  "baselines/corpus/54e433751d02912b754b28c45ed72631d2b15807.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch func_type"
+  ]
  },
  "baselines/corpus/54e433751d02912b754b28c45ed72631d2b15807.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch func_type"
+  ]
  },
  "baselines/corpus/5560f322900c22d34f7503f60e431afc46762866.utu normal": {
   "calls": {}
@@ -1224,10 +1424,14 @@
   }
  },
  "baselines/corpus/562f1af8b897b983783d990854b650447817f5c2.utu normal": {
-  "compile": "Error: @comptime: Unknown variable 'nope' (line 4)"
+  "diagnostics": [
+   "type-mismatch identifier"
+  ]
  },
  "baselines/corpus/562f1af8b897b983783d990854b650447817f5c2.utu test": {
-  "compile": "Error: @comptime: Unknown variable 'nope' (line 4)"
+  "diagnostics": [
+   "type-mismatch identifier"
+  ]
  },
  "baselines/corpus/56850a02338f4f5dd99803472ec88493b8d45475.utu normal": {
   "calls": {
@@ -1258,7 +1462,9 @@
   "calls": {}
  },
  "baselines/corpus/57e8738a9c32bc3d1ec77585033427d012b4b210.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-for-source literal"
+  ]
  },
  "baselines/corpus/57e8738a9c32bc3d1ec77585033427d012b4b210.utu test": {
   "calls": {}
@@ -1287,10 +1493,14 @@
   }
  },
  "baselines/corpus/5877778b67b9c45fd018b0d960e3c50a3b8a12d2.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch optional_field_expr"
+  ]
  },
  "baselines/corpus/5877778b67b9c45fd018b0d960e3c50a3b8a12d2.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch optional_field_expr"
+  ]
  },
  "baselines/corpus/59e21c48e7764a28941013a5327a8b22b5274313.utu normal": {
   "calls": {}
@@ -1359,7 +1569,12 @@
   "calls": {}
  },
  "baselines/corpus/5bb359210ceee87ce13cfd2ebb713b5f49d8b014.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/5bb359210ceee87ce13cfd2ebb713b5f49d8b014.utu test": {
   "calls": {}
@@ -1382,7 +1597,9 @@
   "calls": {}
  },
  "baselines/corpus/5cbfd40d180152f736dd55f5e8cea8d3a565c885.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/5cbfd40d180152f736dd55f5e8cea8d3a565c885.utu test": {
   "calls": {}
@@ -1399,7 +1616,9 @@
   "calls": {}
  },
  "baselines/corpus/5dbd0dffb47ffd56a84a842f1f5db18a0ab5e7e8.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method call_expr"
+  ]
  },
  "baselines/corpus/5dbd0dffb47ffd56a84a842f1f5db18a0ab5e7e8.utu test": {
   "calls": {}
@@ -1420,19 +1639,27 @@
   }
  },
  "baselines/corpus/5f52b76f3a167df36420c40920c71e0a9273e0d6.utu normal": {
-  "compile": "Error: x is captured twice in this pattern"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/5f52b76f3a167df36420c40920c71e0a9273e0d6.utu test": {
   "calls": {}
  },
  "baselines/corpus/605c2379f41903a159d987de1ce424e092819310.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "recursive-type field"
+  ]
  },
  "baselines/corpus/605c2379f41903a159d987de1ce424e092819310.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "recursive-type field"
+  ]
  },
  "baselines/corpus/6098c805f7bbea0400dcbc48cc731f31f3617113.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/6098c805f7bbea0400dcbc48cc731f31f3617113.utu test": {
   "calls": {}
@@ -1449,10 +1676,14 @@
   "calls": {}
  },
  "baselines/corpus/61a23f4f9972b16194f2eaa17f55d78f0d0e7f5d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/61a23f4f9972b16194f2eaa17f55d78f0d0e7f5d.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/623ba9ba9d38a16d254fd55c23339967f72bdda8.utu normal": {
   "calls": {}
@@ -1519,25 +1750,35 @@
   "calls": {}
  },
  "baselines/corpus/63fa5bf1130dd121cbd64ac5aca10aaeef671b23.utu normal": {
-  "compile": "Error: T.B and T.A are both 1"
+  "diagnostics": [
+   "duplicate-declaration variant"
+  ]
  },
  "baselines/corpus/63fa5bf1130dd121cbd64ac5aca10aaeef671b23.utu test": {
-  "compile": "Error: T.B and T.A are both 1"
+  "diagnostics": [
+   "duplicate-declaration variant"
+  ]
  },
  "baselines/corpus/64b1fc87520bb4e23d800e802e87443d5607e4d9.utu normal": {
-  "compile": "Error: @json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/64b1fc87520bb4e23d800e802e87443d5607e4d9.utu test": {
   "calls": {}
  },
  "baselines/corpus/64ee3b3789ca68f466b4f6a623cb263661b33f3d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/64ee3b3789ca68f466b4f6a623cb263661b33f3d.utu test": {
   "calls": {}
  },
  "baselines/corpus/65eeb04411f0c492d614be707974be0eff5ca932.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/65eeb04411f0c492d614be707974be0eff5ca932.utu test": {
   "calls": {}
@@ -1694,7 +1935,9 @@
   "calls": {}
  },
  "baselines/corpus/6a0a5cce5b25f526a52beb7d61d943d04caa547e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-operator index_expr"
+  ]
  },
  "baselines/corpus/6a0a5cce5b25f526a52beb7d61d943d04caa547e.utu test": {
   "calls": {}
@@ -1741,13 +1984,20 @@
   "calls": {}
  },
  "baselines/corpus/6be2d90168da9e127b21d6f9b2aeeb45ad6f858e.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/6be2d90168da9e127b21d6f9b2aeeb45ad6f858e.utu test": {
   "calls": {}
  },
  "baselines/corpus/71b4ee6b9ca48ae70fb179ed82beff620407fe5e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "wrong-arity call_expr"
+  ]
  },
  "baselines/corpus/71b4ee6b9ca48ae70fb179ed82beff620407fe5e.utu test": {
   "calls": {}
@@ -1759,7 +2009,9 @@
   "calls": {}
  },
  "baselines/corpus/74b727465a38368e151d348c6cad4b2a0880331d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "wrong-arity call_expr"
+  ]
  },
  "baselines/corpus/74b727465a38368e151d348c6cad4b2a0880331d.utu test": {
   "calls": {}
@@ -1801,10 +2053,16 @@
   }
  },
  "baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident",
+   "unknown-type type_ident",
+   "wrong-arity call_expr"
+  ]
  },
  "baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu test": {
-  "calls": {}
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/78525b29e4acb419709b3577a7efdf1ab5fc558e.utu normal": {
   "calls": {}
@@ -1830,13 +2088,17 @@
   }
  },
  "baselines/corpus/789c740b66a3c1e9e2b48ba3656de013a8e75ef8.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/789c740b66a3c1e9e2b48ba3656de013a8e75ef8.utu test": {
   "calls": {}
  },
  "baselines/corpus/78a4efef00b689cfa1e5d94c4777e1b2ee3b2748.utu normal": {
-  "compile": "Error: @stored state must be a struct so updates can apply in place; wrap Str in a struct field"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/78a4efef00b689cfa1e5d94c4777e1b2ee3b2748.utu test": {
   "calls": {}
@@ -1890,13 +2152,19 @@
   }
  },
  "baselines/corpus/7c389e2596c3c5af37d3b73f11059d16eb8fe768.utu normal": {
-  "compile": "Error: Cannot import \"./ui.utu\": file not found (<root>/baselines/corpus/ui.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/7c389e2596c3c5af37d3b73f11059d16eb8fe768.utu test": {
-  "compile": "Error: Cannot import \"./ui.utu\": file not found (<root>/baselines/corpus/ui.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/7c3a1ab1ead710beaa0d078b1508b870554beb95.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/7c3a1ab1ead710beaa0d078b1508b870554beb95.utu test": {
   "calls": {}
@@ -1932,10 +2200,15 @@
   }
  },
  "baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu normal": {
-  "diagnostics": true
+  "calls": {
+   "main": {
+    "result": 42,
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu test": {
-  "diagnostics": true
+  "calls": {}
  },
  "baselines/corpus/7e00d630b69cb67bcc6a66e6f9c498e907db2c98.utu normal": {
   "calls": {
@@ -1991,7 +2264,9 @@
   }
  },
  "baselines/corpus/80dcbb25c51621e59fdde34e1497a94639ab8845.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-for-source literal"
+  ]
  },
  "baselines/corpus/80dcbb25c51621e59fdde34e1497a94639ab8845.utu test": {
   "calls": {}
@@ -2028,7 +2303,9 @@
   "calls": {}
  },
  "baselines/corpus/82b040e6e142b5488aac5a5f1d1c280c64cec575.utu normal": {
-  "compile": "Error: @json match needs a ~> arm for text that matches no pattern"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/82b040e6e142b5488aac5a5f1d1c280c64cec575.utu test": {
   "calls": {}
@@ -2060,7 +2337,9 @@
   "calls": {}
  },
  "baselines/corpus/839683defe4f203daccf6baa6155b4d9e72d1f2d.utu normal": {
-  "compile": "Error: a recursive generator passes its own values straight through: `for (g(…)) |v| { yield v; }`"
+  "diagnostics": [
+   "invalid-for-source for_expr"
+  ]
  },
  "baselines/corpus/839683defe4f203daccf6baa6155b4d9e72d1f2d.utu test": {
   "calls": {}
@@ -2077,13 +2356,20 @@
   "calls": {}
  },
  "baselines/corpus/84da01551e61987c07c555a3d96a7f8ebe59ce69.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/84da01551e61987c07c555a3d96a7f8ebe59ce69.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/878af1db77f70078b86430489e463ee100bfa27b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/878af1db77f70078b86430489e463ee100bfa27b.utu test": {
   "calls": {}
@@ -2095,13 +2381,17 @@
   "calls": {}
  },
  "baselines/corpus/87ee21ba075153699772896b79f673e73b61bea3.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break break_expr"
+  ]
  },
  "baselines/corpus/87ee21ba075153699772896b79f673e73b61bea3.utu test": {
   "calls": {}
  },
  "baselines/corpus/898215bfc15013b4e9f6cf0b2f4f960d7e2e3e5b.utu normal": {
-  "compile": "Error: mem s.intern: only byte mems (U8, I8) intern spans"
+  "diagnostics": [
+   "unknown-method field_expr"
+  ]
  },
  "baselines/corpus/898215bfc15013b4e9f6cf0b2f4f960d7e2e3e5b.utu test": {
   "calls": {}
@@ -2135,83 +2425,87 @@
   "calls": {}
  },
  "baselines/corpus/8cd3336530b3b3d840f424b0035ab039b63b76b9.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/8cd3336530b3b3d840f424b0035ab039b63b76b9.utu test": {
   "calls": {}
  },
  "baselines/corpus/8cfadf16564fd2231e4593150d868f7951504748.utu normal": {
-  "compile": "Error: Field a appears twice in this pattern"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/8cfadf16564fd2231e4593150d868f7951504748.utu test": {
   "calls": {}
  },
  "baselines/corpus/8dcba67f93b15f953532bc53cc22498d8522caf5.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/8dcba67f93b15f953532bc53cc22498d8522caf5.utu test": {
   "calls": {}
  },
  "baselines/corpus/8e2a91539cfae4b017fd8b8314902dabb4d0d63d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/8e2a91539cfae4b017fd8b8314902dabb4d0d63d.utu test": {
   "calls": {}
  },
  "baselines/corpus/8ea0be4c5f1fa38d3cd8e1449e80fbdd09da2827.utu normal": {
-  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/8ea0be4c5f1fa38d3cd8e1449e80fbdd09da2827.utu test": {
-  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-for-source for_expr"
+  ]
  },
  "baselines/corpus/8eaaf94244566f94a2a46f6a209835af2376e590.utu test": {
   "calls": {}
  },
  "baselines/corpus/909b41960b0d5b04fbf8e50fa9dcc2c14638e728.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method struct_decl"
+  ]
  },
  "baselines/corpus/909b41960b0d5b04fbf8e50fa9dcc2c14638e728.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method struct_decl"
+  ]
  },
  "baselines/corpus/90b2b584db4170cee56544858b48f31178af96bb.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-field field"
+  ]
  },
  "baselines/corpus/90b2b584db4170cee56544858b48f31178af96bb.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-field field"
+  ]
  },
  "baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu normal": {
-  "calls": {}
+  "diagnostics": [
+   "non-defaultable-type promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu test": {
-  "calls": {
-   "__test_0": {
-    "result": null,
-    "printed": []
-   },
-   "__test_1": {
-    "result": null,
-    "printed": []
-   },
-   "__test_2": {
-    "result": null,
-    "printed": []
-   },
-   "__test_3": {
-    "result": null,
-    "printed": []
-   },
-   "__test_4": {
-    "result": null,
-    "printed": []
-   },
-   "__test_5": {
-    "result": null,
-    "printed": []
-   }
-  }
+  "diagnostics": [
+   "non-defaultable-type promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/91bfa73ab440e23c35805e570e727ca3a0580202.utu normal": {
   "calls": {}
@@ -2226,10 +2520,14 @@
   "calls": {}
  },
  "baselines/corpus/921408b577dd72260a284594cd6cd1b5075d2d3a.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/921408b577dd72260a284594cd6cd1b5075d2d3a.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/92b666afb43ec3d663806c4afc848c2ca5946155.utu normal": {
   "calls": {}
@@ -2238,10 +2536,14 @@
   "calls": {}
  },
  "baselines/corpus/92ba28241cbfc29d796d155432201ab5fe4b2a92.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/92ba28241cbfc29d796d155432201ab5fe4b2a92.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/92bdddcf5c08d35f41d4854afa9e6d2f4e5db40f.utu normal": {
   "calls": {
@@ -2268,7 +2570,10 @@
   }
  },
  "baselines/corpus/92e7abbec91b6b7fdf81206701d46846834ddd61.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type",
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/92e7abbec91b6b7fdf81206701d46846834ddd61.utu test": {
   "calls": {}
@@ -2291,7 +2596,9 @@
   "calls": {}
  },
  "baselines/corpus/9522d7ef0d323ef22347e156ee1fa980694ce032.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch identifier"
+  ]
  },
  "baselines/corpus/9522d7ef0d323ef22347e156ee1fa980694ce032.utu test": {
   "calls": {}
@@ -2308,24 +2615,28 @@
   "calls": {}
  },
  "baselines/corpus/95dfc2ca5fddcca92983d711c298d74dff4fd501.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/95dfc2ca5fddcca92983d711c298d74dff4fd501.utu test": {
   "calls": {}
  },
  "baselines/corpus/9681368d38553e5dcb6a83e23377242977569f3c.utu normal": {
-  "compile": "Error: Unsupported stored type I64; use local structs, Array, Str, Bool, I32, or F64"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/9681368d38553e5dcb6a83e23377242977569f3c.utu test": {
   "calls": {}
  },
  "baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu normal": {
-  "calls": {
-   "main": {
-    "result": 13,
-    "printed": []
-   }
-  }
+  "diagnostics": [
+   "non-defaultable-type promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu test": {
   "calls": {}
@@ -2337,7 +2648,9 @@
   "calls": {}
  },
  "baselines/corpus/994fde4f85de7869eca75dcfae3314a2de62e7fe.utu normal": {
-  "compile": "Error: map expects 1 value binding(s) and an optional index"
+  "diagnostics": [
+   "invalid-iterator-usage iterator_expr"
+  ]
  },
  "baselines/corpus/994fde4f85de7869eca75dcfae3314a2de62e7fe.utu test": {
   "calls": {}
@@ -2362,10 +2675,14 @@
   "calls": {}
  },
  "baselines/corpus/999208f2a83d9961a7b2346ee2b5870d3907a143.utu normal": {
-  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/999208f2a83d9961a7b2346ee2b5870d3907a143.utu test": {
-  "compile": "Error: Cannot import \"./sim.utu\": file not found (<root>/baselines/corpus/sim.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/9a0ac119da8142da862eac10415337f0b7bf5eb1.utu normal": {
   "calls": {
@@ -2399,7 +2716,9 @@
   "calls": {}
  },
  "baselines/corpus/9a8463e1fc37a1b7d993acb00cf28b619bb757ad.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/9a8463e1fc37a1b7d993acb00cf28b619bb757ad.utu test": {
   "calls": {}
@@ -2411,16 +2730,24 @@
   "calls": {}
  },
  "baselines/corpus/9bbd8bc527d608e2c3ea2aaa6103a5e0a9909dc8.utu normal": {
-  "compile": "Error: mem s: an initializer list holds number literals; compute other values with @comptime"
+  "diagnostics": [
+   "type-mismatch array_expr"
+  ]
  },
  "baselines/corpus/9bbd8bc527d608e2c3ea2aaa6103a5e0a9909dc8.utu test": {
-  "compile": "Error: mem s: an initializer list holds number literals; compute other values with @comptime"
+  "diagnostics": [
+   "type-mismatch array_expr"
+  ]
  },
  "baselines/corpus/9bd9b0bd75a72862bec3db826c7408e8ea3ad323.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-declaration variant"
+  ]
  },
  "baselines/corpus/9bd9b0bd75a72862bec3db826c7408e8ea3ad323.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-declaration variant"
+  ]
  },
  "baselines/corpus/9c53dfb52f06d81078eecebe3508973d1ac3a845.utu normal": {
   "calls": {
@@ -2434,10 +2761,14 @@
   "calls": {}
  },
  "baselines/corpus/9c86d4232d842edd6e8d6fd5b7821297508adf66.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/9c86d4232d842edd6e8d6fd5b7821297508adf66.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/9caea06f5ad605538d12085ebf0def9c5d3e2ef4.utu normal": {
   "calls": {}
@@ -2457,10 +2788,14 @@
   "calls": {}
  },
  "baselines/corpus/9ef501feb3739491839371d5ab955a4378c47ea0.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/9ef501feb3739491839371d5ab955a4378c47ea0.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/9ff5b3e8e925475a0926e1260a766ea4afb58f12.utu normal": {
   "calls": {
@@ -2474,10 +2809,14 @@
   "calls": {}
  },
  "baselines/corpus/a0a0e131d9736bb1c2a2bf04d37c9ee68cbba596.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/a0a0e131d9736bb1c2a2bf04d37c9ee68cbba596.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/a13412b10f688d3a9ea496111b3ab4d72ae07793.utu normal": {
   "calls": {
@@ -2491,19 +2830,27 @@
   "calls": {}
  },
  "baselines/corpus/a18b50014f132d1d90feae3cfd4a74339b30c35b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/a18b50014f132d1d90feae3cfd4a74339b30c35b.utu test": {
   "calls": {}
  },
  "baselines/corpus/a1b6745378d2c0d0516d2b754396f3684d65962e.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/a1b6745378d2c0d0516d2b754396f3684d65962e.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/a2370c4d90b5a84f39923256aa03315df5a207ba.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/a2370c4d90b5a84f39923256aa03315df5a207ba.utu test": {
   "calls": {}
@@ -2546,7 +2893,9 @@
   "calls": {}
  },
  "baselines/corpus/a41733144d37c9aa1b128adbdaefd195c77bba5f.utu normal": {
-  "compile": "Error: mem s has no method 'pop'; it has len, cap, push, reserve, resize, clear, copy_in, view, intern, interned, interned_start, interned_size, intern_reset"
+  "diagnostics": [
+   "unknown-method field_expr"
+  ]
  },
  "baselines/corpus/a41733144d37c9aa1b128adbdaefd195c77bba5f.utu test": {
   "calls": {}
@@ -2576,31 +2925,45 @@
   }
  },
  "baselines/corpus/a4f784b1cc612802561fb412a4be5825f5573ef3.utu normal": {
-  "compile": "Error: Missing variant 'B' in match over T"
+  "diagnostics": [
+   "non-exhaustive-match match_expr"
+  ]
  },
  "baselines/corpus/a4f784b1cc612802561fb412a4be5825f5573ef3.utu test": {
-  "compile": "Error: Missing variant 'B' in match over T"
+  "diagnostics": [
+   "non-exhaustive-match match_expr"
+  ]
  },
  "baselines/corpus/a513fcd0fa0913b251b27c14a4ea2a2c967c9533.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/a513fcd0fa0913b251b27c14a4ea2a2c967c9533.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/a58edb03b2093fe19fd047828bfe3952802a3c2d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/a58edb03b2093fe19fd047828bfe3952802a3c2d.utu test": {
   "calls": {}
  },
  "baselines/corpus/a64a37b9e1251ea3bbe7b120ccac04bc5487ceb8.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch bind_expr"
+  ]
  },
  "baselines/corpus/a64a37b9e1251ea3bbe7b120ccac04bc5487ceb8.utu test": {
   "calls": {}
  },
  "baselines/corpus/a6aee19dad13bb95a15b1c9afbd438e621f5ef0e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/a6aee19dad13bb95a15b1c9afbd438e621f5ef0e.utu test": {
   "calls": {}
@@ -2617,7 +2980,9 @@
   "calls": {}
  },
  "baselines/corpus/a7f0db145b8128f483f870f13f3d8d56c025c84f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/a7f0db145b8128f483f870f13f3d8d56c025c84f.utu test": {
   "calls": {}
@@ -2629,16 +2994,23 @@
   "calls": {}
  },
  "baselines/corpus/a8c7bc24c03dccc393883c318fffde77903eaf01.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch array_expr"
+  ]
  },
  "baselines/corpus/a8c7bc24c03dccc393883c318fffde77903eaf01.utu test": {
   "calls": {}
  },
  "baselines/corpus/a91851b910d1d1cb590ba403bd7e345d9c7ed334.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/a91851b910d1d1cb590ba403bd7e345d9c7ed334.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/a93076aa7ec74f50008e3caa2146e57a8c7f5afc.utu normal": {
   "calls": {}
@@ -2647,19 +3019,25 @@
   "calls": {}
  },
  "baselines/corpus/aa5ed85c34cdebb06bc51af1feb4f0190359eb8e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch bind_expr"
+  ]
  },
  "baselines/corpus/aa5ed85c34cdebb06bc51af1feb4f0190359eb8e.utu test": {
   "calls": {}
  },
  "baselines/corpus/aa64d27613e81c462a3c5981579372ad4e9aaeac.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/aa64d27613e81c462a3c5981579372ad4e9aaeac.utu test": {
   "calls": {}
  },
  "baselines/corpus/ab75d538855209c366fd64f25d6c1ade0c5dfce3.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "wrong-arity promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/ab75d538855209c366fd64f25d6c1ade0c5dfce3.utu test": {
   "calls": {}
@@ -2687,40 +3065,62 @@
   "calls": {}
  },
  "baselines/corpus/ad068c847e2f31214b258daa73b2e8dd131d74e5.utu normal": {
-  "compile": "Error: T.A = 300 does not fit in U8"
+  "diagnostics": [
+   "type-mismatch variant"
+  ]
  },
  "baselines/corpus/ad068c847e2f31214b258daa73b2e8dd131d74e5.utu test": {
-  "compile": "Error: T.A = 300 does not fit in U8"
+  "diagnostics": [
+   "type-mismatch variant"
+  ]
  },
  "baselines/corpus/ad4658405c3b665dba7f017e0ecf5d50d3ab4323.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/ad4658405c3b665dba7f017e0ecf5d50d3ab4323.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/ada6702b69004ba9a04d0242c91a1851f4e6054f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/ada6702b69004ba9a04d0242c91a1851f4e6054f.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/aea9df7fad5bf6673ead6122eb24201911b7f19d.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/aea9df7fad5bf6673ead6122eb24201911b7f19d.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/aecf5f2c8c32e637460725548554eebcd6633c08.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "nullable-access field_expr"
+  ]
  },
  "baselines/corpus/aecf5f2c8c32e637460725548554eebcd6633c08.utu test": {
   "calls": {}
  },
  "baselines/corpus/af0c8765b7e81d6eaffdb3469b27e48e24b195fc.utu normal": {
-  "compile": "Error: ?I32 is not supported: only reference types (Str, structs, enums, arrays) can be null"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/af0c8765b7e81d6eaffdb3469b27e48e24b195fc.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-nullable-type nullable_type"
+  ]
  },
  "baselines/corpus/af767b17b92986ea7328e5d72e70e2248fdd2c21.utu normal": {
   "calls": {
@@ -2734,10 +3134,14 @@
   "calls": {}
  },
  "baselines/corpus/af9522ee1acd5d6799d50188c9611af621e395e3.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/af9522ee1acd5d6799d50188c9611af621e395e3.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/af9d3dfed9907b2974cf17ccbffca3ed29e574bb.utu normal": {
   "calls": {}
@@ -2759,28 +3163,41 @@
   }
  },
  "baselines/corpus/b1d3aa7ae9ac8db7f724dcf8f6b83e9014205718.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "not-callable call_expr",
+   "invalid-await await_expr"
+  ]
  },
  "baselines/corpus/b1d3aa7ae9ac8db7f724dcf8f6b83e9014205718.utu test": {
   "calls": {}
  },
  "baselines/corpus/b34e93567128579883fd49dca0c20660d18406fc.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "missing-field struct_init"
+  ]
  },
  "baselines/corpus/b34e93567128579883fd49dca0c20660d18406fc.utu test": {
   "calls": {}
  },
  "baselines/corpus/b431386bd0226ceb604b1ec1d4e4f8d71df9c80e.utu normal": {
-  "compile": "Error: A contains itself; make the recursive field ?A or an Array"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/b431386bd0226ceb604b1ec1d4e4f8d71df9c80e.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "recursive-type field"
+  ]
  },
  "baselines/corpus/b4c7bd394f2cedbe5a5764fbe08c9cf2d918373a.utu normal": {
-  "compile": "Error: mem s has the same name as a top-level function or global"
+  "diagnostics": [
+   "duplicate-declaration mem_decl"
+  ]
  },
  "baselines/corpus/b4c7bd394f2cedbe5a5764fbe08c9cf2d918373a.utu test": {
-  "compile": "Error: mem s has the same name as a top-level function or global"
+  "diagnostics": [
+   "duplicate-declaration mem_decl"
+  ]
  },
  "baselines/corpus/b4c862b7cdfd33603878d19a4fc91a329c8d0196.utu normal": {
   "calls": {
@@ -2864,19 +3281,27 @@
   "calls": {}
  },
  "baselines/corpus/b5a801c9aaaf2a63b281466e860647f4f3fca3ed.utu normal": {
-  "compile": "Error: mem s: @embed cannot read missing.bin: ENOENT"
+  "diagnostics": [
+   "type-mismatch dsl_expr"
+  ]
  },
  "baselines/corpus/b5a801c9aaaf2a63b281466e860647f4f3fca3ed.utu test": {
-  "compile": "Error: mem s: @embed cannot read missing.bin: ENOENT"
+  "diagnostics": [
+   "type-mismatch dsl_expr"
+  ]
  },
  "baselines/corpus/b74a8afc2fe91565346641d6af674bd28e82b470.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-field field_init"
+  ]
  },
  "baselines/corpus/b74a8afc2fe91565346641d6af674bd28e82b470.utu test": {
   "calls": {}
  },
  "baselines/corpus/b84da548bab60657ff48ddcbc51b111b3e276c39.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/b84da548bab60657ff48ddcbc51b111b3e276c39.utu test": {
   "calls": {}
@@ -2899,7 +3324,9 @@
   "calls": {}
  },
  "baselines/corpus/ba76b5a3a2d735396279327d25c93afbd2f8965e.utu normal": {
-  "compile": "Error: mem s is not a value; use s[i], s[i] = v, or s.len()"
+  "diagnostics": [
+   "type-mismatch identifier"
+  ]
  },
  "baselines/corpus/ba76b5a3a2d735396279327d25c93afbd2f8965e.utu test": {
   "calls": {}
@@ -2935,10 +3362,14 @@
   }
  },
  "baselines/corpus/bb8dae5a063f472c511efcb530ae69acd60c0734.utu normal": {
-  "compile": "Error: mem s is declared twice"
+  "diagnostics": [
+   "duplicate-declaration mem_decl"
+  ]
  },
  "baselines/corpus/bb8dae5a063f472c511efcb530ae69acd60c0734.utu test": {
-  "compile": "Error: mem s is declared twice"
+  "diagnostics": [
+   "duplicate-declaration mem_decl"
+  ]
  },
  "baselines/corpus/bb9a1d5e8797232584cffde78559694be561f5dd.utu normal": {
   "calls": {}
@@ -2983,61 +3414,95 @@
   "calls": {}
  },
  "baselines/corpus/bde001b9cf46595bcec91bacdffbacf483acc56d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-nullable-type literal"
+  ]
  },
  "baselines/corpus/bde001b9cf46595bcec91bacdffbacf483acc56d.utu test": {
   "calls": {}
  },
  "baselines/corpus/be72014f1ad4a7789637c14ac361c5d4b4eeefc4.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/be72014f1ad4a7789637c14ac361c5d4b4eeefc4.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/bf24ee8aebc9da647ec84af834e871b0a866e076.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/bf24ee8aebc9da647ec84af834e871b0a866e076.utu test": {
   "calls": {}
  },
  "baselines/corpus/bf37ff97923271bd0102ac8a842b19138bde520f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/bf37ff97923271bd0102ac8a842b19138bde520f.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/c01a8fbd88bdae555c3dd1465b6f9ddae8334b9b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch optional_field_expr"
+  ]
  },
  "baselines/corpus/c01a8fbd88bdae555c3dd1465b6f9ddae8334b9b.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch optional_field_expr"
+  ]
  },
  "baselines/corpus/c1da2c2d2028916e893f2cf5e6404a21e8e1b2b6.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "diagnostics": [
+   "type-mismatch literal",
+   "type-mismatch field_expr",
+   "type-mismatch field_expr",
+   "type-mismatch field_expr",
+   "type-mismatch literal",
+   "type-mismatch field_expr"
+  ]
  },
  "baselines/corpus/c1da2c2d2028916e893f2cf5e6404a21e8e1b2b6.utu test": {
   "calls": {}
  },
  "baselines/corpus/c2094ea519e4323c6d27e1534f7c2031787e6d83.utu normal": {
-  "compile": "Error: E.V has a field named kind, which @json uses to name the variant"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/c2094ea519e4323c6d27e1534f7c2031787e6d83.utu test": {
   "calls": {}
  },
  "baselines/corpus/c23d6199227ece71c4577db08e193be33c57c5a1.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "wrong-arity call_expr"
+  ]
  },
  "baselines/corpus/c23d6199227ece71c4577db08e193be33c57c5a1.utu test": {
   "calls": {}
  },
  "baselines/corpus/c351f4992b3824d6d1dd378fcb8e577a98848c6e.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/c351f4992b3824d6d1dd378fcb8e577a98848c6e.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/c3598316327dd4e24dc8b61b739b6b8048c395f5.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-declaration match_arm"
+  ]
  },
  "baselines/corpus/c3598316327dd4e24dc8b61b739b6b8048c395f5.utu test": {
   "calls": {}
@@ -3049,7 +3514,9 @@
   "calls": {}
  },
  "baselines/corpus/c49dba6213ed8009e151c0db04f87ca1f98bcc1d.utu normal": {
-  "compile": "Error: g is a generator: consume it with `for (g(…)) |value| { … }`"
+  "diagnostics": [
+   "invalid-for-source call_expr"
+  ]
  },
  "baselines/corpus/c49dba6213ed8009e151c0db04f87ca1f98bcc1d.utu test": {
   "calls": {}
@@ -3095,7 +3562,9 @@
   "calls": {}
  },
  "baselines/corpus/c5ae7338a8fe0751773a954d4a0a840d6153cce1.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/c5ae7338a8fe0751773a954d4a0a840d6153cce1.utu test": {
   "calls": {}
@@ -3113,7 +3582,9 @@
   "calls": {}
  },
  "baselines/corpus/c81428e0fc9a701d1eca3e665f58ccc1c705ecc6.utu normal": {
-  "compile": "Error: Expected {…}, |name| Type, or a literal in @json pattern"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/c81428e0fc9a701d1eca3e665f58ccc1c705ecc6.utu test": {
   "calls": {}
@@ -3125,19 +3596,27 @@
   "calls": {}
  },
  "baselines/corpus/c8e1d415ad9abc4dbfce511293232732574b5e01.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch closure_expr"
+  ]
  },
  "baselines/corpus/c8e1d415ad9abc4dbfce511293232732574b5e01.utu test": {
   "calls": {}
  },
  "baselines/corpus/c9b9d01b52fcab8470447d275fcfc1f542f0dc93.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/c9b9d01b52fcab8470447d275fcfc1f542f0dc93.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch tuple_type"
+  ]
  },
  "baselines/corpus/ca02860c00986db4d172e13a52f4b0c99aa7907a.utu normal": {
-  "compile": "Error: mem s takes one index: s[i]"
+  "diagnostics": [
+   "type-mismatch slice_expr"
+  ]
  },
  "baselines/corpus/ca02860c00986db4d172e13a52f4b0c99aa7907a.utu test": {
   "calls": {}
@@ -3154,10 +3633,14 @@
   "calls": {}
  },
  "baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu normal": {
-  "compile": "Error: a generator ends with `return;`, without a value"
+  "diagnostics": [
+   "invalid-for-source return_expr"
+  ]
  },
  "baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu test": {
-  "calls": {}
+  "diagnostics": [
+   "invalid-for-source return_expr"
+  ]
  },
  "baselines/corpus/cb5eb0652dbbc5bf672ae9531b9aae97523624c5.utu normal": {
   "calls": {}
@@ -3179,7 +3662,9 @@
   }
  },
  "baselines/corpus/cc077a61ccd543fa4ae09a708b63538f00ed0f8b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/cc077a61ccd543fa4ae09a708b63538f00ed0f8b.utu test": {
   "calls": {}
@@ -3191,7 +3676,9 @@
   "calls": {}
  },
  "baselines/corpus/ce5e34eb79111f7555c19f40d7787139e5c4ff18.utu normal": {
-  "compile": "Error: @json decode works on a struct, enum, or Array; wrap I32 in a struct field"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/ce5e34eb79111f7555c19f40d7787139e5c4ff18.utu test": {
   "calls": {}
@@ -3203,19 +3690,25 @@
   "calls": {}
  },
  "baselines/corpus/cf77bb2ee8176dd6ffbcb37f4339d561f064d8be.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/cf77bb2ee8176dd6ffbcb37f4339d561f064d8be.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/d0e40ff72d65155b15149adcfa3c403156cbb7c9.utu normal": {
-  "compile": "Error: yield cannot appear inside a closure; the generator expands into its consumer"
+  "diagnostics": [
+   "invalid-for-source yield_expr"
+  ]
  },
  "baselines/corpus/d0e40ff72d65155b15149adcfa3c403156cbb7c9.utu test": {
-  "compile": "Error: yield cannot appear inside a closure; the generator expands into its consumer"
+  "diagnostics": [
+   "invalid-for-source yield_expr"
+  ]
  },
  "baselines/corpus/d2f86b64c96b31ae7cdfc6a181f925c0719623d5.utu normal": {
-  "compile": "Error: g expects 1 argument(s), got 0"
+  "diagnostics": [
+   "invalid-for-source for_expr"
+  ]
  },
  "baselines/corpus/d2f86b64c96b31ae7cdfc6a181f925c0719623d5.utu test": {
   "calls": {}
@@ -3238,10 +3731,15 @@
   "calls": {}
  },
  "baselines/corpus/d3e969869a60730b1ceb4493d2f0c8d42c69a4fe.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/d3e969869a60730b1ceb4493d2f0c8d42c69a4fe.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/d435f6fe29d06e1a921ed2e80d64f5dfd10e88e9.utu normal": {
   "calls": {
@@ -3268,28 +3766,42 @@
   }
  },
  "baselines/corpus/d443a91d5e62e7fc24782aa04332a760534cfad9.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch fn_decl"
+  ]
  },
  "baselines/corpus/d443a91d5e62e7fc24782aa04332a760534cfad9.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch fn_decl"
+  ]
  },
  "baselines/corpus/d6733d20c9f1318e40becf133ed1a35d22497aca.utu normal": {
-  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/d6733d20c9f1318e40becf133ed1a35d22497aca.utu test": {
-  "compile": "Error: Cannot import \"./lib.utu\": file not found (<root>/baselines/corpus/lib.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/d77c6781450ff47e79b9a4a9d239147d30e1ec0b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "non-exhaustive-match match_expr"
+  ]
  },
  "baselines/corpus/d77c6781450ff47e79b9a4a9d239147d30e1ec0b.utu test": {
   "calls": {}
  },
  "baselines/corpus/d8932a6de0a164a686a4d4da45b268bae6819f76.utu normal": {
-  "compile": "Error: mem s: element 0 (256) does not fit in U8"
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/d8932a6de0a164a686a4d4da45b268bae6819f76.utu test": {
-  "compile": "Error: mem s: element 0 (256) does not fit in U8"
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/d89746b87e4cdd73d85062bcaca68268388c6bf6.utu normal": {
   "calls": {
@@ -3430,19 +3942,27 @@
   "calls": {}
  },
  "baselines/corpus/df09e1754c6d264f628d37d4e56ec094231e59e8.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/df09e1754c6d264f628d37d4e56ec094231e59e8.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "parse-error file"
+  ]
  },
  "baselines/corpus/df4296321611dc9ab1a0173614e0d73f162b4e9d.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break break_expr"
+  ]
  },
  "baselines/corpus/df4296321611dc9ab1a0173614e0d73f162b4e9d.utu test": {
   "calls": {}
  },
  "baselines/corpus/df83fdcbfd5e902ed5b4af76e29f958ee5a65378.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-variable identifier"
+  ]
  },
  "baselines/corpus/df83fdcbfd5e902ed5b4af76e29f958ee5a65378.utu test": {
   "calls": {}
@@ -3463,13 +3983,17 @@
   "calls": {}
  },
  "baselines/corpus/e2fedc0b4754de2fcea7855adeb379140860ea6b.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "duplicate-declaration match_arm"
+  ]
  },
  "baselines/corpus/e2fedc0b4754de2fcea7855adeb379140860ea6b.utu test": {
   "calls": {}
  },
  "baselines/corpus/e30c5679e9f2dd0333bd29a9a30cb8ccd38c3ffb.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/e30c5679e9f2dd0333bd29a9a30cb8ccd38c3ffb.utu test": {
   "calls": {}
@@ -3486,19 +4010,30 @@
   "calls": {}
  },
  "baselines/corpus/e358b7a2d670053cc1e446b66fc6dc4726fe375f.utu normal": {
-  "compile": "Error: Cannot import \"./does-not-exist.utu\": file not found (<root>/baselines/corpus/does-not-exist.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/e358b7a2d670053cc1e446b66fc6dc4726fe375f.utu test": {
-  "compile": "Error: Cannot import \"./does-not-exist.utu\": file not found (<root>/baselines/corpus/does-not-exist.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/e361552ecc6e14fcb267702469f9292c9dc97cc1.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "baselines/corpus/e361552ecc6e14fcb267702469f9292c9dc97cc1.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/e3df34f358e3b9ee3993572c691c391658f1ce9c.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-type type_ident"
+  ]
  },
  "baselines/corpus/e3df34f358e3b9ee3993572c691c391658f1ce9c.utu test": {
   "calls": {}
@@ -3660,7 +4195,9 @@
   "calls": {}
  },
  "baselines/corpus/ebf2a57c8a1822855453dfea5332b2b17b9b318f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch match_arm"
+  ]
  },
  "baselines/corpus/ebf2a57c8a1822855453dfea5332b2b17b9b318f.utu test": {
   "calls": {}
@@ -3677,7 +4214,10 @@
   "calls": {}
  },
  "baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal": {
-  "emit": "Error: codegen: unsupported type \"Array__Str\" (no stdlib type-def or heap type match)"
+  "diagnostics": [
+   "invalid-module-arity instantiated_module_ref",
+   "invalid-module-arity promoted_module_call_expr"
+  ]
  },
  "baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test": {
   "calls": {}
@@ -3695,40 +4235,58 @@
   "calls": {}
  },
  "baselines/corpus/ed722328934e3556d614dbe9f54ea4486241032e.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/ed722328934e3556d614dbe9f54ea4486241032e.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/ed8b98ccfd2682ccfa470165b8317f78c2bec457.utu normal": {
-  "compile": "Error: mem s stores Str; a mem holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64"
+  "diagnostics": [
+   "unknown-type mem_decl"
+  ]
  },
  "baselines/corpus/ed8b98ccfd2682ccfa470165b8317f78c2bec457.utu test": {
-  "compile": "Error: mem s stores Str; a mem holds an integer enum, a distinct type, or one of U8, I8, U16, I16, I32, U32, I64, U64, F32, F64"
+  "diagnostics": [
+   "unknown-type mem_decl"
+  ]
  },
  "baselines/corpus/ef59370de1017da92aeea08ad4c4ec93c1f55adf.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/ef59370de1017da92aeea08ad4c4ec93c1f55adf.utu test": {
   "calls": {}
  },
  "baselines/corpus/ef7834238e0a0ac322adf31be4d254d944232865.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/ef7834238e0a0ac322adf31be4d254d944232865.utu test": {
   "calls": {}
  },
  "baselines/corpus/efc743078bc0dfae3e1b53e1c2400ccd036246db.utu normal": {
-  "compile": "Error: prune skips a subtree of a recursive generator; use it in the body of `for (walk(…)) |node| { … }` where walk delegates to itself"
+  "diagnostics": [
+   "invalid-for-source prune_expr"
+  ]
  },
  "baselines/corpus/efc743078bc0dfae3e1b53e1c2400ccd036246db.utu test": {
   "calls": {}
  },
  "baselines/corpus/f08730ddd2300bb12fb4e35ded11e5bd5bec93f6.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/f08730ddd2300bb12fb4e35ded11e5bd5bec93f6.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/f13dfc9c22f2d1c269548a9517c3ec3d2ca0210d.utu normal": {
   "calls": {}
@@ -3760,22 +4318,32 @@
   }
  },
  "baselines/corpus/f29fbc787ee5e508ee63841c6e904d3819b6a0fe.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch array_expr"
+  ]
  },
  "baselines/corpus/f29fbc787ee5e508ee63841c6e904d3819b6a0fe.utu test": {
   "calls": {}
  },
  "baselines/corpus/f2ee19976054f19c2f338873209787d97d05314f.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch literal"
+  ]
  },
  "baselines/corpus/f2ee19976054f19c2f338873209787d97d05314f.utu test": {
   "calls": {}
  },
  "baselines/corpus/f377fd5f9cf4e7346fd25a92bef46ce02ef980d7.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "recursive-type field",
+   "recursive-type field"
+  ]
  },
  "baselines/corpus/f377fd5f9cf4e7346fd25a92bef46ce02ef980d7.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "recursive-type field",
+   "recursive-type field"
+  ]
  },
  "baselines/corpus/f38bd9d2fd0edc2be1d1fe044465e7d2d16561e5.utu normal": {
   "calls": {}
@@ -3829,10 +4397,14 @@
   "calls": {}
  },
  "baselines/corpus/f5d211ce9320dd1834b3c03b93b0bfedd1668298.utu normal": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/f5d211ce9320dd1834b3c03b93b0bfedd1668298.utu test": {
-  "compile": "Error: Cannot import \"../theme.utu\": file not found (<root>/baselines/theme.utu)"
+  "diagnostics": [
+   "unknown-import using_decl"
+  ]
  },
  "baselines/corpus/f61335cfaf618f50c4c38bfa993b292a594697ce.utu normal": {
   "calls": {
@@ -3846,22 +4418,26 @@
   "calls": {}
  },
  "baselines/corpus/f69d234bbd093e23a7f6a79be1e14d44b6bb2bef.utu normal": {
-  "compile": "Error: The ~> arm must be last in @json match"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/f69d234bbd093e23a7f6a79be1e14d44b6bb2bef.utu test": {
   "calls": {}
  },
  "baselines/corpus/f6a66afba4e80df8aa26fc94e6271a924dc2e151.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "type-mismatch bind_expr"
+  ]
  },
  "baselines/corpus/f6a66afba4e80df8aa26fc94e6271a924dc2e151.utu test": {
   "calls": {}
  },
  "baselines/corpus/f6a937a1b7f949170f1970f263b51fd57820546f.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/f6a937a1b7f949170f1970f263b51fd57820546f.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/f735cf1cf1352eca768f39e15c06fd95afc90840.utu normal": {
   "calls": {}
@@ -3887,34 +4463,46 @@
   "calls": {}
  },
  "baselines/corpus/f9686c32cc83736b8ce97bbccf66d40da307b825.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break continue_expr"
+  ]
  },
  "baselines/corpus/f9686c32cc83736b8ce97bbccf66d40da307b825.utu test": {
   "calls": {}
  },
  "baselines/corpus/fa6d1fc9c4a99924d7a71a8738ff9e81670152c3.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "invalid-break defer_expr"
+  ]
  },
  "baselines/corpus/fa6d1fc9c4a99924d7a71a8738ff9e81670152c3.utu test": {
   "calls": {}
  },
  "baselines/corpus/fb933e9f1517fa83b0e6850ace0432e060315127.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "non-exhaustive-match alt_expr"
+  ]
  },
  "baselines/corpus/fb933e9f1517fa83b0e6850ace0432e060315127.utu test": {
   "calls": {}
  },
  "baselines/corpus/fbbbd4557efa65eecfb6eea0ce06717800b96ef6.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "diagnostics": [
+   "invalid-dsl-usage dsl_expr"
+  ]
  },
  "baselines/corpus/fbbbd4557efa65eecfb6eea0ce06717800b96ef6.utu test": {
   "calls": {}
  },
  "baselines/corpus/fc958f3ffa6f5217465f5c68fd1febe81ea703f5.utu normal": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method struct_decl"
+  ]
  },
  "baselines/corpus/fc958f3ffa6f5217465f5c68fd1febe81ea703f5.utu test": {
-  "diagnostics": true
+  "diagnostics": [
+   "unknown-method struct_decl"
+  ]
  },
  "baselines/corpus/fcd6630948b89737c59153f5c7845107124b3ccf.utu normal": {
   "calls": {
@@ -3962,10 +4550,10 @@
   "calls": {}
  },
  "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "baselines/corpus/fff0ec1217d2667c75d47bf37a1e123a25f05978.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "benchmarks/bg/binarytrees/binarytrees.utu normal": {
   "calls": {}
@@ -4001,10 +4589,15 @@
   }
  },
  "benchmarks/bg/fasta/fasta.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/fasta/fasta.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/knucleotide/alt/knucleotide-before.utu normal": {
   "calls": {}
@@ -4117,40 +4710,70 @@
   }
  },
  "benchmarks/bg/regexredux/alt/regexredux-backtrack.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/regexredux/alt/regexredux-backtrack.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/regexredux/regexredux.host.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/regexredux/regexredux.host.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/regexredux/regexredux.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/regexredux/regexredux.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/revcomp/alt/revcomp-bytewise.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/revcomp/alt/revcomp-bytewise.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/revcomp/revcomp.utu normal": {
-  "diagnostics": true
+  "calls": {}
  },
  "benchmarks/bg/revcomp/revcomp.utu test": {
-  "diagnostics": true
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   }
+  }
  },
  "benchmarks/bg/spectralnorm/alt/spectralnorm-direct.utu normal": {
   "calls": {}
@@ -4283,10 +4906,20 @@
   "calls": {}
  },
  "examples/bounds.utu normal": {
-  "diagnostics": true
+  "calls": {
+   "main": {
+    "result": null,
+    "printed": [
+     "bo, ada",
+     "Lagos, Lima, Oslo",
+     "fig..pear true false",
+     "1..3 10"
+    ]
+   }
+  }
  },
  "examples/bounds.utu test": {
-  "diagnostics": true
+  "calls": {}
  },
  "examples/browser-board/main.utu normal": {
   "calls": {
@@ -4780,10 +5413,15 @@
   "calls": {}
  },
  "examples/foundry/utu/app.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'getElementById')",
+    "printed": []
+   }
+  }
  },
  "examples/foundry/utu/app.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/foundry/utu/headless.utu normal": {
   "calls": {}
@@ -4792,10 +5430,15 @@
   "calls": {}
  },
  "examples/foundry/utu/proto/app.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'getElementById')",
+    "printed": []
+   }
+  }
  },
  "examples/foundry/utu/proto/app.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/hello_world.utu normal": {
   "calls": {
@@ -5102,10 +5745,32 @@
   "calls": {}
  },
  "examples/results.utu normal": {
-  "compile": "Error: Result try and errdefer are compiled by the self-hosted compiler (utu), not stage 0"
+  "calls": {
+   "main": {
+    "result": 7,
+    "printed": [
+     "reading 2 lines",
+     "done",
+     "total 1120",
+     "reading 2 lines",
+     "gave up",
+     "done",
+     "error: not a number: tall",
+     "reading 1 lines",
+     "gave up",
+     "done",
+     "error: no '=' in depth",
+     "reading 1 lines",
+     "done",
+     "reading 1 lines",
+     "gave up",
+     "done"
+    ]
+   }
+  }
  },
  "examples/results.utu test": {
-  "compile": "Error: Result try and errdefer are compiled by the self-hosted compiler (utu), not stage 0"
+  "calls": {}
  },
  "examples/stdlib.utu normal": {
   "calls": {
@@ -5314,129 +5979,234 @@
   "calls": {}
  },
  "examples/wutu-five/folio/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-five/folio/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-five/juniper/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-five/juniper/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-five/scope/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-five/scope/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-five/signal/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-five/signal/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-five/wayfarer/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-five/wayfarer/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-garden/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "TypeError: self.getItem is not a function",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-garden/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-more/dispatch/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-more/dispatch/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-more/split/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-more/split/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-more/supper/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-more/supper/main.utu test": {
   "calls": {}
  },
  "examples/wutu-reactive/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-reactive/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-regressions/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-regressions/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-one/atlas/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-one/atlas/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-one/ledger/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-one/ledger/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-one/meter/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-one/meter/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-one/pantry/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-one/pantry/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-one/studio/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-one/studio/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-two/grove/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-two/grove/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-two/pitch/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-two/pitch/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-two/readroom/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-two/readroom/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-two/tempo/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-two/tempo/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  },
  "examples/wutu-round-two/venue/main.utu normal": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {
+   "main": {
+    "throws": "ReferenceError: document is not defined",
+    "printed": []
+   }
+  }
  },
  "examples/wutu-round-two/venue/main.utu test": {
-  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+  "calls": {}
  }
 }

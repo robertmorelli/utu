@@ -50,7 +50,7 @@ test "a utu closure is registered directly as a JS listener" {
 // THE SHARPEST TRAP IN THE WHOLE SET.
 //
 // Captured scalars are *snapshot* into the closure environment
-// (src/compiler/lower-closures.js:21), so accumulating into a captured `I32`
+// (as stage -1 lowered closures), so accumulating into a captured `I32`
 // from a callback silently does nothing — this reads exactly like the JS you
 // would write, compiles clean, fires the listener, and yields 0. Captured GC
 // references are *shared*, so a one-element Array works as a mutable cell.

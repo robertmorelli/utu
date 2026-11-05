@@ -1,5 +1,6 @@
 // What programs the self-hosted compiler builds do when run, against what
-// stage 0's builds did (baselines/run-differential.json).
+// they did when recorded (baselines/run-differential.json; stage -1 recorded
+// it until the handoff, see baselines/README.md).
 //
 //   node scripts/selfhost-run-differential.mjs [--only=substring] [--show=N] [--jobs=N] [--why=node_kind] [--optimize=none|size|speed]
 //   node scripts/selfhost-run-differential.mjs --record [--only=substring]   record what the builds do
@@ -7,7 +8,7 @@
 // --why=call_expr lists the source of the call_exprs it cannot build yet.
 //
 // Every program under examples/, benchmarks/, and baselines/corpus, for its
-// `normal` and `test` targets, as scripts/run-differential.mjs runs them:
+// `normal` and `test` targets, as stage -1's harness ran them:
 // every exported function that takes no arguments is called, and its result
 // (or trap) and what it printed are compared. A program the compiler cannot
 // build yet (it reports something unsupported) is counted, not compared.
@@ -26,50 +27,6 @@ process.env.UTU_OPTIMIZE = OPTIMIZE;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUN_TIMEOUT_MS = 8000;
 
-// Where the self-hosted compiler deliberately differs from stage 0, and why.
-const INTENDED = {
-  // `Pair[I32]` of `mod Pair[A, B]`: stage 0 builds it, reading B as nothing.
-  'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu normal': 'a module given too few type arguments is reported',
-  'baselines/corpus/ec8df734a5c2347d03925bf576b9d802fee64101.utu test': 'a module given too few type arguments is reported',
-  // `Array[P].new_default(n)` of a protocol P: stage 0 fills it with null,
-  // which a P is never.
-  'baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu normal': 'an array of a protocol has no default',
-  'baselines/corpus/1d7c242fe6839ec76ed1da7536febf6812b363ab.utu test': 'an array of a protocol has no default',
-  'baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu normal': 'an array of a protocol has no default',
-  'baselines/corpus/910fed2be6adc5922740738f9f00acda638e229c.utu test': 'an array of a protocol has no default',
-  'baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu normal': 'an array of a protocol has no default',
-  'baselines/corpus/98095849f80e3abfc25a0e780cb801563e58652c.utu test': 'an array of a protocol has no default',
-  // `fn Box.make(…)` with no type Box: stage 0 drops it (its test build never calls it).
-  'baselines/corpus/77da748f79742cd3ec50d3942f5519b93c53d800.utu test': 'a method of an unknown type is reported',
-  // A test's `cl(v) { v + 1; }` where a void closure goes: stage 0 checks test bodies only in test builds.
-  'baselines/corpus/27ebac19700886ac76060251f4dcbc7bca649d2e.utu normal': 'test bodies are checked in every build',
-  // Bounded module parameters (`mod Sorted[T[Ord]]`) are the self-hosted compiler's.
-  'examples/bounds.utu normal': 'bounded module parameters',
-  'examples/bounds.utu test': 'bounded module parameters',
-  // `let value: … = f();`: stage 0 wants a literal; a global may be computed.
-  'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu normal': 'a global may be computed',
-  'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu test': 'a global may be computed',
-  // Benchmarks Game ports whose globals are computed (`let st = …;`).
-  'benchmarks/bg/fasta/fasta.utu normal': 'a global may be computed',
-  'benchmarks/bg/fasta/fasta.utu test': 'a global may be computed',
-  'benchmarks/bg/regexredux/alt/regexredux-backtrack.utu normal': 'a global may be computed',
-  'benchmarks/bg/regexredux/alt/regexredux-backtrack.utu test': 'a global may be computed',
-  'benchmarks/bg/regexredux/regexredux.host.utu normal': 'a global may be computed',
-  'benchmarks/bg/regexredux/regexredux.host.utu test': 'a global may be computed',
-  'benchmarks/bg/regexredux/regexredux.utu normal': 'a global may be computed',
-  'benchmarks/bg/regexredux/regexredux.utu test': 'a global may be computed',
-  'benchmarks/bg/revcomp/alt/revcomp-bytewise.utu normal': 'a global may be computed',
-  'benchmarks/bg/revcomp/alt/revcomp-bytewise.utu test': 'a global may be computed',
-  'benchmarks/bg/revcomp/revcomp.utu normal': 'a global may be computed',
-  'benchmarks/bg/revcomp/revcomp.utu test': 'a global may be computed',
-  'benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu normal': 'a global may be computed',
-  'benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu test': 'a global may be computed',
-  // A test build leaves main out, so the generators it consumes are unused
-  // there: stage 0 never checks them.
-  'baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test': 'a generator nothing consumes is checked',
-  'baselines/corpus/258a4848bf6385809ac1c8ba664cfb06a2ef1163.utu test': 'a generator nothing consumes is checked',
-  'baselines/corpus/caf752afe8eb5a7349853f532fca271c9ffef912.utu test': 'a generator nothing consumes is checked',
-};
 
 if (isMainThread) await main();
 else await worker();
@@ -126,19 +83,15 @@ async function main() {
     return;
   }
   if (flag('json')) await fs.writeFile(flag('json'), JSON.stringify(Object.fromEntries(keys.map(key => [key, results[key]])), null, 1));
-  const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0, unrecorded: 0 };
+  const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, unrecorded: 0 };
   const differ = [];
   const unrecorded = [];
   const reasons = new Map();
   const whys = [];
   for (const key of keys) {
     const result = results[key];
-    if (INTENDED[key]) { count.intended++; continue; }
-    // A program added since stage 0's runs were recorded has nothing to be
-    // compared with.
+    // A program added since the runs were recorded has nothing to be compared with.
     if (!(key in recorded)) { count.unrecorded++; unrecorded.push(key); continue; }
-    // Wutu templates, and Result's try and errdefer, are the self-hosted compiler's alone: stage 0 refuses them.
-    if (JSON.stringify(recorded[key] ?? '').includes(' are compiled by the self-hosted compiler')) { count.intended++; continue; }
     if (result?.unsupported) {
       count.unsupported++;
       for (const snippet of result.snippets ?? []) whys.push(snippet);
@@ -146,7 +99,7 @@ async function main() {
       continue;
     }
     if (result?.diagnostics) {
-      // Stage 0 rejected it too (or failed to build it): the same outcome.
+      // Rejected when recorded too: the same outcome.
       if (recorded[key]?.diagnostics || recorded[key]?.compile) { count.same++; continue; }
       count.rejected++;
       differ.push(`REJECTS ${key}: ${result.diagnostics.slice(0, 3).join('; ')}`);
@@ -154,7 +107,7 @@ async function main() {
     }
     if (JSON.stringify(recorded[key]) === JSON.stringify(result)) { count.same++; continue; }
     // A size build shares one import per member operation, so an engine's
-    // error names `self[k]` where stage 0's per-name import named the member.
+    // error names `self[k]` where the unoptimized build's per-name import named the member.
     if (OPTIMIZE === 'size'
         && JSON.stringify(recorded[key]).replace(/self\.[A-Za-z_$][\w$]*/g, 'self[k]') === JSON.stringify(result)) { count.same++; continue; }
     count.differ++;
@@ -169,8 +122,8 @@ async function main() {
   const top = [...reasons].sort((a, b) => b[1] - a[1]).slice(0, Number(flag('reasons') ?? 15));
   if (top.length) console.log(`unsupported, by what (programs):\n${top.map(([reason, n]) => `  ${n} ${reason}`).join('\n')}`);
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
-  console.log(`${keys.length} builds: ${count.same} behave as stage 0's, ${count.differ} differ, `
-    + `${count.rejected} rejected that stage 0 built, ${count.intended} differ on purpose, ${count.unsupported} not supported yet, `
+  console.log(`${keys.length} builds: ${count.same} behave as recorded, ${count.differ} differ, `
+    + `${count.rejected} rejected that were built, ${count.unsupported} not supported yet, `
     + `${count.unrecorded} with no baseline, in ${seconds} s`);
   if (count.differ || count.rejected || count.unrecorded) process.exit(1);
 }
