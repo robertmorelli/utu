@@ -1,0 +1,556 @@
+{
+ "n": 10,
+ "setup": null,
+ "samples": 10,
+ "warmups": 3,
+ "result": "1161472954",
+ "notes": "bench(n): fannkuch-redux over all n! permutations; result = FNV-1a of the bytes BG prints (\"%d\\nPfannkuchen(%d) = %d\\n\"). BG runs n=12.",
+ "date": "2026-11-05T12:02:14.855Z",
+ "ports": [
+  {
+   "key": "utu-fast",
+   "name": "utu fast",
+   "compileMs": 88,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 2331,
+   "js": 729,
+   "bytes": 3060,
+   "gzip": 1344,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/fannkuchredux-utu-fast/fannkuchredux.mjs"
+   ],
+   "result": "1161472954",
+   "median": 186.94849999999997,
+   "best": 185.904,
+   "times": [
+    187.71300000000008,
+    187.2260000000001,
+    187.45799999999986,
+    187.6489999999999,
+    187.76,
+    186.67099999999982,
+    185.92899999999986,
+    185.904,
+    186.04700000000003,
+    186.0949999999998
+   ]
+  },
+  {
+   "key": "utu-fastUnsafe",
+   "name": "utu fastUnsafe",
+   "compileMs": 83,
+   "flags": [
+    "-O",
+    "fastUnsafe"
+   ],
+   "wasm": 2331,
+   "js": 331,
+   "bytes": 2662,
+   "gzip": 1117,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/fannkuchredux-utu-fastUnsafe/fannkuchredux.mjs"
+   ],
+   "result": "1161472954",
+   "median": 188.72450000000015,
+   "best": 187.73299999999995,
+   "times": [
+    191.3280000000001,
+    188.538,
+    188.61099999999988,
+    187.73299999999995,
+    188.8219999999999,
+    189.33299999999986,
+    188.75000000000023,
+    188.66100000000006,
+    189.5709999999999,
+    188.69900000000007
+   ]
+  },
+  {
+   "key": "utu-small",
+   "name": "utu small",
+   "compileMs": 80,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 1318,
+   "js": 729,
+   "bytes": 2047,
+   "gzip": 1246,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/fannkuchredux-utu-small/fannkuchredux.mjs"
+   ],
+   "result": "1161472954",
+   "median": 190.53100000000006,
+   "best": 189.24400000000014,
+   "times": [
+    190.13599999999997,
+    189.92399999999998,
+    191.3670000000002,
+    190.57200000000012,
+    189.24400000000014,
+    190.49,
+    190.22899999999981,
+    192.46900000000005,
+    192.09900000000016,
+    191.66699999999992
+   ]
+  },
+  {
+   "key": "utu-smallUnsafe",
+   "name": "utu smallUnsafe",
+   "compileMs": 79,
+   "flags": [
+    "-O",
+    "smallUnsafe"
+   ],
+   "wasm": 1318,
+   "js": 331,
+   "bytes": 1649,
+   "gzip": 1019,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/fannkuchredux-utu-smallUnsafe/fannkuchredux.mjs"
+   ],
+   "result": "1161472954",
+   "median": 192.1674999999999,
+   "best": 188.80700000000002,
+   "times": [
+    192.32999999999993,
+    193.236,
+    190.39499999999998,
+    188.80700000000002,
+    193.12999999999988,
+    192.51599999999985,
+    192.00499999999988,
+    191.71900000000005,
+    193.00999999999976,
+    191.23000000000002
+   ]
+  },
+  {
+   "key": "utu-tuned-fast",
+   "name": "utu tuned fast",
+   "compileMs": 85,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 2979,
+   "js": 735,
+   "bytes": 3714,
+   "gzip": 1427,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/fannkuchredux-tuned-utu-fast/fannkuchredux.tuned.mjs"
+   ],
+   "result": "1161472954",
+   "median": 117.12200000000007,
+   "best": 116.42600000000004,
+   "times": [
+    117.18200000000002,
+    116.42600000000004,
+    116.52300000000002,
+    116.769,
+    117.12300000000005,
+    117.12999999999988,
+    117.08899999999994,
+    117.1210000000001,
+    117.68899999999985,
+    117.27499999999986
+   ]
+  },
+  {
+   "key": "utu-tuned-small",
+   "name": "utu tuned small",
+   "compileMs": 80,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 1346,
+   "js": 735,
+   "bytes": 2081,
+   "gzip": 1328,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/fannkuchredux-tuned-utu-small/fannkuchredux.tuned.mjs"
+   ],
+   "result": "1161472954",
+   "median": 116.52849999999995,
+   "best": 114.20100000000002,
+   "times": [
+    117.332,
+    117.33299999999997,
+    116.80000000000007,
+    117.60699999999997,
+    116.96399999999994,
+    116.21899999999982,
+    115.44200000000001,
+    114.20100000000002,
+    114.3409999999999,
+    116.25699999999983
+   ]
+  },
+  {
+   "key": "c",
+   "name": "C",
+   "compileMs": 658,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-msse4.1"
+   ],
+   "wasm": 11236,
+   "js": 355,
+   "bytes": 11591,
+   "gzip": 6112,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/c-loader.mjs"
+   ],
+   "result": "1161472954",
+   "median": 110.7885,
+   "best": 110.45700000000011,
+   "times": [
+    113.11699999999996,
+    110.71900000000005,
+    113.04200000000003,
+    111.21600000000001,
+    110.56399999999996,
+    110.45700000000011,
+    110.47900000000004,
+    111.12999999999988,
+    110.46199999999999,
+    110.85799999999995
+   ]
+  },
+  {
+   "key": "cpp",
+   "name": "C++",
+   "compileMs": 787,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-msse4.1",
+    "-std=c++17"
+   ],
+   "wasm": 11753,
+   "js": 355,
+   "bytes": 12108,
+   "gzip": 6436,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/cpp-loader.mjs"
+   ],
+   "result": "1161472954",
+   "median": 138.97499999999997,
+   "best": 135.048,
+   "times": [
+    139.091,
+    139.64099999999996,
+    138.92099999999994,
+    138.94899999999996,
+    139.54500000000007,
+    135.048,
+    138.05899999999997,
+    138.90700000000015,
+    139.00099999999998,
+    139.54500000000007
+   ]
+  },
+  {
+   "key": "rust",
+   "name": "Rust",
+   "compileMs": 961,
+   "flags": [
+    "--release",
+    "-C",
+    "target-feature=+simd128"
+   ],
+   "wasm": 22624,
+   "js": 361,
+   "bytes": 22985,
+   "gzip": 10115,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/rust-loader.mjs"
+   ],
+   "result": "1161472954",
+   "median": 135.49750000000006,
+   "best": 133.92600000000016,
+   "times": [
+    134.735,
+    134.755,
+    136.19899999999996,
+    136.97899999999993,
+    133.92600000000016,
+    135.2070000000001,
+    135.32900000000018,
+    136.269,
+    135.66599999999994,
+    136.0239999999999
+   ]
+  },
+  {
+   "key": "go",
+   "name": "Go",
+   "compileMs": 2495,
+   "flags": [
+    "-buildmode=c-shared",
+    "-trimpath",
+    "-ldflags=-s -w"
+   ],
+   "wasm": 2424096,
+   "js": 1690,
+   "bytes": 2425786,
+   "gzip": 707426,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1161472954",
+   "median": 391.28700000000026,
+   "best": 389.3149999999996,
+   "times": [
+    391.23900000000003,
+    394.087,
+    393.5229999999997,
+    391.9489999999996,
+    390.5680000000002,
+    391.49299999999994,
+    391.3350000000005,
+    390.1860000000006,
+    391.16699999999946,
+    389.3149999999996
+   ]
+  },
+  {
+   "key": "swift",
+   "name": "Swift",
+   "compileMs": 2977,
+   "flags": [
+    "-c",
+    "release",
+    "--swift-sdk",
+    "swift-6.4.1-RELEASE_wasm",
+    "-Xlinker",
+    "--strip-all"
+   ],
+   "wasm": 5554414,
+   "js": 1690,
+   "bytes": 5556104,
+   "gzip": 1699630,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1161472954",
+   "median": 204.69449999999995,
+   "best": 200.50999999999976,
+   "times": [
+    204.7639999999999,
+    205.8230000000001,
+    205.87599999999998,
+    205.00300000000016,
+    204.87900000000013,
+    204.18300000000022,
+    204.625,
+    204.10900000000038,
+    203.942,
+    200.50999999999976
+   ]
+  },
+  {
+   "key": "haskell",
+   "name": "Haskell",
+   "compileMs": 658,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 1513547,
+   "js": 1690,
+   "bytes": 1515237,
+   "gzip": 437936,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1161472954",
+   "median": 640.607,
+   "best": 636.8980000000001,
+   "times": [
+    639.875,
+    637.8230000000003,
+    641.3609999999994,
+    638.5129999999999,
+    643.982,
+    636.8980000000001,
+    641.3389999999999,
+    642.9860000000008,
+    638.4979999999996,
+    641.9640000000018
+   ]
+  },
+  {
+   "key": "dart",
+   "name": "Dart",
+   "compileMs": 1004,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 36997,
+   "js": 6299,
+   "bytes": 43296,
+   "gzip": 17296,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/dart/fannkuchredux.mjs"
+   ],
+   "result": "1161472954",
+   "median": 200.99599999999998,
+   "best": 199.33199999999988,
+   "times": [
+    202.13099999999986,
+    202.54700000000003,
+    200.7349999999999,
+    200.635,
+    202.07900000000018,
+    201.25700000000006,
+    200.01200000000017,
+    199.33199999999988,
+    201.65099999999984,
+    200.51400000000012
+   ]
+  },
+  {
+   "key": "js",
+   "name": "JavaScript",
+   "compileMs": 1,
+   "flags": [],
+   "wasm": 0,
+   "js": 1294,
+   "bytes": 1294,
+   "gzip": 714,
+   "jsFiles": [
+    "benchmarks/bg/fannkuchredux/js/fannkuchredux.js"
+   ],
+   "result": "1161472954",
+   "median": 237.67500000000018,
+   "best": 233.07000000000016,
+   "times": [
+    238.6980000000001,
+    238.66499999999996,
+    238.45100000000002,
+    237.904,
+    237.2489999999998,
+    237.44600000000037,
+    233.07000000000016,
+    236.86400000000003,
+    238.34799999999996,
+    236.8430000000003
+   ]
+  },
+  {
+   "key": "kotlin",
+   "name": "Kotlin",
+   "compileMs": 1440,
+   "flags": [
+    "compileProductionExecutableKotlinWasmJsOptimize"
+   ],
+   "wasm": 3074,
+   "js": 4299,
+   "bytes": 7373,
+   "gzip": 3867,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fannkuchredux.import-object.mjs",
+    ".tmp/bg/fannkuchredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fannkuchredux.js-builtins.mjs",
+    ".tmp/bg/fannkuchredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fannkuchredux.mjs"
+   ],
+   "result": "1161472954",
+   "median": 203.03349999999978,
+   "best": 202.56600000000026,
+   "times": [
+    204.413,
+    209.01800000000003,
+    207.98500000000013,
+    206.61400000000026,
+    202.7460000000001,
+    202.56600000000026,
+    202.95199999999977,
+    203.11499999999978,
+    202.72900000000027,
+    202.78799999999956
+   ]
+  },
+  {
+   "key": "moonbit",
+   "name": "MoonBit",
+   "compileMs": 167,
+   "flags": [
+    "--target",
+    "wasm-gc",
+    "--release"
+   ],
+   "wasm": 4724,
+   "js": 355,
+   "bytes": 5079,
+   "gzip": 2714,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/moonbit-loader.mjs"
+   ],
+   "result": "1161472954",
+   "median": 187.3789999999999,
+   "best": 187.26299999999992,
+   "times": [
+    187.33900000000006,
+    187.539,
+    187.414,
+    187.34399999999982,
+    187.30899999999997,
+    187.46500000000015,
+    187.58899999999971,
+    187.30600000000004,
+    187.61500000000024,
+    187.26299999999992
+   ]
+  },
+  {
+   "key": "assemblyscript",
+   "name": "AssemblyScript",
+   "compileMs": 1753,
+   "flags": [
+    "-O3",
+    "--enable",
+    "simd",
+    "--runtime",
+    "incremental"
+   ],
+   "wasm": 7834,
+   "js": 394,
+   "bytes": 8228,
+   "gzip": 4113,
+   "jsFiles": [
+    ".tmp/bg/fannkuchredux/assemblyscript-loader.mjs"
+   ],
+   "result": "1161472954",
+   "median": 107.12099999999998,
+   "best": 105.58699999999999,
+   "times": [
+    107.0440000000001,
+    107.22500000000002,
+    106.71799999999996,
+    107.024,
+    105.58699999999999,
+    106.8599999999999,
+    107.19799999999987,
+    107.43399999999997,
+    107.33400000000006,
+    107.4090000000001
+   ]
+  }
+ ],
+ "d8": "15.6.75.16"
+}

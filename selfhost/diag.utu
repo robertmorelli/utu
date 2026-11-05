@@ -86,7 +86,10 @@ fn type_text(t: I32) Str {
     let name = decl_name[decl];
     if decl_is(decl, Decl.TypeDecl) or (module >= 0 and decl_a[module] == decl) { name = decl_name[module]; };
     let text = word_text(name);
-    if qualify_types[0] == 1 and module >= 0 and decl_a[module] != decl and not decl_is(decl, Decl.TypeDecl) { text = word_text(decl_name[module]) + "." + text; };
+    if qualify_types[0] > 0 and module >= 0 and decl_a[module] != decl and not decl_is(decl, Decl.TypeDecl) {
+        let args = if qualify_types[0] == 2 and inst > 0 { "[" + type_list_text(inst_args[inst]) + "]"; } else { ""; };
+        text = word_text(decl_name[module]) + args + "." + text;
+    };
     if inst > 0 and module >= 0 and (decl_a[module] == decl) {
         text = text + "[" + type_list_text(inst_args[inst]) + "]";
     };
@@ -105,6 +108,12 @@ fn expected_got(a: I32, b: I32) Str {
         qualify_types[0] = 1;
         ta = type_text(a);
         tb = type_text(b);
+        // (Instances of one module: with their type arguments.)
+        if ta == tb {
+            qualify_types[0] = 2;
+            ta = type_text(a);
+            tb = type_text(b);
+        };
         qualify_types[0] = 0;
         if ta == tb { return "Expected " + ta + ", got " + tb + " (another type of that name)"; };
     };
@@ -450,6 +459,7 @@ fn diag_text(i: I32) Str {
             if not ty_is(a, Ty.Tuple) { return "let .{…} needs a tuple, got " + type_text(a); };
             // b == 2: a closure captures a tuple
             if b == 2 { return "A closure cannot capture tuple " + w; };
+            if b == 3 { return w + " would hold tuple " + type_text(a) + ": name its values with let .{…}"; };
             "Tuple " + type_text(a) + " has " + int_text(vl_len[ty_a[a]]) + " values";
         },
         Diag.NotNullable => if b == 1 { pick(w.len() > 0, w, "It") + " is " + type_text(a) + ", which is never null"; } else { "Expected nullable, got " + type_text(a); },
@@ -520,7 +530,7 @@ fn diag_text(i: I32) Str {
             if a == 2 or a == 3 { return pick(a == 3, "alt", "match") + " misses " + type_text(b) + "." + w; };
             "match over " + type_text(b) + " needs a default arm";
         },
-        Diag.MatchType => "match takes a number or Bool, not " + type_text(a),
+        Diag.MatchType => "match takes a number or Bool, not " + type_text(a) + (if decl_is(ty_decl(a), Decl.Enum) { "; use alt for enum variants"; } else { ""; }),
         Diag.MatchPattern => {
             let p = node_text(first_child(node));
             if a == 1 { return p + " is not a Bool"; };
@@ -556,8 +566,8 @@ fn diag_text(i: I32) Str {
         },
         Diag.StorageType => w + " is a storage type: use I32",
         Diag.ReturnValueFromVoid => {
-            // (No name: a closure's return, or a test's.)
-            if word < 0 { return pick(in_closure(node), "This closure returns void", "A test returns nothing"); };
+            // (No name: a closure's return, main's, or a test's.)
+            if word < 0 { return pick(in_closure(node), "This closure returns void", pick(in_main(node), "main returns void", "A test returns nothing")); };
             w + " returns void";
         },
         Diag.VoidLet => w + " would hold no value",
@@ -610,7 +620,7 @@ fn diag_text(i: I32) Str {
         Diag.ForeignOverload => "No overload takes " + int_text(a),
         Diag.PruneInClosure => "prune in a closure",
         Diag.GeneratorMethod => "A method cannot be a generator",
-        Diag.UnknownLabel => if a == 1 { "break takes no value"; } else { "No block labeled " + w + " around this break"; },
+        Diag.UnknownLabel => if a == 1 { "break takes no value"; } else if a == 2 { "break cannot leave a closure"; } else { "No block labeled " + w + " around this break"; },
         Diag.GlobalCycle => if a < 0 { "Global " + w + " is read while it is being set"; }
             else { "Globals " + w + " and " + word_text(decl_name[a]) + " each need the other set first"; },
         Diag.NotValue => if a == 2 { w + " is a field: read it from a value"; } else { w + " is a " + pick(a == 1, "module", "type") + ", not a value"; },
@@ -826,7 +836,7 @@ fn diag_default_label(i: I32) Str {
         Diag.ProtoPairType => "one type for get and set",
         Diag.MemberClash => pick(b == 1, "also in the protocol", "also a field"),
         Diag.VariantNotValue => "make one: " + word_text(decl_name[diag_a[i]]) + "." + w + " {…}",
-        Diag.UnknownLabel => pick(a == 1, "a value, not a label", "no such label"),
+        Diag.UnknownLabel => if a == 2 { "block " + w + " is outside the closure"; } else { pick(a == 1, "a value, not a label", "no such label"); },
         Diag.GlobalCycle => if a < 0 { "reads " + w; } else { "needs " + word_text(decl_name[a]); },
         Diag.NotValue => "not a value",
         Diag.NotAssignable => "not a variable",

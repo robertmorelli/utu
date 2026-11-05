@@ -1,0 +1,7 @@
+// What: P.tick(x) with x a F64 that does not implement P
+// Expect: tick takes P, got F64 at the call; nothing inside the default method
+proto P:
+    | step() I32
+fn P[I32].step |s| () I32 { s; }
+fn P.tick |s| () I32 { s.step(); }
+export main() I32 { P.tick(7.5); }

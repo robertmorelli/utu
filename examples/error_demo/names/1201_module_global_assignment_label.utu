@@ -1,0 +1,9 @@
+// What: assigning a module's global
+// Expect: total is immutable, labeled "constant" (not "function")
+mod Counter {
+    let total: I32 = 42;
+}
+export main() I32 {
+    Counter.total = 99;
+    0;
+}

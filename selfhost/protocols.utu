@@ -24,6 +24,19 @@ fn implements(t: I32, proto: I32) Bool {
     false;
 }
 
+/// Whether type `t` (a scalar, say) has an implementation of a method of `proto`.
+fn has_impl(t: I32, proto: I32) Bool {
+    let d = ty_decl(t);
+    if d < 0 { return false; };
+    let c = first_child(decl_node[proto]);
+    while (c >= 0) {
+        let m = if is_kind(c, Node.Proto_member) { first_child(c); } else { -1; };
+        if m >= 0 and is_kind(m, Node.Proto_method) and impl_of(proto, word_of(first_child(m)), d) >= 0 { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
 /// Whether a declaration is in a module with type parameters.
 fn in_generic(d: I32) Bool {
     let module = module_of(d);
@@ -469,8 +482,9 @@ fn proto_call(t: I32, name: I32, args: I32, first: I32, m: I32, at: I32, cx: Cx)
     let a = if args >= 0 { first_child(args); } else { -1; };
     if first > 0 { a = next_sibling(a); };
     let p = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
-    let locals = Array[I32].new(16, 0);
-    let types = Array[I32].new(16, 0);
+    let size = if is_kind(list, Node.Type_list) { child_count(list); } else { 0; };
+    let locals = Array[I32].new(size + 1, 0);
+    let types = Array[I32].new(size + 1, 0);
     while (a >= 0 and p >= 0) {
         let pt = type_of(p, 0);
         let local = new_local(repr(pt));

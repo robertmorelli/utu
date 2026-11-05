@@ -1,0 +1,97 @@
+// binary-trees from the Benchmarks Game, in idiomatic utu: the GC'd tree of the
+// BG Java/JS/Dart programs (Node #6, Java #7): each node a struct whose children
+// are nullable references (WasmGC; V8's GC frees the short-lived trees). The
+// BG-fastest C/C++/Rust programs bump-allocate nodes in memory pools; utu has
+// no arena over GC structs, so this port does not. Single-threaded: the stretch
+// tree, the long-lived tree, then each depth in order. bench(n) returns the
+// FNV-1a hash of the bytes BG prints.
+
+rec struct Node:
+    | left: ?Node
+    | right: ?Node
+
+fn bottom_up_tree(depth: I32) Node {
+    if depth > 0 {
+        Node { left: bottom_up_tree(depth - 1), right: bottom_up_tree(depth - 1) };
+    } else {
+        Node { left: null, right: null };
+    };
+}
+
+fn Node.item_check |self| () I32 {
+    promote self.left {
+        |left| => 1 + left.item_check() + (self.right orelse fatal).item_check(),
+        ~> 1,
+    };
+}
+
+// ---- output: FNV-1a over the bytes BG prints
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_str(h0: I32, s: Str) I32 {
+    let h = h0;
+    for (0..<s.len()) |i| { h = fnv(h, s.get(i)); };
+    h;
+}
+
+// The decimal digits of x (with a '-' if negative).
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let v = x.to_i64();
+    if v < 0 { h = fnv(h, 45); v = -v; };
+    let p: I64 = 1;
+    while (p * 10 <= v) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (v / p % 10).to_i32());
+        p = p / 10;
+    };
+    h;
+}
+
+let min_depth: I32 = 4;
+
+fn binary_trees(n: I32) I32 {
+    let max_depth = n;
+    if max_depth < min_depth + 2 { max_depth = min_depth + 2; };
+
+    let stretch_depth = max_depth + 1;
+    let h = fnv_str(-2128831035, "stretch tree of depth ");
+    h = fnv_int(h, stretch_depth);
+    h = fnv_str(h, "\t check: ");
+    h = fnv_int(h, bottom_up_tree(stretch_depth).item_check());
+    h = fnv(h, 10);
+
+    let long_lived_tree = bottom_up_tree(max_depth);
+
+    let depth = min_depth;
+    while (depth <= max_depth) {
+        let iterations = 1 << (max_depth - depth + min_depth);
+        let check = 0;
+        for (0..<iterations) {
+            check += bottom_up_tree(depth).item_check();
+        };
+        h = fnv_int(h, iterations);
+        h = fnv_str(h, "\t trees of depth ");
+        h = fnv_int(h, depth);
+        h = fnv_str(h, "\t check: ");
+        h = fnv_int(h, check);
+        h = fnv(h, 10);
+        depth += 2;
+    };
+
+    h = fnv_str(h, "long lived tree of depth ");
+    h = fnv_int(h, max_depth);
+    h = fnv_str(h, "\t check: ");
+    h = fnv_int(h, long_lived_tree.item_check());
+    fnv(h, 10);
+}
+
+test "binarytrees prints BG's output" {
+    // BG's output for n = 10 (stretch tree of depth 11 ... long lived tree of depth 10)
+    assert binary_trees(10) == 717034075;
+}
+
+export lib {
+    fn bench(n: I32) I32 { binary_trees(n); }
+}

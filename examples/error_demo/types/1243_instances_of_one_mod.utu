@@ -1,0 +1,6 @@
+// What: two instances of one generic mod are told apart by their type arguments.
+// Expect: f takes cell[I32].Cell, got cell[Str].Cell
+mod cell[T] { struct Cell: | value : T  fn wrap(value: T) Cell { Cell { value: value }; } }
+using cell[I32] |a|; using cell[Str] |b|;
+fn f(x: a.Cell) I32 { x.value; }
+export main() I32 { f(b.wrap("a")); }

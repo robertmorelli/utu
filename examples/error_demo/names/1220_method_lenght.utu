@@ -1,0 +1,6 @@
+// What: a misspelled Array method suggests len.
+// Expect: No method Array[I32].lenght; did you mean len?
+export main() I32 {
+    let a: Array[I32] = [1];
+    a.lenght();
+}

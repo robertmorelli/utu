@@ -1,0 +1,499 @@
+{
+ "n": 500000,
+ "setup": 500000,
+ "samples": 10,
+ "warmups": 3,
+ "result": "1583578344",
+ "notes": "setup(n): BG fasta's output for n (untimed). bench(n): k-nucleotide over it (find >THREE, encode, count 1-, 2-mers and the 5 fragments); result = FNV-1a of the bytes BG prints. n=1000 -> 2506903540 (BG's knucleotide-output.txt). BG runs fasta 25,000,000.",
+ "date": "2026-11-05T12:39:29.372Z",
+ "ports": [
+  {
+   "key": "utu-fast",
+   "name": "utu fast",
+   "compileMs": 80,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 5776,
+   "js": 1174,
+   "bytes": 6950,
+   "gzip": 2717,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/knucleotide-utu-fast/knucleotide.mjs"
+   ],
+   "result": "1583578344",
+   "median": 91.46649999999988,
+   "best": 90.01199999999994,
+   "times": [
+    90.33100000000002,
+    93.78500000000008,
+    94.73400000000004,
+    94.957,
+    90.72800000000007,
+    90.44399999999996,
+    92.63199999999983,
+    91.95699999999988,
+    90.97599999999989,
+    90.01199999999994
+   ]
+  },
+  {
+   "key": "utu-fastUnsafe",
+   "name": "utu fastUnsafe",
+   "compileMs": 83,
+   "flags": [
+    "-O",
+    "fastUnsafe"
+   ],
+   "wasm": 5596,
+   "js": 548,
+   "bytes": 6144,
+   "gzip": 2465,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/knucleotide-utu-fastUnsafe/knucleotide.mjs"
+   ],
+   "result": "1583578344",
+   "median": 83.58899999999994,
+   "best": 81.70900000000006,
+   "times": [
+    85.71999999999997,
+    85.952,
+    83.279,
+    83.46399999999994,
+    83.71399999999994,
+    91.84800000000007,
+    81.70900000000006,
+    81.90000000000009,
+    82.41599999999994,
+    87.99800000000005
+   ]
+  },
+  {
+   "key": "utu-small",
+   "name": "utu small",
+   "compileMs": 78,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 3343,
+   "js": 1174,
+   "bytes": 4517,
+   "gzip": 2445,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/knucleotide-utu-small/knucleotide.mjs"
+   ],
+   "result": "1583578344",
+   "median": 99.46650000000011,
+   "best": 96.87099999999998,
+   "times": [
+    102.95099999999991,
+    99.74099999999999,
+    98.21699999999998,
+    97.38700000000006,
+    96.87099999999998,
+    97.731,
+    99.19900000000007,
+    99.80600000000004,
+    99.73400000000015,
+    99.81400000000008
+   ]
+  },
+  {
+   "key": "utu-smallUnsafe",
+   "name": "utu smallUnsafe",
+   "compileMs": 87,
+   "flags": [
+    "-O",
+    "smallUnsafe"
+   ],
+   "wasm": 3268,
+   "js": 548,
+   "bytes": 3816,
+   "gzip": 2198,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/knucleotide-utu-smallUnsafe/knucleotide.mjs"
+   ],
+   "result": "1583578344",
+   "median": 91.22149999999996,
+   "best": 88.39200000000005,
+   "times": [
+    90.82699999999994,
+    89.43100000000004,
+    91.96399999999994,
+    95.35000000000002,
+    91.61599999999999,
+    92.84999999999991,
+    93.981,
+    89.89900000000011,
+    90.01999999999998,
+    88.39200000000005
+   ]
+  },
+  {
+   "key": "c",
+   "name": "C",
+   "compileMs": 862,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench,_setup"
+   ],
+   "wasm": 26492,
+   "js": 392,
+   "bytes": 26884,
+   "gzip": 12907,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/c-loader.mjs"
+   ],
+   "result": "1583578344",
+   "median": 158.22300000000007,
+   "best": 150.95299999999975,
+   "times": [
+    160.90300000000002,
+    160.95900000000006,
+    158.37000000000012,
+    163.53500000000008,
+    153.35500000000002,
+    158.07600000000002,
+    153.97599999999989,
+    153.8889999999999,
+    150.95299999999975,
+    159.35599999999977
+   ]
+  },
+  {
+   "key": "cpp",
+   "name": "C++",
+   "compileMs": 6864,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench,_setup",
+    "-std=c++17",
+    "-Ibenchmarks/bg/knucleotide/cpp/pbds"
+   ],
+   "wasm": 169484,
+   "js": 1690,
+   "bytes": 171174,
+   "gzip": 61867,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1583578344",
+   "median": 98.7305,
+   "best": 93.26499999999987,
+   "times": [
+    99.678,
+    97.78300000000002,
+    100.37,
+    110.6930000000001,
+    101.21699999999998,
+    102.16499999999996,
+    93.596,
+    94.71900000000005,
+    93.26499999999987,
+    95.22599999999989
+   ]
+  },
+  {
+   "key": "rust",
+   "name": "Rust",
+   "compileMs": 5940,
+   "flags": [
+    "--release",
+    "-C",
+    "target-feature=+simd128"
+   ],
+   "wasm": 77738,
+   "js": 357,
+   "bytes": 78095,
+   "gzip": 29687,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/rust-loader.mjs"
+   ],
+   "result": "1583578344",
+   "median": 114.10699999999986,
+   "best": 104.981,
+   "times": [
+    104.981,
+    116.34399999999994,
+    117.08699999999999,
+    111.60299999999995,
+    111.40000000000009,
+    110.74000000000001,
+    117.15499999999997,
+    117.41200000000003,
+    113.37099999999987,
+    114.84299999999985
+   ]
+  },
+  {
+   "key": "go",
+   "name": "Go",
+   "compileMs": 4462,
+   "flags": [
+    "-buildmode=c-shared",
+    "-trimpath",
+    "-ldflags=-s -w"
+   ],
+   "wasm": 2577565,
+   "js": 1690,
+   "bytes": 2579255,
+   "gzip": 746500,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1583578344",
+   "median": 664.786499999999,
+   "best": 596.8189999999995,
+   "times": [
+    678.2330000000002,
+    659.0269999999996,
+    684.7349999999997,
+    658.8759999999993,
+    680.2930000000006,
+    616.5970000000007,
+    703.1859999999997,
+    602.4339999999993,
+    596.8189999999995,
+    670.5459999999985
+   ]
+  },
+  {
+   "key": "swift",
+   "name": "Swift",
+   "compileMs": 3196,
+   "flags": [
+    "-c",
+    "release",
+    "--swift-sdk",
+    "swift-6.4.1-RELEASE_wasm",
+    "-Xlinker",
+    "--strip-all"
+   ],
+   "wasm": 5570261,
+   "js": 1690,
+   "bytes": 5571951,
+   "gzip": 1707521,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1583578344",
+   "median": 496.54549999999995,
+   "best": 480.7769999999996,
+   "times": [
+    484.828,
+    492.1489999999999,
+    480.7769999999996,
+    498.404,
+    508.0549999999994,
+    521.4960000000001,
+    491.6859999999997,
+    494.6869999999999,
+    521.9169999999995,
+    503.98199999999997
+   ]
+  },
+  {
+   "key": "haskell",
+   "name": "Haskell",
+   "compileMs": 1556,
+   "flags": [
+    "-O2",
+    "-package-db",
+    "/Users/robertmorelli/.ghc-wasm/.cabal/store/ghc-9.14.1.20260731-70e7/package.db",
+    "-package",
+    "hashtables",
+    "-package",
+    "hashable"
+   ],
+   "wasm": 2183654,
+   "js": 1690,
+   "bytes": 2185344,
+   "gzip": 556759,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "1583578344",
+   "median": 2140.9135000000006,
+   "best": 2031.148000000001,
+   "times": [
+    2063.6440000000002,
+    2122.5279999999984,
+    2048.355999999998,
+    2031.148000000001,
+    2168.9519999999975,
+    2146.220000000001,
+    2147.491000000002,
+    2158.0070000000014,
+    2135.607,
+    2168.9420000000027
+   ]
+  },
+  {
+   "key": "dart",
+   "name": "Dart",
+   "compileMs": 1489,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 56427,
+   "js": 6426,
+   "bytes": 62853,
+   "gzip": 24914,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/dart/knucleotide.mjs"
+   ],
+   "result": "1583578344",
+   "median": 487.77599999999984,
+   "best": 455.3040000000001,
+   "times": [
+    462.34100000000035,
+    476.6949999999997,
+    509.422,
+    489.0450000000001,
+    505.3800000000001,
+    487.8019999999997,
+    525.25,
+    455.3040000000001,
+    487.75,
+    479.53200000000015
+   ]
+  },
+  {
+   "key": "js",
+   "name": "JavaScript",
+   "compileMs": 1,
+   "flags": [],
+   "wasm": 0,
+   "js": 3060,
+   "bytes": 3060,
+   "gzip": 1448,
+   "jsFiles": [
+    "benchmarks/bg/knucleotide/js/knucleotide.js"
+   ],
+   "result": "1583578344",
+   "median": 569.1065000000003,
+   "best": 560.9780000000001,
+   "times": [
+    570.3130000000001,
+    567.1399999999999,
+    572.2479999999996,
+    572.6749999999993,
+    580.3159999999998,
+    567.0929999999998,
+    562.5820000000003,
+    560.9780000000001,
+    567.9000000000005,
+    580.6000000000004
+   ]
+  },
+  {
+   "key": "kotlin",
+   "name": "Kotlin",
+   "compileMs": 2112,
+   "flags": [
+    "compileProductionExecutableKotlinWasmJsOptimize"
+   ],
+   "wasm": 18624,
+   "js": 4759,
+   "bytes": 23383,
+   "gzip": 11214,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/knucleotide.import-object.mjs",
+    ".tmp/bg/knucleotide/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/knucleotide.js-builtins.mjs",
+    ".tmp/bg/knucleotide/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/knucleotide.mjs"
+   ],
+   "result": "1583578344",
+   "median": 307.12249999999995,
+   "best": 304.4549999999999,
+   "times": [
+    307.5310000000002,
+    308.8309999999999,
+    308.55600000000004,
+    305.3630000000003,
+    304.4549999999999,
+    305.875,
+    305.46100000000024,
+    306.84799999999996,
+    307.39699999999993,
+    310.66700000000037
+   ]
+  },
+  {
+   "key": "moonbit",
+   "name": "MoonBit",
+   "compileMs": 170,
+   "flags": [
+    "--target",
+    "wasm-gc",
+    "--release"
+   ],
+   "wasm": 15109,
+   "js": 351,
+   "bytes": 15460,
+   "gzip": 6920,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/moonbit-loader.mjs"
+   ],
+   "result": "1583578344",
+   "median": 288.3654999999999,
+   "best": 271.86799999999994,
+   "times": [
+    292.6170000000002,
+    278.885,
+    299.8670000000002,
+    283.80999999999995,
+    284.4659999999999,
+    298.9849999999997,
+    286.4779999999996,
+    290.25300000000016,
+    271.86799999999994,
+    301.6380000000004
+   ]
+  },
+  {
+   "key": "assemblyscript",
+   "name": "AssemblyScript",
+   "compileMs": 2225,
+   "flags": [
+    "-O3",
+    "--enable",
+    "simd",
+    "--runtime",
+    "incremental"
+   ],
+   "wasm": 18589,
+   "js": 390,
+   "bytes": 18979,
+   "gzip": 7903,
+   "jsFiles": [
+    ".tmp/bg/knucleotide/assemblyscript-loader.mjs"
+   ],
+   "result": "1583578344",
+   "median": 243.99249999999984,
+   "best": 238.3130000000001,
+   "times": [
+    244.51499999999987,
+    249.68600000000015,
+    246.81100000000015,
+    243.4699999999998,
+    242.69700000000012,
+    241.36799999999994,
+    238.3130000000001,
+    247.76699999999983,
+    239.16800000000012,
+    248.99800000000005
+   ]
+  }
+ ],
+ "d8": "15.6.75.16"
+}

@@ -1,0 +1,7 @@
+{
+  "n": 2000000,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "c": ["-mavx"], "cpp": ["-mavx", "-std=c++17"] },
+  "notes": "bench(n): n steps of 0.01 from the BG initial state; result = FNV-1a of the two \"%.9f\\n\" energy lines BG prints. BG runs n=50,000,000."
+}

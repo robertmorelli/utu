@@ -228,6 +228,8 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
   // (It runs before the sampler can start: its profile is empty, but written.)
+  // The program's arguments where a built one finds them: process.argv.slice(2).
+  process.argv = [process.argv[0], file, ...argv];
   const { exports, instance } = await (await selfhost()).instantiateNode(built.wasm, built.spec, { root: path.dirname(file), profiler, wrap: placeThrows })
     .catch(async error => {
       if (profiler) await writeProfile(file, profiler, out);
@@ -248,8 +250,6 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
     fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu run calls it with none`, 'main-arguments',
       ['Give main no parameters to run it, or call it from JavaScript (utu build).']);
   }
-  // The program's arguments where a built one finds them: process.argv.slice(2).
-  process.argv = [process.argv[0], file, ...argv];
   // The profile, written once: after main, or before a trap's exit (main's, or a callback's).
   let profiled = null;
   const profileOnce = () => (profiler ? (profiled ??= writeProfile(file, profiler, out)) : null);
@@ -455,12 +455,15 @@ const DRAIN_MS = 2000;
  * n = 0 (the setup alone). Prints the median time per iteration.
  */
 async function bench(file, { utu, optimize, safe }) {
-  const { wasm, spec, benches } = await buildOrExit(utu, file, { target: 'bench', optimize, safe, debugNames: true });
+  const built = await buildOrExit(utu, file, { target: 'bench', optimize, safe, debugNames: true });
+  const { wasm, spec, benches } = built;
   if (!benches.length) {
     console.log('No benches');
     return;
   }
-  const { exports } = await (await selfhost()).instantiateNode(wasm, spec, { root: path.dirname(file) });
+  // A global's initializer runs here, and may trap.
+  const { exports } = await (await selfhost()).instantiateNode(wasm, spec, { root: path.dirname(file) })
+    .catch(error => trap(error, file, built, utu));
   // A run that awaits ends as a test must (see @settled).
   const run = (f, n) => {
     const result = f(n);

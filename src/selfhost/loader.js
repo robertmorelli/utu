@@ -100,7 +100,13 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
   if (runtimeNames.size) lines.unshift(`import { ${[...runtimeNames].join(', ')} } from ${JSON.stringify(runtime)};`);
   const instantiate = streaming ? 'instantiateStreaming' : 'instantiate';
   // Compact: written as it is when nothing is bundled (cli/utu.mjs's build).
-  lines.push(`export const {instance}=await WebAssembly.${instantiate}(${wasm},{${modules.join(',')}},${JSON.stringify(COMPILE_OPTIONS)});`);
+  // Only the compile options the module needs: a module importing no strings takes none.
+  const plain = WebAssembly.Module.imports(new WebAssembly.Module(wasmBytes)).map(i => i.module);
+  const options = {};
+  if (plain.includes('wasm:js-string')) options.builtins = ['js-string'];
+  if (plain.includes("'")) options.importedStringConstants = "'";
+  const optionText = Object.keys(options).length ? `,${JSON.stringify(options)}` : '';
+  lines.push(`export const {instance}=await WebAssembly.${instantiate}(${wasm},{${modules.join(',')}}${optionText});`);
   if (conversionSource) lines.push(conversionSource);
   lines.push(`export const exports=${exports};`);
   return lines.join('\n') + '\n';

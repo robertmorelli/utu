@@ -1,0 +1,15 @@
+{
+  "n": 500000,
+  "setup": true,
+  "samples": 10,
+  "warmups": 3,
+  "notes": "setup(n): BG fasta's output for n (untimed). bench(n): regex-redux over it (strip headers/newlines, count the 9 variants, the 5 replacements, the three lengths); result = FNV-1a of the bytes BG prints. n=1000 -> 2596312850 (BG's regexredux-output.txt). BG runs fasta 5,000,000.",
+  "flags": {
+    "cpp": [
+      "-std=c++17"
+    ],
+    "haskell": [
+      "-optc-O3"
+    ]
+  }
+}

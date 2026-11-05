@@ -1,0 +1,232 @@
+// Regex-redux with the host's RegExp: "utu (host RegExp)", reported apart from
+// regexredux.utu (utu's own matcher, the headline port). The steps of BG
+// regexredux gcc #5 / Node #3
+// (https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/regexredux-node-3.html),
+// but the text is a JavaScript string and every match, count and replace is
+// one call of the host's RegExp (V8's Irregexp) through @es, as the JS and
+// Dart ports' are.
+//
+// setup(n) writes BG fasta's output for n into a byte mem (the generator from
+// fasta.utu) and makes it a host string once (untimed). bench(n) returns the
+// FNV-1a hash of the bytes gcc #5 prints.
+
+using JS from std:JS;
+
+mem heap: U8;
+
+let to_string: fun(JS.Uint8Array) Externref = @es/\
+    (u) => {
+        let s = '';
+        for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192));
+        return s;
+    }
+\/;
+let replace_all: fun(Externref, Str, Str) Externref = @es/\ (s, p, r) => s.replace(new RegExp(p, 'g'), r) \/;
+let count_all: fun(Externref, Str) I32 = @es/\
+    (s, p) => {
+        const m = s.match(new RegExp(p, 'g'));
+        return m ? m.length : 0;
+    }
+\/;
+let length: fun(Externref) I32 = @es/\ (s) => s.length \/;
+
+struct Input:
+    | text: Externref
+
+let input: Input = &{ text: to_string(heap.view(0, 0)) };
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_str(h0: I32, s: Str) I32 {
+    let h = h0;
+    for (0..<s.len()) |i| { h = fnv(h, s[i]); };
+    h;
+}
+
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let p = 1;
+    while (p <= x / 10) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + x / p % 10);
+        p = p / 10;
+    };
+    h;
+}
+
+fn regexredux() I32 {
+    let variants: Array[Str] = [
+        "agggtaaa|tttaccct",
+        "[cgt]gggtaaa|tttaccc[acg]",
+        "a[act]ggtaaa|tttacc[agt]t",
+        "ag[act]gtaaa|tttac[agt]ct",
+        "agg[act]taaa|ttta[agt]cct",
+        "aggg[acg]aaa|ttt[cgt]ccct",
+        "agggt[cgt]aa|tt[acg]accct",
+        "agggta[cgt]a|t[acg]taccct",
+        "agggtaa[cgt]|[acg]ttaccct",
+    ];
+    let patterns: Array[Str] = ["tHa[Nt]", "aND|caN|Ha[DS]|WaS", "a[NSt]|BY", "<[^>]*>", "\\|[^|][^|]*\\|"];
+    let replacements: Array[Str] = ["<4>", "<3>", "<2>", "|", "-"];
+
+    let text = input.text;
+    let ilen = length(text);
+    let sequences = replace_all(text, ">.*\n|\n", "");
+    let slen = length(sequences);
+
+    let s = sequences;
+    for (0..<patterns.len()) |i| { s = replace_all(s, patterns[i], replacements[i]); };
+    let size = length(s);
+
+    let h = -2128831035;
+    for (variants) |v| {
+        h = fnv(fnv_int(fnv(fnv_str(h, v), 32), count_all(sequences, v)), 10);
+    };
+    h = fnv(fnv_int(fnv(h, 10), ilen), 10);
+    h = fnv(fnv_int(h, slen), 10);
+    fnv(fnv_int(h, size), 10);
+}
+
+// ---- input
+
+fn out_str(s: Str) void {
+    for (0..<s.len()) |i| { heap.push(s[i]); };
+}
+
+fn out_buf(len: I32) void {
+    for (0..<len) |i| { heap.push(buf[i]); };
+}
+
+fn out_rep(len: I32) void {
+    for (0..<len) |i| { heap.push(rep[i]); };
+}
+
+// ---- fasta generator: copy from here to "end of the fasta generator"
+
+let im: I32 = 139968;
+let ia: I32 = 3877;
+let ic: I32 = 29573;
+let linelen: I32 = 60;
+let buflines: I32 = 100;
+
+mem hash: U8;    // the symbol for each random number
+mem buf: U8;     // buflines lines of random symbols
+mem rep: U8;     // the repeated sequence, len lines
+
+// The generator's state: the random seed, and the output hash.
+struct State:
+    | seed: I32
+    | h: I32
+
+let st: State = &{ seed: 42, h: 0 };
+
+
+fn alu() Str {
+    "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
+}
+
+// seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
+fn repeat_fasta(seq: Str, n: I32) void {
+    let len = seq.len();
+    let line = linelen + 1;
+    rep.resize(line * len);
+    for (0..<len) |i| {
+        for (0..<linelen) |k| {
+            rep[i * line + k] = seq[(i * linelen + k) % len];
+        };
+        rep[i * line + linelen] = 10;
+    };
+    let whole_buffers = n / (len * linelen);
+    for (0..<whole_buffers) { out_rep(line * len); };
+    let data_remaining = n - whole_buffers * len * linelen;
+    out_rep(data_remaining + data_remaining / linelen);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+// hash[i] = the symbol whose cumulative probability first exceeds i / im.
+fn build_hash(symb: Str, p: Array[F32]) void {
+    hash.resize(im);
+    let len = symb.len();
+    let sum = p[0];
+    let j = 0;
+    let i = 0;
+    while (i < im and j < len) {
+        let r = (i.to_f64() / im.to_f64()).to_f32();
+        if r >= sum {
+            j += 1;
+            if j < len { sum = sum + p[j]; };
+        };
+        hash[i] = if j < len { symb[j]; } else { 0; };
+        i += 1;
+    };
+}
+
+fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+    build_hash(symb, p);
+    let line = linelen + 1;
+    buf.resize(line * buflines);
+    for (0..<buflines) |i| { buf[i * line + linelen] = 10; };
+    let seed = st.seed;
+
+    // whole buffers: fixed loops, no decisions
+    let buffers = n / linelen / buflines;
+    for (0..<buffers) {
+        for (0..<buflines) |j| {
+            for (0..<linelen) |k| {
+                seed = (seed * ia + ic) % im;
+                buf[j * line + k] = hash[seed];
+            };
+        };
+        st.seed = seed;
+        out_buf(line * buflines);
+    };
+
+    // the remaining whole lines, then the partial one
+    let lines = n / linelen - buffers * buflines;
+    for (0..<lines) |j| {
+        for (0..<linelen) |k| {
+            seed = (seed * ia + ic) % im;
+            buf[j * line + k] = hash[seed];
+        };
+    };
+    let partials = n - linelen * lines - buffers * buflines * linelen;
+    for (0..<partials) |k| {
+        seed = (seed * ia + ic) % im;
+        buf[lines * line + k] = hash[seed];
+    };
+    st.seed = seed;
+    out_buf(lines * line + partials);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+fn fasta(n: I32) void {
+    st.seed = 42;
+    let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02];
+    let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008];
+
+    out_str(">ONE Homo sapiens alu\n");
+    repeat_fasta(alu(), n * 2);
+
+    out_str(">TWO IUB ambiguity codes\n");
+    random_fasta("acgtBDHKMNRSVWY", iub_p, n * 3);
+
+    out_str(">THREE Homo sapiens frequency\n");
+    random_fasta("acgt", homosapiens_p, n * 5);
+}
+// ---- end of the fasta generator
+
+fn setup_input(n: I32) void {
+    heap.clear();
+    fasta(n);
+    input.text = to_string(heap.view(0, heap.len()));
+}
+
+test "regexredux 1000 is BG's output" {
+    setup_input(1000);
+    assert regexredux() == -1698654446;
+}
+
+export lib {
+    fn setup(n: I32) void { setup_input(n); }
+    fn bench(n: I32) I32 { regexredux(); }
+}

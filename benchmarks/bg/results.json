@@ -1,0 +1,4647 @@
+{
+ "programs": {
+  "binarytrees": {
+   "n": 18,
+   "setup": null,
+   "samples": 5,
+   "warmups": 3,
+   "result": "3963415002",
+   "notes": "bench(n): binary-trees with max depth n (stretch tree n+1, long-lived tree n, 2^(n-d+4) trees of each even depth d from 4); result = FNV-1a of the bytes BG prints. BG runs n=21.",
+   "date": "2026-11-05T13:10:08.625Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 98,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 2592,
+     "js": 558,
+     "bytes": 3150,
+     "gzip": 1115,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/binarytrees-utu-fast/binarytrees.mjs"
+     ],
+     "result": "3963415002",
+     "median": 243.69499999999994,
+     "best": 238.164,
+     "times": [
+      247.46699999999987,
+      243.69499999999994,
+      238.164,
+      244.88099999999986,
+      238.2130000000002
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 84,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 2568,
+     "js": 329,
+     "bytes": 2897,
+     "gzip": 969,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/binarytrees-utu-fastUnsafe/binarytrees.mjs"
+     ],
+     "result": "3963415002",
+     "median": 244.4509999999998,
+     "best": 238.66499999999996,
+     "times": [
+      247.74199999999996,
+      247.22900000000004,
+      244.394,
+      238.66499999999996,
+      244.4509999999998
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 87,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 721,
+     "js": 558,
+     "bytes": 1279,
+     "gzip": 869,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/binarytrees-utu-small/binarytrees.mjs"
+     ],
+     "result": "3963415002",
+     "median": 262.3700000000001,
+     "best": 252.71499999999992,
+     "times": [
+      262.3700000000001,
+      252.71499999999992,
+      262.4169999999999,
+      263.23800000000006,
+      261.00400000000036
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 84,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 715,
+     "js": 329,
+     "bytes": 1044,
+     "gzip": 726,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/binarytrees-utu-smallUnsafe/binarytrees.mjs"
+     ],
+     "result": "3963415002",
+     "median": 260.02,
+     "best": 254.163,
+     "times": [
+      260.24300000000017,
+      254.163,
+      264.4090000000001,
+      260.02,
+      255.3739999999998
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 634,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench"
+     ],
+     "wasm": 17327,
+     "js": 392,
+     "bytes": 17719,
+     "gzip": 8807,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/c-loader.mjs"
+     ],
+     "result": "3963415002",
+     "median": 257.22699999999986,
+     "best": 256.9000000000001,
+     "times": [
+      257.07399999999984,
+      256.9000000000001,
+      257.90100000000007,
+      257.22699999999986,
+      257.3149999999996
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 1017,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-std=c++17",
+      "-I/opt/homebrew/include",
+      "-DBOOST_POOL_NO_MT"
+     ],
+     "wasm": 18953,
+     "js": 1690,
+     "bytes": 20643,
+     "gzip": 10042,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3963415002",
+     "median": 345.1659999999997,
+     "best": 344.721,
+     "times": [
+      345.18399999999997,
+      345.2900000000002,
+      345.1659999999997,
+      344.7890000000002,
+      344.721
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 745,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 23010,
+     "js": 357,
+     "bytes": 23367,
+     "gzip": 10559,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/rust-loader.mjs"
+     ],
+     "result": "3963415002",
+     "median": 248.221,
+     "best": 247.6919999999999,
+     "times": [
+      247.6919999999999,
+      248.34199999999987,
+      248.02699999999982,
+      248.221,
+      248.4949999999999
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 2789,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2428652,
+     "js": 1690,
+     "bytes": 2430342,
+     "gzip": 708575,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3963415002",
+     "median": 7116.993999999999,
+     "best": 7050.106,
+     "times": [
+      7116.993999999999,
+      7050.106,
+      7077.637999999999,
+      7172.129999999997,
+      7289.3009999999995
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.zdM6F1/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.6jhXxa/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.zdM6F1/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.6jhXxa/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/swift)"
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 1869,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1767396,
+     "js": 1690,
+     "bytes": 1769086,
+     "gzip": 479109,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3963415002",
+     "median": 1941.5480000000007,
+     "best": 1935.9779999999992,
+     "times": [
+      1939.8810000000003,
+      1941.5480000000007,
+      1946.217999999999,
+      1935.9779999999992,
+      1947.6699999999983
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/dart/binarytrees.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/dart/binarytrees.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/dart/binarytrees.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/dart/binarytrees.dart)"
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 899,
+     "bytes": 899,
+     "gzip": 467,
+     "jsFiles": [
+      "benchmarks/bg/binarytrees/js/binarytrees.js"
+     ],
+     "result": "3963415002",
+     "median": 612.1780000000003,
+     "best": 460.16899999999987,
+     "times": [
+      649.1089999999999,
+      648.4959999999996,
+      612.1780000000003,
+      461.21000000000004,
+      460.16899999999987
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 151,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 4355,
+     "js": 351,
+     "bytes": 4706,
+     "gzip": 2483,
+     "jsFiles": [
+      ".tmp/bg/binarytrees/moonbit-loader.mjs"
+     ],
+     "result": "3963415002",
+     "median": 289.7589999999998,
+     "best": 287.5239999999999,
+     "times": [
+      288.9859999999999,
+      287.5239999999999,
+      289.7589999999998,
+      307.50099999999975,
+      303.38700000000017
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/assemblyscript/binarytrees.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/assemblyscript/binarytrees.wasm)"
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "fannkuchredux": {
+   "n": 10,
+   "setup": null,
+   "samples": 10,
+   "warmups": 3,
+   "result": "1161472954",
+   "notes": "bench(n): fannkuch-redux over all n! permutations; result = FNV-1a of the bytes BG prints (\"%d\\nPfannkuchen(%d) = %d\\n\"). BG runs n=12.",
+   "date": "2026-11-05T12:02:14.855Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 88,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 2331,
+     "js": 729,
+     "bytes": 3060,
+     "gzip": 1344,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/fannkuchredux-utu-fast/fannkuchredux.mjs"
+     ],
+     "result": "1161472954",
+     "median": 186.94849999999997,
+     "best": 185.904,
+     "times": [
+      187.71300000000008,
+      187.2260000000001,
+      187.45799999999986,
+      187.6489999999999,
+      187.76,
+      186.67099999999982,
+      185.92899999999986,
+      185.904,
+      186.04700000000003,
+      186.0949999999998
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 83,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 2331,
+     "js": 331,
+     "bytes": 2662,
+     "gzip": 1117,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/fannkuchredux-utu-fastUnsafe/fannkuchredux.mjs"
+     ],
+     "result": "1161472954",
+     "median": 188.72450000000015,
+     "best": 187.73299999999995,
+     "times": [
+      191.3280000000001,
+      188.538,
+      188.61099999999988,
+      187.73299999999995,
+      188.8219999999999,
+      189.33299999999986,
+      188.75000000000023,
+      188.66100000000006,
+      189.5709999999999,
+      188.69900000000007
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 80,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 1318,
+     "js": 729,
+     "bytes": 2047,
+     "gzip": 1246,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/fannkuchredux-utu-small/fannkuchredux.mjs"
+     ],
+     "result": "1161472954",
+     "median": 190.53100000000006,
+     "best": 189.24400000000014,
+     "times": [
+      190.13599999999997,
+      189.92399999999998,
+      191.3670000000002,
+      190.57200000000012,
+      189.24400000000014,
+      190.49,
+      190.22899999999981,
+      192.46900000000005,
+      192.09900000000016,
+      191.66699999999992
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 79,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 1318,
+     "js": 331,
+     "bytes": 1649,
+     "gzip": 1019,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/fannkuchredux-utu-smallUnsafe/fannkuchredux.mjs"
+     ],
+     "result": "1161472954",
+     "median": 192.1674999999999,
+     "best": 188.80700000000002,
+     "times": [
+      192.32999999999993,
+      193.236,
+      190.39499999999998,
+      188.80700000000002,
+      193.12999999999988,
+      192.51599999999985,
+      192.00499999999988,
+      191.71900000000005,
+      193.00999999999976,
+      191.23000000000002
+     ]
+    },
+    {
+     "key": "utu-tuned-fast",
+     "name": "utu tuned fast",
+     "compileMs": 85,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 2979,
+     "js": 735,
+     "bytes": 3714,
+     "gzip": 1427,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/fannkuchredux-tuned-utu-fast/fannkuchredux.tuned.mjs"
+     ],
+     "result": "1161472954",
+     "median": 117.12200000000007,
+     "best": 116.42600000000004,
+     "times": [
+      117.18200000000002,
+      116.42600000000004,
+      116.52300000000002,
+      116.769,
+      117.12300000000005,
+      117.12999999999988,
+      117.08899999999994,
+      117.1210000000001,
+      117.68899999999985,
+      117.27499999999986
+     ]
+    },
+    {
+     "key": "utu-tuned-small",
+     "name": "utu tuned small",
+     "compileMs": 80,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 1346,
+     "js": 735,
+     "bytes": 2081,
+     "gzip": 1328,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/fannkuchredux-tuned-utu-small/fannkuchredux.tuned.mjs"
+     ],
+     "result": "1161472954",
+     "median": 116.52849999999995,
+     "best": 114.20100000000002,
+     "times": [
+      117.332,
+      117.33299999999997,
+      116.80000000000007,
+      117.60699999999997,
+      116.96399999999994,
+      116.21899999999982,
+      115.44200000000001,
+      114.20100000000002,
+      114.3409999999999,
+      116.25699999999983
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 658,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-msse4.1"
+     ],
+     "wasm": 11236,
+     "js": 355,
+     "bytes": 11591,
+     "gzip": 6112,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/c-loader.mjs"
+     ],
+     "result": "1161472954",
+     "median": 110.7885,
+     "best": 110.45700000000011,
+     "times": [
+      113.11699999999996,
+      110.71900000000005,
+      113.04200000000003,
+      111.21600000000001,
+      110.56399999999996,
+      110.45700000000011,
+      110.47900000000004,
+      111.12999999999988,
+      110.46199999999999,
+      110.85799999999995
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 787,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-msse4.1",
+      "-std=c++17"
+     ],
+     "wasm": 11753,
+     "js": 355,
+     "bytes": 12108,
+     "gzip": 6436,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/cpp-loader.mjs"
+     ],
+     "result": "1161472954",
+     "median": 138.97499999999997,
+     "best": 135.048,
+     "times": [
+      139.091,
+      139.64099999999996,
+      138.92099999999994,
+      138.94899999999996,
+      139.54500000000007,
+      135.048,
+      138.05899999999997,
+      138.90700000000015,
+      139.00099999999998,
+      139.54500000000007
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 961,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 22624,
+     "js": 361,
+     "bytes": 22985,
+     "gzip": 10115,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/rust-loader.mjs"
+     ],
+     "result": "1161472954",
+     "median": 135.49750000000006,
+     "best": 133.92600000000016,
+     "times": [
+      134.735,
+      134.755,
+      136.19899999999996,
+      136.97899999999993,
+      133.92600000000016,
+      135.2070000000001,
+      135.32900000000018,
+      136.269,
+      135.66599999999994,
+      136.0239999999999
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 2495,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2424096,
+     "js": 1690,
+     "bytes": 2425786,
+     "gzip": 707426,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1161472954",
+     "median": 391.28700000000026,
+     "best": 389.3149999999996,
+     "times": [
+      391.23900000000003,
+      394.087,
+      393.5229999999997,
+      391.9489999999996,
+      390.5680000000002,
+      391.49299999999994,
+      391.3350000000005,
+      390.1860000000006,
+      391.16699999999946,
+      389.3149999999996
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "compileMs": 2977,
+     "flags": [
+      "-c",
+      "release",
+      "--swift-sdk",
+      "swift-6.4.1-RELEASE_wasm",
+      "-Xlinker",
+      "--strip-all"
+     ],
+     "wasm": 5554414,
+     "js": 1690,
+     "bytes": 5556104,
+     "gzip": 1699630,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1161472954",
+     "median": 204.69449999999995,
+     "best": 200.50999999999976,
+     "times": [
+      204.7639999999999,
+      205.8230000000001,
+      205.87599999999998,
+      205.00300000000016,
+      204.87900000000013,
+      204.18300000000022,
+      204.625,
+      204.10900000000038,
+      203.942,
+      200.50999999999976
+     ]
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 658,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1513547,
+     "js": 1690,
+     "bytes": 1515237,
+     "gzip": 437936,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1161472954",
+     "median": 640.607,
+     "best": 636.8980000000001,
+     "times": [
+      639.875,
+      637.8230000000003,
+      641.3609999999994,
+      638.5129999999999,
+      643.982,
+      636.8980000000001,
+      641.3389999999999,
+      642.9860000000008,
+      638.4979999999996,
+      641.9640000000018
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "compileMs": 1004,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 36997,
+     "js": 6299,
+     "bytes": 43296,
+     "gzip": 17296,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/dart/fannkuchredux.mjs"
+     ],
+     "result": "1161472954",
+     "median": 200.99599999999998,
+     "best": 199.33199999999988,
+     "times": [
+      202.13099999999986,
+      202.54700000000003,
+      200.7349999999999,
+      200.635,
+      202.07900000000018,
+      201.25700000000006,
+      200.01200000000017,
+      199.33199999999988,
+      201.65099999999984,
+      200.51400000000012
+     ]
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 1294,
+     "bytes": 1294,
+     "gzip": 714,
+     "jsFiles": [
+      "benchmarks/bg/fannkuchredux/js/fannkuchredux.js"
+     ],
+     "result": "1161472954",
+     "median": 237.67500000000018,
+     "best": 233.07000000000016,
+     "times": [
+      238.6980000000001,
+      238.66499999999996,
+      238.45100000000002,
+      237.904,
+      237.2489999999998,
+      237.44600000000037,
+      233.07000000000016,
+      236.86400000000003,
+      238.34799999999996,
+      236.8430000000003
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "compileMs": 1440,
+     "flags": [
+      "compileProductionExecutableKotlinWasmJsOptimize"
+     ],
+     "wasm": 3074,
+     "js": 4299,
+     "bytes": 7373,
+     "gzip": 3867,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fannkuchredux.import-object.mjs",
+      ".tmp/bg/fannkuchredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fannkuchredux.js-builtins.mjs",
+      ".tmp/bg/fannkuchredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fannkuchredux.mjs"
+     ],
+     "result": "1161472954",
+     "median": 203.03349999999978,
+     "best": 202.56600000000026,
+     "times": [
+      204.413,
+      209.01800000000003,
+      207.98500000000013,
+      206.61400000000026,
+      202.7460000000001,
+      202.56600000000026,
+      202.95199999999977,
+      203.11499999999978,
+      202.72900000000027,
+      202.78799999999956
+     ]
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 167,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 4724,
+     "js": 355,
+     "bytes": 5079,
+     "gzip": 2714,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/moonbit-loader.mjs"
+     ],
+     "result": "1161472954",
+     "median": 187.3789999999999,
+     "best": 187.26299999999992,
+     "times": [
+      187.33900000000006,
+      187.539,
+      187.414,
+      187.34399999999982,
+      187.30899999999997,
+      187.46500000000015,
+      187.58899999999971,
+      187.30600000000004,
+      187.61500000000024,
+      187.26299999999992
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "compileMs": 1753,
+     "flags": [
+      "-O3",
+      "--enable",
+      "simd",
+      "--runtime",
+      "incremental"
+     ],
+     "wasm": 7834,
+     "js": 394,
+     "bytes": 8228,
+     "gzip": 4113,
+     "jsFiles": [
+      ".tmp/bg/fannkuchredux/assemblyscript-loader.mjs"
+     ],
+     "result": "1161472954",
+     "median": 107.12099999999998,
+     "best": 105.58699999999999,
+     "times": [
+      107.0440000000001,
+      107.22500000000002,
+      106.71799999999996,
+      107.024,
+      105.58699999999999,
+      106.8599999999999,
+      107.19799999999987,
+      107.43399999999997,
+      107.33400000000006,
+      107.4090000000001
+     ]
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "fasta": {
+   "n": 2500000,
+   "setup": null,
+   "samples": 10,
+   "warmups": 3,
+   "result": "3173702343",
+   "notes": "bench(n): BG fasta for n; result = FNV-1a of the bytes BG prints (10.2 n bytes). BG runs n=25,000,000.",
+   "date": "2026-11-05T11:54:01.177Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 101,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 4924,
+     "js": 1472,
+     "bytes": 6396,
+     "gzip": 2227,
+     "jsFiles": [
+      ".tmp/bg/fasta/fasta-utu-fast/fasta.mjs"
+     ],
+     "result": "3173702343",
+     "median": 113.43449999999996,
+     "best": 113.286,
+     "times": [
+      113.286,
+      113.45600000000002,
+      113.56499999999994,
+      113.769,
+      113.3610000000001,
+      113.43200000000002,
+      113.4369999999999,
+      113.37900000000013,
+      113.62000000000012,
+      113.41200000000003
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 148,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 4293,
+     "js": 323,
+     "bytes": 4616,
+     "gzip": 1581,
+     "jsFiles": [
+      ".tmp/bg/fasta/fasta-utu-fastUnsafe/fasta.mjs"
+     ],
+     "result": "3173702343",
+     "median": 113.46550000000002,
+     "best": 113.21000000000004,
+     "times": [
+      113.21000000000004,
+      114.19299999999998,
+      113.28599999999994,
+      113.274,
+      113.45000000000005,
+      113.69000000000005,
+      113.26599999999985,
+      113.481,
+      113.5,
+      113.80899999999997
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 207,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 2102,
+     "js": 1472,
+     "bytes": 3574,
+     "gzip": 1932,
+     "jsFiles": [
+      ".tmp/bg/fasta/fasta-utu-small/fasta.mjs"
+     ],
+     "result": "3173702343",
+     "median": 153.313,
+     "best": 151.8030000000001,
+     "times": [
+      152.5630000000001,
+      152.97400000000005,
+      153.36799999999994,
+      153.25800000000004,
+      153.65100000000007,
+      153.75400000000013,
+      155.1389999999999,
+      162.7059999999999,
+      152.1959999999999,
+      151.8030000000001
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 170,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 1979,
+     "js": 323,
+     "bytes": 2302,
+     "gzip": 1322,
+     "jsFiles": [
+      ".tmp/bg/fasta/fasta-utu-smallUnsafe/fasta.mjs"
+     ],
+     "result": "3173702343",
+     "median": 113.27799999999996,
+     "best": 113.07200000000012,
+     "times": [
+      113.37100000000004,
+      113.26699999999994,
+      113.16200000000003,
+      113.63600000000008,
+      113.154,
+      115.99000000000001,
+      113.07200000000012,
+      113.84300000000007,
+      113.28899999999999,
+      113.24099999999999
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 659,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench"
+     ],
+     "wasm": 10449,
+     "js": 380,
+     "bytes": 10829,
+     "gzip": 4964,
+     "jsFiles": [
+      ".tmp/bg/fasta/c-loader.mjs"
+     ],
+     "result": "3173702343",
+     "median": 106.16149999999988,
+     "best": 106.04200000000003,
+     "times": [
+      106.24000000000001,
+      106.15999999999997,
+      106.04200000000003,
+      106.101,
+      106.16999999999996,
+      106.08799999999997,
+      106.3309999999999,
+      106.13699999999994,
+      106.16299999999978,
+      106.38000000000011
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 1764,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-msse2",
+      "-std=c++17"
+     ],
+     "wasm": 13098,
+     "js": 380,
+     "bytes": 13478,
+     "gzip": 6156,
+     "jsFiles": [
+      ".tmp/bg/fasta/cpp-loader.mjs"
+     ],
+     "result": "3173702343",
+     "median": 126.00400000000002,
+     "best": 125.64300000000003,
+     "times": [
+      125.66499999999996,
+      130.52499999999998,
+      126.17599999999993,
+      128.22799999999995,
+      126.13400000000001,
+      127.62300000000005,
+      125.72800000000007,
+      125.87400000000002,
+      125.65599999999995,
+      125.64300000000003
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 2309,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 15504,
+     "js": 345,
+     "bytes": 15849,
+     "gzip": 7315,
+     "jsFiles": [
+      ".tmp/bg/fasta/rust-loader.mjs"
+     ],
+     "result": "3173702343",
+     "median": 127.50750000000005,
+     "best": 127.36400000000003,
+     "times": [
+      127.62799999999993,
+      127.53800000000001,
+      127.36400000000003,
+      129.46800000000007,
+      127.47700000000009,
+      127.46299999999997,
+      127.39199999999983,
+      127.73199999999997,
+      127.46299999999997,
+      127.58199999999988
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 4766,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 1908342,
+     "js": 1690,
+     "bytes": 1910032,
+     "gzip": 568296,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3173702343",
+     "median": 447.74950000000035,
+     "best": 446.5630000000001,
+     "times": [
+      448.8660000000002,
+      446.91499999999996,
+      451.0840000000003,
+      447.84900000000016,
+      447.6940000000004,
+      447.8050000000003,
+      446.6439999999993,
+      447.9880000000003,
+      446.5630000000001,
+      446.8210000000008
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "compileMs": 5576,
+     "flags": [
+      "-c",
+      "release",
+      "--swift-sdk",
+      "swift-6.4.1-RELEASE_wasm",
+      "-Xlinker",
+      "--strip-all"
+     ],
+     "wasm": 5556553,
+     "js": 1690,
+     "bytes": 5558243,
+     "gzip": 1700492,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3173702343",
+     "median": 281.2739999999999,
+     "best": 280.355,
+     "times": [
+      281.308,
+      281.6850000000002,
+      281.50199999999995,
+      281.23000000000025,
+      281.2399999999998,
+      281.0250000000001,
+      282.47599999999966,
+      282.68899999999985,
+      280.49900000000025,
+      280.355
+     ]
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 1373,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1620738,
+     "js": 1690,
+     "bytes": 1622428,
+     "gzip": 461230,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3173702343",
+     "median": 593.4449999999999,
+     "best": 587.317,
+     "times": [
+      593.6609999999996,
+      593.2290000000003,
+      589.0329999999999,
+      592.9210000000003,
+      591.848,
+      587.317,
+      593.683,
+      597.2040000000006,
+      605.6310000000003,
+      594.7009999999991
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "compileMs": 1259,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 38451,
+     "js": 6388,
+     "bytes": 44839,
+     "gzip": 18426,
+     "jsFiles": [
+      ".tmp/bg/fasta/dart/fasta.mjs"
+     ],
+     "result": "3173702343",
+     "median": 476.0965000000001,
+     "best": 472.90499999999975,
+     "times": [
+      472.90499999999975,
+      478.3119999999999,
+      475.674,
+      475.8159999999998,
+      475.50599999999986,
+      476.51800000000003,
+      477.71399999999994,
+      478.40899999999965,
+      473.2529999999997,
+      476.3770000000004
+     ]
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 2557,
+     "bytes": 2557,
+     "gzip": 1160,
+     "jsFiles": [
+      "benchmarks/bg/fasta/js/fasta.js"
+     ],
+     "result": "3173702343",
+     "median": 441.9545000000005,
+     "best": 434.4069999999997,
+     "times": [
+      442.60199999999986,
+      441.3599999999997,
+      441.56399999999985,
+      437.78200000000015,
+      442.06600000000026,
+      434.4069999999997,
+      443.8210000000008,
+      441.84300000000076,
+      447.85099999999966,
+      447.52700000000004
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "compileMs": 2360,
+     "flags": [
+      "compileProductionExecutableKotlinWasmJsOptimize"
+     ],
+     "wasm": 10594,
+     "js": 4404,
+     "bytes": 14998,
+     "gzip": 7494,
+     "jsFiles": [
+      ".tmp/bg/fasta/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fasta.import-object.mjs",
+      ".tmp/bg/fasta/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fasta.js-builtins.mjs",
+      ".tmp/bg/fasta/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/fasta.mjs"
+     ],
+     "result": "3173702343",
+     "median": 460.5809999999992,
+     "best": 451.8050000000003,
+     "times": [
+      492.87199999999984,
+      492.6880000000001,
+      468.0989999999997,
+      463.5039999999999,
+      459.34400000000005,
+      457.3900000000003,
+      459.84899999999925,
+      459.6990000000005,
+      451.8050000000003,
+      461.3129999999992
+     ]
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 198,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 6099,
+     "js": 339,
+     "bytes": 6438,
+     "gzip": 3212,
+     "jsFiles": [
+      ".tmp/bg/fasta/moonbit-loader.mjs"
+     ],
+     "result": "3173702343",
+     "median": 112.87349999999992,
+     "best": 110.74699999999984,
+     "times": [
+      113.22599999999994,
+      112.63900000000001,
+      112.8309999999999,
+      113.04200000000003,
+      113.33199999999988,
+      110.74699999999984,
+      113.02599999999984,
+      112.654,
+      112.41399999999999,
+      112.91599999999994
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "compileMs": 1625,
+     "flags": [
+      "-O3",
+      "--enable",
+      "simd",
+      "--runtime",
+      "incremental"
+     ],
+     "wasm": 6554,
+     "js": 378,
+     "bytes": 6932,
+     "gzip": 3392,
+     "jsFiles": [
+      ".tmp/bg/fasta/assemblyscript-loader.mjs"
+     ],
+     "result": "3173702343",
+     "median": 106.81649999999996,
+     "best": 103.61800000000017,
+     "times": [
+      106.88299999999992,
+      108.55099999999993,
+      107.75600000000009,
+      109.54500000000007,
+      109.47799999999995,
+      103.82800000000009,
+      103.61800000000017,
+      105.36999999999989,
+      106.71199999999999,
+      106.75
+     ]
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "knucleotide": {
+   "n": 500000,
+   "setup": 500000,
+   "samples": 10,
+   "warmups": 3,
+   "result": "1583578344",
+   "notes": "setup(n): BG fasta's output for n (untimed). bench(n): k-nucleotide over it (find >THREE, encode, count 1-, 2-mers and the 5 fragments); result = FNV-1a of the bytes BG prints. n=1000 -> 2506903540 (BG's knucleotide-output.txt). BG runs fasta 25,000,000.",
+   "date": "2026-11-05T12:39:29.372Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 80,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 5776,
+     "js": 1174,
+     "bytes": 6950,
+     "gzip": 2717,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/knucleotide-utu-fast/knucleotide.mjs"
+     ],
+     "result": "1583578344",
+     "median": 91.46649999999988,
+     "best": 90.01199999999994,
+     "times": [
+      90.33100000000002,
+      93.78500000000008,
+      94.73400000000004,
+      94.957,
+      90.72800000000007,
+      90.44399999999996,
+      92.63199999999983,
+      91.95699999999988,
+      90.97599999999989,
+      90.01199999999994
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 83,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 5596,
+     "js": 548,
+     "bytes": 6144,
+     "gzip": 2465,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/knucleotide-utu-fastUnsafe/knucleotide.mjs"
+     ],
+     "result": "1583578344",
+     "median": 83.58899999999994,
+     "best": 81.70900000000006,
+     "times": [
+      85.71999999999997,
+      85.952,
+      83.279,
+      83.46399999999994,
+      83.71399999999994,
+      91.84800000000007,
+      81.70900000000006,
+      81.90000000000009,
+      82.41599999999994,
+      87.99800000000005
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 78,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 3343,
+     "js": 1174,
+     "bytes": 4517,
+     "gzip": 2445,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/knucleotide-utu-small/knucleotide.mjs"
+     ],
+     "result": "1583578344",
+     "median": 99.46650000000011,
+     "best": 96.87099999999998,
+     "times": [
+      102.95099999999991,
+      99.74099999999999,
+      98.21699999999998,
+      97.38700000000006,
+      96.87099999999998,
+      97.731,
+      99.19900000000007,
+      99.80600000000004,
+      99.73400000000015,
+      99.81400000000008
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 87,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 3268,
+     "js": 548,
+     "bytes": 3816,
+     "gzip": 2198,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/knucleotide-utu-smallUnsafe/knucleotide.mjs"
+     ],
+     "result": "1583578344",
+     "median": 91.22149999999996,
+     "best": 88.39200000000005,
+     "times": [
+      90.82699999999994,
+      89.43100000000004,
+      91.96399999999994,
+      95.35000000000002,
+      91.61599999999999,
+      92.84999999999991,
+      93.981,
+      89.89900000000011,
+      90.01999999999998,
+      88.39200000000005
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 862,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench,_setup"
+     ],
+     "wasm": 26492,
+     "js": 392,
+     "bytes": 26884,
+     "gzip": 12907,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/c-loader.mjs"
+     ],
+     "result": "1583578344",
+     "median": 158.22300000000007,
+     "best": 150.95299999999975,
+     "times": [
+      160.90300000000002,
+      160.95900000000006,
+      158.37000000000012,
+      163.53500000000008,
+      153.35500000000002,
+      158.07600000000002,
+      153.97599999999989,
+      153.8889999999999,
+      150.95299999999975,
+      159.35599999999977
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 6864,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench,_setup",
+      "-std=c++17",
+      "-Ibenchmarks/bg/knucleotide/cpp/pbds"
+     ],
+     "wasm": 169484,
+     "js": 1690,
+     "bytes": 171174,
+     "gzip": 61867,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1583578344",
+     "median": 98.7305,
+     "best": 93.26499999999987,
+     "times": [
+      99.678,
+      97.78300000000002,
+      100.37,
+      110.6930000000001,
+      101.21699999999998,
+      102.16499999999996,
+      93.596,
+      94.71900000000005,
+      93.26499999999987,
+      95.22599999999989
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 5940,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 77738,
+     "js": 357,
+     "bytes": 78095,
+     "gzip": 29687,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/rust-loader.mjs"
+     ],
+     "result": "1583578344",
+     "median": 114.10699999999986,
+     "best": 104.981,
+     "times": [
+      104.981,
+      116.34399999999994,
+      117.08699999999999,
+      111.60299999999995,
+      111.40000000000009,
+      110.74000000000001,
+      117.15499999999997,
+      117.41200000000003,
+      113.37099999999987,
+      114.84299999999985
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 4462,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2577565,
+     "js": 1690,
+     "bytes": 2579255,
+     "gzip": 746500,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1583578344",
+     "median": 664.786499999999,
+     "best": 596.8189999999995,
+     "times": [
+      678.2330000000002,
+      659.0269999999996,
+      684.7349999999997,
+      658.8759999999993,
+      680.2930000000006,
+      616.5970000000007,
+      703.1859999999997,
+      602.4339999999993,
+      596.8189999999995,
+      670.5459999999985
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "compileMs": 3196,
+     "flags": [
+      "-c",
+      "release",
+      "--swift-sdk",
+      "swift-6.4.1-RELEASE_wasm",
+      "-Xlinker",
+      "--strip-all"
+     ],
+     "wasm": 5570261,
+     "js": 1690,
+     "bytes": 5571951,
+     "gzip": 1707521,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1583578344",
+     "median": 496.54549999999995,
+     "best": 480.7769999999996,
+     "times": [
+      484.828,
+      492.1489999999999,
+      480.7769999999996,
+      498.404,
+      508.0549999999994,
+      521.4960000000001,
+      491.6859999999997,
+      494.6869999999999,
+      521.9169999999995,
+      503.98199999999997
+     ]
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 1556,
+     "flags": [
+      "-O2",
+      "-package-db",
+      "/Users/robertmorelli/.ghc-wasm/.cabal/store/ghc-9.14.1.20260731-70e7/package.db",
+      "-package",
+      "hashtables",
+      "-package",
+      "hashable"
+     ],
+     "wasm": 2183654,
+     "js": 1690,
+     "bytes": 2185344,
+     "gzip": 556759,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1583578344",
+     "median": 2140.9135000000006,
+     "best": 2031.148000000001,
+     "times": [
+      2063.6440000000002,
+      2122.5279999999984,
+      2048.355999999998,
+      2031.148000000001,
+      2168.9519999999975,
+      2146.220000000001,
+      2147.491000000002,
+      2158.0070000000014,
+      2135.607,
+      2168.9420000000027
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "compileMs": 1489,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 56427,
+     "js": 6426,
+     "bytes": 62853,
+     "gzip": 24914,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/dart/knucleotide.mjs"
+     ],
+     "result": "1583578344",
+     "median": 487.77599999999984,
+     "best": 455.3040000000001,
+     "times": [
+      462.34100000000035,
+      476.6949999999997,
+      509.422,
+      489.0450000000001,
+      505.3800000000001,
+      487.8019999999997,
+      525.25,
+      455.3040000000001,
+      487.75,
+      479.53200000000015
+     ]
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 3060,
+     "bytes": 3060,
+     "gzip": 1448,
+     "jsFiles": [
+      "benchmarks/bg/knucleotide/js/knucleotide.js"
+     ],
+     "result": "1583578344",
+     "median": 569.1065000000003,
+     "best": 560.9780000000001,
+     "times": [
+      570.3130000000001,
+      567.1399999999999,
+      572.2479999999996,
+      572.6749999999993,
+      580.3159999999998,
+      567.0929999999998,
+      562.5820000000003,
+      560.9780000000001,
+      567.9000000000005,
+      580.6000000000004
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "compileMs": 2112,
+     "flags": [
+      "compileProductionExecutableKotlinWasmJsOptimize"
+     ],
+     "wasm": 18624,
+     "js": 4759,
+     "bytes": 23383,
+     "gzip": 11214,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/knucleotide.import-object.mjs",
+      ".tmp/bg/knucleotide/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/knucleotide.js-builtins.mjs",
+      ".tmp/bg/knucleotide/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/knucleotide.mjs"
+     ],
+     "result": "1583578344",
+     "median": 307.12249999999995,
+     "best": 304.4549999999999,
+     "times": [
+      307.5310000000002,
+      308.8309999999999,
+      308.55600000000004,
+      305.3630000000003,
+      304.4549999999999,
+      305.875,
+      305.46100000000024,
+      306.84799999999996,
+      307.39699999999993,
+      310.66700000000037
+     ]
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 170,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 15109,
+     "js": 351,
+     "bytes": 15460,
+     "gzip": 6920,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/moonbit-loader.mjs"
+     ],
+     "result": "1583578344",
+     "median": 288.3654999999999,
+     "best": 271.86799999999994,
+     "times": [
+      292.6170000000002,
+      278.885,
+      299.8670000000002,
+      283.80999999999995,
+      284.4659999999999,
+      298.9849999999997,
+      286.4779999999996,
+      290.25300000000016,
+      271.86799999999994,
+      301.6380000000004
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "compileMs": 2225,
+     "flags": [
+      "-O3",
+      "--enable",
+      "simd",
+      "--runtime",
+      "incremental"
+     ],
+     "wasm": 18589,
+     "js": 390,
+     "bytes": 18979,
+     "gzip": 7903,
+     "jsFiles": [
+      ".tmp/bg/knucleotide/assemblyscript-loader.mjs"
+     ],
+     "result": "1583578344",
+     "median": 243.99249999999984,
+     "best": 238.3130000000001,
+     "times": [
+      244.51499999999987,
+      249.68600000000015,
+      246.81100000000015,
+      243.4699999999998,
+      242.69700000000012,
+      241.36799999999994,
+      238.3130000000001,
+      247.76699999999983,
+      239.16800000000012,
+      248.99800000000005
+     ]
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "mandelbrot": {
+   "n": 3200,
+   "setup": null,
+   "samples": 5,
+   "warmups": 3,
+   "result": "3411461379",
+   "notes": "bench(n): the BG program for an n x n bitmap; result = FNV-1a of the bytes BG prints (\"P4\\n<n> <n>\\n\" and the bitmap). BG runs n=16,000.",
+   "date": "2026-11-05T13:12:02.923Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 74,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 1730,
+     "js": 557,
+     "bytes": 2287,
+     "gzip": 1085,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/mandelbrot-utu-fast/mandelbrot.mjs"
+     ],
+     "result": "3411461379",
+     "median": 164.7829999999999,
+     "best": 164.41700000000014,
+     "times": [
+      168.69499999999994,
+      169.7460000000001,
+      164.7829999999999,
+      164.644,
+      164.41700000000014
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 72,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 1730,
+     "js": 328,
+     "bytes": 2058,
+     "gzip": 944,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/mandelbrot-utu-fastUnsafe/mandelbrot.mjs"
+     ],
+     "result": "3411461379",
+     "median": 164.98299999999995,
+     "best": 164.66700000000003,
+     "times": [
+      164.66700000000003,
+      165.02099999999996,
+      164.692,
+      164.98299999999995,
+      166.10899999999992
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 69,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 1422,
+     "js": 557,
+     "bytes": 1979,
+     "gzip": 1075,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/mandelbrot-utu-small/mandelbrot.mjs"
+     ],
+     "result": "3411461379",
+     "median": 165.55099999999993,
+     "best": 164.60899999999992,
+     "times": [
+      165.55099999999993,
+      165.67700000000002,
+      166.846,
+      164.60899999999992,
+      164.98900000000003
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 71,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 1422,
+     "js": 328,
+     "bytes": 1750,
+     "gzip": 934,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/mandelbrot-utu-smallUnsafe/mandelbrot.mjs"
+     ],
+     "result": "3411461379",
+     "median": 167.75800000000004,
+     "best": 167.485,
+     "times": [
+      168.10199999999998,
+      167.485,
+      167.70000000000005,
+      167.75800000000004,
+      168.35500000000002
+     ]
+    },
+    {
+     "key": "utu-tuned-fast",
+     "name": "utu tuned fast",
+     "compileMs": 79,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 1757,
+     "js": 563,
+     "bytes": 2320,
+     "gzip": 1011,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/mandelbrot-tuned-utu-fast/mandelbrot.tuned.mjs"
+     ],
+     "result": "3411461379",
+     "median": 126.56799999999998,
+     "best": 126.31600000000003,
+     "times": [
+      126.48299999999995,
+      126.31600000000003,
+      126.88900000000001,
+      126.78100000000006,
+      126.56799999999998
+     ]
+    },
+    {
+     "key": "utu-tuned-small",
+     "name": "utu tuned small",
+     "compileMs": 74,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 1674,
+     "js": 563,
+     "bytes": 2237,
+     "gzip": 1022,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/mandelbrot-tuned-utu-small/mandelbrot.tuned.mjs"
+     ],
+     "result": "3411461379",
+     "median": 126.269,
+     "best": 126.19200000000001,
+     "times": [
+      126.769,
+      126.269,
+      126.19200000000001,
+      126.22699999999998,
+      126.61199999999997
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 854,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-msse2",
+      "-sSTACK_SIZE=4194304"
+     ],
+     "wasm": 14740,
+     "js": 390,
+     "bytes": 15130,
+     "gzip": 6840,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/c-loader.mjs"
+     ],
+     "result": "3411461379",
+     "median": 126.68299999999999,
+     "best": 126.55799999999999,
+     "times": [
+      127.38300000000004,
+      128.59299999999996,
+      126.68299999999999,
+      126.625,
+      126.55799999999999
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 1237,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-mavx",
+      "-std=c++17",
+      "-sSTACK_SIZE=4194304"
+     ],
+     "wasm": 18570,
+     "js": 390,
+     "bytes": 18960,
+     "gzip": 7892,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/cpp-loader.mjs"
+     ],
+     "result": "3411461379",
+     "median": 119.46499999999992,
+     "best": 119.39200000000005,
+     "times": [
+      119.55900000000003,
+      119.39200000000005,
+      119.44799999999998,
+      119.46499999999992,
+      119.59199999999998
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 924,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 22620,
+     "js": 355,
+     "bytes": 22975,
+     "gzip": 10118,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/rust-loader.mjs"
+     ],
+     "result": "3411461379",
+     "median": 123.33699999999999,
+     "best": 121.49799999999993,
+     "times": [
+      121.63599999999997,
+      121.49799999999993,
+      123.33699999999999,
+      124.048,
+      123.54199999999992
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 2685,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2420760,
+     "js": 1690,
+     "bytes": 2422450,
+     "gzip": 706313,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3411461379",
+     "median": 660.9939999999997,
+     "best": 660.2340000000004,
+     "times": [
+      661.6509999999998,
+      661.8680000000004,
+      660.7789999999995,
+      660.9939999999997,
+      660.2340000000004
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.osUsNg/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.DlOFnx/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.osUsNg/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.DlOFnx/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/swift)"
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 1069,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1507970,
+     "js": 1690,
+     "bytes": 1509660,
+     "gzip": 437647,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3411461379",
+     "median": 355.02700000000004,
+     "best": 354.4789999999998,
+     "times": [
+      355.02700000000004,
+      358.3670000000002,
+      354.4789999999998,
+      358.6569999999997,
+      355.02700000000004
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/dart/mandelbrot.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/dart/mandelbrot.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/dart/mandelbrot.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/dart/mandelbrot.dart)"
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 878,
+     "bytes": 878,
+     "gzip": 519,
+     "jsFiles": [
+      "benchmarks/bg/mandelbrot/js/mandelbrot.js"
+     ],
+     "result": "3411461379",
+     "median": 453.9079999999999,
+     "best": 453.6700000000001,
+     "times": [
+      454.058,
+      453.9079999999999,
+      453.8159999999998,
+      455.1089999999999,
+      453.6700000000001
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 131,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 897,
+     "js": 349,
+     "bytes": 1246,
+     "gzip": 840,
+     "jsFiles": [
+      ".tmp/bg/mandelbrot/moonbit-loader.mjs"
+     ],
+     "result": "3411461379",
+     "median": 382.02,
+     "best": 380.8539999999998,
+     "times": [
+      382.3420000000001,
+      380.8539999999998,
+      381.28499999999985,
+      383.0050000000001,
+      382.02
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/assemblyscript/mandelbrot.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/assemblyscript/mandelbrot.wasm)"
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "nbody": {
+   "n": 2000000,
+   "setup": null,
+   "samples": 10,
+   "warmups": 3,
+   "result": "1845223486",
+   "notes": "bench(n): n steps of 0.01 from the BG initial state; result = FNV-1a of the two \"%.9f\\n\" energy lines BG prints. BG runs n=50,000,000.",
+   "date": "2026-11-05T11:35:03.478Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 159,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 3350,
+     "js": 1472,
+     "bytes": 4822,
+     "gzip": 1931,
+     "jsFiles": [
+      ".tmp/bg/nbody/nbody-utu-fast/nbody.mjs"
+     ],
+     "result": "1845223486",
+     "median": 93.70499999999993,
+     "best": 93.26800000000003,
+     "times": [
+      93.26800000000003,
+      93.50099999999998,
+      93.39700000000005,
+      93.88700000000006,
+      94.10699999999997,
+      93.673,
+      94.11699999999996,
+      94.05400000000009,
+      93.73699999999985,
+      93.38699999999994
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 148,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 3350,
+     "js": 323,
+     "bytes": 3673,
+     "gzip": 1373,
+     "jsFiles": [
+      ".tmp/bg/nbody/nbody-utu-fastUnsafe/nbody.mjs"
+     ],
+     "result": "1845223486",
+     "median": 93.54400000000001,
+     "best": 93.29600000000005,
+     "times": [
+      93.56900000000002,
+      93.29600000000005,
+      93.452,
+      93.519,
+      93.71400000000006,
+      93.44399999999996,
+      94.15999999999985,
+      93.61899999999991,
+      93.90200000000004,
+      93.44100000000003
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 165,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 1676,
+     "js": 1472,
+     "bytes": 3148,
+     "gzip": 1869,
+     "jsFiles": [
+      ".tmp/bg/nbody/nbody-utu-small/nbody.mjs"
+     ],
+     "result": "1845223486",
+     "median": 93.07199999999995,
+     "best": 92.88900000000001,
+     "times": [
+      93.95100000000002,
+      93.08000000000004,
+      92.88900000000001,
+      93.24300000000005,
+      93.31500000000005,
+      92.91100000000006,
+      93.0150000000001,
+      92.99900000000002,
+      93.06399999999985,
+      93.53999999999996
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 207,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 1676,
+     "js": 323,
+     "bytes": 1999,
+     "gzip": 1311,
+     "jsFiles": [
+      ".tmp/bg/nbody/nbody-utu-smallUnsafe/nbody.mjs"
+     ],
+     "result": "1845223486",
+     "median": 93.20049999999998,
+     "best": 93,
+     "times": [
+      93.09100000000001,
+      93,
+      93.76699999999994,
+      93.44200000000001,
+      93.67999999999995,
+      93.15600000000006,
+      93.50899999999979,
+      93.12699999999995,
+      93.24499999999989,
+      93.00900000000001
+     ]
+    },
+    {
+     "key": "utu-tuned-fast",
+     "name": "utu tuned fast",
+     "compileMs": 155,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 4852,
+     "js": 1478,
+     "bytes": 6330,
+     "gzip": 2726,
+     "jsFiles": [
+      ".tmp/bg/nbody/nbody-tuned-utu-fast/nbody.tuned.mjs"
+     ],
+     "result": "1845223486",
+     "median": 77.19550000000001,
+     "best": 77.048,
+     "times": [
+      77.45400000000001,
+      77.18199999999996,
+      77.12299999999993,
+      77.10700000000008,
+      77.048,
+      77.06299999999999,
+      77.274,
+      77.26799999999992,
+      77.31299999999987,
+      77.20900000000006
+     ]
+    },
+    {
+     "key": "utu-tuned-small",
+     "name": "utu tuned small",
+     "compileMs": 194,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 4624,
+     "js": 1478,
+     "bytes": 6102,
+     "gzip": 2730,
+     "jsFiles": [
+      ".tmp/bg/nbody/nbody-tuned-utu-small/nbody.tuned.mjs"
+     ],
+     "result": "1845223486",
+     "median": 77.2045,
+     "best": 77.12200000000007,
+     "times": [
+      77.26000000000005,
+      77.24899999999997,
+      77.32799999999997,
+      77.17700000000002,
+      77.21100000000001,
+      77.23599999999999,
+      77.19799999999998,
+      77.15800000000002,
+      77.17800000000011,
+      77.12200000000007
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 778,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-mavx"
+     ],
+     "wasm": 16018,
+     "js": 339,
+     "bytes": 16357,
+     "gzip": 7540,
+     "jsFiles": [
+      ".tmp/bg/nbody/c-loader.mjs"
+     ],
+     "result": "1845223486",
+     "median": 114.269,
+     "best": 114.05000000000018,
+     "times": [
+      114.31299999999999,
+      114.22500000000002,
+      114.31299999999999,
+      114.16399999999999,
+      118.82400000000007,
+      114.19700000000012,
+      114.21500000000015,
+      114.05000000000018,
+      114.84999999999991,
+      114.3889999999999
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 1619,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-mavx",
+      "-std=c++17"
+     ],
+     "wasm": 16861,
+     "js": 339,
+     "bytes": 17200,
+     "gzip": 7886,
+     "jsFiles": [
+      ".tmp/bg/nbody/cpp-loader.mjs"
+     ],
+     "result": "1845223486",
+     "median": 84.64550000000003,
+     "best": 84.50799999999992,
+     "times": [
+      84.606,
+      84.57600000000002,
+      84.60000000000002,
+      84.55100000000004,
+      84.74199999999996,
+      84.50799999999992,
+      84.75599999999997,
+      84.68500000000006,
+      84.72299999999996,
+      84.86099999999988
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 984,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 50730,
+     "js": 345,
+     "bytes": 51075,
+     "gzip": 21283,
+     "jsFiles": [
+      ".tmp/bg/nbody/rust-loader.mjs"
+     ],
+     "result": "1845223486",
+     "median": 88.91550000000007,
+     "best": 88.74799999999999,
+     "times": [
+      88.74799999999999,
+      88.81099999999998,
+      88.78800000000001,
+      88.78499999999997,
+      89.12299999999993,
+      89.41799999999989,
+      89.55999999999995,
+      89.01700000000005,
+      88.85300000000007,
+      88.97800000000007
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 4095,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2422236,
+     "js": 1690,
+     "bytes": 2423926,
+     "gzip": 708645,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1845223486",
+     "median": 133.6895,
+     "best": 133.5200000000002,
+     "times": [
+      133.71799999999996,
+      133.68099999999993,
+      133.74399999999991,
+      133.55899999999997,
+      133.61900000000014,
+      133.73000000000002,
+      133.558,
+      133.6980000000001,
+      133.894,
+      133.5200000000002
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "compileMs": 4306,
+     "flags": [
+      "-c",
+      "release",
+      "--swift-sdk",
+      "swift-6.4.1-RELEASE_wasm",
+      "-Xlinker",
+      "--strip-all"
+     ],
+     "wasm": 5555893,
+     "js": 1690,
+     "bytes": 5557583,
+     "gzip": 1700360,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1845223486",
+     "median": 134.106,
+     "best": 133.86199999999985,
+     "times": [
+      134.04700000000003,
+      133.98400000000004,
+      133.9799999999999,
+      134.06899999999996,
+      134.14999999999986,
+      134.3019999999999,
+      133.86199999999985,
+      134.46600000000012,
+      134.14300000000003,
+      134.14999999999986
+     ]
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 1443,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1956118,
+     "js": 1690,
+     "bytes": 1957808,
+     "gzip": 522115,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "1845223486",
+     "median": 252.50199999999995,
+     "best": 252.125,
+     "times": [
+      252.8710000000001,
+      252.27800000000002,
+      252.79499999999985,
+      252.86199999999985,
+      252.32499999999982,
+      252.82600000000002,
+      252.125,
+      252.24299999999994,
+      252.61099999999988,
+      252.39300000000003
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "compileMs": 2171,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 33729,
+     "js": 6233,
+     "bytes": 39962,
+     "gzip": 16185,
+     "jsFiles": [
+      ".tmp/bg/nbody/dart/nbody.mjs"
+     ],
+     "result": "1845223486",
+     "median": 128.29949999999997,
+     "best": 127.96199999999999,
+     "times": [
+      128.32500000000005,
+      128.2700000000001,
+      128.144,
+      128.9219999999998,
+      128.2739999999999,
+      128.80099999999993,
+      129.1339999999998,
+      127.96199999999999,
+      128.63900000000012,
+      128.19100000000003
+     ]
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 0,
+     "flags": [],
+     "wasm": 0,
+     "js": 2378,
+     "bytes": 2378,
+     "gzip": 1114,
+     "jsFiles": [
+      "benchmarks/bg/nbody/js/nbody.js"
+     ],
+     "result": "1845223486",
+     "median": 132.49300000000005,
+     "best": 132.0100000000001,
+     "times": [
+      132.48199999999997,
+      132.779,
+      132.688,
+      132.0100000000001,
+      132.115,
+      133.02400000000011,
+      132.50400000000013,
+      132.18900000000008,
+      132.44399999999996,
+      132.8019999999999
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "compileMs": 15563,
+     "flags": [
+      "compileProductionExecutableKotlinWasmJsOptimize"
+     ],
+     "wasm": 5745,
+     "js": 4671,
+     "bytes": 10416,
+     "gzip": 5430,
+     "jsFiles": [
+      ".tmp/bg/nbody/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/nbody.import-object.mjs",
+      ".tmp/bg/nbody/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/nbody.js-builtins.mjs",
+      ".tmp/bg/nbody/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/nbody.mjs"
+     ],
+     "result": "1845223486",
+     "median": 118.76600000000002,
+     "best": 117.87599999999998,
+     "times": [
+      118.93600000000004,
+      117.87599999999998,
+      122.00100000000009,
+      119.245,
+      124.54099999999994,
+      119.72399999999993,
+      118.04600000000005,
+      118.26099999999997,
+      118.12799999999993,
+      118.596
+     ]
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 253,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 2124,
+     "js": 339,
+     "bytes": 2463,
+     "gzip": 1510,
+     "jsFiles": [
+      ".tmp/bg/nbody/moonbit-loader.mjs"
+     ],
+     "result": "1845223486",
+     "median": 102.57149999999999,
+     "best": 102.39099999999985,
+     "times": [
+      102.555,
+      102.70399999999995,
+      102.793,
+      102.52199999999993,
+      102.58799999999997,
+      102.49200000000008,
+      102.64200000000005,
+      102.94599999999991,
+      102.39099999999985,
+      102.51499999999987
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "compileMs": 3194,
+     "flags": [
+      "-O3",
+      "--enable",
+      "simd",
+      "--runtime",
+      "incremental"
+     ],
+     "wasm": 4100,
+     "js": 339,
+     "bytes": 4439,
+     "gzip": 1783,
+     "jsFiles": [
+      ".tmp/bg/nbody/assemblyscript-loader.mjs"
+     ],
+     "result": "1845223486",
+     "median": 163.10649999999987,
+     "best": 162.7869999999998,
+     "times": [
+      163.36299999999994,
+      163.73199999999997,
+      163.106,
+      163.17799999999988,
+      163.08899999999994,
+      163.00599999999986,
+      162.9409999999998,
+      163.10699999999974,
+      162.7869999999998,
+      163.14599999999973
+     ]
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "pidigits": {
+   "n": 2000,
+   "setup": null,
+   "samples": 5,
+   "warmups": 3,
+   "result": "3349707335",
+   "notes": "bench(n): the first n digits of pi by BG's spigot; result = FNV-1a of the bytes BG prints (10 digits, \"\\t:<count>\\n\" per line, the last line padded with spaces). BG runs n=10,000.",
+   "date": "2026-11-05T13:15:05.073Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 72,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 13350,
+     "js": 555,
+     "bytes": 13905,
+     "gzip": 2699,
+     "jsFiles": [
+      ".tmp/bg/pidigits/pidigits-utu-fast/pidigits.mjs"
+     ],
+     "result": "3349707335",
+     "median": 132.89499999999998,
+     "best": 131.4129999999999,
+     "times": [
+      133.81899999999996,
+      132.51700000000005,
+      133.32499999999993,
+      131.4129999999999,
+      132.89499999999998
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 77,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 13350,
+     "js": 326,
+     "bytes": 13676,
+     "gzip": 2557,
+     "jsFiles": [
+      ".tmp/bg/pidigits/pidigits-utu-fastUnsafe/pidigits.mjs"
+     ],
+     "result": "3349707335",
+     "median": 131.15699999999993,
+     "best": 130.98299999999995,
+     "times": [
+      131.678,
+      131.97199999999998,
+      131.10899999999992,
+      130.98299999999995,
+      131.15699999999993
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 63,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 3081,
+     "js": 555,
+     "bytes": 3636,
+     "gzip": 1835,
+     "jsFiles": [
+      ".tmp/bg/pidigits/pidigits-utu-small/pidigits.mjs"
+     ],
+     "result": "3349707335",
+     "median": 133.433,
+     "best": 132.09900000000005,
+     "times": [
+      132.09900000000005,
+      135.024,
+      133.433,
+      133.442,
+      133.10500000000002
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 62,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 3081,
+     "js": 326,
+     "bytes": 3407,
+     "gzip": 1693,
+     "jsFiles": [
+      ".tmp/bg/pidigits/pidigits-utu-smallUnsafe/pidigits.mjs"
+     ],
+     "result": "3349707335",
+     "median": 133.78700000000003,
+     "best": 132.86699999999996,
+     "times": [
+      133.822,
+      135.14700000000005,
+      133.111,
+      133.78700000000003,
+      132.86699999999996
+     ]
+    },
+    {
+     "key": "utu-host-fast",
+     "name": "utu host fast",
+     "compileMs": 80,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 630,
+     "js": 718,
+     "bytes": 1348,
+     "gzip": 848,
+     "jsFiles": [
+      ".tmp/bg/pidigits/pidigits-host-utu-fast/pidigits.host.mjs"
+     ],
+     "result": "3349707335",
+     "median": 289.68600000000015,
+     "best": 286.25199999999995,
+     "times": [
+      286.25199999999995,
+      291.24700000000007,
+      291.5809999999999,
+      289.68600000000015,
+      289.41200000000026
+     ]
+    },
+    {
+     "key": "utu-host-small",
+     "name": "utu host small",
+     "compileMs": 70,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 525,
+     "js": 718,
+     "bytes": 1243,
+     "gzip": 825,
+     "jsFiles": [
+      ".tmp/bg/pidigits/pidigits-host-utu-small/pidigits.host.mjs"
+     ],
+     "result": "3349707335",
+     "median": 288.61699999999996,
+     "best": 286.51800000000003,
+     "times": [
+      288.0450000000001,
+      286.51800000000003,
+      291.4169999999999,
+      288.61699999999996,
+      291.3420000000001
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 915,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-DMINI_GMP_LIMB_TYPE=long long"
+     ],
+     "wasm": 30654,
+     "js": 1690,
+     "bytes": 32344,
+     "gzip": 15300,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3349707335",
+     "median": 131.707,
+     "best": 130.97000000000003,
+     "times": [
+      131.707,
+      131.79500000000007,
+      131.17200000000003,
+      130.97000000000003,
+      133.279
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 911,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-DMINI_GMP_LIMB_TYPE=long long"
+     ],
+     "wasm": 31073,
+     "js": 1690,
+     "bytes": 32763,
+     "gzip": 15424,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3349707335",
+     "median": 114.71799999999996,
+     "best": 114.10899999999998,
+     "times": [
+      114.10899999999998,
+      114.85900000000004,
+      114.98000000000002,
+      114.71799999999996,
+      114.66200000000003
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 3548,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 82910,
+     "js": 351,
+     "bytes": 83261,
+     "gzip": 29507,
+     "jsFiles": [
+      ".tmp/bg/pidigits/rust-loader.mjs"
+     ],
+     "result": "3349707335",
+     "median": 262.57899999999995,
+     "best": 262.3029999999999,
+     "times": [
+      262.3029999999999,
+      262.57899999999995,
+      262.52099999999996,
+      263.4229999999998,
+      262.7069999999999
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 2389,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2349515,
+     "js": 1690,
+     "bytes": 2351205,
+     "gzip": 683025,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3349707335",
+     "median": 140.29700000000003,
+     "best": 139.779,
+     "times": [
+      140.29700000000003,
+      140.26300000000003,
+      139.779,
+      143.904,
+      143.68700000000013
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.5aoHa9/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/pidigits/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.HnQmlF/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.5aoHa9/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/pidigits/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.HnQmlF/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/swift)"
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 533,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1507384,
+     "js": 1690,
+     "bytes": 1509074,
+     "gzip": 437145,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3349707335",
+     "median": 213.71500000000015,
+     "best": 212.711,
+     "times": [
+      213.88099999999997,
+      212.711,
+      213.69399999999996,
+      215.711,
+      213.71500000000015
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/dart/pidigits.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/dart/pidigits.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/dart/pidigits.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/pidigits/dart/pidigits.dart)"
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 517,
+     "bytes": 517,
+     "gzip": 377,
+     "jsFiles": [
+      "benchmarks/bg/pidigits/js/pidigits.js"
+     ],
+     "result": "3349707335",
+     "median": 180.78300000000002,
+     "best": 179.97399999999993,
+     "times": [
+      179.97399999999993,
+      180.78300000000002,
+      180.31799999999998,
+      180.788,
+      180.93200000000002
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 116,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 7729,
+     "js": 345,
+     "bytes": 8074,
+     "gzip": 4060,
+     "jsFiles": [
+      ".tmp/bg/pidigits/moonbit-loader.mjs"
+     ],
+     "result": "3349707335",
+     "median": 280.932,
+     "best": 277.91499999999996,
+     "times": [
+      277.91499999999996,
+      280.932,
+      280.9180000000001,
+      281.41600000000017,
+      281.9689999999996
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/pidigits/assemblyscript/pidigits.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/pidigits/assemblyscript/pidigits.wasm)"
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "regexredux": {
+   "n": 500000,
+   "setup": 500000,
+   "samples": 10,
+   "warmups": 3,
+   "result": "3755826591",
+   "notes": "setup(n): BG fasta's output for n (untimed). bench(n): regex-redux over it (strip headers/newlines, count the 9 variants, the 5 replacements, the three lengths); result = FNV-1a of the bytes BG prints. n=1000 -> 2596312850 (BG's regexredux-output.txt). BG runs fasta 5,000,000.",
+   "date": "2026-11-05T12:35:09.501Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 81,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 9638,
+     "js": 964,
+     "bytes": 10602,
+     "gzip": 3911,
+     "jsFiles": [
+      ".tmp/bg/regexredux/regexredux-utu-fast/regexredux.mjs"
+     ],
+     "result": "3755826591",
+     "median": 125.09750000000008,
+     "best": 124.7170000000001,
+     "times": [
+      125.56500000000005,
+      125.49599999999998,
+      124.94299999999998,
+      125.16799999999989,
+      124.7170000000001,
+      125.02099999999996,
+      125.13900000000012,
+      125.24400000000014,
+      124.79700000000003,
+      125.05600000000004
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 81,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 8448,
+     "js": 328,
+     "bytes": 8776,
+     "gzip": 3489,
+     "jsFiles": [
+      ".tmp/bg/regexredux/regexredux-utu-fastUnsafe/regexredux.mjs"
+     ],
+     "result": "3755826591",
+     "median": 108.29150000000004,
+     "best": 107.89999999999986,
+     "times": [
+      108.00299999999993,
+      108.31100000000004,
+      108.44900000000007,
+      107.96000000000004,
+      108.53599999999994,
+      108.38599999999997,
+      107.89999999999986,
+      108.24000000000001,
+      108.30200000000013,
+      108.28099999999995
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 78,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 5076,
+     "js": 964,
+     "bytes": 6040,
+     "gzip": 3109,
+     "jsFiles": [
+      ".tmp/bg/regexredux/regexredux-utu-small/regexredux.mjs"
+     ],
+     "result": "3755826591",
+     "median": 125.572,
+     "best": 125.25200000000007,
+     "times": [
+      125.59900000000005,
+      125.54499999999996,
+      125.25200000000007,
+      125.44600000000003,
+      125.99700000000007,
+      125.3739999999998,
+      125.69200000000001,
+      125.8639999999998,
+      126.14100000000008,
+      125.50500000000011
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 78,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 4892,
+     "js": 328,
+     "bytes": 5220,
+     "gzip": 2782,
+     "jsFiles": [
+      ".tmp/bg/regexredux/regexredux-utu-smallUnsafe/regexredux.mjs"
+     ],
+     "result": "3755826591",
+     "median": 104.80450000000002,
+     "best": 104.50999999999999,
+     "times": [
+      104.88300000000004,
+      105.19799999999998,
+      104.98400000000004,
+      104.80100000000004,
+      104.89999999999998,
+      104.6389999999999,
+      104.72000000000003,
+      104.80799999999999,
+      104.50999999999999,
+      104.74400000000014
+     ]
+    },
+    {
+     "key": "utu-host-fast",
+     "name": "utu host fast",
+     "compileMs": 99,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 5684,
+     "js": 2696,
+     "bytes": 8380,
+     "gzip": 3465,
+     "jsFiles": [
+      ".tmp/bg/regexredux/regexredux-host-utu-fast/regexredux.host.mjs"
+     ],
+     "result": "3755826591",
+     "median": 126.21049999999997,
+     "best": 125.23000000000002,
+     "times": [
+      126.14999999999998,
+      126.27099999999996,
+      126.62900000000002,
+      127.06500000000005,
+      126.65100000000007,
+      132.3449999999998,
+      125.96199999999999,
+      125.56200000000013,
+      125.23000000000002,
+      125.548
+     ]
+    },
+    {
+     "key": "utu-host-small",
+     "name": "utu host small",
+     "compileMs": 99,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 3096,
+     "js": 2696,
+     "bytes": 5792,
+     "gzip": 3081,
+     "jsFiles": [
+      ".tmp/bg/regexredux/regexredux-host-utu-small/regexredux.host.mjs"
+     ],
+     "result": "3755826591",
+     "median": 125.69100000000009,
+     "best": 123.53700000000003,
+     "times": [
+      128.082,
+      127.47799999999995,
+      126.29199999999992,
+      125.85700000000008,
+      124.53500000000008,
+      131.12000000000012,
+      125.52500000000009,
+      124.93600000000015,
+      123.53700000000003,
+      124.12900000000013
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 2516,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench,_setup"
+     ],
+     "wasm": 119680,
+     "js": 390,
+     "bytes": 120070,
+     "gzip": 50387,
+     "jsFiles": [
+      ".tmp/bg/regexredux/c-loader.mjs"
+     ],
+     "result": "3755826591",
+     "median": 1399.1004999999996,
+     "best": 1387.7839999999997,
+     "times": [
+      1392.692,
+      1403.4560000000001,
+      1405.3770000000004,
+      1387.7839999999997,
+      1403.2620000000006,
+      1398.7790000000005,
+      1404.664999999999,
+      1398.996000000001,
+      1394.0499999999993,
+      1399.204999999998
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 3749,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench,_setup",
+      "-std=c++17"
+     ],
+     "wasm": 249999,
+     "js": 1690,
+     "bytes": 251689,
+     "gzip": 99983,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3755826591",
+     "median": 1399.6605000000004,
+     "best": 1384.692,
+     "times": [
+      1384.692,
+      1401.4759999999997,
+      1392.5139999999992,
+      1385.563,
+      1390.4169999999995,
+      1397.8450000000012,
+      1415.5079999999998,
+      1411.0340000000015,
+      1405.6549999999988,
+      1406.196
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 21942,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 1232886,
+     "js": 355,
+     "bytes": 1233241,
+     "gzip": 394342,
+     "jsFiles": [
+      ".tmp/bg/regexredux/rust-loader.mjs"
+     ],
+     "result": "3755826591",
+     "median": 251.09300000000007,
+     "best": 250.12300000000005,
+     "times": [
+      252.3739999999998,
+      252.06400000000008,
+      250.91099999999983,
+      250.12300000000005,
+      250.34400000000005,
+      251.13900000000012,
+      251.80600000000004,
+      251.04700000000003,
+      250.904,
+      251.2779999999998
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 3124,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 3008650,
+     "js": 1690,
+     "bytes": 3010340,
+     "gzip": 862455,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3755826591",
+     "median": 18421.91750000001,
+     "best": 18188.538,
+     "times": [
+      18461.152000000002,
+      18350.284,
+      18467.502999999997,
+      18349.670999999988,
+      18462.690000000002,
+      18314.144,
+      18382.68300000002,
+      18188.538,
+      22328.23000000001,
+      22769.889000000025
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "compileMs": 44742,
+     "flags": [
+      "-c",
+      "release",
+      "--swift-sdk",
+      "swift-6.4.1-RELEASE_wasm",
+      "-Xlinker",
+      "--strip-all"
+     ],
+     "wasm": 53790966,
+     "js": 1690,
+     "bytes": 53792656,
+     "gzip": 19968339,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3755826591",
+     "median": 2544.7625,
+     "best": 2538.946,
+     "times": [
+      2543.622000000001,
+      2543.937,
+      2543.288999999999,
+      2545.7299999999996,
+      2548.127999999997,
+      2548.1500000000015,
+      2543.411,
+      2545.5879999999997,
+      2538.946,
+      2548.010000000002
+     ]
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 3517,
+     "flags": [
+      "-O2",
+      "-optc-O3"
+     ],
+     "wasm": 1765232,
+     "js": 1690,
+     "bytes": 1766922,
+     "gzip": 499192,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "3755826591",
+     "median": 1753.146499999999,
+     "best": 1739.875,
+     "times": [
+      1748.7259999999997,
+      1756.312,
+      1749.6799999999985,
+      1755.6509999999998,
+      1752.8679999999986,
+      1756.601999999999,
+      1757.737000000001,
+      1752.3549999999996,
+      1753.4249999999993,
+      1739.875
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "compileMs": 1211,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 39222,
+     "js": 6613,
+     "bytes": 45835,
+     "gzip": 18401,
+     "jsFiles": [
+      ".tmp/bg/regexredux/dart/regexredux.mjs"
+     ],
+     "result": "3755826591",
+     "median": 181.36900000000014,
+     "best": 165.08399999999983,
+     "times": [
+      165.08399999999983,
+      169.45699999999988,
+      175.7729999999999,
+      192.15699999999993,
+      175.69500000000016,
+      181.19700000000012,
+      182.66900000000032,
+      181.54100000000017,
+      182.23599999999988,
+      197.54700000000003
+     ]
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 1899,
+     "bytes": 1899,
+     "gzip": 984,
+     "jsFiles": [
+      "benchmarks/bg/regexredux/js/regexredux.js"
+     ],
+     "result": "3755826591",
+     "median": 160.639,
+     "best": 158.33000000000015,
+     "times": [
+      160.46800000000007,
+      160.98900000000003,
+      160.86300000000006,
+      160.80999999999995,
+      162.15599999999995,
+      168.14599999999996,
+      158.53999999999996,
+      158.33000000000015,
+      160.43399999999974,
+      160.20600000000013
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "compileMs": 6955,
+     "flags": [
+      "compileProductionExecutableKotlinWasmJsOptimize"
+     ],
+     "wasm": 176350,
+     "js": 5442,
+     "bytes": 181792,
+     "gzip": 77725,
+     "jsFiles": [
+      ".tmp/bg/regexredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/regexredux.import-object.mjs",
+      ".tmp/bg/regexredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/regexredux.js-builtins.mjs",
+      ".tmp/bg/regexredux/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/regexredux.mjs"
+     ],
+     "result": "3755826591",
+     "median": 4219.449500000001,
+     "best": 4203.094000000005,
+     "times": [
+      4219.123000000003,
+      4234.220000000001,
+      4227.6839999999975,
+      4217.166999999998,
+      4215.277999999998,
+      4219.775999999998,
+      4218.481,
+      4203.094000000005,
+      4228.296999999999,
+      4226.067000000003
+     ]
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 238,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 81447,
+     "js": 349,
+     "bytes": 81796,
+     "gzip": 24937,
+     "jsFiles": [
+      ".tmp/bg/regexredux/moonbit-loader.mjs"
+     ],
+     "result": "3755826591",
+     "median": 371.56050000000005,
+     "best": 367.9410000000007,
+     "times": [
+      372.5140000000001,
+      370.9939999999999,
+      373.4359999999997,
+      372.02800000000025,
+      371.3880000000004,
+      371.25700000000006,
+      371.7329999999997,
+      367.9410000000007,
+      368.96000000000004,
+      372.83899999999994
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "compileMs": 1806,
+     "flags": [
+      "-O3",
+      "--enable",
+      "simd",
+      "--runtime",
+      "incremental"
+     ],
+     "wasm": 14332,
+     "js": 388,
+     "bytes": 14720,
+     "gzip": 6382,
+     "jsFiles": [
+      ".tmp/bg/regexredux/assemblyscript-loader.mjs"
+     ],
+     "result": "3755826591",
+     "median": 1183.2614999999992,
+     "best": 1175.5220000000008,
+     "times": [
+      1192.5600000000004,
+      1183.9829999999993,
+      1178.045,
+      1187.005000000001,
+      1182.539999999999,
+      1181.7939999999999,
+      1180.3050000000003,
+      1175.5220000000008,
+      1191.2360000000008,
+      1186.0960000000014
+     ]
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "revcomp": {
+   "n": 5000000,
+   "setup": 5000000,
+   "samples": 10,
+   "warmups": 3,
+   "result": "2124125449",
+   "notes": "setup(n): the fasta output for n (BG fasta's algorithm, 10.2 n bytes), untimed. bench(n): BG revcomp of it; result = FNV-1a of the bytes BG prints. BG runs fasta 25,000,000's output (n = 25,000,000).",
+   "date": "2026-11-05T12:45:54.866Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 82,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 9339,
+     "js": 625,
+     "bytes": 9964,
+     "gzip": 3531,
+     "jsFiles": [
+      ".tmp/bg/revcomp/revcomp-utu-fast/revcomp.mjs"
+     ],
+     "result": "2124125449",
+     "median": 126.11800000000005,
+     "best": 125.47700000000009,
+     "times": [
+      126.14800000000014,
+      126.07700000000023,
+      125.47700000000009,
+      125.95800000000008,
+      126.60099999999989,
+      126.09799999999996,
+      127.87599999999998,
+      126.32500000000005,
+      126.13800000000015,
+      125.88599999999997
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 79,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 9121,
+     "js": 325,
+     "bytes": 9446,
+     "gzip": 3173,
+     "jsFiles": [
+      ".tmp/bg/revcomp/revcomp-utu-fastUnsafe/revcomp.mjs"
+     ],
+     "result": "2124125449",
+     "median": 96.74849999999992,
+     "best": 96.505,
+     "times": [
+      96.505,
+      96.82400000000007,
+      96.63300000000004,
+      96.67299999999977,
+      96.64100000000008,
+      97.04299999999989,
+      97.70499999999993,
+      97.31999999999994,
+      96.63900000000012,
+      97.05400000000009
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 77,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 3974,
+     "js": 625,
+     "bytes": 4599,
+     "gzip": 2477,
+     "jsFiles": [
+      ".tmp/bg/revcomp/revcomp-utu-small/revcomp.mjs"
+     ],
+     "result": "2124125449",
+     "median": 128.36599999999987,
+     "best": 126.70599999999968,
+     "times": [
+      127.846,
+      128.481,
+      129.00700000000006,
+      129.6969999999999,
+      127.61800000000017,
+      128.62200000000007,
+      126.70599999999968,
+      127.6550000000002,
+      128.25099999999975,
+      129.2510000000002
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 73,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 3685,
+     "js": 325,
+     "bytes": 4010,
+     "gzip": 2219,
+     "jsFiles": [
+      ".tmp/bg/revcomp/revcomp-utu-smallUnsafe/revcomp.mjs"
+     ],
+     "result": "2124125449",
+     "median": 98.65099999999995,
+     "best": 96.22900000000004,
+     "times": [
+      99.351,
+      99.13200000000006,
+      99.06299999999999,
+      98.94299999999998,
+      98.60199999999986,
+      97.35099999999989,
+      96.22900000000004,
+      96.23199999999997,
+      97.78399999999988,
+      98.70000000000005
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 737,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench,_setup",
+      "-msse4.1"
+     ],
+     "wasm": 18655,
+     "js": 384,
+     "bytes": 19039,
+     "gzip": 7642,
+     "jsFiles": [
+      ".tmp/bg/revcomp/c-loader.mjs"
+     ],
+     "result": "2124125449",
+     "median": 83.09900000000005,
+     "best": 82.39599999999996,
+     "times": [
+      82.39599999999996,
+      83.46000000000004,
+      82.86400000000003,
+      83.46600000000001,
+      83.45300000000009,
+      82.86299999999994,
+      83.03099999999995,
+      83.3599999999999,
+      83.16700000000014,
+      82.59000000000015
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 1600,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench,_setup",
+      "-DSIMD",
+      "-msse4.1"
+     ],
+     "wasm": 141263,
+     "js": 1690,
+     "bytes": 142953,
+     "gzip": 55365,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "2124125449",
+     "median": 212.92650000000003,
+     "best": 208.9029999999998,
+     "times": [
+      216.43100000000004,
+      214.49900000000002,
+      221.84500000000003,
+      212.34100000000012,
+      208.9029999999998,
+      213.02700000000004,
+      212.82600000000002,
+      211.4949999999999,
+      211.61900000000014,
+      215.413
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 1137,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 42379,
+     "js": 349,
+     "bytes": 42728,
+     "gzip": 19049,
+     "jsFiles": [
+      ".tmp/bg/revcomp/rust-loader.mjs"
+     ],
+     "result": "2124125449",
+     "median": 76.0675,
+     "best": 74.94899999999996,
+     "times": [
+      74.94899999999996,
+      75.97199999999998,
+      76.13100000000009,
+      77.03800000000001,
+      76.16200000000003,
+      75.91099999999994,
+      76.15499999999997,
+      76.41399999999999,
+      75.91200000000003,
+      76.0039999999999
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 2432,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 1926917,
+     "js": 1690,
+     "bytes": 1928607,
+     "gzip": 572550,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "2124125449",
+     "median": 193.53199999999993,
+     "best": 187.31899999999996,
+     "times": [
+      200.41800000000012,
+      213.06399999999985,
+      206.58300000000008,
+      191.77300000000014,
+      196.4649999999997,
+      192.9459999999999,
+      194.11799999999994,
+      188.75199999999995,
+      188.779,
+      187.31899999999996
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "compileMs": 2413,
+     "flags": [
+      "-c",
+      "release",
+      "--swift-sdk",
+      "swift-6.4.1-RELEASE_wasm",
+      "-Xlinker",
+      "--strip-all"
+     ],
+     "wasm": 5563436,
+     "js": 1690,
+     "bytes": 5565126,
+     "gzip": 1703743,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "2124125449",
+     "median": 119.15499999999997,
+     "best": 118.19200000000001,
+     "times": [
+      119.59899999999993,
+      119.31899999999996,
+      118.6110000000001,
+      120.23900000000003,
+      121.5909999999999,
+      119.69600000000014,
+      118.99099999999999,
+      118.8309999999999,
+      118.19200000000001,
+      118.83100000000013
+     ]
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 857,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1642651,
+     "js": 1690,
+     "bytes": 1644341,
+     "gzip": 464486,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "2124125449",
+     "median": 234.73050000000012,
+     "best": 233.38099999999986,
+     "times": [
+      237.308,
+      233.88599999999997,
+      233.38099999999986,
+      234.5300000000002,
+      233.9079999999999,
+      234.93100000000004,
+      234.4399999999996,
+      238.1569999999997,
+      238.87800000000016,
+      236.34499999999935
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "compileMs": 1167,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 41295,
+     "js": 6491,
+     "bytes": 47786,
+     "gzip": 19669,
+     "jsFiles": [
+      ".tmp/bg/revcomp/dart/revcomp.mjs"
+     ],
+     "result": "2124125449",
+     "median": 732.2704999999996,
+     "best": 720.2759999999998,
+     "times": [
+      733.9840000000004,
+      735.4919999999993,
+      734.5730000000003,
+      740.1019999999999,
+      720.2759999999998,
+      730.2380000000003,
+      728.4360000000015,
+      730.9609999999993,
+      727.6119999999992,
+      733.5799999999999
+     ]
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 5306,
+     "bytes": 5306,
+     "gzip": 2143,
+     "jsFiles": [
+      "benchmarks/bg/revcomp/js/revcomp.js"
+     ],
+     "result": "2124125449",
+     "median": 502.50999999999976,
+     "best": 497.04100000000017,
+     "times": [
+      498.93100000000004,
+      497.04100000000017,
+      499.17300000000023,
+      506.52499999999964,
+      500.40399999999954,
+      505.79100000000017,
+      502.84799999999996,
+      502.17199999999957,
+      505.7620000000006,
+      503.97600000000057
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "compileMs": 3452,
+     "flags": [
+      "compileProductionExecutableKotlinWasmJsOptimize"
+     ],
+     "wasm": 11335,
+     "js": 4433,
+     "bytes": 15768,
+     "gzip": 7878,
+     "jsFiles": [
+      ".tmp/bg/revcomp/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/revcomp.import-object.mjs",
+      ".tmp/bg/revcomp/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/revcomp.js-builtins.mjs",
+      ".tmp/bg/revcomp/kotlin/build/compileSync/wasmJs/main/productionExecutable/optimized/revcomp.mjs"
+     ],
+     "result": "2124125449",
+     "median": 360.1424999999999,
+     "best": 357.4249999999993,
+     "times": [
+      361.74900000000025,
+      360.3539999999998,
+      363.5210000000002,
+      359.93100000000004,
+      359.4490000000005,
+      359.6409999999996,
+      362.29199999999946,
+      362.701,
+      357.4249999999993,
+      357.9969999999994
+     ]
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 97,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 7818,
+     "js": 343,
+     "bytes": 8161,
+     "gzip": 4062,
+     "jsFiles": [
+      ".tmp/bg/revcomp/moonbit-loader.mjs"
+     ],
+     "result": "2124125449",
+     "median": 159.67700000000002,
+     "best": 159.13700000000017,
+     "times": [
+      159.933,
+      159.1840000000002,
+      159.95900000000006,
+      159.31000000000017,
+      159.42100000000005,
+      159.13900000000012,
+      173.07100000000014,
+      159.13700000000017,
+      160.5949999999998,
+      160.32500000000027
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "compileMs": 1759,
+     "flags": [
+      "-O3",
+      "--enable",
+      "simd",
+      "--runtime",
+      "incremental"
+     ],
+     "wasm": 8419,
+     "js": 382,
+     "bytes": 8801,
+     "gzip": 4260,
+     "jsFiles": [
+      ".tmp/bg/revcomp/assemblyscript-loader.mjs"
+     ],
+     "result": "2124125449",
+     "median": 96.03099999999995,
+     "best": 95.21100000000001,
+     "times": [
+      96.43599999999992,
+      96.106,
+      95.77400000000011,
+      95.673,
+      95.21100000000001,
+      95.43099999999981,
+      96.90100000000007,
+      96.08699999999999,
+      96.10899999999992,
+      95.97499999999991
+     ]
+    }
+   ],
+   "d8": "15.6.75.16"
+  },
+  "spectralnorm": {
+   "n": 2000,
+   "setup": null,
+   "samples": 10,
+   "warmups": 3,
+   "result": "2982777735",
+   "notes": "bench(n): the BG program for n; result = FNV-1a of the \"%.9f\\n\" line BG prints. BG runs n=5,500.",
+   "date": "2026-11-05T13:34:50.844Z",
+   "ports": [
+    {
+     "key": "utu-fast",
+     "name": "utu fast",
+     "compileMs": 69,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 2642,
+     "js": 559,
+     "bytes": 3201,
+     "gzip": 912,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/spectralnorm-utu-fast/spectralnorm.mjs"
+     ],
+     "result": "2982777735",
+     "median": 87.61700000000002,
+     "best": 86.80999999999995,
+     "times": [
+      86.80999999999995,
+      88.23200000000003,
+      88.19499999999994,
+      88.50200000000007,
+      87.71899999999994,
+      87.125,
+      87.61000000000001,
+      87.03599999999994,
+      86.92499999999995,
+      87.62400000000002
+     ]
+    },
+    {
+     "key": "utu-fastUnsafe",
+     "name": "utu fastUnsafe",
+     "compileMs": 68,
+     "flags": [
+      "-O",
+      "fastUnsafe"
+     ],
+     "wasm": 2642,
+     "js": 330,
+     "bytes": 2972,
+     "gzip": 770,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/spectralnorm-utu-fastUnsafe/spectralnorm.mjs"
+     ],
+     "result": "2982777735",
+     "median": 87.49599999999998,
+     "best": 87.00300000000016,
+     "times": [
+      87.54399999999998,
+      87.14000000000004,
+      87.85199999999998,
+      87.32399999999996,
+      87.44799999999998,
+      87.55199999999991,
+      87.7360000000001,
+      87.89700000000005,
+      87.13200000000006,
+      87.00300000000016
+     ]
+    },
+    {
+     "key": "utu-small",
+     "name": "utu small",
+     "compileMs": 65,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 857,
+     "js": 559,
+     "bytes": 1416,
+     "gzip": 849,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/spectralnorm-utu-small/spectralnorm.mjs"
+     ],
+     "result": "2982777735",
+     "median": 90.5455,
+     "best": 89.87300000000005,
+     "times": [
+      91.81899999999996,
+      90.94600000000003,
+      91.63099999999997,
+      91.32100000000003,
+      89.87300000000005,
+      90.53499999999997,
+      90.23599999999999,
+      90.20299999999997,
+      90.55600000000004,
+      90.27099999999996
+     ]
+    },
+    {
+     "key": "utu-smallUnsafe",
+     "name": "utu smallUnsafe",
+     "compileMs": 66,
+     "flags": [
+      "-O",
+      "smallUnsafe"
+     ],
+     "wasm": 857,
+     "js": 330,
+     "bytes": 1187,
+     "gzip": 707,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/spectralnorm-utu-smallUnsafe/spectralnorm.mjs"
+     ],
+     "result": "2982777735",
+     "median": 90.62900000000002,
+     "best": 90.05100000000004,
+     "times": [
+      90.57,
+      90.423,
+      90.05100000000004,
+      90.84899999999993,
+      90.9960000000001,
+      90.55399999999997,
+      90.606,
+      90.65200000000004,
+      91.53300000000013,
+      90.88300000000004
+     ]
+    },
+    {
+     "key": "utu-tuned-fast",
+     "name": "utu tuned fast",
+     "compileMs": 124,
+     "flags": [
+      "-O",
+      "fast"
+     ],
+     "wasm": 925,
+     "js": 565,
+     "bytes": 1490,
+     "gzip": 985,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/spectralnorm-tuned-utu-fast/spectralnorm.tuned.mjs"
+     ],
+     "result": "2982777735",
+     "median": 83.93099999999993,
+     "best": 83.89099999999996,
+     "times": [
+      83.988,
+      83.89099999999996,
+      83.93099999999993,
+      83.98899999999992,
+      83.9140000000001
+     ]
+    },
+    {
+     "key": "utu-tuned-small",
+     "name": "utu tuned small",
+     "compileMs": 135,
+     "flags": [
+      "-O",
+      "small"
+     ],
+     "wasm": 877,
+     "js": 565,
+     "bytes": 1442,
+     "gzip": 989,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/spectralnorm-tuned-utu-small/spectralnorm.tuned.mjs"
+     ],
+     "result": "2982777735",
+     "median": 83.99300000000005,
+     "best": 83.80500000000006,
+     "times": [
+      83.91799999999995,
+      83.80500000000006,
+      84.05899999999997,
+      83.99300000000005,
+      84.23000000000002
+     ]
+    },
+    {
+     "key": "c",
+     "name": "C",
+     "compileMs": 1068,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-mavx",
+      "-sSTACK_SIZE=1048576"
+     ],
+     "wasm": 20009,
+     "js": 394,
+     "bytes": 20403,
+     "gzip": 9402,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/c-loader.mjs"
+     ],
+     "result": "2982777735",
+     "median": 77.85899999999992,
+     "best": 77.66099999999994,
+     "times": [
+      78.007,
+      77.85899999999992,
+      77.91399999999999,
+      77.77300000000002,
+      77.66099999999994
+     ]
+    },
+    {
+     "key": "cpp",
+     "name": "C++",
+     "compileMs": 803,
+     "flags": [
+      "-O3",
+      "-msimd128",
+      "-sSTANDALONE_WASM",
+      "--no-entry",
+      "-sALLOW_MEMORY_GROWTH",
+      "-sEXPORTED_FUNCTIONS=_bench",
+      "-msse3",
+      "-sSTACK_SIZE=1048576"
+     ],
+     "wasm": 11085,
+     "js": 353,
+     "bytes": 11438,
+     "gzip": 6017,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/cpp-loader.mjs"
+     ],
+     "result": "2982777735",
+     "median": 156.52700000000004,
+     "best": 156.40199999999993,
+     "times": [
+      156.52700000000004,
+      156.4140000000001,
+      156.40199999999993,
+      157.56799999999998,
+      157.788
+     ]
+    },
+    {
+     "key": "rust",
+     "name": "Rust",
+     "compileMs": 1248,
+     "flags": [
+      "--release",
+      "-C",
+      "target-feature=+simd128"
+     ],
+     "wasm": 47852,
+     "js": 359,
+     "bytes": 48211,
+     "gzip": 20184,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/rust-loader.mjs"
+     ],
+     "result": "2982777735",
+     "median": 53.66300000000001,
+     "best": 53.15699999999998,
+     "times": [
+      53.83499999999998,
+      53.66300000000001,
+      53.266999999999996,
+      53.15699999999998,
+      53.980999999999995
+     ]
+    },
+    {
+     "key": "go",
+     "name": "Go",
+     "compileMs": 2539,
+     "flags": [
+      "-buildmode=c-shared",
+      "-trimpath",
+      "-ldflags=-s -w"
+     ],
+     "wasm": 2421442,
+     "js": 1690,
+     "bytes": 2423132,
+     "gzip": 706449,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "2982777735",
+     "median": 195.71400000000017,
+     "best": 195.21900000000005,
+     "times": [
+      199.173,
+      195.71400000000017,
+      195.96000000000004,
+      195.21900000000005,
+      195.26099999999997
+     ]
+    },
+    {
+     "key": "swift",
+     "name": "Swift",
+     "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.m5xkJY/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.tAplXy/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.m5xkJY/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.tAplXy/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/swift)"
+    },
+    {
+     "key": "haskell",
+     "name": "Haskell",
+     "compileMs": 1004,
+     "flags": [
+      "-O2"
+     ],
+     "wasm": 1951378,
+     "js": 1690,
+     "bytes": 1953068,
+     "gzip": 519983,
+     "jsFiles": [
+      "benchmarks/bg/wasi.js"
+     ],
+     "result": "2982777735",
+     "median": 154.20299999999997,
+     "best": 153.31899999999996,
+     "times": [
+      154.42000000000007,
+      153.42999999999995,
+      153.31899999999996,
+      154.20299999999997,
+      155.52700000000004
+     ]
+    },
+    {
+     "key": "dart",
+     "name": "Dart",
+     "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/dart/spectralnorm.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/dart/spectralnorm.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/dart/spectralnorm.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/dart/spectralnorm.dart)"
+    },
+    {
+     "key": "js",
+     "name": "JavaScript",
+     "compileMs": 1,
+     "flags": [],
+     "wasm": 0,
+     "js": 633,
+     "bytes": 633,
+     "gzip": 337,
+     "jsFiles": [
+      "benchmarks/bg/spectralnorm/js/spectralnorm.js"
+     ],
+     "result": "2982777735",
+     "median": 176.40700000000015,
+     "best": 176.26800000000003,
+     "times": [
+      176.26800000000003,
+      176.40700000000015,
+      176.54599999999982,
+      176.5999999999999,
+      176.365
+     ]
+    },
+    {
+     "key": "kotlin",
+     "name": "Kotlin",
+     "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+    },
+    {
+     "key": "moonbit",
+     "name": "MoonBit",
+     "compileMs": 169,
+     "flags": [
+      "--target",
+      "wasm-gc",
+      "--release"
+     ],
+     "wasm": 927,
+     "js": 353,
+     "bytes": 1280,
+     "gzip": 809,
+     "jsFiles": [
+      ".tmp/bg/spectralnorm/moonbit-loader.mjs"
+     ],
+     "result": "2982777735",
+     "median": 159.01199999999994,
+     "best": 158.29099999999994,
+     "times": [
+      158.29099999999994,
+      159.01199999999994,
+      158.52499999999998,
+      161.59899999999993,
+      162.86599999999999
+     ]
+    },
+    {
+     "key": "assemblyscript",
+     "name": "AssemblyScript",
+     "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/assemblyscript/spectralnorm.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/assemblyscript/spectralnorm.wasm)"
+    }
+   ],
+   "d8": "15.6.75.16"
+  }
+ }
+}

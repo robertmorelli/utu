@@ -798,18 +798,19 @@ export function createWutuLazy() {
     const where = (globalThis.__utuWutu?.here() ?? '') + '|' + path + '|' + name;
     const key = where + '|' + args.map(arg => arg !== null && typeof arg === 'object' ? '#' : String(arg)).join('\u001f');
     const known = lazies.get(where);
-    if (known?.key === key && !known.node.hasAttribute('data-wutu-lazy-error')) return known.node;
-    const node = known?.key === key ? known.node
+    const same = known?.key === key && known.args.length === args.length && known.args.every((arg, i) => Object.is(arg, args[i]));
+    if (same && !known.node.hasAttribute('data-wutu-lazy-error')) return known.node;
+    const node = same ? known.node : known ? document.createElement('div')
       : [...document.querySelectorAll('[data-wutu-lazy]')].find(n => n.getAttribute('data-wutu-lazy') === key) ?? document.createElement('div');
     node.setAttribute('data-wutu-lazy', key);
     node.removeAttribute('data-wutu-lazy-error');
-    lazies.set(where, { key, node });
+    lazies.set(where, { key, node, args: [...args] });
     const url = globalThis.__wutuChunks?.[path];
     if (!url) {
       console.error('Wutu: no chunk was built for ' + path);
       return node;
     }
-    const tries = known?.key === key ? (known.tries ?? 0) + 1 : 0;
+    const tries = same ? (known.tries ?? 0) + 1 : 0;
     lazies.get(where).tries = tries;
     loading++;
     document.documentElement.setAttribute('data-wutu-loading', '');
@@ -835,6 +836,8 @@ export function createWutuLazy() {
 // conflict and stops writing until the user explicitly saves or reloads.
 export function installWutuStorage(api) {
   if (api.store) return;
+  // A non-finite F64 becomes null in JSON; keep the other stored fields.
+  api.storageReviveF64 = value => value === null ? 0 : value;
   const stores = new Map();
   const DEBOUNCE_MS = 180;
   let timer;
@@ -901,20 +904,22 @@ export function installWutuStorage(api) {
   const on = (...a) => globalThis.addEventListener?.(...a); on('pagehide', flush);
   on('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   on('storage', event => {
-    const store = stores.get(event.key);
-    if (!store) return;
-    if (store.dirty) {
-      store.conflict = true;
-      clearTimeout(timer); timer = 0;
-      report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
-      return;
-    }
-    try {
-      store.apply?.(event.newValue ?? '');
-      store.last = event.newValue;
-      api.refresh();
-    } catch (cause) {
-      report(cause);
+    // A null key is another tab's clear(): every store is removed.
+    for (const store of event.key === null ? [...stores.values()] : [stores.get(event.key)]) {
+      if (!store) continue;
+      if (store.dirty) {
+        store.conflict = true;
+        clearTimeout(timer); timer = 0;
+        report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
+        continue;
+      }
+      try {
+        store.apply?.(event.newValue ?? '');
+        store.last = event.newValue;
+        api.refresh();
+      } catch (cause) {
+        report(cause);
+      }
     }
   });
 }

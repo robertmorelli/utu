@@ -1,0 +1,328 @@
+{
+ "n": 18,
+ "setup": null,
+ "samples": 5,
+ "warmups": 3,
+ "result": "3963415002",
+ "notes": "bench(n): binary-trees with max depth n (stretch tree n+1, long-lived tree n, 2^(n-d+4) trees of each even depth d from 4); result = FNV-1a of the bytes BG prints. BG runs n=21.",
+ "date": "2026-11-05T13:10:08.625Z",
+ "ports": [
+  {
+   "key": "utu-fast",
+   "name": "utu fast",
+   "compileMs": 98,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 2592,
+   "js": 558,
+   "bytes": 3150,
+   "gzip": 1115,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/binarytrees-utu-fast/binarytrees.mjs"
+   ],
+   "result": "3963415002",
+   "median": 243.69499999999994,
+   "best": 238.164,
+   "times": [
+    247.46699999999987,
+    243.69499999999994,
+    238.164,
+    244.88099999999986,
+    238.2130000000002
+   ]
+  },
+  {
+   "key": "utu-fastUnsafe",
+   "name": "utu fastUnsafe",
+   "compileMs": 84,
+   "flags": [
+    "-O",
+    "fastUnsafe"
+   ],
+   "wasm": 2568,
+   "js": 329,
+   "bytes": 2897,
+   "gzip": 969,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/binarytrees-utu-fastUnsafe/binarytrees.mjs"
+   ],
+   "result": "3963415002",
+   "median": 244.4509999999998,
+   "best": 238.66499999999996,
+   "times": [
+    247.74199999999996,
+    247.22900000000004,
+    244.394,
+    238.66499999999996,
+    244.4509999999998
+   ]
+  },
+  {
+   "key": "utu-small",
+   "name": "utu small",
+   "compileMs": 87,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 721,
+   "js": 558,
+   "bytes": 1279,
+   "gzip": 869,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/binarytrees-utu-small/binarytrees.mjs"
+   ],
+   "result": "3963415002",
+   "median": 262.3700000000001,
+   "best": 252.71499999999992,
+   "times": [
+    262.3700000000001,
+    252.71499999999992,
+    262.4169999999999,
+    263.23800000000006,
+    261.00400000000036
+   ]
+  },
+  {
+   "key": "utu-smallUnsafe",
+   "name": "utu smallUnsafe",
+   "compileMs": 84,
+   "flags": [
+    "-O",
+    "smallUnsafe"
+   ],
+   "wasm": 715,
+   "js": 329,
+   "bytes": 1044,
+   "gzip": 726,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/binarytrees-utu-smallUnsafe/binarytrees.mjs"
+   ],
+   "result": "3963415002",
+   "median": 260.02,
+   "best": 254.163,
+   "times": [
+    260.24300000000017,
+    254.163,
+    264.4090000000001,
+    260.02,
+    255.3739999999998
+   ]
+  },
+  {
+   "key": "c",
+   "name": "C",
+   "compileMs": 634,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench"
+   ],
+   "wasm": 17327,
+   "js": 392,
+   "bytes": 17719,
+   "gzip": 8807,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/c-loader.mjs"
+   ],
+   "result": "3963415002",
+   "median": 257.22699999999986,
+   "best": 256.9000000000001,
+   "times": [
+    257.07399999999984,
+    256.9000000000001,
+    257.90100000000007,
+    257.22699999999986,
+    257.3149999999996
+   ]
+  },
+  {
+   "key": "cpp",
+   "name": "C++",
+   "compileMs": 1017,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-std=c++17",
+    "-I/opt/homebrew/include",
+    "-DBOOST_POOL_NO_MT"
+   ],
+   "wasm": 18953,
+   "js": 1690,
+   "bytes": 20643,
+   "gzip": 10042,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3963415002",
+   "median": 345.1659999999997,
+   "best": 344.721,
+   "times": [
+    345.18399999999997,
+    345.2900000000002,
+    345.1659999999997,
+    344.7890000000002,
+    344.721
+   ]
+  },
+  {
+   "key": "rust",
+   "name": "Rust",
+   "compileMs": 745,
+   "flags": [
+    "--release",
+    "-C",
+    "target-feature=+simd128"
+   ],
+   "wasm": 23010,
+   "js": 357,
+   "bytes": 23367,
+   "gzip": 10559,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/rust-loader.mjs"
+   ],
+   "result": "3963415002",
+   "median": 248.221,
+   "best": 247.6919999999999,
+   "times": [
+    247.6919999999999,
+    248.34199999999987,
+    248.02699999999982,
+    248.221,
+    248.4949999999999
+   ]
+  },
+  {
+   "key": "go",
+   "name": "Go",
+   "compileMs": 2789,
+   "flags": [
+    "-buildmode=c-shared",
+    "-trimpath",
+    "-ldflags=-s -w"
+   ],
+   "wasm": 2428652,
+   "js": 1690,
+   "bytes": 2430342,
+   "gzip": 708575,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3963415002",
+   "median": 7116.993999999999,
+   "best": 7050.106,
+   "times": [
+    7116.993999999999,
+    7050.106,
+    7077.637999999999,
+    7172.129999999997,
+    7289.3009999999995
+   ]
+  },
+  {
+   "key": "swift",
+   "name": "Swift",
+   "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.zdM6F1/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.6jhXxa/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.zdM6F1/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.6jhXxa/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/swift)"
+  },
+  {
+   "key": "haskell",
+   "name": "Haskell",
+   "compileMs": 1869,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 1767396,
+   "js": 1690,
+   "bytes": 1769086,
+   "gzip": 479109,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3963415002",
+   "median": 1941.5480000000007,
+   "best": 1935.9779999999992,
+   "times": [
+    1939.8810000000003,
+    1941.5480000000007,
+    1946.217999999999,
+    1935.9779999999992,
+    1947.6699999999983
+   ]
+  },
+  {
+   "key": "dart",
+   "name": "Dart",
+   "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/dart/binarytrees.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/dart/binarytrees.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/dart/binarytrees.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/dart/binarytrees.dart)"
+  },
+  {
+   "key": "js",
+   "name": "JavaScript",
+   "compileMs": 1,
+   "flags": [],
+   "wasm": 0,
+   "js": 899,
+   "bytes": 899,
+   "gzip": 467,
+   "jsFiles": [
+    "benchmarks/bg/binarytrees/js/binarytrees.js"
+   ],
+   "result": "3963415002",
+   "median": 612.1780000000003,
+   "best": 460.16899999999987,
+   "times": [
+    649.1089999999999,
+    648.4959999999996,
+    612.1780000000003,
+    461.21000000000004,
+    460.16899999999987
+   ]
+  },
+  {
+   "key": "kotlin",
+   "name": "Kotlin",
+   "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+  },
+  {
+   "key": "moonbit",
+   "name": "MoonBit",
+   "compileMs": 151,
+   "flags": [
+    "--target",
+    "wasm-gc",
+    "--release"
+   ],
+   "wasm": 4355,
+   "js": 351,
+   "bytes": 4706,
+   "gzip": 2483,
+   "jsFiles": [
+    ".tmp/bg/binarytrees/moonbit-loader.mjs"
+   ],
+   "result": "3963415002",
+   "median": 289.7589999999998,
+   "best": 287.5239999999999,
+   "times": [
+    288.9859999999999,
+    287.5239999999999,
+    289.7589999999998,
+    307.50099999999975,
+    303.38700000000017
+   ]
+  },
+  {
+   "key": "assemblyscript",
+   "name": "AssemblyScript",
+   "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/binarytrees/assemblyscript/binarytrees.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/binarytrees/assemblyscript/binarytrees.wasm)"
+  }
+ ],
+ "d8": "15.6.75.16"
+}

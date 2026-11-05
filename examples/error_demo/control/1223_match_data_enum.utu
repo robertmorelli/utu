@@ -1,0 +1,8 @@
+// What: match on a data enum needs alt.
+// Expect: match takes a number or Bool, not A; use alt for enum variants
+enum A:
+    | B {}
+export main() I32 {
+    let a: A = B {};
+    match a { ~> 1, };
+}

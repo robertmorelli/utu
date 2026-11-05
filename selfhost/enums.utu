@@ -93,6 +93,10 @@ fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
     };
     if not decl_is(decl, Decl.IntEnum) { return -1; };
     if word == known_word(Known.Count) {
+        if a >= 0 {
+            report2(Diag.WrongArity, at, -1, 0, child_count(args));
+            return error_value();
+        };
         w_i32(variant_count(decl));
         return prelude(Prelude.I32);
     };
@@ -172,9 +176,9 @@ fn variant_count(decl: I32) I32 {
 }
 
 /// `Tag.Leaf`: its value.
-fn enum_variant_value(variant: I32) I32 {
+fn enum_variant_value(variant: I32, inst: I32) I32 {
     w_i32(variant_value[variant]);
-    named(decl_owner[variant], 0);
+    named(decl_owner[variant], inst);
 }
 
 /// Pairs: enum declaration, function.
@@ -338,7 +342,20 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
     };
     if default_ < 0 { check_alt_exhaustive(node, enum_decl); };
     same_variant_arms(arms, enum_decl);
-    let t = alt_arms(arms, s, st, expect, default_, cx);
+    // Arms of different variants (none binding, so each types alone): their enum.
+    let want_t = expect;
+    if expect < 0 {
+        let from = join_nodes.len();
+        let binds = false;
+        c = arms;
+        while (c >= 0) {
+            if is_kind(c, Node.Alt_arm) { binds = binds or arm_binding(c) >= 0; join_nodes.push(last_child(c)); };
+            c = next_sibling(c);
+        };
+        if default_ >= 0 { join_nodes.push(first_child(default_)); };
+        if binds { join_nodes.resize(from); } else { want_t = branch_join(from, cx); };
+    };
+    let t = alt_arms(arms, s, st, want_t, default_, cx);
     if optimize_level[0] == 1 { cast_arms(w_stack[w_stack.len() - 1], s); };
     w_node(Op.Seq, repr(t), 0, 0, m);
     t;
@@ -489,6 +506,11 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
             if variant < 0 and decl_is(other, Decl.Variant) {
                 // `E1.V` tested against an E0: another enum's variant.
                 report2(Diag.TypeMismatch, pattern, -1, st, named(other, 0));
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
+                result = ty_error();
+            } else if variant >= 0 and is_kind(pattern, Node.Qualified_type_ref) and ty_inst(type_path(pattern, cx.inst)) != ty_inst(st) {
+                // `MS.E.A` tested against an `MI.E`: another instance's variant.
+                report2(Diag.TypeMismatch, pattern, -1, st, type_path(pattern, cx.inst));
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
                 result = ty_error();
             } else if variant < 0 {

@@ -1,0 +1,7 @@
+{
+  "n": 2000,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "c": ["-DMINI_GMP_LIMB_TYPE=long long"], "cpp": ["-DMINI_GMP_LIMB_TYPE=long long"] },
+  "notes": "bench(n): the first n digits of pi by BG's spigot; result = FNV-1a of the bytes BG prints (10 digits, \"\\t:<count>\\n\" per line, the last line padded with spaces). BG runs n=10,000."
+}

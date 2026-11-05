@@ -207,6 +207,8 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
     let p = parent_of(write);
     while (p >= 0) {
         if is_kind(p, Node.Closure_expr) and not node_contains(p, decl) { return true; };
+        // In a defer: it runs at the end of the scope, after the capture.
+        if (is_kind(p, Node.Defer_expr) or is_kind(p, Node.Errdefer_expr)) and not node_contains(p, decl) { return true; };
         p = parent_of(p);
     };
     // After the capture (or in the closure), or of the closure itself (`f = cl() { … f … }`).
@@ -214,7 +216,7 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
     // In a loop around the closure, within d's scope.
     p = parent_of(closure);
     while (p >= 0 and not node_contains(p, decl)) {
-        if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr) or is_kind(p, Node.Loop_match_expr)) and node_contains(p, write) { return true; };
+        if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr) or is_kind(p, Node.Loop_match_expr) or is_kind(p, Node.Iterator_expr)) and node_contains(p, write) { return true; };
         p = parent_of(p);
     };
     false;
@@ -637,7 +639,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     };
     if not single { w_node(Op.StructNew, vt_ref(env, false), env, 0, me); };
     let t = ty(Ty.Closure, types_list(ptypes, n), result);
-    w_i32((if result == prelude(Prelude.Bool) { 1; } else { 0; }) + (if single { 2; } else { 0; }) + js_handle_bits(ty_a[t]));
+    w_i32((if single { 2; } else { 0; }) + closure_bits(ty_a[t], result));
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
     t;
 }
@@ -859,7 +861,7 @@ fn invoker_arm(sig: I32, params: I32, rvt: I32, env: Bool) void {
 /// expected: a closure of it with no environment.
 fn decay_fun(fun_t: I32, m: I32) void {
     w_leaf(Op.RefNull, vt_anyref, vt_anyref, 0);
-    w_i32((if ty_b[fun_t] == prelude(Prelude.Bool) { 1; } else { 0; }) + js_handle_bits(ty_a[fun_t]));
+    w_i32(closure_bits(ty_a[fun_t], ty_b[fun_t]));
     w_node(Op.Call, vt_externref, closure_new(), 0, m);
 }
 

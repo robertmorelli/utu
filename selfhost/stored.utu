@@ -44,7 +44,7 @@ fn uses_browser(file: I32) Bool {
     while (item >= 0) {
         if is_kind(item, Node.Using_decl) {
             let text = bytes_text(tok_start[node_first[item]], tok_end[node_last[item] - 1]);
-            if text_has(text, "std:Browser") and text_has(text, "using Browser ") { return true; };
+            if text_has(text, "std:Browser") and text_at(text, 0, "using Browser") and text.get(13) <= 32 { return true; };
         };
         item = next_sibling(item);
     };
@@ -138,7 +138,7 @@ fn stored_validate(type: Str, v: Str, file: I32) Str {
         if fields.len() > 0 { fields = fields + "&&"; };
         fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")";
     };
-    v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")&&" + fields;
+    v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")" + (if fields.len() > 0 { "&&" + fields; } else { ""; });
 }
 
 /// Utu converting validated JS data `v` into a native value.
@@ -181,6 +181,22 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
         fields = fields + field_name(f) + ": " + stored_encode(field_type_text(f), v + "." + field_name(f), file, prefix);
     };
     "&{ " + fields + " }";
+}
+
+/// Replace JSON's null for a non-finite F64, without changing other fields.
+fn stored_sanitize(type: Str, v: Str, file: I32) Str {
+    let t = trim_text(type);
+    if t == "F64" { return "globalThis.__utuWutu.storageReviveF64(" + v + ")"; };
+    // (A value of the wrong shape is left as it is: validation then reports the mismatch.)
+    if text_at(t, 0, "Array[") { return "(Array.isArray(" + v + ")?" + v + ".map(v=>" + stored_sanitize(t.slice(6, t.len() - 1), "v", file) + "):" + v + ")"; };
+    if is_stored_scalar(t) { return v; };
+    let fields = "";
+    for (stored_fields(stored_struct(t, file))) |f| {
+        if fields.len() > 0 { fields = fields + ","; };
+        let name = js_string(field_name(f));
+        fields = fields + name + ":" + stored_sanitize(field_type_text(f), v + "[" + name + "]", file);
+    };
+    "(" + v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")?{..." + v + "," + fields + "}:" + v + ")";
 }
 
 /// The expansion of a `@stored` site: its body parsed as
@@ -251,16 +267,13 @@ fn stored_code(site: I32, prefix: Str) Str {
     if validator.len() > 0 { validator = dsl_splice(site, validator_at, validator); };
     let state = prefix + "state";
     let data = prefix + "data";
-    let load = prefix + "load";
-    let register = prefix + "register";
     let apply_raw = prefix + "decode";
     let copies = "";
     for (stored_fields(stored_struct(type, file))) |f| { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; "; };
     let check = if validator.len() > 0 { "if not " + validator + "(candidate) {candidate=" + fallback + ";};"; } else { ""; };
-    "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1||!("
+    "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data=" + stored_sanitize(type, "value.data", file) + ";if(!("
         + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="
         + prefix + "check(raw);let candidate:" + type + "=" + fallback + ";\n      if json.len()>0 {let " + data + "=Browser.JSON.parse(json);candidate=" + stored_decode(type, data, file, prefix) + ";};\n      " + check + "\n      "
-        + trim_end(copies) + "\n    };\n    let " + load + ":fun(Str) Str=@es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n    "
-        + apply_raw + "(" + load + "(" + key + "));\n    let " + register + ":fun(Str,cl() Str, Bool,cl(Str) void) void=@es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;\n    "
-        + register + "(" + key + ",cl() Str {Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true"; } else { "false"; }) + "," + apply_raw + ");\n    " + state + ";}";
+        + trim_end(copies) + "\n    };\n    " + apply_raw + "(wutu.stored_load(" + key + "));\n    wutu.stored_register("
+        + key + ",cl() Str {Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true"; } else { "false"; }) + "," + apply_raw + ");\n    " + state + ";}";
 }

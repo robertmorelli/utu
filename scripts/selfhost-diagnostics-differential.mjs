@@ -30,6 +30,8 @@ const SCRATCH = path.join(ROOT, '.tmp', 'diagnostics-negative');
 
 const both = (file, reason) => ({ [`${file} normal`]: reason, [`${file} test`]: reason });
 const INTENDED = {
+  // `const mem s: U8 = [256, …]`: the self-hosted compiler points at the element ("256 does not fit U8").
+  ...both('baselines/corpus/d8932a6de0a164a686a4d4da45b268bae6819f76.utu', 'the out-of-range element is underlined, not the list'),
   // `fn f() ?Nope { Nope.null; }`: stage 0 takes Nope for a type once
   // `Nope.null` names it.
   ...both('baselines/corpus/61a23f4f9972b16194f2eaa17f55d78f0d0e7f5d.utu', 'an unknown type is reported wherever it is named'),

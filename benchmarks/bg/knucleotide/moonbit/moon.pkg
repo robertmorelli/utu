@@ -1,0 +1,7 @@
+import {
+  "moonbitlang/core/hashmap",
+}
+
+options(
+  link: { "wasm-gc": { "exports": [ "bench", "setup" ] } },
+)

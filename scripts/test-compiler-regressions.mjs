@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseHTML } from 'linkedom/worker';
 import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 
@@ -108,6 +109,31 @@ export lib {
 }
 `), { optimize: 'speed' });
   assert.equal((await instantiateNode(stored.wasm, stored.spec)).exports.run(), 7, stored.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+
+  const persisted = await compileFile(utu, await write(`using Browser from std:Browser;
+struct State:
+    | bad: F64
+    | good: I32
+export main() I32 {
+    let state = @stored/\\ State "probe" State { bad: 1.0, good: 2 } \\/;
+    state.good * 10 + state.bad.to_i32();
+}
+`));
+  assert.ok(persisted.wasm, persisted.diagnostics?.map(d => d.message).join('\n'));
+  const savedGlobals = ['document', 'localStorage', 'addEventListener'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
+  try {
+    globalThis.document = parseHTML('<html><body></body></html>').document;
+    globalThis.localStorage = { getItem: () => JSON.stringify({ version: 1, data: { bad: Infinity, good: 7 } }), setItem() {} };
+    globalThis.addEventListener = () => {};
+    await fs.mkdir(path.join(dir, 'node_modules'));
+    assert.equal((await instantiateNode(persisted.wasm, persisted.spec, { root: dir })).exports.main(), 70);
+  } finally {
+    for (const [key, descriptor] of savedGlobals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
   checked++;
 
   // A CRLF file's `@css` body: its carriage returns stay in the text (they
@@ -1189,14 +1215,12 @@ export lib {
     }
     // A name bound to a value that never arrives.
     fn never_let(c: I32) I32 { if c > 0 { let z = return 3; z; } else { 4; }; }
-    // Tuples past a defer, dropped whole, and held by one name.
+    // Tuples past a defer, dropped whole, and destructured.
     fn tuples() I32 {
         pair();
         triple(true);
         let .{a, b} = pair();
-        let held = triple(false);
-        held = if a > 0 { held; } else { triple(true); };
-        let .{x, y, z} = held;
+        let .{x, y, z} = triple(false);
         a * 1000 + b.len() * 100 + y.len() * 10 + z + (x * 2.0).to_i32();
     }
     // An inclusive range through the type's largest value ends.
@@ -1742,7 +1766,7 @@ export lib {
     ['export lib {\n    fn squares(n: I32) yield I32 { yield n; }\n}\n', 'squares is a generator: it expands into each for that reads it, so it cannot be exported'],
     // Labeled blocks.
     ['export lib { fn run() I32 { outer: { break nowhere 1; 2; }; } }\n', 'No block labeled nowhere around this break'],
-    ['export lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'No block labeled outer around this break'],
+    ['export lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'break cannot leave a closure'],
     ['export lib { fn run() I32 { let b: I32 = outer: { break outer "x"; }; b; } }\n', 'Expected I32, got Str'],
     ['export lib { fn run() I32 { outer: { defer { break outer; }; }; 0; } }\n', 'break in defer'],
     // Computed globals that need each other.
@@ -1867,7 +1891,7 @@ export lib {
       [`struct N:\n    | next: ?N\n    | v: I32\n    | s: ?Str\nfn f(a: N, c: Bool) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }\n`, '?. only in a statement']),
     // A let of no value (it crashed the compiler).
     ['fn nothing() void {}\nexport main() I32 { let x = nothing(); x; 0; }\n', 'x would hold no value'],
-    // A tuple bound to one name is its values, which a closure cannot hold.
+    // A tuple result must be destructured when bound.
     ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 'A closure cannot capture tuple t'],
     // An integer is no variant of an integer enum.
     ['enum(U8) A:\n    | X\n    | Y\nexport main() I32 { match A.X { 0 => 10, 1 => 20, }; }\n', '0 cannot match A'],
@@ -2679,6 +2703,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   const { linkFiles } = await import('../tools/dts/link.mjs');
   const linked = await project({ 'api.d.ts': callbacks, 'api.js': callbacksJs, 'main.utu': 'using Api from "./bindings/Api.abi.json";\n'
     + 'export main() F64 {\n    Api.cb(cl(x) F64 { x + 1.0; }) + Api.many(cl(a, b, c) F64 { a + b + c; });\n}\n' });
+  await fs.mkdir(path.join(path.dirname(linked), 'node_modules'));
   const abi = linkFiles({ files: [path.join(path.dirname(linked), 'api.d.ts')], prefix: 'Api', moduleSpecifier: './api.js' });
   await fs.mkdir(path.join(path.dirname(linked), 'bindings'));
   await fs.writeFile(path.join(path.dirname(linked), 'bindings/Api.abi.json'), JSON.stringify(abi));
@@ -2960,6 +2985,16 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.throws(() => exports.norm({ x: 3, y: 4 }), TypeError, mode);
     checked++;
   }
+  // A write inside a pipeline body, or in a defer, is seen by a closure that captured the variable: it is shared, not copied.
+  const sharedWrites = await write('fn z() I32 { 0; }\nfn each_loop() I32 {\n    let fs: Array[cl() I32] = Array[cl() I32].new(3, z);\n    let x = 0; let k = 0;\n    [10, 20, 30] each |v| { x = v; fs[k] = cl() { x; }; k += 1; };\n    fs[0]() + fs[1]() * 1000 + fs[2]() * 1000000;\n}\n'
+    + 'fn deferred() cl() I32 { let x = 1; defer x += 5; let f: cl() I32 = cl() { x; }; f; }\n'
+    + 'export main() I32 { each_loop() + deferred()() * 100000000; }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const result = await compileFile(utu, sharedWrites, { mode });
+    assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+    assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), 30030030 + 600000000, mode);
+    checked++;
+  }
   // A source map changes no byte of the module, in any mode; its entries
   // are in offset order, each in the code, and the program's own lines are
   // where they are.
@@ -2973,6 +3008,56 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.ok(entries.some(e => e.kind === 'assert_expr' && e.file === mapped && e.line === 2 && e.column === 5 && e.owner === 'boom'), mode);
     checked++;
   }
+  // An `@es` body ending in a `//` comment: the wrapped glue's closing paren is on its own line.
+  const commented = await compileFile(utu, await write('let flip: fun(Bool) Bool = @es/\\ (b) => !b // negate\n\\/;\nlet five: fun() I32 = @es/\\ (() => 5) // thunk\n\\/;\nexport lib { fn run() I32 { if flip(false) { five(); } else { 0; }; } }\n'));
+  assert.equal((await instantiateNode(commented.wasm, commented.spec)).exports?.run(), 5, commented.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+  // A closure called from `@es`: a U32 or U64 result is unsigned there, and `undefined` for a nullable parameter is null.
+  const fromJs = await write('let big: fun(cl() U32) Str = @es/\\ f => String(f()) \\/;\nlet wide: fun(cl() U64) Str = @es/\\ f => String(f()) \\/;\nlet none: fun(cl(?Str) Str) Str = @es/\\ f => f(undefined) \\/;\nexport lib { fn run() Str { big(cl() U32 { 4294967295; }) + " " + wide(cl() U64 { 18446744073709551615; }) + " " + none(cl(z: ?Str) Str { z orelse "none"; }); } }\n');
+  for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+    const built = await compileFile(utu, fromJs, { mode });
+    assert.equal((await instantiateNode(built.wasm, built.spec)).exports?.run(), '4294967295 18446744073709551615 none', mode);
+    checked++;
+  }
+  // An integer @json pattern beyond F64's exact range compares the token's text too.
+  const bigJson = await compileFile(utu, await write('export lib {\n    fn result(text: Str) Str {\n        @json/\\ match text {\n            9007199254740992 => "matched",\n            ~> "different",\n        } \\/;\n    }\n}\n'));
+  const largeLib = (await instantiateNode(bigJson.wasm, bigJson.spec)).exports;
+  assert.deepEqual([largeLib.result('9007199254740992'), largeLib.result('9007199254740993')], ['matched', 'different'], bigJson.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
+  // `using Browser` and `from std:Browser` on two lines, an empty @stored struct, and a Wutu text in backticks with a semicolon.
+  for (const source of [
+    'using Browser\nfrom std:Browser;\nstruct S:\n    | x: I32\nexport main() void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
+    'using Browser from std:Browser;\nstruct S:\nexport main() void {\n    @stored/\\ S "s" S {} \\/;\n}\n',
+    'using Browser from std:Browser;\nexport main() void {\n    @wutu/\\ p { = `;`; } \\/;\n}\n',
+  ]) {
+    const built = await compileFile(utu, await write(source));
+    assert.ok(built.wasm?.length > 0, built.diagnostics?.map(d => d.message).join('\n'));
+    checked++;
+  }
+  // Generation 1 fixes: each program builds and returns what it should in every mode.
+  const gen1 = async (source, want) => {
+    const file = await write(source);
+    for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
+      const result = await compileFile(utu, file, { mode });
+      assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
+      assert.equal(await (await instantiateNode(result.wasm, result.spec)).exports.main(), want, mode);
+      checked++;
+    }
+  };
+  // A literal just under the F32 overflow midpoint rounds to the largest F32.
+  await gen1('export main() F32 {\n    3.4028235677973366e38;\n}\n', 3.4028234663852886e38);
+  // A protocol method of 17 parameters called through a protocol value.
+  await gen1('proto P:\n | f(I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32) I32\nstruct S[P]: | n: I32\n'
+    + 'fn P[S].f |s| (a0: I32, a1: I32, a2: I32, a3: I32, a4: I32, a5: I32, a6: I32, a7: I32, a8: I32, a9: I32, a10: I32, a11: I32, a12: I32, a13: I32, a14: I32, a15: I32, a16: I32) I32 { a16; }\n'
+    + 'export main() I32 { let s: P = S {n: 0}; s.f(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16); }\n', 16);
+  // Right-nested literal-led operators are checked once per level, not twice.
+  await gen1('export main() I32 { let x = 3; 1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (x)))))))))))))))))))))))); }\n', 27);
+  // Unannotated joins of one enum's variants: if, match, and alt.
+  await gen1('enum E: | A | B\nexport main() I32 {\n    let c = true;\n    let e = if c { E.A; } else { E.B; };\n    let f = match c { true => E.A, false => E.B, };\n    let g = alt E.B { A => E.A, B => E.B, };\n    alt e { A => 1, B => 2, } + alt f { A => 10, B => 20, } + alt g { A => 100, B => 200, };\n}\n', 211);
+  // Variants of an enum in a generic mod, named from outside (by alias, by `M[A]`): int enums, tag enums, and construction.
+  await gen1('mod M[T] {\n    enum(U8) E: | A | B = 5\n    fn f(e: E) I32 { match e { E.A => 1, E.B => 2, }; }\n    fn g() I32 { f(E.B); }\n}\nusing M[I32] |MI|;\nexport main() I32 { M[I32].f(M[I32].E.A) + MI.f(MI.E.B) * 10 + M[Str].g() * 100 + M[I32].g() * 1000; }\n', 2221);
+  await gen1('mod Opt[T] {\n    tag enum &:\n        | Some { v: T }\n        | None\n    fn get(o: &) T { alt o { Some |s| => s.v, None => 0, }; }\n}\nusing Opt[I32] |IntOpt|;\nmod M[T] {\n    enum E: | A | B\n    fn f(e: E) I32 { alt e { A => 1, B => 2, }; }\n}\nusing M[I32] |MI|;\n'
+    + 'export main() I32 {\n    let n: IntOpt = IntOpt.None;\n    let o: Opt[I32] = Opt[I32].Some { v: 3 };\n    Opt[I32].get(o) + Opt[I32].get(n) + MI.f(MI.E.B) * 10 + M[I32].f(M[I32].E.A) * 100;\n}\n', 123);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });

@@ -1,0 +1,150 @@
+// fannkuch-redux from the Benchmarks Game, in idiomatic utu: Oleg Mazurov's
+// algorithm as BG Go #3 / Node #5 / Java #1 run it (single-threaded; the same 720
+// chunks in order). Each chunk unranks its first permutation, then walks the
+// rest with a count array, flipping a copy of each until its first element is 0.
+// The BG-fastest programs (gcc #6, g++ #6, Rust #6) use SSE byte shuffles; this
+// port is scalar (utu SIMD is @wat, which the idiomatic port does not use).
+// bench(n) returns the FNV-1a hash of the bytes BG prints:
+// "<checksum>\nPfannkuchen(<n>) = <max flips>\n".
+
+// The checksum and max flips of permutations idx_min..<idx_max of 0..<n.
+fn fannkuch(n: I32, fact: Array[I32], idx_min: I32, idx_max: I32) .{I32, I32} {
+    let p = Array[I32].new(n, 0);
+    let pp = Array[I32].new(n, 0);
+    let count = Array[I32].new(n, 0);
+
+    // The first permutation: unrank idx_min.
+    for (0..<n) |i| { p[i] = i; };
+    let idx = idx_min;
+    let i = n - 1;
+    while (i > 0) {
+        let d = idx / fact[i];
+        count[i] = d;
+        idx = idx % fact[i];
+        for (0..<n) |j| { pp[j] = p[j]; };
+        for (0..<(i + 1)) |j| {
+            if j + d <= i { p[j] = pp[j + d]; } else { p[j] = pp[j + d - i - 1]; };
+        };
+        i -= 1;
+    };
+
+    let max_flips = 1;
+    let checksum = 0;
+    idx = idx_min;
+    let sign = true;
+    while (true) {
+        // Count flips.
+        let first = p[0];
+        if first != 0 {
+            let flips = 1;
+            if p[first] != 0 {
+                for (1..<n) |j| { pp[j] = p[j]; };
+                let p0 = first;
+                while (true) {
+                    flips += 1;
+                    let lo = 1;
+                    let hi = p0 - 1;
+                    while (lo < hi) {
+                        let t = pp[lo];
+                        pp[lo] = pp[hi];
+                        pp[hi] = t;
+                        lo += 1;
+                        hi -= 1;
+                    };
+                    let t = pp[p0];
+                    pp[p0] = p0;
+                    p0 = t;
+                    if pp[p0] == 0 { break; };
+                };
+            };
+            if max_flips < flips { max_flips = flips; };
+            if sign { checksum += flips; } else { checksum -= flips; };
+        };
+
+        idx += 1;
+        if idx == idx_max { break; };
+
+        // The next permutation.
+        if sign {
+            p[0] = p[1];
+            p[1] = first;
+        } else {
+            let t = p[1];
+            p[1] = p[2];
+            p[2] = t;
+            let k = 2;
+            while (true) {
+                count[k] += 1;
+                if count[k] <= k { break; };
+                count[k] = 0;
+                for (0..<(k + 1)) |j| { p[j] = p[j + 1]; };
+                p[k + 1] = first;
+                first = p[0];
+                k += 1;
+            };
+        };
+        sign = not sign;
+    };
+    .{checksum, max_flips};
+}
+
+// ---- output: FNV-1a over the bytes BG prints
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_str(h0: I32, s: Str) I32 {
+    let h = h0;
+    for (0..<s.len()) |i| { h = fnv(h, s.get(i)); };
+    h;
+}
+
+// The decimal digits of x (with a '-' if negative).
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let v = x.to_i64();
+    if v < 0 { h = fnv(h, 45); v = -v; };
+    let p: I64 = 1;
+    while (p * 10 <= v) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (v / p % 10).to_i32());
+        p = p / 10;
+    };
+    h;
+}
+
+fn fannkuchredux(n: I32) I32 {
+    let fact = Array[I32].new(n + 1, 1);
+    for (1..<(n + 1)) |i| { fact[i] = fact[i - 1] * i; };
+
+    let nchunks = 720;
+    let chunk_size = (fact[n] + nchunks - 1) / nchunks;
+    chunk_size += chunk_size % 2;
+    let tasks = (fact[n] + chunk_size - 1) / chunk_size;
+
+    let flips = 0;
+    let chk = 0;
+    for (0..<tasks) |task| {
+        let idx_min = chunk_size * task;
+        let idx_max = idx_min + chunk_size;
+        if idx_max > fact[n] { idx_max = fact[n]; };
+        let .{checksum, max_flips} = fannkuch(n, fact, idx_min, idx_max);
+        if flips < max_flips { flips = max_flips; };
+        chk += checksum;
+    };
+
+    let h = fnv_int(-2128831035, chk);
+    h = fnv_str(h, "\nPfannkuchen(");
+    h = fnv_int(h, n);
+    h = fnv_str(h, ") = ");
+    h = fnv_int(h, flips);
+    fnv(h, 10);
+}
+
+test "fannkuchredux prints BG's output" {
+    // "228\nPfannkuchen(7) = 16\n"
+    assert fannkuchredux(7) == 1328886884;
+}
+
+export lib {
+    fn bench(n: I32) I32 { fannkuchredux(n); }
+}

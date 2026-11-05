@@ -1,0 +1,172 @@
+// fannkuch-redux, hand-tuned utu (reported as "utu tuned", not utu's headline):
+// BG gcc #6's algorithm (Ilya Kurdyukov) with its SIMD in @wat. A permutation
+// is one V128 of bytes; flipping is i8x16.swizzle (gcc #6's pshufb), the whole
+// flip loop of a permutation in one @wat function (utu does not inline @wat, so
+// one call per instruction would be ~10 calls per flip). The counts are a V128
+// too: the next permutation finds the first count it may increment with
+// bitmask/ctz and shuffles by gcc #6's masks_shift[i] (the rotations of the
+// first 2, 3, ..., i + 1 elements, composed), kept in an Array[V128]. Single-threaded: the 24 blocks in order; each
+// block's first permutation and counts are unranked in scalar code (gcc #6 does
+// it with shuffles; 24 times a run, it does not matter).
+// bench(n) returns the FNV-1a hash of the bytes BG prints.
+
+// The flips of permutation cur (0 if its first element is 0): gcc #6's inner loop.
+fn flips(cur: V128) I32 {
+    @wat/\
+        (local $v0 v128) (local $v3 v128) (local $ramp v128) (local $f i32)
+        (if (i32.eqz (i8x16.extract_lane_u 0 (local.get $cur))) (then (return (i32.const 0))))
+        (local.set $ramp (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+        (local.set $v3 (i8x16.swizzle (local.get $cur) (v128.const i8x16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)))
+        (loop $flip
+          (local.set $v0 (i8x16.sub (local.get $v3) (local.get $ramp)))
+          (local.set $v3 (i8x16.swizzle (local.get $cur) (local.get $v3)))
+          (local.set $v0 (v128.bitselect (local.get $ramp) (local.get $v0) (i8x16.shr_s (local.get $v0) (i32.const 7))))
+          (local.set $cur (i8x16.swizzle (local.get $cur) (local.get $v0)))
+          (local.set $f (i32.add (local.get $f) (i32.const 1)))
+          (br_if $flip (i8x16.extract_lane_u 0 (local.get $v3))))
+        (local.get $f)
+    \/;
+}
+
+// The lane of the first count that may be incremented (count[i] < i).
+fn next_lane(counts: V128) I32 {
+    @wat/\
+        (i32.ctz (i8x16.bitmask (i8x16.sub (local.get $counts)
+          (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))))
+    \/;
+}
+
+// Counts below lane i reset to 0, count i incremented.
+fn next_counts(counts: V128, i: I32) V128 {
+    @wat/\
+        (local $ramp v128) (local $v0 v128)
+        (local.set $ramp (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+        (local.set $v0 (i8x16.splat (local.get $i)))
+        (i8x16.sub
+          (v128.andnot (local.get $counts) (i8x16.gt_s (local.get $v0) (local.get $ramp)))
+          (i8x16.eq (local.get $v0) (local.get $ramp)))
+    \/;
+}
+
+// The first i + 1 elements rotated left by one.
+fn rotate(cur: V128, i: I32) V128 {
+    @wat/\
+        (local $ramp v128) (local $v0 v128)
+        (local.set $ramp (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
+        (local.set $v0 (i8x16.splat (local.get $i)))
+        (i8x16.swizzle (local.get $cur)
+          (v128.andnot
+            (i8x16.sub (local.get $ramp) (i8x16.gt_s (local.get $v0) (local.get $ramp)))
+            (i8x16.eq (local.get $v0) (local.get $ramp))))
+    \/;
+}
+
+// 16 bytes, lane j = byte j of lo (j < 8) or of hi.
+fn pack(lo: I64, hi: I64) V128 {
+    @wat/\ (i64x2.replace_lane 1 (i64x2.splat (local.get $lo)) (local.get $hi)) \/;
+}
+
+fn shuffle(cur: V128, mask: V128) V128 { @wat/\ (i8x16.swizzle (local.get $cur) (local.get $mask)) \/; }
+
+fn bytes(a: Array[I32], from: I32) I64 {
+    let x: I64 = 0;
+    for (0..<8) |j| { x = x | ((a[from + j] & 255).to_i64() << (8 * j).to_i64()); };
+    x;
+}
+
+fn fannkuchredux(n: I32) I32 {
+    let fact = Array[I64].new(17, 1);
+    for (1..<17) |i| { fact[i] = fact[i - 1] * i.to_i64(); };
+    let block_end = fact[n];
+    let block_size = block_end;
+    if block_end > 24 { block_size = block_end / 24; };
+
+    // masks_shift[i]: rotate the first 2, then 3, ..., then i + 1 elements.
+    let masks_shift = Array[V128].new(16, pack(0, 0));
+    let m = pack(506097522914230528, 1084818905618843912);  // 0, 1, ..., 15
+    for (0..<16) |i| {
+        m = rotate(m, i);
+        masks_shift[i] = m;
+    };
+
+    let checksum: I64 = 0;
+    let max_flips = 0;
+    let p = Array[I32].new(16, 0);
+    let pp = Array[I32].new(16, 0);
+    let count = Array[I32].new(16, 0);
+    let block_start: I64 = 0;
+    while (block_start < block_end) {
+        // Unrank block_start: the first permutation and its counts.
+        for (0..<16) |j| { p[j] = j; count[j] = 0; };
+        let idx = block_start;
+        let i = n - 1;
+        while (i >= 0) {
+            let d = (idx / fact[i]).to_i32();
+            idx -= d.to_i64() * fact[i];
+            count[i] = d;
+            for (0..<16) |j| { pp[j] = p[j]; };
+            for (0..<(i + 1)) |j| {
+                if j + d <= i { p[j] = pp[j + d]; } else { p[j] = pp[j + d - i - 1]; };
+            };
+            i -= 1;
+        };
+        let cur = pack(bytes(p, 0), bytes(p, 8));
+        let counts = pack(bytes(count, 0), bytes(count, 8));
+
+        // Each permutation of the block; the sign alternates (block_start is even).
+        let left = block_size;
+        let odd = false;
+        while (left > 0) {
+            let f = flips(cur);
+            let k = next_lane(counts);
+            counts = next_counts(counts, k);
+            cur = shuffle(cur, masks_shift[k]);
+            if f != 0 {
+                if odd { checksum -= f.to_i64(); } else { checksum += f.to_i64(); };
+                if f > max_flips { max_flips = f; };
+            };
+            odd = not odd;
+            left -= 1;
+        };
+        block_start += block_size;
+    };
+
+    let h = fnv_int(-2128831035, checksum);
+    h = fnv_str(h, "\nPfannkuchen(");
+    h = fnv_int(h, n.to_i64());
+    h = fnv_str(h, ") = ");
+    h = fnv_int(h, max_flips.to_i64());
+    fnv(h, 10);
+}
+
+// ---- output: FNV-1a over the bytes BG prints
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_str(h0: I32, s: Str) I32 {
+    let h = h0;
+    for (0..<s.len()) |i| { h = fnv(h, s.get(i)); };
+    h;
+}
+
+fn fnv_int(h0: I32, x: I64) I32 {
+    let h = h0;
+    let v = x;
+    if v < 0 { h = fnv(h, 45); v = -v; };
+    let p: I64 = 1;
+    while (p * 10 <= v) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + (v / p % 10).to_i32());
+        p = p / 10;
+    };
+    h;
+}
+
+test "fannkuchredux prints BG's output" {
+    // "228\nPfannkuchen(7) = 16\n"
+    assert fannkuchredux(7) == 1328886884;
+}
+
+export lib {
+    fn bench(n: I32) I32 { fannkuchredux(n); }
+}

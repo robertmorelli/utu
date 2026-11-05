@@ -1,0 +1,162 @@
+// Fasta, the algorithm of BG fasta gcc #3 (Drake Diedrich), in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/fasta-gcc-3.html
+//
+// The repeated sequence is written from a buffer of len lines (len·60 bases
+// with their newlines), as C does. Each random sequence first builds a table
+// of IM symbols, hash[v] = the symbol for the random number v (cumulative
+// probabilities in F32, as C's floats), then fills a buffer of buflines lines
+// whose newlines are fixed, one table lookup per base.
+//
+// bench(n) returns the FNV-1a hash of the bytes BG prints. Programs that read
+// fasta's output copy the block between the "fasta generator" markers and make the
+// out_* functions append (scratchpad fasta-input.md).
+
+// ---- output sink: what BG writes to stdout goes here
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn out_str(s: Str) void {
+    let h = st.h;
+    for (0..<s.len()) |i| { h = fnv(h, s[i]); };
+    st.h = h;
+}
+
+fn out_buf(len: I32) void {
+    let h = st.h;
+    for (0..<len) |i| { h = fnv(h, buf[i]); };
+    st.h = h;
+}
+
+fn out_rep(len: I32) void {
+    let h = st.h;
+    for (0..<len) |i| { h = fnv(h, rep[i]); };
+    st.h = h;
+}
+
+// ---- fasta generator: copy from here to "end of the fasta generator"
+
+let im: I32 = 139968;
+let ia: I32 = 3877;
+let ic: I32 = 29573;
+let linelen: I32 = 60;
+let buflines: I32 = 100;
+
+mem hash: U8;    // the symbol for each random number
+mem buf: U8;     // buflines lines of random symbols
+mem rep: U8;     // the repeated sequence, len lines
+
+// The generator's state: the random seed, and the output hash.
+struct State:
+    | seed: I32
+    | h: I32
+
+let st: State = &{ seed: 42, h: 0 };
+
+
+fn alu() Str {
+    "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
+}
+
+// seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
+fn repeat_fasta(seq: Str, n: I32) void {
+    let len = seq.len();
+    let line = linelen + 1;
+    rep.resize(line * len);
+    for (0..<len) |i| {
+        for (0..<linelen) |k| {
+            rep[i * line + k] = seq[(i * linelen + k) % len];
+        };
+        rep[i * line + linelen] = 10;
+    };
+    let whole_buffers = n / (len * linelen);
+    for (0..<whole_buffers) { out_rep(line * len); };
+    let data_remaining = n - whole_buffers * len * linelen;
+    out_rep(data_remaining + data_remaining / linelen);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+// hash[i] = the symbol whose cumulative probability first exceeds i / im.
+fn build_hash(symb: Str, p: Array[F32]) void {
+    hash.resize(im);
+    let len = symb.len();
+    let sum = p[0];
+    let j = 0;
+    let i = 0;
+    while (i < im and j < len) {
+        let r = (i.to_f64() / im.to_f64()).to_f32();
+        if r >= sum {
+            j += 1;
+            if j < len { sum = sum + p[j]; };
+        };
+        hash[i] = if j < len { symb[j]; } else { 0; };
+        i += 1;
+    };
+}
+
+fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+    build_hash(symb, p);
+    let line = linelen + 1;
+    buf.resize(line * buflines);
+    for (0..<buflines) |i| { buf[i * line + linelen] = 10; };
+    let seed = st.seed;
+
+    // whole buffers: fixed loops, no decisions
+    let buffers = n / linelen / buflines;
+    for (0..<buffers) {
+        for (0..<buflines) |j| {
+            for (0..<linelen) |k| {
+                seed = (seed * ia + ic) % im;
+                buf[j * line + k] = hash[seed];
+            };
+        };
+        st.seed = seed;
+        out_buf(line * buflines);
+    };
+
+    // the remaining whole lines, then the partial one
+    let lines = n / linelen - buffers * buflines;
+    for (0..<lines) |j| {
+        for (0..<linelen) |k| {
+            seed = (seed * ia + ic) % im;
+            buf[j * line + k] = hash[seed];
+        };
+    };
+    let partials = n - linelen * lines - buffers * buflines * linelen;
+    for (0..<partials) |k| {
+        seed = (seed * ia + ic) % im;
+        buf[lines * line + k] = hash[seed];
+    };
+    st.seed = seed;
+    out_buf(lines * line + partials);
+    if n % linelen != 0 { out_str("\n"); };
+}
+
+fn fasta(n: I32) void {
+    st.seed = 42;
+    let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02];
+    let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008];
+
+    out_str(">ONE Homo sapiens alu\n");
+    repeat_fasta(alu(), n * 2);
+
+    out_str(">TWO IUB ambiguity codes\n");
+    random_fasta("acgtBDHKMNRSVWY", iub_p, n * 3);
+
+    out_str(">THREE Homo sapiens frequency\n");
+    random_fasta("acgt", homosapiens_p, n * 5);
+}
+// ---- end of the fasta generator
+
+fn run(n: I32) I32 {
+    st.h = -2128831035;
+    fasta(n);
+    st.h;
+}
+
+test "fasta 1000 is BG's output" {
+    assert run(1000) == 1656148202;
+}
+
+export lib {
+    fn bench(n: I32) I32 { run(n); }
+}

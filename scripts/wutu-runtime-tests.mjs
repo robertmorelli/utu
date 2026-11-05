@@ -45,6 +45,26 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 const click = (window, node) => node.dispatchEvent(new window.Event('click'));
 
 export function registerWutuRuntimeTests({ test, assert, assertEq }) {
+  test('wutu storage: non-finite F64 does not discard other fields on reload', () => withRuntime(async ({ api }) => {
+    installWutuStorage(api);
+    const saved = JSON.stringify({ version: 1, data: { bad: Infinity, alsoBad: NaN, good: 7 } });
+    const data = JSON.parse(saved).data;
+    assertEq(api.storageReviveF64(data.bad), 0);
+    assertEq(api.storageReviveF64(data.alsoBad), 0);
+    assertEq(data.good, 7);
+  }));
+  test('wutu lazy: signed zero changes component props', () => withRuntime(async () => {
+    const lazy = createWutuLazy();
+    const old = console.error;
+    console.error = () => {};
+    try {
+      const negative = lazy('missing', 'page', [-0]);
+      const positive = lazy('missing', 'page', [0]);
+      assert(negative !== positive, 'Object.is distinguishes signed zero');
+    } finally {
+      console.error = old;
+    }
+  }));
   test('wutu runtime: re-rendering reuses elements, updates text, and drops stale attributes', () => withRuntime(async ({ api, document }) => {
     const state = { label: 'one', title: 'first' };
     const root = api.mount(() => {
@@ -345,6 +365,8 @@ export function registerWutuRuntimeTests({ test, assert, assertEq }) {
 
     dispatch('storage', { key: 'notes', newValue: 'remote' });
     assertEq(applied, 'remote', 'clean state accepts another tab’s value');
+    dispatch('storage', { key: null, newValue: null });
+    assertEq(applied, '', 'another tab’s clear() resets every store');
 
     value = 'local';
     api.save('notes');

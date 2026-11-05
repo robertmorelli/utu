@@ -1,0 +1,299 @@
+// k-nucleotide, the algorithm of BG k-nucleotide gcc #1 (Jeremy Zerfas, the
+// fastest BG program), in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/knucleotide-gcc-1.html
+//
+// The third sequence's bases become 2-bit codes (A0 C1 G2 T3, from the ASCII
+// bits as C does); for each length, a rolling key (key << 2 | code, masked)
+// counts every window in a hash table. C's table is khash: open addressing in
+// power-of-two buckets, quadratic probing, its custom hash key ^ key >> 7,
+// grown at 0.77 load; Table below is the same (insert-only), on I64 keys.
+// The 1- and 2-mers are sorted by count, then key; their percentages are F32,
+// as C's floats. Single-threaded (gcc #1 runs the seven counts as OpenMP
+// sections).
+//
+// setup(n) writes BG fasta's output for n into src (untimed); bench(n) reads
+// it as C reads stdin and returns the FNV-1a hash of the bytes C prints,
+// hashed as they are formatted.
+
+mem src: U8;     // the fasta text setup(n) makes
+mem poly: U8;    // the third sequence's codes
+
+// ---- khash(uint64_t -> uint32_t), insert-only
+
+mod Table {
+    struct &:
+        | keys: Array[I64]
+        | vals: Array[I32]
+        | used: Array[I32]
+        | size: I32
+        | upper: I32
+
+    fn &.new() & {
+        &{ keys: Array[I64].new(4, 0), vals: Array[I32].new(4, 0), used: Array[I32].new(4, 0), size: 0, upper: 3 };
+    }
+
+    // C's CUSTOM_HASH_FUNCTION, truncated to khint32_t
+    fn &.bucket |self| (key: I64) I32 {
+        (key ^ (key >>> 7)).to_i32() & (self.keys.len() - 1);
+    }
+
+    // The bucket holding key, or the empty one where it goes.
+    fn &.find |self| (key: I64) I32 {
+        let mask = self.keys.len() - 1;
+        let i = self.bucket(key);
+        let step = 0;
+        while (self.used[i] != 0 and self.keys[i] != key) {
+            step += 1;
+            i = (i + step) & mask;
+        };
+        i;
+    }
+
+    // kh_put, then value = 1 or value++
+    fn &.increment |self| (key: I64) void {
+        if self.size >= self.upper { self.grow(); };
+        let i = self.find(key);
+        if self.used[i] != 0 {
+            self.vals[i] += 1;
+        } else {
+            self.used[i] = 1;
+            self.keys[i] = key;
+            self.vals[i] = 1;
+            self.size += 1;
+        };
+    }
+
+    fn &.get |self| (key: I64) I32 {
+        let i = self.find(key);
+        if self.used[i] != 0 { self.vals[i]; } else { 0; };
+    }
+
+    fn &.grow |self| () void {
+        let keys = self.keys;
+        let vals = self.vals;
+        let used = self.used;
+        let buckets = keys.len() * 2;
+        self.keys = Array[I64].new(buckets, 0);
+        self.vals = Array[I32].new(buckets, 0);
+        self.used = Array[I32].new(buckets, 0);
+        self.upper = (buckets.to_f64() * 0.77 + 0.5).to_i32();
+        for (0..<keys.len()) |j| {
+            if used[j] != 0 {
+                let i = self.find(keys[j]);
+                self.used[i] = 1;
+                self.keys[i] = keys[j];
+                self.vals[i] = vals[j];
+            };
+        };
+    }
+}
+
+// ---- counting
+
+// code_For_Nucleotide: " \0 \1\3  \2"[c & 7]
+fn code(c: I32) I32 {
+    match c & 7 {
+        1 => 0,
+        3 => 1,
+        7 => 2,
+        4 => 3,
+        ~> 32,
+    };
+}
+
+fn nucleotide(code: I64) I32 {
+    match (code & 3).to_i32() {
+        0 => 65,
+        1 => 67,
+        2 => 71,
+        ~> 84,
+    };
+}
+
+// Every window of `length` codes, counted.
+fn count(length: I32) Table {
+    let table = Table.new();
+    let key: I64 = 0;
+    let mask: I64 = (1.to_i64() << (2 * length).to_i64()) - 1;
+    for (0..<length - 1) |i| {
+        key = ((key << 2) & mask) | poly[i].to_i64();
+    };
+    for (length - 1..<poly.len()) |i| {
+        key = ((key << 2) & mask) | poly[i].to_i64();
+        table.increment(key);
+    };
+    table;
+}
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_str(h0: I32, s: Str) I32 {
+    let h = h0;
+    for (0..<s.len()) |i| { h = fnv(h, s[i]); };
+    h;
+}
+
+// "%.3f" of a percentage below 100: rounded to thousandths, then its digits.
+fn fnv_fixed3(h0: I32, x: F64) I32 {
+    let r = F64.floor(x * 1000.0 + 0.5).to_i32();
+    let h = fnv_str(h0, (r / 1000).to_str());
+    h = fnv(h, 46);
+    h = fnv(h, 48 + r / 100 % 10);
+    h = fnv(h, 48 + r / 10 % 10);
+    fnv(h, 48 + r % 10);
+}
+
+// generate_Frequencies_For_Desired_Length_Oligonucleotides, then the blank
+// line main prints after it.
+fn frequencies(h0: I32, length: I32) I32 {
+    let table = count(length);
+    let keys = Array[I64].new(table.size, 0);
+    let vals = Array[I32].new(table.size, 0);
+    let n = 0;
+    for (0..<table.keys.len()) |j| {
+        if table.used[j] != 0 {
+            // insertion sort: larger values first, then smaller keys
+            let k = table.keys[j];
+            let v = table.vals[j];
+            let i = n;
+            while (i > 0 and (vals[i - 1] < v or (vals[i - 1] == v and keys[i - 1] > k))) {
+                keys[i] = keys[i - 1];
+                vals[i] = vals[i - 1];
+                i -= 1;
+            };
+            keys[i] = k;
+            vals[i] = v;
+            n += 1;
+        };
+    };
+    let h = h0;
+    let windows: F32 = (poly.len() - length + 1).to_f32();
+    let hundred: F32 = 100.0;
+    for (0..<n) |i| {
+        for (0..<length) |j| {
+            h = fnv(h, nucleotide(keys[i] >>> (2 * (length - 1 - j)).to_i64()));
+        };
+        h = fnv(h, 32);
+        h = fnv_fixed3(h, (hundred * vals[i].to_f32() / windows).to_f64());
+        h = fnv(h, 10);
+    };
+    fnv(h, 10);
+}
+
+// generate_Count_For_Oligonucleotide, then the newline main prints after it.
+fn count_of(h0: I32, oligo: Str) I32 {
+    let length = oligo.len();
+    let table = count(length);
+    let key: I64 = 0;
+    for (0..<length) |i| {
+        key = (key << 2) | code(oligo[i]).to_i64();
+    };
+    let h = fnv_str(h0, table.get(key).to_str());
+    h = fnv(h, 9);
+    h = fnv_str(h, oligo);
+    fnv(h, 10);
+}
+
+// main: the codes of the lines after ">THREE", then the seven outputs in order.
+fn knucleotide() I32 {
+    let i = 0;
+    let n = src.len();
+    let three = ">THREE";
+    let found = false;
+    while (not found and i < n) {
+        let start = i;
+        while (i < n and src[i] != 10) { i += 1; };
+        i += 1;
+        found = i - start > three.len();
+        for (0..<three.len()) |j| {
+            if found and src[start + j] != three[j] { found = false; };
+        };
+    };
+    poly.clear();
+    let reading = true;
+    while (reading and i < n) {
+        if src[i] == 62 {
+            reading = false;
+        } else {
+            while (i < n and src[i] != 10) {
+                poly.push(code(src[i]));
+                i += 1;
+            };
+            i += 1;
+        };
+    };
+
+    let h = -2128831035;
+    h = frequencies(h, 1);
+    h = frequencies(h, 2);
+    h = count_of(h, "GGT");
+    h = count_of(h, "GGTA");
+    h = count_of(h, "GGTATT");
+    h = count_of(h, "GGTATTTTAATT");
+    count_of(h, "GGTATTTTAATTTATAGT");
+}
+
+// ---- setup(n): BG fasta's output for n into src (ALU repeated for 2n, IUB
+// random for 3n, Homo sapiens random for 5n, lines of 60; LCG seed 42,
+// cumulative probabilities in F64).
+
+struct Lcg:
+    | seed: I32
+
+fn put_str(s: Str) void {
+    for (0..<s.len()) |i| { src.push(s[i]); };
+}
+
+fn random_fasta(rng: Lcg, chars: Str, probs: Array[F64], count: I32) void {
+    let cum = Array[F64].new(probs.len(), 0.0);
+    let c = 0.0;
+    for (0..<probs.len()) |i| {
+        c += probs[i];
+        cum[i] = c;
+    };
+    let left = count;
+    while (left > 0) {
+        let m = if left < 60 { left; } else { 60; };
+        for (0..<m) {
+            rng.seed = (rng.seed * 3877 + 29573) % 139968;
+            let r = rng.seed.to_f64() / 139968.0;
+            let j = 0;
+            while (j < cum.len() - 1 and r >= cum[j]) { j += 1; };
+            src.push(chars[j]);
+        };
+        src.push(10);
+        left -= 60;
+    };
+}
+
+fn fasta(n: I32) void {
+    let alu = "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
+    src.clear();
+    put_str(">ONE Homo sapiens alu\n");
+    let k = 0;
+    let left = 2 * n;
+    while (left > 0) {
+        let m = if left < 60 { left; } else { 60; };
+        for (0..<m) {
+            src.push(alu[k]);
+            k = (k + 1) % alu.len();
+        };
+        src.push(10);
+        left -= 60;
+    };
+    let rng: Lcg = &{ seed: 42 };
+    put_str(">TWO IUB ambiguity codes\n");
+    random_fasta(rng, "acgtBDHKMNRSVWY", [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02], 3 * n);
+    put_str(">THREE Homo sapiens frequency\n");
+    random_fasta(rng, "acgt", [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008], 5 * n);
+}
+
+test "fasta 1000 gives BG's output" {
+    fasta(1000);
+    assert knucleotide() == -1788063756;
+}
+
+export lib {
+    fn setup(n: I32) void { fasta(n); }
+    fn bench(n: I32) I32 { knucleotide(); }
+}

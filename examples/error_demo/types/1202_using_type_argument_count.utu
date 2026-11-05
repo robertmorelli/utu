@@ -1,0 +1,6 @@
+// What: using P[I32] |q| on a module of two type parameters
+// Expect: P takes 2 type arguments, given 1 at the using; no crash, no follow-ons
+mod P[A, B] { struct Pr: | a : A | b : B
+  fn mk(x: A, y: B) Pr { Pr { a: x, b: y }; } }
+using P[I32] |q|;
+export main() I32 { q.mk(3, 4).a; }

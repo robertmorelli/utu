@@ -1,0 +1,401 @@
+{
+ "n": 2000,
+ "setup": null,
+ "samples": 10,
+ "warmups": 3,
+ "result": "2982777735",
+ "notes": "bench(n): the BG program for n; result = FNV-1a of the \"%.9f\\n\" line BG prints. BG runs n=5,500.",
+ "date": "2026-11-05T13:34:50.844Z",
+ "ports": [
+  {
+   "key": "utu-fast",
+   "name": "utu fast",
+   "compileMs": 69,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 2642,
+   "js": 559,
+   "bytes": 3201,
+   "gzip": 912,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/spectralnorm-utu-fast/spectralnorm.mjs"
+   ],
+   "result": "2982777735",
+   "median": 87.61700000000002,
+   "best": 86.80999999999995,
+   "times": [
+    86.80999999999995,
+    88.23200000000003,
+    88.19499999999994,
+    88.50200000000007,
+    87.71899999999994,
+    87.125,
+    87.61000000000001,
+    87.03599999999994,
+    86.92499999999995,
+    87.62400000000002
+   ]
+  },
+  {
+   "key": "utu-fastUnsafe",
+   "name": "utu fastUnsafe",
+   "compileMs": 68,
+   "flags": [
+    "-O",
+    "fastUnsafe"
+   ],
+   "wasm": 2642,
+   "js": 330,
+   "bytes": 2972,
+   "gzip": 770,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/spectralnorm-utu-fastUnsafe/spectralnorm.mjs"
+   ],
+   "result": "2982777735",
+   "median": 87.49599999999998,
+   "best": 87.00300000000016,
+   "times": [
+    87.54399999999998,
+    87.14000000000004,
+    87.85199999999998,
+    87.32399999999996,
+    87.44799999999998,
+    87.55199999999991,
+    87.7360000000001,
+    87.89700000000005,
+    87.13200000000006,
+    87.00300000000016
+   ]
+  },
+  {
+   "key": "utu-small",
+   "name": "utu small",
+   "compileMs": 65,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 857,
+   "js": 559,
+   "bytes": 1416,
+   "gzip": 849,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/spectralnorm-utu-small/spectralnorm.mjs"
+   ],
+   "result": "2982777735",
+   "median": 90.5455,
+   "best": 89.87300000000005,
+   "times": [
+    91.81899999999996,
+    90.94600000000003,
+    91.63099999999997,
+    91.32100000000003,
+    89.87300000000005,
+    90.53499999999997,
+    90.23599999999999,
+    90.20299999999997,
+    90.55600000000004,
+    90.27099999999996
+   ]
+  },
+  {
+   "key": "utu-smallUnsafe",
+   "name": "utu smallUnsafe",
+   "compileMs": 66,
+   "flags": [
+    "-O",
+    "smallUnsafe"
+   ],
+   "wasm": 857,
+   "js": 330,
+   "bytes": 1187,
+   "gzip": 707,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/spectralnorm-utu-smallUnsafe/spectralnorm.mjs"
+   ],
+   "result": "2982777735",
+   "median": 90.62900000000002,
+   "best": 90.05100000000004,
+   "times": [
+    90.57,
+    90.423,
+    90.05100000000004,
+    90.84899999999993,
+    90.9960000000001,
+    90.55399999999997,
+    90.606,
+    90.65200000000004,
+    91.53300000000013,
+    90.88300000000004
+   ]
+  },
+  {
+   "key": "utu-tuned-fast",
+   "name": "utu tuned fast",
+   "compileMs": 124,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 925,
+   "js": 565,
+   "bytes": 1490,
+   "gzip": 985,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/spectralnorm-tuned-utu-fast/spectralnorm.tuned.mjs"
+   ],
+   "result": "2982777735",
+   "median": 83.93099999999993,
+   "best": 83.89099999999996,
+   "times": [
+    83.988,
+    83.89099999999996,
+    83.93099999999993,
+    83.98899999999992,
+    83.9140000000001
+   ]
+  },
+  {
+   "key": "utu-tuned-small",
+   "name": "utu tuned small",
+   "compileMs": 135,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 877,
+   "js": 565,
+   "bytes": 1442,
+   "gzip": 989,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/spectralnorm-tuned-utu-small/spectralnorm.tuned.mjs"
+   ],
+   "result": "2982777735",
+   "median": 83.99300000000005,
+   "best": 83.80500000000006,
+   "times": [
+    83.91799999999995,
+    83.80500000000006,
+    84.05899999999997,
+    83.99300000000005,
+    84.23000000000002
+   ]
+  },
+  {
+   "key": "c",
+   "name": "C",
+   "compileMs": 1068,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-mavx",
+    "-sSTACK_SIZE=1048576"
+   ],
+   "wasm": 20009,
+   "js": 394,
+   "bytes": 20403,
+   "gzip": 9402,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/c-loader.mjs"
+   ],
+   "result": "2982777735",
+   "median": 77.85899999999992,
+   "best": 77.66099999999994,
+   "times": [
+    78.007,
+    77.85899999999992,
+    77.91399999999999,
+    77.77300000000002,
+    77.66099999999994
+   ]
+  },
+  {
+   "key": "cpp",
+   "name": "C++",
+   "compileMs": 803,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-msse3",
+    "-sSTACK_SIZE=1048576"
+   ],
+   "wasm": 11085,
+   "js": 353,
+   "bytes": 11438,
+   "gzip": 6017,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/cpp-loader.mjs"
+   ],
+   "result": "2982777735",
+   "median": 156.52700000000004,
+   "best": 156.40199999999993,
+   "times": [
+    156.52700000000004,
+    156.4140000000001,
+    156.40199999999993,
+    157.56799999999998,
+    157.788
+   ]
+  },
+  {
+   "key": "rust",
+   "name": "Rust",
+   "compileMs": 1248,
+   "flags": [
+    "--release",
+    "-C",
+    "target-feature=+simd128"
+   ],
+   "wasm": 47852,
+   "js": 359,
+   "bytes": 48211,
+   "gzip": 20184,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/rust-loader.mjs"
+   ],
+   "result": "2982777735",
+   "median": 53.66300000000001,
+   "best": 53.15699999999998,
+   "times": [
+    53.83499999999998,
+    53.66300000000001,
+    53.266999999999996,
+    53.15699999999998,
+    53.980999999999995
+   ]
+  },
+  {
+   "key": "go",
+   "name": "Go",
+   "compileMs": 2539,
+   "flags": [
+    "-buildmode=c-shared",
+    "-trimpath",
+    "-ldflags=-s -w"
+   ],
+   "wasm": 2421442,
+   "js": 1690,
+   "bytes": 2423132,
+   "gzip": 706449,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "2982777735",
+   "median": 195.71400000000017,
+   "best": 195.21900000000005,
+   "times": [
+    199.173,
+    195.71400000000017,
+    195.96000000000004,
+    195.21900000000005,
+    195.26099999999997
+   ]
+  },
+  {
+   "key": "swift",
+   "name": "Swift",
+   "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.m5xkJY/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.tAplXy/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.m5xkJY/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.tAplXy/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/swift)"
+  },
+  {
+   "key": "haskell",
+   "name": "Haskell",
+   "compileMs": 1004,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 1951378,
+   "js": 1690,
+   "bytes": 1953068,
+   "gzip": 519983,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "2982777735",
+   "median": 154.20299999999997,
+   "best": 153.31899999999996,
+   "times": [
+    154.42000000000007,
+    153.42999999999995,
+    153.31899999999996,
+    154.20299999999997,
+    155.52700000000004
+   ]
+  },
+  {
+   "key": "dart",
+   "name": "Dart",
+   "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/dart/spectralnorm.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/dart/spectralnorm.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/dart/spectralnorm.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/dart/spectralnorm.dart)"
+  },
+  {
+   "key": "js",
+   "name": "JavaScript",
+   "compileMs": 1,
+   "flags": [],
+   "wasm": 0,
+   "js": 633,
+   "bytes": 633,
+   "gzip": 337,
+   "jsFiles": [
+    "benchmarks/bg/spectralnorm/js/spectralnorm.js"
+   ],
+   "result": "2982777735",
+   "median": 176.40700000000015,
+   "best": 176.26800000000003,
+   "times": [
+    176.26800000000003,
+    176.40700000000015,
+    176.54599999999982,
+    176.5999999999999,
+    176.365
+   ]
+  },
+  {
+   "key": "kotlin",
+   "name": "Kotlin",
+   "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+  },
+  {
+   "key": "moonbit",
+   "name": "MoonBit",
+   "compileMs": 169,
+   "flags": [
+    "--target",
+    "wasm-gc",
+    "--release"
+   ],
+   "wasm": 927,
+   "js": 353,
+   "bytes": 1280,
+   "gzip": 809,
+   "jsFiles": [
+    ".tmp/bg/spectralnorm/moonbit-loader.mjs"
+   ],
+   "result": "2982777735",
+   "median": 159.01199999999994,
+   "best": 158.29099999999994,
+   "times": [
+    158.29099999999994,
+    159.01199999999994,
+    158.52499999999998,
+    161.59899999999993,
+    162.86599999999999
+   ]
+  },
+  {
+   "key": "assemblyscript",
+   "name": "AssemblyScript",
+   "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/spectralnorm/assemblyscript/spectralnorm.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/spectralnorm/assemblyscript/spectralnorm.wasm)"
+  }
+ ],
+ "d8": "15.6.75.16"
+}

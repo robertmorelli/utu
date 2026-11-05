@@ -731,6 +731,8 @@ mod wutu {
         init();
         let install: fun() void = @es/\ () => { (function installWutuStorage(api) {
   if (api.store) return;
+  // A non-finite F64 becomes null in JSON; keep the other stored fields.
+  api.storageReviveF64 = value => value === null ? 0 : value;
   const stores = new Map();
   const DEBOUNCE_MS = 180;
   let timer;
@@ -797,24 +799,34 @@ mod wutu {
   const on = (...a) => globalThis.addEventListener?.(...a); on('pagehide', flush);
   on('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   on('storage', event => {
-    const store = stores.get(event.key);
-    if (!store) return;
-    if (store.dirty) {
-      store.conflict = true;
-      clearTimeout(timer); timer = 0;
-      report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
-      return;
-    }
-    try {
-      store.apply?.(event.newValue ?? '');
-      store.last = event.newValue;
-      api.refresh();
-    } catch (cause) {
-      report(cause);
+    // A null key is another tab's clear(): every store is removed.
+    for (const store of event.key === null ? [...stores.values()] : [stores.get(event.key)]) {
+      if (!store) continue;
+      if (store.dirty) {
+        store.conflict = true;
+        clearTimeout(timer); timer = 0;
+        report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
+        continue;
+      }
+      try {
+        store.apply?.(event.newValue ?? '');
+        store.last = event.newValue;
+        api.refresh();
+      } catch (cause) {
+        report(cause);
+      }
     }
   });
 })(globalThis.__utuWutu); } \/;
         install();
+    }
+    fn stored_load(key: Str) Str {
+        let load: fun(Str) Str = @es/\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \/;
+        load(key);
+    }
+    fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) void) void {
+        let register: fun(Str,cl() Str,Bool,cl(Str) void) void = @es/\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \/;
+        register(key,encode,manual,apply);
     }
     /// A shared stylesheet (`@style`, `@document`), installed once.
     fn style(sheet: Str) void {

@@ -289,6 +289,28 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     });
   });
 
+  test('wutu: a float prop changing from negative zero redraws its component', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_signed_zero.utu', source: `${BROWSER}
+        struct State:
+            | x: F64
+        fn sign(x: F64) Browser.HTMLElement { @wutu/\\ span { = (1.0 / x).to_str(); } \\/; }
+        export lib {
+            fn main() Browser.HTMLElement {
+                let state = State { x: -0.0 };
+                @wutu/\\ @reactive; main { = sign(state.x); button { on click { state.x = 0.0; } } } \\/;
+            }
+        }
+      ` });
+      const root = instance.exports.main();
+      document.body.append(root);
+      assertEq(root.querySelector('span').textContent, '-Infinity');
+      root.querySelector('button').dispatchEvent(new globalThis.Event('click'));
+      await settle();
+      assertEq(root.querySelector('span').textContent, 'Infinity');
+    });
+  });
+
   test('wutu: a component passed to a component lands inside it, and stays there on re-render', async ({ ROOT }) => {
     await withDom(async (document) => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_nested_call.utu', source: `${BROWSER}

@@ -35,7 +35,11 @@ fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
     };
     // The path: its first part, then names.
     let first = first_child(target);
-    let names = Array[I32].new(8, -1);
+    // (As many names as the path has: `x -o a.b.….m()`.)
+    let span = 0;
+    let s = next_sibling(first);
+    while (s >= 0 and (is_kind(s, Node.Identifier) or is_kind(s, Node.Type_ident))) { span += 1; s = next_sibling(s); };
+    let names = Array[I32].new(span, -1);
     let nnames = 0;
     let c = next_sibling(first);
     while (c >= 0 and (is_kind(c, Node.Identifier) or is_kind(c, Node.Type_ident))) {
@@ -619,6 +623,16 @@ fn in_closure(node: I32) Bool {
     while (p >= 0) {
         if is_kind(p, Node.Closure_expr) { return true; };
         if is_kind(p, Node.Fn_decl) { return false; };
+        p = parent_of(p);
+    };
+    false;
+}
+
+/// Whether a node is inside `export main`.
+fn in_main(node: I32) Bool {
+    let p = parent_of(node);
+    while (p >= 0) {
+        if is_kind(p, Node.Export_main_decl) { return true; };
         p = parent_of(p);
     };
     false;

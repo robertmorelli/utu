@@ -1,0 +1,7 @@
+{
+  "n": 18,
+  "samples": 10,
+  "warmups": 3,
+  "flags": { "cpp": ["-std=c++17", "-I/opt/homebrew/include", "-DBOOST_POOL_NO_MT"] },
+  "notes": "bench(n): binary-trees with max depth n (stretch tree n+1, long-lived tree n, 2^(n-d+4) trees of each even depth d from 4); result = FNV-1a of the bytes BG prints. BG runs n=21."
+}

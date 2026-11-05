@@ -1,0 +1,132 @@
+// Mandelbrot, the algorithm of BG mandelbrot gcc #6 (the fastest BG program)
+// without its SIMD, in idiomatic utu:
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/mandelbrot-gcc-6.html
+//
+// A size x size bitmap of [-1.5, 0.5] x [-1, 1], 8 pixels to a byte; each byte
+// steps its 8 pixels together in scalar F64 (gcc #6 does it in vectors) and
+// tests for escape every 7 steps, up to 50, as gcc #6 does. Single-threaded.
+// (The scalar BG programs' loop, 2 pixels at a time with an escape test every
+// step: alt/mandelbrot-2pixel.utu, ~387 ms.)
+//
+// bench(n) returns the FNV-1a hash of what BG prints: "P4\n<n> <n>\n" and the
+// bitmap, each byte hashed as it is made.
+
+fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
+
+fn fnv_int(h0: I32, x: I32) I32 {
+    let h = h0;
+    let p = 1;
+    while (p * 10 <= x) { p = p * 10; };
+    while (p > 0) {
+        h = fnv(h, 48 + x / p % 10);
+        p = p / 10;
+    };
+    h;
+}
+
+fn render_row(h0: I32, y: I32, initial_r: Array[F64], initial_i: Array[F64]) I32 {
+    let h = h0;
+    let ci = initial_i[y];
+    for (0..<(initial_r.len() >> 3)) |x_byte| {
+        let x = x_byte << 3;
+        let cr0 = initial_r[x + 0];
+        let cr1 = initial_r[x + 1];
+        let cr2 = initial_r[x + 2];
+        let cr3 = initial_r[x + 3];
+        let cr4 = initial_r[x + 4];
+        let cr5 = initial_r[x + 5];
+        let cr6 = initial_r[x + 6];
+        let cr7 = initial_r[x + 7];
+        let zr0 = cr0;
+        let zi0 = ci;
+        let zr1 = cr1;
+        let zi1 = ci;
+        let zr2 = cr2;
+        let zi2 = ci;
+        let zr3 = cr3;
+        let zi3 = ci;
+        let zr4 = cr4;
+        let zi4 = ci;
+        let zr5 = cr5;
+        let zi5 = ci;
+        let zr6 = cr6;
+        let zi6 = ci;
+        let zr7 = cr7;
+        let zi7 = ci;
+        let outer = 0;
+        while (outer < 7) {
+            for (0..<7) {
+                let tr0 = zr0 * zr0;
+                let ti0 = zi0 * zi0;
+                zi0 = 2.0 * zr0 * zi0 + ci;
+                zr0 = tr0 - ti0 + cr0;
+                let tr1 = zr1 * zr1;
+                let ti1 = zi1 * zi1;
+                zi1 = 2.0 * zr1 * zi1 + ci;
+                zr1 = tr1 - ti1 + cr1;
+                let tr2 = zr2 * zr2;
+                let ti2 = zi2 * zi2;
+                zi2 = 2.0 * zr2 * zi2 + ci;
+                zr2 = tr2 - ti2 + cr2;
+                let tr3 = zr3 * zr3;
+                let ti3 = zi3 * zi3;
+                zi3 = 2.0 * zr3 * zi3 + ci;
+                zr3 = tr3 - ti3 + cr3;
+                let tr4 = zr4 * zr4;
+                let ti4 = zi4 * zi4;
+                zi4 = 2.0 * zr4 * zi4 + ci;
+                zr4 = tr4 - ti4 + cr4;
+                let tr5 = zr5 * zr5;
+                let ti5 = zi5 * zi5;
+                zi5 = 2.0 * zr5 * zi5 + ci;
+                zr5 = tr5 - ti5 + cr5;
+                let tr6 = zr6 * zr6;
+                let ti6 = zi6 * zi6;
+                zi6 = 2.0 * zr6 * zi6 + ci;
+                zr6 = tr6 - ti6 + cr6;
+                let tr7 = zr7 * zr7;
+                let ti7 = zi7 * zi7;
+                zi7 = 2.0 * zr7 * zi7 + ci;
+                zr7 = tr7 - ti7 + cr7;
+            };
+            if zr0 * zr0 + zi0 * zi0 > 4.0 and zr1 * zr1 + zi1 * zi1 > 4.0 and zr2 * zr2 + zi2 * zi2 > 4.0 and zr3 * zr3 + zi3 * zi3 > 4.0 and zr4 * zr4 + zi4 * zi4 > 4.0 and zr5 * zr5 + zi5 * zi5 > 4.0 and zr6 * zr6 + zi6 * zi6 > 4.0 and zr7 * zr7 + zi7 * zi7 > 4.0 { outer = 7; } else { outer += 1; };
+        };
+        let res = 0;
+        if zr0 * zr0 + zi0 * zi0 <= 4.0 { res = res | 128; };
+        if zr1 * zr1 + zi1 * zi1 <= 4.0 { res = res | 64; };
+        if zr2 * zr2 + zi2 * zi2 <= 4.0 { res = res | 32; };
+        if zr3 * zr3 + zi3 * zi3 <= 4.0 { res = res | 16; };
+        if zr4 * zr4 + zi4 * zi4 <= 4.0 { res = res | 8; };
+        if zr5 * zr5 + zi5 * zi5 <= 4.0 { res = res | 4; };
+        if zr6 * zr6 + zi6 * zi6 <= 4.0 { res = res | 2; };
+        if zr7 * zr7 + zi7 * zi7 <= 4.0 { res = res | 1; };
+        h = fnv(h, res);
+    };
+    h;
+}
+
+fn mandelbrot(size: I32) I32 {
+    let initial_r = Array[F64].new(size, 0.0);
+    let initial_i = Array[F64].new(size, 0.0);
+    let inv = 2.0 / size.to_f64();
+    for (0..<size) |xy| {
+        let i = inv * xy.to_f64();
+        initial_r[xy] = i - 1.5;
+        initial_i[xy] = i - 1.0;
+    };
+    // "P4\n<size> <size>\n"
+    let h = fnv(fnv(fnv(-2128831035, 80), 52), 10);
+    h = fnv(fnv_int(fnv(fnv_int(h, size), 32), size), 10);
+    for (0..<size) |y| {
+        h = render_row(h, y, initial_r, initial_i);
+    };
+    h;
+}
+
+test "mandelbrot draws BG's 200 x 200 bitmap" {
+    assert mandelbrot(200) == -248892225;
+}
+
+export lib {
+    fn bench(n: I32) I32 { mandelbrot(n); }
+}

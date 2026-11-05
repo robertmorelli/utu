@@ -1,0 +1,382 @@
+{
+ "n": 3200,
+ "setup": null,
+ "samples": 5,
+ "warmups": 3,
+ "result": "3411461379",
+ "notes": "bench(n): the BG program for an n x n bitmap; result = FNV-1a of the bytes BG prints (\"P4\\n<n> <n>\\n\" and the bitmap). BG runs n=16,000.",
+ "date": "2026-11-05T13:12:02.923Z",
+ "ports": [
+  {
+   "key": "utu-fast",
+   "name": "utu fast",
+   "compileMs": 74,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 1730,
+   "js": 557,
+   "bytes": 2287,
+   "gzip": 1085,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/mandelbrot-utu-fast/mandelbrot.mjs"
+   ],
+   "result": "3411461379",
+   "median": 164.7829999999999,
+   "best": 164.41700000000014,
+   "times": [
+    168.69499999999994,
+    169.7460000000001,
+    164.7829999999999,
+    164.644,
+    164.41700000000014
+   ]
+  },
+  {
+   "key": "utu-fastUnsafe",
+   "name": "utu fastUnsafe",
+   "compileMs": 72,
+   "flags": [
+    "-O",
+    "fastUnsafe"
+   ],
+   "wasm": 1730,
+   "js": 328,
+   "bytes": 2058,
+   "gzip": 944,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/mandelbrot-utu-fastUnsafe/mandelbrot.mjs"
+   ],
+   "result": "3411461379",
+   "median": 164.98299999999995,
+   "best": 164.66700000000003,
+   "times": [
+    164.66700000000003,
+    165.02099999999996,
+    164.692,
+    164.98299999999995,
+    166.10899999999992
+   ]
+  },
+  {
+   "key": "utu-small",
+   "name": "utu small",
+   "compileMs": 69,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 1422,
+   "js": 557,
+   "bytes": 1979,
+   "gzip": 1075,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/mandelbrot-utu-small/mandelbrot.mjs"
+   ],
+   "result": "3411461379",
+   "median": 165.55099999999993,
+   "best": 164.60899999999992,
+   "times": [
+    165.55099999999993,
+    165.67700000000002,
+    166.846,
+    164.60899999999992,
+    164.98900000000003
+   ]
+  },
+  {
+   "key": "utu-smallUnsafe",
+   "name": "utu smallUnsafe",
+   "compileMs": 71,
+   "flags": [
+    "-O",
+    "smallUnsafe"
+   ],
+   "wasm": 1422,
+   "js": 328,
+   "bytes": 1750,
+   "gzip": 934,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/mandelbrot-utu-smallUnsafe/mandelbrot.mjs"
+   ],
+   "result": "3411461379",
+   "median": 167.75800000000004,
+   "best": 167.485,
+   "times": [
+    168.10199999999998,
+    167.485,
+    167.70000000000005,
+    167.75800000000004,
+    168.35500000000002
+   ]
+  },
+  {
+   "key": "utu-tuned-fast",
+   "name": "utu tuned fast",
+   "compileMs": 79,
+   "flags": [
+    "-O",
+    "fast"
+   ],
+   "wasm": 1757,
+   "js": 563,
+   "bytes": 2320,
+   "gzip": 1011,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/mandelbrot-tuned-utu-fast/mandelbrot.tuned.mjs"
+   ],
+   "result": "3411461379",
+   "median": 126.56799999999998,
+   "best": 126.31600000000003,
+   "times": [
+    126.48299999999995,
+    126.31600000000003,
+    126.88900000000001,
+    126.78100000000006,
+    126.56799999999998
+   ]
+  },
+  {
+   "key": "utu-tuned-small",
+   "name": "utu tuned small",
+   "compileMs": 74,
+   "flags": [
+    "-O",
+    "small"
+   ],
+   "wasm": 1674,
+   "js": 563,
+   "bytes": 2237,
+   "gzip": 1022,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/mandelbrot-tuned-utu-small/mandelbrot.tuned.mjs"
+   ],
+   "result": "3411461379",
+   "median": 126.269,
+   "best": 126.19200000000001,
+   "times": [
+    126.769,
+    126.269,
+    126.19200000000001,
+    126.22699999999998,
+    126.61199999999997
+   ]
+  },
+  {
+   "key": "c",
+   "name": "C",
+   "compileMs": 854,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-msse2",
+    "-sSTACK_SIZE=4194304"
+   ],
+   "wasm": 14740,
+   "js": 390,
+   "bytes": 15130,
+   "gzip": 6840,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/c-loader.mjs"
+   ],
+   "result": "3411461379",
+   "median": 126.68299999999999,
+   "best": 126.55799999999999,
+   "times": [
+    127.38300000000004,
+    128.59299999999996,
+    126.68299999999999,
+    126.625,
+    126.55799999999999
+   ]
+  },
+  {
+   "key": "cpp",
+   "name": "C++",
+   "compileMs": 1237,
+   "flags": [
+    "-O3",
+    "-msimd128",
+    "-sSTANDALONE_WASM",
+    "--no-entry",
+    "-sALLOW_MEMORY_GROWTH",
+    "-sEXPORTED_FUNCTIONS=_bench",
+    "-mavx",
+    "-std=c++17",
+    "-sSTACK_SIZE=4194304"
+   ],
+   "wasm": 18570,
+   "js": 390,
+   "bytes": 18960,
+   "gzip": 7892,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/cpp-loader.mjs"
+   ],
+   "result": "3411461379",
+   "median": 119.46499999999992,
+   "best": 119.39200000000005,
+   "times": [
+    119.55900000000003,
+    119.39200000000005,
+    119.44799999999998,
+    119.46499999999992,
+    119.59199999999998
+   ]
+  },
+  {
+   "key": "rust",
+   "name": "Rust",
+   "compileMs": 924,
+   "flags": [
+    "--release",
+    "-C",
+    "target-feature=+simd128"
+   ],
+   "wasm": 22620,
+   "js": 355,
+   "bytes": 22975,
+   "gzip": 10118,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/rust-loader.mjs"
+   ],
+   "result": "3411461379",
+   "median": 123.33699999999999,
+   "best": 121.49799999999993,
+   "times": [
+    121.63599999999997,
+    121.49799999999993,
+    123.33699999999999,
+    124.048,
+    123.54199999999992
+   ]
+  },
+  {
+   "key": "go",
+   "name": "Go",
+   "compileMs": 2685,
+   "flags": [
+    "-buildmode=c-shared",
+    "-trimpath",
+    "-ldflags=-s -w"
+   ],
+   "wasm": 2420760,
+   "js": 1690,
+   "bytes": 2422450,
+   "gzip": 706313,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3411461379",
+   "median": 660.9939999999997,
+   "best": 660.2340000000004,
+   "times": [
+    661.6509999999998,
+    661.8680000000004,
+    660.7789999999995,
+    660.9939999999997,
+    660.2340000000004
+   ]
+  },
+  {
+   "key": "swift",
+   "name": "Swift",
+   "error": "build: swift build: error: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.osUsNg/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.DlOFnx/swift-manifest\"])\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/configuration is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/org.swift.swiftpm/security is not accessible or not writable, disabling user-level cache features.\nwarning: /Users/robertmorelli/Library/Caches/org.swift.swiftpm is not accessible or not writable, disabling user-level cache features.\nerror: 'swift': Invalid manifest (compiled with: [\"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.osUsNg/vfs.yaml\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-L\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/macosx/testing\", \"-plugin-path\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-F\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Users/robertmorelli/Library/Developer/Toolchains/swift-6.4.1-RELEASE.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-sdk\", \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\", \"-package-description-version\", \"6.0.0\", \"/Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/swift/Package.swift\", \"-o\", \"/var/folders/z5/4xclvs3x7w3gccl9590jgyrm0000gn/T/TemporaryDirectory.DlOFnx/swift-manifest\"])\n<unknown>:0: error: unable to open output file '/Users/robertmorelli/.cache/clang/ModuleCache/LY3HICJQ998X/SwiftShims-NHGRHEQSUDXT.pcm': 'Operation not permitted'\n<unknown>:0: error: could not build Objective-C module 'SwiftShims'\n(command: swift build -c release --swift-sdk swift-6.4.1-RELEASE_wasm -Xlinker --strip-all --scratch-path /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/swift)"
+  },
+  {
+   "key": "haskell",
+   "name": "Haskell",
+   "compileMs": 1069,
+   "flags": [
+    "-O2"
+   ],
+   "wasm": 1507970,
+   "js": 1690,
+   "bytes": 1509660,
+   "gzip": 437647,
+   "jsFiles": [
+    "benchmarks/bg/wasi.js"
+   ],
+   "result": "3411461379",
+   "median": 355.02700000000004,
+   "best": 354.4789999999998,
+   "times": [
+    355.02700000000004,
+    358.3670000000002,
+    354.4789999999998,
+    358.6569999999997,
+    355.02700000000004
+   ]
+  },
+  {
+   "key": "dart",
+   "name": "Dart",
+   "error": "build: dart compile wasm: FileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\nGenerated wasm module '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/dart/mandelbrot.wasm', and JS init file '/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/dart/mandelbrot.mjs'.\nFileSystemException: Failed to set file modification time, path = '/Users/robertmorelli/.dart-tool/dart-flutter-telemetry-session.json' (OS Error: Operation not permitted, errno = 1)\n#0      _File.setLastModifiedSync (dart:io/file_impl.dart:553)\n#1      ForwardingFile.setLastModifiedSync (package:file/src/forwarding/forwarding_file.dart:65)\n#2      UserProperty.getSessionId (package:unified_analytics/src/user_property.dart:72)\n#3      UserProperty._toMap (package:unified_analytics/src/user_property.dart:147)\n#4      UserProperty.preparePayload (package:unified_analytics/src/user_property.dart:88)\n#5      generateRequestBody (package:unified_analytics/src/utils.dart:92)\n#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:612)\n#7      DartdevRunner.runCommand (package:dartdev/dartdev.dart:271)\n<asynchronous suspension>\n#8      runDartdev (package:dartdev/dartdev.dart:51)\n<asynchronous suspension>\n#9      main (file:///private/tmp/dart-sdk-20260324-7186-xju0ok/sdk-3.11.4/sdk/pkg/dartdev/bin/dartdev.dart:13)\n<asynchronous suspension>\n(command: dart compile wasm -O2 --no-source-maps -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/dart/mandelbrot.wasm /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/dart/mandelbrot.dart)"
+  },
+  {
+   "key": "js",
+   "name": "JavaScript",
+   "compileMs": 1,
+   "flags": [],
+   "wasm": 0,
+   "js": 878,
+   "bytes": 878,
+   "gzip": 519,
+   "jsFiles": [
+    "benchmarks/bg/mandelbrot/js/mandelbrot.js"
+   ],
+   "result": "3411461379",
+   "median": 453.9079999999999,
+   "best": 453.6700000000001,
+   "times": [
+    454.058,
+    453.9079999999999,
+    453.8159999999998,
+    455.1089999999999,
+    453.6700000000001
+   ]
+  },
+  {
+   "key": "kotlin",
+   "name": "Kotlin",
+   "error": "build: gradle (kotlin): FAILURE: Build failed with an exception.\nFAILURE: Build failed with an exception.\n* What went wrong:\nGradle could not start your build.\n> Could not create service of type FileLockContentionHandler using BasicGlobalScopeServices.createFileLockContentionHandler().\n   > java.net.SocketException: Operation not permitted\n* Try:\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights from a Build Scan (powered by Develocity).\n> Get more help at https://help.gradle.org.\n(command: gradle -q --project-cache-dir /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/kotlin/gradle-cache -PoutDir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/kotlin/build -Pkotlin.project.persistent.dir=/Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/kotlin/kotlin-data compileProductionExecutableKotlinWasmJsOptimize)"
+  },
+  {
+   "key": "moonbit",
+   "name": "MoonBit",
+   "compileMs": 131,
+   "flags": [
+    "--target",
+    "wasm-gc",
+    "--release"
+   ],
+   "wasm": 897,
+   "js": 349,
+   "bytes": 1246,
+   "gzip": 840,
+   "jsFiles": [
+    ".tmp/bg/mandelbrot/moonbit-loader.mjs"
+   ],
+   "result": "3411461379",
+   "median": 382.02,
+   "best": 380.8539999999998,
+   "times": [
+    382.3420000000001,
+    380.8539999999998,
+    381.28499999999985,
+    383.0050000000001,
+    382.02
+   ]
+  },
+  {
+   "key": "assemblyscript",
+   "name": "AssemblyScript",
+   "error": "build: asc: npm error code ENOTFOUND\nnpm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/assemblyscript failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the\nnpm error network 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: /Users/robertmorelli/.npm/_logs\nnpm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n(command: npx --yes -p assemblyscript@0.28.20 asc /Users/robertmorelli/Documents/personal-repos/utu/benchmarks/bg/mandelbrot/assemblyscript/mandelbrot.ts -O3 --enable simd --runtime incremental -o /Users/robertmorelli/Documents/personal-repos/utu/.tmp/bg/mandelbrot/assemblyscript/mandelbrot.wasm)"
+  }
+ ],
+ "d8": "15.6.75.16"
+}
