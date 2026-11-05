@@ -117,7 +117,7 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
  * converted export is one arrow over its own parameters (a spec with `p` names
  * every parameter, so the arrow's length is the export's), checking and
  * converting each and converting the result, then `await`ed only for an export
- * that is async. A kind it does not know leaves the module to convertExports.
+ * that is async. A kind it does not know leaves the module to convertExports; "" (unconstrained) is passed as it is.
  */
 function exportConversionSource(spec, input, asyncExports = []) {
   const checks = {
@@ -136,12 +136,14 @@ function exportConversionSource(spec, input, asyncExports = []) {
   for (const [name, entry] of Object.entries(spec)) {
     const r = typeof entry === 'string' ? entry : entry.r;
     const params = typeof entry === 'string' ? null : entry.p ?? null;
-    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params?.some(k => !(k in checks))) return null;
+    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params?.some(k => k !== '' && !(k in checks))) return null;
     const key = JSON.stringify(name);
     const names = params ? params.map((_, i) => `a${i}`) : null;
     const steps = [];
     params?.forEach((kind, i) => {
       const v = names[i];
+      // ("" is unconstrained: no check.)
+      if (kind === '') return;
       if (kind === 'Bool' || kind === '?') steps.push(`${v}=${checks[kind](v)}`);
       else {
         needsFail = true;
