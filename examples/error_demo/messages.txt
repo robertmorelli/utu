@@ -9998,6 +9998,19 @@ FAIL after tests: boom
    │      ╰─ no such type
 --- exit 1
 
+=== utu check examples/error_demo/types/1243_instances_of_one_mod.utu
+ ERROR  f takes cell[I32].Cell, got cell[Str].Cell
+        type-mismatch · examples/error_demo/types/1243_instances_of_one_mod.utu:6:23
+
+ 4 │ using cell[I32] |a|; using cell[Str] |b|;
+ 5 │ fn f(x: a.Cell) I32 { x.value; }
+   │      ─────────
+   │      ╰─ Cell
+ 6 │ export main() I32 { f(b.wrap("a")); }
+   │                       ━━━━━━━━━━━
+   │                       ╰─ Cell
+--- exit 1
+
 === utu check examples/error_demo/types/12_array_literal_mixed.utu
  ERROR  Elements are I32, got Str
         type-mismatch · examples/error_demo/types/12_array_literal_mixed.utu:4:21

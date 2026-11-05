@@ -86,7 +86,10 @@ fn type_text(t: I32) Str {
     let name = decl_name[decl];
     if decl_is(decl, Decl.TypeDecl) or (module >= 0 and decl_a[module] == decl) { name = decl_name[module]; };
     let text = word_text(name);
-    if qualify_types[0] == 1 and module >= 0 and decl_a[module] != decl and not decl_is(decl, Decl.TypeDecl) { text = word_text(decl_name[module]) + "." + text; };
+    if qualify_types[0] > 0 and module >= 0 and decl_a[module] != decl and not decl_is(decl, Decl.TypeDecl) {
+        let args = if qualify_types[0] == 2 and inst > 0 { "[" + type_list_text(inst_args[inst]) + "]"; } else { ""; };
+        text = word_text(decl_name[module]) + args + "." + text;
+    };
     if inst > 0 and module >= 0 and (decl_a[module] == decl) {
         text = text + "[" + type_list_text(inst_args[inst]) + "]";
     };
@@ -105,6 +108,12 @@ fn expected_got(a: I32, b: I32) Str {
         qualify_types[0] = 1;
         ta = type_text(a);
         tb = type_text(b);
+        // (Instances of one module: with their type arguments.)
+        if ta == tb {
+            qualify_types[0] = 2;
+            ta = type_text(a);
+            tb = type_text(b);
+        };
         qualify_types[0] = 0;
         if ta == tb { return "Expected " + ta + ", got " + tb + " (another type of that name)"; };
     };
