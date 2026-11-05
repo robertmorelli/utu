@@ -13,6 +13,7 @@
 //!   {"literal": "x", "base": "Str"}      a literal type
 //!   {"pattern": ["id-", "F64", ""], "name": n, "base": "Str"}   `id-${number}`
 //!   {"indexed": r, "key": r}             T[K]
+//!   {"awaited": r}                       Awaited<T> of a generic T
 //!   {"symbol": "iterator"}               a well-known symbol
 //! ```
 //!
@@ -118,6 +119,9 @@ fn resolved(r: Ref) Ref {
             if index >= 0 { return resolved(Ref { doc: r.doc, at: jget(index, "type"), env: object.env }); };
             return any_slot(r.doc);
         };
+        // `Awaited<T>`: a promise's value (past nested promises), else T.
+        let awaited = jget(at, "awaited");
+        if awaited >= 0 { return awaited_of(resolved(Ref { doc: r.doc, at: awaited, env: r.env })); };
         // `keyof E` of a generic E (TypeScript spells a known one's as its literals): a string.
         if jget(at, "keys") >= 0 { return Ref { doc: r.doc, at: prim_ref(prelude(Prelude.Str)), env: -1 }; };
     };
@@ -131,6 +135,21 @@ fn resolved(r: Ref) Ref {
     };
     if jis_number(at) { return Ref { doc: r.doc, at: at, env: closed_env(abi_type(r.doc, jint(at)), r.env) }; };
     r;
+}
+
+/// `Awaited` of the resolved reference `x`: `Promise<T>` is T's, awaited in
+/// turn; anything else is itself.
+fn awaited_of(x: Ref) Ref {
+    if not jis_number(x.at) { return x; };
+    let decl = abi_type(x.doc, jint(x.at));
+    let lib = jget(decl, "lib");
+    let named = if lib >= 0 { jstring_text(lib); } else { decl_name_text(decl); };
+    if not (named == "Promise" or named.len() > 8 and named.slice(0, 8) == "Promise<") { return x; };
+    let p = jfirst(jget(decl, "parameters"));
+    if p < 0 { return x; };
+    let bound = binding_of(x.env, jstring_word(p));
+    if bound < 0 { return any_slot(x.doc); };
+    awaited_of(resolved(Ref { doc: x.doc, at: bound, env: bind_env[0] }));
 }
 
 /// A declaration's parameters bound to arguments (references in `env`), in
@@ -1811,11 +1830,34 @@ fn arg_score(sig: I32, i: I32, arg: I32, d: Ref, view: I32, cx: Cx) I32 {
         if jlen(desc_get(describe(slot), "calls")) > 0 or ref_dynamic(slot) { return 2; };
         return 0;
     };
+    if is_kind(arg, Node.Implicit_struct_init) { return if record_fits(arg, slot) { 1; } else { -100; }; };
     let t = type_only(arg, -1, cx);
     // (Any Str is no union of string literals: see @host_literal.)
     if t == prelude(Prelude.Str) and not string_arg and string_literals(describe(slot)) and not host_rooted(arg, cx) { return 0; };
     if not ty_is(t, Ty.Error) and assignable_to(t, accept(slot, arg, view, cx)) { return 2; };
     0;
+}
+
+/// Whether record `&{…}` names every required property of `slot`'s object
+/// type and no other (a union, index signature, `object`, or `any` takes it).
+fn record_fits(arg: I32, slot: Ref) Bool {
+    if ref_dynamic(slot) { return true; };
+    let d = describe(slot);
+    if not jis_object(d.at) or desc_get(d, "union") >= 0 or jlen(desc_get(d, "indexes")) > 0 or is_open_object(d) { return true; };
+    let props = desc_get(d, "properties");
+    let p = jfirst(props);
+    while (p >= 0) {
+        if not jis_true(jget(jvalue(p), "optional")) and not record_names(arg, p) { return false; };
+        p = jnext(p);
+    };
+    // (A generic parameter's constraint admits more fields, as a fresh literal does in TypeScript.)
+    if jget(slot.at, "parameter") >= 0 { return true; };
+    let f = next_sibling(first_child(arg));
+    while (f >= 0) {
+        if is_kind(f, Node.Field_init) and jget_word(props, word_of(first_child(f))) < 0 { return false; };
+        f = next_sibling(f);
+    };
+    true;
 }
 
 /// A constraint's union of literal members, or -1.
@@ -2258,12 +2300,18 @@ fn tuple_slot(d: Ref, i: I32) Ref {
 /// The record last given a generic parameter's slot (see @accept).
 vec open_record: I32 = [-1];
 
+/// Whether declaration `d` is `object` or `{}`, which any record fits.
+fn is_open_object(d: Ref) Bool {
+    let name = decl_name_text(d.at);
+    name == "{}" or name == "object";
+}
+
 /// `&{ a: x, b: y }` where a host object is expected: a JS object.
 fn check_foreign_record(node: I32, t: I32, cx: Cx) I32 {
     let view = fty_view[t];
     let d = describe(ref_of(t));
     let props = desc_get(d, "properties");
-    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t)) or open_record[0] == node;
+    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t)) or open_record[0] == node or is_open_object(d);
     let m = w_mark();
     let mt = vl_begin();
     let fields = "";
