@@ -5,7 +5,7 @@
 // DSL delimiters form a balanced language-independent envelope. The payload is
 // opaque to Utu; each registered DSL parses its own content and nested islands.
 // A double-quoted string in a payload is text: a `/\` or `\/` in one is not a
-// delimiter. A string ends at its closing quote or its line (see dsl-envelope.js).
+// delimiter. A string ends at its closing quote or its line (see src/wutu/dsl-envelope.js).
 //
 // Three tokens, so editors can inject a payload's own language into exactly
 // its text: `/\` (hidden), the text between (`dsl_text`, absent when empty),

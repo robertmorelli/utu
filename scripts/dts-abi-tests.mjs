@@ -11,7 +11,7 @@ import { linkFiles } from '../tools/dts/link.mjs';
 import { nodePackageResolver } from '../tools/dts/packages.mjs';
 import { createPackageResolver } from '../src/bindings/packages.js';
 import { linkDeclarations, initParser, createCompiler, emitBinary, instantiateLowered, buildImportObject } from '../src/index.js';
-import { PLATFORM_SOURCES } from '../src/compiler/platform-sources.generated.js';
+import { PLATFORM_SOURCES } from '../src/selfhost/platform-sources.generated.js';
 import { glueModuleSource, liveGlueFields } from '../src/runtime/host-imports.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

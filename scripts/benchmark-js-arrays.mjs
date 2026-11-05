@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { linkFiles } from '../tools/dts/link.mjs';
 import { initParser, createCompiler, emitBinary } from '../src/index.js';
-import { PLATFORM_SOURCES } from '../src/compiler/platform-sources.generated.js';
+import { PLATFORM_SOURCES } from '../src/selfhost/platform-sources.generated.js';
 import { glueModuleSource, liveGlueFields } from '../src/runtime/host-imports.js';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const abi = linkFiles({ files: [path.join(root, 'benchmarks/abi/arrays.d.ts')], prefix: 'Bench', moduleSpecifier: path.join(root, 'benchmarks/abi/arrays.mjs') });

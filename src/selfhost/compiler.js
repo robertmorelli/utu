@@ -19,7 +19,7 @@ import {
   awaitImports, closureImports, exceptionImports, glueModuleSource, importObjectFromEval, importObjectFromGlue,
   convertExports, memoryImports, promiseImports, promisifyExports, splitBody,
 } from '../runtime/host-imports.js';
-import { compressedSourceWarnings, unknownIslandWarnings } from '../compiler/source-warnings.js';
+import { compressedSourceWarnings, unknownIslandWarnings } from './source-warnings.js';
 import { abiFromJson } from '../bindings/schema.js';
 
 /** How a file joins the program. */

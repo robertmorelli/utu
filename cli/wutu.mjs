@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { previewClient } from '../tools/dts/preview-client.mjs';
-import { formatUtu } from '../src/compiler/wutu-tooling.js';
+import { formatUtu } from '../src/wutu/wutu-tooling.js';
 import { buildBrowserApp } from '../tools/dts/build-app.mjs';
 import { prerender } from '../tools/dts/prerender.mjs';
 import { initParser } from '../src/index.js';

@@ -1,4 +1,4 @@
-import { compressedSourceWarnings, unknownIslandWarnings } from './source-warnings.js';
+import { compressedSourceWarnings, unknownIslandWarnings } from '../selfhost/source-warnings.js';
 import { diagnosticFacts, nodeRef } from './diagnostics.js';
 
 export function collectAnalysisDiagnostics(doc) {

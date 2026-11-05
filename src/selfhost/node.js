@@ -11,7 +11,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { isBuiltin } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { PLATFORM_SOURCES } from '../compiler/platform-sources.generated.js';
+import { PLATFORM_SOURCES } from './platform-sources.generated.js';
 import { compile, instantiate, loadCompiler } from './compiler.js';
 import { catalogStdlib } from './catalog.js';
 

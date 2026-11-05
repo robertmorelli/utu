@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import {cssProjection,stencilCss} from '../src/compiler/css-stencil.js';
-import {dslEnd} from '../src/compiler/dsl-envelope.js';
-import {formatUtuSource} from '../src/compiler/wutu-tooling.js';
+import {cssProjection,stencilCss} from '../src/wutu/css-stencil.js';
+import {dslEnd} from '../src/wutu/dsl-envelope.js';
+import {formatUtuSource} from '../src/wutu/wutu-tooling.js';
 const css=String.raw`@layer reset, theme;
 @property --angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @future-rule unknown(foo) { --tokens: { a: b; }; }

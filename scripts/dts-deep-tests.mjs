@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { linkFiles } from '../tools/dts/link.mjs';
 import { initParser, createCompiler, emitBinary, buildImportObject, instantiateLowered } from '../src/index.js';
-import { PLATFORM_SOURCES } from '../src/compiler/platform-sources.generated.js';
+import { PLATFORM_SOURCES } from '../src/selfhost/platform-sources.generated.js';
 import { glueModuleSource, liveGlueFields, promisifyExports, readRuntimeSpec } from '../src/runtime/host-imports.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

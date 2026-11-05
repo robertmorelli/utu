@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PLATFORM_SOURCES } from '../src/compiler/platform-sources.generated.js';
+import { PLATFORM_SOURCES } from '../src/selfhost/platform-sources.generated.js';
 import { writeCatalog } from '../src/selfhost/catalog.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

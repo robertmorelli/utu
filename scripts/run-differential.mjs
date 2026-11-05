@@ -3,7 +3,8 @@
 //
 //   node scripts/run-differential.mjs --record    record baselines/run-differential.json
 //   node scripts/run-differential.mjs             compare against it
-//   ... --only=substring   just the matching programs
+//   ... --only=substring   just the matching programs (with --record, their
+//                          entries are replaced and the rest kept)
 //   ... --jobs=N           worker threads (default: one per core)
 //   ... --optimize=LEVEL   build at none (default), size, or speed, each with
 //                          its own record
@@ -75,7 +76,11 @@ async function main() {
   const keys = Object.keys(results).sort();
   if (record) {
     await fs.mkdir(path.dirname(RECORD), { recursive: true });
-    await fs.writeFile(RECORD, JSON.stringify(Object.fromEntries(keys.map(key => [key, results[key]])), null, 1));
+    // With --only, the other programs keep what was recorded for them.
+    const kept = only ? JSON.parse(await fs.readFile(RECORD, 'utf8').catch(() => '{}')) : {};
+    for (const key of keys) kept[key] = results[key];
+    const all = Object.keys(kept).sort();
+    await fs.writeFile(RECORD, JSON.stringify(Object.fromEntries(all.map(key => [key, kept[key]])), null, 1));
     const ran = keys.filter(key => typeof results[key] === 'object').length;
     console.log(`recorded ${keys.length} builds (${ran} ran) in ${seconds} s on ${jobs} threads`);
     return;
@@ -83,7 +88,8 @@ async function main() {
   const recorded = JSON.parse(await fs.readFile(RECORD, 'utf8'));
   const differ = keys.filter(key => JSON.stringify(recorded[key]) !== JSON.stringify(results[key]));
   for (const key of differ) {
-    console.log(`DIFFERS ${key}\n  was ${JSON.stringify(recorded[key]).slice(0, 400)}\n  now ${JSON.stringify(results[key]).slice(0, 400)}`);
+    if (!(key in recorded)) console.log(`NO BASELINE ${key} (record it: --record --only=${key.replace(/ (normal|test)$/, '')})`);
+    else console.log(`DIFFERS ${key}\n  was ${JSON.stringify(recorded[key]).slice(0, 400)}\n  now ${JSON.stringify(results[key]).slice(0, 400)}`);
   }
   console.log(`${keys.length - differ.length}/${keys.length} builds behave the same in ${seconds} s on ${jobs} threads`);
   if (differ.length) process.exit(1);
