@@ -3082,6 +3082,8 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   await gen1('proto Calc:\n | divmod(I32, I32) .{I32, I32}\nstruct IC[Calc]:\nfn Calc[IC].divmod |s| (a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }\n'
     + 'fn use(c: Calc) I32 { let .{q, r} = c.divmod(17, 5); q * 10 + r; }\n'
     + 'export main() I32 { let c = IC {}; let .{q, r} = c.divmod(17, 5); q * 100 + r + use(c); }\n', 334);
+  // A closure with no written result whose body is an if or match where every arm returns.
+  await gen1('export main() I32 { let n = cl(x: I32) { if x > 0 { return 1; } else { return 2; }; }; let k = cl(x: I32) { match x { 0 => { return 5; }, ~> { return 6; }, }; }; n(1) + k(0) * 10 + k(3) * 100; }\n', 651);
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
