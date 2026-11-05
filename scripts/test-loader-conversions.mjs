@@ -12,7 +12,7 @@ assert.equal(built.status, 0, built.stderr);
 const wasm = await fs.readFile(`${dir}/module.wasm`);
 const instance = (await WebAssembly.instantiate(wasm, {}, { builtins: ['js-string'], importedStringConstants: "'" })).instance;
 const values = [undefined, null, 0, 1, -1, 1.5, 'hi', 1n, true, () => 1, [], {}];
-const kinds = ['Bool', 'int', 'big', 'num', 'Str', '?Str', 'ref', 'cl', '?', 'unknown'];
+const kinds = ['Bool', 'int', 'big', 'num', 'Str', '?Str', 'ref', 'cl', 'cl:UW:S', 'cl:B:b', 'cl:.:n', '?', 'unknown'];
 const results = ['', 'Bool', 'U32', 'U64', 'I64', ['Bool', 'U32', 'U64', '']];
 let cases = 0;
 for (const kind of kinds) for (const result of results) {

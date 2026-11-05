@@ -94,7 +94,7 @@ const CLOSURE_REC = Symbol('utu.closure');
 
 export function closureImports(closureSpec, utu = {}) {
   if (!closureSpec) return utu;
-  if (closureSpec.new) utu.closure_new = closureNew;
+  if (closureSpec.new) utu.closure_new = closureSpec.sigs ? (a, b, c, d) => closureNew(a, b, c, d, closureSpec.sigs) : closureNew;
   utu.closure_rec = closureRec;
   for (const field of closureSpec.calls ?? []) utu[field] = closureApply;
   return utu;
@@ -102,22 +102,25 @@ export function closureImports(closureSpec, utu = {}) {
 
 // flags: 1, the result is a Bool; 2, the environment is there even when
 // null (a closure whose one capture is its environment); 4 and 8, a U32 or U64
-// result (unsigned in JS); 16 << k (safe builds), argument k is a handle,
-// never null (wasm would take null); 131072 << k, argument k is nullable
+// result (unsigned in JS); the rest, from bit 4, one plus an index into the
+// module's `sigs`, a string of one letter per argument: b, a Bool (as 0 or 1);
+// h (safe builds), a handle, never null (wasm would take null); n, nullable
 // (undefined is null, as for host calls). A decayed `fun` is
 // one closure per function (a funcref is one JS function per wasm function),
 // so `removeEventListener` finds the one `addEventListener` was given.
 const DECAYED = new WeakMap();
-export const closureNew = (fn, env, flags, record) => {
+export const closureNew = (fn, env, flags, record, sigs) => {
   const fun = env == null && !(flags & 2);
   const known = fun && DECAYED.get(fn);
   if (known) return known;
   const call = fun ? (...args) => fn(...args) : (...args) => fn(env, ...args);
-  const handles = (flags >> 4) & 8191, nullable = (flags >> 17) & 8191;
-  const invoke = handles | nullable ? (...args) => {
-    for (let k = 0, h = handles, n = nullable; h | n; k++, h >>= 1, n >>= 1) {
-      if (n & 1 && args[k] === undefined) args[k] = null;
-      else if (h & 1 && args[k] == null) throw new TypeError(`Wrong type from JavaScript: a closure's argument ${k + 1} is ${args[k]}`);
+  const kinds = sigs?.[(flags >> 4) - 1];
+  const invoke = kinds ? (...args) => {
+    for (let k = 0; k < kinds.length; k++) {
+      const c = kinds[k];
+      if (c === 'b') args[k] = args[k] ? 1 : 0;
+      else if (c === 'n') { if (args[k] === undefined) args[k] = null; }
+      else if (c === 'h' && args[k] == null) throw new TypeError(`Wrong type from JavaScript: a closure's argument ${k + 1} is ${args[k]}`);
     }
     return call(...args);
   } : call;
@@ -254,12 +257,13 @@ export function promising(f) {
  *   'big'  a BigInt (I64, U64)  'num'   a number (F32, F64)
  *   'Str'  a string            '?Str'  a string or null (undefined is null)
  *   'ref'  not null            '?'     anything (undefined is null)
- *   'cl'   a function (a closure)
- * A promised result converts when it settles.
+ *   'cl'   a function (a closure); 'cl:ARGS:RESULT' one wrapped as an `@es` function is
+ *          (ARGS a letter each: B a Bool, U a U32, W a U64, . as is; RESULT b a Bool, S a Str, n nullable)
+ * A promised result converts when it settles; an async export's bad argument rejects.
  *
  * @returns {Record<string, Function>} exports, with those results converted
  */
-export function convertExports(exports, exportSpec) {
+export function convertExports(exports, exportSpec, asyncExports = []) {
   if (!exportSpec) return exports;
   const scalar = { Bool: v => v !== 0, U32: v => v >>> 0, U64: v => BigInt.asUintN(64, v) };
   const same = v => v;
@@ -267,6 +271,7 @@ export function convertExports(exports, exportSpec) {
     // A number that is no integer by its value (`not 1.5`), anything else by its kind.
     throw new TypeError(`${name}: argument ${i + 1} must be ${what}, not ${v === null ? 'null' : what === 'an integer' && typeof v === 'number' ? v : typeof v}`);
   };
+  const wrongStr = s => { throw new TypeError(`Wrong type from JavaScript: a Str, not ${s === null ? 'null' : s instanceof Promise ? 'a Promise (await it: Promise[Str])' : typeof s}`); };
   const param = (name, kind, i) => {
     if (kind === 'Bool') return v => !!v;
     if (kind === 'int') return v => (Number.isInteger(v) ? v : fail(name, i, 'an integer', v));
@@ -276,6 +281,12 @@ export function convertExports(exports, exportSpec) {
     if (kind === '?Str') return v => (v == null ? null : typeof v === 'string' ? v : fail(name, i, 'a string or null', v));
     if (kind === 'ref') return v => (v == null ? fail(name, i, 'a value', v) : v);
     if (kind === 'cl') return v => (typeof v === 'function' ? v : fail(name, i, 'a function', v));
+    if (kind.startsWith('cl:')) {
+      const [, a, r] = kind.split(':');
+      const into = [...a].map(c => c === 'B' ? x => !!x : c === 'U' ? x => x >>> 0 : c === 'W' ? x => BigInt.asUintN(64, x) : same);
+      const back = r === 'b' ? x => (x ? 1 : 0) : r === 'S' ? x => (typeof x === 'string' ? x : wrongStr(x)) : r === 'n' ? x => x ?? null : same;
+      return v => (typeof v === 'function' ? (...args) => back(v(...args.map((x, k) => into[k](x)))) : fail(name, i, 'a function', v));
+    }
     if (kind === '?') return v => (v === undefined ? null : v);
     return same;
   };
@@ -287,11 +298,13 @@ export function convertExports(exports, exportSpec) {
     const each = Array.isArray(r) ? r.map(k => scalar[k] ?? same) : null;
     const convert = each ? v => v.map((x, i) => each[i](x)) : scalar[r] ?? same;
     const checks = (typeof spec === 'string' ? [] : spec.p ?? []).map((k, i) => param(name, k, i));
-    out[name] = (...args) => {
+    const run = (...args) => {
       for (let i = 0; i < checks.length; i++) args[i] = checks[i](args[i]);
       const result = f(...args);
       return result instanceof Promise ? result.then(convert) : convert(result);
     };
+    // (a bad argument of an async export is a rejected promise)
+    out[name] = asyncExports.includes(name) ? (...args) => { try { return run(...args); } catch (e) { return Promise.reject(e); } } : run;
     // Its parameters, as the export's (a caller may count them).
     Object.defineProperty(out[name], 'length', { value: f.length });
   }
@@ -323,7 +336,7 @@ export function convertExports(exports, exportSpec) {
 // `(await import('pkg')).member` form pulls in the whole namespace and defeats
 // that — measured at 125x more bundled bytes for a package with independent
 // exports. See IMPORTANT_MINIFICATION_INFO.md.
-const IMPORT_DECL = /^\s*import\s[^;]*;/;
+const IMPORT_DECL = /^(?:\s|\/\/.*|\/\*[\s\S]*?\*\/)*import\s[^;]*;/;
 
 /**
  * The glue's one helper, when a body calls it: the compiler wraps a `fun` or

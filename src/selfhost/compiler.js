@@ -968,7 +968,7 @@ export async function instantiate(wasm, spec = {}, { loadGlue = null, profiler =
   // `utu run`'s: what places a JS throw (see cli/utu.mjs).
   wrap?.(imports);
   const instance = await WebAssembly.instantiate(module, imports);
-  const exports = convertExports(promisifyExports(instance, spec.promises), spec.exports);
+  const exports = convertExports(promisifyExports(instance, spec.promises), spec.exports, spec.promises?.asyncExports);
   return { module, instance, exports: profiler ? profiler.attach(instance, exports) : exports };
 }
 

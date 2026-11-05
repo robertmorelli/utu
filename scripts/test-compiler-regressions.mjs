@@ -2738,6 +2738,18 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   await fs.writeFile(path.join(path.dirname(linked), 'bad.utu'), 'using Bad from "./bindings/Bad.abi.json";\nexport main() F64 { 1.0; }\n');
   const badAbi = await compileFile(utu, path.join(path.dirname(linked), 'bad.utu'), {});
   assert.deepEqual(badAbi.diagnostics.map(d => d.message), ['No ABI in ./bindings/Bad.abi.json: missing, or not one tools/dts/cli.mjs wrote']);
+  // A linked `bigint` is an I64; a native Promise[T] is a linked `Promise<T>` (T unbound).
+  const big = await project({ 'api.d.ts': 'export declare function bigs(a: bigint): bigint;\nexport declare function aw<T>(p: Promise<T>): Promise<Awaited<T>>;\n',
+    'api.js': 'export const bigs = a => a * 2n;\nexport const aw = async p => await p;\n',
+    'main.utu': 'using Api from "./bindings/Api.abi.json";\nlet pr: fun(F64) Promise[F64] = @es/\\ (x) => Promise.resolve(x) \\/;\n'
+      + 'export lib {\n    fn twice() I64 { let b: I64 = Api.bigs(21); b; }\n    fn wait() Promise[F64] { let p: Promise[F64] = Api.aw(pr(3.0)); p; }\n}\n' });
+  await fs.mkdir(path.join(path.dirname(big), 'bindings'));
+  await fs.writeFile(path.join(path.dirname(big), 'bindings/Api.abi.json'), JSON.stringify(linkFiles({ files: [path.join(path.dirname(big), 'api.d.ts')], prefix: 'Api', moduleSpecifier: './api.js' })));
+  const bigBuilt = await compileFile(utu, big, {});
+  assert.ok(bigBuilt.wasm, bigBuilt.diagnostics.map(d => d.message).join('\n'));
+  const bigExports = (await instantiateNode(bigBuilt.wasm, bigBuilt.spec, { root: path.dirname(big) })).exports;
+  assert.deepEqual([await bigExports.twice(), await bigExports.wait()], [42n, 3]);
+  checked++;
   // Host declarations' types as TypeScript has them: a tuple's elements each of its own type
   // (`t[1]` read element 0's type, NaN); an optional callback parameter may be absent (it read
   // NaN); `T` of `firstOf<T>(xs: T[])` is the array's element; a host function value is
@@ -3086,6 +3098,58 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   await gen1('export main() I32 { let n = cl(x: I32) { if x > 0 { return 1; } else { return 2; }; }; let k = cl(x: I32) { match x { 0 => { return 5; }, ~> { return 6; }, }; }; n(1) + k(0) * 10 + k(3) * 100; }\n', 651);
   // An alt whose arms of different variants include one that binds.
   await gen1('enum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n    | Pt\nfn f(s: Sh) I32 { let a = alt s { Ci |c| => Sh.Sq { s: c.r }, Sq => Sh.Pt, Pt => Sh.Pt, }; alt a { Sq |q| => q.s, Ci => 0, Pt => 7, }; }\nexport main() I32 { f(Sh.Ci { r: 4 }) * 10 + f(Sh.Sq { s: 1 }); }\n', 47);
+  // Closures called from JS: Bool arguments normalized, distinct/enum unsigned results unsigned, nullable arguments past the 13th.
+  {
+    const ps = Array.from({ length: 14 }, (_, i) => String.fromCharCode(97 + i));
+    const built = await compileFile(utu, await write(`type N = distinct U32;
+type M = distinct U64;
+enum(U32) E: | A = 4000000000 | B
+export lib {
+    fn mkn() cl() N { cl() N { N.from_u32(4000000000); }; }
+    fn mkm() cl() M { cl() M { M.from_u64(18446744073709551615); }; }
+    fn mke() cl() E { cl() E { E.A; }; }
+    fn mkb() cl(Bool, Bool) I32 { cl(a: Bool, b: Bool) I32 { if a and b { 1; } else { 0; }; }; }
+    fn mk14() cl(${ps.slice(1).map(() => 'I32').join(', ')}, ?Str) Bool { cl(${ps.join(', ')}) Bool { promote ${ps[13]} { |v| => true, ~> false, }; }; }
+}
+`));
+    assert.ok(built.wasm, built.diagnostics?.map(d => d.message).join("\n"));
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    assert.deepEqual([e.mkn()(), e.mkm()(), e.mke()(), e.mkb()(2, 1), e.mk14()(...Array(13).fill(0), undefined), e.mk14()(...Array(13).fill(0), 'x')],
+      [4000000000, 18446744073709551615n, 4000000000, 1, false, true], built.diagnostics?.map(d => d.message).join('\n'));
+    checked++;
+  }
+  // A comment before an @es body's imports; a JS function for an export's closure parameter is wrapped as an @es one is
+  // (unsigned and Bool arguments, a Str result checked); a bad argument of an async export is a rejected promise.
+  for (const mode of ['small', 'fast', 'smallUnsafe', 'debug']) {
+    const built = await compileFile(utu, await write(`let j: fun(Str, Str) Str = @es/\\
+// join two paths
+import { join } from 'node:path';
+/* the function */
+(a, b) => join(a, b)
+\\/;
+let delay: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;
+export lib {
+    fn joined() Str { j("a", "b"); }
+    fn call(f: cl(U32, Bool, U64) Str) Str { f(4294967295, true, 18446744073709551615); }
+    fn text(f: cl() Str) Str { f(); }
+    fn flag(f: cl() Bool) I32 { if f() { 1; } else { 0; }; }
+    fn wait(a: I32) I32 { let v: I32 = await delay(a); v; }
+}
+`), { mode });
+    assert.ok(built.wasm, `${mode}: ${built.diagnostics.map(d => d.message).join('\n')}`);
+    const e = (await instantiateNode(built.wasm, built.spec)).exports;
+    assert.equal(e.joined(), path.join('a', 'b'), mode);
+    assert.equal(e.call((a, b, c) => `${a} ${b} ${c}`), '4294967295 true 18446744073709551615', mode);
+    assert.throws(() => e.text(() => 5), /Wrong type from JavaScript: a Str/, mode);
+    assert.equal(e.flag(() => 2), 1, mode);
+    assert.equal(await e.wait(4), 4, mode);
+    if (!mode.includes('Unsafe')) {
+      const late = e.wait('x');
+      assert.ok(late instanceof Promise, mode);
+      await assert.rejects(late, /must be an integer/, mode);
+    }
+    checked++;
+  }
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
