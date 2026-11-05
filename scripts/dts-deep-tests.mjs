@@ -487,9 +487,12 @@ await test('keyof over an index signature accepts any key (mitt handlers need no
   }`, output);
   assert.equal(exports.run(), 5);
 });
-await gap('try/catch catches host exceptions as values, nests, and yields a result', 'a caught host exception is Externref, with no members: Externref has no field name', async () => {
+await test('try/catch catches host exceptions as values, nests, and yields a result', async () => {
+  // The caught value is an Externref with no members (docs/typescript-abi.md, try/catch): JS.String(e) reads it.
+  const members = await compile('using JS from std:JS; export main() void { try { JS.JSON.parse("{"); } catch |e| { e.name; }; }');
+  assert.deepEqual(members.errors, ['Externref has no field name']);
   const doc = await compile(`using JS from std:JS; export lib {
-    fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { e.name; }; }
+    fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { JS.String(e); }; }
     fn counted() F64 { let failures = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; failures; }
     fn nested() Str {
       try { try { JS.JSON.parse("{"); "inner ok"; } catch |inner| { JS.JSON.parse("]"); "inner caught"; }; }
@@ -498,7 +501,7 @@ await gap('try/catch catches host exceptions as values, nests, and yields a resu
   }`);
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.message('[1,2]'), '[1,2]');
-  assert.equal(instance.exports.message('{'), 'SyntaxError');
+  assert.match(instance.exports.message('{'), /^SyntaxError: /);
   assert.equal(instance.exports.counted(), 1);
   assert.equal(instance.exports.nested(), 'outer caught');
 });
