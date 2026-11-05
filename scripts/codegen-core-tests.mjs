@@ -1011,4 +1011,82 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors(doc);
     }
   });
+
+  // Salvaged from stage -1's compiler-quality-tests: closure hygiene, the
+  // closure runtime ABI, and dead-code size.
+  for (const [name, source, expected] of [
+    ['parameter', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { n + __env; }; f(7);', 12],
+    ['local', 'let n: I32 = 5; let f: cl() I32 = cl() { let __env: I32 = 7; n + __env; }; f();', 12],
+    ['capture', 'let __env: I32 = 5; let f: cl() I32 = cl() { __env; }; f();', 5],
+    ['shadow', 'let n: I32 = 5; let f: cl(I32) I32 = cl(n) { n + 1; }; f(7);', 8],
+    ['nested', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { let g: cl(I32) I32 = cl(__env0) { n + __env + __env0; }; g(3); }; f(7);', 15],
+    ['function name', 'let n: I32 = 5; let f: cl() I32 = cl() { n + __closure0(); }; f();', 35],
+  ]) {
+    test(`codegen: closure environments do not shadow a user ${name}`, async ({ ROOT }) => {
+      const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: `closure_hygiene_${name.replace(' ', '_')}.utu`,
+        source: `fn __closure0() I32 { 30; }\nexport lib { fn run() I32 { ${source} } }` });
+      assertEq(instance.exports.run(), expected);
+    });
+  }
+
+  test('codegen: closures use the JS closure runtime; fun references need none', async ({ ROOT }) => {
+    const imported = wasm => WebAssembly.Module.imports(new WebAssembly.Module(wasm)).map(i => `${i.module}.${i.name}`);
+    const closures = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'closure_js_abi.utu', source: `export lib {
+      fn run(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(7); }
+      fn callback(n: I32) cl(I32) I32 { cl(x) { x + n; }; }
+    }` });
+    const names = imported(closures.doc.wasm);
+    assert(names.includes('utu.closure_new') && names.some(n => n.startsWith('utu.closure_call_')), names.join(', '));
+    assertEq(closures.instance.exports.run(5), 12);
+    const callback = closures.instance.exports.callback(5);
+    assertEq(typeof callback, 'function');
+    assertEq([1, 2, 3].map(callback).join(','), '6,7,8');
+    const funs = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fun_abi.utu', source: `fn inc(n: I32) I32 { n + 1; }
+      export lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; f(n); } }` });
+    assert(!imported(funs.doc.wasm).some(n => n.includes('closure_')), imported(funs.doc.wasm).join(', '));
+    assertEq(funs.instance.exports.run(5), 6);
+  });
+
+  test('codegen: unused functions and closures add no shipped Wasm bytes', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    const bytes = source => withTempUtu(ROOT, 'dead_code_size.utu', source, async file => {
+      const result = await compiler.compileFile(file);
+      assertNoErrors(result);
+      return Buffer.from(result.wasm).toString('hex');
+    });
+    const base = 'export lib { fn answer() I32 { 42; } }';
+    assertEq(await bytes(`${base} fn unused(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(1); }`), await bytes(base));
+  });
+
+  test('codegen: module host bindings coexist with intrinsic type methods; void tails keep effects', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'module_host_void_tail.utu', source: String.raw`
+      mod Host { let twice: fun(F64) F64 = @es/\ n => n * 2 \/; }
+      struct Cell: | value: I32
+      fn update(cell: Cell) void { cell.value = 42; cell.value; }
+      export lib {
+        fn host() F64 { Host.twice(F64.sqrt(441.0)); }
+        fn tail() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; }
+      }
+    ` });
+    assertEq(instance.exports.host(), 42);
+    assertEq(instance.exports.tail(), 42);
+  });
+
+  // Salvaged from stage -1's parser-analysis-tests: programs that must check cleanly.
+  test('analysis: valid programs report no diagnostics', async ({ ROOT }) => {
+    const { selfhostDiagnostics } = await import('./test-harness.mjs');
+    for (const source of [
+      'fn add(a: I32, b: I32) I32 { a + b; }\ntest "adds" {\n  assert add(2, 2) == 4;\n}',
+      'bench "counter" {\n  let total: I32 = 0;\n  measure { total += 1; }\n}',
+      'struct Pt:\n  | x : F32\nfn takes64(v: I64) I64 { v; }\nfn wide() I64 {\n  let a: I64 = 0;\n  let b: F32 = 1.0;\n  let c: U32 = 7;\n  let p: Pt = Pt { x: 2.0 };\n  takes64(41);\n}',
+      'export lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
+      'fn double(x: I32) I32 { x * 2; }\nexport main() I32 { double(2) + double(3); }',
+      'export lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }\n  fn mid(x: I32) I32 { x -o clamp(0, &, 10); }\n}',
+      'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) void { self.v = n; }\nexport lib { fn go(b: Box) void { b.set64(7); } }',
+      'export lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
+    ]) {
+      const diagnostics = await selfhostDiagnostics({ ROOT, name: 'valid_program.utu', source });
+      assertEq(diagnostics.length, 0, `${source}\n  got ${diagnostics.map(d => `${d.kind}: ${d.message}`).join('; ')}`);
+    }
+  });
 }

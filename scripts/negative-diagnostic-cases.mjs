@@ -53,4 +53,8 @@ export const negativeDiagnosticCases = [
   ['indirect recursive struct', `struct A:\n  | b : B\nstruct B:\n  | a : A\nexport lib { fn bad() I32 { 0; } }`, 'recursive-type', 'A contains itself; make the field nullable'],
   ['nullable recursive struct is allowed except missing init field', `struct Node:\n  | next : ?Node\nexport lib { fn bad() Node { Node { }; } }`, 'missing-field', 'Node needs a value for next'],
   ['module function called as a method', `export lib { fn bad(x: F64) F64 { x.sqrt(); } }`, 'unknown-method', 'F64.sqrt is a function, not a method: F64.sqrt(value)'],
+  ['nominal Externref types do not mix', `mod Document { type & = @ir/\\ <ir-wasm-ref type-repr="wasm-externref"/> \\/ }\nmod Element { type & = @ir/\\ <ir-wasm-ref type-repr="wasm-externref"/> \\/ }\nexport lib { fn bad(element: Element) Document { let doc: Document = element; doc; } }`, 'type-mismatch', 'doc is Document, got Element'],
+  ['cl never decays to fun', `export lib { fn bad() I32 { let g: fun(I32) I32 = cl(x) { x * 2; }; 1; } }`, 'type-mismatch', 'g is fun(I32) I32, got cl(I32) I32'],
+  ['an int literal does not adopt Bool', `export lib { fn bad() Bool { let b: Bool = 1; b; } }`, 'type-mismatch', 'b is Bool, got I32'],
+  ['break outside a loop', `export main() I32 { break; 1; }`, 'invalid-break', 'break outside a loop'],
 ];
