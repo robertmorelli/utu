@@ -1,7 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { createCompiler, initParser } from '../src/index.js';
-import { nodePackageResolver } from '../tools/dts/packages.mjs';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 
 /** This process's scratch directory: test runner workers each get their own. */
 export function testTmp(ROOT) {
@@ -26,41 +25,28 @@ export function assertThrows(fn, includes) {
   throw new Error('expected function to throw');
 }
 
-export function assertNoErrors(ir) {
-  const errs = ir.querySelectorAll('[data-error]');
-  if (errs.length) {
-    const msgs = [...errs].map(e => {
-      const fn = e.closest?.('ir-fn')?.getAttribute('name');
-      return `${fn ? `${fn}: ` : ''}${e.getAttribute('data-error')}`;
-    }).join(', ');
-    throw new Error(`IR has errors: ${msgs}`);
-  }
+export function assertNoErrors(result) {
+  const errors = result.diagnostics?.filter(diagnostic => diagnostic.severity === 'error') ?? [];
+  if (errors.length || !result.wasm) throw new Error(errors.map(diagnostic => diagnostic.message).join(', ') || 'no module');
 }
 
-// Loading the grammar costs more than most tests; one parser serves them all.
-let sharedParser;
-
-export async function makeCompiler({ ROOT, target, debugAssertions = false, optimize = 'size' }) {
-  const parser = await (sharedParser ??= initParser({ wasmDir: `${ROOT}/` }));
-  return createCompiler({
-    parser,
-    target,
-    debugAssertions,
-    optimize,
-    readFile: (p) => fs.readFile(p, 'utf8'),
-    readBinaryFile: (p) => fs.readFile(p),
-    resolvePath: (from, rel) => path.resolve(path.dirname(from), rel),
-    resolvePackage: nodePackageResolver({ root: ROOT }),
-  });
+let selfhost = null;
+async function selfhostCompiler() {
+  return selfhost ??= loadNodeCompiler();
 }
 
-export function createCompilerEnv({ parser, debugAssertions = false }) {
-  return createCompiler({
-    parser,
-    debugAssertions,
-    readFile: (p) => fs.readFile(p, 'utf8'),
-    resolvePath: (from, rel) => path.resolve(path.dirname(from), rel),
-  });
+export async function makeCompiler({ ROOT, target = 'normal', debugAssertions = false, optimize = 'size' }) {
+  const utu = await selfhostCompiler();
+  const options = { root: ROOT, target: target === 'analysis' ? 'normal' : target, optimize, safe: debugAssertions };
+  const compile = async file => {
+    const result = await compileFile(utu, file, options);
+    return { ...result, artifacts: { diagnostics: result.diagnostics } };
+  };
+  return { compileFile: compile, analyzeFile: compile };
+}
+
+export async function createCompilerEnv({ ROOT, debugAssertions = false }) {
+  return makeCompiler({ ROOT, debugAssertions });
 }
 
 export async function withTempUtu(ROOT, name, source, run) {
@@ -75,23 +61,16 @@ export async function withTempUtu(ROOT, name, source, run) {
 }
 
 export async function compileAndInstantiate({ ROOT, name, source, makeCompiler, assertNoErrors, imports = {} }) {
-  const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
-  const { buildImportObject } = await import('../src/index.js');
   const compiler = await makeCompiler({ ROOT, target: 'normal' });
-  return withTempUtu(ROOT, name, source, async (file) => {
-    const doc = await compiler.compileFile(file);
-    assertNoErrors(doc);
-    const { instance } = await instantiateLowered(emitBinary(doc), mergeImports(await buildImportObject(doc), imports));
-    return { doc, instance };
+  return withTempUtu(ROOT, name, source, async file => {
+    const result = await compiler.compileFile(file);
+    assertNoErrors(result);
+    const built = await instantiateNode(result.wasm, result.spec, {
+      root: ROOT,
+      wrap: base => Object.assign(base, mergeImports(base, imports)),
+    });
+    return { doc: result, instance: { exports: built.exports }, result };
   });
-}
-
-// The self-hosted compiler, loaded once per worker: Wutu templates are built
-// only by it (stage 0 refuses them).
-let selfhost = null;
-async function selfhostCompiler() {
-  const { loadNodeCompiler } = await import('../src/selfhost/node.js');
-  return selfhost ??= loadNodeCompiler();
 }
 
 /** A program's self-hosted diagnostics, each with the source text it points at. */
