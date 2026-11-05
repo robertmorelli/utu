@@ -2288,7 +2288,8 @@ fn member_instance(node: I32, cx: Cx) I32 {
         let module = module_named(node_decl[name_node(first_child(base))]);
         if decl_is(module, Decl.Module) { return instance_of_args(module, next_sibling(first_child(base)), base, cx); };
     };
-    ty_inst(type_path(base, cx.inst));
+    let sp = static_type_path(base, cx);
+    ty_inst(if sp >= 0 { sp; } else { type_path(base, cx.inst); });
 }
 
 /// `module`'s instance for type arguments `args` (`M[A]` at `at`); -1 reported.
@@ -3000,6 +3001,7 @@ fn static_type_path(node: I32, cx: Cx) I32 {
     let base = first_child(node);
     if not is_kind(base, Node.Identifier) and not is_kind(base, Node.Type_ident) { return -1; };
     let d = node_decl[base];
+    if decl_is(node_alias[base], Decl.Alias) { d = node_alias[base]; };
     let inst = 0;
     let module = -1;
     if decl_is(d, Decl.Module) {
@@ -3057,10 +3059,12 @@ fn check_field(node: I32, expect: I32, cx: Cx) I32 {
     let e = path_enum(base);
     let v = node_decl[last_child(node)];
     if e >= 0 and decl_is(v, Decl.Variant) and decl_owner[v] == e {
-        if decl_is(e, Decl.IntEnum) { return enum_variant_value(v); };
         let alias = if is_kind(first_child(base), Node.Identifier) { node_decl[first_child(base)]; } else { -1; };
-        let inst = if is_kind(base, Node.Type_member_expr) and not is_kind(first_child(base), Node.Type_ident) { ty_inst(type_path(first_child(base), cx.inst)); }
+        let sp = static_type_path(base, cx);
+        let inst = if sp >= 0 { ty_inst(sp); }
+            else if is_kind(base, Node.Type_member_expr) and not is_kind(first_child(base), Node.Type_ident) { ty_inst(type_path(first_child(base), cx.inst)); }
             else if decl_is(alias, Decl.Alias) { alias_instance(alias); } else { instance_for(module_of(v), cx.inst); };
+        if decl_is(e, Decl.IntEnum) { return enum_variant_value(v, inst); };
         return fieldless_variant(node, v, inst, cx);
     };
     if e >= 0 and v < 0 and not reported_within(node) {
@@ -3139,7 +3143,7 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
         let inst = member_instance(node, cx);
         return if inst < 0 { error_value(); } else { global_get(decl, inst); };
     };
-    if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl); };
+    if decl_is(decl, Decl.Variant) and decl_is(decl_owner[decl], Decl.IntEnum) { return enum_variant_value(decl, member_instance(node, cx)); };
     let name = last_child(node);
     if decl < 0 and (decl_is(owner, Decl.IntEnum) or decl_is(owner, Decl.Enum)) and not reported_within(name) {
         report2(Diag.UnknownVariant, name, word_of(name), named(owner, -1), -1);
@@ -3148,9 +3152,7 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
     };
     if decl < 0 and decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };
     if decl_is(decl, Decl.Variant) {
-        let inst = if is_kind(first_child(node), Node.Type_ident) { instance_for(module_of(decl), cx.inst); }
-            else { ty_inst(type_path(first_child(node), cx.inst)); };
-        return fieldless_variant(node, decl, inst, cx);
+        return fieldless_variant(node, decl, member_instance(node, cx), cx);
     };
     // `T.make` named, not called: the function, as a value.
     if decl_is(decl, Decl.Fn) {

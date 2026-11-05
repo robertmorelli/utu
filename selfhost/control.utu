@@ -15,7 +15,7 @@ fn pattern_value(lit: I32, t: I32) I64 {
     let c = first_child(lit);
     if is_kind(c, Node.Type_ident) {
         let variant = node_decl[last_child(lit)];
-        if not decl_is(variant, Decl.Variant) or named(decl_owner[variant], 0) != t {
+        if not decl_is(variant, Decl.Variant) or named(decl_owner[variant], ty_inst(t)) != t {
             pattern_fault[0] = 4;
             return 0;
         };

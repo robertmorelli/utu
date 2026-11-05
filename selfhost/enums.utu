@@ -176,9 +176,9 @@ fn variant_count(decl: I32) I32 {
 }
 
 /// `Tag.Leaf`: its value.
-fn enum_variant_value(variant: I32) I32 {
+fn enum_variant_value(variant: I32, inst: I32) I32 {
     w_i32(variant_value[variant]);
-    named(decl_owner[variant], 0);
+    named(decl_owner[variant], inst);
 }
 
 /// Pairs: enum declaration, function.
