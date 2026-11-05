@@ -466,12 +466,34 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.match(r.stderr, /bun was not found/);
   }
 
-  // Stage 0's views: a mistake in the command is said, not thrown.
+  // The views: source, declarations, syntax, WAT and graphs, from the self-hosted compiler.
+  await write('views.utu', 'fn twice(x: I32) I32 { x * 2; }\nexport main() I32 { twice(3); }\ntest "twice" { assert twice(2) == 4; }\n');
+  r = utu('display', 'views.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^fn twice\(x: I32\) I32 \{ x \* 2; \}$/m);
+  r = utu('display:tests', 'views.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^3 │ test "twice"/m);
+  assert.doesNotMatch(r.stdout, /fn twice/);
+  r = utu('display:tests', 'views.utu', '--noln');
+  assert.match(r.stdout, /^test "twice"/m);
+  r = utu('syntax', 'views.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /\(source_file[^]*fn_decl/);
+  r = utu('wat', 'views.utu');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^\(module/);
+  assert.match(r.stdout, /\(export "main"/);
+  r = utu('graph', 'views.utu', '-o', 'views.html');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(await fs.readFile(path.join(dir, 'views.html'), 'utf8'), /twice/);
+
+  // The views: a mistake in the command is said, not thrown.
   await write('lost.utu', 'using nothere from "./nothere.utu";\nexport main() I32 { 1; }\n');
   // A byte that is not UTF-8, in the file or in one it imports: the self-hosted compiler's error, at the byte.
   await fs.writeFile(path.join(dir, 'latin1.utu'), Buffer.concat([Buffer.from('export main() I32 {\n    // caf'), Buffer.from([0xe9]), Buffer.from('\n    1;\n}\n')]));
   await write('uses-latin1.utu', 'using l from "./latin1.utu";\nexport main() I32 { 1; }\n');
-  // Errors stage 0 throws without a diagnostic: said, not a stack.
+  // A module that does not exist: said, not a stack.
   await write('unknown-module.utu', 'using geometri |Point|;\nexport main() I32 { 1; }\n');
   // A @comptime loop that never ends: stopped, as the self-hosted compiler stops it.
   await write('forever.utu', 'fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nexport main() I32 { t.len(); }\n');
@@ -486,7 +508,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     [['display', 'good.utu', 'extra'], /Extra argument extra/, 2],
     [['graph', 'good.utu', '--noln'], /Unknown option --noln/, 2],
     [['graph', 'good.utu', '-o', 'a.html', '-o', 'b.html'], /Two outputs: a\.html, b\.html/, 2],
-    [['display:modules', 'lost.utu'], /Cannot import "\.\/nothere\.utu"/],
+    [['display:modules', 'lost.utu'], /No file \.\/nothere\.utu/],
     [['display', 'latin1.utu'], /Not UTF-8[^]*latin1\.utu:2:11/],
     [['graph', 'latin1.utu', '-o', 'l.html'], /Not UTF-8[^]*latin1\.utu:2:11/],
     [['display:debug', 'uses-latin1.utu'], /Not UTF-8[^]*latin1\.utu:2:11/],
@@ -512,7 +534,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.match(r.stderr, /No export main in lib\.utu/);
     await assert.rejects(fs.access(path.join(dir, 'lib')));
   }
-  console.log('utu cli: check, run, test, bench, build, build-exe, stage 0 mistakes pass');
+  console.log('utu cli: check, run, test, bench, build, build-exe, views and their mistakes pass');
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

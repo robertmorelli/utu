@@ -16,7 +16,7 @@
 // selfhost/inline.utu), both keeping the checks Wasm does not make itself (a
 // Buffer's length, a last alt arm); smallUnsafe and fastUnsafe leave them
 // out; debug is the module as code generation leaves it. `display` and
-// `graph` show stage 0's IR and graphs, so they use stage 0.
+// `graph` inspect the self-hosted compiler's syntax and query tables.
 //
 // Source maps (src/selfhost/sourcemap.js): a trap in `run` or `test` is
 // placed at its line, with the utu functions it was in. Debug's are exact;
@@ -31,6 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatDiagnostics, heading, notes, pen } from '../src/selfhost/format.js';
 import { sourceMapJson, wasmFrames, withMapUrl } from '../src/selfhost/sourcemap.js';
+import { programIndex } from '../src/selfhost/query.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RUNTIME = path.join(ROOT, 'src', 'runtime', 'host-imports.js');
@@ -55,12 +56,12 @@ function compileEarly() {
 /** The compiler's Node host (src/selfhost/node.js): loaded by a command that builds. */
 const selfhost = () => import('../src/selfhost/node.js');
 
-const STAGE0_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'display:modules', 'display:exports', 'display:debug', 'graph']);
+const VIEW_COMMANDS = new Set(['display', 'display:tests', 'display:benches', 'display:modules', 'display:exports', 'display:debug', 'graph', 'wat', 'syntax']);
 
 async function main() {
   const [command, fileArg, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') usage(0);
-  if (STAGE0_COMMANDS.has(command)) return (await import('./stage0.mjs')).main(command, [fileArg, ...rest].filter(a => a !== undefined), fail, notUtf8);
+  if (VIEW_COMMANDS.has(command)) return viewCommand(command, [fileArg, ...rest].filter(a => a !== undefined));
   if (command === 'lsp') {
     // (`--stdio`: what an editor's client may add.)
     const extra = [fileArg, ...rest].find(a => a !== undefined && a !== '--stdio');
@@ -72,7 +73,7 @@ async function main() {
   const [{ MODES }, { loadNodeCompiler }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
   // (Own names only: `utu constructor` is no command.)
   if (!Object.hasOwn(commands, command)) {
-    const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...STAGE0_COMMANDS]);
+    const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...VIEW_COMMANDS]);
     // A file given without a command: it was meant for one.
     if (command.endsWith('.utu')) fail(`No command for ${command}`, 'unknown-command', [], `utu check ${command}`);
     fail(`Unknown command ${command}${near ? `; did you mean ${near}?` : ''}`, 'unknown-command',
@@ -196,15 +197,113 @@ async function report(utu, result, diagnostics) {
   })}\n`);
 }
 
-/** A stage 0 view of a program with a file that is not UTF-8: the self-hosted compiler's "Not UTF-8", at the byte; exits 1. */
-async function notUtf8(file) {
+/** Self-hosted source, syntax, WAT and relationship views. */
+async function viewCommand(command, given) {
+  const sections = new Map([
+    ['display:tests', 'test_decl'], ['display:benches', 'bench_decl'],
+    ['display:modules', 'module_decl'], ['display:exports', 'export_lib_decl|export_main_decl'],
+  ]);
+  const files = [];
+  let out, noLines = false;
+  for (let i = 0; i < given.length; i++) {
+    const arg = given[i];
+    if (arg === '-o' || arg === '--out') {
+      if (command !== 'graph') fail(`${arg} is only for graph`, 'unknown-option', [`utu ${command} writes nothing.`]);
+      const value = given[++i];
+      if (value === undefined || value.startsWith('-')) fail(`${arg} needs a file`, 'missing-output', [], `utu graph ${files[0] ?? '<file.utu>'} ${arg} <out.html>`);
+      if (out !== undefined) fail(`Two outputs: ${out}, ${value}`, 'unknown-option');
+      out = value;
+    } else if (arg === '--noln' && sections.has(command)) noLines = true;
+    else if (arg.startsWith('-') && arg !== '-') fail(`Unknown option ${arg}`, 'unknown-option');
+    else files.push(arg);
+  }
+  if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
+  if (files.length > 1) fail(`Extra argument ${files[1]}`, 'extra-argument', [`utu ${command} takes one file.`]);
+  const file = path.resolve(files[0]);
+  let stat;
+  try { stat = await fs.stat(file); } catch {}
+  if (!stat) fail(`No file ${files[0]}`, 'file-not-found');
+  if (stat.isDirectory()) fail(`${files[0]} is a directory`, 'not-a-file');
   const { compileFile, loadNodeCompiler } = await selfhost();
   const utu = await loadNodeCompiler();
-  const result = await compileFile(utu, file, { target: 'normal' });
-  const bad = result.diagnostics.filter(d => d.message === 'Not UTF-8');
-  if (!bad.length) fail(`${displayPath(file)} is not UTF-8`, 'parse-error');
-  await report(utu, result, bad);
-  process.exit(1);
+  let built;
+  try {
+    built = await compileFile(utu, file, {
+      target: command === 'wat' ? 'normal' : 'analysis', optimize: command === 'wat' ? 'none' : 'size',
+      debugNames: command === 'wat', sourceMap: command === 'wat',
+    });
+  } catch (error) {
+    if (FS_REASONS[error?.code] && error.path) fail(`cannot read ${displayPath(error.path)}: ${FS_REASONS[error.code]}`, 'read-failed');
+    fail(String(error.message ?? error).split('\n')[0], 'build-error');
+  }
+  if (built.diagnostics.length) {
+    await report(utu, built, built.diagnostics);
+    if (built.diagnostics.some(d => d.severity === 'error')) process.exitCode = 1;
+  }
+  if (command === 'wat') {
+    if (!built.wasm) return;
+    const { printWat } = await import('../src/selfhost/wat.js');
+    process.stdout.write(await printWat(built.wasm));
+    return;
+  }
+  if (command === 'graph') {
+    const { renderGraphHtml } = await import('../src/selfhost/graphs.js');
+    const target = path.resolve(out ?? `${path.basename(file, '.utu')}.graph.html`);
+    await fs.writeFile(target, renderGraphHtml(utu, built.files, file));
+    console.error(`wrote ${target}`);
+    return;
+  }
+  if (command === 'syntax') {
+    const { syntaxTree } = await import('../src/selfhost/syntax.js');
+    console.log(syntaxTree(utu, built.files, file));
+    return;
+  }
+  const source = built.files.find(entry => entry.key === file)?.text ?? await fs.readFile(file, 'utf8');
+  const kind = sections.get(command);
+  const ranges = kind ? sectionRanges(utu, built.files, file, kind) : null;
+  if (command === 'display:debug' && built.diagnostics.length) console.log('');
+  const { highlighter, ANSI } = await import('../src/selfhost/highlight.js');
+  const paint = highlighter(utu, built.files);
+  const lines = source.split('\n');
+  let start = 0;
+  const width = String(lines.length).length;
+  for (let line = 0; line < lines.length; line++) {
+    const text = lines[line];
+    const end = start + text.length;
+    if (!ranges || ranges.some(([a, b]) => a <= end && b >= start)) {
+      const number = kind && !noLines ? `${String(line + 1).padStart(width)} │ ` : '';
+      console.log(number + colorSource(text, start, paint(file, start, end), ANSI));
+    }
+    start = end + 1;
+  }
+}
+
+/** Lines covered by the selected declarations in one source file. */
+function sectionRanges(utu, files, file, kinds) {
+  const index = programIndex(utu, files);
+  const names = new Set(kinds.split('|'));
+  const result = [];
+  const nodeKinds = new Uint8Array(utu.node_kind.buffer);
+  for (let n = 0, count = utu.node_count(); n < count; n++) {
+    if (!names.has(utu.node_kind_name(nodeKinds[n]))) continue;
+    const at = index.at(n);
+    if (at?.file === file) result.push([at.start, at.end]);
+  }
+  return result;
+}
+
+function colorSource(line, start, pieces, ANSI) {
+  if (!colored(process.stdout) || !pieces.length) return line;
+  let at = start, out = '';
+  for (const piece of pieces) {
+    const begin = Math.max(start, piece.start), end = Math.min(start + line.length, piece.end);
+    if (end <= begin) continue;
+    out += line.slice(at - start, begin - start);
+    const color = ANSI[piece.class];
+    out += color && color !== '0' ? `\x1b[${color}m${line.slice(begin - start, end - start)}\x1b[0m` : line.slice(begin - start, end - start);
+    at = end;
+  }
+  return out + line.slice(at - start);
 }
 
 /** Write `text` to `stream`, resolving once the stream has taken it all. */
@@ -877,8 +976,11 @@ function usage(code) {
   -O fastUnsafe   fast, without them (Buffer indexing, a last alt arm, …)
   -O debug        the module as code generation leaves it, checked
 
-  display[:tests|:benches|:modules|:exports|:debug] <file>, graph <file> [-o out.html]
-                               stage 0's IR and graphs
+  display[:tests|:benches|:modules|:exports|:debug] <file> [--noln]
+                               highlighted source or selected declarations
+  graph <file> [-o out.html]  binding, call, import and type relationships
+  syntax <file>                self-hosted syntax tree
+  wat <file>                   generated WebAssembly text
 
   exit status: 0 done; 1 the program is wrong, failed, or could not be
   read or written (grep: nothing matched); 2 utu was run wrong (a command,
