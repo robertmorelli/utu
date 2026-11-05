@@ -549,6 +549,7 @@ let i64_gt_s: I32 = 85;
 let i64_gt_u: I32 = 86;
 let i64_le_s: I32 = 87;
 let i64_le_u: I32 = 88;
+let i64_ge_u: I32 = 90;
 let i64_add: I32 = 124;
 let i64_sub: I32 = 125;
 let i64_xor: I32 = 133;

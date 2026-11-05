@@ -3411,6 +3411,7 @@ fn check_while(node: I32, cx: Cx) I32 {
         unwant();
         w_node(Op.Plain, vt_i32, 69, 0, mc);
         w_node(Op.BrIf, vt_none, brk, 0, mc);
+        if counted_while(cond, block, brk, cx) { unrolled_while(cond, block, brk, top, cx); };
     };
     enter_loop(brk, top, -1, -1);
     discard(check_block(block, ty_void(), cx));

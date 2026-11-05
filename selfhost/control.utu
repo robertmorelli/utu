@@ -239,8 +239,11 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop); };
     let end_ = new_label();
     let def = new_label();
-    let labels = Array[I32].new(n, 0);
-    for (0 ..< n) |k| { labels[k] = new_label(); };
+    // In a loop match a speed build lays the arms out twice (see @threaded_continue).
+    let copies = if in_loop and optimize_level[0] == 2 { 2; } else { 1; };
+    let total = n * copies;
+    let labels = Array[I32].new(total, 0);
+    for (0 ..< total) |k| { labels[k] = new_label(); };
     // br_table targets, for each value from lo to hi.
     let targets = w_aux.len();
     let span = (hi - lo).to_i32() + 1;
@@ -255,8 +258,8 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     let m_end = w_mark();
     let m_def = w_mark();
     // Open the arm blocks from the last arm in, so arm 0's is innermost.
-    let marks = Array[I32].new(n, 0);
-    for (0 ..< n) |i| { marks[i] = w_mark(); };
+    let marks = Array[I32].new(total, 0);
+    for (0 ..< total) |i| { marks[i] = w_mark(); };
     let mt = w_mark();
     w_leaf(Op.LocalGet, vt_i32, s, 0);
     if lo != 0 {
@@ -265,13 +268,18 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     };
     w_node(Op.BrTable, vt_unreachable, targets, span + 1, mt);
     let t = if in_loop { ty_void(); } else { expect; };
-    for (0 ..< n) |i| {
-        // Close arm i's block, then its code.
-        w_node(Op.Block, vt_none, labels[i], 0, marks[n - 1 - i]);
-        t = arm_body(arm_nodes[first + i], t, cx, in_loop);
+    // (Labels are numbered in order: arm p's is labels[0] + p.)
+    let lm = loop_matches.len();
+    if in_loop { for ([s, lo.to_i32(), span, n, copies, def, labels[0], first, -1]) |x| { loop_matches.push(x); }; };
+    for (0 ..< total) |p| {
+        // Close arm p's block, then its code.
+        w_node(Op.Block, vt_none, labels[p], 0, marks[total - 1 - p]);
+        if in_loop { loop_matches[lm + 8] = p; };
+        t = arm_body(arm_nodes[first + p % n], t, cx, in_loop);
         if not in_loop { w_node(Op.Br, vt_unreachable, end_, 0, w_mark() - 1); }
         else { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0); };
     };
+    loop_matches.resize(lm);
     w_node(Op.Block, vt_none, def, 0, m_def);
     t = default_body(default_, t, cx, in_loop);
     let result = if t >= 0 { t; } else { ty_never(); };
@@ -380,11 +388,70 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     let t = loop_state_type[k];
     let m = w_mark();
     coerce(check_expr(first_child(node), t, cx), t, first_child(node));
+    // In an arm of a table dispatch: threaded (see @threaded_continue).
+    let lm = loop_matches.len() - 9;
+    while (lm >= 0 and loop_matches[lm] != loop_state[k]) { lm -= 9; };
+    if lm >= 0 and loop_matches[lm + 8] < 0 { lm = -1; };
+    if lm >= 0 and w_mark() == m + 1 and w_op[w_stack[m]] == Op.I32Const.to_i32() {
+        // A constant state: straight to its arm when that is ahead.
+        let label = lm_target(lm, w_a[w_stack[m]]);
+        if label >= 0 {
+            w_stack.resize(m);
+            run_defers(loop_defers[k], cx);
+            w_leaf(Op.Br, vt_unreachable, label, 0);
+            w_node(Op.Seq, vt_unreachable, 0, 0, m);
+            return ty_never();
+        };
+    };
     w_node(Op.LocalSet, vt_none, loop_state[k], 0, m);
     run_defers(loop_defers[k], cx);
-    w_leaf(Op.Br, vt_unreachable, loop_continue[k], 0);
+    if lm >= 0 {
+        // Threaded dispatch: each site's own table, straight to every arm
+        // ahead (whose block encloses the site), else back through the
+        // head, so the engine predicts each site's transitions apart (a
+        // computed goto). A speed build lays the arms out twice: from the
+        // first copy every arm is ahead.
+        let targets = w_aux.len();
+        for (0 ..< loop_matches[lm + 2]) |v| {
+            let label = lm_target(lm, v + loop_matches[lm + 1]);
+            w_aux.push(if label >= 0 { label; } else { loop_continue[k]; });
+        };
+        w_aux.push(loop_matches[lm + 5]);
+        let mt = w_mark();
+        w_leaf(Op.LocalGet, vt_i32, loop_state[k], 0);
+        if loop_matches[lm + 1] != 0 {
+            w_i32(loop_matches[lm + 1]);
+            w_node(Op.Plain, vt_i32, 107, 0, mt);
+        };
+        w_node(Op.BrTable, vt_unreachable, targets, loop_matches[lm + 2] + 1, mt);
+    } else { w_leaf(Op.Br, vt_unreachable, loop_continue[k], 0); };
     w_node(Op.Seq, vt_unreachable, 0, 0, m);
     ty_never();
+}
+
+/// Per loop match dispatched by a table, while its arms are checked, nine
+/// words: its state local, lowest value, values, arms, arm copies, default
+/// label, first arm's label, first arm (in @arm_nodes), and the arm (by copy
+/// then arm) being checked, or -1.
+vec loop_matches: I32;
+
+/// Where `continue v` in the arm being checked of loop match `lm` (at
+/// `loop_matches[lm]`) can branch straight to: the label of v's arm when
+/// that encloses the arm (an arm after it, or of the next copy), the
+/// default's when no arm has v; else -1.
+fn lm_target(lm: I32, v: I32) I32 {
+    let n = loop_matches[lm + 3];
+    let first = loop_matches[lm + 7];
+    let arm = -1;
+    if v >= loop_matches[lm + 1] and v - loop_matches[lm + 1] < loop_matches[lm + 2] {
+        // (The first arm with a value takes it.)
+        for (0 ..< n) |a| { if arm < 0 and arm_values[first + a] == v.to_i64() { arm = a; }; };
+    };
+    if arm < 0 { return loop_matches[lm + 5]; };
+    let at = loop_matches[lm + 8];
+    let copy = at / n;
+    if arm <= at % n { copy += 1; };
+    if copy >= loop_matches[lm + 4] { -1; } else { loop_matches[lm + 6] + copy * n + arm; };
 }
 
 //! = Nullable values
@@ -763,6 +830,7 @@ fn reset_control() void {
     arm_values.clear();
     loop_state.clear();
     loop_state_type.clear();
+    loop_matches.clear();
 }
 
 //! = for
@@ -886,11 +954,18 @@ fn check_for(node: I32, cx: Cx) I32 {
     let top = new_label();
     let next = new_label();
     let d0 = if capture >= 0 { node_decl[first_child(capture)]; } else { -1; };
-    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0))
-        and unroll_fits(block, d0, types[0], counters[0], brk, cx) {
-        unrolled_for(block, counters[0], ends[0], repr(types[0]), types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), brk, top, cx);
-        w_node(Op.Seq, vt_none, 0, 0, m);
-        return ty_void();
+    if optimize_level[0] == 2 and n == 1 and kinds[0] != 1 and unrollable(block) {
+        // A range's capture is its counter, which the body must leave alone;
+        // an array's, a local of its own.
+        let elem = if kinds[0] == 2 and d0 >= 0 and decl_boxed[d0] == 0 { new_local(repr(types[0])); } else { -1; };
+        if (if kinds[0] == 2 { d0 < 0 or elem >= 0; } else { not (d0 >= 0 and assigns(block, d0)); })
+            and unroll_fits(block, d0, types[0], if kinds[0] == 2 { elem; } else { counters[0]; }, brk, cx) {
+            let array = if kinds[0] == 2 { arrays[0]; } else { -1; };
+            let vt = if kinds[0] == 2 { vt_i32; } else { repr(types[0]); };
+            unrolled_for(block, counters[0], ends[0], vt, types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), array, elem, brk, top, cx);
+            w_node(Op.Seq, vt_none, 0, 0, m);
+            return ty_void();
+        };
     };
     let mb = w_mark();
     let ml = w_mark();
@@ -1080,8 +1155,74 @@ fn allocating_method(word: I32) Bool {
     false;
 }
 
+/// Whether `while (i < n) { …; i += 1; }` (at a speed build) counts: i and n
+/// locals of one integer type, the body small (as @unrollable) and without
+/// `continue`, its last statement `i += 1` (or `i = i + 1`), which is the
+/// only write to i, and none to n. Then n - i rounds remain at each test.
+fn counted_while(cond: I32, block: I32, brk: I32, cx: Cx) Bool {
+    if optimize_level[0] != 2 or not is_kind(cond, Node.Binary_expr) or tok_kind[token_after(first_child(cond))] != Tok.Lt.to_i32() { return false; };
+    let a = first_child(cond);
+    let b = last_child(cond);
+    let step = last_child(block);
+    if not (is_kind(a, Node.Identifier) and is_kind(b, Node.Identifier) and step >= 0 and is_kind(step, Node.Assign_expr)) { return false; };
+    let i = node_decl[a];
+    let n = node_decl[b];
+    for ([i, n]) |d| { if not (decl_is(d, Decl.Local) or decl_is(d, Decl.Param)) or decl_boxed[d] != 0 { return false; }; };
+    let t = decl_ty[i];
+    if t != decl_ty[n] or not (t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)) { return false; };
+    let target = first_child(step);
+    let value = last_child(step);
+    let op = tok_kind[token_after(target)];
+    if not (is_kind(target, Node.Identifier) and node_decl[target] == i) { return false; };
+    let one = if op == Tok.PlusEq.to_i32() { value; } else if op == Tok.Eq.to_i32() and is_kind(value, Node.Binary_expr) and tok_kind[token_after(first_child(value))] == Tok.Plus.to_i32()
+        and is_kind(first_child(value), Node.Identifier) and node_decl[first_child(value)] == i { last_child(value); } else { -1; };
+    if one < 0 or not is_number_literal(one) or node_text(one) != "1" { return false; };
+    if not unrollable(block) or has_kind(block, Node.Continue_expr) or assigns(block, n) { return false; };
+    let c = first_child(block);
+    while (c != step) {
+        if assigns(c, i) { return false; };
+        c = next_sibling(c);
+    };
+    unroll_fits(block, -1, t, -1, brk, cx);
+}
+
+/// Whether a node of kind `kind` is in `node`.
+fn has_kind(node: I32, kind: Node) Bool {
+    if is_kind(node, kind) { return true; };
+    let c = first_child(node);
+    while (c >= 0) {
+        if has_kind(c, kind) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+/// A counted while (@counted_while), after its test: `if (n - i) >=u 4 {
+/// four bodies; br $top }`; the plain loop's body follows.
+fn unrolled_while(cond: I32, block: I32, brk: I32, top: I32, cx: Cx) void {
+    let vt = repr(decl_ty[node_decl[first_child(cond)]]);
+    let wide = vt == vt_i64;
+    let mi = w_mark();
+    let mr = w_mark();
+    w_leaf(Op.LocalGet, vt, decl_local[node_decl[last_child(cond)]], 0);
+    w_leaf(Op.LocalGet, vt, decl_local[node_decl[first_child(cond)]], 0);
+    w_node(Op.Plain, vt, if wide { 125; } else { 107; }, 0, mr);
+    if wide { w_leaf(Op.I64Const, vt_i64, unroll_copies, 0); } else { w_i32(unroll_copies); };
+    w_node(Op.Plain, vt_i32, past_end_op(vt, true, false), 0, mr);
+    let mt = w_mark();
+    for (0 ..< unroll_copies) |_k| {
+        enter_loop(brk, top, -1, -1);
+        discard(check_block(block, ty_void(), cx));
+        leave_loop();
+    };
+    w_leaf(Op.Br, vt_unreachable, top, 0);
+    w_node(Op.Seq, vt_none, 0, 0, mt);
+    w_node(Op.If, vt_none, new_label(), 0, mi);
+}
+
 /// The unrolled loop of `for (a ..< b) |i|`, counting in local `counter` to local `end_`.
-fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, brk: I32, top: I32, cx: Cx) void {
+/// Of `for (xs) |x|`: counting through array local `array` (else -1), x in local `elem` (or -1).
+fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, array: I32, elem: I32, brk: I32, top: I32, cx: Cx) void {
     let wide = vt == vt_i64;
     let mb = w_mark();
     let ml = w_mark();
@@ -1100,18 +1241,26 @@ fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, br
     if wide { w_leaf(Op.I64Const, vt_i64, unroll_copies, 0); } else { w_i32(unroll_copies); };
     w_node(Op.Plain, vt_i32, past_end_op(vt, true, false), 0, mr);
     let mt = w_mark();
-    for (0 ..< unroll_copies) |_k| { unrolled_step(block, counter, vt, brk, cx); };
+    for (0 ..< unroll_copies) |_k| { unrolled_step(block, counter, vt, array, elem, brk, cx); };
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Seq, vt_none, 0, 0, mt);
     w_node(Op.If, vt_none, new_label(), 0, mi);
-    unrolled_step(block, counter, vt, brk, cx);
+    unrolled_step(block, counter, vt, array, elem, brk, cx);
     w_leaf(Op.Br, vt_unreachable, top, 0);
     w_node(Op.Loop, vt_none, top, 0, ml);
     w_node(Op.Block, vt_none, brk, 0, mb);
 }
 
 /// One iteration: the body (its continue goes to the end of this copy), then i += 1.
-fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) void {
+fn unrolled_step(block: I32, counter: I32, vt: I32, array: I32, elem: I32, brk: I32, cx: Cx) void {
+    if elem >= 0 {
+        let mg = w_mark();
+        w_leaf(Op.LocalGet, cur_locals[array], array, 0);
+        w_leaf(Op.LocalGet, vt_i32, counter, 0);
+        let heap = vt_heap(cur_locals[array]);
+        w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg);
+        w_node(Op.LocalSet, vt_none, elem, 0, mg);
+    };
     let next = new_label();
     let mn = w_mark();
     enter_loop(brk, next, -1, -1);

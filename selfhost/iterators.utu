@@ -580,7 +580,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     // Setup: the source's, then the stages', in order.
     for (p.setup_start ..< iter_setup.len()) |j| { w_push(iter_setup[j]); };
     iter_setup.resize(p.setup_start);
-    if not p.skip_loop { iterate(p, index, value, body, brk); };
+    if not p.skip_loop { iterate(p, index, value, body, brk, next - 1); };
     for (p.cleanup_start ..< iter_cleanup.len()) |j| { w_push(iter_cleanup[j]); };
     iter_cleanup.resize(p.cleanup_start);
     // The result.
@@ -656,8 +656,12 @@ fn range_source(p: Pipe, input: I32, cx: Cx) Bool {
     true;
 }
 
-/// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
-fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
+/// The loop over `[lo, hi)`: `value = element(i)`, then the stages. The
+/// body's own labels are those past `labels`. A speed build unrolls a
+/// pipeline no stage stops whose body is small, branch-free, and does not
+/// allocate (as `for`, @unrolled_for): while four or more values remain, four
+/// copies of the body (its labels renumbered) run without a test between.
+fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32, labels: I32) void {
     let top = new_label();
     // (From the constant, lo is read only by the stages that need it.)
     if p.lo_zero { set_i32(index, 0); } else { copy_local(index, p.lo); };
@@ -673,6 +677,37 @@ fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
     } else {
         exit_at_end(p, lp, mb);
     };
+    if optimize_level[0] == 2 and p.stop < 0 and unroll_ir_fits(body, 0) and unroll_weight(body, 0) <= unroll_max_ir {
+        // if (hi - i) >=u 4 { four steps; br $top }
+        let mi = w_mark();
+        lg(p.hi);
+        lg(index);
+        if p.range {
+            plain(i64_sub, vt_i64, mi);
+            w_leaf(Op.I64Const, vt_i64, unroll_copies, 0);
+            plain(i64_ge_u, vt_i32, mi);
+        } else {
+            w_i32_op(i32_sub, mi);
+            w_i32(unroll_copies);
+            w_i32_op(i32_ge_u, mi);
+        };
+        let mt = w_mark();
+        let span = next_label[0] - labels;
+        for (0 ..< unroll_copies) |_k| {
+            iterate_step(p, index, value);
+            w_push(relabelled(body, labels, next_label[0] - labels));
+            next_label[0] += span;
+        };
+        w_leaf(Op.Br, vt_unreachable, lp.top, 0);
+        end_if(mi, mt);
+    };
+    iterate_step(p, index, value);
+    w_push(body);
+    loop_close(lp);
+}
+
+/// `value = element(i); i += 1`.
+fn iterate_step(p: Pipe, index: I32, value: I32) void {
     let mv = w_mark();
     if p.range {
         lg(index);
@@ -688,8 +723,49 @@ fn iterate(p: Pipe, index: I32, value: I32, body: I32, brk: I32) void {
         ls(value, mv);
         incr(index);
     };
-    w_push(body);
-    loop_close(lp);
+}
+
+/// Whether IR node `n` (with the callees it calls, to depth 3) neither
+/// loops, branches (but by `br`/`br_if`), nor allocates: worth unrolling.
+fn unroll_ir_fits(n: I32, depth: I32) Bool {
+    let op = w_op[n];
+    if op == Op.Loop.to_i32() or op == Op.If.to_i32() or op == Op.BrTable.to_i32() or op == Op.Try.to_i32() or op == Op.CastArms.to_i32()
+        or op == Op.StructNew.to_i32() or op == Op.StructNewDefault.to_i32() or op == Op.ArrayNew.to_i32()
+        or op == Op.ArrayNewDefault.to_i32() or op == Op.ArrayNewFixed.to_i32() or op == Op.ArrayNewData.to_i32() { return false; };
+    if op == Op.Call.to_i32() and func_kind[w_a[n]] == FuncKind.Defined.to_i32() {
+        let g = w_a[n];
+        if func_body[g] < 0 or depth >= 3 or not unroll_ir_fits(func_body[g], depth + 1) { return false; };
+    };
+    for (0 ..< w_count[n]) |i| { if not unroll_ir_fits(w_kid(n, i), depth) { return false; }; };
+    true;
+}
+
+/// A copy of IR node `n` in which each label past `from` is `by` more.
+fn relabelled(n: I32, from: I32, by: I32) I32 {
+    let count = w_count[n];
+    let first = w_kids.len();
+    for (0 ..< count) |i| { w_kids.push(-1); };
+    for (0 ..< count) |i| { w_kids[first + i] = relabelled(w_kid(n, i), from, by); };
+    let op = w_op[n];
+    let a = w_a[n];
+    if is_labelled(op) and a > from { a += by; };
+    if op == Op.BrTable.to_i32() {
+        a = w_aux.len();
+        for (0 ..< w_b[n]) |i| {
+            let l = w_aux[w_a[n] + i];
+            w_aux.push(if l > from { l + by; } else { l; });
+        };
+    };
+    let id = w_op.len();
+    w_op.push(op);
+    w_type.push(w_type[n]);
+    w_src.push(w_src[n]);
+    w_site.push(w_site[n]);
+    w_a.push(a);
+    w_b.push(w_b[n]);
+    w_first.push(first);
+    w_count.push(count);
+    id;
 }
 
 /// `skip(n)` / `take(n)` before any other stage: narrow `[lo, hi)`.
