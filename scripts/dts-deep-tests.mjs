@@ -169,7 +169,7 @@ await test('explicit new selects the construct signature of callable constructor
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.run(), 1970);
 });
-await gap('mutable globals use direct assignment while const globals stay readonly', 'a foreign mutable global cannot be assigned', async () => {
+await test('mutable globals use direct assignment while const globals stay readonly', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/globals.d.ts')], prefix: 'Globals' });
   const { exports } = await run('fn run() F64 { Globals.abiCounter = 40.0; Globals.abiCounter += 2.0; Globals.abiCounter; }', output);
   try { assert.equal(exports.run(), 42); } finally { delete globalThis.abiCounter; }

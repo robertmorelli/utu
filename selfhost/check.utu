@@ -1689,6 +1689,10 @@ fn check_assign(node: I32, cx: Cx) I32 {
     // `T.Variant = …` or `module.f = …`: a constant, not a variable.
     if is_kind(target, Node.Type_member_expr) or (is_kind(target, Node.Field_expr) and is_module_path(target)) {
         let name = last_child(target);
+        let host = node_decl[first_child(target)];
+        if is_kind(target, Node.Type_member_expr) and decl_is(host, Decl.Foreign) and decl_a[host] >= 0 {
+            return check_foreign_root_set(target, decl_a[host], word_of(name), value, if op == Tok.Eq.to_i32() { -1; } else { compound_word(op, node_last[target]); }, cx);
+        };
         if node_decl[name] < 0 {
             let owner = node_decl[first_child(target)];
             if decl_is(owner, Decl.Module) { return module_member_missing(owner, name); };

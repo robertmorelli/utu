@@ -1116,6 +1116,34 @@ fn check_foreign_constant(node: I32) I32 {
     prelude(Prelude.F64);
 }
 
+/// `Api.counter = v` (`op=` with operator `word`, else -1): a view's
+/// mutable global written; a `const` one is readonly.
+fn check_foreign_root_set(node: I32, view: I32, key: I32, value: I32, word: I32, cx: Cx) I32 {
+    if not root_member(view, key) {
+        check_expr(value, -1, cx);
+        w_pop();
+        return unknown_member(node, view, -1, key);
+    };
+    if member_readonly[0] == 1 {
+        report2(Diag.ForeignReadonly, node, key, -1, -1);
+        return error_value();
+    };
+    let slot = member_ref();
+    let m = w_mark();
+    let vt = if word < 0 { check_argument(slot, value, view, cx); } else {
+        let ft = check_foreign_root(node, view, key, -1);
+        let v = foreign_operate(ft, word, value, node, m, cx);
+        if v < 0 { return error_since(m); };
+        w_get(repr(ft), v);
+        ft;
+    };
+    let ms = if word < 0 { m; } else { w_mark() - 1; };
+    let access = member_access(view, key, true);
+    foreign_member_op(one_type(vt), ty_void(), word_text(access_prologue[0]) + "(value) => { " + access + " = " + js_argument(slot, "value", vt) + "; }", ms, key, true);
+    if word >= 0 { w_node(Op.Seq, vt_none, 0, 0, m); };
+    ty_void();
+}
+
 /// `x.key`: the value of host type `owner` is on the stack since `m`.
 fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
     let view = fty_view[owner];
