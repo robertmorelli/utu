@@ -389,7 +389,7 @@ await test('default exports, booleans, unions, never, namespaces and const enums
   assert.equal(exports.greeting(), 'Hello UTU'); assert.equal(exports.boolean(), true);
   assert.throws(() => exports.failure(), /fixture failure/);
   assert.equal(exports.namespace(), 42);
-  await gap('a union result reads as the member a slot wants', 'a union result does not narrow to its member: number returns F64, got Fixture.Choice', async () => {
+  await test('a union result reads as the member a slot wants', async () => {
     const { exports } = await run('fn number() F64 { Fixture.union(42.0); } fn text() Str { Fixture.union("choice"); }');
     assert.equal(exports.number(), 42); assert.equal(exports.text(), 'choice');
   });

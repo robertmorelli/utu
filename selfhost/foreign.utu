@@ -976,6 +976,11 @@ fn host_coerce(actual: I32, expected: I32) Bool {
         foreign_unbox(a, expected, true);
         return true;
     };
+    // (`string | number` where a Str is wanted: checked, as a dynamic value is)
+    if is_foreign(a) and typeof_name(expected).len() > 0 and desc_get(describe(ref_of(a)), "union") >= 0 and union_admits(describe(ref_of(a)), expected, fty_view[a]) {
+        foreign_unbox(a, expected, true);
+        return true;
+    };
     let boxed = boxed_primitive(a);
     if boxed >= 0 and boxed == expected {
         foreign_unbox(a, expected, false);
