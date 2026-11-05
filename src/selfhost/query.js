@@ -133,6 +133,67 @@ export function programIndex(utu, files) {
     return null;
   };
 
+  const nodeKind = view(utu.node_kind, Uint8Array);
+  const bytePlace = (start, end) => {
+    if (start < 0 || end < start) return null;
+    const file = fileOf(start);
+    return file && end <= file.offset + file.bytes.length
+      ? { file: file.key, start: toUnits(file, start), end: toUnits(file, end) } : null;
+  };
+  const inside = (at, key, offset) => at?.file === key && at.start <= offset && offset <= at.end;
+  const nodeAt = (key, offset, typed = false) => {
+    let best = -1, width = Infinity;
+    for (let n = 0; n < count; n++) {
+      if (first[n] >= last[n] || typed && !utu.node_type(n)) continue;
+      const at = place(n);
+      if (!inside(at, key, offset)) continue;
+      const size = at.end - at.start;
+      if (size < width) { best = n; width = size; }
+    }
+    return best;
+  };
+  let callCache;
+  const calls = () => callCache ??= (() => {
+    const out = [];
+    for (let k = 0; k < (utu.edge_count?.() ?? 0); k++) {
+      const site = bytePlace(utu.edge_site_start(k), utu.edge_site_end(k));
+      if (site) out.push({ from: utu.edge_from_decl(k), to: utu.edge_to_decl(k), site });
+    }
+    return out;
+  })();
+  let coercionCache;
+  const coercions = () => coercionCache ??= (() => {
+    const out = [];
+    for (let k = 0; k < (utu.coercion_count?.() ?? 0); k++) {
+      const node = utu.coercion_node(k);
+      if (node < 0 || node >= count || first[node] >= last[node]) continue;
+      out.push({ node, at: place(node), from: utu.coercion_from_text(k), to: utu.coercion_to_text(k), kind: utu.coercion_kind(k) });
+    }
+    return out;
+  })();
+  const effectCache = new Map();
+  const effectsOf = decl => {
+    if (effectCache.has(decl)) return effectCache.get(decl);
+    const seen = new Set();
+    const visit = d => {
+      if (d < 0 || seen.has(d)) return 0;
+      seen.add(d);
+      let mask = utu.decl_effects?.(d) ?? 0;
+      for (const edge of calls()) if (edge.from === d) mask |= visit(edge.to);
+      return mask;
+    };
+    const mask = visit(decl);
+    const result = { mask, labels: ['await', 'host', 'throws', 'traps'].filter((_, k) => mask & 1 << k) };
+    effectCache.set(decl, result);
+    return result;
+  };
+  const callItem = (index, decl) => {
+    if (decl < 0 || decl >= utu.decl_count()) return null;
+    const span = index.span(decl), selection = index.definition(decl);
+    if (!span || !selection) return null;
+    return { decl, name: index.text(selection), kind: index.kind(decl), span, selection, effects: effectsOf(decl) };
+  };
+
   return {
     /** Where node `n` is: its file key and UTF-16 offsets, or null (a node of no file). */
     at: place,
@@ -232,6 +293,88 @@ export function programIndex(utu, files) {
       out.sort((a, b) => a.at.file < b.at.file ? -1 : a.at.file > b.at.file ? 1 : a.at.start - b.at.start);
       return out.filter((name, i) => i === 0 || name.at.start !== out[i - 1].at.start || name.at.file !== out[i - 1].at.file);
     },
+    /** The smallest typed syntax at a cursor, with facts from the checker. */
+    explainAt(key, offset) {
+      const node = nodeAt(key, offset, true);
+      if (node < 0) return null;
+      const at = place(node);
+      const name = nodeAt(key, offset);
+      const declaration = name >= 0 ? nodeDecl[name] : -1;
+      const siteCalls = calls().filter(edge => inside(edge.site, key, offset));
+      const callTarget = siteCalls.sort((a, b) => (a.site.end - a.site.start) - (b.site.end - b.site.start))[0]?.to ?? -1;
+      const owner = utu.node_field_owner?.(node) ?? -1;
+      const captures = [];
+      for (let k = 0, n = utu.closure_capture_count?.(node) ?? 0; k < n; k++) captures.push(utu.closure_capture_decl(node, k));
+      const trace = [];
+      if (declaration >= 0) {
+        const definition = this.definition(declaration);
+        trace.push({ kind: 'binding', decl: declaration, at: definition, type: this.type(declaration) });
+      }
+      if (callTarget >= 0) trace.push({ kind: 'call result', decl: callTarget, at: this.definition(callTarget) });
+      return {
+        node, at, kind: utu.node_kind_name(nodeKind[node]), type: utu.node_type(node),
+        expectedType: utu.node_expected_type?.(node) || '', declaration, callTarget,
+        field: owner >= 0 ? { owner, index: utu.node_field_index(node) } : null,
+        conversions: coercions().filter(c => c.node === node || inside(c.at, key, offset)),
+        captures, effects: declaration >= 0 ? effectsOf(declaration) : callTarget >= 0 ? effectsOf(callTarget) : { mask: 0, labels: [] },
+        wasmType: utu.node_wasm_type?.(node) || '', trace,
+      };
+    },
+    /** Binding and callee facts behind the type at a cursor. */
+    typeTrace(key, offset) { return this.explainAt(key, offset)?.trace ?? []; },
+    /** Type, capture, conversion, and effect annotations for one file. */
+    inlayHints(key) {
+      const hints = [];
+      for (let d = 0; d < utu.decl_count(); d++) {
+        if (utu.decl_kind_name(d) !== 'Local') continue;
+        const definition = this.definition(d), span = this.span(d), type = this.type(d);
+        if (!definition || !span || definition.file !== key || !type) continue;
+        const head = this.text({ file: key, start: definition.end, end: span.end });
+        if (!/^\s*:/.test(head)) hints.push({ position: definition.end, label: `: ${type}`, kind: 'type', at: definition });
+      }
+      for (let n = 0; n < count; n++) {
+        if (first[n] >= last[n] || utu.node_kind_name(nodeKind[n]) !== 'closure_expr') continue;
+        const at = place(n);
+        if (at?.file !== key) continue;
+        const captures = [];
+        for (let k = 0, length = utu.closure_capture_count(n); k < length; k++) {
+          const d = utu.closure_capture_decl(n, k), definition = this.definition(d);
+          if (definition) captures.push(this.text(definition));
+        }
+        if (captures.length) hints.push({ position: at.end, label: ` captures ${captures.join(', ')}`, kind: 'capture', at });
+      }
+      for (const co of coercions()) if (co.at?.file === key) hints.push({ position: co.at.end, label: ` → ${co.to}`, kind: 'conversion', at: co.at });
+      for (let d = 0; d < utu.decl_count(); d++) {
+        const definition = this.definition(d), effect = effectsOf(d);
+        if (definition?.file === key && effect.mask && ['Fn', 'Main'].includes(this.kind(d)))
+          hints.push({ position: definition.end, label: ` !${effect.labels.join(', ')}`, kind: 'effect', at: definition });
+      }
+      return hints.sort((a, b) => a.position - b.position);
+    },
+    /** Direct and transitive effects of a declaration. */
+    effects(decl) { return effectsOf(decl); },
+    /** Function containing the name at the cursor. */
+    prepareCallHierarchy(key, offset) {
+      const decl = this.declarationAt(key, offset);
+      const item = callItem(this, decl);
+      return item && ['Fn', 'Main', 'ProtoMember'].includes(item.kind) ? [item] : [];
+    },
+    incomingCalls(decl) {
+      const groups = new Map();
+      for (const edge of calls()) if (edge.to === decl && edge.from >= 0) {
+        if (!groups.has(edge.from)) groups.set(edge.from, []);
+        groups.get(edge.from).push(edge.site);
+      }
+      return [...groups].flatMap(([from, sites]) => { const item = callItem(this, from); return item ? [{ from: item, sites }] : []; });
+    },
+    outgoingCalls(decl) {
+      const groups = new Map();
+      for (const edge of calls()) if (edge.from === decl && edge.to >= 0) {
+        if (!groups.has(edge.to)) groups.set(edge.to, []);
+        groups.get(edge.to).push(edge.site);
+      }
+      return [...groups].flatMap(([to, sites]) => { const item = callItem(this, to); return item ? [{ to: item, sites }] : []; });
+    },
     /** The token of file `key` that `offset` (UTF-16) is inside: { kind (lex.utu's Tok), start, end }, or null. */
     tokenAt(key, offset) {
       const f = files.findIndex(file => file.key === key);
@@ -250,4 +393,18 @@ export function programIndex(utu, files) {
       return file ? file.text.slice(at.start, at.end) : '';
     },
   };
+}
+
+/** Markdown for hover and editor X-Ray, from one query result. */
+export function renderEditorHover(explanation, { signature = '', kind = '', where = '', docs = '' } = {}) {
+  const heading = signature ? `\`\`\`utu\n${signature}\n\`\`\`` : explanation?.type ? `\`\`\`utu\n${explanation.type}\n\`\`\`` : '';
+  if (!heading) return null;
+  const label = kind ? `\n*${kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()}*${where}` : '';
+  const facts = [];
+  if (explanation?.expectedType && explanation.expectedType !== explanation.type) facts.push(`Expected: \`${explanation.expectedType}\``);
+  if (explanation?.conversions?.length) facts.push(`Conversion: ${explanation.conversions.map(c => `\`${c.from}\` → \`${c.to}\``).join(', ')}`);
+  if (explanation?.captures?.length) facts.push(`Captures: ${explanation.captures.length}`);
+  if (explanation?.effects?.labels?.length) facts.push(`Effects: ${explanation.effects.labels.join(', ')}`);
+  if (explanation?.wasmType) facts.push(`Wasm: \`${explanation.wasmType}\``);
+  return heading + label + (facts.length ? `\n\n${facts.join(' · ')}` : '') + (docs ? `\n\n---\n\n${docs}` : '');
 }

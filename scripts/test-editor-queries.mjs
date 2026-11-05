@@ -1,6 +1,7 @@
 // Query exports used by editor hover, inlays, and call hierarchy.
 import assert from 'node:assert/strict';
 import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
+import { programIndex, renderEditorHover } from '../src/selfhost/query.js';
 
 const utu = await loadNodeCompiler();
 const built = await compileFile(utu, 'examples/closures.utu', { root: process.cwd() });
@@ -43,6 +44,24 @@ assert.ok(utu.node_field_owner(field) >= 0);
 assert.ok(utu.node_field_index(field) >= 0);
 assert.ok(expected >= 0);
 assert.ok(wasmType >= 0);
+
+const source = built.files.find(file => file.key.endsWith('/examples/closures.utu'));
+const index = programIndex(utu, built.files);
+const explained = index.explainAt(source.key, source.text.lastIndexOf('double'));
+assert.equal(explained.type, 'fun(I32) I32');
+assert.equal(explained.expectedType, 'cl(I32) I32');
+assert.equal(explained.conversions[0].kind, 4);
+assert.match(renderEditorHover(explained), /Conversion:/);
+assert.equal(index.typeTrace(source.key, source.text.lastIndexOf('double'))[0].kind, 'binding');
+const hints = index.inlayHints(source.key);
+assert.ok(hints.some(hint => hint.kind === 'capture'));
+assert.ok(hints.some(hint => hint.kind === 'conversion'));
+const double = index.prepareCallHierarchy(source.key, source.text.indexOf('fn double') + 4)[0];
+assert.equal(double.name, 'double');
+const decayFn = index.prepareCallHierarchy(source.key, source.text.indexOf('fn decay') + 4)[0];
+assert.ok(index.outgoingCalls(decayFn.decl).some(call => call.to.name === 'takes_closure'));
+const called = index.outgoingCalls(decayFn.decl).find(call => call.to.name === 'takes_closure');
+assert.ok(index.incomingCalls(called.to.decl).some(call => call.from.name === 'decay'));
 
 const traps = await compileFile(utu, 'examples/ci/codegen_traps.utu', { root: process.cwd() });
 assert.ok(traps.wasm);
