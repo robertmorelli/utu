@@ -78,12 +78,12 @@ async function refresh(reason) {
   if (dirty) throw new Error(`commit compiler sources and driver before refreshing stage0:\n${dirty}`);
   const commit = git('rev-parse', 'HEAD');
   const selfhostTree = git('rev-parse', `${commit}:selfhost`);
-  const old = fs.readFileSync(STAGE0);
+  const builder = fs.readFileSync(process.env.UTU_STAGE0 ? path.resolve(process.env.UTU_STAGE0) : STAGE0);
   const stage2 = await bootstrap();
   const wasm = Buffer.from(stage2.wasm);
   const meta = {
     commit, selfhostTree, sourcesHash: sourcesRecord(joinSelfhost().text).hash,
-    sha256: sha256(wasm), bytes: wasm.length, builtBy: sha256(old),
+    sha256: sha256(wasm), bytes: wasm.length, builtBy: sha256(builder),
     node: process.version, date: new Date().toISOString(), reason,
   };
   fs.writeFileSync(STAGE0, wasm);
