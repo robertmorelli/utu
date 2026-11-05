@@ -142,6 +142,7 @@ mod Interner {
     }
 
     fn &.byte_at |self| (id: I32, k: I32) I32 {
+        if checks() and (k < 0 or k >= self.size(id)) { fatal; };
         self.bytes[self.starts[id] + k];
     }
 

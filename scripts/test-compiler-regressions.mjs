@@ -1399,6 +1399,8 @@ export lib {
         \`\${a} \${b} \${c} \${d} \${e} \${f} \${names.size(d)} \${names.byte_at(d, 1)} \${names.size(e)} \${names.ascii(names.str("ok"))}\`;
     }
     fn wide() I32 { let names = Interner.new(); names.begin(); names.byte(8364); names.finish(); }
+    fn past() I32 { let names = Interner.new(); let a = names.str("a"); names.str("b"); names.byte_at(a, 1); }
+    fn negative() I32 { let names = Interner.new(); let a = names.str("a"); names.byte_at(a, -1); }
 }`);
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const built = await compileFile(utu, interning, { mode });
@@ -1407,6 +1409,11 @@ export lib {
     assert.equal(exports.ids(), '0 1 0 2 3 4 6 240 3 ok', `${mode} Interner.str`);
     if (mode.endsWith('Unsafe')) assert.equal(exports.wide(), 0, `${mode} Interner.byte masks`);
     else assert.throws(() => exports.wide(), WebAssembly.RuntimeError, `${mode} Interner.byte(8364) traps`);
+    if (mode.endsWith('Unsafe')) assert.equal(exports.past(), 98, `${mode} Interner.byte_at skips checks`);
+    else {
+      assert.throws(() => exports.past(), WebAssembly.RuntimeError, `${mode} Interner.byte_at past key`);
+      assert.throws(() => exports.negative(), WebAssembly.RuntimeError, `${mode} Interner.byte_at negative index`);
+    }
     checked++;
   }
 
