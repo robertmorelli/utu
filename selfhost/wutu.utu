@@ -473,14 +473,14 @@ fn wutu_helper(kind: Str) Str {
         // `bind:values`: a multiple select's chosen values, joined by U+001F, both ways.
         params = "Browser.Element, Str";
         // (Applied again after the render: on the first, its options come after it.)
-        js = "(n,v)=>{const w=new Set(v===''?[]:v.split('\\u001f'));const a=()=>{for(const o of n.options)o.selected=w.has(o.value)};a();queueMicrotask(a)}";
+        js = "(n,v)=>{const w=new Set(v===''?[]:v.slice(1).split('\\u001f'));const a=()=>{for(const o of n.options)o.selected=w.has(o.value)};a();queueMicrotask(a)}";
     } else if kind == "select_value" {
         params = "Browser.HTMLSelectElement, Str";
         js = "(n,v)=>globalThis.__utuWutu.selectValue(n,v)";
     } else if kind == "select_get" {
         params = "Browser.Element";
         result = "Str";
-        js = "(n)=>Array.from(n.selectedOptions,o=>o.value).join('\\u001f')";
+        js = "(n)=>{const a=Array.from(n.selectedOptions,o=>o.value);return a.length?'\\u001f'+a.join('\\u001f'):''}";
     } else {
         wutu_fail("internal: no Wutu helper " + kind, 0);
     };
@@ -911,7 +911,7 @@ fn binding_sync_code(kind: Str, id: Str, target: Str, i: I32) Str {
     if sync.len() == 0 { ""; } else { located_splice(wu_site[0], sync, ti_at[i], ti_to[i]) + ";\n"; };
 }
 
-/// `bind:values` crosses as one string: the chosen values joined by U+001F.
+/// `bind:values` crosses as one string: U+001F before each chosen value ("" for none, so `[""]` differs).
 fn values_separator() Str { "\"\\u001f\""; }
 
 /// A binding's sync code:
@@ -924,7 +924,7 @@ fn binding_sync(kind: Str, id: Str, target: Str) Str {
     // (Only an entry the input cannot parse is kept: a value out of range or step still shows.)
     if kind == "number" { return "if not " + id + ".validity.badInput and " + id + ".valueAsNumber != (" + target + ") { " + id + ".valueAsNumber = (" + target + "); }"; };
     if kind == "group" { return "if " + id + ".checked != (" + id + ".value == (" + target + ")) { " + id + ".checked = " + id + ".value == (" + target + "); }"; };
-    if kind == "values" { return wutu_helper("select_set") + "(" + id + ", " + values_separator() + ".join(" + target + "))"; };
+    if kind == "values" { return wutu_helper("select_set") + "(" + id + ", if (" + target + ").len() == 0 { \"\"; } else { " + values_separator() + " + " + values_separator() + ".join(" + target + "); })"; };
     if kind == "files" { return ""; };
     "if " + id + "." + kind + " != (" + target + ") { " + id + "." + kind + " = (" + target + "); }";
 }
@@ -937,7 +937,7 @@ fn binding_update(kind: Str, id: Str, target: Str) Str {
     // (One expression: the update is spliced in as one.)
     if kind == "values" {
         let chosen = wutu_helper("select_get") + "(" + id + ")";
-        return target + " = if " + chosen + ".len() == 0 { Array[Str].new(0, \"\"); } else { " + chosen + ".split(" + values_separator() + "); }";
+        return target + " = if " + chosen + ".len() == 0 { Array[Str].new(0, \"\"); } else { " + chosen + ".slice(1, " + chosen + ".len()).split(" + values_separator() + "); }";
     };
     if kind == "files" { return target + " = " + id + ".files"; };
     target + " = " + id + "." + kind;
