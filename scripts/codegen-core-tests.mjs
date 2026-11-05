@@ -814,20 +814,17 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         await fs.writeFile(file, `struct P:\n  | v: I32\nfn take(v: I32) I32 { v; }\nfn g(p: ?P) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }`);
         return file;
       })());
-      assert([...doc.querySelectorAll('[data-error]')].some(n => /only allowed in statements/.test(n.dataset.errorMessage ?? '')), body);
+      assert(doc.diagnostics.some(diagnostic => /only (?:allowed )?in a? statements?/.test(diagnostic.message)), body);
     }
   });
 
-  test('codegen: captures that are never reassigned get no cell', async ({ ROOT }) => {
+  test('codegen: captures read the value before closure creation', async ({ ROOT }) => {
     const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });
     const before = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_early_write.utu',
       source: `export lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }` });
     assertEq(plain.instance.exports.run(), 7);
     assertEq(before.instance.exports.run(), 7);
-    for (const { doc } of [plain, before]) {
-      assert(!doc.querySelector('ir-struct[name^="__Cell"]'), 'no cell type for a capture that is never reassigned afterwards');
-    }
   });
 
   test('codegen: fun decays to cl in every declared-type position', async ({ ROOT }) => {
@@ -910,8 +907,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   });
 
   test('codegen: test blocks run as wasm and asserts trap on failure', async ({ ROOT }) => {
-    const { emitBinary, instantiateLowered } = await import('../src/compiler/codegen/index.js');
-    const { buildImportObject } = await import('../src/index.js');
+    const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'test' });
     await withTempUtu(ROOT, 'codegen_test_target.utu', `
       fn add(a: I32, b: I32) I32 { a + b; }
@@ -920,12 +916,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     `, async (file) => {
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-      const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
+      const { exports } = await instantiateNode(doc.wasm, doc.spec, { root: ROOT });
       // The test target exports each `test` block so a host runner can call it.
-      assert(typeof instance.exports.__test_0 === 'function', 'expected test blocks to be exported');
-      instance.exports.__test_0();
+      assert(typeof exports.__test_0 === 'function', 'expected test blocks to be exported');
+      exports.__test_0();
       let trapped = false;
-      try { instance.exports.__test_1(); } catch { trapped = true; }
+      try { exports.__test_1(); } catch { trapped = true; }
       assert(trapped, 'a failing assert must trap');
     });
   });

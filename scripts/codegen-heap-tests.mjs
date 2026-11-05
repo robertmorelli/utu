@@ -251,8 +251,8 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         }
       }
     ` });
-    assertEq(instance.exports.has_value(true), 1);
-    assertEq(instance.exports.has_value(false), 0);
+    assertEq(instance.exports.has_value(true), true);
+    assertEq(instance.exports.has_value(false), false);
   });
 
   test('compile: normal target lowers promote before codegen', async ({ ROOT }) => {
