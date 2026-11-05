@@ -2840,6 +2840,32 @@ ok
  3 │ fn greet(name: Str) Str {
 --- exit 1
 
+=== utu check examples/error_demo/names/1125_closure_arg_of_unknown_call_receiver.utu
+ ERROR  Unknown function nope
+        unknown-function · examples/error_demo/names/1125_closure_arg_of_unknown_call_receiver.utu:4:5
+
+ 2 │ // Expect: Unknown function nope (once); no "v needs a type" for the closure
+ 3 │ export main() I32 {
+ 4 │     nope(1).then(cl(v) { v; });
+   │     ━━━━
+   │     ╰─ not defined
+ 5 │     1;
+ 6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/names/1126_struct_literal_arg_of_unknown_receiver.utu
+ ERROR  Unknown module Nope
+        unknown-module · examples/error_demo/names/1126_struct_literal_arg_of_unknown_receiver.utu:4:14
+
+ 2 │ // Expect: Unknown module Nope (once); no "&{…} needs a struct type"
+ 3 │ struct State:
+ 4 │     | items: Nope.Array
+   │              ━━━━
+   │              ╰─ no such module
+ 5 │
+ 6 │ fn add(state: State) void {
+--- exit 1
+
 === utu check examples/error_demo/names/11_unknown_type_Arary.utu
  ERROR  Unknown module Arary; did you mean Array?
         unknown-module · examples/error_demo/names/11_unknown_type_Arary.utu:4:13
@@ -4828,6 +4854,32 @@ ok
    │                  ╰─ here
  4 │
  5 │ export main() I32 {
+--- exit 1
+
+=== utu check examples/error_demo/platform/1120_stored_default_error_once.utu
+ ERROR  P has no field b
+        unknown-field · examples/error_demo/platform/1120_stored_default_error_once.utu:12:59
+
+10 │
+11 │ export main() void {
+12 │     let state = @stored/\ S "k" manual S { ps: [P { a: 1, b: 2 }] } \/;
+   │                                                           ━━━━
+   │                                                           ╰─ no such field
+13 │     Browser.console.log(state.ps.len().to_str());
+14 │ }
+--- exit 1
+
+=== utu check examples/error_demo/platform/1121_wutu_call_hole_error_once.utu
+ ERROR  Stock has no field nope
+        unknown-field · examples/error_demo/platform/1121_wutu_call_hole_error_once.utu:17:31
+
+15 │         for state.items |item| key item.id {
+16 │             p {
+17 │                 = wutu.number(item.nope);
+   │                               ━━━━━━━━━
+   │                               ╰─ no such field
+18 │             }
+19 │         }
 --- exit 1
 
 === utu check examples/error_demo/platform/11_mem_float_in_int.utu
@@ -7840,6 +7892,22 @@ FAIL after tests: boom
  5 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/1122_very_long_line.utu
+ ERROR  Missing ; after 1
+        missing-semicolon · examples/error_demo/syntax/1122_very_long_line.utu:4:493
+
+ 2 │ // Expect: Missing ; after 1, the line cut short with … on its left
+ 3 │ export main() I32 {
+ 4 │ …1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+   │                                                                                  ━
+   │                                                                                  ╰─ ;?
+ 5 │     a;
+ 6 │ }
+
+  fix   Add ;
+ 4 │ … + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1;
+--- exit 1
+
 === utu check examples/error_demo/syntax/11_keyword_as_name.utu
  ERROR  'match' is a keyword
         foreign-syntax · examples/error_demo/syntax/11_keyword_as_name.utu:4:9
@@ -9489,6 +9557,36 @@ FAIL after tests: boom
    │            ╰─ here
  7 │     0;
  8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1123_unknown_type_inside_array_param.utu
+ ERROR  Unknown type I32Z; did you mean I32?
+        unknown-type · examples/error_demo/types/1123_unknown_type_inside_array_param.utu:3:23
+
+ 1 │ // What: a parameter typed with an unknown type inside Array[...], called with a real array
+ 2 │ // Expect: Unknown type I32Z (once); the calls do not add "takes Array[unknown], got Array[I32]"
+ 3 │ fn swap(values: Array[I32Z], left: I32) void {
+   │                       ━━━━
+   │                       ╰─ no such type
+ 4 │ }
+
+  fix   Use I32
+ 3 │ fn swap(values: Array[I32], left: I32) void {
+--- exit 1
+
+=== utu check examples/error_demo/types/1124_unknown_type_in_proto_field.utu
+ ERROR  Unknown type F32Z; did you mean F32?
+        unknown-type · examples/error_demo/types/1124_unknown_type_in_proto_field.utu:4:15
+
+ 2 │ // Expect: Unknown type F32Z (once); no "P.x is unknown, got F32" at the struct's field
+ 3 │ proto P:
+ 4 │     | get x : F32Z
+   │               ━━━━
+   │               ╰─ no such type
+ 5 │     | perimeter() F32
+
+  fix   Use F32
+ 4 │     | get x : F32
 --- exit 1
 
 === utu check examples/error_demo/types/11_global_annotation.utu

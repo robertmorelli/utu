@@ -797,8 +797,14 @@ export function builtModule(utu, size) {
  */
 export function readDiagnostics(utu, files) {
   const out = [];
+  // A DSL splices one expression into several places of its expansion (a
+  // @stored default, a memoised `= f(x);` hole): its mistake is said once.
+  const seen = new Set();
   for (let i = 0; i < utu.diagnostic_count(); i++) {
     const f = utu.diagnostic_file(i);
+    const key = `${f}\0${utu.diagnostic_start(i)}\0${utu.diagnostic_end(i)}\0${utu.diagnostic_message(i)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const file = f >= 0 ? files[f] : null;
     const diagnostic = { kind: utu.diagnostic_kind(i), message: utu.diagnostic_message(i), severity: 'error', file: file?.key ?? null };
     if (file) Object.assign(diagnostic, place(file, utu.diagnostic_start(i), utu.diagnostic_end(i)));

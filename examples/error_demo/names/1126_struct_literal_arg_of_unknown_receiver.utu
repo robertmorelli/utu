@@ -1,0 +1,12 @@
+// What: a &{…} argument of a method on a field whose type is unknown
+// Expect: Unknown module Nope (once); no "&{…} needs a struct type"
+struct State:
+    | items: Nope.Array
+
+fn add(state: State) void {
+    state.items.push(&{ id: 1 });
+}
+
+export main() I32 {
+    1;
+}

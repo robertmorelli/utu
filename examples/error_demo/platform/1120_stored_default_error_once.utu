@@ -1,0 +1,14 @@
+// What: an error inside a @stored default (the default is used in two places of the expansion)
+// Expect: P has no field b, reported once
+using Browser from std:Browser;
+
+struct P:
+    | a: I32
+
+struct S:
+    | ps: Array[P]
+
+export main() void {
+    let state = @stored/\ S "k" manual S { ps: [P { a: 1, b: 2 }] } \/;
+    Browser.console.log(state.ps.len().to_str());
+}

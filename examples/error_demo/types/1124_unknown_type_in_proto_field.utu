@@ -1,0 +1,15 @@
+// What: a protocol getter typed with an unknown type, implemented by a struct with a real field
+// Expect: Unknown type F32Z (once); no "P.x is unknown, got F32" at the struct's field
+proto P:
+    | get x : F32Z
+    | perimeter() F32
+
+tag struct Line[P]:
+    | x : F32
+    | y : F32
+
+fn P[Line].perimeter |self| () F32 { self.x; }
+
+export main() I32 {
+    1;
+}

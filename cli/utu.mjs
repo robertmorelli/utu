@@ -136,7 +136,7 @@ async function main() {
   const file = path.resolve(files[0]);
   let stat = null;
   try { stat = await fs.stat(file); } catch {}
-  if (!stat) fail(`No file ${files[0]}`, 'file-not-found');
+  if (!stat || !files[0]) fail(`No file ${files[0]}`, 'file-not-found');
   if (stat.isDirectory()) fail(`${files[0]} is a directory`, 'not-a-file');
   if (given.length > 1) fail(`Two build modes: ${given.join(', ')}`, 'build-mode');
   const mode = given[0] ?? 'small';

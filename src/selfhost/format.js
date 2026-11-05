@@ -26,6 +26,9 @@
 const LONG = 6;
 // Lines shown before and after the primary mark.
 const CONTEXT = 2;
+// A line longer than WIDE columns is shown as a window of KEEP characters around its marks, with … for the rest.
+const WIDE = 240;
+const KEEP = 80;
 
 /**
  * How many columns a terminal gives `text`: a tab four, a wide (East
@@ -230,6 +233,17 @@ function view(text, starts, file, marks, primaryFile) {
       const to = line === m.last ? Math.min(raw.length, Math.max(from + 1, m.end - starts[line])) : raw.length;
       return { mark: m, from, to: Math.max(to, from + (raw.length > from ? 1 : 0)), drawn: line === m.first };
     });
+    if (raw.length > WIDE) {
+      // (The marks' columns are into the window; the highlighter's offsets follow.)
+      const lo = Math.min(raw.length, ...on.map(m => m.from));
+      const hi = Math.min(Math.max(lo + 1, ...on.map(m => m.to)), lo + WIDE);
+      const a = Math.max(0, lo - KEEP), b = Math.min(raw.length, hi + KEEP);
+      const pre = a > 0 ? '\u2026' : '';
+      const clip = i => Math.min(Math.max(i, a), b) - a + pre.length;
+      rows.push({ line, raw: pre + raw.slice(a, b) + (b < raw.length ? '\u2026' : ''), offset: starts[line] + a - pre.length,
+        marks: on.map(m => ({ ...m, from: clip(m.from), to: Math.max(clip(m.to), clip(m.from) + 1) })) });
+      continue;
+    }
     rows.push({ line, raw, offset: starts[line], marks: on });
   }
   return { file, rows };
@@ -304,8 +318,11 @@ function fixLines(fix, text, cache, ink, gutter) {
   const lineStart = Math.max(head.lastIndexOf('\n'), head.lastIndexOf('\r')) + 1;
   const rest = text.slice(fix.end).search(/[\r\n]/);
   const lineEnd = rest < 0 ? text.length : fix.end + rest;
-  const before = text.slice(lineStart, lineEnd);
-  const after = text.slice(lineStart, fix.start) + fix.text + text.slice(fix.end, lineEnd);
+  // (A long line is cut short around the edit.)
+  const lead = text.slice(lineStart, fix.start), tail = text.slice(fix.end, lineEnd);
+  const left = lead.length > WIDE ? '\u2026' + lead.slice(-KEEP) : lead, right = tail.length > WIDE ? tail.slice(0, KEEP) + '\u2026' : tail;
+  const before = left + text.slice(fix.start, fix.end) + right;
+  const after = left + fix.text + right;
   // (A \r\n that lineStart splits counts as its \r.)
   const line = lineOf(lineStarts(text, cache), lineStart) + (text[lineStart - 1] === '\r' && text[lineStart] === '\n' ? 2 : 1);
   const out = [`  ${ink.paint(ink.palette.add, `${ink.bold}fix`)}   ${fix.label ?? ''}`];

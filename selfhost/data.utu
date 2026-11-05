@@ -84,6 +84,8 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
     let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect]; } else { expect; };
     if is_foreign(t) { return check_foreign_record(node, t, cx); };
     let decl = if t >= 0 { ty_decl(t); } else { -1; };
+    // (Wanted as an unknown type: said already.)
+    if t >= 0 and ty_is(t, Ty.Error) { return error_value(); };
     if not decl_is(decl, Decl.Struct) {
         report2(Diag.ImplicitStructInit, node, -1, t, -1);
         return error_value();

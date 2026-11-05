@@ -653,7 +653,7 @@ fn conforms(t: I32, proto: I32) void {
                     // A field of another type: "Shape.name is Str, got I32" at the field's type.
                     let got = type_of(last_child(decl_node[field]), 0);
                     let want = sig_type(last_child(m), decl_type(t, 0));
-                    if got != want { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(decl_text(proto) + "." + word_text(word)), want, got, Why.Annotation.to_i32() * 65536); };
+                    if got != want and not ty_has_error(got) and not ty_has_error(want) { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(decl_text(proto) + "." + word_text(word)), want, got, Why.Annotation.to_i32() * 65536); };
                 };
             };
         };
@@ -671,7 +671,7 @@ fn same_signature(f: I32, method: I32, self_t: I32) Bool {
     let p = if params >= 0 { first_child(params); } else { -1; };
     let q = if is_kind(list, Node.Type_list) { first_child(list); } else { -1; };
     while (p >= 0 and q >= 0) {
-        if type_of(last_child(p), inst) != sig_type(q, self_t) { return false; };
+        if not same_type(type_of(last_child(p), inst), sig_type(q, self_t)) { return false; };
         p = next_sibling(p);
         q = next_sibling(q);
     };
@@ -682,8 +682,11 @@ fn same_signature(f: I32, method: I32, self_t: I32) Bool {
         if is_kind(c, Node.Return_type) { ret = c; };
         c = next_sibling(c);
     };
-    type_of(ret, inst) == sig_type(last_child(method), self_t);
+    same_type(type_of(ret, inst), sig_type(last_child(method), self_t));
 }
+
+/// Two types the same, or one made of an unknown (its mistake said once).
+fn same_type(a: I32, b: I32) Bool { a == b or ty_has_error(a) or ty_has_error(b); }
 
 //! = Bounds
 //!
