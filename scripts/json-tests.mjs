@@ -187,7 +187,8 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
     const { describe, first_wins } = instance.exports;
     const cases = [
       [{ status: 'ok', extra: [1, { a: '}' }], user: { age: 41, name: 'Ada', more: true }, plan: { tier: 'pro' } }, 'Ada 41 pro'],
-      [{ status: 'ok', user: { name: 'Bo' } }, 'Bo 18 free'],
+      // An object pattern needs its object, even when every field in it is optional.
+      [{ status: 'ok', user: { name: 'Bo' } }, 'no match: missing field "plan"'],
       [{ status: 'ok', user: { name: 'Bo' }, plan: { tier: null } }, 'Bo 18 free'],
       [{ status: 'error', message: 'nope' }, 'error: nope'],
       [{ items: [{ id: 1, price: 2 }, { id: 2, price: 3.5 }] }, 'items 2 3.5'],
@@ -202,7 +203,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
       const result = describe(JSON.stringify(value));
       assert(result.startsWith(expected), `${JSON.stringify(value)} → ${result} (expected ${expected})`);
     }
-    assertEq(describe('{"status": "ok", "user": {"name": "Al"}} trailing'), 'no match: unexpected text after the value at line 1, column 42');
+    assertEq(describe('{"status": "ok", "user": {"name": "Al"}, "plan": {}} trailing'), 'no match: unexpected text after the value at line 1, column 54');
     assertEq(first_wins('{"a": 1, "b": 2}'), 1, 'arms are tried in order');
     assertEq(first_wins('{"b": 2}'), 0);
   });
