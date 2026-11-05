@@ -84,11 +84,6 @@
         "category": "UTU"
       },
       {
-        "command": "utu.showCompilerIR",
-        "title": "UTU: Show Compiler IR",
-        "category": "UTU"
-      },
-      {
         "command": "utu.showSemanticXray",
         "title": "UTU: Open Semantic X-Ray",
         "category": "UTU",
