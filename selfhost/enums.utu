@@ -76,8 +76,8 @@ fn prelude_index(t: I32) I32 {
 
 /// `Tag.from_i32(i)`, `Tag.count()`, `Tag.name(t)`: static operations of a
 /// scalar kind. -1 when `word` is none of them.
-fn scalar_static(decl: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
-    let t = named(decl, 0);
+fn scalar_static(decl: I32, inst: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
+    let t = named(decl, inst);
     let base = scalar_base(decl);
     let m = w_mark();
     let a = if args >= 0 { first_child(args); } else { -1; };

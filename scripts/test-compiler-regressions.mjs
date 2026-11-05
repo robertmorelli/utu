@@ -822,6 +822,8 @@ export lib {
   // near 800.)
   const closureDepth = process.versions.bun ? 1500 : 3000;
   const everyMode = [
+    // Int-enum statics in a generic mod's instance: `K.from_i32`, `K.name`, `K.count`, in it and through an alias.
+    ['mod m[T] {\n    enum(U8) K: | A | B\n    fn nm(k: K) Str { K.name(k); }\n    fn rt(i: I32) K { K.from_i32(i); }\n    fn n() I32 { K.count(); }\n}\nusing m[I32] |a|;\nexport lib { fn run() I32 { let k: a.K = a.K.from_i32(1); m[I32].nm(m[I32].rt(1)).len() + a.K.name(k).len() * 10 + a.K.count() * 100 + m[Str].n(); } }\n', 213],
     // An empty `[]` before the other elements took Array[I32] (`[[], [1.5]]` was "Elements are I32, got F64"): it takes the type of the first element that is not empty, as `[[1.5], []]` did.
     ['export lib { fn run() I32 { let u = [[], [1.5]]; let v = [[], [], ["a", "b"]]; let w = [[1.5], []]; u[0].len() * 1000 + u[1].len() * 100 + v[0].len() * 10 + v[2].len() + w[1].len() * 10000; } }\n', 102],
     // A hosted mem's copy_in takes an Externref, with no std:JS loaded (it crashed the compiler).
