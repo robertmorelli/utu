@@ -10217,6 +10217,30 @@ FAIL after tests: boom
  4 │ export main() I32 { m[I32].f(m[I32].T { x: 1 }).x; }
 --- exit 1
 
+=== utu check examples/error_demo/types/1360_proto_result_type.utu
+ ERROR  P[S].tick does not match the protocol: wants I32
+        proto-signature · examples/error_demo/types/1360_proto_result_type.utu:6:21
+
+ 4 │ struct S[P]:
+ 5 │     | x: I32
+ 6 │ fn P[S].tick |s| () Str { "bad"; }
+   │                     ━━━
+   │                     ╰─ here
+ 7 │ export main() I32 { 0; }
+--- exit 1
+
+=== utu check examples/error_demo/types/1361_proto_parameter_type.utu
+ ERROR  P[S].tick does not match the protocol: wants I32
+        proto-signature · examples/error_demo/types/1361_proto_parameter_type.utu:6:22
+
+ 4 │ struct S[P]:
+ 5 │     | x: I32
+ 6 │ fn P[S].tick |s| (n: Str) I32 { 0; }
+   │                      ━━━
+   │                      ╰─ here
+ 7 │ export main() I32 { 0; }
+--- exit 1
+
 === utu check examples/error_demo/types/13_if_else_branches.utu
  ERROR  Branches differ: I32 and Str
         type-mismatch · examples/error_demo/types/13_if_else_branches.utu:5:41
@@ -11735,14 +11759,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/86_proto_signature.utu
- ERROR  Shape[Square].area does not match the protocol
-        proto-signature · examples/error_demo/types/86_proto_signature.utu:9:1
+ ERROR  Shape[Square].area does not match the protocol: wants F64
+        proto-signature · examples/error_demo/types/86_proto_signature.utu:9:30
 
  7 │     | side: F64
  8 │
  9 │ fn Shape[Square].area |s| () I32 { s.side.to_i32() * s.side.to_i32(); }
-   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │ ╰─ here
+   │                              ━━━
+   │                              ╰─ here
 10 │
 11 │ export main() I32 { 0; }
 --- exit 1

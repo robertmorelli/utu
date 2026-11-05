@@ -662,7 +662,7 @@ fn diag_text(i: I32) Str {
         Diag.OptionalOutsideStatement => "?. only in a statement",
         Diag.AwaitNotPromise => "Cannot await " + type_text(a),
         Diag.ProtoMissing => decl_text(a) + " lacks " + word_text(diag_c[i]) + "." + w,
-        Diag.ProtoSignature => word_text(a) + "[" + word_text(b) + "]." + w + " does not match the protocol",
+        Diag.ProtoSignature => word_text(a) + "[" + word_text(b) + "]." + w + " does not match the protocol" + if diag_c[i] >= 0 { ": wants " + type_text(diag_c[i]); } else { ""; },
         Diag.MemElementRange => {
             if b == -1 and mem_int_enum(a) >= 0 { return word_text(diag_c[i]) + " is no " + word_text(decl_name[mem_int_enum(a)]); };
             word_text(diag_c[i]) + " does not fit " + Storage.name(mem_storage(a));

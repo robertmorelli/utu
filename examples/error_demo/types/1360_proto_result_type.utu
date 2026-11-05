@@ -1,0 +1,7 @@
+// What: a protocol implementation with the wrong result type
+proto P:
+    | tick() I32
+struct S[P]:
+    | x: I32
+fn P[S].tick |s| () Str { "bad"; }
+export main() I32 { 0; }
