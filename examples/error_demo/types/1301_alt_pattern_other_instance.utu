@@ -1,0 +1,11 @@
+// What: an alt on a cell[I32].E with the variants of cell[Str].E
+// Expect: Expected cell[I32].E, got cell[Str].E
+mod cell[T] {
+    enum E:
+        | A { v : T }
+        | B
+    fn mk(t: T) E { E.A { v: t }; }
+}
+using cell[I32] |a|;
+using cell[Str] |b|;
+export main() I32 { let x = a.mk(7); alt x { b.E.A |p| => p.v.len(), b.E.B => 2, }; }

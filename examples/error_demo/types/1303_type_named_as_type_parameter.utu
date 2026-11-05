@@ -1,0 +1,4 @@
+// What: struct T in mod m[T], hiding the type parameter
+// Expect: Duplicate declaration T
+mod m[T] { struct T: | x : I32  fn f(x: T) T { x; } }
+export main() I32 { m[I32].f(m[I32].T { x: 1 }).x; }

@@ -9830,14 +9830,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/1182_alt_other_instance.utu
- ERROR  Expected E, got A
+ ERROR  Expected M[I32].E, got M[Str].E
         type-mismatch · examples/error_demo/types/1182_alt_other_instance.utu:10:13
 
  8 │ export main() I32 {
  9 │     let e: MI.E = MI.E.A { value: 7 };
 10 │     alt e { MS.E.A |a| => a.value, };
    │             ━━━━━━
-   │             ╰─ A
+   │             ╰─ E
 11 │ }
 --- exit 1
 
@@ -10098,6 +10098,71 @@ FAIL after tests: boom
    │               ╰─ I32
  5 │     xs.len();
  6 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1300_match_pattern_other_instance.utu
+ ERROR  Expected cell[I32].K, got cell[Str].K
+        type-mismatch · examples/error_demo/types/1300_match_pattern_other_instance.utu:9:47
+
+ 7 │ using cell[I32] |a|;
+ 8 │ using cell[Str] |b|;
+ 9 │ export main() I32 { let x = a.k(1); match x { b.K.A => 1, b.K.B => 2, }; }
+   │                                               ━━━━━
+   │                                               ╰─ K
+
+ ERROR  Expected cell[I32].K, got cell[Str].K
+        type-mismatch · examples/error_demo/types/1300_match_pattern_other_instance.utu:9:59
+
+ 7 │ using cell[I32] |a|;
+ 8 │ using cell[Str] |b|;
+ 9 │ export main() I32 { let x = a.k(1); match x { b.K.A => 1, b.K.B => 2, }; }
+   │                                                           ━━━━━
+   │                                                           ╰─ K
+--- exit 1
+
+=== utu check examples/error_demo/types/1301_alt_pattern_other_instance.utu
+ ERROR  Expected cell[I32].E, got cell[Str].E
+        type-mismatch · examples/error_demo/types/1301_alt_pattern_other_instance.utu:11:46
+
+ 9 │ using cell[I32] |a|;
+10 │ using cell[Str] |b|;
+11 │ export main() I32 { let x = a.mk(7); alt x { b.E.A |p| => p.v.len(), b.E.B => 2, }; }
+   │                                              ━━━━━
+   │                                              ╰─ E
+--- exit 1
+
+=== utu check examples/error_demo/types/1302_using_alias_type_arguments.utu
+ ERROR  a takes 0 type arguments, given 1
+        invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:5:10
+
+ 3 │ mod m[T] { struct S: | x : T  fn mk(x: T) S { S { x: x }; } }
+ 4 │ using m[I32] |a|;
+ 5 │ fn h(v: a[Str].S) I32 { 1; }
+   │          ━━━━━
+   │          ╰─ here
+ 6 │ export main() I32 { a[Str].mk(1).x; }
+
+ ERROR  a takes 0 type arguments, given 1
+        invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:6:22
+
+ 4 │ using m[I32] |a|;
+ 5 │ fn h(v: a[Str].S) I32 { 1; }
+ 6 │ export main() I32 { a[Str].mk(1).x; }
+   │                      ━━━━━
+   │                      ╰─ here
+--- exit 1
+
+=== utu check examples/error_demo/types/1303_type_named_as_type_parameter.utu
+ ERROR  Duplicate declaration T
+        duplicate-declaration · examples/error_demo/types/1303_type_named_as_type_parameter.utu:3:19
+
+ 1 │ // What: struct T in mod m[T], hiding the type parameter
+ 2 │ // Expect: Duplicate declaration T
+ 3 │ mod m[T] { struct T: | x : I32  fn f(x: T) T { x; } }
+   │       ─           ━
+   │       │           ╰─ again
+   │       ╰─ first here
+ 4 │ export main() I32 { m[I32].f(m[I32].T { x: 1 }).x; }
 --- exit 1
 
 === utu check examples/error_demo/types/13_if_else_branches.utu

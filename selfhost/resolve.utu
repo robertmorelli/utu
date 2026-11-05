@@ -761,11 +761,13 @@ fn declare_fn(item: I32, owner: I32) I32 {
 fn declare_module(item: I32) I32 {
     let decl = declare_named(Decl.Module, first_child(item), item, -1);
     let c = next_sibling(first_child(item));
+    let first_param = -1;
+    let index = 0;
     if is_kind(c, Node.Module_type_param_list) {
-        let index = 0;
         let param = first_child(c);
         while (param >= 0) {
             let p = declare_named(Decl.ModuleParam, first_child(param), param, decl);
+            if first_param < 0 { first_param = p; };
             decl_a[p] = index;
             index += 1;
             param = next_sibling(param);
@@ -776,6 +778,8 @@ fn declare_module(item: I32) I32 {
         let kind = node_kind[c];
         let t = declare_type_item(c, decl);
         if t >= 0 {
+            // `struct T` in `mod m[T]` would hide the type parameter.
+            for (0 ..< index) |k| { if decl_name[first_param + k] == decl_name[t] and decl_name[t] >= 0 { report_twice(t, first_param + k); }; };
             if names_promoted(c) { decl_a[decl] = t; } else { member_once(decl, t); };
             if decl_is(t, Decl.Enum) {
                 for (t + 1 ..< decl_kind.len()) |v| {
@@ -1656,7 +1660,7 @@ fn walk_using(item: I32, w: Walk) void {
     let n = name_node(name_at);
     // An import's module is in the file it imports (see @bind_import).
     let module = if using_path(item) >= 0 { node_decl[n]; } else { lookup(word_of(n)); };
-    if decl_is(module, Decl.Alias) { module = decl_a[module]; };
+    if decl_is(module, Decl.Alias) { node_alias[n] = module; module = decl_a[module]; };
     module = module_named(module);
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
         // `using helper from "./lib.utu"` with `fn helper` there: only a mod is imported.

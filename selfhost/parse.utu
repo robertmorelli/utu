@@ -1673,6 +1673,15 @@ fn word_expression(p: Parser) I32 {
             field_inits(p);
             return node(p, Node.Struct_init, at, first);
         };
+        // `M[A].E.V { f: x }`: a variant of M's enum E made.
+        if is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1) and is_at(p, 2, Tok.Dot) and is_at(p, 3, Tok.Word) and is_at(p, 4, Tok.LBrace) and is_at(p, 5, Tok.Word) and is_at(p, 6, Tok.Colon) {
+            advance(p);
+            type_ident(p);
+            variant_step(p);
+            node(p, Node.Qualified_type_ref, at, first);
+            field_inits(p);
+            return node(p, Node.Struct_init, at, first);
+        };
         // (`M[A].V`, a variant of M's type, ends at the name; `M[A].T.member` goes on.)
         if is(p, Tok.Dot) and (shaped_at(p, 1) or not is_at(p, 2, Tok.Dot)) {
             node(p, Node.Instantiated_module_ref, at, first);
@@ -1740,7 +1749,8 @@ fn index_ahead(p: Parser) Bool {
             advance(p);
             expression(p);
         };
-        is(p, Tok.RBracket);
+        // `m[a.T].T.f(…)` names an instance: a capitalized word after `].` is a type, not a field.
+        if is(p, Tok.RBracket) { advance(p); not (is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1)); } else { false; };
     } catch {
         false;
     };
