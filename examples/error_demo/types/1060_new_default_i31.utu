@@ -1,0 +1,6 @@
+// What: Array.new_default of I31, which is never null (new_default left nulls that trapped when read)
+// Expect: I31 has no default: Array[I31].new(n, fill)
+export main() I32 {
+    let refs = Array[I31].new_default(3);
+    I31.get_s(refs[0]);
+}

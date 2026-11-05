@@ -377,10 +377,14 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
         let has_null = false;
         let null_at = -1;
         let from = -1;
+        // (An empty `[]` among them takes the type of the first that is not: `[[], [1.5]]`.)
+        let empty_at = -1;
         while (c >= 0) {
             if is_null_literal(c) {
                 has_null = true;
                 if null_at < 0 { null_at = c; };
+            } else if is_empty_array(c) {
+                if empty_at < 0 { empty_at = c; };
             } else if elem < 0 {
                 // (A nested literal's type checked as a whole, at each depth,
                 // would take time the square of the depth.)
@@ -388,6 +392,10 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
                 from = c;
             };
             c = next_sibling(c);
+        };
+        if elem < 0 and empty_at >= 0 {
+            elem = type_only(empty_at, -1, cx);
+            from = empty_at;
         };
         // `[Sh.C {…}, Sh.R {…}]`: an Array[Sh].
         c = if elem >= 0 and ty_is(elem, Ty.Named) and decl_is(ty_decl(elem), Decl.Variant) { next_sibling(from); } else { -1; };
@@ -792,10 +800,10 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
 }
 
 /// Whether a type has a value to start from (a scalar, a nullable or host
-/// reference; not Str, a closure or a tuple, which are never null): `array.new_default` fills arrays of those.
+/// reference; not Str, I31, a closure or a tuple, which are never null): `array.new_default` fills arrays of those.
 fn defaultable(t: I32) Bool {
     if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { return true; };
-    if ty_is(t, Ty.Closure) or ty_is(t, Ty.Tuple) or t == prelude(Prelude.Str) { return false; };
+    if ty_is(t, Ty.Closure) or ty_is(t, Ty.Tuple) or t == prelude(Prelude.Str) or t == prelude(Prelude.I31) { return false; };
     let decl = ty_decl(t);
     if decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Enum) or decl_is(decl, Decl.Variant) or decl_is(decl, Decl.Proto) { return false; };
     not is_array_type(t);

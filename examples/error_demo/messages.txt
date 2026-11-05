@@ -9397,6 +9397,19 @@ FAIL after tests: boom
 12 │ }
 --- exit 1
 
+=== utu check examples/error_demo/types/1060_new_default_i31.utu
+ ERROR  I31 has no default: Array[I31].new(n, fill)
+        non-defaultable · examples/error_demo/types/1060_new_default_i31.utu:4:16
+
+ 2 │ // Expect: I31 has no default: Array[I31].new(n, fill)
+ 3 │ export main() I32 {
+ 4 │     let refs = Array[I31].new_default(3);
+   │                ━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                ╰─ here
+ 5 │     I31.get_s(refs[0]);
+ 6 │ }
+--- exit 1
+
 === utu check examples/error_demo/types/106_closure_self_untyped.utu
  ERROR  f needs a type annotation to call itself
         self-untyped · examples/error_demo/types/106_closure_self_untyped.utu:4:20

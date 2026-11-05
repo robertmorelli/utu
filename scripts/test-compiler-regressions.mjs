@@ -744,6 +744,8 @@ export lib {
   // near 800.)
   const closureDepth = process.versions.bun ? 1500 : 3000;
   const everyMode = [
+    // An empty `[]` before the other elements took Array[I32] (`[[], [1.5]]` was "Elements are I32, got F64"): it takes the type of the first element that is not empty, as `[[1.5], []]` did.
+    ['export lib { fn run() I32 { let u = [[], [1.5]]; let v = [[], [], ["a", "b"]]; let w = [[1.5], []]; u[0].len() * 1000 + u[1].len() * 100 + v[0].len() * 10 + v[2].len() + w[1].len() * 10000; } }\n', 102],
     // A hosted mem's copy_in takes an Externref, with no std:JS loaded (it crashed the compiler).
     ['mem text: U8;\nlet bytes: fun() Externref = @es/\\ () => new Uint8Array([5, 6, 7]) \\/;\nexport lib { fn run() I32 { text.copy_in(bytes()); text.len() * 100 + text[2]; } }\n', 307],
     // An alt arm whose value is a bare name (it was read as the arm's binding).
