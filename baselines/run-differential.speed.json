@@ -4064,6 +4064,12 @@
  "benchmarks/tiny/benchmark.utu test": {
   "calls": {}
  },
+ "examples/bounds.utu normal": {
+  "diagnostics": true
+ },
+ "examples/bounds.utu test": {
+  "diagnostics": true
+ },
  "examples/browser-board/main.utu normal": {
   "calls": {
    "main": {
@@ -5147,6 +5153,12 @@
   "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-reactive/main.utu test": {
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+ },
+ "examples/wutu-regressions/main.utu normal": {
+  "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
+ },
+ "examples/wutu-regressions/main.utu test": {
   "compile": "Error: Wutu templates are compiled by the self-hosted compiler (utu, wutu build), not stage 0"
  },
  "examples/wutu-round-one/atlas/main.utu normal": {

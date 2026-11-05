@@ -10,6 +10,8 @@
 // every exported function that takes no arguments is called, and its result
 // (or trap) and what it printed are compared. A program the compiler cannot
 // build yet (it reports something unsupported) is counted, not compared.
+// A program with no recorded run is listed, and fails the run, until it is
+// recorded (node scripts/run-differential.mjs --record --only=<path>).
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -100,13 +102,17 @@ async function main() {
 
   const keys = Object.keys(results).sort();
   if (flag('json')) await fs.writeFile(flag('json'), JSON.stringify(Object.fromEntries(keys.map(key => [key, results[key]])), null, 1));
-  const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0 };
+  const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0, unrecorded: 0 };
   const differ = [];
+  const unrecorded = [];
   const reasons = new Map();
   const whys = [];
   for (const key of keys) {
     const result = results[key];
     if (INTENDED[key]) { count.intended++; continue; }
+    // A program added since stage 0's runs were recorded has nothing to be
+    // compared with.
+    if (!(key in recorded)) { count.unrecorded++; unrecorded.push(key); continue; }
     // Wutu templates, and Result's try and errdefer, are the self-hosted compiler's alone: stage 0 refuses them.
     if (JSON.stringify(recorded[key] ?? '').includes(' are compiled by the self-hosted compiler')) { count.intended++; continue; }
     if (result?.unsupported) {
@@ -131,13 +137,18 @@ async function main() {
     differ.push(`DIFFERS ${key}\n  was ${JSON.stringify(recorded[key]).slice(0, 300)}\n  now ${JSON.stringify(result).slice(0, 300)}`);
   }
   for (const line of differ.slice(0, show)) console.log(line);
+  if (unrecorded.length) {
+    const paths = [...new Set(unrecorded.map(key => key.replace(/ (normal|test)$/, '')))];
+    console.log(`NO BASELINE (record each: node scripts/run-differential.mjs --record --only=<path>):\n${paths.map(p => `  ${p}`).join('\n')}`);
+  }
   if (whys.length) console.log(`${flag('why')}, unsupported:\n${[...new Set(whys)].slice(0, Number(flag('show') ?? 30)).map(w => `  ${w}`).join('\n')}`);
   const top = [...reasons].sort((a, b) => b[1] - a[1]).slice(0, Number(flag('reasons') ?? 15));
   if (top.length) console.log(`unsupported, by what (programs):\n${top.map(([reason, n]) => `  ${n} ${reason}`).join('\n')}`);
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
   console.log(`${keys.length} builds: ${count.same} behave as stage 0's, ${count.differ} differ, `
-    + `${count.rejected} rejected that stage 0 built, ${count.intended} differ on purpose, ${count.unsupported} not supported yet, in ${seconds} s`);
-  if (count.differ || count.rejected) process.exit(1);
+    + `${count.rejected} rejected that stage 0 built, ${count.intended} differ on purpose, ${count.unsupported} not supported yet, `
+    + `${count.unrecorded} with no baseline, in ${seconds} s`);
+  if (count.differ || count.rejected || count.unrecorded) process.exit(1);
 }
 
 async function worker() {
