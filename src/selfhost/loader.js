@@ -91,7 +91,7 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
     exports = `{ ...instance.exports, ${each.join(', ')} }`;
   }
   if (spec.exports) {
-    const converted = exportConversionSource(spec.exports, exports);
+    const converted = exportConversionSource(spec.exports, exports, asyncExports);
     if (converted) {
       conversionSource = converted.source;
       exports = converted.name;
@@ -106,8 +106,14 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
   return lines.join('\n') + '\n';
 }
 
-/** Specialize the export boundary to the kinds in this module's spec. */
-function exportConversionSource(spec, input) {
+/**
+ * Specialize the export boundary to the kinds in this module's spec: each
+ * converted export is one arrow over its own parameters (a spec with `p` names
+ * every parameter, so the arrow's length is the export's), checking and
+ * converting each and converting the result, then `await`ed only for an export
+ * that is async. A kind it does not know leaves the module to convertExports.
+ */
+function exportConversionSource(spec, input, asyncExports = []) {
   const checks = {
     Bool: v => `!!${v}`, int: v => `Number.isInteger(${v})`,
     big: v => `typeof ${v}==="bigint"`, num: v => `typeof ${v}==="number"`,
@@ -120,26 +126,32 @@ function exportConversionSource(spec, input) {
   // The generic converter leaves every other result kind unchanged.
   const validResult = kind => typeof kind === 'string';
   let needsFail = false;
-  const lines = [`const $utuExports={...${input}};`];
+  const members = [];
   for (const [name, entry] of Object.entries(spec)) {
     const r = typeof entry === 'string' ? entry : entry.r;
-    const params = typeof entry === 'string' ? [] : entry.p ?? [];
-    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params.some(k => !(k in checks))) return null;
+    const params = typeof entry === 'string' ? null : entry.p ?? null;
+    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params?.some(k => !(k in checks))) return null;
     const key = JSON.stringify(name);
-    const body = [];
-    params.forEach((kind, i) => {
-      const v = `a[${i}]`;
-      if (kind === 'Bool' || kind === '?') body.push(`${v}=${checks[kind](v)};`);
+    const names = params ? params.map((_, i) => `a${i}`) : null;
+    const steps = [];
+    params?.forEach((kind, i) => {
+      const v = names[i];
+      if (kind === 'Bool' || kind === '?') steps.push(`${v}=${checks[kind](v)}`);
       else {
         needsFail = true;
-        body.push(`${checks[kind](v)}||$utuFail(${key},${i},${JSON.stringify(descriptions[kind])},${v});`);
-        if (kind === '?Str') body.push(`${v}=${v}==null?null:${v};`);
+        steps.push(`${checks[kind](v)}||$utuFail(${key},${i},${JSON.stringify(descriptions[kind])},${v})`);
+        if (kind === '?Str') steps.push(`${v}??=null`);
       }
     });
-    const converted = Array.isArray(r) ? `v.map((x,i)=>[${r.map(k => `x=>${result(k, 'x')}`).join(',')}][i](x))` : result(r, 'v');
-    body.push(`const v=f(...a);return v instanceof Promise?v.then(x=>${converted.replaceAll(/\bv\b/g, 'x')}):${converted};`);
-    lines.push(`{const f=${input}[${key}];if(typeof f==="function"){$utuExports[${key}]=(...a)=>{${body.join('')}};Object.defineProperty($utuExports[${key}],"length",{value:f.length});}}`);
+    const call = `$utuIn[${key}](${names ? names.join(',') : '...a'})`;
+    const convert = v => Array.isArray(r) ? (v === 'x' ? '' : `(v=>`) + `${v === 'x' ? 'x' : 'v'}.map((x,i)=>[${r.map(k => `x=>${result(k, 'x')}`).join(',')}][i](x))` + (v === 'x' ? '' : `)(${v})`) : result(r, v);
+    const value = asyncExports.includes(name) ? (convert('x') === 'x' ? call : `${call}.then(x=>${convert('x')})`) : convert(call);
+    const body = steps.length ? `(${[...steps, value].join(',')})` : value;
+    // Without `p` the parameters are not listed: the arrow takes them all, and keeps the export's length.
+    if (names) members.push(`${key}:(${names.join(',')})=>${body}`);
+    else members.push(`${key}:Object.defineProperty((...a)=>${body},"length",{value:$utuIn[${key}].length})`);
   }
+  const lines = [`const $utuIn=${input},$utuExports={...$utuIn,${members.join(',')}};`];
   if (needsFail) lines.unshift('const $utuFail=(name,i,what,v)=>{throw new TypeError(`${name}: argument ${i+1} must be ${what}, not ${v===null?"null":what==="an integer"&&typeof v==="number"?v:typeof v}`)};');
   return { source: lines.join('\n'), name: '$utuExports' };
 }
