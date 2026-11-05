@@ -25,6 +25,8 @@ export function declarationSchema(ts, checker, symbols, { prefix, moduleSpecifie
     if (f & ts.TypeFlags.ESSymbolLike) return 'symbol';
     if (f & ts.TypeFlags.IndexedAccess) return { indexed: ref(type.objectType), key: ref(type.indexType) };
     if (f & ts.TypeFlags.Index) return { keys: ref(type.type) };
+    // `Awaited<T>` of a generic T: what a promise of T settles to, T itself otherwise.
+    if (f & ts.TypeFlags.Conditional && type.aliasSymbol?.name === 'Awaited' && type.aliasTypeArguments?.length === 1) return { awaited: ref(type.aliasTypeArguments[0]) };
     if (f & ts.TypeFlags.TypeParameter) {
       // The declared constraint keeps relations such as `S extends T`; F-bounded
       // constraints (`T extends Foo<T>`) stop at the recursive mention.

@@ -305,7 +305,8 @@ fn es_wrap(t: I32) Str {
 }
 
 /// A wasm value to JS: Bool a boolean, U32 and U64 unsigned.
-fn es_in(name: Str, t: I32) Str {
+fn es_in(name: Str, t0: I32) Str {
+    let t = unsigned_view(t0);
     if t == prelude(Prelude.Bool) { return "!!" + name; };
     if t == prelude(Prelude.U32) { return name + " >>> 0"; };
     if t == prelude(Prelude.U64) { return "BigInt.asUintN(64, " + name + ")"; };
@@ -315,6 +316,24 @@ fn es_in(name: Str, t: I32) Str {
 /// A JS value to wasm: Bool 1 or 0, undefined null.
 fn es_out(expr: Str, t: I32) Str {
     if t == prelude(Prelude.Bool) { return expr + " ? 1 : 0"; };
+    // A JS function utu will call: its arguments reach it as a host reads them
+    // (a Bool a boolean, a U32 or U64 unsigned), its result as wasm takes it.
+    if ty_is(t, Ty.Closure) {
+        let params = ty_a[t];
+        let names = "";
+        let args = "";
+        let changed = false;
+        for (0 ..< vl_len[params]) |i| {
+            let name = "p" + i.to_str();
+            let arg = es_in(name, vl_item(params, i));
+            if arg != name { changed = true; };
+            names = names + (if i > 0 { ","; } else { ""; }) + name;
+            args = args + (if i > 0 { ","; } else { ""; }) + arg;
+        };
+        let out = es_out("c(" + args + ")", ty_b[t]);
+        if not changed and out == "c(" + args + ")" { return expr; };
+        return "(c => (" + names + ") => " + out + ")(" + expr + ")";
+    };
     if ty_is(t, Ty.Nullable) { return expr + " ?? null"; };
     // A Str must be a string: anything else would pass as one, and trap later.
     if t == prelude(Prelude.Str) {
@@ -583,8 +602,17 @@ fn write_exports_json() void {
     if not first { json_byte(125); };
 }
 
+/// A distinct type or integer enum over an unsigned type reads as that type (U32, U64); any other type as itself.
+fn unsigned_view(t: I32) I32 {
+    if t < 0 or not ty_is(t, Ty.Named) or not is_scalar_kind(ty_decl(t)) { return t; };
+    let d = ty_decl(t);
+    if not scalar_unsigned(d) { return t; };
+    if decl_is(d, Decl.IntEnum) { prelude(Prelude.U32); } else { distinct_base(d); };
+}
+
 /// How JS reads a result of type t: "Bool", "U32", "U64", or "" (as wasm gives it).
-fn js_result_kind(t: I32) Str {
+fn js_result_kind(t0: I32) Str {
+    let t = unsigned_view(t0);
     if t == prelude(Prelude.Bool) { "Bool"; } else if t == prelude(Prelude.U32) { "U32"; } else if t == prelude(Prelude.U64) { "U64"; } else { ""; };
 }
 
