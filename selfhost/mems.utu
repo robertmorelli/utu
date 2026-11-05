@@ -366,7 +366,7 @@ fn mem_initial_data(decl: I32, m: I32) I32 {
             let e = if negate { last_child(c); } else { c; };
             let lit = if is_kind(e, Node.Literal) { first_child(e); } else { -1; };
             if lit >= 0 and (is_kind(lit, Node.Int_lit) or is_kind(lit, Node.Float_lit)) {
-                store_literal(decl, lit, negate, init, count);
+                store_literal(decl, lit, negate, c, count);
             } else {
                 report(Diag.MemInitializer, init, decl_name[decl]);
             };

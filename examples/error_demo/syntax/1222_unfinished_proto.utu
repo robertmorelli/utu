@@ -1,0 +1,4 @@
+// What: an unfinished protocol member at EOF.
+// Expect: Protocol members begin with |, followed by a name and signature
+proto P:
+    fn

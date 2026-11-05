@@ -645,7 +645,8 @@ fn lex_to(first: I32, n: I32) I32 {
     let next = dfa[start * 256 + src[first]];
     loop match next {
         0 => {  // error_code
-            return tokens_end(put_token(t, Tok.Error.to_i32(), i, i));
+            let width = if i < n { utf8_char_size(i, n); } else { 0; };
+            return tokens_end(put_token(t, Tok.Error.to_i32(), i, i + (if width > 0 { width; } else { 0; })));
         },
         1 => {  // accept_code
             let kind = kind_of[state];

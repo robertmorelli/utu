@@ -941,7 +941,8 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
         let m = w_mark();
         let t = check_expr(a, -1, cx);
         while (w_stack.len() > m) { w_pop(); };
-        if ty_is(t, Ty.Error) or not in_words("I32 U32 I64 U64 F32 F64 Bool Str", type_text(t)) { return false; };
+        // The string key loses signed zero; redraw float props instead.
+        if ty_is(t, Ty.Error) or not in_words("I32 U32 I64 U64 Bool Str", type_text(t)) { return false; };
         a = next_sibling(a);
     };
     true;

@@ -176,7 +176,7 @@ fn alias_word(word: I32) I32 {
 }
 
 fn match_alias(t: Str) Str {
-    if t == "length" or t == "size" { return "len"; };
+    if t == "length" or t == "lenght" or t == "size" { return "len"; };
     if t == "String" or t == "string" { return "Str"; };
     if t == "int" { return "I32"; };
     if t == "float" or t == "double" { return "F64"; };
@@ -589,6 +589,14 @@ fn parse_hint(file: I32, t: I32, wanted: I32) void {
         return;
     };
     if diag_fresh[0] == 0 or t < 0 or tok_kind[t] == Tok.Error.to_i32() { return; };
+    if tok_is(t, Tok.End) {
+        let prev = tok_before(file, t);
+        if prev >= 3 and tok_says(prev, "fn") and tok_says(prev - 3, "proto") and tok_is(prev - 1, Tok.Colon) {
+            diag_focus(prev, prev, "unfinished protocol");
+            parse_says("Protocol members begin with |, followed by a name and signature");
+            return;
+        };
+    };
     let first = line_first(file, t);
     // The line of the error.
     let last = t;
@@ -767,6 +775,11 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         return true;
     };
     if tok_says(k, "fn") and indented(k) and k == line_first(file, k) and (k == t or tok_after(k) == t) {
+        if k >= 3 and tok_says(k - 3, "proto") and tok_is(k - 1, Tok.Colon) {
+            diag_focus(k, k, "unfinished protocol");
+            parse_says("Protocol members begin with |, followed by a name and signature");
+            return true;
+        };
         diag_focus(k, k, "nested");
         diag_note("Use a closure: let f = cl(x: I32) I32 { … };");
         parse_says("A function cannot be declared inside another");

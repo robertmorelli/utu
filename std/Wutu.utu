@@ -731,6 +731,8 @@ mod wutu {
         init();
         let install: fun() void = @es/\ () => { (function installWutuStorage(api) {
   if (api.store) return;
+  // A non-finite F64 becomes null in JSON; keep the other stored fields.
+  api.storageReviveF64 = value => value === null ? 0 : value;
   const stores = new Map();
   const DEBOUNCE_MS = 180;
   let timer;
