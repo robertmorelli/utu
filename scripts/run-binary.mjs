@@ -16,7 +16,8 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { createCompiler, initParser, emitBinary, emitText } from '../src/index.js';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
+import { printWat } from '../src/selfhost/wat.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -30,32 +31,26 @@ async function main() {
   const filePath = path.resolve(argv[0]);
   const rest = argv.slice(1);
 
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser,
-    target: 'normal',
-    readFile: async (p) => fs.readFile(p, 'utf8'),
-    resolvePath: (from, rel) => path.resolve(path.dirname(from), rel),
+  const wat = rest[0] === '--emit-wat';
+  const built = await compileFile(await loadNodeCompiler(), filePath, {
+    root: ROOT, ...(wat ? { optimize: 'none', debugNames: true, sourceMap: true } : {}),
   });
+  if (!built.wasm) throw new Error(built.diagnostics.map(diagnostic => diagnostic.message).join('\n'));
 
-  const doc = await compiler.compileFile(filePath);
-  reportIRErrors(doc, filePath);
-
-  if (rest[0] === '--emit-wat') {
-    process.stdout.write(emitText(doc));
+  if (wat) {
+    process.stdout.write(await printWat(built.wasm, { map: built.map, files: built.files, source: true }));
     return;
   }
 
   if (rest[0] === '--emit-bin') {
     const out = rest[1] ?? filePath.replace(/\.utu$/, '.wasm');
-    await fs.writeFile(out, emitBinary(doc));
+    await fs.writeFile(out, built.wasm);
     console.error(`wrote ${out}`);
     return;
   }
 
   // Default: instantiate and call the requested export (or list exports if none).
-  const bin = emitBinary(doc);
-  const { instance } = await WebAssembly.instantiate(bin);
+  const { instance } = await instantiateNode(built.wasm, built.spec, { root: ROOT });
   const exportName = rest[0];
 
   if (!exportName) {
@@ -80,16 +75,6 @@ function parseArg(s) {
   if (/^-?\d+$/.test(s))     return parseInt(s, 10);
   if (/^-?\d+\.\d+$/.test(s)) return parseFloat(s);
   return s;
-}
-
-function reportIRErrors(doc, filePath) {
-  const errs = [...doc.querySelectorAll('[data-error]')];
-  if (errs.length === 0) return;
-  for (const e of errs) {
-    const span = e.dataset.start && e.dataset.end ? ` @${e.dataset.start}-${e.dataset.end}` : '';
-    console.error(`${filePath}${span}: ${e.localName}: ${e.getAttribute('data-error')}`);
-  }
-  process.exit(1);
 }
 
 function printUsage() {
