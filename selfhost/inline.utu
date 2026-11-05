@@ -99,6 +99,7 @@ fn inline_into(f: I32) void {
         let c = calls[i];
         let g = w_a[c];
         if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and size + inl_size[g] <= inline_caller_nodes
+            and not has_op(func_body[g], Op.MemoryGrow.to_i32())
             and (inl_size[g] <= inline_always_nodes or (looped[i] and inl_size[g] <= inline_loop_nodes)
                 or (func_uses[g] == 1 and inl_size[g] <= inline_once_nodes)) {
             label = inline_call(f, c, g, label);
