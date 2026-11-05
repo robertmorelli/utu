@@ -9,9 +9,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { formatUtu, formatUtuSource } from '../src/wutu/wutu-tooling.js';
+import { createSyntaxShape, formatUtu, formatUtuSource } from '../src/wutu/wutu-tooling.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { loadNodeCompiler } from '../src/selfhost/node.js';
+const shape = createSyntaxShape(await loadNodeCompiler());
+
 
 const files = [];
 const walk = dir => {
@@ -26,10 +29,10 @@ for (const dir of ['examples', 'std', 'docs/src']) walk(path.join(ROOT, dir));
 let formatted = 0;
 for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
-  const { text, refused } = formatUtu(source);
+  const { text, refused } = await formatUtu(source, { shape });
   const name = path.relative(ROOT, file);
   assert.equal(refused, null, `${name}: left as is (${refused})`);
-  assert.equal(formatUtuSource(text), text, `${name}: formatting twice differs from once`);
+  assert.equal(await formatUtuSource(text, { shape }), text, `${name}: formatting twice differs from once`);
   if (text !== source) formatted++;
 }
 
@@ -44,14 +47,14 @@ const cases = [
   ['fn b(x: Bool) I32 {\n    if x { 1; }\n    else { 2; }\n}\n', null],
 ];
 for (const [source, expected] of cases) {
-  const { text, refused } = formatUtu(source);
+  const { text, refused } = await formatUtu(source, { shape });
   if (expected === null) assert.ok(refused && text === source, `left alone: ${source}`);
   else assert.equal(text, expected);
 }
 
 // Wutu: `}else{` formats like `} else {` (the island was once left as written).
 {
-  const text = formatUtuSource('using Browser from std:Browser;\n\nexport main() void {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n');
+  const text = await formatUtuSource('using Browser from std:Browser;\n\nexport main() void {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n', { shape });
   assert.match(text, /\} else \{/);
 }
 
@@ -59,13 +62,13 @@ for (const [source, expected] of cases) {
 // CSS declarations keep their spacing.
 {
   const source = 'using Browser from std:Browser;\n\nexport main() void {\n    let n = @wutu/\\\n    form { label { for="q"; "Find"; } input#q { display: grid; type="search"; } }\n    \\/;\n    Browser.document.body.append(n);\n}\n';
-  const text = formatUtuSource(source);
+  const text = await formatUtuSource(source, { shape });
   assert.match(text, /for="q";/);
   assert.match(text, /input#q \{/);
   assert.match(text, /display: grid;/);
-  assert.equal(formatUtuSource(text), text);
+  assert.equal(await formatUtuSource(text, { shape }), text);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-format-'));
-  for (const [name, body] of [['wutu.utu', text], ['templates.utu', formatUtuSource(fs.readFileSync(path.join(ROOT, 'examples/templates.utu'), 'utf8'))]]) {
+  for (const [name, body] of [['wutu.utu', text], ['templates.utu', await formatUtuSource(fs.readFileSync(path.join(ROOT, 'examples/templates.utu'), 'utf8'), { shape })]]) {
     fs.writeFileSync(path.join(dir, name), body);
     const check = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'check', path.join(dir, name)], { encoding: 'utf8' });
     assert.equal(check.status, 0, `${name} formatted does not compile:\n${check.stdout}${check.stderr}`);

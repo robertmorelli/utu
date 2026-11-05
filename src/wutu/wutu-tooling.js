@@ -4,8 +4,6 @@
 // formatting is driven by the Wutu parser rather than regex rewrites of
 // executable expressions. Bodies with comments are left untouched.
 import { dslLiterals, dslOpenerAt, skipDsl } from './dsl-envelope.js';
-// Stage -1's tree-sitter parser, for the formatter's syntaxShape, until the formatter moves onto the self-hosted parser.
-import { parseSyntax } from '../compiler/syntax/parser.js';
 import { parseWutu, wutuVocabulary } from './wutu-parse.js';
 
 const INDENT = '    ';
@@ -335,43 +333,64 @@ export function wutuCompletions(source, offset) {
  * tree as `source` and formats to itself; otherwise `source` comes back
  * unchanged, so formatting never changes what a program means.
  */
-export function formatUtuSource(source) {
-  return formatUtu(source).text;
+export async function formatUtuSource(source, options) {
+  return (await formatUtu(source, options)).text;
 }
 
 /** { text, refused }: the formatted text, or `source` and why it was left as is. */
-export function formatUtu(source) {
-  const before = syntaxShape(source);
+export async function formatUtu(source, { shape } = {}) {
+  if (!shape) throw new Error('formatUtu needs a self-hosted parser shape function');
+  const before = await shape(source);
   if (!before) return { text: source, refused: 'it does not parse' };
   const once = formatWutuSource(layoutUtu(source));
   if (once === source) return { text: source, refused: null };
-  if (syntaxShape(once) !== before) return { text: source, refused: 'its layout would parse differently' };
+  if (await shape(once) !== before) return { text: source, refused: 'its layout would parse differently' };
   if (formatWutuSource(layoutUtu(once)) !== once) return { text: source, refused: 'its layout is not stable' };
   return { text: once, refused: null };
 }
 
 /**
- * The syntax tree of `source` as text: node types and token texts, comments
- * without trailing blanks, `@wutu` bodies left out (formatWutuSource checks
- * those); null when it does not parse.
+ * A syntax shape function for formatUtu, made from a loaded self-hosted
+ * compiler. It compares the parser's node structure and every token's text,
+ * except Wutu bodies, which formatWutuSource validates separately.
  */
-function syntaxShape(source) {
-  let tree;
-  try { tree = parseSyntax(source); } catch { return null; }
-  if (!tree) return null;
-  const out = [];
-  const walk = node => {
-    if (!node.childCount) {
-      out.push(node.type + ' ' + (node.type === 'comment' ? node.text.trimEnd() : node.text));
-      return;
-    }
-    out.push('(' + node.type);
-    if (node.type === 'dsl_expr' && node.namedChildren[0]?.text === 'wutu') return void out.push('wutu )');
-    for (const child of node.children) walk(child);
-    out.push(')');
+export function createSyntaxShape(utu) {
+  const encoder = new TextEncoder(), decoder = new TextDecoder();
+  return source => {
+    const bytes = encoder.encode(source);
+    const offset = utu.source(bytes.length);
+    new Uint8Array(utu.src.buffer).set(bytes, offset);
+    utu.tokens(bytes.length);
+    let root;
+    try { root = utu.nodes(bytes.length); } catch { return null; }
+    if (root < 0) return null;
+    const memory = name => new Int32Array(utu[name].buffer);
+    const [first, last, child, next, start, end] =
+      ['node_first', 'node_last', 'node_child', 'node_next', 'tok_start', 'tok_end'].map(memory);
+    const kinds = new Uint8Array(utu.node_kind.buffer);
+    const text = t => decoder.decode(new Uint8Array(utu.src.buffer, start[t], end[t] - start[t]));
+    const out = [];
+    const walk = n => {
+      const kind = utu.node_kind_name(kinds[n]);
+      out.push('(', kind);
+      if (kind === 'dsl_expr' && text(first[n] + 1) === 'wutu') {
+        out.push('@wutu', ')');
+        return;
+      }
+      const children = [];
+      for (let c = child[n]; c >= 0; c = next[c]) children.push(c);
+      let t = first[n];
+      for (const c of children) {
+        while (t < first[c]) out.push(JSON.stringify(text(t++)));
+        walk(c);
+        t = last[c];
+      }
+      while (t < last[n]) out.push(JSON.stringify(kind === 'comment' ? text(t++).trimEnd() : text(t++)));
+      out.push(')');
+    };
+    walk(root);
+    return out.join(' ');
   };
-  walk(tree.rootNode);
-  return out.join('\n');
 }
 
 /** Offset just past the template literal whose backtick is at `start`; -1 if unterminated. */
