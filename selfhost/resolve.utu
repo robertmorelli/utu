@@ -2243,6 +2243,15 @@ fn walk_field(node: I32, w: Walk) void {
         node_decl[name] = member(module, word_of(name), Space.Member);
         return;
     };
+    // `api.Counter` with `using Api |api| from …`: the host module's member,
+    // as `Api.Counter` is.
+    if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Foreign) {
+        node_alias[base] = module;
+        node_decl[base] = decl_a[module];
+        node_kind[base] = Node.Type_ident.to_i32();
+        node_kind[node] = Node.Type_member_expr.to_i32();
+        return;
+    };
     // `m.E.V`, `M.E.V`, `alias.E.V`: a variant of the enum the path names.
     if not is_kind(base, Node.Field_expr) and not is_kind(base, Node.Type_member_expr) { return; };
     let e = node_decl[last_child(base)];

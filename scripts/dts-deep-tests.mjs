@@ -154,7 +154,7 @@ await test('mitt callbacks retain identity for subscribe and unsubscribe', async
   }`, output);
   exports.run();
 });
-await gap('ABI files load directly with lowercase module aliases', 'a lowercase module alias is read as a value: api is a module, not a value', async () => {
+await test('ABI files load directly with lowercase module aliases', async () => {
   const source = `using Fixture |api| from "/fixture.abi.json";
     export lib { fn run() F64 { let c = api.Counter(3.0); c.doubled; } }`;
   const doc = await compile(source, fixture, { readFile: async file => file.endsWith('.abi.json') ? JSON.stringify(fixture) : source });
