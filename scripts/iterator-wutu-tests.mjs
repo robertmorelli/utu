@@ -1,5 +1,5 @@
 import { parseHTML } from 'linkedom/worker';
-import { emitText } from '../src/index.js';
+import { printWat } from '../src/selfhost/wat.js';
 import { compileAndInstantiate, compileAndInstantiateSelfhost, selfhostDiagnostics, withTempUtu } from './test-harness.mjs';
 import { parseWutu } from '../src/wutu/wutu-parse.js';
 
@@ -38,8 +38,8 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     const {doc,instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_wat.utu',source:`
       export main(n: I32) I32 { [n,n+1,n+2] map |x| {x*2;} filter |x| {x>3;} fold(0) |a,x| {a+x;}; }
     `});
-    const wat=emitText(doc);
-    assertEq((wat.match(/\(loop /g)??[]).length,1);
+    const wat=await printWat(doc.wasm);
+    assertEq((wat.match(/^\s+loop\b/gm)??[]).length,1);
     assertEq((wat.match(/array\.new/g)??[]).length,1,'only the input literal allocates');
     assert(!wat.includes('call_indirect'));assert(!wat.includes('closure_new'));assert(wat.includes('i32.add'));
     assertEq(instance.exports.main(1),10);

@@ -584,8 +584,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.apply(0, 5), 15);
     // A `fun` is a typed function reference, not a table index: ref.func to
     // produce it, call_ref to call it, and no table anywhere.
-    const { emitText } = await import('../src/compiler/codegen/index.js');
-    const wat = emitText(doc);
+    const { printWat } = await import('../src/selfhost/wat.js');
+    const wat = await printWat(doc.wasm);
     assert(/ref\.func/.test(wat), 'expected fun values to lower to ref.func');
     assert(/call_ref/.test(wat), 'expected fun calls to lower to call_ref');
     assert(!/call_indirect|\(table /.test(wat), 'a fun must not go through a function table');
