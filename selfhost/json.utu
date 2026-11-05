@@ -1093,12 +1093,11 @@ fn json_match(raw: Str, prefix: Str) Str {
             if fallback_body >= 0 { dsl_fail("The ~> arm must be last in @json match", sc_at[0], 1); };
             let pattern = parse_pattern(raw);
             sc_expect(raw, "=>");
-            if narms < 64 {
-                arm_pattern[narms] = pattern;
-                arm_body[narms] = intern_text(sc_until(raw, ",}"));
-                arm_body_start[narms] = sc_until_start[0];
-                narms += 1;
-            };
+            if narms == 64 { dsl_fail("@json match supports at most 64 pattern arms", sc_at[0], 1); };
+            arm_pattern[narms] = pattern;
+            arm_body[narms] = intern_text(sc_until(raw, ",}"));
+            arm_body_start[narms] = sc_until_start[0];
+            narms += 1;
         };
         if not sc_peek(raw, "}") { sc_expect(raw, ","); };
     };
@@ -1187,7 +1186,9 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
         } else {
             // An integer literal matches only an integer token (kl: no fraction or exponent).
             let integer = float_text(text) == text + ".0";
-            "if __json_f64(" + r + ") != " + float_text(text) + (if integer { " or " + r + ".kl != 0"; } else { ""; }) + " { __json_fail(" + r + ", " + expected + "); };";
+            // A long one is an F64 beyond its exact range: the token's text is compared too.
+            let exact = if integer and text.len() > 15 { " or " + r + ".at < " + int_text(text.len()) + " or " + r + ".text.slice(" + r + ".at - " + int_text(text.len()) + ", " + r + ".at) != " + js_string(text); } else { ""; };
+            "if __json_f64(" + r + ") != " + float_text(text) + (if integer { " or " + r + ".kl != 0" + exact; } else { ""; }) + " { __json_fail(" + r + ", " + expected + "); };";
         };
         return "let " + ok + " = " + r + ".failed == 0; " + check + " __json_at(" + r + ", " + ok + ", " + where + ");";
     };

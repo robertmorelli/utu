@@ -101,8 +101,10 @@ export function closureImports(closureSpec, utu = {}) {
 }
 
 // flags: 1, the result is a Bool; 2, the environment is there even when
-// null (a closure whose one capture is its environment); 4 << k (safe builds),
-// argument k is a handle, never null (wasm would take null). A decayed `fun` is
+// null (a closure whose one capture is its environment); 4 and 8, a U32 or U64
+// result (unsigned in JS); 16 << k (safe builds), argument k is a handle,
+// never null (wasm would take null); 131072 << k, argument k is nullable
+// (undefined is null, as for host calls). A decayed `fun` is
 // one closure per function (a funcref is one JS function per wasm function),
 // so `removeEventListener` finds the one `addEventListener` was given.
 const DECAYED = new WeakMap();
@@ -111,12 +113,18 @@ export const closureNew = (fn, env, flags, record) => {
   const known = fun && DECAYED.get(fn);
   if (known) return known;
   const call = fun ? (...args) => fn(...args) : (...args) => fn(env, ...args);
-  const invoke = flags >> 2 ? (...args) => {
-    for (let k = 0, m = flags >> 2; m; k++, m >>= 1)
-      if (m & 1 && args[k] == null) throw new TypeError(`Wrong type from JavaScript: a closure's argument ${k + 1} is ${args[k]}`);
+  const handles = (flags >> 4) & 8191, nullable = (flags >> 17) & 8191;
+  const invoke = handles | nullable ? (...args) => {
+    for (let k = 0, h = handles, n = nullable; h | n; k++, h >>= 1, n >>= 1) {
+      if (n & 1 && args[k] === undefined) args[k] = null;
+      else if (h & 1 && args[k] == null) throw new TypeError(`Wrong type from JavaScript: a closure's argument ${k + 1} is ${args[k]}`);
+    }
     return call(...args);
   } : call;
-  const closure = flags & 1 ? (...args) => !!invoke(...args) : invoke;
+  const closure = flags & 1 ? (...args) => !!invoke(...args)
+    : flags & 4 ? (...args) => invoke(...args) >>> 0
+    : flags & 8 ? (...args) => BigInt.asUintN(64, invoke(...args))
+    : invoke;
   closure[CLOSURE_REC] = record;
   if (fun) DECAYED.set(fn, closure);
   return closure;

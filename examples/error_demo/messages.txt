@@ -4921,6 +4921,19 @@ ok
 10 │     Browser.document.body.append(app);
 --- exit 1
 
+=== utu check examples/error_demo/platform/1160_json_match_too_many_arms.utu
+ ERROR  @json match supports at most 64 pattern arms
+        dsl-error · examples/error_demo/platform/1160_json_match_too_many_arms.utu:70:26
+
+68 │             { a62: 1 } => 62,
+69 │             { a63: 1 } => 63,
+70 │             { a64: 1 } => 64,
+   │                          ━
+   │                          ╰─ here
+71 │             ~> 99,
+72 │         } \/;
+--- exit 1
+
 === utu check examples/error_demo/platform/11_mem_float_in_int.utu
  ERROR  0.5 does not fit I32
         mem-element-range · examples/error_demo/platform/11_mem_float_in_int.utu:3:20
@@ -9678,6 +9691,17 @@ FAIL after tests: boom
 
   fix   Use F32
  4 │     | get x : F32
+--- exit 1
+
+=== utu check examples/error_demo/types/1161_main_returns_value.utu
+ ERROR  main returns void
+        return-value-from-void · examples/error_demo/types/1161_main_returns_value.utu:3:29
+
+ 1 │ // What: a value returned from export main, which returns void
+ 2 │ // Expect: main returns void (pointing at the value)
+ 3 │ export main() void { return 1; }
+   │                             ━
+   │                             ╰─ here
 --- exit 1
 
 === utu check examples/error_demo/types/11_global_annotation.utu
