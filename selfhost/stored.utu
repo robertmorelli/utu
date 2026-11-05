@@ -38,22 +38,17 @@ vec st_type_len: I32 = [0];
 
 fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]); }
 
-/// Whether a file has `using Browser from std:Browser`.
+/// Whether a file has `using Browser from std:Browser` (with or without an alias).
 fn uses_browser(file: I32) Bool {
     let item = first_child(file_root[file]);
     while (item >= 0) {
-        if is_kind(item, Node.Using_decl) {
-            let text = bytes_text(tok_start[node_first[item]], tok_end[node_last[item] - 1]);
-            if text_has(text, "std:Browser") and text_at(text, 0, "using Browser") and text.get(13) <= 32 { return true; };
+        if is_kind(item, Node.Using_decl) and using_path(item) >= 0 {
+            let name = first_child(item);
+            let path = using_path(item);
+            if node_text(name) == "Browser" and node_text(path) == "std:Browser" { return true; };
         };
         item = next_sibling(item);
     };
-    false;
-}
-
-/// Whether `text` holds `part`.
-fn text_has(text: Str, part: Str) Bool {
-    for (0 ..< text.len() - part.len() + 1) |i| { if text_at(text, i, part) { return true; }; };
     false;
 }
 
@@ -188,15 +183,16 @@ fn stored_sanitize(type: Str, v: Str, file: I32) Str {
     let t = trim_text(type);
     if t == "F64" { return "globalThis.__utuWutu.storageReviveF64(" + v + ")"; };
     // (A value of the wrong shape is left as it is: validation then reports the mismatch.)
-    if text_at(t, 0, "Array[") { return "(Array.isArray(" + v + ")?" + v + ".map(v=>" + stored_sanitize(t.slice(6, t.len() - 1), "v", file) + "):" + v + ")"; };
+    if text_at(t, 0, "Array[") { return "(v=>Array.isArray(v)?v.map(v=>" + stored_sanitize(t.slice(6, t.len() - 1), "v", file) + "):v)(" + v + ")"; };
     if is_stored_scalar(t) { return v; };
     let fields = "";
     for (stored_fields(stored_struct(t, file))) |f| {
         if fields.len() > 0 { fields = fields + ","; };
         let name = js_string(field_name(f));
-        fields = fields + name + ":" + stored_sanitize(field_type_text(f), v + "[" + name + "]", file);
+        fields = fields + name + ":" + stored_sanitize(field_type_text(f), "v[" + name + "]", file);
     };
-    "(" + v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")?{..." + v + "," + fields + "}:" + v + ")";
+    // (Each level binds its value once: the text stays linear in the depth.)
+    "(v=>v!==null&&typeof v==='object'&&!Array.isArray(v)?{...v," + fields + "}:v)(" + v + ")";
 }
 
 /// The expansion of a `@stored` site: its body parsed as

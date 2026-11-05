@@ -3048,6 +3048,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     'using Browser\nfrom std:Browser;\nstruct S:\n    | x: I32\nexport main() void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
     'using Browser from std:Browser;\nstruct S:\nexport main() void {\n    @stored/\\ S "s" S {} \\/;\n}\n',
     'using Browser from std:Browser;\nexport main() void {\n    @wutu/\\ p { = `;`; } \\/;\n}\n',
+    'using  Browser   |b|  from std:Browser;\nstruct S:\n    | x: I32\nexport main() void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
   ]) {
     const built = await compileFile(utu, await write(source));
     assert.ok(built.wasm?.length > 0, built.diagnostics?.map(d => d.message).join('\n'));
