@@ -2992,6 +2992,10 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     assert.ok(entries.some(e => e.kind === 'assert_expr' && e.file === mapped && e.line === 2 && e.column === 5 && e.owner === 'boom'), mode);
     checked++;
   }
+  // An `@es` body ending in a `//` comment: the wrapped glue's closing paren is on its own line.
+  const commented = await compileFile(utu, await write('let flip: fun(Bool) Bool = @es/\\ (b) => !b // negate\n\\/;\nlet five: fun() I32 = @es/\\ (() => 5) // thunk\n\\/;\nexport lib { fn run() I32 { if flip(false) { five(); } else { 0; }; } }\n'));
+  assert.equal((await instantiateNode(commented.wasm, commented.spec)).exports?.run(), 5, commented.diagnostics?.map(d => d.message).join('\n'));
+  checked++;
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });

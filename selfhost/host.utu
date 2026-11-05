@@ -234,8 +234,8 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     let unsure = (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) and not es_plain_function(split, end);
     if open.len() > 0 or unsure {
         let body = bytes_text(split, end);
-        if unsure { body = "$utuFn(\"" + word_text(decl_name[decl]) + "\", " + body + ")"; };
-        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { open + body + ")"; } else { body; }));
+        if unsure { body = "$utuFn(\"" + word_text(decl_name[decl]) + "\", " + body + "\n)"; };
+        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { open + body + "\n)"; } else { body; }));
         at = made;
         end = src.len();
     };
