@@ -748,6 +748,17 @@ export lib {
     ['mem text: U8;\nlet bytes: fun() Externref = @es/\\ () => new Uint8Array([5, 6, 7]) \\/;\nexport lib { fn run() I32 { text.copy_in(bytes()); text.len() * 100 + text[2]; } }\n', 307],
     // An alt arm whose value is a bare name (it was read as the arm's binding).
     ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { alt p { Ka => 1, Kc => q, }; }\nexport lib { fn run() I32 { f(Kc {}, 5); } }\n', 5],
+    // `Ord.cmp(a, b)` on a mod's protocol (was "Not supported yet"); `P.tick(7)` of a default method on a scalar implementer
+    // (was "tick takes P, got I32"); `xs[0].step()` with `xs: Array[T]` keeps T's bound (was "step is both P's and Q's");
+    // a scalar `fn P[I32].step` beside struct implementers no longer breaks a protocol value's dispatch (invalid wasm).
+    ['using Ord from std:Ord;\nexport lib { fn run() I32 { Ord.cmp(2, 1) + Ord.cmp("a", "b") + 10; } }\n', 10],
+    ['proto P:\n    | step() I32\nfn P[I32].step |s| () I32 { s; }\nfn P.tick |s| () I32 { s.step(); }\nexport lib { fn run() I32 { P.tick(7); } }\n', 7],
+    ['proto P:\n    | step() I32\nproto Q:\n    | step() I32\nfn P[I32].step |s| () I32 { 1; }\nfn Q[I32].step |s| () I32 { 2; }\nmod M[T[Q]] {\n    fn go(xs: Array[T]) I32 { xs[0].step(); }\n}\nexport lib { fn run() I32 { M[I32].go([0]); } }\n', 2],
+    ['proto P:\n    | step() I32\nstruct S[P]:\n    | n: I32\nfn P[S].step |s| () I32 { s.n; }\nfn P[I32].step |s| () I32 { s; }\nexport lib { fn run() I32 { let p: P = S { n: 3 }; p.step(); } }\n', 3],
+    // A nullable variant or implementer is a nullable enum or protocol value (`?Ci` as `?Sh`, `?A` as `?P` were type mismatches).
+    ['proto P:\n    | get k : I32\n    | f() I32\nstruct A[P]:\n    | k: I32\nfn P[A].f |a| () I32 { a.k + 1; }\nenum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n'
+      + 'fn mk(c: Bool) ?A { if c { A { k: 4 }; } else { null; }; }\nfn mkc(c: Bool) ?Ci { if c { Ci { r: 7 }; } else { null; }; }\nfn up(a: ?A) ?P { a; }\nfn upc(a: ?Ci) ?Sh { a; }\n'
+      + 'export lib { fn run() I32 { let p: ?P = up(mk(true)); let q: ?P = up(mk(false)); let s: ?Sh = upc(mkc(true)); let t: ?Sh = upc(mkc(false)); let u = t orelse Sq { s: 1 }; let w = s orelse Sq { s: 1 }; (p orelse A { k: 0 }).f() + (q orelse A { k: 10 }).f() + alt u { Ci |c| => 1000, Sq |c| => 100, } + alt w { Ci |c| => c.r * 10000, Sq |c| => 0, }; } }\n', 5 + 11 + 100 + 70000],
     // Variants named by their enum (and mod): literals, field-less values, alt arms, types; a bare name
     // two enums have, where the alt's value or the type wanted says which.
     ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\n    | Z {}\n'

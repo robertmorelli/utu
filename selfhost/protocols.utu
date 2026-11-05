@@ -500,6 +500,12 @@ fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array
         return;
     };
     let f = vl_item(impls, i * 2);
+    // (A scalar or Str implementer is no protocol value: it has no case.)
+    let vt = repr(named(vl_item(impls, i * 2 + 1), 0));
+    if vt < vt_defined or vt >= vt_tuple {
+        proto_call_chain(impls, i + 1, r, locals, types, n, rt, cx);
+        return;
+    };
     let m = w_mark();
     let mt = proto_test_cast(r, vt_heap(repr(named(vl_item(impls, i * 2 + 1), 0))));
     let mcall = w_stack.len() - 1;
@@ -768,6 +774,17 @@ fn declared_param(e: I32, inst: I32) I32 {
     if is_kind(e, Node.Call_expr) and is_kind(first_child(e), Node.Identifier) and decl_is(node_decl[first_child(e)], Decl.Fn) {
         let ret = child_of_kind(decl_node[node_decl[first_child(e)]], Node.Return_type);
         return if ret >= 0 { typed_param(first_child(ret), inst); } else { -2; };
+    };
+    // `xs[i]` with `xs: Array[T]`: the element is a T.
+    if is_kind(e, Node.Index_expr) and is_kind(first_child(e), Node.Identifier) {
+        let b = node_decl[first_child(e)];
+        let bt = if b >= 0 { next_sibling(first_child(decl_node[b])); } else { -1; };
+        let ref = if bt >= 0 and is_kind(bt, Node.Ref_type) { first_child(bt); } else { -1; };
+        if ref >= 0 and is_kind(ref, Node.Instantiated_module_ref) and (decl_is(b, Decl.Param) or decl_is(b, Decl.Local)) {
+            let args = next_sibling(first_child(ref));
+            return if args >= 0 { typed_param(first_child(args), inst); } else { -2; };
+        };
+        return -2;
     };
     if not is_kind(e, Node.Identifier) { return -2; };
     let d = node_decl[e];

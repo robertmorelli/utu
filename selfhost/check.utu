@@ -280,6 +280,10 @@ fn receiver_type(decl: I32, inst: I32) I32 {
     if is_kind(node, Node.Fn_decl) and is_kind(args, Node.Module_type_arg_list) {
         return named(owner, instance(module_of(owner), type_args(args, inst)));
     };
+    // `fn Array.first`: a generic module's type takes its type arguments.
+    if is_kind(node, Node.Fn_decl) and not decl_is(owner, Decl.Module) and is_generic(module_of(owner)) and instance_for(module_of(owner), inst) == 0 {
+        return no_instance(r, module_of(owner));
+    };
     decl_type(owner, inst);
 }
 
@@ -486,6 +490,8 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
         return expected;
     };
     if ty_is(expected, Ty.Nullable) and is_variant_of(actual, ty_a[expected]) { return expected; };
+    // ?V to ?E, ?T to ?P: the same reference, as V to E and T to P.
+    if ty_is(expected, Ty.Nullable) and ty_is(actual, Ty.Nullable) and (is_variant_of(ty_a[actual], ty_a[expected]) or converts_to_proto(ty_a[actual], ty_a[expected])) { return expected; };
     if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) {
         w_pop();
         w_leaf(Op.RefNull, repr(expected), heap_of(repr(expected)), 0);
@@ -2023,6 +2029,8 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
                 report_module_member_missing(module, name);
                 return finish_error(args, m, cx);
             };
+            // `Ord.cmp(a, b)` with `mod Ord { proto &: … }`: by protocol.
+            if decl_is(decl, Decl.ProtoMember) and args >= 0 and decl_is(promoted(module), Decl.Proto) { return call_proto_static(promoted(module), callee, args, m, node, cx); };
             // `m.k(…)`: a global, called when it holds a fun or cl.
             if decl_is(decl, Decl.Global) { return call_value(callee, args, m, node, cx); };
             if is_type_decl(decl) {
@@ -2203,31 +2211,36 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
     };
     // `Ord.cmp(a, b)`, cmp a method of Ord: as `a.cmp(b)`, a's `fn Ord[A].cmp`
     // (or, a an Ord, whichever type's it is).
-    if args >= 0 and decl_is(owner_decl, Decl.Proto) and decl_is(decl, Decl.ProtoMember) {
-        let rt = type_only(first_child(args), -1, cx);
-        if ty_decl(rt) == owner_decl {
-            return proto_call(check_expr(first_child(args), -1, cx), last_child(callee), args, 1, m, node, cx);
-        };
-        let word = word_of(last_child(callee));
-        let f = method_of(owner_decl, rt, word);
-        if unbounded_call(rt, word, f, node, cx.inst) or ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
-        if f < 0 {
-            report2(Diag.UnknownMethod, node, word, rt, -1);
-            return finish_error(args, m, cx);
-        };
-        return call_with(fn_instance(f, ty_inst(rt)), args, 0, m, node, cx);
-    };
+    let po = if decl_is(owner_decl, Decl.Module) { promoted(owner_decl); } else { owner_decl; };
+    if args >= 0 and decl_is(po, Decl.Proto) and decl_is(decl, Decl.ProtoMember) { return call_proto_static(po, callee, args, m, node, cx); };
     if not decl_is(decl, Decl.Fn) { return call_value(callee, args, m, node, cx); };
     let inst = member_instance(callee, cx);
     if inst < 0 { return finish_error(args, m, cx); };
     // `P.m(x)` with x a T bounded by P (or the receiver of a `fn P.m2` checked for T): checked for T.
     if args >= 0 and decl_is(owner_decl, Decl.Proto) and proto_default(owner_decl, word_of(last_child(callee))) == decl {
         let rt = type_only(first_child(args), -1, cx);
-        if bound_by(rt, owner_decl, cx.inst, first_child(args)) or (cx.fi >= 0 and fi_self[cx.fi] == rt) {
+        if bound_by(rt, owner_decl, cx.inst, first_child(args)) or (cx.fi >= 0 and fi_self[cx.fi] == rt) or (not ty_is(rt, Ty.Error) and not (repr(rt) >= vt_defined and repr(rt) < vt_tuple)) {
             return call_with(fn_instance_on(decl, inst, rt), args, 0, m, node, cx);
         };
     };
     call_with(fn_instance(decl, inst), args, 0, m, node, cx);
+}
+
+/// `Ord.cmp(a, b)`, cmp a method of protocol `owner_decl`: as `a.cmp(b)`, a's
+/// `fn Ord[A].cmp` (or, a an Ord, whichever type's it is).
+fn call_proto_static(owner_decl: I32, callee: I32, args: I32, m: I32, node: I32, cx: Cx) I32 {
+    let rt = type_only(first_child(args), -1, cx);
+    if ty_decl(rt) == owner_decl {
+        return proto_call(check_expr(first_child(args), -1, cx), last_child(callee), args, 1, m, node, cx);
+    };
+    let word = word_of(last_child(callee));
+    let f = method_of(owner_decl, rt, word);
+    if unbounded_call(rt, word, f, node, cx.inst) or ty_is(rt, Ty.Error) { return finish_error(args, m, cx); };
+    if f < 0 {
+        report2(Diag.UnknownMethod, node, word, rt, -1);
+        return finish_error(args, m, cx);
+    };
+    call_with(fn_instance(f, ty_inst(rt)), args, 0, m, node, cx);
 }
 
 /// The module instance `T.x` names x in: M's (`M.x`, `alias.x`, `M[A].x`),
