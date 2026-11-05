@@ -3086,6 +3086,11 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     + 'export main() Str {\n    let a = @json/\\ encode P P{ x: 1, y: 2 } \\/;\n'
     + '    let c = @utu/\\ @utu/\\ @json/\\ decode Q "{\\"alpha\\":\\"k\\",\\"beta\\":true}" \\/ \\/ \\/;\n'
     + '    a + (promote c { |q| => q.alpha, ~> "none", });\n}\n', '{"x":1,"y":2}k');
+  // @json decode of a float beyond its type reports it (it was +Infinity, then encoded as null).
+  await gen1('struct N:\n    | d: F64\n    | e: F32\n'
+    + 'fn t(s: Str) Str { @json/\\ error N s \\/; }\n'
+    + 'export main() Str { t("{\\"d\\":1e400,\\"e\\":0}") + "|" + t("{\\"d\\":0,\\"e\\":1e39}") + "|" + t("{\\"d\\":1e308,\\"e\\":3.4e38}"); }\n',
+    'number out of range at line 1, column 6|number out of range at line 1, column 12|');
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
