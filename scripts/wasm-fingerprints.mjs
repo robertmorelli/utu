@@ -1,8 +1,9 @@
-// The invariant for compiler refactors: every program compiles to the same wasm.
+// The invariant for compiler refactors: every program compiles to the same
+// wasm (the self-hosted compiler's; record only for a deliberate change).
 //
 //   node scripts/wasm-fingerprints.mjs --record        record baselines/wasm-fingerprints.json
 //   node scripts/wasm-fingerprints.mjs                 compare against it
-//   ... --optimized       also check -Oz and -O3 (with the local cleanup)
+//   ... --optimized       also check -Oz and -O3
 //   ... --only=substring  just the matching programs
 //   ... --jobs=N          worker threads (default: one per core)
 //   ... --corpus          also the programs in baselines/corpus (the syntax corpus)
@@ -73,25 +74,16 @@ async function main() {
 }
 
 async function worker() {
-  const { createCompiler, emitBinary, initParser } = await import('../src/index.js');
-  const { nodePackageResolver } = await import('../tools/dts/packages.mjs');
-  const parser = await initParser({ wasmDir: `${workerData.ROOT}/` });
-  const compilers = {};
-  const compilerFor = optimize => compilers[optimize] ??= createCompiler({
-    parser, target: 'normal', optimize,
-    readFile: file => fs.readFile(file, 'utf8'),
-    readBinaryFile: file => fs.readFile(file),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-    resolvePackage: nodePackageResolver({ root: workerData.ROOT }),
-  });
+  const { compileFile, loadNodeCompiler } = await import('../src/selfhost/node.js');
+  const utu = await loadNodeCompiler();
   parentPort.on('message', async ({ file, level }) => {
     const key = `${path.relative(workerData.ROOT, file)} ${level}`;
     let value;
     try {
-      const doc = await compilerFor(level).compileFile(file);
-      const errors = [...doc.querySelectorAll('[data-error]')].map(node => node.dataset.errorMessage ?? node.dataset.error);
-      value = errors.length ? `errors: ${errors.join(' | ')}`
-        : createHash('sha256').update(emitBinary(doc)).digest('hex');
+      const built = await compileFile(utu, file, { optimize: level, root: workerData.ROOT });
+      const errors = built.diagnostics.filter(d => d.severity === 'error').map(d => d.message);
+      value = errors.length || !built.wasm ? `errors: ${errors.join(' | ')}`
+        : createHash('sha256').update(built.wasm).digest('hex');
     } catch (error) {
       value = `throws: ${String(error.message).split('\n')[0]}`;
     }

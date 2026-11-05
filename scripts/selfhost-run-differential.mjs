@@ -1,7 +1,8 @@
 // What programs the self-hosted compiler builds do when run, against what
 // stage 0's builds did (baselines/run-differential.json).
 //
-//   node scripts/selfhost-run-differential.mjs [--only=substring] [--show=N] [--jobs=N] [--why=node_kind]
+//   node scripts/selfhost-run-differential.mjs [--only=substring] [--show=N] [--jobs=N] [--why=node_kind] [--optimize=none|size|speed]
+//   node scripts/selfhost-run-differential.mjs --record [--only=substring]   record what the builds do
 //
 // --why=call_expr lists the source of the call_exprs it cannot build yet.
 //
@@ -11,7 +12,7 @@
 // (or trap) and what it printed are compared. A program the compiler cannot
 // build yet (it reports something unsupported) is counted, not compared.
 // A program with no recorded run is listed, and fails the run, until it is
-// recorded (node scripts/run-differential.mjs --record --only=<path>).
+// recorded (--record --only=<path>).
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -116,6 +117,14 @@ async function main() {
   }));
 
   const keys = Object.keys(results).sort();
+  if (process.argv.includes('--record')) {
+    if (OPTIMIZE !== 'none') throw new Error('--record records the unoptimized builds; the other levels must behave the same');
+    for (const key of keys) recorded[key] = results[key];
+    await fs.writeFile(path.join(ROOT, 'baselines', 'run-differential.json'),
+      JSON.stringify(Object.fromEntries(Object.entries(recorded).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)), null, 1));
+    console.log(`recorded ${keys.length} builds in ${((performance.now() - started) / 1000).toFixed(1)} s`);
+    return;
+  }
   if (flag('json')) await fs.writeFile(flag('json'), JSON.stringify(Object.fromEntries(keys.map(key => [key, results[key]])), null, 1));
   const count = { same: 0, differ: 0, unsupported: 0, rejected: 0, intended: 0, unrecorded: 0 };
   const differ = [];
@@ -154,7 +163,7 @@ async function main() {
   for (const line of differ.slice(0, show)) console.log(line);
   if (unrecorded.length) {
     const paths = [...new Set(unrecorded.map(key => key.replace(/ (normal|test)$/, '')))];
-    console.log(`NO BASELINE (record each: node scripts/run-differential.mjs --record --only=<path>):\n${paths.map(p => `  ${p}`).join('\n')}`);
+    console.log(`NO BASELINE (record each: node scripts/selfhost-run-differential.mjs --record --only=<path>):\n${paths.map(p => `  ${p}`).join('\n')}`);
   }
   if (whys.length) console.log(`${flag('why')}, unsupported:\n${[...new Set(whys)].slice(0, Number(flag('show') ?? 30)).map(w => `  ${w}`).join('\n')}`);
   const top = [...reasons].sort((a, b) => b[1] - a[1]).slice(0, Number(flag('reasons') ?? 15));
