@@ -1381,9 +1381,9 @@ fn use_js_tag() void {
 }
 
 fn put_limits(pages: I32) void {
-    sec.push(1);
+    // The implicit maximum is the Wasm memory32 limit of 65536 pages.
+    sec.push(0);
     leb_u(false, pages);
-    leb_u(false, 65536);
 }
 
 fn encode_functions() void {
