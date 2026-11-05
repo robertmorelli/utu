@@ -63,7 +63,14 @@ function parseArgs(command, args) {
 async function formatCommand(files, { check }) {
   if (!files.length) throw new Usage('no files to format');
   for (const name of files) {
-    const source = await fs.readFile(name, 'utf8');
+    let source;
+    try { source = await fs.readFile(name, 'utf8'); }
+    catch (error) {
+      // (The other files are still formatted.)
+      console.error(`wutu: ${error.code === 'ENOENT' ? `no file ${name}` : `cannot read ${name}: ${error.message}`}`);
+      process.exitCode = 1;
+      continue;
+    }
     const { text: formatted, refused } = formatUtu(source);
     if (refused) {
       // A file is formatted only when its layout keeps its meaning.

@@ -49,6 +49,12 @@ for (const [source, expected] of cases) {
   else assert.equal(text, expected);
 }
 
+// Wutu: `}else{` formats like `} else {` (the island was once left as written).
+{
+  const text = formatUtuSource('using Browser from std:Browser;\n\nexport main() void {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n');
+  assert.match(text, /\} else \{/);
+}
+
 // Wutu: `for="x"` stays an attribute (`for = "x"` opens a loop), `#id` stays,
 // CSS declarations keep their spacing.
 {

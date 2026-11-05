@@ -273,7 +273,8 @@ function sameWutu(a, b) {
     if (prev && spaced !== respaced) {
       if (!'{};='.includes(prev) && !'{};='.includes(a[i])) return false;
       const word = /[\w-]*$/.exec(a.slice(0, si))[0];
-      if (WUTU_WORDS.has(word)) return false;
+      // (`else{` and `else {` are one: only a word that a following name or `=` would change is kept.)
+      if (WUTU_WORDS.has(word) && !((word === 'else' || word === 'quiet') && a[i] === '{')) return false;
     }
     if (quoted === a[i]) quoted = '';
     else if (!quoted && '"\'`'.includes(a[i])) quoted = a[i];
