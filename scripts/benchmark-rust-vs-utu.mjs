@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { exportFunctions } from './wasm-exports.mjs';
-import { createCompiler, emitBinary, initParser, instantiateLowered } from '../src/index.js';
+import { compileFile, instantiateNode, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BENCH = path.join(ROOT, 'benchmarks', 'tiny');
@@ -22,14 +22,15 @@ const warmups = Number(process.env.BENCH_WARMUPS ?? 5);
 await fs.mkdir(TMP, { recursive: true });
 compileRust(RustSource, RustWasm);
 compileRust(RustSafeSource, RustSafeWasm, true);
-const utuBytes = await compileUtu();
+const utuBuilt = await compileUtu();
+const utuBytes = utuBuilt.wasm;
 const rustBytes = new Uint8Array(await fs.readFile(RustWasm));
 const rustSafeBytes = addSafeRustExport(new Uint8Array(await fs.readFile(RustSafeWasm)));
 await fs.writeFile(RustSafeWasm, rustSafeBytes);
 await fs.writeFile(UtuWasm, utuBytes);
 
 const [{ instance: utu }, rust, rustSafe] = await Promise.all([
-  instantiateLowered(utuBytes),
+  instantiateNode(utuBytes, utuBuilt.spec, { root: ROOT }),
   WebAssembly.instantiate(rustBytes),
   WebAssembly.instantiate(rustSafeBytes),
 ]);
@@ -56,7 +57,7 @@ for (let i = 0; i < samples; i++) {
   for (let offset = 0; offset < timed.length; offset++) timed[(i + offset) % timed.length]();
 }
 
-const bundlePath = path.join(ROOT, 'dist', 'utu.js');
+const bundlePath = path.join(ROOT, 'dist', 'selfhost', 'utu.js');
 const bundle = await fs.readFile(bundlePath).catch(() => null);
 const utuMedian = median(utuTimes);
 const rustMedian = median(rustTimes);
@@ -76,7 +77,9 @@ console.log(`  safe Rust:   ${formatBytes(rustSafeBytes.byteLength)} (${formatBy
 console.log(`  size ratio:  ${(utuBytes.byteLength / rustBytes.byteLength).toFixed(2)}× Rust bytes`);
 if (bundle) {
   console.log('Compiler bundle');
-  console.log(`  dist/utu.js: ${formatBytes(bundle.byteLength)} (${formatBytes(gzipSync(bundle).byteLength)} gzip)`);
+  console.log(`  dist/selfhost/utu.js: ${formatBytes(bundle.byteLength)} (${formatBytes(gzipSync(bundle).byteLength)} gzip)`);
+  const compilerWasm = await fs.readFile(path.join(ROOT, 'dist', 'utu.wasm'));
+  console.log(`  dist/utu.wasm: ${formatBytes(compilerWasm.byteLength)} (${formatBytes(gzipSync(compilerWasm).byteLength)} gzip)`);
 }
 console.log(`  artifacts:   ${path.relative(ROOT, TMP)}/`);
 
@@ -96,17 +99,9 @@ function addSafeRustExport(bytes) {
 }
 
 async function compileUtu() {
-  const parser = await initParser({ wasmDir: `${ROOT}/` });
-  const compiler = createCompiler({
-    parser,
-    target: 'normal',
-    readFile: file => fs.readFile(file, 'utf8'),
-    resolvePath: (from, relative) => path.resolve(path.dirname(from), relative),
-  });
-  const doc = await compiler.compileFile(UtuSource);
-  const errors = [...doc.querySelectorAll('[data-error]')];
-  if (errors.length) throw new Error(`utu compile reported: ${errors.map(node => node.dataset.errorMessage).join('; ')}`);
-  return emitBinary(doc);
+  const built = await compileFile(await loadNodeCompiler(), UtuSource, { root: ROOT });
+  if (!built.wasm) throw new Error(`utu compile reported: ${built.diagnostics.map(diagnostic => diagnostic.message).join('; ')}`);
+  return built;
 }
 
 function time(run) {
