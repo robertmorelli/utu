@@ -105,22 +105,17 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.loud(), 'ok!');
   });
 
-  test('codegen: explainability facts include functions/exports/size', async ({ ROOT }) => {
-    const { emitBinary } = await import('../src/compiler/codegen/index.js');
-    const { createExplainabilityArtifacts } = await import('../src/index.js');
+  test('codegen: module metadata includes functions, exports, and size', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_explainability.utu', `
-      export lib {
-        fn add(a: I32, b: I32) I32 { a + b; }
-      }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      const artifacts = createExplainabilityArtifacts();
-      const bin = emitBinary(doc, { artifacts });
-      assert(bin.length > 0, 'expected wasm bytes');
-      assert(artifacts.lowerings.some(x => x.kind === 'codegen-function'), 'expected codegen-function fact');
-      assert(artifacts.lowerings.some(x => x.kind === 'codegen-export'), 'expected codegen-export fact');
-      assert(artifacts.sizes.some(x => x.kind === 'wasm-module'), 'expected wasm-module size fact');
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `, async file => {
+      const result = await compiler.compileFile(file, { sourceMap: true });
+      assertNoErrors(result);
+      const module = await WebAssembly.compile(result.wasm, { builtins: ['js-string'], importedStringConstants: "'" });
+      assert(result.wasm.length > 8, 'expected wasm bytes');
+      assert(WebAssembly.Module.exports(module).some(entry => entry.name === 'add'), 'expected add export');
+      assert(result.map?.functions?.length > 0, 'expected mapped function');
     });
   });
 
@@ -205,46 +200,27 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(instance.exports.slice('hello'), 'el');
   });
 
-  test('codegen: emitBinary can return a wasm source map', async ({ ROOT }) => {
-    const { emitBinary } = await import('../src/compiler/codegen/index.js');
+  test('codegen: a wasm source map identifies the exported function', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map.utu', `
-      export lib {
-        fn add(a: I32, b: I32) I32 { a + b; }
-      }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      const result = emitBinary(doc, { sourceMap: true });
-      assert(result.binary instanceof Uint8Array, 'expected wasm binary bytes');
-      const sourceMap = JSON.parse(result.sourceMap);
-      assertEq(sourceMap.version, 3, 'expected source map v3');
-      assert(sourceMap.sources?.length > 0, 'expected source map sources');
-      assert(sourceMap.sources.includes(file), 'expected source map to reference source file');
-      // A length>0 check is too weak: separators alone would pass it. Strip
-      // group/segment separators and require at least one VLQ segment.
-      const vlqChars = sourceMap.mappings.replace(/[;,]/g, '');
-      assert(vlqChars.length > 0, `expected at least one VLQ segment in mappings, got ${JSON.stringify(sourceMap.mappings)}`);
+      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+    `, async file => {
+      const result = await compiler.compileFile(file, { sourceMap: true });
+      assertNoErrors(result);
+      assert(result.wasm instanceof Uint8Array, 'expected wasm binary bytes');
+      assert(result.map?.entries?.length > 0, 'expected instruction mappings');
+      assert(result.map.entries.some(entry => entry.file === file && entry.owner === 'add'), 'expected add instruction mapped to its source');
     });
   });
 
   test('codegen: source maps cover string-using code', async ({ ROOT }) => {
-    const { emitBinary } = await import('../src/compiler/codegen/index.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map_strings.utu', `
-      export lib {
-        fn greet_len() I32 { Str.len("hello"); }
-      }
-    `, async (file) => {
-      const doc = await compiler.compileFile(file);
-      assertNoErrors(doc);
-      // Strings are emitted as calls to the JS string builtins directly, so
-      // their code keeps its debug locations.
-      const { sourceMap } = emitBinary(doc, { sourceMap: true });
-      const map = JSON.parse(sourceMap);
-      assertEq(map.version, 3);
-      assert(map.sources.includes(file), 'source file must appear in sources');
-      assert(map.mappings.replace(/[;,]/g, '').length > 0, 'expected at least one VLQ segment');
+      export lib { fn greet_len() I32 { Str.len("hello"); } }
+    `, async file => {
+      const result = await compiler.compileFile(file, { sourceMap: true });
+      assertNoErrors(result);
+      assert(result.map?.entries?.some(entry => entry.file === file && entry.owner === 'greet_len'), 'string code must keep its source locations');
     });
   });
 
@@ -602,8 +578,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       }
     `, async (file) => {
       const doc = await compiler.compileFile(file);
-      const err = doc.querySelector('ir-dsl[name="es"][data-error-kind="invalid-dsl-usage"]');
-      assert(err, 'expected unexpanded @es diagnostic');
+      const err = doc.diagnostics.find(diagnostic => diagnostic.kind === 'invalid-dsl-usage');
+      assert(err?.message.includes('typed let'), 'expected @es diagnostic');
     });
   });
 

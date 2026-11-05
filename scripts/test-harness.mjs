@@ -38,8 +38,8 @@ async function selfhostCompiler() {
 export async function makeCompiler({ ROOT, target = 'normal', debugAssertions = false, optimize = 'size' }) {
   const utu = await selfhostCompiler();
   const options = { root: ROOT, target: target === 'analysis' ? 'normal' : target, optimize, safe: debugAssertions };
-  const compile = async file => {
-    const result = await compileFile(utu, file, options);
+  const compile = async (file, overrides = {}) => {
+    const result = await compileFile(utu, file, { ...options, ...overrides });
     const diagnostics = result.diagnostics.map(diagnostic => ({
       ...diagnostic,
       primary: diagnostic.file ? {
