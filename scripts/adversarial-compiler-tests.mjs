@@ -1,4 +1,3 @@
-import { emitBinary } from '../src/index.js';
 import { compileAndInstantiate, withTempUtu } from './test-harness.mjs';
 
 export function registerAdversarialCompilerTests({ test, assert, assertEq, assertNoErrors, makeCompiler }) {
@@ -38,10 +37,9 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
         fn make() Array[?Cell] { Array[?Cell].new_default(2); }
       }
     `, async file => {
-      const { doc, artifacts } = await compiler.analyzeFile(file);
-      assert(!artifacts.diagnostics.length, JSON.stringify(artifacts.diagnostics));
-      assertNoErrors(doc);
-      emitBinary(doc);
+      const result = await compiler.compileFile(file);
+      assert(!result.diagnostics.length, JSON.stringify(result.diagnostics));
+      assertNoErrors(result);
     });
   });
 

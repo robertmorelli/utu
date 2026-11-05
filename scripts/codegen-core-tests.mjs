@@ -969,7 +969,6 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
 
   test('codegen: await suspends the wasm stack via JSPI', async ({ ROOT }) => {
     if (typeof WebAssembly.Suspending !== 'function') return; // host without JSPI
-    const { promisifyExports, readRuntimeSpec } = await import('../src/runtime/host-imports.js');
     const { doc, instance } = await compileAndInstantiate({
       ROOT,
       makeCompiler,
@@ -986,18 +985,18 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         }
       `,
     });
-    const spec = readRuntimeSpec(doc.body.firstChild, 'promiseRuntime');
-    assert(spec.awaits.includes('I32'), 'await must record its value type as a host import');
+    const spec = doc.spec.promises;
+    assert(spec.awaits.length > 0, 'await must record a host suspension import');
     assert(spec.asyncExports.includes('compute'), 'an export that awaits must be promisified');
     // A real timer elapses inside the wasm frame — straight-line utu code,
     // suspended and resumed by the host with no CPS transform in the compiler.
-    assertEq(await promisifyExports(instance, spec).compute(20), 41);
+    assertEq(await instance.exports.compute(20), 41);
   });
 
   test('examples: every examples/working program compiles and executes', async ({ ROOT }) => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
-    const { buildImportObject, emitBinary, instantiateLowered } = await import('../src/index.js');
+    const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     const expected = new Map([
       ['hello.utu', 42],
@@ -1010,8 +1009,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       const file = path.join(ROOT, 'examples', 'working', name);
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
-      const { instance } = await instantiateLowered(emitBinary(doc), await buildImportObject(doc));
-      assertEq(await instance.exports.main(), value, `${name} returned the wrong result`);
+      const { exports } = await instantiateNode(doc.wasm, doc.spec, { root: ROOT });
+      assertEq(await exports.main(), value, `${name} returned the wrong result`);
     }
     const entries = (await fs.readdir(path.join(ROOT, 'examples', 'working')))
       .filter(name => name.endsWith('.utu')).sort();
