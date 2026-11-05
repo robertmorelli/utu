@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createCompiler, emitBinary, initParser } from '../src/index.js';
+import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BENCH = path.join(ROOT, 'benchmarks', 'engines');
@@ -13,8 +13,7 @@ const SAMPLES = Number(process.env.ENGINE_SAMPLES ?? 20);
 const WARMUPS = Number(process.env.ENGINE_WARMUPS ?? 5);
 await fs.mkdir(TMP, { recursive: true });
 
-const parser = await initParser({ wasmDir: `${ROOT}/` });
-const compiler = createCompiler({ parser, target: 'normal', readFile: name => fs.readFile(name, 'utf8'), resolvePath: (from, relative) => path.resolve(path.dirname(from), relative) });
+const compiler = await loadNodeCompiler();
 const modules = [
   ['scalar', path.join(ROOT, 'benchmarks/suite/scalar.utu')],
   ['strings', path.join(ROOT, 'benchmarks/suite/strings.utu')],
@@ -77,8 +76,7 @@ function render(rows, workloads) {
   return text;
 }
 async function compileUtu(file) {
-  const doc = await compiler.compileFile(file);
-  const errors = [...doc.querySelectorAll('[data-error]')];
-  if (errors.length) throw new Error(`${file}: ${errors.map(node => node.dataset.errorMessage).join('; ')}`);
-  return emitBinary(doc);
+  const built = await compileFile(compiler, file, { root: ROOT });
+  if (!built.wasm) throw new Error(`${file}: ${built.diagnostics.map(diagnostic => diagnostic.message).join('; ')}`);
+  return built.wasm;
 }
