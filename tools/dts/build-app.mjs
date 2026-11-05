@@ -49,7 +49,7 @@ export async function buildBrowserApp({ entry, outDir, stdlib, parser: suppliedP
     const glue = glueModuleSource(spec, live);
     const fields = Object.fromEntries(Object.entries(spec).map(([module, bindings]) =>
       [module, Object.fromEntries(Object.keys(bindings).filter(name => live.has(name)).map(name => [name, '']))]));
-    const closures = { new: live.has('closure_new'), calls: [...live].filter(n => n.startsWith('closure_call_')) };
+    const closures = { new: live.has('closure_new'), calls: [...live].filter(n => n.startsWith('closure_call_')), sigs: JSON.parse(root.dataset.closureRuntime ?? '{}').sigs };
     const declaredPromises = JSON.parse(root.dataset.promiseRuntime ?? '{}');
     const promises = { ops: (declaredPromises.ops ?? []).filter(n => live.has(n)),
       awaits: (declaredPromises.awaits ?? []).filter(n => live.has(`await_${n}`)),

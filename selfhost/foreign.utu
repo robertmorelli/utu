@@ -303,6 +303,7 @@ fn foreign_type(r: Ref, view: I32) I32 {
         if ref_is(x, "Str") { return prelude(Prelude.Str); };
         if ref_is(x, "F64") { return prelude(Prelude.F64); };
         if ref_is(x, "Bool") { return prelude(Prelude.Bool); };
+        if ref_is(x, "bigint") { return prelude(Prelude.I64); };
         if ref_is(x, "unknown") { return foreign_any(view); };
         return foreign_named(x, view);
     };
@@ -793,7 +794,12 @@ fn host_assignable(actual: I32, expected: I32) Bool {
 }
 
 /// Whether utu's `Promise[T]` (`u`) and host `Promise<T>` (`h`) are one: a JS promise of T.
-fn same_promise(u: I32, h: I32) Bool { is_promise_type(u) and host_promise_value(h) == inst_arg(ty_inst(u), 0); }
+/// A `Promise<T>` whose T is not bound (`any`) is a promise of anything.
+fn same_promise(u: I32, h: I32) Bool {
+    if not is_promise_type(u) { return false; };
+    let v = host_promise_value(h);
+    v == inst_arg(ty_inst(u), 0) or (v >= 0 and is_dynamic(v));
+}
 
 /// Whether a string is one: an `ArrayLike` or `Iterable` of strings.
 fn string_like(e: I32) Bool {

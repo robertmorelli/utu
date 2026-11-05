@@ -71,7 +71,7 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
   const utu = [];
   for (const { module, name } of entries) {
     if (module !== 'utu') continue;
-    if (name === 'closure_new') utu.push(`closure_new: ${use('closureNew')}`);
+    if (name === 'closure_new') utu.push(spec.closures?.sigs ? `closure_new:(a,b,c,d)=>${use('closureNew')}(a,b,c,d,${JSON.stringify(spec.closures.sigs)})` : `closure_new: ${use('closureNew')}`);
     else if (name === 'closure_rec') utu.push(`closure_rec: ${use('closureRec')}`);
     else if (name.startsWith('closure_call_')) utu.push(`${name}: ${use('closureApply')}`);
     else if (name === 'promise_then') utu.push(`promise_then: ${use('promiseThen')}`);
@@ -95,7 +95,7 @@ export function loaderSource(spec, wasmBytes, { runtime, glue, wasm, streaming =
     if (converted) {
       conversionSource = converted.source;
       exports = converted.name;
-    } else exports = `${use('convertExports')}(${exports}, ${JSON.stringify(spec.exports)})`;
+    } else exports = `${use('convertExports')}(${exports}, ${JSON.stringify(spec.exports)}${asyncExports.length ? `, ${JSON.stringify(asyncExports)}` : ''})`;
   }
   if (runtimeNames.size) lines.unshift(`import { ${[...runtimeNames].join(', ')} } from ${JSON.stringify(runtime)};`);
   const instantiate = streaming ? 'instantiateStreaming' : 'instantiate';
@@ -131,19 +131,29 @@ function exportConversionSource(spec, input, asyncExports = []) {
   const result = (kind, v) => kind === 'Bool' ? `${v}!==0` : kind === 'U32' ? `${v}>>>0` : kind === 'U64' ? `BigInt.asUintN(64,${v})` : v;
   // The generic converter leaves every other result kind unchanged.
   const validResult = kind => typeof kind === 'string';
-  let needsFail = false;
+  let needsFail = false, needsStr = false;
   const members = [];
   for (const [name, entry] of Object.entries(spec)) {
     const r = typeof entry === 'string' ? entry : entry.r;
     const params = typeof entry === 'string' ? null : entry.p ?? null;
-    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params?.some(k => !(k in checks))) return null;
+    if (!(Array.isArray(r) ? r.every(validResult) : validResult(r)) || params?.some(k => !(k in checks || k.startsWith('cl:')))) return null;
     const key = JSON.stringify(name);
     const names = params ? params.map((_, i) => `a${i}`) : null;
     const steps = [];
     params?.forEach((kind, i) => {
       const v = names[i];
       if (kind === 'Bool' || kind === '?') steps.push(`${v}=${checks[kind](v)}`);
-      else {
+      else if (kind.startsWith('cl:')) {
+        // A function for a closure parameter, wrapped as an `@es` one is (see closure_param_kind).
+        needsFail = true;
+        const [, a, r] = kind.split(':');
+        const ps = [...a].map((_, k) => `p${k}`);
+        const into = [...a].map((c, k) => c === 'B' ? `!!p${k}` : c === 'U' ? `p${k}>>>0` : c === 'W' ? `BigInt.asUintN(64,p${k})` : `p${k}`);
+        const call = `f(${into.join(',')})`;
+        const back = r === 'b' ? `${call}?1:0` : r === 'S' ? `$utuStr(${call})` : r === 'n' ? `${call}??null` : call;
+        if (r === 'S') needsStr = true;
+        steps.push(`${v}=typeof ${v}==="function"?(f=>(${ps.join(',')})=>${back})(${v}):$utuFail(${key},${i},"a function",${v})`);
+      } else {
         needsFail = true;
         steps.push(`${checks[kind](v)}||$utuFail(${key},${i},${JSON.stringify(descriptions[kind])},${v})`);
         if (kind === '?Str') steps.push(`${v}??=null`);
@@ -153,12 +163,14 @@ function exportConversionSource(spec, input, asyncExports = []) {
     const convert = v => Array.isArray(r) ? (v === 'x' ? '' : `(v=>`) + `${v === 'x' ? 'x' : 'v'}.map((x,i)=>[${r.map(k => `x=>${result(k, 'x')}`).join(',')}][i](x))` + (v === 'x' ? '' : `)(${v})`) : result(r, v);
     const value = asyncExports.includes(name) ? (convert('x') === 'x' ? call : `${call}.then(x=>${convert('x')})`) : convert(call);
     const body = steps.length ? `(${[...steps, value].join(',')})` : value;
+    const guarded = asyncExports.includes(name) && steps.length ? `{try{return ${body}}catch(e){return Promise.reject(e)}}` : body;
     // Without `p` the parameters are not listed: the arrow takes them all, and keeps the export's length.
-    if (names) members.push(`${key}:(${names.join(',')})=>${body}`);
-    else members.push(`${key}:Object.defineProperty((...a)=>${body},"length",{value:$utuIn[${key}].length})`);
+    if (names) members.push(`${key}:(${names.join(',')})=>${guarded}`);
+    else members.push(`${key}:Object.defineProperty((...a)=>${guarded},"length",{value:$utuIn[${key}].length})`);
   }
   const lines = [`const $utuIn=${input},$utuExports={...$utuIn,${members.join(',')}};`];
   if (needsFail) lines.unshift('const $utuFail=(name,i,what,v)=>{throw new TypeError(`${name}: argument ${i+1} must be ${what}, not ${v===null?"null":what==="an integer"&&typeof v==="number"?v:typeof v}`)};');
+  if (needsStr) lines.unshift('const $utuStr=s=>typeof s==="string"?s:(()=>{throw new TypeError(`Wrong type from JavaScript: a Str, not ${s===null?"null":s instanceof Promise?"a Promise (await it: Promise[Str])":typeof s}`)})();');
   return { source: lines.join('\n'), name: '$utuExports' };
 }
 
