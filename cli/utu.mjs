@@ -255,7 +255,8 @@ async function viewCommand(command, given) {
   }
   if (command === 'syntax') {
     const { syntaxTree } = await import('../src/selfhost/syntax.js');
-    console.log(syntaxTree(utu, built.files, file));
+    // A file that does not parse has no tree: its parse error is said above.
+    if (!built.diagnostics.some(d => d.kind === 'parse-error')) console.log(syntaxTree(utu, built.files, file));
     return;
   }
   const source = built.files.find(entry => entry.key === file)?.text ?? await fs.readFile(file, 'utf8');

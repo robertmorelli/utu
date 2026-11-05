@@ -16,7 +16,6 @@ const commands = [
   ['node', './scripts/wasm-fingerprints.mjs', '--optimized'],
   ['node', './scripts/run-differential.mjs', '--optimize=size'],
   ['node', './scripts/behavior-fingerprints.mjs'],
-  ['node', './scripts/syntax-differential.mjs', '--fuzz=10'],
   ['node', './scripts/selfhost-lexer-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-parser-differential.mjs', '--fuzz=20'],
   ['node', './scripts/selfhost-resolve-differential.mjs'],

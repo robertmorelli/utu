@@ -36,7 +36,7 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
         ']',
       ),
     // `P`, `&`, or `m.P` from module m.
-    _impl_name: ($) => choice($.type_ident, $.promoted_type, alias($._module_qualified_name, $.qualified_type_ref)),
+    _impl_name: ($) => choice($.type_ident, alias($.identifier, $.type_ident), $.promoted_type, alias($._module_qualified_name, $.qualified_type_ref)),
     _module_qualified_name: ($) => seq($.module_ref, '.', $.type_ident),
 
     // Structs: nom? struct (TypeIdent | &) impl_list? : | field ...

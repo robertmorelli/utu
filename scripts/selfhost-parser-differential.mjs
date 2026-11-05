@@ -1,4 +1,4 @@
-// The self-hosted parser (selfhost/parse.utu) against the stage 0 parser:
+// The self-hosted parser (selfhost/parse.utu) against tree-sitter-utu (editors/tree-sitter-utu):
 // both accept the same sources, and for each one they accept, the named
 // nodes (comments included) are the same, in the same order, with the same
 // spans and depths.
@@ -12,8 +12,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSyntax } from '../src/compiler/syntax/parser.js';
+import { treeSitterUtu } from './tree-sitter-utu.mjs';
 import { loadSelfhost } from './selfhost.mjs';
+
+const parseSyntax = await treeSitterUtu();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -47,11 +49,13 @@ for (const file of files) {
     if (problem) {
       differ++;
       if (differ <= show) console.log(`DIFFERS ${name}: ${problem}`);
+      // (--dump: each differing source, to look at.)
+      if (process.argv.includes('--dump')) fs.writeFileSync(path.join(ROOT, '.tmp', `syntax-differs-${differ}.utu`), text);
     }
   }
 }
 const seconds = ((performance.now() - started) / 1000).toFixed(1);
-console.log(`${checked - differ}/${checked} sources parse as stage 0 parses them (${rejected} both reject) in ${seconds} s`);
+console.log(`${checked - differ}/${checked} sources parse as tree-sitter-utu parses them (${rejected} both reject) in ${seconds} s`);
 process.exit(differ ? 1 : 0);
 
 
@@ -99,7 +103,7 @@ function reference(tree) {
 
 function compare(tree, nodes, text) {
   if (!tree && !nodes) return null;
-  if (!tree) return 'stage 0 rejects it; the self-hosted parser accepts it';
+  if (!tree) return 'tree-sitter-utu rejects it; the self-hosted parser accepts it';
   if (!nodes) return 'the self-hosted parser rejects it';
   const expected = reference(tree);
   const describe = n => n ? `${n.type} @${n.start}-${n.end} depth ${n.depth} "${text.slice(n.start, Math.min(n.end, n.start + 30))}"` : 'nothing';

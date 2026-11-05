@@ -1,5 +1,5 @@
-// The self-hosted lexer (selfhost/lex.utu) against the stage 0 parser:
-// for every source the JavaScript parser accepts, the lexer's tokens must be
+// The self-hosted lexer (selfhost/lex.utu) against tree-sitter-utu (editors/tree-sitter-utu):
+// for every source tree-sitter-utu accepts, the lexer's tokens must be
 // exactly the leaves of its syntax tree, in order, with the same spans.
 //
 //   node scripts/selfhost-lexer-differential.mjs [files…] [--fuzz=N] [--seed=N] [--show=N]
@@ -7,13 +7,15 @@
 // Defaults to every .utu file under examples/, benchmarks/, std/,
 // hand_written_bindings/, and baselines/corpus. --fuzz=N adds N mutants of
 // each (characters deleted, duplicated, or swapped, or words and operators
-// inserted), which reach odd corners of the lexer. A source the JavaScript parser rejects is only checked to lex
+// inserted), which reach odd corners of the lexer. A source tree-sitter-utu rejects is only checked to lex
 // to an end (or an error) without trapping.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSyntax } from '../src/compiler/syntax/parser.js';
+import { treeSitterUtu } from './tree-sitter-utu.mjs';
 import { loadSelfhost } from './selfhost.mjs';
+
+const parseSyntax = await treeSitterUtu();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -63,7 +65,7 @@ for (const file of files) {
   }
 }
 const seconds = ((performance.now() - started) / 1000).toFixed(1);
-console.log(`${checked - differ}/${checked} sources lex as stage 0 parses them (${skipped} it rejects) in ${seconds} s`);
+console.log(`${checked - differ}/${checked} sources lex as tree-sitter-utu parses them (${skipped} it rejects) in ${seconds} s`);
 process.exit(differ ? 1 : 0);
 
 // ── The lexer ────────────────────────────────────────────────────────────────
