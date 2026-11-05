@@ -48,6 +48,21 @@ const INTENDED = {
   // `let value: … = f();`: stage 0 wants a literal; a global may be computed.
   'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu normal': 'a global may be computed',
   'baselines/corpus/7de07dc7142443e85b80d61eeb717be007586eb4.utu test': 'a global may be computed',
+  // Benchmarks Game ports whose globals are computed (`let st = …;`).
+  'benchmarks/bg/fasta/fasta.utu normal': 'a global may be computed',
+  'benchmarks/bg/fasta/fasta.utu test': 'a global may be computed',
+  'benchmarks/bg/regexredux/alt/regexredux-backtrack.utu normal': 'a global may be computed',
+  'benchmarks/bg/regexredux/alt/regexredux-backtrack.utu test': 'a global may be computed',
+  'benchmarks/bg/regexredux/regexredux.host.utu normal': 'a global may be computed',
+  'benchmarks/bg/regexredux/regexredux.host.utu test': 'a global may be computed',
+  'benchmarks/bg/regexredux/regexredux.utu normal': 'a global may be computed',
+  'benchmarks/bg/regexredux/regexredux.utu test': 'a global may be computed',
+  'benchmarks/bg/revcomp/alt/revcomp-bytewise.utu normal': 'a global may be computed',
+  'benchmarks/bg/revcomp/alt/revcomp-bytewise.utu test': 'a global may be computed',
+  'benchmarks/bg/revcomp/revcomp.utu normal': 'a global may be computed',
+  'benchmarks/bg/revcomp/revcomp.utu test': 'a global may be computed',
+  'benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu normal': 'a global may be computed',
+  'benchmarks/bg/revcomp/alt/revcomp-fused-hash.utu test': 'a global may be computed',
   // A test build leaves main out, so the generators it consumes are unused
   // there: stage 0 never checks them.
   'baselines/corpus/05283b522e2bf3f516d2a9246aabe803b91f5a9c.utu test': 'a generator nothing consumes is checked',
