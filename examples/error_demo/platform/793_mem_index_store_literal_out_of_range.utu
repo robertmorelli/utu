@@ -2,8 +2,9 @@
 // Expect: 256 does not fit U8
 mem bytes: U8;
 
-export main() I32 {
+main {
     bytes.push(0);
     bytes[0] = 256;
-    bytes[0];
+    console.log(bytes[0]);
 }
+using console from std:Console

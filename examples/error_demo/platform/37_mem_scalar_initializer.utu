@@ -2,6 +2,7 @@
 // Expect: mem counts: an initializer is a list of number literals: mem counts: U8 = [5];
 mem counts: U8 = 5;
 
-export main() I32 {
-    counts.len();
+main {
+    console.log(counts.len());
 }
+using console from std:Console

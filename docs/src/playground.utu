@@ -31,7 +31,7 @@ mod playground {
         \\    todos count_where |t| { not t.done }
         \\}
         \\
-        \\export main() Void {
+        \\main {
         \\    let state = State { draft: "", todos: [], made: 0 }
         \\    Browser.document.body.append(@wutu/\
         \\    @reactive;

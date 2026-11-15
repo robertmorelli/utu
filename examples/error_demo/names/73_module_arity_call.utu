@@ -7,7 +7,8 @@ mod Pair[A, B] {
     fn &.of(a: A, b: B) & { &{ first: a, second: b }; }
 }
 
-export main() I32 {
+main {
     let p = Pair[I32].of(1, 2);
-    p.first;
+    console.log(p.first);
 }
+using console from std:Console

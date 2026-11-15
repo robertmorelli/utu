@@ -24,8 +24,9 @@ bench "module counter get" {
     }
 }
 
-export main() I32 {
+main {
     let alias_box: ints.Box = step(9)
     let inline_box: counter[I32].Box = counter[I32].Box.new(12)
-    alias_box.get() + inline_box.get()
+    console.log(alias_box.get() + inline_box.get())
 }
+using console from std:Console

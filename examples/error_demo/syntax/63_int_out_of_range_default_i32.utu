@@ -1,6 +1,7 @@
 // What: an integer literal past every integer type (2^64), with no type to take.
 // Expect: 18446744073709551616 does not fit U64 (a literal takes the first of I32, U32, I64, U64 it fits)
-export main() I64 {
+main {
     let big = 18446744073709551616;
-    big.i64();
+    console.log(big.i64());
 }
+using console from std:Console

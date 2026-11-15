@@ -4,7 +4,8 @@ gn squares(n: I32) I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
 
-export main() I32 {
+main {
     let xs = squares(4);
-    xs.len();
+    console.log(xs.len());
 }
+using console from std:Console

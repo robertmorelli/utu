@@ -4,7 +4,7 @@ struct Point:
     | x: F64
     | y
 
-export main() F64 {
+main {
     let p = Point { x: 1.0, y: 2.0 };
     p.x;
 }

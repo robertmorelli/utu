@@ -24,7 +24,7 @@ fn greeting(name: Str) Browser.HTMLElement {
     \/
 }
 
-export main() Void {
+main {
     Browser.document.body.append(greeting("friend"))
 }
 ```
@@ -481,7 +481,7 @@ struct Preferences:
     | name: Str
     | enabled: Bool
 
-export main() Void {
+main {
     let preferences = @stored/\
         Preferences "preferences-v1" Preferences { name: "", enabled: true }
     \/

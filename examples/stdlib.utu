@@ -15,7 +15,7 @@ fn word_counts(text: Str) StrMap[I32] {
     counts
 }
 
-export lib {
+lib {
     fn text() Str {
         let s = "  Hello, World  "
         let t = s.trim()

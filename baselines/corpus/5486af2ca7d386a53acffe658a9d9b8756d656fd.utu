@@ -235,7 +235,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
     \/;
 }
 
-export main() Void {
+main {
     let state = Estimate {
         project: "Brand & website refresh",
         edit: "",

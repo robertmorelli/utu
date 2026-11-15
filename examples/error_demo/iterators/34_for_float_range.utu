@@ -1,7 +1,8 @@
 // What: for over a float range
 // Expect: a range counts integers, got F64; count with integers and scale
-export main() F64 {
+main {
     let total: F64 = 0.0;
     for (0.0 ..< 1.0) |x| { total += x; };
-    total;
+    console.log(total);
 }
+using console from std:Console

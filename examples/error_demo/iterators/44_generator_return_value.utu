@@ -7,8 +7,9 @@ gn upto(limit: I32) I32 {
     };
 }
 
-export main() I32 {
+main {
     let total = 0;
     for (upto(3)) |v| { total += v; };
-    total;
+    console.log(total);
 }
+using console from std:Console

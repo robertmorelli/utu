@@ -2,6 +2,7 @@
 // Expect: Argument 'name' of greet is Str, not nullable; null cannot be passed
 fn greet(name: Str) Str { "hi " + name; }
 
-export main() Str {
-    greet(null);
+main {
+    console.log(greet(null));
 }
+using console from std:Console

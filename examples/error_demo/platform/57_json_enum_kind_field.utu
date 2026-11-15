@@ -9,6 +9,7 @@ fn load(text: Str) ?Event {
     @json/\ decode Event text \/;
 }
 
-export main() I32 {
-    promote load("{}") { |e| => 1, ~> 0, };
+main {
+    console.log(promote load("{}") { |e| => 1, ~> 0, });
 }
+using console from std:Console

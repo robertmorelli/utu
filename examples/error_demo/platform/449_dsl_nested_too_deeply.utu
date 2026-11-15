@@ -1,5 +1,6 @@
 // What: DSLs nested seventeen deep
 // Expect: DSLs nested too deeply (max 16)
-export main() I32 {
-    @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ 1 \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/;
+main {
+    console.log(@utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ @utu/\ 1 \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/ \/);
 }
+using console from std:Console

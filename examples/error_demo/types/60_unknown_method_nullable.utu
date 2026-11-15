@@ -1,6 +1,7 @@
 // What: calling a method on a ?Str without promoting it
 // Expect: a nullable-receiver message (e.g. Cannot call 'len' on nullable ?Str; promote it first)
-export main() I32 {
+main {
     let name: ?Str = "ada";
-    name.len();
+    console.log(name.len());
 }
+using console from std:Console

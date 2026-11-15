@@ -5,4 +5,5 @@ struct S:
 
 fn S.f |s| (s: I32) I32 { s; }
 
-export main() I32 { 1; }
+main { console.log(1); }
+using console from std:Console

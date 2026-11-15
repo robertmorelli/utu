@@ -4,7 +4,8 @@ fn average(total: I32, count: I32) I32 {
     total / count;
 }
 
-export main() I32 {
+main {
     let items: Array[I32] = [];
-    average(0, items.len());
+    console.log(average(0, items.len()));
 }
+using console from std:Console

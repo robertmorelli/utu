@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
           fn signed() Str { let n = -42; n.str(); }
           fn unsigned() Str { let n: U32 = 4294967295; n.str(); }
           fn wide() Str { let n: I64 = -9000000000; n.str(); }

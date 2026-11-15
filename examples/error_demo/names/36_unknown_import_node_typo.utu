@@ -2,6 +2,7 @@
 // Expect: Cannot import "node:fss": no such Node module; did you mean "node:fs"?
 using Fs from "node:fss";
 
-export main() Bool {
-    Fs.existsSync("README.md");
+main {
+    console.log(Fs.existsSync("README.md"));
 }
+using console from std:Console

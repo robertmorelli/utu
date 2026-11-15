@@ -55,7 +55,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       mod Id[T] {
           fn id(x: T) T { x; }
       }
-      export lib {
+      lib {
           fn pair() I32 { Pair[I32].sum(Pair[I32].make(2, 3)); }
           fn deep() I32 { Id[I32].id(Id[I32].id(Id[I32].id(4))); }
           fn floats() F64 { Pair[F64].sum(Pair[F64].make(1.5, Id[F64].id(2.0))); }
@@ -70,7 +70,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'closure_arrays.utu', source: `
       fn inc(x: I32) I32 { x + 1; }
       fn dbl(x: I32) I32 { x * 2; }
-      export lib {
+      lib {
           fn inferred() I32 {
               let fs = [cl(x: I32) I32 { x + 1; }, cl(x: I32) I32 { x * 2; }];
               fs[0](10) + fs[1](10);
@@ -111,8 +111,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const fns = 'fn inc(x: I32) I32 { x + 1; }\n';
     const cases = [
-      ['struct H:\n    | f: fun(I32) I32\nexport main() I32 { 1; }', 'fun(I32) I32', 'a struct field'],
-      [`${fns}export main() I32 { let fs: Array[fun(I32) I32] = [inc]; fs[0](3); }`, '[inc]', 'an array'],
+      ['struct H:\n    | f: fun(I32) I32\nlib { fn run() I32 { 1; } }', 'fun(I32) I32', 'a struct field'],
+      [`${fns}lib { fn run() I32 { let fs: Array[fun(I32) I32] = [inc]; fs[0](3); } }`, '[inc]', 'an array'],
     ];
     for (const [source, text, where] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -124,7 +124,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('loops: continue skips to the next iteration of while, for, and each', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'continue_loops.utu', source: `
-      export lib {
+      lib {
           fn whiles() I32 {
               let i = 0;
               let s = 0;
@@ -167,7 +167,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       struct P:
           | v: I32
       fn items(c: Counter) Array[I32] { c.n += 1; [1, 2, 3]; }
-      export lib {
+      lib {
           fn sum() I32 { let s = 0; for ([1, 2, 3]) |x| { s += x; }; s; }
           fn indexed() I32 { let s = 0; for ([10, 20, 30], 0..<99) |x, i| { s += x * i; }; s; }
           fn zipped() I32 { let s = 0; for ([1, 2, 3], [10, 20]) |a, b| { s += a * b; }; s; }
@@ -190,9 +190,9 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('loops: invalid continue and non-array for sources explain themselves', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['export main() I32 { continue; 1; }', 'invalid-break', 'continue', 'continue outside a loop'],
-      ['export main() I32 { for (5) |x| { x; }; 1; }', 'invalid-for-source', '5', 'for needs an array or range, not I32'],
-      ['export main() I32 { for ("abc") |x| { x; }; 1; }', 'invalid-for-source', '"abc"', 'not Str'],
+      ['lib { fn run() I32 { continue; 1; } }', 'invalid-break', 'continue', 'continue outside a loop'],
+      ['lib { fn run() I32 { for (5) |x| { x; }; 1; } }', 'invalid-for-source', '5', 'for needs an array or range, not I32'],
+      ['lib { fn run() I32 { for ("abc") |x| { x; }; 1; } }', 'invalid-for-source', '"abc"', 'not Str'],
     ];
     for (const [source, kind, text, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -205,7 +205,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('editor: generated loop and iterator code adds no inlay hints', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
-    const source = 'export main() I32 { let xs = [1, 2]; let s = 0; for (xs) |x| { s += x; }; xs each |y| { s += y; }; s; }';
+    const source = 'lib { fn run() I32 { let xs = [1, 2]; let s = 0; for (xs) |x| { s += x; }; xs each |y| { s += y; }; s; } }';
     await withTempUtu(ROOT, 'loop_hints.utu', source, async (file) => {
       const utu = await loadNodeCompiler();
       const { files } = await compileFile(utu, file, { root: ROOT });
@@ -224,7 +224,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       fn returned(l: Log) I32 { defer l.v = 99; return l.v; }
       fn nested(l: Log) I32 { defer l.v = l.v * 10 + 1; { defer l.v = l.v * 10 + 2; return 0; }; }
       fn cleared(l: Log) Void { defer l.v += 5; l.v = 1; }
-      export lib {
+      lib {
           fn order() I32 { let l = Log { v: 0 }; { defer l.v = l.v * 10 + 1; defer l.v = l.v * 10 + 2; l.v = 9; }; l.v; }
           fn after_value() I32 { let l = Log { v: 1 }; let a = value(l); a * 1000 + l.v; }
           fn on_return() I32 { let l = Log { v: 0 }; let a = early(l, true); let b = early(l, false); a * 100 + b * 10 + l.v; }
@@ -253,15 +253,15 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('defer: deferred code cannot leave its block', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['fn f() I32 { defer return; 1; }\nexport main() I32 { f(); }', 'return', 'return in defer'],
-      ['export main() I32 { while (true) { defer break; }; 1; }', 'break', 'break in defer'],
-      ['export main() I32 { let x = defer 1; 1; }', 'defer 1', 'defer must be a statement'],
+      ['fn f() I32 { defer return; 1; }\nlib { fn run() I32 { f(); } }', 'return', 'return in defer'],
+      ['lib { fn run() I32 { while (true) { defer break; }; 1; } }', 'break', 'break in defer'],
+      ['lib { fn run() I32 { let x = defer 1; 1; } }', 'defer 1', 'defer must be a statement'],
     ];
     for (const [source, text, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
       assert(errors.some(e => e.text === text && e.message.includes(message)), `${source}\n  got ${describe(errors)}`);
     }
-    const fine = await errorsOf(compiler, ROOT, 'export main() I32 { while (true) { defer { while (true) { break; }; }; break; }; 1; }');
+    const fine = await errorsOf(compiler, ROOT, 'lib { fn run() I32 { while (true) { defer { while (true) { break; }; }; break; }; 1; } }');
     assertEq(fine.length, 0, describe(fine));
   });
 
@@ -272,7 +272,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       fn mixed(b: Bool) I32 { if b { return 1; } else { 2; }; }
       fn arms(x: I32) I32 { match x { 0 => return 10, ~> 20, }; }
       fn bound(b: Bool) I32 { let x = if b { 5; } else { return 9; }; x * 2; }
-      export lib {
+      lib {
           fn run() I32 { tail_block() * 10000 + (both(true) * 10 + both(false)) * 100 + mixed(false) * 10 + arms(0) / 10; }
           fn binding() I32 { bound(true) * 100 + bound(false); }
       }
@@ -286,7 +286,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       struct Counter:
           | n: I32
       fn bump(c: Counter, value: Bool) Bool { c.n += 1; value; }
-      export lib {
+      lib {
           fn and_skips() I32 { let c = Counter { n: 0 }; let x = false and bump(c, true); c.n; }
           fn or_skips() I32 { let c = Counter { n: 0 }; let x = true or bump(c, true); c.n; }
           fn both_run() I32 { let c = Counter { n: 0 }; let x = true and bump(c, false); let y = false or bump(c, true); c.n; }
@@ -311,7 +311,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('numbers: str formats every scalar, and ships only when used', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'str.utu', source: `
-      export lib {
+      lib {
           fn signed() Str { let n = -42; n.str(); }
           fn unsigned() Str { let n: U32 = 4294967295; n.str(); }
           fn wide() Str { let n: I64 = -9000000000; n.str(); }
@@ -323,18 +323,18 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     `});
     const expected = { signed: '-42', unsigned: '4294967295', wide: '-9000000000', wide_unsigned: '18446744073709551615', single: '0.1', double: '2.5', truth: 'false' };
     for (const [name, value] of Object.entries(expected)) assertEq(instance.exports[name](), value, name);
-    const { wasm } = await instantiateAt(ROOT, 'no_to_str.utu', 'export main() I32 { 42; }', 'size');
+    const { wasm } = await instantiateAt(ROOT, 'no_to_str.utu', 'lib { fn run() I32 { 42; } }', 'size');
     assertEq(WebAssembly.Module.imports(new WebAssembly.Module(wasm)).length, 0, 'an unused str adds no imports');
   });
 
   test('calls: type-associated functions without self check their arity', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const struct = 'struct P:\n    | x: I32\nfn P.make() P { P { x: 1 }; }\nfn P.get |self| () I32 { self.x; }\n';
-    const wrong = await errorsOf(compiler, ROOT, `${struct}export main() I32 { P.make(5).x; }`);
+    const wrong = await errorsOf(compiler, ROOT, `${struct}lib { fn run() I32 { P.make(5).x; } }`);
     assert(wrong.some(e => e.kind === 'wrong-arity' && e.text === 'P.make(5)'), describe(wrong));
-    const generic = await errorsOf(compiler, ROOT, 'using Buffer from std:Buffer;\nexport main() I32 { let b = Buffer[I32].new(0); b.finish().len(); }');
+    const generic = await errorsOf(compiler, ROOT, 'using Buffer from std:Buffer;\nlib { fn run() I32 { let b = Buffer[I32].new(0); b.finish().len(); } }');
     assert(generic.some(e => e.kind === 'wrong-arity' && e.text === 'Buffer[I32].new(0)'), describe(generic));
-    const receiver = await errorsOf(compiler, ROOT, `${struct}export main() I32 { let p = P { x: 1 }; P.get(p); }`);
+    const receiver = await errorsOf(compiler, ROOT, `${struct}lib { fn run() I32 { let p = P { x: 1 }; P.get(p); } }`);
     assertEq(receiver.length, 0, `an explicit receiver is still accepted: ${describe(receiver)}`);
   });
 
@@ -342,7 +342,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const source = `
       struct Log:
           | v: I32
-      export lib {
+      lib {
           fn countdown() I32 { let n = 0; loop match 5 { 0 => { break; }, ~> { n += 1; continue 0; }, }; n; }
           fn machine() I32 {
               let i = 0;
@@ -393,7 +393,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   });
 
   test('loop match: every dynamic continue gets its own dispatch table', async ({ ROOT }) => {
-    const source = `export lib {
+    const source = `lib {
       fn run(code: Array[I32]) I32 {
           let pc = 0;
           let acc = 0;
@@ -417,11 +417,11 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('loop match: misuse of continue is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['export main() I32 { loop match 0 { 0 => { continue; }, ~> {}, }; 1; }', 'continue needs the next state'],
-      ['export main() I32 { while (true) { continue 3; }; 1; }', 'continue with a state only works inside loop match'],
-      ['export main() I32 { loop match 0 { 0 => { continue "x"; }, ~> {}, }; 1; }', 'Expected I32, got Str'],
-      ['export main() I32 { loop match 0 { 0 => { break; }, 0x0 => { break; }, ~> {}, }; 1; }', 'Duplicate pattern 0x0'],
-      ['export main() I32 { loop match 1 { 1.5 => { break; }, ~> {}, }; 1; }', '1.5 cannot match I32'],
+      ['lib { fn run() I32 { loop match 0 { 0 => { continue; }, ~> {}, }; 1; } }', 'continue needs the next state'],
+      ['lib { fn run() I32 { while (true) { continue 3; }; 1; } }', 'continue with a state only works inside loop match'],
+      ['lib { fn run() I32 { loop match 0 { 0 => { continue "x"; }, ~> {}, }; 1; } }', 'Expected I32, got Str'],
+      ['lib { fn run() I32 { loop match 0 { 0 => { break; }, 0x0 => { break; }, ~> {}, }; 1; } }', 'Duplicate pattern 0x0'],
+      ['lib { fn run() I32 { loop match 1 { 1.5 => { break; }, ~> {}, }; 1; } }', '1.5 cannot match I32'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -466,7 +466,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const source = `
       struct Log:
           | v: I32
-      export lib {
+      lib {
           fn sum_to(n: I32) I32 { let s = 0; for (0..<n) |i| { s += i * 3 + 1; }; s; }
           fn evens(n: I32) I32 { let s = 0; for (0..<n) |i| { if i % 2 == 1 { continue; }; s += i; }; s; }
           fn until(n: I32, stop: I32) I32 { let s = 0; for (0..<n) |i| { if i == stop { break; }; s += 1; }; s; }
@@ -518,7 +518,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       gn guarded(l: Log) I32 { defer l.v += 100; yield 1; yield 2; }
       fn bump(l: Log) I32 { l.v += 1; 3; }
       fn first_over(limit: I32) I32 { for (squares(100)) |x| { if x > limit { return x; }; }; -1; }
-      export lib {
+      lib {
           fn sum() I32 { let s = 0; for (squares(10)) |x| { s += x; }; s; }
           fn broken() I32 { let s = 0; for (squares(100)) |x| { if x > 30 { break; }; s += x; }; s; }
           fn skipped() I32 { let s = 0; for (squares(10)) |x| { if x == 16 { continue; }; s += x; }; s; }
@@ -539,8 +539,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   });
 
   test('generators: a consumed generator compiles to the same wasm as the hand-written loop', async ({ ROOT }) => {
-    const generated = 'gn squares(n: I32) I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }\nexport lib { fn run(n: I32) I32 { let s = 0; for (squares(n)) |x| { s += x; }; s; } }';
-    const hand = 'export lib { fn run(n: I32) I32 { let s = 0; for (0..<n) |i| { if i % 3 != 0 { s += i * i; }; }; s; } }';
+    const generated = 'gn squares(n: I32) I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }\nlib { fn run(n: I32) I32 { let s = 0; for (squares(n)) |x| { s += x; }; s; } }';
+    const hand = 'lib { fn run(n: I32) I32 { let s = 0; for (0..<n) |i| { if i % 3 != 0 { s += i * i; }; }; s; } }';
     for (const optimize of ['size', 'speed']) {
       const a = await instantiateAt(ROOT, `generator_shape_${optimize}.utu`, generated, optimize);
       const b = await instantiateAt(ROOT, `hand_shape_${optimize}.utu`, hand, optimize);
@@ -559,7 +559,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
               yield value;
           };
       }
-      export lib {
+      lib {
           fn total(n: I32) I32 { let s = 0; await for (ticks(n)) |t| { s += t; }; s; }
       }
     `});
@@ -575,7 +575,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       mem ids: U32;
       mem wide: I64;
       gn evens(n: I32) I32 { for (0..<n) |i| { if i % 2 == 0 { yield i; }; }; }
-      export lib {
+      lib {
           fn fill(n: I32) I32 { text.clear(); for (0..<n) |i| { text.push(97 + i % 26); }; text.len(); }
           fn count(c: I32) I32 { let k = 0; for (0..<text.len()) |i| { if text[i] == c { k += 1; }; }; k; }
           fn set_len(n: I32) Void { text.resize(n); }
@@ -637,7 +637,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           };
           t;
       }
-      export lib {
+      lib {
           fn lengths() I32 { prec.len() * 1000 + neg.len() * 100 + squares.len(); }
           fn literal() I32 { neg[0] -= 1; prec[4] * 1000 + neg[0]; }
           fn floats() F64 { halves[0] + halves[1]; }
@@ -666,7 +666,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       mem text: U8;
       mem out: U8;
       mem samples: F32;
-      export lib {
+      lib {
           fn load(bytes: Externref) I32 { text.copy_in(bytes); text.len(); }
           fn spaces() I32 { let k = 0; for (0..<text.len()) |i| { if text[i] == 32 { k += 1; }; }; k; }
           fn shout() JS.Uint8Array {
@@ -703,7 +703,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           | Plus
       mem tags: Tag;
       fn weight(t: Tag) I32 { match t { Tag.Leaf => 1, Tag.Unary => 10, Tag.Binary => 100, Tag.Eof => 1000, }; }
-      export lib {
+      lib {
           fn stored() I32 {
               tags.clear();
               tags.push(Tag.Binary);
@@ -753,7 +753,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       type Big = distinct U64;
       mem lhs: NodeId;
       fn child(id: NodeId) NodeId { lhs[id.i32()]; }
-      export lib {
+      lib {
           fn walk() I32 {
               lhs.clear();
               lhs.push(NodeId(2));
@@ -778,7 +778,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       using IntMap from std:IntMap;
       using Interner from std:Interner;
       mem src: U8 = [102, 111, 111, 32, 98, 97, 114, 32, 102, 111, 111, 32, 98, 97, 122, 32, 98, 97, 114];
-      export lib {
+      lib {
           fn words() I32 {
               let names = Interner.new();
               let counts = IntMap.new();
@@ -825,7 +825,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('mem: byte mems intern spans of themselves in place', async ({ ROOT }) => {
     const source = `
       mem src: U8 = [102, 111, 111, 32, 98, 97, 114, 32, 102, 111, 111, 32, 98, 97, 122, 32, 98, 97, 114];
-      export lib {
+      lib {
           fn words() I32 {
               src.intern_reset();
               let start = 0;
@@ -882,7 +882,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           .{b, a + b};
       }
       fn swap(a: I32, b: I32) .{I32, I32} { .{b, a}; }
-      export lib {
+      lib {
           fn scalars() I32 {
               let .{q, r} = divmod(17, 5);
               let .{big, half} = pick(false);
@@ -923,15 +923,15 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const f = 'fn f() .{I32, I32} { .{1, 2}; }\n';
     const cases = [
-      [`${f}export main() I32 { let .{a, b, c} = f(); a; }`, 'Tuple .{I32, I32} has 2 values'],
-      [`${f}export main() I32 { let .{a} = f(); a; }`, 'Tuple .{I32, I32} has 2 values'],
-      ['export main() I32 { let .{a, b} = 5; a; }', 'let .{…} needs a tuple, got I32'],
-      [`${f}export main() I32 { let xs = [f(), f()]; 1; }`, 'Tuple in an array'],
-      ['fn f() .{I32, .{I32, I32}} { .{1, .{2, 3}}; }\nexport main() I32 { 1; }', 'Tuple inside a tuple'],
-      ['fn f(t: .{I32, I32}) I32 { 1; }\nexport main() I32 { 1; }', 'A tuple is only a function result'],
-      ['struct S:\n    | t: .{I32, I32}\nexport main() I32 { 1; }', 'A tuple is only a function result'],
-      ['export main() I32 { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { .{a, a}; }; 1; }', 'A closure cannot return a tuple'],
-      ['fn f() .{I32, I32} { .{1, 2.5}; }\nexport main() I32 { 1; }', 'Expected I32, got F32'],
+      [`${f}lib { fn run() I32 { let .{a, b, c} = f(); a; } }`, 'Tuple .{I32, I32} has 2 values'],
+      [`${f}lib { fn run() I32 { let .{a} = f(); a; } }`, 'Tuple .{I32, I32} has 2 values'],
+      ['lib { fn run() I32 { let .{a, b} = 5; a; } }', 'let .{…} needs a tuple, got I32'],
+      [`${f}lib { fn run() I32 { let xs = [f(), f()]; 1; } }`, 'Tuple in an array'],
+      ['fn f() .{I32, .{I32, I32}} { .{1, .{2, 3}}; }\nlib { fn run() I32 { 1; } }', 'Tuple inside a tuple'],
+      ['fn f(t: .{I32, I32}) I32 { 1; }\nlib { fn run() I32 { 1; } }', 'A tuple is only a function result'],
+      ['struct S:\n    | t: .{I32, I32}\nlib { fn run() I32 { 1; } }', 'A tuple is only a function result'],
+      ['lib { fn run() I32 { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { .{a, a}; }; 1; } }', 'A closure cannot return a tuple'],
+      ['fn f() .{I32, I32} { .{1, 2.5}; }\nlib { fn run() I32 { 1; } }', 'Expected I32, got F32'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -942,28 +942,28 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('mem: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['mem s: Str;\nexport main() I32 { 1; }', 'mem s cannot store Str'],
-      ['mem s: U8;\nmem s: U8;\nexport main() I32 { 1; }', 'Duplicate mem s'],
-      ['mem s: U8;\nfn s() I32 { 1; }\nexport main() I32 { 1; }', 'mem s clashes with a function or global'],
-      ['mem s: U8;\nexport main() I32 { s.pop(); 1; }', 'mem s has no method pop'],
-      ['mem s: I32;\nexport main() I32 { s.intern(0, 1); }', 'Only U8 and I8 mems intern'],
-      ['mem s: U8;\nexport main() I32 { let t = s; 1; }', 'mem s is not a value'],
-      ['mem s: U8;\nexport main() I32 { s[0, 1]; 1; }', 'mem s takes one index'],
-      ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'Expected I32, got F32'],
-      ['const mem s: U8 = [1];\nexport main() I32 { s[0] = 2; 1; }', 'mem s is const'],
-      ['const mem s: U8 = [1];\nexport main() I32 { s.push(2); 1; }', 'mem s is const: no push'],
-      ['mem s: U8 = [256];\nexport main() I32 { 1; }', '256 does not fit U8'],
-      ['mem s: U8 = [x];\nexport main() I32 { 1; }', 'mem s: numbers only'],
-      ['mem s: U8 = @comptime/\\ nope() \\/;\nexport main() I32 { 1; }', '@comptime: Unknown function nope'],
-      ['mem s: U8 = @embed/\\ missing.bin \\/;\nexport main() I32 { 1; }', '@embed cannot read missing.bin'],
-      ['mem s: U8;\nexport main() I32 { s.view(0, 1); 1; }', 'view() needs using JS from std:JS'],
-      ['enum(U8) T:\n    | A\n    | B\nfn f(t: T) I32 { match t { T.A => 1, }; }\nexport main() I32 { 1; }', 'match misses T.B'],
-      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { match t { T.A => 1, T.C => 2, ~> 3, }; }\nexport main() I32 { 1; }', 'T has no variant C'],
-      ['enum(U8) T:\n    | A = 300\nexport main() I32 { 1; }', '300 does not fit U8'],
-      ['enum(U8) T:\n    | A = 1\n    | B = 1\nexport main() I32 { 1; }', 'T.B and .A are both 1'],
-      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { 1; }\nexport main() I32 { f(0); }', 'f takes T, got I32'],
-      ['type N = distinct I32;\nfn f(n: N) I32 { 1; }\nexport main() I32 { f(3); }', 'f takes N, got I32'],
-      ['type N = distinct Str;\nexport main() I32 { 1; }', 'distinct wraps I32, U32, I64, U64, F32, or F64'],
+      ['mem s: Str;\nlib { fn run() I32 { 1; } }', 'mem s cannot store Str'],
+      ['mem s: U8;\nmem s: U8;\nlib { fn run() I32 { 1; } }', 'Duplicate mem s'],
+      ['mem s: U8;\nfn s() I32 { 1; }\nlib { fn run() I32 { 1; } }', 'mem s clashes with a function or global'],
+      ['mem s: U8;\nlib { fn run() I32 { s.pop(); 1; } }', 'mem s has no method pop'],
+      ['mem s: I32;\nlib { fn run() I32 { s.intern(0, 1); } }', 'Only U8 and I8 mems intern'],
+      ['mem s: U8;\nlib { fn run() I32 { let t = s; 1; } }', 'mem s is not a value'],
+      ['mem s: U8;\nlib { fn run() I32 { s[0, 1]; 1; } }', 'mem s takes one index'],
+      ['mem s: U8;\nlib { fn run() I32 { s.push(1.5); 1; } }', 'Expected I32, got F32'],
+      ['const mem s: U8 = [1];\nlib { fn run() I32 { s[0] = 2; 1; } }', 'mem s is const'],
+      ['const mem s: U8 = [1];\nlib { fn run() I32 { s.push(2); 1; } }', 'mem s is const: no push'],
+      ['mem s: U8 = [256];\nlib { fn run() I32 { 1; } }', '256 does not fit U8'],
+      ['mem s: U8 = [x];\nlib { fn run() I32 { 1; } }', 'mem s: numbers only'],
+      ['mem s: U8 = @comptime/\\ nope() \\/;\nlib { fn run() I32 { 1; } }', '@comptime: Unknown function nope'],
+      ['mem s: U8 = @embed/\\ missing.bin \\/;\nlib { fn run() I32 { 1; } }', '@embed cannot read missing.bin'],
+      ['mem s: U8;\nlib { fn run() I32 { s.view(0, 1); 1; } }', 'view() needs using JS from std:JS'],
+      ['enum(U8) T:\n    | A\n    | B\nfn f(t: T) I32 { match t { T.A => 1, }; }\nlib { fn run() I32 { 1; } }', 'match misses T.B'],
+      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { match t { T.A => 1, T.C => 2, ~> 3, }; }\nlib { fn run() I32 { 1; } }', 'T has no variant C'],
+      ['enum(U8) T:\n    | A = 300\nlib { fn run() I32 { 1; } }', '300 does not fit U8'],
+      ['enum(U8) T:\n    | A = 1\n    | B = 1\nlib { fn run() I32 { 1; } }', 'T.B and .A are both 1'],
+      ['enum(U8) T:\n    | A\nfn f(t: T) I32 { 1; }\nlib { fn run() I32 { f(0); } }', 'f takes T, got I32'],
+      ['type N = distinct I32;\nfn f(n: N) I32 { 1; }\nlib { fn run() I32 { f(3); } }', 'f takes N, got I32'],
+      ['type N = distinct Str;\nlib { fn run() I32 { 1; } }', 'distinct wraps I32, U32, I64, U64, F32, or F64'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -986,7 +986,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       fn only(o: One) I32 { alt o { Only |x| => x.v, }; }
       fn plain(p: Plain) I32 { alt p { A |a| => a.v, B |b| => b.w, }; }
       fn effect(n: Node) I32 { let t = 0; alt n { Leaf |x| => { t = 1; }, Bin |b| => { t = 2; }, List |k| => { t = 3; }, }; t; }
-      export lib {
+      lib {
           fn tags() I32 { tag_of(Leaf { v: 1 }) + tag_of(Bin { l: 0 }) * 10 + tag_of(List { n: 3 }) * 100; }
           fn single() I32 { only(Only { v: 4 }); }
           fn plains() I32 { plain(B { w: 5 }) * 10 + plain(A { v: 6 }); }
@@ -1037,7 +1037,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       fn tree() Node {
           Bin { l: List { xs: [Leaf { v: 1 }, Leaf { v: 2 }, Bin { l: Leaf { v: 3 }, r: Leaf { v: 4 } }] }, r: Leaf { v: 5 } };
       }
-      export lib {
+      lib {
           fn preorder() I32 { let s = 0; for (walk(tree())) |n| { s = s * 10 + tag_of(n); }; s; }
           fn postorder() I32 { let s = 0; for (post(tree())) |n| { s = s * 10 + tag_of(n); }; s; }
           fn pruned() I32 { let s = 0; for (walk(tree())) |n| { if tag_of(n) == 8 { prune; }; s = s * 10 + tag_of(n); }; s; }
@@ -1068,20 +1068,20 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('generators: misuse is diagnosed', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['fn f() I32 { yield 1; 1; }\nexport main() I32 { f(); }', 'yield outside a generator'],
-      ['gn g() I32 { yield 1; }\nexport main() I32 { let x = g(); 1; }', 'g is a generator: for (g(…)) |v| { … }'],
-      ['gn a() I32 { for (b()) |x| { yield x; }; }\ngn b() I32 { for (a()) |x| { yield x; }; }\nexport main() I32 { for (a()) |x| { x; }; 1; }', 'Generator a recurses'],
-      ['gn g(n: I32) I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nexport main() I32 { for (g(3)) |x| { x; }; 1; }', 'g passes its values straight through'],
-      ['gn g() I32 { yield 1; }\nexport main() I32 { for (g()) |x| { prune; }; 1; }', 'prune outside a recursive generator loop'],
-      ['export main() I32 { prune; 1; }', 'prune outside a recursive generator loop'],
-      ['gn g(n: I32) I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nexport main() I32 { for (g(3)) |x| { let f = cl() Void { prune; }; }; 1; }', 'prune in a closure'],
-      ['gn g() I32 { return 5; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'A generator returns no value'],
-      ['gn g() I32 { let f = cl() Void { yield 1; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'yield in a closure'],
-      ['export main() I32 { await for ([1, 2]) |x| { x; }; 1; }', 'await for reads a stream, not Array[I32]: use a plain for'],
-      ['export main() I32 { await for (0 ..< 2) |x| { x; }; 1; }', 'await for needs a generator call or a stream'],
-      ['gn g() I32 { yield 1; }\nexport main() I32 { for (g()) |x, i| { x; }; 1; }', 'A generator loop binds one value'],
-      ['gn g(n: I32) I32 { yield n; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'g takes 1, given 0'],
-      ['gn g() I32 { yield "s"; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'Expected I32, got Str'],
+      ['fn f() I32 { yield 1; 1; }\nlib { fn run() I32 { f(); } }', 'yield outside a generator'],
+      ['gn g() I32 { yield 1; }\nlib { fn run() I32 { let x = g(); 1; } }', 'g is a generator: for (g(…)) |v| { … }'],
+      ['gn a() I32 { for (b()) |x| { yield x; }; }\ngn b() I32 { for (a()) |x| { yield x; }; }\nlib { fn run() I32 { for (a()) |x| { x; }; 1; } }', 'Generator a recurses'],
+      ['gn g(n: I32) I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nlib { fn run() I32 { for (g(3)) |x| { x; }; 1; } }', 'g passes its values straight through'],
+      ['gn g() I32 { yield 1; }\nlib { fn run() I32 { for (g()) |x| { prune; }; 1; } }', 'prune outside a recursive generator loop'],
+      ['lib { fn run() I32 { prune; 1; } }', 'prune outside a recursive generator loop'],
+      ['gn g(n: I32) I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nlib { fn run() I32 { for (g(3)) |x| { let f = cl() Void { prune; }; }; 1; } }', 'prune in a closure'],
+      ['gn g() I32 { return 5; }\nlib { fn run() I32 { for (g()) |x| { x; }; 1; } }', 'A generator returns no value'],
+      ['gn g() I32 { let f = cl() Void { yield 1; }; }\nlib { fn run() I32 { for (g()) |x| { x; }; 1; } }', 'yield in a closure'],
+      ['lib { fn run() I32 { await for ([1, 2]) |x| { x; }; 1; } }', 'await for reads a stream, not Array[I32]: use a plain for'],
+      ['lib { fn run() I32 { await for (0 ..< 2) |x| { x; }; 1; } }', 'await for needs a generator call or a stream'],
+      ['gn g() I32 { yield 1; }\nlib { fn run() I32 { for (g()) |x, i| { x; }; 1; } }', 'A generator loop binds one value'],
+      ['gn g(n: I32) I32 { yield n; }\nlib { fn run() I32 { for (g()) |x| { x; }; 1; } }', 'g takes 1, given 0'],
+      ['gn g() I32 { yield "s"; }\nlib { fn run() I32 { for (g()) |x| { x; }; 1; } }', 'Expected I32, got Str'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -1091,7 +1091,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('operators: compound assignments nested inside a compound value are lowered', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'nested_compound.utu', source: `
-      export lib {
+      lib {
           fn loop_value() I32 { let h = 10; h += { let i = 0; while (i < 3) { i += 1; }; i; }; h; }
           fn deep() I32 { let h = 1; h *= { let a = 2; a += { let b = 3; b -= 1; b; }; a; }; h; }
           fn searched(n: I32) I32 { let hits = 0; let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 3; }; for (0..<n) |q| { hits += xs bisect |v| { v < q * 2; }; }; hits; }
@@ -1107,7 +1107,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('iterators: integer sorts use radix sort and agree with a reference everywhere', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'radix_sort.utu', source: `
-      export lib {
+      lib {
           fn make(n: I32, seed: I32) Array[I32] {
               let xs = Array[I32].new(n, 0);
               let s = seed;
@@ -1143,7 +1143,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('iterators: flat_map over an array literal yields each element without allocating', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'flat_map_literal.utu', source: `
-      export lib {
+      lib {
           fn pairs(n: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { x + i.i32(); } flat_map |x| { [x, -x * 10]; } fold(0) |a, v| { a * 3 + v; }; }
           fn empty(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { let ignored: Array[I32] = []; ignored; } count; }
           fn none(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { []; } count; }
@@ -1170,7 +1170,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('iterators: scalar reduce accumulates in a local; empty input yields null', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'scalar_reduce.utu', source: `
-      export lib {
+      lib {
           fn ints(n: I32) I32 { let xs = Array[I32].new(n, 3); promote xs reduce(I32) |a, x, i| { a * 2 + x + i.i32(); } { |f| => f.value, ~> -1, }; }
           fn floats(n: I32) F64 { let xs = Array[F64].new(n, 1.5); promote xs reduce(F64) |a, x| { a + x; } { |f| => f.value, ~> -1.0, }; }
       }
@@ -1184,7 +1184,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   });
 
   test('loops: counted while loops give the same results, counters included, at -Oz and -O3', async ({ ROOT }) => {
-    const source = `export lib {
+    const source = `lib {
       fn sum(n: I32) I32 { let xs = Array[I32].new(n, 2); let s = 0; let i = 0; while (i < n) { s += xs[i] + i; i += 1; }; s * 1000 + i; }
       fn early(n: I32, stop: I32) I32 { let s = 0; let i = 0; while (i < n) { if i == stop { break; }; s += 1; i += 1; }; s * 1000 + i; }
       fn wide(n: I64) I64 { let s: I64 = 0; let i: I64 = 0; while (i < n) { s += i; i += 1; }; s; }
@@ -1206,7 +1206,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fused_collect.utu', source: `
       struct Log:
           | v: I32
-      export lib {
+      lib {
           fn fused(n: I32) I32 { let xs = Array[I32].new(n, 3); (xs map |x, i| { x - i.i32(); } collect(I32)) filter |x| { x > 0; } sum; }
           fn twice(n: I32) I32 { let xs = Array[I32].new(n, 1); ((xs map |x| { x + 1; } collect(I32)) map |x| { x * 10; } collect(I32)) sum; }
           fn cut(n: I32) I32 { let xs = Array[I32].new(n, 2); (xs map |x| { x * x; } collect(I32)) take(2) sum; }
@@ -1224,14 +1224,14 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       assertEq(instance.exports.cut(n), 4 * Math.min(2, n));
     }
     assertEq(instance.exports.ordered(), 123123, 'stages with effects keep running to completion in order');
-    const fused = await instantiateAt(ROOT, 'fused_shape.utu', 'export lib { fn run(xs: Array[I32]) I32 { (xs map |x| { x + 1; } collect(I32)) filter |x| { x > 0; } sum; } }', 'size');
-    const single = await instantiateAt(ROOT, 'single_shape.utu', 'export lib { fn run(xs: Array[I32]) I32 { xs map |x| { x + 1; } filter |x| { x > 0; } sum; } }', 'size');
+    const fused = await instantiateAt(ROOT, 'fused_shape.utu', 'lib { fn run(xs: Array[I32]) I32 { (xs map |x| { x + 1; } collect(I32)) filter |x| { x > 0; } sum; } }', 'size');
+    const single = await instantiateAt(ROOT, 'single_shape.utu', 'lib { fn run(xs: Array[I32]) I32 { xs map |x| { x + 1; } filter |x| { x > 0; } sum; } }', 'size');
     assertEq(fused.wasm.length, single.wasm.length, 'the fused pipeline compiles like one pipeline');
   });
 
   test('iterators: integer-key group_by and distinct_by hash, across many keys and key types', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'hashed_groups.utu', source: `
-      export lib {
+      lib {
           fn make(n: I32) Array[I32] { let xs = Array[I32].new(n, 0); let s = 7; for (0..<n) |i| { s = s * 1103515245 + 12345; xs[i] = s; }; xs; }
           fn distinct_count(xs: Array[I32], m: I32) I32 { (xs distinct_by(I32, I32) |x| { x & m; }).len(); }
           fn first_of(xs: Array[I32], m: I32, k: I32) I32 { (xs distinct_by(I32, I32) |x| { x & m; })[k]; }
@@ -1264,7 +1264,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
 
   test('iterators: fast_sum is exact for integers and close for floats, at every length', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fast_sum.utu', source: `
-      export lib {
+      lib {
           fn ints(n: I32) I32 { let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 2147483 - 7; }; xs fast_sum; }
           fn plain(n: I32) I32 { let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 2147483 - 7; }; xs sum; }
           fn floats(n: I32) F64 { let xs = Array[F64].new(n, 0.0); for (0..<n) |i| { xs[i] = i.f64() * 0.1; }; xs filter |x| { x > 0.05; } fast_sum; }
@@ -1302,7 +1302,7 @@ mod view {
 `);
     await fs.writeFile(path.join(dir, 'main.utu'), `using core from "./core.utu";
 using view from "./view.utu";
-export lib {
+lib {
     fn make(n: I32) core.Bag {
         core.Bag { points: (0..<n) map |i| { core.Point { x: i, label: "p" }; } collect(core.Point) };
     }
@@ -1328,14 +1328,14 @@ export lib {
         Box { w: 1, kids: [Box { w: 2, kids: [] }, Box { w: 3, kids: [Box { w: 4, kids: [] }] }] };
     }
 }
-export lib {
+lib {
     fn run() I32 { shapes.total(shapes.make()); }
 }`, 'size');
     assertEq(instance.exports.run(), 10, 'recursion through Array[Self] is allowed');
   });
 
   test('iterators: ranges start pipelines, and collect builds arrays of arrays', async ({ ROOT }) => {
-    const { instance } = await instantiateAt(ROOT, 'range_sources.utu', `export lib {
+    const { instance } = await instantiateAt(ROOT, 'range_sources.utu', `lib {
     fn squares(n: I32) I32 { let xs = (0..<n) map |i| { i * i; } collect(I32); xs[n - 1] + xs.len(); }
     fn inclusive() I32 { (1...10) sum; }
     fn empty() I32 { (5..<2) count; }
@@ -1354,7 +1354,7 @@ export lib {
 
   test('match: negative integer and float patterns select the right arm', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'negative_patterns.utu', source: `
-      export lib {
+      lib {
           fn sign(x: I32) I32 { match x { -1 => 10, 0 => 20, 1 => 30, - 2 => 40, -0x10 => 50, ~> 0, }; }
           fn wide(x: I64) I32 { match x { -9000000000 => 1, ~> 0, }; }
           fn real(x: F64) I32 { match x { -1.5 => 1, 1.5 => 2, ~> 0, }; }
@@ -1369,13 +1369,13 @@ export lib {
   test('match: invalid scrutinees and patterns are diagnosed instead of crashing codegen', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      ['export main() I32 { match "x" { 1 => 1, ~> 0, }; }', 'type-mismatch', '"x"', 'match takes a number or Bool, not Str'],
-      ['export main() I32 { match 1 { 1.5 => 1, ~> 0, }; }', 'type-mismatch', '1.5 => 1,', '1.5 cannot match I32'],
-      ['export main() I32 { match 1 { true => 1, ~> 0, }; }', 'type-mismatch', 'true => 1,', 'true cannot match I32'],
-      ['export main() I32 { match true { 1 => 1, ~> 0, }; }', 'type-mismatch', '1 => 1,', '1 is not a Bool'],
-      ['export main() I32 { match 1 { 99999999999 => 1, ~> 0, }; }', 'type-mismatch', '99999999999 => 1,', 'out of range for I32'],
-      ['export main() I32 { let x: U32 = 1; match x { -1 => 1, ~> 0, }; }', 'type-mismatch', '-1 => 1,', 'out of range for U32'],
-      ['export main() I32 { match 1 { 1 => 1, 0x1 => 2, ~> 0, }; }', 'duplicate-declaration', '0x1 => 2,', 'Duplicate pattern 0x1'],
+      ['lib { fn run() I32 { match "x" { 1 => 1, ~> 0, }; } }', 'type-mismatch', '"x"', 'match takes a number or Bool, not Str'],
+      ['lib { fn run() I32 { match 1 { 1.5 => 1, ~> 0, }; } }', 'type-mismatch', '1.5 => 1,', '1.5 cannot match I32'],
+      ['lib { fn run() I32 { match 1 { true => 1, ~> 0, }; } }', 'type-mismatch', 'true => 1,', 'true cannot match I32'],
+      ['lib { fn run() I32 { match true { 1 => 1, ~> 0, }; } }', 'type-mismatch', '1 => 1,', '1 is not a Bool'],
+      ['lib { fn run() I32 { match 1 { 99999999999 => 1, ~> 0, }; } }', 'type-mismatch', '99999999999 => 1,', 'out of range for I32'],
+      ['lib { fn run() I32 { let x: U32 = 1; match x { -1 => 1, ~> 0, }; } }', 'type-mismatch', '-1 => 1,', 'out of range for U32'],
+      ['lib { fn run() I32 { match 1 { 1 => 1, 0x1 => 2, ~> 0, }; } }', 'duplicate-declaration', '0x1 => 2,', 'Duplicate pattern 0x1'],
     ];
     for (const [source, kind, text, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -1395,7 +1395,7 @@ export lib {
       ['I32', 'b[0]', 'No [] for Box'],
     ];
     for (const [type, expression, message] of cases) {
-      const errors = await errorsOf(compiler, ROOT, `${struct}export main() ${type} { let b = Box { value: 1 }; ${expression}; }`);
+      const errors = await errorsOf(compiler, ROOT, `${struct}lib { fn run() ${type} { let b = Box { value: 1 }; ${expression}; } }`);
       assertEq(errors.length, 1, describe(errors));
       assertEq(errors[0].kind, 'unknown-operator');
       assertEq(errors[0].text, expression);
@@ -1406,9 +1406,9 @@ export lib {
   test('types: an unknown type is reported once, where it is written', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     for (const source of [
-      'export main() Nope { 1; }',
-      'fn f(x: Nope) I32 { 1; }\nexport main() I32 { f(2); }',
-      'fn f() ?Nope { Nope.null; }\nexport main() I32 { 1; }',
+      'lib { fn run() Nope { 1; } }',
+      'fn f(x: Nope) I32 { 1; }\nlib { fn run() I32 { f(2); } }',
+      'fn f() ?Nope { Nope.null; }\nlib { fn run() I32 { 1; } }',
     ]) {
       const errors = await errorsOf(compiler, ROOT, source);
       const unknown = errors.filter(e => e.kind === 'unknown-type');
@@ -1420,8 +1420,8 @@ export lib {
   test('syntax: recovery reports each error offset once', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     for (const source of [
-      'struct B:\n    | n: \nexport main() I32 { let b = B { n: 1 }; 1; }',
-      'export main() I32 { let = ; let x = (1 + ; x; }',
+      'struct B:\n    | n: \nlib { fn run() I32 { let b = B { n: 1 }; 1; } }',
+      'lib { fn run() I32 { let = ; let x = (1 + ; x; } }',
       'fn a( { }\nfn b() I32 { 2 }\n',
     ]) {
       const errors = (await errorsOf(compiler, ROOT, source)).filter(e => e.kind === 'parse-error');

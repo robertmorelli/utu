@@ -11,6 +11,7 @@ fn kind(p: Point) Str {
     };
 }
 
-export main() Str {
-    kind(Point { x: 0.0, y: 0.0 });
+main {
+    console.log(kind(Point { x: 0.0, y: 0.0 }));
 }
+using console from std:Console

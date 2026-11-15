@@ -75,7 +75,7 @@ fn workspace(state: VenueState) Browser.HTMLElement {
     }
     \/;
 }
-export main() Void {
+main {
     let state = @stored/\
         VenueState "venue-v2" manual
         VenueState {

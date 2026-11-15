@@ -2,6 +2,6 @@
 // Expect: expected 'from' (or ';') after `using console`, got 'std'.
 using console std:Console;
 
-export main() Void {
+main {
     console.log("hi");
 }

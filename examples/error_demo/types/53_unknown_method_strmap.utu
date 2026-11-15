@@ -2,8 +2,9 @@
 // Expect: Unknown method 'StrMap[I32].put'
 using StrMap from std:StrMap;
 
-export main() I32 {
+main {
     let m = StrMap[I32].new();
     m.put("a", 1);
-    m.get("a", 0);
+    console.log(m.get("a", 0));
 }
+using console from std:Console

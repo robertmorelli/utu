@@ -5,6 +5,7 @@ fn clamp(x: I32) I32 {
     x;
 }
 
-export main() I32 {
-    clamp(5);
+main {
+    console.log(clamp(5));
 }
+using console from std:Console

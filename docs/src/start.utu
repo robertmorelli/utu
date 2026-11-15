@@ -15,7 +15,7 @@ mod start {
         \\    `hello, ${name}`
         \\}
         \\
-        \\export main() Void {
+        \\main {
         \\    console.log(greeting("world"))
         \\}
     }
@@ -32,7 +32,7 @@ mod start {
     fn site_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() Void {
+        \\main {
         \\    let app = @wutu/\
         \\    main {
         \\        padding: 2rem;
@@ -70,7 +70,7 @@ mod start {
             p {
                 "A program's entry point is ";
                 code {
-                    "export main";
+                    "main";
                 }
                 ". A block's last expression is its value. A line break ends a statement, and ; puts two on one line.";
             }
@@ -105,7 +105,7 @@ mod start {
             p {
                 "The VS Code extension runs on the desktop and on the web. It provides syntax highlighting, compiler-backed diagnostics as you type, hover information, inlay hints, Wasm and WAT compilation, syntax and compiler-IR views, and runs ";
                 code {
-                    "export main";
+                    "main";
                 }
                 " from the editor.";
             }

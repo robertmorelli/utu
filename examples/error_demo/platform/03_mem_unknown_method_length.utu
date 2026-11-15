@@ -2,7 +2,8 @@
 // Expect: mem bytes has no method 'length'; did you mean len?
 mem bytes: U8;
 
-export main() I32 {
+main {
     bytes.push(1);
-    bytes.length();
+    console.log(bytes.length());
 }
+using console from std:Console

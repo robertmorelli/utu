@@ -1,9 +1,10 @@
 // What: a closure breaks out to a block outside it.
 // Expect: break cannot leave a closure
-export main() I32 {
-    done: {
+main {
+    console.log(done: {
         let stop: cl() Void = cl() { break done; };
         stop();
         1;
-    };
+    });
 }
+using console from std:Console

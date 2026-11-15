@@ -4,6 +4,7 @@ fn odd(a: I32) Bool {
     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \/;
 }
 
-export main() Bool {
-    odd(3);
+main {
+    console.log(odd(3));
 }
+using console from std:Console

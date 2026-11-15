@@ -10,6 +10,7 @@ fn sum(xs: Array[I32]) I32 {
     total;
 }
 
-export main() I32 {
-    sum([1, 2, 3]);
+main {
+    console.log(sum([1, 2, 3]));
 }
+using console from std:Console

@@ -1,5 +1,5 @@
-// What: `utu run` on a main that takes a parameter
-// Expect: `main` takes (name: Str), but `utu run` calls it with no arguments
+// What: a main written with a parameter, as it once could be
+// Expect: Write main { … }, not export main(): main takes nothing and returns nothing
 export main(name: Str) I32 {
     name.len();
 }

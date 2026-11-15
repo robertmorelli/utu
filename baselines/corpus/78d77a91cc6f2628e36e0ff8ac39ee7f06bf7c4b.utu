@@ -1,7 +1,7 @@
 
         struct Counter:
           | n : I32
-        export lib {
+        lib {
           fn capture_modes() I32 {
             let base: I32 = 100;
             let c: Counter = Counter { n: 1 };

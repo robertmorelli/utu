@@ -50,7 +50,7 @@ fn add_task(document: Browser.Document, list: Browser.HTMLElement, label: Str, i
     }
 }
 
-export main() Void {
+main {
     let document = Browser.document
     let app = element(document, "main", "app", "")
     document.body.appendChild(app)

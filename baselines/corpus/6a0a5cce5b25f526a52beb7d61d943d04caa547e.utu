@@ -1,3 +1,4 @@
 struct Box:
     | value: I32
-export main() I32 { let b = Box { value: 1 }; b[0]; }
+main { let b = Box { value: 1 }; console.log(b[0]); }
+using console from std:Console

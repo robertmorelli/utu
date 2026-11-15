@@ -17,8 +17,8 @@ let ms_format: fun(I32) Str = @es/\ ((m) => (n) => m.default(n))(await import('m
 let ms_format_long: fun(I32) Str =
     @es/\ ((m) => (n) => m.default(n, { long: true }))(await import('ms')) \/;
 
-export main() I32 {
-    ms_parse("2h");
+main {
+    console.log(ms_parse("2h"));
 }
 
 test "string form parses to milliseconds" {
@@ -33,3 +33,4 @@ test "number form formats to a string" {
 test "the options-selected third signature needs its own binding too" {
     assert ms_format_long(7200000) == "2 hours";
 }
+using console from std:Console

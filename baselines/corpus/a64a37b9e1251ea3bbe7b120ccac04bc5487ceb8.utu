@@ -1,1 +1,2 @@
-export main() I32 { let .{a, b} = 5; a; }
+main { let .{a, b} = 5; console.log(a); }
+using console from std:Console

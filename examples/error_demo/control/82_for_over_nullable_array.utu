@@ -6,6 +6,7 @@ fn count(xs: ?Array[Str]) I32 {
     n;
 }
 
-export main() I32 {
-    count(["a"]);
+main {
+    console.log(count(["a"]));
 }
+using console from std:Console

@@ -4,4 +4,5 @@ fn café_total(n: I32) I32 {
     n * 2;
 }
 
-export main() I32 { café_total(3); }
+main { caféconsole.log(_total(3)); }
+using console from std:Console

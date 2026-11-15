@@ -16,8 +16,8 @@ let is_absolute: fun(Str) Bool =
     @es/\ ((m) => (p) => m.isAbsolute(p) ? 1 : 0)(await import('node:path')) \/;
 let sep: Str = @es/\ (await import('node:path')).sep \/;
 
-export main() Str {
-    join2("usr", "local");
+main {
+    console.log(join2("usr", "local"));
 }
 
 test "join composes two segments" {
@@ -37,3 +37,4 @@ test "a JS boolean must be hand-converted to utu Bool" {
 test "value imports read as zero-arg accessors" {
     assert sep == "/";
 }
+using console from std:Console

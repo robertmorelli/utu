@@ -4,6 +4,7 @@ fn bit(b: Bool) I32 {
     match b { true => 1, true => 2, false => 0, };
 }
 
-export main() I32 {
-    bit(true);
+main {
+    console.log(bit(true));
 }
+using console from std:Console

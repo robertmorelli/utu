@@ -7,6 +7,7 @@ mod Ranked[V] {
     fn top(xs: Array[V]) V { Order[V].max_of(xs); }
 }
 
-export main() I32 {
-    Ranked[I32].top([4, 8, 2]);
+main {
+    console.log(Ranked[I32].top([4, 8, 2]));
 }
+using console from std:Console

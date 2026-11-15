@@ -4,6 +4,7 @@ fn name_length(name: ?Str) I32 {
     name.len();
 }
 
-export main() I32 {
-    name_length("Ada");
+main {
+    console.log(name_length("Ada"));
 }
+using console from std:Console

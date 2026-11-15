@@ -2,7 +2,9 @@
 // Expect: the tuple takes a constant index, each giving its own element's type.
 using Shapes from "./bindings/Shapes.abi.json";
 
-export main(i: I32) F64 {
+fn at(i: I32) F64 {
     let c = Shapes.corner();
     c[i];
 }
+
+main { at(0) }

@@ -4,4 +4,5 @@ fn in_range(index: U32, limit: I32) Bool {
     index < limit;
 }
 
-export main() I32 { if in_range(3, 5) { 1; } else { 0; }; }
+main { console.log(if in_range(3, 5) { 1; } else { 0; }); }
+using console from std:Console

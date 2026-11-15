@@ -37,7 +37,7 @@ counts. Compare equivalent programs within the same run for size regressions.
   call it: element reuse, keyed and global-key moves, listener replacement,
   islands and cleanup, timers, styles, and storage conflict handling.
 - `import-diagnostic-tests.mjs`: missing files and modules, syntax errors in
-  imported files, and recovered syntax in `export lib`.
+  imported files, and recovered syntax in `lib`.
 - `language-regression-tests.mjs`: nested generic-module calls, closure arrays,
   negative and invalid `match` patterns, operator and unknown-type diagnostics,
   and one report per syntax-error offset.

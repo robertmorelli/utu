@@ -1,5 +1,5 @@
 
-        export lib {
+        lib {
           fn exclusive(n: I32) I32 {
             let total: I32 = 0;
             for (0..<n) |i| { total += i; };

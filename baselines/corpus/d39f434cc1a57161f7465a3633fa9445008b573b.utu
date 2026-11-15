@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
           fn make(n: I32, seed: I32) Array[I32] {
               let xs = Array[I32].new(n, 0);
               let s = seed;

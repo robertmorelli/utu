@@ -4,8 +4,9 @@ gn doubled(xs: Array[I32]) I32 {
     xs map |x| { yield x * 2; };
 }
 
-export main() I32 {
+main {
     let total = 0;
     for (doubled([1, 2])) |v| { total += v; };
-    total;
+    console.log(total);
 }
+using console from std:Console

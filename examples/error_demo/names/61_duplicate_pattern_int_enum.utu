@@ -14,6 +14,7 @@ fn label(l: Level) Str {
     };
 }
 
-export main() I32 {
-    label(Level.High).len();
+main {
+    console.log(label(Level.High).len());
 }
+using console from std:Console

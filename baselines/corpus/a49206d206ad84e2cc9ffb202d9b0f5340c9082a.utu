@@ -20,8 +20,8 @@ let has_color: fun(Str) Bool =
 // An index signature implies enumeration, but the .d.ts never says so.
 let color_count: I32 = @es/\ Object.keys((await import('color-name')).default).length \/;
 
-export main() I32 {
-    red_of("rebeccapurple");
+main {
+    console.log(red_of("rebeccapurple"));
 }
 
 test "tuple elements need one binding each" {
@@ -41,3 +41,4 @@ test "index-signature membership and size are hand-written" {
     assert has_color("notacolor") == false;
     assert color_count > 100;
 }
+using console from std:Console

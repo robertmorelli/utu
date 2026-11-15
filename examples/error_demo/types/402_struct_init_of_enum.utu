@@ -4,7 +4,8 @@ enum(U8) E:
     | A
     | B
 
-export main() I32 {
+main {
     let e = E { x: 1 };
-    0;
+    console.log(0);
 }
+using console from std:Console

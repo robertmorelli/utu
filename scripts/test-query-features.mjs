@@ -4,7 +4,10 @@ import { compileAndInstantiate, makeCompiler, assertEq, assertNoErrors } from '.
 const ROOT=path.resolve('.');
 for (const file of ['iterators', 'indexes']) {
  const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:`query-${file}.utu`,source:await fs.readFile(`examples/queries/${file}.utu`,'utf8')});
- assertEq(instance.exports.main(),1,file);
+ // main prints its result.
+ const printed=[];const log=console.log;console.log=(...a)=>printed.push(a.join(' '));
+ try{instance.exports.main();}finally{console.log=log;}
+ assertEq(printed.join('\n'),'1',file);
  console.log(`${file}: passed`);
 }
 
@@ -15,7 +18,7 @@ const {instance: spatial}=await compileAndInstantiate({ROOT,makeCompiler,assertN
 using Spatial from std:Spatial;
 fn tree() Spatial { Spatial.new(${literal}); }
 fn mask(ids: Array[I32]) I64 { ids fold(0.i64()) |acc, id| { acc + (1.i64() << id.i64()); }; }
-export lib {
+lib {
  fn box(a: F64,b: F64,c: F64,d: F64) I64 { mask(tree().within(a,b,c,d)); }
  fn below(a: F64,b: F64,c: F64) I64 { mask(tree().below(a,b,c)); }
  fn radius(x: F64,y: F64,r: F64) I64 { mask(tree().radius(x,y,r)); }
@@ -40,7 +43,7 @@ using SegmentTree from std:SegmentTree;
 using PersistentSegmentTree from std:PersistentSegmentTree;
 fn add(a: I32,b: I32) I32 {a+b;}
 fn join(a: Str,b: Str) Str {a+b;}
-export lib {
+lib {
  fn query(lo: I32,hi: I32,index: I32,value: I32) I32 {
   let t=SegmentTree[I32].new([2,7,1,8,2,8,1,8],0,add); t.set(index,value,add); t.query(lo,hi,add);
  }
@@ -69,7 +72,7 @@ mod shadows {
  fn item() I32 {99;}
  fn score() I32 { [1,2,3] map |item| {item+1;} sum; }
 }
-export lib {
+lib {
  fn check() I32 {
   let empty:Array[Item]=[];
   assert (empty group_by(Item,I32)|v|{v.value;}).len()==0;

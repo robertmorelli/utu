@@ -1,5 +1,5 @@
-// What: `export fn` used to export a function (JS/TS habit) instead of `export lib { ... }`.
-// Expect: `export` is followed by `main`, `lib`, `mem`, or `const`; to export functions, put them in `export lib { ... }`.
+// What: `export fn` used to export a function (JS/TS habit) instead of `lib { ... }`.
+// Expect: `export` is followed by `main`, `lib`, `mem`, or `const`; to export functions, put them in `lib { ... }`.
 fn area(w: F64, h: F64) F64 { w * h; }
 
 export fn rect_area(w: F64, h: F64) F64 {

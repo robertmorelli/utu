@@ -4,6 +4,7 @@ enum(I32) Wide:
     | Top = 2147483647
     | Next
 
-export main() I32 {
-    Wide.Top.i32();
+main {
+    console.log(Wide.Top.i32());
 }
+using console from std:Console

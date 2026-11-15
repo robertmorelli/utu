@@ -6,4 +6,4 @@ mod cell[T] {
 }
 using cell[I32] |a|;
 using cell[Str] |b|;
-export main() I32 { let x = a.k(1); match x { b.K.A => 1, b.K.B => 2, }; }
+main { let x = a.k(1); let r = match x { b.K.A => 1, b.K.B => 2, } }

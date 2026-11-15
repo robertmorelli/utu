@@ -8,6 +8,7 @@ fn halves(n: I32) Array[F64] {
 
 const mem table: I32 = @comptime/\ halves(8) \/;
 
-export main() I32 {
-    table[2];
+main {
+    console.log(table[2]);
 }
+using console from std:Console

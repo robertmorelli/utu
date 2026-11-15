@@ -1759,7 +1759,7 @@ fn time(runs: I32, print: Bool) F64 {
 // jpl <file.jpl> -t -q    parse and type check
 // jpl <file.jpl> -t -s    type check, then print token, node, symbol, and type counts
 // jpl <file.jpl> -bench   in-process medians for lexing, listing, and parsing
-export main() Void {
+main {
     let args = Process.argv
     let file = ""
     let flags = ""

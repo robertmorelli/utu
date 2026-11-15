@@ -108,7 +108,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
     }
     \/
 }
-export main() Void {
+main {
     let state = @stored/\
         LedgerState "ledger-v2" manual
         LedgerState {

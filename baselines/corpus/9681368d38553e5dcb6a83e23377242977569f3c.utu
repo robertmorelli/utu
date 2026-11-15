@@ -1,4 +1,4 @@
 using Browser from std:Browser;
 struct S:
     | n: I64
-export main() Void { let s = @stored/\ S "k" S { n: 1 } \/; }
+main { let s = @stored/\ S "k" S { n: 1 } \/; }

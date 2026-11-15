@@ -1,6 +1,7 @@
 // What: Array.new_default of Str, which has no null to start from
 // Expect: Str has no default: Array[Str].new(n, fill)
-export main() I32 {
+main {
     let names = Array[Str].new_default(3);
-    names.len();
+    console.log(names.len());
 }
+using console from std:Console

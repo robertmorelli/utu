@@ -13,4 +13,5 @@ fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
 
 fn total(s: Shape) F64 { s.area(); }
 
-export main() I32 { total(Label { text: "x" }).i32(); }
+main { console.log(total(Label { text: "x" }).i32()); }
+using console from std:Console

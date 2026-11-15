@@ -4,6 +4,7 @@ fn twice(a: I64) I32 {
     @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \/;
 }
 
-export main() I32 {
-    twice(3);
+main {
+    console.log(twice(3));
 }
+using console from std:Console

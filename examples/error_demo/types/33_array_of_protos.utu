@@ -11,7 +11,8 @@ struct Label:
 
 fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
 
-export main() I32 {
+main {
     let shapes: Array[Shape] = [Circle { r: 1.0 }, Label { text: "x" }];
-    shapes.len();
+    console.log(shapes.len());
 }
+using console from std:Console

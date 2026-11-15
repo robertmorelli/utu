@@ -6,6 +6,6 @@ fn load(text: Str) ?Browser.Element {
     @json/\ decode Browser.Element text \/;
 }
 
-export main() Void {
+main {
     let e = load("{}");
 }

@@ -4,4 +4,4 @@ fn label(n: I32) Str {
     `count: ${} items`;
 }
 
-export main() Str { label(3); }
+main { label(3); }

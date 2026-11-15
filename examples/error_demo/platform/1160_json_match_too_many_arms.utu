@@ -1,6 +1,6 @@
 // What: an @json match with more than 64 pattern arms
 // Expect: @json match supports at most 64 pattern arms
-export lib {
+lib {
     fn pick(text: Str) I32 {
         @json/\ match text {
             { a0: 1 } => 0,

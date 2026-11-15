@@ -1004,4 +1004,5 @@ fn f(
     a1000: I32
 ) I32 { a0; }
 
-export main() I32 { 1; }
+main { console.log(1); }
+using console from std:Console

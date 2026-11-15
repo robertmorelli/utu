@@ -11,7 +11,8 @@ struct NoStep[Counter]:
 
 fn Counter[Has].step |h| () I32 { h.n + 1; }
 
-export main() I32 {
+main {
     let c: Counter = NoStep { n: 1 };
-    c.step();
+    console.log(c.step());
 }
+using console from std:Console

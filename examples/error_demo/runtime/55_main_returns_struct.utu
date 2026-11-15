@@ -1,9 +1,11 @@
-// What: `utu run` on a main that returns a struct
-// Expect: by design, an opaque handle: JavaScript cannot read a struct (docs/typescript-abi.md); return str() to print it
+// What: printing a struct that has no str()
+// Expect: No method Point.str: console.log prints a value's str(); give Point one (fn Point.str |p| () Str)
+using console from std:Console
+
 struct Point:
     | x: I32
     | y: I32
 
-export main() Point {
-    Point { x: 1, y: 2 };
+main {
+    console.log(Point { x: 1, y: 2 })
 }

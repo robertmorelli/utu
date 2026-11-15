@@ -5,8 +5,9 @@ struct Rect:
 
 fn Rect.square(side: F64) Rect { Rect { w: side }; }
 
-export main() I32 {
+main {
     let r = Rect { w: 1.0 };
     let s = r.square(2.0);
-    s.w.i32();
+    console.log(s.w.i32());
 }
+using console from std:Console

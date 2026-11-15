@@ -4,6 +4,7 @@ fn name(a: Array[I32]) Str {
     @ir/\ <ir-ident name="a"/> \/;
 }
 
-export main() Str {
-    name([1, 2]);
+main {
+    console.log(name([1, 2]));
 }
+using console from std:Console

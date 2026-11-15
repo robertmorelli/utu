@@ -7,6 +7,7 @@ fn average(xs: Array[F64]) ?F64 {
     total / xs.len().f64();
 }
 
-export main() F64 {
-    average([1.0, 2.0]) orelse 0.0;
+main {
+    console.log(average([1.0, 2.0]) orelse 0.0);
 }
+using console from std:Console

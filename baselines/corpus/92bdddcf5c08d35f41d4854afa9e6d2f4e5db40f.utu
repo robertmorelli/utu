@@ -19,8 +19,8 @@ let digest_hex: fun(Str) Promise[Str] =
 let random_int: fun(I32) Promise[I32] =
     @es/\ ((c) => async (max) => c.randomInt(max))(await import('node:crypto')) \/;
 
-export main() Str {
-    await digest_hex("utu");
+main {
+    console.log(await digest_hex("utu"));
 }
 
 test "an awaited promise reads as straight-line code" {
@@ -40,3 +40,4 @@ test "two awaits in sequence" {
     let b: Str = await digest_hex("x");
     assert a == b;
 }
+using console from std:Console

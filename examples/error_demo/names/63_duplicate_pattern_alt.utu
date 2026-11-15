@@ -12,6 +12,7 @@ fn area(s: Shape) F64 {
     };
 }
 
-export main() F64 {
-    area(Circle { r: 1.0 });
+main {
+    console.log(area(Circle { r: 1.0 }));
 }
+using console from std:Console

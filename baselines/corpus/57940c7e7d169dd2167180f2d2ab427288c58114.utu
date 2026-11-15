@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
         fn run(base: Str, piece: Str, repeats: I32) Str {
           let i: I32 = 0;
           let out: Str = base;

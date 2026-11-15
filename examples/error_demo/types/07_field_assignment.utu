@@ -3,8 +3,9 @@
 struct Player:
     | score: I32
 
-export main() I32 {
+main {
     let p = Player { score: 0 };
     p.score = 2.5;
-    p.score;
+    console.log(p.score);
 }
+using console from std:Console

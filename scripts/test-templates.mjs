@@ -39,12 +39,12 @@ try {
   const errors = await build(await write('errors.utu', `struct P:
     | x : I32
 fn f(p: P, q: ?Str) Str { \`p=\${p} q=\${q}\`; }
-export lib { fn run() Str { f(P { x: 1 }, null); } }
+lib { fn run() Str { f(P { x: 1 }, null); } }
 `));
   assert.deepEqual(errors.errors, ['?Str may be null', 'No method P.str']);
 
   // A comment inside `${…}`, and every escape's text.
-  const text = await build(await write('text.utu', `export lib {
+  const text = await build(await write('text.utu', `lib {
     fn commented() Str { \`\${ // the value
         1 }\`; }
     fn escapes() Str { \`\\$\\u0041\\"\`; }
@@ -57,7 +57,7 @@ export lib { fn run() Str { f(P { x: 1 }, null); } }
   assert.equal(text.exports.quoted(), "'B/");
 
   // A \u without its four digits, in a template or a string, is a mistake.
-  const escapes = await build(await write('escapes.utu', `export lib {
+  const escapes = await build(await write('escapes.utu', `lib {
     fn a() Str { \`\\u{41}\`; }
     fn b() Str { "\\u41"; }
 }
@@ -74,13 +74,13 @@ export lib { fn run() Str { f(P { x: 1 }, null); } }
     const wrong = await build(await write('str.utu', `struct P:
     | x : I32
 fn P.str |self| ${signature} { fatal; }
-export lib { fn run() Str { \`\${P { x: 1 }}\`; } }
+lib { fn run() Str { \`\${P { x: 1 }}\`; } }
 `));
     assert.deepEqual(wrong.errors, [message], signature);
   }
 
   // An unclosed template or string says so.
-  const unclosed = await compileFile(utu, await write('unclosed.utu', 'export lib { fn f() Str { `abc; } }\n'));
+  const unclosed = await compileFile(utu, await write('unclosed.utu', 'lib { fn f() Str { `abc; } }\n'));
   assert.equal(unclosed.diagnostics[0].message, 'Unclosed template string');
   console.log(`templates: ${Object.keys(expected).length} templates build; comments and escapes inside them; bad \\u escapes, str signatures, and values without str reported`);
 } finally {

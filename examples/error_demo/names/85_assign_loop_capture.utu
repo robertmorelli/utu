@@ -1,7 +1,8 @@
 // What: assigns to a for-loop capture, hoping to change the array element
 // Expect: Cannot assign to loop capture 'x' (assign xs[i] instead)
-export main() I32 {
+main {
     let xs = [1, 2, 3];
     for (xs) |x| { x = x * 2; };
-    xs[0];
+    console.log(xs[0]);
 }
+using console from std:Console

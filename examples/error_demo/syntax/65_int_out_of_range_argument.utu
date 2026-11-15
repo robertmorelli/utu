@@ -2,6 +2,7 @@
 // Expect: Integer literal 5000000000 is out of range for I32 (the parameter `ms` of `wait`).
 fn wait(ms: I32) I32 { ms; }
 
-export main() I32 {
-    wait(5000000000);
+main {
+    console.log(wait(5000000000));
 }
+using console from std:Console

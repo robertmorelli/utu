@@ -29,8 +29,8 @@ let yaml_get_str: fun(YamlDoc, Str) Str = @es/\ (d, k) => String(d[k]) \/;
 let yaml_get_int: fun(YamlDoc, Str) I32 = @es/\ (d, k) => Number(d[k]) \/;
 let yaml_has: fun(YamlDoc, Str) Bool = @es/\ (d, k) => (k in d) ? 1 : 0 \/;
 
-export main() Str {
-    parse("name: utu\nyear: 2026\n").str("name");
+main {
+    console.log(parse("name: utu\nyear: 2026\n").str("name"));
 }
 
 test "a parsed document is an opaque nominal handle" {
@@ -49,3 +49,4 @@ test "membership and round-trip through the same handle type" {
 test "methods promote onto the handle so calls read natively" {
     assert parse("k: v\n").str("k") == "v";
 }
+using console from std:Console

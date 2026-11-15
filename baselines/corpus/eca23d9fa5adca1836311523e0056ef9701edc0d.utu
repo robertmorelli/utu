@@ -1,7 +1,7 @@
 
       struct Box:
         | v : I32
-      export lib {
+      lib {
         fn run(b: Box, n: F64) I32 {
           let f: cl(I32) I32 = cl(x) { x + b.v; };
           let g: cl() F64 = cl() { n; };

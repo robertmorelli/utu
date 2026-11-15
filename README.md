@@ -6,7 +6,7 @@ See `PRINCIPLES.md` for the design constraints that keep this true.
 
 The desktop and web extension provides syntax highlighting, compiler-backed
 diagnostics, hover information, Wasm/WAT compilation, syntax and compiler-IR
-views, and `export main` execution.
+views, and `main` execution.
 
 ```sh
 bun run package:vscode
@@ -30,7 +30,7 @@ npm package with types imports directly:
 using Browser from std:Browser
 using Nano from "npm:nanoid"
 
-export main() Void {
+main {
     let item = Browser.document.createElement("li")
     item.textContent = Nano.nanoid(8)
     Browser.document.body.append(item)

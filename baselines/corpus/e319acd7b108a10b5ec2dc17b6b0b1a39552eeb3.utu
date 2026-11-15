@@ -1,4 +1,4 @@
-export lib {
+lib {
   fn text() Str {
     let s =
       \\{"quoted": true}

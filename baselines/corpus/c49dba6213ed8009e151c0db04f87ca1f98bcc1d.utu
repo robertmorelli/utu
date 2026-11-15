@@ -1,2 +1,3 @@
 gn g() I32 { yield 1; }
-export main() I32 { let x = g(); 1; }
+main { let x = g(); console.log(1); }
+using console from std:Console

@@ -11,4 +11,5 @@ fn area(s: Shape) F64 {
     };
 }
 
-export main() I32 { area(Circle { r: 1.0 }).i32(); }
+main { console.log(area(Circle { r: 1.0 }).i32()); }
+using console from std:Console

@@ -4,6 +4,7 @@ fn parity(b: U8) Str {
     match b % 2 { 0 => "even", 1 => "odd", };
 }
 
-export main() Str {
-    parity(3);
+main {
+    console.log(parity(3));
 }
+using console from std:Console

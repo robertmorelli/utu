@@ -10,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const abi = linkFiles({ files: [path.join(root, 'benchmarks/abi/arrays.d.ts')], prefix: 'Bench', moduleSpecifier: path.join(root, 'benchmarks/abi/arrays.mjs') });
 const utu = await loadNodeCompiler();
 const source = `using Bench from std:Bench;
-  export lib {
+  lib {
     fn indexed(values: Bench.Numbers) F64 {
       let n: F64 = values.length; let total: F64 = 0.0; let i: F64 = 0.0;
       while (i < n) { total = total + values[i]; i = i + 1.0; }; total;

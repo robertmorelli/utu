@@ -6,128 +6,140 @@ using ui from "./ui.utu"
 mod stdlib {
     // ── Samples ──────────────────────────────────────────────────────────────
     fn ints_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let n = 1000000
         \\    let wide = n.i64() * n.i64()   // I64: no overflow
         \\    let flags = 0b1011
         \\    let mask = (flags & 6) | (1 << 4)
         \\    let unsigned = (0 - 1).u32()      // the same bits, read unsigned
-        \\    `${wide} ${mask} ${~flags} ${-8 >> 1} ${-8 >>> 28} ${unsigned} ${I32.popcnt(255)} ${I32.clz(1)}`
+        \\    console.log(`${wide} ${mask} ${~flags} ${-8 >> 1} ${-8 >>> 28} ${unsigned} ${I32.popcnt(255)} ${I32.clz(1)}`)
         \\}
         \\// 1000000000000 18 -12 -4 15 4294967295 8 31
+        \\using console from std:Console
     }
     fn wide_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let one: U64 = 1                     // an integer literal adopts the declared type
         \\    let top = one << 63
         \\    let signed = top.i64()            // the same bits, read signed
         \\    let seconds: I64 = 86400
         \\    let ms = seconds * 1000
-        \\    `${top} ${signed} ${ms} ${ms.f64() / 3.6e6} ${top.u32()}`
+        \\    console.log(`${top} ${signed} ${ms} ${ms.f64() / 3.6e6} ${top.u32()}`)
         \\}
         \\// 9223372036854775808 -9223372036854775808 86400000 24 0
+        \\using console from std:Console
     }
     fn floats_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let angle = F64.pi() / 6.0
         \\    let two: F64 = 2
         \\    let hyp = two.hypot(3.0)
         \\    let r = F64.sqrt(2.0)                // operations on the bits are module functions,
         \\    let parts = `${angle.sin()} ${two.pow(10.0)} ${F64.floor(hyp * 100.0) / 100.0}`   // Math is methods
-        \\    `${parts} ${F64.max(r, 1.5)} ${F64.nan().is_nan()} ${F64.inf().is_finite()} ${2.9.i32()}`
+        \\    console.log(`${parts} ${F64.max(r, 1.5)} ${F64.nan().is_nan()} ${F64.inf().is_finite()} ${2.9.i32()}`)
         \\}
         \\// 0.49999999999999994 1024 3.6 1.5 true false 2
+        \\using console from std:Console
     }
     fn f32_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let x: F32 = 0.1
         \\    let y = x * 3.0
         \\    let bits = x.bits()                  // the IEEE 754 bits, as an I32
         \\    let back = F32.from_bits(bits)
-        \\    `${y} ${bits} ${back == x} ${y.f64()} ${F32.sqrt(x)}`
+        \\    console.log(`${y} ${bits} ${back == x} ${y.f64()} ${F32.sqrt(x)}`)
         \\}
         \\// 0.3 1036831949 true 0.30000001192092896 0.31622776
+        \\using console from std:Console
     }
     fn bool_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let ready = true
         \\    let late = 3 > 4
-        \\    `${ready and not late} ${ready xor late} ${ready == late}`
+        \\    console.log(`${ready and not late} ${ready xor late} ${ready == late}`)
         \\}
         \\// true true false
+        \\using console from std:Console
     }
     fn masks_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let read: M32 = 1
         \\    let write: M32 = 2
         \\    let both = read | write              // bitwise only: no + or * on a mask
         \\    let lanes = M128.ones() & ~M128.zero()
-        \\    `${(both & write) == write} ${M128.any_true(lanes)} ${V128.any_true(V128.zero())}`
+        \\    console.log(`${(both & write) == write} ${M128.any_true(lanes)} ${V128.any_true(V128.zero())}`)
         \\}
         \\// true true false
+        \\using console from std:Console
     }
     fn i31_sample() Str {
-        \\export main() I32 {
+        \\main {
         \\    let packed = I31.from_i32(-5)        // an integer in a GC reference slot
-        \\    I31.get_s(packed) + I31.get_u(I31.from_i32(7))
+        \\    console.log(I31.get_s(packed) + I31.get_u(I31.from_i32(7)))
         \\}
         \\// 2
+        \\using console from std:Console
     }
     fn str_search_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let s = "the cat sat on the mat"
         \\    let first = s.index_of("at", 0)
         \\    let next = s.index_of("at", first + 1)
         \\    let last = s.last_index_of("the")
         \\    let checks = `${s.contains("sat")} ${s.starts_with("the")} ${s.ends_with("hat")}`
-        \\    `${s.len()} ${first} ${next} ${last} ${checks} ${s.slice(4, 7)} ${s[0]}`
+        \\    console.log(`${s.len()} ${first} ${next} ${last} ${checks} ${s.slice(4, 7)} ${s[0]}`)
         \\}
         \\// 22 5 9 15 true true false cat 116
+        \\using console from std:Console
     }
     fn str_shape_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let raw = "  Hello, World  "
         \\    let t = raw.trim()
         \\    let shouted = t.to_upper()
         \\    let swapped = t.replace("o", "0")    // every occurrence
         \\    let row = "7".pad_start(3, "0") + "|" + "ab".pad_end(4, ".") + "|" + "-".repeat(3)
-        \\    `[${raw.trim_start()}] ${shouted} ${swapped} ${row}`
+        \\    console.log(`[${raw.trim_start()}] ${shouted} ${swapped} ${row}`)
         \\}
         \\// [Hello, World  ] HELLO, WORLD Hell0, W0rld 007|ab..|---
+        \\using console from std:Console
     }
     fn str_split_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let fields = "ada,36,,london".split(",")   // ["ada", "36", "", "london"]
         \\    let age = fields[1].parse_i32(0)
         \\    let bad = "twelve".parse_i32(-1)           // the fallback
         \\    let price = " 2.50 ".parse_f64()
         \\    let letters = " / ".join("abc".split(""))
-        \\    `${fields.len()} ${age} ${bad} ${price} ${"x".parse_f64().is_nan()} ${letters}`
+        \\    console.log(`${fields.len()} ${age} ${bad} ${price} ${"x".parse_f64().is_nan()} ${letters}`)
         \\}
         \\// 4 36 -1 2.5 true a / b / c
+        \\using console from std:Console
     }
     fn str_build_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let codes = Array[I32].new(26, 0)
         \\    for (0 ..< 26) |i| { codes[i] = 97 + i }
         \\    let alphabet = Str.from_codes(codes, 26)   // build once, no concatenation
         \\    let star = Str.from_code_point(9733)
         \\    let n = 42
-        \\    `${alphabet.slice(0, 5)} ${star} ${n.str() + "!"} ${3.5} ${true}`
+        \\    console.log(`${alphabet.slice(0, 5)} ${star} ${n.str() + "!"} ${3.5} ${true}`)
         \\}
         \\// abcde ★ 42! 3.5 true
+        \\using console from std:Console
     }
     fn array_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let xs = [3, 1, 4, 1, 5]                // Array[I32]
         \\    xs[1] = 9
         \\    let zeros = Array[I32].new(4, 0)        // [0, 0, 0, 0]
         \\    let names = Array[?Str].new_default(2)  // [null, null]
         \\    zeros.copy_from(1, xs, 0, 3)            // [0, 3, 9, 4]
         \\    let middle = xs[1, 4]                   // a copy: [9, 4, 1]
-        \\    `${xs.len()} ${zeros[3]} ${middle.len()} ${middle[0]} ${names.len()} ${xs.slice(3, 5)[1]}`
+        \\    console.log(`${xs.len()} ${zeros[3]} ${middle.len()} ${middle[0]} ${names.len()} ${xs.slice(3, 5)[1]}`)
         \\}
         \\// 5 4 3 9 2 5
+        \\using console from std:Console
     }
     fn buffer_sample() Str {
         \\using Buffer from std:Buffer
@@ -140,45 +152,49 @@ mod stdlib {
         \\    out.finish()                            // exactly the pushed length
         \\}
         \\
-        \\export main() Str {
+        \\main {
         \\    let xs = even_squares(10)
-        \\    `${xs.len()} ${xs[4]}`
+        \\    console.log(`${xs.len()} ${xs[4]}`)
         \\}
         \\// 5 64
+        \\using console from std:Console
     }
     fn list_sample() Str {
         \\using List from std:List
         \\
-        \\export main() Str {
+        \\main {
         \\    let before = ["a", "b", "c"]
         \\    let more = List[Str].append(before, "d")
         \\    let fewer = List[Str].remove_at(more, 1)
-        \\    `${before.len()} ${", ".join(more)} | ${", ".join(fewer)}`
+        \\    console.log(`${before.len()} ${", ".join(more)} | ${", ".join(fewer)}`)
         \\}
         \\// 3 a, b, c, d | a, c, d
+        \\using console from std:Console
     }
     fn strmap_sample() Str {
         \\using StrMap from std:StrMap
         \\
-        \\export main() Str {
+        \\main {
         \\    let counts = StrMap[I32].new()
         \\    for ("the cat and the hat and the bat".split(" ")) |word| {
         \\        counts.set(word, counts.get(word, 0) + 1)
         \\    }
         \\    let removed = counts.remove("bat")
-        \\    `${counts.len()} ${counts.get("the", 0)} ${counts.get("dog", -1)} ${counts.has("hat")} ${removed} ${counts.keys().len()}`
+        \\    console.log(`${counts.len()} ${counts.get("the", 0)} ${counts.get("dog", -1)} ${counts.has("hat")} ${removed} ${counts.keys().len()}`)
         \\}
         \\// 4 3 -1 true true 4
+        \\using console from std:Console
     }
     fn intmap_sample() Str {
         \\using IntMap from std:IntMap
         \\
-        \\export main() Str {
+        \\main {
         \\    let squares = IntMap.new()
         \\    for (0 ..< 100) |i| { squares.set(i * 7, i * i) }
-        \\    `${squares.len()} ${squares.get(21, -1)} ${squares.get(22, -1)} ${squares.has(693)}`
+        \\    console.log(`${squares.len()} ${squares.get(21, -1)} ${squares.get(22, -1)} ${squares.has(693)}`)
         \\}
         \\// 100 9 -1 true
+        \\using console from std:Console
     }
     fn interner_sample() Str {
         \\using Interner from std:Interner
@@ -189,27 +205,29 @@ mod stdlib {
         \\    names.finish()
         \\}
         \\
-        \\export main() Str {
+        \\main {
         \\    let names = Interner.new()
         \\    let a = names.str("alpha")
         \\    let b = names.str("beta")
         \\    let again = intern(names, [97, 108, 112, 104, 97])   // the same bytes, the same id
         \\    let euro = names.str("€")             // UTF-8: 3 bytes
-        \\    `${a} ${b} ${again} ${names.len()} ${names.size(b)} ${names.byte_at(b, 0)} ${names.ascii(b)} ${names.size(euro)}`
+        \\    console.log(`${a} ${b} ${again} ${names.len()} ${names.size(b)} ${names.byte_at(b, 0)} ${names.ascii(b)} ${names.size(euro)}`)
         \\}
         \\// 0 1 0 3 4 98 beta 3
+        \\using console from std:Console
     }
     fn found_sample() Str {
-        \\export main() Str {
+        \\main {
         \\    let words = ["fig", "apple", "kiwi", "banana"]
         \\    let long = words first_where(Str) |w| { w.len() > 4 }      // ?Found[Str]
         \\    let none = words first_where(Str) |w| { w.len() > 9 }
         \\    let groups = words group_by(Str, I32) |w| { w.len() % 2 }  // Array[Group[I32, Str]]
         \\    let first = promote long { |f| => f.value, ~> "none", }
         \\    let g = groups[0]
-        \\    `${first} ${(none orelse Found[Str].new("fallback")).value} ${g.key} ${", ".join(g.values)}`
+        \\    console.log(`${first} ${(none orelse Found[Str].new("fallback")).value} ${g.key} ${", ".join(g.values)}`)
         \\}
         \\// apple fallback 1 fig, apple
+        \\using console from std:Console
     }
     fn segment_sample() Str {
         \\using SegmentTree from std:SegmentTree
@@ -217,44 +235,47 @@ mod stdlib {
         \\fn add(a: I32, b: I32) I32 { a + b }
         \\fn at_least_ten(sum: I32) Bool { sum >= 10 }
         \\
-        \\export main() Str {
+        \\main {
         \\    let sums = SegmentTree[I32].new([2, 3, 5, 7, 1], 0, add)
         \\    let before = sums.query(1, 4, add)                // 3 + 5 + 7
         \\    sums.set(2, 20, add)                              // [2, 3, 20, 7, 1]
         \\    let after = sums.query(1, 4, add)
         \\    let first = sums.first_prefix(at_least_ten, add)  // 2 + 3 + 20 >= 10 at index 2
-        \\    `${before} ${after} ${first}`
+        \\    console.log(`${before} ${after} ${first}`)
         \\}
         \\// 15 30 2
+        \\using console from std:Console
     }
     fn segment_max_sample() Str {
         \\using SegmentTree from std:SegmentTree
         \\
         \\fn larger(a: F64, b: F64) F64 { F64.max(a, b) }
         \\
-        \\export main() F64 {
+        \\main {
         \\    let temps = [12.5, 18.0, 9.5, 21.0, 16.5]
         \\    let highs = SegmentTree[F64].new(temps, -F64.inf(), larger)
-        \\    highs.query(0, 3, larger)
+        \\    console.log(highs.query(0, 3, larger))
         \\}
         \\// 18
+        \\using console from std:Console
     }
     fn persistent_sample() Str {
         \\using PersistentSegmentTree from std:PersistentSegmentTree
         \\
         \\fn add(a: I32, b: I32) I32 { a + b }
         \\
-        \\export main() Str {
+        \\main {
         \\    let v1 = PersistentSegmentTree[I32].new([1, 2, 3, 4], 0, add)
         \\    let v2 = v1.set(0, 100, add)              // a new version; v1 is unchanged
-        \\    `${v1.query(0, 4, add)} ${v2.query(0, 4, add)} ${v2.query(1, 3, add)}`
+        \\    console.log(`${v1.query(0, 4, add)} ${v2.query(0, 4, add)} ${v2.query(1, 3, add)}`)
         \\}
         \\// 10 109 5
+        \\using console from std:Console
     }
     fn spatial_sample() Str {
         \\using Spatial from std:Spatial
         \\
-        \\export main() Str {
+        \\main {
         \\    let index = Spatial.new([
         \\        Spatial.point(0.0, 0.0, 10),
         \\        Spatial.point(1.0, 2.0, 20),
@@ -265,9 +286,10 @@ mod stdlib {
         \\    let low = index.below(0.0, 5.0, 1.0)         // x in [0, 5], y <= 1
         \\    let near = index.radius(0.0, 0.0, 2.5)
         \\    let closest = promote index.nearest(4.0, 4.0) { |f| => f.value, ~> -1, }
-        \\    `${box.len()} ${low.len()} ${near.len()} ${closest}`
+        \\    console.log(`${box.len()} ${low.len()} ${near.len()} ${closest}`)
         \\}
         \\// 3 2 2 40
+        \\using console from std:Console
     }
     fn promise_sample() Str {
         \\let later: fun(I32, I32) Promise[I32] =
@@ -279,12 +301,13 @@ mod stdlib {
         \\    a + b
         \\}
         \\
-        \\export main() I32 {
+        \\main {
         \\    later(7, 1).then(cl(v) { assert v == 7 })
         \\    later(0, 1).catch(cl(reason) { fatal })
-        \\    total()
+        \\    console.log(total())
         \\}
         \\// 42
+        \\using console from std:Console
     }
     fn stream_sample() Str {
         \\fn sum(s: Stream[I32]) I32 {
@@ -293,34 +316,36 @@ mod stdlib {
         \\    total
         \\}
         \\
-        \\export main() Str {
+        \\main {
         \\    let evens = Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { v % 2 == 0 }).map(cl(v) { v * 10 })
         \\    let squares = Stream[I32].generate(10, cl(i) { i * i }).skip(1).take(3)   // 1, 4, 9
         \\    let both = Stream[I32].of([100]).chain(Stream[I32].of([1, 2]))
-        \\    `${sum(evens)} ${sum(squares)} ${sum(both)}`
+        \\    console.log(`${sum(evens)} ${sum(squares)} ${sum(both)}`)
         \\}
         \\// 120 14 103
+        \\using console from std:Console
     }
     fn stream_js_sample() Str {
         \\let words: fun() Externref = @es/\ () => (async function* () {
         \\    yield "alpha"; yield "beta"; yield "gamma";
         \\})() \/
         \\
-        \\export main() Str {
+        \\main {
         \\    let out = ""
         \\    await for (Stream[Str].from_js(words())) |w| {
         \\        if w == "gamma" { break }       // break closes the host iterator
         \\        out = out + w + " "
         \\    }
-        \\    out
+        \\    console.log(out)
         \\}
         \\// alpha beta
+        \\using console from std:Console
     }
     fn console_sample() Str {
         \\using console from std:Console
         \\using time from std:Time
         \\
-        \\export main() Void {
+        \\main {
         \\    let start = time.now()
         \\    let total = 0
         \\    for (0 ..< 1000000) |i| { total += i % 7 }
@@ -332,26 +357,28 @@ mod stdlib {
     fn random_sample() Str {
         \\using Random from std:Random
         \\
-        \\export main() Str {
+        \\main {
         \\    let r = Random.new(42)              // the same seed, the same numbers, on every host
         \\    let die = r.int(1, 7)               // 1 to 6, unbiased
         \\    let unit = r.float()                // in [0, 1)
         \\    let heads = 0
         \\    for (0 ..< 1000) |i| { if r.chance(0.5) { heads += 1 } }
         \\    let fresh = Random.from_host()      // seeded from crypto.getRandomValues
-        \\    `${die} ${unit < 1.0} ${heads > 400 and heads < 600} ${r.bits() != 0 or fresh.bits() != 0}`
+        \\    console.log(`${die} ${unit < 1.0} ${heads > 400 and heads < 600} ${r.bits() != 0 or fresh.bits() != 0}`)
         \\}
         \\// 4 true true true
+        \\using console from std:Console
     }
     fn number_field_sample() Str {
         \\using NumberField from std:NumberField
         \\
-        \\export main() Str {
+        \\main {
         \\    let good = NumberField.new("42.5")
         \\    let empty = NumberField.new("")
-        \\    `${good.valid(0.0, 100.0)} ${good.value()} ${empty.valid(0.0, 100.0)} [${good.error(0.0, 10.0)}]`
+        \\    console.log(`${good.valid(0.0, 100.0)} ${good.value()} ${empty.valid(0.0, 100.0)} [${good.error(0.0, 10.0)}]`)
         \\}
         \\// true 42.5 false [Enter a number within the allowed range.]
+        \\using console from std:Console
     }
     fn wutu_sample() Str {
         \\using Browser from std:Browser
@@ -360,7 +387,7 @@ mod stdlib {
         \\    | cents: I32
         \\    | seconds: I32
         \\
-        \\export main() Void {
+        \\main {
         \\    let cart = Cart { cents: 1999, seconds: 0 }
         \\    let app = @wutu/\
         \\    @reactive;
@@ -384,7 +411,7 @@ mod stdlib {
     fn browser_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() Void {
+        \\main {
         \\    let title = Browser.document.createElement("h1")   // an HTMLHeadingElement
         \\    title.textContent = "Hello"
         \\    title.addEventListener("click", cl(event) Void {
@@ -396,23 +423,25 @@ mod stdlib {
     fn js_sample() Str {
         \\using JS from std:JS
         \\
-        \\export main() Str {
+        \\main {
         \\    let biggest = JS.Math.max(3.0, 7.0)
         \\    let when = JS.Date.UTC(2026, 0, 1)
         \\    let parsed = try { JS.JSON.parse("[1, 2"); 1 } catch { 0 }   // a host throw, caught
-        \\    `${biggest} ${when} ${parsed} ${JS.Number.isInteger(4.0)}`
+        \\    console.log(`${biggest} ${when} ${parsed} ${JS.Number.isInteger(4.0)}`)
         \\}
         \\// 7 1767225600000 0 true
+        \\using console from std:Console
     }
     fn web_sample() Str {
         \\using Web from std:Web
         \\
-        \\export main() Str {
+        \\main {
         \\    let url = new Web.URL("https://example.com/a/b?q=utu")
         \\    let bytes = new Web.TextEncoder().encode("héllo")
-        \\    `${url.pathname} ${url.searchParams.get("q") orelse ""} ${bytes.length}`
+        \\    console.log(`${url.pathname} ${url.searchParams.get("q") orelse ""} ${bytes.length}`)
         \\}
         \\// /a/b utu 6
+        \\using console from std:Console
     }
     // ── Surfaces: each row is "signature::what it does" ─────────────────────
     fn int_rows() Array[Str] {
@@ -495,12 +524,13 @@ mod stdlib {
         \\    if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
         \\}
         \\
-        \\export main() Str {
+        \\main {
         \\    let words = ["pear", "fig", "apple"]
         \\    Order[Str].sort(words)
         \\    let v = Order[Version].max(Version { major: 1, minor: 4 }, Version { major: 1, minor: 9 })
-        \\    `${", ".join(words)} ${v.major}.${v.minor} ${Order[I32].clamp(12, 0, 10)}`   // apple, fig, pear 1.9 10
+        \\    console.log(`${", ".join(words)} ${v.major}.${v.minor} ${Order[I32].clamp(12, 0, 10)}`)   // apple, fig, pear 1.9 10
         \\}
+        \\using console from std:Console
     }
     fn ord_rows() Array[Str] {
         [

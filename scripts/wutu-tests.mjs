@@ -168,7 +168,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             }
             \\/;
           }
-          export lib {
+          lib {
             fn render(n: I32) Browser.HTMLElement { view(n); }
           }
         `});
@@ -198,7 +198,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             }
             \\/;
           }
-          export lib {
+          lib {
             fn make(pct: I32) Gauge { Gauge { pct: pct }; }
             fn render(g: Gauge) Browser.HTMLElement { view(g); }
             fn set(g: Gauge, pct: I32) Void { g.pct = pct; wutu.refresh(); }
@@ -224,16 +224,16 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_static_style.utu', source: `${BROWSER}
         fn first() Str { "p{color:red}"; }
         fn second() Str { "p{color:blue}"; }
-        export main() Browser.HTMLElement {
+        lib { fn run() Browser.HTMLElement {
           @wutu/\\
           @style first();
           @style second();
           div { /* comment */ background: url(https://example.com/a.png); "x"; }
           \\/;
-        }
+        } }
       `});
-      instance.exports.main();
-      instance.exports.main();
+      instance.exports.run();
+      instance.exports.run();
       const sheets = [...document.querySelectorAll('style')].map(node => node.textContent);
       // A shared sheet joins the wutu.document layer, below element styles.
       const red = '@layer wutu.document{p{color:red}}', blue = '@layer wutu.document{p{color:blue}}';
@@ -251,7 +251,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
         struct State:
             | text: Str
             | items: Array[Item]
-        export main() Browser.HTMLElement {
+        lib { fn run() Browser.HTMLElement {
           let state = State { text: "start", items: [Item { id: "a" }, Item { id: "b" }] };
           @wutu/\\
           @reactive;
@@ -270,9 +270,9 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             }
           }
           \\/;
-        }
+        } }
       `});
-      const root = instance.exports.main();
+      const root = instance.exports.run();
       document.body.append(root);
       const input = root.querySelector('input');
       assertEq(input.value, 'start');
@@ -295,7 +295,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
         struct State:
             | x: F64
         fn sign(x: F64) Browser.HTMLElement { @wutu/\\ span { = (1.0 / x).str(); } \\/; }
-        export lib {
+        lib {
             fn main() Browser.HTMLElement {
                 let state = State { x: -0.0 };
                 @wutu/\\ @reactive; main { = sign(state.x); button { on click { state.x = 0.0; } } } \\/;
@@ -335,7 +335,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
           }
           \\/;
         }
-        export lib {
+        lib {
             fn once() Browser.HTMLElement { plain(); }
             fn reactive() Browser.HTMLElement { view(); }
         }
@@ -374,9 +374,9 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
 
   test('wutu diagnostics: template errors point at the attribute, alias, binding, or interpolation', async ({ ROOT }) => {
     const cases = [
-      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; }`, 'invalid-dsl-usage', 'h'],
-      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) Void { x.focus(); }; } } \\/; }`, 'invalid-dsl-usage', 'x'],
-      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { = 1 +; } \\/; }`, 'invalid-dsl-usage', '1'],
+      [`${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; } }`, 'invalid-dsl-usage', 'h'],
+      [`${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) Void { x.focus(); }; } } \\/; } }`, 'invalid-dsl-usage', 'x'],
+      [`${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { = 1 +; } \\/; } }`, 'invalid-dsl-usage', '1'],
     ];
     for (const [source, kind, text] of cases) {
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
@@ -389,7 +389,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
   test('wutu diagnostics: type errors in values point at the value, not the template', async ({ ROOT }) => {
     const source = `${BROWSER}struct S:
     | n: I32
-export main() Browser.HTMLElement {
+lib { fn run() Browser.HTMLElement {
     let s = S { n: 1 };
     @wutu/\\
     @reactive;
@@ -401,7 +401,7 @@ export main() Browser.HTMLElement {
         if s.n { "x"; }
     }
     \\/;
-}`;
+} }`;
     const diagnostics = (await selfhostDiagnostics({ ROOT, source })).filter(d => d.kind === 'type-mismatch');
     const texts = diagnostics.map(d => d.text);
     // (A binding reports once, at the bind statement.)
@@ -414,11 +414,11 @@ export main() Browser.HTMLElement {
   });
 
   test('wutu diagnostics: misspelled island names warn without blocking compilation', async ({ ROOT }) => {
-    const program = (name) => `${BROWSER}export main() Browser.HTMLElement {
+    const program = (name) => `${BROWSER}lib { fn run() Browser.HTMLElement {
     // wutu.invalidate("commented-out") is ignored
     wutu.invalidate("${name}");
     @wutu/\\ @island "board"; div { "x"; } \\/;
-}`;
+} }`;
     const warned = (await selfhostDiagnostics({ ROOT, source: program('bored') })).filter(d => d.kind === 'unknown-island');
     assertEq(warned.length, 1);
     assertEq(warned[0].severity, 'warning');
@@ -431,10 +431,16 @@ export main() Browser.HTMLElement {
   test('@stored: non-struct state, bad types, and unknown validators are located precisely', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      [`${BROWSER}export main() Void { let s = @stored/\\ Str "k" "x" \\/; }`, 'invalid-dsl-usage', 'Str', 'must be a struct'],
-      [`${BROWSER}struct S:\n    | n: I64\nexport main() Void { let s = @stored/\\ S "k" S { n: 1 } \\/; }`, 'invalid-dsl-usage', 'S', 'Unsupported stored type I64'],
-      [`${BROWSER}struct S:\n    | n: I32\nexport main() Void { let s = @stored/\\ S "k" validate nope S { n: 1 } \\/; }`, 'unknown-variable', 'nope', ''],
-      [`${BROWSER}struct S:\n    | n: I32\nexport main() Void { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'missing', ''],
+      [`${BROWSER}main { let s = @stored/\\ Str "k" "x" \\/; }`, 'invalid-dsl-usage', 'Str', 'must be a struct'],
+      [`${BROWSER}struct S:
+    | n: I64
+main { let s = @stored/\\ S "k" S { n: 1 } \\/; }`, 'invalid-dsl-usage', 'S', 'Unsupported stored type I64'],
+      [`${BROWSER}struct S:
+    | n: I32
+main { let s = @stored/\\ S "k" validate nope S { n: 1 } \\/; }`, 'unknown-variable', 'nope', ''],
+      [`${BROWSER}struct S:
+    | n: I32
+main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'missing', ''],
     ];
     for (const [source, kind, text, message] of cases) {
       const diagnostics = await diagnose(compiler, ROOT, source);
@@ -501,14 +507,14 @@ export main() Browser.HTMLElement {
           }
           \\/;
       }
-      export main() Browser.HTMLElement { view(St { u: "/safe" }); }
+      lib { fn run() Browser.HTMLElement { view(St { u: "/safe" }); } }
     `;
     const BAD = ['javascript:window.__pwned=1', 'JAVASCRIPT:alert(1)', ' javascript:alert(1)', 'java\tscript:alert(1)',
       '\u0001javascript:alert(1)', 'jav\nascript:x', 'vbscript:msgbox', 'data:text/html,<script>alert(1)</script>'];
     for (const mode of Object.keys(MODES)) {
       await withDom(async (document) => {
         const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: `wutu_url_${mode}.utu`, source, mode });
-        const root = instance.exports.main();
+        const root = instance.exports.run();
         document.body.append(root);
         const $ = s => root.querySelector(s);
         const urls = () => [$('#attr').getAttribute('href'), $('#prop').getAttribute('href'), $('form').getAttribute('action'),
@@ -540,13 +546,13 @@ export main() Browser.HTMLElement {
 
   test('wutu: a srcdoc from a value is an error (it is HTML); a written one stays', async ({ ROOT }) => {
     for (const item of ['srcdoc = h;', '.srcdoc = h;']) {
-      const source = `${BROWSER}export main() Browser.HTMLElement { let h = "<b>x</b>"; @wutu/\\ iframe { ${item} } \\/; }`;
+      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "<b>x</b>"; @wutu/\\ iframe { ${item} } \\/; } }`;
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
       const match = diagnostics.find(d => d.severity === 'error' && d.message.includes('srcdoc is HTML'));
       assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
       assertEq(source.slice(match.start, match.start + 6), 'srcdoc', `${item}: located at the name`);
     }
-    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ iframe { srcdoc = "<b>x</b>"; } \\/; }` });
+    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ iframe { srcdoc = "<b>x</b>"; } \\/; } }` });
     assertEq(written.filter(d => d.severity === 'error').length, 0);
   });
 
@@ -555,13 +561,13 @@ export main() Browser.HTMLElement {
       ['p { OnMouseOver = h; }', 'expected an HTML tag', 'OnMouseOver'], ['x-note { .oNmouseover = h; }', 'events are written on mouseover', 'oNmouseover'],
       ['script { src = h; }', "a script's attributes are code", 'src'], ['script { .src = h; }', "a script's attributes are code", 'src'],
       ['script { = h; }', "a script's text is code", '= h'], ['script { for ([h]) |x| { "a"; } }', "a script's text is code", 'for']]) {
-      const source = `${BROWSER}export main() Browser.HTMLElement { let h = "alert(1)"; @wutu/\\ div { ${item} } \\/; }`;
+      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "alert(1)"; @wutu/\\ div { ${item} } \\/; } }`;
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
       const match = diagnostics.find(d => d.severity === 'error' && d.message.includes(message));
       assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
       assertEq(source.slice(match.start, match.start + at.length), at, `${item}: located`);
     }
-    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { script { src = "/a.js"; type = "module"; "let a = 1;"; } } \\/; }` });
+    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { script { src = "/a.js"; type = "module"; "let a = 1;"; } } \\/; } }` });
     assertEq(written.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
   });
 
@@ -570,18 +576,18 @@ export main() Browser.HTMLElement {
       ['iframe { if true { = h; } }', "an iframe's text is unescaped", 'if true'], ['noscript { .textContent = h; }', "a noscript's text is unescaped", 'textContent'],
       ['a { href = "mailto:x"; .protocol = h; }', '.protocol from a value', 'protocol'], ['base { href = h; }', "a base's href moves every relative URL", 'href'],
       ['x-note { onClick = h; }', 'events are written on Click', 'onClick'], ['x-note { .ONLOAD = h; }', 'events are written on LOAD', 'ONLOAD']]) {
-      const source = `${BROWSER}export main() Browser.HTMLElement { let h = "</style><img src=x onerror=alert(1)>"; @wutu/\\ div { ${item} } \\/; }`;
+      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "</style><img src=x onerror=alert(1)>"; @wutu/\\ div { ${item} } \\/; } }`;
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
       const match = diagnostics.find(d => d.severity === 'error' && d.message.includes(message));
       assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
       assertEq(source.slice(match.start, match.start + at.length), at, `${item}: located`);
     }
-    const fine = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { let h = "x"; @wutu/\\ div { x-note { one = h; online = h; only; onfoo = h; } style { "p { color: red; }"; } noscript { p { title = h; = h; } } base { href = "/"; } a { href = h; .protocol = "https:"; } } \\/; }` });
+    const fine = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "x"; @wutu/\\ div { x-note { one = h; online = h; only; onfoo = h; } style { "p { color: red; }"; } noscript { p { title = h; = h; } } base { href = "/"; } a { href = h; .protocol = "https:"; } } \\/; } }` });
     assertEq(fine.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
     await withDom(async () => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_on_names.utu', mode: 'debug',
-        source: `${BROWSER}export main() Browser.HTMLElement { let h = "x"; @wutu/\\ x-note { one = h; online = h; onfoo = h; } \\/; }` });
-      const root = instance.exports.main();
+        source: `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "x"; @wutu/\\ x-note { one = h; online = h; onfoo = h; } \\/; } }` });
+      const root = instance.exports.run();
       assertEq(['one', 'online', 'onfoo'].map(n => root.getAttribute(n)).join(' '), 'x x x', 'set at run time');
     });
   });
@@ -599,7 +605,7 @@ export main() Browser.HTMLElement {
           }
           \\/;
       }
-      export lib { fn render(u: Str) Browser.HTMLElement { view(u); } }
+      lib { fn render(u: Str) Browser.HTMLElement { view(u); } }
     `;
     const { MODES } = await import('../src/selfhost/compiler.js');
     for (const mode of Object.keys(MODES)) {
@@ -629,7 +635,7 @@ export main() Browser.HTMLElement {
       fn custom() Browser.HTMLElement {
           @wutu/\\ div { on changed { } on resized { } on closed { } on scrolled { } on paused { } on toggled { } on selected { } } \\/;
       }
-      export lib {
+      lib {
           fn d() Browser.SVGElement { dot(3); }
           fn g() Browser.SVGElement { grp(); }
           fn a() Browser.HTMLElement { link(); }
@@ -647,7 +653,7 @@ export main() Browser.HTMLElement {
       assertEq(x.o('data:text/html,x').getAttribute('data'), null);
       x.c();
     });
-    const typo = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { on clik { } } \\/; }` });
+    const typo = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { on clik { } } \\/; } }` });
     assert(typo.some(d => d.severity === 'error' && d.message.includes('unknown event clik; did you mean click?')), typo.map(d => d.message).join('; '));
   });
 
@@ -675,7 +681,7 @@ export main() Browser.HTMLElement {
       "x";
     }`;
     parseWutu(ok);
-    const okDiagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { @wutu/\\ ${ok} \\/; }` });
+    const okDiagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ ${ok} \\/; } }` });
     assertEq(okDiagnostics.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
     const bad = [
       ['div { color: red margin: 0; }', 'CSS declarations require a semicolon'],
@@ -692,7 +698,7 @@ export main() Browser.HTMLElement {
     ];
     for (const [text, message] of bad) {
       assert(syntaxError(text).message.includes(message), `js ${text}: ${syntaxError(text).message}`);
-      const diagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}export main() Browser.HTMLElement { let f = 1; @wutu/\\ ${text} \\/; }` });
+      const diagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { let f = 1; @wutu/\\ ${text} \\/; } }` });
       assert(diagnostics.some(d => d.severity === 'error' && d.message.includes(message)), `selfhost ${text}: ${diagnostics.map(d => d.message).join('; ')}`);
     }
   });

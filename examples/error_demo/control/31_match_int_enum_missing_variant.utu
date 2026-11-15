@@ -9,6 +9,7 @@ fn label(l: Level) Str {
     match l { Level.Low => "calm", Level.Mid => "busy", };
 }
 
-export main() Str {
-    label(Level.High);
+main {
+    console.log(label(Level.High));
 }
+using console from std:Console

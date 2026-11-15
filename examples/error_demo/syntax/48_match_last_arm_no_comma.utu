@@ -8,4 +8,5 @@ fn describe(n: I32) Str {
     };
 }
 
-export main() Str { describe(4); }
+main { console.log(describe(4)); }
+using console from std:Console

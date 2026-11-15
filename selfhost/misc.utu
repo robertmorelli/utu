@@ -628,7 +628,7 @@ fn in_closure(node: I32) Bool {
     false
 }
 
-/// Whether a node is inside `export main`.
+/// Whether a node is inside `main`.
 fn in_main(node: I32) Bool {
     let p = parent_of(node)
     while (p >= 0) {

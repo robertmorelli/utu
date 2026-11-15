@@ -8,7 +8,8 @@ let hold: fun(Point, Array[Str]) Externref = @es/\ (p, names) => ({ p, names }) 
 let point: fun(Externref) Point = @es/\ (o) => o.p \/;
 let names: fun(Externref) Array[Str] = @es/\ (o) => o.names \/;
 
-export main() F64 {
+main {
     let box = hold(Point { x: 1.0, y: 2.0 }, ["a", "b"]);
-    point(box).x + names(box).len().f64();
+    console.log(point(box).x + names(box).len().f64());
 }
+using console from std:Console

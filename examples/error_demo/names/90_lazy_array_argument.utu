@@ -3,6 +3,6 @@
 using Browser from std:Browser;
 using widgets lazy from "./lazy_parts/widgets.utu";
 
-export main() Void {
+main {
     Browser.document.body.append(widgets.tally([1, 2, 3]));
 }

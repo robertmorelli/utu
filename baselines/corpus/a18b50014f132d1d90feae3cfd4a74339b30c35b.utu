@@ -1,1 +1,1 @@
-export lib { fn bad() I32 { @es/\41\/; } }
+lib { fn bad() I32 { @es/\41\/; } }

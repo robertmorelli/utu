@@ -8,4 +8,5 @@ struct Square[Shape]:
 
 fn Shape[Square].area |s| (scale: F64) F64 { s.side * s.side * scale; }
 
-export main() I32 { 0; }
+main { console.log(0); }
+using console from std:Console

@@ -9,6 +9,6 @@ fn open(mode: I32) Void {
     };
 }
 
-export main() Void {
+main {
     open(1);
 }

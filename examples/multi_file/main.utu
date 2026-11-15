@@ -1,5 +1,6 @@
 using boxes |Box| from "./_boxes.utu"
 
-export main() I32 {
-    Box.score(Box.new(20))
+main {
+    console.log(Box.score(Box.new(20)))
 }
+using console from std:Console

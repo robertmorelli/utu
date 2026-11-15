@@ -1,5 +1,5 @@
 
-export lib {
+lib {
       fn std_M32_band(a: M32, b: M32) M32 { a & b; }
       fn std_M32_bor(a: M32, b: M32) M32 { a | b; }
       fn std_M32_bxor(a: M32, b: M32) M32 { a ^ b; }

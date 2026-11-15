@@ -2,6 +2,7 @@
 // Expect: accepted by design: an @es result converts to its declared type ("12" is 12; docs/typescript-abi.md), so 13
 let count: fun() I32 = @es/\ () => "12" \/;
 
-export main() I32 {
-    count() + 1;
+main {
+    console.log(count() + 1);
 }
+using console from std:Console

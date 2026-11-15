@@ -2,6 +2,7 @@
 // Expect: Cannot import "./helpers.utu": file not found
 using helpers from "./helpers.utu";
 
-export main() I32 {
-    helpers.double(21);
+main {
+    console.log(helpers.double(21));
 }
+using console from std:Console

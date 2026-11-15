@@ -5,7 +5,7 @@ using Browser from std:Browser;
 struct Note:
     | text: Str
 
-export main() Void {
+main {
     let doc = Browser.document;
     doc.addEventListener("input", cl(e) Void {
         let text = alt e.target {

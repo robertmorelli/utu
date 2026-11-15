@@ -2,8 +2,9 @@
 // Expect: Type mismatch: expected I32, got Str at the value argument
 using StrMap from std:StrMap;
 
-export main() I32 {
+main {
     let ages = StrMap[I32].new();
     ages.set("ada", "36");
-    ages.get("ada", 0);
+    console.log(ages.get("ada", 0));
 }
+using console from std:Console

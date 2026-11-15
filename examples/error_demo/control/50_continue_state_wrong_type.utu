@@ -9,6 +9,7 @@ fn run() I32 {
     n;
 }
 
-export main() I32 {
-    run();
+main {
+    console.log(run());
 }
+using console from std:Console

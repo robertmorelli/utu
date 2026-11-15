@@ -11,6 +11,7 @@ fn label(l: Level) Str {
     };
 }
 
-export main() Str {
-    label(Level.Low);
+main {
+    console.log(label(Level.Low));
 }
+using console from std:Console

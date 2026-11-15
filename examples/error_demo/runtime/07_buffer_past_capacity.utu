@@ -2,8 +2,9 @@
 // Expect: trap: Buffer index 100 out of range (length 1)
 using Buffer from std:Buffer;
 
-export main() I32 {
+main {
     let b = Buffer[I32].new();
     b.push(1);
-    b[100];
+    console.log(b[100]);
 }
+using console from std:Console

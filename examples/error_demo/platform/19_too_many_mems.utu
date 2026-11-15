@@ -102,8 +102,9 @@ mem m98: U8;
 mem m99: U8;
 mem m100: U8;
 
-export main() I32 {
+main {
     m0.push(1);
     m100.push(2);
-    m0.len() + m100.len();
+    console.log(m0.len() + m100.len());
 }
+using console from std:Console

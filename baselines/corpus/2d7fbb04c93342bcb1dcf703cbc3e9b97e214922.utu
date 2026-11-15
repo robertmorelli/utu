@@ -1,7 +1,7 @@
 // Headless entry for tests and benchmarks: the simulation behind a small API.
 using sim from "./sim.utu";
 
-export lib {
+lib {
     fn create(game_text: Str, save_text: Str) ?sim.World {
         sim.load(game_text, save_text);
     }

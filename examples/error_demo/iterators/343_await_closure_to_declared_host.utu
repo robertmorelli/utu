@@ -4,6 +4,6 @@ using Browser from std:Browser;
 
 let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
 
-export main() Void {
+main {
     Browser.setTimeout(cl() Void { let v: I32 = await later(1); }, 0.0);
 }

@@ -1,2 +1,3 @@
 using ui from "./does-not-exist.utu";
-export main() I32 { 1; }
+main { console.log(1); }
+using console from std:Console

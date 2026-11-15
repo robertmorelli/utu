@@ -1,4 +1,5 @@
 
       let value: I32 = 40 + 2;
-      export main() I32 { value; }
+      main { console.log(value); }
     
+using console from std:Console

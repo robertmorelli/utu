@@ -8,4 +8,5 @@ fn unit() Shape {
     &{ r: 1.0 };
 }
 
-export main() I32 { 0; }
+main { console.log(0); }
+using console from std:Console

@@ -4,4 +4,5 @@ proto P:
 struct S[P]:
     | x: I32
 fn P[S].tick |s| () Str { "bad"; }
-export main() I32 { 0; }
+main { console.log(0); }
+using console from std:Console

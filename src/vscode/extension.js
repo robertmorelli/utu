@@ -166,7 +166,7 @@ export async function activate(context) {
     if (!document) return;
     const { exports } = await service.instantiate(document);
     if (typeof exports.main !== 'function') {
-      throw new Error('The active file does not export main().');
+      throw new Error('The active file has no main { … }.');
     }
     const result = await exports.main();
     output.appendLine(`[utu] ${displayName(document)} main${result === undefined ? '' : ` => ${String(result)}`}`);
@@ -689,7 +689,7 @@ function registerCommand(context, output, name, handler) {
 function wutuStarter(name) {
   return `using Browser from std:Browser;
 
-export main() Void {
+main {
     Browser.document.body.append(@wutu/\\
     main {
         font-family: system-ui;

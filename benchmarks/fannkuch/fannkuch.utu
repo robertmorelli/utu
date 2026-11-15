@@ -52,7 +52,7 @@ test "fannkuch matches the Benchmarks Game's reference output" {
     assert fannkuch(7) == 228016
 }
 
-export lib {
+lib {
     fn bench(iterations: I32) I64 {
         let sink: I64 = 0
         for (0..<iterations) { sink += fannkuch(9) }

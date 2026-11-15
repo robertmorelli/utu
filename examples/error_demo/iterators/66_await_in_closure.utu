@@ -3,10 +3,11 @@
 let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
 let record: fun(I32) Void = @es/\ (v) => { globalThis.__v = v; } \/;
 
-export main() I32 {
+main {
     later(1).then(cl(v) {
         let w: I32 = await later(v + 1);
         record(w);
     });
-    0;
+    console.log(0);
 }
+using console from std:Console

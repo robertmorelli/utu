@@ -1,1 +1,2 @@
-export main() I32 { @json/\ match "{}" { { a: |a| I32 } => a, }\/; }
+main { console.log(@json/\ match "{}" { { a: |a| I32 } => a, }\/); }
+using console from std:Console

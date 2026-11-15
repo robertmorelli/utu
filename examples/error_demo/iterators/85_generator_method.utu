@@ -7,9 +7,10 @@ mod Bag {
     gn &.each_item |b| () I32 { for (b.items) |v| { yield v; }; }
 }
 
-export main() I32 {
+main {
     let b = Bag.new([1, 2, 3]);
     let total = 0;
     for (b.each_item()) |v| { total += v; };
-    total;
+    console.log(total);
 }
+using console from std:Console

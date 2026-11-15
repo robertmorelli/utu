@@ -9,6 +9,7 @@ fn first_big(xs: Array[I32]) I32 {
     found;
 }
 
-export main() I32 {
-    first_big([1, 20]);
+main {
+    console.log(first_big([1, 20]));
 }
+using console from std:Console

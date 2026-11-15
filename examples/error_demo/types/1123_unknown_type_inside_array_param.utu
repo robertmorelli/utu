@@ -3,9 +3,10 @@
 fn swap(values: Array[I32Z], left: I32) Void {
 }
 
-export main() I32 {
+main {
     let xs: Array[I32] = Array[I32].new_default(3);
     swap(xs, 0);
     swap(xs, 1);
-    1;
+    console.log(1);
 }
+using console from std:Console

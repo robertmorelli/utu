@@ -24,7 +24,7 @@ struct Doc:
     | nodes: Array[Node]
     | title: ?Str
 
-export lib {
+lib {
     fn roundtrip(text: Str) Str {
         promote @json/\ decode Doc text \/ {
             |doc| => @json/\ encode Doc doc \/,

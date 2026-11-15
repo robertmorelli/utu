@@ -16,7 +16,7 @@ fn amount(item: Ingredient, servings: F64) Str {
     (item.quantity * servings / 2.0).toFixed(1) + " " + item.unit
 }
 
-export main() Void {
+main {
     let state = @stored/\
         Kitchen "supper-v1" Kitchen {
             servings: 2.0, step: 0,

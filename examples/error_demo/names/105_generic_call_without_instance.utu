@@ -4,6 +4,7 @@ mod box[T] {
     fn id(v: T) T { v; }
 }
 
-export main() F64 {
-    box.id(1.5);
+main {
+    console.log(box.id(1.5));
 }
+using console from std:Console

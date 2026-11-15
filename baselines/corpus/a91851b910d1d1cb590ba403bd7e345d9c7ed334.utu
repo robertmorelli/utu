@@ -240,7 +240,7 @@ fn basket(state: Menu) Browser.HTMLElement {
     \/;
 }
 
-export main() Void {
+main {
     let state = Menu {
         category: "All",
         dishes: [

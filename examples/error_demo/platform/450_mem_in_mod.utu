@@ -5,6 +5,7 @@ mod counts {
     fn second() I32 { seen[1]; }
 }
 
-export main() I32 {
-    counts.second();
+main {
+    console.log(counts.second());
 }
+using console from std:Console

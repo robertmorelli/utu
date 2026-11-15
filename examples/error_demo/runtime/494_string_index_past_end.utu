@@ -1,6 +1,7 @@
 // What: a string indexed past its end.
 // Expect: trap: Index out of bounds, at s[5]
-export main() I32 {
+main {
     let s = "abc";
-    s[5];
+    console.log(s[5]);
 }
+using console from std:Console

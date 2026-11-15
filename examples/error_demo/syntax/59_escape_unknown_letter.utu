@@ -1,6 +1,7 @@
 // What: an unknown escape `\d` (regex habit) in a string literal.
 // Expect: Invalid escape '\d' (known escapes: \n \t \r \b \f \" \\ \uXXXX).
-export main() Bool {
+main {
     let pattern = "\d+";
-    pattern.len() == 3;
+    console.log(pattern.len() == 3);
 }
+using console from std:Console

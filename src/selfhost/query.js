@@ -402,7 +402,7 @@ export function programIndex(utu, files) {
     /** Function containing the name at the cursor. */
     prepareCallHierarchy(key, offset) {
       let decl = this.declarationAt(key, offset);
-      // A name no node resolves to (`export main`): the declaration it names.
+      // A name no node resolves to (`main`): the declaration it names.
       if (decl < 0) decl = this.declarations(key).find(d => inside(this.definition(d.decl), key, offset))?.decl ?? -1;
       const item = callItem(this, decl);
       return item && ['Fn', 'Main', 'ProtoMember'].includes(item.kind) ? [item] : [];

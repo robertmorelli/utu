@@ -7,6 +7,7 @@ fn add(state: State) Void {
     state.items.push(&{ id: 1 });
 }
 
-export main() I32 {
-    1;
+main {
+    console.log(1);
 }
+using console from std:Console

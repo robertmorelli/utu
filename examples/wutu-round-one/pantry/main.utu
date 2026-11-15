@@ -82,7 +82,7 @@ fn workspace(state: PantryState) Browser.HTMLElement {
     }
     \/
 }
-export main() Void {
+main {
     let state = @stored/\
         PantryState "pantry-v2" manual
         PantryState {

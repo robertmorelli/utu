@@ -7,6 +7,7 @@ fn size(p: Pt) I32 {
     @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
 }
 
-export main() I32 {
-    size(Pt { x: 1 });
+main {
+    console.log(size(Pt { x: 1 }));
 }
+using console from std:Console

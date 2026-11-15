@@ -2,6 +2,7 @@
 // Expect: Unknown variable ops: an alias is its file's own
 using shapes from "./import_parts/shapes.utu";
 
-export main() I32 {
-    ops.double(21);
+main {
+    console.log(ops.double(21));
 }
+using console from std:Console

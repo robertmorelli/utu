@@ -2,6 +2,7 @@
 // Expect: es-syntax at the @es block (3:27), at build time: "Unexpected token ';'"
 let parse: fun(Str) F64 = @es/\ (s) => Number(s \/;
 
-export main() F64 {
-    parse("12");
+main {
+    console.log(parse("12"));
 }
+using console from std:Console

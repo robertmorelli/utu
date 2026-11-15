@@ -14,6 +14,7 @@ fn label(l: Level) Str {
     };
 }
 
-export main() Str {
-    label(Level.Mid);
+main {
+    console.log(label(Level.Mid));
 }
+using console from std:Console

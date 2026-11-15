@@ -3,6 +3,7 @@
 fn hi() Str { "hi"; }
 let greeters: Array[fun() Str] = [hi];
 
-export main() Str {
-    greeters[0]();
+main {
+    console.log(greeters[0]());
 }
+using console from std:Console

@@ -81,6 +81,7 @@ fn decay() I32 {
     takes_closure(double)
 }
 
-export main() I32 {
-    pick_op(true, 2) + scale_by(3) + annotated() + capture_modes() + nested(1) + decay()
+main {
+    console.log(pick_op(true, 2) + scale_by(3) + annotated() + capture_modes() + nested(1) + decay())
 }
+using console from std:Console

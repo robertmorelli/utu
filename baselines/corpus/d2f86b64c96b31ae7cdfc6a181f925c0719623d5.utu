@@ -1,2 +1,3 @@
 gn g(n: I32) I32 { yield n; }
-export main() I32 { for (g()) |x| { x; }; 1; }
+main { for (g()) |x| { x; }; console.log(1); }
+using console from std:Console

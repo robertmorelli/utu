@@ -15,4 +15,5 @@ fn total(codes: Array[I32]) Result[I32, Str] {
     Result[I32, Str].ok(t);
 }
 
-export main() I32 { total([49, 50]).value(); }
+main { console.log(total([49, 50]).value()); }
+using console from std:Console

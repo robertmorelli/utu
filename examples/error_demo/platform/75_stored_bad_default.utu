@@ -6,7 +6,7 @@ struct Prefs:
     | name: Str
     | enabled: Bool
 
-export main() Void {
+main {
     let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", enabled: } \/;
     Browser.console.log(prefs.name);
 }

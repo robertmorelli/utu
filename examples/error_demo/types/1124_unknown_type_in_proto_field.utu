@@ -10,6 +10,7 @@ tag struct Line[P]:
 
 fn P[Line].perimeter |self| () F32 { self.x; }
 
-export main() I32 {
-    1;
+main {
+    console.log(1);
 }
+using console from std:Console

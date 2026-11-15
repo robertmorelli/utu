@@ -9,6 +9,7 @@ fn load(text: Str) ?Node {
     @json/\ decode Node text \/;
 }
 
-export main() I32 {
-    promote load("{}") { |n| => n.value, ~> 0, };
+main {
+    console.log(promote load("{}") { |n| => n.value, ~> 0, });
 }
+using console from std:Console

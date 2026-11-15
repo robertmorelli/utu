@@ -6,7 +6,8 @@ mod Money {
     fn &.of(c: I32) & { &{ cents: c }; }
     fn doubled(m: &) & { &{ cents: m.cents * 2 }; }
 }
-export main() I32 {
+main {
     let m = Money.of(5);
-    m.doubled().cents;
+    console.log(m.doubled().cents);
 }
+using console from std:Console

@@ -1,1 +1,1 @@
-export main() Void { @wutu/ div {} ; }
+main { @wutu/ div {} ; }

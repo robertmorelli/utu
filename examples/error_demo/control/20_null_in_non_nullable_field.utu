@@ -7,7 +7,8 @@ struct Pet:
     | name: Str
     | owner: User
 
-export main() I32 {
+main {
     let p = Pet { name: "Rex", owner: null };
-    0;
+    console.log(0);
 }
+using console from std:Console

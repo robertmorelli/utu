@@ -1,6 +1,6 @@
 
         let cat: fun(Str, Str) Str = @es/\(a, b) => a + b\/;
-        export lib {
+        lib {
           fn greet() Str { cat("hi ", "there"); }
         }
       

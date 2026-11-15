@@ -4,8 +4,9 @@ struct Node:
     | name: Str
     | next: ?Node
 
-export main() Str {
+main {
     let tail = Node { name: "b", next: null };
     let n = tail.next orelse fatal;
-    n.name;
+    console.log(n.name);
 }
+using console from std:Console

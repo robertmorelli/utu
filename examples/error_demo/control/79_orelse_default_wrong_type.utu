@@ -4,6 +4,7 @@ fn shown(nickname: ?Str) Str {
     nickname orelse 0;
 }
 
-export main() Str {
-    shown(null);
+main {
+    console.log(shown(null));
 }
+using console from std:Console

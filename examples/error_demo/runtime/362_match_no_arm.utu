@@ -8,6 +8,7 @@ fn label(l: Level) I32 {
     match l { Level.Low => 1, Level.High => 2, };
 }
 
-export main() I32 {
-    label(Level(7));
+main {
+    console.log(label(Level(7)));
 }
+using console from std:Console

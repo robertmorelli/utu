@@ -12,6 +12,7 @@ mod Flags[T1] {
     }
 }
 
-export main() Bool {
-    Flags[I32].new(2, 5).on(0);
+main {
+    console.log(Flags[I32].new(2, 5).on(0));
 }
+using console from std:Console

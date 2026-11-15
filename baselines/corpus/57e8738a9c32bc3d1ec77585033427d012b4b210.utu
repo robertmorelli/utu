@@ -1,1 +1,2 @@
-export main() I32 { for ("abc") |x| { x; }; 1; }
+main { for ("abc") |x| { x; }; console.log(1); }
+using console from std:Console

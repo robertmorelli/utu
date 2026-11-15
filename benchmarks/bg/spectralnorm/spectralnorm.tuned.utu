@@ -110,7 +110,7 @@ test "spectralnorm prints BG's 1.274219991 for n = 100" {
     assert fnv_fixed9(-2128831035, spectralnorm(100)) == 890904276
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 {
         fnv_fixed9(-2128831035, spectralnorm(n))
     }

@@ -4,4 +4,5 @@ fn is_zero(n: I32) I32 {
     if n = 0 { 1; } else { 0; };
 }
 
-export main() I32 { is_zero(0); }
+main { console.log(is_zero(0)); }
+using console from std:Console

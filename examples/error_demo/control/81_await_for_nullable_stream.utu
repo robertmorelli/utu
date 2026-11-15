@@ -6,6 +6,7 @@ fn sum(s: ?Stream[I32]) I32 {
     acc;
 }
 
-export main() I32 {
-    sum(Stream[I32].of([1, 2, 3]));
+main {
+    console.log(sum(Stream[I32].of([1, 2, 3])));
 }
+using console from std:Console

@@ -1,5 +1,5 @@
 let console_log: fun(Str) Void = @es/\console.log\/
 
-export main() Void {
+main {
     console_log("hello world")
 }

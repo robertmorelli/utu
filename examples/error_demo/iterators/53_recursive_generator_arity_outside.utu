@@ -9,9 +9,10 @@ gn walk(n: Node) Node {
     for (n.kids) |k| { for (walk(k)) |d| { yield d; }; };
 }
 
-export main() I32 {
+main {
     let root = Node { name: "/", kids: [] };
     let count = 0;
     for (walk(root, 0)) |n| { count += 1; };
-    count;
+    console.log(count);
 }
+using console from std:Console

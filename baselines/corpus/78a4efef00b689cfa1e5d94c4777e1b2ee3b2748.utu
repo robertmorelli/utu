@@ -1,2 +1,2 @@
 using Browser from std:Browser;
-export main() Void { let s = @stored/\ Str "k" "x" \/; }
+main { let s = @stored/\ Str "k" "x" \/; }

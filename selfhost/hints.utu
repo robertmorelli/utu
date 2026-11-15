@@ -782,15 +782,36 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         parse_says("The default arm is ~>, not _ =>")
         return true
     }
+    // The spellings before lib { … } and main { … }.
+    if tok_says(k, "export") and tok_says(n, "lib") {
+        diag_focus(k, n, "lib")
+        diag_fix(tok_start[k], tok_start[n], "", "Drop export")
+        parse_says("Write lib { … }, not export lib { … }")
+        return true
+    }
+    if tok_says(k, "export") and tok_says(n, "main") {
+        // `main() Void {`: main; with a result, main returns none.
+        let close = tok_after(tok_after(n))
+        let result = tok_after(close)
+        if tok_is(tok_after(n), Tok.LParen) and tok_is(close, Tok.RParen) and tok_says(result, "Void") {
+            diag_focus(k, result, "main")
+            diag_fix(tok_start[k], tok_end[result], "main", "Use main")
+            parse_says("Write main { … }, not export main() Void { … }")
+            return true
+        }
+        diag_focus(k, n, "main")
+        diag_note("main returns nothing: print with console.log, or put a function JS calls in lib { … }")
+        parse_says("Write main { … }, not export main()")
+        return true
+    }
     if tok_says(k, "export") and tok_says(n, "fn") {
         if tok_says(tok_after(n), "main") {
-            diag_focus(n, n, "no fn")
-            diag_fix(tok_start[n], tok_start[tok_after(n)], "", "Drop fn")
-            parse_says("Write export main(), not export fn main()")
+            diag_focus(k, tok_after(n), "main")
+            parse_says("Write main { … }, not export fn main()")
             return true
         }
         diag_focus(k, n, "not a declaration")
-        diag_note("Exported functions go in export lib { … }")
+        diag_note("Functions JS calls go in lib { … }")
         parse_says("export fn is not a declaration")
         return true
     }

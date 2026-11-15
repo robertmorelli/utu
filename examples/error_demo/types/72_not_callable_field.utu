@@ -3,7 +3,8 @@
 struct User:
     | name: Str
 
-export main() I32 {
+main {
     let u = User { name: "ada" };
-    u.name().len();
+    console.log(u.name().len());
 }
+using console from std:Console

@@ -205,7 +205,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
     \/;
 }
 
-export main() Void {
+main {
     let state = Trip {
         day: "all",
         stops: [Stop {

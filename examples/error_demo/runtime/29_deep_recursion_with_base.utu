@@ -4,6 +4,7 @@ fn sum_to(n: I32) I64 {
     if n == 0 { 0.i64(); } else { n.i64() + sum_to(n - 1); };
 }
 
-export main() I64 {
-    sum_to(1000000);
+main {
+    console.log(sum_to(1000000));
 }
+using console from std:Console

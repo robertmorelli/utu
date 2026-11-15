@@ -4,7 +4,7 @@ Every `.utu` file in this directory is compiled and executed by the automated
 test suite in both compiler debug modes. They are safe starting points for the
 VS Code extension:
 
-- `hello.utu` — minimal `export main`
+- `hello.utu` — minimal `main`
 - `arrays_and_for.utu` — WasmGC arrays, `len()`, mutation, and range loops
 - `structs.utu` — nominal structs and field access
 - `strings.utu` — host strings and concatenation

@@ -1,8 +1,9 @@
 // What: a labeled block of type I32 left with a Str
 // Expect: Expected I32, got Str (at the value)
-export main() I32 {
+main {
     let n: I32 = found: {
         break found "seven";
     };
-    n;
+    console.log(n);
 }
+using console from std:Console

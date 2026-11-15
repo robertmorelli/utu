@@ -613,8 +613,8 @@ fn item(p: Parser) Void {
     if w == Kw.Lib.i32() and is_at(p, 1, Tok.LBrace) { lib_decl(p); return }
     if w == Kw.Export.i32() {
         let after = tok_word[ptok[p.pos + 1]]
-        if after == Kw.Lib.i32() { export_lib_decl(p); return }
-        if after == Kw.Main.i32() { export_main_decl(p); return }
+        // (`lib` is `lib`, `main() T` is `main`: hints.utu says so.)
+        if after == Kw.Lib.i32() or after == Kw.Main.i32() { fail(p) }
         if after == Kw.Const.i32() or after == Kw.Mem.i32() {
             let e = begin_statement(p)
             mem_decl(p)
@@ -1089,31 +1089,7 @@ fn using_decl(p: Parser) I32 {
     node(p, Node.Using_decl, at, first)
 }
 
-fn export_lib_decl(p: Parser) I32 {
-    let at = mark()
-    let first = p.pos
-    advance(p)
-    expect_kw(p, Kw.Lib)
-    expect(p, Tok.LBrace)
-    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn)) { fn_or_op_decl(p) }
-    expect(p, Tok.RBrace)
-    node(p, Node.Export_lib_decl, at, first)
-}
-
-fn export_main_decl(p: Parser) I32 {
-    let at = mark()
-    let first = p.pos
-    advance(p)
-    expect_kw(p, Kw.Main)
-    expect(p, Tok.LParen)
-    if not is(p, Tok.RParen) { param_list(p) }
-    expect(p, Tok.RParen)
-    return_type(p)
-    block(p)
-    node(p, Node.Export_main_decl, at, first)
-}
-
-/// `main { … }`, as `export main() Void { … }` was.
+/// `main { … }`, as `main() Void { … }` was.
 fn main_decl(p: Parser) I32 {
     let at = mark()
     let first = p.pos
@@ -1122,7 +1098,7 @@ fn main_decl(p: Parser) I32 {
     node(p, Node.Export_main_decl, at, first)
 }
 
-/// `lib { fn … }`, as `export lib { … }` was.
+/// `lib { fn … }`, as `lib { … }` was.
 fn lib_decl(p: Parser) I32 {
     let at = mark()
     let first = p.pos
@@ -1263,8 +1239,9 @@ fn block(p: Parser) I32 {
 /// A block's statement: an expression, ended as @statement_end finds (a
 /// `;` after it is read, and does nothing more).
 fn statement(p: Parser) Void {
-    // (A `;` alone: nothing.)
-    if is(p, Tok.Semi) {
+    // (A `;` alone: nothing. A written one: the end of a statement read as one
+    // is not passed.)
+    if written_semi(p) {
         advance(p)
         return
     }
@@ -1286,8 +1263,11 @@ fn begin_statement(p: Parser) I32 {
 fn end_statement(p: Parser, e: I32) Void {
     stmt_limit.resize(stmt_limit.len() - 1)
     if p.pos < e { fail_wanting(p, Tok.Semi.i32()) }
-    if is(p, Tok.Semi) { advance(p) }
+    if written_semi(p) { advance(p) }
 }
+
+/// Whether a `;` is written at the cursor (not the end of a statement, read as one).
+fn written_semi(p: Parser) Bool => tok_kind[ptok[p.pos]] == Tok.Semi.i32()
 
 /// Where the statement at the cursor ends: at a `;`, at the `}` (or `)`,
 /// `]`) closing what it is in, at the end, or at a line break outside its

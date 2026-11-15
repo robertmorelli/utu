@@ -9,6 +9,7 @@ mod G[T] {
     }
 }
 
-export main() I32 {
-    G[U32].f(3);
+main {
+    console.log(G[U32].f(3));
 }
+using console from std:Console

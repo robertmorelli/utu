@@ -9,6 +9,7 @@ struct S[P]:
 fn P[S].m |a| (b: S) I32 { 1; }
 fn P[S].m |a| (b: S) I32 { 2; }
 
-export main() I32 {
-    S { v: 0 }.m(S { v: 1 });
+main {
+    console.log(S { v: 0 }.m(S { v: 1 }));
 }
+using console from std:Console

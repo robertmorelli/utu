@@ -1,7 +1,7 @@
 
         struct Cell:
           | value : I32
-        export lib {
+        lib {
           fn nested(a: Bool, b: Bool) ?Cell {
             if a { if b { null; } else { Cell { value: 7 }; }; } else { null; };
           }

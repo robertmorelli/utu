@@ -5,7 +5,7 @@ using Browser from std:Browser;
 struct State:
     | n: I32
 
-export main() Void {
+main {
     let state = State { n: 3 };
     let app = @wutu/\
     @reactive;

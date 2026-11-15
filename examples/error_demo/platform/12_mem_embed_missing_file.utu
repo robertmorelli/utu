@@ -2,6 +2,7 @@
 // Expect: mem font: @embed cannot read font.binn: file not found
 mem font: U8 = @embed/\ font.binn \/;
 
-export main() I32 {
-    font.len();
+main {
+    console.log(font.len());
 }
+using console from std:Console

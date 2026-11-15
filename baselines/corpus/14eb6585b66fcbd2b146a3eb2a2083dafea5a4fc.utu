@@ -6,7 +6,7 @@
               yield value;
           };
       }
-      export lib {
+      lib {
           fn total(n: I32) I32 { let s = 0; await for (ticks(n)) |t| { s += t; }; s; }
       }
     

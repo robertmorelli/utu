@@ -293,7 +293,7 @@ test "fasta 1000 gives BG's output" {
     assert knucleotide() == -1788063756
 }
 
-export lib {
+lib {
     fn setup(n: I32) Void { fasta(n) }
     fn bench(n: I32) I32 { knucleotide() }
 }

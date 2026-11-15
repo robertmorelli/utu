@@ -7,8 +7,9 @@ fn reset(c: ?Counter) Void {
     c.count = 0;
 }
 
-export main() I32 {
+main {
     let c = Counter { count: 5 };
     reset(c);
-    c.count;
+    console.log(c.count);
 }
+using console from std:Console

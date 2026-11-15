@@ -5,4 +5,5 @@ fn count(text: Str) Result[I32, Str] {
     Result[I32, Str].ok(n);
 }
 
-export main() I32 { count("abc").value(); }
+main { console.log(count("abc").value()); }
+using console from std:Console

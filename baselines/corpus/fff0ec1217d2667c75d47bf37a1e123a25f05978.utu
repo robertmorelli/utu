@@ -7,7 +7,7 @@ using Browser from std:Browser;
             }
             \/;
           }
-          export lib {
+          lib {
             fn render(n: I32) Browser.HTMLElement { view(n); }
           }
         

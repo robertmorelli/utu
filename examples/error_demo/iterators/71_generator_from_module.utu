@@ -6,8 +6,9 @@ mod seq {
     }
 }
 
-export main() I32 {
+main {
     let total = 0;
     for (seq.squares(4)) |s| { total += s; };
-    total;
+    console.log(total);
 }
+using console from std:Console

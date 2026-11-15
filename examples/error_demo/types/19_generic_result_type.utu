@@ -6,7 +6,8 @@ mod Stack[T] {
     fn &.new(fill: T) & { &{ items: Array[T].new(4, fill) }; }
 }
 
-export main() I32 {
+main {
     let s: Stack[I32] = Stack[Str].new("");
-    s.items.len();
+    console.log(s.items.len());
 }
+using console from std:Console

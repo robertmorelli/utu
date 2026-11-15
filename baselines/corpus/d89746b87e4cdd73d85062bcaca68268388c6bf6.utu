@@ -22,7 +22,7 @@
           fn wrap(value: T) Cell { Cell.new(value); }
         }
         using cell[I32];
-        export lib {
+        lib {
           fn plain() I32 { math.inc(math.Pair.new(2, 3).sum()); }
           fn parameterized() I32 { boxy[I32].Box.new(7).get(); }
           fn alias_path() I32 { box_i32.Box.new(8).get(); }

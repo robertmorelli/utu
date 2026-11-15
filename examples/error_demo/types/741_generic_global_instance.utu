@@ -5,4 +5,5 @@ mod Zero[T] {
     fn get() T { v; }
 }
 
-export main() I32 { Zero[I32].get() + Zero[Str].get().len(); }
+main { console.log(Zero[I32].get() + Zero[Str].get().len()); }
+using console from std:Console

@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
         fn widen(i: I32) F64 { i.f64(); }
         fn narrow(f: F64) I32 { f.i32(); }
         fn unsigned(f: F64) F64 { f.u32().f64(); }

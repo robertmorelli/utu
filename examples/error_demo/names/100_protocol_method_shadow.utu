@@ -9,7 +9,8 @@ struct Sq[Sh]:
 fn Sh[Sq].area |q| () I32 { q.s * q.s; }
 fn Sh.area |x| () I32 { 0; }
 
-export main() I32 {
+main {
     let s: Sh = Sq { s: 3 };
-    s.area();
+    console.log(s.area());
 }
+using console from std:Console

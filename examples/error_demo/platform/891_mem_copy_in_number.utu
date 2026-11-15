@@ -2,7 +2,7 @@
 // Expect: Expected Externref, got I32 (copy_in takes a host value)
 mem text: U8;
 
-export lib {
+lib {
     fn load(n: I32) I32 {
         text.copy_in(n);
         text.len();

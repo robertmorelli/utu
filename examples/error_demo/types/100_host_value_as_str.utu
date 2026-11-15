@@ -2,7 +2,8 @@
 // Expect: expected Str, got the host type (only Externref holds any host value).
 using JS from std:JS;
 
-export main() I32 {
+main {
     let s: Str = new JS.Map();
-    s.len();
+    console.log(s.len());
 }
+using console from std:Console

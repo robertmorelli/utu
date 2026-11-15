@@ -5,9 +5,9 @@ using Browser from std:Browser;
         struct State:
             | text: Str
             | items: Array[Item]
-        export main() Browser.HTMLElement {
+        main {
           let state = State { text: "start", items: [Item { id: "a" }, Item { id: "b" }] };
-          @wutu/\
+          Browser.document.body.append(@wutu/\
           @reactive;
           main {
             input { bind:value = state.text; }
@@ -23,6 +23,6 @@ using Browser from std:Browser;
               }
             }
           }
-          \/;
+          \/);
         }
       

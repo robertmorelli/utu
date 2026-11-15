@@ -2,11 +2,11 @@
 // Expect: continue cannot appear inside deferred code
 using console from std:Console;
 
-export main() I32 {
+main {
     let n = 0;
     for (0 ..< 5) |i| {
         defer { if i % 2 == 0 { continue; }; };
         n += i;
     };
-    n;
+    console.log(n);
 }

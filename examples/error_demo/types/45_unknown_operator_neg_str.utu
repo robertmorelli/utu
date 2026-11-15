@@ -1,7 +1,8 @@
 // What: unary minus on a Str
 // Expect: Str has no '-' operator
-export main() I32 {
+main {
     let s = "abc";
     let t = -s;
-    t.len();
+    console.log(t.len());
 }
+using console from std:Console

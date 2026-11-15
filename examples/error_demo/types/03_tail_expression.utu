@@ -4,4 +4,5 @@ fn is_empty(s: Str) Bool {
     if s.len() == 0 { "yes"; } else { "no"; };
 }
 
-export main() I32 { if is_empty("") { 1; } else { 0; }; }
+main { console.log(if is_empty("") { 1; } else { 0; }); }
+using console from std:Console

@@ -1,4 +1,4 @@
-export lib {
+lib {
   fn bad() I32 {
     missing_name;
   }

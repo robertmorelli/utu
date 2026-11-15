@@ -4,6 +4,7 @@ fn checks(a: I32) Bool {
     @ir/\ <ir-safe-checks><ir-ident name="nothing"/></ir-safe-checks> \/;
 }
 
-export main() Bool {
-    checks(1);
+main {
+    console.log(checks(1));
 }
+using console from std:Console

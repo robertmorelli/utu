@@ -167,7 +167,7 @@ bench "nbody" {
     }
 }
 
-export lib {
+lib {
     fn bench(iterations: I32) I64 {
         let sum: I64 = 0
         for (0..<iterations) { sum += run(20000) }

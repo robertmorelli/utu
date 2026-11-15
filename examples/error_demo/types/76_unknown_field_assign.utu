@@ -3,8 +3,9 @@
 struct Counter:
     | n: I32
 
-export main() I32 {
+main {
     let c = Counter { n: 0 };
     c.count = 1;
-    c.n;
+    console.log(c.n);
 }
+using console from std:Console

@@ -20,7 +20,7 @@ mod home {
         \\    \/
         \\}
         \\
-        \\export main() Void {
+        \\main {
         \\    Browser.document.body.append(greeting("friend"))
         \\}
     }
@@ -28,19 +28,20 @@ mod home {
         \\using Browser from std:Browser
         \\using Nano from "npm:nanoid"
         \\
-        \\export main() Void {
+        \\main {
         \\    let item = Browser.document.createElement("li")
         \\    item.textContent = Nano.nanoid(8)
         \\    Browser.document.body.append(item)
         \\}
     }
     fn pipeline_sample() Str {
-        \\export main() I32 {
-        \\    [1, 2, 3, 4, 5]
+        \\main {
+        \\    console.log([1, 2, 3, 4, 5]
         \\        map |n| { n * 2 }
         \\        filter |n| { n > 4 }
-        \\        fold (0) |total, n| { total + n }
+        \\        fold (0) |total, n| { total + n })
         \\}
+        \\using console from std:Console
     }
     fn page() Browser.HTMLElement {
         @wutu/\

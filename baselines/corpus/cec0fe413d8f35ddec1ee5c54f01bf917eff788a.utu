@@ -14,7 +14,7 @@
       }
       struct Row:
           | name: Str
-      export lib {
+      lib {
           fn rows(text: Str) I32 { store.count(text); }
           fn name(text: Str) Str { promote @json/\ decode Row text \/ { |r| => r.name, ~> "?", }; }
       }

@@ -6,4 +6,5 @@ fn Array[I32].sum |a| () I32 {
     t;
 }
 
-export main() I32 { 1; }
+main { console.log(1); }
+using console from std:Console

@@ -8,6 +8,6 @@ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
     \/;
 }
 
-export main() Void {
+main {
     Browser.document.body.append(view("Plants", ["fern", "ivy"]));
 }

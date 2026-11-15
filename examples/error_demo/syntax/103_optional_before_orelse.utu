@@ -4,9 +4,10 @@ struct Node:
     | name: ?Str
     | next: ?Node
 
-export main() Str {
+main {
     let head = Node { name: "a", next: null };
     let second = "none";
     second = head.next?.name orelse "default";
-    second;
+    console.log(second);
 }
+using console from std:Console

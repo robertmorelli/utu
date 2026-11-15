@@ -11,6 +11,7 @@ fn area(shape: Shape) F64 {
     };
 }
 
-export main() F64 {
-    area(Dot {});
+main {
+    console.log(area(Dot {}));
 }
+using console from std:Console

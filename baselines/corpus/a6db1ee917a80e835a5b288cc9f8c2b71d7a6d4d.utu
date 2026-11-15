@@ -1,7 +1,7 @@
 
       enum Shape:
         | Circle { radius: I32 }
-      export lib {
+      lib {
         fn radius() I32 {
           let c: Circle = Circle { radius: 7 };
           c.radius;

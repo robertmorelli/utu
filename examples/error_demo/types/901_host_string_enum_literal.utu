@@ -2,7 +2,8 @@
 // Expect: a string enum takes its members (Shapes.Tag.A), not "a".
 using Shapes from "./bindings/Shapes.abi.json";
 
-export main() Str {
+main {
     let t: Shapes.Tag = "a";
-    t;
+    console.log(t);
 }
+using console from std:Console

@@ -41,7 +41,7 @@ struct Doc:
     | nodes: Array[Node]
     | title: ?Str
 
-export lib {
+lib {
     fn roundtrip(text: Str) Str {
         promote @json/\\ decode Doc text \\/ {
             |doc| => @json/\\ encode Doc doc \\/,
@@ -165,7 +165,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
           | id: I32
           | price: F64
 
-      export lib {
+      lib {
           fn describe(text: Str) Str {
               @json/\\ match text {
                   { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.str() + " " + (tier orelse "free"),
@@ -209,7 +209,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
   });
 
   test('json: malformed match sites are compile errors', async ({ compiler, ROOT }) => {
-    const site = body => `export main() I32 { @json/\\ match "{}" { ${body} }\\/; }`;
+    const site = body => `lib { fn run() I32 { @json/\\ match "{}" { ${body} }\\/; } }`;
     const cases = [
       [site('{ a: |a| I32 } => a,'), 'needs a ~> arm'],
       [site('~> 0,'), 'at least one pattern arm'],
@@ -242,7 +242,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
       }
       struct Row:
           | name: Str
-      export lib {
+      lib {
           fn rows(text: Str) I32 { store.count(text); }
           fn name(text: Str) Str { promote @json/\\ decode Row text \\/ { |r| => r.name, ~> "?", }; }
       }
@@ -253,13 +253,13 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
 
   test('json: unsupported types and malformed sites are compile errors at the type', async ({ compiler, ROOT }) => {
     const cases = [
-      ['struct A:\n    | x: ?I32\nexport main() Void { let a = @json/\\ decode A "{}" \\/; }', '?I32 is not supported', 'A'],
-      ['struct A:\n    | a: A\nexport main() Void { let a = @json/\\ decode A "{}" \\/; }', 'A contains itself', 'A'],
-      ['export main() Void { let a = @json/\\ decode I32 "1" \\/; }', 'works on a struct, enum, or Array', 'I32'],
-      ['export main() Void { let a = @json/\\ decode Array[Missing] "1" \\/; }', '@json cannot use Missing', 'Array[Missing]'],
-      ['export main() Void { let a = @json/\\ parse Missing "1" \\/; }', '@json expects', 'p'],
-      ['enum E:\n    | V { kind: I32 }\nexport main() Void { let a = @json/\\ decode Array[E] "[]" \\/; }', 'field named kind', 'Array[E]'],
-      ['struct A:\n    | x: I32\nexport main() Void { let a = @json/\\ decode A \\/; }', 'needs a text expression', 'A'],
+      ['struct A:\n    | x: ?I32\nmain { let a = @json/\\ decode A "{}" \\/; }', '?I32 is not supported', 'A'],
+      ['struct A:\n    | a: A\nmain { let a = @json/\\ decode A "{}" \\/; }', 'A contains itself', 'A'],
+      ['main { let a = @json/\\ decode I32 "1" \\/; }', 'works on a struct, enum, or Array', 'I32'],
+      ['main { let a = @json/\\ decode Array[Missing] "1" \\/; }', '@json cannot use Missing', 'Array[Missing]'],
+      ['main { let a = @json/\\ parse Missing "1" \\/; }', '@json expects', 'p'],
+      ['enum E:\n    | V { kind: I32 }\nmain { let a = @json/\\ decode Array[E] "[]" \\/; }', 'field named kind', 'Array[E]'],
+      ['struct A:\n    | x: I32\nmain { let a = @json/\\ decode A \\/; }', 'needs a text expression', 'A'],
     ];
     for (const [source, expected, text] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);

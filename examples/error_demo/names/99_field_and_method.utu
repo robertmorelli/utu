@@ -5,7 +5,8 @@ struct P:
 
 fn P.f |p| () I32 { 2; }
 
-export main() I32 {
+main {
     let p = P { f: cl() I32 { 1; } };
-    p.f();
+    console.log(p.f());
 }
+using console from std:Console

@@ -8,6 +8,7 @@ fn name(n: I32) Str {
     };
 }
 
-export main() Str {
-    name(16);
+main {
+    console.log(name(16));
 }
+using console from std:Console

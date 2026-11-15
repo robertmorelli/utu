@@ -5,7 +5,8 @@ struct Point {
     y: F64,
 }
 
-export main() F64 {
+main {
     let p = Point { x: 1.0, y: 2.0 };
-    p.x + p.y;
+    console.log(p.x + p.y);
 }
+using console from std:Console

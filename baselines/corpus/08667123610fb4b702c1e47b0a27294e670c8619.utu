@@ -1,1 +1,2 @@
-export main() Nope { 1; }
+main { console.log(1); }
+using console from std:Console

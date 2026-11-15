@@ -1,3 +1,4 @@
 struct Box:
     | value: I32
-export main() Bool { let b = Box { value: 1 }; b == b; }
+main { let b = Box { value: 1 }; console.log(b == b); }
+using console from std:Console

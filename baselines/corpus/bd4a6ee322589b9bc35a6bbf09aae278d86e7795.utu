@@ -1,4 +1,5 @@
 
       fn double(x: I32) I32 { x * 2; }
-      export main() I32 { double(2) + double(3); }
+      main { console.log(double(2) + double(3)); }
     
+using console from std:Console

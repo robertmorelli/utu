@@ -9,6 +9,7 @@ fn second_name(head: Node) Str {
     n.name;
 }
 
-export main() Str {
-    second_name(Node { name: "a", next: Node { name: "b", next: null } });
+main {
+    console.log(second_name(Node { name: "a", next: Node { name: "b", next: null } }));
 }
+using console from std:Console

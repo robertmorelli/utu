@@ -36,9 +36,9 @@ let emitter_on: fun(Emitter, Str, cl(I32) Void) Void = @es/\ (e, k, f) => e.on(k
 let emitter_emit: fun(Emitter, Str, I32) Bool = @es/\ (e, k, v) => e.emit(k, v) ? 1 : 0 \/;
 let emitter_count: fun(Emitter, Str) I32 = @es/\ (e, k) => e.listenerCount(k) \/;
 
-export main() I32 {
+main {
     let e: Emitter = new_emitter();
-    e.count("tick");
+    console.log(e.count("tick"));
 }
 
 test "a utu closure is registered directly as a JS listener" {
@@ -86,3 +86,4 @@ test "two listeners on one event both fire" {
     assert cells[1] == 6;
     assert e.count("x") == 2;
 }
+using console from std:Console

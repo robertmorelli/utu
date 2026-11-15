@@ -2,7 +2,7 @@
 // Expect: Callback takes 3 parameters; JS passes 1
 using Browser from std:Browser;
 
-export main() Void {
+main {
     let draw: cl(F64, F64, F64) Void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
     Browser.window.requestAnimationFrame(draw);
 }

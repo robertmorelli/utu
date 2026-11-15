@@ -7,4 +7,5 @@ fn status(code: I64) I32 {
     };
 }
 
-export main() I32 { status(0); }
+main { console.log(status(0)); }
+using console from std:Console

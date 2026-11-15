@@ -1,4 +1,4 @@
-export lib {
+lib {
   fn run(base: Str, piece: Str, repeats: I32) Str {
     let out: Str = base;
     for (0..<repeats) {

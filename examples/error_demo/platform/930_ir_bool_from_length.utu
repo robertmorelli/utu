@@ -4,6 +4,7 @@ fn nonempty(s: Str) Bool {
     @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
 }
 
-export main() I32 {
-    if nonempty("abc") { 1; } else { 0; };
+main {
+    console.log(if nonempty("abc") { 1; } else { 0; });
 }
+using console from std:Console

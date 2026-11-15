@@ -908,7 +908,7 @@ bench "deltablue_both" {
     }
 }
 
-export main(kind: I32, iterations: I32) I64 {
+lib { fn run(kind: I32, iterations: I32) I64 {
     let sink: I64 = 0;
     for (0..<iterations) |iteration| {
         if kind == 0 {
@@ -918,4 +918,4 @@ export main(kind: I32, iterations: I32) I64 {
         };
     };
     sink;
-}
+} }

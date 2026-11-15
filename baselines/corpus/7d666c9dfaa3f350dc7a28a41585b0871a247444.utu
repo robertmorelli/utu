@@ -23,8 +23,8 @@ let major: fun(Str) I32 = @es/\ ((m) => (v) => m.major(v))(await import('semver'
 let satisfies_prerelease: fun(Str, Str) Bool =
     @es/\ ((m) => (v, r) => m.satisfies(v, r, { includePrerelease: true }) ? 1 : 0)(await import('semver')) \/;
 
-export main() Bool {
-    satisfies("1.2.3", "^1.0.0");
+main {
+    console.log(satisfies("1.2.3", "^1.0.0"));
 }
 
 test "the no-options call is the common one and needs no bag" {
@@ -41,3 +41,4 @@ test "a set option changes behaviour and needs a second binding" {
     assert satisfies("1.2.3-alpha.1", "^1.0.0") == false;
     assert satisfies_prerelease("1.2.3-alpha.1", ">=1.0.0-0");
 }
+using console from std:Console

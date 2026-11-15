@@ -240,7 +240,7 @@ fn finish(report: Report) I32 {
     mix(result, report.transitions);
 }
 
-export lib {
+lib {
     fn run(text: Str) I32 {
         let report: Report = Report {
             hash: hash_forward(text),

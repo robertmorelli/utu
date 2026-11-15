@@ -6,6 +6,6 @@ mod console {
     fn f() I32 { 3; }
 }
 
-export main() I32 {
-    console.f();
+main {
+    console.f()
 }

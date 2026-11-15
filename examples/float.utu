@@ -71,7 +71,8 @@ bench "float normalize" {
     }
 }
 
-export main() F64 {
+main {
     let best: Point = benchmark(points)
-    best.x
+    console.log(best.x)
 }
+using console from std:Console

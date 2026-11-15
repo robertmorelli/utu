@@ -8,8 +8,9 @@ mod Stack[T] {
     fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1; }
 }
 
-export main() I32 {
+main {
     let s = Stack[I32].new(0);
     s.push("four");
-    s.size;
+    console.log(s.size);
 }
+using console from std:Console

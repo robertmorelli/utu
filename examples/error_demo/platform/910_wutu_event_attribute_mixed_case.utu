@@ -11,6 +11,6 @@ fn view(note: Str) Browser.HTMLElement {
     \/;
 }
 
-export main() Void {
+main {
     Browser.document.body.append(view("alert(1)"));
 }

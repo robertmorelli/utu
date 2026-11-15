@@ -3,6 +3,7 @@
 fn tab() Array[I32] { [t.len()]; }
 const mem t: I32 = @comptime/\ tab() \/;
 
-export main() I32 {
-    t[0];
+main {
+    console.log(t[0]);
 }
+using console from std:Console

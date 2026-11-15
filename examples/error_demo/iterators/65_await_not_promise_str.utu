@@ -2,7 +2,8 @@
 // Expect: Cannot await non-promise Str
 let read_name: fun() Str = @es/\ () => "ada" \/;
 
-export main() I32 {
+main {
     let name = await read_name();
-    name.len();
+    console.log(name.len());
 }
+using console from std:Console

@@ -309,7 +309,7 @@ test "richards counts its packets and holds" {
 // Each iteration runs the simulation inner_iterations times.
 let inner_iterations: I32 = 10
 
-export lib {
+lib {
     fn bench(iterations: I32) I64 {
         let sink: I64 = 0
         for (0..<iterations * inner_iterations) { sink += richards() }

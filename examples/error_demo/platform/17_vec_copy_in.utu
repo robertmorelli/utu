@@ -4,7 +4,7 @@ using JS from std:JS;
 
 vec input: U8;
 
-export lib {
+lib {
     fn load(bytes: JS.Uint8Array) I32 {
         input.copy_in(bytes);
     }

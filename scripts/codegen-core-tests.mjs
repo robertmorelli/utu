@@ -9,7 +9,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_arith.utu',
       source: `
-        export lib {
+        lib {
           fn add(a: I32, b: I32) I32 { a + b; }
           fn scaled_sum(a: I32, b: I32) I32 {
             let sum: I32 = add(a, b);
@@ -32,7 +32,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_operator_literal_context.utu',
       source: `
-        export lib {
+        lib {
           fn add_one_i64(value: I64) I64 { value + 1; }
           fn half_f64(value: F64) F64 { value / 2.0; }
         }
@@ -72,7 +72,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           fn wrap(value: T) Cell { Cell.new(value); }
         }
         using cell[I32];
-        export lib {
+        lib {
           fn plain() I32 { math.inc(math.Pair.new(2, 3).sum()); }
           fn parameterized() I32 { boxy[I32].Box.new(7).get(); }
           fn alias_path() I32 { box_i32.Box.new(8).get(); }
@@ -95,7 +95,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let seed: I32 = 41;
         let banner: Str = "ok";
-        export lib {
+        lib {
           fn next() I32 { seed + 1; }
           fn loud() Str { banner + "!"; }
         }
@@ -108,7 +108,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: module metadata includes functions, exports, and size', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_explainability.utu', `
-      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+      lib { fn add(a: I32, b: I32) I32 { a + b; } }
     `, async file => {
       const result = await compiler.compileFile(file, { sourceMap: true });
       assertNoErrors(result);
@@ -130,17 +130,17 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       return { result, imports, exports: (await instantiateNode(result.wasm, result.spec, { root: ROOT })).exports };
     });
     const scalar = await inspect('codegen_import_shaking.utu', `
-      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+      lib { fn add(a: I32, b: I32) I32 { a + b; } }
     `);
     assert(!scalar.imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
     assertEq(scalar.exports.add(2, 3), 5);
     const concat = await inspect('codegen_string_import_shaking.utu', `
-      export lib { fn join(a: Str, b: Str) Str { a + b; } }
+      lib { fn join(a: Str, b: Str) Str { a + b; } }
     `);
     assertEq(concat.exports.join('a', 'b'), 'ab');
     assert(!concat.imports.some(item => /substring|charCodeAt|fromCodePoint|intoCharCodeArray/.test(item.name)), 'concat-only module retained unrelated string imports');
     const midpoint = await inspect('codegen_midpoint_insert_size.utu', `
-      export lib {
+      lib {
         fn run(base: Str, piece: Str, repeats: I32) Str {
           let i: I32 = 0;
           let out: Str = base;
@@ -165,7 +165,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_string_receiver_methods.utu',
       source: `
-        export lib {
+        lib {
           fn len(s: Str) I32 { s.len(); }
           fn get(s: Str, i: I32) I32 { s.get(i); }
           fn index(s: Str, i: I32) I32 { s[i]; }
@@ -182,7 +182,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: a wasm source map identifies the exported function', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map.utu', `
-      export lib { fn add(a: I32, b: I32) I32 { a + b; } }
+      lib { fn add(a: I32, b: I32) I32 { a + b; } }
     `, async file => {
       const result = await compiler.compileFile(file, { sourceMap: true });
       assertNoErrors(result);
@@ -195,7 +195,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: source maps cover string-using code', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map_strings.utu', `
-      export lib { fn greet_len() I32 { Str.len("hello"); } }
+      lib { fn greet_len() I32 { Str.len("hello"); } }
     `, async file => {
       const result = await compiler.compileFile(file, { sourceMap: true });
       assertNoErrors(result);
@@ -210,7 +210,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_cf.utu',
       source: `
-        export lib {
+        lib {
           fn abs(x: I32) I32 { if x < 0 { 0 - x; } else { x; }; }
           fn sum_to(n: I32) I32 {
             let i: I32 = 0;
@@ -240,7 +240,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_for_ranges.utu',
       source: `
-        export lib {
+        lib {
           fn exclusive(n: I32) I32 {
             let total: I32 = 0;
             for (0..<n) |i| { total += i; };
@@ -299,7 +299,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_match.utu',
       source: `
-        export lib {
+        lib {
           fn dense_pick(x: I32) I32 {
             match x {
               0 => 10,
@@ -334,7 +334,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_bool_match.utu',
       source: `
-        export lib {
+        lib {
           fn pick(flag: Bool) I32 {
             match flag { true => 11, false => 22, ~> 33, };
           }
@@ -352,7 +352,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_match_i64.utu',
       source: `
-        export lib {
+        lib {
           fn dense64(x: I64) I32 {
             match x {
               0 => 10,
@@ -387,7 +387,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_match_float.utu',
       source: `
-        export lib {
+        lib {
           fn dense32(x: F32) I32 {
             match x {
               0.0 => 10,
@@ -441,7 +441,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'es_value_import.utu',
       source: `
         let lucky: I32 = @es/\\41\\/;
-        export lib {
+        lib {
           fn get_lucky() I32 { lucky; }
         }
       `,
@@ -457,7 +457,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'es_function_import.utu',
       source: `
         let add: fun(I32, I32) I32 = @es/\\(a, b) => a + b\\/;
-        export lib {
+        lib {
           fn sum(a: I32, b: I32) I32 { add(a, b); }
         }
       `,
@@ -478,7 +478,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let join: fun(Str, Str) Str = @es/\\ (await import('node:path')).join \\/;
         let sep: Str = @es/\\ (await import('node:path')).sep \\/;
-        export lib {
+        lib {
           fn joined() Str { join("a", "b"); }
           fn separator() Str { sep; }
         }
@@ -502,7 +502,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         let join: fun(Str, Str) Str =
             @es/\\ import { join } from 'node:path'; (a, b) => join(a, b) \\/;
         let sep: Str = @es/\\ import { sep } from 'node:path'; sep \\/;
-        export lib {
+        lib {
           fn joined() Str { join("a", "b"); }
           fn separator() Str { sep; }
         }
@@ -541,7 +541,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'es_string_import.utu',
       source: `
         let cat: fun(Str, Str) Str = @es/\\(a, b) => a + b\\/;
-        export lib {
+        lib {
           fn greet() Str { cat("hi ", "there"); }
         }
       `,
@@ -552,7 +552,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: @es without typed let stays diagnostic-only', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     await withTempUtu(ROOT, 'es_missing_type.utu', `
-      export lib {
+      lib {
         fn bad() I32 { @es/\\41\\/; }
       }
     `, async (file) => {
@@ -569,7 +569,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors,
       name: 'codegen_fun_ptr.utu',
       source: `
-        export lib {
+        lib {
           fn double(x: I32) I32 { x * 2; }
           fn triple(x: I32) I32 { x * 3; }
           fn apply(pick: Bool, n: I32) I32 {
@@ -600,7 +600,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         struct Box:
           | v : I32
-        export lib {
+        lib {
           fn double(x: I32) I32 { x * 2; }
           fn scalar_capture(n: I32) I32 {
             let f: cl(I32) I32 = cl(x) { x * n; };
@@ -645,7 +645,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         struct Counter:
           | n : I32
-        export lib {
+        lib {
           fn capture_modes() I32 {
             let base: I32 = 100;
             let c: Counter = Counter { n: 1 };
@@ -678,7 +678,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
 
   test('stdlib: numeric conversions are single instructions with saturating float → int', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'stdlib_conversions.utu', source: `
-      export lib {
+      lib {
         fn widen(i: I32) F64 { i.f64(); }
         fn narrow(f: F64) I32 { f.i32(); }
         fn unsigned(f: F64) F64 { f.u32().f64(); }
@@ -697,7 +697,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('typing: integer literals adopt float types from context', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'int_literal_floats.utu', source: `
       fn half(x: F64) F64 { x / 2; }
-      export lib {
+      lib {
         fn run() F64 { let a: F64 = 3; let b: F64 = 1.5; half(10) + a + 2 * b + b * 2; }
         fn single() F32 { let x: F32 = 4; x; }
         fn still_int() I32 { let n = 5; n; }
@@ -711,7 +711,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       struct P:
         | v: I32
       fn total(xs: Array[I32]) I32 { let t = 0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
-      export lib {
+      lib {
         fn literals() I32 { let xs = [1, 2, 3]; total(xs) + total([10, 20]); }
         fn floats() F64 { let x: F64 = 1.5; let mixed = [x, 2]; let typed: Array[F64] = [1, 2.5]; mixed[1] + typed[0]; }
         fn locals() I32 { let a = 4; let xs = [a, a, 1]; xs[0] + xs[2]; }
@@ -735,7 +735,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         | v: I32
       fn find(ok: Bool) ?P { if ok { P { v: 7 }; } else { null; }; }
       fn keep(p: P) P { p; }
-      export lib {
+      lib {
         fn factorial(n: I32) I32 { let fact = cl(k: I32) I32 { if k <= 1 { 1; } else { k * fact(k - 1); }; }; fact(n); }
         fn countdown() I32 { let calls = 0; let tick = cl(k: I32) Void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
         fn captured() I32 { promote find(true) { |p| => { let read = cl() I32 { p.v; }; read(); }, ~> 0, }; }
@@ -751,7 +751,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
 
   test('codegen: multiline string literals drop their line markers', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'multiline_strings.utu', source: [
-      'export lib {',
+      'lib {',
       '  fn text() Str {',
       '    let s =',
       '      \\\\{"quoted": true}',
@@ -771,7 +771,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         | next: ?P
       fn find(ok: Bool) ?P { if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
       fn bump(p: P) Void { p.v += 1; }
-      export lib {
+      lib {
         fn run() I32 {
           let p = find(true);
           let q = find(false);
@@ -790,7 +790,11 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         const fs = await import('node:fs/promises'); const path = await import('node:path');
         const file = path.join(testTmp(ROOT), 'optional_rejected.utu');
         await fs.mkdir(path.dirname(file), { recursive: true });
-        await fs.writeFile(file, `struct P:\n  | v: I32\nfn take(v: I32) I32 { v; }\nfn g(p: ?P) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }`);
+        await fs.writeFile(file, `struct P:
+  | v: I32
+fn take(v: I32) I32 { v; }
+fn g(p: ?P) I32 { ${body} }
+lib { fn run() I32 { 0; } }`);
         return file;
       })());
       assert(doc.diagnostics.some(diagnostic => /only (?:allowed )?in a? statements?/.test(diagnostic.message)), body);
@@ -798,10 +802,10 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   });
 
   test('codegen: captures read the value before closure creation', async ({ ROOT }) => {
-    const source = (extra) => `export lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
+    const source = (extra) => `lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });
     const before = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_early_write.utu',
-      source: `export lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }` });
+      source: `lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }` });
     assertEq(plain.instance.exports.run(), 7);
     assertEq(before.instance.exports.run(), 7);
   });
@@ -820,7 +824,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         struct Holder:
           | cb : cl(I32) I32
-        export lib {
+        lib {
           fn double(x: I32) I32 { x * 2; }
           fn from_return() cl(I32) I32 { double; }
           fn from_field() Holder { Holder { cb: double }; }
@@ -847,7 +851,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let js_apply: fun(cl(I32) I32, I32) I32 = @es/\\ (f, v) => f(v) \\/;
         let js_twice: fun(cl(I32) I32, I32) I32 = @es/\\ (f, v) => f(f(v)) \\/;
-        export lib {
+        lib {
           fn to_js(n: I32) I32 {
             let f: cl(I32) I32 = cl(x) { x * n; };
             js_apply(f, 5);
@@ -874,7 +878,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_closure_multi.utu',
       source: `
         let js_call2: fun(cl(I32, I32) I32, I32, I32) I32 = @es/\\ (f, a, b) => f(a, b) \\/;
-        export lib {
+        lib {
           fn run(a: I32, b: I32) I32 {
             let f: cl(I32, I32) I32 = cl(x, y) { x + y; };
             js_call2(f, a, b);
@@ -913,7 +917,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_promise_value.utu',
       source: `
         let make: fun(Str) Promise[Str] = @es/\\ (u) => Promise.resolve("body:" + u) \\/;
-        export lib { fn get(u: Str) Promise[Str] { make(u); } }
+        lib { fn get(u: Str) Promise[Str] { make(u); } }
       `,
     });
     const p = instance.exports.get('/x');
@@ -931,7 +935,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v * 2) \\/;
         let record: fun(I32) Void = @es/\\ (v) => { globalThis.__utu_seen = v; } \\/;
         let seen: fun() I32 = @es/\\ () => globalThis.__utu_seen ?? -1 \\/;
-        export lib {
+        lib {
           fn subscribe(n: I32) Void { later(n).then(cl(v) { record(v); }); }
           fn observed() I32 { seen(); }
         }
@@ -952,7 +956,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let later: fun(I32) Promise[I32] =
           @es/\\ (v) => new Promise(r => setTimeout(() => r(v * 2), 5)) \\/;
-        export lib {
+        lib {
           fn compute(n: I32) I32 {
             let doubled: I32 = await later(n);
             doubled + 1;
@@ -985,7 +989,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       const doc = await compiler.compileFile(file);
       assertNoErrors(doc);
       const { exports } = await instantiateNode(doc.wasm, doc.spec, { root: ROOT });
-      assertEq(await exports.main(), value, `${name} returned the wrong result`);
+      // main prints its result.
+      const printed = [];
+      const log = console.log;
+      console.log = (...args) => printed.push(args.join(' '));
+      try { await exports.main(); } finally { console.log = log; }
+      assertEq(printed.join('\n'), String(value), `${name} printed the wrong result`);
     }
     const entries = (await fs.readdir(path.join(ROOT, 'examples', 'working')))
       .filter(name => name.endsWith('.utu')).sort();
@@ -1024,14 +1033,15 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   ]) {
     test(`codegen: closure environments do not shadow a user ${name}`, async ({ ROOT }) => {
       const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: `closure_hygiene_${name.replace(' ', '_')}.utu`,
-        source: `fn __closure0() I32 { 30; }\nexport lib { fn run() I32 { ${source} } }` });
+        source: `fn __closure0() I32 { 30; }
+lib { fn run() I32 { ${source} } }` });
       assertEq(instance.exports.run(), expected);
     });
   }
 
   test('codegen: closures use the JS closure runtime; fun references need none', async ({ ROOT }) => {
     const imported = wasm => WebAssembly.Module.imports(new WebAssembly.Module(wasm)).map(i => `${i.module}.${i.name}`);
-    const closures = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'closure_js_abi.utu', source: `export lib {
+    const closures = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'closure_js_abi.utu', source: `lib {
       fn run(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(7); }
       fn callback(n: I32) cl(I32) I32 { cl(x) { x + n; }; }
     }` });
@@ -1042,7 +1052,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     assertEq(typeof callback, 'function');
     assertEq([1, 2, 3].map(callback).join(','), '6,7,8');
     const funs = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fun_abi.utu', source: `fn inc(n: I32) I32 { n + 1; }
-      export lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; f(n); } }` });
+      lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; f(n); } }` });
     assert(!imported(funs.doc.wasm).some(n => n.includes('closure_')), imported(funs.doc.wasm).join(', '));
     assertEq(funs.instance.exports.run(5), 6);
   });
@@ -1054,7 +1064,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       assertNoErrors(result);
       return Buffer.from(result.wasm).toString('hex');
     });
-    const base = 'export lib { fn answer() I32 { 42; } }';
+    const base = 'lib { fn answer() I32 { 42; } }';
     assertEq(await bytes(`${base} fn unused(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(1); }`), await bytes(base));
   });
 
@@ -1063,7 +1073,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       mod Host { let twice: fun(F64) F64 = @es/\ n => n * 2 \/; }
       struct Cell: | value: I32
       fn update(cell: Cell) Void { cell.value = 42; cell.value; }
-      export lib {
+      lib {
         fn host() F64 { Host.twice(F64.sqrt(441.0)); }
         fn tail() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; }
       }
@@ -1079,11 +1089,11 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       'fn add(a: I32, b: I32) I32 { a + b; }\ntest "adds" {\n  assert add(2, 2) == 4;\n}',
       'bench "counter" {\n  let total: I32 = 0;\n  measure { total += 1; }\n}',
       'struct Pt:\n  | x : F32\nfn takes64(v: I64) I64 { v; }\nfn wide() I64 {\n  let a: I64 = 0;\n  let b: F32 = 1.0;\n  let c: U32 = 7;\n  let p: Pt = Pt { x: 2.0 };\n  takes64(41);\n}',
-      'export lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
-      'fn double(x: I32) I32 { x * 2; }\nexport main() I32 { double(2) + double(3); }',
-      'export lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }\n  fn mid(x: I32) I32 { x -o clamp(0, &, 10); }\n}',
-      'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) Void { self.v = n; }\nexport lib { fn go(b: Box) Void { b.set64(7); } }',
-      'export lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
+      'lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
+      'fn double(x: I32) I32 { x * 2; }\nlib { fn run() I32 { double(2) + double(3); } }',
+      'lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }\n  fn mid(x: I32) I32 { x -o clamp(0, &, 10); }\n}',
+      'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) Void { self.v = n; }\nlib { fn go(b: Box) Void { b.set64(7); } }',
+      'lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
     ]) {
       const diagnostics = await selfhostDiagnostics({ ROOT, name: 'valid_program.utu', source });
       assertEq(diagnostics.length, 0, `${source}\n  got ${diagnostics.map(d => `${d.kind}: ${d.message}`).join('; ')}`);

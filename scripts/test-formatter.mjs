@@ -54,14 +54,14 @@ for (const [source, expected] of cases) {
 
 // Wutu: `}else{` formats like `} else {` (the island was once left as written).
 {
-  const text = await formatUtuSource('using Browser from std:Browser;\n\nexport main() Void {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n', { shape });
+  const text = await formatUtuSource('using Browser from std:Browser;\n\nmain {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n', { shape });
   assert.match(text, /\} else \{/);
 }
 
 // Wutu: `for="x"` stays an attribute (`for = "x"` opens a loop), `#id` stays,
 // CSS declarations keep their spacing.
 {
-  const source = 'using Browser from std:Browser;\n\nexport main() Void {\n    let n = @wutu/\\\n    form { label { for="q"; "Find"; } input#q { display: grid; type="search"; } }\n    \\/;\n    Browser.document.body.append(n);\n}\n';
+  const source = 'using Browser from std:Browser;\n\nmain {\n    let n = @wutu/\\\n    form { label { for="q"; "Find"; } input#q { display: grid; type="search"; } }\n    \\/;\n    Browser.document.body.append(n);\n}\n';
   const text = await formatUtuSource(source, { shape });
   assert.match(text, /for="q";/);
   assert.match(text, /input#q \{/);

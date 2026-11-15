@@ -4,6 +4,7 @@ fn label(n: I32) I32 {
     if n > 0 { n; } else { "none"; };
 }
 
-export main() I32 {
-    label(1);
+main {
+    console.log(label(1));
 }
+using console from std:Console

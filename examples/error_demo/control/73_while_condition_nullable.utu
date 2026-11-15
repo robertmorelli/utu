@@ -11,6 +11,7 @@ fn length(head: ?Node) I32 {
     n;
 }
 
-export main() I32 {
-    length(null);
+main {
+    console.log(length(null));
 }
+using console from std:Console

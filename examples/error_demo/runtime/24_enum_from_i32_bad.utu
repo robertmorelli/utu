@@ -5,7 +5,8 @@ enum(U8) Level:
     | Mid
     | High = 9
 
-export main() Str {
+main {
     let l = Level(7);
-    Level.name(l);
+    console.log(Level.name(l));
 }
+using console from std:Console

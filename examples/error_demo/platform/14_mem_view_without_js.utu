@@ -2,7 +2,7 @@
 // Expect: pixels.view() returns a JS.Uint8Array; add `using JS from std:JS;`
 export mem pixels: U8;
 
-export lib {
+lib {
     fn frame() Void {
         pixels.push(0);
         let v = pixels.view(0, 1);

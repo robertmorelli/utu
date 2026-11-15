@@ -171,12 +171,8 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
 
     // Export forms
     // `lib { fn … }`: what JS calls; `main { … }`: the program.
-    export_lib_decl: ($) => choice(
-      seq('export', 'lib', '{', repeat($._library_item), '}'),
-      seq('lib', '{', repeat($._library_item), '}')),
-    export_main_decl: ($) => choice(
-      seq('export', 'main', '(', optional($.param_list), ')', $.return_type, $.block),
-      seq('main', $.block)),
+    export_lib_decl: ($) => seq('lib', '{', repeat($._library_item), '}'),
+    export_main_decl: ($) => seq('main', $.block),
 
     // Tests and benchmarks
     test_decl: ($) => seq('test', $.string_lit, $.block),

@@ -1,5 +1,5 @@
 
-        export lib {
+        lib {
           fn dense32(x: F32) I32 {
             match x {
               0.0 => 10,

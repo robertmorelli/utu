@@ -6,6 +6,7 @@ mod geometry {
 
 using geometri |geo|;
 
-export main() F64 {
-    geo.square(3.0);
+main {
+    console.log(geo.square(3.0));
 }
+using console from std:Console

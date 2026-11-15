@@ -9,4 +9,5 @@ struct X[Pa, Pb]:
 fn Pa[X].name |x| () Str { "a"; }
 fn Pb[X].name |x| () Str { "b"; }
 
-export main() Str { X { id: 1 }.name(); }
+main { console.log(X { id: 1 }.name()); }
+using console from std:Console

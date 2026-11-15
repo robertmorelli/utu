@@ -4,7 +4,8 @@ type UserId = distinct I32;
 
 fn lookup(id: UserId) I32 { id.i32(); }
 
-export main() I32 {
+main {
     let raw = 7;
-    lookup(raw);
+    console.log(lookup(raw));
 }
+using console from std:Console

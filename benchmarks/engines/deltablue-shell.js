@@ -11,7 +11,7 @@ const instance = new WebAssembly.Instance(module, {});
 function time(run) { const start = performance.now(); run(); return performance.now() - start; }
 function median(values) { const sorted = values.slice().sort((a, b) => a - b); const i = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[i] : (sorted[i - 1] + sorted[i]) / 2; }
 function measure(kind) {
-  const run = () => instance.exports.main(kind, iterations);
+  const run = () => instance.exports.run(kind, iterations);
   const expected = run();
   if (String(expected) !== '0') throw new Error(`DeltaBlue returned ${expected}`);
   for (let i = 0; i < warmups; i++) run();

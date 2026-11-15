@@ -4,8 +4,9 @@ fn take(s: Str) I32 {
     s.len();
 }
 
-export main() I32 {
-    take(cl(m) Str {
+main {
+    console.log(take(cl(m) Str {
         m;
-    });
+    }));
 }
+using console from std:Console

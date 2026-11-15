@@ -74,6 +74,6 @@ test "pidigits prints BG's digits" {
     assert pidigits(100) == 2141273922
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 { pidigits(n) }
 }

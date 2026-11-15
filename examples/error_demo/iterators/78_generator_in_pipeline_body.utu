@@ -4,6 +4,7 @@ gn squares(n: I32) I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
 
-export main() I32 {
-    [1, 2, 3] flat_map |n| { squares(n); } sum;
+main {
+    console.log([1, 2, 3] flat_map |n| { squares(n); } sum);
 }
+using console from std:Console

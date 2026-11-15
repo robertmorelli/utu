@@ -8,4 +8,5 @@ mod Box[T] {
 }
 fn P[Box[I32]].m |b| () I32 { b.v; }
 
-export main() I32 { 0; }
+main { console.log(0); }
+using console from std:Console

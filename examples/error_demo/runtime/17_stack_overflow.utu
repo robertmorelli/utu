@@ -4,6 +4,7 @@ fn count_down(n: I32) I32 {
     count_down(n - 1) + 1;
 }
 
-export main() I32 {
-    count_down(10);
+main {
+    console.log(count_down(10));
 }
+using console from std:Console

@@ -7,7 +7,8 @@ mod Adder[T] {
 
 }
 
-export main() I32 {
+main {
     let y: F32 = Adder[F32].add(2.0,3.0)
-    Adder[I32].add(2,3)
+    console.log(Adder[I32].add(2,3))
 }
+using console from std:Console

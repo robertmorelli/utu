@@ -8,7 +8,7 @@ gn walk(n: Node) Node {
     for (n.kids) |k| { yield k; for (walk(k)) |d| { yield d; }; };
 }
 
-export main() I32 {
+main {
     let root = Node { name: "/", kids: [Node { name: "tmp", kids: [] }] };
     let count = 0;
     for (walk(root)) |n| {
@@ -16,5 +16,6 @@ export main() I32 {
         skip();
         count += 1;
     };
-    count;
+    console.log(count);
 }
+using console from std:Console

@@ -3,6 +3,7 @@
 using api from "./lib/782_api_one.utu";
 using api from "./lib/782_api_two.utu";
 
-export main() I32 {
-    api.x();
+main {
+    console.log(api.x());
 }
+using console from std:Console

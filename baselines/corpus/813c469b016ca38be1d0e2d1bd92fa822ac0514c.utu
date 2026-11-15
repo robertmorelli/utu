@@ -1,7 +1,7 @@
 
       fn inc(x: I32) I32 { x + 1; }
       fn dbl(x: I32) I32 { x * 2; }
-      export lib {
+      lib {
           fn inferred() I32 {
               let fs = [cl(x: I32) I32 { x + 1; }, cl(x: I32) I32 { x * 2; }];
               fs[0](10) + fs[1](10);

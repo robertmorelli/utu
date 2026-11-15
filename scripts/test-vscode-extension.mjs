@@ -1,6 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+// What main prints while `run` runs.
+async function printing(run) {
+  const lines = [];
+  const log = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try { await run(); } finally { console.log = log; }
+  return lines.join('\n');
+}
 
 const ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname));
 const vscodeDir = path.join(ROOT, 'node_modules', 'vscode');
@@ -42,7 +50,7 @@ try {
     if (!commands.has(name)) throw new Error(`activation did not register ${name}`);
   }
 
-  const source = 'export main() I32 { let x: I32 = 41; x + 1; }';
+  const source = 'main { let x: I32 = 41; console.log(x + 1) }\nusing console from std:Console\n';
   const document = makeDocument(vscode.Uri.parse('file:///activation.utu'), source);
   globalThis.__utuVscodeStub.textDocuments.push(document);
   const providers = globalThis.__utuVscodeStub.providers;
@@ -58,15 +66,15 @@ try {
   const references = await providers.references.provideReferences(document, document.positionAt(source.indexOf('x +')), { includeDeclaration: true });
   if (references.length !== 2) throw new Error(`find references returned ${references.length} entries instead of 2`);
   // Diagnostics from the self-hosted compiler: stage 0's kinds, located in the file.
-  const broken = makeDocument(vscode.Uri.parse('file:///broken.utu'), 'export main() I32 { let x: I32 = "no"; x + missing; }');
+  const broken = makeDocument(vscode.Uri.parse('file:///broken.utu'), 'lib { fn run() I32 { let x: I32 = "no"; x + missing; } }');
   globalThis.__utuVscodeStub.textDocuments.push(broken);
   const found = await api.compiler.diagnostics(broken);
   const summary = found.map(d => `${d.code} ${d.primary.start}-${d.primary.end}`).sort().join(', ');
-  if (summary !== 'type-mismatch 33-37, unknown-variable 43-50') throw new Error(`diagnostics were ${summary}`);
+  if (summary !== 'type-mismatch 34-38, unknown-variable 44-51') throw new Error(`diagnostics were ${summary}`);
   const hierarchy = await providers.calls.prepareCallHierarchy(document, document.positionAt(source.indexOf('main')));
   if (hierarchy?.name !== 'main') throw new Error('call hierarchy did not resolve main');
   // Inferred types, calls both ways, and the views, from the self-hosted compiler.
-  const callsSource = 'fn twice(n: I32) I32 { n * 2; }\nexport main() I32 { let y = twice(20); y + 2; }';
+  const callsSource = 'fn twice(n: I32) I32 { n * 2; }\nlib { fn run() I32 { let y = twice(20); y + 2; } }';
   const callsDocument = makeDocument(vscode.Uri.parse('file:///calls.utu'), callsSource);
   globalThis.__utuVscodeStub.textDocuments.push(callsDocument);
   const whole = new vscode.Range(callsDocument.positionAt(0), callsDocument.positionAt(callsSource.length));
@@ -75,10 +83,10 @@ try {
   const twice = await providers.calls.prepareCallHierarchy(callsDocument, callsDocument.positionAt(callsSource.indexOf('twice')));
   if (twice?.name !== 'twice') throw new Error('call hierarchy did not resolve twice');
   const incoming = await providers.calls.provideCallHierarchyIncomingCalls(twice);
-  if (incoming.map(call => call.from.name).join() !== 'main' || incoming[0].fromRanges.length !== 1) throw new Error('incoming calls of twice were not main, once');
-  const main = await providers.calls.prepareCallHierarchy(callsDocument, callsDocument.positionAt(callsSource.indexOf('main')));
-  const outgoing = await providers.calls.provideCallHierarchyOutgoingCalls(main);
-  if (outgoing.map(call => call.to.name).join() !== 'twice') throw new Error('outgoing calls of main were not twice');
+  if (incoming.map(call => call.from.name).join() !== 'run' || incoming[0].fromRanges.length !== 1) throw new Error('incoming calls of twice were not run, once');
+  const run = await providers.calls.prepareCallHierarchy(callsDocument, callsDocument.positionAt(callsSource.indexOf('run')));
+  const outgoing = await providers.calls.provideCallHierarchyOutgoingCalls(run);
+  if (outgoing.map(call => call.to.name).join() !== 'twice') throw new Error('outgoing calls of run were not twice');
   const callHover = await providers.hover.provideHover(callsDocument, callsDocument.positionAt(callsSource.indexOf('twice(20)')));
   if (!callHover?.contents?.value?.includes('Call target')) throw new Error(`call hover was ${callHover?.contents?.value}`);
   const compiler = api.compiler;
@@ -89,8 +97,8 @@ try {
   if (!(await compiler.graphs(callsDocument)).includes('twice')) throw new Error('graphs did not draw twice');
   const binary = await commands.get('utu.compileCurrentFile')(document);
   if (!(binary instanceof Uint8Array) || binary.length === 0) throw new Error('compile command did not return Wasm');
-  const result = await commands.get('utu.runMain')(document);
-  if (result !== 42) throw new Error(`runMain returned ${String(result)} instead of 42`);
+  const printed = await printing(() => commands.get('utu.runMain')(document));
+  if (printed !== '42') throw new Error(`runMain printed ${printed} instead of 42`);
   const created = await commands.get('utu.createWutuWebsite')();
   if (!created?.fsPath.endsWith('/my-wutu-site/main.utu')) throw new Error('Wutu starter was not created');
   const starter = await vscode.workspace.openTextDocument(created);
@@ -106,12 +114,12 @@ try {
 
   const webContext = { subscriptions: [], extensionUri: vscode.Uri.parse(`${pathToFileURL(ROOT).href}/`) };
   await webActivate(webContext);
-  const webDocument = makeDocument(vscode.Uri.parse('file:///web-activation.utu'), 'export main() I32 { 43; }');
+  const webDocument = makeDocument(vscode.Uri.parse('file:///web-activation.utu'), 'main { console.log(43) }\nusing console from std:Console\n');
   globalThis.__utuVscodeStub.textDocuments.push(webDocument);
   const webBinary = await commands.get('utu.compileCurrentFile')(webDocument);
   if (!(webBinary instanceof Uint8Array) || webBinary.length === 0) throw new Error('web compile command did not return Wasm');
-  const webResult = await commands.get('utu.runMain')(webDocument);
-  if (webResult !== 43) throw new Error(`web runMain returned ${String(webResult)} instead of 43`);
+  const webPrinted = await printing(() => commands.get('utu.runMain')(webDocument));
+  if (webPrinted !== '43') throw new Error(`web runMain printed ${webPrinted} instead of 43`);
   (webBundle.deactivate ?? webBundle.default?.deactivate)?.();
   for (const disposable of webContext.subscriptions.reverse()) disposable?.dispose?.();
 

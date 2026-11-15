@@ -8,6 +8,7 @@ fn norm(p: Point) I32 {
     p.x + p.y;
 }
 
-export main() I32 {
-    norm(Point);
+main {
+    console.log(norm(Point));
 }
+using console from std:Console

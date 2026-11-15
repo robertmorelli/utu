@@ -29,8 +29,8 @@ if (kind === 'js') {
   projection = () => benchProjection(+iterations);
 } else {
   const e = new WebAssembly.Instance(new WebAssembly.Module(readbuffer(file)), {}).exports;
-  chain = e.main ? () => e.main(0, +iterations) : () => e.bench_chain(+iterations);
-  projection = e.main ? () => e.main(1, +iterations) : () => e.bench_projection(+iterations);
+  chain = e.run ? () => e.run(0, +iterations) : () => e.bench_chain(+iterations);
+  projection = e.run ? () => e.run(1, +iterations) : () => e.bench_projection(+iterations);
 }
 function measure(run) {
   const result = String(run());

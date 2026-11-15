@@ -152,7 +152,7 @@ fn results(state: Library) Browser.HTMLElement {
     \/
 }
 
-export main() Void {
+main {
     let state = @stored/\
         Library "folio-v2" Library {
         books: [Book {

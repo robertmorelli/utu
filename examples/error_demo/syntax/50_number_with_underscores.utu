@@ -4,4 +4,5 @@ fn million() I32 {
     1_000_000;
 }
 
-export main() I32 { million(); }
+main { console.log(million()); }
+using console from std:Console

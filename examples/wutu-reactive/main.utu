@@ -13,7 +13,7 @@ struct State:
     | draft: Str
     | tasks: Array[Task]
 
-export main() Void {
+main {
     let state = @stored/\
         State "wutu-smooth-v1" State {
             changes: 0,

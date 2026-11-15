@@ -31,7 +31,7 @@
 //! + `optimize.utu` cleans up each function's IR, and `wasm.utu` encodes the
 //!   module.
 
-export lib {
+lib {
     fn reset() Void {
         unseal()
         reset_program()

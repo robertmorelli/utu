@@ -3,6 +3,7 @@
 using helpers from "./lib/489_helper_lib.utu";
 using helpers from "./lib/../lib/489_helper_lib.utu";
 
-export main() I32 {
-    helpers.one();
+main {
+    console.log(helpers.one());
 }
+using console from std:Console

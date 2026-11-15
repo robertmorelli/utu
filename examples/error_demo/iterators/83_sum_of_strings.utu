@@ -1,5 +1,6 @@
 // What: sum over strings, which have + but no 0
 // Expect: sum needs numbers, not Str (use fold("") to join)
-export main() Str {
-    ["a", "b"] sum;
+main {
+    console.log(["a", "b"] sum);
 }
+using console from std:Console

@@ -11,7 +11,7 @@ compiler ships with a compiled application.
 ```utu
 using Browser from std:Browser
 
-export main() Void {
+main {
     let document = Browser.document
     let input = document.createElement("input")
     input.placeholder = "Write something"
@@ -193,7 +193,7 @@ using Nano from "npm:nanoid"
 using Floating from "npm:@floating-ui/dom"
 using Path from "node:path"
 
-export main() Void {
+main {
     let id = Nano.nanoid(8)
     let file = Path.join("out", id, "report.txt")
 }
@@ -295,7 +295,7 @@ element converted so. An `@es` result of a nullable type
 treats `undefined` as `null`, and so does `await` of a `Promise[?T]`.
 
 Structs, `Result`s, payload enums and arrays cross both edges, an `@es`
-binding's arguments and results and an `export lib` function's, as opaque
+binding's arguments and results and an `lib` function's, as opaque
 wasm objects, handles: JavaScript cannot read their fields or make one, but
 can keep one and give it back, where utu reads it. So `make() Point` and
 `norm(p: Point) F64` work together from JS (`lib.norm(lib.make())`), and an
@@ -315,7 +315,7 @@ lib` function's arguments below. Give JS what it should read as numbers, `Str` (
 whole values), or host objects. A `fun` argument reaches JS as a function it
 can call. A JS function is a closure: type a function result `cl(I32) I32`;
 `fun(I32) I32` is an error (`add gets a JS function: that is a cl, not
-fun(I32) I32`), as is an `export lib` parameter typed `fun` (`call: argument 1
+fun(I32) I32`), as is an `lib` parameter typed `fun` (`call: argument 1
 comes from JS, which gives a cl, not fun(I32) I32`).
 
 An `@es` body bound to a `fun` or `cl` type should be a function. One that
@@ -323,7 +323,7 @@ is not plainly one (an arrow or `function`), such as `Math.abs`, is tested
 as the glue loads: a value that is no function throws a `TypeError` naming
 the binding (`f: @es gave number, not a function`) before the program runs.
 
-Safe builds (`-O small`, `fast`, `debug`) also check an `export lib`
+Safe builds (`-O small`, `fast`, `debug`) also check an `lib`
 function's arguments: an `I32`, `U32` or
 `enum(I32)` an integer number (wasm keeps its low bits, as above), not `1.5`;
 an `I64` or `U64` a BigInt; an `F32` or `F64` a number (`NaN` included); a

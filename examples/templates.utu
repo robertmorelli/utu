@@ -14,7 +14,7 @@ fn describe(name: Str, age: I32, height: F64) Str {
     `${name} is ${age} years old and ${height} m tall`
 }
 
-export lib {
+lib {
     fn greeting() Str { describe("Ada", 36, 1.65) }
     fn point() Str { `p = ${Point { x: 3, y: -4 }}` }
     fn nested() Str { `[${`inner ${1 + 2}`}]` }

@@ -29,7 +29,7 @@ fn distance(a: Point, b: Point) F64 {
 //! = Exported
 //! What the host sees.
 
-export lib {
+lib {
     /// From the origin; see @Point; and @nowhere.
     fn norm(x: F64, y: F64) F64 { distance(Point { x: x, y: y }, Point { x: 0.0, y: 0.0 }); }
 }

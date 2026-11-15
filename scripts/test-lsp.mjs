@@ -37,7 +37,7 @@ fn twice(p: Point) I32 {
     total * 2;
 }
 
-export lib {
+lib {
     fn run() I32 { twice(Point.new(1, 2)); }
 }
 
@@ -177,7 +177,7 @@ try {
 
   // A @wat function's parameter is named in its text as `$x`: renamed,
   // referenced, and hovered there too (with its type as written).
-  const WAT = 'fn rotl(x: I32, k: I32) I32 {\n    @wat/\\ local.get $x ;; not $x in a comment\n      local.get $k i32.rotl \\/;\n}\nexport lib { fn t() I32 { rotl(1, 2); } }\n';
+  const WAT = 'fn rotl(x: I32, k: I32) I32 {\n    @wat/\\ local.get $x ;; not $x in a comment\n      local.get $k i32.rotl \\/;\n}\nlib { fn t() I32 { rotl(1, 2); } }\n';
   const wat = pathToFileURL(path.join(dir, 'wat.utu')).href;
   await fs.writeFile(path.join(dir, 'wat.utu'), WAT);
   await tell('textDocument/didOpen', { textDocument: { uri: wat, languageId: 'utu', version: 1, text: WAT } });
@@ -220,7 +220,7 @@ try {
     await call('initialize', { capabilities: {} });
 
     // While a file does not parse, answers come from its last text that did.
-    const S = 'fn g() I32 { 2; }\nfn f() I32 { let count = g(); count; }\nexport lib { fn h() I32 { f(); } }\n';
+    const S = 'fn g() I32 { 2; }\nfn f() I32 { let count = g(); count; }\nlib { fn h() I32 { f(); } }\n';
     const s = await file('s.utu', S);
     await note('textDocument/didOpen', { textDocument: { uri: s, version: 1, text: S } });
     const broken = '// above\n' + S.replace('count; }', 'count + }');
@@ -237,7 +237,7 @@ try {
 
     // References and rename from an imported file reach the open files importing it.
     const SH = 'mod shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n    fn &.sum |self| () I32 { self.x; }\n}\n';
-    const M = 'using shapes |Point| from "./sh.utu";\nexport lib { fn run() I32 { let p = Point.new(1); p.sum(); } }\n';
+    const M = 'using shapes |Point| from "./sh.utu";\nlib { fn run() I32 { let p = Point.new(1); p.sum(); } }\n';
     const sh = await file('sh.utu', SH), m = await file('m.utu', M);
     await note('textDocument/didOpen', { textDocument: { uri: m, version: 1, text: M } });
     await note('textDocument/didOpen', { textDocument: { uri: sh, version: 1, text: SH } });
@@ -268,7 +268,7 @@ try {
       '    for (0 ..< 3) |i| { n = n + i; };',
       '    n;',
       '}',
-      'export lib { fn run() I32 { one() + two(1) + three() + four(); } }',
+      'lib { fn run() I32 { one() + two(1) + three() + four(); } }',
       '',
     ].join('\n');
     const k = await file('k.utu', K);
@@ -295,7 +295,7 @@ try {
       'fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }',
       'fn big(s: Shape) F64 { s.area(); }',
       'fn direct(c: Circle) F64 { c.area(); }',
-      'export lib { fn run() F64 { big(Circle { r: 1.0 }) + direct(Circle { r: 1.0 }); } }',
+      'lib { fn run() F64 { big(Circle { r: 1.0 }) + direct(Circle { r: 1.0 }); } }',
       '',
     ].join('\n');
     const pr = await file('pr.utu', P);
@@ -311,7 +311,7 @@ try {
     assert.deepEqual(protoRename.changes[pr].map(e => e.range.start.line), all);
     // The protocol in one file, implemented in an open file importing it.
     const PS = 'mod shapes {\n    proto Area:\n        | area() I32\n}\n';
-    const PM = 'using shapes from "./ps.utu";\nusing shapes;\nstruct Tri[Area]:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nexport main() I32 { let x: Area = Tri { base: 2 }; x.area(); }\n';
+    const PM = 'using shapes from "./ps.utu";\nusing shapes;\nstruct Tri[Area]:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nlib { fn run() I32 { let x: Area = Tri { base: 2 }; x.area(); } }\n';
     const ps = await file('ps.utu', PS), pm = await file('pm.utu', PM);
     await note('textDocument/didOpen', { textDocument: { uri: pm, version: 1, text: PM } });
     await note('textDocument/didOpen', { textDocument: { uri: ps, version: 1, text: PS } });
@@ -327,7 +327,7 @@ try {
       'tag struct Sa[Pm]:',
       '    | w : I32',
       'fn f(p: Pm) I32 { p.w; }',
-      'export main() I32 { let s = Sa { w: 1 }; s.w + f(s); }',
+      'lib { fn run() I32 { let s = Sa { w: 1 }; s.w + f(s); } }',
       '',
     ].join('\n');
     const g = await file('g.utu', G);
@@ -337,8 +337,11 @@ try {
     assert.deepEqual(await glines('textDocument/references', 'w :', 1, { context: { includeDeclaration: true } }), [1, 3, 4, 5, 5], 'from the field');
     assert.deepEqual(await glines('textDocument/documentHighlight', 'w; }', 0, {}), [1, 3, 4, 5, 5]);
     assert.deepEqual((await call('textDocument/rename', { ...at(G, 'w :', 0, g), newName: 'wd' })).changes[g].map(e => e.range.start.line), [1, 3, 4, 5, 5]);
-    // `export main` is the entry point.
-    assert.equal((await call('textDocument/rename', { ...at(G, 'main', 0, g), newName: 'start' })).error, "main is the program's entry point: it is not renamed");
+    // `main` is the entry point.
+    const MN = 'fn f() I32 => 1\nmain {\n    f()\n}\n';
+    const mn = await file('mn.utu', MN);
+    await note('textDocument/didOpen', { textDocument: { uri: mn, version: 1, text: MN } });
+    assert.equal((await call('textDocument/rename', { ...at(MN, 'main', 0, mn), newName: 'start' })).error, "main is the program's entry point: it is not renamed");
 
     // Closing a file: the others are built again (on its text on disk), and
     // what only its builds showed on files not open is cleared.
@@ -347,7 +350,7 @@ try {
     await note('textDocument/didClose', { textDocument: { uri: sh } });
     assert.deepEqual(shown(m), [], 'the discarded text no longer counts');
     const lib = await file('util.utu', 'mod util { fn helper() I32 { nope; } }\n');
-    const U = 'using util from "./util.utu";\nexport lib { fn run() I32 { util.helper(); } }\n';
+    const U = 'using util from "./util.utu";\nlib { fn run() I32 { util.helper(); } }\n';
     const user = await file('user.utu', U);
     await note('textDocument/didOpen', { textDocument: { uri: user, version: 1, text: U } });
     assert.equal(shown(lib)?.length, 1, 'an import not open shows its mistake');
@@ -355,13 +358,13 @@ try {
     assert.deepEqual(shown(lib), [], 'and not after its importer closes');
 
     // An unsaved buffer keeps its own URI.
-    const T = 'fn f() I32 {\n    let total = 1;\n    totl;\n}\nexport lib { fn h() I32 { f(); } }\n';
+    const T = 'fn f() I32 {\n    let total = 1;\n    totl;\n}\nlib { fn h() I32 { f(); } }\n';
     await note('textDocument/didOpen', { textDocument: { uri: 'untitled:Untitled-1', version: 1, text: T } });
     assert.equal(shown('untitled:Untitled-1')[0].data.fix.uri, 'untitled:Untitled-1');
     assert.equal((await call('textDocument/definition', at(T, 'f();', 0, 'untitled:Untitled-1'))).uri, 'untitled:Untitled-1');
 
     // Completion after a type, a field, a call, an index; `?.` on a nullable.
-    const C = 'struct Inner:\n    | v: I32\nstruct Rect:\n    | w: F64\n    | inner: Inner\nfn Rect.square(s: F64) Rect { Rect { w: s, inner: Inner { v: 1 } }; }\nfn Rect.area |r| () F64 { r.w; }\nenum Shape:\n    | Circle\n    | Square\nfn mk() Rect { Rect.square(2.0); }\nexport lib {\n    fn f(r: Rect, opt: ?Rect, arr: Array[Rect]) F64 {\n        CURSOR\n        r.w;\n    }\n}\n';
+    const C = 'struct Inner:\n    | v: I32\nstruct Rect:\n    | w: F64\n    | inner: Inner\nfn Rect.square(s: F64) Rect { Rect { w: s, inner: Inner { v: 1 } }; }\nfn Rect.area |r| () F64 { r.w; }\nenum Shape:\n    | Circle\n    | Square\nfn mk() Rect { Rect.square(2.0); }\nlib {\n    fn f(r: Rect, opt: ?Rect, arr: Array[Rect]) F64 {\n        CURSOR\n        r.w;\n    }\n}\n';
     const c = await file('c.utu', C.replace('CURSOR', ''));
     await note('textDocument/didOpen', { textDocument: { uri: c, version: 1, text: C.replace('CURSOR', '') } });
     let v = 1;
@@ -377,14 +380,14 @@ try {
     assert.deepEqual(await offered('opt.'), [], 'not without ?.');
 
     // Hover: a built-in type without its representation, a module's type by the module's name.
-    const H = 'using shapes |Point| from "./sh.utu";\nfn f(a: Array[I32], p: Point) I32 { a.len() + p.x; }\nexport lib { fn run() I32 { f([1], Point.new(1)); } }\n';
+    const H = 'using shapes |Point| from "./sh.utu";\nfn f(a: Array[I32], p: Point) I32 { a.len() + p.x; }\nlib { fn run() I32 { f([1], Point.new(1)); } }\n';
     const h = await file('h.utu', H);
     await note('textDocument/didOpen', { textDocument: { uri: h, version: 1, text: H } });
     assert.match((await call('textDocument/hover', at(H, 'Array', 0, h))).contents.value, /^```utu\ntype Array\n```/);
     assert.match((await call('textDocument/hover', at(H, 'new(1)', 0, h))).contents.value, /fn shapes\.new\(x: I32\) shapes/);
 
     // An alt arm's bare variant two enums have is the tested enum's; an enum's hover shows its variants.
-    const V = 'enum Shape:\n    | Circle { r: F64 }\n    | Dot {}\nenum Lens:\n    | Circle { f: F64 }\nfn a(s: Shape) F64 {\n    alt s {\n        Circle |c| => c.r,\n        Dot => 0.0,\n    };\n}\nfn b(l: Lens) F64 {\n    alt l {\n        Circle |c| => c.f,\n    };\n}\nexport lib { fn run() F64 { a(Shape.Dot) + b(Lens.Circle { f: 1.0 }); } }\n';
+    const V = 'enum Shape:\n    | Circle { r: F64 }\n    | Dot {}\nenum Lens:\n    | Circle { f: F64 }\nfn a(s: Shape) F64 {\n    alt s {\n        Circle |c| => c.r,\n        Dot => 0.0,\n    };\n}\nfn b(l: Lens) F64 {\n    alt l {\n        Circle |c| => c.f,\n    };\n}\nlib { fn run() F64 { a(Shape.Dot) + b(Lens.Circle { f: 1.0 }); } }\n';
     const vu = await file('v.utu', V);
     await note('textDocument/didOpen', { textDocument: { uri: vu, version: 1, text: V } });
     assert.equal((await call('textDocument/definition', at(V, 'Circle |c|', 0, vu))).range.start.line, 1);
@@ -394,7 +397,7 @@ try {
     assert.match((await call('textDocument/hover', at(V, 'Shape', 0, vu))).contents.value, /enum Shape: \| Circle \{ r: F64 \} \| Dot \{\}/);
 
     // An import that cannot be read: the rest of the file's names still answer.
-    const X = 'using helpers from "./nope.utu";\nfn twice(x: I32) I32 {\n    x * 2;\n}\nexport main() I32 {\n    helpers.double(21) + twice(1);\n}\n';
+    const X = 'using helpers from "./nope.utu";\nfn twice(x: I32) I32 {\n    x * 2;\n}\nlib { fn run() I32 {\n    helpers.double(21) + twice(1);\n} }\n';
     const xu = await file('x.utu', X);
     await note('textDocument/didOpen', { textDocument: { uri: xu, version: 1, text: X } });
     assert.match((await call('textDocument/hover', at(X, 'twice', 0, xu))).contents.value, /fn twice\(x: I32\) I32/);
@@ -425,10 +428,10 @@ try {
     const file = async (name, text) => { await fs.writeFile(path.join(ws, name), text); return pathToFileURL(path.join(ws, name)).href; };
     await call('initialize', { capabilities: {}, rootUri: pathToFileURL(ws).href });
     const AX = 'mod ax {\n    fn addx(n: I32) I32 { n + 1; }\n    struct Box:\n        | v: I32\n    proto Sized:\n        | size() I32\n}\n';
-    const MAINX = 'using ax from "./ax.utu";\nusing ax;\nstruct Tri[Sized]:\n    | b: I32\nfn Sized[Tri].size |t| () I32 { t.b; }\nfn get(b: Box) I32 { b.v; }\nexport main() I32 { let s: Sized = Tri { b: 2 }; ax.addx(s.size()) + get(Box { v: 1 }); }\n';
+    const MAINX = 'using ax from "./ax.utu";\nusing ax;\nstruct Tri[Sized]:\n    | b: I32\nfn Sized[Tri].size |t| () I32 { t.b; }\nfn get(b: Box) I32 { b.v; }\nlib { fn run() I32 { let s: Sized = Tri { b: 2 }; ax.addx(s.size()) + get(Box { v: 1 }); } }\n';
     // (Through another file: deep imports mid, which imports ax.)
     const MID = 'using ax from "../ax.utu";\nmod mid { fn one() I32 { ax.addx(0); } }\n';
-    const DEEP = 'using mid from "./mid.utu";\nexport lib { fn d() I32 { mid.one(); } }\n';
+    const DEEP = 'using mid from "./mid.utu";\nlib { fn d() I32 { mid.one(); } }\n';
     const ax = await file('ax.utu', AX);
     await file('main.utu', MAINX);
     await file('sub/mid.utu', MID);
@@ -451,7 +454,7 @@ try {
     assert.equal(await renaming('addx', 0, 'plusx'), 'main.utu, which imports ax.utu, does not parse: no rename');
     await fs.writeFile(path.join(ws, 'main.utu'), MAINX);
     // One whose build stops at another import: refused (its names are not checked), and said so.
-    await file('other.utu', 'using nope from "./nope.utu";\nusing ax from "./ax.utu";\nexport lib { fn o() I32 { ax.addx(2); } }\n');
+    await file('other.utu', 'using nope from "./nope.utu";\nusing ax from "./ax.utu";\nlib { fn o() I32 { ax.addx(2); } }\n');
     assert.match(await renaming('addx', 0, 'plusx'), /^other\.utu, which imports ax\.utu, does not build \(No file \.\/nope\.utu .*\): no rename$/);
     await fs.rm(path.join(ws, 'other.utu'));
     // Not refused: a file that only imports it, one naming it in a comment
@@ -461,7 +464,7 @@ try {
     await fs.symlink(path.join(ws, 'nowhere.utu'), path.join(ws, 'gone.utu'));
     // Through a link to a folder (one leading back is walked once).
     await fs.mkdir(path.join(dir, 'outside'));
-    await fs.writeFile(path.join(dir, 'outside', 'far.utu'), 'using ax from "../ax.utu";\nexport lib { fn far() I32 { ax.addx(3); } }\n');
+    await fs.writeFile(path.join(dir, 'outside', 'far.utu'), 'using ax from "../ax.utu";\nlib { fn far() I32 { ax.addx(3); } }\n');
     await fs.symlink(path.join(dir, 'outside'), path.join(ws, 'linked'));
     await fs.symlink(ws, path.join(ws, 'sub', 'loop'));
     assert.deepEqual(await renaming('addx', 0, 'plusx'), { 'ax.utu': [1], 'main.utu': [6], 'mid.utu': [1], 'far.utu': [1] }, 'past what is not an importer');
@@ -477,7 +480,7 @@ try {
     }
     // A protocol's getter: without declarations, neither its own nor the field's satisfying it.
     const PR = 'mod pr {\n    proto Named:\n        | get label : I32\n}\n';
-    const FR = 'using pr from "./pr.utu";\nusing pr;\nstruct F[Named]:\n    | label: I32\nfn g(n: Named) I32 { n.label; }\nexport main() I32 { g(F { label: 1 }); }\n';
+    const FR = 'using pr from "./pr.utu";\nusing pr;\nstruct F[Named]:\n    | label: I32\nfn g(n: Named) I32 { n.label; }\nlib { fn run() I32 { g(F { label: 1 }); } }\n';
     await file('pr.utu', PR);
     const fr = await file('fr.utu', FR);
     await server.handle({ jsonrpc: '2.0', method: 'textDocument/didOpen', params: { textDocument: { uri: fr, version: 1, text: FR } } });

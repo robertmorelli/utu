@@ -7,8 +7,9 @@ mod M {
         if s.n > 0 { for ((M { n: s.n - 1 }).walk()) |x| { yield x; }; };
     }
 }
-export main() I32 {
+main {
     let total = 0;
     for ((M { n: 1 }).walk()) |x| { total += x; };
-    total;
+    console.log(total);
 }
+using console from std:Console

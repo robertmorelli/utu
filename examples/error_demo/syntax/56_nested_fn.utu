@@ -5,4 +5,5 @@ fn sum_of_squares(a: I32, b: I32) I32 {
     square(a) + square(b);
 }
 
-export main() I32 { sum_of_squares(3, 4); }
+main { console.log(sum_of_squares(3, 4)); }
+using console from std:Console

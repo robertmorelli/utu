@@ -6,4 +6,5 @@ mod cell[T] {
 
 using cell;
 
-export main() I32 { mk(3); }
+main { console.log(mk(3)); }
+using console from std:Console

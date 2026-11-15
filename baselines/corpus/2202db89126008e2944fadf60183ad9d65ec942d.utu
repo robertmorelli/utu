@@ -109,7 +109,7 @@ fn workspace(state: PitchState) Browser.HTMLElement {
     }
     \/;
 }
-export main() Void {
+main {
     let state = @stored/\
         PitchState "pitch-v2" manual
         PitchState {

@@ -117,7 +117,7 @@ fn by_id(id: Str) Browser.HTMLElement {
     Browser.document.getElementById(id) orelse fatal;
 }
 
-export main() Void {
+main {
     let document = Browser.document;
     let response = await Browser.fetch("items.json");
     let items = await response.json();

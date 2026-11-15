@@ -168,6 +168,6 @@ test "mandelbrot draws BG's 200 x 200 bitmap" {
     assert mandelbrot(200) == -248892225
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 { mandelbrot(n) }
 }

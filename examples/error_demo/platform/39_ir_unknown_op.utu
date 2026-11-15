@@ -4,6 +4,7 @@ fn square(a: I32) I32 {
     @ir/\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \/;
 }
 
-export main() I32 {
-    square(7);
+main {
+    console.log(square(7));
 }
+using console from std:Console

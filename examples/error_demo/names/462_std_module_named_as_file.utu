@@ -2,4 +2,5 @@
 // Expect: Unknown module Time; note: using time from std:Time; (the module is time)
 using Time from std:Time;
 
-export main() F64 { time.now(); }
+main { console.log(time.now()); }
+using console from std:Console

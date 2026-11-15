@@ -141,7 +141,7 @@ fn arrive(site: Site, route: Str) Str {
     }
     ""
 }
-export main() Void {
+main {
     let site = Site {
         route: ""
     }

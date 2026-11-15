@@ -347,7 +347,7 @@ test "revcomp of fasta 1000 is BG's output" {
     assert revcomp() == -752769756
 }
 
-export lib {
+lib {
     fn setup(n: I32) Void { setup_input(n) }
     fn bench(n: I32) I32 { revcomp() }
 }

@@ -1,1 +1,1 @@
-export lib { fn bad() I32 { missing; } }
+lib { fn bad() I32 { missing; } }

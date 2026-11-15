@@ -43,9 +43,9 @@ fn report(lines: Array[Str]) Void {
     else { console.log("error: " + r.error()) }
 }
 
-export main() I32 {
+main {
     report(["width=640", "height=480"])    // reading 2 lines, done, total 1120
     report(["width=640", "height=tall"])   // reading 2 lines, gave up, done, error: not a number: tall
     report(["depth"])                      // reading 1 lines, gave up, done, error: no '=' in depth
-    total(["x=7"]).value_or(0) + total(["x=?"]).value_or(0)   // 7
+    console.log(total(["x=7"]).value_or(0) + total(["x=?"]).value_or(0))   // 7
 }

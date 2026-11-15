@@ -6,14 +6,14 @@
 
 ```
 // library of reusable declarations — may only contain functions
-export lib {
+lib {
     fn exported_thing(...) ... {
         ...
     }
 }
 
 // main entry point
-export main(...) ... {
+main {
     ...
 }
 ```
@@ -22,9 +22,9 @@ export main(...) ... {
 calls it with none, so it refuses a `main` that takes any.
 
 Rules:
-- `export lib` is a codegen annotation surface. It contains **only functions** — no structs, enums, globals, or tests.
-- `export lib` does not create any importable Utu interface. It only marks enclosed functions for Wasm export to JS.
-- `export main` and `export lib` are mutually exclusive in one entry file.
+- `lib` is a codegen annotation surface. It contains **only functions** — no structs, enums, globals, or tests.
+- `lib` does not create any importable Utu interface. It only marks enclosed functions for Wasm export to JS.
+- `main` and `lib` are mutually exclusive in one entry file.
 
 ---
 
@@ -946,7 +946,7 @@ fn triangle(n: I32) I32 {
 - It takes and returns `I32`, `U32`, `I64`, `U64`, `F32`, `F64`, `Bool`,
   `M32`, `M64` (each `i32`, `i64`, `f32` or `f64`), or `V128`, `M128`
   (`v128`), written out (not a module's type parameter), and is a plain
-  function (no `|self|`, not a generator); `export main` may be one. A
+  function (no `|self|`, not a generator); `main` may be one. A
   `Bool` it returns is 0 or 1: the code is trusted to leave one.
 - Every numeric and vector instruction, constants, locals, `block`, `loop`,
   `if`/`else`, `br`, `br_if`, `br_table`, `return`, `select`, `drop`,

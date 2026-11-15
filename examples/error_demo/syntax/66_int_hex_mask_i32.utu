@@ -4,4 +4,5 @@ fn low_bits(x: I32) I32 {
     x & 0xFFFFFFFF;
 }
 
-export main() I32 { low_bits(7); }
+main { console.log(low_bits(7)); }
+using console from std:Console

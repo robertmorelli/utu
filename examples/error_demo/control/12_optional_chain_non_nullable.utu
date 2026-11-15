@@ -6,7 +6,7 @@ struct Point:
     | x: F64
     | y: F64
 
-export main() Void {
+main {
     let p = Point { x: 1.0, y: 2.0 };
     console.log(p?.x.str());
 }

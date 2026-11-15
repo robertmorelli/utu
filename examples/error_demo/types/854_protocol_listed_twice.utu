@@ -10,6 +10,7 @@ fn Area[Sq].area |self| () I32 {
     self.s * self.s;
 }
 
-export main() I32 {
-    Sq { s: 2 }.area();
+main {
+    console.log(Sq { s: 2 }.area());
 }
+using console from std:Console

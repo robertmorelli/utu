@@ -1,4 +1,5 @@
 enum(U8) T:
     | A
 fn f(t: T) I32 { match t { T.A => 1, T.C => 2, ~> 3, }; }
-export main() I32 { 1; }
+main { console.log(1); }
+using console from std:Console

@@ -9,8 +9,9 @@ gn odds(n: I32) I32 {
     if n > 0 { for (evens(n - 1)) |v| { yield v; }; };
 }
 
-export main() I32 {
+main {
     let total = 0;
     for (evens(4)) |v| { total += v; };
-    total;
+    console.log(total);
 }
+using console from std:Console

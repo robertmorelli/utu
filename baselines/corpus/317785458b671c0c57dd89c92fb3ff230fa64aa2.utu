@@ -1,6 +1,6 @@
 
       struct Item: | value: I32
-      export lib {
+      lib {
         fn growth() I32 { let a = [1,2,3,4,5] repeat(4) collect(I32); a.len()*100+a[19]; }
         fn empty() I32 { let a = [Item {value:1}] filter |x| {false;} collect(Item); a.len(); }
         fn structs() I32 { let a = [1,2,3] map |x| {Item {value:x};} collect(Item); a[2].value; }

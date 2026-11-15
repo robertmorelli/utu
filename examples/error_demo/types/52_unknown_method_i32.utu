@@ -1,6 +1,7 @@
 // What: calling a method that does not exist on I32
 // Expect: Unknown method 'I32.to_string' (did you mean str?)
-export main() I32 {
+main {
     let n = 42;
-    n.to_string().len();
+    console.log(n.to_string().len());
 }
+using console from std:Console

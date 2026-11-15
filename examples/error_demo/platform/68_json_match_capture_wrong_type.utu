@@ -8,6 +8,7 @@ fn age_of(text: Str) I32 {
     }\/;
 }
 
-export main() I32 {
-    age_of("{}");
+main {
+    console.log(age_of("{}"));
 }
+using console from std:Console

@@ -5,6 +5,7 @@ fn parse(s: Str) I32 {
     s.len();
 }
 
-export main() I32 {
-    parse("abc");
+main {
+    console.log(parse("abc"));
 }
+using console from std:Console

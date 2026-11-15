@@ -15,7 +15,7 @@ fn draw(ui: view.Ui, ctx: Browser.CanvasRenderingContext2D) Void {
     }
 }
 
-export main() Void {
+main {
     let document = Browser.document
     let game = document.getElementById("game") orelse fatal
     let save = document.getElementById("save") orelse fatal

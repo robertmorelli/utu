@@ -4,4 +4,5 @@ mod geometry {
     fn square(x: F64) F64 { x * x; }
 }
 
-export main() I32 { geometry.cube(2.0).i32(); }
+main { console.log(geometry.cube(2.0).i32()); }
+using console from std:Console

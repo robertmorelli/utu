@@ -2,7 +2,8 @@
 // Expect: each binds one value and an optional index; got 3 names
 let log: fun(I32) Void = @es/\ (n) => console.log(n) \/;
 
-export main() I32 {
+main {
     [1, 2, 3] each |a, b, i| { log(a); };
-    0;
+    console.log(0);
 }
+using console from std:Console

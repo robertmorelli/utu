@@ -2,6 +2,6 @@
 // Expect: either accept it or say std modules are written unquoted: std:Console
 using console from "std:Console";
 
-export main() Void {
+main {
     console.log("hi");
 }

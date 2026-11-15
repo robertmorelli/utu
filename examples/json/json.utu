@@ -181,7 +181,7 @@ fn analyze(text: Str) Stats {
     stats
 }
 
-export lib {
+lib {
     fn parse(text: Str) I32 {
         let stats = analyze(text)
         if stats.error >= 0 { -(stats.error + 1) } else { stats.values }

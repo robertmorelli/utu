@@ -6,6 +6,7 @@ fn countdown(n: I32) I32 {
     steps;
 }
 
-export main() I32 {
-    countdown(5);
+main {
+    console.log(countdown(5));
 }
+using console from std:Console

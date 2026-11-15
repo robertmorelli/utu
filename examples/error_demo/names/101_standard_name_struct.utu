@@ -3,7 +3,8 @@
 struct Found:
     | x: I32
 
-export main() I32 {
+main {
     let s = Found { x: 4 };
-    s.x;
+    console.log(s.x);
 }
+using console from std:Console

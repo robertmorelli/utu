@@ -27,6 +27,7 @@ still one per instance. Outside, an instance's global is read by its path,
 `Stash[I32].items`, as a plain module's is by `M.items`.
 
 ```utu
+using console from std:Console
 using Buffer from std:Buffer
 
 mod Stash[T] {
@@ -35,10 +36,10 @@ mod Stash[T] {
     fn size() I32 { items.len() }
 }
 
-export main() I32 {
+main {
     Stash[I32].add(1)
     Stash[Str].add("a")
-    Stash[I32].size()             // 1: Stash[Str] has its own items
+    console.log(Stash[I32].size())  // 1: Stash[Str] has its own items
 }
 ```
 
@@ -66,6 +67,7 @@ checked: no dispatch and no boxing, so a scalar can be a T as well as a
 struct.
 
 ```utu
+using console from std:Console
 proto Ord:
     | cmp(&) I32                   // & is the implementing type
 
@@ -86,10 +88,10 @@ mod Largest[T[Ord]] {
     }
 }
 
-export main() I32 {
+main {
     let versions = [Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }]
-    Largest[Version].of(versions).major * 100   // 2
-        + Largest[I32].of([3, 9, 4])           // 9: 209
+    console.log(Largest[Version].of(versions).major * 100   // 2
+        + Largest[I32].of([3, 9, 4]))                       // 9: 209
 }
 ```
 

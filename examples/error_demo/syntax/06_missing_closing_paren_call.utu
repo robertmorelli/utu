@@ -2,7 +2,8 @@
 // Expect: expected ')' or ',' to close the call `max(a, b` opened on line 4.
 fn max(a: I32, b: I32) I32 { if a > b { a; } else { b; }; }
 
-export main() I32 {
+main {
     let m = max(3, 4;
-    m;
+    console.log(m);
 }
+using console from std:Console

@@ -1,1 +1,1 @@
-export lib { fn run() I32 { 42; } }
+lib { fn run() I32 { 42; } }

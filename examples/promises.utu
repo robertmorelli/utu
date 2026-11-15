@@ -53,7 +53,8 @@ fn scaled(n: I32) I32 {
 // (Shown here as a comment: stage 0, which every example is also built
 // with, still refuses an await in a closure.)
 
-export main() I32 {
+main {
     subscribe(7)
-    total(20, 22) + scaled(6)
+    console.log(total(20, 22) + scaled(6))
 }
+using console from std:Console

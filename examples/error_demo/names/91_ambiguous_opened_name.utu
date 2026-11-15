@@ -5,6 +5,7 @@ mod b { fn v() I32 { 2; } }
 using a;
 using b;
 
-export main() I32 {
-    v();
+main {
+    console.log(v());
 }
+using console from std:Console

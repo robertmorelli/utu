@@ -4,4 +4,5 @@ fn greeting() Str {
     “hello”;
 }
 
-export main() Str { greeting(); }
+main { console.log(greeting()); }
+using console from std:Console

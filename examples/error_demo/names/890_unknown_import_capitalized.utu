@@ -2,6 +2,7 @@
 // Expect: No declarations for npm:left-pad-xyz; is it installed? (once, at the using; not again at Pad.leftPad)
 using Pad from "npm:left-pad-xyz";
 
-export main() Str {
-    Pad.leftPad("7", 3);
+main {
+    console.log(Pad.leftPad("7", 3));
 }
+using console from std:Console

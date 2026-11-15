@@ -4,6 +4,7 @@ fn huge() F32 {
     @ir/\ <ir-lit kind="int" type-name="F32" value="1000000000000000000000000000000000000000"/> \/;
 }
 
-export main() F32 {
-    huge();
+main {
+    console.log(huge());
 }
+using console from std:Console

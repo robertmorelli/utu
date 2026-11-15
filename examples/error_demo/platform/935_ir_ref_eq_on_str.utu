@@ -4,6 +4,7 @@ fn same(a: Str, b: Str) Bool {
     @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
 }
 
-export main() Bool {
-    same("a", "a");
+main {
+    console.log(same("a", "a"));
 }
+using console from std:Console

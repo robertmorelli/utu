@@ -595,7 +595,7 @@ bench "deltablue_projection" {
     }
 }
 
-export main(kind: I32, iterations: I32) I64 {
+lib { fn run(kind: I32, iterations: I32) I64 {
     let sink: I64 = 0
     if kind == 0 {
         for (0..<iterations) { sink += chain_test(1048) }
@@ -603,4 +603,4 @@ export main(kind: I32, iterations: I32) I64 {
         for (0..<iterations) { sink += projection_test(1048) }
     }
     sink
-}
+} }

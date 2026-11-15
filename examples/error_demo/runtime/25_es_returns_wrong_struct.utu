@@ -6,9 +6,10 @@ enum Shape:
 
 let load_shape: fun() Shape = @es/\ () => ({ r: 2 }) \/;
 
-export main() F64 {
-    alt load_shape() {
+main {
+    console.log(alt load_shape() {
         Circle |c| => c.r,
         Square |s| => s.side,
-    };
+    });
 }
+using console from std:Console

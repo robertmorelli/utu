@@ -2,7 +2,7 @@
       struct Pt:
         | x : I32
       fn takes(n: I32) I32 { n; }
-      export lib {
+      lib {
         fn ok(p: Pt) I32 { takes(p.x); }
         fn bad() I32 { takes(true); }
       }

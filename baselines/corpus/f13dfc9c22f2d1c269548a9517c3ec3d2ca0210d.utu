@@ -1,7 +1,7 @@
 
         let js_apply: fun(cl(I32) I32, I32) I32 = @es/\ (f, v) => f(v) \/;
         let js_twice: fun(cl(I32) I32, I32) I32 = @es/\ (f, v) => f(f(v)) \/;
-        export lib {
+        lib {
           fn to_js(n: I32) I32 {
             let f: cl(I32) I32 = cl(x) { x * n; };
             js_apply(f, 5);

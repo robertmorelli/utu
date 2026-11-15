@@ -12,6 +12,6 @@ fn run(c: Command) Void {
     };
 }
 
-export main() Void {
+main {
     run(Quit {});
 }

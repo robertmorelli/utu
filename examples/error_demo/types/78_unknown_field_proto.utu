@@ -7,7 +7,8 @@ struct Circle[Shape]:
     | name: Str
     | r: F64
 
-export main() I32 {
+main {
     let s: Shape = Circle { name: "c", r: 1.0 };
-    s.r.i32();
+    console.log(s.r.i32());
 }
+using console from std:Console

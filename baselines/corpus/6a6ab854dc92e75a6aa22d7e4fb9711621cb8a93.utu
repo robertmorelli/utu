@@ -2,7 +2,7 @@
       struct Point:
         | x : I32
         | y : I32
-      export lib {
+      lib {
         fn make() Point {
           let p: Point = &{ x: 1, y: 2 };
           p;

@@ -2,5 +2,5 @@
       struct Box:
         | v : I64
       fn Box.set64 |self| (n: I64) Void { self.v = n; }
-      export lib { fn go(b: Box) Void { b.set64(7); } }
+      lib { fn go(b: Box) Void { b.set64(7); } }
     

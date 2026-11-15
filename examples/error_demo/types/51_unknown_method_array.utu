@@ -1,6 +1,7 @@
 // What: calling .length() on an array (it is .len())
 // Expect: Unknown method 'Array[I32].length' (did you mean len?)
-export main() I32 {
+main {
     let xs = [1, 2, 3];
-    xs.length();
+    console.log(xs.length());
 }
+using console from std:Console

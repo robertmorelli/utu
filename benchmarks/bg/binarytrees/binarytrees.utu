@@ -92,6 +92,6 @@ test "binarytrees prints BG's output" {
     assert binary_trees(10) == 717034075
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 { binary_trees(n) }
 }

@@ -35,8 +35,8 @@ let expect_green: Str = @es/\ '\x1b[32mx\x1b[39m' \/;
 
 // `type Formatter` composes by ordinary application — no binding needed for the
 // composition itself, which is the one place this API is pleasant.
-export main() Str {
-    bold(red("error"));
+main {
+    console.log(bold(red("error")));
 }
 
 test "each formatter wraps its input in escape codes" {
@@ -49,3 +49,4 @@ test "formatters compose without extra bindings" {
     assert bold(red("e")).len() == red("e").len() + 9;
     assert dim("y").len() == 10;
 }
+using console from std:Console

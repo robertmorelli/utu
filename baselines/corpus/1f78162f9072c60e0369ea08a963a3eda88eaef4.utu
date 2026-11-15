@@ -1,3 +1,4 @@
 
-      export main() I32 { let broken: I32 = ; }
+      main { let broken: I32 = ; }
     
+using console from std:Console

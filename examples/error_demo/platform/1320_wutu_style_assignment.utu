@@ -2,7 +2,7 @@
 // Expect: @style takes one expression
 using Browser from std:Browser;
 
-export main() Void {
+main {
     let app = @wutu/\
     @style = "p { color: red }";
     div { "x"; }

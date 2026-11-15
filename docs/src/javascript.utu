@@ -5,7 +5,7 @@ mod javascript {
     fn dom_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() Void {
+        \\main {
         \\    let document = Browser.document
         \\    let input = document.createElement("input")   // an HTMLInputElement
         \\    input.placeholder = "Write something"
@@ -20,7 +20,7 @@ mod javascript {
         \\using JS from std:JS
         \\using console from std:Console
         \\
-        \\export main() Void {
+        \\main {
         \\    let epoch = new JS.Date(0.0)
         \\    console.log(epoch.toISOString())                     // 1970-01-01T00:00:00.000Z
         \\    console.log(`${JS.Math.max(1.0, 5.0)} ${JS.Math.floor(2.7)}`)   // 5 2
@@ -38,7 +38,7 @@ mod javascript {
         \\using JS from std:JS
         \\using console from std:Console
         \\
-        \\export main() Void {
+        \\main {
         \\    let text = JS.JSON.stringify(&{ name: "utu", tags: ["wasm", "gc"] })
         \\    console.log(text)                    // {"name":"utu","tags":["wasm","gc"]}
         \\    let parsed = JS.JSON.parse(text)     // any: read in the context that needs it
@@ -49,7 +49,7 @@ mod javascript {
     fn records_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() Void {
+        \\main {
         \\    let doc = Browser.document
         \\    // &{ ... } and [ ... ] become real JS objects and arrays in a declared slot
         \\    let blob = new Browser.Blob(["hello, ", "file"], &{ type: "text/plain" })
@@ -67,7 +67,7 @@ mod javascript {
     fn callbacks_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() Void {
+        \\main {
         \\    let doc = Browser.document
         \\    // parameter types come from the declaration the closure reaches
         \\    doc.querySelectorAll("p.old").forEach(cl(el) Void { el.remove() })
@@ -81,7 +81,7 @@ mod javascript {
     fn narrowing_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() Void {
+        \\main {
         \\    let doc = Browser.document
         \\    // alt over a host value tests each arm with instanceof
         \\    doc.addEventListener("input", cl(e) Void {
@@ -110,10 +110,11 @@ mod javascript {
         \\    }
         \\}
         \\
-        \\export main() Str {
-        \\    parse_or("[1, 2]", "") + " / " + parse_or("{oops", "bad")
+        \\main {
+        \\    console.log(parse_or("[1, 2]", "") + " / " + parse_or("{oops", "bad"))
         \\    // [1,2] / bad (SyntaxError: ...)
         \\}
+        \\using console from std:Console
     }
     fn fetch_sample() Str {
         \\using Web from std:Web
@@ -124,15 +125,16 @@ mod javascript {
         \\    await response.text()
         \\}
         \\
-        \\export main() Str {
-        \\    load("data:text/plain,hello from fetch")   // hello from fetch
+        \\main {
+        \\    console.log(load("data:text/plain,hello from fetch"))   // hello from fetch
         \\}
+        \\using console from std:Console
     }
     fn timers_sample() Str {
         \\using Web from std:Web
         \\using console from std:Console
         \\
-        \\export main() Void {
+        \\main {
         \\    Web.setTimeout(cl() Void { console.log("later") }, 10)
         \\    console.log(`${Web.crypto.randomUUID().len()}`)   // 36
         \\    let url = new Web.URL("https://example.com/a?page=2")
@@ -146,7 +148,7 @@ mod javascript {
         \\using Fs from "node:fs"
         \\using console from std:Console
         \\
-        \\export main() Void {
+        \\main {
         \\    let id = Nano.nanoid(8)
         \\    let file = Path.join("out", id, "report.txt")
         \\    console.log(`${Path.extname(file)} ${id.len()}`)   // .txt 8

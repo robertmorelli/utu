@@ -1,6 +1,7 @@
 // What: calling a JS-style method name that Str does not have
 // Expect: Unknown method 'Str.toUpperCase' (maybe to_upper)
-export main() I32 {
+main {
     let s = "hi";
-    s.toUpperCase().len();
+    console.log(s.toUpperCase().len());
 }
+using console from std:Console

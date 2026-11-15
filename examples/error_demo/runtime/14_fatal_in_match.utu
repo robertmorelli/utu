@@ -4,6 +4,7 @@ fn step(state: I32) I32 {
     match state { 0 => 1, 1 => 2, ~> fatal, };
 }
 
-export main() I32 {
-    step(step(step(0)));
+main {
+    console.log(step(step(step(0))));
 }
+using console from std:Console

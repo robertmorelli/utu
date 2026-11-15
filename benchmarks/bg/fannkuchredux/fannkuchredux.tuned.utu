@@ -167,6 +167,6 @@ test "fannkuchredux prints BG's output" {
     assert fannkuchredux(7) == 1328886884
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 { fannkuchredux(n) }
 }

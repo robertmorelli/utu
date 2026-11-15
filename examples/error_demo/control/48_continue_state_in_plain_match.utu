@@ -9,6 +9,7 @@ fn steps(n: I32) I32 {
     count;
 }
 
-export main() I32 {
-    steps(0);
+main {
+    console.log(steps(0));
 }
+using console from std:Console

@@ -1,1 +1,2 @@
-export main() I32 { let x: U32 = 1; match x { -1 => 1, ~> 0, }; }
+main { let x: U32 = 1; console.log(match x { -1 => 1, ~> 0, }); }
+using console from std:Console

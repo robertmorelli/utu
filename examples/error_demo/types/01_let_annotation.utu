@@ -1,6 +1,7 @@
 // What: a Str literal bound to a let annotated I32
 // Expect: Type mismatch: expected I32, got Str (pointing at the literal)
-export main() I32 {
+main {
     let count: I32 = "three";
-    count;
+    console.log(count);
 }
+using console from std:Console

@@ -1,6 +1,7 @@
 // What: a closure declares the same parameter name twice
 // Expect: Duplicate parameter 'a'
-export main() I32 {
+main {
     let add = cl(a: I32, a: I32) I32 { a + a; };
-    add(1, 2);
+    console.log(add(1, 2));
 }
+using console from std:Console

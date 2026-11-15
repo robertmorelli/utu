@@ -6,4 +6,5 @@ fn count(s: Stream[?Promise[I32]]) I32 {
     n;
 }
 
-export main() I32 { 0; }
+main { console.log(0); }
+using console from std:Console

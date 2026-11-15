@@ -8,4 +8,5 @@ fn second_name(head: Node) Str {
     return head.next?.name;
 }
 
-export main() Str { second_name(Node { name: "a", next: null }); }
+main { console.log(second_name(Node { name: "a", next: null })); }
+using console from std:Console

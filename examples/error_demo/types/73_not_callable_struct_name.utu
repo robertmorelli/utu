@@ -4,7 +4,8 @@ struct Point:
     | x: F64
     | y: F64
 
-export main() I32 {
+main {
     let p = Point(1.0, 2.0);
-    p.x.i32();
+    console.log(p.x.i32());
 }
+using console from std:Console

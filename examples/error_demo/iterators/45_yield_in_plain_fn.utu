@@ -5,6 +5,7 @@ fn evens(n: I32) I32 {
     0;
 }
 
-export main() I32 {
-    evens(10);
+main {
+    console.log(evens(10));
 }
+using console from std:Console

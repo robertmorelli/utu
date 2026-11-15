@@ -2,6 +2,7 @@
 // Expect: Array takes 1 type arguments, given 0
 fn Array.first |xs| () I32 { xs[0]; }
 
-export main() I32 {
-    0;
+main {
+    console.log(0);
 }
+using console from std:Console

@@ -17,8 +17,8 @@ const cases=[
  ['middle insert: large chunks',()=>checksumString(instances.strings.run(base,asciiPiece(1024),64)),131140],
  ['source analyzer',()=>instances.analyzer.run(analyzer),1301565917],
  ['prime sieve',()=>instances.sieve.run(100000),9592],
- ['DeltaBlue chain',()=>instances.deltablue.main(0,20),0],
- ['DeltaBlue projection',()=>instances.deltablue.main(1,20),0],
+ ['DeltaBlue chain',()=>instances.deltablue.run(0,20),0],
+ ['DeltaBlue projection',()=>instances.deltablue.run(1,20),0],
 ];
 function median(a){const s=[...a].sort((x,y)=>x-y),i=s.length>>1;return s.length%2?s[i]:(s[i-1]+s[i])/2}
 const results={};

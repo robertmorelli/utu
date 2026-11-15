@@ -2,6 +2,7 @@
 // Expect: mem weights: element 1 (0.5) is not an integer; I32 holds integers
 mem weights: I32 = [1, 0.5];
 
-export main() I32 {
-    weights[0];
+main {
+    console.log(weights[0]);
 }
+using console from std:Console

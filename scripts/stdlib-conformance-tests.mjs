@@ -27,7 +27,11 @@ async function compileCases(ROOT, makeCompiler, assertNoErrors, cases, name, imp
 
   const helpers = [...new Set(cases.flatMap((c) => c.helpers ?? []))].join('\n');
   const functions = cases.map((c) => `      fn ${c.name}(${c.params}) ${c.returnType} { ${c.expr}; }`).join('\n');
-  await fs.writeFile(tmp, `${helpers}\nexport lib {\n${functions}\n    }\n`);
+  await fs.writeFile(tmp, `${helpers}
+lib {
+${functions}
+    }
+`);
 
   try {
     const doc = await compiler.compileFile(tmp);

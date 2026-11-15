@@ -7,7 +7,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   test('iterators: fused stages, independent indexes, short circuit, and nested pipelines',async({ROOT})=>{
     const {instance,doc}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterators.utu',source:`
       struct Counter: | value: I32
-      export lib {
+      lib {
         fn fused() I32 { [1,2,3,4,5] map |x| { x*2; } filter |x| {x>4;} skip(1) take(2) fold(0) |a,x| {a+x;}; }
         fn indexes() U64 { let zero: U64 = 0; [4,5,6,7] filter |x| {x>5;} fold(zero) |a,x,i| {a+i;}; }
         fn once() I32 { let c = Counter {value:0}; [1,2,3,4] map |x| {c.value+=1;x;} any |x| {x==2;}; c.value; }
@@ -36,25 +36,25 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   });
   test('iterators: canonical WAT has one fused loop and no intermediate arrays or indirect body calls',async({ROOT})=>{
     const {doc,instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_wat.utu',source:`
-      export main(n: I32) I32 { [n,n+1,n+2] map |x| {x*2;} filter |x| {x>3;} fold(0) |a,x| {a+x;}; }
+      lib { fn run(n: I32) I32 { [n,n+1,n+2] map |x| {x*2;} filter |x| {x>3;} fold(0) |a,x| {a+x;}; } }
     `});
     const wat=await printWat(doc.wasm);
     assertEq((wat.match(/^\s+loop\b/gm)??[]).length,1);
     assertEq((wat.match(/array\.new/g)??[]).length,1,'only the input literal allocates');
     assert(!wat.includes('call_indirect'));assert(!wat.includes('closure_new'));assert(wat.includes('i32.add'));
-    assertEq(instance.exports.main(1),10);
+    assertEq(instance.exports.run(1),10);
   });
   test('iterators: generic module specializations infer their own element types',async({ROOT})=>{
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_generics.utu',source:`
       mod Sum[T] { fn total(xs: Array[T]) T { xs sum; } }
-      export main() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; Sum[I32].total(a).f64()+Sum[F64].total(b); }
+      lib { fn run() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; Sum[I32].total(a).f64()+Sum[F64].total(b); } }
     `});
-    assertEq(instance.exports.main(),7);
+    assertEq(instance.exports.run(),7);
   });
   test('iterators: collection growth, empty results, changed element types and non-defaultable structs',async({ROOT})=>{
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_collect.utu',source:`
       struct Item: | value: I32
-      export lib {
+      lib {
         fn growth() I32 { let a = [1,2,3,4,5] repeat(4) collect(I32); a.len()*100+a[19]; }
         fn empty() I32 { let a = [Item {value:1}] filter |x| {false;} collect(Item); a.len(); }
         fn structs() I32 { let a = [1,2,3] map |x| {Item {value:x};} collect(Item); a[2].value; }
@@ -76,7 +76,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
       const {instance,spec}=await compileAndInstantiateSelfhost({ROOT,name:'wutu_dom.utu',source:`
         using Browser from std:Browser;
         fn unused() Browser.HTMLElement { @wutu/\\ div { color: magenta; "DEAD-COMPONENT"; } \\/; }
-        export main() Browser.HTMLElement {
+        lib { fn run() Browser.HTMLElement {
           @wutu/\\
           div.card {
             color: red;
@@ -90,10 +90,10 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
             if true { p { "present"; } } else { p { "absent"; } }
           }
           \\/;
-        }
+        } }
       `});
       assert(!JSON.stringify(spec).includes('magenta'),'unreachable component styles are absent from shipped glue');
-      const root=instance.exports.main();
+      const root=instance.exports.run();
       assert(root.classList.contains('extra'));assert(root.classList.contains('card'));
       assertEq(root.getAttribute('data-label'),'<b>safe</b>');assertEq(root.querySelectorAll('b').length,0);
       assertEq(root.querySelector('input').value,'hello');assert(!root.querySelector('input').hasAttribute('disabled'));
@@ -102,13 +102,13 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
       const buttons=root.querySelectorAll('button');buttons[0].dispatchEvent(new Event('click'));buttons[1].dispatchEvent(new Event('click'));
       assertEq(buttons[0].textContent,'10');assertEq(buttons[1].textContent,'20');
       assertEq(root.querySelector('p').textContent,'present');assertEq(document.querySelectorAll('style').length,1);
-      instance.exports.main();assertEq(document.querySelectorAll('style').length,1);
+      instance.exports.run();assertEq(document.querySelectorAll('style').length,1);
       assert(!document.head.textContent.includes('magenta'),'unreached component styles are not installed');
     } finally { globalThis.document = previous; }
   });
   test('codegen: local @es functions use unique imports and retain their callable types',async({ROOT})=>{
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'local_es_functions.utu',source:`
-      export lib {
+      lib {
         fn first() I32 { let f: fun(I32) I32 = @es/\\ x => x + 1 \\/; f(10); }
         fn second() I32 { let f: fun(I32) I32 = @es/\\ x => x + 2 \\/; f(10); }
       }
@@ -117,17 +117,17 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   });
   test('syntax diagnostics: invalid pipelines report their site, and Utu islands retain exact ranges',async({ROOT})=>{
     for (const [source,kind,text] of [
-      ['export main() Void { [1,2] map |x| {x;}; }','invalid-iterator-usage','[1,2] map |x| {x;}'],
-      ['export main() I32 { [1] map |x,y,z| {x;} sum; }','invalid-iterator-usage','[1] map |x,y,z| {x;} sum'],
+      ['main { [1,2] map |x| {x;}; }','invalid-iterator-usage','[1,2] map |x| {x;}'],
+      ['lib { fn run() I32 { [1] map |x,y,z| {x;} sum; } }','invalid-iterator-usage','[1] map |x,y,z| {x;} sum'],
     ]) {
       const errors=(await selfhostDiagnostics({ROOT,name:'invalid_new_syntax.utu',source})).filter(d=>d.severity==='error');
       assertEq(errors.length,1,JSON.stringify(errors));assertEq(errors[0].kind,kind);assertEq(errors[0].text,text);
       assert(errors[0].file.endsWith('invalid_new_syntax.utu'));
     }
-    const malformed=await selfhostDiagnostics({ROOT,name:'wutu_missing_delimiter.utu',source:'export main() Void { @wutu/ div {} ; }'});
+    const malformed=await selfhostDiagnostics({ROOT,name:'wutu_missing_delimiter.utu',source:'main { @wutu/ div {} ; }'});
     assert(malformed.some(d=>d.kind==='parse-error'),'malformed DSL reports syntax error instead of crashing expansion');
     // Wutu templates are the self-hosted compiler's: an expression in one keeps its exact range.
-    const source='using Browser from std:Browser; export main() Void { @wutu/\\ div { = unknown_value; } \\/; }';
+    const source='using Browser from std:Browser; main { @wutu/\\ div { = unknown_value; } \\/; }';
     const problem=(await selfhostDiagnostics({ROOT,name:'wutu_ranges.utu',source})).find(d=>d.kind==='unknown-variable');
     assert(problem,'expected an unknown variable diagnostic');
     assertEq(problem.text,'unknown_value');

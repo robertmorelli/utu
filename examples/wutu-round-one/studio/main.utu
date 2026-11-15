@@ -85,7 +85,7 @@ fn workspace(state: StudioState) Browser.HTMLElement {
     }
     \/
 }
-export main() Void {
+main {
     let state = @stored/\
         StudioState "studio-v2" manual
         StudioState {

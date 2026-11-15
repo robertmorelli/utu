@@ -157,6 +157,6 @@ test "fasta 1000 is BG's output" {
     assert run(1000) == 1656148202
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 { run(n) }
 }

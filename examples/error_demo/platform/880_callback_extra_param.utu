@@ -2,6 +2,6 @@
 // Expect: Callback takes 2 parameters; JS passes 1
 using Browser from std:Browser;
 
-export main() Void {
+main {
     Browser.window.requestAnimationFrame(cl(time, frame) Void { Browser.console.log(time + frame); });
 }

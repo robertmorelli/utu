@@ -8,7 +8,9 @@ const dir = mkdtempSync(path.join(tmpdir(), 'utu-mem-trap-'));
 try {
   for (const [name, body] of [['read', 'bytes[1];'], ['write', 'bytes[1] = 3;']]) {
     const file = path.join(dir, `${name}.utu`);
-    writeFileSync(file, `mem bytes: U8;\nexport main() Void { bytes.resize(1); ${body} }\n`);
+    writeFileSync(file, `mem bytes: U8;
+main { bytes.resize(1); ${body} }
+`);
     for (const mode of ['small', 'fast']) {
       const run = spawnSync(process.execPath, ['cli/utu.mjs', 'run', file, '-O', mode], { encoding: 'utf8', timeout: 600_000 });
       assert.equal(run.status, 1, `${name} ${mode}: ${run.stderr}`);

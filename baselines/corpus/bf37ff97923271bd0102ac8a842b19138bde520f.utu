@@ -1,2 +1,3 @@
 fn f(x: Nope) I32 { 1; }
-export main() I32 { f(2); }
+main { console.log(f(2)); }
+using console from std:Console

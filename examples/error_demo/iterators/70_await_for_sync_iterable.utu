@@ -11,8 +11,9 @@ mod Counter {
     fn &.close |self| (it: I32) Void { }
 }
 
-export main() I32 {
+main {
     let total = 0;
     await for (Counter.new(3)) |v| { total += v; };
-    total;
+    console.log(total);
 }
+using console from std:Console

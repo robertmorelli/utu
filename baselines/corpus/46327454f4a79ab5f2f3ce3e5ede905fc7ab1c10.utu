@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
           fn whiles() I32 {
               let i = 0;
               let s = 0;

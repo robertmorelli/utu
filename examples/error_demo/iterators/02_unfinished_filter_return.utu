@@ -4,6 +4,7 @@ fn evens(xs: Array[I32]) Array[I32] {
     xs filter |n| { n % 2 == 0; };
 }
 
-export main() I32 {
-    evens([1, 2, 3, 4]).len();
+main {
+    console.log(evens([1, 2, 3, 4]).len());
 }
+using console from std:Console

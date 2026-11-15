@@ -1,2 +1,3 @@
 fn f() .{I32, I32} { .{1, 2}; }
-export main() I32 { let xs = [f(), f()]; 1; }
+main { let xs = [f(), f()]; console.log(1); }
+using console from std:Console

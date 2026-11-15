@@ -1,6 +1,6 @@
 
       struct Counter: | value: I32
-      export lib {
+      lib {
         fn fused() I32 { [1,2,3,4,5] map |x| { x*2; } filter |x| {x>4;} skip(1) take(2) fold(0) |a,x| {a+x;}; }
         fn indexes() U64 { let zero: U64 = 0; [4,5,6,7] filter |x| {x>5;} fold(zero) |a,x,i| {a+i;}; }
         fn once() I32 { let c = Counter {value:0}; [1,2,3,4] map |x| {c.value+=1;x;} any |x| {x==2;}; c.value; }

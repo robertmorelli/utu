@@ -10,7 +10,7 @@ struct Prefs:
     | name: Str
     | theme: Theme
 
-export main() Void {
+main {
     let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", theme: Light {} } \/;
     Browser.console.log(prefs.name);
 }

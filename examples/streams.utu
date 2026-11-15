@@ -25,7 +25,7 @@ fn total(s: Stream[I32]) I32 {
     sum
 }
 
-export lib {
+lib {
     // Made, transformed, and read in utu.
     fn evens() I32 {
         total(Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { v % 2 == 0 }).map(cl(v) { v * 10 }))

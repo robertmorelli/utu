@@ -7,6 +7,7 @@ fn waits() I32 {
     await fetch_n(3);
 }
 
-export main() I32 {
-    call(waits);
+main {
+    console.log(call(waits));
 }
+using console from std:Console

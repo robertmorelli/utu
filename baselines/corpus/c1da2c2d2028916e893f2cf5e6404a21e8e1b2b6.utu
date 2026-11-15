@@ -1,9 +1,9 @@
 using Browser from std:Browser;
 struct S:
     | n: I32
-export main() Browser.HTMLElement {
+main {
     let s = S { n: 1 };
-    @wutu/\
+    Browser.document.body.append(@wutu/\
     @reactive;
     div {
         title = 42;
@@ -12,5 +12,5 @@ export main() Browser.HTMLElement {
         input { bind:value = s.n; }
         if s.n { "x"; }
     }
-    \/;
+    \/);
 }

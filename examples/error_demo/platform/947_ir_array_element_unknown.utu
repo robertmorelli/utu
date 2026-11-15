@@ -4,6 +4,7 @@ mod Bag {
     type & = @ir/\ <ir-wasm-array type-repr="wasm-array:elem=Item:mut=true"/> \/
 }
 
-export main() I32 {
-    1;
+main {
+    console.log(1);
 }
+using console from std:Console

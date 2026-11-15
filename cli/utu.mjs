@@ -336,12 +336,12 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
       return trap(error, file, built, utu);
     });
   if (typeof exports.main !== 'function') {
-    // `fn main` without export: that one; a library: what it exports.
+    // `fn main`, a function: that one; a library: what it exports.
     const text = await fs.readFile(file, 'utf8');
     const at = /^[ \t]*fn\s+main\s*\(/m.exec(text);
     const names = Object.keys(exports).filter(name => typeof exports[name] === 'function');
-    if (at) fail(`fn main at ${displayPath(file)}:${text.slice(0, at.index).split('\n').length} is not exported`, 'no-main', ['Write export main() to run it.']);
-    fail(`No export main in ${displayPath(file)}`, 'no-main', names.length ? [`It exports ${names.join(', ')}: utu build makes a module of them.`] : []);
+    if (at) fail(`fn main at ${displayPath(file)}:${text.slice(0, at.index).split('\n').length} is a function, not the program`, 'no-main', ['Write main { … } to run it.']);
+    fail(`No main in ${displayPath(file)}`, 'no-main', names.length ? [`Its lib exports ${names.join(', ')}: utu build makes a module of them.`] : []);
   }
   // A main with parameters is for a host that passes them; run passes none.
   // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
@@ -731,7 +731,7 @@ async function buildExe(file, { utu, optimize, safe, out }) {
   const { glueSource, loaderSource, moduleFunctions } = await import('../src/selfhost/loader.js');
   // The executable calls main: without one it would do nothing (utu run says so too).
   if (!moduleFunctions(wasm).includes('main')) {
-    fail(`No export main in ${displayPath(file)}`, 'no-main', ['An executable runs main; utu build makes a module for a library.']);
+    fail(`No main in ${displayPath(file)}`, 'no-main', ['An executable runs main; utu build makes a module for a library.']);
   }
   const target = path.resolve(out ?? path.basename(file, '.utu'));
   // Not over a directory, nor a file that is not to be written (bun would replace it).
@@ -748,10 +748,7 @@ async function buildExe(file, { utu, optimize, safe, out }) {
     wasm: `Uint8Array.from(atob(${JSON.stringify(Buffer.from(wasm).toString('base64'))}), c => c.charCodeAt(0))`,
   });
   const runner = path.join(dir, 'runner.mjs');
-  // A main that returns I32 gives the exit status; any other result is printed.
-  const status = /export\s+main\s*\([^)]*\)\s*I32\b/.test(await fs.readFile(file, 'utf8'));
-  const finish = status ? 'process.exitCode = result' : 'if (result !== undefined) console.log(result)';
-  await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') {\n  const result = await exports.main();\n  ${finish};\n}\n`);
+  await fs.writeFile(runner, `${loader}if (typeof exports.main === 'function') await exports.main();\n`);
   const { spawnSync } = await import('node:child_process');
   const result = spawnSync('bun', ['build', runner, '--compile', '--outfile', target], { cwd: process.cwd(), stdio: 'inherit' });
   await fs.rm(dir, { recursive: true, force: true });

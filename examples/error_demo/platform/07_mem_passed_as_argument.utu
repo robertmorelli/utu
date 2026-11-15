@@ -6,7 +6,8 @@ fn total(xs: Array[F64]) F64 {
     xs fold(0.0) |s, x| { s + x; };
 }
 
-export main() F64 {
+main {
     samples.push(1.5);
-    total(samples);
+    console.log(total(samples));
 }
+using console from std:Console

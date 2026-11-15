@@ -9,6 +9,7 @@ mod Stack[T] {
 
 fn depth(s: Stack) I32 { s.size; }
 
-export main() I32 {
-    depth(Stack[I32].new(0));
+main {
+    console.log(depth(Stack[I32].new(0)));
 }
+using console from std:Console

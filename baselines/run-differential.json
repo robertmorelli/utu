@@ -140,8 +140,10 @@
  "baselines/corpus/07e08ab9073c710ecc7802c81475f889724b820e.utu normal": {
   "calls": {
    "main": {
-    "result": 1,
-    "printed": []
+    "result": null,
+    "printed": [
+     "true"
+    ]
    }
   }
  },
@@ -683,8 +685,10 @@
  "baselines/corpus/2d906d778959733a2d5aac8bf9a07d22d6776dde.utu normal": {
   "calls": {
    "main": {
-    "result": 3,
-    "printed": []
+    "result": null,
+    "printed": [
+     "3"
+    ]
    }
   }
  },
@@ -1304,8 +1308,10 @@
  "baselines/corpus/51001d8392252df239785676a3cfa85b6bb71c60.utu normal": {
   "calls": {
    "main": {
-    "result": 10,
-    "printed": []
+    "result": null,
+    "printed": [
+     "10"
+    ]
    }
   }
  },
@@ -2178,8 +2184,10 @@
  "baselines/corpus/7d666c9dfaa3f350dc7a28a41585b0871a247444.utu normal": {
   "calls": {
    "main": {
-    "result": 1,
-    "printed": []
+    "result": null,
+    "printed": [
+     "true"
+    ]
    }
   }
  },
@@ -2548,8 +2556,10 @@
  "baselines/corpus/92bdddcf5c08d35f41d4854afa9e6d2f4e5db40f.utu normal": {
   "calls": {
    "main": {
-    "result": "ce9682d5f1fade3ea673bd5af612080071baa8ef1ba624074d152a925350de98",
-    "printed": []
+    "result": null,
+    "printed": [
+     "ce9682d5f1fade3ea673bd5af612080071baa8ef1ba624074d152a925350de98"
+    ]
    }
   }
  },
@@ -2687,8 +2697,10 @@
  "baselines/corpus/9a0ac119da8142da862eac10415337f0b7bf5eb1.utu normal": {
   "calls": {
    "main": {
-    "result": "\u001b[1m\u001b[31merror\u001b[39m\u001b[22m",
-    "printed": []
+    "result": null,
+    "printed": [
+     "\u001b[1m\u001b[31merror\u001b[39m\u001b[22m"
+    ]
    }
   }
  },
@@ -2903,8 +2915,10 @@
  "baselines/corpus/a49206d206ad84e2cc9ffb202d9b0f5340c9082a.utu normal": {
   "calls": {
    "main": {
-    "result": 102,
-    "printed": []
+    "result": null,
+    "printed": [
+     "102"
+    ]
    }
   }
  },
@@ -3340,8 +3354,10 @@
  "baselines/corpus/bb74dfa07e7f6f5df6ce89af07e19c4f819e0eaf.utu normal": {
   "calls": {
    "main": {
-    "result": "utu",
-    "printed": []
+    "result": null,
+    "printed": [
+     "utu"
+    ]
    }
   }
  },
@@ -3744,8 +3760,10 @@
  "baselines/corpus/d435f6fe29d06e1a921ed2e80d64f5dfd10e88e9.utu normal": {
   "calls": {
    "main": {
-    "result": 7200000,
-    "printed": []
+    "result": null,
+    "printed": [
+     "7200000"
+    ]
    }
   }
  },
@@ -4507,8 +4525,10 @@
  "baselines/corpus/fcd6630948b89737c59153f5c7845107124b3ccf.utu normal": {
   "calls": {
    "main": {
-    "result": "usr/local",
-    "printed": []
+    "result": null,
+    "printed": [
+     "usr/local"
+    ]
    }
   }
  },
@@ -5384,8 +5404,10 @@
  "examples/fannkuch.utu normal": {
   "calls": {
    "main": {
-    "result": 10,
-    "printed": []
+    "result": null,
+    "printed": [
+     "10"
+    ]
    }
   }
  },

@@ -14,7 +14,7 @@ const sample = `using Browser from std:Browser;
 struct State:
     | count: I32
 
-export main() void {
+main {
     let state = State { count: 0 };
     Browser.document.body.append(@wutu/\\
     @reactive;

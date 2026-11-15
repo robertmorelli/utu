@@ -70,8 +70,9 @@ static bool statement_end(TSLexer *l) {
     else if (iswspace(l->lookahead)) l->advance(l, true);
     else if (l->lookahead == '/') {
       l->advance(l, true);
-      // A comment ends its line; `/` that begins no comment divides: it goes on.
-      if (l->lookahead != '/') return false;
+      // A comment ends its line; `/` that begins no comment divides: it goes on
+      // (`/=`, an assignment, does not).
+      if (l->lookahead != '/') return line && l->lookahead == '=';
       while (!l->eof(l) && l->lookahead != '\n') l->advance(l, true);
     } else break;
   }
@@ -80,7 +81,18 @@ static bool statement_end(TSLexer *l) {
   int32_t c = l->lookahead;
   switch (c) {
     // (`\\` goes on a multiline string.)
-    case '+': case '*': case '%': case '^': case '|': case '<': case '>': case '{': case '\\': return false;
+    case '{': case '\\': return false;
+    // An operator goes on; an assignment (`+=`, `>>=`) is a statement of its own.
+    case '+': case '*': case '%': case '^': case '|':
+      l->advance(l, false);
+      return l->lookahead == '=';
+    case '<': case '>':
+      l->advance(l, false);
+      if (l->lookahead == '=') return false;
+      if (l->lookahead != c) return false;
+      l->advance(l, false);
+      if (c == '>' && l->lookahead == '>') l->advance(l, false);
+      return l->lookahead == '=';
     case '.': l->advance(l, false); return l->lookahead == '{';
     case '?': l->advance(l, false); return l->lookahead != '.';
     case '=': case '!': l->advance(l, false); return l->lookahead != '=';

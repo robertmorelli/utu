@@ -428,7 +428,7 @@ fn diag_text(i: I32) Str {
     let node = diag_node[i]
     match k {
         Diag.UnknownVariable => {
-            // `export main` is the module's entry, not a function the program (or a @comptime build) can call.
+            // `main` is the module's entry, not a function the program (or a @comptime build) can call.
             if w == "main" and is_callee(node) { return "main is the entry point, not a function: move its body into a fn" }
             pick(is_callee(node), "Unknown function ", "Unknown variable ") + w + did_you_mean(i)
         },

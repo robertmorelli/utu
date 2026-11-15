@@ -7,6 +7,7 @@ fn first_even(xs: Array[I32]) I32 {
     -1;
 }
 
-export main() I32 {
-    first_even([1, 4]);
+main {
+    console.log(first_even([1, 4]));
 }
+using console from std:Console

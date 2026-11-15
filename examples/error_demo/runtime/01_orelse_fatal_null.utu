@@ -4,7 +4,8 @@ fn find_user(id: I32) ?Str {
     if id == 1 { "ada"; } else { null; };
 }
 
-export main() I32 {
+main {
     let name = find_user(2) orelse fatal;
-    name.len();
+    console.log(name.len());
 }
+using console from std:Console

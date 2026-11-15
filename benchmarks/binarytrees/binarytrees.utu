@@ -57,7 +57,7 @@ test "binary trees counts its nodes" {
     assert bottom_up_tree(3).check() == 15
 }
 
-export lib {
+lib {
     fn bench(iterations: I32) I64 {
         let sink: I64 = 0
         for (0..<iterations) { sink += binary_trees() }

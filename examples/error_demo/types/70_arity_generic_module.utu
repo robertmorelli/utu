@@ -6,7 +6,8 @@ mod Box[T] {
     fn &.new(v: T) & { &{ value: v }; }
 }
 
-export main() I32 {
+main {
     let b = Box[I32, Str].new(1);
-    b.value;
+    console.log(b.value);
 }
+using console from std:Console

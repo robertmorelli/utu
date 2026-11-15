@@ -1,6 +1,7 @@
 // What: one below I64's least value
 // Expect: -9223372036854775809 does not fit I64 (it once wrapped to I64's largest)
-export main() I64 {
+main {
     let least: I64 = -9223372036854775809;
-    least;
+    console.log(least);
 }
+using console from std:Console

@@ -7,6 +7,7 @@ struct Person:
     | name: Str
     | home: Adress
 
-export main() I32 {
-    0;
+main {
+    console.log(0);
 }
+using console from std:Console

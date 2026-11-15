@@ -39,7 +39,7 @@ fn sleepy() I32 {
     v
 }
 
-export main() I32 {
+main {
     probe("main")
     down(2)
     apply(cl(x) { probe("closure"); x + 1 }, 1)
@@ -49,5 +49,6 @@ export main() I32 {
     try { guarded() } catch { probe("caught") }
     early(3)
     probe("after-early")
-    sleepy()
+    console.log(sleepy())
 }
+using console from std:Console

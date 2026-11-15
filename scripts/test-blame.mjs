@@ -44,13 +44,13 @@ tag struct Pair:
 
 fn toks() Array[Tok] { [Num { value: 3 }, End {}]; }
 
-export main() I32 {
+lib { fn run() I32 {
     let p = Pair { x: 1, y: 2 };
     toks().len() + p.x + p.y;
-}
+} }
 `);
 const labels = new Set((await compileFile(utu, named, { ...MODES.small, blame: true })).blame.decls.map(d => d.name));
 fs.rmSync(dir, { recursive: true, force: true });
-for (const name of ['Tok', 'Pair', 'toks', 'main']) assert.ok(labels.has(name), `a declaration named ${name}: ${[...labels]}`);
+for (const name of ['Tok', 'Pair', 'toks', 'run']) assert.ok(labels.has(name), `a declaration named ${name}: ${[...labels]}`);
 assert.ok(!labels.has('tag'), `none named for its modifier: ${[...labels]}`);
 console.log(`blame: ${checked} builds, every byte blamed once, modules unchanged, declarations by name`);

@@ -1,4 +1,4 @@
-export lib {
+lib {
   fn run(n: I32) I32 {
     let flags: Array[I32] = Array[I32].new(n, 1)
     if n > 0 { flags[0] = 0 }

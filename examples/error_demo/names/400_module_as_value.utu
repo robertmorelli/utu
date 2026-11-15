@@ -4,7 +4,8 @@ mod shapes {
     fn area(w: I32, h: I32) I32 { w * h; }
 }
 
-export main() I32 {
+main {
     let s = shapes;
-    0;
+    console.log(0);
 }
+using console from std:Console

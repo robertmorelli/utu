@@ -4,6 +4,7 @@ fn lookup(key: ?I32) I32 {
     key orelse -1;
 }
 
-export main() I32 {
-    lookup(4);
+main {
+    console.log(lookup(4));
 }
+using console from std:Console

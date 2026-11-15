@@ -8,6 +8,6 @@ fn log_twice(s: Str) Void {
     return 1;
 }
 
-export main() Void {
+main {
     log_twice("hi");
 }

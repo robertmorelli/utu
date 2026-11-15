@@ -4,6 +4,7 @@ fn greet(name: Strng) Str {
     "hello " + name;
 }
 
-export main() I32 {
-    greet("ada").len();
+main {
+    console.log(greet("ada").len());
 }
+using console from std:Console

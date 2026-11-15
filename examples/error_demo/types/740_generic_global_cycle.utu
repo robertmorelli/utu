@@ -10,4 +10,5 @@ mod Q[T] {
     fn y() I32 { y0; }
 }
 
-export main() I32 { P[I32].get(); }
+main { console.log(P[I32].get()); }
+using console from std:Console

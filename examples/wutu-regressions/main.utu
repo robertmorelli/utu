@@ -70,7 +70,7 @@ fn icon(state: State) Browser.SVGElement {
     \/
 }
 
-export main() Void {
+main {
     ticks.push(0)
     let state = State {
         n: 0,

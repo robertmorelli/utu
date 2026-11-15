@@ -4,6 +4,7 @@ fn name(x: F64) Str {
     match x { 0.0 => "zero", 1.0 => "one", };
 }
 
-export main() Str {
-    name(0.5);
+main {
+    console.log(name(0.5));
 }
+using console from std:Console

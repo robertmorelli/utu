@@ -5,8 +5,9 @@ struct Account:
 
 fn Account.deposit |a| (amount: F64) Void { a.balance += amount; }
 
-export main() I32 {
+main {
     let acct = Account { balance: 0.0 };
     acct.deposit("100");
-    0;
+    console.log(0);
 }
+using console from std:Console

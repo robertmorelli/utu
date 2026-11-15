@@ -5,4 +5,4 @@ mod report {
     fn show(n: I32) Void { console.log(n.str()); }
 }
 
-export main() Void { report.show(3); }
+main { report.show(3); }

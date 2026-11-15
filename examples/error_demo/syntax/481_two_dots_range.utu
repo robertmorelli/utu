@@ -1,5 +1,6 @@
 // What: a range written `0..5`, which utu does not have.
 // Expect: Write ..< (end left out) or ... (end kept), not ..
-export main() I32 {
-    (0..5) count;
+main {
+    console.log((0..5) count);
 }
+using console from std:Console

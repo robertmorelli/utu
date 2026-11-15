@@ -5,11 +5,12 @@ iterator objects, closures, or a runtime operator library. A contiguous pipeline
 is consumed immediately by a terminal operation.
 
 ```utu
-export main() I32 {
-    [1, 2, 3, 4, 5]
+using console from std:Console
+main {
+    console.log([1, 2, 3, 4, 5]
         map |n| { n * 2 }
         filter |n| { n > 4 }
-        fold (0) |total, n| { total + n }
+        fold (0) |total, n| { total + n })
 }
 ```
 

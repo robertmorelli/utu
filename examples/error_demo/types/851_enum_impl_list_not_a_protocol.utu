@@ -4,6 +4,7 @@ enum Light[I32]:
     | Red
     | Green
 
-export main() I32 {
-    1;
+main {
+    console.log(1);
 }
+using console from std:Console

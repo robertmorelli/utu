@@ -8,6 +8,7 @@ fn make_table(n: I32) Array[I32] {
 
 const mem squares: I32 = @comptime/\ make_tabel(16) \/;
 
-export main() I32 {
-    squares[3];
+main {
+    console.log(squares[3]);
 }
+using console from std:Console

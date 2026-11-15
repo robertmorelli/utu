@@ -8,4 +8,5 @@ fn sum_to(n: I32) I32 {
     total;
 }
 
-export main() I32 { sum_to(10); }
+main { console.log(sum_to(10)); }
+using console from std:Console

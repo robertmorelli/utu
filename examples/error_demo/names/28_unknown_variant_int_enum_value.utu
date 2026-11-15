@@ -5,7 +5,8 @@ enum(U8) Color:
     | Green
     | Blue
 
-export main() I32 {
+main {
     let c = Color.Purple;
-    c.i32();
+    console.log(c.i32());
 }
+using console from std:Console

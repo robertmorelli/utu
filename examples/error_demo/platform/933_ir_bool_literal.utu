@@ -4,6 +4,7 @@ fn yes() Bool {
     @ir/\ <ir-lit kind="bool" type-name="Bool" value="2"/> \/;
 }
 
-export main() Bool {
-    yes();
+main {
+    console.log(yes());
 }
+using console from std:Console

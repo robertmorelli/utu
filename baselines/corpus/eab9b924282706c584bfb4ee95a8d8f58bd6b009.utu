@@ -6,7 +6,8 @@ fn score(point: Point) I32 {
     point.x * point.x + point.y * point.y;
 }
 
-export main() I32 {
+main {
     let point: Point = Point { x: 3, y: 4 };
-    score(point);
+    console.log(score(point));
 }
+using console from std:Console

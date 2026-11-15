@@ -12,7 +12,7 @@ using Browser from std:Browser;
             }
             \/;
           }
-          export lib {
+          lib {
             fn make(pct: I32) Gauge { Gauge { pct: pct }; }
             fn render(g: Gauge) Browser.HTMLElement { view(g); }
             fn set(g: Gauge, pct: I32) Void { g.pct = pct; wutu.refresh(); }

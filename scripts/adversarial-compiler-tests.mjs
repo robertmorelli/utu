@@ -6,7 +6,7 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
       name: 'adversarial_contexts.utu', source: `
         struct Cell:
           | value : I32
-        export lib {
+        lib {
           fn nested(a: Bool, b: Bool) ?Cell {
             if a { if b { null; } else { Cell { value: 7 }; }; } else { null; };
           }
@@ -33,7 +33,7 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
     await withTempUtu(ROOT, 'adversarial_nullable_generic.utu', `
       struct Cell:
         | value : I32
-      export lib {
+      lib {
         fn make() Array[?Cell] { Array[?Cell].new_default(2); }
       }
     `, async file => {
@@ -54,7 +54,7 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
           item.value = 9;
           item.value;
         }
-        export lib {
+        lib {
           fn run() I32 {
             let cell: Cell = Cell { value: 1 };
             update(cell);
@@ -71,23 +71,31 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
           struct &: | left : A | right : B
           fn &.new(left: A, right: B) & { &{ left: left, right: right }; }
         }
-        export lib { fn bad() Pair[I32] { Pair[I32].new(1, 2); } }
+        lib { fn bad() Pair[I32] { Pair[I32].new(1, 2); } }
       `],
       ['non-defaultable-type', `
         struct Cell: | value : I32
-        export lib { fn bad() Array[Cell] { Array[Cell].new_default(1); } }
+        lib { fn bad() Array[Cell] { Array[Cell].new_default(1); } }
       `],
-      ['invalid-nullable-type', `export lib { fn bad() ?I32 { null; } }`],
-      ['invalid-nullable-type', `export lib { fn bad() Void { null; } }`],
-      ['unknown-field', `struct Cell: | value : I32\nexport lib { fn bad() Cell { Cell { value: 1, extra: 2 }; } }`],
-      ['duplicate-field', `struct Cell: | value : I32 | value : F32\nexport lib { fn ok() I32 { 1; } }`],
-      ['duplicate-declaration', `tag enum Choice: | A | A\nexport lib { fn ok() I32 { 1; } }`],
-      ['duplicate-declaration', `export lib { fn bad(x: I32, x: I32) I32 { x; } }`],
-      ['duplicate-declaration', `fn x() I32 { 1; } fn x() I32 { 2; } export lib { fn bad() I32 { x(); } }`],
-      ['duplicate-declaration', `export lib { fn bad(x: I32) I32 { match x { 1 => 2, 1 => 3, ~> 4, }; } }`],
-      ['unknown-method', `proto P: | value() I32\ntag struct Cell[P]: | value : I32\nexport lib { fn bad(p: P) I32 { p.value(); } }`],
-      ['type-mismatch', `proto P: | value() I32\ntag struct Cell[P]: | value : I32\nfn P[Cell].value |self| (extra: I32) I32 { extra; }\nexport lib { fn bad(p: P) I32 { p.value(); } }`],
-      ['integer-literal-out-of-range', `export lib { fn bad() I32 { 2147483648; } }`],
+      ['invalid-nullable-type', `lib { fn bad() ?I32 { null; } }`],
+      ['invalid-nullable-type', `lib { fn bad() Void { null; } }`],
+      ['unknown-field', `struct Cell: | value : I32
+lib { fn bad() Cell { Cell { value: 1, extra: 2 }; } }`],
+      ['duplicate-field', `struct Cell: | value : I32 | value : F32
+lib { fn ok() I32 { 1; } }`],
+      ['duplicate-declaration', `tag enum Choice: | A | A
+lib { fn ok() I32 { 1; } }`],
+      ['duplicate-declaration', `lib { fn bad(x: I32, x: I32) I32 { x; } }`],
+      ['duplicate-declaration', `fn x() I32 { 1; } fn x() I32 { 2; } lib { fn bad() I32 { x(); } }`],
+      ['duplicate-declaration', `lib { fn bad(x: I32) I32 { match x { 1 => 2, 1 => 3, ~> 4, }; } }`],
+      ['unknown-method', `proto P: | value() I32
+tag struct Cell[P]: | value : I32
+lib { fn bad(p: P) I32 { p.value(); } }`],
+      ['type-mismatch', `proto P: | value() I32
+tag struct Cell[P]: | value : I32
+fn P[Cell].value |self| (extra: I32) I32 { extra; }
+lib { fn bad(p: P) I32 { p.value(); } }`],
+      ['integer-literal-out-of-range', `lib { fn bad() I32 { 2147483648; } }`],
     ];
 
     for (const target of ['analysis', 'normal']) {

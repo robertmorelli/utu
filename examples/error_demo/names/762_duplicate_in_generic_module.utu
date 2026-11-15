@@ -5,6 +5,7 @@ mod Box[T] {
     fn size() I32 { 2; }
 }
 
-export main() I32 {
-    Box[I32].size();
+main {
+    console.log(Box[I32].size());
 }
+using console from std:Console

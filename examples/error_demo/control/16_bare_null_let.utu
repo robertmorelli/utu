@@ -1,6 +1,7 @@
 // What: binds null with no type annotation.
 // Expect: Bare null requires a nullable type context: write let current: ?T = null
-export main() I32 {
+main {
     let current = null;
-    0;
+    console.log(0);
 }
+using console from std:Console

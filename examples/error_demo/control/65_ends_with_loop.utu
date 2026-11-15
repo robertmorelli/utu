@@ -5,6 +5,7 @@ fn join(xs: Array[Str]) Str {
     for (xs) |x| { out = out + x; };
 }
 
-export main() Str {
-    join(["a", "b"]);
+main {
+    console.log(join(["a", "b"]));
 }
+using console from std:Console

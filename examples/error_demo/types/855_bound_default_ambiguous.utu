@@ -16,6 +16,7 @@ mod Run[T[A, B]] {
     fn go(c: T) I32 { c.t(); }
 }
 
-export main() I32 {
-    Run[S].go(S { n: 0 });
+main {
+    console.log(Run[S].go(S { n: 0 }));
 }
+using console from std:Console

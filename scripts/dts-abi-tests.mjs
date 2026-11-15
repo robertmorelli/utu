@@ -80,7 +80,7 @@ await test('the CLI writes a portable ABI file that programs import directly', a
   execFileSync(process.execPath, [path.join(ROOT, 'tools/dts/cli.mjs'), '--input', path.join(ROOT, 'scripts/fixtures/dts/targets.d.ts'),
     '--module', fixtureModule, '--prefix', 'Cli', '--out', out]);
   const file = path.join(out, 'Cli.abi.json');
-  const { instance } = await compile(`using Cli from "${file}"; export lib { fn run() F64 { Cli.optional(21.0); } }`);
+  const { instance } = await compile(`using Cli from "${file}"; lib { fn run() F64 { Cli.optional(21.0); } }`);
   assert.equal(instance.exports.run(), 42);
 });
 await test('a tuple names its element parameters by position, and a union enum is marked', async () => {
@@ -103,7 +103,7 @@ await test('"npm:" and "node:" imports link packages from node_modules and cache
   await fs.rm(cacheDir, { recursive: true, force: true });
   const resolvePackage = nodePackageResolver({ root: ROOT, cacheDir });
   const source = `using Nano from "npm:nanoid"; using Path from "node:path"; using Floating from "npm:@floating-ui/dom";
-    export lib {
+    lib {
       fn id() I32 { Nano.nanoid(9).len(); }
       fn file() Str { Path.join("a", "b.txt"); }
       fn middleware() Str { Floating.offset(4).name; }
@@ -118,10 +118,10 @@ await test('"npm:" and "node:" imports link packages from node_modules and cache
   }
   assert.equal((await fs.readdir(cacheDir)).length, 3, 'one cached declaration graph per package');
   // A package that cannot be linked, or no resolver to link it, leaves the import unresolved: no module.
-  const missing = await buildProgram('using Nope from "npm:utu-no-such-package"; export main() Void {}', { resolvePackage });
+  const missing = await buildProgram('using Nope from "npm:utu-no-such-package"; main {}', { resolvePackage });
   assert.equal(missing.wasm, null);
   assert.deepEqual(missing.errors, ['No declarations for npm:utu-no-such-package; is it installed?']);
-  const unresolved = await buildProgram('using Nano from "npm:nanoid"; export main() Void {}', { resolvePackage: null });
+  const unresolved = await buildProgram('using Nano from "npm:nanoid"; main {}', { resolvePackage: null });
   assert.equal(unresolved.wasm, null);
   assert.deepEqual(unresolved.errors, ['No declarations for npm:nanoid; is it installed?']);
 });
@@ -142,7 +142,7 @@ await test('package resolution runs over an in-memory file system', () => {
 const fixture = link('scripts/fixtures/dts/targets.d.ts', 'Fixture', fixtureModule);
 await test('portable Wasm import scanning matches host reflection and rejects truncation', async () => {
   const { wasmImports } = await import('../src/runtime/wasm-imports.js');
-  const { wasm } = await compile('using Fixture from std:Fixture; export lib { fn run() Bool { Fixture.flip(false); } }', [fixture]);
+  const { wasm } = await compile('using Fixture from std:Fixture; lib { fn run() Bool { Fixture.flip(false); } }', [fixture]);
   const expected = WebAssembly.Module.imports(await WebAssembly.compile(wasm)).map(({ module, name }) => ({ module, name }));
   assert.deepEqual(wasmImports(wasm).map(({ module, name }) => ({ module, name })), expected);
   const padded = new Uint8Array(wasm.length + 10); padded.set(wasm, 5);
@@ -154,7 +154,7 @@ await test('portable Wasm import scanning matches host reflection and rejects tr
 });
 await test('package members are named imports that bundlers tree-shake', async () => {
   const floating = link('node_modules/@floating-ui/dom/dist/floating-ui.dom.d.ts', 'Floating', '@floating-ui/dom');
-  const { instance, glue } = await compile('using Floating from std:Floating; export lib { fn run() Str { Floating.offset(12.0).name; } }', [floating]);
+  const { instance, glue } = await compile('using Floating from std:Floating; lib { fn run() Str { Floating.offset(12.0).name; } }', [floating]);
   assert.equal(instance.exports.run(), 'offset');
   assert.match(glue, /import \{ "offset" as /);
   assert(!glue.includes('computePosition'));
@@ -166,7 +166,7 @@ await test('1,000 unused declarations add zero Wasm or live-glue bytes', async (
   async function variant(extra) {
     await fs.writeFile(file, 'export declare function optional(value: number): number;\n' + extra);
     const size = linkFiles({ files: [file], prefix: 'Size', moduleSpecifier: fixtureModule });
-    const result = await compile('using Size from std:Size; export lib { fn run() F64 { Size.optional(21.0); } }', [size]);
+    const result = await compile('using Size from std:Size; lib { fn run() F64 { Size.optional(21.0); } }', [size]);
     assert.equal(result.instance.exports.run(), 42);
     return result;
   }
@@ -178,7 +178,7 @@ await test('1,000 unused declarations add zero Wasm or live-glue bytes', async (
   } finally { await fs.unlink(file); }
 });
 await test('operations differing only in host types share one import', async () => {
-  const { glue } = await compile(`using Browser from std:Browser; export lib { fn run() Void {
+  const { glue } = await compile(`using Browser from std:Browser; lib { fn run() Void {
     let document = Browser.document;
     let div = document.createElement("div"); let input = document.createElement("input"); let span = document.createElement("span");
     div.append(input, span); input.append(span, div); document.body.append(div, input);
@@ -186,7 +186,7 @@ await test('operations differing only in host types share one import', async () 
   assert.equal((glue.match(/\.append\(|\["append"\]\(/g) ?? []).length, 1, glue);
 });
 await test('-Oz shares one import per host operation shape; -O3 specializes each name', async () => {
-  const source = `using Browser from std:Browser; export lib { fn run() Void {
+  const source = `using Browser from std:Browser; lib { fn run() Void {
     let input = Browser.document.createElement("input");
     input.value = "a"; input.placeholder = "b"; input.title = input.value + input.placeholder;
   } }`;
@@ -197,11 +197,11 @@ await test('-Oz shares one import per host operation shape; -O3 specializes each
   assert(size.length < speed.length, 'sharing makes the glue smaller');
 });
 await test('dead @es imports never execute', async () => {
-  const { instance } = await compile('let poison: fun() I32 = @es/\\ (()=>{throw Error("dead glue executed")})() \\/; export lib { fn run() I32 { 42; } }');
+  const { instance } = await compile('let poison: fun() I32 = @es/\\ (()=>{throw Error("dead glue executed")})() \\/; lib { fn run() I32 { 42; } }');
   assert.equal(instance.exports.run(), 42);
 });
 await test('the browser module is one lazy declaration graph; only used members emit code', async () => {
-  const { wasm, files, instance, glue } = await compile('using Browser from std:Browser; export lib { fn run() Bool { Browser.isFinite(42.0); } }');
+  const { wasm, files, instance, glue } = await compile('using Browser from std:Browser; lib { fn run() Bool { Browser.isFinite(42.0); } }');
   assert.equal(instance.exports.run(), true);
   // (No std:Browser source joins the program: its declarations are a graph, not a file.)
   assert(!files.some(file => file.key === 'std:Browser'));
@@ -210,7 +210,7 @@ await test('the browser module is one lazy declaration graph; only used members 
 });
 await test('aliased browser imports across a module diamond resolve independently per build', async () => {
   const files = new Map([
-    ['/main.utu', 'using left from "left.utu"; using right from "right.utu"; export lib { fn run() Bool { left.run() and right.run(); } }'],
+    ['/main.utu', 'using left from "left.utu"; using right from "right.utu"; lib { fn run() Bool { left.run() and right.run(); } }'],
     ['/left.utu', 'using Browser |B| from std:Browser; mod left { fn run() Bool { B.isFinite(42.0); } }'],
     ['/right.utu', 'using Browser from std:Browser; mod right { fn run() Bool { Browser.isNaN(0.0 / 0.0); } }'],
   ]);
@@ -220,13 +220,13 @@ await test('aliased browser imports across a module diamond resolve independentl
   assert.equal(foreignImports(first.wasm).length, 2);
   const instance = await instantiateNode(first.wasm, first.spec, { root: ROOT });
   assert.equal(instance.exports.run(), true);
-  files.set('/main.utu', 'using Browser from std:Browser; export lib { fn run() Bool { Browser.isFinite(1.0); } }');
+  files.set('/main.utu', 'using Browser from std:Browser; lib { fn run() Bool { Browser.isFinite(1.0); } }');
   const second = await buildProgram(files, { optimize: 'speed', resolvePath });
   assert.deepEqual(second.errors, []);
   assert(!JSON.stringify(second.spec.es ?? {}).includes('isNaN'));
 });
 await test('unknown browser members name the declaration they were looked up on', async () => {
-  const { errors: messages } = await buildProgram('using Browser from std:Browser; export main() Void { Browser.not_a_browser_api(); Browser.document.notAMethod(); }');
+  const { errors: messages } = await buildProgram('using Browser from std:Browser; main { Browser.not_a_browser_api(); Browser.document.notAMethod(); }');
   // One error per unknown member: its call-site consequences are not reported apart.
   assert(messages.includes('No member Browser.not_a_browser_api'), messages.join('\n'));
   assert(messages.includes('No member Browser.Document.notAMethod'), messages.join('\n'));
@@ -235,7 +235,7 @@ await test('unknown browser members name the declaration they were looked up on'
 await test('closures capture host strings without unlowered public GC types', async () => {
   const { instance } = await compile(`
     struct Box: | text: Str
-    export lib {
+    lib {
       fn capture(text: Str) cl() Str { cl() { text; }; }
       fn boxed(text: Str) cl() Str { let box: Box = Box { text: text }; cl() { box.text; }; }
     }

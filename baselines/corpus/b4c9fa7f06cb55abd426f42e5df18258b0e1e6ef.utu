@@ -42,7 +42,8 @@ fn scaled(n: I32) I32 {
     if base > 10 { base * 2; } else { base; };
 }
 
-export main() I32 {
+main {
     subscribe(7);
-    total(20, 22) + scaled(6);
+    console.log(total(20, 22) + scaled(6));
 }
+using console from std:Console

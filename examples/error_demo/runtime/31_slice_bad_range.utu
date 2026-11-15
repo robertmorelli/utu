@@ -1,7 +1,8 @@
 // What: an array slice whose end is past the length
 // Expect: trap: slice [2, 9) out of bounds for an array of length 4
-export main() I32 {
+main {
     let xs = [1, 2, 3, 4];
     let tail = xs[2, 9];
-    tail.len();
+    console.log(tail.len());
 }
+using console from std:Console

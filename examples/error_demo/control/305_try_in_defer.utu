@@ -7,4 +7,5 @@ fn save() Result[I32, Str] {
     Result[I32, Str].ok(1);
 }
 
-export main() I32 { save().value(); }
+main { console.log(save().value()); }
+using console from std:Console

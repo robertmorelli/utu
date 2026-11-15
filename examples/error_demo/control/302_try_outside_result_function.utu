@@ -10,4 +10,5 @@ fn quarter(n: I32) I32 {
     h / 2;
 }
 
-export main() I32 { quarter(8); }
+main { console.log(quarter(8)); }
+using console from std:Console

@@ -4,6 +4,7 @@ fn shout(s: String) String {
     s.to_upper();
 }
 
-export main() I32 {
-    shout("hi").len();
+main {
+    console.log(shout("hi").len());
 }
+using console from std:Console

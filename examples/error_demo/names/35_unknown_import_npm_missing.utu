@@ -2,6 +2,7 @@
 // Expect: Cannot import "npm:left-pad-xyz": package not found in node_modules
 using pad from "npm:left-pad-xyz";
 
-export main() Str {
-    pad.leftPad("7", 3);
+main {
+    console.log(pad.leftPad("7", 3));
 }
+using console from std:Console

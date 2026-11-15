@@ -1,8 +1,9 @@
 // What: adding two Bools
 // Expect: Bool has no '+' operator
-export main() I32 {
+main {
     let a = true;
     let b = false;
     let n = a + b;
-    0;
+    console.log(0);
 }
+using console from std:Console

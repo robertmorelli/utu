@@ -2,4 +2,5 @@
 // Expect: Type mismatch: expected I32, got Str
 let limit: I32 = "ten";
 
-export main() I32 { limit; }
+main { console.log(limit); }
+using console from std:Console

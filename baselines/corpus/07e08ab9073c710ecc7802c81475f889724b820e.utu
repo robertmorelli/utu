@@ -37,8 +37,8 @@ fn matches(target: Str, pattern: Str, o: Opts) Bool {
 let match_default: fun(Str, Str) Bool =
     @es/\ ((m) => (t, p) => m.minimatch(t, p) ? 1 : 0)(await import('minimatch')) \/;
 
-export main() Bool {
-    match_default("src/a.js", "src/*.js");
+main {
+    console.log(match_default("src/a.js", "src/*.js"));
 }
 
 test "the no-options call needs no bag at all" {
@@ -59,3 +59,4 @@ test "options actually reach minimatch through the flattening" {
     let base: Opts = &{ nocase: false, dot: false, match_base: true };
     assert matches("a/b/c.js", "*.js", base);
 }
+using console from std:Console

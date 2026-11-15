@@ -1,7 +1,7 @@
 using JS from std:JS
 
 // ── 1. The dashboard's data work on JS objects (render() without the DOM) ──
-export lib {
+lib {
     fn analyze(items: JS.Array, category: Str, query: Str) F64 {
         let visible = items.filter(cl(item) Bool {
             (category == "All" or item.category == category) and item.name.toLowerCase().includes(query)

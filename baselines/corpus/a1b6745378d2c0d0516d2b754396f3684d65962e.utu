@@ -88,7 +88,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
     }
     \/;
 }
-export main() Void {
+main {
     let state = @stored/\
         ReadroomState "readroom-v2" manual
         ReadroomState {

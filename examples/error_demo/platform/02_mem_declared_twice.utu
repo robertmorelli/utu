@@ -3,7 +3,8 @@
 mem pixels: U8;
 mem pixels: U8;
 
-export main() I32 {
+main {
     pixels.push(255);
-    pixels.len();
+    console.log(pixels.len());
 }
+using console from std:Console

@@ -4,7 +4,8 @@ struct Point:
     | x: F64
     | y: F64
 
-export main() I32 {
+main {
     let ps = Array[Point].new_default(4);
-    ps.len();
+    console.log(ps.len());
 }
+using console from std:Console

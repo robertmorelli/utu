@@ -75,7 +75,7 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
     }
     \/
 }
-export main() Void {
+main {
     let state = @stored/\
         AtlasState "atlas-v2" manual
         AtlasState {

@@ -9,7 +9,8 @@ mod a {
 struct S:
     | x: I32
 
-export main() I32 {
+main {
     let s: S = a.mk();
-    s.x;
+    console.log(s.x);
 }
+using console from std:Console

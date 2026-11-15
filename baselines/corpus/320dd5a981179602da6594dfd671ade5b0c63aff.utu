@@ -5,7 +5,7 @@
       struct Line:
         | start : Point
         | end : Point
-      export lib {
+      lib {
         fn shift_start(ax: I32, ay: I32) I32 {
           let l: Line = Line {
             start: Point { x: ax, y: ay },

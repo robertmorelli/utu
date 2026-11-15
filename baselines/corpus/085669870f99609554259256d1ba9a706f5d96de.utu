@@ -104,7 +104,7 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
     \/;
 }
 
-export main() Void {
+main {
     let state = @stored/\
         Board "dispatch-v1" Board {
             query: "", draft: "", category: "Design",

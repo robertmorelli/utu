@@ -412,7 +412,7 @@ test "regexredux 1000 is BG's output" {
     assert regexredux() == -1698654446
 }
 
-export lib {
+lib {
     fn setup(n: I32) Void { setup_input(n) }
     fn bench(n: I32) I32 { regexredux() }
 }

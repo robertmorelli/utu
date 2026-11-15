@@ -1,6 +1,7 @@
 // What: allocating an absurdly large array
 // Expect: out of memory: could not allocate Array[I64] of 2000000000 elements
-export main() I32 {
+main {
     let xs = Array[I64].new(2000000000, 0.i64());
-    xs.len();
+    console.log(xs.len());
 }
+using console from std:Console

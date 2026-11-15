@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
         fn outer(n: I32, m: I32) I32 {
           let a: I32 = 5;
           let f: cl(I32) I32 = cl(x) { x * n + a; };

@@ -2,7 +2,7 @@
 // Expect: Every arm of an alt over a host value must name a declared class: write Browser.HTMLInputElement
 using Browser from std:Browser;
 
-export main() Void {
+main {
     let doc = Browser.document;
     doc.addEventListener("input", cl(e) Void {
         let text = alt e.target {

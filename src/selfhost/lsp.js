@@ -211,9 +211,9 @@ export function createLanguageServer({ utu, hostFor, toKey, toUri, send, listFil
     return { key, program, text, current, lines, offset, decl, stale: !!moved, place };
   }
 
-  /** Whether the name at a request's position is the program's `export main`. */
+  /** Whether the name at a request's position is the program's `main`. */
   const entryPoint = q => q.program.index.declarations(q.key).some(({ kind, span }) => {
-    const head = kind === 'Main' && /^export\s+main\b/.exec(q.text.slice(span.start, span.end));
+    const head = kind === 'Main' && /^(?:export\s+)?main\b/.exec(q.text.slice(span.start, span.end));
     const start = head && span.start + head[0].length - 4;
     return head && start <= q.offset && q.offset <= start + 4;
   });

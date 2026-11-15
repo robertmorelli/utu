@@ -3,4 +3,5 @@
 fn n(x: I32) I32 { x; }
 let xs: Array[I32] = [1, 2];
 let g: I32 = xs[n(5)];
-export main() I32 { g; }
+main { console.log(g); }
+using console from std:Console

@@ -6,6 +6,6 @@ mod console {
 
 using console from std:Console;
 
-export main() I32 {
-    console.f();
+main {
+    console.f()
 }

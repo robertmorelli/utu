@@ -6,6 +6,7 @@ mod m {
 
 fn m() I32 { 2; }
 
-export main() I32 {
-    m.f();
+main {
+    console.log(m.f());
 }
+using console from std:Console

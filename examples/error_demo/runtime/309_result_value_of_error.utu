@@ -5,4 +5,5 @@ fn half(n: I32) Result[I32, Str] {
     Result[I32, Str].ok(n / 2);
 }
 
-export main() I32 { half(3).value(); }
+main { console.log(half(3).value()); }
+using console from std:Console

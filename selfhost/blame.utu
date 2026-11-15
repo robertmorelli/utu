@@ -87,7 +87,7 @@ fn memory_syntax(i: I32) I32 {
 }
 
 /// The declaration a node is in: the outermost one, short of a module or
-/// an `export lib` block (whose items are declarations of their own), or -1.
+/// an `lib` block (whose items are declarations of their own), or -1.
 fn outer_decl(node: I32) I32 {
     let n = node
     let found = -1

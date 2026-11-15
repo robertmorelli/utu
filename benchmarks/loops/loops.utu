@@ -2,7 +2,7 @@
 // Inputs are built inside the module: ints(n) is deterministic pseudo-random
 // data in -500..499; floats(n) is i * 0.5.
 
-export lib {
+lib {
     fn ints(n: I32) Array[I32] {
         let xs = Array[I32].new(n, 0)
         let seed = 12345

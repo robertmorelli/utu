@@ -3,7 +3,8 @@
 mod Counter {
     let total: I32 = 42;
 }
-export main() I32 {
+main {
     Counter.total = 99;
-    0;
+    console.log(0);
 }
+using console from std:Console

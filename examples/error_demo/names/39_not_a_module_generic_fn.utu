@@ -2,6 +2,7 @@
 // Expect: 'square' is a function, not a generic module; it takes no type arguments
 fn square(x: I32) I32 { x * x; }
 
-export main() I32 {
-    square[I32](4);
+main {
+    square[I32]console.log((4));
 }
+using console from std:Console

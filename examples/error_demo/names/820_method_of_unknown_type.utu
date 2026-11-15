@@ -7,6 +7,7 @@ fn Sqare.area |self| () I32 {
     self.side * self.side;
 }
 
-export main() I32 {
-    0;
+main {
+    console.log(0);
 }
+using console from std:Console

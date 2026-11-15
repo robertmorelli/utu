@@ -6,7 +6,8 @@ mod Money {
     fn &.zero() & { &{ cents: 0.i64() }; }
 }
 
-export main() I32 {
+main {
     let m = Money[I64].zero();
-    0;
+    console.log(0);
 }
+using console from std:Console

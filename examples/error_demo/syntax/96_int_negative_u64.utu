@@ -1,6 +1,7 @@
 // What: a negative literal for a U64
 // Expect: -5 does not fit U64
-export main() I32 {
+main {
     let count: U64 = -5;
-    count.i32();
+    console.log(count.i32());
 }
+using console from std:Console

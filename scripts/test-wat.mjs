@@ -135,10 +135,10 @@ try {
 
   // `export main` may be a @wat function.
   const mainFile = path.join(dir, 'main.utu');
-  await fs.writeFile(mainFile, 'export main() I32 { @wat/\\ i32.const 37 \\/; }\n');
+  await fs.writeFile(mainFile, 'lib { fn run() I32 { @wat/\\ i32.const 37 \\/; } }\n');
   {
     const { exports, errors } = await selfhost(mainFile);
-    assert.equal(exports?.main(), 37, String(errors));
+    assert.equal(exports?.run(), 37, String(errors));
   }
 
   // Mistakes: each at its place.
@@ -154,14 +154,18 @@ try {
   ];
   for (const [i, [source, want]] of mistakes.entries()) {
     const file = path.join(dir, `mistake${i}.utu`);
-    await fs.writeFile(file, `${source}\nexport lib { fn g() I32 { 0; } }\n`);
+    await fs.writeFile(file, `${source}
+lib { fn g() I32 { 0; } }
+`);
     const got = await selfhost(file);
     assert.deepEqual(got.errors, [want], source);
   }
   // A generator is not one, whether or not it is called (it expands into its consumers).
   for (const call of ['0', 'let s = 0; for (g(3)) |v| { s += v; }; s']) {
     const file = path.join(dir, 'generator.utu');
-    await fs.writeFile(file, `gn g(n: I32) I32 { @wat/\\ local.get $n \\/; }\nexport lib { fn t() I32 { ${call}; } }\n`);
+    await fs.writeFile(file, `gn g(n: I32) I32 { @wat/\\ local.get $n \\/; }
+lib { fn t() I32 { ${call}; } }
+`);
     const shape = 'a @wat function is a plain function: fn f(x: I32) I32 { @wat/\\ … \\/; }';
     assert.deepEqual((await selfhost(file)).errors?.map(e => e.replace(/^\d+:\d+ /, '')), [shape], `self-hosted: ${call}`);
   }

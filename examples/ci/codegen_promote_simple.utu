@@ -5,7 +5,7 @@ fn maybe_box() ?Box {
     Box.null
 }
 
-export lib {
+lib {
     fn test_promote() I32 {
         promote maybe_box() {
             |box| => box.value,

@@ -1,7 +1,7 @@
 
         let seed: I32 = 41;
         let banner: Str = "ok";
-        export lib {
+        lib {
           fn next() I32 { seed + 1; }
           fn loud() Str { banner + "!"; }
         }

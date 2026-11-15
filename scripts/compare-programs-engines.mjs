@@ -50,7 +50,7 @@ const harness = `
   ];
   const variants = {
     JavaScript: { scalar: scalarJs, strings: stringsJs, analyzer: analyzerJs, sieve: sieveJs, deltablue: { chain: () => benchChain(20), projection: () => benchProjection(20) } },
-    UTU: { ...utu, deltablue: { chain: () => utu.deltablue.main(0, 20), projection: () => utu.deltablue.main(1, 20) } },
+    UTU: { ...utu, deltablue: { chain: () => utu.deltablue.run(0, 20), projection: () => utu.deltablue.run(1, 20) } },
   };
   const median = v => { const s = v.slice().sort((a, b) => a - b); return s[s.length >> 1]; };
   const report = {};

@@ -3,7 +3,8 @@
 struct Prefs:
     | name: Str
 
-export main() Str {
+main {
     let prefs = @stored/\ Prefs "prefs" Prefs { name: "a" } \/;
-    prefs.name;
+    console.log(prefs.name);
 }
+using console from std:Console

@@ -3,6 +3,7 @@
 type UserId = distinct I32;
 type AdminId = distinct UserId;
 
-export main() I32 {
-    0;
+main {
+    console.log(0);
 }
+using console from std:Console

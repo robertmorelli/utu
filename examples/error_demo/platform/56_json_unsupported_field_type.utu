@@ -10,6 +10,7 @@ fn load(text: Str) ?Pixel {
     @json/\ decode Pixel text \/;
 }
 
-export main() I32 {
-    promote load("{}") { |p| => p.r.i32(), ~> 0, };
+main {
+    console.log(promote load("{}") { |p| => p.r.i32(), ~> 0, });
 }
+using console from std:Console

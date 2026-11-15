@@ -1,1 +1,2 @@
-export main() I32 { let = ; let x = (1 + ; x; }
+main { let = ; let x = (1 + ; x; }
+using console from std:Console

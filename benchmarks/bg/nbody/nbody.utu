@@ -154,7 +154,7 @@ test "nbody prints BG's energies" {
     assert fnv_fixed9(h, energy(bodies)) == 661152772
 }
 
-export lib {
+lib {
     fn bench(n: I32) I32 {
         let bodies = create()
         let h = fnv_fixed9(-2128831035, energy(bodies))

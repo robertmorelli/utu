@@ -1,1 +1,1 @@
-export main() Void { let a = @json/\ parse Missing "1" \/; }
+main { let a = @json/\ parse Missing "1" \/; }

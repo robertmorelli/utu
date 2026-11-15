@@ -6,6 +6,7 @@ let parse: fun(Str) F64 = @es/\ (s) => {
     return n;
 } \/;
 
-export main() F64 {
-    parse("twelve");
+main {
+    console.log(parse("twelve"));
 }
+using console from std:Console

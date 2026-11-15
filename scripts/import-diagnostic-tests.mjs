@@ -36,7 +36,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
   test('imports: missing files report unknown-import at the using declaration', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const diagnostics = await analyzeProject(compiler, ROOT, {
-      'main.utu': 'using ui from "./does-not-exist.utu";\nexport main() I32 { 1; }\n',
+      'main.utu': 'using ui from "./does-not-exist.utu";\nlib { fn run() I32 { 1; } }\n',
     });
     const missing = diagnostics.find(d => d.kind === 'unknown-import');
     assert(missing, kinds(diagnostics));
@@ -47,7 +47,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
   test('imports: a missing module names the modules the file does define', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const diagnostics = await analyzeProject(compiler, ROOT, {
-      'main.utu': 'using shapes from "./lib.utu";\nexport main() I32 { 1; }\n',
+      'main.utu': 'using shapes from "./lib.utu";\nlib { fn run() I32 { 1; } }\n',
       'lib.utu': 'mod shape {\n    fn one() I32 { 1; }\n}\nmod color {\n    fn two() I32 { 2; }\n}\n',
     });
     const missing = diagnostics.find(d => d.kind === 'unknown-type' && /Unknown module shapes/.test(d.message));
@@ -63,7 +63,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
       'fn stray( {\n',
     ]) {
       const diagnostics = await analyzeProject(compiler, ROOT, {
-        'main.utu': 'using lib from "./lib.utu";\nexport main() I32 { 1; }\n',
+        'main.utu': 'using lib from "./lib.utu";\nlib { fn run() I32 { 1; } }\n',
         'lib.utu': lib,
       });
       const errors = diagnostics.filter(d => d.severity === 'error');
@@ -74,7 +74,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
 
   test('syntax: an entry-file parse error is reported once, at its location', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
-    const diagnostics = await analyzeProject(compiler, ROOT, { 'main.utu': 'export main() I32 {\n    let x = ;\n}\n' });
+    const diagnostics = await analyzeProject(compiler, ROOT, { 'main.utu': 'lib { fn run() I32 {\n    let x = ;\n} }\n' });
     const errors = diagnostics.filter(d => d.severity === 'error');
     assertEq(errors.length, 1, kinds(diagnostics));
     assertEq(errors[0].primary.row, 2);
@@ -82,7 +82,7 @@ export function registerImportDiagnosticTests({ test, assert, assertEq, makeComp
 
   test('export lib: recovered syntax errors report parse errors under the codegen target', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
-    for (const source of ['export lib { fn a() I32 { 1; } ) }', 'export lib { 5; fn b() I32 { 2; } }']) {
+    for (const source of ['lib { fn a() I32 { 1; } ) }', 'lib { 5; fn b() I32 { 2; } }']) {
       const dir = await tempDir(ROOT, 'lib-');
       try {
         await fs.writeFile(path.join(dir, 'main.utu'), source);

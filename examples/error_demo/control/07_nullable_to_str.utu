@@ -9,6 +9,7 @@ fn show(b: ?Box) Str {
     b.str();
 }
 
-export main() Str {
-    show(Box { n: 4 });
+main {
+    console.log(show(Box { n: 4 }));
 }
+using console from std:Console

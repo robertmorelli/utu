@@ -25,8 +25,8 @@ let from_bytes: fun(Externref) Str =
 let byte_at: fun(Externref, I32) I32 = @es/\ (a, i) => a[i] \/;
 let byte_count: fun(Externref) I32 = @es/\ (a) => a.length \/;
 
-export main() I32 {
-    byte_length("AAAA");
+main {
+    console.log(byte_length("AAAA"));
 }
 
 test "scalar results are free" {
@@ -49,3 +49,4 @@ test "summing bytes costs one host call per element" {
     };
     assert total == 10;
 }
+using console from std:Console

@@ -6,6 +6,7 @@ struct Point:
 
 vec points: Point;
 
-export main() I32 {
-    points.len();
+main {
+    console.log(points.len());
 }
+using console from std:Console

@@ -4,6 +4,7 @@ fn g() I32 {
     Nope[F64].x() + Nope[F64].x();
 }
 
-export main() I32 {
-    g();
+main {
+    console.log(g());
 }
+using console from std:Console

@@ -4,4 +4,5 @@ fn pairs() Array[.{I32, I32}] {
     Array[.{I32, I32}].new(0, .{0, 0});
 }
 
-export main() I32 { 0; }
+main { console.log(0); }
+using console from std:Console

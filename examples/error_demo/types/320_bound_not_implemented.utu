@@ -7,7 +7,8 @@ struct Point:
     | x: I32
     | y: I32
 
-export main() I32 {
+main {
     let far = Order[Point].max(Point { x: 1, y: 2 }, Point { x: 5, y: 0 });
-    far.x;
+    console.log(far.x);
 }
+using console from std:Console

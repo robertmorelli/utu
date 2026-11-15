@@ -10,7 +10,7 @@ struct State:
 struct Item:
     | id: I32
 
-export main() Void {
+main {
     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
     let app = @wutu/\
     @reactive;

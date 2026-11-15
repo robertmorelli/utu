@@ -2,7 +2,8 @@
 // Expect: let .{…} takes apart a tuple, but this value is I32.
 fn total(a: I32, b: I32) I32 { a + b; }
 
-export main() I32 {
+main {
     let .{sum, count} = total(3, 4);
-    sum + count;
+    console.log(sum + count);
 }
+using console from std:Console

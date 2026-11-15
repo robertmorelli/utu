@@ -78,6 +78,7 @@ bench "fannkuch" {
     }
 }
 
-export main() I32 {
-    fannkuch(6)
+main {
+    console.log(fannkuch(6))
 }
+using console from std:Console

@@ -2,6 +2,6 @@
 // Expect: Unknown std module 'std:console'; did you mean std:Console?
 using console from std:console;
 
-export main() Void {
+main {
     console.log("hi");
 }

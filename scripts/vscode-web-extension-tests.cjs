@@ -16,7 +16,7 @@ async function run() {
   console.log('[utu-web-test] open document');
   const document = await vscode.workspace.openTextDocument({
     language: 'utu',
-    content: 'export main() I32 { 42; }',
+    content: 'lib { fn run() I32 { 42; } }',
   });
   console.log('[utu-web-test] compile');
   const binary = await vscode.commands.executeCommand('utu.compileCurrentFile', document);

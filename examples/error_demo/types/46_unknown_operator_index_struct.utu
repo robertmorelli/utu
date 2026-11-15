@@ -3,7 +3,8 @@
 struct Grid:
     | cells: Array[I32]
 
-export main() I32 {
+main {
     let g = Grid { cells: [1, 2, 3] };
-    g[0];
+    console.log(g[0]);
 }
+using console from std:Console

@@ -1,4 +1,5 @@
 // What: x.i32(1) on a distinct type
 // Expect: Takes 0, given 1
 type X = distinct I32;
-export main() I32 { let x: X = X(1); x.i32(1); }
+main { let x: X = X(1); console.log(x.i32(1)); }
+using console from std:Console

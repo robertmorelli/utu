@@ -2,7 +2,7 @@
       enum Shape:
         | Circle { radius: I32 }
         | Rect { width: I32, height: I32 }
-      export lib {
+      lib {
         fn area(shape: Shape) I32 {
           alt shape {
             Circle |c| => c.radius,

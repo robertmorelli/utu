@@ -44,7 +44,8 @@ try {
   ];
   for (const [i, [body, message]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);
-    await fs.writeFile(file, `export lib { ${body} }\n`);
+    await fs.writeFile(file, `lib { ${body} }
+`);
     const built = await build(file);
     assert.deepEqual(built.errors, [message], body);
   }
@@ -66,7 +67,7 @@ let source: fun() Stream[I32] = @es/\\ () => { const s = (async function* () { y
 let closed: fun() I32 = @es/\\ () => { const n = globalThis.__returns ?? 0; globalThis.__returns = 0; return n; } \\/;
 fn first(s: Stream[I32]) I32 { await for (s) |v| { return v; }; 0; }
 fn apply(f: fun(Stream[I32]) I32, s: Stream[I32]) I32 { f(s) * 100; }
-export lib {
+lib {
     fn nested() I32 {
         let t = 0;
         await for (Stream[I32].of([1, 2])) |a| { await for (Stream[I32].of([10, 20])) |b| { t += a * b; }; };

@@ -7,6 +7,7 @@ fn initial(name: ?Str) Str {
     };
 }
 
-export main() Str {
-    initial(null);
+main {
+    console.log(initial(null));
 }
+using console from std:Console

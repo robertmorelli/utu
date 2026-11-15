@@ -1,6 +1,7 @@
 // What: a file with a syntax error (two values on one line) passed to `utu run`
 // Expect: the syntax error at 52_syntax_error_run.utu:4, and nothing run
-export main() I32 {
+main {
     let x = 40 2
-    x + 2;
+    console.log(x + 2);
 }
+using console from std:Console

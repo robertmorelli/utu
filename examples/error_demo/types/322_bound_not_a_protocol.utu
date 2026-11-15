@@ -7,6 +7,7 @@ mod Pairs[T[Point]] {
     fn first(a: T, b: T) T { a; }
 }
 
-export main() I32 {
-    Pairs[I32].first(1, 2);
+main {
+    console.log(Pairs[I32].first(1, 2));
 }
+using console from std:Console

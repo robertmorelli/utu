@@ -21,20 +21,20 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
           for (0..<values.len()) |i| { out += values[i].score(1); };
           out;
         }
-        export main() I32 {
+        lib { fn run() I32 {
           let values: Array[Score] = Array[Score].new(2, Point { value: 0 });
           values[0] = Point { value: 3 };
           values[1] = Bonus { value: 4 };
           total(values);
-        }
+        } }
       `,
     });
-    assertEq(instance.exports.main(), 13);
+    assertEq(instance.exports.run(), 13);
   });
 
   test('codegen: WasmGC arrays support fill, indexing, mutation, and nested loops', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_arrays_nested.utu', source: `
-      export lib {
+      lib {
         fn count_primes(n: I32) I32 {
           let flags: Array[I32] = Array[I32].new(n, 1);
           flags[0] = 0;
@@ -62,7 +62,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       struct Point:
         | x : I32
         | y : I32
-      export lib {
+      lib {
         fn make_x(a: I32, b: I32) I32 {
           let p: Point = Point { x: a, y: b };
           p.x;
@@ -90,7 +90,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       struct Line:
         | start : Point
         | end : Point
-      export lib {
+      lib {
         fn dx(ax: I32, ay: I32, bx: I32, by: I32) I32 {
           let l: Line = Line {
             start: Point { x: ax, y: ay },
@@ -107,7 +107,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_struct_set.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn bump_twice(start: I32) I32 {
           let c: Counter = Counter { n: start };
           c.n = c.n + 1;
@@ -127,7 +127,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       struct Line:
         | start : Point
         | end : Point
-      export lib {
+      lib {
         fn shift_start(ax: I32, ay: I32) I32 {
           let l: Line = Line {
             start: Point { x: ax, y: ay },
@@ -145,7 +145,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_ref.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn maybe_counter(flag: Bool) ?Counter {
           if flag { Counter { n: 41 }; } else { Counter.null; };
         }
@@ -165,7 +165,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_literal.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn from_let() I32 {
           let c: ?Counter = null;
           promote c {
@@ -182,7 +182,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_statement_branches.utu', source: `
       struct Point:
         | x : F64
-      export lib {
+      lib {
         fn branch(flag: Bool) F64 { if flag { 1.0; } else { }; 2.0; }
         fn option(p: ?Point) Void { promote p { |v| => v.x, ~> {}, }; }
         fn binding() Void { let unused: F64 = 3.0; }
@@ -197,7 +197,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_null_branch.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn maybe(flag: Bool) ?Counter {
           if flag { Counter { n: 9 }; } else { null; };
         }
@@ -217,7 +217,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_nested_promote.utu', source: `
       struct Box:
         | n : I32
-      export lib {
+      lib {
         fn read(outer: Bool, inner: Bool) I32 {
           let a: ?Box = if outer { Box { n: 7 }; } else { null; };
           let b: ?Box = if inner { Box { n: 3 }; } else { null; };
@@ -241,7 +241,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_promote_false.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn has_value(flag: Bool) Bool {
           let value: ?Counter = if flag { Counter { n: 1 }; } else { null; };
           promote value {
@@ -260,7 +260,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       name: 'lowered_promote_normal.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn maybe(flag: Bool) ?Counter {
           if flag { Counter { n: 7 }; } else { Counter.null; };
         }
@@ -278,7 +278,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       struct Pair:
         | a : I32
         | b : I32
-      export lib {
+      lib {
         fn sum() I32 {
           let p: Pair = &{ a: 7, b: 8 };
           p.a + p.b;
@@ -292,7 +292,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_orelse.utu', source: `
       struct Counter:
         | n : I32
-      export lib {
+      lib {
         fn maybe_counter(flag: Bool) ?Counter {
           if flag { Counter { n: 7 }; } else { Counter.null; };
         }
@@ -310,7 +310,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_variant_ctor.utu', source: `
       enum Shape:
         | Circle { radius: I32 }
-      export lib {
+      lib {
         fn radius() I32 {
           let c: Circle = Circle { radius: 7 };
           c.radius;
@@ -326,7 +326,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | Circle { radius: I32 }
         | Rect { width: I32, height: I32 }
         | Triangle { base: I32, height: I32, skew: I32 }
-      export lib {
+      lib {
         fn classify(shape: Shape) I32 {
           alt shape {
             Circle => 7,

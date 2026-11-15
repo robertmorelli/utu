@@ -3,7 +3,7 @@
           | id: I32
           | price: F64
 
-      export lib {
+      lib {
           fn describe(text: Str) Str {
               @json/\ match text {
                   { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.str() + " " + (tier orelse "free"),

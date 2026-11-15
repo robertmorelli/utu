@@ -1,1 +1,1 @@
-using Browser from std:Browser; export main() Void { @wutu/\ canvas { padding="10"; } \/; }
+using Browser from std:Browser; main { @wutu/\ canvas { padding="10"; } \/; }

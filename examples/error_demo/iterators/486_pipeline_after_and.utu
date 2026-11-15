@@ -1,6 +1,7 @@
 // What: a pipeline after `and`, which takes `ok and (0 ..< 5)` as its source.
 // Expect: A pipeline binds looser than and: its source is all of this; note: parenthesize the pipeline
-export main() Bool {
+main {
     let ok = true;
-    ok and (0 ..< 5) all |i| { i < 9; };
+    console.log(ok and (0 ..< 5) all |i| { i < 9; });
 }
+using console from std:Console

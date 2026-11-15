@@ -1,6 +1,7 @@
 // What: reading .length on a Str (it is a method, len())
 // Expect: Unknown field 'length' for Str (did you mean len()?)
-export main() I32 {
+main {
     let s = "hello";
-    s.length;
+    console.log(s.length);
 }
+using console from std:Console

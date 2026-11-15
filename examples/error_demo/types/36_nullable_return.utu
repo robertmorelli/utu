@@ -7,4 +7,5 @@ fn shown(u: User) Str {
     u.nickname;
 }
 
-export main() I32 { shown(User { nickname: "x" }).len(); }
+main { console.log(shown(User { nickname: "x" }).len()); }
+using console from std:Console

@@ -100,16 +100,16 @@ once here and written `<usage>` after that.
 
     $ : > empty.utu
     $ node cli/utu.mjs check empty.utu     -> stdout: ok, exit 0
-    $ node cli/utu.mjs run empty.utu       -> stderr: empty.utu: no `export main`, exit 1
+    $ node cli/utu.mjs run empty.utu       -> stderr: empty.utu: no `main`, exit 1
 
-## run on a file without export main
+## run on a file without main
 
-    $ node cli/utu.mjs run $R/50_no_main.utu               # has `export lib { ... }`
-    stderr: examples/error_demo/runtime/50_no_main.utu: no `export main`
+    $ node cli/utu.mjs run $R/50_no_main.utu               # has `lib { ... }`
+    stderr: examples/error_demo/runtime/50_no_main.utu: no `main`
     exit 1
 
     $ node cli/utu.mjs run $R/51_main_not_exported.utu     # `fn main() I32`, no export
-    stderr: examples/error_demo/runtime/51_main_not_exported.utu: no `export main`
+    stderr: examples/error_demo/runtime/51_main_not_exported.utu: no `main`
     exit 1
 
 `check` says `ok` (exit 0) for both.

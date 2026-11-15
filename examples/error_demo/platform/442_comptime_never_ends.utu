@@ -6,6 +6,7 @@ fn f() Array[I32] {
 }
 const mem t: I32 = @comptime/\ f() \/;
 
-export main() I32 {
-    t.len();
+main {
+    console.log(t.len());
 }
+using console from std:Console

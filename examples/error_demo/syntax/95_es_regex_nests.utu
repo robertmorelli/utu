@@ -2,6 +2,7 @@
 // Expect: the `/\` in the regex is named: the body ends at a later `\/` than meant.
 let words: fun(Str) I32 = @es/\ (s) => s.split(/\s\//).length \/;
 
-export main() I32 {
-    words("a /b");
+main {
+    console.log(words("a /b"));
 }
+using console from std:Console

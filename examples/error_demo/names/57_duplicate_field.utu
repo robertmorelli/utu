@@ -5,6 +5,7 @@ struct Point:
     | y: F64
     | x: F64
 
-export main() I32 {
-    0;
+main {
+    console.log(0);
 }
+using console from std:Console

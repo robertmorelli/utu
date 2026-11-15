@@ -56,7 +56,7 @@ fn shown(todos: Array[Todo], filter: Filter) Array[Todo] {
     } collect(Todo)
 }
 
-export main() Void {
+main {
     let config = settings()
     let state = State { draft: "", todos: [], made: 0, filter: All {} }
     let started = now()

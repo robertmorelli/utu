@@ -4,6 +4,7 @@ fn len(n: I32) I32 {
     @ir/\ <ir-string-measure-utf16><ir-ident name="n"/></ir-string-measure-utf16> \/;
 }
 
-export main() I32 {
-    len(3);
+main {
+    console.log(len(3));
 }
+using console from std:Console

@@ -4,7 +4,8 @@ enum Shape:
     | Rect { w: F64, h: F64 }
     | Dot {}
 
-export main() I32 {
+main {
     let s: Shape = Rect { w: 1.0 };
-    0;
+    console.log(0);
 }
+using console from std:Console

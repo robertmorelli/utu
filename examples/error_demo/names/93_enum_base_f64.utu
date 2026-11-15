@@ -4,6 +4,7 @@ enum(F64) Ratio:
     | Half
     | Whole
 
-export main() I32 {
-    0;
+main {
+    console.log(0);
 }
+using console from std:Console

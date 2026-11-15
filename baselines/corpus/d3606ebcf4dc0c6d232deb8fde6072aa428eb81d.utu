@@ -1,4 +1,4 @@
-export main() I32 {
+main {
     let values: Array[I32] = Array[I32].new(8, 0);
     for (0..<values.len()) |i| {
         values[i] = i * i;
@@ -7,5 +7,6 @@ export main() I32 {
     for (0..<values.len()) |i| {
         total += values[i];
     };
-    total;
+    console.log(total);
 }
+using console from std:Console

@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
         fn first() I32 { let f: fun(I32) I32 = @es/\ x => x + 1 \/; f(10); }
         fn second() I32 { let f: fun(I32) I32 = @es/\ x => x + 2 \/; f(10); }
       }

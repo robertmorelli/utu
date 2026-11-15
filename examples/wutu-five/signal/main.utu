@@ -231,7 +231,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
     \/
 }
 
-export main() Void {
+main {
     let state = Conference {
         day: "all",
         track: "All tracks",

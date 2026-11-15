@@ -4,6 +4,7 @@ fn name(a: I32) Str {
     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
 }
 
-export main() Str {
-    name(1);
+main {
+    console.log(name(1));
 }
+using console from std:Console

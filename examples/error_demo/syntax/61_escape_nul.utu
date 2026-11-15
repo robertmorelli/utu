@@ -1,6 +1,7 @@
 // What: a C-style `\0` NUL escape.
 // Expect: Invalid escape '\0' (write \u0000), not a silent '0'.
-export main() I32 {
+main {
     let s = "a\0b";
-    s[1];
+    console.log(s[1]);
 }
+using console from std:Console

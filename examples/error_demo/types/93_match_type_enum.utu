@@ -11,4 +11,5 @@ fn kind(s: Shape) I32 {
     };
 }
 
-export main() I32 { kind(Dot {}); }
+main { console.log(kind(Dot {})); }
+using console from std:Console

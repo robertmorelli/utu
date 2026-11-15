@@ -4,6 +4,7 @@ fn add(a: i32, b: i32) i32 {
     a + b;
 }
 
-export main() I32 {
-    add(2, 3);
+main {
+    console.log(add(2, 3));
 }
+using console from std:Console

@@ -3,6 +3,7 @@
 let limit: I32 = 3;
 let limit: I32 = 5;
 
-export main() I32 {
-    limit;
+main {
+    console.log(limit);
 }
+using console from std:Console

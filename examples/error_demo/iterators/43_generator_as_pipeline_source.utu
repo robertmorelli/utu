@@ -4,6 +4,7 @@ gn squares(n: I32) I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
 
-export main() I32 {
-    squares(4) filter |s| { s % 2 == 0; } sum;
+main {
+    console.log(squares(4) filter |s| { s % 2 == 0; } sum);
 }
+using console from std:Console

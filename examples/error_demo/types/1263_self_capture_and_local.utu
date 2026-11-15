@@ -8,4 +8,5 @@ fn S.g |s| () I32 {
     s;
 }
 
-export main() I32 { 1; }
+main { console.log(1); }
+using console from std:Console

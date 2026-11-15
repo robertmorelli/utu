@@ -2,7 +2,8 @@
 // Expect: mem names stores Str; a mem holds an integer enum, a distinct type, or a number type
 mem names: Str;
 
-export main() I32 {
+main {
     names.push("ada");
-    names.len();
+    console.log(names.len());
 }
+using console from std:Console

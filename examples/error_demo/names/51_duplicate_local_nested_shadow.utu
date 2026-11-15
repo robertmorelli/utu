@@ -1,10 +1,11 @@
 // What: an inner block redeclares an outer local's name
 // Expect: either allowed shadowing, or Duplicate local binding 'x'
-export main() I32 {
+main {
     let x = 1;
     if true {
         let x = 2;
         x;
     };
-    x;
+    console.log(x);
 }
+using console from std:Console

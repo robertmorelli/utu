@@ -5,9 +5,10 @@ struct User:
 
 fn make_user() User { User { name: "x" }; }
 
-export main() Str {
-    promote make_user() {
+main {
+    console.log(promote make_user() {
         |u| => u.name,
         ~> "nobody",
-    };
+    });
 }
+using console from std:Console

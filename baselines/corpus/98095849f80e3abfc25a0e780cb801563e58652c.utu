@@ -12,10 +12,11 @@
           for (0..<values.len()) |i| { out += values[i].score(1); };
           out;
         }
-        export main() I32 {
+        main {
           let values: Array[Score] = Array[Score].new_default(2);
           values[0] = Point { value: 3 };
           values[1] = Bonus { value: 4 };
-          total(values);
+          console.log(total(values));
         }
       
+using console from std:Console

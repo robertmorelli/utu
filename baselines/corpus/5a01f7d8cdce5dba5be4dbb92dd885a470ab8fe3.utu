@@ -4,7 +4,7 @@
       struct P:
           | v: I32
       fn items(c: Counter) Array[I32] { c.n += 1; [1, 2, 3]; }
-      export lib {
+      lib {
           fn sum() I32 { let s = 0; for ([1, 2, 3]) |x| { s += x; }; s; }
           fn indexed() I32 { let s = 0; for ([10, 20, 30], 0..<99) |x, i| { s += x * i; }; s; }
           fn zipped() I32 { let s = 0; for ([1, 2, 3], [10, 20]) |a, b| { s += a * b; }; s; }

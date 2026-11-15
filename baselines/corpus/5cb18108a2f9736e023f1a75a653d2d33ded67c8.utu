@@ -1,5 +1,5 @@
 
-      export lib {
+      lib {
           fn pairs(n: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { x + i.i32(); } flat_map |x| { [x, -x * 10]; } fold(0) |a, v| { a * 3 + v; }; }
           fn empty(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { let ignored: Array[I32] = []; ignored; } count; }
           fn none(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { []; } count; }

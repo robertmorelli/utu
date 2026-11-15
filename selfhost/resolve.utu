@@ -1308,7 +1308,7 @@ fn entry_file() I32 {
     -1
 }
 
-/// A program has one `export lib` or one `export main`, not both.
+/// A program has one `lib` or one `main`, not both.
 fn check_entry_surface(root: I32) Void {
     let lib = -1
     let main = -1

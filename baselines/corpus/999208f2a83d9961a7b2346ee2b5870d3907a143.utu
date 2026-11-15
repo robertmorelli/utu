@@ -364,7 +364,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) Void {
     Browser.requestAnimationFrame(frame);
 }
 
-export main() Void {
+main {
     let document = Browser.document;
     let game = document.getElementById("game") orelse fatal;
     let starter = document.getElementById("starter") orelse fatal;

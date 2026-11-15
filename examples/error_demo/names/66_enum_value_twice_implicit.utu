@@ -5,6 +5,7 @@ enum(U8) Level:
     | Mid
     | Max = 0
 
-export main() I32 {
-    Level.Max.i32();
+main {
+    console.log(Level.Max.i32());
 }
+using console from std:Console

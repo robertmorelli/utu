@@ -5,6 +5,7 @@ using Order from std:Ord;
 
 fn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }
 
-export main() Str {
-    Order[Str].max_of(["aaaa", "b", "cc"]);
+main {
+    console.log(Order[Str].max_of(["aaaa", "b", "cc"]));
 }
+using console from std:Console

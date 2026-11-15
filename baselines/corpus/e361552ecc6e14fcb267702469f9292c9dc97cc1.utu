@@ -1,8 +1,8 @@
 
         using Browser from std:Browser;
         fn unused() Browser.HTMLElement { @wutu/\ div { color: magenta; "DEAD-COMPONENT"; } \/; }
-        export main() Browser.HTMLElement {
-          @wutu/\
+        main {
+          Browser.document.body.append(@wutu/\
           div.card {
             color: red;
             class="extra";
@@ -14,6 +14,6 @@
             }
             if true { p { "present"; } } else { p { "absent"; } }
           }
-          \/;
+          \/);
         }
       

@@ -1,7 +1,7 @@
 enum Shape:
   | Circle { radius: I32 }
   | Rect { width: I32 }
-export lib {
+lib {
   fn bad(s: Shape) I32 {
     alt s {
       Circle => 1,

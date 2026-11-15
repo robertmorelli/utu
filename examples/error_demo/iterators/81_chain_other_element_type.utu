@@ -1,5 +1,6 @@
 // What: chain appends an array of another element type
 // Expect: Expected I32, got Str (the chained array's elements continue the pipeline)
-export main() I32 {
-    [1, 2, 3] chain(["a"]) count;
+main {
+    console.log([1, 2, 3] chain(["a"]) count);
 }
+using console from std:Console

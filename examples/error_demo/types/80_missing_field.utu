@@ -4,7 +4,8 @@ struct Rect:
     | w: F64
     | h: F64
 
-export main() I32 {
+main {
     let r = Rect { w: 2.0 };
-    r.w.i32();
+    console.log(r.w.i32());
 }
+using console from std:Console

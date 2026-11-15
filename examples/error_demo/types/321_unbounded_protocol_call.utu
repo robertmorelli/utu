@@ -10,6 +10,7 @@ mod Largest[T] {
     }
 }
 
-export main() I32 {
-    Largest[I32].of([3, 9, 4]);
+main {
+    console.log(Largest[I32].of([3, 9, 4]));
 }
+using console from std:Console

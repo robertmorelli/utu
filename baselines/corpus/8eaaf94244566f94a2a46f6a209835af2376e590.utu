@@ -1,1 +1,2 @@
-export main() I32 { await for ([1, 2]) |x| { x; }; 1; }
+main { await for ([1, 2]) |x| { x; }; console.log(1); }
+using console from std:Console

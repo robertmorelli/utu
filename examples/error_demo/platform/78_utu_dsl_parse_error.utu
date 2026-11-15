@@ -1,7 +1,8 @@
 // What: an @utu body that is not a complete expression
 // Expect: @utu: could not parse the body as an expression (pointing at the dangling +)
 
-export main() I32 {
+main {
     let x: I32 = @utu/\ 1 + \/;
-    x;
+    console.log(x);
 }
+using console from std:Console

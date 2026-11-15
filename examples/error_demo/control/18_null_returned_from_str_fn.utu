@@ -5,6 +5,7 @@ fn find_user(id: I32) Str {
     null;
 }
 
-export main() Str {
-    find_user(1);
+main {
+    console.log(find_user(1));
 }
+using console from std:Console

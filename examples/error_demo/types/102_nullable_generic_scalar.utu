@@ -6,7 +6,8 @@ mod Box[T] {
     fn &.empty() & { &{ v: null }; }
 }
 
-export main() I32 {
+main {
     let b = Box[I32].empty();
-    0;
+    console.log(0);
 }
+using console from std:Console

@@ -2,8 +2,9 @@
 // Expect: all three, in file order, with a count at the end
 fn add(a: I32, b: I32) I32 { a + b; }
 
-export main() I32 {
+main {
     let s: Str = 5;
     let n = add(1, "two");
-    missing_function(n);
+    console.log(missing_function(n));
 }
+using console from std:Console

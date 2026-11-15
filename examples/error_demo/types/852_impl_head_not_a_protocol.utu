@@ -10,6 +10,7 @@ fn Rec[Sq].area |self| () I32 {
     self.s * self.s;
 }
 
-export main() I32 {
-    Sq { s: 2 }.s;
+main {
+    console.log(Sq { s: 2 }.s);
 }
+using console from std:Console

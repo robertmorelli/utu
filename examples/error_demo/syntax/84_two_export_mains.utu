@@ -1,9 +1,10 @@
-// What: two `export main` entry points in one file.
-// Expect: entry surface: multiple export main declarations.
-export main() I32 {
-    1;
+// What: two `main` entry points in one file.
+// Expect: entry surface: multiple main declarations.
+main {
+    console.log(1);
 }
 
-export main() I32 {
-    2;
+main {
+    console.log(2);
 }
+using console from std:Console

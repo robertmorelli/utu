@@ -10,7 +10,8 @@ fn P[A].n |a| () I32 { a.x; }
 fn P.dflt |p| () I32 { p.n(); }
 fn P.dflt |p| () I32 { 99; }
 
-export main() I32 {
+main {
     let p: P = A { x: 1 };
-    p.dflt();
+    console.log(p.dflt());
 }
+using console from std:Console

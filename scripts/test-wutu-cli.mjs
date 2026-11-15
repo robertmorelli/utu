@@ -10,7 +10,7 @@ const cli = path.resolve('cli/wutu.mjs');
 const dir = await fs.mkdtemp(path.resolve('.tmp-wutu-cli-'));
 const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
 const app = (heading) => `using Browser from std:Browser;
-export main() Void {
+main {
     let view = @wutu/\\
     @reactive;
     main {
@@ -47,10 +47,10 @@ let child;
 try {
   // format
   const messy = path.join(dir, 'messy.utu');
-  await fs.writeFile(messy, 'export main() I32 { let a = 1; a; }\n');
+  await fs.writeFile(messy, 'main { let a = 1; console.log(a); }\nusing console from std:Console\n');
   assert.equal(run('format', messy, '--check').status, 1, 'unformatted file fails --check');
   assert.equal(run('format', messy).status, 0);
-  assert.equal(await fs.readFile(messy, 'utf8'), 'export main() I32 {\n    let a = 1;\n    a;\n}\n');
+  assert.equal(await fs.readFile(messy, 'utf8'), 'main {\n    let a = 1;\n    console.log(a);\n}\nusing console from std:Console\n');
   assert.equal(run('format', messy, '--check').status, 0, 'formatted file passes --check');
   assert.equal(run('format').status, 2, 'format without files is a usage error');
   // A file that does not parse is left as it is, and says so.

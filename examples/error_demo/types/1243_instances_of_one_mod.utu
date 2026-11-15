@@ -3,4 +3,5 @@
 mod cell[T] { struct Cell: | value : T  fn wrap(value: T) Cell { Cell { value: value }; } }
 using cell[I32] |a|; using cell[Str] |b|;
 fn f(x: a.Cell) I32 { x.value; }
-export main() I32 { f(b.wrap("a")); }
+main { console.log(f(b.wrap("a"))); }
+using console from std:Console

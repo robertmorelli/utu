@@ -106,7 +106,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
     }
     \/
 }
-export main() Void {
+main {
     let state = @stored/\
         TempoState "tempo-v2" manual validate valid_tempo
         TempoState {

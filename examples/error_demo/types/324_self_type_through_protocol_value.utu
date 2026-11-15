@@ -7,7 +7,8 @@ struct Version[Ord]:
 
 fn Ord[Version].cmp |a| (b: Version) I32 { a.major - b.major; }
 
-export main() I32 {
+main {
     let all: Array[Ord] = [Version { major: 2 }, Version { major: 3 }];
-    all[0].cmp(all[1]);
+    console.log(all[0].cmp(all[1]));
 }
+using console from std:Console
