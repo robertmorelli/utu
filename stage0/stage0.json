@@ -1,11 +1,11 @@
 {
-  "commit": "763a83cdf849b153d78ada94f78ade0653ef1ef5",
-  "selfhostTree": "e263de0d4d0422e5e8cbdbf925079883ce089e42",
-  "sourcesHash": "ccd4e0e0c4f8e4b27e3498bcd61aefb66f81d4b111e6e9d827efe784e6ec19a1",
-  "sha256": "8719e1d2c6cdd8aded574d99fe8b1d8ab91837190bcfe57ec3d21a631cabfbbf",
-  "bytes": 510153,
-  "builtBy": "8dfaaf7705025dd2e05b4183147bd527a10c3fd78b35257ff71f4c86c43b01a6",
+  "commit": "d52d8eecda1be1a3ae5bdf9ea87bd22780a0b1d6",
+  "selfhostTree": "42335cfd301c9b6fd458ac6fbef51f10a073df00",
+  "sourcesHash": "fce8460ce85c1fd640b9e339338601d25c90b8f1dfc24946cdc7a07a776a99b5",
+  "sha256": "2c0db085ee0f7bb7f6b658357b64321ce59cbd8aed2f96eb8f18196b7b88e61f",
+  "bytes": 522752,
+  "builtBy": "8719e1d2c6cdd8aded574d99fe8b1d8ab91837190bcfe57ec3d21a631cabfbbf",
   "node": "v25.8.1",
-  "date": "2026-11-05T13:11:44.095Z",
-  "reason": "establish reproducible self-hosted bootstrap provenance"
+  "date": "2026-11-15T04:33:05.332Z",
+  "reason": "knows x.i32(), Tag(n), and template str: before conversions by type name, step B"
 }
