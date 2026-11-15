@@ -85,8 +85,12 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     ))),
 
     // Functions: fn name self? ( params? ) return_type (block | => expr)
-    fn_decl: ($) =>
+    fn_decl: ($) => choice(
       seq('fn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', $.return_type, $._fn_body),
+      // `gn g(…) T { … }`: a generator of Ts, as `fn g(…) yield T` is.
+      seq('gn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', alias($._yields, $.return_type), $._fn_body)),
+    _yields: ($) => alias($._yielded, $.yield_type),
+    _yielded: ($) => $._type,
     // `=> expr`: a block of that one expression, ended as a statement is.
     _fn_body: ($) => choice($.block, alias($._arrow_body, $.block)),
     _arrow_body: ($) => seq('=>', $._expr, $._end),

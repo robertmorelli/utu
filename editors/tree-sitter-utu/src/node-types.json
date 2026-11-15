@@ -12064,6 +12064,10 @@
     "named": false
   },
   {
+    "type": "gn",
+    "named": false
+  },
+  {
     "type": "group_by",
     "named": false
   },

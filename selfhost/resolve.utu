@@ -981,9 +981,15 @@ fn imported_modules_text(item: I32) Str {
 }
 
 /// A declaration of a file named like a module of the prelude, reported at
-/// its name: the compiler's own `Str` or `Array` is the prelude's.
+/// its name: the compiler's own `Str` or `Array` is the prelude's. (A short
+/// name, `S` for Str, is a file's to declare.)
 fn standard_name(decl: I32, name_at: I32) void {
-    if decl_name[decl] >= 0 and prelude_lookup(decl_name[decl]) >= 0 { report(Diag.StandardName, name_at, decl_name[decl]) }
+    if decl_name[decl] >= 0 and prelude_lookup(decl_name[decl]) >= 0 and not short_type_name(decl_name[decl]) { report(Diag.StandardName, name_at, decl_name[decl]) }
+}
+
+fn short_type_name(word: I32) Bool {
+    let t = word_text(word)
+    t == "S" or t == "B" or t == "U" or t == "I" or t == "F"
 }
 
 /// The node naming a top-level item, or -1.
@@ -1042,6 +1048,13 @@ fn declare_program() void {
                 }
             }
         }
+    }
+    // Short names of common types, as the prelude's (a file's own S comes
+    // first). A name no file has written is not bound.
+    for (["S", "B", "U", "I", "F"], ["Str", "Bool", "U64", "I64", "F64"]) |short, long| {
+        let s = intern_text(short)
+        let l = intern_text(long)
+        if s < word_top.len() and l < word_top.len() and lookup(l) >= 0 { bind(s, lookup(l)) }
     }
     prelude_binds[0] = scope_mark()
     for (0 ..< import_file.len()) |i| { bind_import(i) }
@@ -1845,6 +1858,12 @@ fn walk_types(node: I32, w: Walk) void {
 
 fn walk_type(node: I32, w: Walk) void {
     let kind = node_kind[node]
+    // `Void` (or `V`) where no declaration has the name: no value.
+    if kind == Node.Ref_type.i32() and is_kind(first_child(node), Node.Type_ident) and lookup(word_of(first_child(node))) < 0
+        and (node_text(first_child(node)) == "Void" or node_text(first_child(node)) == "V") {
+        node_kind[node] = Node.Void_type.i32()
+        return
+    }
     if kind == Node.Ref_type.i32() {
         let c = first_child(node)
         as_type(c, if is_kind(c, Node.Type_ident) { walk_type_name(c, w) } else { walk_type_path(c, w) })

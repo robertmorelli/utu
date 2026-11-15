@@ -255,6 +255,7 @@ enum(U8) Kw:
     | True
     | False
     | Null
+    | Gn
 
 /// The tokens the parser reads (positions of the lexer's tokens, without
 /// comments).
@@ -588,7 +589,7 @@ fn item(p: Parser) void {
     }
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
     if w == Kw.Proto.i32() { proto_decl(p); return }
-    if w == Kw.Fn.i32() { fn_or_op_decl(p); return }
+    if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
     if w == Kw.Let.i32() {
         let e = begin_statement(p)
         global_decl(p)
@@ -631,7 +632,7 @@ fn module_item(p: Parser) void {
     if w == Kw.Type.i32() { type_decl(p); return }
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
     if w == Kw.Proto.i32() { proto_decl(p); return }
-    if w == Kw.Fn.i32() { fn_or_op_decl(p); return }
+    if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
     if w == Kw.Let.i32() {
         let e = begin_statement(p)
         global_decl(p)
@@ -877,6 +878,8 @@ fn proto_member(p: Parser) I32 {
 fn fn_or_op_decl(p: Parser) I32 {
     let at = mark()
     let first = p.pos
+    // `gn g(…) T { … }`: a generator of Ts, as `fn g(…) yield T` is.
+    let generator = is_kw(p, Kw.Gn)
     advance(p)
     // `fn T:op |a, b| R { … }` is an operator; `fn T.name(…)` and `fn name(…)` are functions.
     if not shaped(p) or is(p, Tok.Amp) {
@@ -897,9 +900,19 @@ fn fn_or_op_decl(p: Parser) I32 {
     expect(p, Tok.LParen)
     if not is(p, Tok.RParen) { param_list(p) }
     expect(p, Tok.RParen)
-    return_type(p)
+    if generator { yields(p) } else { return_type(p) }
     function_body(p)
     node(p, Node.Fn_decl, at, first)
+}
+
+/// A `gn`'s result `T`: the type it yields, as `yield T` is.
+fn yields(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    let inner = mark()
+    type_(p)
+    node(p, Node.Yield_type, inner, first)
+    node(p, Node.Return_type, at, first)
 }
 
 /// A function's body: a block, or `=> expr`, a block of that one
