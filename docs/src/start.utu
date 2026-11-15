@@ -78,7 +78,7 @@ mod start {
                 code {
                     "export main";
                 }
-                ". A block's last expression is its value, and every statement ends with a semicolon.";
+                ". A block's last expression is its value, and every statement ends with a semicolon, but for one that ends at a } that ends its line (if, for, while, match, alt).";
             }
             = code.block(hello_sample());
             = code.shell(run_sample());

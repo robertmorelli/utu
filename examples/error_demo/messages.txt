@@ -1143,6 +1143,9 @@ ok
    │            ━
    │            ╰─ here
  9 │ }
+
+  fix   Return I32
+ 5 │ fn log_twice(s: Str) I32 {
 --- exit 1
 
 === utu check examples/error_demo/control/64_missing_final_value.utu
@@ -7939,19 +7942,15 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/03_missing_semicolon_after_if_block.utu
- ERROR  Missing ; after }
-        missing-semicolon · examples/error_demo/syntax/03_missing_semicolon_after_if_block.utu:6:5
+ ERROR  Expected ';', got 'x'
+        parse-error · examples/error_demo/syntax/03_missing_semicolon_after_if_block.utu:4:30
 
- 4 │     if x > 10 {
- 5 │         return 10;
- 6 │     }
-   │     ━
-   │     ╰─ ;?
- 7 │     x;
- 8 │ }
-
-  fix   Add ;
- 6 │     };
+ 2 │ // Expect: expected ';' before x (a `}` that ends its line needs none).
+ 3 │ fn clamp(x: I32) I32 {
+ 4 │     if x > 10 { return 10; } x;
+   │                              ━
+   │                              ╰─ ';'?
+ 5 │ }
 --- exit 1
 
 === utu check examples/error_demo/syntax/04_missing_closing_brace_eof.utu
@@ -9879,6 +9878,9 @@ FAIL after tests: boom
  3 │ export main() void { return 1; }
    │                             ━
    │                             ╰─ here
+
+  fix   Return I32
+ 3 │ export main() I32 { return 1; }
 --- exit 1
 
 === utu check examples/error_demo/types/1182_alt_other_instance.utu
@@ -11387,16 +11389,21 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/73_not_callable_struct_name.utu
- ERROR  Unexpected '('
-        parse-error · examples/error_demo/types/73_not_callable_struct_name.utu:8:18
+ ERROR  Point is not callable
+        not-callable · examples/error_demo/types/73_not_callable_struct_name.utu:8:13
 
  6 │
  7 │ export main() I32 {
  8 │     let p = Point(1.0, 2.0);
-   │                  ━
-   │                  ╰─ unexpected
+   │             ━━━━━━━━━━━━━━━
+   │             ╰─ not a function
  9 │     p.x.to_i32();
 10 │ }
+
+  note  Point is a struct: write Point { x: …, y: … }
+
+  fix   Use Point { … }
+ 8 │     let p = Point { x: 1.0, y: 2.0 };
 --- exit 1
 
 === utu check examples/error_demo/types/740_generic_global_cycle.utu

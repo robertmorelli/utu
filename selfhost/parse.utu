@@ -1060,10 +1060,7 @@ fn bench_decl(p: Parser) I32 {
     advance(p);
     string_lit(p);
     expect(p, Tok.LBrace);
-    while (not is_kw(p, Kw.Measure)) {
-        expression(p);
-        expect(p, Tok.Semi);
-    };
+    while (not is_kw(p, Kw.Measure)) { statement(p); };
     let measure = mark();
     let start = p.pos;
     advance(p);
@@ -1165,12 +1162,49 @@ fn block(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
     expect(p, Tok.LBrace);
-    while (not is(p, Tok.RBrace)) {
-        expression(p);
-        expect(p, Tok.Semi);
-    };
+    while (not is(p, Tok.RBrace)) { statement(p); };
     advance(p);
     node(p, Node.Block, at, first);
+}
+
+/// A block's statement: an expression and its `;`. One that begins with
+/// `if`, `for`, `while`, `match`, `loop`, `alt`, `promote`, `try`, or a label,
+/// and ends at a `}` that ends its line, may leave the `;` out: the next line
+/// is the next statement (`for (xs) |x| { … }` then `-y;` is not a
+/// subtraction). On the `}`'s line, the expression goes on (`alt t { … } + 1;`).
+fn statement(p: Parser) void {
+    if not block_statement_ahead(p) {
+        expression(p);
+        expect(p, Tok.Semi);
+        return;
+    };
+    deeper(p);
+    let left = prefix(p);
+    // (`try { … }` without catch reads its own operators, as `try e` does: not one.)
+    if kind_at(p, -1) == Tok.RBrace.to_i32() and not is_kind(left, Node.Try_result_expr) and not is(p, Tok.Semi)
+        and line_ends_before(p) {
+        parse_depth[0] -= 1;
+        return;
+    };
+    extend(p, left, -1000, true);
+    expect(p, Tok.Semi);
+}
+
+/// Whether a line ends between the token before the cursor and the cursor's.
+fn line_ends_before(p: Parser) Bool {
+    for (tok_end[ptok[p.pos - 1]] ..< tok_start[ptok[p.pos]]) |i| { if src[i] == 10 { return true; }; };
+    false;
+}
+
+/// Whether the statement at the cursor begins as one that may end at its `}`.
+fn block_statement_ahead(p: Parser) Bool {
+    if not is_word(p) { return false; };
+    let w = word_id(p);
+    if w == Kw.If.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32() or w == Kw.Match.to_i32()
+        or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32() or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() {
+        return true;
+    };
+    shaped(p) and is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.LBrace);
 }
 
 fn capture(p: Parser) I32 {
@@ -1195,7 +1229,11 @@ fn expression(p: Parser) I32 { expr(p, -1000, true); }
 /// when `or_equal` (the rule this operand belongs to is right-associative).
 fn expr(p: Parser, min: I32, or_equal: Bool) I32 {
     deeper(p);
-    let left = prefix(p);
+    extend(p, prefix(p), min, or_equal);
+}
+
+/// `left` and the operations after it, as `expr` reads them; one `deeper` ends.
+fn extend(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     while (true) {
         let next = infix(p, left, min, or_equal);
         if next < 0 {
@@ -1654,7 +1692,9 @@ fn word_expression(p: Parser) I32 {
     if module_call_ahead(p) { return module_call(p); };
     let s = save(p);
     let type_name = not shaped(p);
-    leaf(p, if type_name { Node.Type_ident; } else { Node.Identifier; });
+    let name = leaf(p, if type_name { Node.Type_ident; } else { Node.Identifier; });
+    // `Tag(i)`, `Meters(x)`: a scalar kind made from its base (the call is infix's).
+    if type_name and is(p, Tok.LParen) { return name; };
     if type_name and is(p, Tok.LBrace) {
         field_inits(p);
         return node(p, Node.Struct_init, at, first);

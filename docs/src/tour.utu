@@ -1261,7 +1261,7 @@ mod tour {
                 "Functions";
             }
             p {
-                "The result type follows the parameters, and the last expression is the result. Every statement ends with a semicolon. ";
+                "The result type follows the parameters, and the last expression is the result. Every statement ends with a semicolon; an if, for, while, match, alt, promote, try, or labeled block whose } ends its line may leave it out. ";
                 code {
                     "-o";
                 }

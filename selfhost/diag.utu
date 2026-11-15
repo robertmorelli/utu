@@ -510,8 +510,8 @@ fn diag_text(i: I32) Str {
         },
         Diag.MissingField => if a >= 0 { decl_text(a) + " needs a value for " + w; } else { "Missing field " + w; },
         Diag.NullableAccess => {
-            // A name the compiler calls for you (a template's to_str, a loop's iterator, indexing): just the type.
-            if w == "to_str" or w == "iterator" or w == "get_index" or w == "set_index" { return type_text(a) + " may be null"; };
+            // A name the compiler calls for you (a template's str, a loop's iterator, indexing): just the type.
+            if w == "str" or w == "to_str" or w == "iterator" or w == "get_index" or w == "set_index" { return type_text(a) + " may be null"; };
             "." + w + " on nullable " + type_text(a);
         },
         Diag.MemIndex => mem_word(word) + " " + w + " takes one index",

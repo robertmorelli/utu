@@ -365,7 +365,7 @@ fn user_declares(word: I32) Bool {
 /// @pure_flags's entry `i`.
 fn pure_flag(i: I32) Bool {
     if pure_words.len() == 0 {
-        for (["to_i32", "to_u32", "to_i64", "to_u64", "to_f32", "to_f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)); };
+        for (["to_i32", "to_u32", "to_i64", "to_u64", "to_f32", "to_f64", "to_str", "i32", "u32", "i64", "u64", "f32", "f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)); };
         pure_words.push(known_word(Known.ToStr));
         for (0 ..< pure_words.len()) |j| { pure_flags.push(if user_declares(pure_words[j]) { 1; } else { 0; }); };
         pure_flags.push(if user_declares(-1) { 1; } else { 0; });

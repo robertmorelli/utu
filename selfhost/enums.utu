@@ -59,7 +59,7 @@ fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
 /// method emits nothing), or -1 when `word` is no such method.
 fn scalar_method(decl: I32, word: I32) I32 {
     let base = scalar_base(decl);
-    if word != conversion_word(true, base) { return -1; };
+    if word != conversion_word(true, base) and word != base_word(base) { return -1; };
     base;
 }
 
@@ -67,6 +67,12 @@ fn scalar_method(decl: I32, word: I32) I32 {
 fn conversion_word(to: Bool, base: I32) I32 {
     let name = Prelude.name(Prelude.from_i32(prelude_index(base)));
     intern_text(if to { "to_"; } else { "from_"; } + Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()));
+}
+
+/// `i32` for I32: a value's conversion to a base type (`t.i32()`).
+fn base_word(base: I32) I32 {
+    let name = Prelude.name(Prelude.from_i32(prelude_index(base)));
+    intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()));
 }
 
 fn prelude_index(t: I32) I32 {

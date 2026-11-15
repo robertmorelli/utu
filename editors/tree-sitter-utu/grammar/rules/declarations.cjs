@@ -172,7 +172,7 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // Tests and benchmarks
     test_decl: ($) => seq('test', $.string_lit, $.block),
     bench_decl: ($) =>
-      seq('bench', $.string_lit, '{', repeat(seq($._expr, ';')), $.measure_decl, '}'),
+      seq('bench', $.string_lit, '{', repeat($._statement), $.measure_decl, '}'),
     measure_decl: ($) => seq('measure', $.block),
   };
 };

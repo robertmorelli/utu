@@ -11,8 +11,9 @@ const options = buildGrammarOptions();
 module.exports = grammar({
   name: 'utu',
   word: options.word,
-  // A DSL's envelope: `/\`, its text, and the balancing `\/` (src/scanner.c).
-  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close],
+  // A DSL's envelope: `/\`, its text, and the balancing `\/` (src/scanner.c);
+  // and the line end that ends `for … { … }` without its `;`.
+  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close, $._statement_end],
   extras: options.extras,
   conflicts: options.conflicts,
   rules: {

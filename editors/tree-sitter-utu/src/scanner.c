@@ -10,7 +10,7 @@
 // Three tokens, so editors can inject a payload's own language into exactly
 // its text: `/\` (hidden), the text between (`dsl_text`, absent when empty),
 // and the `\/` that balances the opener (hidden).
-enum { DSL_OPEN, DSL_TEXT, DSL_CLOSE };
+enum { DSL_OPEN, DSL_TEXT, DSL_CLOSE, STATEMENT_END };
 
 void *tree_sitter_utu_external_scanner_create(void) { return NULL; }
 void tree_sitter_utu_external_scanner_destroy(void *p) { (void)p; }
@@ -27,10 +27,45 @@ static void skip_string(TSLexer *l) {
   if (l->lookahead == '"') l->advance(l, false);
 }
 
+/** Whether the word at the lexer is `w` (and only it): looked at, not taken. */
+static bool word_is(TSLexer *l, const char *w) {
+  for (; *w; w++) {
+    if (l->lookahead != *w) return false;
+    l->advance(l, false);
+  }
+  return !(iswalnum(l->lookahead) || l->lookahead == '_');
+}
+
+/**
+ * Zero width, after a statement that ends at `}` (`for … { … }`): a line ends
+ * before the next token, and it is not `;`, `else`, or `catch` (which go on).
+ * The self-hosted parser's rule (selfhost/parse.utu, `statement`).
+ */
+static bool statement_end(TSLexer *l) {
+  l->mark_end(l);
+  bool line = false;
+  for (;;) {
+    if (l->lookahead == '\n') { line = true; l->advance(l, true); }
+    else if (iswspace(l->lookahead)) l->advance(l, true);
+    else if (l->lookahead == '/') {
+      // A comment ends its line; a `/` that begins no comment is an operator.
+      l->advance(l, true);
+      if (l->lookahead != '/') return false;
+      while (!l->eof(l) && l->lookahead != '\n') l->advance(l, true);
+    } else break;
+  }
+  if (!line || l->lookahead == ';') return false;
+  if (l->lookahead == 'e' && word_is(l, "else")) return false;
+  if (l->lookahead == 'c' && word_is(l, "catch")) return false;
+  l->result_symbol = STATEMENT_END;
+  return true;
+}
+
 bool tree_sitter_utu_external_scanner_scan(void *p, TSLexer *l, const bool *valid) {
   (void)p;
   // (Error recovery asks for every token at once: none of these is a guess.)
   if (valid[DSL_OPEN] && valid[DSL_TEXT] && valid[DSL_CLOSE]) return false;
+  if (valid[STATEMENT_END] && !valid[DSL_OPEN] && !valid[DSL_TEXT] && !valid[DSL_CLOSE]) return statement_end(l);
   if (valid[DSL_OPEN]) {
     while (iswspace(l->lookahead)) l->advance(l, true);
     if (l->lookahead != '/') return false;

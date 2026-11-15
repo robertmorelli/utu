@@ -44,7 +44,7 @@ const cases = [
   // Captures are not split at their comma; an empty block stays `{}`.
   ['fn h(xs: Array[I32]) I32 { xs fold(0) |a, b| { a + b; }; }\nfn k() void {}\n', 'fn h(xs: Array[I32]) I32 {\n    xs fold(0) |a, b| {\n        a + b;\n    };\n}\nfn k() void {}\n'],
   // Not a program: left alone.
-  ['fn b(x: Bool) I32 {\n    if x { 1; }\n    else { 2; }\n}\n', null],
+  ['fn b(x: Bool) I32 {\n    if x { 1; } else { 2; } 3;\n}\n', null],
 ];
 for (const [source, expected] of cases) {
   const { text, refused } = await formatUtu(source, { shape });

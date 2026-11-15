@@ -1069,6 +1069,8 @@ fn to_str_of(rt: I32, e: I32, m: I32, cx: Cx) void {
         return;
     };
     let decl = member(ty_decl(rt), word, Space.Method);
+    // (Until stage 0 knows `str`: a type's `to_str`.)
+    if decl < 0 { decl = member(ty_decl(rt), intern_text("to_str"), Space.Method); };
     if decl < 0 {
         report2(Diag.UnknownMethod, e, word, rt, -1);
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
@@ -2025,7 +2027,48 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx); };
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx); };
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx); };
+    if is_kind(callee, Node.Type_ident) { return call_scalar_kind(node, callee, args, m, cx); };
     call_value(callee, args, m, node, cx);
+}
+
+/// `Point(1.0, 2.0)` for a struct: a note of its literal, and a fix when
+/// the values are as many as its fields (in their order).
+fn suggest_struct_init(node: I32, decl: I32, args: I32) void {
+    let name = word_text(decl_name[decl]);
+    let shown = "";
+    let made = "";
+    let fields = 0;
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    let c = first_child(fields_holder(decl));
+    while (c >= 0) {
+        if is_kind(c, Node.Field) {
+            let field = word_text(word_of(first_child(c)));
+            let sep = if fields == 0 { ""; } else { ", "; };
+            shown = shown + sep + field + ": …";
+            made = made + sep + field + ": " + if a >= 0 { node_text(a); } else { ""; };
+            if a >= 0 { a = next_sibling(a); };
+            fields += 1;
+        };
+        c = next_sibling(c);
+    };
+    diag_note(name + " is a struct: write " + name + " { " + shown + " }");
+    if fields > 0 and args >= 0 and fields == child_count(args) {
+        diag_fix(tok_start[node_first[node]], tok_end[node_last[node] - 1], name + " { " + made + " }", "Use " + name + " { … }");
+    };
+}
+
+/// `Tag(i)`, `Meters(x)`: an integer enum or a distinct type, made from its
+/// base's value (an enum's I32). Another type is no function.
+fn call_scalar_kind(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
+    let decl = node_decl[callee];
+    if decl < 0 { return finish_error(args, m, cx); };
+    let inst = instance_for(module_of(decl), cx.inst);
+    if not is_scalar_kind(decl) {
+        report2(Diag.NotCallable, node, -1, named(decl, inst), -1);
+        if decl_is(decl, Decl.Struct) { suggest_struct_init(node, decl, args); };
+        return finish_error(args, m, cx);
+    };
+    scalar_static(decl, inst, conversion_word(false, scalar_base(decl)), args, node, cx);
 }
 
 /// `f(…)`: a function, a host function, or a `fun` or `cl` value, by name.
@@ -3445,6 +3488,22 @@ fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
     ty_never();
 }
 
+/// `return v` where the function (or closure, or main) is written `void`: a
+/// fix that writes v's type there instead.
+fn suggest_result_type(node: I32, t: I32) void {
+    let p = parent_of(node);
+    while (p >= 0 and not (is_kind(p, Node.Fn_decl) or is_kind(p, Node.Op_decl) or is_kind(p, Node.Closure_expr)
+        or is_kind(p, Node.Export_main_decl) or is_kind(p, Node.Test_decl))) {
+        p = parent_of(p);
+    };
+    if p < 0 { return; };
+    let rt = child_of_kind(p, Node.Return_type);
+    if rt < 0 or not is_kind(first_child(rt), Node.Void_type) { return; };
+    let text = type_text(t);
+    let at = node_first[rt];
+    diag_fix(tok_start[at], tok_end[at], text, "Return " + text);
+}
+
 fn check_return(node: I32, cx: Cx) I32 {
     let ended = generator_return(node, cx);
     if ended >= 0 { return ended; };
@@ -3458,6 +3517,7 @@ fn check_return(node: I32, cx: Cx) I32 {
             // The function's name, unless the return is a closure's.
             let name = if cx.fi >= 0 and not in_closure(node) { decl_name[fi_decl[cx.fi]]; } else { -1; };
             report(Diag.ReturnValueFromVoid, value, name);
+            suggest_result_type(node, t);
         };
         want(value, cx.result, Why.Returns, if cx.fi >= 0 and not in_closure(node) { fi_decl[cx.fi]; } else { -1; }, -1);
         coerce(t, cx.result, value);

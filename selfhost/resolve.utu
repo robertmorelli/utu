@@ -2154,6 +2154,9 @@ fn walk_expr(node: I32, w: Walk) void {
         let decl = lookup(word);
         if ambiguous(decl, node) { return; };
         if decl < 0 { report_unknown(Diag.UnknownVariable, node, word, Seek.Value); } else { node_decl[node] = decl; };
+    } else if kind == Node.Type_ident.to_i32() {
+        // `Tag(i)`: a type called (the parser makes no other bare type an expression).
+        walk_owner_name(node);
     } else {
         walk_compound(node, kind, w);
     };

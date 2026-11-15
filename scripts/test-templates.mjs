@@ -41,7 +41,7 @@ try {
 fn f(p: P, q: ?Str) Str { \`p=\${p} q=\${q}\`; }
 export lib { fn run() Str { f(P { x: 1 }, null); } }
 `));
-  assert.deepEqual(errors.errors, ['?Str may be null', 'No method P.to_str']);
+  assert.deepEqual(errors.errors, ['?Str may be null', 'No method P.str']);
 
   // A comment inside `${…}`, and every escape's text.
   const text = await build(await write('text.utu', `export lib {
