@@ -446,6 +446,7 @@ fn diag_text(i: I32) Str {
             if a == 6 { return "Duplicate capture " + w; };
             if a == 7 { return "Duplicate protocol " + w; };
             if a == 8 { return "Duplicate local " + w + ": already a parameter"; };
+            if a == 9 { return "$" + w + " twice: bind it once, then write " + w; };
             let what = pick(a == 1, "parameter", pick(a == 2, "variant", pick(a == 3, "local", "declaration")));
             "Duplicate " + what + " " + w;
         },
@@ -638,6 +639,7 @@ fn diag_text(i: I32) Str {
         Diag.AmbiguousVariant => w + " is a variant of " + word_text(decl_name[a]) + " and of " + word_text(decl_name[b]) + ": write " + word_text(decl_name[a]) + "." + w + " or " + word_text(decl_name[b]) + "." + w,
         Diag.EsNative => w + " gets a JS function: that is a cl, not " + type_text(a),
         Diag.ExportFun => w + ": argument " + int_text(b) + " comes from JS, which gives a cl, not " + type_text(a),
+        Diag.TemplateValue => w + " has a $ type: call it, or name its types (let g: fun(I32) Str = " + w + ")",
         Diag.YieldPlace => "yield T is only a generator's result type",
         Diag.NotStruct => type_text(a) + " is not a struct: it has no fields to set",
         Diag.NewNotHost => "new makes host objects; " + w + " is not a host class",
@@ -852,6 +854,7 @@ fn diag_default_label(i: I32) Str {
         Diag.AmbiguousVariant => "ambiguous",
         Diag.EsNative => "a cl",
         Diag.ExportFun => "a cl",
+        Diag.TemplateValue => "which types?",
         Diag.YieldPlace => "not a type here",
         Diag.NotStruct => "no fields",
         Diag.NewNotHost => "not a host class",

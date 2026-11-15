@@ -1,0 +1,8 @@
+// What: a $T function named as a value, with no fun(…) type to bind its T
+// Expect: show has a $ type: call it, or name its types (let g: fun(I32) Str = show)
+fn show(x: $T) Str { `<${x}>`; }
+
+export main() I32 {
+    let g = show;
+    0;
+}

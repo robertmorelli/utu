@@ -680,7 +680,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
 /// @check_expr's work, by the node's kind.
 fn check_node(node: I32, expect: I32, cx: Cx) I32 {
     match Node(node_kind[node]) {
-        Node.Identifier => check_ident(node, cx),
+        Node.Identifier => if binder_count(node_decl[node]) > 0 { binder_fn_value(node_decl[node], node, expect); } else { check_ident(node, cx); },
         Node.Literal => check_literal(node, expect, cx),
         Node.Template_string => check_template(node, cx),
         Node.Paren_expr => check_expr(first_child(node), expect, cx),
@@ -2085,6 +2085,170 @@ fn suggest_struct_init(node: I32, decl: I32, args: I32) void {
     };
 }
 
+//! = \$T functions
+//!
+//! `fn max(a: $T, b: T) T`: T is a type parameter of the function, bound
+//! where it is written `$T`. Each call binds it to that argument's type
+//! (a number literal's waits for an argument that is not one, else takes
+//! the literals' type, as one alone would), and calls the function's
+//! instance for those types, its body checked in it as a generic module's
+//! is: a body that does not fit them is a mistake there, at this call.
+
+/// A function's parameter list, or -1.
+fn fn_params(decl: I32) I32 {
+    let c = first_child(decl_node[decl]);
+    while (c >= 0 and not is_kind(c, Node.Param_list)) { c = next_sibling(c); };
+    c;
+}
+
+/// How many `$T` function `decl` binds: 0 for one that is not a template.
+fn binder_count(decl: I32) I32 {
+    if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return 0; };
+    let params = fn_params(decl);
+    if params < 0 { 0; } else { binders_in(params, decl, 0); };
+}
+
+fn binders_in(node: I32, decl: I32, n: I32) I32 {
+    let most = n;
+    if is_kind(node, Node.Type_binder) {
+        let v = node_decl[first_child(node)];
+        if decl_is(v, Decl.ModuleParam) and decl_owner[v] == decl and decl_a[v] + 1 > most { most = decl_a[v] + 1; };
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        most = binders_in(c, decl, most);
+        c = next_sibling(c);
+    };
+    most;
+}
+
+/// The index of the type parameter of template `decl` that type node `tn`
+/// is (`$T` or `T`), or -1.
+fn var_of(tn: I32, decl: I32) I32 {
+    let n = tn;
+    if is_kind(n, Node.Type_binder) or is_kind(n, Node.Ref_type) { n = first_child(n); };
+    if not is_kind(n, Node.Type_ident) { return -1; };
+    let v = node_decl[n];
+    if decl_is(v, Decl.ModuleParam) and decl_owner[v] == decl { decl_a[v]; } else { -1; };
+}
+
+/// Whether type node `tn` names a type parameter of template `decl`.
+fn mentions_var(tn: I32, decl: I32) Bool {
+    if var_of(tn, decl) >= 0 { return true; };
+    let c = first_child(tn);
+    while (c >= 0) {
+        if mentions_var(c, decl) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
+/// Bind the type parameters of template `decl` that type node `tn` names to
+/// what they are in `t`, the argument's type, where not bound yet.
+fn bind_type(tn: I32, t: I32, decl: I32, bound: Array[I32]) void {
+    if tn < 0 or t < 0 or ty_has_error(t) { return; };
+    let v = var_of(tn, decl);
+    if v >= 0 {
+        if bound[v] < 0 { bound[v] = t; };
+        return;
+    };
+    let k = node_kind[tn];
+    if k == Node.Paren_type.i32() or k == Node.Return_type.i32() { return bind_type(first_child(tn), t, decl, bound); };
+    // `?T` from a ?X binds X; from an X (made nullable), X.
+    if k == Node.Nullable_type.i32() { return bind_type(first_child(tn), if ty_is(t, Ty.Nullable) { ty_a[t]; } else { t; }, decl, bound); };
+    if k == Node.Tuple_type.i32() and ty_is(t, Ty.Tuple) { return bind_list(first_child(tn), ty_a[t], decl, bound); };
+    if (k == Node.Func_type.i32() or k == Node.Closure_type.i32()) and (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) {
+        let c = first_child(tn);
+        while (c >= 0) {
+            if is_kind(c, Node.Type_list) { bind_list(first_child(c), ty_a[t], decl, bound); };
+            if is_kind(c, Node.Return_type) and ty_b[t] >= 0 { bind_type(c, ty_b[t], decl, bound); };
+            c = next_sibling(c);
+        };
+        return;
+    };
+    // `Array[$T]`: its type arguments, as the argument's instance has them.
+    if k == Node.Ref_type.i32() and is_kind(first_child(tn), Node.Instantiated_module_ref) and ty_inst(t) > 0 {
+        bind_list(first_child(last_child(first_child(tn))), inst_args[ty_inst(t)], decl, bound);
+    };
+}
+
+/// @bind_type over sibling type nodes from `first`, against list `ts`.
+fn bind_list(first: I32, ts: I32, decl: I32, bound: Array[I32]) void {
+    let c = first;
+    let i = 0;
+    while (c >= 0 and i < vl_len[ts]) {
+        bind_type(c, vl_item(ts, i), decl, bound);
+        c = next_sibling(c);
+        i += 1;
+    };
+}
+
+/// Of two number literals' types, the one both fit: the later of I32, U32,
+/// I64, U64, and a float over any integer (F64 over F32).
+fn wider_literal(a: I32, b: I32) I32 {
+    if a < 0 { return b; };
+    if b < 0 { return a; };
+    let order = [prelude(Prelude.I32), prelude(Prelude.U32), prelude(Prelude.I64), prelude(Prelude.U64), prelude(Prelude.F32), prelude(Prelude.F64)];
+    let ra = 0;
+    let rb = 0;
+    for (0 ..< order.len()) |i| {
+        if order[i] == a { ra = i; };
+        if order[i] == b { rb = i; };
+    };
+    if ra >= rb { a; } else { b; };
+}
+
+/// Template `decl` named as a value: its instance for the `fun(…)` expected
+/// (`let g: fun(I32) Str = show;`). With none, its types are unknown.
+fn binder_fn_value(decl: I32, node: I32, expect: I32) I32 {
+    let n = binder_count(decl);
+    if expect >= 0 and ty_is(expect, Ty.Fun) {
+        let bound = Array[I32].new(n, -1);
+        let p = first_child(fn_params(decl));
+        let i = 0;
+        while (p >= 0 and i < vl_len[ty_a[expect]]) {
+            bind_type(next_sibling(first_child(p)), vl_item(ty_a[expect], i), decl, bound);
+            p = next_sibling(p);
+            i += 1;
+        };
+        let complete = true;
+        let list = vl_begin();
+        for (0 ..< n) |i| {
+            if bound[i] < 0 { complete = false; };
+            vl_add(if bound[i] >= 0 { bound[i]; } else { ty_error(); });
+        };
+        let types = vl_end(list);
+        if complete { return fn_value_in(decl, instance(decl, types)); };
+    };
+    report(Diag.TemplateValue, node, decl_name[decl]);
+    error_value();
+}
+
+/// A call of template `decl`: its instance for the arguments' types, called.
+fn call_template(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
+    if is_generic(module_of(decl)) { return unsupported(at); };
+    let n = binder_count(decl);
+    let bound = Array[I32].new(n, -1);
+    let literal = Array[I32].new(n, -1);
+    let p = first_child(fn_params(decl));
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    while (p >= 0 and a >= 0) {
+        let tn = next_sibling(first_child(p));
+        let v = var_of(tn, decl);
+        if v >= 0 and is_number_literal(a) {
+            literal[v] = wider_literal(literal[v], type_only(a, -1, cx));
+        } else if mentions_var(tn, decl) {
+            bind_type(tn, type_only(a, -1, cx), decl, bound);
+        };
+        p = next_sibling(p);
+        a = next_sibling(a);
+    };
+    let list = vl_begin();
+    for (0 ..< n) |i| { vl_add(if bound[i] >= 0 { bound[i]; } else if literal[i] >= 0 { literal[i]; } else { ty_error(); }); };
+    let inst = instance(decl, vl_end(list));
+    call_with(fn_instance(decl, inst), args, 0, m, at, cx);
+}
+
 /// `F64(x)`, `I64(n)`: a number as number type `t`. A literal is read as
 /// `t` (`F64(0.1)`); another value converts, as `x.f64()` does.
 fn numeric_convert(t: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
@@ -2147,6 +2311,7 @@ fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
         report2(Diag.NotCallable, node, word_of(callee), t, -1);
         return finish_error(args, m, cx);
     };
+    if binder_count(decl) > 0 { return call_template(decl, args, m, node, cx); };
     call_with(fn_instance(decl, instance_for(module_of(decl), cx.inst)), args, 0, m, node, cx);
 }
 
@@ -2198,6 +2363,7 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
             return unsupported(node);
         };
         node_decl[name] = decl;
+        if binder_count(decl) > 0 { return call_template(decl, args, m, node, cx); };
         let inst = module_instance(module, -1, callee, cx);
         if inst < 0 { return finish_error(args, m, cx); };
         return call_with(fn_instance(decl, inst), args, 0, m, node, cx);
@@ -3242,6 +3408,10 @@ fn check_field(node: I32, expect: I32, cx: Cx) I32 {
 
 /// `m.f` or `T.f` named, not called: a `fun`. A generator is not a value.
 fn member_fn_value(node: I32, decl: I32, inst: I32) I32 {
+    if binder_count(decl) > 0 {
+        report(Diag.TemplateValue, node, decl_name[decl]);
+        return error_value();
+    };
     if is_generator(decl) {
         report(Diag.GeneratorCall, node, word_of(last_child(node)));
         return error_value();

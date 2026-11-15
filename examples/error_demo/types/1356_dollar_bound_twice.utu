@@ -1,0 +1,5 @@
+// What: a $T function binds T at two parameters
+// Expect: $T twice: bind it once, then write T
+fn same(a: $T, b: $T) Bool { a == b; }
+
+export main() I32 { if same(1, 2) { 1; } else { 0; }; }

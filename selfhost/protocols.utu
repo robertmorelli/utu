@@ -793,7 +793,7 @@ fn has_bound(param: I32, proto: I32) Bool {
 /// Whether `t`, the type of expression `e`, is a type argument of instance
 /// `inst` bounded by `proto`: `e`'s parameter's bounds (see @declared_param).
 fn bound_by(t: I32, proto: I32, inst: I32, e: I32) Bool {
-    if inst <= 0 { return false; };
+    if inst <= 0 or not decl_is(inst_module[inst], Decl.Module) { return false; };
     let declared = declared_param(e, inst);
     if declared == -1 { return false; };
     let p = first_child(next_sibling(first_child(decl_node[inst_module[inst]])));
@@ -844,6 +844,7 @@ fn declared_param(e: I32, inst: I32) I32 {
 
 /// @declared_param of a type as written.
 fn typed_param(tn: I32, inst: I32) I32 {
+    if not decl_is(inst_module[inst], Decl.Module) { return -2; };
     let p = arg_param(tn);
     if p < 0 { return -1; };
     if decl_owner[p] == inst_module[inst] { p; } else { -2; };
@@ -901,7 +902,7 @@ fn bound_fix(param: I32, proto: I32) void {
 /// be bounded by it. Whether that was reported (or, bounded but lacking m,
 /// already was where the module was instantiated).
 fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
-    if inst <= 0 { return false; };
+    if inst <= 0 or not decl_is(inst_module[inst], Decl.Module) { return false; };
     let proto = if f >= 0 { decl_a[f]; } else { proto_with_method(word); };
     if not decl_is(proto, Decl.Proto) { return false; };
     let module = inst_module[inst];
@@ -931,7 +932,7 @@ fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
 /// bounds are those of the parameter receiver `c` is declared as (see
 /// @declared_param), not of each parameter given rt: a concrete type has none.
 fn bound_default(rt: I32, word: I32, at: I32, inst: I32, c: I32) I32 {
-    if inst <= 0 { return -1; };
+    if inst <= 0 or not decl_is(inst_module[inst], Decl.Module) { return -1; };
     let declared = declared_param(c, inst);
     if declared == -1 { return -1; };
     let found = -1;

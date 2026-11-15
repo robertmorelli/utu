@@ -1,10 +1,9 @@
 # Generics
 
-Modules are utu's only unit of type parameters. `mod Stack[T] { … }` is a
-template: `Stack[I32]` and `Stack[Str]` are two instances, each checked and
-compiled on its own, with T replaced by its argument. There are no generic
-functions; a generic function is a function of a generic module
-(`Order[I32].max(3, 9)`).
+A module's type parameters make generic types: `mod Stack[T] { … }` is a
+template, and `Stack[I32]` and `Stack[Str]` are two instances, each checked
+and compiled on its own, with T replaced by its argument. A function takes
+its own type parameters with `$T` (below): `fn max(a: $T, b: T) T`.
 
 ```utu
 mod Stack[T] {
@@ -132,6 +131,36 @@ A protocol declared in a mod is named by its path, in a bound or in a
 struct's list alike: `mod Sorted[T[m.Ord]]`, `struct Tri[shapes.Area]:`.
 A type declared in a mod is too, where it implements one:
 `fn Area[geo.Sq].area |q| () I32 { … }`.
+
+## Functions: `$T`
+
+A parameter typed `$T` makes T a type parameter of the function. Each call
+binds it to that argument's type, and the other parameters and the result
+write `T`; `Array[$T]`, `?$T`, and `cl($T) $U` bind from inside a type.
+
+```utu
+fn max(a: $T, b: T) T { if a > b { a; } else { b; }; }
+fn first(xs: Array[$T]) T { xs[0]; }
+
+max(3, 7);           // max[I32]
+max(1, big);         // big: I64. A literal waits for an argument that is not one: max[I64]
+first(["a", "b"]);   // first[Str]
+```
+
+- Each T is bound in one place, its `$T`, so every T comes from an argument:
+  a second `$T` is an error (`$T twice: bind it once, then write T`).
+- Arguments are matched against their parameters' types, left to right; T
+  is never inferred from the result.
+- Number literals alone bind T as a literal would be typed alone: the
+  first of I32, U32, I64, U64 that fits them all, F32 or F64 for floats.
+- The body is checked once per binding, as a module instance is: one that
+  does not fit (`x.str()` for a struct with none) is a mistake there, with
+  the call marked `as f[Point] here`.
+- A `$T` function named as a value binds T from the `fun(…)` it is given
+  (`let g: fun(I32) Str = show;`); with none, it is an error.
+- Not yet in a generic module.
+
+`console.log(x: $T)` is one: it prints `x.str()` for any x that has one.
 
 ## What is checked
 

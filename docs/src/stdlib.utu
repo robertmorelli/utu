@@ -602,7 +602,7 @@ mod stdlib {
     }
     fn host_rows() Array[Str] {
         [
-        "console.log(text) warn(text) error(text)::the host console; using console from std:Console",
+        "console.log(x) warn(x) error(x)::the host console, x any value with a str(); using console from std:Console",
         "time.now() F64::milliseconds for measuring (performance.now); using time from std:Time",
         "time.epoch_ms() F64::milliseconds since 1970 (Date.now)",
         "NumberField.new(text)::a form field's draft text, kept apart from its number",

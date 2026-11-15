@@ -306,7 +306,7 @@ fn type_of(node: I32, inst: I32) I32 {
         };
         return nullable(t);
     };
-    if kind == Node.Paren_type.i32() { return type_of(first_child(node), inst); };
+    if kind == Node.Paren_type.i32() or kind == Node.Type_binder.i32() { return type_of(first_child(node), inst); };
     if kind == Node.Void_type.i32() { return ty_void(); };
     if kind == Node.Return_type.i32() { return type_of(first_child(node), inst); };
     if kind == Node.Tuple_type.i32() { return ty(Ty.Tuple, type_args(node, inst), 0); };

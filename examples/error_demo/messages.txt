@@ -10221,6 +10221,52 @@ FAIL after tests: boom
  4 │ export main() I32 { m[I32].f(m[I32].T { x: 1 }).x; }
 --- exit 1
 
+=== utu check examples/error_demo/types/1356_dollar_bound_twice.utu
+ ERROR  $T twice: bind it once, then write T
+        duplicate-declaration · examples/error_demo/types/1356_dollar_bound_twice.utu:3:19
+
+ 1 │ // What: a $T function binds T at two parameters
+ 2 │ // Expect: $T twice: bind it once, then write T
+ 3 │ fn same(a: $T, b: $T) Bool { a == b; }
+   │                   ━━
+   │                   ╰─ already declared
+ 4 │
+ 5 │ export main() I32 { if same(1, 2) { 1; } else { 0; }; }
+--- exit 1
+
+=== utu check examples/error_demo/types/1357_dollar_fn_value.utu
+ ERROR  show has a $ type: call it, or name its types (let g: fun(I32) Str = show)
+        template-value · examples/error_demo/types/1357_dollar_fn_value.utu:6:13
+
+ 4 │
+ 5 │ export main() I32 {
+ 6 │     let g = show;
+   │             ━━━━
+   │             ╰─ which types?
+ 7 │     0;
+ 8 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1358_console_log_no_str.utu
+ ERROR  No method Point.str
+        unknown-method · std:Console:12:35
+
+10 │
+11 │     /// A line on standard output (`console.log`): `x.str()`.
+12 │     fn log(x: $T) void { host_log(x.str()); }
+   │                                   ━━━━━━━
+   │                                   ╰─ no such method
+13 │
+14 │     /// A line on standard error, as a warning (`console.warn`): `x.str()`.
+
+   ╭─ examples/error_demo/types/1358_console_log_no_str.utu
+10 │     console.log(Point { x: 1, y: 2 });
+   │     ─────────────────────────────────
+   │     ╰─ as log[Point] here
+
+  note  in log[Point]
+--- exit 1
+
 === utu check examples/error_demo/types/1360_proto_result_type.utu
  ERROR  P[S].tick does not match the protocol: wants I32
         proto-signature · examples/error_demo/types/1360_proto_result_type.utu:6:21

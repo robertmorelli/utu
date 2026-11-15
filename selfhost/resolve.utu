@@ -266,6 +266,7 @@ enum(U8) Diag:
     | AmbiguousVariant // a bare variant two enums in scope declare (a: one enum, b: the other)
     | ImportCycle     // the `using` that closes an import cycle
     | ExportFun       // an `export lib` parameter typed `fun` (JS gives a `cl`; a: its type, b: its number)
+    | TemplateValue   // a `$T` function named as a value, with no `fun(…)` to bind its types
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -2062,6 +2063,31 @@ fn walk_bounds(list: I32, w: Walk) void {
     };
 }
 
+/// `$T` in a function's parameter types: T, the function's type parameter
+/// (decl_a its index), which each call's arguments bind; in scope for its
+/// parameters, result, and body. Returns the next index.
+fn declare_binders(node: I32, owner: I32, index: I32) I32 {
+    let i = index;
+    if is_kind(node, Node.Type_binder) {
+        let name = first_child(node);
+        let prev = lookup(word_of(name));
+        if decl_is(prev, Decl.ModuleParam) and decl_owner[prev] == owner {
+            report2(Diag.DuplicateDeclaration, node, word_of(name), 9, -1);
+            node_decl[name] = prev;
+            return i;
+        };
+        let d = declare_in_scope(Decl.ModuleParam, name, node, owner);
+        decl_a[d] = i;
+        return i + 1;
+    };
+    let c = first_child(node);
+    while (c >= 0) {
+        i = declare_binders(c, owner, i);
+        c = next_sibling(c);
+    };
+    i;
+}
+
 fn walk_params(list: I32, owner: I32, w: Walk) void {
     // A Wasm function takes at most 1000 parameters.
     let n = child_count(list);
@@ -2087,6 +2113,9 @@ fn walk_fn(item: I32, w: Walk) void {
     let decl = node_decl[last_child(name)];
     let mark = scope_mark();
     let c = next_sibling(name);
+    let params = c;
+    while (params >= 0 and not is_kind(params, Node.Param_list)) { params = next_sibling(params); };
+    if params >= 0 { declare_binders(params, decl, 0); };
     while (c >= 0) {
         let kind = node_kind[c];
         if kind == Node.Self_param.i32() {

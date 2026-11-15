@@ -158,6 +158,7 @@ enum(U8) Node:
     | Template_tail
     | Try_result_expr
     | Errdefer_expr
+    | Type_binder      // `$T` in a parameter's type: T, bound by the argument
 
 /// Every keyword of the grammar, as interned word ids: each is its variant's
 /// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
@@ -349,6 +350,7 @@ fn tok_spelling(kind: I32) Str {
         Tok.Semi => ";",
         Tok.Colon => ":",
         Tok.At => "@",
+        Tok.Dollar => "$",
         Tok.Dot => ".",
         Tok.DotDotDot => "...",
         Tok.DotDotLt => "..<",
@@ -1094,6 +1096,11 @@ fn base_type(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
     if is(p, Tok.Amp) { return promoted_type(p); };
+    if is(p, Tok.Dollar) {
+        advance(p);
+        type_ident(p);
+        return node(p, Node.Type_binder, at, first);
+    };
     if is(p, Tok.LParen) {
         advance(p);
         type_(p);

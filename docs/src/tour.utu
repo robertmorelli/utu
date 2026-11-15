@@ -20,6 +20,22 @@ mod tour {
         \\}
         ;
     }
+    fn dollar_sample() Str {
+        \\using console from std:Console;
+        \\
+        \\fn max(a: $T, b: T) T { if a > b { a; } else { b; }; }
+        \\fn first(xs: Array[$T]) T { xs[0]; }
+        \\fn show(x: $T) Str { `<${x}>`; }
+        \\
+        \\export main() void {
+        \\    let big: I64 = 5000000000;
+        \\    console.log(max(3, 7));          // 7: max[I32]
+        \\    console.log(max(1, big));        // 5000000000: T is I64
+        \\    console.log(first(["a", "b"]));  // a
+        \\    console.log(show(1.5));          // <1.5>
+        \\}
+        ;
+    }
     fn conversions_sample() Str {
         \\export main() F64 {
         \\    let count = 7;
@@ -1212,15 +1228,35 @@ mod tour {
                 "Literals and numbers";
             }
             p {
-                "Integers default to ";
+                "A literal with no type to take is the first of ";
                 code {
                     "I32";
                 }
-                " and floats to ";
+                ", ";
+                code {
+                    "U32";
+                }
+                ", ";
+                code {
+                    "I64";
+                }
+                ", ";
+                code {
+                    "U64";
+                }
+                " it fits; a float is ";
+                code {
+                    "F32";
+                }
+                " when it reads the same as F32 and as F64, else ";
                 code {
                     "F64";
                 }
-                "; an annotation picks another type. Numeric types are nominal, so every conversion is written out and costs one instruction.";
+                ". An annotation or ";
+                code {
+                    "F64(…)";
+                }
+                " picks another type. Numeric types are nominal, so every conversion is written out and costs one instruction.";
             }
             = code.block(literals_sample());
             = code.block(conversions_sample());
@@ -1539,7 +1575,7 @@ mod tour {
                 code {
                     "&";
                 }
-                " is the module's own type. Modules are also the only unit of type parameters: ";
+                " is the module's own type. A module's type parameters make generic types: ";
                 code {
                     "Stack[I32]";
                 }
@@ -1594,6 +1630,33 @@ mod tour {
             = code.block(generic_global_sample());
             = code.block(std_generic_sample());
             = code.block(files_multi());
+            h2 {
+                "Functions of any type: $T";
+            }
+            p {
+                "A parameter typed ";
+                code {
+                    "$T";
+                }
+                " makes T a type parameter of the function, which each call binds to that argument's type (a literal's waits for an argument that is not one). Other parameters and the result write ";
+                code {
+                    "T";
+                }
+                ". The body is checked for each binding, so one that does not fit (";
+                code {
+                    "x.str()";
+                }
+                " on a type with none) is a mistake at that call. ";
+                code {
+                    "console.log";
+                }
+                " is one: it prints any value's ";
+                code {
+                    "str()";
+                }
+                ".";
+            }
+            = code.block(dollar_sample());
             h2 {
                 "Protocols";
             }

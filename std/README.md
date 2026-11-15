@@ -64,8 +64,8 @@ host's own (JavaScript's string methods, `Math`).
   for the numbers and Str, and `Order[T[Ord]]`: `max`, `min`, `clamp`,
   `sort` (stable), `is_sorted`, `search`, `max_of`, `min_of`. See
   [generics](../docs/generics.md).
-- `std:Console` — `using console from std:Console;` then `console.log(text)`,
-  `warn`, `error`.
+- `std:Console` — `using console from std:Console;` then `console.log(x)`,
+  `warn`, `error`: any value with a `str()` (`console.log(42)`, a Str as is).
 - `std:Time` — `using time from std:Time;` then `time.now()` (milliseconds,
   for measuring) and `time.epoch_ms()`.
 

@@ -4,7 +4,9 @@ exports.buildTypeRules = function buildTypeRules() {
   return {
     _type: ($) => choice($.nullable_type, $._base_type),
     nullable_type: ($) => seq('?', $._base_type),
-    _base_type: ($) => choice($.ref_type, $.func_type, $.closure_type, $.paren_type, $.promoted_type, $.tuple_type),
+    _base_type: ($) => choice($.ref_type, $.func_type, $.closure_type, $.paren_type, $.promoted_type, $.tuple_type, $.type_binder),
+    // `fn max(a: $T, b: T) T`: T is the type of the argument for a, at each call.
+    type_binder: ($) => seq('$', $.type_ident),
     // .{I32, Tag} — several values at once, as a function's result. Tuples
     // live in locals and wasm results only; they are never stored.
     tuple_type: ($) => seq('.', '{', $._type, repeat(seq(',', $._type)), optional(','), '}'),

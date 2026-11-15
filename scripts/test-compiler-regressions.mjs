@@ -983,6 +983,15 @@ export lib {
     ['type Id = distinct U64;\nexport lib { fn run() Id { Id(18446744073709551615); } }\n', 18446744073709551615n],
     // Tag(i) of a value a variant has, in an enum with gaps.
     ['enum(I32) Gap:\n    | A = 1\n    | B = 5\nexport lib { fn run() I32 { Gap(5).i32() + Gap(1).i32(); } }\n', 6],
+    // $T: each call binds T to the argument written `$T`'s type (a literal's waits for one that is not a literal), an instance per binding.
+    ['fn mx(a: $T, b: T) T { if a > b { a; } else { b; }; }\nfn first(xs: Array[$T]) T { xs[0]; }\nfn pair(a: $A, b: $B) Str { `${a}${b}`; }\n'
+      + 'export lib { fn run() I64 { let big: I64 = 5000000000; mx(1, big) + mx(3, 7).i64() + first([2.5, 1.0]).i64() + pair(1, "x").len().i64(); } }\n', 5000000011n],
+    // A $T function as a value takes its types from the fun(…) wanted.
+    ['fn show(x: $T) Str { `<${x}>`; }\nfn apply(f: fun(I32) Str) I32 { f(7).len(); }\nexport lib { fn run() I32 { apply(show); } }\n', 3],
+    // Literals with no type to take: the first of I32, U32, I64, U64 they fit (3000000000 a U32, which wraps);
+    // a float F32 when it reads as F32 the same as F64 (0.5; h.f64() is no F64 method), else F64 (0.1).
+    ['export lib { fn run() U32 { let a = 3000000000; a + a; } }\n', 1705032704],
+    ['export lib { fn run() F64 { let h = 0.5; let t = 0.1; h.f64() + t + F64(0.25); } }\n', 0.85],
     // A computed global in a program with no `export main` (it crashed the compiler).
     ['let n: I32 = 1 + 1;\nlet k: cl() I32 = cl() { n * 10; };\nexport lib { fn run() I32 { k() + n; } }\n', 22],
     // A closure in a generator has its own try, errdefer, and return.
@@ -2034,6 +2043,13 @@ export lib {
       '@json decode gives ?Col, and an enum(U8) cannot be null: decode a struct with a Col field, or use error or match'],
     ['enum(U8) Col:\n    | Red\nstruct T:\n    | c: ?Col\nexport lib { fn run() Str { @json/\\ error T "{}" \\/; } }\n',
       '?Col is not supported: an enum(U8) cannot be null; use Col'],
+    // $T: bound once; a value needs its types; a body that does not fit a call's types is a mistake at that call.
+    ['fn f(a: $T, b: $T) I32 { 0; }\nexport lib { fn run() I32 { f(1, 2); } }\n', '$T twice: bind it once, then write T'],
+    ['fn show(x: $T) Str { "a"; }\nexport lib { fn run() I32 { let g = show; 0; } }\n', 'show has a $ type: call it, or name its types (let g: fun(I32) Str = show)'],
+    ['using console from std:Console;\nstruct Q:\n    | x: I32\nexport lib { fn run() I32 { console.log(Q { x: 1 }); 0; } }\n', 'No method Q.str'],
+    ['fn f(a: $T, b: T) T { a; }\nexport lib { fn run() I32 { let x: I64 = 1; f("s", x); 0; } }\n', 'f takes Str, got I64'],
+    // F64(x), I64(n): a literal of that type, or x converted.
+    ['export lib { fn run() I32 { let s = F64("a"); 0; } }\n', 'No method Str.f64'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
