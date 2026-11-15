@@ -12,132 +12,132 @@
 //! a reference to a defined type `h` is vt_defined + 2h (nullable) or + 2h + 1
 //! (non-null); a multi-value result is vt_tuple + a list of value types.
 
-let vt_none: I32 = 0;
-let vt_i32: I32 = 1;
-let vt_i64: I32 = 2;
-let vt_f32: I32 = 3;
-let vt_f64: I32 = 4;
-let vt_v128: I32 = 5;
+let vt_none: I32 = 0
+let vt_i32: I32 = 1
+let vt_i64: I32 = 2
+let vt_f32: I32 = 3
+let vt_f64: I32 = 4
+let vt_v128: I32 = 5
 /// (ref null extern).
-let vt_externref: I32 = 6;
+let vt_externref: I32 = 6
 /// (ref extern).
-let vt_extern: I32 = 7;
+let vt_extern: I32 = 7
 /// (ref null i31).
-let vt_i31ref: I32 = 8;
+let vt_i31ref: I32 = 8
 /// (ref null func).
-let vt_funcref: I32 = 9;
+let vt_funcref: I32 = 9
 /// (ref null eq).
-let vt_eqref: I32 = 10;
+let vt_eqref: I32 = 10
 /// (ref null any).
-let vt_anyref: I32 = 11;
+let vt_anyref: I32 = 11
 /// An expression that does not complete.
-let vt_unreachable: I32 = 12;
+let vt_unreachable: I32 = 12
 /// Packed, in fields and array elements.
-let vt_i8: I32 = 13;
-let vt_i16: I32 = 14;
-let vt_defined: I32 = 16;
-let vt_tuple: I32 = 268435456;
+let vt_i8: I32 = 13
+let vt_i16: I32 = 14
+let vt_defined: I32 = 16
+let vt_tuple: I32 = 268435456
 
 /// The value type of a reference to defined type `heap`.
-fn vt_ref(heap: I32, nullable: Bool) I32 { vt_defined + heap * 2 + if nullable { 0; } else { 1; }; }
+fn vt_ref(heap: I32, nullable: Bool) I32 { vt_defined + heap * 2 + if nullable { 0 } else { 1 } }
 
-fn vt_is_ref(vt: I32) Bool { (vt >= vt_externref and vt <= vt_anyref) or (vt >= vt_defined and vt < vt_tuple); }
+fn vt_is_ref(vt: I32) Bool { (vt >= vt_externref and vt <= vt_anyref) or (vt >= vt_defined and vt < vt_tuple) }
 
-fn vt_heap(vt: I32) I32 { (vt - vt_defined) / 2; }
+fn vt_heap(vt: I32) I32 { (vt - vt_defined) / 2 }
 
 /// The nullable form of a reference type (other types as they are).
 fn vt_nullable(vt: I32) I32 {
-    if vt == vt_extern { return vt_externref; };
-    if vt >= vt_defined and vt < vt_tuple { return vt - (vt - vt_defined) % 2; };
-    vt;
+    if vt == vt_extern { return vt_externref }
+    if vt >= vt_defined and vt < vt_tuple { return vt - (vt - vt_defined) % 2 }
+    vt
 }
 
-fn vt_tuple_of(list: I32) I32 { vt_tuple + list; }
+fn vt_tuple_of(list: I32) I32 { vt_tuple + list }
 
 //! = Lists of value types
 //!
 //! Interned, so a list is an id and equal lists are equal ids (function
 //! signatures compare as ints).
 
-vec vl_start: I32;
-vec vl_len: I32;
-vec vl_items: I32;
+vec vl_start: I32
+vec vl_len: I32
+vec vl_items: I32
 /// Open addressing over list ids, -1 empty.
-vec vl_table: I32;
+vec vl_table: I32
 /// The list being built.
-vec vl_pending: I32;
+vec vl_pending: I32
 
 fn vl_hash(start: I32, len: I32) I32 {
-    let h = len * 31;
-    for (0 ..< len) |i| { h = (h ^ vl_pending[start + i]) * 16777619; };
-    h;
+    let h = len * 31
+    for (0 ..< len) |i| { h = (h ^ vl_pending[start + i]) * 16777619 }
+    h
 }
 
 fn vl_same(list: I32, start: I32, len: I32) Bool {
-    if vl_len[list] != len { return false; };
-    let at = vl_start[list];
-    for (0 ..< len) |i| { if vl_items[at + i] != vl_pending[start + i] { return false; }; };
-    true;
+    if vl_len[list] != len { return false }
+    let at = vl_start[list]
+    for (0 ..< len) |i| { if vl_items[at + i] != vl_pending[start + i] { return false } }
+    true
 }
 
 /// Start a list; push its items with @vl_add, then @vl_end.
-fn vl_begin() I32 { vl_pending.len(); }
+fn vl_begin() I32 { vl_pending.len() }
 
-fn vl_add(vt: I32) void { vl_pending.push(vt); }
+fn vl_add(vt: I32) void { vl_pending.push(vt) }
 
 /// The list pushed since `mark`, interned: the id of an equal list when
 /// there is one.
 fn vl_end(mark: I32) I32 {
-    let len = vl_pending.len() - mark;
-    if (vl_start.len() + 1) * 2 > vl_table.len() { vl_grow(); };
-    let mask = vl_table.len() - 1;
-    let h = vl_hash(mark, len) & mask;
+    let len = vl_pending.len() - mark
+    if (vl_start.len() + 1) * 2 > vl_table.len() { vl_grow() }
+    let mask = vl_table.len() - 1
+    let h = vl_hash(mark, len) & mask
     while (vl_table[h] >= 0) {
         if vl_same(vl_table[h], mark, len) {
-            vl_pending.resize(mark);
-            return vl_table[h];
-        };
-        h = (h + 1) & mask;
-    };
-    let id = vl_start.len();
-    vl_start.push(vl_items.len());
-    vl_len.push(len);
-    for (0 ..< len) |i| { vl_items.push(vl_pending[mark + i]); };
-    vl_table[h] = id;
-    vl_pending.resize(mark);
-    id;
+            vl_pending.resize(mark)
+            return vl_table[h]
+        }
+        h = (h + 1) & mask
+    }
+    let id = vl_start.len()
+    vl_start.push(vl_items.len())
+    vl_len.push(len)
+    for (0 ..< len) |i| { vl_items.push(vl_pending[mark + i]) }
+    vl_table[h] = id
+    vl_pending.resize(mark)
+    id
 }
 
 fn vl_grow() void {
-    let n = if vl_table.len() == 0 { 64; } else { vl_table.len() * 2; };
-    vl_table.resize(n);
-    for (0 ..< n) |i| { vl_table[i] = -1; };
-    let mask = n - 1;
+    let n = if vl_table.len() == 0 { 64 } else { vl_table.len() * 2 }
+    vl_table.resize(n)
+    for (0 ..< n) |i| { vl_table[i] = -1 }
+    let mask = n - 1
     for (0 ..< vl_start.len()) |id| {
-        let mark = vl_pending.len();
-        for (0 ..< vl_len[id]) |i| { vl_pending.push(vl_items[vl_start[id] + i]); };
-        let h = vl_hash(mark, vl_len[id]) & mask;
-        while (vl_table[h] >= 0) { h = (h + 1) & mask; };
-        vl_table[h] = id;
-        vl_pending.resize(mark);
-    };
+        let mark = vl_pending.len()
+        for (0 ..< vl_len[id]) |i| { vl_pending.push(vl_items[vl_start[id] + i]) }
+        let h = vl_hash(mark, vl_len[id]) & mask
+        while (vl_table[h] >= 0) { h = (h + 1) & mask }
+        vl_table[h] = id
+        vl_pending.resize(mark)
+    }
 }
 
-fn vl_item(list: I32, i: I32) I32 { vl_items[vl_start[list] + i]; }
+fn vl_item(list: I32, i: I32) I32 { vl_items[vl_start[list] + i] }
 
 fn vl_one(vt: I32) I32 {
-    let m = vl_begin();
-    vl_add(vt);
-    vl_end(m);
+    let m = vl_begin()
+    vl_add(vt)
+    vl_end(m)
 }
 
-fn vl_empty() I32 { vl_end(vl_begin()); }
+fn vl_empty() I32 { vl_end(vl_begin()) }
 
 /// The value types of a result: none, one, or a tuple's.
 fn vl_of_result(vt: I32) I32 {
-    if vt >= vt_tuple { return vt - vt_tuple; };
-    if vt == vt_none or vt == vt_unreachable { return vl_empty(); };
-    vl_one(vt);
+    if vt >= vt_tuple { return vt - vt_tuple }
+    if vt == vt_none or vt == vt_unreachable { return vl_empty() }
+    vl_one(vt)
 }
 
 //! = Defined (heap) types
@@ -147,99 +147,99 @@ enum(U8) Heap:
     | Array
     | Func
 
-vec ht_kind: U8;
+vec ht_kind: U8
 /// Struct: first field (in ht_fields); Array: element; Func: parameters (a list)
-vec ht_a: I32;
+vec ht_a: I32
 /// Struct: field count; Array: 1 when mutable; Func: results (a list)
-vec ht_b: I32;
+vec ht_b: I32
 /// Supertype, or -1.
-vec ht_super: I32;
+vec ht_super: I32
 /// 1 when other types may extend it (not final)
-vec ht_open: U8;
+vec ht_open: U8
 /// 1 when it is its own recursion group (imports need these)
-vec ht_single: U8;
+vec ht_single: U8
 /// Per field: storage type, then 1 when mutable.
-vec ht_fields: I32;
+vec ht_fields: I32
 /// The syntax being checked when it was made (@cur_src), or -1: blame.utu's.
-vec ht_src: I32;
+vec ht_src: I32
 
 /// Function types are interned by signature; arrays by element; structs are
 /// nominal (two structs with the same fields are different types).
-vec ht_table: I32;   // open addressing over func and array types, -1 empty
+vec ht_table: I32   // open addressing over func and array types, -1 empty
 
 fn ht_new(kind: Heap, a: I32, b: I32) I32 {
-    let id = ht_kind.len();
-    ht_kind.push(kind.i32());
-    ht_a.push(a);
-    ht_b.push(b);
-    ht_super.push(-1);
-    ht_open.push(0);
-    ht_single.push(0);
-    ht_src.push(cur_src[0]);
-    id;
+    let id = ht_kind.len()
+    ht_kind.push(kind.i32())
+    ht_a.push(a)
+    ht_b.push(b)
+    ht_super.push(-1)
+    ht_open.push(0)
+    ht_single.push(0)
+    ht_src.push(cur_src[0])
+    id
 }
 
-fn ht_key_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 31 + a) * 16777619) ^ (b * 40503); }
+fn ht_key_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 31 + a) * 16777619) ^ (b * 40503) }
 
 /// The function or array type of this shape (`a` and `b` as in @ht_a and
 /// @ht_b), made when it is new. A `single` one is a different type from
 /// the same shape in the recursion group.
 fn ht_intern(kind: Heap, a: I32, b: I32, single: Bool) I32 {
-    if (ht_kind.len() + 1) * 2 > ht_table.len() { ht_grow(); };
-    let mask = ht_table.len() - 1;
-    let k = kind.i32();
-    let h = ht_key_hash(k, a, b) & mask;
+    if (ht_kind.len() + 1) * 2 > ht_table.len() { ht_grow() }
+    let mask = ht_table.len() - 1
+    let k = kind.i32()
+    let h = ht_key_hash(k, a, b) & mask
     while (ht_table[h] >= 0) {
-        let t = ht_table[h];
-        if ht_kind[t] == k and ht_a[t] == a and ht_b[t] == b and ht_single[t] == if single { 1; } else { 0; } { return t; };
-        h = (h + 1) & mask;
-    };
-    let id = ht_new(kind, a, b);
-    if single { ht_single[id] = 1; };
-    ht_table[h] = id;
-    id;
+        let t = ht_table[h]
+        if ht_kind[t] == k and ht_a[t] == a and ht_b[t] == b and ht_single[t] == if single { 1 } else { 0 } { return t }
+        h = (h + 1) & mask
+    }
+    let id = ht_new(kind, a, b)
+    if single { ht_single[id] = 1 }
+    ht_table[h] = id
+    id
 }
 
 fn ht_grow() void {
-    let n = if ht_table.len() == 0 { 64; } else { ht_table.len() * 2; };
-    ht_table.resize(n);
-    for (0 ..< n) |i| { ht_table[i] = -1; };
-    let mask = n - 1;
+    let n = if ht_table.len() == 0 { 64 } else { ht_table.len() * 2 }
+    ht_table.resize(n)
+    for (0 ..< n) |i| { ht_table[i] = -1 }
+    let mask = n - 1
     for (0 ..< ht_kind.len()) |t| {
         if ht_kind[t] != Heap.Struct.i32() {
-            let h = ht_key_hash(ht_kind[t], ht_a[t], ht_b[t]) & mask;
-            while (ht_table[h] >= 0) { h = (h + 1) & mask; };
-            ht_table[h] = t;
-        };
-    };
+            let h = ht_key_hash(ht_kind[t], ht_a[t], ht_b[t]) & mask
+            while (ht_table[h] >= 0) { h = (h + 1) & mask }
+            ht_table[h] = t
+        }
+    }
 }
 
-fn func_type(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, false); }
+fn func_type(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, false) }
 
 /// A function type in a recursion group of its own, as imports of host
 /// builtins need.
-fn func_type_single(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, true); }
+fn func_type_single(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, true) }
 
-fn array_type(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1; } else { 0; }, false); }
+fn array_type(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1 } else { 0 }, false) }
 
-fn array_type_single(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1; } else { 0; }, true); }
+fn array_type_single(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1 } else { 0 }, true) }
 
 /// A new struct type; add its fields with @struct_field, all of them before
 /// another struct is started.
 fn struct_type(super: I32, open: Bool) I32 {
-    let id = ht_new(Heap.Struct, ht_fields.len(), 0);
-    ht_super[id] = super;
-    if open { ht_open[id] = 1; };
-    id;
+    let id = ht_new(Heap.Struct, ht_fields.len(), 0)
+    ht_super[id] = super
+    if open { ht_open[id] = 1 }
+    id
 }
 
 fn struct_field(t: I32, storage: I32, mutable: Bool) void {
-    ht_fields.push(storage);
-    ht_fields.push(if mutable { 1; } else { 0; });
-    ht_b[t] += 1;
+    ht_fields.push(storage)
+    ht_fields.push(if mutable { 1 } else { 0 })
+    ht_b[t] += 1
 }
 
-fn field_storage(t: I32, i: I32) I32 { ht_fields[ht_a[t] + i * 2]; }
+fn field_storage(t: I32, i: I32) I32 { ht_fields[ht_a[t] + i * 2] }
 
 //! = The module
 
@@ -247,200 +247,200 @@ enum(U8) FuncKind:
     | Defined
     | Import
 
-vec func_kind: U8;
+vec func_kind: U8
 /// A Func heap type.
-vec func_type_of: I32;
+vec func_type_of: I32
 /// The body's IR node, or -1.
-vec func_body: I32;
+vec func_body: I32
 /// First local (after the parameters) in local_types.
-vec func_locals: I32;
-vec func_local_count: I32;
+vec func_locals: I32
+vec func_local_count: I32
 /// Import: module name (a span in names), else -1.
-vec func_module_name: I32;
+vec func_module_name: I32
 /// Import: field name; defined: export name, or -1.
-vec func_field_name: I32;
+vec func_field_name: I32
 /// For the name section, or -1.
-vec func_debug_name: I32;
+vec func_debug_name: I32
 /// Its syntax node (a declaration, a closure), or -1: where a source map
 /// places what has no nearer one.
-vec func_src: I32;
+vec func_src: I32
 /// Its index in the module, once encoding assigns them.
-vec func_index: I32;
+vec func_index: I32
 /// A @wat function: its site (host.utu), whose code is its body; else -1.
-vec func_code: I32;
-vec local_types: I32;
+vec func_code: I32
+vec local_types: I32
 
 /// FuncKind
-vec glob_kind: U8;
-vec glob_type: I32;
-vec glob_mutable: U8;
+vec glob_kind: U8
+vec glob_type: I32
+vec glob_mutable: U8
 /// Defined: a constant IR node.
-vec glob_init: I32;
-vec glob_module_name: I32;
+vec glob_init: I32
+vec glob_module_name: I32
 /// Import: field name; defined: export name, or -1.
-vec glob_field_name: I32;
-vec glob_index: I32;
+vec glob_field_name: I32
+vec glob_index: I32
 /// As @ht_src.
-vec glob_src: I32;
+vec glob_src: I32
 
 /// FuncKind
-vec memory_kind: U8;
-vec memory_pages: I32;
-vec memory_module_name: I32;
+vec memory_kind: U8
+vec memory_pages: I32
+vec memory_module_name: I32
 /// Import: field name; defined: export name, or -1.
-vec memory_field_name: I32;
+vec memory_field_name: I32
 /// By memory: its index (imported ones first).
-vec memory_index: I32;
+vec memory_index: I32
 
 /// Its memory.
-vec data_memory: I32;
+vec data_memory: I32
 /// Bytes, in data_bytes.
-vec data_start: I32;
-vec data_len: I32;
-vec data_bytes: U8;
+vec data_start: I32
+vec data_len: I32
+vec data_bytes: U8
 /// Its mem's declaration node: blame.utu's.
-vec data_src: I32;
+vec data_src: I32
 
 /// At `[0]`: 1 when the JS exception tag is imported.
-vec tag_used: U8;
+vec tag_used: U8
 
 /// Names (import and export names, debug names): spans of bytes.
-vec names: U8;
-vec name_start: I32;
-vec name_len: I32;
+vec names: U8
+vec name_start: I32
+vec name_len: I32
 
 fn name_add(text: Str) I32 {
-    let id = name_start.len();
-    name_start.push(names.len());
-    for (0 ..< text.len()) |i| { utf8_push_names(text.get(i)); };
-    name_len.push(names.len() - name_start[id]);
-    id;
+    let id = name_start.len()
+    name_start.push(names.len())
+    for (0 ..< text.len()) |i| { utf8_push_names(text.get(i)) }
+    name_len.push(names.len() - name_start[id])
+    id
 }
 
 /// A name from bytes of `src`.
 fn name_from_src(start: I32, end_: I32) I32 {
-    let id = name_start.len();
-    name_start.push(names.len());
-    for (start ..< end_) |i| { names.push(src[i]); };
-    name_len.push(end_ - start);
-    id;
+    let id = name_start.len()
+    name_start.push(names.len())
+    for (start ..< end_) |i| { names.push(src[i]) }
+    name_len.push(end_ - start)
+    id
 }
 
 /// A UTF-16 code unit, as UTF-8 in @names. A surrogate is three bytes of
 /// its own: pairs are not combined.
 fn utf8_push_names(unit: I32) void {
-    if unit < 128 { names.push(unit); return; };
+    if unit < 128 { names.push(unit); return }
     if unit < 2048 {
-        names.push(192 | (unit >> 6));
-        names.push(128 | (unit & 63));
-        return;
-    };
-    names.push(224 | (unit >> 12));
-    names.push(128 | ((unit >> 6) & 63));
-    names.push(128 | (unit & 63));
+        names.push(192 | (unit >> 6))
+        names.push(128 | (unit & 63))
+        return
+    }
+    names.push(224 | (unit >> 12))
+    names.push(128 | ((unit >> 6) & 63))
+    names.push(128 | (unit & 63))
 }
 
 fn add_import_func(module: I32, field: I32, t: I32) I32 {
-    let f = new_func(FuncKind.Import, t);
-    func_module_name[f] = module;
-    func_field_name[f] = field;
-    f;
+    let f = new_func(FuncKind.Import, t)
+    func_module_name[f] = module
+    func_field_name[f] = field
+    f
 }
 
 /// A function of type `t` (a `Func` heap type), with no body yet.
 fn new_func(kind: FuncKind, t: I32) I32 {
-    let f = func_kind.len();
-    func_kind.push(kind.i32());
-    func_type_of.push(t);
-    func_body.push(-1);
-    func_locals.push(0);
-    func_local_count.push(0);
-    func_module_name.push(-1);
-    func_field_name.push(-1);
-    func_debug_name.push(-1);
-    func_src.push(cur_src[0]);
-    func_index.push(-1);
-    func_code.push(-1);
-    f;
+    let f = func_kind.len()
+    func_kind.push(kind.i32())
+    func_type_of.push(t)
+    func_body.push(-1)
+    func_locals.push(0)
+    func_local_count.push(0)
+    func_module_name.push(-1)
+    func_field_name.push(-1)
+    func_debug_name.push(-1)
+    func_src.push(cur_src[0])
+    func_index.push(-1)
+    func_code.push(-1)
+    f
 }
 
 /// A defined global, its initializer the constant IR node `init`.
 fn add_global(t: I32, mutable: Bool, init: I32) I32 {
-    let g = glob_kind.len();
-    glob_kind.push(FuncKind.Defined.i32());
-    glob_type.push(t);
-    glob_mutable.push(if mutable { 1; } else { 0; });
-    glob_init.push(init);
-    glob_module_name.push(-1);
-    glob_field_name.push(-1);
-    glob_index.push(-1);
-    glob_src.push(cur_src[0]);
-    g;
+    let g = glob_kind.len()
+    glob_kind.push(FuncKind.Defined.i32())
+    glob_type.push(t)
+    glob_mutable.push(if mutable { 1 } else { 0 })
+    glob_init.push(init)
+    glob_module_name.push(-1)
+    glob_field_name.push(-1)
+    glob_index.push(-1)
+    glob_src.push(cur_src[0])
+    g
 }
 
 fn add_import_global(module: I32, field: I32, t: I32) I32 {
-    let g = add_global(t, false, -1);
-    glob_kind[g] = FuncKind.Import.i32();
-    glob_module_name[g] = module;
-    glob_field_name[g] = field;
-    g;
+    let g = add_global(t, false, -1)
+    glob_kind[g] = FuncKind.Import.i32()
+    glob_module_name[g] = module
+    glob_field_name[g] = field
+    g
 }
 
 /// Forgets the module being built.
 fn reset_wasm() void {
-    start_func[0] = -1;
-    vl_start.clear();
-    vl_len.clear();
-    vl_items.clear();
-    vl_table.clear();
-    vl_pending.clear();
-    ht_kind.clear();
-    ht_a.clear();
-    ht_b.clear();
-    ht_super.clear();
-    ht_open.clear();
-    ht_single.clear();
-    ht_fields.clear();
-    ht_src.clear();
-    ht_table.clear();
-    func_kind.clear();
-    func_type_of.clear();
-    func_body.clear();
-    func_locals.clear();
-    func_local_count.clear();
-    func_module_name.clear();
-    func_field_name.clear();
-    func_debug_name.clear();
-    func_src.clear();
-    func_index.clear();
-    func_code.clear();
-    local_types.clear();
-    glob_kind.clear();
-    glob_type.clear();
-    glob_mutable.clear();
-    glob_init.clear();
-    glob_module_name.clear();
-    glob_field_name.clear();
-    glob_index.clear();
-    glob_src.clear();
-    memory_kind.clear();
-    memory_pages.clear();
-    memory_module_name.clear();
-    memory_field_name.clear();
-    data_memory.clear();
-    data_start.clear();
-    data_len.clear();
-    data_bytes.clear();
-    data_src.clear();
-    tag_used.resize(1);
-    tag_used[0] = 0;
-    names.clear();
-    name_start.clear();
-    name_len.clear();
-    host_json.clear();
-    reset_ir();
-    vl_grow();
-    ht_grow();
+    start_func[0] = -1
+    vl_start.clear()
+    vl_len.clear()
+    vl_items.clear()
+    vl_table.clear()
+    vl_pending.clear()
+    ht_kind.clear()
+    ht_a.clear()
+    ht_b.clear()
+    ht_super.clear()
+    ht_open.clear()
+    ht_single.clear()
+    ht_fields.clear()
+    ht_src.clear()
+    ht_table.clear()
+    func_kind.clear()
+    func_type_of.clear()
+    func_body.clear()
+    func_locals.clear()
+    func_local_count.clear()
+    func_module_name.clear()
+    func_field_name.clear()
+    func_debug_name.clear()
+    func_src.clear()
+    func_index.clear()
+    func_code.clear()
+    local_types.clear()
+    glob_kind.clear()
+    glob_type.clear()
+    glob_mutable.clear()
+    glob_init.clear()
+    glob_module_name.clear()
+    glob_field_name.clear()
+    glob_index.clear()
+    glob_src.clear()
+    memory_kind.clear()
+    memory_pages.clear()
+    memory_module_name.clear()
+    memory_field_name.clear()
+    data_memory.clear()
+    data_start.clear()
+    data_len.clear()
+    data_bytes.clear()
+    data_src.clear()
+    tag_used.resize(1)
+    tag_used[0] = 0
+    names.clear()
+    name_start.clear()
+    name_len.clear()
+    host_json.clear()
+    reset_ir()
+    vl_grow()
+    ht_grow()
 }
 
 //! = IR
@@ -523,209 +523,209 @@ enum(U16) Op:
     | Held        // the value a CastArms arm (or its rest) starts with, on the stack: emits nothing
 
 // The `Plain` instructions written by name, by their opcodes.
-let i32_eqz: I32 = 69;
-let i32_eq: I32 = 70;
-let i32_ne: I32 = 71;
-let i32_lt_s: I32 = 72;
-let i32_lt_u: I32 = 73;
-let i32_gt_s: I32 = 74;
-let i32_gt_u: I32 = 75;
-let i32_le_s: I32 = 76;
-let i32_ge_s: I32 = 78;
-let i32_ge_u: I32 = 79;
-let i32_add: I32 = 106;
-let i32_sub: I32 = 107;
-let i32_mul: I32 = 108;
-let i32_div_s: I32 = 109;
-let i32_and: I32 = 113;
-let i32_or: I32 = 114;
-let i32_xor: I32 = 115;
-let i32_shl: I32 = 116;
-let i32_shr_u: I32 = 118;
-let i64_eq: I32 = 81;
-let i64_lt_s: I32 = 83;
-let i64_lt_u: I32 = 84;
-let i64_gt_s: I32 = 85;
-let i64_gt_u: I32 = 86;
-let i64_le_s: I32 = 87;
-let i64_le_u: I32 = 88;
-let i64_add: I32 = 124;
-let i64_sub: I32 = 125;
-let i64_xor: I32 = 133;
-let i64_shr_u: I32 = 136;
-let i32_wrap_i64: I32 = 167;
-let i64_extend_i32_s: I32 = 172;
-let i64_extend_i32_u: I32 = 173;
+let i32_eqz: I32 = 69
+let i32_eq: I32 = 70
+let i32_ne: I32 = 71
+let i32_lt_s: I32 = 72
+let i32_lt_u: I32 = 73
+let i32_gt_s: I32 = 74
+let i32_gt_u: I32 = 75
+let i32_le_s: I32 = 76
+let i32_ge_s: I32 = 78
+let i32_ge_u: I32 = 79
+let i32_add: I32 = 106
+let i32_sub: I32 = 107
+let i32_mul: I32 = 108
+let i32_div_s: I32 = 109
+let i32_and: I32 = 113
+let i32_or: I32 = 114
+let i32_xor: I32 = 115
+let i32_shl: I32 = 116
+let i32_shr_u: I32 = 118
+let i64_eq: I32 = 81
+let i64_lt_s: I32 = 83
+let i64_lt_u: I32 = 84
+let i64_gt_s: I32 = 85
+let i64_gt_u: I32 = 86
+let i64_le_s: I32 = 87
+let i64_le_u: I32 = 88
+let i64_add: I32 = 124
+let i64_sub: I32 = 125
+let i64_xor: I32 = 133
+let i64_shr_u: I32 = 136
+let i32_wrap_i64: I32 = 167
+let i64_extend_i32_s: I32 = 172
+let i64_extend_i32_u: I32 = 173
 
 /// By IR node: its instruction. The other `w_*` vecs are its other columns.
-vec w_op: U16;
+vec w_op: U16
 /// Its value type (vt_none for none).
-vec w_type: I32;
-vec w_a: I32;
-vec w_b: I32;
+vec w_type: I32
+vec w_a: I32
+vec w_b: I32
 /// Its first child, in w_kids.
-vec w_first: I32;
+vec w_first: I32
 /// Its number of children.
-vec w_count: I32;
-vec w_kids: I32;
+vec w_count: I32
+vec w_kids: I32
 /// Br_table targets.
-vec w_aux: I32;
+vec w_aux: I32
 /// Nodes built and not yet taken.
-vec w_stack: I32;
+vec w_stack: I32
 /// The syntax node each was made for (@cur_src then), or -1: a source map's spans.
-vec w_src: I32;
+vec w_src: I32
 /// For a copy inlining made: the syntax of the call it replaced, or -1.
-vec w_site: I32;
+vec w_site: I32
 /// The syntax node being checked, whose code nodes made now are (-1: none).
-vec cur_src: I32 = [-1];
+vec cur_src: I32 = [-1]
 
 fn reset_ir() void {
-    w_op.clear();
-    w_type.clear();
-    w_a.clear();
-    w_b.clear();
-    w_first.clear();
-    w_count.clear();
-    w_kids.clear();
-    w_aux.clear();
-    w_stack.clear();
-    w_src.clear();
-    w_site.clear();
-    cur_src[0] = -1;
+    w_op.clear()
+    w_type.clear()
+    w_a.clear()
+    w_b.clear()
+    w_first.clear()
+    w_count.clear()
+    w_kids.clear()
+    w_aux.clear()
+    w_stack.clear()
+    w_src.clear()
+    w_site.clear()
+    cur_src[0] = -1
 }
 
-fn w_mark() I32 { w_stack.len(); }
+fn w_mark() I32 { w_stack.len() }
 
 /// A node of the nodes built since `mark`, pushed in their place.
 fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
     // A @comptime build's loops burn fuel, so one that never ends stops.
-    if op == Op.Loop and comptime_fuel[0] >= 0 { w_insert(mark, fuel_check()); };
-    let id = w_op.len();
+    if op == Op.Loop and comptime_fuel[0] >= 0 { w_insert(mark, fuel_check()) }
+    let id = w_op.len()
     // A block with several results is typed by a function type, which must
     // exist before encoding numbers the types.
-    if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple); };
-    w_op.push(op.i32());
-    w_type.push(vt);
-    w_src.push(cur_src[0]);
-    w_site.push(-1);
-    w_a.push(a);
-    w_b.push(b);
-    w_first.push(w_kids.len());
-    let n = w_stack.len();
-    w_count.push(n - mark);
-    for (mark ..< n) |i| { w_kids.push(w_stack[i]); };
-    w_stack.resize(mark);
-    w_stack.push(id);
-    id;
+    if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple) }
+    w_op.push(op.i32())
+    w_type.push(vt)
+    w_src.push(cur_src[0])
+    w_site.push(-1)
+    w_a.push(a)
+    w_b.push(b)
+    w_first.push(w_kids.len())
+    let n = w_stack.len()
+    w_count.push(n - mark)
+    for (mark ..< n) |i| { w_kids.push(w_stack[i]) }
+    w_stack.resize(mark)
+    w_stack.push(id)
+    id
 }
 
-fn w_leaf(op: Op, vt: I32, a: I32, b: I32) I32 { w_node(op, vt, a, b, w_stack.len()); }
+fn w_leaf(op: Op, vt: I32, a: I32, b: I32) I32 { w_node(op, vt, a, b, w_stack.len()) }
 
 /// Take the node on top of the stack.
 fn w_pop() I32 {
-    let id = w_stack[w_stack.len() - 1];
-    w_stack.resize(w_stack.len() - 1);
-    id;
+    let id = w_stack[w_stack.len() - 1]
+    w_stack.resize(w_stack.len() - 1)
+    id
 }
 
-fn w_push(id: I32) void { w_stack.push(id); }
+fn w_push(id: I32) void { w_stack.push(id) }
 
 /// Put node `id` on the stack at position `at`, after the ones before it.
 fn w_insert(at: I32, id: I32) void {
-    w_stack.push(id);
-    let i = w_stack.len() - 1;
+    w_stack.push(id)
+    let i = w_stack.len() - 1
     while (i > at) {
-        w_stack[i] = w_stack[i - 1];
-        i -= 1;
-    };
-    w_stack[at] = id;
+        w_stack[i] = w_stack[i - 1]
+        i -= 1
+    }
+    w_stack[at] = id
 }
 
-fn w_kid(node: I32, i: I32) I32 { w_kids[w_first[node] + i]; }
+fn w_kid(node: I32, i: I32) I32 { w_kids[w_first[node] + i] }
 
-fn w_i32(value: I32) I32 { w_leaf(Op.I32Const, vt_i32, value, 0); }
+fn w_i32(value: I32) I32 { w_leaf(Op.I32Const, vt_i32, value, 0) }
 
-fn w_get(vt: I32, local: I32) I32 { w_leaf(Op.LocalGet, vt, local, 0); }
+fn w_get(vt: I32, local: I32) I32 { w_leaf(Op.LocalGet, vt, local, 0) }
 
 /// An `i32` instruction of no immediates (as `i32_add`) over the nodes since `mark`.
-fn w_i32_op(opcode: I32, mark: I32) I32 { w_node(Op.Plain, vt_i32, opcode, 0, mark); }
+fn w_i32_op(opcode: I32, mark: I32) I32 { w_node(Op.Plain, vt_i32, opcode, 0, mark) }
 
 //! = Encoding
 
-export mem out: U8;
+export mem out: U8
 /// The section being written.
-vec sec: U8;
+vec sec: U8
 /// The function body being written.
-vec code_bytes: U8;
+vec code_bytes: U8
 
 fn leb_u(in_body: Bool, value: I32) void {
-    let v = value;
+    let v = value
     while (true) {
-        let b = v & 127;
-        v = v >>> 7;
-        if v != 0 { put(in_body, b | 128); } else { put(in_body, b); return; };
-    };
+        let b = v & 127
+        v = v >>> 7
+        if v != 0 { put(in_body, b | 128) } else { put(in_body, b); return }
+    }
 }
 
 /// Where bytes go: the section, or (when `in_body`) the function body.
-fn put(in_body: Bool, b: I32) void { if in_body { code_bytes.push(b); } else { sec.push(b); }; }
+fn put(in_body: Bool, b: I32) void { if in_body { code_bytes.push(b) } else { sec.push(b) } }
 
 fn leb_s(in_body: Bool, value: I32) void {
-    let v = value;
+    let v = value
     while (true) {
-        let b = v & 127;
-        v = v >> 7;
+        let b = v & 127
+        v = v >> 7
         if (v == 0 and (b & 64) == 0) or (v == -1 and (b & 64) != 0) {
-            put(in_body, b);
-            return;
-        };
-        put(in_body, b | 128);
-    };
+            put(in_body, b)
+            return
+        }
+        put(in_body, b | 128)
+    }
 }
 
 fn leb_s64(in_body: Bool, lo: I32, hi: I32) void {
-    let v = (hi.i64() << 32) | (lo.i64() & 4294967295);
+    let v = (hi.i64() << 32) | (lo.i64() & 4294967295)
     while (true) {
-        let b = (v & 127).i32();
-        v = v >> 7;
+        let b = (v & 127).i32()
+        v = v >> 7
         if (v == 0 and (b & 64) == 0) or (v == -1 and (b & 64) != 0) {
-            put(in_body, b);
-            return;
-        };
-        put(in_body, b | 128);
-    };
+            put(in_body, b)
+            return
+        }
+        put(in_body, b | 128)
+    }
 }
 
 fn put_name(in_body: Bool, name: I32) void {
-    leb_u(in_body, name_len[name]);
-    for (0 ..< name_len[name]) |i| { put(in_body, names[name_start[name] + i]); };
+    leb_u(in_body, name_len[name])
+    for (0 ..< name_len[name]) |i| { put(in_body, names[name_start[name] + i]) }
 }
 
 fn put_text(text: Str) void {
-    leb_u(false, text.len());
-    for (0 ..< text.len()) |i| { sec.push(text.get(i)); };
+    leb_u(false, text.len())
+    for (0 ..< text.len()) |i| { sec.push(text.get(i)) }
 }
 
 fn put_u32le(in_body: Bool, v: I32) void {
-    put(in_body, v & 255);
-    put(in_body, (v >>> 8) & 255);
-    put(in_body, (v >>> 16) & 255);
-    put(in_body, (v >>> 24) & 255);
+    put(in_body, v & 255)
+    put(in_body, (v >>> 8) & 255)
+    put(in_body, (v >>> 16) & 255)
+    put(in_body, (v >>> 24) & 255)
 }
 
 /// Write the section in `sec` to `out` with its id and size.
 fn flush_section(id: I32) void {
-    if sec.len() == 0 { return; };
-    out.push(id);
-    let n = sec.len();
-    let v = n;
+    if sec.len() == 0 { return }
+    out.push(id)
+    let n = sec.len()
+    let v = n
     while (true) {
-        let b = v & 127;
-        v = v >>> 7;
-        if v != 0 { out.push(b | 128); } else { out.push(b); break; };
-    };
-    for (0 ..< n) |i| { out.push(sec[i]); };
-    sec.clear();
+        let b = v & 127
+        v = v >>> 7
+        if v != 0 { out.push(b | 128) } else { out.push(b); break }
+    }
+    for (0 ..< n) |i| { out.push(sec[i]) }
+    sec.clear()
 }
 
 //! = What the exports reach
@@ -733,120 +733,120 @@ fn flush_section(id: I32) void {
 //! Checking translates every function of the program's own files, so their
 //! mistakes are reported; only what the exports reach is encoded.
 
-vec func_live: U8;
-vec glob_live: U8;
-vec live_work: I32;
+vec func_live: U8
+vec glob_live: U8
+vec live_work: I32
 /// By node: how many places in the live code hold it.
-vec node_holders: I32;
+vec node_holders: I32
 /// By function: the calls and references to it in the live code.
-vec func_uses: I32;
+vec func_uses: I32
 /// By global: the reads and writes of it.
-vec glob_uses: I32;
+vec glob_uses: I32
 /// By global: the writes of it.
-vec glob_sets: I32;
+vec glob_sets: I32
 
 /// Marks the functions and globals the exports reach, and counts their
 /// uses (@func_uses, @glob_uses, @glob_sets) and each node's holders.
 fn sweep() void {
-    node_holders.resize(w_op.len());
-    for (0 ..< w_op.len()) |n| { node_holders[n] = 0; };
-    func_live.resize(func_kind.len());
-    glob_live.resize(glob_kind.len());
-    func_uses.resize(func_kind.len());
-    glob_uses.resize(glob_kind.len());
-    glob_sets.resize(glob_kind.len());
+    node_holders.resize(w_op.len())
+    for (0 ..< w_op.len()) |n| { node_holders[n] = 0 }
+    func_live.resize(func_kind.len())
+    glob_live.resize(glob_kind.len())
+    func_uses.resize(func_kind.len())
+    glob_uses.resize(glob_kind.len())
+    glob_sets.resize(glob_kind.len())
     for (0 ..< func_kind.len()) |f| {
-        func_live[f] = 0;
-        func_uses[f] = 0;
-    };
+        func_live[f] = 0
+        func_uses[f] = 0
+    }
     for (0 ..< glob_kind.len()) |g| {
-        glob_live[g] = 0;
-        glob_uses[g] = 0;
-        glob_sets[g] = 0;
-    };
-    live_work.clear();
+        glob_live[g] = 0
+        glob_uses[g] = 0
+        glob_sets[g] = 0
+    }
+    live_work.clear()
     for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { mark_func(f); };
-    };
+        if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { mark_func(f) }
+    }
     for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { mark_global(g); };
-    };
+        if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { mark_global(g) }
+    }
     // (The start function the computed globals made; see check.utu.)
-    if start_func[0] >= 0 { mark_func(start_func[0]); };
+    if start_func[0] >= 0 { mark_func(start_func[0]) }
     while (live_work.len() > 0) {
-        let node = live_work[live_work.len() - 1];
-        live_work.resize(live_work.len() - 1);
-        scan_live(node);
-    };
+        let node = live_work[live_work.len() - 1]
+        live_work.resize(live_work.len() - 1)
+        scan_live(node)
+    }
 }
 
 fn mark_func(f: I32) void {
-    if func_live[f] == 1 { return; };
-    func_live[f] = 1;
-    if func_body[f] >= 0 { live_work.push(func_body[f]); };
+    if func_live[f] == 1 { return }
+    func_live[f] = 1
+    if func_body[f] >= 0 { live_work.push(func_body[f]) }
 }
 
 fn mark_global(g: I32) void {
-    if glob_live[g] == 1 { return; };
-    glob_live[g] = 1;
-    if glob_init[g] >= 0 { live_work.push(glob_init[g]); };
+    if glob_live[g] == 1 { return }
+    glob_live[g] = 1
+    if glob_init[g] >= 0 { live_work.push(glob_init[g]) }
 }
 
 fn scan_live(node: I32) void {
     // (Late functions, see mark_late, have nodes made after the sweep.)
     if node >= node_holders.len() {
-        let old = node_holders.len();
-        node_holders.resize(w_op.len());
-        for (old ..< w_op.len()) |n| { node_holders[n] = 0; };
-    };
-    node_holders[node] += 1;
-    let op = w_op[node];
+        let old = node_holders.len()
+        node_holders.resize(w_op.len())
+        for (old ..< w_op.len()) |n| { node_holders[n] = 0 }
+    }
+    node_holders[node] += 1
+    let op = w_op[node]
     if op == Op.Call.i32() or op == Op.ReturnCall.i32() or op == Op.RefFunc.i32() {
-        func_uses[w_a[node]] += 1;
-        mark_func(w_a[node]);
+        func_uses[w_a[node]] += 1
+        mark_func(w_a[node])
     } else if op == Op.GlobalGet.i32() or op == Op.GlobalSet.i32() {
-        glob_uses[w_a[node]] += 1;
-        if op == Op.GlobalSet.i32() { glob_sets[w_a[node]] += 1; };
-        mark_global(w_a[node]);
-    };
-    for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
+        glob_uses[w_a[node]] += 1
+        if op == Op.GlobalSet.i32() { glob_sets[w_a[node]] += 1 }
+        mark_global(w_a[node])
+    }
+    for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)) }
 }
 
 /// By memory: 0 for one a @comptime build leaves out (index -1, its data
 /// passive), else 1.
-vec memory_live: U8;
+vec memory_live: U8
 
 /// A @comptime build has every mem of the entry file as a memory (see
 /// compile), and the host reads only the values' (`__comptime_*`): the
 /// others its code does not use are left out, as an engine may take long
 /// to make each memory.
 fn mark_memories() void {
-    let n = memory_kind.len();
-    memory_live.resize(n);
-    for (0 ..< n) |m| { memory_live[m] = if comptime_fuel[0] < 0 or memory_kind[m] == FuncKind.Import.i32() or is_comptime_value(memory_field_name[m]) { 1; } else { 0; }; };
-    if comptime_fuel[0] < 0 { return; };
-    live_work.clear();
-    for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_body[f] >= 0 { live_work.push(func_body[f]); }; };
-    for (0 ..< glob_kind.len()) |g| { if glob_live[g] == 1 and glob_init[g] >= 0 { live_work.push(glob_init[g]); }; };
+    let n = memory_kind.len()
+    memory_live.resize(n)
+    for (0 ..< n) |m| { memory_live[m] = if comptime_fuel[0] < 0 or memory_kind[m] == FuncKind.Import.i32() or is_comptime_value(memory_field_name[m]) { 1 } else { 0 } }
+    if comptime_fuel[0] < 0 { return }
+    live_work.clear()
+    for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_body[f] >= 0 { live_work.push(func_body[f]) } }
+    for (0 ..< glob_kind.len()) |g| { if glob_live[g] == 1 and glob_init[g] >= 0 { live_work.push(glob_init[g]) } }
     while (live_work.len() > 0) {
-        let node = live_work[live_work.len() - 1];
-        live_work.resize(live_work.len() - 1);
-        let op = w_op[node];
+        let node = live_work[live_work.len() - 1]
+        live_work.resize(live_work.len() - 1)
+        let op = w_op[node]
         if op == Op.Load.i32() or op == Op.Store.i32() or op == Op.MemorySize.i32() or op == Op.MemoryGrow.i32()
             or op == Op.MemoryFill.i32() or op == Op.MemoryInit.i32() or op == Op.MemoryCopy.i32() {
-            memory_live[w_a[node]] = 1;
-        };
-        if op == Op.MemoryCopy.i32() { memory_live[w_b[node]] = 1; };
-        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
-    };
+            memory_live[w_a[node]] = 1
+        }
+        if op == Op.MemoryCopy.i32() { memory_live[w_b[node]] = 1 }
+        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)) }
+    }
 }
 
 /// Whether name `name` (-1: none) begins `__comptime_`.
 fn is_comptime_value(name: I32) Bool {
-    let prefix = "__comptime_";
-    if name < 0 or name_len[name] < prefix.len() { return false; };
-    for (0 ..< prefix.len()) |i| { if names[name_start[name] + i] != prefix.get(i) { return false; }; };
-    true;
+    let prefix = "__comptime_"
+    if name < 0 or name_len[name] < prefix.len() { return false }
+    for (0 ..< prefix.len()) |i| { if names[name_start[name] + i] != prefix.get(i) { return false } }
+    true
 }
 
 // Final indices: types (singles that need nothing defined after them, then
@@ -855,73 +855,73 @@ fn is_comptime_value(name: I32) Bool {
 // take the indices under 128 (one byte); the others keep the program's
 // order, in which related code sits together and compresses better.
 /// By heap type.
-vec type_index: I32;
+vec type_index: I32
 /// Heap types in index order.
-vec type_order: I32;
+vec type_order: I32
 /// Live functions in index order.
-vec func_order: I32;
+vec func_order: I32
 /// Live globals in index order.
-vec glob_order: I32;
+vec glob_order: I32
 /// How many of func_order are imports.
-vec func_imported: I32 = [0];
-vec glob_imported: I32 = [0];
+vec func_imported: I32 = [0]
+vec glob_imported: I32 = [0]
 
 fn assign_indices() void {
-    memory_index.resize(memory_kind.len());
-    mark_memories();
-    let next_m = 0;
+    memory_index.resize(memory_kind.len())
+    mark_memories()
+    let next_m = 0
     for (0 ..< memory_kind.len()) |m| {
         if memory_kind[m] == FuncKind.Import.i32() {
-            memory_index[m] = next_m;
-            next_m += 1;
-        };
-    };
+            memory_index[m] = next_m
+            next_m += 1
+        }
+    }
     for (0 ..< memory_kind.len()) |m| {
-        memory_index[m] = if memory_kind[m] == FuncKind.Import.i32() or m == prof_memory[0] { memory_index[m]; } else if memory_live[m] == 0 { -1; } else {
-            next_m += 1;
-            next_m - 1;
-        };
-    };
+        memory_index[m] = if memory_kind[m] == FuncKind.Import.i32() or m == prof_memory[0] { memory_index[m] } else if memory_live[m] == 0 { -1 } else {
+            next_m += 1
+            next_m - 1
+        }
+    }
     // The profiler's is last, so the program's keep their indices.
-    if prof_memory[0] >= 0 { memory_index[prof_memory[0]] = next_m; };
-    let n = ht_kind.len();
-    sweep_types();
-    type_index.resize(n);
-    type_order.clear();
-    type_alone.resize(n);
-    for (0 ..< n) |t| { type_alone[t] = 0; };
-    for (0 ..< n) |t| { type_index[t] = -1; };
-    order_types(n);
-    func_order.clear();
+    if prof_memory[0] >= 0 { memory_index[prof_memory[0]] = next_m }
+    let n = ht_kind.len()
+    sweep_types()
+    type_index.resize(n)
+    type_order.clear()
+    type_alone.resize(n)
+    for (0 ..< n) |t| { type_alone[t] = 0 }
+    for (0 ..< n) |t| { type_index[t] = -1 }
+    order_types(n)
+    func_order.clear()
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
-        sort_items.clear();
+        sort_items.clear()
         for (0 ..< func_kind.len()) |f| {
-            if func_kind[f] == kind.i32() and func_live[f] == 1 { sort_items.push(f); };
-        };
-        sort_keys.resize(func_uses.len());
-        for (0 ..< func_uses.len()) |f| { sort_keys[f] = func_uses[f]; };
-        most_used_first(128 - func_order.len());
+            if func_kind[f] == kind.i32() and func_live[f] == 1 { sort_items.push(f) }
+        }
+        sort_keys.resize(func_uses.len())
+        for (0 ..< func_uses.len()) |f| { sort_keys[f] = func_uses[f] }
+        most_used_first(128 - func_order.len())
         for (0 ..< sort_items.len()) |i| {
-            func_index[sort_items[i]] = func_order.len();
-            func_order.push(sort_items[i]);
-        };
-        if kind == FuncKind.Import { func_imported[0] = func_order.len(); };
-    };
-    glob_order.clear();
+            func_index[sort_items[i]] = func_order.len()
+            func_order.push(sort_items[i])
+        }
+        if kind == FuncKind.Import { func_imported[0] = func_order.len() }
+    }
+    glob_order.clear()
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
-        sort_items.clear();
+        sort_items.clear()
         for (0 ..< glob_kind.len()) |g| {
-            if glob_kind[g] == kind.i32() and glob_live[g] == 1 and not glob_folded(g) { sort_items.push(g); };
-        };
-        sort_keys.resize(glob_uses.len());
-        for (0 ..< glob_uses.len()) |g| { sort_keys[g] = glob_uses[g]; };
-        most_used_first(128 - glob_order.len());
+            if glob_kind[g] == kind.i32() and glob_live[g] == 1 and not glob_folded(g) { sort_items.push(g) }
+        }
+        sort_keys.resize(glob_uses.len())
+        for (0 ..< glob_uses.len()) |g| { sort_keys[g] = glob_uses[g] }
+        most_used_first(128 - glob_order.len())
         for (0 ..< sort_items.len()) |i| {
-            glob_index[sort_items[i]] = glob_order.len();
-            glob_order.push(sort_items[i]);
-        };
-        if kind == FuncKind.Import { glob_imported[0] = glob_order.len(); };
-    };
+            glob_index[sort_items[i]] = glob_order.len()
+            glob_order.push(sort_items[i])
+        }
+        if kind == FuncKind.Import { glob_imported[0] = glob_order.len() }
+    }
 }
 
 // Types are numbered so the most used take the shortest indices (a heap
@@ -931,193 +931,193 @@ fn assign_indices() void {
 // unit (the group's is n); a unit ranks as its most used type, or as the
 // best unit that has to come after it, and the best ready unit goes next.
 /// By heap type: its unit, or -1 (not encoded: dead, or a twin's).
-vec type_unit: I32;
+vec type_unit: I32
 /// By heap type: the single of the same plain signature it is, or -1.
-vec type_twin: I32;
+vec type_twin: I32
 /// By unit.
-vec unit_rank: I32;
-vec unit_placed: U8;
+vec unit_rank: I32
+vec unit_placed: U8
 /// The heap types a type names (refs_of).
-vec type_refs: I32;
+vec type_refs: I32
 
 /// The live heap types (of the `n` there are), in @type_order: numbered as
 /// the comment above @type_unit says.
 fn order_types(n: I32) void {
-    type_unit.resize(n);
-    type_twin.resize(n);
-    unit_rank.resize(n + 1);
-    unit_placed.resize(n + 1);
+    type_unit.resize(n)
+    type_twin.resize(n)
+    unit_rank.resize(n + 1)
+    unit_placed.resize(n + 1)
     for (0 ..< n + 1) |u| {
-        unit_rank[u] = -1;
-        unit_placed[u] = 0;
-    };
+        unit_rank[u] = -1
+        unit_placed[u] = 0
+    }
     for (0 ..< n) |t| {
-        type_twin[t] = -1;
-        type_unit[t] = -1;
+        type_twin[t] = -1
+        type_unit[t] = -1
         if type_live[t] == 1 {
-            if ht_single[t] == 1 { type_unit[t] = t; }
+            if ht_single[t] == 1 { type_unit[t] = t }
             else if plain_func(t) {
                 // A function type of numbers and abstract references alone
                 // has no identity to keep (no cast tells two of them apart),
                 // so it is a single too: the one of the same signature, or
                 // one of its own.
-                let twin = ht_lookup(Heap.Func.i32(), ht_a[t], ht_b[t], 1);
-                if twin >= 0 and type_live[twin] == 1 { type_twin[t] = twin; }
+                let twin = ht_lookup(Heap.Func.i32(), ht_a[t], ht_b[t], 1)
+                if twin >= 0 and type_live[twin] == 1 { type_twin[t] = twin }
                 else {
-                    type_alone[t] = 1;
-                    type_unit[t] = t;
-                };
-            } else { type_unit[t] = n; };
-        };
-        if type_unit[t] >= 0 and type_uses[t] > unit_rank[type_unit[t]] { unit_rank[type_unit[t]] = type_uses[t]; };
-    };
+                    type_alone[t] = 1
+                    type_unit[t] = t
+                }
+            } else { type_unit[t] = n }
+        }
+        if type_unit[t] >= 0 and type_uses[t] > unit_rank[type_unit[t]] { unit_rank[type_unit[t]] = type_uses[t] }
+    }
     // A unit others need first ranks with the best of them.
-    let changed = true;
+    let changed = true
     while (changed) {
-        changed = false;
+        changed = false
         for (0 ..< n) |t| {
-            let u = type_unit[t];
+            let u = type_unit[t]
             if u >= 0 {
-                refs_of(t);
+                refs_of(t)
                 for (0 ..< type_refs.len()) |i| {
-                    let v = unit_of(type_refs[i]);
+                    let v = unit_of(type_refs[i])
                     if v >= 0 and v != u and unit_rank[v] < unit_rank[u] {
-                        unit_rank[v] = unit_rank[u];
-                        changed = true;
-                    };
-                };
-            };
-        };
-    };
+                        unit_rank[v] = unit_rank[u]
+                        changed = true
+                    }
+                }
+            }
+        }
+    }
     while (true) {
-        let best = -1;
+        let best = -1
         for (0 ..< n + 1) |u| {
-            if unit_placed[u] == 0 and unit_rank[u] >= 0 and (best < 0 or unit_rank[u] > unit_rank[best]) and unit_ready(u, n) { best = u; };
-        };
-        if best < 0 { break; };
-        unit_placed[best] = 1;
-        if best < n { place_type(best); } else { place_group(n); };
-    };
+            if unit_placed[u] == 0 and unit_rank[u] >= 0 and (best < 0 or unit_rank[u] > unit_rank[best]) and unit_ready(u, n) { best = u }
+        }
+        if best < 0 { break }
+        unit_placed[best] = 1
+        if best < n { place_type(best) } else { place_group(n) }
+    }
     // (Nothing is left unless units need each other, which interning prevents.)
-    if unit_placed[n] == 0 { place_group(n); };
-    for (0 ..< n) |t| { if type_unit[t] == t and type_index[t] < 0 { place_type(t); }; };
-    for (0 ..< n) |t| { if type_twin[t] >= 0 { type_index[t] = type_index[type_twin[t]]; }; };
+    if unit_placed[n] == 0 { place_group(n) }
+    for (0 ..< n) |t| { if type_unit[t] == t and type_index[t] < 0 { place_type(t) } }
+    for (0 ..< n) |t| { if type_twin[t] >= 0 { type_index[t] = type_index[type_twin[t]] } }
 }
 
-fn unit_of(t: I32) I32 { if type_twin[t] >= 0 { type_unit[type_twin[t]]; } else { type_unit[t]; }; }
+fn unit_of(t: I32) I32 { if type_twin[t] >= 0 { type_unit[type_twin[t]] } else { type_unit[t] } }
 
 fn place_type(t: I32) void {
-    type_index[t] = type_order.len();
-    type_order.push(t);
+    type_index[t] = type_order.len()
+    type_order.push(t)
 }
 
 /// Whether every type unit u names, outside it, has its index.
 fn unit_ready(u: I32, n: I32) Bool {
     for (0 ..< n) |t| {
         if type_unit[t] == u {
-            refs_of(t);
+            refs_of(t)
             for (0 ..< type_refs.len()) |i| {
-                let v = unit_of(type_refs[i]);
-                if v >= 0 and v != u and unit_placed[v] == 0 { return false; };
-            };
-        };
-    };
-    true;
+                let v = unit_of(type_refs[i])
+                if v >= 0 and v != u and unit_placed[v] == 0 { return false }
+            }
+        }
+    }
+    true
 }
 
 /// The group's types, the most used first, each after its supertype.
 fn place_group(n: I32) void {
-    let count = 0;
-    for (0 ..< n) |t| { if type_unit[t] == n and type_index[t] < 0 { count += 1; }; };
-    let order = Array[I32].new(count, 0);
-    let key = Array[I32].new(n, 0);
-    let k = 0;
+    let count = 0
+    for (0 ..< n) |t| { if type_unit[t] == n and type_index[t] < 0 { count += 1 } }
+    let order = Array[I32].new(count, 0)
+    let key = Array[I32].new(n, 0)
+    let k = 0
     for (0 ..< n) |t| {
         if type_unit[t] == n and type_index[t] < 0 {
-            order[k] = t;
-            key[t] = 0 - type_uses[t];
-            k += 1;
-        };
-    };
+            order[k] = t
+            key[t] = 0 - type_uses[t]
+            k += 1
+        }
+    }
     // The most used first (of equals, the first); each time, the first of
     // them whose supertype has its index.
-    sort_by_key(order, key);
-    let lo = 0;
+    sort_by_key(order, key)
+    let lo = 0
     while (true) {
-        while (lo < count and type_index[order[lo]] >= 0) { lo += 1; };
-        let i = lo;
-        while (i < count and not (type_index[order[i]] < 0 and (ht_super[order[i]] < 0 or type_index[ht_super[order[i]]] >= 0))) { i += 1; };
-        if i >= count { return; };
-        place_type(order[i]);
-    };
+        while (lo < count and type_index[order[lo]] >= 0) { lo += 1 }
+        let i = lo
+        while (i < count and not (type_index[order[i]] < 0 and (ht_super[order[i]] < 0 or type_index[ht_super[order[i]]] >= 0))) { i += 1 }
+        if i >= count { return }
+        place_type(order[i])
+    }
 }
 
 /// The heap types type `t` names, into @type_refs.
 fn refs_of(t: I32) void {
-    type_refs.clear();
-    let kind = ht_kind[t];
+    type_refs.clear()
+    let kind = ht_kind[t]
     if kind == Heap.Func.i32() {
-        refs_of_list(ht_a[t]);
-        refs_of_list(ht_b[t]);
+        refs_of_list(ht_a[t])
+        refs_of_list(ht_b[t])
     } else if kind == Heap.Array.i32() {
-        type_ref_of(ht_a[t]);
+        type_ref_of(ht_a[t])
     } else {
-        for (0 ..< ht_b[t]) |i| { type_ref_of(field_storage(t, i)); };
-    };
-    if ht_super[t] >= 0 { type_refs.push(ht_super[t]); };
+        for (0 ..< ht_b[t]) |i| { type_ref_of(field_storage(t, i)) }
+    }
+    if ht_super[t] >= 0 { type_refs.push(ht_super[t]) }
 }
 
-fn refs_of_list(list: I32) void { for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)); }; }
+fn refs_of_list(list: I32) void { for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)) } }
 
-fn type_ref_of(vt: I32) void { if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)); }; }
+fn type_ref_of(vt: I32) void { if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)) } }
 
 /// A global nothing writes, of an integer constant: it is not in the
 /// module, and each read is the constant (as short as the read, mostly, and
 /// a constant to the engine).
 fn glob_folded(g: I32) Bool {
-    if glob_kind[g] != FuncKind.Defined.i32() or glob_field_name[g] >= 0 or glob_sets[g] != 0 or glob_init[g] < 0 { return false; };
-    let op = w_op[glob_init[g]];
-    op == Op.I32Const.i32() or op == Op.I64Const.i32();
+    if glob_kind[g] != FuncKind.Defined.i32() or glob_field_name[g] >= 0 or glob_sets[g] != 0 or glob_init[g] < 0 { return false }
+    let op = w_op[glob_init[g]]
+    op == Op.I32Const.i32() or op == Op.I64Const.i32()
 }
 
 // The `room` items of sort_items with the greatest sort_keys first (the
 // greatest first), then the others as they were.
-vec sort_items: I32;
-vec sort_keys: I32;
-vec sort_rest: I32;
+vec sort_items: I32
+vec sort_keys: I32
+vec sort_rest: I32
 
 /// Reorders @sort_items by @sort_keys: the `room` greatest first, then the
 /// others in the order they were.
 fn most_used_first(room: I32) void {
     // Sorted by the keys negated (equals keep their order), as @sort_rest.
-    let n = sort_items.len();
-    let key = Array[I32].new(sort_keys.len(), 0);
-    for (0 ..< sort_keys.len()) |k| { key[k] = 0 - sort_keys[k]; };
-    let order = Array[I32].new(n, 0);
-    sort_rest.clear();
+    let n = sort_items.len()
+    let key = Array[I32].new(sort_keys.len(), 0)
+    for (0 ..< sort_keys.len()) |k| { key[k] = 0 - sort_keys[k] }
+    let order = Array[I32].new(n, 0)
+    sort_rest.clear()
     for (0 ..< n) |i| {
-        order[i] = sort_items[i];
-        sort_rest.push(sort_items[i]);
-    };
-    sort_by_key(order, key);
-    for (0 ..< n) |i| { sort_items[i] = order[i]; };
-    let front = if room < sort_items.len() { if room > 0 { room; } else { 0; }; } else { sort_items.len(); };
+        order[i] = sort_items[i]
+        sort_rest.push(sort_items[i])
+    }
+    sort_by_key(order, key)
+    for (0 ..< n) |i| { sort_items[i] = order[i] }
+    let front = if room < sort_items.len() { if room > 0 { room } else { 0 } } else { sort_items.len() }
     // The front is the first `front` of the sorted ones; the rest follow in their order.
-    for (0 ..< sort_rest.len()) |i| { if sort_rest[i] >= sort_front.len() { sort_front.resize(sort_rest[i] + 1); }; };
-    for (0 ..< sort_rest.len()) |i| { sort_front[sort_rest[i]] = 0; };
-    for (0 ..< front) |i| { sort_front[sort_items[i]] = 1; };
-    let at = front;
+    for (0 ..< sort_rest.len()) |i| { if sort_rest[i] >= sort_front.len() { sort_front.resize(sort_rest[i] + 1) } }
+    for (0 ..< sort_rest.len()) |i| { sort_front[sort_rest[i]] = 0 }
+    for (0 ..< front) |i| { sort_front[sort_items[i]] = 1 }
+    let at = front
     for (0 ..< sort_rest.len()) |i| {
-        let item = sort_rest[i];
+        let item = sort_rest[i]
         if sort_front[item] == 0 {
-            sort_items[at] = item;
-            at += 1;
-        };
-    };
+            sort_items[at] = item
+            at += 1
+        }
+    }
 }
 
 /// By item: 1 for those among the first `front` of @sort_items.
-vec sort_front: U8;
+vec sort_front: U8
 
 // The types the module uses: those of its live functions (signatures,
 // locals, and every instruction's result and type immediate), globals, and
@@ -1125,526 +1125,526 @@ vec sort_front: U8;
 // results, supertypes). Checking interns types it then does not use (a
 // generic's instances, a closure's environment when nothing captures), and
 // they are left out.
-vec type_live: U8;
+vec type_live: U8
 /// By heap type: how often the module names it.
-vec type_uses: I32;
-vec type_work: I32;
+vec type_uses: I32
+vec type_work: I32
 
 fn sweep_types() void {
-    type_live.resize(ht_kind.len());
-    type_uses.resize(ht_kind.len());
+    type_live.resize(ht_kind.len())
+    type_uses.resize(ht_kind.len())
     for (0 ..< ht_kind.len()) |t| {
-        type_live[t] = 0;
-        type_uses[t] = 0;
-    };
-    type_work.clear();
-    live_work.clear();
+        type_live[t] = 0
+        type_uses[t] = 0
+    }
+    type_work.clear()
+    live_work.clear()
     for (0 ..< func_kind.len()) |f| {
         if func_live[f] == 1 {
-            mark_type(func_type_of[f]);
-            for (func_locals[f] ..< func_locals[f] + func_local_count[f]) |l| { mark_vt(local_types[l]); };
-            if func_body[f] >= 0 { live_work.push(func_body[f]); };
-        };
-    };
+            mark_type(func_type_of[f])
+            for (func_locals[f] ..< func_locals[f] + func_local_count[f]) |l| { mark_vt(local_types[l]) }
+            if func_body[f] >= 0 { live_work.push(func_body[f]) }
+        }
+    }
     for (0 ..< glob_kind.len()) |g| {
         if glob_live[g] == 1 {
-            mark_vt(glob_type[g]);
-            if glob_init[g] >= 0 { live_work.push(glob_init[g]); };
-        };
-    };
-    if tag_used[0] == 1 { mark_type(js_tag_type()); };
+            mark_vt(glob_type[g])
+            if glob_init[g] >= 0 { live_work.push(glob_init[g]) }
+        }
+    }
+    if tag_used[0] == 1 { mark_type(js_tag_type()) }
     while (live_work.len() > 0) {
-        let node = live_work[live_work.len() - 1];
-        live_work.resize(live_work.len() - 1);
-        let op = w_op[node];
+        let node = live_work[live_work.len() - 1]
+        live_work.resize(live_work.len() - 1)
+        let op = w_op[node]
         // Only a block's several results need a function type (a call's
         // are its callee's).
-        let vt = w_type[node];
+        let vt = w_type[node]
         if vt >= vt_tuple and not (op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.If.i32() or op == Op.Try.i32()) {
-            mark_list(vt - vt_tuple);
+            mark_list(vt - vt_tuple)
         } else {
-            mark_vt(vt);
-        };
-        if op == Op.RefNull.i32() or op == Op.RefTest.i32() or op == Op.RefCast.i32() { mark_vt(w_a[node]); }
-        else if op == Op.CastArms.i32() { for (0 ..< w_b[node] + 1) |i| { mark_vt(w_aux[w_a[node] + i]); }; }
+            mark_vt(vt)
+        }
+        if op == Op.RefNull.i32() or op == Op.RefTest.i32() or op == Op.RefCast.i32() { mark_vt(w_a[node]) }
+        else if op == Op.CastArms.i32() { for (0 ..< w_b[node] + 1) |i| { mark_vt(w_aux[w_a[node] + i]) } }
         else if op == Op.CallRef.i32() or (op >= Op.StructNew.i32() and op <= Op.ArrayInitData.i32() and op != Op.ArrayLen.i32()) {
-            mark_type(w_a[node]);
-            if op == Op.ArrayCopy.i32() { mark_type(w_b[node]); };
-        };
-        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
-    };
+            mark_type(w_a[node])
+            if op == Op.ArrayCopy.i32() { mark_type(w_b[node]) }
+        }
+        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)) }
+    }
     while (type_work.len() > 0) {
-        let t = type_work[type_work.len() - 1];
-        type_work.resize(type_work.len() - 1);
-        let kind = ht_kind[t];
+        let t = type_work[type_work.len() - 1]
+        type_work.resize(type_work.len() - 1)
+        let kind = ht_kind[t]
         if kind == Heap.Func.i32() {
-            mark_list(ht_a[t]);
-            mark_list(ht_b[t]);
+            mark_list(ht_a[t])
+            mark_list(ht_b[t])
         } else if kind == Heap.Array.i32() {
-            mark_vt(ht_a[t]);
+            mark_vt(ht_a[t])
         } else {
-            for (0 ..< ht_b[t]) |i| { mark_vt(field_storage(t, i)); };
-        };
-        if ht_super[t] >= 0 { mark_type(ht_super[t]); };
-    };
+            for (0 ..< ht_b[t]) |i| { mark_vt(field_storage(t, i)) }
+        }
+        if ht_super[t] >= 0 { mark_type(ht_super[t]) }
+    }
 }
 
 fn mark_type(t: I32) void {
-    if t < 0 { return; };
-    type_uses[t] += 1;
-    if type_live[t] == 1 { return; };
-    type_live[t] = 1;
-    type_work.push(t);
+    if t < 0 { return }
+    type_uses[t] += 1
+    if type_live[t] == 1 { return }
+    type_live[t] = 1
+    type_work.push(t)
 }
 
 fn mark_vt(vt: I32) void {
     if vt >= vt_tuple {
-        mark_list(vt - vt_tuple);
+        mark_list(vt - vt_tuple)
         // A block with several results is typed by a function type.
-        mark_type(func_type(vl_empty(), vt - vt_tuple));
+        mark_type(func_type(vl_empty(), vt - vt_tuple))
     } else if vt >= vt_defined {
-        mark_type(vt_heap(vt));
-    };
+        mark_type(vt_heap(vt))
+    }
 }
 
 fn mark_list(list: I32) void {
-    for (0 ..< vl_len[list]) |i| { mark_vt(vl_item(list, i)); };
+    for (0 ..< vl_len[list]) |i| { mark_vt(vl_item(list, i)) }
 }
 
 /// By type: 1 when encoded on its own though interned for the group (@plain_func).
-vec type_alone: U8;
+vec type_alone: U8
 
 /// A function type that names no defined type, so it can be encoded on its own.
 fn plain_func(t: I32) Bool {
-    if ht_kind[t] != Heap.Func.i32() { return false; };
-    for (0 ..< vl_len[ht_a[t]]) |i| { if vl_item(ht_a[t], i) >= vt_defined { return false; }; };
-    for (0 ..< vl_len[ht_b[t]]) |i| { if vl_item(ht_b[t], i) >= vt_defined { return false; }; };
-    true;
+    if ht_kind[t] != Heap.Func.i32() { return false }
+    for (0 ..< vl_len[ht_a[t]]) |i| { if vl_item(ht_a[t], i) >= vt_defined { return false } }
+    for (0 ..< vl_len[ht_b[t]]) |i| { if vl_item(ht_b[t], i) >= vt_defined { return false } }
+    true
 }
 
 /// Whether type t is encoded on its own (not in the recursion group).
-fn encoded_single(t: I32) Bool { ht_single[t] == 1 or type_alone[t] == 1; }
+fn encoded_single(t: I32) Bool { ht_single[t] == 1 or type_alone[t] == 1 }
 
 /// The interned type of this shape, or -1.
 fn ht_lookup(kind: I32, a: I32, b: I32, single: I32) I32 {
-    let mask = ht_table.len() - 1;
-    let h = ht_key_hash(kind, a, b) & mask;
+    let mask = ht_table.len() - 1
+    let h = ht_key_hash(kind, a, b) & mask
     while (ht_table[h] >= 0) {
-        let t = ht_table[h];
-        if ht_kind[t] == kind and ht_a[t] == a and ht_b[t] == b and ht_single[t] == single { return t; };
-        h = (h + 1) & mask;
-    };
-    -1;
+        let t = ht_table[h]
+        if ht_kind[t] == kind and ht_a[t] == a and ht_b[t] == b and ht_single[t] == single { return t }
+        h = (h + 1) & mask
+    }
+    -1
 }
 
 fn put_valtype(in_body: Bool, vt: I32) void {
-    if vt == vt_i32 { put(in_body, 127); }
-    else if vt == vt_i64 { put(in_body, 126); }
-    else if vt == vt_f32 { put(in_body, 125); }
-    else if vt == vt_f64 { put(in_body, 124); }
-    else if vt == vt_v128 { put(in_body, 123); }
-    else if vt == vt_i8 { put(in_body, 120); }
-    else if vt == vt_i16 { put(in_body, 119); }
-    else if vt == vt_externref { put(in_body, 111); }
-    else if vt == vt_extern { put(in_body, 100); put(in_body, 111); }
-    else if vt == vt_i31ref { put(in_body, 108); }
-    else if vt == vt_funcref { put(in_body, 112); }
-    else if vt == vt_eqref { put(in_body, 109); }
-    else if vt == vt_anyref { put(in_body, 110); }
+    if vt == vt_i32 { put(in_body, 127) }
+    else if vt == vt_i64 { put(in_body, 126) }
+    else if vt == vt_f32 { put(in_body, 125) }
+    else if vt == vt_f64 { put(in_body, 124) }
+    else if vt == vt_v128 { put(in_body, 123) }
+    else if vt == vt_i8 { put(in_body, 120) }
+    else if vt == vt_i16 { put(in_body, 119) }
+    else if vt == vt_externref { put(in_body, 111) }
+    else if vt == vt_extern { put(in_body, 100); put(in_body, 111) }
+    else if vt == vt_i31ref { put(in_body, 108) }
+    else if vt == vt_funcref { put(in_body, 112) }
+    else if vt == vt_eqref { put(in_body, 109) }
+    else if vt == vt_anyref { put(in_body, 110) }
     else {
-        put(in_body, if (vt - vt_defined) % 2 == 0 { 99; } else { 100; });
-        leb_s(in_body, type_index[vt_heap(vt)]);
-    };
+        put(in_body, if (vt - vt_defined) % 2 == 0 { 99 } else { 100 })
+        leb_s(in_body, type_index[vt_heap(vt)])
+    }
 }
 
 /// A heap type operand (`ref.null`, `ref.test`, …): a defined type's index, or an abstract heap type.
 fn put_heap(in_body: Bool, vt: I32) void {
-    if vt >= vt_defined { leb_s(in_body, type_index[vt_heap(vt)]); }
-    else if vt == vt_externref or vt == vt_extern { put(in_body, 111); }
-    else if vt == vt_i31ref { put(in_body, 108); }
-    else if vt == vt_funcref { put(in_body, 112); }
-    else if vt == vt_eqref { put(in_body, 109); }
-    else { put(in_body, 110); };
+    if vt >= vt_defined { leb_s(in_body, type_index[vt_heap(vt)]) }
+    else if vt == vt_externref or vt == vt_extern { put(in_body, 111) }
+    else if vt == vt_i31ref { put(in_body, 108) }
+    else if vt == vt_funcref { put(in_body, 112) }
+    else if vt == vt_eqref { put(in_body, 109) }
+    else { put(in_body, 110) }
 }
 
 fn put_list(list: I32) void {
-    leb_u(false, vl_len[list]);
-    for (0 ..< vl_len[list]) |i| { put_valtype(false, vl_item(list, i)); };
+    leb_u(false, vl_len[list])
+    for (0 ..< vl_len[list]) |i| { put_valtype(false, vl_item(list, i)) }
 }
 
 fn put_composite(t: I32) void {
-    let kind = ht_kind[t];
+    let kind = ht_kind[t]
     if ht_super[t] >= 0 or ht_open[t] == 1 {
-        sec.push(if ht_open[t] == 1 { 80; } else { 79; });
+        sec.push(if ht_open[t] == 1 { 80 } else { 79 })
         if ht_super[t] >= 0 {
-            leb_u(false, 1);
-            leb_u(false, type_index[ht_super[t]]);
+            leb_u(false, 1)
+            leb_u(false, type_index[ht_super[t]])
         } else {
-            leb_u(false, 0);
-        };
-    };
+            leb_u(false, 0)
+        }
+    }
     if kind == Heap.Func.i32() {
-        sec.push(96);
-        put_list(ht_a[t]);
-        put_list(ht_b[t]);
+        sec.push(96)
+        put_list(ht_a[t])
+        put_list(ht_b[t])
     } else if kind == Heap.Array.i32() {
-        sec.push(94);
-        put_valtype(false, ht_a[t]);
-        sec.push(ht_b[t]);
+        sec.push(94)
+        put_valtype(false, ht_a[t])
+        sec.push(ht_b[t])
     } else {
-        sec.push(95);
-        leb_u(false, ht_b[t]);
+        sec.push(95)
+        leb_u(false, ht_b[t])
         for (0 ..< ht_b[t]) |i| {
-            put_valtype(false, field_storage(t, i));
-            sec.push(ht_fields[ht_a[t] + i * 2 + 1]);
-        };
-    };
+            put_valtype(false, field_storage(t, i))
+            sec.push(ht_fields[ht_a[t] + i * 2 + 1])
+        }
+    }
 }
 
 fn encode_types() void {
-    let groups = 0;
-    let in_group = false;
+    let groups = 0
+    let in_group = false
     for (0 ..< type_order.len()) |i| {
-        let t = type_order[i];
-        if encoded_single(t) { groups += 1; in_group = false; }
-        else if not in_group { groups += 1; in_group = true; };
-    };
-    if groups == 0 { return; };
-    leb_u(false, groups);
-    let i = 0;
+        let t = type_order[i]
+        if encoded_single(t) { groups += 1; in_group = false }
+        else if not in_group { groups += 1; in_group = true }
+    }
+    if groups == 0 { return }
+    leb_u(false, groups)
+    let i = 0
     while (i < type_order.len()) {
-        let t = type_order[i];
+        let t = type_order[i]
         if encoded_single(t) {
-            put_composite(t);
-            i += 1;
+            put_composite(t)
+            i += 1
         } else {
-            let j = i;
-            while (j < type_order.len() and not encoded_single(type_order[j])) { j += 1; };
+            let j = i
+            while (j < type_order.len() and not encoded_single(type_order[j])) { j += 1 }
             // A group of one type is that type (2 bytes fewer).
             if j - i > 1 {
-                sec.push(78);
-                leb_u(false, j - i);
-            };
-            for (i ..< j) |k| { put_composite(type_order[k]); };
-            i = j;
-        };
-    };
-    flush_section(1);
+                sec.push(78)
+                leb_u(false, j - i)
+            }
+            for (i ..< j) |k| { put_composite(type_order[k]) }
+            i = j
+        }
+    }
+    flush_section(1)
 }
 
 fn encode_imports() void {
-    let count = func_imported[0] + glob_imported[0];
-    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.i32() { count += 1; }; };
-    if tag_used[0] == 1 { count += 1; };
-    if count == 0 { return; };
-    leb_u(false, count);
+    let count = func_imported[0] + glob_imported[0]
+    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.i32() { count += 1 } }
+    if tag_used[0] == 1 { count += 1 }
+    if count == 0 { return }
+    leb_u(false, count)
     for (0 ..< func_imported[0]) |i| {
-        let f = func_order[i];
-        put_name(false, func_module_name[f]);
-        put_name(false, func_field_name[f]);
-        sec.push(0);
-        leb_u(false, type_index[func_type_of[f]]);
-    };
+        let f = func_order[i]
+        put_name(false, func_module_name[f])
+        put_name(false, func_field_name[f])
+        sec.push(0)
+        leb_u(false, type_index[func_type_of[f]])
+    }
     if tag_used[0] == 1 {
-        put_text("utu");
-        put_text("js_tag");
-        sec.push(4);
-        sec.push(0);
-        leb_u(false, type_index[js_tag_type()]);
-    };
+        put_text("utu")
+        put_text("js_tag")
+        sec.push(4)
+        sec.push(0)
+        leb_u(false, type_index[js_tag_type()])
+    }
     for (0 ..< memory_kind.len()) |m| {
         if memory_kind[m] == FuncKind.Import.i32() {
-            put_name(false, memory_module_name[m]);
-            put_name(false, memory_field_name[m]);
-            sec.push(2);
-            put_limits(memory_pages[m]);
-        };
-    };
+            put_name(false, memory_module_name[m])
+            put_name(false, memory_field_name[m])
+            sec.push(2)
+            put_limits(memory_pages[m])
+        }
+    }
     for (0 ..< glob_imported[0]) |i| {
-        let g = glob_order[i];
-        put_name(false, glob_module_name[g]);
-        put_name(false, glob_field_name[g]);
-        sec.push(3);
-        put_valtype(false, glob_type[g]);
-        sec.push(glob_mutable[g]);
-    };
-    flush_section(2);
+        let g = glob_order[i]
+        put_name(false, glob_module_name[g])
+        put_name(false, glob_field_name[g])
+        sec.push(3)
+        put_valtype(false, glob_type[g])
+        sec.push(glob_mutable[g])
+    }
+    flush_section(2)
 }
 
 /// The JS exception tag's type: one externref.
-fn js_tag_type() I32 { func_type_single(vl_one(vt_externref), vl_empty()); }
+fn js_tag_type() I32 { func_type_single(vl_one(vt_externref), vl_empty()) }
 
 /// Import the JS exception tag (for `try` and `throw`).
 fn use_js_tag() void {
-    js_tag_type();
-    tag_used[0] = 1;
+    js_tag_type()
+    tag_used[0] = 1
 }
 
 fn put_limits(pages: I32) void {
     // The implicit maximum is the Wasm memory32 limit of 65536 pages.
-    sec.push(0);
-    leb_u(false, pages);
+    sec.push(0)
+    leb_u(false, pages)
 }
 
 fn encode_functions() void {
-    let count = func_order.len() - func_imported[0];
-    if count == 0 { return; };
-    leb_u(false, count);
-    for (func_imported[0] ..< func_order.len()) |i| { leb_u(false, type_index[func_type_of[func_order[i]]]); };
-    flush_section(3);
+    let count = func_order.len() - func_imported[0]
+    if count == 0 { return }
+    leb_u(false, count)
+    for (func_imported[0] ..< func_order.len()) |i| { leb_u(false, type_index[func_type_of[func_order[i]]]) }
+    flush_section(3)
 }
 
 fn encode_memories() void {
-    let count = 0;
-    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1; }; };
-    if count == 0 { return; };
-    leb_u(false, count);
+    let count = 0
+    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1 } }
+    if count == 0 { return }
+    leb_u(false, count)
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 and m != prof_memory[0] { put_limits(memory_pages[m]); };
-    };
+        if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 and m != prof_memory[0] { put_limits(memory_pages[m]) }
+    }
     // The profiler's: shared, of a fixed size.
     if prof_memory[0] >= 0 {
-        sec.push(3);
-        leb_u(false, profile_pages);
-        leb_u(false, profile_pages);
-    };
-    flush_section(5);
+        sec.push(3)
+        leb_u(false, profile_pages)
+        leb_u(false, profile_pages)
+    }
+    flush_section(5)
 }
 
 fn encode_globals() void {
-    let count = glob_order.len() - glob_imported[0];
-    if count == 0 { return; };
-    leb_u(false, count);
+    let count = glob_order.len() - glob_imported[0]
+    if count == 0 { return }
+    leb_u(false, count)
     for (glob_imported[0] ..< glob_order.len()) |k| {
-        let g = glob_order[k];
-        put_valtype(false, glob_type[g]);
-        sec.push(glob_mutable[g]);
-        code_bytes.clear();
-        emit(glob_init[g], -1);
-        for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]); };
-        sec.push(11);
-    };
-    flush_section(6);
+        let g = glob_order[k]
+        put_valtype(false, glob_type[g])
+        sec.push(glob_mutable[g])
+        code_bytes.clear()
+        emit(glob_init[g], -1)
+        for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]) }
+        sec.push(11)
+    }
+    flush_section(6)
 }
 
 /// The function run when the module is instantiated, or -1.
-vec start_func: I32 = [-1];
+vec start_func: I32 = [-1]
 
 fn encode_start() void {
-    if start_func[0] < 0 { return; };
-    leb_u(false, func_index[start_func[0]]);
-    flush_section(8);
+    if start_func[0] < 0 { return }
+    leb_u(false, func_index[start_func[0]])
+    flush_section(8)
 }
 
 /// Mark what a function made after the @sweep reaches.
 fn mark_late(f: I32) void {
     // (It and what it uses were made after the sweep sized these.)
-    let funcs = func_live.len();
-    func_live.resize(func_kind.len());
-    func_uses.resize(func_kind.len());
+    let funcs = func_live.len()
+    func_live.resize(func_kind.len())
+    func_uses.resize(func_kind.len())
     for (funcs ..< func_kind.len()) |g| {
-        func_live[g] = 0;
-        func_uses[g] = 0;
-    };
-    let globs = glob_live.len();
-    glob_live.resize(glob_kind.len());
-    glob_uses.resize(glob_kind.len());
-    glob_sets.resize(glob_kind.len());
+        func_live[g] = 0
+        func_uses[g] = 0
+    }
+    let globs = glob_live.len()
+    glob_live.resize(glob_kind.len())
+    glob_uses.resize(glob_kind.len())
+    glob_sets.resize(glob_kind.len())
     for (globs ..< glob_kind.len()) |g| {
-        glob_live[g] = 0;
-        glob_uses[g] = 0;
-        glob_sets[g] = 0;
-    };
-    mark_func(f);
+        glob_live[g] = 0
+        glob_uses[g] = 0
+        glob_sets[g] = 0
+    }
+    mark_func(f)
     while (live_work.len() > 0) {
-        let node = live_work[live_work.len() - 1];
-        live_work.resize(live_work.len() - 1);
-        scan_live(node);
-    };
+        let node = live_work[live_work.len() - 1]
+        live_work.resize(live_work.len() - 1)
+        scan_live(node)
+    }
 }
 
 fn encode_exports() void {
-    let count = 0;
-    for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { count += 1; }; };
-    for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { count += 1; }; };
-    for (0 ..< memory_kind.len()) |m| { if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1; }; };
-    if count == 0 { return; };
-    leb_u(false, count);
+    let count = 0
+    for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { count += 1 } }
+    for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { count += 1 } }
+    for (0 ..< memory_kind.len()) |m| { if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1 } }
+    if count == 0 { return }
+    leb_u(false, count)
     for (0 ..< func_kind.len()) |f| {
         if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 {
-            put_name(false, func_field_name[f]);
-            sec.push(0);
-            leb_u(false, func_index[f]);
-        };
-    };
+            put_name(false, func_field_name[f])
+            sec.push(0)
+            leb_u(false, func_index[f])
+        }
+    }
     for (0 ..< memory_kind.len()) |m| {
         if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 {
-            put_name(false, memory_field_name[m]);
-            sec.push(2);
-            leb_u(false, memory_index[m]);
-        };
-    };
+            put_name(false, memory_field_name[m])
+            sec.push(2)
+            leb_u(false, memory_index[m])
+        }
+    }
     for (0 ..< glob_kind.len()) |g| {
         if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 {
-            put_name(false, glob_field_name[g]);
-            sec.push(3);
-            leb_u(false, glob_index[g]);
-        };
-    };
-    flush_section(7);
+            put_name(false, glob_field_name[g])
+            sec.push(3)
+            leb_u(false, glob_index[g])
+        }
+    }
+    flush_section(7)
 }
 
 /// Functions named by `ref.func` must be declared: one declarative segment.
-vec declared: I32;   // functions, deduplicated by func_declared
-vec func_declared: U8;
+vec declared: I32   // functions, deduplicated by func_declared
+vec func_declared: U8
 
 fn encode_elements() void {
-    if declared.len() == 0 { return; };
-    leb_u(false, 1);
-    sec.push(3);
-    sec.push(0);
-    leb_u(false, declared.len());
-    for (0 ..< declared.len()) |i| { leb_u(false, func_index[declared[i]]); };
-    flush_section(9);
+    if declared.len() == 0 { return }
+    leb_u(false, 1)
+    sec.push(3)
+    sec.push(0)
+    leb_u(false, declared.len())
+    for (0 ..< declared.len()) |i| { leb_u(false, func_index[declared[i]]) }
+    flush_section(9)
 }
 
 fn encode_data_count() void {
-    if data_memory.len() == 0 { return; };
-    leb_u(false, data_memory.len());
-    flush_section(12);
+    if data_memory.len() == 0 { return }
+    leb_u(false, data_memory.len())
+    flush_section(12)
 }
 
 /// The code section: each live function's locals and body, or a `@wat`
 /// function's code as the host assembled it.
 fn encode_code() void {
-    let count = func_order.len() - func_imported[0];
-    if count == 0 { return; };
-    leb_u(false, count);
+    let count = func_order.len() - func_imported[0]
+    if count == 0 { return }
+    leb_u(false, count)
     for (func_imported[0] ..< func_order.len()) |n| {
-        let f = func_order[n];
+        let f = func_order[n]
         if func_code[f] >= 0 {
             // Assembled already: locals, instructions, and end.
-            let k = func_code[f];
-            leb_u(false, wat_len[k]);
+            let k = func_code[f]
+            leb_u(false, wat_len[k])
             // One entry, the `@wat` text's place: its code is the host's.
             if source_map[0] == 1 {
-                map_at.push(sec.len());
-                map_node.push(wat_site[k]);
-                map_site.push(-1);
-            };
-            for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]); };
+                map_at.push(sec.len())
+                map_node.push(wat_site[k])
+                map_site.push(-1)
+            }
+            for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]) }
         } else {
-            code_bytes.clear();
-            encode_locals(f);
-            mark_targets(func_body[f]);
-            let first = map_at.len();
-            if source_map[0] == 1 { map_function(f); };
-            emit(func_body[f], f);
-            code_bytes.push(11);
-            leb_u(false, code_bytes.len());
+            code_bytes.clear()
+            encode_locals(f)
+            mark_targets(func_body[f])
+            let first = map_at.len()
+            if source_map[0] == 1 { map_function(f) }
+            emit(func_body[f], f)
+            code_bytes.push(11)
+            leb_u(false, code_bytes.len())
             // The map's offsets, from the body's to the section's.
-            for (first ..< map_at.len()) |i| { map_at[i] += sec.len(); };
-            for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]); };
-        };
-    };
-    map_code_size[0] = sec.len();
-    map_func[0] = -1;
-    flush_section(10);
+            for (first ..< map_at.len()) |i| { map_at[i] += sec.len() }
+            for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]) }
+        }
+    }
+    map_code_size[0] = sec.len()
+    map_func[0] = -1
+    flush_section(10)
 }
 
 // The labels a function's branches target (labels are numbered per function).
-vec label_targeted: U8;
+vec label_targeted: U8
 
 fn mark_targets(body: I32) void {
-    label_targeted.clear();
-    live_work.clear();
-    live_work.push(body);
+    label_targeted.clear()
+    live_work.clear()
+    live_work.push(body)
     while (live_work.len() > 0) {
-        let node = live_work[live_work.len() - 1];
-        live_work.resize(live_work.len() - 1);
-        let op = w_op[node];
-        if op == Op.Br.i32() or op == Op.BrIf.i32() or op == Op.Rethrow.i32() { mark_target(w_a[node]); }
-        else if op == Op.BrTable.i32() { for (0 ..< w_b[node]) |i| { mark_target(w_aux[w_a[node] + i]); }; };
-        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
-    };
+        let node = live_work[live_work.len() - 1]
+        live_work.resize(live_work.len() - 1)
+        let op = w_op[node]
+        if op == Op.Br.i32() or op == Op.BrIf.i32() or op == Op.Rethrow.i32() { mark_target(w_a[node]) }
+        else if op == Op.BrTable.i32() { for (0 ..< w_b[node]) |i| { mark_target(w_aux[w_a[node] + i]) } }
+        for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)) }
+    }
 }
 
 /// One more branch to `label` in @label_targeted, counted to 2: once, or more.
 fn mark_target(label: I32) void {
     if label >= label_targeted.len() {
-        let old = label_targeted.len();
-        label_targeted.resize(label + 1);
-        for (old ..< label + 1) |l| { label_targeted[l] = 0; };
-    };
-    if label_targeted[label] < 2 { label_targeted[label] += 1; };
+        let old = label_targeted.len()
+        label_targeted.resize(label + 1)
+        for (old ..< label + 1) |l| { label_targeted[l] = 0 }
+    }
+    if label_targeted[label] < 2 { label_targeted[label] += 1 }
 }
 
-fn targeted(label: I32) Bool { targets(label) > 0; }
+fn targeted(label: I32) Bool { targets(label) > 0 }
 
-fn targets(label: I32) I32 { if label < label_targeted.len() { label_targeted[label]; } else { 0; }; }
+fn targets(label: I32) I32 { if label < label_targeted.len() { label_targeted[label] } else { 0 } }
 
 /// Locals after the parameters, run-length encoded by type.
 fn encode_locals(f: I32) void {
-    let first = func_locals[f];
-    let n = func_local_count[f];
-    let runs = 0;
-    for (0 ..< n) |i| { if i == 0 or local_types[first + i] != local_types[first + i - 1] { runs += 1; }; };
-    leb_u(true, runs);
-    let i = 0;
+    let first = func_locals[f]
+    let n = func_local_count[f]
+    let runs = 0
+    for (0 ..< n) |i| { if i == 0 or local_types[first + i] != local_types[first + i - 1] { runs += 1 } }
+    leb_u(true, runs)
+    let i = 0
     while (i < n) {
-        let j = i;
-        while (j < n and local_types[first + j] == local_types[first + i]) { j += 1; };
-        leb_u(true, j - i);
-        put_valtype(true, local_types[first + i]);
-        i = j;
-    };
+        let j = i
+        while (j < n and local_types[first + j] == local_types[first + i]) { j += 1 }
+        leb_u(true, j - i)
+        put_valtype(true, local_types[first + i])
+        i = j
+    }
 }
 
 fn encode_data() void {
-    if data_memory.len() == 0 { return; };
-    leb_u(false, data_memory.len());
+    if data_memory.len() == 0 { return }
+    leb_u(false, data_memory.len())
     for (0 ..< data_memory.len()) |d| {
-        let m = if data_memory[d] < 0 { -1; } else { memory_index[data_memory[d]]; };
+        let m = if data_memory[d] < 0 { -1 } else { memory_index[data_memory[d]] }
         if m < 0 {
-            sec.push(1);
+            sec.push(1)
         } else if m == 0 {
-            sec.push(0);
-            sec.push(65);
-            sec.push(0);
-            sec.push(11);
+            sec.push(0)
+            sec.push(65)
+            sec.push(0)
+            sec.push(11)
         } else {
-            sec.push(2);
-            leb_u(false, m);
-            sec.push(65);
-            sec.push(0);
-            sec.push(11);
-        };
-        leb_u(false, data_len[d]);
-        for (0 ..< data_len[d]) |i| { sec.push(data_bytes[data_start[d] + i]); };
-    };
-    flush_section(11);
+            sec.push(2)
+            leb_u(false, m)
+            sec.push(65)
+            sec.push(0)
+            sec.push(11)
+        }
+        leb_u(false, data_len[d])
+        for (0 ..< data_len[d]) |i| { sec.push(data_bytes[data_start[d] + i]) }
+    }
+    flush_section(11)
 }
 
 /// The name section: function names, for stack traces.
 fn encode_names() void {
-    let count = 0;
-    for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_debug_name[f] >= 0 { count += 1; }; };
-    if count == 0 { return; };
-    put_text("name");
-    code_bytes.clear();
-    leb_u(true, count);
+    let count = 0
+    for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_debug_name[f] >= 0 { count += 1 } }
+    if count == 0 { return }
+    put_text("name")
+    code_bytes.clear()
+    leb_u(true, count)
     // In index order.
     for (0 ..< func_order.len()) |i| {
-        let f = func_order[i];
+        let f = func_order[i]
         if func_debug_name[f] >= 0 {
-            leb_u(true, i);
-            put_name(true, func_debug_name[f]);
-        };
-    };
-    sec.push(1);
-    leb_u(false, code_bytes.len());
-    for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]); };
-    flush_section(0);
+            leb_u(true, i)
+            put_name(true, func_debug_name[f])
+        }
+    }
+    sec.push(1)
+    leb_u(false, code_bytes.len())
+    for (0 ..< code_bytes.len()) |i| { sec.push(code_bytes[i]) }
+    flush_section(0)
 }
 
 /// The module's bytes, in `out`: the live code (see @sweep), cleaned up
@@ -1652,72 +1652,72 @@ fn encode_names() void {
 /// encoded section by section. Returns their number.
 fn encode_module() I32 {
     // Nodes made from here (inlining, cleaning up) have no syntax of their own.
-    cur_src[0] = -1;
-    lean_closures();
-    sweep();
+    cur_src[0] = -1
+    lean_closures()
+    sweep()
     // -O3 inlines (inline.utu); what is no longer called is then swept out,
     // before the mems' late functions are made (and marked live).
     if optimize_level[0] == 2 {
-        inline_module();
-        sweep();
-    };
+        inline_module()
+        sweep()
+    }
     // -O small inlines what shrinks the module (it sweeps as it goes).
-    if optimize_level[0] == 1 { inline_small(); };
+    if optimize_level[0] == 1 { inline_small() }
     // Structs returned as their fields (inline.utu).
-    if optimize_level[0] != 0 and struct_returns() { sweep(); };
-    finish_mems();
-    if optimize_level[0] != 0 { optimize_module(); };
-    write_host_json();
-    assign_indices();
-    out.clear();
-    sec.clear();
-    labels.clear();
-    label_at.clear();
-    label_outer.clear();
-    map_at.clear();
-    map_node.clear();
-    map_site.clear();
-    w_near.clear();
-    map_func[0] = -1;
-    declared.clear();
-    func_declared.resize(func_kind.len());
-    for (0 ..< func_kind.len()) |f| { func_declared[f] = 0; };
-    for ([0, 97, 115, 109, 1, 0, 0, 0]) |b| { out.push(b); };
-    encode_types();
-    encode_imports();
-    encode_functions();
-    encode_memories();
-    encode_globals();
-    encode_exports();
-    encode_start();
+    if optimize_level[0] != 0 and struct_returns() { sweep() }
+    finish_mems()
+    if optimize_level[0] != 0 { optimize_module() }
+    write_host_json()
+    assign_indices()
+    out.clear()
+    sec.clear()
+    labels.clear()
+    label_at.clear()
+    label_outer.clear()
+    map_at.clear()
+    map_node.clear()
+    map_site.clear()
+    w_near.clear()
+    map_func[0] = -1
+    declared.clear()
+    func_declared.resize(func_kind.len())
+    for (0 ..< func_kind.len()) |f| { func_declared[f] = 0 }
+    for ([0, 97, 115, 109, 1, 0, 0, 0]) |b| { out.push(b) }
+    encode_types()
+    encode_imports()
+    encode_functions()
+    encode_memories()
+    encode_globals()
+    encode_exports()
+    encode_start()
     // ref.func targets are found while encoding code; encode it first, into
     // its own buffer, then the elements before it.
-    let code_start = out.len();
-    encode_code();
-    let code_end = out.len();
-    let code = Array[I32].new(code_end - code_start, 0);
-    for (code_start ..< code_end) |i| { code[i - code_start] = out[i]; };
-    out.resize(code_start);
-    encode_elements();
-    encode_data_count();
+    let code_start = out.len()
+    encode_code()
+    let code_end = out.len()
+    let code = Array[I32].new(code_end - code_start, 0)
+    for (code_start ..< code_end) |i| { code[i - code_start] = out[i] }
+    out.resize(code_start)
+    encode_elements()
+    encode_data_count()
     // The map's offsets, from the section's contents to the module's.
-    let moved = out.len() + code.len() - map_code_size[0];
-    for (0 ..< map_at.len()) |i| { map_at[i] += moved; };
-    for (0 ..< code.len()) |i| { out.push(code[i]); };
-    encode_data();
-    if debug_names[0] == 1 { encode_names(); };
-    out.len();
+    let moved = out.len() + code.len() - map_code_size[0]
+    for (0 ..< map_at.len()) |i| { map_at[i] += moved }
+    for (0 ..< code.len()) |i| { out.push(code[i]) }
+    encode_data()
+    if debug_names[0] == 1 { encode_names() }
+    out.len()
 }
 
 /// What the host provides the module (`@es` bodies, closures, promises,
 /// hosted mems), as JSON, beside the module rather than in it, as stage 0
 /// keeps it: the host writes the glue for what the module imports, and the
 /// module ships as small as its code.
-export mem host_json: U8;
+export mem host_json: U8
 
 /// Whether the module carries a name section (function names for stack
 /// traces): off unless asked for, as stage 0 has none.
-vec debug_names: I32 = [0];
+vec debug_names: I32 = [0]
 
 //! = Source maps
 //!
@@ -1730,95 +1730,95 @@ vec debug_names: I32 = [0];
 //! coarser place, never another one.
 
 /// Whether builds keep a source map (1), or not (0, the default).
-vec source_map: I32 = [0];
+vec source_map: I32 = [0]
 /// By entry: an instruction's byte offset in the module, its syntax node,
 /// and the call it was inlined at (-1: none).
-vec map_at: I32;
-vec map_node: I32;
-vec map_site: I32;
+vec map_at: I32
+vec map_node: I32
+vec map_site: I32
 /// The code section's size, before its header.
-vec map_code_size: I32 = [0];
+vec map_code_size: I32 = [0]
 /// While a body is encoded: by IR node, the nearest node with syntax (it, or
 /// one around it), or -1.
-vec w_near: I32;
+vec w_near: I32
 /// The function being encoded.
-vec map_func: I32 = [-1];
+vec map_func: I32 = [-1]
 
 /// Function `f`'s body is next: @w_near for its nodes, and an entry at its
 /// start (its locals), for what precedes its first instruction.
 fn map_function(f: I32) void {
-    map_func[0] = f;
+    map_func[0] = f
     if w_near.len() < w_op.len() {
-        let old = w_near.len();
-        w_near.resize(w_op.len());
-        for (old ..< w_op.len()) |n| { w_near[n] = -1; };
-    };
-    let body = func_body[f];
-    w_near[body] = if w_src[body] >= 0 { body; } else { -1; };
-    live_work.clear();
-    live_work.push(body);
+        let old = w_near.len()
+        w_near.resize(w_op.len())
+        for (old ..< w_op.len()) |n| { w_near[n] = -1 }
+    }
+    let body = func_body[f]
+    w_near[body] = if w_src[body] >= 0 { body } else { -1 }
+    live_work.clear()
+    live_work.push(body)
     while (live_work.len() > 0) {
-        let n = live_work[live_work.len() - 1];
-        live_work.resize(live_work.len() - 1);
+        let n = live_work[live_work.len() - 1]
+        live_work.resize(live_work.len() - 1)
         for (0 ..< w_count[n]) |i| {
-            let k = w_kid(n, i);
-            w_near[k] = if w_src[k] >= 0 { k; } else { w_near[n]; };
-            live_work.push(k);
-        };
-    };
+            let k = w_kid(n, i)
+            w_near[k] = if w_src[k] >= 0 { k } else { w_near[n] }
+            live_work.push(k)
+        }
+    }
     // From the body's first byte (its locals): a stack overflow is there.
-    map_at.push(0);
-    map_node.push(func_src[f]);
-    map_site.push(-1);
+    map_at.push(0)
+    map_node.push(func_src[f])
+    map_site.push(-1)
 }
 
 /// An entry for node's instruction, next in @code_bytes, unless its syntax is the last entry's.
 fn map_note(node: I32) void {
-    if map_func[0] < 0 { return; };
+    if map_func[0] < 0 { return }
     // A global's folded initializer is no body's node: its own syntax, or its function's.
-    let near = if w_src[node] >= 0 { node; } else if node < w_near.len() { w_near[node]; } else { -1; };
-    let s = if near >= 0 { w_src[near]; } else { func_src[map_func[0]]; };
-    let site = if near >= 0 { w_site[near]; } else { -1; };
-    let last = map_node.len() - 1;
-    if map_node[last] == s and map_site[last] == site { return; };
-    map_at.push(code_bytes.len());
-    map_node.push(s);
-    map_site.push(site);
+    let near = if w_src[node] >= 0 { node } else if node < w_near.len() { w_near[node] } else { -1 }
+    let s = if near >= 0 { w_src[near] } else { func_src[map_func[0]] }
+    let site = if near >= 0 { w_site[near] } else { -1 }
+    let last = map_node.len() - 1
+    if map_node[last] == s and map_site[last] == site { return }
+    map_at.push(code_bytes.len())
+    map_node.push(s)
+    map_site.push(site)
 }
 
 //! = Instructions
 
 /// The labels of the blocks around the instruction being encoded.
-vec labels: I32;
+vec labels: I32
 /// By label: its place in @labels (the innermost), or -1; and by place,
 /// the place its label had before.
-vec label_at: I32;
-vec label_outer: I32;
+vec label_at: I32
+vec label_outer: I32
 
 fn depth_of(label: I32) I32 {
-    if label >= 0 and label < label_at.len() and label_at[label] >= 0 { return labels.len() - 1 - label_at[label]; };
-    let i = labels.len() - 1;
+    if label >= 0 and label < label_at.len() and label_at[label] >= 0 { return labels.len() - 1 - label_at[label] }
+    let i = labels.len() - 1
     while (i >= 0) {
-        if labels[i] == label { return labels.len() - 1 - i; };
-        i -= 1;
-    };
-    fatal;
+        if labels[i] == label { return labels.len() - 1 - i }
+        i -= 1
+    }
+    fatal
 }
 
 fn block_type(vt: I32) void {
-    if vt == vt_none or vt == vt_unreachable { code_bytes.push(64); return; };
+    if vt == vt_none or vt == vt_unreachable { code_bytes.push(64); return }
     if vt >= vt_tuple {
-        leb_s(true, type_index[func_type(vl_empty(), vt - vt_tuple)]);
-        return;
-    };
-    put_valtype(true, vt);
+        leb_s(true, type_index[func_type(vl_empty(), vt - vt_tuple)])
+        return
+    }
+    put_valtype(true, vt)
 }
 
 /// `i32` and `i64` `eq`/`ne`, `lt`/`ge`, `gt`/`le` (signed and unsigned): the opposite, or -1.
 fn inverse_comparison(code: I32) I32 {
-    if code >= 70 and code <= 79 { return [71, 70, 78, 79, 76, 77, 74, 75, 72, 73][code - 70]; };
-    if code >= 81 and code <= 90 { return [82, 81, 89, 90, 87, 88, 85, 86, 83, 84][code - 81]; };
-    -1;
+    if code >= 70 and code <= 79 { return [71, 70, 78, 79, 76, 77, 74, 75, 72, 73][code - 70] }
+    if code >= 81 and code <= 90 { return [82, 81, 89, 90, 87, 88, 85, 86, 83, 84][code - 81] }
+    -1
 }
 
 /// A while loop as lowerings make it,
@@ -1827,176 +1827,176 @@ fn inverse_comparison(code: I32) I32 {
 /// `loop (if (not c) body (br $loop))` (two bytes fewer, and
 /// three when c was negated to leave).
 fn exits_only_loop(block: I32) Bool {
-    if w_type[block] != vt_none or w_count[block] != 1 or targets(w_a[block]) != 1 { return false; };
-    let lp = w_kid(block, 0);
-    if w_op[lp] != Op.Loop.i32() or w_type[lp] != vt_none or w_count[lp] < 2 { return false; };
-    let exit = w_kid(lp, 0);
-    let back = w_kid(lp, w_count[lp] - 1);
+    if w_type[block] != vt_none or w_count[block] != 1 or targets(w_a[block]) != 1 { return false }
+    let lp = w_kid(block, 0)
+    if w_op[lp] != Op.Loop.i32() or w_type[lp] != vt_none or w_count[lp] < 2 { return false }
+    let exit = w_kid(lp, 0)
+    let back = w_kid(lp, w_count[lp] - 1)
     w_op[exit] == Op.BrIf.i32() and w_a[exit] == w_a[block] and w_count[exit] == 1
-        and w_op[back] == Op.Br.i32() and w_a[back] == w_a[lp] and w_count[back] == 0;
+        and w_op[back] == Op.Br.i32() and w_a[back] == w_a[lp] and w_count[back] == 0
 }
 
 /// Open a structured instruction (`block` 2, `loop` 3, `if` 4, `try` 6) of
 /// result `vt`, branched to as `label`; @close_block ends it.
 fn open_block(code: I32, vt: I32, label: I32) void {
-    op1(code);
-    block_type(vt);
+    op1(code)
+    block_type(vt)
     if label >= 0 {
         if label >= label_at.len() {
-            let old = label_at.len();
-            label_at.resize(label + 1);
-            for (old ..< label + 1) |l| { label_at[l] = -1; };
-        };
-        label_outer.push(label_at[label]);
-        label_at[label] = labels.len();
+            let old = label_at.len()
+            label_at.resize(label + 1)
+            for (old ..< label + 1) |l| { label_at[l] = -1 }
+        }
+        label_outer.push(label_at[label])
+        label_at[label] = labels.len()
     } else {
-        label_outer.push(-1);
-    };
-    labels.push(label);
+        label_outer.push(-1)
+    }
+    labels.push(label)
 }
 
 fn close_block() void {
-    let label = labels[labels.len() - 1];
-    if label >= 0 { label_at[label] = label_outer[labels.len() - 1]; };
-    labels.resize(labels.len() - 1);
-    label_outer.resize(labels.len());
-    op1(11);
+    let label = labels[labels.len() - 1]
+    if label >= 0 { label_at[label] = label_outer[labels.len() - 1] }
+    labels.resize(labels.len() - 1)
+    label_outer.resize(labels.len())
+    op1(11)
 }
 
-fn op1(b: I32) void { code_bytes.push(b); }
+fn op1(b: I32) void { code_bytes.push(b) }
 
 fn op_fb(sub: I32) void {
-    code_bytes.push(251);
-    leb_u(true, sub);
+    code_bytes.push(251)
+    leb_u(true, sub)
 }
 
 fn emit_while_rec(block: I32, d: I32) void {
-    let lp = w_kid(block, 0);
-    let leave = w_kid(w_kid(lp, 0), 0);
-    open_block(3, vt_none, w_a[lp]);
+    let lp = w_kid(block, 0)
+    let leave = w_kid(w_kid(lp, 0), 0)
+    open_block(3, vt_none, w_a[lp])
     // Round again while the condition to leave does not hold.
     if w_op[leave] == Op.Plain.i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
-        emit_at(w_kid(leave, 0), d);
+        emit_at(w_kid(leave, 0), d)
     } else if w_op[leave] == Op.Plain.i32() and inverse_comparison(w_a[leave]) >= 0 {
-        emit_kids_rec(leave, d);
-        op1(inverse_comparison(w_a[leave]));
+        emit_kids_rec(leave, d)
+        op1(inverse_comparison(w_a[leave]))
     } else {
-        emit_at(leave, d);
-        op1(i32_eqz);
-    };
-    open_block(4, vt_none, -1);
-    for (1 ..< w_count[lp]) |i| { emit_at(w_kid(lp, i), d); };
-    close_block();
-    close_block();
+        emit_at(leave, d)
+        op1(i32_eqz)
+    }
+    open_block(4, vt_none, -1)
+    for (1 ..< w_count[lp]) |i| { emit_at(w_kid(lp, i), d) }
+    close_block()
+    close_block()
 }
 
 fn emit_kids_rec(node: I32, d: I32) void {
-    for (0 ..< w_count[node]) |i| { emit_at(w_kid(node, i), d); };
+    for (0 ..< w_count[node]) |i| { emit_at(w_kid(node, i), d) }
 }
 
 /// How many of a sequence's kids are encoded: what follows one that never
 /// ends is dead and left out (a `try` there, in JavaScriptCore, has no catch
 /// to rethrow from: "rethrow doesn't refer to a catch block").
 fn live_kids(node: I32) I32 {
-    let n = w_count[node];
+    let n = w_count[node]
     for (0 ..< n) |i| {
-        if never_ends(w_kid(node, i)) { return i + 1; };
-    };
-    n;
+        if never_ends(w_kid(node, i)) { return i + 1 }
+    }
+    n
 }
 
 /// Whether a node surely never completes: a branch, return, throw or
 /// `unreachable`, or a sequence that ends in one.
 fn never_ends(k: I32) Bool {
-    let op = w_op[k];
+    let op = w_op[k]
     if op == Op.Seq.i32() or ((op == Op.Block.i32() or op == Op.Loop.i32()) and not targeted(w_a[k])) {
-        return w_count[k] > 0 and never_ends(w_kid(k, live_kids(k) - 1));
-    };
-    w_type[k] == vt_unreachable and (op == Op.Unreachable.i32() or op == Op.Br.i32() or op == Op.Return.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32());
+        return w_count[k] > 0 and never_ends(w_kid(k, live_kids(k) - 1))
+    }
+    w_type[k] == vt_unreachable and (op == Op.Unreachable.i32() or op == Op.Br.i32() or op == Op.Return.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32())
 }
 
 fn emit_body_rec(node: I32, d: I32) void {
-    for (0 ..< live_kids(node)) |i| { emit_at(w_kid(node, i), d); };
+    for (0 ..< live_kids(node)) |i| { emit_at(w_kid(node, i), d) }
 }
 
 /// Recursion while shallow (calls are cheap), the explicit stack below a depth.
-fn emit_at(node: I32, d: I32) void { if d < 1000 { emit_rec(node, d + 1); } else { emit_deep(node); }; }
+fn emit_at(node: I32, d: I32) void { if d < 1000 { emit_rec(node, d + 1) } else { emit_deep(node) } }
 
-fn emit(node: I32, f: I32) void { emit_rec(node, 0); }
+fn emit(node: I32, f: I32) void { emit_rec(node, 0) }
 
 /// Encode a node into @code_bytes. `f` is the function (only passed along:
 /// kept for the locals of a function a lowering may need).
 fn emit_rec(node: I32, d: I32) void {
-    let op = w_op[node];
-    let a = w_a[node];
-    let b = w_b[node];
-    if op == Op.Seq.i32() { emit_body_rec(node, d); return; };
+    let op = w_op[node]
+    let a = w_a[node]
+    let b = w_b[node]
+    if op == Op.Seq.i32() { emit_body_rec(node, d); return }
     if op == Op.Block.i32() and exits_only_loop(node) {
-        emit_while_rec(node, d);
-        return;
-    };
+        emit_while_rec(node, d)
+        return
+    }
     if op == Op.GlobalGet.i32() and glob_folded(a) {
-        emit_at(glob_init[a], d);
-        return;
-    };
+        emit_at(glob_init[a], d)
+        return
+    }
     if op == Op.Block.i32() or op == Op.Loop.i32() {
         // A block nothing branches to is its contents (a loop's `continue`
         // target when nothing continues, …).
         if not targeted(a) {
-            emit_body_rec(node, d);
-            return;
-        };
-        open_block(if op == Op.Block.i32() { 2; } else { 3; }, w_type[node], a);
-        emit_body_rec(node, d);
-        close_block();
-        return;
-    };
+            emit_body_rec(node, d)
+            return
+        }
+        open_block(if op == Op.Block.i32() { 2 } else { 3 }, w_type[node], a)
+        emit_body_rec(node, d)
+        close_block()
+        return
+    }
     // (Planned by emit_step.)
     if op == Op.CastArms.i32() {
-        emit_deep(node);
-        return;
-    };
+        emit_deep(node)
+        return
+    }
     if op == Op.NullElse.i32() {
-        open_block(2, w_type[node], -1);
-        emit_at(w_kid(node, 0), d);
-        op1(214);  // br_on_non_null 0
-        op1(0);
-        emit_at(w_kid(node, 1), d);
-        close_block();
-        return;
-    };
+        open_block(2, w_type[node], -1)
+        emit_at(w_kid(node, 0), d)
+        op1(214)  // br_on_non_null 0
+        op1(0)
+        emit_at(w_kid(node, 1), d)
+        close_block()
+        return
+    }
     if op == Op.If.i32() {
-        emit_at(w_kid(node, 0), d);
-        open_block(4, w_type[node], a);
-        emit_at(w_kid(node, 1), d);
+        emit_at(w_kid(node, 0), d)
+        open_block(4, w_type[node], a)
+        emit_at(w_kid(node, 1), d)
         if w_count[node] > 2 {
-            op1(5);  // else
-            emit_at(w_kid(node, 2), d);
-        };
-        close_block();
-        return;
-    };
+            op1(5)  // else
+            emit_at(w_kid(node, 2), d)
+        }
+        close_block()
+        return
+    }
     // `i32.eqz` of an integer comparison is the opposite comparison (a byte
     // fewer; not for floats, where NaN makes neither hold).
     if op == Op.Plain.i32() and a == i32_eqz and w_count[node] == 1 {
-        let c = w_kid(node, 0);
+        let c = w_kid(node, 0)
         if w_op[c] == Op.Plain.i32() and inverse_comparison(w_a[c]) >= 0 {
-            emit_kids_rec(c, d);
-            op1(inverse_comparison(w_a[c]));
-            return;
-        };
-    };
+            emit_kids_rec(c, d)
+            op1(inverse_comparison(w_a[c]))
+            return
+        }
+    }
     if op == Op.Try.i32() {
-        open_block(6, w_type[node], a);
-        emit_at(w_kid(node, 0), d);
-        op1(7);  // catch the JS tag (tag 0)
-        leb_u(true, 0);
-        emit_at(w_kid(node, 1), d);
-        close_block();
-        return;
-    };
-    emit_kids_rec(node, d);
-    emit_own(node);
+        open_block(6, w_type[node], a)
+        emit_at(w_kid(node, 0), d)
+        op1(7)  // catch the JS tag (tag 0)
+        leb_u(true, 0)
+        emit_at(w_kid(node, 1), d)
+        close_block()
+        return
+    }
+    emit_kids_rec(node, d)
+    emit_own(node)
 }
 
 /// The encoder's work, as pairs (an argument, then a task): 0 encode a
@@ -2004,268 +2004,268 @@ fn emit_rec(node: I32, d: I32) void {
 /// block (its type and label pushed below the pair), 4 close a block, 5 an
 /// unsigned LEB, 6 a CastArms' casts. Explicit, so a deep tree does not
 /// deepen the call stack.
-vec emit_tasks: I32;
+vec emit_tasks: I32
 
 fn emit_task(task: I32, x: I32) void {
-    emit_tasks.push(x);
-    emit_tasks.push(task);
+    emit_tasks.push(x)
+    emit_tasks.push(task)
 }
 
 fn emit_open(code: I32, vt: I32, label: I32) void {
-    emit_tasks.push(vt);
-    emit_tasks.push(label);
-    emit_task(3, code);
+    emit_tasks.push(vt)
+    emit_tasks.push(label)
+    emit_task(3, code)
 }
 
 /// Push the node's kids, from `from`, so the first is encoded first.
 fn emit_kids_from(node: I32, from: I32) void {
-    let i = w_count[node];
+    let i = w_count[node]
     while (i > from) {
-        i -= 1;
-        emit_task(0, w_kid(node, i));
-    };
+        i -= 1
+        emit_task(0, w_kid(node, i))
+    }
 }
 
-fn emit_kids_deep(node: I32) void { emit_kids_from(node, 0); }
+fn emit_kids_deep(node: I32) void { emit_kids_from(node, 0) }
 
 fn emit_body_deep(node: I32) void {
-    let i = live_kids(node);
+    let i = live_kids(node)
     while (i > 0) {
-        i -= 1;
-        emit_task(0, w_kid(node, i));
-    };
+        i -= 1
+        emit_task(0, w_kid(node, i))
+    }
 }
 
 /// Encode a node into @code_bytes. `f` is the function (only passed along:
 /// kept for the locals of a function a lowering may need).
 fn emit_deep(node: I32) void {
-    let base = emit_tasks.len();
-    emit_task(0, node);
+    let base = emit_tasks.len()
+    emit_task(0, node)
     while (emit_tasks.len() > base) {
-        let n = emit_tasks.len();
-        let task = emit_tasks[n - 1];
-        let x = emit_tasks[n - 2];
-        emit_tasks.resize(n - 2);
+        let n = emit_tasks.len()
+        let task = emit_tasks[n - 1]
+        let x = emit_tasks[n - 2]
+        emit_tasks.resize(n - 2)
         if task == 0 {
-            emit_step(x);
+            emit_step(x)
         } else if task == 1 {
-            emit_own(x);
+            emit_own(x)
         } else if task == 2 {
-            op1(x);
+            op1(x)
         } else if task == 3 {
-            let m = emit_tasks.len();
-            let label = emit_tasks[m - 1];
-            let vt = emit_tasks[m - 2];
-            emit_tasks.resize(m - 2);
-            open_block(x, vt, label);
+            let m = emit_tasks.len()
+            let label = emit_tasks[m - 1]
+            let vt = emit_tasks[m - 2]
+            emit_tasks.resize(m - 2)
+            open_block(x, vt, label)
         } else if task == 4 {
-            close_block();
+            close_block()
         } else if task == 6 {
-            emit_casts(x);
+            emit_casts(x)
         } else {
-            leb_u(true, x);
-        };
-    };
+            leb_u(true, x)
+        }
+    }
 }
 
 /// Plan a node's encoding: tasks pushed last first.
 fn emit_step(node: I32) void {
-    let op = w_op[node];
-    let a = w_a[node];
-    if op == Op.Seq.i32() { emit_body_deep(node); return; };
+    let op = w_op[node]
+    let a = w_a[node]
+    if op == Op.Seq.i32() { emit_body_deep(node); return }
     if op == Op.Block.i32() and exits_only_loop(node) {
-        emit_while_deep(node);
-        return;
-    };
+        emit_while_deep(node)
+        return
+    }
     if op == Op.GlobalGet.i32() and glob_folded(a) {
-        emit_task(0, glob_init[a]);
-        return;
-    };
+        emit_task(0, glob_init[a])
+        return
+    }
     if op == Op.Block.i32() or op == Op.Loop.i32() {
         // A block nothing branches to is its contents (a loop's `continue`
         // target when nothing continues, …).
         if not targeted(a) {
-            emit_kids_deep(node);
-            return;
-        };
-        emit_task(4, 0);
-        emit_kids_deep(node);
-        emit_open(if op == Op.Block.i32() { 2; } else { 3; }, w_type[node], a);
-        return;
-    };
+            emit_kids_deep(node)
+            return
+        }
+        emit_task(4, 0)
+        emit_kids_deep(node)
+        emit_open(if op == Op.Block.i32() { 2 } else { 3 }, w_type[node], a)
+        return
+    }
     if op == Op.CastArms.i32() {
-        let k = w_b[node];
-        emit_task(4, 0);
-        let i = k;
+        let k = w_b[node]
+        emit_task(4, 0)
+        let i = k
         while (i >= 1) {
             if i < k and w_type[w_kid(node, i)] != vt_unreachable {
-                emit_task(5, k - i);
-                emit_task(2, 12);
-            };
-            emit_task(0, w_kid(node, i));
-            emit_task(4, 0);
-            i -= 1;
-        };
-        let rest = w_kid(node, k + 1);
+                emit_task(5, k - i)
+                emit_task(2, 12)
+            }
+            emit_task(0, w_kid(node, i))
+            emit_task(4, 0)
+            i -= 1
+        }
+        let rest = w_kid(node, k + 1)
         if w_type[rest] != vt_unreachable {
-            emit_task(5, k);
-            emit_task(2, 12);
-        };
-        emit_task(0, rest);
-        emit_task(6, node);
-        emit_task(0, w_kid(node, 0));
-        for (0 ..< k) |j| { emit_open(2, w_aux[a + j], -1); };
-        emit_open(2, w_type[node], -1);
-        return;
-    };
+            emit_task(5, k)
+            emit_task(2, 12)
+        }
+        emit_task(0, rest)
+        emit_task(6, node)
+        emit_task(0, w_kid(node, 0))
+        for (0 ..< k) |j| { emit_open(2, w_aux[a + j], -1) }
+        emit_open(2, w_type[node], -1)
+        return
+    }
     if op == Op.NullElse.i32() {
-        emit_task(4, 0);
-        emit_task(0, w_kid(node, 1));
-        emit_task(2, 0);
-        emit_task(2, 214);  // br_on_non_null 0
-        emit_task(0, w_kid(node, 0));
-        emit_open(2, w_type[node], -1);
-        return;
-    };
+        emit_task(4, 0)
+        emit_task(0, w_kid(node, 1))
+        emit_task(2, 0)
+        emit_task(2, 214)  // br_on_non_null 0
+        emit_task(0, w_kid(node, 0))
+        emit_open(2, w_type[node], -1)
+        return
+    }
     if op == Op.If.i32() {
-        emit_task(4, 0);
+        emit_task(4, 0)
         if w_count[node] > 2 {
-            emit_task(0, w_kid(node, 2));
-            emit_task(2, 5);  // else
-        };
-        emit_task(0, w_kid(node, 1));
-        emit_open(4, w_type[node], a);
-        emit_task(0, w_kid(node, 0));
-        return;
-    };
+            emit_task(0, w_kid(node, 2))
+            emit_task(2, 5)  // else
+        }
+        emit_task(0, w_kid(node, 1))
+        emit_open(4, w_type[node], a)
+        emit_task(0, w_kid(node, 0))
+        return
+    }
     // `i32.eqz` of an integer comparison is the opposite comparison (a byte
     // fewer; not for floats, where NaN makes neither hold).
     if op == Op.Plain.i32() and a == i32_eqz and w_count[node] == 1 {
-        let c = w_kid(node, 0);
+        let c = w_kid(node, 0)
         if w_op[c] == Op.Plain.i32() and inverse_comparison(w_a[c]) >= 0 {
-            emit_task(2, inverse_comparison(w_a[c]));
-            emit_kids_deep(c);
-            return;
-        };
-    };
+            emit_task(2, inverse_comparison(w_a[c]))
+            emit_kids_deep(c)
+            return
+        }
+    }
     if op == Op.Try.i32() {
-        emit_task(4, 0);
-        emit_task(0, w_kid(node, 1));
-        emit_task(5, 0);  // catch the JS tag (tag 0)
-        emit_task(2, 7);
-        emit_task(0, w_kid(node, 0));
-        emit_open(6, w_type[node], a);
-        return;
-    };
-    emit_task(1, node);
-    emit_kids_deep(node);
+        emit_task(4, 0)
+        emit_task(0, w_kid(node, 1))
+        emit_task(5, 0)  // catch the JS tag (tag 0)
+        emit_task(2, 7)
+        emit_task(0, w_kid(node, 0))
+        emit_open(6, w_type[node], a)
+        return
+    }
+    emit_task(1, node)
+    emit_kids_deep(node)
 }
 
 fn emit_while_deep(block: I32) void {
-    let lp = w_kid(block, 0);
-    let leave = w_kid(w_kid(lp, 0), 0);
-    emit_task(4, 0);
-    emit_task(4, 0);
-    emit_kids_from(lp, 1);
-    emit_open(4, vt_none, -1);
+    let lp = w_kid(block, 0)
+    let leave = w_kid(w_kid(lp, 0), 0)
+    emit_task(4, 0)
+    emit_task(4, 0)
+    emit_kids_from(lp, 1)
+    emit_open(4, vt_none, -1)
     // Round again while the condition to leave does not hold.
     if w_op[leave] == Op.Plain.i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
-        emit_task(0, w_kid(leave, 0));
+        emit_task(0, w_kid(leave, 0))
     } else if w_op[leave] == Op.Plain.i32() and inverse_comparison(w_a[leave]) >= 0 {
-        emit_task(2, inverse_comparison(w_a[leave]));
-        emit_kids_deep(leave);
+        emit_task(2, inverse_comparison(w_a[leave]))
+        emit_kids_deep(leave)
     } else {
-        emit_task(2, i32_eqz);
-        emit_task(0, leave);
-    };
-    emit_open(3, vt_none, w_a[lp]);
+        emit_task(2, i32_eqz)
+        emit_task(0, leave)
+    }
+    emit_open(3, vt_none, w_a[lp])
 }
 
 fn emit_own(node: I32) void {
-    if source_map[0] == 1 { map_note(node); };
-    let op = w_op[node];
-    let a = w_a[node];
-    let b = w_b[node];
+    if source_map[0] == 1 { map_note(node) }
+    let op = w_op[node]
+    let a = w_a[node]
+    let b = w_b[node]
     match Op(op) {
-        Op.Nop => { op1(1); },
-        Op.Unreachable => { op1(0); },
-        Op.Br => { op1(12); leb_u(true, depth_of(a)); },
-        Op.BrIf => { op1(13); leb_u(true, depth_of(a)); },
+        Op.Nop => { op1(1) },
+        Op.Unreachable => { op1(0) },
+        Op.Br => { op1(12); leb_u(true, depth_of(a)) },
+        Op.BrIf => { op1(13); leb_u(true, depth_of(a)) },
         Op.BrTable => {
-            op1(14);
-            leb_u(true, b - 1);
-            for (0 ..< b) |i| { leb_u(true, depth_of(w_aux[a + i])); };
+            op1(14)
+            leb_u(true, b - 1)
+            for (0 ..< b) |i| { leb_u(true, depth_of(w_aux[a + i])) }
         },
-        Op.Return => { op1(15); },
-        Op.Drop => { op1(26); },
-        Op.Select => { op1(27); },
-        Op.Call => { op1(16); leb_u(true, func_index[a]); },
-        Op.ReturnCall => { op1(18); leb_u(true, func_index[a]); },
-        Op.CallRef => { op1(20); leb_u(true, type_index[a]); },
-        Op.LocalGet => { op1(32); leb_u(true, a); },
-        Op.LocalSet => { op1(33); leb_u(true, a); },
-        Op.LocalTee => { op1(34); leb_u(true, a); },
-        Op.GlobalGet => { op1(35); leb_u(true, glob_index[a]); },  // (or its constant: see emit)
-        Op.GlobalSet => { op1(36); leb_u(true, glob_index[a]); },
-        Op.I32Const => { op1(65); leb_s(true, a); },
-        Op.I64Const => { op1(66); leb_s64(true, a, b); },
-        Op.F32Const => { op1(67); put_u32le(true, a); },
-        Op.F64Const => { op1(68); put_u32le(true, a); put_u32le(true, b); },
-        Op.Plain => { if a < 256 { op1(a); } else { op1(a >> 8); leb_u(true, a & 255); }; },
-        Op.Load => { memory_access(a, b); },
-        Op.Store => { memory_access(a, b); },
-        Op.MemorySize => { op1(63); leb_u(true, memory_index[a]); },
-        Op.MemoryGrow => { op1(64); leb_u(true, memory_index[a]); },
-        Op.MemoryCopy => { op1(252); leb_u(true, 10); leb_u(true, memory_index[a]); leb_u(true, memory_index[b]); },
-        Op.MemoryFill => { op1(252); leb_u(true, 11); leb_u(true, memory_index[a]); },
-        Op.MemoryInit => { op1(252); leb_u(true, 8); leb_u(true, b); leb_u(true, memory_index[a]); },
-        Op.StructNew => { op_fb(0); leb_u(true, type_index[a]); },
-        Op.StructNewDefault => { op_fb(1); leb_u(true, type_index[a]); },
-        Op.StructGet => { op_fb(2); leb_u(true, type_index[a]); leb_u(true, b); },
-        Op.StructGetS => { op_fb(3); leb_u(true, type_index[a]); leb_u(true, b); },
-        Op.StructGetU => { op_fb(4); leb_u(true, type_index[a]); leb_u(true, b); },
-        Op.StructSet => { op_fb(5); leb_u(true, type_index[a]); leb_u(true, b); },
-        Op.ArrayNew => { op_fb(6); leb_u(true, type_index[a]); },
-        Op.ArrayNewDefault => { op_fb(7); leb_u(true, type_index[a]); },
-        Op.ArrayNewFixed => { op_fb(8); leb_u(true, type_index[a]); leb_u(true, w_count[node]); },
-        Op.ArrayNewData => { op_fb(9); leb_u(true, type_index[a]); leb_u(true, b); },
-        Op.ArrayGet => { op_fb(11); leb_u(true, type_index[a]); },
-        Op.ArrayGetS => { op_fb(12); leb_u(true, type_index[a]); },
-        Op.ArrayGetU => { op_fb(13); leb_u(true, type_index[a]); },
-        Op.ArraySet => { op_fb(14); leb_u(true, type_index[a]); },
-        Op.ArrayLen => { op_fb(15); },
-        Op.ArrayFill => { op_fb(16); leb_u(true, type_index[a]); },
-        Op.ArrayCopy => { op_fb(17); leb_u(true, type_index[a]); leb_u(true, type_index[b]); },
-        Op.ArrayInitData => { op_fb(18); leb_u(true, type_index[a]); leb_u(true, b); },
-        Op.RefNull => { op1(208); put_heap(true, a); },
-        Op.RefIsNull => { op1(209); },
+        Op.Return => { op1(15) },
+        Op.Drop => { op1(26) },
+        Op.Select => { op1(27) },
+        Op.Call => { op1(16); leb_u(true, func_index[a]) },
+        Op.ReturnCall => { op1(18); leb_u(true, func_index[a]) },
+        Op.CallRef => { op1(20); leb_u(true, type_index[a]) },
+        Op.LocalGet => { op1(32); leb_u(true, a) },
+        Op.LocalSet => { op1(33); leb_u(true, a) },
+        Op.LocalTee => { op1(34); leb_u(true, a) },
+        Op.GlobalGet => { op1(35); leb_u(true, glob_index[a]) },  // (or its constant: see emit)
+        Op.GlobalSet => { op1(36); leb_u(true, glob_index[a]) },
+        Op.I32Const => { op1(65); leb_s(true, a) },
+        Op.I64Const => { op1(66); leb_s64(true, a, b) },
+        Op.F32Const => { op1(67); put_u32le(true, a) },
+        Op.F64Const => { op1(68); put_u32le(true, a); put_u32le(true, b) },
+        Op.Plain => { if a < 256 { op1(a) } else { op1(a >> 8); leb_u(true, a & 255) } },
+        Op.Load => { memory_access(a, b) },
+        Op.Store => { memory_access(a, b) },
+        Op.MemorySize => { op1(63); leb_u(true, memory_index[a]) },
+        Op.MemoryGrow => { op1(64); leb_u(true, memory_index[a]) },
+        Op.MemoryCopy => { op1(252); leb_u(true, 10); leb_u(true, memory_index[a]); leb_u(true, memory_index[b]) },
+        Op.MemoryFill => { op1(252); leb_u(true, 11); leb_u(true, memory_index[a]) },
+        Op.MemoryInit => { op1(252); leb_u(true, 8); leb_u(true, b); leb_u(true, memory_index[a]) },
+        Op.StructNew => { op_fb(0); leb_u(true, type_index[a]) },
+        Op.StructNewDefault => { op_fb(1); leb_u(true, type_index[a]) },
+        Op.StructGet => { op_fb(2); leb_u(true, type_index[a]); leb_u(true, b) },
+        Op.StructGetS => { op_fb(3); leb_u(true, type_index[a]); leb_u(true, b) },
+        Op.StructGetU => { op_fb(4); leb_u(true, type_index[a]); leb_u(true, b) },
+        Op.StructSet => { op_fb(5); leb_u(true, type_index[a]); leb_u(true, b) },
+        Op.ArrayNew => { op_fb(6); leb_u(true, type_index[a]) },
+        Op.ArrayNewDefault => { op_fb(7); leb_u(true, type_index[a]) },
+        Op.ArrayNewFixed => { op_fb(8); leb_u(true, type_index[a]); leb_u(true, w_count[node]) },
+        Op.ArrayNewData => { op_fb(9); leb_u(true, type_index[a]); leb_u(true, b) },
+        Op.ArrayGet => { op_fb(11); leb_u(true, type_index[a]) },
+        Op.ArrayGetS => { op_fb(12); leb_u(true, type_index[a]) },
+        Op.ArrayGetU => { op_fb(13); leb_u(true, type_index[a]) },
+        Op.ArraySet => { op_fb(14); leb_u(true, type_index[a]) },
+        Op.ArrayLen => { op_fb(15) },
+        Op.ArrayFill => { op_fb(16); leb_u(true, type_index[a]) },
+        Op.ArrayCopy => { op_fb(17); leb_u(true, type_index[a]); leb_u(true, type_index[b]) },
+        Op.ArrayInitData => { op_fb(18); leb_u(true, type_index[a]); leb_u(true, b) },
+        Op.RefNull => { op1(208); put_heap(true, a) },
+        Op.RefIsNull => { op1(209) },
         Op.RefFunc => {
-            op1(210);
-            leb_u(true, func_index[a]);
+            op1(210)
+            leb_u(true, func_index[a])
             if func_declared[a] == 0 {
-                func_declared[a] = 1;
-                declared.push(a);
-            };
+                func_declared[a] = 1
+                declared.push(a)
+            }
         },
-        Op.RefEq => { op1(211); },
-        Op.RefAsNonNull => { op1(212); },
-        Op.RefTest => { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 21; } else { 20; }); put_heap(true, a); },
-        Op.RefCast => { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 23; } else { 22; }); put_heap(true, a); },
-        Op.AnyConvertExtern => { op_fb(26); },
-        Op.ExternConvertAny => { op_fb(27); },
-        Op.RefI31 => { op_fb(28); },
-        Op.I31GetS => { op_fb(29); },
-        Op.I31GetU => { op_fb(30); },
-        Op.Throw => { op1(8); leb_u(true, 0); },
+        Op.RefEq => { op1(211) },
+        Op.RefAsNonNull => { op1(212) },
+        Op.RefTest => { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 21 } else { 20 }); put_heap(true, a) },
+        Op.RefCast => { op_fb(if (a - vt_defined) % 2 == 0 and a >= vt_defined { 23 } else { 22 }); put_heap(true, a) },
+        Op.AnyConvertExtern => { op_fb(26) },
+        Op.ExternConvertAny => { op_fb(27) },
+        Op.RefI31 => { op_fb(28) },
+        Op.I31GetS => { op_fb(29) },
+        Op.I31GetU => { op_fb(30) },
+        Op.Throw => { op1(8); leb_u(true, 0) },
         Op.V128Const => {
-            op1(253);
-            leb_u(true, 12);
-            for (0 ..< 4) |i| { put_u32le(true, w_aux[a + i]); };
+            op1(253)
+            leb_u(true, 12)
+            for (0 ..< 4) |i| { put_u32le(true, w_aux[a + i]) }
         },
-        Op.Rethrow => { op1(9); leb_u(true, depth_of(a)); },
+        Op.Rethrow => { op1(9); leb_u(true, depth_of(a)) },
         Op.Held => {},
-        ~> { fatal; },
-    };
+        ~> { fatal },
+    }
 }
 
 
@@ -2287,28 +2287,28 @@ fn emit_own(node: I32) void {
 /// end
 /// ```
 fn emit_casts(node: I32) void {
-    let k = w_b[node];
-    let from = w_aux[w_a[node] + k];
+    let k = w_b[node]
+    let from = w_aux[w_a[node] + k]
     for (0 ..< k) |i| {
-        let to = w_aux[w_a[node] + i];
-        op_fb(24);
+        let to = w_aux[w_a[node] + i]
+        op_fb(24)
         // Bit 0: the value may be null; bit 1: the cast's type may.
-        let nullable_to = (to - vt_defined) % 2 == 0;
-        op1(if nullable_to { 3; } else { 1; });
-        leb_u(true, i);
-        put_heap(true, from);
-        put_heap(true, to);
-    };
+        let nullable_to = (to - vt_defined) % 2 == 0
+        op1(if nullable_to { 3 } else { 1 })
+        leb_u(true, i)
+        put_heap(true, from)
+        put_heap(true, to)
+    }
 }
 
 /// A load or store (opcode `code`) of memory m, and its memarg: the
 /// alignment (with bit 6 set when a memory index follows), the memory, offset 0.
 fn memory_access(m: I32, code: I32) void {
-    op1(code);
-    let align = natural_align(code);
-    let mi = memory_index[m];
-    if mi == 0 { leb_u(true, align); } else { leb_u(true, align | 64); leb_u(true, mi); };
-    leb_u(true, 0);
+    op1(code)
+    let align = natural_align(code)
+    let mi = memory_index[m]
+    if mi == 0 { leb_u(true, align) } else { leb_u(true, align | 64); leb_u(true, mi) }
+    leb_u(true, 0)
 }
 
 /// The natural alignment (log2 of the access size) of a load or store opcode.
@@ -2323,5 +2323,5 @@ fn natural_align(opcode: I32) I32 {
         54 => 2, 55 => 3, 56 => 2, 57 => 3,
         58 => 0, 59 => 1, 60 => 0, 61 => 1, 62 => 2,
         ~> 0,
-    };
+    }
 }

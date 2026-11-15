@@ -18,125 +18,125 @@
 /// (and evaluated) where `&` stands among the written ones. With arguments
 /// and no `&`, `x` is neither passed nor evaluated.
 fn check_pipe(node: I32, expect: I32, cx: Cx) I32 {
-    let value = first_child(node);
-    let target = last_child(node);
+    let value = first_child(node)
+    let target = last_child(node)
     // The arguments: their nodes, -2 for the piped value (alone, when none are written).
-    let args_node = last_child(target);
-    let has_args = is_kind(args_node, Node.Pipe_args);
-    let list = if has_args { first_child(args_node); } else { -1; };
-    let count = if has_args { child_count(list); } else { 1; };
-    let args = Array[I32].new(count, -2);
-    let a = if list >= 0 { first_child(list); } else { -1; };
-    let i = 0;
+    let args_node = last_child(target)
+    let has_args = is_kind(args_node, Node.Pipe_args)
+    let list = if has_args { first_child(args_node) } else { -1 }
+    let count = if has_args { child_count(list) } else { 1 }
+    let args = Array[I32].new(count, -2)
+    let a = if list >= 0 { first_child(list) } else { -1 }
+    let i = 0
     while (a >= 0) {
-        args[i] = if is_kind(a, Node.Pipe_arg) { first_child(a); } else { -2; };
-        i += 1;
-        a = next_sibling(a);
-    };
+        args[i] = if is_kind(a, Node.Pipe_arg) { first_child(a) } else { -2 }
+        i += 1
+        a = next_sibling(a)
+    }
     // The path: its first part, then names.
-    let first = first_child(target);
+    let first = first_child(target)
     // (As many names as the path has: `x -o a.b.….m()`.)
-    let span = 0;
-    let s = next_sibling(first);
-    while (s >= 0 and (is_kind(s, Node.Identifier) or is_kind(s, Node.Type_ident))) { span += 1; s = next_sibling(s); };
-    let names = Array[I32].new(span, -1);
-    let nnames = 0;
-    let c = next_sibling(first);
+    let span = 0
+    let s = next_sibling(first)
+    while (s >= 0 and (is_kind(s, Node.Identifier) or is_kind(s, Node.Type_ident))) { span += 1; s = next_sibling(s) }
+    let names = Array[I32].new(span, -1)
+    let nnames = 0
+    let c = next_sibling(first)
     while (c >= 0 and (is_kind(c, Node.Identifier) or is_kind(c, Node.Type_ident))) {
-        names[nnames] = c;
-        nnames += 1;
-        c = next_sibling(c);
-    };
-    let m = w_mark();
-    let last = if nnames > 0 { names[nnames - 1]; } else { first; };
-    let decl = node_decl[last];
+        names[nnames] = c
+        nnames += 1
+        c = next_sibling(c)
+    }
+    let m = w_mark()
+    let last = if nnames > 0 { names[nnames - 1] } else { first }
+    let decl = node_decl[last]
     // A function by name, or a module's or type's.
     if decl_is(decl, Decl.Fn) {
-        let inst = 0;
-        if is_kind(first, Node.Instantiated_module_ref) { inst = ty_inst(type_path(first, cx.inst)); }
+        let inst = 0
+        if is_kind(first, Node.Instantiated_module_ref) { inst = ty_inst(type_path(first, cx.inst)) }
         else {
-            let owner = node_decl[first];
-            let alias = if decl_is(owner, Decl.Alias) { owner; } else { node_alias[first]; };
-            if alias >= 0 { inst = module_instance(decl_a[alias], alias, target, cx); }
-            else if decl_is(owner, Decl.Module) and nnames > 0 { inst = module_instance(owner, -1, target, cx); }
-            else { inst = instance_for(module_of(decl), cx.inst); };
-            if inst < 0 { return finish_error(-1, m, cx); };
+            let owner = node_decl[first]
+            let alias = if decl_is(owner, Decl.Alias) { owner } else { node_alias[first] }
+            if alias >= 0 { inst = module_instance(decl_a[alias], alias, target, cx) }
+            else if decl_is(owner, Decl.Module) and nnames > 0 { inst = module_instance(owner, -1, target, cx) }
+            else { inst = instance_for(module_of(decl), cx.inst) }
+            if inst < 0 { return finish_error(-1, m, cx) }
             if nnames > 0 and not decl_is(owner, Decl.Module) and not is_type_decl(owner) and owner >= 0 {
                 // `x -o value.method(…)`: a method of a value.
-                return pipe_method(node, first, names, nnames, args, count, value, m, cx);
-            };
-        };
-        let fi = fn_instance(decl, inst);
-        return pipe_call(fi, args, count, value, 0, m, node, cx);
-    };
-    if nnames > 0 { return pipe_method(node, first, names, nnames, args, count, value, m, cx); };
+                return pipe_method(node, first, names, nnames, args, count, value, m, cx)
+            }
+        }
+        let fi = fn_instance(decl, inst)
+        return pipe_call(fi, args, count, value, 0, m, node, cx)
+    }
+    if nnames > 0 { return pipe_method(node, first, names, nnames, args, count, value, m, cx) }
     // A fun or cl value.
-    let t = type_only(first, -1, cx);
+    let t = type_only(first, -1, cx)
     if ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure) {
-        if ty_is(t, Ty.Closure) { check_expr(first, t, cx); };
-        pipe_args_check(ty_a[t], args, count, value, 0, node, cx);
+        if ty_is(t, Ty.Closure) { check_expr(first, t, cx) }
+        pipe_args_check(ty_a[t], args, count, value, 0, node, cx)
         if ty_is(t, Ty.Fun) {
-            check_expr(first, t, cx);
-            w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m);
+            check_expr(first, t, cx)
+            w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m)
         } else {
-            w_node(Op.Call, repr(ty_b[t]), closure_invoker(t), 0, m);
-        };
-        return ty_b[t];
-    };
-    if ty_is(t, Ty.Error) { return follow_on(first, -1, m, node, cx); };
-    report2(Diag.NotCallable, first, -1, t, -1);
-    error_value();
+            w_node(Op.Call, repr(ty_b[t]), closure_invoker(t), 0, m)
+        }
+        return ty_b[t]
+    }
+    if ty_is(t, Ty.Error) { return follow_on(first, -1, m, node, cx) }
+    report2(Diag.NotCallable, first, -1, t, -1)
+    error_value()
 }
 
 /// `x -o a.b.method(…)`: the value `a.b`, then its method.
 fn pipe_method(node: I32, first: I32, names: Array[I32], nnames: I32, args: Array[I32], count: I32, value: I32, m: I32, cx: Cx) I32 {
     // The receiver: the path but its last name, read as fields.
-    let rt = check_expr(first, -1, cx);
-    if ty_is(rt, Ty.Error) { return finish_error(-1, m, cx); };
+    let rt = check_expr(first, -1, cx)
+    if ty_is(rt, Ty.Error) { return finish_error(-1, m, cx) }
     for (0 ..< nnames - 1) |i| {
-        let field = field_of(rt, names[i]);
-        if field < 0 { return finish_error(-1, m, cx); };
-        let ft = field_type(field, ty_inst(rt));
-        let mg = w_mark() - 1;
-        w_node(Op.StructGet, repr(ft), vt_heap(repr(rt)), decl_a[field], mg);
-        rt = ft;
-    };
-    let name = names[nnames - 1];
-    let decl = member(ty_decl(rt), word_of(name), Space.Method);
+        let field = field_of(rt, names[i])
+        if field < 0 { return finish_error(-1, m, cx) }
+        let ft = field_type(field, ty_inst(rt))
+        let mg = w_mark() - 1
+        w_node(Op.StructGet, repr(ft), vt_heap(repr(rt)), decl_a[field], mg)
+        rt = ft
+    }
+    let name = names[nnames - 1]
+    let decl = member(ty_decl(rt), word_of(name), Space.Method)
     if decl < 0 {
         // (Piping into a host value's method is not done yet.)
-        if is_foreign(rt) or primitive_host_type(rt, word_of(name)) >= 0 { return unsupported(node); };
-        report2(Diag.UnknownMethod, node, word_of(name), rt, -1);
-        return finish_error(-1, m, cx);
-    };
-    let fi = fn_instance(decl, ty_inst(rt));
-    coerce(rt, vl_item(fi_params[fi], 0), first);
-    pipe_call(fi, args, count, value, 1, m, node, cx);
+        if is_foreign(rt) or primitive_host_type(rt, word_of(name)) >= 0 { return unsupported(node) }
+        report2(Diag.UnknownMethod, node, word_of(name), rt, -1)
+        return finish_error(-1, m, cx)
+    }
+    let fi = fn_instance(decl, ty_inst(rt))
+    coerce(rt, vl_item(fi_params[fi], 0), first)
+    pipe_call(fi, args, count, value, 1, m, node, cx)
 }
 
 fn pipe_call(fi: I32, args: Array[I32], count: I32, value: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 {
-    call_site.resize(1);
-    call_site[0] = at;
+    call_site.resize(1)
+    call_site[0] = at
     if not pipe_args_check(fi_params[fi], args, count, value, first_param, at, cx) {
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
-    };
-    finish_call(fi, m, cx);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
+        return ty_error()
+    }
+    finish_call(fi, m, cx)
 }
 
 /// The arguments in order, the piped value at its placeholder; false after
 /// reporting a wrong count.
 fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first: I32, at: I32, cx: Cx) Bool {
     if first + count != vl_len[params] {
-        report2(Diag.WrongArity, at, -1, vl_len[params] - first, count);
-        return false;
-    };
+        report2(Diag.WrongArity, at, -1, vl_len[params] - first, count)
+        return false
+    }
     for (0 ..< count) |i| {
-        let pt = vl_item(params, first + i);
-        let e = if args[i] == -2 { value; } else { args[i]; };
-        coerce(check_expr(e, pt, cx), pt, e);
-    };
-    true;
+        let pt = vl_item(params, first + i)
+        let e = if args[i] == -2 { value } else { args[i] }
+        coerce(check_expr(e, pt, cx), pt, e)
+    }
+    true
 }
 
 //! = defer
@@ -147,23 +147,23 @@ fn pipe_args_check(params: I32, args: Array[I32], count: I32, value: I32, first:
 //! checked again at each exit.
 
 /// The pending defers, innermost last.
-vec defer_node: I32;
+vec defer_node: I32
 /// Per open block: where its defers start.
-vec defer_marks: I32;
+vec defer_marks: I32
 /// At `[0]`: where the current function's defers start.
-vec function_defers: I32;
+vec function_defers: I32
 
 fn reset_defers() void {
-    defer_node.clear();
-    defer_guard.clear();
-    defer_running.clear();
-    running_guards.clear();
-    exit_flags.clear();
-    stream_closes.clear();
-    defer_marks.clear();
-    function_defers.resize(1);
-    function_defers[0] = 0;
-    begin_exit_flag();
+    defer_node.clear()
+    defer_guard.clear()
+    defer_running.clear()
+    running_guards.clear()
+    exit_flags.clear()
+    stream_closes.clear()
+    defer_marks.clear()
+    function_defers.resize(1)
+    function_defers[0] = 0
+    begin_exit_flag()
 }
 
 //! == Defers that throw
@@ -178,209 +178,209 @@ fn reset_defers() void {
 
 /// Per depth in defers' code (from @function_flags): the exit flag local,
 /// -1 before one is needed.
-vec exit_flags: I32;
+vec exit_flags: I32
 /// Where the current function's entries in @exit_flags, @defer_guard and
 /// @defer_running start.
-vec function_flags: I32 = [0];
-vec function_guards: I32 = [0];
-vec function_running: I32 = [0];
+vec function_flags: I32 = [0]
+vec function_guards: I32 = [0]
+vec function_running: I32 = [0]
 /// The defers whose code is being written (at an exit or in a handler),
 /// innermost last, and how long @defer_guard was then.
-vec defer_running: I32;
-vec running_guards: I32;
+vec defer_running: I32
+vec running_guards: I32
 /// Flag sets and handler reads written so far.
-vec flag_sets: I32 = [0];
-vec flag_reads: I32 = [0];
+vec flag_sets: I32 = [0]
+vec flag_reads: I32 = [0]
 
 fn begin_exit_flag() void {
-    function_flags[0] = exit_flags.len();
-    function_guards[0] = defer_guard.len();
-    function_running[0] = defer_running.len();
+    function_flags[0] = exit_flags.len()
+    function_guards[0] = defer_guard.len()
+    function_running[0] = defer_running.len()
 }
 
 fn run_inside(i: I32) void {
-    defer_running.push(i);
-    running_guards.push(defer_guard.len());
-    defer_bindings(i, true);
+    defer_running.push(i)
+    running_guards.push(defer_guard.len())
+    defer_bindings(i, true)
 }
 
 fn run_outside() void {
-    defer_bindings(defer_running[defer_running.len() - 1], false);
-    defer_running.resize(defer_running.len() - 1);
-    running_guards.resize(running_guards.len() - 1);
+    defer_bindings(defer_running[defer_running.len() - 1], false)
+    defer_running.resize(defer_running.len() - 1)
+    running_guards.resize(running_guards.len() - 1)
 }
 
 /// Where this depth's entries in @defer_guard start.
 fn depth_guards() I32 {
-    if defer_running.len() > function_running[0] { running_guards[running_guards.len() - 1]; } else { function_guards[0]; };
+    if defer_running.len() > function_running[0] { running_guards[running_guards.len() - 1] } else { function_guards[0] }
 }
 
 /// This depth's exit flag local (-1 none), made when `make`.
 fn exit_flag(make: Bool) I32 {
-    let k = function_flags[0] + defer_running.len() - function_running[0];
-    while (exit_flags.len() <= k) { exit_flags.push(-1); };
-    if make and exit_flags[k] < 0 { exit_flags[k] = new_local(vt_i32); };
-    exit_flags[k];
+    let k = function_flags[0] + defer_running.len() - function_running[0]
+    while (exit_flags.len() <= k) { exit_flags.push(-1) }
+    if make and exit_flags[k] < 0 { exit_flags[k] = new_local(vt_i32) }
+    exit_flags[k]
 }
 
 fn set_exit_flag(v: I32) void {
-    let f = exit_flag(true);
-    let m = w_mark();
-    w_i32(v);
-    w_node(Op.LocalSet, vt_none, f, 0, m);
+    let f = exit_flag(true)
+    let m = w_mark()
+    w_i32(v)
+    w_node(Op.LocalSet, vt_none, f, 0, m)
 }
 
 /// Whether the defer at index `i` or a newer one may have a guard.
 fn guarded_from(i: I32) Bool {
-    let n = defer_guard.len();
-    n > depth_guards() and defer_guard[n - 1] >= i;
+    let n = defer_guard.len()
+    n > depth_guards() and defer_guard[n - 1] >= i
 }
 
 /// A block that starts its depth's guards (`guards` its first entry) sets
 /// the flag to none first, when a handler in it reads the flag: the code since `m`.
 fn init_exit_flag(m: I32, guards: I32, reads: I32) void {
-    if flag_reads[0] == reads or guards != depth_guards() or exit_flag(false) < 0 { return; };
-    set_exit_flag(-1);
-    w_insert(m, w_pop());
+    if flag_reads[0] == reads or guards != depth_guards() or exit_flag(false) < 0 { return }
+    set_exit_flag(-1)
+    w_insert(m, w_pop())
 }
 
 /// `defer e;`: noted, for @run_defers to check at each exit of its block.
 /// It emits nothing where it is written.
 fn check_defer(node: I32) I32 {
     // One that leaves (reported in validation) would run itself without end.
-    if deferred_exit(first_child(node), false) >= 0 { return error_value(); };
-    defer_node.push(first_child(node));
-    w_node(Op.Seq, vt_none, 0, 0, w_mark());
-    ty_void();
+    if deferred_exit(first_child(node), false) >= 0 { return error_value() }
+    defer_node.push(first_child(node))
+    w_node(Op.Seq, vt_none, 0, 0, w_mark())
+    ty_void()
 }
 
 /// Per plain defer of the open blocks, in order: where the code after it
 /// starts (a w mark), then its index in @defer_node.
-vec defer_guard: I32;
+vec defer_guard: I32
 
 /// After a block's statement: the defers it noted (`from` on) guard what follows.
 fn note_defer_guards(from: I32) void {
     for (from ..< defer_node.len()) |i| {
-        let d = defer_node[i];
+        let d = defer_node[i]
         if (d >= 0 and not is_kind(d, Node.Errdefer_expr)) or is_profile_defer(d) {
-            defer_guard.push(w_mark());
-            defer_guard.push(i);
-        };
-    };
+            defer_guard.push(w_mark())
+            defer_guard.push(i)
+        }
+    }
 }
 
-vec throw_work: I32;
+vec throw_work: I32
 
 /// Whether the nodes since `m` call or throw: only then can an exception
 /// leave them. An exit's run of a defer up to index `own` is passed over:
 /// what it throws, the guard of defer `own` lets by (see @exit_flags).
 fn may_throw(m: I32, own: I32) Bool {
-    throw_work.clear();
-    for (m ..< w_stack.len()) |i| { throw_work.push(w_stack[i]); };
+    throw_work.clear()
+    for (m ..< w_stack.len()) |i| { throw_work.push(w_stack[i]) }
     while (throw_work.len() > 0) {
-        let n = throw_work[throw_work.len() - 1];
-        throw_work.resize(throw_work.len() - 1);
-        let op = w_op[n];
-        let passed = op == Op.Seq.i32() and w_a[n] > 0 and w_a[n] <= own + 1;
-        if not passed and (op == Op.Call.i32() or op == Op.CallRef.i32() or op == Op.ReturnCall.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32()) { return true; };
-        if not passed { for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)); }; };
-    };
-    false;
+        let n = throw_work[throw_work.len() - 1]
+        throw_work.resize(throw_work.len() - 1)
+        let op = w_op[n]
+        let passed = op == Op.Seq.i32() and w_a[n] > 0 and w_a[n] <= own + 1
+        if not passed and (op == Op.Call.i32() or op == Op.CallRef.i32() or op == Op.ReturnCall.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32()) { return true }
+        if not passed { for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)) } }
+    }
+    false
 }
 
 /// The code after each guard (`base` on), newest first, so a JS exception
 /// thrown through it runs that defer and goes on: `try { … } catch { d;
 /// rethrow }`, of value type `vt`. Errdefers stay unrun: it is no error return.
 fn guard_defers(base: I32, vt: I32, cx: Cx) void {
-    let k = defer_guard.len() - 2;
+    let k = defer_guard.len() - 2
     while (k >= base) {
-        let m = defer_guard[k];
+        let m = defer_guard[k]
         if w_mark() > m and may_throw(m, defer_guard[k + 1]) {
-            use_js_tag();
-            let label = new_label();
-            w_node(Op.Seq, vt, 0, 0, m);
-            let mh = w_mark();
-            w_leaf(Op.Drop, vt_none, 0, 0);
-            let j = defer_guard[k + 1];
-            let d = defer_node[j];
-            let md = w_mark();
-            run_inside(j);
-            if is_profile_defer(d) { run_profile_defer(d); } else { discard(check_statement(d, ty_void(), cx)); };
-            run_outside();
-            let f = exit_flag(false);
+            use_js_tag()
+            let label = new_label()
+            w_node(Op.Seq, vt, 0, 0, m)
+            let mh = w_mark()
+            w_leaf(Op.Drop, vt_none, 0, 0)
+            let j = defer_guard[k + 1]
+            let d = defer_node[j]
+            let md = w_mark()
+            run_inside(j)
+            if is_profile_defer(d) { run_profile_defer(d) } else { discard(check_statement(d, ty_void(), cx)) }
+            run_outside()
+            let f = exit_flag(false)
             if f >= 0 {
                 // if j <u flag { d }: not one an exit has run.
-                w_node(Op.Seq, vt_none, 0, 0, md);
-                let run = w_pop();
-                let mc = w_mark();
-                w_i32(j);
-                w_get(vt_i32, f);
-                w_i32_op(i32_lt_u, mc);
-                w_push(run);
-                w_node(Op.If, vt_none, new_label(), 0, mc);
-                flag_reads[0] += 1;
-            };
-            w_leaf(Op.Rethrow, vt_unreachable, label, 0);
-            w_node(Op.Seq, vt_unreachable, 0, 0, mh);
+                w_node(Op.Seq, vt_none, 0, 0, md)
+                let run = w_pop()
+                let mc = w_mark()
+                w_i32(j)
+                w_get(vt_i32, f)
+                w_i32_op(i32_lt_u, mc)
+                w_push(run)
+                w_node(Op.If, vt_none, new_label(), 0, mc)
+                flag_reads[0] += 1
+            }
+            w_leaf(Op.Rethrow, vt_unreachable, label, 0)
+            w_node(Op.Seq, vt_unreachable, 0, 0, mh)
             // Code that never ends leaves a try of no value: say so after it.
             if vt == vt_unreachable {
-                w_node(Op.Try, vt_none, label, 0, m);
-                w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
-                w_node(Op.Seq, vt_unreachable, 0, 0, m);
+                w_node(Op.Try, vt_none, label, 0, m)
+                w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
+                w_node(Op.Seq, vt_unreachable, 0, 0, m)
             } else {
-                w_node(Op.Try, vt, label, 0, m);
-            };
-        };
-        k -= 2;
-    };
-    defer_guard.resize(base);
+                w_node(Op.Try, vt, label, 0, m)
+            }
+        }
+        k -= 2
+    }
+    defer_guard.resize(base)
 }
 
 /// Run the defers from `from` (an index in `defer_node`) on, newest first,
 /// at an exit that is not an error return: errdefers stay put.
-fn run_defers(from: I32, cx: Cx) void { run_exit_defers(from, -1, -1, cx); }
+fn run_defers(from: I32, cx: Cx) void { run_exit_defers(from, -1, -1, cx) }
 
 /// Run the defers from `from` on, newest first. An errdefer (noted as its
 /// node) runs as `failed` says: -1 never, -2 always (a `try` returning an
 /// error), else when the Result (of type `rt`) in local `failed` is an error.
 fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) void {
-    let sets = flag_sets[0];
-    let i = defer_node.len() - 1;
+    let sets = flag_sets[0]
+    let i = defer_node.len() - 1
     while (i >= from) {
-        let mi = w_mark();
-        run_inside(i);
-        let d = defer_node[i];
-        if is_profile_defer(d) { run_profile_defer(d); }
-        else if d < 0 { close_stream(-d - 1, cx); }
-        else if not is_kind(d, Node.Errdefer_expr) { discard(check_statement(d, ty_void(), cx)); }
-        else if failed == -2 { discard(check_statement(first_child(d), ty_void(), cx)); }
+        let mi = w_mark()
+        run_inside(i)
+        let d = defer_node[i]
+        if is_profile_defer(d) { run_profile_defer(d) }
+        else if d < 0 { close_stream(-d - 1, cx) }
+        else if not is_kind(d, Node.Errdefer_expr) { discard(check_statement(d, ty_void(), cx)) }
+        else if failed == -2 { discard(check_statement(first_child(d), ty_void(), cx)) }
         else if failed >= 0 {
             // if not failed._ok { e }
-            let m = w_mark();
-            w_get(repr(rt), failed);
-            w_node(Op.StructGet, vt_i32, vt_heap(repr(rt)), 0, m);
-            w_i32_op(i32_eqz, m);
-            let mt = w_mark();
-            discard(check_statement(first_child(d), ty_void(), cx));
-            w_node(Op.Seq, vt_none, 0, 0, mt);
-            w_node(Op.If, vt_none, new_label(), 0, m);
-        };
-        run_outside();
+            let m = w_mark()
+            w_get(repr(rt), failed)
+            w_node(Op.StructGet, vt_i32, vt_heap(repr(rt)), 0, m)
+            w_i32_op(i32_eqz, m)
+            let mt = w_mark()
+            discard(check_statement(first_child(d), ty_void(), cx))
+            w_node(Op.Seq, vt_none, 0, 0, mt)
+            w_node(Op.If, vt_none, new_label(), 0, m)
+        }
+        run_outside()
         // One that may throw says first that it runs (see @exit_flags); its
         // Seq's `a` says whose run it is, for @may_throw.
         if w_mark() > mi {
-            let flag = guarded_from(i) and may_throw(mi, -1);
-            w_node(Op.Seq, vt_none, i + 1, 0, mi);
+            let flag = guarded_from(i) and may_throw(mi, -1)
+            w_node(Op.Seq, vt_none, i + 1, 0, mi)
             if flag {
-                let run = w_pop();
-                set_exit_flag(i);
-                w_push(run);
-                flag_sets[0] += 1;
-            };
-        };
-        i -= 1;
-    };
-    if flag_sets[0] > sets { set_exit_flag(-1); };
+                let run = w_pop()
+                set_exit_flag(i)
+                w_push(run)
+                flag_sets[0] += 1
+            }
+        }
+        i -= 1
+    }
+    if flag_sets[0] > sets { set_exit_flag(-1) }
 }
 
 //! = errdefer
@@ -392,90 +392,90 @@ fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) void {
 //! one.
 
 /// The function body being checked (a closure's, in a closure).
-vec body_block: I32 = [-1];
+vec body_block: I32 = [-1]
 
 /// `errdefer e;`: noted, for @run_exit_defers.
 fn check_errdefer(node: I32, cx: Cx) I32 {
     if expansion_of(node) >= 0 {
-        report2(Diag.TryPlace, node, -1, 3, -1);
-        return error_value();
-    };
+        report2(Diag.TryPlace, node, -1, 3, -1)
+        return error_value()
+    }
     if not is_result_type(cx.result) {
-        if cx.result < 0 or not ty_is(cx.result, Ty.Error) { report2(Diag.TryPlace, node, -1, 1, cx.result); };
-        return error_value();
-    };
-    if deferred_exit(first_child(node), false) >= 0 { return error_value(); };
-    defer_node.push(node);
-    w_node(Op.Seq, vt_none, 0, 0, w_mark());
-    ty_void();
+        if cx.result < 0 or not ty_is(cx.result, Ty.Error) { report2(Diag.TryPlace, node, -1, 1, cx.result) }
+        return error_value()
+    }
+    if deferred_exit(first_child(node), false) >= 0 { return error_value() }
+    defer_node.push(node)
+    w_node(Op.Seq, vt_none, 0, 0, w_mark())
+    ty_void()
 }
 
 /// Whether an errdefer is among the defers from `from` on.
 fn errdefer_pending(from: I32) Bool {
-    for (from ..< defer_node.len()) |i| { if defer_node[i] >= 0 and is_kind(defer_node[i], Node.Errdefer_expr) { return true; }; };
-    false;
+    for (from ..< defer_node.len()) |i| { if defer_node[i] >= 0 and is_kind(defer_node[i], Node.Errdefer_expr) { return true } }
+    false
 }
 
 /// Run the defers pending since `from` after a value of type `t` (on the
 /// stack since `m`) that the function returns: an errdefer among them runs
 /// when the value is a Result's error.
 fn return_defers(t: I32, m: I32, from: I32, cx: Cx) void {
-    let vt = repr(t);
+    let vt = repr(t)
     if vt == vt_unreachable or not is_result_type(t) or not errdefer_pending(from) {
-        defers_after_value(vt, m, from, cx);
-        return;
-    };
-    let local = new_local(vt);
-    w_node(Op.LocalSet, vt_none, local, 0, m);
-    run_exit_defers(from, local, t, cx);
-    w_leaf(Op.LocalGet, vt, local, 0);
+        defers_after_value(vt, m, from, cx)
+        return
+    }
+    let local = new_local(vt)
+    w_node(Op.LocalSet, vt_none, local, 0, m)
+    run_exit_defers(from, local, t, cx)
+    w_leaf(Op.LocalGet, vt, local, 0)
 }
 
 // The defers between here and a loop being left (loop_defers holds their
 // start per loop).
 /// Per loop: the defers a continue runs from.
-vec loop_defers: I32;
+vec loop_defers: I32
 /// Per loop: the defers a break runs from.
-vec loop_break_defers: I32;
+vec loop_break_defers: I32
 
 //! = Optional chains
 
 /// `a?.b` nodes being checked as a present value
-vec optional_node: I32;
+vec optional_node: I32
 /// The local holding it.
-vec optional_local: I32;
+vec optional_local: I32
 /// Its type (not nullable).
-vec optional_type: I32;
+vec optional_type: I32
 
 fn reset_optional() void {
-    optional_node.clear();
-    optional_local.clear();
-    optional_type.clear();
-    loop_defers.clear();
-    loop_break_defers.clear();
+    optional_node.clear()
+    optional_local.clear()
+    optional_type.clear()
+    loop_defers.clear()
+    loop_break_defers.clear()
 }
 
 fn optional_override(node: I32) I32 {
-    for (0 ..< optional_node.len()) |i| { if optional_node[i] == node { return i; }; };
-    -1;
+    for (0 ..< optional_node.len()) |i| { if optional_node[i] == node { return i } }
+    -1
 }
 
 /// The leftmost `?.` of a statement not yet being checked as present: one
 /// whose base has none. A block's statements are guarded on their own; one
 /// in a nested branch, loop, or `orelse` is a value, not looked for.
 fn leftmost_optional(node: I32) I32 {
-    let k = Node(node_kind[node]);
+    let k = Node(node_kind[node])
     if k == Node.Closure_expr or k == Node.Block or k == Node.Block_expr or k == Node.If_expr or k == Node.Match_expr
         or k == Node.Loop_match_expr or k == Node.Alt_expr or k == Node.Promote_expr or k == Node.Else_expr
-        or k == Node.While_expr or k == Node.For_expr or k == Node.Try_expr { return -1; };
-    let c = first_child(node);
+        or k == Node.While_expr or k == Node.For_expr or k == Node.Try_expr { return -1 }
+    let c = first_child(node)
     while (c >= 0) {
-        let found = leftmost_optional(c);
-        if found >= 0 { return found; };
-        c = next_sibling(c);
-    };
-    if is_kind(node, Node.Optional_field_expr) and optional_override(node) < 0 { return node; };
-    -1;
+        let found = leftmost_optional(c)
+        if found >= 0 { return found }
+        c = next_sibling(c)
+    }
+    if is_kind(node, Node.Optional_field_expr) and optional_override(node) < 0 { return node }
+    -1
 }
 
 /// A statement with `a?.b` in it runs only when a is present:
@@ -483,85 +483,85 @@ fn leftmost_optional(node: I32) I32 {
 /// promote a { |o| => (the statement, with o.b for a?.b), ~> {}, }
 /// ```
 fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
-    let base = first_child(opt);
-    let m = w_mark();
-    let bt = check_expr(base, -1, cx);
-    if ty_is(bt, Ty.Error) { return finish_error(-1, m, cx); };
+    let base = first_child(opt)
+    let m = w_mark()
+    let bt = check_expr(base, -1, cx)
+    if ty_is(bt, Ty.Error) { return finish_error(-1, m, cx) }
     if not ty_is(bt, Ty.Nullable) {
-        report2(Diag.NotNullable, base, -1, bt, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
-    };
-    let s = new_local(repr(bt));
-    w_node(Op.LocalSet, vt_none, s, 0, m);
-    let mi = w_mark();
-    let mc = w_mark();
-    w_get(repr(bt), s);
-    w_node(Op.RefIsNull, vt_i32, 0, 0, mc);
-    w_i32_op(i32_eqz, mc);
-    let mt = w_mark();
-    optional_node.push(opt);
-    optional_local.push(s);
-    optional_type.push(ty_a[bt]);
-    discard(check_statement(stmt, ty_void(), cx));
-    optional_node.resize(optional_node.len() - 1);
-    optional_local.resize(optional_local.len() - 1);
-    optional_type.resize(optional_type.len() - 1);
-    w_node(Op.Seq, vt_none, 0, 0, mt);
-    w_node(Op.If, vt_none, new_label(), 0, mi);
-    w_node(Op.Seq, vt_none, 0, 0, m);
-    ty_void();
+        report2(Diag.NotNullable, base, -1, bt, -1)
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
+        return ty_error()
+    }
+    let s = new_local(repr(bt))
+    w_node(Op.LocalSet, vt_none, s, 0, m)
+    let mi = w_mark()
+    let mc = w_mark()
+    w_get(repr(bt), s)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc)
+    w_i32_op(i32_eqz, mc)
+    let mt = w_mark()
+    optional_node.push(opt)
+    optional_local.push(s)
+    optional_type.push(ty_a[bt])
+    discard(check_statement(stmt, ty_void(), cx))
+    optional_node.resize(optional_node.len() - 1)
+    optional_local.resize(optional_local.len() - 1)
+    optional_type.resize(optional_type.len() - 1)
+    w_node(Op.Seq, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, new_label(), 0, mi)
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    ty_void()
 }
 
 /// Whether the program has an `a?.b` anywhere, counted once for the nodes
 /// there are (`[0]`: how many nodes were looked at, `[1]`: 1 when one was found).
-vec optionals_seen: I32 = [0, 0];
+vec optionals_seen: I32 = [0, 0]
 
 fn has_optionals() Bool {
     if optionals_seen[0] != node_kind.len() {
-        optionals_seen[1] = 0;
-        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.i32() { optionals_seen[1] = 1; }; };
-        optionals_seen[0] = node_kind.len();
-    };
-    optionals_seen[1] == 1;
+        optionals_seen[1] = 0
+        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.i32() { optionals_seen[1] = 1 } }
+        optionals_seen[0] = node_kind.len()
+    }
+    optionals_seen[1] == 1
 }
 
 /// Whether a statement can run only when its `?.` is present: a call, an
 /// assignment, or a plain chain. Any other (a `let`, `return`, `assert`, a
 /// jump, a branch) would skip more than the chain: its `?.` is a value.
 fn guardable(stmt: I32) Bool {
-    let k = Node(node_kind[stmt]);
-    k == Node.Call_expr or k == Node.Assign_expr or k == Node.Field_expr or k == Node.Optional_field_expr or k == Node.Index_expr;
+    let k = Node(node_kind[stmt])
+    k == Node.Call_expr or k == Node.Assign_expr or k == Node.Field_expr or k == Node.Optional_field_expr or k == Node.Index_expr
 }
 
 /// A statement: an optional chain's guard, or the expression.
 fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
-    let opt = if has_optionals() { leftmost_optional(stmt); } else { -1; };
+    let opt = if has_optionals() { leftmost_optional(stmt) } else { -1 }
     if opt >= 0 and expect >= 0 and not ty_is(expect, Ty.Void) {
         // A statement whose value is used (a block's last) is not guarded.
-        report(Diag.OptionalOutsideStatement, opt, -1);
-        diag_note("for a value, use promote");
-        return error_value();
-    };
-    if opt >= 0 and guardable(stmt) { return check_optional_statement(stmt, opt, cx); };
-    check_expr(stmt, expect, cx);
+        report(Diag.OptionalOutsideStatement, opt, -1)
+        diag_note("for a value, use promote")
+        return error_value()
+    }
+    if opt >= 0 and guardable(stmt) { return check_optional_statement(stmt, opt, cx) }
+    check_expr(stmt, expect, cx)
 }
 
 /// The base of a field access, pushed: `a` of `a.b`, or the present value
 /// of `a?.b` in its guarded statement.
 fn check_base(field_node: I32, cx: Cx) I32 {
     if is_kind(field_node, Node.Optional_field_expr) {
-        let i = optional_override(field_node);
+        let i = optional_override(field_node)
         if i < 0 {
-            report(Diag.OptionalOutsideStatement, field_node, -1);
-            diag_note("for a value, use promote");
-            return error_value();
-        };
-        let t = optional_type[i];
-        w_get(repr(t), optional_local[i]);
-        return t;
-    };
-    check_expr(first_child(field_node), -1, cx);
+            report(Diag.OptionalOutsideStatement, field_node, -1)
+            diag_note("for a value, use promote")
+            return error_value()
+        }
+        let t = optional_type[i]
+        w_get(repr(t), optional_local[i])
+        return t
+    }
+    check_expr(first_child(field_node), -1, cx)
 }
 
 //! = Promises
@@ -571,20 +571,20 @@ fn check_base(field_node: I32, cx: Cx) I32 {
 //! that can reach an await are wrapped in WebAssembly.promising.
 
 /// Pairs: value type (times 2, plus 1 when nullable), its import.
-vec await_types: I32;
+vec await_types: I32
 /// [then, catch] imports, or -1.
-vec promise_ops: I32;
+vec promise_ops: I32
 
 fn reset_promises() void {
-    await_types.clear();
-    promise_ops.resize(2);
-    promise_ops[0] = -1;
-    promise_ops[1] = -1;
+    await_types.clear()
+    promise_ops.resize(2)
+    promise_ops[0] = -1
+    promise_ops[1] = -1
 }
 
 fn is_promise_type(t: I32) Bool {
-    let decl = ty_decl(t);
-    decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise");
+    let decl = ty_decl(t)
+    decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise")
 }
 
 /// `await p`: the host's `utu.await_N` for the promise's value type, which
@@ -592,50 +592,50 @@ fn is_promise_type(t: I32) Bool {
 /// utu calls a closure's body by `call_ref` (see @closure_invoker); one the
 /// host calls is reported where it is given to the host (@host_callbacks).
 fn check_await(node: I32, cx: Cx) I32 {
-    let e = first_child(node);
+    let e = first_child(node)
     if is_kind(e, Node.For_expr) {
         // `await for (gen()) |x| { … }`: the generator's body may await.
-        if generator_source(e, cx) >= 0 { return check_expr(e, ty_void(), cx); };
-        return check_stream_for(e, cx);
-    };
-    let m = w_mark();
-    let pt = check_expr(e, -1, cx);
-    if ty_is(pt, Ty.Error) { return finish_error(-1, m, cx); };
+        if generator_source(e, cx) >= 0 { return check_expr(e, ty_void(), cx) }
+        return check_stream_for(e, cx)
+    }
+    let m = w_mark()
+    let pt = check_expr(e, -1, cx)
+    if ty_is(pt, Ty.Error) { return finish_error(-1, m, cx) }
     // A host promise (`Promise<Response>`): its value, as utu has it.
-    let host = host_promise_value(pt);
+    let host = host_promise_value(pt)
     if host >= 0 {
-        profile_await(await_import(host), repr(host), m);
-        return host;
-    };
+        profile_await(await_import(host), repr(host), m)
+        return host
+    }
     if not is_promise_type(pt) {
-        report2(Diag.AwaitNotPromise, node, -1, pt, -1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
-    };
-    let t = inst_arg(ty_inst(pt), 0);
-    profile_await(await_import(t), repr(t), m);
-    t;
+        report2(Diag.AwaitNotPromise, node, -1, pt, -1)
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
+        return ty_error()
+    }
+    let t = inst_arg(ty_inst(pt), 0)
+    profile_await(await_import(t), repr(t), m)
+    t
 }
 
 /// Whether node is in a closure's body (before any function's).
 fn in_closure(node: I32) Bool {
-    let p = parent_of(node);
+    let p = parent_of(node)
     while (p >= 0) {
-        if is_kind(p, Node.Closure_expr) { return true; };
-        if is_kind(p, Node.Fn_decl) { return false; };
-        p = parent_of(p);
-    };
-    false;
+        if is_kind(p, Node.Closure_expr) { return true }
+        if is_kind(p, Node.Fn_decl) { return false }
+        p = parent_of(p)
+    }
+    false
 }
 
 /// Whether a node is inside `export main`.
 fn in_main(node: I32) Bool {
-    let p = parent_of(node);
+    let p = parent_of(node)
     while (p >= 0) {
-        if is_kind(p, Node.Export_main_decl) { return true; };
-        p = parent_of(p);
-    };
-    false;
+        if is_kind(p, Node.Export_main_decl) { return true }
+        p = parent_of(p)
+    }
+    false
 }
 
 /// `await for (s) |v| { body }` over a `Stream[T]` (`std:Stream`), or any type
@@ -648,257 +648,257 @@ fn in_main(node: I32) Bool {
 ///
 /// So a `return` in the body closes the stream too, as a `break` does.
 fn check_stream_for(node: I32, cx: Cx) I32 {
-    let sources = first_child(node);
-    let source = first_child(first_child(sources));
-    let capture = next_sibling(sources);
-    let block = last_child(node);
+    let sources = first_child(node)
+    let source = first_child(first_child(sources))
+    let capture = next_sibling(sources)
+    let block = last_child(node)
     // More than one source, or value, is reported (validate_await).
-    if next_sibling(first_child(sources)) >= 0 or next_sibling(source) >= 0 { return error_value(); };
-    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 and next_sibling(first_child(capture)) >= 0 { return error_value(); };
-    let m = w_mark();
-    let st = check_expr(source, -1, cx);
-    if ty_is(st, Ty.Error) { return finish_error(-1, m, cx); };
+    if next_sibling(first_child(sources)) >= 0 or next_sibling(source) >= 0 { return error_value() }
+    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 and next_sibling(first_child(capture)) >= 0 { return error_value() }
+    let m = w_mark()
+    let st = check_expr(source, -1, cx)
+    if ty_is(st, Ty.Error) { return finish_error(-1, m, cx) }
     if ty_is(st, Ty.Nullable) {
-        report2(Diag.NullableAccess, node, intern_text("iterator"), st, -1);
-        return finish_error(-1, m, cx);
-    };
-    let s = new_local(repr(st));
-    w_node(Op.LocalSet, vt_none, s, 0, m);
+        report2(Diag.NullableAccess, node, intern_text("iterator"), st, -1)
+        return finish_error(-1, m, cx)
+    }
+    let s = new_local(repr(st))
+    w_node(Op.LocalSet, vt_none, s, 0, m)
     // An array is read by a plain for.
     if is_array_type(st) {
-        report2(Diag.AwaitForSource, node, -1, 1, st);
-        return finish_error(-1, m, cx);
-    };
+        report2(Diag.AwaitForSource, node, -1, 1, st)
+        return finish_error(-1, m, cx)
+    }
     // Not a stream: its first call is reported, as stage 0 does.
-    let it_fi = stream_method(st, "iterator", node);
-    if it_fi < 0 { return finish_error(-1, m, cx); };
-    let next_fi = stream_method(st, "next", node);
-    let done_fi = stream_method(st, "done", node);
-    let value_fi = stream_method(st, "value", node);
-    let close_fi = stream_method(st, "close", node);
-    if next_fi < 0 or done_fi < 0 or value_fi < 0 or close_fi < 0 { return finish_error(-1, m, cx); };
-    let mi = w_mark();
-    let it_t = stream_call(it_fi, s, st, -1, -1, node, cx);
-    if ty_is(it_t, Ty.Error) { return finish_error(-1, m, cx); };
-    let it = new_local(repr(it_t));
-    w_node(Op.LocalSet, vt_none, it, 0, mi);
+    let it_fi = stream_method(st, "iterator", node)
+    if it_fi < 0 { return finish_error(-1, m, cx) }
+    let next_fi = stream_method(st, "next", node)
+    let done_fi = stream_method(st, "done", node)
+    let value_fi = stream_method(st, "value", node)
+    let close_fi = stream_method(st, "close", node)
+    if next_fi < 0 or done_fi < 0 or value_fi < 0 or close_fi < 0 { return finish_error(-1, m, cx) }
+    let mi = w_mark()
+    let it_t = stream_call(it_fi, s, st, -1, -1, node, cx)
+    if ty_is(it_t, Ty.Error) { return finish_error(-1, m, cx) }
+    let it = new_local(repr(it_t))
+    w_node(Op.LocalSet, vt_none, it, 0, mi)
     // What `next` promises: the result `done` and `value` read.
-    let pt = fi_result[next_fi];
-    let host = host_promise_value(pt);
-    let rt = if host >= 0 { host; } else if is_promise_type(pt) { inst_arg(ty_inst(pt), 0); } else { -1; };
+    let pt = fi_result[next_fi]
+    let host = host_promise_value(pt)
+    let rt = if host >= 0 { host } else if is_promise_type(pt) { inst_arg(ty_inst(pt), 0) } else { -1 }
     if rt < 0 {
-        report2(Diag.AwaitNotPromise, node, -1, pt, -1);
-        return finish_error(-1, m, cx);
-    };
-    defer_node.push(-(stream_closes.len() / 6) - 1);
-    for ([close_fi, s, st, it, it_t, node]) |x| { stream_closes.push(x); };
-    let brk = new_label();
-    let top = new_label();
-    let mb = w_mark();
-    let ml = w_mark();
-    let r = new_local(repr(rt));
-    let mr = w_mark();
-    stream_call(next_fi, s, st, it, it_t, node, cx);
-    profile_await(await_import(rt), repr(rt), mr);
-    w_node(Op.LocalSet, vt_none, r, 0, mr);
-    let md = w_mark();
-    coerce(stream_call(done_fi, s, st, r, rt, node, cx), prelude(Prelude.Bool), node);
-    w_node(Op.BrIf, vt_none, brk, 0, md);
-    let mv = w_mark();
-    let t = stream_call(value_fi, s, st, r, rt, node, cx);
-    let v = new_local(repr(t));
-    w_node(Op.LocalSet, vt_none, v, 0, mv);
-    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 { bind_local(node_decl[first_child(capture)], t, v); };
-    enter_loop(brk, top, -1, -1);
-    discard(check_block(block, ty_void(), cx));
-    leave_loop();
-    w_leaf(Op.Br, vt_unreachable, top, 0);
-    w_node(Op.Loop, vt_none, top, 0, ml);
-    w_node(Op.Block, vt_none, brk, 0, mb);
-    defer_node.resize(defer_node.len() - 1);
-    discard(stream_call(close_fi, s, st, it, it_t, node, cx));
-    w_node(Op.Seq, vt_none, 0, 0, m);
-    ty_void();
+        report2(Diag.AwaitNotPromise, node, -1, pt, -1)
+        return finish_error(-1, m, cx)
+    }
+    defer_node.push(-(stream_closes.len() / 6) - 1)
+    for ([close_fi, s, st, it, it_t, node]) |x| { stream_closes.push(x) }
+    let brk = new_label()
+    let top = new_label()
+    let mb = w_mark()
+    let ml = w_mark()
+    let r = new_local(repr(rt))
+    let mr = w_mark()
+    stream_call(next_fi, s, st, it, it_t, node, cx)
+    profile_await(await_import(rt), repr(rt), mr)
+    w_node(Op.LocalSet, vt_none, r, 0, mr)
+    let md = w_mark()
+    coerce(stream_call(done_fi, s, st, r, rt, node, cx), prelude(Prelude.Bool), node)
+    w_node(Op.BrIf, vt_none, brk, 0, md)
+    let mv = w_mark()
+    let t = stream_call(value_fi, s, st, r, rt, node, cx)
+    let v = new_local(repr(t))
+    w_node(Op.LocalSet, vt_none, v, 0, mv)
+    if is_kind(capture, Node.Capture) and first_child(capture) >= 0 { bind_local(node_decl[first_child(capture)], t, v) }
+    enter_loop(brk, top, -1, -1)
+    discard(check_block(block, ty_void(), cx))
+    leave_loop()
+    w_leaf(Op.Br, vt_unreachable, top, 0)
+    w_node(Op.Loop, vt_none, top, 0, ml)
+    w_node(Op.Block, vt_none, brk, 0, mb)
+    defer_node.resize(defer_node.len() - 1)
+    discard(stream_call(close_fi, s, st, it, it_t, node, cx))
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    ty_void()
 }
 
 /// The streams being read, six each (close's instance, the stream's local
 /// and type, the iterator's local and type, the loop): a pending defer -k-1
 /// closes stream k.
-vec stream_closes: I32;
+vec stream_closes: I32
 
 /// Close stream k of @stream_closes: its `close` method, with its iterator.
 fn close_stream(k: I32, cx: Cx) void {
-    let i = k * 6;
-    discard(stream_call(stream_closes[i], stream_closes[i + 1], stream_closes[i + 2], stream_closes[i + 3], stream_closes[i + 4], stream_closes[i + 5], cx));
+    let i = k * 6
+    discard(stream_call(stream_closes[i], stream_closes[i + 1], stream_closes[i + 2], stream_closes[i + 3], stream_closes[i + 4], stream_closes[i + 5], cx))
 }
 
 /// The function instance of a stream's method `name`, or -1 (reported, as
 /// stage 0 reports a call of a method its type lacks).
 fn stream_method(st: I32, name: Str, at: I32) I32 {
-    let word = intern_text(name);
-    let decl = member(ty_decl(st), word, Space.Method);
+    let word = intern_text(name)
+    let decl = member(ty_decl(st), word, Space.Method)
     if decl < 0 {
-        report2(Diag.UnknownMethod, at, word, st, -1);
-        return -1;
-    };
-    fn_instance(decl, ty_inst(st));
+        report2(Diag.UnknownMethod, at, word, st, -1)
+        return -1
+    }
+    fn_instance(decl, ty_inst(st))
 }
 
 /// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s;
 /// st and xt are their types. Its result's type.
 fn stream_call(fi: I32, s: I32, st: I32, x: I32, xt: I32, at: I32, cx: Cx) I32 {
-    let m = w_mark();
-    let params = fi_params[fi];
-    let given = if x >= 0 { 2; } else { 1; };
+    let m = w_mark()
+    let params = fi_params[fi]
+    let given = if x >= 0 { 2 } else { 1 }
     if vl_len[params] != given {
-        report2(Diag.WrongArity, at, -1, if vl_len[params] > 0 { vl_len[params] - 1; } else { 0; }, given - 1);
-        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
-        return ty_error();
-    };
-    w_get(cur_locals[s], s);
-    coerce(st, vl_item(params, 0), at);
+        report2(Diag.WrongArity, at, -1, if vl_len[params] > 0 { vl_len[params] - 1 } else { 0 }, given - 1)
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
+        return ty_error()
+    }
+    w_get(cur_locals[s], s)
+    coerce(st, vl_item(params, 0), at)
     if x >= 0 {
-        w_get(cur_locals[x], x);
-        coerce(xt, vl_item(params, 1), at);
-    };
-    finish_call(fi, m, cx);
+        w_get(cur_locals[x], x)
+        coerce(xt, vl_item(params, 1), at)
+    }
+    finish_call(fi, m, cx)
 }
 
 /// `utu.await_N`, or `await_null_N` for a nullable value, whose host import
 /// gives an undefined result as null (as an `@es` result is).
 fn await_import(t: I32) I32 {
-    let vt = repr(t);
-    let absent = ty_is(t, Ty.Nullable);
-    let key = vt * 2 + (if absent { 1; } else { 0; });
-    let i = 0;
+    let vt = repr(t)
+    let absent = ty_is(t, Ty.Nullable)
+    let key = vt * 2 + (if absent { 1 } else { 0 })
+    let i = 0
     while (i < await_types.len()) {
-        if await_types[i] == key { return await_types[i + 1]; };
-        i += 2;
-    };
-    let f = add_import_func(name_add("utu"), name_add("await_" + (if absent { "null_"; } else { ""; }) + (await_types.len() / 2).str()),
-        func_type(vl_one(vt_externref), vl_of_result(vt)));
-    await_types.push(key);
-    await_types.push(f);
-    f;
+        if await_types[i] == key { return await_types[i + 1] }
+        i += 2
+    }
+    let f = add_import_func(name_add("utu"), name_add("await_" + (if absent { "null_" } else { "" }) + (await_types.len() / 2).str()),
+        func_type(vl_one(vt_externref), vl_of_result(vt)))
+    await_types.push(key)
+    await_types.push(f)
+    f
 }
 
 /// `utu.promise_then(p, f)` / `promise_catch(p, f)`: `(externref, externref) → ()`
 fn promise_op(catching: Bool) I32 {
-    let k = if catching { 1; } else { 0; };
-    if promise_ops[k] >= 0 { return promise_ops[k]; };
-    let m = vl_begin();
-    vl_add(vt_externref);
-    vl_add(vt_externref);
-    let f = add_import_func(name_add("utu"), name_add(if catching { "promise_catch"; } else { "promise_then"; }), func_type(vl_end(m), vl_empty()));
-    promise_ops[k] = f;
-    f;
+    let k = if catching { 1 } else { 0 }
+    if promise_ops[k] >= 0 { return promise_ops[k] }
+    let m = vl_begin()
+    vl_add(vt_externref)
+    vl_add(vt_externref)
+    let f = add_import_func(name_add("utu"), name_add(if catching { "promise_catch" } else { "promise_then" }), func_type(vl_end(m), vl_empty()))
+    promise_ops[k] = f
+    f
 }
 
 /// The promise imports and the exports that can await, for the host section.
 fn write_promise_json() void {
-    let awaits = false;
-    let i = 1;
+    let awaits = false
+    let i = 1
     while (i < await_types.len()) {
-        if func_live[await_types[i]] == 1 { awaits = true; };
-        i += 2;
-    };
-    let ops = (promise_ops[0] >= 0 and func_live[promise_ops[0]] == 1) or (promise_ops[1] >= 0 and func_live[promise_ops[1]] == 1);
-    if not awaits and not ops { return; };
-    json_text("\"promises\":{\"awaits\":[");
-    let first = true;
-    i = 1;
+        if func_live[await_types[i]] == 1 { awaits = true }
+        i += 2
+    }
+    let ops = (promise_ops[0] >= 0 and func_live[promise_ops[0]] == 1) or (promise_ops[1] >= 0 and func_live[promise_ops[1]] == 1)
+    if not awaits and not ops { return }
+    json_text("\"promises\":{\"awaits\":[")
+    let first = true
+    i = 1
     while (i < await_types.len()) {
-        let f = await_types[i];
+        let f = await_types[i]
         if func_live[f] == 1 {
-            if not first { json_byte(44); };
-            first = false;
-            json_byte(34);
+            if not first { json_byte(44) }
+            first = false
+            json_byte(34)
             // The host names the import await_<type>; ours is await_N, so give the suffix.
-            let name = func_field_name[f];
-            for (6 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]); };
-            json_byte(34);
-        };
-        i += 2;
-    };
-    json_text("],\"ops\":[");
-    first = true;
+            let name = func_field_name[f]
+            for (6 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]) }
+            json_byte(34)
+        }
+        i += 2
+    }
+    json_text("],\"ops\":[")
+    first = true
     for ([0, 1]) |k| {
         if promise_ops[k] >= 0 and func_live[promise_ops[k]] == 1 {
-            if not first { json_byte(44); };
-            first = false;
-            json_text(if k == 0 { "\"promise_then\""; } else { "\"promise_catch\""; });
-        };
-    };
-    json_text("],\"asyncExports\":[");
-    write_async_exports();
-    json_text("]}");
+            if not first { json_byte(44) }
+            first = false
+            json_text(if k == 0 { "\"promise_then\"" } else { "\"promise_catch\"" })
+        }
+    }
+    json_text("],\"asyncExports\":[")
+    write_async_exports()
+    json_text("]}")
 }
 
 /// Exports that reach an await, through calls: they must be entered through
 /// WebAssembly.promising for the stack to suspend. A call through a
 /// reference (a closure's body, a `fun`) may reach any function taken as a
 /// value: it awaits when one of those does.
-vec awaiting: U8;
+vec awaiting: U8
 /// By function: named by ref.func.
-vec taken: U8;
-vec taken_awaits: U8 = [0];
+vec taken: U8
+vec taken_awaits: U8 = [0]
 
 /// Mark @awaiting, to a fixpoint over the encoded bodies, and write the
 /// exports among them as a JSON list of names.
 fn write_async_exports() void {
-    let n = func_kind.len();
-    awaiting.resize(n);
-    for (0 ..< n) |f| { awaiting[f] = 0; };
+    let n = func_kind.len()
+    awaiting.resize(n)
+    for (0 ..< n) |f| { awaiting[f] = 0 }
     // Nothing awaits: no export is async.
-    if await_types.len() < 2 { return; };
-    let i = 1;
+    if await_types.len() < 2 { return }
+    let i = 1
     while (i < await_types.len()) {
-        awaiting[await_types[i]] = 1;
-        i += 2;
-    };
-    taken.resize(n);
-    for (0 ..< n) |f| { taken[f] = 0; };
-    for (0 ..< n) |f| { if func_live[f] == 1 and func_body[f] >= 0 { mark_taken(func_body[f]); }; };
-    taken_awaits[0] = 0;
+        awaiting[await_types[i]] = 1
+        i += 2
+    }
+    taken.resize(n)
+    for (0 ..< n) |f| { taken[f] = 0 }
+    for (0 ..< n) |f| { if func_live[f] == 1 and func_body[f] >= 0 { mark_taken(func_body[f]) } }
+    taken_awaits[0] = 0
     // To a fixpoint: a function awaits when it calls one that does.
-    let changed = true;
+    let changed = true
     while (changed) {
-        changed = false;
+        changed = false
         for (0 ..< n) |f| {
             if awaiting[f] == 1 and taken[f] == 1 and taken_awaits[0] == 0 {
-                taken_awaits[0] = 1;
-                changed = true;
-            };
+                taken_awaits[0] = 1
+                changed = true
+            }
             if awaiting[f] == 0 and func_live[f] == 1 and func_body[f] >= 0 and calls_awaiting(func_body[f]) {
-                awaiting[f] = 1;
-                changed = true;
-            };
-        };
-    };
-    let first = true;
+                awaiting[f] = 1
+                changed = true
+            }
+        }
+    }
+    let first = true
     for (0 ..< n) |f| {
         if awaiting[f] == 1 and func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 {
-            if not first { json_byte(44); };
-            first = false;
-            json_byte(34);
-            let name = func_field_name[f];
-            for (0 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]); };
-            json_byte(34);
-        };
-    };
+            if not first { json_byte(44) }
+            first = false
+            json_byte(34)
+            let name = func_field_name[f]
+            for (0 ..< name_len[name]) |k| { json_byte(names[name_start[name] + k]) }
+            json_byte(34)
+        }
+    }
 }
 
 fn mark_taken(node: I32) void {
-    if w_op[node] == Op.RefFunc.i32() { taken[w_a[node]] = 1; };
-    for (0 ..< w_count[node]) |i| { mark_taken(w_kid(node, i)); };
+    if w_op[node] == Op.RefFunc.i32() { taken[w_a[node]] = 1 }
+    for (0 ..< w_count[node]) |i| { mark_taken(w_kid(node, i)) }
 }
 
 /// Whether an encoded body calls a function that awaits, or calls through a
 /// reference when any function taken as a value awaits.
 fn calls_awaiting(node: I32) Bool {
-    let op = w_op[node];
-    if (op == Op.Call.i32() or op == Op.ReturnCall.i32()) and awaiting[w_a[node]] == 1 { return true; };
-    if op == Op.CallRef.i32() and taken_awaits[0] == 1 { return true; };
-    for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true; }; };
-    false;
+    let op = w_op[node]
+    if (op == Op.Call.i32() or op == Op.ReturnCall.i32()) and awaiting[w_a[node]] == 1 { return true }
+    if op == Op.CallRef.i32() and taken_awaits[0] == 1 { return true }
+    for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true } }
+    false
 }

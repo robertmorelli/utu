@@ -41,7 +41,7 @@ host value: the names are distinct, the representation is shared.
 **The typechecker compares by `type-name`.** Code like
 
 ```utu
-let a: U32 = some_i32_value;
+let a: U32 = some_i32_value
 ```
 
 is rejected even though both sides have the same `type-repr`. Same

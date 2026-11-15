@@ -24,20 +24,20 @@ mod Stream[T1] {
 
     /// An async iterable host value (not an array: see @of), as a stream of T1.
     fn from_js(iterable: Externref) & {
-        let adopt: fun(Externref) & = @es/\ (s) => s \/;
-        adopt(iterable);
+        let adopt: fun(Externref) & = @es/\ (s) => s \/
+        adopt(iterable)
     }
 
     /// The values of an array, in order.
     fn of(values: Array[T1]) & {
-        let make: fun(I32, cl(I32) T1) & = @es/\ (n, at) => (async function* () { for (let i = 0; i < n; i++) yield at(i); })() \/;
-        make(values.len(), cl(i) { values[i]; });
+        let make: fun(I32, cl(I32) T1) & = @es/\ (n, at) => (async function* () { for (let i = 0; i < n; i++) yield at(i); })() \/
+        make(values.len(), cl(i) { values[i] })
     }
 
     /// `count` values, each `make(i)` for i from 0, made as they are read.
     fn generate(count: I32, make: cl(I32) T1) & {
-        let gen: fun(I32, cl(I32) T1) & = @es/\ (n, at) => (async function* () { for (let i = 0; i < n; i++) yield at(i); })() \/;
-        gen(count, make);
+        let gen: fun(I32, cl(I32) T1) & = @es/\ (n, at) => (async function* () { for (let i = 0; i < n; i++) yield at(i); })() \/
+        gen(count, make)
     }
 
     // ── Transforming ─────────────────────────────────────────────────────────
@@ -45,32 +45,32 @@ mod Stream[T1] {
 
     /// The first `n` values.
     fn &.take |self| (n: I32) & {
-        let f: fun(&, I32) & = @es/\ (s, n) => (async function* () { if (n <= 0) return; let i = 0; for await (const v of s) { yield v; if (++i >= n) return; } })() \/;
-        f(self, n);
+        let f: fun(&, I32) & = @es/\ (s, n) => (async function* () { if (n <= 0) return; let i = 0; for await (const v of s) { yield v; if (++i >= n) return; } })() \/
+        f(self, n)
     }
 
     /// All but the first `n` values.
     fn &.skip |self| (n: I32) & {
-        let f: fun(&, I32) & = @es/\ (s, n) => (async function* () { let i = 0; for await (const v of s) if (i++ >= n) yield v; })() \/;
-        f(self, n);
+        let f: fun(&, I32) & = @es/\ (s, n) => (async function* () { let i = 0; for await (const v of s) if (i++ >= n) yield v; })() \/
+        f(self, n)
     }
 
     /// The values `keep` is true of.
     fn &.filter |self| (keep: cl(T1) Bool) & {
-        let f: fun(&, cl(T1) Bool) & = @es/\ (s, keep) => (async function* () { for await (const v of s) if (keep(v)) yield v; })() \/;
-        f(self, keep);
+        let f: fun(&, cl(T1) Bool) & = @es/\ (s, keep) => (async function* () { for await (const v of s) if (keep(v)) yield v; })() \/
+        f(self, keep)
     }
 
     /// Each value, changed by `f` (to a value of the same type).
     fn &.map |self| (f: cl(T1) T1) & {
-        let m: fun(&, cl(T1) T1) & = @es/\ (s, f) => (async function* () { for await (const v of s) yield f(v); })() \/;
-        m(self, f);
+        let m: fun(&, cl(T1) T1) & = @es/\ (s, f) => (async function* () { for await (const v of s) yield f(v); })() \/
+        m(self, f)
     }
 
     /// This stream's values, then `other`'s.
     fn &.chain |self| (other: &) & {
-        let f: fun(&, &) & = @es/\ (a, b) => (async function* () { yield* a; yield* b; })() \/;
-        f(self, other);
+        let f: fun(&, &) & = @es/\ (a, b) => (async function* () { yield* a; yield* b; })() \/
+        f(self, other)
     }
 
     // ── What `await for` calls ───────────────────────────────────────────────
@@ -82,28 +82,28 @@ mod Stream[T1] {
     // Any type with these methods is read the same way.
 
     fn &.iterator |self| () Externref {
-        let f: fun(&) Externref = @es/\ (s) => s[Symbol.asyncIterator]() \/;
-        f(self);
+        let f: fun(&) Externref = @es/\ (s) => s[Symbol.asyncIterator]() \/
+        f(self)
     }
 
     fn &.next |self| (iterator: Externref) Promise[Externref] {
-        let f: fun(Externref) Promise[Externref] = @es/\ (it) => it.next() \/;
-        f(iterator);
+        let f: fun(Externref) Promise[Externref] = @es/\ (it) => it.next() \/
+        f(iterator)
     }
 
     fn &.done |self| (result: Externref) Bool {
-        let f: fun(Externref) Bool = @es/\ (r) => r.done === true \/;
-        f(result);
+        let f: fun(Externref) Bool = @es/\ (r) => r.done === true \/
+        f(result)
     }
 
     fn &.value |self| (result: Externref) T1 {
-        let f: fun(Externref) T1 = @es/\ (r) => r.value \/;
-        f(result);
+        let f: fun(Externref) T1 = @es/\ (r) => r.value \/
+        f(result)
     }
 
     /// Settles once the stream has finished closing (its `finally` blocks run).
     fn &.close |self| (iterator: Externref) void {
-        let f: fun(Externref) Promise[Externref] = @es/\ (it) => Promise.resolve(it.return?.()) \/;
-        await f(iterator);
+        let f: fun(Externref) Promise[Externref] = @es/\ (it) => Promise.resolve(it.return?.()) \/
+        await f(iterator)
     }
 }

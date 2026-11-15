@@ -2,9 +2,9 @@
 // over the same highlighter the code samples use; the self-hosted compiler
 // (utu, compiled to WasmGC) builds the source in the browser, and the result
 // runs in a sandboxed iframe.
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod playground {
     struct Saved:
     | source: Str
@@ -15,7 +15,7 @@ mod playground {
     | failed: Bool
     | started: Bool
     fn sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Todo:
         \\    | id: Str
@@ -28,11 +28,11 @@ mod playground {
         \\    | made: I32
         \\
         \\fn Todo.left(todos: Array[Todo]) I32 {
-        \\    todos count_where |t| { not t.done; };
+        \\    todos count_where |t| { not t.done }
         \\}
         \\
         \\export main() void {
-        \\    let state = State { draft: "", todos: [], made: 0 };
+        \\    let state = State { draft: "", todos: [], made: 0 }
         \\    Browser.document.body.append(@wutu/\
         \\    @reactive;
         \\    main {
@@ -93,16 +93,15 @@ mod playground {
         \\            = `${Todo.left(state.todos)} left`;
         \\        }
         \\    }
-        \\    \/);
+        \\    \/)
         \\}
-        ;
     }
     /// The source the editor opens with: the last one edited, kept in this
     /// browser's storage.
     fn saved() Saved {
         @stored/\
         Saved "utu-playground-v1" Saved { source: sample() }
-        \/;
+        \/
     }
     fn start() State {
         State {
@@ -111,7 +110,7 @@ mod playground {
             detail: "",
             failed: false,
             started: false
-        };
+        }
     }
     // Hands the source to the compiler (docs/playground/playground.js, loaded
     // on first use) and hears back how it went.
@@ -120,21 +119,21 @@ mod playground {
         (source, delay, done) => import(new URL("./playground/playground.js", document.baseURI).href)
             .then((m) => m.schedule(source, delay, done))
             .catch((error) => done("Could not load the compiler", String(error), true))
-        \/;
+        \/
         schedule(state.saved.source, delay, cl(status: Str, detail: Str, failed: Bool) void {
-            state.status = status;
-            state.detail = detail;
-            state.failed = failed;
-            wutu.refresh();
-        });
+            state.status = status
+            state.detail = detail
+            state.failed = failed
+            wutu.refresh()
+        })
     }
     fn page(state: State) Browser.HTMLElement {
         if not state.started {
-            state.started = true;
+            state.started = true
             wutu.after_render(cl() void {
-                compile(state, 0);
-            });
-        };
+                compile(state, 0)
+            })
+        }
         @wutu/\
         article.page.playground {
             = ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.");
@@ -291,6 +290,6 @@ mod playground {
                 }
             }
         }
-        \/;
+        \/
     }
 }

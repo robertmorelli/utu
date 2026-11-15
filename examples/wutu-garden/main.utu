@@ -1,11 +1,11 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 struct Plant:
     | name: Str
     | days: I32
     | watered: Bool
 
-fn today() Str { new Browser.Date().toLocaleDateString("en-CA"); }
+fn today() Str { new Browser.Date().toLocaleDateString("en-CA") }
 
 fn card(plant: Plant) Browser.HTMLElement {
     @wutu/\
@@ -42,13 +42,13 @@ fn card(plant: Plant) Browser.HTMLElement {
             };
         }
     }
-    \/;
+    \/
 }
 
 
 fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLElement {
-    let ordered = if by_frequency { plants sort(Plant) |a, b| { a.days < b.days; }; } else { plants; };
-    let visible = ordered count_where |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); };
+    let ordered = if by_frequency { plants sort(Plant) |a, b| { a.days < b.days } } else { plants }
+    let visible = ordered count_where |plant| { plant.name.toLowerCase().includes(query.toLowerCase()) }
     @wutu/\
     section#plants {
         aria-label="Your plants";
@@ -63,18 +63,18 @@ fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLEle
             p.empty { grid-column: 1 / -1; padding-block: 2rem; color: var(--muted); "No plants found. Try a different name."; }
         }
     }
-    \/;
+    \/
 }
 
 export main() void {
-    let plants = [Plant { name: "Monstera", days: 7, watered: false }, Plant { name: "Golden pothos", days: 10, watered: false }, Plant { name: "Peace lily", days: 5, watered: false }, Plant { name: "Rubber plant", days: 14, watered: false }];
+    let plants = [Plant { name: "Monstera", days: 7, watered: false }, Plant { name: "Golden pothos", days: 10, watered: false }, Plant { name: "Peace lily", days: 5, watered: false }, Plant { name: "Rubber plant", days: 14, watered: false }]
     plants each |plant| {
         promote Browser.localStorage.getItem("wutu-plant-" + plant.name) {
-            |saved| => { plant.watered = saved == today(); },
+            |saved| => { plant.watered = saved == today() },
             ~> {},
-        };
-    };
-    let grid = listing(plants, "", false);
+        }
+    }
+    let grid = listing(plants, "", false)
     let app = @wutu/\
     @document {
         :root { --paper: oklch(97% 0.02 95); --card: oklch(99% 0.01 95); --ink: oklch(28% 0.04 150); --muted: oklch(49% 0.04 150); --green: oklch(43% 0.08 150); --dark: oklch(33% 0.08 150); --accent: oklch(72% 0.12 80); --line: oklch(86% 0.025 110); font-family: system-ui, sans-serif; color: var(--ink); background: var(--paper); }
@@ -142,6 +142,6 @@ export main() void {
         }
         footer { color: var(--muted); font-size: 0.85rem; "Grown with Utu. Native Wasm, a little CSS, and room to breathe."; }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

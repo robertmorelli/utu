@@ -15,110 +15,110 @@
 //! (hashed, built when it is first looked into).
 
 /// By document: its first entry in abi_type_at.
-vec abi_doc_types: I32;
+vec abi_doc_types: I32
 /// By document: its number of types.
-vec abi_doc_count: I32;
+vec abi_doc_count: I32
 /// Each type's JSON object, by document, in order.
-vec abi_type_at: I32;
+vec abi_type_at: I32
 /// By entry of abi_type_at: 1 once its containers are indexed.
-vec abi_type_ready: U8;
+vec abi_type_ready: U8
 /// Where the host says a document's types are (offsets into its text).
-export mem abi_offsets: I32;
+export mem abi_offsets: I32
 
 /// By view: its document.
-vec view_doc: I32;
+vec view_doc: I32
 /// By view: its JSON object.
-vec view_json: I32;
+vec view_json: I32
 /// By view: its prefix, a word (`Browser`).
-vec view_prefix: I32;
+vec view_prefix: I32
 /// By view: the import it serves, or -1.
-vec view_import: I32;
+vec view_import: I32
 
 /// The bytes of src that host declarations sealed with `seal` fill (from
 /// 0), kept from program to program; 0 when none are.
-vec abi_kept: I32 = [0];
+vec abi_kept: I32 = [0]
 
 /// Forget the documents, views, and indexes: a new program, when no host
 /// declarations are sealed.
 fn reset_abi() void {
-    jbr_open.clear();
-    jbr_close.clear();
-    jbr_table.clear();
-    abi_type_ready.clear();
-    jk_table.clear();
-    jk_obj.clear();
-    jk_key.clear();
-    jk_val.clear();
-    jk_indexed.clear();
-    abi_doc_types.clear();
-    abi_doc_count.clear();
-    abi_type_at.clear();
-    view_doc.clear();
-    view_json.clear();
-    view_prefix.clear();
-    view_import.clear();
+    jbr_open.clear()
+    jbr_close.clear()
+    jbr_table.clear()
+    abi_type_ready.clear()
+    jk_table.clear()
+    jk_obj.clear()
+    jk_key.clear()
+    jk_val.clear()
+    jk_indexed.clear()
+    abi_doc_types.clear()
+    abi_doc_count.clear()
+    abi_type_at.clear()
+    view_doc.clear()
+    view_json.clear()
+    view_prefix.clear()
+    view_import.clear()
 }
 
 /// Room for `n` bytes of JSON at the end of src; returns their offset.
 fn abi_reserve(n: I32) I32 {
-    let at = src.len();
-    src.resize(at + n + 1);
-    src[at + n] = 0;
-    at;
+    let at = src.len()
+    src.resize(at + n + 1)
+    src[at + n] = 0
+    at
 }
 
 /// JSON `text` the compiler makes (a reference no document has), written
 /// into src: its offset.
 fn abi_text(text: Str) I32 {
-    let at = abi_reserve(text.len());
-    for (0 ..< text.len()) |i| { src[at + i] = text.get(i); };
-    at;
+    let at = abi_reserve(text.len())
+    for (0 ..< text.len()) |i| { src[at + i] = text.get(i) }
+    at
 }
 
 /// A document whose types the host has placed (`abi_offsets`): each type's
 /// containers are indexed when it is first used.
 fn abi_add_doc_at(at: I32, n: I32) I32 {
-    let doc = abi_doc_types.len();
-    abi_doc_types.push(abi_type_at.len());
+    let doc = abi_doc_types.len()
+    abi_doc_types.push(abi_type_at.len())
     for (0 ..< n) |k| {
-        abi_type_at.push(at + abi_offsets[k]);
-        abi_type_ready.push(0);
-    };
-    abi_doc_count.push(n);
-    doc;
+        abi_type_at.push(at + abi_offsets[k])
+        abi_type_ready.push(0)
+    }
+    abi_doc_count.push(n)
+    doc
 }
 
 /// A view of document `doc`, its JSON object at `at`, for import i.
 fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
-    jbrackets(at);
-    let v = view_doc.len();
-    view_doc.push(doc);
-    view_json.push(at);
-    let p = jget(at, "prefix");
-    view_prefix.push(if p >= 0 { jstring_word(p); } else { -1; });
-    view_import.push(import_);
-    v;
+    jbrackets(at)
+    let v = view_doc.len()
+    view_doc.push(doc)
+    view_json.push(at)
+    let p = jget(at, "prefix")
+    view_prefix.push(if p >= 0 { jstring_word(p) } else { -1 })
+    view_import.push(import_)
+    v
 }
 
 /// Whether view v serves an import of this program (a view kept from
 /// earlier programs may serve none).
-fn view_live(v: I32) Bool { view_import[v] >= 0; }
+fn view_live(v: I32) Bool { view_import[v] >= 0 }
 
 /// The view an import declares, or -1.
 fn view_of_import(i: I32) I32 {
-    for (0 ..< view_import.len()) |v| { if view_import[v] == i { return v; }; };
-    -1;
+    for (0 ..< view_import.len()) |v| { if view_import[v] == i { return v } }
+    -1
 }
 
 /// The JSON object of type n of document doc.
 fn abi_type(doc: I32, n: I32) I32 {
-    if n < 0 or n >= abi_doc_count[doc] { return -1; };
-    let k = abi_doc_types[doc] + n;
+    if n < 0 or n >= abi_doc_count[doc] { return -1 }
+    let k = abi_doc_types[doc] + n
     if abi_type_ready[k] == 0 {
-        abi_type_ready[k] = 1;
-        jbrackets(abi_type_at[k]);
-    };
-    abi_type_at[k];
+        abi_type_ready[k] = 1
+        jbrackets(abi_type_at[k])
+    }
+    abi_type_at[k]
 }
 
 //! = JSON
@@ -126,304 +126,304 @@ fn abi_type(doc: I32, n: I32) I32 {
 //! Values are offsets of their first byte. jend gives the offset after one.
 
 fn jws(at: I32) I32 {
-    let i = at;
-    while (src[i] == 32 or src[i] == 10 or src[i] == 13 or src[i] == 9) { i += 1; };
-    i;
+    let i = at
+    while (src[i] == 32 or src[i] == 10 or src[i] == 13 or src[i] == 9) { i += 1 }
+    i
 }
 
 /// The offset after the JSON value at `at`.
 fn jend(at: I32) I32 {
-    let c = src[at];
-    if c == 34 { return jstring_end(at); };
+    let c = src[at]
+    if c == 34 { return jstring_end(at) }
     if c == 123 or c == 91 {
-        let known = jbr_end(at);
-        if known >= 0 { return known; };
+        let known = jbr_end(at)
+        if known >= 0 { return known }
         // An object or array: to its matching bracket, past strings.
-        let depth = 0;
-        let i = at;
+        let depth = 0
+        let i = at
         while (true) {
-            let b = src[i];
-            if b == 34 { i = jstring_end(i); }
+            let b = src[i]
+            if b == 34 { i = jstring_end(i) }
             else {
-                if b == 123 or b == 91 { depth += 1; }
+                if b == 123 or b == 91 { depth += 1 }
                 else if b == 125 or b == 93 {
-                    depth -= 1;
-                    if depth == 0 { return i + 1; };
-                };
-                i += 1;
-            };
-        };
-    };
+                    depth -= 1
+                    if depth == 0 { return i + 1 }
+                }
+                i += 1
+            }
+        }
+    }
     // A number, true, false, or null.
-    let i = at;
-    while (not (src[i] == 44 or src[i] == 125 or src[i] == 93 or src[i] == 32 or src[i] == 10 or src[i] == 0)) { i += 1; };
-    i;
+    let i = at
+    while (not (src[i] == 44 or src[i] == 125 or src[i] == 93 or src[i] == 32 or src[i] == 10 or src[i] == 0)) { i += 1 }
+    i
 }
 
 /// The offset after the string at `at`.
 fn jstring_end(at: I32) I32 {
-    let i = at + 1;
+    let i = at + 1
     while (src[i] != 34) {
-        if src[i] == 92 { i += 2; } else { i += 1; };
-    };
-    i + 1;
+        if src[i] == 92 { i += 2 } else { i += 1 }
+    }
+    i + 1
 }
 
 /// The first item of an array, or the first key of an object (-1 when empty).
 fn jfirst(at: I32) I32 {
-    if at < 0 or not (src[at] == 123 or src[at] == 91) { return -1; };
-    let i = jws(at + 1);
-    if src[i] == 93 or src[i] == 125 { return -1; };
-    i;
+    if at < 0 or not (src[at] == 123 or src[at] == 91) { return -1 }
+    let i = jws(at + 1)
+    if src[i] == 93 or src[i] == 125 { return -1 }
+    i
 }
 
 /// The item (or key) after the one at `at`, -1 after the last. For an
 /// object, `at` is a key and the next is the next key.
 fn jnext(at: I32) I32 {
-    let i = jws(jend(at));
-    if src[i] == 58 { i = jws(jend(jws(i + 1))); };
-    if src[i] == 44 { return jws(i + 1); };
-    -1;
+    let i = jws(jend(at))
+    if src[i] == 58 { i = jws(jend(jws(i + 1))) }
+    if src[i] == 44 { return jws(i + 1) }
+    -1
 }
 
 /// An object entry's value, given its key.
-fn jvalue(key: I32) I32 { jws(jws(jstring_end(key)) + 1); }
+fn jvalue(key: I32) I32 { jws(jws(jstring_end(key)) + 1) }
 
 /// Whether the string at `at` is the bytes `src[start ..< end_]` (without escapes).
 fn jstring_is(at: I32, start: I32, end_: I32) Bool {
-    let n = end_ - start;
-    if at + 1 + n >= src.len() or src[at + 1 + n] != 34 { return false; };
-    for (0 ..< n) |k| { if src[at + 1 + k] != src[start + k] { return false; }; };
-    true;
+    let n = end_ - start
+    if at + 1 + n >= src.len() or src[at + 1 + n] != 34 { return false }
+    for (0 ..< n) |k| { if src[at + 1 + k] != src[start + k] { return false } }
+    true
 }
 
 /// Whether the string at `at` is `text` (without escapes).
 fn jstring_is_text(at: I32, text: Str) Bool {
-    if at + 1 + text.len() >= src.len() or src[at] != 34 or src[at + 1 + text.len()] != 34 { return false; };
-    for (0 ..< text.len()) |k| { if src[at + 1 + k] != text.get(k) { return false; }; };
-    true;
+    if at + 1 + text.len() >= src.len() or src[at] != 34 or src[at + 1 + text.len()] != 34 { return false }
+    for (0 ..< text.len()) |k| { if src[at + 1 + k] != text.get(k) { return false } }
+    true
 }
 
 /// The value of key `key` in the object at `at`, or -1.
 fn jget(at: I32, key: Str) I32 {
-    if at < 0 or src[at] != 123 { return -1; };
+    if at < 0 or src[at] != 123 { return -1 }
     if jkeyed(at) {
-        let w = intern_text(key);
-        let start = src.interned_start(w);
-        return jk_find(at, start, start + src.interned_size(w));
-    };
-    let k = jfirst(at);
+        let w = intern_text(key)
+        let start = src.interned_start(w)
+        return jk_find(at, start, start + src.interned_size(w))
+    }
+    let k = jfirst(at)
     while (k >= 0) {
-        if jstring_is_text(k, key) { return jvalue(k); };
-        k = jnext(k);
-    };
-    -1;
+        if jstring_is_text(k, key) { return jvalue(k) }
+        k = jnext(k)
+    }
+    -1
 }
 
 /// The value of the key that is word w's text, or -1.
 fn jget_word(at: I32, w: I32) I32 {
-    if at < 0 or src[at] != 123 { return -1; };
-    let start = src.interned_start(w);
-    let end_ = start + src.interned_size(w);
-    if jkeyed(at) { return jk_find(at, start, end_); };
-    let k = jfirst(at);
+    if at < 0 or src[at] != 123 { return -1 }
+    let start = src.interned_start(w)
+    let end_ = start + src.interned_size(w)
+    if jkeyed(at) { return jk_find(at, start, end_) }
+    let k = jfirst(at)
     while (k >= 0) {
-        if jstring_is(k, start, end_) { return jvalue(k); };
-        k = jnext(k);
-    };
-    -1;
+        if jstring_is(k, start, end_) { return jvalue(k) }
+        k = jnext(k)
+    }
+    -1
 }
 
 /// How many items (or keys) the container at `at` has (0 when `at` is -1).
 fn jlen(at: I32) I32 {
-    if at < 0 { return 0; };
-    let n = 0;
-    let i = jfirst(at);
+    if at < 0 { return 0 }
+    let n = 0
+    let i = jfirst(at)
     while (i >= 0) {
-        n += 1;
-        i = jnext(i);
-    };
-    n;
+        n += 1
+        i = jnext(i)
+    }
+    n
 }
 
 /// Item `index` of the array at `at`, or -1.
 fn jitem(at: I32, index: I32) I32 {
-    if at < 0 { return -1; };
-    let i = jfirst(at);
-    for (0 ..< index) |_k| { if i >= 0 { i = jnext(i); }; };
-    i;
+    if at < 0 { return -1 }
+    let i = jfirst(at)
+    for (0 ..< index) |_k| { if i >= 0 { i = jnext(i) } }
+    i
 }
 
-fn jis_number(at: I32) Bool { at >= 0 and ((src[at] >= 48 and src[at] <= 57) or src[at] == 45); }
+fn jis_number(at: I32) Bool { at >= 0 and ((src[at] >= 48 and src[at] <= 57) or src[at] == 45) }
 
-fn jis_string(at: I32) Bool { at >= 0 and src[at] == 34; }
+fn jis_string(at: I32) Bool { at >= 0 and src[at] == 34 }
 
-fn jis_object(at: I32) Bool { at >= 0 and src[at] == 123; }
+fn jis_object(at: I32) Bool { at >= 0 and src[at] == 123 }
 
-fn jis_true(at: I32) Bool { at >= 0 and src[at] == 116; }
+fn jis_true(at: I32) Bool { at >= 0 and src[at] == 116 }
 
 /// The integer at `at`.
 fn jint(at: I32) I32 {
-    let i = at;
-    let negative = src[i] == 45;
-    if negative { i += 1; };
-    let v = 0;
+    let i = at
+    let negative = src[i] == 45
+    if negative { i += 1 }
+    let v = 0
     while (src[i] >= 48 and src[i] <= 57) {
-        v = v * 10 + (src[i] - 48);
-        i += 1;
-    };
-    if negative { 0 - v; } else { v; };
+        v = v * 10 + (src[i] - 48)
+        i += 1
+    }
+    if negative { 0 - v } else { v }
 }
 
 /// A string's text as a word (escapes kept as written; names have none).
-fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1); }
+fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1) }
 
 /// A string's text (escapes kept as written).
-fn jstring_text(at: I32) Str { bytes_text(at + 1, jstring_end(at) - 1); }
+fn jstring_text(at: I32) Str { bytes_text(at + 1, jstring_end(at) - 1) }
 
 //! = Where containers end
 //!
 //! For each object and array of a view, and of each type used: its start,
 //! and the offset after its end, hashed by its start.
-vec jbr_open: I32;
-vec jbr_close: I32;
+vec jbr_open: I32
+vec jbr_close: I32
 /// Open addressing: entry, or -1.
-vec jbr_table: I32;
-vec jbr_stack: I32;
+vec jbr_table: I32
+vec jbr_stack: I32
 
 /// Index where each object and array inside the container at `at` ends, in
 /// one scan.
 fn jbrackets(at: I32) void {
-    if not (src[at] == 123 or src[at] == 91) { return; };
-    jbr_stack.clear();
-    let i = at;
+    if not (src[at] == 123 or src[at] == 91) { return }
+    jbr_stack.clear()
+    let i = at
     while (true) {
-        let b = src[i];
-        if b == 34 { i = jstring_end(i); }
+        let b = src[i]
+        if b == 34 { i = jstring_end(i) }
         else {
             if b == 123 or b == 91 {
-                jbr_stack.push(i);
+                jbr_stack.push(i)
             } else if b == 125 or b == 93 {
-                jbr_put(jbr_stack[jbr_stack.len() - 1], i + 1);
-                jbr_stack.resize(jbr_stack.len() - 1);
-                if jbr_stack.len() == 0 { return; };
-            };
-            i += 1;
-        };
-    };
+                jbr_put(jbr_stack[jbr_stack.len() - 1], i + 1)
+                jbr_stack.resize(jbr_stack.len() - 1)
+                if jbr_stack.len() == 0 { return }
+            }
+            i += 1
+        }
+    }
 }
 
 fn jbr_put(start: I32, end_: I32) void {
-    if (jbr_open.len() + 1) * 2 > jbr_table.len() { jbr_grow(); };
-    let mask = jbr_table.len() - 1;
-    let h = (start * -1640531535) & mask;
-    while (jbr_table[h] >= 0) { h = (h + 1) & mask; };
-    jbr_table[h] = jbr_open.len();
-    jbr_open.push(start);
-    jbr_close.push(end_);
+    if (jbr_open.len() + 1) * 2 > jbr_table.len() { jbr_grow() }
+    let mask = jbr_table.len() - 1
+    let h = (start * -1640531535) & mask
+    while (jbr_table[h] >= 0) { h = (h + 1) & mask }
+    jbr_table[h] = jbr_open.len()
+    jbr_open.push(start)
+    jbr_close.push(end_)
 }
 
 fn jbr_grow() void {
-    let n = if jbr_table.len() == 0 { 4096; } else { jbr_table.len() * 2; };
-    jbr_table.resize(n);
-    for (0 ..< n) |i| { jbr_table[i] = -1; };
-    let mask = n - 1;
+    let n = if jbr_table.len() == 0 { 4096 } else { jbr_table.len() * 2 }
+    jbr_table.resize(n)
+    for (0 ..< n) |i| { jbr_table[i] = -1 }
+    let mask = n - 1
     for (0 ..< jbr_open.len()) |e| {
-        let h = (jbr_open[e] * -1640531535) & mask;
-        while (jbr_table[h] >= 0) { h = (h + 1) & mask; };
-        jbr_table[h] = e;
-    };
+        let h = (jbr_open[e] * -1640531535) & mask
+        while (jbr_table[h] >= 0) { h = (h + 1) & mask }
+        jbr_table[h] = e
+    }
 }
 
 /// The end of the container at `at`, or -1 when it is not indexed.
 fn jbr_end(at: I32) I32 {
-    if jbr_table.len() == 0 { return -1; };
-    let mask = jbr_table.len() - 1;
-    let h = (at * -1640531535) & mask;
+    if jbr_table.len() == 0 { return -1 }
+    let mask = jbr_table.len() - 1
+    let h = (at * -1640531535) & mask
     while (jbr_table[h] >= 0) {
-        let e = jbr_table[h];
-        if jbr_open[e] == at { return jbr_close[e]; };
-        h = (h + 1) & mask;
-    };
-    -1;
+        let e = jbr_table[h]
+        if jbr_open[e] == at { return jbr_close[e] }
+        h = (h + 1) & mask
+    }
+    -1
 }
 
 //! = Keys of large objects
 //!
 //! An object of more than jk_large bytes (a view's exports and names) has
 //! its keys hashed the first time one is looked up: (object, key) → value.
-let jk_large: I32 = 4096;
+let jk_large: I32 = 4096
 
 /// Open addressing: entry, or -1.
-vec jk_table: I32;
+vec jk_table: I32
 /// By entry: the object.
-vec jk_obj: I32;
+vec jk_obj: I32
 /// By entry: its key (a JSON string).
-vec jk_key: I32;
+vec jk_key: I32
 /// By entry: the value.
-vec jk_val: I32;
+vec jk_val: I32
 /// The objects indexed.
-vec jk_indexed: I32;
+vec jk_indexed: I32
 
 /// (An array of strings is indexed the same way, each string its own key and value.)
 fn jkeyed(at: I32) Bool {
-    for (0 ..< jk_indexed.len()) |i| { if jk_indexed[i] == at { return true; }; };
-    if jbr_end(at) < 0 or jend(at) - at <= jk_large { return false; };
-    jk_indexed.push(at);
-    let object = src[at] == 123;
-    let k = jfirst(at);
+    for (0 ..< jk_indexed.len()) |i| { if jk_indexed[i] == at { return true } }
+    if jbr_end(at) < 0 or jend(at) - at <= jk_large { return false }
+    jk_indexed.push(at)
+    let object = src[at] == 123
+    let k = jfirst(at)
     while (k >= 0) {
-        if (jk_obj.len() + 1) * 2 > jk_table.len() { jk_grow(); };
-        let mask = jk_table.len() - 1;
-        let h = jk_hash(at, k + 1, jstring_end(k) - 1) & mask;
-        while (jk_table[h] >= 0) { h = (h + 1) & mask; };
-        jk_table[h] = jk_obj.len();
-        jk_obj.push(at);
-        jk_key.push(k);
-        jk_val.push(if object { jvalue(k); } else { k; });
-        k = jnext(k);
-    };
-    true;
+        if (jk_obj.len() + 1) * 2 > jk_table.len() { jk_grow() }
+        let mask = jk_table.len() - 1
+        let h = jk_hash(at, k + 1, jstring_end(k) - 1) & mask
+        while (jk_table[h] >= 0) { h = (h + 1) & mask }
+        jk_table[h] = jk_obj.len()
+        jk_obj.push(at)
+        jk_key.push(k)
+        jk_val.push(if object { jvalue(k) } else { k })
+        k = jnext(k)
+    }
+    true
 }
 
 /// Whether array `at` holds the string `src[start ..< end_]`.
 fn jarray_has(at: I32, start: I32, end_: I32) Bool {
-    if at < 0 or src[at] != 91 { return false; };
-    if jkeyed(at) { return jk_find(at, start, end_) >= 0; };
-    let g = jfirst(at);
+    if at < 0 or src[at] != 91 { return false }
+    if jkeyed(at) { return jk_find(at, start, end_) >= 0 }
+    let g = jfirst(at)
     while (g >= 0) {
-        if jstring_is(g, start, end_) { return true; };
-        g = jnext(g);
-    };
-    false;
+        if jstring_is(g, start, end_) { return true }
+        g = jnext(g)
+    }
+    false
 }
 
 fn jk_hash(obj: I32, start: I32, end_: I32) I32 {
-    let h = -2128831035 ^ obj;
-    for (start ..< end_) |i| { h = (h ^ src[i]) * 16777619; };
-    h;
+    let h = -2128831035 ^ obj
+    for (start ..< end_) |i| { h = (h ^ src[i]) * 16777619 }
+    h
 }
 
 fn jk_grow() void {
-    let n = if jk_table.len() == 0 { 1024; } else { jk_table.len() * 2; };
-    jk_table.resize(n);
-    for (0 ..< n) |i| { jk_table[i] = -1; };
-    let mask = n - 1;
+    let n = if jk_table.len() == 0 { 1024 } else { jk_table.len() * 2 }
+    jk_table.resize(n)
+    for (0 ..< n) |i| { jk_table[i] = -1 }
+    let mask = n - 1
     for (0 ..< jk_obj.len()) |e| {
-        let h = jk_hash(jk_obj[e], jk_key[e] + 1, jstring_end(jk_key[e]) - 1) & mask;
-        while (jk_table[h] >= 0) { h = (h + 1) & mask; };
-        jk_table[h] = e;
-    };
+        let h = jk_hash(jk_obj[e], jk_key[e] + 1, jstring_end(jk_key[e]) - 1) & mask
+        while (jk_table[h] >= 0) { h = (h + 1) & mask }
+        jk_table[h] = e
+    }
 }
 
 /// The value of key `src[start ..< end_]` in indexed object `obj`, or -1.
 fn jk_find(obj: I32, start: I32, end_: I32) I32 {
-    let mask = jk_table.len() - 1;
-    let h = jk_hash(obj, start, end_) & mask;
+    let mask = jk_table.len() - 1
+    let h = jk_hash(obj, start, end_) & mask
     while (jk_table[h] >= 0) {
-        let e = jk_table[h];
-        if jk_obj[e] == obj and jstring_is(jk_key[e], start, end_) { return jk_val[e]; };
-        h = (h + 1) & mask;
-    };
-    -1;
+        let e = jk_table[h]
+        if jk_obj[e] == obj and jstring_is(jk_key[e], start, end_) { return jk_val[e] }
+        h = (h + 1) & mask
+    }
+    -1
 }

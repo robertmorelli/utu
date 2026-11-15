@@ -1,178 +1,166 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod javascript {
     fn dom_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
-        \\    let document = Browser.document;
-        \\    let input = document.createElement("input");   // an HTMLInputElement
-        \\    input.placeholder = "Write something";
-        \\    let echo = document.createElement("p");
+        \\    let document = Browser.document
+        \\    let input = document.createElement("input")   // an HTMLInputElement
+        \\    input.placeholder = "Write something"
+        \\    let echo = document.createElement("p")
         \\    input.addEventListener("input", cl(event) void {
-        \\        echo.textContent = input.value.toUpperCase();
-        \\    });
-        \\    document.body.append(input, echo);
+        \\        echo.textContent = input.value.toUpperCase()
+        \\    })
+        \\    document.body.append(input, echo)
         \\}
-        ;
     }
     fn builtins_sample() Str {
-        \\using JS from std:JS;
-        \\using console from std:Console;
+        \\using JS from std:JS
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    let epoch = new JS.Date(0.0);
-        \\    console.log(epoch.toISOString());                     // 1970-01-01T00:00:00.000Z
-        \\    console.log(`${JS.Math.max(1.0, 5.0)} ${JS.Math.floor(2.7)}`);   // 5 2
-        \\    console.log(`${(3.14159).toFixed(2)} ${"abc".toUpperCase()}`);   // 3.14 ABC
-        \\    let words = JS.Array.of("b", "c", "a");
-        \\    words.sort();
-        \\    console.log(words.join("-"));                         // a-b-c
-        \\    let counts = new JS.Int32Array(3);
-        \\    counts[1] += 5;                                       // op= reads, operates, writes back
-        \\    words.length -= 1;
-        \\    console.log(`${counts[1]} ${words.join("-")}`);       // 5 a-b
+        \\    let epoch = new JS.Date(0.0)
+        \\    console.log(epoch.toISOString())                     // 1970-01-01T00:00:00.000Z
+        \\    console.log(`${JS.Math.max(1.0, 5.0)} ${JS.Math.floor(2.7)}`)   // 5 2
+        \\    console.log(`${(3.14159).toFixed(2)} ${"abc".toUpperCase()}`)   // 3.14 ABC
+        \\    let words = JS.Array.of("b", "c", "a")
+        \\    words.sort()
+        \\    console.log(words.join("-"))                         // a-b-c
+        \\    let counts = new JS.Int32Array(3)
+        \\    counts[1] += 5                                       // op= reads, operates, writes back
+        \\    words.length -= 1
+        \\    console.log(`${counts[1]} ${words.join("-")}`)       // 5 a-b
         \\}
-        ;
     }
     fn json_host_sample() Str {
-        \\using JS from std:JS;
-        \\using console from std:Console;
+        \\using JS from std:JS
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    let text = JS.JSON.stringify(&{ name: "utu", tags: ["wasm", "gc"] });
-        \\    console.log(text);                    // {"name":"utu","tags":["wasm","gc"]}
-        \\    let parsed = JS.JSON.parse(text);     // any: read in the context that needs it
-        \\    let name: Str = parsed.name;
-        \\    console.log(name.to_upper());         // UTU
+        \\    let text = JS.JSON.stringify(&{ name: "utu", tags: ["wasm", "gc"] })
+        \\    console.log(text)                    // {"name":"utu","tags":["wasm","gc"]}
+        \\    let parsed = JS.JSON.parse(text)     // any: read in the context that needs it
+        \\    let name: Str = parsed.name
+        \\    console.log(name.to_upper())         // UTU
         \\}
-        ;
     }
     fn records_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
-        \\    let doc = Browser.document;
+        \\    let doc = Browser.document
         \\    // &{ ... } and [ ... ] become real JS objects and arrays in a declared slot
-        \\    let blob = new Browser.Blob(["hello, ", "file"], &{ type: "text/plain" });
-        \\    let link = doc.createElement("a");
-        \\    link.href = Browser.URL.createObjectURL(blob);
-        \\    link.download = "hello.txt";
-        \\    link.textContent = "Download";
+        \\    let blob = new Browser.Blob(["hello, ", "file"], &{ type: "text/plain" })
+        \\    let link = doc.createElement("a")
+        \\    link.href = Browser.URL.createObjectURL(blob)
+        \\    link.download = "hello.txt"
+        \\    link.textContent = "Download"
         \\    link.addEventListener("click", cl(e) void {
-        \\        link.textContent = "Downloaded";
-        \\    }, &{ once: true });
-        \\    doc.body.append(link);
-        \\    Browser.window.scrollTo(&{ top: 0.0, left: 0.0, behavior: "smooth" });
+        \\        link.textContent = "Downloaded"
+        \\    }, &{ once: true })
+        \\    doc.body.append(link)
+        \\    Browser.window.scrollTo(&{ top: 0.0, left: 0.0, behavior: "smooth" })
         \\}
-        ;
     }
     fn callbacks_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
-        \\    let doc = Browser.document;
+        \\    let doc = Browser.document
         \\    // parameter types come from the declaration the closure reaches
-        \\    doc.querySelectorAll("p.old").forEach(cl(el) void { el.remove(); });
-        \\    let tags = Browser.Array.of("wasm", "gc", "dom");
-        \\    let loud = tags.map(cl(s) Str { s.toUpperCase(); });
+        \\    doc.querySelectorAll("p.old").forEach(cl(el) void { el.remove() })
+        \\    let tags = Browser.Array.of("wasm", "gc", "dom")
+        \\    let loud = tags.map(cl(s) Str { s.toUpperCase() })
         \\    Browser.setTimeout(cl() void {
-        \\        doc.title = loud.join(" ");
-        \\    }, 100);
+        \\        doc.title = loud.join(" ")
+        \\    }, 100)
         \\}
-        ;
     }
     fn narrowing_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
-        \\    let doc = Browser.document;
+        \\    let doc = Browser.document
         \\    // alt over a host value tests each arm with instanceof
         \\    doc.addEventListener("input", cl(e) void {
         \\        let text = alt e.target {
         \\            Browser.HTMLInputElement |t| => t.value,
         \\            Browser.HTMLTextAreaElement |t| => t.value,
         \\            ~> "",
-        \\        };
-        \\        Browser.console.log(text);
-        \\    });
+        \\        }
+        \\        Browser.console.log(text)
+        \\    })
         \\    // null and undefined both mean absence
-        \\    let search: ?Browser.HTMLInputElement = doc.querySelector("#search");
-        \\    promote search { |s| => s.focus(), ~> {}, };
-        \\    let name = Browser.localStorage.getItem("name") orelse "stranger";
-        \\    doc.title = "Hello, " + name;
+        \\    let search: ?Browser.HTMLInputElement = doc.querySelector("#search")
+        \\    promote search { |s| => s.focus(), ~> {}, }
+        \\    let name = Browser.localStorage.getItem("name") orelse "stranger"
+        \\    doc.title = "Hello, " + name
         \\}
-        ;
     }
     fn try_sample() Str {
-        \\using JS from std:JS;
+        \\using JS from std:JS
         \\
         \\fn parse_or(text: Str, fallback: Str) Str {
         \\    try {
-        \\        JS.JSON.stringify(JS.JSON.parse(text));
+        \\        JS.JSON.stringify(JS.JSON.parse(text))
         \\    } catch |e| {                // e is the thrown JavaScript value
-        \\        fallback + " (" + JS.String(e) + ")";
-        \\    };
+        \\        fallback + " (" + JS.String(e) + ")"
+        \\    }
         \\}
         \\
         \\export main() Str {
-        \\    parse_or("[1, 2]", "") + " / " + parse_or("{oops", "bad");
+        \\    parse_or("[1, 2]", "") + " / " + parse_or("{oops", "bad")
         \\    // [1,2] / bad (SyntaxError: ...)
         \\}
-        ;
     }
     fn fetch_sample() Str {
-        \\using Web from std:Web;
+        \\using Web from std:Web
         \\
         \\fn load(url: Str) Str {
-        \\    let response = await Web.fetch(url);   // a host Promise[Response]
-        \\    if not response.ok { return "failed"; };
-        \\    await response.text();
+        \\    let response = await Web.fetch(url)   // a host Promise[Response]
+        \\    if not response.ok { return "failed" }
+        \\    await response.text()
         \\}
         \\
         \\export main() Str {
-        \\    load("data:text/plain,hello from fetch");   // hello from fetch
+        \\    load("data:text/plain,hello from fetch")   // hello from fetch
         \\}
-        ;
     }
     fn timers_sample() Str {
-        \\using Web from std:Web;
-        \\using console from std:Console;
+        \\using Web from std:Web
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    Web.setTimeout(cl() void { console.log("later"); }, 10);
-        \\    console.log(`${Web.crypto.randomUUID().len()}`);   // 36
-        \\    let url = new Web.URL("https://example.com/a?page=2");
-        \\    console.log(url.hostname + " " + (url.searchParams.get("page") orelse "1"));
+        \\    Web.setTimeout(cl() void { console.log("later") }, 10)
+        \\    console.log(`${Web.crypto.randomUUID().len()}`)   // 36
+        \\    let url = new Web.URL("https://example.com/a?page=2")
+        \\    console.log(url.hostname + " " + (url.searchParams.get("page") orelse "1"))
         \\    // example.com 2, then: later
         \\}
-        ;
     }
     fn packages_sample() Str {
-        \\using Nano from "npm:nanoid";
-        \\using Path from "node:path";
-        \\using Fs from "node:fs";
-        \\using console from std:Console;
+        \\using Nano from "npm:nanoid"
+        \\using Path from "node:path"
+        \\using Fs from "node:fs"
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    let id = Nano.nanoid(8);
-        \\    let file = Path.join("out", id, "report.txt");
-        \\    console.log(`${Path.extname(file)} ${id.len()}`);   // .txt 8
-        \\    console.log(`${Fs.existsSync("package.json")}`);    // true, run from a package
+        \\    let id = Nano.nanoid(8)
+        \\    let file = Path.join("out", id, "report.txt")
+        \\    console.log(`${Path.extname(file)} ${id.len()}`)   // .txt 8
+        \\    console.log(`${Fs.existsSync("package.json")}`)    // true, run from a package
         \\}
-        ;
     }
     fn link_shell() Str {
         \\node tools/dts/cli.mjs --input path/to/api.d.ts --module ./api.js --prefix Api --out bindings
         \\wasm-pack build --target nodejs --out-dir pkg
         \\node tools/dts/cli.mjs --input pkg/geom.d.ts --module ./pkg/geom.js --prefix Geom --out bindings
-        ;
     }
     fn link_use_multi() Str {
-        \\using Api from "./bindings/Api.abi.json";
-        \\using Geom from "./bindings/Geom.abi.json";
-        ;
+        \\using Api from "./bindings/Api.abi.json"
+        \\using Geom from "./bindings/Geom.abi.json"
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -380,6 +368,6 @@ mod javascript {
             }
             = ui.further("docs/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI");
         }
-        \/;
+        \/
     }
 }

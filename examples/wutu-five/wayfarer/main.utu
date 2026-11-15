@@ -1,31 +1,31 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 fn number(value: I32) Str {
-    value.f64().toString();
+    value.f64().toString()
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2)
 }
 
 fn node(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal;
+    Browser.document.getElementById(id) orelse fatal
 }
 
 fn restore_focus(id: Str) void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
-    };
+    }
 }
 
 fn persist(key: Str,
 value: Str) void {
     try {
-        Browser.localStorage.setItem(key, value);
+        Browser.localStorage.setItem(key, value)
     } catch {
-        node("notice").textContent = "Storage is unavailable. Your changes will last for this session.";
-    };
+        node("notice").textContent = "Storage is unavailable. Your changes will last for this session."
+    }
 }
 
 struct Stop:
@@ -40,7 +40,7 @@ struct Trip:
     | day: Str
 
 fn save(state: Trip) void {
-    let data = Browser.Array();
+    let data = Browser.Array()
     state.stops each |s| {
         data.push(&{
             id: s.id,
@@ -48,28 +48,28 @@ fn save(state: Trip) void {
             day: s.day,
             cost: s.cost,
             done: s.done
-        });
-    };
-    persist("wayfarer-v1", Browser.JSON.stringify(data));
+        })
+    }
+    persist("wayfarer-v1", Browser.JSON.stringify(data))
 }
 
 fn refresh(state: Trip) void {
-    save(state);
+    save(state)
 }
 
 fn itinerary(state: Trip) Browser.HTMLElement {
     let total = state.stops map |stop| {
-        stop.cost.f64();
-    } sum;
+        stop.cost.f64()
+    } sum
     let done = state.stops count_where |stop| {
-        stop.done;
-    };
+        stop.done
+    }
     let visible = state.stops filter |stop| {
-        state.day == "all" or number(stop.day) == state.day;
+        state.day == "all" or number(stop.day) == state.day
     }
     sort(Stop)|a, b| {
-        a.day<b.day;
-    };
+        a.day<b.day
+    }
     @wutu/\
     section {
         id = "itinerary";
@@ -202,7 +202,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 
 export main() void {
@@ -237,18 +237,18 @@ export main() void {
             done: false
         }
         ]
-    };
+    }
     try {
         promote Browser.localStorage.getItem("wayfarer-v1") {
             |saved|=> {
-                let data = Browser.JSON.parse(saved);
-                let length: F64 = data.length;
-                let i: F64 = 0.0;
-                let stops: Array[Stop] = [];
+                let data = Browser.JSON.parse(saved)
+                let length: F64 = data.length
+                let i: F64 = 0.0
+                let stops: Array[Stop] = []
                 while(i<length) {
-                    let row = data[i];
-                    let day: F64 = row.day;
-                    let cost: F64 = row.cost;
+                    let row = data[i]
+                    let day: F64 = row.day
+                    let cost: F64 = row.cost
                     stops = stops chain([Stop {
                         id: row.id,
                         title: row.title,
@@ -256,16 +256,16 @@ export main() void {
                         cost: cost.i32(),
                         done: row.done
                     }
-                    ]) collect(Stop);
-                    i += 1.0;
-                };
-                state.stops = stops;
+                    ]) collect(Stop)
+                    i += 1.0
+                }
+                state.stops = stops
             },
             ~> {
             },
-        };
+        }
     } catch {
-    };
+    }
     let app = @wutu/\
     @reactive;
     @document {
@@ -613,6 +613,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

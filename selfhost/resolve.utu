@@ -63,44 +63,44 @@ enum(U8) Decl:
     | Ambiguous
 
 /// By declaration (its id): its Decl.
-vec decl_kind: U8;
+vec decl_kind: U8
 /// Its name's word id, or -1.
-vec decl_name: I32;
+vec decl_name: I32
 /// The node that declares it.
-export mem decl_node: I32;
+export mem decl_node: I32
 /// The declaration it is part of (module, struct, enum, function), or -1.
-export mem decl_owner: I32;
+export mem decl_owner: I32
 /// Module: its promoted type (`&`), or -1. ModuleParam: its index. Fn: the
 /// type it is a method or operator of, or -1. Alias: the module it names.
 /// Field: its index. Ambiguous (a name two opened modules have): one of
 /// them, and its owner the other.
-vec decl_a: I32;
+vec decl_a: I32
 
 /// The declaration a name node refers to, by node; -1 for none.
-export mem node_decl: I32;
+export mem node_decl: I32
 /// By node: the alias a module name was written as (`ints` in `ints.Box`), or -1.
-vec node_alias: I32;
+vec node_alias: I32
 
 /// A new declaration: its id.
 fn declare(kind: Decl, name: I32, node: I32, owner: I32) I32 {
-    let id = decl_kind.len();
-    decl_kind.push(kind.i32());
-    decl_name.push(name);
-    decl_node.push(node);
-    decl_owner.push(owner);
-    decl_a.push(-1);
-    id;
+    let id = decl_kind.len()
+    decl_kind.push(kind.i32())
+    decl_name.push(name)
+    decl_node.push(node)
+    decl_owner.push(owner)
+    decl_a.push(-1)
+    id
 }
 
-fn decl_is(decl: I32, kind: Decl) Bool { decl >= 0 and decl_kind[decl] == kind.i32(); }
+fn decl_is(decl: I32, kind: Decl) Bool { decl >= 0 and decl_kind[decl] == kind.i32() }
 
 /// Whether a declaration names a type (a module names its promoted type).
 fn is_type_decl(decl: I32) Bool {
-    let k = decl_kind[decl];
+    let k = decl_kind[decl]
     k == Decl.Module.i32() or k == Decl.Foreign.i32() or k == Decl.ModuleParam.i32() or k == Decl.Struct.i32()
         or k == Decl.Enum.i32() or k == Decl.IntEnum.i32() or k == Decl.Variant.i32()
         or k == Decl.Proto.i32() or k == Decl.TypeDecl.i32() or k == Decl.Distinct.i32()
-        or k == Decl.Alias.i32();
+        or k == Decl.Alias.i32()
 }
 
 //! = Diagnostics
@@ -271,12 +271,12 @@ enum(U8) Diag:
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
 /// (see `diag.utu`).
-vec diag_kind: U8;
-vec diag_node: I32;
-vec diag_word: I32;
-vec diag_a: I32;
-vec diag_b: I32;
-vec diag_c: I32;
+vec diag_kind: U8
+vec diag_node: I32
+vec diag_word: I32
+vec diag_a: I32
+vec diag_b: I32
+vec diag_c: I32
 
 /// What a diagnostic says beyond its message and span, for the host to draw
 /// (see `diagnostic_extra_*` in lib.utu): a label on its own span, other
@@ -284,20 +284,20 @@ vec diag_c: I32;
 /// edit of the source. A diagnostic owns a run of extra rows, `diag_extra_n`
 /// of them from `diag_extra`; rows are added right after the report, so the
 /// run is unbroken.
-vec diag_extra: I32;
-vec diag_extra_n: I32;
+vec diag_extra: I32
+vec diag_extra_n: I32
 /// A row: its @Extra kind; for a place, its node (-1: the diagnostic's own
 /// span), or bytes `extra_node ..< extra_end` when `extra_end` is not -1 (for
 /// a label, the part of its own span to show: its focus); for a fix, the
 /// bytes it replaces; and its text (a label, a note, or a fix's new text)
 /// and a fix's label, both interned (-1 for none).
-vec extra_kind: U8;
-vec extra_node: I32;
-vec extra_end: I32;
-vec extra_text: I32;
-vec extra_label: I32;
+vec extra_kind: U8
+vec extra_node: I32
+vec extra_end: I32
+vec extra_text: I32
+vec extra_label: I32
 /// Whether the last report made a diagnostic (a repeat makes none, and its extras go nowhere).
-vec diag_fresh: U8 = [0];
+vec diag_fresh: U8 = [0]
 
 /// What an extra row is. A place's kind is the role it plays: where the
 /// requirement came from, where the value came from, or other context.
@@ -310,140 +310,140 @@ enum(U8) Extra:
     | Fix
 
 fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) void {
-    if diag_fresh[0] == 0 { return; };
-    let i = diag_kind.len() - 1;
-    if diag_extra_n[i] == 0 { diag_extra[i] = extra_kind.len(); };
-    extra_kind.push(kind.i32());
-    extra_node.push(node);
-    extra_end.push(end_);
-    extra_text.push(text);
-    extra_label.push(label);
-    diag_extra_n[i] += 1;
+    if diag_fresh[0] == 0 { return }
+    let i = diag_kind.len() - 1
+    if diag_extra_n[i] == 0 { diag_extra[i] = extra_kind.len() }
+    extra_kind.push(kind.i32())
+    extra_node.push(node)
+    extra_end.push(end_)
+    extra_text.push(text)
+    extra_label.push(label)
+    diag_extra_n[i] += 1
 }
 
 /// A label on the last diagnostic's own span.
 fn diag_label(label: Str) void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Here, -1, -1, intern_text(label), -1); };
+    if diag_fresh[0] == 1 { add_extra(Extra.Here, -1, -1, intern_text(label), -1) }
 }
 
 /// The part of the last diagnostic's span to show (tokens `first` to `last`), with a label.
 fn diag_focus(first: I32, last: I32, label: Str) void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Here, tok_start[first], tok_end[last], intern_text(label), -1); };
+    if diag_fresh[0] == 1 { add_extra(Extra.Here, tok_start[first], tok_end[last], intern_text(label), -1) }
 }
 
 /// Another place the last diagnostic is about, by tokens `first` to `last`.
 fn diag_place_tokens(role: Extra, first: I32, last: I32, label: Str) void {
-    if first >= 0 and diag_fresh[0] == 1 { add_extra(role, tok_start[first], tok_end[last], intern_text(label), -1); };
+    if first >= 0 and diag_fresh[0] == 1 { add_extra(role, tok_start[first], tok_end[last], intern_text(label), -1) }
 }
 
 /// Another place the last diagnostic is about: node, its role, and a label.
 fn diag_place(role: Extra, node: I32, label: Str) void {
-    if node >= 0 and diag_fresh[0] == 1 { add_extra(role, node, -1, intern_text(label), -1); };
+    if node >= 0 and diag_fresh[0] == 1 { add_extra(role, node, -1, intern_text(label), -1) }
 }
 
 /// A note on the last diagnostic: one sentence that teaches the rule.
 fn diag_note(text: Str) void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Note, -1, -1, intern_text(text), -1); };
+    if diag_fresh[0] == 1 { add_extra(Extra.Note, -1, -1, intern_text(text), -1) }
 }
 
 /// A fix for the last diagnostic: source bytes `start ..< end_` become `text`.
 fn diag_fix(start: I32, end_: I32, text: Str, label: Str) void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)); };
+    if diag_fresh[0] == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)) }
 }
 
-fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1, -1, -1); }
+fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1, -1, -1) }
 
-fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind, node, word, a, b, -1); }
+fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind, node, word, a, b, -1) }
 
 /// Report a mistake (once per node, kind, and word).
 fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
     // Once for a node: a name resolved, or a type read, twice is still one mistake.
-    diag_fresh[0] = 0;
-    if node >= 0 and diag_slot(node, kind.i32(), word) >= 0 { return; };
-    diag_fresh[0] = 1;
-    if node >= 0 { diag_seen_add(diag_kind.len(), node, kind.i32(), word); };
-    diag_extra.push(-1);
-    diag_extra_n.push(0);
-    diag_kind.push(kind.i32());
-    diag_node.push(node);
-    diag_word.push(word);
-    diag_a.push(a);
-    diag_b.push(b);
-    diag_c.push(c);
-    instance_note();
+    diag_fresh[0] = 0
+    if node >= 0 and diag_slot(node, kind.i32(), word) >= 0 { return }
+    diag_fresh[0] = 1
+    if node >= 0 { diag_seen_add(diag_kind.len(), node, kind.i32(), word) }
+    diag_extra.push(-1)
+    diag_extra_n.push(0)
+    diag_kind.push(kind.i32())
+    diag_node.push(node)
+    diag_word.push(word)
+    diag_a.push(a)
+    diag_b.push(b)
+    diag_c.push(c)
+    instance_note()
 }
 
 /// The diagnostics with a node, by node, kind, and word: open addressing
 /// over their indexes (-1 empty), for @report3 to find a repeat. Rebuilt
 /// when diagnostics are dropped or moved (`diag_seen_ok` 0).
-vec diag_seen: I32;
-vec diag_seen_ok: U8 = [0];
+vec diag_seen: I32
+vec diag_seen_ok: U8 = [0]
 
-fn diag_hash(node: I32, kind: I32, word: I32) I32 { (node * -1640531535) ^ (kind * 40503) ^ (word * 9973); }
+fn diag_hash(node: I32, kind: I32, word: I32) I32 { (node * -1640531535) ^ (kind * 40503) ^ (word * 9973) }
 
 /// The diagnostic about `node` of `kind` and `word`, or -1.
 fn diag_slot(node: I32, kind: I32, word: I32) I32 {
-    if diag_seen_ok[0] == 0 or (diag_kind.len() + 1) * 2 > diag_seen.len() { diag_seen_rebuild(); };
-    let mask = diag_seen.len() - 1;
-    let h = diag_hash(node, kind, word) & mask;
+    if diag_seen_ok[0] == 0 or (diag_kind.len() + 1) * 2 > diag_seen.len() { diag_seen_rebuild() }
+    let mask = diag_seen.len() - 1
+    let h = diag_hash(node, kind, word) & mask
     while (diag_seen[h] >= 0) {
-        let i = diag_seen[h];
-        if diag_node[i] == node and diag_kind[i] == kind and diag_word[i] == word { return i; };
-        h = (h + 1) & mask;
-    };
-    -1;
+        let i = diag_seen[h]
+        if diag_node[i] == node and diag_kind[i] == kind and diag_word[i] == word { return i }
+        h = (h + 1) & mask
+    }
+    -1
 }
 
 fn diag_seen_add(i: I32, node: I32, kind: I32, word: I32) void {
-    let mask = diag_seen.len() - 1;
-    let h = diag_hash(node, kind, word) & mask;
-    while (diag_seen[h] >= 0) { h = (h + 1) & mask; };
-    diag_seen[h] = i;
+    let mask = diag_seen.len() - 1
+    let h = diag_hash(node, kind, word) & mask
+    while (diag_seen[h] >= 0) { h = (h + 1) & mask }
+    diag_seen[h] = i
 }
 
 fn diag_seen_rebuild() void {
-    let n = 64;
-    while (n < (diag_kind.len() + 1) * 4) { n = n * 2; };
-    diag_seen.resize(n);
-    for (0 ..< n) |h| { diag_seen[h] = -1; };
-    for (0 ..< diag_kind.len()) |i| { if diag_node[i] >= 0 { diag_seen_add(i, diag_node[i], diag_kind[i], diag_word[i]); }; };
-    diag_seen_ok[0] = 1;
+    let n = 64
+    while (n < (diag_kind.len() + 1) * 4) { n = n * 2 }
+    diag_seen.resize(n)
+    for (0 ..< n) |h| { diag_seen[h] = -1 }
+    for (0 ..< diag_kind.len()) |i| { if diag_node[i] >= 0 { diag_seen_add(i, diag_node[i], diag_kind[i], diag_word[i]) } }
+    diag_seen_ok[0] = 1
 }
 
 /// Keep the first n diagnostics.
 fn diag_truncate(n: I32) void {
-    diag_seen_ok[0] = 0;
-    diag_kind.resize(n);
-    diag_node.resize(n);
-    diag_word.resize(n);
-    diag_a.resize(n);
-    diag_b.resize(n);
-    diag_c.resize(n);
-    diag_extra.resize(n);
-    diag_extra_n.resize(n);
-    diag_fresh[0] = 0;
+    diag_seen_ok[0] = 0
+    diag_kind.resize(n)
+    diag_node.resize(n)
+    diag_word.resize(n)
+    diag_a.resize(n)
+    diag_b.resize(n)
+    diag_c.resize(n)
+    diag_extra.resize(n)
+    diag_extra_n.resize(n)
+    diag_fresh[0] = 0
 }
 
 /// No diagnostics, and no extra rows: a build starting over.
 fn diag_reset() void {
-    diag_truncate(0);
-    extra_kind.clear();
-    extra_node.clear();
-    extra_end.clear();
-    extra_text.clear();
-    extra_label.clear();
+    diag_truncate(0)
+    extra_kind.clear()
+    extra_node.clear()
+    extra_end.clear()
+    extra_text.clear()
+    extra_label.clear()
 }
 
 fn diag_move(from: I32, to: I32) void {
-    diag_seen_ok[0] = 0;
-    diag_kind[to] = diag_kind[from];
-    diag_node[to] = diag_node[from];
-    diag_word[to] = diag_word[from];
-    diag_a[to] = diag_a[from];
-    diag_b[to] = diag_b[from];
-    diag_c[to] = diag_c[from];
-    diag_extra[to] = diag_extra[from];
-    diag_extra_n[to] = diag_extra_n[from];
+    diag_seen_ok[0] = 0
+    diag_kind[to] = diag_kind[from]
+    diag_node[to] = diag_node[from]
+    diag_word[to] = diag_word[from]
+    diag_a[to] = diag_a[from]
+    diag_b[to] = diag_b[from]
+    diag_c[to] = diag_c[from]
+    diag_extra[to] = diag_extra[from]
+    diag_extra_n[to] = diag_extra_n[from]
 }
 
 //! = Members
@@ -458,165 +458,165 @@ enum(U8) Space:
 /// The member table, by slot: owner, key (word × 4 + Space), declaration.
 /// Open addressing; a slot is empty when its key is -1. `member_fill[0]`
 /// counts the slots in use.
-vec member_owner: I32;
-vec member_key: I32;
-vec member_decl: I32;
-vec member_fill: I32;
+vec member_owner: I32
+vec member_key: I32
+vec member_decl: I32
+vec member_fill: I32
 
 fn member_slot(owner: I32, key: I32) I32 {
-    let mask = member_key.len() - 1;
-    let h = (owner * -1640531535 + key * 40503) & mask;
-    while (member_key[h] >= 0 and (member_key[h] != key or member_owner[h] != owner)) { h = (h + 1) & mask; };
-    h;
+    let mask = member_key.len() - 1
+    let h = (owner * -1640531535 + key * 40503) & mask
+    while (member_key[h] >= 0 and (member_key[h] != key or member_owner[h] != owner)) { h = (h + 1) & mask }
+    h
 }
 
 fn members_reset(capacity: I32) void {
-    member_owner.resize(capacity);
-    member_key.resize(capacity);
-    member_decl.resize(capacity);
-    for (0 ..< capacity) |i| { member_key[i] = -1; };
-    member_fill.resize(1);
-    member_fill[0] = 0;
-    method_twice.clear();
+    member_owner.resize(capacity)
+    member_key.resize(capacity)
+    member_decl.resize(capacity)
+    for (0 ..< capacity) |i| { member_key[i] = -1 }
+    member_fill.resize(1)
+    member_fill[0] = 0
+    method_twice.clear()
 }
 
 /// Pairs: `fn Pa[T].m` and `fn Pb[T].m`, two protocols' m for one T, which
 /// `t.m()` cannot choose between.
-vec method_twice: I32;
+vec method_twice: I32
 
 /// Add a member; returns the declaration already there under that name, or -1.
 fn add_member(owner: I32, name: I32, space: Space, decl: I32) I32 {
-    if name < 0 { return -1; };
-    if (member_fill[0] + 1) * 2 > member_key.len() { grow_members(); };
-    let key = name * 4 + space.i32();
-    let h = member_slot(owner, key);
-    if member_key[h] >= 0 { return member_decl[h]; };
-    member_owner[h] = owner;
-    member_key[h] = key;
-    member_decl[h] = decl;
-    member_fill[0] += 1;
-    -1;
+    if name < 0 { return -1 }
+    if (member_fill[0] + 1) * 2 > member_key.len() { grow_members() }
+    let key = name * 4 + space.i32()
+    let h = member_slot(owner, key)
+    if member_key[h] >= 0 { return member_decl[h] }
+    member_owner[h] = owner
+    member_key[h] = key
+    member_decl[h] = decl
+    member_fill[0] += 1
+    -1
 }
 
 fn grow_members() void {
-    let n = member_key.len();
-    let owners = Array[I32].new(n, 0);
-    let keys = Array[I32].new(n, 0);
-    let decls = Array[I32].new(n, 0);
+    let n = member_key.len()
+    let owners = Array[I32].new(n, 0)
+    let keys = Array[I32].new(n, 0)
+    let decls = Array[I32].new(n, 0)
     for (0 ..< n) |i| {
-        owners[i] = member_owner[i];
-        keys[i] = member_key[i];
-        decls[i] = member_decl[i];
-    };
-    let fill = member_fill[0];
-    members_reset(n * 2);
-    member_fill[0] = fill;
+        owners[i] = member_owner[i]
+        keys[i] = member_key[i]
+        decls[i] = member_decl[i]
+    }
+    let fill = member_fill[0]
+    members_reset(n * 2)
+    member_fill[0] = fill
     for (0 ..< n) |i| {
         if keys[i] >= 0 {
-            let h = member_slot(owners[i], keys[i]);
-            member_owner[h] = owners[i];
-            member_key[h] = keys[i];
-            member_decl[h] = decls[i];
-        };
-    };
+            let h = member_slot(owners[i], keys[i])
+            member_owner[h] = owners[i]
+            member_key[h] = keys[i]
+            member_decl[h] = decls[i]
+        }
+    }
 }
 
 /// The member of `owner` named `name` in `space`, or -1.
 fn member(owner: I32, name: I32, space: Space) I32 {
-    if owner < 0 or name < 0 { return -1; };
-    let h = member_slot(owner, name * 4 + space.i32());
-    if member_key[h] < 0 { -1; } else { member_decl[h]; };
+    if owner < 0 or name < 0 { return -1 }
+    let h = member_slot(owner, name * 4 + space.i32())
+    if member_key[h] < 0 { -1 } else { member_decl[h] }
 }
 
 //! = Scopes
 
 /// The bindings in scope, innermost last: each one's word and declaration.
-vec bind_word: I32;
-vec bind_decl: I32;
+vec bind_word: I32
+vec bind_decl: I32
 /// The binding this one hides, or -1.
-vec bind_prev: I32;
+vec bind_prev: I32
 /// By word id: the innermost binding, or -1.
-vec word_top: I32;
+vec word_top: I32
 
 /// Bring `decl` into scope as `word`, hiding what that word named.
 fn bind(word: I32, decl: I32) void {
-    if word < 0 { return; };
-    bind_word.push(word);
-    bind_decl.push(decl);
-    bind_prev.push(word_top[word]);
-    word_top[word] = bind_decl.len() - 1;
+    if word < 0 { return }
+    bind_word.push(word)
+    bind_decl.push(decl)
+    bind_prev.push(word_top[word])
+    word_top[word] = bind_decl.len() - 1
 }
 
 /// Where the scope stands: @scope_pop goes back to it.
-fn scope_mark() I32 { bind_decl.len(); }
+fn scope_mark() I32 { bind_decl.len() }
 
 fn scope_pop(mark: I32) void {
-    let i = bind_decl.len();
+    let i = bind_decl.len()
     while (i > mark) {
-        i -= 1;
-        word_top[bind_word[i]] = bind_prev[i];
-    };
-    bind_word.resize(mark);
-    bind_decl.resize(mark);
-    bind_prev.resize(mark);
+        i -= 1
+        word_top[bind_word[i]] = bind_prev[i]
+    }
+    bind_word.resize(mark)
+    bind_decl.resize(mark)
+    bind_prev.resize(mark)
 }
 
 /// The declaration `word` names in scope, or -1.
 fn lookup(word: I32) I32 {
-    if word < 0 { return -1; };
-    let b = word_top[word];
-    if b < 0 { -1; } else { bind_decl[b]; };
+    if word < 0 { return -1 }
+    let b = word_top[word]
+    if b < 0 { -1 } else { bind_decl[b] }
 }
 
 /// The declaration `word` names in the prelude's scope, or -1: what the
 /// compiler means by `Array` or `Str`, whatever a file calls its own.
 fn prelude_lookup(word: I32) I32 {
-    if word < 0 or word >= word_top.len() { return -1; };
-    let b = word_top[word];
-    while (b >= prelude_binds[0]) { b = bind_prev[b]; };
-    if b < 0 { -1; } else { bind_decl[b]; };
+    if word < 0 or word >= word_top.len() { return -1 }
+    let b = word_top[word]
+    while (b >= prelude_binds[0]) { b = bind_prev[b] }
+    if b < 0 { -1 } else { bind_decl[b] }
 }
 
 /// The bindings below this are the prelude's scope.
-vec prelude_binds: I32 = [0];
+vec prelude_binds: I32 = [0]
 
 /// By file: its scope, the bindings `scope_word`/`scope_decl` from
 /// `file_scope` to `file_scope_end`, made once (@declare_program) and bound
 /// again for each walk of its items (@enter_file).
-vec scope_word: I32;
-vec scope_decl: I32;
-vec file_scope: I32;
-vec file_scope_end: I32;
+vec scope_word: I32
+vec scope_decl: I32
+vec file_scope: I32
+vec file_scope_end: I32
 
 /// The file whose scope a file's items are in: a generated file's is the
 /// entry file's (`entry`, or -1 for none).
 fn scope_file(file: I32, entry: I32) I32 {
-    if file_role[file] != FileRole.Generated.i32() { return file; };
+    if file_role[file] != FileRole.Generated.i32() { return file }
     // What is generated for an imported file's mems is in its scope.
-    if gen_owner_of(file) >= 0 { return gen_owner_of(file); };
-    if entry >= 0 { entry; } else { file; };
+    if gen_owner_of(file) >= 0 { return gen_owner_of(file) }
+    if entry >= 0 { entry } else { file }
 }
 
 /// Bring file `f`'s scope into scope (on top of the prelude's).
 fn enter_file(f: I32) void {
-    if f >= file_scope.len() or file_scope[f] < 0 { return; };
-    for (file_scope[f] ..< file_scope_end[f]) |k| { bind(scope_word[k], scope_decl[k]); };
+    if f >= file_scope.len() or file_scope[f] < 0 { return }
+    for (file_scope[f] ..< file_scope_end[f]) |k| { bind(scope_word[k], scope_decl[k]) }
 }
 
 fn reset_resolve() void {
-    decl_kind.clear();
-    decl_name.clear();
-    decl_node.clear();
-    decl_owner.clear();
-    decl_a.clear();
-    node_decl.clear();
-    diag_reset();
-    bind_word.clear();
-    bind_decl.clear();
-    bind_prev.clear();
-    word_top.clear();
-    mem_clashes.clear();
-    members_reset(1024);
+    decl_kind.clear()
+    decl_name.clear()
+    decl_node.clear()
+    decl_owner.clear()
+    decl_a.clear()
+    node_decl.clear()
+    diag_reset()
+    bind_word.clear()
+    bind_decl.clear()
+    bind_prev.clear()
+    word_top.clear()
+    mem_clashes.clear()
+    members_reset(1024)
 }
 
 //! = Declaring
@@ -625,244 +625,244 @@ fn reset_resolve() void {
 /// inside a module name. -1 for `&`.
 fn name_node(node: I32) I32 {
     if is_kind(node, Node.Module_name) or is_kind(node, Node.Module_ref) or is_kind(node, Node.Captured_module_name) {
-        return name_node(first_child(node));
-    };
-    if is_kind(node, Node.Identifier) or is_kind(node, Node.Type_ident) { node; } else { -1; };
+        return name_node(first_child(node))
+    }
+    if is_kind(node, Node.Identifier) or is_kind(node, Node.Type_ident) { node } else { -1 }
 }
 
 fn name_word(node: I32) I32 {
-    let n = name_node(node);
-    if n < 0 { -1; } else { word_of(n); };
+    let n = name_node(node)
+    if n < 0 { -1 } else { word_of(n) }
 }
 
 /// A declaration named by `name_at` (or by its module when that is `&`),
 /// recorded on its name node.
 fn declare_named(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
-    let word = name_word(name_at);
-    if word < 0 and owner >= 0 and decl_is(owner, Decl.Module) { word = decl_name[owner]; };
-    let decl = declare(kind, word, node, owner);
-    let n = name_node(name_at);
-    if n >= 0 { node_decl[n] = decl; };
-    decl;
+    let word = name_word(name_at)
+    if word < 0 and owner >= 0 and decl_is(owner, Decl.Module) { word = decl_name[owner] }
+    let decl = declare(kind, word, node, owner)
+    let n = name_node(name_at)
+    if n >= 0 { node_decl[n] = decl }
+    decl
 }
 
 /// A declaration (as @declare_named makes it), a member of `owner`.
 fn declare_member(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
-    let decl = declare_named(kind, name_at, node, owner);
-    add_member(owner, decl_name[decl], Space.Member, decl);
-    decl;
+    let decl = declare_named(kind, name_at, node, owner)
+    add_member(owner, decl_name[decl], Space.Member, decl)
+    decl
 }
 
 /// A declaration (as @declare_named makes it), in scope from here.
 fn declare_in_scope(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
-    let decl = declare_named(kind, name_at, node, owner);
-    bind(decl_name[decl], decl);
-    decl;
+    let decl = declare_named(kind, name_at, node, owner)
+    bind(decl_name[decl], decl)
+    decl
 }
 
 /// The first child that is not a nominal qualifier.
 fn after_qualifier(node: I32) I32 {
-    let c = first_child(node);
-    if is_kind(c, Node.Nom_qualifier) { next_sibling(c); } else { c; };
+    let c = first_child(node)
+    if is_kind(c, Node.Nom_qualifier) { next_sibling(c) } else { c }
 }
 
 /// An enum's name node: after its qualifier, and after its representation
 /// when it is an integer enum (`enum(U8) Tag`).
 fn enum_name(node: I32) I32 {
-    let c = after_qualifier(node);
-    let after = next_sibling(c);
-    if is_kind(after, Node.Type_ident) or is_kind(after, Node.Promoted_type) { after; } else { c; };
+    let c = after_qualifier(node)
+    let after = next_sibling(c)
+    if is_kind(after, Node.Type_ident) or is_kind(after, Node.Promoted_type) { after } else { c }
 }
 
-fn is_int_enum(node: I32) Bool { enum_name(node) != after_qualifier(node); }
+fn is_int_enum(node: I32) Bool { enum_name(node) != after_qualifier(node) }
 
 /// Declare a type-like item (struct, enum, proto, type) and its parts.
 /// Returns the declaration, or -1 when `item` is not one.
 fn declare_type_item(item: I32, owner: I32) I32 {
-    let kind = node_kind[item];
+    let kind = node_kind[item]
     if kind == Node.Struct_decl.i32() {
-        let name_at = after_qualifier(item);
-        let decl = declare_named(Decl.Struct, name_at, item, owner);
-        declare_fields(item, decl);
-        return decl;
-    };
+        let name_at = after_qualifier(item)
+        let decl = declare_named(Decl.Struct, name_at, item, owner)
+        declare_fields(item, decl)
+        return decl
+    }
     if kind == Node.Enum_decl.i32() {
-        let name_at = enum_name(item);
-        let decl = declare_named(if is_int_enum(item) { Decl.IntEnum; } else { Decl.Enum; }, name_at, item, owner);
-        let c = first_child(item);
+        let name_at = enum_name(item)
+        let decl = declare_named(if is_int_enum(item) { Decl.IntEnum } else { Decl.Enum }, name_at, item, owner)
+        let c = first_child(item)
         while (c >= 0) {
             if is_kind(c, Node.Variant) {
-                let variant = declare_member(Decl.Variant, first_child(c), c, decl);
-                let fields = next_sibling(first_child(c));
-                if is_kind(fields, Node.Field_list) { declare_fields(fields, variant); };
-            };
-            c = next_sibling(c);
-        };
-        return decl;
-    };
+                let variant = declare_member(Decl.Variant, first_child(c), c, decl)
+                let fields = next_sibling(first_child(c))
+                if is_kind(fields, Node.Field_list) { declare_fields(fields, variant) }
+            }
+            c = next_sibling(c)
+        }
+        return decl
+    }
     if kind == Node.Proto_decl.i32() {
-        let decl = declare_named(Decl.Proto, first_child(item), item, owner);
-        let c = first_child(item);
+        let decl = declare_named(Decl.Proto, first_child(item), item, owner)
+        let c = first_child(item)
         while (c >= 0) {
             if is_kind(c, Node.Proto_member) {
-                let m = first_child(c);
-                let name_at = first_child(m);
-                declare_member(Decl.ProtoMember, name_at, m, decl);
-            };
-            c = next_sibling(c);
-        };
-        return decl;
-    };
-    if kind == Node.Type_decl.i32() { return declare_named(Decl.TypeDecl, first_child(item), item, owner); };
-    if kind == Node.Distinct_decl.i32() { return declare_named(Decl.Distinct, first_child(item), item, owner); };
-    -1;
+                let m = first_child(c)
+                let name_at = first_child(m)
+                declare_member(Decl.ProtoMember, name_at, m, decl)
+            }
+            c = next_sibling(c)
+        }
+        return decl
+    }
+    if kind == Node.Type_decl.i32() { return declare_named(Decl.TypeDecl, first_child(item), item, owner) }
+    if kind == Node.Distinct_decl.i32() { return declare_named(Decl.Distinct, first_child(item), item, owner) }
+    -1
 }
 
 fn declare_fields(holder: I32, owner: I32) void {
-    let c = first_child(holder);
-    let index = 0;
+    let c = first_child(holder)
+    let index = 0
     while (c >= 0) {
         if is_kind(c, Node.Field) {
-            let field = declare_member(Decl.Field, first_child(c), c, owner);
-            decl_a[field] = index;
-            index += 1;
-        };
-        c = next_sibling(c);
-    };
+            let field = declare_member(Decl.Field, first_child(c), c, owner)
+            decl_a[field] = index
+            index += 1
+        }
+        c = next_sibling(c)
+    }
 }
 
 /// Whether a type item declares `&`, its module's promoted type.
 fn names_promoted(item: I32) Bool {
-    let kind = node_kind[item];
-    let name_at = if kind == Node.Enum_decl.i32() { enum_name(item); }
-        else if kind == Node.Struct_decl.i32() { after_qualifier(item); }
-        else { first_child(item); };
-    is_kind(name_at, Node.Promoted_type);
+    let kind = node_kind[item]
+    let name_at = if kind == Node.Enum_decl.i32() { enum_name(item) }
+        else if kind == Node.Struct_decl.i32() { after_qualifier(item) }
+        else { first_child(item) }
+    is_kind(name_at, Node.Promoted_type)
 }
 
 /// A free function's name, or -1 for a method or operator.
 fn free_fn_word(item: I32) I32 {
-    if not is_kind(item, Node.Fn_decl) { return -1; };
-    let name = first_child(first_child(item));
-    if is_kind(name, Node.Identifier) and next_sibling(name) < 0 { word_of(name); } else { -1; };
+    if not is_kind(item, Node.Fn_decl) { return -1 }
+    let name = first_child(first_child(item))
+    if is_kind(name, Node.Identifier) and next_sibling(name) < 0 { word_of(name) } else { -1 }
 }
 
 /// A function: named when free; a method or operator is found as its type's member.
 fn declare_fn(item: I32, owner: I32) I32 {
-    let decl = declare(Decl.Fn, free_fn_word(item), item, owner);
+    let decl = declare(Decl.Fn, free_fn_word(item), item, owner)
     if is_kind(item, Node.Fn_decl) {
         // The name node of a free function, or of a method (its last word).
-        node_decl[last_child(first_child(item))] = decl;
+        node_decl[last_child(first_child(item))] = decl
     } else {
-        node_decl[next_sibling(first_child(item))] = decl;
-    };
-    decl;
+        node_decl[next_sibling(first_child(item))] = decl
+    }
+    decl
 }
 
 fn declare_module(item: I32) I32 {
-    let decl = declare_named(Decl.Module, first_child(item), item, -1);
-    let c = next_sibling(first_child(item));
-    let first_param = -1;
-    let index = 0;
+    let decl = declare_named(Decl.Module, first_child(item), item, -1)
+    let c = next_sibling(first_child(item))
+    let first_param = -1
+    let index = 0
     if is_kind(c, Node.Module_type_param_list) {
-        let param = first_child(c);
+        let param = first_child(c)
         while (param >= 0) {
-            let p = declare_named(Decl.ModuleParam, first_child(param), param, decl);
-            if first_param < 0 { first_param = p; };
-            decl_a[p] = index;
-            index += 1;
-            param = next_sibling(param);
-        };
-        c = next_sibling(c);
-    };
+            let p = declare_named(Decl.ModuleParam, first_child(param), param, decl)
+            if first_param < 0 { first_param = p }
+            decl_a[p] = index
+            index += 1
+            param = next_sibling(param)
+        }
+        c = next_sibling(c)
+    }
     while (c >= 0) {
-        let kind = node_kind[c];
-        let t = declare_type_item(c, decl);
+        let kind = node_kind[c]
+        let t = declare_type_item(c, decl)
         if t >= 0 {
             // `struct T` in `mod m[T]` would hide the type parameter.
-            for (0 ..< index) |k| { if decl_name[first_param + k] == decl_name[t] and decl_name[t] >= 0 { report_twice(t, first_param + k); }; };
-            if names_promoted(c) { decl_a[decl] = t; } else { member_once(decl, t); };
+            for (0 ..< index) |k| { if decl_name[first_param + k] == decl_name[t] and decl_name[t] >= 0 { report_twice(t, first_param + k) } }
+            if names_promoted(c) { decl_a[decl] = t } else { member_once(decl, t) }
             if decl_is(t, Decl.Enum) {
                 for (t + 1 ..< decl_kind.len()) |v| {
-                    if decl_owner[v] == t { add_variant_member(decl, v); };
-                };
-            };
+                    if decl_owner[v] == t { add_variant_member(decl, v) }
+                }
+            }
         } else if kind == Node.Fn_decl.i32() or kind == Node.Op_decl.i32() {
-            member_once(decl, declare_fn(c, decl));
+            member_once(decl, declare_fn(c, decl))
         } else if kind == Node.Global_decl.i32() {
-            member_once(decl, declare_named(Decl.Global, first_child(c), c, decl));
-        };
-        c = next_sibling(c);
-    };
-    decl;
+            member_once(decl, declare_named(Decl.Global, first_child(c), c, decl))
+        }
+        c = next_sibling(c)
+    }
+    decl
 }
 
 /// Whether `d` (what a name is bound to) is a variant, or variants.
 fn is_variant_name(d: I32) Bool {
-    decl_is(d, Decl.Variant) or (decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant));
+    decl_is(d, Decl.Variant) or (decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant))
 }
 
 /// Variant `v`, a member of `module` by its name: a name two of its enums'
 /// variants have is ambiguous (`m.E.V` says which).
 fn add_variant_member(module: I32, v: I32) void {
-    let prior = add_member(module, decl_name[v], Space.Member, v);
-    let p = prior;
-    while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p]; };
+    let prior = add_member(module, decl_name[v], Space.Member, v)
+    let p = prior
+    while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p] }
     if decl_is(p, Decl.Variant) and decl_owner[p] != decl_owner[v] {
-        let both = declare(Decl.Ambiguous, decl_name[v], -1, v);
-        decl_a[both] = prior;
-        member_decl[member_slot(module, decl_name[v] * 4 + Space.Member.i32())] = both;
-    };
+        let both = declare(Decl.Ambiguous, decl_name[v], -1, v)
+        decl_a[both] = prior
+        member_decl[member_slot(module, decl_name[v] * 4 + Space.Member.i32())] = both
+    }
 }
 
 /// `d`, a member of `module`; a second of its name is reported. (A
 /// variant's name is a declaration's: the variant is `m.E.V`.)
 fn member_once(module: I32, d: I32) void {
-    let prior = add_member(module, decl_name[d], Space.Member, d);
+    let prior = add_member(module, decl_name[d], Space.Member, d)
     if is_variant_name(prior) {
-        member_decl[member_slot(module, decl_name[d] * 4 + Space.Member.i32())] = d;
-        return;
-    };
-    if prior >= 0 and prior != d and file_role[file_of_token(node_first[decl_node[d]])] != FileRole.Generated.i32() { report_twice(d, prior); };
+        member_decl[member_slot(module, decl_name[d] * 4 + Space.Member.i32())] = d
+        return
+    }
+    if prior >= 0 and prior != d and file_role[file_of_token(node_first[decl_node[d]])] != FileRole.Generated.i32() { report_twice(d, prior) }
 }
 
 /// A module's type parameters and members, in scope for its body.
 fn bind_module(module: I32) void {
-    let item = decl_node[module];
-    let c = next_sibling(first_child(item));
+    let item = decl_node[module]
+    let c = next_sibling(first_child(item))
     if is_kind(c, Node.Module_type_param_list) {
-        let param = first_child(c);
+        let param = first_child(c)
         while (param >= 0) {
-            let n = name_node(first_child(param));
-            bind(word_of(n), node_decl[n]);
-            param = next_sibling(param);
-        };
-    };
-    bind_module_members(module);
+            let n = name_node(first_child(param))
+            bind(word_of(n), node_decl[n])
+            param = next_sibling(param)
+        }
+    }
+    bind_module_members(module)
 }
 
 /// A module's members (and the variants of its enums), by their names. Its
 /// promoted type is not bound: its name stays the module's, which stands
 /// for it as a type.
 fn bind_module_members(module: I32) void {
-    let since = scope_mark();
+    let since = scope_mark()
     // In declaration order: each declaration's id follows the module's.
-    let d = module + 1;
+    let d = module + 1
     while (d < decl_kind.len() and is_part_of(d, module)) {
         if decl_owner[d] == module and decl_kind[d] != Decl.ModuleParam.i32() and decl_name[d] >= 0 and d != decl_a[module] {
-            if decl_kind[d] != Decl.Fn.i32() or free_fn_word(decl_node[d]) >= 0 { bind(decl_name[d], d); };
+            if decl_kind[d] != Decl.Fn.i32() or free_fn_word(decl_node[d]) >= 0 { bind(decl_name[d], d) }
         } else if decl_is(d, Decl.Variant) and decl_is(decl_owner[d], Decl.Enum) {
-            bind_variant(d, since);
-        };
-        d += 1;
-    };
+            bind_variant(d, since)
+        }
+        d += 1
+    }
 }
 
 /// Whether `decl` is inside `module` (at any depth).
 fn is_part_of(decl: I32, module: I32) Bool {
-    let o = decl_owner[decl];
-    while (o >= 0 and o != module) { o = decl_owner[o]; };
-    o == module;
+    let o = decl_owner[decl]
+    while (o >= 0 and o != module) { o = decl_owner[o] }
+    o == module
 }
 
 /// A `using … |Alias|` declares the alias. `using M;` and `using M[A];`
@@ -871,158 +871,158 @@ fn is_part_of(decl: I32, module: I32) Bool {
 /// ambiguous.
 fn declare_alias(item: I32, since: I32) void {
     if has_alias(item) {
-        let c = first_child(item);
-        while (not is_kind(c, Node.Captured_module_name)) { c = next_sibling(c); };
-        declare_in_scope(Decl.Alias, c, item, -1);
-        return;
-    };
-    if using_path(item) >= 0 { return; };
-    let module = lookup(name_word(first_child(item)));
-    if not decl_is(module, Decl.Module) { return; };
-    let opens = is_kind(next_sibling(first_child(item)), Node.Module_type_arg_list);
-    if opens or not is_kind(next_sibling(first_child(decl_node[module])), Node.Module_type_param_list) { open_module(module, since); };
+        let c = first_child(item)
+        while (not is_kind(c, Node.Captured_module_name)) { c = next_sibling(c) }
+        declare_in_scope(Decl.Alias, c, item, -1)
+        return
+    }
+    if using_path(item) >= 0 { return }
+    let module = lookup(name_word(first_child(item)))
+    if not decl_is(module, Decl.Module) { return }
+    let opens = is_kind(next_sibling(first_child(item)), Node.Module_type_arg_list)
+    if opens or not is_kind(next_sibling(first_child(decl_node[module])), Node.Module_type_param_list) { open_module(module, since) }
 }
 
 /// Whether a `using` names an alias (`|A|`).
 fn has_alias(item: I32) Bool {
-    let c = first_child(item);
+    let c = first_child(item)
     while (c >= 0) {
-        if is_kind(c, Node.Captured_module_name) { return true; };
-        c = next_sibling(c);
-    };
-    false;
+        if is_kind(c, Node.Captured_module_name) { return true }
+        c = next_sibling(c)
+    }
+    false
 }
 
 /// The path a `using … from` imports (a string or platform path), or -1.
 fn using_path(item: I32) I32 {
-    let path = last_child(item);
-    if is_kind(path, Node.String_lit) or is_kind(path, Node.Platform_path) { path; } else { -1; };
+    let path = last_child(item)
+    if is_kind(path, Node.String_lit) or is_kind(path, Node.Platform_path) { path } else { -1 }
 }
 
 /// A module's members, opened. Where one hides a member another module
 /// opened since `since`, the name is ambiguous.
 fn open_module(module: I32, since: I32) void {
-    let mark = scope_mark();
-    bind_module_members(module);
+    let mark = scope_mark()
+    bind_module_members(module)
     for (mark ..< scope_mark()) |b| {
-        let prior = bind_prev[b];
+        let prior = bind_prev[b]
         if prior >= since and prior < mark and not decl_is(bind_decl[prior], Decl.Alias) and opened_from(bind_decl[prior]) != module {
-            let both = declare(Decl.Ambiguous, bind_word[b], -1, bind_decl[b]);
-            decl_a[both] = bind_decl[prior];
-            bind_decl[b] = both;
-        };
-    };
+            let both = declare(Decl.Ambiguous, bind_word[b], -1, bind_decl[b])
+            decl_a[both] = bind_decl[prior]
+            bind_decl[b] = both
+        }
+    }
 }
 
 /// The module an opened name is a member of (through ambiguity, the first's).
 fn opened_from(decl: I32) I32 {
-    let d = decl;
-    while (decl_is(d, Decl.Ambiguous)) { d = decl_a[d]; };
-    while (d >= 0 and not decl_is(d, Decl.Module)) { d = decl_owner[d]; };
-    d;
+    let d = decl
+    while (decl_is(d, Decl.Ambiguous)) { d = decl_a[d] }
+    while (d >= 0 and not decl_is(d, Decl.Module)) { d = decl_owner[d] }
+    d
 }
 
 /// Whether `decl` (what a name looked up) is ambiguous, which is reported at `node`.
 fn ambiguous(decl: I32, node: I32) Bool {
-    if not decl_is(decl, Decl.Ambiguous) { return false; };
-    let a = decl_a[decl];
-    while (decl_is(a, Decl.Ambiguous)) { a = decl_a[a]; };
+    if not decl_is(decl, Decl.Ambiguous) { return false }
+    let a = decl_a[decl]
+    while (decl_is(a, Decl.Ambiguous)) { a = decl_a[a] }
     if decl_is(a, Decl.Variant) and decl_is(decl_owner[decl], Decl.Variant) {
-        report2(Diag.AmbiguousVariant, node, decl_name[decl], decl_owner[a], decl_owner[decl_owner[decl]]);
-    } else { report2(Diag.AmbiguousName, node, decl_name[decl], a, decl_owner[decl]); };
-    true;
+        report2(Diag.AmbiguousVariant, node, decl_name[decl], decl_owner[a], decl_owner[decl_owner[decl]])
+    } else { report2(Diag.AmbiguousName, node, decl_name[decl], a, decl_owner[decl]) }
+    true
 }
 
 /// The module an import names, in the file it imports, recorded on its name.
 fn bind_import(i: I32) void {
-    let n = name_node(first_child(import_node[i]));
-    let file = import_target[i];
-    if n < 0 or file < 0 or file_root[file] < 0 { return; };
-    let item = first_child(file_root[file]);
+    let n = name_node(first_child(import_node[i]))
+    let file = import_target[i]
+    if n < 0 or file < 0 or file_root[file] < 0 { return }
+    let item = first_child(file_root[file])
     while (item >= 0) {
         if is_kind(item, Node.Module_decl) and name_word(first_child(item)) == word_of(n) {
-            node_decl[n] = node_decl[name_node(first_child(item))];
-            return;
-        };
-        item = next_sibling(item);
-    };
+            node_decl[n] = node_decl[name_node(first_child(item))]
+            return
+        }
+        item = next_sibling(item)
+    }
 }
 
 /// The node kind of the top-level item named `word` that the file `using`
 /// `item` imports declares, when it is not a mod; else -1.
 fn imported_item_kind(item: I32, word: I32) I32 {
     for (0 ..< import_node.len()) |i| {
-        let file = import_target[i];
+        let file = import_target[i]
         if import_node[i] == item and file >= 0 and file_root[file] >= 0 {
-            let c = first_child(file_root[file]);
+            let c = first_child(file_root[file])
             while (c >= 0) {
-                if not is_kind(c, Node.Module_decl) and not is_kind(c, Node.Using_decl) and item_name_node(c) >= 0 and word_of(item_name_node(c)) == word { return node_kind[c]; };
-                c = next_sibling(c);
-            };
-        };
-    };
-    -1;
+                if not is_kind(c, Node.Module_decl) and not is_kind(c, Node.Using_decl) and item_name_node(c) >= 0 and word_of(item_name_node(c)) == word { return node_kind[c] }
+                c = next_sibling(c)
+            }
+        }
+    }
+    -1
 }
 
 /// The mods the file `using` `item` imports declares: "'a', 'b'", or "no modules".
 fn imported_modules_text(item: I32) Str {
-    let out = "";
+    let out = ""
     for (0 ..< import_node.len()) |i| {
-        let file = import_target[i];
+        let file = import_target[i]
         if import_node[i] == item and file >= 0 and file_root[file] >= 0 {
-            let c = first_child(file_root[file]);
+            let c = first_child(file_root[file])
             while (c >= 0) {
-                if is_kind(c, Node.Module_decl) { out = out + pick(out.len() == 0, "'", ", '") + word_text(name_word(first_child(c))) + "'"; };
-                c = next_sibling(c);
-            };
-        };
-    };
-    if out.len() == 0 { "no modules"; } else { out; };
+                if is_kind(c, Node.Module_decl) { out = out + pick(out.len() == 0, "'", ", '") + word_text(name_word(first_child(c))) + "'" }
+                c = next_sibling(c)
+            }
+        }
+    }
+    if out.len() == 0 { "no modules" } else { out }
 }
 
 /// A declaration of a file named like a module of the prelude, reported at
 /// its name: the compiler's own `Str` or `Array` is the prelude's.
 fn standard_name(decl: I32, name_at: I32) void {
-    if decl_name[decl] >= 0 and prelude_lookup(decl_name[decl]) >= 0 { report(Diag.StandardName, name_at, decl_name[decl]); };
+    if decl_name[decl] >= 0 and prelude_lookup(decl_name[decl]) >= 0 { report(Diag.StandardName, name_at, decl_name[decl]) }
 }
 
 /// The node naming a top-level item, or -1.
 fn item_name_node(item: I32) I32 {
-    let kind = node_kind[item];
-    if kind == Node.Struct_decl.i32() { return name_node(after_qualifier(item)); };
-    if kind == Node.Enum_decl.i32() { return name_node(enum_name(item)); };
-    if kind == Node.Fn_decl.i32() { return last_child(first_child(item)); };
-    if kind == Node.Op_decl.i32() { return -1; };
-    name_node(first_child(item));
+    let kind = node_kind[item]
+    if kind == Node.Struct_decl.i32() { return name_node(after_qualifier(item)) }
+    if kind == Node.Enum_decl.i32() { return name_node(enum_name(item)) }
+    if kind == Node.Fn_decl.i32() { return last_child(first_child(item)) }
+    if kind == Node.Op_decl.i32() { return -1 }
+    name_node(first_child(item))
 }
 
 /// Lazy modules (`using … lazy from`), and each one's path as written (with its quotes).
-vec lazy_module: I32;
-vec lazy_path: I32;
+vec lazy_module: I32
+vec lazy_path: I32
 
 /// Whether imports i and j name one path, as written.
 fn same_path(i: I32, j: I32) Bool {
-    let a = tok_start[node_first[import_path[i]]];
-    let b = tok_start[node_first[import_path[j]]];
-    let n = tok_end[node_last[import_path[i]] - 1] - a;
-    if tok_end[node_last[import_path[j]] - 1] - b != n { return false; };
-    for (0 ..< n) |k| { if src[a + k] != src[b + k] { return false; }; };
-    true;
+    let a = tok_start[node_first[import_path[i]]]
+    let b = tok_start[node_first[import_path[j]]]
+    let n = tok_end[node_last[import_path[i]] - 1] - a
+    if tok_end[node_last[import_path[j]] - 1] - b != n { return false }
+    for (0 ..< n) |k| { if src[a + k] != src[b + k] { return false } }
+    true
 }
 
 /// Whether a `using` says `lazy`.
 fn using_is_lazy(node: I32) Bool {
     for (node_first[node] ..< node_last[node]) |t| {
-        let n = tok_end[t] - tok_start[t];
-        if n == 4 and src[tok_start[t]] == 108 and src[tok_start[t] + 1] == 97 and src[tok_start[t] + 2] == 122 and src[tok_start[t] + 3] == 121 { return true; };
-    };
-    false;
+        let n = tok_end[t] - tok_start[t]
+        if n == 4 and src[tok_start[t]] == 108 and src[tok_start[t] + 1] == 97 and src[tok_start[t] + 2] == 122 and src[tok_start[t] + 3] == 121 { return true }
+    }
+    false
 }
 
 /// The lazy module m's index in lazy_module, or -1.
 fn lazy_index(m: I32) I32 {
-    for (0 ..< lazy_module.len()) |k| { if lazy_module[k] == m { return k; }; };
-    -1;
+    for (0 ..< lazy_module.len()) |k| { if lazy_module[k] == m { return k } }
+    -1
 }
 
 /// Every declaration of the program: each file's modules (the prelude's
@@ -1032,86 +1032,86 @@ fn declare_program() void {
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry]) |role| {
         for (0 ..< file_root.len()) |file| {
             if file_role[file] == role.i32() and file_root[file] >= 0 {
-                let item = first_child(file_root[file]);
+                let item = first_child(file_root[file])
                 while (item >= 0) {
                     if is_kind(item, Node.Module_decl) {
-                        let m = declare_module(item);
-                        if role == FileRole.Prelude { bind(decl_name[m], m); };
-                    };
-                    item = next_sibling(item);
-                };
-            };
-        };
-    };
-    prelude_binds[0] = scope_mark();
-    for (0 ..< import_file.len()) |i| { bind_import(i); };
+                        let m = declare_module(item)
+                        if role == FileRole.Prelude { bind(decl_name[m], m) }
+                    }
+                    item = next_sibling(item)
+                }
+            }
+        }
+    }
+    prelude_binds[0] = scope_mark()
+    for (0 ..< import_file.len()) |i| { bind_import(i) }
     // `using tour lazy from "./tour.utu"`: the modules that file declares are
     // lazy; their functions the program calls are stubs (see lazy_stub).
-    lazy_module.clear();
-    lazy_path.clear();
+    lazy_module.clear()
+    lazy_path.clear()
     for (0 ..< import_file.len()) |i| {
         if import_target[i] >= 0 and using_is_lazy(import_node[i]) {
-            let written = intern_text(bytes_text(tok_start[node_first[import_path[i]]], tok_end[node_last[import_path[i]] - 1]));
+            let written = intern_text(bytes_text(tok_start[node_first[import_path[i]]], tok_end[node_last[import_path[i]] - 1]))
             for (0 ..< decl_kind.len()) |m| {
                 if decl_is(m, Decl.Module) and decl_node[m] >= 0 and file_of_token(node_first[decl_node[m]]) == import_target[i] and lazy_index(m) < 0 {
-                    lazy_module.push(m);
-                    lazy_path.push(written);
-                };
-            };
-        };
-    };
+                    lazy_module.push(m)
+                    lazy_path.push(written)
+                }
+            }
+        }
+    }
     // Modules of host declarations (`using JS from std:JS`): the module the
     // using names, with members the compiler does not know yet.
     for (0 ..< import_file.len()) |i| {
         if import_target[i] == -2 {
-            let m = declare_named(Decl.Foreign, first_child(import_node[i]), import_node[i], -1);
-            decl_a[m] = view_of_import(i);
+            let m = declare_named(Decl.Foreign, first_child(import_node[i]), import_node[i], -1)
+            decl_a[m] = view_of_import(i)
             // Files that import one module share its view, bound to one of them.
             for (0 ..< import_file.len()) |j| {
-                if decl_a[m] < 0 and import_target[j] == -2 and same_path(i, j) { decl_a[m] = view_of_import(j); };
-            };
-            let path = import_path[i];
+                if decl_a[m] < 0 and import_target[j] == -2 and same_path(i, j) { decl_a[m] = view_of_import(j) }
+            }
+            let path = import_path[i]
             // (`"npm:x"` without its quotes; `node:x` as written.)
-            let text = node_text(path);
-            if text.starts_with(Str.from_code_point(34)) { text = text.slice(1, text.len() - 1); };
+            let text = node_text(path)
+            if text.starts_with(Str.from_code_point(34)) { text = text.slice(1, text.len() - 1) }
             // `"node:fss"`: no module of Node's, whatever the host found.
-            let node_name = if text.starts_with("node:") { text.slice(5, text.len()); } else { ""; };
+            let node_name = if text.starts_with("node:") { text.slice(5, text.len()) } else { "" }
             if node_name.len() > 0 and not in_words(node_modules(), node_name) {
-                decl_a[m] = -1;
-                report2(Diag.HostMissing, path, intern_text(text), 1, -1);
-                let near = near_in_words(intern_text(node_name), node_modules());
+                decl_a[m] = -1
+                report2(Diag.HostMissing, path, intern_text(text), 1, -1)
+                let near = near_in_words(intern_text(node_name), node_modules())
                 // (Inside the quotes: the fix's text is the name's.)
-                let e = tok_end[node_last[path] - 1] - (node_text(path).len() - text.len()) / 2;
-                if near >= 0 { diag_fix(e - text.len(), e, "node:" + word_text(near), "Use node:" + word_text(near)); };
+                let e = tok_end[node_last[path] - 1] - (node_text(path).len() - text.len()) / 2
+                if near >= 0 { diag_fix(e - text.len(), e, "node:" + word_text(near), "Use node:" + word_text(near)) }
             } else if decl_a[m] < 0 {
                 // The host found none (an npm package not installed).
-                report(Diag.HostMissing, path, intern_text(text));
-                if node_name.len() > 0 { diag_note("node: modules' declarations come from @types/node in node_modules"); };
-            };
-        };
-    };
-    scope_word.clear();
-    scope_decl.clear();
-    refused_module.clear();
-    file_scope.resize(file_root.len());
-    file_scope_end.resize(file_root.len());
+                report(Diag.HostMissing, path, intern_text(text))
+                if node_name.len() > 0 { diag_note("node: modules' declarations come from @types/node in node_modules") }
+            }
+        }
+    }
+    scope_word.clear()
+    scope_decl.clear()
+    refused_module.clear()
+    file_scope.resize(file_root.len())
+    file_scope_end.resize(file_root.len())
     for (0 ..< file_root.len()) |file| {
-        file_scope[file] = -1;
-        file_scope_end[file] = -1;
-        let role = file_role[file];
+        file_scope[file] = -1
+        file_scope_end[file] = -1
+        let role = file_role[file]
         if (role == FileRole.Entry.i32() or role == FileRole.Import.i32()) and file_root[file] >= 0 {
-            let mark = scope_mark();
-            declare_file_scope(file);
-            file_scope[file] = scope_word.len();
+            let mark = scope_mark()
+            declare_file_scope(file)
+            file_scope[file] = scope_word.len()
             for (mark ..< scope_mark()) |b| {
-                scope_word.push(bind_word[b]);
-                scope_decl.push(bind_decl[b]);
-            };
-            file_scope_end[file] = scope_word.len();
-            scope_pop(mark);
-        };
-    };
-    bind_json_pins();
+                scope_word.push(bind_word[b])
+                scope_decl.push(bind_decl[b])
+            }
+            file_scope_end[file] = scope_word.len()
+            scope_pop(mark)
+        }
+    }
+    bind_json_pins()
 }
 
 /// A file's scope, declared and bound: its modules, the modules it imports
@@ -1119,337 +1119,337 @@ fn declare_program() void {
 /// modules, then its own declarations (the entry file's, with those of its
 /// generated files), each hiding what came before.
 fn declare_file_scope(file: I32) void {
-    let root = file_root[file];
-    let item = first_child(root);
+    let root = file_root[file]
+    let item = first_child(root)
     while (item >= 0) {
         if is_kind(item, Node.Module_decl) {
-            let n = name_node(first_child(item));
-            let m = node_decl[n];
-            standard_name(m, n);
-            bind(decl_name[m], m);
-        };
-        item = next_sibling(item);
-    };
+            let n = name_node(first_child(item))
+            let m = node_decl[n]
+            standard_name(m, n)
+            bind(decl_name[m], m)
+        }
+        item = next_sibling(item)
+    }
     for (0 ..< import_file.len()) |i| {
         if import_file[i] == file {
-            let n = name_node(first_child(import_node[i]));
-            let m = node_decl[n];
+            let n = name_node(first_child(import_node[i]))
+            let m = node_decl[n]
             // Host declarations are in scope under their name, aliased or not.
-            if m >= 0 and (decl_is(m, Decl.Foreign) or not has_alias(import_node[i])) { bind(word_of(n), m); };
-        };
-    };
-    let since = scope_mark();
-    item = first_child(root);
+            if m >= 0 and (decl_is(m, Decl.Foreign) or not has_alias(import_node[i])) { bind(word_of(n), m) }
+        }
+    }
+    let since = scope_mark()
+    item = first_child(root)
     while (item >= 0) {
-        if is_kind(item, Node.Using_decl) { declare_alias(item, since); };
-        item = next_sibling(item);
-    };
-    let entry = file_role[file] == FileRole.Entry.i32();
-    items_since[0] = scope_mark();
+        if is_kind(item, Node.Using_decl) { declare_alias(item, since) }
+        item = next_sibling(item)
+    }
+    let entry = file_role[file] == FileRole.Entry.i32()
+    items_since[0] = scope_mark()
     for (file ..< file_root.len()) |f| {
-        let owner = if entry { -1; } else { file; };
-        let generated = file_role[f] == FileRole.Generated.i32() and gen_owner_of(f) == owner;
+        let owner = if entry { -1 } else { file }
+        let generated = file_role[f] == FileRole.Generated.i32() and gen_owner_of(f) == owner
         if (f == file or generated) and file_root[f] >= 0 {
-            let first_entry = decl_kind.len();
-            item = first_child(file_root[f]);
+            let first_entry = decl_kind.len()
+            item = first_child(file_root[f])
             while (item >= 0) {
-                if declares_item(f, item) { declare_entry_item(item, first_entry); };
-                item = next_sibling(item);
-            };
-        };
-    };
-    check_using_names(root);
-    if entry { check_entry_surface(root); };
+                if declares_item(f, item) { declare_entry_item(item, first_entry) }
+                item = next_sibling(item)
+            }
+        }
+    }
+    check_using_names(root)
+    if entry { check_entry_surface(root) }
 }
 
 /// Modules a `using` named twice imports again (see @check_using_names).
-vec refused_module: I32;
+vec refused_module: I32
 
 fn refused(m: I32) Bool {
-    for (0 ..< refused_module.len()) |k| { if refused_module[k] == m { return true; }; };
-    false;
+    for (0 ..< refused_module.len()) |k| { if refused_module[k] == m { return true } }
+    false
 }
 
 /// The names a file's top-level items declare, in order (see @check_using_names),
 /// and by each, the next of the same word and the next of the same word
 /// that is a `using` or `mod` (-1 none).
-vec top_name: I32;
-vec top_item: I32;
-vec top_same: I32;
-vec top_same_module: I32;
+vec top_name: I32
+vec top_item: I32
+vec top_same: I32
+vec top_same_module: I32
 
 /// A `using`'s or `mod`'s name is the file's: one that names what a
 /// declaration of the file (or another `using`) names is reported at the
 /// later one. Two
 /// `using`s of one module (one file, two spellings) are not.
 fn check_using_names(root: I32) void {
-    top_name.clear();
-    top_item.clear();
-    let item = first_child(root);
+    top_name.clear()
+    top_item.clear()
+    let item = first_child(root)
     while (item >= 0) {
         if is_kind(item, Node.Export_lib_decl) {
-            let f = first_child(item);
-            while (f >= 0) { add_top_name(f, f); f = next_sibling(f); };
-        } else { add_top_name(item, item); };
-        item = next_sibling(item);
-    };
+            let f = first_child(item)
+            while (f >= 0) { add_top_name(f, f); f = next_sibling(f) }
+        } else { add_top_name(item, item) }
+        item = next_sibling(item)
+    }
     // Each word's names chained in order, and its `using`s and `mod`s (their
     // first and last noted by word): two names clash only when one is either.
-    top_same.resize(top_name.len());
-    top_same_module.resize(top_name.len());
+    top_same.resize(top_name.len())
+    top_same_module.resize(top_name.len())
     for (0 ..< top_name.len()) |j| {
-        let word = word_of(top_name[j]);
-        top_same[j] = -1;
-        top_same_module[j] = -1;
-        if word_note(word, 0) < 0 { set_word_note(word, 0, j); } else { top_same[word_note(word, 1)] = j; };
-        set_word_note(word, 1, j);
+        let word = word_of(top_name[j])
+        top_same[j] = -1
+        top_same_module[j] = -1
+        if word_note(word, 0) < 0 { set_word_note(word, 0, j) } else { top_same[word_note(word, 1)] = j }
+        set_word_note(word, 1, j)
         if is_module_item(top_item[j]) {
-            if word_note(word, 2) < 0 { set_word_note(word, 2, j); } else { top_same_module[word_note(word, 3)] = j; };
-            set_word_note(word, 3, j);
-        };
-    };
+            if word_note(word, 2) < 0 { set_word_note(word, 2, j) } else { top_same_module[word_note(word, 3)] = j }
+            set_word_note(word, 3, j)
+        }
+    }
     for (1 ..< top_name.len()) |j| {
-        let word = word_of(top_name[j]);
-        let all = is_module_item(top_item[j]);
-        let k = word_note(word, if all { 0; } else { 2; });
+        let word = word_of(top_name[j])
+        let all = is_module_item(top_item[j])
+        let k = word_note(word, if all { 0 } else { 2 })
         while (k >= 0 and k < j) {
-            let a = top_item[k];
-            let b = top_item[j];
+            let a = top_item[k]
+            let b = top_item[j]
             if word_of(top_name[k]) == word and (is_kind(a, Node.Using_decl) or is_kind(b, Node.Using_decl) or mod_clash(a, b) or mod_clash(b, a)) and not same_import(a, b) {
-                report(Diag.DuplicateDeclaration, b, word);
-                if top_name[j] != b { diag_focus(node_first[top_name[j]], node_last[top_name[j]] - 1, "again"); };
-                diag_place(Extra.Related, top_name[k], "first here");
+                report(Diag.DuplicateDeclaration, b, word)
+                if top_name[j] != b { diag_focus(node_first[top_name[j]], node_last[top_name[j]] - 1, "again") }
+                diag_place(Extra.Related, top_name[k], "first here")
                 // The file's own mod is the name's (no cascade through the import).
-                if is_kind(a, Node.Module_decl) { bind(word, node_decl[top_name[k]]); }
-                else if is_kind(b, Node.Module_decl) { bind(word, node_decl[top_name[j]]); };
+                if is_kind(a, Node.Module_decl) { bind(word, node_decl[top_name[k]]) }
+                else if is_kind(b, Node.Module_decl) { bind(word, node_decl[top_name[j]]) }
                 // The later import's mod is refused, not compared with the earlier's.
-                if is_kind(b, Node.Using_decl) and using_path(b) >= 0 and node_decl[name_node(first_child(b))] >= 0 { refused_module.push(node_decl[name_node(first_child(b))]); };
-                k = j;
+                if is_kind(b, Node.Using_decl) and using_path(b) >= 0 and node_decl[name_node(first_child(b))] >= 0 { refused_module.push(node_decl[name_node(first_child(b))]) }
+                k = j
             } else {
-                k = if all { top_same[k]; } else { top_same_module[k]; };
-            };
-        };
-    };
+                k = if all { top_same[k] } else { top_same_module[k] }
+            }
+        }
+    }
     for (0 ..< top_name.len()) |j| {
-        for (0 ..< 4) |slot| { set_word_note(word_of(top_name[j]), slot, -1); };
-    };
+        for (0 ..< 4) |slot| { set_word_note(word_of(top_name[j]), slot, -1) }
+    }
 }
 
 /// A `using` or a `mod`.
-fn is_module_item(item: I32) Bool { is_kind(item, Node.Using_decl) or is_kind(item, Node.Module_decl); }
+fn is_module_item(item: I32) Bool { is_kind(item, Node.Using_decl) or is_kind(item, Node.Module_decl) }
 
 /// Whether a file's `mod` and another of its items (not a method) share a name.
 fn mod_clash(m: I32, item: I32) Bool {
     is_kind(m, Node.Module_decl) and not is_kind(item, Node.Module_decl) and not is_kind(item, Node.Using_decl)
-        and (not is_kind(item, Node.Fn_decl) or free_fn_word(item) >= 0);
+        and (not is_kind(item, Node.Fn_decl) or free_fn_word(item) >= 0)
 }
 
 /// `item`'s name node, kept when it has one (a `using`'s: its alias, or the
 /// module a file import names).
 fn add_top_name(item: I32, at: I32) void {
-    let n = -1;
+    let n = -1
     if is_kind(item, Node.Using_decl) {
         if has_alias(item) {
-            let c = first_child(item);
-            while (not is_kind(c, Node.Captured_module_name)) { c = next_sibling(c); };
-            n = name_node(c);
-        } else if using_path(item) >= 0 { n = name_node(first_child(item)); };
-    } else if is_kind(item, Node.Module_decl) { n = name_node(first_child(item));
-    } else if names_in_file(item) { n = item_name_node(item);
-    };
+            let c = first_child(item)
+            while (not is_kind(c, Node.Captured_module_name)) { c = next_sibling(c) }
+            n = name_node(c)
+        } else if using_path(item) >= 0 { n = name_node(first_child(item)) }
+    } else if is_kind(item, Node.Module_decl) { n = name_node(first_child(item))
+    } else if names_in_file(item) { n = item_name_node(item)
+    }
     if n >= 0 and word_of(n) >= 0 {
-        top_name.push(n);
-        top_item.push(at);
-    };
+        top_name.push(n)
+        top_item.push(at)
+    }
 }
 
 /// Whether two `using`s import one module: one path, or two that reach one mod.
 fn same_import(a: I32, b: I32) Bool {
-    if not is_kind(a, Node.Using_decl) or not is_kind(b, Node.Using_decl) or using_path(a) < 0 or using_path(b) < 0 { return false; };
-    if is_kind(next_sibling(first_child(a)), Node.Module_type_arg_list) or is_kind(next_sibling(first_child(b)), Node.Module_type_arg_list) { return false; };
-    if node_text(using_path(a)) == node_text(using_path(b)) { return true; };
-    let m = node_decl[name_node(first_child(a))];
-    m >= 0 and not decl_is(m, Decl.Foreign) and m == node_decl[name_node(first_child(b))];
+    if not is_kind(a, Node.Using_decl) or not is_kind(b, Node.Using_decl) or using_path(a) < 0 or using_path(b) < 0 { return false }
+    if is_kind(next_sibling(first_child(a)), Node.Module_type_arg_list) or is_kind(next_sibling(first_child(b)), Node.Module_type_arg_list) { return false }
+    if node_text(using_path(a)) == node_text(using_path(b)) { return true }
+    let m = node_decl[name_node(first_child(a))]
+    m >= 0 and not decl_is(m, Decl.Foreign) and m == node_decl[name_node(first_child(b))]
 }
 
 /// Whether an item is a type, function, global, or mem.
 fn names_in_file(item: I32) Bool {
-    let k = node_kind[item];
+    let k = node_kind[item]
     k == Node.Fn_decl.i32() or k == Node.Struct_decl.i32() or k == Node.Enum_decl.i32() or k == Node.Proto_decl.i32()
-        or k == Node.Type_decl.i32() or k == Node.Distinct_decl.i32() or k == Node.Global_decl.i32() or k == Node.Mem_decl.i32();
+        or k == Node.Type_decl.i32() or k == Node.Distinct_decl.i32() or k == Node.Global_decl.i32() or k == Node.Mem_decl.i32()
 }
 
 /// Whether a top-level item declares something in its file's scope: any of
 /// the entry file's (and its generated files'); an imported file's types,
 /// functions, globals, and mems.
 fn declares_item(file: I32, item: I32) Bool {
-    let role = file_role[file];
-    if role == FileRole.Entry.i32() or role == FileRole.Generated.i32() { return true; };
-    if role != FileRole.Import.i32() { return false; };
-    names_in_file(item) or is_kind(item, Node.Op_decl);
+    let role = file_role[file]
+    if role == FileRole.Entry.i32() or role == FileRole.Generated.i32() { return true }
+    if role != FileRole.Import.i32() { return false }
+    names_in_file(item) or is_kind(item, Node.Op_decl)
 }
 
 /// The entry file, or -1.
 fn entry_file() I32 {
-    for (0 ..< file_role.len()) |f| { if file_role[f] == FileRole.Entry.i32() { return f; }; };
-    -1;
+    for (0 ..< file_role.len()) |f| { if file_role[f] == FileRole.Entry.i32() { return f } }
+    -1
 }
 
 /// A program has one `export lib` or one `export main`, not both.
 fn check_entry_surface(root: I32) void {
-    let lib = -1;
-    let main = -1;
-    let item = first_child(root);
+    let lib = -1
+    let main = -1
+    let item = first_child(root)
     while (item >= 0) {
         if is_kind(item, Node.Export_lib_decl) {
-            if lib >= 0 { report2(Diag.EntrySurface, lib, -1, 0, -1); return; };
-            lib = item;
+            if lib >= 0 { report2(Diag.EntrySurface, lib, -1, 0, -1); return }
+            lib = item
         } else if is_kind(item, Node.Export_main_decl) {
-            if main >= 0 { report2(Diag.EntrySurface, main, -1, 1, -1); return; };
-            main = item;
-        };
-        item = next_sibling(item);
-    };
-    if lib >= 0 and main >= 0 { report2(Diag.EntrySurface, lib, -1, 2, -1); };
-    check_test_names(root);
+            if main >= 0 { report2(Diag.EntrySurface, main, -1, 1, -1); return }
+            main = item
+        }
+        item = next_sibling(item)
+    }
+    if lib >= 0 and main >= 0 { report2(Diag.EntrySurface, lib, -1, 2, -1) }
+    check_test_names(root)
 }
 
 /// Each test and bench has a name, and no two tests (or benches) the same
 /// one as `utu test` shows it (`geo: name` for one in mod geo).
 fn check_test_names(root: I32) void {
-    for ([Node.Test_decl, Node.Bench_decl]) |kind| { check_test_names_in(root, kind, -1, word_stamp()); };
+    for ([Node.Test_decl, Node.Bench_decl]) |kind| { check_test_names_in(root, kind, -1, word_stamp()) }
 }
 
 /// The tests (or benches) of a file or mod (`module`, its name node, or -1).
 fn check_test_names_in(root: I32, kind: Node, module: I32, stamp: I32) void {
     // (TestName's argument: 0 a duplicate, 1 empty; 2 and 3 a bench's.)
-    let bench = if kind == Node.Bench_decl { 2; } else { 0; };
-    let item = first_child(root);
+    let bench = if kind == Node.Bench_decl { 2 } else { 0 }
+    let item = first_child(root)
     while (item >= 0) {
-        let name = first_child(item);
+        let name = first_child(item)
         if is_kind(item, kind) and is_kind(name, Node.String_lit) {
-            let start = tok_start[node_first[name]];
-            let end_ = tok_end[node_last[name] - 1];
-            lit_bytes.clear();
-            if end_ - start <= 2 { report2(Diag.TestName, name, -1, 1 + bench, -1); }
-            else if not decode_string(start + 1, end_ - 1) { report_bad_literal(name); }
+            let start = tok_start[node_first[name]]
+            let end_ = tok_end[node_last[name] - 1]
+            lit_bytes.clear()
+            if end_ - start <= 2 { report2(Diag.TestName, name, -1, 1 + bench, -1) }
+            else if not decode_string(start + 1, end_ - 1) { report_bad_literal(name) }
             else {
-                let shown = shown_test_name(module);
-                if word_seen(shown, stamp) { report2(Diag.TestName, name, shown, bench, -1); };
-            };
-        };
-        if is_kind(item, Node.Module_decl) { check_test_names_in(item, kind, name_node(first_child(item)), stamp); };
-        item = next_sibling(item);
-    };
+                let shown = shown_test_name(module)
+                if word_seen(shown, stamp) { report2(Diag.TestName, name, shown, bench, -1) }
+            }
+        }
+        if is_kind(item, Node.Module_decl) { check_test_names_in(item, kind, name_node(first_child(item)), stamp) }
+        item = next_sibling(item)
+    }
 }
 
 /// The name `lit_bytes` holds as a test of mod `module` (or -1) shows: interned.
 fn shown_test_name(module: I32) I32 {
-    let start = src.len();
-    let before = src.interned();
+    let start = src.len()
+    let before = src.interned()
     // `geo: `, then the name.
-    let n = if module >= 0 { tok_end[node_first[module]] - tok_start[node_first[module]]; } else { 0; };
-    let j = if module >= 0 { start + n + 2; } else { start; };
-    src.resize(j + lit_bytes.len());
+    let n = if module >= 0 { tok_end[node_first[module]] - tok_start[node_first[module]] } else { 0 }
+    let j = if module >= 0 { start + n + 2 } else { start }
+    src.resize(j + lit_bytes.len())
     if module >= 0 {
-        for (0 ..< n) |i| { src[start + i] = src[tok_start[node_first[module]] + i]; };
-        src[start + n] = 58;
-        src[start + n + 1] = 32;
-    };
-    for (0 ..< lit_bytes.len()) |i| { src[j + i] = lit_bytes[i]; };
-    let id = src.intern(start, src.len());
+        for (0 ..< n) |i| { src[start + i] = src[tok_start[node_first[module]] + i] }
+        src[start + n] = 58
+        src[start + n + 1] = 32
+    }
+    for (0 ..< lit_bytes.len()) |i| { src[j + i] = lit_bytes[i] }
+    let id = src.intern(start, src.len())
     // Already interned: its bytes are elsewhere.
-    if id < before { src.resize(start); };
-    id;
+    if id < before { src.resize(start) }
+    id
 }
 
 fn declare_entry_item(item: I32, first_entry: I32) void {
-    let kind = node_kind[item];
-    let decl = declare_type_item(item, -1);
+    let kind = node_kind[item]
+    let decl = declare_type_item(item, -1)
     if decl < 0 {
         if kind == Node.Fn_decl.i32() or kind == Node.Op_decl.i32() {
-            decl = declare_fn(item, -1);
+            decl = declare_fn(item, -1)
         } else if kind == Node.Global_decl.i32() {
-            decl = declare_named(Decl.Global, first_child(item), item, -1);
+            decl = declare_named(Decl.Global, first_child(item), item, -1)
         } else if kind == Node.Mem_decl.i32() {
-            decl = declare_named(Decl.Mem, first_child(item), item, -1);
+            decl = declare_named(Decl.Mem, first_child(item), item, -1)
         } else if kind == Node.Export_lib_decl.i32() {
-            let f = first_child(item);
+            let f = first_child(item)
             while (f >= 0) {
-                declare_entry_item(f, first_entry);
-                f = next_sibling(f);
-            };
-            return;
+                declare_entry_item(f, first_entry)
+                f = next_sibling(f)
+            }
+            return
         } else if kind == Node.Export_main_decl.i32() {
-            declare(Decl.Main, -1, item, -1);
-            return;
+            declare(Decl.Main, -1, item, -1)
+            return
         } else {
-            return;
-        };
-    };
-    let name = decl_name[decl];
-    if name < 0 { return; };
-    standard_name(decl, item_name_node(item));
-    let hidden = lookup(name);
+            return
+        }
+    }
+    let name = decl_name[decl]
+    if name < 0 { return }
+    standard_name(decl, item_name_node(item))
+    let hidden = lookup(name)
     // What is generated for a mem is generated again for its twin: the
     // twin is the mistake.
     if hidden >= first_entry and hidden < decl and not is_variant_name(hidden) and file_role[file_of_token(node_first[item])] != FileRole.Generated.i32() {
         // A mem's name is its own: reported at the mem.
-        if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name); }
-        else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); mem_clashes.push(name); }
-        else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); mem_clashes.push(name); }
-        else { report_twice(decl, hidden); };
-    };
-    bind(name, decl);
-    bind_variants(decl);
+        if decl_is(decl, Decl.Mem) and decl_is(hidden, Decl.Mem) { report(Diag.MemTwice, decl_node[decl], name) }
+        else if decl_is(decl, Decl.Mem) { report(Diag.MemClash, decl_node[decl], name); mem_clashes.push(name) }
+        else if decl_is(hidden, Decl.Mem) { report(Diag.MemClash, decl_node[hidden], name); mem_clashes.push(name) }
+        else { report_twice(decl, hidden) }
+    }
+    bind(name, decl)
+    bind_variants(decl)
 }
 
 /// The words a mem and a function or global both name (MemClash): a use
 /// of one as the other is that mistake again, not reported twice.
-vec mem_clashes: I32;
+vec mem_clashes: I32
 
 fn clashes_mem(word: I32) Bool {
-    for (0 ..< mem_clashes.len()) |i| { if mem_clashes[i] == word { return true; }; };
-    false;
+    for (0 ..< mem_clashes.len()) |i| { if mem_clashes[i] == word { return true } }
+    false
 }
 
 /// `decl`, named as `first` is in one scope: reported at `decl`.
 fn report_twice(decl: I32, first: I32) void {
-    report(Diag.DuplicateDeclaration, decl_node[decl], decl_name[decl]);
-    let again = decl_name_at(decl);
-    if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again"); };
-    diag_place(Extra.Related, decl_name_at(first), "first here");
+    report(Diag.DuplicateDeclaration, decl_node[decl], decl_name[decl])
+    let again = decl_name_at(decl)
+    if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again") }
+    diag_place(Extra.Related, decl_name_at(first), "first here")
 }
 
 /// An enum's variants are types too, named where the enum is.
 fn bind_variants(decl: I32) void {
-    if not decl_is(decl, Decl.Enum) { return; };
-    let d = decl + 1;
+    if not decl_is(decl, Decl.Enum) { return }
+    let d = decl + 1
     while (d < decl_kind.len() and decl_owner[d] >= decl and decl_owner[d] <= d) {
-        if decl_owner[d] == decl { bind_variant(d, items_since[0]); };
-        d += 1;
-    };
+        if decl_owner[d] == decl { bind_variant(d, items_since[0]) }
+        d += 1
+    }
 }
 
 /// Where a file's (or mod's) own declarations begin to be bound.
-vec items_since: I32 = [0];
+vec items_since: I32 = [0]
 
 /// Variant `v` in scope by its name. A name a variant of another enum bound
 /// since `since` (one file's, one mod's) has is ambiguous: `E.V` says which.
 /// A declaration's name (its enum's too) is the declaration's: the variant
 /// is then `E.V`.
 fn bind_variant(v: I32, since: I32) void {
-    let word = decl_name[v];
-    if word < 0 { return; };
-    let b = word_top[word];
-    let p = if b >= since { bind_decl[b]; } else { -1; };
-    while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p]; };
-    if p >= 0 and not decl_is(p, Decl.Variant) { return; };
+    let word = decl_name[v]
+    if word < 0 { return }
+    let b = word_top[word]
+    let p = if b >= since { bind_decl[b] } else { -1 }
+    while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p] }
+    if p >= 0 and not decl_is(p, Decl.Variant) { return }
     if decl_is(p, Decl.Variant) and decl_owner[p] != decl_owner[v] {
-        let both = declare(Decl.Ambiguous, word, -1, v);
-        decl_a[both] = bind_decl[b];
-        bind(word, both);
-    } else { bind(word, v); };
+        let both = declare(Decl.Ambiguous, word, -1, v)
+        decl_a[both] = bind_decl[b]
+        bind(word, both)
+    } else { bind(word, v) }
 }
 
 //! = Resolving
@@ -1464,411 +1464,411 @@ struct Walk:
 /// Resolution, after parsing: `@`-DSLs expanded, every declaration declared,
 /// method headers then bodies walked. Returns the number of diagnostics.
 fn resolve_names() I32 {
-    diag_reset();
-    intern_known();
+    diag_reset()
+    intern_known()
     // DSLs expand first: their expansions add nodes, words, and files.
-    expand_dsls();
-    generate_sources();
-    node_decl.resize(node_kind.len());
-    node_alias.resize(node_kind.len());
+    expand_dsls()
+    generate_sources()
+    node_decl.resize(node_kind.len())
+    node_alias.resize(node_kind.len())
     for (0 ..< node_kind.len()) |n| {
-        node_decl[n] = -1;
-        node_alias[n] = -1;
-    };
-    word_top.resize(src.interned());
-    for (0 ..< src.interned()) |w| { word_top[w] = -1; };
-    bind_word.clear();
-    bind_decl.clear();
-    bind_prev.clear();
-    declare_program();
-    walk_program(true);
-    walk_program(false);
+        node_decl[n] = -1
+        node_alias[n] = -1
+    }
+    word_top.resize(src.interned())
+    for (0 ..< src.interned()) |w| { word_top[w] = -1 }
+    bind_word.clear()
+    bind_decl.clear()
+    bind_prev.clear()
+    declare_program()
+    walk_program(true)
+    walk_program(false)
     // What is looked up after resolution is the entry file's.
-    let entry = entry_file();
-    if entry >= 0 { enter_file(entry); };
-    find_comptime_mems();
+    let entry = entry_file()
+    if entry >= 0 { enter_file(entry) }
+    find_comptime_mems()
     // An import the host could not read ends the build, but names resolve
     // (for an editor): its mistake is the one said.
     if missing_import[0] >= 0 {
-        diag_reset();
-        let at = import_node[missing_import[0]];
-        report2(if missing_why[0] == 1 { Diag.ImportCycle; } else { Diag.UnknownImport; }, at, -1, missing_why[0], -1);
+        diag_reset()
+        let at = import_node[missing_import[0]]
+        report2(if missing_why[0] == 1 { Diag.ImportCycle } else { Diag.UnknownImport }, at, -1, missing_why[0], -1)
         // (`using console from std:Consle`: the std module it names.)
-        let m = std_module(node_text(name_node(first_child(at))));
-        if missing_why[0] == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";"); };
-    };
-    save_diagnostics();
-    diag_kind.len();
+        let m = std_module(node_text(name_node(first_child(at))))
+        if missing_why[0] == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";") }
+    }
+    save_diagnostics()
+    diag_kind.len()
 }
 
 /// Resolution's diagnostics, kept so each build (exports, tests, `@comptime`)
 /// starts from them and drops what is outside it.
-vec saved_kind: U8;
-vec saved_node: I32;
-vec saved_word: I32;
-vec saved_a: I32;
-vec saved_b: I32;
-vec saved_c: I32;
-vec saved_extra: I32;
-vec saved_extra_n: I32;
+vec saved_kind: U8
+vec saved_node: I32
+vec saved_word: I32
+vec saved_a: I32
+vec saved_b: I32
+vec saved_c: I32
+vec saved_extra: I32
+vec saved_extra_n: I32
 
 fn save_diagnostics() void {
-    let n = diag_kind.len();
-    saved_kind.resize(n);
-    saved_node.resize(n);
-    saved_word.resize(n);
-    saved_a.resize(n);
-    saved_b.resize(n);
-    saved_c.resize(n);
-    saved_extra.resize(n);
-    saved_extra_n.resize(n);
+    let n = diag_kind.len()
+    saved_kind.resize(n)
+    saved_node.resize(n)
+    saved_word.resize(n)
+    saved_a.resize(n)
+    saved_b.resize(n)
+    saved_c.resize(n)
+    saved_extra.resize(n)
+    saved_extra_n.resize(n)
     for (0 ..< n) |i| {
-        saved_kind[i] = diag_kind[i];
-        saved_node[i] = diag_node[i];
-        saved_word[i] = diag_word[i];
-        saved_a[i] = diag_a[i];
-        saved_b[i] = diag_b[i];
-        saved_c[i] = diag_c[i];
-        saved_extra[i] = diag_extra[i];
-        saved_extra_n[i] = diag_extra_n[i];
-    };
+        saved_kind[i] = diag_kind[i]
+        saved_node[i] = diag_node[i]
+        saved_word[i] = diag_word[i]
+        saved_a[i] = diag_a[i]
+        saved_b[i] = diag_b[i]
+        saved_c[i] = diag_c[i]
+        saved_extra[i] = diag_extra[i]
+        saved_extra_n[i] = diag_extra_n[i]
+    }
 }
 
 fn restore_diagnostics() void {
-    let n = saved_kind.len();
-    diag_truncate(n);
+    let n = saved_kind.len()
+    diag_truncate(n)
     for (0 ..< n) |i| {
-        diag_kind[i] = saved_kind[i];
-        diag_node[i] = saved_node[i];
-        diag_word[i] = saved_word[i];
-        diag_a[i] = saved_a[i];
-        diag_b[i] = saved_b[i];
-        diag_c[i] = saved_c[i];
-        diag_extra[i] = saved_extra[i];
-        diag_extra_n[i] = saved_extra_n[i];
-    };
+        diag_kind[i] = saved_kind[i]
+        diag_node[i] = saved_node[i]
+        diag_word[i] = saved_word[i]
+        diag_a[i] = saved_a[i]
+        diag_b[i] = saved_b[i]
+        diag_c[i] = saved_c[i]
+        diag_extra[i] = saved_extra[i]
+        diag_extra_n[i] = saved_extra_n[i]
+    }
 }
 
 /// Each file's items, prelude first, in its scope: modules with their
 /// members in scope. The header pass (`headers`) registers methods and
 /// aliases; the next resolves bodies.
 fn walk_program(headers: Bool) void {
-    let entry = entry_file();
+    let entry = entry_file()
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry, FileRole.Generated]) |role| {
         // A scope entered stays for the next file in it (generated files
         // share their owner's): the bindings are as if entered again.
-        let outer = scope_mark();
-        let entered = -1;
+        let outer = scope_mark()
+        let entered = -1
         for (0 ..< file_root.len()) |file| {
             if file_role[file] == role.i32() and file_root[file] >= 0 {
-                let scope = scope_file(file, entry);
+                let scope = scope_file(file, entry)
                 if scope != entered {
-                    scope_pop(outer);
-                    enter_file(scope);
-                    entered = scope;
-                };
-                let file_mark = scope_mark();
-                let item = first_child(file_root[file]);
+                    scope_pop(outer)
+                    enter_file(scope)
+                    entered = scope
+                }
+                let file_mark = scope_mark()
+                let item = first_child(file_root[file])
                 while (item >= 0) {
                     if is_kind(item, Node.Module_decl) {
-                        let module = node_decl[name_node(first_child(item))];
-                        let mark = scope_mark();
-                        bind_module(module);
-                        let c = first_child(item);
+                        let module = node_decl[name_node(first_child(item))]
+                        let mark = scope_mark()
+                        bind_module(module)
+                        let c = first_child(item)
                         while (c >= 0) {
-                            walk_item(c, Walk { module: module, headers: headers });
-                            c = next_sibling(c);
-                        };
-                        scope_pop(mark);
+                            walk_item(c, Walk { module: module, headers: headers })
+                            c = next_sibling(c)
+                        }
+                        scope_pop(mark)
                     } else if is_kind(item, Node.Using_decl) or declares_item(file, item) or is_kind(item, Node.Test_decl) or is_kind(item, Node.Bench_decl) {
-                        walk_item(item, Walk { module: -1, headers: headers });
-                    };
-                    item = next_sibling(item);
-                };
-                scope_pop(file_mark);
-            };
-        };
-        scope_pop(outer);
-    };
+                        walk_item(item, Walk { module: -1, headers: headers })
+                    }
+                    item = next_sibling(item)
+                }
+                scope_pop(file_mark)
+            }
+        }
+        scope_pop(outer)
+    }
 }
 
 fn walk_item(item: I32, w: Walk) void {
-    let kind = node_kind[item];
+    let kind = node_kind[item]
     if kind == Node.Using_decl.i32() {
-        if w.headers { walk_using(item, w); };
-        return;
-    };
+        if w.headers { walk_using(item, w) }
+        return
+    }
     if kind == Node.Fn_decl.i32() {
-        if w.headers { register_method(item, w); } else { walk_fn(item, w); };
-        return;
-    };
+        if w.headers { register_method(item, w) } else { walk_fn(item, w) }
+        return
+    }
     if kind == Node.Op_decl.i32() {
-        if w.headers { register_operator(item, w); } else { walk_op(item, w); };
-        return;
-    };
+        if w.headers { register_operator(item, w) } else { walk_op(item, w) }
+        return
+    }
     if kind == Node.Export_lib_decl.i32() {
-        let f = first_child(item);
+        let f = first_child(item)
         while (f >= 0) {
-            walk_item(f, w);
-            f = next_sibling(f);
-        };
-        return;
-    };
-    if w.headers { return; };
+            walk_item(f, w)
+            f = next_sibling(f)
+        }
+        return
+    }
+    if w.headers { return }
     if kind == Node.Struct_decl.i32() or kind == Node.Proto_decl.i32() or kind == Node.Enum_decl.i32() {
-        walk_type_item(item, w);
+        walk_type_item(item, w)
     } else if kind == Node.Module_type_param_list.i32() {
-        walk_bounds(item, w);
+        walk_bounds(item, w)
     } else if kind == Node.Global_decl.i32() {
-        let t = next_sibling(first_child(item));
-        walk_type(t, w);
-        walk_expr(next_sibling(t), w);
+        let t = next_sibling(first_child(item))
+        walk_type(t, w)
+        walk_expr(next_sibling(t), w)
     } else if kind == Node.Mem_decl.i32() {
-        let t = next_sibling(first_child(item));
-        walk_elem_type(t, w);
+        let t = next_sibling(first_child(item))
+        walk_elem_type(t, w)
         // An initializer list holds number literals, and names nothing.
-        let init = next_sibling(t);
-        if init >= 0 and not is_kind(init, Node.Array_expr) { walk_expr(init, w); };
+        let init = next_sibling(t)
+        if init >= 0 and not is_kind(init, Node.Array_expr) { walk_expr(init, w) }
     } else if kind == Node.Distinct_decl.i32() {
-        walk_elem_type(next_sibling(first_child(item)), w);
+        walk_elem_type(next_sibling(first_child(item)), w)
     } else if kind == Node.Export_main_decl.i32() {
-        let mark = scope_mark();
-        let c = first_child(item);
+        let mark = scope_mark()
+        let c = first_child(item)
         while (c >= 0) {
-            if is_kind(c, Node.Param_list) { walk_params(c, -1, w); } else if is_kind(c, Node.Return_type) { walk_type(c, w); }
-            else { walk_expr(c, w); };
-            c = next_sibling(c);
-        };
-        scope_pop(mark);
+            if is_kind(c, Node.Param_list) { walk_params(c, -1, w) } else if is_kind(c, Node.Return_type) { walk_type(c, w) }
+            else { walk_expr(c, w) }
+            c = next_sibling(c)
+        }
+        scope_pop(mark)
     } else if kind == Node.Test_decl.i32() {
-        walk_expr(last_child(item), w);
+        walk_expr(last_child(item), w)
     } else if kind == Node.Bench_decl.i32() {
         // Setup and the measured block share one scope.
-        let mark = scope_mark();
-        let c = next_sibling(first_child(item));
+        let mark = scope_mark()
+        let c = next_sibling(first_child(item))
         while (c >= 0) {
-            if is_kind(c, Node.Measure_decl) { walk_expr(first_child(c), w); } else { walk_expr(c, w); };
-            c = next_sibling(c);
-        };
-        scope_pop(mark);
-    };
+            if is_kind(c, Node.Measure_decl) { walk_expr(first_child(c), w) } else { walk_expr(c, w) }
+            c = next_sibling(c)
+        }
+        scope_pop(mark)
+    }
 }
 
 /// `using M[…] |A| from …`: the module it names, its type arguments, and for
 /// an import, that the module is in the file imported.
 fn walk_using(item: I32, w: Walk) void {
-    let name_at = first_child(item);
-    let n = name_node(name_at);
+    let name_at = first_child(item)
+    let n = name_node(name_at)
     // An import's module is in the file it imports (see @bind_import).
-    let module = if using_path(item) >= 0 { node_decl[n]; } else { lookup(word_of(n)); };
-    if decl_is(module, Decl.Alias) { node_alias[n] = module; module = decl_a[module]; };
-    module = module_named(module);
+    let module = if using_path(item) >= 0 { node_decl[n] } else { lookup(word_of(n)) }
+    if decl_is(module, Decl.Alias) { node_alias[n] = module; module = decl_a[module] }
+    module = module_named(module)
     if not decl_is(module, Decl.Module) and not decl_is(module, Decl.Foreign) {
         // `using helper from "./lib.utu"` with `fn helper` there: only a mod is imported.
-        let kind = imported_item_kind(item, word_of(n));
+        let kind = imported_item_kind(item, word_of(n))
         // `using Point |P|` with `struct Point`: the same, in this file.
-        let found = lookup(word_of(n));
-        if kind < 0 and using_path(item) < 0 and found >= 0 and decl_node[found] >= 0 and item_kind_text(node_kind[decl_node[found]]) != "not a mod" { kind = node_kind[decl_node[found]]; };
+        let found = lookup(word_of(n))
+        if kind < 0 and using_path(item) < 0 and found >= 0 and decl_node[found] >= 0 and item_kind_text(node_kind[decl_node[found]]) != "not a mod" { kind = node_kind[decl_node[found]] }
         if kind >= 0 {
-            report2(Diag.ImportNotModule, n, word_of(n), kind, -1);
-            if using_path(item) >= 0 { diag_note("Declare it in a mod there (mod m { … }) and import that"); };
+            report2(Diag.ImportNotModule, n, word_of(n), kind, -1)
+            if using_path(item) >= 0 { diag_note("Declare it in a mod there (mod m { … }) and import that") }
         } else {
-            report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module);
+            report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module)
             // (An import names a mod of the file: `mod guide { … }` for `using guide … from`.)
-            if using_path(item) >= 0 and diag_fresh[0] == 1 { diag_a[diag_a.len() - 1] = item; };
-            if using_path(item) >= 0 { diag_note("The file has no mod " + word_text(word_of(n)) + ": declare one there, mod " + word_text(word_of(n)) + " { … }"); };
-        };
-        return;
-    };
-    node_decl[n] = module;
-    let c = next_sibling(name_at);
+            if using_path(item) >= 0 and diag_fresh[0] == 1 { diag_a[diag_a.len() - 1] = item }
+            if using_path(item) >= 0 { diag_note("The file has no mod " + word_text(word_of(n)) + ": declare one there, mod " + word_text(word_of(n)) + " { … }") }
+        }
+        return
+    }
+    node_decl[n] = module
+    let c = next_sibling(name_at)
     while (c >= 0) {
-        if is_kind(c, Node.Module_type_arg_list) { walk_types(c, w); }
-        else if is_kind(c, Node.Captured_module_name) { decl_a[node_decl[name_node(c)]] = module; };
-        c = next_sibling(c);
-    };
+        if is_kind(c, Node.Module_type_arg_list) { walk_types(c, w) }
+        else if is_kind(c, Node.Captured_module_name) { decl_a[node_decl[name_node(c)]] = module }
+        c = next_sibling(c)
+    }
 }
 
 /// `fn T.name`, `fn &.name`, `fn P[T].name`: a method of T (or of the
 /// promoted type), found by `T.name` and by calls on a T.
 fn register_method(item: I32, w: Walk) void {
-    let name = first_child(item);
-    let receiver = first_child(name);
-    let method = last_child(name);
-    if receiver == method { return; };
-    let owner = as_type(receiver, walk_type_name(receiver, w));
-    let decl = node_decl[method];
-    decl_a[decl] = owner;
-    let args = next_sibling(receiver);
+    let name = first_child(item)
+    let receiver = first_child(name)
+    let method = last_child(name)
+    if receiver == method { return }
+    let owner = as_type(receiver, walk_type_name(receiver, w))
+    let decl = node_decl[method]
+    decl_a[decl] = owner
+    let args = next_sibling(receiver)
     if is_kind(args, Node.Module_type_arg_list) {
-        walk_types(args, w);
+        walk_types(args, w)
         // `fn Rec[Sq].m`: the head names a protocol (read on as Sq's, said once).
         if owner >= 0 and not decl_is(owner, Decl.Proto) {
-            report2(Diag.BoundNotProto, receiver, -1, owner, 3);
-            diag_label("not a protocol");
+            report2(Diag.BoundNotProto, receiver, -1, owner, 3)
+            diag_label("not a protocol")
             // (A generic type's `[I32]` is its instance, not the type read on.)
-            let n = if is_generic(module_of(owner)) { -1; } else { impl_target(args); };
-            owner = if n >= 0 { node_decl[n]; } else { -1; };
-            decl_a[decl] = owner;
-        };
+            let n = if is_generic(module_of(owner)) { -1 } else { impl_target(args) }
+            owner = if n >= 0 { node_decl[n] } else { -1 }
+            decl_a[decl] = owner
+        }
         // `fn P[T].m`: also a method of T, so calls on a T find it.
         if decl_is(owner, Decl.Proto) {
-            let n = impl_target(args);
+            let n = impl_target(args)
             if n >= 0 and node_decl[n] >= 0 {
-                let prior = add_member(node_decl[n], word_of(method), Space.Method, decl);
+                let prior = add_member(node_decl[n], word_of(method), Space.Method, decl)
                 if prior >= 0 and decl_is(decl_a[prior], Decl.Proto) and decl_a[prior] != owner {
-                    method_twice.push(prior);
-                    method_twice.push(decl);
+                    method_twice.push(prior)
+                    method_twice.push(decl)
                 } else if prior >= 0 and prior != decl and decl_a[prior] == owner {
-                    impl_twice(prior, decl);
-                };
-            };
-        };
-    };
+                    impl_twice(prior, decl)
+                }
+            }
+        }
+    }
     if owner >= 0 {
-        let prior = add_member(owner, word_of(method), Space.Method, decl);
+        let prior = add_member(owner, word_of(method), Space.Method, decl)
         // A protocol's `fn P[T].m` is one method per T, all members of P.
         if prior >= 0 and prior != decl and (not decl_is(owner, Decl.Proto) or (not is_kind(args, Node.Module_type_arg_list) and not is_kind(next_sibling(first_child(first_child(decl_node[prior]))), Node.Module_type_arg_list))) {
-            report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1);
-            diag_place(Extra.Related, decl_name_at(prior), "first here");
-        };
+            report2(Diag.DuplicateDeclaration, name, word_of(method), 5, -1)
+            diag_place(Extra.Related, decl_name_at(prior), "first here")
+        }
         // `p.f()` cannot mean both: a field holding a closure, and a method.
-        let field = member(owner, word_of(method), Space.Member);
+        let field = member(owner, word_of(method), Space.Member)
         if decl_is(field, Decl.Field) and is_kind(next_sibling(first_child(decl_node[field])), Node.Closure_type) {
-            report2(Diag.MemberClash, method, word_of(method), owner, 0);
-        };
+            report2(Diag.MemberClash, method, word_of(method), owner, 0)
+        }
         // `fn P.m` beside a member m of protocol P: `p.m()` is the member.
         if decl_is(field, Decl.ProtoMember) and not is_kind(args, Node.Module_type_arg_list) {
-            report2(Diag.MemberClash, method, word_of(method), owner, 1);
-        };
-    };
+            report2(Diag.MemberClash, method, word_of(method), owner, 1)
+        }
+    }
 }
 
 /// `fn P[T].m` twice for one T: reported at the one in the program's own
 /// files (the user's, when std already has it).
 fn impl_twice(a: I32, b: I32) void {
-    let again = if is_own_file(file_of_token(node_first[decl_node[b]])) { b; } else { a; };
-    let first = if again == b { a; } else { b; };
-    let name = first_child(decl_node[again]);
-    report2(Diag.DuplicateDeclaration, name, word_of(last_child(name)), 5, -1);
-    diag_place(Extra.Related, decl_name_at(first), "first here");
+    let again = if is_own_file(file_of_token(node_first[decl_node[b]])) { b } else { a }
+    let first = if again == b { a } else { b }
+    let name = first_child(decl_node[again])
+    report2(Diag.DuplicateDeclaration, name, word_of(last_child(name)), 5, -1)
+    diag_place(Extra.Related, decl_name_at(first), "first here")
 }
 
 /// The node naming T in `fn P[T].m`'s `[T]` (`args`): a name (`T`, the
 /// `T` of `m.T`), or `&` (in a module, every instance of its type), or -1.
 fn impl_target(args: I32) I32 {
-    let t = first_child(args);
-    if is_kind(t, Node.Promoted_type) { return t; };
-    if is_kind(t, Node.Ref_type) { t = first_child(t); };
+    let t = first_child(args)
+    if is_kind(t, Node.Promoted_type) { return t }
+    if is_kind(t, Node.Ref_type) { t = first_child(t) }
     // `m.T`; not `M[A].T`, an instance's.
-    if is_kind(t, Node.Qualified_type_ref) and not is_kind(first_child(t), Node.Instantiated_module_ref) and not is_kind(next_sibling(first_child(t)), Node.Module_type_arg_list) { return name_node(last_child(t)); };
-    name_node(t);
+    if is_kind(t, Node.Qualified_type_ref) and not is_kind(first_child(t), Node.Instantiated_module_ref) and not is_kind(next_sibling(first_child(t)), Node.Module_type_arg_list) { return name_node(last_child(t)) }
+    name_node(t)
 }
 
 /// `fn T:add |a, b|`: an operator of T.
 fn register_operator(item: I32, w: Walk) void {
-    let receiver = first_child(item);
-    let op = next_sibling(receiver);
-    let owner = as_type(receiver, walk_type_name(receiver, w));
-    let decl = node_decl[op];
-    decl_a[decl] = owner;
-    if owner >= 0 { add_member(owner, word_of(op), Space.Operator, decl); };
+    let receiver = first_child(item)
+    let op = next_sibling(receiver)
+    let owner = as_type(receiver, walk_type_name(receiver, w))
+    let decl = node_decl[op]
+    decl_a[decl] = owner
+    if owner >= 0 { add_member(owner, word_of(op), Space.Operator, decl) }
 }
 
 /// The type a type name names, recorded on it: a module stands for its
 /// promoted type, an alias for its module's. Reports unknown names.
 fn walk_type_name(node: I32, w: Walk) I32 {
     if is_kind(node, Node.Promoted_type) {
-        let t = if w.module >= 0 { decl_a[w.module]; } else { -1; };
-        node_decl[node] = t;
-        return t;
-    };
-    let n = name_node(node);
-    let word = word_of(n);
-    let decl = lookup(word);
-    if ambiguous(decl, n) { return -1; };
+        let t = if w.module >= 0 { decl_a[w.module] } else { -1 }
+        node_decl[node] = t
+        return t
+    }
+    let n = name_node(node)
+    let word = word_of(n)
+    let decl = lookup(word)
+    if ambiguous(decl, n) { return -1 }
     if decl < 0 or not is_type_decl(decl) {
-        if not builtin_type(word) { report_unknown(Diag.UnknownType, n, word, Seek.Type); };
-        return -1;
-    };
+        if not builtin_type(word) { report_unknown(Diag.UnknownType, n, word, Seek.Type) }
+        return -1
+    }
     // An alias's instance is its type's (see @type_path).
-    if decl_is(decl, Decl.Alias) { node_alias[n] = decl; };
-    let t = promoted(decl);
-    node_decl[n] = t;
-    t;
+    if decl_is(decl, Decl.Alias) { node_alias[n] = decl }
+    let t = promoted(decl)
+    node_decl[n] = t
+    t
 }
 
 /// `t`, named at `node` where a type goes: a mod with no type `&` is not one
 /// (`using geo |Pt|` names mod geo, not geo.Pt).
 fn as_type(node: I32, t: I32) I32 {
-    let m = if decl_is(t, Decl.Alias) { decl_a[t]; } else { t; };
-    if not decl_is(m, Decl.Module) { return t; };
-    let n = if is_kind(node, Node.Instantiated_module_ref) { name_node(first_child(node)); } else { name_node(node); };
-    if n < 0 { n = node; };
-    report2(Diag.ModNoType, n, word_of(n), m, -1);
-    let inner = member(m, word_of(n), Space.Member);
-    let mod_name = word_text(decl_name[m]);
-    let name = word_text(word_of(n));
+    let m = if decl_is(t, Decl.Alias) { decl_a[t] } else { t }
+    if not decl_is(m, Decl.Module) { return t }
+    let n = if is_kind(node, Node.Instantiated_module_ref) { name_node(first_child(node)) } else { name_node(node) }
+    if n < 0 { n = node }
+    report2(Diag.ModNoType, n, word_of(n), m, -1)
+    let inner = member(m, word_of(n), Space.Member)
+    let mod_name = word_text(decl_name[m])
+    let name = word_text(word_of(n))
     if word_of(n) == decl_name[m] {
-        diag_note("Name a type in it (" + mod_name + ".T), or declare one: struct &: …");
+        diag_note("Name a type in it (" + mod_name + ".T), or declare one: struct &: …")
     } else if inner >= 0 and is_type_decl(inner) {
-        diag_note("|" + name + "| renames the mod; to name its " + name + ", open it: using " + mod_name + ";");
+        diag_note("|" + name + "| renames the mod; to name its " + name + ", open it: using " + mod_name + ";")
     } else {
-        diag_note("|" + name + "| renames the mod; name a type in it: " + name + ".T");
-    };
-    -1;
+        diag_note("|" + name + "| renames the mod; name a type in it: " + name + ".T")
+    }
+    -1
 }
 
 /// A module (or an alias of one) stands for its promoted type, when it has one.
 fn promoted(decl: I32) I32 {
-    let d = decl;
-    if decl_is(d, Decl.Alias) and decl_a[d] >= 0 { d = decl_a[d]; };
-    if decl_is(d, Decl.Module) and decl_a[d] >= 0 { decl_a[d]; } else { decl; };
+    let d = decl
+    if decl_is(d, Decl.Alias) and decl_a[d] >= 0 { d = decl_a[d] }
+    if decl_is(d, Decl.Module) and decl_a[d] >= 0 { decl_a[d] } else { decl }
 }
 
 /// Names the language provides without a declaration: the narrow element
 /// kinds of mems and integer enums, interned after the keywords.
-fn builtin_type(word: I32) Bool { word >= narrow_word(Narrow.U8) and word <= narrow_word(Narrow.I16); }
+fn builtin_type(word: I32) Bool { word >= narrow_word(Narrow.U8) and word <= narrow_word(Narrow.I16) }
 
 /// Element kinds of mems and bases of distinct types: builtin names or types.
 fn walk_elem_type(node: I32, w: Walk) void {
-    if not builtin_type(word_of(node)) { as_type(node, walk_type_name(node, w)); };
+    if not builtin_type(word_of(node)) { as_type(node, walk_type_name(node, w)) }
 }
 
 fn walk_types(node: I32, w: Walk) void {
-    let c = first_child(node);
+    let c = first_child(node)
     while (c >= 0) {
-        walk_type(c, w);
-        c = next_sibling(c);
-    };
+        walk_type(c, w)
+        c = next_sibling(c)
+    }
 }
 
 fn walk_type(node: I32, w: Walk) void {
-    let kind = node_kind[node];
+    let kind = node_kind[node]
     if kind == Node.Ref_type.i32() {
-        let c = first_child(node);
-        as_type(c, if is_kind(c, Node.Type_ident) { walk_type_name(c, w); } else { walk_type_path(c, w); });
-        return;
-    };
+        let c = first_child(node)
+        as_type(c, if is_kind(c, Node.Type_ident) { walk_type_name(c, w) } else { walk_type_path(c, w) })
+        return
+    }
     if kind == Node.Promoted_type.i32() or kind == Node.Type_ident.i32() {
-        as_type(node, walk_type_name(node, w));
-        return;
-    };
-    if kind != Node.Void_type.i32() { walk_types(node, w); };
+        as_type(node, walk_type_name(node, w))
+        return
+    }
+    if kind != Node.Void_type.i32() { walk_types(node, w) }
 }
 
 /// A path to a type: `M[A]`, `M.T`, `M[A].T`, `E.V` (enum E's variant),
 /// `M.E.V`, or a name. Returns the declaration it names (a module's
 /// promoted type for `M[A]`).
 fn walk_type_path(node: I32, w: Walk) I32 {
-    let t = walk_variant_path(node, w);
+    let t = walk_variant_path(node, w)
     if decl_is(t, Decl.Ambiguous) {
-        let n = name_node(if is_kind(node, Node.Qualified_type_ref) { last_child(node); } else { node; });
-        ambiguous(t, n);
-        node_decl[n] = -1;
-        return -1;
-    };
-    t;
+        let n = name_node(if is_kind(node, Node.Qualified_type_ref) { last_child(node) } else { node })
+        ambiguous(t, n)
+        node_decl[n] = -1
+        return -1
+    }
+    t
 }
 
 /// A type path (as @walk_type_path walks it) where a variant goes, a
@@ -1877,669 +1877,669 @@ fn walk_type_path(node: I32, w: Walk) I32 {
 /// value tested to decide.
 fn walk_variant_path(node: I32, w: Walk) I32 {
     if is_kind(node, Node.Type_ident) {
-        let d = lookup(word_of(node));
+        let d = lookup(word_of(node))
         if decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant) {
-            node_decl[node] = d;
-            return d;
-        };
-    };
-    let kind = node_kind[node];
-    if kind == Node.Type_ident.i32() or kind == Node.Promoted_type.i32() { return walk_type_name(node, w); };
+            node_decl[node] = d
+            return d
+        }
+    }
+    let kind = node_kind[node]
+    if kind == Node.Type_ident.i32() or kind == Node.Promoted_type.i32() { return walk_type_name(node, w) }
     if kind == Node.Instantiated_module_ref.i32() {
         // `M[A]` as a type is M's promoted type.
-        let module = walk_module_name(first_child(node));
-        walk_types(next_sibling(first_child(node)), w);
-        let t = promoted(module);
-        let n = name_node(first_child(node));
-        if t >= 0 { node_decl[n] = t; };
-        return t;
-    };
+        let module = walk_module_name(first_child(node))
+        walk_types(next_sibling(first_child(node)), w)
+        let t = promoted(module)
+        let n = name_node(first_child(node))
+        if t >= 0 { node_decl[n] = t }
+        return t
+    }
     if kind == Node.Qualified_type_ref.i32() or kind == Node.Inline_module_type_path.i32() {
-        let c = first_child(node);
-        let module = -1;
-        let mid = next_sibling(c);
+        let c = first_child(node)
+        let module = -1
+        let mid = next_sibling(c)
         if is_kind(c, Node.Instantiated_module_ref) {
-            module = walk_module_name(first_child(c));
-            walk_types(next_sibling(first_child(c)), w);
+            module = walk_module_name(first_child(c))
+            walk_types(next_sibling(first_child(c)), w)
         } else if is_kind(c, Node.Module_ref) and enum_named(name_node(c)) >= 0 {
             // `E.V`: enum E's variant.
-            module = enum_named(name_node(c));
-            node_decl[name_node(c)] = module;
+            module = enum_named(name_node(c))
+            node_decl[name_node(c)] = module
         } else {
-            module = walk_module_name(c);
+            module = walk_module_name(c)
             if is_kind(mid, Node.Module_type_arg_list) {
-                walk_types(mid, w);
-                mid = next_sibling(mid);
-            };
-        };
-        let member_at = last_child(node);
+                walk_types(mid, w)
+                mid = next_sibling(mid)
+            }
+        }
+        let member_at = last_child(node)
         // `M.E.V`: M's enum E, then its variant.
         if mid >= 0 and mid != member_at {
-            let e = member(module, word_of(mid), Space.Member);
+            let e = member(module, word_of(mid), Space.Member)
             if not decl_is(e, Decl.Enum) {
                 // (A type but not an enum: it has no variants.)
-                let at = if e >= 0 { name_node(member_at); } else { mid; };
-                if decl_is(module, Decl.Module) { report(Diag.UnknownType, at, word_of(at)); };
-                return -1;
-            };
-            node_decl[mid] = e;
-            module = e;
-        };
-        let n = name_node(member_at);
-        let t = member(module, word_of(n), Space.Member);
-        if t < 0 and decl_is(module, Decl.Module) { report(Diag.UnknownType, n, word_of(n)); };
-        node_decl[n] = t;
-        return t;
-    };
-    -1;
+                let at = if e >= 0 { name_node(member_at) } else { mid }
+                if decl_is(module, Decl.Module) { report(Diag.UnknownType, at, word_of(at)) }
+                return -1
+            }
+            node_decl[mid] = e
+            module = e
+        }
+        let n = name_node(member_at)
+        let t = member(module, word_of(n), Space.Member)
+        if t < 0 and decl_is(module, Decl.Module) { report(Diag.UnknownType, n, word_of(n)) }
+        node_decl[n] = t
+        return t
+    }
+    -1
 }
 
 /// The enum of variants a name before `.V` names, or -1.
 fn enum_named(n: I32) I32 {
-    let d = lookup(word_of(n));
-    if decl_is(d, Decl.Enum) { d; } else { -1; };
+    let d = lookup(word_of(n))
+    if decl_is(d, Decl.Enum) { d } else { -1 }
 }
 
 /// A module name: the module (through an alias), recorded on it.
 fn walk_module_name(node: I32) I32 {
-    let n = name_node(node);
-    let word = word_of(n);
-    let decl = lookup(word);
-    if ambiguous(decl, n) { return -1; };
+    let n = name_node(node)
+    let word = word_of(n)
+    let decl = lookup(word)
+    if ambiguous(decl, n) { return -1 }
     if decl_is(decl, Decl.Alias) {
-        node_alias[n] = decl;
-        decl = decl_a[decl];
-    };
+        node_alias[n] = decl
+        decl = decl_a[decl]
+    }
     // Inside `mod G[T]`, G is its type `&`: in `G[T]`, the module.
-    decl = module_named(decl);
+    decl = module_named(decl)
     if not decl_is(decl, Decl.Module) and not decl_is(decl, Decl.Foreign) {
-        report_unknown(Diag.UnknownModule, n, word, Seek.Module);
-        return -1;
-    };
-    node_decl[n] = decl;
-    decl;
+        report_unknown(Diag.UnknownModule, n, word, Seek.Module)
+        return -1
+    }
+    node_decl[n] = decl
+    decl
 }
 
 /// An open `M` binds M's name to its type `&`; as a module name, it is M.
 fn module_named(decl: I32) I32 {
-    if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl_owner[decl]; } else { decl; };
+    if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl_owner[decl] } else { decl }
 }
 
 fn walk_type_item(item: I32, w: Walk) void {
-    let c = first_child(item);
+    let c = first_child(item)
     while (c >= 0) {
-        let kind = node_kind[c];
+        let kind = node_kind[c]
         if kind == Node.Field.i32() {
-            walk_type(next_sibling(first_child(c)), w);
+            walk_type(next_sibling(first_child(c)), w)
         } else if kind == Node.Impl_list.i32() {
-            let t = first_child(c);
+            let t = first_child(c)
             // An integer enum is a bare scalar: it is never boxed as a protocol.
             if is_kind(item, Node.Enum_decl) and is_int_enum(item) {
-                report2(Diag.BoundNotProto, c, -1, node_decl[enum_name(item)], 4);
-                t = -1;
-            };
+                report2(Diag.BoundNotProto, c, -1, node_decl[enum_name(item)], 4)
+                t = -1
+            }
             while (t >= 0) {
-                let d = as_type(t, walk_impl_name(t, w));
+                let d = as_type(t, walk_impl_name(t, w))
                 if d >= 0 and not decl_is(d, Decl.Proto) {
-                    report2(Diag.BoundNotProto, t, -1, d, if is_kind(item, Node.Enum_decl) { 2; } else { 1; });
-                    diag_label("not a protocol");
+                    report2(Diag.BoundNotProto, t, -1, d, if is_kind(item, Node.Enum_decl) { 2 } else { 1 })
+                    diag_label("not a protocol")
                 } else if d >= 0 and listed_before(c, t, d) {
-                    report2(Diag.DuplicateDeclaration, t, decl_name[d], 7, -1);
-                };
-                t = next_sibling(t);
-            };
+                    report2(Diag.DuplicateDeclaration, t, decl_name[d], 7, -1)
+                }
+                t = next_sibling(t)
+            }
         } else if kind == Node.Variant.i32() {
-            let fields = next_sibling(first_child(c));
+            let fields = next_sibling(first_child(c))
             if is_kind(fields, Node.Field_list) {
-                let f = first_child(fields);
+                let f = first_child(fields)
                 while (f >= 0) {
-                    walk_type(next_sibling(first_child(f)), w);
-                    f = next_sibling(f);
-                };
-            };
+                    walk_type(next_sibling(first_child(f)), w)
+                    f = next_sibling(f)
+                }
+            }
         } else if kind == Node.Proto_member.i32() {
-            let m = first_child(c);
-            let t = next_sibling(first_child(m));
+            let m = first_child(c)
+            let t = next_sibling(first_child(m))
             while (t >= 0) {
-                walk_type(t, w);
-                self_types(t, node_decl[first_child(item)]);
-                t = next_sibling(t);
-            };
+                walk_type(t, w)
+                self_types(t, node_decl[first_child(item)])
+                t = next_sibling(t)
+            }
         } else if kind == Node.Type_ident.i32() and c != enum_name(item) and is_kind(item, Node.Enum_decl) {
-            walk_elem_type(c, w);
-        };
-        c = next_sibling(c);
-    };
+            walk_elem_type(c, w)
+        }
+        c = next_sibling(c)
+    }
 }
 
 /// Whether an entry of impl list `list` before `t` names `d` too.
 fn listed_before(list: I32, t: I32, d: I32) Bool {
-    let c = first_child(list);
+    let c = first_child(list)
     while (c >= 0 and c != t) {
-        if node_decl[c] == d { return true; };
-        c = next_sibling(c);
-    };
-    false;
+        if node_decl[c] == d { return true }
+        c = next_sibling(c)
+    }
+    false
 }
 
 /// `&` in a protocol's member (`cmp(&) I32`) is the type implementing it:
 /// recorded as the protocol, and read as the implementer by a bounded
 /// module's calls and by conformance.
 fn self_types(node: I32, proto: I32) void {
-    if is_kind(node, Node.Promoted_type) { node_decl[node] = proto; };
-    let c = first_child(node);
+    if is_kind(node, Node.Promoted_type) { node_decl[node] = proto }
+    let c = first_child(node)
     while (c >= 0) {
-        self_types(c, proto);
-        c = next_sibling(c);
-    };
+        self_types(c, proto)
+        c = next_sibling(c)
+    }
 }
 
 /// A protocol in `[P, m.Q]`, recorded on the entry itself as well (where
 /// conformance and bounds read it).
 fn walk_impl_name(node: I32, w: Walk) I32 {
-    if not is_kind(node, Node.Qualified_type_ref) { return walk_type_name(node, w); };
-    let d = walk_type_path(node, w);
-    node_decl[node] = d;
-    d;
+    if not is_kind(node, Node.Qualified_type_ref) { return walk_type_name(node, w) }
+    let d = walk_type_path(node, w)
+    node_decl[node] = d
+    d
 }
 
 /// `mod M[T[P, Q]]`: each bound names a protocol.
 fn walk_bounds(list: I32, w: Walk) void {
-    let param = first_child(list);
+    let param = first_child(list)
     while (param >= 0) {
-        let bounds = next_sibling(first_child(param));
+        let bounds = next_sibling(first_child(param))
         if is_kind(bounds, Node.Impl_list) {
-            let b = first_child(bounds);
+            let b = first_child(bounds)
             while (b >= 0) {
-                let d = walk_impl_name(b, w);
+                let d = walk_impl_name(b, w)
                 if d >= 0 and not decl_is(d, Decl.Proto) {
-                    report2(Diag.BoundNotProto, b, -1, d, -1);
-                    diag_label("not a protocol");
-                };
-                b = next_sibling(b);
-            };
-        };
-        param = next_sibling(param);
-    };
+                    report2(Diag.BoundNotProto, b, -1, d, -1)
+                    diag_label("not a protocol")
+                }
+                b = next_sibling(b)
+            }
+        }
+        param = next_sibling(param)
+    }
 }
 
 /// `$T` in a function's parameter types: T, the function's type parameter
 /// (decl_a its index), which each call's arguments bind; in scope for its
 /// parameters, result, and body. Returns the next index.
 fn declare_binders(node: I32, owner: I32, index: I32) I32 {
-    let i = index;
+    let i = index
     if is_kind(node, Node.Type_binder) {
-        let name = first_child(node);
-        let prev = lookup(word_of(name));
+        let name = first_child(node)
+        let prev = lookup(word_of(name))
         if decl_is(prev, Decl.ModuleParam) and decl_owner[prev] == owner {
-            report2(Diag.DuplicateDeclaration, node, word_of(name), 9, -1);
-            node_decl[name] = prev;
-            return i;
-        };
-        let d = declare_in_scope(Decl.ModuleParam, name, node, owner);
-        decl_a[d] = i;
-        return i + 1;
-    };
-    let c = first_child(node);
+            report2(Diag.DuplicateDeclaration, node, word_of(name), 9, -1)
+            node_decl[name] = prev
+            return i
+        }
+        let d = declare_in_scope(Decl.ModuleParam, name, node, owner)
+        decl_a[d] = i
+        return i + 1
+    }
+    let c = first_child(node)
     while (c >= 0) {
-        i = declare_binders(c, owner, i);
-        c = next_sibling(c);
-    };
-    i;
+        i = declare_binders(c, owner, i)
+        c = next_sibling(c)
+    }
+    i
 }
 
 fn walk_params(list: I32, owner: I32, w: Walk) void {
     // A Wasm function takes at most 1000 parameters.
-    let n = child_count(list);
+    let n = child_count(list)
     if n > 1000 {
         // At the function's name (main's first parameter): the list is long.
-        let at = if decl_is(owner, Decl.Fn) and is_kind(decl_node[owner], Node.Fn_decl) { last_child(first_child(decl_node[owner])); } else { first_child(list); };
-        report2(Diag.TooManyParams, at, if owner >= 0 { decl_name[owner]; } else { -1; }, n, -1);
-    };
-    let p = first_child(list);
+        let at = if decl_is(owner, Decl.Fn) and is_kind(decl_node[owner], Node.Fn_decl) { last_child(first_child(decl_node[owner])) } else { first_child(list) }
+        report2(Diag.TooManyParams, at, if owner >= 0 { decl_name[owner] } else { -1 }, n, -1)
+    }
+    let p = first_child(list)
     while (p >= 0) {
-        let name_at = first_child(p);
-        walk_type(next_sibling(name_at), w);
-        let prev = lookup(word_of(name_at));
-        let d = declare_in_scope(Decl.Param, name_at, p, owner);
+        let name_at = first_child(p)
+        walk_type(next_sibling(name_at), w)
+        let prev = lookup(word_of(name_at))
+        let d = declare_in_scope(Decl.Param, name_at, p, owner)
         // A repeated name (reported by validate) still names the first.
-        if owner >= 0 and decl_is(prev, Decl.Param) and decl_owner[prev] == owner { bind(decl_name[d], prev); };
-        p = next_sibling(p);
-    };
+        if owner >= 0 and decl_is(prev, Decl.Param) and decl_owner[prev] == owner { bind(decl_name[d], prev) }
+        p = next_sibling(p)
+    }
 }
 
 fn walk_fn(item: I32, w: Walk) void {
-    let name = first_child(item);
-    let decl = node_decl[last_child(name)];
-    let mark = scope_mark();
-    let c = next_sibling(name);
-    let params = c;
-    while (params >= 0 and not is_kind(params, Node.Param_list)) { params = next_sibling(params); };
-    if params >= 0 { declare_binders(params, decl, 0); };
+    let name = first_child(item)
+    let decl = node_decl[last_child(name)]
+    let mark = scope_mark()
+    let c = next_sibling(name)
+    let params = c
+    while (params >= 0 and not is_kind(params, Node.Param_list)) { params = next_sibling(params) }
+    if params >= 0 { declare_binders(params, decl, 0) }
     while (c >= 0) {
-        let kind = node_kind[c];
+        let kind = node_kind[c]
         if kind == Node.Self_param.i32() {
-            declare_in_scope(Decl.SelfParam, first_child(c), c, decl);
+            declare_in_scope(Decl.SelfParam, first_child(c), c, decl)
         } else if kind == Node.Param_list.i32() {
-            walk_params(c, decl, w);
+            walk_params(c, decl, w)
         } else if kind == Node.Return_type.i32() {
-            walk_type(c, w);
+            walk_type(c, w)
         } else {
-            walk_expr(c, w);
-        };
-        c = next_sibling(c);
-    };
-    scope_pop(mark);
+            walk_expr(c, w)
+        }
+        c = next_sibling(c)
+    }
+    scope_pop(mark)
 }
 
 /// `fn T:op |a, b| R { … }`: the captures are its parameters.
 fn walk_op(item: I32, w: Walk) void {
-    let op = next_sibling(first_child(item));
-    let decl = node_decl[op];
-    let mark = scope_mark();
-    let c = next_sibling(op);
+    let op = next_sibling(first_child(item))
+    let decl = node_decl[op]
+    let mark = scope_mark()
+    let c = next_sibling(op)
     while (c >= 0) {
         if is_kind(c, Node.Capture) {
             // An operator takes two (the left and the right operand); neg, bnot and not, one.
-            let want = if word_of(op) == known_word(Known.Neg) or word_of(op) == known_word(Known.Bnot) or node_text(op) == "not" { 1; } else { 2; };
-            if child_count(c) != want { report2(Diag.WrongArity, c, -1, want, child_count(c)); };
-            let n = first_child(c);
+            let want = if word_of(op) == known_word(Known.Neg) or word_of(op) == known_word(Known.Bnot) or node_text(op) == "not" { 1 } else { 2 }
+            if child_count(c) != want { report2(Diag.WrongArity, c, -1, want, child_count(c)) }
+            let n = first_child(c)
             while (n >= 0) {
-                declare_in_scope(Decl.Param, n, n, decl);
-                n = next_sibling(n);
-            };
+                declare_in_scope(Decl.Param, n, n, decl)
+                n = next_sibling(n)
+            }
         } else if is_kind(c, Node.Return_type) {
-            walk_type(c, w);
+            walk_type(c, w)
         } else {
-            walk_expr(c, w);
-        };
-        c = next_sibling(c);
-    };
-    scope_pop(mark);
+            walk_expr(c, w)
+        }
+        c = next_sibling(c)
+    }
+    scope_pop(mark)
 }
 
 fn walk_children(node: I32, w: Walk) void {
-    let c = first_child(node);
+    let c = first_child(node)
     while (c >= 0) {
-        walk_expr(c, w);
-        c = next_sibling(c);
-    };
+        walk_expr(c, w)
+        c = next_sibling(c)
+    }
 }
 
 /// Bind each name of a capture (`|a, b|`) to the capture.
 fn bind_capture(capture: I32, kind: Decl) void {
-    let n = first_child(capture);
+    let n = first_child(capture)
     while (n >= 0) {
-        declare_in_scope(kind, n, capture, -1);
-        n = next_sibling(n);
-    };
+        declare_in_scope(kind, n, capture, -1)
+        n = next_sibling(n)
+    }
 }
 
 fn walk_expr(node: I32, w: Walk) void {
-    if node < 0 { return; };
-    let kind = node_kind[node];
+    if node < 0 { return }
+    let kind = node_kind[node]
     if kind == Node.Identifier.i32() {
-        let word = word_of(node);
-        let decl = lookup(word);
-        if ambiguous(decl, node) { return; };
-        if decl < 0 { report_unknown(Diag.UnknownVariable, node, word, Seek.Value); } else { node_decl[node] = decl; };
+        let word = word_of(node)
+        let decl = lookup(word)
+        if ambiguous(decl, node) { return }
+        if decl < 0 { report_unknown(Diag.UnknownVariable, node, word, Seek.Value) } else { node_decl[node] = decl }
     } else if kind == Node.Type_ident.i32() {
         // `Tag(i)`: a type called (the parser makes no other bare type an expression).
-        walk_owner_name(node);
+        walk_owner_name(node)
     } else {
-        walk_compound(node, kind, w);
-    };
+        walk_compound(node, kind, w)
+    }
 }
 
 fn walk_compound(node: I32, kind: I32, w: Walk) void {
     match Node(kind) {
         Node.Block => {
-            let mark = scope_mark();
-            walk_children(node, w);
-            scope_pop(mark);
+            let mark = scope_mark()
+            walk_children(node, w)
+            scope_pop(mark)
         },
-        Node.Bind_expr => { walk_bind(node, w); },
-        Node.Field_expr => { walk_field(node, w); },
-        Node.Optional_field_expr => { walk_field(node, w); },
+        Node.Bind_expr => { walk_bind(node, w) },
+        Node.Field_expr => { walk_field(node, w) },
+        Node.Optional_field_expr => { walk_field(node, w) },
         Node.Type_member_expr => {
-            let base = first_child(node);
-            let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base); } else { walk_type_path(base, w); };
+            let base = first_child(node)
+            let owner = if is_kind(base, Node.Type_ident) { walk_owner_name(base) } else { walk_type_path(base, w) }
             // `M[A].x`: a member of M (a global), or of its type.
-            if is_kind(base, Node.Instantiated_module_ref) { owner = module_named(node_decl[name_node(first_child(base))]); };
-            let name = next_sibling(base);
-            node_decl[name] = static_member(owner, word_of(name));
+            if is_kind(base, Node.Instantiated_module_ref) { owner = module_named(node_decl[name_node(first_child(base))]) }
+            let name = next_sibling(base)
+            node_decl[name] = static_member(owner, word_of(name))
         },
         Node.Promoted_module_call_expr => {
-            let name_at = first_child(node);
-            let module = walk_module_name(name_at);
-            let args = next_sibling(name_at);
-            walk_types(args, w);
-            let name = next_sibling(args);
-            node_decl[name] = static_member(module, word_of(name));
-            walk_expr(next_sibling(name), w);
+            let name_at = first_child(node)
+            let module = walk_module_name(name_at)
+            let args = next_sibling(name_at)
+            walk_types(args, w)
+            let name = next_sibling(args)
+            node_decl[name] = static_member(module, word_of(name))
+            walk_expr(next_sibling(name), w)
         },
-        Node.Null_expr => { as_type(first_child(node), walk_type_name(first_child(node), w)); },
+        Node.Null_expr => { as_type(first_child(node), walk_type_name(first_child(node), w)) },
         Node.Struct_init => {
-            let t = first_child(node);
-            let decl = as_type(t, walk_variant_path(t, w));
-            if decl_is(decl, Decl.Ambiguous) { decl = -1; };
-            walk_field_inits(next_sibling(t), decl, w);
+            let t = first_child(node)
+            let decl = as_type(t, walk_variant_path(t, w))
+            if decl_is(decl, Decl.Ambiguous) { decl = -1 }
+            walk_field_inits(next_sibling(t), decl, w)
         },
-        Node.Implicit_struct_init => { walk_field_inits(next_sibling(first_child(node)), -1, w); },
-        Node.Closure_expr => { walk_closure(node, w); },
+        Node.Implicit_struct_init => { walk_field_inits(next_sibling(first_child(node)), -1, w) },
+        Node.Closure_expr => { walk_closure(node, w) },
         Node.For_expr => {
-            let c = first_child(node);
-            walk_for_sources(c, w);
-            let mark = scope_mark();
-            c = next_sibling(c);
+            let c = first_child(node)
+            walk_for_sources(c, w)
+            let mark = scope_mark()
+            c = next_sibling(c)
             if is_kind(c, Node.Capture) {
-                bind_capture(c, Decl.Capture);
-                c = next_sibling(c);
-            };
-            walk_expr(c, w);
-            scope_pop(mark);
+                bind_capture(c, Decl.Capture)
+                c = next_sibling(c)
+            }
+            walk_expr(c, w)
+            scope_pop(mark)
         },
-        Node.Iterator_expr => { walk_iterator(node, w); },
+        Node.Iterator_expr => { walk_iterator(node, w) },
         Node.Alt_expr => {
-            let c = first_child(node);
-            walk_expr(c, w);
-            c = next_sibling(c);
+            let c = first_child(node)
+            walk_expr(c, w)
+            c = next_sibling(c)
             while (c >= 0) {
-                if is_kind(c, Node.Alt_arm) { walk_alt_arm(c, w); } else { walk_children(c, w); };
-                c = next_sibling(c);
-            };
+                if is_kind(c, Node.Alt_arm) { walk_alt_arm(c, w) } else { walk_children(c, w) }
+                c = next_sibling(c)
+            }
         },
         Node.Promote_expr => {
-            let c = first_child(node);
-            walk_expr(c, w);
-            let binding = next_sibling(c);
-            let mark = scope_mark();
-            declare_in_scope(Decl.Promoted, binding, node, -1);
-            let arm = next_sibling(binding);
-            walk_expr(arm, w);
-            scope_pop(mark);
-            walk_expr(next_sibling(arm), w);
+            let c = first_child(node)
+            walk_expr(c, w)
+            let binding = next_sibling(c)
+            let mark = scope_mark()
+            declare_in_scope(Decl.Promoted, binding, node, -1)
+            let arm = next_sibling(binding)
+            walk_expr(arm, w)
+            scope_pop(mark)
+            walk_expr(next_sibling(arm), w)
         },
         Node.Try_expr => {
-            let body = first_child(node);
-            walk_expr(body, w);
-            let c = next_sibling(body);
-            let mark = scope_mark();
+            let body = first_child(node)
+            walk_expr(body, w)
+            let c = next_sibling(body)
+            let mark = scope_mark()
             if is_kind(c, Node.Identifier) {
-                declare_in_scope(Decl.Caught, c, node, -1);
-                c = next_sibling(c);
-            };
-            walk_expr(c, w);
-            scope_pop(mark);
+                declare_in_scope(Decl.Caught, c, node, -1)
+                c = next_sibling(c)
+            }
+            walk_expr(c, w)
+            scope_pop(mark)
         },
-        Node.Match_expr => { walk_match(node, w); },
-        Node.Loop_match_expr => { walk_match(node, w); },
+        Node.Match_expr => { walk_match(node, w) },
+        Node.Loop_match_expr => { walk_match(node, w) },
         Node.Block_expr => {
             // A label is not a variable.
-            walk_expr(last_child(node), w);
+            walk_expr(last_child(node), w)
         },
         Node.Break_expr => {
             // `break label value`: the label is not a variable.
-            let label = first_child(node);
-            if label >= 0 { walk_expr(next_sibling(label), w); };
+            let label = first_child(node)
+            if label >= 0 { walk_expr(next_sibling(label), w) }
         },
         Node.Pipe_expr => {
-            walk_expr(first_child(node), w);
-            walk_pipe_target(last_child(node), w);
+            walk_expr(first_child(node), w)
+            walk_pipe_target(last_child(node), w)
         },
-        Node.Unary_expr => { walk_expr(last_child(node), w); },
+        Node.Unary_expr => { walk_expr(last_child(node), w) },
         Node.Dsl_expr => {},
         Node.Literal => {},
         Node.Multiline_string_lit => {},
-        ~> { walk_children(node, w); },
-    };
+        ~> { walk_children(node, w) },
+    }
 }
 
 /// `a.f`, `a?.f`; with `a` a module (`m.f`), its member.
 fn walk_field(node: I32, w: Walk) void {
-    let base = first_child(node);
-    walk_expr(base, w);
-    let module = node_decl[base];
-    let name = next_sibling(base);
+    let base = first_child(node)
+    walk_expr(base, w)
+    let module = node_decl[base]
+    let name = next_sibling(base)
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Module) {
-        node_decl[name] = member(module, word_of(name), Space.Member);
-        return;
-    };
+        node_decl[name] = member(module, word_of(name), Space.Member)
+        return
+    }
     // `api.Counter` with `using Api |api| from …`: the host module's member,
     // as `Api.Counter` is.
     if is_kind(base, Node.Identifier) and decl_is(module, Decl.Alias) and decl_is(decl_a[module], Decl.Foreign) {
-        node_alias[base] = module;
-        node_decl[base] = decl_a[module];
-        node_kind[base] = Node.Type_ident.i32();
-        node_kind[node] = Node.Type_member_expr.i32();
-        return;
-    };
+        node_alias[base] = module
+        node_decl[base] = decl_a[module]
+        node_kind[base] = Node.Type_ident.i32()
+        node_kind[node] = Node.Type_member_expr.i32()
+        return
+    }
     // `m.E.V`, `M.E.V`, `alias.E.V`: a variant of the enum the path names.
-    if not is_kind(base, Node.Field_expr) and not is_kind(base, Node.Type_member_expr) { return; };
-    let e = node_decl[last_child(base)];
-    let head = first_child(base);
+    if not is_kind(base, Node.Field_expr) and not is_kind(base, Node.Type_member_expr) { return }
+    let e = node_decl[last_child(base)]
+    let head = first_child(base)
     if e < 0 and is_kind(head, Node.Identifier) and decl_is(node_decl[head], Decl.Alias) {
-        e = static_member(decl_a[node_decl[head]], word_of(last_child(base)));
-    };
+        e = static_member(decl_a[node_decl[head]], word_of(last_child(base)))
+    }
     if decl_is(e, Decl.Enum) or decl_is(e, Decl.IntEnum) {
-        node_decl[last_child(base)] = e;
-        node_decl[name] = member(e, word_of(name), Space.Member);
-    };
+        node_decl[last_child(base)] = e
+        node_decl[name] = member(e, word_of(name), Space.Member)
+    }
 }
 
 /// `match e { p => a, … }` and `loop match`.
 fn walk_match(node: I32, w: Walk) void {
-    let c = first_child(node);
-    walk_expr(c, w);
-    c = next_sibling(c);
+    let c = first_child(node)
+    walk_expr(c, w)
+    c = next_sibling(c)
     while (c >= 0) {
         if is_kind(c, Node.Match_arm) {
-            walk_match_lit(first_child(c), w);
-            walk_expr(next_sibling(first_child(c)), w);
+            walk_match_lit(first_child(c), w)
+            walk_expr(next_sibling(first_child(c)), w)
         } else {
-            walk_children(c, w);
-        };
-        c = next_sibling(c);
-    };
+            walk_children(c, w)
+        }
+        c = next_sibling(c)
+    }
 }
 
 /// `let x: T = e;`, `let .{a, b} = e;`. The name is in scope after the
 /// initializer, except for a closure, which may call itself.
 fn walk_bind(node: I32, w: Walk) void {
-    let c = first_child(node);
-    let init = last_child(node);
+    let c = first_child(node)
+    let init = last_child(node)
     if is_kind(c, Node.Tuple_pattern) {
-        walk_expr(init, w);
-        let n = first_child(c);
+        walk_expr(init, w)
+        let n = first_child(c)
         while (n >= 0) {
-            declare_in_scope(Decl.Local, n, node, -1);
-            n = next_sibling(n);
-        };
-        return;
-    };
-    let t = next_sibling(c);
-    if t != init { walk_type(t, w); };
-    let d = declare_named(Decl.Local, c, node, -1);
+            declare_in_scope(Decl.Local, n, node, -1)
+            n = next_sibling(n)
+        }
+        return
+    }
+    let t = next_sibling(c)
+    if t != init { walk_type(t, w) }
+    let d = declare_named(Decl.Local, c, node, -1)
     if is_kind(init, Node.Closure_expr) {
-        bind(decl_name[d], d);
-        walk_expr(init, w);
+        bind(decl_name[d], d)
+        walk_expr(init, w)
     } else {
-        walk_expr(init, w);
-        bind(decl_name[d], d);
-    };
+        walk_expr(init, w)
+        bind(decl_name[d], d)
+    }
 }
 
 fn walk_closure(node: I32, w: Walk) void {
-    let mark = scope_mark();
-    let c = first_child(node);
+    let mark = scope_mark()
+    let c = first_child(node)
     while (c >= 0) {
         if is_kind(c, Node.Closure_param_list) {
-            let p = first_child(c);
+            let p = first_child(c)
             while (p >= 0) {
-                let name_at = first_child(p);
-                let t = next_sibling(name_at);
-                if t >= 0 { walk_type(t, w); };
-                declare_in_scope(Decl.ClosureParam, name_at, p, -1);
-                p = next_sibling(p);
-            };
+                let name_at = first_child(p)
+                let t = next_sibling(name_at)
+                if t >= 0 { walk_type(t, w) }
+                declare_in_scope(Decl.ClosureParam, name_at, p, -1)
+                p = next_sibling(p)
+            }
         } else if is_kind(c, Node.Return_type) {
-            walk_type(c, w);
+            walk_type(c, w)
         } else {
-            walk_expr(c, w);
-        };
-        c = next_sibling(c);
-    };
-    scope_pop(mark);
+            walk_expr(c, w)
+        }
+        c = next_sibling(c)
+    }
+    scope_pop(mark)
 }
 
 fn walk_for_sources(sources: I32, w: Walk) void {
-    let s = first_child(sources);
+    let s = first_child(sources)
     while (s >= 0) {
-        walk_children(s, w);
-        s = next_sibling(s);
-    };
+        walk_children(s, w)
+        s = next_sibling(s)
+    }
 }
 
 /// `xs map |x| { … }`, `xs fold(0) |acc, x| { … }`, `xs collect(T)`: the
 /// parameters and types, then the block with the capture in scope.
 fn walk_iterator(node: I32, w: Walk) void {
-    let c = first_child(node);
-    walk_expr(c, w);
-    c = next_sibling(c);
-    let mark = scope_mark();
+    let c = first_child(node)
+    walk_expr(c, w)
+    c = next_sibling(c)
+    let mark = scope_mark()
     while (c >= 0) {
-        let kind = node_kind[c];
+        let kind = node_kind[c]
         if kind == Node.Capture.i32() {
-            bind_capture(c, Decl.Capture);
+            bind_capture(c, Decl.Capture)
         } else if is_type_node(kind) {
-            walk_type(c, w);
+            walk_type(c, w)
         } else {
-            walk_expr(c, w);
-        };
-        c = next_sibling(c);
-    };
-    scope_pop(mark);
+            walk_expr(c, w)
+        }
+        c = next_sibling(c)
+    }
+    scope_pop(mark)
 }
 
 fn is_type_node(kind: I32) Bool {
     kind == Node.Ref_type.i32() or kind == Node.Nullable_type.i32() or kind == Node.Paren_type.i32()
         or kind == Node.Tuple_type.i32() or kind == Node.Func_type.i32() or kind == Node.Closure_type.i32()
-        or kind == Node.Promoted_type.i32();
+        or kind == Node.Promoted_type.i32()
 }
 
 /// `Variant |x| => e`: the variant (by its type when it is qualified), then
 /// the arm with the binding in scope.
 fn walk_alt_arm(arm: I32, w: Walk) void {
-    let pattern = first_child(arm);
-    if is_kind(pattern, Node.Qualified_type_ref) { walk_variant_path(pattern, w); }
+    let pattern = first_child(arm)
+    if is_kind(pattern, Node.Qualified_type_ref) { walk_variant_path(pattern, w) }
     else {
-        let decl = lookup(word_of(pattern));
-        if decl >= 0 and is_type_decl(decl) { node_decl[pattern] = decl; };
-    };
-    let c = next_sibling(pattern);
-    let mark = scope_mark();
+        let decl = lookup(word_of(pattern))
+        if decl >= 0 and is_type_decl(decl) { node_decl[pattern] = decl }
+    }
+    let c = next_sibling(pattern)
+    let mark = scope_mark()
     if arm_binding(arm) >= 0 {
-        declare_in_scope(Decl.ArmBinding, c, arm, -1);
-        c = next_sibling(c);
-    };
-    walk_expr(c, w);
-    scope_pop(mark);
+        declare_in_scope(Decl.ArmBinding, c, arm, -1)
+        c = next_sibling(c)
+    }
+    walk_expr(c, w)
+    scope_pop(mark)
 }
 
 /// An alt arm's `|x|` binding, or -1. The arm `V => x` has no binding: the
 /// binding is the identifier between the pattern and the arm's expression.
 fn arm_binding(arm: I32) I32 {
-    let c = next_sibling(first_child(arm));
-    if is_kind(c, Node.Identifier) and next_sibling(c) >= 0 { c; } else { -1; };
+    let c = next_sibling(first_child(arm))
+    if is_kind(c, Node.Identifier) and next_sibling(c) >= 0 { c } else { -1 }
 }
 
 /// `Tag.Leaf` (or `m.Tag.Leaf`) in a match: the integer enum and its variant.
 fn walk_match_lit(lit: I32, w: Walk) void {
-    let t = first_child(lit);
-    if not is_kind(t, Node.Type_ident) { return; };
-    let v = last_child(lit);
-    let owner = -1;
+    let t = first_child(lit)
+    if not is_kind(t, Node.Type_ident) { return }
+    let v = last_child(lit)
+    let owner = -1
     if next_sibling(t) != v {
         // `m.Tag`: mod m's enum.
-        let module = walk_owner_name(t);
-        let e = next_sibling(t);
-        owner = if decl_is(module, Decl.Module) { member(module, word_of(e), Space.Member); } else { -1; };
-        if decl_is(module, Decl.Module) and owner < 0 { report(Diag.UnknownType, e, word_of(e)); };
-        node_decl[e] = owner;
-    } else { owner = walk_type_name(t, w); };
-    node_decl[v] = member(owner, word_of(v), Space.Member);
+        let module = walk_owner_name(t)
+        let e = next_sibling(t)
+        owner = if decl_is(module, Decl.Module) { member(module, word_of(e), Space.Member) } else { -1 }
+        if decl_is(module, Decl.Module) and owner < 0 { report(Diag.UnknownType, e, word_of(e)) }
+        node_decl[e] = owner
+    } else { owner = walk_type_name(t, w) }
+    node_decl[v] = member(owner, word_of(v), Space.Member)
 }
 
 /// `T { a: e, … }`: each field name recorded as `owner`'s field.
 fn walk_field_inits(first_init: I32, owner: I32, w: Walk) void {
-    let f = first_init;
+    let f = first_init
     while (f >= 0) {
-        let name = first_child(f);
-        if owner >= 0 { node_decl[name] = member(owner, word_of(name), Space.Member); };
-        walk_expr(next_sibling(name), w);
-        f = next_sibling(f);
-    };
+        let name = first_child(f)
+        if owner >= 0 { node_decl[name] = member(owner, word_of(name), Space.Member) }
+        walk_expr(next_sibling(name), w)
+        f = next_sibling(f)
+    }
 }
 
 /// `x -o f`, `x -o M.f(a, &)`, `x -o T.method`.
 fn walk_pipe_target(target: I32, w: Walk) void {
-    let c = first_child(target);
-    let owner = -1;
+    let c = first_child(target)
+    let owner = -1
     if is_kind(c, Node.Instantiated_module_ref) {
-        owner = walk_type_path(c, w);
+        owner = walk_type_path(c, w)
     } else if is_kind(c, Node.Identifier) {
-        let decl = lookup(word_of(c));
-        if ambiguous(decl, c) { decl = -1; } else if decl < 0 { report_unknown(Diag.UnknownVariable, c, word_of(c), Seek.Value); } else { node_decl[c] = decl; };
-        owner = decl;
+        let decl = lookup(word_of(c))
+        if ambiguous(decl, c) { decl = -1 } else if decl < 0 { report_unknown(Diag.UnknownVariable, c, word_of(c), Seek.Value) } else { node_decl[c] = decl }
+        owner = decl
     } else {
-        owner = walk_owner_name(c);
-    };
-    c = next_sibling(c);
+        owner = walk_owner_name(c)
+    }
+    c = next_sibling(c)
     while (c >= 0 and (is_kind(c, Node.Identifier) or is_kind(c, Node.Type_ident))) {
-        let found = if decl_is(owner, Decl.Module) or (owner >= 0 and is_type_decl(owner)) { static_member(owner, word_of(c)); } else { -1; };
-        node_decl[c] = found;
-        owner = found;
-        c = next_sibling(c);
-    };
-    if c >= 0 { walk_pipe_args(c, w); };
+        let found = if decl_is(owner, Decl.Module) or (owner >= 0 and is_type_decl(owner)) { static_member(owner, word_of(c)) } else { -1 }
+        node_decl[c] = found
+        owner = found
+        c = next_sibling(c)
+    }
+    if c >= 0 { walk_pipe_args(c, w) }
 }
 
 fn walk_pipe_args(args: I32, w: Walk) void {
-    let list = first_child(args);
-    let a = first_child(list);
+    let list = first_child(args)
+    let a = first_child(list)
     while (a >= 0) {
-        if is_kind(a, Node.Pipe_arg) { walk_expr(first_child(a), w); };
-        a = next_sibling(a);
-    };
+        if is_kind(a, Node.Pipe_arg) { walk_expr(first_child(a), w) }
+        a = next_sibling(a)
+    }
 }
 
 /// The type or module a name before `.` names: `Tag` in `Tag.Leaf`, `M` in `M.f`.
 fn walk_owner_name(node: I32) I32 {
-    let word = word_of(node);
-    let decl = lookup(word);
-    if ambiguous(decl, node) { return -1; };
+    let word = word_of(node)
+    let decl = lookup(word)
+    if ambiguous(decl, node) { return -1 }
     if decl < 0 or not is_type_decl(decl) {
-        if not builtin_type(word) { report_unknown(Diag.UnknownType, node, word, Seek.Type); };
-        return -1;
-    };
+        if not builtin_type(word) { report_unknown(Diag.UnknownType, node, word, Seek.Type) }
+        return -1
+    }
     if decl_is(decl, Decl.Alias) {
-        node_alias[node] = decl;
-        decl = decl_a[decl];
-    };
-    node_decl[node] = decl;
-    decl;
+        node_alias[node] = decl
+        decl = decl_a[decl]
+    }
+    node_decl[node] = decl
+    decl
 }
 
 /// What `T.name` names: a member of a module (or of its promoted type: a
 /// method or variant), a variant, or a method.
 fn static_member(owner: I32, word: I32) I32 {
-    if owner < 0 { return -1; };
-    let found = member(owner, word, Space.Member);
-    if found >= 0 { return found; };
-    found = member(owner, word, Space.Method);
-    if found >= 0 { return found; };
-    if decl_is(owner, Decl.Module) and decl_a[owner] >= 0 { return static_member(decl_a[owner], word); };
+    if owner < 0 { return -1 }
+    let found = member(owner, word, Space.Member)
+    if found >= 0 { return found }
+    found = member(owner, word, Space.Method)
+    if found >= 0 { return found }
+    if decl_is(owner, Decl.Module) and decl_a[owner] >= 0 { return static_member(decl_a[owner], word) }
     // `B.wrap` with B open, where B names its type `&`: B's function.
-    if module_named(owner) != owner { return member(module_named(owner), word, Space.Member); };
-    -1;
+    if module_named(owner) != owner { return member(module_named(owner), word, Space.Member) }
+    -1
 }

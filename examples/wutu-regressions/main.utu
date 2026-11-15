@@ -1,14 +1,14 @@
 // Wutu behaviors once broken, checked in a browser by
 // scripts/test-wutu-regressions.mjs (built prerendered, then hydrated).
-using Browser from std:Browser;
-using time from std:Time;
+using Browser from std:Browser
+using time from std:Time
 
-mem ticks: I32;
+mem ticks: I32
 
 struct Reader:
     | k: I32
 
-fn Reader.read |self| () I32 { ticks[0] + self.k; }
+fn Reader.read |self| () I32 { ticks[0] + self.k }
 
 struct Row:
     | id: Str
@@ -31,53 +31,53 @@ struct State:
 fn cell(label: Str) Browser.HTMLElement {
     @wutu/\
     span.cell { = label; }
-    \/;
+    \/
 }
 
 /// Takes another component: it lands inside, not beside.
 fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
     @wutu/\
     figure { header { "Title"; } = body; }
-    \/;
+    \/
 }
 
 /// Reused unless what it reads changes: a method that reads a mem does.
 fn byMethod(label: Str) Browser.HTMLElement {
-    let r = Reader { k: 0 };
+    let r = Reader { k: 0 }
     @wutu/\
     span#method { = label + r.read().str(); }
-    \/;
+    \/
 }
 
 /// The clock is new each time: never reused.
 fn byClock(label: Str) Browser.HTMLElement {
     @wutu/\
     span#clock { = label + time.now().str(); }
-    \/;
+    \/
 }
 
 fn beat(state: State) Browser.HTMLElement {
-    wutu.interval("beat", 20.0, cl() void { state.beats += 1; });
+    wutu.interval("beat", 20.0, cl() void { state.beats += 1 })
     @wutu/\
     p#beat { "beating"; }
-    \/;
+    \/
 }
 
 fn icon(state: State) Browser.SVGElement {
     @wutu/\
     @reactive;
     svg { viewBox = "0 0 10 10"; circle { r = state.n.str(); } use#ns { xlink:href = "#c" + state.n.str(); xml:space = "preserve"; } }
-    \/;
+    \/
 }
 
 export main() void {
-    ticks.push(0);
+    ticks.push(0)
     let state = State {
         n: 0,
         rows: [Row { id: "a", cells: ["b|c"] }, Row { id: "a|b", cells: ["c"] }],
         number: 2.5, capped: 5.0, pick: "c", options: ["a", "b", "c"],
         timer: true, beats: 0, hidden: true, width: "40%", twice: 0, picks: [""],
-    };
+    }
     let app = @wutu/\
     @reactive;
     main {
@@ -128,6 +128,6 @@ export main() void {
             for state.rows |row| key row.id { = framed(cell(row.id)); }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

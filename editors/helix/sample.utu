@@ -1,6 +1,6 @@
 // A tour of what the Helix support does. Open it with `hx editors/helix/sample.utu`.
-using Browser from std:Browser;
-using ui from "./sample_ui.utu";
+using Browser from std:Browser
+using ui from "./sample_ui.utu"
 
 /// A to-do item. (Hover a name with `space k`; `gd` goes to its definition.)
 struct Todo:
@@ -25,7 +25,7 @@ struct Settings:
     | limit: I32
 
 fn settings() Settings {
-    @json/\ decode Settings `{"title": "Things to do", "limit": 20}` \/ orelse Settings { title: "Todo", limit: 10 };
+    @json/\ decode Settings `{"title": "Things to do", "limit": 20}` \/ orelse Settings { title: "Todo", limit: 10 }
 }
 
 /// A shared stylesheet (the payload is highlighted as CSS).
@@ -33,17 +33,17 @@ fn sheet() Str {
     @css/\
     .badge { font-size: 0.8rem; }
     li.done { text-decoration: line-through; }
-    \/;
+    \/
 }
 
 /// Host JavaScript (the payload is highlighted as JavaScript).
 fn now() F64 {
-    let read: fun() F64 = @es/\ () => performance.now() \/;
-    read();
+    let read: fun() F64 = @es/\ () => performance.now() \/
+    read()
 }
 
 fn left(todos: Array[Todo]) I32 {
-    todos count_where |t| { not t.done; };
+    todos count_where |t| { not t.done }
 }
 
 fn shown(todos: Array[Todo], filter: Filter) Array[Todo] {
@@ -52,17 +52,16 @@ fn shown(todos: Array[Todo], filter: Filter) Array[Todo] {
             All => true,
             Open => not t.done,
             Done => t.done,
-        };
-    } collect(Todo);
+        }
+    } collect(Todo)
 }
 
 export main() void {
-    let config = settings();
-    let state = State { draft: "", todos: [], made: 0, filter: All {} };
-    let started = now();
+    let config = settings()
+    let state = State { draft: "", todos: [], made: 0, filter: All {} }
+    let started = now()
     let help = \\Type a task and press Enter.
                \\Tick it when it is done.
-    ;
     Browser.document.body.append(@wutu/\
     @reactive;
     @style sheet();
@@ -123,14 +122,14 @@ export main() void {
             }
         }
     }
-    \/);
+    \/)
 }
 
 test "a new list has nothing left" {
-    assert left([]) == 0;
+    assert left([]) == 0
 }
 
 test "done items are filtered out of Open" {
-    let todos = [Todo { id: 1, text: "a", done: true }, Todo { id: 2, text: "b", done: false }];
-    assert shown(todos, Open {}).len() == 1;
+    let todos = [Todo { id: 1, text: "a", done: true }, Todo { id: 2, text: "b", done: false }]
+    assert shown(todos, Open {}).len() == 1
 }

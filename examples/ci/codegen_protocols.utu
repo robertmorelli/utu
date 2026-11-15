@@ -26,57 +26,57 @@ struct Shelf:
     | current : Measure
 
 fn Measure[Box].measure |self| () I32 {
-    self.width * self.height;
+    self.width * self.height
 }
 
 fn Measure[Square].measure |self| () I32 {
-    self.side * self.side;
+    self.side * self.side
 }
 
 fn CounterOps[Counter].bump |self| () I32 {
-    self.value + 1;
+    self.value + 1
 }
 
 fn total_measure(first: Measure, shelf: Shelf) I32 {
-    first.measure() + shelf.current.measure() + shelf.items[1].measure();
+    first.measure() + shelf.current.measure() + shelf.items[1].measure()
 }
 
 fn maybe_box(flag: Bool) ?Box {
-    if flag { Box { width: 2, height: 5 }; } else { Box.null; };
+    if flag { Box { width: 2, height: 5 } } else { Box.null }
 }
 
 test "protocol method sugar dispatches on tagged structs" {
-    let box: Box = Box { width: 2, height: 3 };
-    let square: Square = Square { side: 4 };
-    assert box.measure() == 6;
-    assert square.measure() == 16;
+    let box: Box = Box { width: 2, height: 3 }
+    let square: Square = Square { side: 4 }
+    assert box.measure() == 6
+    assert square.measure() == 16
 }
 
 test "protocol methods dispatch through receiver syntax" {
-    let box: Box = Box { width: 3, height: 4 };
-    assert box.measure() == 12;
+    let box: Box = Box { width: 3, height: 4 }
+    assert box.measure() == 12
 }
 
 test "getter-only protocols expose their implementing field" {
-    let rect: Rect = Rect { area: 12 };
-    assert rect.area == 12;
+    let rect: Rect = Rect { area: 12 }
+    assert rect.area == 12
 }
 
 test "protocol getters and methods compose" {
-    let counter: Counter = Counter { value: 7 };
-    assert counter.value == 7;
-    assert counter.bump() == 8;
+    let counter: Counter = Counter { value: 7 }
+    assert counter.value == 7
+    assert counter.bump() == 8
 }
 
 test "protocol methods work with promote captures" {
     promote maybe_box(true) {
         |box| => assert box.measure() == 10,
         ~> fatal,
-    };
+    }
 }
 
 test "protocol values can live in arrays fields and params" {
-    let items: Array[Measure] = [Box { width: 2, height: 3 }, Square { side: 4 }];
-    let shelf: Shelf = Shelf { items: items, current: items[0] };
-    assert total_measure(items[1], shelf) == 38;
+    let items: Array[Measure] = [Box { width: 2, height: 3 }, Square { side: 4 }]
+    let shelf: Shelf = Shelf { items: items, current: items[0] }
+    assert total_measure(items[1], shelf) == 38
 }

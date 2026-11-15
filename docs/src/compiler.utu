@@ -1,6 +1,6 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod compiler {
     fn pipeline_sample() Str {
         \\source files
@@ -14,7 +14,6 @@ mod compiler {
         \\wasm backend ── types, module, local cleanup, encoding, source maps
         \\    ▼
         \\app.wasm + the JavaScript glue it actually imports
-        ;
     }
     fn stages_sample() Str {
         \\bun run build        # stage 0 (stage0/utu.wasm) builds stage 1,
@@ -22,7 +21,6 @@ mod compiler {
         \\                     # stages 2 and 3 must be identical
         \\bun run stage0       # the compiler just built becomes stage 0
         \\bun run test         # the whole suite, including the bootstrap
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -183,6 +181,6 @@ mod compiler {
             }
             = ui.further("PRINCIPLES.md", "utu design principles");
         }
-        \/;
+        \/
     }
 }

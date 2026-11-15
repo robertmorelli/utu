@@ -1,5 +1,5 @@
-using boxes |Box| from "./_boxes.utu";
+using boxes |Box| from "./_boxes.utu"
 
 export main() I32 {
-    Box.score(Box.new(20));
+    Box.score(Box.new(20))
 }

@@ -2,7 +2,7 @@ struct Box:
     | value : I32
 
 fn maybe_box() ?Box {
-    Box.null;
+    Box.null
 }
 
 export lib {
@@ -10,6 +10,6 @@ export lib {
         promote maybe_box() {
             |box| => box.value,
             ~> 0,
-        };
+        }
     }
 }

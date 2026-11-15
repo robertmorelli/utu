@@ -3,6 +3,6 @@ mod Group[K, T] {
         | key: K
         | values: Array[T]
     fn &.new(key: K) & {
-        &{ key: key, values: [] };
+        &{ key: key, values: [] }
     }
 }

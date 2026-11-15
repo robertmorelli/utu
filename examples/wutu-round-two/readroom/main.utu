@@ -1,6 +1,6 @@
-using Browser from std:Browser;
-using theme from "../theme.utu";
-using NumberField from std:NumberField;
+using Browser from std:Browser
+using theme from "../theme.utu"
+using NumberField from std:NumberField
 struct Book:
 | id: Str
 | title: Str
@@ -39,7 +39,7 @@ fn notes(book:Book) Browser.HTMLElement {
             "Notes save on this device after you pause typing.";
         }
     }
-    \/;
+    \/
 }
 fn workspace(state: ReadroomState) Browser.HTMLElement {
     @wutu/\
@@ -86,7 +86,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 export main() void {
     let state = @stored/\
@@ -114,7 +114,7 @@ export main() void {
             }
             ]
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @style theme.sheet();
@@ -162,6 +162,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

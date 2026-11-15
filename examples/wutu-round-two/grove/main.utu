@@ -1,6 +1,6 @@
-using Browser from std:Browser;
-using theme from "../theme.utu";
-using NumberField from std:NumberField;
+using Browser from std:Browser
+using theme from "../theme.utu"
+using NumberField from std:NumberField
 struct Plant:
 | id: Str
 | name: Str
@@ -10,12 +10,12 @@ struct GroveState:
 | date: Str
 | plants: Array[Plant]
 fn today() Str {
-    let date:fun() Str=@es/\ ()=>{const date=new Date();return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');} \/;
-    date();
+    let date:fun() Str=@es/\ ()=>{const date=new Date();return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');} \/
+    date()
 }
 fn days(start:Str,end:Str) I32 {
-    let difference:fun(Str,Str) I32=@es/\ (start,end)=>Math.round((Date.parse(end+'T12:00:00Z')-Date.parse(start+'T12:00:00Z'))/86400000)||0 \/;
-    difference(start,end);
+    let difference:fun(Str,Str) I32=@es/\ (start,end)=>Math.round((Date.parse(end+'T12:00:00Z')-Date.parse(start+'T12:00:00Z'))/86400000)||0 \/
+    difference(start,end)
 }
 fn workspace(state: GroveState) Browser.HTMLElement {
     @wutu/\
@@ -70,7 +70,7 @@ fn workspace(state: GroveState) Browser.HTMLElement {
             "Intervals are reminders, not automatic watering instructions. Light, soil, pot size, and seasons change what plants need.";
         }
     }
-    \/;
+    \/
 }
 export main() void {
     let state = @stored/\
@@ -95,7 +95,7 @@ export main() void {
             }
             ]
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @style theme.sheet();
@@ -136,6 +136,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

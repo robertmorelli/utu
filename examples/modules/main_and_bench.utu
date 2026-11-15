@@ -3,29 +3,29 @@ mod counter[T] {
         | value : T
 
     fn Box.new(value: T) Box {
-        Box { value: value };
+        Box { value: value }
     }
 
     fn Box.get |self| () T {
-        self.value;
+        self.value
     }
 }
 
-using counter[I32] |ints|;
+using counter[I32] |ints|
 
 fn step(value: I32) ints.Box {
-    ints.Box.new(value + 1);
+    ints.Box.new(value + 1)
 }
 
 bench "module counter get" {
-    let box: ints.Box = step(9);
+    let box: ints.Box = step(9)
     measure {
-        box.get();
+        box.get()
     }
 }
 
 export main() I32 {
-    let alias_box: ints.Box = step(9);
-    let inline_box: counter[I32].Box = counter[I32].Box.new(12);
-    alias_box.get() + inline_box.get();
+    let alias_box: ints.Box = step(9)
+    let inline_box: counter[I32].Box = counter[I32].Box.new(12)
+    alias_box.get() + inline_box.get()
 }

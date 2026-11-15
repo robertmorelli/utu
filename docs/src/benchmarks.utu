@@ -1,5 +1,5 @@
-using Browser from std:Browser;
-using ui from "./ui.utu";
+using Browser from std:Browser
+using ui from "./ui.utu"
 mod benchmarks {
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -1766,6 +1766,6 @@ mod benchmarks {
                 }
             }
         }
-        \/;
+        \/
     }
 }

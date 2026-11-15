@@ -1,7 +1,7 @@
 // Foundry's interface in wutu: state, widgets, the HUD, the build palette,
 // one panel per machine type, the footer, and the windows. See UI.md.
-using Browser from std:Browser;
-using sim from "./sim.utu";
+using Browser from std:Browser
+using sim from "./sim.utu"
 
 mod ui {
     struct Alert:
@@ -47,43 +47,43 @@ mod ui {
         | colors: Array[Str]
         | item_colors: Array[Str]
 
-    let tool_none: I32 = -1;
-    let tool_remove: I32 = -2;
-    let item_count: I32 = 26;
+    let tool_none: I32 = -1
+    let tool_remove: I32 = -2
+    let item_count: I32 = 26
 
     fn categories() Array[Str] {
-        ["extraction", "smelting", "production", "logistics", "storage", "energy", "science", "circuits"];
+        ["extraction", "smelting", "production", "logistics", "storage", "energy", "science", "circuits"]
     }
 
     fn category_color(category: Str) Str {
-        let names = categories();
-        let colors = ["#a1887f", "#e67e22", "#4da3ff", "#f1c40f", "#95a5a6", "#4cc38a", "#b388ff", "#ff6fa5"];
-        let color = "#888888";
+        let names = categories()
+        let colors = ["#a1887f", "#e67e22", "#4da3ff", "#f1c40f", "#95a5a6", "#4cc38a", "#b388ff", "#ff6fa5"]
+        let color = "#888888"
         for (0..<names.len()) |i| {
             if names[i] == category {
-                color = colors[i];
-            };
-        };
-        color;
+                color = colors[i]
+            }
+        }
+        color
     }
 
     // Two capital letters from a machine name: "electric-miner" → "EM".
     fn glyph(name: Str) Str {
-        let codes = [name[0] - 32, 0];
-        let dash = -1;
+        let codes = [name[0] - 32, 0]
+        let dash = -1
         for (0..<name.len()) |i| {
             if dash < 0 and name[i] == 45 {
-                dash = i;
-            };
-        };
-        codes[1] = if dash > 0 and dash + 1 < name.len() { name[dash + 1] - 32; } else { name[1] - 32; };
-        Str.from_codes(codes, 2);
+                dash = i
+            }
+        }
+        codes[1] = if dash > 0 and dash + 1 < name.len() { name[dash + 1] - 32 } else { name[1] - 32 }
+        Str.from_codes(codes, 2)
     }
 
     fn new_ui(w: sim.World, game_text: Str, starter_text: Str) Ui {
-        let machines = w.game.machines;
-        let empty_alerts: Array[Alert] = [];
-        let none: Array[I32] = [];
+        let machines = w.game.machines
+        let empty_alerts: Array[Alert] = []
+        let none: Array[I32] = []
         Ui {
             w: w, game_text: game_text, starter_text: starter_text, speed: 1, tool: tool_none, dir: 1, tab: 0,
             cam_x: 0.0, cam_y: 0.0, zoom: 24.0, selected: -1, pinned: none, hover_x: -1, hover_y: -1, windows: [],
@@ -92,84 +92,84 @@ mod ui {
             supply: Array[I32].new_default(60), demand: Array[I32].new_default(60), alerts: empty_alerts,
             done_count: 0, range10: false, search: "", text: "", notice: "",
             drag: false, drag_x: 0.0, drag_y: 0.0, dragged: false, frame: 0,
-            glyphs: machines map |m| { glyph(m.name); } collect(Str),
-            colors: machines map |m| { category_color(m.category); } collect(Str),
-            item_colors: w.game.items map |item| { item.color; } collect(Str),
-        };
+            glyphs: machines map |m| { glyph(m.name) } collect(Str),
+            colors: machines map |m| { category_color(m.category) } collect(Str),
+            item_colors: w.game.items map |item| { item.color } collect(Str),
+        }
     }
 
     // ── sampling and alerts ──────────────────────────────────────────────────
 
     fn add_alert(ui: Ui, text: Str, kind: Str, entity: I32) void {
-        let kept = ui.alerts filter |a| { not (a.text == text and a.entity == entity); } take(7) collect(Alert);
-        ui.alerts = [Alert { text: text, kind: kind, entity: entity }] chain(kept) collect(Alert);
+        let kept = ui.alerts filter |a| { not (a.text == text and a.entity == entity) } take(7) collect(Alert)
+        ui.alerts = [Alert { text: text, kind: kind, entity: entity }] chain(kept) collect(Alert)
     }
 
     // Take the 1-second (and every tenth, the 10-second) production and power samples.
     fn sample(ui: Ui) void {
-        let w = ui.w;
+        let w = ui.w
         while (ui.samples < w.tick / 60) {
-            let slot = ui.samples % 60;
+            let slot = ui.samples % 60
             for (0..<item_count) |i| {
-                ui.prod[slot * item_count + i] = w.produced[i] - ui.last[i];
-                ui.last[i] = w.produced[i];
-            };
-            ui.supply[slot] = w.supply;
-            ui.demand[slot] = w.demand;
+                ui.prod[slot * item_count + i] = w.produced[i] - ui.last[i]
+                ui.last[i] = w.produced[i]
+            }
+            ui.supply[slot] = w.supply
+            ui.demand[slot] = w.demand
             if ui.samples % 10 == 0 {
-                let slot10 = (ui.samples / 10) % 60;
+                let slot10 = (ui.samples / 10) % 60
                 for (0..<item_count) |i| {
-                    ui.prod10[slot10 * item_count + i] = w.produced[i] - ui.last10[i];
-                    ui.last10[i] = w.produced[i];
-                };
-            };
-            ui.samples += 1;
-            check_alerts(ui);
-        };
+                    ui.prod10[slot10 * item_count + i] = w.produced[i] - ui.last10[i]
+                    ui.last10[i] = w.produced[i]
+                }
+            }
+            ui.samples += 1
+            check_alerts(ui)
+        }
     }
 
     fn check_alerts(ui: Ui) void {
-        let w = ui.w;
+        let w = ui.w
         if w.satisfaction < 500 {
-            add_alert(ui, "No power: " + (w.satisfaction / 10).str() + "% satisfaction", "bad", -1);
-        };
-        let done = w.done sum;
+            add_alert(ui, "No power: " + (w.satisfaction / 10).str() + "% satisfaction", "bad", -1)
+        }
+        let done = w.done sum
         if done > ui.done_count {
             if ui.done_count > 0 or ui.w.tick > 60 {
-                add_alert(ui, "Research complete", "good", -1);
-            };
-            ui.done_count = done;
-        };
-        let crafters = w.crafters;
+                add_alert(ui, "Research complete", "good", -1)
+            }
+            ui.done_count = done
+        }
+        let crafters = w.crafters
         for (0..<crafters.n) |i| {
-            let e = crafters.items[i];
+            let e = crafters.items[i]
             if not e.busy and e.recipe >= 0 {
-                let full = false;
+                let full = false
                 for (w.game.recipes[e.recipe].products) |p| {
                     if e.out[p[0]] > p[1] {
-                        full = true;
-                    };
-                };
+                        full = true
+                    }
+                }
                 if full {
-                    add_alert(ui, w.game.machines[e.machine].label + " #" + e.id.str() + " output full", "", e.id);
-                };
-            };
-        };
+                    add_alert(ui, w.game.machines[e.machine].label + " #" + e.id.str() + " output full", "", e.id)
+                }
+            }
+        }
     }
 
     fn per_minute(ui: Ui, item: I32) I32 {
-        let total = 0;
+        let total = 0
         for (0..<60) |s| {
-            total += if ui.range10 { ui.prod10[s * item_count + item]; } else { ui.prod[s * item_count + item]; };
-        };
-        if ui.range10 { total / 10; } else { total; };
+            total += if ui.range10 { ui.prod10[s * item_count + item] } else { ui.prod[s * item_count + item] }
+        }
+        if ui.range10 { total / 10 } else { total }
     }
 
     // ── small widgets ────────────────────────────────────────────────────────
 
     fn percent(value: I32, max: I32) Str {
-        let p = if max <= 0 { 0; } else { sim.imin(100, sim.imax(0, value * 100 / max)); };
-        p.str() + "%";
+        let p = if max <= 0 { 0 } else { sim.imin(100, sim.imax(0, value * 100 / max)) }
+        p.str() + "%"
     }
 
     fn bar(value: I32, max: I32, kind: Str) Browser.HTMLElement {
@@ -180,7 +180,7 @@ mod ui {
                 width: = percent(value, max);
             }
         }
-        \/;
+        \/
     }
 
     fn row(label: Str, value: Str) Browser.HTMLElement {
@@ -189,7 +189,7 @@ mod ui {
             span.muted { = label; }
             b { = value; }
         }
-        \/;
+        \/
     }
 
     fn meter_row(label: Str, value: I32, max: I32, kind: Str) Browser.HTMLElement {
@@ -198,11 +198,11 @@ mod ui {
             span.muted { = label; }
             = bar(value, max, kind);
         }
-        \/;
+        \/
     }
 
     fn item_name(ui: Ui, item: I32) Str {
-        if item < 0 { "empty"; } else { ui.w.game.items[item].label; };
+        if item < 0 { "empty" } else { ui.w.game.items[item].label }
     }
 
     fn slot(ui: Ui, item: I32, count: I32) Browser.HTMLElement {
@@ -216,7 +216,7 @@ mod ui {
                 b { = count.str(); }
             }
         }
-        \/;
+        \/
     }
 
     // Nonzero counts as slots.
@@ -227,7 +227,7 @@ mod ui {
                 = slot(ui, i, counts[i]);
             }
         }
-        \/;
+        \/
     }
 
     fn lane(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -240,7 +240,7 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn state_name(e: sim.Entity) Str {
@@ -248,14 +248,14 @@ mod ui {
             0 => "idle",
             1 => "carrying",
             ~> "returning",
-        };
+        }
     }
 
     fn neighbor_name(ui: Ui, x: I32, y: I32) Str {
         promote sim.at(ui.w, x, y) {
             |n| => ui.w.game.machines[n.machine].label,
             ~> "nothing",
-        };
+        }
     }
 
     fn fluid_gauge(ui: Ui, item: I32, amount: I32, max: I32) Browser.HTMLElement {
@@ -270,17 +270,17 @@ mod ui {
             }
             small.muted { = amount.str(); }
         }
-        \/;
+        \/
     }
 
     // ── HUD ──────────────────────────────────────────────────────────────────
 
     fn clock(tick: I32) Str {
-        let phase = tick % 25200;
-        let minutes = phase * 1440 / 25200;
-        let hours = minutes / 60;
-        let mins = minutes % 60;
-        (if hours < 10 { "0"; } else { ""; }) + hours.str() + ":" + (if mins < 10 { "0"; } else { ""; }) + mins.str();
+        let phase = tick % 25200
+        let minutes = phase * 1440 / 25200
+        let hours = minutes / 60
+        let mins = minutes % 60
+        (if hours < 10 { "0" } else { "" }) + hours.str() + ":" + (if mins < 10 { "0" } else { "" }) + mins.str()
     }
 
     fn hud(ui: Ui) Browser.HTMLElement {
@@ -342,17 +342,17 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn research_name(ui: Ui) Str {
-        let r = ui.w.research_current;
-        if r < 0 { "No research"; } else { ui.w.game.techs[r].label; };
+        let r = ui.w.research_current
+        if r < 0 { "No research" } else { ui.w.game.techs[r].label }
     }
 
     fn research_percent(ui: Ui) Str {
-        let r = ui.w.research_current;
-        if r < 0 { "0%"; } else { percent(ui.w.research_progress, ui.w.game.techs[r].units); };
+        let r = ui.w.research_current
+        if r < 0 { "0%" } else { percent(ui.w.research_progress, ui.w.game.techs[r].units) }
     }
 
     // ── palette ──────────────────────────────────────────────────────────────
@@ -414,35 +414,35 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     // ── inspector ────────────────────────────────────────────────────────────
 
     fn is_pinned(ui: Ui, id: I32) Bool {
-        ui.pinned any |p| { p == id; };
+        ui.pinned any |p| { p == id }
     }
 
     fn toggle_pin(ui: Ui, id: I32) void {
         if is_pinned(ui, id) {
-            ui.pinned = ui.pinned filter |p| { p != id; } collect(I32);
+            ui.pinned = ui.pinned filter |p| { p != id } collect(I32)
         } else {
-            ui.pinned = ui.pinned chain([id]) collect(I32);
-        };
+            ui.pinned = ui.pinned chain([id]) collect(I32)
+        }
     }
 
     fn inspected(ui: Ui) Array[sim.Entity] {
-        let ids = if ui.selected > 0 and not is_pinned(ui, ui.selected) { [ui.selected] chain(ui.pinned) collect(I32); } else { ui.pinned; };
-        let found: Array[sim.Entity] = [];
+        let ids = if ui.selected > 0 and not is_pinned(ui, ui.selected) { [ui.selected] chain(ui.pinned) collect(I32) } else { ui.pinned }
+        let found: Array[sim.Entity] = []
         for (ids) |id| {
             promote sim.entity(ui.w, id) {
                 |e| => {
-                    found = found chain([e]) collect(sim.Entity);
+                    found = found chain([e]) collect(sim.Entity)
                 },
                 ~> {},
-            };
-        };
-        found;
+            }
+        }
+        found
     }
 
     fn inspector(ui: Ui) Browser.HTMLElement {
@@ -456,7 +456,7 @@ mod ui {
                 p.muted { "Click a machine to inspect it. Pick a machine on the left to build."; }
             }
         }
-        \/;
+        \/
     }
 
     fn machine_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -501,7 +501,7 @@ mod ui {
                 = panel_body(ui, e);
             }
         }
-        \/;
+        \/
     }
 
     fn panel_body(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -543,17 +543,17 @@ mod ui {
             34 => combinator(ui, e),
             35 => lamp(ui, e),
             ~> silo(ui, e),
-        };
+        }
     }
 
     // ── extraction ───────────────────────────────────────────────────────────
 
     fn tile_ore(ui: Ui, x: I32, y: I32) I32 {
-        if sim.inside(ui.w, x, y) { ui.w.res_kind[y * ui.w.width + x]; } else { -1; };
+        if sim.inside(ui.w, x, y) { ui.w.res_kind[y * ui.w.width + x] } else { -1 }
     }
 
     fn tile_amount(ui: Ui, x: I32, y: I32) I32 {
-        if sim.inside(ui.w, x, y) { ui.w.res_amount[y * ui.w.width + x]; } else { 0; };
+        if sim.inside(ui.w, x, y) { ui.w.res_amount[y * ui.w.width + x] } else { 0 }
     }
 
     fn burner_miner(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -571,7 +571,7 @@ mod ui {
                 = slot(ui, e.hand, e.held);
             }
         }
-        \/;
+        \/
     }
 
     fn electric_miner(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -592,23 +592,23 @@ mod ui {
                 = slot(ui, e.hand, e.held);
             }
         }
-        \/;
+        \/
     }
 
     fn offshore_pump(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let target = sim.back(ui.w, e, 1);
-        let fill = promote target { |t| => t.amount, ~> 0, };
-        let capacity = promote target { |t| => ui.w.speed[t.machine], ~> 100, };
+        let target = sim.back(ui.w, e, 1)
+        let fill = promote target { |t| => t.amount, ~> 0, }
+        let capacity = promote target { |t| => ui.w.speed[t.machine], ~> 100, }
         @wutu/\
         div {
             = row("Flow", if e.busy { "600 / s"; } else { "0 / s"; });
             = meter_row("Target pipe", fill, capacity, "info");
         }
-        \/;
+        \/
     }
 
     fn pumpjack(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let field = tile_amount(ui, e.x, e.y);
+        let field = tile_amount(ui, e.x, e.y)
         @wutu/\
         div {
             = row("Yield", (sim.imax(100, sim.imin(1000, field / 100)) / 10).str() + "%");
@@ -618,23 +618,23 @@ mod ui {
             }
             = meter_row("Pumping", e.progress, 6000, "info");
         }
-        \/;
+        \/
     }
 
     // ── smelting ─────────────────────────────────────────────────────────────
 
     fn recipe_name(ui: Ui, r: I32) Str {
-        if r < 0 { "none"; } else { ui.w.game.recipes[r].name; };
+        if r < 0 { "none" } else { ui.w.game.recipes[r].name }
     }
 
     fn first_item(counts: Array[I32]) I32 {
-        let found = -1;
+        let found = -1
         for (0..<counts.len()) |i| {
             if found < 0 and counts[i] > 0 {
-                found = i;
-            };
-        };
-        found;
+                found = i
+            }
+        }
+        found
     }
 
     fn furnace_slots(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -653,7 +653,7 @@ mod ui {
             }
             = meter_row("Progress", e.progress, if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time * 1000; } else { 1; }, "");
         }
-        \/;
+        \/
     }
 
     fn stone_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -666,7 +666,7 @@ mod ui {
             }
             = furnace_slots(ui, e);
         }
-        \/;
+        \/
     }
 
     fn steel_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -689,7 +689,7 @@ mod ui {
                 b { = e.heat.str() + " °C"; }
             }
         }
-        \/;
+        \/
     }
 
     fn electric_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -699,7 +699,7 @@ mod ui {
             = furnace_slots(ui, e);
             = row("Crafts", e.crafts.str());
         }
-        \/;
+        \/
     }
 
     // ── production ───────────────────────────────────────────────────────────
@@ -727,11 +727,11 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn progress_ring(e: sim.Entity, time: I32) Browser.Element {
-        let fraction = if time <= 0 { 0.0; } else { e.progress.f64() / (time * 1000).f64(); };
+        let fraction = if time <= 0 { 0.0 } else { e.progress.f64() / (time * 1000).f64() }
         @wutu/\
         svg {
             viewBox = "0 0 40 40";
@@ -757,15 +757,15 @@ mod ui {
                 transform-origin: center;
             }
         }
-        \/;
+        \/
     }
 
     fn recipe_time(ui: Ui, e: sim.Entity) I32 {
-        if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time; } else { 0; };
+        if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time } else { 0 }
     }
 
     fn allowed_recipes(ui: Ui, e: sim.Entity) Array[I32] {
-        (0..<ui.w.game.recipes.len()) filter |r| { sim.recipe_allowed(ui.w, e, r); } collect(I32);
+        (0..<ui.w.game.recipes.len()) filter |r| { sim.recipe_allowed(ui.w, e, r) } collect(I32)
     }
 
     fn assembler_1(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -787,11 +787,11 @@ mod ui {
                 = progress_ring(e, recipe_time(ui, e));
             }
         }
-        \/;
+        \/
     }
 
     fn effective_speed(ui: Ui, e: sim.Entity) I32 {
-        (ui.w.speed[e.machine] + 250 * sim.beacons(ui.w, e) * ui.w.satisfaction / 1000) * ui.w.satisfaction / 1000;
+        (ui.w.speed[e.machine] + 250 * sim.beacons(ui.w, e) * ui.w.satisfaction / 1000) * ui.w.satisfaction / 1000
     }
 
     fn assembler_2(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -819,7 +819,7 @@ mod ui {
             = row("Speed", (effective_speed(ui, e) / 10).str() + "%");
             = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
         }
-        \/;
+        \/
     }
 
     fn assembler_3(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -848,7 +848,7 @@ mod ui {
             = row("Effective speed", (effective_speed(ui, e) / 10).str() + "%");
             = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
         }
-        \/;
+        \/
     }
 
     fn fluid_side(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -864,7 +864,7 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn chemical_plant(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -892,7 +892,7 @@ mod ui {
             = slots(ui, e.out);
             = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
         }
-        \/;
+        \/
     }
 
     fn oil_refinery(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -906,7 +906,7 @@ mod ui {
             = row("Crafts", e.crafts.str());
             = meter_row("Progress", e.progress, 300000, "");
         }
-        \/;
+        \/
     }
 
     fn centrifuge(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -922,7 +922,7 @@ mod ui {
             = row("Next U-235 in", ((6 - e.crafts % 7 + 7) % 7 + 1).str() + " crafts");
             = slots(ui, e.inv);
         }
-        \/;
+        \/
     }
 
     // ── logistics ────────────────────────────────────────────────────────────
@@ -940,7 +940,7 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -950,7 +950,7 @@ mod ui {
             = belt_items(ui, e);
             = row("Speed", ui.w.speed[e.machine].str() + " / tick");
         }
-        \/;
+        \/
     }
 
     fn fast_belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -960,7 +960,7 @@ mod ui {
             = meter_row("Compression", (e.belt_n / 2) * 64, 256, "info");
             = belt_items(ui, e);
         }
-        \/;
+        \/
     }
 
     fn express_belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -970,7 +970,7 @@ mod ui {
             = row("State", if e.belt_n > 0 and e.belt[1] >= 256 { "blocked"; } else { "moving"; });
             = belt_items(ui, e);
         }
-        \/;
+        \/
     }
 
     fn splitter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1007,22 +1007,22 @@ mod ui {
             = row("Next output", if e.toggle == 0 { "front"; } else { "side"; });
             = lane(ui, e);
         }
-        \/;
+        \/
     }
 
     fn exit_distance(ui: Ui, e: sim.Entity) Str {
-        let found = "no exit";
+        let found = "no exit"
         for (1...5) |d| {
             promote sim.front(ui.w, e, d) {
                 |t| => {
                     if found == "no exit" and t.cls == 9 and t.dir == e.dir and t.role == 1 {
-                        found = d.str() + " tiles";
-                    };
+                        found = d.str() + " tiles"
+                    }
                 },
                 ~> {},
-            };
-        };
-        found;
+            }
+        }
+        found
     }
 
     fn underground(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1047,14 +1047,14 @@ mod ui {
             = row("Linked exit", if e.role == 0 { exit_distance(ui, e); } else { "this is an exit"; });
             = lane(ui, e);
         }
-        \/;
+        \/
     }
 
     fn connected(ui: Ui, e: sim.Entity, side: I32) Bool {
         promote sim.neighbor(ui.w, e, side) {
             |n| => n.cls == 10,
             ~> false,
-        };
+        }
     }
 
     fn pipe(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1067,7 +1067,7 @@ mod ui {
                 b { = (if connected(ui, e, 0) { "↑"; } else { "·"; }) + (if connected(ui, e, 1) { "→"; } else { "·"; }) + (if connected(ui, e, 2) { "↓"; } else { "·"; }) + (if connected(ui, e, 3) { "←"; } else { "·"; }); }
             }
         }
-        \/;
+        \/
     }
 
     fn storage_tank(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1082,13 +1082,13 @@ mod ui {
             = row("Fluid", if e.fluid >= 0 { item_name(ui, e.fluid); } else { "empty"; });
             = row("Fill", percent(e.amount, 2500) + " of 2500");
         }
-        \/;
+        \/
     }
 
     fn inserter_common(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let reach = ui.w.reach[e.machine];
-        let dxs = [0, 1, 0, -1];
-        let dys = [-1, 0, 1, 0];
+        let reach = ui.w.reach[e.machine]
+        let dxs = [0, 1, 0, -1]
+        let dys = [-1, 0, 1, 0]
         @wutu/\
         div {
             = row("State", state_name(e));
@@ -1101,11 +1101,11 @@ mod ui {
             = row("From", neighbor_name(ui, e.x - dxs[e.dir] * reach, e.y - dys[e.dir] * reach));
             = row("To", neighbor_name(ui, e.x + dxs[e.dir] * reach, e.y + dys[e.dir] * reach));
         }
-        \/;
+        \/
     }
 
     fn inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        inserter_common(ui, e);
+        inserter_common(ui, e)
     }
 
     fn long_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1120,7 +1120,7 @@ mod ui {
             }
             = inserter_common(ui, e);
         }
-        \/;
+        \/
     }
 
     fn fast_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1134,7 +1134,7 @@ mod ui {
             = row("Moved", e.moved.str());
             = row("Average", (e.moved * 3600 / sim.imax(1, ui.w.tick)).str() + " / min");
         }
-        \/;
+        \/
     }
 
     fn filter_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1158,7 +1158,7 @@ mod ui {
             = row("State", state_name(e));
             = row("Moved", e.moved.str());
         }
-        \/;
+        \/
     }
 
     fn stack_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1182,17 +1182,17 @@ mod ui {
             }
             = row("Moved", e.moved.str());
         }
-        \/;
+        \/
     }
 
     // ── storage ──────────────────────────────────────────────────────────────
 
     fn used_slots(counts: Array[I32]) I32 {
-        counts fold(0) |a, c| { a + (c + 49) / 50; };
+        counts fold(0) |a, c| { a + (c + 49) / 50 }
     }
 
     fn chest_grid(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let stacks = (0..<e.inv.len()) flat_map |i| { (0..<((e.inv[i] + 49) / 50)) map |k| { i; } collect(I32); } collect(I32);
+        let stacks = (0..<e.inv.len()) flat_map |i| { (0..<((e.inv[i] + 49) / 50)) map |k| { i } collect(I32) } collect(I32)
         @wutu/\
         div.chest-grid {
             for (0..<ui.w.speed[e.machine]) |s| key s.str() {
@@ -1205,7 +1205,7 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn wooden_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1214,7 +1214,7 @@ mod ui {
             = chest_grid(ui, e);
             = row("Used", used_slots(e.inv).str() + " of 16 slots");
         }
-        \/;
+        \/
     }
 
     fn steel_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1231,7 +1231,7 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn requester_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1247,7 +1247,7 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     // ── energy ───────────────────────────────────────────────────────────────
@@ -1264,11 +1264,11 @@ mod ui {
             = row("Running", if e.busy { "yes"; } else { "no"; });
             = row("Output", if e.busy { "900 kW"; } else { "0 kW"; });
         }
-        \/;
+        \/
     }
 
     fn solar_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let angle = (ui.w.tick % 25200).f64() / 25200.0 * 6.2832;
+        let angle = (ui.w.tick % 25200).f64() / 25200.0 * 6.2832
         @wutu/\
         div {
             svg {
@@ -1291,7 +1291,7 @@ mod ui {
             = meter_row("Light", ui.w.light, 1000, "");
             = row("Output", (60 * ui.w.light / 1000).str() + " kW");
         }
-        \/;
+        \/
     }
 
     fn accumulator(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1301,13 +1301,13 @@ mod ui {
             = row("Stored", e.charge.str() + " / 5000");
             = row("State", if ui.w.supply > ui.w.demand and e.charge < 5000 { "charging"; } else { if ui.w.supply < ui.w.demand and e.charge > 0 { "discharging"; } else { "idle"; }; });
         }
-        \/;
+        \/
     }
 
     // ── science ──────────────────────────────────────────────────────────────
 
     fn lab(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let r = ui.w.research_current;
+        let r = ui.w.research_current
         @wutu/\
         div {
             = row("Research", research_name(ui));
@@ -1319,7 +1319,7 @@ mod ui {
             = meter_row("Unit", e.progress, if r >= 0 { ui.w.game.techs[r].time * 1000; } else { 1; }, "info");
             = meter_row("Research", ui.w.research_progress, if r >= 0 { ui.w.game.techs[r].units; } else { 1; }, "good");
         }
-        \/;
+        \/
     }
 
     fn radar(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1328,7 +1328,7 @@ mod ui {
             = meter_row("Sweep", e.progress, 300000, "info");
             = row("Chunks revealed", e.crafts.str());
         }
-        \/;
+        \/
     }
 
     fn beacon(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1336,21 +1336,21 @@ mod ui {
             promote sim.at(ui.w, e.x + k % 5 - 2, e.y + k / 5 - 2) {
                 |n| => sim.is_crafter(n.cls),
                 ~> false,
-            };
-        };
+            }
+        }
         @wutu/\
         div {
             = row("Crafters in range", count.str());
             = row("Bonus each", "+" + (25 * ui.w.satisfaction / 1000).str() + "% speed");
         }
-        \/;
+        \/
     }
 
     fn combinator_source(ui: Ui, e: sim.Entity) I32 {
         promote sim.back(ui.w, e, 1) {
-            |s| => if s.inv.len() > 0 { s.inv[e.cond_item]; } else { 0; },
+            |s| => if s.inv.len() > 0 { s.inv[e.cond_item] } else { 0 },
             ~> 0,
-        };
+        }
     }
 
     fn combinator(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1396,7 +1396,7 @@ mod ui {
             = row("Source count", combinator_source(ui, e).str());
             = row("Signal", if e.signal { "on"; } else { "off"; });
         }
-        \/;
+        \/
     }
 
     fn lamp(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1407,14 +1407,14 @@ mod ui {
             }
             = row("Controlled by", if (0..<4) any |side| { connected_combinator(ui, e, side); } { "combinator"; } else { "nothing"; });
         }
-        \/;
+        \/
     }
 
     fn connected_combinator(ui: Ui, e: sim.Entity, side: I32) Bool {
         promote sim.neighbor(ui.w, e, side) {
             |n| => n.cls == 19,
             ~> false,
-        };
+        }
     }
 
     fn silo(ui: Ui, e: sim.Entity) Browser.HTMLElement {
@@ -1436,7 +1436,7 @@ mod ui {
             }
             = row("Rockets launched", e.crafts.str());
         }
-        \/;
+        \/
     }
 
     // ── footer ───────────────────────────────────────────────────────────────
@@ -1466,13 +1466,13 @@ mod ui {
                 = tile_info(ui);
             }
         }
-        \/;
+        \/
     }
 
     fn tile_info(ui: Ui) Browser.HTMLElement {
-        let x = ui.hover_x;
-        let y = ui.hover_y;
-        let inside = sim.inside(ui.w, x, y);
+        let x = ui.hover_x
+        let y = ui.hover_y
+        let inside = sim.inside(ui.w, x, y)
         @wutu/\
         div {
             if inside {
@@ -1484,25 +1484,25 @@ mod ui {
                 span.muted { "Hover the map."; }
             }
         }
-        \/;
+        \/
     }
 
     // ── windows ──────────────────────────────────────────────────────────────
 
     fn is_open(ui: Ui, name: Str) Bool {
-        ui.windows any |w| { w == name; };
+        ui.windows any |w| { w == name }
     }
 
     fn toggle_window(ui: Ui, name: Str) void {
         if is_open(ui, name) {
-            ui.windows = ui.windows filter |w| { w != name; } collect(Str);
+            ui.windows = ui.windows filter |w| { w != name } collect(Str)
         } else {
-            ui.windows = ui.windows chain([name]) collect(Str);
-        };
+            ui.windows = ui.windows chain([name]) collect(Str)
+        }
     }
 
     fn window_title(name: Str) Str {
-        name.slice(0, 1).to_upper() + name.slice(1, name.len());
+        name.slice(0, 1).to_upper() + name.slice(1, name.len())
     }
 
     // The open windows, side by side.
@@ -1531,29 +1531,29 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn window_body(ui: Ui, name: Str) Browser.HTMLElement {
-        if name == "research" { research_window(ui); } else {
-            if name == "production" { production_window(ui); } else {
-                if name == "power" { power_window(ui); } else { saves_window(ui); };
-            };
-        };
+        if name == "research" { research_window(ui) } else {
+            if name == "production" { production_window(ui) } else {
+                if name == "power" { power_window(ui) } else { saves_window(ui) }
+            }
+        }
     }
 
     fn tech_state(ui: Ui, t: I32) Str {
-        if ui.w.done[t] == 1 { "done"; } else {
-            if ui.w.research_current == t { "current"; } else {
-                if sim.research_available(ui.w, t) { "available"; } else { "locked"; };
-            };
-        };
+        if ui.w.done[t] == 1 { "done" } else {
+            if ui.w.research_current == t { "current" } else {
+                if sim.research_available(ui.w, t) { "available" } else { "locked" }
+            }
+        }
     }
 
     fn unlocks(ui: Ui, t: I32) Str {
-        let tech = ui.w.game.techs[t];
-        let parts = (tech.machines map |m| { ui.w.game.machines[m].label; } collect(Str)) chain(tech.recipes map |r| { ui.w.game.recipes[r].name; } collect(Str)) collect(Str);
-        parts fold("") |text, part, i| { if i == 0 { part; } else { text + ", " + part; }; };
+        let tech = ui.w.game.techs[t]
+        let parts = (tech.machines map |m| { ui.w.game.machines[m].label } collect(Str)) chain(tech.recipes map |r| { ui.w.game.recipes[r].name } collect(Str)) collect(Str)
+        parts fold("") |text, part, i| { if i == 0 { part } else { text + ", " + part } }
     }
 
     fn research_window(ui: Ui) Browser.HTMLElement {
@@ -1575,18 +1575,18 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn spark_path(ui: Ui, item: I32) Str {
         let values = (0..<60) map |k| {
-            let s = (ui.samples + k) % 60;
-            if ui.range10 { ui.prod10[s * item_count + item]; } else { ui.prod[s * item_count + item]; };
-        } collect(I32);
-        let high = sim.imax(1, values fold(0) |m, v| { sim.imax(m, v); });
+            let s = (ui.samples + k) % 60
+            if ui.range10 { ui.prod10[s * item_count + item] } else { ui.prod[s * item_count + item] }
+        } collect(I32)
+        let high = sim.imax(1, values fold(0) |m, v| { sim.imax(m, v) })
         values fold("") |d, v, k| {
-            d + (if k == 0 { "M"; } else { " L"; }) + k.str() + " " + (20 - v * 18 / high).str();
-        };
+            d + (if k == 0 { "M" } else { " L" }) + k.str() + " " + (20 - v * 18 / high).str()
+        }
     }
 
     fn production_window(ui: Ui) Browser.HTMLElement {
@@ -1631,31 +1631,31 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn graph_path(values: Array[I32], start: I32, high: I32) Str {
         (0..<60) fold("") |d, k| {
-            let v = values[(start + k) % 60];
-            d + (if k == 0 { "M"; } else { " L"; }) + (k * 10).str() + " " + (118 - v * 110 / sim.imax(1, high)).str();
-        };
+            let v = values[(start + k) % 60]
+            d + (if k == 0 { "M" } else { " L" }) + (k * 10).str() + " " + (118 - v * 110 / sim.imax(1, high)).str()
+        }
     }
 
     fn demand_by_machine(ui: Ui) Array[I32] {
-        let totals = Array[I32].new_default(ui.w.game.machines.len());
-        let all = ui.w.entities;
+        let totals = Array[I32].new_default(ui.w.game.machines.len())
+        let all = ui.w.entities
         for (0..<all.n) |i| {
-            let e = all.items[i];
+            let e = all.items[i]
             if e.busy or e.cls == 17 or e.cls == 18 {
-                totals[e.machine] += ui.w.power[e.machine];
-            };
-        };
-        totals;
+                totals[e.machine] += ui.w.power[e.machine]
+            }
+        }
+        totals
     }
 
     fn power_window(ui: Ui) Browser.HTMLElement {
-        let high = sim.imax(ui.supply fold(0) |m, v| { sim.imax(m, v); }, ui.demand fold(0) |m, v| { sim.imax(m, v); });
-        let totals = demand_by_machine(ui);
+        let high = sim.imax(ui.supply fold(0) |m, v| { sim.imax(m, v) }, ui.demand fold(0) |m, v| { sim.imax(m, v) })
+        let totals = demand_by_machine(ui)
         @wutu/\
         div {
             = row("Satisfaction", (ui.w.satisfaction / 10).str() + "%");
@@ -1683,22 +1683,22 @@ mod ui {
                 }
             }
         }
-        \/;
+        \/
     }
 
     fn load_world(ui: Ui, text: Str) void {
         promote sim.load(ui.game_text, text) {
             |w| => {
-                ui.w = w;
-                ui.selected = -1;
-                ui.pinned = [];
-                ui.samples = w.tick / 60;
-                ui.notice = "Loaded.";
+                ui.w = w
+                ui.selected = -1
+                ui.pinned = []
+                ui.samples = w.tick / 60
+                ui.notice = "Loaded."
             },
             ~> {
-                ui.notice = "Could not load: " + sim.load_error(ui.game_text, text);
+                ui.notice = "Could not load: " + sim.load_error(ui.game_text, text)
             },
-        };
+        }
     }
 
     fn saves_window(ui: Ui) Browser.HTMLElement {
@@ -1756,6 +1756,6 @@ mod ui {
             }
             p.muted { = ui.notice; }
         }
-        \/;
+        \/
     }
 }

@@ -19,7 +19,7 @@ An `@es` body may open with `import` declarations. They are hoisted to the top
 of the generated glue module and deduplicated:
 
 ```utu
-let valid: fun(Str) Bool = @es/\ import { valid } from 'semver'; (v) => valid(v) ? 1 : 0 \/;
+let valid: fun(Str) Bool = @es/\ import { valid } from 'semver'; (v) => valid(v) ? 1 : 0 \/
 ```
 
 This is the **preferred spelling** and the binder must emit it.

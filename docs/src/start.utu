@@ -1,40 +1,36 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod start {
     fn clone_sample() Str {
         \\git clone https://github.com/robertmorelli/utu
         \\cd utu
         \\bun install
         \\bun run build
-        ;
     }
     fn hello_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\fn greeting(name: Str) Str {
-        \\    `hello, ${name}`;
+        \\    `hello, ${name}`
         \\}
         \\
         \\export main() void {
-        \\    console.log(greeting("world"));
+        \\    console.log(greeting("world"))
         \\}
-        ;
     }
     fn run_sample() Str {
         \\bun ./cli/utu.mjs check hello.utu    # report what is wrong with the program
         \\bun ./cli/utu.mjs run hello.utu      # build it, then call its main
         \\bun ./cli/utu.mjs test hello.utu     # build its tests, then run each
         \\bun ./cli/utu.mjs build hello.utu    # hello.wasm, and hello.mjs that loads it
-        ;
     }
     fn vscode_sample() Str {
         \\bun run package:vscode
         \\code --install-extension dist/utu-vscode.vsix
-        ;
     }
     fn site_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
         \\    let app = @wutu/\
@@ -44,16 +40,14 @@ mod start {
         \\        h1 { "Hello from utu"; }
         \\        p { "This page is Wasm, HTML, and CSS from one source file."; }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn wutu_sample() Str {
         \\node cli/wutu.mjs dev main.utu                 # live-reload preview
         \\node cli/wutu.mjs format main.utu              # format source
         \\node cli/wutu.mjs build main.utu --out dist/site
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -78,7 +72,7 @@ mod start {
                 code {
                     "export main";
                 }
-                ". A block's last expression is its value, and every statement ends with a semicolon, but for one that ends at a } that ends its line (if, for, while, match, alt).";
+                ". A block's last expression is its value. A line break ends a statement, and ; puts two on one line.";
             }
             = code.block(hello_sample());
             = code.shell(run_sample());
@@ -157,6 +151,6 @@ mod start {
             }
             = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression");
         }
-        \/;
+        \/
     }
 }

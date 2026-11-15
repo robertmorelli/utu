@@ -10,53 +10,53 @@
 
 /// The parsed elements, a row each: its tag's word id. The other `x_*`
 /// vecs are the rows' other columns, and `attr_*` their attributes.
-vec x_tag: I32;
+vec x_tag: I32
 /// Its first attribute, in `attr_*`
-vec x_attr_first: I32;
-vec x_attr_count: I32;
+vec x_attr_first: I32
+vec x_attr_count: I32
 /// First child element, or -1.
-vec x_child: I32;
+vec x_child: I32
 /// Next sibling element, or -1.
-vec x_next: I32;
+vec x_next: I32
 /// Word id.
-vec attr_name: I32;
+vec attr_name: I32
 /// The value's bytes in src.
-vec attr_start: I32;
-vec attr_end: I32;
+vec attr_start: I32
+vec attr_end: I32
 /// By DSL node: its parsed root, -2 before parsing, -1 when it does not parse.
-vec x_cache: I32;
+vec x_cache: I32
 
 fn reset_ir_trees() void {
-    x_tag.clear();
-    x_attr_first.clear();
-    x_attr_count.clear();
-    x_child.clear();
-    x_next.clear();
-    attr_name.clear();
-    attr_start.clear();
-    attr_end.clear();
-    x_cache.clear();
+    x_tag.clear()
+    x_attr_first.clear()
+    x_attr_count.clear()
+    x_child.clear()
+    x_next.clear()
+    attr_name.clear()
+    attr_start.clear()
+    attr_end.clear()
+    x_cache.clear()
 }
 
 /// The tree of an `@ir` DSL expression (or of its body token's node).
 fn ir_tree(dsl: I32) I32 {
-    if dsl < 0 { return -1; };
+    if dsl < 0 { return -1 }
     if x_cache.len() < node_kind.len() {
-        let old = x_cache.len();
-        x_cache.resize(node_kind.len());
-        for (old ..< node_kind.len()) |n| { x_cache[n] = -2; };
-    };
-    if x_cache[dsl] != -2 { return x_cache[dsl]; };
-    let body = if is_kind(dsl, Node.Dsl_expr) { last_child(dsl); } else { dsl; };
-    let t = node_first[body];
+        let old = x_cache.len()
+        x_cache.resize(node_kind.len())
+        for (old ..< node_kind.len()) |n| { x_cache[n] = -2 }
+    }
+    if x_cache[dsl] != -2 { return x_cache[dsl] }
+    let body = if is_kind(dsl, Node.Dsl_expr) { last_child(dsl) } else { dsl }
+    let t = node_first[body]
     // The body token is `/\ … \/`.
-    let at = XmlAt { pos: tok_start[t] + 2, end: tok_end[t] - 2 };
-    let root = x_element(at);
+    let at = XmlAt { pos: tok_start[t] + 2, end: tok_end[t] - 2 }
+    let root = x_element(at)
     // One element, and nothing after it.
-    x_space(at);
-    if at.pos < at.end { root = -1; };
-    x_cache[dsl] = root;
-    root;
+    x_space(at)
+    if at.pos < at.end { root = -1 }
+    x_cache[dsl] = root
+    root
 }
 
 /// Where an `@ir` body is being read, and where it ends.
@@ -65,106 +65,106 @@ struct XmlAt:
     | end: I32
 
 fn x_space(at: XmlAt) void {
-    while (at.pos < at.end and is_space(src[at.pos])) { at.pos += 1; };
+    while (at.pos < at.end and is_space(src[at.pos])) { at.pos += 1 }
 }
 
-fn x_name_char(c: I32) Bool { (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 45 or c == 95; }
+fn x_name_char(c: I32) Bool { (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57) or c == 45 or c == 95 }
 
 /// The element at `at` and its children, read into the `x_*` rows: its row,
 /// or -1 when it is not well formed (unclosed, a close tag of another name,
 /// an attribute without `="…"`).
 fn x_element(at: XmlAt) I32 {
-    x_space(at);
-    if at.pos >= at.end or src[at.pos] != 60 { return -1; };
-    at.pos += 1;
-    let name_start = at.pos;
-    while (at.pos < at.end and x_name_char(src[at.pos])) { at.pos += 1; };
-    let id = x_tag.len();
-    x_tag.push(src.intern(name_start, at.pos));
-    x_attr_first.push(attr_name.len());
-    x_attr_count.push(0);
-    x_child.push(-1);
-    x_next.push(-1);
+    x_space(at)
+    if at.pos >= at.end or src[at.pos] != 60 { return -1 }
+    at.pos += 1
+    let name_start = at.pos
+    while (at.pos < at.end and x_name_char(src[at.pos])) { at.pos += 1 }
+    let id = x_tag.len()
+    x_tag.push(src.intern(name_start, at.pos))
+    x_attr_first.push(attr_name.len())
+    x_attr_count.push(0)
+    x_child.push(-1)
+    x_next.push(-1)
     // Attributes, up to `/>` or `>`.
     while (true) {
-        x_space(at);
-        if at.pos >= at.end { return -1; };
-        let c = src[at.pos];
+        x_space(at)
+        if at.pos >= at.end { return -1 }
+        let c = src[at.pos]
         if c == 47 {
-            if at.pos + 1 >= at.end or src[at.pos + 1] != 62 { return -1; };
-            at.pos += 2;
-            return id;
-        };
+            if at.pos + 1 >= at.end or src[at.pos + 1] != 62 { return -1 }
+            at.pos += 2
+            return id
+        }
         if c == 62 {
-            at.pos += 1;
-            break;
-        };
-        let a_start = at.pos;
-        while (at.pos < at.end and x_name_char(src[at.pos])) { at.pos += 1; };
-        if at.pos == a_start { return -1; };
-        attr_name.push(src.intern(a_start, at.pos));
-        x_space(at);
-        if at.pos >= at.end or src[at.pos] != 61 { return -1; };
-        at.pos += 1;   // =
-        x_space(at);
-        if at.pos >= at.end or src[at.pos] != 34 { return -1; };
-        at.pos += 1;   // "
-        let v_start = at.pos;
-        while (at.pos < at.end and src[at.pos] != 34) { at.pos += 1; };
-        if at.pos >= at.end { return -1; };
-        attr_start.push(v_start);
-        attr_end.push(at.pos);
-        at.pos += 1;
-        x_attr_count[id] += 1;
-    };
+            at.pos += 1
+            break
+        }
+        let a_start = at.pos
+        while (at.pos < at.end and x_name_char(src[at.pos])) { at.pos += 1 }
+        if at.pos == a_start { return -1 }
+        attr_name.push(src.intern(a_start, at.pos))
+        x_space(at)
+        if at.pos >= at.end or src[at.pos] != 61 { return -1 }
+        at.pos += 1   // =
+        x_space(at)
+        if at.pos >= at.end or src[at.pos] != 34 { return -1 }
+        at.pos += 1   // "
+        let v_start = at.pos
+        while (at.pos < at.end and src[at.pos] != 34) { at.pos += 1 }
+        if at.pos >= at.end { return -1 }
+        attr_start.push(v_start)
+        attr_end.push(at.pos)
+        at.pos += 1
+        x_attr_count[id] += 1
+    }
     // Children, up to `</name>`.
-    let last = -1;
+    let last = -1
     while (true) {
-        x_space(at);
-        if at.pos >= at.end { return -1; };
+        x_space(at)
+        if at.pos >= at.end { return -1 }
         if src[at.pos] == 60 and at.pos + 1 < at.end and src[at.pos + 1] == 47 {
             // `</name>`, of this element's name.
-            let close = at.pos + 2;
-            while (at.pos < at.end and src[at.pos] != 62) { at.pos += 1; };
-            if at.pos >= at.end or src.intern(close, at.pos) != x_tag[id] { return -1; };
-            at.pos += 1;
-            return id;
-        };
-        let child = x_element(at);
-        if child < 0 { return -1; };
-        if last < 0 { x_child[id] = child; } else { x_next[last] = child; };
-        last = child;
-    };
-    id;
+            let close = at.pos + 2
+            while (at.pos < at.end and src[at.pos] != 62) { at.pos += 1 }
+            if at.pos >= at.end or src.intern(close, at.pos) != x_tag[id] { return -1 }
+            at.pos += 1
+            return id
+        }
+        let child = x_element(at)
+        if child < 0 { return -1 }
+        if last < 0 { x_child[id] = child } else { x_next[last] = child }
+        last = child
+    }
+    id
 }
 
 /// The attribute named `name` (a word id) of an element, or -1.
 fn x_attr(x: I32, name: I32) I32 {
-    if x < 0 { return -1; };
+    if x < 0 { return -1 }
     for (0 ..< x_attr_count[x]) |i| {
-        let a = x_attr_first[x] + i;
-        if attr_name[a] == name { return a; };
-    };
-    -1;
+        let a = x_attr_first[x] + i
+        if attr_name[a] == name { return a }
+    }
+    -1
 }
 
 fn attr_is(a: I32, text: Str) Bool {
-    if attr_end[a] - attr_start[a] != text.len() { return false; };
-    for (0 ..< text.len()) |i| { if src[attr_start[a] + i] != text.get(i) { return false; }; };
-    true;
+    if attr_end[a] - attr_start[a] != text.len() { return false }
+    for (0 ..< text.len()) |i| { if src[attr_start[a] + i] != text.get(i) { return false } }
+    true
 }
 
 /// The attribute's value as a word id (to compare with names).
-fn attr_word(a: I32) I32 { src.intern(attr_start[a], attr_end[a]); }
+fn attr_word(a: I32) I32 { src.intern(attr_start[a], attr_end[a]) }
 
 fn x_children(x: I32) I32 {
-    let n = 0;
-    let c = x_child[x];
+    let n = 0
+    let c = x_child[x]
     while (c >= 0) {
-        n += 1;
-        c = x_next[c];
-    };
-    n;
+        n += 1
+        c = x_next[c]
+    }
+    n
 }
 
 //! = Names the compiler knows
@@ -173,9 +173,9 @@ fn x_children(x: I32) I32 {
 //! has a word id; `word_opcode` maps a tag's word to its wasm opcode.
 
 /// By Known: its word id.
-vec known: I32;
+vec known: I32
 /// By word id: the opcode of an `ir-…` tag, or -1.
-vec word_opcode: I32;
+vec word_opcode: I32
 
 /// The words the compiler compares names with: `@ir` tag and attribute
 /// names, operator method names, DSL names, and a few type and method names.
@@ -246,9 +246,9 @@ enum(U8) Known:
     | IrSafeChecks
     | WordResult
 
-fn known_word(k: Known) I32 { known[k.i32()]; }
+fn known_word(k: Known) I32 { known[k.i32()] }
 
-fn attr_type_repr() I32 { known_word(Known.TypeRepr); }
+fn attr_type_repr() I32 { known_word(Known.TypeRepr) }
 
 /// The tag names, and the opcodes of those that are one wasm instruction
 /// (0xFC00 + n and 0xFD00 + n for prefixed ones).
@@ -278,18 +278,18 @@ fn opcode_table() Str {
     + "i32-trunc-s-sat-f32 64512 u32-trunc-u-sat-f32 64513 i32-trunc-s-sat-f64 64514 u32-trunc-u-sat-f64 64515 "
     + "i64-trunc-s-sat-f32 64516 u64-trunc-u-sat-f32 64517 i64-trunc-s-sat-f64 64518 u64-trunc-u-sat-f64 64519 "
     + "v128-not 64845 v128-and 64846 v128-andnot 64847 v128-or 64848 v128-xor 64849 v128-bitselect 64850 "
-    + "v128-any-true 64851";
+    + "v128-any-true 64851"
 }
 
 /// Sealed with the prelude (see `seal` in lib.utu): its words are kept, and so the same ids.
-vec known_kept: I32 = [0];
+vec known_kept: I32 = [0]
 
 /// Interns the @Known words and the tags of @opcode_table, with their
 /// opcodes in @word_opcode. After `seal`, the words kept stand.
 fn intern_known() void {
-    if known_kept[0] == 1 { return; };
-    word_opcode.clear();
-    known.resize(Known.count());
+    if known_kept[0] == 1 { return }
+    word_opcode.clear()
+    known.resize(Known.count())
     let names = ["ir-ident", "ir-lit", "name", "kind", "value", "type-name", "type-repr", "main",
         "add", "sub", "mul", "div", "rem", "band", "bor", "bxor", "shl", "shr", "ushr",
         "eq", "ne", "lt", "le", "gt", "ge", "neg", "bnot", "es", "ir", "comptime", "embed", "ir-wasm-scalar", "I32", "Array", "get_index", "set_index", "get_slice",
@@ -297,35 +297,35 @@ fn intern_known() void {
         "ir-string-get-wtf16", "ir-string-from-code-point", "ir-string-from-codes",
         "ir-array-get", "ir-array-set", "ir-array-len", "ir-array-new", "ir-array-slice", "ir-array-copy",
         "count", "U32", "ir-i31-new", "ir-i31-get-s", "ir-i31-get-u", "ir-ref-eq", "ir-ref-ne",
-        "ir-promise-then", "ir-promise-catch", "ir-v128-const", "str", "wat", "ir-safe-checks", "Result"];
-    for (0 ..< Known.count()) |k| { known[k] = intern_text(names[k]); };
+        "ir-promise-then", "ir-promise-catch", "ir-v128-const", "str", "wat", "ir-safe-checks", "Result"]
+    for (0 ..< Known.count()) |k| { known[k] = intern_text(names[k]) }
     // Tags: "ir-" and the name, then its opcode.
-    let table = opcode_table();
-    let i = 0;
-    let n = table.len();
+    let table = opcode_table()
+    let i = 0
+    let n = table.len()
     while (i < n) {
-        let start = src.len();
-        for ([105, 114, 45]) |b| { src.push(b); };
+        let start = src.len()
+        for ([105, 114, 45]) |b| { src.push(b) }
         while (table.get(i) != 32) {
-            src.push(table.get(i));
-            i += 1;
-        };
-        let word = src.intern(start, src.len());
-        i += 1;
-        let code = 0;
+            src.push(table.get(i))
+            i += 1
+        }
+        let word = src.intern(start, src.len())
+        i += 1
+        let code = 0
         while (i < n and table.get(i) != 32) {
-            code = code * 10 + table.get(i) - 48;
-            i += 1;
-        };
-        i += 1;
+            code = code * 10 + table.get(i) - 48
+            i += 1
+        }
+        i += 1
         if word_opcode.len() <= word {
-            let old = word_opcode.len();
-            word_opcode.resize(word + 1);
-            for (old ..< word + 1) |w| { word_opcode[w] = -1; };
-        };
-        word_opcode[word] = code;
-    };
+            let old = word_opcode.len()
+            word_opcode.resize(word + 1)
+            for (old ..< word + 1) |w| { word_opcode[w] = -1 }
+        }
+        word_opcode[word] = code
+    }
 }
 
 /// The opcode of a tag, or -1 when it is not one plain instruction.
-fn tag_opcode(word: I32) I32 { if word < word_opcode.len() { word_opcode[word]; } else { -1; }; }
+fn tag_opcode(word: I32) I32 { if word < word_opcode.len() { word_opcode[word] } else { -1 } }

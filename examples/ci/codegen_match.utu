@@ -1,4 +1,4 @@
-let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
+let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/
 
 enum Shape:
     | Circle { radius: I32 }
@@ -11,7 +11,7 @@ fn area(shape: Shape) I32 {
         Rect |r| => r.width * r.height,
         Triangle |t| => t.base * t.height / 2,
         ~> 0,
-    };
+    }
 }
 
 fn describe(shape: Shape) Str {
@@ -20,7 +20,7 @@ fn describe(shape: Shape) Str {
         Rect => "rect",
         Triangle => "triangle",
         ~> "unknown",
-    };
+    }
 }
 
 fn tag(kind: I32) Str {
@@ -28,23 +28,23 @@ fn tag(kind: I32) Str {
         0 => "zero",
         1 => "one",
         ~> "many",
-    };
+    }
 }
 
 test "alt dispatches circle arms" {
-    assert area(Circle { radius: 4 }) == 16;
+    assert area(Circle { radius: 4 }) == 16
 }
 
 test "alt dispatches rect arms" {
-    assert area(Rect { width: 3, height: 4 }) == 12;
+    assert area(Rect { width: 3, height: 4 }) == 12
 }
 
 test "alt dispatches triangle arms" {
-    assert area(Triangle { base: 5, height: 4 }) == 10;
+    assert area(Triangle { base: 5, height: 4 }) == 10
 }
 
 test "alt and match can return strings" {
-    assert str_eq(describe(Rect { width: 2, height: 6 }), "rect");
-    assert str_eq(tag(0), "zero");
-    assert str_eq(tag(3), "many");
+    assert str_eq(describe(Rect { width: 2, height: 6 }), "rect")
+    assert str_eq(tag(0), "zero")
+    assert str_eq(tag(3), "many")
 }

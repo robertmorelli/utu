@@ -46,7 +46,7 @@ static bool in_list(const char *w, const char *const *list) {
   return false;
 }
 
-static const char *const GOES_ON[] = { "and", "or", "xor", "orelse", "else", "catch", "from", 0 };
+static const char *const GOES_ON[] = { "and", "or", "xor", "orelse", "else", "catch", 0 };
 static const char *const STAGES[] = { "map", "filter", "flat_map", "skip_while", "take_while", "each", "any", "all",
   "count_where", "first_index", "last_index", "bisect", "fold", "scan", "zip", "skip", "take", "chain", "repeat",
   "sort", "min_by", "max_by", "first_where", "reduce", "partition", "collect", "group_by", "distinct_by", "batched",
@@ -57,8 +57,8 @@ static const char *const STAGES[] = { "map", "filter", "flat_map", "skip_while",
  * what cannot end a statement, `=` or `+`, it does not): before a `}` or
  * the end, or at a line break the next line does not go on from. A line
  * goes on that begins `.f` (not `.{`), `?.`, a binary operator but `-`
- * (`-o` goes on), `{`, `and`, `or`, `xor`, `orelse`, `else`, `catch`, `from`, or a
- * stage with its `|` or `(`. The self-hosted parser's rule
+ * (`-o` goes on), `{`, `and`, `or`, `xor`, `orelse`, `else`, `catch`, or a
+ * stage with its capture (`map |x|`, `fold(0) |a, x|`, `collect(T)`). The self-hosted parser's rule
  * (selfhost/parse.utu, `statement_end`).
  */
 static bool statement_end(TSLexer *l) {
@@ -96,7 +96,18 @@ static bool statement_end(TSLexer *l) {
   if (in_list(w, GOES_ON)) return false;
   if (!in_list(w, STAGES)) return true;
   while (l->lookahead == ' ' || l->lookahead == '\t') l->advance(l, true);
-  return !(l->lookahead == '|' || l->lookahead == '(');
+  if (l->lookahead == '|') return false;
+  if (l->lookahead != '(') return true;
+  if (!strcmp(w, "collect")) return false;
+  // `fold(0) |a, x|` goes on; `fold(x)`, a call, does not.
+  int depth = 0;
+  do {
+    if (l->lookahead == '(') depth++;
+    else if (l->lookahead == ')') depth--;
+    l->advance(l, false);
+  } while (depth > 0 && !l->eof(l) && l->lookahead != '\n');
+  while (l->lookahead == ' ' || l->lookahead == '\t') l->advance(l, true);
+  return l->lookahead != '|';
 }
 
 bool tree_sitter_utu_external_scanner_scan(void *p, TSLexer *l, const bool *valid) {

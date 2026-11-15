@@ -14,9 +14,9 @@ struct Body:
     | vz: F64
     | mass: F64
 
-fn pi() F64 { 3.141592653589793; }
-fn solar_mass() F64 { 4.0 * pi() * pi(); }
-fn days_per_year() F64 { 365.24; }
+fn pi() F64 { 3.141592653589793 }
+fn solar_mass() F64 { 4.0 * pi() * pi() }
+fn days_per_year() F64 { 365.24 }
 
 fn Body.new(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
     &{
@@ -27,13 +27,13 @@ fn Body.new(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
         vy: vy * days_per_year(),
         vz: vz * days_per_year(),
         mass: mass * solar_mass(),
-    };
+    }
 }
 
 fn Body.offset_momentum |self| (px: F64, py: F64, pz: F64) void {
-    self.vx = 0.0 - px / solar_mass();
-    self.vy = 0.0 - py / solar_mass();
-    self.vz = 0.0 - pz / solar_mass();
+    self.vx = 0.0 - px / solar_mass()
+    self.vy = 0.0 - py / solar_mass()
+    self.vz = 0.0 - pz / solar_mass()
 }
 
 fn jupiter() Body {
@@ -45,7 +45,7 @@ fn jupiter() Body {
         7.69901118419740425e-03,
         -6.90460016972063023e-05,
         9.54791938424326609e-04,
-    );
+    )
 }
 
 fn saturn() Body {
@@ -57,7 +57,7 @@ fn saturn() Body {
         4.99852801234917238e-03,
         2.30417297573763929e-05,
         2.85885980666130812e-04,
-    );
+    )
 }
 
 fn uranus() Body {
@@ -69,7 +69,7 @@ fn uranus() Body {
         2.37847173959480950e-03,
         -2.96589568540237556e-05,
         4.36624404335156298e-05,
-    );
+    )
 }
 
 fn neptune() Body {
@@ -81,96 +81,96 @@ fn neptune() Body {
         1.62824170038242295e-03,
         -9.51592254519715870e-05,
         5.15138902046611451e-05,
-    );
+    )
 }
 
-fn sun() Body { Body.new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0); }
+fn sun() Body { Body.new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0) }
 
 // The five bodies, with the Sun's velocity set so the total momentum is zero.
 fn create_bodies() Array[Body] {
-    let bodies: Array[Body] = [sun(), jupiter(), saturn(), uranus(), neptune()];
-    let px: F64 = 0.0;
-    let py: F64 = 0.0;
-    let pz: F64 = 0.0;
+    let bodies: Array[Body] = [sun(), jupiter(), saturn(), uranus(), neptune()]
+    let px: F64 = 0.0
+    let py: F64 = 0.0
+    let pz: F64 = 0.0
     for (0..<bodies.len()) |i| {
-        let b = bodies[i];
-        px += b.vx * b.mass;
-        py += b.vy * b.mass;
-        pz += b.vz * b.mass;
-    };
-    bodies[0].offset_momentum(px, py, pz);
-    bodies;
+        let b = bodies[i]
+        px += b.vx * b.mass
+        py += b.vy * b.mass
+        pz += b.vz * b.mass
+    }
+    bodies[0].offset_momentum(px, py, pz)
+    bodies
 }
 
 fn advance(bodies: Array[Body], dt: F64) void {
     for (0..<bodies.len()) |i| {
-        let ib = bodies[i];
+        let ib = bodies[i]
         for ((i + 1)..<bodies.len()) |j| {
-            let jb = bodies[j];
-            let dx = ib.x - jb.x;
-            let dy = ib.y - jb.y;
-            let dz = ib.z - jb.z;
-            let d_squared = dx * dx + dy * dy + dz * dz;
-            let distance = F64.sqrt(d_squared);
-            let mag = dt / (d_squared * distance);
-            ib.vx = ib.vx - dx * jb.mass * mag;
-            ib.vy = ib.vy - dy * jb.mass * mag;
-            ib.vz = ib.vz - dz * jb.mass * mag;
-            jb.vx = jb.vx + dx * ib.mass * mag;
-            jb.vy = jb.vy + dy * ib.mass * mag;
-            jb.vz = jb.vz + dz * ib.mass * mag;
-        };
-    };
+            let jb = bodies[j]
+            let dx = ib.x - jb.x
+            let dy = ib.y - jb.y
+            let dz = ib.z - jb.z
+            let d_squared = dx * dx + dy * dy + dz * dz
+            let distance = F64.sqrt(d_squared)
+            let mag = dt / (d_squared * distance)
+            ib.vx = ib.vx - dx * jb.mass * mag
+            ib.vy = ib.vy - dy * jb.mass * mag
+            ib.vz = ib.vz - dz * jb.mass * mag
+            jb.vx = jb.vx + dx * ib.mass * mag
+            jb.vy = jb.vy + dy * ib.mass * mag
+            jb.vz = jb.vz + dz * ib.mass * mag
+        }
+    }
     for (0..<bodies.len()) |i| {
-        let b = bodies[i];
-        b.x = b.x + dt * b.vx;
-        b.y = b.y + dt * b.vy;
-        b.z = b.z + dt * b.vz;
-    };
+        let b = bodies[i]
+        b.x = b.x + dt * b.vx
+        b.y = b.y + dt * b.vy
+        b.z = b.z + dt * b.vz
+    }
 }
 
 fn energy(bodies: Array[Body]) F64 {
-    let e: F64 = 0.0;
+    let e: F64 = 0.0
     for (0..<bodies.len()) |i| {
-        let ib = bodies[i];
-        e = e + 0.5 * ib.mass * (ib.vx * ib.vx + ib.vy * ib.vy + ib.vz * ib.vz);
+        let ib = bodies[i]
+        e = e + 0.5 * ib.mass * (ib.vx * ib.vx + ib.vy * ib.vy + ib.vz * ib.vz)
         for ((i + 1)..<bodies.len()) |j| {
-            let jb = bodies[j];
-            let dx = ib.x - jb.x;
-            let dy = ib.y - jb.y;
-            let dz = ib.z - jb.z;
-            let distance = F64.sqrt(dx * dx + dy * dy + dz * dz);
-            e = e - ib.mass * jb.mass / distance;
-        };
-    };
-    e;
+            let jb = bodies[j]
+            let dx = ib.x - jb.x
+            let dy = ib.y - jb.y
+            let dz = ib.z - jb.z
+            let distance = F64.sqrt(dx * dx + dy * dy + dz * dz)
+            e = e - ib.mass * jb.mass / distance
+        }
+    }
+    e
 }
 
 // One run: a fresh system advanced `steps` times; its energy in nano-units,
 // rounded half up.
 fn run(steps: I32) I64 {
-    let bodies = create_bodies();
-    for (0..<steps) { advance(bodies, 0.01); };
-    F64.floor(energy(bodies) * 1.0e9 + 0.5).i64();
+    let bodies = create_bodies()
+    for (0..<steps) { advance(bodies, 0.01) }
+    F64.floor(energy(bodies) * 1.0e9 + 0.5).i64()
 }
 
 test "nbody energy matches the Benchmarks Game reference" {
     // -0.169075164 before any step, -0.169083134 after 1000 (to 9 places).
-    assert run(0) == -169075164;
-    assert run(1000) == -169087605;
+    assert run(0) == -169075164
+    assert run(1000) == -169087605
 }
 
 bench "nbody" {
-    let sink: I64 = 0;
+    let sink: I64 = 0
     measure {
-        sink = sink + run(20000);
+        sink = sink + run(20000)
     }
 }
 
 export lib {
     fn bench(iterations: I32) I64 {
-        let sum: I64 = 0;
-        for (0..<iterations) { sum += run(20000); };
-        sum;
+        let sum: I64 = 0
+        for (0..<iterations) { sum += run(20000) }
+        sum
     }
 }

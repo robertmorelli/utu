@@ -5,27 +5,27 @@ browser bindings, the same TypeScript-declaration interface that lets Utu call
 any typed npm package ([details](typescript-abi.md)). Import those bindings once:
 
 ```utu
-using Browser from std:Browser;
+using Browser from std:Browser
 
 fn greeting(name: Str) Browser.HTMLElement {
     @wutu/\
     section.greeting {
-        display: grid;
-        gap: 1rem;
-        padding: 1.5rem;
+        display: grid
+        gap: 1rem
+        padding: 1.5rem
         h2 { margin: 0; "Hello, "; = name; }
         a {
-            href="/about";
-            color: oklch(45% 0.12 150);
+            href="/about"
+            color: oklch(45% 0.12 150)
             :hover { text-decoration-thickness: 0.15em; }
-            "About this garden";
+            "About this garden"
         }
     }
-    \/;
+    \/
 }
 
 export main() void {
-    Browser.document.body.append(greeting("friend"));
+    Browser.document.body.append(greeting("friend"))
 }
 ```
 
@@ -144,7 +144,7 @@ moved into the parent by the DOM's normal append semantics.
 @wutu/\
 section {
     for (plants filter |plant| { not plant.watered; }) |plant, index| {
-        = plant_card(plant);
+        = plant_card(plant)
     }
     if empty {
         p { "Everything is watered."; }
@@ -152,7 +152,7 @@ section {
         p { "A little care goes a long way."; }
     }
 }
-\/;
+\/
 ```
 
 Conditions chain with `else if ... { ... }`; the first matching branch renders.
@@ -175,11 +175,11 @@ references, shared struct state, and persistence.
 
 ```utu
 button as toggle {
-    type = "button";
-    = if plant.watered { "Watered ✓"; } else { "Water me"; };
+    type = "button"
+    = if plant.watered { "Watered ✓"; } else { "Water me"; }
     on click {
-        plant.watered = not plant.watered;
-        toggle.textContent = if plant.watered { "Watered ✓"; } else { "Water me"; };
+        plant.watered = not plant.watered
+        toggle.textContent = if plant.watered { "Watered ✓"; } else { "Water me"; }
     }
 }
 ```
@@ -193,7 +193,7 @@ template show it:
 p { = s.msg; }
 button {
     on click { s.msg = "Saved"; }
-    = "Save";
+    = "Save"
 }
 ```
 
@@ -266,10 +266,10 @@ fn editor() Browser.HTMLElement {
     }
     div.editor {
         pre {
-            "…";
+            "…"
         }
     }
-    \/;
+    \/
 }
 ```
 
@@ -370,25 +370,25 @@ The file holds a module of the name the `using` gives:
 
 ```utu
 // guide.utu
-using Browser from std:Browser;
+using Browser from std:Browser
 
 mod guide {
     fn page(who: Str) Browser.HTMLElement {
         @wutu/\
         article { h1 { = "Hello, " + who; } }
-        \/;
+        \/
     }
 }
 ```
 
 ```utu
-using guide lazy from "./guide.utu";
+using guide lazy from "./guide.utu"
 
 // …
 if wutu.route() == "/guide" {
-    = guide.page("you");
+    = guide.page("you")
 } else {
-    = home.page();
+    = home.page()
 }
 ```
 
@@ -418,23 +418,23 @@ header from its title) costs nothing once rendered.
 
 ```utu
 @wutu/\
-@reactive;
+@reactive
 main {
     label {
-        "Search";
+        "Search"
         input { bind:value = state.query; }
     }
     for state.items |item| key item.id {
         article {
             h2 { = item.title; }
             button {
-                "Finish";
+                "Finish"
                 on click { item.done = true; }
             }
         }
     }
 }
-\/;
+\/
 ```
 
 `= expression;` inserts text, a number, or a component node. An attribute's
@@ -475,7 +475,7 @@ Unchanged property values are not rewritten, preserving the input caret.
 Richer validation uses explicit events and browser properties.
 
 ```utu
-using Browser from std:Browser;
+using Browser from std:Browser
 
 struct Preferences:
     | name: Str
@@ -484,7 +484,7 @@ struct Preferences:
 export main() void {
     let preferences = @stored/\
         Preferences "preferences-v1" Preferences { name: "", enabled: true }
-    \/;
+    \/
 }
 ```
 
@@ -564,7 +564,7 @@ mod theme {
         @layer theme {
             .card { color: oklch(40% .12 150); }
         }
-        \/;
+        \/
     }
 }
 ```
@@ -609,7 +609,7 @@ once the element is gone. Unmounting the view stops either.
 ```utu
 p.clock {
     on mount { wutu.interval("tick", 1000.0, cl() void { s.seconds = s.seconds + 1; }); }
-    = "Uptime " + s.seconds.str() + "s";
+    = "Uptime " + s.seconds.str() + "s"
 }
 ``` `wutu.route()`
 reads the hash path, and hash/history changes refresh views. This is a small route
@@ -620,17 +620,17 @@ numbers. Arrays have a fixed length; a list that grows is an `Array[T]` in state
 replaced by `std:List[T]`'s `append` and `remove_at`, which return copies:
 
 ```utu
-using List[Todo] |todos| from std:List;
+using List[Todo] |todos| from std:List
 
 button {
     on click { s.todos = todos.append(s.todos, Todo { text: s.draft, done: false }); }
-    = "Add";
+    = "Add"
 }
 ```
 
 A closure is `cl(params) Type { … }`: `wutu.after_render(cl() void { s.ready = true; })`.
-In a function body, a plain Utu `if`, `for` or `while` statement ends with `;`
-(`if s.busy { return; };`); Wutu's own `if` and `for`, among elements, do not. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
+In a function body, a plain Utu `if`, `for` or `while` is a statement like any
+other (`if s.busy { return }`); Wutu's own `if` and `for` are among elements. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
 simple display without shipping a formatting library.
 
 The [two new five-site batches](wutu-round-two-review.md) exercise these APIs.

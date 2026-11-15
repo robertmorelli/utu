@@ -1,9 +1,9 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod home {
     fn greeting_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn greeting(name: Str) Browser.HTMLElement {
         \\    @wutu/\
@@ -17,33 +17,30 @@ mod home {
         \\            "Start here";
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(greeting("friend"));
+        \\    Browser.document.body.append(greeting("friend"))
         \\}
-        ;
     }
     fn npm_sample() Str {
-        \\using Browser from std:Browser;
-        \\using Nano from "npm:nanoid";
+        \\using Browser from std:Browser
+        \\using Nano from "npm:nanoid"
         \\
         \\export main() void {
-        \\    let item = Browser.document.createElement("li");
-        \\    item.textContent = Nano.nanoid(8);
-        \\    Browser.document.body.append(item);
+        \\    let item = Browser.document.createElement("li")
+        \\    item.textContent = Nano.nanoid(8)
+        \\    Browser.document.body.append(item)
         \\}
-        ;
     }
     fn pipeline_sample() Str {
         \\export main() I32 {
         \\    [1, 2, 3, 4, 5]
-        \\        map |n| { n * 2; }
-        \\        filter |n| { n > 4; }
-        \\        fold (0) |total, n| { total + n; };
+        \\        map |n| { n * 2 }
+        \\        filter |n| { n > 4 }
+        \\        fold (0) |total, n| { total + n }
         \\}
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -225,6 +222,6 @@ mod home {
                 }
             }
         }
-        \/;
+        \/
     }
 }

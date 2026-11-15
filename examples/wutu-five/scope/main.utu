@@ -1,31 +1,31 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 fn number(value: I32) Str {
-    value.f64().toString();
+    value.f64().toString()
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2)
 }
 
 fn node(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal;
+    Browser.document.getElementById(id) orelse fatal
 }
 
 fn restore_focus(id: Str) void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
-    };
+    }
 }
 
 fn persist(key: Str,
 value: Str) void {
     try {
-        Browser.localStorage.setItem(key, value);
+        Browser.localStorage.setItem(key, value)
     } catch {
-        node("notice").textContent = "Storage is unavailable. Your changes will last for this session.";
-    };
+        node("notice").textContent = "Storage is unavailable. Your changes will last for this session."
+    }
 }
 
 struct Line:
@@ -40,41 +40,41 @@ struct Estimate:
     | edit: Str
 
 fn amount(line: Line) I32 {
-    (line.hours * line.rate.f64()).i32();
+    (line.hours * line.rate.f64()).i32()
 }
 
 fn input(id: Str) Browser.HTMLInputElement {
-    let field: ?Browser.HTMLInputElement = Browser.document.querySelector("#" + id);
-    field orelse fatal;
+    let field: ?Browser.HTMLInputElement = Browser.document.querySelector("#" + id)
+    field orelse fatal
 }
 
 fn save(state: Estimate) void {
-    let data = Browser.Array();
+    let data = Browser.Array()
     state.lines each |line| {
         data.push(&{
             id: line.id,
             title: line.title,
             hours: line.hours,
             rate: line.rate
-        });
-    };
-    persist("scope-lines-v1", Browser.JSON.stringify(data));
-    persist("scope-project-v1", state.project);
+        })
+    }
+    persist("scope-lines-v1", Browser.JSON.stringify(data))
+    persist("scope-project-v1", state.project)
 }
 
 fn csv_field(value: Str) Str {
     let safe = if value.startsWith("=") or value.startsWith("+") or value.startsWith("-") or value.startsWith("@") {
-        "'" + value;
+        "'" + value
     } else {
-        value;
-    };
-    let quote = Browser.String.fromCharCode(34);
-    quote + safe.replaceAll(quote, quote + quote) + quote;
+        value
+    }
+    let quote = Browser.String.fromCharCode(34)
+    quote + safe.replaceAll(quote, quote + quote) + quote
 }
 
 fn csv(state: Estimate) Str {
-    let newline = Browser.String.fromCharCode(13, 10);
-    let text = "Project,Work,Hours,Rate USD,Amount USD" + newline;
+    let newline = Browser.String.fromCharCode(13, 10)
+    let text = "Project,Work,Hours,Rate USD,Amount USD" + newline
     state.lines each |line| {
         text += csv_field(state.project)
             + ","
@@ -85,22 +85,22 @@ fn csv(state: Estimate) Str {
             + (line.rate.f64() / 100.0).toFixed(2)
             + ","
             + (amount(line).f64() / 100.0).toFixed(2)
-            + newline;
-    };
-    "data:text/csv;charset=utf-8," + Browser.encodeURIComponent(text);
+            + newline
+    }
+    "data:text/csv;charset=utf-8," + Browser.encodeURIComponent(text)
 }
 
 fn refresh(state: Estimate) void {
-    save(state);
+    save(state)
 }
 
 fn estimate(state: Estimate) Browser.HTMLElement {
     let total = state.lines map |line| {
-        amount(line).f64();
-    } sum;
+        amount(line).f64()
+    } sum
     let hours = state.lines map |line| {
-        line.hours;
-    } sum;
+        line.hours
+    } sum
     @wutu/\
     section {
         id = "estimate";
@@ -232,7 +232,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
             "Download estimate as CSV ↓";
         }
     }
-    \/;
+    \/
 }
 
 export main() void {
@@ -258,40 +258,40 @@ export main() void {
             rate: 10000
         }
         ]
-    };
+    }
     try {
         promote Browser.localStorage.getItem("scope-project-v1") {
             |p|=> {
-                state.project = p;
+                state.project = p
             },
             ~> {
             },
-        };
+        }
         promote Browser.localStorage.getItem("scope-lines-v1") {
             |saved|=> {
-                let data = Browser.JSON.parse(saved);
-                let length: F64 = data.length;
-                let i: F64 = 0.0;
-                let lines: Array[Line] = [];
+                let data = Browser.JSON.parse(saved)
+                let length: F64 = data.length
+                let i: F64 = 0.0
+                let lines: Array[Line] = []
                 while(i<length) {
-                    let row = data[i];
-                    let rate: F64 = row.rate;
+                    let row = data[i]
+                    let rate: F64 = row.rate
                     lines = lines chain([Line {
                         id: row.id,
                         title: row.title,
                         hours: row.hours,
                         rate: rate.i32()
                     }
-                    ]) collect(Line);
-                    i += 1.0;
-                };
-                state.lines = lines;
+                    ]) collect(Line)
+                    i += 1.0
+                }
+                state.lines = lines
             },
             ~> {
             },
-        };
+        }
     } catch {
-    };
+    }
     let app = @wutu/\
     @reactive;
     @document {
@@ -600,6 +600,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

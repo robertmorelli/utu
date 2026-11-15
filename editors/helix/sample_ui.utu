@@ -1,5 +1,5 @@
 // A module sample.utu imports: go to definition (gd) on `ui.badge` lands here.
-using Browser from std:Browser;
+using Browser from std:Browser
 
 mod ui {
     fn badge(text: Str) Browser.HTMLElement {
@@ -10,6 +10,6 @@ mod ui {
             background: #eef;
             = text;
         }
-        \/;
+        \/
     }
 }

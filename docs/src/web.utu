@@ -1,9 +1,9 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod web {
     fn hello_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn greeting(name: Str) Browser.HTMLElement {
         \\    @wutu/\
@@ -16,16 +16,15 @@ mod web {
         \\            "Welcome back.";
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(greeting("friend"));
+        \\    Browser.document.body.append(greeting("friend"))
         \\}
-        ;
     }
     fn namespaces_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn chart(done: Bool, draft: Str) Browser.HTMLElement {
         \\    @wutu/\
@@ -46,16 +45,15 @@ mod web {
         \\            "About";
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(chart(false, "draft"));
+        \\    Browser.document.body.append(chart(false, "draft"))
         \\}
-        ;
     }
     fn text_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn stats(user: Str, count: I32, ratio: F64) Browser.HTMLElement {
         \\    @wutu/\
@@ -69,16 +67,15 @@ mod web {
         \\        = ratio * 100.0;
         \\        "%). Escapes: \"quoted\" →";
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(stats("<b>ada</b>", 3, 0.5));   // text, never HTML
+        \\    Browser.document.body.append(stats("<b>ada</b>", 3, 0.5))   // text, never HTML
         \\}
-        ;
     }
     fn events_closure_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Plant:
         \\    | name: Str
@@ -97,23 +94,22 @@ mod web {
         \\            };
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(plant_card(Plant { name: "Fern", watered: false }));
+        \\    Browser.document.body.append(plant_card(Plant { name: "Fern", watered: false }))
         \\}
-        ;
     }
     fn events_on_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Counter:
         \\    | n: I32
         \\    | last: Str
         \\
         \\export main() void {
-        \\    let state = Counter { n: 0, last: "" };
+        \\    let state = Counter { n: 0, last: "" }
         \\    let app = @wutu/\
         \\    @reactive;
         \\    main {
@@ -130,13 +126,12 @@ mod web {
         \\        }
         \\        p { = `${state.n} clicks, last event: ${state.last}`; }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn components_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn badge(label: Str) Browser.HTMLElement {
         \\    @wutu/\
@@ -146,7 +141,7 @@ mod web {
         \\        background: gold;
         \\        = label;
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\fn card(title: Str, body: Browser.HTMLElement) Browser.HTMLElement {
@@ -155,19 +150,18 @@ mod web {
         \\        h3 { = title; = badge("new"); }  // a component is a function call
         \\        = body;  // a slot is just a node parameter
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
         \\    let content = @wutu/\
         \\    p { "Any element can go in the slot."; }
-        \\    \/;
-        \\    Browser.document.body.append(card("Slots", content));
+        \\    \/
+        \\    Browser.document.body.append(card("Slots", content))
         \\}
-        ;
     }
     fn conditions_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn status(stock: I32) Browser.HTMLElement {
         \\    @wutu/\
@@ -182,16 +176,15 @@ mod web {
         \\            "In stock";
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(status(3));
+        \\    Browser.document.body.append(status(3))
         \\}
-        ;
     }
     fn for_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn ranking(names: Array[Str]) Browser.HTMLElement {
         \\    @wutu/\
@@ -203,7 +196,7 @@ mod web {
         \\            }
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\fn long_words(words: Array[Str]) Browser.HTMLElement {
@@ -213,17 +206,16 @@ mod web {
         \\            li { = w; }
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(ranking(["ada", "grace"]));
-        \\    Browser.document.body.append(long_words(["tiny", "enormous", "huge", "gigantic"]));
+        \\    Browser.document.body.append(ranking(["ada", "grace"]))
+        \\    Browser.document.body.append(long_words(["tiny", "enormous", "huge", "gigantic"]))
         \\}
-        ;
     }
     fn keyed_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Todo:
         \\    | id: Str
@@ -237,7 +229,7 @@ mod web {
         \\    let state = State { todos: [
         \\        Todo { id: "a", title: "Water the fern", done: false },
         \\        Todo { id: "b", title: "Repot the cactus", done: false }
-        \\    ] };
+        \\    ] }
         \\    let app = @wutu/\
         \\    @reactive;
         \\    ul {
@@ -253,13 +245,12 @@ mod web {
         \\            }
         \\        }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn bind_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Order:
         \\    | name: Str
@@ -267,7 +258,7 @@ mod web {
         \\    | amount: F64
         \\
         \\export main() void {
-        \\    let order = Order { name: "", gift: false, amount: 1.0 };
+        \\    let order = Order { name: "", gift: false, amount: 1.0 }
         \\    let app = @wutu/\
         \\    @reactive;
         \\    form {
@@ -282,13 +273,12 @@ mod web {
         \\            if order.gift { " (wrapped)"; }
         \\        }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn stored_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Prefs:
         \\    | name: Str
@@ -297,21 +287,20 @@ mod web {
         \\export main() void {
         \\    let prefs = @stored/\
         \\        Prefs "prefs-v1" Prefs { name: "", visits: 0 }
-        \\    \/;                                          // loaded, validated, saved after events
-        \\    prefs.visits += 1;
+        \\    \/                                          // loaded, validated, saved after events
+        \\    prefs.visits += 1
         \\    let app = @wutu/\
         \\    @reactive;
         \\    main {
         \\        input { bind:value = prefs.name; }
         \\        p { = `Visit ${prefs.visits}, ${prefs.name}`; }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn stored_manual_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Draft:
         \\    | text: Str
@@ -319,7 +308,7 @@ mod web {
         \\export main() void {
         \\    let draft = @stored/\
         \\        Draft "draft-v1" manual Draft { text: "" }
-        \\    \/;                                          // saves only when asked
+        \\    \/                                          // saves only when asked
         \\    let app = @wutu/\
         \\    @reactive;
         \\    main {
@@ -329,13 +318,12 @@ mod web {
         \\            on click { wutu.save("draft-v1"); }
         \\        }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn document_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
         \\    let app = @wutu/\
@@ -352,13 +340,12 @@ mod web {
         \\            "Tokens and resets";
         \\        }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn local_css_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn toolbar() Browser.HTMLElement {
         \\    @wutu/\
@@ -381,16 +368,15 @@ mod web {
         \\        }
         \\        a { href = "#/docs"; "Docs"; }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(toolbar());
+        \\    Browser.document.body.append(toolbar())
         \\}
-        ;
     }
     fn dynamic_css_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn meter(progress: I32, hue: I32) Browser.HTMLElement {
         \\    @wutu/\
@@ -404,23 +390,22 @@ mod web {
         \\            background: = "hsl(" + hue.str() + " 70% 50%)";
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(meter(40, 140));
+        \\    Browser.document.body.append(meter(40, 140))
         \\}
-        ;
     }
     fn css_sheet_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn sheet() Str {
         \\    @css/\
         \\    @layer theme {
         \\        .card { border: 1px solid oklch(40% 0.12 150); border-radius: 8px; }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
@@ -430,13 +415,12 @@ mod web {
         \\        class = "card";
         \\        "Styled by a plain CSS class";
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn alias_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn search() Browser.HTMLElement {
         \\    @wutu/\
@@ -452,16 +436,15 @@ mod web {
         \\            };
         \\        }
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(search());
+        \\    Browser.document.body.append(search())
         \\}
-        ;
     }
     fn route_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
         \\    let app = @wutu/\
@@ -477,27 +460,26 @@ mod web {
         \\            h1 { "Home"; }
         \\        }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn island_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\struct Clock:
         \\    | ticks: I32
         \\
         \\fn clock(c: Clock) Browser.HTMLElement {
-        \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1; });
+        \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1 })
         \\    @wutu/\
         \\    @island "clock";  // updates on its own
         \\    p { = `${c.ticks} seconds`; }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    let c = Clock { ticks: 0 };
+        \\    let c = Clock { ticks: 0 }
         \\    let app = @wutu/\
         \\    @reactive;
         \\    main {
@@ -510,13 +492,12 @@ mod web {
         \\            }
         \\        }
         \\    }
-        \\    \/;
-        \\    Browser.document.body.append(app);
+        \\    \/
+        \\    Browser.document.body.append(app)
         \\}
-        ;
     }
     fn layers_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
         \\    Browser.document.body.append(@wutu/\
@@ -529,12 +510,11 @@ mod web {
         \\            "green, with the document's padding";
         \\        }
         \\    }
-        \\    \/);
+        \\    \/)
         \\}
-        ;
     }
     fn unmanaged_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\export main() void {
         \\    Browser.document.body.append(@wutu/\
@@ -555,14 +535,13 @@ mod web {
         \\            }
         \\        }
         \\    }
-        \\    \/);
+        \\    \/)
         \\}
-        ;
     }
     fn lazy_multi() Str {
         \\// main.utu
-        \\using Browser from std:Browser;
-        \\using guide lazy from "./guide.utu";    // its own chunk
+        \\using Browser from std:Browser
+        \\using guide lazy from "./guide.utu"    // its own chunk
         \\
         \\export main() void {
         \\    Browser.document.body.append(@wutu/\
@@ -574,25 +553,23 @@ mod web {
         \\            p { "Welcome."; }
         \\        }
         \\    }
-        \\    \/);
+        \\    \/)
         \\}
         \\
         \\// guide.utu
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\mod guide {
         \\    fn page(reader: Str) Browser.HTMLElement {
         \\        @wutu/\
         \\        article { h1 { = "A guide for " + reader; } }
-        \\        \/;
+        \\        \/
         \\    }
         \\}
-        ;
     }
     fn build_shell() Str {
         \\node cli/wutu.mjs dev main.utu --port 4176
         \\node cli/wutu.mjs format main.utu --check
         \\node cli/wutu.mjs build main.utu --out dist/site --title "My site"
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -853,6 +830,6 @@ mod web {
             = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression");
             = ui.further("examples/wutu-five/README.md", "five working Wutu websites");
         }
-        \/;
+        \/
     }
 }

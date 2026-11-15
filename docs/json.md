@@ -22,11 +22,11 @@ fn load(text: Str) Save {
     promote @json/\ decode Save text \/ {
         |save| => save,
         ~> Save { version: 1, items: [] },
-    };
+    }
 }
 
 fn store(save: Save) Str {
-    @json/\ encode Save save \/;
+    @json/\ encode Save save \/
 }
 ```
 
@@ -73,11 +73,11 @@ third-party response, `match` describes just that part:
 ```utu
 @json/\ match response {
     { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => {
-        greet(name, age, tier orelse "free");
+        greet(name, age, tier orelse "free")
     },
     { status: "error", message: |message| Str } => show(message),
     ~> |error| show("unexpected response: " + error),
-}\/;
+}\/
 ```
 
 - `|name| T` captures a typed value. Any `@json` type works, so

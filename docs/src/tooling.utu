@@ -1,6 +1,6 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod tooling {
     fn cli_sample() Str {
         \\usage: utu <command> <file.utu> [options]
@@ -20,24 +20,20 @@ mod tooling {
         \\  -O smallUnsafe  small, without the checks Wasm does not make itself
         \\  -O fastUnsafe   fast, without them (Buffer indexing, a last alt arm, …)
         \\  -O debug        the module as code generation leaves it, checked
-        ;
     }
     fn grep_sample() Str {
         \\bun ./cli/utu.mjs grep '$v.push($x)' src/ --where 'x: I32'
         \\bun ./cli/utu.mjs grep --refs word_counts examples/
-        ;
     }
     fn wutu_sample() Str {
         \\wutu format <files...> [--check]
         \\wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
         \\wutu dev <entry.utu> [--out dist/wutu] [--port 4176]
-        ;
     }
     fn neovim_sample() Str {
         \\vim.lsp.config('utu', { cmd = { 'node', '/path/to/utu/cli/utu.mjs', 'lsp' }, filetypes = { 'utu' } })
         \\vim.lsp.enable('utu')
         \\vim.filetype.add({ extension = { utu = 'utu' } })
-        ;
     }
     fn helix_sample() Str {
         \\[language-server.utu]
@@ -49,14 +45,12 @@ mod tooling {
         \\scope = "source.utu"
         \\file-types = ["utu"]
         \\language-servers = ["utu"]
-        ;
     }
     fn diagnostic_sample() Str {
         \\hello.utu:10:5: error: Unknown method 'F64.sqrt'
         \\  9 | fn Point.length |self| () F64 {
         \\ 10 |     (self.x * self.x + self.y * self.y).sqrt();
         \\    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ;
     }
     fn trap_sample() Str {
         \\$ utu run boom.utu
@@ -72,7 +66,6 @@ mod tooling {
         \\
         \\  in boom  boom.utu:2:5
         \\  in main  boom.utu:8:5
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -298,6 +291,6 @@ mod tooling {
             = ui.further("docs/diagnostics.md", "Diagnostics");
             = ui.further("docs/grep.md", "utu grep");
         }
-        \/;
+        \/
     }
 }

@@ -1,6 +1,6 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod data {
     fn decode_sample() Str {
         \\struct Item:
@@ -10,14 +10,12 @@ mod data {
         \\
         \\export main() Str {
         \\    let text = \\{"name": "pen", "count": 3, "extra": [1, 2]}
-        \\    ;
         \\    promote @json/\ decode Item text \/ {
         \\        |item| => `${item.count} ${item.name}, ${item.note orelse "no note"}`,
         \\        ~> "not an Item",
-        \\    };
+        \\    }
         \\    // 3 pen, no note: unknown fields are skipped
         \\}
-        ;
     }
     fn encode_sample() Str {
         \\struct Item:
@@ -33,12 +31,11 @@ mod data {
         \\    let save = Save { version: 2, items: [
         \\        Item { name: "pen", count: 3, note: null },
         \\        Item { name: "cup", count: 1, note: "chipped" }
-        \\    ] };
-        \\    @json/\ encode Save save \/;
+        \\    ] }
+        \\    @json/\ encode Save save \/
         \\    // {"version":2,"items":[{"name":"pen","count":3,"note":null},
         \\    //                       {"name":"cup","count":1,"note":"chipped"}]}
         \\}
-        ;
     }
     fn roundtrip_sample() Str {
         \\struct Point:
@@ -47,14 +44,13 @@ mod data {
         \\
         \\export main() Str {
         \\    let points = @json/\ decode Array[Point] "[{\"x\": 1, \"y\": 2}, {\"y\": 5, \"x\": 4}]" \/
-        \\        orelse fatal;
-        \\    for (points) |p| { p.x *= 10; };
-        \\    @json/\ encode Array[Point] points \/;   // [{"x":10,"y":2},{"x":40,"y":5}]
+        \\        orelse fatal
+        \\    for (points) |p| { p.x *= 10 }
+        \\    @json/\ encode Array[Point] points \/   // [{"x":10,"y":2},{"x":40,"y":5}]
         \\}
-        ;
     }
     fn error_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\struct Item:
         \\    | name: Str
@@ -63,13 +59,11 @@ mod data {
         \\export main() void {
         \\    let missing = \\{"name": "pen",
         \\                  \\ "colour": "red"}
-        \\    ;
-        \\    console.log(@json/\ error Item missing \/);         // missing field "count" at line 2, column 18
-        \\    console.log(@json/\ error Item "{\"name\": 5}" \/);   // expected a string at line 1, column 10
-        \\    let ok = @json/\ error Item "{\"name\": \"a\", \"count\": 1}" \/;
-        \\    console.log(`matches: ${ok == ""}`);                 // matches: true
+        \\    console.log(@json/\ error Item missing \/)         // missing field "count" at line 2, column 18
+        \\    console.log(@json/\ error Item "{\"name\": 5}" \/)   // expected a string at line 1, column 10
+        \\    let ok = @json/\ error Item "{\"name\": \"a\", \"count\": 1}" \/
+        \\    console.log(`matches: ${ok == ""}`)                 // matches: true
         \\}
-        ;
     }
     fn enums_sample() Str {
         \\enum Color:
@@ -86,12 +80,10 @@ mod data {
         \\
         \\export main() Str {
         \\    let text = \\{"color": "Green", "shape": {"kind": "Circle", "r": 2}}
-        \\    ;
-        \\    let s = @json/\ decode Sticker text \/ orelse fatal;
-        \\    s.shape = Square { side: 3.0 };
-        \\    @json/\ encode Sticker s \/;   // {"color":"Green","shape":{"kind":"Square","side":3}}
+        \\    let s = @json/\ decode Sticker text \/ orelse fatal
+        \\    s.shape = Square { side: 3.0 }
+        \\    @json/\ encode Sticker s \/   // {"color":"Green","shape":{"kind":"Square","side":3}}
         \\}
-        ;
     }
     fn recursive_sample() Str {
         \\struct Folder:
@@ -100,18 +92,16 @@ mod data {
         \\    | children: Array[Folder]
         \\
         \\fn total(f: Folder) I64 {
-        \\    let sum = f.size;
-        \\    for (f.children) |c| { sum += total(c); };
-        \\    sum;
+        \\    let sum = f.size
+        \\    for (f.children) |c| { sum += total(c) }
+        \\    sum
         \\}
         \\
         \\export main() I64 {
         \\    let text = \\{"name": "/", "size": 9007199254740993, "children": [
         \\               \\  {"name": "src", "size": 10, "children": []}]}
-        \\    ;
-        \\    total(@json/\ decode Folder text \/ orelse fatal);   // 9007199254741003
+        \\    total(@json/\ decode Folder text \/ orelse fatal)   // 9007199254741003
         \\}
-        ;
     }
     fn match_sample() Str {
         \\fn handle(response: Str) Str {
@@ -119,18 +109,17 @@ mod data {
         \\        { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 } } => `${name} is ${age}`,
         \\        { status: "error", message: |message| Str } => "error: " + message,
         \\        ~> |error| "unexpected: " + error,
-        \\    }\/;
+        \\    }\/
         \\}
         \\
         \\export main() Str {
-        \\    handle("{\"status\": \"ok\", \"user\": {\"name\": \"Ada\", \"age\": 36}}");
+        \\    handle("{\"status\": \"ok\", \"user\": {\"name\": \"Ada\", \"age\": 36}}")
         \\    // Ada is 36
         \\    // {"status": "ok", "user": {"name": "Bo"}}            Bo is 18 (a default)
         \\    // {"status": "error", "message": "quota"}             error: quota
         \\    // {"status": "ok", "user": {"name": "Cy", "age": "old"}}
         \\    //     unexpected: user.age: expected an integer at line 1, column 48
         \\}
-        ;
     }
     fn match_subtree_sample() Str {
         \\struct Line:
@@ -146,58 +135,53 @@ mod data {
         \\            sum;
         \\        },
         \\        ~> 0,
-        \\    }\/;
+        \\    }\/
         \\}
         \\
         \\export main() I32 {
         \\    let order = \\{"id": 7, "lines": [{"name": "a", "count": 2}, {"name": "b", "count": 3}],
         \\                \\ "coupon-code": "SPRING", "audit": {"by": "x", "at": 1}}
-        \\    ;
-        \\    units(order);   // 6: "id" and "audit" are skipped without being decoded
+        \\    units(order)   // 6: "id" and "audit" are skipped without being decoded
         \\}
-        ;
     }
     fn segment_sample() Str {
-        \\using SegmentTree from std:SegmentTree;
+        \\using SegmentTree from std:SegmentTree
         \\
-        \\fn add(a: I32, b: I32) I32 { a + b; }
-        \\fn reaches_ten(total: I32) Bool { total >= 10; }
+        \\fn add(a: I32, b: I32) I32 { a + b }
+        \\fn reaches_ten(total: I32) Bool { total >= 10 }
         \\
         \\export main() I32 {
-        \\    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add);
-        \\    let before = sums.query(1, 3, add);              // 3 + 5 = 8, the range [1, 3)
-        \\    sums.set(1, 10, add);                            // O(log n)
-        \\    let after = sums.query(1, 3, add);               // 10 + 5 = 15
-        \\    let first = sums.first_prefix(reaches_ten, add); // 1: 2 + 10 reaches ten
-        \\    before * 100 + after + first;                    // 816
+        \\    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add)
+        \\    let before = sums.query(1, 3, add)              // 3 + 5 = 8, the range [1, 3)
+        \\    sums.set(1, 10, add)                            // O(log n)
+        \\    let after = sums.query(1, 3, add)               // 10 + 5 = 15
+        \\    let first = sums.first_prefix(reaches_ten, add) // 1: 2 + 10 reaches ten
+        \\    before * 100 + after + first                    // 816
         \\}
-        ;
     }
     fn segment_max_sample() Str {
-        \\using SegmentTree from std:SegmentTree;
+        \\using SegmentTree from std:SegmentTree
         \\
-        \\fn max(a: F64, b: F64) F64 { F64.max(a, b); }
+        \\fn max(a: F64, b: F64) F64 { F64.max(a, b) }
         \\
         \\export main() F64 {
-        \\    let temps = SegmentTree[F64].new([12.5, 18.0, 9.5, 21.0, 15.0], F64.inf() * -1.0, max);
-        \\    temps.query(0, 3, max) + temps.query(2, 5, max);   // 18 + 21 = 39
+        \\    let temps = SegmentTree[F64].new([12.5, 18.0, 9.5, 21.0, 15.0], F64.inf() * -1.0, max)
+        \\    temps.query(0, 3, max) + temps.query(2, 5, max)   // 18 + 21 = 39
         \\}
-        ;
     }
     fn persistent_sample() Str {
-        \\using PersistentSegmentTree from std:PersistentSegmentTree;
+        \\using PersistentSegmentTree from std:PersistentSegmentTree
         \\
-        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\fn add(a: I32, b: I32) I32 { a + b }
         \\
         \\export main() I32 {
-        \\    let v1 = PersistentSegmentTree[I32].new([2, 3, 5], 0, add);
-        \\    let v2 = v1.set(1, 10, add);          // a new version; v1 is unchanged
-        \\    v1.query(0, 3, add) * 100 + v2.query(0, 3, add);   // 10 and 17: 1017
+        \\    let v1 = PersistentSegmentTree[I32].new([2, 3, 5], 0, add)
+        \\    let v2 = v1.set(1, 10, add)          // a new version; v1 is unchanged
+        \\    v1.query(0, 3, add) * 100 + v2.query(0, 3, add)   // 10 and 17: 1017
         \\}
-        ;
     }
     fn spatial_sample() Str {
-        \\using Spatial from std:Spatial;
+        \\using Spatial from std:Spatial
         \\
         \\export main() I32 {
         \\    let index = Spatial.new([
@@ -205,14 +189,13 @@ mod data {
         \\        Spatial.point(1.0, 2.0, 20),
         \\        Spatial.point(3.0, 1.0, 30),
         \\        Spatial.point(1.0, 5.0, 40)
-        \\    ]);
-        \\    let low = index.below(0.0, 3.0, 2.0) sum;         // x in [0, 3], y <= 2: 60
-        \\    let box = index.within(0.0, 1.0, 0.0, 2.0) sum;   // a rectangle: 30
-        \\    let near = index.radius(0.0, 0.0, 1.0) sum;       // a circle: 10
-        \\    let closest = (index.nearest(3.1, 1.1) orelse fatal).value;   // 30
-        \\    low + box + near + closest;                       // 130
+        \\    ])
+        \\    let low = index.below(0.0, 3.0, 2.0) sum         // x in [0, 3], y <= 2: 60
+        \\    let box = index.within(0.0, 1.0, 0.0, 2.0) sum   // a rectangle: 30
+        \\    let near = index.radius(0.0, 0.0, 1.0) sum       // a circle: 10
+        \\    let closest = (index.nearest(3.1, 1.1) orelse fatal).value   // 30
+        \\    low + box + near + closest                       // 130
         \\}
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -443,6 +426,6 @@ mod data {
                 " page.";
             }
         }
-        \/;
+        \/
     }
 }

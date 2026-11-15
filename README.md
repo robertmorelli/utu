@@ -27,13 +27,13 @@ gives typed access to the whole DOM and JavaScript standard library, and any
 npm package with types imports directly:
 
 ```utu
-using Browser from std:Browser;
-using Nano from "npm:nanoid";
+using Browser from std:Browser
+using Nano from "npm:nanoid"
 
 export main() void {
-    let item = Browser.document.createElement("li");
-    item.textContent = Nano.nanoid(8);
-    Browser.document.body.append(item);
+    let item = Browser.document.createElement("li")
+    item.textContent = Nano.nanoid(8)
+    Browser.document.body.append(item)
 }
 ```
 

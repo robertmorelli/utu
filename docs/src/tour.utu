@@ -1,287 +1,268 @@
-using Browser from std:Browser;
-using code from "./code.utu";
-using ui from "./ui.utu";
+using Browser from std:Browser
+using code from "./code.utu"
+using ui from "./ui.utu"
 mod tour {
     // Literals and numbers
     fn literals_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    let n = 42;                   // I32: the first of I32, U32, I64, U64 it fits
-        \\    let wide = 4000000000;        // U32
-        \\    let big = 9007199254740993;   // I64
-        \\    let mask = 0xff;              // hexadecimal
-        \\    let bits = 0b1010;            // binary
-        \\    let half = 0.5;               // F32: it reads the same as F32 and as F64
-        \\    let tenth = 0.1;              // F64: as F32 it would be 0.100000001…
-        \\    let x = F64(2.5e3);           // F64(…), I64(…): a literal of that type
-        \\    console.log(`${n} ${wide} ${big} ${mask} ${bits} ${half} ${tenth} ${x}`);
+        \\    let n = 42                   // I32: the first of I32, U32, I64, U64 it fits
+        \\    let wide = 4000000000        // U32
+        \\    let big = 9007199254740993   // I64
+        \\    let mask = 0xff              // hexadecimal
+        \\    let bits = 0b1010            // binary
+        \\    let half = 0.5               // F32: it reads the same as F32 and as F64
+        \\    let tenth = 0.1              // F64: as F32 it would be 0.100000001…
+        \\    let x = F64(2.5e3)           // F64(…), I64(…): a literal of that type
+        \\    console.log(`${n} ${wide} ${big} ${mask} ${bits} ${half} ${tenth} ${x}`)
         \\    // 42 4000000000 9007199254740993 255 10 0.5 0.1 2500
         \\}
-        ;
     }
     fn dollar_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
-        \\fn max(a: $T, b: T) T { if a > b { a; } else { b; }; }
-        \\fn first(xs: Array[$T]) T { xs[0]; }
-        \\fn show(x: $T) Str { `<${x}>`; }
+        \\fn max(a: $T, b: T) T { if a > b { a } else { b } }
+        \\fn first(xs: Array[$T]) T { xs[0] }
+        \\fn show(x: $T) Str { `<${x}>` }
         \\
         \\export main() void {
-        \\    let big: I64 = 5000000000;
-        \\    console.log(max(3, 7));          // 7: max[I32]
-        \\    console.log(max(1, big));        // 5000000000: T is I64
-        \\    console.log(first(["a", "b"]));  // a
-        \\    console.log(show(1.5));          // <1.5>
+        \\    let big: I64 = 5000000000
+        \\    console.log(max(3, 7))          // 7: max[I32]
+        \\    console.log(max(1, big))        // 5000000000: T is I64
+        \\    console.log(first(["a", "b"]))  // a
+        \\    console.log(show(1.5))          // <1.5>
         \\}
-        ;
     }
     fn conversions_sample() Str {
         \\export main() F64 {
-        \\    let count = 7;
-        \\    let ratio: F64 = 1;           // an integer literal adopts a float type
-        \\    let half = count.f64() / 2.0;
-        \\    let rounded = 3.9.i32();   // 3: float to integer truncates
-        \\    let clamped = 1.0e12.i32(); // 2147483647: and saturates
-        \\    let long = count.i64() * 1000000000.i64();
-        \\    half + rounded.f64() + ratio;   // 7.5
+        \\    let count = 7
+        \\    let ratio: F64 = 1           // an integer literal adopts a float type
+        \\    let half = count.f64() / 2.0
+        \\    let rounded = 3.9.i32()   // 3: float to integer truncates
+        \\    let clamped = 1.0e12.i32() // 2147483647: and saturates
+        \\    let long = count.i64() * 1000000000.i64()
+        \\    half + rounded.f64() + ratio   // 7.5
         \\}
-        ;
     }
     fn nominal_sample() Str {
         \\fn widen(i: I32) I64 {
         \\    // let u: U32 = i;    error: Type mismatch: expected U32, got I32
         \\    // let f: F64 = i;    error: Type mismatch: expected F64, got I32
         \\    // 1 + 2.5            error: Type mismatch: expected I32, got F64
-        \\    i.i64();
+        \\    i.i64()
         \\}
         \\
         \\export main() I64 {
-        \\    widen(-5);   // -5
+        \\    widen(-5)   // -5
         \\}
-        ;
     }
     fn operators_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    console.log(`${7 / 2} ${7 % 2} ${7.0 / 2.0}`);           // 3 1 3.5
-        \\    console.log(`${(1 << 4) | 3} ${0b1010 & 6} ${I32.clz(1)}`);  // 19 2 31
-        \\    console.log(`${not true} ${true xor false} ${3 < 4 and 4 < 5}`);  // false true true
-        \\    console.log(`${F64.sqrt(2.0)} ${2.0.pow(10.0)} ${F64.pi()}`);
+        \\    console.log(`${7 / 2} ${7 % 2} ${7.0 / 2.0}`)           // 3 1 3.5
+        \\    console.log(`${(1 << 4) | 3} ${0b1010 & 6} ${I32.clz(1)}`)  // 19 2 31
+        \\    console.log(`${not true} ${true xor false} ${3 < 4 and 4 < 5}`)  // false true true
+        \\    console.log(`${F64.sqrt(2.0)} ${2.0.pow(10.0)} ${F64.pi()}`)
         \\    // 1.4142135623730951 1024 3.141592653589793
         \\}
-        ;
     }
     // Bindings
     fn let_sample() Str {
         \\export main() I32 {
-        \\    let total = 10;          // inferred: I32
-        \\    let scale: F64 = 0.5;    // annotated
-        \\    total = total + 1;       // a local binding is mutable
-        \\    total += 4;
-        \\    total *= 2;
-        \\    total <<= 1;
-        \\    total;                   // 60
+        \\    let total = 10          // inferred: I32
+        \\    let scale: F64 = 0.5    // annotated
+        \\    total = total + 1       // a local binding is mutable
+        \\    total += 4
+        \\    total *= 2
+        \\    total <<= 1
+        \\    total                   // 60
         \\}
-        ;
     }
     fn globals_sample() Str {
-        \\let greeting: Str = "hello";
-        \\let limit: I32 = 3;
-        \\let loud: Str = shout();         // computed when the module starts
+        \\let greeting: Str = "hello"
+        \\let limit: I32 = 3
+        \\let loud: Str = shout()         // computed when the module starts
         \\
         \\fn shout() Str {
-        \\    greeting.to_upper();
+        \\    greeting.to_upper()
         \\}
         \\
         \\export main() Str {
-        \\    loud.repeat(limit);   // HELLOHELLOHELLO
+        \\    loud.repeat(limit)   // HELLOHELLOHELLO
         \\}
-        ;
     }
     fn global_state_sample() Str {
         \\struct Tally:
         \\    | hits: I32
-        \\let tally: Tally = Tally { hits: 0 };   // set once; its fields still change
+        \\let tally: Tally = Tally { hits: 0 }   // set once; its fields still change
         \\
-        \\fn hit() void { tally.hits += 1; }     // `tally = …` would be an error
+        \\fn hit() void { tally.hits += 1 }     // `tally = …` would be an error
         \\
         \\export main() I32 {
-        \\    hit();
-        \\    hit();
-        \\    tally.hits;                          // 2
+        \\    hit()
+        \\    hit()
+        \\    tally.hits                          // 2
         \\}
-        ;
     }
     // Functions
     fn functions_sample() Str {
         \\fn add(a: I32, b: I32) I32 {
-        \\    a + b;                       // the last expression is the result
+        \\    a + b                       // the last expression is the result
         \\}
         \\
         \\fn clamp(x: I32, low: I32, high: I32) I32 {
-        \\    if x < low { return low; };  // return leaves early
-        \\    if x > high { return high; };
-        \\    x;
+        \\    if x < low { return low }  // return leaves early
+        \\    if x > high { return high }
+        \\    x
         \\}
         \\
         \\fn log_nothing() void {          // void: no result
         \\}
         \\
         \\export main() I32 {
-        \\    log_nothing();
-        \\    add(clamp(99, 0, 10), 32);   // 42
+        \\    log_nothing()
+        \\    add(clamp(99, 0, 10), 32)   // 42
         \\}
-        ;
     }
     fn recursion_sample() Str {
         \\fn fib(n: I32) I32 {
-        \\    if n < 2 { n; } else { fib(n - 1) + fib(n - 2); };
+        \\    if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
         \\}
         \\
         \\fn gcd(a: I32, b: I32) I32 {
-        \\    if b == 0 { a; } else { gcd(b, a % b); };
+        \\    if b == 0 { a } else { gcd(b, a % b) }
         \\}
         \\
         \\export main() I32 {
-        \\    fib(10) + gcd(84, 36);   // 55 + 12 = 67
+        \\    fib(10) + gcd(84, 36)   // 55 + 12 = 67
         \\}
-        ;
     }
     fn pipe_sample() Str {
-        \\fn double(x: I32) I32 { x * 2; }
-        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\fn double(x: I32) I32 { x * 2 }
+        \\fn add(a: I32, b: I32) I32 { a + b }
         \\
         \\export main() I32 {
-        \\    let a = 5 -o double;          // double(5)
-        \\    let b = 5 -o add(&, 10);      // add(5, 10): & marks where the value goes
-        \\    3 -o double -o add(a, &);     // add(10, 6) = 16
+        \\    let a = 5 -o double          // double(5)
+        \\    let b = 5 -o add(&, 10)      // add(5, 10): & marks where the value goes
+        \\    3 -o double -o add(a, &)     // add(10, 6) = 16
         \\}
-        ;
     }
     // Blocks
     fn blocks_sample() Str {
         \\export main() I32 {
         \\    let area = {
-        \\        let w = 6;
-        \\        let h = 7;
-        \\        w * h;              // the block's value
-        \\    };
-        \\    let label = if area > 40 { "big"; } else { "small"; };
-        \\    area + label.len();     // 42 + 3 = 45
+        \\        let w = 6
+        \\        let h = 7
+        \\        w * h              // the block's value
+        \\    }
+        \\    let label = if area > 40 { "big" } else { "small" }
+        \\    area + label.len()     // 42 + 3 = 45
         \\}
-        ;
     }
     // if / else
     fn if_sample() Str {
         \\fn classify(n: I32) Str {
         \\    if n < 0 {
-        \\        "negative";
+        \\        "negative"
         \\    } else if n == 0 {
-        \\        "zero";
+        \\        "zero"
         \\    } else {
-        \\        "positive";
-        \\    };
+        \\        "positive"
+        \\    }
         \\}
         \\
         \\export main() Str {
-        \\    classify(-3) + " " + classify(0) + " " + classify(8);   // negative zero positive
+        \\    classify(-3) + " " + classify(0) + " " + classify(8)   // negative zero positive
         \\}
-        ;
     }
     fn if_statement_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\fn report(errors: I32) void {
         \\    if errors > 0 {
-        \\        console.log(`${errors} problems`);
-        \\    };                                    // no else: the if is a statement
-        \\    let word = if errors == 1 { "problem"; } else { "problems"; };
-        \\    console.log(word);
+        \\        console.log(`${errors} problems`)
+        \\    }                                    // no else: the if is a statement
+        \\    let word = if errors == 1 { "problem" } else { "problems" }
+        \\    console.log(word)
         \\}
         \\
         \\export main() void {
-        \\    report(3);   // 3 problems, then: problems
+        \\    report(3)   // 3 problems, then: problems
         \\}
-        ;
     }
     // Loops
     fn while_sample() Str {
         \\fn collatz_steps(start: I32) I32 {
-        \\    let n = start;
-        \\    let steps = 0;
+        \\    let n = start
+        \\    let steps = 0
         \\    while (n != 1) {
-        \\        n = if n % 2 == 0 { n / 2; } else { 3 * n + 1; };
-        \\        steps += 1;
-        \\    };
-        \\    steps;
+        \\        n = if n % 2 == 0 { n / 2 } else { 3 * n + 1 }
+        \\        steps += 1
+        \\    }
+        \\    steps
         \\}
         \\
         \\export main() I32 {
-        \\    collatz_steps(27);   // 111
+        \\    collatz_steps(27)   // 111
         \\}
-        ;
     }
     fn ranges_sample() Str {
         \\export main() I32 {
-        \\    let sum = 0;
+        \\    let sum = 0
         \\    for (0 ..< 5) |i| {      // exclusive: 0 1 2 3 4
-        \\        sum += i;
-        \\    };
+        \\        sum += i
+        \\    }
         \\    for (1 ... 3) |i| {      // inclusive: 1 2 3
-        \\        sum += i * 100;
-        \\    };
-        \\    sum;                     // 610
+        \\        sum += i * 100
+        \\    }
+        \\    sum                     // 610
         \\}
-        ;
     }
     fn for_each_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    let names = ["ada", "grace", "edsger"];
+        \\    let names = ["ada", "grace", "edsger"]
         \\    for (names) |name| {
-        \\        console.log(name.to_upper());
-        \\    };
-        \\    let scores = [90, 72, 85];
+        \\        console.log(name.to_upper())
+        \\    }
+        \\    let scores = [90, 72, 85]
         \\    for (names, scores) |name, score| {     // zipped: stops at the shorter
-        \\        console.log(`${name}: ${score}`);
-        \\    };
+        \\        console.log(`${name}: ${score}`)
+        \\    }
         \\    for (names, 0 ..< 10) |name, i| {       // an array and a range
-        \\        console.log(`${i}. ${name}`);
-        \\    };
+        \\        console.log(`${i}. ${name}`)
+        \\    }
         \\}
-        ;
     }
     fn break_sample() Str {
         \\export main() I32 {
-        \\    let total = 0;
+        \\    let total = 0
         \\    for (0 ..< 100) |i| {
-        \\        if i % 3 == 0 { continue; };   // skip multiples of three
-        \\        if i > 10 { break; };          // stop altogether
-        \\        total += i;
-        \\    };
-        \\    total;                             // 1+2+4+5+7+8+10 = 37
+        \\        if i % 3 == 0 { continue }   // skip multiples of three
+        \\        if i > 10 { break }          // stop altogether
+        \\        total += i
+        \\    }
+        \\    total                             // 1+2+4+5+7+8+10 = 37
         \\}
-        ;
     }
     fn labeled_sample() Str {
         \\fn find(rows: Array[Array[I32]], want: I32) I32 {
         \\    found: {                                 // a block named found
         \\        for (rows) |row| {
         \\            for (row) |x| {
-        \\                if x == want { break found x * 10; };   // leaves both loops, with a value
-        \\            };
-        \\        };
-        \\        -1;                                  // the value when nothing breaks
-        \\    };
+        \\                if x == want { break found x * 10 }   // leaves both loops, with a value
+        \\            }
+        \\        }
+        \\        -1                                  // the value when nothing breaks
+        \\    }
         \\}
         \\
         \\export main() I32 {
-        \\    find([[1, 2], [3, 4]], 3);               // 30
+        \\    find([[1, 2], [3, 4]], 3)               // 30
         \\}
-        ;
     }
     // match and loop match
     fn match_sample() Str {
@@ -291,45 +272,43 @@ mod tour {
         \\        0 => "zero",
         \\        1 => "one",
         \\        ~> "many",          // ~> is the default arm
-        \\    };
+        \\    }
         \\}
         \\
         \\fn bit(b: Bool) I32 {
-        \\    match b { true => 1, false => 0, };   // exhaustive: no ~> needed
+        \\    match b { true => 1, false => 0, }   // exhaustive: no ~> needed
         \\}
         \\
         \\export main() Str {
-        \\    describe(-1) + ", " + describe(7) + ", " + bit(true).str();   // minus one, many, 1
+        \\    describe(-1) + ", " + describe(7) + ", " + bit(true).str()   // minus one, many, 1
         \\}
-        ;
     }
     fn loop_match_sample() Str {
         \\// A state machine: continue <state> jumps straight to that arm.
         \\fn count_words(text: Str) I32 {
-        \\    let i = 0;
-        \\    let words = 0;
+        \\    let i = 0
+        \\    let words = 0
         \\    loop match 0 {
         \\        0 => {                                  // between words
-        \\            if i >= text.len() { break; };
-        \\            let space = text[i] == 32;
-        \\            i += 1;
-        \\            if space { continue 0; } else { words += 1; continue 1; };
+        \\            if i >= text.len() { break }
+        \\            let space = text[i] == 32
+        \\            i += 1
+        \\            if space { continue 0 } else { words += 1; continue 1 }
         \\        },
         \\        1 => {                                  // inside a word
-        \\            if i >= text.len() { break; };
-        \\            let space = text[i] == 32;
-        \\            i += 1;
-        \\            if space { continue 0; } else { continue 1; };
+        \\            if i >= text.len() { break }
+        \\            let space = text[i] == 32
+        \\            i += 1
+        \\            if space { continue 0 } else { continue 1 }
         \\        },
-        \\        ~> { break; },
-        \\    };
-        \\    words;
+        \\        ~> { break },
+        \\    }
+        \\    words
         \\}
         \\
         \\export main() I32 {
-        \\    count_words("  the quick  brown fox ");   // 4
+        \\    count_words("  the quick  brown fox ")   // 4
         \\}
-        ;
     }
     // Structs
     fn struct_sample() Str {
@@ -338,16 +317,15 @@ mod tour {
         \\    | y: F64
         \\
         \\fn origin() Point {
-        \\    &{ x: 0.0, y: 0.0 };          // &{ } takes its type from the result
+        \\    &{ x: 0.0, y: 0.0 }          // &{ } takes its type from the result
         \\}
         \\
         \\export main() F64 {
-        \\    let p = Point { x: 3.0, y: 4.0 };
-        \\    let q: Point = &{ x: 1.0, y: 1.0 };
-        \\    p.x = p.x + q.x;              // fields are mutable
-        \\    p.x + p.y + origin().x;       // 8
+        \\    let p = Point { x: 3.0, y: 4.0 }
+        \\    let q: Point = &{ x: 1.0, y: 1.0 }
+        \\    p.x = p.x + q.x              // fields are mutable
+        \\    p.x + p.y + origin().x       // 8
         \\}
-        ;
     }
     fn methods_sample() Str {
         \\struct Rect:
@@ -355,74 +333,70 @@ mod tour {
         \\    | h: F64
         \\
         \\fn Rect.square(side: F64) Rect {         // static: Rect.square(2.0)
-        \\    Rect { w: side, h: side };
+        \\    Rect { w: side, h: side }
         \\}
         \\
         \\fn Rect.area |self| () F64 {             // a method: r.area()
-        \\    self.w * self.h;
+        \\    self.w * self.h
         \\}
         \\
         \\fn Rect.scale |r| (k: F64) void {        // the receiver can have any name
-        \\    r.w *= k;
-        \\    r.h *= k;
+        \\    r.w *= k
+        \\    r.h *= k
         \\}
         \\
         \\export main() F64 {
-        \\    let r = Rect.square(2.0);
-        \\    r.scale(3.0);
-        \\    r.area();                              // 36
+        \\    let r = Rect.square(2.0)
+        \\    r.scale(3.0)
+        \\    r.area()                              // 36
         \\}
-        ;
     }
     fn struct_ops_sample() Str {
         \\struct Vec2:
         \\    | x: F64
         \\    | y: F64
         \\
-        \\fn Vec2:add |a, b| Vec2 { &{ x: a.x + b.x, y: a.y + b.y }; }   // a + b
-        \\fn Vec2:mul |a, b| Vec2 { &{ x: a.x * b.x, y: a.y * b.y }; }   // a * b
-        \\fn Vec2:eq |a, b| Bool { a.x == b.x and a.y == b.y; }          // a == b
-        \\fn Vec2:neg |a| Vec2 { &{ x: -a.x, y: -a.y }; }                // -a
-        \\fn Vec2.str |v| () Str { `(${v.x}, ${v.y})`; }              // used by `${v}`
+        \\fn Vec2:add |a, b| Vec2 { &{ x: a.x + b.x, y: a.y + b.y } }   // a + b
+        \\fn Vec2:mul |a, b| Vec2 { &{ x: a.x * b.x, y: a.y * b.y } }   // a * b
+        \\fn Vec2:eq |a, b| Bool { a.x == b.x and a.y == b.y }          // a == b
+        \\fn Vec2:neg |a| Vec2 { &{ x: -a.x, y: -a.y } }                // -a
+        \\fn Vec2.str |v| () Str { `(${v.x}, ${v.y})` }              // used by `${v}`
         \\
         \\export main() Str {
-        \\    let a = Vec2 { x: 1.0, y: 2.0 };
-        \\    let b = Vec2 { x: 3.0, y: 4.0 };
-        \\    `${a + b} ${a * b} ${-a} ${a == b}`;   // (4, 6) (3, 8) (-1, -2) false
+        \\    let a = Vec2 { x: 1.0, y: 2.0 }
+        \\    let b = Vec2 { x: 3.0, y: 4.0 }
+        \\    `${a + b} ${a * b} ${-a} ${a == b}`   // (4, 6) (3, 8) (-1, -2) false
         \\}
-        ;
     }
     // Distinct types and aliases
     fn distinct_sample() Str {
-        \\type UserId = distinct I32;
-        \\type Meters = distinct F64;
+        \\type UserId = distinct I32
+        \\type Meters = distinct F64
         \\
         \\fn lookup(id: UserId) Str {
-        \\    `user #${id.i32()}`;
+        \\    `user #${id.i32()}`
         \\}
         \\
         \\export main() Str {
-        \\    let id = UserId(7);
-        \\    let height = Meters(1.8);
+        \\    let id = UserId(7)
+        \\    let height = Meters(1.8)
         \\    // lookup(7);       error: Type mismatch: expected UserId, got I32
         \\    // lookup(height);  error: a Meters is not a UserId
-        \\    lookup(id);         // user #7
+        \\    lookup(id)         // user #7
         \\}
-        ;
     }
     fn alias_sample() Str {
-        \\using console |out| from std:Console;   // import under another name
+        \\using console |out| from std:Console   // import under another name
         \\
         \\mod geometry {
-        \\    fn square(x: F64) F64 { x * x; }
+        \\    fn square(x: F64) F64 { x * x }
         \\}
         \\
-        \\using geometry |geo|;                    // a within-file alias
+        \\using geometry |geo|                    // a within-file alias
         \\
         \\export main() void {
-        \\    out.log(`${geo.square(3.0)} ${geometry.square(4.0)}`);   // 9 16
+        \\    out.log(`${geo.square(3.0)} ${geometry.square(4.0)}`)   // 9 16
         \\}
-        ;
     }
     // Enums
     fn enum_sample() Str {
@@ -436,13 +410,12 @@ mod tour {
         \\        Circle |c| => 3.0 * c.r * c.r,    // c is the Circle, with its fields
         \\        Rect |r| => r.w * r.h,
         \\        Dot => 0.0,
-        \\    };
+        \\    }
         \\}
         \\
         \\export main() F64 {
-        \\    area(Circle { r: 2.0 }) + area(Rect { w: 2.0, h: 3.0 }) + area(Dot {});   // 18
+        \\    area(Circle { r: 2.0 }) + area(Rect { w: 2.0, h: 3.0 }) + area(Dot {})   // 18
         \\}
-        ;
     }
     fn enum_qualified_sample() Str {
         \\enum Shape:
@@ -456,15 +429,14 @@ mod tour {
         \\    alt shape {
         \\        Circle |c| => 3.0 * c.r * c.r,   // shape is a Shape: Shape's Circle
         \\        Shape.Dot => 0.0,
-        \\    };
+        \\    }
         \\}
         \\
         \\export main() F64 {
-        \\    let lens = Lens.Circle { focus: 1.5 };
-        \\    let c: Shape = Circle { r: 1.0 };   // a Shape is wanted: Shape's Circle
-        \\    area(c) + area(Shape.Circle { r: 2.0 }) + area(Shape.Dot) + lens.focus;   // 16.5
+        \\    let lens = Lens.Circle { focus: 1.5 }
+        \\    let c: Shape = Circle { r: 1.0 }   // a Shape is wanted: Shape's Circle
+        \\    area(c) + area(Shape.Circle { r: 2.0 }) + area(Shape.Dot) + lens.focus   // 16.5
         \\}
-        ;
     }
     fn enum_tag_sample() Str {
         \\tag enum Token:            // tag: alt compiles to a jump table
@@ -476,19 +448,18 @@ mod tour {
         \\    alt t {
         \\        Num |n| => acc + sign * n.value,
         \\        ~> acc,                 // every other variant
-        \\    };
+        \\    }
         \\}
         \\
         \\export main() I32 {
-        \\    let tokens: Array[Token] = [Num { value: 5 }, Plus {}, Num { value: 3 }];
-        \\    let total = 0;
-        \\    for (tokens) |t| { total = apply(total, 1, t); };
-        \\    total;                      // 8
+        \\    let tokens: Array[Token] = [Num { value: 5 }, Plus {}, Num { value: 3 }]
+        \\    let total = 0
+        \\    for (tokens) |t| { total = apply(total, 1, t) }
+        \\    total                      // 8
         \\}
-        ;
     }
     fn int_enum_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\enum(U8) Level:
         \\    | Low                  // 0
@@ -496,15 +467,14 @@ mod tour {
         \\    | High = 9             // explicit value
         \\
         \\fn label(l: Level) Str {
-        \\    match l { Level.Low => "calm", Level.Mid => "busy", Level.High => "on fire", };
+        \\    match l { Level.Low => "calm", Level.Mid => "busy", Level.High => "on fire", }
         \\}
         \\
         \\export main() void {
-        \\    let l = Level.Mid;
-        \\    console.log(`${label(l)} ${Level.name(l)} ${l.i32()} ${Level.count()}`);  // busy Mid 1 3
-        \\    console.log(`${Level(9) == Level.High} ${l < Level.High}`);        // true true
+        \\    let l = Level.Mid
+        \\    console.log(`${label(l)} ${Level.name(l)} ${l.i32()} ${Level.count()}`)  // busy Mid 1 3
+        \\    console.log(`${Level(9) == Level.High} ${l < Level.High}`)        // true true
         \\}
-        ;
     }
     // Nullables
     fn promote_sample() Str {
@@ -512,14 +482,13 @@ mod tour {
         \\    promote name {
         \\        |n| => n.slice(0, 1),   // n is a Str here
         \\        ~> "?",                 // absent
-        \\    };
+        \\    }
         \\}
         \\
         \\export main() Str {
-        \\    let nobody: ?Str = null;
-        \\    initial("Ada") + initial(nobody);   // A?
+        \\    let nobody: ?Str = null
+        \\    initial("Ada") + initial(nobody)   // A?
         \\}
-        ;
     }
     fn orelse_sample() Str {
         \\struct User:
@@ -527,234 +496,221 @@ mod tour {
         \\    | nickname: ?Str
         \\
         \\fn shown(u: User) Str {
-        \\    u.nickname orelse u.name;            // a default when absent
+        \\    u.nickname orelse u.name            // a default when absent
         \\}
         \\
         \\export main() Str {
-        \\    let a = User { name: "Grace", nickname: "Amazing Grace" };
-        \\    let b = User { name: "Edsger", nickname: null };
-        \\    let sure: ?Str = "here";
-        \\    let s = sure orelse fatal;            // trap if absent
-        \\    shown(a) + ", " + shown(b) + ", " + s; // Amazing Grace, Edsger, here
+        \\    let a = User { name: "Grace", nickname: "Amazing Grace" }
+        \\    let b = User { name: "Edsger", nickname: null }
+        \\    let sure: ?Str = "here"
+        \\    let s = sure orelse fatal            // trap if absent
+        \\    shown(a) + ", " + shown(b) + ", " + s // Amazing Grace, Edsger, here
         \\}
-        ;
     }
     fn chain_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\struct Node:
         \\    | name: Str
         \\    | next: ?Node
         \\
         \\export main() void {
-        \\    let tail = Node { name: "b", next: null };
-        \\    let head = Node { name: "a", next: tail };
-        \\    head.next?.name = "B";                  // runs only when next is present
-        \\    tail.next?.name = "never";              // skipped: tail.next is null
-        \\    console.log(head.next?.name);           // B
-        \\    if tail.next == null { console.log("end of the list"); };
+        \\    let tail = Node { name: "b", next: null }
+        \\    let head = Node { name: "a", next: tail }
+        \\    head.next?.name = "B"                  // runs only when next is present
+        \\    tail.next?.name = "never"              // skipped: tail.next is null
+        \\    console.log(head.next?.name)           // B
+        \\    if tail.next == null { console.log("end of the list") }
         \\}
-        ;
     }
     // Tuples
     fn tuple_sample() Str {
         \\fn divmod(a: I32, b: I32) .{I32, I32} {
-        \\    .{a / b, a % b};
+        \\    .{a / b, a % b}
         \\}
         \\
         \\fn min_max(xs: Array[I32]) .{I32, I32} {
-        \\    let lo = xs[0];
-        \\    let hi = xs[0];
+        \\    let lo = xs[0]
+        \\    let hi = xs[0]
         \\    for (xs) |x| {
-        \\        if x < lo { lo = x; };
-        \\        if x > hi { hi = x; };
-        \\    };
-        \\    .{lo, hi};
+        \\        if x < lo { lo = x }
+        \\        if x > hi { hi = x }
+        \\    }
+        \\    .{lo, hi}
         \\}
         \\
         \\export main() I32 {
-        \\    let .{q, r} = divmod(17, 5);           // 3, 2
-        \\    let .{lo, hi} = min_max([4, 9, 1, 7]);   // 1, 9
-        \\    q * 1000 + r * 100 + lo * 10 + hi;     // 3219
+        \\    let .{q, r} = divmod(17, 5)           // 3, 2
+        \\    let .{lo, hi} = min_max([4, 9, 1, 7])   // 1, 9
+        \\    q * 1000 + r * 100 + lo * 10 + hi     // 3219
         \\}
-        ;
     }
     // Closures
     fn fun_sample() Str {
-        \\fn double(x: I32) I32 { x * 2; }
-        \\fn square(x: I32) I32 { x * x; }
+        \\fn double(x: I32) I32 { x * 2 }
+        \\fn square(x: I32) I32 { x * x }
         \\
         \\fn twice(f: fun(I32) I32, x: I32) I32 {   // fun: a Wasm function reference
-        \\    f(f(x));
+        \\    f(f(x))
         \\}
         \\
         \\export main() I32 {
-        \\    let op: fun(I32) I32 = square;          // a fun is a named function
-        \\    twice(double, 3) + twice(op, 3);        // 12 + 81 = 93
+        \\    let op: fun(I32) I32 = square          // a fun is a named function
+        \\    twice(double, 3) + twice(op, 3)        // 12 + 81 = 93
         \\}
-        ;
     }
     fn cl_sample() Str {
         \\fn adder(k: I32) cl(I32) I32 {
-        \\    cl(x) { x + k; };                       // captures k
+        \\    cl(x) { x + k }                       // captures k
         \\}
         \\
-        \\fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
-        \\fn double(x: I32) I32 { x * 2; }
+        \\fn apply(f: cl(I32) I32, x: I32) I32 { f(x) }
+        \\fn double(x: I32) I32 { x * 2 }
         \\
         \\export main() I32 {
-        \\    let add5 = adder(5);
-        \\    let triple: cl(I32) I32 = cl(x) { x * 3; };      // types from the annotation
-        \\    let neg = cl(x: I32) I32 { -x; };                // or written out
-        \\    apply(add5, 1) + apply(triple, 2) + apply(double, 3) + neg(1);   // 6 + 6 + 6 - 1 = 17
+        \\    let add5 = adder(5)
+        \\    let triple: cl(I32) I32 = cl(x) { x * 3 }      // types from the annotation
+        \\    let neg = cl(x: I32) I32 { -x }                // or written out
+        \\    apply(add5, 1) + apply(triple, 2) + apply(double, 3) + neg(1)   // 6 + 6 + 6 - 1 = 17
         \\}
-        ;
     }
     fn capture_sample() Str {
         \\struct Counter:
         \\    | n: I32
         \\
         \\fn counter(c: Counter) cl() I32 {
-        \\    cl() { c.n += 1; c.n; };   // the struct is shared, not copied
+        \\    cl() { c.n += 1; c.n }   // the struct is shared, not copied
         \\}
         \\
         \\export main() I32 {
-        \\    let c = Counter { n: 0 };
-        \\    let next = counter(c);
-        \\    next();
-        \\    next();
-        \\    c.n * 10 + next();          // the closure's changes are visible: 23
+        \\    let c = Counter { n: 0 }
+        \\    let next = counter(c)
+        \\    next()
+        \\    next()
+        \\    c.n * 10 + next()          // the closure's changes are visible: 23
         \\}
-        ;
     }
     // Modules and generics
     fn mod_sample() Str {
         \\mod temperature {
-        \\    fn to_fahrenheit(c: F64) F64 { c * 9.0 / 5.0 + 32.0; }
-        \\    fn to_celsius(f: F64) F64 { (f - 32.0) * 5.0 / 9.0; }
+        \\    fn to_fahrenheit(c: F64) F64 { c * 9.0 / 5.0 + 32.0 }
+        \\    fn to_celsius(f: F64) F64 { (f - 32.0) * 5.0 / 9.0 }
         \\}
         \\
         \\export main() F64 {
-        \\    temperature.to_fahrenheit(100.0) + temperature.to_celsius(212.0);   // 212 + 100 = 312
+        \\    temperature.to_fahrenheit(100.0) + temperature.to_celsius(212.0)   // 212 + 100 = 312
         \\}
-        ;
     }
     fn mod_type_sample() Str {
         \\mod Money {
         \\    struct &:                          // & is the module's own type: Money
         \\        | cents: I64
-        \\    fn &.dollars(d: I64) & { &{ cents: d * 100.i64() }; }
-        \\    fn &.of_cents(c: I64) & { &{ cents: c }; }
-        \\    fn &:add |a, b| & { &{ cents: a.cents + b.cents }; }
-        \\    fn &.str |m| () Str { `$${m.cents / 100.i64()}.${m.cents % 100.i64()}`; }
+        \\    fn &.dollars(d: I64) & { &{ cents: d * 100.i64() } }
+        \\    fn &.of_cents(c: I64) & { &{ cents: c } }
+        \\    fn &:add |a, b| & { &{ cents: a.cents + b.cents } }
+        \\    fn &.str |m| () Str { `$${m.cents / 100.i64()}.${m.cents % 100.i64()}` }
         \\}
         \\
         \\export main() Str {
-        \\    let price = Money.dollars(3.i64()) + Money.of_cents(50.i64());
-        \\    `${price}`;                        // $3.50
+        \\    let price = Money.dollars(3.i64()) + Money.of_cents(50.i64())
+        \\    `${price}`                        // $3.50
         \\}
-        ;
     }
     fn member_values_sample() Str {
         \\mod temperature {
-        \\    fn to_fahrenheit(c: F64) F64 { c * 9.0 / 5.0 + 32.0; }
+        \\    fn to_fahrenheit(c: F64) F64 { c * 9.0 / 5.0 + 32.0 }
         \\}
         \\
         \\struct Point:
         \\    | x: F64
-        \\fn Point.at(x: F64) Point { Point { x: x }; }
+        \\fn Point.at(x: F64) Point { Point { x: x } }
         \\
-        \\fn convert(f: fun(F64) F64, c: F64) F64 { f(c); }
+        \\fn convert(f: fun(F64) F64, c: F64) F64 { f(c) }
         \\
         \\export main() F64 {
-        \\    let make = Point.at;                     // a type's function, as a value
-        \\    convert(temperature.to_fahrenheit, 100.0) + make(1.0).x;   // 212 + 1
+        \\    let make = Point.at                     // a type's function, as a value
+        \\    convert(temperature.to_fahrenheit, 100.0) + make(1.0).x   // 212 + 1
         \\}
-        ;
     }
     fn generic_sample() Str {
         \\mod Stack[T] {
         \\    struct &:
         \\        | items: Array[T]
         \\        | size: I32
-        \\    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
-        \\    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }
-        \\    fn &.pop |s| () T { s.size -= 1; s.items[s.size]; }
+        \\    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 } }
+        \\    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1 }
+        \\    fn &.pop |s| () T { s.size -= 1; s.items[s.size] }
         \\    fn &.each |s| () yield T {        // a generator method: for (nums.each()) |v|
-        \\        for (0 ..< s.size) |i| { yield s.items[i]; };
+        \\        for (0 ..< s.size) |i| { yield s.items[i] }
         \\    }
         \\}
         \\
         \\export main() Str {
-        \\    let nums = Stack[I32].new(0);      // the module instantiated at I32
-        \\    nums.push(4);
-        \\    nums.push(5);
-        \\    let words = Stack[Str].new("");    // and again at Str
-        \\    words.push("five");
-        \\    `${nums.pop()} is ${words.pop()}`; // 5 is five
+        \\    let nums = Stack[I32].new(0)      // the module instantiated at I32
+        \\    nums.push(4)
+        \\    nums.push(5)
+        \\    let words = Stack[Str].new("")    // and again at Str
+        \\    words.push("five")
+        \\    `${nums.pop()} is ${words.pop()}` // 5 is five
         \\}
-        ;
     }
     fn generic_global_sample() Str {
-        \\using Buffer from std:Buffer;
+        \\using Buffer from std:Buffer
         \\
         \\mod Stash[T] {
-        \\    let items: Buffer[T] = Buffer[T].new();   // one per instance
-        \\    fn add(x: T) void { items.push(x); }
-        \\    fn size() I32 { items.len(); }
+        \\    let items: Buffer[T] = Buffer[T].new()   // one per instance
+        \\    fn add(x: T) void { items.push(x) }
+        \\    fn size() I32 { items.len() }
         \\}
         \\
         \\export main() I32 {
-        \\    Stash[I32].add(1);
-        \\    Stash[I32].add(2);
-        \\    Stash[Str].add("a");
-        \\    Stash[I32].size() * 10 + Stash[Str].size();   // 21
+        \\    Stash[I32].add(1)
+        \\    Stash[I32].add(2)
+        \\    Stash[Str].add("a")
+        \\    Stash[I32].size() * 10 + Stash[Str].size()   // 21
         \\}
-        ;
     }
     fn std_generic_sample() Str {
-        \\using StrMap from std:StrMap;
+        \\using StrMap from std:StrMap
         \\
         \\fn word_counts(text: Str) StrMap[I32] {
-        \\    let counts = StrMap[I32].new();
+        \\    let counts = StrMap[I32].new()
         \\    for (text.to_lower().split(" ")) |word| {
-        \\        counts.set(word, counts.get(word, 0) + 1);
-        \\    };
-        \\    counts;
+        \\        counts.set(word, counts.get(word, 0) + 1)
+        \\    }
+        \\    counts
         \\}
         \\
         \\export main() I32 {
-        \\    word_counts("the cat saw The dog").get("the", 0);   // 2
+        \\    word_counts("the cat saw The dog").get("the", 0)   // 2
         \\}
-        ;
     }
     fn files_multi() Str {
         \\// ops.utu
         \\mod mathops {
-        \\    fn double(value: I32) I32 { value * 2; }
+        \\    fn double(value: I32) I32 { value * 2 }
         \\}
         \\
         \\// boxes.utu
-        \\using mathops |ops| from "./ops.utu";
+        \\using mathops |ops| from "./ops.utu"
         \\
         \\mod boxes {
         \\    struct &:
         \\        | value: I32
-        \\    fn &.new(value: I32) & { &{ value: value }; }
-        \\    fn &.score |self| () I32 { ops.double(self.value); }
+        \\    fn &.new(value: I32) & { &{ value: value } }
+        \\    fn &.score |self| () I32 { ops.double(self.value) }
         \\}
         \\
         \\// main.utu
-        \\using boxes |Box| from "./boxes.utu";
+        \\using boxes |Box| from "./boxes.utu"
         \\
         \\export main() I32 {
-        \\    Box.new(21).score();   // 42
+        \\    Box.new(21).score()   // 42
         \\}
-        ;
     }
     // Protocols
     fn proto_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\proto Shape:
         \\    | get name : Str
@@ -768,19 +724,18 @@ mod tour {
         \\    | name: Str
         \\    | side: F64
         \\
-        \\fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
-        \\fn Shape[Square].area |s| () F64 { s.side * s.side; }
+        \\fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r }
+        \\fn Shape[Square].area |s| () F64 { s.side * s.side }
         \\
         \\export main() void {
         \\    let shapes: Array[Shape] = [
         \\        Circle { name: "coin", r: 1.0 },
         \\        Square { name: "tile", side: 2.0 }
-        \\    ];
+        \\    ]
         \\    for (shapes) |s| {
-        \\        console.log(`${s.name}: ${s.area()}`);   // coin: 3, tile: 4
-        \\    };
+        \\        console.log(`${s.name}: ${s.area()}`)   // coin: 3, tile: 4
+        \\    }
         \\}
-        ;
     }
     fn proto_members_sample() Str {
         \\proto Counter:
@@ -793,19 +748,18 @@ mod tour {
         \\struct ByTen[Counter]:
         \\    | count: I32
         \\
-        \\fn Counter[ByOne].step |c| () I32 { 1; }
-        \\fn Counter[ByTen].step |c| () I32 { 10; }
+        \\fn Counter[ByOne].step |c| () I32 { 1 }
+        \\fn Counter[ByTen].step |c| () I32 { 10 }
         \\
         \\fn Counter.tick |c| () void {    // written once, for every Counter
-        \\    c.count = c.count + c.step();
+        \\    c.count = c.count + c.step()
         \\}
         \\
         \\export main() I32 {
-        \\    let counters: Array[Counter] = [ByOne { count: 0 }, ByTen { count: 0 }];
-        \\    for (counters) |c| { Counter.tick(c); Counter.tick(c); };
-        \\    counters[0].count + counters[1].count;   // 22
+        \\    let counters: Array[Counter] = [ByOne { count: 0 }, ByTen { count: 0 }]
+        \\    for (counters) |c| { Counter.tick(c); Counter.tick(c) }
+        \\    counters[0].count + counters[1].count   // 22
         \\}
-        ;
     }
     fn bounds_sample() Str {
         \\proto Ord:
@@ -816,272 +770,253 @@ mod tour {
         \\    | minor: I32
         \\
         \\fn Ord[Version].cmp |a| (b: Version) I32 {
-        \\    if a.major != b.major { a.major - b.major; } else { a.minor - b.minor; };
+        \\    if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
         \\}
-        \\fn Ord[I32].cmp |a| (b: I32) I32 { a - b; }   // a scalar implements it too
+        \\fn Ord[I32].cmp |a| (b: I32) I32 { a - b }   // a scalar implements it too
         \\
         \\mod Largest[T[Ord]] {            // every T implements Ord
         \\    fn of(xs: Array[T]) T {
-        \\        let best = xs[0];
-        \\        for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };   // T's own cmp
-        \\        best;
+        \\        let best = xs[0]
+        \\        for (xs) |x| { if x.cmp(best) > 0 { best = x } }   // T's own cmp
+        \\        best
         \\    }
         \\}
         \\
         \\export main() I32 {
-        \\    let v = Largest[Version].of([Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }]);
-        \\    v.major * 10 + Largest[I32].of([3, 9, 4]);   // 29
+        \\    let v = Largest[Version].of([Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }])
+        \\    v.major * 10 + Largest[I32].of([3, 9, 4])   // 29
         \\}
-        ;
     }
     fn std_bounds_sample() Str {
-        \\using Order from std:Ord;
+        \\using Order from std:Ord
         \\
         \\export main() Str {
-        \\    let words = ["pear", "fig", "apple"];
-        \\    Order[Str].sort(words);
-        \\    `${", ".join(words)}: ${Order[F64].max(1.5, 2.5)}`;   // apple, fig, pear: 2.5
+        \\    let words = ["pear", "fig", "apple"]
+        \\    Order[Str].sort(words)
+        \\    `${", ".join(words)}: ${Order[F64].max(1.5, 2.5)}`   // apple, fig, pear: 2.5
         \\}
-        ;
     }
     // Strings
     fn strings_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    let s = "  Hello, World  ".trim();
-        \\    console.log(s.to_upper());                       // HELLO, WORLD
-        \\    console.log(`${s.len()} ${s.index_of("o", 0)} ${s.contains("World")}`);   // 12 4 true
-        \\    console.log(s.replace("l", "L"));                // HeLLo, WorLd
-        \\    console.log(", ".join(s.split(", ")));           // Hello, World
-        \\    console.log(`${s[0]} ${s.slice(7, 12)} ${"42".parse_i32(0) + 1}`);   // 72 World 43
+        \\    let s = "  Hello, World  ".trim()
+        \\    console.log(s.to_upper())                       // HELLO, WORLD
+        \\    console.log(`${s.len()} ${s.index_of("o", 0)} ${s.contains("World")}`)   // 12 4 true
+        \\    console.log(s.replace("l", "L"))                // HeLLo, WorLd
+        \\    console.log(", ".join(s.split(", ")))           // Hello, World
+        \\    console.log(`${s[0]} ${s.slice(7, 12)} ${"42".parse_i32(0) + 1}`)   // 72 World 43
         \\}
-        ;
     }
     fn templates_sample() Str {
         \\struct Money:
         \\    | cents: I32
         \\
         \\fn Money.str |m| () Str {          // any type with str fits in ${ }
-        \\    `$${m.cents / 100}.${(m.cents % 100).str().pad_start(2, "0")}`;
+        \\    `$${m.cents / 100}.${(m.cents % 100).str().pad_start(2, "0")}`
         \\}
         \\
         \\export main() Str {
-        \\    let name = "Ada";
-        \\    let price = Money { cents: 1205 };
-        \\    let tag: ?Str = null;
-        \\    `${name} owes ${price} (${tag orelse "no tag"}, ${1 + 2} items)`;
+        \\    let name = "Ada"
+        \\    let price = Money { cents: 1205 }
+        \\    let tag: ?Str = null
+        \\    `${name} owes ${price} (${tag orelse "no tag"}, ${1 + 2} items)`
         \\    // Ada owes $12.05 (no tag, 3 items)
         \\}
-        ;
     }
     fn escapes_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\export main() void {
-        \\    console.log("say \"hi\"\tthen → leave");   // say "hi"	then → leave
-        \\    console.log(`a backtick \` and \${not a hole}`);  // a backtick ` and ${not a hole}
-        \\    console.log(`costs $5`);                          // a $ without { is text
+        \\    console.log("say \"hi\"\tthen → leave")   // say "hi"	then → leave
+        \\    console.log(`a backtick \` and \${not a hole}`)  // a backtick ` and ${not a hole}
+        \\    console.log(`costs $5`)                          // a $ without { is text
         \\}
-        ;
     }
     fn multiline_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\export main() void {
         \\    let usage = \\usage: utu check <file.utu>
         \\                \\       utu run <file.utu>
-        \\    ;
-        \\    console.log(usage);
+        \\    console.log(usage)
         \\}
-        ;
     }
     // Arrays
     fn arrays_sample() Str {
         \\export main() I32 {
-        \\    let xs = [3, 1, 4, 1, 5];             // Array[I32]
-        \\    let fs: Array[F64] = [1, 2.5];        // the element type from context
-        \\    let zeros = Array[I32].new(3, 0);     // [0, 0, 0]
-        \\    xs[0] = 9;
-        \\    let middle = xs[1, 4];                // a slice: [1, 4, 1]
-        \\    let total = xs filter |x| { x > 1; } fold(0) |sum, x| { sum + x; };
-        \\    total + middle.len() + zeros.len();   // 9+4+5 + 3 + 3 = 24
+        \\    let xs = [3, 1, 4, 1, 5]             // Array[I32]
+        \\    let fs: Array[F64] = [1, 2.5]        // the element type from context
+        \\    let zeros = Array[I32].new(3, 0)     // [0, 0, 0]
+        \\    xs[0] = 9
+        \\    let middle = xs[1, 4]                // a slice: [1, 4, 1]
+        \\    let total = xs filter |x| { x > 1 } fold(0) |sum, x| { sum + x }
+        \\    total + middle.len() + zeros.len()   // 9+4+5 + 3 + 3 = 24
         \\}
-        ;
     }
     fn generator_sample() Str {
         \\fn squares(n: I32) yield I32 {
-        \\    for (0 ..< n) |i| { yield i * i; };
+        \\    for (0 ..< n) |i| { yield i * i }
         \\}
         \\
         \\export main() I32 {
-        \\    let sum = 0;
-        \\    for (squares(5)) |x| { sum += x; };   // the body is inlined: no closure, no array
-        \\    sum;                                  // 0+1+4+9+16 = 30
+        \\    let sum = 0
+        \\    for (squares(5)) |x| { sum += x }   // the body is inlined: no closure, no array
+        \\    sum                                  // 0+1+4+9+16 = 30
         \\}
-        ;
     }
     fn generator_index_sample() Str {
         \\fn evens(n: I32) yield I32 {
-        \\    for (0 ..< n) |i| { yield i * 2; };
+        \\    for (0 ..< n) |i| { yield i * 2 }
         \\}
         \\
         \\export main() I32 {
-        \\    let sum = 0;
-        \\    let i = 0;
+        \\    let sum = 0
+        \\    let i = 0
         \\    for (evens(4)) |v| {
-        \\        sum += v * i;
-        \\        i += 1;
-        \\    };
-        \\    sum;                     // 0*0 + 2*1 + 4*2 + 6*3 = 28
+        \\        sum += v * i
+        \\        i += 1
+        \\    }
+        \\    sum                     // 0*0 + 2*1 + 4*2 + 6*3 = 28
         \\}
-        ;
     }
     fn mem_sample() Str {
-        \\mem bytes: U8;          // a linear memory of its own, starts empty
-        \\vec stack: I32;         // a growable WasmGC array
+        \\mem bytes: U8          // a linear memory of its own, starts empty
+        \\vec stack: I32         // a growable WasmGC array
         \\
         \\export main() I32 {
-        \\    bytes.push(200);
-        \\    bytes.push(56);
-        \\    stack.push(7);
-        \\    stack[0] += 1;
-        \\    bytes[0] + bytes[1] + stack[0] + bytes.len();   // 200 + 56 + 8 + 2 = 266
+        \\    bytes.push(200)
+        \\    bytes.push(56)
+        \\    stack.push(7)
+        \\    stack[0] += 1
+        \\    bytes[0] + bytes[1] + stack[0] + bytes.len()   // 200 + 56 + 8 + 2 = 266
         \\}
-        ;
     }
     // Errors
     fn assert_sample() Str {
         \\fn checked_div(a: I32, b: I32) I32 {
-        \\    assert b != 0;            // traps if false
-        \\    a / b;
+        \\    assert b != 0            // traps if false
+        \\    a / b
         \\}
         \\
         \\fn unreachable_state(s: I32) I32 {
-        \\    match s { 0 => 10, 1 => 20, ~> fatal, };   // fatal always traps
+        \\    match s { 0 => 10, 1 => 20, ~> fatal, }   // fatal always traps
         \\}
         \\
         \\export main() I32 {
-        \\    checked_div(10, 2) + unreachable_state(1);   // 25
+        \\    checked_div(10, 2) + unreachable_state(1)   // 25
         \\}
-        ;
     }
     fn try_sample() Str {
         \\let parse: fun(Str) F64 = @es/\ (s) => {
         \\    const n = Number(s);
         \\    if (Number.isNaN(n)) throw new Error("not a number: " + s);
         \\    return n;
-        \\} \/;
-        \\let message: fun(Externref) Str = @es/\ (e) => String(e?.message ?? e) \/;
+        \\} \/
+        \\let message: fun(Externref) Str = @es/\ (e) => String(e?.message ?? e) \/
         \\
         \\fn read(text: Str) Str {
         \\    try {
-        \\        parse(text).str();
+        \\        parse(text).str()
         \\    } catch |e| {             // e is what was thrown
-        \\        message(e);
-        \\    };
+        \\        message(e)
+        \\    }
         \\}
         \\
         \\export main() Str {
-        \\    read("12.5") + " / " + read("twelve");   // 12.5 / not a number: twelve
+        \\    read("12.5") + " / " + read("twelve")   // 12.5 / not a number: twelve
         \\}
-        ;
     }
     fn try_default_sample() Str {
-        \\let risky: fun(I32) I32 = @es/\ (n) => { if (n < 0) throw "negative"; return n * 2; } \/;
+        \\let risky: fun(I32) I32 = @es/\ (n) => { if (n < 0) throw "negative"; return n * 2; } \/
         \\
         \\export main() I32 {
-        \\    let a = try { risky(5); } catch { -1; };    // 10
-        \\    let b = try { risky(-5); } catch { -1; };   // -1: the binding is optional
-        \\    a + b;                                      // 9
+        \\    let a = try { risky(5) } catch { -1 }    // 10
+        \\    let b = try { risky(-5) } catch { -1 }   // -1: the binding is optional
+        \\    a + b                                      // 9
         \\}
-        ;
     }
     fn result_sample() Str {
         \\fn digit(c: I32) Result[I32, Str] {
-        \\    if c < 48 or c > 57 { return Result[I32, Str].err("not a digit"); };
-        \\    Result[I32, Str].ok(c - 48);
+        \\    if c < 48 or c > 57 { return Result[I32, Str].err("not a digit") }
+        \\    Result[I32, Str].ok(c - 48)
         \\}
         \\
         \\fn two_digits(a: I32, b: I32) Result[I32, Str] {
-        \\    let tens = try digit(a);                // or return digit's error
-        \\    Result[I32, Str].ok(tens * 10 + try digit(b));
+        \\    let tens = try digit(a)                // or return digit's error
+        \\    Result[I32, Str].ok(tens * 10 + try digit(b))
         \\}
         \\
         \\export main() I32 {
-        \\    let r = two_digits(52, 50);              // ok 42
-        \\    let bad = two_digits(52, 120);           // err "not a digit"
-        \\    if bad.is_err() { r.value(); } else { 0; };   // 42; bad.value() is fatal
+        \\    let r = two_digits(52, 50)              // ok 42
+        \\    let bad = two_digits(52, 120)           // err "not a digit"
+        \\    if bad.is_err() { r.value() } else { 0 }   // 42; bad.value() is fatal
         \\}
-        ;
     }
     // defer
     fn defer_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\fn work() I32 {
-        \\    console.log("open");
-        \\    defer console.log("close");        // runs when the block exits
-        \\    defer console.log("flush");        // newest first
-        \\    console.log("write");
-        \\    42;                                // the value is computed first
+        \\    console.log("open")
+        \\    defer console.log("close")        // runs when the block exits
+        \\    defer console.log("flush")        // newest first
+        \\    console.log("write")
+        \\    42                                // the value is computed first
         \\}
         \\
         \\export main() I32 {
-        \\    work();                            // open, write, flush, close
+        \\    work()                            // open, write, flush, close
         \\}
-        ;
     }
     fn defer_return_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\fn find(xs: Array[I32], target: I32) I32 {
-        \\    defer console.log("searched");     // also runs on return
+        \\    defer console.log("searched")     // also runs on return
         \\    for (xs, 0 ..< xs.len()) |x, i| {
-        \\        if x == target { return i; };
-        \\    };
-        \\    -1;
+        \\        if x == target { return i }
+        \\    }
+        \\    -1
         \\}
         \\
         \\export main() I32 {
-        \\    find([5, 6, 7], 6);                // searched, then 1
+        \\    find([5, 6, 7], 6)                // searched, then 1
         \\}
-        ;
     }
     fn errdefer_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\fn half(n: I32) Result[I32, Str] {
-        \\    defer console.log("done");             // every return
-        \\    errdefer console.log("failed");        // error returns only
-        \\    if n % 2 != 0 { return Result[I32, Str].err("odd"); };
-        \\    Result[I32, Str].ok(n / 2);
+        \\    defer console.log("done")             // every return
+        \\    errdefer console.log("failed")        // error returns only
+        \\    if n % 2 != 0 { return Result[I32, Str].err("odd") }
+        \\    Result[I32, Str].ok(n / 2)
         \\}
         \\
         \\export main() I32 {
-        \\    half(3).value_or(0) + half(8).value_or(0);   // failed, done, done; 4
+        \\    half(3).value_or(0) + half(8).value_or(0)   // failed, done, done; 4
         \\}
-        ;
     }
     // Tests
     fn tests_sample() Str {
-        \\fn add(a: I32, b: I32) I32 { a + b; }
+        \\fn add(a: I32, b: I32) I32 { a + b }
         \\
         \\test "addition commutes" {
-        \\    assert add(2, 3) == add(3, 2);
+        \\    assert add(2, 3) == add(3, 2)
         \\}
         \\
         \\test "zero is the identity" {
-        \\    for (0 ..< 10) |i| { assert add(i, 0) == i; };
+        \\    for (0 ..< 10) |i| { assert add(i, 0) == i }
         \\}
         \\
         \\bench "adding" {
-        \\    let total = 0;          // setup is not measured
+        \\    let total = 0          // setup is not measured
         \\    measure {
-        \\        total = add(total, 1);
+        \\        total = add(total, 1)
         \\    }
         \\}
-        ;
     }
     fn tests_shell() Str {
         \\$ utu test add.utu
@@ -1091,38 +1026,35 @@ mod tour {
         \\$ utu bench add.utu -O fast
         \\bench   median  iterations
         \\adding  0.31 ns  11 × 67108864
-        ;
     }
     // Promises
     fn await_sample() Str {
         \\let delay: fun(I32, I32) Promise[I32] =
-        \\    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+        \\    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/
         \\
         \\fn total(a: I32, b: I32) I32 {      // no async keyword
-        \\    let first = await delay(a, 5);
-        \\    let second = await delay(b, 5);
-        \\    first + second;
+        \\    let first = await delay(a, 5)
+        \\    let second = await delay(b, 5)
+        \\    first + second
         \\}
         \\
-        \\fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+        \\fn apply(f: cl(I32) I32, x: I32) I32 { f(x) }
         \\
         \\export main() I32 {
-        \\    let later = cl(n: I32) I32 { await delay(n, 5); };   // a closure may await
-        \\    total(20, 22) + apply(later, 8);   // 50
+        \\    let later = cl(n: I32) I32 { await delay(n, 5) }   // a closure may await
+        \\    total(20, 22) + apply(later, 8)   // 50
         \\}
-        ;
     }
     fn then_sample() Str {
-        \\using console from std:Console;
+        \\using console from std:Console
         \\
         \\let delay: fun(I32, I32) Promise[I32] =
-        \\    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
+        \\    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/
         \\
         \\export main() void {
-        \\    delay(7, 10).then(cl(v) { console.log(`later: ${v}`); });   // works on any host
-        \\    console.log("now");                                         // now, then later: 7
+        \\    delay(7, 10).then(cl(v) { console.log(`later: ${v}`) })   // works on any host
+        \\    console.log("now")                                         // now, then later: 7
         \\}
-        ;
     }
     fn stream_sample() Str {
         \\fn sum(s: Stream[I32]) I32 {
@@ -1135,19 +1067,17 @@ mod tour {
         \\    let s = Stream[I32].of([1, 2, 3, 4]).map(cl(v) { v * 10; }).take(3);
         \\    sum(s);                            // 60
         \\}
-        ;
     }
     // @es
     fn es_sample() Str {
-        \\let now: fun() F64 = @es/\ () => Date.now() \/;
-        \\let shout: fun(Str) Str = @es/\ (s) => s.toUpperCase() + "!" \/;
-        \\let clamp: fun(F64, F64, F64) F64 = @es/\ (x, lo, hi) => Math.min(hi, Math.max(lo, x)) \/;
+        \\let now: fun() F64 = @es/\ () => Date.now() \/
+        \\let shout: fun(Str) Str = @es/\ (s) => s.toUpperCase() + "!" \/
+        \\let clamp: fun(F64, F64, F64) F64 = @es/\ (x, lo, hi) => Math.min(hi, Math.max(lo, x)) \/
         \\
         \\export main() Str {
-        \\    let started = now();
-        \\    shout("hello") + " " + clamp(12.0, 0.0, 10.0).str();   // HELLO! 10
+        \\    let started = now()
+        \\    shout("hello") + " " + clamp(12.0, 0.0, 10.0).str()   // HELLO! 10
         \\}
-        ;
     }
     // DSLs
     fn json_sample() Str {
@@ -1156,37 +1086,34 @@ mod tour {
         \\    | y: I32
         \\
         \\export main() Str {
-        \\    let p = @json/\ decode Point "{\"y\": 2, \"x\": 1}" \/ orelse fatal;
-        \\    p.x += 10;
-        \\    @json/\ encode Point p \/;      // {"x":11,"y":2}
+        \\    let p = @json/\ decode Point "{\"y\": 2, \"x\": 1}" \/ orelse fatal
+        \\    p.x += 10
+        \\    @json/\ encode Point p \/      // {"x":11,"y":2}
         \\}
-        ;
     }
     fn wat_sample() Str {
         \\fn rotl(x: I32, k: I32) I32 {
-        \\    @wat/\ local.get $x local.get $k i32.rotl \/;
+        \\    @wat/\ local.get $x local.get $k i32.rotl \/
         \\}
         \\
         \\export main() I32 {
-        \\    rotl(1, 4);          // 16
+        \\    rotl(1, 4)          // 16
         \\}
-        ;
     }
     fn css_sample() Str {
         \\fn theme() Str {
         \\    @css/\
         \\    :root { --accent: oklch(70% 0.15 60); }
         \\    .card { border: 1px solid var(--accent); }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() I32 {
-        \\    theme().len();
+        \\    theme().len()
         \\}
-        ;
     }
     fn wutu_sample() Str {
-        \\using Browser from std:Browser;
+        \\using Browser from std:Browser
         \\
         \\fn badge(label: Str) Browser.HTMLElement {
         \\    @wutu/\
@@ -1195,30 +1122,27 @@ mod tour {
         \\        border-radius: 1rem;
         \\        = label;
         \\    }
-        \\    \/;
+        \\    \/
         \\}
         \\
         \\export main() void {
-        \\    Browser.document.body.append(badge("new"));
+        \\    Browser.document.body.append(badge("new"))
         \\}
-        ;
     }
     // Entry points
     fn lib_sample() Str {
         \\/// The area of a `w` by `h` rectangle.
-        \\fn area(w: F64, h: F64) F64 { w * h; }
+        \\fn area(w: F64, h: F64) F64 { w * h }
         \\
         \\export lib {                     // these become the module's Wasm exports
-        \\    fn rect_area(w: F64, h: F64) F64 { area(w, h); }
-        \\    fn greet(name: Str) Str { `Hello, ${name}`; }
+        \\    fn rect_area(w: F64, h: F64) F64 { area(w, h) }
+        \\    fn greet(name: Str) Str { `Hello, ${name}` }
         \\}
-        ;
     }
     fn lib_js() Str {
         \\// app.mjs, after `utu build shapes.utu`
         \\import { exports } from "./shapes.mjs";
         \\console.log(exports.rect_area(3, 4), exports.greet("JS"));   // 12 Hello, JS
-        ;
     }
     fn page() Browser.HTMLElement {
         @wutu/\
@@ -1298,7 +1222,7 @@ mod tour {
                 "Functions";
             }
             p {
-                "The result type follows the parameters, and the last expression is the result. Every statement ends with a semicolon; an if, for, while, match, alt, promote, try, or labeled block whose } ends its line may leave it out. ";
+                "The result type follows the parameters, and the last expression is the result. A line break ends a statement, unless the next line goes on (it begins with ., an operator but -, and, or, else, or a stage like map |x|); ; puts two statements on one line. ";
                 code {
                     "-o";
                 }
@@ -1730,7 +1654,7 @@ mod tour {
                 code {
                     "\\\\";
                 }
-                " line is raw text, and its statement's semicolon goes on the next line.";
+                " line is raw text, and the string ends at the first line that is not one.";
             }
             = code.block(strings_sample());
             = code.block(templates_sample());
@@ -2001,6 +1925,6 @@ mod tour {
             = code.block(lib_js());
             = ui.further("new_spec2.md", "the language specification");
         }
-        \/;
+        \/
     }
 }

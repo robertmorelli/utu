@@ -15,46 +15,46 @@ mod Str {
     type & = @ir/\ <ir-wasm-ref type-repr="wasm-stringref"/> \/
 
     // Concatenation via the + operator.
-    fn &:add |a, b| & { @ir/\ <ir-string-concat><ir-ident name="a"/><ir-ident name="b"/></ir-string-concat> \/; }
+    fn &:add |a, b| & { @ir/\ <ir-string-concat><ir-ident name="a"/><ir-ident name="b"/></ir-string-concat> \/ }
 
     // Equality — structural (content) comparison.
-    fn &:eq |a, b| Bool { @ir/\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \/; }
-    fn &:ne |a, b| Bool { @ir/\ <ir-string-ne><ir-ident name="a"/><ir-ident name="b"/></ir-string-ne> \/; }
+    fn &:eq |a, b| Bool { @ir/\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \/ }
+    fn &:ne |a, b| Bool { @ir/\ <ir-string-ne><ir-ident name="a"/><ir-ident name="b"/></ir-string-ne> \/ }
 
     // Order: by UTF-16 code units, as JavaScript compares strings ("B" < "a").
-    fn &:lt |a, b| Bool { compare(a, b) < 0; }
-    fn &:le |a, b| Bool { compare(a, b) <= 0; }
-    fn &:gt |a, b| Bool { compare(a, b) > 0; }
-    fn &:ge |a, b| Bool { compare(a, b) >= 0; }
+    fn &:lt |a, b| Bool { compare(a, b) < 0 }
+    fn &:le |a, b| Bool { compare(a, b) <= 0 }
+    fn &:gt |a, b| Bool { compare(a, b) > 0 }
+    fn &:ge |a, b| Bool { compare(a, b) >= 0 }
 
     // -1, 0, or 1: a before, equal to, or after b, by UTF-16 code units.
     fn compare(a: &, b: &) I32 {
-        let n = len(a);
-        let m = len(b);
-        let i = 0;
+        let n = len(a)
+        let m = len(b)
+        let i = 0
         while (i < n and i < m) {
-            let x = get(a, i);
-            let y = get(b, i);
+            let x = get(a, i)
+            let y = get(b, i)
             if x != y {
-                if x < y { return -1; };
-                return 1;
-            };
-            i += 1;
-        };
-        if n < m { -1; } else if n > m { 1; } else { 0; };
+                if x < y { return -1 }
+                return 1
+            }
+            i += 1
+        }
+        if n < m { -1 } else if n > m { 1 } else { 0 }
     }
 
     // Number of UTF-16 code units in the host string.
     fn len(s: &) I32 {
-        @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
+        @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/
     }
 
     // Substring [start, end) — returns a new string. An end past the string
     // stops at its end, as in JavaScript; a negative start or an end before
     // start traps in --safe builds, as Array's slice does.
     fn slice(s: &, start: I32, end_: I32) & {
-        if checks() and (start < 0 or end_ < start) { fatal; };
-        slice_unchecked(s, start, end_);
+        if checks() and (start < 0 or end_ < start) { fatal }
+        slice_unchecked(s, start, end_)
     }
 
     // `slice` without the --safe check: a negative index reads as unsigned.
@@ -63,44 +63,44 @@ mod Str {
             <ir-ident name="s"/>
             <ir-ident name="start"/>
             <ir-ident name="end_"/>
-        </ir-string-slice-wtf16> \/;
+        </ir-string-slice-wtf16> \/
     }
 
     // Read one UTF-16 code unit at index i.
     fn get(s: &, i: I32) I32 {
-        @ir/\ <ir-string-get-wtf16><ir-ident name="s"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+        @ir/\ <ir-string-get-wtf16><ir-ident name="s"/><ir-ident name="i"/></ir-string-get-wtf16> \/
     }
 
     // A one-code-point string.
     fn from_code_point(code: I32) & {
-        @ir/\ <ir-string-from-code-point><ir-ident name="code"/></ir-string-from-code-point> \/;
+        @ir/\ <ir-string-from-code-point><ir-ident name="code"/></ir-string-from-code-point> \/
     }
 
     // The first `count` UTF-16 code units of `codes`, as one string. Build
     // text in an Array[I32] and convert once, rather than concatenating.
     fn from_codes(codes: Array[I32], count: I32) & {
-        @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="count"/></ir-string-from-codes> \/;
+        @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="count"/></ir-string-from-codes> \/
     }
 
     // Receiver/index forms mirror Array's surface while preserving the
     // existing static Str.len/slice/get entry points.
     fn &.len |self| () I32 {
-        @ir/\ <ir-string-measure-utf16><ir-ident name="self"/></ir-string-measure-utf16> \/;
+        @ir/\ <ir-string-measure-utf16><ir-ident name="self"/></ir-string-measure-utf16> \/
     }
-    fn &.slice |self| (start: I32, end_: I32) & { slice(self, start, end_); }
+    fn &.slice |self| (start: I32, end_: I32) & { slice(self, start, end_) }
     fn &.get |self| (i: I32) I32 {
-        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/
     }
     fn &.get_index |self| (i: I32) I32 {
-        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/;
+        @ir/\ <ir-string-get-wtf16><ir-ident name="self"/><ir-ident name="i"/></ir-string-get-wtf16> \/
     }
-    fn &.get_slice |self| (start: I32, end_: I32) & { slice(self, start, end_); }
+    fn &.get_slice |self| (start: I32, end_: I32) & { slice(self, start, end_) }
 
     // Whether the build is --safe.
-    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
+    fn checks() Bool { @ir/\ <ir-safe-checks/> \/ }
 
     // The string itself: what `${s}` in a template string calls.
-    fn &.str |self| () & { @ir/\ <ir-ident name="self"/> \/; }
+    fn &.str |self| () & { @ir/\ <ir-ident name="self"/> \/ }
 
     // ── Text ────────────────────────────────────────────────────────────────
     // Each ships only when used. Offsets and lengths are in UTF-16 code
@@ -108,129 +108,129 @@ mod Str {
 
     /// Where `part` first occurs at or after `from`, or -1.
     fn &.index_of |self| (part: &, from: I32) I32 {
-        let find: fun(&, &, I32) I32 = @es/\ (s, p, i) => s.indexOf(p, i) \/;
-        find(self, part, from);
+        let find: fun(&, &, I32) I32 = @es/\ (s, p, i) => s.indexOf(p, i) \/
+        find(self, part, from)
     }
 
     /// Where `part` last occurs, or -1.
     fn &.last_index_of |self| (part: &) I32 {
-        let find: fun(&, &) I32 = @es/\ (s, p) => s.lastIndexOf(p) \/;
-        find(self, part);
+        let find: fun(&, &) I32 = @es/\ (s, p) => s.lastIndexOf(p) \/
+        find(self, part)
     }
 
     /// Whether `part` occurs in the string.
-    fn &.contains |self| (part: &) Bool { self.index_of(part, 0) >= 0; }
+    fn &.contains |self| (part: &) Bool { self.index_of(part, 0) >= 0 }
 
     /// Whether the string begins with `part`.
     fn &.starts_with |self| (part: &) Bool {
-        part.len() <= self.len() and self.slice(0, part.len()) == part;
+        part.len() <= self.len() and self.slice(0, part.len()) == part
     }
 
     /// Whether the string ends with `part`.
     fn &.ends_with |self| (part: &) Bool {
-        part.len() <= self.len() and self.slice(self.len() - part.len(), self.len()) == part;
+        part.len() <= self.len() and self.slice(self.len() - part.len(), self.len()) == part
     }
 
     /// Without the white space at either end.
     fn &.trim |self| () & {
-        let f: fun(&) & = @es/\ (s) => s.trim() \/;
-        f(self);
+        let f: fun(&) & = @es/\ (s) => s.trim() \/
+        f(self)
     }
 
     /// Without the white space at its start.
     fn &.trim_start |self| () & {
-        let f: fun(&) & = @es/\ (s) => s.trimStart() \/;
-        f(self);
+        let f: fun(&) & = @es/\ (s) => s.trimStart() \/
+        f(self)
     }
 
     /// Without the white space at its end.
     fn &.trim_end |self| () & {
-        let f: fun(&) & = @es/\ (s) => s.trimEnd() \/;
-        f(self);
+        let f: fun(&) & = @es/\ (s) => s.trimEnd() \/
+        f(self)
     }
 
     /// In upper case (`"Straße"` is `"STRASSE"`).
     fn &.to_upper |self| () & {
-        let f: fun(&) & = @es/\ (s) => s.toUpperCase() \/;
-        f(self);
+        let f: fun(&) & = @es/\ (s) => s.toUpperCase() \/
+        f(self)
     }
 
     /// In lower case.
     fn &.to_lower |self| () & {
-        let f: fun(&) & = @es/\ (s) => s.toLowerCase() \/;
-        f(self);
+        let f: fun(&) & = @es/\ (s) => s.toLowerCase() \/
+        f(self)
     }
 
     /// The string `count` times over.
     fn &.repeat |self| (count: I32) & {
-        let f: fun(&, I32) & = @es/\ (s, n) => s.repeat(Math.max(0, n)) \/;
-        f(self, count);
+        let f: fun(&, I32) & = @es/\ (s, n) => s.repeat(Math.max(0, n)) \/
+        f(self, count)
     }
 
     /// Every occurrence of `part` replaced by `with`, as it is (a `$` in it is a `$`).
     fn &.replace |self| (part: &, with: &) & {
-        let f: fun(&, &, &) & = @es/\ (s, p, w) => s.replaceAll(p, () => w) \/;
-        f(self, part, with);
+        let f: fun(&, &, &) & = @es/\ (s, p, w) => s.replaceAll(p, () => w) \/
+        f(self, part, with)
     }
 
     /// At least `width` long: `fill` repeated before it as needed (`"7".pad_start(3, "0")` is `"007"`).
     fn &.pad_start |self| (width: I32, fill: &) & {
-        let f: fun(&, I32, &) & = @es/\ (s, n, f) => s.padStart(n, f) \/;
-        f(self, width, fill);
+        let f: fun(&, I32, &) & = @es/\ (s, n, f) => s.padStart(n, f) \/
+        f(self, width, fill)
     }
 
     /// At least `width` long: `fill` repeated after it as needed.
     fn &.pad_end |self| (width: I32, fill: &) & {
-        let f: fun(&, I32, &) & = @es/\ (s, n, f) => s.padEnd(n, f) \/;
-        f(self, width, fill);
+        let f: fun(&, I32, &) & = @es/\ (s, n, f) => s.padEnd(n, f) \/
+        f(self, width, fill)
     }
 
     /// The pieces between the occurrences of `separator` (`"a,b,,c"` is `["a", "b", "", "c"]`).
     /// An empty separator splits into code units.
     fn &.split |self| (separator: &) Array[Str] {
         if separator.len() == 0 {
-            let units = Array[Str].new(self.len(), "");
-            for (0 ..< self.len()) |i| { units[i] = self.slice(i, i + 1); };
-            return units;
-        };
-        let count = 1;
-        let at = self.index_of(separator, 0);
+            let units = Array[Str].new(self.len(), "")
+            for (0 ..< self.len()) |i| { units[i] = self.slice(i, i + 1) }
+            return units
+        }
+        let count = 1
+        let at = self.index_of(separator, 0)
         while (at >= 0) {
-            count += 1;
-            at = self.index_of(separator, at + separator.len());
-        };
-        let pieces = Array[Str].new(count, "");
-        let start = 0;
+            count += 1
+            at = self.index_of(separator, at + separator.len())
+        }
+        let pieces = Array[Str].new(count, "")
+        let start = 0
         for (0 ..< count) |k| {
-            let end_ = self.index_of(separator, start);
-            if end_ < 0 { end_ = self.len(); };
-            pieces[k] = self.slice(start, end_);
-            start = end_ + separator.len();
-        };
-        pieces;
+            let end_ = self.index_of(separator, start)
+            if end_ < 0 { end_ = self.len() }
+            pieces[k] = self.slice(start, end_)
+            start = end_ + separator.len()
+        }
+        pieces
     }
 
     /// The `parts`, with the string between each two (`", ".join(["a", "b"])` is `"a, b"`).
     fn &.join |self| (parts: Array[Str]) & {
-        if parts.len() == 0 { return ""; };
-        let out = parts[0];
-        for (1 ..< parts.len()) |i| { out = out + self + parts[i]; };
-        out;
+        if parts.len() == 0 { return "" }
+        let out = parts[0]
+        for (1 ..< parts.len()) |i| { out = out + self + parts[i] }
+        out
     }
 
     /// The integer the string is, or `fallback` when it is not one or does not
     /// fit in an I32: white space around it, then a sign (`+` or `-`) if any,
     /// then decimal digits or hexadecimal ones after `0x`.
     fn &.parse_i32 |self| (fallback: I32) I32 {
-        let f: fun(&, I32) I32 = @es/\ (s, d) => { const m = /^([+-]?)(0x[0-9a-f]+|\d+)$/i.exec(s.trim()); if (!m) return d; const v = (m[1] === '-' ? -1 : 1) * Number(m[2]); return v >= -2147483648 && v <= 2147483647 ? v : d; } \/;
-        f(self, fallback);
+        let f: fun(&, I32) I32 = @es/\ (s, d) => { const m = /^([+-]?)(0x[0-9a-f]+|\d+)$/i.exec(s.trim()); if (!m) return d; const v = (m[1] === '-' ? -1 : 1) * Number(m[2]); return v >= -2147483648 && v <= 2147483647 ? v : d; } \/
+        f(self, fallback)
     }
 
     /// The number the string is, or NaN when it is not one (`F64.is_nan`), as
     /// JavaScript's `Number` reads it after the white space around it: so
     /// also `0x…`, `0b…`, `0o…`, and `Infinity`, but not `inf`.
     fn &.parse_f64 |self| () F64 {
-        let f: fun(&) F64 = @es/\ (s) => { const t = s.trim(); return t === '' ? NaN : Number(t); } \/;
-        f(self);
+        let f: fun(&) F64 = @es/\ (s) => { const t = s.trim(); return t === '' ? NaN : Number(t); } \/
+        f(self)
     }
 }

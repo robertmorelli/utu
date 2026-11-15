@@ -1,7 +1,7 @@
-using List[Purchase] |purchases| from std:List;
-using Browser from std:Browser;
-using theme from "../theme.utu";
-using NumberField from std:NumberField;
+using List[Purchase] |purchases| from std:List
+using Browser from std:Browser
+using theme from "../theme.utu"
+using NumberField from std:NumberField
 struct Purchase:
 | title: Str
 | cents: I32
@@ -12,8 +12,8 @@ struct Draft:
 fn ledger_form(state: LedgerState) Browser.HTMLElement {
     let draft=Draft {
         title:""
-    };
-    let amount=NumberField.new("");
+    }
+    let amount=NumberField.new("")
     @wutu/\
     @island "ledger-form";
     form.panel {
@@ -57,7 +57,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
             };
         }
     }
-    \/;
+    \/
 }
 fn workspace(state: LedgerState) Browser.HTMLElement {
     @wutu/\
@@ -106,7 +106,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 export main() void {
     let state = @stored/\
@@ -121,7 +121,7 @@ export main() void {
             }
             ]
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @style theme.sheet();
@@ -162,6 +162,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

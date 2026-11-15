@@ -1,22 +1,22 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 fn number(value: I32) Str {
-    value.f64().toString();
+    value.f64().toString()
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2)
 }
 
 fn node(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal;
+    Browser.document.getElementById(id) orelse fatal
 }
 
 fn restore_focus(id: Str) void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
-    };
+    }
 }
 
 struct Book:
@@ -33,7 +33,7 @@ struct Library:
 fn matches(book: Book,
 state: Library) Bool {
     (book.title + " " + book.author).toLowerCase().includes(state.query.toLowerCase())
-    and (state.filter == "all" or (state.filter == "finished" and book.finished) or (state.filter == "reading" and not book.finished));
+    and (state.filter == "all" or (state.filter == "finished" and book.finished) or (state.filter == "reading" and not book.finished))
 }
 
 fn book_card(book: Book,
@@ -108,16 +108,16 @@ state: Library) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 
 fn results(state: Library) Browser.HTMLElement {
     let count = state.books count_where |book| {
-        matches(book, state);
-    };
+        matches(book, state)
+    }
     let finished = state.books count_where |book| {
-        book.finished;
-    };
+        book.finished
+    }
     @wutu/\
     section {
         id = "results";
@@ -149,7 +149,7 @@ fn results(state: Library) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 
 export main() void {
@@ -177,7 +177,7 @@ export main() void {
         query: "",
         filter: "all"
     }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @document {
@@ -464,6 +464,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

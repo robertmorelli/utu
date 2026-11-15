@@ -11,225 +11,225 @@
 //! table of the field and variant names they read and write.
 
 /// Where the host wrote `std:JsonRuntime` in `src` (@json_runtime_room): start, end.
-vec json_rt: I32 = [0, 0];
+vec json_rt: I32 = [0, 0]
 
 /// The runtime, as utu source text.
-fn json_runtime() Str { "\n" + bytes_text(json_rt[0], json_rt[1]); }
+fn json_runtime() Str { "\n" + bytes_text(json_rt[0], json_rt[1]) }
 
 /// The container being expanded: its types, names, and generated functions.
-vec jp_container: I32 = [-1];
+vec jp_container: I32 = [-1]
 /// The name table, in order.
-vec jp_name_words: I32;
+vec jp_name_words: I32
 /// Words of the functions generated (or the container's own)
-vec jp_defined: I32;
+vec jp_defined: I32
 /// By word: 1 + its offset in the name table (0 not in it), and 1 when in
 /// @jp_defined; the table's length so far.
-vec jp_name_at: I32;
-vec jp_word_defined: U8;
-vec jp_names_len: I32 = [0];
+vec jp_name_at: I32
+vec jp_word_defined: U8
+vec jp_names_len: I32 = [0]
 /// By container, the name table (as a word) an earlier round grafted.
-vec jp_prev_container: I32;
-vec jp_prev_names: I32;
+vec jp_prev_container: I32
+vec jp_prev_names: I32
 /// The generated functions' sources, as words, in order.
-vec jp_functions: I32;
+vec jp_functions: I32
 /// A counter for each site's fresh names (`__json0_`).
-vec jp_serial: I32 = [0];
+vec jp_serial: I32 = [0]
 /// Pinned names: a word generated code names a declaration by (`Circle__json0`),
 /// and that declaration's name node. Resolution binds each under every scope
 /// (@bind_json_pins), so no same-named type or variant hides it.
-vec jp_pin_word: I32;
-vec jp_pin_name: I32;
+vec jp_pin_word: I32
+vec jp_pin_name: I32
 /// By name node: 1 + its pin (when @jp_pin_name says so).
-vec jp_pin_of: I32;
+vec jp_pin_of: I32
 /// The struct and enum names of the container (slot 0) and its file (slot
 /// 1), indexed once each: by `word * 2 + slot`, 1 + the first of that name,
 /// when stamped with the slot's stamp (`jd_stamp[1 + slot]`, 0 for none yet;
 /// `[0]` counts).
-vec jd_item: I32;
-vec jd_at: I32;
-vec jd_stamp: I32 = [0, 0, 0];
+vec jd_item: I32
+vec jd_at: I32
+vec jd_stamp: I32 = [0, 0, 0]
 
 /// The type span of the site being expanded, for a codec's mistakes.
-vec jc_type_at: I32 = [0];
-vec jc_type_len: I32 = [0];
+vec jc_type_at: I32 = [0]
+vec jc_type_len: I32 = [0]
 /// Functions the current site generated, as words.
-vec jc_pending: I32;
+vec jc_pending: I32
 /// The site being expanded.
-vec jc_site: I32 = [-1];
+vec jc_site: I32 = [-1]
 
 /// Each `@json` site in `container` replaced by its expansion, then the
 /// runtime (unless the container has it), the generated codecs, and the name
 /// table added to the container.
 fn json_expand_container(container: I32, json: I32, count: I32) void {
-    jp_container[0] = container;
-    jd_stamp[1] = 0;
-    jd_stamp[2] = 0;
-    for (0 ..< jp_name_words.len()) |k| { jp_name_at[jp_name_words[k]] = 0; };
-    for (0 ..< jp_defined.len()) |k| { jp_word_defined[jp_defined[k]] = 0; };
-    jp_name_words.clear();
-    jp_defined.clear();
-    jp_names_len[0] = 0;
-    jp_functions.clear();
-    let has_runtime = false;
-    let old_slot = -1;
-    for (0 ..< jp_prev_container.len()) |k| { if jp_prev_container[k] == container { old_slot = k; }; };
-    let names_fn = -1;
-    let before = -1;
-    let item = first_child(container);
+    jp_container[0] = container
+    jd_stamp[1] = 0
+    jd_stamp[2] = 0
+    for (0 ..< jp_name_words.len()) |k| { jp_name_at[jp_name_words[k]] = 0 }
+    for (0 ..< jp_defined.len()) |k| { jp_word_defined[jp_defined[k]] = 0 }
+    jp_name_words.clear()
+    jp_defined.clear()
+    jp_names_len[0] = 0
+    jp_functions.clear()
+    let has_runtime = false
+    let old_slot = -1
+    for (0 ..< jp_prev_container.len()) |k| { if jp_prev_container[k] == container { old_slot = k } }
+    let names_fn = -1
+    let before = -1
+    let item = first_child(container)
     while (item >= 0) {
-        if is_kind(item, Node.Fn_decl) and word_text(word_of(first_child(first_child(item)))) == "__json_names" { names_fn = item; };
-        if names_fn < 0 { before = item; };
-        if is_kind(item, Node.Fn_decl) and next_sibling(first_child(first_child(item))) < 0 { jp_define_word(word_of(first_child(first_child(item)))); };
-        if is_kind(item, Node.Struct_decl) and word_text(word_of(first_child(item))) == "JsonReader__" { has_runtime = true; };
-        item = next_sibling(item);
-    };
+        if is_kind(item, Node.Fn_decl) and word_text(word_of(first_child(first_child(item)))) == "__json_names" { names_fn = item }
+        if names_fn < 0 { before = item }
+        if is_kind(item, Node.Fn_decl) and next_sibling(first_child(first_child(item))) < 0 { jp_define_word(word_of(first_child(first_child(item)))) }
+        if is_kind(item, Node.Struct_decl) and word_text(word_of(first_child(item))) == "JsonReader__" { has_runtime = true }
+        item = next_sibling(item)
+    }
     // An earlier round's name table: this round's extends it.
-    let old_names = "";
-    if names_fn >= 0 and old_slot >= 0 { old_names = word_text(jp_prev_names[old_slot]); };
-    jp_names_len[0] = old_names.len();
-    let first_site = -1;
-    let s = own_sites();
+    let old_names = ""
+    if names_fn >= 0 and old_slot >= 0 { old_names = word_text(jp_prev_names[old_slot]) }
+    jp_names_len[0] = old_names.len()
+    let first_site = -1
+    let s = own_sites()
     while (s < dsl_sites.len() and dsl_sites[s] < count) {
-        let n = dsl_sites[s];
+        let n = dsl_sites[s]
         if node_kind[n] == Node.Dsl_expr.i32() and word_of(first_child(n)) == json and dsl_in_program(n) and dsl_container(n) == container {
-            if first_site < 0 { first_site = n; };
-            let prefix = "__json" + int_text(jp_serial[0]) + "_";
-            jp_serial[0] += 1;
-            jc_pending.clear();
-            jc_site[0] = n;
+            if first_site < 0 { first_site = n }
+            let prefix = "__json" + int_text(jp_serial[0]) + "_"
+            jp_serial[0] += 1
+            jc_pending.clear()
+            jc_site[0] = n
             try {
-                graft_expression(n, json_expand_site(n, prefix));
-                for (0 ..< jc_pending.len()) |k| { jp_functions.push(jc_pending[k]); };
+                graft_expression(n, json_expand_site(n, prefix))
+                for (0 ..< jc_pending.len()) |k| { jp_functions.push(jc_pending[k]) }
             } catch {
-                report_dsl_error(n);
-                dsl_failed.push(n);
-            };
-        };
-        s += 1;
-    };
-    if first_site < 0 { return; };
-    let source = if has_runtime { ""; } else { json_runtime(); };
-    for (0 ..< jp_functions.len()) |k| { source = source + word_text(jp_functions[k]) + "\n"; };
-    let names = old_names;
-    for (0 ..< jp_name_words.len()) |k| { names = names + word_text(jp_name_words[k]); };
+                report_dsl_error(n)
+                dsl_failed.push(n)
+            }
+        }
+        s += 1
+    }
+    if first_site < 0 { return }
+    let source = if has_runtime { "" } else { json_runtime() }
+    for (0 ..< jp_functions.len()) |k| { source = source + word_text(jp_functions[k]) + "\n" }
+    let names = old_names
+    for (0 ..< jp_name_words.len()) |k| { names = names + word_text(jp_name_words[k]) }
     if old_slot < 0 {
-        jp_prev_container.push(container);
-        jp_prev_names.push(intern_text(names));
+        jp_prev_container.push(container)
+        jp_prev_names.push(intern_text(names))
     } else {
-        jp_prev_names[old_slot] = intern_text(names);
-    };
+        jp_prev_names[old_slot] = intern_text(names)
+    }
     // One table per container: this round's replaces the earlier round's.
     if names_fn >= 0 {
-        if before >= 0 { node_next[before] = node_next[names_fn]; } else { node_child[container] = node_next[names_fn]; };
-    };
-    source = source + "fn __json_names() Str {\n    " + js_string(names) + ";\n}\n";
-    dsl_current_site[0] = first_site;
-    graft_declarations(container, source);
+        if before >= 0 { node_next[before] = node_next[names_fn] } else { node_child[container] = node_next[names_fn] }
+    }
+    source = source + "fn __json_names() Str {\n    " + js_string(names) + ";\n}\n"
+    dsl_current_site[0] = first_site
+    graft_declarations(container, source)
 }
 
 /// `offset, length` of a name in the container's table.
 fn name_ref(name: Str) Str {
-    let w = intern_text(name);
-    jp_word_room(w);
+    let w = intern_text(name)
+    jp_word_room(w)
     if jp_name_at[w] == 0 {
-        jp_name_words.push(w);
-        jp_name_at[w] = jp_names_len[0] + 1;
-        jp_names_len[0] += word_text(w).len();
-    };
-    int_text(jp_name_at[w] - 1) + ", " + int_text(name.len());
+        jp_name_words.push(w)
+        jp_name_at[w] = jp_names_len[0] + 1
+        jp_names_len[0] += word_text(w).len()
+    }
+    int_text(jp_name_at[w] - 1) + ", " + int_text(name.len())
 }
 
 /// @jp_name_at and @jp_word_defined reach word w.
 fn jp_word_room(w: I32) void {
-    let old = jp_name_at.len();
-    if w < old { return; };
-    let n = src.interned();
-    jp_name_at.resize(n);
-    jp_word_defined.resize(n);
+    let old = jp_name_at.len()
+    if w < old { return }
+    let n = src.interned()
+    jp_name_at.resize(n)
+    jp_word_defined.resize(n)
     for (old ..< n) |k| {
-        jp_name_at[k] = 0;
-        jp_word_defined[k] = 0;
-    };
+        jp_name_at[k] = 0
+        jp_word_defined[k] = 0
+    }
 }
 
 /// Word w on @jp_defined; whether it was not yet.
 fn jp_define_word(w: I32) Bool {
-    jp_word_room(w);
-    if jp_word_defined[w] == 1 { return false; };
-    jp_word_defined[w] = 1;
-    jp_defined.push(w);
-    true;
+    jp_word_room(w)
+    if jp_word_defined[w] == 1 { return false }
+    jp_word_defined[w] = 1
+    jp_defined.push(w)
+    true
 }
 
 //! = A site
 
 /// The utu expression a `@json` site stands for; its codecs go to @jc_pending.
 fn json_expand_site(site: I32, prefix: Str) Str {
-    let raw = dsl_body(site);
-    let i = skip_spaces(raw, 0);
-    if text_at(raw, i, "match") and (i + 5 >= raw.len() or not is_word_code(raw.get(i + 5))) { return json_match(raw, prefix); };
+    let raw = dsl_body(site)
+    let i = skip_spaces(raw, 0)
+    if text_at(raw, i, "match") and (i + 5 >= raw.len() or not is_word_code(raw.get(i + 5))) { return json_match(raw, prefix) }
     // `decode|encode|error`, a type (with nested brackets), then the expression.
-    let op = if text_at(raw, i, "decode") { "decode"; } else if text_at(raw, i, "encode") { "encode"; } else if text_at(raw, i, "error") { "error"; } else { ""; };
-    let after = i + op.len();
+    let op = if text_at(raw, i, "decode") { "decode" } else if text_at(raw, i, "encode") { "encode" } else if text_at(raw, i, "error") { "error" } else { "" }
+    let after = i + op.len()
     if op.len() == 0 or after >= raw.len() or not is_space_code(raw.get(after)) {
-        dsl_fail("@json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`", first_non_space(raw), 1);
-    };
-    let type_start = skip_spaces(raw, after);
-    let j = type_start;
-    let depth = 0;
+        dsl_fail("@json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`", first_non_space(raw), 1)
+    }
+    let type_start = skip_spaces(raw, after)
+    let j = type_start
+    let depth = 0
     while (j < raw.len() and (depth > 0 or not is_space_code(raw.get(j)))) {
-        if raw.get(j) == 91 { depth += 1; };
-        if raw.get(j) == 93 { depth -= 1; };
-        j += 1;
-    };
-    let type = raw.slice(type_start, j);
+        if raw.get(j) == 91 { depth += 1 }
+        if raw.get(j) == 93 { depth -= 1 }
+        j += 1
+    }
+    let type = raw.slice(type_start, j)
     if not is_written_type(type) {
-        dsl_fail("Expected a type after " + op, type_start, if type.len() > 1 { type.len(); } else { 1; });
-    };
-    let expr_start = skip_spaces(raw, j);
+        dsl_fail("Expected a type after " + op, type_start, if type.len() > 1 { type.len() } else { 1 })
+    }
+    let expr_start = skip_spaces(raw, j)
     if expr_start >= trim_end(raw).len() {
-        let what = if op == "encode" { "value"; } else { "text"; };
-        dsl_fail("@json " + op + " needs a " + what + " expression after the type", type_start, type.len());
-    };
-    let expr = raw.slice(expr_start, raw.len());
-    jc_type_at[0] = type_start;
-    jc_type_len[0] = type.len();
-    let kind = shape_kind(type);
+        let what = if op == "encode" { "value" } else { "text" }
+        dsl_fail("@json " + op + " needs a " + what + " expression after the type", type_start, type.len())
+    }
+    let expr = raw.slice(expr_start, raw.len())
+    jc_type_at[0] = type_start
+    jc_type_len[0] = type.len()
+    let kind = shape_kind(type)
     if kind == Shape.Scalar or kind == Shape.Nullable {
-        dsl_fail("@json " + op + " works on a struct, enum, or Array; wrap " + type + " in a struct field", type_start, type.len());
-    };
+        dsl_fail("@json " + op + " works on a struct, enum, or Array; wrap " + type + " in a struct field", type_start, type.len())
+    }
     // decode gives ?T, and an integer enum cannot be null.
     if op == "decode" and kind == Shape.Enum and is_int_enum(declared_type(without_spaces(type))) {
-        dsl_fail("@json decode gives ?" + type + ", and an enum(U8) cannot be null: decode a struct with a " + type + " field, or use error or match", type_start, type.len());
-    };
+        dsl_fail("@json decode gives ?" + type + ", and an enum(U8) cannot be null: decode a struct with a " + type + " field, or use error or match", type_start, type.len())
+    }
     if not splice_parses(site, expr_start, expr) {
-        let what = if op == "encode" { "value"; } else { "text"; };
-        dsl_fail("Invalid " + what + " expression", expr_start, trim_end(expr).len());
-    };
-    let input = dsl_splice(site, expr_start, expr);
-    let r = prefix + "reader";
-    let w = prefix + "writer";
-    let value = prefix + "value";
-    let out = prefix + "out";
-    if op == "encode" { return "{ let " + w + " = __json_writer(64); " + json_write(type, input, w) + " Str.from_codes(" + w + ".buf, " + w + ".n); }"; };
-    let read = json_read(type, r);
+        let what = if op == "encode" { "value" } else { "text" }
+        dsl_fail("Invalid " + what + " expression", expr_start, trim_end(expr).len())
+    }
+    let input = dsl_splice(site, expr_start, expr)
+    let r = prefix + "reader"
+    let w = prefix + "writer"
+    let value = prefix + "value"
+    let out = prefix + "out"
+    if op == "encode" { return "{ let " + w + " = __json_writer(64); " + json_write(type, input, w) + " Str.from_codes(" + w + ".buf, " + w + ".n); }" }
+    let read = json_read(type, r)
     if op == "decode" {
         return "{ let " + r + " = __json_reader(" + input + "); let " + value + " = " + read + "; __json_end(" + r + "); let " + out + ": ?" + type_ref(type)
-            + " = null; if " + r + ".failed == 0 { " + out + " = " + value + "; }; " + out + "; }";
-    };
-    "{ let " + r + " = __json_reader(" + input + "); let " + value + " = " + read + "; __json_end(" + r + "); __json_describe(" + r + "); }";
+            + " = null; if " + r + ".failed == 0 { " + out + " = " + value + "; }; " + out + "; }"
+    }
+    "{ let " + r + " = __json_reader(" + input + "); let " + value + " = " + read + "; __json_end(" + r + "); __json_describe(" + r + "); }"
 }
 
-fn first_non_space(text: Str) I32 { skip_spaces(text, 0); }
+fn first_non_space(text: Str) I32 { skip_spaces(text, 0) }
 
 /// `?Name`, `Name`, `Name[…]`: what may follow decode, encode, or error.
 fn is_written_type(type: Str) Bool {
-    let i = 0;
-    if i < type.len() and type.get(i) == 63 { i += 1; };
-    if i >= type.len() or not is_upper_code(type.get(i)) { return false; };
-    while (i < type.len() and is_word_code(type.get(i))) { i += 1; };
-    if i == type.len() { return true; };
-    type.get(i) == 91 and type.get(type.len() - 1) == 93;
+    let i = 0
+    if i < type.len() and type.get(i) == 63 { i += 1 }
+    if i >= type.len() or not is_upper_code(type.get(i)) { return false }
+    while (i < type.len() and is_word_code(type.get(i))) { i += 1 }
+    if i == type.len() { return true }
+    type.get(i) == 91 and type.get(type.len() - 1) == 93
 }
 
 //! = Shapes
@@ -237,10 +237,10 @@ fn is_written_type(type: Str) Bool {
 //! 0 scalar, 1 optional, 2 array, 3 struct, 4 enum. A codec's mistakes point
 //! at the site's type.
 
-fn json_fail(message: Str) void { dsl_fail(message, jc_type_at[0], jc_type_len[0]); }
+fn json_fail(message: Str) void { dsl_fail(message, jc_type_at[0], jc_type_len[0]) }
 
 fn is_json_scalar(type: Str) Bool {
-    type == "I32" or type == "U32" or type == "I64" or type == "F32" or type == "F64" or type == "Bool" or type == "Str";
+    type == "I32" or type == "U32" or type == "I64" or type == "F32" or type == "F64" or type == "Bool" or type == "Str"
 }
 
 /// What JSON a type is.
@@ -253,504 +253,504 @@ enum(U8) Shape:
 
 /// The @Shape of a written type; a type JSON cannot have is reported.
 fn shape_kind(written: Str) Shape {
-    let type = without_spaces(written);
-    if is_json_scalar(type) { return Shape.Scalar; };
+    let type = without_spaces(written)
+    if is_json_scalar(type) { return Shape.Scalar }
     if type.len() > 0 and type.get(0) == 63 {
-        let inner = shape_kind(type.slice(1, type.len()));
-        if inner == Shape.Scalar and type.slice(1, type.len()) != "Str" { json_fail(type + " is not supported: only reference types (Str, structs, enums, arrays) can be null"); };
-        if inner == Shape.Nullable { json_fail(type + " is not supported"); };
-        if inner == Shape.Enum and is_int_enum(declared_type(type.slice(1, type.len()))) { json_fail(type + " is not supported: an enum(U8) cannot be null; use " + type.slice(1, type.len())); };
-        return Shape.Nullable;
-    };
+        let inner = shape_kind(type.slice(1, type.len()))
+        if inner == Shape.Scalar and type.slice(1, type.len()) != "Str" { json_fail(type + " is not supported: only reference types (Str, structs, enums, arrays) can be null") }
+        if inner == Shape.Nullable { json_fail(type + " is not supported") }
+        if inner == Shape.Enum and is_int_enum(declared_type(type.slice(1, type.len()))) { json_fail(type + " is not supported: an enum(U8) cannot be null; use " + type.slice(1, type.len())) }
+        return Shape.Nullable
+    }
     if text_at(type, 0, "Array[") and type.get(type.len() - 1) == 93 {
-        shape_kind(type.slice(6, type.len() - 1));
-        return Shape.Array;
-    };
-    let node = declared_type(type);
-    if node < 0 { json_fail("@json cannot use " + type + ": use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64"); };
-    if is_kind(node, Node.Struct_decl) { return Shape.Struct; };
+        shape_kind(type.slice(6, type.len() - 1))
+        return Shape.Array
+    }
+    let node = declared_type(type)
+    if node < 0 { json_fail("@json cannot use " + type + ": use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64") }
+    if is_kind(node, Node.Struct_decl) { return Shape.Struct }
     // Enum variants name their kind with a field `kind`: none may have one.
-    let v = first_child(node);
+    let v = first_child(node)
     while (v >= 0) {
         if is_kind(v, Node.Variant) {
-            let fields = variant_fields(v);
-            let f = if fields >= 0 { first_child(fields); } else { -1; };
+            let fields = variant_fields(v)
+            let f = if fields >= 0 { first_child(fields) } else { -1 }
             while (f >= 0) {
                 if is_kind(f, Node.Field) and word_text(word_of(first_child(f))) == "kind" {
-                    json_fail(type + "." + word_text(word_of(first_child(v))) + " has a field named kind, which @json uses to name the variant");
-                };
-                f = next_sibling(f);
-            };
-        };
-        v = next_sibling(v);
-    };
-    Shape.Enum;
+                    json_fail(type + "." + word_text(word_of(first_child(v))) + " has a field named kind, which @json uses to name the variant")
+                }
+                f = next_sibling(f)
+            }
+        }
+        v = next_sibling(v)
+    }
+    Shape.Enum
 }
 
 /// The struct or enum declaration a type names in the container, or -1:
 /// the file's top-level one of that name; in a module, its own, else the
 /// file's top-level one.
 fn declared_type(type: Str) I32 {
-    let w = intern_text(type);
+    let w = intern_text(type)
     if is_kind(jp_container[0], Node.Module_decl) {
-        let own = json_declared_in(jp_container[0], w, 0);
-        if own >= 0 { return own; };
-        let file = parent_of(jp_container[0]);
-        return if file >= 0 { json_declared_in(file, w, 1); } else { -1; };
-    };
-    json_declared_in(jp_container[0], w, 0);
+        let own = json_declared_in(jp_container[0], w, 0)
+        if own >= 0 { return own }
+        let file = parent_of(jp_container[0])
+        return if file >= 0 { json_declared_in(file, w, 1) } else { -1 }
+    }
+    json_declared_in(jp_container[0], w, 0)
 }
 
 /// The first struct or enum of that name directly in `node` (indexed in
 /// `slot`), or -1.
 fn json_declared_in(node: I32, w: I32, slot: I32) I32 {
     if jd_stamp[1 + slot] == 0 {
-        jd_stamp[0] += 1;
-        jd_stamp[1 + slot] = jd_stamp[0];
-        let item = first_child(node);
+        jd_stamp[0] += 1
+        jd_stamp[1 + slot] = jd_stamp[0]
+        let item = first_child(node)
         while (item >= 0) {
             if is_kind(item, Node.Struct_decl) or is_kind(item, Node.Enum_decl) {
-                let x = type_word(item) * 2 + slot;
+                let x = type_word(item) * 2 + slot
                 if x >= 0 {
-                    jd_room(x);
+                    jd_room(x)
                     if jd_at[x] != jd_stamp[0] {
-                        jd_at[x] = jd_stamp[0];
-                        jd_item[x] = item;
-                    };
-                };
-            };
-            item = next_sibling(item);
-        };
-    };
-    let x = w * 2 + slot;
-    if x >= 0 and x < jd_at.len() and jd_at[x] == jd_stamp[1 + slot] { jd_item[x]; } else { -1; };
+                        jd_at[x] = jd_stamp[0]
+                        jd_item[x] = item
+                    }
+                }
+            }
+            item = next_sibling(item)
+        }
+    }
+    let x = w * 2 + slot
+    if x >= 0 and x < jd_at.len() and jd_at[x] == jd_stamp[1 + slot] { jd_item[x] } else { -1 }
 }
 
 /// @jd_item and @jd_at reach `x`.
 fn jd_room(x: I32) void {
     if x >= jd_at.len() {
-        jd_at.resize(x * 2 + 2);
-        jd_item.resize(x * 2 + 2);
-    };
+        jd_at.resize(x * 2 + 2)
+        jd_item.resize(x * 2 + 2)
+    }
 }
 
 /// The last of that name in the file, in order, as stage 0's table keeps it.
 fn find_declared(node: I32, w: I32) I32 {
-    let found = -1;
-    let c = first_child(node);
+    let found = -1
+    let c = first_child(node)
     while (c >= 0) {
-        if (is_kind(c, Node.Struct_decl) or is_kind(c, Node.Enum_decl)) and type_word(c) == w { found = c; };
+        if (is_kind(c, Node.Struct_decl) or is_kind(c, Node.Enum_decl)) and type_word(c) == w { found = c }
         if is_kind(c, Node.Module_decl) {
-            let inner = find_declared(c, w);
-            if inner >= 0 { found = inner; };
-        };
-        c = next_sibling(c);
-    };
-    found;
+            let inner = find_declared(c, w)
+            if inner >= 0 { found = inner }
+        }
+        c = next_sibling(c)
+    }
+    found
 }
 
 /// A struct's or enum's name node (after an integer enum's representation).
-fn type_name_at(node: I32) I32 { if is_kind(node, Node.Enum_decl) { enum_name(node); } else { first_child(node); }; }
+fn type_name_at(node: I32) I32 { if is_kind(node, Node.Enum_decl) { enum_name(node) } else { first_child(node) } }
 
-fn type_word(node: I32) I32 { word_of(type_name_at(node)); }
+fn type_word(node: I32) I32 { word_of(type_name_at(node)) }
 
 /// The pinned name of the declaration named at `name_at` (`name` as written).
 fn json_pin(name_at: I32, name: Str) Str {
     if name_at < jp_pin_of.len() {
-        let k = jp_pin_of[name_at] - 1;
-        if k >= 0 and k < jp_pin_name.len() and jp_pin_name[k] == name_at { return word_text(jp_pin_word[k]); };
+        let k = jp_pin_of[name_at] - 1
+        if k >= 0 and k < jp_pin_name.len() and jp_pin_name[k] == name_at { return word_text(jp_pin_word[k]) }
     } else {
-        jp_pin_of.resize(name_at * 2 + 2);
-    };
-    let text = name + "__json" + int_text(jp_pin_name.len());
-    jp_pin_of[name_at] = jp_pin_name.len() + 1;
-    jp_pin_word.push(intern_text(text));
-    jp_pin_name.push(name_at);
-    text;
+        jp_pin_of.resize(name_at * 2 + 2)
+    }
+    let text = name + "__json" + int_text(jp_pin_name.len())
+    jp_pin_of[name_at] = jp_pin_name.len() + 1
+    jp_pin_word.push(intern_text(text))
+    jp_pin_name.push(name_at)
+    text
 }
 
 /// Each pinned name bound to its declaration, under every file's scope.
 fn bind_json_pins() void {
     for (0 ..< jp_pin_word.len()) |k| {
-        let n = name_node(jp_pin_name[k]);
-        if n >= 0 and node_decl[n] >= 0 { bind(jp_pin_word[k], node_decl[n]); };
-    };
+        let n = name_node(jp_pin_name[k])
+        if n >= 0 and node_decl[n] >= 0 { bind(jp_pin_word[k], node_decl[n]) }
+    }
 }
 
 /// A written type as generated code names it: each struct and enum pinned.
 fn type_ref(written: Str) Str {
-    let type = without_spaces(written);
-    if is_json_scalar(type) { return type; };
-    if type.get(0) == 63 { return "?" + type_ref(type.slice(1, type.len())); };
-    if text_at(type, 0, "Array[") { return "Array[" + type_ref(inner_type(type)) + "]"; };
-    let node = declared_type(type);
-    if node < 0 { type; } else { json_pin(type_name_at(node), type); };
+    let type = without_spaces(written)
+    if is_json_scalar(type) { return type }
+    if type.get(0) == 63 { return "?" + type_ref(type.slice(1, type.len())) }
+    if text_at(type, 0, "Array[") { return "Array[" + type_ref(inner_type(type)) + "]" }
+    let node = declared_type(type)
+    if node < 0 { type } else { json_pin(type_name_at(node), type) }
 }
 
 /// A variant, pinned, as generated code builds it.
-fn variant_ref(variant: I32) Str { json_pin(first_child(variant), word_text(word_of(first_child(variant)))); }
+fn variant_ref(variant: I32) Str { json_pin(first_child(variant), word_text(word_of(first_child(variant)))) }
 
 /// A field-less variant as a value: `Red {}`, or an integer enum's `Level.Low`.
 fn json_variant(node: I32, v: I32) Str {
-    if is_int_enum(node) { json_pin(type_name_at(node), word_text(type_word(node))) + "." + word_text(word_of(first_child(v))); } else { variant_ref(v) + " {}"; };
+    if is_int_enum(node) { json_pin(type_name_at(node), word_text(type_word(node))) + "." + word_text(word_of(first_child(v))) } else { variant_ref(v) + " {}" }
 }
 
 fn variant_fields(variant: I32) I32 {
-    let c = next_sibling(first_child(variant));
+    let c = next_sibling(first_child(variant))
     while (c >= 0) {
-        if is_kind(c, Node.Field_list) { return c; };
-        c = next_sibling(c);
-    };
-    -1;
+        if is_kind(c, Node.Field_list) { return c }
+        c = next_sibling(c)
+    }
+    -1
 }
 
 /// A struct's fields (or a variant's): the node whose Field children they are.
-fn fields_holder_of(node: I32) I32 { if is_kind(node, Node.Variant) { variant_fields(node); } else { node; }; }
+fn fields_holder_of(node: I32) I32 { if is_kind(node, Node.Variant) { variant_fields(node) } else { node } }
 
-fn field_name(field: I32) Str { word_text(word_of(first_child(field))); }
+fn field_name(field: I32) Str { word_text(word_of(first_child(field))) }
 
-fn field_type_text(field: I32) Str { without_spaces(node_text(next_sibling(first_child(field)))); }
+fn field_type_text(field: I32) Str { without_spaces(node_text(next_sibling(first_child(field)))) }
 
 /// The element type of `Array[T]`, or `T` of `?T`.
 fn inner_type(type: Str) Str {
-    let t = without_spaces(type);
-    if t.get(0) == 63 { return t.slice(1, t.len()); };
-    t.slice(6, t.len() - 1);
+    let t = without_spaces(type)
+    if t.get(0) == 63 { return t.slice(1, t.len()) }
+    t.slice(6, t.len() - 1)
 }
 
 /// A type as a function-name part: `?` is `opt_`, other punctuation `_`.
 fn mangle(type: Str) Str {
-    let out = "";
+    let out = ""
     for (0 ..< type.len()) |i| {
-        let c = type.get(i);
-        if c == 63 { out = out + "opt_"; } else if is_word_code(c) { out = out + Str.from_code_point(c); } else { out = out + "_"; };
-    };
-    out;
+        let c = type.get(i)
+        if c == 63 { out = out + "opt_" } else if is_word_code(c) { out = out + Str.from_code_point(c) } else { out = out + "_" }
+    }
+    out
 }
 
 fn scalar_zero(type: Str) Str {
-    if type == "F32" or type == "F64" { return "0.0"; };
-    if type == "Bool" { return "false"; };
-    if type == "Str" { return "\"\""; };
-    "0";
+    if type == "F32" or type == "F64" { return "0.0" }
+    if type == "Bool" { return "false" }
+    if type == "Str" { return "\"\"" }
+    "0"
 }
 
 fn scalar_read(type: Str) Str {
-    if type == "I32" { return "i32"; };
-    if type == "U32" { return "u32"; };
-    if type == "I64" { return "i64"; };
-    if type == "F32" { return "f32"; };
-    if type == "F64" { return "f64"; };
-    if type == "Bool" { return "bool"; };
-    "str";
+    if type == "I32" { return "i32" }
+    if type == "U32" { return "u32" }
+    if type == "I64" { return "i64" }
+    if type == "F32" { return "f32" }
+    if type == "F64" { return "f64" }
+    if type == "Bool" { return "bool" }
+    "str"
 }
 
 fn scalar_write(type: Str, v: Str, w: Str) Str {
-    if type == "I32" or type == "U32" { return "__json_put_i64(" + w + ", " + v + ".i64());"; };
-    if type == "I64" { return "__json_put_i64(" + w + ", " + v + ");"; };
-    if type == "F32" { return "__json_put_f32(" + w + ", " + v + ");"; };
-    if type == "F64" { return "__json_put_f64(" + w + ", " + v + ");"; };
-    if type == "Bool" { return "__json_raw(" + w + ", if " + v + " { \"true\"; } else { \"false\"; });"; };
-    "__json_put_str(" + w + ", " + v + ");";
+    if type == "I32" or type == "U32" { return "__json_put_i64(" + w + ", " + v + ".i64());" }
+    if type == "I64" { return "__json_put_i64(" + w + ", " + v + ");" }
+    if type == "F32" { return "__json_put_f32(" + w + ", " + v + ");" }
+    if type == "F64" { return "__json_put_f64(" + w + ", " + v + ");" }
+    if type == "Bool" { return "__json_raw(" + w + ", if " + v + " { \"true\"; } else { \"false\"; });" }
+    "__json_put_str(" + w + ", " + v + ");"
 }
 
 /// Generate a function once, by name, unless the container already has it:
 /// whether to generate it now.
 fn json_define(name: Str) Bool {
-    jp_define_word(intern_text(name));
+    jp_define_word(intern_text(name))
 }
 
-fn json_emit(source: Str) void { jc_pending.push(intern_text(source)); }
+fn json_emit(source: Str) void { jc_pending.push(intern_text(source)) }
 
 //! = Defaults
 
 /// A value of the type to start a field with; the struct or enum ones are
 /// generated functions. A type that contains itself has none.
 fn json_zero(written: Str, visiting: I32) Str {
-    let type = without_spaces(written);
-    let kind = shape_kind(type);
-    if kind == Shape.Scalar { return scalar_zero(type); };
-    if kind == Shape.Nullable { return "null"; };
-    if kind == Shape.Array { return "[]"; };
-    let w = intern_text(type);
-    if visiting >= 0 and list_has(visiting, w) { json_fail(type + " contains itself; make the recursive field ?" + type + " or an Array"); };
-    let name = "__json_zero_" + mangle(type);
-    let next = list_with(visiting, w);
-    let node = declared_type(type);
-    let t = type_ref(type);
+    let type = without_spaces(written)
+    let kind = shape_kind(type)
+    if kind == Shape.Scalar { return scalar_zero(type) }
+    if kind == Shape.Nullable { return "null" }
+    if kind == Shape.Array { return "[]" }
+    let w = intern_text(type)
+    if visiting >= 0 and list_has(visiting, w) { json_fail(type + " contains itself; make the recursive field ?" + type + " or an Array") }
+    let name = "__json_zero_" + mangle(type)
+    let next = list_with(visiting, w)
+    let node = declared_type(type)
+    let t = type_ref(type)
     if json_define(name) {
-        let body = "";
-        if kind == Shape.Struct { body = t + " { " + construct_fields(node, next) + " }"; }
+        let body = ""
+        if kind == Shape.Struct { body = t + " { " + construct_fields(node, next) + " }" }
         else {
-            let usable = -1;
-            let v = first_child(node);
+            let usable = -1
+            let v = first_child(node)
             while (v >= 0 and usable < 0) {
-                if is_kind(v, Node.Variant) and fields_constructible(fields_holder_of(v), next) { usable = v; };
-                v = next_sibling(v);
-            };
-            if usable < 0 { json_fail(type + " has no variant without a recursive field"); };
-            body = if is_int_enum(node) { json_variant(node, usable); } else { variant_ref(usable) + " { " + construct_fields(fields_holder_of(usable), next) + " }"; };
-        };
-        json_emit("fn " + name + "() " + t + " {\n    " + body + ";\n}");
-    };
-    name + "()";
+                if is_kind(v, Node.Variant) and fields_constructible(fields_holder_of(v), next) { usable = v }
+                v = next_sibling(v)
+            }
+            if usable < 0 { json_fail(type + " has no variant without a recursive field") }
+            body = if is_int_enum(node) { json_variant(node, usable) } else { variant_ref(usable) + " { " + construct_fields(fields_holder_of(usable), next) + " }" }
+        }
+        json_emit("fn " + name + "() " + t + " {\n    " + body + ";\n}")
+    }
+    name + "()"
 }
 
 fn construct_fields(holder: I32, visiting: I32) Str {
-    let out = "";
-    let f = if holder >= 0 { first_child(holder); } else { -1; };
-    let first = true;
+    let out = ""
+    let f = if holder >= 0 { first_child(holder) } else { -1 }
+    let first = true
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            if not first { out = out + ", "; };
-            out = out + field_name(f) + ": " + json_zero(field_type_text(f), visiting);
-            first = false;
-        };
-        f = next_sibling(f);
-    };
-    out;
+            if not first { out = out + ", " }
+            out = out + field_name(f) + ": " + json_zero(field_type_text(f), visiting)
+            first = false
+        }
+        f = next_sibling(f)
+    }
+    out
 }
 
 /// Whether every field has a default without a type it is inside.
 fn fields_constructible(holder: I32, visiting: I32) Bool {
-    let f = if holder >= 0 { first_child(holder); } else { -1; };
+    let f = if holder >= 0 { first_child(holder) } else { -1 }
     while (f >= 0) {
-        if is_kind(f, Node.Field) and not constructible(field_type_text(f), visiting) { return false; };
-        f = next_sibling(f);
-    };
-    true;
+        if is_kind(f, Node.Field) and not constructible(field_type_text(f), visiting) { return false }
+        f = next_sibling(f)
+    }
+    true
 }
 
 /// Whether a value of `type` can be made without a type it is inside
 /// (`visiting`, a list of words).
 fn constructible(type: Str, visiting: I32) Bool {
-    let kind = shape_kind(type);
-    if kind == Shape.Scalar or kind == Shape.Nullable or kind == Shape.Array { return true; };
-    let w = intern_text(type);
-    if visiting >= 0 and list_has(visiting, w) { return false; };
-    let next = list_with(visiting, w);
-    let node = declared_type(type);
-    if kind == Shape.Struct { return fields_constructible(node, next); };
-    let v = first_child(node);
+    let kind = shape_kind(type)
+    if kind == Shape.Scalar or kind == Shape.Nullable or kind == Shape.Array { return true }
+    let w = intern_text(type)
+    if visiting >= 0 and list_has(visiting, w) { return false }
+    let next = list_with(visiting, w)
+    let node = declared_type(type)
+    if kind == Shape.Struct { return fields_constructible(node, next) }
+    let v = first_child(node)
     while (v >= 0) {
-        if is_kind(v, Node.Variant) and fields_constructible(fields_holder_of(v), next) { return true; };
-        v = next_sibling(v);
-    };
-    false;
+        if is_kind(v, Node.Variant) and fields_constructible(fields_holder_of(v), next) { return true }
+        v = next_sibling(v)
+    }
+    false
 }
 
 fn list_has(list: I32, w: I32) Bool {
-    for (0 ..< vl_len[list]) |i| { if vl_item(list, i) == w { return true; }; };
-    false;
+    for (0 ..< vl_len[list]) |i| { if vl_item(list, i) == w { return true } }
+    false
 }
 
 fn list_with(list: I32, w: I32) I32 {
-    let m = vl_begin();
-    if list >= 0 { for (0 ..< vl_len[list]) |i| { vl_add(vl_item(list, i)); }; };
-    vl_add(w);
-    vl_end(m);
+    let m = vl_begin()
+    if list >= 0 { for (0 ..< vl_len[list]) |i| { vl_add(vl_item(list, i)) } }
+    vl_add(w)
+    vl_end(m)
 }
 
 //! = Readers
 
 /// An expression reading a value of `type` from reader `r`.
 fn json_read(written: Str, r: Str) Str {
-    let type = without_spaces(written);
-    let kind = shape_kind(type);
-    if kind == Shape.Scalar { return "__json_" + scalar_read(type) + "(" + r + ")"; };
-    let name = "__json_read_" + mangle(type);
-    let t = type_ref(type);
+    let type = without_spaces(written)
+    let kind = shape_kind(type)
+    if kind == Shape.Scalar { return "__json_" + scalar_read(type) + "(" + r + ")" }
+    let name = "__json_read_" + mangle(type)
+    let t = type_ref(type)
     if json_define(name) {
         if kind == Shape.Nullable {
-            json_emit("fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = null;\n    if not __json_null(r) {\n        out = " + json_read(inner_type(type), "r") + ";\n    };\n    out;\n}");
+            json_emit("fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = null;\n    if not __json_null(r) {\n        out = " + json_read(inner_type(type), "r") + ";\n    };\n    out;\n}")
         } else if kind == Shape.Array {
-            json_emit(array_reader(name, type));
+            json_emit(array_reader(name, type))
         } else if kind == Shape.Struct {
-            let node = declared_type(type);
-            json_emit("fn " + name + "(r: JsonReader__) " + t + " {\n" + fields_reader(node, t + " { " + fields_result(node) + " }", true) + "\n}");
+            let node = declared_type(type)
+            json_emit("fn " + name + "(r: JsonReader__) " + t + " {\n" + fields_reader(node, t + " { " + fields_result(node) + " }", true) + "\n}")
         } else {
-            json_emit(enum_reader(name, type));
-        };
-    };
-    name + "(" + r + ")";
+            json_emit(enum_reader(name, type))
+        }
+    }
+    name + "(" + r + ")"
 }
 
 fn fields_result(holder: I32) Str {
-    let out = "";
-    let i = 0;
-    let f = if holder >= 0 { first_child(holder); } else { -1; };
+    let out = ""
+    let i = 0
+    let f = if holder >= 0 { first_child(holder) } else { -1 }
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            if i > 0 { out = out + ", "; };
-            out = out + field_name(f) + ": f" + int_text(i);
-            i += 1;
-        };
-        f = next_sibling(f);
-    };
-    out;
+            if i > 0 { out = out + ", " }
+            out = out + field_name(f) + ": f" + int_text(i)
+            i += 1
+        }
+        f = next_sibling(f)
+    }
+    out
 }
 
 /// The source of a generated reader of `Array[T]`, which grows by doubling.
 fn array_reader(name: Str, type: Str) Str {
-    let element = type_ref(inner_type(type));
-    let read = json_read(inner_type(type), "r");
-    let t = type_ref(type);
+    let element = type_ref(inner_type(type))
+    let read = json_read(inner_type(type), "r")
+    let t = type_ref(type)
     "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = [];\n    __json_open(r, 91, \"expected an array\");\n    if __json_first(r, 93) {\n        let first = " + read
         + ";\n        let items = Array[" + element + "].new(8, first);\n        let count = 1;\n        while (__json_next(r, 93)) {\n            let item = " + read
-        + ";\n            if count == items.len() {\n                let grown = Array[" + element + "].new(count * 2, first);\n                grown.copy_from(0, items, 0, count);\n                items = grown;\n            };\n            items[count] = item;\n            count += 1;\n        };\n        out = if count == items.len() { items; } else { items.slice(0, count); };\n    };\n    out;\n}";
+        + ";\n            if count == items.len() {\n                let grown = Array[" + element + "].new(count * 2, first);\n                grown.copy_from(0, items, 0, count);\n                items = grown;\n            };\n            items[count] = item;\n            count += 1;\n        };\n        out = if count == items.len() { items; } else { items.slice(0, count); };\n    };\n    out;\n}"
 }
 
 /// The body of an object reader: one local per field, matched by name, then
 /// required-field checks and `result`. With `open`, it reads the `{` and
 /// the first field; otherwise the object is already open (after a kind).
 fn fields_reader(holder: I32, result: Str, open: Bool) Str {
-    let locals = "";
-    let matcher = "";
-    let required = "";
-    let i = 0;
-    let f = if holder >= 0 { first_child(holder); } else { -1; };
+    let locals = ""
+    let matcher = ""
+    let required = ""
+    let i = 0
+    let f = if holder >= 0 { first_child(holder) } else { -1 }
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            let type = field_type_text(f);
-            if i > 0 { locals = locals + "\n"; };
-            locals = locals + "    let f" + int_text(i) + ": " + type_ref(type) + " = " + json_zero(type, -1) + ";\n    let s" + int_text(i) + " = false;";
-            matcher = matcher + "if __json_is(r, " + name_ref(field_name(f)) + ") {\n            f" + int_text(i) + " = " + json_read(type, "r") + ";\n            s" + int_text(i) + " = true;\n        } else ";
-            if type.get(0) != 63 { required = required + "    if not s" + int_text(i) + " {\n        __json_missing(r, " + js_string(field_name(f)) + ");\n    };\n"; };
-            i += 1;
-        };
-        f = next_sibling(f);
-    };
-    matcher = matcher + "{\n            __json_skip(r);\n        };";
-    let start = if open { "    __json_open(r, 123, \"expected an object\");\n    let more = __json_first(r, 125);"; } else { "    let more = __json_next(r, 125);"; };
-    locals + "\n" + start + "\n    while (more) {\n        __json_span(r);\n        __json_colon(r);\n        " + matcher + "\n        more = __json_next(r, 125);\n    };\n" + required + "    " + result + ";";
+            let type = field_type_text(f)
+            if i > 0 { locals = locals + "\n" }
+            locals = locals + "    let f" + int_text(i) + ": " + type_ref(type) + " = " + json_zero(type, -1) + ";\n    let s" + int_text(i) + " = false;"
+            matcher = matcher + "if __json_is(r, " + name_ref(field_name(f)) + ") {\n            f" + int_text(i) + " = " + json_read(type, "r") + ";\n            s" + int_text(i) + " = true;\n        } else "
+            if type.get(0) != 63 { required = required + "    if not s" + int_text(i) + " {\n        __json_missing(r, " + js_string(field_name(f)) + ");\n    };\n" }
+            i += 1
+        }
+        f = next_sibling(f)
+    }
+    matcher = matcher + "{\n            __json_skip(r);\n        };"
+    let start = if open { "    __json_open(r, 123, \"expected an object\");\n    let more = __json_first(r, 125);" } else { "    let more = __json_next(r, 125);" }
+    locals + "\n" + start + "\n    while (more) {\n        __json_span(r);\n        __json_colon(r);\n        " + matcher + "\n        more = __json_next(r, 125);\n    };\n" + required + "    " + result + ";"
 }
 
 /// Whether some variant of an enum has fields (it is then read and written
 /// as an object with a `kind`, else as a string).
 fn is_tagged(node: I32) Bool {
-    let v = first_child(node);
+    let v = first_child(node)
     while (v >= 0) {
         if is_kind(v, Node.Variant) {
-            let holder = variant_fields(v);
-            if holder >= 0 and child_count_of(holder, Node.Field) > 0 { return true; };
-        };
-        v = next_sibling(v);
-    };
-    false;
+            let holder = variant_fields(v)
+            if holder >= 0 and child_count_of(holder, Node.Field) > 0 { return true }
+        }
+        v = next_sibling(v)
+    }
+    false
 }
 
 fn child_count_of(node: I32, kind: Node) I32 {
-    let n = 0;
-    let c = first_child(node);
+    let n = 0
+    let c = first_child(node)
     while (c >= 0) {
-        if is_kind(c, kind) { n += 1; };
-        c = next_sibling(c);
-    };
-    n;
+        if is_kind(c, kind) { n += 1 }
+        c = next_sibling(c)
+    }
+    n
 }
 
 fn enum_reader(name: Str, type: Str) Str {
-    let node = declared_type(type);
-    let t = type_ref(type);
-    let zero_value = json_zero(type, -1);
+    let node = declared_type(type)
+    let t = type_ref(type)
+    let zero_value = json_zero(type, -1)
     // It names the variant read, when its text is plain (`unknown Expr variant "Mul"`).
-    let quote = js_string(Str.from_code_point(34));
-    let unknown = js_string("unknown " + type + " variant ") + " + " + quote + " + r.text.slice(r.ks, r.ks + r.kl) + " + quote;
+    let quote = js_string(Str.from_code_point(34))
+    let unknown = js_string("unknown " + type + " variant ") + " + " + quote + " + r.text.slice(r.ks, r.ks + r.kl) + " + quote
     if not is_tagged(node) {
-        let arms = "";
-        let v = first_child(node);
+        let arms = ""
+        let v = first_child(node)
         while (v >= 0) {
             if is_kind(v, Node.Variant) {
-                let vname = word_text(word_of(first_child(v)));
-                arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n        out = " + json_variant(node, v) + ";\n    } else ";
-            };
-            v = next_sibling(v);
-        };
-        return "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = " + zero_value + ";\n    __json_ws(r);\n    let start = r.at;\n    __json_span(r);\n    " + arms + "{\n        r.at = start;\n        __json_fail(r, " + unknown + ");\n    };\n    out;\n}";
-    };
-    let arms = "";
-    let v = first_child(node);
+                let vname = word_text(word_of(first_child(v)))
+                arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n        out = " + json_variant(node, v) + ";\n    } else "
+            }
+            v = next_sibling(v)
+        }
+        return "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = " + zero_value + ";\n    __json_ws(r);\n    let start = r.at;\n    __json_span(r);\n    " + arms + "{\n        r.at = start;\n        __json_fail(r, " + unknown + ");\n    };\n    out;\n}"
+    }
+    let arms = ""
+    let v = first_child(node)
     while (v >= 0) {
         if is_kind(v, Node.Variant) {
-            let vname = word_text(word_of(first_child(v)));
-            let reader = "__json_variant_" + mangle(type) + "_" + vname;
+            let vname = word_text(word_of(first_child(v)))
+            let reader = "__json_variant_" + mangle(type) + "_" + vname
             if json_define(reader) {
-                let holder = variant_fields(v);
-                json_emit("fn " + reader + "(r: JsonReader__) " + t + " {\n" + fields_reader(holder, variant_ref(v) + " { " + fields_result(holder) + " }", false) + "\n}");
-            };
-            arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n            out = " + reader + "(r);\n        } else ";
-        };
-        v = next_sibling(v);
-    };
-    let kind_ref = name_ref("kind");
+                let holder = variant_fields(v)
+                json_emit("fn " + reader + "(r: JsonReader__) " + t + " {\n" + fields_reader(holder, variant_ref(v) + " { " + fields_result(holder) + " }", false) + "\n}")
+            }
+            arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n            out = " + reader + "(r);\n        } else "
+        }
+        v = next_sibling(v)
+    }
+    let kind_ref = name_ref("kind")
     "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = " + zero_value + ";\n    __json_open(r, 123, \"expected an object\");\n    if __json_first(r, 125) {\n        __json_span(r);\n        if not __json_is(r, " + kind_ref
         + ") {\n            __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n        };\n        __json_colon(r);\n        __json_ws(r);\n        let start = r.at;\n        __json_span(r);\n        " + arms + "{\n            r.at = start;\n            __json_fail(r, " + unknown
-        + ");\n        };\n    } else {\n        __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n    };\n    out;\n}";
+        + ");\n        };\n    } else {\n        __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n    };\n    out;\n}"
 }
 
 //! = Writers
 
 /// Statements writing `value` (of `type`) to writer `w`.
 fn json_write(written: Str, value: Str, w: Str) Str {
-    let type = without_spaces(written);
-    let kind = shape_kind(type);
-    if kind == Shape.Scalar { return scalar_write(type, value, w); };
-    let name = "__json_write_" + mangle(type);
+    let type = without_spaces(written)
+    let kind = shape_kind(type)
+    if kind == Shape.Scalar { return scalar_write(type, value, w) }
+    let name = "__json_write_" + mangle(type)
     if json_define(name) {
-        let body = "";
+        let body = ""
         if kind == Shape.Nullable {
-            body = "promote v {\n        |x| => {\n            " + json_write(inner_type(type), "x", "w") + "\n        },\n        ~> {\n            __json_raw(w, \"null\");\n        },\n    };";
+            body = "promote v {\n        |x| => {\n            " + json_write(inner_type(type), "x", "w") + "\n        },\n        ~> {\n            __json_raw(w, \"null\");\n        },\n    };"
         } else if kind == Shape.Array {
-            body = "__json_put(w, 91);\n    for (0..<v.len()) |i| {\n        if i > 0 {\n            __json_put(w, 44);\n        };\n        " + json_write(inner_type(type), "v[i]", "w") + "\n    };\n    __json_put(w, 93);";
+            body = "__json_put(w, 91);\n    for (0..<v.len()) |i| {\n        if i > 0 {\n            __json_put(w, 44);\n        };\n        " + json_write(inner_type(type), "v[i]", "w") + "\n    };\n    __json_put(w, 93);"
         } else if kind == Shape.Struct {
-            body = object_writer(declared_type(type), "v", true);
+            body = object_writer(declared_type(type), "v", true)
         } else {
-            let node = declared_type(type);
-            let tagged = is_tagged(node);
-            let arms = "";
-            let first = true;
-            let v = first_child(node);
+            let node = declared_type(type)
+            let tagged = is_tagged(node)
+            let arms = ""
+            let first = true
+            let v = first_child(node)
             while (v >= 0) {
                 if is_kind(v, Node.Variant) {
-                    let vname = word_text(word_of(first_child(v)));
-                    let tag = "__json_tag(w, " + name_ref(vname) + ");";
-                    if not first { arms = arms + "\n"; };
-                    first = false;
-                    let holder = variant_fields(v);
-                    if is_int_enum(node) { arms = arms + "if v == " + json_variant(node, v) + " {\n        " + tag + "\n    } else "; }
-                    else if not tagged { arms = arms + "        " + vname + " => {\n            " + tag + "\n        },"; }
+                    let vname = word_text(word_of(first_child(v)))
+                    let tag = "__json_tag(w, " + name_ref(vname) + ");"
+                    if not first { arms = arms + "\n" }
+                    first = false
+                    let holder = variant_fields(v)
+                    if is_int_enum(node) { arms = arms + "if v == " + json_variant(node, v) + " {\n        " + tag + "\n    } else " }
+                    else if not tagged { arms = arms + "        " + vname + " => {\n            " + tag + "\n        }," }
                     else {
-                        let kind_ = "__json_name(w, 123, " + name_ref("kind") + ");\n            " + tag;
-                        if holder < 0 or child_count_of(holder, Node.Field) == 0 { arms = arms + "        " + vname + " => {\n            " + kind_ + "\n            __json_put(w, 125);\n        },"; }
-                        else { arms = arms + "        " + vname + " |x| => {\n            " + kind_ + "\n            " + object_writer(holder, "x", false) + "\n        },"; };
-                    };
-                };
-                v = next_sibling(v);
-            };
-            body = if is_int_enum(node) { arms + "{};"; } else { "alt v {\n" + arms + "\n        ~> {},\n    };"; };
-        };
-        json_emit("fn " + name + "(w: JsonWriter__, v: " + type_ref(type) + ") void {\n    " + body + "\n}");
-    };
-    name + "(" + w + ", " + value + ");";
+                        let kind_ = "__json_name(w, 123, " + name_ref("kind") + ");\n            " + tag
+                        if holder < 0 or child_count_of(holder, Node.Field) == 0 { arms = arms + "        " + vname + " => {\n            " + kind_ + "\n            __json_put(w, 125);\n        }," }
+                        else { arms = arms + "        " + vname + " |x| => {\n            " + kind_ + "\n            " + object_writer(holder, "x", false) + "\n        }," }
+                    }
+                }
+                v = next_sibling(v)
+            }
+            body = if is_int_enum(node) { arms + "{};" } else { "alt v {\n" + arms + "\n        ~> {},\n    };" }
+        }
+        json_emit("fn " + name + "(w: JsonWriter__, v: " + type_ref(type) + ") void {\n    " + body + "\n}")
+    }
+    name + "(" + w + ", " + value + ");"
 }
 
 /// Fields as "name":value pairs; `opens` writes the `{` (else the object
 /// already has its kind).
 fn object_writer(holder: I32, value: Str, opens: Bool) Str {
-    let parts = "";
-    let i = 0;
-    let f = if holder >= 0 { first_child(holder); } else { -1; };
+    let parts = ""
+    let i = 0
+    let f = if holder >= 0 { first_child(holder) } else { -1 }
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            if i > 0 { parts = parts + "\n    "; };
-            let open = if i == 0 and opens { 123; } else { 44; };
-            parts = parts + "__json_name(w, " + int_text(open) + ", " + name_ref(field_name(f)) + ");\n    " + json_write(field_type_text(f), value + "." + field_name(f), "w");
-            i += 1;
-        };
-        f = next_sibling(f);
-    };
-    if i == 0 { return if opens { "__json_raw(w, \"{}\");"; } else { "__json_put(w, 125);"; }; };
-    parts + "\n    __json_put(w, 125);";
+            if i > 0 { parts = parts + "\n    " }
+            let open = if i == 0 and opens { 123 } else { 44 }
+            parts = parts + "__json_name(w, " + int_text(open) + ", " + name_ref(field_name(f)) + ");\n    " + json_write(field_type_text(f), value + "." + field_name(f), "w")
+            i += 1
+        }
+        f = next_sibling(f)
+    }
+    if i == 0 { return if opens { "__json_raw(w, \"{}\");" } else { "__json_put(w, 125);" } }
+    parts + "\n    __json_put(w, 125);"
 }
 
 //! = match: structural patterns over JSON
@@ -764,116 +764,116 @@ fn object_writer(holder: I32, value: Str, opens: Bool) Str {
 //!
 //! Patterns list only what the program needs; other fields are skipped.
 
-vec sc_at: I32 = [0];
+vec sc_at: I32 = [0]
 
 /// Past spaces and `//` comments.
 fn sc_ws(raw: Str) I32 {
-    let i = sc_at[0];
+    let i = sc_at[0]
     while (true) {
-        i = skip_spaces(raw, i);
+        i = skip_spaces(raw, i)
         if text_at(raw, i, "//") {
-            while (i < raw.len() and raw.get(i) != 10) { i += 1; };
+            while (i < raw.len() and raw.get(i) != 10) { i += 1 }
         } else {
-            sc_at[0] = i;
-            return i;
-        };
-    };
-    i;
+            sc_at[0] = i
+            return i
+        }
+    }
+    i
 }
 
 fn sc_peek(raw: Str, text: Str) Bool {
-    sc_ws(raw);
-    text_at(raw, sc_at[0], text);
+    sc_ws(raw)
+    text_at(raw, sc_at[0], text)
 }
 
 fn sc_expect(raw: Str, text: Str) void {
-    sc_ws(raw);
-    if not text_at(raw, sc_at[0], text) { dsl_fail("Expected '" + text + "' in @json match", sc_at[0], 1); };
-    sc_at[0] += text.len();
+    sc_ws(raw)
+    if not text_at(raw, sc_at[0], text) { dsl_fail("Expected '" + text + "' in @json match", sc_at[0], 1) }
+    sc_at[0] += text.len()
 }
 
 /// Source up to the first of `stops` at nesting depth 0 (`sc_until_start` says where it began).
-vec sc_until_start: I32 = [0];
+vec sc_until_start: I32 = [0]
 
 fn sc_until(raw: Str, stops: Str) Str {
-    sc_ws(raw);
-    let from = sc_at[0];
-    let i = from;
-    let depth = 0;
+    sc_ws(raw)
+    let from = sc_at[0]
+    let i = from
+    let depth = 0
     while (i < raw.len()) {
-        let c = raw.get(i);
+        let c = raw.get(i)
         if c == 34 or c == 96 {
-            i += 1;
-            while (i < raw.len() and raw.get(i) != c) { i += if raw.get(i) == 92 { 2; } else { 1; }; };
-            i += 1;
+            i += 1
+            while (i < raw.len() and raw.get(i) != c) { i += if raw.get(i) == 92 { 2 } else { 1 } }
+            i += 1
         } else if text_at(raw, i, "//") {
-            while (i < raw.len() and raw.get(i) != 10) { i += 1; };
+            while (i < raw.len() and raw.get(i) != 10) { i += 1 }
         } else {
-            if depth == 0 and text_index(stops, Str.from_code_point(c), 0) >= 0 { break; };
-            if c == 40 or c == 91 or c == 123 { depth += 1; };
-            if c == 41 or c == 93 or c == 125 { depth -= 1; };
-            if depth < 0 { break; };
-            i += 1;
-        };
-    };
-    sc_at[0] = i;
-    sc_until_start[0] = from;
-    trim_end(raw.slice(from, i));
+            if depth == 0 and text_index(stops, Str.from_code_point(c), 0) >= 0 { break }
+            if c == 40 or c == 91 or c == 123 { depth += 1 }
+            if c == 41 or c == 93 or c == 125 { depth -= 1 }
+            if depth < 0 { break }
+            i += 1
+        }
+    }
+    sc_at[0] = i
+    sc_until_start[0] = from
+    trim_end(raw.slice(from, i))
 }
 
 /// An identifier at the cursor (of a lowercase or `_` start, unless
 /// `upper` allows uppercase too), or "".
 fn sc_word(raw: Str, upper: Bool) Str {
-    sc_ws(raw);
-    let i = sc_at[0];
-    if i >= raw.len() { return ""; };
-    let c = raw.get(i);
-    if not (is_lower_code(c) or c == 95 or upper and is_upper_code(c)) { return ""; };
-    let j = i;
-    while (j < raw.len() and is_word_code(raw.get(j))) { j += 1; };
-    sc_at[0] = j;
-    raw.slice(i, j);
+    sc_ws(raw)
+    let i = sc_at[0]
+    if i >= raw.len() { return "" }
+    let c = raw.get(i)
+    if not (is_lower_code(c) or c == 95 or upper and is_upper_code(c)) { return "" }
+    let j = i
+    while (j < raw.len() and is_word_code(raw.get(j))) { j += 1 }
+    sc_at[0] = j
+    raw.slice(i, j)
 }
 
 /// A JSON string literal at the cursor (with its quotes), or "".
 fn sc_string(raw: Str) Str {
-    sc_ws(raw);
-    let i = sc_at[0];
-    if i >= raw.len() or raw.get(i) != 34 { return ""; };
-    let j = i + 1;
-    while (j < raw.len() and raw.get(j) != 34) { j += if raw.get(j) == 92 { 2; } else { 1; }; };
-    if j >= raw.len() { return ""; };
-    sc_at[0] = j + 1;
-    raw.slice(i, j + 1);
+    sc_ws(raw)
+    let i = sc_at[0]
+    if i >= raw.len() or raw.get(i) != 34 { return "" }
+    let j = i + 1
+    while (j < raw.len() and raw.get(j) != 34) { j += if raw.get(j) == 92 { 2 } else { 1 } }
+    if j >= raw.len() { return "" }
+    sc_at[0] = j + 1
+    raw.slice(i, j + 1)
 }
 
 /// What a JSON string literal (with its quotes) says: its escapes decoded.
 fn json_unescape(quoted: Str) Str {
-    let out = "";
-    let i = 1;
-    let end = quoted.len() - 1;
+    let out = ""
+    let i = 1
+    let end = quoted.len() - 1
     while (i < end) {
-        let c = quoted.get(i);
-        i += 1;
+        let c = quoted.get(i)
+        i += 1
         if c == 92 and i < end {
-            let e = quoted.get(i);
-            i += 1;
+            let e = quoted.get(i)
+            i += 1
             if e == 117 and i + 4 <= end {
-                let v = 0;
+                let v = 0
                 for (0 ..< 4) |k| {
-                    let h = quoted.get(i + k);
-                    v = v * 16 + (if h >= 97 { h - 87; } else if h >= 65 { h - 55; } else { h - 48; });
-                };
-                i += 4;
-                out = out + Str.from_code_point(v);
+                    let h = quoted.get(i + k)
+                    v = v * 16 + (if h >= 97 { h - 87 } else if h >= 65 { h - 55 } else { h - 48 })
+                }
+                i += 4
+                out = out + Str.from_code_point(v)
             } else {
-                out = out + Str.from_code_point(if e == 110 { 10; } else if e == 116 { 9; } else if e == 114 { 13; } else if e == 98 { 8; } else if e == 102 { 12; } else { e; });
-            };
+                out = out + Str.from_code_point(if e == 110 { 10 } else if e == 116 { 9 } else if e == 114 { 13 } else if e == 98 { 8 } else if e == 102 { 12 } else { e })
+            }
         } else {
-            out = out + Str.from_code_point(c);
-        };
-    };
-    out;
+            out = out + Str.from_code_point(c)
+        }
+    }
+    out
 }
 
 // Patterns: object (its fields' patterns, linked), capture, or literal.
@@ -885,362 +885,362 @@ enum(U8) Pat:
     | Literal
 
 /// Its @Pat.
-vec pat_kind: U8;
+vec pat_kind: U8
 /// Capture: its name; a field: its key (words)
-vec pat_name: I32;
-vec pat_name_start: I32;
+vec pat_name: I32
+vec pat_name_start: I32
 /// Capture: its type (a word)
-vec pat_type: I32;
-vec pat_type_start: I32;
+vec pat_type: I32
+vec pat_type_start: I32
 /// Capture: `= default` text (a word), or -1.
-vec pat_fallback: I32;
-vec pat_fallback_start: I32;
+vec pat_fallback: I32
+vec pat_fallback_start: I32
 /// Literal: as written (a word)
-vec pat_text: I32;
+vec pat_text: I32
 /// Object: its first field's pattern, or -1.
-vec pat_first: I32;
+vec pat_first: I32
 /// A field's next field, or -1.
-vec pat_next: I32;
+vec pat_next: I32
 /// A field's key (a word)
-vec pat_key: I32;
+vec pat_key: I32
 
-fn pat_is(p: I32, kind: Pat) Bool { pat_kind[p] == kind.i32(); }
+fn pat_is(p: I32, kind: Pat) Bool { pat_kind[p] == kind.i32() }
 
 fn new_pattern(kind: Pat) I32 {
-    let p = pat_kind.len();
-    pat_kind.push(kind.i32());
-    pat_name.push(-1);
-    pat_name_start.push(0);
-    pat_type.push(-1);
-    pat_type_start.push(0);
-    pat_fallback.push(-1);
-    pat_fallback_start.push(0);
-    pat_text.push(-1);
-    pat_first.push(-1);
-    pat_next.push(-1);
-    pat_key.push(-1);
-    p;
+    let p = pat_kind.len()
+    pat_kind.push(kind.i32())
+    pat_name.push(-1)
+    pat_name_start.push(0)
+    pat_type.push(-1)
+    pat_type_start.push(0)
+    pat_fallback.push(-1)
+    pat_fallback_start.push(0)
+    pat_text.push(-1)
+    pat_first.push(-1)
+    pat_next.push(-1)
+    pat_key.push(-1)
+    p
 }
 
 /// A `@json match` pattern at the cursor, into the `pat_` rows: its index.
 fn parse_pattern(raw: Str) I32 {
-    sc_ws(raw);
+    sc_ws(raw)
     if sc_peek(raw, "{") {
-        sc_expect(raw, "{");
-        let p = new_pattern(Pat.Object);
-        let last = -1;
+        sc_expect(raw, "{")
+        let p = new_pattern(Pat.Object)
+        let last = -1
         while (not sc_peek(raw, "}")) {
-            let key_start = sc_ws(raw);
-            let quoted = sc_string(raw);
-            let key = if quoted.len() > 0 { json_unescape(quoted); } else { sc_word(raw, true); };
-            if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at[0], 1); };
-            let written = if quoted.len() > 0 { quoted.len(); } else { key.len(); };
-            let f = pat_first[p];
+            let key_start = sc_ws(raw)
+            let quoted = sc_string(raw)
+            let key = if quoted.len() > 0 { json_unescape(quoted) } else { sc_word(raw, true) }
+            if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at[0], 1) }
+            let written = if quoted.len() > 0 { quoted.len() } else { key.len() }
+            let f = pat_first[p]
             while (f >= 0) {
-                if word_text(pat_key[f]) == key { dsl_fail("Field " + key + " appears twice in this pattern", key_start, written); };
-                f = pat_next[f];
-            };
-            sc_expect(raw, ":");
-            let child = parse_pattern(raw);
-            pat_key[child] = intern_text(key);
-            if last < 0 { pat_first[p] = child; } else { pat_next[last] = child; };
-            last = child;
-            if not sc_peek(raw, "}") { sc_expect(raw, ","); };
-        };
-        sc_expect(raw, "}");
-        return p;
-    };
+                if word_text(pat_key[f]) == key { dsl_fail("Field " + key + " appears twice in this pattern", key_start, written) }
+                f = pat_next[f]
+            }
+            sc_expect(raw, ":")
+            let child = parse_pattern(raw)
+            pat_key[child] = intern_text(key)
+            if last < 0 { pat_first[p] = child } else { pat_next[last] = child }
+            last = child
+            if not sc_peek(raw, "}") { sc_expect(raw, ",") }
+        }
+        sc_expect(raw, "}")
+        return p
+    }
     if sc_peek(raw, "|") {
-        sc_expect(raw, "|");
-        let name_start = sc_ws(raw);
-        let name = sc_word(raw, false);
-        if name.len() == 0 { dsl_fail("Expected a capture name: |name| Type", sc_at[0], 1); };
-        sc_expect(raw, "|");
-        let type_start = sc_ws(raw);
-        let type = sc_capture_type(raw);
-        if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at[0], 1); };
-        let p = new_pattern(Pat.Capture);
-        pat_name[p] = intern_text(name);
-        pat_name_start[p] = name_start;
-        pat_type[p] = intern_text(type);
-        pat_type_start[p] = type_start;
+        sc_expect(raw, "|")
+        let name_start = sc_ws(raw)
+        let name = sc_word(raw, false)
+        if name.len() == 0 { dsl_fail("Expected a capture name: |name| Type", sc_at[0], 1) }
+        sc_expect(raw, "|")
+        let type_start = sc_ws(raw)
+        let type = sc_capture_type(raw)
+        if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at[0], 1) }
+        let p = new_pattern(Pat.Capture)
+        pat_name[p] = intern_text(name)
+        pat_name_start[p] = name_start
+        pat_type[p] = intern_text(type)
+        pat_type_start[p] = type_start
         if sc_peek(raw, "=") and not sc_peek(raw, "=>") {
-            sc_expect(raw, "=");
-            pat_fallback[p] = intern_text(sc_until(raw, ",}"));
-            pat_fallback_start[p] = sc_until_start[0];
-        };
-        return p;
-    };
-    let token = sc_string(raw);
-    if token.len() == 0 { token = sc_number(raw); };
-    if token.len() == 0 { token = sc_keyword(raw); };
-    if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at[0], 1); };
-    let p = new_pattern(Pat.Literal);
-    pat_text[p] = intern_text(token);
-    p;
+            sc_expect(raw, "=")
+            pat_fallback[p] = intern_text(sc_until(raw, ",}"))
+            pat_fallback_start[p] = sc_until_start[0]
+        }
+        return p
+    }
+    let token = sc_string(raw)
+    if token.len() == 0 { token = sc_number(raw) }
+    if token.len() == 0 { token = sc_keyword(raw) }
+    if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at[0], 1) }
+    let p = new_pattern(Pat.Literal)
+    pat_text[p] = intern_text(token)
+    p
 }
 
 /// `?Name`, `Name`, `Name[…]` (one level of nested brackets), or "".
 fn sc_capture_type(raw: Str) Str {
-    let i = sc_at[0];
-    let j = i;
-    if j < raw.len() and raw.get(j) == 63 { j += 1; };
-    if j >= raw.len() or not is_upper_code(raw.get(j)) { return ""; };
-    while (j < raw.len() and is_word_code(raw.get(j))) { j += 1; };
+    let i = sc_at[0]
+    let j = i
+    if j < raw.len() and raw.get(j) == 63 { j += 1 }
+    if j >= raw.len() or not is_upper_code(raw.get(j)) { return "" }
+    while (j < raw.len() and is_word_code(raw.get(j))) { j += 1 }
     if j < raw.len() and raw.get(j) == 91 {
-        let depth = 0;
+        let depth = 0
         while (j < raw.len()) {
-            if raw.get(j) == 91 { depth += 1; };
+            if raw.get(j) == 91 { depth += 1 }
             if raw.get(j) == 93 {
-                depth -= 1;
+                depth -= 1
                 if depth == 0 {
-                    j += 1;
-                    break;
-                };
-            };
-            j += 1;
-        };
-    };
-    sc_at[0] = j;
-    raw.slice(i, j);
+                    j += 1
+                    break
+                }
+            }
+            j += 1
+        }
+    }
+    sc_at[0] = j
+    raw.slice(i, j)
 }
 
 fn sc_number(raw: Str) Str {
-    let i = sc_at[0];
-    let j = i;
-    if j < raw.len() and raw.get(j) == 45 { j += 1; };
-    if j >= raw.len() or raw.get(j) < 48 or raw.get(j) > 57 { return ""; };
-    while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1; };
+    let i = sc_at[0]
+    let j = i
+    if j < raw.len() and raw.get(j) == 45 { j += 1 }
+    if j >= raw.len() or raw.get(j) < 48 or raw.get(j) > 57 { return "" }
+    while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1 }
     if j + 1 < raw.len() and raw.get(j) == 46 and raw.get(j + 1) >= 48 and raw.get(j + 1) <= 57 {
-        j += 1;
-        while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1; };
-    };
+        j += 1
+        while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1 }
+    }
     if j < raw.len() and (raw.get(j) == 101 or raw.get(j) == 69) {
-        let k = j + 1;
-        if k < raw.len() and (raw.get(k) == 43 or raw.get(k) == 45) { k += 1; };
+        let k = j + 1
+        if k < raw.len() and (raw.get(k) == 43 or raw.get(k) == 45) { k += 1 }
         if k < raw.len() and raw.get(k) >= 48 and raw.get(k) <= 57 {
-            j = k;
-            while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1; };
-        };
-    };
-    sc_at[0] = j;
-    raw.slice(i, j);
+            j = k
+            while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1 }
+        }
+    }
+    sc_at[0] = j
+    raw.slice(i, j)
 }
 
 fn sc_keyword(raw: Str) Str {
-    let i = sc_at[0];
+    let i = sc_at[0]
     for (["true", "false", "null"]) |k| {
         if text_at(raw, i, k) and (i + k.len() >= raw.len() or not is_word_code(raw.get(i + k.len()))) {
-            sc_at[0] = i + k.len();
-            return k;
-        };
-    };
-    "";
+            sc_at[0] = i + k.len()
+            return k
+        }
+    }
+    ""
 }
 
 /// Whether a pattern can be satisfied when its field is absent: only a
 /// `?T` capture or one with a default; an object pattern needs its object.
 fn pattern_optional(p: I32) Bool {
-    if pat_is(p, Pat.Capture) { return word_text(pat_type[p]).get(0) == 63 or pat_fallback[p] >= 0; };
-    false;
+    if pat_is(p, Pat.Capture) { return word_text(pat_type[p]).get(0) == 63 or pat_fallback[p] >= 0 }
+    false
 }
 
 // The site's fresh names, and an arm's captures.
 
-vec jm_serial: I32 = [0];
+vec jm_serial: I32 = [0]
 /// By capture: its name (a word)
-vec cap_name: I32;
+vec cap_name: I32
 /// Its local (a word)
-vec cap_local: I32;
+vec cap_local: I32
 /// Its pattern.
-vec cap_pat: I32;
+vec cap_pat: I32
 /// The current arm's declarations, as words.
-vec jm_declare: I32;
+vec jm_declare: I32
 
 fn fresh_name(prefix: Str, name: Str) Str {
-    let text = prefix + name + int_text(jm_serial[0]);
-    jm_serial[0] += 1;
-    text;
+    let text = prefix + name + int_text(jm_serial[0])
+    jm_serial[0] += 1
+    text
 }
 
 /// A slice of the body as utu: in parentheses, once it parses.
 fn json_splice(text: Str, start: I32, what: Str) Str {
     if not splice_parses(jc_site[0], start, text) {
-        dsl_fail("Invalid " + what + " in @json match", start, if text.len() > 1 { text.len(); } else { 1; });
-    };
-    dsl_splice(jc_site[0], start, text);
+        dsl_fail("Invalid " + what + " in @json match", start, if text.len() > 1 { text.len() } else { 1 })
+    }
+    dsl_splice(jc_site[0], start, text)
 }
 
 /// `@json/\ match text { pattern => value, …, ~> fallback }` as utu: a
 /// reader over `text`, then each arm's pattern tried in order.
 fn json_match(raw: Str, prefix: Str) Str {
-    jm_serial[0] = 0;
-    pat_kind.clear();
-    pat_name.clear();
-    pat_name_start.clear();
-    pat_type.clear();
-    pat_type_start.clear();
-    pat_fallback.clear();
-    pat_fallback_start.clear();
-    pat_text.clear();
-    pat_first.clear();
-    pat_next.clear();
-    pat_key.clear();
+    jm_serial[0] = 0
+    pat_kind.clear()
+    pat_name.clear()
+    pat_name_start.clear()
+    pat_type.clear()
+    pat_type_start.clear()
+    pat_fallback.clear()
+    pat_fallback_start.clear()
+    pat_text.clear()
+    pat_first.clear()
+    pat_next.clear()
+    pat_key.clear()
     // Parse: the text, then arms, then one ~> arm.
-    sc_at[0] = text_index(raw, "match", 0) + 5;
-    let text = sc_until(raw, "{");
-    let text_start = sc_until_start[0];
-    if text.len() == 0 { dsl_fail("@json match needs the text to match: `match text { … }`", sc_at[0], 1); };
-    sc_expect(raw, "{");
-    let arm_pattern = Array[I32].new(64, -1);
-    let arm_body = Array[I32].new(64, -1);
-    let arm_body_start = Array[I32].new(64, 0);
-    let narms = 0;
-    let fallback_body = -1;
-    let fallback_start = 0;
-    let fallback_binding = -1;
+    sc_at[0] = text_index(raw, "match", 0) + 5
+    let text = sc_until(raw, "{")
+    let text_start = sc_until_start[0]
+    if text.len() == 0 { dsl_fail("@json match needs the text to match: `match text { … }`", sc_at[0], 1) }
+    sc_expect(raw, "{")
+    let arm_pattern = Array[I32].new(64, -1)
+    let arm_body = Array[I32].new(64, -1)
+    let arm_body_start = Array[I32].new(64, 0)
+    let narms = 0
+    let fallback_body = -1
+    let fallback_start = 0
+    let fallback_binding = -1
     while (not sc_peek(raw, "}")) {
         if sc_peek(raw, "~>") {
-            if fallback_body >= 0 { dsl_fail("@json match has more than one ~> arm", sc_at[0], 2); };
-            sc_expect(raw, "~>");
+            if fallback_body >= 0 { dsl_fail("@json match has more than one ~> arm", sc_at[0], 2) }
+            sc_expect(raw, "~>")
             if sc_peek(raw, "|") {
-                sc_expect(raw, "|");
-                let binding = sc_word(raw, false);
-                if binding.len() == 0 { dsl_fail("Expected a name for the error: ~> |error| …", sc_at[0], 1); };
-                fallback_binding = intern_text(binding);
-                sc_expect(raw, "|");
-            };
-            fallback_body = intern_text(sc_until(raw, ",}"));
-            fallback_start = sc_until_start[0];
+                sc_expect(raw, "|")
+                let binding = sc_word(raw, false)
+                if binding.len() == 0 { dsl_fail("Expected a name for the error: ~> |error| …", sc_at[0], 1) }
+                fallback_binding = intern_text(binding)
+                sc_expect(raw, "|")
+            }
+            fallback_body = intern_text(sc_until(raw, ",}"))
+            fallback_start = sc_until_start[0]
         } else {
-            if fallback_body >= 0 { dsl_fail("The ~> arm must be last in @json match", sc_at[0], 1); };
-            let pattern = parse_pattern(raw);
-            sc_expect(raw, "=>");
-            if narms == 64 { dsl_fail("@json match supports at most 64 pattern arms", sc_at[0], 1); };
-            arm_pattern[narms] = pattern;
-            arm_body[narms] = intern_text(sc_until(raw, ",}"));
-            arm_body_start[narms] = sc_until_start[0];
-            narms += 1;
-        };
-        if not sc_peek(raw, "}") { sc_expect(raw, ","); };
-    };
-    sc_expect(raw, "}");
-    if sc_ws(raw) < raw.len() { dsl_fail("Unexpected text after @json match", sc_at[0], 1); };
-    if narms == 0 { dsl_fail("@json match needs at least one pattern arm", sc_at[0], 1); };
-    if fallback_body < 0 { dsl_fail("@json match needs a ~> arm for text that matches no pattern", sc_at[0], 1); };
+            if fallback_body >= 0 { dsl_fail("The ~> arm must be last in @json match", sc_at[0], 1) }
+            let pattern = parse_pattern(raw)
+            sc_expect(raw, "=>")
+            if narms == 64 { dsl_fail("@json match supports at most 64 pattern arms", sc_at[0], 1) }
+            arm_pattern[narms] = pattern
+            arm_body[narms] = intern_text(sc_until(raw, ",}"))
+            arm_body_start[narms] = sc_until_start[0]
+            narms += 1
+        }
+        if not sc_peek(raw, "}") { sc_expect(raw, ",") }
+    }
+    sc_expect(raw, "}")
+    if sc_ws(raw) < raw.len() { dsl_fail("Unexpected text after @json match", sc_at[0], 1) }
+    if narms == 0 { dsl_fail("@json match needs at least one pattern arm", sc_at[0], 1) }
+    if fallback_body < 0 { dsl_fail("@json match needs a ~> arm for text that matches no pattern", sc_at[0], 1) }
     // Generate.
-    let r = fresh_name(prefix, "reader");
-    let best = fresh_name(prefix, "error");
-    let best_at = fresh_name(prefix, "errorAt");
-    let best_matched = fresh_name(prefix, "errorMatched");
-    let fallback = json_splice(word_text(fallback_body), fallback_start, "fallback");
-    let code = "{ " + (if fallback_binding >= 0 { "let " + word_text(fallback_binding) + " = " + best + ";"; } else { ""; }) + " " + fallback + "; }";
-    let index = narms - 1;
+    let r = fresh_name(prefix, "reader")
+    let best = fresh_name(prefix, "error")
+    let best_at = fresh_name(prefix, "errorAt")
+    let best_matched = fresh_name(prefix, "errorMatched")
+    let fallback = json_splice(word_text(fallback_body), fallback_start, "fallback")
+    let code = "{ " + (if fallback_binding >= 0 { "let " + word_text(fallback_binding) + " = " + best + ";" } else { "" }) + " " + fallback + "; }"
+    let index = narms - 1
     while (index >= 0) {
-        cap_name.clear();
-        cap_local.clear();
-        cap_pat.clear();
-        jm_declare.clear();
-        let read = read_pattern(arm_pattern[index], "", r, prefix);
-        let declare = "";
-        for (0 ..< jm_declare.len()) |k| { declare = declare + word_text(jm_declare[k]) + " "; };
+        cap_name.clear()
+        cap_local.clear()
+        cap_pat.clear()
+        jm_declare.clear()
+        let read = read_pattern(arm_pattern[index], "", r, prefix)
+        let declare = ""
+        for (0 ..< jm_declare.len()) |k| { declare = declare + word_text(jm_declare[k]) + " " }
         // Each capture is marked present where it is read; a default fills
         // one whose field was absent; then each is bound by its name.
-        let marked = read;
-        let has_decls = "";
-        let fill = "";
-        let bind = "";
+        let marked = read
+        let has_decls = ""
+        let fill = ""
+        let bind = ""
         for (0 ..< cap_name.len()) |k| {
-            let p = cap_pat[k];
-            let local = word_text(cap_local[k]);
-            let has = fresh_name(prefix, "has");
-            has_decls = has_decls + "let " + has + " = false; ";
-            marked = replace_first(marked, local + " = ", has + " = true; " + local + " = ");
+            let p = cap_pat[k]
+            let local = word_text(cap_local[k])
+            let has = fresh_name(prefix, "has")
+            has_decls = has_decls + "let " + has + " = false; "
+            marked = replace_first(marked, local + " = ", has + " = true; " + local + " = ")
             if pat_fallback[p] >= 0 {
-                let value = json_splice(word_text(pat_fallback[p]), pat_fallback_start[p], "default for " + word_text(pat_name[p]));
-                fill = fill + "if not " + has + " { " + local + " = " + value + "; }; ";
-            };
-            bind = bind + "let " + word_text(cap_name[k]) + ": " + type_ref(word_text(pat_type[p])) + " = " + local + "; ";
-        };
-        let body = json_splice(word_text(arm_body[index]), arm_body_start[index], "arm body");
-        code = "{ " + (if index > 0 { "__json_restart(" + r + ");"; } else { ""; }) + "\n      " + declare + " " + has_decls + "\n      " + marked
+                let value = json_splice(word_text(pat_fallback[p]), pat_fallback_start[p], "default for " + word_text(pat_name[p]))
+                fill = fill + "if not " + has + " { " + local + " = " + value + "; }; "
+            }
+            bind = bind + "let " + word_text(cap_name[k]) + ": " + type_ref(word_text(pat_type[p])) + " = " + local + "; "
+        }
+        let body = json_splice(word_text(arm_body[index]), arm_body_start[index], "arm body")
+        code = "{ " + (if index > 0 { "__json_restart(" + r + ");" } else { "" }) + "\n      " + declare + " " + has_decls + "\n      " + marked
             + "\n      __json_end(" + r + ");\n      if " + r + ".failed == 0 { " + fill + " " + bind + " " + body + "; } else {\n        if " + r + ".matched > " + best_matched
             + " or (" + r + ".matched == " + best_matched + " and " + r + ".failed > " + best_at + ") {\n          " + best_matched + " = " + r + ".matched; " + best_at + " = " + r
-            + ".failed; " + best + " = __json_describe(" + r + ");\n        };\n        " + code + ";\n      };\n    }";
-        index -= 1;
-    };
-    "{ let " + r + " = __json_reader(" + json_splice(text, text_start, "text expression") + "); let " + best + " = \"\"; let " + best_at + " = 0; let " + best_matched + " = -1; " + code + "; }";
+            + ".failed; " + best + " = __json_describe(" + r + ");\n        };\n        " + code + ";\n      };\n    }"
+        index -= 1
+    }
+    "{ let " + r + " = __json_reader(" + json_splice(text, text_start, "text expression") + "); let " + best + " = \"\"; let " + best_at + " = 0; let " + best_matched + " = -1; " + code + "; }"
 }
 
 /// Statements reading pattern p from r, assigning its captures; its
 /// declarations go to `jm_declare`.
 fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
-    let where = js_string(path);
+    let where = js_string(path)
     if pat_is(p, Pat.Capture) {
-        let name = word_text(pat_name[p]);
+        let name = word_text(pat_name[p])
         for (0 ..< cap_name.len()) |k| {
-            if cap_name[k] == pat_name[p] { dsl_fail(name + " is captured twice in this pattern", pat_name_start[p], name.len()); };
-        };
-        let type = word_text(pat_type[p]);
-        jc_type_at[0] = pat_type_start[p];
-        jc_type_len[0] = type.len();
-        shape_kind(type);
-        let local = fresh_name(prefix, "capture_" + name + "_");
-        cap_name.push(pat_name[p]);
-        cap_local.push(intern_text(local));
-        cap_pat.push(p);
-        let ok = fresh_name(prefix, "ok");
-        let read = json_read(type, r);
-        let zero = json_zero(type, -1);
-        jm_declare.push(intern_text("let " + local + ": " + type_ref(type) + " = " + zero + ";"));
-        return "let " + ok + " = " + r + ".failed == 0; " + local + " = " + read + "; __json_at(" + r + ", " + ok + ", " + where + ");";
-    };
+            if cap_name[k] == pat_name[p] { dsl_fail(name + " is captured twice in this pattern", pat_name_start[p], name.len()) }
+        }
+        let type = word_text(pat_type[p])
+        jc_type_at[0] = pat_type_start[p]
+        jc_type_len[0] = type.len()
+        shape_kind(type)
+        let local = fresh_name(prefix, "capture_" + name + "_")
+        cap_name.push(pat_name[p])
+        cap_local.push(intern_text(local))
+        cap_pat.push(p)
+        let ok = fresh_name(prefix, "ok")
+        let read = json_read(type, r)
+        let zero = json_zero(type, -1)
+        jm_declare.push(intern_text("let " + local + ": " + type_ref(type) + " = " + zero + ";"))
+        return "let " + ok + " = " + r + ".failed == 0; " + local + " = " + read + "; __json_at(" + r + ", " + ok + ", " + where + ");"
+    }
     if pat_is(p, Pat.Literal) {
-        let ok = fresh_name(prefix, "ok");
-        let text = word_text(pat_text[p]);
-        let expected = js_string("expected " + text);
-        let c = text.get(0);
+        let ok = fresh_name(prefix, "ok")
+        let text = word_text(pat_text[p])
+        let expected = js_string("expected " + text)
+        let c = text.get(0)
         let check = if c == 34 {
-            "__json_span(" + r + "); if " + r + ".failed == 0 and not __json_is(" + r + ", " + name_ref(json_unescape(text)) + ") { __json_fail(" + r + ", " + expected + "); };";
+            "__json_span(" + r + "); if " + r + ".failed == 0 and not __json_is(" + r + ", " + name_ref(json_unescape(text)) + ") { __json_fail(" + r + ", " + expected + "); };"
         } else if c == 116 or c == 102 {
-            "if __json_bool(" + r + ") != " + text + " { __json_fail(" + r + ", " + expected + "); };";
+            "if __json_bool(" + r + ") != " + text + " { __json_fail(" + r + ", " + expected + "); };"
         } else if c == 110 {
-            "if not __json_null(" + r + ") { __json_fail(" + r + ", " + expected + "); };";
+            "if not __json_null(" + r + ") { __json_fail(" + r + ", " + expected + "); };"
         } else {
             // An integer literal matches only an integer token (kl: no fraction or exponent).
-            let integer = float_text(text) == text + ".0";
+            let integer = float_text(text) == text + ".0"
             // A long one is an F64 beyond its exact range: the token's text is compared too.
-            let exact = if integer and text.len() > 15 { " or " + r + ".at < " + int_text(text.len()) + " or " + r + ".text.slice(" + r + ".at - " + int_text(text.len()) + ", " + r + ".at) != " + js_string(text); } else { ""; };
-            "if __json_f64(" + r + ") != " + float_text(text) + (if integer { " or " + r + ".kl != 0" + exact; } else { ""; }) + " { __json_fail(" + r + ", " + expected + "); };";
-        };
-        return "let " + ok + " = " + r + ".failed == 0; " + check + " __json_at(" + r + ", " + ok + ", " + where + ");";
-    };
+            let exact = if integer and text.len() > 15 { " or " + r + ".at < " + int_text(text.len()) + " or " + r + ".text.slice(" + r + ".at - " + int_text(text.len()) + ", " + r + ".at) != " + js_string(text) } else { "" }
+            "if __json_f64(" + r + ") != " + float_text(text) + (if integer { " or " + r + ".kl != 0" + exact } else { "" }) + " { __json_fail(" + r + ", " + expected + "); };"
+        }
+        return "let " + ok + " = " + r + ".failed == 0; " + check + " __json_at(" + r + ", " + ok + ", " + where + ");"
+    }
     // An object: one pass over its fields, matching the ones the pattern names.
-    let more = fresh_name(prefix, "more");
-    let arms = "";
-    let required = "";
-    let f = pat_first[p];
+    let more = fresh_name(prefix, "more")
+    let arms = ""
+    let required = ""
+    let f = pat_first[p]
     while (f >= 0) {
-        let key = word_text(pat_key[f]);
-        let seen = fresh_name(prefix, "seen");
-        let read = read_pattern(f, if path.len() > 0 { path + "." + key; } else { key; }, r, prefix);
-        jm_declare.push(intern_text("let " + seen + " = false;"));
-        arms = arms + "if __json_is(" + r + ", " + name_ref(key) + ") { " + read + " " + seen + " = true; } else ";
+        let key = word_text(pat_key[f])
+        let seen = fresh_name(prefix, "seen")
+        let read = read_pattern(f, if path.len() > 0 { path + "." + key } else { key }, r, prefix)
+        jm_declare.push(intern_text("let " + seen + " = false;"))
+        arms = arms + "if __json_is(" + r + ", " + name_ref(key) + ") { " + read + " " + seen + " = true; } else "
         if not pattern_optional(f) {
-            required = required + "if not " + seen + " { if " + r + ".failed == 0 { " + r + ".where = " + where + "; }; __json_missing(" + r + ", " + js_string(key) + "); }; ";
-        };
-        f = pat_next[f];
-    };
-    let ok = fresh_name(prefix, "ok");
+            required = required + "if not " + seen + " { if " + r + ".failed == 0 { " + r + ".where = " + where + "; }; __json_missing(" + r + ", " + js_string(key) + "); }; "
+        }
+        f = pat_next[f]
+    }
+    let ok = fresh_name(prefix, "ok")
     "let " + ok + " = " + r + ".failed == 0; __json_open(" + r + ", 123, \"expected an object\"); __json_at(" + r + ", " + ok + ", " + where + ");\n        let " + more + " = __json_first(" + r
-        + ", 125);\n        while (" + more + ") { __json_span(" + r + "); __json_colon(" + r + "); " + arms + "{ __json_skip(" + r + "); }; " + more + " = __json_next(" + r + ", 125); };\n        " + required;
+        + ", 125);\n        while (" + more + ") { __json_span(" + r + "); __json_colon(" + r + "); " + arms + "{ __json_skip(" + r + "); }; " + more + " = __json_next(" + r + ", 125); };\n        " + required
 }
 
 /// A JSON number as a utu F64 literal: `3` is `3.0`, `1e5` is `1.0e5`.
 fn float_text(text: Str) Str {
-    if text_index(text, ".", 0) >= 0 { return text; };
-    let e = text_index(text, "e", 0);
-    if e < 0 { e = text_index(text, "E", 0); };
-    if e < 0 { return text + ".0"; };
-    text.slice(0, e) + ".0" + text.slice(e, text.len());
+    if text_index(text, ".", 0) >= 0 { return text }
+    let e = text_index(text, "e", 0)
+    if e < 0 { e = text_index(text, "E", 0) }
+    if e < 0 { return text + ".0" }
+    text.slice(0, e) + ".0" + text.slice(e, text.len())
 }

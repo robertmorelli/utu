@@ -1,7 +1,7 @@
-using List[Work] |work| from std:List;
-using Browser from std:Browser;
-using theme from "../theme.utu";
-using NumberField from std:NumberField;
+using List[Work] |work| from std:List
+using Browser from std:Browser
+using theme from "../theme.utu"
+using NumberField from std:NumberField
 struct Work:
 | id: Str
 | title: Str
@@ -13,7 +13,7 @@ struct Draft:
 fn studio_form(state: StudioState) Browser.HTMLElement {
     let draft=Draft {
         title:""
-    };
+    }
     @wutu/\
     @island "studio-form";
     form.panel {
@@ -41,7 +41,7 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
             };
         }
     }
-    \/;
+    \/
 }
 fn workspace(state: StudioState) Browser.HTMLElement {
     @wutu/\
@@ -83,7 +83,7 @@ fn workspace(state: StudioState) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 export main() void {
     let state = @stored/\
@@ -104,7 +104,7 @@ export main() void {
             }
             ]
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @style theme.sheet();
@@ -145,6 +145,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

@@ -8,55 +8,55 @@ mod Buffer[T] {
         | length: I32
 
     fn &.new() & {
-        &{ values: [], length: 0 };
+        &{ values: [], length: 0 }
     }
 
     fn &.push |self| (value: T) void {
         if self.length == self.values.len() {
-            if checks() and self.length > 536870911 { fatal; };
-            let capacity = if self.length == 0 { 8; } else { self.length * 2; };
-            let grown = Array[T].new(capacity, value);
-            grown.copy_from(0, self.values, 0, self.length);
-            self.values = grown;
-        };
-        self.values[self.length] = value;
-        self.length += 1;
+            if checks() and self.length > 536870911 { fatal }
+            let capacity = if self.length == 0 { 8 } else { self.length * 2 }
+            let grown = Array[T].new(capacity, value)
+            grown.copy_from(0, self.values, 0, self.length)
+            self.values = grown
+        }
+        self.values[self.length] = value
+        self.length += 1
     }
 
-    fn &.len |self| () I32 { self.length; }
+    fn &.len |self| () I32 { self.length }
 
-    fn &.is_empty |self| () Bool { self.length == 0; }
+    fn &.is_empty |self| () Bool { self.length == 0 }
 
     // b[i] and b[i] = v.
     fn &.get_index |self| (i: I32) T {
-        if checks() and (i < 0 or i >= self.length) { fatal; };
-        self.values[i];
+        if checks() and (i < 0 or i >= self.length) { fatal }
+        self.values[i]
     }
 
     fn &.set_index |self| (i: I32, value: T) void {
-        if checks() and (i < 0 or i >= self.length) { fatal; };
-        self.values[i] = value;
+        if checks() and (i < 0 or i >= self.length) { fatal }
+        self.values[i] = value
     }
 
     // The last value, removed.
     fn &.pop |self| () T {
-        if checks() and self.length == 0 { fatal; };
-        self.length -= 1;
-        self.values[self.length];
+        if checks() and self.length == 0 { fatal }
+        self.length -= 1
+        self.values[self.length]
     }
 
-    fn &.clear |self| () void { self.length = 0; }
+    fn &.clear |self| () void { self.length = 0 }
 
     // Keeps the first `length` values.
     fn &.truncate |self| (length: I32) void {
-        if checks() and (length < 0 or length > self.length) { fatal; };
-        self.length = length;
+        if checks() and (length < 0 or length > self.length) { fatal }
+        self.length = length
     }
 
     // Whether the build is --safe.
-    fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
+    fn checks() Bool { @ir/\ <ir-safe-checks/> \/ }
 
     fn &.finish |self| () Array[T] {
-        self.values.slice(0, self.length);
+        self.values.slice(0, self.length)
     }
 }

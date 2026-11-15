@@ -27,58 +27,58 @@ enum(U8) Narrow:
     | I16
 
 /// The word id of a narrow integer type's name.
-fn narrow_word(n: Narrow) I32 { Kw.count() + n.i32(); }
+fn narrow_word(n: Narrow) I32 { Kw.count() + n.i32() }
 
 /// The program's own files: checked whole, reached or not.
-fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.i32() or file_role[file] == FileRole.Import.i32(); }
+fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.i32() or file_role[file] == FileRole.Import.i32() }
 
 /// By file: 1 for the standard library's (the host says which).
-vec file_std: I32;
+vec file_std: I32
 /// A file's first byte in `src`. The `file_*` vecs are rows by file id.
-vec file_start: I32;
+vec file_start: I32
 /// The end byte after its last.
-vec file_end: I32;
+vec file_end: I32
 /// Its @FileRole.
-vec file_role: U8;
+vec file_role: U8
 /// First token.
-vec file_tok: I32;
+vec file_tok: I32
 /// After its last (End or Error).
-vec file_tok_end: I32;
+vec file_tok_end: I32
 /// Its source file node, or -1 until it parses.
-vec file_root: I32;
+vec file_root: I32
 /// The token its parse error is at, or -1.
-vec file_error: I32;
+vec file_error: I32
 /// And the word of what the parser wanted there, or -1.
-vec file_wanted: I32;
+vec file_wanted: I32
 
 // `using M from "…"`, in the order files are parsed.
 /// The file that imports.
-vec import_file: I32;
+vec import_file: I32
 /// The using declaration.
-vec import_node: I32;
+vec import_node: I32
 /// The node naming the file (a string or platform path).
-vec import_path: I32;
+vec import_path: I32
 /// The file it names, once the host binds it, else -1 (-2: host declarations).
-vec import_target: I32;
+vec import_target: I32
 /// The import the host could not read, which ends the build (as in stage
 /// 0), or -1; why (0: no file, 1: it closes an import cycle, 2: no such
 /// platform module); and the path the host looked for, a span of `src`.
-vec missing_import: I32 = [-1];
-vec missing_why: I32 = [0];
-vec missing_start: I32 = [0];
-vec missing_end: I32 = [0];
+vec missing_import: I32 = [-1]
+vec missing_why: I32 = [0]
+vec missing_start: I32 = [0]
+vec missing_end: I32 = [0]
 
 /// What the host sealed (see @seal) besides host declarations:
 /// the standard library's prelude, parsed. Its words, tokens, nodes, files,
 /// imports, and DSL sites are the first of each, by count.
-vec kept: I32 = [0, 0, 0, 0, 0, 0];
+vec kept: I32 = [0, 0, 0, 0, 0, 0]
 
 /// Keep nothing for the programs that follow.
 fn unseal() void {
-    abi_kept[0] = 0;
-    for (0 ..< kept.len()) |k| { kept[k] = 0; };
-    kept_reactive[0] = -1;
-    known_kept[0] = 0;
+    abi_kept[0] = 0
+    for (0 ..< kept.len()) |k| { kept[k] = 0 }
+    kept_reactive[0] = -1
+    known_kept[0] = 0
 }
 
 /// Forget every file, and start a program. What the host has sealed stays,
@@ -86,207 +86,207 @@ fn unseal() void {
 /// documents at the same offsets, so their indexes still hold; the prelude's
 /// files are the same tokens and nodes, its words the same ids.
 fn reset_program() void {
-    missing_import[0] = -1;
+    missing_import[0] = -1
     if abi_kept[0] > 0 {
-        for (0 ..< view_import.len()) |v| { view_import[v] = -1; };
+        for (0 ..< view_import.len()) |v| { view_import[v] = -1 }
     } else {
-        reset_abi();
-    };
-    dsl_failed.clear();
-    jp_serial[0] = 0;
-    jp_prev_container.clear();
-    jp_prev_names.clear();
-    jp_pin_word.clear();
-    jp_pin_name.clear();
-    st_serial[0] = 0;
-    dsl_cursor[0] = -1;
-    splice_start.clear();
-    splice_end.clear();
-    splice_code.clear();
-    splice_from.clear();
-    splice_to.clear();
-    splice_rename_k.clear();
-    splice_rename_at.clear();
-    splice_rename_to.clear();
-    wu_serial[0] = 0;
-    dsl_file_site.clear();
-    reset_wat();
-    if kept[0] > 0 { intern_kept(); } else {
-        intern_keywords();
-        for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow(k))); };
-    };
-    tokens_room(kept[1]);
-    let nodes = kept[2];
-    node_kind.resize(nodes);
-    node_first.resize(nodes);
-    node_last.resize(nodes);
-    node_child.resize(nodes);
-    node_next.resize(nodes);
+        reset_abi()
+    }
+    dsl_failed.clear()
+    jp_serial[0] = 0
+    jp_prev_container.clear()
+    jp_prev_names.clear()
+    jp_pin_word.clear()
+    jp_pin_name.clear()
+    st_serial[0] = 0
+    dsl_cursor[0] = -1
+    splice_start.clear()
+    splice_end.clear()
+    splice_code.clear()
+    splice_from.clear()
+    splice_to.clear()
+    splice_rename_k.clear()
+    splice_rename_at.clear()
+    splice_rename_to.clear()
+    wu_serial[0] = 0
+    dsl_file_site.clear()
+    reset_wat()
+    if kept[0] > 0 { intern_kept() } else {
+        intern_keywords()
+        for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow(k))) }
+    }
+    tokens_room(kept[1])
+    let nodes = kept[2]
+    node_kind.resize(nodes)
+    node_first.resize(nodes)
+    node_last.resize(nodes)
+    node_child.resize(nodes)
+    node_next.resize(nodes)
     // The kept nodes' parents are the same (nothing grafts into the prelude).
-    node_parent.resize(nodes);
-    let files = kept[3];
-    file_start.resize(files);
-    file_end.resize(files);
-    file_role.resize(files);
-    file_tok.resize(files);
-    file_tok_end.resize(files);
-    file_root.resize(files);
-    file_error.resize(files);
-    file_wanted.resize(files);
-    file_std.resize(files);
-    let imports = kept[4];
-    import_file.resize(imports);
-    import_node.resize(imports);
-    import_path.resize(imports);
-    import_target.resize(imports);
-    dsl_sites.resize(kept[5]);
-    reset_resolve();
+    node_parent.resize(nodes)
+    let files = kept[3]
+    file_start.resize(files)
+    file_end.resize(files)
+    file_role.resize(files)
+    file_tok.resize(files)
+    file_tok_end.resize(files)
+    file_root.resize(files)
+    file_error.resize(files)
+    file_wanted.resize(files)
+    file_std.resize(files)
+    let imports = kept[4]
+    import_file.resize(imports)
+    import_node.resize(imports)
+    import_path.resize(imports)
+    import_target.resize(imports)
+    dsl_sites.resize(kept[5])
+    reset_resolve()
     // Words are interned anew for each program; kept views spell theirs again.
     if abi_kept[0] > 0 {
         for (0 ..< view_prefix.len()) |v| {
-            let p = jget(view_json[v], "prefix");
-            view_prefix[v] = if p >= 0 { jstring_word(p); } else { -1; };
-        };
-    };
+            let p = jget(view_json[v], "prefix")
+            view_prefix[v] = if p >= 0 { jstring_word(p) } else { -1 }
+        }
+    }
 }
 
 /// The kept words again, and only those: interned anew in order, each is
 /// its old id (the keywords first, as @intern_keywords made them).
 fn intern_kept() void {
-    let n = kept[0];
-    let starts = Array[I32].new(n, 0);
-    let ends = Array[I32].new(n, 0);
+    let n = kept[0]
+    let starts = Array[I32].new(n, 0)
+    let ends = Array[I32].new(n, 0)
     for (0 ..< n) |w| {
-        starts[w] = src.interned_start(w);
-        ends[w] = starts[w] + src.interned_size(w);
-    };
-    src.resize(abi_kept[0]);
-    src.intern_reset();
-    for (0 ..< n) |w| { src.intern(starts[w], ends[w]); };
+        starts[w] = src.interned_start(w)
+        ends[w] = starts[w] + src.interned_size(w)
+    }
+    src.resize(abi_kept[0])
+    src.intern_reset()
+    for (0 ..< n) |w| { src.intern(starts[w], ends[w]) }
 }
 
 /// A node noted by word, in one of four slots, -1 none: scratch for a walk
 /// that finds each name's first (cleared after it, by the walk).
-vec word_notes: I32;
+vec word_notes: I32
 
 fn word_note(word: I32, slot: I32) I32 {
-    let i = word * 4 + slot;
-    if word >= 0 and i < word_notes.len() { word_notes[i]; } else { -1; };
+    let i = word * 4 + slot
+    if word >= 0 and i < word_notes.len() { word_notes[i] } else { -1 }
 }
 
 fn set_word_note(word: I32, slot: I32, node: I32) void {
-    if word < 0 { return; };
-    let i = word * 4 + slot;
-    while (word_notes.len() <= i) { word_notes.push(-1); };
-    word_notes[i] = node;
+    if word < 0 { return }
+    let i = word * 4 + slot
+    while (word_notes.len() <= i) { word_notes.push(-1) }
+    word_notes[i] = node
 }
 
 /// Intern a name that is not in any file (pushed onto `src`).
 fn intern_text(text: Str) I32 {
-    let start = src.len();
-    let before = src.interned();
-    gen_text_utf8(text);
-    let id = src.intern(start, src.len());
+    let start = src.len()
+    let before = src.interned()
+    gen_text_utf8(text)
+    let id = src.intern(start, src.len())
     // Already interned: its bytes are elsewhere.
-    if id < before { src.resize(start); };
-    id;
+    if id < before { src.resize(start) }
+    id
 }
 
 /// Room for a file of `n` bytes, which the host then writes at @file_start.
 fn add_file(n: I32, role: FileRole) I32 {
-    let file = file_start.len();
-    let start = src.len();
-    src.resize(start + n + 1);
-    src[start + n] = end_byte;
-    file_start.push(start);
-    file_end.push(start + n);
-    file_role.push(role.i32());
-    file_tok.push(tok_kind.len());
-    file_tok_end.push(tok_kind.len());
-    file_root.push(-1);
-    file_error.push(-1);
-    file_wanted.push(-1);
-    file_std.push(0);
-    file;
+    let file = file_start.len()
+    let start = src.len()
+    src.resize(start + n + 1)
+    src[start + n] = end_byte
+    file_start.push(start)
+    file_end.push(start + n)
+    file_role.push(role.i32())
+    file_tok.push(tok_kind.len())
+    file_tok_end.push(tok_kind.len())
+    file_root.push(-1)
+    file_error.push(-1)
+    file_wanted.push(-1)
+    file_std.push(0)
+    file
 }
 
 /// Lex and parse a file the host has written, and list its imports. Returns
 /// its source file node, or -1 when it does not lex or parse.
 fn parse_file(file: I32) I32 {
-    let first = tok_kind.len();
-    file_tok[file] = first;
-    let last = lex(file_start[file], file_end[file]);
-    file_tok_end[file] = last;
-    let root = parse(first, last);
-    file_root[file] = root;
-    if root >= 0 { list_imports(file, root); } else {
-        file_error[file] = parse_error_at[0];
-        file_wanted[file] = parse_error_wanted[0];
-    };
-    root;
+    let first = tok_kind.len()
+    file_tok[file] = first
+    let last = lex(file_start[file], file_end[file])
+    file_tok_end[file] = last
+    let root = parse(first, last)
+    file_root[file] = root
+    if root >= 0 { list_imports(file, root) } else {
+        file_error[file] = parse_error_at[0]
+        file_wanted[file] = parse_error_wanted[0]
+    }
+    root
 }
 
 fn list_imports(file: I32, root: I32) void {
-    let item = node_child[root];
+    let item = node_child[root]
     while (item >= 0) {
         if node_kind[item] == Node.Using_decl.i32() {
-            let path = last_child(item);
-            let kind = node_kind[path];
+            let path = last_child(item)
+            let kind = node_kind[path]
             if kind == Node.String_lit.i32() or kind == Node.Platform_path.i32() {
-                import_file.push(file);
-                import_node.push(item);
-                import_path.push(path);
-                import_target.push(-1);
-            };
-        };
-        item = node_next[item];
-    };
+                import_file.push(file)
+                import_node.push(item)
+                import_path.push(path)
+                import_target.push(-1)
+            }
+        }
+        item = node_next[item]
+    }
 }
 
 /// The file a token is in: the one whose bytes it is (a DSL's expansion
 /// re-reads utu written in a file, after other files' tokens).
 fn file_of_token(t: I32) I32 {
-    let at = tok_start[t];
-    let lo = 0;
-    let hi = file_start.len() - 1;
+    let at = tok_start[t]
+    let lo = 0
+    let hi = file_start.len() - 1
     while (lo < hi) {
-        let mid = (lo + hi + 1) / 2;
-        if file_start[mid] <= at { lo = mid; } else { hi = mid - 1; };
-    };
-    lo;
+        let mid = (lo + hi + 1) / 2
+        if file_start[mid] <= at { lo = mid } else { hi = mid - 1 }
+    }
+    lo
 }
 
 //! = Tree helpers
 
 /// The number of a node's children (0 for no node).
 fn child_count(node: I32) I32 {
-    if node < 0 { return 0; };
-    let n = 0;
-    let c = first_child(node);
+    if node < 0 { return 0 }
+    let n = 0
+    let c = first_child(node)
     while (c >= 0) {
-        n += 1;
-        c = next_sibling(c);
-    };
-    n;
+        n += 1
+        c = next_sibling(c)
+    }
+    n
 }
 
 /// A compiled program's tree has no comments (see @attach_comments), so a
 /// node's children are its children.
 fn last_child(node: I32) I32 {
-    let c = node_child[node];
-    let last = -1;
+    let c = node_child[node]
+    let last = -1
     while (c >= 0) {
-        last = c;
-        c = node_next[c];
-    };
-    last;
+        last = c
+        c = node_next[c]
+    }
+    last
 }
 
-fn first_child(node: I32) I32 { node_child[node]; }
+fn first_child(node: I32) I32 { node_child[node] }
 
-fn next_sibling(node: I32) I32 { node_next[node]; }
+fn next_sibling(node: I32) I32 { node_next[node] }
 
-fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.i32(); }
+fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.i32() }
 
 /// The word id of a node that is one word (an identifier, a type name), else -1.
-fn word_of(node: I32) I32 { tok_word[node_first[node]]; }
+fn word_of(node: I32) I32 { tok_word[node_first[node]] }

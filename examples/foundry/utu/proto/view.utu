@@ -1,5 +1,5 @@
-using Browser from std:Browser;
-using sim from "../sim.utu";
+using Browser from std:Browser
+using sim from "../sim.utu"
 
 mod view {
     struct Ui:
@@ -25,7 +25,7 @@ mod view {
                 on click { ui.speed = 1; }
             }
         }
-        \/;
+        \/
     }
 
     fn panel(ui: Ui) Browser.HTMLElement {
@@ -46,6 +46,6 @@ mod view {
                 p.muted { "Select a machine."; }
             }
         }
-        \/;
+        \/
     }
 }

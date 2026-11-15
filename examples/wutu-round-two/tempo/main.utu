@@ -1,12 +1,12 @@
-using Browser from std:Browser;
-using theme from "../theme.utu";
-using NumberField from std:NumberField;
+using Browser from std:Browser
+using theme from "../theme.utu"
+using NumberField from std:NumberField
 struct TempoState:
 | duration: I32
 | remaining: I32
 | running: Bool
 fn valid_tempo(state: TempoState) Bool {
-    state.duration >= 15 and state.duration <= 3600 and state.remaining >= 0 and state.remaining <= state.duration;
+    state.duration >= 15 and state.duration <= 3600 and state.remaining >= 0 and state.remaining <= state.duration
 }
 fn workspace(state: TempoState) Browser.HTMLElement {
     @wutu/\
@@ -104,7 +104,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
             "About this timer";
         }
     }
-    \/;
+    \/
 }
 export main() void {
     let state = @stored/\
@@ -114,7 +114,7 @@ export main() void {
             remaining:60,
             running:false
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @style theme.sheet();
@@ -171,6 +171,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

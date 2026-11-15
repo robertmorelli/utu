@@ -44,6 +44,6 @@ mod theme {
             @media print { nav,form,button,footer { display: none; } }
             @supports (container-type: inline-size) { .workspace { container-type: inline-size; } }
         }
-        \/;
+        \/
     }
 }

@@ -25,219 +25,219 @@ enum(U8) Ty:
     | Foreign   // a host value (foreign.utu); a: its canonical spelling, a word
 
 /// By type: its @Ty, then its operands in @ty_a and @ty_b. One id per triple.
-vec ty_kind: U8;
-vec ty_a: I32;
-vec ty_b: I32;
+vec ty_kind: U8
+vec ty_a: I32
+vec ty_b: I32
 /// Open addressing over types, -1 empty.
-vec ty_table: I32;
+vec ty_table: I32
 
-vec inst_module: I32;
+vec inst_module: I32
 /// A list of types.
-vec inst_args: I32;
-vec inst_table: I32;
+vec inst_args: I32
+vec inst_table: I32
 
-fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 40503; }
+fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 40503 }
 
 /// The type of this kind and these operands, interned: the same arguments
 /// give the same id.
 fn ty(kind: Ty, a: I32, b: I32) I32 {
-    if (ty_kind.len() + 1) * 2 > ty_table.len() { ty_grow(); };
-    let mask = ty_table.len() - 1;
-    let k = kind.i32();
-    let h = ty_hash(k, a, b) & mask;
+    if (ty_kind.len() + 1) * 2 > ty_table.len() { ty_grow() }
+    let mask = ty_table.len() - 1
+    let k = kind.i32()
+    let h = ty_hash(k, a, b) & mask
     while (ty_table[h] >= 0) {
-        let t = ty_table[h];
-        if ty_kind[t] == k and ty_a[t] == a and ty_b[t] == b { return t; };
-        h = (h + 1) & mask;
-    };
-    let id = ty_kind.len();
-    ty_kind.push(k);
-    ty_a.push(a);
-    ty_b.push(b);
-    ty_table[h] = id;
-    id;
+        let t = ty_table[h]
+        if ty_kind[t] == k and ty_a[t] == a and ty_b[t] == b { return t }
+        h = (h + 1) & mask
+    }
+    let id = ty_kind.len()
+    ty_kind.push(k)
+    ty_a.push(a)
+    ty_b.push(b)
+    ty_table[h] = id
+    id
 }
 
 fn ty_grow() void {
-    let n = if ty_table.len() == 0 { 256; } else { ty_table.len() * 2; };
-    ty_table.resize(n);
-    for (0 ..< n) |i| { ty_table[i] = -1; };
-    let mask = n - 1;
+    let n = if ty_table.len() == 0 { 256 } else { ty_table.len() * 2 }
+    ty_table.resize(n)
+    for (0 ..< n) |i| { ty_table[i] = -1 }
+    let mask = n - 1
     for (0 ..< ty_kind.len()) |t| {
-        let h = ty_hash(ty_kind[t], ty_a[t], ty_b[t]) & mask;
-        while (ty_table[h] >= 0) { h = (h + 1) & mask; };
-        ty_table[h] = t;
-    };
+        let h = ty_hash(ty_kind[t], ty_a[t], ty_b[t]) & mask
+        while (ty_table[h] >= 0) { h = (h + 1) & mask }
+        ty_table[h] = t
+    }
 }
 
-fn ty_is(t: I32, kind: Ty) Bool { ty_kind[t] == kind.i32(); }
+fn ty_is(t: I32, kind: Ty) Bool { ty_kind[t] == kind.i32() }
 
-fn named(decl: I32, inst: I32) I32 { ty(Ty.Named, decl, inst); }
+fn named(decl: I32, inst: I32) I32 { ty(Ty.Named, decl, inst) }
 
 /// `?t`. A type already nullable, or the error type, is its own.
-fn nullable(t: I32) I32 { if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { t; } else { ty(Ty.Nullable, t, 0); }; }
+fn nullable(t: I32) I32 { if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { t } else { ty(Ty.Nullable, t, 0) } }
 
-fn ty_error() I32 { ty(Ty.Error, 0, 0); }
+fn ty_error() I32 { ty(Ty.Error, 0, 0) }
 
 /// Whether a type is, or is made of, the error type (`Array[I32Z]`): a mistake already reported.
 fn ty_has_error(t: I32) Bool {
-    if t < 0 { return false; };
-    if ty_is(t, Ty.Error) { return true; };
-    if ty_is(t, Ty.Nullable) { return ty_has_error(ty_a[t]); };
+    if t < 0 { return false }
+    if ty_is(t, Ty.Error) { return true }
+    if ty_is(t, Ty.Nullable) { return ty_has_error(ty_a[t]) }
     if ty_is(t, Ty.Tuple) or ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure) {
-        let list = ty_a[t];
-        for (0 ..< vl_len[list]) |i| { if ty_has_error(vl_item(list, i)) { return true; }; };
-        return if ty_is(t, Ty.Tuple) { false; } else { ty_has_error(ty_b[t]); };
-    };
+        let list = ty_a[t]
+        for (0 ..< vl_len[list]) |i| { if ty_has_error(vl_item(list, i)) { return true } }
+        return if ty_is(t, Ty.Tuple) { false } else { ty_has_error(ty_b[t]) }
+    }
     if ty_is(t, Ty.Named) and ty_b[t] > 0 {
-        let list = inst_args[ty_b[t]];
-        for (0 ..< vl_len[list]) |i| { if ty_has_error(vl_item(list, i)) { return true; }; };
-    };
-    false;
+        let list = inst_args[ty_b[t]]
+        for (0 ..< vl_len[list]) |i| { if ty_has_error(vl_item(list, i)) { return true } }
+    }
+    false
 }
 
-fn ty_void() I32 { ty(Ty.Void, 0, 0); }
+fn ty_void() I32 { ty(Ty.Void, 0, 0) }
 
-fn ty_never() I32 { ty(Ty.Never, 0, 0); }
+fn ty_never() I32 { ty(Ty.Never, 0, 0) }
 
-fn ty_null() I32 { ty(Ty.Null, 0, 0); }
+fn ty_null() I32 { ty(Ty.Null, 0, 0) }
 
 /// The declaration of a named type, or -1.
-fn ty_decl(t: I32) I32 { if ty_is(t, Ty.Named) { ty_a[t]; } else { -1; }; }
+fn ty_decl(t: I32) I32 { if ty_is(t, Ty.Named) { ty_a[t] } else { -1 } }
 
 /// The instance of a named type; 0 for any other type.
-fn ty_inst(t: I32) I32 { if ty_is(t, Ty.Named) { ty_b[t]; } else { 0; }; }
+fn ty_inst(t: I32) I32 { if ty_is(t, Ty.Named) { ty_b[t] } else { 0 } }
 
 //! = Instances
 
-fn inst_hash(module: I32, args: I32) I32 { (module * -1640531535) ^ (args * 40503); }
+fn inst_hash(module: I32, args: I32) I32 { (module * -1640531535) ^ (args * 40503) }
 
 /// The instance of `module` with type arguments `args` (a list of types),
 /// interned.
 fn instance(module: I32, args: I32) I32 {
-    let site = inst_here[0];
-    inst_here[0] = -1;
-    if (inst_module.len() + 1) * 2 > inst_table.len() { inst_grow(); };
-    let mask = inst_table.len() - 1;
-    let h = inst_hash(module, args) & mask;
+    let site = inst_here[0]
+    inst_here[0] = -1
+    if (inst_module.len() + 1) * 2 > inst_table.len() { inst_grow() }
+    let mask = inst_table.len() - 1
+    let h = inst_hash(module, args) & mask
     while (inst_table[h] >= 0) {
-        let i = inst_table[h];
-        if inst_module[i] == module and inst_args[i] == args { return i; };
-        h = (h + 1) & mask;
-    };
-    let id = inst_module.len();
-    inst_module.push(module);
-    inst_args.push(args);
-    inst_site.push(site);
-    inst_table[h] = id;
-    let depth = 0;
-    for (0 ..< vl_len[args]) |i| { depth = max_i32(depth, type_depth(vl_item(args, i))); };
-    inst_depth.push(depth + 1);
-    inst_bad.push(if stream_of_promise(module, args) { 1; } else { 0; });
-    id;
+        let i = inst_table[h]
+        if inst_module[i] == module and inst_args[i] == args { return i }
+        h = (h + 1) & mask
+    }
+    let id = inst_module.len()
+    inst_module.push(module)
+    inst_args.push(args)
+    inst_site.push(site)
+    inst_table[h] = id
+    let depth = 0
+    for (0 ..< vl_len[args]) |i| { depth = max_i32(depth, type_depth(vl_item(args, i))) }
+    inst_depth.push(depth + 1)
+    inst_bad.push(if stream_of_promise(module, args) { 1 } else { 0 })
+    id
 }
 
 /// By instance: 1 when its type arguments are wrong in a way @too_deep
 /// reports where it is first written (see @stream_of_promise), 2 once reported.
-vec inst_bad: I32;
+vec inst_bad: I32
 
 /// `Stream[Promise[T]]` or `Stream[?Promise[T]]`: a stream is a JS async
 /// generator, whose `yield` awaits a promise, so its values are never promises.
 fn stream_of_promise(module: I32, args: I32) Bool {
-    if module < 0 or vl_len[args] != 1 or decl_name[module] != intern_text("Stream") or not from_std(decl_node[module]) { return false; };
-    let t = vl_item(args, 0);
-    if ty_is(t, Ty.Nullable) { t = ty_a[t]; };
-    ty_is(t, Ty.Named) and is_promise_type(t);
+    if module < 0 or vl_len[args] != 1 or decl_name[module] != intern_text("Stream") or not from_std(decl_node[module]) { return false }
+    let t = vl_item(args, 0)
+    if ty_is(t, Ty.Nullable) { t = ty_a[t] }
+    ty_is(t, Ty.Named) and is_promise_type(t)
 }
 
 /// By instance: the `[U32]` of where it was first written (`G[U32]`), or -1.
-vec inst_site: I32;
+vec inst_site: I32
 /// The type arguments @type_args last read, for @instance to keep as its site.
-vec inst_here: I32 = [-1];
+vec inst_here: I32 = [-1]
 
 /// By instance: how deep its type arguments nest instances (`m[Array[I32]]` is 2).
-vec inst_depth: I32;
+vec inst_depth: I32
 
 /// How deeply instances nest in a type.
 fn type_depth(t: I32) I32 {
-    let kind = ty_kind[t];
-    if kind == Ty.Named.i32() { return if ty_b[t] > 0 { inst_depth[ty_b[t]]; } else { 0; }; };
-    if kind == Ty.Nullable.i32() { return type_depth(ty_a[t]); };
-    let depth = 0;
+    let kind = ty_kind[t]
+    if kind == Ty.Named.i32() { return if ty_b[t] > 0 { inst_depth[ty_b[t]] } else { 0 } }
+    if kind == Ty.Nullable.i32() { return type_depth(ty_a[t]) }
+    let depth = 0
     if kind == Ty.Tuple.i32() or kind == Ty.Fun.i32() or kind == Ty.Closure.i32() {
-        for (0 ..< vl_len[ty_a[t]]) |i| { depth = max_i32(depth, type_depth(vl_item(ty_a[t], i))); };
-    };
-    if kind == Ty.Fun.i32() or kind == Ty.Closure.i32() { depth = max_i32(depth, type_depth(ty_b[t])); };
-    depth;
+        for (0 ..< vl_len[ty_a[t]]) |i| { depth = max_i32(depth, type_depth(vl_item(ty_a[t], i))) }
+    }
+    if kind == Ty.Fun.i32() or kind == Ty.Closure.i32() { depth = max_i32(depth, type_depth(ty_b[t])) }
+    depth
 }
 
-fn max_i32(a: I32, b: I32) I32 { if a > b { a; } else { b; }; }
+fn max_i32(a: I32, b: I32) I32 { if a > b { a } else { b } }
 
 /// The deepest instances nest (a generic module that instantiates itself
 /// with a bigger type each time would go on without end).
-let inst_depth_max: I32 = 64;
+let inst_depth_max: I32 = 64
 
 /// Whether instance `inst` nests too deeply, which is reported at `node`
 /// (its module's name the word) where it first does; or is otherwise wrong
 /// (@inst_bad).
 fn too_deep(inst: I32, node: I32) Bool {
     if inst_bad[inst] > 0 {
-        if inst_bad[inst] == 1 { report2(Diag.StreamPromise, node, -1, inst_arg(inst, 0), -1); };
-        inst_bad[inst] = 2;
-        return true;
-    };
-    if inst_depth[inst] <= inst_depth_max { return false; };
-    if inst_depth[inst] == inst_depth_max + 1 { report2(Diag.InstanceDepth, node, decl_name[inst_module[inst]], inst_depth_max, -1); };
-    true;
+        if inst_bad[inst] == 1 { report2(Diag.StreamPromise, node, -1, inst_arg(inst, 0), -1) }
+        inst_bad[inst] = 2
+        return true
+    }
+    if inst_depth[inst] <= inst_depth_max { return false }
+    if inst_depth[inst] == inst_depth_max + 1 { report2(Diag.InstanceDepth, node, decl_name[inst_module[inst]], inst_depth_max, -1) }
+    true
 }
 
 fn inst_grow() void {
-    let n = if inst_table.len() == 0 { 64; } else { inst_table.len() * 2; };
-    inst_table.resize(n);
-    for (0 ..< n) |i| { inst_table[i] = -1; };
-    let mask = n - 1;
+    let n = if inst_table.len() == 0 { 64 } else { inst_table.len() * 2 }
+    inst_table.resize(n)
+    for (0 ..< n) |i| { inst_table[i] = -1 }
+    let mask = n - 1
     for (0 ..< inst_module.len()) |i| {
-        let h = inst_hash(inst_module[i], inst_args[i]) & mask;
-        while (inst_table[h] >= 0) { h = (h + 1) & mask; };
-        inst_table[h] = i;
-    };
+        let h = inst_hash(inst_module[i], inst_args[i]) & mask
+        while (inst_table[h] >= 0) { h = (h + 1) & mask }
+        inst_table[h] = i
+    }
 }
 
 /// Type argument i of an instance.
-fn inst_arg(inst: I32, i: I32) I32 { vl_item(inst_args[inst], i); }
+fn inst_arg(inst: I32, i: I32) I32 { vl_item(inst_args[inst], i) }
 
 /// The module a declaration belongs to (itself for a module), or -1.
 fn module_of(decl: I32) I32 {
-    let d = decl;
-    while (d >= 0 and not decl_is(d, Decl.Module)) { d = decl_owner[d]; };
-    d;
+    let d = decl
+    while (d >= 0 and not decl_is(d, Decl.Module)) { d = decl_owner[d] }
+    d
 }
 
 /// How many type parameters a module has.
 fn module_arity(module: I32) I32 {
-    let list = next_sibling(first_child(decl_node[module]));
-    if not is_kind(list, Node.Module_type_param_list) { return 0; };
-    let n = 0;
-    let p = first_child(list);
+    let list = next_sibling(first_child(decl_node[module]))
+    if not is_kind(list, Node.Module_type_param_list) { return 0 }
+    let n = 0
+    let p = first_child(list)
     while (p >= 0) {
-        n += 1;
-        p = next_sibling(p);
-    };
-    n;
+        n += 1
+        p = next_sibling(p)
+    }
+    n
 }
 
 /// Whether a module has type parameters.
 fn is_generic(module: I32) Bool {
-    module >= 0 and is_kind(next_sibling(first_child(decl_node[module])), Node.Module_type_param_list);
+    module >= 0 and is_kind(next_sibling(first_child(decl_node[module])), Node.Module_type_param_list)
 }
 
 /// The instance a declaration of `module` is seen in from code in instance
 /// `inst`: that instance when the code is in the same module, none when
 /// the module is not generic, else an instance opened by `using M[A];`.
 fn instance_for(module: I32, inst: I32) I32 {
-    if not is_generic(module) { return 0; };
-    if inst > 0 and inst_module[inst] == module { return inst; };
-    open_instance(module);
+    if not is_generic(module) { return 0 }
+    if inst > 0 and inst_module[inst] == module { return inst }
+    open_instance(module)
 }
 
 //! = Prelude types
@@ -246,7 +246,7 @@ fn instance_for(module: I32, inst: I32) I32 {
 //! when checking starts.
 
 /// By Prelude.
-vec prelude_ty: I32;
+vec prelude_ty: I32
 
 /// The types every program has, found by name in the program scope when
 /// checking starts (@find_prelude_types).
@@ -267,178 +267,178 @@ enum(U8) Prelude:
     | I31
 
 /// The type of a prelude name: `prelude(Prelude.Str)` is `Str`.
-fn prelude(p: Prelude) I32 { prelude_ty[p.i32()]; }
+fn prelude(p: Prelude) I32 { prelude_ty[p.i32()] }
 
 fn find_prelude_types() void {
-    prelude_ty.resize(Prelude.count());
+    prelude_ty.resize(Prelude.count())
     for (0 ..< Prelude.count()) |p| {
-        let word = intern_text(Prelude.name(Prelude(p)));
-        let decl = promoted(prelude_lookup(word));
-        prelude_ty[p] = if decl >= 0 { named(decl, 0); } else { ty_error(); };
-    };
+        let word = intern_text(Prelude.name(Prelude(p)))
+        let decl = promoted(prelude_lookup(word))
+        prelude_ty[p] = if decl >= 0 { named(decl, 0) } else { ty_error() }
+    }
 }
 
 /// Whether arithmetic takes the type: the integers, the floats, `M32`, `M64`.
 fn is_numeric(t: I32) Bool {
     t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
-        or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.M32) or t == prelude(Prelude.M64);
+        or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.M32) or t == prelude(Prelude.M64)
 }
 
-fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64); }
+fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64) }
 
 //! = Types from syntax
 
 /// The type a type node names, in instance `inst`.
 fn type_of(node: I32, inst: I32) I32 {
-    if node < 0 { return ty_error(); };
-    let kind = node_kind[node];
-    if kind == Node.Promoted_type.i32() and sig_self[0] >= 0 { return sig_self[0]; };
-    if kind == Node.Ref_type.i32() { return type_path(first_child(node), inst); };
-    if kind == Node.Type_ident.i32() or kind == Node.Promoted_type.i32() { return type_path(node, inst); };
+    if node < 0 { return ty_error() }
+    let kind = node_kind[node]
+    if kind == Node.Promoted_type.i32() and sig_self[0] >= 0 { return sig_self[0] }
+    if kind == Node.Ref_type.i32() { return type_path(first_child(node), inst) }
+    if kind == Node.Type_ident.i32() or kind == Node.Promoted_type.i32() { return type_path(node, inst) }
     if kind == Node.Nullable_type.i32() {
         // A scalar has no null: `?Id`, `?L` for an int enum, `?T` as `I32`.
-        let t = type_of(first_child(node), inst);
-        let d = ty_decl(t);
+        let t = type_of(first_child(node), inst)
+        let d = ty_decl(t)
         if is_scalar_kind(d) or (decl_is(d, Decl.TypeDecl) and is_scalar_decl(d)) {
-            report(Diag.InvalidNullableType, node, decl_name[d]);
-            in_instance(inst);
-            return ty_error();
-        };
-        return nullable(t);
-    };
-    if kind == Node.Paren_type.i32() or kind == Node.Type_binder.i32() { return type_of(first_child(node), inst); };
-    if kind == Node.Void_type.i32() { return ty_void(); };
-    if kind == Node.Return_type.i32() { return type_of(first_child(node), inst); };
-    if kind == Node.Tuple_type.i32() { return ty(Ty.Tuple, type_args(node, inst), 0); };
+            report(Diag.InvalidNullableType, node, decl_name[d])
+            in_instance(inst)
+            return ty_error()
+        }
+        return nullable(t)
+    }
+    if kind == Node.Paren_type.i32() or kind == Node.Type_binder.i32() { return type_of(first_child(node), inst) }
+    if kind == Node.Void_type.i32() { return ty_void() }
+    if kind == Node.Return_type.i32() { return type_of(first_child(node), inst) }
+    if kind == Node.Tuple_type.i32() { return ty(Ty.Tuple, type_args(node, inst), 0) }
     if kind == Node.Func_type.i32() or kind == Node.Closure_type.i32() {
-        let m = vl_begin();
-        let c = first_child(node);
-        let result = ty_void();
+        let m = vl_begin()
+        let c = first_child(node)
+        let result = ty_void()
         while (c >= 0) {
             if is_kind(c, Node.Type_list) {
-                let t = first_child(c);
+                let t = first_child(c)
                 while (t >= 0) {
-                    vl_add(type_of(t, inst));
-                    t = next_sibling(t);
-                };
+                    vl_add(type_of(t, inst))
+                    t = next_sibling(t)
+                }
             } else {
-                result = type_of(c, inst);
-            };
-            c = next_sibling(c);
-        };
-        let params = vl_end(m);
-        return ty(if kind == Node.Func_type.i32() { Ty.Fun; } else { Ty.Closure; }, params, result);
-    };
+                result = type_of(c, inst)
+            }
+            c = next_sibling(c)
+        }
+        let params = vl_end(m)
+        return ty(if kind == Node.Func_type.i32() { Ty.Fun } else { Ty.Closure }, params, result)
+    }
     if is_kind(node, Node.Yield_type) {
-        if not reported_within(node) { report(Diag.YieldPlace, node, -1); };
-        return ty_error();
-    };
+        if not reported_within(node) { report(Diag.YieldPlace, node, -1) }
+        return ty_error()
+    }
     // Anything else not known yet.
-    if not reported_within(node) { report(Diag.Unsupported, node, -1); };
-    ty_error();
+    if not reported_within(node) { report(Diag.Unsupported, node, -1) }
+    ty_error()
 }
 
 /// While a protocol member's type is read (see @sig_type): the type `&`
 /// stands for; else -1.
-vec sig_self: I32 = [-1];
+vec sig_self: I32 = [-1]
 
 /// The type a name or path names: `T`, `&`, `M[A]`, `M.T`, `M[A].T`.
 fn type_path(node: I32, inst: I32) I32 {
-    let kind = node_kind[node];
+    let kind = node_kind[node]
     if kind == Node.Instantiated_module_ref.i32() {
-        let module = node_decl[name_node(first_child(node))];
-        if alias_given_args(first_child(node), next_sibling(first_child(node))) { return ty_error(); };
-        let decl = if decl_is(module, Decl.Module) { decl_a[module]; } else { node_decl[name_node(first_child(node))]; };
-        if decl < 0 { return ty_error(); };
-        let owner = module_of(decl);
-        let args = type_args(next_sibling(first_child(node)), inst);
+        let module = node_decl[name_node(first_child(node))]
+        if alias_given_args(first_child(node), next_sibling(first_child(node))) { return ty_error() }
+        let decl = if decl_is(module, Decl.Module) { decl_a[module] } else { node_decl[name_node(first_child(node))] }
+        if decl < 0 { return ty_error() }
+        let owner = module_of(decl)
+        let args = type_args(next_sibling(first_child(node)), inst)
         if vl_len[args] != module_arity(owner) {
-            report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[args]);
-            return ty_error();
-        };
-        let at = instance(owner, args);
-        if too_deep(at, node) { return ty_error(); };
-        return named(decl, at);
-    };
+            report2(Diag.InvalidModuleArity, node, decl_name[owner], module_arity(owner), vl_len[args])
+            return ty_error()
+        }
+        let at = instance(owner, args)
+        if too_deep(at, node) { return ty_error() }
+        return named(decl, at)
+    }
     if kind == Node.Qualified_type_ref.i32() or kind == Node.Inline_module_type_path.i32() {
-        let c = first_child(node);
+        let c = first_child(node)
         // `Browser.HTMLElement`: a type a view of host declarations names.
-        let host = if name_node(c) >= 0 { node_decl[name_node(c)]; } else { -1; };
+        let host = if name_node(c) >= 0 { node_decl[name_node(c)] } else { -1 }
         if decl_is(host, Decl.Foreign) and decl_a[host] >= 0 {
-            let t = foreign_named_type(decl_a[host], word_of(name_node(last_child(node))));
+            let t = foreign_named_type(decl_a[host], word_of(name_node(last_child(node))))
             if t < 0 {
-                report(Diag.UnknownType, node, word_of(name_node(last_child(node))));
-                return ty_error();
-            };
-            return t;
-        };
-        let member_decl = node_decl[name_node(last_child(node))];
+                report(Diag.UnknownType, node, word_of(name_node(last_child(node))))
+                return ty_error()
+            }
+            return t
+        }
+        let member_decl = node_decl[name_node(last_child(node))]
         if member_decl < 0 {
             // `E.X` where enum E has no variant X.
-            let mid = next_sibling(c);
-            if is_kind(mid, Node.Module_type_arg_list) { mid = next_sibling(mid); };
-            let e = if mid != last_child(node) { node_decl[mid]; } else if is_kind(c, Node.Module_ref) { node_decl[name_node(c)]; } else { -1; };
+            let mid = next_sibling(c)
+            if is_kind(mid, Node.Module_type_arg_list) { mid = next_sibling(mid) }
+            let e = if mid != last_child(node) { node_decl[mid] } else if is_kind(c, Node.Module_ref) { node_decl[name_node(c)] } else { -1 }
             if decl_is(e, Decl.Enum) and not reported_within(node) {
-                let n = name_node(last_child(node));
-                report2(Diag.UnknownVariant, n, word_of(n), named(e, 0), -1);
-                suggest_member(e, n, Space.Member);
-            };
-            return ty_error();
-        };
-        let owner = module_of(member_decl);
-        let at = 0;
+                let n = name_node(last_child(node))
+                report2(Diag.UnknownVariant, n, word_of(n), named(e, 0), -1)
+                suggest_member(e, n, Space.Member)
+            }
+            return ty_error()
+        }
+        let owner = module_of(member_decl)
+        let at = 0
         if is_kind(c, Node.Instantiated_module_ref) {
-            if alias_given_args(first_child(c), next_sibling(first_child(c))) { return ty_error(); };
-            at = instance_checked(owner, next_sibling(first_child(c)), inst, c);
-            if at < 0 { return ty_error(); };
+            if alias_given_args(first_child(c), next_sibling(first_child(c))) { return ty_error() }
+            at = instance_checked(owner, next_sibling(first_child(c)), inst, c)
+            if at < 0 { return ty_error() }
         } else if is_kind(next_sibling(c), Node.Module_type_arg_list) {
-            at = instance_checked(owner, next_sibling(c), inst, next_sibling(c));
-            if at < 0 { return ty_error(); };
+            at = instance_checked(owner, next_sibling(c), inst, next_sibling(c))
+            if at < 0 { return ty_error() }
         } else {
             // `ints.Box` with `using boxy[I32] |ints|`: Box in boxy[I32].
-            let named_by = node_alias[name_node(c)];
-            at = if decl_is(named_by, Decl.Alias) { alias_instance(named_by); } else { instance_for(owner, inst); };
-        };
-        if at == 0 and is_generic(owner) { return no_instance(node, owner); };
-        if too_deep(at, node) { return ty_error(); };
-        return named(member_decl, at);
-    };
-    let n = if kind == Node.Promoted_type.i32() { node; } else { name_node(node); };
+            let named_by = node_alias[name_node(c)]
+            at = if decl_is(named_by, Decl.Alias) { alias_instance(named_by) } else { instance_for(owner, inst) }
+        }
+        if at == 0 and is_generic(owner) { return no_instance(node, owner) }
+        if too_deep(at, node) { return ty_error() }
+        return named(member_decl, at)
+    }
+    let n = if kind == Node.Promoted_type.i32() { node } else { name_node(node) }
     // U8, I8, U16, I16 are how a mem, a vec, or an int enum stores its
     // values, which read as I32: not the type of a value.
     if node_decl[n] < 0 and builtin_type(word_of(n)) {
-        report(Diag.StorageType, n, word_of(n));
-        return ty_error();
-    };
+        report(Diag.StorageType, n, word_of(n))
+        return ty_error()
+    }
     // `bi` with `using B[I32] |bi|`: B's type in B[I32].
-    let alias = if kind == Node.Promoted_type.i32() { -1; } else { node_alias[n]; };
-    if decl_is(alias, Decl.Alias) and is_generic(decl_a[alias]) { return alias_type(alias); };
-    let d = node_decl[n];
+    let alias = if kind == Node.Promoted_type.i32() { -1 } else { node_alias[n] }
+    if decl_is(alias, Decl.Alias) and is_generic(decl_a[alias]) { return alias_type(alias) }
+    let d = node_decl[n]
     if d >= 0 and not decl_is(d, Decl.Alias) and not decl_is(d, Decl.ModuleParam) {
-        let owner = module_of(if decl_is(d, Decl.Module) { decl_a[d]; } else { d; });
-        if is_generic(owner) and instance_for(owner, inst) == 0 { return no_instance(node, owner); };
-    };
-    decl_type(d, inst);
+        let owner = module_of(if decl_is(d, Decl.Module) { decl_a[d] } else { d })
+        if is_generic(owner) and instance_for(owner, inst) == 0 { return no_instance(node, owner) }
+    }
+    decl_type(d, inst)
 }
 
 /// A generic module's type named with no type arguments, outside it and
 /// with no `using M[A];` open.
 fn no_instance(node: I32, module: I32) I32 {
-    report2(Diag.InvalidModuleArity, node, decl_name[module], module_arity(module), 0);
-    ty_error();
+    report2(Diag.InvalidModuleArity, node, decl_name[module], module_arity(module), 0)
+    ty_error()
 }
 
 /// The types a node's children name, as a list: a module's type arguments,
 /// a tuple's types.
 fn type_args(list: I32, inst: I32) I32 {
-    let m = vl_begin();
-    let c = first_child(list);
+    let m = vl_begin()
+    let c = first_child(list)
     while (c >= 0) {
-        vl_add(type_of(c, inst));
-        c = next_sibling(c);
-    };
-    inst_here[0] = list;
-    vl_end(m);
+        vl_add(type_of(c, inst))
+        c = next_sibling(c)
+    }
+    inst_here[0] = list
+    vl_end(m)
 }
 
 /// `module`'s instance for the type arguments `list` (written at `at`), seen
@@ -446,128 +446,128 @@ fn type_args(list: I32, inst: I32) I32 {
 /// `a[Str]` where `a` is an alias of an instance (`using m[I32] |a|`): it takes
 /// no type arguments; reported.
 fn alias_given_args(name_at: I32, list: I32) Bool {
-    let by = node_alias[name_node(name_at)];
-    if not decl_is(by, Decl.Alias) or not is_generic(decl_a[by]) or alias_instance(by) == 0 { return false; };
-    report2(Diag.InvalidModuleArity, list, decl_name[by], 0, child_count(list));
-    true;
+    let by = node_alias[name_node(name_at)]
+    if not decl_is(by, Decl.Alias) or not is_generic(decl_a[by]) or alias_instance(by) == 0 { return false }
+    report2(Diag.InvalidModuleArity, list, decl_name[by], 0, child_count(list))
+    true
 }
 
 fn instance_checked(module: I32, list: I32, inst: I32, at: I32) I32 {
-    let args = type_args(list, inst);
+    let args = type_args(list, inst)
     if vl_len[args] != module_arity(module) {
-        report2(Diag.InvalidModuleArity, at, decl_name[module], module_arity(module), vl_len[args]);
-        return -1;
-    };
-    instance(module, args);
+        report2(Diag.InvalidModuleArity, at, decl_name[module], module_arity(module), vl_len[args])
+        return -1
+    }
+    instance(module, args)
 }
 
 /// `type_args`, but exactly `n` of them: more are dropped, fewer end in
 /// error types (a wrong count is reported where it is written).
 fn fit_args(list: I32, n: I32) I32 {
-    let m = vl_begin();
-    let c = first_child(list);
+    let m = vl_begin()
+    let c = first_child(list)
     for (0 ..< n) |i| {
-        vl_add(if c >= 0 { type_of(c, 0); } else { ty_error(); });
-        if c >= 0 { c = next_sibling(c); };
-    };
-    inst_here[0] = list;
-    vl_end(m);
+        vl_add(if c >= 0 { type_of(c, 0) } else { ty_error() })
+        if c >= 0 { c = next_sibling(c) }
+    }
+    inst_here[0] = list
+    vl_end(m)
 }
 
 /// The type a type declaration names, seen from instance `inst`.
 fn decl_type(decl: I32, inst: I32) I32 {
-    if decl < 0 { return ty_error(); };
+    if decl < 0 { return ty_error() }
     if decl_is(decl, Decl.ModuleParam) {
-        if inst <= 0 { return ty_error(); };
-        return inst_arg(inst, decl_a[decl]);
-    };
-    if decl_is(decl, Decl.Alias) { return alias_type(decl); };
+        if inst <= 0 { return ty_error() }
+        return inst_arg(inst, decl_a[decl])
+    }
+    if decl_is(decl, Decl.Alias) { return alias_type(decl) }
     if decl_is(decl, Decl.Module) {
-        if decl_a[decl] < 0 { return ty_error(); };
-        return decl_type(decl_a[decl], inst);
-    };
-    let module = module_of(decl);
-    named(decl, if module >= 0 { instance_for(module, inst); } else { 0; });
+        if decl_a[decl] < 0 { return ty_error() }
+        return decl_type(decl_a[decl], inst)
+    }
+    let module = module_of(decl)
+    named(decl, if module >= 0 { instance_for(module, inst) } else { 0 })
 }
 
 /// What `using M[A] |Alias|` names: `M`'s promoted type in `M[A]`.
 fn alias_type(alias: I32) I32 {
-    let module = decl_a[alias];
-    if not decl_is(module, Decl.Module) or decl_a[module] < 0 { return ty_error(); };
-    named(decl_a[module], alias_instance(alias));
+    let module = decl_a[alias]
+    if not decl_is(module, Decl.Module) or decl_a[module] < 0 { return ty_error() }
+    named(decl_a[module], alias_instance(alias))
 }
 
 fn alias_instance(alias: I32) I32 {
-    let module = decl_a[alias];
-    let using = decl_node[alias];
-    let args = next_sibling(first_child(using));
-    if not is_kind(args, Node.Module_type_arg_list) { return 0; };
-    instance(module, fit_args(args, module_arity(module)));
+    let module = decl_a[alias]
+    let using = decl_node[alias]
+    let args = next_sibling(first_child(using))
+    if not is_kind(args, Node.Module_type_arg_list) { return 0 }
+    instance(module, fit_args(args, module_arity(module)))
 }
 
 /// `using M[A]; using M[B];`: M's names would mean either instance.
 fn check_open_instances() void {
     for (0 ..< file_root.len()) |file| {
-        let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
+        let item = if file_root[file] >= 0 { first_child(file_root[file]) } else { -1 }
         while (item >= 0) {
             // `using M[A] |q|;` / `using M[A];` with another count of arguments than M has.
-            let named = if is_kind(item, Node.Using_decl) { node_decl[name_node(first_child(item))]; } else { -1; };
-            let given = if named >= 0 { next_sibling(first_child(item)); } else { -1; };
+            let named = if is_kind(item, Node.Using_decl) { node_decl[name_node(first_child(item))] } else { -1 }
+            let given = if named >= 0 { next_sibling(first_child(item)) } else { -1 }
             if decl_is(named, Decl.Module) and is_kind(given, Node.Module_type_arg_list) and child_count(given) != module_arity(named) {
-                report2(Diag.InvalidModuleArity, given, decl_name[named], module_arity(named), child_count(given));
-                item = next_sibling(item);
-                continue;
-            };
+                report2(Diag.InvalidModuleArity, given, decl_name[named], module_arity(named), child_count(given))
+                item = next_sibling(item)
+                continue
+            }
             // `using a[Str] |b|;` of an alias `a` of an instance: no type arguments.
-            let by = if named >= 0 { node_alias[name_node(first_child(item))]; } else { -1; };
+            let by = if named >= 0 { node_alias[name_node(first_child(item))] } else { -1 }
             if decl_is(by, Decl.Alias) and is_generic(decl_a[by]) and alias_instance(by) > 0 and is_kind(given, Node.Module_type_arg_list) {
-                report2(Diag.InvalidModuleArity, given, decl_name[by], 0, child_count(given));
-                item = next_sibling(item);
-                continue;
-            };
+                report2(Diag.InvalidModuleArity, given, decl_name[by], 0, child_count(given))
+                item = next_sibling(item)
+                continue
+            }
             // `using M;` of a generic M: it opens no instance.
             if decl_is(named, Decl.Module) and given < 0 and module_arity(named) > 0 {
-                report2(Diag.InvalidModuleArity, first_child(item), decl_name[named], module_arity(named), 0);
-            };
-            let module = opened_module(item);
+                report2(Diag.InvalidModuleArity, first_child(item), decl_name[named], module_arity(named), 0)
+            }
+            let module = opened_module(item)
             if module >= 0 {
-                let inst = open_instance(module);
-                let mine = instance(module, fit_args(next_sibling(first_child(item)), module_arity(module)));
+                let inst = open_instance(module)
+                let mine = instance(module, fit_args(next_sibling(first_child(item)), module_arity(module)))
                 if inst != mine {
-                    report2(Diag.UsingTwice, next_sibling(first_child(item)), decl_name[module], first_open(module), -1);
-                };
-            };
-            item = next_sibling(item);
-        };
-    };
+                    report2(Diag.UsingTwice, next_sibling(first_child(item)), decl_name[module], first_open(module), -1)
+                }
+            }
+            item = next_sibling(item)
+        }
+    }
 }
 
 /// The module `using M[A];` opens (no alias, no file), or -1.
 fn opened_module(item: I32) I32 {
-    if not is_kind(item, Node.Using_decl) { return -1; };
-    let name_at = first_child(item);
-    let args = next_sibling(name_at);
-    if not is_kind(args, Node.Module_type_arg_list) or is_kind(next_sibling(args), Node.Captured_module_name) { return -1; };
-    let module = node_decl[name_node(name_at)];
-    if decl_is(module, Decl.Module) { module; } else { -1; };
+    if not is_kind(item, Node.Using_decl) { return -1 }
+    let name_at = first_child(item)
+    let args = next_sibling(name_at)
+    if not is_kind(args, Node.Module_type_arg_list) or is_kind(next_sibling(args), Node.Captured_module_name) { return -1 }
+    let module = node_decl[name_node(name_at)]
+    if decl_is(module, Decl.Module) { module } else { -1 }
 }
 
 /// The type arguments of the first `using M[A];`.
 fn first_open(module: I32) I32 {
     for (0 ..< file_root.len()) |file| {
-        let item = if file_root[file] >= 0 { first_child(file_root[file]); } else { -1; };
+        let item = if file_root[file] >= 0 { first_child(file_root[file]) } else { -1 }
         while (item >= 0) {
-            if opened_module(item) == module { return next_sibling(first_child(item)); };
-            item = next_sibling(item);
-        };
-    };
-    -1;
+            if opened_module(item) == module { return next_sibling(first_child(item)) }
+            item = next_sibling(item)
+        }
+    }
+    -1
 }
 
 /// The instance `using M[A];` opened, or 0.
 fn open_instance(module: I32) I32 {
-    let args = first_open(module);
-    if args >= 0 { instance(module, fit_args(args, module_arity(module))); } else { 0; };
+    let args = first_open(module)
+    if args >= 0 { instance(module, fit_args(args, module_arity(module))) } else { 0 }
 }
 
 //! = Representation
@@ -576,196 +576,196 @@ fn open_instance(module: I32) I32 {
 //! fields of any type have a default.
 
 // Each declaration's instances' heap types: a chain of entries per declaration.
-vec struct_inst: I32;
-vec struct_heap: I32;
+vec struct_inst: I32
+vec struct_heap: I32
 /// The next entry for the same declaration, or -1.
-vec struct_next: I32;
+vec struct_next: I32
 /// By declaration: its first entry, or -1.
-vec struct_first: I32;
+vec struct_first: I32
 
 /// By type: its representation once known, else -2 (types are interned, so
 /// it is asked of the same ids again and again).
-vec repr_memo: I32;
+vec repr_memo: I32
 
 /// The wasm value type a type is represented by (a `vt_*` id), memoized.
 fn repr(t: I32) I32 {
-    if t < repr_memo.len() and repr_memo[t] != -2 { return repr_memo[t]; };
-    let r = repr_of(t);
+    if t < repr_memo.len() and repr_memo[t] != -2 { return repr_memo[t] }
+    let r = repr_of(t)
     if t >= repr_memo.len() {
-        let old = repr_memo.len();
-        repr_memo.resize(ty_kind.len());
-        for (old ..< repr_memo.len()) |k| { repr_memo[k] = -2; };
-    };
-    repr_memo[t] = r;
-    r;
+        let old = repr_memo.len()
+        repr_memo.resize(ty_kind.len())
+        for (old ..< repr_memo.len()) |k| { repr_memo[k] = -2 }
+    }
+    repr_memo[t] = r
+    r
 }
 
 /// What @repr computes: a nullable reference for a struct, enum, or `fun`; an
 /// externref for a closure or host value; a type declaration's `@ir` type;
 /// `i32` for an integer enum and the rest.
 fn repr_of(t: I32) I32 {
-    let kind = ty_kind[t];
-    if kind == Ty.Void.i32() { return vt_none; };
-    if kind == Ty.Never.i32() { return vt_unreachable; };
-    if kind == Ty.Nullable.i32() { return vt_nullable(repr(ty_a[t])); };
-    if kind == Ty.Fun.i32() { return vt_ref(fun_heap(t), true); };
-    if kind == Ty.Closure.i32() or kind == Ty.Foreign.i32() { return vt_externref; };
+    let kind = ty_kind[t]
+    if kind == Ty.Void.i32() { return vt_none }
+    if kind == Ty.Never.i32() { return vt_unreachable }
+    if kind == Ty.Nullable.i32() { return vt_nullable(repr(ty_a[t])) }
+    if kind == Ty.Fun.i32() { return vt_ref(fun_heap(t), true) }
+    if kind == Ty.Closure.i32() or kind == Ty.Foreign.i32() { return vt_externref }
     if kind == Ty.Tuple.i32() {
-        let m = vl_begin();
-        let list = ty_a[t];
-        for (0 ..< vl_len[list]) |i| { vl_add(repr(vl_item(list, i))); };
-        return vt_tuple_of(vl_end(m));
-    };
-    if kind != Ty.Named.i32() { return vt_i32; };
-    let decl = ty_a[t];
-    let dk = decl_kind[decl];
-    if dk == Decl.TypeDecl.i32() { return type_decl_repr(decl, ty_b[t]); };
-    if dk == Decl.IntEnum.i32() { return vt_i32; };
-    if dk == Decl.Distinct.i32() { return repr(decl_type(node_decl[name_node(last_child(decl_node[decl]))], 0)); };
-    if dk == Decl.Struct.i32() or dk == Decl.Enum.i32() or dk == Decl.Variant.i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true); };
-    if dk == Decl.Proto.i32() { return vt_anyref; };
-    vt_i32;
+        let m = vl_begin()
+        let list = ty_a[t]
+        for (0 ..< vl_len[list]) |i| { vl_add(repr(vl_item(list, i))) }
+        return vt_tuple_of(vl_end(m))
+    }
+    if kind != Ty.Named.i32() { return vt_i32 }
+    let decl = ty_a[t]
+    let dk = decl_kind[decl]
+    if dk == Decl.TypeDecl.i32() { return type_decl_repr(decl, ty_b[t]) }
+    if dk == Decl.IntEnum.i32() { return vt_i32 }
+    if dk == Decl.Distinct.i32() { return repr(decl_type(node_decl[name_node(last_child(decl_node[decl]))], 0)) }
+    if dk == Decl.Struct.i32() or dk == Decl.Enum.i32() or dk == Decl.Variant.i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true) }
+    if dk == Decl.Proto.i32() { return vt_anyref }
+    vt_i32
 }
 
 /// The heap type of a `fun` type: its signature.
 fn fun_heap(t: I32) I32 {
-    let params = ty_a[t];
-    let m = vl_begin();
-    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
-    let ps = vl_end(m);
-    func_type(ps, vl_of_result(repr(ty_b[t])));
+    let params = ty_a[t]
+    let m = vl_begin()
+    for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))) }
+    let ps = vl_end(m)
+    func_type(ps, vl_of_result(repr(ty_b[t])))
 }
 
 /// `type & = @ir/\ <ir-wasm-… type-repr="…"/> \/`: what the attribute says.
 fn type_decl_repr(decl: I32, inst: I32) I32 {
-    let x = ir_tree(last_child(last_child(decl_node[decl])));
-    let r = x_attr(x, attr_type_repr());
-    if r < 0 { return vt_i32; };
-    let named_vt = repr_named(r);
-    if named_vt >= 0 { return named_vt; };
+    let x = ir_tree(last_child(last_child(decl_node[decl])))
+    let r = x_attr(x, attr_type_repr())
+    if r < 0 { return vt_i32 }
+    let named_vt = repr_named(r)
+    if named_vt >= 0 { return named_vt }
     // wasm-array:elem=T1:mut=true
-    let elem = type_decl_elem(decl, inst);
+    let elem = type_decl_elem(decl, inst)
     // (An instance's element of a type already reported: as an i32's.)
-    if elem >= 0 and (inst > 0 or not ty_is(elem, Ty.Error)) { return vt_ref(array_type(storage(repr(elem)), true), true); };
+    if elem >= 0 and (inst > 0 or not ty_is(elem, Ty.Error)) { return vt_ref(array_type(storage(repr(elem)), true), true) }
     // (Another is reported where it is declared: check_ir_types.)
-    vt_i32;
+    vt_i32
 }
 
 /// The value type a `type-repr` names (all but an array's), or -1.
 fn repr_named(r: I32) I32 {
-    if attr_is(r, "wasm-i32") { return vt_i32; };
-    if attr_is(r, "wasm-i64") { return vt_i64; };
-    if attr_is(r, "wasm-f32") { return vt_f32; };
-    if attr_is(r, "wasm-f64") { return vt_f64; };
-    if attr_is(r, "wasm-v128") { return vt_v128; };
-    if attr_is(r, "wasm-externref") or attr_is(r, "wasm-stringref") { return vt_externref; };
-    if attr_is(r, "wasm-i31") { return vt_i31ref; };
-    -1;
+    if attr_is(r, "wasm-i32") { return vt_i32 }
+    if attr_is(r, "wasm-i64") { return vt_i64 }
+    if attr_is(r, "wasm-f32") { return vt_f32 }
+    if attr_is(r, "wasm-f64") { return vt_f64 }
+    if attr_is(r, "wasm-v128") { return vt_v128 }
+    if attr_is(r, "wasm-externref") or attr_is(r, "wasm-stringref") { return vt_externref }
+    if attr_is(r, "wasm-i31") { return vt_i31ref }
+    -1
 }
 
 /// `wasm-array:elem=T:mut=true`'s T, as a word; else -1.
 fn array_elem_word(r: I32) I32 {
-    let head = "wasm-array:elem=";
-    let tail = ":mut=true";
-    let s = attr_start[r];
-    let e = attr_end[r];
-    if e - s <= head.len() + tail.len() { return -1; };
-    for (0 ..< head.len()) |i| { if src[s + i] != head.get(i) { return -1; }; };
-    for (0 ..< tail.len()) |i| { if src[e - tail.len() + i] != tail.get(i) { return -1; }; };
-    src.intern(s + head.len(), e - tail.len());
+    let head = "wasm-array:elem="
+    let tail = ":mut=true"
+    let s = attr_start[r]
+    let e = attr_end[r]
+    if e - s <= head.len() + tail.len() { return -1 }
+    for (0 ..< head.len()) |i| { if src[s + i] != head.get(i) { return -1 } }
+    for (0 ..< tail.len()) |i| { if src[e - tail.len() + i] != tail.get(i) { return -1 } }
+    src.intern(s + head.len(), e - tail.len())
 }
 
 /// An array type declaration's element type in instance `inst`: a
 /// parameter of its module, or a standard type. -1 when it is no array or
 /// names neither.
 fn type_decl_elem(decl: I32, inst: I32) I32 {
-    let x = ir_tree(last_child(last_child(decl_node[decl])));
-    let r = x_attr(x, attr_type_repr());
-    let w = if r >= 0 { array_elem_word(r); } else { -1; };
-    if w < 0 { return -1; };
-    let module = module_of(decl);
-    let list = if module >= 0 { next_sibling(first_child(decl_node[module])); } else { -1; };
+    let x = ir_tree(last_child(last_child(decl_node[decl])))
+    let r = x_attr(x, attr_type_repr())
+    let w = if r >= 0 { array_elem_word(r) } else { -1 }
+    if w < 0 { return -1 }
+    let module = module_of(decl)
+    let list = if module >= 0 { next_sibling(first_child(decl_node[module])) } else { -1 }
     if is_kind(list, Node.Module_type_param_list) {
-        let i = 0;
-        let p = first_child(list);
+        let i = 0
+        let p = first_child(list)
         while (p >= 0) {
-            if word_of(first_child(p)) == w { return if inst > 0 { inst_arg(inst, i); } else { ty_error(); }; };
-            i += 1;
-            p = next_sibling(p);
-        };
-    };
-    let d = prelude_lookup(w);
-    if d < 0 or not decl_is(promoted(d), Decl.TypeDecl) { return -1; };
-    decl_type(promoted(d), 0);
+            if word_of(first_child(p)) == w { return if inst > 0 { inst_arg(inst, i) } else { ty_error() } }
+            i += 1
+            p = next_sibling(p)
+        }
+    }
+    let d = prelude_lookup(w)
+    if d < 0 or not decl_is(promoted(d), Decl.TypeDecl) { return -1 }
+    decl_type(promoted(d), 0)
 }
 
 /// A field or element's storage: refs as nullable, everything else as is.
-fn storage(vt: I32) I32 { vt_nullable(vt); }
+fn storage(vt: I32) I32 { vt_nullable(vt) }
 
 /// The struct type of a struct declaration in an instance.
 fn struct_heap_of(decl: I32, inst: I32) I32 {
     if struct_first.len() < decl_kind.len() {
-        let old = struct_first.len();
-        struct_first.resize(decl_kind.len());
-        for (old ..< decl_kind.len()) |d| { struct_first[d] = -1; };
-    };
-    let e = struct_first[decl];
+        let old = struct_first.len()
+        struct_first.resize(decl_kind.len())
+        for (old ..< decl_kind.len()) |d| { struct_first[d] = -1 }
+    }
+    let e = struct_first[decl]
     while (e >= 0) {
-        if struct_inst[e] == inst { return struct_heap[e]; };
-        e = struct_next[e];
-    };
+        if struct_inst[e] == inst { return struct_heap[e] }
+        e = struct_next[e]
+    }
     // An enum is a struct its variants extend; a variant, a struct of its fields.
-    let super = if decl_is(decl, Decl.Variant) { struct_heap_of(decl_owner[decl], inst); } else { -1; };
-    let h = struct_type(super, decl_is(decl, Decl.Enum));
-    let entry = struct_inst.len();
-    struct_inst.push(inst);
-    struct_heap.push(h);
-    struct_next.push(struct_first[decl]);
-    struct_first[decl] = entry;
+    let super = if decl_is(decl, Decl.Variant) { struct_heap_of(decl_owner[decl], inst) } else { -1 }
+    let h = struct_type(super, decl_is(decl, Decl.Enum))
+    let entry = struct_inst.len()
+    struct_inst.push(inst)
+    struct_heap.push(h)
+    struct_next.push(struct_first[decl])
+    struct_first[decl] = entry
     // Fields after the entry exists, so a field of the struct's own type
     // finds it; their types first, since they may make other structs.
-    let holder = fields_holder(decl);
-    let c = if holder >= 0 and not decl_is(decl, Decl.Enum) { first_child(holder); } else { -1; };
-    let n = 0;
+    let holder = fields_holder(decl)
+    let c = if holder >= 0 and not decl_is(decl, Decl.Enum) { first_child(holder) } else { -1 }
+    let n = 0
     while (c >= 0) {
-        if is_kind(c, Node.Field) { n += 1; };
-        c = next_sibling(c);
-    };
-    let vts = Array[I32].new(n, 0);
-    let i = 0;
-    c = if holder >= 0 and not decl_is(decl, Decl.Enum) { first_child(holder); } else { -1; };
+        if is_kind(c, Node.Field) { n += 1 }
+        c = next_sibling(c)
+    }
+    let vts = Array[I32].new(n, 0)
+    let i = 0
+    c = if holder >= 0 and not decl_is(decl, Decl.Enum) { first_child(holder) } else { -1 }
     while (c >= 0) {
         if is_kind(c, Node.Field) {
-            vts[i] = storage(repr(type_of(next_sibling(first_child(c)), inst)));
-            i += 1;
-        };
-        c = next_sibling(c);
-    };
-    ht_a[h] = ht_fields.len();
-    for (0 ..< n) |k| { struct_field(h, vts[k], true); };
-    h;
+            vts[i] = storage(repr(type_of(next_sibling(first_child(c)), inst)))
+            i += 1
+        }
+        c = next_sibling(c)
+    }
+    ht_a[h] = ht_fields.len()
+    for (0 ..< n) |k| { struct_field(h, vts[k], true) }
+    h
 }
 
 fn reset_types() void {
-    reset_foreign();
-    ty_kind.clear();
-    repr_memo.clear();
-    ty_a.clear();
-    ty_b.clear();
-    ty_table.clear();
-    inst_module.clear();
-    inst_args.clear();
-    inst_depth.clear();
-    inst_bad.clear();
-    inst_site.clear();
-    inst_table.clear();
-    struct_inst.clear();
-    struct_heap.clear();
-    struct_next.clear();
-    struct_first.clear();
-    ty_grow();
-    inst_grow();
+    reset_foreign()
+    ty_kind.clear()
+    repr_memo.clear()
+    ty_a.clear()
+    ty_b.clear()
+    ty_table.clear()
+    inst_module.clear()
+    inst_args.clear()
+    inst_depth.clear()
+    inst_bad.clear()
+    inst_site.clear()
+    inst_table.clear()
+    struct_inst.clear()
+    struct_heap.clear()
+    struct_next.clear()
+    struct_first.clear()
+    ty_grow()
+    inst_grow()
     // Type 0 is Error and instance 0 is none.
-    ty_error();
-    instance(-1, vl_empty());
+    ty_error()
+    instance(-1, vl_empty())
 }

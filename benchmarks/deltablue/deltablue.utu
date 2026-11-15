@@ -2,7 +2,7 @@
 // Dart's DeltaBlue, in idiomatic utu: growable Buffers, nullable references,
 // and one enum of constraint kinds. Every port in this directory computes the
 // same canonical algorithm (worklists are stacks, as the original's are).
-using Buffer from std:Buffer;
+using Buffer from std:Buffer
 
 enum(U8) Strength:
     | Required
@@ -13,11 +13,11 @@ enum(U8) Strength:
     | WeakDefault
     | Weakest
 
-fn Strength.stronger |self| (other: Strength) Bool { self.i32() < other.i32(); }
+fn Strength.stronger |self| (other: Strength) Bool { self.i32() < other.i32() }
 
-fn Strength.weaker |self| (other: Strength) Bool { self.i32() > other.i32(); }
+fn Strength.weaker |self| (other: Strength) Bool { self.i32() > other.i32() }
 
-fn Strength.weakest_of |self| (other: Strength) Strength { if self.weaker(other) { self; } else { other; }; }
+fn Strength.weakest_of |self| (other: Strength) Strength { if self.weaker(other) { self } else { other } }
 
 // As the original has it: Required's next weaker is Weakest.
 fn Strength.next_weaker |self| () Strength {
@@ -29,7 +29,7 @@ fn Strength.next_weaker |self| () Strength {
         4 => Strength.Preferred,
         5 => Strength.Required,
         ~> fatal,
-    };
+    }
 }
 
 enum(U8) Direction:
@@ -62,43 +62,43 @@ struct Planner:
     | current_mark: I32
 
 // Constraints are compared by identity.
-fn Constraint:eq |a, b| Bool { @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/; }
+fn Constraint:eq |a, b| Bool { @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/ }
 
 fn Variable.new(value: I32) Variable {
-    &{ value: value, constraints: Buffer[Constraint].new(), determined_by: null, mark: 0, walk_strength: Strength.Weakest, stay: true };
+    &{ value: value, constraints: Buffer[Constraint].new(), determined_by: null, mark: 0, walk_strength: Strength.Weakest, stay: true }
 }
 
-fn Variable.add_constraint |self| (c: Constraint) void { self.constraints.push(c); }
+fn Variable.add_constraint |self| (c: Constraint) void { self.constraints.push(c) }
 
 // Removes every occurrence of c, in place.
 fn Variable.remove_constraint |self| (c: Constraint) void {
-    let kept = 0;
+    let kept = 0
     for (0..<self.constraints.len()) |i| {
-        let each = self.constraints[i];
+        let each = self.constraints[i]
         if not (each == c) {
-            if kept != i { self.constraints[kept] = each; };
-            kept += 1;
-        };
-    };
-    self.constraints.truncate(kept);
-    if self.is_determined_by(c) { self.determined_by = null; };
+            if kept != i { self.constraints[kept] = each }
+            kept += 1
+        }
+    }
+    self.constraints.truncate(kept)
+    if self.is_determined_by(c) { self.determined_by = null }
 }
 
 fn Variable.is_determined |self| () Bool {
     promote self.determined_by {
         |d| => true,
         ~> false,
-    };
+    }
 }
 
-fn Variable.is_determined_by |self| (c: Constraint) Bool { c.is(self.determined_by); }
+fn Variable.is_determined_by |self| (c: Constraint) Bool { c.is(self.determined_by) }
 
 // Whether this is `other`, which may be null.
 fn Constraint.is |self| (other: ?Constraint) Bool {
     promote other {
         |o| => self == o,
         ~> false,
-    };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -110,14 +110,14 @@ fn Constraint.strength |self| () Strength {
         Edit |c| => c.strength,
         Equality |c| => c.strength,
         Scale |c| => c.strength,
-    };
+    }
 }
 
 fn Constraint.is_input |self| () Bool {
     alt self {
         Edit => true,
         ~> false,
-    };
+    }
 }
 
 fn Constraint.is_satisfied |self| () Bool {
@@ -126,20 +126,20 @@ fn Constraint.is_satisfied |self| () Bool {
         Edit |c| => c.satisfied,
         Equality |c| => c.direction != Direction.Unset,
         Scale |c| => c.direction != Direction.Unset,
-    };
+    }
 }
 
 // A binary constraint's input and output, by its direction.
-fn input_of(direction: Direction, v1: Variable, v2: Variable) Variable { if direction == Direction.Forward { v1; } else { v2; }; }
+fn input_of(direction: Direction, v1: Variable, v2: Variable) Variable { if direction == Direction.Forward { v1 } else { v2 } }
 
-fn output_of(direction: Direction, v1: Variable, v2: Variable) Variable { if direction == Direction.Forward { v2; } else { v1; }; }
+fn output_of(direction: Direction, v1: Variable, v2: Variable) Variable { if direction == Direction.Forward { v2 } else { v1 } }
 
 fn Constraint.input |self| () Variable {
     alt self {
         Equality |c| => input_of(c.direction, c.v1, c.v2),
         Scale |c| => input_of(c.direction, c.v1, c.v2),
         ~> fatal,
-    };
+    }
 }
 
 fn Constraint.output |self| () Variable {
@@ -148,123 +148,123 @@ fn Constraint.output |self| () Variable {
         Edit |c| => c.output,
         Equality |c| => output_of(c.direction, c.v1, c.v2),
         Scale |c| => output_of(c.direction, c.v1, c.v2),
-    };
+    }
 }
 
 fn Constraint.add_to_graph |self| () void {
     alt self {
         Stay |c| => {
-            c.output.add_constraint(self);
-            c.satisfied = false;
+            c.output.add_constraint(self)
+            c.satisfied = false
         },
         Edit |c| => {
-            c.output.add_constraint(self);
-            c.satisfied = false;
+            c.output.add_constraint(self)
+            c.satisfied = false
         },
         Equality |c| => {
-            c.v1.add_constraint(self);
-            c.v2.add_constraint(self);
-            c.direction = Direction.Unset;
+            c.v1.add_constraint(self)
+            c.v2.add_constraint(self)
+            c.direction = Direction.Unset
         },
         Scale |c| => {
-            c.v1.add_constraint(self);
-            c.v2.add_constraint(self);
-            c.direction = Direction.Unset;
-            c.scale.add_constraint(self);
-            c.offset.add_constraint(self);
+            c.v1.add_constraint(self)
+            c.v2.add_constraint(self)
+            c.direction = Direction.Unset
+            c.scale.add_constraint(self)
+            c.offset.add_constraint(self)
         },
-    };
+    }
 }
 
 fn Constraint.remove_from_graph |self| () void {
     alt self {
         Stay |c| => {
-            c.output.remove_constraint(self);
-            c.satisfied = false;
+            c.output.remove_constraint(self)
+            c.satisfied = false
         },
         Edit |c| => {
-            c.output.remove_constraint(self);
-            c.satisfied = false;
+            c.output.remove_constraint(self)
+            c.satisfied = false
         },
         Equality |c| => {
-            c.v1.remove_constraint(self);
-            c.v2.remove_constraint(self);
-            c.direction = Direction.Unset;
+            c.v1.remove_constraint(self)
+            c.v2.remove_constraint(self)
+            c.direction = Direction.Unset
         },
         Scale |c| => {
-            c.v1.remove_constraint(self);
-            c.v2.remove_constraint(self);
-            c.direction = Direction.Unset;
-            c.scale.remove_constraint(self);
-            c.offset.remove_constraint(self);
+            c.v1.remove_constraint(self)
+            c.v2.remove_constraint(self)
+            c.direction = Direction.Unset
+            c.scale.remove_constraint(self)
+            c.offset.remove_constraint(self)
         },
-    };
+    }
 }
 
 // The direction a binary constraint takes. The first two choices are the
 // original's, which the third always replaces.
 fn choose_direction(v1: Variable, v2: Variable, strength: Strength, mark: I32) Direction {
-    let direction = Direction.Unset;
+    let direction = Direction.Unset
     if v1.mark == mark {
-        direction = if v2.mark != mark and strength.stronger(v2.walk_strength) { Direction.Forward; } else { Direction.Unset; };
-    };
+        direction = if v2.mark != mark and strength.stronger(v2.walk_strength) { Direction.Forward } else { Direction.Unset }
+    }
     if v2.mark == mark {
-        direction = if v1.mark != mark and strength.stronger(v1.walk_strength) { Direction.Backward; } else { Direction.Unset; };
-    };
+        direction = if v1.mark != mark and strength.stronger(v1.walk_strength) { Direction.Backward } else { Direction.Unset }
+    }
     if v1.walk_strength.weaker(v2.walk_strength) {
-        direction = if strength.stronger(v1.walk_strength) { Direction.Backward; } else { Direction.Unset; };
+        direction = if strength.stronger(v1.walk_strength) { Direction.Backward } else { Direction.Unset }
     } else {
-        direction = if strength.stronger(v2.walk_strength) { Direction.Forward; } else { Direction.Backward; };
-    };
-    direction;
+        direction = if strength.stronger(v2.walk_strength) { Direction.Forward } else { Direction.Backward }
+    }
+    direction
 }
 
 fn Constraint.choose_method |self| (mark: I32) void {
     alt self {
         Stay |c| => {
-            c.satisfied = c.output.mark != mark and c.strength.stronger(c.output.walk_strength);
+            c.satisfied = c.output.mark != mark and c.strength.stronger(c.output.walk_strength)
         },
         Edit |c| => {
-            c.satisfied = c.output.mark != mark and c.strength.stronger(c.output.walk_strength);
+            c.satisfied = c.output.mark != mark and c.strength.stronger(c.output.walk_strength)
         },
         Equality |c| => {
-            c.direction = choose_direction(c.v1, c.v2, c.strength, mark);
+            c.direction = choose_direction(c.v1, c.v2, c.strength, mark)
         },
         Scale |c| => {
-            c.direction = choose_direction(c.v1, c.v2, c.strength, mark);
+            c.direction = choose_direction(c.v1, c.v2, c.strength, mark)
         },
-    };
+    }
 }
 
 fn Constraint.mark_unsatisfied |self| () void {
     alt self {
         Stay |c| => {
-            c.satisfied = false;
+            c.satisfied = false
         },
         Edit |c| => {
-            c.satisfied = false;
+            c.satisfied = false
         },
         Equality |c| => {
-            c.direction = Direction.Unset;
+            c.direction = Direction.Unset
         },
         Scale |c| => {
-            c.direction = Direction.Unset;
+            c.direction = Direction.Unset
         },
-    };
+    }
 }
 
 fn Constraint.mark_inputs |self| (mark: I32) void {
     alt self {
         Equality => {
-            self.input().mark = mark;
+            self.input().mark = mark
         },
         Scale |c| => {
-            self.input().mark = mark;
-            c.scale.mark = mark;
-            c.offset.mark = mark;
+            self.input().mark = mark
+            c.scale.mark = mark
+            c.offset.mark = mark
         },
         ~> {},
-    };
+    }
 }
 
 fn Constraint.inputs_known |self| (mark: I32) Bool {
@@ -272,222 +272,222 @@ fn Constraint.inputs_known |self| (mark: I32) Bool {
         Stay => true,
         Edit => true,
         ~> {
-            let input = self.input();
-            input.mark == mark or input.stay or not input.is_determined();
+            let input = self.input()
+            input.mark == mark or input.stay or not input.is_determined()
         },
-    };
+    }
 }
 
 fn Constraint.execute |self| () void {
     alt self {
         Equality => {
-            self.output().value = self.input().value;
+            self.output().value = self.input().value
         },
         Scale |c| => {
             if c.direction == Direction.Forward {
-                c.v2.value = c.v1.value * c.scale.value + c.offset.value;
+                c.v2.value = c.v1.value * c.scale.value + c.offset.value
             } else {
-                c.v1.value = (c.v2.value - c.offset.value) / c.scale.value;
-            };
+                c.v1.value = (c.v2.value - c.offset.value) / c.scale.value
+            }
         },
         ~> {},
-    };
+    }
 }
 
 fn Constraint.recalculate |self| () void {
     alt self {
         Stay |c| => {
-            c.output.walk_strength = c.strength;
-            c.output.stay = not self.is_input();
-            if c.output.stay { self.execute(); };
+            c.output.walk_strength = c.strength
+            c.output.stay = not self.is_input()
+            if c.output.stay { self.execute() }
         },
         Edit |c| => {
-            c.output.walk_strength = c.strength;
-            c.output.stay = not self.is_input();
-            if c.output.stay { self.execute(); };
+            c.output.walk_strength = c.strength
+            c.output.stay = not self.is_input()
+            if c.output.stay { self.execute() }
         },
         Equality |c| => {
-            let input = self.input();
-            let output = self.output();
-            output.walk_strength = c.strength.weakest_of(input.walk_strength);
-            output.stay = input.stay;
-            if output.stay { self.execute(); };
+            let input = self.input()
+            let output = self.output()
+            output.walk_strength = c.strength.weakest_of(input.walk_strength)
+            output.stay = input.stay
+            if output.stay { self.execute() }
         },
         Scale |c| => {
-            let input = self.input();
-            let output = self.output();
-            output.walk_strength = c.strength.weakest_of(input.walk_strength);
-            output.stay = input.stay and c.scale.stay and c.offset.stay;
-            if output.stay { self.execute(); };
+            let input = self.input()
+            let output = self.output()
+            output.walk_strength = c.strength.weakest_of(input.walk_strength)
+            output.stay = input.stay and c.scale.stay and c.offset.stay
+            if output.stay { self.execute() }
         },
-    };
+    }
 }
 
 // The constraint it overrode, if any.
 fn Constraint.satisfy |self| (planner: Planner, mark: I32) ?Constraint {
-    self.choose_method(mark);
+    self.choose_method(mark)
     if not self.is_satisfied() {
-        if self.strength() == Strength.Required { fatal; };
-        return null;
-    };
-    self.mark_inputs(mark);
-    let out = self.output();
-    let overridden = out.determined_by;
+        if self.strength() == Strength.Required { fatal }
+        return null
+    }
+    self.mark_inputs(mark)
+    let out = self.output()
+    let overridden = out.determined_by
     promote overridden {
         |o| => o.mark_unsatisfied(),
         ~> {},
-    };
-    out.determined_by = self;
-    if not planner.add_propagate(self, mark) { fatal; };
-    out.mark = mark;
-    overridden;
+    }
+    out.determined_by = self
+    if not planner.add_propagate(self, mark) { fatal }
+    out.mark = mark
+    overridden
 }
 
 // Adds a new constraint to the graph and satisfies it.
 fn Constraint.add |self| (planner: Planner) Constraint {
-    self.add_to_graph();
-    planner.incremental_add(self);
-    self;
+    self.add_to_graph()
+    planner.incremental_add(self)
+    self
 }
 
 fn Constraint.destroy |self| (planner: Planner) void {
-    if self.is_satisfied() { planner.incremental_remove(self); } else { self.remove_from_graph(); };
+    if self.is_satisfied() { planner.incremental_remove(self) } else { self.remove_from_graph() }
 }
 
 fn stay(v: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Stay { output: v, strength: strength, satisfied: false }, planner);
+    Constraint.add(Stay { output: v, strength: strength, satisfied: false }, planner)
 }
 
 fn edit(v: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Edit { output: v, strength: strength, satisfied: false }, planner);
+    Constraint.add(Edit { output: v, strength: strength, satisfied: false }, planner)
 }
 
 fn equality(v1: Variable, v2: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Equality { v1: v1, v2: v2, strength: strength, direction: Direction.Unset }, planner);
+    Constraint.add(Equality { v1: v1, v2: v2, strength: strength, direction: Direction.Unset }, planner)
 }
 
 fn scale(src: Variable, scale: Variable, offset: Variable, dest: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Scale { v1: src, v2: dest, scale: scale, offset: offset, strength: strength, direction: Direction.Unset }, planner);
+    Constraint.add(Scale { v1: src, v2: dest, scale: scale, offset: offset, strength: strength, direction: Direction.Unset }, planner)
 }
 
 // ---------------------------------------------------------------------------
 // The planner
 
-fn Planner.new() Planner { &{ current_mark: 0 }; }
+fn Planner.new() Planner { &{ current_mark: 0 } }
 
 fn Planner.new_mark |self| () I32 {
-    self.current_mark += 1;
-    self.current_mark;
+    self.current_mark += 1
+    self.current_mark
 }
 
 fn Planner.incremental_add |self| (c: Constraint) void {
-    let mark = self.new_mark();
-    let overridden = c.satisfy(self, mark);
-    let more = true;
+    let mark = self.new_mark()
+    let overridden = c.satisfy(self, mark)
+    let more = true
     while (more) {
         promote overridden {
-            |o| => { overridden = o.satisfy(self, mark); },
-            ~> { more = false; },
-        };
-    };
+            |o| => { overridden = o.satisfy(self, mark) },
+            ~> { more = false },
+        }
+    }
 }
 
 fn Planner.incremental_remove |self| (c: Constraint) void {
-    let out = c.output();
-    c.mark_unsatisfied();
-    c.remove_from_graph();
-    let unsatisfied = self.remove_propagate_from(out);
-    let strength = Strength.Required;
-    let more = true;
+    let out = c.output()
+    c.mark_unsatisfied()
+    c.remove_from_graph()
+    let unsatisfied = self.remove_propagate_from(out)
+    let strength = Strength.Required
+    let more = true
     while (more) {
         for (0..<unsatisfied.len()) |i| {
-            let u = unsatisfied[i];
-            if u.strength() == strength { self.incremental_add(u); };
-        };
-        strength = strength.next_weaker();
-        more = strength != Strength.Weakest;
-    };
+            let u = unsatisfied[i]
+            if u.strength() == strength { self.incremental_add(u) }
+        }
+        strength = strength.next_weaker()
+        more = strength != Strength.Weakest
+    }
 }
 
 // Whether `c` propagated without finding a cycle.
 fn Planner.add_propagate |self| (c: Constraint, mark: I32) Bool {
-    let todo = Buffer[Constraint].new();
-    todo.push(c);
+    let todo = Buffer[Constraint].new()
+    todo.push(c)
     while (not todo.is_empty()) {
-        let d = todo.pop();
-        let out = d.output();
+        let d = todo.pop()
+        let out = d.output()
         if out.mark == mark {
-            self.incremental_remove(c);
-            return false;
-        };
-        d.recalculate();
-        add_constraints_consuming_to(out, todo);
-    };
-    true;
+            self.incremental_remove(c)
+            return false
+        }
+        d.recalculate()
+        add_constraints_consuming_to(out, todo)
+    }
+    true
 }
 
 fn add_constraints_consuming_to(v: Variable, coll: Buffer[Constraint]) void {
-    let determining = v.determined_by;
+    let determining = v.determined_by
     for (0..<v.constraints.len()) |i| {
-        let c = v.constraints[i];
-        if not c.is(determining) and c.is_satisfied() { coll.push(c); };
-    };
+        let c = v.constraints[i]
+        if not c.is(determining) and c.is_satisfied() { coll.push(c) }
+    }
 }
 
 // The constraints left unsatisfied downstream of `out`, which has lost what determined it.
 fn Planner.remove_propagate_from |self| (out: Variable) Buffer[Constraint] {
-    out.determined_by = null;
-    out.walk_strength = Strength.Weakest;
-    out.stay = true;
-    let unsatisfied = Buffer[Constraint].new();
-    let todo = Buffer[Variable].new();
-    todo.push(out);
+    out.determined_by = null
+    out.walk_strength = Strength.Weakest
+    out.stay = true
+    let unsatisfied = Buffer[Constraint].new()
+    let todo = Buffer[Variable].new()
+    todo.push(out)
     while (not todo.is_empty()) {
-        let v = todo.pop();
+        let v = todo.pop()
         for (0..<v.constraints.len()) |i| {
-            let c = v.constraints[i];
-            if not c.is_satisfied() { unsatisfied.push(c); };
-        };
-        let determining = v.determined_by;
+            let c = v.constraints[i]
+            if not c.is_satisfied() { unsatisfied.push(c) }
+        }
+        let determining = v.determined_by
         for (0..<v.constraints.len()) |i| {
-            let c = v.constraints[i];
+            let c = v.constraints[i]
             if not c.is(determining) and c.is_satisfied() {
-                c.recalculate();
-                todo.push(c.output());
-            };
-        };
-    };
-    unsatisfied;
+                c.recalculate()
+                todo.push(c.output())
+            }
+        }
+    }
+    unsatisfied
 }
 
 // The order to run the constraints downstream of `sources` in (which it uses up).
 fn Planner.make_plan |self| (sources: Buffer[Constraint]) Buffer[Constraint] {
-    let mark = self.new_mark();
-    let plan = Buffer[Constraint].new();
-    let todo = sources;
+    let mark = self.new_mark()
+    let plan = Buffer[Constraint].new()
+    let todo = sources
     while (not todo.is_empty()) {
-        let c = todo.pop();
-        let out = c.output();
+        let c = todo.pop()
+        let out = c.output()
         if out.mark != mark and c.inputs_known(mark) {
-            plan.push(c);
-            out.mark = mark;
-            add_constraints_consuming_to(out, todo);
-        };
-    };
-    plan;
+            plan.push(c)
+            out.mark = mark
+            add_constraints_consuming_to(out, todo)
+        }
+    }
+    plan
 }
 
 fn Planner.extract_plan_from_constraints |self| (constraints: Buffer[Constraint]) Buffer[Constraint] {
-    let sources = Buffer[Constraint].new();
+    let sources = Buffer[Constraint].new()
     for (0..<constraints.len()) |i| {
-        let c = constraints[i];
-        if c.is_input() and c.is_satisfied() { sources.push(c); };
-    };
-    self.make_plan(sources);
+        let c = constraints[i]
+        if c.is_input() and c.is_satisfied() { sources.push(c) }
+    }
+    self.make_plan(sources)
 }
 
 fn execute_plan(plan: Buffer[Constraint]) void {
-    for (0..<plan.len()) |i| { plan[i].execute(); };
+    for (0..<plan.len()) |i| { plan[i].execute() }
 }
 
 // ---------------------------------------------------------------------------
@@ -495,112 +495,112 @@ fn execute_plan(plan: Buffer[Constraint]) void {
 
 // The plan for one edit constraint.
 fn plan_for(planner: Planner, edit: Constraint) Buffer[Constraint] {
-    let edits = Buffer[Constraint].new();
-    edits.push(edit);
-    planner.extract_plan_from_constraints(edits);
+    let edits = Buffer[Constraint].new()
+    edits.push(edit)
+    planner.extract_plan_from_constraints(edits)
 }
 
 // A chain of n equality constraints, whose first value must reach its last.
 fn chain_test(n: I32) I64 {
-    let planner = Planner.new();
-    let prev: ?Variable = null;
-    let first: ?Variable = null;
-    let last: ?Variable = null;
+    let planner = Planner.new()
+    let prev: ?Variable = null
+    let first: ?Variable = null
+    let last: ?Variable = null
     for (0...n) |i| {
-        let v = Variable.new(0);
+        let v = Variable.new(0)
         promote prev {
-            |p| => { equality(p, v, Strength.Required, planner); },
+            |p| => { equality(p, v, Strength.Required, planner) },
             ~> {},
-        };
-        if i == 0 { first = v; };
-        if i == n { last = v; };
-        prev = v;
-    };
-    let head = first orelse fatal;
-    let tail = last orelse fatal;
-    stay(tail, Strength.StrongDefault, planner);
-    let plan = plan_for(planner, edit(head, Strength.Preferred, planner));
-    let failures: I64 = 0;
+        }
+        if i == 0 { first = v }
+        if i == n { last = v }
+        prev = v
+    }
+    let head = first orelse fatal
+    let tail = last orelse fatal
+    stay(tail, Strength.StrongDefault, planner)
+    let plan = plan_for(planner, edit(head, Strength.Preferred, planner))
+    let failures: I64 = 0
     for (0..<100) |i| {
-        head.value = i;
-        execute_plan(plan);
-        if tail.value != i { failures += 1; };
-    };
-    failures;
+        head.value = i
+        execute_plan(plan)
+        if tail.value != i { failures += 1 }
+    }
+    failures
 }
 
 fn change(planner: Planner, v: Variable, value: I32) void {
-    let e = edit(v, Strength.Preferred, planner);
-    let plan = plan_for(planner, e);
+    let e = edit(v, Strength.Preferred, planner)
+    let plan = plan_for(planner, e)
     for (0..<10) {
-        v.value = value;
-        execute_plan(plan);
-    };
-    e.destroy(planner);
+        v.value = value
+        execute_plan(plan)
+    }
+    e.destroy(planner)
 }
 
 // n scale constraints, dst = src * scale + offset, edited from every end.
 fn projection_test(n: I32) I64 {
-    let planner = Planner.new();
-    let scale_by = Variable.new(10);
-    let offset = Variable.new(1000);
-    let src: ?Variable = null;
-    let dst: ?Variable = null;
-    let dests = Buffer[Variable].new();
+    let planner = Planner.new()
+    let scale_by = Variable.new(10)
+    let offset = Variable.new(1000)
+    let src: ?Variable = null
+    let dst: ?Variable = null
+    let dests = Buffer[Variable].new()
     for (0..<n) |i| {
-        let s = Variable.new(i);
-        let d = Variable.new(i);
-        dests.push(d);
-        stay(s, Strength.Normal, planner);
-        scale(s, scale_by, offset, d, Strength.Required, planner);
-        src = s;
-        dst = d;
-    };
-    let source = src orelse fatal;
-    let dest = dst orelse fatal;
-    let failures: I64 = 0;
-    change(planner, source, 17);
-    if dest.value != 1170 { failures += 1; };
-    change(planner, dest, 1050);
-    if source.value != 5 { failures += 1; };
-    change(planner, scale_by, 5);
+        let s = Variable.new(i)
+        let d = Variable.new(i)
+        dests.push(d)
+        stay(s, Strength.Normal, planner)
+        scale(s, scale_by, offset, d, Strength.Required, planner)
+        src = s
+        dst = d
+    }
+    let source = src orelse fatal
+    let dest = dst orelse fatal
+    let failures: I64 = 0
+    change(planner, source, 17)
+    if dest.value != 1170 { failures += 1 }
+    change(planner, dest, 1050)
+    if source.value != 5 { failures += 1 }
+    change(planner, scale_by, 5)
     for (0..<n - 1) |i| {
-        if dests[i].value != i * 5 + 1000 { failures += 1; };
-    };
-    change(planner, offset, 2000);
+        if dests[i].value != i * 5 + 1000 { failures += 1 }
+    }
+    change(planner, offset, 2000)
     for (0..<n - 1) |i| {
-        if dests[i].value != i * 5 + 2000 { failures += 1; };
-    };
-    failures;
+        if dests[i].value != i * 5 + 2000 { failures += 1 }
+    }
+    failures
 }
 
 test "deltablue solves small graphs" {
     for ([1, 2, 3, 20, 100]) |n| {
-        assert chain_test(n) == 0;
-        assert projection_test(n) == 0;
-    };
+        assert chain_test(n) == 0
+        assert projection_test(n) == 0
+    }
 }
 
 bench "deltablue_chain" {
-    let sink: I64 = 0;
+    let sink: I64 = 0
     measure {
-        sink = sink + chain_test(1048);
+        sink = sink + chain_test(1048)
     }
 }
 
 bench "deltablue_projection" {
-    let sink: I64 = 0;
+    let sink: I64 = 0
     measure {
-        sink = sink + projection_test(1048);
+        sink = sink + projection_test(1048)
     }
 }
 
 export main(kind: I32, iterations: I32) I64 {
-    let sink: I64 = 0;
+    let sink: I64 = 0
     if kind == 0 {
-        for (0..<iterations) { sink += chain_test(1048); };
+        for (0..<iterations) { sink += chain_test(1048) }
     } else {
-        for (0..<iterations) { sink += projection_test(1048); };
-    };
-    sink;
+        for (0..<iterations) { sink += projection_test(1048) }
+    }
+    sink
 }

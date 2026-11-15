@@ -4,13 +4,13 @@ mod time {
     /// Milliseconds since an arbitrary start, with sub-millisecond precision
     /// where the host has it (`performance.now`): for measuring.
     fn now() F64 {
-        let f: fun() F64 = @es/\ () => performance.now() \/;
-        f();
+        let f: fun() F64 = @es/\ () => performance.now() \/
+        f()
     }
 
     /// Milliseconds since 1970-01-01 UTC (`Date.now`): for dates.
     fn epoch_ms() F64 {
-        let f: fun() F64 = @es/\ () => Date.now() \/;
-        f();
+        let f: fun() F64 = @es/\ () => Date.now() \/
+        f()
     }
 }

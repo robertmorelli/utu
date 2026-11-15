@@ -57,7 +57,7 @@ loop match state {
     0 => { ...; continue 1; },     // jump to state 1
     1 => { ...; break; },          // leave the loop
     ~> { ... },                    // an arm that finishes also leaves
-};
+}
 ```
 
 Lowering (dense integer states): `block $exit (loop $dispatch …)` with one
@@ -85,9 +85,9 @@ At the default -Oz the JSON parser is both faster on both engines and smaller.
 
 ```utu
 fn squares(n: I32) yield I32 {
-    for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; };
+    for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }
 }
-for (squares(10)) |x| { ... };        // or: await for (…) |x| { … }
+for (squares(10)) |x| { ... }        // or: await for (…) |x| { … }
 ```
 
 Sum of squares of 0..2M that are not multiples of 3, written five ways (-Oz):
@@ -117,9 +117,9 @@ Because `await` suspends the wasm stack (JSPI), a generator body may await;
 
 ```utu
 fn walk(n: Node) yield Node {
-    for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; };
+    for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; }
 }
-for (walk(root)) |n| { if is_function(n) { prune; }; ... };
+for (walk(root)) |n| { if is_function(n) { prune; }; ... }
 ```
 
 A generator that delegates to itself cannot expand inline, so it runs as one
@@ -153,9 +153,9 @@ the generator buys depth-first order as a loop with `break` and `prune`.
 ## Memory arrays — accepted (`memories.mjs`)
 
 ```utu
-export mem input: U8;
-export mem table: U8;
-for (0 ..< n) |i| { s = table[(s << 8) + input[i]]; if s == 0 { c += 1; }; };
+export mem input: U8
+export mem table: U8
+for (0 ..< n) |i| { s = table[(s << 8) + input[i]]; if s == 0 { c += 1; }; }
 ```
 
 A `mem` is a top-level scalar array that is its own linear memory. The same

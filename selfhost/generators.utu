@@ -21,255 +21,255 @@
 
 // The expansions being checked, innermost last: what each yield needs.
 /// The label a `return;` in the generator and a `break` in the body leave.
-vec gen_whole: I32;
+vec gen_whole: I32
 /// The consumer's capture declaration, or -1.
-vec gen_capture: I32;
+vec gen_capture: I32
 /// The consumer's block.
-vec gen_body: I32;
+vec gen_body: I32
 /// The yielded type.
-vec gen_type: I32;
+vec gen_type: I32
 /// The consumer's checking context.
-vec gen_cx_inst: I32;
-vec gen_cx_fi: I32;
-vec gen_cx_result: I32;
+vec gen_cx_inst: I32
+vec gen_cx_fi: I32
+vec gen_cx_result: I32
 /// The generator's declaration.
-vec gen_decl: I32;
+vec gen_decl: I32
 /// The defers pending when the generation began.
-vec gen_defers: I32;
+vec gen_defers: I32
 /// For a recursive generation, its index in `rec_*`; else -1.
-vec gen_rec: I32;
+vec gen_rec: I32
 /// The generators of the program's own items, checked even when unused.
-vec own_gens: I32;
+vec own_gens: I32
 /// By declaration: 1 for a generator a `for` expanded.
-vec gen_used: U8;
+vec gen_used: U8
 
 fn mark_used(gen: I32) void {
-    grow_used();
-    gen_used[gen] = 1;
+    grow_used()
+    gen_used[gen] = 1
 }
 
 /// @gen_used to every declaration, new ones 0.
 fn grow_used() void {
-    while (gen_used.len() < decl_kind.len()) { gen_used.push(0); };
+    while (gen_used.len() < decl_kind.len()) { gen_used.push(0) }
 }
 
 /// An expansion begins: what its yields need, on the stacks above.
 fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32, rec: I32) void {
-    gen_whole.push(whole);
-    gen_capture.push(cap);
-    gen_body.push(body);
-    gen_type.push(elem);
-    gen_cx_inst.push(cx.inst);
-    gen_cx_fi.push(cx.fi);
-    gen_cx_result.push(cx.result);
-    gen_decl.push(gen);
-    gen_defers.push(defer_node.len());
-    gen_rec.push(rec);
+    gen_whole.push(whole)
+    gen_capture.push(cap)
+    gen_body.push(body)
+    gen_type.push(elem)
+    gen_cx_inst.push(cx.inst)
+    gen_cx_fi.push(cx.fi)
+    gen_cx_result.push(cx.result)
+    gen_decl.push(gen)
+    gen_defers.push(defer_node.len())
+    gen_rec.push(rec)
 }
 
 /// The innermost expansion ends.
 fn end_expansion() void {
-    let k = gen_whole.len() - 1;
-    gen_whole.resize(k);
-    gen_capture.resize(k);
-    gen_body.resize(k);
-    gen_type.resize(k);
-    gen_cx_inst.resize(k);
-    gen_cx_fi.resize(k);
-    gen_cx_result.resize(k);
-    gen_decl.resize(k);
-    gen_defers.resize(k);
-    gen_rec.resize(k);
+    let k = gen_whole.len() - 1
+    gen_whole.resize(k)
+    gen_capture.resize(k)
+    gen_body.resize(k)
+    gen_type.resize(k)
+    gen_cx_inst.resize(k)
+    gen_cx_fi.resize(k)
+    gen_cx_result.resize(k)
+    gen_decl.resize(k)
+    gen_defers.resize(k)
+    gen_rec.resize(k)
 }
 
 /// Empty the expansion and recursion stacks, before a program is checked.
 fn reset_generators() void {
-    gen_whole.clear();
-    gen_capture.clear();
-    gen_body.clear();
-    gen_type.clear();
-    gen_cx_inst.clear();
-    gen_cx_fi.clear();
-    gen_cx_result.clear();
-    gen_decl.clear();
-    gen_defers.clear();
-    gen_rec.clear();
-    aside_decls.clear();
-    aside_at.clear();
-    aside_defers.clear();
-    aside_vals.clear();
-    own_gens.clear();
-    gen_used.clear();
-    fl_first.clear();
-    fl_last.clear();
-    fl_next.clear();
-    rec_kind.clear();
-    rec_val.clear();
-    rec_top.clear();
-    rec_args.clear();
-    rec_elem.clear();
-    rec_params.clear();
-    prune_flag.clear();
-    prune_loop.clear();
+    gen_whole.clear()
+    gen_capture.clear()
+    gen_body.clear()
+    gen_type.clear()
+    gen_cx_inst.clear()
+    gen_cx_fi.clear()
+    gen_cx_result.clear()
+    gen_decl.clear()
+    gen_defers.clear()
+    gen_rec.clear()
+    aside_decls.clear()
+    aside_at.clear()
+    aside_defers.clear()
+    aside_vals.clear()
+    own_gens.clear()
+    gen_used.clear()
+    fl_first.clear()
+    fl_last.clear()
+    fl_next.clear()
+    rec_kind.clear()
+    rec_val.clear()
+    rec_top.clear()
+    rec_args.clear()
+    rec_elem.clear()
+    rec_params.clear()
+    prune_flag.clear()
+    prune_loop.clear()
 }
 
 /// Whether a function declaration is a generator (its result is `yield T`).
 fn is_generator(decl: I32) Bool {
-    if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return false; };
-    let ret = child_of_kind(decl_node[decl], Node.Return_type);
-    ret >= 0 and is_kind(first_child(ret), Node.Yield_type);
+    if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return false }
+    let ret = child_of_kind(decl_node[decl], Node.Return_type)
+    ret >= 0 and is_kind(first_child(ret), Node.Yield_type)
 }
 
 /// The generator a `for` loop consumes: its one source is a call of one,
 /// by name (`g(…)`, `m.g(…)`, `T.g(…)`). A method's, `x.g(…)`, needs x's
 /// type: see @generator_source.
 fn generator_call(for_node: I32) I32 {
-    let call = sole_call(for_node);
-    if call >= 0 and generator_decl_of(call) >= 0 { call; } else { -1; };
+    let call = sole_call(for_node)
+    if call >= 0 and generator_decl_of(call) >= 0 { call } else { -1 }
 }
 
 /// A `for` loop's one source, when it is a call; else -1.
 fn sole_call(for_node: I32) I32 {
-    let sources = first_child(for_node);
-    let source = first_child(sources);
-    if source < 0 or next_sibling(source) >= 0 or next_sibling(first_child(source)) >= 0 { return -1; };
-    let call = first_child(source);
-    if is_kind(call, Node.Call_expr) or is_kind(call, Node.Promoted_module_call_expr) { call; } else { -1; };
+    let sources = first_child(for_node)
+    let source = first_child(sources)
+    if source < 0 or next_sibling(source) >= 0 or next_sibling(first_child(source)) >= 0 { return -1 }
+    let call = first_child(source)
+    if is_kind(call, Node.Call_expr) or is_kind(call, Node.Promoted_module_call_expr) { call } else { -1 }
 }
 
 /// A call's argument list (-1 for none): `f(…)`'s, or `M[A].f(…)`'s.
 fn call_args(call: I32) I32 {
-    if is_kind(call, Node.Promoted_module_call_expr) { return next_sibling(next_sibling(next_sibling(first_child(call)))); };
-    next_sibling(first_child(call));
+    if is_kind(call, Node.Promoted_module_call_expr) { return next_sibling(next_sibling(next_sibling(first_child(call)))) }
+    next_sibling(first_child(call))
 }
 
 /// The generator a call names: `g(…)`, `m.g(…)` (a module's or an alias's),
 /// `T.g(…)`, or `M[A].g(…)`; else -1.
 fn generator_decl_of(call: I32) I32 {
-    let callee = first_child(call);
-    let d = -1;
-    if is_kind(call, Node.Promoted_module_call_expr) { d = node_decl[next_sibling(next_sibling(callee))]; }
-    else if is_kind(callee, Node.Identifier) { d = node_decl[callee]; }
+    let callee = first_child(call)
+    let d = -1
+    if is_kind(call, Node.Promoted_module_call_expr) { d = node_decl[next_sibling(next_sibling(callee))] }
+    else if is_kind(callee, Node.Identifier) { d = node_decl[callee] }
     else if is_kind(callee, Node.Field_expr) and is_kind(first_child(callee), Node.Identifier) {
-        let base = node_decl[first_child(callee)];
-        if decl_is(base, Decl.Module) { d = node_decl[last_child(callee)]; }
-        else if decl_is(base, Decl.Alias) and decl_is(decl_a[base], Decl.Module) { d = static_member(decl_a[base], word_of(last_child(callee))); };
-    } else if is_kind(callee, Node.Type_member_expr) { d = node_decl[last_child(callee)]; };
-    if is_generator(d) { d; } else { -1; };
+        let base = node_decl[first_child(callee)]
+        if decl_is(base, Decl.Module) { d = node_decl[last_child(callee)] }
+        else if decl_is(base, Decl.Alias) and decl_is(decl_a[base], Decl.Module) { d = static_member(decl_a[base], word_of(last_child(callee))) }
+    } else if is_kind(callee, Node.Type_member_expr) { d = node_decl[last_child(callee)] }
+    if is_generator(d) { d } else { -1 }
 }
 
 /// The generator call a `for` loop consumes, a method's (`x.each()`, by x's
 /// type) too; else -1. A method's is recorded on its name.
 fn generator_source(for_node: I32, cx: Cx) I32 {
-    let call = sole_call(for_node);
-    if call < 0 { return -1; };
-    if generator_decl_of(call) >= 0 { return call; };
-    let callee = first_child(call);
-    if not is_kind(callee, Node.Field_expr) or is_module_path(callee) { return -1; };
-    let rt = type_only(first_child(callee), -1, cx);
-    if ty_is(rt, Ty.Error) or ty_is(rt, Ty.Nullable) or ty_decl(rt) < 0 { return -1; };
-    let d = member(ty_decl(rt), word_of(last_child(callee)), Space.Method);
-    if not is_generator(d) { return -1; };
-    node_decl[last_child(callee)] = d;
-    call;
+    let call = sole_call(for_node)
+    if call < 0 { return -1 }
+    if generator_decl_of(call) >= 0 { return call }
+    let callee = first_child(call)
+    if not is_kind(callee, Node.Field_expr) or is_module_path(callee) { return -1 }
+    let rt = type_only(first_child(callee), -1, cx)
+    if ty_is(rt, Ty.Error) or ty_is(rt, Ty.Nullable) or ty_decl(rt) < 0 { return -1 }
+    let d = member(ty_decl(rt), word_of(last_child(callee)), Space.Method)
+    if not is_generator(d) { return -1 }
+    node_decl[last_child(callee)] = d
+    call
 }
 
 /// The module instance a named generator call (see @generator_decl_of) runs in.
 fn generator_inst(call: I32, gen: I32, cx: Cx) I32 {
-    let callee = first_child(call);
-    let base = first_child(callee);
-    if is_kind(call, Node.Promoted_module_call_expr) { return instance_checked(module_of(gen), next_sibling(callee), cx.inst, call); };
-    if is_kind(callee, Node.Field_expr) and decl_is(node_decl[base], Decl.Alias) { return alias_instance(node_decl[base]); };
+    let callee = first_child(call)
+    let base = first_child(callee)
+    if is_kind(call, Node.Promoted_module_call_expr) { return instance_checked(module_of(gen), next_sibling(callee), cx.inst, call) }
+    if is_kind(callee, Node.Field_expr) and decl_is(node_decl[base], Decl.Alias) { return alias_instance(node_decl[base]) }
     if is_kind(callee, Node.Type_member_expr) and not (is_kind(base, Node.Type_ident) and decl_is(node_decl[base], Decl.Module)) {
-        let t = type_path(base, cx.inst);
-        return if ty_is(t, Ty.Error) { -1; } else { ty_inst(t); };
-    };
-    instance_for(module_of(gen), cx.inst);
+        let t = type_path(base, cx.inst)
+        return if ty_is(t, Ty.Error) { -1 } else { ty_inst(t) }
+    }
+    instance_for(module_of(gen), cx.inst)
 }
 
 /// The declarations of a generator (its parameters and locals): those
 /// whose node is inside it, in order.
 fn generator_decls(gen: I32) I32 {
-    file_locals();
-    let m = vl_begin();
-    let d = fl_first[decl_node[gen]];
+    file_locals()
+    let m = vl_begin()
+    let d = fl_first[decl_node[gen]]
     while (d > 0) {
-        vl_add(d - 1);
-        d = fl_next[d - 1];
-    };
-    vl_end(m);
+        vl_add(d - 1)
+        d = fl_next[d - 1]
+    }
+    vl_end(m)
 }
 
 /// By node: a function's first and last local declaration, plus one (0 for
 /// none); by declaration: the next local of its function, plus one.
-vec fl_first: I32;
-vec fl_last: I32;
-vec fl_next: I32;
+vec fl_first: I32
+vec fl_last: I32
+vec fl_next: I32
 
 /// File the declarations not yet filed under their functions (see @fl_first).
 fn file_locals() void {
     // (Pushed, not resized: a vec's resize can bring back a past build's values.)
     while (fl_first.len() < node_kind.len()) {
-        fl_first.push(0);
-        fl_last.push(0);
-    };
-    let d = fl_next.len();
+        fl_first.push(0)
+        fl_last.push(0)
+    }
+    let d = fl_next.len()
     while (d < decl_kind.len()) {
-        fl_next.push(0);
+        fl_next.push(0)
         if is_local_decl(d) and decl_node[d] >= 0 {
-            let f = node_parent[decl_node[d]];
-            while (f >= 0 and not is_kind(f, Node.Fn_decl)) { f = node_parent[f]; };
+            let f = node_parent[decl_node[d]]
+            while (f >= 0 and not is_kind(f, Node.Fn_decl)) { f = node_parent[f] }
             if f >= 0 {
-                if fl_last[f] > 0 { fl_next[fl_last[f] - 1] = d + 1; } else { fl_first[f] = d + 1; };
-                fl_last[f] = d + 1;
-            };
-        };
-        d += 1;
-    };
+                if fl_last[f] > 0 { fl_next[fl_last[f] - 1] = d + 1 } else { fl_first[f] = d + 1 }
+                fl_last[f] = d + 1
+            }
+        }
+        d += 1
+    }
 }
 
 // What @set_aside kept, innermost last: the list, where its values start
 // in @aside_vals ([local, type] each), and the defers pending then.
-vec aside_decls: I32;
-vec aside_at: I32;
-vec aside_defers: I32;
-vec aside_vals: I32;
+vec aside_decls: I32
+vec aside_at: I32
+vec aside_defers: I32
+vec aside_vals: I32
 
 /// Set aside the locals and types of declarations `decls` (a list), in case
 /// an outer expansion of their generator is running.
 fn set_aside(decls: I32) void {
-    aside_decls.push(decls);
-    aside_at.push(aside_vals.len());
-    aside_defers.push(defer_node.len());
+    aside_decls.push(decls)
+    aside_at.push(aside_vals.len())
+    aside_defers.push(defer_node.len())
     for (0 ..< vl_len[decls]) |i| {
-        aside_vals.push(decl_local[vl_item(decls, i)]);
-        aside_vals.push(decl_ty[vl_item(decls, i)]);
-    };
+        aside_vals.push(decl_local[vl_item(decls, i)])
+        aside_vals.push(decl_ty[vl_item(decls, i)])
+    }
 }
 
 /// Bring back what the innermost @set_aside kept.
 fn bring_back() void {
-    let k = aside_decls.len() - 1;
-    swap_aside(k);
-    aside_vals.resize(aside_at[k]);
-    aside_decls.resize(k);
-    aside_at.resize(k);
-    aside_defers.resize(k);
+    let k = aside_decls.len() - 1
+    swap_aside(k)
+    aside_vals.resize(aside_at[k])
+    aside_decls.resize(k)
+    aside_at.resize(k)
+    aside_defers.resize(k)
 }
 
 /// Swap set-aside entry k's values with the declarations' current ones.
 fn swap_aside(k: I32) void {
-    let decls = aside_decls[k];
-    let at = aside_at[k];
+    let decls = aside_decls[k]
+    let at = aside_at[k]
     for (0 ..< vl_len[decls]) |i| {
-        let d = vl_item(decls, i);
-        let l = decl_local[d];
-        let t = decl_ty[d];
-        decl_local[d] = aside_vals[at + i * 2];
-        decl_ty[d] = aside_vals[at + i * 2 + 1];
-        aside_vals[at + i * 2] = l;
-        aside_vals[at + i * 2 + 1] = t;
-    };
+        let d = vl_item(decls, i)
+        let l = decl_local[d]
+        let t = decl_ty[d]
+        decl_local[d] = aside_vals[at + i * 2]
+        decl_ty[d] = aside_vals[at + i * 2 + 1]
+        aside_vals[at + i * 2] = l
+        aside_vals[at + i * 2 + 1] = t
+    }
 }
 
 /// Defer i runs (at an exit, or in a guard) with the bindings of when it was
@@ -277,43 +277,43 @@ fn swap_aside(k: I32) void {
 /// set its declarations aside, so they come back while it runs (`back`),
 /// innermost first, and go again after (`back` false), outermost first.
 fn defer_bindings(i: I32, back: Bool) void {
-    let n = aside_decls.len();
-    let from = n;
-    while (from > 0 and aside_defers[from - 1] > i) { from -= 1; };
+    let n = aside_decls.len()
+    let from = n
+    while (from > 0 and aside_defers[from - 1] > i) { from -= 1 }
     if back {
-        let k = n - 1;
-        while (k >= from) { swap_aside(k); k -= 1; };
+        let k = n - 1
+        while (k >= from) { swap_aside(k); k -= 1 }
     } else {
-        for (from ..< n) |k| { swap_aside(k); };
-    };
+        for (from ..< n) |k| { swap_aside(k) }
+    }
 }
 
 /// Whether generator `gen`'s body has a `for (gen(…))` of its own.
-fn delegates_to_itself(gen: I32) Bool { calls_generator(last_child(decl_node[gen]), gen); }
+fn delegates_to_itself(gen: I32) Bool { calls_generator(last_child(decl_node[gen]), gen) }
 
 /// Whether a `for` under `node` consumes generator `gen`.
 fn calls_generator(node: I32, gen: I32) Bool {
     if is_kind(node, Node.For_expr) {
-        let call = generator_call(node);
-        if call >= 0 and generator_decl_of(call) == gen { return true; };
-    };
-    let c = first_child(node);
+        let call = generator_call(node)
+        if call >= 0 and generator_decl_of(call) == gen { return true }
+    }
+    let c = first_child(node)
     while (c >= 0) {
-        if calls_generator(c, gen) { return true; };
-        c = next_sibling(c);
-    };
-    false;
+        if calls_generator(c, gen) { return true }
+        c = next_sibling(c)
+    }
+    false
 }
 
 /// `for (g(…)) |v| { yield v; }`: the loop yields each value, and nothing else.
 fn is_delegation(loop_: I32) Bool {
-    let capture = next_sibling(first_child(loop_));
-    if not is_kind(capture, Node.Capture) or next_sibling(first_child(capture)) >= 0 { return false; };
-    let body = last_child(loop_);
-    let y = first_child(body);
-    if y < 0 or next_sibling(y) >= 0 or not is_kind(y, Node.Yield_expr) { return false; };
-    let v = first_child(y);
-    is_kind(v, Node.Identifier) and first_child(v) < 0 and word_of(v) == word_of(first_child(capture));
+    let capture = next_sibling(first_child(loop_))
+    if not is_kind(capture, Node.Capture) or next_sibling(first_child(capture)) >= 0 { return false }
+    let body = last_child(loop_)
+    let y = first_child(body)
+    if y < 0 or next_sibling(y) >= 0 or not is_kind(y, Node.Yield_expr) { return false }
+    let v = first_child(y)
+    is_kind(v, Node.Identifier) and first_child(v) < 0 and word_of(v) == word_of(first_child(capture))
 }
 
 /// `for (gen(args)) |x| { body }`: the generator's body in place of the
@@ -321,14 +321,14 @@ fn is_delegation(loop_: I32) Bool {
 /// itself goes to @check_recursive_loop; one already expanding here is a
 /// call item of its recursion, or reported.
 fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
-    let gen = generator_decl_of(call);
+    let gen = generator_decl_of(call)
     // `x.each()`: a method's, x its receiver (see @generator_source).
-    let receiver = -1;
+    let receiver = -1
     if gen < 0 {
-        gen = node_decl[last_child(first_child(call))];
-        receiver = first_child(first_child(call));
-    };
-    mark_used(gen);
+        gen = node_decl[last_child(first_child(call))]
+        receiver = first_child(first_child(call))
+    }
+    mark_used(gen)
     // A generator that consumes itself would expand without end.
     for (0 ..< gen_decl.len()) |i| {
         if gen_decl[i] == gen {
@@ -336,244 +336,244 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
             // passes its values straight through.
             if delegates_to_itself(gen) and receiver < 0 {
                 if not is_delegation(node) {
-                    report(Diag.GeneratorPassThrough, node, decl_name[gen]);
-                    return error_value();
-                };
-                return rec_push_call(gen_rec[i], node, call, cx);
-            };
-            report(Diag.GeneratorRecursion, node, if receiver >= 0 { word_of(last_child(first_child(call))); } else { decl_name[gen]; });
-            if receiver >= 0 { diag_note("a method generator cannot consume itself"); };
-            return error_value();
-        };
-    };
-    let capture = next_sibling(first_child(node));
-    let body = last_child(node);
-    let cap = -1;
+                    report(Diag.GeneratorPassThrough, node, decl_name[gen])
+                    return error_value()
+                }
+                return rec_push_call(gen_rec[i], node, call, cx)
+            }
+            report(Diag.GeneratorRecursion, node, if receiver >= 0 { word_of(last_child(first_child(call))) } else { decl_name[gen] })
+            if receiver >= 0 { diag_note("a method generator cannot consume itself") }
+            return error_value()
+        }
+    }
+    let capture = next_sibling(first_child(node))
+    let body = last_child(node)
+    let cap = -1
     if is_kind(capture, Node.Capture) {
-        let name = first_child(capture);
+        let name = first_child(capture)
         if next_sibling(name) >= 0 {
-            report2(Diag.InvalidForSource, node, -1, 1, -1);
-            return error_value();
-        };
-        cap = node_decl[name];
-    };
-    let m = w_mark();
+            report2(Diag.InvalidForSource, node, -1, 1, -1)
+            return error_value()
+        }
+        cap = node_decl[name]
+    }
+    let m = w_mark()
     // A method's receiver is evaluated first, and its type is the instance.
-    let rt = if receiver >= 0 { check_expr(receiver, -1, cx); } else { -1; };
-    if receiver >= 0 and ty_is(rt, Ty.Error) { return error_since(m); };
-    let inst = if receiver >= 0 { ty_inst(rt); } else { generator_inst(call, gen, cx); };
+    let rt = if receiver >= 0 { check_expr(receiver, -1, cx) } else { -1 }
+    if receiver >= 0 and ty_is(rt, Ty.Error) { return error_since(m) }
+    let inst = if receiver >= 0 { ty_inst(rt) } else { generator_inst(call, gen, cx) }
     // (A module named with the wrong count of type arguments was reported.)
-    if inst < 0 { return error_since(m); };
+    if inst < 0 { return error_since(m) }
     // Its element type: `yield T`.
-    let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), inst);
+    let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), inst)
     if delegates_to_itself(gen) {
         // (A method's would pass its receiver along: not done.)
         if receiver >= 0 {
-            w_stack.resize(m);
-            report(Diag.GeneratorRecursion, node, word_of(last_child(first_child(call))));
-            diag_note("a method generator cannot consume itself");
-            return error_value();
-        };
-        return check_recursive_loop(node, call, gen, cap, elem, inst, cx);
-    };
-    let decls = generator_decls(gen);
-    set_aside(decls);
+            w_stack.resize(m)
+            report(Diag.GeneratorRecursion, node, word_of(last_child(first_child(call))))
+            diag_note("a method generator cannot consume itself")
+            return error_value()
+        }
+        return check_recursive_loop(node, call, gen, cap, elem, inst, cx)
+    }
+    let decls = generator_decls(gen)
+    set_aside(decls)
     // Before the parameters are bound: a captured one may be a box.
-    mark_boxes(fn_body(gen));
+    mark_boxes(fn_body(gen))
     // The receiver into self.
     if receiver >= 0 {
-        let st = receiver_type(gen, inst);
-        coerce(rt, st, receiver);
-        let self_decl = vl_item(param_decls(gen), 0);
-        decl_ty[self_decl] = st;
-        bind_value(self_decl, st, m);
-    };
+        let st = receiver_type(gen, inst)
+        coerce(rt, st, receiver)
+        let self_decl = vl_item(param_decls(gen), 0)
+        decl_ty[self_decl] = st
+        bind_value(self_decl, st, m)
+    }
     // Arguments into the parameters.
-    let params = param_list_of(gen);
-    let args = call_args(call);
-    let a = if args >= 0 { first_child(args); } else { -1; };
-    let p = if params >= 0 { first_child(params); } else { -1; };
+    let params = param_list_of(gen)
+    let args = call_args(call)
+    let a = if args >= 0 { first_child(args) } else { -1 }
+    let p = if params >= 0 { first_child(params) } else { -1 }
     while (a >= 0 and p >= 0) {
-        let d = node_decl[first_child(p)];
-        let pt = type_of(next_sibling(first_child(p)), inst);
-        let ma = w_mark();
-        coerce(check_expr(a, pt, cx), pt, a);
-        decl_ty[d] = pt;
-        bind_value(d, pt, ma);
-        a = next_sibling(a);
-        p = next_sibling(p);
-    };
+        let d = node_decl[first_child(p)]
+        let pt = type_of(next_sibling(first_child(p)), inst)
+        let ma = w_mark()
+        coerce(check_expr(a, pt, cx), pt, a)
+        decl_ty[d] = pt
+        bind_value(d, pt, ma)
+        a = next_sibling(a)
+        p = next_sibling(p)
+    }
     if a >= 0 or p >= 0 {
-        report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args));
-        w_stack.resize(m);
-        bring_back();
-        return error_value();
-    };
+        report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args))
+        w_stack.resize(m)
+        bring_back()
+        return error_value()
+    }
     // The generation.
-    let whole = new_label();
-    begin_expansion(whole, cap, body, elem, cx, gen, -1);
-    let mb = w_mark();
+    let whole = new_label()
+    begin_expansion(whole, cap, body, elem, cx, gen, -1)
+    let mb = w_mark()
     // The generator's own loops are its; the consumer's loops are not in reach.
-    let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
-    let loops = hide_loops();
-    let pg = profile_generator(gen, inst, gen_whole.len() - 1);
-    discard(check_block(fn_body(gen), ty_void(), gcx));
-    profile_generator_end(pg, gen_whole.len() - 1, gcx);
-    show_loops(loops);
-    w_node(Op.Block, vt_none, whole, 0, mb);
-    end_expansion();
-    bring_back();
-    w_node(Op.Seq, vt_none, 0, 0, m);
-    ty_void();
+    let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() }
+    let loops = hide_loops()
+    let pg = profile_generator(gen, inst, gen_whole.len() - 1)
+    discard(check_block(fn_body(gen), ty_void(), gcx))
+    profile_generator_end(pg, gen_whole.len() - 1, gcx)
+    show_loops(loops)
+    w_node(Op.Block, vt_none, whole, 0, mb)
+    end_expansion()
+    bring_back()
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    ty_void()
 }
 
 /// Each generator of the program's own items that no `for` expanded:
 /// checked on its own, as an unused function is.
 fn check_unused_generators() void {
-    grow_used();
+    grow_used()
     for (0 ..< own_gens.len()) |i| {
-        let gen = own_gens[i];
+        let gen = own_gens[i]
         // (One that delegates to itself expands only from a consumer.)
         if gen_used[gen] == 0 and not delegates_to_itself(gen) {
-            check_lone_generator(gen);
-            mark_used(gen);
-        };
-    };
+            check_lone_generator(gen)
+            mark_used(gen)
+        }
+    }
 }
 
 /// Generator `gen`'s body, with no consumer (each value dropped), in a
 /// function of its parameters that nothing calls.
 fn check_lone_generator(gen: I32) void {
-    let mp = vl_begin();
-    let method = is_method_generator(decl_node[gen]);
-    if method { vl_add(receiver_type(gen, 0)); };
-    let params = param_list_of(gen);
-    let p = if params >= 0 { first_child(params); } else { -1; };
+    let mp = vl_begin()
+    let method = is_method_generator(decl_node[gen])
+    if method { vl_add(receiver_type(gen, 0)) }
+    let params = param_list_of(gen)
+    let p = if params >= 0 { first_child(params) } else { -1 }
     while (p >= 0) {
-        vl_add(type_of(next_sibling(first_child(p)), 0));
-        p = next_sibling(p);
-    };
-    let ptypes = vl_end(mp);
-    let f = defined_func(ptypes, ty_void());
-    func_debug_name[f] = fn_debug_name(gen);
-    begin_function();
-    cur_fn[0] = -1;
-    let decls = param_decls(gen);
+        vl_add(type_of(next_sibling(first_child(p)), 0))
+        p = next_sibling(p)
+    }
+    let ptypes = vl_end(mp)
+    let f = defined_func(ptypes, ty_void())
+    func_debug_name[f] = fn_debug_name(gen)
+    begin_function()
+    cur_fn[0] = -1
+    let decls = param_decls(gen)
     for (0 ..< vl_len[ptypes]) |i| {
-        let d = vl_item(decls, i);
-        decl_local[d] = new_local(repr(vl_item(ptypes, i)));
-        decl_ty[d] = vl_item(ptypes, i);
-    };
-    cur_params.resize(1);
-    cur_params[0] = cur_locals.len();
-    mark_boxes(fn_body(gen));
-    let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), 0);
-    let cx = Cx { inst: 0, fi: -1, result: ty_void() };
-    let m = w_mark();
-    let prologue = box_params(decls, ptypes);
-    if prologue >= 0 { w_push(prologue); };
-    let mb = w_mark();
-    let whole = new_label();
-    begin_expansion(whole, -1, -1, elem, cx, gen, -1);
-    discard(check_block(fn_body(gen), ty_void(), cx));
-    w_node(Op.Block, vt_none, whole, 0, mb);
-    end_expansion();
-    w_node(Op.Seq, vt_none, 0, 0, m);
-    func_body[f] = w_pop();
-    record_locals(f, cur_params[0]);
+        let d = vl_item(decls, i)
+        decl_local[d] = new_local(repr(vl_item(ptypes, i)))
+        decl_ty[d] = vl_item(ptypes, i)
+    }
+    cur_params.resize(1)
+    cur_params[0] = cur_locals.len()
+    mark_boxes(fn_body(gen))
+    let elem = type_of(first_child(first_child(child_of_kind(decl_node[gen], Node.Return_type))), 0)
+    let cx = Cx { inst: 0, fi: -1, result: ty_void() }
+    let m = w_mark()
+    let prologue = box_params(decls, ptypes)
+    if prologue >= 0 { w_push(prologue) }
+    let mb = w_mark()
+    let whole = new_label()
+    begin_expansion(whole, -1, -1, elem, cx, gen, -1)
+    discard(check_block(fn_body(gen), ty_void(), cx))
+    w_node(Op.Block, vt_none, whole, 0, mb)
+    end_expansion()
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    func_body[f] = w_pop()
+    record_locals(f, cur_params[0])
 }
 
 /// A function declaration's `Param_list` node, or -1.
-fn param_list_of(decl: I32) I32 { child_of_kind(decl_node[decl], Node.Param_list); }
+fn param_list_of(decl: I32) I32 { child_of_kind(decl_node[decl], Node.Param_list) }
 
 /// The innermost expansion whose generator the node is in, or -1; a node
 /// in a closure there belongs to the closure's body (its `try`, `errdefer`
 /// and `return` are the closure's).
 fn expansion_of(node: I32) I32 {
-    let k = expansion_around(node);
-    if k < 0 { return -1; };
-    let g = decl_node[gen_decl[k]];
-    let p = parent_of(node);
+    let k = expansion_around(node)
+    if k < 0 { return -1 }
+    let g = decl_node[gen_decl[k]]
+    let p = parent_of(node)
     while (p >= 0 and p != g) {
-        if is_kind(p, Node.Closure_expr) { return -1; };
-        p = parent_of(p);
-    };
-    k;
+        if is_kind(p, Node.Closure_expr) { return -1 }
+        p = parent_of(p)
+    }
+    k
 }
 
 /// The innermost expansion whose generator's text the node is in, or -1.
 fn expansion_around(node: I32) I32 {
-    let k = gen_decl.len() - 1;
-    let t = node_first[node];
+    let k = gen_decl.len() - 1
+    let t = node_first[node]
     while (k >= 0) {
         if gen_decl[k] >= 0 {
-            let g = decl_node[gen_decl[k]];
-            if t >= node_first[g] and t < node_last[g] { return k; };
-        };
-        k -= 1;
-    };
-    -1;
+            let g = decl_node[gen_decl[k]]
+            if t >= node_first[g] and t < node_last[g] { return k }
+        }
+        k -= 1
+    }
+    -1
 }
 
 /// `yield v`: v into the consumer's capture, then its body, which `continue`
 /// leaves (to resume the generator) and `break` ends the whole generation.
 fn check_yield(node: I32, cx: Cx) I32 {
     // (One in a closure there is reported when validated.)
-    let k = expansion_around(node);
+    let k = expansion_around(node)
     if k < 0 {
-        report(Diag.YieldOutside, node, -1);
-        return error_value();
-    };
-    let t = gen_type[k];
-    if gen_rec[k] >= 0 { return rec_push_value(gen_rec[k], first_child(node), cx); };
-    let m = w_mark();
-    let value = first_child(node);
-    let mv = w_mark();
-    coerce(check_expr(value, t, cx), t, value);
-    let resume = new_label();
-    let mr = w_mark();
+        report(Diag.YieldOutside, node, -1)
+        return error_value()
+    }
+    let t = gen_type[k]
+    if gen_rec[k] >= 0 { return rec_push_value(gen_rec[k], first_child(node), cx) }
+    let m = w_mark()
+    let value = first_child(node)
+    let mv = w_mark()
+    coerce(check_expr(value, t, cx), t, value)
+    let resume = new_label()
+    let mr = w_mark()
     if gen_capture[k] >= 0 {
-        decl_ty[gen_capture[k]] = t;
-        bind_value(gen_capture[k], t, mv);
+        decl_ty[gen_capture[k]] = t
+        bind_value(gen_capture[k], t, mv)
     } else {
-        drop_value(t);
-    };
+        drop_value(t)
+    }
     // The consumer's body, as part of the consumer: its loops and its result.
-    let ccx = Cx { inst: gen_cx_inst[k], fi: gen_cx_fi[k], result: gen_cx_result[k] };
+    let ccx = Cx { inst: gen_cx_inst[k], fi: gen_cx_fi[k], result: gen_cx_result[k] }
     // (Profiling: the body runs in the consumer's frame.)
-    let pg = profile_yield(k);
+    let pg = profile_yield(k)
     // Its break and continue reach this expansion, not the generator's loops.
-    enter_loop(gen_whole[k], resume, -1, -1);
+    enter_loop(gen_whole[k], resume, -1, -1)
     // break leaves the whole generation, so it runs the generator's defers.
-    loop_break_defers[loop_break_defers.len() - 1] = gen_defers[k];
+    loop_break_defers[loop_break_defers.len() - 1] = gen_defers[k]
     // While the body is checked, it is outside this expansion (a yield in
     // it belongs to an outer one).
-    let decl = gen_decl[k];
-    gen_decl[k] = -1;
-    if gen_body[k] >= 0 { discard(check_block(gen_body[k], ty_void(), ccx)); };
-    gen_decl[k] = decl;
-    leave_loop();
-    profile_yield_guard(pg, ccx);
-    w_node(Op.Block, vt_none, resume, 0, mr);
-    profile_yield_end(pg, k);
-    w_node(Op.Seq, vt_none, 0, 0, m);
-    ty_void();
+    let decl = gen_decl[k]
+    gen_decl[k] = -1
+    if gen_body[k] >= 0 { discard(check_block(gen_body[k], ty_void(), ccx)) }
+    gen_decl[k] = decl
+    leave_loop()
+    profile_yield_guard(pg, ccx)
+    w_node(Op.Block, vt_none, resume, 0, mr)
+    profile_yield_end(pg, k)
+    w_node(Op.Seq, vt_none, 0, 0, m)
+    ty_void()
 }
 
 /// `return;` inside a generator's expansion ends the generation.
 /// It runs the generator's pending defers first.
 fn generator_return(node: I32, cx: Cx) I32 {
-    let k = expansion_of(node);
-    if k < 0 { return -1; };
+    let k = expansion_of(node)
+    if k < 0 { return -1 }
     if first_child(node) >= 0 {
-        report(Diag.GeneratorReturnValue, node, -1);
-        return error_value();
-    };
-    let m = w_mark();
-    run_defers(gen_defers[k], cx);
-    w_leaf(Op.Br, vt_unreachable, gen_whole[k], 0);
-    w_node(Op.Seq, vt_unreachable, 0, 0, m);
-    ty_never();
+        report(Diag.GeneratorReturnValue, node, -1)
+        return error_value()
+    }
+    let m = w_mark()
+    run_defers(gen_defers[k], cx)
+    w_leaf(Op.Br, vt_unreachable, gen_whole[k], 0)
+    w_node(Op.Seq, vt_unreachable, 0, 0, m)
+    ty_never()
 }
 
 //! = Recursive generators
@@ -600,157 +600,157 @@ fn generator_return(node: I32, cx: Cx) I32 {
 //! still arrive in depth-first order.
 
 // The recursive generations being checked: their item arrays' locals.
-vec rec_kind: I32;
-vec rec_val: I32;
-vec rec_top: I32;
+vec rec_kind: I32
+vec rec_val: I32
+vec rec_top: I32
 /// A list of the parameters' array locals.
-vec rec_args: I32;
+vec rec_args: I32
 /// The yielded type.
-vec rec_elem: I32;
+vec rec_elem: I32
 /// A list of the parameters' types.
-vec rec_params: I32;
+vec rec_params: I32
 /// The innermost recursive consumer's `pruned` local.
-vec prune_flag: I32;
+vec prune_flag: I32
 /// And its loop.
-vec prune_loop: I32;
+vec prune_loop: I32
 
-fn rec_array_heap(vt: I32) I32 { array_type(storage(vt), true); }
+fn rec_array_heap(vt: I32) I32 { array_type(storage(vt), true) }
 
 /// A new array of 16 elements of vt's storage, in a new local.
 fn rec_new_array(vt: I32) I32 {
-    let heap = rec_array_heap(vt);
-    let local = new_local(vt_ref(heap, false));
-    let m = w_mark();
-    w_i32(16);
-    w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, m);
-    ls(local, m);
-    local;
+    let heap = rec_array_heap(vt)
+    let local = new_local(vt_ref(heap, false))
+    let m = w_mark()
+    w_i32(16)
+    w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, m)
+    ls(local, m)
+    local
 }
 
 /// `array[index]` = the value just pushed (at `m`); `index` is a local.
 fn rec_set(array: I32, index: I32, m: I32) void {
-    let v = w_pop();
-    lg(array);
-    lg(index);
-    w_push(v);
-    w_node(Op.ArraySet, vt_none, vt_heap(cur_locals[array]), 0, m);
+    let v = w_pop()
+    lg(array)
+    lg(index)
+    w_push(v)
+    w_node(Op.ArraySet, vt_none, vt_heap(cur_locals[array]), 0, m)
 }
 
 /// `array[index]`, read as `vt` (a reference stored nullable is read non-null).
 fn rec_get(array: I32, index: I32, vt: I32) void {
-    let heap = vt_heap(cur_locals[array]);
-    let m = w_mark();
-    lg(array);
-    lg(index);
-    w_node(Op.ArrayGet, storage(vt), heap, 0, m);
-    if storage(vt) != vt { w_node(Op.RefAsNonNull, vt, 0, 0, m); };
+    let heap = vt_heap(cur_locals[array])
+    let m = w_mark()
+    lg(array)
+    lg(index)
+    w_node(Op.ArrayGet, storage(vt), heap, 0, m)
+    if storage(vt) != vt { w_node(Op.RefAsNonNull, vt, 0, 0, m) }
 }
 
 /// When `top` reaches an array's length, each of `arrays` (locals) doubles.
 fn rec_grow(top: I32, arrays: Array[I32], n: I32) void {
-    let mi = w_mark();
-    let mc = w_mark();
-    lg(top);
-    let ml = w_mark();
-    lg(arrays[0]);
-    w_node(Op.ArrayLen, vt_i32, 0, 0, ml);
-    plain(70, vt_i32, mc);
-    let mt = w_mark();
+    let mi = w_mark()
+    let mc = w_mark()
+    lg(top)
+    let ml = w_mark()
+    lg(arrays[0])
+    w_node(Op.ArrayLen, vt_i32, 0, 0, ml)
+    plain(70, vt_i32, mc)
+    let mt = w_mark()
     for (0 ..< n) |k| {
-        let heap = vt_heap(cur_locals[arrays[k]]);
-        let grown = new_local(cur_locals[arrays[k]]);
-        let mg = w_mark();
-        lg(top);
-        w_i32(2);
-        plain(108, vt_i32, mg);
-        w_node(Op.ArrayNewDefault, cur_locals[arrays[k]], heap, 0, mg);
-        ls(grown, mg);
-        let mcp = w_mark();
-        lg(grown);
-        w_i32(0);
-        lg(arrays[k]);
-        w_i32(0);
-        lg(top);
-        w_node(Op.ArrayCopy, vt_none, heap, heap, mcp);
-        let ms = w_mark();
-        lg(grown);
-        ls(arrays[k], ms);
-    };
-    seq_void(mt);
-    w_node(Op.If, vt_none, new_label(), 0, mi);
+        let heap = vt_heap(cur_locals[arrays[k]])
+        let grown = new_local(cur_locals[arrays[k]])
+        let mg = w_mark()
+        lg(top)
+        w_i32(2)
+        plain(108, vt_i32, mg)
+        w_node(Op.ArrayNewDefault, cur_locals[arrays[k]], heap, 0, mg)
+        ls(grown, mg)
+        let mcp = w_mark()
+        lg(grown)
+        w_i32(0)
+        lg(arrays[k])
+        w_i32(0)
+        lg(top)
+        w_node(Op.ArrayCopy, vt_none, heap, heap, mcp)
+        let ms = w_mark()
+        lg(grown)
+        ls(arrays[k], ms)
+    }
+    seq_void(mt)
+    w_node(Op.If, vt_none, new_label(), 0, mi)
 }
 
 /// The item arrays of recursive generation r.
 fn rec_item_arrays(r: I32) Array[I32] {
-    let n = vl_len[rec_args[r]];
-    let arrays = Array[I32].new(n + 2, 0);
-    arrays[0] = rec_kind[r];
-    arrays[1] = rec_val[r];
-    for (0 ..< n) |i| { arrays[i + 2] = vl_item(rec_args[r], i); };
-    arrays;
+    let n = vl_len[rec_args[r]]
+    let arrays = Array[I32].new(n + 2, 0)
+    arrays[0] = rec_kind[r]
+    arrays[1] = rec_val[r]
+    for (0 ..< n) |i| { arrays[i + 2] = vl_item(rec_args[r], i) }
+    arrays
 }
 
 /// `kind[top] = kind_; top += 1` (after the item's own sets).
 fn rec_finish_item(r: I32, kind_: I32) void {
-    let m = w_mark();
-    w_i32(kind_);
-    rec_set(rec_kind[r], rec_top[r], m);
-    incr(rec_top[r]);
+    let m = w_mark()
+    w_i32(kind_)
+    rec_set(rec_kind[r], rec_top[r], m)
+    incr(rec_top[r])
 }
 
 /// `yield v` in a recursive generation: a value item.
 fn rec_push_value(r: I32, value: I32, cx: Cx) I32 {
-    let t = rec_elem[r];
-    let m = w_mark();
-    let v = new_local(repr(t));
-    let mv = w_mark();
-    coerce(check_expr(value, t, cx), t, value);
-    ls(v, mv);
-    rec_grow(rec_top[r], rec_item_arrays(r), vl_len[rec_args[r]] + 2);
-    let ms = w_mark();
-    lg(v);
-    rec_set(rec_val[r], rec_top[r], ms);
-    rec_finish_item(r, 0);
-    seq_void(m);
-    ty_void();
+    let t = rec_elem[r]
+    let m = w_mark()
+    let v = new_local(repr(t))
+    let mv = w_mark()
+    coerce(check_expr(value, t, cx), t, value)
+    ls(v, mv)
+    rec_grow(rec_top[r], rec_item_arrays(r), vl_len[rec_args[r]] + 2)
+    let ms = w_mark()
+    lg(v)
+    rec_set(rec_val[r], rec_top[r], ms)
+    rec_finish_item(r, 0)
+    seq_void(m)
+    ty_void()
 }
 
 /// The arguments of a call checked against `ptypes` (a list), each into a
 /// new local; the locals.
 fn args_into_locals(args: I32, ptypes: I32, cx: Cx) Array[I32] {
-    let n = vl_len[ptypes];
-    let locals = Array[I32].new(n + 1, 0);
-    let a = if args >= 0 { first_child(args); } else { -1; };
+    let n = vl_len[ptypes]
+    let locals = Array[I32].new(n + 1, 0)
+    let a = if args >= 0 { first_child(args) } else { -1 }
     for (0 ..< n) |i| {
-        let pt = vl_item(ptypes, i);
-        locals[i] = new_local(repr(pt));
-        let ma = w_mark();
-        coerce(check_expr(a, pt, cx), pt, a);
-        ls(locals[i], ma);
-        a = next_sibling(a);
-    };
-    locals;
+        let pt = vl_item(ptypes, i)
+        locals[i] = new_local(repr(pt))
+        let ma = w_mark()
+        coerce(check_expr(a, pt, cx), pt, a)
+        ls(locals[i], ma)
+        a = next_sibling(a)
+    }
+    locals
 }
 
 /// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
 fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
-    let params = rec_params[r];
-    let args = call_args(call);
+    let params = rec_params[r]
+    let args = call_args(call)
     if child_count(args) != vl_len[params] {
-        report2(Diag.GeneratorArity, node, decl_name[generator_decl_of(call)], vl_len[params], child_count(args));
-        return error_value();
-    };
-    let m = w_mark();
-    let values = args_into_locals(args, params, cx);
-    rec_grow(rec_top[r], rec_item_arrays(r), vl_len[params] + 2);
+        report2(Diag.GeneratorArity, node, decl_name[generator_decl_of(call)], vl_len[params], child_count(args))
+        return error_value()
+    }
+    let m = w_mark()
+    let values = args_into_locals(args, params, cx)
+    rec_grow(rec_top[r], rec_item_arrays(r), vl_len[params] + 2)
     for (0 ..< vl_len[params]) |i| {
-        let ms = w_mark();
-        lg(values[i]);
-        rec_set(vl_item(rec_args[r], i), rec_top[r], ms);
-    };
-    rec_finish_item(r, 1);
-    seq_void(m);
-    ty_void();
+        let ms = w_mark()
+        lg(values[i])
+        rec_set(vl_item(rec_args[r], i), rec_top[r], ms)
+    }
+    rec_finish_item(r, 1)
+    seq_void(m)
+    ty_void()
 }
 
 /// The locals of a recursive generation's loop.
@@ -767,276 +767,276 @@ struct RecLoop:
 /// The running frame is done: the last suspended one runs again, or, with
 /// none, the generation (block `whole`) ends.
 fn rec_resume_frame(l: RecLoop, whole: I32) void {
-    let m = w_mark();
-    let mz = w_mark();
-    let mzc = w_mark();
-    lg(l.fsp);
-    plain(69, vt_i32, mzc);
-    let mzt = w_mark();
-    w_leaf(Op.Br, vt_unreachable, whole, 0);
-    seq_void(mzt);
-    w_node(Op.If, vt_none, new_label(), 0, mz);
-    let md = w_mark();
-    lg(l.fsp);
-    w_i32(1);
-    plain(107, vt_i32, md);
-    ls(l.fsp, md);
-    rec_get(l.fcur, l.fsp, vt_i32);
-    ls(l.cur, w_mark() - 1);
-    rec_get(l.fend, l.fsp, vt_i32);
-    ls(l.end_, w_mark() - 1);
-    let mtop = w_mark();
-    lg(l.end_);
-    ls(l.top, mtop);
-    seq_void(m);
+    let m = w_mark()
+    let mz = w_mark()
+    let mzc = w_mark()
+    lg(l.fsp)
+    plain(69, vt_i32, mzc)
+    let mzt = w_mark()
+    w_leaf(Op.Br, vt_unreachable, whole, 0)
+    seq_void(mzt)
+    w_node(Op.If, vt_none, new_label(), 0, mz)
+    let md = w_mark()
+    lg(l.fsp)
+    w_i32(1)
+    plain(107, vt_i32, md)
+    ls(l.fsp, md)
+    rec_get(l.fcur, l.fsp, vt_i32)
+    ls(l.cur, w_mark() - 1)
+    rec_get(l.fend, l.fsp, vt_i32)
+    ls(l.end_, w_mark() - 1)
+    let mtop = w_mark()
+    lg(l.end_)
+    ls(l.top, mtop)
+    seq_void(m)
 }
 
 /// After `prune`: skip the call items that follow in the running frame
 /// (`while cur < end and kind[cur] == 1: cur += 1`).
 fn rec_skip_calls(l: RecLoop) void {
-    let m = w_mark();
-    let skip_loop = new_label();
-    let skip_out = new_label();
-    let mso = w_mark();
-    let msl = w_mark();
-    let mex = w_mark();
-    lg(l.cur);
-    lg(l.end_);
-    plain(72, vt_i32, mex);
-    plain(69, vt_i32, mex);
-    w_node(Op.BrIf, vt_none, skip_out, 0, mex);
-    let mek = w_mark();
-    rec_get(l.kind, l.cur, vt_i32);
-    w_i32(1);
-    plain(71, vt_i32, mek);
-    w_node(Op.BrIf, vt_none, skip_out, 0, mek);
-    incr(l.cur);
-    w_leaf(Op.Br, vt_unreachable, skip_loop, 0);
-    w_node(Op.Loop, vt_none, skip_loop, 0, msl);
-    w_node(Op.Block, vt_none, skip_out, 0, mso);
-    seq_void(m);
+    let m = w_mark()
+    let skip_loop = new_label()
+    let skip_out = new_label()
+    let mso = w_mark()
+    let msl = w_mark()
+    let mex = w_mark()
+    lg(l.cur)
+    lg(l.end_)
+    plain(72, vt_i32, mex)
+    plain(69, vt_i32, mex)
+    w_node(Op.BrIf, vt_none, skip_out, 0, mex)
+    let mek = w_mark()
+    rec_get(l.kind, l.cur, vt_i32)
+    w_i32(1)
+    plain(71, vt_i32, mek)
+    w_node(Op.BrIf, vt_none, skip_out, 0, mek)
+    incr(l.cur)
+    w_leaf(Op.Br, vt_unreachable, skip_loop, 0)
+    w_node(Op.Loop, vt_none, skip_loop, 0, msl)
+    w_node(Op.Block, vt_none, skip_out, 0, mso)
+    seq_void(m)
 }
 
 /// A call pushed the items from `start`: they are the running frame, and
 /// the one it ran in is suspended.
 fn rec_enter_frame(l: RecLoop, start: I32) void {
-    let m = w_mark();
-    let frames = Array[I32].new(2, 0);
-    frames[0] = l.fcur;
-    frames[1] = l.fend;
-    rec_grow(l.fsp, frames, 2);
-    let ms1 = w_mark();
-    lg(l.cur);
-    rec_set(l.fcur, l.fsp, ms1);
-    let ms2 = w_mark();
-    lg(l.end_);
-    rec_set(l.fend, l.fsp, ms2);
-    incr(l.fsp);
-    let ms3 = w_mark();
-    lg(start);
-    ls(l.cur, ms3);
-    let ms4 = w_mark();
-    lg(l.top);
-    ls(l.end_, ms4);
-    seq_void(m);
+    let m = w_mark()
+    let frames = Array[I32].new(2, 0)
+    frames[0] = l.fcur
+    frames[1] = l.fend
+    rec_grow(l.fsp, frames, 2)
+    let ms1 = w_mark()
+    lg(l.cur)
+    rec_set(l.fcur, l.fsp, ms1)
+    let ms2 = w_mark()
+    lg(l.end_)
+    rec_set(l.fend, l.fsp, ms2)
+    incr(l.fsp)
+    let ms3 = w_mark()
+    lg(start)
+    ls(l.cur, ms3)
+    let ms4 = w_mark()
+    lg(l.top)
+    ls(l.end_, ms4)
+    seq_void(m)
 }
 
 /// `for (walk(root)) |x| { body }`, walk recursive.
 fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, inst: I32, cx: Cx) I32 {
-    let params = param_list_of(gen);
-    let args = call_args(call);
+    let params = param_list_of(gen)
+    let args = call_args(call)
     if child_count(args) != child_count(params) {
-        report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args));
-        return error_value();
-    };
-    let np = child_count(params);
-    let decls = generator_decls(gen);
-    set_aside(decls);
-    let m = w_mark();
+        report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args))
+        return error_value()
+    }
+    let np = child_count(params)
+    let decls = generator_decls(gen)
+    set_aside(decls)
+    let m = w_mark()
     // The parameters' types, and the roots: the call's arguments.
-    let mt = vl_begin();
-    let p = if params >= 0 { first_child(params); } else { -1; };
+    let mt = vl_begin()
+    let p = if params >= 0 { first_child(params) } else { -1 }
     while (p >= 0) {
-        vl_add(type_of(next_sibling(first_child(p)), inst));
-        p = next_sibling(p);
-    };
-    let ptypes = vl_end(mt);
-    let roots = args_into_locals(args, ptypes, cx);
+        vl_add(type_of(next_sibling(first_child(p)), inst))
+        p = next_sibling(p)
+    }
+    let ptypes = vl_end(mt)
+    let roots = args_into_locals(args, ptypes, cx)
     // The items, starting with the root call; the frames.
-    let kind = rec_new_array(vt_i32);
-    let val = rec_new_array(repr(elem));
-    let ma = vl_begin();
-    for (0 ..< np) |i| { vl_add(rec_new_array(repr(vl_item(ptypes, i)))); };
-    let arg_arrays = vl_end(ma);
-    let top = new_local(vt_i32);
-    let cur = new_local(vt_i32);
-    let end_ = new_local(vt_i32);
-    let fsp = new_local(vt_i32);
-    let l = RecLoop { kind: kind, val: val, top: top, cur: cur, end_: end_, fsp: fsp, fcur: rec_new_array(vt_i32), fend: rec_new_array(vt_i32) };
+    let kind = rec_new_array(vt_i32)
+    let val = rec_new_array(repr(elem))
+    let ma = vl_begin()
+    for (0 ..< np) |i| { vl_add(rec_new_array(repr(vl_item(ptypes, i)))) }
+    let arg_arrays = vl_end(ma)
+    let top = new_local(vt_i32)
+    let cur = new_local(vt_i32)
+    let end_ = new_local(vt_i32)
+    let fsp = new_local(vt_i32)
+    let l = RecLoop { kind: kind, val: val, top: top, cur: cur, end_: end_, fsp: fsp, fcur: rec_new_array(vt_i32), fend: rec_new_array(vt_i32) }
     // The loop may run again: each run starts from nothing.
-    let m0 = w_mark();
-    w_i32(0);
-    ls(top, m0);
-    let m0c = w_mark();
-    w_i32(0);
-    ls(cur, m0c);
-    let m0f = w_mark();
-    w_i32(0);
-    ls(fsp, m0f);
-    let mk = w_mark();
-    w_i32(1);
-    rec_set(kind, top, mk);
+    let m0 = w_mark()
+    w_i32(0)
+    ls(top, m0)
+    let m0c = w_mark()
+    w_i32(0)
+    ls(cur, m0c)
+    let m0f = w_mark()
+    w_i32(0)
+    ls(fsp, m0f)
+    let mk = w_mark()
+    w_i32(1)
+    rec_set(kind, top, mk)
     for (0 ..< np) |i| {
-        let mr = w_mark();
-        lg(roots[i]);
-        rec_set(vl_item(arg_arrays, i), top, mr);
-    };
-    let m1 = w_mark();
-    w_i32(1);
-    ls(top, m1);
-    let m2 = w_mark();
-    w_i32(1);
-    ls(end_, m2);
+        let mr = w_mark()
+        lg(roots[i])
+        rec_set(vl_item(arg_arrays, i), top, mr)
+    }
+    let m1 = w_mark()
+    w_i32(1)
+    ls(top, m1)
+    let m2 = w_mark()
+    w_i32(1)
+    ls(end_, m2)
     // The generation.
-    let whole = new_label();
-    let again = new_label();
-    let mw = w_mark();
-    let ml = w_mark();
-    let mi = w_mark();
+    let whole = new_label()
+    let again = new_label()
+    let mw = w_mark()
+    let ml = w_mark()
+    let mi = w_mark()
     // cur == end: the running frame is done.
-    let mc = w_mark();
-    lg(cur);
-    lg(end_);
-    plain(70, vt_i32, mc);
-    rec_resume_frame(l, whole);
+    let mc = w_mark()
+    lg(cur)
+    lg(end_)
+    plain(70, vt_i32, mc)
+    rec_resume_frame(l, whole)
     // Else: the next item.
-    let melse = w_mark();
-    let i = new_local(vt_i32);
-    let k = new_local(vt_i32);
-    let mi1 = w_mark();
-    lg(cur);
-    ls(i, mi1);
-    incr(cur);
-    rec_get(kind, i, vt_i32);
-    ls(k, w_mark() - 1);
+    let melse = w_mark()
+    let i = new_local(vt_i32)
+    let k = new_local(vt_i32)
+    let mi1 = w_mark()
+    lg(cur)
+    ls(i, mi1)
+    incr(cur)
+    rec_get(kind, i, vt_i32)
+    ls(k, w_mark() - 1)
     // A value: the consumer's body.
-    let mv = w_mark();
-    let mvc = w_mark();
-    lg(k);
-    plain(69, vt_i32, mvc);
-    let mvt = w_mark();
-    let pruned = new_local(vt_i32);
-    let mp = w_mark();
-    w_i32(0);
-    ls(pruned, mp);
-    let mcap = w_mark();
-    rec_get(val, i, repr(elem));
+    let mv = w_mark()
+    let mvc = w_mark()
+    lg(k)
+    plain(69, vt_i32, mvc)
+    let mvt = w_mark()
+    let pruned = new_local(vt_i32)
+    let mp = w_mark()
+    w_i32(0)
+    ls(pruned, mp)
+    let mcap = w_mark()
+    rec_get(val, i, repr(elem))
     if cap >= 0 {
-        decl_ty[cap] = elem;
-        bind_value(cap, elem, mcap);
+        decl_ty[cap] = elem
+        bind_value(cap, elem, mcap)
     } else {
-        drop_value(elem);
-    };
-    let resume = new_label();
-    let mr = w_mark();
-    enter_loop(whole, resume, -1, -1);
-    prune_flag.push(pruned);
-    prune_loop.push(node);
-    discard(check_block(last_child(node), ty_void(), cx));
-    prune_flag.resize(prune_flag.len() - 1);
-    prune_loop.resize(prune_loop.len() - 1);
-    leave_loop();
-    w_node(Op.Block, vt_none, resume, 0, mr);
-    let mpr = w_mark();
-    lg(pruned);
-    rec_skip_calls(l);
-    w_node(Op.If, vt_none, new_label(), 0, mpr);
-    seq_void(mvt);
-    w_node(Op.If, vt_none, new_label(), 0, mv);
+        drop_value(elem)
+    }
+    let resume = new_label()
+    let mr = w_mark()
+    enter_loop(whole, resume, -1, -1)
+    prune_flag.push(pruned)
+    prune_loop.push(node)
+    discard(check_block(last_child(node), ty_void(), cx))
+    prune_flag.resize(prune_flag.len() - 1)
+    prune_loop.resize(prune_loop.len() - 1)
+    leave_loop()
+    w_node(Op.Block, vt_none, resume, 0, mr)
+    let mpr = w_mark()
+    lg(pruned)
+    rec_skip_calls(l)
+    w_node(Op.If, vt_none, new_label(), 0, mpr)
+    seq_void(mvt)
+    w_node(Op.If, vt_none, new_label(), 0, mv)
     // A call: the generator's body, with its arguments.
-    let mcall = w_mark();
-    let mcc = w_mark();
-    lg(k);
-    w_i32(1);
-    plain(70, vt_i32, mcc);
-    let mct = w_mark();
-    mark_boxes(fn_body(gen));
-    let pnode = if params >= 0 { first_child(params); } else { -1; };
+    let mcall = w_mark()
+    let mcc = w_mark()
+    lg(k)
+    w_i32(1)
+    plain(70, vt_i32, mcc)
+    let mct = w_mark()
+    mark_boxes(fn_body(gen))
+    let pnode = if params >= 0 { first_child(params) } else { -1 }
     for (0 ..< np) |j| {
-        let d = node_decl[first_child(pnode)];
-        let pt = vl_item(ptypes, j);
-        let mg = w_mark();
-        rec_get(vl_item(arg_arrays, j), i, repr(pt));
-        decl_ty[d] = pt;
-        bind_value(d, pt, mg);
-        pnode = next_sibling(pnode);
-    };
-    let start = new_local(vt_i32);
-    let mst = w_mark();
-    lg(top);
-    ls(start, mst);
-    let frame = new_label();
-    let r = rec_kind.len();
-    rec_kind.push(kind);
-    rec_val.push(val);
-    rec_top.push(top);
-    rec_args.push(arg_arrays);
-    rec_elem.push(elem);
-    rec_params.push(ptypes);
-    begin_expansion(frame, -1, -1, elem, cx, gen, r);
-    let mb = w_mark();
-    let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() };
+        let d = node_decl[first_child(pnode)]
+        let pt = vl_item(ptypes, j)
+        let mg = w_mark()
+        rec_get(vl_item(arg_arrays, j), i, repr(pt))
+        decl_ty[d] = pt
+        bind_value(d, pt, mg)
+        pnode = next_sibling(pnode)
+    }
+    let start = new_local(vt_i32)
+    let mst = w_mark()
+    lg(top)
+    ls(start, mst)
+    let frame = new_label()
+    let r = rec_kind.len()
+    rec_kind.push(kind)
+    rec_val.push(val)
+    rec_top.push(top)
+    rec_args.push(arg_arrays)
+    rec_elem.push(elem)
+    rec_params.push(ptypes)
+    begin_expansion(frame, -1, -1, elem, cx, gen, r)
+    let mb = w_mark()
+    let gcx = Cx { inst: inst, fi: cx.fi, result: ty_void() }
     // The generator's own loops are its; the consumer's loops are not in reach.
-    let loops = hide_loops();
-    let pg = profile_generator(gen, inst, gen_whole.len() - 1);
-    discard(check_block(fn_body(gen), ty_void(), gcx));
-    profile_generator_end(pg, gen_whole.len() - 1, gcx);
-    show_loops(loops);
-    w_node(Op.Block, vt_none, frame, 0, mb);
-    end_expansion();
-    rec_kind.resize(r);
-    rec_val.resize(r);
-    rec_top.resize(r);
-    rec_args.resize(r);
-    rec_elem.resize(r);
-    rec_params.resize(r);
+    let loops = hide_loops()
+    let pg = profile_generator(gen, inst, gen_whole.len() - 1)
+    discard(check_block(fn_body(gen), ty_void(), gcx))
+    profile_generator_end(pg, gen_whole.len() - 1, gcx)
+    show_loops(loops)
+    w_node(Op.Block, vt_none, frame, 0, mb)
+    end_expansion()
+    rec_kind.resize(r)
+    rec_val.resize(r)
+    rec_top.resize(r)
+    rec_args.resize(r)
+    rec_elem.resize(r)
+    rec_params.resize(r)
     // Its items, if any, are the running frame; the one it ran in waits.
-    let mf = w_mark();
-    let mfc = w_mark();
-    lg(top);
-    lg(start);
-    plain(74, vt_i32, mfc);
-    rec_enter_frame(l, start);
-    w_node(Op.If, vt_none, new_label(), 0, mf);
-    seq_void(mct);
-    w_node(Op.If, vt_none, new_label(), 0, mcall);
-    seq_void(melse);
-    w_node(Op.If, vt_none, new_label(), 0, mi);
-    w_leaf(Op.Br, vt_unreachable, again, 0);
-    w_node(Op.Loop, vt_none, again, 0, ml);
-    w_node(Op.Block, vt_none, whole, 0, mw);
-    bring_back();
-    seq_void(m);
-    ty_void();
+    let mf = w_mark()
+    let mfc = w_mark()
+    lg(top)
+    lg(start)
+    plain(74, vt_i32, mfc)
+    rec_enter_frame(l, start)
+    w_node(Op.If, vt_none, new_label(), 0, mf)
+    seq_void(mct)
+    w_node(Op.If, vt_none, new_label(), 0, mcall)
+    seq_void(melse)
+    w_node(Op.If, vt_none, new_label(), 0, mi)
+    w_leaf(Op.Br, vt_unreachable, again, 0)
+    w_node(Op.Loop, vt_none, again, 0, ml)
+    w_node(Op.Block, vt_none, whole, 0, mw)
+    bring_back()
+    seq_void(m)
+    ty_void()
 }
 
 /// `prune;` in the body of a recursive generator's consumer.
 fn check_prune(node: I32) I32 {
     if prune_flag.len() == 0 {
-        report(Diag.PruneOutside, node, -1);
-        return error_value();
-    };
+        report(Diag.PruneOutside, node, -1)
+        return error_value()
+    }
     // A closure in the consumer is a function of its own.
-    let p = parent_of(node);
+    let p = parent_of(node)
     while (p >= 0 and p != prune_loop[prune_loop.len() - 1]) {
         if is_kind(p, Node.Closure_expr) {
-            report(Diag.PruneInClosure, node, -1);
-            return error_value();
-        };
-        p = parent_of(p);
-    };
-    let m = w_mark();
-    w_i32(1);
-    ls(prune_flag[prune_flag.len() - 1], m);
-    ty_void();
+            report(Diag.PruneInClosure, node, -1)
+            return error_value()
+        }
+        p = parent_of(p)
+    }
+    let m = w_mark()
+    w_i32(1)
+    ls(prune_flag[prune_flag.len() - 1], m)
+    ty_void()
 }

@@ -10,13 +10,13 @@ mod Stack[T] {
     struct &:
         | items: Array[T]
         | size: I32
-    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
-    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }
-    fn &.pop |s| () T { s.size -= 1; s.items[s.size]; }
+    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 } }
+    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1 }
+    fn &.pop |s| () T { s.size -= 1; s.items[s.size] }
 }
 
-let nums: Stack[I32] = Stack[I32].new(0);
-using Stack[Str] |Words|;          // an alias for one instance
+let nums: Stack[I32] = Stack[I32].new(0)
+using Stack[Str] |Words|          // an alias for one instance
 ```
 
 A global in a generic module is one per instance, as its functions are:
@@ -27,18 +27,18 @@ still one per instance. Outside, an instance's global is read by its path,
 `Stash[I32].items`, as a plain module's is by `M.items`.
 
 ```utu
-using Buffer from std:Buffer;
+using Buffer from std:Buffer
 
 mod Stash[T] {
-    let items: Buffer[T] = Buffer[T].new();
-    fn add(x: T) void { items.push(x); }
-    fn size() I32 { items.len(); }
+    let items: Buffer[T] = Buffer[T].new()
+    fn add(x: T) void { items.push(x) }
+    fn size() I32 { items.len() }
 }
 
 export main() I32 {
-    Stash[I32].add(1);
-    Stash[Str].add("a");
-    Stash[I32].size();             // 1: Stash[Str] has its own items
+    Stash[I32].add(1)
+    Stash[Str].add("a")
+    Stash[I32].size()             // 1: Stash[Str] has its own items
 }
 ```
 
@@ -74,22 +74,22 @@ struct Version[Ord]:
     | minor: I32
 
 fn Ord[Version].cmp |a| (b: Version) I32 {
-    if a.major != b.major { a.major - b.major; } else { a.minor - b.minor; };
+    if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
 }
-fn Ord[I32].cmp |a| (b: I32) I32 { a - b; }
+fn Ord[I32].cmp |a| (b: I32) I32 { a - b }
 
 mod Largest[T[Ord]] {
     fn of(xs: Array[T]) T {
-        let best = xs[0];
-        for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };
-        best;
+        let best = xs[0]
+        for (xs) |x| { if x.cmp(best) > 0 { best = x } }
+        best
     }
 }
 
 export main() I32 {
-    let versions = [Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }];
+    let versions = [Version { major: 1, minor: 4 }, Version { major: 2, minor: 0 }]
     Largest[Version].of(versions).major * 100   // 2
-        + Largest[I32].of([3, 9, 4]);           // 9: 209
+        + Largest[I32].of([3, 9, 4])           // 9: 209
 }
 ```
 
@@ -142,9 +142,9 @@ write `T`; `Array[$T]`, `?$T`, and `cl($T) $U` bind from inside a type.
 fn max(a: $T, b: T) T { if a > b { a; } else { b; }; }
 fn first(xs: Array[$T]) T { xs[0]; }
 
-max(3, 7);           // max[I32]
-max(1, big);         // big: I64. A literal waits for an argument that is not one: max[I64]
-first(["a", "b"]);   // first[Str]
+max(3, 7)           // max[I32]
+max(1, big)         // big: I64. A literal waits for an argument that is not one: max[I64]
+first(["a", "b"])   // first[Str]
 ```
 
 - Each T is bound in one place, its `$T`, so every T comes from an argument:
@@ -205,14 +205,14 @@ everything), and Str (by UTF-16 code units, as JavaScript's `<`), and
 | `max_of(xs)`, `min_of(xs)` | the greatest, the least (the first of a tie) |
 
 ```utu
-using Ord from std:Ord;            // the protocol, to implement it
-using Order from std:Ord;
+using Ord from std:Ord            // the protocol, to implement it
+using Order from std:Ord
 
 fn Ord[Version].cmp |a| (b: Version) I32 { … }
 
-let words: Array[Str] = ["pear", "fig", "apple"];
-Order[Str].sort(words);            // apple fig pear
-Order[Version].max_of(versions);
+let words: Array[Str] = ["pear", "fig", "apple"]
+Order[Str].sort(words)            // apple fig pear
+Order[Version].max_of(versions)
 ```
 
 See [examples/bounds.utu](../examples/bounds.utu).

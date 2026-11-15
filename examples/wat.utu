@@ -7,11 +7,11 @@
 // and hand-written loops.
 
 fn rotl(x: I32, k: I32) I32 {
-    @wat/\ local.get $x local.get $k i32.rotl \/;
+    @wat/\ local.get $x local.get $k i32.rotl \/
 }
 
 fn copysign(x: F64, sign: F64) F64 {
-    @wat/\ (f64.copysign (local.get $x) (local.get $sign)) \/;
+    @wat/\ (f64.copysign (local.get $x) (local.get $sign)) \/
 }
 
 // Folded or flat, with locals and labels.
@@ -25,7 +25,7 @@ fn triangle(n: I32) I32 {
             (local.set $i (i32.add (local.get $i) (i32.const 1)))
             (br $next)))
         local.get $acc
-    \/;
+    \/
 }
 
 // Four lanes at once.
@@ -38,15 +38,15 @@ fn dot4(a: I32, b: I32, c: I32, d: I32) I32 {
                 (i32x4.splat (local.get $a)) (local.get $b)) (local.get $c)) (local.get $d))))
         (i32.add (i32.add (i32x4.extract_lane 0 (local.get $v)) (i32x4.extract_lane 1 (local.get $v)))
                  (i32.add (i32x4.extract_lane 2 (local.get $v)) (i32x4.extract_lane 3 (local.get $v))))
-    \/;
+    \/
 }
 
-fn low_byte_signed(x: I32) I32 { @wat/\ (i32.extend8_s (local.get $x)) \/; }
+fn low_byte_signed(x: I32) I32 { @wat/\ (i32.extend8_s (local.get $x)) \/ }
 
 export lib {
-    fn rotated() I32 { rotl(-2147483647, 1); }
-    fn signed() F64 { copysign(2.5, -0.0); }
-    fn summed() I32 { triangle(100); }
-    fn dotted() I32 { dot4(1, 1, 1, 1) + dot4(0, 0, 0, 10); }
-    fn extended() I32 { low_byte_signed(255); }
+    fn rotated() I32 { rotl(-2147483647, 1) }
+    fn signed() F64 { copysign(2.5, -0.0) }
+    fn summed() I32 { triangle(100) }
+    fn dotted() I32 { dot4(1, 1, 1, 1) + dot4(0, 0, 0, 10) }
+    fn extended() I32 { low_byte_signed(255) }
 }

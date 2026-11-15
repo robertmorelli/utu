@@ -1,20 +1,20 @@
 // The utu documentation site, written in utu and Wutu.
 // Build it with `node scripts/build-docs.mjs`; preview with `node cli/wutu.mjs dev docs/src/main.utu`.
-using Browser from std:Browser;
-using ui from "./ui.utu";
-using home from "./home.utu";
-using playground from "./playground.utu";
+using Browser from std:Browser
+using ui from "./ui.utu"
+using home from "./home.utu"
+using playground from "./playground.utu"
 // Every other page is its own chunk, loaded the first time it is shown.
-using start lazy from "./start.utu";
-using tour lazy from "./tour.utu";
-using iterators lazy from "./iterators.utu";
-using stdlib lazy from "./stdlib.utu";
-using javascript lazy from "./javascript.utu";
-using data lazy from "./data.utu";
-using web lazy from "./web.utu";
-using tooling lazy from "./tooling.utu";
-using compiler lazy from "./compiler.utu";
-using benchmarks lazy from "./benchmarks.utu";
+using start lazy from "./start.utu"
+using tour lazy from "./tour.utu"
+using iterators lazy from "./iterators.utu"
+using stdlib lazy from "./stdlib.utu"
+using javascript lazy from "./javascript.utu"
+using data lazy from "./data.utu"
+using web lazy from "./web.utu"
+using tooling lazy from "./tooling.utu"
+using compiler lazy from "./compiler.utu"
+using benchmarks lazy from "./benchmarks.utu"
 struct Link:
 | href: Str
 | label: Str
@@ -70,63 +70,63 @@ fn links() Array[Link] {
         href: "/benchmarks",
         label: "Benchmarks"
     }
-    ];
+    ]
 }
 fn title(route: Str) Str {
     let found = links() first_where(Link) |link| {
-        link.href == route;
-    };
+        link.href == route
+    }
     promote found {
         |link| => if link.value.href == "/" {
-            "utu";
+            "utu"
         } else {
-            link.value.label + " | utu";
+            link.value.label + " | utu"
         },
         ~> "utu",
-    };
+    }
 }
 // The overview and the playground are part of the site; every other page is
 // a lazy module (above), so the site starts with only the page it shows.
 fn page(route: Str, play: playground.State) Browser.HTMLElement {
     if route == "/playground" {
-        playground.page(play);
+        playground.page(play)
     } else if route == "/start" {
-        start.page();
+        start.page()
     } else if route == "/tour" {
-        tour.page();
+        tour.page()
     } else if route == "/iterators" {
-        iterators.page();
+        iterators.page()
     } else if route == "/std" {
-        stdlib.page();
+        stdlib.page()
     } else if route == "/javascript" {
-        javascript.page();
+        javascript.page()
     } else if route == "/data" {
-        data.page();
+        data.page()
     } else if route == "/wutu" {
-        web.page();
+        web.page()
     } else if route == "/tooling" {
-        tooling.page();
+        tooling.page()
     } else if route == "/compiler" {
-        compiler.page();
+        compiler.page()
     } else if route == "/benchmarks" {
-        benchmarks.page();
+        benchmarks.page()
     } else {
-        home.page();
-    };
+        home.page()
+    }
 }
 // When the hash changes, the whole view re-renders; scroll back to the top of the new page.
 fn arrive(site: Site, route: Str) Str {
     if site.route != route {
-        let first = site.route == "";
-        site.route = route;
-        Browser.document.title = title(route);
+        let first = site.route == ""
+        site.route = route
+        Browser.document.title = title(route)
         if not first {
             wutu.after_render(cl() void {
                 Browser.window.scrollTo(& {
                     top: 0.0,
                     left: 0.0,
                     behavior: "instant"
-                });
+                })
                 // On narrow screens the nav is a horizontal strip: keep the current page in view.
                 promote Browser.document.querySelector("nav a.here") {
                     |current| => current.scrollIntoView(& {
@@ -135,23 +135,23 @@ fn arrive(site: Site, route: Str) Str {
                     }),
                     ~> {
                     },
-                };
-            });
-        };
-    };
-    "";
+                }
+            })
+        }
+    }
+    ""
 }
 export main() void {
     let site = Site {
         route: ""
-    };
-    let play = playground.start();
+    }
+    let play = playground.start()
     // The favicon is the same mark as the sidebar's, as an SVG data URI.
-    let icon = Browser.document.createElement("link");
-    icon.rel = "icon";
-    icon.type = "image/svg+xml";
-    icon.href = "data:image/svg+xml," + Browser.encodeURIComponent(ui.logo().outerHTML);
-    Browser.document.head.append(icon);
+    let icon = Browser.document.createElement("link")
+    icon.rel = "icon"
+    icon.type = "image/svg+xml"
+    icon.href = "data:image/svg+xml," + Browser.encodeURIComponent(ui.logo().outerHTML)
+    Browser.document.head.append(icon)
     let app = @wutu/\
     @reactive;
     @document {
@@ -673,6 +673,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

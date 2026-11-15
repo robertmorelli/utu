@@ -9,16 +9,16 @@ compiler ships with a compiled application.
 ## Browser code
 
 ```utu
-using Browser from std:Browser;
+using Browser from std:Browser
 
 export main() void {
-    let document = Browser.document;
-    let input = document.createElement("input");
-    input.placeholder = "Write something";
+    let document = Browser.document
+    let input = document.createElement("input")
+    input.placeholder = "Write something"
     input.addEventListener("input", cl(event) void {
-        Browser.console.log(input.value);
-    });
-    document.body.appendChild(input);
+        Browser.console.log(input.value)
+    })
+    document.body.appendChild(input)
 }
 ```
 
@@ -189,13 +189,13 @@ Diagnostics use declaration names, such as `expected Browser.Node, got Str`,
 ## Import a package
 
 ```utu
-using Nano from "npm:nanoid";
-using Floating from "npm:@floating-ui/dom";
-using Path from "node:path";
+using Nano from "npm:nanoid"
+using Floating from "npm:@floating-ui/dom"
+using Path from "node:path"
 
 export main() void {
-    let id = Nano.nanoid(8);
-    let file = Path.join("out", id, "report.txt");
+    let id = Nano.nanoid(8)
+    let file = Path.join("out", id, "report.txt")
 }
 ```
 
@@ -230,7 +230,7 @@ node tools/dts/cli.mjs --input path/to/api.d.ts --module ./api.js --prefix Api -
 ```
 
 ```utu
-using Api from "./bindings/Api.abi.json";
+using Api from "./bindings/Api.abi.json"
 ```
 
 The path is from the importing file, as any `using` path is. A relative
@@ -340,7 +340,7 @@ derive parameter types from declarations, including DOM event maps.
 Host exceptions are caught with `try`:
 
 ```utu
-let parsed = try { JS.JSON.parse(text); } catch |e| { Browser.console.warn(JS.String(e)); null; };
+let parsed = try { JS.JSON.parse(text); } catch |e| { Browser.console.warn(JS.String(e)); null; }
 ```
 
 `try { … } catch |e| { … }` is an expression whose branches meet like `if`
@@ -367,7 +367,7 @@ promotion, then unboxed when a numeric result is required.
 promote Browser.localStorage.getItem("key") {
     |stored| => Browser.console.log(stored), // stored is Str
     ~> Browser.console.log("missing"),
-};
+}
 ```
 
 Typed host promises work with UTU `await` on engines supporting JSPI;

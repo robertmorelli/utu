@@ -7,13 +7,15 @@ is consumed immediately by a terminal operation.
 ```utu
 export main() I32 {
     [1, 2, 3, 4, 5]
-        map |n| { n * 2; }
-        filter |n| { n > 4; }
-        fold (0) |total, n| { total + n; };
+        map |n| { n * 2 }
+        filter |n| { n > 4 }
+        fold (0) |total, n| { total + n }
 }
 ```
 
-Utu blocks retain their usual semicolons. Auxiliary values go in parentheses:
+A stage on a line of its own goes on the pipeline when it begins with its
+capture or its arguments and capture (`map |x|`, `fold (0) |a, x|`, `collect(T)`);
+a bare terminal (`sum`, `count`) stays on the line it ends. Auxiliary values go in parentheses:
 `fold (initial)`, `take (count)`, `zip (other)`. This separates parameters from
 capture bars and ordinary bitwise-or expressions without grammar conflicts.
 A pipeline binds looser than every operator (arithmetic, comparisons, `and`,
@@ -66,8 +68,8 @@ struct Row:
     | score: I32
 
 fn rows() Array[Row] {
-    [3, 1, 2] map |n| { Row { score: n }; }
-        sort(Row) |a, b| { a.score < b.score; };
+    [3, 1, 2] map |n| { Row { score: n } }
+        sort(Row) |a, b| { a.score < b.score }
 }
 ```
 
@@ -75,8 +77,8 @@ Use a typed initial variable for a nondefault fold accumulator:
 
 ```utu
 fn index_total(numbers: Array[I32]) U64 {
-    let zero: U64 = 0;
-    numbers fold(zero) |total, value, i| { total + i; };
+    let zero: U64 = 0
+    numbers fold(zero) |total, value, i| { total + i }
 }
 ```
 
@@ -132,18 +134,18 @@ depth-first order.
 ```utu
 fn additions() void {
     let totals = [1, 2, 3] scan(0) |acc, value| {
-        acc + value;
-    } collect(I32); // [1, 3, 6]
+        acc + value
+    } collect(I32) // [1, 3, 6]
 
     let groups = [1, 2, 3, 4] group_by(I32, I32) |value| {
-        value % 2;
-    };
+        value % 2
+    }
     // Array[Group[I32, I32]]: key 1 -> [1, 3], then key 0 -> [2, 4].
 
     let first = [4, 2, 3] first_where(I32) |value| {
-        value < 4;
-    };
-    let value = (first orelse fatal).value; // 2
+        value < 4
+    }
+    let value = (first orelse fatal).value // 2
 }
 ```
 
@@ -188,11 +190,11 @@ same evaluation and cancellation rules as other pipelines.
 ```utu
 fn bounds() void {
     let lower = [1, 2, 2, 4] bisect |value| {
-        value < 2;
-    }; // 1
+        value < 2
+    } // 1
     let upper = [1, 2, 2, 4] bisect |value| {
-        value <= 2;
-    }; // 3
+        value <= 2
+    } // 3
 }
 ```
 

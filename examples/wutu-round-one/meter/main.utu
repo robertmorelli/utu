@@ -1,6 +1,6 @@
-using Browser from std:Browser;
-using theme from "../theme.utu";
-using NumberField from std:NumberField;
+using Browser from std:Browser
+using theme from "../theme.utu"
+using NumberField from std:NumberField
 struct Habit:
 | id: Str
 | name: Str
@@ -49,7 +49,7 @@ fn workspace(state: MeterState) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 export main() void {
     let state = @stored/\
@@ -70,7 +70,7 @@ export main() void {
             }
             ]
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @style theme.sheet();
@@ -111,6 +111,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

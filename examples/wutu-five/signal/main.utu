@@ -1,31 +1,31 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 fn number(value: I32) Str {
-    value.f64().toString();
+    value.f64().toString()
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2)
 }
 
 fn node(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal;
+    Browser.document.getElementById(id) orelse fatal
 }
 
 fn restore_focus(id: Str) void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
-    };
+    }
 }
 
 fn persist(key: Str,
 value: Str) void {
     try {
-        Browser.localStorage.setItem(key, value);
+        Browser.localStorage.setItem(key, value)
     } catch {
-        node("notice").textContent = "Storage is unavailable. Your changes will last for this session.";
-    };
+        node("notice").textContent = "Storage is unavailable. Your changes will last for this session."
+    }
 }
 
 struct Session:
@@ -45,27 +45,27 @@ struct Conference:
 
 fn matches(session: Session,
 state: Conference) Bool {
-    (state.day == "all" or number(session.day) == state.day) and (state.track == "All tracks" or session.track == state.track) and (not state.agenda or session.saved);
+    (state.day == "all" or number(session.day) == state.day) and (state.track == "All tracks" or session.track == state.track) and (not state.agenda or session.saved)
 }
 
 fn calendar(state: Conference) Str {
-    let newline = Browser.String.fromCharCode(13, 10);
-    let text = "BEGIN:VCALENDAR" + newline + "VERSION:2.0" + newline + "PRODID:-//Wutu//Signal//EN" + newline;
+    let newline = Browser.String.fromCharCode(13, 10)
+    let text = "BEGIN:VCALENDAR" + newline + "VERSION:2.0" + newline + "PRODID:-//Wutu//Signal//EN" + newline
     state.sessions filter |s| {
-        s.saved;
+        s.saved
     }
     each |s| {
         let date = if s.day == 1 {
-            "20261022";
+            "20261022"
         } else {
-            "20261023";
-        };
+            "20261023"
+        }
         let hour = if s.hour<10 {
-            "0" + number(s.hour);
+            "0" + number(s.hour)
         } else {
-            number(s.hour);
-        };
-        let end = number(s.hour + 1);
+            number(s.hour)
+        }
+        let end = number(s.hour + 1)
         text += "BEGIN:VEVENT"
             + newline
             + "UID:"
@@ -90,9 +90,9 @@ fn calendar(state: Conference) Str {
             + s.title
             + newline
             + "END:VEVENT"
-            + newline;
-    };
-    "data:text/calendar;charset=utf-8," + Browser.encodeURIComponent(text + "END:VCALENDAR" + newline);
+            + newline
+    }
+    "data:text/calendar;charset=utf-8," + Browser.encodeURIComponent(text + "END:VCALENDAR" + newline)
 }
 
 fn refresh(state: Conference) void {
@@ -100,20 +100,20 @@ fn refresh(state: Conference) void {
 
 fn sessions(state: Conference) Browser.HTMLElement {
     let count = state.sessions count_where |s| {
-        s.saved;
-    };
+        s.saved
+    }
     let conflicts = state.sessions filter |s| {
-        s.saved;
+        s.saved
     }
     count_where |s| {
         (state.sessions count_where |b| {
-            b.saved and b.day == s.day and b.hour == s.hour;
+            b.saved and b.day == s.day and b.hour == s.hour
         }
-        )>1;
-    };
+        )>1
+    }
     let visible = state.sessions filter |s| {
-        matches(s, state);
-    } collect(Session);
+        matches(s, state)
+    } collect(Session)
     @wutu/\
     section {
         id = "sessions";
@@ -228,7 +228,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
             }
         }
     }
-    \/;
+    \/
 }
 
 export main() void {
@@ -310,19 +310,19 @@ export main() void {
             saved: false
         }
         ]
-    };
+    }
     state.sessions each |session| {
         try {
             promote Browser.localStorage.getItem("signal-" + session.id) {
                 |saved|=> {
-                    session.saved = saved == "yes";
+                    session.saved = saved == "yes"
                 },
                 ~> {
                 },
-            };
+            }
         } catch {
-        };
-    };
+        }
+    }
     let app = @wutu/\
     @reactive;
     @document {
@@ -580,6 +580,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

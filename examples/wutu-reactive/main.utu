@@ -1,5 +1,5 @@
-using Browser from std:Browser;
-using ui from "./ui.utu";
+using Browser from std:Browser
+using ui from "./ui.utu"
 
 struct Task:
     | id: Str
@@ -25,7 +25,7 @@ export main() void {
                 Task { id: "two", title: "Make forms pleasant", done: false }
             ]
         }
-    \/;
+    \/
     let app = @wutu/\
     @reactive;
     @document {
@@ -148,6 +148,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

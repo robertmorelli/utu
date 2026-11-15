@@ -10209,7 +10209,7 @@ FAIL after tests: boom
 
 10 │
 11 │     /// A line on standard output (`console.log`): `x.str()`.
-12 │     fn log(x: $T) void { host_log(x.str()); }
+12 │     fn log(x: $T) void { host_log(x.str()) }
    │                                   ━━━━━━━
    │                                   ╰─ no such method
 13 │

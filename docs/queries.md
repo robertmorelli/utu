@@ -8,17 +8,17 @@ many queries would otherwise rescan the same data.
 ## Segment trees
 
 ```utu
-using SegmentTree from std:SegmentTree;
-using PersistentSegmentTree from std:PersistentSegmentTree;
+using SegmentTree from std:SegmentTree
+using PersistentSegmentTree from std:PersistentSegmentTree
 
 fn add(a: I32, b: I32) I32 {
-    a + b;
+    a + b
 }
 
 fn example() I32 {
-    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add);
-    sums.set(1, 10, add);
-    sums.query(1, 3, add); // 15
+    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add)
+    sums.set(1, 10, add)
+    sums.query(1, 3, add) // 15
 }
 ```
 
@@ -52,27 +52,27 @@ implementation fields.
 
 ```utu
 fn versions() I32 {
-    let before = PersistentSegmentTree[I32].new([2, 3, 5], 0, add);
-    let after = before.set(1, 10, add);
-    before.query(0, 3, add) * 100 + after.query(0, 3, add); // 10, 17: 1017
+    let before = PersistentSegmentTree[I32].new([2, 3, 5], 0, add)
+    let after = before.set(1, 10, add)
+    before.query(0, 3, add) * 100 + after.query(0, 3, add) // 10, 17: 1017
 }
 ```
 
 ## Priority search tree and geometric queries
 
 ```utu
-using Spatial from std:Spatial;
+using Spatial from std:Spatial
 
 fn lookups() void {
     let points = [
         Spatial.point(0.0, 0.0, 10),
         Spatial.point(1.0, 2.0, 20),
         Spatial.point(3.0, 1.0, 30)
-    ];
-    let index = Spatial.new(points);
-    let ids = index.below(0.0, 3.0, 2.0); // x interval, y ceiling
-    let nearby = index.radius(0.0, 0.0, 2.5);
-    let closest = index.nearest(2.9, 1.0); // ?Found[I32]
+    ]
+    let index = Spatial.new(points)
+    let ids = index.below(0.0, 3.0, 2.0) // x interval, y ceiling
+    let nearby = index.radius(0.0, 0.0, 2.5)
+    let closest = index.nearest(2.9, 1.0) // ?Found[I32]
 }
 ```
 

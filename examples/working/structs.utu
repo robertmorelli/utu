@@ -3,10 +3,10 @@ struct Point:
     | y : I32
 
 fn score(point: Point) I32 {
-    point.x * point.x + point.y * point.y;
+    point.x * point.x + point.y * point.y
 }
 
 export main() I32 {
-    let point: Point = Point { x: 3, y: 4 };
-    score(point);
+    let point: Point = Point { x: 3, y: 4 }
+    score(point)
 }

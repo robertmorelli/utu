@@ -1,4 +1,4 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 struct Ingredient:
     | id: Str
@@ -13,7 +13,7 @@ struct Kitchen:
     | step: I32
 
 fn amount(item: Ingredient, servings: F64) Str {
-    (item.quantity * servings / 2.0).toFixed(1) + " " + item.unit;
+    (item.quantity * servings / 2.0).toFixed(1) + " " + item.unit
 }
 
 export main() void {
@@ -29,10 +29,10 @@ export main() void {
                 Ingredient { id: "feta", name: "Feta", quantity: 80.0, unit: "g", packed: false }
             ]
         }
-    \/;
-    if state.servings < 1.0 or state.servings > 12.0 { state.servings = 2.0; };
-    if state.step < 0 or state.step > 3 { state.step = 0; };
-    let instructions = ["Warm the olive oil in a wide pan over medium heat. Add the orzo and stir for two minutes, until lightly toasted.", "Pour in the stock. Simmer gently for ten minutes, stirring often, until the orzo is nearly tender.", "Stir in the peas and cook for three more minutes. Add a splash of water if the pan looks dry.", "Finish with lemon zest and juice. Crumble over the feta, season to taste, and bring the pan to the table."];
+    \/
+    if state.servings < 1.0 or state.servings > 12.0 { state.servings = 2.0 }
+    if state.step < 0 or state.step > 3 { state.step = 0 }
+    let instructions = ["Warm the olive oil in a wide pan over medium heat. Add the orzo and stir for two minutes, until lightly toasted.", "Pour in the stock. Simmer gently for ten minutes, stirring often, until the orzo is nearly tender.", "Stir in the peas and cook for three more minutes. Add a splash of water if the pan looks dry.", "Finish with lemon zest and juice. Crumble over the feta, season to taste, and bring the pan to the table."]
     let app = @wutu/\
     @reactive;
     @document {
@@ -371,6 +371,6 @@ export main() void {
             }
         }
     }
-    \/;
-    Browser.document.body.append(app);
+    \/
+    Browser.document.body.append(app)
 }

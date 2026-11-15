@@ -1,4 +1,4 @@
-using Browser from std:Browser;
+using Browser from std:Browser
 
 mod ui {
     fn badge(text: Str) Browser.HTMLElement {
@@ -7,6 +7,6 @@ mod ui {
             padding:0.25rem;
             = text;
         }
-        \/;
+        \/
     }
 }
