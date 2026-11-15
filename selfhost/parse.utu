@@ -887,7 +887,7 @@ fn fn_or_op_decl(p: Parser) I32 {
             identifier(p)
             capture(p)
             return_type(p)
-            block(p)
+            function_body(p)
             return node(p, Node.Op_decl, at, first)
         }
         restore(p, s)
@@ -898,8 +898,21 @@ fn fn_or_op_decl(p: Parser) I32 {
     if not is(p, Tok.RParen) { param_list(p) }
     expect(p, Tok.RParen)
     return_type(p)
-    block(p)
+    function_body(p)
     node(p, Node.Fn_decl, at, first)
+}
+
+/// A function's body: a block, or `=> expr`, a block of that one
+/// expression, which ends as a statement does.
+fn function_body(p: Parser) I32 {
+    if not is(p, Tok.FatArrow) { return block(p) }
+    let at = mark()
+    let first = p.pos
+    advance(p)
+    let e = begin_statement(p)
+    expression(p)
+    end_statement(p, e)
+    node(p, Node.Block, at, first)
 }
 
 fn fn_name(p: Parser) I32 {

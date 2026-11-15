@@ -84,9 +84,12 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
       seq('=', field('value', seq(optional('-'), $.int_lit))),
     ))),
 
-    // Functions: fn name self? ( params? ) return_type block
+    // Functions: fn name self? ( params? ) return_type (block | => expr)
     fn_decl: ($) =>
-      seq('fn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', $.return_type, $.block),
+      seq('fn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', $.return_type, $._fn_body),
+    // `=> expr`: a block of that one expression, ended as a statement is.
+    _fn_body: ($) => choice($.block, alias($._arrow_body, $.block)),
+    _arrow_body: ($) => seq('=>', $._expr, $._end),
     fn_name: ($) =>
       choice(
         $.identifier,
@@ -157,7 +160,7 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // Unary:  fn TypeIdent:neg |a|    ReturnType { ... }
     // Binary: fn TypeIdent:add |a, b| ReturnType { ... }
     op_decl: ($) =>
-      seq('fn', choice($.type_ident, $.promoted_type), ':', $.identifier, $.capture, $.return_type, $.block),
+      seq('fn', choice($.type_ident, $.promoted_type), ':', $.identifier, $.capture, $.return_type, $._fn_body),
 
     // Wasm-native type binding: type (TypeIdent | &) = @dsl/\ ... \/
     // Used to declare that the promoted type maps to a wasm intrinsic
