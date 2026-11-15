@@ -248,18 +248,18 @@ fn iterator_op(node: I32) I32 { tok_word[token_after(first_child(node))]; }
 
 /// Operators that end a pipeline.
 fn is_terminal(op: I32) Bool {
-    op == Kw.Fold.to_i32() or op == Kw.Each.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
-        or op == Kw.Count_where.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32()
-        or op == Kw.Sum.to_i32() or op == Kw.Fast_sum.to_i32() or op == Kw.Product.to_i32() or op == Kw.Count.to_i32()
-        or op == Kw.Collect.to_i32() or op == Kw.Sort.to_i32() or op == Kw.Group_by.to_i32() or op == Kw.Distinct_by.to_i32()
-        or op == Kw.Partition.to_i32() or op == Kw.Batched.to_i32() or op == Kw.Windows.to_i32() or op == Kw.Min_by.to_i32()
-        or op == Kw.Max_by.to_i32() or op == Kw.First_where.to_i32() or op == Kw.Reduce.to_i32() or op == Kw.Bisect.to_i32();
+    op == Kw.Fold.i32() or op == Kw.Each.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
+        or op == Kw.Count_where.i32() or op == Kw.First_index.i32() or op == Kw.Last_index.i32()
+        or op == Kw.Sum.i32() or op == Kw.Fast_sum.i32() or op == Kw.Product.i32() or op == Kw.Count.i32()
+        or op == Kw.Collect.i32() or op == Kw.Sort.i32() or op == Kw.Group_by.i32() or op == Kw.Distinct_by.i32()
+        or op == Kw.Partition.i32() or op == Kw.Batched.i32() or op == Kw.Windows.i32() or op == Kw.Min_by.i32()
+        or op == Kw.Max_by.i32() or op == Kw.First_where.i32() or op == Kw.Reduce.i32() or op == Kw.Bisect.i32();
 }
 
 /// Stages that never pass on more values than they receive.
 fn is_bounded_stage(op: I32) Bool {
-    op == Kw.Map.to_i32() or op == Kw.Filter.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Take.to_i32()
-        or op == Kw.Skip_while.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Scan.to_i32() or op == Kw.Zip.to_i32();
+    op == Kw.Map.i32() or op == Kw.Filter.i32() or op == Kw.Skip.i32() or op == Kw.Take.i32()
+        or op == Kw.Skip_while.i32() or op == Kw.Take_while.i32() or op == Kw.Scan.i32() or op == Kw.Zip.i32();
 }
 
 //! = The pipeline
@@ -273,7 +273,7 @@ fn fusable_collect(input: I32, strict: Bool) I32 {
     if not is_kind(input, Node.Paren_expr) { return -1; };
     let inner = past_splices(first_child(input));
     if not is_kind(inner, Node.Iterator_expr) or next_sibling(first_child(input)) >= 0 { return -1; };
-    if iterator_op(inner) != Kw.Collect.to_i32() { return -1; };
+    if iterator_op(inner) != Kw.Collect.i32() { return -1; };
     let s = past_splices(first_child(inner));
     while (is_kind(s, Node.Iterator_expr)) {
         if is_terminal(iterator_op(s)) or not pure_stage(s) or (strict and stage_may_trap(s)) { return -1; };
@@ -284,8 +284,8 @@ fn fusable_collect(input: I32, strict: Bool) I32 {
 
 /// Stages that can end the pipeline before its source does.
 fn stops_early(op: I32) Bool {
-    op == Kw.Take.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
-        or op == Kw.First_where.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Zip.to_i32();
+    op == Kw.Take.i32() or op == Kw.Take_while.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
+        or op == Kw.First_where.i32() or op == Kw.First_index.i32() or op == Kw.Zip.i32();
 }
 
 /// A stage whose parts (all but its source) assign only their own locals,
@@ -304,28 +304,28 @@ fn pure_stage(stage: I32) Bool {
 
 fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
     let kind = node_kind[node];
-    if kind == Node.Await_expr.to_i32() or kind == Node.Dsl_expr.to_i32() or kind == Node.Iterator_expr.to_i32()
-        or kind == Node.Yield_expr.to_i32() or kind == Node.Return_expr.to_i32() or kind == Node.Break_expr.to_i32()
-        or kind == Node.Continue_expr.to_i32() or kind == Node.Promoted_module_call_expr.to_i32() or kind == Node.Prune_expr.to_i32()
-        or kind == Node.Defer_expr.to_i32() or kind == Node.Bind_expr.to_i32() or kind == Node.Pipe_expr.to_i32() {
+    if kind == Node.Await_expr.i32() or kind == Node.Dsl_expr.i32() or kind == Node.Iterator_expr.i32()
+        or kind == Node.Yield_expr.i32() or kind == Node.Return_expr.i32() or kind == Node.Break_expr.i32()
+        or kind == Node.Continue_expr.i32() or kind == Node.Promoted_module_call_expr.i32() or kind == Node.Prune_expr.i32()
+        or kind == Node.Defer_expr.i32() or kind == Node.Bind_expr.i32() or kind == Node.Pipe_expr.i32() {
         return false;
     };
     // An operator may be the program's own method.
-    if (kind == Node.Binary_expr.to_i32() or kind == Node.Unary_expr.to_i32() or kind == Node.Index_expr.to_i32()
-        or kind == Node.Slice_expr.to_i32()) and user_operators() {
+    if (kind == Node.Binary_expr.i32() or kind == Node.Unary_expr.i32() or kind == Node.Index_expr.i32()
+        or kind == Node.Slice_expr.i32()) and user_operators() {
         return false;
     };
-    // A hole's text is its value's `to_str`.
-    if kind == Node.Template_string.to_i32() and user_to_str() { return false; };
-    if kind == Node.Assign_expr.to_i32() {
+    // A hole's text is its value's `str`.
+    if kind == Node.Template_string.i32() and user_str() { return false; };
+    if kind == Node.Assign_expr.i32() {
         let target = first_child(node);
-        if not is_kind(target, Node.Identifier) or (tok_kind[token_after(target)] != Tok.Eq.to_i32() and user_operators()) { return false; };
+        if not is_kind(target, Node.Identifier) or (tok_kind[token_after(target)] != Tok.Eq.i32() and user_operators()) { return false; };
         let d = node_decl[target];
         if d < 0 or decl_node[d] < 0 { return false; };
         let at = tok_start[node_first[decl_node[d]]];
         if at < lo or at >= hi { return false; };
     };
-    if kind == Node.Call_expr.to_i32() {
+    if kind == Node.Call_expr.i32() {
         let callee = first_child(node);
         if not (is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Type_member_expr)) or not pure_method(word_of(last_child(callee))) { return false; };
         // A host module's function is the host's.
@@ -341,7 +341,7 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
 }
 
 /// The methods pure_method allows, interned once per program, and then
-/// `to_str` (a template's holes).
+/// `str` (a template's holes).
 vec pure_words: I32;
 /// By entry of @pure_words: 1 when the program declares a function or field
 /// of that name of its own (which may do anything), else 0; last, 1 when it
@@ -365,7 +365,7 @@ fn user_declares(word: I32) Bool {
 /// @pure_flags's entry `i`.
 fn pure_flag(i: I32) Bool {
     if pure_words.len() == 0 {
-        for (["to_i32", "to_u32", "to_i64", "to_u64", "to_f32", "to_f64", "to_str", "i32", "u32", "i64", "u64", "f32", "f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)); };
+        for (["i32", "u32", "i64", "u64", "f32", "f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)); };
         pure_words.push(known_word(Known.ToStr));
         for (0 ..< pure_words.len()) |j| { pure_flags.push(if user_declares(pure_words[j]) { 1; } else { 0; }); };
         pure_flags.push(if user_declares(-1) { 1; } else { 0; });
@@ -379,8 +379,8 @@ fn user_operators() Bool {
     pure_flag(pure_flags.len() - 1);
 }
 
-/// Whether a template's holes may call the program's own `to_str`.
-fn user_to_str() Bool {
+/// Whether a template's holes may call the program's own `str`.
+fn user_str() Bool {
     pure_flag(0);
     pure_flag(pure_words.len() - 1);
 }
@@ -406,20 +406,20 @@ fn stage_may_trap(stage: I32) Bool {
 
 fn may_trap(node: I32) Bool {
     let kind = node_kind[node];
-    if kind == Node.Index_expr.to_i32() or kind == Node.Slice_expr.to_i32() or kind == Node.Call_expr.to_i32()
-        or kind == Node.Promote_expr.to_i32() or kind == Node.Assert_expr.to_i32() or kind == Node.Fatal_expr.to_i32()
-        or kind == Node.While_expr.to_i32() or kind == Node.For_expr.to_i32() or kind == Node.Loop_match_expr.to_i32()
-        or kind == Node.Match_expr.to_i32() or kind == Node.Alt_expr.to_i32() or kind == Node.Try_expr.to_i32()
-        or kind == Node.Template_string.to_i32() {
+    if kind == Node.Index_expr.i32() or kind == Node.Slice_expr.i32() or kind == Node.Call_expr.i32()
+        or kind == Node.Promote_expr.i32() or kind == Node.Assert_expr.i32() or kind == Node.Fatal_expr.i32()
+        or kind == Node.While_expr.i32() or kind == Node.For_expr.i32() or kind == Node.Loop_match_expr.i32()
+        or kind == Node.Match_expr.i32() or kind == Node.Alt_expr.i32() or kind == Node.Try_expr.i32()
+        or kind == Node.Template_string.i32() {
         return true;
     };
-    if kind == Node.Binary_expr.to_i32() {
+    if kind == Node.Binary_expr.i32() {
         let w = operator_word(token_after(first_child(node)));
         if w == known_word(Known.Div) or w == known_word(Known.Rem) { return true; };
     };
-    if kind == Node.Assign_expr.to_i32() {
+    if kind == Node.Assign_expr.i32() {
         let op = tok_kind[token_after(first_child(node))];
-        if op == Tok.SlashEq.to_i32() or op == Tok.PercentEq.to_i32() { return true; };
+        if op == Tok.SlashEq.i32() or op == Tok.PercentEq.i32() { return true; };
     };
     let c = first_child(node);
     while (c >= 0) {
@@ -440,7 +440,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     // its source at random, never.
     let n = 0;
     let input = node;
-    let pure = iterator_op(node) != Kw.Bisect.to_i32();
+    let pure = iterator_op(node) != Kw.Bisect.i32();
     let strict = false;
     while (true) {
         while (is_kind(input, Node.Iterator_expr)) {
@@ -477,7 +477,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     if not is_terminal(end_op) {
         report(Diag.IteratorUnfinished, node, end_op);
         t = error_value();
-    } else if end_op == Kw.Bisect.to_i32() {
+    } else if end_op == Kw.Bisect.i32() {
         t = check_bisect(node, input, n, cx);
     } else {
         t = check_pipeline(input, first_stage, n, cx);
@@ -539,7 +539,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         ls(p.hi, mh);
     };
     // Leading skip and take narrow the range instead of counting values.
-    while (p.first < n - 1 and (stage_op(p, p.first) == Kw.Skip.to_i32() or stage_op(p, p.first) == Kw.Take.to_i32())) {
+    while (p.first < n - 1 and (stage_op(p, p.first) == Kw.Skip.i32() or stage_op(p, p.first) == Kw.Take.i32())) {
         narrow(p, p.first, cx);
         p.first += 1;
     };
@@ -549,8 +549,8 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let stops = false;
     for (p.first ..< n) |j| {
         let op = stage_op(p, j);
-        if op == Kw.Take.to_i32() or op == Kw.Take_while.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
-            or op == Kw.First_where.to_i32() or op == Kw.First_index.to_i32() or (op == Kw.Zip.to_i32() and j != p.first) {
+        if op == Kw.Take.i32() or op == Kw.Take_while.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
+            or op == Kw.First_where.i32() or op == Kw.First_index.i32() or (op == Kw.Zip.i32() and j != p.first) {
             stops = true;
         };
     };
@@ -597,8 +597,8 @@ fn pipe_took_operator(input: I32) Bool {
     if not is_kind(input, Node.Binary_expr) { return false; };
     let t = token_after(first_child(input));
     let w = tok_word[t];
-    let k = Tok.from_i32(tok_kind[t]);
-    let logical = w == Kw.And.to_i32() or w == Kw.Or.to_i32() or w == Kw.Xor.to_i32();
+    let k = Tok(tok_kind[t]);
+    let logical = w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32();
     if not (logical or k == Tok.EqEq or k == Tok.BangEq or k == Tok.Lt or k == Tok.Gt or k == Tok.LtEq or k == Tok.GtEq) { return false; };
     report2(Diag.IteratorSource, input, intern_text(tok_text(t)), -1, 7);
     diag_label("piped");
@@ -633,7 +633,7 @@ fn range_source(p: Pipe, input: I32, cx: Cx) Bool {
     coerce(check_expr(b, t, cx), t, b);
     if repr(t) == vt_i32 { plain(to_wide, vt_i64, mb); };
     ls(p.hi, mb);
-    let inclusive = tok_kind[token_after(a)] == Tok.DotDotDot.to_i32();
+    let inclusive = tok_kind[token_after(a)] == Tok.DotDotDot.i32();
     // if hi < lo (hi <= lo for ..<) { hi = lo } [else { hi += 1 }]
     let mi = w_mark();
     lg(p.hi);
@@ -700,7 +700,7 @@ fn narrow(p: Pipe, k: I32, cx: Cx) void {
     param_i32(stage_node(p, k), limit, cx);
     // (hi - lo compared unsigned: a range's may pass I32's greatest.)
     let pos = cur_locals[p.lo];
-    if stage_op(p, k) == Kw.Skip.to_i32() {
+    if stage_op(p, k) == Kw.Skip.i32() {
         // if limit > 0 { lo = if limit > hi - lo { hi } else { lo + limit } }
         let mi = w_mark();
         lg(limit);
@@ -842,7 +842,7 @@ fn counter_of(p: Pipe, k: I32) I32 {
 /// Whether a stage reads its position: an index binding, or its operator.
 fn stage_counts(p: Pipe, k: I32, nvalues: I32) Bool {
     let op = stage_op(p, k);
-    if op == Kw.Take.to_i32() or op == Kw.Skip.to_i32() or op == Kw.Zip.to_i32() or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() { return true; };
+    if op == Kw.Take.i32() or op == Kw.Skip.i32() or op == Kw.Zip.i32() or op == Kw.First_index.i32() or op == Kw.Last_index.i32() { return true; };
     child_count(stage_capture(stage_node(p, k))) > nvalues;
 }
 
@@ -878,8 +878,8 @@ fn two(a: I32, b: I32) Array[I32] {
 fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void {
     let m = w_mark();
     let op = stage_op(p, k);
-    let nvalues = if op == Kw.Fold.to_i32() or op == Kw.Scan.to_i32() or op == Kw.Zip.to_i32() or op == Kw.Reduce.to_i32()
-        or op == Kw.Min_by.to_i32() or op == Kw.Max_by.to_i32() or op == Kw.Sort.to_i32() { 2; } else { 1; };
+    let nvalues = if op == Kw.Fold.i32() or op == Kw.Scan.i32() or op == Kw.Zip.i32() or op == Kw.Reduce.i32()
+        or op == Kw.Min_by.i32() or op == Kw.Max_by.i32() or op == Kw.Sort.i32() { 2; } else { 1; };
     if k < p.count - 1 and is_terminal(op) {
         report(Diag.IteratorTerminalInside, stage_node(p, k), op);
         let here = stage_node(p, k);
@@ -948,7 +948,7 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
     let slot = p.first_stage + k;
     let bool_t = prelude(Prelude.Bool);
-    if op == Kw.Map.to_i32() {
+    if op == Kw.Map.i32() {
         let mm = w_mark();
         let t = stage_body(p, k, one(value), one(vt), 1, -1, cx);
         let mapped = new_local(repr(t));
@@ -956,12 +956,12 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         next_stage(p, k, mapped, t, cx);
         return;
     };
-    if op == Kw.Filter.to_i32() or op == Kw.Take_while.to_i32() {
+    if op == Kw.Filter.i32() or op == Kw.Take_while.i32() {
         let mi = w_mark();
         stage_body(p, k, one(value), one(vt), 1, bool_t, cx);
         let mt = w_mark();
         next_stage(p, k, value, vt, cx);
-        if op == Kw.Take_while.to_i32() {
+        if op == Kw.Take_while.i32() {
             let me = else_begin(mt);
             cancel(p, k);
             end_if(mi, me);
@@ -970,7 +970,7 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         };
         return;
     };
-    if op == Kw.Skip_while.to_i32() {
+    if op == Kw.Skip_while.i32() {
         let skipping = stage_local(slot, 0, vt_i32);
         if not p.replay {
             set_i32(skipping, 1);
@@ -992,12 +992,12 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         end_if(mi2, mt2);
         return;
     };
-    if op == Kw.Skip.to_i32() or op == Kw.Take.to_i32() {
+    if op == Kw.Skip.i32() or op == Kw.Take.i32() {
         let limit = stage_local(slot, 0, vt_i32);
         if not p.replay {
             let ml = w_mark();
             param_i32(node, limit, cx);
-            if op == Kw.Take.to_i32() {
+            if op == Kw.Take.i32() {
                 // if limit <= 0 { cancel }
                 let mi = w_mark();
                 lg(limit);
@@ -1014,11 +1014,11 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         let mi = w_mark();
         lg(ord);
         lg(limit);
-        w_i32_op(if op == Kw.Take.to_i32() { i32_lt_s; } else { i32_ge_s; }, mi);
+        w_i32_op(if op == Kw.Take.i32() { i32_lt_s; } else { i32_ge_s; }, mi);
         let mt = w_mark();
         next_stage(p, k, value, vt, cx);
         end_if(mi, mt);
-        if op == Kw.Take.to_i32() {
+        if op == Kw.Take.i32() {
             let mi2 = w_mark();
             lg(st_counter[slot]);
             lg(limit);
@@ -1027,7 +1027,7 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         };
         return;
     };
-    if op == Kw.Repeat.to_i32() {
+    if op == Kw.Repeat.i32() {
         let times = stage_local(slot, 0, vt_i32);
         if not p.replay {
             param_i32(node, times, cx);
@@ -1046,11 +1046,11 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         loop_close(lp);
         return;
     };
-    if op == Kw.Chain.to_i32() {
+    if op == Kw.Chain.i32() {
         check_chain(p, k, value, vt, cx);
         return;
     };
-    if op == Kw.Scan.to_i32() {
+    if op == Kw.Scan.i32() {
         let param = stage_param(node);
         let at = type_only(param, -1, cx);
         let acc = stage_local(slot, 0, repr(at));
@@ -1068,11 +1068,11 @@ fn stage_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         next_stage(p, k, mapped, at, cx);
         return;
     };
-    if op == Kw.Flat_map.to_i32() {
+    if op == Kw.Flat_map.i32() {
         check_flat_map(p, k, value, vt, cx);
         return;
     };
-    if op == Kw.Zip.to_i32() {
+    if op == Kw.Zip.i32() {
         check_zip(p, k, value, vt, cx);
         return;
     };
@@ -1318,7 +1318,7 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let slot = p.first_stage + k;
     let bool_t = prelude(Prelude.Bool);
     let i32_t = prelude(Prelude.I32);
-    if op == Kw.Fold.to_i32() {
+    if op == Kw.Fold.i32() {
         let param = stage_param(node);
         let rt = if p.replay { p.result_type; } else { type_only(param, -1, cx); };
         let result = stage_local(slot, 0, repr(rt));
@@ -1335,36 +1335,36 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         ls(result, ms);
         return;
     };
-    if op == Kw.Each.to_i32() {
+    if op == Kw.Each.i32() {
         p.result_type = ty_void();
         discard(stage_body(p, k, one(value), one(vt), 1, ty_void(), cx));
         return;
     };
-    if (op == Kw.Sum.to_i32() or op == Kw.Product.to_i32() or op == Kw.Fast_sum.to_i32()) and not is_numeric(vt) {
+    if (op == Kw.Sum.i32() or op == Kw.Product.i32() or op == Kw.Fast_sum.i32()) and not is_numeric(vt) {
         // Only a number has a 0 and a 1 to start from.
         if not ty_is(vt, Ty.Error) { report2(Diag.IteratorSource, node, op, vt, 5); };
         p.result_type = error_value();
         return;
     };
-    if op == Kw.Sum.to_i32() or op == Kw.Product.to_i32() {
+    if op == Kw.Sum.i32() or op == Kw.Product.i32() {
         // An accumulator of the element's type: 0 (or 1), then += (or *=) each.
         let result = stage_local(slot, 0, repr(vt));
         if not p.replay {
             let mr = w_mark();
-            push_number(vt, if op == Kw.Sum.to_i32() { 0; } else { 1; }, false);
+            push_number(vt, if op == Kw.Sum.i32() { 0; } else { 1; }, false);
             ls(result, mr);
             to_setup(p);
         };
         p.result = result;
         p.result_type = vt;
-        let word = known_word(if op == Kw.Sum.to_i32() { Known.Add; } else { Known.Mul; });
+        let word = known_word(if op == Kw.Sum.i32() { Known.Add; } else { Known.Mul; });
         let ma = w_mark();
         lg(result);
         accumulate(word, vt, value, node, cx, ma);
         ls(result, ma);
         return;
     };
-    if op == Kw.Fast_sum.to_i32() {
+    if op == Kw.Fast_sum.i32() {
         // Four running sums, rotated every value: result, lane1, lane2, lane3.
         let result = stage_local(slot, 0, repr(vt));
         let l1 = stage_local(slot, 1, repr(vt));
@@ -1411,34 +1411,34 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         p.result_type = vt;
         return;
     };
-    if op == Kw.Count.to_i32() or op == Kw.Count_where.to_i32() or op == Kw.Any.to_i32() or op == Kw.All.to_i32()
-        or op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() {
+    if op == Kw.Count.i32() or op == Kw.Count_where.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
+        or op == Kw.First_index.i32() or op == Kw.Last_index.i32() {
         let result = stage_local(slot, 0, vt_i32);
         if not p.replay {
-            set_i32(result, if op == Kw.All.to_i32() { 1; } else if op == Kw.First_index.to_i32() or op == Kw.Last_index.to_i32() { -1; } else { 0; });
+            set_i32(result, if op == Kw.All.i32() { 1; } else if op == Kw.First_index.i32() or op == Kw.Last_index.i32() { -1; } else { 0; });
             to_setup(p);
         };
         p.result = result;
-        p.result_type = if op == Kw.Any.to_i32() or op == Kw.All.to_i32() { bool_t; } else { i32_t; };
-        if op == Kw.Count.to_i32() {
+        p.result_type = if op == Kw.Any.i32() or op == Kw.All.i32() { bool_t; } else { i32_t; };
+        if op == Kw.Count.i32() {
             incr(result);
             return;
         };
         let mi = w_mark();
         stage_body(p, k, one(value), one(vt), 1, bool_t, cx);
-        if op == Kw.All.to_i32() { w_i32_op(i32_eqz, mi); };
+        if op == Kw.All.i32() { w_i32_op(i32_eqz, mi); };
         let mt = w_mark();
-        if op == Kw.Count_where.to_i32() { incr(result); }
-        else if op == Kw.Any.to_i32() { set_i32(result, 1); cancel(p, k); }
-        else if op == Kw.All.to_i32() { set_i32(result, 0); cancel(p, k); }
+        if op == Kw.Count_where.i32() { incr(result); }
+        else if op == Kw.Any.i32() { set_i32(result, 1); cancel(p, k); }
+        else if op == Kw.All.i32() { set_i32(result, 0); cancel(p, k); }
         else {
             copy_local(result, st_ordinal[slot]);
-            if op == Kw.First_index.to_i32() { cancel(p, k); };
+            if op == Kw.First_index.i32() { cancel(p, k); };
         };
         end_if(mi, mt);
         return;
     };
-    if op == Kw.Collect.to_i32() {
+    if op == Kw.Collect.i32() {
         let et = type_of(stage_type(node, 0), cx.inst);
         let b = buffer(p, slot, et, stage_type(node, 0));
         buffer_add(p, b, et, value, vt, node);
@@ -1446,19 +1446,19 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         p.result_type = array_of(et);
         return;
     };
-    if op == Kw.Sort.to_i32() {
+    if op == Kw.Sort.i32() {
         check_sort(p, k, value, vt, cx);
         return;
     };
-    if op == Kw.Partition.to_i32() {
+    if op == Kw.Partition.i32() {
         check_partition(p, k, value, vt, cx);
         return;
     };
-    if op == Kw.Distinct_by.to_i32() or op == Kw.Group_by.to_i32() {
+    if op == Kw.Distinct_by.i32() or op == Kw.Group_by.i32() {
         check_group(p, k, op, value, vt, cx);
         return;
     };
-    if op == Kw.Batched.to_i32() or op == Kw.Windows.to_i32() {
+    if op == Kw.Batched.i32() or op == Kw.Windows.i32() {
         check_batches(p, k, op, value, vt, cx);
         return;
     };
@@ -1830,8 +1830,8 @@ fn scalar_order(block: I32, capture: I32, et: I32) I32 {
     let a = first_child(capture);
     if node_decl[l] != node_decl[a] or node_decl[r] != node_decl[next_sibling(a)] { return 0; };
     let op = tok_kind[token_after(l)];
-    if op == Tok.Lt.to_i32() { return 1; };
-    if op == Tok.Gt.to_i32() { return -1; };
+    if op == Tok.Lt.i32() { return 1; };
+    if op == Tok.Gt.i32() { return -1; };
     0;
 }
 
@@ -2281,10 +2281,10 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let fheap = vt_heap(repr(found_t));
     // min_by and max_by compare two values: no index.
     let capture = stage_capture(node);
-    if (op == Kw.Min_by.to_i32() or op == Kw.Max_by.to_i32()) and capture >= 0 and child_count(capture) != 2 {
+    if (op == Kw.Min_by.i32() or op == Kw.Max_by.i32()) and capture >= 0 and child_count(capture) != 2 {
         report2(Diag.IteratorCaptures, node, stage_op(p, k), 2, 1);
     };
-    if op == Kw.First_where.to_i32() {
+    if op == Kw.First_where.i32() {
         // if test { result = Found.new(value); stop }
         let mi = w_mark();
         stage_body(p, k, one(value), one(vt), 1, prelude(Prelude.Bool), cx);
@@ -2298,7 +2298,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         end_if(mi, mt);
         return;
     };
-    if op == Kw.Reduce.to_i32() and written_scalar(type_node, false) {
+    if op == Kw.Reduce.i32() and written_scalar(type_node, false) {
         // A number: the accumulator in a local (it has a zero); the result made once, after.
         let acc = stage_local(slot, 1, repr(et));
         let has = stage_local(slot, 2, vt_i32);
@@ -2351,7 +2351,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     lg(found);
     w_node(Op.StructGet, repr(et), fheap, 0, mg);
     ls(fv, mg);
-    if op == Kw.Reduce.to_i32() {
+    if op == Kw.Reduce.i32() {
         // found.value = body(found.value, value)
         let ms = w_mark();
         lg(found);
@@ -2360,7 +2360,7 @@ fn check_found(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     } else {
         // if body(…) { found.value = value }: min_by binds (value, best), max_by (best, value)
         let mb = w_mark();
-        if op == Kw.Min_by.to_i32() { stage_body(p, k, two(value, fv), two(vt, et), 2, prelude(Prelude.Bool), cx); }
+        if op == Kw.Min_by.i32() { stage_body(p, k, two(value, fv), two(vt, et), 2, prelude(Prelude.Bool), cx); }
         else { stage_body(p, k, two(fv, value), two(et, vt), 2, prelude(Prelude.Bool), cx); };
         let mt2 = w_mark();
         lg(found);
@@ -2384,7 +2384,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let key_node = stage_type(node, 1);
     let et = type_of(type_node, cx.inst);
     let kt = type_of(key_node, cx.inst);
-    let grouping = op == Kw.Group_by.to_i32();
+    let grouping = op == Kw.Group_by.i32();
     let gmodule = prelude_lookup(intern_text("Group"));
     let group_t = if grouping { named(decl_a[gmodule], instance(gmodule, list2(kt, et))); } else { et; };
     let keys = buffer_at(p, slot, 0, kt, -1, false);
@@ -2735,7 +2735,7 @@ fn check_batches(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
         ls(count, mc);
         to_cleanup(p);
     };
-    let windows = op == Kw.Windows.to_i32();
+    let windows = op == Kw.Windows.i32();
     let at = array_of(array_of(et));
     let gheap = vt_heap(repr(at));
     let vheap = vt_heap(cur_locals[data]);
@@ -2841,7 +2841,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     // Its value, and optionally its index.
     let names = child_count(stage_capture(node));
     if names < 1 or names > 2 {
-        report2(Diag.IteratorCaptures, node, Kw.Bisect.to_i32(), 1, -1);
+        report2(Diag.IteratorCaptures, node, Kw.Bisect.i32(), 1, -1);
         return error_value();
     };
     let i32_t = prelude(Prelude.I32);
@@ -2871,7 +2871,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
         lg(start);
         plain(i64_extend_i32_s, vt_i64, w_mark() - 1);
         plain(i64_sub, vt_i64, mb);
-        if tok_kind[token_after(a)] == Tok.DotDotDot.to_i32() {
+        if tok_kind[token_after(a)] == Tok.DotDotDot.i32() {
             w_leaf(Op.I64Const, vt_i64, 1, 0);
             plain(i64_add, vt_i64, mb);
         };
@@ -2999,7 +2999,7 @@ fn past_splices(node: I32) I32 {
 /// Whether a pipeline's own mistake was reported since diagnostic `from`.
 fn pipeline_mistake_since(from: I32) Bool {
     for (from ..< diag_kind.len()) |i| {
-        let k = Diag.from_i32(diag_kind[i]);
+        let k = Diag(diag_kind[i]);
         if k == Diag.IteratorTerminalInside or k == Diag.IteratorCaptures or k == Diag.IteratorSource or k == Diag.GeneratorCall { return true; };
     };
     false;

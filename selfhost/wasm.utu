@@ -169,7 +169,7 @@ vec ht_table: I32;   // open addressing over func and array types, -1 empty
 
 fn ht_new(kind: Heap, a: I32, b: I32) I32 {
     let id = ht_kind.len();
-    ht_kind.push(kind.to_i32());
+    ht_kind.push(kind.i32());
     ht_a.push(a);
     ht_b.push(b);
     ht_super.push(-1);
@@ -187,7 +187,7 @@ fn ht_key_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 31 + a) * 16777619) ^ (
 fn ht_intern(kind: Heap, a: I32, b: I32, single: Bool) I32 {
     if (ht_kind.len() + 1) * 2 > ht_table.len() { ht_grow(); };
     let mask = ht_table.len() - 1;
-    let k = kind.to_i32();
+    let k = kind.i32();
     let h = ht_key_hash(k, a, b) & mask;
     while (ht_table[h] >= 0) {
         let t = ht_table[h];
@@ -206,7 +206,7 @@ fn ht_grow() void {
     for (0 ..< n) |i| { ht_table[i] = -1; };
     let mask = n - 1;
     for (0 ..< ht_kind.len()) |t| {
-        if ht_kind[t] != Heap.Struct.to_i32() {
+        if ht_kind[t] != Heap.Struct.i32() {
             let h = ht_key_hash(ht_kind[t], ht_a[t], ht_b[t]) & mask;
             while (ht_table[h] >= 0) { h = (h + 1) & mask; };
             ht_table[h] = t;
@@ -350,7 +350,7 @@ fn add_import_func(module: I32, field: I32, t: I32) I32 {
 /// A function of type `t` (a `Func` heap type), with no body yet.
 fn new_func(kind: FuncKind, t: I32) I32 {
     let f = func_kind.len();
-    func_kind.push(kind.to_i32());
+    func_kind.push(kind.i32());
     func_type_of.push(t);
     func_body.push(-1);
     func_locals.push(0);
@@ -367,7 +367,7 @@ fn new_func(kind: FuncKind, t: I32) I32 {
 /// A defined global, its initializer the constant IR node `init`.
 fn add_global(t: I32, mutable: Bool, init: I32) I32 {
     let g = glob_kind.len();
-    glob_kind.push(FuncKind.Defined.to_i32());
+    glob_kind.push(FuncKind.Defined.i32());
     glob_type.push(t);
     glob_mutable.push(if mutable { 1; } else { 0; });
     glob_init.push(init);
@@ -380,7 +380,7 @@ fn add_global(t: I32, mutable: Bool, init: I32) I32 {
 
 fn add_import_global(module: I32, field: I32, t: I32) I32 {
     let g = add_global(t, false, -1);
-    glob_kind[g] = FuncKind.Import.to_i32();
+    glob_kind[g] = FuncKind.Import.i32();
     glob_module_name[g] = module;
     glob_field_name[g] = field;
     g;
@@ -604,7 +604,7 @@ fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
     // A block with several results is typed by a function type, which must
     // exist before encoding numbers the types.
     if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple); };
-    w_op.push(op.to_i32());
+    w_op.push(op.i32());
     w_type.push(vt);
     w_src.push(cur_src[0]);
     w_site.push(-1);
@@ -684,9 +684,9 @@ fn leb_s(in_body: Bool, value: I32) void {
 }
 
 fn leb_s64(in_body: Bool, lo: I32, hi: I32) void {
-    let v = (hi.to_i64() << 32) | (lo.to_i64() & 4294967295);
+    let v = (hi.i64() << 32) | (lo.i64() & 4294967295);
     while (true) {
-        let b = (v & 127).to_i32();
+        let b = (v & 127).i32();
         v = v >> 7;
         if (v == 0 and (b & 64) == 0) or (v == -1 and (b & 64) != 0) {
             put(in_body, b);
@@ -766,10 +766,10 @@ fn sweep() void {
     };
     live_work.clear();
     for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 { mark_func(f); };
+        if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { mark_func(f); };
     };
     for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] >= 0 { mark_global(g); };
+        if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { mark_global(g); };
     };
     // (The start function the computed globals made; see check.utu.)
     if start_func[0] >= 0 { mark_func(start_func[0]); };
@@ -801,12 +801,12 @@ fn scan_live(node: I32) void {
     };
     node_holders[node] += 1;
     let op = w_op[node];
-    if op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.RefFunc.to_i32() {
+    if op == Op.Call.i32() or op == Op.ReturnCall.i32() or op == Op.RefFunc.i32() {
         func_uses[w_a[node]] += 1;
         mark_func(w_a[node]);
-    } else if op == Op.GlobalGet.to_i32() or op == Op.GlobalSet.to_i32() {
+    } else if op == Op.GlobalGet.i32() or op == Op.GlobalSet.i32() {
         glob_uses[w_a[node]] += 1;
-        if op == Op.GlobalSet.to_i32() { glob_sets[w_a[node]] += 1; };
+        if op == Op.GlobalSet.i32() { glob_sets[w_a[node]] += 1; };
         mark_global(w_a[node]);
     };
     for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
@@ -823,7 +823,7 @@ vec memory_live: U8;
 fn mark_memories() void {
     let n = memory_kind.len();
     memory_live.resize(n);
-    for (0 ..< n) |m| { memory_live[m] = if comptime_fuel[0] < 0 or memory_kind[m] == FuncKind.Import.to_i32() or is_comptime_value(memory_field_name[m]) { 1; } else { 0; }; };
+    for (0 ..< n) |m| { memory_live[m] = if comptime_fuel[0] < 0 or memory_kind[m] == FuncKind.Import.i32() or is_comptime_value(memory_field_name[m]) { 1; } else { 0; }; };
     if comptime_fuel[0] < 0 { return; };
     live_work.clear();
     for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_body[f] >= 0 { live_work.push(func_body[f]); }; };
@@ -832,11 +832,11 @@ fn mark_memories() void {
         let node = live_work[live_work.len() - 1];
         live_work.resize(live_work.len() - 1);
         let op = w_op[node];
-        if op == Op.Load.to_i32() or op == Op.Store.to_i32() or op == Op.MemorySize.to_i32() or op == Op.MemoryGrow.to_i32()
-            or op == Op.MemoryFill.to_i32() or op == Op.MemoryInit.to_i32() or op == Op.MemoryCopy.to_i32() {
+        if op == Op.Load.i32() or op == Op.Store.i32() or op == Op.MemorySize.i32() or op == Op.MemoryGrow.i32()
+            or op == Op.MemoryFill.i32() or op == Op.MemoryInit.i32() or op == Op.MemoryCopy.i32() {
             memory_live[w_a[node]] = 1;
         };
-        if op == Op.MemoryCopy.to_i32() { memory_live[w_b[node]] = 1; };
+        if op == Op.MemoryCopy.i32() { memory_live[w_b[node]] = 1; };
         for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
     };
 }
@@ -871,13 +871,13 @@ fn assign_indices() void {
     mark_memories();
     let next_m = 0;
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] == FuncKind.Import.to_i32() {
+        if memory_kind[m] == FuncKind.Import.i32() {
             memory_index[m] = next_m;
             next_m += 1;
         };
     };
     for (0 ..< memory_kind.len()) |m| {
-        memory_index[m] = if memory_kind[m] == FuncKind.Import.to_i32() or m == prof_memory[0] { memory_index[m]; } else if memory_live[m] == 0 { -1; } else {
+        memory_index[m] = if memory_kind[m] == FuncKind.Import.i32() or m == prof_memory[0] { memory_index[m]; } else if memory_live[m] == 0 { -1; } else {
             next_m += 1;
             next_m - 1;
         };
@@ -896,7 +896,7 @@ fn assign_indices() void {
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
         sort_items.clear();
         for (0 ..< func_kind.len()) |f| {
-            if func_kind[f] == kind.to_i32() and func_live[f] == 1 { sort_items.push(f); };
+            if func_kind[f] == kind.i32() and func_live[f] == 1 { sort_items.push(f); };
         };
         sort_keys.resize(func_uses.len());
         for (0 ..< func_uses.len()) |f| { sort_keys[f] = func_uses[f]; };
@@ -911,7 +911,7 @@ fn assign_indices() void {
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
         sort_items.clear();
         for (0 ..< glob_kind.len()) |g| {
-            if glob_kind[g] == kind.to_i32() and glob_live[g] == 1 and not glob_folded(g) { sort_items.push(g); };
+            if glob_kind[g] == kind.i32() and glob_live[g] == 1 and not glob_folded(g) { sort_items.push(g); };
         };
         sort_keys.resize(glob_uses.len());
         for (0 ..< glob_uses.len()) |g| { sort_keys[g] = glob_uses[g]; };
@@ -961,7 +961,7 @@ fn order_types(n: I32) void {
                 // has no identity to keep (no cast tells two of them apart),
                 // so it is a single too: the one of the same signature, or
                 // one of its own.
-                let twin = ht_lookup(Heap.Func.to_i32(), ht_a[t], ht_b[t], 1);
+                let twin = ht_lookup(Heap.Func.i32(), ht_a[t], ht_b[t], 1);
                 if twin >= 0 and type_live[twin] == 1 { type_twin[t] = twin; }
                 else {
                     type_alone[t] = 1;
@@ -1056,10 +1056,10 @@ fn place_group(n: I32) void {
 fn refs_of(t: I32) void {
     type_refs.clear();
     let kind = ht_kind[t];
-    if kind == Heap.Func.to_i32() {
+    if kind == Heap.Func.i32() {
         refs_of_list(ht_a[t]);
         refs_of_list(ht_b[t]);
-    } else if kind == Heap.Array.to_i32() {
+    } else if kind == Heap.Array.i32() {
         type_ref_of(ht_a[t]);
     } else {
         for (0 ..< ht_b[t]) |i| { type_ref_of(field_storage(t, i)); };
@@ -1075,9 +1075,9 @@ fn type_ref_of(vt: I32) void { if vt >= vt_defined and vt < vt_tuple { type_refs
 /// module, and each read is the constant (as short as the read, mostly, and
 /// a constant to the engine).
 fn glob_folded(g: I32) Bool {
-    if glob_kind[g] != FuncKind.Defined.to_i32() or glob_field_name[g] >= 0 or glob_sets[g] != 0 or glob_init[g] < 0 { return false; };
+    if glob_kind[g] != FuncKind.Defined.i32() or glob_field_name[g] >= 0 or glob_sets[g] != 0 or glob_init[g] < 0 { return false; };
     let op = w_op[glob_init[g]];
-    op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32();
+    op == Op.I32Const.i32() or op == Op.I64Const.i32();
 }
 
 // The `room` items of sort_items with the greatest sort_keys first (the
@@ -1160,16 +1160,16 @@ fn sweep_types() void {
         // Only a block's several results need a function type (a call's
         // are its callee's).
         let vt = w_type[node];
-        if vt >= vt_tuple and not (op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.If.to_i32() or op == Op.Try.to_i32()) {
+        if vt >= vt_tuple and not (op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.If.i32() or op == Op.Try.i32()) {
             mark_list(vt - vt_tuple);
         } else {
             mark_vt(vt);
         };
-        if op == Op.RefNull.to_i32() or op == Op.RefTest.to_i32() or op == Op.RefCast.to_i32() { mark_vt(w_a[node]); }
-        else if op == Op.CastArms.to_i32() { for (0 ..< w_b[node] + 1) |i| { mark_vt(w_aux[w_a[node] + i]); }; }
-        else if op == Op.CallRef.to_i32() or (op >= Op.StructNew.to_i32() and op <= Op.ArrayInitData.to_i32() and op != Op.ArrayLen.to_i32()) {
+        if op == Op.RefNull.i32() or op == Op.RefTest.i32() or op == Op.RefCast.i32() { mark_vt(w_a[node]); }
+        else if op == Op.CastArms.i32() { for (0 ..< w_b[node] + 1) |i| { mark_vt(w_aux[w_a[node] + i]); }; }
+        else if op == Op.CallRef.i32() or (op >= Op.StructNew.i32() and op <= Op.ArrayInitData.i32() and op != Op.ArrayLen.i32()) {
             mark_type(w_a[node]);
-            if op == Op.ArrayCopy.to_i32() { mark_type(w_b[node]); };
+            if op == Op.ArrayCopy.i32() { mark_type(w_b[node]); };
         };
         for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
     };
@@ -1177,10 +1177,10 @@ fn sweep_types() void {
         let t = type_work[type_work.len() - 1];
         type_work.resize(type_work.len() - 1);
         let kind = ht_kind[t];
-        if kind == Heap.Func.to_i32() {
+        if kind == Heap.Func.i32() {
             mark_list(ht_a[t]);
             mark_list(ht_b[t]);
-        } else if kind == Heap.Array.to_i32() {
+        } else if kind == Heap.Array.i32() {
             mark_vt(ht_a[t]);
         } else {
             for (0 ..< ht_b[t]) |i| { mark_vt(field_storage(t, i)); };
@@ -1216,7 +1216,7 @@ vec type_alone: U8;
 
 /// A function type that names no defined type, so it can be encoded on its own.
 fn plain_func(t: I32) Bool {
-    if ht_kind[t] != Heap.Func.to_i32() { return false; };
+    if ht_kind[t] != Heap.Func.i32() { return false; };
     for (0 ..< vl_len[ht_a[t]]) |i| { if vl_item(ht_a[t], i) >= vt_defined { return false; }; };
     for (0 ..< vl_len[ht_b[t]]) |i| { if vl_item(ht_b[t], i) >= vt_defined { return false; }; };
     true;
@@ -1283,11 +1283,11 @@ fn put_composite(t: I32) void {
             leb_u(false, 0);
         };
     };
-    if kind == Heap.Func.to_i32() {
+    if kind == Heap.Func.i32() {
         sec.push(96);
         put_list(ht_a[t]);
         put_list(ht_b[t]);
-    } else if kind == Heap.Array.to_i32() {
+    } else if kind == Heap.Array.i32() {
         sec.push(94);
         put_valtype(false, ht_a[t]);
         sec.push(ht_b[t]);
@@ -1334,7 +1334,7 @@ fn encode_types() void {
 
 fn encode_imports() void {
     let count = func_imported[0] + glob_imported[0];
-    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.to_i32() { count += 1; }; };
+    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.i32() { count += 1; }; };
     if tag_used[0] == 1 { count += 1; };
     if count == 0 { return; };
     leb_u(false, count);
@@ -1353,7 +1353,7 @@ fn encode_imports() void {
         leb_u(false, type_index[js_tag_type()]);
     };
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] == FuncKind.Import.to_i32() {
+        if memory_kind[m] == FuncKind.Import.i32() {
             put_name(false, memory_module_name[m]);
             put_name(false, memory_field_name[m]);
             sec.push(2);
@@ -1396,11 +1396,11 @@ fn encode_functions() void {
 
 fn encode_memories() void {
     let count = 0;
-    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Defined.to_i32() and memory_index[m] >= 0 { count += 1; }; };
+    for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1; }; };
     if count == 0 { return; };
     leb_u(false, count);
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] == FuncKind.Defined.to_i32() and memory_index[m] >= 0 and m != prof_memory[0] { put_limits(memory_pages[m]); };
+        if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 and m != prof_memory[0] { put_limits(memory_pages[m]); };
     };
     // The profiler's: shared, of a fixed size.
     if prof_memory[0] >= 0 {
@@ -1465,27 +1465,27 @@ fn mark_late(f: I32) void {
 
 fn encode_exports() void {
     let count = 0;
-    for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 { count += 1; }; };
-    for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] >= 0 { count += 1; }; };
-    for (0 ..< memory_kind.len()) |m| { if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.to_i32() and memory_index[m] >= 0 { count += 1; }; };
+    for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { count += 1; }; };
+    for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { count += 1; }; };
+    for (0 ..< memory_kind.len()) |m| { if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1; }; };
     if count == 0 { return; };
     leb_u(false, count);
     for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 {
+        if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 {
             put_name(false, func_field_name[f]);
             sec.push(0);
             leb_u(false, func_index[f]);
         };
     };
     for (0 ..< memory_kind.len()) |m| {
-        if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.to_i32() and memory_index[m] >= 0 {
+        if memory_field_name[m] >= 0 and memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 {
             put_name(false, memory_field_name[m]);
             sec.push(2);
             leb_u(false, memory_index[m]);
         };
     };
     for (0 ..< glob_kind.len()) |g| {
-        if glob_kind[g] == FuncKind.Defined.to_i32() and glob_field_name[g] >= 0 {
+        if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 {
             put_name(false, glob_field_name[g]);
             sec.push(3);
             leb_u(false, glob_index[g]);
@@ -1563,8 +1563,8 @@ fn mark_targets(body: I32) void {
         let node = live_work[live_work.len() - 1];
         live_work.resize(live_work.len() - 1);
         let op = w_op[node];
-        if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() or op == Op.Rethrow.to_i32() { mark_target(w_a[node]); }
-        else if op == Op.BrTable.to_i32() { for (0 ..< w_b[node]) |i| { mark_target(w_aux[w_a[node] + i]); }; };
+        if op == Op.Br.i32() or op == Op.BrIf.i32() or op == Op.Rethrow.i32() { mark_target(w_a[node]); }
+        else if op == Op.BrTable.i32() { for (0 ..< w_b[node]) |i| { mark_target(w_aux[w_a[node] + i]); }; };
         for (0 ..< w_count[node]) |i| { live_work.push(w_kid(node, i)); };
     };
 }
@@ -1829,11 +1829,11 @@ fn inverse_comparison(code: I32) I32 {
 fn exits_only_loop(block: I32) Bool {
     if w_type[block] != vt_none or w_count[block] != 1 or targets(w_a[block]) != 1 { return false; };
     let lp = w_kid(block, 0);
-    if w_op[lp] != Op.Loop.to_i32() or w_type[lp] != vt_none or w_count[lp] < 2 { return false; };
+    if w_op[lp] != Op.Loop.i32() or w_type[lp] != vt_none or w_count[lp] < 2 { return false; };
     let exit = w_kid(lp, 0);
     let back = w_kid(lp, w_count[lp] - 1);
-    w_op[exit] == Op.BrIf.to_i32() and w_a[exit] == w_a[block] and w_count[exit] == 1
-        and w_op[back] == Op.Br.to_i32() and w_a[back] == w_a[lp] and w_count[back] == 0;
+    w_op[exit] == Op.BrIf.i32() and w_a[exit] == w_a[block] and w_count[exit] == 1
+        and w_op[back] == Op.Br.i32() and w_a[back] == w_a[lp] and w_count[back] == 0;
 }
 
 /// Open a structured instruction (`block` 2, `loop` 3, `if` 4, `try` 6) of
@@ -1875,9 +1875,9 @@ fn emit_while_rec(block: I32, d: I32) void {
     let leave = w_kid(w_kid(lp, 0), 0);
     open_block(3, vt_none, w_a[lp]);
     // Round again while the condition to leave does not hold.
-    if w_op[leave] == Op.Plain.to_i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
+    if w_op[leave] == Op.Plain.i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
         emit_at(w_kid(leave, 0), d);
-    } else if w_op[leave] == Op.Plain.to_i32() and inverse_comparison(w_a[leave]) >= 0 {
+    } else if w_op[leave] == Op.Plain.i32() and inverse_comparison(w_a[leave]) >= 0 {
         emit_kids_rec(leave, d);
         op1(inverse_comparison(w_a[leave]));
     } else {
@@ -1909,10 +1909,10 @@ fn live_kids(node: I32) I32 {
 /// `unreachable`, or a sequence that ends in one.
 fn never_ends(k: I32) Bool {
     let op = w_op[k];
-    if op == Op.Seq.to_i32() or ((op == Op.Block.to_i32() or op == Op.Loop.to_i32()) and not targeted(w_a[k])) {
+    if op == Op.Seq.i32() or ((op == Op.Block.i32() or op == Op.Loop.i32()) and not targeted(w_a[k])) {
         return w_count[k] > 0 and never_ends(w_kid(k, live_kids(k) - 1));
     };
-    w_type[k] == vt_unreachable and (op == Op.Unreachable.to_i32() or op == Op.Br.to_i32() or op == Op.Return.to_i32() or op == Op.Throw.to_i32() or op == Op.Rethrow.to_i32());
+    w_type[k] == vt_unreachable and (op == Op.Unreachable.i32() or op == Op.Br.i32() or op == Op.Return.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32());
 }
 
 fn emit_body_rec(node: I32, d: I32) void {
@@ -1930,33 +1930,33 @@ fn emit_rec(node: I32, d: I32) void {
     let op = w_op[node];
     let a = w_a[node];
     let b = w_b[node];
-    if op == Op.Seq.to_i32() { emit_body_rec(node, d); return; };
-    if op == Op.Block.to_i32() and exits_only_loop(node) {
+    if op == Op.Seq.i32() { emit_body_rec(node, d); return; };
+    if op == Op.Block.i32() and exits_only_loop(node) {
         emit_while_rec(node, d);
         return;
     };
-    if op == Op.GlobalGet.to_i32() and glob_folded(a) {
+    if op == Op.GlobalGet.i32() and glob_folded(a) {
         emit_at(glob_init[a], d);
         return;
     };
-    if op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+    if op == Op.Block.i32() or op == Op.Loop.i32() {
         // A block nothing branches to is its contents (a loop's `continue`
         // target when nothing continues, …).
         if not targeted(a) {
             emit_body_rec(node, d);
             return;
         };
-        open_block(if op == Op.Block.to_i32() { 2; } else { 3; }, w_type[node], a);
+        open_block(if op == Op.Block.i32() { 2; } else { 3; }, w_type[node], a);
         emit_body_rec(node, d);
         close_block();
         return;
     };
     // (Planned by emit_step.)
-    if op == Op.CastArms.to_i32() {
+    if op == Op.CastArms.i32() {
         emit_deep(node);
         return;
     };
-    if op == Op.NullElse.to_i32() {
+    if op == Op.NullElse.i32() {
         open_block(2, w_type[node], -1);
         emit_at(w_kid(node, 0), d);
         op1(214);  // br_on_non_null 0
@@ -1965,7 +1965,7 @@ fn emit_rec(node: I32, d: I32) void {
         close_block();
         return;
     };
-    if op == Op.If.to_i32() {
+    if op == Op.If.i32() {
         emit_at(w_kid(node, 0), d);
         open_block(4, w_type[node], a);
         emit_at(w_kid(node, 1), d);
@@ -1978,15 +1978,15 @@ fn emit_rec(node: I32, d: I32) void {
     };
     // `i32.eqz` of an integer comparison is the opposite comparison (a byte
     // fewer; not for floats, where NaN makes neither hold).
-    if op == Op.Plain.to_i32() and a == i32_eqz and w_count[node] == 1 {
+    if op == Op.Plain.i32() and a == i32_eqz and w_count[node] == 1 {
         let c = w_kid(node, 0);
-        if w_op[c] == Op.Plain.to_i32() and inverse_comparison(w_a[c]) >= 0 {
+        if w_op[c] == Op.Plain.i32() and inverse_comparison(w_a[c]) >= 0 {
             emit_kids_rec(c, d);
             op1(inverse_comparison(w_a[c]));
             return;
         };
     };
-    if op == Op.Try.to_i32() {
+    if op == Op.Try.i32() {
         open_block(6, w_type[node], a);
         emit_at(w_kid(node, 0), d);
         op1(7);  // catch the JS tag (tag 0)
@@ -2072,16 +2072,16 @@ fn emit_deep(node: I32) void {
 fn emit_step(node: I32) void {
     let op = w_op[node];
     let a = w_a[node];
-    if op == Op.Seq.to_i32() { emit_body_deep(node); return; };
-    if op == Op.Block.to_i32() and exits_only_loop(node) {
+    if op == Op.Seq.i32() { emit_body_deep(node); return; };
+    if op == Op.Block.i32() and exits_only_loop(node) {
         emit_while_deep(node);
         return;
     };
-    if op == Op.GlobalGet.to_i32() and glob_folded(a) {
+    if op == Op.GlobalGet.i32() and glob_folded(a) {
         emit_task(0, glob_init[a]);
         return;
     };
-    if op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+    if op == Op.Block.i32() or op == Op.Loop.i32() {
         // A block nothing branches to is its contents (a loop's `continue`
         // target when nothing continues, …).
         if not targeted(a) {
@@ -2090,10 +2090,10 @@ fn emit_step(node: I32) void {
         };
         emit_task(4, 0);
         emit_kids_deep(node);
-        emit_open(if op == Op.Block.to_i32() { 2; } else { 3; }, w_type[node], a);
+        emit_open(if op == Op.Block.i32() { 2; } else { 3; }, w_type[node], a);
         return;
     };
-    if op == Op.CastArms.to_i32() {
+    if op == Op.CastArms.i32() {
         let k = w_b[node];
         emit_task(4, 0);
         let i = k;
@@ -2118,7 +2118,7 @@ fn emit_step(node: I32) void {
         emit_open(2, w_type[node], -1);
         return;
     };
-    if op == Op.NullElse.to_i32() {
+    if op == Op.NullElse.i32() {
         emit_task(4, 0);
         emit_task(0, w_kid(node, 1));
         emit_task(2, 0);
@@ -2127,7 +2127,7 @@ fn emit_step(node: I32) void {
         emit_open(2, w_type[node], -1);
         return;
     };
-    if op == Op.If.to_i32() {
+    if op == Op.If.i32() {
         emit_task(4, 0);
         if w_count[node] > 2 {
             emit_task(0, w_kid(node, 2));
@@ -2140,15 +2140,15 @@ fn emit_step(node: I32) void {
     };
     // `i32.eqz` of an integer comparison is the opposite comparison (a byte
     // fewer; not for floats, where NaN makes neither hold).
-    if op == Op.Plain.to_i32() and a == i32_eqz and w_count[node] == 1 {
+    if op == Op.Plain.i32() and a == i32_eqz and w_count[node] == 1 {
         let c = w_kid(node, 0);
-        if w_op[c] == Op.Plain.to_i32() and inverse_comparison(w_a[c]) >= 0 {
+        if w_op[c] == Op.Plain.i32() and inverse_comparison(w_a[c]) >= 0 {
             emit_task(2, inverse_comparison(w_a[c]));
             emit_kids_deep(c);
             return;
         };
     };
-    if op == Op.Try.to_i32() {
+    if op == Op.Try.i32() {
         emit_task(4, 0);
         emit_task(0, w_kid(node, 1));
         emit_task(5, 0);  // catch the JS tag (tag 0)
@@ -2169,9 +2169,9 @@ fn emit_while_deep(block: I32) void {
     emit_kids_from(lp, 1);
     emit_open(4, vt_none, -1);
     // Round again while the condition to leave does not hold.
-    if w_op[leave] == Op.Plain.to_i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
+    if w_op[leave] == Op.Plain.i32() and w_a[leave] == i32_eqz and w_count[leave] == 1 {
         emit_task(0, w_kid(leave, 0));
-    } else if w_op[leave] == Op.Plain.to_i32() and inverse_comparison(w_a[leave]) >= 0 {
+    } else if w_op[leave] == Op.Plain.i32() and inverse_comparison(w_a[leave]) >= 0 {
         emit_task(2, inverse_comparison(w_a[leave]));
         emit_kids_deep(leave);
     } else {
@@ -2186,7 +2186,7 @@ fn emit_own(node: I32) void {
     let op = w_op[node];
     let a = w_a[node];
     let b = w_b[node];
-    match Op.from_i32(op) {
+    match Op(op) {
         Op.Nop => { op1(1); },
         Op.Unreachable => { op1(0); },
         Op.Br => { op1(12); leb_u(true, depth_of(a)); },

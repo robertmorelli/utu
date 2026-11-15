@@ -59,7 +59,7 @@ fn func_syntax(i: I32) I32 {
 /// Function `i`: 0 defined, 1 imported, 2 a helper the compiler made (data.utu), 3 `@wat`.
 fn func_role(i: I32) I32 {
     let f = func_order[i];
-    if func_kind[f] == FuncKind.Import.to_i32() { return 1; };
+    if func_kind[f] == FuncKind.Import.i32() { return 1; };
     if func_code[f] >= 0 { return 3; };
     for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == f { return 2; }; };
     0;
@@ -93,11 +93,11 @@ fn outer_decl(node: I32) I32 {
     let found = -1;
     while (n >= 0) {
         let k = node_kind[n];
-        if k == Node.Fn_decl.to_i32() or k == Node.Op_decl.to_i32() or k == Node.Struct_decl.to_i32()
-            or k == Node.Enum_decl.to_i32() or k == Node.Proto_decl.to_i32() or k == Node.Global_decl.to_i32()
-            or k == Node.Mem_decl.to_i32() or k == Node.Distinct_decl.to_i32() or k == Node.Type_decl.to_i32()
-            or k == Node.Using_decl.to_i32() or k == Node.Export_main_decl.to_i32() or k == Node.Test_decl.to_i32()
-            or k == Node.Bench_decl.to_i32() or k == Node.Measure_decl.to_i32() { found = n; };
+        if k == Node.Fn_decl.i32() or k == Node.Op_decl.i32() or k == Node.Struct_decl.i32()
+            or k == Node.Enum_decl.i32() or k == Node.Proto_decl.i32() or k == Node.Global_decl.i32()
+            or k == Node.Mem_decl.i32() or k == Node.Distinct_decl.i32() or k == Node.Type_decl.i32()
+            or k == Node.Using_decl.i32() or k == Node.Export_main_decl.i32() or k == Node.Test_decl.i32()
+            or k == Node.Bench_decl.i32() or k == Node.Measure_decl.i32() { found = n; };
         n = parent_of(n);
     };
     found;

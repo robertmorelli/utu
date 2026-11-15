@@ -679,12 +679,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('stdlib: numeric conversions are single instructions with saturating float → int', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'stdlib_conversions.utu', source: `
       export lib {
-        fn widen(i: I32) F64 { i.to_f64(); }
-        fn narrow(f: F64) I32 { f.to_i32(); }
-        fn unsigned(f: F64) F64 { f.to_u32().to_f64(); }
-        fn wide(i: I32) F64 { i.to_i64().to_f64(); }
-        fn single(f: F64) F64 { f.to_f32().to_f64(); }
-        fn wrap(n: F64) I32 { n.to_i64().to_i32(); }
+        fn widen(i: I32) F64 { i.f64(); }
+        fn narrow(f: F64) I32 { f.i32(); }
+        fn unsigned(f: F64) F64 { f.u32().f64(); }
+        fn wide(i: I32) F64 { i.i64().f64(); }
+        fn single(f: F64) F64 { f.f32().f64(); }
+        fn wrap(n: F64) I32 { n.i64().i32(); }
       }
     ` });
     const e = instance.exports;
@@ -740,7 +740,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         fn countdown() I32 { let calls = 0; let tick = cl(k: I32) void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
         fn captured() I32 { promote find(true) { |p| => { let read = cl() I32 { p.v; }; read(); }, ~> 0, }; }
         fn required() I32 { let p = find(true) orelse fatal; p.v; }
-        fn scaled(i: I32) F64 { let y = 16 + i.to_f64() * 40; y + 14; }
+        fn scaled(i: I32) F64 { let y = 16 + i.f64() * 40; y + 14; }
         fn loop_values() I32 { let last = P { v: 0 }; for (0..<3) |i| { keep(last); }; while (last.v < 2) { last.v += 1; keep(last); }; last.v; }
       }
     ` });

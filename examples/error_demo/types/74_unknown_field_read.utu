@@ -6,5 +6,5 @@ struct Point:
 
 export main() I32 {
     let p = Point { x: 1.0, y: 2.0 };
-    p.z.to_i32();
+    p.z.i32();
 }

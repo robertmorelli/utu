@@ -25,24 +25,18 @@ mod F64 {
     fn max(a: &, b: &) & { @ir/\ <ir-f64-max><ir-ident name="a"/><ir-ident name="b"/></ir-f64-max> \/; }
 
     // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
-    fn &.f32 |self| () F32 { self.to_f32(); }
-    fn &.to_f32 |self| () F32 { @ir/\ <ir-f32-demote><ir-ident name="self"/></ir-f32-demote> \/; }
-    fn &.i32 |self| () I32 { self.to_i32(); }
-    fn &.to_i32 |self| () I32 { @ir/\ <ir-i32-trunc-s-sat-f64><ir-ident name="self"/></ir-i32-trunc-s-sat-f64> \/; }
-    fn &.u32 |self| () U32 { self.to_u32(); }
-    fn &.to_u32 |self| () U32 { @ir/\ <ir-u32-trunc-u-sat-f64><ir-ident name="self"/></ir-u32-trunc-u-sat-f64> \/; }
-    fn &.i64 |self| () I64 { self.to_i64(); }
-    fn &.to_i64 |self| () I64 { @ir/\ <ir-i64-trunc-s-sat-f64><ir-ident name="self"/></ir-i64-trunc-s-sat-f64> \/; }
-    fn &.u64 |self| () U64 { self.to_u64(); }
-    fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-trunc-u-sat-f64><ir-ident name="self"/></ir-u64-trunc-u-sat-f64> \/; }
+    fn &.f32 |self| () F32 { @ir/\ <ir-f32-demote><ir-ident name="self"/></ir-f32-demote> \/; }
+    fn &.i32 |self| () I32 { @ir/\ <ir-i32-trunc-s-sat-f64><ir-ident name="self"/></ir-i32-trunc-s-sat-f64> \/; }
+    fn &.u32 |self| () U32 { @ir/\ <ir-u32-trunc-u-sat-f64><ir-ident name="self"/></ir-u32-trunc-u-sat-f64> \/; }
+    fn &.i64 |self| () I64 { @ir/\ <ir-i64-trunc-s-sat-f64><ir-ident name="self"/></ir-i64-trunc-s-sat-f64> \/; }
+    fn &.u64 |self| () U64 { @ir/\ <ir-u64-trunc-u-sat-f64><ir-ident name="self"/></ir-u64-trunc-u-sat-f64> \/; }
 
     // The IEEE 754 bits, and back.
     fn &.bits |self| () I64 { @ir/\ <ir-i64-reinterpret><ir-ident name="self"/></ir-i64-reinterpret> \/; }
     fn from_bits(bits: I64) & { @ir/\ <ir-f64-reinterpret><ir-ident name="bits"/></ir-f64-reinterpret> \/; }
 
     // Decimal text, as JavaScript's String() spells it. Ships only when used.
-    fn &.str |self| () Str { self.to_str(); }
-    fn &.to_str |self| () Str {
+    fn &.str |self| () Str {
         let format: fun(F64) Str = @es/\ (v) => String(v) \/;
         format(self);
     }

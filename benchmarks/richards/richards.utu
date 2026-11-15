@@ -299,7 +299,7 @@ fn richards() I64 {
     s.create_task(device_b, 5000, null, false, true, false, Device { pending: null });
 
     s.schedule();
-    s.queue_packet_count.to_i64() * 100000 + s.hold_count.to_i64();
+    s.queue_packet_count.i64() * 100000 + s.hold_count.i64();
 }
 
 test "richards counts its packets and holds" {

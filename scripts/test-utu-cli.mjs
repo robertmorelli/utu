@@ -252,12 +252,12 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     slice: ['fn cut(xs: Array[I32]) I32 {\n    xs[2, 1].len();\n}\nexport main() I32 { cut([1, 2, 3]); }\n', 'Slice ends before it starts', '2:5', 'cut'],
     // In the slice helper every use shares: at this use, not the first.
     slice2: ['fn n(x: I32) I32 { x; }\nfn ok(xs: Array[I32]) I32 { xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    xs[2, n(1)].len();\n}\nexport main() I32 { let xs = [1, 2, 3]; ok(xs) + cut(xs); }\n', 'Slice ends before it starts', '4:5', 'cut'],
-    // (A safe build stops at from_i32, before the match could miss.)
+    // (A safe build stops at Color(9), before the match could miss.)
     // A column counts characters, as check's do (an emoji is one, not two UTF-16 units).
     emoji: ['fn at(xs: Array[I32], i: I32) I32 {\n    let s = "😀😀"; xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:19', 'at'],
     // A lone \r ends a line, as \n and \r\n do.
     cr: ['fn at(xs: Array[I32], i: I32) I32 {\r    xs[i];\r}\rexport main() I32 { at([1, 2, 3], 5); }\r', 'Index out of bounds', '2:5', 'at'],
-    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color.from_i32(9)); }\n', 'Color.from_i32: no variant has this value', '7:26', 'main'],
+    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nexport main() I32 { name(Color(9)); }\n', 'Color: no variant has this value', '7:26', 'main'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
     await write(`${name}.utu`, source);

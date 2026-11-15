@@ -19,12 +19,12 @@ const KINDS = [['U8', 200], ['I8', -100], ['U16', 60000], ['I16', -30000], ['I32
 // For each kind: initial contents, pushes past 64 KiB, writes, compound
 // writes, resize (keeping old contents; the new ones are zero in the
 // self-hosted compiler, stale in stage 0: test-compiler-regressions), and clear.
-const widen = kind => kind === 'I64' || kind === 'F64' ? '' : kind === 'F32' ? '.to_f64()' : '.to_i64()';
+const widen = kind => kind === 'I64' || kind === 'F64' ? '' : kind === 'F32' ? '.f64()' : '.i64()';
 const exercise = word => KINDS.map(([kind, value], k) => {
   const float = kind.startsWith('F');
   const lit = float ? value.toFixed(2) : String(value);
   const w = widen(kind);
-  const n = x => float ? `${x}.to_f64()` : `${x}.to_i64()`;
+  const n = x => float ? `${x}.f64()` : `${x}.i64()`;
   return `
 ${word} m${k}: ${kind} = [${lit}, ${lit}, ${lit}];
 fn run${k}() ${float ? 'F64' : 'I64'} {

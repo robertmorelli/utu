@@ -3,5 +3,5 @@
 export main() I32 {
     let x = 3.0;
     let masked = x & 1.0;
-    masked.to_i32();
+    masked.i32();
 }

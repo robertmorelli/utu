@@ -192,8 +192,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             @wutu/\\ ${reactive ? '@reactive;' : ''}
             div {
               display: block;
-              width: = g.pct.to_str() + "%";
-              --level: = g.pct.to_str();
+              width: = g.pct.str() + "%";
+              --level: = g.pct.str();
               span { "gauge"; }
             }
             \\/;
@@ -294,7 +294,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_signed_zero.utu', source: `${BROWSER}
         struct State:
             | x: F64
-        fn sign(x: F64) Browser.HTMLElement { @wutu/\\ span { = (1.0 / x).to_str(); } \\/; }
+        fn sign(x: F64) Browser.HTMLElement { @wutu/\\ span { = (1.0 / x).str(); } \\/; }
         export lib {
             fn main() Browser.HTMLElement {
                 let state = State { x: -0.0 };
@@ -319,7 +319,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             | words: Array[Str]
         fn card(body: Browser.HTMLElement) Browser.HTMLElement { @wutu/\\ figure { header { "Title"; } = body; } \\/; }
         fn tag(word: Str) Browser.HTMLElement { @wutu/\\ em { = word; } \\/; }
-        fn badge(n: I32) Browser.HTMLElement { card(tag(n.to_str())); }
+        fn badge(n: I32) Browser.HTMLElement { card(tag(n.str())); }
         fn plain() Browser.HTMLElement { @wutu/\\ main { = card(tag("hello")); } \\/; }
         fn view() Browser.HTMLElement {
           let state = State { n: 1, words: ["a", "b"] };
@@ -407,7 +407,7 @@ export main() Browser.HTMLElement {
     // (A binding reports once, at the bind statement.)
     assert(diagnostics.length >= 4, texts.join(' | '));
     assert(texts.every(text => !text.includes('@wutu')), `no diagnostic covers the whole template: ${texts.join(' | ')}`);
-    // (`= 7;` is text: a number shows as its to_str.)
+    // (`= 7;` is text: a number shows as its str.)
     for (const expected of ['42', 's.n']) assert(texts.includes(expected), `expected a diagnostic at ${expected}: ${texts.join(' | ')}`);
     assert(!texts.includes('7'), 'a number in a text hole is text');
     assert(texts.some(text => text.startsWith('bind:value')), 'bind sync errors point at the bind statement');
@@ -622,7 +622,7 @@ export main() Browser.HTMLElement {
 
   test('wutu: a root SVG-only tag is SVG; object takes data, checked as a URL; on changed is a custom event', async ({ ROOT }) => {
     const source = `${BROWSER}
-      fn dot(k: I32) Browser.SVGElement { @wutu/\\ circle.dot { r = k.to_str(); } \\/; }
+      fn dot(k: I32) Browser.SVGElement { @wutu/\\ circle.dot { r = k.str(); } \\/; }
       fn grp() Browser.SVGElement { @wutu/\\ g { rect { width = "2"; } } \\/; }
       fn link() Browser.HTMLElement { @wutu/\\ a { href = "/x"; "x"; } \\/; }
       fn obj(u: Str) Browser.HTMLElement { @wutu/\\ object#ob { data = u; } \\/; }

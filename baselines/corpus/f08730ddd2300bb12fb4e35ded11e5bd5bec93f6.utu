@@ -26,11 +26,11 @@ fn workspace(state: MeterState) Browser.HTMLElement {
                 div.days {
                     for ["M","T","W","T","F","S","S"] |day,index| {
                         button {
-                            aria-label = habit.name+" day "+wutu.number(index.to_i64().to_i32()+1);
-                            aria-pressed = if habit.days[index.to_i64().to_i32()] {"true";} else {"false";};
+                            aria-label = habit.name+" day "+wutu.number(index.i64().i32()+1);
+                            aria-pressed = if habit.days[index.i64().i32()] {"true";} else {"false";};
                             = day;
                             on click {
-                                let i=index.to_i64().to_i32();
+                                let i=index.i64().i32();
                                 habit.days[i]=not habit.days[i];
                                 wutu.save("meter-v2");
                             }

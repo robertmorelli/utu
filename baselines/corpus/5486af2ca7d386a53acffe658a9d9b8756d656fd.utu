@@ -1,11 +1,11 @@
 using Browser from std:Browser;
 
 fn number(value: I32) Str {
-    value.to_f64().toString();
+    value.f64().toString();
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.to_f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2);
 }
 
 fn node(id: Str) Browser.HTMLElement {
@@ -40,7 +40,7 @@ struct Estimate:
     | edit: Str
 
 fn amount(line: Line) I32 {
-    (line.hours * line.rate.to_f64()).to_i32();
+    (line.hours * line.rate.f64()).i32();
 }
 
 fn input(id: Str) Browser.HTMLInputElement {
@@ -82,9 +82,9 @@ fn csv(state: Estimate) Str {
             + ","
             + line.hours.toString()
             + ","
-            + (line.rate.to_f64() / 100.0).toFixed(2)
+            + (line.rate.f64() / 100.0).toFixed(2)
             + ","
-            + (amount(line).to_f64() / 100.0).toFixed(2)
+            + (amount(line).f64() / 100.0).toFixed(2)
             + newline;
     };
     "data:text/csv;charset=utf-8," + Browser.encodeURIComponent(text);
@@ -96,7 +96,7 @@ fn refresh(state: Estimate) void {
 
 fn estimate(state: Estimate) Browser.HTMLElement {
     let total = state.lines map |line| {
-        amount(line).to_f64();
+        amount(line).f64();
     } sum;
     let hours = state.lines map |line| {
         line.hours;
@@ -196,7 +196,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                             state.edit = line.id;
                             input("work").value = line.title;
                             input("hours").value = line.hours.toString();
-                            input("rate").value = (line.rate.to_f64() / 100.0).toString();
+                            input("rate").value = (line.rate.f64() / 100.0).toString();
                             input("work").focus();
                         }
                     }
@@ -280,7 +280,7 @@ export main() void {
                         id: row.id,
                         title: row.title,
                         hours: row.hours,
-                        rate: rate.to_i32()
+                        rate: rate.i32()
                     }
                     ]) collect(Line);
                     i += 1.0;
@@ -562,7 +562,7 @@ export main() void {
                                     id: Browser.crypto.randomUUID(),
                                     title: work.value.trim(),
                                     hours: hours.valueAsNumber,
-                                    rate: (rate.valueAsNumber * 100.0).to_i32()
+                                    rate: (rate.valueAsNumber * 100.0).i32()
                                 }
                                 ]) collect(Line);
                             }
@@ -571,7 +571,7 @@ export main() void {
                                     if line.id == state.edit {
                                         line.title = work.value.trim();
                                         line.hours = hours.valueAsNumber;
-                                        line.rate = (rate.valueAsNumber * 100.0).to_i32();
+                                        line.rate = (rate.valueAsNumber * 100.0).i32();
                                     };
                                 };
                             };

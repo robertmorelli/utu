@@ -160,7 +160,7 @@ try {
   let version = 1;
   assert.deepEqual(await completing(MAIN.replace('total * 2;', 'p.¦\n    total * 2;'), '¦'), ['x', 'y', 'sum']);
   assert.deepEqual(await completing(MAIN.replace('Point.new(1, 2));', 'Point.¦);'), '¦'), ['new', 'sum']);
-  assert.ok((await completing(MAIN.replace('total * 2;', 'total.to¦\n    total * 2;'), '¦')).includes('to_str'), "an I32's methods");
+  assert.ok((await completing(MAIN.replace('total * 2;', 'total.st¦\n    total * 2;'), '¦')).includes('str'), "an I32's methods");
   const names = await completing(MAIN.replace('total * 2;', 'to¦\n    total * 2;'), '¦');
   for (const name of ['total', 'p', 'twice', 'Point', 'Str', 'let']) assert.ok(names.includes(name), name);
   // Nothing is offered in a comment or a string.

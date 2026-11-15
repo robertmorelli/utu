@@ -17,7 +17,7 @@ fn card(plant: Plant) Browser.HTMLElement {
         border-radius: 1.25rem;
         background: var(--card);
         h2 { font-size: 1.4rem; margin: 0; = plant.name; }
-        p { margin: 0; color: var(--muted); "Water every "; = plant.days.to_f64().toString(); " days"; }
+        p { margin: 0; color: var(--muted); "Water every "; = plant.days.f64().toString(); " days"; }
         button as toggle {
             type="button";
             aria-pressed=if plant.watered { "true";
@@ -55,7 +55,7 @@ fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLEle
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
         gap: 1rem;
-        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); role="status"; = visible.to_f64().toString(); " plants in your greenhouse"; }
+        p.results { grid-column: 1 / -1; margin: 0; color: var(--muted); role="status"; = visible.f64().toString(); " plants in your greenhouse"; }
         for (ordered filter |plant| { plant.name.toLowerCase().includes(query.toLowerCase()); }) |plant| {
             = card(plant);
         }

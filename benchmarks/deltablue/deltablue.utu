@@ -13,15 +13,15 @@ enum(U8) Strength:
     | WeakDefault
     | Weakest
 
-fn Strength.stronger |self| (other: Strength) Bool { self.to_i32() < other.to_i32(); }
+fn Strength.stronger |self| (other: Strength) Bool { self.i32() < other.i32(); }
 
-fn Strength.weaker |self| (other: Strength) Bool { self.to_i32() > other.to_i32(); }
+fn Strength.weaker |self| (other: Strength) Bool { self.i32() > other.i32(); }
 
 fn Strength.weakest_of |self| (other: Strength) Strength { if self.weaker(other) { self; } else { other; }; }
 
 // As the original has it: Required's next weaker is Weakest.
 fn Strength.next_weaker |self| () Strength {
-    match self.to_i32() {
+    match self.i32() {
         0 => Strength.Weakest,
         1 => Strength.WeakDefault,
         2 => Strength.Normal,

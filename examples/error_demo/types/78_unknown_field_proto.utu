@@ -9,5 +9,5 @@ struct Circle[Shape]:
 
 export main() I32 {
     let s: Shape = Circle { name: "c", r: 1.0 };
-    s.r.to_i32();
+    s.r.i32();
 }

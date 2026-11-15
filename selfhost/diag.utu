@@ -59,7 +59,7 @@ fn node_text(node: I32) Str {
     bytes_text(tok_start[node_first[node]], tok_end[node_last[node] - 1]);
 }
 
-fn int_text(v: I32) Str { v.to_str(); }
+fn int_text(v: I32) Str { v.str(); }
 
 fn pick(c: Bool, yes: Str, no: Str) Str {
     if c { return yes; };
@@ -70,15 +70,15 @@ fn pick(c: Bool, yes: Str, no: Str) Str {
 fn type_text(t: I32) Str {
     if t < 0 { return "unknown"; };
     let kind = ty_kind[t];
-    if kind == Ty.Error.to_i32() { return "unknown"; };
-    if kind == Ty.Void.to_i32() { return "void"; };
-    if kind == Ty.Never.to_i32() { return "never"; };
-    if kind == Ty.Null.to_i32() { return "null"; };
-    if kind == Ty.Nullable.to_i32() { return "?" + type_text(ty_a[t]); };
-    if kind == Ty.Tuple.to_i32() { return ".{" + type_list_text(ty_a[t]) + "}"; };
-    if kind == Ty.Foreign.to_i32() { return foreign_text(t); };
-    if kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() {
-        return pick(kind == Ty.Fun.to_i32(), "fun(", "cl(") + type_list_text(ty_a[t]) + ") " + type_text(ty_b[t]);
+    if kind == Ty.Error.i32() { return "unknown"; };
+    if kind == Ty.Void.i32() { return "void"; };
+    if kind == Ty.Never.i32() { return "never"; };
+    if kind == Ty.Null.i32() { return "null"; };
+    if kind == Ty.Nullable.i32() { return "?" + type_text(ty_a[t]); };
+    if kind == Ty.Tuple.i32() { return ".{" + type_list_text(ty_a[t]) + "}"; };
+    if kind == Ty.Foreign.i32() { return foreign_text(t); };
+    if kind == Ty.Fun.i32() or kind == Ty.Closure.i32() {
+        return pick(kind == Ty.Fun.i32(), "fun(", "cl(") + type_list_text(ty_a[t]) + ") " + type_text(ty_b[t]);
     };
     let decl = ty_a[t];
     let inst = ty_b[t];
@@ -199,7 +199,7 @@ fn comptime_site(i: I32) I32 {
 /// The `@comptime` expression a parse error is in, or -1: the generated
 /// text from its start to the next one's (its expression did not end).
 fn comptime_parse_site(i: I32) I32 {
-    if diag_kind[i] != Diag.ParseError.to_i32() or diag_a[i] < 0 { return -1; };
+    if diag_kind[i] != Diag.ParseError.i32() or diag_a[i] < 0 { return -1; };
     let b = tok_start[diag_a[i]];
     let k = comptime_text_start.len() - 1;
     while (k >= 0 and comptime_text_start[k] > b) { k -= 1; };
@@ -232,7 +232,7 @@ fn diag_message(i: I32) Str {
 
 /// The kind name a diagnostic is reported under; several share one, as in stage 0.
 fn diag_kind_of(i: I32) Str {
-    let k = Diag.from_i32(diag_kind[i]);
+    let k = Diag(diag_kind[i]);
     if k == Diag.UnknownVariable { return "unknown-variable"; };
     if k == Diag.UnknownType or k == Diag.NotAModule or k == Diag.UnknownModule or k == Diag.UnknownVariant or k == Diag.MemKind or k == Diag.InvalidDistinct or k == Diag.MemView { return "unknown-type"; };
     if k == Diag.UnknownImport { return "unknown-import"; };
@@ -332,15 +332,15 @@ fn vt_text(vt: I32) Str {
     if vt == vt_extern or vt == vt_externref { return "externref"; };
     if vt >= vt_defined and vt < vt_tuple {
         let k = ht_kind[vt_heap(vt)];
-        if k == Heap.Array.to_i32() { return "an array of " + vt_text(ht_a[vt_heap(vt)]); };
-        if k == Heap.Struct.to_i32() { return "a struct"; };
+        if k == Heap.Array.i32() { return "an array of " + vt_text(ht_a[vt_heap(vt)]); };
+        if k == Heap.Struct.i32() { return "a struct"; };
     };
     "a reference";
 }
 
 /// A top-level item, by its node kind, after "is".
 fn item_kind_text(kind: I32) Str {
-    let k = Node.from_i32(kind);
+    let k = Node(kind);
     if k == Node.Fn_decl { return "a function"; };
     if k == Node.Struct_decl { return "a struct"; };
     if k == Node.Enum_decl { return "an enum"; };
@@ -398,7 +398,7 @@ fn comptime_trap_text(code: I32) Str {
 
 /// What InvalidBreak or InvalidDefer says, by the @BreakRule broken.
 fn break_rule_text(a: I32) Str {
-    let r = BreakRule.from_i32(if a < 0 { 0; } else { a; });
+    let r = BreakRule(if a < 0 { 0; } else { a; });
     if r == BreakRule.BreakOutside { return "break outside a loop"; };
     if r == BreakRule.ContinueOutside { return "continue outside a loop"; };
     if r == BreakRule.ContinueStateOutside { return "continue with a state only works inside loop match"; };
@@ -412,7 +412,7 @@ fn break_rule_text(a: I32) Str {
 
 /// Whether token t is a `\\` line whose text ends in `;` (meant to end the statement).
 fn semicolon_in_multiline(t: I32) Bool {
-    if t < 0 or tok_kind[t] != Tok.MultilineLine.to_i32() { return false; };
+    if t < 0 or tok_kind[t] != Tok.MultilineLine.i32() { return false; };
     let e = tok_end[t] - 1;
     while (e > tok_start[t] and (src[e] == 32 or src[e] == 9 or src[e] == 10 or src[e] == 13)) { e -= 1; };
     src[e] == 59;
@@ -420,7 +420,7 @@ fn semicolon_in_multiline(t: I32) Bool {
 
 /// A diagnostic's message, in stage 0's words.
 fn diag_text(i: I32) Str {
-    let k = Diag.from_i32(diag_kind[i]);
+    let k = Diag(diag_kind[i]);
     let word = diag_word[i];
     let w = word_text(word);
     let a = diag_a[i];
@@ -511,7 +511,7 @@ fn diag_text(i: I32) Str {
         Diag.MissingField => if a >= 0 { decl_text(a) + " needs a value for " + w; } else { "Missing field " + w; },
         Diag.NullableAccess => {
             // A name the compiler calls for you (a template's str, a loop's iterator, indexing): just the type.
-            if w == "str" or w == "to_str" or w == "iterator" or w == "get_index" or w == "set_index" { return type_text(a) + " may be null"; };
+            if w == "str" or w == "iterator" or w == "get_index" or w == "set_index" { return type_text(a) + " may be null"; };
             "." + w + " on nullable " + type_text(a);
         },
         Diag.MemIndex => mem_word(word) + " " + w + " takes one index",
@@ -678,7 +678,7 @@ fn diag_text(i: I32) Str {
         },
         Diag.MemEmbed => {
             let file = bytes_text(dsl_text_start(node), dsl_text_end(node));
-            if b > 0 { return file + " is " + int_text(a) + " bytes, not a whole number of " + int_text(b) + "-byte " + Storage.name(Storage.from_i32(diag_c[i])) + "s"; };
+            if b > 0 { return file + " is " + int_text(a) + " bytes, not a whole number of " + int_text(b) + "-byte " + Storage.name(Storage(diag_c[i])) + "s"; };
             "@embed cannot read " + file;
         },
         Diag.MemView => "view() needs using JS from std:JS",
@@ -694,10 +694,10 @@ fn diag_text(i: I32) Str {
             // What the parser wanted, and what it found; or what @parse_hint saw.
             if diag_c[i] >= 0 { return word_text(diag_c[i]); };
             // The lexer stops at a quote or backtick it finds no end for.
-            if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 34 { return "Unclosed string"; };
-            if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 96 { return "Unclosed template string"; };
-            if tok_kind[a] == Tok.Error.to_i32() and utf8_char_size(tok_start[a], file_end[file_of_token(a)]) < 0 { return "Not UTF-8"; };
-            if tok_kind[a] == Tok.Error.to_i32() and src[tok_start[a]] == 47 and src[tok_start[a] + 1] == 92 {
+            if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 34 { return "Unclosed string"; };
+            if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 96 { return "Unclosed template string"; };
+            if tok_kind[a] == Tok.Error.i32() and utf8_char_size(tok_start[a], file_end[file_of_token(a)]) < 0 { return "Not UTF-8"; };
+            if tok_kind[a] == Tok.Error.i32() and src[tok_start[a]] == 47 and src[tok_start[a] + 1] == 92 {
                 let inner = first_bare_opener(tok_start[a] + 2, file_end[file_of_token(a)]);
                 if inner >= 0 { return "No \\/ ends this body: the /\\ at line " + int_text(line_of_byte(inner)) + " opens another"; };
                 return "No \\/ ends this body";
@@ -705,7 +705,7 @@ fn diag_text(i: I32) Str {
             let found = found_text(a);
             if b >= 0 and semicolon_in_multiline(a - 1) and word_text(b) == "';'" { return "Expected ';', got " + found + " (a \\\\ line's ';' is text)"; };
             if b >= 0 { return "Expected " + word_text(b) + ", got " + found; };
-            if tok_kind[a] == Tok.End.to_i32() { return "Unexpected end of file"; };
+            if tok_kind[a] == Tok.End.i32() { return "Unexpected end of file"; };
             // A mem is one program's memory: not a module's (made per instance) or a function's.
             if found == "'mem'" or found == "'vec'" { return "Unexpected " + found + ": a " + found.slice(1, 4) + " goes at the top level of a file"; };
             "Unexpected " + found;
@@ -762,11 +762,11 @@ fn diag_text(i: I32) Str {
 /// long one cut short), and what the others are.
 fn found_text(t: I32) Str {
     let kind = tok_kind[t];
-    if kind == Tok.End.to_i32() { return "the end of the file"; };
-    if kind == Tok.String.to_i32() or kind == Tok.MultilineLine.to_i32() { return "a string"; };
-    if kind == Tok.DslBody.to_i32() { return "a DSL body"; };
+    if kind == Tok.End.i32() { return "the end of the file"; };
+    if kind == Tok.String.i32() or kind == Tok.MultilineLine.i32() { return "a string"; };
+    if kind == Tok.DslBody.i32() { return "a DSL body"; };
     // The lexer stops before a character it does not know: that character.
-    if kind == Tok.Error.to_i32() {
+    if kind == Tok.Error.i32() {
         let b = src[tok_start[t]];
         let n = if b >= 240 { 4; } else if b >= 224 { 3; } else if b >= 192 { 2; } else { 1; };
         return "character '" + bytes_text(tok_start[t], tok_start[t] + n) + "'";
@@ -780,13 +780,13 @@ fn found_text(t: I32) Str {
 /// or another node), not a note or a fix.
 fn is_place(i: I32, k: I32) Bool {
     let kind = extra_kind[diag_extra[i] + k];
-    kind != Extra.Note.to_i32() and kind != Extra.Fix.to_i32();
+    kind != Extra.Note.i32() and kind != Extra.Fix.i32();
 }
 
 /// What hangs off a diagnostic's own span when its report gave no label:
 /// the shortest true thing about it, from what was reported.
 fn diag_default_label(i: I32) Str {
-    let k = Diag.from_i32(diag_kind[i]);
+    let k = Diag(diag_kind[i]);
     let a = diag_a[i];
     let b = diag_b[i];
     let w = word_text(diag_word[i]);
@@ -871,8 +871,8 @@ fn diag_default_label(i: I32) Str {
 /// The span a diagnostic points at: its node's, as byte offsets.
 fn diag_start(i: I32) I32 {
     if comptime_parse_site(i) >= 0 { return comptime_byte(comptime_parse_site(i), tok_start[diag_a[i]]); };
-    if diag_kind[i] == Diag.ParseError.to_i32() { return tok_start[diag_a[i]]; };
-    if diag_kind[i] == Diag.DslError.to_i32() { return diag_a[i]; };
+    if diag_kind[i] == Diag.ParseError.i32() { return tok_start[diag_a[i]]; };
+    if diag_kind[i] == Diag.DslError.i32() { return diag_a[i]; };
     let f = located_file(i);
     if f >= 0 { return dsl_file_from[f]; };
     let node = diag_at(i);
@@ -883,8 +883,8 @@ fn diag_start(i: I32) I32 {
 /// Where a diagnostic's span ends (see @diag_start).
 fn diag_end(i: I32) I32 {
     if comptime_parse_site(i) >= 0 { return comptime_byte(comptime_parse_site(i), tok_end[diag_a[i]]); };
-    if diag_kind[i] == Diag.ParseError.to_i32() { return tok_end[diag_a[i]]; };
-    if diag_kind[i] == Diag.DslError.to_i32() { return diag_b[i]; };
+    if diag_kind[i] == Diag.ParseError.i32() { return tok_end[diag_a[i]]; };
+    if diag_kind[i] == Diag.DslError.i32() { return diag_b[i]; };
     let f = located_file(i);
     if f >= 0 { return dsl_file_to[f]; };
     let node = diag_at(i);
@@ -920,7 +920,7 @@ fn diag_file(i: I32) I32 {
     if node < 0 {
         let k = comptime_parse_site(i);
         if k >= 0 { return file_of_token(node_first[comptime_text_node[k]]); };
-        if diag_kind[i] == Diag.ParseError.to_i32() { return diag_word[i]; };
+        if diag_kind[i] == Diag.ParseError.i32() { return diag_word[i]; };
         return -1;
     };
     file_of_token(node_first[node]);

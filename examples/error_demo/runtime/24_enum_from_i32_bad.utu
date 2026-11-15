@@ -1,11 +1,11 @@
 // What: converting an out-of-range integer to an int enum
-// Expect: Level.from_i32: no variant has this value
+// Expect: Level: no variant has this value
 enum(U8) Level:
     | Low
     | Mid
     | High = 9
 
 export main() Str {
-    let l = Level.from_i32(7);
+    let l = Level(7);
     Level.name(l);
 }

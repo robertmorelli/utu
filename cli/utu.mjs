@@ -1050,7 +1050,7 @@ const STD_CHECKS = {
 };
 
 // The functions the compiler makes, shared by every use (selfhost `helper`).
-const HELPERS = /^(array\.slice|Str\.from_codes|closure\.(new|call)|enum\.name|mem\.(reserve|push|resize)|\w+\.from_i32)$/;
+const HELPERS = /^(array\.slice|Str\.from_codes|closure\.(new|call)|enum\.name|mem\.(reserve|push|resize)|[A-Z]\w*)$/;
 
 // An `unreachable`, by the syntax it was made for: which trap it is.
 const UNREACHABLE = {
@@ -1128,8 +1128,8 @@ function trapParts(error, map) {
     // The standard library's own: a check of how it was used.
     title = inner.file?.startsWith('std:') ? STD_CHECKS[`${inner.file} ${frames[0].fn}`] ?? `Failed check in ${inner.file}` : UNREACHABLE[inner.kind] ?? 'Reached unreachable code';
   }
-  // A safe build's `Tag.from_i32(v)` (its own function) with no variant of value v.
-  if (wasm && /unreachable/i.test(message) && /^\w+\.from_i32$/.test(frames[0]?.fn ?? '')) title = `${frames[0].fn}: no variant has this value`;
+  // A safe build's `Tag(v)` (its own function) with no variant of value v.
+  if (wasm && /unreachable/i.test(message) && /^[A-Z]\w*$/.test(frames[0]?.fn ?? '')) title = `${frames[0].fn}: no variant has this value`;
   // A stack overflows as a function is entered (placed at its body): the call that entered it is the place.
   if (title === 'Stack overflow' && frames.length > 1 && /^(block|fn_decl)$/.test(frames[0].entry?.kind ?? '')) frames = frames.slice(1);
   // A helper the compiler made is shared, and mapped to its first use: placed by its caller.

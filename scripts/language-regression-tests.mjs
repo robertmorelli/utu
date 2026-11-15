@@ -309,22 +309,22 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     assertEq(instance.exports.truth(), 1111);
   });
 
-  test('numbers: to_str formats every scalar, and ships only when used', async ({ ROOT }) => {
-    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'to_str.utu', source: `
+  test('numbers: str formats every scalar, and ships only when used', async ({ ROOT }) => {
+    const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'str.utu', source: `
       export lib {
-          fn signed() Str { let n = -42; n.to_str(); }
-          fn unsigned() Str { let n: U32 = 4294967295; n.to_str(); }
-          fn wide() Str { let n: I64 = -9000000000; n.to_str(); }
-          fn wide_unsigned() Str { let n: U64 = 18446744073709551615; n.to_str(); }
-          fn single() Str { let n: F32 = 0.1; n.to_str(); }
-          fn double() Str { 2.5.to_str(); }
-          fn truth() Str { (1 > 2).to_str(); }
+          fn signed() Str { let n = -42; n.str(); }
+          fn unsigned() Str { let n: U32 = 4294967295; n.str(); }
+          fn wide() Str { let n: I64 = -9000000000; n.str(); }
+          fn wide_unsigned() Str { let n: U64 = 18446744073709551615; n.str(); }
+          fn single() Str { let n: F32 = 0.1; n.str(); }
+          fn double() Str { 2.5.str(); }
+          fn truth() Str { (1 > 2).str(); }
       }
     `});
     const expected = { signed: '-42', unsigned: '4294967295', wide: '-9000000000', wide_unsigned: '18446744073709551615', single: '0.1', double: '2.5', truth: 'false' };
     for (const [name, value] of Object.entries(expected)) assertEq(instance.exports[name](), value, name);
     const { wasm } = await instantiateAt(ROOT, 'no_to_str.utu', 'export main() I32 { 42; }', 'size');
-    assertEq(WebAssembly.Module.imports(new WebAssembly.Module(wasm)).length, 0, 'an unused to_str adds no imports');
+    assertEq(WebAssembly.Module.imports(new WebAssembly.Module(wasm)).length, 0, 'an unused str adds no imports');
   });
 
   test('calls: type-associated functions without self check their arity', async ({ ROOT }) => {
@@ -585,9 +585,9 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           fn halves() I32 { half.clear(); let wide_half = 70000; half.push(wide_half); half.push(65535); half[0] * 100000 + half[1]; }
           fn floaty() F32 { floats.clear(); floats.push(1.25); floats[0] += 2.5; floats[0]; }
           fn unsigned() U32 { ids.clear(); ids.push(7); ids[0]; }
-          fn big() I64 { wide.resize(4); wide[3] = 1 << 40; wide[3] + wide.len().to_i64(); }
+          fn big() I64 { wide.resize(4); wide[3] = 1 << 40; wide[3] + wide.len().i64(); }
           fn shadow(text: I32) I32 { let half = text + 1; half; }
-          fn generated() I32 { ids.clear(); for (evens(10)) |e| { ids.push(e.to_u32()); }; ids.len(); }
+          fn generated() I32 { ids.clear(); for (evens(10)) |e| { ids.push(e.u32()); }; ids.len(); }
       }
     `;
     for (const optimize of ['size', 'speed']) {
@@ -724,10 +724,10 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
               };
               steps;
           }
-          fn values() I32 { Tag.Eof.to_i32() * 100 + Sign.Minus.to_i32() * 10 + Sign.Plus.to_i32() + Tag.count() * 100000; }
-          fn ordered() Bool { Tag.Leaf < Tag.Eof and Sign.Minus < Sign.Zero and Tag.Unary == Tag.from_i32(1); }
+          fn values() I32 { Tag.Eof.i32() * 100 + Sign.Minus.i32() * 10 + Sign.Plus.i32() + Tag.count() * 100000; }
+          fn ordered() Bool { Tag.Leaf < Tag.Eof and Sign.Minus < Sign.Zero and Tag.Unary == Tag(1); }
           fn names() I32 { Tag.name(Tag.Binary).len() * 10 + Tag.name(Tag.Eof).len(); }
-          fn unknown(i: I32) I32 { Tag.name(Tag.from_i32(i)).len(); }
+          fn unknown(i: I32) I32 { Tag.name(Tag(i)).len(); }
       }
     `;
     for (const optimize of ['size', 'speed']) {
@@ -739,7 +739,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       assertEq(e.ordered(), true, `ordering at ${optimize}`);
       assertEq(e.names(), 63, `names at ${optimize}`);
     }
-    // No variant is 9: a safe build traps in from_i32; an unsafe one names it "?".
+    // No variant is 9: a safe build traps in Tag(9); an unsafe one names it "?".
     const safe = await instantiateAt(ROOT, 'int_enums_safe.utu', source, 'size', { safe: true });
     assertThrows(() => safe.instance.exports.unknown(9), 'nreachable');
     const unsafe = await instantiateAt(ROOT, 'int_enums_unsafe.utu', source, 'size', { safe: false });
@@ -752,17 +752,17 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       type Weight = distinct F64;
       type Big = distinct U64;
       mem lhs: NodeId;
-      fn child(id: NodeId) NodeId { lhs[id.to_i32()]; }
+      fn child(id: NodeId) NodeId { lhs[id.i32()]; }
       export lib {
           fn walk() I32 {
               lhs.clear();
-              lhs.push(NodeId.from_i32(2));
-              lhs.push(NodeId.from_i32(0));
-              lhs.push(NodeId.from_i32(1));
-              child(child(NodeId.from_i32(0))).to_i32();
+              lhs.push(NodeId(2));
+              lhs.push(NodeId(0));
+              lhs.push(NodeId(1));
+              child(child(NodeId(0))).i32();
           }
-          fn zero() F64 { 1.0 / Weight.from_f64(-0.0).to_f64(); }
-          fn unsigned() Bool { Big.from_u64(1) < Big.from_u64(18446744073709551615); }
+          fn zero() F64 { 1.0 / Weight(-0.0).f64(); }
+          fn unsigned() Bool { Big(1) < Big(18446744073709551615); }
       }
     `;
     for (const optimize of ['size', 'speed']) {
@@ -886,7 +886,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           fn scalars() I32 {
               let .{q, r} = divmod(17, 5);
               let .{big, half} = pick(false);
-              q * 1000 + r * 100 + big.to_i32() * 10 + half.to_i32();
+              q * 1000 + r * 100 + big.i32() * 10 + half.i32();
           }
           fn returns() I32 {
               let .{twice, ok} = early(21);
@@ -1118,7 +1118,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           fn at(xs: Array[I32], i: I32) I32 { xs[i]; }
           fn up(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a < b; }; }
           fn down(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a > b; }; }
-          fn unsigned_up(xs: Array[I32]) Array[U32] { xs map |x| { x.to_u32(); } sort(U32) |a, b| { a < b; }; }
+          fn unsigned_up(xs: Array[I32]) Array[U32] { xs map |x| { x.u32(); } sort(U32) |a, b| { a < b; }; }
           fn unsigned_at(xs: Array[U32], i: I32) U32 { xs[i]; }
           fn unsigned_len(xs: Array[U32]) I32 { xs.len(); }
           fn len(xs: Array[I32]) I32 { xs.len(); }
@@ -1144,11 +1144,11 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('iterators: flat_map over an array literal yields each element without allocating', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'flat_map_literal.utu', source: `
       export lib {
-          fn pairs(n: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { x + i.to_i32(); } flat_map |x| { [x, -x * 10]; } fold(0) |a, v| { a * 3 + v; }; }
+          fn pairs(n: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { x + i.i32(); } flat_map |x| { [x, -x * 10]; } fold(0) |a, v| { a * 3 + v; }; }
           fn empty(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { let ignored: Array[I32] = []; ignored; } count; }
           fn none(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { []; } count; }
           fn statements(n: I32) I32 { let xs = Array[I32].new(n, 2); xs flat_map |x| { let y = x * 5; [y, y + 1, y + 2]; } sum; }
-          fn cut(n: I32, k: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { i.to_i32(); } flat_map |x| { [x, x, x]; } take(k) sum; }
+          fn cut(n: I32, k: I32) I32 { let xs = Array[I32].new(n, 1); xs map |x, i| { i.i32(); } flat_map |x| { [x, x, x]; } take(k) sum; }
           fn wide(n: I32) I32 { let xs = Array[I32].new(n, 1); xs flat_map |x| { [x, x, x, x, x]; } sum; }
       }
     `});
@@ -1171,7 +1171,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   test('iterators: scalar reduce accumulates in a local; empty input yields null', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'scalar_reduce.utu', source: `
       export lib {
-          fn ints(n: I32) I32 { let xs = Array[I32].new(n, 3); promote xs reduce(I32) |a, x, i| { a * 2 + x + i.to_i32(); } { |f| => f.value, ~> -1, }; }
+          fn ints(n: I32) I32 { let xs = Array[I32].new(n, 3); promote xs reduce(I32) |a, x, i| { a * 2 + x + i.i32(); } { |f| => f.value, ~> -1, }; }
           fn floats(n: I32) F64 { let xs = Array[F64].new(n, 1.5); promote xs reduce(F64) |a, x| { a + x; } { |f| => f.value, ~> -1.0, }; }
       }
     `});
@@ -1207,7 +1207,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       struct Log:
           | v: I32
       export lib {
-          fn fused(n: I32) I32 { let xs = Array[I32].new(n, 3); (xs map |x, i| { x - i.to_i32(); } collect(I32)) filter |x| { x > 0; } sum; }
+          fn fused(n: I32) I32 { let xs = Array[I32].new(n, 3); (xs map |x, i| { x - i.i32(); } collect(I32)) filter |x| { x > 0; } sum; }
           fn twice(n: I32) I32 { let xs = Array[I32].new(n, 1); ((xs map |x| { x + 1; } collect(I32)) map |x| { x * 10; } collect(I32)) sum; }
           fn cut(n: I32) I32 { let xs = Array[I32].new(n, 2); (xs map |x| { x * x; } collect(I32)) take(2) sum; }
           fn ordered() I32 {
@@ -1237,8 +1237,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           fn first_of(xs: Array[I32], m: I32, k: I32) I32 { (xs distinct_by(I32, I32) |x| { x & m; })[k]; }
           fn group_count(xs: Array[I32], m: I32) I32 { (xs group_by(I32, I32) |x| { x & m; }).len(); }
           fn group_checksum(xs: Array[I32], m: I32) I32 { (xs group_by(I32, I32) |x| { x & m; }) fold(0) |a, g, i| { a * 31 + g.key * 7 + g.values.len() + g.values[0]; }; }
-          fn wide_keys(xs: Array[I32]) I32 { (xs distinct_by(I32, I64) |x| { x.to_i64() * 4294967296; }).len(); }
-          fn unsigned_keys(xs: Array[I32]) I32 { (xs group_by(I32, U32) |x| { x.to_u32() >>> 20; }).len(); }
+          fn wide_keys(xs: Array[I32]) I32 { (xs distinct_by(I32, I64) |x| { x.i64() * 4294967296; }).len(); }
+          fn unsigned_keys(xs: Array[I32]) I32 { (xs group_by(I32, U32) |x| { x.u32() >>> 20; }).len(); }
       }
     `});
     const e = instance.exports;
@@ -1267,8 +1267,8 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       export lib {
           fn ints(n: I32) I32 { let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 2147483 - 7; }; xs fast_sum; }
           fn plain(n: I32) I32 { let xs = Array[I32].new(n, 0); for (0..<n) |i| { xs[i] = i * 2147483 - 7; }; xs sum; }
-          fn floats(n: I32) F64 { let xs = Array[F64].new(n, 0.0); for (0..<n) |i| { xs[i] = i.to_f64() * 0.1; }; xs filter |x| { x > 0.05; } fast_sum; }
-          fn wide(n: I32) I64 { let xs = Array[I64].new(n, 0); for (0..<n) |i| { xs[i] = i.to_i64() * 3000000000; }; xs fast_sum; }
+          fn floats(n: I32) F64 { let xs = Array[F64].new(n, 0.0); for (0..<n) |i| { xs[i] = i.f64() * 0.1; }; xs filter |x| { x > 0.05; } fast_sum; }
+          fn wide(n: I32) I64 { let xs = Array[I64].new(n, 0); for (0..<n) |i| { xs[i] = i.i64() * 3000000000; }; xs fast_sum; }
       }
     `});
     for (let n = 0; n <= 13; n++) {
@@ -1341,7 +1341,7 @@ export lib {
     fn empty() I32 { (5..<2) count; }
     fn search() I32 { (10..<100) bisect |v| { v * v < 2000; }; }
     fn pairs() I32 { let ps = (0..<4) map |i| { [i, i * 2]; } collect(Array[I32]); ps[3][1] + ps.len(); }
-    fn shadow(n: I32) I64 { let x: ?Str = "a"; promote x { |s| => { let zero: I64 = 0; (0..<n) fold(zero) |a, i| { a + i.to_i64(); }; }, ~> -1, }; }
+    fn shadow(n: I32) I64 { let x: ?Str = "a"; promote x { |s| => { let zero: I64 = 0; (0..<n) fold(zero) |a, i| { a + i.i64(); }; }, ~> -1, }; }
 }`, 'size');
     const e = instance.exports;
     assertEq(e.squares(5), 21);

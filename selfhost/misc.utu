@@ -281,8 +281,8 @@ fn may_throw(m: I32, own: I32) Bool {
         let n = throw_work[throw_work.len() - 1];
         throw_work.resize(throw_work.len() - 1);
         let op = w_op[n];
-        let passed = op == Op.Seq.to_i32() and w_a[n] > 0 and w_a[n] <= own + 1;
-        if not passed and (op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32() or op == Op.Throw.to_i32() or op == Op.Rethrow.to_i32()) { return true; };
+        let passed = op == Op.Seq.i32() and w_a[n] > 0 and w_a[n] <= own + 1;
+        if not passed and (op == Op.Call.i32() or op == Op.CallRef.i32() or op == Op.ReturnCall.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32()) { return true; };
         if not passed { for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)); }; };
     };
     false;
@@ -464,7 +464,7 @@ fn optional_override(node: I32) I32 {
 /// whose base has none. A block's statements are guarded on their own; one
 /// in a nested branch, loop, or `orelse` is a value, not looked for.
 fn leftmost_optional(node: I32) I32 {
-    let k = Node.from_i32(node_kind[node]);
+    let k = Node(node_kind[node]);
     if k == Node.Closure_expr or k == Node.Block or k == Node.Block_expr or k == Node.If_expr or k == Node.Match_expr
         or k == Node.Loop_match_expr or k == Node.Alt_expr or k == Node.Promote_expr or k == Node.Else_expr
         or k == Node.While_expr or k == Node.For_expr or k == Node.Try_expr { return -1; };
@@ -520,7 +520,7 @@ vec optionals_seen: I32 = [0, 0];
 fn has_optionals() Bool {
     if optionals_seen[0] != node_kind.len() {
         optionals_seen[1] = 0;
-        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.to_i32() { optionals_seen[1] = 1; }; };
+        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.i32() { optionals_seen[1] = 1; }; };
         optionals_seen[0] = node_kind.len();
     };
     optionals_seen[1] == 1;
@@ -530,7 +530,7 @@ fn has_optionals() Bool {
 /// assignment, or a plain chain. Any other (a `let`, `return`, `assert`, a
 /// jump, a branch) would skip more than the chain: its `?.` is a value.
 fn guardable(stmt: I32) Bool {
-    let k = Node.from_i32(node_kind[stmt]);
+    let k = Node(node_kind[stmt]);
     k == Node.Call_expr or k == Node.Assign_expr or k == Node.Field_expr or k == Node.Optional_field_expr or k == Node.Index_expr;
 }
 
@@ -775,7 +775,7 @@ fn await_import(t: I32) I32 {
         if await_types[i] == key { return await_types[i + 1]; };
         i += 2;
     };
-    let f = add_import_func(name_add("utu"), name_add("await_" + (if absent { "null_"; } else { ""; }) + (await_types.len() / 2).to_str()),
+    let f = add_import_func(name_add("utu"), name_add("await_" + (if absent { "null_"; } else { ""; }) + (await_types.len() / 2).str()),
         func_type(vl_one(vt_externref), vl_of_result(vt)));
     await_types.push(key);
     await_types.push(f);
@@ -877,7 +877,7 @@ fn write_async_exports() void {
     };
     let first = true;
     for (0 ..< n) |f| {
-        if awaiting[f] == 1 and func_kind[f] == FuncKind.Defined.to_i32() and func_field_name[f] >= 0 {
+        if awaiting[f] == 1 and func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 {
             if not first { json_byte(44); };
             first = false;
             json_byte(34);
@@ -889,7 +889,7 @@ fn write_async_exports() void {
 }
 
 fn mark_taken(node: I32) void {
-    if w_op[node] == Op.RefFunc.to_i32() { taken[w_a[node]] = 1; };
+    if w_op[node] == Op.RefFunc.i32() { taken[w_a[node]] = 1; };
     for (0 ..< w_count[node]) |i| { mark_taken(w_kid(node, i)); };
 }
 
@@ -897,8 +897,8 @@ fn mark_taken(node: I32) void {
 /// reference when any function taken as a value awaits.
 fn calls_awaiting(node: I32) Bool {
     let op = w_op[node];
-    if (op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32()) and awaiting[w_a[node]] == 1 { return true; };
-    if op == Op.CallRef.to_i32() and taken_awaits[0] == 1 { return true; };
+    if (op == Op.Call.i32() or op == Op.ReturnCall.i32()) and awaiting[w_a[node]] == 1 { return true; };
+    if op == Op.CallRef.i32() and taken_awaits[0] == 1 { return true; };
     for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true; }; };
     false;
 }

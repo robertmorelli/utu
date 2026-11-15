@@ -17,8 +17,8 @@ boundary code.
 global scope, linked from `lib.webworker`. See the table in
 [the declaration guide](../docs/typescript-abi.md).
 
-Numbers convert explicitly with one instruction each: `i.to_f64()`,
-`f.to_i32()`, `n.to_i64()`, `x.to_f32()`, and so on. Float-to-integer
+Numbers convert explicitly with one instruction each: `i.f64()`,
+`f.i32()`, `n.i64()`, `x.f32()`, and so on. Float-to-integer
 conversions saturate, and NaN becomes 0, like Rust's `as`. Integer literals
 adopt a float type from context (`let x: F64 = 1`).
 

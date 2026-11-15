@@ -45,14 +45,14 @@ fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
 fn byMethod(label: Str) Browser.HTMLElement {
     let r = Reader { k: 0 };
     @wutu/\
-    span#method { = label + r.read().to_str(); }
+    span#method { = label + r.read().str(); }
     \/;
 }
 
 /// The clock is new each time: never reused.
 fn byClock(label: Str) Browser.HTMLElement {
     @wutu/\
-    span#clock { = label + time.now().to_str(); }
+    span#clock { = label + time.now().str(); }
     \/;
 }
 
@@ -66,7 +66,7 @@ fn beat(state: State) Browser.HTMLElement {
 fn icon(state: State) Browser.SVGElement {
     @wutu/\
     @reactive;
-    svg { viewBox = "0 0 10 10"; circle { r = state.n.to_str(); } use#ns { xlink:href = "#c" + state.n.to_str(); xml:space = "preserve"; } }
+    svg { viewBox = "0 0 10 10"; circle { r = state.n.str(); } use#ns { xlink:href = "#c" + state.n.str(); xml:space = "preserve"; } }
     \/;
 }
 
@@ -113,7 +113,7 @@ export main() void {
             option { value = "x"; "x"; }
         }
         p#tpl { = `a${`b;`}`; }
-        p#picks { = state.picks.len().to_str(); }
+        p#picks { = state.picks.len().str(); }
         button#stop { "stop"; on click { state.timer = false; } }
         p#beats { = state.beats; }
         if state.timer { = beat(state); }
@@ -124,7 +124,7 @@ export main() void {
         }
         = icon(state);
         div#nested {
-            = framed(cell(state.n.to_str()));
+            = framed(cell(state.n.str()));
             for state.rows |row| key row.id { = framed(cell(row.id)); }
         }
     }

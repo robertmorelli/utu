@@ -49,12 +49,12 @@ fn bytes_at(at: I32, hi: I32, text: Str) Bool {
 fn wutu_hash(text: Str) Str {
     let n = -2128831035;
     for (0 ..< text.len()) |i| { n = (n ^ text.get(i)) * 16777619; };
-    let v = n.to_i64() & 4294967295;
+    let v = n.i64() & 4294967295;
     if v == 0 { return "0"; };
     let digits = "0123456789abcdefghijklmnopqrstuvwxyz";
     let out = "";
     while (v > 0) {
-        out = Str.from_code_point(digits.get((v % 36).to_i32())) + out;
+        out = Str.from_code_point(digits.get((v % 36).i32())) + out;
         v = v / 36;
     };
     out;
@@ -1074,7 +1074,7 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
 //! = Children
 
 /// A text hole's value: `= x;` is `wutu.show(x)` (a number or Bool shows as
-/// its to_str, a Str or a node as itself); written text (from < 0) is itself.
+/// its str, a Str or a node as itself); written text (from < 0) is itself.
 fn shown(value: Str, from: I32) Str { if from < 0 { "(" + value + ")"; } else { "wutu.show(" + value + ")"; }; }
 
 /// Whether an identifier refers to a value (not a field, member, or

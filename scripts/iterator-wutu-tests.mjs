@@ -47,7 +47,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   test('iterators: generic module specializations infer their own element types',async({ROOT})=>{
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_generics.utu',source:`
       mod Sum[T] { fn total(xs: Array[T]) T { xs sum; } }
-      export main() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; Sum[I32].total(a).to_f64()+Sum[F64].total(b); }
+      export main() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; Sum[I32].total(a).f64()+Sum[F64].total(b); }
     `});
     assertEq(instance.exports.main(),7);
   });
@@ -62,7 +62,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
         fn empty_product() F64 { let a: Array[F64] = []; a product; }
         fn wide_sum() I64 { let a: Array[I64] = [3,4]; a sum; }
         fn sorted() I32 { let a=[5,3,1,8,2,4] sort(I32) |a,b| {a<b;}; a[0]*100+a[5]; }
-        fn floats() F64 { let a = [1,2] map |x| {x.to_f64()/2.0;} collect(F64); a[0]+a[1]; }
+        fn floats() F64 { let a = [1,2] map |x| {x.f64()/2.0;} collect(F64); a[0]+a[1]; }
       }
     `});
     assertEq(instance.exports.growth(),2005);assertEq(instance.exports.empty(),0);assertEq(instance.exports.structs(),3);assertEq(instance.exports.floats(),1.5);
@@ -85,7 +85,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
             input { .value="hello"; disabled="x" == "y"; }
             svg { viewBox="0 0 10 10"; circle { cx="5"; cy="5"; r="4"; } }
             for [1,2] |n| {
-              button as button { type="button"; = n.to_f64().toString(); on click = cl(e) void { button.textContent = (n*10).to_f64().toString(); }; }
+              button as button { type="button"; = n.f64().toString(); on click = cl(e) void { button.textContent = (n*10).f64().toString(); }; }
             }
             if true { p { "present"; } } else { p { "absent"; } }
           }

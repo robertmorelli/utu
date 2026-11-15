@@ -11,5 +11,5 @@ fn load(text: Str) ?Pixel {
 }
 
 export main() I32 {
-    promote load("{}") { |p| => p.r.to_i32(), ~> 0, };
+    promote load("{}") { |p| => p.r.i32(), ~> 0, };
 }

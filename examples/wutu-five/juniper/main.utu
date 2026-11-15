@@ -1,11 +1,11 @@
 using Browser from std:Browser;
 
 fn number(value: I32) Str {
-    value.to_f64().toString();
+    value.f64().toString();
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.to_f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2);
 }
 
 fn node(id: Str) Browser.HTMLElement {
@@ -306,7 +306,7 @@ export main() void {
                     let qty: F64 = row.quantity;
                     state.dishes each |dish| {
                         if dish.id == id and qty >= 0.0 and qty <= 20.0 {
-                            dish.quantity = qty.to_i32();
+                            dish.quantity = qty.i32();
                         };
                     };
                     i += 1.0;

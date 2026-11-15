@@ -3,7 +3,7 @@
 //! Integer enums (`enum(U8) Tag: | Leaf | Eof = 255`) and distinct types
 //! (`type Id = distinct I32;`) are scalars: a value is its integer (or its
 //! base's value). Their operations are the language's own: comparisons,
-//! `t.to_i32()` and `Tag.from_i32(i)` (or `to_<base>`, `from_<base>`), and for
+//! `t.i32()` and `Tag(i)` (or `to_<base>`, `from_<base>`), and for
 //! an integer enum `Tag.count()`, `Tag.name(t)`, and `Tag.Leaf`.
 //!
 //! An enum with data (`enum Shape: | Circle { r: F64 } | Square { s: F64 }`)
@@ -55,23 +55,20 @@ fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
     true;
 }
 
-/// `x.to_i32()` of a scalar kind: the base type its value already is (the
+/// `x.i32()` of a scalar kind: the base type its value already is (the
 /// method emits nothing), or -1 when `word` is no such method.
 fn scalar_method(decl: I32, word: I32) I32 {
     let base = scalar_base(decl);
-    if word != conversion_word(true, base) and word != base_word(base) { return -1; };
+    if word != base_word(base) { return -1; };
     base;
 }
 
-/// `to_i32` (or `from_i32`) for a base type.
-fn conversion_word(to: Bool, base: I32) I32 {
-    let name = Prelude.name(Prelude.from_i32(prelude_index(base)));
-    intern_text(if to { "to_"; } else { "from_"; } + Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()));
-}
+/// The old spelling `to_i32` of `i32`, for a base type.
+fn old_conversion_word(base: I32) I32 { intern_text("to_" + word_text(base_word(base))); }
 
 /// `i32` for I32: a value's conversion to a base type (`t.i32()`).
 fn base_word(base: I32) I32 {
-    let name = Prelude.name(Prelude.from_i32(prelude_index(base)));
+    let name = Prelude.name(Prelude(prelude_index(base)));
     intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()));
 }
 
@@ -80,23 +77,28 @@ fn prelude_index(t: I32) I32 {
     0;
 }
 
-/// `Tag.from_i32(i)`, `Tag.count()`, `Tag.name(t)`: static operations of a
-/// scalar kind. -1 when `word` is none of them.
-fn scalar_static(decl: I32, inst: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
+/// `Tag(i)`, `Meters(x)`: a scalar kind made from its base's value.
+fn scalar_convert(decl: I32, inst: I32, args: I32, at: I32, cx: Cx) I32 {
     let t = named(decl, inst);
     let base = scalar_base(decl);
     let m = w_mark();
     let a = if args >= 0 { first_child(args); } else { -1; };
-    if word == conversion_word(false, base) {
-        if a < 0 or next_sibling(a) >= 0 {
-            report2(Diag.WrongArity, at, -1, 1, child_count(args));
-            return error_value();
-        };
-        coerce(check_expr(a, base, cx), base, a);
-        // A safe build traps on a value no variant has, here: not in a later match.
-        if safe_checks[0] == 1 and decl_is(decl, Decl.IntEnum) { w_node(Op.Call, vt_i32, enum_from_helper(decl), 0, m); };
-        return t;
+    if a < 0 or next_sibling(a) >= 0 {
+        report2(Diag.WrongArity, at, -1, 1, if args >= 0 { child_count(args); } else { 0; });
+        return error_value();
     };
+    coerce(check_expr(a, base, cx), base, a);
+    // A safe build traps on a value no variant has, here: not in a later match.
+    if safe_checks[0] == 1 and decl_is(decl, Decl.IntEnum) { w_node(Op.Call, vt_i32, enum_from_helper(decl), 0, m); };
+    t;
+}
+
+/// `Tag.count()`, `Tag.name(t)`: static operations of an integer enum. -1
+/// when `word` is neither.
+fn scalar_static(decl: I32, inst: I32, word: I32, args: I32, at: I32, cx: Cx) I32 {
+    let t = named(decl, inst);
+    let m = w_mark();
+    let a = if args >= 0 { first_child(args); } else { -1; };
     if not decl_is(decl, Decl.IntEnum) { return -1; };
     if word == known_word(Known.Count) {
         if a >= 0 {
@@ -121,15 +123,15 @@ fn scalar_static(decl: I32, inst: I32, word: I32, args: I32, at: I32, cx: Cx) I3
 /// Pairs: enum declaration, function.
 vec from_helper_enum: I32;
 
-/// `Tag.from_i32` in a safe build: (value) → value, trapping when no variant
-/// has it. Named `Tag.from_i32`, which a trap's frames show.
+/// `Tag(i)` in a safe build: (value) → value, trapping when no variant
+/// has it. Named `Tag`, which a trap's frames show.
 fn enum_from_helper(decl: I32) I32 {
     let i = 0;
     while (i < from_helper_enum.len()) {
         if from_helper_enum[i] == decl { return from_helper_enum[i + 1]; };
         i += 2;
     };
-    let f = helper(vl_one(vt_i32), vl_one(vt_i32), vl_empty(), word_text(decl_name[decl]) + ".from_i32");
+    let f = helper(vl_one(vt_i32), vl_one(vt_i32), vl_empty(), word_text(decl_name[decl]));
     from_helper_enum.push(decl);
     from_helper_enum.push(f);
     let .{n, lo, hi} = variant_range(decl);
@@ -399,8 +401,8 @@ fn cast_arms(n: I32, s: I32) void {
     for (0 ..< k) |i| { rest = if i == 0 { n; } else { only_kid(w_kid(rest, 2)); }; };
     rest = w_kid(rest, 2);
     let first = first_run(rest);
-    if first >= 0 and w_op[first] == Op.RefCast.to_i32() and w_count[first] == 1 and is_get(w_kid(first, 0), s) { last = first; };
-    let unreachable_rest = w_count[rest] == 1 and w_op[w_kid(rest, 0)] == Op.Unreachable.to_i32();
+    if first >= 0 and w_op[first] == Op.RefCast.i32() and w_count[first] == 1 and is_get(w_kid(first, 0), s) { last = first; };
+    let unreachable_rest = w_count[rest] == 1 and w_op[w_kid(rest, 0)] == Op.Unreachable.i32();
     // (No default and every variant tested, in a safe build: typed as the alt.)
     if unreachable_rest { w_type[rest] = vt_unreachable; };
     // Bytes: a test, an if, an else, an end, and a cast an arm, against a
@@ -437,7 +439,7 @@ fn cast_arms(n: I32, s: I32) void {
         let to = w_a[w_kid(x, 0)];
         w_aux.push(to);
         let cast = first_run(w_kid(x, 1));
-        w_op[cast] = Op.Held.to_i32();
+        w_op[cast] = Op.Held.i32();
         w_type[cast] = to;
         w_count[cast] = 0;
         arms[i] = w_kid(x, 1);
@@ -447,7 +449,7 @@ fn cast_arms(n: I32, s: I32) void {
     // of a subtype in its place (an inlined argument), which the casts to
     // its siblings would not be within.
     w_aux.push(w_type[subject]);
-    w_op[n] = Op.CastArms.to_i32();
+    w_op[n] = Op.CastArms.i32();
     w_a[n] = aux;
     w_b[n] = k;
     w_first[n] = w_kids.len();
@@ -460,18 +462,18 @@ fn cast_arms(n: I32, s: I32) void {
 /// Whether `x` is an alt arm's `if` that binds its variant: `ref.test` of
 /// local s, then a branch that first casts s to it. Its type, or -1.
 fn alt_cast_arm(x: I32, s: I32) I32 {
-    if x < 0 or w_op[x] != Op.If.to_i32() or w_count[x] != 3 { return -1; };
+    if x < 0 or w_op[x] != Op.If.i32() or w_count[x] != 3 { return -1; };
     let test = w_kid(x, 0);
-    if w_op[test] != Op.RefTest.to_i32() or not is_get(w_kid(test, 0), s) { return -1; };
+    if w_op[test] != Op.RefTest.i32() or not is_get(w_kid(test, 0), s) { return -1; };
     let cast = first_run(w_kid(x, 1));
-    if cast < 0 or w_op[cast] != Op.RefCast.to_i32() or w_a[cast] != w_a[test] or not is_get(w_kid(cast, 0), s) { return -1; };
+    if cast < 0 or w_op[cast] != Op.RefCast.i32() or w_a[cast] != w_a[test] or not is_get(w_kid(cast, 0), s) { return -1; };
     w_a[test];
 }
 
-fn is_get(n: I32, local: I32) Bool { w_op[n] == Op.LocalGet.to_i32() and w_a[n] == local; }
+fn is_get(n: I32, local: I32) Bool { w_op[n] == Op.LocalGet.i32() and w_a[n] == local; }
 
 /// The one kid of a Seq, or -1.
-fn only_kid(seq: I32) I32 { if w_op[seq] == Op.Seq.to_i32() and w_count[seq] == 1 { w_kid(seq, 0); } else { -1; }; }
+fn only_kid(seq: I32) I32 { if w_op[seq] == Op.Seq.i32() and w_count[seq] == 1 { w_kid(seq, 0); } else { -1; }; }
 
 /// The instruction that runs first in `n`, inside no block (a value on the
 /// stack before n reaches it), or -1.
@@ -479,12 +481,12 @@ fn first_run(n: I32) I32 {
     let x = n;
     while (w_count[x] > 0) {
         let op = w_op[x];
-        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or op == Op.NullElse.to_i32()
-            or op == Op.CastArms.to_i32() or (op == Op.LocalGet.to_i32()) { return -1; };
-        if op == Op.RefCast.to_i32() { return x; };
+        if op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.Try.i32() or op == Op.NullElse.i32()
+            or op == Op.CastArms.i32() or (op == Op.LocalGet.i32()) { return -1; };
+        if op == Op.RefCast.i32() { return x; };
         x = w_kid(x, 0);
     };
-    if w_op[x] == Op.Seq.to_i32() { -1; } else { x; };
+    if w_op[x] == Op.Seq.i32() { -1; } else { x; };
 }
 
 /// The arms from `arm` on, as a chain of ifs; returns the result type.

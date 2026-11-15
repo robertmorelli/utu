@@ -131,7 +131,7 @@ mod ui {
     fn check_alerts(ui: Ui) void {
         let w = ui.w;
         if w.satisfaction < 500 {
-            add_alert(ui, "No power: " + (w.satisfaction / 10).to_str() + "% satisfaction", "bad", -1);
+            add_alert(ui, "No power: " + (w.satisfaction / 10).str() + "% satisfaction", "bad", -1);
         };
         let done = w.done sum;
         if done > ui.done_count {
@@ -151,7 +151,7 @@ mod ui {
                     };
                 };
                 if full {
-                    add_alert(ui, w.game.machines[e.machine].label + " #" + e.id.to_str() + " output full", "", e.id);
+                    add_alert(ui, w.game.machines[e.machine].label + " #" + e.id.str() + " output full", "", e.id);
                 };
             };
         };
@@ -169,7 +169,7 @@ mod ui {
 
     fn percent(value: I32, max: I32) Str {
         let p = if max <= 0 { 0; } else { sim.imin(100, sim.imax(0, value * 100 / max)); };
-        p.to_str() + "%";
+        p.str() + "%";
     }
 
     fn bar(value: I32, max: I32, kind: Str) Browser.HTMLElement {
@@ -213,7 +213,7 @@ mod ui {
                 span.dot {
                     background: = ui.item_colors[item];
                 }
-                b { = count.to_str(); }
+                b { = count.str(); }
             }
         }
         \/;
@@ -223,7 +223,7 @@ mod ui {
     fn slots(ui: Ui, counts: Array[I32]) Browser.HTMLElement {
         @wutu/\
         div.slots {
-            for ((0..<counts.len()) filter |i| { counts[i] > 0; }) |i| key i.to_str() {
+            for ((0..<counts.len()) filter |i| { counts[i] > 0; }) |i| key i.str() {
                 = slot(ui, i, counts[i]);
             }
         }
@@ -233,7 +233,7 @@ mod ui {
     fn lane(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         @wutu/\
         div.lane {
-            for (0..<(e.belt_n / 2)) |k| key k.to_str() {
+            for (0..<(e.belt_n / 2)) |k| key k.str() {
                 i {
                     left: = percent(e.belt[k * 2 + 1] * 90 / 100, 256);
                     background: = ui.item_colors[e.belt[k * 2]];
@@ -261,14 +261,14 @@ mod ui {
     fn fluid_gauge(ui: Ui, item: I32, amount: I32, max: I32) Browser.HTMLElement {
         @wutu/\
         div {
-            title = item_name(ui, item) + ": " + amount.to_str();
+            title = item_name(ui, item) + ": " + amount.str();
             div.gauge {
                 i {
                     height: = percent(amount, max);
                     background: = ui.item_colors[item];
                 }
             }
-            small.muted { = amount.to_str(); }
+            small.muted { = amount.str(); }
         }
         \/;
     }
@@ -280,7 +280,7 @@ mod ui {
         let minutes = phase * 1440 / 25200;
         let hours = minutes / 60;
         let mins = minutes % 60;
-        (if hours < 10 { "0"; } else { ""; }) + hours.to_str() + ":" + (if mins < 10 { "0"; } else { ""; }) + mins.to_str();
+        (if hours < 10 { "0"; } else { ""; }) + hours.str() + ":" + (if mins < 10 { "0"; } else { ""; }) + mins.str();
     }
 
     fn hud(ui: Ui) Browser.HTMLElement {
@@ -293,7 +293,7 @@ mod ui {
                 b { = clock(ui.w.tick); }
             }
             div.hud-group {
-                title = "Supply " + ui.w.supply.to_str() + " / demand " + ui.w.demand.to_str();
+                title = "Supply " + ui.w.supply.str() + " / demand " + ui.w.demand.str();
                 span.muted { "Power"; }
                 div.meter {
                     class = if ui.w.satisfaction < 500 { "low"; } else { ""; };
@@ -301,7 +301,7 @@ mod ui {
                         width: = percent(ui.w.satisfaction, 1000);
                     }
                 }
-                small { = (ui.w.satisfaction / 10).to_str() + "%"; }
+                small { = (ui.w.satisfaction / 10).str() + "%"; }
             }
             div.hud-group {
                 span.muted { = research_name(ui); }
@@ -311,18 +311,18 @@ mod ui {
                     }
                 }
             }
-            for [5, 6, 7, 9, 11, 13, 17, 18] |item| key item.to_str() {
+            for [5, 6, 7, 9, 11, 13, 17, 18] |item| key item.str() {
                 div.counter {
                     title = item_name(ui, item) + " per minute";
-                    b { = per_minute(ui, item).to_str(); }
+                    b { = per_minute(ui, item).str(); }
                     small { = item_name(ui, item); }
                 }
             }
             div.hud-group {
-                for [0, 1, 2, 4] |s| key s.to_str() {
+                for [0, 1, 2, 4] |s| key s.str() {
                     button {
                         class = if ui.speed == s { "active"; } else { ""; };
-                        = if s == 0 { "❚❚"; } else { s.to_str() + "×"; };
+                        = if s == 0 { "❚❚"; } else { s.str() + "×"; };
                         on click {
                             ui.speed = s;
                         }
@@ -364,20 +364,20 @@ mod ui {
             div.tabs {
                 for categories() |name, index| key name {
                     button {
-                        class = if ui.tab == index.to_i32() { "active"; } else { ""; };
+                        class = if ui.tab == index.i32() { "active"; } else { ""; };
                         = name;
                         on click {
-                            ui.tab = index.to_i32();
+                            ui.tab = index.i32();
                         }
                     }
                 }
             }
             div.machines {
-                for ((0..<ui.w.game.machines.len()) filter |m| { ui.w.game.machines[m].category == categories()[ui.tab]; }) |m| key m.to_str() {
+                for ((0..<ui.w.game.machines.len()) filter |m| { ui.w.game.machines[m].category == categories()[ui.tab]; }) |m| key m.str() {
                     button.machine-btn {
                         class = if ui.tool == m { "active"; } else { ""; };
                         disabled = ui.w.machine_unlocked[m] == 0;
-                        title = ui.w.game.machines[m].label + " · speed " + ui.w.game.machines[m].speed.to_str() + " · power " + ui.w.game.machines[m].power.to_str();
+                        title = ui.w.game.machines[m].label + " · speed " + ui.w.game.machines[m].speed.str() + " · power " + ui.w.game.machines[m].power.str();
                         span.glyph {
                             background: = ui.colors[m];
                             = ui.glyphs[m];
@@ -449,7 +449,7 @@ mod ui {
         @wutu/\
         @island "inspector";
         aside.inspector {
-            for inspected(ui) |e| key "panel-" + e.id.to_str() {
+            for inspected(ui) |e| key "panel-" + e.id.str() {
                 = machine_panel(ui, e);
             }
             if ui.selected <= 0 and ui.pinned.len() == 0 {
@@ -469,7 +469,7 @@ mod ui {
                     = ui.glyphs[e.machine];
                 }
                 h3 { = ui.w.game.machines[e.machine].label; }
-                small.muted { = "#" + e.id.to_str() + " (" + e.x.to_str() + ", " + e.y.to_str() + ") " + ["N", "E", "S", "W"][e.dir]; }
+                small.muted { = "#" + e.id.str() + " (" + e.x.str() + ", " + e.y.str() + ") " + ["N", "E", "S", "W"][e.dir]; }
                 button {
                     title = "Rotate";
                     "↻";
@@ -564,7 +564,7 @@ mod ui {
                 = slot(ui, if e.fuel > 0 { 2; } else { -1; }, e.fuel);
                 = bar(e.burn, 3600, "");
             }
-            = row("Under the drill", item_name(ui, tile_ore(ui, e.x, e.y)) + " × " + tile_amount(ui, e.x, e.y).to_str());
+            = row("Under the drill", item_name(ui, tile_ore(ui, e.x, e.y)) + " × " + tile_amount(ui, e.x, e.y).str());
             = meter_row("Mining", e.progress, 60000, "info");
             div.row {
                 span.muted { "Output"; }
@@ -578,10 +578,10 @@ mod ui {
         @wutu/\
         div {
             div.grid3 {
-                for (0..<9) |k| key k.to_str() {
+                for (0..<9) |k| key k.str() {
                     div {
                         background: = if tile_ore(ui, e.x + k % 3 - 1, e.y + k / 3 - 1) >= 0 { ui.item_colors[tile_ore(ui, e.x + k % 3 - 1, e.y + k / 3 - 1)]; } else { "#2a2f36"; };
-                        = tile_amount(ui, e.x + k % 3 - 1, e.y + k / 3 - 1).to_str();
+                        = tile_amount(ui, e.x + k % 3 - 1, e.y + k / 3 - 1).str();
                     }
                 }
             }
@@ -611,8 +611,8 @@ mod ui {
         let field = tile_amount(ui, e.x, e.y);
         @wutu/\
         div {
-            = row("Yield", (sim.imax(100, sim.imin(1000, field / 100)) / 10).to_str() + "%");
-            = row("Oil field", field.to_str());
+            = row("Yield", (sim.imax(100, sim.imin(1000, field / 100)) / 10).str() + "%");
+            = row("Oil field", field.str());
             div.gauges {
                 = fluid_gauge(ui, 23, e.amount, 100);
             }
@@ -686,7 +686,7 @@ mod ui {
                         background: = if e.heat > 1000 { "#ff6a3a"; } else { "#f0a73a"; };
                     }
                 }
-                b { = e.heat.to_str() + " °C"; }
+                b { = e.heat.str() + " °C"; }
             }
         }
         \/;
@@ -695,9 +695,9 @@ mod ui {
     fn electric_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         @wutu/\
         div {
-            = row("Power draw", if e.busy { (180 * ui.w.satisfaction / 1000).to_str() + " kW"; } else { "idle"; });
+            = row("Power draw", if e.busy { (180 * ui.w.satisfaction / 1000).str() + " kW"; } else { "idle"; });
             = furnace_slots(ui, e);
-            = row("Crafts", e.crafts.to_str());
+            = row("Crafts", e.crafts.str());
         }
         \/;
     }
@@ -708,7 +708,7 @@ mod ui {
         @wutu/\
         table {
             if e.recipe >= 0 {
-                for ui.w.game.recipes[e.recipe].ingredients |ing| key "in" + ing[0].to_str() {
+                for ui.w.game.recipes[e.recipe].ingredients |ing| key "in" + ing[0].str() {
                     tr {
                         td {
                             span.dot {
@@ -716,13 +716,13 @@ mod ui {
                             }
                             = " " + item_name(ui, ing[0]);
                         }
-                        td.num { = e.inv[ing[0]].to_str() + " / " + ing[1].to_str(); }
+                        td.num { = e.inv[ing[0]].str() + " / " + ing[1].str(); }
                     }
                 }
-                for ui.w.game.recipes[e.recipe].products |prod| key "out" + prod[0].to_str() {
+                for ui.w.game.recipes[e.recipe].products |prod| key "out" + prod[0].str() {
                     tr {
                         td { = "→ " + item_name(ui, prod[0]); }
-                        td.num { = e.out[prod[0]].to_str(); }
+                        td.num { = e.out[prod[0]].str(); }
                     }
                 }
             }
@@ -731,7 +731,7 @@ mod ui {
     }
 
     fn progress_ring(e: sim.Entity, time: I32) Browser.Element {
-        let fraction = if time <= 0 { 0.0; } else { e.progress.to_f64() / (time * 1000).to_f64(); };
+        let fraction = if time <= 0 { 0.0; } else { e.progress.f64() / (time * 1000).f64(); };
         @wutu/\
         svg {
             viewBox = "0 0 40 40";
@@ -772,7 +772,7 @@ mod ui {
         @wutu/\
         div {
             div.recipe-grid {
-                for allowed_recipes(ui, e) |r| key r.to_str() {
+                for allowed_recipes(ui, e) |r| key r.str() {
                     button {
                         class = if e.recipe == r { "active"; } else { ""; };
                         = ui.w.game.recipes[r].name;
@@ -803,20 +803,20 @@ mod ui {
                     value = "-1";
                     "Choose a recipe";
                 }
-                for allowed_recipes(ui, e) |r| key r.to_str() {
+                for allowed_recipes(ui, e) |r| key r.str() {
                     option {
-                        value = r.to_str();
+                        value = r.str();
                         selected = e.recipe == r;
                         = ui.w.game.recipes[r].name;
                     }
                 }
                 on change {
-                    sim.set_recipe(ui.w, e, Browser.parseInt(pick.value, 10).to_i32());
+                    sim.set_recipe(ui.w, e, Browser.parseInt(pick.value, 10).i32());
                 }
             }
             = ingredients(ui, e);
-            = row("Crafts", e.crafts.to_str());
-            = row("Speed", (effective_speed(ui, e) / 10).to_str() + "%");
+            = row("Crafts", e.crafts.str());
+            = row("Speed", (effective_speed(ui, e) / 10).str() + "%");
             = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
         }
         \/;
@@ -834,7 +834,7 @@ mod ui {
                 }
             }
             div.recipe-grid {
-                for (allowed_recipes(ui, e) filter |r| { ui.search.len() == 0 or ui.w.game.recipes[r].name.includes(ui.search); }) |r| key r.to_str() {
+                for (allowed_recipes(ui, e) filter |r| { ui.search.len() == 0 or ui.w.game.recipes[r].name.includes(ui.search); }) |r| key r.str() {
                     button {
                         class = if e.recipe == r { "active"; } else { ""; };
                         = ui.w.game.recipes[r].name;
@@ -844,8 +844,8 @@ mod ui {
                     }
                 }
             }
-            = row("Beacons in range", sim.beacons(ui.w, e).to_str());
-            = row("Effective speed", (effective_speed(ui, e) / 10).to_str() + "%");
+            = row("Beacons in range", sim.beacons(ui.w, e).str());
+            = row("Effective speed", (effective_speed(ui, e) / 10).str() + "%");
             = meter_row("Progress", e.progress, sim.imax(1, recipe_time(ui, e) * 1000), "");
         }
         \/;
@@ -855,11 +855,11 @@ mod ui {
         @wutu/\
         div.gauges {
             if e.recipe >= 0 {
-                for (ui.w.game.recipes[e.recipe].ingredients filter |ing| { ui.w.is_fluid[ing[0]]; }) |ing| key "fi" + ing[0].to_str() {
+                for (ui.w.game.recipes[e.recipe].ingredients filter |ing| { ui.w.is_fluid[ing[0]]; }) |ing| key "fi" + ing[0].str() {
                     = fluid_gauge(ui, ing[0], e.inv[ing[0]], ing[1] * 2);
                 }
                 span { "→"; }
-                for (ui.w.game.recipes[e.recipe].products filter |prod| { ui.w.is_fluid[prod[0]]; }) |prod| key "fo" + prod[0].to_str() {
+                for (ui.w.game.recipes[e.recipe].products filter |prod| { ui.w.is_fluid[prod[0]]; }) |prod| key "fo" + prod[0].str() {
                     = fluid_gauge(ui, prod[0], e.out[prod[0]], prod[1] * 2);
                 }
             }
@@ -876,15 +876,15 @@ mod ui {
                     value = "-1";
                     "Choose a recipe";
                 }
-                for allowed_recipes(ui, e) |r| key r.to_str() {
+                for allowed_recipes(ui, e) |r| key r.str() {
                     option {
-                        value = r.to_str();
+                        value = r.str();
                         selected = e.recipe == r;
                         = ui.w.game.recipes[r].name;
                     }
                 }
                 on change {
-                    sim.set_recipe(ui.w, e, Browser.parseInt(pick.value, 10).to_i32());
+                    sim.set_recipe(ui.w, e, Browser.parseInt(pick.value, 10).i32());
                 }
             }
             = fluid_side(ui, e);
@@ -903,7 +903,7 @@ mod ui {
                 span { "→"; }
                 = fluid_gauge(ui, 24, e.out[24], 90);
             }
-            = row("Crafts", e.crafts.to_str());
+            = row("Crafts", e.crafts.str());
             = meter_row("Progress", e.progress, 300000, "");
         }
         \/;
@@ -915,11 +915,11 @@ mod ui {
             div.row {
                 = progress_ring(e, 720);
                 div {
-                    = row("Uranium-238", e.out[20].to_str());
-                    = row("Uranium-235", e.out[21].to_str());
+                    = row("Uranium-238", e.out[20].str());
+                    = row("Uranium-235", e.out[21].str());
                 }
             }
-            = row("Next U-235 in", ((6 - e.crafts % 7 + 7) % 7 + 1).to_str() + " crafts");
+            = row("Next U-235 in", ((6 - e.crafts % 7 + 7) % 7 + 1).str() + " crafts");
             = slots(ui, e.inv);
         }
         \/;
@@ -930,7 +930,7 @@ mod ui {
     fn belt_items(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         @wutu/\
         div.items {
-            for (0..<(e.belt_n / 2)) |k| key k.to_str() {
+            for (0..<(e.belt_n / 2)) |k| key k.str() {
                 span {
                     title = item_name(ui, e.belt[k * 2]);
                     span.dot {
@@ -948,7 +948,7 @@ mod ui {
         div {
             = lane(ui, e);
             = belt_items(ui, e);
-            = row("Speed", ui.w.speed[e.machine].to_str() + " / tick");
+            = row("Speed", ui.w.speed[e.machine].str() + " / tick");
         }
         \/;
     }
@@ -977,7 +977,7 @@ mod ui {
         @wutu/\
         div {
             div.row {
-                for (0..<3) |p| key p.to_str() {
+                for (0..<3) |p| key p.str() {
                     button {
                         class = if e.priority == p { "active"; } else { ""; };
                         = ["Alternate", "Front", "Side"][p];
@@ -993,15 +993,15 @@ mod ui {
                     value = "-1";
                     "No filter";
                 }
-                for (0..<22) |i| key i.to_str() {
+                for (0..<22) |i| key i.str() {
                     option {
-                        value = i.to_str();
+                        value = i.str();
                         selected = e.pick == i;
                         = item_name(ui, i);
                     }
                 }
                 on change {
-                    e.pick = Browser.parseInt(pick.value, 10).to_i32();
+                    e.pick = Browser.parseInt(pick.value, 10).i32();
                 }
             }
             = row("Next output", if e.toggle == 0 { "front"; } else { "side"; });
@@ -1016,7 +1016,7 @@ mod ui {
             promote sim.front(ui.w, e, d) {
                 |t| => {
                     if found == "no exit" and t.cls == 9 and t.dir == e.dir and t.role == 1 {
-                        found = d.to_str() + " tiles";
+                        found = d.str() + " tiles";
                     };
                 },
                 ~> {},
@@ -1097,7 +1097,7 @@ mod ui {
                 span.muted { "Hand"; }
                 = slot(ui, e.hand, e.held);
             }
-            = row("Moved", e.moved.to_str());
+            = row("Moved", e.moved.str());
             = row("From", neighbor_name(ui, e.x - dxs[e.dir] * reach, e.y - dys[e.dir] * reach));
             = row("To", neighbor_name(ui, e.x + dxs[e.dir] * reach, e.y + dys[e.dir] * reach));
         }
@@ -1112,7 +1112,7 @@ mod ui {
         @wutu/\
         div {
             div.reach {
-                for (0..<5) |k| key k.to_str() {
+                for (0..<5) |k| key k.str() {
                     div {
                         class = if k == 0 { "src"; } else { if k == 2 { "me"; } else { if k == 4 { "dst"; } else { ""; }; }; };
                     }
@@ -1131,8 +1131,8 @@ mod ui {
                 span.muted { "Hand"; }
                 = slot(ui, e.hand, e.held);
             }
-            = row("Moved", e.moved.to_str());
-            = row("Average", (e.moved * 3600 / sim.imax(1, ui.w.tick)).to_str() + " / min");
+            = row("Moved", e.moved.str());
+            = row("Average", (e.moved * 3600 / sim.imax(1, ui.w.tick)).str() + " / min");
         }
         \/;
     }
@@ -1141,7 +1141,7 @@ mod ui {
         @wutu/\
         div {
             div.items {
-                for (0..<22) |i| key i.to_str() {
+                for (0..<22) |i| key i.str() {
                     button {
                         class = if e.pick == i { "active"; } else { ""; };
                         title = item_name(ui, i);
@@ -1156,7 +1156,7 @@ mod ui {
             }
             = row("Filter", item_name(ui, e.pick));
             = row("State", state_name(e));
-            = row("Moved", e.moved.to_str());
+            = row("Moved", e.moved.str());
         }
         \/;
     }
@@ -1165,14 +1165,14 @@ mod ui {
         @wutu/\
         div {
             label.row {
-                span.muted { = "Stack size " + e.stack.to_str(); }
+                span.muted { = "Stack size " + e.stack.str(); }
                 input as size {
                     type = "range";
                     min = "1";
                     max = "4";
-                    value = e.stack.to_str();
+                    value = e.stack.str();
                     on input {
-                        e.stack = sim.imax(1, sim.imin(4, Browser.parseInt(size.value, 10).to_i32()));
+                        e.stack = sim.imax(1, sim.imin(4, Browser.parseInt(size.value, 10).i32()));
                     }
                 }
             }
@@ -1180,7 +1180,7 @@ mod ui {
                 span.muted { "Hand"; }
                 = slot(ui, e.hand, e.held);
             }
-            = row("Moved", e.moved.to_str());
+            = row("Moved", e.moved.str());
         }
         \/;
     }
@@ -1195,7 +1195,7 @@ mod ui {
         let stacks = (0..<e.inv.len()) flat_map |i| { (0..<((e.inv[i] + 49) / 50)) map |k| { i; } collect(I32); } collect(I32);
         @wutu/\
         div.chest-grid {
-            for (0..<ui.w.speed[e.machine]) |s| key s.to_str() {
+            for (0..<ui.w.speed[e.machine]) |s| key s.str() {
                 div {
                     if s < stacks.len() {
                         span.dot {
@@ -1212,7 +1212,7 @@ mod ui {
         @wutu/\
         div {
             = chest_grid(ui, e);
-            = row("Used", used_slots(e.inv).to_str() + " of 16 slots");
+            = row("Used", used_slots(e.inv).str() + " of 16 slots");
         }
         \/;
     }
@@ -1223,10 +1223,10 @@ mod ui {
             = chest_grid(ui, e);
             = meter_row("Used", used_slots(e.inv), 48, "");
             table {
-                for ((0..<e.inv.len()) filter |i| { e.inv[i] > 0; } sort(I32) |a, b| { e.inv[a] > e.inv[b]; }) |i| key i.to_str() {
+                for ((0..<e.inv.len()) filter |i| { e.inv[i] > 0; } sort(I32) |a, b| { e.inv[a] > e.inv[b]; }) |i| key i.str() {
                     tr {
                         td { = item_name(ui, i); }
-                        td.num { = e.inv[i].to_str(); }
+                        td.num { = e.inv[i].str(); }
                     }
                 }
             }
@@ -1237,10 +1237,10 @@ mod ui {
     fn requester_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         @wutu/\
         table {
-            for ((0..<e.inv.len()) filter |i| { e.inv[i] > 0; }) |i| key i.to_str() {
+            for ((0..<e.inv.len()) filter |i| { e.inv[i] > 0; }) |i| key i.str() {
                 tr {
                     td { = item_name(ui, i); }
-                    td.num { = e.inv[i].to_str(); }
+                    td.num { = e.inv[i].str(); }
                     td {
                         = bar(e.inv[i] % 50 + (if e.inv[i] % 50 == 0 { 50; } else { 0; }), 50, "");
                     }
@@ -1268,7 +1268,7 @@ mod ui {
     }
 
     fn solar_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        let angle = (ui.w.tick % 25200).to_f64() / 25200.0 * 6.2832;
+        let angle = (ui.w.tick % 25200).f64() / 25200.0 * 6.2832;
         @wutu/\
         div {
             svg {
@@ -1289,7 +1289,7 @@ mod ui {
                 }
             }
             = meter_row("Light", ui.w.light, 1000, "");
-            = row("Output", (60 * ui.w.light / 1000).to_str() + " kW");
+            = row("Output", (60 * ui.w.light / 1000).str() + " kW");
         }
         \/;
     }
@@ -1298,7 +1298,7 @@ mod ui {
         @wutu/\
         div {
             = meter_row("Charge", e.charge, 5000, "good");
-            = row("Stored", e.charge.to_str() + " / 5000");
+            = row("Stored", e.charge.str() + " / 5000");
             = row("State", if ui.w.supply > ui.w.demand and e.charge < 5000 { "charging"; } else { if ui.w.supply < ui.w.demand and e.charge > 0 { "discharging"; } else { "idle"; }; });
         }
         \/;
@@ -1326,7 +1326,7 @@ mod ui {
         @wutu/\
         div {
             = meter_row("Sweep", e.progress, 300000, "info");
-            = row("Chunks revealed", e.crafts.to_str());
+            = row("Chunks revealed", e.crafts.str());
         }
         \/;
     }
@@ -1340,8 +1340,8 @@ mod ui {
         };
         @wutu/\
         div {
-            = row("Crafters in range", count.to_str());
-            = row("Bonus each", "+" + (25 * ui.w.satisfaction / 1000).to_str() + "% speed");
+            = row("Crafters in range", count.str());
+            = row("Bonus each", "+" + (25 * ui.w.satisfaction / 1000).str() + "% speed");
         }
         \/;
     }
@@ -1359,41 +1359,41 @@ mod ui {
             div.row {
                 select as item {
                     aria-label = "Item";
-                    for (0..<22) |i| key i.to_str() {
+                    for (0..<22) |i| key i.str() {
                         option {
-                            value = i.to_str();
+                            value = i.str();
                             selected = e.cond_item == i;
                             = item_name(ui, i);
                         }
                     }
                     on change {
-                        e.cond_item = Browser.parseInt(item.value, 10).to_i32();
+                        e.cond_item = Browser.parseInt(item.value, 10).i32();
                     }
                 }
                 select as op {
                     aria-label = "Operator";
-                    for (0..<3) |o| key o.to_str() {
+                    for (0..<3) |o| key o.str() {
                         option {
-                            value = o.to_str();
+                            value = o.str();
                             selected = e.cond_op == o;
                             = [">", "<", "="][o];
                         }
                     }
                     on change {
-                        e.cond_op = Browser.parseInt(op.value, 10).to_i32();
+                        e.cond_op = Browser.parseInt(op.value, 10).i32();
                     }
                 }
                 input as amount {
                     type = "number";
                     aria-label = "Value";
-                    value = e.cond_value.to_str();
+                    value = e.cond_value.str();
                     width: 70px;
                     on change {
-                        e.cond_value = Browser.parseInt(amount.value, 10).to_i32();
+                        e.cond_value = Browser.parseInt(amount.value, 10).i32();
                     }
                 }
             }
-            = row("Source count", combinator_source(ui, e).to_str());
+            = row("Source count", combinator_source(ui, e).str());
             = row("Signal", if e.signal { "on"; } else { "off"; });
         }
         \/;
@@ -1434,7 +1434,7 @@ mod ui {
                     sim.launch(e);
                 }
             }
-            = row("Rockets launched", e.crafts.to_str());
+            = row("Rockets launched", e.crafts.str());
         }
         \/;
     }
@@ -1446,7 +1446,7 @@ mod ui {
         @island "footer";
         footer.footer {
             div.alerts {
-                for ui.alerts |a, index| key a.text + index.to_str() {
+                for ui.alerts |a, index| key a.text + index.str() {
                     div.alert {
                         class = a.kind;
                         = a.text;
@@ -1458,8 +1458,8 @@ mod ui {
             }
             div.minimap {
                 canvas#minimap {
-                    width = ui.w.width.to_str();
-                    height = ui.w.height.to_str();
+                    width = ui.w.width.str();
+                    height = ui.w.height.str();
                 }
             }
             div.tileinfo {
@@ -1476,9 +1476,9 @@ mod ui {
         @wutu/\
         div {
             if inside {
-                = row("Tile", "(" + x.to_str() + ", " + y.to_str() + ")");
+                = row("Tile", "(" + x.str() + ", " + y.str() + ")");
                 = row("Terrain", if ui.w.water[y * ui.w.width + x] == 1 { "water"; } else { "land"; });
-                = row("Resource", if tile_ore(ui, x, y) >= 0 { item_name(ui, tile_ore(ui, x, y)) + " × " + tile_amount(ui, x, y).to_str(); } else { "none"; });
+                = row("Resource", if tile_ore(ui, x, y) >= 0 { item_name(ui, tile_ore(ui, x, y)) + " × " + tile_amount(ui, x, y).str(); } else { "none"; });
                 = row("Entity", neighbor_name(ui, x, y));
             } else {
                 span.muted { "Hover the map."; }
@@ -1559,12 +1559,12 @@ mod ui {
     fn research_window(ui: Ui) Browser.HTMLElement {
         @wutu/\
         div.techs {
-            for (0..<ui.w.game.techs.len()) |t| key t.to_str() {
+            for (0..<ui.w.game.techs.len()) |t| key t.str() {
                 button.tech {
                     class = tech_state(ui, t);
                     disabled = tech_state(ui, t) != "available";
                     b { = ui.w.game.techs[t].label; }
-                    small.muted { = ui.w.game.techs[t].units.to_str() + " × " + (ui.w.game.techs[t].packs sum).to_str() + " packs"; }
+                    small.muted { = ui.w.game.techs[t].units.str() + " × " + (ui.w.game.techs[t].packs sum).str() + " packs"; }
                     small { = unlocks(ui, t); }
                     if ui.w.research_current == t {
                         = bar(ui.w.research_progress, ui.w.game.techs[t].units, "info");
@@ -1585,7 +1585,7 @@ mod ui {
         } collect(I32);
         let high = sim.imax(1, values fold(0) |m, v| { sim.imax(m, v); });
         values fold("") |d, v, k| {
-            d + (if k == 0 { "M"; } else { " L"; }) + k.to_str() + " " + (20 - v * 18 / high).to_str();
+            d + (if k == 0 { "M"; } else { " L"; }) + k.str() + " " + (20 - v * 18 / high).str();
         };
     }
 
@@ -1609,7 +1609,7 @@ mod ui {
                 }
             }
             table {
-                for (0..<item_count) |i| key i.to_str() {
+                for (0..<item_count) |i| key i.str() {
                     tr {
                         td {
                             span.dot {
@@ -1617,7 +1617,7 @@ mod ui {
                             }
                             = " " + item_name(ui, i);
                         }
-                        td.num { = per_minute(ui, i).to_str() + " / min"; }
+                        td.num { = per_minute(ui, i).str() + " / min"; }
                         td {
                             svg.spark {
                                 viewBox = "0 0 60 22";
@@ -1637,7 +1637,7 @@ mod ui {
     fn graph_path(values: Array[I32], start: I32, high: I32) Str {
         (0..<60) fold("") |d, k| {
             let v = values[(start + k) % 60];
-            d + (if k == 0 { "M"; } else { " L"; }) + (k * 10).to_str() + " " + (118 - v * 110 / sim.imax(1, high)).to_str();
+            d + (if k == 0 { "M"; } else { " L"; }) + (k * 10).str() + " " + (118 - v * 110 / sim.imax(1, high)).str();
         };
     }
 
@@ -1658,8 +1658,8 @@ mod ui {
         let totals = demand_by_machine(ui);
         @wutu/\
         div {
-            = row("Satisfaction", (ui.w.satisfaction / 10).to_str() + "%");
-            = row("Supply / demand", ui.w.supply.to_str() + " / " + ui.w.demand.to_str() + " kW");
+            = row("Satisfaction", (ui.w.satisfaction / 10).str() + "%");
+            = row("Supply / demand", ui.w.supply.str() + " / " + ui.w.demand.str() + " kW");
             svg.graph {
                 viewBox = "0 0 600 120";
                 preserveAspectRatio = "none";
@@ -1675,10 +1675,10 @@ mod ui {
                     th { "Machine"; }
                     th.num { "Demand (kW)"; }
                 }
-                for ((0..<totals.len()) filter |m| { totals[m] > 0; }) |m| key m.to_str() {
+                for ((0..<totals.len()) filter |m| { totals[m] > 0; }) |m| key m.str() {
                     tr {
                         td { = ui.w.game.machines[m].label; }
-                        td.num { = totals[m].to_str(); }
+                        td.num { = totals[m].str(); }
                     }
                 }
             }
@@ -1704,23 +1704,23 @@ mod ui {
     fn saves_window(ui: Ui) Browser.HTMLElement {
         @wutu/\
         div.saves {
-            for (1...3) |n| key n.to_str() {
+            for (1...3) |n| key n.str() {
                 div.row {
-                    b { = "Slot " + n.to_str(); }
+                    b { = "Slot " + n.str(); }
                     button {
                         "Save";
                         on click {
-                            Browser.localStorage.setItem("foundry-slot-" + n.to_str(), sim.save_text(ui.w));
-                            ui.notice = "Saved to slot " + n.to_str() + ".";
+                            Browser.localStorage.setItem("foundry-slot-" + n.str(), sim.save_text(ui.w));
+                            ui.notice = "Saved to slot " + n.str() + ".";
                         }
                     }
                     button {
                         "Load";
                         on click {
-                            promote Browser.localStorage.getItem("foundry-slot-" + n.to_str()) {
+                            promote Browser.localStorage.getItem("foundry-slot-" + n.str()) {
                                 |text| => load_world(ui, text),
                                 ~> {
-                                    ui.notice = "Slot " + n.to_str() + " is empty.";
+                                    ui.notice = "Slot " + n.str() + " is empty.";
                                 },
                             };
                         }

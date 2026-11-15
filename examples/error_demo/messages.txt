@@ -192,8 +192,8 @@
 
  7 │
  8 │ fn show(b: ?Box) Str {
- 9 │     b.to_str();
-   │     ━━━━━━━━
+ 9 │     b.str();
+   │     ━━━━━
    │     ╰─ may be null
 10 │ }
 --- exit 1
@@ -301,7 +301,7 @@ ok
 
  9 │ export main() void {
 10 │     let p = Point { x: 1.0, y: 2.0 };
-11 │     console.log(p?.x.to_str());
+11 │     console.log(p?.x.str());
    │                 ━
    │                 ╰─ never null
 12 │ }
@@ -552,7 +552,7 @@ ok
  9 │     let c = try code(n);
    │                 ━━━━━━━
    │                 ╰─ I32 errors
-10 │     Result[Str, Str].ok("code " + c.to_str());
+10 │     Result[Str, Str].ok("code " + c.str());
 11 │ }
 
   note  try returns the error as it is, unconverted
@@ -3276,7 +3276,7 @@ ok
  9 │     let c = Color.Purple;
    │                   ━━━━━━
    │                   ╰─ no such variant
-10 │     c.to_i32();
+10 │     c.i32();
 11 │ }
 --- exit 1
 
@@ -4601,7 +4601,7 @@ ok
  7 │     let n = widgets.total(4);
    │             ━━━━━━━━━━━━━━━━
    │             ╰─ here
- 8 │     Browser.document.title = n.to_str();
+ 8 │     Browser.document.title = n.str();
  9 │ }
 
    ╭─ examples/error_demo/names/lazy_parts/widgets.utu
@@ -4677,7 +4677,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/95_distinct_wrong_conversion.utu
- ERROR  No method Id.from_i32
+ ERROR  No method Id.from_i32; did you mean Id?
         unknown-method · examples/error_demo/names/95_distinct_wrong_conversion.utu:6:14
 
  4 │
@@ -4687,6 +4687,9 @@ ok
    │              ╰─ no such method
  7 │     0;
  8 │ }
+
+  fix   Use Id(…)
+ 6 │     let id = Id(5);
 --- exit 1
 
 === utu check examples/error_demo/names/960_ambiguous_variant.utu
@@ -4971,7 +4974,7 @@ ok
 12 │     let state = @stored/\ S "k" manual S { ps: [P { a: 1, b: 2 }] } \/;
    │                                                           ━━━━
    │                                                           ╰─ no such field
-13 │     Browser.console.log(state.ps.len().to_str());
+13 │     Browser.console.log(state.ps.len().str());
 14 │ }
 --- exit 1
 
@@ -7387,8 +7390,8 @@ ok
 
  2 │ // Expect: out of memory: could not allocate Array[I64] of 2000000000 elements
  3 │ export main() I32 {
- 4 │     let xs = Array[I64].new(2000000000, 0.to_i64());
-   │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 4 │     let xs = Array[I64].new(2000000000, 0.i64());
+   │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │              ╰─ here
  5 │     xs.len();
  6 │ }
@@ -7470,18 +7473,18 @@ ok
 --- exit 1
 
 === utu run examples/error_demo/runtime/24_enum_from_i32_bad.utu
- TRAP  Level.from_i32: no variant has this value
+ TRAP  Level: no variant has this value
        trap · examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
 
  7 │
  8 │ export main() Str {
- 9 │     let l = Level.from_i32(7);
-   │             ━━━━━━━━━━━━━━━━━
+ 9 │     let l = Level(7);
+   │             ━━━━━━━━
    │             ╰─ here
 10 │     Level.name(l);
 11 │ }
 
-  in Level.from_i32
+  in Level
   in main  examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
 --- exit 1
 
@@ -7547,16 +7550,16 @@ scheduled
 
 === utu run examples/error_demo/runtime/29_deep_recursion_with_base.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
+       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:45
 
  2 │ // Expect: stack overflow in `sum_to` at 29_deep_recursion_with_base.utu:4; a short trace, not 10,000 frames
  3 │ fn sum_to(n: I32) I64 {
- 4 │     if n == 0 { 0.to_i64(); } else { n.to_i64() + sum_to(n - 1); };
-   │                                                   ━━━━━━━━━━━━━
-   │                                                   ╰─ here
+ 4 │     if n == 0 { 0.i64(); } else { n.i64() + sum_to(n - 1); };
+   │                                             ━━━━━━━━━━━━━
+   │                                             ╰─ here
  5 │ }
 
-  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:51
+  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:45
 --- exit 1
 
 === utu run examples/error_demo/runtime/309_result_value_of_error.utu
@@ -7684,17 +7687,17 @@ scheduled
 --- exit 1
 
 === utu run examples/error_demo/runtime/362_match_no_arm.utu
- TRAP  Level.from_i32: no variant has this value
+ TRAP  Level: no variant has this value
        trap · examples/error_demo/runtime/362_match_no_arm.utu:12:11
 
 10 │
 11 │ export main() I32 {
-12 │     label(Level.from_i32(7));
-   │           ━━━━━━━━━━━━━━━━━
+12 │     label(Level(7));
+   │           ━━━━━━━━
    │           ╰─ here
 13 │ }
 
-  in Level.from_i32
+  in Level
   in main  examples/error_demo/runtime/362_match_no_arm.utu:12:11
 --- exit 1
 
@@ -8307,7 +8310,7 @@ FAIL after tests: boom
    │              ━━━
    │              ╰─ unexpected
  7 │
- 8 │ export main() I32 { Level.High.to_i32(); }
+ 8 │ export main() I32 { Level.High.i32(); }
 --- exit 1
 
 === utu check examples/error_demo/syntax/22_proto_field_without_get.utu
@@ -8347,7 +8350,7 @@ FAIL after tests: boom
  4 │     using console from std:Console;
    │     ━━━━━
    │     ╰─ unexpected
- 5 │     fn show(n: I32) void { console.log(n.to_str()); }
+ 5 │     fn show(n: I32) void { console.log(n.str()); }
  6 │ }
 --- exit 1
 
@@ -8968,7 +8971,7 @@ FAIL after tests: boom
  4 │     let level: U8 = 300;
    │                ━━
    │                ╰─ here
- 5 │     level.to_i32();
+ 5 │     level.i32();
  6 │ }
 --- exit 1
 
@@ -8981,7 +8984,7 @@ FAIL after tests: boom
  4 │     let big = 3000000000;
    │               ━━━━━━━━━━
    │               ╰─ I32
- 5 │     big.to_i64();
+ 5 │     big.i64();
  6 │ }
 --- exit 1
 
@@ -8994,7 +8997,7 @@ FAIL after tests: boom
  4 │     let none: U32 = -1;
    │                     ━━
    │                     ╰─ U32
- 5 │     none.to_i32();
+ 5 │     none.i32();
  6 │ }
 --- exit 1
 
@@ -9430,7 +9433,7 @@ FAIL after tests: boom
  4 │     let count: U64 = -5;
    │                      ━━
    │                      ╰─ U64
- 5 │     count.to_i32();
+ 5 │     count.i32();
  6 │ }
 --- exit 1
 
@@ -9511,8 +9514,8 @@ FAIL after tests: boom
  3 │ fn average(a: I32, b: I32) I32 {
    │                            ───
    │                            ╰─ I32
- 4 │     return (a + b).to_f64() / 2.0;
-   │            ━━━━━━━━━━━━━━━━━━━━━━
+ 4 │     return (a + b).f64() / 2.0;
+   │            ━━━━━━━━━━━━━━━━━━━
    │            ╰─ F64
  5 │ }
 --- exit 1
@@ -10008,13 +10011,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/1207_scalar_conversion_arity.utu
  ERROR  Takes 0, given 1
-        wrong-arity · examples/error_demo/types/1207_scalar_conversion_arity.utu:4:47
+        wrong-arity · examples/error_demo/types/1207_scalar_conversion_arity.utu:4:38
 
  2 │ // Expect: Takes 0, given 1
  3 │ type X = distinct I32;
- 4 │ export main() I32 { let x: X = X.from_i32(1); x.to_i32(1); }
-   │                                               ━━━━━━━━━━━
-   │                                               ╰─ takes 0, given 1
+ 4 │ export main() I32 { let x: X = X(1); x.i32(1); }
+   │                                      ━━━━━━━━
+   │                                      ╰─ takes 0, given 1
 --- exit 1
 
 === utu check examples/error_demo/types/1240_mem_of_unknown_type.utu
@@ -10351,8 +10354,8 @@ FAIL after tests: boom
 
  2 │ // Expect: Type mismatch: expected I32, got Str at the closure body
  3 │ export main() I32 {
- 4 │     let f = cl(x: I32) I32 { "n=" + x.to_str(); };
-   │                              ━━━━━━━━━━━━━━━━━
+ 4 │     let f = cl(x: I32) I32 { "n=" + x.str(); };
+   │                              ━━━━━━━━━━━━━━
    │                              ╰─ Str
  5 │     f(1);
  6 │ }
@@ -10367,8 +10370,8 @@ FAIL after tests: boom
    │          ╰─ cl(I32) I32
  4 │
  5 │ export main() I32 {
- 6 │     apply(cl(x: F64) I32 { x.to_i32(); }, 3);
-   │           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6 │     apply(cl(x: F64) I32 { x.i32(); }, 3);
+   │           ━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │           ╰─ cl(F64) I32
  7 │ }
 --- exit 1
@@ -10402,7 +10405,7 @@ FAIL after tests: boom
  ERROR  No + for I32 and I64
         operand-mismatch · examples/error_demo/types/24_i32_plus_i64.utu:4:13
 
- 2 │ // Expect: Type mismatch: expected I32, got I64 (or: I32 + I64 needs a conversion, use .to_i64())
+ 2 │ // Expect: Type mismatch: expected I32, got I64 (or: I32 + I64 needs a conversion, use .i64())
  3 │ fn total(count: I32, bytes: I64) I64 {
  4 │     count + bytes;
    │     ─────   ━━━━━
@@ -10634,7 +10637,7 @@ FAIL after tests: boom
    │          ────────
    │          ╰─ Shape
 15 │
-16 │ export main() I32 { total(Label { text: "x" }).to_i32(); }
+16 │ export main() I32 { total(Label { text: "x" }).i32(); }
    │                           ━━━━━━━━━━━━━━━━━━━
    │                           ╰─ Label
 --- exit 1
@@ -10727,7 +10730,7 @@ FAIL after tests: boom
  ERROR  lookup takes UserId, got I32
         type-mismatch · examples/error_demo/types/39_distinct_vs_base.utu:9:12
 
- 5 │ fn lookup(id: UserId) I32 { id.to_i32(); }
+ 5 │ fn lookup(id: UserId) I32 { id.i32(); }
    │           ──────────
    │           ╰─ UserId
    ┆
@@ -10784,7 +10787,7 @@ FAIL after tests: boom
  ERROR  paint takes Color, got Size
         type-mismatch · examples/error_demo/types/40_enum_variant_wrong_enum.utu:13:27
 
-11 │ fn paint(c: Color) I32 { c.to_i32(); }
+11 │ fn paint(c: Color) I32 { c.i32(); }
    │          ────────
    │          ╰─ Color
 12 │
@@ -10802,7 +10805,7 @@ FAIL after tests: boom
 10 │     let c = a + b;
    │             ━━━━━
    │             ╰─ Vec2
-11 │     c.x.to_i32();
+11 │     c.x.i32();
 12 │ }
 --- exit 1
 
@@ -10840,7 +10843,7 @@ FAIL after tests: boom
  5 │     let masked = x & 1.0;
    │                  ━━━━━━━
    │                  ╰─ F64
- 6 │     masked.to_i32();
+ 6 │     masked.i32();
  7 │ }
 --- exit 1
 
@@ -10951,7 +10954,7 @@ FAIL after tests: boom
 
  9 │ export main() I32 {
 10 │     let r = Rect { w: 2.0, h: 3.0 };
-11 │     r.perimeter().to_i32();
+11 │     r.perimeter().i32();
    │     ━━━━━━━━━━━━━
    │     ╰─ no such method
 12 │ }
@@ -11082,7 +11085,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/52_unknown_method_i32.utu
- ERROR  No method I32.to_string; did you mean to_str?
+ ERROR  No method I32.to_string; did you mean str?
         unknown-method · examples/error_demo/types/52_unknown_method_i32.utu:5:5
 
  3 │ export main() I32 {
@@ -11092,8 +11095,8 @@ FAIL after tests: boom
    │     ╰─ no such method
  6 │ }
 
-  fix   Use to_str
- 5 │     n.to_str().len();
+  fix   Use str
+ 5 │     n.str().len();
 --- exit 1
 
 === utu check examples/error_demo/types/53_unknown_method_strmap.utu
@@ -11119,7 +11122,7 @@ FAIL after tests: boom
    │                         ━━━━━━━━━━━━━
    │                         ╰─ no such method
 12 │
-13 │ export main() I32 { edge(Circle { r: 1.0 }).to_i32(); }
+13 │ export main() I32 { edge(Circle { r: 1.0 }).i32(); }
 --- exit 1
 
 === utu check examples/error_demo/types/55_unknown_method_static.utu
@@ -11131,7 +11134,7 @@ FAIL after tests: boom
  7 │     let r = Rect.unit();
    │             ━━━━━━━━━━━
    │             ╰─ no such method
- 8 │     r.w.to_i32();
+ 8 │     r.w.i32();
  9 │ }
 --- exit 1
 
@@ -11141,7 +11144,7 @@ FAIL after tests: boom
 
  5 │ }
  6 │
- 7 │ export main() I32 { geometry.cube(2.0).to_i32(); }
+ 7 │ export main() I32 { geometry.cube(2.0).i32(); }
    │                              ━━━━
    │                              ╰─ no such member
 --- exit 1
@@ -11155,7 +11158,7 @@ FAIL after tests: boom
 10 │     let s = r.square(2.0);
    │             ━━━━━━━━━━━━━
    │             ╰─ no such method
-11 │     s.w.to_i32();
+11 │     s.w.i32();
 12 │ }
 --- exit 1
 
@@ -11165,7 +11168,7 @@ FAIL after tests: boom
 
  3 │ export main() I32 {
  4 │     let x = 2.0;
- 5 │     x.sqrt().to_i32();
+ 5 │     x.sqrt().i32();
    │     ━━━━━━━━
    │     ╰─ no such method
  6 │ }
@@ -11257,7 +11260,7 @@ FAIL after tests: boom
 
  9 │ export main() I32 {
 10 │     let r = Rect { w: 2.0, h: 3.0 };
-11 │     r.area(2.0).to_i32();
+11 │     r.area(2.0).i32();
    │     ━━━━━━━━━━━
    │     ╰─ takes 0, given 1
 12 │ }
@@ -11272,7 +11275,7 @@ FAIL after tests: boom
 10 │     let p = Point.new(1.0);
    │             ━━━━━━━━━━━━━━
    │             ╰─ takes 2, given 1
-11 │     p.x.to_i32();
+11 │     p.x.i32();
 12 │ }
 --- exit 1
 
@@ -11335,7 +11338,7 @@ FAIL after tests: boom
    │                        ━━━━━━━━━━━
    │                        ╰─ takes 0, given 1
 12 │
-13 │ export main() I32 { big(Circle { r: 1.0 }).to_i32(); }
+13 │ export main() I32 { big(Circle { r: 1.0 }).i32(); }
 --- exit 1
 
 === utu check examples/error_demo/types/69_arity_distinct_from.utu
@@ -11344,10 +11347,10 @@ FAIL after tests: boom
 
  4 │
  5 │ export main() I32 {
- 6 │     let id = UserId.from_i32();
-   │              ━━━━━━━━━━━━━━━━━
+ 6 │     let id = UserId();
+   │              ━━━━━━━━
    │              ╰─ takes 1, given 0
- 7 │     id.to_i32();
+ 7 │     id.i32();
  8 │ }
 --- exit 1
 
@@ -11397,7 +11400,7 @@ FAIL after tests: boom
  8 │     let p = Point(1.0, 2.0);
    │             ━━━━━━━━━━━━━━━
    │             ╰─ not a function
- 9 │     p.x.to_i32();
+ 9 │     p.x.i32();
 10 │ }
 
   note  Point is a struct: write Point { x: …, y: … }
@@ -11447,7 +11450,7 @@ FAIL after tests: boom
 
  7 │ export main() I32 {
  8 │     let p = Point { x: 1.0, y: 2.0 };
- 9 │     p.z.to_i32();
+ 9 │     p.z.i32();
    │     ━━━
    │     ╰─ no such field
 10 │ }
@@ -11547,7 +11550,7 @@ FAIL after tests: boom
 
 10 │ export main() I32 {
 11 │     let s: Shape = Circle { name: "c", r: 1.0 };
-12 │     s.r.to_i32();
+12 │     s.r.i32();
    │     ━━━
    │     ╰─ no such field
 13 │ }
@@ -11606,7 +11609,7 @@ FAIL after tests: boom
  8 │     let r = Rect { w: 2.0 };
    │             ━━━━━━━━━━━━━━━
    │             ╰─ h?
- 9 │     r.w.to_i32();
+ 9 │     r.w.i32();
 10 │ }
 --- exit 1
 
@@ -11622,7 +11625,7 @@ FAIL after tests: boom
    │                     ━━━━━━━━━━━
    │                     ╰─ y?
  8 │
- 9 │ export main() I32 { origin().x.to_i32(); }
+ 9 │ export main() I32 { origin().x.i32(); }
 --- exit 1
 
 === utu check examples/error_demo/types/82_missing_field_variant.utu
@@ -11771,7 +11774,7 @@ FAIL after tests: boom
 
  7 │     | side: F64
  8 │
- 9 │ fn Shape[Square].area |s| () I32 { s.side.to_i32() * s.side.to_i32(); }
+ 9 │ fn Shape[Square].area |s| () I32 { s.side.i32() * s.side.i32(); }
    │                              ━━━
    │                              ╰─ here
 10 │

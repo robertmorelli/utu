@@ -5,5 +5,5 @@ struct Rect:
 
 export main() I32 {
     let r = Rect.unit();
-    r.w.to_i32();
+    r.w.i32();
 }

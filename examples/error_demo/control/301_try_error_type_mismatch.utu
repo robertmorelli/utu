@@ -7,7 +7,7 @@ fn code(n: I32) Result[I32, I32] {
 
 fn label(n: I32) Result[Str, Str] {
     let c = try code(n);
-    Result[Str, Str].ok("code " + c.to_str());
+    Result[Str, Str].ok("code " + c.str());
 }
 
 export main() Str { label(4).value(); }

@@ -8,5 +8,5 @@ struct Point:
 
 export main() void {
     let p = Point { x: 1.0, y: 2.0 };
-    console.log(p?.x.to_str());
+    console.log(p?.x.str());
 }

@@ -43,7 +43,7 @@ fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 4
 fn ty(kind: Ty, a: I32, b: I32) I32 {
     if (ty_kind.len() + 1) * 2 > ty_table.len() { ty_grow(); };
     let mask = ty_table.len() - 1;
-    let k = kind.to_i32();
+    let k = kind.i32();
     let h = ty_hash(k, a, b) & mask;
     while (ty_table[h] >= 0) {
         let t = ty_table[h];
@@ -70,7 +70,7 @@ fn ty_grow() void {
     };
 }
 
-fn ty_is(t: I32, kind: Ty) Bool { ty_kind[t] == kind.to_i32(); }
+fn ty_is(t: I32, kind: Ty) Bool { ty_kind[t] == kind.i32(); }
 
 fn named(decl: I32, inst: I32) I32 { ty(Ty.Named, decl, inst); }
 
@@ -161,13 +161,13 @@ vec inst_depth: I32;
 /// How deeply instances nest in a type.
 fn type_depth(t: I32) I32 {
     let kind = ty_kind[t];
-    if kind == Ty.Named.to_i32() { return if ty_b[t] > 0 { inst_depth[ty_b[t]]; } else { 0; }; };
-    if kind == Ty.Nullable.to_i32() { return type_depth(ty_a[t]); };
+    if kind == Ty.Named.i32() { return if ty_b[t] > 0 { inst_depth[ty_b[t]]; } else { 0; }; };
+    if kind == Ty.Nullable.i32() { return type_depth(ty_a[t]); };
     let depth = 0;
-    if kind == Ty.Tuple.to_i32() or kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() {
+    if kind == Ty.Tuple.i32() or kind == Ty.Fun.i32() or kind == Ty.Closure.i32() {
         for (0 ..< vl_len[ty_a[t]]) |i| { depth = max_i32(depth, type_depth(vl_item(ty_a[t], i))); };
     };
-    if kind == Ty.Fun.to_i32() or kind == Ty.Closure.to_i32() { depth = max_i32(depth, type_depth(ty_b[t])); };
+    if kind == Ty.Fun.i32() or kind == Ty.Closure.i32() { depth = max_i32(depth, type_depth(ty_b[t])); };
     depth;
 }
 
@@ -267,12 +267,12 @@ enum(U8) Prelude:
     | I31
 
 /// The type of a prelude name: `prelude(Prelude.Str)` is `Str`.
-fn prelude(p: Prelude) I32 { prelude_ty[p.to_i32()]; }
+fn prelude(p: Prelude) I32 { prelude_ty[p.i32()]; }
 
 fn find_prelude_types() void {
     prelude_ty.resize(Prelude.count());
     for (0 ..< Prelude.count()) |p| {
-        let word = intern_text(Prelude.name(Prelude.from_i32(p)));
+        let word = intern_text(Prelude.name(Prelude(p)));
         let decl = promoted(prelude_lookup(word));
         prelude_ty[p] = if decl >= 0 { named(decl, 0); } else { ty_error(); };
     };
@@ -292,10 +292,10 @@ fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64
 fn type_of(node: I32, inst: I32) I32 {
     if node < 0 { return ty_error(); };
     let kind = node_kind[node];
-    if kind == Node.Promoted_type.to_i32() and sig_self[0] >= 0 { return sig_self[0]; };
-    if kind == Node.Ref_type.to_i32() { return type_path(first_child(node), inst); };
-    if kind == Node.Type_ident.to_i32() or kind == Node.Promoted_type.to_i32() { return type_path(node, inst); };
-    if kind == Node.Nullable_type.to_i32() {
+    if kind == Node.Promoted_type.i32() and sig_self[0] >= 0 { return sig_self[0]; };
+    if kind == Node.Ref_type.i32() { return type_path(first_child(node), inst); };
+    if kind == Node.Type_ident.i32() or kind == Node.Promoted_type.i32() { return type_path(node, inst); };
+    if kind == Node.Nullable_type.i32() {
         // A scalar has no null: `?Id`, `?L` for an int enum, `?T` as `I32`.
         let t = type_of(first_child(node), inst);
         let d = ty_decl(t);
@@ -306,11 +306,11 @@ fn type_of(node: I32, inst: I32) I32 {
         };
         return nullable(t);
     };
-    if kind == Node.Paren_type.to_i32() { return type_of(first_child(node), inst); };
-    if kind == Node.Void_type.to_i32() { return ty_void(); };
-    if kind == Node.Return_type.to_i32() { return type_of(first_child(node), inst); };
-    if kind == Node.Tuple_type.to_i32() { return ty(Ty.Tuple, type_args(node, inst), 0); };
-    if kind == Node.Func_type.to_i32() or kind == Node.Closure_type.to_i32() {
+    if kind == Node.Paren_type.i32() { return type_of(first_child(node), inst); };
+    if kind == Node.Void_type.i32() { return ty_void(); };
+    if kind == Node.Return_type.i32() { return type_of(first_child(node), inst); };
+    if kind == Node.Tuple_type.i32() { return ty(Ty.Tuple, type_args(node, inst), 0); };
+    if kind == Node.Func_type.i32() or kind == Node.Closure_type.i32() {
         let m = vl_begin();
         let c = first_child(node);
         let result = ty_void();
@@ -327,7 +327,7 @@ fn type_of(node: I32, inst: I32) I32 {
             c = next_sibling(c);
         };
         let params = vl_end(m);
-        return ty(if kind == Node.Func_type.to_i32() { Ty.Fun; } else { Ty.Closure; }, params, result);
+        return ty(if kind == Node.Func_type.i32() { Ty.Fun; } else { Ty.Closure; }, params, result);
     };
     if is_kind(node, Node.Yield_type) {
         if not reported_within(node) { report(Diag.YieldPlace, node, -1); };
@@ -345,7 +345,7 @@ vec sig_self: I32 = [-1];
 /// The type a name or path names: `T`, `&`, `M[A]`, `M.T`, `M[A].T`.
 fn type_path(node: I32, inst: I32) I32 {
     let kind = node_kind[node];
-    if kind == Node.Instantiated_module_ref.to_i32() {
+    if kind == Node.Instantiated_module_ref.i32() {
         let module = node_decl[name_node(first_child(node))];
         if alias_given_args(first_child(node), next_sibling(first_child(node))) { return ty_error(); };
         let decl = if decl_is(module, Decl.Module) { decl_a[module]; } else { node_decl[name_node(first_child(node))]; };
@@ -360,7 +360,7 @@ fn type_path(node: I32, inst: I32) I32 {
         if too_deep(at, node) { return ty_error(); };
         return named(decl, at);
     };
-    if kind == Node.Qualified_type_ref.to_i32() or kind == Node.Inline_module_type_path.to_i32() {
+    if kind == Node.Qualified_type_ref.i32() or kind == Node.Inline_module_type_path.i32() {
         let c = first_child(node);
         // `Browser.HTMLElement`: a type a view of host declarations names.
         let host = if name_node(c) >= 0 { node_decl[name_node(c)]; } else { -1; };
@@ -403,7 +403,7 @@ fn type_path(node: I32, inst: I32) I32 {
         if too_deep(at, node) { return ty_error(); };
         return named(member_decl, at);
     };
-    let n = if kind == Node.Promoted_type.to_i32() { node; } else { name_node(node); };
+    let n = if kind == Node.Promoted_type.i32() { node; } else { name_node(node); };
     // U8, I8, U16, I16 are how a mem, a vec, or an int enum stores its
     // values, which read as I32: not the type of a value.
     if node_decl[n] < 0 and builtin_type(word_of(n)) {
@@ -411,7 +411,7 @@ fn type_path(node: I32, inst: I32) I32 {
         return ty_error();
     };
     // `bi` with `using B[I32] |bi|`: B's type in B[I32].
-    let alias = if kind == Node.Promoted_type.to_i32() { -1; } else { node_alias[n]; };
+    let alias = if kind == Node.Promoted_type.i32() { -1; } else { node_alias[n]; };
     if decl_is(alias, Decl.Alias) and is_generic(decl_a[alias]) { return alias_type(alias); };
     let d = node_decl[n];
     if d >= 0 and not decl_is(d, Decl.Alias) and not decl_is(d, Decl.ModuleParam) {
@@ -605,25 +605,25 @@ fn repr(t: I32) I32 {
 /// `i32` for an integer enum and the rest.
 fn repr_of(t: I32) I32 {
     let kind = ty_kind[t];
-    if kind == Ty.Void.to_i32() { return vt_none; };
-    if kind == Ty.Never.to_i32() { return vt_unreachable; };
-    if kind == Ty.Nullable.to_i32() { return vt_nullable(repr(ty_a[t])); };
-    if kind == Ty.Fun.to_i32() { return vt_ref(fun_heap(t), true); };
-    if kind == Ty.Closure.to_i32() or kind == Ty.Foreign.to_i32() { return vt_externref; };
-    if kind == Ty.Tuple.to_i32() {
+    if kind == Ty.Void.i32() { return vt_none; };
+    if kind == Ty.Never.i32() { return vt_unreachable; };
+    if kind == Ty.Nullable.i32() { return vt_nullable(repr(ty_a[t])); };
+    if kind == Ty.Fun.i32() { return vt_ref(fun_heap(t), true); };
+    if kind == Ty.Closure.i32() or kind == Ty.Foreign.i32() { return vt_externref; };
+    if kind == Ty.Tuple.i32() {
         let m = vl_begin();
         let list = ty_a[t];
         for (0 ..< vl_len[list]) |i| { vl_add(repr(vl_item(list, i))); };
         return vt_tuple_of(vl_end(m));
     };
-    if kind != Ty.Named.to_i32() { return vt_i32; };
+    if kind != Ty.Named.i32() { return vt_i32; };
     let decl = ty_a[t];
     let dk = decl_kind[decl];
-    if dk == Decl.TypeDecl.to_i32() { return type_decl_repr(decl, ty_b[t]); };
-    if dk == Decl.IntEnum.to_i32() { return vt_i32; };
-    if dk == Decl.Distinct.to_i32() { return repr(decl_type(node_decl[name_node(last_child(decl_node[decl]))], 0)); };
-    if dk == Decl.Struct.to_i32() or dk == Decl.Enum.to_i32() or dk == Decl.Variant.to_i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true); };
-    if dk == Decl.Proto.to_i32() { return vt_anyref; };
+    if dk == Decl.TypeDecl.i32() { return type_decl_repr(decl, ty_b[t]); };
+    if dk == Decl.IntEnum.i32() { return vt_i32; };
+    if dk == Decl.Distinct.i32() { return repr(decl_type(node_decl[name_node(last_child(decl_node[decl]))], 0)); };
+    if dk == Decl.Struct.i32() or dk == Decl.Enum.i32() or dk == Decl.Variant.i32() { return vt_ref(struct_heap_of(decl, ty_b[t]), true); };
+    if dk == Decl.Proto.i32() { return vt_anyref; };
     vt_i32;
 }
 

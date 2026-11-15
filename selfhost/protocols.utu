@@ -673,7 +673,7 @@ fn conforms(t: I32, proto: I32) void {
                     // A field of another type: "Shape.name is Str, got I32" at the field's type.
                     let got = type_of(last_child(decl_node[field]), 0);
                     let want = sig_type(last_child(m), decl_type(t, 0));
-                    if got != want and not ty_has_error(got) and not ty_has_error(want) { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(decl_text(proto) + "." + word_text(word)), want, got, Why.Annotation.to_i32() * 65536); };
+                    if got != want and not ty_has_error(got) and not ty_has_error(want) { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(decl_text(proto) + "." + word_text(word)), want, got, Why.Annotation.i32() * 65536); };
                 };
             };
         };
@@ -985,7 +985,7 @@ fn validate_bounds() void {
     if not any_bounds() { return; };
     bounds_missed.clear();
     for (0 ..< node_kind.len()) |n| {
-        if node_kind[n] == Node.Module_type_arg_list.to_i32() and is_own_file(file_of_token(node_first[n])) {
+        if node_kind[n] == Node.Module_type_arg_list.i32() and is_own_file(file_of_token(node_first[n])) {
             let module = instantiated_module(n);
             if module >= 0 { check_bounds(module, n); };
         };

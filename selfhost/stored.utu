@@ -146,10 +146,10 @@ fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
         let i = stored_fresh(prefix);
         let item = stored_fresh(prefix);
         return "{let " + length + ":F64=" + v + ".length;let " + array + ":Array[" + element + "]=[];\n        if " + length + ">0.0 {let " + item + "=" + stored_decode(element, v + "[0]", file, prefix) + ";" + array
-            + "=Array[" + element + "].new(" + length + ".to_i32()," + item + ");let " + i + ":I32=1;while(" + i + "<" + length + ".to_i32()){" + array + "[" + i + "]="
-            + stored_decode(element, v + "[" + i + ".to_f64()]", file, prefix) + ";" + i + "+=1;};};" + array + ";}";
+            + "=Array[" + element + "].new(" + length + ".i32()," + item + ");let " + i + ":I32=1;while(" + i + "<" + length + ".i32()){" + array + "[" + i + "]="
+            + stored_decode(element, v + "[" + i + ".f64()]", file, prefix) + ";" + i + "+=1;};};" + array + ";}";
     };
-    if t == "I32" { return "{let " + prefix + "number:F64=" + v + ";" + prefix + "number.to_i32();}"; };
+    if t == "I32" { return "{let " + prefix + "number:F64=" + v + ";" + prefix + "number.i32();}"; };
     if is_stored_scalar(t) { return v; };
     let node = stored_struct(t, file);
     let fields = "";

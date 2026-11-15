@@ -1,12 +1,12 @@
-// Template strings: `text ${expr} text`. Each `${expr}` is `expr.to_str()`,
+// Template strings: `text ${expr} text`. Each `${expr}` is `expr.str()`,
 // and the pieces are joined with `+`.
 
 struct Point:
     | x : I32
     | y : I32
 
-// A type takes part in templates by having a to_str.
-fn Point.to_str |self| () Str {
+// A type takes part in templates by having a str.
+fn Point.str |self| () Str {
     `(${self.x}, ${self.y})`;
 }
 

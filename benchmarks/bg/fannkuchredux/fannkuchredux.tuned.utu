@@ -70,13 +70,13 @@ fn shuffle(cur: V128, mask: V128) V128 { @wat/\ (i8x16.swizzle (local.get $cur) 
 
 fn bytes(a: Array[I32], from: I32) I64 {
     let x: I64 = 0;
-    for (0..<8) |j| { x = x | ((a[from + j] & 255).to_i64() << (8 * j).to_i64()); };
+    for (0..<8) |j| { x = x | ((a[from + j] & 255).i64() << (8 * j).i64()); };
     x;
 }
 
 fn fannkuchredux(n: I32) I32 {
     let fact = Array[I64].new(17, 1);
-    for (1..<17) |i| { fact[i] = fact[i - 1] * i.to_i64(); };
+    for (1..<17) |i| { fact[i] = fact[i - 1] * i.i64(); };
     let block_end = fact[n];
     let block_size = block_end;
     if block_end > 24 { block_size = block_end / 24; };
@@ -101,8 +101,8 @@ fn fannkuchredux(n: I32) I32 {
         let idx = block_start;
         let i = n - 1;
         while (i >= 0) {
-            let d = (idx / fact[i]).to_i32();
-            idx -= d.to_i64() * fact[i];
+            let d = (idx / fact[i]).i32();
+            idx -= d.i64() * fact[i];
             count[i] = d;
             for (0..<16) |j| { pp[j] = p[j]; };
             for (0..<(i + 1)) |j| {
@@ -122,7 +122,7 @@ fn fannkuchredux(n: I32) I32 {
             counts = next_counts(counts, k);
             cur = shuffle(cur, masks_shift[k]);
             if f != 0 {
-                if odd { checksum -= f.to_i64(); } else { checksum += f.to_i64(); };
+                if odd { checksum -= f.i64(); } else { checksum += f.i64(); };
                 if f > max_flips { max_flips = f; };
             };
             odd = not odd;
@@ -133,9 +133,9 @@ fn fannkuchredux(n: I32) I32 {
 
     let h = fnv_int(-2128831035, checksum);
     h = fnv_str(h, "\nPfannkuchen(");
-    h = fnv_int(h, n.to_i64());
+    h = fnv_int(h, n.i64());
     h = fnv_str(h, ") = ");
-    h = fnv_int(h, max_flips.to_i64());
+    h = fnv_int(h, max_flips.i64());
     fnv(h, 10);
 }
 
@@ -156,7 +156,7 @@ fn fnv_int(h0: I32, x: I64) I32 {
     let p: I64 = 1;
     while (p * 10 <= v) { p = p * 10; };
     while (p > 0) {
-        h = fnv(h, 48 + (v / p % 10).to_i32());
+        h = fnv(h, 48 + (v / p % 10).i32());
         p = p / 10;
     };
     h;

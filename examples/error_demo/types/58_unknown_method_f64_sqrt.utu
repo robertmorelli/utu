@@ -2,5 +2,5 @@
 // Expect: Unknown method 'F64.sqrt': sqrt is a function of F64, call F64.sqrt(x)
 export main() I32 {
     let x = 2.0;
-    x.sqrt().to_i32();
+    x.sqrt().i32();
 }

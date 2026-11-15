@@ -38,12 +38,12 @@ fn fnv_str(h0: I32, s: Str) I32 {
 // The decimal digits of x (with a '-' if negative).
 fn fnv_int(h0: I32, x: I32) I32 {
     let h = h0;
-    let v = x.to_i64();
+    let v = x.i64();
     if v < 0 { h = fnv(h, 45); v = -v; };
     let p: I64 = 1;
     while (p * 10 <= v) { p = p * 10; };
     while (p > 0) {
-        h = fnv(h, 48 + (v / p % 10).to_i32());
+        h = fnv(h, 48 + (v / p % 10).i32());
         p = p / 10;
     };
     h;

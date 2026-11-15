@@ -385,7 +385,7 @@ fn build_hash(symb: Str, p: Array[F32]) void {
     let j = 0;
     let i = 0;
     while (i < im and j < len) {
-        let r = (i.to_f64() / im.to_f64()).to_f32();
+        let r = (i.f64() / im.f64()).f32();
         if r >= sum {
             j += 1;
             if j < len { sum = sum + p[j]; };

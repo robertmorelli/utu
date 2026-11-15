@@ -1,8 +1,8 @@
-// What: calling a distinct type's from_i32 with no argument
-// Expect: Wrong arity: UserId.from_i32 expects 1 argument, got 0
+// What: making a distinct type, UserId(), with no value
+// Expect: Wrong arity: UserId() takes 1 argument, got 0
 type UserId = distinct I32;
 
 export main() I32 {
-    let id = UserId.from_i32();
-    id.to_i32();
+    let id = UserId();
+    id.i32();
 }

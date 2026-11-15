@@ -33,7 +33,7 @@ let max_depth: I32 = 14;
 fn binary_trees() I64 {
     let checksum: I64 = 0;
     let stretch_depth = max_depth + 1;
-    checksum += bottom_up_tree(stretch_depth).check().to_i64();
+    checksum += bottom_up_tree(stretch_depth).check().i64();
 
     let long_lived = bottom_up_tree(max_depth);
 
@@ -44,11 +44,11 @@ fn binary_trees() I64 {
         for (0..<iterations) {
             check += bottom_up_tree(depth).check();
         };
-        checksum += check.to_i64();
+        checksum += check.i64();
         depth += 2;
     };
 
-    checksum += long_lived.check().to_i64();
+    checksum += long_lived.check().i64();
     checksum;
 }
 

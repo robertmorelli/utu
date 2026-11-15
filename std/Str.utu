@@ -100,8 +100,7 @@ mod Str {
     fn checks() Bool { @ir/\ <ir-safe-checks/> \/; }
 
     // The string itself: what `${s}` in a template string calls.
-    fn &.str |self| () & { self.to_str(); }
-    fn &.to_str |self| () & { @ir/\ <ir-ident name="self"/> \/; }
+    fn &.str |self| () & { @ir/\ <ir-ident name="self"/> \/; }
 
     // ── Text ────────────────────────────────────────────────────────────────
     // Each ships only when used. Offsets and lengths are in UTF-16 code

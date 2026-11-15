@@ -8,6 +8,6 @@
         fn empty_product() F64 { let a: Array[F64] = []; a product; }
         fn wide_sum() I64 { let a: Array[I64] = [3,4]; a sum; }
         fn sorted() I32 { let a=[5,3,1,8,2,4] sort(I32) |a,b| {a<b;}; a[0]*100+a[5]; }
-        fn floats() F64 { let a = [1,2] map |x| {x.to_f64()/2.0;} collect(F64); a[0]+a[1]; }
+        fn floats() F64 { let a = [1,2] map |x| {x.f64()/2.0;} collect(F64); a[0]+a[1]; }
       }
     

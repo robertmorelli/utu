@@ -42,24 +42,24 @@ mod Random {
 
     /// A number in [0, 1), with 32 random bits.
     fn &.float |self| () F64 {
-        self.bits().to_u32().to_f64() / 4294967296.0;
+        self.bits().u32().f64() / 4294967296.0;
     }
 
     /// An integer in [`low`, `high`), every one equally likely (empty: `low`).
     fn &.int |self| (low: I32, high: I32) I32 {
         if high <= low { return low; };
-        let span = (high - low).to_u32().to_u64();
+        let span = (high - low).u32().u64();
         // Lemire's method: a multiply, and a retry only when a value would be biased.
-        let product = self.bits().to_u32().to_u64() * span;
-        let fraction = product.to_u32();
-        if fraction < span.to_u32() {
-            let threshold = (0.to_u32() - span.to_u32()) % span.to_u32();
+        let product = self.bits().u32().u64() * span;
+        let fraction = product.u32();
+        if fraction < span.u32() {
+            let threshold = (0.u32() - span.u32()) % span.u32();
             while (fraction < threshold) {
-                product = self.bits().to_u32().to_u64() * span;
-                fraction = product.to_u32();
+                product = self.bits().u32().u64() * span;
+                fraction = product.u32();
             };
         };
-        low + (product >> 32.to_u64()).to_i32();
+        low + (product >> 32.u64()).i32();
     }
 
     /// True with probability `p`.

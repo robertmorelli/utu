@@ -90,7 +90,7 @@ fn generate_sources() void {
                 let n = gen_owner.len();
                 gen_owner.resize(file + 1);
                 for (n ..< file + 1) |f| { gen_owner[f] = -1; };
-                if file_role[owner] == FileRole.Import.to_i32() { gen_owner[file] = owner; };
+                if file_role[owner] == FileRole.Import.i32() { gen_owner[file] = owner; };
                 parse_file(file);
             };
         };

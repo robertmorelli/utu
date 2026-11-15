@@ -251,7 +251,7 @@ export main() void {
                     p.muted {
                         = (state.ingredients count_where |item| {
                             item.packed;
-                        }).to_f64().toString() + " / 6 ready";
+                        }).f64().toString() + " / 6 ready";
                     }
                 }
                 div.panel.bar {
@@ -317,12 +317,12 @@ export main() void {
                         "Let’s cook";
                     }
                     span.eyebrow {
-                        = "STEP " + (state.step + 1).to_f64().toString() + " / 4";
+                        = "STEP " + (state.step + 1).f64().toString() + " / 4";
                     }
                 }
                 progress {
                     max = "4";
-                    value = (state.step + 1).to_f64().toString();
+                    value = (state.step + 1).f64().toString();
                     width:100%;
                     accent-color:var(--accent);
                 }

@@ -1,11 +1,11 @@
 using Browser from std:Browser;
 
 fn number(value: I32) Str {
-    value.to_f64().toString();
+    value.f64().toString();
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.to_f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2);
 }
 
 fn node(id: Str) Browser.HTMLElement {
@@ -59,7 +59,7 @@ fn refresh(state: Trip) void {
 
 fn itinerary(state: Trip) Browser.HTMLElement {
     let total = state.stops map |stop| {
-        stop.cost.to_f64();
+        stop.cost.f64();
     } sum;
     let done = state.stops count_where |stop| {
         stop.done;
@@ -252,8 +252,8 @@ export main() void {
                     stops = stops chain([Stop {
                         id: row.id,
                         title: row.title,
-                        day: day.to_i32(),
-                        cost: cost.to_i32(),
+                        day: day.i32(),
+                        cost: cost.i32(),
                         done: row.done
                     }
                     ]) collect(Stop);
@@ -590,7 +590,7 @@ export main() void {
                                 id: Browser.crypto.randomUUID(),
                                 title: place.value.trim(),
                                 day: d,
-                                cost: (cost.valueAsNumber * 100.0).to_i32(),
+                                cost: (cost.valueAsNumber * 100.0).i32(),
                                 done: false
                             }
                             ]) collect(Stop);

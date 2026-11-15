@@ -111,7 +111,7 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // `mem name: U8;` declares a resizable array of scalars that is its own
     // linear memory. `export mem` also exports that memory to the host.
     // `type NodeId = distinct I32;` is a new type with I32's representation:
-    // a NodeId is not an I32, and converts only through from_i32/to_i32.
+    // a NodeId is not an I32, and converts only through NodeId(i) and .i32().
     distinct_decl: ($) => seq('type', field('name', $.type_ident), '=', 'distinct', field('base', $.type_ident)),
     // `const mem` rejects writes. An initializer fills it when the module is
     // instantiated: `= [1, 2, 3]`, `= @embed/\ file.bin \/`, or

@@ -1,5 +1,5 @@
 // What: a match reached with a value none of its arms takes
-// Expect: Level.from_i32: no variant has this value (safe builds stop there; unsafe ones reach the match: No arm for the value)
+// Expect: Level: no variant has this value (safe builds stop there; unsafe ones reach the match: No arm for the value)
 enum(U8) Level:
     | Low
     | High
@@ -9,5 +9,5 @@ fn label(l: Level) I32 {
 }
 
 export main() I32 {
-    label(Level.from_i32(7));
+    label(Level(7));
 }

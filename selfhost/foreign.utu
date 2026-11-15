@@ -557,9 +557,9 @@ fn foreign_op(params: I32, result: I32, body: Str) I32 {
     let m = vl_begin();
     for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))); };
     let ft = func_type(vl_end(m), vl_of_result(repr(result)));
-    let key = intern_text(body + "|" + ft.to_str());
+    let key = intern_text(body + "|" + ft.str());
     for (0 ..< fop_key.len()) |i| { if fop_key[i] == key { return fop_func[i]; }; };
-    let name = "__foreign_" + fop_key.len().to_str();
+    let name = "__foreign_" + fop_key.len().str();
     let f = add_import_func(name_add("es"), name_add(name), ft);
     func_debug_name[f] = name_add(name);
     let start = src.len();
@@ -1123,7 +1123,7 @@ fn check_foreign_constant(node: I32) I32 {
     };
     if not jis_number(value) { return -1; };
     let bits = json_number(value).bits();
-    w_leaf(Op.F64Const, vt_f64, (bits & 4294967295).to_i32(), (bits >> 32).to_i32());
+    w_leaf(Op.F64Const, vt_f64, (bits & 4294967295).i32(), (bits >> 32).i32());
     prelude(Prelude.F64);
 }
 
@@ -1445,7 +1445,7 @@ fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) void {
     let d = describe(slot);
     if desc_get(d, "union") < 0 and literal_fit(d.at, d, false, -1, -1) < 0 { return; };
     let lit = arg;
-    if is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.to_i32() { lit = last_child(lit); };
+    if is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.i32() { lit = last_child(lit); };
     if not is_kind(lit, Node.Literal) {
         // Nor is any Str one (a variable's, a call's), as TypeScript has it; one
         // from the host may be (utu keeps no literal types).
@@ -1465,14 +1465,14 @@ vec fit_x: F64 = [0.0];
 /// member of no literal type, or `arg` is no literal.
 fn literal_in(d: Ref, arg: I32) I32 {
     let lit = arg;
-    let negate = is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.to_i32();
+    let negate = is_kind(lit, Node.Unary_expr) and tok_kind[node_first[lit]] == Tok.Minus.i32();
     if negate { lit = last_child(lit); };
     if not is_kind(lit, Node.Literal) { return -1; };
     let c = first_child(lit);
     let text = is_kind(c, Node.String_lit) and not negate;
     let number = is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit);
     if not text and not number { return -1; };
-    fit_x[0] = if is_kind(c, Node.Int_lit) { int_value(c).to_u64().to_f64(); } else if number { parse_number(token_text(node_first[c])); } else { 0.0; };
+    fit_x[0] = if is_kind(c, Node.Int_lit) { int_value(c).u64().f64(); } else if number { parse_number(token_text(node_first[c])); } else { 0.0; };
     if negate { fit_x[0] = 0.0 - fit_x[0]; };
     let lo = tok_start[node_first[c]];
     let hi = tok_end[node_last[c] - 1];
@@ -2282,13 +2282,13 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     let slot = index_slot(d, info);
     if is_tuple(d) {
         let at = if is_kind(key_node, Node.Literal) and is_kind(first_child(key_node), Node.Int_lit) and int_value(first_child(key_node)) < 1000000 {
-            tuple_slot(d, int_value(first_child(key_node)).to_i32()).at;
+            tuple_slot(d, int_value(first_child(key_node)).i32()).at;
         } else { -1; };
         let constant = is_kind(key_node, Node.Literal) and is_kind(first_child(key_node), Node.Int_lit);
-        if at >= 0 { slot = tuple_slot(d, int_value(first_child(key_node)).to_i32()); }
+        if at >= 0 { slot = tuple_slot(d, int_value(first_child(key_node)).i32()); }
         else if constant and not tuple_has_rest(d) or not tuple_uniform(d, view) {
             // (`[number, number][2]`: past its end)
-            report2(Diag.TupleIndex, key_node, -1, owner, if constant { int_value(first_child(key_node)).to_i32(); } else { -1; });
+            report2(Diag.TupleIndex, key_node, -1, owner, if constant { int_value(first_child(key_node)).i32(); } else { -1; });
             w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
             return ty_error();
         };

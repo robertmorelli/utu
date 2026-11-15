@@ -7,5 +7,5 @@ enum(U8) Level:
     | Mid
 
 export main() I32 {
-    Level.Low.to_i32();
+    Level.Low.i32();
 }

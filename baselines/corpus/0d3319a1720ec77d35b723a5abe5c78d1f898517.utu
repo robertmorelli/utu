@@ -15,7 +15,7 @@ mod SegmentTree[T] {
         };
         let nodes = Array[T].new(size * 2, identity);
         values each |value, index| {
-            nodes[size + index.to_i64().to_i32()] = value;
+            nodes[size + index.i64().i32()] = value;
         };
         let i = size - 1;
         while (i > 0) {

@@ -28,7 +28,7 @@ exports.buildLiteralRules = function buildLiteralRules() {
     float_lit: (_) => token(/[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/),
     // Backslash escapes as in JSON (\" \\ \n \t \uXXXX …); literals decode with JSON's rules.
     string_lit: (_) => token(seq('"', repeat(choice(/[^"\\\n]/, /\\[^\n]/)), '"')),
-    // `text ${expr} text`: each `${expr}` is `expr.to_str()`, joined with `+`.
+    // `text ${expr} text`: each `${expr}` is `expr.str()`, joined with `+`.
     template_string: ($) =>
       choice(
         $.template_full,

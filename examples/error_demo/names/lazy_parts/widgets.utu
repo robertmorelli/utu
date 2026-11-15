@@ -12,7 +12,7 @@ mod widgets {
     }
     fn tally(counts: Array[I32]) Browser.HTMLElement {
         let el = Browser.document.createElement("span");
-        el.textContent = counts.len().to_str();
+        el.textContent = counts.len().str();
         el;
     }
     fn total(n: I32) I32 { n * 2; }

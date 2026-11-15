@@ -10,7 +10,7 @@ fn draw(ui: view.Ui, ctx: Browser.CanvasRenderingContext2D) void {
         let e = all.items[i];
         if e.x < 40 and e.y < 26 {
             ctx.fillStyle = if e.busy { "#4cc38a"; } else { "#8a96a3"; };
-            ctx.fillRect(e.x.to_f64() * 24 + 2, e.y.to_f64() * 24 + 2, 20, 20);
+            ctx.fillRect(e.x.f64() * 24 + 2, e.y.f64() * 24 + 2, 20, 20);
         };
     };
 }

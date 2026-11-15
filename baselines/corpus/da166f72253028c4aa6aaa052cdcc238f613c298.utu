@@ -6,9 +6,9 @@
       export lib {
           fn describe(text: Str) Str {
               @json/\ match text {
-                  { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.to_str() + " " + (tier orelse "free"),
+                  { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.str() + " " + (tier orelse "free"),
                   { status: "error", message: |message| Str } => "error: " + message,
-                  { items: |items| Array[Item] } => "items " + items.len().to_str() + " " + items[1].price.to_str(),
+                  { items: |items| Array[Item] } => "items " + items.len().str() + " " + items[1].price.str(),
                   { "content-type": |kind| Str, retry: true, limit: 2.5, cursor: null } => "literal " + kind,
                   ~> |error| "no match: " + error,
               }\/;

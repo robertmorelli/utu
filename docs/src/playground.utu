@@ -62,7 +62,7 @@ mod playground {
         \\                if state.draft != "" {
         \\                    state.made += 1;
         \\                    let todo = Todo {
-        \\                        id: state.made.to_str(),
+        \\                        id: state.made.str(),
         \\                        text: state.draft,
         \\                        done: false
         \\                    };

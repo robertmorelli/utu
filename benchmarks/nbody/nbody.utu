@@ -151,7 +151,7 @@ fn energy(bodies: Array[Body]) F64 {
 fn run(steps: I32) I64 {
     let bodies = create_bodies();
     for (0..<steps) { advance(bodies, 0.01); };
-    F64.floor(energy(bodies) * 1.0e9 + 0.5).to_i64();
+    F64.floor(energy(bodies) * 1.0e9 + 0.5).i64();
 }
 
 test "nbody energy matches the Benchmarks Game reference" {

@@ -17,7 +17,7 @@ struct Balance:
     | cents: I32
 
 fn money(cents: I32) Str {
-    "$" + (cents.to_f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2);
 }
 
 fn total(state: Trip) I32 {
@@ -292,7 +292,7 @@ export main() void {
                 }
                 strong {
                     font-size:2.5rem;
-                    = "$" + (total(state).to_f64() / 300.0).toFixed(2);
+                    = "$" + (total(state).f64() / 300.0).toFixed(2);
                 }
             }
             article.panel.stack {
@@ -301,7 +301,7 @@ export main() void {
                 }
                 strong {
                     font-size:2.5rem;
-                    = state.expenses.len().to_f64().toString();
+                    = state.expenses.len().f64().toString();
                 }
             }
         }
@@ -407,7 +407,7 @@ export main() void {
                             id: Browser.crypto.randomUUID(),
                             title: state.draft.trim(),
                             payer: state.payer,
-                            cents: (state.amount * 100.0 + 0.5).to_i32()
+                            cents: (state.amount * 100.0 + 0.5).i32()
                         }
                         ]) collect(Expense);
                         state.draft = "";

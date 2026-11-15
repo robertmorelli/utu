@@ -20,7 +20,7 @@ struct Big:
 
 fn big(v: I32) Big {
     let d = Array[U32].new(16, 0);
-    d[0] = I32.abs(v).to_u32();
+    d[0] = I32.abs(v).u32();
     let n = 1;
     if v == 0 { n = 0; };
     &{ d: d, n: n, neg: v < 0 };
@@ -82,7 +82,7 @@ fn get_si(a: Big) I32 {
     if a.n == 0 {
         0;
     } else {
-        let v = a.d[0].to_i32();
+        let v = a.d[0].i32();
         if a.neg { -v; } else { v; };
     };
 }
@@ -97,18 +97,18 @@ fn add_mag(r: Big, a: Big, b: Big) void {
     let rd = r.d;
     let carry: U64 = 0;
     for (0..<bn) |i| {
-        let s = ad[i].to_u64() + bd[i].to_u64() + carry;
-        rd[i] = s.to_u32();
+        let s = ad[i].u64() + bd[i].u64() + carry;
+        rd[i] = s.u32();
         carry = s >> 32;
     };
     for (bn..<an) |i| {
-        let s = ad[i].to_u64() + carry;
-        rd[i] = s.to_u32();
+        let s = ad[i].u64() + carry;
+        rd[i] = s.u32();
         carry = s >> 32;
     };
     let n = an;
     if carry != 0 {
-        rd[an] = carry.to_u32();
+        rd[an] = carry.u32();
         n = an + 1;
     };
     r.n = n;
@@ -124,13 +124,13 @@ fn sub_mag(r: Big, a: Big, b: Big) void {
     let rd = r.d;
     let borrow: I64 = 0;
     for (0..<bn) |i| {
-        let t = ad[i].to_i64() - bd[i].to_i64() - borrow;
-        rd[i] = t.to_u32();
+        let t = ad[i].i64() - bd[i].i64() - borrow;
+        rd[i] = t.u32();
         borrow = -(t >> 32);
     };
     for (bn..<an) |i| {
-        let t = ad[i].to_i64() - borrow;
-        rd[i] = t.to_u32();
+        let t = ad[i].i64() - borrow;
+        rd[i] = t.u32();
         borrow = -(t >> 32);
     };
     r.n = norm(rd, an);
@@ -161,19 +161,19 @@ fn mul_si(r: Big, a: Big, s: I32) void {
         set_zero(r);
     } else {
         let neg = a.neg != (s < 0);
-        let m = I32.abs(s).to_u32().to_u64();
+        let m = I32.abs(s).u32().u64();
         reserve(r, an + 1);
         let ad = a.d;
         let rd = r.d;
         let carry: U64 = 0;
         for (0..<an) |i| {
-            let p = ad[i].to_u64() * m + carry;
-            rd[i] = p.to_u32();
+            let p = ad[i].u64() * m + carry;
+            rd[i] = p.u32();
             carry = p >> 32;
         };
         let n = an;
         if carry != 0 {
-            rd[an] = carry.to_u32();
+            rd[an] = carry.u32();
             n = an + 1;
         };
         r.n = n;
@@ -193,14 +193,14 @@ fn mul(r: Big, a: Big, b: Big) void {
         let bd = b.d;
         let rd = Array[U32].new(an + bn + 16, 0);
         for (0..<bn) |j| {
-            let m = bd[j].to_u64();
+            let m = bd[j].u64();
             let carry: U64 = 0;
             for (0..<an) |i| {
-                let p = ad[i].to_u64() * m + rd[i + j].to_u64() + carry;
-                rd[i + j] = p.to_u32();
+                let p = ad[i].u64() * m + rd[i + j].u64() + carry;
+                rd[i + j] = p.u32();
                 carry = p >> 32;
             };
-            rd[an + j] = carry.to_u32();
+            rd[an + j] = carry.u32();
         };
         r.d = rd;
         r.n = norm(rd, an + bn);
@@ -219,23 +219,23 @@ fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) void {
     if m < 0 {
         set_zero(q);
     } else if n == 1 {
-        let v = b.d[0].to_u64();
+        let v = b.d[0].u64();
         reserve(q, an);
         let ad = a.d;
         let qd = q.d;
         let rem: U64 = 0;
         let i = an - 1;
         while (i >= 0) {
-            let cur = (rem << 32) | ad[i].to_u64();
+            let cur = (rem << 32) | ad[i].u64();
             let qi = cur / v;
-            qd[i] = qi.to_u32();
+            qd[i] = qi.u32();
             rem = cur - qi * v;
             i -= 1;
         };
         q.n = norm(qd, an);
         q.neg = neg and q.n != 0;
     } else {
-        let s = I32.clz(b.d[n - 1].to_i32()).to_u64();
+        let s = I32.clz(b.d[n - 1].i32()).u64();
         reserve(vn, n);
         reserve(un, an + 1);
         reserve(q, m + 1);
@@ -246,31 +246,31 @@ fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) void {
         let qd = q.d;
         let i = n - 1;
         while (i > 0) {
-            vd[i] = ((((bd[i].to_u64() << 32) | bd[i - 1].to_u64()) << s) >> 32).to_u32();
+            vd[i] = ((((bd[i].u64() << 32) | bd[i - 1].u64()) << s) >> 32).u32();
             i -= 1;
         };
-        vd[0] = (bd[0].to_u64() << s).to_u32();
-        ud[an] = ((ad[an - 1].to_u64() << s) >> 32).to_u32();
+        vd[0] = (bd[0].u64() << s).u32();
+        ud[an] = ((ad[an - 1].u64() << s) >> 32).u32();
         i = an - 1;
         while (i > 0) {
-            ud[i] = ((((ad[i].to_u64() << 32) | ad[i - 1].to_u64()) << s) >> 32).to_u32();
+            ud[i] = ((((ad[i].u64() << 32) | ad[i - 1].u64()) << s) >> 32).u32();
             i -= 1;
         };
-        ud[0] = (ad[0].to_u64() << s).to_u32();
+        ud[0] = (ad[0].u64() << s).u32();
 
         let base: U64 = 4294967296;
         let low: U64 = 4294967295;
-        let vtop = vd[n - 1].to_u64();
-        let vnext = vd[n - 2].to_u64();
+        let vtop = vd[n - 1].u64();
+        let vnext = vd[n - 2].u64();
         let j = m;
         while (j >= 0) {
             // Estimate the quotient limb from the top two limbs, then correct it.
-            let num = (ud[j + n].to_u64() << 32) | ud[j + n - 1].to_u64();
+            let num = (ud[j + n].u64() << 32) | ud[j + n - 1].u64();
             let qhat = num / vtop;
             let rhat = num - qhat * vtop;
             let adjusting = true;
             while (adjusting) {
-                if qhat >= base or qhat * vnext > ((rhat << 32) | ud[j + n - 2].to_u64()) {
+                if qhat >= base or qhat * vnext > ((rhat << 32) | ud[j + n - 2].u64()) {
                     qhat -= 1;
                     rhat += vtop;
                     if rhat >= base { adjusting = false; };
@@ -282,26 +282,26 @@ fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) void {
             let borrow: I64 = 0;
             let carry: U64 = 0;
             for (0..<n) |k| {
-                let p = qhat * vd[k].to_u64() + carry;
+                let p = qhat * vd[k].u64() + carry;
                 carry = p >> 32;
-                let t = ud[k + j].to_i64() - borrow - (p & low).to_i64();
-                ud[k + j] = t.to_u32();
+                let t = ud[k + j].i64() - borrow - (p & low).i64();
+                ud[k + j] = t.u32();
                 borrow = -(t >> 32);
             };
-            let t = ud[j + n].to_i64() - borrow - carry.to_i64();
-            ud[j + n] = t.to_u32();
+            let t = ud[j + n].i64() - borrow - carry.i64();
+            ud[j + n] = t.u32();
             if t < 0 {
                 // qhat was one too big: add v back.
                 qhat -= 1;
                 let c: U64 = 0;
                 for (0..<n) |k| {
-                    let sum = ud[k + j].to_u64() + vd[k].to_u64() + c;
-                    ud[k + j] = sum.to_u32();
+                    let sum = ud[k + j].u64() + vd[k].u64() + c;
+                    ud[k + j] = sum.u32();
                     c = sum >> 32;
                 };
-                ud[j + n] = (ud[j + n].to_u64() + c).to_u32();
+                ud[j + n] = (ud[j + n].u64() + c).u32();
             };
-            qd[j] = qhat.to_u32();
+            qd[j] = qhat.u32();
             j -= 1;
         };
         q.n = norm(qd, m + 1);

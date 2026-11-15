@@ -163,7 +163,7 @@ fn near_member(owner: I32, word: I32, space: Space) I32 {
     };
     for (0 ..< member_key.len()) |h| {
         let key = member_key[h];
-        if key >= 0 and member_owner[h] == owner and key % 4 == space.to_i32() { near_consider(word, key / 4, member_decl[h]); };
+        if key >= 0 and member_owner[h] == owner and key % 4 == space.i32() { near_consider(word, key / 4, member_decl[h]); };
     };
     near_found();
 }
@@ -183,7 +183,9 @@ fn match_alias(t: Str) Str {
     if t == "bool" or t == "boolean" { return "Bool"; };
     if t == "toUpperCase" or t == "upper" or t == "toUpper" { return "to_upper"; };
     if t == "toLowerCase" or t == "lower" or t == "toLower" { return "to_lower"; };
-    if t == "to_string" or t == "toString" { return "to_str"; };
+    if t == "to_string" or t == "toString" or t == "to_str" { return "str"; };
+    // The old conversions: `to_i32` is `i32`.
+    if t == "to_i32" or t == "to_u32" or t == "to_i64" or t == "to_u64" or t == "to_f32" or t == "to_f64" { return t.slice(3, t.len()); };
     if t == "append" { return "push"; };
     if t == "True" { return "true"; };
     if t == "False" { return "false"; };
@@ -229,7 +231,7 @@ fn suggest(at: I32, meant: I32, decl: I32) void {
 fn suggested(i: I32) Str {
     for (0 ..< diag_extra_n[i]) |k| {
         let r = diag_extra[i] + k;
-        if extra_kind[r] == Extra.Fix.to_i32() { return word_text(extra_text[r]); };
+        if extra_kind[r] == Extra.Fix.i32() { return word_text(extra_text[r]); };
     };
     "";
 }
@@ -244,14 +246,14 @@ fn did_you_mean(i: I32) Str {
 fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) void {
     // The same name again on one line is the same mistake.
     for (0 ..< diag_kind.len()) |i| {
-        if diag_kind[i] == kind.to_i32() and diag_word[i] == word and diag_node[i] != node and same_line(diag_node[i], node) {
+        if diag_kind[i] == kind.i32() and diag_word[i] == word and diag_node[i] != node and same_line(diag_node[i], node) {
             diag_fresh[0] = 0;
             return;
         };
     };
     // A name `using` could not import is reported there.
     for (0 ..< diag_kind.len()) |i| {
-        if diag_kind[i] == Diag.ImportNotModule.to_i32() and diag_word[i] == word {
+        if diag_kind[i] == Diag.ImportNotModule.i32() and diag_word[i] == word {
             diag_fresh[0] = 0;
             return;
         };
@@ -375,7 +377,7 @@ vec want_b: I32;
 fn want(root: I32, t: I32, why: Why, a: I32, b: I32) void {
     want_root.push(root);
     want_ty.push(t);
-    want_why.push(why.to_i32());
+    want_why.push(why.i32());
     want_a.push(a);
     want_b.push(b);
 }
@@ -430,7 +432,7 @@ fn tail_child(p: I32, c: I32) Bool {
 /// Report a TypeMismatch at `site` with reason k (see @want_for): the
 /// reason's words, and where it is.
 fn report_wanted(k: I32, site: I32, expected: I32, actual: I32) void {
-    let why = Why.from_i32(want_why[k]);
+    let why = Why(want_why[k]);
     let a = want_a[k];
     let b = want_b[k];
     let place = -1;
@@ -474,7 +476,7 @@ fn report_wanted(k: I32, site: I32, expected: I32, actual: I32) void {
     if why == Why.Condition and op >= 0 and tok_is(op, Tok.Eq) { word = known_word(Known.Eq); };
     // The same reason, types, and root again (both branches of one `if`): one mistake.
     for (0 ..< diag_kind.len()) |i| {
-        if diag_kind[i] == Diag.TypeMismatch.to_i32() and diag_a[i] == expected and diag_b[i] == actual and diag_word[i] == word
+        if diag_kind[i] == Diag.TypeMismatch.i32() and diag_a[i] == expected and diag_b[i] == actual and diag_word[i] == word
             and diag_c[i] >= 0 and diag_c[i] / 65536 == want_why[k] and diag_node[i] >= 0 and tail_of(diag_node[i], want_root[k]) {
             diag_fresh[0] = 0;
             return;
@@ -516,7 +518,7 @@ fn mismatch_text(i: I32) Str {
     // A name the compiler made says nothing to the user.
     if w.len() > 1 and w.slice(0, 2) == "__" { w = ""; };
     if diag_a[i] < 0 or diag_b[i] < 0 { return "Type mismatch"; };
-    let r = Why.from_i32(why);
+    let r = Why(why);
     if r == Why.Param and w.len() > 0 { return w + " takes " + e + got; };
     if (r == Why.Annotation or r == Why.Variable) and w.len() > 0 { return w + " is " + e + got; };
     if r == Why.Returns { return pick(w.len() > 0, w, "The closure") + " returns " + e + got; };
@@ -544,10 +546,10 @@ fn mismatch_text(i: I32) Str {
 /// The token's text.
 fn tok_text(t: I32) Str { bytes_text(tok_start[t], tok_end[t]); }
 
-fn tok_is(t: I32, kind: Tok) Bool { t >= 0 and tok_kind[t] == kind.to_i32(); }
+fn tok_is(t: I32, kind: Tok) Bool { t >= 0 and tok_kind[t] == kind.i32(); }
 
 /// Whether token t is the word `text`.
-fn tok_says(t: I32, text: Str) Bool { t >= 0 and tok_kind[t] == Tok.Word.to_i32() and tok_text(t) == text; }
+fn tok_says(t: I32, text: Str) Bool { t >= 0 and tok_kind[t] == Tok.Word.i32() and tok_text(t) == text; }
 
 /// Whether tokens a and b touch (`&&`, `->`).
 fn touching(a: I32, b: I32) Bool { tok_end[a] == tok_start[b]; }
@@ -555,15 +557,15 @@ fn touching(a: I32, b: I32) Bool { tok_end[a] == tok_start[b]; }
 /// The token before t in file `file` that is not a comment, or -1.
 fn tok_before(file: I32, t: I32) I32 {
     let k = t - 1;
-    while (k >= file_tok[file] and tok_kind[k] == Tok.Comment.to_i32()) { k -= 1; };
+    while (k >= file_tok[file] and tok_kind[k] == Tok.Comment.i32()) { k -= 1; };
     if k < file_tok[file] { -1; } else { k; };
 }
 
 /// The token after t, not a comment (the End token stays put).
 fn tok_after(t: I32) I32 {
-    if tok_kind[t] == Tok.End.to_i32() { return t; };
+    if tok_kind[t] == Tok.End.i32() { return t; };
     let k = t + 1;
-    while (tok_kind[k] == Tok.Comment.to_i32()) { k += 1; };
+    while (tok_kind[k] == Tok.Comment.i32()) { k += 1; };
     k;
 }
 
@@ -589,11 +591,11 @@ fn parse_says(text: Str) void {
 /// recognizes; see the section's comment.
 fn parse_hint(file: I32, t: I32, wanted: I32) void {
     // `'\/'` in a DSL body: its `\/` ended the body (only a "…" string keeps one).
-    if diag_fresh[0] == 1 and t > 0 and tok_kind[t] == Tok.Error.to_i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.to_i32() {
+    if diag_fresh[0] == 1 and t > 0 and tok_kind[t] == Tok.Error.i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.i32() {
         diag_note("\\/ ends a DSL body, except inside \"…\": write \"\\/\" there, not '\\/'");
         return;
     };
-    if diag_fresh[0] == 0 or t < 0 or tok_kind[t] == Tok.Error.to_i32() { return; };
+    if diag_fresh[0] == 0 or t < 0 or tok_kind[t] == Tok.Error.i32() { return; };
     if tok_is(t, Tok.End) {
         let prev = tok_before(file, t);
         if prev >= 3 and tok_says(prev, "fn") and tok_says(prev - 3, "proto") and tok_is(prev - 1, Tok.Colon) {
@@ -605,7 +607,7 @@ fn parse_hint(file: I32, t: I32, wanted: I32) void {
     let first = line_first(file, t);
     // The line of the error.
     let last = t;
-    while (tok_kind[last] != Tok.End.to_i32() and not lines_apart(last, last + 1)) { last += 1; };
+    while (tok_kind[last] != Tok.End.i32() and not lines_apart(last, last + 1)) { last += 1; };
     let k = first;
     while (k <= last) {
         if foreign_habit(file, k, t) { return; };
@@ -672,10 +674,10 @@ fn unclosed_brace(file: I32) I32 {
     let depth = 0;
     let open = -1;
     for (file_tok[file] ..< file_tok_end[file]) |k| {
-        if tok_kind[k] == Tok.LBrace.to_i32() {
+        if tok_kind[k] == Tok.LBrace.i32() {
             if depth == 0 { open = k; };
             depth += 1;
-        } else if tok_kind[k] == Tok.RBrace.to_i32() and depth > 0 {
+        } else if tok_kind[k] == Tok.RBrace.i32() and depth > 0 {
             depth -= 1;
         };
     };
@@ -705,7 +707,7 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         // `for x in xs {` is `for (xs) |x| {`.
         let from = tok_after(tok_after(n));
         let brace = from;
-        while (tok_kind[brace] != Tok.End.to_i32() and not tok_is(brace, Tok.LBrace)) { brace += 1; };
+        while (tok_kind[brace] != Tok.End.i32() and not tok_is(brace, Tok.LBrace)) { brace += 1; };
         if tok_is(brace, Tok.LBrace) and brace > from {
             let until = tok_before(file, brace);
             let text = "(" + range_text(from, until) + ") |" + tok_text(n) + "|";
@@ -747,7 +749,7 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
     if tok_is(k, Tok.Word) and tok_is(n, Tok.Lt) and touching(k, n) {
         // `Array<I32>` is `Array[I32]`.
         let close = tok_after(n);
-        while (close < t + 4 and tok_kind[close] != Tok.End.to_i32() and not tok_is(close, Tok.Gt)) { close = tok_after(close); };
+        while (close < t + 4 and tok_kind[close] != Tok.End.i32() and not tok_is(close, Tok.Gt)) { close = tok_after(close); };
         if tok_is(close, Tok.Gt) and close > tok_after(n) {
             let text = tok_text(k) + "[" + bytes_text(tok_start[tok_after(n)], tok_end[tok_before(file, close)]) + "]";
             diag_focus(k, close, text);
@@ -876,9 +878,9 @@ fn named_word(w: I32) Bool {
 //! distinct mistakes (stage 0's kind, `diag_kind_of`, stays as it was).
 
 fn diag_code(i: I32) Str {
-    let k = Diag.from_i32(diag_kind[i]);
+    let k = Diag(diag_kind[i]);
     let a = diag_a[i];
-    if k == Diag.TypeMismatch and diag_c[i] > 0 and diag_c[i] / 65536 == Why.Operand.to_i32() and not is_logical(diag_word[i]) { return "OperandMismatch"; };
+    if k == Diag.TypeMismatch and diag_c[i] > 0 and diag_c[i] / 65536 == Why.Operand.i32() and not is_logical(diag_word[i]) { return "OperandMismatch"; };
     if k == Diag.ParseError and diag_c[i] >= 0 {
         let t = word_text(diag_c[i]);
         if t.len() > 8 and t.slice(0, 9) == "Missing ;" { return "MissingSemicolon"; };
@@ -898,7 +900,7 @@ fn diag_code(i: I32) Str {
     Diag.name(k);
 }
 
-fn is_logical(w: I32) Bool { w == Kw.And.to_i32() or w == Kw.Or.to_i32() or w == Kw.Not.to_i32() or w == Kw.Xor.to_i32(); }
+fn is_logical(w: I32) Bool { w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Not.i32() or w == Kw.Xor.i32(); }
 
 /// Whether a node is what a call calls (`f` in `f(x)`).
 fn is_callee(node: I32) Bool {

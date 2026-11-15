@@ -108,9 +108,9 @@ fn render_row(h0: I32, y: I32, initial_r: Array[F64], initial_i: Array[F64]) I32
 fn mandelbrot(size: I32) I32 {
     let initial_r = Array[F64].new(size, 0.0);
     let initial_i = Array[F64].new(size, 0.0);
-    let inv = 2.0 / size.to_f64();
+    let inv = 2.0 / size.f64();
     for (0..<size) |xy| {
-        let i = inv * xy.to_f64();
+        let i = inv * xy.f64();
         initial_r[xy] = i - 1.5;
         initial_i[xy] = i - 1.0;
     };

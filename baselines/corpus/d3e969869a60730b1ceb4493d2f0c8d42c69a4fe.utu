@@ -1,11 +1,11 @@
 using Browser from std:Browser;
 
 fn number(value: I32) Str {
-    value.to_f64().toString();
+    value.f64().toString();
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.to_f64() / 100.0).toFixed(2);
+    "$" + (cents.f64() / 100.0).toFixed(2);
 }
 
 fn node(id: Str) Browser.HTMLElement {

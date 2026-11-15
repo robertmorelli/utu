@@ -27,7 +27,7 @@ fn setting(line: Str) Result[I32, Str] {
 
 /// The sum of every line's number; the first bad line's error, if any.
 fn total(lines: Array[Str]) Result[I32, Str] {
-    console.log("reading " + lines.len().to_str() + " lines");
+    console.log("reading " + lines.len().str() + " lines");
     defer console.log("done");                        // runs on every return
     errdefer console.log("gave up");                  // runs only on an error
     let sum = 0;
@@ -39,7 +39,7 @@ fn total(lines: Array[Str]) Result[I32, Str] {
 
 fn report(lines: Array[Str]) void {
     let r = total(lines);
-    if r.is_ok() { console.log("total " + r.value().to_str()); }
+    if r.is_ok() { console.log("total " + r.value().str()); }
     else { console.log("error: " + r.error()); };
 }
 

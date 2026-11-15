@@ -66,7 +66,7 @@ export lib {
     }
 
     /// Room for a file of `n` bytes; `role` is a `FileRole`. Returns the file.
-    fn file_add(n: I32, role: I32) I32 { add_file(n, FileRole.from_i32(role)); }
+    fn file_add(n: I32, role: I32) I32 { add_file(n, FileRole(role)); }
 
     /// The file is the standard library's (`std:…`).
     fn file_mark_std(file: I32) void { file_std[file] = 1; }
@@ -143,7 +143,7 @@ export lib {
     /// Check and encode the resolved program for a `Target` (0: its exports,
     /// 1: its tests, 2: @comptime values, 3: its benches). Returns the module's size in `out`, or -1 when there
     /// are diagnostics.
-    fn compile_program(target: I32) I32 { compile(Target.from_i32(target)); }
+    fn compile_program(target: I32) I32 { compile(Target(target)); }
 
     /// The JSON of what the last module built needs from its host (empty for nothing).
     fn host_json_size() I32 { host_json.len(); }
@@ -406,7 +406,7 @@ export lib {
 
     fn diagnostic_extra_start(i: I32, k: I32) I32 {
         let r = diag_extra[i] + k;
-        if extra_kind[r] == Extra.Fix.to_i32() { return extra_node[r]; };
+        if extra_kind[r] == Extra.Fix.i32() { return extra_node[r]; };
         if not is_place(i, k) { return -1; };
         if extra_end[r] >= 0 { return extra_node[r]; };
         if extra_node[r] < 0 { diag_start(i); } else { tok_start[node_first[extra_node[r]]]; };
@@ -414,7 +414,7 @@ export lib {
 
     fn diagnostic_extra_end(i: I32, k: I32) I32 {
         let r = diag_extra[i] + k;
-        if extra_kind[r] == Extra.Fix.to_i32() { return extra_end[r]; };
+        if extra_kind[r] == Extra.Fix.i32() { return extra_end[r]; };
         if not is_place(i, k) { return -1; };
         if extra_end[r] >= 0 { return extra_end[r]; };
         if extra_node[r] < 0 { diag_end(i); } else { tok_end[node_last[extra_node[r]] - 1]; };
@@ -469,7 +469,7 @@ export lib {
         at;
     }
 
-    fn decl_kind_name(decl: I32) Str { Decl.name(Decl.from_i32(decl_kind[decl])); }
+    fn decl_kind_name(decl: I32) Str { Decl.name(Decl(decl_kind[decl])); }
 
     fn decl_count() I32 { decl_kind.len(); }
 
@@ -596,7 +596,7 @@ export lib {
 
     /// A node kind's name in tree-sitter's spelling.
     fn node_kind_name(kind: I32) Str {
-        let name = Node.name(Node.from_i32(kind));
+        let name = Node.name(Node(kind));
         Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len());
     }
 }
@@ -609,8 +609,8 @@ fn owner_of(node: I32) I32 {
     let n = node;
     while (n >= 0) {
         let k = node_kind[n];
-        if k == Node.Fn_decl.to_i32() or k == Node.Op_decl.to_i32() or k == Node.Closure_expr.to_i32()
-            or k == Node.Test_decl.to_i32() or k == Node.Bench_decl.to_i32() or k == Node.Export_main_decl.to_i32() { return n; };
+        if k == Node.Fn_decl.i32() or k == Node.Op_decl.i32() or k == Node.Closure_expr.i32()
+            or k == Node.Test_decl.i32() or k == Node.Bench_decl.i32() or k == Node.Export_main_decl.i32() { return n; };
         n = parent_of(n);
     };
     -1;
@@ -667,8 +667,8 @@ fn wasm_type_text(vt: I32) Str {
     if vt == vt_anyref { return "(ref null any)"; };
     if vt == vt_unreachable { return "unreachable"; };
     if vt >= vt_defined and vt < vt_tuple {
-        return if vt_nullable(vt) == vt { "(ref null type " + vt_heap(vt).to_str() + ")"; }
-            else { "(ref type " + vt_heap(vt).to_str() + ")"; };
+        return if vt_nullable(vt) == vt { "(ref null type " + vt_heap(vt).str() + ")"; }
+            else { "(ref type " + vt_heap(vt).str() + ")"; };
     };
-    "value " + vt.to_str();
+    "value " + vt.str();
 }

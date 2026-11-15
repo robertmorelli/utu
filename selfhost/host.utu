@@ -140,7 +140,7 @@ fn report_bare_openers() void {
         let n = dsl_sites[k];
         let file = file_of_token(node_first[n]);
         let t = node_first[n];
-        while (t < node_last[n] and tok_kind[t] != Tok.DslBody.to_i32()) { t += 1; };
+        while (t < node_last[n] and tok_kind[t] != Tok.DslBody.i32()) { t += 1; };
         if is_own_file(file) and t < node_last[n] and not scanned_before(done_start, tok_start[t]) {
             vl_add(tok_start[t]);
             vl_add(tok_end[t]);
@@ -249,7 +249,7 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
             return es_func[k];
         };
     };
-    let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().to_str()), ft);
+    let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().str()), ft);
     let w = decl_name[decl];
     func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w));
     decl_es[decl] = f;
@@ -292,7 +292,7 @@ fn es_wrap(t: I32) Str {
     let args = "";
     let changed = false;
     for (0 ..< vl_len[params]) |i| {
-        let name = "p" + i.to_str();
+        let name = "p" + i.str();
         let arg = es_in(name, vl_item(params, i));
         if arg != name { changed = true; };
         names = names + (if i > 0 { ","; } else { ""; }) + name;
@@ -324,7 +324,7 @@ fn es_out(expr: Str, t: I32) Str {
         let args = "";
         let changed = false;
         for (0 ..< vl_len[params]) |i| {
-            let name = "p" + i.to_str();
+            let name = "p" + i.str();
             let arg = es_in(name, vl_item(params, i));
             if arg != name { changed = true; };
             names = names + (if i > 0 { ","; } else { ""; }) + name;
@@ -552,7 +552,7 @@ fn number_es_imports() void {
     for (0 ..< es_func.len()) |i| {
         let f = es_func[i];
         if func_live[f] == 1 {
-            func_field_name[f] = name_add(n.to_str());
+            func_field_name[f] = name_add(n.str());
             n += 1;
         };
     };
@@ -730,7 +730,7 @@ fn write_lazy_json() void {
         json_text_string(word_text(decl_name[decl]));
         json_text(",\"signature\":");
         json_text_string(word_text(lazy_call_sig[k]));
-        json_text(",\"file\":" + file_of_token(node_first[decl_node[module]]).to_str() + "}");
+        json_text(",\"file\":" + file_of_token(node_first[decl_node[module]]).str() + "}");
     };
     json_byte(93);
 }

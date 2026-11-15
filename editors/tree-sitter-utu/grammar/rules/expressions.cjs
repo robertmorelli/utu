@@ -105,7 +105,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     new_expr: ($) => prec.right(15, seq('new', $._expr, '(', optional($.arg_list), ')')),
 
-    call_expr: ($) => prec.left(14, seq($._expr, '(', optional($.arg_list), ')')),
+    // `Tag(i)`, `Meters(x)`: a scalar kind made from its base.
+    call_expr: ($) => prec.left(14, seq(choice($._expr, $.type_ident), '(', optional($.arg_list), ')')),
 
     // TypeIdent.method or Module[T].method
     type_member_expr: ($) =>

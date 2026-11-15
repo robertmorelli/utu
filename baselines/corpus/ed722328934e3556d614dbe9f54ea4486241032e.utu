@@ -48,7 +48,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
             if draft.title.trim().len()>0 and amount.valid(0.01,10000.0) {
                 state.purchases=purchases.append(state.purchases, Purchase {
                     title:draft.title,
-                    cents:(amount.value()*100.0+0.5).to_i32()
+                    cents:(amount.value()*100.0+0.5).i32()
                 });
                 draft.title="";
                 amount.text="";
@@ -98,7 +98,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
                         aria-label = "Remove "+purchase.title;
                         "Remove";
                         on click {
-                            state.purchases=purchases.remove_at(state.purchases, index.to_i64().to_i32());
+                            state.purchases=purchases.remove_at(state.purchases, index.i64().i32());
                             wutu.save("ledger-v2");
                         }
                     }

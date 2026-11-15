@@ -143,7 +143,7 @@ Dynamic values (`any`, parsed JSON) follow JavaScript where UTU needs a
 primitive: arithmetic and orderings between two dynamic values are numeric,
 `+` takes its context, a dynamic value reaching a `Str`, `F64`, or `Bool`
 position (or a union's primitive member) is converted with a `typeof` check,
-and a UTU-only method such as `json.length.to_i32()` reads its receiver as that
+and a UTU-only method such as `json.length.i32()` reads its receiver as that
 primitive. `any` absorbs unions (`any | undefined` is `any`), and a dynamic
 value is nullable as the subject of `promote` or `orelse`. A closure passed to
 a dynamic slot receives dynamic arguments.

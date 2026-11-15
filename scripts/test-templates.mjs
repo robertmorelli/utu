@@ -1,6 +1,6 @@
 // Template strings in the self-hosted compiler: what each part of examples/templates.utu
 // builds to, edge cases of their text (`$`, escapes, nesting, braces inside
-// `${…}`, lines), and the diagnostics of a value without to_str.
+// `${…}`, lines), and the diagnostics of a value without str.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -64,16 +64,16 @@ export lib { fn run() Str { f(P { x: 1 }, null); } }
 `));
   assert.deepEqual(escapes.errors, Array(2).fill('\\u needs four hex digits'));
 
-  // A type's to_str is called as \`x.to_str()\` would be: no arguments, a Str.
+  // A type's str is called as \`x.str()\` would be: no arguments, a Str.
   // Each row: the signature and its diagnostic.
   for (const [signature, message] of [
     ['(extra: I32) Str', 'Takes 1, given 0'],
     ['() I32', 'Expected Str, got I32'],
     ['() ?Str', 'Expected Str, got ?Str'],
   ]) {
-    const wrong = await build(await write('to_str.utu', `struct P:
+    const wrong = await build(await write('str.utu', `struct P:
     | x : I32
-fn P.to_str |self| ${signature} { fatal; }
+fn P.str |self| ${signature} { fatal; }
 export lib { fn run() Str { \`\${P { x: 1 }}\`; } }
 `));
     assert.deepEqual(wrong.errors, [message], signature);
@@ -82,7 +82,7 @@ export lib { fn run() Str { \`\${P { x: 1 }}\`; } }
   // An unclosed template or string says so.
   const unclosed = await compileFile(utu, await write('unclosed.utu', 'export lib { fn f() Str { `abc; } }\n'));
   assert.equal(unclosed.diagnostics[0].message, 'Unclosed template string');
-  console.log(`templates: ${Object.keys(expected).length} templates build; comments and escapes inside them; bad \\u escapes, to_str signatures, and values without to_str reported`);
+  console.log(`templates: ${Object.keys(expected).length} templates build; comments and escapes inside them; bad \\u escapes, str signatures, and values without str reported`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
 }

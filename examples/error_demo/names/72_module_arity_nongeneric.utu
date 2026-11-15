@@ -3,7 +3,7 @@
 mod Money {
     struct &:
         | cents: I64
-    fn &.zero() & { &{ cents: 0.to_i64() }; }
+    fn &.zero() & { &{ cents: 0.i64() }; }
 }
 
 export main() I32 {

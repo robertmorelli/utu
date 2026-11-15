@@ -27,10 +27,10 @@ enum(U8) Narrow:
     | I16
 
 /// The word id of a narrow integer type's name.
-fn narrow_word(n: Narrow) I32 { Kw.count() + n.to_i32(); }
+fn narrow_word(n: Narrow) I32 { Kw.count() + n.i32(); }
 
 /// The program's own files: checked whole, reached or not.
-fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.to_i32() or file_role[file] == FileRole.Import.to_i32(); }
+fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.i32() or file_role[file] == FileRole.Import.i32(); }
 
 /// By file: 1 for the standard library's (the host says which).
 vec file_std: I32;
@@ -113,7 +113,7 @@ fn reset_program() void {
     reset_wat();
     if kept[0] > 0 { intern_kept(); } else {
         intern_keywords();
-        for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow.from_i32(k))); };
+        for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow(k))); };
     };
     tokens_room(kept[1]);
     let nodes = kept[2];
@@ -200,7 +200,7 @@ fn add_file(n: I32, role: FileRole) I32 {
     src[start + n] = end_byte;
     file_start.push(start);
     file_end.push(start + n);
-    file_role.push(role.to_i32());
+    file_role.push(role.i32());
     file_tok.push(tok_kind.len());
     file_tok_end.push(tok_kind.len());
     file_root.push(-1);
@@ -229,10 +229,10 @@ fn parse_file(file: I32) I32 {
 fn list_imports(file: I32, root: I32) void {
     let item = node_child[root];
     while (item >= 0) {
-        if node_kind[item] == Node.Using_decl.to_i32() {
+        if node_kind[item] == Node.Using_decl.i32() {
             let path = last_child(item);
             let kind = node_kind[path];
-            if kind == Node.String_lit.to_i32() or kind == Node.Platform_path.to_i32() {
+            if kind == Node.String_lit.i32() or kind == Node.Platform_path.i32() {
                 import_file.push(file);
                 import_node.push(item);
                 import_path.push(path);
@@ -286,7 +286,7 @@ fn first_child(node: I32) I32 { node_child[node]; }
 
 fn next_sibling(node: I32) I32 { node_next[node]; }
 
-fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.to_i32(); }
+fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.i32(); }
 
 /// The word id of a node that is one word (an identifier, a type name), else -1.
 fn word_of(node: I32) I32 { tok_word[node_first[node]]; }

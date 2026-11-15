@@ -2846,6 +2846,10 @@
           "named": true
         },
         {
+          "type": "type_ident",
+          "named": true
+        },
+        {
           "type": "type_member_expr",
           "named": true
         },

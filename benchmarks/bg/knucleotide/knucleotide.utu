@@ -37,7 +37,7 @@ mod Table {
     fn &.find |self| (key: I64) I32 {
         let data = self.data;
         let mask = (data.len() >> 1) - 1;
-        let i = (key ^ (key >>> 7)).to_i32() & mask;
+        let i = (key ^ (key >>> 7)).i32() & mask;
         let step = 0;
         let k1 = key + 1;
         let cur = data[i << 1];
@@ -64,18 +64,18 @@ mod Table {
 
     fn &.get |self| (key: I64) I32 {
         let i = self.find(key);
-        if self.data[i << 1] != 0 { self.data[(i << 1) + 1].to_i32(); } else { 0; };
+        if self.data[i << 1] != 0 { self.data[(i << 1) + 1].i32(); } else { 0; };
     }
 
     fn &.used_at |self| (j: I32) Bool { self.data[j << 1] != 0; }
     fn &.key_at |self| (j: I32) I64 { self.data[j << 1] - 1; }
-    fn &.val_at |self| (j: I32) I32 { self.data[(j << 1) + 1].to_i32(); }
+    fn &.val_at |self| (j: I32) I32 { self.data[(j << 1) + 1].i32(); }
 
     fn &.grow |self| () void {
         let old = self.data;
         let buckets = old.len();
         self.data = Array[I64].new(buckets * 2, 0);
-        self.upper = (buckets.to_f64() * 0.77 + 0.5).to_i32();
+        self.upper = (buckets.f64() * 0.77 + 0.5).i32();
         for (0..<(old.len() >> 1)) |j| {
             if old[j << 1] != 0 {
                 let i = self.find(old[j << 1] - 1);
@@ -100,7 +100,7 @@ fn code(c: I32) I32 {
 }
 
 fn nucleotide(code: I64) I32 {
-    match (code & 3).to_i32() {
+    match (code & 3).i32() {
         0 => 65,
         1 => 67,
         2 => 71,
@@ -112,12 +112,12 @@ fn nucleotide(code: I64) I32 {
 fn count(length: I32) Table {
     let table = Table.new();
     let key: I64 = 0;
-    let mask: I64 = (1.to_i64() << (2 * length).to_i64()) - 1;
+    let mask: I64 = (1.i64() << (2 * length).i64()) - 1;
     for (0..<length - 1) |i| {
-        key = ((key << 2) & mask) | poly[i].to_i64();
+        key = ((key << 2) & mask) | poly[i].i64();
     };
     for (length - 1..<poly.len()) |i| {
-        key = ((key << 2) & mask) | poly[i].to_i64();
+        key = ((key << 2) & mask) | poly[i].i64();
         table.increment(key);
     };
     table;
@@ -133,8 +133,8 @@ fn fnv_str(h0: I32, s: Str) I32 {
 
 // "%.3f" of a percentage below 100: rounded to thousandths, then its digits.
 fn fnv_fixed3(h0: I32, x: F64) I32 {
-    let r = F64.floor(x * 1000.0 + 0.5).to_i32();
-    let h = fnv_str(h0, (r / 1000).to_str());
+    let r = F64.floor(x * 1000.0 + 0.5).i32();
+    let h = fnv_str(h0, (r / 1000).str());
     h = fnv(h, 46);
     h = fnv(h, 48 + r / 100 % 10);
     h = fnv(h, 48 + r / 10 % 10);
@@ -165,14 +165,14 @@ fn frequencies(h0: I32, length: I32) I32 {
         };
     };
     let h = h0;
-    let windows: F32 = (poly.len() - length + 1).to_f32();
+    let windows: F32 = (poly.len() - length + 1).f32();
     let hundred: F32 = 100.0;
     for (0..<n) |i| {
         for (0..<length) |j| {
-            h = fnv(h, nucleotide(keys[i] >>> (2 * (length - 1 - j)).to_i64()));
+            h = fnv(h, nucleotide(keys[i] >>> (2 * (length - 1 - j)).i64()));
         };
         h = fnv(h, 32);
-        h = fnv_fixed3(h, (hundred * vals[i].to_f32() / windows).to_f64());
+        h = fnv_fixed3(h, (hundred * vals[i].f32() / windows).f64());
         h = fnv(h, 10);
     };
     fnv(h, 10);
@@ -184,9 +184,9 @@ fn count_of(h0: I32, oligo: Str) I32 {
     let table = count(length);
     let key: I64 = 0;
     for (0..<length) |i| {
-        key = (key << 2) | code(oligo[i]).to_i64();
+        key = (key << 2) | code(oligo[i]).i64();
     };
-    let h = fnv_str(h0, table.get(key).to_str());
+    let h = fnv_str(h0, table.get(key).str());
     h = fnv(h, 9);
     h = fnv_str(h, oligo);
     fnv(h, 10);
@@ -259,7 +259,7 @@ fn random_fasta(rng: Lcg, chars: Str, probs: Array[F64], count: I32) void {
         let m = if left < 60 { left; } else { 60; };
         for (0..<m) {
             rng.seed = (rng.seed * 3877 + 29573) % 139968;
-            let r = rng.seed.to_f64() / 139968.0;
+            let r = rng.seed.f64() / 139968.0;
             let j = 0;
             while (j < cum.len() - 1 and r >= cum[j]) { j += 1; };
             src.push(chars[j]);

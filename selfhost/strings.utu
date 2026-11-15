@@ -31,7 +31,7 @@ fn code_units_type() I32 { array_type_single(vt_i16, true); }
 
 /// The imported function of builtin `b`, imported the first time it is asked for.
 fn builtin(b: Builtin) I32 {
-    let i = b.to_i32();
+    let i = b.i32();
     if builtin_func[i] >= 0 { return builtin_func[i]; };
     let m = vl_begin();
     let result = vt_extern;

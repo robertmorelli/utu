@@ -23,11 +23,11 @@ mod tour {
         \\export main() F64 {
         \\    let count = 7;
         \\    let ratio: F64 = 1;           // an integer literal adopts a float type
-        \\    let half = count.to_f64() / 2.0;
-        \\    let rounded = 3.9.to_i32();   // 3: float to integer truncates
-        \\    let clamped = 1.0e12.to_i32(); // 2147483647: and saturates
-        \\    let long = count.to_i64() * 1000000000.to_i64();
-        \\    half + rounded.to_f64() + ratio;   // 7.5
+        \\    let half = count.f64() / 2.0;
+        \\    let rounded = 3.9.i32();   // 3: float to integer truncates
+        \\    let clamped = 1.0e12.i32(); // 2147483647: and saturates
+        \\    let long = count.i64() * 1000000000.i64();
+        \\    half + rounded.f64() + ratio;   // 7.5
         \\}
         ;
     }
@@ -36,7 +36,7 @@ mod tour {
         \\    // let u: U32 = i;    error: Type mismatch: expected U32, got I32
         \\    // let f: F64 = i;    error: Type mismatch: expected F64, got I32
         \\    // 1 + 2.5            error: Type mismatch: expected I32, got F64
-        \\    i.to_i64();
+        \\    i.i64();
         \\}
         \\
         \\export main() I64 {
@@ -282,7 +282,7 @@ mod tour {
         \\}
         \\
         \\export main() Str {
-        \\    describe(-1) + ", " + describe(7) + ", " + bit(true).to_str();   // minus one, many, 1
+        \\    describe(-1) + ", " + describe(7) + ", " + bit(true).str();   // minus one, many, 1
         \\}
         ;
     }
@@ -366,7 +366,7 @@ mod tour {
         \\fn Vec2:mul |a, b| Vec2 { &{ x: a.x * b.x, y: a.y * b.y }; }   // a * b
         \\fn Vec2:eq |a, b| Bool { a.x == b.x and a.y == b.y; }          // a == b
         \\fn Vec2:neg |a| Vec2 { &{ x: -a.x, y: -a.y }; }                // -a
-        \\fn Vec2.to_str |v| () Str { `(${v.x}, ${v.y})`; }              // used by `${v}`
+        \\fn Vec2.str |v| () Str { `(${v.x}, ${v.y})`; }              // used by `${v}`
         \\
         \\export main() Str {
         \\    let a = Vec2 { x: 1.0, y: 2.0 };
@@ -381,12 +381,12 @@ mod tour {
         \\type Meters = distinct F64;
         \\
         \\fn lookup(id: UserId) Str {
-        \\    `user #${id.to_i32()}`;
+        \\    `user #${id.i32()}`;
         \\}
         \\
         \\export main() Str {
-        \\    let id = UserId.from_i32(7);
-        \\    let height = Meters.from_f64(1.8);
+        \\    let id = UserId(7);
+        \\    let height = Meters(1.8);
         \\    // lookup(7);       error: Type mismatch: expected UserId, got I32
         \\    // lookup(height);  error: a Meters is not a UserId
         \\    lookup(id);         // user #7
@@ -484,8 +484,8 @@ mod tour {
         \\
         \\export main() void {
         \\    let l = Level.Mid;
-        \\    console.log(`${label(l)} ${Level.name(l)} ${l.to_i32()} ${Level.count()}`);  // busy Mid 1 3
-        \\    console.log(`${Level.from_i32(9) == Level.High} ${l < Level.High}`);        // true true
+        \\    console.log(`${label(l)} ${Level.name(l)} ${l.i32()} ${Level.count()}`);  // busy Mid 1 3
+        \\    console.log(`${Level(9) == Level.High} ${l < Level.High}`);        // true true
         \\}
         ;
     }
@@ -626,14 +626,14 @@ mod tour {
         \\mod Money {
         \\    struct &:                          // & is the module's own type: Money
         \\        | cents: I64
-        \\    fn &.dollars(d: I64) & { &{ cents: d * 100.to_i64() }; }
+        \\    fn &.dollars(d: I64) & { &{ cents: d * 100.i64() }; }
         \\    fn &.of_cents(c: I64) & { &{ cents: c }; }
         \\    fn &:add |a, b| & { &{ cents: a.cents + b.cents }; }
-        \\    fn &.to_str |m| () Str { `$${m.cents / 100.to_i64()}.${m.cents % 100.to_i64()}`; }
+        \\    fn &.str |m| () Str { `$${m.cents / 100.i64()}.${m.cents % 100.i64()}`; }
         \\}
         \\
         \\export main() Str {
-        \\    let price = Money.dollars(3.to_i64()) + Money.of_cents(50.to_i64());
+        \\    let price = Money.dollars(3.i64()) + Money.of_cents(50.i64());
         \\    `${price}`;                        // $3.50
         \\}
         ;
@@ -845,8 +845,8 @@ mod tour {
         \\struct Money:
         \\    | cents: I32
         \\
-        \\fn Money.to_str |m| () Str {          // any type with to_str fits in ${ }
-        \\    `$${m.cents / 100}.${(m.cents % 100).to_str().pad_start(2, "0")}`;
+        \\fn Money.str |m| () Str {          // any type with str fits in ${ }
+        \\    `$${m.cents / 100}.${(m.cents % 100).str().pad_start(2, "0")}`;
         \\}
         \\
         \\export main() Str {
@@ -959,7 +959,7 @@ mod tour {
         \\
         \\fn read(text: Str) Str {
         \\    try {
-        \\        parse(text).to_str();
+        \\        parse(text).str();
         \\    } catch |e| {             // e is what was thrown
         \\        message(e);
         \\    };
@@ -1128,7 +1128,7 @@ mod tour {
         \\
         \\export main() Str {
         \\    let started = now();
-        \\    shout("hello") + " " + clamp(12.0, 0.0, 10.0).to_str();   // HELLO! 10
+        \\    shout("hello") + " " + clamp(12.0, 0.0, 10.0).str();   // HELLO! 10
         \\}
         ;
     }
@@ -1432,7 +1432,7 @@ mod tour {
                 }
                 ". In a safe build, ";
                 code {
-                    "Level.from_i32(v)";
+                    "Level(v)";
                 }
                 " traps when no variant has the value v.";
             }
@@ -1656,7 +1656,7 @@ mod tour {
                 }
                 " is a JavaScript string. Template strings call ";
                 code {
-                    "to_str";
+                    "str";
                 }
                 " on each ";
                 code {

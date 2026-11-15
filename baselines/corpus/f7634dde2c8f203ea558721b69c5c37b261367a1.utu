@@ -10,7 +10,7 @@ fn load_favorites() Browser.Set {
     promote Browser.localStorage.getItem("pantry-favorites") {
         |text| => {
             let ids = Browser.JSON.parse(text);
-            for (0..<ids.length.to_i32()) |i| { saved.add(ids[i]); };
+            for (0..<ids.length.i32()) |i| { saved.add(ids[i]); };
         },
         ~> {},
     };
@@ -30,7 +30,7 @@ fn draw_chart(canvas: Browser.HTMLCanvasElement, items: Browser.Array) void {
             for (0..<categories.len()) |i| {
                 let name = categories[i];
                 let count = items.filter(cl(item) Bool { item.category == name; }).length;
-                let y = 16 + i.to_f64() * 40;
+                let y = 16 + i.f64() * 40;
                 ctx.fillStyle = "#66756b";
                 ctx.fillText(name, 12, y + 14);
                 ctx.fillStyle = "#2f6b4f";

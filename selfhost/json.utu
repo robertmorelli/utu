@@ -91,7 +91,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) void {
     let s = own_sites();
     while (s < dsl_sites.len() and dsl_sites[s] < count) {
         let n = dsl_sites[s];
-        if node_kind[n] == Node.Dsl_expr.to_i32() and word_of(first_child(n)) == json and dsl_in_program(n) and dsl_container(n) == container {
+        if node_kind[n] == Node.Dsl_expr.i32() and word_of(first_child(n)) == json and dsl_in_program(n) and dsl_container(n) == container {
             if first_site < 0 { first_site = n; };
             let prefix = "__json" + int_text(jp_serial[0]) + "_";
             jp_serial[0] += 1;
@@ -446,7 +446,7 @@ fn scalar_read(type: Str) Str {
 }
 
 fn scalar_write(type: Str, v: Str, w: Str) Str {
-    if type == "I32" or type == "U32" { return "__json_put_i64(" + w + ", " + v + ".to_i64());"; };
+    if type == "I32" or type == "U32" { return "__json_put_i64(" + w + ", " + v + ".i64());"; };
     if type == "I64" { return "__json_put_i64(" + w + ", " + v + ");"; };
     if type == "F32" { return "__json_put_f32(" + w + ", " + v + ");"; };
     if type == "F64" { return "__json_put_f64(" + w + ", " + v + ");"; };
@@ -904,11 +904,11 @@ vec pat_next: I32;
 /// A field's key (a word)
 vec pat_key: I32;
 
-fn pat_is(p: I32, kind: Pat) Bool { pat_kind[p] == kind.to_i32(); }
+fn pat_is(p: I32, kind: Pat) Bool { pat_kind[p] == kind.i32(); }
 
 fn new_pattern(kind: Pat) I32 {
     let p = pat_kind.len();
-    pat_kind.push(kind.to_i32());
+    pat_kind.push(kind.i32());
     pat_name.push(-1);
     pat_name_start.push(0);
     pat_type.push(-1);

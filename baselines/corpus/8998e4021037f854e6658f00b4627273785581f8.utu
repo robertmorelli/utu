@@ -106,7 +106,7 @@ fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
 fn restricted(m: Machine, kind: Kind) I32 {
     let state = m.next;
     m.next += 1;
-    m.kinds[state] = kind.to_i32();
+    m.kinds[state] = kind.i32();
     state;
 }
 
@@ -192,7 +192,7 @@ fn double(m: Machine, a: I32, b: I32) void {
         second = permissive(m, Kind.Invalid);
         set(m, first, b, second);
     };
-    m.kinds[second] = Kind.OP.to_i32();
+    m.kinds[second] = Kind.OP.i32();
 }
 
 fn doubles(m: Machine) void {
@@ -227,14 +227,14 @@ fn keyword(m: Machine, word: Str, kind: Kind, var_state: I32) void {
         };
         current = get(m, current, c);
     };
-    m.kinds[current] = kind.to_i32();
+    m.kinds[current] = kind.i32();
 }
 
 fn keywords(m: Machine, var_state: I32) void {
     let words = ["assert", "array", "bool", "else", "false", "fn", "float", "int", "image", "if", "let",
         "print", "return", "read", "struct", "show", "sum", "to", "time", "true", "then", "void", "write"];
     for (words, 0 ..< 23) |word, k| {
-        keyword(m, word, Kind.from_i32(Kind.ASSERT.to_i32() + k), var_state);
+        keyword(m, word, Kind(Kind.ASSERT.i32() + k), var_state);
     };
 }
 
@@ -272,10 +272,10 @@ fn continuations(m: Machine) void {
 }
 
 fn build() Machine {
-    let m = Machine { tabs: Array[I32].new(256 * 256, 0), kinds: Array[I32].new(256, Kind.Invalid.to_i32()), next: 4 };
-    m.kinds[start_state] = Kind.Start.to_i32();
-    m.kinds[accept_state] = Kind.Accept.to_i32();
-    m.kinds[ignore_state] = Kind.Ignore.to_i32();
+    let m = Machine { tabs: Array[I32].new(256 * 256, 0), kinds: Array[I32].new(256, Kind.Invalid.i32()), next: 4 };
+    m.kinds[start_state] = Kind.Start.i32();
+    m.kinds[accept_state] = Kind.Accept.i32();
+    m.kinds[ignore_state] = Kind.Ignore.i32();
     // Accept and ignore restart the scan from the start state.
     for (0 ..< 256) |c| {
         set(m, accept_state, c, start_state);
@@ -297,7 +297,7 @@ fn name_bytes() Array[I32] {
     let out = Array[I32].new(1024, 0);
     let n = 0;
     for (0 ..< Kind.count()) |k| {
-        let name = Kind.name(Kind.from_i32(k));
+        let name = Kind.name(Kind(k));
         for (0 ..< name.len()) |c| {
             out[n] = name.get(c);
             n += 1;
@@ -308,7 +308,7 @@ fn name_bytes() Array[I32] {
 
 fn name_offsets() Array[I32] {
     let at = Array[I32].new(Kind.count() + 1, 0);
-    for (0 ..< Kind.count()) |k| { at[k + 1] = at[k] + Kind.name(Kind.from_i32(k)).len(); };
+    for (0 ..< Kind.count()) |k| { at[k + 1] = at[k] + Kind.name(Kind(k)).len(); };
     at;
 }
 
@@ -335,7 +335,7 @@ fn lex() I32 {
         2 => {
             starts[n] = i;
             ends[n] = j;
-            kinds[n] = Kind.from_i32(kind_of[state]);
+            kinds[n] = Kind(kind_of[state]);
             n += 1;
             i = j;
             next = dfa[start_state * 256 + src[j]];
@@ -356,10 +356,10 @@ fn lex() I32 {
     };
     if failed { return -1; };
     if i != j {
-        if kind_of[state] == Kind.Invalid.to_i32() { return -1; };
+        if kind_of[state] == Kind.Invalid.i32() { return -1; };
         starts[n] = i;
         ends[n] = j;
-        kinds[n] = Kind.from_i32(kind_of[state]);
+        kinds[n] = Kind(kind_of[state]);
         n += 1;
         i = j;
     };
@@ -382,7 +382,7 @@ fn listing(n: I32) I32 {
     let at = 0;
     for (0 ..< n) |t| {
         let kind = kinds[t];
-        let k = kind.to_i32();
+        let k = kind.i32();
         for (name_at[k] ..< name_at[k + 1]) |c| {
             out[at] = names[c];
             at += 1;
@@ -493,7 +493,7 @@ fn Scanner.scan |s| () void {
             if j != s.end { fail(); };
             if i != j {
                 s.cursor = j;
-                s.token(Kind.from_i32(kind_of[state]), i, j);
+                s.token(Kind(kind_of[state]), i, j);
             } else {
                 s.kind = Kind.END_OF_FILE;
             };
@@ -501,7 +501,7 @@ fn Scanner.scan |s| () void {
         },
         2 => {
             s.cursor = j;
-            s.token(Kind.from_i32(kind_of[state]), i, j);
+            s.token(Kind(kind_of[state]), i, j);
             break;
         },
         3 => {
@@ -538,8 +538,8 @@ fn Scanner.token |s| (kind: Kind, i: I32, j: I32) void {
 }
 
 fn Scanner.set_bits |s| (bits: I64) void {
-    s.hi = (bits >> 32).to_i32();
-    s.lo = bits.to_i32();
+    s.hi = (bits >> 32).i32();
+    s.lo = bits.i32();
 }
 
 fn Scanner.take |s| () Kind {
@@ -572,7 +572,7 @@ fn Scanner.expect_name |s| () I32 {
 fn parse_int(i: I32, j: I32) I64 {
     let value: I64 = 0;
     for (i ..< j) |k| {
-        let digit = (src[k] - 48).to_i64();
+        let digit = (src[k] - 48).i64();
         if value > (9223372036854775807 - digit) / 10 { fail(); };
         value = value * 10 + digit;
     };
@@ -590,9 +590,9 @@ fn parse_float(i: I32, j: I32) F64 {
             fraction = true;
         } else if fraction {
             scale = scale / 10.0;
-            value += (c - 48).to_f64() * scale;
+            value += (c - 48).f64() * scale;
         } else {
-            value = value * 10.0 + (c - 48).to_f64();
+            value = value * 10.0 + (c - 48).f64();
         };
     };
     if value > 1.7976931348623157e308 { fail(); };
@@ -1736,7 +1736,7 @@ fn report(n: I32, print: Bool) void {
     // A pipe can take less than everything, or nothing yet (EAGAIN under Node).
     let written = 0;
     while (written < at) {
-        written += try { Fs.writeSync(1.0, out.view(written, at)).to_i32(); } catch { 0; };
+        written += try { Fs.writeSync(1.0, out.view(written, at)).i32(); } catch { 0; };
     };
 }
 
@@ -1763,7 +1763,7 @@ export main() void {
     let args = Process.argv;
     let file = "";
     let flags = "";
-    for (2 ..< args.length.to_i32()) |k| {
+    for (2 ..< args.length.i32()) |k| {
         let arg = args[k];
         if arg.get(0) == 45 { flags = flags + arg; } else { file = arg; };
     };
@@ -1774,20 +1774,20 @@ export main() void {
         let parsing = time_parse(15, false);
         let checking = time_parse(15, true);
         let n = lex();
-        Web.console.log("lex " + lexing.to_str() + " ms, lex + listing " + listing_too.to_str() + " ms, parse "
-            + parsing.to_str() + " ms, type check " + checking.to_str() + " ms, " + n.to_str() + " tokens");
+        Web.console.log("lex " + lexing.str() + " ms, lex + listing " + listing_too.str() + " ms, parse "
+            + parsing.str() + " ms, type check " + checking.str() + " ms, " + n.str() + " tokens");
         return;
     };
     if flags == "-s" {
         let tokens = parse();
-        let text = if tokens < 0 { "Compilation failed\n"; } else { "tokens=" + tokens.to_str() + " nodes=" + node_tag.len().to_str() + "\n"; };
+        let text = if tokens < 0 { "Compilation failed\n"; } else { "tokens=" + tokens.str() + " nodes=" + node_tag.len().str() + "\n"; };
         Fs.writeSync(1.0, text);
         return;
     };
     if flags == "-t-s" or flags == "-s-t" {
         let .{tokens, symbols, types} = check();
-        let counts = "tokens=" + tokens.to_str() + " nodes=" + node_tag.len().to_str() + " symbols="
-            + symbols.to_str() + " types=" + types.to_str() + "\n";
+        let counts = "tokens=" + tokens.str() + " nodes=" + node_tag.len().str() + " symbols="
+            + symbols.str() + " types=" + types.str() + "\n";
         Fs.writeSync(1.0, if tokens < 0 { "Compilation failed\n"; } else { counts; });
         return;
     };

@@ -325,7 +325,7 @@ fn wanted_text() Str {
 
 /// How a kind of token is written (or named, for the kinds with no one spelling).
 fn tok_spelling(kind: I32) Str {
-    match Tok.from_i32(kind) {
+    match Tok(kind) {
         Tok.End => "end of file",
         Tok.Error => "a character",
         Tok.Word => "a name",
@@ -406,13 +406,13 @@ struct Save:
 
 fn kind_at(p: Parser, offset: I32) I32 { tok_kind[ptok[p.pos + offset]]; }
 
-fn is(p: Parser, kind: Tok) Bool { tok_kind[ptok[p.pos]] == kind.to_i32(); }
+fn is(p: Parser, kind: Tok) Bool { tok_kind[ptok[p.pos]] == kind.i32(); }
 
-fn is_at(p: Parser, offset: I32, kind: Tok) Bool { tok_kind[ptok[p.pos + offset]] == kind.to_i32(); }
+fn is_at(p: Parser, offset: I32, kind: Tok) Bool { tok_kind[ptok[p.pos + offset]] == kind.i32(); }
 
 fn word_id(p: Parser) I32 { tok_word[ptok[p.pos]]; }
 
-fn is_kw(p: Parser, kw: Kw) Bool { tok_word[ptok[p.pos]] == kw.to_i32(); }
+fn is_kw(p: Parser, kw: Kw) Bool { tok_word[ptok[p.pos]] == kw.i32(); }
 
 fn is_word(p: Parser) Bool { is(p, Tok.Word); }
 
@@ -426,7 +426,7 @@ fn adjacent(a: I32, b: I32) Bool { tok_end[ptok[a]] == tok_start[ptok[b]]; }
 /// Identifier-shaped: a lowercase first letter, or `_` and more.
 fn shaped_at(p: Parser, offset: I32) Bool {
     let t = ptok[p.pos + offset];
-    if tok_kind[t] != Tok.Word.to_i32() { return false; };
+    if tok_kind[t] != Tok.Word.i32() { return false; };
     let c = src[tok_start[t]];
     (c >= 97 and c <= 122) or (c == 95 and tok_end[t] - tok_start[t] > 1);
 }
@@ -436,12 +436,12 @@ fn shaped(p: Parser) Bool { shaped_at(p, 0); }
 fn advance(p: Parser) void { p.pos += 1; }
 
 fn expect(p: Parser, kind: Tok) void {
-    if not is(p, kind) { fail_wanting(p, kind.to_i32()); };
+    if not is(p, kind) { fail_wanting(p, kind.i32()); };
     p.pos += 1;
 }
 
 fn expect_kw(p: Parser, kw: Kw) void {
-    if not is_kw(p, kw) { fail_wanting(p, kw_wanted + kw.to_i32()); };
+    if not is_kw(p, kw) { fail_wanting(p, kw_wanted + kw.i32()); };
     p.pos += 1;
 }
 
@@ -454,7 +454,7 @@ fn mark() I32 { pending.len(); }
 fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
     let id = node_kind.len();
     let n = pending.len();
-    node_kind.push(kind.to_i32());
+    node_kind.push(kind.i32());
     node_first.push(first);
     node_last.push(last);
     node_parent.push(-1);
@@ -563,37 +563,37 @@ fn source_file(p: Parser) I32 {
 /// A top-level declaration, by its first word (`export`'s by its second).
 fn item(p: Parser) void {
     let w = word_id(p);
-    if w == Kw.Mod.to_i32() { module_decl(p); return; };
-    if w == Kw.Using.to_i32() { using_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Tag.to_i32() or w == Kw.Rec.to_i32() or w == Kw.Struct.to_i32() or w == Kw.Enum.to_i32() { struct_or_enum(p); return; };
-    if w == Kw.Proto.to_i32() { proto_decl(p); return; };
-    if w == Kw.Fn.to_i32() { fn_or_op_decl(p); return; };
-    if w == Kw.Let.to_i32() { global_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Mem.to_i32() or w == Kw.Vec.to_i32() or w == Kw.Const.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Type.to_i32() { distinct_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Export.to_i32() {
+    if w == Kw.Mod.i32() { module_decl(p); return; };
+    if w == Kw.Using.i32() { using_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return; };
+    if w == Kw.Proto.i32() { proto_decl(p); return; };
+    if w == Kw.Fn.i32() { fn_or_op_decl(p); return; };
+    if w == Kw.Let.i32() { global_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Mem.i32() or w == Kw.Vec.i32() or w == Kw.Const.i32() { mem_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Type.i32() { distinct_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Export.i32() {
         let after = tok_word[ptok[p.pos + 1]];
-        if after == Kw.Lib.to_i32() { export_lib_decl(p); return; };
-        if after == Kw.Main.to_i32() { export_main_decl(p); return; };
-        if after == Kw.Const.to_i32() or after == Kw.Mem.to_i32() { mem_decl(p); expect(p, Tok.Semi); return; };
+        if after == Kw.Lib.i32() { export_lib_decl(p); return; };
+        if after == Kw.Main.i32() { export_main_decl(p); return; };
+        if after == Kw.Const.i32() or after == Kw.Mem.i32() { mem_decl(p); expect(p, Tok.Semi); return; };
         fail(p);
         return;
     };
-    if w == Kw.Test.to_i32() { test_decl(p); return; };
-    if w == Kw.Bench.to_i32() { bench_decl(p); return; };
+    if w == Kw.Test.i32() { test_decl(p); return; };
+    if w == Kw.Bench.i32() { bench_decl(p); return; };
     fail(p);
 }
 
 /// A declaration inside a `mod`.
 fn module_item(p: Parser) void {
     let w = word_id(p);
-    if w == Kw.Type.to_i32() { type_decl(p); return; };
-    if w == Kw.Tag.to_i32() or w == Kw.Rec.to_i32() or w == Kw.Struct.to_i32() or w == Kw.Enum.to_i32() { struct_or_enum(p); return; };
-    if w == Kw.Proto.to_i32() { proto_decl(p); return; };
-    if w == Kw.Fn.to_i32() { fn_or_op_decl(p); return; };
-    if w == Kw.Let.to_i32() { global_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Test.to_i32() { test_decl(p); return; };
-    if w == Kw.Bench.to_i32() { bench_decl(p); return; };
+    if w == Kw.Type.i32() { type_decl(p); return; };
+    if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return; };
+    if w == Kw.Proto.i32() { proto_decl(p); return; };
+    if w == Kw.Fn.i32() { fn_or_op_decl(p); return; };
+    if w == Kw.Let.i32() { global_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Test.i32() { test_decl(p); return; };
+    if w == Kw.Bench.i32() { bench_decl(p); return; };
     fail(p);
 }
 
@@ -1181,7 +1181,7 @@ fn statement(p: Parser) void {
     deeper(p);
     let left = prefix(p);
     // (`try { … }` without catch reads its own operators, as `try e` does: not one.)
-    if kind_at(p, -1) == Tok.RBrace.to_i32() and not is_kind(left, Node.Try_result_expr) and not is(p, Tok.Semi)
+    if kind_at(p, -1) == Tok.RBrace.i32() and not is_kind(left, Node.Try_result_expr) and not is(p, Tok.Semi)
         and line_ends_before(p) {
         parse_depth[0] -= 1;
         return;
@@ -1200,8 +1200,8 @@ fn line_ends_before(p: Parser) Bool {
 fn block_statement_ahead(p: Parser) Bool {
     if not is_word(p) { return false; };
     let w = word_id(p);
-    if w == Kw.If.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32() or w == Kw.Match.to_i32()
-        or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32() or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() {
+    if w == Kw.If.i32() or w == Kw.For.i32() or w == Kw.While.i32() or w == Kw.Match.i32()
+        or w == Kw.Loop.i32() or w == Kw.Alt.i32() or w == Kw.Promote.i32() or w == Kw.Try.i32() {
         return true;
     };
     shaped(p) and is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.LBrace);
@@ -1252,7 +1252,7 @@ fn binds(precedence: I32, min: I32, or_equal: Bool) Bool {
 /// The precedence of the binary operator at the cursor (a token or a
 /// keyword), or -1 if none. `^` (12) is the one right-associative.
 fn binary_precedence(p: Parser) I32 {
-    match Tok.from_i32(kind_at(p, 0)) {
+    match Tok(kind_at(p, 0)) {
         Tok.Caret => 12,
         Tok.Star => 11,
         Tok.Slash => 11,
@@ -1272,29 +1272,29 @@ fn binary_precedence(p: Parser) I32 {
         Tok.GtEq => 5,
         ~> {
             let w = word_id(p);
-            if w == Kw.And.to_i32() { 4; } else if w == Kw.Xor.to_i32() { 3; } else if w == Kw.Or.to_i32() { 2; } else { -1; };
+            if w == Kw.And.i32() { 4; } else if w == Kw.Xor.i32() { 3; } else if w == Kw.Or.i32() { 2; } else { -1; };
         },
     };
 }
 
 fn is_assignment(k: I32) Bool {
-    k == Tok.Eq.to_i32() or k == Tok.PlusEq.to_i32() or k == Tok.MinusEq.to_i32() or k == Tok.StarEq.to_i32()
-        or k == Tok.SlashEq.to_i32() or k == Tok.PercentEq.to_i32() or k == Tok.ShlEq.to_i32() or k == Tok.ShrEq.to_i32()
-        or k == Tok.Shr3Eq.to_i32() or k == Tok.AmpEq.to_i32() or k == Tok.PipeEq.to_i32() or k == Tok.CaretEq.to_i32();
+    k == Tok.Eq.i32() or k == Tok.PlusEq.i32() or k == Tok.MinusEq.i32() or k == Tok.StarEq.i32()
+        or k == Tok.SlashEq.i32() or k == Tok.PercentEq.i32() or k == Tok.ShlEq.i32() or k == Tok.ShrEq.i32()
+        or k == Tok.Shr3Eq.i32() or k == Tok.AmpEq.i32() or k == Tok.PipeEq.i32() or k == Tok.CaretEq.i32();
 }
 
 /// The form of an iterator keyword: 0 capture, 1 param-capture, 2 param,
 /// 3 element-capture, 4 element, 5 element-key-capture, 6 element-param,
 /// 7 none; -1 when the word is not one.
 fn iterator_form(w: I32) I32 {
-    if w >= Kw.Map.to_i32() and w <= Kw.Bisect.to_i32() { return 0; };
-    if w >= Kw.Fold.to_i32() and w <= Kw.Zip.to_i32() { return 1; };
-    if w >= Kw.Skip.to_i32() and w <= Kw.Repeat.to_i32() { return 2; };
-    if w >= Kw.Sort.to_i32() and w <= Kw.Partition.to_i32() { return 3; };
-    if w == Kw.Collect.to_i32() { return 4; };
-    if w == Kw.Group_by.to_i32() or w == Kw.Distinct_by.to_i32() { return 5; };
-    if w == Kw.Batched.to_i32() or w == Kw.Windows.to_i32() { return 6; };
-    if w >= Kw.Sum.to_i32() and w <= Kw.Count.to_i32() { return 7; };
+    if w >= Kw.Map.i32() and w <= Kw.Bisect.i32() { return 0; };
+    if w >= Kw.Fold.i32() and w <= Kw.Zip.i32() { return 1; };
+    if w >= Kw.Skip.i32() and w <= Kw.Repeat.i32() { return 2; };
+    if w >= Kw.Sort.i32() and w <= Kw.Partition.i32() { return 3; };
+    if w == Kw.Collect.i32() { return 4; };
+    if w == Kw.Group_by.i32() or w == Kw.Distinct_by.i32() { return 5; };
+    if w == Kw.Batched.i32() or w == Kw.Windows.i32() { return 6; };
+    if w >= Kw.Sum.i32() and w <= Kw.Count.i32() { return 7; };
     -1;
 }
 
@@ -1302,28 +1302,28 @@ fn iterator_form(w: I32) I32 {
 fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     let k = kind_at(p, 0);
     // What most often follows an expression ends it.
-    if k == Tok.Semi.to_i32() or k == Tok.RParen.to_i32() or k == Tok.Comma.to_i32() or k == Tok.RBrace.to_i32()
-        or k == Tok.LBrace.to_i32() or k == Tok.RBracket.to_i32() or k == Tok.Colon.to_i32() or k == Tok.FatArrow.to_i32()
-        or k == Tok.End.to_i32() {
+    if k == Tok.Semi.i32() or k == Tok.RParen.i32() or k == Tok.Comma.i32() or k == Tok.RBrace.i32()
+        or k == Tok.LBrace.i32() or k == Tok.RBracket.i32() or k == Tok.Colon.i32() or k == Tok.FatArrow.i32()
+        or k == Tok.End.i32() {
         return -1;
     };
     let w = word_id(p);
     // Postfix: calls, fields, indexes (precedence 14).
     if binds(14, min, or_equal) {
-        if k == Tok.LParen.to_i32() {
+        if k == Tok.LParen.i32() {
             let at = mark_below(left);
             advance(p);
             arg_list_or_none(p);
             expect(p, Tok.RParen);
             return node(p, Node.Call_expr, at, node_first[left]);
         };
-        if k == Tok.Dot.to_i32() or k == Tok.QuestionDot.to_i32() {
+        if k == Tok.Dot.i32() or k == Tok.QuestionDot.i32() {
             let at = mark_below(left);
             advance(p);
             identifier_or_type(p);
-            return node(p, if k == Tok.Dot.to_i32() { Node.Field_expr; } else { Node.Optional_field_expr; }, at, node_first[left]);
+            return node(p, if k == Tok.Dot.i32() { Node.Field_expr; } else { Node.Optional_field_expr; }, at, node_first[left]);
         };
-        if k == Tok.LBracket.to_i32() {
+        if k == Tok.LBracket.i32() {
             let at = mark_below(left);
             advance(p);
             expression(p);
@@ -1338,7 +1338,7 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
         };
     };
     // Compound assignment keywords are one token: `x and= y`.
-    if (w == Kw.And.to_i32() or w == Kw.Or.to_i32() or w == Kw.Xor.to_i32()) and is_at(p, 1, Tok.Eq) and adjacent(p.pos, p.pos + 1) {
+    if (w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32()) and is_at(p, 1, Tok.Eq) and adjacent(p.pos, p.pos + 1) {
         return assignment(p, left, 2);
     };
     if is_assignment(k) { return assignment(p, left, 1); };
@@ -1355,14 +1355,14 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
         if not binds(1, min, or_equal) { return -1; };
         return iterator(p, left, form);
     };
-    if w == Kw.Orelse.to_i32() {
+    if w == Kw.Orelse.i32() {
         if not binds(1, min, or_equal) { return -1; };
         let at = mark_below(left);
         advance(p);
         expr(p, 1, false);
         return node(p, Node.Else_expr, at, node_first[left]);
     };
-    if k == Tok.MinusO.to_i32() {
+    if k == Tok.MinusO.i32() {
         if not binds(0, min, or_equal) { return -1; };
         let at = mark_below(left);
         advance(p);
@@ -1377,9 +1377,9 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
 /// enclosing expression, so `a + b = c` is `a + (b = c)`.
 fn assignment(p: Parser, left: I32, operator_tokens: I32) I32 {
     let target = node_kind[left];
-    let assignable = target == Node.Identifier.to_i32() or target == Node.Field_expr.to_i32()
-        or target == Node.Optional_field_expr.to_i32() or target == Node.Index_expr.to_i32()
-        or (target == Node.Type_member_expr.to_i32() and (node_kind[node_child[left]] == Node.Type_ident.to_i32() or node_kind[node_child[left]] == Node.Instantiated_module_ref.to_i32()));
+    let assignable = target == Node.Identifier.i32() or target == Node.Field_expr.i32()
+        or target == Node.Optional_field_expr.i32() or target == Node.Index_expr.i32()
+        or (target == Node.Type_member_expr.i32() and (node_kind[node_child[left]] == Node.Type_ident.i32() or node_kind[node_child[left]] == Node.Instantiated_module_ref.i32()));
     if not assignable { return -1; };
     let at = mark_below(left);
     p.pos += operator_tokens;
@@ -1546,39 +1546,39 @@ fn prefix(p: Parser) I32 {
 /// Keywords that begin an expression; elsewhere these words are identifiers.
 /// (Keywords are the first words interned: any other is past them.)
 fn is_expression_keyword(w: I32) Bool {
-    w < Kw.count() and (w == Kw.If.to_i32() or w == Kw.Match.to_i32() or w == Kw.Loop.to_i32() or w == Kw.Alt.to_i32()
-        or w == Kw.Promote.to_i32() or w == Kw.Try.to_i32() or w == Kw.For.to_i32() or w == Kw.While.to_i32()
-        or w == Kw.Break.to_i32() or w == Kw.Continue.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Errdefer.to_i32()
-        or w == Kw.Yield.to_i32() or w == Kw.Return.to_i32() or w == Kw.Let.to_i32() or w == Kw.Cl.to_i32() or w == Kw.Fatal.to_i32()
-        or w == Kw.Prune.to_i32() or w == Kw.New.to_i32() or w == Kw.Await.to_i32() or w == Kw.Assert.to_i32()
-        or w == Kw.Not.to_i32() or w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32());
+    w < Kw.count() and (w == Kw.If.i32() or w == Kw.Match.i32() or w == Kw.Loop.i32() or w == Kw.Alt.i32()
+        or w == Kw.Promote.i32() or w == Kw.Try.i32() or w == Kw.For.i32() or w == Kw.While.i32()
+        or w == Kw.Break.i32() or w == Kw.Continue.i32() or w == Kw.Defer.i32() or w == Kw.Errdefer.i32()
+        or w == Kw.Yield.i32() or w == Kw.Return.i32() or w == Kw.Let.i32() or w == Kw.Cl.i32() or w == Kw.Fatal.i32()
+        or w == Kw.Prune.i32() or w == Kw.New.i32() or w == Kw.Await.i32() or w == Kw.Assert.i32()
+        or w == Kw.Not.i32() or w == Kw.True.i32() or w == Kw.False.i32() or w == Kw.Null.i32());
 }
 
 fn keyword_expression(p: Parser) I32 {
     let at = mark();
     let first = p.pos;
     let w = word_id(p);
-    if w == Kw.True.to_i32() or w == Kw.False.to_i32() or w == Kw.Null.to_i32() {
+    if w == Kw.True.i32() or w == Kw.False.i32() or w == Kw.Null.i32() {
         advance(p);
         return node(p, Node.Literal, at, first);
     };
-    if w == Kw.Not.to_i32() {
+    if w == Kw.Not.i32() {
         advance(p);
         node(p, Node.Unary_op, at, first);
         expr(p, 13, true);
         return node(p, Node.Unary_expr, at, first);
     };
-    if w == Kw.Await.to_i32() {
+    if w == Kw.Await.i32() {
         advance(p);
         expr(p, 13, true);
         return node(p, Node.Await_expr, at, first);
     };
-    if w == Kw.Assert.to_i32() {
+    if w == Kw.Assert.i32() {
         advance(p);
         expr(p, -2, true);
         return node(p, Node.Assert_expr, at, first);
     };
-    if w == Kw.New.to_i32() {
+    if w == Kw.New.i32() {
         advance(p);
         let callee = prefix(p);
         while (is(p, Tok.Dot) or is(p, Tok.QuestionDot) or is(p, Tok.LBracket)) {
@@ -1590,18 +1590,18 @@ fn keyword_expression(p: Parser) I32 {
         expect(p, Tok.RParen);
         return node(p, Node.New_expr, at, first);
     };
-    if w == Kw.Return.to_i32() or w == Kw.Continue.to_i32() {
+    if w == Kw.Return.i32() or w == Kw.Continue.i32() {
         advance(p);
         if starts_expression(p) { expr(p, 0, true); };
-        return node(p, if w == Kw.Return.to_i32() { Node.Return_expr; } else { Node.Continue_expr; }, at, first);
+        return node(p, if w == Kw.Return.i32() { Node.Return_expr; } else { Node.Continue_expr; }, at, first);
     };
-    if w == Kw.Yield.to_i32() or w == Kw.Defer.to_i32() or w == Kw.Errdefer.to_i32() {
+    if w == Kw.Yield.i32() or w == Kw.Defer.i32() or w == Kw.Errdefer.i32() {
         advance(p);
         expr(p, 0, true);
-        let kind = if w == Kw.Yield.to_i32() { Node.Yield_expr; } else if w == Kw.Defer.to_i32() { Node.Defer_expr; } else { Node.Errdefer_expr; };
+        let kind = if w == Kw.Yield.i32() { Node.Yield_expr; } else if w == Kw.Defer.i32() { Node.Defer_expr; } else { Node.Errdefer_expr; };
         return node(p, kind, at, first);
     };
-    if w == Kw.Break.to_i32() {
+    if w == Kw.Break.i32() {
         // `break label value`: a label is a name, but not a word that may follow an expression.
         advance(p);
         if shaped(p) and starts_expression(p) {
@@ -1610,25 +1610,25 @@ fn keyword_expression(p: Parser) I32 {
         };
         return node(p, Node.Break_expr, at, first);
     };
-    if w == Kw.Fatal.to_i32() { return leaf(p, Node.Fatal_expr); };
-    if w == Kw.Prune.to_i32() { return leaf(p, Node.Prune_expr); };
-    if w == Kw.Let.to_i32() { return bind_expr(p); };
-    if w == Kw.Cl.to_i32() { return closure_expr(p); };
-    if w == Kw.If.to_i32() { return if_expr(p); };
-    if w == Kw.Match.to_i32() {
+    if w == Kw.Fatal.i32() { return leaf(p, Node.Fatal_expr); };
+    if w == Kw.Prune.i32() { return leaf(p, Node.Prune_expr); };
+    if w == Kw.Let.i32() { return bind_expr(p); };
+    if w == Kw.Cl.i32() { return closure_expr(p); };
+    if w == Kw.If.i32() { return if_expr(p); };
+    if w == Kw.Match.i32() {
         advance(p);
         return match_expr(p, Node.Match_expr, at, first);
     };
-    if w == Kw.Loop.to_i32() {
+    if w == Kw.Loop.i32() {
         advance(p);
         expect_kw(p, Kw.Match);
         return match_expr(p, Node.Loop_match_expr, at, first);
     };
-    if w == Kw.Alt.to_i32() { return alt_expr(p); };
-    if w == Kw.Promote.to_i32() { return promote_expr(p); };
-    if w == Kw.Try.to_i32() { return try_expr(p); };
-    if w == Kw.For.to_i32() { return for_expr(p); };
-    if w == Kw.While.to_i32() { return while_expr(p); };
+    if w == Kw.Alt.i32() { return alt_expr(p); };
+    if w == Kw.Promote.i32() { return promote_expr(p); };
+    if w == Kw.Try.i32() { return try_expr(p); };
+    if w == Kw.For.i32() { return for_expr(p); };
+    if w == Kw.While.i32() { return while_expr(p); };
     fail(p);
     -1;
 }
@@ -1662,7 +1662,7 @@ fn starts_expression(p: Parser) Bool {
     if at_end(p) { return false; };
     if is_word(p) {
         let w = word_id(p);
-        return w != Kw.And.to_i32() and w != Kw.Or.to_i32() and w != Kw.Xor.to_i32() and w != Kw.Orelse.to_i32();
+        return w != Kw.And.i32() and w != Kw.Or.i32() and w != Kw.Xor.i32() and w != Kw.Orelse.i32();
     };
     is(p, Tok.Int) or is(p, Tok.Float) or is(p, Tok.String) or is(p, Tok.TemplateFull) or is(p, Tok.TemplateHead) or is(p, Tok.MultilineLine) or is(p, Tok.Minus)
         or is(p, Tok.Tilde) or is(p, Tok.LParen) or is(p, Tok.LBracket) or is(p, Tok.Dot) or is(p, Tok.LBrace)
@@ -2202,7 +2202,7 @@ fn intern_keywords() void {
     src.resize(abi_kept[0]);
     src.intern_reset();
     for (0 ..< Kw.count()) |k| {
-        let name = Kw.name(Kw.from_i32(k));
+        let name = Kw.name(Kw(k));
         let start = src.len();
         for (0 ..< name.len()) |c| {
             let b = name.get(c);
@@ -2218,7 +2218,7 @@ fn parser_tokens(first: I32, last: I32) void {
     ptok.resize(last - first + 4);
     let p = 0;
     for (first ..< last) |t| {
-        if tok_kind[t] != Tok.Comment.to_i32() {
+        if tok_kind[t] != Tok.Comment.i32() {
             ptok[p] = t;
             p += 1;
         };
@@ -2233,7 +2233,7 @@ fn parser_tokens(first: I32, last: I32) void {
 /// parse (and adds no nodes).
 fn parse(first: I32, last: I32) I32 {
     parse_error_wanted[0] = -1;
-    if tok_kind[last - 1] != Tok.End.to_i32() {
+    if tok_kind[last - 1] != Tok.End.i32() {
         parse_error_at[0] = last - 1;
         return -1;
     };
@@ -2291,7 +2291,7 @@ fn attach_comments(root: I32) void {
 }
 
 fn skip_to_comment(comments: Comments) void {
-    while (comments.next < tok_kind.len() and tok_kind[comments.next] != Tok.Comment.to_i32()) { comments.next += 1; };
+    while (comments.next < tok_kind.len() and tok_kind[comments.next] != Tok.Comment.i32()) { comments.next += 1; };
 }
 
 /// Place the comments before the end of `parent`'s tokens.
@@ -2310,7 +2310,7 @@ fn attach_within(parent: I32, comments: Comments) void {
             c = node_next[c];
         } else {
             let id = node_kind.len();
-            node_kind.push(Node.Comment.to_i32());
+            node_kind.push(Node.Comment.i32());
             node_first.push(t);
             node_last.push(t + 1);
             node_child.push(-1);
@@ -2328,7 +2328,7 @@ fn attach_within(parent: I32, comments: Comments) void {
 /// or -1. (A DSL's expansion takes the utu written in its body this way, at
 /// its place in the source.)
 fn parse_expression(first: I32, last: I32) I32 {
-    if tok_kind[last - 1] != Tok.End.to_i32() { return -1; };
+    if tok_kind[last - 1] != Tok.End.i32() { return -1; };
     parser_tokens(first, last);
     let before = node_kind.len();
     pending.clear();

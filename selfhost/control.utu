@@ -22,21 +22,21 @@ fn pattern_value(lit: I32, t: I32) I64 {
             pattern_fault[0] = 4;
             return 0;
         };
-        return variant_value[variant].to_i64();
+        return variant_value[variant].i64();
     };
     if is_kind(c, Node.Bool_lit) {
         if t != prelude(Prelude.Bool) { pattern_fault[0] = 3; };
-        return if tok_word[node_first[c]] == Kw.True.to_i32() { 1; } else { 0; };
+        return if tok_word[node_first[c]] == Kw.True.i32() { 1; } else { 0; };
     };
-    let negate = tok_kind[node_first[lit]] == Tok.Minus.to_i32();
+    let negate = tok_kind[node_first[lit]] == Tok.Minus.i32();
     if is_kind(c, Node.Float_lit) {
         if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1; } else { 2; }; return 0; };
         if not literal_fits(c, t, negate) { pattern_fault[0] = 0; };
         // `-0.0` matches what `0.0` does (they compare equal): the same pattern.
-        if negate and literal_bits(c, t, false) == 0.to_i64() { return 0.to_i64(); };
+        if negate and literal_bits(c, t, false) == 0.i64() { return 0.i64(); };
         return literal_bits(c, t, negate);
     };
-    if negate and is_float(t) and literal_bits(c, t, false) == 0.to_i64() { return 0.to_i64(); };
+    if negate and is_float(t) and literal_bits(c, t, false) == 0.i64() { return 0.i64(); };
     let v = literal_bits(c, t, negate);
     if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v; };
     if decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v; };
@@ -51,16 +51,16 @@ fn push_pattern_test(s: I32, t: I32, v: I64) void {
     let m = w_mark();
     w_leaf(Op.LocalGet, vt, s, 0);
     if vt == vt_i64 {
-        w_leaf(Op.I64Const, vt_i64, (v & 4294967295).to_i32(), (v >> 32).to_i32());
+        w_leaf(Op.I64Const, vt_i64, (v & 4294967295).i32(), (v >> 32).i32());
         w_node(Op.Plain, vt_i32, 81, 0, m);
     } else if vt == vt_f64 {
-        w_leaf(Op.F64Const, vt_f64, (v & 4294967295).to_i32(), (v >> 32).to_i32());
+        w_leaf(Op.F64Const, vt_f64, (v & 4294967295).i32(), (v >> 32).i32());
         w_node(Op.Plain, vt_i32, 97, 0, m);
     } else if vt == vt_f32 {
-        w_leaf(Op.F32Const, vt_f32, v.to_i32(), 0);
+        w_leaf(Op.F32Const, vt_f32, v.i32(), 0);
         w_node(Op.Plain, vt_i32, 91, 0, m);
     } else {
-        w_i32(v.to_i32());
+        w_i32(v.i32());
         w_node(Op.Plain, vt_i32, 70, 0, m);
     };
 }
@@ -87,7 +87,7 @@ fn arm_table(n: I32) void {
 /// The slot of value `v` in @arm_slots: its own, or the empty one it goes in.
 fn arm_slot(v: I64) I32 {
     let mask = arm_slots.len() - 1;
-    let i = ((v.to_i32() ^ (v >> 32).to_i32()) * -1640531535) & mask;
+    let i = ((v.i32() ^ (v >> 32).i32()) * -1640531535) & mask;
     while (arm_slots[i] >= 0 and arm_values[arm_slots[i]] != v) { i = (i + 1) & mask; };
     i;
 }
@@ -201,7 +201,7 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
         let c = first_child(decl_node[d]);
         while (c >= 0) {
             if is_kind(c, Node.Variant) {
-                let v = variant_value[node_decl[first_child(c)]].to_i64();
+                let v = variant_value[node_decl[first_child(c)]].i64();
                 if arm_slots[arm_slot(v)] < 0 {
                     report2(Diag.NonExhaustive, node, decl_name[node_decl[first_child(c)]], 2, st);
                     return;
@@ -242,8 +242,8 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     // A table is as fast as dispatch gets; a size build takes it only when
     // it is the smaller (an arm of a chain is about 9 bytes, of a table
     // about 5, and the table a byte per value from lo to hi).
-    let values = hi - lo + 1.to_i64();
-    let dense = vt == vt_i32 and n >= 3 and (if optimize_level[0] == 1 { values < (n * 4 - 8).to_i64(); } else { hi - lo < (n * 3 + 8).to_i64(); });
+    let values = hi - lo + 1.i64();
+    let dense = vt == vt_i32 and n >= 3 and (if optimize_level[0] == 1 { values < (n * 4 - 8).i64(); } else { hi - lo < (n * 3 + 8).i64(); });
     if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop); };
     let end_ = new_label();
     let def = new_label();
@@ -254,12 +254,12 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     for (0 ..< total) |k| { labels[k] = new_label(); };
     // br_table targets, for each value from lo to hi.
     let targets = w_aux.len();
-    let span = (hi - lo).to_i32() + 1;
+    let span = (hi - lo).i32() + 1;
     for (0 ..< span) |i| { w_aux.push(def); };
     // (The first arm with a value takes it.)
     let k = last - 1;
     while (k >= first) {
-        w_aux[targets + (arm_values[k] - lo).to_i32()] = labels[k - first];
+        w_aux[targets + (arm_values[k] - lo).i32()] = labels[k - first];
         k -= 1;
     };
     w_aux.push(def);
@@ -271,14 +271,14 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     let mt = w_mark();
     w_leaf(Op.LocalGet, vt_i32, s, 0);
     if lo != 0 {
-        w_i32(lo.to_i32());
+        w_i32(lo.i32());
         w_node(Op.Plain, vt_i32, 107, 0, mt);
     };
     w_node(Op.BrTable, vt_unreachable, targets, span + 1, mt);
     let t = if in_loop { ty_void(); } else { expect; };
     // (Labels are numbered in order: arm p's is labels[0] + p.)
     let lm = loop_matches.len();
-    if in_loop { for ([s, lo.to_i32(), span, n, copies, def, labels[0], first, -1]) |x| { loop_matches.push(x); }; };
+    if in_loop { for ([s, lo.i32(), span, n, copies, def, labels[0], first, -1]) |x| { loop_matches.push(x); }; };
     for (0 ..< total) |p| {
         // Close arm p's block, then its code.
         w_node(Op.Block, vt_none, labels[p], 0, marks[total - 1 - p]);
@@ -315,7 +315,7 @@ fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
 /// The default arm, as @arm_body does an arm (`unreachable` when there is none).
 fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     if default_ < 0 {
-        // Every value has an arm; another can only come from from_i32.
+        // Every value has an arm; another can only come from Tag(i).
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0);
         return t;
     };
@@ -390,7 +390,7 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     let k = loop_state.len() - 1;
     while (k >= 0 and loop_state[k] < 0) { k -= 1; };
     if k < 0 {
-        report2(Diag.InvalidBreak, node, -1, BreakRule.ContinueStateOutside.to_i32(), -1);
+        report2(Diag.InvalidBreak, node, -1, BreakRule.ContinueStateOutside.i32(), -1);
         return error_value();
     };
     let t = loop_state_type[k];
@@ -400,7 +400,7 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
     let lm = loop_matches.len() - 9;
     while (lm >= 0 and loop_matches[lm] != loop_state[k]) { lm -= 9; };
     if lm >= 0 and loop_matches[lm + 8] < 0 { lm = -1; };
-    if lm >= 0 and w_mark() == m + 1 and w_op[w_stack[m]] == Op.I32Const.to_i32() {
+    if lm >= 0 and w_mark() == m + 1 and w_op[w_stack[m]] == Op.I32Const.i32() {
         // A constant state: straight to its arm when that is ahead.
         let label = lm_target(lm, w_a[w_stack[m]]);
         if label >= 0 {
@@ -453,7 +453,7 @@ fn lm_target(lm: I32, v: I32) I32 {
     let arm = -1;
     if v >= loop_matches[lm + 1] and v - loop_matches[lm + 1] < loop_matches[lm + 2] {
         // (The first arm with a value takes it.)
-        for (0 ..< n) |a| { if arm < 0 and arm_values[first + a] == v.to_i64() { arm = a; }; };
+        for (0 ..< n) |a| { if arm < 0 and arm_values[first + a] == v.i64() { arm = a; }; };
     };
     if arm < 0 { return loop_matches[lm + 5]; };
     let at = loop_matches[lm + 8];
@@ -633,7 +633,7 @@ fn enum_of(d: I32) I32 {
 }
 
 fn is_null_literal(node: I32) Bool {
-    is_kind(node, Node.Literal) and first_child(node) < 0 and tok_word[node_first[node]] == Kw.Null.to_i32();
+    is_kind(node, Node.Literal) and first_child(node) < 0 and tok_word[node_first[node]] == Kw.Null.i32();
 }
 
 /// `x == null`, `x != null` (either side): `ref.is_null`.
@@ -911,7 +911,7 @@ fn check_for(node: I32, cx: Cx) I32 {
         let lo = first_child(s);
         let hi = next_sibling(lo);
         if hi >= 0 {
-            kinds[i] = if tok_kind[token_after(lo)] == Tok.DotDotDot.to_i32() { 1; } else { 0; };
+            kinds[i] = if tok_kind[token_after(lo)] == Tok.DotDotDot.i32() { 1; } else { 0; };
             let t = if is_number_literal(lo) and not is_number_literal(hi) { type_only(hi, -1, cx); } else { type_only(lo, -1, cx); };
             if not is_numeric(t) or is_float(t) {
                 // A bound with a mistake of its own (`xs.len()` on a ?Array) says that one.
@@ -1111,7 +1111,7 @@ fn unroll_fits(block: I32, d: I32, ty: I32, counter: I32, brk: I32, cx: Cx) Bool
 /// more than @unroll_max_ir for a callee not yet checked.
 fn unroll_weight(n: I32, depth: I32) I32 {
     let total = 1;
-    if w_op[n] == Op.Call.to_i32() and func_kind[w_a[n]] == FuncKind.Defined.to_i32() {
+    if w_op[n] == Op.Call.i32() and func_kind[w_a[n]] == FuncKind.Defined.i32() {
         let g = w_a[n];
         if func_body[g] < 0 or depth >= 3 { return unroll_max_ir + 1; };
         total += unroll_weight(func_body[g], depth + 1);
@@ -1126,13 +1126,13 @@ fn unroll_weight(n: I32, depth: I32) I32 {
 /// The nodes of a body, or more than the most when it may not be unrolled.
 fn unroll_nodes(node: I32) I32 {
     let kind = node_kind[node];
-    if kind == Node.For_expr.to_i32() or kind == Node.While_expr.to_i32() or kind == Node.Loop_match_expr.to_i32()
-        or kind == Node.Match_expr.to_i32() or kind == Node.Alt_expr.to_i32() or kind == Node.Promote_expr.to_i32()
-        or kind == Node.Struct_init.to_i32() or kind == Node.Implicit_struct_init.to_i32() or kind == Node.Array_expr.to_i32()
-        or kind == Node.Closure_expr.to_i32() or kind == Node.Dsl_expr.to_i32() or kind == Node.If_expr.to_i32() {
+    if kind == Node.For_expr.i32() or kind == Node.While_expr.i32() or kind == Node.Loop_match_expr.i32()
+        or kind == Node.Match_expr.i32() or kind == Node.Alt_expr.i32() or kind == Node.Promote_expr.i32()
+        or kind == Node.Struct_init.i32() or kind == Node.Implicit_struct_init.i32() or kind == Node.Array_expr.i32()
+        or kind == Node.Closure_expr.i32() or kind == Node.Dsl_expr.i32() or kind == Node.If_expr.i32() {
         return unroll_max_nodes + 1;
     };
-    if kind == Node.Call_expr.to_i32() {
+    if kind == Node.Call_expr.i32() {
         let callee = first_child(node);
         if (is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Type_member_expr)) and allocating_method(word_of(last_child(callee))) {
             return unroll_max_nodes + 1;

@@ -60,7 +60,7 @@ fn is_profile_defer(d: I32) Bool { d <= profile_pop_defer; }
 fn prof_mem() I32 {
     if prof_memory[0] >= 0 { return prof_memory[0]; };
     let m = memory_kind.len();
-    memory_kind.push(FuncKind.Defined.to_i32());
+    memory_kind.push(FuncKind.Defined.i32());
     memory_pages.push(profile_pages);
     memory_module_name.push(-1);
     memory_field_name.push(name_add("utu_profile"));

@@ -30,20 +30,14 @@ mod I64 {
     fn &:bnot |a| & { @ir/\ <ir-i64-xor><ir-ident name="a"/><ir-lit kind="int" type-name="I64" value="-1"/></ir-i64-xor> \/; }
 
     // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
-    fn &.i32 |self| () I32 { self.to_i32(); }
-    fn &.to_i32 |self| () I32 { @ir/\ <ir-i32-wrap><ir-ident name="self"/></ir-i32-wrap> \/; }
-    fn &.u32 |self| () U32 { self.to_u32(); }
-    fn &.to_u32 |self| () U32 { @ir/\ <ir-u32-wrap><ir-ident name="self"/></ir-u32-wrap> \/; }
-    fn &.u64 |self| () U64 { self.to_u64(); }
-    fn &.to_u64 |self| () U64 { @ir/\ <ir-u64-or><ir-ident name="self"/><ir-lit kind="int" type-name="U64" value="0"/></ir-u64-or> \/; }
-    fn &.f32 |self| () F32 { self.to_f32(); }
-    fn &.to_f32 |self| () F32 { @ir/\ <ir-f32-convert-s-i64><ir-ident name="self"/></ir-f32-convert-s-i64> \/; }
-    fn &.f64 |self| () F64 { self.to_f64(); }
-    fn &.to_f64 |self| () F64 { @ir/\ <ir-f64-convert-s-i64><ir-ident name="self"/></ir-f64-convert-s-i64> \/; }
+    fn &.i32 |self| () I32 { @ir/\ <ir-i32-wrap><ir-ident name="self"/></ir-i32-wrap> \/; }
+    fn &.u32 |self| () U32 { @ir/\ <ir-u32-wrap><ir-ident name="self"/></ir-u32-wrap> \/; }
+    fn &.u64 |self| () U64 { @ir/\ <ir-u64-or><ir-ident name="self"/><ir-lit kind="int" type-name="U64" value="0"/></ir-u64-or> \/; }
+    fn &.f32 |self| () F32 { @ir/\ <ir-f32-convert-s-i64><ir-ident name="self"/></ir-f32-convert-s-i64> \/; }
+    fn &.f64 |self| () F64 { @ir/\ <ir-f64-convert-s-i64><ir-ident name="self"/></ir-f64-convert-s-i64> \/; }
 
     // Decimal text, as JavaScript's String() spells it. Ships only when used.
-    fn &.str |self| () Str { self.to_str(); }
-    fn &.to_str |self| () Str {
+    fn &.str |self| () Str {
         let format: fun(I64) Str = @es/\ (v) => String(v) \/;
         format(self);
     }

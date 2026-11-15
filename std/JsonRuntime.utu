@@ -360,7 +360,7 @@ fn __json_f64(r: JsonReader__) F64 {
         // Integers below 10^15 are exact in F64: no host call.
         let v = 0.0;
         for (whole..<end) |k| {
-            v = v * 10.0 + (r.text[k] - 48).to_f64();
+            v = v * 10.0 + (r.text[k] - 48).f64();
         };
         if negative { v * -1.0; } else { v; };
     } else {
@@ -376,7 +376,7 @@ fn __json_f64(r: JsonReader__) F64 {
 
 fn __json_f32(r: JsonReader__) F32 {
     let start = r.at;
-    let v = __json_f64(r).to_f32();
+    let v = __json_f64(r).f32();
     if v - v != 0.0 {
         r.at = start;
         __json_fail(r, "number out of range");
@@ -400,7 +400,7 @@ fn __json_i64(r: JsonReader__) I64 {
     let limit: I64 = -922337203685477580;
     let overflow = false;
     for (whole..<end) |k| {
-        let d = (r.text[k] - 48).to_i64();
+        let d = (r.text[k] - 48).i64();
         if v < limit or (v == limit and d > 8) {
             overflow = true;
         };
@@ -425,7 +425,7 @@ fn __json_i32(r: JsonReader__) I32 {
         __json_fail(r, "integer out of range");
         0;
     } else {
-        v.to_i32();
+        v.i32();
     };
 }
 
@@ -438,7 +438,7 @@ fn __json_u32(r: JsonReader__) U32 {
         r.at = start;
         __json_fail(r, "integer out of range");
     };
-    v.to_u32();
+    v.u32();
 }
 
 // Skip one value of any shape (unknown fields).
@@ -513,7 +513,7 @@ fn __json_describe(r: JsonReader__) Str {
         };
     };
     let place = if r.where.len() > 0 { r.where + ": "; } else { ""; };
-    place + r.reason + " at line " + line.to_str() + ", column " + column.to_str();
+    place + r.reason + " at line " + line.str() + ", column " + column.str();
 }
 
 fn __json_writer(capacity: I32) JsonWriter__ {
@@ -638,7 +638,7 @@ fn __json_put_i64(w: JsonWriter__, v: I64) void {
     let start = w.n;
     let more = true;
     while (more) {
-        w.buf[w.n] = 48 - (m % 10).to_i32();
+        w.buf[w.n] = 48 - (m % 10).i32();
         w.n += 1;
         m = m / 10;
         more = m != 0;
@@ -656,8 +656,8 @@ fn __json_put_i64(w: JsonWriter__, v: I64) void {
 
 fn __json_put_f64(w: JsonWriter__, x: F64) void {
     if x > -9007199254740992.0 and x < 9007199254740992.0 {
-        let whole = x.to_i64();
-        if whole.to_f64() == x {
+        let whole = x.i64();
+        if whole.f64() == x {
             __json_put_i64(w, whole);
             return;
         };
@@ -666,12 +666,12 @@ fn __json_put_f64(w: JsonWriter__, x: F64) void {
 }
 
 fn __json_put_f32(w: JsonWriter__, x: F32) void {
-    let wide = x.to_f64();
-    if wide > -16777216.0 and wide < 16777216.0 and wide.to_i64().to_f64() == wide {
-        __json_put_i64(w, wide.to_i64());
+    let wide = x.f64();
+    if wide > -16777216.0 and wide < 16777216.0 and wide.i64().f64() == wide {
+        __json_put_i64(w, wide.i64());
     } else {
         if wide - wide == 0.0 {
-            __json_raw(w, x.to_str());
+            __json_raw(w, x.str());
         } else {
             __json_raw(w, "null");
         };

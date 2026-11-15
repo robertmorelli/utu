@@ -26,7 +26,7 @@ export main() void {
         background: honeydew;
         border-radius: 1.5rem;
         h1 { "Hello, Wutu"; }
-        p { "Clicks: "; $[state.count.to_f64().toString()]; }
+        p { "Clicks: "; $[state.count.f64().toString()]; }
         button {
             padding: 0.75rem 1rem;
             background: seagreen;

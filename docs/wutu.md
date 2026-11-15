@@ -57,7 +57,7 @@ and returns that element, with its concrete browser type where available.
 | `disabled;` / `disabled = condition;` | Boolean attribute presence |
 | `.value = expression;` | Typed DOM **property** assignment |
 | `"text";` | A text node |
-| `= expression;` | Text or a node: a Str, a number or Bool (its `to_str()`), or a DOM node such as a component's result |
+| `= expression;` | Text or a node: a Str, a number or Bool (its `str()`), or a DOM node such as a component's result |
 | `property: = expression;` | A CSS value computed at render |
 | `if cond { … } else if cond { … } else { … }` | Conditional children |
 | `for items \|item, i\| key item.id { … }` | Repeated children (keys may be any scalar or Str) |
@@ -88,7 +88,7 @@ name (`on changed`, `on resized`). `@reactive`,
 element, `@unmanaged;` and CSS at-rules (`@media`, `@container`, …) are the
 only `@` forms, and any other is an error. Interpolated strings become text, never HTML.
 Written strings take Utu's escapes: `"say \"hi\"";`, `"\u2192";`, `"\\";`.
-A number or Bool in a text hole shows as its `to_str()`: `= state.count;`.
+A number or Bool in a text hole shows as its `str()`: `= state.count;`.
 
 A URL from a value is checked on every render, first and update alike, as an
 attribute (`href = link;`) or a property (`.href = link;`): `href`, `src`,
@@ -231,8 +231,8 @@ and applied with `style.setProperty`, which a strict `style-src` policy allows:
 ```css
 div.bar {
     i {
-        width: = progress.to_str() + "%";
-        --hue: = hue.to_str();
+        width: = progress.str() + "%";
+        --hue: = hue.str();
     }
 }
 ```
@@ -609,7 +609,7 @@ once the element is gone. Unmounting the view stops either.
 ```utu
 p.clock {
     on mount { wutu.interval("tick", 1000.0, cl() void { s.seconds = s.seconds + 1; }); }
-    = "Uptime " + s.seconds.to_str() + "s";
+    = "Uptime " + s.seconds.str() + "s";
 }
 ``` `wutu.route()`
 reads the hash path, and hash/history changes refresh views. This is a small route

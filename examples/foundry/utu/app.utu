@@ -13,7 +13,7 @@ struct Bench:
     | work: Array[F64]
 
 fn tile_px(state: ui.Ui, tile: I32, camera: F64) F64 {
-    (tile.to_f64() - camera) * state.zoom;
+    (tile.f64() - camera) * state.zoom;
 }
 
 fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, height: F64) void {
@@ -21,10 +21,10 @@ fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, hei
     let zoom = state.zoom;
     ctx.fillStyle = "#0c0e11";
     ctx.fillRect(0, 0, width, height);
-    let x0 = sim.imax(0, Browser.Math.floor(state.cam_x).to_i32());
-    let y0 = sim.imax(0, Browser.Math.floor(state.cam_y).to_i32());
-    let x1 = sim.imin(w.width, Browser.Math.ceil(state.cam_x + width / zoom).to_i32() + 1);
-    let y1 = sim.imin(w.height, Browser.Math.ceil(state.cam_y + height / zoom).to_i32() + 1);
+    let x0 = sim.imax(0, Browser.Math.floor(state.cam_x).i32());
+    let y0 = sim.imax(0, Browser.Math.floor(state.cam_y).i32());
+    let x1 = sim.imin(w.width, Browser.Math.ceil(state.cam_x + width / zoom).i32() + 1);
+    let y1 = sim.imin(w.height, Browser.Math.ceil(state.cam_y + height / zoom).i32() + 1);
     let glyphs = zoom >= 20.0;
     if glyphs {
         ctx.font = "bold 10px system-ui";
@@ -85,7 +85,7 @@ fn draw_entity(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, e: sim.Entit
     if sim.is_belt_like(e.cls) {
         let k = 0;
         while (k < e.belt_n) {
-            let along = e.belt[k + 1].to_f64() / 256.0 * (zoom - 6) + 3;
+            let along = e.belt[k + 1].f64() / 256.0 * (zoom - 6) + 3;
             let ix = match e.dir {
                 1 => px + along,
                 3 => px + zoom - along,
@@ -130,23 +130,23 @@ fn draw_minimap(state: ui.Ui) void {
                 |ctx| => {
                     let w = state.w;
                     ctx.fillStyle = "#0c0e11";
-                    ctx.fillRect(0, 0, w.width.to_f64(), w.height.to_f64());
+                    ctx.fillRect(0, 0, w.width.f64(), w.height.f64());
                     for (0..<w.height) |y| {
                         for (0..<w.width) |x| {
                             let tile = y * w.width + x;
                             promote w.grid[tile] {
                                 |e| => {
                                     ctx.fillStyle = state.colors[e.machine];
-                                    ctx.fillRect(x.to_f64(), y.to_f64(), 1, 1);
+                                    ctx.fillRect(x.f64(), y.f64(), 1, 1);
                                 },
                                 ~> {
                                     if w.water[tile] == 1 {
                                         ctx.fillStyle = "#1d4f7a";
-                                        ctx.fillRect(x.to_f64(), y.to_f64(), 1, 1);
+                                        ctx.fillRect(x.f64(), y.f64(), 1, 1);
                                     } else {
                                         if w.res_kind[tile] >= 0 {
                                             ctx.fillStyle = state.item_colors[w.res_kind[tile]];
-                                            ctx.fillRect(x.to_f64(), y.to_f64(), 1, 1);
+                                            ctx.fillRect(x.f64(), y.f64(), 1, 1);
                                         };
                                     };
                                 },
@@ -180,8 +180,8 @@ fn click_tile(state: ui.Ui, x: I32, y: I32) void {
 }
 
 fn pan(state: ui.Ui, dx: F64, dy: F64) void {
-    state.cam_x = Browser.Math.max(-4, Browser.Math.min(state.w.width.to_f64(), state.cam_x + dx));
-    state.cam_y = Browser.Math.max(-4, Browser.Math.min(state.w.height.to_f64(), state.cam_y + dy));
+    state.cam_x = Browser.Math.max(-4, Browser.Math.min(state.w.width.f64(), state.cam_x + dx));
+    state.cam_y = Browser.Math.max(-4, Browser.Math.min(state.w.height.f64(), state.cam_y + dy));
 }
 
 fn param(name: Str) ?Str {
@@ -190,7 +190,7 @@ fn param(name: Str) ?Str {
 
 fn param_int(name: Str, fallback: I32) I32 {
     promote param(name) {
-        |text| => Browser.parseInt(text, 10).to_i32(),
+        |text| => Browser.parseInt(text, 10).i32(),
         ~> fallback,
     };
 }
@@ -216,20 +216,20 @@ fn after_render(f: cl() void) void {
 
 fn percentile(values: Array[F64], fraction: F64) F64 {
     let sorted = values sort(F64) |a, b| { a < b; };
-    if sorted.len() == 0 { 0.0; } else { sorted[sim.imin(sorted.len() - 1, (sorted.len().to_f64() * fraction).to_i32())]; };
+    if sorted.len() == 0 { 0.0; } else { sorted[sim.imin(sorted.len() - 1, (sorted.len().f64() * fraction).i32())]; };
 }
 
 fn average(values: Array[F64]) F64 {
-    if values.len() == 0 { 0.0; } else { (values fold(0.0) |a, v| { a + v; }) / values.len().to_f64(); };
+    if values.len() == 0 { 0.0; } else { (values fold(0.0) |a, v| { a + v; }) / values.len().f64(); };
 }
 
 fn report(state: ui.Ui, bench: Bench) void {
-    let text = "{\"frames\":" + bench.done.to_str()
+    let text = "{\"frames\":" + bench.done.str()
         + ",\"intervalAvg\":" + average(bench.intervals).toFixed(3)
         + ",\"intervalP95\":" + percentile(bench.intervals, 0.95).toFixed(3)
         + ",\"workAvg\":" + average(bench.work).toFixed(3)
         + ",\"workP95\":" + percentile(bench.work, 0.95).toFixed(3)
-        + ",\"hash\":" + (sim.hash(state.w).to_f64() + (if sim.hash(state.w) < 0 { 4294967296.0; } else { 0.0; })).toString() + "}";
+        + ",\"hash\":" + (sim.hash(state.w).f64() + (if sim.hash(state.w) < 0 { 4294967296.0; } else { 0.0; })).toString() + "}";
     let pre = Browser.document.createElement("pre");
     pre.id = "bench-result";
     pre.textContent = text;
@@ -263,8 +263,8 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
                     state.drag_y = event.offsetY;
                 }
                 on mousemove |event| {
-                    state.hover_x = Browser.Math.floor(state.cam_x + event.offsetX / state.zoom).to_i32();
-                    state.hover_y = Browser.Math.floor(state.cam_y + event.offsetY / state.zoom).to_i32();
+                    state.hover_x = Browser.Math.floor(state.cam_x + event.offsetX / state.zoom).i32();
+                    state.hover_y = Browser.Math.floor(state.cam_y + event.offsetY / state.zoom).i32();
                     if state.drag and (state.tool == ui.tool_none or event.buttons == 2) {
                         let dx = event.offsetX - state.drag_x;
                         let dy = event.offsetY - state.drag_y;

@@ -246,7 +246,7 @@ enum(U8) Known:
     | IrSafeChecks
     | WordResult
 
-fn known_word(k: Known) I32 { known[k.to_i32()]; }
+fn known_word(k: Known) I32 { known[k.i32()]; }
 
 fn attr_type_repr() I32 { known_word(Known.TypeRepr); }
 

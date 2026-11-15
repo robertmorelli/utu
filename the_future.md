@@ -316,7 +316,7 @@ This should be treated as a meaningful language-shaping priority, not a small su
 
 ## String interpolation
 
-**Landed:** template strings, `` `x is ${x}` ``: each `${e}` is `e.to_str()`,
+**Landed:** template strings, `` `x is ${x}` ``: each `${e}` is `e.str()`,
 and the pieces are joined with `+` (new_spec2.md, "Template strings").
 
 Users coming from JS, Dart, Python, or Rust expect template-literal style string interpolation.

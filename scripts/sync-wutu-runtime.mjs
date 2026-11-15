@@ -51,13 +51,13 @@ mod wutu {
         call(callback);
     }
     /// A template's text hole (\`= x;\`): a number or a Bool shows as its
-    /// \`to_str()\`, a Str or a node as itself. The compiler picks which, by
+    /// \`str()\`, a Str or a node as itself. The compiler picks which, by
     /// x's type; this body is never what runs.
     fn show(value: Externref) Externref {
         value;
     }
     /// A keyed loop's key (\`key k\`) as text: a Str is itself, a number or
-    /// a Bool its \`to_str()\`. The compiler picks which; this body is never
+    /// a Bool its \`str()\`. The compiler picks which; this body is never
     /// what runs.
     fn key_text(value: Externref) Str {
         "";

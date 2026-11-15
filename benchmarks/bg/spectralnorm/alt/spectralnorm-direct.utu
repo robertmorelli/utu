@@ -18,7 +18,7 @@ fn times(v: Array[F64], u: Array[F64]) void {
     for (0..<v.len()) |i| {
         let t = 0.0;
         for (0..<n) |j| {
-            t += u[j] / a(i, j).to_f64();
+            t += u[j] / a(i, j).f64();
         };
         v[i] = t;
     };
@@ -30,7 +30,7 @@ fn times_transp(v: Array[F64], u: Array[F64]) void {
     for (0..<v.len()) |i| {
         let t = 0.0;
         for (0..<n) |j| {
-            t += u[j] / a(j, i).to_f64();
+            t += u[j] / a(j, i).f64();
         };
         v[i] = t;
     };
@@ -67,19 +67,19 @@ fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619; }
 fn fnv_fixed9(h0: I32, x: F64) I32 {
     let h = h0;
     if x < 0.0 { h = fnv(h, 45); };
-    let nanos = F64.floor(F64.abs(x) * 1.0e9 + 0.5).to_i64();
+    let nanos = F64.floor(F64.abs(x) * 1.0e9 + 0.5).i64();
     let whole = nanos / 1000000000;
     let frac = nanos % 1000000000;
     let p: I64 = 1;
     while (p * 10 <= whole) { p = p * 10; };
     while (p > 0) {
-        h = fnv(h, 48 + (whole / p % 10).to_i32());
+        h = fnv(h, 48 + (whole / p % 10).i32());
         p = p / 10;
     };
     h = fnv(h, 46);
     let d: I64 = 100000000;
     while (d > 0) {
-        h = fnv(h, 48 + (frac / d % 10).to_i32());
+        h = fnv(h, 48 + (frac / d % 10).i32());
         d = d / 10;
     };
     fnv(h, 10);

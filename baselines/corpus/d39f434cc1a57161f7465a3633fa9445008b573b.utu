@@ -10,7 +10,7 @@
           fn at(xs: Array[I32], i: I32) I32 { xs[i]; }
           fn up(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a < b; }; }
           fn down(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a > b; }; }
-          fn unsigned_up(xs: Array[I32]) Array[U32] { xs map |x| { x.to_u32(); } sort(U32) |a, b| { a < b; }; }
+          fn unsigned_up(xs: Array[I32]) Array[U32] { xs map |x| { x.u32(); } sort(U32) |a, b| { a < b; }; }
           fn unsigned_at(xs: Array[U32], i: I32) U32 { xs[i]; }
           fn unsigned_len(xs: Array[U32]) I32 { xs.len(); }
           fn len(xs: Array[I32]) I32 { xs.len(); }

@@ -21,8 +21,8 @@ export lib {
     fn skip_take_sum(xs: Array[I32], a: I32, b: I32) I32 { xs skip(a) take(b) sum; }
     fn take_skip_sum(xs: Array[I32], a: I32, b: I32) I32 { xs take(a) skip(b) sum; }
     fn filter_take_count(xs: Array[I32], b: I32) I32 { xs filter |x| { x > 0; } take(b) count; }
-    fn zip_first(xs: Array[I32], ys: Array[I32]) I32 { xs zip(ys) |a, b, i| { a * b + i.to_i32(); } sum; }
-    fn zip_later(xs: Array[I32], ys: Array[I32]) I32 { xs filter |x| { x % 2 == 0; } zip(ys) |a, b, i| { a - b + i.to_i32(); } sum; }
+    fn zip_first(xs: Array[I32], ys: Array[I32]) I32 { xs zip(ys) |a, b, i| { a * b + i.i32(); } sum; }
+    fn zip_later(xs: Array[I32], ys: Array[I32]) I32 { xs filter |x| { x % 2 == 0; } zip(ys) |a, b, i| { a - b + i.i32(); } sum; }
     fn skip_zip(xs: Array[I32], ys: Array[I32], a: I32) I32 { xs skip(a) zip(ys) |p, q| { p * 3 + q; } sum; }
     fn collect_map(xs: Array[I32]) Array[I32] { xs map |x| { x * 2 + 1; } collect(I32); }
     fn collect_filter(xs: Array[I32]) Array[I32] { xs filter |x| { x % 3 == 0; } collect(I32); }
@@ -37,7 +37,7 @@ export lib {
     fn sort_ints(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a < b; }; }
     fn sort_desc(xs: Array[I32]) Array[I32] { xs sort(I32) |a, b| { a > b; }; }
     fn sort_stable(xs: Array[I32]) Array[I32] {
-        let rows = xs map |x, i| { Row { key: x % 7, seq: i.to_i32() }; } sort(Row) |a, b| { a.key < b.key; };
+        let rows = xs map |x, i| { Row { key: x % 7, seq: i.i32() }; } sort(Row) |a, b| { a.key < b.key; };
         rows map |r| { r.key * 100000 + r.seq; } collect(I32);
     }
     fn sort_filtered(xs: Array[I32]) Array[I32] { xs filter |x| { x > 0; } sort(I32) |a, b| { a < b; }; }
@@ -56,7 +56,7 @@ export lib {
     fn max_or(xs: Array[I32]) I32 { promote xs max_by(I32) |a, b| { a < b; } { |f| => f.value, ~> -999, }; }
     fn reduce_or(xs: Array[I32]) I32 { promote xs reduce(I32) |a, x| { a * 3 + x; } { |f| => f.value, ~> 7777, }; }
     fn first_where_or(xs: Array[I32], a: I32) I32 { promote xs skip(a) first_where(I32) |x| { x > 90; } { |f| => f.value, ~> 5555, }; }
-    fn fold_index(xs: Array[I32]) I32 { xs skip(3) fold(0) |acc, x, i| { acc + x * i.to_i32(); }; }
+    fn fold_index(xs: Array[I32]) I32 { xs skip(3) fold(0) |acc, x, i| { acc + x * i.i32(); }; }
     fn product_small(xs: Array[I32]) I32 { xs map |x| { x % 3 + 2; } take(12) product; }
     fn bisect_sorted(xs: Array[I32], target: I32) I32 { let s = xs sort(I32) |a, b| { a < b; }; s bisect |v| { v < target; }; }
 }

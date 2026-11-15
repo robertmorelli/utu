@@ -14,7 +14,7 @@ const literal='['+points.map(p=>`Spatial.point(${p.x}.0, ${p.y}.0, ${p.id})`).jo
 const {instance: spatial}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'spatial-oracle.utu',source:`
 using Spatial from std:Spatial;
 fn tree() Spatial { Spatial.new(${literal}); }
-fn mask(ids: Array[I32]) I64 { ids fold(0.to_i64()) |acc, id| { acc + (1.to_i64() << id.to_i64()); }; }
+fn mask(ids: Array[I32]) I64 { ids fold(0.i64()) |acc, id| { acc + (1.i64() << id.i64()); }; }
 export lib {
  fn box(a: F64,b: F64,c: F64,d: F64) I64 { mask(tree().within(a,b,c,d)); }
  fn below(a: F64,b: F64,c: F64) I64 { mask(tree().below(a,b,c)); }
@@ -101,7 +101,7 @@ export lib {
   let index=Array[I32].new(1024,2) bisect |v|{counter.calls+=1;v<2;};
   assert index==0 and counter.calls<=11;
   assert (Array[I32].new(1024,2) bisect |v|{v<=2;})==1024;
-  assert ([1,2,3] bisect |v,i|{i<2.to_u32().to_u64();})==2;
+  assert ([1,2,3] bisect |v,i|{i<2.u32().u64();})==2;
   let rows=[Item{value:4},Item{value:2},Item{value:2}];
   let max=(rows max_by(Item)|a,b|{a.value<b.value;}) orelse fatal;
   assert max.value.value==4;

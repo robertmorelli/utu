@@ -143,10 +143,10 @@ fn mandelbrot(n: I32) I32 {
     let i0 = Array[F64].new(wid, 0.0);
     let xy = 0;
     while (xy < wid) {
-        let a = 2.0 / wid.to_f64();
-        r0[xy >> 1] = pair(a * xy.to_f64() - 1.5, a * (xy + 1).to_f64() - 1.5);
-        i0[xy] = a * xy.to_f64() - 1.0;
-        i0[xy + 1] = a * (xy + 1).to_f64() - 1.0;
+        let a = 2.0 / wid.f64();
+        r0[xy >> 1] = pair(a * xy.f64() - 1.5, a * (xy + 1).f64() - 1.5);
+        i0[xy] = a * xy.f64() - 1.0;
+        i0[xy + 1] = a * (xy + 1).f64() - 1.0;
         xy += 2;
     };
     // "P4\n<wid> <wid>\n"

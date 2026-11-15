@@ -10,5 +10,5 @@ let names: fun(Externref) Array[Str] = @es/\ (o) => o.names \/;
 
 export main() F64 {
     let box = hold(Point { x: 1.0, y: 2.0 }, ["a", "b"]);
-    point(box).x + names(box).len().to_f64();
+    point(box).x + names(box).len().f64();
 }

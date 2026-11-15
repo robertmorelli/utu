@@ -64,7 +64,7 @@ mod web {
         \\        "User ";
         \\        b { = user; }
         \\        " has ";
-        \\        = count;                     // a number shows as its to_str
+        \\        = count;                     // a number shows as its str
         \\        " items (";
         \\        = ratio * 100.0;
         \\        "%). Escapes: \"quoted\" →";
@@ -176,7 +176,7 @@ mod web {
         \\            b { "Sold out"; }
         \\        } else if stock < 5 {
         \\            "Only ";
-        \\            = stock.to_str();
+        \\            = stock.str();
         \\            " left";
         \\        } else {
         \\            "In stock";
@@ -198,7 +198,7 @@ mod web {
         \\    ol {
         \\        for names |name, i| {  // the index is a U64
         \\            li {
-        \\                data-rank = (i.to_i32() + 1).to_str();
+        \\                data-rank = (i.i32() + 1).str();
         \\                = name;
         \\            }
         \\        }
@@ -400,8 +400,8 @@ mod web {
         \\        i {
         \\            display: block;
         \\            height: 100%;
-        \\            width: = progress.to_str() + "%";  // computed at render
-        \\            background: = "hsl(" + hue.to_str() + " 70% 50%)";
+        \\            width: = progress.str() + "%";  // computed at render
+        \\            background: = "hsl(" + hue.str() + " 70% 50%)";
         \\        }
         \\    }
         \\    \/;

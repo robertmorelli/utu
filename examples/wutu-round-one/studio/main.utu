@@ -54,7 +54,7 @@ fn workspace(state: StudioState) Browser.HTMLElement {
                     h2 {
                         = name;
                     }
-                    for (state.tasks filter |task| {task.stage==index.to_i64().to_i32();}) |task| key global task.id {
+                    for (state.tasks filter |task| {task.stage==index.i64().i32();}) |task| key global task.id {
                         article.panel.stack {
                             h3 {
                                 = task.title;

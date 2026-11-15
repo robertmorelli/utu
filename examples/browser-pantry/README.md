@@ -31,8 +31,8 @@ in Chromium. Wasm and generated JS together are about 5 KB gzipped.
 | `["All", "Produce"].forEach(cl(name) …)` | a literal-only array was a native array | a literal used through JS array members is a JS array of its element type |
 | `a.price - b.price`, `sum + item.price * item.quantity` | arithmetic on two JSON values | dynamic operands are numeric, or take `+`'s context; checked at the boundary |
 | `row.dataset.id = item.id` | a dynamic value into a `string \| undefined` slot | dynamic values meet a union through its primitive member |
-| `16 + i.to_f64() * 40` | the literal kept I32 | literal operands adopt their sibling's numeric type |
-| `ids.length.to_i32()` on parsed JSON | a UTU method on a JS value | the receiver is read as the primitive that has the method |
+| `16 + i.f64() * 40` | the literal kept I32 | literal operands adopt their sibling's numeric type |
+| `ids.length.i32()` on parsed JSON | a UTU method on a JS value | the receiver is read as the primitive that has the method |
 | `promote search { \|input\| => … cl(event) { input.value } }` | closures captured a promote binding with the wrong type | captures use the binding's type |
 | `for (…) { saved.add(id); }` | loop bodies ending in a value emitted invalid Wasm | loop bodies discard their value |
 | `map.get("k")` on a `Map<any, any>` | `any \| undefined` was nullable | `any` absorbs unions, as in TypeScript |

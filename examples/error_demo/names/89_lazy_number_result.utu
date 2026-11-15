@@ -5,5 +5,5 @@ using widgets lazy from "./lazy_parts/widgets.utu";
 
 export main() void {
     let n = widgets.total(4);
-    Browser.document.title = n.to_str();
+    Browser.document.title = n.str();
 }

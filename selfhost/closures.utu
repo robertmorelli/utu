@@ -65,8 +65,8 @@ fn reset_closures() void {
 /// parameter, or a name a capture, arm, or `catch` binds.
 fn is_local_decl(d: I32) Bool {
     let k = decl_kind[d];
-    k == Decl.Local.to_i32() or k == Decl.Param.to_i32() or k == Decl.SelfParam.to_i32() or k == Decl.Capture.to_i32()
-        or k == Decl.ClosureParam.to_i32() or k == Decl.ArmBinding.to_i32() or k == Decl.Promoted.to_i32() or k == Decl.Caught.to_i32();
+    k == Decl.Local.i32() or k == Decl.Param.i32() or k == Decl.SelfParam.i32() or k == Decl.Capture.i32()
+        or k == Decl.ClosureParam.i32() or k == Decl.ArmBinding.i32() or k == Decl.Promoted.i32() or k == Decl.Caught.i32();
 }
 
 /// By node: 1 while @captures_of walks a closure it is in.
@@ -142,7 +142,7 @@ fn has_closure(node: I32) Bool {
 }
 
 fn mark_closures_below(node: I32) Bool {
-    let found = node_kind[node] == Node.Closure_expr.to_i32();
+    let found = node_kind[node] == Node.Closure_expr.i32();
     let c = node_child[node];
     while (c >= 0) {
         if mark_closures_below(c) { found = true; };
@@ -176,8 +176,8 @@ fn find_closures(node: I32, body: I32) void {
             let d = vl_item(list, i);
             // Variables bound by a let, a parameter, a capture, an arm, or a catch.
             let k = decl_kind[d];
-            let bindable = k == Decl.Local.to_i32() or k == Decl.Param.to_i32() or k == Decl.SelfParam.to_i32() or k == Decl.ClosureParam.to_i32()
-                or k == Decl.Capture.to_i32() or k == Decl.ArmBinding.to_i32() or k == Decl.Promoted.to_i32() or k == Decl.Caught.to_i32();
+            let bindable = k == Decl.Local.i32() or k == Decl.Param.i32() or k == Decl.SelfParam.i32() or k == Decl.ClosureParam.i32()
+                or k == Decl.Capture.i32() or k == Decl.ArmBinding.i32() or k == Decl.Promoted.i32() or k == Decl.Caught.i32();
             if bindable and assigned_after_capture(d, node, body) { decl_boxed[d] = 1; };
         };
     };
@@ -657,7 +657,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
 fn gc_ref(vt: I32) Bool {
     if vt < vt_defined or vt >= vt_tuple { return false; };
     let kind = ht_kind[(vt - vt_defined) / 2];
-    kind == Heap.Struct.to_i32() or kind == Heap.Array.to_i32();
+    kind == Heap.Struct.i32() or kind == Heap.Array.i32();
 }
 
 /// The first `n` of `ts`, as a list.
@@ -753,7 +753,7 @@ fn closure_call(t: I32) I32 {
         if closure_calls[i] == ft { return closure_calls[i + 1]; };
         i += 2;
     };
-    let f = add_import_func(name_add("utu"), name_add("closure_call_" + (closure_calls.len() / 2).to_str()), ft);
+    let f = add_import_func(name_add("utu"), name_add("closure_call_" + (closure_calls.len() / 2).str()), ft);
     closure_calls.push(ft);
     closure_calls.push(f);
     f;
@@ -1077,7 +1077,7 @@ fn lean_closures() void {
         closure_new_func[0] = plain;
     };
     for (0 ..< func_kind.len()) |f| {
-        if func_kind[f] == FuncKind.Defined.to_i32() and func_body[f] >= 0 and f != helper_ and not is_invoker(f) { retarget(func_body[f], helper_, plain); };
+        if func_kind[f] == FuncKind.Defined.i32() and func_body[f] >= 0 and f != helper_ and not is_invoker(f) { retarget(func_body[f], helper_, plain); };
     };
     for (0 ..< glob_init.len()) |g| { if glob_init[g] >= 0 { retarget(glob_init[g], helper_, plain); }; };
     // The bodies, called by the host alone, take their environments exact: no cast.
@@ -1088,7 +1088,7 @@ fn lean_closures() void {
         func_type_of[f] = closure_bodies[i + 1];
         let set = closure_bodies[i + 2];
         // The cast erased: no code (not even a `nop`).
-        w_op[set] = Op.Seq.to_i32();
+        w_op[set] = Op.Seq.i32();
         w_type[set] = vt_none;
         w_count[set] = 0;
         read_param(func_body[f], closure_bodies[i + 3]);
@@ -1135,7 +1135,7 @@ fn closures_recur(helper_: I32) Bool {
     };
     for (0 ..< n) |f| {
         recur_from[f] = recur_to.len();
-        if func_body[f] >= 0 and func_kind[f] == FuncKind.Defined.to_i32() { recur_calls(f, helper_); };
+        if func_body[f] >= 0 and func_kind[f] == FuncKind.Defined.i32() { recur_calls(f, helper_); };
     };
     recur_from[n] = recur_to.len();
     for (0 ..< glob_init.len()) |g| { if glob_init[g] >= 0 { recur_work.push(glob_init[g]); }; };
@@ -1144,7 +1144,7 @@ fn closures_recur(helper_: I32) Bool {
     while (recur_work.len() > 0) {
         let node = recur_work[recur_work.len() - 1];
         recur_work.resize(recur_work.len() - 1);
-        if w_op[node] == Op.RefFunc.to_i32() and recur_seen[w_a[node]] == 0 {
+        if w_op[node] == Op.RefFunc.i32() and recur_seen[w_a[node]] == 0 {
             recur_seen[w_a[node]] = 1;
             recur_roots.push(w_a[node]);
         };
@@ -1216,11 +1216,11 @@ fn recur_calls(f: I32, helper_: I32) void {
 /// Under `node`: notes in `recur_local` what each write of a local makes.
 fn recur_writes(node: I32, helper_: I32) void {
     let op = w_op[node];
-    if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+    if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         let l = w_a[node];
         let v = w_kid(node, 0);
         let body = -1;
-        if helper_ >= 0 and w_op[v] == Op.Call.to_i32() and w_a[v] == helper_ and w_op[w_kid(v, 0)] == Op.RefFunc.to_i32() {
+        if helper_ >= 0 and w_op[v] == Op.Call.i32() and w_a[v] == helper_ and w_op[w_kid(v, 0)] == Op.RefFunc.i32() {
             body = w_a[w_kid(v, 0)];
         };
         if recur_local[l] == -2 { recur_local[l] = body; }
@@ -1232,11 +1232,11 @@ fn recur_writes(node: I32, helper_: I32) void {
 /// Under `node` (in function `f`): its calls, as @recur_calls says.
 fn recur_edges(f: I32, node: I32) void {
     let op = w_op[node];
-    if op == Op.Call.to_i32() or op == Op.ReturnCall.to_i32() {
+    if op == Op.Call.i32() or op == Op.ReturnCall.i32() {
         let g = w_a[node];
         if is_invoker(g) {
             let callee = w_kid(node, 0);
-            let body = if w_op[callee] == Op.LocalGet.to_i32() { recur_local[w_a[callee]]; } else { -1; };
+            let body = if w_op[callee] == Op.LocalGet.i32() { recur_local[w_a[callee]]; } else { -1; };
             if body >= 0 {
                 recur_to.push(body);
                 recur_pairs.push(f);
@@ -1259,7 +1259,7 @@ fn is_invoker(f: I32) Bool { f < lean_invoker.len() and lean_invoker[f] == 1; }
 /// Under `node`: calls of an invoker go to its closure_call import, and of
 /// @closure_new's helper to `plain`.
 fn retarget(node: I32, helper_: I32, plain: I32) void {
-    if w_op[node] == Op.Call.to_i32() {
+    if w_op[node] == Op.Call.i32() {
         let f = w_a[node];
         if f == helper_ { w_a[node] = plain; }
         else if is_invoker(f) { w_a[node] = closure_call_of(func_type_of[f]); };
@@ -1269,7 +1269,7 @@ fn retarget(node: I32, helper_: I32, plain: I32) void {
 
 /// Under `node`: reads of local `l` read local 0.
 fn read_param(node: I32, l: I32) void {
-    if w_op[node] == Op.LocalGet.to_i32() and w_a[node] == l { w_a[node] = 0; };
+    if w_op[node] == Op.LocalGet.i32() and w_a[node] == l { w_a[node] = 0; };
     for (0 ..< w_count[node]) |i| { read_param(w_kid(node, i), l); };
 }
 

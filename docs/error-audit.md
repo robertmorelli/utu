@@ -148,7 +148,7 @@ equally good edits.
 | inserting the one expected token | 17 |
 | deleting the unexpected token | 12 |
 | listing the missing `alt` arms, with `fatal` bodies | 9 |
-| a numeric conversion (`.to_i64()`) | 8 |
+| a numeric conversion (`.i64()`) | 8 |
 | an annotation, a CLI correction, removing a duplicate | 7 |
 
 ## What the compiler needs

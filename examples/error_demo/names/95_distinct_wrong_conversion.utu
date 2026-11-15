@@ -1,5 +1,5 @@
-// What: from_i32 on a distinct U32, whose conversion is from_u32
-// Expect: No method Id.from_i32 (it once said "Not supported yet")
+// What: from_i32 on a distinct U32: the old spelling of a conversion, and the wrong base
+// Expect: No method Id.from_i32, and a fix to Id(5)
 type Id = distinct U32;
 
 export main() I32 {

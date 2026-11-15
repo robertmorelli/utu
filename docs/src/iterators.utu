@@ -118,7 +118,7 @@ mod iterators {
         \\export main() Array[I32] {
         \\    [5, 6, 7, 8]
         \\        filter |n, i| { i % 2 == 0; }       // positions 0 and 2: 5, 7
-        \\        map |n, i| { n * 10 + i.to_i32(); } // positions in the filtered stream: 0, 1
+        \\        map |n, i| { n * 10 + i.i32(); } // positions in the filtered stream: 0, 1
         \\        collect(I32);   // [50, 71]
         \\}
         ;
@@ -417,7 +417,7 @@ mod iterators {
     fn recipe_stats_sample() Str {
         \\export main() Str {
         \\    let temps = [12.5, 17.0, 9.5, 21.0];
-        \\    let mean = temps sum / temps.len().to_f64();
+        \\    let mean = temps sum / temps.len().f64();
         \\    let hottest = temps reduce(F64) |a, b| { if b > a { b; } else { a; }; };
         \\    `mean ${mean}, max ${(hottest orelse fatal).value}`;   // "mean 15, max 21"
         \\}

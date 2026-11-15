@@ -180,7 +180,7 @@ fn is_word_char(c: I32) Bool {
 fn ends(m: Machine, kind: Tok, after: I32) I32 {
     let state = m.next;
     m.next += 1;
-    m.kinds[state] = kind.to_i32();
+    m.kinds[state] = kind.i32();
     m.afters[state] = after;
     for (0 ..< 256) |c| { set(m, state, c, accept_code); };
     state;
@@ -196,7 +196,7 @@ fn inside(m: Machine) I32 {
 /// A state that backs off when no edge continues: the token was `kind`, ending `by` bytes back.
 fn backs_off(m: Machine, kind: Tok, after: I32, by: I32) I32 {
     let state = inside(m);
-    m.backs[state] = kind.to_i32();
+    m.backs[state] = kind.i32();
     m.afters[state] = after;
     for (0 ..< 256) |c| { set(m, state, c, if by == 1 { back1_code; } else { back2_code; }); };
     state;
@@ -373,7 +373,7 @@ fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
     let eq = ends(m, assign, start_before);
     set(m, first, 61, eq);
     set(m, eq, 62, back1_code);
-    m.backs[eq] = plain.to_i32();
+    m.backs[eq] = plain.i32();
     first;
 }
 
@@ -468,15 +468,15 @@ fn punctuation(m: Machine) void {
     set(m, start_after, 63, question);
     set(m, question, 46, optional);
     set(m, optional, 123, back1_code);
-    m.backs[optional] = Tok.Question.to_i32();
+    m.backs[optional] = Tok.Question.i32();
 }
 
 /// The state machine, made at compile time (the @dfa tables are its rows).
 fn build() Machine {
     let m = Machine {
         tabs: Array[I32].new(256 * 256, error_code),
-        kinds: Array[I32].new(256, Tok.Error.to_i32()),
-        backs: Array[I32].new(256, Tok.Error.to_i32()),
+        kinds: Array[I32].new(256, Tok.Error.i32()),
+        backs: Array[I32].new(256, Tok.Error.i32()),
         afters: Array[I32].new(256, same_start),
         next: start_type + 1,
         word: 0,
@@ -513,7 +513,7 @@ fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
     tok_kind[t] = kind;
     tok_start[t] = start;
     tok_end[t] = end_;
-    tok_word[t] = if kind == Tok.Word.to_i32() { src.intern(start, end_); } else { -1; };
+    tok_word[t] = if kind == Tok.Word.i32() { src.intern(start, end_); } else { -1; };
     t + 1;
 }
 
@@ -605,8 +605,8 @@ fn lex(first: I32, n: I32) I32 {
     let t = lex_to(first, k);
     src[k] = byte;
     let last = t - 1;
-    if tok_kind[last] == Tok.End.to_i32() or runs_to(tok_start[last], k) {
-        tok_kind[last] = Tok.Error.to_i32();
+    if tok_kind[last] == Tok.End.i32() or runs_to(tok_start[last], k) {
+        tok_kind[last] = Tok.Error.i32();
         tok_start[last] = k;
         tok_end[last] = k;
     };
@@ -646,29 +646,29 @@ fn lex_to(first: I32, n: I32) I32 {
     loop match next {
         0 => {  // error_code
             let width = if i < n { utf8_char_size(i, n); } else { 0; };
-            return tokens_end(put_token(t, Tok.Error.to_i32(), i, i + (if width > 0 { width; } else { 0; })));
+            return tokens_end(put_token(t, Tok.Error.i32(), i, i + (if width > 0 { width; } else { 0; })));
         },
         1 => {  // accept_code
             let kind = kind_of[state];
-            if open > 0 and kind == Tok.RBrace.to_i32() and template_braces[open - 1] == 0 {
+            if open > 0 and kind == Tok.RBrace.i32() and template_braces[open - 1] == 0 {
                 // The `}` that ends a `${`: the template's text goes on.
                 j = template_text_end(i + 1, n);
                 // (A template the source ends in is unclosed at its backtick.)
                 if j == -1 {
                     template_ran_out[0] = 1;
-                    return tokens_end(put_token(t, Tok.Error.to_i32(), template_opens[open - 1], template_opens[open - 1]));
+                    return tokens_end(put_token(t, Tok.Error.i32(), template_opens[open - 1], template_opens[open - 1]));
                 };
-                if j < 0 { return tokens_end(put_token(t, Tok.Error.to_i32(), i, i)); };
+                if j < 0 { return tokens_end(put_token(t, Tok.Error.i32(), i, i)); };
                 if src[j] == 96 {
                     j += 1;
-                    t = put_token(t, Tok.TemplateTail.to_i32(), i, j);
+                    t = put_token(t, Tok.TemplateTail.i32(), i, j);
                     open -= 1;
                     template_braces.resize(open);
                     template_opens.resize(open);
                     start = start_after;
                 } else {
                     j += 2;
-                    t = put_token(t, Tok.TemplateMiddle.to_i32(), i, j);
+                    t = put_token(t, Tok.TemplateMiddle.i32(), i, j);
                     start = start_before;
                 };
                 i = j;
@@ -676,8 +676,8 @@ fn lex_to(first: I32, n: I32) I32 {
                 next = dfa[start * 256 + src[j]];
                 continue next;
             };
-            if open > 0 and kind == Tok.LBrace.to_i32() { template_braces[open - 1] += 1; };
-            if open > 0 and kind == Tok.RBrace.to_i32() { template_braces[open - 1] -= 1; };
+            if open > 0 and kind == Tok.LBrace.i32() { template_braces[open - 1] += 1; };
+            if open > 0 and kind == Tok.RBrace.i32() { template_braces[open - 1] -= 1; };
             t = put_token(t, kind, i, j);
             let after = after_of[state];
             if after != same_start { start = after; };
@@ -714,9 +714,9 @@ fn lex_to(first: I32, n: I32) I32 {
         5 => {  // dsl_code
             j = dsl_end(i, n);
             if j < 0 {
-                return tokens_end(put_token(t, Tok.Error.to_i32(), i, i));
+                return tokens_end(put_token(t, Tok.Error.i32(), i, i));
             };
-            t = put_token(t, Tok.DslBody.to_i32(), i, j);
+            t = put_token(t, Tok.DslBody.i32(), i, j);
             start = start_after;
             i = j;
             state = start;
@@ -724,19 +724,19 @@ fn lex_to(first: I32, n: I32) I32 {
             continue next;
         },
         6 => {  // done_code
-            if j < n { return tokens_end(put_token(t, Tok.Error.to_i32(), j, j)); };
-            return tokens_end(put_token(t, Tok.End.to_i32(), n, n));
+            if j < n { return tokens_end(put_token(t, Tok.Error.i32(), j, j)); };
+            return tokens_end(put_token(t, Tok.End.i32(), n, n));
         },
         7 => {  // template_code
             j = template_text_end(i + 1, n);
-            if j < 0 { return tokens_end(put_token(t, Tok.Error.to_i32(), i, i)); };
+            if j < 0 { return tokens_end(put_token(t, Tok.Error.i32(), i, i)); };
             if src[j] == 96 {
                 j += 1;
-                t = put_token(t, Tok.TemplateFull.to_i32(), i, j);
+                t = put_token(t, Tok.TemplateFull.i32(), i, j);
                 start = start_after;
             } else {
                 j += 2;
-                t = put_token(t, Tok.TemplateHead.to_i32(), i, j);
+                t = put_token(t, Tok.TemplateHead.i32(), i, j);
                 template_braces.push(0);
                 template_opens.push(i);
                 open += 1;

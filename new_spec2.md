@@ -77,7 +77,7 @@ enum(U8) Tag:
 let t: Tag = Tag.Leaf;
 match t { Tag.Leaf => 1, Tag.Unary => 2, Tag.Eof => 3, };   // exhaustive without ~>
 loop match t { Tag.Leaf => { continue Tag.Unary; }, ~> { break; }, };
-t.to_i32();  Tag.from_i32(1);  Tag.count();  Tag.name(t);    // == != < <= > >= compare values
+t.i32();  Tag(1);  Tag.count();  Tag.name(t);    // == != < <= > >= compare values
 ```
 
 A `Tag` is not an `I32`. Integer enums can be stored in a `mem` and dispatch
@@ -92,8 +92,8 @@ comparisons (`I32 U32 I64 U64 F32 F64`). It converts only explicitly:
 
 ```
 type NodeId = distinct I32;
-let id = NodeId.from_i32(3);
-id.to_i32();
+let id = NodeId(3);
+id.i32();
 mem lhs: NodeId;            // stored as I32
 ```
 
@@ -748,21 +748,21 @@ found: { ... }
 
 A template string is text between backticks, with `${expr}` wherever a value
 goes. It is a `Str`: its pieces joined with `+`, left to right, where each
-`${expr}` is `expr.to_str()` and text is a string literal. So the example is
+`${expr}` is `expr.str()` and text is a string literal. So the example is
 
 ```
-"Hello, " + name.to_str() + "! You are " + age.to_str() + " years old."
+"Hello, " + name.str() + "! You are " + age.str() + " years old."
 ```
 
-Empty text is left out (`${x}` alone is `x.to_str()`, ` `` ` is `""`).
+Empty text is left out (`${x}` alone is `x.str()`, ` `` ` is `""`).
 
-- `I32`, `U32`, `I64`, `U64`, `F32`, `F64` and `Bool` have `to_str` (as
+- `I32`, `U32`, `I64`, `U64`, `F32`, `F64` and `Bool` have `str` (as
   JavaScript's `String()` writes them; an `F32` as the shortest decimal
   that reads back as the same `F32`, so `0.1` and not `0.10000000149…`),
   and so does `Str` (the string itself, at no cost). A type takes part by
-  having one, as `x.to_str()` would call it: `fn Point.to_str |self| () Str { ... }`.
-- A value with no `to_str` is an error at its `${…}`: `Unknown method
-  'P.to_str'`. A nullable one is too; unwrap it first (`${x orelse "none"}`).
+  having one, as `x.str()` would call it: `fn Point.str |self| () Str { ... }`.
+- A value with no `str` is an error at its `${…}`: `Unknown method
+  'P.str'`. A nullable one is too; unwrap it first (`${x orelse "none"}`).
 - Any expression fits in `${…}`, braces, blocks and other template strings
   included.
 - The text may span lines (a line break is as the file has it). Escapes are

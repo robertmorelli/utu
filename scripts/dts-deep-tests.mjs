@@ -303,7 +303,7 @@ await test('array literals become JS arrays for array, array-like, iterable and 
     fn set() F64 { let s = new Browser.Set(["a", "b", "a"]); s.size; }
   `);
   assert.equal(exports.json(), '[1,"two",true,{"n":3}]');
-  const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().to_f64(); }`);
+  const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().f64(); }`);
   assert.equal(native.dates(), 4);
   // A literal given to JavaScript, or used through JS array members, is a JS array.
   // An empty `[]` nothing constrains is a native Array[I32], JS members or not
@@ -508,7 +508,7 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
       items.sort(cl(a, b) F64 { if a.price > b.price { a.price - b.price; } else { b.n - a.n; }; });
       items.reduce(cl(sum, item) F64 { sum + item.price * item.n; }, 0);
     }
-    fn count() I32 { let ids = Browser.JSON.parse("[4,5,6]"); let t = 0; for (0..<ids.length.to_i32()) |i| { t += i; }; t; }
+    fn count() I32 { let ids = Browser.JSON.parse("[4,5,6]"); let t = 0; for (0..<ids.length.i32()) |i| { t += i; }; t; }
     fn same() Bool { let a = new Browser.EventTarget(); let b = a; a == b and a != new Browser.EventTarget(); }
     fn from_set() Str { let s = new Browser.Set(); s.add("x"); s.add("y"); Browser.Array.from(s).join(""); }
     fn dataset() Str {

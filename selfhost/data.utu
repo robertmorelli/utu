@@ -326,12 +326,12 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let m = w_mark();
     let t = check_base(target, cx);
     if is_foreign(t) {
-        if op != Tok.Eq.to_i32() { return check_foreign_update(target, t, word_of(name), value, compound_word(op, node_last[target]), m, cx); };
+        if op != Tok.Eq.i32() { return check_foreign_update(target, t, word_of(name), value, compound_word(op, node_last[target]), m, cx); };
         return check_foreign_set(target, t, word_of(name), value, m, cx);
     };
     let field = field_of(t, name);
     if field == -2 {
-        let word = if op == Tok.Eq.to_i32() { -1; } else { compound_word(op, node_last[target]); };
+        let word = if op == Tok.Eq.i32() { -1; } else { compound_word(op, node_last[target]); };
         return proto_field_set(t, name, value, word, at, m, cx);
     };
     if field < 0 {
@@ -342,7 +342,7 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let ft = field_type(field, ty_inst(t));
     let heap = vt_heap(repr(t));
     let index = decl_a[field];
-    if op == Tok.Eq.to_i32() {
+    if op == Tok.Eq.i32() {
         want(value, ft, Why.Field, field, -1);
         coerce(check_expr(value, ft, cx), ft, value);
         unwant();
@@ -666,7 +666,7 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let t = check_expr(base, -1, cx);
     if ty_is(t, Ty.Error) { return finish_error(-1, m, cx); };
     if is_foreign(t) {
-        if op != Tok.Eq.to_i32() { return check_foreign_index_update(target, t, last_child(target), value, compound_word(op, node_last[target]), m, cx); };
+        if op != Tok.Eq.i32() { return check_foreign_index_update(target, t, last_child(target), value, compound_word(op, node_last[target]), m, cx); };
         return check_foreign_index_set(t, last_child(target), value, m, cx);
     };
     let set = member(ty_decl(t), known_word(Known.SetIndex), Space.Method);
@@ -679,7 +679,7 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     let it = vl_item(fi_params[fi], 1);
     let vt_ = vl_item(fi_params[fi], 2);
     let index = last_child(target);
-    if op == Tok.Eq.to_i32() {
+    if op == Tok.Eq.i32() {
         coerce(check_expr(index, it, cx), it, index);
         want(value, vt_, Why.Elements, -1, -1);
         coerce(check_expr(value, vt_, cx), vt_, value);
@@ -717,7 +717,7 @@ fn intrinsic_array_fi(fi: I32) Bool {
     let module = module_of(fi_decl[fi]);
     if module < 0 or not decl_is(module, Decl.Module) or decl_a[module] < 0 { return false; };
     let vt = repr(named(decl_a[module], fi_inst[fi]));
-    vt_is_ref(vt) and vt >= vt_defined and vt < vt_tuple and ht_kind[vt_heap(vt)] == Heap.Array.to_i32();
+    vt_is_ref(vt) and vt >= vt_defined and vt < vt_tuple and ht_kind[vt_heap(vt)] == Heap.Array.i32();
 }
 
 /// The array type of an intrinsic's module (Array's `&` in the instance).
@@ -825,10 +825,10 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
         return 1;
     };
     let k = -1;
-    for (Known.IrI31New.to_i32() ... Known.IrV128Const.to_i32()) |i| { if known[i] == tag { k = i; }; };
+    for (Known.IrI31New.i32() ... Known.IrV128Const.i32()) |i| { if known[i] == tag { k = i; }; };
     if k < 0 { return 0; };
     let m = w_mark();
-    if k == Known.IrV128Const.to_i32() {
+    if k == Known.IrV128Const.i32() {
         // bytes="b0,…,b15" in w_aux as four little-endian words
         let a = x_attr(x, intern_text("bytes"));
         if a < 0 or x_child[x] >= 0 {
@@ -888,19 +888,19 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
         return 1;
     };
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1; };
-    let sig = if k == Known.IrI31New.to_i32() { "i"; } else if k == Known.IrI31GetS.to_i32() or k == Known.IrI31GetU.to_i32() { "3"; }
-        else if k == Known.IrRefEq.to_i32() or k == Known.IrRefNe.to_i32() { "ee"; } else { "xx"; };
+    let sig = if k == Known.IrI31New.i32() { "i"; } else if k == Known.IrI31GetS.i32() or k == Known.IrI31GetU.i32() { "3"; }
+        else if k == Known.IrRefEq.i32() or k == Known.IrRefNe.i32() { "ee"; } else { "xx"; };
     if not ir_kids_typed(x, decls, fi, m, sig) { return -1; };
     // (A `ref.i31` makes a `(ref i31)`: a nullable i31 local holds it.)
-    if k == Known.IrI31New.to_i32() { w_node(Op.RefI31, vt_i31ref, 0, 0, m); }
-    else if k == Known.IrI31GetS.to_i32() { w_node(Op.I31GetS, vt_i32, 0, 0, m); }
-    else if k == Known.IrI31GetU.to_i32() { w_node(Op.I31GetU, vt_i32, 0, 0, m); }
-    else if k == Known.IrRefEq.to_i32() { w_node(Op.RefEq, vt_i32, 0, 0, m); }
-    else if k == Known.IrRefNe.to_i32() {
+    if k == Known.IrI31New.i32() { w_node(Op.RefI31, vt_i31ref, 0, 0, m); }
+    else if k == Known.IrI31GetS.i32() { w_node(Op.I31GetS, vt_i32, 0, 0, m); }
+    else if k == Known.IrI31GetU.i32() { w_node(Op.I31GetU, vt_i32, 0, 0, m); }
+    else if k == Known.IrRefEq.i32() { w_node(Op.RefEq, vt_i32, 0, 0, m); }
+    else if k == Known.IrRefNe.i32() {
         w_node(Op.RefEq, vt_i32, 0, 0, m);
         w_i32_op(i32_eqz, m);
     }
-    else if k == Known.IrPromiseThen.to_i32() { w_node(Op.Call, vt_none, promise_op(false), 0, m); }
+    else if k == Known.IrPromiseThen.i32() { w_node(Op.Call, vt_none, promise_op(false), 0, m); }
     else { w_node(Op.Call, vt_none, promise_op(true), 0, m); };
     1;
 }
@@ -945,7 +945,7 @@ fn ir_kids_typed(x: I32, decls: I32, fi: I32, m: I32, sig: Str) Bool {
         if got != vt_unreachable and s == 42 and not elem_fits(ht_a[intrinsic_array_heap(fi)], got) {
             return ir_mistyped(x, ht_a[intrinsic_array_heap(fi)], got);
         };
-        let codes = got >= vt_defined and got < vt_tuple and ht_kind[vt_heap(got)] == Heap.Array.to_i32() and ht_a[vt_heap(got)] == vt_i32;
+        let codes = got >= vt_defined and got < vt_tuple and ht_kind[vt_heap(got)] == Heap.Array.i32() and ht_a[vt_heap(got)] == vt_i32;
         if got != vt_unreachable and s == 99 and not codes { return ir_mistyped(x, vt_ref(array_type(vt_i32, true), true), got); };
         // (A host value, a function reference: not comparable by `ref.eq`.)
         let eq = vt_is_ref(got) and got != vt_extern and got != vt_externref and got != vt_funcref and got != vt_anyref;
@@ -963,7 +963,7 @@ fn elem_fits(elem: I32, got: I32) Bool {
 }
 
 fn is_data_tag(tag: I32) Bool {
-    for (Known.IrStringConcat.to_i32() ... Known.IrArrayCopy.to_i32()) |k| { if known[k] == tag { return true; }; };
+    for (Known.IrStringConcat.i32() ... Known.IrArrayCopy.i32()) |k| { if known[k] == tag { return true; }; };
     false;
 }
 
@@ -1066,7 +1066,7 @@ fn string_slice(m: I32) void {
     let a = if w_stack.len() == m + 3 { w_stack[m + 1]; } else { -1; };
     let b = if a >= 0 { w_stack[m + 2]; } else { -1; };
     // Not one, or constants already in order: as they are.
-    if a < 0 or (w_op[a] == Op.I32Const.to_i32() and w_op[b] == Op.I32Const.to_i32() and w_a[a] >= 0 and w_a[b] >= w_a[a]) {
+    if a < 0 or (w_op[a] == Op.I32Const.i32() and w_op[b] == Op.I32Const.i32() and w_a[a] >= 0 and w_a[b] >= w_a[a]) {
         call_builtin(Builtin.Substring, m);
         return;
     };

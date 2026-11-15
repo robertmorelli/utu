@@ -59,7 +59,7 @@ export main() void {
         }
         p {
             id = "changes";
-            = state.changes.to_f64().toString();
+            = state.changes.f64().toString();
         }
         label {
             "Budget";
@@ -142,7 +142,7 @@ export main() void {
             on click {
                 state.tasks = state.tasks map |task,
                 index| {
-                    state.tasks[state.tasks.len() - 1 - index.to_i64().to_i32()];
+                    state.tasks[state.tasks.len() - 1 - index.i64().i32()];
                 }
                 collect(Task);
             }

@@ -7,5 +7,5 @@ enum(U8) Color:
 
 export main() I32 {
     let c = Color.Purple;
-    c.to_i32();
+    c.i32();
 }

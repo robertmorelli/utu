@@ -71,7 +71,7 @@ fn optimize_module() void {
     for (0 ..< func_kind.len()) |f| { if optimizable(f) { optimize_function(f); }; };
 }
 
-fn optimizable(f: I32) Bool { func_kind[f] == FuncKind.Defined.to_i32() and func_live[f] == 1 and func_body[f] >= 0; }
+fn optimizable(f: I32) Bool { func_kind[f] == FuncKind.Defined.i32() and func_live[f] == 1 and func_body[f] >= 0; }
 
 /// Constants, copies and temporaries until none changes anything, then
 /// tees, then unused locals. A body sharing a node with another is left as it is.
@@ -126,13 +126,13 @@ fn opt_collect(f: I32, total: I32) void {
         let node = opt_nodes[k];
         let op = w_op[node];
         if node_holders[node] != 1 { opt_shared[0] = 1; };
-        if op == Op.LocalGet.to_i32() {
+        if op == Op.LocalGet.i32() {
             opt_gets[w_a[node]] += 1;
             opt_get_at[w_a[node]] = k;
-        } else if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+        } else if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
             opt_sets[w_a[node]] += 1;
             opt_set_at[w_a[node]] = k;
-        } else if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+        } else if op == Op.Seq.i32() or op == Op.Block.i32() or op == Op.Loop.i32() {
             opt_blocks.push(node);
         };
         let c = w_count[node];
@@ -177,16 +177,16 @@ fn sink_pure(node: I32) Bool {
 /// Whether node `node`'s own operation is one @opt_pure allows.
 fn pure_op(node: I32) Bool {
     let op = w_op[node];
-    if op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32() or op == Op.F64Const.to_i32()
-        or op == Op.LocalGet.to_i32() or op == Op.RefNull.to_i32() or op == Op.RefFunc.to_i32() or op == Op.Nop.to_i32() {
+    if op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32() or op == Op.F64Const.i32()
+        or op == Op.LocalGet.i32() or op == Op.RefNull.i32() or op == Op.RefFunc.i32() or op == Op.Nop.i32() {
         return true;
     };
     // An immutable field of a reference that cannot be null (a closure's
     // capture, from its environment) neither traps nor changes.
-    let immutable_read = (op == Op.StructGet.to_i32() or op == Op.StructGetS.to_i32() or op == Op.StructGetU.to_i32())
+    let immutable_read = (op == Op.StructGet.i32() or op == Op.StructGetS.i32() or op == Op.StructGetU.i32())
         and ht_fields[ht_a[w_a[node]] + w_b[node] * 2 + 1] == 0 and non_null(w_type[w_kid(node, 0)]);
-    op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefI31.to_i32() or op == Op.I31GetS.to_i32()
-        or op == Op.I31GetU.to_i32() or op == Op.Select.to_i32() or (op == Op.Plain.to_i32() and pure_opcode(w_a[node])) or immutable_read;
+    op == Op.RefIsNull.i32() or op == Op.RefEq.i32() or op == Op.RefI31.i32() or op == Op.I31GetS.i32()
+        or op == Op.I31GetU.i32() or op == Op.Select.i32() or (op == Op.Plain.i32() and pure_opcode(w_a[node])) or immutable_read;
 }
 
 /// A numeric instruction that cannot trap (not a division, remainder, or
@@ -205,8 +205,8 @@ fn non_null(vt: I32) Bool { vt == vt_extern or (vt >= vt_defined and vt < vt_tup
 /// Whether node `n` is a number or a null.
 fn opt_literal(n: I32) Bool {
     let op = w_op[n];
-    w_count[n] == 0 and (op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32()
-        or op == Op.F64Const.to_i32() or op == Op.RefNull.to_i32());
+    w_count[n] == 0 and (op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32()
+        or op == Op.F64Const.i32() or op == Op.RefNull.i32());
 }
 
 fn single_value(vt: I32) Bool { vt != vt_none and vt != vt_unreachable and vt < vt_tuple; }
@@ -215,7 +215,7 @@ fn set_kid(parent: I32, place: I32, node: I32) void { w_kids[w_first[parent] + p
 
 /// Make node `n` emit nothing.
 fn opt_erase(n: I32) void {
-    w_op[n] = Op.Seq.to_i32();
+    w_op[n] = Op.Seq.i32();
     w_type[n] = vt_none;
     w_count[n] = 0;
 }
@@ -243,12 +243,12 @@ fn propagate_copies(params: I32) Bool {
         if opt_sets[l] == 1 {
             let write = opt_nodes[opt_set_at[l]];
             let source = if w_count[write] == 1 { w_kid(write, 0); } else { -1; };
-            if optimize_level[0] == 1 and w_op[write] == Op.LocalSet.to_i32() and source >= 0 and opt_gets[l] > 0
+            if optimize_level[0] == 1 and w_op[write] == Op.LocalSet.i32() and source >= 0 and opt_gets[l] > 0
                 and opt_literal(source) and (opt_gets[l] == 1 or sm_bytes(source, true) <= 2) {
                 opt_const_of[l] = source;
                 changed = true;
             };
-            if w_op[write] == Op.LocalSet.to_i32() and source >= 0 and w_op[source] == Op.LocalGet.to_i32() {
+            if w_op[write] == Op.LocalSet.i32() and source >= 0 and w_op[source] == Op.LocalGet.i32() {
                 let p = w_a[source];
                 let t = w_type[source];
                 if p >= params and p < l and opt_copy_of[p] >= 0 {
@@ -268,7 +268,7 @@ fn propagate_copies(params: I32) Bool {
     changed = false;
     for (0 ..< opt_nodes.len()) |k| {
         let n = opt_nodes[k];
-        if w_op[n] == Op.LocalGet.to_i32() and opt_const_of[w_a[n]] >= 0 {
+        if w_op[n] == Op.LocalGet.i32() and opt_const_of[w_a[n]] >= 0 {
             let c = opt_const_of[w_a[n]];
             opt_gets[w_a[n]] -= 1;
             w_op[n] = w_op[c];
@@ -276,7 +276,7 @@ fn propagate_copies(params: I32) Bool {
             w_a[n] = w_a[c];
             w_b[n] = w_b[c];
             changed = true;
-        } else if w_op[n] == Op.LocalGet.to_i32() and opt_copy_of[w_a[n]] >= 0 {
+        } else if w_op[n] == Op.LocalGet.i32() and opt_copy_of[w_a[n]] >= 0 {
             let l = w_a[n];
             w_a[n] = opt_copy_of[l];
             w_type[n] = opt_copy_type[l];
@@ -306,12 +306,12 @@ fn sink_temporaries(params: I32) Bool {
     for (0 ..< opt_blocks.len()) |b| {
         let block = opt_blocks[b];
         let op = w_op[block];
-        if op == Op.Seq.to_i32() or op == Op.Block.to_i32() {
+        if op == Op.Seq.i32() or op == Op.Block.i32() {
             let i = 0;
             while (i + 1 < w_count[block]) {
                 let write = w_kid(block, i);
                 let l = w_a[write];
-                if w_op[write] == Op.LocalSet.to_i32() and w_count[write] == 1 and l >= params and opt_sets[l] == 1 and opt_gets[l] == 1 {
+                if w_op[write] == Op.LocalSet.i32() and w_count[write] == 1 and l >= params and opt_sets[l] == 1 and opt_gets[l] == 1 {
                     let value = w_kid(write, 0);
                     let at = opt_get_at[l];
                     let read = opt_nodes[at];
@@ -330,7 +330,7 @@ fn sink_temporaries(params: I32) Bool {
                             opt_sets[l] = 0;
                             changed = true;
                             // The value's own read (if it is one) now sits where the sunk read was.
-                            if w_op[value] == Op.LocalGet.to_i32() and opt_gets[w_a[value]] == 1 {
+                            if w_op[value] == Op.LocalGet.i32() and opt_gets[w_a[value]] == 1 {
                                 let v = opt_get_at[w_a[value]];
                                 opt_parent[v] = opt_parent[at];
                                 opt_place[v] = opt_place[at];
@@ -358,12 +358,12 @@ fn tee_stores() Bool {
     for (0 ..< opt_blocks.len()) |b| {
         let block = opt_blocks[b];
         let op = w_op[block];
-        if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+        if op == Op.Seq.i32() or op == Op.Block.i32() or op == Op.Loop.i32() {
             let run = 0;
             for (0 ..< w_count[block]) |i| {
                 let write = w_kid(block, i);
                 // (What emits nothing is passed over, as by tee_into.)
-                if w_op[write] == Op.LocalSet.to_i32() and w_count[write] == 1 and run < tee_run_max and tee_into(block, i + 1, write) {
+                if w_op[write] == Op.LocalSet.i32() and w_count[write] == 1 and run < tee_run_max and tee_into(block, i + 1, write) {
                     changed = true;
                     run += 1;
                 } else if not emits_nothing(write) {
@@ -390,10 +390,10 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
         if place >= w_count[holder] { return false; };
         let node = w_kid(holder, place);
         let op = w_op[node];
-        if op == Op.LocalGet.to_i32() {
+        if op == Op.LocalGet.i32() {
             if w_a[node] != w_a[write] { return false; };
             set_kid(holder, place, write);
-            w_op[write] = Op.LocalTee.to_i32();
+            w_op[write] = Op.LocalTee.i32();
             w_type[write] = w_type[node];
             opt_gets[w_a[write]] -= 1;
             // The read is now nothing, where the store was.
@@ -402,10 +402,10 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
             return true;
         };
         // A block's contents come after its opcode, which a value cannot cross.
-        if op == Op.Block.to_i32() or op == Op.Loop.to_i32() or op == Op.Try.to_i32() or op == Op.NullElse.to_i32() or w_count[node] == 0 { return false; };
+        if op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.Try.i32() or op == Op.NullElse.i32() or w_count[node] == 0 { return false; };
         // So does a CastArms' value, its blocks opened: one that takes the
         // value an arm starts with (a Held) would find it outside them.
-        if op == Op.CastArms.to_i32() and holds_held(write) { return false; };
+        if op == Op.CastArms.i32() and holds_held(write) { return false; };
         holder = node;
         place = 0;
     };
@@ -414,14 +414,14 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
 
 /// Whether `node` takes, somewhere in it, the value on the stack an arm starts with.
 fn holds_held(node: I32) Bool {
-    if w_op[node] == Op.Held.to_i32() { return true; };
+    if w_op[node] == Op.Held.i32() { return true; };
     for (0 ..< w_count[node]) |i| { if holds_held(w_kid(node, i)) { return true; }; };
     false;
 }
 
 /// Whether a node is only empty Seqs (what a removed store leaves).
 fn emits_nothing(node: I32) Bool {
-    if w_op[node] != Op.Seq.to_i32() { return false; };
+    if w_op[node] != Op.Seq.i32() { return false; };
     for (0 ..< w_count[node]) |i| { if not emits_nothing(w_kid(node, i)) { return false; }; };
     true;
 }
@@ -434,7 +434,7 @@ fn reads_of(node: I32) void {
         for (0 ..< opt_rd_len[node]) |r| { read_once(opt_rd_pool[from + r]); };
         return;
     };
-    if w_op[node] == Op.LocalGet.to_i32() { read_once(w_a[node]); };
+    if w_op[node] == Op.LocalGet.i32() { read_once(w_a[node]); };
     for (0 ..< w_count[node]) |i| { reads_of(w_kid(node, i)); };
 }
 
@@ -450,13 +450,13 @@ fn read_once(l: I32) void {
 /// each time round); 2 when it cannot be, 0 when it is not there.
 fn sink_visit(node: I32, target: I32, in_loop: Bool) I32 {
     if node == target { return if in_loop { 2; } else { 1; }; };
-    let looping = in_loop or w_op[node] == Op.Loop.to_i32();
+    let looping = in_loop or w_op[node] == Op.Loop.i32();
     for (0 ..< w_count[node]) |i| {
         let r = sink_visit(w_kid(node, i), target, looping);
         if r != 0 { return r; };
     };
     let op = w_op[node];
-    if op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+    if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         for (0 ..< opt_reads.len()) |i| { if opt_reads[i] == w_a[node] { return 2; }; };
     };
     0;
@@ -488,19 +488,19 @@ fn remove_unused_locals(f: I32, params: I32, total: I32) void {
 fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) void {
     for (0 ..< w_count[n]) |i| { unused_walk(f, w_kid(n, i), n, i, params); };
     let op = w_op[n];
-    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
+    if (op == Op.LocalSet.i32() or op == Op.LocalTee.i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
         // A store with no operand takes its value from the stack (a
         // multi-value result, taken apart): it is dropped there.
         if w_count[n] == 0 {
             // (A tee would leave it there: it is nothing.)
-            if op == Op.LocalTee.to_i32() { opt_erase(n); } else { w_op[n] = Op.Drop.to_i32(); };
+            if op == Op.LocalTee.i32() { opt_erase(n); } else { w_op[n] = Op.Drop.i32(); };
             return;
         };
         let value = w_kid(n, 0);
-        if op == Op.LocalSet.to_i32() and opt_pure(value) {
+        if op == Op.LocalSet.i32() and opt_pure(value) {
             opt_erase(n);
-        } else if op == Op.LocalSet.to_i32() and single_value(w_type[value]) {
-            w_op[n] = Op.Drop.to_i32();
+        } else if op == Op.LocalSet.i32() and single_value(w_type[value]) {
+            w_op[n] = Op.Drop.i32();
         } else if parent >= 0 {
             set_kid(parent, place, value);
         } else {
@@ -508,7 +508,7 @@ fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) void {
         };
         return;
     };
-    if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() { w_a[n] = opt_renumber[w_a[n]]; };
+    if op == Op.LocalGet.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() { w_a[n] = opt_renumber[w_a[n]]; };
 }
 
 //! = Coalescing
@@ -763,7 +763,7 @@ fn sort_by_key(order: Array[I32], key: Array[I32]) void {
 fn co_walk(node: I32) void {
     let op = w_op[node];
     let span = -1;
-    if op == Op.Loop.to_i32() {
+    if op == Op.Loop.i32() {
         span = co_loop_start.len();
         co_loop_start.push(co_pos[0]);
         co_loop_end.push(-1);
@@ -771,20 +771,20 @@ fn co_walk(node: I32) void {
         co_loop_outer.push(if co_loops.len() > 0 { co_loops[co_loops.len() - 1]; } else { -1; });
         co_loops.push(span);
     };
-    if op == Op.Br.to_i32() or op == Op.BrIf.to_i32() {
+    if op == Op.Br.i32() or op == Op.BrIf.i32() {
         co_target(w_a[node]);
-    } else if op == Op.BrTable.to_i32() {
+    } else if op == Op.BrTable.i32() {
         for (0 ..< w_b[node]) |i| { co_target(w_aux[w_a[node] + i]); };
     };
     for (0 ..< w_count[node]) |i| { co_walk(w_kid(node, i)); };
     let at = co_pos[0];
     co_pos[0] = at + 1;
-    if op == Op.LocalGet.to_i32() or op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32() {
+    if op == Op.LocalGet.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         let l = w_a[node];
         co_mentions.push(node);
         if co_first[l] < 0 {
             co_first[l] = at;
-            co_store_first[l] = if op == Op.LocalGet.to_i32() { 0; } else { 1; };
+            co_store_first[l] = if op == Op.LocalGet.i32() { 0; } else { 1; };
             if co_loops.len() > 0 { co_loop_first[l] = co_loops[co_loops.len() - 1]; };
         };
         co_last[l] = at;
@@ -861,7 +861,7 @@ fn co_undo_written(mark: I32) void {
 /// block branched out of, a `try`) writes for itself only.
 fn co_reads_first(n: I32, s: I32) void {
     let op = w_op[n];
-    if op == Op.LocalGet.to_i32() {
+    if op == Op.LocalGet.i32() {
         let l = w_a[n];
         if co_written[l] == 0 and co_noted[l] != s {
             co_noted[l] = s;
@@ -869,18 +869,18 @@ fn co_reads_first(n: I32, s: I32) void {
         };
         return;
     };
-    let maybe = op == Op.Loop.to_i32() or op == Op.Try.to_i32()
-        or (op == Op.Block.to_i32() and w_a[n] < co_targeted.len() and co_targeted[w_a[n]] == 1);
+    let maybe = op == Op.Loop.i32() or op == Op.Try.i32()
+        or (op == Op.Block.i32() and w_a[n] < co_targeted.len() and co_targeted[w_a[n]] == 1);
     // (A `try`'s catch runs after any part of its body.)
-    let branches = op == Op.If.to_i32() or op == Op.NullElse.to_i32() or op == Op.CastArms.to_i32() or op == Op.Try.to_i32();
+    let branches = op == Op.If.i32() or op == Op.NullElse.i32() or op == Op.CastArms.i32() or op == Op.Try.i32();
     let mark = co_written_log.len();
     for (0 ..< w_count[n]) |i| {
         if branches and i > 0 { co_undo_written(mark); };
         co_reads_first(w_kid(n, i), s);
-        if branches and i == 0 and op != Op.Try.to_i32() { mark = co_written_log.len(); };
+        if branches and i == 0 and op != Op.Try.i32() { mark = co_written_log.len(); };
     };
     if maybe or branches { co_undo_written(mark); };
-    if (op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32()) and co_written[w_a[n]] == 0 {
+    if (op == Op.LocalSet.i32() or op == Op.LocalTee.i32()) and co_written[w_a[n]] == 0 {
         co_written[w_a[n]] = 1;
         co_written_log.push(w_a[n]);
     };
@@ -904,7 +904,7 @@ fn fold_logic() Bool {
     while (k > 0) {
         k -= 1;
         let n = opt_nodes[k];
-        if w_op[n] == Op.If.to_i32() and w_type[n] == vt_i32 and w_count[n] == 3 and fold_if(n) { changed = true; };
+        if w_op[n] == Op.If.i32() and w_type[n] == vt_i32 and w_count[n] == 3 and fold_if(n) { changed = true; };
     };
     changed;
 }
@@ -928,7 +928,7 @@ fn fold_if(n: I32) Bool {
 /// Node n rewritten in place as `op a` of kids k1 (and k2, if any), a
 /// Bool (marked so when a Plain).
 fn relink(n: I32, op: Op, a: I32, k1: I32, k2: I32) Bool {
-    w_op[n] = op.to_i32();
+    w_op[n] = op.i32();
     w_a[n] = a;
     w_b[n] = 2;
     w_first[n] = w_kids.len();
@@ -944,24 +944,24 @@ fn relink(n: I32, op: Op, a: I32, k1: I32, k2: I32) Bool {
 /// A branch's value: the node a Seq of one value holds, or -1.
 fn seq_value(n: I32) I32 {
     let v = n;
-    while (w_op[v] == Op.Seq.to_i32()) {
+    while (w_op[v] == Op.Seq.i32()) {
         if w_count[v] != 1 { return -1; };
         v = w_kid(v, 0);
     };
     if w_type[v] == vt_i32 { v; } else { -1; };
 }
 
-fn is_const(n: I32, value: I32) Bool { w_op[n] == Op.I32Const.to_i32() and w_a[n] == value; }
+fn is_const(n: I32, value: I32) Bool { w_op[n] == Op.I32Const.i32() and w_a[n] == value; }
 
 /// Whether an `i32` is always 0 or 1: a comparison, a null or type test, a
 /// Bool `if` or fold, 0 or 1.
 fn bool_valued(n: I32) Bool {
     let op = w_op[n];
-    if op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32() or op == Op.RefTest.to_i32() { return true; };
-    if op == Op.I32Const.to_i32() { return w_a[n] == 0 or w_a[n] == 1; };
-    if (op == Op.If.to_i32() or op == Op.Plain.to_i32()) and (w_b[n] & 2) == 2 { return true; };
-    if op == Op.Seq.to_i32() { return w_count[n] == 1 and bool_valued(w_kid(n, 0)); };
-    if op == Op.Plain.to_i32() {
+    if op == Op.RefIsNull.i32() or op == Op.RefEq.i32() or op == Op.RefTest.i32() { return true; };
+    if op == Op.I32Const.i32() { return w_a[n] == 0 or w_a[n] == 1; };
+    if (op == Op.If.i32() or op == Op.Plain.i32()) and (w_b[n] & 2) == 2 { return true; };
+    if op == Op.Seq.i32() { return w_count[n] == 1 and bool_valued(w_kid(n, 0)); };
+    if op == Op.Plain.i32() {
         let code = w_a[n];
         if code >= 69 and code <= 102 { return true; };
         if code == i32_and or code == i32_or or code == i32_xor { return bool_valued(w_kid(n, 0)) and bool_valued(w_kid(n, 1)); };
@@ -973,9 +973,9 @@ fn bool_valued(n: I32) Bool {
 /// or may trap or have effects.
 fn cheap(n: I32, budget: I32) I32 {
     let op = w_op[n];
-    let ok = op == Op.I32Const.to_i32() or op == Op.I64Const.to_i32() or op == Op.F32Const.to_i32() or op == Op.F64Const.to_i32()
-        or op == Op.LocalGet.to_i32() or op == Op.GlobalGet.to_i32() or op == Op.RefIsNull.to_i32() or op == Op.RefEq.to_i32()
-        or (op == Op.Plain.to_i32() and pure_opcode(w_a[n]));
+    let ok = op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32() or op == Op.F64Const.i32()
+        or op == Op.LocalGet.i32() or op == Op.GlobalGet.i32() or op == Op.RefIsNull.i32() or op == Op.RefEq.i32()
+        or (op == Op.Plain.i32() and pure_opcode(w_a[n]));
     if not ok or budget < 1 { return -1; };
     let left = budget - 1;
     for (0 ..< w_count[n]) |i| {
@@ -993,27 +993,27 @@ vec rb_value: I64 = [0];
 /// local: 0 `x >= v`, 1 `x <= v` (@rb_local, @rb_value); -1 none. `negate`
 /// reads it as its opposite (`x < v` is not `x >= v`).
 fn range_bound(n: I32, negate: Bool) I32 {
-    if w_op[n] != Op.Plain.to_i32() or w_count[n] != 2 { return -1; };
+    if w_op[n] != Op.Plain.i32() or w_count[n] != 2 { return -1; };
     let code = w_a[n];
     // lt_s 72, gt_s 74, le_s 76, ge_s 78.
     if code != 72 and code != 74 and code != 76 and code != 78 { return -1; };
     let l = w_kid(n, 0);
     let r = w_kid(n, 1);
     // `k < x` is `x > k`.
-    if w_op[l] == Op.I32Const.to_i32() and w_op[r] == Op.LocalGet.to_i32() {
+    if w_op[l] == Op.I32Const.i32() and w_op[r] == Op.LocalGet.i32() {
         code = if code == 72 { 74; } else if code == 74 { 72; } else if code == 76 { 78; } else { 76; };
         let t = l;
         l = r;
         r = t;
     };
-    if w_op[l] != Op.LocalGet.to_i32() or w_op[r] != Op.I32Const.to_i32() { return -1; };
+    if w_op[l] != Op.LocalGet.i32() or w_op[r] != Op.I32Const.i32() { return -1; };
     if negate { code = if code == 72 { 78; } else if code == 74 { 76; } else if code == 76 { 74; } else { 72; }; };
     rb_local[0] = w_a[l];
-    let v = w_a[r].to_i64();
+    let v = w_a[r].i64();
     if code == 78 { rb_value[0] = v; return 0; };
-    if code == 74 { rb_value[0] = v + 1.to_i64(); return 0; };
+    if code == 74 { rb_value[0] = v + 1.i64(); return 0; };
     if code == 76 { rb_value[0] = v; return 1; };
-    rb_value[0] = v - 1.to_i64();
+    rb_value[0] = v - 1.i64();
     1;
 }
 
@@ -1027,21 +1027,21 @@ fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
     if ka < 0 or kb < 0 or ka == kb or la != rb_local[0] { return false; };
     let lo = if ka == 0 { va; } else { rb_value[0]; };
     let hi = if ka == 0 { rb_value[0]; } else { va; };
-    let span = hi - lo + 1.to_i64();
-    if lo > hi or span >= 65536.to_i64() * 65536.to_i64() { return false; };
+    let span = hi - lo + 1.i64();
+    if lo > hi or span >= 65536.i64() * 65536.i64() { return false; };
     let x = if ka == 0 { w_kid(a, 0); } else { w_kid(b, 0); };
-    if w_op[x] != Op.LocalGet.to_i32() { x = if ka == 0 { w_kid(a, 1); } else { w_kid(b, 1); }; };
+    if w_op[x] != Op.LocalGet.i32() { x = if ka == 0 { w_kid(a, 1); } else { w_kid(b, 1); }; };
     let m = w_mark();
     w_push(x);
-    if span == 1.to_i64() {
-        w_i32(lo.to_i32());
+    if span == 1.i64() {
+        w_i32(lo.i32());
         w_i32_op(if and_ { i32_eq; } else { i32_ne; }, m);
-    } else if lo != 0.to_i64() {
-        w_i32(lo.to_i32());
+    } else if lo != 0.i64() {
+        w_i32(lo.i32());
         w_i32_op(i32_sub, m);
     };
-    if span != 1.to_i64() {
-        w_i32(span.to_i32());
+    if span != 1.i64() {
+        w_i32(span.i32());
         w_i32_op(if and_ { i32_lt_u; } else { i32_ge_u; }, m);
     };
     // The new nodes, each held once.
@@ -1121,18 +1121,18 @@ fn reuse_loads(f: I32) Bool {
 fn ld_walk(n: I32) void {
     let op = w_op[n];
     let count = w_count[n];
-    if op == Op.Loop.to_i32() { ld_loop_writes(n); };
+    if op == Op.Loop.i32() { ld_loop_writes(n); };
     // Kids from `alone` on run each (or not) from what was known before
     // them; a block's or loop's, in turn, forgotten after it.
-    let alone = if op == Op.If.to_i32() or op == Op.NullElse.to_i32() or op == Op.CastArms.to_i32() { 1; }
-        else if op == Op.Try.to_i32() { 0; } else { count; };
+    let alone = if op == Op.If.i32() or op == Op.NullElse.i32() or op == Op.CastArms.i32() { 1; }
+        else if op == Op.Try.i32() { 0; } else { count; };
     let start = ld_node.len();
     for (0 ..< count) |i| {
         let mark = ld_node.len();
         ld_walk(w_kid(n, i));
         if i >= alone { ld_forget(mark); };
     };
-    if op == Op.Block.to_i32() or op == Op.Loop.to_i32() { ld_forget(start); };
+    if op == Op.Block.i32() or op == Op.Loop.i32() { ld_forget(start); };
     ld_effect(n);
 }
 
@@ -1229,8 +1229,8 @@ fn ld_loop_writes(n: I32) void {
 /// What node n's own instruction does to the reads known.
 fn ld_effect(n: I32) void {
     let op = w_op[n];
-    if (op == Op.StructGet.to_i32() or op == Op.StructGetS.to_i32() or op == Op.StructGetU.to_i32())
-        and w_op[w_kid(n, 0)] == Op.LocalGet.to_i32() and not non_null(w_type[n]) {
+    if (op == Op.StructGet.i32() or op == Op.StructGetS.i32() or op == Op.StructGetU.i32())
+        and w_op[w_kid(n, 0)] == Op.LocalGet.i32() and not non_null(w_type[n]) {
         ld_read(n);
     } else {
         ld_effect_write(n);
@@ -1239,9 +1239,9 @@ fn ld_effect(n: I32) void {
 
 fn ld_effect_write(n: I32) void {
     let op = w_op[n];
-    let set = op == Op.StructSet.to_i32();
-    let call = op == Op.Call.to_i32() or op == Op.CallRef.to_i32() or op == Op.ReturnCall.to_i32();
-    let local = op == Op.LocalSet.to_i32() or op == Op.LocalTee.to_i32();
+    let set = op == Op.StructSet.i32();
+    let call = op == Op.Call.i32() or op == Op.CallRef.i32() or op == Op.ReturnCall.i32();
+    let local = op == Op.LocalSet.i32() or op == Op.LocalTee.i32();
     if local { ld_bump(0, w_a[n]); };
     if call { ld_call_writes[0] += 1; };
     if set { ld_bump(1, w_b[n]); };
@@ -1283,9 +1283,9 @@ fn ld_reuse(e: I32, n: I32) void {
         // The read, teed: a copy of it in a tee where it was.
         let m = w_mark();
         w_push(w_kid(r, 0));
-        let copy = w_node(Op.from_i32(w_op[r]), w_type[r], w_a[r], w_b[r], m);
+        let copy = w_node(Op(w_op[r]), w_type[r], w_a[r], w_b[r], m);
         w_pop();
-        w_op[r] = Op.LocalTee.to_i32();
+        w_op[r] = Op.LocalTee.i32();
         w_a[r] = t;
         w_b[r] = 0;
         w_first[r] = w_kids.len();
@@ -1293,7 +1293,7 @@ fn ld_reuse(e: I32, n: I32) void {
         w_count[r] = 1;
         ld_node[e] = copy;
     };
-    w_op[n] = Op.LocalGet.to_i32();
+    w_op[n] = Op.LocalGet.i32();
     w_a[n] = ld_temp[id];
     w_b[n] = 0;
     w_count[n] = 0;
@@ -1330,17 +1330,17 @@ fn cf_fold(n: I32) I32 {
     let op = w_op[n];
     let count = w_count[n];
     // A global never set is its constant (as encoding emits it).
-    if op == Op.GlobalGet.to_i32() and glob_folded(w_a[n]) {
+    if op == Op.GlobalGet.i32() and glob_folded(w_a[n]) {
         let init = glob_init[w_a[n]];
-        return cf_set(n, if w_op[init] == Op.I32Const.to_i32() { vt_i32; } else { vt_i64; }, cf_val(init));
+        return cf_set(n, if w_op[init] == Op.I32Const.i32() { vt_i32; } else { vt_i64; }, cf_val(init));
     };
-    if op == Op.Plain.to_i32() and count == 2 { return cf_binary(n); };
-    if op == Op.Plain.to_i32() and count == 1 { return cf_unary(n); };
-    if op == Op.Select.to_i32() and count == 3 and cf_const(w_kid(n, 2)) { return cf_select(n); };
-    if op == Op.BrIf.to_i32() and count >= 1 and cf_const(w_kid(n, count - 1)) { return cf_br_if(n); };
-    if op == Op.If.to_i32() and count >= 2 and cf_const(w_kid(n, 0)) { cf_if(n); };
+    if op == Op.Plain.i32() and count == 2 { return cf_binary(n); };
+    if op == Op.Plain.i32() and count == 1 { return cf_unary(n); };
+    if op == Op.Select.i32() and count == 3 and cf_const(w_kid(n, 2)) { return cf_select(n); };
+    if op == Op.BrIf.i32() and count >= 1 and cf_const(w_kid(n, count - 1)) { return cf_br_if(n); };
+    if op == Op.If.i32() and count >= 2 and cf_const(w_kid(n, 0)) { cf_if(n); };
     // What follows a `br` (as a folded `br_if` leaves), `return` or `unreachable` never runs.
-    if op == Op.Seq.to_i32() or op == Op.Block.to_i32() or op == Op.Loop.to_i32() {
+    if op == Op.Seq.i32() or op == Op.Block.i32() or op == Op.Loop.i32() {
         let i = 0;
         while (i + 1 < count) {
             if cf_diverges(w_kid(n, i)) {
@@ -1359,42 +1359,42 @@ fn cf_fold(n: I32) I32 {
 /// leaves it by its label). The last only: one path, not the tree.
 fn cf_diverges(n: I32) Bool {
     let k = w_op[n];
-    if k == Op.Br.to_i32() or k == Op.Return.to_i32() or k == Op.Unreachable.to_i32() { return true; };
+    if k == Op.Br.i32() or k == Op.Return.i32() or k == Op.Unreachable.i32() { return true; };
     let count = w_count[n];
-    if count == 0 or k == Op.Loop.to_i32() or k == Op.If.to_i32() or k == Op.Try.to_i32() or k == Op.NullElse.to_i32() or k == Op.CastArms.to_i32() { return false; };
+    if count == 0 or k == Op.Loop.i32() or k == Op.If.i32() or k == Op.Try.i32() or k == Op.NullElse.i32() or k == Op.CastArms.i32() { return false; };
     if not cf_diverges(w_kid(n, count - 1)) { return false; };
-    k != Op.Block.to_i32() or not cf_branches_to(n, w_a[n]);
+    k != Op.Block.i32() or not cf_branches_to(n, w_a[n]);
 }
 
 /// Whether a `br`, `br_if` or `br_table` to `label` is in node n.
 fn cf_branches_to(n: I32, label: I32) Bool {
     let k = w_op[n];
-    if (k == Op.Br.to_i32() or k == Op.BrIf.to_i32()) and w_a[n] == label { return true; };
-    if k == Op.BrTable.to_i32() {
+    if (k == Op.Br.i32() or k == Op.BrIf.i32()) and w_a[n] == label { return true; };
+    if k == Op.BrTable.i32() {
         for (0 ..< w_b[n]) |i| { if w_aux[w_a[n] + i] == label { return true; }; };
     };
     for (0 ..< w_count[n]) |i| { if cf_branches_to(w_kid(n, i), label) { return true; }; };
     false;
 }
 
-fn cf_const(n: I32) Bool { w_op[n] == Op.I32Const.to_i32() or w_op[n] == Op.I64Const.to_i32(); }
+fn cf_const(n: I32) Bool { w_op[n] == Op.I32Const.i32() or w_op[n] == Op.I64Const.i32(); }
 
 /// A constant's value (an `i32`'s sign-extended).
 fn cf_val(n: I32) I64 {
-    if w_op[n] == Op.I32Const.to_i32() { return w_a[n].to_i64(); };
-    (w_b[n].to_i64() << 32) | (w_a[n].to_i64() & 4294967295);
+    if w_op[n] == Op.I32Const.i32() { return w_a[n].i64(); };
+    (w_b[n].i64() << 32) | (w_a[n].i64() & 4294967295);
 }
 
 /// The low 32 bits of v.
 fn cf_low(v: I64) I32 {
     let lo = v & 4294967295;
     if lo >= 2147483648 { lo = lo - 4294967296; };
-    lo.to_i32();
+    lo.i32();
 }
 
 /// Node n rewritten as the constant v (of type vt, `i32` or `i64`).
 fn cf_set(n: I32, vt: I32, v: I64) I32 {
-    w_op[n] = if vt == vt_i32 { Op.I32Const.to_i32(); } else { Op.I64Const.to_i32(); };
+    w_op[n] = if vt == vt_i32 { Op.I32Const.i32(); } else { Op.I64Const.i32(); };
     w_type[n] = vt;
     w_a[n] = cf_low(v);
     w_b[n] = if vt == vt_i32 { 0; } else { cf_low(v >> 32); };
@@ -1412,7 +1412,7 @@ fn cf_take(x: I32) I32 {
 /// v shifted right by k (0 to 63), zeros in.
 fn cf_shr_u(v: I64, k: I64) I64 {
     if k == 0 { return v; };
-    (v >> k) & ((1.to_i64() << (64.to_i64() - k)) - 1);
+    (v >> k) & ((1.i64() << (64.i64() - k)) - 1);
 }
 
 /// A binary `i32` or `i64` instruction.
@@ -1458,7 +1458,7 @@ fn cf_compare(op: I32, a: I64, b: I64, wide: Bool) Bool {
     let y = b;
     // Unsigned: as signed, with the sign bit flipped (`i64`) or no sign (`i32`).
     if op == 73 or op == 75 or op == 77 or op == 79 {
-        let flip = 1.to_i64() << 63;
+        let flip = 1.i64() << 63;
         if wide {
             x = a ^ flip;
             y = b ^ flip;
@@ -1513,19 +1513,19 @@ fn cf_reassociate(n: I32, op: I32, wide: Bool) I32 {
     if c < 0 { return n; };
     let other = if c == r { l; } else { r; };
     let k = cf_val(c);
-    if c == r and op == 107 { k = 0.to_i64() - k; };
+    if c == r and op == 107 { k = 0.i64() - k; };
     let negated = c == l and op == 107;
-    if w_op[other] != Op.Plain.to_i32() or w_count[other] != 2 or (w_a[other] != add and w_a[other] != sub) { return n; };
+    if w_op[other] != Op.Plain.i32() or w_count[other] != 2 or (w_a[other] != add and w_a[other] != sub) { return n; };
     // other is `j + x`, or `j - x` when x is negated.
     let ol = w_kid(other, 0);
     let or_ = w_kid(other, 1);
     let x = -1;
-    let j = 0.to_i64();
+    let j = 0.i64();
     let x_negated = false;
     if cf_const(or_) and not cf_const(ol) {
         x = ol;
         j = cf_val(or_);
-        if w_a[other] == sub { j = 0.to_i64() - j; };
+        if w_a[other] == sub { j = 0.i64() - j; };
     } else if cf_const(ol) and not cf_const(or_) {
         x = or_;
         j = cf_val(ol);
@@ -1578,7 +1578,7 @@ fn cf_br_if(n: I32) I32 {
     let count = w_count[n];
     cf_changed[0] = 1;
     if w_a[w_kid(n, count - 1)] != 0 {
-        w_op[n] = Op.Br.to_i32();
+        w_op[n] = Op.Br.i32();
         w_count[n] = count - 1;
         if count == 1 { w_type[n] = vt_unreachable; };
         return n;
@@ -1601,7 +1601,7 @@ fn cf_if(n: I32) void {
     };
     let arm = w_kid(n, if on { 1; } else { 2; });
     // A block only when a branch leaves it by its label.
-    w_op[n] = if w_a[n] >= 0 and cf_branches_to(arm, w_a[n]) { Op.Block.to_i32(); } else { Op.Seq.to_i32(); };
+    w_op[n] = if w_a[n] >= 0 and cf_branches_to(arm, w_a[n]) { Op.Block.i32(); } else { Op.Seq.i32(); };
     w_b[n] = 0;
     set_kid(n, 0, arm);
     w_count[n] = 1;

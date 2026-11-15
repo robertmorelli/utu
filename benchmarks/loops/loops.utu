@@ -16,7 +16,7 @@ export lib {
 
     fn floats(n: I32) Array[F64] {
         let xs = Array[F64].new(n, 0.0);
-        for (0..<n) |i| { xs[i] = i.to_f64() * 0.5; };
+        for (0..<n) |i| { xs[i] = i.f64() * 0.5; };
         xs;
     }
 
@@ -98,12 +98,12 @@ export lib {
     }
 
     fn group_by_4096(xs: Array[I32]) I32 {
-        let groups = xs group_by(I32, I32) |x, i| { (x * 31 + i.to_i32()) & 4095; };
+        let groups = xs group_by(I32, I32) |x, i| { (x * 31 + i.i32()) & 4095; };
         groups.len();
     }
 
     fn distinct_4096(xs: Array[I32]) I32 {
-        let firsts = xs distinct_by(I32, I32) |x, i| { (x * 31 + i.to_i32()) & 4095; };
+        let firsts = xs distinct_by(I32, I32) |x, i| { (x * 31 + i.i32()) & 4095; };
         firsts.len();
     }
 

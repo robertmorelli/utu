@@ -8,6 +8,6 @@ enum(U8) Size:
     | Small
     | Large
 
-fn paint(c: Color) I32 { c.to_i32(); }
+fn paint(c: Color) I32 { c.i32(); }
 
 export main() I32 { paint(Size.Small); }

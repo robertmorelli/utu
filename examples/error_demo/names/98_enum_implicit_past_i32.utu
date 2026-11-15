@@ -5,5 +5,5 @@ enum(I32) Wide:
     | Next
 
 export main() I32 {
-    Wide.Top.to_i32();
+    Wide.Top.i32();
 }
