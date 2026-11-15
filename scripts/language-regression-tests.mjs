@@ -931,7 +931,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       ['fn f(t: .{I32, I32}) I32 { 1; }\nexport main() I32 { 1; }', 'A tuple is only a function result'],
       ['struct S:\n    | t: .{I32, I32}\nexport main() I32 { 1; }', 'A tuple is only a function result'],
       ['export main() I32 { let k: cl(I32) .{I32, I32} = cl(a) .{I32, I32} { .{a, a}; }; 1; }', 'A closure cannot return a tuple'],
-      ['fn f() .{I32, I32} { .{1, 2.5}; }\nexport main() I32 { 1; }', 'Expected I32, got F64'],
+      ['fn f() .{I32, I32} { .{1, 2.5}; }\nexport main() I32 { 1; }', 'Expected I32, got F32'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);
@@ -949,7 +949,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       ['mem s: I32;\nexport main() I32 { s.intern(0, 1); }', 'Only U8 and I8 mems intern'],
       ['mem s: U8;\nexport main() I32 { let t = s; 1; }', 'mem s is not a value'],
       ['mem s: U8;\nexport main() I32 { s[0, 1]; 1; }', 'mem s takes one index'],
-      ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'Expected I32, got F64'],
+      ['mem s: U8;\nexport main() I32 { s.push(1.5); 1; }', 'Expected I32, got F32'],
       ['const mem s: U8 = [1];\nexport main() I32 { s[0] = 2; 1; }', 'mem s is const'],
       ['const mem s: U8 = [1];\nexport main() I32 { s.push(2); 1; }', 'mem s is const: no push'],
       ['mem s: U8 = [256];\nexport main() I32 { 1; }', '256 does not fit U8'],

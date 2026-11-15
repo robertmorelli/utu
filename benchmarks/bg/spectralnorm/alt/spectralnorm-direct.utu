@@ -16,7 +16,7 @@ fn a(i: I32, j: I32) I32 { ((i + j) * (i + j + 1) >>> 1) + i + 1; }
 fn times(v: Array[F64], u: Array[F64]) void {
     let n = u.len();
     for (0..<v.len()) |i| {
-        let t = 0.0;
+        let t: F64 = 0.0;
         for (0..<n) |j| {
             t += u[j] / a(i, j).f64();
         };
@@ -28,7 +28,7 @@ fn times(v: Array[F64], u: Array[F64]) void {
 fn times_transp(v: Array[F64], u: Array[F64]) void {
     let n = u.len();
     for (0..<v.len()) |i| {
-        let t = 0.0;
+        let t: F64 = 0.0;
         for (0..<n) |j| {
             t += u[j] / a(j, i).f64();
         };
@@ -50,8 +50,8 @@ fn spectralnorm(n: I32) F64 {
         a_times_transp(v, u, x);
         a_times_transp(u, v, x);
     };
-    let vbv = 0.0;
-    let vv = 0.0;
+    let vbv: F64 = 0.0;
+    let vv: F64 = 0.0;
     for (0..<n) |i| {
         vbv += u[i] * v[i];
         vv += v[i] * v[i];

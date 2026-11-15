@@ -473,7 +473,7 @@ await test('keyof over an index signature accepts any key (mitt handlers need no
   const output = linkFiles({ files: [path.join(ROOT, 'node_modules/mitt/index.d.ts')], prefix: 'Mitt', moduleSpecifier: 'mitt' });
   const { exports } = await run(`fn run() F64 {
     let emitter = Mitt.default();
-    let total = 0.0;
+    let total: F64 = 0.0;
     emitter.on("add", cl(value: F64) void { total = total + value; });
     emitter.emit("add", 2); emitter.emit("add", 3);
     total;
@@ -486,7 +486,7 @@ await test('try/catch catches host exceptions as values, nests, and yields a res
   assert.deepEqual(members.errors, ['Externref has no field name']);
   const doc = await compile(`using JS from std:JS; export lib {
     fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { JS.String(e); }; }
-    fn counted() F64 { let failures = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; failures; }
+    fn counted() F64 { let failures: F64 = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; failures; }
     fn nested() Str {
       try { try { JS.JSON.parse("{"); "inner ok"; } catch |inner| { JS.JSON.parse("]"); "inner caught"; }; }
       catch |outer| { "outer caught"; };

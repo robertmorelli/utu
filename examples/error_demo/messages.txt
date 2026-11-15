@@ -343,7 +343,7 @@ ok
    │                            ━━━━
    │                            ╰─ here
  4 │     if xs.len() == 0 { return null; };
- 5 │     let total = 0.0;
+ 5 │     let total: F64 = 0.0;
 --- exit 1
 
 === utu check examples/error_demo/control/16_bare_null_let.utu
@@ -1850,7 +1850,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/30_source_range_float.utu
- ERROR  Cannot pipe a range of F64
+ ERROR  Cannot pipe a range of F32
         iterator-source · examples/error_demo/iterators/30_source_range_float.utu:4:5
 
  2 │ // Expect: a range pipeline counts integers; F64 bounds are not allowed
@@ -1961,11 +1961,11 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/iterators/34_for_float_range.utu
- ERROR  for needs an array or range, not F64
+ ERROR  for needs an array or range, not F32
         invalid-for-source · examples/error_demo/iterators/34_for_float_range.utu:5:10
 
  3 │ export main() F64 {
- 4 │     let total = 0.0;
+ 4 │     let total: F64 = 0.0;
  5 │     for (0.0 ..< 1.0) |x| { total += x; };
    │          ━━━━━━━━━━━
    │          ╰─ here
@@ -8034,15 +8034,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/100_int_u64_max_default_i32.utu
- ERROR  18446744073709551615 does not fit I32
-        integer-out-of-range · examples/error_demo/syntax/100_int_u64_max_default_i32.utu:4:20
+ ERROR  Expected I32, got U64
+        type-mismatch · examples/error_demo/syntax/100_int_u64_max_default_i32.utu:5:5
 
- 2 │ // Expect: 18446744073709551615 does not fit I32 (it once wrapped to -1)
  3 │ export main() I32 {
  4 │     let all_ones = 18446744073709551615;
-   │                    ━━━━━━━━━━━━━━━━━━━━
-   │                    ╰─ I32
  5 │     all_ones;
+   │     ━━━━━━━━
+   │     ╰─ U64
  6 │ }
 --- exit 1
 
@@ -8976,14 +8975,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/63_int_out_of_range_default_i32.utu
- ERROR  3000000000 does not fit I32
+ ERROR  18446744073709551616 does not fit U64
         integer-out-of-range · examples/error_demo/syntax/63_int_out_of_range_default_i32.utu:4:15
 
- 2 │ // Expect: Integer literal 3000000000 is out of range for I32; annotate the binding (e.g. `: I64`).
+ 2 │ // Expect: 18446744073709551616 does not fit U64 (a literal takes the first of I32, U32, I64, U64 it fits)
  3 │ export main() I64 {
- 4 │     let big = 3000000000;
-   │               ━━━━━━━━━━
-   │               ╰─ I32
+ 4 │     let big = 18446744073709551616;
+   │               ━━━━━━━━━━━━━━━━━━━━
+   │               ╰─ U64
  5 │     big.i64();
  6 │ }
 --- exit 1
@@ -9543,7 +9542,7 @@ FAIL after tests: boom
    │                ╰─ I32
    ┆
  5 │ export main() I32 {
- 6 │     let width = 4.5;
+ 6 │     let width: F64 = 4.5;
  7 │     repeat_dash(width).len();
    │                 ━━━━━
    │                 ╰─ F64
@@ -9584,7 +9583,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/07_field_assignment.utu
- ERROR  Field score is I32, got F64
+ ERROR  Field score is I32, got F32
         type-mismatch · examples/error_demo/types/07_field_assignment.utu:8:15
 
  4 │     | score: I32
@@ -9595,33 +9594,33 @@ FAIL after tests: boom
  7 │     let p = Player { score: 0 };
  8 │     p.score = 2.5;
    │               ━━━
-   │               ╰─ F64
+   │               ╰─ F32
  9 │     p.score;
 10 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/08_array_elem_assign.utu
- ERROR  Elements are I32, got F64
+ ERROR  Elements are I32, got F32
         type-mismatch · examples/error_demo/types/08_array_elem_assign.utu:5:13
 
  3 │ export main() I32 {
  4 │     let xs = Array[I32].new(3, 0);
  5 │     xs[0] = 1.5;
    │             ━━━
-   │             ╰─ F64
+   │             ╰─ F32
  6 │     xs[0];
  7 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/09_compound_assign.utu
- ERROR  No + for I32 and F64
+ ERROR  No + for I32 and F32
         operand-mismatch · examples/error_demo/types/09_compound_assign.utu:5:14
 
  3 │ export main() I32 {
  4 │     let total = 0;
  5 │     total += 0.5;
    │     ─────    ━━━
-   │     │        ╰─ F64
+   │     │        ╰─ F32
    │     ╰─ I32
  6 │     total;
  7 │ }
@@ -9913,7 +9912,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/1200_proto_default_on_unimplementing_scalar.utu
- ERROR  tick takes P, got F64
+ ERROR  tick takes P, got F32
         type-mismatch · examples/error_demo/types/1200_proto_default_on_unimplementing_scalar.utu:7:28
 
  5 │ fn P[I32].step |s| () I32 { s; }
@@ -9922,7 +9921,7 @@ FAIL after tests: boom
    │           ╰─ P
  7 │ export main() I32 { P.tick(7.5); }
    │                            ━━━
-   │                            ╰─ F64
+   │                            ╰─ F32
 --- exit 1
 
 === utu check examples/error_demo/types/1202_using_type_argument_count.utu
@@ -10839,7 +10838,7 @@ FAIL after tests: boom
         unknown-operator · examples/error_demo/types/44_unknown_operator_float_bitand.utu:5:18
 
  3 │ export main() I32 {
- 4 │     let x = 3.0;
+ 4 │     let x: F64 = 3.0;
  5 │     let masked = x & 1.0;
    │                  ━━━━━━━
    │                  ╰─ F64
@@ -11167,7 +11166,7 @@ FAIL after tests: boom
         static-as-method · examples/error_demo/types/58_unknown_method_f64_sqrt.utu:5:5
 
  3 │ export main() I32 {
- 4 │     let x = 2.0;
+ 4 │     let x: F64 = 2.0;
  5 │     x.sqrt().i32();
    │     ━━━━━━━━
    │     ╰─ no such method

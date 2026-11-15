@@ -7,15 +7,16 @@ mod tour {
         \\using console from std:Console;
         \\
         \\export main() void {
-        \\    let n = 42;                   // I32: an integer literal's default
+        \\    let n = 42;                   // I32: the first of I32, U32, I64, U64 it fits
+        \\    let wide = 4000000000;        // U32
+        \\    let big = 9007199254740993;   // I64
         \\    let mask = 0xff;              // hexadecimal
         \\    let bits = 0b1010;            // binary
-        \\    let x = 2.5e3;                // F64: a float literal's default
-        \\    let big: I64 = 9007199254740993;
-        \\    let wide: U32 = 4000000000;
-        \\    let tiny: F32 = 0.1;
-        \\    console.log(`${n} ${mask} ${bits} ${x} ${big} ${wide} ${tiny}`);
-        \\    // 42 255 10 2500 9007199254740993 4000000000 0.1
+        \\    let half = 0.5;               // F32: it reads the same as F32 and as F64
+        \\    let tenth = 0.1;              // F64: as F32 it would be 0.100000001…
+        \\    let x = F64(2.5e3);           // F64(…), I64(…): a literal of that type
+        \\    console.log(`${n} ${wide} ${big} ${mask} ${bits} ${half} ${tenth} ${x}`);
+        \\    // 42 4000000000 9007199254740993 255 10 0.5 0.1 2500
         \\}
         ;
     }

@@ -249,7 +249,7 @@ fn put_str(s: Str) void {
 
 fn random_fasta(rng: Lcg, chars: Str, probs: Array[F64], count: I32) void {
     let cum = Array[F64].new(probs.len(), 0.0);
-    let c = 0.0;
+    let c: F64 = 0.0;
     for (0..<probs.len()) |i| {
         c += probs[i];
         cum[i] = c;

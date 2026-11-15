@@ -592,6 +592,20 @@ fn branch_join(from: I32, cx: Cx) I32 {
         let v = branch_value(join_nodes[k]);
         if is_null_literal(v) or is_kind(v, Node.Struct_init) or is_kind(v, Node.Type_member_expr) { shaped = true; };
     };
+    // `if c { 0.0; } else { x; }`: a literal branch takes the number type
+    // of the first that is not one.
+    if not shaped {
+        let literal = false;
+        let other = -1;
+        for (from ..< n) |k| {
+            let b = join_nodes[k];
+            if is_number_literal(branch_value(b)) { literal = true; } else if other < 0 { other = b; };
+        };
+        join_nodes.resize(from);
+        if not literal or other < 0 { return -1; };
+        let ot = type_only(other, -1, cx);
+        return if is_numeric(ot) { ot; } else { -1; };
+    };
     let has_null = false;
     let differ = false;
     let t = -1;

@@ -1797,7 +1797,7 @@ export lib {
     ['fn sq(a: I32) I32 {\n    @ir/\\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \\/;\n}\nexport lib { fn run() I32 { sq(7); } }\n', 'No @ir element <ir-i32-mull>'],
     ['fn sq(a: I32) I32 {\n    @ir/\\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \\/;\n}\nexport lib { fn run() I32 { sq(7); } }\n', '@ir names no parameter b'],
     ['using JS from std:JS;\nexport lib { fn run() I32 { let f = cl(x) { x; }; 0; } }\n', 'x needs a type'],
-    ['export lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F64'],
+    ['export lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F32'],
     // Only Externref holds any host value: not Str.
     ['using JS from std:JS;\nexport main() I32 { let s: Str = new JS.Map(); s.len(); }\n', 's is Str, got JS.Map<any, any>'],
     ['fn take(s: Str) I32 { s.len(); }\nexport main() I32 { take(cl() void {}); }\n', 'take takes Str, got cl() void'],
@@ -1830,7 +1830,7 @@ export lib {
       'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
     // Literals past their type, once wrapped as they were read.
-    ['export lib { fn run() I32 { let a = 18446744073709551615; a; } }\n', '18446744073709551615 does not fit I32'],
+    ['export lib { fn run() U64 { let a = 18446744073709551616; a; } }\n', '18446744073709551616 does not fit U64'],
     ['export lib { fn run() I32 { let a: I32 = -18446744073709551615; a; } }\n', '-18446744073709551615 does not fit I32'],
     ['export lib { fn run() I64 { let a: I64 = -9223372036854775809; a; } }\n', '-9223372036854775809 does not fit I64'],
     ['export lib { fn run() U64 { let a: U64 = -5; a; } }\n', '-5 does not fit U64'],
@@ -2361,7 +2361,7 @@ export lib {
   // Every build checks the tests (and benches), not only a test build.
   for (const target of ['normal', 'test', 'bench']) {
     const typed = await compileFile(utu, await write('export main() I32 { 1; }\ntest "bad" { let a: I32 = 1.5; assert a == 1; }\nbench "worse" { measure { let b: Str = 2; } }\n'), { target });
-    assert.deepEqual(typed.diagnostics.map(d => d.message), ['a is I32, got F64', 'b is Str, got I32'], target);
+    assert.deepEqual(typed.diagnostics.map(d => d.message), ['a is I32, got F32', 'b is Str, got I32'], target);
     checked++;
   }
   // An imported file's tests and benches (its mods' too) are checked, not run.
@@ -2878,7 +2878,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     ['C.inTup(["a", "b"]).len().f64()', ['Expected F64, got Str']],
     ['C.inTup([1.0]).len().f64()', ['C.[F64, Str] takes 2 elements, given 1']],
     ['C.inTup([1.0, "a", "b"]).len().f64()', ['C.[F64, Str] takes 2 elements, given 3']],
-    ['C.inRest([3.0, 4.0])', ['Expected Str, got F64']],
+    ['C.inRest([3.0, 4.0])', ['Expected Str, got F32']],
     ['C.applyStrRest(C.nums())', ['Expected C.(...a: string[]) => number, got C.(...a: number[]) => number']],
     ['let s = "x"; C.litU(s).len().f64()', ['"x" | "y" takes its values, not any Str']],
     ['C.cbLit(cl() Str { "p"; }).len().f64()', ['"p" | "q" takes its values, not any Str']],
@@ -2920,7 +2920,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     + 'export function fnLike(f) { return f(2); }\n';
   const hostDHead = 'using D from "npm:hostd";\n';
   const hostDTypes = await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': hostDHead + 'export main() F64 {\n'
-    + '    let xs = [1.0, 2.0, 3.0];\n    let e = [];\n    let ys = [4.0];\n    let k = D.ks()[1];\n    let n = 0.0;\n'
+    + '    let xs = [1.0, 2.0, 3.0];\n    let e = [];\n    let ys = [4.0];\n    let k = D.ks()[1];\n    let n: F64 = 0.0;\n'
     + '    let b = new D.Bus();\n    b.on("data", cl(v) void { n += v; });\n    b.emit("data", 5.0);\n'
     + '    let v = D.get(&{ a: 1.0 }, "z");\n    let m = D.mapVals(&{ a: 1.0 }, cl(x) Str { `#${x}`; });\n'
     + '    D.total(D.counts) + D.sum(xs) + D.sum(e) + D.iter([1.0, 2.0]) + D.iter(ys) + D.keyName(k).len().f64() + n\n'
@@ -2939,7 +2939,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     ['new D.Bus().emit("nope", 1.0); 0.0', ['keyof D.Events has no value "nope"']],
     ['let s = "data"; new D.Bus().on(s, cl(v) void { }); 0.0', ['keyof D.Events takes its values, not any Str']],
     ['let k = D.ks()[0]; k = "x"; D.keyName(k).len().f64()', ['D.Key takes its values, not any Str']],
-    ['let xs = [1.0]; let n = xs.len(); D.sum(xs)', ['Expected D.F64[], got Array[F64]']],
+    ['let xs = [1.0]; let n = xs.len(); D.sum(xs)', ['Expected D.F64[], got Array[F32]']],
     ['new D.Shape(); 0.0', ['D.Shape is abstract: make one of a class that extends it']],
     ['D.fnLike(cl(x) F64 { x * 2.0; })', ['x needs a type']],
   ]) {

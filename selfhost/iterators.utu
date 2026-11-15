@@ -1312,6 +1312,17 @@ fn len_of(local: I32) void {
 //! = Terminals
 
 /// The code of the terminal stage, `k`: what it does with each value, and the
+/// Whether a number literal (`1.5`, `-(2.0 * 3)`) has a float in it.
+fn has_float_literal(node: I32) Bool {
+    if is_kind(node, Node.Literal) { return is_kind(first_child(node), Node.Float_lit); };
+    let c = first_child(node);
+    while (c >= 0) {
+        if has_float_literal(c) { return true; };
+        c = next_sibling(c);
+    };
+    false;
+}
+
 /// setup and cleanup that make its result.
 fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let node = stage_node(p, k);
@@ -1320,11 +1331,13 @@ fn terminal_code(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) void {
     let i32_t = prelude(Prelude.I32);
     if op == Kw.Fold.i32() {
         let param = stage_param(node);
-        let rt = if p.replay { p.result_type; } else { type_only(param, -1, cx); };
+        // `fold(0.0)` over floats starts at their type.
+        let seed = if is_float(vt) and is_number_literal(param) and has_float_literal(param) { vt; } else { -1; };
+        let rt = if p.replay { p.result_type; } else { type_only(param, seed, cx); };
         let result = stage_local(slot, 0, repr(rt));
         if not p.replay {
             let mr = w_mark();
-            check_expr(param, -1, cx);
+            check_expr(param, seed, cx);
             ls(result, mr);
             to_setup(p);
         };

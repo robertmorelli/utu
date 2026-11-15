@@ -581,8 +581,8 @@ fn parse_int(i: I32, j: I32) I64 {
 
 // Digits [. digits]; a value too large for an F64 is a syntax error.
 fn parse_float(i: I32, j: I32) F64 {
-    let value = 0.0;
-    let scale = 1.0;
+    let value: F64 = 0.0;
+    let scale: F64 = 1.0;
     let fraction = false;
     for (i ..< j) |k| {
         let c = src[k];

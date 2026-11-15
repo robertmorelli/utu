@@ -1112,10 +1112,10 @@ fn int_value(node: I32) I64 {
 }
 
 /// The type an integer literal takes: the one expected, when integers
-/// adopt it, else I32. `at` is the literal as written: with its minus,
-/// when `negate`.
+/// adopt it, else @literal_default. `at` is the literal as written: with
+/// its minus, when `negate`.
 fn int_literal(node: I32, at: I32, expect: I32, negate: Bool) I32 {
-    let t = if expect >= 0 and is_numeric(expect) { expect; } else { prelude(Prelude.I32); };
+    let t = if expect >= 0 and is_numeric(expect) { expect; } else { literal_default(node, negate); };
     if not literal_fits(node, t, negate) {
         report2(Diag.IntegerOutOfRange, at, -1, t, if negate { 1; } else { 0; });
         in_instance(cur_inst[0]);
@@ -1258,8 +1258,25 @@ let parse_f32: fun(Str) F64 = @es/\ (s) => {
     return (l > r) === (g > f) ? g : f;
 } \/;
 
+/// The type a literal takes where no number is expected: an integer the
+/// first of I32, U32, I64, U64 it fits (the widest when none, which says so); a
+/// float F32 when it reads as F32 the same as F64, else F64.
+fn literal_default(node: I32, negate: Bool) I32 {
+    if is_kind(node, Node.Float_lit) {
+        let narrow = F32.from_bits(literal_bits(node, prelude(Prelude.F32), negate).i32());
+        let wide = F64.from_bits(literal_bits(node, prelude(Prelude.F64), negate));
+        return prelude(if narrow.f64() == wide { Prelude.F32; } else { Prelude.F64; });
+    };
+    if literal_fits(node, prelude(Prelude.I32), negate) { return prelude(Prelude.I32); };
+    if literal_fits(node, prelude(Prelude.U32), negate) { return prelude(Prelude.U32); };
+    if literal_fits(node, prelude(Prelude.I64), negate) { return prelude(Prelude.I64); };
+    if negate or literal_fits(node, prelude(Prelude.U64), negate) { return prelude(if negate { Prelude.I64; } else { Prelude.U64; }); };
+    prelude(Prelude.U64);
+}
+
 fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
-    let ft = if expect >= 0 and is_float(expect) { expect; } else { prelude(Prelude.F64); };
+    // (A host value is a JS number, a double.)
+    let ft = if expect >= 0 and is_float(expect) { expect; } else if is_foreign_or_nullable(expect) { prelude(Prelude.F64); } else { literal_default(node, negate); };
     if not literal_fits(node, ft, negate) { report2(Diag.FloatOutOfRange, node, -1, ft, if negate { 1; } else { 0; }); };
     push_number(ft, literal_bits(node, ft, negate), true);
     ft;
@@ -2068,12 +2085,33 @@ fn suggest_struct_init(node: I32, decl: I32, args: I32) void {
     };
 }
 
+/// `F64(x)`, `I64(n)`: a number as number type `t`. A literal is read as
+/// `t` (`F64(0.1)`); another value converts, as `x.f64()` does.
+fn numeric_convert(t: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
+    let a = if args >= 0 { first_child(args); } else { -1; };
+    if a < 0 or next_sibling(a) >= 0 {
+        report2(Diag.WrongArity, at, -1, 1, if args >= 0 { child_count(args); } else { 0; });
+        return finish_error(args, m, cx);
+    };
+    let rt = check_expr(a, t, cx);
+    if rt == t or ty_has_error(rt) { return t; };
+    let word = base_word(t);
+    let decl = member(ty_decl(rt), word, Space.Method);
+    if not decl_is(decl, Decl.Fn) {
+        report2(Diag.UnknownMethod, at, word, rt, -1);
+        w_node(Op.Unreachable, vt_unreachable, 0, 0, m);
+        return ty_error();
+    };
+    call_with(fn_instance(decl, ty_inst(rt)), -1, 1, m, at, cx);
+}
+
 /// `Tag(i)`, `Meters(x)`: an integer enum or a distinct type, made from its
 /// base's value (an enum's I32). Another type is no function.
 fn call_scalar_kind(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
     let decl = node_decl[callee];
     if decl < 0 { return finish_error(args, m, cx); };
     let inst = instance_for(module_of(decl), cx.inst);
+    if decl_is(decl, Decl.Module) and decl_a[decl] >= 0 and is_numeric(decl_type(decl, 0)) { return numeric_convert(decl_type(decl, 0), args, node, m, cx); };
     if not is_scalar_kind(decl) {
         report2(Diag.NotCallable, node, -1, named(decl, inst), -1);
         if decl_is(decl, Decl.Struct) { suggest_struct_init(node, decl, args); };

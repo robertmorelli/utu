@@ -2,8 +2,8 @@
 fn times(v: Array[F64], u: Array[F64]) void {
     let n = u.len();
     for (0..<v.len()) |i| {
-        let sum0 = 0.0;
-        let sum1 = 0.0;
+        let sum0: F64 = 0.0;
+        let sum1: F64 = 0.0;
         let d = ((i + 1) * (i + 2)) >>> 1;
         let step = i + 1;
         for (0..<(n / 2)) |jj| {
@@ -22,8 +22,8 @@ fn times(v: Array[F64], u: Array[F64]) void {
 fn times_transp(v: Array[F64], u: Array[F64]) void {
     let n = u.len();
     for (0..<v.len()) |i| {
-        let sum0 = 0.0;
-        let sum1 = 0.0;
+        let sum0: F64 = 0.0;
+        let sum1: F64 = 0.0;
         let d = ((i * (i + 1)) >>> 1) + 1;
         let step = i + 2;
         for (0..<(n / 2)) |jj| {
@@ -52,8 +52,8 @@ fn spectralnorm(n: I32) F64 {
         a_times_transp(v, u, x);
         a_times_transp(u, v, x);
     };
-    let vbv = 0.0;
-    let vv = 0.0;
+    let vbv: F64 = 0.0;
+    let vv: F64 = 0.0;
     for (0..<n) |i| {
         vbv += u[i] * v[i];
         vv += v[i] * v[i];

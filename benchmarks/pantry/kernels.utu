@@ -40,7 +40,7 @@ export lib {
             };
             kept[j + 1] = current;
         };
-        let total = 0.0;
+        let total: F64 = 0.0;
         for (0..<n) |i| { let item = items[i]; total += item.price * item.quantity; };
         total + count.f64() + kept[0].price;
     }

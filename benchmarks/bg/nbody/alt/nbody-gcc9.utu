@@ -59,9 +59,9 @@ fn create() System {
             2.68067772490389322e-03, 1.62824170038242295e-03, -9.51592254519715870e-05, 5.15138902046611451e-05),
     ];
     // offset momentum
-    let px = 0.0;
-    let py = 0.0;
-    let pz = 0.0;
+    let px: F64 = 0.0;
+    let py: F64 = 0.0;
+    let pz: F64 = 0.0;
     for (0..<bodies.len()) |i| {
         let b = bodies[i];
         px += b.mass * b.vx;
@@ -117,7 +117,7 @@ fn kernel(s: System) void {
 
 fn energy(s: System) F64 {
     let b = s.bodies;
-    let e = 0.0;
+    let e: F64 = 0.0;
     for (0..<b.len()) |i| {
         let bi = b[i];
         e += 0.5 * bi.mass * (bi.vy * bi.vy + bi.vz * bi.vz + bi.vx * bi.vx);

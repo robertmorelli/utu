@@ -89,9 +89,9 @@ fn sun() Body { Body.new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0); }
 // The five bodies, with the Sun's velocity set so the total momentum is zero.
 fn create_bodies() Array[Body] {
     let bodies: Array[Body] = [sun(), jupiter(), saturn(), uranus(), neptune()];
-    let px = 0.0;
-    let py = 0.0;
-    let pz = 0.0;
+    let px: F64 = 0.0;
+    let py: F64 = 0.0;
+    let pz: F64 = 0.0;
     for (0..<bodies.len()) |i| {
         let b = bodies[i];
         px += b.vx * b.mass;
@@ -130,7 +130,7 @@ fn advance(bodies: Array[Body], dt: F64) void {
 }
 
 fn energy(bodies: Array[Body]) F64 {
-    let e = 0.0;
+    let e: F64 = 0.0;
     for (0..<bodies.len()) |i| {
         let ib = bodies[i];
         e = e + 0.5 * ib.mass * (ib.vx * ib.vx + ib.vy * ib.vy + ib.vz * ib.vz);

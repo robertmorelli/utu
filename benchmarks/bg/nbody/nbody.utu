@@ -47,9 +47,9 @@ fn create() Array[Body] {
             2.68067772490389322e-03, 1.62824170038242295e-03, -9.51592254519715870e-05, 5.15138902046611451e-05),
     ];
     // offset momentum
-    let px = 0.0;
-    let py = 0.0;
-    let pz = 0.0;
+    let px: F64 = 0.0;
+    let py: F64 = 0.0;
+    let pz: F64 = 0.0;
     for (0..<bodies.len()) |i| {
         let b = bodies[i];
         let mass = b.mass;
@@ -103,7 +103,7 @@ fn advance(bodies: Array[Body], dt: F64) void {
 }
 
 fn energy(bodies: Array[Body]) F64 {
-    let e = 0.0;
+    let e: F64 = 0.0;
     let size = bodies.len();
     for (0..<size) |i| {
         let bodyi = bodies[i];

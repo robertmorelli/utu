@@ -3,6 +3,6 @@
 fn repeat_dash(n: I32) Str { "-".repeat(n); }
 
 export main() I32 {
-    let width = 4.5;
+    let width: F64 = 4.5;
     repeat_dash(width).len();
 }

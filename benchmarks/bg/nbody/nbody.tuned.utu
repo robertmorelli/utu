@@ -160,7 +160,7 @@ fn energy(s: Sys) F64 {
     let k01 = dist2(s.v0l, s.v0h, s.v1l, s.v1h);
     let k23 = dist2(s.v2l, s.v2h, s.v3l, s.v3h);
     let k4 = dist2(s.v4l, s.v4h, s.v4l, s.v4h);
-    let e = 0.0;
+    let e: F64 = 0.0;
     e += 0.5 * s.m0 * lane0(k01);
     e += 0.5 * s.m1 * lane1(k01);
     e += 0.5 * s.m2 * lane0(k23);

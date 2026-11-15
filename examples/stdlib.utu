@@ -39,7 +39,7 @@ export lib {
         let n = 0;
         if F64.nan().is_nan() { n += 1; };
         if not F64.inf().is_finite() { n += 10; };
-        if 1.5.is_finite() { n += 100; };
+        if F64(1.5).is_finite() { n += 100; };
         n;
     }
     fn words() Str {

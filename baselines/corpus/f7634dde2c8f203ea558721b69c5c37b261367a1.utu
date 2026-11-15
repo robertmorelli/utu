@@ -147,7 +147,7 @@ export main() void {
     promote search {
         |input| => {
             input.value = state.query;
-            let timer = 0.0;
+            let timer: F64 = 0.0;
             input.addEventListener("input", cl(event) void {
                 Browser.clearTimeout(timer);
                 timer = Browser.setTimeout(cl() void {

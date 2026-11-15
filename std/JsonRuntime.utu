@@ -358,7 +358,7 @@ fn __json_f64(r: JsonReader__) F64 {
     let whole = if negative { start + 1; } else { start; };
     if r.kl == 0 and end - whole <= 15 {
         // Integers below 10^15 are exact in F64: no host call.
-        let v = 0.0;
+        let v: F64 = 0.0;
         for (whole..<end) |k| {
             v = v * 10.0 + (r.text[k] - 48).f64();
         };

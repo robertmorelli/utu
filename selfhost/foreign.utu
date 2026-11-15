@@ -1278,7 +1278,7 @@ fn closure_node(written: I32) I32 {
 /// Whether an argument is a closure: written, bound by a `let`, or of a
 /// closure type.
 fn is_closure_arg(arg: I32, cx: Cx) Bool {
-    closure_node(arg) >= 0 or (not is_kind(arg, Node.Literal) and ty_is(type_only(arg, -1, cx), Ty.Closure));
+    closure_node(arg) >= 0 or (not is_kind(arg, Node.Literal) and ty_is(host_type(arg, cx), Ty.Closure));
 }
 
 fn is_record(arg: I32) Bool { is_kind(arg, Node.Implicit_struct_init); }
@@ -1345,7 +1345,7 @@ fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
         if is_untyped_array(arg) { return foreign_any(view); };
         let c = closure_node(arg);
         if c >= 0 { return dynamic_callback(c, view, cx); };
-        let t = type_only(arg, -1, cx);
+        let t = host_type(arg, cx);
         if ty_is(t, Ty.Error) or ty_is(t, Ty.Null) { return foreign_any(view); };
         return t;
     };
@@ -1355,7 +1355,7 @@ fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     if jlen(desc_get(d, "calls")) > 0 and is_closure_arg(arg, cx) { return callback_type(d, arg, view, cx); };
     if decl_name_text(d.at) == "Function" and is_closure_arg(arg, cx) {
         // (a parameter of no written type: checked as `Function`, which reports it)
-        let t = type_only(arg, -1, cx);
+        let t = host_type(arg, cx);
         if ty_is(t, Ty.Closure) and not untyped_params(t) { return t; };
     };
     foreign_type(s, view);
@@ -1381,7 +1381,7 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
         m = jnext(m);
     };
     if is_null_literal(arg) and nullable_ { return foreign_type(s, view); };
-    let t = if is_null_literal(arg) { ty_null(); } else { type_only(arg, -1, cx); };
+    let t = if is_null_literal(arg) { ty_null(); } else { host_type(arg, cx); };
     // A member the argument's shape picks: an array-like for `[…]`, a
     // callable for a closure, the object `&{…}` fits best (see @record_fit).
     let best = -1;
@@ -1434,6 +1434,13 @@ fn check_argument(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     t;
 }
 
+/// @type_only of a value bound for the host: a number literal there is a
+/// JS number, so a float one is F64 (alone, `1.5` would be F32).
+fn host_type(node: I32, cx: Cx) I32 {
+    let t = type_only(node, -1, cx);
+    if t == prelude(Prelude.F32) and is_number_literal(node) { prelude(Prelude.F64); } else { t; };
+}
+
 /// A literal where a union of literals (an enum) is wanted is one of them,
 /// as TypeScript 5 has it: `99.0` is no `Color` of `enum Color { Red,
 /// Green = 5 }`, and no string literal is a string enum's member.
@@ -1449,7 +1456,7 @@ fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) void {
     if not is_kind(lit, Node.Literal) {
         // Nor is any Str one (a variable's, a call's), as TypeScript has it; one
         // from the host may be (utu keeps no literal types).
-        if lit == arg and string_literals(d) and type_only(arg, -1, cx) == prelude(Prelude.Str) and not host_rooted(arg, cx) { report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), -1, -1, 2); };
+        if lit == arg and string_literals(d) and host_type(arg, cx) == prelude(Prelude.Str) and not host_rooted(arg, cx) { report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), -1, -1, 2); };
         return;
     };
     if literal_in(d, arg) != 0 { return; };
@@ -1569,7 +1576,7 @@ fn host_rooted(arg: I32, cx: Cx) Bool {
     for (0 ..< 32) |_k| {
         if is_kind(n, Node.Paren_expr) or is_kind(n, Node.Call_expr) or is_kind(n, Node.Index_expr) { n = first_child(n); }
         else if is_kind(n, Node.Type_member_expr) { return decl_is(node_decl[first_child(n)], Decl.Foreign); }
-        else if is_kind(n, Node.Field_expr) { return is_foreign_or_nullable(type_only(first_child(n), -1, cx)); }
+        else if is_kind(n, Node.Field_expr) { return is_foreign_or_nullable(host_type(first_child(n), cx)); }
         else if is_kind(n, Node.Identifier) and decl_is(node_decl[n], Decl.Local) {
             // `let k = Api.f(); … k`: its value, while nothing assigns it another.
             let let_node = decl_node[node_decl[n]];
@@ -1701,7 +1708,7 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let sig = jfirst(desc_get(d, "calls"));
     let c = closure_node(arg);
     if c < 0 {
-        let t = type_only(arg, -1, cx);
+        let t = host_type(arg, cx);
         // (its first parameter may be the receiver)
         let receiver = if jget(sig, "receiver") >= 0 { 1; } else { 0; };
         if ty_is(t, Ty.Closure) { callback_arity(sig, vl_len[ty_a[t]] - receiver, arg); };
@@ -1714,7 +1721,7 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     if receiver { arity -= 1; };
     // (once reported, a `let`'s closure is checked as its own type: the mistake is said once)
     callback_arity(sig, arity, arg);
-    if callback_extra(sig, arity) and is_kind(arg, Node.Identifier) { return type_only(arg, -1, cx); };
+    if callback_extra(sig, arity) and is_kind(arg, Node.Identifier) { return host_type(arg, cx); };
     let params = jget(sig, "params");
     let m = vl_begin();
     if receiver {
@@ -1889,7 +1896,7 @@ fn arg_score(sig: I32, i: I32, arg: I32, d: Ref, view: I32, cx: Cx) I32 {
         return 0;
     };
     if is_kind(arg, Node.Implicit_struct_init) { return if record_fits(arg, slot) { 1; } else { -100; }; };
-    let t = type_only(arg, -1, cx);
+    let t = host_type(arg, cx);
     // (Any Str is no union of string literals: see @host_literal.)
     if t == prelude(Prelude.Str) and not string_arg and string_literals(describe(slot)) and not host_rooted(arg, cx) { return 0; };
     if not ty_is(t, Ty.Error) and assignable_to(t, accept(slot, arg, view, cx)) { return 2; };
@@ -1974,7 +1981,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 let c = jget(slot.at, "constraint");
                 if c >= 0 { unify_elements(Ref { doc: d.doc, at: c, env: d.env }, args[k], m, d, 0, cx); };
             } else if not is_null_literal(args[k]) and closure_node(args[k]) < 0 {
-                let t = type_only(args[k], -1, cx);
+                let t = host_type(args[k], cx);
                 // (Outside its constraint, `T` stays unbound: the slot is the constraint, which rejects it.
                 // `B extends A` reads A's binding so far.)
                 let senv = if jget(jget(slot.at, "constraint"), "parameter") >= 0 { pending_env(m); } else { slot.env; };
@@ -2002,7 +2009,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
             let ep = if el >= 0 { open_param(Ref { doc: d.doc, at: el, env: element_env[0] }); } else { -1; };
             if ep >= 0 and not bound_in_pending(m, jstring_word(jget(ep, "parameter"))) {
                 if not is_untyped_array(args[k]) {
-                    let at_ = type_only(args[k], -1, cx);
+                    let at_ = host_type(args[k], cx);
                     let ae = if is_foreign(at_) and not is_dynamic(at_) and fty_doc[at_] == d.doc { element_of(ref_of(at_), 0); } else { -1; };
                     if ae >= 0 {
                         vl_add(jstring_word(jget(ep, "parameter")));
@@ -2013,7 +2020,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
             };
         };
         // A string where an array-like or iterable of `T` is wanted: `T` is Str.
-        if p < 0 and not is_untyped_array(args[k]) and closure_node(args[k]) < 0 and type_only(args[k], -1, cx) == prelude(Prelude.Str) {
+        if p < 0 and not is_untyped_array(args[k]) and closure_node(args[k]) < 0 and host_type(args[k], cx) == prelude(Prelude.Str) {
             let el = element_of(slot, 0);
             let ep = if el >= 0 { jget(el, "parameter"); } else { -1; };
             if ep >= 0 and not bound_in_pending(m, jstring_word(ep)) {
@@ -2079,7 +2086,7 @@ fn bind_param(ep: I32, arg: I32, m: I32, d: Ref, cx: Cx) void {
         vl_add(w);
         vl_add(literal_json(arg));
         vl_add(-1);
-    } else if ref_of_type(type_only(arg, -1, cx)) {
+    } else if ref_of_type(host_type(arg, cx)) {
         vl_add(w);
         vl_add(typed_ref_at[0]);
         vl_add(typed_ref_env[0]);
@@ -2094,7 +2101,7 @@ fn union_slot(slot: Ref, arg: I32, cx: Cx) Ref {
     let d = describe(slot);
     let union = desc_get(d, "union");
     let closure = closure_node(arg) >= 0;
-    if union < 0 or is_record(arg) or is_untyped_array(arg) or is_null_literal(arg) or not closure and ty_is(type_only(arg, -1, cx), Ty.Nullable) { return slot; };
+    if union < 0 or is_record(arg) or is_untyped_array(arg) or is_null_literal(arg) or not closure and ty_is(host_type(arg, cx), Ty.Nullable) { return slot; };
     let m = jfirst(union);
     while (m >= 0) {
         let r = Ref { doc: d.doc, at: m, env: d.env };
@@ -2314,8 +2321,8 @@ fn symbol_member(d: Ref, kt: I32) I32 {
 /// receiver (its call type `t`), or -1 when `callee` is no such member.
 fn check_foreign_symbol_call(node: I32, callee: I32, t: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
     if not is_kind(callee, Node.Index_expr) { return -1; };
-    let rt = type_only(first_child(callee), -1, cx);
-    let kt = type_only(last_child(callee), -1, cx);
+    let rt = host_type(first_child(callee), cx);
+    let kt = host_type(last_child(callee), cx);
     if not is_foreign(rt) or symbol_member(describe(ref_of(rt)), kt) < 0 { return -1; };
     let sym = jget(fty_at[kt], "symbol");
     let view = fty_view[kt];
@@ -2624,7 +2631,7 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
 /// The JS array type an array literal is as the receiver of method `key`
 /// native arrays lack (`["a", "b"].forEach(…)`), or -1.
 fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
-    let lt = type_only(literal, -1, cx);
+    let lt = host_type(literal, cx);
     if not is_array_type(lt) { return -1; };
     let elem = inst_arg(ty_inst(lt), 0);
     if member(ty_decl(lt), key, Space.Method) >= 0 { return -1; };
@@ -2742,10 +2749,10 @@ fn later_local_type(decl: I32, after: I32, cx: Cx) I32 {
     if n < 0 or node_first[n] <= after { return -1; };
     if decl_is(decl, Decl.Local) and is_kind(n, Node.Bind_expr) {
         let t = let_annotation(n, cx);
-        return if t >= 0 { t; } else { type_only(last_child(n), -1, cx); };
+        return if t >= 0 { t; } else { host_type(last_child(n), cx); };
     };
     if not decl_is(decl, Decl.Promoted) or not is_kind(n, Node.Promote_expr) { return -1; };
-    let et = type_only(first_child(n), -1, cx);
+    let et = host_type(first_child(n), cx);
     if et >= 0 and ty_is(et, Ty.Nullable) { ty_a[et]; } else { -1; };
 }
 
