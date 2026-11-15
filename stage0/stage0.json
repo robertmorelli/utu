@@ -1,11 +1,11 @@
 {
-  "commit": "beddb39054fa31777dad9619efa2bd4d23add014",
-  "selfhostTree": "b7059eb67f6de8c18976b17ea1a3ca1ab0143243",
-  "sourcesHash": "84d6e9ab5aef8e77507a85ea510077553cd74b09612d3c4da9673d6a502e8bba",
-  "sha256": "2be126ac892aea0858f682a5586b500935e208111cea2ab9b21353a1ff37c0fc",
-  "bytes": 527736,
-  "builtBy": "8c0b8352e53dac1414a6919df77125a0bff5de60b80559b13429dc59ff23178d",
+  "commit": "dfe424679738b9ceba194d3f6c097052bd83e613",
+  "selfhostTree": "d5bcde71b25ce65a2e377d1771e9afa8c8455914",
+  "sourcesHash": "2d0f9a210f561c27e140609d12e5d38c72121721f058cc1a9a27e0558ac85800",
+  "sha256": "bb53c1a8d9686ac423390c6ec020fafadfd4aa8d918e36d879a3f47ccefa0c55",
+  "bytes": 528173,
+  "builtBy": "2be126ac892aea0858f682a5586b500935e208111cea2ab9b21353a1ff37c0fc",
   "node": "v25.8.1",
-  "date": "2026-11-15T11:24:36.724Z",
-  "reason": "reads fn … => expr: before the compiler's own one-line functions use it"
+  "date": "2026-11-15T11:31:53.814Z",
+  "reason": "reads S B U I F, Void, V, and gn: before the sources use them"
 }
