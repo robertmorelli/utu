@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // cli/utu.mjs — the utu command line, on the self-hosted compiler.
 //
 //   utu check <file.utu>                 report what is wrong

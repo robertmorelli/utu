@@ -16,6 +16,9 @@
   },
   "homepage": "https://github.com/robertmorelli/utu#readme",
   "type": "module",
+  "bin": {
+    "utu": "./cli/utu.mjs"
+  },
   "engines": {
     "vscode": "^1.96.0"
   },
