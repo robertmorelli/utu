@@ -1,11 +1,11 @@
 {
-  "commit": "a1d62d62d7469347054505d71c777fe8ba89347a",
-  "selfhostTree": "a9353fe780be20fd47305e58097a64dff1d9537e",
-  "sourcesHash": "63a148e4f332b4591073bf45b8c591d5dcb0545cb75880bf6071aa17c7c1ed37",
-  "sha256": "e7a5b323aa5e095396b25aadd92451161f3d36b06248dc1f55cbe2a9c6e967e2",
-  "bytes": 523268,
-  "builtBy": "2c0db085ee0f7bb7f6b658357b64321ce59cbd8aed2f96eb8f18196b7b88e61f",
+  "commit": "c8ff749a63c533cab82c182b35aaa6e82be38569",
+  "selfhostTree": "5032f2b617097d254d2faad7462d7fec48cf67be",
+  "sourcesHash": "0f062176c4fe7733d27dda56574eceeb4af5a1735a3e1c6c37214523eceea1aa",
+  "sha256": "80bb952caca1a5fda8597d3e867adb3122304ba0f5224047c04d597dafc1e224",
+  "bytes": 527470,
+  "builtBy": "e7a5b323aa5e095396b25aadd92451161f3d36b06248dc1f55cbe2a9c6e967e2",
   "node": "v25.8.1",
-  "date": "2026-11-15T04:44:28.653Z",
-  "reason": "conversions by type name, step B: sources use x.i32(), Tag(n), str"
+  "date": "2026-11-15T11:12:15.272Z",
+  "reason": "reads statements ended by line breaks: before removing ; from sources"
 }
