@@ -2329,7 +2329,15 @@ fn for_expr(p: Parser) I32 {
     node(p, Node.For_sources, sources, start)
     expect(p, Tok.RParen)
     if is(p, Tok.Pipe) { capture(p) }
-    block(p)
+    // `for (xs) |x| f(x)`: a body of one statement, on the loop's line, is a block of it.
+    if is(p, Tok.LBrace) {
+        block(p)
+    } else {
+        let body = mark()
+        let start_body = p.pos
+        expression(p)
+        node(p, Node.Block, body, start_body)
+    }
     node(p, Node.For_expr, at, first)
 }
 

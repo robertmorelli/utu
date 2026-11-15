@@ -223,7 +223,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
     alt_arm: ($) => seq(choice($.type_ident, $.qualified_type_ref, alias($._variant_type_ref, $.qualified_type_ref)), optional(seq('|', $.identifier, '|')), '=>', $._expr, ','),
     alt_default: ($) => seq('~>', $._expr, ','),
 
-    for_expr: ($) => seq('for', '(', $.for_sources, ')', optional($.capture), $.block),
+    // `for (xs) |x| f(x)`: a body of one statement, a block of it.
+    for_expr: ($) => prec.right(seq('for', '(', $.for_sources, ')', optional($.capture), choice(prec.dynamic(1, $.block), alias($._loop_line, $.block)))),
+    _loop_line: ($) => prec(-100, $._expr),
     while_expr: ($) => seq('while', '(', optional($._expr), ')', $.block),
     for_sources: ($) => seq($.for_source, repeat(seq(',', $.for_source))),
     // `a..<b` / `a...b` count; a lone expression iterates an array's elements.

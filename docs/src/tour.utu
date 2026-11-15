@@ -1319,7 +1319,11 @@ mod tour {
                 code {
                     "for";
                 }
-                " over ranges and arrays (zipped when given several: arrays and ranges only, stopping at the shortest; a generator is looped alone), ";
+                " over ranges and arrays (zipped when given several: arrays and ranges only, stopping at the shortest; a generator is looped alone; a body of one statement may go without braces, ";
+                code {
+                    "for (xs) |x| show(x)";
+                }
+                "), ";
                 code {
                     "break";
                 }
