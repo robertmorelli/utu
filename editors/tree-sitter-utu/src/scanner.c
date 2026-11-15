@@ -1,6 +1,7 @@
 #include "tree_sitter/parser.h"
 #include <stdbool.h>
 #include <wctype.h>
+#include <string.h>
 
 // DSL delimiters form a balanced language-independent envelope. The payload is
 // opaque to Utu; each registered DSL parses its own content and nested islands.
@@ -27,38 +28,75 @@ static void skip_string(TSLexer *l) {
   if (l->lookahead == '"') l->advance(l, false);
 }
 
-/** Whether the word at the lexer is `w` (and only it): looked at, not taken. */
-static bool word_is(TSLexer *l, const char *w) {
-  for (; *w; w++) {
-    if (l->lookahead != *w) return false;
+static bool is_word_char(int32_t c) { return iswalnum(c) || c == '_'; }
+
+/** The word at the lexer (at most 15 letters; longer is no keyword), taken. */
+static void read_word(TSLexer *l, char *w) {
+  int n = 0;
+  while (is_word_char(l->lookahead)) {
+    if (n < 15) w[n] = (char)l->lookahead;
+    n++;
     l->advance(l, false);
   }
-  return !(iswalnum(l->lookahead) || l->lookahead == '_');
+  w[n < 15 ? n : 0] = 0;
 }
 
+static bool in_list(const char *w, const char *const *list) {
+  for (; *list; list++) if (!strcmp(w, *list)) return true;
+  return false;
+}
+
+static const char *const GOES_ON[] = { "and", "or", "xor", "orelse", "else", "catch", "from", 0 };
+static const char *const STAGES[] = { "map", "filter", "flat_map", "skip_while", "take_while", "each", "any", "all",
+  "count_where", "first_index", "last_index", "bisect", "fold", "scan", "zip", "skip", "take", "chain", "repeat",
+  "sort", "min_by", "max_by", "first_where", "reduce", "partition", "collect", "group_by", "distinct_by", "batched",
+  "windows", "sum", "fast_sum", "product", "count", 0 };
+
 /**
- * Zero width, after a statement that ends at `}` (`for … { … }`): a line ends
- * before the next token, and it is not `;`, `else`, or `catch` (which go on).
- * The self-hosted parser's rule (selfhost/parse.utu, `statement`).
+ * Zero width: the end of a statement, where the grammar allows one (after
+ * what cannot end a statement, `=` or `+`, it does not): before a `}` or
+ * the end, or at a line break the next line does not go on from. A line
+ * goes on that begins `.f` (not `.{`), `?.`, a binary operator but `-`
+ * (`-o` goes on), `{`, `and`, `or`, `xor`, `orelse`, `else`, `catch`, `from`, or a
+ * stage with its `|` or `(`. The self-hosted parser's rule
+ * (selfhost/parse.utu, `statement_end`).
  */
 static bool statement_end(TSLexer *l) {
   l->mark_end(l);
+  l->result_symbol = STATEMENT_END;
   bool line = false;
   for (;;) {
     if (l->lookahead == '\n') { line = true; l->advance(l, true); }
     else if (iswspace(l->lookahead)) l->advance(l, true);
     else if (l->lookahead == '/') {
-      // A comment ends its line; a `/` that begins no comment is an operator.
       l->advance(l, true);
+      // A comment ends its line; `/` that begins no comment divides: it goes on.
       if (l->lookahead != '/') return false;
       while (!l->eof(l) && l->lookahead != '\n') l->advance(l, true);
     } else break;
   }
-  if (!line || l->lookahead == ';') return false;
-  if (l->lookahead == 'e' && word_is(l, "else")) return false;
-  if (l->lookahead == 'c' && word_is(l, "catch")) return false;
-  l->result_symbol = STATEMENT_END;
-  return true;
+  if (l->eof(l) || l->lookahead == '}') return true;
+  if (l->lookahead == ';' || !line) return false;
+  int32_t c = l->lookahead;
+  switch (c) {
+    // (`\\` goes on a multiline string.)
+    case '+': case '*': case '%': case '^': case '|': case '<': case '>': case '{': case '\\': return false;
+    case '.': l->advance(l, false); return l->lookahead == '{';
+    case '?': l->advance(l, false); return l->lookahead != '.';
+    case '=': case '!': l->advance(l, false); return l->lookahead != '=';
+    case '-':
+      l->advance(l, false);
+      if (l->lookahead != 'o') return true;
+      l->advance(l, false);
+      return is_word_char(l->lookahead);
+  }
+  if (!is_word_char(c)) return true;
+  char w[16];
+  read_word(l, w);
+  if (in_list(w, GOES_ON)) return false;
+  if (!in_list(w, STAGES)) return true;
+  while (l->lookahead == ' ' || l->lookahead == '\t') l->advance(l, true);
+  return !(l->lookahead == '|' || l->lookahead == '(');
 }
 
 bool tree_sitter_utu_external_scanner_scan(void *p, TSLexer *l, const bool *valid) {

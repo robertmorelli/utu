@@ -223,7 +223,7 @@ try {
     const S = 'fn g() I32 { 2; }\nfn f() I32 { let count = g(); count; }\nexport lib { fn h() I32 { f(); } }\n';
     const s = await file('s.utu', S);
     await note('textDocument/didOpen', { textDocument: { uri: s, version: 1, text: S } });
-    const broken = '// above\n' + S.replace('count; }', 'count }');
+    const broken = '// above\n' + S.replace('count; }', 'count + }');
     await note('textDocument/didChange', { textDocument: { uri: s, version: 2 }, contentChanges: [{ text: broken }] });
     assert.match((await call('textDocument/hover', at(broken, 'f();', 0, s))).contents.value, /fn f\(\) I32/);
     assert.deepEqual((await call('textDocument/definition', at(broken, 'g()', 0, s))).range.start, { line: 1, character: 3 });
@@ -447,7 +447,7 @@ try {
     // A name an importer not open already declares (`using ax;` brings ax's names in).
     assert.equal(await renaming('Box', 0, 'Tri'), "renaming to 'Tri' breaks the program: Tri has no field v");
     // An importer that does not parse: no rename, rather than part of one.
-    await fs.writeFile(path.join(ws, 'main.utu'), MAINX.replace('{ t.b; }', '{ t.b }'));
+    await fs.writeFile(path.join(ws, 'main.utu'), MAINX.replace('{ t.b; }', '{ t.b + }'));
     assert.equal(await renaming('addx', 0, 'plusx'), 'main.utu, which imports ax.utu, does not parse: no rename');
     await fs.writeFile(path.join(ws, 'main.utu'), MAINX);
     // One whose build stops at another import: refused (its names are not checked), and said so.

@@ -7802,19 +7802,16 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
 --- exit 1
 
 === utu run examples/error_demo/runtime/52_syntax_error_run.utu
- ERROR  Missing ; after 40
-        missing-semicolon · examples/error_demo/runtime/52_syntax_error_run.utu:4:13
+ ERROR  Expected ';', got '2'
+        parse-error · examples/error_demo/runtime/52_syntax_error_run.utu:4:16
 
- 2 │ // Expect: the syntax error at 52_syntax_error_run.utu:5, and nothing run
+ 2 │ // Expect: the syntax error at 52_syntax_error_run.utu:4, and nothing run
  3 │ export main() I32 {
- 4 │     let x = 40
-   │             ━━
-   │             ╰─ ;?
+ 4 │     let x = 40 2
+   │                ━
+   │                ╰─ ';'?
  5 │     x + 2;
  6 │ }
-
-  fix   Add ;
- 4 │     let x = 40;
 --- exit 1
 
 === utu run examples/error_demo/runtime/53_multiple_errors_check.utu
@@ -7914,34 +7911,15 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/01_missing_semicolon_after_let.utu
- ERROR  Missing ; after qty
-        missing-semicolon · examples/error_demo/syntax/01_missing_semicolon_after_let.utu:4:25
+ ERROR  Expected ';', got 'total'
+        parse-error · examples/error_demo/syntax/01_missing_semicolon_after_let.utu:4:29
 
- 2 │ // Expect: expected ';' after `let total = price * qty`, pointing at the end of line 4.
+ 2 │ // Expect: expected ';' before `total` (a line break or ';' ends a statement).
  3 │ fn cost(price: I32, qty: I32) I32 {
- 4 │     let total = price * qty
-   │                         ━━━
-   │                         ╰─ ;?
- 5 │     total + 5;
- 6 │ }
-
-  fix   Add ;
- 4 │     let total = price * qty;
---- exit 1
-
-=== utu check examples/error_demo/syntax/02_missing_semicolon_last_expression.utu
- ERROR  Missing ; after b
-        missing-semicolon · examples/error_demo/syntax/02_missing_semicolon_last_expression.utu:4:9
-
- 2 │ // Expect: expected ';' after `a + b` (the last expression of a block also ends with ';').
- 3 │ fn add(a: I32, b: I32) I32 {
- 4 │     a + b
-   │         ━
-   │         ╰─ ;?
+ 4 │     let total = price * qty total + 5
+   │                             ━━━━━
+   │                             ╰─ ';'?
  5 │ }
-
-  fix   Add ;
- 4 │     a + b;
 --- exit 1
 
 === utu check examples/error_demo/syntax/03_missing_semicolon_after_if_block.utu
@@ -8125,19 +8103,16 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/1122_very_long_line.utu
- ERROR  Missing ; after 1
-        missing-semicolon · examples/error_demo/syntax/1122_very_long_line.utu:4:493
+ ERROR  Expected ';', got '2'
+        parse-error · examples/error_demo/syntax/1122_very_long_line.utu:4:495
 
- 2 │ // Expect: Missing ; after 1, the line cut short with … on its left
+ 2 │ // Expect: Expected ';', got '2', the line cut short with … on its left
  3 │ export main() I32 {
- 4 │ …1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+ 4 │ …+ 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 2
    │                                                                                  ━
-   │                                                                                  ╰─ ;?
+   │                                                                                  ╰─ ';'?
  5 │     a;
  6 │ }
-
-  fix   Add ;
- 4 │ … + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1;
 --- exit 1
 
 === utu check examples/error_demo/syntax/11_keyword_as_name.utu
@@ -8646,19 +8621,6 @@ FAIL after tests: boom
    │                         ╰─ unexpected
  4 │
  5 │ export main() F64 {
---- exit 1
-
-=== utu check examples/error_demo/syntax/46_multiline_string_semicolon.utu
- ERROR  Expected ';', got '}' (a \\ line's ';' is text)
-        parse-error · examples/error_demo/syntax/46_multiline_string_semicolon.utu:6:1
-
- 4 │     \\usage: utu check <file.utu>
- 5 │     \\       utu run <file.utu>;
- 6 │ }
-   │ ━
-   │ ╰─ ';'?
- 7 │
- 8 │ export main() Str { usage(); }
 --- exit 1
 
 === utu check examples/error_demo/syntax/47_using_missing_from.utu
@@ -9345,19 +9307,16 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/90_error_in_imported_file.utu
- ERROR  Missing ; after x
-        missing-semicolon · examples/error_demo/syntax/lib/broken_shapes.utu:4:21
+ ERROR  Expected ';', got 'x'
+        parse-error · examples/error_demo/syntax/lib/broken_shapes.utu:4:23
 
  2 │ mod shapes {
  3 │     fn square(x: F64) F64 {
- 4 │         let y = x * x
-   │                     ━
-   │                     ╰─ ;?
+ 4 │         let y = x * x x
+   │                       ━
+   │                       ╰─ ';'?
  5 │         y;
  6 │     }
-
-  fix   Add ;
- 4 │         let y = x * x;
 --- exit 1
 
 === utu check examples/error_demo/syntax/91_dsl_missing_name.utu
@@ -9476,19 +9435,16 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/lib/broken_shapes.utu
- ERROR  Missing ; after x
-        missing-semicolon · examples/error_demo/syntax/lib/broken_shapes.utu:4:21
+ ERROR  Expected ';', got 'x'
+        parse-error · examples/error_demo/syntax/lib/broken_shapes.utu:4:23
 
  2 │ mod shapes {
  3 │     fn square(x: F64) F64 {
- 4 │         let y = x * x
-   │                     ━
-   │                     ╰─ ;?
+ 4 │         let y = x * x x
+   │                       ━
+   │                       ╰─ ';'?
  5 │         y;
  6 │     }
-
-  fix   Add ;
- 4 │         let y = x * x;
 --- exit 1
 
 === utu check examples/error_demo/types/01_let_annotation.utu

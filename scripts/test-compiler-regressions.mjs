@@ -991,6 +991,11 @@ export lib {
     // Literals with no type to take: the first of I32, U32, I64, U64 they fit (3000000000 a U32, which wraps);
     // a float F32 when it reads as F32 the same as F64 (0.5; h.f64() is no F64 method), else F64 (0.1).
     ['export lib { fn run() U32 { let a = 3000000000; a + a; } }\n', 1705032704],
+    // A line break ends a statement, unless the next line only goes on (`+ x`, `.f()`, `else`);
+    // a line beginning `-` is a new statement. `;` puts two on one line.
+    ['fn f() I32 {\n    let x = 1\n    -x\n}\nfn g() I32 {\n    let y = 2\n    y\n        + 10\n}\n'
+      + 'fn h(c: Bool) I32 {\n    if c {\n        1\n    }\n    else {\n        2\n    }\n}\n'
+      + 'export lib { fn run() I32 { let a = f(); let b = g()\n    a * 100 + b + h(false) * 1000 + "ab"\n        .len() * 10000 } }\n', 21912],
     ['export lib { fn run() F64 { let h = 0.5; let t = 0.1; h.f64() + t + F64(0.25); } }\n', 0.85],
     // A computed global in a program with no `export main` (it crashed the compiler).
     ['let n: I32 = 1 + 1;\nlet k: cl() I32 = cl() { n * 10; };\nexport lib { fn run() I32 { k() + n; } }\n', 22],
@@ -1930,8 +1935,6 @@ export lib {
     // Nesting past the compiler's stack: a diagnostic, not a JavaScript stack.
     [`export main() I32 {\n    ${'('.repeat(30000)}1${')'.repeat(30000)};\n}\n`, 'Program nested too deeply (at about line 2)'],
     ['fn f() I32 {\n    let x = 1 2;\n    x;\n}\n', "Expected ';', got '2'"],
-    // A token missing at the end of a line: after the token before it.
-    ['fn f() I32 {\n    let x = 1\n    x;\n}\n', 'Missing ; after 1'],
     // Other languages' habits, and names that are nearly right.
     ['fn f(a: Bool, b: Bool) Bool { a && b; }\n', 'Write and, not &&'],
     ['fn f() I32 {\n    let total = 1;\n    totl;\n}\n', 'Unknown variable totl; did you mean total?'],

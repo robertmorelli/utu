@@ -13,8 +13,7 @@ struct PitchState:
 fn quote(state:PitchState) I32 {
     let subtotal=state.services map |service| {
         service.hours*service.rate;
-    }
-    sum;
+    } sum;
     if state.discount {
         subtotal-subtotal/10;
     }

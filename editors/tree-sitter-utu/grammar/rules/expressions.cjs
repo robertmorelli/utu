@@ -232,12 +232,10 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     block_expr: ($) => prec.right(seq(optional(seq($.identifier, ':')), $.block)),
     block: ($) => seq('{', repeat($._statement), '}'),
-    // An expression and its `;`; one of these, ending at a `}` that ends its
-    // line, may leave the `;` out (`_statement_end`, src/scanner.c).
-    _statement: ($) => choice(seq($._expr, ';'), seq($._block_statement, $._statement_end)),
-    _block_statement: ($) => choice($.if_expr, $.for_expr, $.while_expr, $.match_expr, $.loop_match_expr, $.alt_expr,
-      $.promote_expr, $.try_expr, alias($._labeled_block, $.block_expr)),
-    _labeled_block: ($) => seq($.identifier, ':', $.block),
+    // An expression, ended by a `;` or (`_statement_end`, src/scanner.c) a
+    // line break the next line does not go on from, a `}`, or the end.
+    _statement: ($) => choice(seq($._expr, $._end), ';'),
+    _end: ($) => choice(';', $._statement_end),
 
     // `break` leaves a loop; `break label value` leaves the block `label: { … }` with a value.
     break_expr: ($) => prec.right(seq('break', optional(seq($.identifier, optional($._expr))))),

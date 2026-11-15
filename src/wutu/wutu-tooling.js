@@ -497,7 +497,10 @@ function layoutUtu(source) {
       depth--;
       braces.pop();
       line = '}';
-      if (!ahead(/\s*([;,)\]]|else\b)/y, i)) { i = trailer(i); flush(); }
+      // What follows on its line stays there: a line break after `}` ends a
+      // statement (`} - 1` and `} sum` would be new ones).
+      // (`else` joins its `}` from the next line too.)
+      if (!(ahead(/[ \t]*[^\s/]/y, i) || ahead(/\s*else\b/y, i)) || ahead(/[ \t]*\/\//y, i)) { i = trailer(i); flush(); }
     } else if (c === ';' && parens === 0) {
       line = line.trimEnd() + ';';
       i = trailer(i);

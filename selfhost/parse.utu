@@ -403,18 +403,28 @@ struct Save:
     | nodes: I32
     | pending: I32
     | depth: I32
+    | limits: I32
 
 //! = Tokens
 
-fn kind_at(p: Parser, offset: I32) I32 { tok_kind[ptok[p.pos + offset]]; }
+/// Where the statement being read ends (@statement_end): the parser reads a
+/// `;` there, so what it is in stops as at a written one. -1 outside one.
+vec stmt_limit: I32 = [-1];
 
-fn is(p: Parser, kind: Tok) Bool { tok_kind[ptok[p.pos]] == kind.i32(); }
+fn past_limit(p: Parser, offset: I32) Bool {
+    let limit = stmt_limit[stmt_limit.len() - 1];
+    limit >= 0 and p.pos + offset >= limit;
+}
 
-fn is_at(p: Parser, offset: I32, kind: Tok) Bool { tok_kind[ptok[p.pos + offset]] == kind.i32(); }
+fn kind_at(p: Parser, offset: I32) I32 { if past_limit(p, offset) { Tok.Semi.i32(); } else { tok_kind[ptok[p.pos + offset]]; }; }
 
-fn word_id(p: Parser) I32 { tok_word[ptok[p.pos]]; }
+fn is(p: Parser, kind: Tok) Bool { kind_at(p, 0) == kind.i32(); }
 
-fn is_kw(p: Parser, kw: Kw) Bool { tok_word[ptok[p.pos]] == kw.i32(); }
+fn is_at(p: Parser, offset: I32, kind: Tok) Bool { kind_at(p, offset) == kind.i32(); }
+
+fn word_id(p: Parser) I32 { if past_limit(p, 0) { -1; } else { tok_word[ptok[p.pos]]; }; }
+
+fn is_kw(p: Parser, kw: Kw) Bool { word_id(p) == kw.i32(); }
 
 fn is_word(p: Parser) Bool { is(p, Tok.Word); }
 
@@ -427,6 +437,7 @@ fn adjacent(a: I32, b: I32) Bool { tok_end[ptok[a]] == tok_start[ptok[b]]; }
 
 /// Identifier-shaped: a lowercase first letter, or `_` and more.
 fn shaped_at(p: Parser, offset: I32) Bool {
+    if past_limit(p, offset) { return false; };
     let t = ptok[p.pos + offset];
     if tok_kind[t] != Tok.Word.i32() { return false; };
     let c = src[tok_start[t]];
@@ -494,12 +505,13 @@ fn mark_below(left: I32) I32 {
 }
 
 /// Before an attempt that may be given up (@restore).
-fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0] }; }
+fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0], limits: stmt_limit.len() }; }
 
 /// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
 fn restore(p: Parser, s: Save) void {
     p.pos = s.pos;
     parse_depth[0] = s.depth;
+    stmt_limit.resize(s.limits);
     node_kind.resize(s.nodes);
     node_first.resize(s.nodes);
     node_last.resize(s.nodes);
@@ -556,6 +568,8 @@ fn int_lit(p: Parser) I32 {
 //! = Source file and items
 
 fn source_file(p: Parser) I32 {
+    // (A file that failed in a statement left its end behind.)
+    stmt_limit.resize(1);
     let at = mark();
     let first = p.pos;
     while (not at_end(p)) { item(p); };
@@ -566,18 +580,43 @@ fn source_file(p: Parser) I32 {
 fn item(p: Parser) void {
     let w = word_id(p);
     if w == Kw.Mod.i32() { module_decl(p); return; };
-    if w == Kw.Using.i32() { using_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Using.i32() {
+        let e = begin_statement(p);
+        using_decl(p);
+        end_statement(p, e);
+        return;
+    };
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return; };
     if w == Kw.Proto.i32() { proto_decl(p); return; };
     if w == Kw.Fn.i32() { fn_or_op_decl(p); return; };
-    if w == Kw.Let.i32() { global_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Mem.i32() or w == Kw.Vec.i32() or w == Kw.Const.i32() { mem_decl(p); expect(p, Tok.Semi); return; };
-    if w == Kw.Type.i32() { distinct_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Let.i32() {
+        let e = begin_statement(p);
+        global_decl(p);
+        end_statement(p, e);
+        return;
+    };
+    if w == Kw.Mem.i32() or w == Kw.Vec.i32() or w == Kw.Const.i32() {
+        let e = begin_statement(p);
+        mem_decl(p);
+        end_statement(p, e);
+        return;
+    };
+    if w == Kw.Type.i32() {
+        let e = begin_statement(p);
+        distinct_decl(p);
+        end_statement(p, e);
+        return;
+    };
     if w == Kw.Export.i32() {
         let after = tok_word[ptok[p.pos + 1]];
         if after == Kw.Lib.i32() { export_lib_decl(p); return; };
         if after == Kw.Main.i32() { export_main_decl(p); return; };
-        if after == Kw.Const.i32() or after == Kw.Mem.i32() { mem_decl(p); expect(p, Tok.Semi); return; };
+        if after == Kw.Const.i32() or after == Kw.Mem.i32() {
+            let e = begin_statement(p);
+            mem_decl(p);
+            end_statement(p, e);
+            return;
+        };
         fail(p);
         return;
     };
@@ -593,7 +632,12 @@ fn module_item(p: Parser) void {
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return; };
     if w == Kw.Proto.i32() { proto_decl(p); return; };
     if w == Kw.Fn.i32() { fn_or_op_decl(p); return; };
-    if w == Kw.Let.i32() { global_decl(p); expect(p, Tok.Semi); return; };
+    if w == Kw.Let.i32() {
+        let e = begin_statement(p);
+        global_decl(p);
+        end_statement(p, e);
+        return;
+    };
     if w == Kw.Test.i32() { test_decl(p); return; };
     if w == Kw.Bench.i32() { bench_decl(p); return; };
     fail(p);
@@ -1174,44 +1218,113 @@ fn block(p: Parser) I32 {
     node(p, Node.Block, at, first);
 }
 
-/// A block's statement: an expression and its `;`. One that begins with
-/// `if`, `for`, `while`, `match`, `loop`, `alt`, `promote`, `try`, or a label,
-/// and ends at a `}` that ends its line, may leave the `;` out: the next line
-/// is the next statement (`for (xs) |x| { … }` then `-y;` is not a
-/// subtraction). On the `}`'s line, the expression goes on (`alt t { … } + 1;`).
+/// A block's statement: an expression, ended as @statement_end finds (a
+/// `;` after it is read, and does nothing more).
 fn statement(p: Parser) void {
-    if not block_statement_ahead(p) {
-        expression(p);
-        expect(p, Tok.Semi);
+    // (A `;` alone: nothing.)
+    if is(p, Tok.Semi) {
+        advance(p);
         return;
     };
-    deeper(p);
-    let left = prefix(p);
-    // (`try { … }` without catch reads its own operators, as `try e` does: not one.)
-    if kind_at(p, -1) == Tok.RBrace.i32() and not is_kind(left, Node.Try_result_expr) and not is(p, Tok.Semi)
-        and line_ends_before(p) {
-        parse_depth[0] -= 1;
-        return;
-    };
-    extend(p, left, -1000, true);
-    expect(p, Tok.Semi);
+    let e = begin_statement(p);
+    expression(p);
+    end_statement(p, e);
 }
 
-/// Whether a line ends between the token before the cursor and the cursor's.
-fn line_ends_before(p: Parser) Bool {
-    for (tok_end[ptok[p.pos - 1]] ..< tok_start[ptok[p.pos]]) |i| { if src[i] == 10 { return true; }; };
+/// Reading a statement from the cursor: where it ends, which the parser
+/// reads as a `;` until @end_statement.
+fn begin_statement(p: Parser) I32 {
+    let e = statement_end(p);
+    stmt_limit.push(e);
+    e;
+}
+
+/// After a statement: nothing may be left before its end `e`; a `;` there
+/// is read.
+fn end_statement(p: Parser, e: I32) void {
+    stmt_limit.resize(stmt_limit.len() - 1);
+    if p.pos < e { fail_wanting(p, Tok.Semi.i32()); };
+    if is(p, Tok.Semi) { advance(p); };
+}
+
+/// Where the statement at the cursor ends: at a `;`, at the `}` (or `)`,
+/// `]`) closing what it is in, at the end, or at a line break outside its
+/// brackets, unless the line goes on: after what cannot end it (`=`, `+`,
+/// `,`, `and`), or into a line that only continues (`.f()`, `+ x`, `and`,
+/// `else`, `catch`, `from`, a stage `map |x|`). A line beginning `-`, `(`, `[`, or
+/// `&` is a new statement.
+fn statement_end(p: Parser) I32 {
+    let i = p.pos;
+    let depth = 0;
+    while (true) {
+        let k = tok_kind[ptok[i]];
+        if k == Tok.End.i32() { return i; };
+        if depth == 0 {
+            if k == Tok.Semi.i32() or k == Tok.RBrace.i32() or k == Tok.RParen.i32() or k == Tok.RBracket.i32() { return i; };
+            if i > p.pos and line_break_before(i) and not continues_line(i) { return i; };
+        };
+        if k == Tok.LParen.i32() or k == Tok.LBracket.i32() or k == Tok.LBrace.i32() or k == Tok.TemplateHead.i32() {
+            depth += 1;
+        } else if k == Tok.RParen.i32() or k == Tok.RBracket.i32() or k == Tok.RBrace.i32() or k == Tok.TemplateTail.i32() {
+            depth -= 1;
+        };
+        i += 1;
+    };
+    i;
+}
+
+/// Whether a line ends between the tokens at positions `i - 1` and `i`.
+fn line_break_before(i: I32) Bool {
+    let prev = ptok[i - 1];
+    // (A `\\` line's token holds its line's end.)
+    if tok_kind[prev] == Tok.MultilineLine.i32() { return true; };
+    for (tok_end[prev] ..< tok_start[ptok[i]]) |b| { if src[b] == 10 { return true; }; };
     false;
 }
 
-/// Whether the statement at the cursor begins as one that may end at its `}`.
-fn block_statement_ahead(p: Parser) Bool {
-    if not is_word(p) { return false; };
-    let w = word_id(p);
-    if w == Kw.If.i32() or w == Kw.For.i32() or w == Kw.While.i32() or w == Kw.Match.i32()
-        or w == Kw.Loop.i32() or w == Kw.Alt.i32() or w == Kw.Promote.i32() or w == Kw.Try.i32() {
+/// Whether the statement goes on across the line break before position `i`.
+fn continues_line(i: I32) Bool {
+    let k = tok_kind[ptok[i]];
+    let prev = tok_kind[ptok[i - 1]];
+    if k == Tok.MultilineLine.i32() and prev == Tok.MultilineLine.i32() { return true; };
+    if open_end(prev, tok_word[ptok[i - 1]]) { return true; };
+    // `.f()` goes on; `.{a, b}` is a tuple.
+    if k == Tok.Dot.i32() { return tok_kind[ptok[i + 1]] != Tok.LBrace.i32(); };
+    if k == Tok.QuestionDot.i32() or k == Tok.Plus.i32() or k == Tok.Star.i32() or k == Tok.Slash.i32() or k == Tok.Percent.i32()
+        or k == Tok.Caret.i32() or k == Tok.Pipe.i32() or k == Tok.EqEq.i32() or k == Tok.BangEq.i32() or k == Tok.Lt.i32()
+        or k == Tok.Gt.i32() or k == Tok.LtEq.i32() or k == Tok.GtEq.i32() or k == Tok.Shl.i32() or k == Tok.Shr.i32()
+        or k == Tok.Shr3.i32() or k == Tok.MinusO.i32() or k == Tok.LBrace.i32() {
         return true;
     };
-    shaped(p) and is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.LBrace);
+    if k != Tok.Word.i32() { return false; };
+    let w = tok_word[ptok[i]];
+    if w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32() or w == Kw.Orelse.i32() or w == Kw.Else.i32() or w == Kw.Catch.i32()
+        or w == Kw.From.i32() {
+        return true;
+    };
+    // A stage, with its capture or arguments (a bare `count` is a name).
+    let next = tok_kind[ptok[i + 1]];
+    w >= Kw.Map.i32() and w <= Kw.Count.i32() and (next == Tok.Pipe.i32() or next == Tok.LParen.i32());
+}
+
+/// Whether a statement cannot end after a token of kind `k` (word `w`): an
+/// operator, `=`, `,`, `.`, or a word that wants more (`and`, `let`, `else`).
+fn open_end(k: I32, w: I32) Bool {
+    if k == Tok.Word.i32() {
+        return w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32() or w == Kw.Orelse.i32() or w == Kw.Not.i32()
+            or w == Kw.Await.i32() or w == Kw.New.i32() or w == Kw.Let.i32() or w == Kw.If.i32() or w == Kw.Else.i32()
+            or w == Kw.Match.i32() or w == Kw.Alt.i32() or w == Kw.For.i32() or w == Kw.While.i32() or w == Kw.Try.i32()
+            or w == Kw.Promote.i32() or w == Kw.Defer.i32() or w == Kw.Errdefer.i32() or w == Kw.Yield.i32() or w == Kw.Assert.i32()
+            or w == Kw.Catch.i32() or w == Kw.Loop.i32();
+    };
+    k == Tok.Eq.i32() or k == Tok.PlusEq.i32() or k == Tok.MinusEq.i32() or k == Tok.StarEq.i32() or k == Tok.SlashEq.i32()
+        or k == Tok.PercentEq.i32() or k == Tok.PipeEq.i32() or k == Tok.AmpEq.i32() or k == Tok.CaretEq.i32() or k == Tok.ShlEq.i32()
+        or k == Tok.ShrEq.i32() or k == Tok.Shr3Eq.i32() or k == Tok.Plus.i32() or k == Tok.Minus.i32() or k == Tok.Star.i32()
+        or k == Tok.Slash.i32() or k == Tok.Percent.i32() or k == Tok.Caret.i32() or k == Tok.Pipe.i32() or k == Tok.Amp.i32()
+        or k == Tok.EqEq.i32() or k == Tok.BangEq.i32() or k == Tok.Lt.i32() or k == Tok.Gt.i32() or k == Tok.LtEq.i32()
+        or k == Tok.GtEq.i32() or k == Tok.Shl.i32() or k == Tok.Shr.i32() or k == Tok.Shr3.i32() or k == Tok.Dot.i32()
+        or k == Tok.QuestionDot.i32() or k == Tok.Comma.i32() or k == Tok.Colon.i32() or k == Tok.FatArrow.i32()
+        or k == Tok.TildeArrow.i32() or k == Tok.DotDotLt.i32() or k == Tok.DotDotDot.i32() or k == Tok.MinusO.i32();
 }
 
 fn capture(p: Parser) I32 {
@@ -2260,7 +2373,7 @@ fn parse(first: I32, last: I32) I32 {
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]];
         if parse_expected.len() > 0 { parse_error_wanted[0] = intern_text(wanted_text()); };
-        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0 });
+        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limits: 1 });
         -1;
     };
 }
@@ -2351,7 +2464,7 @@ fn parse_expression(first: I32, last: I32) I32 {
         };
         e;
     } catch {
-        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0 });
+        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limits: 1 });
         -1;
     };
 }
