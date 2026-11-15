@@ -10,9 +10,9 @@ fn element(document: Browser.Document, tag: Str, class_name: Str, label: Str) Br
     node
 }
 
-fn save(document: Browser.Document) void {
+fn save(document: Browser.Document) Void {
     let data = Browser.Array()
-    document.querySelectorAll(".task").forEach(cl(row) void {
+    document.querySelectorAll(".task").forEach(cl(row) Void {
         promote row.querySelector(".task-label") {
             |text| => data.push(&{ label: text.textContent, done: row.classList.contains("done") }),
             ~> {},
@@ -21,13 +21,13 @@ fn save(document: Browser.Document) void {
     Browser.localStorage.setItem("utu-focus-v1", Browser.JSON.stringify(data))
 }
 
-fn paint(task: Task, row: Browser.HTMLElement, toggle: Browser.HTMLElement) void {
+fn paint(task: Task, row: Browser.HTMLElement, toggle: Browser.HTMLElement) Void {
     row.classList.toggle("done", task.done)
     toggle.textContent = if task.done { "✓" } else { "○" }
     toggle.setAttribute("aria-label", if task.done { "Reopen task" } else { "Complete task" })
 }
 
-fn add_task(document: Browser.Document, list: Browser.HTMLElement, label: Str, initial_done: Bool) void {
+fn add_task(document: Browser.Document, list: Browser.HTMLElement, label: Str, initial_done: Bool) Void {
     if label.len() > 0 {
         let task: Task = Task { done: initial_done }
         let row = element(document, "li", "task", "")
@@ -38,19 +38,19 @@ fn add_task(document: Browser.Document, list: Browser.HTMLElement, label: Str, i
         row.append(toggle, text, remove)
         list.appendChild(row)
         paint(task, row, toggle)
-        toggle.addEventListener("click", cl(event) void {
+        toggle.addEventListener("click", cl(event) Void {
             task.done = not task.done
             paint(task, row, toggle)
             save(document)
         })
-        remove.addEventListener("click", cl(event) void {
+        remove.addEventListener("click", cl(event) Void {
             row.remove()
             save(document)
         })
     }
 }
 
-export main() void {
+export main() Void {
     let document = Browser.document
     let app = element(document, "main", "app", "")
     document.body.appendChild(app)
@@ -89,7 +89,7 @@ export main() void {
             add_task(document, list, "Try the browser ABI from UTU", false)
         },
     }
-    form.addEventListener("submit", cl(event) void {
+    form.addEventListener("submit", cl(event) Void {
         event.preventDefault()
         add_task(document, list, input.value, false)
         save(document)

@@ -1,6 +1,6 @@
 // What: a generator called inside a map body, as if it returned an array
 // Expect: squares is a generator: consume it with for, not as a value
-fn squares(n: I32) yield I32 {
+gn squares(n: I32) I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
 

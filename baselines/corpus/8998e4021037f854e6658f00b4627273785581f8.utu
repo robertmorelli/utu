@@ -91,7 +91,7 @@ fn illegal_in_string(c: I32) Bool {
     c < 32 or c > 126;
 }
 
-fn set(m: Machine, from: I32, c: I32, to: I32) void {
+fn set(m: Machine, from: I32, c: I32, to: I32) Void {
     m.tabs[from * 256 + c] = to;
 }
 
@@ -99,7 +99,7 @@ fn get(m: Machine, from: I32, c: I32) I32 {
     m.tabs[from * 256 + c];
 }
 
-fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
+fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) Void {
     for (lo ... hi) |c| { set(m, from, c, to); };
 }
 
@@ -128,13 +128,13 @@ fn variable_state(m: Machine, var_state: I32) I32 {
     state;
 }
 
-fn self_legal(m: Machine, state: I32) void {
+fn self_legal(m: Machine, state: I32) Void {
     for (0 ..< 256) |c| {
         if not illegal(c) { set(m, state, c, state); };
     };
 }
 
-fn invisible(m: Machine) void {
+fn invisible(m: Machine) Void {
     let newline = permissive(m, Kind.NEWLINE);
     let slash = permissive(m, Kind.OP);
     let block = restricted(m, Kind.Invalid);
@@ -158,11 +158,11 @@ fn invisible(m: Machine) void {
     set(m, leaving, 47, ignore_state);
 }
 
-fn single(m: Machine, c: I32, kind: Kind) void {
+fn single(m: Machine, c: I32, kind: Kind) Void {
     set(m, start_state, c, permissive(m, kind));
 }
 
-fn singles(m: Machine) void {
+fn singles(m: Machine) Void {
     single(m, 40, Kind.LPAREN);
     single(m, 41, Kind.RPAREN);
     single(m, 123, Kind.LCURLY);
@@ -181,7 +181,7 @@ fn singles(m: Machine) void {
     single(m, 61, Kind.EQUALS);
 }
 
-fn double(m: Machine, a: I32, b: I32) void {
+fn double(m: Machine, a: I32, b: I32) Void {
     let first = get(m, start_state, a);
     if first == start_state or first == error_state or first == accept_state {
         first = restricted(m, Kind.Invalid);
@@ -195,7 +195,7 @@ fn double(m: Machine, a: I32, b: I32) void {
     m.kinds[second] = Kind.OP.i32();
 }
 
-fn doubles(m: Machine) void {
+fn doubles(m: Machine) Void {
     double(m, 124, 124);
     double(m, 38, 38);
     double(m, 61, 61);
@@ -217,7 +217,7 @@ fn variables(m: Machine) I32 {
 }
 
 // Keywords are paths through the identifier states; each ends in its kind.
-fn keyword(m: Machine, word: Str, kind: Kind, var_state: I32) void {
+fn keyword(m: Machine, word: Str, kind: Kind, var_state: I32) Void {
     let current = start_state;
     for (0 ..< word.len()) |k| {
         let c = word.get(k);
@@ -230,7 +230,7 @@ fn keyword(m: Machine, word: Str, kind: Kind, var_state: I32) void {
     m.kinds[current] = kind.i32();
 }
 
-fn keywords(m: Machine, var_state: I32) void {
+fn keywords(m: Machine, var_state: I32) Void {
     let words = ["assert", "array", "bool", "else", "false", "fn", "float", "int", "image", "if", "let",
         "print", "return", "read", "struct", "show", "sum", "to", "time", "true", "then", "void", "write"];
     for (words, 0 ..< 23) |word, k| {
@@ -238,7 +238,7 @@ fn keywords(m: Machine, var_state: I32) void {
     };
 }
 
-fn numbers(m: Machine) void {
+fn numbers(m: Machine) Void {
     let int = permissive(m, Kind.INTVAL);
     let dot = permissive(m, Kind.DOT);
     let float = permissive(m, Kind.FLOATVAL);
@@ -250,7 +250,7 @@ fn numbers(m: Machine) void {
     set_range(m, float, 48, 57, float);
 }
 
-fn strings(m: Machine) void {
+fn strings(m: Machine) Void {
     let open = restricted(m, Kind.Invalid);
     set(m, start_state, 34, open);
     let body = restricted(m, Kind.Invalid);
@@ -265,7 +265,7 @@ fn strings(m: Machine) void {
     set(m, body, 34, close);
 }
 
-fn continuations(m: Machine) void {
+fn continuations(m: Machine) Void {
     let backslash = restricted(m, Kind.Invalid);
     set(m, start_state, 92, backslash);
     set(m, backslash, 10, ignore_state);
@@ -430,10 +430,10 @@ mod Vec[T] {
     fn &.get_index |self| (i: I32) T {
         self.items[i];
     }
-    fn &.set_index |self| (i: I32, v: T) void {
+    fn &.set_index |self| (i: I32, v: T) Void {
         self.items[i] = v;
     }
-    fn &.push |self| (v: T) void {
+    fn &.push |self| (v: T) Void {
         if self.len == self.items.len() {
             let grown = Array[T].new_default(self.len * 2);
             grown.copy_from(0, self.items, 0, self.len);
@@ -442,10 +442,10 @@ mod Vec[T] {
         self.items[self.len] = v;
         self.len += 1;
     }
-    fn &.truncate |self| (n: I32) void {
+    fn &.truncate |self| (n: I32) Void {
         self.len = n;
     }
-    fn &.clear |self| () void {
+    fn &.clear |self| () Void {
         self.len = 0;
     }
 }
@@ -475,15 +475,15 @@ fn new_scanner(end: I32, env: Env) Scanner {
     s;
 }
 
-let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('jpl'); } \/;
+let syntax_error: fun() Void = @es/\ () => { throw new SyntaxError('jpl'); } \/;
 
 // A syntax or type error unwinds to `parse` or `check`.
-fn fail() void {
+fn fail() Void {
     syntax_error();
 }
 
 // Scan the next token.
-fn Scanner.scan |s| () void {
+fn Scanner.scan |s| () Void {
     let i = s.cursor;
     let j = i;
     let state = start_state;
@@ -522,7 +522,7 @@ fn Scanner.scan |s| () void {
 }
 
 // The token's payload: `!=` is the operator `~`.
-fn Scanner.token |s| (kind: Kind, i: I32, j: I32) void {
+fn Scanner.token |s| (kind: Kind, i: I32, j: I32) Void {
     s.kind = kind;
     if kind == Kind.Invalid { fail(); };
     if kind == Kind.OP {
@@ -537,7 +537,7 @@ fn Scanner.token |s| (kind: Kind, i: I32, j: I32) void {
     };
 }
 
-fn Scanner.set_bits |s| (bits: I64) void {
+fn Scanner.set_bits |s| (bits: I64) Void {
     s.hi = (bits >> 32).i32();
     s.lo = bits.i32();
 }
@@ -551,7 +551,7 @@ fn Scanner.take |s| () Kind {
     kind;
 }
 
-fn Scanner.expect |s| (kind: Kind) void {
+fn Scanner.expect |s| (kind: Kind) Void {
     if s.kind != kind { fail(); };
     s.take();
 }
@@ -643,7 +643,7 @@ fn typed_node(tag: Tag, a: I32, b: I32, at: I32, type_id: I32) I32 {
     node(tag, a, b, at);
 }
 
-fn reset_nodes() void {
+fn reset_nodes() Void {
     node_tag.clear();
     node_a.clear();
     node_b.clear();
@@ -1080,7 +1080,7 @@ fn bind(e: Env, name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
     symbol;
 }
 
-fn unbind_to(e: Env, mark: I32) void {
+fn unbind_to(e: Env, mark: I32) Void {
     while (e.locals.len > mark) {
         let name = e.locals[e.locals.len - 1];
         e.locals.truncate(e.locals.len - 1);
@@ -1113,7 +1113,7 @@ fn field_type_of(e: Env, record: I32, name: I32) I32 {
     0;
 }
 
-fn builtin(e: Env, name: Str, result: I32, first: I32, second: I32) void {
+fn builtin(e: Env, name: Str, result: I32, first: I32, second: I32) Void {
     let start = e.fn_types.len;
     e.fn_types.push(first);
     if second != 0 { e.fn_types.push(second); };
@@ -1122,7 +1122,7 @@ fn builtin(e: Env, name: Str, result: I32, first: I32, second: I32) void {
     e.sym_params_len[symbol] = e.fn_types.len - start;
 }
 
-fn reset_env(e: Env) void {
+fn reset_env(e: Env) Void {
     src.intern_reset();
     e.bound.clear();
     e.sym_tag.clear();
@@ -1153,7 +1153,7 @@ fn reset_env(e: Env) void {
 }
 
 // The builtin types, records, variables, and functions.
-fn init_env(e: Env) void {
+fn init_env(e: Env) Void {
     reset_env(e);
     new_type(e, TypeTag.Invalid, 0, 0, 0, 0);
     new_type(e, TypeTag.Void, 0, 0, 0, 0);
@@ -1514,7 +1514,7 @@ fn pattern(s: Scanner, parameter: Bool) I32 {
     id;
 }
 
-fn bind_pattern(e: Env, id: I32, expected: I32, local: Bool) void {
+fn bind_pattern(e: Env, id: I32, expected: I32, local: Bool) Void {
     if e.pat_declared[id] != 0 and e.pat_declared[id] != expected { fail(); };
     let tag = e.pat_tag[id];
     if tag == PatternTag.Plain {
@@ -1725,12 +1725,12 @@ fn check() .{I32, I32, I32} {
 
 // ── The command line ───────────────────────────────────────────────────────────
 
-fn load(path: Str) void {
+fn load(path: Str) Void {
     src.copy_in(Fs.readFileSync(path));
     src.push(255);
 }
 
-fn report(n: I32, print: Bool) void {
+fn report(n: I32, print: Bool) Void {
     let at = if n >= 0 and print { listing(n); } else { 0; };
     at = emit_bytes(at, if n < 0 { "Compilation failed\n"; } else { "Compilation succeeded\n"; });
     // A pipe can take less than everything, or nothing yet (EAGAIN under Node).
@@ -1759,7 +1759,7 @@ fn time(runs: I32, print: Bool) F64 {
 // jpl <file.jpl> -t -q    parse and type check
 // jpl <file.jpl> -t -s    type check, then print token, node, symbol, and type counts
 // jpl <file.jpl> -bench   in-process medians for lexing, listing, and parsing
-export main() void {
+export main() Void {
     let args = Process.argv;
     let file = "";
     let flags = "";

@@ -105,7 +105,7 @@ await test('readonly members and incorrect arguments produce diagnostics', async
     ['Fixture.make(&{label: "missing count"});', /Missing property count/],
     ['let c = Fixture.Counter(); c.missing();', /No member Fixture\.Counter\.missing/],
   ]) {
-    const doc = await compile(`using Fixture from std:Fixture; export main() void { ${body} }`);
+    const doc = await compile(`using Fixture from std:Fixture; export main() Void { ${body} }`);
     assert(doc.errors.some(m => pattern.test(m)), `${body}: ${doc.errors.join(' | ')}`);
   }
 });
@@ -136,9 +136,9 @@ await test('Floating UI factory returns a typed middleware object', async () => 
 });
 await test('mitt callbacks retain identity for subscribe and unsubscribe', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'node_modules/mitt/index.d.ts')], prefix: 'Mitt', moduleSpecifier: 'mitt' });
-  const { exports } = await run(`fn run() void {
+  const { exports } = await run(`fn run() Void {
     let emitter = Mitt.default();
-    let callback = cl(value: Externref) void {};
+    let callback = cl(value: Externref) Void {};
     emitter.on("event", callback); emitter.emit("event", "hello"); emitter.off("event", callback);
   }`, output);
   exports.run();
@@ -162,7 +162,7 @@ await test('mutable globals use direct assignment while const globals stay reado
   const output = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/globals.d.ts')], prefix: 'Globals' });
   const { exports } = await run('fn run() F64 { Globals.abiCounter = 40.0; Globals.abiCounter += 2.0; Globals.abiCounter; }', output);
   try { assert.equal(exports.run(), 42); } finally { delete globalThis.abiCounter; }
-  const doc = await compile('using Globals from std:Globals; export main() void { Globals.abiFixed = 0.0; }', output);
+  const doc = await compile('using Globals from std:Globals; export main() Void { Globals.abiFixed = 0.0; }', output);
   assert(doc.errors.some(m => /readonly/.test(m)));
 });
 await test('generic calls retain foreign identities across separate ABI imports', async () => {
@@ -188,11 +188,11 @@ await test('union slots accept any member: strings, subtypes, closures and recor
   let fired = 0;
   const exports = await runBrowser(`
     fn params() Str { let p = new Browser.URLSearchParams("a=1&b=2"); p.append("c", "3"); p.toString(); }
-    fn timer() void { Browser.setTimeout(cl() void { Browser.console.info("timer"); }, 0.0); }
+    fn timer() Void { Browser.setTimeout(cl() Void { Browser.console.info("timer"); }, 0.0); }
     fn once() F64 {
       let seen = Browser.Array();
       let target = new Browser.EventTarget();
-      target.addEventListener("ping", cl(event) void { seen.push(event.type); }, &{ once: true });
+      target.addEventListener("ping", cl(event) Void { seen.push(event.type); }, &{ once: true });
       target.dispatchEvent(new Browser.Event("ping"));
       target.dispatchEvent(new Browser.Event("ping"));
       seen.length;
@@ -213,7 +213,7 @@ await test('generic callbacks infer results, accept shorter arity and bind later
     fn upper() Str { Browser.Array.of("x", "y").map(cl(s) Str { s.toUpperCase(); }).join(","); }
     fn doubled() Str {
       let out = Browser.Array();
-      Browser.Array.of(1.0, 2.0, 3.0).forEach(cl(n) void { out.push(n * 2.0); });
+      Browser.Array.of(1.0, 2.0, 3.0).forEach(cl(n) Void { out.push(n * 2.0); });
       out.join(",");
     }
     fn later() F64 {
@@ -277,7 +277,7 @@ await test('DOM: tag-name narrowing, index-signature properties, union rest argu
     await test('DOM: event targets narrow in a closure whose parameter a later call types', async () => {
       const later = await runBrowser(`fn target() Str {
         let log = Browser.Array();
-        let handler = cl(event) void {
+        let handler = cl(event) Void {
           alt event.target {
             Browser.HTMLInputElement |input| => log.push(input.value),
             ~> log.push("unknown"),
@@ -309,7 +309,7 @@ await test('array literals become JS arrays for array, array-like, iterable and 
   // An empty `[]` nothing constrains is a native Array[I32], JS members or not
   // (docs/arrays.md, rule 4: "a literal with elements"); Browser.Array() is an empty JS one.
   await test('array literals used through JS array members are JS arrays', async () => {
-    const empty = await compile('using Browser from std:Browser; export main() void { let items = []; items.push("a"); }');
+    const empty = await compile('using Browser from std:Browser; export main() Void { let items = []; items.push("a"); }');
     assert.deepEqual(empty.errors, ['No method Array[I32].push']);
     const host = await runBrowser(`
       fn direct() Str { Browser.JSON.stringify([1, 2]); }
@@ -321,19 +321,19 @@ await test('array literals become JS arrays for array, array-like, iterable and 
     assert.equal(host.pushed(), 2); assert.equal(host.logged(), 2);
   });
   assert.equal(exports.from(), 7); assert.equal(exports.blob(), 11); assert.equal(exports.set(), 2);
-  const doc = await compile('using Browser from std:Browser; export main() void { let t = [Browser.document, 1]; }');
+  const doc = await compile('using Browser from std:Browser; export main() Void { let t = [Browser.document, 1]; }');
   assert(doc.errors.some(m => /^Elements are Browser\.Document, got I32$/.test(m)));
 });
 await test('package declarations accept DOM values, records, tuples, closures and awaited results', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'node_modules/@floating-ui/dom/dist/floating-ui.dom.d.ts')], prefix: 'Floating', moduleSpecifier: '@floating-ui/dom' });
   const source = `using Browser from std:Browser; using Floating from std:Floating;
-    export main() void {
+    export main() Void {
       let button = Browser.document.createElement("button");
       let tip = Browser.document.createElement("div");
       let pos = await Floating.computePosition(button, tip, &{ placement: "top",
         middleware: [Floating.offset(8), Floating.flip(), Floating.shift(&{ padding: 5 })] });
       tip.style.left = pos.x.toString() + "px";
-      let cleanup = Floating.autoUpdate(button, tip, cl() void {});
+      let cleanup = Floating.autoUpdate(button, tip, cl() Void {});
       cleanup();
     }`;
   const doc = await compile(source, output);
@@ -367,7 +367,7 @@ await test('checked programs keep precise declaration types in diagnostics', asy
     ['promote Browser.document { |d| => {}, ~> {}, };', 'Expected nullable, got Browser.Document'],
     ['let words = Browser.Array.of("a"); let n: F64 = words;', 'got Browser.Str[]'],
   ]) {
-    const doc = await compile(`using Browser from std:Browser; export main() void { ${body} }`);
+    const doc = await compile(`using Browser from std:Browser; export main() Void { ${body} }`);
     const messages = doc.errors;
     assert(messages.some(m => m.includes(message)), `${body}: ${messages.join(' | ')}`);
   }
@@ -376,7 +376,7 @@ await test('default exports, booleans, unions, never, namespaces and const enums
   const { exports } = await run(`
     fn greeting() Str { Fixture.default("UTU"); }
     fn boolean() Bool { Fixture.flip(false); }
-    fn failure() void { Fixture.fail(); }
+    fn failure() Void { Fixture.fail(); }
     fn namespace() F64 { Fixture.Util.scale(21.0); }
   `);
   assert.equal(exports.greeting(), 'Hello UTU'); assert.equal(exports.boolean(), true);
@@ -417,7 +417,7 @@ await test('a Rust crate links through its wasm-bindgen declarations', async () 
     }
     fn steps() F64 {
       let seen = new Geom.Polygon(0.0, 0.0);
-      Geom.each_step(3.0, cl(i: F64) void { seen.scale(1.0); });
+      Geom.each_step(3.0, cl(i: F64) Void { seen.scale(1.0); });
       seen.free();
       3.0;
     }
@@ -435,7 +435,7 @@ await test('std:JS is the ECMAScript library alone, sharing the browser\'s stand
   } }`);
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.run(), '[5,1,1970,"--x"]');
-  const dom = await compile('using JS from std:JS; export main() void { JS.document.title = "x"; }');
+  const dom = await compile('using JS from std:JS; export main() Void { JS.document.title = "x"; }');
   assert(dom.errors.includes('No member JS.document'));
   const both = await compile(`using JS from std:JS; using Browser from std:Browser;
     export lib { fn run() F64 { let m: Browser.Map = new JS.Map(); m.size; } }`);
@@ -455,12 +455,12 @@ await test('std:Web runs the common web APIs on any JS runtime; std:Worker types
   assert.equal(exports.url(), 'https://utu.dev/a?q=2'); assert.equal(exports.bytes(), 6);
   assert.equal(exports.base64(), 'utu'); assert.equal(exports.uuid(), 36); assert.equal(exports.aborted(), true);
   if (typeof WebAssembly.Suspending === 'function') assert.equal(await exports.body(), 'from a Response');
-  const dom = await compile('using Web from std:Web; export main() void { Web.document.title = "x"; }');
+  const dom = await compile('using Web from std:Web; export main() Void { Web.document.title = "x"; }');
   assert(dom.errors.includes('No member Web.document'));
   const worker = await compile(`using Worker from std:Worker; using Web from std:Web;
-    fn reply(response: Web.Response) void { Worker.postMessage(response.status); }
-    export main() void {
-      Worker.self.onmessage = cl(event) void { Worker.postMessage(event.data); };
+    fn reply(response: Web.Response) Void { Worker.postMessage(response.status); }
+    export main() Void {
+      Worker.self.onmessage = cl(event) Void { Worker.postMessage(event.data); };
       Worker.importScripts("helper.js");
       reply(new Worker.Response("ok"));
     }`);
@@ -474,7 +474,7 @@ await test('keyof over an index signature accepts any key (mitt handlers need no
   const { exports } = await run(`fn run() F64 {
     let emitter = Mitt.default();
     let total: F64 = 0.0;
-    emitter.on("add", cl(value: F64) void { total = total + value; });
+    emitter.on("add", cl(value: F64) Void { total = total + value; });
     emitter.emit("add", 2); emitter.emit("add", 3);
     total;
   }`, output);
@@ -482,7 +482,7 @@ await test('keyof over an index signature accepts any key (mitt handlers need no
 });
 await test('try/catch catches host exceptions as values, nests, and yields a result', async () => {
   // The caught value is an Externref with no members (docs/typescript-abi.md, try/catch): JS.String(e) reads it.
-  const members = await compile('using JS from std:JS; export main() void { try { JS.JSON.parse("{"); } catch |e| { e.name; }; }');
+  const members = await compile('using JS from std:JS; export main() Void { try { JS.JSON.parse("{"); } catch |e| { e.name; }; }');
   assert.deepEqual(members.errors, ['Externref has no field name']);
   const doc = await compile(`using JS from std:JS; export lib {
     fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { JS.String(e); }; }
@@ -524,10 +524,10 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
   assert.equal(exports.total(), 9); assert.equal(exports.count(), 3); assert.equal(exports.same(), true);
   assert.equal(exports.from_set(), 'xy'); assert.equal(exports.dataset(), 'z');
   await test('web friction: array literals take JS array members', async () => {
-    const chips = await runBrowser('fn chips() Str { let out = Browser.Array(); ["a", "b"].forEach(cl(name) void { out.push(name + "!"); }); out.join(","); }');
+    const chips = await runBrowser('fn chips() Str { let out = Browser.Array(); ["a", "b"].forEach(cl(name) Void { out.push(name + "!"); }); out.join(","); }');
     assert.equal(chips.chips(), 'a!,b!');
   });
-  const typed = await compile(`using Browser from std:Browser; export main() void {
+  const typed = await compile(`using Browser from std:Browser; export main() Void {
     let input: ?Browser.HTMLInputElement = Browser.document.querySelector("#q");
     promote input { |i| => i.value = "x", ~> {}, };
     let wrong: ?Browser.Date = Browser.document.querySelector("#q");
@@ -546,7 +546,7 @@ await test('closures whose first parameter is `this` receive the JS receiver', a
     fn click() Str {
       let target = new Browser.EventTarget();
       let seen = Browser.Array();
-      target.addEventListener("ping", cl(this, event) void { seen.push(Browser.Object.is(this, target)); });
+      target.addEventListener("ping", cl(this, event) Void { seen.push(Browser.Object.is(this, target)); });
       target.dispatchEvent(new Browser.Event("ping"));
       Browser.JSON.stringify(seen);
     }
@@ -569,7 +569,7 @@ await test('CommonJS callables and wildcard ambient modules link to their runtim
   assert.equal(theme.color(), 'green');
 });
 await test('closure parameters without any context are diagnosed instead of crashing', async () => {
-  const doc = await compile('using Browser from std:Browser; export main() void { let h = cl(e) void {}; }');
+  const doc = await compile('using Browser from std:Browser; export main() Void { let h = cl(e) Void {}; }');
   assert(doc.errors.some(m => /^e needs a type$/.test(m)));
 });
 console.log(`${passed} deep ABI tests passed`);

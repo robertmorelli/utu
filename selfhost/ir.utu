@@ -26,7 +26,7 @@ vec attr_end: I32
 /// By DSL node: its parsed root, -2 before parsing, -1 when it does not parse.
 vec x_cache: I32
 
-fn reset_ir_trees() void {
+fn reset_ir_trees() Void {
     x_tag.clear()
     x_attr_first.clear()
     x_attr_count.clear()
@@ -64,7 +64,7 @@ struct XmlAt:
     | pos: I32
     | end: I32
 
-fn x_space(at: XmlAt) void {
+fn x_space(at: XmlAt) Void {
     while (at.pos < at.end and is_space(src[at.pos])) { at.pos += 1 }
 }
 
@@ -286,7 +286,7 @@ vec known_kept: I32 = [0]
 
 /// Interns the @Known words and the tags of @opcode_table, with their
 /// opcodes in @word_opcode. After `seal`, the words kept stand.
-fn intern_known() void {
+fn intern_known() Void {
     if known_kept[0] == 1 { return }
     word_opcode.clear()
     known.resize(Known.count())

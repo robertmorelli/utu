@@ -22,7 +22,7 @@ mod Array[T1] {
     }
 
     // a[i] = v — write element at index i (returns void).
-    fn &.set_index |self| (i: I32, v: T1) void {
+    fn &.set_index |self| (i: I32, v: T1) Void {
         @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
     }
 
@@ -52,7 +52,7 @@ mod Array[T1] {
     fn &.get |self| (i: I32) T1 {
         @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
     }
-    fn &.set |self| (i: I32, v: T1) void {
+    fn &.set |self| (i: I32, v: T1) Void {
         @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
     }
     fn &.slice |self| (start: I32, end_: I32) & {
@@ -61,7 +61,7 @@ mod Array[T1] {
 
     // self[at .. at+count) = source[start .. start+count), as one bulk copy.
     // Overlapping ranges of the same array copy correctly. Out of range traps.
-    fn &.copy_from |self| (at: I32, source: &, start: I32, count: I32) void {
+    fn &.copy_from |self| (at: I32, source: &, start: I32, count: I32) Void {
         @ir/\ <ir-array-copy>
             <ir-ident name="self"/>
             <ir-ident name="at"/>

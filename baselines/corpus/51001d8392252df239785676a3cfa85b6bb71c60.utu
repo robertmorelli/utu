@@ -1,10 +1,10 @@
-fn swap(values: Array[I32], left: I32, right: I32) void {
+fn swap(values: Array[I32], left: I32, right: I32) Void {
     let temp: I32 = values[left];
     values[left] = values[right];
     values[right] = temp;
 }
 
-fn reverse_prefix(values: Array[I32], last: I32) void {
+fn reverse_prefix(values: Array[I32], last: I32) Void {
     let left: I32 = 0;
     let right: I32 = last;
     for (0..<values.len()) |step| {

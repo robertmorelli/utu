@@ -49,7 +49,7 @@ mod Table {
         i
     }
 
-    fn &.increment |self| (key: I64) void {
+    fn &.increment |self| (key: I64) Void {
         if self.size >= self.upper { self.grow() }
         let i = self.find(key)
         let data = self.data
@@ -71,7 +71,7 @@ mod Table {
     fn &.key_at |self| (j: I32) I64 { self.data[j << 1] - 1 }
     fn &.val_at |self| (j: I32) I32 { self.data[(j << 1) + 1].i32() }
 
-    fn &.grow |self| () void {
+    fn &.grow |self| () Void {
         let old = self.data
         let buckets = old.len()
         self.data = Array[I64].new(buckets * 2, 0)
@@ -243,11 +243,11 @@ fn knucleotide() I32 {
 struct Lcg:
     | seed: I32
 
-fn put_str(s: Str) void {
+fn put_str(s: Str) Void {
     for (0..<s.len()) |i| { src.push(s[i]) }
 }
 
-fn random_fasta(rng: Lcg, chars: Str, probs: Array[F64], count: I32) void {
+fn random_fasta(rng: Lcg, chars: Str, probs: Array[F64], count: I32) Void {
     let cum = Array[F64].new(probs.len(), 0.0)
     let c: F64 = 0.0
     for (0..<probs.len()) |i| {
@@ -269,7 +269,7 @@ fn random_fasta(rng: Lcg, chars: Str, probs: Array[F64], count: I32) void {
     }
 }
 
-fn fasta(n: I32) void {
+fn fasta(n: I32) Void {
     let alu = "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
     src.clear()
     put_str(">ONE Homo sapiens alu\n")
@@ -297,6 +297,6 @@ test "fasta 1000 gives BG's output" {
 }
 
 export lib {
-    fn setup(n: I32) void { fasta(n) }
+    fn setup(n: I32) Void { fasta(n) }
     fn bench(n: I32) I32 { knucleotide() }
 }

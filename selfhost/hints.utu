@@ -60,7 +60,7 @@ vec near_tie: U8 = [0]
 vec near_cap: I32 = [-1]
 
 /// Start looking for the word nearest `word`.
-fn near_start(word: I32) void {
+fn near_start(word: I32) Void {
     near_word[0] = -1
     near_dist[0] = 1 + max_distance(word)
     near_decl[0] = -1
@@ -79,7 +79,7 @@ fn max_distance(word: I32) I32 {
 }
 
 /// Weigh candidate `cand` (declared by `decl`, or -1) against `word`.
-fn near_consider(word: I32, cand: I32, decl: I32) void {
+fn near_consider(word: I32, cand: I32, decl: I32) Void {
     if cand < 0 or cand == word or cand == near_word[0] { return }
     // A name the compiler made (`__…`) is not one to suggest.
     if src.interned_size(cand) > 1 and src[src.interned_start(cand)] == 95 and src[src.interned_start(cand) + 1] == 95 { return }
@@ -219,7 +219,7 @@ fn same_file(a: I32, b: I32) Bool => a >= 0 and b >= 0 and file_of_token(node_fi
 /// Suggest `meant` for the name at `at` (its one token) on the last
 /// diagnostic: a fix, and where `meant` is declared (`decl`), when that is
 /// in the same file.
-fn suggest(at: I32, meant: I32, decl: I32) void {
+fn suggest(at: I32, meant: I32, decl: I32) Void {
     if meant < 0 or at < 0 { return }
     let t = node_first[at]
     let text = word_text(meant)
@@ -243,7 +243,7 @@ fn did_you_mean(i: I32) Str {
 }
 
 /// Report a name that names nothing (a `seek`), suggesting the nearest one in scope.
-fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) void {
+fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
     // The same name again on one line is the same mistake.
     for (0 ..< diag_kind.len()) |i| {
         if diag_kind[i] == kind.i32() and diag_word[i] == word and diag_node[i] != node and same_line(diag_node[i], node) {
@@ -287,12 +287,12 @@ fn std_file(m: Str) Str {
 }
 
 /// Suggest the member of `owner` in `space` nearest the name at `at`.
-fn suggest_member(owner: I32, at: I32, space: Space) void {
+fn suggest_member(owner: I32, at: I32, space: Space) Void {
     if diag_fresh[0] == 1 and at >= 0 { suggest(at, near_member(owner, word_of(at), space), near_decl[0]) }
 }
 
 /// A note for `x.m()` with no method m (and no name suggested): where m is found.
-fn method_note(t: I32, word: I32) void {
+fn method_note(t: I32, word: I32) Void {
     if diag_fresh[0] == 0 or suggested(diag_kind.len() - 1).len() > 0 { return }
     let m = word_text(word)
     if is_array_type(t) and (m == "push" or m == "append" or m == "pop" or m == "insert") {
@@ -308,7 +308,7 @@ fn method_note(t: I32, word: I32) void {
 
 /// Suggest the field of `owner` nearest the name at `at`, or a method of
 /// that name, called (`s.length` → `s.len()`).
-fn suggest_field(owner: I32, at: I32) void {
+fn suggest_field(owner: I32, at: I32) Void {
     if diag_fresh[0] == 0 or at < 0 { return }
     let word = word_of(at)
     let f = near_member(owner, word, Space.Member)
@@ -374,7 +374,7 @@ vec want_why: U8
 vec want_a: I32
 vec want_b: I32
 
-fn want(root: I32, t: I32, why: Why, a: I32, b: I32) void {
+fn want(root: I32, t: I32, why: Why, a: I32, b: I32) Void {
     want_root.push(root)
     want_ty.push(t)
     want_why.push(why.i32())
@@ -382,7 +382,7 @@ fn want(root: I32, t: I32, why: Why, a: I32, b: I32) void {
     want_b.push(b)
 }
 
-fn unwant() void {
+fn unwant() Void {
     let n = want_root.len() - 1
     if n < 0 { return }
     want_root.resize(n)
@@ -392,7 +392,7 @@ fn unwant() void {
     want_b.resize(n)
 }
 
-fn want_reset() void {
+fn want_reset() Void {
     want_root.clear()
     want_ty.clear()
     want_why.clear()
@@ -431,7 +431,7 @@ fn tail_child(p: I32, c: I32) Bool {
 
 /// Report a TypeMismatch at `site` with reason k (see @want_for): the
 /// reason's words, and where it is.
-fn report_wanted(k: I32, site: I32, expected: I32, actual: I32) void {
+fn report_wanted(k: I32, site: I32, expected: I32, actual: I32) Void {
     let why = Why(want_why[k])
     let a = want_a[k]
     let b = want_b[k]
@@ -583,13 +583,13 @@ fn line_first(file: I32, t: I32) I32 {
 }
 
 /// The hint's message, for the last diagnostic (a ParseError).
-fn parse_says(text: Str) void {
+fn parse_says(text: Str) Void {
     if diag_fresh[0] == 1 { diag_c[diag_kind.len() - 1] = intern_text(text) }
 }
 
 /// What a ParseError at token t (in `file`, the parser wanting `wanted`)
 /// recognizes; see the section's comment.
-fn parse_hint(file: I32, t: I32, wanted: I32) void {
+fn parse_hint(file: I32, t: I32, wanted: I32) Void {
     // `'\/'` in a DSL body: its `\/` ended the body (only a "…" string keeps one).
     if diag_fresh[0] == 1 and t > 0 and tok_kind[t] == Tok.Error.i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.i32() {
         diag_note("\\/ ends a DSL body, except inside \"…\": write \"\\/\" there, not '\\/'")
@@ -688,6 +688,19 @@ fn unclosed_brace(file: I32) I32 {
 /// another language's habit, which is then reported.
 fn foreign_habit(file: I32, k: I32, t: I32) Bool {
     let n = tok_after(k)
+    // The spellings before Void and gn.
+    if tok_says(k, "void") { return habit(k, k, "Void", "Write Void, not void") }
+    if tok_says(k, "yield") and tok_is(tok_before(file, k), Tok.RParen) {
+        let f = k
+        while (f > 0 and not tok_says(f, "fn") and not lines_apart(f - 1, f)) { f -= 1 }
+        if tok_says(f, "fn") {
+            let text = "gn" + bytes_text(tok_end[f], tok_start[k])
+            diag_focus(k, k, "gn")
+            diag_fix(tok_start[f], tok_start[n], text, "Use gn")
+            parse_says("A generator is gn g(…) T, not fn g(…) yield T")
+            return true
+        }
+    }
     if tok_is(k, Tok.Amp) and tok_is(n, Tok.Amp) and touching(k, n) { return habit(k, n, "and", "Write and, not &&") }
     if tok_is(k, Tok.Pipe) and tok_is(n, Tok.Pipe) and touching(k, n) { return habit(k, n, "or", "Write or, not ||") }
     if tok_is(k, Tok.Minus) and tok_is(n, Tok.Gt) and touching(k, n) {
@@ -923,7 +936,7 @@ vec cur_inst: I32 = [0]
 
 /// The last diagnostic was found checking instance `inst` (of a generic
 /// module): name it, at the place it was written when known.
-fn in_instance(inst: I32) void {
+fn in_instance(inst: I32) Void {
     if inst <= 0 { return }
     let text = "in " + word_text(decl_name[inst_module[inst]]) + "[" + type_list_text(inst_args[inst]) + "]"
     let l = inst_site[inst]

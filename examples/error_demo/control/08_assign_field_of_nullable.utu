@@ -3,7 +3,7 @@
 struct Counter:
     | count: I32
 
-fn reset(c: ?Counter) void {
+fn reset(c: ?Counter) Void {
     c.count = 0;
 }
 

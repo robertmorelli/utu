@@ -31,7 +31,7 @@ struct Regex:
     | first: Array[I32]   // 1 for each byte a match can start with
     | from_any: Bool      // an alternative can start anywhere (it starts with a star)
 
-fn set_bit(sets: Array[I32], k: I32, c: I32) void {
+fn set_bit(sets: Array[I32], k: I32, c: I32) Void {
     let w = k * 8 + (c >>> 5)
     sets[w] = sets[w] | (1 << (c & 31))
 }
@@ -157,7 +157,7 @@ fn find(re: Regex, from: I32, end: I32) .{I32, I32} {
 }
 
 // Copy heap[from ..< from + len) to heap[to ..].
-fn copy(from: I32, to: I32, len: I32) void {
+fn copy(from: I32, to: I32, len: I32) Void {
     for (0..<len) |i| { heap[to + i] = heap[from + i] }
 }
 
@@ -275,15 +275,15 @@ fn regexredux() I32 {
 
 // ---- input: setup(n) writes BG fasta's output for n at heap[0 ..)
 
-fn out_str(s: Str) void {
+fn out_str(s: Str) Void {
     for (0..<s.len()) |i| { heap.push(s[i]) }
 }
 
-fn out_buf(len: I32) void {
+fn out_buf(len: I32) Void {
     for (0..<len) |i| { heap.push(buf[i]) }
 }
 
-fn out_rep(len: I32) void {
+fn out_rep(len: I32) Void {
     for (0..<len) |i| { heap.push(rep[i]) }
 }
 
@@ -312,7 +312,7 @@ fn alu() Str {
 }
 
 // seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
-fn repeat_fasta(seq: Str, n: I32) void {
+fn repeat_fasta(seq: Str, n: I32) Void {
     let len = seq.len()
     let line = linelen + 1
     rep.resize(line * len)
@@ -330,7 +330,7 @@ fn repeat_fasta(seq: Str, n: I32) void {
 }
 
 // hash[i] = the symbol whose cumulative probability first exceeds i / im.
-fn build_hash(symb: Str, p: Array[F32]) void {
+fn build_hash(symb: Str, p: Array[F32]) Void {
     hash.resize(im)
     let len = symb.len()
     let sum = p[0]
@@ -347,7 +347,7 @@ fn build_hash(symb: Str, p: Array[F32]) void {
     }
 }
 
-fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+fn random_fasta(symb: Str, p: Array[F32], n: I32) Void {
     build_hash(symb, p)
     let line = linelen + 1
     buf.resize(line * buflines)
@@ -385,7 +385,7 @@ fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
     if n % linelen != 0 { out_str("\n") }
 }
 
-fn fasta(n: I32) void {
+fn fasta(n: I32) Void {
     st.seed = 42
     let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
     let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008]
@@ -401,7 +401,7 @@ fn fasta(n: I32) void {
 }
 // ---- end of the fasta generator
 
-fn setup_input(n: I32) void {
+fn setup_input(n: I32) Void {
     heap.clear()
     fasta(n)
     input.len = heap.len()
@@ -413,6 +413,6 @@ test "regexredux 1000 is BG's output" {
 }
 
 export lib {
-    fn setup(n: I32) void { setup_input(n) }
+    fn setup(n: I32) Void { setup_input(n) }
     fn bench(n: I32) I32 { regexredux() }
 }

@@ -12,7 +12,7 @@
           }
           fn counter() I32 {
             let count: I32 = 0;
-            let bump = cl() void { count = count + 1; };
+            let bump = cl() Void { count = count + 1; };
             bump(); bump(); bump();
             count;
           }

@@ -43,18 +43,18 @@ vec own_gens: I32
 /// By declaration: 1 for a generator a `for` expanded.
 vec gen_used: U8
 
-fn mark_used(gen: I32) void {
+fn mark_used(gen: I32) Void {
     grow_used()
     gen_used[gen] = 1
 }
 
 /// @gen_used to every declaration, new ones 0.
-fn grow_used() void {
+fn grow_used() Void {
     while (gen_used.len() < decl_kind.len()) { gen_used.push(0) }
 }
 
 /// An expansion begins: what its yields need, on the stacks above.
-fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32, rec: I32) void {
+fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32, rec: I32) Void {
     gen_whole.push(whole)
     gen_capture.push(cap)
     gen_body.push(body)
@@ -68,7 +68,7 @@ fn begin_expansion(whole: I32, cap: I32, body: I32, elem: I32, cx: Cx, gen: I32,
 }
 
 /// The innermost expansion ends.
-fn end_expansion() void {
+fn end_expansion() Void {
     let k = gen_whole.len() - 1
     gen_whole.resize(k)
     gen_capture.resize(k)
@@ -83,7 +83,7 @@ fn end_expansion() void {
 }
 
 /// Empty the expansion and recursion stacks, before a program is checked.
-fn reset_generators() void {
+fn reset_generators() Void {
     gen_whole.clear()
     gen_capture.clear()
     gen_body.clear()
@@ -207,7 +207,7 @@ vec fl_last: I32
 vec fl_next: I32
 
 /// File the declarations not yet filed under their functions (see @fl_first).
-fn file_locals() void {
+fn file_locals() Void {
     // (Pushed, not resized: a vec's resize can bring back a past build's values.)
     while (fl_first.len() < node_kind.len()) {
         fl_first.push(0)
@@ -237,7 +237,7 @@ vec aside_vals: I32
 
 /// Set aside the locals and types of declarations `decls` (a list), in case
 /// an outer expansion of their generator is running.
-fn set_aside(decls: I32) void {
+fn set_aside(decls: I32) Void {
     aside_decls.push(decls)
     aside_at.push(aside_vals.len())
     aside_defers.push(defer_node.len())
@@ -248,7 +248,7 @@ fn set_aside(decls: I32) void {
 }
 
 /// Bring back what the innermost @set_aside kept.
-fn bring_back() void {
+fn bring_back() Void {
     let k = aside_decls.len() - 1
     swap_aside(k)
     aside_vals.resize(aside_at[k])
@@ -258,7 +258,7 @@ fn bring_back() void {
 }
 
 /// Swap set-aside entry k's values with the declarations' current ones.
-fn swap_aside(k: I32) void {
+fn swap_aside(k: I32) Void {
     let decls = aside_decls[k]
     let at = aside_at[k]
     for (0 ..< vl_len[decls]) |i| {
@@ -276,7 +276,7 @@ fn swap_aside(k: I32) void {
 /// noted: an expansion of its generator begun since (in the consumer) has
 /// set its declarations aside, so they come back while it runs (`back`),
 /// innermost first, and go again after (`back` false), outermost first.
-fn defer_bindings(i: I32, back: Bool) void {
+fn defer_bindings(i: I32, back: Bool) Void {
     let n = aside_decls.len()
     let from = n
     while (from > 0 and aside_defers[from - 1] > i) { from -= 1 }
@@ -429,7 +429,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
 
 /// Each generator of the program's own items that no `for` expanded:
 /// checked on its own, as an unused function is.
-fn check_unused_generators() void {
+fn check_unused_generators() Void {
     grow_used()
     for (0 ..< own_gens.len()) |i| {
         let gen = own_gens[i]
@@ -443,7 +443,7 @@ fn check_unused_generators() void {
 
 /// Generator `gen`'s body, with no consumer (each value dropped), in a
 /// function of its parameters that nothing calls.
-fn check_lone_generator(gen: I32) void {
+fn check_lone_generator(gen: I32) Void {
     let mp = vl_begin()
     let method = is_method_generator(decl_node[gen])
     if method { vl_add(receiver_type(gen, 0)) }
@@ -628,7 +628,7 @@ fn rec_new_array(vt: I32) I32 {
 }
 
 /// `array[index]` = the value just pushed (at `m`); `index` is a local.
-fn rec_set(array: I32, index: I32, m: I32) void {
+fn rec_set(array: I32, index: I32, m: I32) Void {
     let v = w_pop()
     lg(array)
     lg(index)
@@ -637,7 +637,7 @@ fn rec_set(array: I32, index: I32, m: I32) void {
 }
 
 /// `array[index]`, read as `vt` (a reference stored nullable is read non-null).
-fn rec_get(array: I32, index: I32, vt: I32) void {
+fn rec_get(array: I32, index: I32, vt: I32) Void {
     let heap = vt_heap(cur_locals[array])
     let m = w_mark()
     lg(array)
@@ -647,7 +647,7 @@ fn rec_get(array: I32, index: I32, vt: I32) void {
 }
 
 /// When `top` reaches an array's length, each of `arrays` (locals) doubles.
-fn rec_grow(top: I32, arrays: Array[I32], n: I32) void {
+fn rec_grow(top: I32, arrays: Array[I32], n: I32) Void {
     let mi = w_mark()
     let mc = w_mark()
     lg(top)
@@ -691,7 +691,7 @@ fn rec_item_arrays(r: I32) Array[I32] {
 }
 
 /// `kind[top] = kind_; top += 1` (after the item's own sets).
-fn rec_finish_item(r: I32, kind_: I32) void {
+fn rec_finish_item(r: I32, kind_: I32) Void {
     let m = w_mark()
     w_i32(kind_)
     rec_set(rec_kind[r], rec_top[r], m)
@@ -766,7 +766,7 @@ struct RecLoop:
 
 /// The running frame is done: the last suspended one runs again, or, with
 /// none, the generation (block `whole`) ends.
-fn rec_resume_frame(l: RecLoop, whole: I32) void {
+fn rec_resume_frame(l: RecLoop, whole: I32) Void {
     let m = w_mark()
     let mz = w_mark()
     let mzc = w_mark()
@@ -793,7 +793,7 @@ fn rec_resume_frame(l: RecLoop, whole: I32) void {
 
 /// After `prune`: skip the call items that follow in the running frame
 /// (`while cur < end and kind[cur] == 1: cur += 1`).
-fn rec_skip_calls(l: RecLoop) void {
+fn rec_skip_calls(l: RecLoop) Void {
     let m = w_mark()
     let skip_loop = new_label()
     let skip_out = new_label()
@@ -819,7 +819,7 @@ fn rec_skip_calls(l: RecLoop) void {
 
 /// A call pushed the items from `start`: they are the running frame, and
 /// the one it ran in is suspended.
-fn rec_enter_frame(l: RecLoop, start: I32) void {
+fn rec_enter_frame(l: RecLoop, start: I32) Void {
     let m = w_mark()
     let frames = Array[I32].new(2, 0)
     frames[0] = l.fcur

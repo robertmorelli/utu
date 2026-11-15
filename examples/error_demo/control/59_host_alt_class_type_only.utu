@@ -2,9 +2,9 @@
 // Expect: Browser.ParentNode is only a type; narrowing needs a declared runtime class
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let doc = Browser.document;
-    doc.addEventListener("click", cl(e) void {
+    doc.addEventListener("click", cl(e) Void {
         alt e.target {
             Browser.ParentNode |p| => Browser.console.log(p.childElementCount),
             ~> {},

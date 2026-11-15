@@ -123,8 +123,8 @@ test "top" { assert true; }
   // an interval ends the run all the same; what a callback throws after
   // the tests is a failure after them; the summary is always there.
   await write('waits.utu', `let never: fun() Promise[I32] = @es/\\ () => new Promise(() => {}) \\/;
-let tick: fun() void = @es/\\ () => { setInterval(() => {}, 1000); } \\/;
-let later: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("boom"); }, 5); } \\/;
+let tick: fun() Void = @es/\\ () => { setInterval(() => {}, 1000); } \\/;
+let later: fun() Void = @es/\\ () => { setTimeout(() => { throw new Error("boom"); }, 5); } \\/;
 test "first" { assert true; }
 test "hangs" { let a = await never(); assert a == 1; }
 test "ticks" { tick(); assert true; }
@@ -147,7 +147,7 @@ pass ticks
   assert.equal(r.stderr, '');
 
   // A callback a test scheduled for now fails that test, not the next.
-  await write('soon.utu', `let soon: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("soon"); }, 0); } \\/;
+  await write('soon.utu', `let soon: fun() Void = @es/\\ () => { setTimeout(() => { throw new Error("soon"); }, 0); } \\/;
 let wait: fun() Promise[I32] = @es/\\ () => new Promise(r => setTimeout(() => r(1), 20)) \\/;
 test "schedules" { soon(); }
 test "waits" { let x = await wait(); assert x == 1; }
@@ -155,7 +155,7 @@ test "waits" { let x = await wait(); assert x == 1; }
   // Benches as tests: one that waits on nothing fails (the rows before it
   // print); a callback's error fails its bench, once however often setup ran.
   await write('benchwaits.utu', `let never: fun() Promise[I32] = @es/\\ () => new Promise(() => {}) \\/;
-let later: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("late"); }, 0); } \\/;
+let later: fun() Void = @es/\\ () => { setTimeout(() => { throw new Error("late"); }, 0); } \\/;
 bench "ok first" { let s = 0; measure { s = s + 1; } }
 bench "never later" { let s = 0; let x = await never(); measure { s = s + x; } }
 bench "throws later" { let s = 0; later(); measure { s = s + 1; } }
@@ -178,13 +178,13 @@ bench "ok last" { let s = 0; measure { s = s + 1; } }
   // A thrown value with no text (no prototype, a throwing toString) fails its test, and the rest run;
   // a callback 300 ms after the last test is still a failure after them; a stray error thrown
   // thousands of times is one line, and past 20 distinct ones the rest are a count.
-  await write('strange.utu', `let rej: fun(I32) void = @es/\\ (k) => { Promise.reject(k ? {toString() { throw new Error("ts"); }} : Object.create(null)); } \\/;
-let thr: fun() void = @es/\\ () => { throw {toString() { throw new Error("ts"); }}; } \\/;
-let many: fun() void = @es/\\ () => {
+  await write('strange.utu', `let rej: fun(I32) Void = @es/\\ (k) => { Promise.reject(k ? {toString() { throw new Error("ts"); }} : Object.create(null)); } \\/;
+let thr: fun() Void = @es/\\ () => { throw {toString() { throw new Error("ts"); }}; } \\/;
+let many: fun() Void = @es/\\ () => {
     for (let i = 0; i < 3000; i++) setTimeout(() => { throw new Error("same"); }, 0);
     for (let i = 0; i < 25; i++) setTimeout(() => { throw new Error("e" + i); }, 0);
 } \\/;
-let later: fun() void = @es/\\ () => { setTimeout(() => { throw new Error("late"); }, 300); } \\/;
+let later: fun() Void = @es/\\ () => { setTimeout(() => { throw new Error("late"); }, 300); } \\/;
 test "no prototype" { rej(0); }
 test "throwing toString" { rej(1); }
 test "throws it" { thr(); }
@@ -245,7 +245,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     divide: ['fn div(a: I32, b: I32) I32 {\n    a / b;\n}\nexport main() I32 { div(7, 0); }\n', 'Integer division by zero', '2:5', 'div'],
     bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    xs[i];\n}\nexport main() I32 { at([1, 2, 3], 5); }\n', 'Index out of bounds', '2:5', 'at'],
     // A mem's or vec's index past its length (within its capacity), as an array's.
-    mem_bounds: ['mem b: U8;\nfn put(i: I32) void {\n    b[i] = 77;\n}\nexport main() I32 { b.push(9); put(1); put(4); b.len(); }\n', 'Index out of bounds', '3:5', 'put'],
+    mem_bounds: ['mem b: U8;\nfn put(i: I32) Void {\n    b[i] = 77;\n}\nexport main() I32 { b.push(9); put(1); put(4); b.len(); }\n', 'Index out of bounds', '3:5', 'put'],
     vec_bounds: ['vec b: I32;\nfn at(i: I32) I32 {\n    b[i] + 1;\n}\nexport main() I32 { b.reserve(8); b.push(9); at(0) + at(3); }\n', 'Index out of bounds', '3:5', 'at'],
     // `orelse fatal` is fatal's trap, not a null's.
     null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nexport main() Str { pick(null); }\n', 'Reached fatal', '2:14', 'pick'],
@@ -280,7 +280,7 @@ export main() I32 { let b = Buffer[I32].new(); b.push(7); b[3]; }
     assert.ok(r.stderr.startsWith(' TRAP  Index out of bounds\n       trap · global.utu:3:14\n'), `${command}:\n${r.stderr}`);
   }
   // A callback's trap after main returned (a `.then`'s), placed as main's are.
-  await write('later.utu', 'let delay: fun(I32) Promise[I32] = @es/\\ (v) => new Promise(r => setTimeout(() => r(v), 1)) \\/;\nexport main() void {\n    delay(0).then(cl(v) { let n = 10 / v; });\n}\n');
+  await write('later.utu', 'let delay: fun(I32) Promise[I32] = @es/\\ (v) => new Promise(r => setTimeout(() => r(v), 1)) \\/;\nexport main() Void {\n    delay(0).then(cl(v) { let n = 10 / v; });\n}\n');
   r = utu('run', 'later.utu');
   assert.equal(r.status, 1, r.stdout);
   assert.ok(r.stderr.startsWith(' TRAP  Integer division by zero\n       trap · later.utu:3:35\n'), r.stderr);

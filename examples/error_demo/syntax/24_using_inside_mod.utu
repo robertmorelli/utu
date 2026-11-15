@@ -2,7 +2,7 @@
 // Expect: `using` is only allowed at the top level of a file; move it above `mod report`.
 mod report {
     using console from std:Console;
-    fn show(n: I32) void { console.log(n.str()); }
+    fn show(n: I32) Void { console.log(n.str()); }
 }
 
-export main() void { report.show(3); }
+export main() Void { report.show(3); }

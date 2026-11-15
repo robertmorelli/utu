@@ -127,7 +127,7 @@ fn Scheduler.new() Scheduler {
     }
 }
 
-fn Scheduler.create_task |self| (identity: I32, priority: I32, work: ?Packet, packet_pending: Bool, task_waiting: Bool, task_holding: Bool, data: TaskData) void {
+fn Scheduler.create_task |self| (identity: I32, priority: I32, work: ?Packet, packet_pending: Bool, task_waiting: Bool, task_holding: Bool, data: TaskData) Void {
     let t: Task = &{
         link: self.task_list,
         identity: identity,
@@ -255,7 +255,7 @@ fn Scheduler.run_function |self| (data: TaskData, work: ?Packet) ?Task {
     }
 }
 
-fn Scheduler.schedule |self| () void {
+fn Scheduler.schedule |self| () Void {
     self.current_task = self.task_list
     let more = true
     while (more) {

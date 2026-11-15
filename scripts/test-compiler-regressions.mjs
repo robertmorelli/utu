@@ -234,7 +234,7 @@ export lib {
   // a labeled block's break runs its defers, not its errdefers.
   const results = await write(`// What ran, in order: one letter each.
 vec trail: I32;
-fn note(s: Str) void { trail.push(s.get(0)); }
+fn note(s: Str) Void { trail.push(s.get(0)); }
 fn taken() Str {
     let s = "";
     for (0 ..< trail.len()) |i| { s = s + Str.from_code_point(trail[i]); };
@@ -410,7 +410,7 @@ export lib {
   const once = await write(`using JS from std:JS;
 vec trail: I32;
 fn tick(v: I32) I32 { trail.push(v); v; }
-fn note(v: I32) void { trail.push(v); }
+fn note(v: I32) Void { trail.push(v); }
 fn digits(n: I32, base: I32) I32 {
     if n == 0 { return 1; };
     let count = 0;
@@ -616,7 +616,7 @@ struct Box:
     | f: cl(I32) I32
 fn slow(n: I32) I32 { await delay(n, 1) + 1; }
 fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
-fn ticks(n: I32) yield I32 { for (0 ..< n) |i| { yield await delay(i, 1); }; }
+gn ticks(n: I32) I32 { for (0 ..< n) |i| { yield await delay(i, 1); }; }
 export lib {
     fn through() I32 { apply(cl(n) { slow(n); }, 41); }
     fn nested() I32 {
@@ -740,7 +740,7 @@ export lib {
   const ord = `proto Ord:\n    | cmp(&) I32\nproto Named:\n    | get name : Str\n`
     + `fn Ord[I32].cmp |a| (b: I32) I32 { a - b; }\n`
     + `mod Sorted[T[Ord]] {\n    fn max(a: T, b: T) T { if a.cmp(b) >= 0 { a; } else { b; }; }\n`
-    + `    fn sort(xs: Array[T]) void { for (1 ..< xs.len()) |i| { let j = i; while (j > 0 and xs[j - 1].cmp(xs[j]) > 0) { let t = xs[j]; xs[j] = xs[j - 1]; xs[j - 1] = t; j -= 1; }; }; }\n}\n`;
+    + `    fn sort(xs: Array[T]) Void { for (1 ..< xs.len()) |i| { let j = i; while (j > 0 and xs[j - 1].cmp(xs[j]) > 0) { let t = xs[j]; xs[j] = xs[j - 1]; xs[j - 1] = t; j -= 1; }; }; }\n}\n`;
   const bounded = [
     [`${ord}struct P[Ord]:\n    | x: I32\nfn Ord[P].cmp |a| (b: P) I32 { a.x - b.x; }\nexport lib { fn run() I32 { Sorted[P].max(P { x: 4 }, P { x: 9 }).x; } }\n`, 9],
     [`${ord}export lib { fn run() I32 { let xs = [5, 2, 9, 1]; Sorted[I32].sort(xs); xs[0] * 1000 + xs[1] * 100 + xs[2] * 10 + xs[3] + Sorted[I32].max(3, 7); } }\n`, 1266],
@@ -752,8 +752,8 @@ export lib {
     // `c.tick()` on a T bounded by Counter is Counter's `fn Counter.tick` (it was "No method ByOne.tick"),
     // as on a Counter and as `Counter.tick(c)`; a T's own tick comes first.
     [`proto Counter:\n    | get set count : I32\n    | step() I32\nstruct ByOne[Counter]:\n    | count: I32\nstruct Own[Counter]:\n    | count: I32\n`
-      + `fn Counter[ByOne].step |c| () I32 { 1; }\nfn Counter[Own].step |c| () I32 { 2; }\nfn Own.tick |c| () void { c.count = c.count + 100; }\n`
-      + `fn Counter.tick |c| () void { c.count = c.count + c.step(); }\nmod Run[T[Counter]] {\n    fn twice(c: T) I32 { c.tick(); Counter.tick(c); c.count; }\n}\n`
+      + `fn Counter[ByOne].step |c| () I32 { 1; }\nfn Counter[Own].step |c| () I32 { 2; }\nfn Own.tick |c| () Void { c.count = c.count + 100; }\n`
+      + `fn Counter.tick |c| () Void { c.count = c.count + c.step(); }\nmod Run[T[Counter]] {\n    fn twice(c: T) I32 { c.tick(); Counter.tick(c); c.count; }\n}\n`
       + `fn on(c: Counter) I32 { c.tick(); c.count; }\n`
       + `export lib { fn run() I32 { Run[ByOne].twice(ByOne { count: 4 }) * 1000 + Run[Own].twice(Own { count: 1 }) * 10 + on(ByOne { count: 0 }); } }\n`, 6000 + 1030 + 1],
     // `x.label()` and `Tag.label(x)` on a bounded T that is a scalar, Str or enum (it was "Expected Tag, got I32"):
@@ -862,7 +862,7 @@ export lib {
     [`export lib { fn run() I32 { let d: cl(I32) I32 = cl(n) { 0; }; d = cl(n) { if n == 0 { 0; } else { 1 + d(n - 1); }; }; d(${closureDepth}); } }\n`, closureDepth],
     [`fn f(n: I32) I32 { let c = cl(k: I32) I32 { if k == 0 { 0; } else { 1 + f(k - 1); }; }; c(n); }\nexport lib { fn run() I32 { f(${closureDepth}); } }\n`, closureDepth],
     // A generator's parameter, captured, then assigned.
-    ['fn g(a: I32) yield I32 { let c: cl(I32) I32 = cl(x) { x + a; }; a = 5; yield c(1); }\nexport lib { fn run() I32 { let t = 0; for (g(1)) |v| { t += v; }; t; } }\n', 6],
+    ['gn g(a: I32) I32 { let c: cl(I32) I32 = cl(x) { x + a; }; a = 5; yield c(1); }\nexport lib { fn run() I32 { let t = 0; for (g(1)) |v| { t += v; }; t; } }\n', 6],
     // A name from a tuple, captured, then assigned.
     ['fn two() .{I32, I32} { .{1, 2}; }\nexport lib { fn run() I32 { let .{a, b} = two(); let c: cl() I32 = cl() { a + b; }; a = 10; c(); } }\n', 12],
     // Operators declared on a distinct type.
@@ -916,7 +916,7 @@ export lib {
       + '    t + first(xs) * 100000 + first([Circle { r: 1 }, Sq { s: 9 }, Dot {}]) * 1000000 + first([Rect { w: 0, h: 1 }]);\n} }\n', 104064628],
     // A field read again (small): kept in a local only while no call, struct.set of the field,
     // assignment of the local, or loop writing them, comes between.
-    ['struct P:\n    | x: I32\n    | y: I32\n    | next: ?P\nfn poke(p: P) void { p.x += 100; }\nfn alias(a: P, b: P) I32 {\n    let s = a.x + a.x;\n    b.x = 7;\n'
+    ['struct P:\n    | x: I32\n    | y: I32\n    | next: ?P\nfn poke(p: P) Void { p.x += 100; }\nfn alias(a: P, b: P) I32 {\n    let s = a.x + a.x;\n    b.x = 7;\n'
       + '    s + a.x + a.x + a.x;\n}\nfn calls(a: P) I32 {\n    let s = a.x + a.x;\n    poke(a);\n    s * 1000 + a.x + a.x + a.x;\n}\nfn loop_write(a: P) I32 {\n'
       + '    let s = a.y + a.y + a.y;\n    let i = 0;\n    while (i < 3) {\n        s += a.y + a.y;\n        a.y += 1;\n        i += 1;\n    };\n    s + a.y;\n}\n'
       + 'fn reassign(a: P, b: P) I32 {\n    let p = a;\n    let s = p.x + p.x + p.x;\n    p = b;\n    s * 1000 + p.x + p.x + p.x;\n}\nfn branch(a: P, c: Bool) I32 {\n'
@@ -944,26 +944,26 @@ export lib {
       + 'let doubled: I32 = twice_base();\nlet base: I32 = compute();\nlet origin: Pt = Pt { x: base, y: 2 };\nlet squares: Array[I32] = [1, 4, 9, 16];\nlet name: Str = "utu " + base.str();\nlet maybe: ?Pt = null;\nlet total: I64 = squares.len().i64() * 1000.i64();\nlet pick: fun(I32) I32 = twice;\n'
       + 'export lib { fn run() I32 { let n = if maybe == null { 1; } else { 0; }; doubled + origin.x * 100 + squares[3] * 10000 + total.i32() * 1000 + n * 100000000 + pick(name.len()) * 1000000; } }\n', 42 + 2100 + 160000 + 4000000 + 100000000 + 12000000],
     // Generators through a module, an alias, a type, and a method (`x.each()`).
-    ['mod seq { fn squares(n: I32) yield I32 { for (0 ..< n) |i| { yield i * i; }; } }\nmod Stack[T] {\n    struct &:\n        | items: Array[T]\n        | size: I32\n    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }\n    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }\n'
-      + '    fn &.each |s| () yield T { let i = s.size - 1; while (i >= 0) { yield s.items[i]; i -= 1; }; }\n    fn &.upto(n: I32) yield I32 { for (0 ..< n) |i| { yield i; }; }\n}\nusing seq |s|;\nstruct Range:\n    | lo: I32\n    | hi: I32\n'
-      + 'fn Range.each |r| () yield I32 { for (r.lo ..< r.hi) |i| { yield i; }; }\nfn Range.below(n: I32) yield I32 { for (0 ..< n) |i| { yield i; }; }\n'
+    ['mod seq { gn squares(n: I32) I32 { for (0 ..< n) |i| { yield i * i; }; } }\nmod Stack[T] {\n    struct &:\n        | items: Array[T]\n        | size: I32\n    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }\n    fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1; }\n'
+      + '    gn &.each |s| () T { let i = s.size - 1; while (i >= 0) { yield s.items[i]; i -= 1; }; }\n    gn &.upto(n: I32) I32 { for (0 ..< n) |i| { yield i; }; }\n}\nusing seq |s|;\nstruct Range:\n    | lo: I32\n    | hi: I32\n'
+      + 'gn Range.each |r| () I32 { for (r.lo ..< r.hi) |i| { yield i; }; }\ngn Range.below(n: I32) I32 { for (0 ..< n) |i| { yield i; }; }\n'
       + 'export lib { fn run() I32 {\n    let total = 0;\n    for (seq.squares(4)) |v| { total += v; };\n    for (s.squares(3)) |v| { total += v * 100; };\n    let st = Stack[I32].new(0);\n    st.push(1);\n    st.push(2);\n    st.push(3);\n    let order = 0;\n    for (st.each()) |v| { order = order * 10 + v; };\n'
       + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    total + order * 1000000;\n} }\n', 321393514],
     // An unconditional break after a defer in a generator's consumer: the second yield's expansion is dead code,
     // left out (JavaScriptCore: "rethrow doesn't refer to a catch block" for a try there).
-    ['vec seen: I32;\nfn items() yield I64 { yield 1; yield 2; }\nexport lib { fn run() I32 { for (items()) |x| { defer seen.push(7); seen.push(1); break; }; seen[0] * 10 + seen[1]; } }\n', 17],
+    ['vec seen: I32;\ngn items() I64 { yield 1; yield 2; }\nexport lib { fn run() I32 { for (items()) |x| { defer seen.push(7); seen.push(1); break; }; seen[0] * 10 + seen[1]; } }\n', 17],
     // A closure whose result is not written takes it from its first `return` (the compiler crashed: Out of bounds array.get).
     ['fn a() I32 { let k = cl(x: I32) { if x > 1 { return x * 2; }; x; }; k(1) + k(5); }\nexport lib { fn run() I32 { cl() { return; }; a(); } }\n', 11],
     // A generator's `return;` runs its defers.
-    ['fn g(n: I32) yield I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nexport lib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; t + seen[0] * 10; } }\n', 71],
+    ['gn g(n: I32) I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nexport lib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; t + seen[0] * 10; } }\n', 71],
     // A return or break out of nested expansions of one generator runs each one's defers with its own
     // parameters and locals (the outer one's ran with the inner one's).
-    ['vec seen: I32;\nfn gen(t: I32, k: I32) yield I32 {\n    let u = t + k;\n    let f = cl() I32 { u; };\n    defer seen.push(t * 10 + k);\n    defer seen.push(f());\n    yield t;\n    yield t + 1;\n}\n'
+    ['vec seen: I32;\ngn gen(t: I32, k: I32) I32 {\n    let u = t + k;\n    let f = cl() I32 { u; };\n    defer seen.push(t * 10 + k);\n    defer seen.push(f());\n    yield t;\n    yield t + 1;\n}\n'
       + 'fn three() I32 {\n    for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { for (gen(5, 6)) |c| { if b == 4 and c == 6 { return a * 100 + b * 10 + c; }; }; }; };\n    0;\n}\n'
       + 'fn left() I32 { out: { for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { if b == 4 { break out a + b; }; }; }; 0; }; }\n'
       + 'export lib { fn run() Str {\n    let r = three().str() + "|" + left().str() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].str() + ","; };\n    r;\n} }\n', '146|5|11,56,11,56,7,34,3,12,7,34,3,12,'],
     // And an error return or a failed `try` there, before the function's errdefers.
-    ['vec seen: I32;\nfn gen(t: I32) yield I32 { defer seen.push(t); yield t; yield t + 1; }\nfn digit(c: I32) Result[I32, Str] { if c > 9 { return Result[I32, Str].err("bad"); }; Result[I32, Str].ok(c); }\n'
+    ['vec seen: I32;\ngn gen(t: I32) I32 { defer seen.push(t); yield t; yield t + 1; }\nfn digit(c: I32) Result[I32, Str] { if c > 9 { return Result[I32, Str].err("bad"); }; Result[I32, Str].ok(c); }\n'
       + 'fn f(mode: I32) Result[I32, Str] {\n    errdefer seen.push(0);\n    for (gen(1)) |a| { for (gen(10)) |b| {\n        if b == 11 and mode == 0 { return Result[I32, Str].err("ret"); };\n        if b == 11 { let x = try digit(b); };\n    }; };\n    Result[I32, Str].ok(0);\n}\n'
       + 'export lib { fn run() Str {\n    let r = f(0).error() + f(1).error() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].str() + ","; };\n    r;\n} }\n', 'retbad|10,1,0,10,1,0,'],
     // An alias of a generic module's instance is its type there.
@@ -1000,25 +1000,25 @@ export lib {
     // A computed global in a program with no `export main` (it crashed the compiler).
     ['let n: I32 = 1 + 1;\nlet k: cl() I32 = cl() { n * 10; };\nexport lib { fn run() I32 { k() + n; } }\n', 22],
     // A closure in a generator has its own try, errdefer, and return.
-    ['fn parse(s: Str) Result[I32, Str] { if s == "x" { Result[I32, Str].err("bad"); } else { Result[I32, Str].ok(s.len()); }; }\nfn g(n: I32) yield I32 {\n    let f = cl(s: Str) Result[I32, Str] { errdefer { n; }; let v = try parse(s); Result[I32, Str].ok(v + n); };\n    let r = cl(k: I32) I32 { if k > 1 { return 100; }; k; };\n    yield f("abc").value();\n    yield r(5);\n    yield r(1);\n}\nexport lib { fn run() I32 { let s = 0; for (g(10)) |v| { s += v; }; s; } }\n', 114],
+    ['fn parse(s: Str) Result[I32, Str] { if s == "x" { Result[I32, Str].err("bad"); } else { Result[I32, Str].ok(s.len()); }; }\ngn g(n: I32) I32 {\n    let f = cl(s: Str) Result[I32, Str] { errdefer { n; }; let v = try parse(s); Result[I32, Str].ok(v + n); };\n    let r = cl(k: I32) I32 { if k > 1 { return 100; }; k; };\n    yield f("abc").value();\n    yield r(5);\n    yield r(1);\n}\nexport lib { fn run() I32 { let s = 0; for (g(10)) |v| { s += v; }; s; } }\n', 114],
     // `&` in a protocol member's type arguments.
     ['proto Big:\n    | biggest(Array[&]) &\nstruct N[Big]:\n    | v: I32\nfn Big[N].biggest |a| (xs: Array[N]) N { let b = a; for (xs) |x| { if x.v > b.v { b = x; }; }; b; }\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nexport lib { fn run() I32 { let xs: Array[N] = [N { v: 3 }, N { v: 9 }]; Pick[N].top(N { v: 1 }, xs).v + Pick[N].top(N { v: 20 }, xs).v; } }\n', 29],
     // A generic mod's globals that do not depend on T; unused generators, checked and dropped.
-    ['mod Arr[T] {\n    let k: I32 = 3;\n    let s: Str = "ab" + "c";\n    fn count(xs: Array[T]) I32 { xs.len() + k + s.len(); }\n}\nstruct P:\n    | x: I32\nfn g(n: I32, p: P) yield I32 { defer { n; }; let f = cl() I32 { n + p.x; }; for (0 ..< n) |i| { if i > 3 { return; }; yield f() + i; }; }\nfn walk(n: I32) yield I32 { if n > 0 { for (walk(n - 1)) |v| { yield v; }; }; yield n; }\nfn P.each |q| () yield I32 { yield q.x; }\nexport lib { fn run() I32 { Arr[I32].count([1, 2]) + Arr[F64].count([1.0]); } }\n', 15],
+    ['mod Arr[T] {\n    let k: I32 = 3;\n    let s: Str = "ab" + "c";\n    fn count(xs: Array[T]) I32 { xs.len() + k + s.len(); }\n}\nstruct P:\n    | x: I32\ngn g(n: I32, p: P) I32 { defer { n; }; let f = cl() I32 { n + p.x; }; for (0 ..< n) |i| { if i > 3 { return; }; yield f() + i; }; }\ngn walk(n: I32) I32 { if n > 0 { for (walk(n - 1)) |v| { yield v; }; }; yield n; }\ngn P.each |q| () I32 { yield q.x; }\nexport lib { fn run() I32 { Arr[I32].count([1, 2]) + Arr[F64].count([1.0]); } }\n', 15],
     // A generic mod's globals, one per instance: `Buffer[T]`, read through each kind of alias.
-    ['using Buffer from std:Buffer;\nmod Stash[T] {\n    let items: Buffer[T] = Buffer[T].new();\n    fn add(x: T) void { items.push(x); }\n    fn size() I32 { items.len(); }\n}\nusing Stash[I32] |S|;\nusing Stash[Str] |s|;\nexport lib { fn run() I32 { Stash[I32].add(1); S.add(2); Stash[Str].add("a"); Stash[I32].size() * 100 + Stash[Str].size() * 10 + s.items.len(); } }\n', 211],
+    ['using Buffer from std:Buffer;\nmod Stash[T] {\n    let items: Buffer[T] = Buffer[T].new();\n    fn add(x: T) Void { items.push(x); }\n    fn size() I32 { items.len(); }\n}\nusing Stash[I32] |S|;\nusing Stash[Str] |s|;\nexport lib { fn run() I32 { Stash[I32].add(1); S.add(2); Stash[Str].add("a"); Stash[I32].size() * 100 + Stash[Str].size() * 10 + s.items.len(); } }\n', 211],
     // Per instance: `?T`, `Array[T]`, the mod's own types and functions, one global from another, and one without T.
-    ['struct P:\n    | x: I32\nmod Box[T] {\n    struct &:\n        | v: T\n    struct Tag:\n        | k: I32\n    let item: Array[?T] = [null];\n    let all: Array[T] = [];\n    let made: Array[I32] = [0];\n    let base: I32 = start() + 1;\n    let twice: I32 = base * 2;\n    let tag: Tag = Tag { k: twice };\n    let none: ?& = null;\n    fn start() I32 { 10; }\n    fn put(x: T) void { item[0] = x; made[0] += 1; }\n    fn empty() Bool { item[0] == null and none == null; }\n    fn total() I32 { all.len() + made[0] * 1000 + tag.k; }\n}\nexport lib { fn run() I32 {\n    Box[P].put(P { x: 1 });\n    Box[P].put(P { x: 2 });\n    Box[Str].put("a");\n    let e = (if Box[P].empty() { 1; } else { 0; }) + (if Box[Array[I32]].empty() { 10; } else { 0; });\n    Box[P].total() * 10 + Box[Str].total() + e * 100000;\n} }\n', 1021242],
+    ['struct P:\n    | x: I32\nmod Box[T] {\n    struct &:\n        | v: T\n    struct Tag:\n        | k: I32\n    let item: Array[?T] = [null];\n    let all: Array[T] = [];\n    let made: Array[I32] = [0];\n    let base: I32 = start() + 1;\n    let twice: I32 = base * 2;\n    let tag: Tag = Tag { k: twice };\n    let none: ?& = null;\n    fn start() I32 { 10; }\n    fn put(x: T) Void { item[0] = x; made[0] += 1; }\n    fn empty() Bool { item[0] == null and none == null; }\n    fn total() I32 { all.len() + made[0] * 1000 + tag.k; }\n}\nexport lib { fn run() I32 {\n    Box[P].put(P { x: 1 });\n    Box[P].put(P { x: 2 });\n    Box[Str].put("a");\n    let e = (if Box[P].empty() { 1; } else { 0; }) + (if Box[Array[I32]].empty() { 10; } else { 0; });\n    Box[P].total() * 10 + Box[Str].total() + e * 100000;\n} }\n', 1021242],
     // A bounded mod's global.
-    ['using Ord from std:Ord;\nusing Buffer from std:Buffer;\nmod Best[T[Ord]] {\n    let top: Buffer[T] = Buffer[T].new();\n    fn offer(x: T) void { if top.len() == 0 { top.push(x); } else if x.cmp(top.get_index(0)) > 0 { top.set_index(0, x); }; }\n    fn best(d: T) T { if top.len() == 0 { d; } else { top.get_index(0); }; }\n}\nexport lib { fn run() I32 { Best[I32].offer(3); Best[I32].offer(9); Best[I32].offer(4); Best[Str].offer("bb"); Best[Str].offer("a"); Best[I32].best(0) * 100 + Best[Str].best("").len() * 10 + Best[F64].best(1.0).i32(); } }\n', 921],
+    ['using Ord from std:Ord;\nusing Buffer from std:Buffer;\nmod Best[T[Ord]] {\n    let top: Buffer[T] = Buffer[T].new();\n    fn offer(x: T) Void { if top.len() == 0 { top.push(x); } else if x.cmp(top.get_index(0)) > 0 { top.set_index(0, x); }; }\n    fn best(d: T) T { if top.len() == 0 { d; } else { top.get_index(0); }; }\n}\nexport lib { fn run() I32 { Best[I32].offer(3); Best[I32].offer(9); Best[I32].offer(4); Best[Str].offer("bb"); Best[Str].offer("a"); Best[I32].best(0) * 100 + Best[Str].best("").len() * 10 + Best[F64].best(1.0).i32(); } }\n', 921],
     // An iterator word in scope as a value is a value after return, continue, break label, yield and defer.
     ['let log: Array[I32] = [0];\n'
-      + 'fn count(n: I32) void { log[0] += n; }\n'
+      + 'fn count(n: I32) Void { log[0] += n; }\n'
       + 'fn params(count: I32, sum: I32, product: I32) I32 { return count + sum * product; }\n'
       + 'fn local() I32 { let count: I32 = 5; let sum: I32 = count; return sum; }\n'
       + 'fn scaled(product: I32) I32 { return product * 2; }\n'
       + 'fn brk(sum: I32) I32 { outer: { break outer sum; }; }\n'
-      + 'fn gen(count: I32) yield I32 { yield count; }\n'
+      + 'gn gen(count: I32) I32 { yield count; }\n'
       + 'fn steps(count: I32) I32 { let hits = 0; loop match 0 { 0 => { hits += 1; continue count; }, 3 => { hits += 10; break; }, ~> break, }; hits; }\n'
       + 'fn deferred() I32 { defer count(100); return 1; }\n'
       + 'fn piped() I32 { let xs = [1, 2, 3]; return xs count; }\n'
@@ -1037,8 +1037,8 @@ export lib {
   // A defer that throws lets the older ones run, newest first, at every
   // exit and while unwinding, without running any twice; the newest
   // exception goes on. Each digit is a mark; e<n> the exception caught.
-  const throwing = await write(String.raw`let boom: fun(I32) void = @es/\ (n) => { if (n >= 0) { globalThis.__err = "e" + n; throw new Error("e" + n); } } \/;
-let mark: fun(I32) void = @es/\ (s) => { globalThis.__log = (globalThis.__log ?? "") + s; } \/;
+  const throwing = await write(String.raw`let boom: fun(I32) Void = @es/\ (n) => { if (n >= 0) { globalThis.__err = "e" + n; throw new Error("e" + n); } } \/;
+let mark: fun(I32) Void = @es/\ (s) => { globalThis.__log = (globalThis.__log ?? "") + s; } \/;
 let log: fun() Str = @es/\ () => { const s = (globalThis.__err ?? "") + ":" + (globalThis.__log ?? ""); globalThis.__log = ""; globalThis.__err = ""; return s; } \/;
 fn ends() I32 { defer mark(1); defer boom(0); defer mark(3); 5; }
 fn returns(x: I32) I32 { defer mark(1); defer boom(0); defer mark(3); if x > 0 { return 7; }; 5; }
@@ -1098,7 +1098,7 @@ export lib { fn run() Str {
   }
 
   // A generic mod's globals from another file, one per instance.
-  await fs.writeFile(path.join(dir, 'counter.utu'), 'mod Counter[T] {\n    let n: Array[I32] = [0];\n    let seen: Array[T] = [];\n    fn bump() void { n[0] += 1; }\n    fn get() I32 { n[0] + seen.len(); }\n}\n');
+  await fs.writeFile(path.join(dir, 'counter.utu'), 'mod Counter[T] {\n    let n: Array[I32] = [0];\n    let seen: Array[T] = [];\n    fn bump() Void { n[0] += 1; }\n    fn get() I32 { n[0] + seen.len(); }\n}\n');
   const counted = await write('using Counter from "./counter.utu";\nexport lib { fn run() I32 { Counter[I32].bump(); Counter[I32].bump(); Counter[Str].bump(); Counter[I32].get() * 10 + Counter[Str].get(); } }\n');
   for (const mode of modes) {
     const built = await compileFile(utu, counted, { mode });
@@ -1127,7 +1127,7 @@ export lib { fn run() Str {
   // checks, as an array's does: reads, stores, and `op=` (a store past it once
   // succeeded, the length unchanged). Unsafe builds check only the capacity.
   for (const [kind, type] of [['mem', 'U8'], ['mem', 'I32'], ['vec', 'U8'], ['vec', 'I32']]) {
-    const bounded = await write(`${kind} b: ${type};\nfn fill() void { b.clear(); b.reserve(16); b.push(9); b.push(9); b.push(9); }\nexport lib {\n    fn read(i: I32) I32 { fill(); b[i]; }\n    fn store(i: I32) I32 { fill(); b[i] = 77; b[i] + 1000 * b.len(); }\n    fn bump(i: I32) I32 { fill(); b[i] += 5; b[i] + 1000 * b.len(); }\n    fn bump_at(i: I32) I32 { fill(); let k = [i]; b[k[0]] -= 2; b[k[0] + 0] + 1000 * b.len(); }\n}\n`);
+    const bounded = await write(`${kind} b: ${type};\nfn fill() Void { b.clear(); b.reserve(16); b.push(9); b.push(9); b.push(9); }\nexport lib {\n    fn read(i: I32) I32 { fill(); b[i]; }\n    fn store(i: I32) I32 { fill(); b[i] = 77; b[i] + 1000 * b.len(); }\n    fn bump(i: I32) I32 { fill(); b[i] += 5; b[i] + 1000 * b.len(); }\n    fn bump_at(i: I32) I32 { fill(); let k = [i]; b[k[0]] -= 2; b[k[0] + 0] + 1000 * b.len(); }\n}\n`);
     for (const mode of modes) {
       const built = await compileFile(utu, bounded, { mode });
       const { exports } = await instantiateNode(built.wasm, built.spec);
@@ -1184,7 +1184,7 @@ export lib { fn run() Str {
   for (const [kind, type] of [['mem', 'I32'], ['mem', 'I8'], ['mem', 'I64'], ['mem', 'F64'], ['vec', 'I32'], ['vec', 'U8'], ['vec', 'F64']]) {
     const two = type.startsWith('F') ? '2.0' : '2';
     const value = type === 'U8' || type === 'I8' ? 'I32' : type;
-    const shrunk = await write(`${kind} b: ${type};\nfn cut() ${value} { b.resize(1); ${two}; }\nfn wipe() ${value} { b.clear(); ${two}; }\nfn grow() ${value} { b.push(${two}); ${two}; }\nexport lib {\n    fn fill() void { b.clear(); b.push(${two}); b.push(${two}); b.push(${two}); }\n    fn times() I32 { b[1] *= cut(); b.len(); }\n    fn plus() I32 { b[0] += wipe(); b.len(); }\n    fn ok() I32 { b[2] += grow(); if b[2] == ${two} + ${two} { b.len(); } else { 0; }; }\n}\n`);
+    const shrunk = await write(`${kind} b: ${type};\nfn cut() ${value} { b.resize(1); ${two}; }\nfn wipe() ${value} { b.clear(); ${two}; }\nfn grow() ${value} { b.push(${two}); ${two}; }\nexport lib {\n    fn fill() Void { b.clear(); b.push(${two}); b.push(${two}); b.push(${two}); }\n    fn times() I32 { b[1] *= cut(); b.len(); }\n    fn plus() I32 { b[0] += wipe(); b.len(); }\n    fn ok() I32 { b[2] += grow(); if b[2] == ${two} + ${two} { b.len(); } else { 0; }; }\n}\n`);
     for (const mode of modes) {
       const built = await compileFile(utu, shrunk, { mode });
       const { exports } = await instantiateNode(built.wasm, built.spec);
@@ -1270,7 +1270,7 @@ export lib {
   const tree = `struct Node:
     | v: I32
     | kids: Array[Node]
-fn walk(n: Node) yield Node { yield n; for (n.kids) |k| { for (walk(k)) |d| { yield d; }; }; }
+gn walk(n: Node) Node { yield n; for (n.kids) |k| { for (walk(k)) |d| { yield d; }; }; }
 fn tree() Node { Node { v: 1, kids: [Node { v: 2, kids: [] }] }; }
 fn show(xs: Array[I32]) Str { xs fold("") |acc, v, i| { if i == 0 { \`\${v}\`; } else { \`\${acc},\${v}\`; }; }; }
 mod Box {
@@ -1434,10 +1434,10 @@ export lib {
   // A `then` on a promise that also has a `catch` does not report the rejection as unhandled (its
   // derived promise rejected with no way to catch it); a `then` alone still does.
   const rejecting = await write(`let fail: fun() Promise[I32] = @es/\\ () => Promise.reject(new Error("boom")) \\/;
-let note: fun(Str) void = @es/\\ (s) => { (globalThis.__seen ??= []).push(s); } \\/;
+let note: fun(Str) Void = @es/\\ (s) => { (globalThis.__seen ??= []).push(s); } \\/;
 export lib {
-    fn both() void { let q = fail(); q.then(cl(v) { note("value"); }); q.catch(cl(e) { note("caught"); }); }
-    fn alone() void { fail().then(cl(v) { note("value"); }); }
+    fn both() Void { let q = fail(); q.then(cl(v) { note("value"); }); q.catch(cl(e) { note("caught"); }); }
+    fn alone() Void { fail().then(cl(v) { note("value"); }); }
 }`);
   const settled = await compileFile(utu, rejecting);
   assert.ok(settled.wasm, settled.diagnostics?.map(d => d.message).join('\n'));
@@ -1717,7 +1717,7 @@ export lib {
   }
 
   // Test names with utu escapes that JSON lacks.
-  const named = await compileFile(utu, await write('export main() void {}\ntest "it\\\'s \\$5\tok" { assert 1 == 1; }\n'), { target: 'test' });
+  const named = await compileFile(utu, await write('export main() Void {}\ntest "it\\\'s \\$5\tok" { assert 1 == 1; }\n'), { target: 'test' });
   assert.deepEqual(named.tests.map(t => t.name), ["it's $5\tok"]);
   checked++;
 
@@ -1745,7 +1745,7 @@ export lib {
     ['let f: fun(F64) F64 = @es/\\Math.sq', [0xff], 'rt\\/;\nexport main() F64 { f(4.0); }\n'],
     ['let f: fun() Str = @es/\\() => "x', [0xc3], 'ABCy"\\/;\nexport main() Str { f(); }\n'],
     ['let c: Str = @css/\\ a { color: r', [0xe2, 0x82], 'ed; } \\/;\nexport main() Str { c; }\n'],
-    ['using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab', [0xf4, 0x90, 0x80, 0x80], 'cd"; }\n    }\n    \\/;\n}\nexport main() void { Browser.document.body.append(view()); }\n'],
+    ['using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab', [0xf4, 0x90, 0x80, 0x80], 'cd"; }\n    }\n    \\/;\n}\nexport main() Void { Browser.document.body.append(view()); }\n'],
     ['export main() I32 {\n    let s = "ab', [0xc3], '";\n    s.len();\n}\n'],
     ['export main() I32 {\n    let s = "ab\\', [0xc3], '";\n    s.len();\n}\n'],
     ['export main() Str { `a${1}b', [0xed, 0xa0, 0x80], 'c`; }\n'],
@@ -1760,7 +1760,7 @@ export lib {
   // larger file ran for minutes): checked in a child, under a time limit.
   {
     const file = path.join(dir, 'bad_wutu.utu');
-    await fs.writeFile(file, Buffer.concat([Buffer.from('using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab'), Buffer.from([0xf4, 0xbf, 0xbf, 0xbf]), Buffer.from('cd"; }\n    }\n    \\/;\n}\nexport main() void { Browser.document.body.append(view()); }\n')]));
+    await fs.writeFile(file, Buffer.concat([Buffer.from('using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab'), Buffer.from([0xf4, 0xbf, 0xbf, 0xbf]), Buffer.from('cd"; }\n    }\n    \\/;\n}\nexport main() Void { Browser.document.body.append(view()); }\n')]));
     const run = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'check', file], { encoding: 'utf8', timeout: 60000 });
     assert.equal(run.signal, null, 'timed out');
     assert.equal((run.stdout + run.stderr).match(/ERROR/g)?.length, 1, run.stdout + run.stderr);
@@ -1780,15 +1780,15 @@ export lib {
     [`struct Q:\n    | x: I32\nmod Top[T[Q]] {\n    fn top(a: T) T { a; }\n}\nexport lib { fn run() I32 { Top[I32].top(1); } }\n`, 'Q is not a protocol; a bound names one'],
     [`${ord}export lib { fn run() I32 { let xs: Array[Ord] = []; xs[0].cmp(xs[1]); } }\n`, 'Ord.cmp uses &, so only a bounded T calls it: mod M[T[Ord]]'],
     // A generator's body cannot leave its consumer's loop.
-    ['fn g() yield I32 { yield 1; break; }\nexport lib { fn run() I32 { let t = 0; for (0 ..< 2) |i| { for (g()) |v| { t += v; }; }; t; } }\n', 'break outside a loop'],
+    ['gn g() I32 { yield 1; break; }\nexport lib { fn run() I32 { let t = 0; for (0 ..< 2) |i| { for (g()) |v| { t += v; }; }; t; } }\n', 'break outside a loop'],
     // Element types the pipeline's values are not (these built invalid Wasm).
     ['export lib { fn run() I32 { [1, 2, 3] chain(["a"]) count; } }\n', 'Elements are I32, got Str'],
     ['export lib { fn run() I32 { let w = [1, 2] windows(Str, 1); w.len(); } }\n', 'Expected Str, got I32'],
     ['export lib { fn run() Str { ["a", "b"] sum; } }\n', 'sum needs numbers, not Str'],
     ['export lib { fn run() I32 { [1, 2] bisect |v, i, j| { true; }; } }\n', 'bisect takes 1 name and an optional index'],
-    ['mod B {\n    struct &:\n        | x: I32\n    fn &.new() & { &{ x: 1 }; }\n    fn &.each |b| () yield I32 { yield b.x; }\n}\nexport lib { fn run() I32 { B.new().each(); 0; } }\n', 'each is a generator: for (each(…)) |v| { … }'],
-    ['mod seq { fn squares(n: I32) yield I32 { yield n; } }\nexport lib { fn run() I32 { let f = seq.squares; 0; } }\n', 'squares is a generator: for (squares(…)) |v| { … }'],
-    ['export lib {\n    fn squares(n: I32) yield I32 { yield n; }\n}\n', 'squares is a generator: it expands into each for that reads it, so it cannot be exported'],
+    ['mod B {\n    struct &:\n        | x: I32\n    fn &.new() & { &{ x: 1 }; }\n    gn &.each |b| () I32 { yield b.x; }\n}\nexport lib { fn run() I32 { B.new().each(); 0; } }\n', 'each is a generator: for (each(…)) |v| { … }'],
+    ['mod seq { gn squares(n: I32) I32 { yield n; } }\nexport lib { fn run() I32 { let f = seq.squares; 0; } }\n', 'squares is a generator: for (squares(…)) |v| { … }'],
+    ['export lib {\n    gn squares(n: I32) I32 { yield n; }\n}\n', 'squares is a generator: it expands into each for that reads it, so it cannot be exported'],
     // Labeled blocks.
     ['export lib { fn run() I32 { outer: { break nowhere 1; 2; }; } }\n', 'No block labeled nowhere around this break'],
     ['export lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'break cannot leave a closure'],
@@ -1814,7 +1814,7 @@ export lib {
     ['export lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F32'],
     // Only Externref holds any host value: not Str.
     ['using JS from std:JS;\nexport main() I32 { let s: Str = new JS.Map(); s.len(); }\n', 's is Str, got JS.Map<any, any>'],
-    ['fn take(s: Str) I32 { s.len(); }\nexport main() I32 { take(cl() void {}); }\n', 'take takes Str, got cl() void'],
+    ['fn take(s: Str) I32 { s.len(); }\nexport main() I32 { take(cl() Void {}); }\n', 'take takes Str, got cl() Void'],
     ['using JS from std:JS;\nexport main() Str { "hello".replace("l", cl(m) Str { m; }); }\n', 'replace takes Str, got cl(unknown) Str'],
     // A bare /\\ in a body nests.
     ['let f: fun(Str) I32 = @es/\\ (s) => s.split(/\\s\\//).length \\/;\nexport main() I32 { f("a"); }\n', 'This /\\ opens a nested body, so the body ends at a later \\/'],
@@ -1915,7 +1915,7 @@ export lib {
       'let s = "i"; s = a.next?.s orelse "d"; 0;', 'loop match 0 { 0 => { continue a.next?.v; }, ~> { break; }, }; 0;'].map(body =>
       [`struct N:\n    | next: ?N\n    | v: I32\n    | s: ?Str\nfn f(a: N, c: Bool) I32 { ${body} }\nexport lib { fn run() I32 { 0; } }\n`, '?. only in a statement']),
     // A let of no value (it crashed the compiler).
-    ['fn nothing() void {}\nexport main() I32 { let x = nothing(); x; 0; }\n', 'x would hold no value'],
+    ['fn nothing() Void {}\nexport main() I32 { let x = nothing(); x; 0; }\n', 'x would hold no value'],
     // A tuple result must be destructured when bound.
     ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nexport main() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); }\n', 'A closure cannot capture tuple t'],
     // An integer is no variant of an integer enum.
@@ -1961,7 +1961,7 @@ export lib {
       "try passes on I32; the function's errors are Str"],
     ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() I32 { try g(); }\nexport main() I32 { f(); }\n', 'try in a function returning I32, not a Result'],
     ['fn f() I32 { errdefer f(); 2; }\nexport main() I32 { f(); }\n', 'errdefer in a function returning I32, not a Result'],
-    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn gen() yield I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; Result[I32, Str].ok(s); }\nexport main() I32 { f().value(); }\n',
+    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\ngn gen() I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; Result[I32, Str].ok(s); }\nexport main() I32 { f().value(); }\n',
       'try in a generator'],
     ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; g(); }\nexport main() I32 { f().value(); }\n', 'try in defer'],
     ['export main() I32 { let r = Result[I32, Str].ok(1); r._value; }\n', 'Result has no field _value'],
@@ -1974,7 +1974,7 @@ export lib {
     ['fn f(s: Str) I32 { match s { "+" => 1, ~> 0, }; }\n', 'match takes number, Bool, and enum patterns, not strings'],
     ['fn f() Bool { true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
-    ['let each: fun(cl(I32) void) void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() void { each(cl(v) { let w: I32 = await later(v); }); }\n',
+    ['let each: fun(cl(I32) Void) Void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nexport main() Void { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
     // @comptime and the other DSLs (each crashed, hung, or passed silently).
     ['fn tab() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nexport main() I32 { t[0]; }\n', '@comptime t reads itself'],
@@ -2026,7 +2026,7 @@ export lib {
     // A global first read where only its type is wanted: its mistakes still said.
     ['fn hi() Str { "hi"; }\nlet fs: Array[fun() Str] = [hi];\nexport lib { fn run() Str { fs[0](); } }\n', 'fun() Str cannot be stored; use cl() Str'],
     // An unused generator is checked.
-    ['fn g() yield I32 { let a: I32 = "s"; yield a; }\nexport lib { fn run() I32 { 0; } }\n', 'a is I32, got Str'],
+    ['gn g() I32 { let a: I32 = "s"; yield a; }\nexport lib { fn run() I32 { 0; } }\n', 'a is I32, got Str'],
     // An unknown generic module called twice (it crashed the compiler).
     ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nexport lib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
     // -0.0 after 0.0.
@@ -2060,7 +2060,7 @@ export lib {
     checked++;
   }
   const wutuHead = 'using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n';
-  const wutuTail = '        "x";\n    }\n    \\/;\n}\nexport main() void { Browser.document.body.append(view()); }\n';
+  const wutuTail = '        "x";\n    }\n    \\/;\n}\nexport main() Void { Browser.document.body.append(view()); }\n';
   // A missing bound, said once for its type however many places use it; an unknown module once.
   for (const [source, message] of [
     ['proto Big:\n    | biggest(Array[&]) &\nstruct M:\n    | v: I32\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nexport lib { fn run() I32 { let xs: Array[M] = [M { v: 3 }]; Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 2 }, xs).v; } }\n', "M does not implement Big (Pick's T needs it)"],
@@ -2078,7 +2078,7 @@ export lib {
     ['mem text: U8;\nexport lib { fn load(x: I32) I32 { text.copy_in(x); text.len(); } }\n', 'Expected Externref, got I32'],
     // An element's or a generator's value, captured, is a copy: a write to it was lost (accepted).
     ['export main() I32 { let xs = [1, 2]; for (xs) |x| { x = x * 2; }; xs[0]; }\n', 'Cannot assign to capture x'],
-    ['fn g() yield I32 { yield 1; }\nexport main() I32 { let t = 0; for (g()) |v| { v += 1; t += v; }; t; }\n', 'Cannot assign to capture v'],
+    ['gn g() I32 { yield 1; }\nexport main() I32 { let t = 0; for (g()) |v| { v += 1; t += v; }; t; }\n', 'Cannot assign to capture v'],
     // A range's count, set by the range: a write moved it (accepted), in the body or a closure.
     ['export main() I32 { let t = 0; for (0 ..< 8) |i| { t += i; i += 2; }; t; }\n', 'Cannot assign to capture i'],
     ['export main() I32 { let t = 0; for (0 ..< 5) |i| { let f = cl() { i = i + 1; }; f(); t += i; }; t; }\n', 'Cannot assign to capture i'],
@@ -2086,7 +2086,7 @@ export lib {
     // A let in a function's body of a parameter's name (accepted).
     ['fn clamp(n: I32) I32 { let n = 3; n; }\nexport main() I32 { clamp(4); }\n', 'Duplicate local n: already a parameter'],
     // A Str where a host Node is wanted: `appendChild<T extends Node>(node: T)` bound T to Str (accepted).
-    ['using Browser from std:Browser;\nexport main() void { Browser.document.body.appendChild("hello"); }\n', 'Expected Browser.Node, got Str'],
+    ['using Browser from std:Browser;\nexport main() Void { Browser.document.body.appendChild("hello"); }\n', 'Expected Browser.Node, got Str'],
     // Wutu CSS: a declaration without its `;` before the next, and a property's typo (accepted).
     [`${wutuHead}        padding: 1rem\n        gap: 2rem;\n${wutuTail}`, 'CSS declarations require a semicolon'],
     [`${wutuHead}        colr: red;\n${wutuTail}`, 'invalid CSS property colr; did you mean color?'],
@@ -2099,7 +2099,7 @@ export lib {
   // where `T extends Node` is wanted, custom, prefixed and unlisted CSS properties, a value over lines.
   for (const source of [
     'fn f(n: I32) I32 { n = n + 1; if n > 0 { let n = 2; n; } else { n; }; }\nexport main() I32 { f(1); }\n',
-    'using Browser from std:Browser;\nexport main() void { let d = Browser.document.createElement("div"); Browser.document.body.appendChild(d); }\n',
+    'using Browser from std:Browser;\nexport main() Void { let d = Browser.document.createElement("div"); Browser.document.body.appendChild(d); }\n',
     `${wutuHead}        --gap: 1rem;\n        -webkit-line-clamp: 2;\n        anchor-name: --a;\n        grid-template-columns:\n            repeat(2, 1fr);\n        font-family: a,\n            b;\n${wutuTail}`,
   ]) {
     const built = await compileFile(utu, await write(source), { optimize: 'size' });
@@ -2110,7 +2110,7 @@ export lib {
   for (const [source, note] of [
     ['export main() F64 { Time.now(); }\n', 'using time from std:Time; (the module is time)'],
     ['using Time from std:Time;\nexport main() F64 { time.now(); }\n', 'using time from std:Time; (the module is time)'],
-    ['export main() void { console.log("hi"); }\n', 'using console from std:Console;'],
+    ['export main() Void { console.log("hi"); }\n', 'using console from std:Console;'],
   ]) {
     const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
     assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
@@ -2152,7 +2152,7 @@ export lib {
     ['fn f() F64 { @ir/\\ <ir-lit kind="float" type-name="F64" value="-"/> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-lit> is written wrong here'],
     // References and nothing: said by the compiler, not the engine.
     ['fn f(a: I32) Str { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { 0; }\n', '@ir gives i32, not Str'],
-    ['fn f(a: I32) void { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { 0; }\n', '@ir gives i32, not void'],
+    ['fn f(a: I32) Void { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nexport main() I32 { 0; }\n', '@ir gives i32, not Void'],
     ['fn f(a: I32) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\nexport main() I32 { f(3); }\n', '@ir <ir-string-measure-utf16> takes externref, given i32'],
     ['fn f(a: I32, b: I32) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-ref-eq> takes eqref, given i32'],
     ['fn f(a: Str, b: Str) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nexport main() I32 { 0; }\n', '@ir <ir-ref-eq> takes eqref, given externref'],
@@ -2167,12 +2167,12 @@ export lib {
     ['struct Pt:\n    | x: I32\nfn f(p: Pt) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \\/; }\nexport main() I32 { f(Pt { x: 1 }); }\n', '@ir <ir-string-measure-utf16> takes externref, given a struct'],
     ['fn f(s: Str) I32 { @ir/\\ <ir-i31-get-s><ir-ident name="s"/></ir-i31-get-s> \\/; }\nexport main() I32 { f("x"); }\n', '@ir <ir-i31-get-s> takes i31ref, given externref'],
     ['fn f(a: Array[I64], n: I32) Str { @ir/\\ <ir-string-from-codes><ir-ident name="a"/><ir-ident name="n"/></ir-string-from-codes> \\/; }\nexport main() I32 { f(Array[I64].new(2, 65), 2).len(); }\n', '@ir <ir-string-from-codes> takes an array of i32, given an array of i64'],
-    [IR_ARR + '    fn &.put |self| (i: I32, v: Str) void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n}\n'
+    [IR_ARR + '    fn &.put |self| (i: I32, v: Str) Void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n}\n'
       + 'export main() I32 { Arr[I32].new(2, 0).put(0, "x"); 1; }\n', '@ir <ir-array-set> takes i32, given externref'],
     [IR_ARR + '    fn &.size |self| (x: Str) I32 { @ir/\\ <ir-array-len><ir-ident name="x"/></ir-array-len> \\/; }\n}\n'
       + 'export main() I32 { Arr[I32].new(2, 0).size("x"); }\n', '@ir <ir-array-len> takes an array of i32, given externref'],
-    ['fn f(a: I32, b: I32) void { @ir/\\ <ir-promise-then><ir-ident name="a"/><ir-ident name="b"/></ir-promise-then> \\/; }\nexport main() I32 { f(1, 2); 1; }\n', '@ir <ir-promise-then> takes externref, given i32'],
-    ['fn f(a: I32) void { @ir/\\ <ir-promise-catch><ir-ident name="a"/></ir-promise-catch> \\/; }\nexport main() I32 { f(1); 1; }\n', '@ir <ir-promise-catch> is written wrong here'],
+    ['fn f(a: I32, b: I32) Void { @ir/\\ <ir-promise-then><ir-ident name="a"/><ir-ident name="b"/></ir-promise-then> \\/; }\nexport main() I32 { f(1, 2); 1; }\n', '@ir <ir-promise-then> takes externref, given i32'],
+    ['fn f(a: I32) Void { @ir/\\ <ir-promise-catch><ir-ident name="a"/></ir-promise-catch> \\/; }\nexport main() I32 { f(1); 1; }\n', '@ir <ir-promise-catch> is written wrong here'],
     // A reference result by its type: an array is no Str.
     ['fn f(a: Array[I32]) Str { @ir/\\ <ir-ident name="a"/> \\/; }\nexport main() I32 { f([1]).len(); }\n', '@ir gives an array of i32, not Str'],
     // A type-repr the compiler does not know (it was an i32), an array element naming no type; an operand of a nullary element.
@@ -2214,7 +2214,7 @@ export lib {
     + 'mod Words {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=I64:mut=true"/> \\/\n'
     + '    fn new(n: I32) & { @ir/\\ <ir-array-new><ir-ident name="n"/></ir-array-new> \\/; }\n'
     + '    fn &.get |self| (i: I32) I64 { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n'
-    + '    fn &.set |self| (i: I32, v: I64) void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n'
+    + '    fn &.set |self| (i: I32, v: I64) Void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n'
     + '    fn &.len |self| () I32 { @ir/\\ <ir-array-len><ir-ident name="self"/></ir-array-len> \\/; }\n}\n'
     + IR_ARR + '    fn &.bget |self| (i: I32) Bool { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n}\n'
     + 'export main() Str {\n    let w = Words.new(3);\n    w.set(1, 40);\n    let b = Arr[Bool].new(2, true);\n'
@@ -2330,11 +2330,11 @@ export lib {
   checked++;
 
   // Test names: each test has one, its own.
-  const twice = await compileFile(utu, await write('export main() void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
+  const twice = await compileFile(utu, await write('export main() Void {}\ntest "passes" { assert true; }\ntest "passes" { assert true; }\ntest "" { assert true; }\n'), { target: 'test' });
   assert.deepEqual(twice.diagnostics.map(d => d.message), ['Duplicate test "passes"', 'Empty test name']);
   checked++;
   // A test name's escapes, checked as a string's are.
-  const escaped = await compileFile(utu, await write('export main() void {}\ntest "x\\u{41}" { assert true; }\n'), { target: 'test' });
+  const escaped = await compileFile(utu, await write('export main() Void {}\ntest "x\\u{41}" { assert true; }\n'), { target: 'test' });
   assert.deepEqual(escaped.diagnostics.map(d => d.message), ['\\u needs four hex digits']);
   checked++;
   // Benches too; a test's and a bench's names are of their own kinds, and a mod's of its own.
@@ -2367,7 +2367,7 @@ export lib {
   }
   assert.deepEqual((await compileFile(utu, await write('bench "r" { measure { let f = cl() I32 { return 1; }; f(); } }\n'), { target: 'bench' })).diagnostics, []);
   // A defer in a bench's setup runs once its measuring is done.
-  const deferred = await write('let note: fun(I32) void = @es/\\ (n) => { globalThis.deferred.push(n); } \\/;\nbench "d" {\n    let n = 0;\n    defer note(n);\n    measure { n += 1; }\n}\n');
+  const deferred = await write('let note: fun(I32) Void = @es/\\ (n) => { globalThis.deferred.push(n); } \\/;\nbench "d" {\n    let n = 0;\n    defer note(n);\n    measure { n += 1; }\n}\n');
   for (const mode of modes) {
     const benched = await compileFile(utu, deferred, { target: 'bench', mode });
     assert.ok(benched.wasm, `${mode}: ${benched.diagnostics.map(d => d.message)}`);
@@ -2491,7 +2491,7 @@ export lib {
     [{ 'main.utu': 'let js_double: cl(I32) I32 = @es/\\ (x) => x * 2 \\/;\nfn apply(f: cl(I32) I32, x: I32) I32 { f(x); }\nexport main() I32 { apply(js_double, 4) + js_double(5) * 10; }\n' }, 108],
     // A JavaScript exception runs the defers it unwinds through, newest first, before the catch; not errdefers.
     [{ 'main.utu': `let risky: fun(I32) I32 = @es/\\ (x) => { if (x < 0) throw new Error("neg"); return x; } \\/;
-let log: fun(I32) void = @es/\\ (v) => { globalThis.__dlog = (globalThis.__dlog ?? 0) * 10 + v; } \\/;
+let log: fun(I32) Void = @es/\\ (v) => { globalThis.__dlog = (globalThis.__dlog ?? 0) * 10 + v; } \\/;
 let logged: fun() I32 = @es/\\ () => { const v = globalThis.__dlog ?? 0; globalThis.__dlog = 0; return v; } \\/;
 fn inner() I32 { defer log(3); risky(-1); }
 fn outer() I32 { defer log(4); let v = inner(); v + 1; }
@@ -2818,21 +2818,21 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   // optional parameter or a `this`. A closure that writes no result fits a callback whose
   // result is `any` ("Expected cl(Web.Event) unknown").
   const decayed = await write('let et: fun() Externref = @es/\\ () => new EventTarget() \\/;\n'
-    + 'let on: fun(Externref, Str, cl(I32) void) void = @es/\\ (t, ev, f) => t.addEventListener(ev, f) \\/;\n'
-    + 'let off: fun(Externref, Str, cl(I32) void) void = @es/\\ (t, ev, f) => t.removeEventListener(ev, f) \\/;\n'
-    + 'let fire: fun(Externref, Str) void = @es/\\ (t, ev) => t.dispatchEvent(new Event(ev)) \\/;\n'
-    + 'let reset: fun() void = @es/\\ () => { globalThis.__decayHits = 0; } \\/;\n'
+    + 'let on: fun(Externref, Str, cl(I32) Void) Void = @es/\\ (t, ev, f) => t.addEventListener(ev, f) \\/;\n'
+    + 'let off: fun(Externref, Str, cl(I32) Void) Void = @es/\\ (t, ev, f) => t.removeEventListener(ev, f) \\/;\n'
+    + 'let fire: fun(Externref, Str) Void = @es/\\ (t, ev) => t.dispatchEvent(new Event(ev)) \\/;\n'
+    + 'let reset: fun() Void = @es/\\ () => { globalThis.__decayHits = 0; } \\/;\n'
     + 'let hits: fun() I32 = @es/\\ () => globalThis.__decayHits \\/;\n'
-    + 'let bump: fun() void = @es/\\ () => { globalThis.__decayHits += 1; } \\/;\n'
-    + 'fn tick(x: I32) void { bump(); }\n'
-    + 'export main() I32 {\n    reset();\n    let t: Externref = et();\n    let f: fun(I32) void = tick;\n'
+    + 'let bump: fun() Void = @es/\\ () => { globalThis.__decayHits += 1; } \\/;\n'
+    + 'fn tick(x: I32) Void { bump(); }\n'
+    + 'export main() I32 {\n    reset();\n    let t: Externref = et();\n    let f: fun(I32) Void = tick;\n'
     + '    on(t, "x", f);\n    fire(t, "x");\n    off(t, "x", f);\n    fire(t, "x");\n'
     + '    on(t, "y", tick);\n    fire(t, "y");\n    off(t, "y", tick);\n    fire(t, "y");\n    hits();\n}\n');
   const hostC = 'export declare function add(f: (a: number, b?: number) => void): void;\n'
     + 'export declare function remove(f: (a: number, b?: number) => void): boolean;\n';
   const hostCJs = 'const fs = new Set();\nexport function add(f) { fs.add(f); }\nexport function remove(f) { return fs.delete(f); }\n';
   const kept = await project({ ...pkg('hostc', hostC, hostCJs), 'main.utu': 'using C from "npm:hostc";\nusing Web from std:Web;\n'
-    + 'export main() I32 {\n    let n = 0;\n    let h = cl(a, b) void { n += 1; };\n    let g = cl(this, a) void { n += 1; };\n'
+    + 'export main() I32 {\n    let n = 0;\n    let h = cl(a, b) Void { n += 1; };\n    let g = cl(this, a) Void { n += 1; };\n'
     + '    C.add(h);\n    C.add(g);\n    let r = (if C.remove(h) { 1; } else { 0; }) + (if C.remove(g) { 10; } else { 0; });\n'
     + '    let t = new Web.EventTarget();\n    t.addEventListener("x", cl(e: Web.Event) { n += 100; });\n'
     + '    t.dispatchEvent(new Web.Event("x"));\n    r + n;\n}\n' });
@@ -2940,7 +2940,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   const hostDHead = 'using D from "npm:hostd";\n';
   const hostDTypes = await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': hostDHead + 'export main() F64 {\n'
     + '    let xs = [1.0, 2.0, 3.0];\n    let e = [];\n    let ys = [4.0];\n    let k = D.ks()[1];\n    let n: F64 = 0.0;\n'
-    + '    let b = new D.Bus();\n    b.on("data", cl(v) void { n += v; });\n    b.emit("data", 5.0);\n'
+    + '    let b = new D.Bus();\n    b.on("data", cl(v) Void { n += v; });\n    b.emit("data", 5.0);\n'
     + '    let v = D.get(&{ a: 1.0 }, "z");\n    let m = D.mapVals(&{ a: 1.0 }, cl(x) Str { `#${x}`; });\n'
     + '    D.total(D.counts) + D.sum(xs) + D.sum(e) + D.iter([1.0, 2.0]) + D.iter(ys) + D.keyName(k).len().f64() + n\n'
     + '        + D.defaultTo(v, 7.0) + D.defaultTo(D.get(&{ a: 1.0 }, "a"), 7.0) + m["a"].len().f64() + new D.Sq(3.0).area()\n'
@@ -2956,7 +2956,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     ['let n: F64 = D.get(&{ a: 1.0 }, "z"); n', ['n is F64, got ?F64']],
     ['D.total(&{ a: "s" })', ['Expected F64, got Str']],
     ['new D.Bus().emit("nope", 1.0); 0.0', ['keyof D.Events has no value "nope"']],
-    ['let s = "data"; new D.Bus().on(s, cl(v) void { }); 0.0', ['keyof D.Events takes its values, not any Str']],
+    ['let s = "data"; new D.Bus().on(s, cl(v) Void { }); 0.0', ['keyof D.Events takes its values, not any Str']],
     ['let k = D.ks()[0]; k = "x"; D.keyName(k).len().f64()', ['D.Key takes its values, not any Str']],
     ['let xs = [1.0]; let n = xs.len(); D.sum(xs)', ['Expected D.F64[], got Array[F32]']],
     ['new D.Shape(); 0.0', ['D.Shape is abstract: make one of a class that extends it']],
@@ -3008,7 +3008,7 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
     ['let s = E.mkShape(0.0); s.r', ['No member E.Shape.r']],
     ['let n: F64 = E.nev(); let s: Str = await E.pp(); n + s.len().f64()', []],
     // `keyof E` of a generic E is a string; a nullable literal union is a ?Str; utu's Promise[T] is the host's
-    ['E.bus().on("ping", cl(n: F64) void { }); let a: Str = promote E.align() { |v| => v, ~> "none", }; let p: Promise[F64] = E.later(); await p', []],
+    ['E.bus().on("ping", cl(n: F64) Void { }); let a: Str = promote E.align() { |v| => v, ~> "none", }; let p: Promise[F64] = E.later(); await p', []],
     ['let s: Str = E.unwrap(5.0); 0.0', ['s is Str, got F64']],
     ['E.trio()[3]', ['E.[F64, F64, F64] has no element 3: it has 3 elements']],
   ]) {
@@ -3068,10 +3068,10 @@ export main() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 1
   checked++;
   // `using Browser` and `from std:Browser` on two lines, an empty @stored struct, and a Wutu text in backticks with a semicolon.
   for (const source of [
-    'using Browser\nfrom std:Browser;\nstruct S:\n    | x: I32\nexport main() void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
-    'using Browser from std:Browser;\nstruct S:\nexport main() void {\n    @stored/\\ S "s" S {} \\/;\n}\n',
-    'using Browser from std:Browser;\nexport main() void {\n    @wutu/\\ p { = `;`; } \\/;\n}\n',
-    'using  Browser   |b|  from std:Browser;\nstruct S:\n    | x: I32\nexport main() void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
+    'using Browser\nfrom std:Browser;\nstruct S:\n    | x: I32\nexport main() Void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
+    'using Browser from std:Browser;\nstruct S:\nexport main() Void {\n    @stored/\\ S "s" S {} \\/;\n}\n',
+    'using Browser from std:Browser;\nexport main() Void {\n    @wutu/\\ p { = `;`; } \\/;\n}\n',
+    'using  Browser   |b|  from std:Browser;\nstruct S:\n    | x: I32\nexport main() Void {\n    @stored/\\ S "s" S { x: 0 } \\/;\n}\n',
   ]) {
     const built = await compileFile(utu, await write(source));
     assert.ok(built.wasm?.length > 0, built.diagnostics?.map(d => d.message).join('\n'));

@@ -31,7 +31,7 @@ mod playground {
         \\    todos count_where |t| { not t.done }
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let state = State { draft: "", todos: [], made: 0 }
         \\    Browser.document.body.append(@wutu/\
         \\    @reactive;
@@ -114,13 +114,13 @@ mod playground {
     }
     // Hands the source to the compiler (docs/playground/playground.js, loaded
     // on first use) and hears back how it went.
-    fn compile(state: State, delay: I32) void {
-        let schedule: fun(Str, I32, cl(Str, Str, Bool) void) void = @es/\
+    fn compile(state: State, delay: I32) Void {
+        let schedule: fun(Str, I32, cl(Str, Str, Bool) Void) Void = @es/\
         (source, delay, done) => import(new URL("./playground/playground.js", document.baseURI).href)
             .then((m) => m.schedule(source, delay, done))
             .catch((error) => done("Could not load the compiler", String(error), true))
         \/
-        schedule(state.saved.source, delay, cl(status: Str, detail: Str, failed: Bool) void {
+        schedule(state.saved.source, delay, cl(status: Str, detail: Str, failed: Bool) Void {
             state.status = status
             state.detail = detail
             state.failed = failed
@@ -130,7 +130,7 @@ mod playground {
     fn page(state: State) Browser.HTMLElement {
         if not state.started {
             state.started = true
-            wutu.after_render(cl() void {
+            wutu.after_render(cl() Void {
                 compile(state, 0)
             })
         }

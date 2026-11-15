@@ -11,7 +11,7 @@ mod Stack[T] {
         | items: Array[T]
         | size: I32
     fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 } }
-    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1 }
+    fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1 }
     fn &.pop |s| () T { s.size -= 1; s.items[s.size] }
 }
 
@@ -31,7 +31,7 @@ using Buffer from std:Buffer
 
 mod Stash[T] {
     let items: Buffer[T] = Buffer[T].new()
-    fn add(x: T) void { items.push(x) }
+    fn add(x: T) Void { items.push(x) }
     fn size() I32 { items.len() }
 }
 

@@ -1,6 +1,6 @@
 // What: await for over a generator, binding a value and an index
 // Expect: a generator loop binds one value: await for (ticks()) |t| { … }
-fn ticks(n: I32) yield I32 {
+gn ticks(n: I32) I32 {
     for (0 ..< n) |i| { yield i; };
 }
 

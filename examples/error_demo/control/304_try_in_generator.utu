@@ -5,7 +5,7 @@ fn digit(c: I32) Result[I32, Str] {
     Result[I32, Str].ok(c - 48);
 }
 
-fn digits(codes: Array[I32]) yield I32 {
+gn digits(codes: Array[I32]) I32 {
     for (codes) |c| { yield try digit(c); };
 }
 

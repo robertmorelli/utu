@@ -6,12 +6,12 @@ enum Command:
     | Say { text: Str }
     | Quit {}
 
-fn run(c: Command) void {
+fn run(c: Command) Void {
     alt c {
         Say |s| => console.log(s.text),
     };
 }
 
-export main() void {
+export main() Void {
     run(Quit {});
 }

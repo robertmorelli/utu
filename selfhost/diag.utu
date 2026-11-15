@@ -71,7 +71,7 @@ fn type_text(t: I32) Str {
     if t < 0 { return "unknown" }
     let kind = ty_kind[t]
     if kind == Ty.Error.i32() { return "unknown" }
-    if kind == Ty.Void.i32() { return "void" }
+    if kind == Ty.Void.i32() { return "Void" }
     if kind == Ty.Never.i32() { return "never" }
     if kind == Ty.Null.i32() { return "null" }
     if kind == Ty.Nullable.i32() { return "?" + type_text(ty_a[t]) }
@@ -568,8 +568,8 @@ fn diag_text(i: I32) Str {
         Diag.StorageType => w + " is a storage type: use I32",
         Diag.ReturnValueFromVoid => {
             // (No name: a closure's return, main's, or a test's.)
-            if word < 0 { return pick(in_closure(node), "This closure returns void", pick(in_main(node), "main returns void", "A test returns nothing")) }
-            w + " returns void"
+            if word < 0 { return pick(in_closure(node), "This closure returns Void", pick(in_main(node), "main returns Void", "A test returns nothing")) }
+            w + " returns Void"
         },
         Diag.VoidLet => w + " would hold no value",
         Diag.ComptimeTrap => "@comptime " + w + " trapped: " + comptime_trap_text(a),

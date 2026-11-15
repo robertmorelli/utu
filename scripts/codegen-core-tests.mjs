@@ -656,7 +656,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           }
           fn counter() I32 {
             let count: I32 = 0;
-            let bump = cl() void { count = count + 1; };
+            let bump = cl() Void { count = count + 1; };
             bump(); bump(); bump();
             count;
           }
@@ -737,7 +737,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       fn keep(p: P) P { p; }
       export lib {
         fn factorial(n: I32) I32 { let fact = cl(k: I32) I32 { if k <= 1 { 1; } else { k * fact(k - 1); }; }; fact(n); }
-        fn countdown() I32 { let calls = 0; let tick = cl(k: I32) void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
+        fn countdown() I32 { let calls = 0; let tick = cl(k: I32) Void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
         fn captured() I32 { promote find(true) { |p| => { let read = cl() I32 { p.v; }; read(); }, ~> 0, }; }
         fn required() I32 { let p = find(true) orelse fatal; p.v; }
         fn scaled(i: I32) F64 { let y = 16 + i.f64() * 40; y + 14; }
@@ -770,7 +770,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         | v: I32
         | next: ?P
       fn find(ok: Bool) ?P { if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
-      fn bump(p: P) void { p.v += 1; }
+      fn bump(p: P) Void { p.v += 1; }
       export lib {
         fn run() I32 {
           let p = find(true);
@@ -929,10 +929,10 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_promise_then.utu',
       source: `
         let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v * 2) \\/;
-        let record: fun(I32) void = @es/\\ (v) => { globalThis.__utu_seen = v; } \\/;
+        let record: fun(I32) Void = @es/\\ (v) => { globalThis.__utu_seen = v; } \\/;
         let seen: fun() I32 = @es/\\ () => globalThis.__utu_seen ?? -1 \\/;
         export lib {
-          fn subscribe(n: I32) void { later(n).then(cl(v) { record(v); }); }
+          fn subscribe(n: I32) Void { later(n).then(cl(v) { record(v); }); }
           fn observed() I32 { seen(); }
         }
       `,
@@ -1062,7 +1062,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'module_host_void_tail.utu', source: String.raw`
       mod Host { let twice: fun(F64) F64 = @es/\ n => n * 2 \/; }
       struct Cell: | value: I32
-      fn update(cell: Cell) void { cell.value = 42; cell.value; }
+      fn update(cell: Cell) Void { cell.value = 42; cell.value; }
       export lib {
         fn host() F64 { Host.twice(F64.sqrt(441.0)); }
         fn tail() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; }
@@ -1082,7 +1082,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       'export lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
       'fn double(x: I32) I32 { x * 2; }\nexport main() I32 { double(2) + double(3); }',
       'export lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }\n  fn mid(x: I32) I32 { x -o clamp(0, &, 10); }\n}',
-      'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) void { self.v = n; }\nexport lib { fn go(b: Box) void { b.set64(7); } }',
+      'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) Void { self.v = n; }\nexport lib { fn go(b: Box) Void { b.set64(7); } }',
       'export lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
     ]) {
       const diagnostics = await selfhostDiagnostics({ ROOT, name: 'valid_program.utu', source });

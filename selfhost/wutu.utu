@@ -79,7 +79,7 @@ fn es_string(text: Str) Str {
 /// installs its CSS and attaches its listeners, and whose value is the root
 /// element. With `reconcile`, each element goes through `std:Wutu`'s
 /// reconciler, and a reactive template mounts a view.
-fn expand_wutu(site: I32) void {
+fn expand_wutu(site: I32) Void {
     let whole = bytes_text(tok_start[node_first[last_child(site)]], tok_end[node_first[last_child(site)]])
     let prefix = ""
     let searching = true
@@ -132,7 +132,7 @@ fn expand_wutu(site: I32) void {
     css = layered_document_css(without_hash_lines(document)) + without_hash_lines(css)
     if css.len() > 0 {
         let key = es_string("wutu-" + wutu_hash(css))
-        prelude = "let " + prefix + "install_css: fun() void = @es/\\ () => { if (!document.getElementById(" + key + ")) { const s=document.createElement('style'); s.id=" + key
+        prelude = "let " + prefix + "install_css: fun() Void = @es/\\ () => { if (!document.getElementById(" + key + ")) { const s=document.createElement('style'); s.id=" + key
             + "; s.textContent=" + es_string(css) + "; document.head.append(s); } } \\/; " + prefix + "install_css();\n" + prelude
     }
     let declarations = ""
@@ -218,7 +218,7 @@ fn without_hash_lines(css: Str) Str {
 }
 
 /// Add stylesheet `key` to the site's; a repeated key replaces the CSS.
-fn wutu_style(key: Str, css: Str) void {
+fn wutu_style(key: Str, css: Str) Void {
     let w = intern_text(key)
     for (0 ..< wu_style_key.len()) |k| {
         if wu_style_key[k] == w {
@@ -231,7 +231,7 @@ fn wutu_style(key: Str, css: Str) void {
 }
 
 /// Number the elements and collect their aliases, in order.
-fn wutu_prepare(n: I32) void {
+fn wutu_prepare(n: I32) Void {
     if tn_kind[n] == 4 {
         tn_index[n] = wu_node_count[0]
         wu_node_count[0] += 1
@@ -307,7 +307,7 @@ fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
     placeholder
 }
 
-fn rename_aliases(node: I32, root: I32, k: I32, owner: I32) void {
+fn rename_aliases(node: I32, root: I32, k: I32, owner: I32) Void {
     if is_kind(node, Node.Identifier) and is_reference(node) {
         let name = word_of(node)
         if not island_shadowed(node, name, root) {
@@ -384,7 +384,7 @@ fn wutu_helper(kind: Str) Str {
     for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]) } }
     let name = wutu_prefix() + kind
     let params = ""
-    let result = "void"
+    let result = "Void"
     let js = ""
     if kind == "attr" {
         params = "Browser.Element, Str, Str"
@@ -408,7 +408,7 @@ fn wutu_helper(kind: Str) Str {
         params = "Bool"
         js = "(v)=>globalThis.__utuWutu.put(v)"
     } else if kind == "on" {
-        params = "cl(Browser.Event) void"
+        params = "cl(Browser.Event) Void"
         js = "(v)=>globalThis.__utuWutu.put(v)"
     } else if kind == "begin" {
         params = "Str"
@@ -430,7 +430,7 @@ fn wutu_helper(kind: Str) Str {
         params = "Browser.Node"
         js = "(v)=>globalThis.__utuWutu.append(v)"
     } else if kind == "event" {
-        params = "Browser.Element, Str, cl(Browser.Event) void"
+        params = "Browser.Element, Str, cl(Browser.Event) Void"
         js = "(n,e,h)=>globalThis.__utuWutu.listen(n,e,h)"
     } else if kind == "leave" {
         js = "()=>{globalThis.__utuWutu.leave()}"
@@ -578,10 +578,10 @@ vec wx_event_ops: I32
 fn event_listener(name: Str, handler: Str, param: I32) Str {
     let prevent = if name == "submit" { "__wutu_event.preventDefault();" } else { "" }
     let type = event_type(name)
-    if param < 0 { return "cl(__wutu_event) void { " + prevent + " " + handler + "; }" }
+    if param < 0 { return "cl(__wutu_event) Void { " + prevent + " " + handler + "; }" }
     let e = word_text(param)
-    if type.len() > 0 { return "cl(__wutu_event) void { " + prevent + " alt __wutu_event { Browser." + type + " |" + e + "| => { " + handler + "; }, ~> {}, }; }" }
-    "cl(__wutu_event) void { " + prevent + " let " + e + " = __wutu_event; " + handler + "; }"
+    if type.len() > 0 { return "cl(__wutu_event) Void { " + prevent + " alt __wutu_event { Browser." + type + " |" + e + "| => { " + handler + "; }, ~> {}, }; }" }
+    "cl(__wutu_event) Void { " + prevent + " let " + e + " = __wutu_event; " + handler + "; }"
 }
 
 /// Whether an `on` handler can only change its own elements: every statement
@@ -798,7 +798,7 @@ fn wutu_description(n: I32) Str {
 struct WOps:
     | text: Str
 
-fn wd_op(o: WOps, item: Str) void { o.text = o.text + (if o.text.len() > 0 { "," } else { "" }) + item }
+fn wd_op(o: WOps, item: Str) Void { o.text = o.text + (if o.text.len() > 0 { "," } else { "" }) + item }
 
 /// Whether code needs element n itself: an alias, a property, or a binding.
 fn wd_needs_node(n: I32) Bool {
@@ -898,7 +898,7 @@ fn wd_binding(n: I32, i: I32) Str {
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
     let kind = word_text(ti_a[i])
     let update = located_splice(wu_site[0], binding_update(kind, id, target), ti_at[i], ti_to[i])
-    wx_events.push(intern_text(wutu_helper("on") + "(cl(__wutu_event) void { " + update + "; });\n"))
+    wx_events.push(intern_text(wutu_helper("on") + "(cl(__wutu_event) Void { " + update + "; });\n"))
     wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + binding_event(kind) + "\"]"))
     if kind == "value" and word_text(tn_text[n]) == "select" { return located_splice(wu_site[0], select_value(id, target), ti_at[i], ti_to[i]) + ";\n" }
     binding_sync_code(kind, id, target, i)

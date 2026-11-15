@@ -1,6 +1,6 @@
 using boxes |Box| from "./_boxes.utu"
 
-fn main() void {}
+fn main() Void {}
 
 test "file imports preserve transitive module dependencies" {
     let box: Box = Box.new(4)

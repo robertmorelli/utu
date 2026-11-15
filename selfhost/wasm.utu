@@ -83,7 +83,7 @@ fn vl_same(list: I32, start: I32, len: I32) Bool {
 /// Start a list; push its items with @vl_add, then @vl_end.
 fn vl_begin() I32 => vl_pending.len()
 
-fn vl_add(vt: I32) void => vl_pending.push(vt)
+fn vl_add(vt: I32) Void => vl_pending.push(vt)
 
 /// The list pushed since `mark`, interned: the id of an equal list when
 /// there is one.
@@ -108,7 +108,7 @@ fn vl_end(mark: I32) I32 {
     id
 }
 
-fn vl_grow() void {
+fn vl_grow() Void {
     let n = if vl_table.len() == 0 { 64 } else { vl_table.len() * 2 }
     vl_table.resize(n)
     for (0 ..< n) |i| { vl_table[i] = -1 }
@@ -200,7 +200,7 @@ fn ht_intern(kind: Heap, a: I32, b: I32, single: Bool) I32 {
     id
 }
 
-fn ht_grow() void {
+fn ht_grow() Void {
     let n = if ht_table.len() == 0 { 64 } else { ht_table.len() * 2 }
     ht_table.resize(n)
     for (0 ..< n) |i| { ht_table[i] = -1 }
@@ -233,7 +233,7 @@ fn struct_type(super: I32, open: Bool) I32 {
     id
 }
 
-fn struct_field(t: I32, storage: I32, mutable: Bool) void {
+fn struct_field(t: I32, storage: I32, mutable: Bool) Void {
     ht_fields.push(storage)
     ht_fields.push(if mutable { 1 } else { 0 })
     ht_b[t] += 1
@@ -328,7 +328,7 @@ fn name_from_src(start: I32, end_: I32) I32 {
 
 /// A UTF-16 code unit, as UTF-8 in @names. A surrogate is three bytes of
 /// its own: pairs are not combined.
-fn utf8_push_names(unit: I32) void {
+fn utf8_push_names(unit: I32) Void {
     if unit < 128 { names.push(unit); return }
     if unit < 2048 {
         names.push(192 | (unit >> 6))
@@ -387,7 +387,7 @@ fn add_import_global(module: I32, field: I32, t: I32) I32 {
 }
 
 /// Forgets the module being built.
-fn reset_wasm() void {
+fn reset_wasm() Void {
     start_func[0] = -1
     vl_start.clear()
     vl_len.clear()
@@ -579,7 +579,7 @@ vec w_site: I32
 /// The syntax node being checked, whose code nodes made now are (-1: none).
 vec cur_src: I32 = [-1]
 
-fn reset_ir() void {
+fn reset_ir() Void {
     w_op.clear()
     w_type.clear()
     w_a.clear()
@@ -628,10 +628,10 @@ fn w_pop() I32 {
     id
 }
 
-fn w_push(id: I32) void => w_stack.push(id)
+fn w_push(id: I32) Void => w_stack.push(id)
 
 /// Put node `id` on the stack at position `at`, after the ones before it.
-fn w_insert(at: I32, id: I32) void {
+fn w_insert(at: I32, id: I32) Void {
     w_stack.push(id)
     let i = w_stack.len() - 1
     while (i > at) {
@@ -658,7 +658,7 @@ vec sec: U8
 /// The function body being written.
 vec code_bytes: U8
 
-fn leb_u(in_body: Bool, value: I32) void {
+fn leb_u(in_body: Bool, value: I32) Void {
     let v = value
     while (true) {
         let b = v & 127
@@ -668,9 +668,9 @@ fn leb_u(in_body: Bool, value: I32) void {
 }
 
 /// Where bytes go: the section, or (when `in_body`) the function body.
-fn put(in_body: Bool, b: I32) void => if in_body { code_bytes.push(b) } else { sec.push(b) }
+fn put(in_body: Bool, b: I32) Void => if in_body { code_bytes.push(b) } else { sec.push(b) }
 
-fn leb_s(in_body: Bool, value: I32) void {
+fn leb_s(in_body: Bool, value: I32) Void {
     let v = value
     while (true) {
         let b = v & 127
@@ -683,7 +683,7 @@ fn leb_s(in_body: Bool, value: I32) void {
     }
 }
 
-fn leb_s64(in_body: Bool, lo: I32, hi: I32) void {
+fn leb_s64(in_body: Bool, lo: I32, hi: I32) Void {
     let v = (hi.i64() << 32) | (lo.i64() & 4294967295)
     while (true) {
         let b = (v & 127).i32()
@@ -696,17 +696,17 @@ fn leb_s64(in_body: Bool, lo: I32, hi: I32) void {
     }
 }
 
-fn put_name(in_body: Bool, name: I32) void {
+fn put_name(in_body: Bool, name: I32) Void {
     leb_u(in_body, name_len[name])
     for (0 ..< name_len[name]) |i| { put(in_body, names[name_start[name] + i]) }
 }
 
-fn put_text(text: Str) void {
+fn put_text(text: Str) Void {
     leb_u(false, text.len())
     for (0 ..< text.len()) |i| { sec.push(text.get(i)) }
 }
 
-fn put_u32le(in_body: Bool, v: I32) void {
+fn put_u32le(in_body: Bool, v: I32) Void {
     put(in_body, v & 255)
     put(in_body, (v >>> 8) & 255)
     put(in_body, (v >>> 16) & 255)
@@ -714,7 +714,7 @@ fn put_u32le(in_body: Bool, v: I32) void {
 }
 
 /// Write the section in `sec` to `out` with its id and size.
-fn flush_section(id: I32) void {
+fn flush_section(id: I32) Void {
     if sec.len() == 0 { return }
     out.push(id)
     let n = sec.len()
@@ -747,7 +747,7 @@ vec glob_sets: I32
 
 /// Marks the functions and globals the exports reach, and counts their
 /// uses (@func_uses, @glob_uses, @glob_sets) and each node's holders.
-fn sweep() void {
+fn sweep() Void {
     node_holders.resize(w_op.len())
     for (0 ..< w_op.len()) |n| { node_holders[n] = 0 }
     func_live.resize(func_kind.len())
@@ -780,19 +780,19 @@ fn sweep() void {
     }
 }
 
-fn mark_func(f: I32) void {
+fn mark_func(f: I32) Void {
     if func_live[f] == 1 { return }
     func_live[f] = 1
     if func_body[f] >= 0 { live_work.push(func_body[f]) }
 }
 
-fn mark_global(g: I32) void {
+fn mark_global(g: I32) Void {
     if glob_live[g] == 1 { return }
     glob_live[g] = 1
     if glob_init[g] >= 0 { live_work.push(glob_init[g]) }
 }
 
-fn scan_live(node: I32) void {
+fn scan_live(node: I32) Void {
     // (Late functions, see mark_late, have nodes made after the sweep.)
     if node >= node_holders.len() {
         let old = node_holders.len()
@@ -820,7 +820,7 @@ vec memory_live: U8
 /// compile), and the host reads only the values' (`__comptime_*`): the
 /// others its code does not use are left out, as an engine may take long
 /// to make each memory.
-fn mark_memories() void {
+fn mark_memories() Void {
     let n = memory_kind.len()
     memory_live.resize(n)
     for (0 ..< n) |m| { memory_live[m] = if comptime_fuel[0] < 0 or memory_kind[m] == FuncKind.Import.i32() or is_comptime_value(memory_field_name[m]) { 1 } else { 0 } }
@@ -866,7 +866,7 @@ vec glob_order: I32
 vec func_imported: I32 = [0]
 vec glob_imported: I32 = [0]
 
-fn assign_indices() void {
+fn assign_indices() Void {
     memory_index.resize(memory_kind.len())
     mark_memories()
     let next_m = 0
@@ -942,7 +942,7 @@ vec type_refs: I32
 
 /// The live heap types (of the `n` there are), in @type_order: numbered as
 /// the comment above @type_unit says.
-fn order_types(n: I32) void {
+fn order_types(n: I32) Void {
     type_unit.resize(n)
     type_twin.resize(n)
     unit_rank.resize(n + 1)
@@ -1006,7 +1006,7 @@ fn order_types(n: I32) void {
 
 fn unit_of(t: I32) I32 => if type_twin[t] >= 0 { type_unit[type_twin[t]] } else { type_unit[t] }
 
-fn place_type(t: I32) void {
+fn place_type(t: I32) Void {
     type_index[t] = type_order.len()
     type_order.push(t)
 }
@@ -1026,7 +1026,7 @@ fn unit_ready(u: I32, n: I32) Bool {
 }
 
 /// The group's types, the most used first, each after its supertype.
-fn place_group(n: I32) void {
+fn place_group(n: I32) Void {
     let count = 0
     for (0 ..< n) |t| { if type_unit[t] == n and type_index[t] < 0 { count += 1 } }
     let order = Array[I32].new(count, 0)
@@ -1053,7 +1053,7 @@ fn place_group(n: I32) void {
 }
 
 /// The heap types type `t` names, into @type_refs.
-fn refs_of(t: I32) void {
+fn refs_of(t: I32) Void {
     type_refs.clear()
     let kind = ht_kind[t]
     if kind == Heap.Func.i32() {
@@ -1067,9 +1067,9 @@ fn refs_of(t: I32) void {
     if ht_super[t] >= 0 { type_refs.push(ht_super[t]) }
 }
 
-fn refs_of_list(list: I32) void => for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)) }
+fn refs_of_list(list: I32) Void => for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)) }
 
-fn type_ref_of(vt: I32) void => if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)) }
+fn type_ref_of(vt: I32) Void => if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)) }
 
 /// A global nothing writes, of an integer constant: it is not in the
 /// module, and each read is the constant (as short as the read, mostly, and
@@ -1088,7 +1088,7 @@ vec sort_rest: I32
 
 /// Reorders @sort_items by @sort_keys: the `room` greatest first, then the
 /// others in the order they were.
-fn most_used_first(room: I32) void {
+fn most_used_first(room: I32) Void {
     // Sorted by the keys negated (equals keep their order), as @sort_rest.
     let n = sort_items.len()
     let key = Array[I32].new(sort_keys.len(), 0)
@@ -1130,7 +1130,7 @@ vec type_live: U8
 vec type_uses: I32
 vec type_work: I32
 
-fn sweep_types() void {
+fn sweep_types() Void {
     type_live.resize(ht_kind.len())
     type_uses.resize(ht_kind.len())
     for (0 ..< ht_kind.len()) |t| {
@@ -1189,7 +1189,7 @@ fn sweep_types() void {
     }
 }
 
-fn mark_type(t: I32) void {
+fn mark_type(t: I32) Void {
     if t < 0 { return }
     type_uses[t] += 1
     if type_live[t] == 1 { return }
@@ -1197,7 +1197,7 @@ fn mark_type(t: I32) void {
     type_work.push(t)
 }
 
-fn mark_vt(vt: I32) void {
+fn mark_vt(vt: I32) Void {
     if vt >= vt_tuple {
         mark_list(vt - vt_tuple)
         // A block with several results is typed by a function type.
@@ -1207,7 +1207,7 @@ fn mark_vt(vt: I32) void {
     }
 }
 
-fn mark_list(list: I32) void {
+fn mark_list(list: I32) Void {
     for (0 ..< vl_len[list]) |i| { mark_vt(vl_item(list, i)) }
 }
 
@@ -1237,7 +1237,7 @@ fn ht_lookup(kind: I32, a: I32, b: I32, single: I32) I32 {
     -1
 }
 
-fn put_valtype(in_body: Bool, vt: I32) void {
+fn put_valtype(in_body: Bool, vt: I32) Void {
     if vt == vt_i32 { put(in_body, 127) }
     else if vt == vt_i64 { put(in_body, 126) }
     else if vt == vt_f32 { put(in_body, 125) }
@@ -1258,7 +1258,7 @@ fn put_valtype(in_body: Bool, vt: I32) void {
 }
 
 /// A heap type operand (`ref.null`, `ref.test`, …): a defined type's index, or an abstract heap type.
-fn put_heap(in_body: Bool, vt: I32) void {
+fn put_heap(in_body: Bool, vt: I32) Void {
     if vt >= vt_defined { leb_s(in_body, type_index[vt_heap(vt)]) }
     else if vt == vt_externref or vt == vt_extern { put(in_body, 111) }
     else if vt == vt_i31ref { put(in_body, 108) }
@@ -1267,12 +1267,12 @@ fn put_heap(in_body: Bool, vt: I32) void {
     else { put(in_body, 110) }
 }
 
-fn put_list(list: I32) void {
+fn put_list(list: I32) Void {
     leb_u(false, vl_len[list])
     for (0 ..< vl_len[list]) |i| { put_valtype(false, vl_item(list, i)) }
 }
 
-fn put_composite(t: I32) void {
+fn put_composite(t: I32) Void {
     let kind = ht_kind[t]
     if ht_super[t] >= 0 or ht_open[t] == 1 {
         sec.push(if ht_open[t] == 1 { 80 } else { 79 })
@@ -1301,7 +1301,7 @@ fn put_composite(t: I32) void {
     }
 }
 
-fn encode_types() void {
+fn encode_types() Void {
     let groups = 0
     let in_group = false
     for (0 ..< type_order.len()) |i| {
@@ -1332,7 +1332,7 @@ fn encode_types() void {
     flush_section(1)
 }
 
-fn encode_imports() void {
+fn encode_imports() Void {
     let count = func_imported[0] + glob_imported[0]
     for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.i32() { count += 1 } }
     if tag_used[0] == 1 { count += 1 }
@@ -1375,18 +1375,18 @@ fn encode_imports() void {
 fn js_tag_type() I32 => func_type_single(vl_one(vt_externref), vl_empty())
 
 /// Import the JS exception tag (for `try` and `throw`).
-fn use_js_tag() void {
+fn use_js_tag() Void {
     js_tag_type()
     tag_used[0] = 1
 }
 
-fn put_limits(pages: I32) void {
+fn put_limits(pages: I32) Void {
     // The implicit maximum is the Wasm memory32 limit of 65536 pages.
     sec.push(0)
     leb_u(false, pages)
 }
 
-fn encode_functions() void {
+fn encode_functions() Void {
     let count = func_order.len() - func_imported[0]
     if count == 0 { return }
     leb_u(false, count)
@@ -1394,7 +1394,7 @@ fn encode_functions() void {
     flush_section(3)
 }
 
-fn encode_memories() void {
+fn encode_memories() Void {
     let count = 0
     for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 { count += 1 } }
     if count == 0 { return }
@@ -1411,7 +1411,7 @@ fn encode_memories() void {
     flush_section(5)
 }
 
-fn encode_globals() void {
+fn encode_globals() Void {
     let count = glob_order.len() - glob_imported[0]
     if count == 0 { return }
     leb_u(false, count)
@@ -1430,14 +1430,14 @@ fn encode_globals() void {
 /// The function run when the module is instantiated, or -1.
 vec start_func: I32 = [-1]
 
-fn encode_start() void {
+fn encode_start() Void {
     if start_func[0] < 0 { return }
     leb_u(false, func_index[start_func[0]])
     flush_section(8)
 }
 
 /// Mark what a function made after the @sweep reaches.
-fn mark_late(f: I32) void {
+fn mark_late(f: I32) Void {
     // (It and what it uses were made after the sweep sized these.)
     let funcs = func_live.len()
     func_live.resize(func_kind.len())
@@ -1463,7 +1463,7 @@ fn mark_late(f: I32) void {
     }
 }
 
-fn encode_exports() void {
+fn encode_exports() Void {
     let count = 0
     for (0 ..< func_kind.len()) |f| { if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { count += 1 } }
     for (0 ..< glob_kind.len()) |g| { if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { count += 1 } }
@@ -1498,7 +1498,7 @@ fn encode_exports() void {
 vec declared: I32   // functions, deduplicated by func_declared
 vec func_declared: U8
 
-fn encode_elements() void {
+fn encode_elements() Void {
     if declared.len() == 0 { return }
     leb_u(false, 1)
     sec.push(3)
@@ -1508,7 +1508,7 @@ fn encode_elements() void {
     flush_section(9)
 }
 
-fn encode_data_count() void {
+fn encode_data_count() Void {
     if data_memory.len() == 0 { return }
     leb_u(false, data_memory.len())
     flush_section(12)
@@ -1516,7 +1516,7 @@ fn encode_data_count() void {
 
 /// The code section: each live function's locals and body, or a `@wat`
 /// function's code as the host assembled it.
-fn encode_code() void {
+fn encode_code() Void {
     let count = func_order.len() - func_imported[0]
     if count == 0 { return }
     leb_u(false, count)
@@ -1555,7 +1555,7 @@ fn encode_code() void {
 // The labels a function's branches target (labels are numbered per function).
 vec label_targeted: U8
 
-fn mark_targets(body: I32) void {
+fn mark_targets(body: I32) Void {
     label_targeted.clear()
     live_work.clear()
     live_work.push(body)
@@ -1570,7 +1570,7 @@ fn mark_targets(body: I32) void {
 }
 
 /// One more branch to `label` in @label_targeted, counted to 2: once, or more.
-fn mark_target(label: I32) void {
+fn mark_target(label: I32) Void {
     if label >= label_targeted.len() {
         let old = label_targeted.len()
         label_targeted.resize(label + 1)
@@ -1584,7 +1584,7 @@ fn targeted(label: I32) Bool => targets(label) > 0
 fn targets(label: I32) I32 => if label < label_targeted.len() { label_targeted[label] } else { 0 }
 
 /// Locals after the parameters, run-length encoded by type.
-fn encode_locals(f: I32) void {
+fn encode_locals(f: I32) Void {
     let first = func_locals[f]
     let n = func_local_count[f]
     let runs = 0
@@ -1600,7 +1600,7 @@ fn encode_locals(f: I32) void {
     }
 }
 
-fn encode_data() void {
+fn encode_data() Void {
     if data_memory.len() == 0 { return }
     leb_u(false, data_memory.len())
     for (0 ..< data_memory.len()) |d| {
@@ -1626,7 +1626,7 @@ fn encode_data() void {
 }
 
 /// The name section: function names, for stack traces.
-fn encode_names() void {
+fn encode_names() Void {
     let count = 0
     for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_debug_name[f] >= 0 { count += 1 } }
     if count == 0 { return }
@@ -1746,7 +1746,7 @@ vec map_func: I32 = [-1]
 
 /// Function `f`'s body is next: @w_near for its nodes, and an entry at its
 /// start (its locals), for what precedes its first instruction.
-fn map_function(f: I32) void {
+fn map_function(f: I32) Void {
     map_func[0] = f
     if w_near.len() < w_op.len() {
         let old = w_near.len()
@@ -1773,7 +1773,7 @@ fn map_function(f: I32) void {
 }
 
 /// An entry for node's instruction, next in @code_bytes, unless its syntax is the last entry's.
-fn map_note(node: I32) void {
+fn map_note(node: I32) Void {
     if map_func[0] < 0 { return }
     // A global's folded initializer is no body's node: its own syntax, or its function's.
     let near = if w_src[node] >= 0 { node } else if node < w_near.len() { w_near[node] } else { -1 }
@@ -1805,7 +1805,7 @@ fn depth_of(label: I32) I32 {
     fatal
 }
 
-fn block_type(vt: I32) void {
+fn block_type(vt: I32) Void {
     if vt == vt_none or vt == vt_unreachable { code_bytes.push(64); return }
     if vt >= vt_tuple {
         leb_s(true, type_index[func_type(vl_empty(), vt - vt_tuple)])
@@ -1838,7 +1838,7 @@ fn exits_only_loop(block: I32) Bool {
 
 /// Open a structured instruction (`block` 2, `loop` 3, `if` 4, `try` 6) of
 /// result `vt`, branched to as `label`; @close_block ends it.
-fn open_block(code: I32, vt: I32, label: I32) void {
+fn open_block(code: I32, vt: I32, label: I32) Void {
     op1(code)
     block_type(vt)
     if label >= 0 {
@@ -1855,7 +1855,7 @@ fn open_block(code: I32, vt: I32, label: I32) void {
     labels.push(label)
 }
 
-fn close_block() void {
+fn close_block() Void {
     let label = labels[labels.len() - 1]
     if label >= 0 { label_at[label] = label_outer[labels.len() - 1] }
     labels.resize(labels.len() - 1)
@@ -1863,14 +1863,14 @@ fn close_block() void {
     op1(11)
 }
 
-fn op1(b: I32) void => code_bytes.push(b)
+fn op1(b: I32) Void => code_bytes.push(b)
 
-fn op_fb(sub: I32) void {
+fn op_fb(sub: I32) Void {
     code_bytes.push(251)
     leb_u(true, sub)
 }
 
-fn emit_while_rec(block: I32, d: I32) void {
+fn emit_while_rec(block: I32, d: I32) Void {
     let lp = w_kid(block, 0)
     let leave = w_kid(w_kid(lp, 0), 0)
     open_block(3, vt_none, w_a[lp])
@@ -1890,7 +1890,7 @@ fn emit_while_rec(block: I32, d: I32) void {
     close_block()
 }
 
-fn emit_kids_rec(node: I32, d: I32) void {
+fn emit_kids_rec(node: I32, d: I32) Void {
     for (0 ..< w_count[node]) |i| { emit_at(w_kid(node, i), d) }
 }
 
@@ -1915,18 +1915,18 @@ fn never_ends(k: I32) Bool {
     w_type[k] == vt_unreachable and (op == Op.Unreachable.i32() or op == Op.Br.i32() or op == Op.Return.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32())
 }
 
-fn emit_body_rec(node: I32, d: I32) void {
+fn emit_body_rec(node: I32, d: I32) Void {
     for (0 ..< live_kids(node)) |i| { emit_at(w_kid(node, i), d) }
 }
 
 /// Recursion while shallow (calls are cheap), the explicit stack below a depth.
-fn emit_at(node: I32, d: I32) void => if d < 1000 { emit_rec(node, d + 1) } else { emit_deep(node) }
+fn emit_at(node: I32, d: I32) Void => if d < 1000 { emit_rec(node, d + 1) } else { emit_deep(node) }
 
-fn emit(node: I32, f: I32) void => emit_rec(node, 0)
+fn emit(node: I32, f: I32) Void => emit_rec(node, 0)
 
 /// Encode a node into @code_bytes. `f` is the function (only passed along:
 /// kept for the locals of a function a lowering may need).
-fn emit_rec(node: I32, d: I32) void {
+fn emit_rec(node: I32, d: I32) Void {
     let op = w_op[node]
     let a = w_a[node]
     let b = w_b[node]
@@ -2006,19 +2006,19 @@ fn emit_rec(node: I32, d: I32) void {
 /// deepen the call stack.
 vec emit_tasks: I32
 
-fn emit_task(task: I32, x: I32) void {
+fn emit_task(task: I32, x: I32) Void {
     emit_tasks.push(x)
     emit_tasks.push(task)
 }
 
-fn emit_open(code: I32, vt: I32, label: I32) void {
+fn emit_open(code: I32, vt: I32, label: I32) Void {
     emit_tasks.push(vt)
     emit_tasks.push(label)
     emit_task(3, code)
 }
 
 /// Push the node's kids, from `from`, so the first is encoded first.
-fn emit_kids_from(node: I32, from: I32) void {
+fn emit_kids_from(node: I32, from: I32) Void {
     let i = w_count[node]
     while (i > from) {
         i -= 1
@@ -2026,9 +2026,9 @@ fn emit_kids_from(node: I32, from: I32) void {
     }
 }
 
-fn emit_kids_deep(node: I32) void => emit_kids_from(node, 0)
+fn emit_kids_deep(node: I32) Void => emit_kids_from(node, 0)
 
-fn emit_body_deep(node: I32) void {
+fn emit_body_deep(node: I32) Void {
     let i = live_kids(node)
     while (i > 0) {
         i -= 1
@@ -2038,7 +2038,7 @@ fn emit_body_deep(node: I32) void {
 
 /// Encode a node into @code_bytes. `f` is the function (only passed along:
 /// kept for the locals of a function a lowering may need).
-fn emit_deep(node: I32) void {
+fn emit_deep(node: I32) Void {
     let base = emit_tasks.len()
     emit_task(0, node)
     while (emit_tasks.len() > base) {
@@ -2069,7 +2069,7 @@ fn emit_deep(node: I32) void {
 }
 
 /// Plan a node's encoding: tasks pushed last first.
-fn emit_step(node: I32) void {
+fn emit_step(node: I32) Void {
     let op = w_op[node]
     let a = w_a[node]
     if op == Op.Seq.i32() { emit_body_deep(node); return }
@@ -2161,7 +2161,7 @@ fn emit_step(node: I32) void {
     emit_kids_deep(node)
 }
 
-fn emit_while_deep(block: I32) void {
+fn emit_while_deep(block: I32) Void {
     let lp = w_kid(block, 0)
     let leave = w_kid(w_kid(lp, 0), 0)
     emit_task(4, 0)
@@ -2181,7 +2181,7 @@ fn emit_while_deep(block: I32) void {
     emit_open(3, vt_none, w_a[lp])
 }
 
-fn emit_own(node: I32) void {
+fn emit_own(node: I32) Void {
     if source_map[0] == 1 { map_note(node) }
     let op = w_op[node]
     let a = w_a[node]
@@ -2286,7 +2286,7 @@ fn emit_own(node: I32) void {
 ///   end  arm k
 /// end
 /// ```
-fn emit_casts(node: I32) void {
+fn emit_casts(node: I32) Void {
     let k = w_b[node]
     let from = w_aux[w_a[node] + k]
     for (0 ..< k) |i| {
@@ -2303,7 +2303,7 @@ fn emit_casts(node: I32) void {
 
 /// A load or store (opcode `code`) of memory m, and its memarg: the
 /// alignment (with bit 6 set when a memory index follows), the memory, offset 0.
-fn memory_access(m: I32, code: I32) void {
+fn memory_access(m: I32, code: I32) Void {
     op1(code)
     let align = natural_align(code)
     let mi = memory_index[m]

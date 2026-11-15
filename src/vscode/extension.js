@@ -689,7 +689,7 @@ function registerCommand(context, output, name, handler) {
 function wutuStarter(name) {
   return `using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     Browser.document.body.append(@wutu/\\
     main {
         font-family: system-ui;

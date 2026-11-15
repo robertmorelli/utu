@@ -22,15 +22,15 @@ mem mapping: U8    // complement of each byte
 
 // ---- input: the fasta output setup(n) generates
 
-fn out_str(s: Str) void {
+fn out_str(s: Str) Void {
     for (0..<s.len()) |i| { input.push(s[i]) }
 }
 
-fn out_buf(len: I32) void {
+fn out_buf(len: I32) Void {
     for (0..<len) |i| { input.push(buf[i]) }
 }
 
-fn out_rep(len: I32) void {
+fn out_rep(len: I32) Void {
     for (0..<len) |i| { input.push(rep[i]) }
 }
 
@@ -59,7 +59,7 @@ fn alu() Str {
 }
 
 // seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
-fn repeat_fasta(seq: Str, n: I32) void {
+fn repeat_fasta(seq: Str, n: I32) Void {
     let len = seq.len()
     let line = linelen + 1
     rep.resize(line * len)
@@ -77,7 +77,7 @@ fn repeat_fasta(seq: Str, n: I32) void {
 }
 
 // hash[i] = the symbol whose cumulative probability first exceeds i / im.
-fn build_hash(symb: Str, p: Array[F32]) void {
+fn build_hash(symb: Str, p: Array[F32]) Void {
     hash.resize(im)
     let len = symb.len()
     let sum = p[0]
@@ -94,7 +94,7 @@ fn build_hash(symb: Str, p: Array[F32]) void {
     }
 }
 
-fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+fn random_fasta(symb: Str, p: Array[F32], n: I32) Void {
     build_hash(symb, p)
     let line = linelen + 1
     buf.resize(line * buflines)
@@ -132,7 +132,7 @@ fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
     if n % linelen != 0 { out_str("\n") }
 }
 
-fn fasta(n: I32) void {
+fn fasta(n: I32) Void {
     st.seed = 42
     let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
     let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008]
@@ -164,7 +164,7 @@ let read_size: I32 = 65536
 let line_len: I32 = 60     // a line, without its newline
 let block_rows: I32 = 4096 // rows done in one left/right pair
 
-fn init_mapping() void {
+fn init_mapping() Void {
     mapping.resize(256)
     for (0..<256) |i| { mapping[i] = i }
     let from = "ABCDGHKMNRSTUVWYabcdghkmnrstuvwy"
@@ -173,7 +173,7 @@ fn init_mapping() void {
 }
 
 // sbuf[left + i] and sbuf[right + len - 1 - i] swap, complemented.
-fn reverse_chunks(left: I32, right: I32, len: I32) void {
+fn reverse_chunks(left: I32, right: I32, len: I32) Void {
     let pl = left
     let pr = right + len
     for (0..<len) {
@@ -188,7 +188,7 @@ fn reverse_chunks(left: I32, right: I32, len: I32) void {
 
 // The left part (ls, ll) and the right part (rs, rl) of a sequence's content;
 // trailing_len is the length of the last line (newline included).
-fn reverse_complement_left_right(ls0: I32, ll0: I32, rs: I32, rl0: I32, trailing_len: I32) void {
+fn reverse_complement_left_right(ls0: I32, ll0: I32, rs: I32, rl0: I32, trailing_len: I32) Void {
     let ls = ls0
     let ll = ll0
     let rl = rl0
@@ -221,7 +221,7 @@ fn reverse_complement_left_right(ls0: I32, ll0: I32, rs: I32, rl0: I32, trailing
 }
 
 // The sequence sbuf[0 ..< len], header first.
-fn reverse_complement(len: I32) void {
+fn reverse_complement(len: I32) Void {
     let content = 0
     while (sbuf[content] != 10) { content += 1 }
     content += 1
@@ -296,7 +296,7 @@ fn revcomp() I32 {
     h
 }
 
-fn setup_input(n: I32) void {
+fn setup_input(n: I32) Void {
     input.clear()
     fasta(n)
 }
@@ -307,6 +307,6 @@ test "revcomp of fasta 1000 is BG's output" {
 }
 
 export lib {
-    fn setup(n: I32) void { setup_input(n) }
+    fn setup(n: I32) Void { setup_input(n) }
     fn bench(n: I32) I32 { revcomp() }
 }

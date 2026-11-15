@@ -1,5 +1,5 @@
 // v = A·u
-fn times(v: Array[F64], u: Array[F64]) void {
+fn times(v: Array[F64], u: Array[F64]) Void {
     let n = u.len()
     for (0..<v.len()) |i| {
         let sum0: F64 = 0.0
@@ -19,7 +19,7 @@ fn times(v: Array[F64], u: Array[F64]) void {
 }
 
 // v = Aᵀ·u
-fn times_transp(v: Array[F64], u: Array[F64]) void {
+fn times_transp(v: Array[F64], u: Array[F64]) Void {
     let n = u.len()
     for (0..<v.len()) |i| {
         let sum0: F64 = 0.0
@@ -39,7 +39,7 @@ fn times_transp(v: Array[F64], u: Array[F64]) void {
 }
 
 // v = AᵀA·u, through x
-fn a_times_transp(v: Array[F64], u: Array[F64], x: Array[F64]) void {
+fn a_times_transp(v: Array[F64], u: Array[F64], x: Array[F64]) Void {
     times(x, u)
     times_transp(v, x)
 }

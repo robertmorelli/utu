@@ -13,10 +13,10 @@ fn workspace(state: TempoState) Browser.HTMLElement {
     @island "tempo-workspace";
     section.workspace {
         = {
-            wutu.on_cleanup(cl() void {
+            wutu.on_cleanup(cl() Void {
                 state.running=false;
             });
-            wutu.interval("tempo-tick",1000.0,cl() void {
+            wutu.interval("tempo-tick",1000.0,cl() Void {
                 if state.running and state.remaining>0 {
                     state.remaining-=1;
                 };if state.remaining==0 {
@@ -106,7 +106,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
     }
     \/
 }
-export main() void {
+export main() Void {
     let state = @stored/\
         TempoState "tempo-v2" manual validate valid_tempo
         TempoState {

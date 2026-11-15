@@ -1,2 +1,2 @@
-fn g() yield I32 { let f = cl() void { yield 1; }; }
+gn g() I32 { let f = cl() Void { yield 1; }; }
 export main() I32 { for (g()) |x| { x; }; 1; }

@@ -100,13 +100,13 @@ mod ui {
 
     // ── sampling and alerts ──────────────────────────────────────────────────
 
-    fn add_alert(ui: Ui, text: Str, kind: Str, entity: I32) void {
+    fn add_alert(ui: Ui, text: Str, kind: Str, entity: I32) Void {
         let kept = ui.alerts filter |a| { not (a.text == text and a.entity == entity); } take(7) collect(Alert);
         ui.alerts = [Alert { text: text, kind: kind, entity: entity }] chain(kept) collect(Alert);
     }
 
     // Take the 1-second (and every tenth, the 10-second) production and power samples.
-    fn sample(ui: Ui) void {
+    fn sample(ui: Ui) Void {
         let w = ui.w;
         while (ui.samples < w.tick / 60) {
             let slot = ui.samples % 60;
@@ -128,7 +128,7 @@ mod ui {
         };
     }
 
-    fn check_alerts(ui: Ui) void {
+    fn check_alerts(ui: Ui) Void {
         let w = ui.w;
         if w.satisfaction < 500 {
             add_alert(ui, "No power: " + (w.satisfaction / 10).str() + "% satisfaction", "bad", -1);
@@ -423,7 +423,7 @@ mod ui {
         ui.pinned any |p| { p == id; };
     }
 
-    fn toggle_pin(ui: Ui, id: I32) void {
+    fn toggle_pin(ui: Ui, id: I32) Void {
         if is_pinned(ui, id) {
             ui.pinned = ui.pinned filter |p| { p != id; } collect(I32);
         } else {
@@ -1665,7 +1665,7 @@ mod ui {
         \/;
     }
 
-    fn load_world(ui: Ui, text: Str) void {
+    fn load_world(ui: Ui, text: Str) Void {
         promote sim.load(ui.game_text, text) {
             |w| => {
                 ui.w = w;

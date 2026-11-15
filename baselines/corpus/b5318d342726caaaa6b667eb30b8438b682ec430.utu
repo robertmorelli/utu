@@ -120,7 +120,7 @@ fn Planner.new(variable_capacity: I32, constraint_capacity: I32) Planner {
     };
 }
 
-fn ConstraintList.append |self| (constraint: Constraint) void {
+fn ConstraintList.append |self| (constraint: Constraint) Void {
     assert self.count < self.items.len();
     self.items[self.count] = constraint;
     self.count += 1;
@@ -143,7 +143,7 @@ fn ConstraintList.copy |self| (capacity: I32) ConstraintList {
     out;
 }
 
-fn VariableList.append |self| (value: Variable) void {
+fn VariableList.append |self| (value: Variable) Void {
     assert self.count < self.items.len();
     self.items[self.count] = value;
     self.count += 1;
@@ -158,12 +158,12 @@ fn VariableList.pop_front |self| () Variable {
     value;
 }
 
-fn Variable.add_constraint |self| (constraint: Constraint) void {
+fn Variable.add_constraint |self| (constraint: Constraint) Void {
     let constraints: ConstraintList = self.constraints;
     constraints.append(constraint);
 }
 
-fn Variable.remove_constraint |self| (constraint: Constraint) void {
+fn Variable.remove_constraint |self| (constraint: Constraint) Void {
     let found: I32 = -1;
     for (0..<self.constraints.count) |search_index| {
         if found == -1 {
@@ -189,7 +189,7 @@ fn Constraint.same |self| (other: Constraint) Bool {
     @ir/\ <ir-ref-eq><ir-ident name="self"/><ir-ident name="other"/></ir-ref-eq> \/;
 }
 
-fn noop() void {
+fn noop() Void {
 }
 
 fn Constraint.strength |self| () I32 {
@@ -254,7 +254,7 @@ fn Constraint.output |self| () Variable {
     };
 }
 
-fn Constraint.execute |self| () void {
+fn Constraint.execute |self| () Void {
     alt self {
         EmptyConstraint => fatal,
         StayConstraint => noop(),
@@ -273,7 +273,7 @@ fn Constraint.execute |self| () void {
     };
 }
 
-fn Constraint.mark_unsatisfied |self| () void {
+fn Constraint.mark_unsatisfied |self| () Void {
     alt self {
         EmptyConstraint => noop(),
         StayConstraint |stay| => {
@@ -292,7 +292,7 @@ fn Constraint.mark_unsatisfied |self| () void {
     };
 }
 
-fn Constraint.add_to_graph |self| () void {
+fn Constraint.add_to_graph |self| () Void {
     alt self {
         EmptyConstraint => fatal,
         StayConstraint |stay| => {
@@ -319,7 +319,7 @@ fn Constraint.add_to_graph |self| () void {
     };
 }
 
-fn Constraint.remove_from_graph |self| () void {
+fn Constraint.remove_from_graph |self| () Void {
     alt self {
         EmptyConstraint => noop(),
         StayConstraint |stay| => {
@@ -346,7 +346,7 @@ fn Constraint.remove_from_graph |self| () void {
     };
 }
 
-fn Constraint.mark_inputs |self| (mark: I32) void {
+fn Constraint.mark_inputs |self| (mark: I32) Void {
     alt self {
         EmptyConstraint => fatal,
         StayConstraint => noop(),
@@ -363,7 +363,7 @@ fn Constraint.mark_inputs |self| (mark: I32) void {
     };
 }
 
-fn Constraint.choose_method |self| (mark: I32) void {
+fn Constraint.choose_method |self| (mark: I32) Void {
     alt self {
         EmptyConstraint => fatal,
         StayConstraint |stay| => {
@@ -503,7 +503,7 @@ fn Constraint.inputs_known |self| (mark: I32) Bool {
     };
 }
 
-fn Constraint.recalculate |self| () void {
+fn Constraint.recalculate |self| () Void {
     alt self {
         EmptyConstraint => fatal,
         StayConstraint |stay| => {
@@ -553,7 +553,7 @@ fn Planner.new_mark |self| () I32 {
     self.current_mark;
 }
 
-fn Variable.add_constraints_consuming_to |self| (coll: ConstraintList) void {
+fn Variable.add_constraints_consuming_to |self| (coll: ConstraintList) Void {
     let determining: Constraint = self.determined_by;
     for (0..<self.constraints.count) |i| {
         let constraint: Constraint = self.constraints.items[i];
@@ -618,7 +618,7 @@ fn Planner.remove_propagate_from |self| (out: Variable) ConstraintList {
     unsatisfied;
 }
 
-fn Planner.incremental_add |self| (constraint: Constraint) void {
+fn Planner.incremental_add |self| (constraint: Constraint) Void {
     let mark: I32 = self.new_mark();
     let overridden: Constraint = constraint.satisfy(self, mark);
 
@@ -627,7 +627,7 @@ fn Planner.incremental_add |self| (constraint: Constraint) void {
     };
 }
 
-fn Planner.incremental_remove |self| (constraint: Constraint) void {
+fn Planner.incremental_remove |self| (constraint: Constraint) Void {
     let out: Variable = constraint.output();
     constraint.mark_unsatisfied();
     constraint.remove_from_graph();
@@ -681,7 +681,7 @@ fn Planner.extract_plan_from_constraints |self| (constraints: ConstraintList) Co
     self.make_plan(sources);
 }
 
-fn Constraint.add_constraint |self| (planner: Planner) void {
+fn Constraint.add_constraint |self| (planner: Planner) Void {
     self.add_to_graph();
     planner.incremental_add(self);
 }
@@ -709,7 +709,7 @@ fn Constraint.satisfy |self| (planner: Planner, mark: I32) Constraint {
     result;
 }
 
-fn Constraint.destroy |self| (planner: Planner) void {
+fn Constraint.destroy |self| (planner: Planner) Void {
     if self.is_satisfied() {
         planner.incremental_remove(self);
     } else {
@@ -717,7 +717,7 @@ fn Constraint.destroy |self| (planner: Planner) void {
     };
 }
 
-fn plan_execute(plan: ConstraintList) void {
+fn plan_execute(plan: ConstraintList) Void {
     for (0..<plan.count) |i| {
         let constraint: Constraint = plan.items[i];
         constraint.execute();
@@ -768,7 +768,7 @@ fn new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest: 
     constraint;
 }
 
-fn change(planner: Planner, variable: Variable, new_value: I32) void {
+fn change(planner: Planner, variable: Variable, new_value: I32) Void {
     let edit: Constraint = new_edit_constraint(variable, preferred, planner);
     let edits: ConstraintList = ConstraintList.new(1);
     edits.append(edit);

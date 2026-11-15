@@ -2,7 +2,7 @@
 // Expect: an element has one id
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let app = @wutu/\
     @reactive;
     main { div#a { id = "b"; } }

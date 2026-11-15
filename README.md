@@ -30,7 +30,7 @@ npm package with types imports directly:
 using Browser from std:Browser
 using Nano from "npm:nanoid"
 
-export main() void {
+export main() Void {
     let item = Browser.document.createElement("li")
     item.textContent = Nano.nanoid(8)
     Browser.document.body.append(item)

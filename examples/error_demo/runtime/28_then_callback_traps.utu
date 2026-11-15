@@ -5,7 +5,7 @@ using console from std:Console;
 let delay: fun(I32, I32) Promise[I32] =
     @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/;
 
-export main() void {
+export main() Void {
     delay(0, 5).then(cl(v) { console.log(`${10 / v}`); });
     console.log("scheduled");
 }

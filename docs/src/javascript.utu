@@ -5,12 +5,12 @@ mod javascript {
     fn dom_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let document = Browser.document
         \\    let input = document.createElement("input")   // an HTMLInputElement
         \\    input.placeholder = "Write something"
         \\    let echo = document.createElement("p")
-        \\    input.addEventListener("input", cl(event) void {
+        \\    input.addEventListener("input", cl(event) Void {
         \\        echo.textContent = input.value.toUpperCase()
         \\    })
         \\    document.body.append(input, echo)
@@ -20,7 +20,7 @@ mod javascript {
         \\using JS from std:JS
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let epoch = new JS.Date(0.0)
         \\    console.log(epoch.toISOString())                     // 1970-01-01T00:00:00.000Z
         \\    console.log(`${JS.Math.max(1.0, 5.0)} ${JS.Math.floor(2.7)}`)   // 5 2
@@ -38,7 +38,7 @@ mod javascript {
         \\using JS from std:JS
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let text = JS.JSON.stringify(&{ name: "utu", tags: ["wasm", "gc"] })
         \\    console.log(text)                    // {"name":"utu","tags":["wasm","gc"]}
         \\    let parsed = JS.JSON.parse(text)     // any: read in the context that needs it
@@ -49,7 +49,7 @@ mod javascript {
     fn records_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let doc = Browser.document
         \\    // &{ ... } and [ ... ] become real JS objects and arrays in a declared slot
         \\    let blob = new Browser.Blob(["hello, ", "file"], &{ type: "text/plain" })
@@ -57,7 +57,7 @@ mod javascript {
         \\    link.href = Browser.URL.createObjectURL(blob)
         \\    link.download = "hello.txt"
         \\    link.textContent = "Download"
-        \\    link.addEventListener("click", cl(e) void {
+        \\    link.addEventListener("click", cl(e) Void {
         \\        link.textContent = "Downloaded"
         \\    }, &{ once: true })
         \\    doc.body.append(link)
@@ -67,13 +67,13 @@ mod javascript {
     fn callbacks_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let doc = Browser.document
         \\    // parameter types come from the declaration the closure reaches
-        \\    doc.querySelectorAll("p.old").forEach(cl(el) void { el.remove() })
+        \\    doc.querySelectorAll("p.old").forEach(cl(el) Void { el.remove() })
         \\    let tags = Browser.Array.of("wasm", "gc", "dom")
         \\    let loud = tags.map(cl(s) Str { s.toUpperCase() })
-        \\    Browser.setTimeout(cl() void {
+        \\    Browser.setTimeout(cl() Void {
         \\        doc.title = loud.join(" ")
         \\    }, 100)
         \\}
@@ -81,10 +81,10 @@ mod javascript {
     fn narrowing_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let doc = Browser.document
         \\    // alt over a host value tests each arm with instanceof
-        \\    doc.addEventListener("input", cl(e) void {
+        \\    doc.addEventListener("input", cl(e) Void {
         \\        let text = alt e.target {
         \\            Browser.HTMLInputElement |t| => t.value,
         \\            Browser.HTMLTextAreaElement |t| => t.value,
@@ -132,8 +132,8 @@ mod javascript {
         \\using Web from std:Web
         \\using console from std:Console
         \\
-        \\export main() void {
-        \\    Web.setTimeout(cl() void { console.log("later") }, 10)
+        \\export main() Void {
+        \\    Web.setTimeout(cl() Void { console.log("later") }, 10)
         \\    console.log(`${Web.crypto.randomUUID().len()}`)   // 36
         \\    let url = new Web.URL("https://example.com/a?page=2")
         \\    console.log(url.hostname + " " + (url.searchParams.get("page") orelse "1"))
@@ -146,7 +146,7 @@ mod javascript {
         \\using Fs from "node:fs"
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let id = Nano.nanoid(8)
         \\    let file = Path.join("out", id, "report.txt")
         \\    console.log(`${Path.extname(file)} ${id.len()}`)   // .txt 8

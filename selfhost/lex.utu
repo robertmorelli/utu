@@ -156,7 +156,7 @@ struct Machine:
     | next: I32
     | word: I32
 
-fn set(m: Machine, from: I32, c: I32, to: I32) void {
+fn set(m: Machine, from: I32, c: I32, to: I32) Void {
     m.tabs[from * 256 + c] = to
 }
 
@@ -164,11 +164,11 @@ fn get(m: Machine, from: I32, c: I32) I32 {
     m.tabs[from * 256 + c]
 }
 
-fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) void {
+fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) Void {
     for (lo ... hi) |c| { set(m, from, c, to) }
 }
 
-fn both(m: Machine, c: I32, to: I32) void {
+fn both(m: Machine, c: I32, to: I32) Void {
     set(m, start_before, c, to)
     set(m, start_after, c, to)
 }
@@ -203,11 +203,11 @@ fn backs_off(m: Machine, kind: Tok, after: I32, by: I32) I32 {
     state
 }
 
-fn single(m: Machine, c: I32, kind: Tok, after: I32) void {
+fn single(m: Machine, c: I32, kind: Tok, after: I32) Void {
     both(m, c, ends(m, kind, after))
 }
 
-fn whitespace(m: Machine) void {
+fn whitespace(m: Machine) Void {
     // JavaScript's `\s`, which is what the grammar skips: ASCII tab through
     // carriage return and space, and the UTF-8 encodings of no-break space,
     // ogham space mark, the en quad through hair space, the line and
@@ -247,7 +247,7 @@ fn whitespace(m: Machine) void {
 }
 
 /// A token running to the end of its line (`\n`, `\r\n` or a lone `\r`): `// …` and `\\ …`.
-fn to_line_end(m: Machine, state: I32) void {
+fn to_line_end(m: Machine, state: I32) Void {
     for (0 ..< 256) |c| { set(m, state, c, state) }
     set(m, state, 10, accept_code)
     set(m, state, 13, accept_code)
@@ -255,7 +255,7 @@ fn to_line_end(m: Machine, state: I32) void {
 }
 
 /// `"…"` with backslash escapes; a newline or the end of the source inside is an error.
-fn strings(m: Machine) void {
+fn strings(m: Machine) Void {
     let body = inside(m)
     let escape = inside(m)
     let close = ends(m, Tok.String, start_after)
@@ -272,7 +272,7 @@ fn strings(m: Machine) void {
 
 /// Numbers, as the grammar's regular expressions take them: a float
 /// (`1.5`, `2.0e-3`) where one fits, else `0x1f`, `0b101`, or `15`.
-fn numbers(m: Machine) void {
+fn numbers(m: Machine) Void {
     let int = ends(m, Tok.Int, start_after)
     let zero = ends(m, Tok.Int, start_after)
     let dot = backs_off(m, Tok.Int, start_after, 1)
@@ -320,7 +320,7 @@ fn word_state(m: Machine, after: I32) I32 {
     state
 }
 
-fn words(m: Machine) void {
+fn words(m: Machine) Void {
     m.word = word_state(m, start_after)
     for (0 ..< 256) |c| { if is_word_char(c) { set(m, m.word, c, m.word) } }
     for (0 ..< 256) |c| {
@@ -351,7 +351,7 @@ fn words(m: Machine) void {
 }
 
 /// The path of `word` through the word states from `root`, ending in a state whose token is followed by start state `after`.
-fn keyword_path(m: Machine, root: I32, word: Str, after: I32) void {
+fn keyword_path(m: Machine, root: I32, word: Str, after: I32) Void {
     let current = root
     for (0 ..< word.len()) |k| {
         let c = word.get(k)
@@ -378,7 +378,7 @@ fn compound(m: Machine, c: I32, plain: Tok, assign: Tok) I32 {
     first
 }
 
-fn punctuation(m: Machine) void {
+fn punctuation(m: Machine) Void {
     single(m, 40, Tok.LParen, start_before)
     single(m, 41, Tok.RParen, start_after)
     single(m, 123, Tok.LBrace, start_before)
@@ -526,7 +526,7 @@ fn tokens_end(t: I32) I32 {
 }
 
 /// The token mems resized to `n`.
-fn tokens_room(n: I32) void {
+fn tokens_room(n: I32) Void {
     tok_kind.resize(n)
     tok_start.resize(n)
     tok_end.resize(n)

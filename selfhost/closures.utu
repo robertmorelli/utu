@@ -38,7 +38,7 @@ vec closure_parts: I32
 /// cast of its environment into a local at entry, and that local.
 vec closure_bodies: I32
 
-fn reset_closures() void {
+fn reset_closures() Void {
     decl_boxed.resize(decl_kind.len())
     cap_seen.resize(decl_kind.len())
     for (0 ..< decl_kind.len()) |d| { decl_boxed[d] = 0; cap_seen[d] = 0 }
@@ -86,7 +86,7 @@ fn captures_of(closure: I32) I32 {
 }
 
 /// Set @cap_inside (to 1 when `v`) for `node` and every node under it.
-fn mark_inside(node: I32, v: Bool) void {
+fn mark_inside(node: I32, v: Bool) Void {
     cap_inside[node] = if v { 1 } else { 0 }
     let c = first_child(node)
     while (c >= 0) {
@@ -97,7 +97,7 @@ fn mark_inside(node: I32, v: Bool) void {
 
 /// Add the captures under `node` to the list being built: a
 /// declaration outside the closure (its node not in @cap_inside).
-fn collect_captures(node: I32) void {
+fn collect_captures(node: I32) Void {
     if is_kind(node, Node.Identifier) {
         let d = node_decl[node]
         if d >= 0 and is_local_decl(d) and not (decl_node[d] >= 0 and cap_inside[decl_node[d]] == 1) and decl_es[d] < 0 and cap_seen[d] == 0 {
@@ -118,7 +118,7 @@ fn collect_captures(node: I32) void {
 /// stage 0's box-captures): in another closure, after the capture, or in a
 /// loop around the closure. A variable assigned only before it is captured
 /// is copied into the closure, as any other.
-fn mark_boxes(body: I32) void {
+fn mark_boxes(body: I32) Void {
     // A closure's body, marked already by the body around it: its search
     // covered this one's.
     if boxes_marked[body] == 1 { return }
@@ -154,7 +154,7 @@ fn mark_closures_below(node: I32) Bool {
 
 /// Mark in @decl_boxed the variables of function body `body` that closures
 /// under `node` capture and that must be boxes.
-fn find_closures(node: I32, body: I32) void {
+fn find_closures(node: I32, body: I32) Void {
     if not has_closure(node) { return }
     // `let f = cl(…) { … f(…) … };`: the closure captures f before f has a
     // value, so f is a box, filled once the closure exists.
@@ -270,7 +270,7 @@ fn box_type(vt: I32) I32 {
 
 /// Store the value on the stack (since `m`) as declaration `d`'s: in its
 /// local, or in a new box its local holds.
-fn bind_value(d: I32, t: I32, m: I32) void {
+fn bind_value(d: I32, t: I32, m: I32) Void {
     let vt = repr(t)
     if vt >= vt_tuple {
         // A tuple: a local each, in a row from decl_local.
@@ -296,7 +296,7 @@ fn bind_value(d: I32, t: I32, m: I32) void {
 
 /// Bind `d` (of type `t`) to the value in `local`: d is that local, or,
 /// when boxed, a new box filled from it.
-fn bind_local(d: I32, t: I32, local: I32) void {
+fn bind_local(d: I32, t: I32, local: I32) Void {
     decl_ty[d] = t
     if decl_boxed[d] == 0 {
         decl_local[d] = local
@@ -311,7 +311,7 @@ fn bind_local(d: I32, t: I32, local: I32) void {
 
 /// The tuple on the stack (since `m`, of value types `list`) into the locals
 /// from `first` on (the last on top).
-fn set_tuple(first: I32, list: I32, m: I32) void {
+fn set_tuple(first: I32, list: I32, m: I32) Void {
     let k = vl_len[list] - 1
     while (k >= 0) {
         w_leaf(Op.LocalSet, vt_none, first + k, 0)
@@ -321,7 +321,7 @@ fn set_tuple(first: I32, list: I32, m: I32) void {
 }
 
 /// Push the value of declaration `d` (of type `t`).
-fn read_value(d: I32, t: I32) void {
+fn read_value(d: I32, t: I32) Void {
     let vt = repr(t)
     // A name bound to a value that never arrives (`let z = fatal;`).
     if vt == vt_unreachable {
@@ -345,13 +345,13 @@ fn read_value(d: I32, t: I32) void {
 
 /// A write to `d` begins: a box is pushed first, its value to follow (see
 /// @write_end).
-fn write_begin(d: I32, t: I32) void {
+fn write_begin(d: I32, t: I32) Void {
     if decl_boxed[d] == 1 and repr(t) < vt_tuple { w_leaf(Op.LocalGet, vt_ref(box_type(repr(t)), true), decl_local[d], 0) }
 }
 
 /// A write to `d` ends: the value on the stack since `m` goes into its box
 /// (pushed by @write_begin) or its local.
-fn write_end(d: I32, t: I32, m: I32) void {
+fn write_end(d: I32, t: I32, m: I32) Void {
     if repr(t) >= vt_tuple {
         set_tuple(decl_local[d], repr(t) - vt_tuple, m)
     } else if decl_boxed[d] == 1 {
@@ -392,7 +392,7 @@ vec saved_loops: I32
 
 /// Set the enclosing function's checking state aside (its locals, labels,
 /// loops, and defers), to check a closure's body as a function of its own.
-fn save_function() void {
+fn save_function() Void {
     saved_marks.push(function_flags[0])
     saved_marks.push(function_guards[0])
     saved_marks.push(function_running[0])
@@ -425,7 +425,7 @@ fn hide_loops() I32 {
 }
 
 /// Bring back the loops @hide_loops set aside at `at`.
-fn show_loops(at: I32) void {
+fn show_loops(at: I32) Void {
     clear_loops()
     let i = at
     while (i < saved_loops.len()) {
@@ -441,7 +441,7 @@ fn show_loops(at: I32) void {
 }
 
 /// Bring back what @save_function set aside.
-fn restore_function() void {
+fn restore_function() Void {
     let n = saved_marks.len()
     let loops_at = saved_marks[n - 1]
     let label = saved_marks[n - 2]
@@ -606,7 +606,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     }
     else if result < 0 { result = if ty_is(actual, Ty.Never) { ty_void() } else { actual } }
     else if ty_is(result, Ty.Void) {
-        // A closure that says nothing of its result, where `cl(…) void` is
+        // A closure that says nothing of its result, where `cl(…) Void` is
         // expected, ends without a value (with `void` written, a value is dropped).
         if ret_node < 0 and not ty_is(actual, Ty.Void) and not ty_is(actual, Ty.Never) and not ty_is(actual, Ty.Error) {
             let before = diag_kind.len()
@@ -839,7 +839,7 @@ fn closure_invoker(t: I32) I32 {
 
 /// In @closure_invoker: when the body is of function type `sig`, return its
 /// call (given the environment when `env`).
-fn invoker_arm(sig: I32, params: I32, rvt: I32, env: Bool) void {
+fn invoker_arm(sig: I32, params: I32, rvt: I32, env: Bool) Void {
     let np = vl_len[params]
     let r = np + 1
     let fl = np + 2
@@ -867,14 +867,14 @@ fn invoker_arm(sig: I32, params: I32, rvt: I32, env: Bool) void {
 
 /// A `fun` (on the stack since `m`) where a `cl` of the same signature is
 /// expected: a closure of it with no environment.
-fn decay_fun(fun_t: I32, m: I32) void {
+fn decay_fun(fun_t: I32, m: I32) Void {
     w_leaf(Op.RefNull, vt_anyref, vt_anyref, 0)
     w_i32(closure_bits(ty_a[fun_t], ty_b[fun_t]))
     w_node(Op.Call, vt_externref, closure_new(), 0, m)
 }
 
 /// The closure imports the module has, for the host section.
-fn write_closure_json() void {
+fn write_closure_json() Void {
     let any = closure_new_func[0] >= 0 and func_live[closure_new_func[0]] == 1
     let calls = false
     let i = 1
@@ -928,7 +928,7 @@ vec decl_awaits: U8
 vec param_to_host: U8
 
 /// Report a closure `arg` that awaits, given to the host.
-fn host_callback(arg: I32) void {
+fn host_callback(arg: I32) Void {
     let c = closure_node(arg)
     if c < 0 {
         let d = named_fn(arg)
@@ -958,7 +958,7 @@ fn named_fn(written: I32) I32 {
 /// The arguments of a call of function `decl` (-1: a host function's), from
 /// its parameter `first`: each closure or named function the host is given,
 /// reported when it awaits.
-fn host_callbacks(decl: I32, args: I32, first: I32) void {
+fn host_callbacks(decl: I32, args: I32, first: I32) Void {
     if args < 0 { return }
     // (The parameters, made at the first closure: most calls pass none.)
     let decls = -1
@@ -1054,7 +1054,7 @@ fn fn_awaits(decl: I32) Bool {
 /// module that calls no closure. Not when closures may recurse (see
 /// @closures_recur). Before the sweep, so the invokers and @closure_new's
 /// helper are left out.
-fn lean_closures() void {
+fn lean_closures() Void {
     // (With no call of a closure in utu, nothing reads the records, at any level.)
     if (optimize_level[0] != 1 or await_types.len() > 0) and closure_invokers.len() > 0 { return }
     // (By function, once: a scan of the invokers at every call is slow.)
@@ -1204,7 +1204,7 @@ fn recur_reaches(from: I32, to: I32) Bool {
 /// @closures_recur's calls of function `f`: what it calls by name, and the
 /// body a call of a closure in a local runs, when every write of the local
 /// makes a closure of that body (else the call is one it cannot name).
-fn recur_calls(f: I32, helper_: I32) void {
+fn recur_calls(f: I32, helper_: I32) Void {
     let np = vl_len[ht_a[func_type_of[f]]]
     let nl = np + func_local_count[f]
     recur_local.resize(nl)
@@ -1214,7 +1214,7 @@ fn recur_calls(f: I32, helper_: I32) void {
 }
 
 /// Under `node`: notes in `recur_local` what each write of a local makes.
-fn recur_writes(node: I32, helper_: I32) void {
+fn recur_writes(node: I32, helper_: I32) Void {
     let op = w_op[node]
     if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         let l = w_a[node]
@@ -1230,7 +1230,7 @@ fn recur_writes(node: I32, helper_: I32) void {
 }
 
 /// Under `node` (in function `f`): its calls, as @recur_calls says.
-fn recur_edges(f: I32, node: I32) void {
+fn recur_edges(f: I32, node: I32) Void {
     let op = w_op[node]
     if op == Op.Call.i32() or op == Op.ReturnCall.i32() {
         let g = w_a[node]
@@ -1258,7 +1258,7 @@ fn is_invoker(f: I32) Bool => f < lean_invoker.len() and lean_invoker[f] == 1
 
 /// Under `node`: calls of an invoker go to its closure_call import, and of
 /// @closure_new's helper to `plain`.
-fn retarget(node: I32, helper_: I32, plain: I32) void {
+fn retarget(node: I32, helper_: I32, plain: I32) Void {
     if w_op[node] == Op.Call.i32() {
         let f = w_a[node]
         if f == helper_ { w_a[node] = plain }
@@ -1268,7 +1268,7 @@ fn retarget(node: I32, helper_: I32, plain: I32) void {
 }
 
 /// Under `node`: reads of local `l` read local 0.
-fn read_param(node: I32, l: I32) void {
+fn read_param(node: I32, l: I32) Void {
     if w_op[node] == Op.LocalGet.i32() and w_a[node] == l { w_a[node] = 0 }
     for (0 ..< w_count[node]) |i| { read_param(w_kid(node, i), l) }
 }

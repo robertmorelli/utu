@@ -2,13 +2,13 @@
 // Expect: defer must be a statement in a block: 1 => { defer ...; }
 using console from std:Console;
 
-fn open(mode: I32) void {
+fn open(mode: I32) Void {
     match mode {
         1 => defer console.log("closed"),
         ~> {},
     };
 }
 
-export main() void {
+export main() Void {
     open(1);
 }

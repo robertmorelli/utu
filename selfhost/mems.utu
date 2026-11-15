@@ -48,7 +48,7 @@ vec mem_planned: I32
 vec mem_array_init: I32
 
 /// Each declaration's mem rows, sized to the program and unset.
-fn reset_mems() void {
+fn reset_mems() Void {
     mem_method_word.clear()
     mem_memory.resize(decl_kind.len())
     mem_len.resize(decl_kind.len())
@@ -218,7 +218,7 @@ fn array_get_op(s: Storage) Op {
 
 /// The array of a vec: as long as its initial contents, which are copied in
 /// when the module starts.
-fn mem_array_of(decl: I32) void {
+fn mem_array_of(decl: I32) Void {
     let s = mem_storage(decl)
     let h = mem_array_heap(s)
     let segment = data_memory.len()
@@ -240,7 +240,7 @@ fn mem_array_of(decl: I32) void {
 /// as in stage 0, where the access is a function called with them: a call in
 /// one may push to the vec, and so replace its array. With no call it goes in
 /// front of them; else they are kept in locals first.
-fn array_access(decl: I32, m: I32, op: Op, vt: I32) void {
+fn array_access(decl: I32, m: I32, op: Op, vt: I32) Void {
     let h = mem_array_heap(mem_storage(decl))
     let calls = false
     for (m ..< w_stack.len()) |k| { if w_calls(w_stack[k]) { calls = true } }
@@ -286,13 +286,13 @@ fn changes_len(node: I32, len_g: I32) Bool {
 }
 
 /// The array of mem `decl`, pushed.
-fn w_mem_array(decl: I32) void {
+fn w_mem_array(decl: I32) Void {
     w_leaf(Op.GlobalGet, vt_ref(mem_array_heap(mem_storage(decl)), false), mem_array[decl], 0)
 }
 
 /// After the sweep: a start function copies the initial contents of the
 /// arrays in use into them; an unused one's segment is left empty.
-fn finish_mems() void {
+fn finish_mems() Void {
     let k = 0
     let m = w_mark()
     while (k < mem_array_init.len()) {
@@ -423,7 +423,7 @@ fn read_u32(at: I32) I32 {
 
 /// Append element `i` of mem `decl`'s initializer `at`: literal `lit`,
 /// negated or not, read as the mem's element type.
-fn store_literal(decl: I32, lit: I32, negate: Bool, at: I32, i: I32) void {
+fn store_literal(decl: I32, lit: I32, negate: Bool, at: I32, i: I32) Void {
     let s = mem_storage(decl)
     let fits = true
     let bits: I64 = 0
@@ -448,7 +448,7 @@ fn store_literal(decl: I32, lit: I32, negate: Bool, at: I32, i: I32) void {
 
 /// Append element `i` of mem `decl`'s initializer `at`: `v`, an integer or
 /// (when `is_float`) the element type's bits, as @comptime gives them.
-fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) void {
+fn store_value(decl: I32, v: I64, is_float: Bool, at: I32, i: I32) Void {
     let s = mem_storage(decl)
     let size = 1 << storage_shift(s)
     if is_float {
@@ -477,7 +477,7 @@ fn mem_int_enum(decl: I32) I32 {
 
 /// Element `i` of a mem of an integer enum must be one of its variants'
 /// values (a match over it has no other arm).
-fn check_variant_value(decl: I32, v: I64, at: I32, i: I32) void {
+fn check_variant_value(decl: I32, v: I64, at: I32, i: I32) Void {
     let e = mem_int_enum(decl)
     if e < 0 { return }
     let d = e + 1
@@ -512,7 +512,7 @@ fn embed_index(decl: I32) I32 {
 }
 
 /// The `@comptime` mems of the program, found once names are resolved.
-fn find_comptime_mems() void {
+fn find_comptime_mems() Void {
     comptime_mem.clear()
     comptime_start.clear()
     comptime_count.clear()
@@ -554,7 +554,7 @@ fn w_i32_detached(value: I32) I32 {
 }
 
 /// The address of element i (on the stack since `m`): `i << shift`.
-fn mem_address(s: Storage, m: I32) void {
+fn mem_address(s: Storage, m: I32) Void {
     let shift = storage_shift(s)
     if shift > 0 {
         w_i32(shift)
@@ -564,7 +564,7 @@ fn mem_address(s: Storage, m: I32) void {
 
 /// A safe build traps when index i is outside the mem's length.
 /// An unsafe build's access checks only the capacity.
-fn checked_index(decl: I32, m: I32) void {
+fn checked_index(decl: I32, m: I32) Void {
     if safe_checks[0] == 0 { return }
     let i = w_pop()
     let op = w_op[i]
@@ -647,7 +647,7 @@ fn check_mem_index(node: I32, cx: Cx) I32 {
 
 /// A number literal `value` (or `-` and one) stored into narrow mem `decl`
 /// must fit its element type; a computed value wraps.
-fn check_narrow_literal(decl: I32, value: I32) void {
+fn check_narrow_literal(decl: I32, value: I32) Void {
     let s = mem_storage(decl)
     if value < 0 or storage_shift(s) > 1 or mem_value_type(decl) != prelude(Prelude.I32) { return }
     let negate = is_kind(value, Node.Unary_expr) and tok_kind[node_first[value]] == Tok.Minus.i32()
@@ -896,13 +896,13 @@ fn mem_helper_functions(decl: I32) I32 {
 }
 
 /// Before `n` of `reserve(n)` is pushed: an array's array.
-fn w_reserve_start(decl: I32) void {
+fn w_reserve_start(decl: I32) Void {
     if mem_array[decl] >= 0 { w_mem_array(decl) }
 }
 
 /// After it, from mark `m` (@w_reserve_start): the memory's reserve, or
 /// `array = grow(array, n)`.
-fn w_reserve_end(decl: I32, m: I32) void {
+fn w_reserve_end(decl: I32, m: I32) Void {
     if mem_array[decl] < 0 {
         w_node(Op.Call, vt_none, mem_reserve[decl], 0, m)
         return
@@ -978,7 +978,7 @@ fn memory_reserve_helper(decl: I32) I32 {
 }
 
 /// `need - size`, in @memory_reserve_helper.
-fn pages_short() void {
+fn pages_short() Void {
     let m = w_mark()
     w_get(vt_i32, 1)
     w_get(vt_i32, 2)
@@ -1048,7 +1048,7 @@ fn array_grow_helper(h: I32) I32 {
 }
 
 /// `array[len] = v`, in @array_push_helper.
-fn array_set_len(h: I32, arr: I32, vt: I32) void {
+fn array_set_len(h: I32, arr: I32, vt: I32) Void {
     let m = w_mark()
     w_get(arr, 0)
     w_get(vt_i32, 1)
@@ -1057,7 +1057,7 @@ fn array_set_len(h: I32, arr: I32, vt: I32) void {
 }
 
 /// `length << 1`, in @array_grow_helper.
-fn twice_length() void {
+fn twice_length() Void {
     let m = w_mark()
     w_get(vt_i32, 2)
     w_i32(1)
@@ -1175,7 +1175,7 @@ fn array_push_helper(h: I32, vt: I32) I32 {
 
 /// `resize(n)`: `reserve(n); if n > len { elements [len, n) = 0 }; len = n`
 /// (a safe build traps on a negative n).
-fn mem_resize_helper(decl: I32) void {
+fn mem_resize_helper(decl: I32) Void {
     let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize")
     let r = w_mark()
     if safe_checks[0] == 1 {
@@ -1221,7 +1221,7 @@ fn mem_resize_helper(decl: I32) void {
 
 /// The capacity of mem `decl`, in elements, pushed: its array's length, or
 /// its memory's size in elements.
-fn w_mem_capacity(decl: I32) void {
+fn w_mem_capacity(decl: I32) Void {
     let m = w_mark()
     if mem_array[decl] >= 0 {
         w_mem_array(decl)
@@ -1271,7 +1271,7 @@ fn mem_word(w: I32) Str {
 }
 
 /// A program declares at most `max_memories` mems; the first past that is reported.
-fn count_memories() void {
+fn count_memories() Void {
     let n = 0
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Mem) and not mem_is_vec(d) {
@@ -1284,7 +1284,7 @@ fn count_memories() void {
 /// Which mems are memories (each mem) and which arrays (each vec); and which
 /// memories the host makes, in one pass over the program: those used with
 /// `copy_in` or view.
-fn plan_mems() void {
+fn plan_mems() Void {
     mem_method(-1)
     let copy_in = mem_method_word[MemMethod.Copy_in.i32()]
     let view = mem_method_word[MemMethod.View.i32()]
@@ -1350,7 +1350,7 @@ fn mem_view_type(decl: I32) I32 {
 }
 
 /// The build's `"mems"` list: each mem whose memory the host makes, with its storage.
-fn write_mems_json() void {
+fn write_mems_json() Void {
     let any = false
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 { any = true }

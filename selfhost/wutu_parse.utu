@@ -74,9 +74,9 @@ vec wp_at: I32 = [0]
 vec wp_svg: I32 = [0, 0]
 
 /// A syntax error in the template, at `offset` in its text.
-fn wutu_fail(message: Str, offset: I32) void => dsl_fail(message, offset, 1)
+fn wutu_fail(message: Str, offset: I32) Void => dsl_fail(message, offset, 1)
 
-fn reset_template() void {
+fn reset_template() Void {
     tn_kind.clear()
     tn_start.clear()
     tn_parent.clear()
@@ -154,7 +154,7 @@ fn add_item(node: I32, kind: I32, a: I32, b: I32, flags: I32, from: I32, to: I32
 }
 
 /// Append child c to a list whose first is at `first_of` (a node's children, or its else).
-fn append_child(parent: I32, c: I32, otherwise: Bool) void {
+fn append_child(parent: I32, c: I32, otherwise: Bool) Void {
     let first = if otherwise { tn_else[parent] } else { tn_first[parent] }
     if first < 0 {
         if otherwise { tn_else[parent] = c } else { tn_first[parent] = c }
@@ -337,7 +337,7 @@ fn typo_of(list: Str, w: Str) Str {
 /// An invalid property name fails; so does a typo of a standard one (names
 /// are ASCII case-insensitive; a prefixed or custom one, `-webkit-…` or
 /// `--x`, is not checked).
-fn css_property_known(head: Str, at: I32) void {
+fn css_property_known(head: Str, at: I32) Void {
     let name = if text_at(head, 0, "--") { head } else { lower_text(head) }
     if not is_css_property(name) { wutu_fail("invalid CSS property", at) }
     let near = if name.get(0) == 45 { "" } else { typo_of(css_properties(), name) }
@@ -351,7 +351,7 @@ fn css_property_known(head: Str, at: I32) void {
 /// (`hidden;`), or text when the value has no string (else it may be
 /// `grid-template-areas`'s next row). A custom property's (`custom`) may hold
 /// anything balanced.
-fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) void {
+fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) Void {
     let depth = 0
     let quoted = custom
     let i = from
@@ -407,7 +407,7 @@ fn wp_keyword(text: Str, word: Str) Bool {
 fn wp_after_blank(text: Str, p: I32) Bool => p == 0 or is_space_code(text.get(p - 1))
 
 /// Whitespace, `//` comments (first on a line or after a blank), and CSS comments.
-fn wp_trivia(text: Str) void {
+fn wp_trivia(text: Str) Void {
     while (wp_at[0] < text.len()) {
         let p = wp_at[0]
         let c = text.get(p)
@@ -427,12 +427,12 @@ fn wp_trivia(text: Str) void {
     }
 }
 
-fn wp_skip_line(text: Str) void {
+fn wp_skip_line(text: Str) Void {
     let end = text_index(text, "\n", wp_at[0])
     wp_at[0] = if end < 0 { text.len() } else { end }
 }
 
-fn wp_semicolon(text: Str) void {
+fn wp_semicolon(text: Str) Void {
     let statement_end = wp_at[0]
     wp_trivia(text)
     if wp_char(text) != 59 { wutu_fail("expected ; after Wutu statement", statement_end) }
@@ -616,7 +616,7 @@ fn unparenthesized(source: Str) Str {
     trim_text(source.slice(1, n - 1))
 }
 
-fn wp_fail_interpolation(text: Str) void {
+fn wp_fail_interpolation(text: Str) Void {
     wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr; for text, name = expr; for an attribute, if cond {, prop: = expr;)", wp_at[0])
 }
 
@@ -793,7 +793,7 @@ fn parse_tnode(text: Str) I32 {
 }
 
 /// `{ nodes }`, into node n's children (or its otherwise).
-fn parse_branch(text: Str, n: I32, otherwise: Bool) void {
+fn parse_branch(text: Str, n: I32, otherwise: Bool) Void {
     wp_trivia(text)
     let open = wp_at[0]
     if wp_char(text) != 123 { wutu_fail("expected {", wp_at[0]) }
@@ -995,13 +995,13 @@ fn has_attribute_item(n: I32, name: Str) Bool {
     false
 }
 
-fn add_child(n: I32, c: I32) void {
+fn add_child(n: I32, c: I32) Void {
     tn_parent[c] = n
     append_child(n, c, false)
 }
 
 /// One statement of an element's body: an item, a CSS rule, or a child node.
-fn parse_element_statement(text: Str, n: I32) void {
+fn parse_element_statement(text: Str, n: I32) Void {
     let p = wp_at[0]
     let c = text.get(p)
     if c == 59 {
@@ -1059,7 +1059,7 @@ fn parse_element_statement(text: Str, n: I32) void {
             if near.len() > 0 { wutu_fail("unknown event " + name + "; did you mean " + near + "?", a) }
             let flags = if quiet { 4 } else { 0 }
             if text.get(r) == 61 {
-                if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) void { … };", r) }
+                if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) Void { … };", r) }
                 wp_at[0] = r + 1
                 let source = wp_bare_expression(text)
                 let from = wx_from[0]
@@ -1113,7 +1113,7 @@ fn parse_element_statement(text: Str, n: I32) void {
 /// `@name` at p, where an element's body (`inside`) or the template's head
 /// has one: a CSS at-rule inside passes; a directive in the wrong place, or
 /// an unknown one, fails.
-fn at_directive(text: Str, p: I32, inside: Bool) void {
+fn at_directive(text: Str, p: I32, inside: Bool) Void {
     let q = p + 1
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let name = text.slice(p + 1, q)
@@ -1210,7 +1210,7 @@ fn old_attribute_text(text: Str, p: I32) Str {
 }
 
 /// `"text" name…`: a string, then (no operator) another statement: a forgotten `;`.
-fn literal_then_name(text: Str, q: I32) void {
+fn literal_then_name(text: Str, q: I32) Void {
     if q >= text.len() or text.get(q) != 34 { return }
     let i = q + 1
     while (i < text.len() and text.get(i) != 34 and text.get(i) != 10) { i += if text.get(i) == 92 { 2 } else { 1 } }
@@ -1256,7 +1256,7 @@ fn is_event_name(w: Str) Bool {
 /// `name = value;` or `name;` (an attribute), `.name = value;` (a property);
 /// the cursor is on the name. A value that is one string literal is written
 /// into the element; anything else is an expression.
-fn parse_attribute(text: Str, n: I32, is_property: Bool) void {
+fn parse_attribute(text: Str, n: I32, is_property: Bool) Void {
     let name_start = wp_at[0]
     let q = if is_property or namespace_prefix(text, name_start) == 0 { name_start } else { namespace_prefix(text, name_start) }
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
@@ -1307,7 +1307,7 @@ fn has_item_named(n: I32, name: Str, is_property: Bool) Bool {
 }
 
 /// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
-fn parse_css_rule(text: Str, n: I32) void {
+fn parse_css_rule(text: Str, n: I32) Void {
     let selector = wp_css_until(text, "{;")
     if wp_char(text) == 59 {
         wp_at[0] += 1
@@ -1333,7 +1333,7 @@ fn scoped_selector(selector: Str) Str {
 }
 
 /// `property: value;` in an element's body, or else a child element.
-fn parse_declaration_or_child(text: Str, n: I32) void {
+fn parse_declaration_or_child(text: Str, n: I32) Void {
     let start = wp_at[0]
     let head = wp_css_until(text, ":{};")
     if wp_char(text) != 58 {

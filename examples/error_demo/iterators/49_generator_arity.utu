@@ -1,6 +1,6 @@
 // What: a generator consumed with the wrong number of arguments
 // Expect: range_step expects 3 argument(s), got 2
-fn range_step(lo: I32, hi: I32, step: I32) yield I32 {
+gn range_step(lo: I32, hi: I32, step: I32) I32 {
     let i = lo;
     while (i < hi) { yield i; i += step; };
 }

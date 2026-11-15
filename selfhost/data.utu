@@ -72,7 +72,7 @@ fn expected_variant(name: I32, expect: I32) Bool {
 
 /// `V {…}` where V names a declaration, not a variant, and an enum with a
 /// variant V is expected: that variant.
-fn hidden_variant(name: I32, expect: I32) void {
+fn hidden_variant(name: I32, expect: I32) Void {
     let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect] } else { expect }
     if t < 0 or not ty_is(t, Ty.Named) or not decl_is(ty_decl(t), Decl.Enum) or decl_is(node_decl[name], Decl.Variant) { return }
     let v = member(ty_decl(t), word_of(name), Space.Member)
@@ -234,7 +234,7 @@ fn has_std_own(decl: I32) Bool {
 }
 
 /// Push Wasm's default value of a field's storage `vt`: zero, or null.
-fn w_default(vt: I32) void {
+fn w_default(vt: I32) Void {
     if vt == vt_i32 { w_i32(0) }
     else if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 0, 0) }
     else if vt == vt_f32 { w_leaf(Op.F32Const, vt_f32, 0, 0) }
@@ -1062,7 +1062,7 @@ fn array_slice_helper(heap: I32) I32 {
 /// `substring` of the string, start, and end since `m`, a negative or
 /// reversed range empty: engines differ there (one reads an index unsigned,
 /// another clamps it).
-fn string_slice(m: I32) void {
+fn string_slice(m: I32) Void {
     let a = if w_stack.len() == m + 3 { w_stack[m + 1] } else { -1 }
     let b = if a >= 0 { w_stack[m + 2] } else { -1 }
     // Not one, or constants already in order: as they are.
@@ -1154,7 +1154,7 @@ fn from_codes_helper(heap: I32) I32 {
 }
 
 /// Forget the helper functions, before a program is checked.
-fn reset_data() void {
+fn reset_data() Void {
     slice_helper.clear()
     codes_helper.clear()
     helper_funcs.clear()

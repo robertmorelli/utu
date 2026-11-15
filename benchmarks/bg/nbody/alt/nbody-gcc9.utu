@@ -92,7 +92,7 @@ fn rsqrt(s: F64) F64 {
 }
 
 // r and w = 1/|r| for the pairs (i, j), j < i, in C's order.
-fn kernel(s: System) void {
+fn kernel(s: System) Void {
     let b = s.bodies
     let rx = s.rx
     let ry = s.ry
@@ -133,7 +133,7 @@ fn energy(s: System) F64 {
     e
 }
 
-fn advance(s: System, n: I32, dt: F64) void {
+fn advance(s: System, n: I32, dt: F64) Void {
     let b = s.bodies
     let rx = s.rx
     let ry = s.ry

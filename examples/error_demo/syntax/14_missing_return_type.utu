@@ -6,4 +6,4 @@ fn greet(name: Str) {
     console.log(name);
 }
 
-export main() void { greet("Ada"); }
+export main() Void { greet("Ada"); }

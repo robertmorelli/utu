@@ -39,7 +39,7 @@ vec fty_env: I32
 /// The view that named it first, for its spelling.
 vec fty_view: I32
 
-fn reset_foreign() void {
+fn reset_foreign() Void {
     fty_doc.clear()
     fty_at.clear()
     fty_env.clear()
@@ -544,7 +544,7 @@ vec fop_key: I32
 /// And its imported function.
 vec fop_func: I32
 
-fn reset_foreign_ops() void {
+fn reset_foreign_ops() Void {
     fop_key.clear()
     fop_func.clear()
 }
@@ -573,7 +573,7 @@ fn foreign_op(params: I32, result: I32, body: Str) I32 {
 }
 
 /// Text into `src`, as UTF-8.
-fn gen_text_utf8(text: Str) void {
+fn gen_text_utf8(text: Str) Void {
     // Room for the most it can take (3 bytes a code unit), written in
     // place, then the length it took.
     let n = text.len()
@@ -1006,7 +1006,7 @@ fn dynamic_nullable(t: I32) I32 {
     foreign_call_op(vl_end(mt), nullable(t), "(value) => value ?? null", m)
 }
 
-fn foreign_unbox(from: I32, to: I32, checked: Bool) void {
+fn foreign_unbox(from: I32, to: I32, checked: Bool) Void {
     let v = w_pop()
     let m = w_mark()
     w_push(v)
@@ -1444,7 +1444,7 @@ fn host_type(node: I32, cx: Cx) I32 {
 /// A literal where a union of literals (an enum) is wanted is one of them,
 /// as TypeScript 5 has it: `99.0` is no `Color` of `enum Color { Red,
 /// Green = 5 }`, and no string literal is a string enum's member.
-fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) void {
+fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) Void {
     // `K extends keyof M`: K's literals are its constraint's, whatever the argument bound it to.
     let constraint = if jis_object(given.at) and jget(given.at, "parameter") >= 0 { jget(given.at, "constraint") } else { -1 }
     let bound = Ref { doc: given.doc, at: constraint, env: given.env }
@@ -1549,7 +1549,7 @@ fn number_text(i: I32, end_: I32, integer: Bool) Bool {
 /// A closure whose written result is Str, for a callback whose result is a
 /// union of string literals, gives none of them (as TypeScript has it of
 /// `(): string => …`).
-fn literal_result(slot: Ref, arg: I32, view: I32, cx: Cx) void {
+fn literal_result(slot: Ref, arg: I32, view: I32, cx: Cx) Void {
     let c = closure_node(arg)
     let sig = if c >= 0 and not ref_dynamic(slot) { jfirst(desc_get(describe(slot), "calls")) } else { -1 }
     if sig < 0 or closure_written_result(c, cx) != prelude(Prelude.Str) { return }
@@ -1618,7 +1618,7 @@ fn string_literals(d: Ref) Bool {
 fn json_number(at: I32) F64 => parse_number(bytes_text(at, jend(at)))
 
 /// `let c: Api.Color = 99.0`: a literal for a host union of literals (see @host_literal).
-fn host_literal_let(type_node: I32, init: I32, cx: Cx) void {
+fn host_literal_let(type_node: I32, init: I32, cx: Cx) Void {
     let n = type_node
     while (n >= 0 and not is_kind(n, Node.Qualified_type_ref) and not is_kind(n, Node.Inline_module_type_path)) {
         if child_count(n) != 1 { return }
@@ -1774,7 +1774,7 @@ fn union_admits(d: Ref, t: I32, view: I32) Bool {
 
 /// A callback of more parameters than the host passes is reported (as in
 /// TypeScript; fewer is fine).
-fn callback_arity(sig: I32, arity: I32, arg: I32) void {
+fn callback_arity(sig: I32, arity: I32, arg: I32) Void {
     if callback_extra(sig, arity) { report2(Diag.CallbackArity, arg, -1, arity, jlen(jget(sig, "params"))) }
 }
 
@@ -2057,7 +2057,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
 /// for `slot`: an array's element parameter from its first element, a
 /// tuple's from each of its own, into nested `[…]` too. The other elements
 /// are checked against them after.
-fn unify_elements(slot: Ref, arg: I32, m: I32, d: Ref, depth: I32, cx: Cx) void {
+fn unify_elements(slot: Ref, arg: I32, m: I32, d: Ref, depth: I32, cx: Cx) Void {
     if depth > 8 or first_child(arg) < 0 { return }
     let sd = describe(slot)
     let tuple = is_tuple(sd)
@@ -2078,7 +2078,7 @@ fn unify_elements(slot: Ref, arg: I32, m: I32, d: Ref, depth: I32, cx: Cx) void 
 
 /// Generic parameter `ep` (its JSON) bound, unless already, to argument
 /// `arg`'s type: a string literal's own, where its constraint asks for literals.
-fn bind_param(ep: I32, arg: I32, m: I32, d: Ref, cx: Cx) void {
+fn bind_param(ep: I32, arg: I32, m: I32, d: Ref, cx: Cx) Void {
     let w = jstring_word(jget(ep, "parameter"))
     if bound_in_pending(m, w) or is_null_literal(arg) or closure_node(arg) >= 0 { return }
     let literals = literal_members(Ref { doc: d.doc, at: jget(ep, "constraint"), env: d.env })

@@ -7,7 +7,7 @@
 //! to keep them) before any function is checked.
 
 /// `type N = distinct B;`: B is one of the numeric scalars.
-fn validate_distinct(node: I32) void {
+fn validate_distinct(node: I32) Void {
     let base = last_child(node)
     // An unknown base is the mistake (reported).
     let n = name_node(base)
@@ -29,7 +29,7 @@ vec variant_value: I32
 
 /// Number every integer enum's variants into @variant_value, reporting a
 /// value that is repeated or does not fit.
-fn int_enum_values() void {
+fn int_enum_values() Void {
     variant_value.resize(decl_kind.len())
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.IntEnum) { enum_values(d) }
@@ -38,7 +38,7 @@ fn int_enum_values() void {
 }
 
 /// A tag enum's variants take no `= n`.
-fn tag_enum_values(decl: I32) void {
+fn tag_enum_values(decl: I32) Void {
     let c = first_child(decl_node[decl])
     while (c >= 0) {
         if is_kind(c, Node.Variant) and is_kind(last_child(c), Node.Int_lit) {
@@ -51,7 +51,7 @@ fn tag_enum_values(decl: I32) void {
 /// An integer enum's values, counted in 64 bits and each checked against
 /// its representation: U8, I8, U16, I16, I32, or U32 (any other is reported,
 /// and counted as I32).
-fn enum_values(decl: I32) void {
+fn enum_values(decl: I32) Void {
     let node = decl_node[decl]
     let repr_word = word_of(after_qualifier(node))
     let own = is_own_file(file_of_token(node_first[node]))
@@ -114,7 +114,7 @@ fn enum_values(decl: I32) void {
 /// The rules of this file, over the program: integer enums' values,
 /// protocols, each own file's tree (a file that did not parse is reported
 /// here), recursive structs, and modules of one name.
-fn validate_program() void {
+fn validate_program() Void {
     int_enum_values()
     validate_protocols()
     validate_bounds()
@@ -137,7 +137,7 @@ fn validate_program() void {
 //! file's `using` names its own). Within one file, a name is one module.
 
 /// Report a module that an earlier one of its file already names.
-fn validate_module_members() void {
+fn validate_module_members() Void {
     for (0 ..< decl_kind.len()) |b| {
         if decl_is(b, Decl.Module) and is_own_file(file_of_token(node_first[decl_node[b]])) {
             let file = file_of_token(node_first[decl_node[b]])
@@ -155,7 +155,7 @@ fn validate_module_members() void {
 }
 
 /// Validate each node of the tree, in order.
-fn validate_tree(node: I32) void {
+fn validate_tree(node: I32) Void {
     if validated_kinds.len() == 0 {
         validated_kinds.resize(Node.count())
         for (0 ..< Node.count()) |k| { validated_kinds[k] = 0 }
@@ -169,7 +169,7 @@ fn validate_tree(node: I32) void {
 /// By Node: 1 for the kinds @validate_node has a rule for (its arms).
 vec validated_kinds: U8
 
-fn validate_within(node: I32) void {
+fn validate_within(node: I32) Void {
     if validated_kinds[node_kind[node]] == 1 { validate_node(node) }
     let c = node_child[node]
     while (c >= 0) {
@@ -181,7 +181,7 @@ fn validate_within(node: I32) void {
 
 /// The rule for a node of its kind (most kinds have none; those with one
 /// are @validated_kinds).
-fn validate_node(node: I32) void {
+fn validate_node(node: I32) Void {
     match Node(node_kind[node]) {
         Node.Param_list => { duplicate_names(node, Diag.DuplicateDeclaration, 1); self_clash(node) },
         Node.Struct_decl => { duplicate_names(node, Diag.DuplicateField, node_decl[first_child(node)]) },
@@ -210,7 +210,7 @@ fn validate_node(node: I32) void {
 /// Children that declare a name (parameters, fields, variants), each name
 /// once. `what` is the diagnostic's argument: which names (1 parameters, 2
 /// variants), or the type whose fields they are.
-fn duplicate_names(node: I32, kind: Diag, what: I32) void {
+fn duplicate_names(node: I32, kind: Diag, what: I32) Void {
     // Each name's first, noted by word (and kind) while the names are walked.
     let c = first_child(node)
     while (c >= 0) {
@@ -241,7 +241,7 @@ fn duplicate_names(node: I32, kind: Diag, what: I32) void {
 /// Names a node lists (closure parameters, a tuple's parts, a capture's
 /// names), each once; `_` may repeat. `what` is DuplicateDeclaration's
 /// argument: 1 parameters, 3 local bindings, 6 captures.
-fn duplicate_words(node: I32, what: I32) void {
+fn duplicate_words(node: I32, what: I32) Void {
     let c = first_child(node)
     while (c >= 0) {
         let word = list_word(c)
@@ -275,7 +275,7 @@ vec arm_same_end: I32
 /// An alt's arms, each variant once: a second arm for one can never run.
 /// (Two patterns of one text end in one word: an arm is compared with the
 /// earlier ones that do, chained by that word, first and last noted.)
-fn duplicate_alt_arms(node: I32) void {
+fn duplicate_alt_arms(node: I32) Void {
     if arm_same_end.len() < node_kind.len() {
         let old = arm_same_end.len()
         arm_same_end.resize(node_kind.len())
@@ -350,7 +350,7 @@ fn self_of(fn_node: I32) I32 {
 }
 
 /// A parameter named as the method's `|self|` capture hides it.
-fn self_clash(params: I32) void {
+fn self_clash(params: I32) Void {
     let sp = self_of(parent_of(params))
     if sp < 0 { return }
     let p = param_named(params, word_of(first_child(sp)))
@@ -361,7 +361,7 @@ fn self_clash(params: I32) void {
 }
 
 /// The lets of a block, each name once; a function's body also not a parameter's.
-fn duplicate_lets(block: I32) void {
+fn duplicate_lets(block: I32) Void {
     let stamp = word_stamp()
     let params = body_params(block)
     if params >= 0 {
@@ -422,7 +422,7 @@ fn param_named(params: I32, word: I32) I32 {
 }
 
 /// `?I32`: a scalar has no null.
-fn validate_nullable(node: I32) void {
+fn validate_nullable(node: I32) Void {
     let inner = first_child(node)
     if not is_kind(inner, Node.Ref_type) { return }
     let name = first_child(inner)
@@ -437,7 +437,7 @@ fn is_scalar_decl(decl: I32) Bool {
 }
 
 /// A tuple type is only a function's result.
-fn validate_tuple_type(node: I32) void {
+fn validate_tuple_type(node: I32) Void {
     let parent = parent_of(node)
     if is_kind(parent, Node.Return_type) {
         let owner = parent_of(parent)
@@ -451,7 +451,7 @@ fn validate_tuple_type(node: I32) void {
 }
 
 /// A struct field holds no `fun` (use `cl`).
-fn validate_field_type(node: I32) void {
+fn validate_field_type(node: I32) Void {
     let t = next_sibling(first_child(node))
     if is_kind(t, Node.Func_type) { report2(Diag.FunInField, t, -1, type_of(t, 0), 0) }
 }
@@ -460,7 +460,7 @@ fn validate_field_type(node: I32) void {
 
 /// A struct that reaches itself through fields of struct types (not
 /// nullable, not arrays) can never be built.
-fn validate_recursive_structs() void {
+fn validate_recursive_structs() Void {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Struct) and is_own_file(file_of_token(node_first[decl_node[d]])) and not is_generic(module_of(d)) {
             // The field the cycle goes through is marked.
@@ -496,7 +496,7 @@ fn is_method_generator(fn_node: I32) Bool {
 
 /// `yield` belongs in a generator, and not in a closure inside one (the
 /// generator expands into its consumer).
-fn validate_yield(node: I32) void {
+fn validate_yield(node: I32) Void {
     let p = parent_of(node)
     while (p >= 0) {
         if is_kind(p, Node.Closure_expr) {
@@ -514,13 +514,13 @@ fn validate_yield(node: I32) void {
 }
 
 /// A bench's code does not return: the timing would end with it.
-fn validate_bench(node: I32) void {
+fn validate_bench(node: I32) Void {
     let r = first_return(node)
     if r >= 0 { report(Diag.ReturnInBench, r, -1) }
 }
 
 /// A global's initializer is not a function's body: it has nothing to return from.
-fn validate_global(node: I32) void {
+fn validate_global(node: I32) Void {
     let r = first_return(last_child(node))
     if r >= 0 { report(Diag.InvalidGlobalInitializer, r, word_of(first_child(node))) }
 }
@@ -540,7 +540,7 @@ fn first_return(node: I32) I32 {
 
 /// A defer is a statement of a block (or of a bench's setup), and its code
 /// does not leave it (return, or a break or continue not of a loop inside it).
-fn validate_defer(node: I32) void {
+fn validate_defer(node: I32) Void {
     if not is_kind(parent_of(node), Node.Block) and not is_kind(parent_of(node), Node.Bench_decl) {
         report2(Diag.InvalidDefer, node, -1, BreakRule.DeferNotStatement.i32(), -1)
         return
@@ -586,7 +586,7 @@ fn leaves_defer(brk: I32) Bool {
 }
 
 /// `await for (…)` reads a generator call, or one stream (with one value bound).
-fn validate_await(node: I32) void {
+fn validate_await(node: I32) Void {
     let e = first_child(node)
     if not is_kind(e, Node.For_expr) or generator_call(e) >= 0 { return }
     let source = first_child(first_child(e))
@@ -606,4 +606,4 @@ fn validate_await(node: I32) void {
 fn parent_of(node: I32) I32 => node_parent[node]
 
 /// Node `child` is now under `parent`.
-fn set_parent(child: I32, parent: I32) void { node_parent[child] = parent }
+fn set_parent(child: I32, parent: I32) Void { node_parent[child] = parent }

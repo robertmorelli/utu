@@ -24,7 +24,7 @@ fn greeting(name: Str) Browser.HTMLElement {
     \/
 }
 
-export main() void {
+export main() Void {
     Browser.document.body.append(greeting("friend"))
 }
 ```
@@ -63,7 +63,7 @@ and returns that element, with its concrete browser type where available.
 | `for items \|item, i\| key item.id { … }` | Repeated children (keys may be any scalar or Str) |
 | `on click { … }` | An event handler, with no event variable |
 | `on click \|e\| { … }` | The same, with the event as `e`, typed as the DOM types it (`MouseEvent`) |
-| `on click = handler;` | A handler value: a `cl(Browser.Event) void` |
+| `on click = handler;` | A handler value: a `cl(Browser.Event) Void` |
 | `bind:value = state.text;` | Two-way bindings: `value`, `checked`, `number`, `group`, `values`, `files` |
 | `// comment` | A comment, first on a line or after a blank; `/* … */` also works. `#` is always text, so `color: #1f2535;` is a color |
 
@@ -481,7 +481,7 @@ struct Preferences:
     | name: Str
     | enabled: Bool
 
-export main() void {
+export main() Void {
     let preferences = @stored/\
         Preferences "preferences-v1" Preferences { name: "", enabled: true }
     \/
@@ -608,7 +608,7 @@ once the element is gone. Unmounting the view stops either.
 
 ```utu
 p.clock {
-    on mount { wutu.interval("tick", 1000.0, cl() void { s.seconds = s.seconds + 1; }); }
+    on mount { wutu.interval("tick", 1000.0, cl() Void { s.seconds = s.seconds + 1; }); }
     = "Uptime " + s.seconds.str() + "s"
 }
 ``` `wutu.route()`
@@ -628,7 +628,7 @@ button {
 }
 ```
 
-A closure is `cl(params) Type { … }`: `wutu.after_render(cl() void { s.ready = true; })`.
+A closure is `cl(params) Type { … }`: `wutu.after_render(cl() Void { s.ready = true; })`.
 In a function body, a plain Utu `if`, `for` or `while` is a statement like any
 other (`if s.busy { return }`); Wutu's own `if` and `for` are among elements. `wutu.number`, `wutu.money` (integer USD cents: `-$1.23`), and `wutu.decimal` cover
 simple display without shipping a formatting library.

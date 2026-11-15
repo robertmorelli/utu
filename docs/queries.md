@@ -63,7 +63,7 @@ fn versions() I32 {
 ```utu
 using Spatial from std:Spatial
 
-fn lookups() void {
+fn lookups() Void {
     let points = [
         Spatial.point(0.0, 0.0, 10),
         Spatial.point(1.0, 2.0, 20),

@@ -3,7 +3,7 @@
 export mem pixels: U8;
 
 export lib {
-    fn frame() void {
+    fn frame() Void {
         pixels.push(0);
         let v = pixels.view(0, 1);
     }

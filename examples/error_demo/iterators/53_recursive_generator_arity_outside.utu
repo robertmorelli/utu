@@ -4,7 +4,7 @@ struct Node:
     | name: Str
     | kids: Array[Node]
 
-fn walk(n: Node) yield Node {
+gn walk(n: Node) Node {
     yield n;
     for (n.kids) |k| { for (walk(k)) |d| { yield d; }; };
 }

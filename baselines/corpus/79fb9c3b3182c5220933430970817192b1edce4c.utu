@@ -15,7 +15,7 @@ fn new_todo(text: Str) Todo {
     Todo { text: text, done: false };
 }
 
-fn toggle(todo: Todo) void {
+fn toggle(todo: Todo) Void {
     todo.done = not todo.done;
 }
 

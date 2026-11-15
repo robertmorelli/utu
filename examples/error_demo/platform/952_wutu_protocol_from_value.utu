@@ -10,6 +10,6 @@ fn view(scheme: Str) Browser.HTMLElement {
     \/;
 }
 
-export main() void {
+export main() Void {
     Browser.document.body.append(view("https:"));
 }

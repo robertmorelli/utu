@@ -58,7 +58,7 @@ fn ty(kind: Ty, a: I32, b: I32) I32 {
     id
 }
 
-fn ty_grow() void {
+fn ty_grow() Void {
     let n = if ty_table.len() == 0 { 256 } else { ty_table.len() * 2 }
     ty_table.resize(n)
     for (0 ..< n) |i| { ty_table[i] = -1 }
@@ -191,7 +191,7 @@ fn too_deep(inst: I32, node: I32) Bool {
     true
 }
 
-fn inst_grow() void {
+fn inst_grow() Void {
     let n = if inst_table.len() == 0 { 64 } else { inst_table.len() * 2 }
     inst_table.resize(n)
     for (0 ..< n) |i| { inst_table[i] = -1 }
@@ -269,7 +269,7 @@ enum(U8) Prelude:
 /// The type of a prelude name: `prelude(Prelude.Str)` is `Str`.
 fn prelude(p: Prelude) I32 => prelude_ty[p.i32()]
 
-fn find_prelude_types() void {
+fn find_prelude_types() Void {
     prelude_ty.resize(Prelude.count())
     for (0 ..< Prelude.count()) |p| {
         let word = intern_text(Prelude.name(Prelude(p)))
@@ -506,7 +506,7 @@ fn alias_instance(alias: I32) I32 {
 }
 
 /// `using M[A]; using M[B];`: M's names would mean either instance.
-fn check_open_instances() void {
+fn check_open_instances() Void {
     for (0 ..< file_root.len()) |file| {
         let item = if file_root[file] >= 0 { first_child(file_root[file]) } else { -1 }
         while (item >= 0) {
@@ -746,7 +746,7 @@ fn struct_heap_of(decl: I32, inst: I32) I32 {
     h
 }
 
-fn reset_types() void {
+fn reset_types() Void {
     reset_foreign()
     ty_kind.clear()
     repr_memo.clear()

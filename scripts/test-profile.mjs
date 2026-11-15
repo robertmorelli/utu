@@ -104,7 +104,7 @@ for (const ext of ['folded', 'speedscope.json', 'flame.html']) assert.ok(fs.exis
 const later = path.join(dir, 'later.utu');
 fs.writeFileSync(later, `let delay: fun(I32, I32) Promise[I32] =
     @es/\\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \\/;
-fn subscribe(n: I32) void { delay(n, 0).then(cl(v) void { let z = v - v; 10 / z; }); }
+fn subscribe(n: I32) Void { delay(n, 0).then(cl(v) Void { let z = v - v; 10 / z; }); }
 export main() I32 { subscribe(3); 1; }
 `);
 for (let i = 0; i < 3; i++) {

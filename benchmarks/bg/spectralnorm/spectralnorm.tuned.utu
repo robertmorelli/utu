@@ -44,7 +44,7 @@ fn term(sum: V128, x: V128, i: I32, j: I32, tr: I32) V128 {
 }
 
 // out = A·v (tr = 0) or Aᵀ·v (tr = 1), a pair of rows at a time.
-fn mult(v: Array[V128], out: Array[V128], tr: I32) void {
+fn mult(v: Array[V128], out: Array[V128], tr: I32) Void {
     for (0..<out.len()) |k| {
         let i = 2 * k
         let sum0 = zero()

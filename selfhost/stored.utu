@@ -9,7 +9,7 @@
 //! `@utu/\ expr \/` is the expression; `@css/\ … \/` is the text, as a `Str`.
 
 /// `@utu/\ e \/`: `e`.
-fn expand_utu(site: I32) void {
+fn expand_utu(site: I32) Void {
     let body = dsl_body(site)
     if not splice_parses(site, 0, body) {
         dsl_fail("standard dsls (utu): could not parse DSL body as expression", 0, 1)
@@ -19,7 +19,7 @@ fn expand_utu(site: I32) void {
 
 /// `@css/\ … \/`: the stylesheet's text (no `/` in the literal, so `*/`
 /// before a line break cannot spell the DSL's end).
-fn expand_css(site: I32) void {
+fn expand_css(site: I32) Void {
     let literal = js_string(dsl_body(site))
     let safe = ""
     for (0 ..< literal.len()) |i| {
@@ -36,7 +36,7 @@ vec st_seq: I32 = [0]
 vec st_type_at: I32 = [0]
 vec st_type_len: I32 = [0]
 
-fn stored_fail(message: Str) void => dsl_fail(message, st_type_at[0], st_type_len[0])
+fn stored_fail(message: Str) Void => dsl_fail(message, st_type_at[0], st_type_len[0])
 
 /// Whether a file has `using Browser from std:Browser` (with or without an alias).
 fn uses_browser(file: I32) Bool {
@@ -53,11 +53,11 @@ fn uses_browser(file: I32) Bool {
 }
 
 /// A body not of the form `Type "key" default`.
-fn stored_syntax(raw: Str) void => dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1)
+fn stored_syntax(raw: Str) Void => dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1)
 
 /// `@stored/\ … \/`: the state, loaded and registered with the host's store.
 /// Each site's names start with its own prefix.
-fn expand_stored(site: I32) void {
+fn expand_stored(site: I32) Void {
     let prefix = "__stored" + int_text(st_serial[0]) + "_"
     st_serial[0] += 1
     st_seq[0] = 0
@@ -67,7 +67,7 @@ fn expand_stored(site: I32) void {
 fn is_stored_scalar(type: Str) Bool => type == "Str" or type == "Bool" or type == "I32" or type == "F64"
 
 /// Checks that a type can be stored (scalars, arrays, acyclic local structs).
-fn stored_shape(written: Str, visiting: I32, file: I32) void {
+fn stored_shape(written: Str, visiting: I32, file: I32) Void {
     let type = trim_text(written)
     if type.len() == 0 { stored_fail("Unsupported type in stored schema") }
     if is_stored_scalar(type) { return }
@@ -267,7 +267,7 @@ fn stored_code(site: I32, prefix: Str) Str {
     let copies = ""
     for (stored_fields(stored_struct(type, file))) |f| { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; " }
     let check = if validator.len() > 0 { "if not " + validator + "(candidate) {candidate=" + fallback + ";};" } else { "" }
-    "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data=" + stored_sanitize(type, "value.data", file) + ";if(!("
+    "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) Void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data=" + stored_sanitize(type, "value.data", file) + ";if(!("
         + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="
         + prefix + "check(raw);let candidate:" + type + "=" + fallback + ";\n      if json.len()>0 {let " + data + "=Browser.JSON.parse(json);candidate=" + stored_decode(type, data, file, prefix) + ";};\n      " + check + "\n      "
         + trim_end(copies) + "\n    };\n    " + apply_raw + "(wutu.stored_load(" + key + "));\n    wutu.stored_register("

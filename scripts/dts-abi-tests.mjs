@@ -118,10 +118,10 @@ await test('"npm:" and "node:" imports link packages from node_modules and cache
   }
   assert.equal((await fs.readdir(cacheDir)).length, 3, 'one cached declaration graph per package');
   // A package that cannot be linked, or no resolver to link it, leaves the import unresolved: no module.
-  const missing = await buildProgram('using Nope from "npm:utu-no-such-package"; export main() void {}', { resolvePackage });
+  const missing = await buildProgram('using Nope from "npm:utu-no-such-package"; export main() Void {}', { resolvePackage });
   assert.equal(missing.wasm, null);
   assert.deepEqual(missing.errors, ['No declarations for npm:utu-no-such-package; is it installed?']);
-  const unresolved = await buildProgram('using Nano from "npm:nanoid"; export main() void {}', { resolvePackage: null });
+  const unresolved = await buildProgram('using Nano from "npm:nanoid"; export main() Void {}', { resolvePackage: null });
   assert.equal(unresolved.wasm, null);
   assert.deepEqual(unresolved.errors, ['No declarations for npm:nanoid; is it installed?']);
 });
@@ -178,7 +178,7 @@ await test('1,000 unused declarations add zero Wasm or live-glue bytes', async (
   } finally { await fs.unlink(file); }
 });
 await test('operations differing only in host types share one import', async () => {
-  const { glue } = await compile(`using Browser from std:Browser; export lib { fn run() void {
+  const { glue } = await compile(`using Browser from std:Browser; export lib { fn run() Void {
     let document = Browser.document;
     let div = document.createElement("div"); let input = document.createElement("input"); let span = document.createElement("span");
     div.append(input, span); input.append(span, div); document.body.append(div, input);
@@ -186,7 +186,7 @@ await test('operations differing only in host types share one import', async () 
   assert.equal((glue.match(/\.append\(|\["append"\]\(/g) ?? []).length, 1, glue);
 });
 await test('-Oz shares one import per host operation shape; -O3 specializes each name', async () => {
-  const source = `using Browser from std:Browser; export lib { fn run() void {
+  const source = `using Browser from std:Browser; export lib { fn run() Void {
     let input = Browser.document.createElement("input");
     input.value = "a"; input.placeholder = "b"; input.title = input.value + input.placeholder;
   } }`;
@@ -226,7 +226,7 @@ await test('aliased browser imports across a module diamond resolve independentl
   assert(!JSON.stringify(second.spec.es ?? {}).includes('isNaN'));
 });
 await test('unknown browser members name the declaration they were looked up on', async () => {
-  const { errors: messages } = await buildProgram('using Browser from std:Browser; export main() void { Browser.not_a_browser_api(); Browser.document.notAMethod(); }');
+  const { errors: messages } = await buildProgram('using Browser from std:Browser; export main() Void { Browser.not_a_browser_api(); Browser.document.notAMethod(); }');
   // One error per unknown member: its call-site consequences are not reported apart.
   assert(messages.includes('No member Browser.not_a_browser_api'), messages.join('\n'));
   assert(messages.includes('No member Browser.Document.notAMethod'), messages.join('\n'));

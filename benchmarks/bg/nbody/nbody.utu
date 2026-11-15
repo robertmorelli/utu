@@ -64,7 +64,7 @@ fn create() Array[Body] {
     bodies
 }
 
-fn advance(bodies: Array[Body], dt: F64) void {
+fn advance(bodies: Array[Body], dt: F64) Void {
     let size = bodies.len()
     for (0..<size) |i| {
         let bodyi = bodies[i]

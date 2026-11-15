@@ -61,7 +61,7 @@ let resolved: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;
 fn Counter.next |self| (it: It) Promise[I32] { it.at += 1; resolved(it.at); }
 fn Counter.done |self| (r: I32) Bool { r > self.n; }
 fn Counter.value |self| (r: I32) I32 { r * 10; }
-fn Counter.close |self| (it: It) void { }
+fn Counter.close |self| (it: It) Void { }
 let source: fun() Stream[I32] = @es/\\ () => { const s = (async function* () { yield 1; yield 2; yield 3; })(); const ret = s.return.bind(s); s.return = v => { globalThis.__returns = (globalThis.__returns ?? 0) + 1; return ret(v); }; return s; } \\/;
 let closed: fun() I32 = @es/\\ () => { const n = globalThis.__returns ?? 0; globalThis.__returns = 0; return n; } \\/;
 fn first(s: Stream[I32]) I32 { await for (s) |v| { return v; }; 0; }

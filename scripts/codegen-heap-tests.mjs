@@ -184,8 +184,8 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | x : F64
       export lib {
         fn branch(flag: Bool) F64 { if flag { 1.0; } else { }; 2.0; }
-        fn option(p: ?Point) void { promote p { |v| => v.x, ~> {}, }; }
-        fn binding() void { let unused: F64 = 3.0; }
+        fn option(p: ?Point) Void { promote p { |v| => v.x, ~> {}, }; }
+        fn binding() Void { let unused: F64 = 3.0; }
       }
     ` });
     assertEq(instance.exports.branch(1), 2);

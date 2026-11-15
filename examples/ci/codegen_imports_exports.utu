@@ -1,4 +1,4 @@
-let console_log: fun(Str) void = @es/\console.log\/
+let console_log: fun(Str) Void = @es/\console.log\/
 let wrap: fun(Str) Str = @es/\(value) => `[${value}]`\/
 let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/
 

@@ -1,5 +1,5 @@
-let probe: fun(Str) void = @es/\ (label) => globalThis.__probe(label) \/
-let fail: fun() void = @es/\ () => { throw new Error("boom"); } \/
+let probe: fun(Str) Void = @es/\ (label) => globalThis.__probe(label) \/
+let fail: fun() Void = @es/\ () => { throw new Error("boom"); } \/
 let delay: fun(I32) Promise[I32] = @es/\ (v) => new Promise(r => setTimeout(() => r(v), 1)) \/
 
 mod Stack[T] {
@@ -7,8 +7,8 @@ mod Stack[T] {
         | items: Array[T]
         | size: I32
     fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 } }
-    fn &.push |s| (v: T) void { probe("push"); s.items[s.size] = v; s.size += 1 }
-    fn &.each |s| () yield T {
+    fn &.push |s| (v: T) Void { probe("push"); s.items[s.size] = v; s.size += 1 }
+    gn &.each |s| () T {
         for (0 ..< s.size) |i| { probe("gen"); yield s.items[i] }
     }
 }
@@ -20,7 +20,7 @@ fn down(n: I32) I32 {
 
 fn apply(f: cl(I32) I32, x: I32) I32 { f(x) }
 
-fn guarded() void {
+fn guarded() Void {
     defer probe("deferred")
     fail()
 }

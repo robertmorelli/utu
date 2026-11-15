@@ -1,2 +1,2 @@
-fn g(n: I32) yield I32 { yield n; }
+gn g(n: I32) I32 { yield n; }
 export main() I32 { for (g()) |x| { x; }; 1; }

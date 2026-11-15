@@ -1,6 +1,6 @@
 // What: a generator loop binding a value and an index
 // Expect: a generator loop binds one value: for (gen()) |value| { … }
-fn squares(n: I32) yield I32 {
+gn squares(n: I32) I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
 

@@ -2,6 +2,6 @@
 // Expect: the union has no value "fast".
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let b: Browser.ScrollBehavior = "fast";
 }

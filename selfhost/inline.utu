@@ -53,7 +53,7 @@ let inline_once_nodes: I32 = 2000
 let inline_caller_nodes: I32 = 20000
 
 /// Inline through every live function (after the sweep; sweep again after).
-fn inline_module() void {
+fn inline_module() Void {
     inl_state.resize(func_kind.len())
     inl_size.resize(func_kind.len())
     inl_label.resize(func_kind.len())
@@ -76,7 +76,7 @@ fn inline_module() void {
     }
 }
 
-fn inline_into(f: I32) void {
+fn inline_into(f: I32) Void {
     if inl_state[f] != 0 { return }
     inl_state[f] = 1
     // The calls first: inlining rewrites the body, and the callees' own
@@ -134,7 +134,7 @@ fn assigns_param(g: I32, i: I32) Bool {
 }
 
 /// Flags the parameters (below `np`) assigned under node `n`, at `at`.
-fn note_params_set(n: I32, at: I32, np: I32) void {
+fn note_params_set(n: I32, at: I32, np: I32) Void {
     let op = w_op[n]
     if (op == Op.LocalSet.i32() or op == Op.LocalTee.i32()) and w_a[n] < np { inl_param_set[at + w_a[n]] = 1 }
     for (0 ..< w_count[n]) |i| { note_params_set(w_kid(n, i), at, np) }
@@ -300,7 +300,7 @@ fn has_op(n: I32, op: I32) Bool {
 }
 
 /// The calls under node `n` (`looped`: inside a loop), onto @inl_calls.
-fn calls_in(n: I32, looped: Bool) void {
+fn calls_in(n: I32, looped: Bool) Void {
     if w_op[n] == Op.Call.i32() {
         inl_calls.push(n)
         if looped { inl_call_loop.push(1) } else { inl_call_loop.push(0) }
@@ -337,7 +337,7 @@ vec fold_copy_of: I32
 vec fold_local: I32
 vec fold_heap: I32
 
-fn fold_known_tests(f: I32) void {
+fn fold_known_tests(f: I32) Void {
     let params = vl_len[ht_a[func_type_of[f]]]
     let total = params + func_local_count[f]
     fold_assigned.resize(total)
@@ -354,7 +354,7 @@ fn fold_known_tests(f: I32) void {
     fold(func_body[f])
 }
 
-fn note_assigned(n: I32) void {
+fn note_assigned(n: I32) Void {
     let op = w_op[n]
     if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         let x = w_a[n]
@@ -378,7 +378,7 @@ fn fold_canonical(x: I32) I32 {
     -1
 }
 
-fn fold(n: I32) void {
+fn fold(n: I32) Void {
     let op = w_op[n]
     if op == Op.RefTest.i32() {
         let known = known_test(n)
@@ -495,7 +495,7 @@ vec h_targeted: U8
 /// The function `locals_for_structs` is working on.
 vec current_fold_function: I32 = [0]
 
-fn locals_for_structs(f: I32) void {
+fn locals_for_structs(f: I32) Void {
     current_fold_function[0] = f
     let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f]
     h_walk_function(f)
@@ -506,7 +506,7 @@ fn locals_for_structs(f: I32) void {
     }
 }
 
-fn h_walk_function(f: I32) void {
+fn h_walk_function(f: I32) Void {
     let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f]
     h_node.clear()
     h_parent.clear()
@@ -522,7 +522,7 @@ fn h_walk_function(f: I32) void {
     h_walk(func_body[f], -1, 0)
 }
 
-fn h_walk(n: I32, parent: I32, place: I32) void {
+fn h_walk(n: I32, parent: I32, place: I32) Void {
     h_add(n, parent, place)
     let op = w_op[n]
     if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
@@ -536,7 +536,7 @@ fn h_walk(n: I32, parent: I32, place: I32) void {
 }
 
 /// Node `n`, kid `place` of `parent`, in the walk (its reads noted).
-fn h_add(n: I32, parent: I32, place: I32) void {
+fn h_add(n: I32, parent: I32, place: I32) Void {
     let k = h_node.len()
     h_node.push(n)
     h_parent.push(parent)
@@ -547,16 +547,16 @@ fn h_add(n: I32, parent: I32, place: I32) void {
 }
 
 /// The read at position `k`, last of its local's.
-fn h_note_get(k: I32) void {
+fn h_note_get(k: I32) Void {
     let l = w_a[h_node[k]]
     if h_get_first[l] < 0 { h_get_first[l] = k } else { h_get_next[h_get_last[l]] = k }
     h_get_last[l] = k
 }
 
-fn h_note_set(n: I32) void { h_set[w_a[n]] = if h_set[w_a[n]] == -1 { n } else { -2 } }
+fn h_note_set(n: I32) Void { h_set[w_a[n]] = if h_set[w_a[n]] == -1 { n } else { -2 } }
 
 /// The notes by local grown to `total` locals.
-fn h_locals(total: I32) void {
+fn h_locals(total: I32) Void {
     while (h_set.len() < total) {
         h_set.push(-1)
         h_get_first.push(-1)
@@ -564,7 +564,7 @@ fn h_locals(total: I32) void {
     }
 }
 
-fn h_target(label: I32) void {
+fn h_target(label: I32) Void {
     if label < 0 { return }
     if label >= h_targeted.len() {
         let old = h_targeted.len()
@@ -742,7 +742,7 @@ fn struct_stays(local: I32, t: I32) Bool {
     true
 }
 
-fn add_carriers(local: I32) void {
+fn add_carriers(local: I32) Void {
     let k = h_get_first[local]
     while (k >= 0) {
         let n = h_node[k]
@@ -1057,7 +1057,7 @@ fn sr_local_fresh(x: I32, t: I32) Bool {
 
 /// `twin` (holding f's body) gives the fields of what f returned; f makes
 /// the struct from them.
-fn sr_to_fields(f: I32, twin: I32, t: I32) void {
+fn sr_to_fields(f: I32, twin: I32, t: I32) Void {
     if not sr_returns(twin, t) { fatal }
     let fv = sr_vt(t)
     for (0 ..< sr_path.len()) |i| { w_type[sr_path[i]] = fv }
@@ -1104,7 +1104,7 @@ fn sr_to_fields(f: I32, twin: I32, t: I32) void {
 /// Each direct call under `n` (a kid of `parent`) to a function with
 /// a twin calls the twin, and makes the struct from its fields (or drops
 /// them, when the result is dropped).
-fn sr_rewrite_calls(f: I32, n: I32, parent: I32) void {
+fn sr_rewrite_calls(f: I32, n: I32, parent: I32) Void {
     for (0 ..< w_count[n]) |i| { sr_rewrite_calls(f, w_kid(n, i), n) }
     if w_op[n] != Op.Call.i32() or sr_twin[w_a[n]] < 0 { return }
     let g = w_a[n]
@@ -1188,7 +1188,7 @@ vec inl_subst: I32
 
 /// Rounds until none inlines (each sweeps after it); then each function
 /// called once moves there.
-fn inline_small() void {
+fn inline_small() Void {
     let rounds = 0
     let fresh = false
     while (rounds < 16 and not fresh) {
@@ -1311,7 +1311,7 @@ fn sm_move_all() Bool {
 
 /// Walk each live body (sm_walk), and count each function's calls; one by
 /// itself, or shared, is bad (@sm_bad).
-fn sm_survey() void {
+fn sm_survey() Void {
     let n = func_kind.len()
     sm_label.resize(n)
     sm_count.resize(n)
@@ -1357,7 +1357,7 @@ fn sm_add_local(f: I32, vt: I32) I32 {
 
 /// Walks body node `n` of `f` (of `np` parameters): its calls, its
 /// greatest label, its parameters' reads and writes, and its @sm_flags.
-fn sm_walk(f: I32, n: I32, np: I32) void {
+fn sm_walk(f: I32, n: I32, np: I32) Void {
     let op = w_op[n]
     let a = w_a[n]
     // (The ops to note are all up to LocalTee, but `try` and `rethrow`.)
@@ -1387,7 +1387,7 @@ fn sm_walk(f: I32, n: I32, np: I32) void {
 
 /// Moves `g` (to move), its caller first when that moves too: so each body
 /// is renumbered once, where it ends.
-fn sm_move_down(g: I32) void {
+fn sm_move_down(g: I32) Void {
     let k = sm_once[g]
     let caller = sm_found_in[k]
     sm_state[g] = 3
@@ -1414,7 +1414,7 @@ fn sm_movable(g: I32) Bool {
 }
 
 /// Call `c` in `f` becomes a block of its callee's body (see above).
-fn sm_move(f: I32, c: I32) void {
+fn sm_move(f: I32, c: I32) Void {
     let g = w_a[c]
     let body = func_body[g]
     let params = ht_a[func_type_of[g]]
@@ -1484,7 +1484,7 @@ fn sm_move(f: I32, c: I32) void {
 
 /// Node `n` of a body moving, in place: in the caller's locals and labels,
 /// placed as @inl_copy places a copy.
-fn sm_renumber(n: I32) void {
+fn sm_renumber(n: I32) Void {
     let op = w_op[n]
     let a = w_a[n]
     if op == Op.LocalGet.i32() and a < inl_subst.len() and inl_subst[a] >= 0 {
@@ -1643,7 +1643,7 @@ fn sm_constant(n: I32) Bool {
 }
 
 /// Call `c` in `f` becomes the body of its callee.
-fn sm_inline(f: I32, c: I32) void {
+fn sm_inline(f: I32, c: I32) Void {
     let g = w_a[c]
     let np = vl_len[ht_a[func_type_of[g]]]
     inl_subst.resize(np)
@@ -1681,7 +1681,7 @@ fn sm_calls_chosen(n: I32) Bool {
     false
 }
 
-fn sm_mark_called(n: I32) void {
+fn sm_mark_called(n: I32) Void {
     if w_op[n] == Op.Call.i32() or w_op[n] == Op.RefFunc.i32() { sm_called[w_a[n]] = 1 }
     for (0 ..< w_count[n]) |i| { sm_mark_called(w_kid(n, i)) }
 }
@@ -1715,7 +1715,7 @@ fn sm_targeted(label: I32) Bool {
 
 /// Walks `n` in the order it runs, while only reads of the parameters
 /// before @sm_next have: a read of that one, its only read, is the next.
-fn sm_order(n: I32) void {
+fn sm_order(n: I32) Void {
     if sm_clean[0] == 0 { return }
     let op = w_op[n]
     if op == Op.LocalGet.i32() {

@@ -2,7 +2,7 @@ using Browser from std:Browser
 using sim from "../sim.utu"
 using view from "./view.utu"
 
-fn draw(ui: view.Ui, ctx: Browser.CanvasRenderingContext2D) void {
+fn draw(ui: view.Ui, ctx: Browser.CanvasRenderingContext2D) Void {
     ctx.fillStyle = "#0c0e11"
     ctx.fillRect(0, 0, 960, 640)
     let all = ui.w.entities
@@ -15,7 +15,7 @@ fn draw(ui: view.Ui, ctx: Browser.CanvasRenderingContext2D) void {
     }
 }
 
-export main() void {
+export main() Void {
     let document = Browser.document
     let game = document.getElementById("game") orelse fatal
     let save = document.getElementById("save") orelse fatal
@@ -32,7 +32,7 @@ export main() void {
     document.body.append(app)
     let canvas: ?Browser.HTMLCanvasElement = document.querySelector("#map")
     let ctx = (canvas orelse fatal).getContext("2d") orelse fatal
-    let frame = cl(time: F64) void {
+    let frame = cl(time: F64) Void {
         for (0..<ui.speed) |k| {
             sim.step(ui.w)
         }

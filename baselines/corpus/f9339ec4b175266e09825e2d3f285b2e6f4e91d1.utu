@@ -2,6 +2,6 @@
       mod Document { type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/ }
       mod Element { type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/ }
       export lib {
-        fn pair(doc: Document, element: Element) void {}
+        fn pair(doc: Document, element: Element) Void {}
       }
     

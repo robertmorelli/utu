@@ -2,7 +2,7 @@
 // Expect: a template string not closed, pointing at the opening backtick.
 using console from std:Console;
 
-export main() void {
+export main() Void {
     let name = "Ada";
     console.log(`hello, ${name});
 }

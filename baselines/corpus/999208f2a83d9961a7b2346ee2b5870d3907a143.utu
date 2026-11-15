@@ -16,7 +16,7 @@ fn tile_px(state: ui.Ui, tile: I32, camera: F64) F64 {
     (tile.f64() - camera) * state.zoom;
 }
 
-fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, height: F64) void {
+fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, height: F64) Void {
     let w = state.w;
     let zoom = state.zoom;
     ctx.fillStyle = "#0c0e11";
@@ -61,7 +61,7 @@ fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, hei
     draw_overlay(state, ctx);
 }
 
-fn draw_entity(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, e: sim.Entity, px: F64, py: F64, glyphs: Bool) void {
+fn draw_entity(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, e: sim.Entity, px: F64, py: F64, glyphs: Bool) Void {
     let zoom = state.zoom;
     ctx.fillStyle = if e.cls == 20 and e.signal { "#ffe066"; } else { state.colors[e.machine]; };
     ctx.fillRect(px + 1, py + 1, zoom - 2, zoom - 2);
@@ -103,7 +103,7 @@ fn draw_entity(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, e: sim.Entit
     };
 }
 
-fn draw_overlay(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D) void {
+fn draw_overlay(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D) Void {
     let zoom = state.zoom;
     if sim.inside(state.w, state.hover_x, state.hover_y) and state.tool != ui.tool_none {
         let ok = state.tool == ui.tool_remove or sim.can_place(state.w, state.tool, state.hover_x, state.hover_y, state.dir);
@@ -122,7 +122,7 @@ fn draw_overlay(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D) void {
 }
 
 // One pixel per tile, redrawn every 30 frames.
-fn draw_minimap(state: ui.Ui) void {
+fn draw_minimap(state: ui.Ui) Void {
     let canvas: ?Browser.HTMLCanvasElement = Browser.document.querySelector("#minimap");
     promote canvas {
         |c| => {
@@ -161,7 +161,7 @@ fn draw_minimap(state: ui.Ui) void {
     };
 }
 
-fn click_tile(state: ui.Ui, x: I32, y: I32) void {
+fn click_tile(state: ui.Ui, x: I32, y: I32) Void {
     if not sim.inside(state.w, x, y) {
         return;
     };
@@ -179,7 +179,7 @@ fn click_tile(state: ui.Ui, x: I32, y: I32) void {
     };
 }
 
-fn pan(state: ui.Ui, dx: F64, dy: F64) void {
+fn pan(state: ui.Ui, dx: F64, dy: F64) Void {
     state.cam_x = Browser.Math.max(-4, Browser.Math.min(state.w.width.f64(), state.cam_x + dx));
     state.cam_y = Browser.Math.max(-4, Browser.Math.min(state.w.height.f64(), state.cam_y + dy));
 }
@@ -196,7 +196,7 @@ fn param_int(name: Str, fallback: I32) I32 {
 }
 
 // Pin panels for the first n entities of distinct machine types.
-fn pin_panels(state: ui.Ui, n: I32) void {
+fn pin_panels(state: ui.Ui, n: I32) Void {
     let seen = Array[I32].new_default(state.w.game.machines.len());
     let all = state.w.entities;
     for (0..<all.n) |i| {
@@ -217,7 +217,7 @@ fn average(values: Array[F64]) F64 {
     if values.len() == 0 { 0.0; } else { (values fold(0.0) |a, v| { a + v; }) / values.len().f64(); };
 }
 
-fn report(state: ui.Ui, bench: Bench) void {
+fn report(state: ui.Ui, bench: Bench) Void {
     let text = "{\"frames\":" + bench.done.str()
         + ",\"intervalAvg\":" + average(bench.intervals).toFixed(3)
         + ",\"intervalP95\":" + percentile(bench.intervals, 0.95).toFixed(3)
@@ -230,7 +230,7 @@ fn report(state: ui.Ui, bench: Bench) void {
     Browser.document.body.append(pre);
 }
 
-fn start(game_text: Str, save_text: Str, starter_text: Str) void {
+fn start(game_text: Str, save_text: Str, starter_text: Str) Void {
     let document = Browser.document;
     let world = sim.load(game_text, save_text) orelse fatal;
     let state = ui.new_ui(world, game_text, starter_text);
@@ -300,7 +300,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
     }
     \/;
     document.body.append(app);
-    document.addEventListener("keydown", cl(event) void {
+    document.addEventListener("keydown", cl(event) Void {
         let key = event.key;
         if key == "r" or key == "R" {
             state.dir = (state.dir + 1) % 4;
@@ -326,7 +326,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
     let map = canvas orelse fatal;
     let ctx = map.getContext("2d") orelse fatal;
     let bench = Bench { frames: param_int("bench", 0), done: 0, last_time: -1.0, intervals: [], work: [] };
-    let frame = cl(time: F64) void {
+    let frame = cl(time: F64) Void {
         let started = Browser.performance.now();
         if map.width != map.clientWidth or map.height != map.clientHeight {
             map.width = map.clientWidth;
@@ -364,7 +364,7 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) void {
     Browser.requestAnimationFrame(frame);
 }
 
-export main() void {
+export main() Void {
     let document = Browser.document;
     let game = document.getElementById("game") orelse fatal;
     let starter = document.getElementById("starter") orelse fatal;

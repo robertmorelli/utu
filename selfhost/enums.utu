@@ -263,7 +263,7 @@ fn name_table_span(decl: I32) I32 {
 }
 
 /// Function f's body: the table's look-up, with its one local.
-fn enum_name_table(decl: I32, f: I32) void {
+fn enum_name_table(decl: I32, f: I32) Void {
     let .{n, lo, hi} = variant_range(decl)
     let span = hi - lo + 1
     let h = array_type(vt_extern, false)
@@ -304,7 +304,7 @@ fn enum_name_table(decl: I32, f: I32) void {
 }
 
 /// A string constant whose text is word `word`.
-fn text_constant(word: I32) void => w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0)
+fn text_constant(word: I32) Void => w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0)
 
 //! = Enums with data
 
@@ -384,7 +384,7 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
 /// CastArms (wasm.utu) when that is smaller: each arm's `ref.test`, and the
 /// `ref.cast` it binds, become one `br_on_cast`. Rewrites the alt's first
 /// `if`, `n`, in place.
-fn cast_arms(n: I32, s: I32) void {
+fn cast_arms(n: I32, s: I32) Void {
     let k = 0
     let x = n
     while (alt_cast_arm(x, s) >= 0) {
@@ -608,7 +608,7 @@ fn alt_variant(pattern: I32, enum_decl: I32) I32 {
 /// Two arms for one variant written differently, one by its enum (`Circle`,
 /// `Shape.Circle`): the later can never run. (Arms written alike are
 /// validate's.)
-fn same_variant_arms(arms: I32, enum_decl: I32) void {
+fn same_variant_arms(arms: I32, enum_decl: I32) Void {
     let q = arms
     while (q >= 0 and not (is_kind(q, Node.Alt_arm) and is_kind(first_child(q), Node.Qualified_type_ref))) { q = next_sibling(q) }
     if q < 0 { return }
@@ -629,7 +629,7 @@ fn same_variant_arms(arms: I32, enum_decl: I32) void {
 
 /// An `alt` without a default arm names every variant: the first missing one
 /// is reported.
-fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
+fn check_alt_exhaustive(node: I32, enum_decl: I32) Void {
     // An arm naming no variant is the mistake (reported): no more of it.
     let a0 = next_sibling(first_child(node))
     while (a0 >= 0) {
@@ -664,7 +664,7 @@ fn check_alt_exhaustive(node: I32, enum_decl: I32) void {
 /// By declaration: 1 for a variant an alt's arms name, while checking it.
 vec alt_covered: U8
 
-fn reset_enums() void {
+fn reset_enums() Void {
     name_helper_enum.clear()
     from_helper_enum.clear()
 }

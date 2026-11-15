@@ -3,6 +3,6 @@
 using Browser from std:Browser;
 using gadgets lazy from "./lazy_parts/widgets.utu";
 
-export main() void {
+export main() Void {
     Browser.document.body.append(gadgets.badge("new"));
 }

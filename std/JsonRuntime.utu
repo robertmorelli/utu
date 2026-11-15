@@ -33,7 +33,7 @@ fn __json_reader(text: Str) JsonReader__ {
 }
 
 // Start over from the beginning, for the next match arm.
-fn __json_restart(r: JsonReader__) void {
+fn __json_restart(r: JsonReader__) Void {
     r.at = 0
     r.failed = 0
     r.reason = ""
@@ -43,7 +43,7 @@ fn __json_restart(r: JsonReader__) void {
 }
 
 // After one part of a match pattern: count it, or name where it failed.
-fn __json_at(r: JsonReader__, was_ok: Bool, where: Str) void {
+fn __json_at(r: JsonReader__, was_ok: Bool, where: Str) Void {
     if was_ok {
         if r.failed != 0 {
             r.where = where
@@ -54,7 +54,7 @@ fn __json_at(r: JsonReader__, was_ok: Bool, where: Str) void {
 }
 
 // Record the first problem; then every later read stops at the end of input.
-fn __json_fail(r: JsonReader__, why: Str) void {
+fn __json_fail(r: JsonReader__, why: Str) Void {
     if r.failed == 0 {
         r.failed = r.at + 1
         r.reason = why
@@ -62,7 +62,7 @@ fn __json_fail(r: JsonReader__, why: Str) void {
     r.at = r.n
 }
 
-fn __json_ws(r: JsonReader__) void {
+fn __json_ws(r: JsonReader__) Void {
     let t = r.text
     let n = r.n
     let i = r.at
@@ -82,7 +82,7 @@ fn __json_peek(r: JsonReader__) I32 {
     if r.at < r.n { r.text[r.at] } else { -1 }
 }
 
-fn __json_open(r: JsonReader__, c: I32, why: Str) void {
+fn __json_open(r: JsonReader__, c: I32, why: Str) Void {
     if __json_peek(r) == c {
         r.at += 1
         if c != 58 {
@@ -94,14 +94,14 @@ fn __json_open(r: JsonReader__, c: I32, why: Str) void {
 }
 
 // Into an object or array: one level deeper (out again at its close).
-fn __json_enter(r: JsonReader__) void {
+fn __json_enter(r: JsonReader__) Void {
     r.depth += 1
     if r.depth > 512 {
         __json_fail(r, "nested too deeply")
     }
 }
 
-fn __json_colon(r: JsonReader__) void {
+fn __json_colon(r: JsonReader__) Void {
     __json_open(r, 58, "expected ':'")
 }
 
@@ -133,13 +133,13 @@ fn __json_next(r: JsonReader__, close: I32) Bool {
     }
 }
 
-fn __json_end(r: JsonReader__) void {
+fn __json_end(r: JsonReader__) Void {
     if __json_peek(r) != -1 {
         __json_fail(r, "unexpected text after the value")
     }
 }
 
-fn __json_missing(r: JsonReader__, name: Str) void {
+fn __json_missing(r: JsonReader__, name: Str) Void {
     __json_fail(r, "missing field \"" + name + "\"")
 }
 
@@ -169,7 +169,7 @@ fn __json_hex(r: JsonReader__, at: I32) I32 {
 
 // Read a string token. Without escapes it stays a span of the input
 // (ks, kl); with escapes it is decoded into key and ks is -1.
-fn __json_span(r: JsonReader__) void {
+fn __json_span(r: JsonReader__) Void {
     r.ks = 0
     r.kl = 0
     if __json_peek(r) != 34 {
@@ -442,7 +442,7 @@ fn __json_u32(r: JsonReader__) U32 {
 }
 
 // Skip one value of any shape (unknown fields).
-fn __json_skip(r: JsonReader__) void {
+fn __json_skip(r: JsonReader__) Void {
     let c = __json_peek(r)
     if c == 123 {
         r.at += 1
@@ -485,7 +485,7 @@ fn __json_skip(r: JsonReader__) void {
 }
 
 // Skip the remaining fields of an object whose first field was already read.
-fn __json_rest(r: JsonReader__) void {
+fn __json_rest(r: JsonReader__) Void {
     let more = __json_next(r, 125)
     while (more) {
         __json_span(r)
@@ -521,7 +521,7 @@ fn __json_writer(capacity: I32) JsonWriter__ {
 }
 
 // Make room for count more code units, so writes can skip the check.
-fn __json_reserve(w: JsonWriter__, count: I32) void {
+fn __json_reserve(w: JsonWriter__, count: I32) Void {
     if w.n + count > w.buf.len() {
         let grown = Array[I32].new_default(w.n * 2 + count + 16)
         grown.copy_from(0, w.buf, 0, w.n)
@@ -529,13 +529,13 @@ fn __json_reserve(w: JsonWriter__, count: I32) void {
     }
 }
 
-fn __json_put(w: JsonWriter__, c: I32) void {
+fn __json_put(w: JsonWriter__, c: I32) Void {
     __json_reserve(w, 1)
     w.buf[w.n] = c
     w.n += 1
 }
 
-fn __json_raw(w: JsonWriter__, s: Str) void {
+fn __json_raw(w: JsonWriter__, s: Str) Void {
     let n = s.len()
     __json_reserve(w, n)
     for (0..<n) |i| {
@@ -545,7 +545,7 @@ fn __json_raw(w: JsonWriter__, s: Str) void {
 }
 
 // prefix, then "name": with the name copied from the table in one array.copy.
-fn __json_name(w: JsonWriter__, prefix: I32, at: I32, n: I32) void {
+fn __json_name(w: JsonWriter__, prefix: I32, at: I32, n: I32) Void {
     __json_reserve(w, n + 4)
     let o = w.n
     if prefix != 0 {
@@ -560,7 +560,7 @@ fn __json_name(w: JsonWriter__, prefix: I32, at: I32, n: I32) void {
 }
 
 // "name", as an enum value.
-fn __json_tag(w: JsonWriter__, at: I32, n: I32) void {
+fn __json_tag(w: JsonWriter__, at: I32, n: I32) Void {
     __json_reserve(w, n + 2)
     w.buf[w.n] = 34
     w.buf.copy_from(w.n + 1, w.names, at, n)
@@ -572,7 +572,7 @@ fn __json_hex_digit(v: I32) I32 {
     if v < 10 { v + 48 } else { v + 87 }
 }
 
-fn __json_put_str(w: JsonWriter__, s: Str) void {
+fn __json_put_str(w: JsonWriter__, s: Str) Void {
     let n = s.len()
     __json_reserve(w, n + 2)
     w.buf[w.n] = 34
@@ -627,7 +627,7 @@ fn __json_put_str(w: JsonWriter__, s: Str) void {
     __json_put(w, 34)
 }
 
-fn __json_put_i64(w: JsonWriter__, v: I64) void {
+fn __json_put_i64(w: JsonWriter__, v: I64) Void {
     __json_reserve(w, 20)
     if v < 0 {
         w.buf[w.n] = 45
@@ -654,7 +654,7 @@ fn __json_put_i64(w: JsonWriter__, v: I64) void {
     }
 }
 
-fn __json_put_f64(w: JsonWriter__, x: F64) void {
+fn __json_put_f64(w: JsonWriter__, x: F64) Void {
     if x > -9007199254740992.0 and x < 9007199254740992.0 {
         let whole = x.i64()
         if whole.f64() == x {
@@ -665,7 +665,7 @@ fn __json_put_f64(w: JsonWriter__, x: F64) void {
     __json_raw(w, __json_float_text(x))
 }
 
-fn __json_put_f32(w: JsonWriter__, x: F32) void {
+fn __json_put_f32(w: JsonWriter__, x: F32) Void {
     let wide = x.f64()
     if wide > -16777216.0 and wide < 16777216.0 and wide.i64().f64() == wide {
         __json_put_i64(w, wide.i64())

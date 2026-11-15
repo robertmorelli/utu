@@ -12,7 +12,7 @@ fn node(id: Str) Browser.HTMLElement {
     Browser.document.getElementById(id) orelse fatal;
 }
 
-fn restore_focus(id: Str) void {
+fn restore_focus(id: Str) Void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
@@ -152,7 +152,7 @@ fn results(state: Library) Browser.HTMLElement {
     \/;
 }
 
-export main() void {
+export main() Void {
     let state = @stored/\
         Library "folio-v2" Library {
         books: [Book {

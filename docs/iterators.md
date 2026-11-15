@@ -132,7 +132,7 @@ depth-first order.
 ## Additional operators
 
 ```utu
-fn additions() void {
+fn additions() Void {
     let totals = [1, 2, 3] scan(0) |acc, value| {
         acc + value
     } collect(I32) // [1, 3, 6]
@@ -188,7 +188,7 @@ same evaluation and cancellation rules as other pipelines.
 ## Binary partition search (`bisect`)
 
 ```utu
-fn bounds() void {
+fn bounds() Void {
     let lower = [1, 2, 2, 4] bisect |value| {
         value < 2
     } // 1

@@ -40,7 +40,7 @@ mod StrMap[V] {
     }
 
     /// `key`'s value is now `value`.
-    fn &.set |self| (key: Str, value: V) void {
+    fn &.set |self| (key: Str, value: V) Void {
         let h = hash(key)
         let i = if self.keys.len() > 0 { self.slot(key, h) } else { -1 }
         if i < 0 or self.full[i] == 0 {
@@ -111,7 +111,7 @@ mod StrMap[V] {
     }
 
     // Twice the room (16 at first); `fill` fills the new values.
-    fn &.grow |self| (fill: V) void {
+    fn &.grow |self| (fill: V) Void {
         let old_keys = self.keys
         let old_full = self.full
         let old_hashes = self.hashes

@@ -40,7 +40,7 @@ vec abi_kept: I32 = [0]
 
 /// Forget the documents, views, and indexes: a new program, when no host
 /// declarations are sealed.
-fn reset_abi() void {
+fn reset_abi() Void {
     jbr_open.clear()
     jbr_close.clear()
     jbr_table.clear()
@@ -293,7 +293,7 @@ vec jbr_stack: I32
 
 /// Index where each object and array inside the container at `at` ends, in
 /// one scan.
-fn jbrackets(at: I32) void {
+fn jbrackets(at: I32) Void {
     if not (src[at] == 123 or src[at] == 91) { return }
     jbr_stack.clear()
     let i = at
@@ -313,7 +313,7 @@ fn jbrackets(at: I32) void {
     }
 }
 
-fn jbr_put(start: I32, end_: I32) void {
+fn jbr_put(start: I32, end_: I32) Void {
     if (jbr_open.len() + 1) * 2 > jbr_table.len() { jbr_grow() }
     let mask = jbr_table.len() - 1
     let h = (start * -1640531535) & mask
@@ -323,7 +323,7 @@ fn jbr_put(start: I32, end_: I32) void {
     jbr_close.push(end_)
 }
 
-fn jbr_grow() void {
+fn jbr_grow() Void {
     let n = if jbr_table.len() == 0 { 4096 } else { jbr_table.len() * 2 }
     jbr_table.resize(n)
     for (0 ..< n) |i| { jbr_table[i] = -1 }
@@ -404,7 +404,7 @@ fn jk_hash(obj: I32, start: I32, end_: I32) I32 {
     h
 }
 
-fn jk_grow() void {
+fn jk_grow() Void {
     let n = if jk_table.len() == 0 { 1024 } else { jk_table.len() * 2 }
     jk_table.resize(n)
     for (0 ..< n) |i| { jk_table[i] = -1 }

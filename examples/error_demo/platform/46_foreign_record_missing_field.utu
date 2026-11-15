@@ -2,6 +2,6 @@
 // Expect: Missing foreign property 'urls' (required by RTCIceServer)
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let pc = new Browser.RTCPeerConnection(&{ iceServers: [&{ username: "me", credential: "pw" }] });
 }

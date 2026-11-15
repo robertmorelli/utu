@@ -161,7 +161,7 @@ try {
   // A generator is not one, whether or not it is called (it expands into its consumers).
   for (const call of ['0', 'let s = 0; for (g(3)) |v| { s += v; }; s']) {
     const file = path.join(dir, 'generator.utu');
-    await fs.writeFile(file, `fn g(n: I32) yield I32 { @wat/\\ local.get $n \\/; }\nexport lib { fn t() I32 { ${call}; } }\n`);
+    await fs.writeFile(file, `gn g(n: I32) I32 { @wat/\\ local.get $n \\/; }\nexport lib { fn t() I32 { ${call}; } }\n`);
     const shape = 'a @wat function is a plain function: fn f(x: I32) I32 { @wat/\\ … \\/; }';
     assert.deepEqual((await selfhost(file)).errors?.map(e => e.replace(/^\d+:\d+ /, '')), [shape], `self-hosted: ${call}`);
   }

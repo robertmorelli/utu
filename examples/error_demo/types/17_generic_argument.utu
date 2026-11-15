@@ -5,7 +5,7 @@ mod Stack[T] {
         | items: Array[T]
         | size: I32
     fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
-    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }
+    fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1; }
 }
 
 export main() I32 {

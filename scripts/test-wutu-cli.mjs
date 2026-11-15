@@ -10,7 +10,7 @@ const cli = path.resolve('cli/wutu.mjs');
 const dir = await fs.mkdtemp(path.resolve('.tmp-wutu-cli-'));
 const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
 const app = (heading) => `using Browser from std:Browser;
-export main() void {
+export main() Void {
     let view = @wutu/\\
     @reactive;
     main {

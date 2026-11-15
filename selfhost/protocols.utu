@@ -81,7 +81,7 @@ fn method_impls(proto: I32, word: I32) I32 {
 /// when first wanted.
 vec px_list: I32
 
-fn proto_index() void {
+fn proto_index() Void {
     if px_list.len() > 0 { return }
     let n = decl_kind.len()
     let head = Array[I32].new(n + 1, -1)
@@ -242,7 +242,7 @@ fn proto_has(proto: I32, word: I32, kind: Node) Bool {
 }
 
 /// Each member of a protocol once, but a getter and a setter of one type.
-fn validate_proto_members(proto: I32) void {
+fn validate_proto_members(proto: I32) Void {
     let self_t = decl_type(proto, 0)
     let c = first_child(decl_node[proto])
     while (c >= 0) {
@@ -318,7 +318,7 @@ vec pd_read: I32
 vec pd_write: I32
 vec pd_from: I32
 
-fn reset_protocols() void {
+fn reset_protocols() Void {
     px_list.clear()
     pd_read.clear()
     pd_write.clear()
@@ -349,7 +349,7 @@ fn dispatch_fn(proto: I32, pm: I32, params: I32, rt: I32) I32 {
 
 /// Field `pm` of receiver local `r` read (or, when `v` is a local, `v`
 /// written to it), by its dispatch function.
-fn proto_field_site(proto: I32, pm: I32, r: I32, ft: I32, v: I32) void {
+fn proto_field_site(proto: I32, pm: I32, r: I32, ft: I32, v: I32) Void {
     let vt = repr(ft)
     let mp = vl_begin()
     vl_add(vt_anyref)
@@ -375,7 +375,7 @@ fn proto_field_site(proto: I32, pm: I32, r: I32, ft: I32, v: I32) void {
 
 /// Method `pm` called on receiver local `r` with the `n` arguments in
 /// `locals`, by its dispatch function.
-fn proto_call_site(proto: I32, pm: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) void {
+fn proto_call_site(proto: I32, pm: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) Void {
     let impls = method_impls(proto, decl_name[pm])
     let mp = vl_begin()
     vl_add(vt_anyref)
@@ -413,7 +413,7 @@ fn proto_call_site(proto: I32, pm: I32, r: I32, locals: Array[I32], types: Array
 /// when `v` is a local, writing `v` to it), from implementer `i` on; past
 /// the last, `unreachable`. An implementer without the field (reported in
 /// conformance) has no arm.
-fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32, v: I32) void {
+fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32, v: I32) Void {
     if i == vl_len[impls] {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         return
@@ -508,7 +508,7 @@ fn proto_call(t: I32, name: I32, args: I32, first: I32, m: I32, at: I32, cx: Cx)
     rt
 }
 
-fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) void {
+fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) Void {
     if i * 2 >= vl_len[impls] {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         return
@@ -584,7 +584,7 @@ fn impl_of(proto: I32, word: I32, t: I32) I32 {
 }
 
 /// Conformance of each type in the program's own files to the protocols it lists.
-fn validate_protocols() void {
+fn validate_protocols() Void {
     pm_head.resize(decl_kind.len())
     pt_head.resize(decl_kind.len())
     for (0 ..< decl_kind.len()) |d| {
@@ -629,7 +629,7 @@ fn validate_protocols() void {
 /// (a bound or a P takes a module's for every instance, `fn P[&].m` in it).
 /// (`fn P[T].m` for a T that does not list P is T's for bounds.) An m P
 /// does not declare is reported.
-fn validate_impls() void {
+fn validate_impls() Void {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Fn) and decl_is(decl_a[d], Decl.Proto) and is_kind(decl_node[d], Node.Fn_decl)
             and is_own_file(file_of_token(node_first[decl_node[d]])) {
@@ -652,7 +652,7 @@ fn validate_impls() void {
 
 /// Reports each member of `proto` that type `t` lacks, or has with another
 /// type or signature.
-fn conforms(t: I32, proto: I32) void {
+fn conforms(t: I32, proto: I32) Void {
     let c = first_child(decl_node[proto])
     while (c >= 0) {
         if is_kind(c, Node.Proto_member) {
@@ -682,7 +682,7 @@ fn conforms(t: I32, proto: I32) void {
 }
 
 /// Point at the first wrong type, leaving the whole declaration for arity mismatches.
-fn report_signature_mismatch(f: I32, method: I32, self_t: I32, word: I32, proto: I32, t: I32) void {
+fn report_signature_mismatch(f: I32, method: I32, self_t: I32, word: I32, proto: I32, t: I32) Void {
     let inst = instance_for(module_of(f), ty_inst(self_t))
     let list = next_sibling(first_child(method))
     let params = param_list_of(f)
@@ -882,7 +882,7 @@ fn bounded_text(module: I32, param: I32, proto: I32) Str {
 }
 
 /// A fix for the last diagnostic: `proto` added to `param`'s bounds.
-fn bound_fix(param: I32, proto: I32) void {
+fn bound_fix(param: I32, proto: I32) Void {
     let name = first_child(decl_node[param])
     let bounds = next_sibling(name)
     let label = "bound " + decl_text(param) + " by " + proto_text(proto)
@@ -982,7 +982,7 @@ fn proto_with_method(word: I32) I32 {
 /// Each instantiation in the program's own files (`Sorted[Point]`, `using
 /// Sorted[Point] |S|`) gives each bounded parameter a type that implements
 /// its bounds.
-fn validate_bounds() void {
+fn validate_bounds() Void {
     if not any_bounds() { return }
     bounds_missed.clear()
     for (0 ..< node_kind.len()) |n| {
@@ -1019,7 +1019,7 @@ fn instantiated_module(args: I32) I32 {
 }
 
 /// The bounds of `module`'s parameters, against the arguments `args` gives.
-fn check_bounds(module: I32, args: I32) void {
+fn check_bounds(module: I32, args: I32) Void {
     let p = first_child(next_sibling(first_child(decl_node[module])))
     let arg = first_child(args)
     while (p >= 0 and arg >= 0) {
@@ -1040,7 +1040,7 @@ fn check_bounds(module: I32, args: I32) void {
 vec bounds_missed: I32
 
 /// Type argument `arg` for `param`, bounded by `proto` (written at `bound`).
-fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) void {
+fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) Void {
     // A parameter of the module it is written in: bounded by proto too.
     let outer = arg_param(arg)
     if outer >= 0 {

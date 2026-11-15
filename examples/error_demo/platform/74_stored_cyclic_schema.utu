@@ -6,7 +6,7 @@ struct Folder:
     | name: Str
     | children: Array[Folder]
 
-export main() void {
+export main() Void {
     let tree = @stored/\ Folder "tree" Folder { name: "root", children: [] } \/;
     Browser.console.log(tree.name);
 }

@@ -278,7 +278,7 @@ vec pending: I32
 
 /// Throws, abandoning the rule that failed: an attempt that catches it
 /// restores its @Save.
-let syntax_error: fun() void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/
+let syntax_error: fun() Void = @es/\ () => { throw new SyntaxError('utu syntax'); } \/
 
 // Give up: the program is not one this parser accepts. The furthest token
 // any attempt failed at is where the error is reported, with what the
@@ -295,11 +295,11 @@ vec parse_error_wanted: I32 = [-1]
 /// In @parse_expected, a keyword is this plus its word id; a token kind is itself.
 let kw_wanted: I32 = 1000
 
-fn fail(p: Parser) void => fail_wanting(p, -1)
+fn fail(p: Parser) Void => fail_wanting(p, -1)
 
 /// Fails at the cursor, noting what was wanted there (a token kind, or
 /// @kw_wanted plus a keyword's word; -1 for nothing in particular).
-fn fail_wanting(p: Parser, wanted: I32) void {
+fn fail_wanting(p: Parser, wanted: I32) Void {
     if p.pos > parse_furthest[0] {
         parse_furthest[0] = p.pos
         parse_expected.clear()
@@ -447,14 +447,14 @@ fn shaped_at(p: Parser, offset: I32) Bool {
 
 fn shaped(p: Parser) Bool => shaped_at(p, 0)
 
-fn advance(p: Parser) void { p.pos += 1 }
+fn advance(p: Parser) Void { p.pos += 1 }
 
-fn expect(p: Parser, kind: Tok) void {
+fn expect(p: Parser, kind: Tok) Void {
     if not is(p, kind) { fail_wanting(p, kind.i32()) }
     p.pos += 1
 }
 
-fn expect_kw(p: Parser, kw: Kw) void {
+fn expect_kw(p: Parser, kw: Kw) Void {
     if not is_kw(p, kw) { fail_wanting(p, kw_wanted + kw.i32()) }
     p.pos += 1
 }
@@ -509,7 +509,7 @@ fn mark_below(left: I32) I32 {
 fn save(p: Parser) Save => Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0], limits: stmt_limit.len() }
 
 /// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
-fn restore(p: Parser, s: Save) void {
+fn restore(p: Parser, s: Save) Void {
     p.pos = s.pos
     parse_depth[0] = s.depth
     stmt_limit.resize(s.limits)
@@ -578,7 +578,7 @@ fn source_file(p: Parser) I32 {
 }
 
 /// A top-level declaration, by its first word (`export`'s by its second).
-fn item(p: Parser) void {
+fn item(p: Parser) Void {
     let w = word_id(p)
     if w == Kw.Mod.i32() { module_decl(p); return }
     if w == Kw.Using.i32() {
@@ -627,7 +627,7 @@ fn item(p: Parser) void {
 }
 
 /// A declaration inside a `mod`.
-fn module_item(p: Parser) void {
+fn module_item(p: Parser) Void {
     let w = word_id(p)
     if w == Kw.Type.i32() { type_decl(p); return }
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
@@ -975,16 +975,9 @@ fn param(p: Parser) I32 {
 fn return_type(p: Parser) I32 {
     let at = mark()
     let first = p.pos
-    if is_kw(p, Kw.Void) {
-        leaf(p, Node.Void_type)
-    } else if is_kw(p, Kw.Yield) {
-        let inner = mark()
-        advance(p)
-        type_(p)
-        node(p, Node.Yield_type, inner, first)
-    } else {
-        type_(p)
-    }
+    // (`void` is `Void`, and `fn g() yield T` is `gn g() T`: hints.utu says so.)
+    if is_kw(p, Kw.Void) or is_kw(p, Kw.Yield) { fail(p) }
+    type_(p)
     node(p, Node.Return_type, at, first)
 }
 
@@ -1099,7 +1092,7 @@ fn export_lib_decl(p: Parser) I32 {
     advance(p)
     expect_kw(p, Kw.Lib)
     expect(p, Tok.LBrace)
-    while (is_kw(p, Kw.Fn)) { fn_or_op_decl(p) }
+    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn)) { fn_or_op_decl(p) }
     expect(p, Tok.RBrace)
     node(p, Node.Export_lib_decl, at, first)
 }
@@ -1246,7 +1239,7 @@ fn block(p: Parser) I32 {
 
 /// A block's statement: an expression, ended as @statement_end finds (a
 /// `;` after it is read, and does nothing more).
-fn statement(p: Parser) void {
+fn statement(p: Parser) Void {
     // (A `;` alone: nothing.)
     if is(p, Tok.Semi) {
         advance(p)
@@ -1267,7 +1260,7 @@ fn begin_statement(p: Parser) I32 {
 
 /// After a statement: nothing may be left before its end `e`; a `;` there
 /// is read.
-fn end_statement(p: Parser, e: I32) void {
+fn end_statement(p: Parser, e: I32) Void {
     stmt_limit.resize(stmt_limit.len() - 1)
     if p.pos < e { fail_wanting(p, Tok.Semi.i32()) }
     if is(p, Tok.Semi) { advance(p) }
@@ -1552,7 +1545,7 @@ fn assignment(p: Parser, left: I32, operator_tokens: I32) I32 {
     node(p, Node.Assign_expr, at, node_first[left])
 }
 
-fn arg_list_or_none(p: Parser) void {
+fn arg_list_or_none(p: Parser) Void {
     if is(p, Tok.RParen) { return }
     let at = mark()
     let first = p.pos
@@ -1654,7 +1647,7 @@ fn pipe_args(p: Parser) I32 {
 vec parse_depth: I32 = [0]
 vec parse_deepest: I32 = [0, -1]
 
-fn deeper(p: Parser) void {
+fn deeper(p: Parser) Void {
     parse_depth[0] += 1
     if parse_depth[0] > parse_deepest[0] {
         parse_deepest[0] = parse_depth[0]
@@ -2006,7 +1999,7 @@ fn module_call(p: Parser) I32 {
     node(p, Node.Promoted_module_call_expr, at, first)
 }
 
-fn field_inits(p: Parser) void {
+fn field_inits(p: Parser) Void {
     expect(p, Tok.LBrace)
     if not is(p, Tok.RBrace) {
         field_init(p)
@@ -2363,7 +2356,7 @@ fn while_expr(p: Parser) I32 {
 
 /// Intern every keyword, at the start of `src`, so a word's id is its
 /// keyword's when it is one. Files follow.
-fn intern_keywords() void {
+fn intern_keywords() Void {
     src.resize(abi_kept[0])
     src.intern_reset()
     for (0 ..< Kw.count()) |k| {
@@ -2379,7 +2372,7 @@ fn intern_keywords() void {
 
 /// List the tokens from `first` up to `last` the parser reads (all but
 /// comments) in @ptok.
-fn parser_tokens(first: I32, last: I32) void {
+fn parser_tokens(first: I32, last: I32) Void {
     ptok.resize(last - first + 4)
     let p = 0
     for (first ..< last) |t| {
@@ -2426,7 +2419,7 @@ fn parse(first: I32, last: I32) I32 {
 /// Node spans in the lexer's tokens (with comments) rather than the parser's,
 /// for the nodes from `before` on. The source file spans every token from
 /// `first` up to `end_` (the `End` token).
-fn token_spans(before: I32, root: I32, first: I32, end_: I32) void {
+fn token_spans(before: I32, root: I32, first: I32, end_: I32) Void {
     for (before ..< node_kind.len()) |id| {
         let a = node_first[id]
         let b = node_last[id]
@@ -2449,18 +2442,18 @@ struct Comments:
 /// in source order, so one walk down the tree places them all. Only the
 /// parser's differential asks for them (@comment_nodes): nothing compiling a
 /// program reads them, so its tree is without them, and walking it skips none.
-fn attach_comments(root: I32) void {
+fn attach_comments(root: I32) Void {
     let comments = Comments { next: node_first[root] }
     skip_to_comment(comments)
     attach_within(root, comments)
 }
 
-fn skip_to_comment(comments: Comments) void {
+fn skip_to_comment(comments: Comments) Void {
     while (comments.next < tok_kind.len() and tok_kind[comments.next] != Tok.Comment.i32()) { comments.next += 1 }
 }
 
 /// Place the comments before the end of `parent`'s tokens.
-fn attach_within(parent: I32, comments: Comments) void {
+fn attach_within(parent: I32, comments: Comments) Void {
     let before = -1
     let c = node_child[parent]
     while (comments.next < node_last[parent]) {

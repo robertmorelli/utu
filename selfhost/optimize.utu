@@ -67,7 +67,7 @@ vec opt_shared: U8 = [0]
 vec opt_renumber: I32
 
 /// The cleanup, over each live function with a body, after the sweep.
-fn optimize_module() void {
+fn optimize_module() Void {
     for (0 ..< func_kind.len()) |f| { if optimizable(f) { optimize_function(f) } }
 }
 
@@ -75,7 +75,7 @@ fn optimizable(f: I32) Bool => func_kind[f] == FuncKind.Defined.i32() and func_l
 
 /// Constants, copies and temporaries until none changes anything, then
 /// tees, then unused locals. A body sharing a node with another is left as it is.
-fn optimize_function(f: I32) void {
+fn optimize_function(f: I32) Void {
     let params = vl_len[ht_a[func_type_of[f]]]
     let total = params + func_local_count[f]
     opt_collect(f, total)
@@ -104,7 +104,7 @@ fn optimize_function(f: I32) void {
 }
 
 /// Walk the body, noting each node's parent, and each local's reads and writes.
-fn opt_collect(f: I32, total: I32) void {
+fn opt_collect(f: I32, total: I32) Void {
     opt_gets.resize(total)
     opt_sets.resize(total)
     opt_get_at.resize(total)
@@ -150,7 +150,7 @@ fn opt_collect(f: I32, total: I32) void {
 }
 
 /// @opt_nodes, @opt_parent and @opt_place resized to `n`.
-fn opt_room(n: I32) void {
+fn opt_room(n: I32) Void {
     opt_nodes.resize(n)
     opt_parent.resize(n)
     opt_place.resize(n)
@@ -211,10 +211,10 @@ fn opt_literal(n: I32) Bool {
 
 fn single_value(vt: I32) Bool => vt != vt_none and vt != vt_unreachable and vt < vt_tuple
 
-fn set_kid(parent: I32, place: I32, node: I32) void { w_kids[w_first[parent] + place] = node }
+fn set_kid(parent: I32, place: I32, node: I32) Void { w_kids[w_first[parent] + place] = node }
 
 /// Make node `n` emit nothing.
-fn opt_erase(n: I32) void {
+fn opt_erase(n: I32) Void {
     w_op[n] = Op.Seq.i32()
     w_type[n] = vt_none
     w_count[n] = 0
@@ -428,7 +428,7 @@ fn emits_nothing(node: I32) Bool {
 
 /// The locals `node` reads, into @opt_reads, once each; a value of this
 /// pass already sunk there is not walked again.
-fn reads_of(node: I32) void {
+fn reads_of(node: I32) Void {
     if opt_rd_at[node] == opt_pass[0] {
         let from = opt_rd_from[node]
         for (0 ..< opt_rd_len[node]) |r| { read_once(opt_rd_pool[from + r]) }
@@ -438,7 +438,7 @@ fn reads_of(node: I32) void {
     for (0 ..< w_count[node]) |i| { reads_of(w_kid(node, i)) }
 }
 
-fn read_once(l: I32) void {
+fn read_once(l: I32) Void {
     if opt_rd_mark[l] != opt_pass[1] {
         opt_rd_mark[l] = opt_pass[1]
         opt_reads.push(l)
@@ -464,7 +464,7 @@ fn sink_visit(node: I32, target: I32, in_loop: Bool) I32 {
 
 /// The unused rewrite: each store to a local never read goes (or becomes a
 /// drop, or its value), and the locals still read are renumbered.
-fn remove_unused_locals(f: I32, params: I32, total: I32) void {
+fn remove_unused_locals(f: I32, params: I32, total: I32) Void {
     let first = func_locals[f]
     let kept = 0
     opt_renumber.resize(total)
@@ -485,7 +485,7 @@ fn remove_unused_locals(f: I32, params: I32, total: I32) void {
 
 /// The unused rewrite under `n`, kid `place` of `parent`: inner stores first
 /// (one moved out of its parent would leave what it holds a stale parent).
-fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) void {
+fn unused_walk(f: I32, n: I32, parent: I32, place: I32, params: I32) Void {
     for (0 ..< w_count[n]) |i| { unused_walk(f, w_kid(n, i), n, i, params) }
     let op = w_op[n]
     if (op == Op.LocalSet.i32() or op == Op.LocalTee.i32()) and w_a[n] >= params and opt_gets[w_a[n]] == 0 {
@@ -574,7 +574,7 @@ vec co_tree_slot: I32
 /// locals, set before read, do not come round a caller's loop). A local is
 /// only moved into another's when its first mention stores it: one read
 /// first would rely on starting at zero.
-fn coalesce_locals(f: I32, params: I32) void {
+fn coalesce_locals(f: I32, params: I32) Void {
     let n = func_local_count[f]
     if n < 2 { return }
     let total = params + n
@@ -714,7 +714,7 @@ fn co_first_free(t: I32, start: I32) I32 {
 }
 
 /// Type t's slot at `leaf` ends at `end`.
-fn co_tree_set(t: I32, leaf: I32, end: I32) void {
+fn co_tree_set(t: I32, leaf: I32, end: I32) Void {
     let at = co_tree_at[t]
     let i = co_tree_leaves[t] + leaf
     co_tree[at + i] = end
@@ -729,7 +729,7 @@ fn co_tree_set(t: I32, leaf: I32, end: I32) void {
 
 /// Sort `order` by `key` (of each item), keeping the order of equal ones (a
 /// merge sort).
-fn sort_by_key(order: Array[I32], key: Array[I32]) void {
+fn sort_by_key(order: Array[I32], key: Array[I32]) Void {
     let n = order.len()
     co_sort.resize(n)
     let width = 1
@@ -760,7 +760,7 @@ fn sort_by_key(order: Array[I32], key: Array[I32]) void {
 
 /// Number the nodes in the order they run (operands first), noting each
 /// local's mentions and each loop's span.
-fn co_walk(node: I32) void {
+fn co_walk(node: I32) Void {
     let op = w_op[node]
     let span = -1
     if op == Op.Loop.i32() {
@@ -796,7 +796,7 @@ fn co_walk(node: I32) void {
     }
 }
 
-fn co_target(label: I32) void {
+fn co_target(label: I32) Void {
     if label >= co_targeted.len() {
         let old = co_targeted.len()
         co_targeted.resize(label + 1)
@@ -829,7 +829,7 @@ fn co_round_loop(l: I32, inner: I32) I32 {
 }
 
 /// No loop's exposed locals found yet (each is when asked: co_loop_exposed).
-fn co_find_exposed(total: I32) void {
+fn co_find_exposed(total: I32) Void {
     co_written.resize(total)
     co_noted.resize(total)
     for (0 ..< total) |l| {
@@ -843,7 +843,7 @@ fn co_find_exposed(total: I32) void {
 }
 
 /// Loop `s`'s locals read before written in it, onto @co_exposed.
-fn co_loop_exposed(s: I32) void {
+fn co_loop_exposed(s: I32) Void {
     co_exposed_at[s] = co_exposed.len()
     let node = co_loop_node[s]
     for (0 ..< w_count[node]) |i| { co_reads_first(w_kid(node, i), s) }
@@ -851,7 +851,7 @@ fn co_loop_exposed(s: I32) void {
     co_exposed_count[s] = co_exposed.len() - co_exposed_at[s]
 }
 
-fn co_undo_written(mark: I32) void {
+fn co_undo_written(mark: I32) Void {
     for (mark ..< co_written_log.len()) |i| { co_written[co_written_log[i]] = 0 }
     co_written_log.resize(mark)
 }
@@ -859,7 +859,7 @@ fn co_undo_written(mark: I32) void {
 /// Walks `n` in the order it runs, noting reads of locals not yet written
 /// on every path (in loop `s`). What runs maybe (a branch, a loop's body, a
 /// block branched out of, a `try`) writes for itself only.
-fn co_reads_first(n: I32, s: I32) void {
+fn co_reads_first(n: I32, s: I32) Void {
     let op = w_op[n]
     if op == Op.LocalGet.i32() {
         let l = w_a[n]
@@ -1118,7 +1118,7 @@ fn reuse_loads(f: I32) Bool {
     true
 }
 
-fn ld_walk(n: I32) void {
+fn ld_walk(n: I32) Void {
     let op = w_op[n]
     let count = w_count[n]
     if op == Op.Loop.i32() { ld_loop_writes(n) }
@@ -1136,7 +1136,7 @@ fn ld_walk(n: I32) void {
     ld_effect(n)
 }
 
-fn ld_forget(mark: I32) void {
+fn ld_forget(mark: I32) Void {
     ld_node.resize(mark)
     ld_id.resize(mark)
     ld_at_local.resize(mark)
@@ -1185,7 +1185,7 @@ fn ld_find(n: I32) I32 {
 
 /// Entry e in the slots: in an empty one, one whose entry is forgotten, or
 /// one of an entry reading the same (which no longer holds).
-fn ld_place(e: I32) void {
+fn ld_place(e: I32) Void {
     if (ld_filled[0] + 1) * 2 > ld_slot.len() {
         let size = if ld_slot.len() == 0 { 64 } else { ld_slot.len() * 2 }
         ld_slot.resize(size)
@@ -1210,7 +1210,7 @@ fn ld_place(e: I32) void {
 }
 
 /// One more write to counts `counts` (as @ld_count) at i.
-fn ld_bump(counts: I32, i: I32) void {
+fn ld_bump(counts: I32, i: I32) Void {
     if counts == 0 {
         while (ld_local_writes.len() <= i) { ld_local_writes.push(0) }
         ld_local_writes[i] += 1
@@ -1221,13 +1221,13 @@ fn ld_bump(counts: I32, i: I32) void {
 }
 
 /// What a loop writes, anywhere in it, as written before it.
-fn ld_loop_writes(n: I32) void {
+fn ld_loop_writes(n: I32) Void {
     ld_effect_write(n)
     for (0 ..< w_count[n]) |i| { ld_loop_writes(w_kid(n, i)) }
 }
 
 /// What node n's own instruction does to the reads known.
-fn ld_effect(n: I32) void {
+fn ld_effect(n: I32) Void {
     let op = w_op[n]
     if (op == Op.StructGet.i32() or op == Op.StructGetS.i32() or op == Op.StructGetU.i32())
         and w_op[w_kid(n, 0)] == Op.LocalGet.i32() and not non_null(w_type[n]) {
@@ -1237,7 +1237,7 @@ fn ld_effect(n: I32) void {
     }
 }
 
-fn ld_effect_write(n: I32) void {
+fn ld_effect_write(n: I32) Void {
     let op = w_op[n]
     let set = op == Op.StructSet.i32()
     let call = op == Op.Call.i32() or op == Op.CallRef.i32() or op == Op.ReturnCall.i32()
@@ -1248,7 +1248,7 @@ fn ld_effect_write(n: I32) void {
 }
 
 /// A field read of a local: one known again, or known from here.
-fn ld_read(n: I32) void {
+fn ld_read(n: I32) Void {
     let e = ld_find(n)
     if e >= 0 {
         ld_reuse(e, n)
@@ -1269,7 +1269,7 @@ fn ld_read(n: I32) void {
 }
 
 /// Read n reads what known entry e's read did.
-fn ld_reuse(e: I32, n: I32) void {
+fn ld_reuse(e: I32, n: I32) Void {
     let id = ld_id[e]
     if ld_rewrite[0] == 0 {
         ld_reuses[id] += 1
@@ -1592,7 +1592,7 @@ fn cf_br_if(n: I32) I32 {
 
 /// `if` on a constant: the arm taken, in a block of the `if`'s label and
 /// type (a branch to it still leaves it), or nothing.
-fn cf_if(n: I32) void {
+fn cf_if(n: I32) Void {
     cf_changed[0] = 1
     let on = w_a[w_kid(n, 0)] != 0
     if not on and w_count[n] == 2 {

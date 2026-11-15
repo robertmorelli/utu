@@ -3,7 +3,7 @@
         | v: I32
         | next: ?P
       fn find(ok: Bool) ?P { if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
-      fn bump(p: P) void { p.v += 1; }
+      fn bump(p: P) Void { p.v += 1; }
       export lib {
         fn run() I32 {
           let p = find(true);

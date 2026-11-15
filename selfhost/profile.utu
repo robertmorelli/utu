@@ -40,7 +40,7 @@ let profile_push_defer: I32 = -1000000001
 /// The memory's pages (4 MiB: a million frames), its least and its most.
 let profile_pages: I32 = 64
 
-fn reset_profile() void {
+fn reset_profile() Void {
     prof_memory[0] = -1
     prof_imports[0] = -1
     prof_imports[1] = -1
@@ -85,7 +85,7 @@ fn prof_frame(block: I32, decl: I32, inst: I32) I32 {
 /// count (high); the frame is `x + id`, so its own address and count, which
 /// the sampler checks:
 /// `x = load64(0); store64(wrap(x), x + id); store64(0, x + 2^32 + 8)`.
-fn prof_push(id: I32) void {
+fn prof_push(id: I32) Void {
     let mem = prof_mem()
     let x = new_local(vt_i64)
     let m = w_mark()
@@ -113,7 +113,7 @@ fn prof_push(id: I32) void {
 }
 
 /// Pop a frame: `store64(0, load64(0) - 8)`.
-fn prof_pop() void {
+fn prof_pop() Void {
     let mem = prof_mem()
     let m = w_mark()
     w_i32(0)
@@ -127,19 +127,19 @@ fn prof_pop() void {
 }
 
 /// Run the profiler's defer `d`.
-fn run_profile_defer(d: I32) void {
+fn run_profile_defer(d: I32) Void {
     if d == profile_pop_defer { prof_pop() } else { prof_push(profile_push_defer - d) }
 }
 
 /// Note profiler defer `d`, from the code that follows on (a guard too).
-fn note_profile_defer(d: I32) void {
+fn note_profile_defer(d: I32) Void {
     defer_node.push(d)
     note_defer_guards(defer_node.len() - 1)
 }
 
 /// A function's or closure's body begins (`block`, checked in `cx`): its
 /// frame, popped at each exit.
-fn profile_body(block: I32, cx: Cx) void {
+fn profile_body(block: I32, cx: Cx) Void {
     let decl = if cx.fi >= 0 { fi_decl[cx.fi] } else { -1 }
     prof_push(prof_frame(block, decl, cx.inst))
     note_profile_defer(profile_pop_defer)
@@ -157,7 +157,7 @@ fn profile_generator(gen: I32, inst: I32, k: I32) I32 {
 }
 
 /// The expansion's body is checked: as @profile_close.
-fn profile_generator_end(guards: I32, k: I32, cx: Cx) void {
+fn profile_generator_end(guards: I32, k: I32, cx: Cx) Void {
     if guards < 0 { return }
     profile_close(guards, cx)
     prof_gen[k] = -1
@@ -177,7 +177,7 @@ fn profile_open(node: I32, decl: I32, inst: I32) I32 {
 
 /// The code is checked (void): its frame popped where it ends (a `return`
 /// in it popped it already), and a JS exception from it pops it too.
-fn profile_close(guards: I32, cx: Cx) void {
+fn profile_close(guards: I32, cx: Cx) Void {
     if guards < 0 { return }
     guard_defers(guards, vt_none, cx)
     prof_pop()
@@ -197,10 +197,10 @@ fn profile_yield(k: I32) I32 {
 
 /// The consumer's body is checked (still in its `continue` block): a JS
 /// exception from it pushes the frame back.
-fn profile_yield_guard(guards: I32, cx: Cx) void => if guards >= 0 { guard_defers(guards, vt_none, cx) }
+fn profile_yield_guard(guards: I32, cx: Cx) Void => if guards >= 0 { guard_defers(guards, vt_none, cx) }
 
 /// After the body's block (where its `continue` goes): the frame back.
-fn profile_yield_end(guards: I32, k: I32) void {
+fn profile_yield_end(guards: I32, k: I32) Void {
     if guards < 0 { return }
     prof_push(prof_gen[k])
     defer_node.resize(defer_node.len() - 1)
@@ -218,7 +218,7 @@ fn prof_import(resume: Bool) I32 {
 /// A call of await import `f` (of result `vt`), its promise on the stack
 /// since `m`. Profiling, the frames set aside while it waits:
 /// `p = promise; s = park(); try { v = await(p) } catch { resume(s); rethrow }; resume(s); v`.
-fn profile_await(f: I32, vt: I32, m: I32) void {
+fn profile_await(f: I32, vt: I32, m: I32) Void {
     if not profiling() {
         w_node(Op.Call, vt, f, 0, m)
         return
@@ -250,7 +250,7 @@ fn profile_await(f: I32, vt: I32, m: I32) void {
     w_node(Op.Seq, vt, 0, 0, m)
 }
 
-fn prof_resume(s: I32) void {
+fn prof_resume(s: I32) Void {
     let m = w_mark()
     w_get(vt_externref, s)
     w_node(Op.Call, vt_none, prof_import(true), 0, m)

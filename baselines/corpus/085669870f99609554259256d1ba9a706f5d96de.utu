@@ -12,8 +12,8 @@ struct Board:
     | category: Str
     | cards: Array[Card]
 
-fn focus_after_render(id: Str) void {
-    let frame = Browser.requestAnimationFrame(cl(time) void {
+fn focus_after_render(id: Str) Void {
+    let frame = Browser.requestAnimationFrame(cl(time) Void {
         promote Browser.document.getElementById(id) {
             |element| => element.focus(),
             ~> {},
@@ -104,7 +104,7 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
     \/;
 }
 
-export main() void {
+export main() Void {
     let state = @stored/\
         Board "dispatch-v1" Board {
             query: "", draft: "", category: "Design",

@@ -56,7 +56,7 @@ mod data {
         \\    | name: Str
         \\    | count: I32
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let missing = \\{"name": "pen",
         \\                  \\ "colour": "red"}
         \\    console.log(@json/\ error Item missing \/)         // missing field "count" at line 2, column 18

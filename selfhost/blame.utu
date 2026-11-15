@@ -16,7 +16,7 @@ vec blame_func_decl: I32
 vec blame_mem_decl: I32
 
 /// The declarations' entities, inverted.
-fn blame_invert() void {
+fn blame_invert() Void {
     blame_ht_decl.resize(ht_kind.len())
     for (0 ..< ht_kind.len()) |t| { blame_ht_decl[t] = -1 }
     blame_glob_decl.resize(glob_kind.len())

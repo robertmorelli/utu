@@ -13,14 +13,14 @@
 let delay: fun(I32, I32) Promise[I32] =
     @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/
 
-let record: fun(I32) void = @es/\ (v) => { globalThis.__last = v; } \/
+let record: fun(I32) Void = @es/\ (v) => { globalThis.__last = v; } \/
 let last: fun() I32 = @es/\ () => globalThis.__last ?? 0 \/
 
 // ── Subscribing ──────────────────────────────────────────────────────────────
 // The callback is a `cl`, which is already a JS function, so `.then` hands it
 // straight to the platform. No host support beyond the promise itself.
 
-fn subscribe(n: I32) void {
+fn subscribe(n: I32) Void {
     delay(n, 5).then(cl(v) { record(v) })
 }
 

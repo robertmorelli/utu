@@ -107,10 +107,8 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     self_param: ($) => seq('|', $.identifier, '|'),
     param_list: ($) => seq($.param, repeat(seq(',', $.param)), optional(',')),
     param: ($) => seq($.identifier, ':', $._type),
-    return_type: ($) => choice($.void_type, $._type, $.yield_type),
-    // `fn name() yield T { … yield v; … }` declares a generator of T values.
-    yield_type: ($) => seq('yield', $._type),
-    void_type: (_) => 'void',
+    return_type: ($) => $._type,
+    // (`gn name() T { … yield v … }` declares a generator of T values: fn_decl.)
     type_list: ($) => seq($._type, repeat(seq(',', $._type))),
 
     // Global constant

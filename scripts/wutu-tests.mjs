@@ -201,7 +201,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
           export lib {
             fn make(pct: I32) Gauge { Gauge { pct: pct }; }
             fn render(g: Gauge) Browser.HTMLElement { view(g); }
-            fn set(g: Gauge, pct: I32) void { g.pct = pct; wutu.refresh(); }
+            fn set(g: Gauge, pct: I32) Void { g.pct = pct; wutu.refresh(); }
           }
         `});
         const gauge = instance.exports.make(40);
@@ -375,7 +375,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
   test('wutu diagnostics: template errors point at the attribute, alias, binding, or interpolation', async ({ ROOT }) => {
     const cases = [
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; }`, 'invalid-dsl-usage', 'h'],
-      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) void { x.focus(); }; } } \\/; }`, 'invalid-dsl-usage', 'x'],
+      [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) Void { x.focus(); }; } } \\/; }`, 'invalid-dsl-usage', 'x'],
       [`${BROWSER}export main() Browser.HTMLElement { @wutu/\\ div { = 1 +; } \\/; }`, 'invalid-dsl-usage', '1'],
     ];
     for (const [source, kind, text] of cases) {
@@ -431,10 +431,10 @@ export main() Browser.HTMLElement {
   test('@stored: non-struct state, bad types, and unknown validators are located precisely', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
-      [`${BROWSER}export main() void { let s = @stored/\\ Str "k" "x" \\/; }`, 'invalid-dsl-usage', 'Str', 'must be a struct'],
-      [`${BROWSER}struct S:\n    | n: I64\nexport main() void { let s = @stored/\\ S "k" S { n: 1 } \\/; }`, 'invalid-dsl-usage', 'S', 'Unsupported stored type I64'],
-      [`${BROWSER}struct S:\n    | n: I32\nexport main() void { let s = @stored/\\ S "k" validate nope S { n: 1 } \\/; }`, 'unknown-variable', 'nope', ''],
-      [`${BROWSER}struct S:\n    | n: I32\nexport main() void { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'missing', ''],
+      [`${BROWSER}export main() Void { let s = @stored/\\ Str "k" "x" \\/; }`, 'invalid-dsl-usage', 'Str', 'must be a struct'],
+      [`${BROWSER}struct S:\n    | n: I64\nexport main() Void { let s = @stored/\\ S "k" S { n: 1 } \\/; }`, 'invalid-dsl-usage', 'S', 'Unsupported stored type I64'],
+      [`${BROWSER}struct S:\n    | n: I32\nexport main() Void { let s = @stored/\\ S "k" validate nope S { n: 1 } \\/; }`, 'unknown-variable', 'nope', ''],
+      [`${BROWSER}struct S:\n    | n: I32\nexport main() Void { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'missing', ''],
     ];
     for (const [source, kind, text, message] of cases) {
       const diagnostics = await diagnose(compiler, ROOT, source);
@@ -454,7 +454,7 @@ export main() Browser.HTMLElement {
         if ready { p { "ready"; } } else if failed { p { "failed"; } } else { p { "wait"; } }
         for items |item, i| key item.id { li { data-id = item.id; = item.name; } }
         input { type = "text"; bind:value = state.text; .disabled = locked; }
-        button { aria-label = "Go"; on click { go(app); } on focus = cl(e) void { log("[x]"); }; }
+        button { aria-label = "Go"; on click { go(app); } on focus = cl(e) Void { log("[x]"); }; }
       }`;
     let seed = 1;
     const random = n => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };

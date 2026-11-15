@@ -30,12 +30,12 @@ mod Interner {
         self.count;
     }
 
-    fn &.begin |self| () void {
+    fn &.begin |self| () Void {
         self.start = self.used;
         self.hash = -2128831035;
     }
 
-    fn &.byte |self| (b: I32) void {
+    fn &.byte |self| (b: I32) Void {
         if self.used == self.bytes.len() {
             let grown = Array[I32].new(self.used * 2, 0);
             grown.copy_from(0, self.bytes, 0, self.used);
@@ -86,7 +86,7 @@ mod Interner {
         true;
     }
 
-    fn &.rehash |self| () void {
+    fn &.rehash |self| () Void {
         let table = Array[I32].new(self.table.len() * 2, 0);
         let mask = table.len() - 1;
         for (0 ..< self.count) |id| {

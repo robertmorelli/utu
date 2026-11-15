@@ -2,7 +2,7 @@
 // Expect: a `${` in a template string is not closed: expected '}'.
 using console from std:Console;
 
-export main() void {
+export main() Void {
     let n = 3;
     console.log(`items: ${n`);
 }

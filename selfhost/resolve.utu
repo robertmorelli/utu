@@ -309,7 +309,7 @@ enum(U8) Extra:
     | Note
     | Fix
 
-fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) void {
+fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) Void {
     if diag_fresh[0] == 0 { return }
     let i = diag_kind.len() - 1
     if diag_extra_n[i] == 0 { diag_extra[i] = extra_kind.len() }
@@ -322,41 +322,41 @@ fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) void {
 }
 
 /// A label on the last diagnostic's own span.
-fn diag_label(label: Str) void {
+fn diag_label(label: Str) Void {
     if diag_fresh[0] == 1 { add_extra(Extra.Here, -1, -1, intern_text(label), -1) }
 }
 
 /// The part of the last diagnostic's span to show (tokens `first` to `last`), with a label.
-fn diag_focus(first: I32, last: I32, label: Str) void {
+fn diag_focus(first: I32, last: I32, label: Str) Void {
     if diag_fresh[0] == 1 { add_extra(Extra.Here, tok_start[first], tok_end[last], intern_text(label), -1) }
 }
 
 /// Another place the last diagnostic is about, by tokens `first` to `last`.
-fn diag_place_tokens(role: Extra, first: I32, last: I32, label: Str) void {
+fn diag_place_tokens(role: Extra, first: I32, last: I32, label: Str) Void {
     if first >= 0 and diag_fresh[0] == 1 { add_extra(role, tok_start[first], tok_end[last], intern_text(label), -1) }
 }
 
 /// Another place the last diagnostic is about: node, its role, and a label.
-fn diag_place(role: Extra, node: I32, label: Str) void {
+fn diag_place(role: Extra, node: I32, label: Str) Void {
     if node >= 0 and diag_fresh[0] == 1 { add_extra(role, node, -1, intern_text(label), -1) }
 }
 
 /// A note on the last diagnostic: one sentence that teaches the rule.
-fn diag_note(text: Str) void {
+fn diag_note(text: Str) Void {
     if diag_fresh[0] == 1 { add_extra(Extra.Note, -1, -1, intern_text(text), -1) }
 }
 
 /// A fix for the last diagnostic: source bytes `start ..< end_` become `text`.
-fn diag_fix(start: I32, end_: I32, text: Str, label: Str) void {
+fn diag_fix(start: I32, end_: I32, text: Str, label: Str) Void {
     if diag_fresh[0] == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)) }
 }
 
-fn report(kind: Diag, node: I32, word: I32) void => report3(kind, node, word, -1, -1, -1)
+fn report(kind: Diag, node: I32, word: I32) Void => report3(kind, node, word, -1, -1, -1)
 
-fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void => report3(kind, node, word, a, b, -1)
+fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) Void => report3(kind, node, word, a, b, -1)
 
 /// Report a mistake (once per node, kind, and word).
-fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
+fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) Void {
     // Once for a node: a name resolved, or a type read, twice is still one mistake.
     diag_fresh[0] = 0
     if node >= 0 and diag_slot(node, kind.i32(), word) >= 0 { return }
@@ -394,14 +394,14 @@ fn diag_slot(node: I32, kind: I32, word: I32) I32 {
     -1
 }
 
-fn diag_seen_add(i: I32, node: I32, kind: I32, word: I32) void {
+fn diag_seen_add(i: I32, node: I32, kind: I32, word: I32) Void {
     let mask = diag_seen.len() - 1
     let h = diag_hash(node, kind, word) & mask
     while (diag_seen[h] >= 0) { h = (h + 1) & mask }
     diag_seen[h] = i
 }
 
-fn diag_seen_rebuild() void {
+fn diag_seen_rebuild() Void {
     let n = 64
     while (n < (diag_kind.len() + 1) * 4) { n = n * 2 }
     diag_seen.resize(n)
@@ -411,7 +411,7 @@ fn diag_seen_rebuild() void {
 }
 
 /// Keep the first n diagnostics.
-fn diag_truncate(n: I32) void {
+fn diag_truncate(n: I32) Void {
     diag_seen_ok[0] = 0
     diag_kind.resize(n)
     diag_node.resize(n)
@@ -425,7 +425,7 @@ fn diag_truncate(n: I32) void {
 }
 
 /// No diagnostics, and no extra rows: a build starting over.
-fn diag_reset() void {
+fn diag_reset() Void {
     diag_truncate(0)
     extra_kind.clear()
     extra_node.clear()
@@ -434,7 +434,7 @@ fn diag_reset() void {
     extra_label.clear()
 }
 
-fn diag_move(from: I32, to: I32) void {
+fn diag_move(from: I32, to: I32) Void {
     diag_seen_ok[0] = 0
     diag_kind[to] = diag_kind[from]
     diag_node[to] = diag_node[from]
@@ -470,7 +470,7 @@ fn member_slot(owner: I32, key: I32) I32 {
     h
 }
 
-fn members_reset(capacity: I32) void {
+fn members_reset(capacity: I32) Void {
     member_owner.resize(capacity)
     member_key.resize(capacity)
     member_decl.resize(capacity)
@@ -498,7 +498,7 @@ fn add_member(owner: I32, name: I32, space: Space, decl: I32) I32 {
     -1
 }
 
-fn grow_members() void {
+fn grow_members() Void {
     let n = member_key.len()
     let owners = Array[I32].new(n, 0)
     let keys = Array[I32].new(n, 0)
@@ -539,7 +539,7 @@ vec bind_prev: I32
 vec word_top: I32
 
 /// Bring `decl` into scope as `word`, hiding what that word named.
-fn bind(word: I32, decl: I32) void {
+fn bind(word: I32, decl: I32) Void {
     if word < 0 { return }
     bind_word.push(word)
     bind_decl.push(decl)
@@ -550,7 +550,7 @@ fn bind(word: I32, decl: I32) void {
 /// Where the scope stands: @scope_pop goes back to it.
 fn scope_mark() I32 => bind_decl.len()
 
-fn scope_pop(mark: I32) void {
+fn scope_pop(mark: I32) Void {
     let i = bind_decl.len()
     while (i > mark) {
         i -= 1
@@ -598,12 +598,12 @@ fn scope_file(file: I32, entry: I32) I32 {
 }
 
 /// Bring file `f`'s scope into scope (on top of the prelude's).
-fn enter_file(f: I32) void {
+fn enter_file(f: I32) Void {
     if f >= file_scope.len() or file_scope[f] < 0 { return }
     for (file_scope[f] ..< file_scope_end[f]) |k| { bind(scope_word[k], scope_decl[k]) }
 }
 
-fn reset_resolve() void {
+fn reset_resolve() Void {
     decl_kind.clear()
     decl_name.clear()
     decl_node.clear()
@@ -718,7 +718,7 @@ fn declare_type_item(item: I32, owner: I32) I32 {
     -1
 }
 
-fn declare_fields(holder: I32, owner: I32) void {
+fn declare_fields(holder: I32, owner: I32) Void {
     let c = first_child(holder)
     let index = 0
     while (c >= 0) {
@@ -804,7 +804,7 @@ fn is_variant_name(d: I32) Bool {
 
 /// Variant `v`, a member of `module` by its name: a name two of its enums'
 /// variants have is ambiguous (`m.E.V` says which).
-fn add_variant_member(module: I32, v: I32) void {
+fn add_variant_member(module: I32, v: I32) Void {
     let prior = add_member(module, decl_name[v], Space.Member, v)
     let p = prior
     while (decl_is(p, Decl.Ambiguous)) { p = decl_owner[p] }
@@ -817,7 +817,7 @@ fn add_variant_member(module: I32, v: I32) void {
 
 /// `d`, a member of `module`; a second of its name is reported. (A
 /// variant's name is a declaration's: the variant is `m.E.V`.)
-fn member_once(module: I32, d: I32) void {
+fn member_once(module: I32, d: I32) Void {
     let prior = add_member(module, decl_name[d], Space.Member, d)
     if is_variant_name(prior) {
         member_decl[member_slot(module, decl_name[d] * 4 + Space.Member.i32())] = d
@@ -827,7 +827,7 @@ fn member_once(module: I32, d: I32) void {
 }
 
 /// A module's type parameters and members, in scope for its body.
-fn bind_module(module: I32) void {
+fn bind_module(module: I32) Void {
     let item = decl_node[module]
     let c = next_sibling(first_child(item))
     if is_kind(c, Node.Module_type_param_list) {
@@ -844,7 +844,7 @@ fn bind_module(module: I32) void {
 /// A module's members (and the variants of its enums), by their names. Its
 /// promoted type is not bound: its name stays the module's, which stands
 /// for it as a type.
-fn bind_module_members(module: I32) void {
+fn bind_module_members(module: I32) Void {
     let since = scope_mark()
     // In declaration order: each declaration's id follows the module's.
     let d = module + 1
@@ -869,7 +869,7 @@ fn is_part_of(decl: I32, module: I32) Bool {
 /// (no alias, no file) open M (an instance of it): its members are in scope
 /// by their own names. A name two opened modules have, since `since`, is
 /// ambiguous.
-fn declare_alias(item: I32, since: I32) void {
+fn declare_alias(item: I32, since: I32) Void {
     if has_alias(item) {
         let c = first_child(item)
         while (not is_kind(c, Node.Captured_module_name)) { c = next_sibling(c) }
@@ -901,7 +901,7 @@ fn using_path(item: I32) I32 {
 
 /// A module's members, opened. Where one hides a member another module
 /// opened since `since`, the name is ambiguous.
-fn open_module(module: I32, since: I32) void {
+fn open_module(module: I32, since: I32) Void {
     let mark = scope_mark()
     bind_module_members(module)
     for (mark ..< scope_mark()) |b| {
@@ -934,7 +934,7 @@ fn ambiguous(decl: I32, node: I32) Bool {
 }
 
 /// The module an import names, in the file it imports, recorded on its name.
-fn bind_import(i: I32) void {
+fn bind_import(i: I32) Void {
     let n = name_node(first_child(import_node[i]))
     let file = import_target[i]
     if n < 0 or file < 0 or file_root[file] < 0 { return }
@@ -983,7 +983,7 @@ fn imported_modules_text(item: I32) Str {
 /// A declaration of a file named like a module of the prelude, reported at
 /// its name: the compiler's own `Str` or `Array` is the prelude's. (A short
 /// name, `S` for Str, is a file's to declare.)
-fn standard_name(decl: I32, name_at: I32) void {
+fn standard_name(decl: I32, name_at: I32) Void {
     if decl_name[decl] >= 0 and prelude_lookup(decl_name[decl]) >= 0 and not short_type_name(decl_name[decl]) { report(Diag.StandardName, name_at, decl_name[decl]) }
 }
 
@@ -1034,7 +1034,7 @@ fn lazy_index(m: I32) I32 {
 /// Every declaration of the program: each file's modules (the prelude's
 /// in scope under every file's), then each file's scope (see
 /// @declare_file_scope), kept to be bound again by @enter_file.
-fn declare_program() void {
+fn declare_program() Void {
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry]) |role| {
         for (0 ..< file_root.len()) |file| {
             if file_role[file] == role.i32() and file_root[file] >= 0 {
@@ -1131,7 +1131,7 @@ fn declare_program() void {
 /// (under their aliases when they have them), its aliases and opened
 /// modules, then its own declarations (the entry file's, with those of its
 /// generated files), each hiding what came before.
-fn declare_file_scope(file: I32) void {
+fn declare_file_scope(file: I32) Void {
     let root = file_root[file]
     let item = first_child(root)
     while (item >= 0) {
@@ -1195,7 +1195,7 @@ vec top_same_module: I32
 /// declaration of the file (or another `using`) names is reported at the
 /// later one. Two
 /// `using`s of one module (one file, two spellings) are not.
-fn check_using_names(root: I32) void {
+fn check_using_names(root: I32) Void {
     top_name.clear()
     top_item.clear()
     let item = first_child(root)
@@ -1259,7 +1259,7 @@ fn mod_clash(m: I32, item: I32) Bool {
 
 /// `item`'s name node, kept when it has one (a `using`'s: its alias, or the
 /// module a file import names).
-fn add_top_name(item: I32, at: I32) void {
+fn add_top_name(item: I32, at: I32) Void {
     let n = -1
     if is_kind(item, Node.Using_decl) {
         if has_alias(item) {
@@ -1309,7 +1309,7 @@ fn entry_file() I32 {
 }
 
 /// A program has one `export lib` or one `export main`, not both.
-fn check_entry_surface(root: I32) void {
+fn check_entry_surface(root: I32) Void {
     let lib = -1
     let main = -1
     let item = first_child(root)
@@ -1329,12 +1329,12 @@ fn check_entry_surface(root: I32) void {
 
 /// Each test and bench has a name, and no two tests (or benches) the same
 /// one as `utu test` shows it (`geo: name` for one in mod geo).
-fn check_test_names(root: I32) void {
+fn check_test_names(root: I32) Void {
     for ([Node.Test_decl, Node.Bench_decl]) |kind| { check_test_names_in(root, kind, -1, word_stamp()) }
 }
 
 /// The tests (or benches) of a file or mod (`module`, its name node, or -1).
-fn check_test_names_in(root: I32, kind: Node, module: I32, stamp: I32) void {
+fn check_test_names_in(root: I32, kind: Node, module: I32, stamp: I32) Void {
     // (TestName's argument: 0 a duplicate, 1 empty; 2 and 3 a bench's.)
     let bench = if kind == Node.Bench_decl { 2 } else { 0 }
     let item = first_child(root)
@@ -1376,7 +1376,7 @@ fn shown_test_name(module: I32) I32 {
     id
 }
 
-fn declare_entry_item(item: I32, first_entry: I32) void {
+fn declare_entry_item(item: I32, first_entry: I32) Void {
     let kind = node_kind[item]
     let decl = declare_type_item(item, -1)
     if decl < 0 {
@@ -1427,7 +1427,7 @@ fn clashes_mem(word: I32) Bool {
 }
 
 /// `decl`, named as `first` is in one scope: reported at `decl`.
-fn report_twice(decl: I32, first: I32) void {
+fn report_twice(decl: I32, first: I32) Void {
     report(Diag.DuplicateDeclaration, decl_node[decl], decl_name[decl])
     let again = decl_name_at(decl)
     if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again") }
@@ -1435,7 +1435,7 @@ fn report_twice(decl: I32, first: I32) void {
 }
 
 /// An enum's variants are types too, named where the enum is.
-fn bind_variants(decl: I32) void {
+fn bind_variants(decl: I32) Void {
     if not decl_is(decl, Decl.Enum) { return }
     let d = decl + 1
     while (d < decl_kind.len() and decl_owner[d] >= decl and decl_owner[d] <= d) {
@@ -1451,7 +1451,7 @@ vec items_since: I32 = [0]
 /// since `since` (one file's, one mod's) has is ambiguous: `E.V` says which.
 /// A declaration's name (its enum's too) is the declaration's: the variant
 /// is then `E.V`.
-fn bind_variant(v: I32, since: I32) void {
+fn bind_variant(v: I32, since: I32) Void {
     let word = decl_name[v]
     if word < 0 { return }
     let b = word_top[word]
@@ -1525,7 +1525,7 @@ vec saved_c: I32
 vec saved_extra: I32
 vec saved_extra_n: I32
 
-fn save_diagnostics() void {
+fn save_diagnostics() Void {
     let n = diag_kind.len()
     saved_kind.resize(n)
     saved_node.resize(n)
@@ -1547,7 +1547,7 @@ fn save_diagnostics() void {
     }
 }
 
-fn restore_diagnostics() void {
+fn restore_diagnostics() Void {
     let n = saved_kind.len()
     diag_truncate(n)
     for (0 ..< n) |i| {
@@ -1565,7 +1565,7 @@ fn restore_diagnostics() void {
 /// Each file's items, prelude first, in its scope: modules with their
 /// members in scope. The header pass (`headers`) registers methods and
 /// aliases; the next resolves bodies.
-fn walk_program(headers: Bool) void {
+fn walk_program(headers: Bool) Void {
     let entry = entry_file()
     for ([FileRole.Prelude, FileRole.Import, FileRole.Entry, FileRole.Generated]) |role| {
         // A scope entered stays for the next file in it (generated files
@@ -1605,7 +1605,7 @@ fn walk_program(headers: Bool) void {
     }
 }
 
-fn walk_item(item: I32, w: Walk) void {
+fn walk_item(item: I32, w: Walk) Void {
     let kind = node_kind[item]
     if kind == Node.Using_decl.i32() {
         if w.headers { walk_using(item, w) }
@@ -1669,7 +1669,7 @@ fn walk_item(item: I32, w: Walk) void {
 
 /// `using M[…] |A| from …`: the module it names, its type arguments, and for
 /// an import, that the module is in the file imported.
-fn walk_using(item: I32, w: Walk) void {
+fn walk_using(item: I32, w: Walk) Void {
     let name_at = first_child(item)
     let n = name_node(name_at)
     // An import's module is in the file it imports (see @bind_import).
@@ -1704,7 +1704,7 @@ fn walk_using(item: I32, w: Walk) void {
 
 /// `fn T.name`, `fn &.name`, `fn P[T].name`: a method of T (or of the
 /// promoted type), found by `T.name` and by calls on a T.
-fn register_method(item: I32, w: Walk) void {
+fn register_method(item: I32, w: Walk) Void {
     let name = first_child(item)
     let receiver = first_child(name)
     let method = last_child(name)
@@ -1759,7 +1759,7 @@ fn register_method(item: I32, w: Walk) void {
 
 /// `fn P[T].m` twice for one T: reported at the one in the program's own
 /// files (the user's, when std already has it).
-fn impl_twice(a: I32, b: I32) void {
+fn impl_twice(a: I32, b: I32) Void {
     let again = if is_own_file(file_of_token(node_first[decl_node[b]])) { b } else { a }
     let first = if again == b { a } else { b }
     let name = first_child(decl_node[again])
@@ -1779,7 +1779,7 @@ fn impl_target(args: I32) I32 {
 }
 
 /// `fn T:add |a, b|`: an operator of T.
-fn register_operator(item: I32, w: Walk) void {
+fn register_operator(item: I32, w: Walk) Void {
     let receiver = first_child(item)
     let op = next_sibling(receiver)
     let owner = as_type(receiver, walk_type_name(receiver, w))
@@ -1844,11 +1844,11 @@ fn promoted(decl: I32) I32 {
 fn builtin_type(word: I32) Bool => word >= narrow_word(Narrow.U8) and word <= narrow_word(Narrow.I16)
 
 /// Element kinds of mems and bases of distinct types: builtin names or types.
-fn walk_elem_type(node: I32, w: Walk) void {
+fn walk_elem_type(node: I32, w: Walk) Void {
     if not builtin_type(word_of(node)) { as_type(node, walk_type_name(node, w)) }
 }
 
-fn walk_types(node: I32, w: Walk) void {
+fn walk_types(node: I32, w: Walk) Void {
     let c = first_child(node)
     while (c >= 0) {
         walk_type(c, w)
@@ -1856,7 +1856,7 @@ fn walk_types(node: I32, w: Walk) void {
     }
 }
 
-fn walk_type(node: I32, w: Walk) void {
+fn walk_type(node: I32, w: Walk) Void {
     let kind = node_kind[node]
     // `Void` (or `V`) where no declaration has the name: no value.
     if kind == Node.Ref_type.i32() and is_kind(first_child(node), Node.Type_ident) and lookup(word_of(first_child(node))) < 0
@@ -1984,7 +1984,7 @@ fn module_named(decl: I32) I32 {
     if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl_owner[decl] } else { decl }
 }
 
-fn walk_type_item(item: I32, w: Walk) void {
+fn walk_type_item(item: I32, w: Walk) Void {
     let c = first_child(item)
     while (c >= 0) {
         let kind = node_kind[c]
@@ -2044,7 +2044,7 @@ fn listed_before(list: I32, t: I32, d: I32) Bool {
 /// `&` in a protocol's member (`cmp(&) I32`) is the type implementing it:
 /// recorded as the protocol, and read as the implementer by a bounded
 /// module's calls and by conformance.
-fn self_types(node: I32, proto: I32) void {
+fn self_types(node: I32, proto: I32) Void {
     if is_kind(node, Node.Promoted_type) { node_decl[node] = proto }
     let c = first_child(node)
     while (c >= 0) {
@@ -2063,7 +2063,7 @@ fn walk_impl_name(node: I32, w: Walk) I32 {
 }
 
 /// `mod M[T[P, Q]]`: each bound names a protocol.
-fn walk_bounds(list: I32, w: Walk) void {
+fn walk_bounds(list: I32, w: Walk) Void {
     let param = first_child(list)
     while (param >= 0) {
         let bounds = next_sibling(first_child(param))
@@ -2107,7 +2107,7 @@ fn declare_binders(node: I32, owner: I32, index: I32) I32 {
     i
 }
 
-fn walk_params(list: I32, owner: I32, w: Walk) void {
+fn walk_params(list: I32, owner: I32, w: Walk) Void {
     // A Wasm function takes at most 1000 parameters.
     let n = child_count(list)
     if n > 1000 {
@@ -2127,7 +2127,7 @@ fn walk_params(list: I32, owner: I32, w: Walk) void {
     }
 }
 
-fn walk_fn(item: I32, w: Walk) void {
+fn walk_fn(item: I32, w: Walk) Void {
     let name = first_child(item)
     let decl = node_decl[last_child(name)]
     let mark = scope_mark()
@@ -2152,7 +2152,7 @@ fn walk_fn(item: I32, w: Walk) void {
 }
 
 /// `fn T:op |a, b| R { … }`: the captures are its parameters.
-fn walk_op(item: I32, w: Walk) void {
+fn walk_op(item: I32, w: Walk) Void {
     let op = next_sibling(first_child(item))
     let decl = node_decl[op]
     let mark = scope_mark()
@@ -2177,7 +2177,7 @@ fn walk_op(item: I32, w: Walk) void {
     scope_pop(mark)
 }
 
-fn walk_children(node: I32, w: Walk) void {
+fn walk_children(node: I32, w: Walk) Void {
     let c = first_child(node)
     while (c >= 0) {
         walk_expr(c, w)
@@ -2186,7 +2186,7 @@ fn walk_children(node: I32, w: Walk) void {
 }
 
 /// Bind each name of a capture (`|a, b|`) to the capture.
-fn bind_capture(capture: I32, kind: Decl) void {
+fn bind_capture(capture: I32, kind: Decl) Void {
     let n = first_child(capture)
     while (n >= 0) {
         declare_in_scope(kind, n, capture, -1)
@@ -2194,7 +2194,7 @@ fn bind_capture(capture: I32, kind: Decl) void {
     }
 }
 
-fn walk_expr(node: I32, w: Walk) void {
+fn walk_expr(node: I32, w: Walk) Void {
     if node < 0 { return }
     let kind = node_kind[node]
     if kind == Node.Identifier.i32() {
@@ -2210,7 +2210,7 @@ fn walk_expr(node: I32, w: Walk) void {
     }
 }
 
-fn walk_compound(node: I32, kind: I32, w: Walk) void {
+fn walk_compound(node: I32, kind: I32, w: Walk) Void {
     match Node(kind) {
         Node.Block => {
             let mark = scope_mark()
@@ -2315,7 +2315,7 @@ fn walk_compound(node: I32, kind: I32, w: Walk) void {
 }
 
 /// `a.f`, `a?.f`; with `a` a module (`m.f`), its member.
-fn walk_field(node: I32, w: Walk) void {
+fn walk_field(node: I32, w: Walk) Void {
     let base = first_child(node)
     walk_expr(base, w)
     let module = node_decl[base]
@@ -2347,7 +2347,7 @@ fn walk_field(node: I32, w: Walk) void {
 }
 
 /// `match e { p => a, … }` and `loop match`.
-fn walk_match(node: I32, w: Walk) void {
+fn walk_match(node: I32, w: Walk) Void {
     let c = first_child(node)
     walk_expr(c, w)
     c = next_sibling(c)
@@ -2364,7 +2364,7 @@ fn walk_match(node: I32, w: Walk) void {
 
 /// `let x: T = e;`, `let .{a, b} = e;`. The name is in scope after the
 /// initializer, except for a closure, which may call itself.
-fn walk_bind(node: I32, w: Walk) void {
+fn walk_bind(node: I32, w: Walk) Void {
     let c = first_child(node)
     let init = last_child(node)
     if is_kind(c, Node.Tuple_pattern) {
@@ -2388,7 +2388,7 @@ fn walk_bind(node: I32, w: Walk) void {
     }
 }
 
-fn walk_closure(node: I32, w: Walk) void {
+fn walk_closure(node: I32, w: Walk) Void {
     let mark = scope_mark()
     let c = first_child(node)
     while (c >= 0) {
@@ -2411,7 +2411,7 @@ fn walk_closure(node: I32, w: Walk) void {
     scope_pop(mark)
 }
 
-fn walk_for_sources(sources: I32, w: Walk) void {
+fn walk_for_sources(sources: I32, w: Walk) Void {
     let s = first_child(sources)
     while (s >= 0) {
         walk_children(s, w)
@@ -2421,7 +2421,7 @@ fn walk_for_sources(sources: I32, w: Walk) void {
 
 /// `xs map |x| { … }`, `xs fold(0) |acc, x| { … }`, `xs collect(T)`: the
 /// parameters and types, then the block with the capture in scope.
-fn walk_iterator(node: I32, w: Walk) void {
+fn walk_iterator(node: I32, w: Walk) Void {
     let c = first_child(node)
     walk_expr(c, w)
     c = next_sibling(c)
@@ -2448,7 +2448,7 @@ fn is_type_node(kind: I32) Bool {
 
 /// `Variant |x| => e`: the variant (by its type when it is qualified), then
 /// the arm with the binding in scope.
-fn walk_alt_arm(arm: I32, w: Walk) void {
+fn walk_alt_arm(arm: I32, w: Walk) Void {
     let pattern = first_child(arm)
     if is_kind(pattern, Node.Qualified_type_ref) { walk_variant_path(pattern, w) }
     else {
@@ -2473,7 +2473,7 @@ fn arm_binding(arm: I32) I32 {
 }
 
 /// `Tag.Leaf` (or `m.Tag.Leaf`) in a match: the integer enum and its variant.
-fn walk_match_lit(lit: I32, w: Walk) void {
+fn walk_match_lit(lit: I32, w: Walk) Void {
     let t = first_child(lit)
     if not is_kind(t, Node.Type_ident) { return }
     let v = last_child(lit)
@@ -2490,7 +2490,7 @@ fn walk_match_lit(lit: I32, w: Walk) void {
 }
 
 /// `T { a: e, … }`: each field name recorded as `owner`'s field.
-fn walk_field_inits(first_init: I32, owner: I32, w: Walk) void {
+fn walk_field_inits(first_init: I32, owner: I32, w: Walk) Void {
     let f = first_init
     while (f >= 0) {
         let name = first_child(f)
@@ -2501,7 +2501,7 @@ fn walk_field_inits(first_init: I32, owner: I32, w: Walk) void {
 }
 
 /// `x -o f`, `x -o M.f(a, &)`, `x -o T.method`.
-fn walk_pipe_target(target: I32, w: Walk) void {
+fn walk_pipe_target(target: I32, w: Walk) Void {
     let c = first_child(target)
     let owner = -1
     if is_kind(c, Node.Instantiated_module_ref) {
@@ -2523,7 +2523,7 @@ fn walk_pipe_target(target: I32, w: Walk) void {
     if c >= 0 { walk_pipe_args(c, w) }
 }
 
-fn walk_pipe_args(args: I32, w: Walk) void {
+fn walk_pipe_args(args: I32, w: Walk) Void {
     let list = first_child(args)
     let a = first_child(list)
     while (a >= 0) {

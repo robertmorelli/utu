@@ -41,7 +41,7 @@ mod Span[T[Ord]] {
     fn Ord[&].cmp |a| (b: &) I32 { a.low.cmp(b.low) }
 }
 
-export main() void {
+export main() Void {
     let players = [Player { name: "ada", score: 31 }, Player { name: "bo", score: 47 }, Player { name: "cy", score: 12 }]
     console.log(Ranking[Player].top(players, 2))                           // bo, ada
     let cities = [City { name: "Oslo", people: 0.7 }, City { name: "Lagos", people: 15.4 }, City { name: "Lima", people: 10.9 }]

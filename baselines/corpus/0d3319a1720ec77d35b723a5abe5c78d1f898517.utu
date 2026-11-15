@@ -25,7 +25,7 @@ mod SegmentTree[T] {
         &{ nodes: nodes, size: size, length: values.len(), identity: identity };
     }
 
-    fn &.set |self| (index: I32, value: T, combine: fun(T, T) T) void {
+    fn &.set |self| (index: I32, value: T, combine: fun(T, T) T) Void {
         if index < 0 or index >= self.length { fatal; };
         let i = self.size + index;
         self.nodes[i] = value;

@@ -9,7 +9,7 @@ mod Spatial {
         | id: I32
 
     // Keep squared distances finite, including the difference of two coordinates.
-    fn check_coordinate(value: F64) void {
+    fn check_coordinate(value: F64) Void {
         if value != value or F64.abs(value) > 1.0e150 { fatal }
     }
 
@@ -65,7 +65,7 @@ mod Spatial {
         &{ root: build(copied) }
     }
 
-    fn rectangle(node: ?Node, min_x: F64, max_x: F64, min_y: F64, max_y: F64, out: Buffer[I32]) void {
+    fn rectangle(node: ?Node, min_x: F64, max_x: F64, min_y: F64, max_y: F64, out: Buffer[I32]) Void {
         promote node {
             |current| => {
                 if current.max_x < min_x or current.min_x > max_x
@@ -93,7 +93,7 @@ mod Spatial {
     }
 
     // Three-sided reporting: inclusive x interval, y <= ceiling.
-    fn below_node(node: ?Node, min_x: F64, max_x: F64, ceiling: F64, out: Buffer[I32]) void {
+    fn below_node(node: ?Node, min_x: F64, max_x: F64, ceiling: F64, out: Buffer[I32]) Void {
         promote node {
             |current| => {
                 if current.max_x < min_x or current.min_x > max_x or current.min_y > ceiling { return }
@@ -127,7 +127,7 @@ mod Spatial {
         dx * dx + dy * dy
     }
 
-    fn radius_node(node: ?Node, x: F64, y: F64, squared: F64, out: Buffer[I32]) void {
+    fn radius_node(node: ?Node, x: F64, y: F64, squared: F64, out: Buffer[I32]) Void {
         promote node {
             |current| => {
                 if box_distance(current, x, y) > squared { return }
@@ -155,7 +155,7 @@ mod Spatial {
         | id: I32
         | squared: F64
 
-    fn nearest_node(node: ?Node, x: F64, y: F64, best: Nearest) void {
+    fn nearest_node(node: ?Node, x: F64, y: F64, best: Nearest) Void {
         promote node {
             |current| => {
                 if box_distance(current, x, y) > best.squared { return }

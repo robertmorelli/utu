@@ -51,7 +51,7 @@ fn workspace(state: MeterState) Browser.HTMLElement {
     }
     \/
 }
-export main() void {
+export main() Void {
     let state = @stored/\
         MeterState "meter-v2" manual
         MeterState {

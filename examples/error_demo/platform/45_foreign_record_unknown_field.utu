@@ -2,7 +2,7 @@
 // Expect: Unknown foreign property 'onse' in AddEventListenerOptions; did you mean once?
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let button = Browser.document.createElement("button");
-    button.addEventListener("click", cl() void { Browser.console.log("hi"); }, &{ onse: true });
+    button.addEventListener("click", cl() Void { Browser.console.log("hi"); }, &{ onse: true });
 }

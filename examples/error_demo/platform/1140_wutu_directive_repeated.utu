@@ -2,7 +2,7 @@
 // Expect: @reactive is repeated or out of order, not "unknown directive @reactive"
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let app = @wutu/\
     @reactive;
     @reactive;

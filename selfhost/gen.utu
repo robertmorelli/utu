@@ -12,10 +12,10 @@
 //!   made for it (compile with `Target.Comptime`).
 
 /// Appends `text` to `src`, where the generated file is written.
-fn gen_text(text: Str) void => for (0 ..< text.len()) |i| { src.push(text.get(i)) }
+fn gen_text(text: Str) Void => for (0 ..< text.len()) |i| { src.push(text.get(i)) }
 
 /// `text` with each `$` replaced by word `name`.
-fn gen_template(text: Str, name: I32) void {
+fn gen_template(text: Str, name: I32) Void {
     for (0 ..< text.len()) |i| {
         let c = text.get(i)
         if c == 36 { gen_word(name) } else { src.push(c) }
@@ -23,14 +23,14 @@ fn gen_template(text: Str, name: I32) void {
 }
 
 /// Appends the text of word id `word`.
-fn gen_word(word: I32) void {
+fn gen_word(word: I32) Void {
     let start = src.interned_start(word)
     for (start ..< start + src.interned_size(word)) |i| { src.push(src[i]) }
 }
 
 /// Bytes of `src` itself (copied through a buffer: pushing may move nothing,
 /// but reads and writes of one mem must not overlap).
-fn gen_span(start: I32, end_: I32) void {
+fn gen_span(start: I32, end_: I32) Void {
     let n = end_ - start
     let copy = Array[I32].new(n, 0)
     for (0 ..< n) |i| { copy[i] = src[start + i] }
@@ -65,7 +65,7 @@ fn gen_owner_of(file: I32) I32 => if file < gen_owner.len() { gen_owner[file] } 
 
 /// Writes the generated sources for each own file's mems, and parses them
 /// as one more file per file. Called before names are resolved.
-fn generate_sources() void {
+fn generate_sources() Void {
     comptime_text_start.clear()
     comptime_text_end.clear()
     comptime_text_node.clear()
@@ -99,7 +99,7 @@ fn generate_sources() void {
 
 /// A mem declaration's generated source: its interner when it holds bytes,
 /// and its `@comptime` evaluation when it has one.
-fn generate_for_mem(item: I32) void {
+fn generate_for_mem(item: I32) Void {
     let name = word_of(first_child(item))
     let elem = next_sibling(first_child(item))
     let w = word_of(elem)
@@ -166,14 +166,14 @@ fn representation_word(w: I32) I32 {
 /// generates, so word ids agree between the two compilers.
 fn interner_template() Str {
     "\nvec __$_slots: I32;\nvec __$_starts: I32;\nvec __$_sizes: I32;\nvec __$_hashes: I32;\n"
-    + "fn __mem_$_intern_reset() void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n"
+    + "fn __mem_$_intern_reset() Void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n"
     + "    __$_starts.clear();\n    __$_sizes.clear();\n    __$_hashes.clear();\n}\n"
     + "fn __mem_$_interned() I32 { __$_starts.len(); }\n"
     + "fn __mem_$_interned_start(id: I32) I32 { __$_starts[id]; }\n"
     + "fn __mem_$_interned_size(id: I32) I32 { __$_sizes[id]; }\n"
     + "fn __mem_$_intern_same(a: I32, b: I32, size: I32) Bool {\n    for (0 ..< size) |k| {\n"
     + "        if $[a + k] != $[b + k] { return false; };\n    };\n    true;\n}\n"
-    + "fn __mem_$_intern_rehash() void {\n    let size = __$_slots.len() * 2;\n    __$_slots.resize(size);\n"
+    + "fn __mem_$_intern_rehash() Void {\n    let size = __$_slots.len() * 2;\n    __$_slots.resize(size);\n"
     + "    for (0 ..< size) |slot| { __$_slots[slot] = 0; };\n    let mask = size - 1;\n"
     + "    for (0 ..< __$_starts.len()) |id| {\n        let slot = __$_hashes[id] & mask;\n"
     + "        while (__$_slots[slot] != 0) { slot = (slot + 1) & mask; };\n        __$_slots[slot] = id + 1;\n    };\n}\n"
@@ -225,13 +225,13 @@ vec checking_fi: I32 = [-1]
 vec comptime_blocker: I32 = [-1]
 
 /// Function instance `fi` names `to` (or uses mem `-2 - to`), while checked.
-fn note_reach(to: I32) void {
+fn note_reach(to: I32) Void {
     if checking_fi[0] < 0 { return }
     reach_from.push(checking_fi[0])
     reach_to.push(to)
 }
 
-fn note_mem_use(decl: I32) void => note_reach(-2 - decl)
+fn note_mem_use(decl: I32) Void => note_reach(-2 - decl)
 
 /// Whether mem k's expression waits, and the build just made can evaluate
 /// it: nothing it reaches is a `@comptime` mem still waiting (that one is

@@ -82,7 +82,7 @@ fn settlement(state: Trip) Browser.HTMLElement {
     \/
 }
 
-export main() void {
+export main() Void {
     let state = @stored/\
         Trip "split-v1" Trip {
             draft: "", amount: 0.0, payer: "Ada",

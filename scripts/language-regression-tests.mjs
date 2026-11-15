@@ -223,7 +223,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       fn early(l: Log, stop: Bool) I32 { defer l.v += 1; if stop { return 5; }; 7; }
       fn returned(l: Log) I32 { defer l.v = 99; return l.v; }
       fn nested(l: Log) I32 { defer l.v = l.v * 10 + 1; { defer l.v = l.v * 10 + 2; return 0; }; }
-      fn cleared(l: Log) void { defer l.v += 5; l.v = 1; }
+      fn cleared(l: Log) Void { defer l.v += 5; l.v = 1; }
       export lib {
           fn order() I32 { let l = Log { v: 0 }; { defer l.v = l.v * 10 + 1; defer l.v = l.v * 10 + 2; l.v = 9; }; l.v; }
           fn after_value() I32 { let l = Log { v: 1 }; let a = value(l); a * 1000 + l.v; }
@@ -509,13 +509,13 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           | v: I32
       struct P:
           | v: I32
-      fn squares(n: I32) yield I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }
-      fn three() yield I32 { yield 1; yield 2; yield 3; }
-      fn upto(n: I32) yield I32 { let i = 0; while (true) { if i == n { return; }; yield i; i += 1; }; }
-      fn shadowing(s: I32) yield I32 { let x = s * 2; yield x; yield x + 1; }
-      fn doubled(n: I32) yield I32 { for (squares(n)) |x| { yield x * 2; }; }
-      fn points(n: I32) yield P { for (0..<n) |i| { yield P { v: i }; }; }
-      fn guarded(l: Log) yield I32 { defer l.v += 100; yield 1; yield 2; }
+      gn squares(n: I32) I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }
+      gn three() I32 { yield 1; yield 2; yield 3; }
+      gn upto(n: I32) I32 { let i = 0; while (true) { if i == n { return; }; yield i; i += 1; }; }
+      gn shadowing(s: I32) I32 { let x = s * 2; yield x; yield x + 1; }
+      gn doubled(n: I32) I32 { for (squares(n)) |x| { yield x * 2; }; }
+      gn points(n: I32) P { for (0..<n) |i| { yield P { v: i }; }; }
+      gn guarded(l: Log) I32 { defer l.v += 100; yield 1; yield 2; }
       fn bump(l: Log) I32 { l.v += 1; 3; }
       fn first_over(limit: I32) I32 { for (squares(100)) |x| { if x > limit { return x; }; }; -1; }
       export lib {
@@ -539,7 +539,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
   });
 
   test('generators: a consumed generator compiles to the same wasm as the hand-written loop', async ({ ROOT }) => {
-    const generated = 'fn squares(n: I32) yield I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }\nexport lib { fn run(n: I32) I32 { let s = 0; for (squares(n)) |x| { s += x; }; s; } }';
+    const generated = 'gn squares(n: I32) I32 { for (0..<n) |i| { if i % 3 != 0 { yield i * i; }; }; }\nexport lib { fn run(n: I32) I32 { let s = 0; for (squares(n)) |x| { s += x; }; s; } }';
     const hand = 'export lib { fn run(n: I32) I32 { let s = 0; for (0..<n) |i| { if i % 3 != 0 { s += i * i; }; }; s; } }';
     for (const optimize of ['size', 'speed']) {
       const a = await instantiateAt(ROOT, `generator_shape_${optimize}.utu`, generated, optimize);
@@ -553,7 +553,7 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     if (typeof WebAssembly.Suspending !== 'function') return; // host without JSPI
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'async_generator.utu', source: `
       let later: fun(I32) Promise[I32] = @es/\\ (v) => new Promise(r => setTimeout(() => r(v * 10), 2)) \\/;
-      fn ticks(n: I32) yield I32 {
+      gn ticks(n: I32) I32 {
           for (0..<n) |i| {
               let value: I32 = await later(i);
               yield value;
@@ -574,11 +574,11 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
       mem floats: F32;
       mem ids: U32;
       mem wide: I64;
-      fn evens(n: I32) yield I32 { for (0..<n) |i| { if i % 2 == 0 { yield i; }; }; }
+      gn evens(n: I32) I32 { for (0..<n) |i| { if i % 2 == 0 { yield i; }; }; }
       export lib {
           fn fill(n: I32) I32 { text.clear(); for (0..<n) |i| { text.push(97 + i % 26); }; text.len(); }
           fn count(c: I32) I32 { let k = 0; for (0..<text.len()) |i| { if text[i] == c { k += 1; }; }; k; }
-          fn set_len(n: I32) void { text.resize(n); }
+          fn set_len(n: I32) Void { text.resize(n); }
           fn capacity(n: I32) I32 { text.reserve(n); text.cap(); }
           fn truncate() I32 { text.resize(3); let wide_byte = 300; text[0] = wide_byte; text[1] += 10; text[2] = text[text[0] - 44]; text[0] * 10000 + text[1] * 100 + text[2]; }
           fn sign() I32 { signed.resize(2); let unsigned_byte = 200; signed[0] = unsigned_byte; signed[1] = -3; signed[0] * 1000 + signed[1]; }
@@ -1011,27 +1011,27 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
           | next: ?Chain
       struct Log:
           | v: I32
-      fn children(n: Node) yield Node {
+      gn children(n: Node) Node {
           alt n {
               Leaf |x| => {},
               Bin |b| => { yield b.l; yield b.r; },
               List |k| => { for (k.xs) |c| { yield c; }; },
           };
       }
-      fn walk(n: Node) yield Node { for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; }; }
-      fn post(n: Node) yield Node { for (children(n)) |c| { for (post(c)) |d| { yield d; }; }; yield n; }
-      fn inorder(lo: I32, hi: I32) yield I32 {
+      gn walk(n: Node) Node { for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; }; }
+      gn post(n: Node) Node { for (children(n)) |c| { for (post(c)) |d| { yield d; }; }; yield n; }
+      gn inorder(lo: I32, hi: I32) I32 {
           if hi - lo <= 0 { return; };
           let mid: I32 = lo + (hi - lo) / 2;
           for (inorder(lo, mid)) |x| { yield x; };
           yield mid;
           for (inorder(mid + 1, hi)) |x| { yield x; };
       }
-      fn links(c: Chain) yield I32 {
+      gn links(c: Chain) I32 {
           yield c.v;
           promote c.next { |n| => { for (links(n)) |x| { yield x; }; }, ~> {}, };
       }
-      fn counted(l: Log, n: I32) yield I32 { l.v += 1; if n > 0 { yield n; for (counted(l, n - 1)) |x| { yield x; }; }; }
+      gn counted(l: Log, n: I32) I32 { l.v += 1; if n > 0 { yield n; for (counted(l, n - 1)) |x| { yield x; }; }; }
       fn value(n: Node) I32 { alt n { Leaf |x| => x.v, ~> 0, }; }
       fn tag_of(n: Node) I32 { alt n { Leaf |x| => x.v, Bin |b| => 7, List |k| => 8, }; }
       fn tree() Node {
@@ -1069,19 +1069,19 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     const cases = [
       ['fn f() I32 { yield 1; 1; }\nexport main() I32 { f(); }', 'yield outside a generator'],
-      ['fn g() yield I32 { yield 1; }\nexport main() I32 { let x = g(); 1; }', 'g is a generator: for (g(…)) |v| { … }'],
-      ['fn a() yield I32 { for (b()) |x| { yield x; }; }\nfn b() yield I32 { for (a()) |x| { yield x; }; }\nexport main() I32 { for (a()) |x| { x; }; 1; }', 'Generator a recurses'],
-      ['fn g(n: I32) yield I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nexport main() I32 { for (g(3)) |x| { x; }; 1; }', 'g passes its values straight through'],
-      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x| { prune; }; 1; }', 'prune outside a recursive generator loop'],
+      ['gn g() I32 { yield 1; }\nexport main() I32 { let x = g(); 1; }', 'g is a generator: for (g(…)) |v| { … }'],
+      ['gn a() I32 { for (b()) |x| { yield x; }; }\ngn b() I32 { for (a()) |x| { yield x; }; }\nexport main() I32 { for (a()) |x| { x; }; 1; }', 'Generator a recurses'],
+      ['gn g(n: I32) I32 { for (g(n - 1)) |x| { yield x + 1; }; }\nexport main() I32 { for (g(3)) |x| { x; }; 1; }', 'g passes its values straight through'],
+      ['gn g() I32 { yield 1; }\nexport main() I32 { for (g()) |x| { prune; }; 1; }', 'prune outside a recursive generator loop'],
       ['export main() I32 { prune; 1; }', 'prune outside a recursive generator loop'],
-      ['fn g(n: I32) yield I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nexport main() I32 { for (g(3)) |x| { let f = cl() void { prune; }; }; 1; }', 'prune in a closure'],
-      ['fn g() yield I32 { return 5; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'A generator returns no value'],
-      ['fn g() yield I32 { let f = cl() void { yield 1; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'yield in a closure'],
+      ['gn g(n: I32) I32 { yield n; for (g(n - 1)) |x| { yield x; }; }\nexport main() I32 { for (g(3)) |x| { let f = cl() Void { prune; }; }; 1; }', 'prune in a closure'],
+      ['gn g() I32 { return 5; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'A generator returns no value'],
+      ['gn g() I32 { let f = cl() Void { yield 1; }; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'yield in a closure'],
       ['export main() I32 { await for ([1, 2]) |x| { x; }; 1; }', 'await for reads a stream, not Array[I32]: use a plain for'],
       ['export main() I32 { await for (0 ..< 2) |x| { x; }; 1; }', 'await for needs a generator call or a stream'],
-      ['fn g() yield I32 { yield 1; }\nexport main() I32 { for (g()) |x, i| { x; }; 1; }', 'A generator loop binds one value'],
-      ['fn g(n: I32) yield I32 { yield n; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'g takes 1, given 0'],
-      ['fn g() yield I32 { yield "s"; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'Expected I32, got Str'],
+      ['gn g() I32 { yield 1; }\nexport main() I32 { for (g()) |x, i| { x; }; 1; }', 'A generator loop binds one value'],
+      ['gn g(n: I32) I32 { yield n; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'g takes 1, given 0'],
+      ['gn g() I32 { yield "s"; }\nexport main() I32 { for (g()) |x| { x; }; 1; }', 'Expected I32, got Str'],
     ];
     for (const [source, message] of cases) {
       const errors = await errorsOf(compiler, ROOT, source);

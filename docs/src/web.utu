@@ -19,7 +19,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(greeting("friend"))
         \\}
     }
@@ -48,7 +48,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(chart(false, "draft"))
         \\}
     }
@@ -70,7 +70,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(stats("<b>ada</b>", 3, 0.5))   // text, never HTML
         \\}
     }
@@ -88,7 +88,7 @@ mod web {
         \\        button as toggle {  // name the node: toggle
         \\            type = "button";
         \\            "Water me";
-        \\            on click = cl(event) void {       // a typed closure as the listener
+        \\            on click = cl(event) Void {       // a typed closure as the listener
         \\                plant.watered = not plant.watered;
         \\                toggle.textContent = if plant.watered { "Watered"; } else { "Water me"; };
         \\            };
@@ -97,7 +97,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(plant_card(Plant { name: "Fern", watered: false }))
         \\}
     }
@@ -108,7 +108,7 @@ mod web {
         \\    | n: I32
         \\    | last: Str
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let state = Counter { n: 0, last: "" }
         \\    let app = @wutu/\
         \\    @reactive;
@@ -153,7 +153,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let content = @wutu/\
         \\    p { "Any element can go in the slot."; }
         \\    \/
@@ -179,7 +179,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(status(3))
         \\}
     }
@@ -209,7 +209,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(ranking(["ada", "grace"]))
         \\    Browser.document.body.append(long_words(["tiny", "enormous", "huge", "gigantic"]))
         \\}
@@ -225,7 +225,7 @@ mod web {
         \\struct State:
         \\    | todos: Array[Todo]
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let state = State { todos: [
         \\        Todo { id: "a", title: "Water the fern", done: false },
         \\        Todo { id: "b", title: "Repot the cactus", done: false }
@@ -257,7 +257,7 @@ mod web {
         \\    | gift: Bool
         \\    | amount: F64
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let order = Order { name: "", gift: false, amount: 1.0 }
         \\    let app = @wutu/\
         \\    @reactive;
@@ -284,7 +284,7 @@ mod web {
         \\    | name: Str
         \\    | visits: I32
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let prefs = @stored/\
         \\        Prefs "prefs-v1" Prefs { name: "", visits: 0 }
         \\    \/                                          // loaded, validated, saved after events
@@ -305,7 +305,7 @@ mod web {
         \\struct Draft:
         \\    | text: Str
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let draft = @stored/\
         \\        Draft "draft-v1" manual Draft { text: "" }
         \\    \/                                          // saves only when asked
@@ -325,7 +325,7 @@ mod web {
     fn document_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let app = @wutu/\
         \\    @document {  // document-level CSS, before the root
         \\        :root { --accent: oklch(65% 0.15 60); }
@@ -371,7 +371,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(toolbar())
         \\}
     }
@@ -393,7 +393,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(meter(40, 140))
         \\}
     }
@@ -408,7 +408,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let app = @wutu/\
         \\    @style sheet();  // install any stylesheet, once
         \\    div {
@@ -429,7 +429,7 @@ mod web {
         \\        output as result { "Nothing yet"; }
         \\        button {
         \\            "Search";
-        \\            on click = cl(event) void {
+        \\            on click = cl(event) Void {
         \\                event.preventDefault();
         \\                result.textContent = "Looking for " + query.value;   // query is an HTMLInputElement
         \\                query.focus();
@@ -439,14 +439,14 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(search())
         \\}
     }
     fn route_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let app = @wutu/\
         \\    @reactive;
         \\    main {
@@ -478,7 +478,7 @@ mod web {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let c = Clock { ticks: 0 }
         \\    let app = @wutu/\
         \\    @reactive;
@@ -499,7 +499,7 @@ mod web {
     fn layers_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(@wutu/\
         \\    @document {
         \\        main p.note { color: crimson; padding: 1rem; }
@@ -516,7 +516,7 @@ mod web {
     fn unmanaged_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(@wutu/\
         \\    @reactive;
         \\    main {
@@ -543,7 +543,7 @@ mod web {
         \\using Browser from std:Browser
         \\using guide lazy from "./guide.utu"    // its own chunk
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(@wutu/\
         \\    @reactive;
         \\    main {

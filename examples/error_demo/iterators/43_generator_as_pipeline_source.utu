@@ -1,6 +1,6 @@
 // What: a generator used as the source of an iterator pipeline
 // Expect: squares is a generator: pipelines read arrays; consume it with for, or collect into an array first
-fn squares(n: I32) yield I32 {
+gn squares(n: I32) I32 {
     for (0 ..< n) |i| { yield i * i; };
 }
 

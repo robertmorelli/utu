@@ -12,7 +12,7 @@ fn node(id: Str) Browser.HTMLElement {
     Browser.document.getElementById(id) orelse fatal;
 }
 
-fn restore_focus(id: Str) void {
+fn restore_focus(id: Str) Void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
@@ -20,7 +20,7 @@ fn restore_focus(id: Str) void {
 }
 
 fn persist(key: Str,
-value: Str) void {
+value: Str) Void {
     try {
         Browser.localStorage.setItem(key, value);
     } catch {
@@ -95,7 +95,7 @@ fn calendar(state: Conference) Str {
     "data:text/calendar;charset=utf-8," + Browser.encodeURIComponent(text + "END:VCALENDAR" + newline);
 }
 
-fn refresh(state: Conference) void {
+fn refresh(state: Conference) Void {
 }
 
 fn sessions(state: Conference) Browser.HTMLElement {
@@ -231,7 +231,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
     \/;
 }
 
-export main() void {
+export main() Void {
     let state = Conference {
         day: "all",
         track: "All tracks",

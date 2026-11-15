@@ -12,7 +12,7 @@ fn node(id: Str) Browser.HTMLElement {
     Browser.document.getElementById(id) orelse fatal;
 }
 
-fn restore_focus(id: Str) void {
+fn restore_focus(id: Str) Void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
@@ -20,7 +20,7 @@ fn restore_focus(id: Str) void {
 }
 
 fn persist(key: Str,
-value: Str) void {
+value: Str) Void {
     try {
         Browser.localStorage.setItem(key, value);
     } catch {
@@ -39,7 +39,7 @@ struct Trip:
     | stops: Array[Stop]
     | day: Str
 
-fn save(state: Trip) void {
+fn save(state: Trip) Void {
     let data = Browser.Array();
     state.stops each |s| {
         data.push(&{
@@ -53,7 +53,7 @@ fn save(state: Trip) void {
     persist("wayfarer-v1", Browser.JSON.stringify(data));
 }
 
-fn refresh(state: Trip) void {
+fn refresh(state: Trip) Void {
     save(state);
 }
 
@@ -205,7 +205,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
     \/;
 }
 
-export main() void {
+export main() Void {
     let state = Trip {
         day: "all",
         stops: [Stop {

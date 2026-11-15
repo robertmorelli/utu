@@ -60,7 +60,7 @@ vec jc_site: I32 = [-1]
 /// Each `@json` site in `container` replaced by its expansion, then the
 /// runtime (unless the container has it), the generated codecs, and the name
 /// table added to the container.
-fn json_expand_container(container: I32, json: I32, count: I32) void {
+fn json_expand_container(container: I32, json: I32, count: I32) Void {
     jp_container[0] = container
     jd_stamp[1] = 0
     jd_stamp[2] = 0
@@ -140,7 +140,7 @@ fn name_ref(name: Str) Str {
 }
 
 /// @jp_name_at and @jp_word_defined reach word w.
-fn jp_word_room(w: I32) void {
+fn jp_word_room(w: I32) Void {
     let old = jp_name_at.len()
     if w < old { return }
     let n = src.interned()
@@ -237,7 +237,7 @@ fn is_written_type(type: Str) Bool {
 //! 0 scalar, 1 optional, 2 array, 3 struct, 4 enum. A codec's mistakes point
 //! at the site's type.
 
-fn json_fail(message: Str) void => dsl_fail(message, jc_type_at[0], jc_type_len[0])
+fn json_fail(message: Str) Void => dsl_fail(message, jc_type_at[0], jc_type_len[0])
 
 fn is_json_scalar(type: Str) Bool {
     type == "I32" or type == "U32" or type == "I64" or type == "F32" or type == "F64" or type == "Bool" or type == "Str"
@@ -327,7 +327,7 @@ fn json_declared_in(node: I32, w: I32, slot: I32) I32 {
 }
 
 /// @jd_item and @jd_at reach `x`.
-fn jd_room(x: I32) void {
+fn jd_room(x: I32) Void {
     if x >= jd_at.len() {
         jd_at.resize(x * 2 + 2)
         jd_item.resize(x * 2 + 2)
@@ -370,7 +370,7 @@ fn json_pin(name_at: I32, name: Str) Str {
 }
 
 /// Each pinned name bound to its declaration, under every file's scope.
-fn bind_json_pins() void {
+fn bind_json_pins() Void {
     for (0 ..< jp_pin_word.len()) |k| {
         let n = name_node(jp_pin_name[k])
         if n >= 0 and node_decl[n] >= 0 { bind(jp_pin_word[k], node_decl[n]) }
@@ -460,7 +460,7 @@ fn json_define(name: Str) Bool {
     jp_define_word(intern_text(name))
 }
 
-fn json_emit(source: Str) void => jc_pending.push(intern_text(source))
+fn json_emit(source: Str) Void => jc_pending.push(intern_text(source))
 
 //! = Defaults
 
@@ -729,7 +729,7 @@ fn json_write(written: Str, value: Str, w: Str) Str {
             }
             body = if is_int_enum(node) { arms + "{};" } else { "alt v {\n" + arms + "\n        ~> {},\n    };" }
         }
-        json_emit("fn " + name + "(w: JsonWriter__, v: " + type_ref(type) + ") void {\n    " + body + "\n}")
+        json_emit("fn " + name + "(w: JsonWriter__, v: " + type_ref(type) + ") Void {\n    " + body + "\n}")
     }
     name + "(" + w + ", " + value + ");"
 }
@@ -786,7 +786,7 @@ fn sc_peek(raw: Str, text: Str) Bool {
     text_at(raw, sc_at[0], text)
 }
 
-fn sc_expect(raw: Str, text: Str) void {
+fn sc_expect(raw: Str, text: Str) Void {
     sc_ws(raw)
     if not text_at(raw, sc_at[0], text) { dsl_fail("Expected '" + text + "' in @json match", sc_at[0], 1) }
     sc_at[0] += text.len()

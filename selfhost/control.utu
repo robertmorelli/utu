@@ -46,7 +46,7 @@ fn pattern_value(lit: I32, t: I32) I64 {
 }
 
 /// Push the comparison of local `s` (of type `t`) with a pattern's value.
-fn push_pattern_test(s: I32, t: I32, v: I64) void {
+fn push_pattern_test(s: I32, t: I32, v: I64) Void {
     let vt = repr(t)
     let m = w_mark()
     w_leaf(Op.LocalGet, vt, s, 0)
@@ -76,7 +76,7 @@ vec arm_slot_last: I32
 vec arm_same: I32
 
 /// Make @arm_slots room for `n` values, empty.
-fn arm_table(n: I32) void {
+fn arm_table(n: I32) Void {
     let size = 16
     while (size < n * 2) { size *= 2 }
     arm_slots.resize(size)
@@ -188,7 +188,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
 
 /// A match without a default must cover every value: both Bools, or every
 /// variant of an integer enum; of any other type it cannot.
-fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) void {
+fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) Void {
     let d = ty_decl(st)
     if st == prelude(Prelude.Bool) {
         let t_ = false
@@ -847,7 +847,7 @@ fn check_let_tuple(node: I32, cx: Cx) I32 {
     ty_void()
 }
 
-fn reset_control() void {
+fn reset_control() Void {
     arm_nodes.clear()
     arm_values.clear()
     loop_state.clear()
@@ -859,7 +859,7 @@ fn reset_control() void {
 
 /// Enter and leave a loop: its break and continue labels, and (for a loop
 /// match) its state.
-fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) void {
+fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) Void {
     loop_defers.push(defer_node.len())
     loop_break_defers.push(defer_node.len())
     loop_break.push(brk)
@@ -869,7 +869,7 @@ fn enter_loop(brk: I32, next: I32, state: I32, state_type: I32) void {
 }
 
 /// No loop is entered: a function's start.
-fn clear_loops() void {
+fn clear_loops() Void {
     loop_break.clear()
     loop_continue.clear()
     loop_state.clear()
@@ -878,7 +878,7 @@ fn clear_loops() void {
     loop_break_defers.clear()
 }
 
-fn leave_loop() void {
+fn leave_loop() Void {
     loop_defers.resize(loop_defers.len() - 1)
     loop_break_defers.resize(loop_break_defers.len() - 1)
     loop_break.resize(loop_break.len() - 1)
@@ -1064,7 +1064,7 @@ fn past_end_op(vt: I32, unsigned: Bool, inclusive: Bool) I32 {
 }
 
 /// `counter += 1` (of value type `vt`).
-fn step_counter(counter: I32, vt: I32) void {
+fn step_counter(counter: I32, vt: I32) Void {
     let m = w_mark()
     w_leaf(Op.LocalGet, vt, counter, 0)
     if vt == vt_i64 { w_leaf(Op.I64Const, vt_i64, 1, 0) } else { w_i32(1) }
@@ -1171,7 +1171,7 @@ fn allocating_method(word: I32) Bool {
 }
 
 /// The unrolled loop of `for (a ..< b) |i|`, counting in local `counter` to local `end_`.
-fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, brk: I32, top: I32, cx: Cx) void {
+fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, brk: I32, top: I32, cx: Cx) Void {
     let wide = vt == vt_i64
     let mb = w_mark()
     let ml = w_mark()
@@ -1201,7 +1201,7 @@ fn unrolled_for(block: I32, counter: I32, end_: I32, vt: I32, unsigned: Bool, br
 }
 
 /// One iteration: the body (its continue goes to the end of this copy), then i += 1.
-fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) void {
+fn unrolled_step(block: I32, counter: I32, vt: I32, brk: I32, cx: Cx) Void {
     let next = new_label()
     let mn = w_mark()
     enter_loop(brk, next, -1, -1)

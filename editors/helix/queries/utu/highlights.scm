@@ -4,7 +4,6 @@
 
 ; Types and modules
 (type_ident) @type
-(void_type) @type.builtin
 (promoted_type) @type.builtin
 ; `$T`: the type a call's argument binds, a type like its other uses.
 (type_binder) @type

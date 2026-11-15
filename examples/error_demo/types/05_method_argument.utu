@@ -3,7 +3,7 @@
 struct Account:
     | balance: F64
 
-fn Account.deposit |a| (amount: F64) void { a.balance += amount; }
+fn Account.deposit |a| (amount: F64) Void { a.balance += amount; }
 
 export main() I32 {
     let acct = Account { balance: 0.0 };

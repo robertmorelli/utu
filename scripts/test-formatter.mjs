@@ -42,7 +42,7 @@ const cases = [
   // `|` fields stay under their struct; a trailing comment stays on its line.
   ['struct P:\n| x: I32 // across\n| y: I32\n\nfn g() I32 { 1; } // one\n', 'struct P:\n    | x: I32 // across\n    | y: I32\n\nfn g() I32 {\n    1;\n} // one\n'],
   // Captures are not split at their comma; an empty block stays `{}`.
-  ['fn h(xs: Array[I32]) I32 { xs fold(0) |a, b| { a + b; }; }\nfn k() void {}\n', 'fn h(xs: Array[I32]) I32 {\n    xs fold(0) |a, b| {\n        a + b;\n    };\n}\nfn k() void {}\n'],
+  ['fn h(xs: Array[I32]) I32 { xs fold(0) |a, b| { a + b; }; }\nfn k() Void {}\n', 'fn h(xs: Array[I32]) I32 {\n    xs fold(0) |a, b| {\n        a + b;\n    };\n}\nfn k() Void {}\n'],
   // Not a program: left alone.
   ['fn b(x: Bool) I32 {\n    if x { 1; } else { 2; } 3;\n}\n', null],
 ];
@@ -54,14 +54,14 @@ for (const [source, expected] of cases) {
 
 // Wutu: `}else{` formats like `} else {` (the island was once left as written).
 {
-  const text = await formatUtuSource('using Browser from std:Browser;\n\nexport main() void {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n', { shape });
+  const text = await formatUtuSource('using Browser from std:Browser;\n\nexport main() Void {\n    let n = @wutu/\\\n    main{ if true {b{"a";}}else{u{"b";}} }\n    \\/;\n    Browser.document.body.append(n);\n}\n', { shape });
   assert.match(text, /\} else \{/);
 }
 
 // Wutu: `for="x"` stays an attribute (`for = "x"` opens a loop), `#id` stays,
 // CSS declarations keep their spacing.
 {
-  const source = 'using Browser from std:Browser;\n\nexport main() void {\n    let n = @wutu/\\\n    form { label { for="q"; "Find"; } input#q { display: grid; type="search"; } }\n    \\/;\n    Browser.document.body.append(n);\n}\n';
+  const source = 'using Browser from std:Browser;\n\nexport main() Void {\n    let n = @wutu/\\\n    form { label { for="q"; "Find"; } input#q { display: grid; type="search"; } }\n    \\/;\n    Browser.document.body.append(n);\n}\n';
   const text = await formatUtuSource(source, { shape });
   assert.match(text, /for="q";/);
   assert.match(text, /input#q \{/);

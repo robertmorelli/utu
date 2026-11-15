@@ -8,7 +8,7 @@ mod Counter {
     fn &.next |self| (it: I32) I32 { it + 1; }
     fn &.done |self| (r: I32) Bool { r > self.n; }
     fn &.value |self| (r: I32) I32 { r; }
-    fn &.close |self| (it: I32) void { }
+    fn &.close |self| (it: I32) Void { }
 }
 
 export main() I32 {

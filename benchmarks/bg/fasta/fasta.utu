@@ -15,19 +15,19 @@
 
 fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
 
-fn out_str(s: Str) void {
+fn out_str(s: Str) Void {
     let h = st.h
     for (0..<s.len()) |i| { h = fnv(h, s[i]) }
     st.h = h
 }
 
-fn out_buf(len: I32) void {
+fn out_buf(len: I32) Void {
     let h = st.h
     for (0..<len) |i| { h = fnv(h, buf[i]) }
     st.h = h
 }
 
-fn out_rep(len: I32) void {
+fn out_rep(len: I32) Void {
     let h = st.h
     for (0..<len) |i| { h = fnv(h, rep[i]) }
     st.h = h
@@ -58,7 +58,7 @@ fn alu() Str {
 }
 
 // seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
-fn repeat_fasta(seq: Str, n: I32) void {
+fn repeat_fasta(seq: Str, n: I32) Void {
     let len = seq.len()
     let line = linelen + 1
     rep.resize(line * len)
@@ -76,7 +76,7 @@ fn repeat_fasta(seq: Str, n: I32) void {
 }
 
 // hash[i] = the symbol whose cumulative probability first exceeds i / im.
-fn build_hash(symb: Str, p: Array[F32]) void {
+fn build_hash(symb: Str, p: Array[F32]) Void {
     hash.resize(im)
     let len = symb.len()
     let sum = p[0]
@@ -93,7 +93,7 @@ fn build_hash(symb: Str, p: Array[F32]) void {
     }
 }
 
-fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
+fn random_fasta(symb: Str, p: Array[F32], n: I32) Void {
     build_hash(symb, p)
     let line = linelen + 1
     buf.resize(line * buflines)
@@ -131,7 +131,7 @@ fn random_fasta(symb: Str, p: Array[F32], n: I32) void {
     if n % linelen != 0 { out_str("\n") }
 }
 
-fn fasta(n: I32) void {
+fn fasta(n: I32) Void {
     st.seed = 42
     let iub_p: Array[F32] = [0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
     let homosapiens_p: Array[F32] = [0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008]

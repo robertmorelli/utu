@@ -11,11 +11,11 @@ compiler ships with a compiled application.
 ```utu
 using Browser from std:Browser
 
-export main() void {
+export main() Void {
     let document = Browser.document
     let input = document.createElement("input")
     input.placeholder = "Write something"
-    input.addEventListener("input", cl(event) void {
+    input.addEventListener("input", cl(event) Void {
         Browser.console.log(input.value)
     })
     document.body.appendChild(input)
@@ -61,8 +61,8 @@ Declaration shapes map onto ordinary UTU syntax:
 | `ctx.fillStyle = "red"` (`string \| CanvasGradient \| CanvasPattern`) | same: union slots accept any member |
 | `el.append("text", span)` (`...(string \| Node)[]`) | same: subtypes are accepted |
 | `el.dataset.role = "x"` (string index signature) | same |
-| `setTimeout(() => {...}, 100)` (`TimerHandler`) | `Browser.setTimeout(cl() void {...}, 100)` |
-| `list.forEach(el => el.remove())` | `list.forEach(cl(el) void { el.remove(); })`: fewer parameters than declared are fine |
+| `setTimeout(() => {...}, 100)` (`TimerHandler`) | `Browser.setTimeout(cl() Void {...}, 100)` |
+| `list.forEach(el => el.remove())` | `list.forEach(cl(el) Void { el.remove(); })`: fewer parameters than declared are fine |
 | `xs.map(s => s.toUpperCase())` | `xs.map(cl(s) Str { s.toUpperCase(); })`: `U` is inferred from the closure |
 | `new Blob(["a", "b"], { type })` | `new Browser.Blob(["a", "b"], &{ type: "text/plain" })` |
 | `el.addEventListener("x", f, { once: true })` | same shape, with `&{ once: true }` |
@@ -94,7 +94,7 @@ for its first use, so `let xs = [1.0, 2.0]; Api.sum(xs);` passes a JS array
 
 Closures take parameter types from the slot they reach: an argument, a record
 field, an assigned property such as `button.onclick`, or the first use of a
-`let`-bound closure (`let handler = cl(e) void {...}; a.addEventListener("x", handler);`).
+`let`-bound closure (`let handler = cl(e) Void {...}; a.addEventListener("x", handler);`).
 If no context exists, the compiler asks for an annotation; so does a `Function`
 slot (`fnLike(cl(x: F64) F64 {...})`). An optional callback
 parameter (`(a: number, b?: number) => number`) is nullable, `?F64`: `promote`
@@ -193,7 +193,7 @@ using Nano from "npm:nanoid"
 using Floating from "npm:@floating-ui/dom"
 using Path from "node:path"
 
-export main() void {
+export main() Void {
     let id = Nano.nanoid(8)
     let file = Path.join("out", id, "report.txt")
 }

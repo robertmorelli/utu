@@ -292,7 +292,7 @@ fn vel4(v: V128, a0: V128, b0: V128, w0: V128, m0: V128, a1: V128, b1: V128, w1:
 fn moved(p: V128, v: V128, rt: V128) V128 { @wat/\ (f64x2.add (local.get $p) (f64x2.mul (local.get $v) (local.get $rt))) \/ }
 
 // n steps of dt, the system in locals throughout.
-fn advance(s: Sys, n: I32, dt: F64) void {
+fn advance(s: Sys, n: I32, dt: F64) Void {
     let p0l = s.p0l
     let p0h = s.p0h
     let p1l = s.p1l

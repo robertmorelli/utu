@@ -4,8 +4,8 @@ using Browser from std:Browser
 using code from "./code.utu"
 using ui from "./ui.utu"
 mod iterators {
-    fn jump(id: Str) void {
-        let go: fun(Str) void = @es/\ (id) => document.getElementById(id)?.scrollIntoView({ block: "start" }) \/
+    fn jump(id: Str) Void {
+        let go: fun(Str) Void = @es/\ (id) => document.getElementById(id)?.scrollIntoView({ block: "start" }) \/
         go(id)
     }
     fn array_sample() Str {
@@ -281,7 +281,7 @@ mod iterators {
         \\}
     }
     fn generator_sample() Str {
-        \\fn squares(n: I32) yield I32 {
+        \\gn squares(n: I32) I32 {
         \\    for (1 ... n) |i| { yield i * i }
         \\}
         \\
@@ -298,7 +298,7 @@ mod iterators {
         \\
         \\fn leaf(name: Str) Node { Node { name: name, kids: [] } }
         \\
-        \\fn walk(n: Node) yield Node {
+        \\gn walk(n: Node) Node {
         \\    for (n.kids) |kid| { yield kid; for (walk(kid)) |d| { yield d } }
         \\}
         \\

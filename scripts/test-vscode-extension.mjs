@@ -46,7 +46,7 @@ try {
   const document = makeDocument(vscode.Uri.parse('file:///activation.utu'), source);
   globalThis.__utuVscodeStub.textDocuments.push(document);
   const providers = globalThis.__utuVscodeStub.providers;
-  const template=makeDocument(vscode.Uri.parse('file:///format.utu'), 'fn page() void { let node=@wutu/\\ main {button {"Go";}} \\/; }');
+  const template=makeDocument(vscode.Uri.parse('file:///format.utu'), 'fn page() Void { let node=@wutu/\\ main {button {"Go";}} \\/; }');
   const edits=await providers.format.provideDocumentFormattingEdits(template);
   if(edits.length!==1||!edits[0].newText.includes('\n'))throw Error('Wutu formatter did not provide an edit');
   const completions=providers.completion.provideCompletionItems(template,template.positionAt(template.getText().indexOf('button')));

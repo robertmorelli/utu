@@ -34,7 +34,7 @@ fn card(plant: Plant) Browser.HTMLElement {
             = if plant.watered { "Watered today ✓";
             } else { "Mark as watered";
             };
-            on click = cl(event) void {
+            on click = cl(event) Void {
                 plant.watered = not plant.watered;
                 Browser.localStorage.setItem("wutu-plant-" + plant.name, if plant.watered { today(); } else { ""; });
                 toggle.textContent = if plant.watered { "Watered today ✓"; } else { "Mark as watered"; };
@@ -66,7 +66,7 @@ fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLEle
     \/;
 }
 
-export main() void {
+export main() Void {
     let plants = [Plant { name: "Monstera", days: 7, watered: false }, Plant { name: "Golden pothos", days: 10, watered: false }, Plant { name: "Peace lily", days: 5, watered: false }, Plant { name: "Rubber plant", days: 14, watered: false }];
     plants each |plant| {
         promote Browser.localStorage.getItem("wutu-plant-" + plant.name) {
@@ -117,7 +117,7 @@ export main() void {
                 border-radius: 0.75rem;
                 background: var(--card);
                 color: var(--ink);
-                on input = cl(event) void {
+                on input = cl(event) Void {
                     let next = listing(plants, search.value, sort.value == "frequency");
                     grid.replaceWith(next);
                     grid = next;
@@ -132,7 +132,7 @@ export main() void {
                 color: var(--ink);
                 option { value="original"; "My collection"; }
                 option { value="frequency"; "Watering frequency"; }
-                on change = cl(event) void {
+                on change = cl(event) Void {
                     let next = listing(plants, search.value, sort.value == "frequency");
                     grid.replaceWith(next);
                     grid = next;

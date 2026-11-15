@@ -23,7 +23,7 @@ in Chromium. Wasm and generated JS together are about 5 KB gzipped.
 
 | Written as | Problem | Fix |
 |---|---|---|
-| `let step = cl(now: F64) void { … requestAnimationFrame(step); }` | a closure could not name itself | recursive `let` closures (a shared cell, filled after creation) |
+| `let step = cl(now: F64) Void { … requestAnimationFrame(step); }` | a closure could not name itself | recursive `let` closures (a shared cell, filled after creation) |
 | `let input: ?Browser.HTMLInputElement = document.querySelector("#search")` | `querySelector<E>` only mentions E in its result | E is inferred from the expected type, within its constraint |
 | `document.getElementById("items") orelse fatal` | `fatal` was typed `void` | `fatal` is the bottom type and fits any context |
 | `other == chip` | host references had no `==` | `==` and `!=` on host values are JS `===` |

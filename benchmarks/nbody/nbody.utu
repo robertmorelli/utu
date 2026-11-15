@@ -30,7 +30,7 @@ fn Body.new(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
     }
 }
 
-fn Body.offset_momentum |self| (px: F64, py: F64, pz: F64) void {
+fn Body.offset_momentum |self| (px: F64, py: F64, pz: F64) Void {
     self.vx = 0.0 - px / solar_mass()
     self.vy = 0.0 - py / solar_mass()
     self.vz = 0.0 - pz / solar_mass()
@@ -102,7 +102,7 @@ fn create_bodies() Array[Body] {
     bodies
 }
 
-fn advance(bodies: Array[Body], dt: F64) void {
+fn advance(bodies: Array[Body], dt: F64) Void {
     for (0..<bodies.len()) |i| {
         let ib = bodies[i]
         for ((i + 1)..<bodies.len()) |j| {

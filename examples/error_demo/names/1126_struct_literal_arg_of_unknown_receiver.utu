@@ -3,7 +3,7 @@
 struct State:
     | items: Nope.Array
 
-fn add(state: State) void {
+fn add(state: State) Void {
     state.items.push(&{ id: 1 });
 }
 

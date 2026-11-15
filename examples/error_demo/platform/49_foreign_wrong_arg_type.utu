@@ -2,6 +2,6 @@
 // Expect: Type mismatch: expected Browser.Node, got Str
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     Browser.document.body.appendChild("hello");
 }

@@ -2,7 +2,7 @@
 // Expect: Cannot assign to readonly foreign property 'tagName'
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let el = Browser.document.createElement("div");
     el.tagName = "SPAN";
 }

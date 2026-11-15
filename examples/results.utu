@@ -37,7 +37,7 @@ fn total(lines: Array[Str]) Result[I32, Str] {
     Result[I32, Str].ok(sum)
 }
 
-fn report(lines: Array[Str]) void {
+fn report(lines: Array[Str]) Void {
     let r = total(lines)
     if r.is_ok() { console.log("total " + r.value().str()) }
     else { console.log("error: " + r.error()) }

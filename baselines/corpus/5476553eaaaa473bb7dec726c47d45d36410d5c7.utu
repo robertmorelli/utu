@@ -41,7 +41,7 @@ mod IntMap {
         if self.full[i] != 0 { self.values[i]; } else { missing; };
     }
 
-    fn &.set |self| (key: I32, value: I32) void {
+    fn &.set |self| (key: I32, value: I32) Void {
         let i = self.slot(key);
         if self.full[i] == 0 {
             if (self.count + 1) * 2 > self.keys.len() {
@@ -55,7 +55,7 @@ mod IntMap {
         self.values[i] = value;
     }
 
-    fn &.grow |self| () void {
+    fn &.grow |self| () Void {
         let keys = self.keys;
         let values = self.values;
         let full = self.full;

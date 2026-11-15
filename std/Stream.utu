@@ -102,7 +102,7 @@ mod Stream[T1] {
     }
 
     /// Settles once the stream has finished closing (its `finally` blocks run).
-    fn &.close |self| (iterator: Externref) void {
+    fn &.close |self| (iterator: Externref) Void {
         let f: fun(Externref) Promise[Externref] = @es/\ (it) => Promise.resolve(it.return?.()) \/
         await f(iterator)
     }

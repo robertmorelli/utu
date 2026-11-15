@@ -6,7 +6,7 @@ mod tour {
     fn literals_sample() Str {
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let n = 42                   // I32: the first of I32, U32, I64, U64 it fits
         \\    let wide = 4000000000        // U32
         \\    let big = 9007199254740993   // I64
@@ -26,7 +26,7 @@ mod tour {
         \\fn first(xs: Array[$T]) T { xs[0] }
         \\fn show(x: $T) Str { `<${x}>` }
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let big: I64 = 5000000000
         \\    console.log(max(3, 7))          // 7: max[I32]
         \\    console.log(max(1, big))        // 5000000000: T is I64
@@ -60,7 +60,7 @@ mod tour {
     fn operators_sample() Str {
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    console.log(`${7 / 2} ${7 % 2} ${7.0 / 2.0}`)           // 3 1 3.5
         \\    console.log(`${(1 << 4) | 3} ${0b1010 & 6} ${I32.clz(1)}`)  // 19 2 31
         \\    console.log(`${not true} ${true xor false} ${3 < 4 and 4 < 5}`)  // false true true
@@ -98,7 +98,7 @@ mod tour {
         \\    | hits: I32
         \\let tally: Tally = Tally { hits: 0 }   // set once; its fields still change
         \\
-        \\fn hit() void { tally.hits += 1 }     // `tally = …` would be an error
+        \\fn hit() Void { tally.hits += 1 }     // `tally = …` would be an error
         \\
         \\export main() I32 {
         \\    hit()
@@ -118,7 +118,7 @@ mod tour {
         \\    x
         \\}
         \\
-        \\fn log_nothing() void {          // void: no result
+        \\fn log_nothing() Void {          // void: no result
         \\}
         \\
         \\export main() I32 {
@@ -180,7 +180,7 @@ mod tour {
     fn if_statement_sample() Str {
         \\using console from std:Console
         \\
-        \\fn report(errors: I32) void {
+        \\fn report(errors: I32) Void {
         \\    if errors > 0 {
         \\        console.log(`${errors} problems`)
         \\    }                                    // no else: the if is a statement
@@ -188,7 +188,7 @@ mod tour {
         \\    console.log(word)
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    report(3)   // 3 problems, then: problems
         \\}
     }
@@ -223,7 +223,7 @@ mod tour {
     fn for_each_sample() Str {
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let names = ["ada", "grace", "edsger"]
         \\    for (names) |name| {
         \\        console.log(name.to_upper())
@@ -340,7 +340,7 @@ mod tour {
         \\    self.w * self.h
         \\}
         \\
-        \\fn Rect.scale |r| (k: F64) void {        // the receiver can have any name
+        \\fn Rect.scale |r| (k: F64) Void {        // the receiver can have any name
         \\    r.w *= k
         \\    r.h *= k
         \\}
@@ -394,7 +394,7 @@ mod tour {
         \\
         \\using geometry |geo|                    // a within-file alias
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    out.log(`${geo.square(3.0)} ${geometry.square(4.0)}`)   // 9 16
         \\}
     }
@@ -470,7 +470,7 @@ mod tour {
         \\    match l { Level.Low => "calm", Level.Mid => "busy", Level.High => "on fire", }
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let l = Level.Mid
         \\    console.log(`${label(l)} ${Level.name(l)} ${l.i32()} ${Level.count()}`)  // busy Mid 1 3
         \\    console.log(`${Level(9) == Level.High} ${l < Level.High}`)        // true true
@@ -514,7 +514,7 @@ mod tour {
         \\    | name: Str
         \\    | next: ?Node
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let tail = Node { name: "b", next: null }
         \\    let head = Node { name: "a", next: tail }
         \\    head.next?.name = "B"                  // runs only when next is present
@@ -638,9 +638,9 @@ mod tour {
         \\        | items: Array[T]
         \\        | size: I32
         \\    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 } }
-        \\    fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1 }
+        \\    fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1 }
         \\    fn &.pop |s| () T { s.size -= 1; s.items[s.size] }
-        \\    fn &.each |s| () yield T {        // a generator method: for (nums.each()) |v|
+        \\    gn &.each |s| () T {        // a generator method: for (nums.each()) |v|
         \\        for (0 ..< s.size) |i| { yield s.items[i] }
         \\    }
         \\}
@@ -659,7 +659,7 @@ mod tour {
         \\
         \\mod Stash[T] {
         \\    let items: Buffer[T] = Buffer[T].new()   // one per instance
-        \\    fn add(x: T) void { items.push(x) }
+        \\    fn add(x: T) Void { items.push(x) }
         \\    fn size() I32 { items.len() }
         \\}
         \\
@@ -727,7 +727,7 @@ mod tour {
         \\fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r }
         \\fn Shape[Square].area |s| () F64 { s.side * s.side }
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let shapes: Array[Shape] = [
         \\        Circle { name: "coin", r: 1.0 },
         \\        Square { name: "tile", side: 2.0 }
@@ -751,7 +751,7 @@ mod tour {
         \\fn Counter[ByOne].step |c| () I32 { 1 }
         \\fn Counter[ByTen].step |c| () I32 { 10 }
         \\
-        \\fn Counter.tick |c| () void {    // written once, for every Counter
+        \\fn Counter.tick |c| () Void {    // written once, for every Counter
         \\    c.count = c.count + c.step()
         \\}
         \\
@@ -800,7 +800,7 @@ mod tour {
     fn strings_sample() Str {
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let s = "  Hello, World  ".trim()
         \\    console.log(s.to_upper())                       // HELLO, WORLD
         \\    console.log(`${s.len()} ${s.index_of("o", 0)} ${s.contains("World")}`)   // 12 4 true
@@ -828,7 +828,7 @@ mod tour {
     fn escapes_sample() Str {
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    console.log("say \"hi\"\tthen → leave")   // say "hi"	then → leave
         \\    console.log(`a backtick \` and \${not a hole}`)  // a backtick ` and ${not a hole}
         \\    console.log(`costs $5`)                          // a $ without { is text
@@ -837,7 +837,7 @@ mod tour {
     fn multiline_sample() Str {
         \\using console from std:Console
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let usage = \\usage: utu check <file.utu>
         \\                \\       utu run <file.utu>
         \\    console.log(usage)
@@ -856,7 +856,7 @@ mod tour {
         \\}
     }
     fn generator_sample() Str {
-        \\fn squares(n: I32) yield I32 {
+        \\gn squares(n: I32) I32 {
         \\    for (0 ..< n) |i| { yield i * i }
         \\}
         \\
@@ -867,7 +867,7 @@ mod tour {
         \\}
     }
     fn generator_index_sample() Str {
-        \\fn evens(n: I32) yield I32 {
+        \\gn evens(n: I32) I32 {
         \\    for (0 ..< n) |i| { yield i * 2 }
         \\}
         \\
@@ -1051,7 +1051,7 @@ mod tour {
         \\let delay: fun(I32, I32) Promise[I32] =
         \\    @es/\ (v, ms) => new Promise(r => setTimeout(() => r(v), ms)) \/
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    delay(7, 10).then(cl(v) { console.log(`later: ${v}`) })   // works on any host
         \\    console.log("now")                                         // now, then later: 7
         \\}
@@ -1125,7 +1125,7 @@ mod tour {
         \\    \/
         \\}
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    Browser.document.body.append(badge("new"))
         \\}
     }

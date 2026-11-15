@@ -68,10 +68,10 @@ fn Variable.new(value: I32) Variable {
     &{ value: value, constraints: Buffer[Constraint].new(), determined_by: null, mark: 0, walk_strength: Strength.Weakest, stay: true }
 }
 
-fn Variable.add_constraint |self| (c: Constraint) void { self.constraints.push(c) }
+fn Variable.add_constraint |self| (c: Constraint) Void { self.constraints.push(c) }
 
 // Removes every occurrence of c, in place.
-fn Variable.remove_constraint |self| (c: Constraint) void {
+fn Variable.remove_constraint |self| (c: Constraint) Void {
     let kept = 0
     for (0..<self.constraints.len()) |i| {
         let each = self.constraints[i]
@@ -151,7 +151,7 @@ fn Constraint.output |self| () Variable {
     }
 }
 
-fn Constraint.add_to_graph |self| () void {
+fn Constraint.add_to_graph |self| () Void {
     alt self {
         Stay |c| => {
             c.output.add_constraint(self)
@@ -176,7 +176,7 @@ fn Constraint.add_to_graph |self| () void {
     }
 }
 
-fn Constraint.remove_from_graph |self| () void {
+fn Constraint.remove_from_graph |self| () Void {
     alt self {
         Stay |c| => {
             c.output.remove_constraint(self)
@@ -219,7 +219,7 @@ fn choose_direction(v1: Variable, v2: Variable, strength: Strength, mark: I32) D
     direction
 }
 
-fn Constraint.choose_method |self| (mark: I32) void {
+fn Constraint.choose_method |self| (mark: I32) Void {
     alt self {
         Stay |c| => {
             c.satisfied = c.output.mark != mark and c.strength.stronger(c.output.walk_strength)
@@ -236,7 +236,7 @@ fn Constraint.choose_method |self| (mark: I32) void {
     }
 }
 
-fn Constraint.mark_unsatisfied |self| () void {
+fn Constraint.mark_unsatisfied |self| () Void {
     alt self {
         Stay |c| => {
             c.satisfied = false
@@ -253,7 +253,7 @@ fn Constraint.mark_unsatisfied |self| () void {
     }
 }
 
-fn Constraint.mark_inputs |self| (mark: I32) void {
+fn Constraint.mark_inputs |self| (mark: I32) Void {
     alt self {
         Equality => {
             self.input().mark = mark
@@ -278,7 +278,7 @@ fn Constraint.inputs_known |self| (mark: I32) Bool {
     }
 }
 
-fn Constraint.execute |self| () void {
+fn Constraint.execute |self| () Void {
     alt self {
         Equality => {
             self.output().value = self.input().value
@@ -294,7 +294,7 @@ fn Constraint.execute |self| () void {
     }
 }
 
-fn Constraint.recalculate |self| () void {
+fn Constraint.recalculate |self| () Void {
     alt self {
         Stay |c| => {
             c.output.walk_strength = c.strength
@@ -350,7 +350,7 @@ fn Constraint.add |self| (planner: Planner) Constraint {
     self
 }
 
-fn Constraint.destroy |self| (planner: Planner) void {
+fn Constraint.destroy |self| (planner: Planner) Void {
     if self.is_satisfied() { planner.incremental_remove(self) } else { self.remove_from_graph() }
 }
 
@@ -380,7 +380,7 @@ fn Planner.new_mark |self| () I32 {
     self.current_mark
 }
 
-fn Planner.incremental_add |self| (c: Constraint) void {
+fn Planner.incremental_add |self| (c: Constraint) Void {
     let mark = self.new_mark()
     let overridden = c.satisfy(self, mark)
     let more = true
@@ -392,7 +392,7 @@ fn Planner.incremental_add |self| (c: Constraint) void {
     }
 }
 
-fn Planner.incremental_remove |self| (c: Constraint) void {
+fn Planner.incremental_remove |self| (c: Constraint) Void {
     let out = c.output()
     c.mark_unsatisfied()
     c.remove_from_graph()
@@ -426,7 +426,7 @@ fn Planner.add_propagate |self| (c: Constraint, mark: I32) Bool {
     true
 }
 
-fn add_constraints_consuming_to(v: Variable, coll: Buffer[Constraint]) void {
+fn add_constraints_consuming_to(v: Variable, coll: Buffer[Constraint]) Void {
     let determining = v.determined_by
     for (0..<v.constraints.len()) |i| {
         let c = v.constraints[i]
@@ -486,7 +486,7 @@ fn Planner.extract_plan_from_constraints |self| (constraints: Buffer[Constraint]
     self.make_plan(sources)
 }
 
-fn execute_plan(plan: Buffer[Constraint]) void {
+fn execute_plan(plan: Buffer[Constraint]) Void {
     for (0..<plan.len()) |i| { plan[i].execute() }
 }
 
@@ -529,7 +529,7 @@ fn chain_test(n: I32) I64 {
     failures
 }
 
-fn change(planner: Planner, v: Variable, value: I32) void {
+fn change(planner: Planner, v: Variable, value: I32) Void {
     let e = edit(v, Strength.Preferred, planner)
     let plan = plan_for(planner, e)
     for (0..<10) {

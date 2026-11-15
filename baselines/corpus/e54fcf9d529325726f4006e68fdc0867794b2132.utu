@@ -281,7 +281,7 @@ mod sim {
         List { items: Array[Entity].new(16, sentinel), n: 0 };
     }
 
-    fn list_push(list: List, e: Entity) void {
+    fn list_push(list: List, e: Entity) Void {
         if list.n == list.items.len() {
             let grown = Array[Entity].new(list.n * 2, e);
             grown.copy_from(0, list.items, 0, list.n);
@@ -291,7 +291,7 @@ mod sim {
         list.n += 1;
     }
 
-    fn list_remove(list: List, e: Entity) void {
+    fn list_remove(list: List, e: Entity) Void {
         let i = 0;
         while (i < list.n and list.items[i].id != e.id) {
             i += 1;
@@ -321,7 +321,7 @@ mod sim {
         };
     }
 
-    fn lists_of(w: World, e: Entity, add: Bool) void {
+    fn lists_of(w: World, e: Entity, add: Bool) Void {
         let lists = [w.classes[e.cls]];
         if is_crafter(e.cls) {
             lists = [w.classes[e.cls], w.crafters];
@@ -344,13 +344,13 @@ mod sim {
         };
     }
 
-    fn add_entity(w: World, e: Entity) void {
+    fn add_entity(w: World, e: Entity) Void {
         list_push(w.entities, e);
         w.grid[e.y * w.width + e.x] = e;
         lists_of(w, e, true);
     }
 
-    fn remove_entity(w: World, e: Entity) void {
+    fn remove_entity(w: World, e: Entity) Void {
         list_remove(w.entities, e);
         w.grid[e.y * w.width + e.x] = null;
         lists_of(w, e, false);
@@ -544,14 +544,14 @@ mod sim {
         true;
     }
 
-    fn remove(w: World, x: I32, y: I32) void {
+    fn remove(w: World, x: I32, y: I32) Void {
         promote at(w, x, y) {
             |e| => remove_entity(w, e),
             ~> {},
         };
     }
 
-    fn rotate(e: Entity) void {
+    fn rotate(e: Entity) Void {
         e.dir = (e.dir + 1) % 4;
     }
 
@@ -570,7 +570,7 @@ mod sim {
         recipe.category == category and (e.machine != assembler_1_id or recipe.ingredients.len() <= 2);
     }
 
-    fn set_recipe(w: World, e: Entity, r: I32) void {
+    fn set_recipe(w: World, e: Entity, r: I32) Void {
         if recipe_allowed(w, e, r) {
             e.recipe = r;
             e.busy = false;
@@ -578,7 +578,7 @@ mod sim {
         };
     }
 
-    fn launch(e: Entity) void {
+    fn launch(e: Entity) Void {
         if e.cls == silo_class and e.held == 20 {
             e.held = 0;
             e.crafts += 1;
@@ -595,7 +595,7 @@ mod sim {
         ready;
     }
 
-    fn start_research(w: World, t: I32) void {
+    fn start_research(w: World, t: I32) Void {
         if research_available(w, t) {
             w.research_current = t;
             w.research_progress = 0;
@@ -712,7 +712,7 @@ mod sim {
 
     // ── the tick ─────────────────────────────────────────────────────────────────
 
-    fn step(w: World) void {
+    fn step(w: World) Void {
         power(w);
         signals(w);
         fluids(w);
@@ -745,7 +745,7 @@ mod sim {
         w.tick += 1;
     }
 
-    fn power(w: World) void {
+    fn power(w: World) Void {
         let p = w.tick % 25200;
         w.light = if p < 2520 { p * 1000 / 2520; } else { if p < 12600 { 1000; } else { if p < 15120 { (15120 - p) * 1000 / 2520; } else { 0; }; }; };
         let demand = 0;
@@ -800,7 +800,7 @@ mod sim {
         w.satisfaction = if demand == 0 { 1000; } else { imin(1000, supply * 1000 / demand); };
     }
 
-    fn signals(w: World) void {
+    fn signals(w: World) Void {
         let combinators = w.classes[combinator_class];
         for (0..<combinators.n) |i| {
             let e = combinators.items[i];
@@ -845,7 +845,7 @@ mod sim {
         };
     }
 
-    fn fluids(w: World) void {
+    fn fluids(w: World) Void {
         let pumps = w.classes[pump_class];
         for (0..<pumps.n) |i| {
             let e = pumps.items[i];
@@ -997,7 +997,7 @@ mod sim {
         -1;
     }
 
-    fn mine(w: World, e: Entity) void {
+    fn mine(w: World, e: Entity) Void {
         let tile = mining_tile(w, e);
         if tile >= 0 and e.held < 5 {
             let rate = 0;
@@ -1060,7 +1060,7 @@ mod sim {
         count;
     }
 
-    fn craft(w: World, e: Entity) void {
+    fn craft(w: World, e: Entity) Void {
         if not e.busy and e.recipe >= 0 {
             let recipe = w.game.recipes[e.recipe];
             let ready = true;
@@ -1126,7 +1126,7 @@ mod sim {
         };
     }
 
-    fn lab(w: World, e: Entity) void {
+    fn lab(w: World, e: Entity) Void {
         let r = w.research_current;
         if r < 0 or w.done[r] == 1 {
             e.busy = false;
@@ -1154,7 +1154,7 @@ mod sim {
         };
     }
 
-    fn complete(w: World, r: I32) void {
+    fn complete(w: World, r: I32) Void {
         w.done[r] = 1;
         for (w.game.techs[r].machines) |m| {
             w.machine_unlocked[m] = 1;
@@ -1166,7 +1166,7 @@ mod sim {
         w.research_progress = 0;
     }
 
-    fn silo(w: World, e: Entity) void {
+    fn silo(w: World, e: Entity) Void {
         if e.held >= 20 {
             e.busy = false;
             return;
@@ -1197,7 +1197,7 @@ mod sim {
         };
     }
 
-    fn radar(w: World, e: Entity) void {
+    fn radar(w: World, e: Entity) Void {
         e.busy = true;
         e.progress += w.satisfaction;
         if e.progress < 300000 {
@@ -1241,7 +1241,7 @@ mod sim {
         off;
     }
 
-    fn swing(w: World, e: Entity) void {
+    fn swing(w: World, e: Entity) Void {
         let reach = w.reach[e.machine];
         let time = w.speed[e.machine];
         if e.state == 0 {
@@ -1290,7 +1290,7 @@ mod sim {
     }
 
     // Pick an item from source that target accepts, and start the swing.
-    fn choose_and_take(w: World, e: Entity, source: Entity, target: Entity, time: I32) void {
+    fn choose_and_take(w: World, e: Entity, source: Entity, target: Entity, time: I32) Void {
         let filter = if e.machine == filter_inserter_id { e.pick; } else { -2; };
         if filter == -1 {
             return;
@@ -1365,7 +1365,7 @@ mod sim {
         };
     }
 
-    fn move_belt(w: World, e: Entity) void {
+    fn move_belt(w: World, e: Entity) Void {
         let speed = w.speed[e.machine];
         let k = 0;
         while (k < e.belt_n) {

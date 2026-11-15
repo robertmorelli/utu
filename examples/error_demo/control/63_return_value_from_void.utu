@@ -2,12 +2,12 @@
 // Expect: log_twice returns void; return takes no value here
 using console from std:Console;
 
-fn log_twice(s: Str) void {
+fn log_twice(s: Str) Void {
     console.log(s);
     console.log(s);
     return 1;
 }
 
-export main() void {
+export main() Void {
     log_twice("hi");
 }

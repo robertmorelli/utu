@@ -1,6 +1,6 @@
 // What: a generator returns a value to stop early
 // Expect: a generator ends with `return;`, without a value
-fn upto(limit: I32) yield I32 {
+gn upto(limit: I32) I32 {
     for (0 ..< 100) |i| {
         if i == limit { return i; };
         yield i;

@@ -1,1 +1,1 @@
-export main() void { [1,2] map |x| {x;}; }
+export main() Void { [1,2] map |x| {x;}; }

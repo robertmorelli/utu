@@ -1,6 +1,6 @@
 // What: a generator whose body yields from a pipeline that is never finished
 // Expect: map pipeline is unfinished: end it with each |v| { yield v; }
-fn doubled(xs: Array[I32]) yield I32 {
+gn doubled(xs: Array[I32]) I32 {
     xs map |x| { yield x * 2; };
 }
 

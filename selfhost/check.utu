@@ -121,16 +121,16 @@ vec fi_site: I32
 vec checking_inst: I32
 
 /// Check code in instance `inst` (0: none), from call `site`, until @leave_instance.
-fn enter_instance(inst: I32, site: I32) void {
+fn enter_instance(inst: I32, site: I32) Void {
     checking_inst.push(inst)
     checking_inst.push(site)
 }
 
-fn leave_instance() void => checking_inst.resize(checking_inst.len() - 2)
+fn leave_instance() Void => checking_inst.resize(checking_inst.len() - 2)
 
 /// On a mistake just reported in a generic instance's code: which instance,
 /// and where it was first called.
-fn instance_note() void {
+fn instance_note() Void {
     let n = checking_inst.len()
     if n == 0 { return }
     let inst = checking_inst[n - 2]
@@ -141,7 +141,7 @@ fn instance_note() void {
     if checking_inst[n - 1] >= 0 { diag_place(Extra.Related, checking_inst[n - 1], "as " + text + " here") }
 }
 
-fn fi_grow() void {
+fn fi_grow() Void {
     let n = if fi_table.len() == 0 { 256 } else { fi_table.len() * 2 }
     fi_table.resize(n)
     for (0 ..< n) |i| { fi_table[i] = -1 }
@@ -231,7 +231,7 @@ vec sig_params: I32
 vec sig_result: I32
 
 /// Sets @sig_params and @sig_result for `decl` in instance `inst`.
-fn signature(decl: I32, inst: I32) void {
+fn signature(decl: I32, inst: I32) Void {
     let node = decl_node[decl]
     let m = vl_begin()
     let result = ty_void()
@@ -330,7 +330,7 @@ fn new_label() I32 {
 }
 
 /// A function's checking starts: no locals, labels, loops, or defers yet.
-fn begin_function() void {
+fn begin_function() Void {
     want_reset()
     cur_entry.clear()
     cur_locals.clear()
@@ -344,7 +344,7 @@ fn begin_function() void {
 }
 
 /// Check a function instance's body into its wasm function.
-fn check_function(fi: I32) void {
+fn check_function(fi: I32) Void {
     let decl = fi_decl[fi]
     begin_function()
     cur_fn[0] = fi
@@ -372,7 +372,7 @@ fn check_function(fi: I32) void {
 
 /// A body checked against the result type, as function `f`'s (after
 /// `prologue`, when it is a node: moving boxed parameters into their boxes).
-fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
+fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) Void {
     let outer = cur_src[0]
     cur_src[0] = body_node
     func_src[f] = body_node
@@ -388,7 +388,7 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) void {
 }
 
 /// Function `f`'s locals: those of @cur_locals from `first` (past its parameters).
-fn record_locals(f: I32, first: I32) void {
+fn record_locals(f: I32, first: I32) Void {
     func_locals[f] = local_types.len()
     func_local_count[f] = cur_locals.len() - first
     for (first ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]) }
@@ -436,7 +436,7 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
 /// Run the defers pending since `from` after a value (of value type `vt`,
 /// on the stack since `m`), which waits in a local meanwhile; with no value
 /// (`vt` none or unreachable), just run them.
-fn defers_after_value(vt: I32, m: I32, from: I32, cx: Cx) void {
+fn defers_after_value(vt: I32, m: I32, from: I32, cx: Cx) Void {
     if vt == vt_none or vt == vt_unreachable {
         run_defers(from, cx)
         return
@@ -458,10 +458,10 @@ fn defers_after_value(vt: I32, m: I32, from: I32, cx: Cx) void {
 }
 
 /// A value checked as Void: dropped, if it is one.
-fn discard(t: I32) void => drop_value(t)
+fn discard(t: I32) Void => drop_value(t)
 
 /// Drop the value on top of the stack, if it has one.
-fn drop_value(t: I32) void {
+fn drop_value(t: I32) Void {
     let vt = repr(t)
     if vt == vt_none or vt == vt_unreachable or ty_is(t, Ty.Error) { return }
     let m = w_mark() - 1
@@ -533,7 +533,7 @@ fn heap_of(vt: I32) I32 => vt_nullable(vt)
 
 /// Report that the value at `at` is an `actual`, not the `expected`; or,
 /// when it follows from an earlier mistake, count it there.
-fn mismatch(at: I32, expected: I32, actual: I32) void {
+fn mismatch(at: I32, expected: I32, actual: I32) Void {
     let site = value_site(at)
     // A local whose type came of a mistake: that mistake's consequence.
     if is_kind(site, Node.Identifier) and node_decl[site] >= 0 and decl_cause[node_decl[site]] >= 0 {
@@ -558,7 +558,7 @@ fn mismatch(at: I32, expected: I32, actual: I32) void {
 /// By declaration (a let): the mismatch in its initializer, or -1.
 vec decl_cause: I32
 
-fn fold_into(i: I32) void {
+fn fold_into(i: I32) Void {
     if i < 0 or i >= diag_kind.len() { return }
     // (A TypeMismatch's diag_c holds its reason above the count: see @want.)
     diag_c[i] = if diag_c[i] < 0 { 1 } else { diag_c[i] + 1 }
@@ -623,7 +623,7 @@ fn module_member_missing(module: I32, name: I32) I32 {
     error_value()
 }
 
-fn report_module_member_missing(module: I32, name: I32) void {
+fn report_module_member_missing(module: I32, name: I32) Void {
     if reported_within(name) { return }
     report3(Diag.UnknownMember, name, word_of(name), -1, -1, decl_name[module])
 }
@@ -635,7 +635,7 @@ fn bad_literal(at: I32) I32 {
     error_value()
 }
 
-fn report_bad_literal(at: I32) void {
+fn report_bad_literal(at: I32) Void {
     // A lone surrogate: half of a pair, which a string cannot hold alone.
     if bad_escape[0] < 0 { report2(Diag.InvalidEscape, at, -1, 1, -1) }
     else if bad_escape[1] == 2 { report2(Diag.InvalidEscape, at, -1, 3, -1) }
@@ -837,7 +837,7 @@ fn check_template(node: I32, cx: Cx) I32 {
 }
 
 /// `${e}`: `e.str()`.
-fn template_value(e: I32, cx: Cx) void {
+fn template_value(e: I32, cx: Cx) Void {
     let m = w_mark()
     let rt = check_expr(e, -1, cx)
     if ty_is(rt, Ty.Error) { return }
@@ -1061,7 +1061,7 @@ fn memo_safe_node(n: I32) Bool {
 }
 
 /// The value of type rt (checked, its code from mark m) as `.str()`.
-fn str_of(rt: I32, e: I32, m: I32, cx: Cx) void {
+fn str_of(rt: I32, e: I32, m: I32, cx: Cx) Void {
     let word = known_word(Known.ToStr)
     if ty_is(rt, Ty.Nullable) {
         report2(Diag.NullableAccess, e, word, rt, -1)
@@ -1219,7 +1219,7 @@ fn token_text(t: I32) Str {
 
 /// Push a constant of numeric type `t`: the integer `v`, or (when `is_bits`)
 /// the constant whose bits are `v` (an F32's in the low 32).
-fn push_number(t: I32, v: I64, is_bits: Bool) void {
+fn push_number(t: I32, v: I64, is_bits: Bool) Void {
     let vt = repr(t)
     if vt == vt_i32 {
         w_i32(v.i32())
@@ -1297,7 +1297,7 @@ fn check_let(node: I32, cx: Cx) I32 {
         let js = first_js_array_use(decl, node, init, cx)
         if js >= 0 { t = js }
     }
-    // `let f = cl(e) void {…}; el.addEventListener("x", f);`: its first use as a host argument types it.
+    // `let f = cl(e) Void {…}; el.addEventListener("x", f);`: its first use as a host argument types it.
     if not annotated and is_kind(init, Node.Closure_expr) and has_foreign() { t = first_host_use(decl, node, cx) }
     if is_es(init) and annotated {
         t = es_binding_type(t)
@@ -1525,7 +1525,7 @@ vec edge_site: I32
 /// `export main` while it is checked: its declaration, for its calls' edges.
 vec cur_entry: I32
 
-fn note_edge(to: I32, site: I32) void {
+fn note_edge(to: I32, site: I32) Void {
     let from = if cur_fn[0] != -1 { cur_fn[0] } else if cur_entry.len() > 0 { -1000000 - cur_entry[0] } else { return }
     edge_from.push(from)
     edge_to.push(to)
@@ -1574,7 +1574,7 @@ fn computed_global(gi: I32, t: I32, init: I32) I32 {
 
 /// After checking: the order the computed globals are set in (see above),
 /// cycles reported, and the start function that sets them.
-fn start_globals() void {
+fn start_globals() Void {
     let n = computed_gi.len()
     if n == 0 { return }
     // The edges by source: function instances, then initializers.
@@ -1654,7 +1654,7 @@ fn edge_source(from: I32, nf: I32) I32 {
 
 /// Computed global k set (`global.set g (call init)`), after its
 /// dependencies; one met again while it waits is a cycle, reported.
-fn set_global_after(k: I32, deps: Array[I32], deps_first: Array[I32], state: Array[I32]) void {
+fn set_global_after(k: I32, deps: Array[I32], deps_first: Array[I32], state: Array[I32]) Void {
     if state[k] != 0 { return }
     state[k] = 1
     for (deps_first[k] ..< deps_first[k + 1]) |i| {
@@ -2061,7 +2061,7 @@ fn old_scalar_static(decl: I32, name: I32, owner: I32, node: I32) Bool {
 
 /// `Point(1.0, 2.0)` for a struct: a note of its literal, and a fix when
 /// the values are as many as its fields (in their order).
-fn suggest_struct_init(node: I32, decl: I32, args: I32) void {
+fn suggest_struct_init(node: I32, decl: I32, args: I32) Void {
     let name = word_text(decl_name[decl])
     let shown = ""
     let made = ""
@@ -2145,7 +2145,7 @@ fn mentions_var(tn: I32, decl: I32) Bool {
 
 /// Bind the type parameters of template `decl` that type node `tn` names to
 /// what they are in `t`, the argument's type, where not bound yet.
-fn bind_type(tn: I32, t: I32, decl: I32, bound: Array[I32]) void {
+fn bind_type(tn: I32, t: I32, decl: I32, bound: Array[I32]) Void {
     if tn < 0 or t < 0 or ty_has_error(t) { return }
     let v = var_of(tn, decl)
     if v >= 0 {
@@ -2173,7 +2173,7 @@ fn bind_type(tn: I32, t: I32, decl: I32, bound: Array[I32]) void {
 }
 
 /// @bind_type over sibling type nodes from `first`, against list `ts`.
-fn bind_list(first: I32, ts: I32, decl: I32, bound: Array[I32]) void {
+fn bind_list(first: I32, ts: I32, decl: I32, bound: Array[I32]) Void {
     let c = first
     let i = 0
     while (c >= 0 and i < vl_len[ts]) {
@@ -2781,7 +2781,7 @@ vec lazy_call_path: I32
 
 /// Lazy module function `fi`'s body (f, its arguments on the stack since m):
 /// a call of the runtime, through an import of its own.
-fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
+fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) Void {
     let decl = fi_decl[fi]
     let params = fi_params[fi]
     let sig = "("
@@ -2805,7 +2805,7 @@ fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) void {
 /// What crosses into lazy module function `fi`'s chunk and back: numbers,
 /// Bool, Str, and host values in, a host element out.
 /// Reported at the call (`site`), the module's declaration related.
-fn check_lazy_signature(fi: I32, site: I32) void {
+fn check_lazy_signature(fi: I32, site: I32) Void {
     let decl = fi_decl[fi]
     let params = fi_params[fi]
     let at = if site >= 0 { site } else { decl_node[decl] }
@@ -3001,7 +3001,7 @@ fn vt_class(vt: I32) I32 {
 
 /// Check each `@ir` body of the program's own once, its parameters for
 /// arguments, though nothing calls it.
-fn check_own_ir() void {
+fn check_own_ir() Void {
     for (0 ..< user_ir_fi.len()) |k| {
         let fi = user_ir_fi[k]
         let params = fi_params[fi]
@@ -3027,7 +3027,7 @@ fn check_own_ir() void {
 /// Report each `@ir` type declaration of the program's own whose
 /// `type-repr` the compiler does not know, or whose array element names
 /// neither a parameter of its module nor a standard type.
-fn check_ir_types() void {
+fn check_ir_types() Void {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.TypeDecl) and file_std[file_of_token(node_first[decl_node[d]])] != 1 {
             let dsl = last_child(decl_node[d])
@@ -3127,7 +3127,7 @@ fn ident_uses(x: I32, decls: I32) I32 {
     vl_end(m)
 }
 
-fn collect_uses(x: I32, decls: I32) void {
+fn collect_uses(x: I32, decls: I32) Void {
     if x_tag[x] == known_word(Known.IrIdent) {
         vl_add(param_index(x, decls))
         return
@@ -3168,7 +3168,7 @@ fn ir_malformed(x: I32) Bool {
 
 /// The engine found the module invalid (`message`, a word): reported at
 /// each @ir body of the program's own, whose plain instructions alone the compiler checks.
-fn report_invalid_ir(message: I32) void {
+fn report_invalid_ir(message: I32) Void {
     for (0 ..< user_ir_decl.len()) |k| {
         let d = user_ir_decl[k]
         let seen = false
@@ -3523,7 +3523,7 @@ fn labeled_type(node: I32, cx: Cx) I32 {
     if seen >= 0 { seen } else { ty_void() }
 }
 
-fn open_label(node: I32, label: I32, t: I32) void {
+fn open_label(node: I32, label: I32, t: I32) Void {
     label_node.push(node)
     label_wasm.push(label)
     label_defers.push(defer_node.len())
@@ -3531,7 +3531,7 @@ fn open_label(node: I32, label: I32, t: I32) void {
     label_seen.push(-1)
 }
 
-fn close_label() void {
+fn close_label() Void {
     let n = label_node.len() - 1
     label_node.resize(n)
     label_wasm.resize(n)
@@ -3728,7 +3728,7 @@ fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
 
 /// `return v` where the function (or closure, or main) is written `void`: a
 /// fix that writes v's type there instead.
-fn suggest_result_type(node: I32, t: I32) void {
+fn suggest_result_type(node: I32, t: I32) Void {
     let p = parent_of(node)
     while (p >= 0 and not (is_kind(p, Node.Fn_decl) or is_kind(p, Node.Op_decl) or is_kind(p, Node.Closure_expr)
         or is_kind(p, Node.Export_main_decl) or is_kind(p, Node.Test_decl))) {
@@ -3800,7 +3800,7 @@ enum(U8) Target:
     | Benches
     | Analysis
 
-fn reset_check() void {
+fn reset_check() Void {
     memo_state.clear()
     lazy_call_fn.clear()
     export_func.clear()
@@ -4042,7 +4042,7 @@ fn compile(target: Target) I32 {
 
 /// A test or bench: every build checks it; a test build exports the entry
 /// file's tests, a bench build its benches.
-fn test_or_bench(item: I32, target: Target) void {
+fn test_or_bench(item: I32, target: Target) Void {
     if target == Target.Comptime { return }
     if is_kind(item, Node.Test_decl) {
         entry_function(item, -1, if target == Target.Tests { test_node.len() } else { -1 })
@@ -4055,7 +4055,7 @@ fn test_or_bench(item: I32, target: Target) void {
 }
 
 /// Export a function of the program under its name.
-fn export_fn(decl: I32) void {
+fn export_fn(decl: I32) Void {
     let fi = fn_instance(decl, 0)
     func_field_name[function_of(fi)] = fn_debug_name(decl)
     export_func.push(function_of(fi))
@@ -4088,7 +4088,7 @@ fn has_prefix(word: I32, prefix: Str) Bool {
 }
 
 /// Enqueue a function declaration (or those of an `export lib`).
-fn check_item(item: I32) void {
+fn check_item(item: I32) Void {
     if is_kind(item, Node.Export_lib_decl) {
         let f = first_child(item)
         while (f >= 0) {
@@ -4113,7 +4113,7 @@ fn check_item(item: I32) void {
 /// Resolution reports on the whole entry file; drop what is in surfaces the
 /// target leaves out (tests in a normal build, exports in a test build), as
 /// those are not part of the program built.
-fn keep_target_diagnostics(target: Target) void {
+fn keep_target_diagnostics(target: Target) Void {
     // The entry file's own items, in place order, for @in_target to search.
     target_items.clear()
     let entry = entry_file()
@@ -4136,7 +4136,7 @@ vec located_repeat: U8
 
 /// A mistake inside the place of generated code (a Wutu binding's) that
 /// another diagnostic is at is dropped: the one at the binding names it.
-fn drop_located_repeats() void {
+fn drop_located_repeats() Void {
     let located = false
     for (0 ..< diag_kind.len()) |j| { if located_file(j) >= 0 { located = true } }
     if not located { return }
@@ -4201,7 +4201,7 @@ vec bench_node: I32
 /// ```
 /// setup  block $done  loop $top  (br_if $done (i >= n))  body  i += 1  (br $top)  end  end
 /// ```
-fn bench_function(item: I32, k: I32) void {
+fn bench_function(item: I32, k: I32) Void {
     let i32_t = prelude(Prelude.I32)
     let mp = vl_begin()
     vl_add(i32_t)
@@ -4269,7 +4269,7 @@ vec target_items: I32
 
 /// `export main(…)` and tests: functions of their own, exported (a test
 /// only in a test build: `test_index` -1 checks it).
-fn entry_function(item: I32, name: I32, test_index: I32) void {
+fn entry_function(item: I32, name: I32, test_index: I32) Void {
     let list = child_of_kind(item, Node.Param_list)
     let m = vl_begin()
     let result = ty_void()
@@ -4327,7 +4327,7 @@ vec run_elem: I32 = [-1]
 /// array level k, `run:len:k` and `run:at:k`, its `len()` and `[i]`, so
 /// `utu run` prints the result as `[[1, 2], []]`. (`:` is in no utu name.)
 /// A tuple or handle main's type is @run_elem too: printed `[1, P]`, `P`.
-fn run_readers(item: I32) void {
+fn run_readers(item: I32) Void {
     run_depth[0] = 0
     let ret = child_of_kind(item, Node.Return_type)
     if ret < 0 { return }

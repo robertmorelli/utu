@@ -12,7 +12,7 @@ fn node(id: Str) Browser.HTMLElement {
     Browser.document.getElementById(id) orelse fatal
 }
 
-fn restore_focus(id: Str) void {
+fn restore_focus(id: Str) Void {
     promote Browser.document.getElementById(id) {
         |element| => element.focus(), ~> {
         },
@@ -20,7 +20,7 @@ fn restore_focus(id: Str) void {
 }
 
 fn persist(key: Str,
-value: Str) void {
+value: Str) Void {
     try {
         Browser.localStorage.setItem(key, value)
     } catch {
@@ -40,7 +40,7 @@ struct Menu:
     | dishes: Array[Dish]
     | category: Str
 
-fn save(state: Menu) void {
+fn save(state: Menu) Void {
     let data = Browser.Array()
     state.dishes each |dish| {
         data.push(&{
@@ -51,7 +51,7 @@ fn save(state: Menu) void {
     persist("juniper-v1", Browser.JSON.stringify(data))
 }
 
-fn update(state: Menu) void {
+fn update(state: Menu) Void {
     save(state)
 }
 
@@ -240,7 +240,7 @@ fn basket(state: Menu) Browser.HTMLElement {
     \/
 }
 
-export main() void {
+export main() Void {
     let state = Menu {
         category: "All",
         dishes: [

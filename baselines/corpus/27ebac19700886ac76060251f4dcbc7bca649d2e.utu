@@ -19,7 +19,7 @@
 mod Emitter {
     type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
 
-    fn &.on |self| (event: Str, handler: cl(I32) void) void { emitter_on(self, event, handler); }
+    fn &.on |self| (event: Str, handler: cl(I32) Void) Void { emitter_on(self, event, handler); }
     fn &.emit |self| (event: Str, value: I32) Bool { emitter_emit(self, event, value); }
     fn &.count |self| (event: Str) I32 { emitter_count(self, event); }
 }
@@ -29,7 +29,7 @@ let new_emitter: fun() Emitter =
     @es/\ ((m) => () => new m.EventEmitter())(await import('node:events')) \/;
 
 // The closure arrives already callable — this is genuinely just `e.on(k, f)`.
-let emitter_on: fun(Emitter, Str, cl(I32) void) void = @es/\ (e, k, f) => e.on(k, f) \/;
+let emitter_on: fun(Emitter, Str, cl(I32) Void) Void = @es/\ (e, k, f) => e.on(k, f) \/;
 
 // PAIN: `emit(event, ...args)` is variadic. This binding is the arity-1 case;
 // arity 0 and 2 would each need their own.

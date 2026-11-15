@@ -27,7 +27,7 @@ fn big(v: I32) Big {
 }
 
 // Room for cap limbs, keeping the value.
-fn reserve(a: Big, cap: I32) void {
+fn reserve(a: Big, cap: I32) Void {
     if a.d.len() < cap {
         let d = Array[U32].new(cap * 2, 0)
         let old = a.d
@@ -43,7 +43,7 @@ fn norm(d: Array[U32], n0: I32) I32 {
     n
 }
 
-fn set_zero(r: Big) void {
+fn set_zero(r: Big) Void {
     r.n = 0
     r.neg = false
 }
@@ -88,7 +88,7 @@ fn get_si(a: Big) I32 {
 }
 
 // |r| = |a| + |b|, a.n >= b.n
-fn add_mag(r: Big, a: Big, b: Big) void {
+fn add_mag(r: Big, a: Big, b: Big) Void {
     let an = a.n
     let bn = b.n
     reserve(r, an + 1)
@@ -115,7 +115,7 @@ fn add_mag(r: Big, a: Big, b: Big) void {
 }
 
 // |r| = |a| - |b|, |a| >= |b|
-fn sub_mag(r: Big, a: Big, b: Big) void {
+fn sub_mag(r: Big, a: Big, b: Big) Void {
     let an = a.n
     let bn = b.n
     reserve(r, an)
@@ -137,7 +137,7 @@ fn sub_mag(r: Big, a: Big, b: Big) void {
 }
 
 // mpz_add: r = a + b (r may be a or b)
-fn add(r: Big, a: Big, b: Big) void {
+fn add(r: Big, a: Big, b: Big) Void {
     let aneg = a.neg
     let bneg = b.neg
     if aneg == bneg {
@@ -155,7 +155,7 @@ fn add(r: Big, a: Big, b: Big) void {
 }
 
 // mpz_mul_si: r = a * s (r may be a)
-fn mul_si(r: Big, a: Big, s: I32) void {
+fn mul_si(r: Big, a: Big, s: I32) Void {
     let an = a.n
     if s == 0 or an == 0 {
         set_zero(r)
@@ -182,7 +182,7 @@ fn mul_si(r: Big, a: Big, s: I32) void {
 }
 
 // mpz_mul: r = a * b (schoolbook, into a new array; r may be a or b)
-fn mul(r: Big, a: Big, b: Big) void {
+fn mul(r: Big, a: Big, b: Big) Void {
     let an = a.n
     let bn = b.n
     if an == 0 or bn == 0 {
@@ -211,7 +211,7 @@ fn mul(r: Big, a: Big, b: Big) void {
 // mpz_tdiv_q: q = a / b truncated (q is neither a nor b). Knuth's algorithm
 // D (TAOCP 4.3.1) on b and a shifted so b's top limb has its high bit set;
 // un and vn hold the shifted copies.
-fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) void {
+fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) Void {
     let n = b.n
     let an = a.n
     let m = an - n

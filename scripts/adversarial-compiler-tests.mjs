@@ -78,7 +78,7 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
         export lib { fn bad() Array[Cell] { Array[Cell].new_default(1); } }
       `],
       ['invalid-nullable-type', `export lib { fn bad() ?I32 { null; } }`],
-      ['invalid-nullable-type', `export lib { fn bad() void { null; } }`],
+      ['invalid-nullable-type', `export lib { fn bad() Void { null; } }`],
       ['unknown-field', `struct Cell: | value : I32\nexport lib { fn bad() Cell { Cell { value: 1, extra: 2 }; } }`],
       ['duplicate-field', `struct Cell: | value : I32 | value : F32\nexport lib { fn ok() I32 { 1; } }`],
       ['duplicate-declaration', `tag enum Choice: | A | A\nexport lib { fn ok() I32 { 1; } }`],

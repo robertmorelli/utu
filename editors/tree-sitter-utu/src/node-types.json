@@ -9818,10 +9818,6 @@
           "named": true
         },
         {
-          "type": "void_type",
-          "named": true
-        },
-        {
           "type": "yield_type",
           "named": true
         }
@@ -12298,10 +12294,6 @@
   {
     "type": "vec",
     "named": false
-  },
-  {
-    "type": "void_type",
-    "named": true
   },
   {
     "type": "while",

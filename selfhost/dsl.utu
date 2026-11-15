@@ -13,7 +13,7 @@
 
 /// Expand every DSL site of the program's own files; then the sites the
 /// expansions made, until none is left.
-fn expand_dsls() void {
+fn expand_dsls() Void {
     let rounds = 0
     while (rounds < 16 and expand_dsl_round()) { rounds += 1 }
     if rounds < 16 { return }
@@ -90,7 +90,7 @@ fn expand_each(a: I32, b: I32, end_: I32) Bool {
 
 /// Expands one site of DSL `name` (`utu`, `css`, `stored`, `wutu`); a
 /// mistake is reported, and the site left as it is.
-fn expand_site(n: I32, name: Str) void {
+fn expand_site(n: I32, name: Str) Void {
     try {
         if name == "utu" { expand_utu(n) }
         else if name == "css" { expand_css(n) }
@@ -151,19 +151,19 @@ vec dsl_err_message: I32 = [-1]
 vec dsl_err_offset: I32 = [0]
 vec dsl_err_length: I32 = [0]
 
-let dsl_throw: fun() void = @es/\ () => { throw new SyntaxError('utu dsl'); } \/
+let dsl_throw: fun() Void = @es/\ () => { throw new SyntaxError('utu dsl'); } \/
 
 /// A mistake in the body being expanded: at `offset` (code units into it),
 /// `length` long. It throws, and the expansion's `catch` reports it
 /// (@report_dsl_error) and leaves the site as it is.
-fn dsl_fail(message: Str, offset: I32, length: I32) void {
+fn dsl_fail(message: Str, offset: I32, length: I32) Void {
     dsl_err_message[0] = intern_text(message)
     dsl_err_offset[0] = offset
     dsl_err_length[0] = length
     dsl_throw()
 }
 
-fn report_dsl_error(site: I32) void {
+fn report_dsl_error(site: I32) Void {
     let start = dsl_byte(site, dsl_err_offset[0])
     report3(Diag.DslError, site, dsl_err_message[0], start, start + dsl_err_length[0], -1)
 }
@@ -189,7 +189,7 @@ fn dsl_units(site: I32, at: I32) I32 {
 /// Moves @dsl_cursor through a site's body (from where it is, unless that
 /// is past the place) to byte `to` or UTF-16 offset `units`, whichever
 /// comes first.
-fn dsl_walk(site: I32, to: I32, units: I32) void {
+fn dsl_walk(site: I32, to: I32, units: I32) Void {
     let b = dsl_inner_start(site)
     let u = 0
     if dsl_cursor[0] == site and dsl_cursor[1] <= to and dsl_cursor[2] <= units {
@@ -230,7 +230,7 @@ fn dsl_site_of(node: I32) I32 {
 }
 
 /// Parse `code` (an expression) and make it the site's value.
-fn graft_expression(site: I32, code: Str) void {
+fn graft_expression(site: I32, code: Str) Void {
     dsl_current_site[0] = site
     let expr = parse_expansion(code)
     // Reported once, as its generated file; not expanded again each round.
@@ -244,7 +244,7 @@ fn graft_expression(site: I32, code: Str) void {
 /// Expression `code`, parsed as a generated file, out of the file (which is
 /// left empty): its node, or -1.
 fn parse_expansion(code: Str) I32 {
-    let root = parse_generated_file("fn __expansion() void { " + code + "; }")
+    let root = parse_generated_file("fn __expansion() Void { " + code + "; }")
     if root < 0 { return -1 }
     let block = last_child(first_child(root))
     let e = first_child(block)
@@ -256,7 +256,7 @@ fn parse_expansion(code: Str) I32 {
 }
 
 /// Parse declarations and make them the container's first items.
-fn graft_declarations(container: I32, code: Str) void {
+fn graft_declarations(container: I32, code: Str) Void {
     let root = parse_generated_file(code)
     if root < 0 { return }
     let first = node_child[root]
@@ -377,7 +377,7 @@ fn parse_span(start: I32, end_: I32) I32 {
 }
 
 /// Replace the placeholders under `node` with their expressions.
-fn fill_splices(node: I32) void {
+fn fill_splices(node: I32) Void {
     if node < 0 { return }
     if is_kind(node, Node.Identifier) {
         let name = word_text(word_of(node))
@@ -405,7 +405,7 @@ fn fill_splices(node: I32) void {
 }
 
 /// A Wutu island's identifiers that name element aliases, renamed.
-fn apply_renames(node: I32, k: I32) void {
+fn apply_renames(node: I32, k: I32) Void {
     if is_kind(node, Node.Identifier) {
         let at = tok_start[node_first[node]]
         for (0 ..< splice_rename_k.len()) |r| {

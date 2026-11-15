@@ -17,11 +17,11 @@ fn load_favorites() Browser.Set {
     saved
 }
 
-fn save_favorites(favorites: Browser.Set) void {
+fn save_favorites(favorites: Browser.Set) Void {
     Browser.localStorage.setItem("pantry-favorites", Browser.JSON.stringify(Browser.Array.from(favorites)))
 }
 
-fn draw_chart(canvas: Browser.HTMLCanvasElement, items: Browser.Array) void {
+fn draw_chart(canvas: Browser.HTMLCanvasElement, items: Browser.Array) Void {
     promote canvas.getContext("2d") {
         |ctx| => {
             let categories = ["Produce", "Dairy", "Bakery", "Pantry"]
@@ -41,9 +41,9 @@ fn draw_chart(canvas: Browser.HTMLCanvasElement, items: Browser.Array) void {
     }
 }
 
-fn count_up(target: Browser.HTMLElement, total: F64) void {
+fn count_up(target: Browser.HTMLElement, total: F64) Void {
     let start = Browser.performance.now()
-    let step = cl(now: F64) void {
+    let step = cl(now: F64) Void {
         let progress = Browser.Math.min(1, (now - start) / 600)
         target.textContent = money(total * progress)
         if progress < 1 { Browser.requestAnimationFrame(step) }
@@ -51,7 +51,7 @@ fn count_up(target: Browser.HTMLElement, total: F64) void {
     Browser.requestAnimationFrame(step)
 }
 
-fn render(state: State) void {
+fn render(state: State) Void {
     let document = Browser.document
     let list = state.list
     let query = state.query.toLowerCase()
@@ -71,7 +71,7 @@ fn render(state: State) void {
         empty.textContent = "Nothing matches “" + state.query + "”."
         list.append(empty)
     }
-    visible.forEach(cl(item) void {
+    visible.forEach(cl(item) Void {
         let row = document.createElement("li")
         row.className = "item"
         row.dataset.id = item.id
@@ -117,7 +117,7 @@ fn by_id(id: Str) Browser.HTMLElement {
     Browser.document.getElementById(id) orelse fatal
 }
 
-export main() void {
+export main() Void {
     let document = Browser.document
     let response = await Browser.fetch("items.json")
     let items = await response.json()
@@ -131,14 +131,14 @@ export main() void {
     }
 
     let chips = by_id("chips")
-    ["All", "Produce", "Dairy", "Bakery", "Pantry"].forEach(cl(name) void {
+    ["All", "Produce", "Dairy", "Bakery", "Pantry"].forEach(cl(name) Void {
         let chip = document.createElement("button")
         chip.className = "chip"
         chip.textContent = name
         chip.classList.toggle("active", name == state.category)
-        chip.addEventListener("click", cl(event) void {
+        chip.addEventListener("click", cl(event) Void {
             state.category = name
-            chips.querySelectorAll(".chip").forEach(cl(other) void { other.classList.toggle("active", other == chip) })
+            chips.querySelectorAll(".chip").forEach(cl(other) Void { other.classList.toggle("active", other == chip) })
             render(state)
         })
         chips.append(chip)
@@ -148,14 +148,14 @@ export main() void {
         |input| => {
             input.value = state.query
             let timer: F64 = 0.0
-            input.addEventListener("input", cl(event) void {
+            input.addEventListener("input", cl(event) Void {
                 Browser.clearTimeout(timer)
-                timer = Browser.setTimeout(cl() void {
+                timer = Browser.setTimeout(cl() Void {
                     state.query = input.value
                     render(state)
                 }, 150)
             })
-            document.addEventListener("keydown", cl(event) void {
+            document.addEventListener("keydown", cl(event) Void {
                 if event.key == "/" and document.activeElement != input {
                     event.preventDefault()
                     input.focus()
@@ -167,14 +167,14 @@ export main() void {
 
     let sort: ?Browser.HTMLSelectElement = document.querySelector("#sort")
     promote sort {
-        |select| => select.addEventListener("change", cl(event) void {
+        |select| => select.addEventListener("change", cl(event) Void {
             state.sort = select.value
             render(state)
         }),
         ~> {},
     }
 
-    state.list.addEventListener("click", cl(event) void {
+    state.list.addEventListener("click", cl(event) Void {
         alt event.target {
             Browser.Element |target| => {
                 let row: ?Browser.HTMLElement = target.closest(".item")
@@ -191,7 +191,7 @@ export main() void {
 
     let add: ?Browser.HTMLFormElement = document.querySelector("#add")
     promote add {
-        |form| => form.addEventListener("submit", cl(event) void {
+        |form| => form.addEventListener("submit", cl(event) Void {
             event.preventDefault()
             let data = new Browser.FormData(form)
             let name = data.get("name")

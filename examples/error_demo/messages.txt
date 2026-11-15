@@ -54,7 +54,7 @@
    │       ─────────────
    │       ╰─ I32
    ┆
-10 │ fn field_blame_demo(config: Config) void {
+10 │ fn field_blame_demo(config: Config) Void {
 11 │     let enabled: Bool = config.enabled;
 12 │     config.retries = enabled;
    │                      ━━━━━━━
@@ -203,7 +203,7 @@
         nullable-access · examples/error_demo/control/08_assign_field_of_nullable.utu:7:5
 
  5 │
- 6 │ fn reset(c: ?Counter) void {
+ 6 │ fn reset(c: ?Counter) Void {
  7 │     c.count = 0;
    │     ━━━━━━━
    │     ╰─ may be null
@@ -243,7 +243,7 @@
  4 │     done: {
    │     ────
    │     ╰─ outside the closure
- 5 │         let stop: cl() void = cl() { break done; };
+ 5 │         let stop: cl() Void = cl() { break done; };
    │                                            ━━━━
    │                                            ╰─ block done is outside the closure
  6 │         stop();
@@ -299,7 +299,7 @@ ok
  ERROR  Expected nullable, got Point
         not-nullable · examples/error_demo/control/12_optional_chain_non_nullable.utu:11:17
 
- 9 │ export main() void {
+ 9 │ export main() Void {
 10 │     let p = Point { x: 1.0, y: 2.0 };
 11 │     console.log(p?.x.str());
    │                 ━
@@ -494,7 +494,7 @@ ok
         non-exhaustive · examples/error_demo/control/27_alt_statement_missing_variant.utu:10:5
 
  8 │
- 9 │ fn run(c: Command) void {
+ 9 │ fn run(c: Command) Void {
 10 │     alt c {
    │     ━━━━━━━
    │     ╰─ no Quit
@@ -589,7 +589,7 @@ ok
         try-place · examples/error_demo/control/304_try_in_generator.utu:9:29
 
  7 │
- 8 │ fn digits(codes: Array[I32]) yield I32 {
+ 8 │ gn digits(codes: Array[I32]) I32 {
  9 │     for (codes) |c| { yield try digit(c); };
    │                             ━━━━━━━━━━━━
    │                             ╰─ in a generator
@@ -801,7 +801,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/403_break_label_no_value.utu
- ERROR  n is I32, got void
+ ERROR  n is I32, got Void
         type-mismatch · examples/error_demo/control/403_break_label_no_value.utu:5:9
 
  3 │ export main() I32 {
@@ -810,7 +810,7 @@ ok
    │            ╰─ I32
  5 │         break found;
    │         ━━━━━━━━━━━
-   │         ╰─ void
+   │         ╰─ Void
  6 │     };
  7 │     n;
 --- exit 1
@@ -903,7 +903,7 @@ ok
 
  4 │     let found = -1;
  5 │     for (xs) |x| {
- 6 │         let test = cl(v: I32) void { if v > 10 { break; }; };
+ 6 │         let test = cl(v: I32) Void { if v > 10 { break; }; };
    │                                                  ━━━━━
    │                                                  ╰─ here
  7 │         test(x);
@@ -1018,7 +1018,7 @@ ok
  ERROR  defer must be a statement
         invalid-defer · examples/error_demo/control/55_defer_as_if_branch.utu:7:14
 
- 5 │ fn open(mode: I32) void {
+ 5 │ fn open(mode: I32) Void {
  6 │     match mode {
  7 │         1 => defer console.log("closed"),
    │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1044,7 +1044,7 @@ ok
  ERROR  Each arm must name a class
         host-alt-arm · examples/error_demo/control/57_host_alt_arm_not_a_class.utu:12:13
 
-10 │     doc.addEventListener("input", cl(e) void {
+10 │     doc.addEventListener("input", cl(e) Void {
 11 │         let text = alt e.target {
 12 │             Note |n| => n.text,
    │             ━━━━━━━━━━━━━━━━━━━
@@ -1057,7 +1057,7 @@ ok
  ERROR  Each arm must name a class
         host-alt-arm · examples/error_demo/control/58_host_alt_arm_unqualified.utu:9:13
 
- 7 │     doc.addEventListener("input", cl(e) void {
+ 7 │     doc.addEventListener("input", cl(e) Void {
  8 │         let text = alt e.target {
  9 │             HTMLInputElement |t| => t.value,
    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1070,7 +1070,7 @@ ok
  ERROR  Browser.ParentNode is only a type
         host-alt-class · examples/error_demo/control/59_host_alt_class_type_only.utu:9:13
 
- 7 │     doc.addEventListener("click", cl(e) void {
+ 7 │     doc.addEventListener("click", cl(e) Void {
  8 │         alt e.target {
  9 │             Browser.ParentNode |p| => Browser.console.log(p.childElementCount),
    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1096,7 +1096,7 @@ ok
  ERROR  Browser.AddEventListenerOptions is only a type
         host-alt-class · examples/error_demo/control/60_host_alt_class_dictionary.utu:9:13
 
- 7 │     doc.addEventListener("click", cl(e) void {
+ 7 │     doc.addEventListener("click", cl(e) Void {
  8 │         alt e.target {
  9 │             Browser.AddEventListenerOptions |o| => Browser.console.log("options"),
    │             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1121,20 +1121,20 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/62_return_without_value.utu
- ERROR  Expected I32, got void
+ ERROR  Expected I32, got Void
         type-mismatch · examples/error_demo/control/62_return_without_value.utu:5:26
 
  3 │ fn find(xs: Array[I32], target: I32) I32 {
  4 │     for (xs, 0 ..< xs.len()) |x, i| {
  5 │         if x == target { return; };
    │                          ━━━━━━
-   │                          ╰─ void
+   │                          ╰─ Void
  6 │     };
  7 │     -1;
 --- exit 1
 
 === utu check examples/error_demo/control/63_return_value_from_void.utu
- ERROR  log_twice returns void
+ ERROR  log_twice returns Void
         return-value-from-void · examples/error_demo/control/63_return_value_from_void.utu:8:12
 
  6 │     console.log(s);
@@ -1149,7 +1149,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/64_missing_final_value.utu
- ERROR  double returns I32, got void
+ ERROR  double returns I32, got Void
         type-mismatch · examples/error_demo/control/64_missing_final_value.utu:4:5
 
  2 │ // Expect: double must end with an I32 value; its last statement is a let (add `d;`)
@@ -1158,12 +1158,12 @@ ok
    │                   ╰─ I32
  4 │     let d = x * 2;
    │     ━━━━━━━━━━━━━
-   │     ╰─ void
+   │     ╰─ Void
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/65_ends_with_loop.utu
- ERROR  join returns Str, got void
+ ERROR  join returns Str, got Void
         type-mismatch · examples/error_demo/control/65_ends_with_loop.utu:5:5
 
  3 │ fn join(xs: Array[Str]) Str {
@@ -1172,26 +1172,26 @@ ok
  4 │     let out = "";
  5 │     for (xs) |x| { out = out + x; };
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ void
+   │     ╰─ Void
  6 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/66_if_without_else_as_value.utu
- ERROR  s is I32, got void
+ ERROR  s is I32, got Void
         type-mismatch · examples/error_demo/control/66_if_without_else_as_value.utu:4:18
 
  2 │ // Expect: if without else has no value; add an else branch
  3 │ fn sign(x: I32) I32 {
  4 │     let s: I32 = if x < 0 { -1; };
    │            ───   ━━━━━━━━━━━━━━━━
-   │            │     ╰─ void
+   │            │     ╰─ Void
    │            ╰─ I32
  5 │     s;
  6 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/67_if_without_else_returned.utu
- ERROR  abs returns I32, got void
+ ERROR  abs returns I32, got Void
         type-mismatch · examples/error_demo/control/67_if_without_else_returned.utu:4:5
 
  2 │ // Expect: abs must end with an I32 value; this if has no else branch
@@ -1200,19 +1200,19 @@ ok
    │                ╰─ I32
  4 │     if x < 0 { -x; };
    │     ━━━━━━━━━━━━━━━━
-   │     ╰─ void
+   │     ╰─ Void
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/68_while_as_value.utu
- ERROR  n is I32, got void
+ ERROR  n is I32, got Void
         type-mismatch · examples/error_demo/control/68_while_as_value.utu:5:18
 
  3 │ export main() I32 {
  4 │     let i = 0;
  5 │     let n: I32 = while (i < 10) { i += 1; };
    │            ───   ━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │            │     ╰─ void
+   │            │     ╰─ Void
    │            ╰─ I32
  6 │     n;
  7 │ }
@@ -1328,7 +1328,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/78_missing_return_in_one_branch.utu
- ERROR  sign returns I32, got void
+ ERROR  sign returns I32, got Void
         type-mismatch · examples/error_demo/control/78_missing_return_in_one_branch.utu:6:29
 
  4 │
@@ -1337,7 +1337,7 @@ ok
    │                 ╰─ I32
  6 │     if x >= 0 { 1; } else { console.log("negative"); };
    │                             ━━━━━━━━━━━━━━━━━━━━━━━
-   │                             ╰─ void
+   │                             ╰─ Void
  7 │ }
 --- exit 1
 
@@ -1599,7 +1599,7 @@ ok
  ERROR  Generator walk recurses
         generator-recursion · examples/error_demo/iterators/1185_recursive_generator_method.utu:7:22
 
- 5 │     fn &.walk |s| () yield I32 {
+ 5 │     gn &.walk |s| () I32 {
  6 │         yield s.n;
  7 │         if s.n > 0 { for ((M { n: s.n - 1 }).walk()) |x| { yield x; }; };
    │                      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1904,7 +1904,7 @@ ok
         await-in-closure · examples/error_demo/iterators/340_await_closure_to_es.utu:7:31
 
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
  7 │     each(cl(v) { let w: I32 = await later(v); });
    │          ──                   ━━━━━━━━━━━━━━
    │          │                    ╰─ suspends
@@ -1919,7 +1919,7 @@ ok
         await-in-closure · examples/error_demo/iterators/341_await_through_fn_in_then.utu:8:35
 
  6 │
- 7 │ export main() void {
+ 7 │ export main() Void {
  8 │     later(1).then(cl(v) { let w = slow(v); });
    │                   ──              ━━━━━━━
    │                   │               ╰─ may suspend
@@ -1934,7 +1934,7 @@ ok
         await-in-closure · examples/error_demo/iterators/342_await_let_closure_to_es.utu:7:36
 
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
  7 │     let tick = cl() { let v: I32 = await later(1); };
    │                ──                  ━━━━━━━━━━━━━━
    │                │                   ╰─ suspends
@@ -1950,8 +1950,8 @@ ok
         await-in-closure · examples/error_demo/iterators/343_await_closure_to_declared_host.utu:8:49
 
  6 │
- 7 │ export main() void {
- 8 │     Browser.setTimeout(cl() void { let v: I32 = await later(1); }, 0.0);
+ 7 │ export main() Void {
+ 8 │     Browser.setTimeout(cl() Void { let v: I32 = await later(1); }, 0.0);
    │                        ──                       ━━━━━━━━━━━━━━
    │                        │                        ╰─ suspends
    │                        ╰─ the host calls it
@@ -2106,7 +2106,7 @@ ok
  ERROR  A generator returns no value
         generator-return-value · examples/error_demo/iterators/44_generator_return_value.utu:5:25
 
- 3 │ fn upto(limit: I32) yield I32 {
+ 3 │ gn upto(limit: I32) I32 {
  4 │     for (0 ..< 100) |i| {
  5 │         if i == limit { return i; };
    │                         ━━━━━━━━
@@ -2146,7 +2146,7 @@ ok
         yield-in-closure · examples/error_demo/iterators/47_yield_in_closure.utu:4:29
 
  2 │ // Expect: yield cannot appear inside a closure; the generator expands into its consumer
- 3 │ fn doubled(xs: Array[I32]) yield I32 {
+ 3 │ gn doubled(xs: Array[I32]) I32 {
  4 │     let emit = cl(v: I32) { yield v * 2; };
    │                             ━━━━━━━━━━━
    │                             ╰─ here
@@ -2174,7 +2174,7 @@ ok
         generator-recursion · examples/error_demo/iterators/48_generator_mutual_recursion.utu:9:16
 
  7 │
- 8 │ fn odds(n: I32) yield I32 {
+ 8 │ gn odds(n: I32) I32 {
  9 │     if n > 0 { for (evens(n - 1)) |v| { yield v; }; };
    │                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                ╰─ here
@@ -2210,7 +2210,7 @@ ok
  ERROR  depths passes its values straight through
         generator-pass-through · examples/error_demo/iterators/50_generator_pass_through_transform.utu:8:24
 
- 6 │ fn depths(n: Node, d: I32) yield I32 {
+ 6 │ gn depths(n: Node, d: I32) I32 {
  7 │     yield d;
  8 │     for (n.kids) |k| { for (depths(k, d)) |x| { yield x + 1; }; };
    │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2235,7 +2235,7 @@ ok
  ERROR  walk takes 2, given 1
         generator-arity · examples/error_demo/iterators/52_recursive_generator_arity_inside.utu:9:24
 
- 7 │ fn walk(n: Node, depth: I32) yield Node {
+ 7 │ gn walk(n: Node, depth: I32) Node {
  8 │     yield n;
  9 │     for (n.kids) |k| { for (walk(k)) |d| { yield d; }; };
    │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2546,7 +2546,7 @@ ok
 
  2 │ // Expect: a generator cannot be exported: it expands inline at a for loop; export a function returning Array[I32]
  3 │ export lib {
- 4 │     fn squares(n: I32) yield I32 {
+ 4 │     gn squares(n: I32) I32 {
    │        ━━━━━━━
    │        ╰─ a generator
  5 │         for (0 ..< n) |i| { yield i * i; };
@@ -2570,7 +2570,7 @@ ok
         iterator-unfinished · examples/error_demo/iterators/79_generator_unused_with_pipeline.utu:4:5
 
  2 │ // Expect: map pipeline is unfinished: end it with each |v| { yield v; }
- 3 │ fn doubled(xs: Array[I32]) yield I32 {
+ 3 │ gn doubled(xs: Array[I32]) I32 {
  4 │     xs map |x| { yield x * 2; };
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │     ╰─ here
@@ -2581,7 +2581,7 @@ ok
  ERROR  break outside a loop
         invalid-break · examples/error_demo/iterators/80_break_in_generator_body.utu:5:5
 
- 3 │ fn ones() yield I32 {
+ 3 │ gn ones() I32 {
  4 │     yield 1;
  5 │     break;
    │     ━━━━━
@@ -2929,7 +2929,7 @@ ok
    │              ━━━━
    │              ╰─ no such module
  5 │
- 6 │ fn add(state: State) void {
+ 6 │ fn add(state: State) Void {
 --- exit 1
 
 === utu check examples/error_demo/names/11_unknown_type_Arary.utu
@@ -3329,7 +3329,7 @@ ok
    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
 
   note  using console from std:Console;
 --- exit 1
@@ -3344,7 +3344,7 @@ ok
    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
 
   note  using console from std:Console;
 --- exit 1
@@ -3359,7 +3359,7 @@ ok
    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
 --- exit 1
 
 === utu check examples/error_demo/names/35_unknown_import_npm_missing.utu
@@ -3583,7 +3583,7 @@ ok
 
  1 │ // What: console.log with no import
  2 │ // Expect: Unknown variable console; note: using console from std:Console;
- 3 │ export main() void { console.log("hi"); }
+ 3 │ export main() Void { console.log("hi"); }
    │                      ━━━━━━━
    │                      ╰─ not defined
 
@@ -3802,7 +3802,7 @@ ok
    │       ━━━━━━━
    │       ╰─ no such module
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
 
   note  The file has no mod gadgets: declare one there, mod gadgets { … }
 
@@ -3810,7 +3810,7 @@ ok
         unknown-variable · examples/error_demo/names/551_lazy_file_without_mod.utu:7:34
 
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
  7 │     Browser.document.body.append(gadgets.badge("new"));
    │                                  ━━━━━━━
    │                                  ╰─ not defined
@@ -4409,7 +4409,7 @@ ok
         assignment-to-immutable · examples/error_demo/names/82_assign_global.utu:6:5
 
  4 │
- 5 │ fn bump() void {
+ 5 │ fn bump() Void {
  6 │     count += 1;
    │     ━━━━━
    │     ╰─ cannot be assigned
@@ -4567,7 +4567,7 @@ ok
         lazy-value · examples/error_demo/names/88_lazy_struct_argument.utu:7:34
 
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
  7 │     Browser.document.body.append(widgets.badge(&{ title: "new", count: 3 }));
    │                                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                                  ╰─ here
@@ -4597,7 +4597,7 @@ ok
         lazy-value · examples/error_demo/names/89_lazy_number_result.utu:7:13
 
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
  7 │     let n = widgets.total(4);
    │             ━━━━━━━━━━━━━━━━
    │             ╰─ here
@@ -4615,7 +4615,7 @@ ok
         lazy-value · examples/error_demo/names/90_lazy_array_argument.utu:7:34
 
  5 │
- 6 │ export main() void {
+ 6 │ export main() Void {
  7 │     Browser.document.body.append(widgets.tally([1, 2, 3]));
    │                                  ━━━━━━━━━━━━━━━━━━━━━━━━
    │                                  ╰─ here
@@ -4970,7 +4970,7 @@ ok
         unknown-field · examples/error_demo/platform/1120_stored_default_error_once.utu:12:59
 
 10 │
-11 │ export main() void {
+11 │ export main() Void {
 12 │     let state = @stored/\ S "k" manual S { ps: [P { a: 1, b: 2 }] } \/;
    │                                                           ━━━━
    │                                                           ╰─ no such field
@@ -5073,7 +5073,7 @@ ok
  ERROR  @style takes one expression, not an assignment: @style e;
         dsl-error · examples/error_demo/platform/1320_wutu_style_assignment.utu:7:12
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let app = @wutu/\
  7 │     @style = "p { color: red }";
    │            ━
@@ -5086,7 +5086,7 @@ ok
  ERROR  @style goes first in the template, before its root element
         dsl-error · examples/error_demo/platform/1321_wutu_style_in_element.utu:7:11
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let app = @wutu/\
  7 │     div { @style = "p { color: red }"; "x"; }
    │           ━
@@ -5138,7 +5138,7 @@ ok
  ERROR  view() needs using JS from std:JS
         mem-view · examples/error_demo/platform/14_mem_view_without_js.utu:8:17
 
- 6 │     fn frame() void {
+ 6 │     fn frame() Void {
  7 │         pixels.push(0);
  8 │         let v = pixels.view(0, 1);
    │                 ━━━━━━━━━━━
@@ -5539,7 +5539,7 @@ ok
         unknown-foreign-member · examples/error_demo/platform/42_foreign_root_typo.utu:6:15
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let doc = Browser.documnet;
    │               ━━━━━━━━━━━━━━━━
    │               ╰─ here
@@ -5551,7 +5551,7 @@ ok
  ERROR  No member Browser.HTMLDivElement.innerHtml
         unknown-foreign-member · examples/error_demo/platform/43_foreign_member_typo.utu:7:5
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let div = Browser.document.createElement("div");
  7 │     div.innerHtml = "<b>hi</b>";
    │     ━━━━━━━━━━━━━
@@ -5701,7 +5701,7 @@ ok
  ERROR  tagName is readonly
         foreign-readonly · examples/error_demo/platform/44_foreign_readonly_write.utu:7:5
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let el = Browser.document.createElement("div");
  7 │     el.tagName = "SPAN";
    │     ━━━━━━━━━━
@@ -5778,9 +5778,9 @@ ok
  ERROR  No property onse
         foreign-record-field · examples/error_demo/platform/45_foreign_record_unknown_field.utu:7:83
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let button = Browser.document.createElement("button");
- 7 │     button.addEventListener("click", cl() void { Browser.console.log("hi"); }, &{ onse: true });
+ 7 │     button.addEventListener("click", cl() Void { Browser.console.log("hi"); }, &{ onse: true });
    │                                                                                   ━━━━━━━━━━
    │                                                                                   ╰─ here
  8 │ }
@@ -5791,7 +5791,7 @@ ok
         foreign-record-missing · examples/error_demo/platform/46_foreign_record_missing_field.utu:6:60
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let pc = new Browser.RTCPeerConnection(&{ iceServers: [&{ username: "me", credential: "pw" }] });
    │                                                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                                                            ╰─ here
@@ -5803,7 +5803,7 @@ ok
         foreign-overload · examples/error_demo/platform/47_foreign_overload_no_args.utu:6:14
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let el = Browser.document.createElement();
    │              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │              ╰─ here
@@ -5843,7 +5843,7 @@ ok
         type-mismatch · examples/error_demo/platform/49_foreign_wrong_arg_type.utu:6:39
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     Browser.document.body.appendChild("hello");
    │                                       ━━━━━━━
    │                                       ╰─ Str
@@ -5984,7 +5984,7 @@ ok
 16 │     @reactive;
 17 │     main { p { = Browser.console.log("x"); } }
    │                  ━━━━━━━━━━━━━━━━━━━━━━━━
-   │                  ╰─ void
+   │                  ╰─ Void
 18 │     \/;
 19 │     Browser.document.body.append(app);
 --- exit 1
@@ -6278,7 +6278,7 @@ ok
         dsl-error · examples/error_demo/platform/69_stored_missing_key.utu:10:27
 
  8 │
- 9 │ export main() void {
+ 9 │ export main() Void {
 10 │     let prefs = @stored/\ Prefs Prefs { name: "", enabled: true } \/;
    │                           ━
    │                           ╰─ here
@@ -6291,7 +6291,7 @@ ok
         dsl-error · examples/error_demo/platform/70_stored_scalar_state.utu:6:28
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let visits = @stored/\ I32 "visits" 0 \/;
    │                            ━━━
    │                            ╰─ here
@@ -6304,7 +6304,7 @@ ok
         dsl-error · examples/error_demo/platform/71_stored_array_state.utu:6:26
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let tags = @stored/\ Array[Str] "tags" ["a"] \/;
    │                          ━━━━━━━━━━
    │                          ╰─ here
@@ -6317,7 +6317,7 @@ ok
         dsl-error · examples/error_demo/platform/72_stored_optional_field.utu:10:27
 
  8 │
- 9 │ export main() void {
+ 9 │ export main() Void {
 10 │     let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", note: null } \/;
    │                           ━━━━━
    │                           ╰─ here
@@ -6330,7 +6330,7 @@ ok
         dsl-error · examples/error_demo/platform/73_stored_enum_field.utu:14:27
 
 12 │
-13 │ export main() void {
+13 │ export main() Void {
 14 │     let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", theme: Light {} } \/;
    │                           ━━━━━
    │                           ╰─ here
@@ -6343,7 +6343,7 @@ ok
         dsl-error · examples/error_demo/platform/74_stored_cyclic_schema.utu:10:26
 
  8 │
- 9 │ export main() void {
+ 9 │ export main() Void {
 10 │     let tree = @stored/\ Folder "tree" Folder { name: "root", children: [] } \/;
    │                          ━━━━━━
    │                          ╰─ here
@@ -6356,7 +6356,7 @@ ok
         dsl-error · examples/error_demo/platform/75_stored_bad_default.utu:10:44
 
  8 │
- 9 │ export main() void {
+ 9 │ export main() Void {
 10 │     let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", enabled: } \/;
    │                                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                                            ╰─ here
@@ -6369,7 +6369,7 @@ ok
         type-mismatch · examples/error_demo/platform/76_stored_default_wrong_type.utu:13:44
 
 11 │
-12 │ export main() void {
+12 │ export main() Void {
 13 │     let prefs = @stored/\ Prefs "prefs-v1" Other { x: 1 } \/;
    │                                            ━━━━━━━━━━━━━━
    │                                            ╰─ Other
@@ -6380,7 +6380,7 @@ ok
         type-mismatch · examples/error_demo/platform/76_stored_default_wrong_type.utu:13:44
 
 11 │
-12 │ export main() void {
+12 │ export main() Void {
 13 │     let prefs = @stored/\ Prefs "prefs-v1" Other { x: 1 } \/;
    │                                            ━━━━━━━━━━━━━━
    │                                            ╰─ Other
@@ -6393,7 +6393,7 @@ ok
         dsl-error · examples/error_demo/platform/77_stored_unknown_type.utu:10:27
 
  8 │
- 9 │ export main() void {
+ 9 │ export main() Void {
 10 │     let prefs = @stored/\ Prefz "prefs-v1" Prefs { name: "", enabled: true } \/;
    │                           ━━━━━
    │                           ╰─ here
@@ -6668,8 +6668,8 @@ ok
         callback-arity · examples/error_demo/platform/880_callback_extra_param.utu:6:42
 
  4 │
- 5 │ export main() void {
- 6 │     Browser.window.requestAnimationFrame(cl(time, frame) void { Browser.console.log(time + frame); });
+ 5 │ export main() Void {
+ 6 │     Browser.window.requestAnimationFrame(cl(time, frame) Void { Browser.console.log(time + frame); });
    │                                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                                          ╰─ JS passes 1
  7 │ }
@@ -6679,8 +6679,8 @@ ok
  ERROR  Callback takes 3 parameters; JS passes 1
         callback-arity · examples/error_demo/platform/881_callback_extra_param_let.utu:7:42
 
- 5 │ export main() void {
- 6 │     let draw: cl(F64, F64, F64) void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
+ 5 │ export main() Void {
+ 6 │     let draw: cl(F64, F64, F64) Void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
  7 │     Browser.window.requestAnimationFrame(draw);
    │                                          ━━━━
    │                                          ╰─ JS passes 1
@@ -7003,7 +7003,7 @@ ok
         ir-type · examples/error_demo/platform/948_ir_promise_then_operands.utu:4:5
 
  2 │ // Expect: @ir <ir-promise-then> takes externref, given i32
- 3 │ fn listen(p: I32, f: I32) void {
+ 3 │ fn listen(p: I32, f: I32) Void {
  4 │     @ir/\ <ir-promise-then><ir-ident name="p"/><ir-ident name="f"/></ir-promise-then> \/;
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │     ╰─ i32
@@ -7538,7 +7538,7 @@ scheduled
        trap · examples/error_demo/runtime/28_then_callback_traps.utu:9:45
 
  7 │
- 8 │ export main() void {
+ 8 │ export main() Void {
  9 │     delay(0, 5).then(cl(v) { console.log(`${10 / v}`); });
    │                                             ━━━━━━
    │                                             ╰─ here
@@ -7980,7 +7980,7 @@ FAIL after tests: boom
         parse-error · examples/error_demo/syntax/07_unclosed_string.utu:6:17
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     console.log("hello, world);
    │                 ━
    │                 ╰─ unexpected
@@ -7991,7 +7991,7 @@ FAIL after tests: boom
  ERROR  Unclosed template string
         parse-error · examples/error_demo/syntax/08_unclosed_template_string.utu:7:17
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let name = "Ada";
  7 │     console.log(`hello, ${name});
    │                 ━
@@ -8003,7 +8003,7 @@ FAIL after tests: boom
  ERROR  Unclosed template string
         parse-error · examples/error_demo/syntax/09_unclosed_template_hole.utu:7:28
 
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let n = 3;
  7 │     console.log(`items: ${n`);
    │                            ━
@@ -8324,7 +8324,7 @@ FAIL after tests: boom
  4 │     using console from std:Console;
    │     ━━━━━
    │     ╰─ unexpected
- 5 │     fn show(n: I32) void { console.log(n.str()); }
+ 5 │     fn show(n: I32) Void { console.log(n.str()); }
  6 │ }
 --- exit 1
 
@@ -8520,7 +8520,7 @@ FAIL after tests: boom
  3 │ fn is_zero(n: I32) I32 {
  4 │     if n = 0 { 1; } else { 0; };
    │        ━━━━━
-   │        ╰─ void
+   │        ╰─ Void
  5 │ }
 
   fix   Use ==
@@ -8633,7 +8633,7 @@ FAIL after tests: boom
    │               ━━━
    │               ╰─ ';'?
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
 --- exit 1
 
 === utu check examples/error_demo/syntax/480_for_in_two_dots.utu
@@ -8787,7 +8787,7 @@ FAIL after tests: boom
  ERROR  \u needs four hex digits
         invalid-escape · examples/error_demo/syntax/520_test_name_escape.utu:5:6
 
- 3 │ export main() void {}
+ 3 │ export main() Void {}
  4 │
  5 │ test "letter \u{41}" {
    │      ━━━━━━━━━━━━━━━
@@ -9337,7 +9337,7 @@ FAIL after tests: boom
         parse-error · examples/error_demo/syntax/92_adjacent_strings.utu:6:27
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     console.log("hello, " "world");
    │                           ━━━━━━━
    │                           ╰─ ')'?
@@ -9509,7 +9509,7 @@ FAIL after tests: boom
  ERROR  deposit takes F64, got Str
         type-mismatch · examples/error_demo/types/05_method_argument.utu:10:18
 
- 6 │ fn Account.deposit |a| (amount: F64) void { a.balance += amount; }
+ 6 │ fn Account.deposit |a| (amount: F64) Void { a.balance += amount; }
    │                         ───────────
    │                         ╰─ F64
    ┆
@@ -9803,13 +9803,13 @@ FAIL after tests: boom
 
  1 │ // What: a parameter typed with an unknown type inside Array[...], called with a real array
  2 │ // Expect: Unknown type I32Z (once); the calls do not add "takes Array[unknown], got Array[I32]"
- 3 │ fn swap(values: Array[I32Z], left: I32) void {
+ 3 │ fn swap(values: Array[I32Z], left: I32) Void {
    │                       ━━━━
    │                       ╰─ no such type
  4 │ }
 
   fix   Use I32
- 3 │ fn swap(values: Array[I32], left: I32) void {
+ 3 │ fn swap(values: Array[I32], left: I32) Void {
 --- exit 1
 
 === utu check examples/error_demo/types/1124_unknown_type_in_proto_field.utu
@@ -9828,12 +9828,12 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/1161_main_returns_value.utu
- ERROR  main returns void
+ ERROR  main returns Void
         return-value-from-void · examples/error_demo/types/1161_main_returns_value.utu:3:29
 
  1 │ // What: a value returned from export main, which returns void
  2 │ // Expect: main returns void (pointing at the value)
- 3 │ export main() void { return 1; }
+ 3 │ export main() Void { return 1; }
    │                             ━
    │                             ╰─ here
 
@@ -9897,7 +9897,7 @@ FAIL after tests: boom
         invalid-module-arity · examples/error_demo/types/1203_generator_module_type_argument_count.utu:4:37
 
  2 │ // Expect: P takes 2 type arguments, given 1; no crash
- 3 │ mod P[A, B] { fn gen(a: A, b: B) yield A { yield a; } }
+ 3 │ mod P[A, B] { gn gen(a: A, b: B) A { yield a; } }
  4 │ export main() I32 { let t = 0; for (P[I32].gen(1, 2)) |x| { t += x; }; t; }
    │                                     ━━━━━━━━━━━━━━━━
    │                                     ╰─ here
@@ -10209,7 +10209,7 @@ FAIL after tests: boom
 
 10 │
 11 │     /// A line on standard output (`console.log`): `x.str()`.
-12 │     fn log(x: $T) void { host_log(x.str()) }
+12 │     fn log(x: $T) Void { host_log(x.str()) }
    │                                   ━━━━━━━
    │                                   ╰─ no such method
 13 │
@@ -10309,7 +10309,7 @@ FAIL after tests: boom
  ERROR  push takes I32, got Str
         type-mismatch · examples/error_demo/types/17_generic_argument.utu:13:12
 
- 8 │     fn &.push |s| (v: T) void { s.items[s.size] = v; s.size += 1; }
+ 8 │     fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1; }
    │                    ────
    │                    ╰─ I32
    ┆
@@ -10714,14 +10714,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/38_void_as_value.utu
- ERROR  r is I32, got void
+ ERROR  r is I32, got Void
         type-mismatch · examples/error_demo/types/38_void_as_value.utu:6:18
 
  4 │
  5 │ export main() I32 {
  6 │     let r: I32 = log_it(3);
    │            ───   ━━━━━━━━━
-   │            │     ╰─ void
+   │            │     ╰─ Void
    │            ╰─ I32
  7 │     r;
  8 │ }
@@ -11205,7 +11205,7 @@ FAIL after tests: boom
         type-mismatch · examples/error_demo/types/606_unused_generator.utu:4:18
 
  2 │ // Expect: a is I32, got Str
- 3 │ fn g() yield I32 {
+ 3 │ gn g() I32 {
  4 │     let a: I32 = "s";
    │            ───   ━━━
    │            │     ╰─ Str
@@ -11851,7 +11851,7 @@ FAIL after tests: boom
         host-literal · examples/error_demo/types/902_host_literal_union_value.utu:6:37
 
  4 │
- 5 │ export main() void {
+ 5 │ export main() Void {
  6 │     let b: Browser.ScrollBehavior = "fast";
    │                                     ━━━━━━
    │                                     ╰─ not one of its values

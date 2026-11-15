@@ -121,7 +121,7 @@ fn arrive(site: Site, route: Str) Str {
         site.route = route
         Browser.document.title = title(route)
         if not first {
-            wutu.after_render(cl() void {
+            wutu.after_render(cl() Void {
                 Browser.window.scrollTo(& {
                     top: 0.0,
                     left: 0.0,
@@ -141,7 +141,7 @@ fn arrive(site: Site, route: Str) Str {
     }
     ""
 }
-export main() void {
+export main() Void {
     let site = Site {
         route: ""
     }

@@ -8,7 +8,7 @@ mod Buffer[T] {
         &{ values: [], length: 0 };
     }
 
-    fn &.push |self| (value: T) void {
+    fn &.push |self| (value: T) Void {
         if self.length == self.values.len() {
             if self.length > 536870911 { fatal; };
             let capacity = if self.length == 0 { 8; } else { self.length * 2; };

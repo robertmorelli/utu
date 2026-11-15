@@ -7,7 +7,7 @@ struct Config:
     | retries : I32
     | enabled : Bool
 
-fn field_blame_demo(config: Config) void {
+fn field_blame_demo(config: Config) Void {
     let enabled: Bool = config.enabled;
     config.retries = enabled;
 }

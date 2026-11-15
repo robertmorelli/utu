@@ -4,7 +4,7 @@ struct Node:
     | name: Str
     | kids: Array[Node]
 
-fn walk(n: Node) yield Node {
+gn walk(n: Node) Node {
     for (n.kids) |k| {
         yield k;
         if k.name == "tmp" { prune; };

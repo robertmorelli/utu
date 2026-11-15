@@ -679,7 +679,7 @@ class WutuParser {
       if (near) this.fail(`unknown event ${match[1]}; did you mean ${near}?`, start + match[0].indexOf(match[1], 2));
       const event = { name: match[1], quiet: !!match[2], param: match[3] ?? null, start };
       if (this.text[this.p] === '=') {
-        if (event.param) this.fail('a handler value names its own parameter: on click = cl(e) void { … };');
+        if (event.param) this.fail('a handler value names its own parameter: on click = cl(e) Void { … };');
         this.p++;
         const { source, range } = this.readBareExpression();
         this.expectSemicolon();

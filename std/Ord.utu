@@ -61,7 +61,7 @@ mod Order[T[Ord]] {
 
     /// Sorts `xs` in place, first to last, keeping ties in their order: a
     /// merge sort, O(n log n).
-    fn sort(xs: Array[T]) void {
+    fn sort(xs: Array[T]) Void {
         let n = xs.len()
         if n < 2 { return }
         let from = xs

@@ -1280,38 +1280,8 @@
       ]
     },
     "return_type": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SYMBOL",
-          "name": "void_type"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_type"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "yield_type"
-        }
-      ]
-    },
-    "yield_type": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "yield"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "_type"
-        }
-      ]
-    },
-    "void_type": {
-      "type": "STRING",
-      "value": "void"
+      "type": "SYMBOL",
+      "name": "_type"
     },
     "type_list": {
       "type": "SEQ",

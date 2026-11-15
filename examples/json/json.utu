@@ -22,7 +22,7 @@ struct Stats:
 let object_kind: I32 = 1
 let array_kind: I32 = 2
 
-fn push(stack: Stack, kind: I32) void {
+fn push(stack: Stack, kind: I32) Void {
     if stack.size == stack.kinds.len() {
         let grown = Array[I32].new(stack.size * 2, 0)
         for (0..<stack.size) |k| { grown[k] = stack.kinds[k] }

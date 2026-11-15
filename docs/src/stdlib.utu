@@ -320,7 +320,7 @@ mod stdlib {
         \\using console from std:Console
         \\using time from std:Time
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let start = time.now()
         \\    let total = 0
         \\    for (0 ..< 1000000) |i| { total += i % 7 }
@@ -360,7 +360,7 @@ mod stdlib {
         \\    | cents: I32
         \\    | seconds: I32
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let cart = Cart { cents: 1999, seconds: 0 }
         \\    let app = @wutu/\
         \\    @reactive;
@@ -372,22 +372,22 @@ mod stdlib {
         \\            "Add one";
         \\            on click {
         \\                cart.cents += 100;
-        \\                wutu.after_render(cl() void { wutu.focus("note"); });
+        \\                wutu.after_render(cl() Void { wutu.focus("note"); });
         \\            }
         \\        }
         \\    }
         \\    \/
-        \\    wutu.interval("clock", 1000.0, cl() void { cart.seconds += 1; wutu.refresh() })
+        \\    wutu.interval("clock", 1000.0, cl() Void { cart.seconds += 1; wutu.refresh() })
         \\    Browser.document.body.append(app)
         \\}
     }
     fn browser_sample() Str {
         \\using Browser from std:Browser
         \\
-        \\export main() void {
+        \\export main() Void {
         \\    let title = Browser.document.createElement("h1")   // an HTMLHeadingElement
         \\    title.textContent = "Hello"
-        \\    title.addEventListener("click", cl(event) void {
+        \\    title.addEventListener("click", cl(event) Void {
         \\        Browser.console.log(Browser.location.hash)
         \\    })
         \\    Browser.document.body.append(title)
@@ -616,7 +616,7 @@ mod stdlib {
         ["Scalars::std-scalars", "Text::std-text", "Collections::std-collections", "Indexes::std-indexes", "Async::std-async", "Host::std-host"]
     }
     // ── Pieces ───────────────────────────────────────────────────────────────
-    fn jump(id: Str) void {
+    fn jump(id: Str) Void {
         promote Browser.document.getElementById(id) {
             |target| => target.scrollIntoView(),
             ~> {

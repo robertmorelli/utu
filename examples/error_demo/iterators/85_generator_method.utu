@@ -4,7 +4,7 @@ mod Bag {
     struct &:
         | items: Array[I32]
     fn &.new(xs: Array[I32]) & { &{ items: xs }; }
-    fn &.each_item |b| () yield I32 { for (b.items) |v| { yield v; }; }
+    gn &.each_item |b| () I32 { for (b.items) |v| { yield v; }; }
 }
 
 export main() I32 {

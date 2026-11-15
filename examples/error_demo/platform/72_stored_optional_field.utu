@@ -6,7 +6,7 @@ struct Prefs:
     | name: Str
     | note: ?Str
 
-export main() void {
+export main() Void {
     let prefs = @stored/\ Prefs "prefs-v1" Prefs { name: "", note: null } \/;
     Browser.console.log(prefs.name);
 }

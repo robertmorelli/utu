@@ -2,7 +2,7 @@
 // Expect: @style goes first in the template
 using Browser from std:Browser;
 
-export main() void {
+export main() Void {
     let app = @wutu/\
     div { @style = "p { color: red }"; "x"; }
     \/;

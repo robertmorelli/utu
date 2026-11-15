@@ -57,7 +57,7 @@ fn byClock(label: Str) Browser.HTMLElement {
 }
 
 fn beat(state: State) Browser.HTMLElement {
-    wutu.interval("beat", 20.0, cl() void { state.beats += 1 })
+    wutu.interval("beat", 20.0, cl() Void { state.beats += 1 })
     @wutu/\
     p#beat { "beating"; }
     \/
@@ -70,7 +70,7 @@ fn icon(state: State) Browser.SVGElement {
     \/
 }
 
-export main() void {
+export main() Void {
     ticks.push(0)
     let state = State {
         n: 0,

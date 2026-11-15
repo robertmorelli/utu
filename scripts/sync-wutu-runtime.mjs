@@ -3,51 +3,51 @@ import {createWutuRuntime,installWutuStorage,wutuStyle} from '../src/runtime/wut
 export async function syncWutuRuntime() {
  const source=`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
 mod wutu {
-    fn init() void {
-        let install: fun() void = @es/\\ () => { globalThis.__utuWutu ??= (${createWutuRuntime.toString()})(); } \\/;
+    fn init() Void {
+        let install: fun() Void = @es/\\ () => { globalThis.__utuWutu ??= (${createWutuRuntime.toString()})(); } \\/;
         install();
     }
-    fn storage_init() void {
+    fn storage_init() Void {
         init();
-        let install: fun() void = @es/\\ () => { (${installWutuStorage.toString()})(globalThis.__utuWutu); } \\/;
+        let install: fun() Void = @es/\\ () => { (${installWutuStorage.toString()})(globalThis.__utuWutu); } \\/;
         install();
     }
     fn stored_load(key: Str) Str {
         let load: fun(Str) Str = @es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;
         load(key);
     }
-    fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) void) void {
-        let register: fun(Str,cl() Str,Bool,cl(Str) void) void = @es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;
+    fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) Void) Void {
+        let register: fun(Str,cl() Str,Bool,cl(Str) Void) Void = @es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;
         register(key,encode,manual,apply);
     }
     /// A shared stylesheet (\`@style\`, \`@document\`), installed once.
-    fn style(sheet: Str) void {
+    fn style(sheet: Str) Void {
         init();
-        let install: fun(Str) void = @es/\\ (${wutuStyle.toString()}) \\/;
+        let install: fun(Str) Void = @es/\\ (${wutuStyle.toString()}) \\/;
         install(sheet);
     }
-    fn invalidate(name: Str) void {
-        let call: fun(Str) void = @es/\\ (name)=>globalThis.__utuWutu?.invalidate(name) \\/;
+    fn invalidate(name: Str) Void {
+        let call: fun(Str) Void = @es/\\ (name)=>globalThis.__utuWutu?.invalidate(name) \\/;
         call(name);
     }
-    fn save(key: Str) void {
-        let call: fun(Str) void = @es/\\ (key)=>globalThis.__utuWutu?.save?.(key) \\/;
+    fn save(key: Str) Void {
+        let call: fun(Str) Void = @es/\\ (key)=>globalThis.__utuWutu?.save?.(key) \\/;
         call(key);
     }
-    fn flush() void {
-        let call: fun() void = @es/\\ ()=>globalThis.__utuWutu?.flush?.() \\/;
+    fn flush() Void {
+        let call: fun() Void = @es/\\ ()=>globalThis.__utuWutu?.flush?.() \\/;
         call();
     }
-    fn focus(id: Str) void {
-        let call: fun(Str) void = @es/\\ (id)=>globalThis.__utuWutu?.focus(id) \\/;
+    fn focus(id: Str) Void {
+        let call: fun(Str) Void = @es/\\ (id)=>globalThis.__utuWutu?.focus(id) \\/;
         call(id);
     }
-    fn after_render(callback: cl() void) void {
-        let call: fun(cl() void) void = @es/\\ (callback)=>globalThis.__utuWutu?.after(callback) \\/;
+    fn after_render(callback: cl() Void) Void {
+        let call: fun(cl() Void) Void = @es/\\ (callback)=>globalThis.__utuWutu?.after(callback) \\/;
         call(callback);
     }
-    fn on_cleanup(callback: cl() void) void {
-        let call: fun(cl() void) void = @es/\\ (callback)=>globalThis.__utuWutu?.cleanup(callback) \\/;
+    fn on_cleanup(callback: cl() Void) Void {
+        let call: fun(cl() Void) Void = @es/\\ (callback)=>globalThis.__utuWutu?.cleanup(callback) \\/;
         call(callback);
     }
     /// A template's text hole (\`= x;\`): a number or a Bool shows as its
@@ -83,20 +83,20 @@ mod wutu {
         let format: fun(F64,I32) Str = @es/\\ (value,digits)=>value.toFixed(Math.max(0,Math.min(20,digits))) \\/;
         format(value,digits);
     }
-    fn reload_store(key: Str) void {
-        let reload: fun(Str) void = @es/\\ key=>globalThis.__utuWutu?.reload?.(key) \\/;
+    fn reload_store(key: Str) Void {
+        let reload: fun(Str) Void = @es/\\ key=>globalThis.__utuWutu?.reload?.(key) \\/;
         reload(key);
     }
-    fn interval(key: Str, milliseconds: F64, callback: cl() void) void {
-        let start: fun(Str, F64, cl() void) void = @es/\\ (key,ms,callback)=>globalThis.__utuWutu?.interval(key,ms,callback) \\/;
+    fn interval(key: Str, milliseconds: F64, callback: cl() Void) Void {
+        let start: fun(Str, F64, cl() Void) Void = @es/\\ (key,ms,callback)=>globalThis.__utuWutu?.interval(key,ms,callback) \\/;
         start(key,milliseconds,callback);
     }
     fn storage_error() Str {
         let read: fun() Str = @es/\\ () => globalThis.__utuWutu?.storageError ?? "" \\/;
         read();
     }
-    fn refresh() void {
-        let update: fun() void = @es/\\ () => globalThis.__utuWutu?.refresh() \\/;
+    fn refresh() Void {
+        let update: fun() Void = @es/\\ () => globalThis.__utuWutu?.refresh() \\/;
         update();
     }
 }

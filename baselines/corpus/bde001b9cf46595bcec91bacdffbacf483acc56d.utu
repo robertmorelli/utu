@@ -1,1 +1,1 @@
-export lib { fn bad() void { null; } }
+export lib { fn bad() Void { null; } }

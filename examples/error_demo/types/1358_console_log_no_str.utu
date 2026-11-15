@@ -6,6 +6,6 @@ struct Point:
     | x: I32
     | y: I32
 
-export main() void {
+export main() Void {
     console.log(Point { x: 1, y: 2 });
 }

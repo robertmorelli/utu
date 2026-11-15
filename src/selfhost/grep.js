@@ -33,7 +33,7 @@ export function parsePattern(utu, pattern) {
     .replace(/\$([A-Za-z_]\w*)/g, (_, name) => `${HOLE}${name}`)
     .trim().replace(/;$/, '');
   // An expression or statements, in a function; else declarations.
-  for (const [prefix, suffix] of [['fn __utu_pattern() void { ', '; }'], ['', '']]) {
+  for (const [prefix, suffix] of [['fn __utu_pattern() Void { ', '; }'], ['', '']]) {
     const tree = parseSource(utu, `${prefix}${holes}${suffix}`);
     if (!tree) continue;
     if (!prefix) return tree.children.length ? tree.children : null;
@@ -125,7 +125,7 @@ export function matchProgram(utu, files, pattern, { where = {}, seen = null } = 
   const isStatement = n => {
     const kind = utu.node_kind_name(kinds[n]);
     if (kind === 'bind_expr') return true;
-    if (!STATEMENTS.has(kind) || utu.node_type(n) !== 'void') return false;
+    if (!STATEMENTS.has(kind) || utu.node_type(n) !== 'Void') return false;
     if (!parent) {
       parent = new Int32Array(utu.node_count()).fill(-1);
       for (let m = 0; m < parent.length; m++) for (let c = child[m]; c >= 0; c = next[c]) parent[c] = m;

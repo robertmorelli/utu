@@ -4,6 +4,6 @@ let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
 
 fn slow(n: I32) I32 { await later(n) + 1; }
 
-export main() void {
+export main() Void {
     later(1).then(cl(v) { let w = slow(v); });
 }

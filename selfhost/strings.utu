@@ -20,7 +20,7 @@ vec builtin_func: I32
 /// By word id (a literal's decoded text): its global, or -1.
 vec word_string: I32
 
-fn reset_strings() void {
+fn reset_strings() Void {
     builtin_func.resize(Builtin.count())
     for (0 ..< Builtin.count()) |b| { builtin_func[b] = -1 }
     word_string.clear()
@@ -55,7 +55,7 @@ fn builtin(b: Builtin) I32 {
 }
 
 /// Calls a builtin with the arguments on the stack since `m`.
-fn call_builtin(b: Builtin, m: I32) void {
+fn call_builtin(b: Builtin, m: I32) Void {
     let f = builtin(b)
     let results = ht_b[func_type_of[f]]
     w_node(Op.Call, vl_item(results, 0), f, 0, m)
@@ -115,7 +115,7 @@ fn template_text(start: I32, end_: I32) Bool {
 
 /// The text in `lit_bytes`, as a constant. Its text is interned, so each
 /// distinct literal is one imported global.
-fn push_lit_bytes() void {
+fn push_lit_bytes() Void {
     let start = src.len()
     for (0 ..< lit_bytes.len()) |i| { src.push(lit_bytes[i]) }
     let before = src.interned()
@@ -237,7 +237,7 @@ fn hex4(at: I32) I32 {
     v
 }
 
-fn utf8_push(cp: I32) void {
+fn utf8_push(cp: I32) Void {
     if cp < 128 { lit_bytes.push(cp); return }
     if cp < 2048 {
         lit_bytes.push(192 | (cp >> 6))

@@ -23,7 +23,7 @@ vec es_made_func: I32
 vec es_made_wrap: I32
 vec decl_es_wrap: I32
 
-fn reset_host() void {
+fn reset_host() Void {
     decl_es.resize(decl_kind.len())
     decl_es_wrap.resize(decl_kind.len())
     for (0 ..< decl_kind.len()) |d| { decl_es[d] = -1 }
@@ -58,7 +58,7 @@ vec wat_to: I32
 vec wat_found: I32 = [0]
 export mem wat_bytes: U8
 
-fn reset_wat() void {
+fn reset_wat() Void {
     wat_found[0] = 0
     wat_site.clear()
     wat_start.clear()
@@ -110,7 +110,7 @@ fn wat_of(block: I32) I32 {
 
 /// Each `@wat` function the host did not assemble is a mistake: the host's,
 /// at its place in the text, or (with no host to assemble it) the site's.
-fn report_wat() void {
+fn report_wat() Void {
     find_wat()
     for (0 ..< wat_site.len()) |k| {
         if wat_start[k] < 0 {
@@ -134,7 +134,7 @@ fn report_wat() void {
 /// `/\//`) still nests, as the lexers balance bodies: the body then ends at
 /// a later `\/` than meant, and can take the declarations after it. Each is
 /// reported where it is.
-fn report_bare_openers() void {
+fn report_bare_openers() Void {
     let done_start = vl_begin()
     for (own_sites() ..< dsl_sites.len()) |k| {
         let n = dsl_sites[k]
@@ -265,7 +265,7 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
 /// Report an `@es` binding typed to give a `fun`: JavaScript gives a
 /// function, which is a `cl`. Structs, arrays and enums cross as opaque
 /// handles (docs/typescript-abi.md); a `fun` argument crosses as a closure.
-fn es_check_native(decl: I32, t: I32) void {
+fn es_check_native(decl: I32, t: I32) Void {
     let n = decl_node[decl]
     let at = if n >= 0 and next_sibling(first_child(n)) != last_child(n) { next_sibling(first_child(n)) } else { n }
     let r = if ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure) { ty_b[t] } else { t }
@@ -480,12 +480,12 @@ fn es_read(decl: I32, t: I32) I32 {
 
 //! = The custom section
 
-fn json_byte(b: I32) void => host_json.push(b)
+fn json_byte(b: I32) Void => host_json.push(b)
 
-fn json_text(text: Str) void => for (0 ..< text.len()) |i| { host_json.push(text.get(i)) }
+fn json_text(text: Str) Void => for (0 ..< text.len()) |i| { host_json.push(text.get(i)) }
 
 /// A JSON string of `src[start ..< end_]`.
-fn json_string(start: I32, end_: I32) void {
+fn json_string(start: I32, end_: I32) Void {
     json_byte(34)
     for (start ..< end_) |i| {
         let c = src[i]
@@ -530,7 +530,7 @@ fn is_space(c: I32) Bool => c == 32 or c == 10 or c == 9 or c == 13
 
 /// Writes the host section for what the module imports (after the sweep):
 /// `host_json`, empty when there is nothing to say.
-fn write_host_json() void {
+fn write_host_json() Void {
     if optimize_level[0] != 0 { number_es_imports() }
     host_json.clear()
     json_byte(123)
@@ -547,7 +547,7 @@ fn write_host_json() void {
 
 /// Optimized, the live `es` imports are named `0`, `1`, … in order, so the
 /// loader gives them as an array (src/selfhost/loader.js).
-fn number_es_imports() void {
+fn number_es_imports() Void {
     let n = 0
     for (0 ..< es_func.len()) |i| {
         let f = es_func[i]
@@ -560,7 +560,7 @@ fn number_es_imports() void {
 
 /// One part of the host section (es, closures, promises, mems, lazy, exports), after a comma
 /// when another came before it.
-fn json_part(k: I32) void {
+fn json_part(k: I32) Void {
     let before = host_json.len()
     if before > 1 { json_byte(44) }
     let start = host_json.len()
@@ -568,7 +568,7 @@ fn json_part(k: I32) void {
     if host_json.len() == start { host_json.resize(before) }
 }
 
-fn write_es_json() void {
+fn write_es_json() Void {
     let any = false
     for (0 ..< es_func.len()) |i| { if func_live[es_func[i]] == 1 { any = true } }
     if not any { return }
@@ -591,7 +591,7 @@ fn write_es_json() void {
 }
 
 /// A JSON string of `text` (ASCII, as the compiler writes its own JS).
-fn json_text_string(text: Str) void {
+fn json_text_string(text: Str) Void {
     json_byte(34)
     for (0 ..< text.len()) |i| {
         let c = text.get(i)
@@ -607,7 +607,7 @@ fn json_text_string(text: Str) void {
 /// arguments must be (`"p":["Bool","Str","?Str","ref","?",""]`): a Bool's
 /// truthiness always, the rest in safe builds (src/runtime/host-imports.js
 /// convertExports).
-fn write_exports_json() void {
+fn write_exports_json() Void {
     let first = true
     for (0 ..< export_func.len()) |k| {
         let f = export_func[k]
@@ -715,7 +715,7 @@ fn js_param_kind(t: I32) Str {
 
 /// The lazy modules' functions the program calls (see lazy_stub), for the
 /// build that makes their chunks: path, module, name, signature, file.
-fn write_lazy_json() void {
+fn write_lazy_json() Void {
     if lazy_call_fn.len() == 0 { return }
     json_text("\"lazy\":[")
     for (0 ..< lazy_call_fn.len()) |k| {
