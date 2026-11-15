@@ -5254,7 +5254,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/23_two_export_mains.utu
- ERROR  Two export main
+ ERROR  Two mains
         entry-surface · examples/error_demo/platform/23_two_export_mains.utu:3:1
 
  1 │ // What: two export main declarations (an old one left behind)
@@ -5269,7 +5269,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/24_two_export_libs.utu
- ERROR  Two export lib
+ ERROR  Two lib blocks
         entry-surface · examples/error_demo/platform/24_two_export_libs.utu:3:1
 
  1 │ // What: two export lib blocks in one file
@@ -5284,7 +5284,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/25_lib_and_main.utu
- ERROR  export lib and export main together
+ ERROR  lib and main together: a program is one or the other
         entry-surface · examples/error_demo/platform/25_lib_and_main.utu:3:1
 
  1 │ // What: a file with both export lib and export main
@@ -9211,7 +9211,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/83_two_export_libs.utu
- ERROR  Two export lib
+ ERROR  Two lib blocks
         entry-surface · examples/error_demo/syntax/83_two_export_libs.utu:5:1
 
  3 │ fn area(w: F64, h: F64) F64 { w * h; }
@@ -9226,7 +9226,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/84_two_export_mains.utu
- ERROR  Two export main
+ ERROR  Two mains
         entry-surface · examples/error_demo/syntax/84_two_export_mains.utu:3:1
 
  1 │ // What: two `export main` entry points in one file.
@@ -9241,7 +9241,7 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/syntax/85_lib_and_main.utu
- ERROR  export lib and export main together
+ ERROR  lib and main together: a program is one or the other
         entry-surface · examples/error_demo/syntax/85_lib_and_main.utu:5:1
 
  3 │ fn area(w: F64, h: F64) F64 { w * h; }

@@ -608,6 +608,9 @@ fn item(p: Parser) Void {
         end_statement(p, e)
         return
     }
+    // `main { … }`: the program, which returns nothing; `lib { fn … }`: what JS calls.
+    if w == Kw.Main.i32() and is_at(p, 1, Tok.LBrace) { main_decl(p); return }
+    if w == Kw.Lib.i32() and is_at(p, 1, Tok.LBrace) { lib_decl(p); return }
     if w == Kw.Export.i32() {
         let after = tok_word[ptok[p.pos + 1]]
         if after == Kw.Lib.i32() { export_lib_decl(p); return }
@@ -1108,6 +1111,26 @@ fn export_main_decl(p: Parser) I32 {
     return_type(p)
     block(p)
     node(p, Node.Export_main_decl, at, first)
+}
+
+/// `main { … }`, as `export main() Void { … }` was.
+fn main_decl(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    advance(p)
+    block(p)
+    node(p, Node.Export_main_decl, at, first)
+}
+
+/// `lib { fn … }`, as `export lib { … }` was.
+fn lib_decl(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    advance(p)
+    expect(p, Tok.LBrace)
+    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn)) { fn_or_op_decl(p) }
+    expect(p, Tok.RBrace)
+    node(p, Node.Export_lib_decl, at, first)
 }
 
 fn test_decl(p: Parser) I32 {

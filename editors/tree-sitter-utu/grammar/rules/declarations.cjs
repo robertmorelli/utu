@@ -170,9 +170,13 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     type_decl: ($) => seq('type', choice($.type_ident, $.promoted_type), '=', $.dsl_expr),
 
     // Export forms
-    export_lib_decl: ($) => seq('export', 'lib', '{', repeat($._library_item), '}'),
-    export_main_decl: ($) =>
+    // `lib { fn … }`: what JS calls; `main { … }`: the program.
+    export_lib_decl: ($) => choice(
+      seq('export', 'lib', '{', repeat($._library_item), '}'),
+      seq('lib', '{', repeat($._library_item), '}')),
+    export_main_decl: ($) => choice(
       seq('export', 'main', '(', optional($.param_list), ')', $.return_type, $.block),
+      seq('main', $.block)),
 
     // Tests and benchmarks
     test_decl: ($) => seq('test', $.string_lit, $.block),

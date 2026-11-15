@@ -1819,9 +1819,9 @@ export lib {
     // A bare /\\ in a body nests.
     ['let f: fun(Str) I32 = @es/\\ (s) => s.split(/\\s\\//).length \\/;\nexport main() I32 { f("a"); }\n', 'This /\\ opens a nested body, so the body ends at a later \\/'],
     ['let f: fun(Str) Str = @es/\\ (s) => s.replace(/\\//g, "-") \\/;\nexport main() I32 { 0; }\n', 'No \\/ ends this body: the /\\ at line 1 opens another'],
-    ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two export lib'],
-    ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'Two export main'],
-    ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'export lib and export main together'],
+    ['export lib { fn a() I32 { 1; } }\nexport lib { fn b() I32 { 2; } }\n', 'Two lib blocks'],
+    ['export main() I32 { 1; }\nexport main() I32 { 2; }\n', 'Two mains'],
+    ['export lib { fn a() I32 { 1; } }\nexport main() I32 { 2; }\n', 'lib and main together: a program is one or the other'],
     // A function of a type without self, called on a value of it.
     ['struct P:\n    | x : I32\nfn P.make() I32 { 1; }\nexport lib { fn run() I32 { P { x: 1 }.make(); } }\n', 'P.make is a function, not a method: P.make(value)'],
     ['struct R:\n    | w: F64\nfn R.sq(s: F64) R { R { w: s }; }\nexport main() I32 { let r = R { w: 1.0 }; r.sq(2.0).w.i32(); }\n', 'R.sq is a function, not a method: R.sq(value)'],

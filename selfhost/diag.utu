@@ -561,9 +561,9 @@ fn diag_text(i: I32) Str {
             "\\u needs four hex digits"
         },
         Diag.EntrySurface => {
-            if a == 0 { return "Two export lib" }
-            if a == 1 { return "Two export main" }
-            "export lib and export main together"
+            if a == 0 { return "Two lib blocks" }
+            if a == 1 { return "Two mains" }
+            "lib and main together: a program is one or the other"
         },
         Diag.StorageType => w + " is a storage type: use I32",
         Diag.ReturnValueFromVoid => {

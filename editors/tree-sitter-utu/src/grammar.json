@@ -1700,71 +1700,118 @@
       ]
     },
     "export_lib_decl": {
-      "type": "SEQ",
+      "type": "CHOICE",
       "members": [
         {
-          "type": "STRING",
-          "value": "export"
-        },
-        {
-          "type": "STRING",
-          "value": "lib"
-        },
-        {
-          "type": "STRING",
-          "value": "{"
-        },
-        {
-          "type": "REPEAT",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_library_item"
-          }
-        },
-        {
-          "type": "STRING",
-          "value": "}"
-        }
-      ]
-    },
-    "export_main_decl": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "export"
-        },
-        {
-          "type": "STRING",
-          "value": "main"
-        },
-        {
-          "type": "STRING",
-          "value": "("
-        },
-        {
-          "type": "CHOICE",
+          "type": "SEQ",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "param_list"
+              "type": "STRING",
+              "value": "export"
             },
             {
-              "type": "BLANK"
+              "type": "STRING",
+              "value": "lib"
+            },
+            {
+              "type": "STRING",
+              "value": "{"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_library_item"
+              }
+            },
+            {
+              "type": "STRING",
+              "value": "}"
             }
           ]
         },
         {
-          "type": "STRING",
-          "value": ")"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "lib"
+            },
+            {
+              "type": "STRING",
+              "value": "{"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_library_item"
+              }
+            },
+            {
+              "type": "STRING",
+              "value": "}"
+            }
+          ]
+        }
+      ]
+    },
+    "export_main_decl": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "export"
+            },
+            {
+              "type": "STRING",
+              "value": "main"
+            },
+            {
+              "type": "STRING",
+              "value": "("
+            },
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "param_list"
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
+            },
+            {
+              "type": "STRING",
+              "value": ")"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "return_type"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "block"
+            }
+          ]
         },
         {
-          "type": "SYMBOL",
-          "name": "return_type"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "block"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "main"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "block"
+            }
+          ]
         }
       ]
     },
