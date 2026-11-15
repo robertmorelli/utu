@@ -102,7 +102,7 @@ fn abi_add_view(import_: I32, doc: I32, at: I32) I32 {
 
 /// Whether view v serves an import of this program (a view kept from
 /// earlier programs may serve none).
-fn view_live(v: I32) Bool { view_import[v] >= 0 }
+fn view_live(v: I32) Bool => view_import[v] >= 0
 
 /// The view an import declares, or -1.
 fn view_of_import(i: I32) I32 {
@@ -187,7 +187,7 @@ fn jnext(at: I32) I32 {
 }
 
 /// An object entry's value, given its key.
-fn jvalue(key: I32) I32 { jws(jws(jstring_end(key)) + 1) }
+fn jvalue(key: I32) I32 => jws(jws(jstring_end(key)) + 1)
 
 /// Whether the string at `at` is the bytes `src[start ..< end_]` (without escapes).
 fn jstring_is(at: I32, start: I32, end_: I32) Bool {
@@ -254,13 +254,13 @@ fn jitem(at: I32, index: I32) I32 {
     i
 }
 
-fn jis_number(at: I32) Bool { at >= 0 and ((src[at] >= 48 and src[at] <= 57) or src[at] == 45) }
+fn jis_number(at: I32) Bool => at >= 0 and ((src[at] >= 48 and src[at] <= 57) or src[at] == 45)
 
-fn jis_string(at: I32) Bool { at >= 0 and src[at] == 34 }
+fn jis_string(at: I32) Bool => at >= 0 and src[at] == 34
 
-fn jis_object(at: I32) Bool { at >= 0 and src[at] == 123 }
+fn jis_object(at: I32) Bool => at >= 0 and src[at] == 123
 
-fn jis_true(at: I32) Bool { at >= 0 and src[at] == 116 }
+fn jis_true(at: I32) Bool => at >= 0 and src[at] == 116
 
 /// The integer at `at`.
 fn jint(at: I32) I32 {
@@ -276,10 +276,10 @@ fn jint(at: I32) I32 {
 }
 
 /// A string's text as a word (escapes kept as written; names have none).
-fn jstring_word(at: I32) I32 { src.intern(at + 1, jstring_end(at) - 1) }
+fn jstring_word(at: I32) I32 => src.intern(at + 1, jstring_end(at) - 1)
 
 /// A string's text (escapes kept as written).
-fn jstring_text(at: I32) Str { bytes_text(at + 1, jstring_end(at) - 1) }
+fn jstring_text(at: I32) Str => bytes_text(at + 1, jstring_end(at) - 1)
 
 //! = Where containers end
 //!

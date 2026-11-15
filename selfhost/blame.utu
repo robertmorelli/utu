@@ -42,7 +42,7 @@ fn blame_invert() void {
     for (0 ..< es_made_decl.len()) |k| { blame_func_decl[es_made_func[k]] = es_made_decl[k] }
 }
 
-fn decl_syntax(d: I32) I32 { if d < 0 { -1 } else { decl_node[d] } }
+fn decl_syntax(d: I32) I32 => if d < 0 { -1 } else { decl_node[d] }
 
 /// Type `i` of the module.
 fn type_syntax(i: I32) I32 {

@@ -27,10 +27,10 @@ enum(U8) Narrow:
     | I16
 
 /// The word id of a narrow integer type's name.
-fn narrow_word(n: Narrow) I32 { Kw.count() + n.i32() }
+fn narrow_word(n: Narrow) I32 => Kw.count() + n.i32()
 
 /// The program's own files: checked whole, reached or not.
-fn is_own_file(file: I32) Bool { file_role[file] == FileRole.Entry.i32() or file_role[file] == FileRole.Import.i32() }
+fn is_own_file(file: I32) Bool => file_role[file] == FileRole.Entry.i32() or file_role[file] == FileRole.Import.i32()
 
 /// By file: 1 for the standard library's (the host says which).
 vec file_std: I32
@@ -282,11 +282,11 @@ fn last_child(node: I32) I32 {
     last
 }
 
-fn first_child(node: I32) I32 { node_child[node] }
+fn first_child(node: I32) I32 => node_child[node]
 
-fn next_sibling(node: I32) I32 { node_next[node] }
+fn next_sibling(node: I32) I32 => node_next[node]
 
-fn is_kind(node: I32, kind: Node) Bool { node >= 0 and node_kind[node] == kind.i32() }
+fn is_kind(node: I32, kind: Node) Bool => node >= 0 and node_kind[node] == kind.i32()
 
 /// The word id of a node that is one word (an identifier, a type name), else -1.
-fn word_of(node: I32) I32 { tok_word[node_first[node]] }
+fn word_of(node: I32) I32 => tok_word[node_first[node]]

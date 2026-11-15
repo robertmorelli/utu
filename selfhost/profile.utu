@@ -51,10 +51,10 @@ fn reset_profile() void {
 }
 
 /// Whether this build profiles: asked for, and not a @comptime build.
-fn profiling() Bool { profile_build[0] == 1 and comptime_fuel[0] < 0 }
+fn profiling() Bool => profile_build[0] == 1 and comptime_fuel[0] < 0
 
 /// Whether defer entry `d` is the profiler's.
-fn is_profile_defer(d: I32) Bool { d <= profile_pop_defer }
+fn is_profile_defer(d: I32) Bool => d <= profile_pop_defer
 
 /// The profile memory, made when first needed.
 fn prof_mem() I32 {
@@ -197,7 +197,7 @@ fn profile_yield(k: I32) I32 {
 
 /// The consumer's body is checked (still in its `continue` block): a JS
 /// exception from it pushes the frame back.
-fn profile_yield_guard(guards: I32, cx: Cx) void { if guards >= 0 { guard_defers(guards, vt_none, cx) } }
+fn profile_yield_guard(guards: I32, cx: Cx) void => if guards >= 0 { guard_defers(guards, vt_none, cx) }
 
 /// After the body's block (where its `continue` goes): the frame back.
 fn profile_yield_end(guards: I32, k: I32) void {
@@ -257,7 +257,7 @@ fn prof_resume(s: I32) void {
 }
 
 /// Frame `k`'s name: `Stack[I32].top`, `closure in main`.
-fn profile_text(k: I32) Str { prof_owner_text(owner_of(prof_node[k]), prof_decl[k], prof_inst[k]) }
+fn profile_text(k: I32) Str => prof_owner_text(owner_of(prof_node[k]), prof_decl[k], prof_inst[k])
 
 fn prof_owner_text(owner: I32, decl: I32, inst: I32) Str {
     if owner < 0 { return "(top level)" }

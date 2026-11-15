@@ -262,7 +262,7 @@ fn duplicate_words(node: I32, what: I32) void {
 }
 
 /// The name a listed child declares: itself, or a closure or mod type parameter's first child.
-fn name_of_listed(c: I32) I32 { if is_kind(c, Node.Closure_param) or is_kind(c, Node.Module_type_param) { first_child(c) } else { c } }
+fn name_of_listed(c: I32) I32 => if is_kind(c, Node.Closure_param) or is_kind(c, Node.Module_type_param) { first_child(c) } else { c }
 
 fn list_word(c: I32) I32 {
     let n = name_of_listed(c)
@@ -603,7 +603,7 @@ fn validate_await(node: I32) void {
 //! a node somewhere else, it says so (set_parent).
 
 /// A node's parent, or -1.
-fn parent_of(node: I32) I32 { node_parent[node] }
+fn parent_of(node: I32) I32 => node_parent[node]
 
 /// Node `child` is now under `parent`.
 fn set_parent(child: I32, parent: I32) void { node_parent[child] = parent }

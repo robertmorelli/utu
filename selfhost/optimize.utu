@@ -71,7 +71,7 @@ fn optimize_module() void {
     for (0 ..< func_kind.len()) |f| { if optimizable(f) { optimize_function(f) } }
 }
 
-fn optimizable(f: I32) Bool { func_kind[f] == FuncKind.Defined.i32() and func_live[f] == 1 and func_body[f] >= 0 }
+fn optimizable(f: I32) Bool => func_kind[f] == FuncKind.Defined.i32() and func_live[f] == 1 and func_body[f] >= 0
 
 /// Constants, copies and temporaries until none changes anything, then
 /// tees, then unused locals. A body sharing a node with another is left as it is.
@@ -200,7 +200,7 @@ fn pure_opcode(code: I32) Bool {
     true
 }
 
-fn non_null(vt: I32) Bool { vt == vt_extern or (vt >= vt_defined and vt < vt_tuple and (vt - vt_defined) % 2 == 1) }
+fn non_null(vt: I32) Bool => vt == vt_extern or (vt >= vt_defined and vt < vt_tuple and (vt - vt_defined) % 2 == 1)
 
 /// Whether node `n` is a number or a null.
 fn opt_literal(n: I32) Bool {
@@ -209,7 +209,7 @@ fn opt_literal(n: I32) Bool {
         or op == Op.F64Const.i32() or op == Op.RefNull.i32())
 }
 
-fn single_value(vt: I32) Bool { vt != vt_none and vt != vt_unreachable and vt < vt_tuple }
+fn single_value(vt: I32) Bool => vt != vt_none and vt != vt_unreachable and vt < vt_tuple
 
 fn set_kid(parent: I32, place: I32, node: I32) void { w_kids[w_first[parent] + place] = node }
 
@@ -951,7 +951,7 @@ fn seq_value(n: I32) I32 {
     if w_type[v] == vt_i32 { v } else { -1 }
 }
 
-fn is_const(n: I32, value: I32) Bool { w_op[n] == Op.I32Const.i32() and w_a[n] == value }
+fn is_const(n: I32, value: I32) Bool => w_op[n] == Op.I32Const.i32() and w_a[n] == value
 
 /// Whether an `i32` is always 0 or 1: a comparison, a null or type test, a
 /// Bool `if` or fold, 0 or 1.
@@ -1377,7 +1377,7 @@ fn cf_branches_to(n: I32, label: I32) Bool {
     false
 }
 
-fn cf_const(n: I32) Bool { w_op[n] == Op.I32Const.i32() or w_op[n] == Op.I64Const.i32() }
+fn cf_const(n: I32) Bool => w_op[n] == Op.I32Const.i32() or w_op[n] == Op.I64Const.i32()
 
 /// A constant's value (an `i32`'s sign-extended).
 fn cf_val(n: I32) I64 {

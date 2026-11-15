@@ -6,7 +6,7 @@
 //! the message ends "; did you mean …?".
 
 /// A byte, lowercased.
-fn lower_byte(b: I32) I32 { if b >= 65 and b <= 90 { b + 32 } else { b } }
+fn lower_byte(b: I32) I32 => if b >= 65 and b <= 90 { b + 32 } else { b }
 
 /// How far apart two words are: insertions, deletions, changes, and swaps
 /// of two neighbors, one each; a change of case alone costs nothing. Past
@@ -110,7 +110,7 @@ fn near_in_words(word: I32, list: Str) I32 {
 }
 
 /// Node's modules (`module.builtinModules`, Node 24, without `_…`).
-fn node_modules() Str { "assert assert/strict async_hooks buffer child_process cluster console constants crypto dgram diagnostics_channel dns dns/promises domain events fs fs/promises http http2 https inspector inspector/promises module net os path path/posix path/win32 perf_hooks process punycode querystring readline readline/promises repl stream stream/consumers stream/promises stream/web string_decoder sys timers timers/promises tls trace_events tty url util util/types v8 vm wasi worker_threads zlib sea sqlite test test/reporters" }
+fn node_modules() Str => "assert assert/strict async_hooks buffer child_process cluster console constants crypto dgram diagnostics_channel dns dns/promises domain events fs fs/promises http http2 https inspector inspector/promises module net os path path/posix path/win32 perf_hooks process punycode querystring readline readline/promises repl stream stream/consumers stream/promises stream/web string_decoder sys timers timers/promises tls trace_events tty url util util/types v8 vm wasi worker_threads zlib sea sqlite test test/reporters"
 
 /// The word found, or -1 when none is close, or two are as close.
 fn near_found() I32 {
@@ -214,7 +214,7 @@ fn named_within(node: I32, decl: I32, depth: I32) I32 {
 }
 
 /// Whether two nodes are in one file (a place elsewhere is not drawn).
-fn same_file(a: I32, b: I32) Bool { a >= 0 and b >= 0 and file_of_token(node_first[a]) == file_of_token(node_first[b]) }
+fn same_file(a: I32, b: I32) Bool => a >= 0 and b >= 0 and file_of_token(node_first[a]) == file_of_token(node_first[b])
 
 /// Suggest `meant` for the name at `at` (its one token) on the last
 /// diagnostic: a fix, and where `meant` is declared (`decl`), when that is
@@ -490,7 +490,7 @@ fn report_wanted(k: I32, site: I32, expected: I32, actual: I32) void {
 }
 
 /// Whether node a is node b or inside it.
-fn within(a: I32, b: I32) Bool { node_first[a] >= node_first[b] and node_last[a] <= node_last[b] }
+fn within(a: I32, b: I32) Bool => node_first[a] >= node_first[b] and node_last[a] <= node_last[b]
 
 /// A TypeMismatch's message, by its reason.
 fn mismatch_text(i: I32) Str {
@@ -544,15 +544,15 @@ fn mismatch_text(i: I32) Str {
 //! ParseError does not otherwise use), a fix, and where the mistake is.
 
 /// The token's text.
-fn tok_text(t: I32) Str { bytes_text(tok_start[t], tok_end[t]) }
+fn tok_text(t: I32) Str => bytes_text(tok_start[t], tok_end[t])
 
-fn tok_is(t: I32, kind: Tok) Bool { t >= 0 and tok_kind[t] == kind.i32() }
+fn tok_is(t: I32, kind: Tok) Bool => t >= 0 and tok_kind[t] == kind.i32()
 
 /// Whether token t is the word `text`.
-fn tok_says(t: I32, text: Str) Bool { t >= 0 and tok_kind[t] == Tok.Word.i32() and tok_text(t) == text }
+fn tok_says(t: I32, text: Str) Bool => t >= 0 and tok_kind[t] == Tok.Word.i32() and tok_text(t) == text
 
 /// Whether tokens a and b touch (`&&`, `->`).
-fn touching(a: I32, b: I32) Bool { tok_end[a] == tok_start[b] }
+fn touching(a: I32, b: I32) Bool => tok_end[a] == tok_start[b]
 
 /// The token before t in file `file` that is not a comment, or -1.
 fn tok_before(file: I32, t: I32) I32 {
@@ -828,7 +828,7 @@ fn match_subject(file: I32, k: I32) Str {
 }
 
 /// Whether tokens k and k+1 are `..` (two dots, which utu does not have).
-fn two_dots(k: I32) Bool { tok_is(k, Tok.Dot) and tok_is(k + 1, Tok.Dot) and touching(k, k + 1) }
+fn two_dots(k: I32) Bool => tok_is(k, Tok.Dot) and tok_is(k + 1, Tok.Dot) and touching(k, k + 1)
 
 /// Tokens a to b as written, each `..` made ` ..< ` (utu's half-open range).
 fn range_text(a: I32, b: I32) Str {
@@ -900,7 +900,7 @@ fn diag_code(i: I32) Str {
     Diag.name(k)
 }
 
-fn is_logical(w: I32) Bool { w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Not.i32() or w == Kw.Xor.i32() }
+fn is_logical(w: I32) Bool => w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Not.i32() or w == Kw.Xor.i32()
 
 /// Whether a node is what a call calls (`f` in `f(x)`).
 fn is_callee(node: I32) Bool {

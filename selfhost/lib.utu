@@ -38,7 +38,7 @@ export lib {
     }
 
     /// Start a program, keeping what is sealed.
-    fn reset_keep() void { reset_program() }
+    fn reset_keep() void => reset_program()
 
     /// What the host has given since `reset()` (host declarations, and the
     /// standard library's prelude, its files added and parsed) stays for the
@@ -57,7 +57,7 @@ export lib {
     }
 
     /// A view of a document, its JSON at `at`, serving no import yet.
-    fn abi_resident_view(doc: I32, at: I32) I32 { abi_add_view(-1, doc, at) }
+    fn abi_resident_view(doc: I32, at: I32) I32 => abi_add_view(-1, doc, at)
 
     /// Binds a view to import `i`.
     fn abi_bind(i: I32, view: I32) void {
@@ -66,40 +66,40 @@ export lib {
     }
 
     /// Room for a file of `n` bytes; `role` is a `FileRole`. Returns the file.
-    fn file_add(n: I32, role: I32) I32 { add_file(n, FileRole(role)) }
+    fn file_add(n: I32, role: I32) I32 => add_file(n, FileRole(role))
 
     /// The file is the standard library's (`std:…`).
     fn file_mark_std(file: I32) void { file_std[file] = 1 }
 
     /// Where the host writes the file's bytes in `src`.
-    fn file_offset(file: I32) I32 { file_start[file] }
+    fn file_offset(file: I32) I32 => file_start[file]
 
     /// Lex and parse a file. Returns its source file node, or -1.
-    fn file_parse(file: I32) I32 { parse_file(file) }
+    fn file_parse(file: I32) I32 => parse_file(file)
 
-    fn file_first_token(file: I32) I32 { file_tok[file] }
+    fn file_first_token(file: I32) I32 => file_tok[file]
 
     /// Where the last parse was most deeply nested: a byte in `src`, or -1.
-    fn parse_deepest_at() I32 { if parse_deepest[1] >= 0 { tok_start[parse_deepest[1]] } else { -1 } }
+    fn parse_deepest_at() I32 => if parse_deepest[1] >= 0 { tok_start[parse_deepest[1]] } else { -1 }
 
-    fn file_end_token(file: I32) I32 { file_tok_end[file] }
+    fn file_end_token(file: I32) I32 => file_tok_end[file]
 
-    fn import_count() I32 { import_file.len() }
+    fn import_count() I32 => import_file.len()
 
-    fn import_from(i: I32) I32 { import_file[i] }
+    fn import_from(i: I32) I32 => import_file[i]
 
     /// The byte span of the import's path (a string with its quotes, or a
     /// platform path like `std:Array`).
-    fn import_path_start(i: I32) I32 { tok_start[node_first[import_path[i]]] }
+    fn import_path_start(i: I32) I32 => tok_start[node_first[import_path[i]]]
 
-    fn import_path_end(i: I32) I32 { tok_end[node_last[import_path[i]] - 1] }
+    fn import_path_end(i: I32) I32 => tok_end[node_last[import_path[i]] - 1]
 
     fn import_bind(i: I32, file: I32) void { import_target[i] = file }
 
     /// The name a `using` gives the module it imports (`Fs` of `using Fs from "node:fs"`).
-    fn import_name_start(i: I32) I32 { tok_start[node_first[name_node(first_child(import_node[i]))]] }
+    fn import_name_start(i: I32) I32 => tok_start[node_first[name_node(first_child(import_node[i]))]]
 
-    fn import_name_end(i: I32) I32 { tok_end[node_last[name_node(first_child(import_node[i]))] - 1] }
+    fn import_name_end(i: I32) I32 => tok_end[node_last[name_node(first_child(import_node[i]))] - 1]
 
     /// The import is of host declarations (std:JS, npm:…), not a utu file.
     fn import_foreign(i: I32) void { import_target[i] = -2 }
@@ -110,11 +110,11 @@ export lib {
     /// `abi_offsets_room(n)`), so the document is read only where it is used;
     /// then each import's view of one (its prefix, module specifier, exports,
     /// names, mutable globals).
-    fn abi_room(n: I32) I32 { abi_reserve(n) }
+    fn abi_room(n: I32) I32 => abi_reserve(n)
 
-    fn abi_offsets_room(n: I32) void { abi_offsets.resize(n) }
+    fn abi_offsets_room(n: I32) void => abi_offsets.resize(n)
 
-    fn abi_doc_at(at: I32, n: I32) I32 { abi_add_doc_at(at, n) }
+    fn abi_doc_at(at: I32, n: I32) I32 => abi_add_doc_at(at, n)
 
     /// Room for `std:JsonRuntime`, `n` bytes the host writes at the offset
     /// returned, before `seal()`.
@@ -136,17 +136,17 @@ export lib {
     }
 
     /// Resolve every name. Returns the number of diagnostics.
-    fn resolve() I32 { resolve_names() }
+    fn resolve() I32 => resolve_names()
 
-    fn node_count() I32 { node_kind.len() }
+    fn node_count() I32 => node_kind.len()
 
     /// Check and encode the resolved program for a `Target` (0: its exports,
     /// 1: its tests, 2: @comptime values, 3: its benches). Returns the module's size in `out`, or -1 when there
     /// are diagnostics.
-    fn compile_program(target: I32) I32 { compile(Target(target)) }
+    fn compile_program(target: I32) I32 => compile(Target(target))
 
     /// The JSON of what the last module built needs from its host (empty for nothing).
-    fn host_json_size() I32 { host_json.len() }
+    fn host_json_size() I32 => host_json.len()
 
     /// Function names in the modules built (1), or none (0, the default).
     fn set_debug_names(on: I32) void { debug_names[0] = on }
@@ -157,73 +157,73 @@ export lib {
     /// The last module's source map: its entries, each an instruction's
     /// byte offset in the module and its syntax node's byte span in src
     /// (-1 for none), kind (as node_kind_name takes it), and function.
-    fn map_count() I32 { map_at.len() }
+    fn map_count() I32 => map_at.len()
 
-    fn map_offset(k: I32) I32 { map_at[k] }
+    fn map_offset(k: I32) I32 => map_at[k]
 
-    fn map_start(k: I32) I32 { span_start(map_node[k]) }
+    fn map_start(k: I32) I32 => span_start(map_node[k])
 
-    fn map_end(k: I32) I32 { if map_node[k] < 0 { -1 } else { tok_end[node_last[map_node[k]] - 1] } }
+    fn map_end(k: I32) I32 => if map_node[k] < 0 { -1 } else { tok_end[node_last[map_node[k]] - 1] }
 
-    fn map_kind(k: I32) I32 { if map_node[k] < 0 { -1 } else { node_kind[map_node[k]] } }
+    fn map_kind(k: I32) I32 => if map_node[k] < 0 { -1 } else { node_kind[map_node[k]] }
 
     /// The syntax of the call entry k's code was inlined at: its byte span, or -1.
-    fn map_site_start(k: I32) I32 { span_start(map_site[k]) }
+    fn map_site_start(k: I32) I32 => span_start(map_site[k])
 
-    fn map_site_end(k: I32) I32 { if map_site[k] < 0 { -1 } else { tok_end[node_last[map_site[k]] - 1] } }
+    fn map_site_end(k: I32) I32 => if map_site[k] < 0 { -1 } else { tok_end[node_last[map_site[k]] - 1] }
 
     /// Where the function that entry k's syntax is in starts (-1: none), and its name.
-    fn map_owner_start(k: I32) I32 { span_start(owner_of(map_node[k])) }
+    fn map_owner_start(k: I32) I32 => span_start(owner_of(map_node[k]))
 
-    fn map_owner_name(k: I32) Str { owner_name(owner_of(map_node[k])) }
+    fn map_owner_name(k: I32) Str => owner_name(owner_of(map_node[k]))
 
-    fn map_function_count() I32 { func_order.len() }
+    fn map_function_count() I32 => func_order.len()
 
     /// Where the function (as map_owner_start) of function `i` of the module (imports first) starts, or -1.
-    fn map_function_start(i: I32) I32 { span_start(owner_of(func_src[func_order[i]])) }
+    fn map_function_start(i: I32) I32 => span_start(owner_of(func_src[func_order[i]]))
 
     /// Size blame (blame.utu): after blame_prepare, by entity of the last
     /// module (its index there), the syntax node it was made for, or -1.
-    fn blame_prepare() void { blame_invert() }
+    fn blame_prepare() void => blame_invert()
 
-    fn blame_type_count() I32 { type_order.len() }
+    fn blame_type_count() I32 => type_order.len()
 
     /// Source map entry k's syntax node, and its call's (as map_site_start), or -1.
-    fn blame_map_node(k: I32) I32 { map_node[k] }
+    fn blame_map_node(k: I32) I32 => map_node[k]
 
-    fn blame_map_site(k: I32) I32 { map_site[k] }
+    fn blame_map_site(k: I32) I32 => map_site[k]
 
-    fn blame_type_node(i: I32) I32 { type_syntax(i) }
+    fn blame_type_node(i: I32) I32 => type_syntax(i)
 
-    fn blame_func_node(i: I32) I32 { func_syntax(i) }
+    fn blame_func_node(i: I32) I32 => func_syntax(i)
 
-    fn blame_func_role(i: I32) I32 { func_role(i) }
+    fn blame_func_role(i: I32) I32 => func_role(i)
 
-    fn blame_func_name(i: I32) Str { func_name_text(i) }
+    fn blame_func_name(i: I32) Str => func_name_text(i)
 
-    fn blame_glob_count() I32 { glob_order.len() }
+    fn blame_glob_count() I32 => glob_order.len()
 
-    fn blame_glob_node(i: I32) I32 { glob_syntax(i) }
+    fn blame_glob_node(i: I32) I32 => glob_syntax(i)
 
-    fn blame_memory_count() I32 { memory_kind.len() }
+    fn blame_memory_count() I32 => memory_kind.len()
 
-    fn blame_memory_node(i: I32) I32 { memory_syntax(i) }
+    fn blame_memory_node(i: I32) I32 => memory_syntax(i)
 
-    fn blame_data_count() I32 { data_src.len() }
+    fn blame_data_count() I32 => data_src.len()
 
-    fn blame_data_node(d: I32) I32 { data_src[d] }
+    fn blame_data_node(d: I32) I32 => data_src[d]
 
     /// A node's byte span in src, its kind (as node_kind_name takes it), and
     /// the declaration it is in (outer_decl in blame.utu), with that one's name.
-    fn blame_node_start(node: I32) I32 { span_start(node) }
+    fn blame_node_start(node: I32) I32 => span_start(node)
 
-    fn blame_node_end(node: I32) I32 { if node < 0 { -1 } else { tok_end[node_last[node] - 1] } }
+    fn blame_node_end(node: I32) I32 => if node < 0 { -1 } else { tok_end[node_last[node] - 1] }
 
-    fn blame_node_kind(node: I32) I32 { if node < 0 { -1 } else { node_kind[node] } }
+    fn blame_node_kind(node: I32) I32 => if node < 0 { -1 } else { node_kind[node] }
 
-    fn blame_decl(node: I32) I32 { outer_decl(node) }
+    fn blame_decl(node: I32) I32 => outer_decl(node)
 
-    fn blame_decl_name(node: I32) Str { decl_label(node) }
+    fn blame_decl_name(node: I32) Str => decl_label(node)
 
     /// Profile builds (1: "Profiling" in profile.utu), or none (0, the default).
     fn set_profile(on: I32) void { profile_build[0] = on }
@@ -233,17 +233,17 @@ export lib {
 
     /// The last run build's array levels (0: none), and its innermost one's
     /// element type, as written (a tuple or handle main's own; "" none).
-    fn run_levels() I32 { run_depth[0] }
+    fn run_levels() I32 => run_depth[0]
 
-    fn run_leaf() Str { if run_elem[0] >= 0 { type_text(run_elem[0]) } else { "" } }
+    fn run_leaf() Str => if run_elem[0] >= 0 { type_text(run_elem[0]) } else { "" }
 
     /// The last profile build's frames: how many, and frame k's name and
     /// where its function starts in src.
-    fn profile_count() I32 { prof_node.len() }
+    fn profile_count() I32 => prof_node.len()
 
-    fn profile_name(k: I32) Str { profile_text(k) }
+    fn profile_name(k: I32) Str => profile_text(k)
 
-    fn profile_at(k: I32) I32 { span_start(owner_of(prof_node[k])) }
+    fn profile_at(k: I32) I32 => span_start(owner_of(prof_node[k]))
 
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) void { optimize_level[0] = level }
@@ -257,35 +257,35 @@ export lib {
 
     /// A test build's tests: how many, and where test k's name (a string
     /// literal, quotes and all) is in src.
-    fn test_count() I32 { test_node.len() }
+    fn test_count() I32 => test_node.len()
 
-    fn test_name_start(k: I32) I32 { tok_start[node_first[first_child(test_node[k])]] }
+    fn test_name_start(k: I32) I32 => tok_start[node_first[first_child(test_node[k])]]
 
-    fn test_name_end(k: I32) I32 { tok_end[node_first[first_child(test_node[k])]] }
+    fn test_name_end(k: I32) I32 => tok_end[node_first[first_child(test_node[k])]]
 
     /// A bench build's benches: how many, and where bench k's name is in src.
-    fn bench_count() I32 { bench_node.len() }
+    fn bench_count() I32 => bench_node.len()
 
-    fn bench_name_start(k: I32) I32 { tok_start[node_first[first_child(bench_node[k])]] }
+    fn bench_name_start(k: I32) I32 => tok_start[node_first[first_child(bench_node[k])]]
 
-    fn bench_name_end(k: I32) I32 { tok_end[node_first[first_child(bench_node[k])]] }
+    fn bench_name_end(k: I32) I32 => tok_end[node_first[first_child(bench_node[k])]]
 
     /// The mod test (or bench) k is in: where its name is in src, or -1.
-    fn test_mod_start(k: I32) I32 { mod_name_at(test_node[k], false) }
+    fn test_mod_start(k: I32) I32 => mod_name_at(test_node[k], false)
 
-    fn test_mod_end(k: I32) I32 { mod_name_at(test_node[k], true) }
+    fn test_mod_end(k: I32) I32 => mod_name_at(test_node[k], true)
 
-    fn bench_mod_start(k: I32) I32 { mod_name_at(bench_node[k], false) }
+    fn bench_mod_start(k: I32) I32 => mod_name_at(bench_node[k], false)
 
-    fn bench_mod_end(k: I32) I32 { mod_name_at(bench_node[k], true) }
+    fn bench_mod_end(k: I32) I32 => mod_name_at(bench_node[k], true)
 
-    fn file_count() I32 { file_root.len() }
+    fn file_count() I32 => file_root.len()
 
-    fn diagnostic_count() I32 { diag_kind.len() }
+    fn diagnostic_count() I32 => diag_kind.len()
 
     /// `@comptime`: how many mems the host evaluates (with a Comptime build,
     /// calling `__comptime_run_NAME` and reading memory `__comptime_NAME`).
-    fn comptime_mems() I32 { comptime_mem.len() }
+    fn comptime_mems() I32 => comptime_mem.len()
 
     fn comptime_name(k: I32) Str {
         let w = decl_name[comptime_mem[k]]
@@ -295,15 +295,15 @@ export lib {
     }
 
     /// `@embed`: the files the host reads, by the byte span of their path in src.
-    fn embed_files() I32 { embed_mem.len() }
+    fn embed_files() I32 => embed_mem.len()
 
-    fn embed_path_start(k: I32) I32 { dsl_text_start(last_child(decl_node[embed_mem[k]])) }
+    fn embed_path_start(k: I32) I32 => dsl_text_start(last_child(decl_node[embed_mem[k]]))
 
-    fn embed_path_end(k: I32) I32 { dsl_text_end(last_child(decl_node[embed_mem[k]])) }
+    fn embed_path_end(k: I32) I32 => dsl_text_end(last_child(decl_node[embed_mem[k]]))
 
     /// How many functions of the program's own are @ir in the last build
     /// (the host validates a module with any).
-    fn user_ir_count() I32 { user_ir_decl.len() }
+    fn user_ir_count() I32 => user_ir_decl.len()
 
     /// The module is not valid Wasm, for the reason the engine gives (`n`
     /// bytes, which the host writes at the offset returned in src): reported
@@ -320,7 +320,7 @@ export lib {
     }
 
     /// The file that declares embed k's mem, which its path is relative to.
-    fn embed_file(k: I32) I32 { file_of_token(node_first[decl_node[embed_mem[k]]]) }
+    fn embed_file(k: I32) I32 => file_of_token(node_first[decl_node[embed_mem[k]]])
 
     /// Room for a file's `n` bytes, written by the host at the offset returned in `embed_bytes`.
     fn embed_set(k: I32, n: I32) I32 {
@@ -341,11 +341,11 @@ export lib {
     }
 
     /// Whether mem k's expression is still to be evaluated (1) or not (0).
-    fn comptime_waiting(k: I32) I32 { if comptime_start[k] == -1 { 1 } else { 0 } }
+    fn comptime_waiting(k: I32) I32 => if comptime_start[k] == -1 { 1 } else { 0 }
 
     /// Whether the @comptime build just made can evaluate mem k (1): it
     /// waits, and reaches no mem that waits (see `comptime_ready`).
-    fn comptime_can_run(k: I32) I32 { if comptime_ready(k) { 1 } else { 0 } }
+    fn comptime_can_run(k: I32) I32 => if comptime_ready(k) { 1 } else { 0 }
 
     /// Mem k waits on itself, or on a mem that waits on it: reported.
     fn comptime_cycle(k: I32) void {
@@ -369,19 +369,19 @@ export lib {
         at
     }
 
-    fn diagnostic_kind(i: I32) Str { diag_kind_name(i) }
+    fn diagnostic_kind(i: I32) Str => diag_kind_name(i)
 
 
-    fn diagnostic_message(i: I32) Str { diag_message(i) }
+    fn diagnostic_message(i: I32) Str => diag_message(i)
 
     /// Where a diagnostic points: a file, and byte offsets into the source.
-    fn diagnostic_file(i: I32) I32 { diag_file(i) }
+    fn diagnostic_file(i: I32) I32 => diag_file(i)
 
-    fn diagnostic_start(i: I32) I32 { diag_start(i) }
+    fn diagnostic_start(i: I32) I32 => diag_start(i)
 
-    fn diagnostic_end(i: I32) I32 { diag_end(i) }
+    fn diagnostic_end(i: I32) I32 => diag_end(i)
 
-    fn diagnostic_node(i: I32) I32 { diag_node[i] }
+    fn diagnostic_node(i: I32) I32 => diag_node[i]
 
     /// A diagnostic's own kind (its @Diag name; `diagnostic_kind` is stage
     /// 0's, which several share), and what it says beyond its message (see
@@ -389,14 +389,14 @@ export lib {
     /// a place (a file and byte offsets: another node's, or its own span's
     /// for a label, or the bytes a fix replaces), a text (a label, a note,
     /// or a fix's new text), and a fix's label.
-    fn diagnostic_code(i: I32) Str { diag_code(i) }
+    fn diagnostic_code(i: I32) Str => diag_code(i)
 
-    fn diagnostic_extras(i: I32) I32 { diag_extra_n[i] }
+    fn diagnostic_extras(i: I32) I32 => diag_extra_n[i]
 
     /// What hangs off a diagnostic's span when its report gave no label.
-    fn diagnostic_default_label(i: I32) Str { diag_default_label(i) }
+    fn diagnostic_default_label(i: I32) Str => diag_default_label(i)
 
-    fn diagnostic_extra_kind(i: I32, k: I32) I32 { extra_kind[diag_extra[i] + k] }
+    fn diagnostic_extra_kind(i: I32, k: I32) I32 => extra_kind[diag_extra[i] + k]
 
     fn diagnostic_extra_file(i: I32, k: I32) I32 {
         let r = diag_extra[i] + k
@@ -420,22 +420,22 @@ export lib {
         if extra_node[r] < 0 { diag_end(i) } else { tok_end[node_last[extra_node[r]] - 1] }
     }
 
-    fn diagnostic_extra_text(i: I32, k: I32) Str { word_text(extra_text[diag_extra[i] + k]) }
+    fn diagnostic_extra_text(i: I32, k: I32) Str => word_text(extra_text[diag_extra[i] + k])
 
-    fn diagnostic_extra_label(i: I32, k: I32) Str { word_text(extra_label[diag_extra[i] + k]) }
+    fn diagnostic_extra_label(i: I32, k: I32) Str => word_text(extra_label[diag_extra[i] + k])
 
     /// DSL sites (`dsl.utu`), for the host to check an `@es` body's syntax:
     /// how many; site k's span, and its body's (in src) when it is an `@es`
     /// in the program's own files, else -1.
-    fn dsl_count() I32 { dsl_sites.len() }
+    fn dsl_count() I32 => dsl_sites.len()
 
-    fn dsl_site_start(k: I32) I32 { span_start(dsl_sites[k]) }
+    fn dsl_site_start(k: I32) I32 => span_start(dsl_sites[k])
 
-    fn dsl_site_end(k: I32) I32 { tok_end[node_last[dsl_sites[k]] - 1] }
+    fn dsl_site_end(k: I32) I32 => tok_end[node_last[dsl_sites[k]] - 1]
 
-    fn es_body_start(k: I32) I32 { if is_es(dsl_sites[k]) and dsl_in_program(dsl_sites[k]) { dsl_text_start(dsl_sites[k]) } else { -1 } }
+    fn es_body_start(k: I32) I32 => if is_es(dsl_sites[k]) and dsl_in_program(dsl_sites[k]) { dsl_text_start(dsl_sites[k]) } else { -1 }
 
-    fn es_body_end(k: I32) I32 { dsl_text_end(dsl_sites[k]) }
+    fn es_body_end(k: I32) I32 => dsl_text_end(dsl_sites[k])
 
     /// `@wat` functions (`host.utu`): how many the loaded program has; site k's
     /// function (its node: name, parameters, result) and text (between `/\`
@@ -443,13 +443,13 @@ export lib {
     /// at the offset returned, in `wat_bytes`), or a mistake: `n` bytes of
     /// message it writes at the offset returned, in src, and where it is in
     /// the text (UTF-16 offsets; -1 for the function's signature).
-    fn wat_count() I32 { find_wat() }
+    fn wat_count() I32 => find_wat()
 
-    fn wat_function(k: I32) I32 { wat_function_of(wat_site[k]) }
+    fn wat_function(k: I32) I32 => wat_function_of(wat_site[k])
 
-    fn wat_text_start(k: I32) I32 { dsl_inner_start(wat_site[k]) }
+    fn wat_text_start(k: I32) I32 => dsl_inner_start(wat_site[k])
 
-    fn wat_text_end(k: I32) I32 { dsl_inner_end(wat_site[k]) }
+    fn wat_text_end(k: I32) I32 => dsl_inner_end(wat_site[k])
 
     fn wat_set(k: I32, n: I32) I32 {
         let at = wat_bytes.len()
@@ -469,12 +469,12 @@ export lib {
         at
     }
 
-    fn decl_kind_name(decl: I32) Str { Decl.name(Decl(decl_kind[decl])) }
+    fn decl_kind_name(decl: I32) Str => Decl.name(Decl(decl_kind[decl]))
 
-    fn decl_count() I32 { decl_kind.len() }
+    fn decl_count() I32 => decl_kind.len()
 
     /// Word ids below this are keywords (`tok_word` names a word token's word).
-    fn keyword_count() I32 { Kw.count() }
+    fn keyword_count() I32 => Kw.count()
 
     /// An expression's type as the last build checked it ("" when it was not).
     fn node_type(n: I32) Str {
@@ -488,7 +488,7 @@ export lib {
 
     /// Calls and computed-global reads in the last build. A call edge has
     /// a site; value references and global reads have site -1.
-    fn edge_count() I32 { edge_from.len() }
+    fn edge_count() I32 => edge_from.len()
     fn edge_from_decl(k: I32) I32 {
         let from = edge_from[k]
         if from <= -1000000 { -1000000 - from } else if from >= 0 and from < fi_decl.len() { fi_decl[from] } else { from }
@@ -497,15 +497,15 @@ export lib {
         let to = edge_to[k]
         if to >= 0 and to < fi_decl.len() { fi_decl[to] } else { to }
     }
-    fn edge_site_start(k: I32) I32 { span_start(edge_site[k]) }
-    fn edge_site_end(k: I32) I32 { if edge_site[k] < 0 { -1 } else { tok_end[node_last[edge_site[k]] - 1] } }
+    fn edge_site_start(k: I32) I32 => span_start(edge_site[k])
+    fn edge_site_end(k: I32) I32 => if edge_site[k] < 0 { -1 } else { tok_end[node_last[edge_site[k]] - 1] }
 
     /// Successful implicit conversions from the last build.
-    fn coercion_count() I32 { co_node.len() }
-    fn coercion_node(k: I32) I32 { co_node[k] }
-    fn coercion_from_text(k: I32) Str { type_text(co_from[k]) }
-    fn coercion_to_text(k: I32) Str { type_text(co_to[k]) }
-    fn coercion_kind(k: I32) I32 { co_kind[k] }
+    fn coercion_count() I32 => co_node.len()
+    fn coercion_node(k: I32) I32 => co_node[k]
+    fn coercion_from_text(k: I32) Str => type_text(co_from[k])
+    fn coercion_to_text(k: I32) Str => type_text(co_to[k])
+    fn coercion_kind(k: I32) I32 => co_kind[k]
     fn node_expected_type(n: I32) Str {
         if n < 0 or n >= node_expect.len() or node_expect[n] < 0 { return "" }
         type_text(node_expect[n])
@@ -585,7 +585,7 @@ export lib {
         file_start[add_file(n, FileRole.Entry)]
     }
 
-    fn tokens(n: I32) I32 { lex(file_start[0], file_end[0]) }
+    fn tokens(n: I32) I32 => lex(file_start[0], file_end[0])
 
     fn nodes(n: I32) I32 {
         comment_nodes[0] = 1
@@ -602,7 +602,7 @@ export lib {
 }
 
 /// Where a syntax node starts in src, or -1 for none.
-fn span_start(node: I32) I32 { if node < 0 { -1 } else { tok_start[node_first[node]] } }
+fn span_start(node: I32) I32 => if node < 0 { -1 } else { tok_start[node_first[node]] }
 
 /// The function a syntax node is in (a declaration, a closure, a test), or -1.
 fn owner_of(node: I32) I32 {

@@ -1254,7 +1254,7 @@ fn recur_edges(f: I32, node: I32) void {
 /// By function (as @lean_closures sets it): 1 for an invoker.
 vec lean_invoker: U8
 
-fn is_invoker(f: I32) Bool { f < lean_invoker.len() and lean_invoker[f] == 1 }
+fn is_invoker(f: I32) Bool => f < lean_invoker.len() and lean_invoker[f] == 1
 
 /// Under `node`: calls of an invoker go to its closure_call import, and of
 /// @closure_new's helper to `plain`.

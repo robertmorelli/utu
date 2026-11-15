@@ -294,7 +294,7 @@ vec parse_error_wanted: I32 = [-1]
 /// In @parse_expected, a keyword is this plus its word id; a token kind is itself.
 let kw_wanted: I32 = 1000
 
-fn fail(p: Parser) void { fail_wanting(p, -1) }
+fn fail(p: Parser) void => fail_wanting(p, -1)
 
 /// Fails at the cursor, noting what was wanted there (a token kind, or
 /// @kw_wanted plus a keyword's word; -1 for nothing in particular).
@@ -416,24 +416,24 @@ fn past_limit(p: Parser, offset: I32) Bool {
     limit >= 0 and p.pos + offset >= limit
 }
 
-fn kind_at(p: Parser, offset: I32) I32 { if past_limit(p, offset) { Tok.Semi.i32() } else { tok_kind[ptok[p.pos + offset]] } }
+fn kind_at(p: Parser, offset: I32) I32 => if past_limit(p, offset) { Tok.Semi.i32() } else { tok_kind[ptok[p.pos + offset]] }
 
-fn is(p: Parser, kind: Tok) Bool { kind_at(p, 0) == kind.i32() }
+fn is(p: Parser, kind: Tok) Bool => kind_at(p, 0) == kind.i32()
 
-fn is_at(p: Parser, offset: I32, kind: Tok) Bool { kind_at(p, offset) == kind.i32() }
+fn is_at(p: Parser, offset: I32, kind: Tok) Bool => kind_at(p, offset) == kind.i32()
 
-fn word_id(p: Parser) I32 { if past_limit(p, 0) { -1 } else { tok_word[ptok[p.pos]] } }
+fn word_id(p: Parser) I32 => if past_limit(p, 0) { -1 } else { tok_word[ptok[p.pos]] }
 
-fn is_kw(p: Parser, kw: Kw) Bool { word_id(p) == kw.i32() }
+fn is_kw(p: Parser, kw: Kw) Bool => word_id(p) == kw.i32()
 
-fn is_word(p: Parser) Bool { is(p, Tok.Word) }
+fn is_word(p: Parser) Bool => is(p, Tok.Word)
 
-fn is_keyword_id(id: I32) Bool { id >= 0 and id < Kw.count() }
+fn is_keyword_id(id: I32) Bool => id >= 0 and id < Kw.count()
 
-fn at_end(p: Parser) Bool { is(p, Tok.End) }
+fn at_end(p: Parser) Bool => is(p, Tok.End)
 
 /// Whether the tokens at positions `a` and `b` touch, with nothing between them.
-fn adjacent(a: I32, b: I32) Bool { tok_end[ptok[a]] == tok_start[ptok[b]] }
+fn adjacent(a: I32, b: I32) Bool => tok_end[ptok[a]] == tok_start[ptok[b]]
 
 /// Identifier-shaped: a lowercase first letter, or `_` and more.
 fn shaped_at(p: Parser, offset: I32) Bool {
@@ -444,7 +444,7 @@ fn shaped_at(p: Parser, offset: I32) Bool {
     (c >= 97 and c <= 122) or (c == 95 and tok_end[t] - tok_start[t] > 1)
 }
 
-fn shaped(p: Parser) Bool { shaped_at(p, 0) }
+fn shaped(p: Parser) Bool => shaped_at(p, 0)
 
 fn advance(p: Parser) void { p.pos += 1 }
 
@@ -461,7 +461,7 @@ fn expect_kw(p: Parser, kw: Kw) void {
 //! = Nodes
 
 /// Where the node about to begin starts on @pending.
-fn mark() I32 { pending.len() }
+fn mark() I32 => pending.len()
 
 /// A node of the nodes made since `at` (on the @pending stack), spanning tokens `first ..< last`.
 fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
@@ -489,7 +489,7 @@ fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
 }
 
 /// A node from `at` up to the cursor.
-fn node(p: Parser, kind: Node, at: I32, first: I32) I32 { finish(kind, at, first, p.pos) }
+fn node(p: Parser, kind: Node, at: I32, first: I32) I32 => finish(kind, at, first, p.pos)
 
 /// A node of the token at the cursor.
 fn leaf(p: Parser, kind: Node) I32 {
@@ -505,7 +505,7 @@ fn mark_below(left: I32) I32 {
 }
 
 /// Before an attempt that may be given up (@restore).
-fn save(p: Parser) Save { Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0], limits: stmt_limit.len() } }
+fn save(p: Parser) Save => Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0], limits: stmt_limit.len() }
 
 /// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
 fn restore(p: Parser, s: Save) void {
@@ -1375,7 +1375,7 @@ fn capture(p: Parser) I32 {
 //! = Expressions
 
 /// An expression of any precedence.
-fn expression(p: Parser) I32 { expr(p, -1000, true) }
+fn expression(p: Parser) I32 => expr(p, -1000, true)
 
 /// An expression whose operators have precedence above `min`, or equal to it
 /// when `or_equal` (the rule this operand belongs to is right-associative).

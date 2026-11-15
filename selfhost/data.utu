@@ -16,7 +16,7 @@ fn fields_holder(decl: I32) I32 {
 }
 
 /// A field declaration's type, in instance `inst`.
-fn field_type(field: I32, inst: I32) I32 { type_of(next_sibling(first_child(decl_node[field])), inst) }
+fn field_type(field: I32, inst: I32) I32 => type_of(next_sibling(first_child(decl_node[field])), inst)
 
 /// `T { a: x, b: y }`: the initializers in the order written, then
 /// `struct.new` of the fields in declaration order.
@@ -213,7 +213,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
 }
 
 /// Whether a node is in the standard library's code.
-fn from_std(node: I32) Bool { file_std[file_of_token(node_first[node])] == 1 }
+fn from_std(node: I32) Bool => file_std[file_of_token(node_first[node])] == 1
 
 /// A field of std's own: one a std struct declares with a name starting
 /// with `_`. Only std's code names it (Result's `_ok`, `_value`, `_error`).
@@ -262,7 +262,7 @@ fn inits_in_order(holder: I32, first_init: I32) Bool {
 }
 
 /// Whether an initializer neither has effects nor sees them: a literal.
-fn plain_init(value: I32) Bool { is_kind(value, Node.Literal) }
+fn plain_init(value: I32) Bool => is_kind(value, Node.Literal)
 
 /// Nodes from `node` on, it and its next siblings.
 fn child_count_from(node: I32) I32 {
@@ -554,7 +554,7 @@ fn array_of(elem: I32) I32 {
     named(decl_a[module], instance(module, vl_end(m)))
 }
 
-fn is_empty_array(node: I32) Bool { is_kind(node, Node.Array_expr) and first_child(node) < 0 }
+fn is_empty_array(node: I32) Bool => is_kind(node, Node.Array_expr) and first_child(node) < 0
 
 /// `let xs = [];`: the type a later use in its block gives it (an array
 /// assigned to it, or the parameter it is passed as), or -1.
@@ -727,7 +727,7 @@ fn intrinsic_array_heap(fi: I32) I32 {
 }
 
 /// The element type of an intrinsic's array (Array's `T1` in the instance).
-fn intrinsic_array_elem(fi: I32) I32 { type_decl_elem(decl_a[module_of(fi_decl[fi])], fi_inst[fi]) }
+fn intrinsic_array_elem(fi: I32) I32 => type_decl_elem(decl_a[module_of(fi_decl[fi])], fi_inst[fi])
 
 /// Push an `@ir` element's children; false when one is not known.
 fn translate_kids(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: Bool, fi: I32) Bool {

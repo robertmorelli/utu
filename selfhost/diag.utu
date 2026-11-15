@@ -59,7 +59,7 @@ fn node_text(node: I32) Str {
     bytes_text(tok_start[node_first[node]], tok_end[node_last[node] - 1])
 }
 
-fn int_text(v: I32) Str { v.str() }
+fn int_text(v: I32) Str => v.str()
 
 fn pick(c: Bool, yes: Str, no: Str) Str {
     if c { return yes }
@@ -315,7 +315,7 @@ fn awaited_type(t: I32) I32 {
 }
 
 /// Whether t is a `fun` type, or a nullable one.
-fn es_fun_type(t: I32) Bool { ty_is(t, Ty.Fun) or (ty_is(t, Ty.Nullable) and ty_is(ty_a[t], Ty.Fun)) }
+fn es_fun_type(t: I32) Bool => ty_is(t, Ty.Fun) or (ty_is(t, Ty.Nullable) and ty_is(ty_a[t], Ty.Fun))
 
 /// A value type's name, as `@ir` tags spell it.
 fn vt_text(vt: I32) Str {

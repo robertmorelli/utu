@@ -13,13 +13,13 @@
 //! = Scalar enums and distinct types
 
 /// Whether a declaration is an integer enum or a distinct type: a scalar.
-fn is_scalar_kind(decl: I32) Bool { decl_is(decl, Decl.IntEnum) or decl_is(decl, Decl.Distinct) }
+fn is_scalar_kind(decl: I32) Bool => decl_is(decl, Decl.IntEnum) or decl_is(decl, Decl.Distinct)
 
 /// The base of a distinct type (I32, F64, …).
-fn distinct_base(decl: I32) I32 { decl_type(node_decl[last_child(decl_node[decl])], 0) }
+fn distinct_base(decl: I32) I32 => decl_type(node_decl[last_child(decl_node[decl])], 0)
 
 /// The type a scalar kind converts to and from: I32 for an integer enum.
-fn scalar_base(decl: I32) I32 { if decl_is(decl, Decl.IntEnum) { prelude(Prelude.I32) } else { distinct_base(decl) } }
+fn scalar_base(decl: I32) I32 => if decl_is(decl, Decl.IntEnum) { prelude(Prelude.I32) } else { distinct_base(decl) }
 
 /// Whether its comparisons are unsigned (U32 and U64 bases, U32 enums).
 fn scalar_unsigned(decl: I32) Bool {
@@ -64,7 +64,7 @@ fn scalar_method(decl: I32, word: I32) I32 {
 }
 
 /// The old spelling `to_i32` of `i32`, for a base type.
-fn old_conversion_word(base: I32) I32 { intern_text("to_" + word_text(base_word(base))) }
+fn old_conversion_word(base: I32) I32 => intern_text("to_" + word_text(base_word(base)))
 
 /// `i32` for I32: a value's conversion to a base type (`t.i32()`).
 fn base_word(base: I32) I32 {
@@ -304,7 +304,7 @@ fn enum_name_table(decl: I32, f: I32) void {
 }
 
 /// A string constant whose text is word `word`.
-fn text_constant(word: I32) void { w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0) }
+fn text_constant(word: I32) void => w_leaf(Op.GlobalGet, vt_extern, string_global(word), 0)
 
 //! = Enums with data
 
@@ -470,10 +470,10 @@ fn alt_cast_arm(x: I32, s: I32) I32 {
     w_a[test]
 }
 
-fn is_get(n: I32, local: I32) Bool { w_op[n] == Op.LocalGet.i32() and w_a[n] == local }
+fn is_get(n: I32, local: I32) Bool => w_op[n] == Op.LocalGet.i32() and w_a[n] == local
 
 /// The one kid of a Seq, or -1.
-fn only_kid(seq: I32) I32 { if w_op[seq] == Op.Seq.i32() and w_count[seq] == 1 { w_kid(seq, 0) } else { -1 } }
+fn only_kid(seq: I32) I32 => if w_op[seq] == Op.Seq.i32() and w_count[seq] == 1 { w_kid(seq, 0) } else { -1 }
 
 /// The instruction that runs first in `n`, inside no block (a value on the
 /// stack before n reaches it), or -1.

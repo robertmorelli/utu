@@ -74,7 +74,7 @@ vec wp_at: I32 = [0]
 vec wp_svg: I32 = [0, 0]
 
 /// A syntax error in the template, at `offset` in its text.
-fn wutu_fail(message: Str, offset: I32) void { dsl_fail(message, offset, 1) }
+fn wutu_fail(message: Str, offset: I32) void => dsl_fail(message, offset, 1)
 
 fn reset_template() void {
     tn_kind.clear()
@@ -183,7 +183,7 @@ fn is_boolean_attribute(name: Str) Bool {
     in_words("hidden inert disabled required readonly checked multiple autofocus selected open reversed controls autoplay muted loop playsinline novalidate", name)
 }
 
-fn is_void_tag(tag: Str) Bool { in_words("area base br col embed hr img input link meta param source track wbr", tag) }
+fn is_void_tag(tag: Str) Bool => in_words("area base br col embed hr img input link meta param source track wbr", tag)
 
 /// SVG's elements (but `a`, `script`, `style`): `fe…` filter primitives,
 /// and the rest. (Inside `svg { }` any name is one: see parse_telement.)
@@ -242,9 +242,9 @@ fn tag_attributes(tag: Str) Str {
     ""
 }
 
-fn is_custom_element(tag: Str) Bool { text_index(tag, "-", 0) >= 0 }
+fn is_custom_element(tag: Str) Bool => text_index(tag, "-", 0) >= 0
 
-fn is_known_tag(tag: Str) Bool { is_html_tag(tag) or is_svg_tag(tag) or is_custom_element(tag) }
+fn is_known_tag(tag: Str) Bool => is_html_tag(tag) or is_svg_tag(tag) or is_custom_element(tag)
 
 /// Global, `aria-` and `data-` attributes, the tag's own, and anything on
 /// an SVG element (`svg`) or a custom one.
@@ -253,7 +253,7 @@ fn is_allowed_attribute(tag: Str, name: Str, svg: Bool) Bool {
         or is_custom_element(tag)
 }
 
-fn is_name_code(c: I32) Bool { is_word_code(c) or c == 45 }
+fn is_name_code(c: I32) Bool => is_word_code(c) or c == 45
 
 /// `--x` or `-?[a-z][\w-]*`: a CSS property.
 fn is_css_property(head: Str) Bool {
@@ -390,11 +390,11 @@ fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) void {
 
 //! = The parser
 
-fn wp_done(text: Str) Bool { wp_at[0] >= text.len() }
+fn wp_done(text: Str) Bool => wp_at[0] >= text.len()
 
-fn wp_char(text: Str) I32 { if wp_at[0] < text.len() { text.get(wp_at[0]) } else { -1 } }
+fn wp_char(text: Str) I32 => if wp_at[0] < text.len() { text.get(wp_at[0]) } else { -1 }
 
-fn wp_at_text(text: Str, part: Str) Bool { text_at(text, wp_at[0], part) }
+fn wp_at_text(text: Str, part: Str) Bool => text_at(text, wp_at[0], part)
 
 /// A word then whitespace at the cursor (`if `, `for `, `as `), not consumed.
 fn wp_keyword(text: Str, word: Str) Bool {
@@ -404,7 +404,7 @@ fn wp_keyword(text: Str, word: Str) Bool {
 
 /// Whether offset p starts the text or follows a blank (a `//` there is a
 /// comment, not `url(http://…)`).
-fn wp_after_blank(text: Str, p: I32) Bool { p == 0 or is_space_code(text.get(p - 1)) }
+fn wp_after_blank(text: Str, p: I32) Bool => p == 0 or is_space_code(text.get(p - 1))
 
 /// Whitespace, `//` comments (first on a line or after a blank), and CSS comments.
 fn wp_trivia(text: Str) void {
@@ -979,7 +979,7 @@ fn parse_telement(text: Str) I32 {
 
 /// Elements whose text HTML holds unescaped (raw text; a script's is code):
 /// prerendered, a value there could close the element and start markup.
-fn is_raw_text_tag(tag: Str) Bool { in_words("style noscript iframe xmp noembed noframes plaintext", tag) }
+fn is_raw_text_tag(tag: Str) Bool => in_words("style noscript iframe xmp noembed noframes plaintext", tag)
 
 fn raw_text_error(tag: Str) Str {
     (if tag == "iframe" { "an " } else { "a " }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\"; }"

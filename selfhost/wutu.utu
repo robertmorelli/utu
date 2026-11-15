@@ -33,7 +33,7 @@ vec splice_rename_at: I32
 vec splice_rename_to: I32
 
 /// The prefix of the site's generated names, `__wutu_N_`: one its body does not use.
-fn wutu_prefix() Str { word_text(wu_prefix[0]) }
+fn wutu_prefix() Str => word_text(wu_prefix[0])
 
 /// Whether the kept nodes have a reactive site: 1 or 0, or -1 until asked.
 vec kept_reactive: I32 = [-1]
@@ -250,7 +250,7 @@ fn wutu_prepare(n: I32) void {
 }
 
 /// The local that holds template element n.
-fn node_uid(n: I32) Str { wutu_prefix() + "node" + int_text(tn_index[n]) }
+fn node_uid(n: I32) Str => wutu_prefix() + "node" + int_text(tn_index[n])
 
 /// Whether template node n is node `ancestor` or under it.
 fn tn_within(n: I32, ancestor: I32) Bool {
@@ -675,7 +675,7 @@ fn is_alias_name(name: Str) Bool {
     false
 }
 
-fn word_byte(c: I32) Bool { (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 }
+fn word_byte(c: I32) Bool => (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
 
 /// An element's classes, its scoped CSS's among them (registered here), space-separated.
 fn wutu_classes(n: I32) Str {
@@ -717,7 +717,7 @@ fn wutu_json(text: Str) Str {
 }
 
 /// Whether property `name` is a URL a browser follows or loads (see `safe` in src/runtime/wutu.js).
-fn is_url_property(name: Str) Bool { in_words("href src action formAction poster cite data background codeBase longDesc ping srcset imageSrcset content", name) }
+fn is_url_property(name: Str) Bool => in_words("href src action formAction poster cite data background codeBase longDesc ping srcset imageSrcset content", name)
 
 /// Whether attribute item i is known when compiling (written, not a property),
 /// so it comes in the element's shell. A written class merges, so it does not.
@@ -905,7 +905,7 @@ fn wd_binding(n: I32, i: I32) Str {
 }
 
 /// A select's value: set again once its options are in place (they may come with this render).
-fn select_value(id: Str, value: Str) Str { wutu_helper("select_value") + "(" + id + ", (" + value + "))" }
+fn select_value(id: Str, value: Str) Str => wutu_helper("select_value") + "(" + id + ", (" + value + "))"
 
 /// A binding's sync (state into the element, on render), located at the
 /// bind statement; empty for `files`, which is read-only.
@@ -915,7 +915,7 @@ fn binding_sync_code(kind: Str, id: Str, target: Str, i: I32) Str {
 }
 
 /// `bind:values` crosses as one string: U+001F before each chosen value ("" for none, so `[""]` differs).
-fn values_separator() Str { "\"\\u001f\"" }
+fn values_separator() Str => "\"\\u001f\""
 
 /// A binding's sync code:
 ///   value / checked   a string / a Bool property
@@ -947,7 +947,7 @@ fn binding_update(kind: Str, id: Str, target: Str) Str {
 }
 
 /// The event a binding listens to.
-fn binding_event(kind: Str) Str { if kind == "value" or kind == "number" { "input" } else { "change" } }
+fn binding_event(kind: Str) Str => if kind == "value" or kind == "number" { "input" } else { "change" }
 
 /// The children from `first`, as ops into `o`, then their listeners.
 fn wd_fragment(first: I32, svg: Bool, o: WOps) Str {
@@ -1075,7 +1075,7 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
 
 /// A text hole's value: `= x;` is `wutu.show(x)` (a number or Bool shows as
 /// its str, a Str or a node as itself); written text (from < 0) is itself.
-fn shown(value: Str, from: I32) Str { if from < 0 { "(" + value + ")" } else { "wutu.show(" + value + ")" } }
+fn shown(value: Str, from: I32) Str => if from < 0 { "(" + value + ")" } else { "wutu.show(" + value + ")" }
 
 /// Whether an identifier refers to a value (not a field, member, or
 /// parameter name, nor a binding being declared).

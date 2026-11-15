@@ -36,7 +36,7 @@ vec inst_module: I32
 vec inst_args: I32
 vec inst_table: I32
 
-fn ty_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 16777619) ^ a) * 31 + b * 40503 }
+fn ty_hash(kind: I32, a: I32, b: I32) I32 => ((kind * 16777619) ^ a) * 31 + b * 40503
 
 /// The type of this kind and these operands, interned: the same arguments
 /// give the same id.
@@ -70,14 +70,14 @@ fn ty_grow() void {
     }
 }
 
-fn ty_is(t: I32, kind: Ty) Bool { ty_kind[t] == kind.i32() }
+fn ty_is(t: I32, kind: Ty) Bool => ty_kind[t] == kind.i32()
 
-fn named(decl: I32, inst: I32) I32 { ty(Ty.Named, decl, inst) }
+fn named(decl: I32, inst: I32) I32 => ty(Ty.Named, decl, inst)
 
 /// `?t`. A type already nullable, or the error type, is its own.
-fn nullable(t: I32) I32 { if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { t } else { ty(Ty.Nullable, t, 0) } }
+fn nullable(t: I32) I32 => if ty_is(t, Ty.Nullable) or ty_is(t, Ty.Error) { t } else { ty(Ty.Nullable, t, 0) }
 
-fn ty_error() I32 { ty(Ty.Error, 0, 0) }
+fn ty_error() I32 => ty(Ty.Error, 0, 0)
 
 /// Whether a type is, or is made of, the error type (`Array[I32Z]`): a mistake already reported.
 fn ty_has_error(t: I32) Bool {
@@ -96,21 +96,21 @@ fn ty_has_error(t: I32) Bool {
     false
 }
 
-fn ty_void() I32 { ty(Ty.Void, 0, 0) }
+fn ty_void() I32 => ty(Ty.Void, 0, 0)
 
-fn ty_never() I32 { ty(Ty.Never, 0, 0) }
+fn ty_never() I32 => ty(Ty.Never, 0, 0)
 
-fn ty_null() I32 { ty(Ty.Null, 0, 0) }
+fn ty_null() I32 => ty(Ty.Null, 0, 0)
 
 /// The declaration of a named type, or -1.
-fn ty_decl(t: I32) I32 { if ty_is(t, Ty.Named) { ty_a[t] } else { -1 } }
+fn ty_decl(t: I32) I32 => if ty_is(t, Ty.Named) { ty_a[t] } else { -1 }
 
 /// The instance of a named type; 0 for any other type.
-fn ty_inst(t: I32) I32 { if ty_is(t, Ty.Named) { ty_b[t] } else { 0 } }
+fn ty_inst(t: I32) I32 => if ty_is(t, Ty.Named) { ty_b[t] } else { 0 }
 
 //! = Instances
 
-fn inst_hash(module: I32, args: I32) I32 { (module * -1640531535) ^ (args * 40503) }
+fn inst_hash(module: I32, args: I32) I32 => (module * -1640531535) ^ (args * 40503)
 
 /// The instance of `module` with type arguments `args` (a list of types),
 /// interned.
@@ -171,7 +171,7 @@ fn type_depth(t: I32) I32 {
     depth
 }
 
-fn max_i32(a: I32, b: I32) I32 { if a > b { a } else { b } }
+fn max_i32(a: I32, b: I32) I32 => if a > b { a } else { b }
 
 /// The deepest instances nest (a generic module that instantiates itself
 /// with a bigger type each time would go on without end).
@@ -204,7 +204,7 @@ fn inst_grow() void {
 }
 
 /// Type argument i of an instance.
-fn inst_arg(inst: I32, i: I32) I32 { vl_item(inst_args[inst], i) }
+fn inst_arg(inst: I32, i: I32) I32 => vl_item(inst_args[inst], i)
 
 /// The module a declaration belongs to (itself for a module), or -1.
 fn module_of(decl: I32) I32 {
@@ -267,7 +267,7 @@ enum(U8) Prelude:
     | I31
 
 /// The type of a prelude name: `prelude(Prelude.Str)` is `Str`.
-fn prelude(p: Prelude) I32 { prelude_ty[p.i32()] }
+fn prelude(p: Prelude) I32 => prelude_ty[p.i32()]
 
 fn find_prelude_types() void {
     prelude_ty.resize(Prelude.count())
@@ -284,7 +284,7 @@ fn is_numeric(t: I32) Bool {
         or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.M32) or t == prelude(Prelude.M64)
 }
 
-fn is_float(t: I32) Bool { t == prelude(Prelude.F32) or t == prelude(Prelude.F64) }
+fn is_float(t: I32) Bool => t == prelude(Prelude.F32) or t == prelude(Prelude.F64)
 
 //! = Types from syntax
 
@@ -700,7 +700,7 @@ fn type_decl_elem(decl: I32, inst: I32) I32 {
 }
 
 /// A field or element's storage: refs as nullable, everything else as is.
-fn storage(vt: I32) I32 { vt_nullable(vt) }
+fn storage(vt: I32) I32 => vt_nullable(vt)
 
 /// The struct type of a struct declaration in an instance.
 fn struct_heap_of(decl: I32, inst: I32) I32 {

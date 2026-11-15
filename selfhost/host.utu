@@ -70,7 +70,7 @@ fn reset_wat() void {
     wat_bytes.clear()
 }
 
-fn is_wat(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Wat) }
+fn is_wat(node: I32) Bool => is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Wat)
 
 /// Finds the program's `@wat` functions' sites (once). Returns how many.
 fn find_wat() I32 {
@@ -200,10 +200,10 @@ fn opened_by_name(from: I32, at: I32) Bool {
     i < word_end and i > from and src[i - 1] == 64
 }
 
-fn is_word_byte(c: I32) Bool { c == 95 or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) }
+fn is_word_byte(c: I32) Bool => c == 95 or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
 
 /// Whether a node is `@es/\ … \/`.
-fn is_es(node: I32) Bool { is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Es) }
+fn is_es(node: I32) Bool => is_kind(node, Node.Dsl_expr) and word_of(first_child(node)) == known_word(Known.Es)
 
 /// The imported function of an `@es` binding of type `t`, imported once
 /// for each type the binding has (a module's instances may give it several).
@@ -480,9 +480,9 @@ fn es_read(decl: I32, t: I32) I32 {
 
 //! = The custom section
 
-fn json_byte(b: I32) void { host_json.push(b) }
+fn json_byte(b: I32) void => host_json.push(b)
 
-fn json_text(text: Str) void { for (0 ..< text.len()) |i| { host_json.push(text.get(i)) } }
+fn json_text(text: Str) void => for (0 ..< text.len()) |i| { host_json.push(text.get(i)) }
 
 /// A JSON string of `src[start ..< end_]`.
 fn json_string(start: I32, end_: I32) void {
@@ -506,7 +506,7 @@ fn json_string(start: I32, end_: I32) void {
     json_byte(34)
 }
 
-fn hex_digit(d: I32) I32 { if d < 10 { 48 + d } else { 87 + d } }
+fn hex_digit(d: I32) I32 => if d < 10 { 48 + d } else { 87 + d }
 
 /// Where the body of `@name/\ body \/` starts, without its delimiters and
 /// outer spaces; @dsl_text_end is where it ends.
@@ -526,7 +526,7 @@ fn dsl_text_end(dsl: I32) I32 {
     i
 }
 
-fn is_space(c: I32) Bool { c == 32 or c == 10 or c == 9 or c == 13 }
+fn is_space(c: I32) Bool => c == 32 or c == 10 or c == 9 or c == 13
 
 /// Writes the host section for what the module imports (after the sweep):
 /// `host_json`, empty when there is nothing to say.

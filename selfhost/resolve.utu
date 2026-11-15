@@ -92,7 +92,7 @@ fn declare(kind: Decl, name: I32, node: I32, owner: I32) I32 {
     id
 }
 
-fn decl_is(decl: I32, kind: Decl) Bool { decl >= 0 and decl_kind[decl] == kind.i32() }
+fn decl_is(decl: I32, kind: Decl) Bool => decl >= 0 and decl_kind[decl] == kind.i32()
 
 /// Whether a declaration names a type (a module names its promoted type).
 fn is_type_decl(decl: I32) Bool {
@@ -351,9 +351,9 @@ fn diag_fix(start: I32, end_: I32, text: Str, label: Str) void {
     if diag_fresh[0] == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)) }
 }
 
-fn report(kind: Diag, node: I32, word: I32) void { report3(kind, node, word, -1, -1, -1) }
+fn report(kind: Diag, node: I32, word: I32) void => report3(kind, node, word, -1, -1, -1)
 
-fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void { report3(kind, node, word, a, b, -1) }
+fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) void => report3(kind, node, word, a, b, -1)
 
 /// Report a mistake (once per node, kind, and word).
 fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
@@ -379,7 +379,7 @@ fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) void {
 vec diag_seen: I32
 vec diag_seen_ok: U8 = [0]
 
-fn diag_hash(node: I32, kind: I32, word: I32) I32 { (node * -1640531535) ^ (kind * 40503) ^ (word * 9973) }
+fn diag_hash(node: I32, kind: I32, word: I32) I32 => (node * -1640531535) ^ (kind * 40503) ^ (word * 9973)
 
 /// The diagnostic about `node` of `kind` and `word`, or -1.
 fn diag_slot(node: I32, kind: I32, word: I32) I32 {
@@ -548,7 +548,7 @@ fn bind(word: I32, decl: I32) void {
 }
 
 /// Where the scope stands: @scope_pop goes back to it.
-fn scope_mark() I32 { bind_decl.len() }
+fn scope_mark() I32 => bind_decl.len()
 
 fn scope_pop(mark: I32) void {
     let i = bind_decl.len()
@@ -674,7 +674,7 @@ fn enum_name(node: I32) I32 {
     if is_kind(after, Node.Type_ident) or is_kind(after, Node.Promoted_type) { after } else { c }
 }
 
-fn is_int_enum(node: I32) Bool { enum_name(node) != after_qualifier(node) }
+fn is_int_enum(node: I32) Bool => enum_name(node) != after_qualifier(node)
 
 /// Declare a type-like item (struct, enum, proto, type) and its parts.
 /// Returns the declaration, or -1 when `item` is not one.
@@ -1236,7 +1236,7 @@ fn check_using_names(root: I32) void {
 }
 
 /// A `using` or a `mod`.
-fn is_module_item(item: I32) Bool { is_kind(item, Node.Using_decl) or is_kind(item, Node.Module_decl) }
+fn is_module_item(item: I32) Bool => is_kind(item, Node.Using_decl) or is_kind(item, Node.Module_decl)
 
 /// Whether a file's `mod` and another of its items (not a method) share a name.
 fn mod_clash(m: I32, item: I32) Bool {
@@ -1828,7 +1828,7 @@ fn promoted(decl: I32) I32 {
 
 /// Names the language provides without a declaration: the narrow element
 /// kinds of mems and integer enums, interned after the keywords.
-fn builtin_type(word: I32) Bool { word >= narrow_word(Narrow.U8) and word <= narrow_word(Narrow.I16) }
+fn builtin_type(word: I32) Bool => word >= narrow_word(Narrow.U8) and word <= narrow_word(Narrow.I16)
 
 /// Element kinds of mems and bases of distinct types: builtin names or types.
 fn walk_elem_type(node: I32, w: Walk) void {

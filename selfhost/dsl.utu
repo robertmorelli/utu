@@ -107,7 +107,7 @@ fn expand_site(n: I32, name: Str) void {
 vec dsl_sites: I32
 
 /// The first of @dsl_sites that is not the kept prelude's.
-fn own_sites() I32 { kept[5] }
+fn own_sites() I32 => kept[5]
 
 /// Whether a node is in an own file (not the standard library), and its
 /// expansion has not failed (an expanded site is a parenthesis).
@@ -134,12 +134,12 @@ fn dsl_container(node: I32) I32 {
 }
 
 /// The body of a site: after `/\`, before `\/`, as written.
-fn dsl_inner_start(site: I32) I32 { tok_start[node_first[last_child(site)]] + 2 }
+fn dsl_inner_start(site: I32) I32 => tok_start[node_first[last_child(site)]] + 2
 
-fn dsl_inner_end(site: I32) I32 { tok_end[node_first[last_child(site)]] - 2 }
+fn dsl_inner_end(site: I32) I32 => tok_end[node_first[last_child(site)]] - 2
 
 /// A site's body, as text.
-fn dsl_body(site: I32) Str { bytes_text(dsl_inner_start(site), dsl_inner_end(site)) }
+fn dsl_body(site: I32) Str => bytes_text(dsl_inner_start(site), dsl_inner_end(site))
 
 //! = Mistakes
 //!
@@ -207,7 +207,7 @@ fn dsl_walk(site: I32, to: I32, units: I32) void {
 }
 
 /// The length of the UTF-8 sequence a lead byte starts.
-fn utf8_size(b: I32) I32 { if b < 128 { 1 } else if b < 224 { 2 } else if b < 240 { 3 } else { 4 } }
+fn utf8_size(b: I32) I32 => if b < 128 { 1 } else if b < 224 { 2 } else if b < 240 { 3 } else { 4 }
 
 //! = Grafting
 //!
@@ -439,13 +439,13 @@ fn int_of(text: Str) I32 {
 
 //! = Text
 
-fn is_space_code(c: I32) Bool { c == 32 or c == 10 or c == 13 or c == 9 }
+fn is_space_code(c: I32) Bool => c == 32 or c == 10 or c == 13 or c == 9
 
-fn is_word_code(c: I32) Bool { (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 }
+fn is_word_code(c: I32) Bool => (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
 
-fn is_upper_code(c: I32) Bool { c >= 65 and c <= 90 }
+fn is_upper_code(c: I32) Bool => c >= 65 and c <= 90
 
-fn is_lower_code(c: I32) Bool { c >= 97 and c <= 122 }
+fn is_lower_code(c: I32) Bool => c >= 97 and c <= 122
 
 /// Whether `text` has `part` at `at`.
 fn text_at(text: Str, at: I32, part: Str) Bool {
@@ -456,7 +456,7 @@ fn text_at(text: Str, at: I32, part: Str) Bool {
 
 /// Where `part` first is in `text`, from `from` on, or -1 (JavaScript's
 /// search, which a scan of code units here is many times slower than).
-fn text_index(text: Str, part: Str, from: I32) I32 { if from > text.len() { -1 } else { str_index(text, part, from) } }
+fn text_index(text: Str, part: Str, from: I32) I32 => if from > text.len() { -1 } else { str_index(text, part, from) }
 
 let str_index: fun(Str, Str, I32) I32 = @es/\ (t, p, f) => t.indexOf(p, f) \/
 

@@ -39,11 +39,11 @@ let vt_defined: I32 = 16
 let vt_tuple: I32 = 268435456
 
 /// The value type of a reference to defined type `heap`.
-fn vt_ref(heap: I32, nullable: Bool) I32 { vt_defined + heap * 2 + if nullable { 0 } else { 1 } }
+fn vt_ref(heap: I32, nullable: Bool) I32 => vt_defined + heap * 2 + if nullable { 0 } else { 1 }
 
-fn vt_is_ref(vt: I32) Bool { (vt >= vt_externref and vt <= vt_anyref) or (vt >= vt_defined and vt < vt_tuple) }
+fn vt_is_ref(vt: I32) Bool => (vt >= vt_externref and vt <= vt_anyref) or (vt >= vt_defined and vt < vt_tuple)
 
-fn vt_heap(vt: I32) I32 { (vt - vt_defined) / 2 }
+fn vt_heap(vt: I32) I32 => (vt - vt_defined) / 2
 
 /// The nullable form of a reference type (other types as they are).
 fn vt_nullable(vt: I32) I32 {
@@ -52,7 +52,7 @@ fn vt_nullable(vt: I32) I32 {
     vt
 }
 
-fn vt_tuple_of(list: I32) I32 { vt_tuple + list }
+fn vt_tuple_of(list: I32) I32 => vt_tuple + list
 
 //! = Lists of value types
 //!
@@ -81,9 +81,9 @@ fn vl_same(list: I32, start: I32, len: I32) Bool {
 }
 
 /// Start a list; push its items with @vl_add, then @vl_end.
-fn vl_begin() I32 { vl_pending.len() }
+fn vl_begin() I32 => vl_pending.len()
 
-fn vl_add(vt: I32) void { vl_pending.push(vt) }
+fn vl_add(vt: I32) void => vl_pending.push(vt)
 
 /// The list pushed since `mark`, interned: the id of an equal list when
 /// there is one.
@@ -123,7 +123,7 @@ fn vl_grow() void {
     }
 }
 
-fn vl_item(list: I32, i: I32) I32 { vl_items[vl_start[list] + i] }
+fn vl_item(list: I32, i: I32) I32 => vl_items[vl_start[list] + i]
 
 fn vl_one(vt: I32) I32 {
     let m = vl_begin()
@@ -131,7 +131,7 @@ fn vl_one(vt: I32) I32 {
     vl_end(m)
 }
 
-fn vl_empty() I32 { vl_end(vl_begin()) }
+fn vl_empty() I32 => vl_end(vl_begin())
 
 /// The value types of a result: none, one, or a tuple's.
 fn vl_of_result(vt: I32) I32 {
@@ -179,7 +179,7 @@ fn ht_new(kind: Heap, a: I32, b: I32) I32 {
     id
 }
 
-fn ht_key_hash(kind: I32, a: I32, b: I32) I32 { ((kind * 31 + a) * 16777619) ^ (b * 40503) }
+fn ht_key_hash(kind: I32, a: I32, b: I32) I32 => ((kind * 31 + a) * 16777619) ^ (b * 40503)
 
 /// The function or array type of this shape (`a` and `b` as in @ht_a and
 /// @ht_b), made when it is new. A `single` one is a different type from
@@ -214,15 +214,15 @@ fn ht_grow() void {
     }
 }
 
-fn func_type(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, false) }
+fn func_type(params: I32, results: I32) I32 => ht_intern(Heap.Func, params, results, false)
 
 /// A function type in a recursion group of its own, as imports of host
 /// builtins need.
-fn func_type_single(params: I32, results: I32) I32 { ht_intern(Heap.Func, params, results, true) }
+fn func_type_single(params: I32, results: I32) I32 => ht_intern(Heap.Func, params, results, true)
 
-fn array_type(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1 } else { 0 }, false) }
+fn array_type(elem: I32, mutable: Bool) I32 => ht_intern(Heap.Array, elem, if mutable { 1 } else { 0 }, false)
 
-fn array_type_single(elem: I32, mutable: Bool) I32 { ht_intern(Heap.Array, elem, if mutable { 1 } else { 0 }, true) }
+fn array_type_single(elem: I32, mutable: Bool) I32 => ht_intern(Heap.Array, elem, if mutable { 1 } else { 0 }, true)
 
 /// A new struct type; add its fields with @struct_field, all of them before
 /// another struct is started.
@@ -239,7 +239,7 @@ fn struct_field(t: I32, storage: I32, mutable: Bool) void {
     ht_b[t] += 1
 }
 
-fn field_storage(t: I32, i: I32) I32 { ht_fields[ht_a[t] + i * 2] }
+fn field_storage(t: I32, i: I32) I32 => ht_fields[ht_a[t] + i * 2]
 
 //! = The module
 
@@ -594,7 +594,7 @@ fn reset_ir() void {
     cur_src[0] = -1
 }
 
-fn w_mark() I32 { w_stack.len() }
+fn w_mark() I32 => w_stack.len()
 
 /// A node of the nodes built since `mark`, pushed in their place.
 fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
@@ -619,7 +619,7 @@ fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
     id
 }
 
-fn w_leaf(op: Op, vt: I32, a: I32, b: I32) I32 { w_node(op, vt, a, b, w_stack.len()) }
+fn w_leaf(op: Op, vt: I32, a: I32, b: I32) I32 => w_node(op, vt, a, b, w_stack.len())
 
 /// Take the node on top of the stack.
 fn w_pop() I32 {
@@ -628,7 +628,7 @@ fn w_pop() I32 {
     id
 }
 
-fn w_push(id: I32) void { w_stack.push(id) }
+fn w_push(id: I32) void => w_stack.push(id)
 
 /// Put node `id` on the stack at position `at`, after the ones before it.
 fn w_insert(at: I32, id: I32) void {
@@ -641,14 +641,14 @@ fn w_insert(at: I32, id: I32) void {
     w_stack[at] = id
 }
 
-fn w_kid(node: I32, i: I32) I32 { w_kids[w_first[node] + i] }
+fn w_kid(node: I32, i: I32) I32 => w_kids[w_first[node] + i]
 
-fn w_i32(value: I32) I32 { w_leaf(Op.I32Const, vt_i32, value, 0) }
+fn w_i32(value: I32) I32 => w_leaf(Op.I32Const, vt_i32, value, 0)
 
-fn w_get(vt: I32, local: I32) I32 { w_leaf(Op.LocalGet, vt, local, 0) }
+fn w_get(vt: I32, local: I32) I32 => w_leaf(Op.LocalGet, vt, local, 0)
 
 /// An `i32` instruction of no immediates (as `i32_add`) over the nodes since `mark`.
-fn w_i32_op(opcode: I32, mark: I32) I32 { w_node(Op.Plain, vt_i32, opcode, 0, mark) }
+fn w_i32_op(opcode: I32, mark: I32) I32 => w_node(Op.Plain, vt_i32, opcode, 0, mark)
 
 //! = Encoding
 
@@ -668,7 +668,7 @@ fn leb_u(in_body: Bool, value: I32) void {
 }
 
 /// Where bytes go: the section, or (when `in_body`) the function body.
-fn put(in_body: Bool, b: I32) void { if in_body { code_bytes.push(b) } else { sec.push(b) } }
+fn put(in_body: Bool, b: I32) void => if in_body { code_bytes.push(b) } else { sec.push(b) }
 
 fn leb_s(in_body: Bool, value: I32) void {
     let v = value
@@ -1004,7 +1004,7 @@ fn order_types(n: I32) void {
     for (0 ..< n) |t| { if type_twin[t] >= 0 { type_index[t] = type_index[type_twin[t]] } }
 }
 
-fn unit_of(t: I32) I32 { if type_twin[t] >= 0 { type_unit[type_twin[t]] } else { type_unit[t] } }
+fn unit_of(t: I32) I32 => if type_twin[t] >= 0 { type_unit[type_twin[t]] } else { type_unit[t] }
 
 fn place_type(t: I32) void {
     type_index[t] = type_order.len()
@@ -1067,9 +1067,9 @@ fn refs_of(t: I32) void {
     if ht_super[t] >= 0 { type_refs.push(ht_super[t]) }
 }
 
-fn refs_of_list(list: I32) void { for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)) } }
+fn refs_of_list(list: I32) void => for (0 ..< vl_len[list]) |i| { type_ref_of(vl_item(list, i)) }
 
-fn type_ref_of(vt: I32) void { if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)) } }
+fn type_ref_of(vt: I32) void => if vt >= vt_defined and vt < vt_tuple { type_refs.push(vt_heap(vt)) }
 
 /// A global nothing writes, of an integer constant: it is not in the
 /// module, and each read is the constant (as short as the read, mostly, and
@@ -1223,7 +1223,7 @@ fn plain_func(t: I32) Bool {
 }
 
 /// Whether type t is encoded on its own (not in the recursion group).
-fn encoded_single(t: I32) Bool { ht_single[t] == 1 or type_alone[t] == 1 }
+fn encoded_single(t: I32) Bool => ht_single[t] == 1 or type_alone[t] == 1
 
 /// The interned type of this shape, or -1.
 fn ht_lookup(kind: I32, a: I32, b: I32, single: I32) I32 {
@@ -1372,7 +1372,7 @@ fn encode_imports() void {
 }
 
 /// The JS exception tag's type: one externref.
-fn js_tag_type() I32 { func_type_single(vl_one(vt_externref), vl_empty()) }
+fn js_tag_type() I32 => func_type_single(vl_one(vt_externref), vl_empty())
 
 /// Import the JS exception tag (for `try` and `throw`).
 fn use_js_tag() void {
@@ -1579,9 +1579,9 @@ fn mark_target(label: I32) void {
     if label_targeted[label] < 2 { label_targeted[label] += 1 }
 }
 
-fn targeted(label: I32) Bool { targets(label) > 0 }
+fn targeted(label: I32) Bool => targets(label) > 0
 
-fn targets(label: I32) I32 { if label < label_targeted.len() { label_targeted[label] } else { 0 } }
+fn targets(label: I32) I32 => if label < label_targeted.len() { label_targeted[label] } else { 0 }
 
 /// Locals after the parameters, run-length encoded by type.
 fn encode_locals(f: I32) void {
@@ -1863,7 +1863,7 @@ fn close_block() void {
     op1(11)
 }
 
-fn op1(b: I32) void { code_bytes.push(b) }
+fn op1(b: I32) void => code_bytes.push(b)
 
 fn op_fb(sub: I32) void {
     code_bytes.push(251)
@@ -1920,9 +1920,9 @@ fn emit_body_rec(node: I32, d: I32) void {
 }
 
 /// Recursion while shallow (calls are cheap), the explicit stack below a depth.
-fn emit_at(node: I32, d: I32) void { if d < 1000 { emit_rec(node, d + 1) } else { emit_deep(node) } }
+fn emit_at(node: I32, d: I32) void => if d < 1000 { emit_rec(node, d + 1) } else { emit_deep(node) }
 
-fn emit(node: I32, f: I32) void { emit_rec(node, 0) }
+fn emit(node: I32, f: I32) void => emit_rec(node, 0)
 
 /// Encode a node into @code_bytes. `f` is the function (only passed along:
 /// kept for the locals of a function a lowering may need).
@@ -2026,7 +2026,7 @@ fn emit_kids_from(node: I32, from: I32) void {
     }
 }
 
-fn emit_kids_deep(node: I32) void { emit_kids_from(node, 0) }
+fn emit_kids_deep(node: I32) void => emit_kids_from(node, 0)
 
 fn emit_body_deep(node: I32) void {
     let i = live_kids(node)

@@ -168,9 +168,9 @@ fn mem_value_type(decl: I32) I32 {
     decl_type(node_decl[elem], 0)
 }
 
-fn mem_is_const(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Const.i32() or tok_word[node_first[decl_node[decl]] + 1] == Kw.Const.i32() }
+fn mem_is_const(decl: I32) Bool => tok_word[node_first[decl_node[decl]]] == Kw.Const.i32() or tok_word[node_first[decl_node[decl]] + 1] == Kw.Const.i32()
 
-fn mem_is_exported(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Export.i32() }
+fn mem_is_exported(decl: I32) Bool => tok_word[node_first[decl_node[decl]]] == Kw.Export.i32()
 
 /// The memory of a mem (-1 for one in an array), made when first needed,
 /// with its initial contents.
@@ -1262,7 +1262,7 @@ fn mem_is_hosted(decl: I32) Bool {
 let max_memories: I32 = 100
 
 /// Whether a declaration is `vec name: …` (rather than `mem name: …`).
-fn mem_is_vec(decl: I32) Bool { tok_word[node_first[decl_node[decl]]] == Kw.Vec.i32() or tok_word[node_first[decl_node[decl]] + 1] == Kw.Vec.i32() }
+fn mem_is_vec(decl: I32) Bool => tok_word[node_first[decl_node[decl]]] == Kw.Vec.i32() or tok_word[node_first[decl_node[decl]] + 1] == Kw.Vec.i32()
 
 /// How a mem or vec is spoken of, for a diagnostic about the one named `w`.
 fn mem_word(w: I32) Str {

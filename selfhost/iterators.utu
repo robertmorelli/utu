@@ -78,13 +78,13 @@ fn reset_iterators() void {
 
 //! = Small builders
 
-fn lg(local: I32) void { w_get(cur_locals[local], local) }
+fn lg(local: I32) void => w_get(cur_locals[local], local)
 
-fn ls(local: I32, m: I32) void { w_node(Op.LocalSet, vt_none, local, 0, m) }
+fn ls(local: I32, m: I32) void => w_node(Op.LocalSet, vt_none, local, 0, m)
 
-fn plain(opcode: I32, vt: I32, m: I32) void { w_node(Op.Plain, vt, opcode, 0, m) }
+fn plain(opcode: I32, vt: I32, m: I32) void => w_node(Op.Plain, vt, opcode, 0, m)
 
-fn seq_void(m: I32) void { w_node(Op.Seq, vt_none, 0, 0, m) }
+fn seq_void(m: I32) void => w_node(Op.Seq, vt_none, 0, 0, m)
 
 /// `local = local + 1`
 fn incr(local: I32) void {
@@ -164,7 +164,7 @@ fn else_begin(then_mark: I32) I32 {
 }
 
 /// `br_if label`, the condition on the stack since `m`.
-fn br_if(label: I32, m: I32) void { w_node(Op.BrIf, vt_none, label, 0, m) }
+fn br_if(label: I32, m: I32) void => w_node(Op.BrIf, vt_none, label, 0, m)
 
 /// Leave the loop at `brk` once the pipeline has stopped.
 fn exit_if_stopped(p: Pipe, brk: I32) void {
@@ -193,9 +193,9 @@ fn stage_local(slot: I32, which: I32, vt: I32) I32 {
     st_locals[at]
 }
 
-fn stage_op(p: Pipe, k: I32) I32 { st_op[p.first_stage + k] }
+fn stage_op(p: Pipe, k: I32) I32 => st_op[p.first_stage + k]
 
-fn stage_node(p: Pipe, k: I32) I32 { st_node[p.first_stage + k] }
+fn stage_node(p: Pipe, k: I32) I32 => st_node[p.first_stage + k]
 
 /// A stage's parts: its parameter `( … )` expressions and types, capture, block.
 fn stage_param(node: I32) I32 {
@@ -229,9 +229,9 @@ fn stage_type(node: I32, which: I32) I32 {
     -1
 }
 
-fn stage_capture(node: I32) I32 { stage_part(node, Node.Capture) }
+fn stage_capture(node: I32) I32 => stage_part(node, Node.Capture)
 
-fn stage_block(node: I32) I32 { stage_part(node, Node.Block) }
+fn stage_block(node: I32) I32 => stage_part(node, Node.Block)
 
 /// A stage's first child of a kind, or -1.
 fn stage_part(node: I32, kind: Node) I32 {
@@ -244,7 +244,7 @@ fn stage_part(node: I32, kind: Node) I32 {
 }
 
 /// The operator of an iterator stage: the word after its source.
-fn iterator_op(node: I32) I32 { tok_word[token_after(first_child(node))] }
+fn iterator_op(node: I32) I32 => tok_word[token_after(first_child(node))]
 
 /// Operators that end a pipeline.
 fn is_terminal(op: I32) Bool {
@@ -940,7 +940,7 @@ fn each_in_array(p: Pipe, k: I32, array: I32, et: I32, cx: Cx) void {
 }
 
 /// Hand a value to the next stage.
-fn next_stage(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void { stage_at(p, k + 1, value, vt, cx) }
+fn next_stage(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) void => stage_at(p, k + 1, value, vt, cx)
 
 /// The code of non-terminal stage `k`, by its operator, ending in the next
 /// stage's (@next_stage).
@@ -1485,7 +1485,7 @@ fn accumulate(word: I32, t: I32, value: I32, at: I32, cx: Cx, m: I32) void {
     finish_operator(word, t, at, cx, m)
 }
 
-fn add_values(t: I32, m: I32, at: I32, cx: Cx) void { finish_operator(known_word(Known.Add), t, at, cx, m) }
+fn add_values(t: I32, m: I32, at: I32, cx: Cx) void => finish_operator(known_word(Known.Add), t, at, cx, m)
 
 /// Both operands on the stack since `m`: apply the type's operator.
 fn finish_operator(word: I32, t: I32, at: I32, cx: Cx, m: I32) void {
@@ -1522,7 +1522,7 @@ struct Buffer:
     | bounded: Bool   // its first allocation is hi - lo values
 
 /// Whether a written type names one with a zero (`I32` … `Bool`, or `?T`).
-fn written_defaultable(type_node: I32) Bool { is_kind(type_node, Node.Nullable_type) or written_scalar(type_node, true) }
+fn written_defaultable(type_node: I32) Bool => is_kind(type_node, Node.Nullable_type) or written_scalar(type_node, true)
 
 /// Whether a written type names a number (`I32` … `F64`), or `Bool` when `bool_too`.
 fn written_scalar(type_node: I32, bool_too: Bool) Bool {
@@ -1540,7 +1540,7 @@ fn written_word(type_node: I32) I32 {
     if is_kind(name, Node.Type_ident) { word_of(name) } else { -1 }
 }
 
-fn buffer(p: Pipe, slot: I32, et: I32, type_node: I32) Buffer { buffer_at(p, slot, 0, et, if p.bounded { type_node } else { -1 }, p.bounded) }
+fn buffer(p: Pipe, slot: I32, et: I32, type_node: I32) Buffer => buffer_at(p, slot, 0, et, if p.bounded { type_node } else { -1 }, p.bounded)
 
 /// A buffer in the stage's locals from `base` (three of them); `bounded`
 /// when it may be allocated once at `hi - lo` (with a written type that has a zero).
@@ -1715,7 +1715,7 @@ fn loop_while_lt(lp: WLoop, a: I32, b: I32) void {
 }
 
 /// The value of `cond ? a : b` for i32 values on the stack since `m`: `a`, `b`, `cond`.
-fn select_i32(m: I32) void { w_node(Op.Select, vt_i32, 0, 0, m) }
+fn select_i32(m: I32) void => w_node(Op.Select, vt_i32, 0, 0, m)
 
 /// `target = a op b`, of i32 locals.
 fn arith(target: I32, a: I32, opcode: I32, b: I32) void {

@@ -54,14 +54,14 @@ fn reset_foreign() void {
     reset_foreign_ops()
 }
 
-fn ref_of(t: I32) Ref { Ref { doc: fty_doc[t], at: fty_at[t], env: fty_env[t] } }
+fn ref_of(t: I32) Ref => Ref { doc: fty_doc[t], at: fty_at[t], env: fty_env[t] }
 
-fn is_foreign(t: I32) Bool { t >= 0 and ty_is(t, Ty.Foreign) }
+fn is_foreign(t: I32) Bool => t >= 0 and ty_is(t, Ty.Foreign)
 
 //! = Reading references
 
 /// Whether the reference is the JSON string `text`.
-fn ref_is(r: Ref, text: Str) Bool { jstring_is_text(r.at, text) }
+fn ref_is(r: Ref, text: Str) Bool => jstring_is_text(r.at, text)
 
 // A generic parameter's binding, or -1 (its at), with its env in bind_env[0].
 vec bind_env: I32 = [0]
@@ -203,7 +203,7 @@ fn any_ref() I32 {
 }
 
 /// A reference to `any`, in document `doc`.
-fn any_slot(doc: I32) Ref { Ref { doc: doc, at: any_ref(), env: -1 } }
+fn any_slot(doc: I32) Ref => Ref { doc: doc, at: any_ref(), env: -1 }
 
 /// A reference's declaration: the object to read members from (a type of
 /// the document, a template's declaration with its arguments bound), or the
@@ -221,7 +221,7 @@ fn ref_dynamic(r: Ref) Bool {
 }
 
 /// A member of a declaration's object, by key (a field of the JSON object).
-fn desc_get(d: Ref, key: Str) I32 { if jis_object(d.at) { jget(d.at, key) } else { -1 } }
+fn desc_get(d: Ref, key: Str) I32 => if jis_object(d.at) { jget(d.at, key) } else { -1 }
 
 //! = Canonical spelling
 
@@ -289,9 +289,9 @@ fn foreign_named(r: Ref, view: I32) I32 {
 }
 
 /// The dynamic host type: `any`.
-fn foreign_any(view: I32) I32 { foreign_named(any_slot(view_doc[view]), view) }
+fn foreign_any(view: I32) I32 => foreign_named(any_slot(view_doc[view]), view)
 
-fn is_dynamic(t: I32) Bool { is_foreign(t) and ref_dynamic(ref_of(t)) }
+fn is_dynamic(t: I32) Bool => is_foreign(t) and ref_dynamic(ref_of(t))
 
 /// The type a declaration reference has in utu: `Str`, `F64`, `Bool`, `void`, a host
 /// value type, or a nullable one (from a union with null or undefined).
@@ -458,7 +458,7 @@ vec member_env: I32 = [0]
 vec member_readonly: I32 = [0]
 
 /// The member @foreign_member or @root_member found last.
-fn member_ref() Ref { Ref { doc: member_doc[0], at: member_at[0], env: member_env[0] } }
+fn member_ref() Ref => Ref { doc: member_doc[0], at: member_at[0], env: member_env[0] }
 
 fn found_member(doc: I32, at: I32, env: I32, readonly: Bool) Bool {
     member_doc[0] = doc
@@ -662,7 +662,7 @@ fn foreign_member_op(params: I32, result: I32, body: Str, m: I32, key: I32, root
 }
 
 /// A JS string literal of a word: `"value"`.
-fn js_key(w: I32) Str { js_string(word_text(w)) }
+fn js_key(w: I32) Str => js_string(word_text(w))
 
 fn js_string(text: Str) Str {
     let out = "\""
@@ -698,7 +698,7 @@ fn js_output(expr: Str, t: I32, checked: Bool) Str {
 }
 
 /// A utu value to JS: `Bool` as a boolean.
-fn js_input(name: Str, t: I32) Str { if t == prelude(Prelude.Bool) { "!!" + name } else { name } }
+fn js_input(name: Str, t: I32) Str => if t == prelude(Prelude.Bool) { "!!" + name } else { name }
 
 /// A value for a declaration slot: absent as undefined where the slot
 /// admits undefined but not null.
@@ -711,7 +711,7 @@ fn js_argument(slot: Ref, name: Str, t: I32) Str {
 }
 
 /// Whether a union member is no value: `null`, `undefined`, or `never`.
-fn is_absence(m: I32) Bool { jstring_is_text(m, "null") or jstring_is_text(m, "undefined") or jstring_is_text(m, "never") }
+fn is_absence(m: I32) Bool => jstring_is_text(m, "null") or jstring_is_text(m, "undefined") or jstring_is_text(m, "never")
 
 fn union_has(union: I32, text: Str) Bool {
     let m = jfirst(union)
@@ -752,7 +752,7 @@ fn foreign_result(r: Ref, view: I32, expect: I32) I32 {
 //! instance of `any` arguments takes any instance; a declared interface
 //! takes a value with its required members; a union takes its members.
 
-fn is_host_value(t: I32) Bool { is_foreign(t) or t == prelude(Prelude.Str) or ty_is(t, Ty.Closure) }
+fn is_host_value(t: I32) Bool => is_foreign(t) or t == prelude(Prelude.Str) or ty_is(t, Ty.Closure)
 
 /// Whether a value of type `actual` is one of type `expected`, by the rules
 /// above, where either is a host type.
@@ -1281,10 +1281,10 @@ fn is_closure_arg(arg: I32, cx: Cx) Bool {
     closure_node(arg) >= 0 or (not is_kind(arg, Node.Literal) and ty_is(host_type(arg, cx), Ty.Closure))
 }
 
-fn is_record(arg: I32) Bool { is_kind(arg, Node.Implicit_struct_init) }
+fn is_record(arg: I32) Bool => is_kind(arg, Node.Implicit_struct_init)
 
 /// `[…]` with no written type, which its slot makes a JS array.
-fn is_untyped_array(arg: I32) Bool { is_kind(arg, Node.Array_expr) }
+fn is_untyped_array(arg: I32) Bool => is_kind(arg, Node.Array_expr)
 
 // The element a JS array must hold for an array, array-like, or iterable slot, or -1.
 vec element_env: I32 = [0]
@@ -1615,7 +1615,7 @@ fn string_literals(d: Ref) Bool {
 }
 
 /// A JSON number's value.
-fn json_number(at: I32) F64 { parse_number(bytes_text(at, jend(at))) }
+fn json_number(at: I32) F64 => parse_number(bytes_text(at, jend(at)))
 
 /// `let c: Api.Color = 99.0`: a literal for a host union of literals (see @host_literal).
 fn host_literal_let(type_node: I32, init: I32, cx: Cx) void {
@@ -2120,7 +2120,7 @@ fn pending_env(m: I32) I32 {
     vl_end(m2)
 }
 
-fn vl_len_safe(list: I32) I32 { if list < 0 { 0 } else { vl_len[list] } }
+fn vl_len_safe(list: I32) I32 => if list < 0 { 0 } else { vl_len[list] }
 
 /// Whether the pending list (begun at `m`) binds parameter word `w`.
 fn bound_in_pending(m: I32, w: I32) Bool {
@@ -2133,7 +2133,7 @@ fn bound_in_pending(m: I32, w: I32) Bool {
 }
 
 /// `{"literal":"input","base":"Str"}` for a string literal argument, in src.
-fn literal_json(arg: I32) I32 { abi_text("{\"literal\":" + node_text(arg) + ",\"base\":\"Str\"}") }
+fn literal_json(arg: I32) I32 => abi_text("{\"literal\":" + node_text(arg) + ",\"base\":\"Str\"}")
 
 /// A call of host function `fn_ref`, reached in JS as `access` (with its
 /// receiver, of type `receiver`, on the stack since `m`; -1 for none).
@@ -2189,7 +2189,7 @@ fn check_foreign_value_call(node: I32, callee: I32, t: I32, args: I32, m: I32, e
 }
 
 /// Whether a host type is a function's (has a call signature).
-fn foreign_callable(t: I32) Bool { is_foreign(t) and jlen(desc_get(describe(ref_of(t)), "calls")) > 0 }
+fn foreign_callable(t: I32) Bool => is_foreign(t) and jlen(desc_get(describe(ref_of(t)), "calls")) > 0
 
 /// A closure whose parameter may be absent receives JS's undefined as null
 /// (a parameter the host leaves out is undefined), through a wrapper (see
@@ -2384,7 +2384,7 @@ fn tuple_required(d: Ref) I32 {
 
 /// Whether a tuple ends in a rest (`[number, ...string[]]`): it has a
 /// parameter, its rest's element, past its elements.
-fn tuple_has_rest(d: Ref) Bool { jlen(desc_get(d, "parameters")) > tuple_fixed(d) }
+fn tuple_has_rest(d: Ref) Bool => jlen(desc_get(d, "parameters")) > tuple_fixed(d)
 
 /// The type of a tuple's element `i`: its own, past the fixed ones its
 /// rest's element; at -1 for none.
@@ -2527,7 +2527,7 @@ fn foreign_equal_op(left_t: I32, rt: I32, equal: Bool, m: I32) I32 {
     foreign_call_op(vl_end(mt), prelude(Prelude.Bool), "(a,b) => " + js_output("a " + same + " b", prelude(Prelude.Bool), false), m)
 }
 
-fn is_foreign_or_nullable(t: I32) Bool { is_foreign(t) or (t >= 0 and ty_is(t, Ty.Nullable) and is_foreign(ty_a[t])) }
+fn is_foreign_or_nullable(t: I32) Bool => is_foreign(t) or (t >= 0 and ty_is(t, Ty.Nullable) and is_foreign(ty_a[t]))
 
 /// A view of a document (for spelling the types it makes).
 fn view_of_doc(doc: I32) I32 {

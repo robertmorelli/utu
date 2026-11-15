@@ -27,7 +27,7 @@ fn reset_strings() void {
 }
 
 /// `(array (mut i16))`: the code units `fromCharCodeArray` takes, its own group.
-fn code_units_type() I32 { array_type_single(vt_i16, true) }
+fn code_units_type() I32 => array_type_single(vt_i16, true)
 
 /// The imported function of builtin `b`, imported the first time it is asked for.
 fn builtin(b: Builtin) I32 {

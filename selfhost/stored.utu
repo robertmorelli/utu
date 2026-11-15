@@ -36,7 +36,7 @@ vec st_seq: I32 = [0]
 vec st_type_at: I32 = [0]
 vec st_type_len: I32 = [0]
 
-fn stored_fail(message: Str) void { dsl_fail(message, st_type_at[0], st_type_len[0]) }
+fn stored_fail(message: Str) void => dsl_fail(message, st_type_at[0], st_type_len[0])
 
 /// Whether a file has `using Browser from std:Browser` (with or without an alias).
 fn uses_browser(file: I32) Bool {
@@ -53,7 +53,7 @@ fn uses_browser(file: I32) Bool {
 }
 
 /// A body not of the form `Type "key" default`.
-fn stored_syntax(raw: Str) void { dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1) }
+fn stored_syntax(raw: Str) void => dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1)
 
 /// `@stored/\ … \/`: the state, loaded and registered with the host's store.
 /// Each site's names start with its own prefix.
@@ -64,7 +64,7 @@ fn expand_stored(site: I32) void {
     graft_expression(site, stored_code(site, prefix))
 }
 
-fn is_stored_scalar(type: Str) Bool { type == "Str" or type == "Bool" or type == "I32" or type == "F64" }
+fn is_stored_scalar(type: Str) Bool => type == "Str" or type == "Bool" or type == "I32" or type == "F64"
 
 /// Checks that a type can be stored (scalars, arrays, acyclic local structs).
 fn stored_shape(written: Str, visiting: I32, file: I32) void {
@@ -111,7 +111,7 @@ fn stored_struct(type: Str, file: I32) I32 {
     if found >= 0 and is_kind(found, Node.Struct_decl) { found } else { -1 }
 }
 
-fn trim_text(text: Str) Str { trim_end(text.slice(skip_spaces(text, 0), text.len())) }
+fn trim_text(text: Str) Str => trim_end(text.slice(skip_spaces(text, 0), text.len()))
 
 fn stored_fresh(prefix: Str) Str {
     let name = prefix + int_text(st_seq[0])

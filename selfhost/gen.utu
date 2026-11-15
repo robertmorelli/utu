@@ -12,7 +12,7 @@
 //!   made for it (compile with `Target.Comptime`).
 
 /// Appends `text` to `src`, where the generated file is written.
-fn gen_text(text: Str) void { for (0 ..< text.len()) |i| { src.push(text.get(i)) } }
+fn gen_text(text: Str) void => for (0 ..< text.len()) |i| { src.push(text.get(i)) }
 
 /// `text` with each `$` replaced by word `name`.
 fn gen_template(text: Str, name: I32) void {
@@ -61,7 +61,7 @@ fn generated_file(start: I32) I32 {
 vec gen_owner: I32
 
 /// The imported file whose scope a file's declarations are in, or -1.
-fn gen_owner_of(file: I32) I32 { if file < gen_owner.len() { gen_owner[file] } else { -1 } }
+fn gen_owner_of(file: I32) I32 => if file < gen_owner.len() { gen_owner[file] } else { -1 }
 
 /// Writes the generated sources for each own file's mems, and parses them
 /// as one more file per file. Called before names are resolved.
@@ -231,7 +231,7 @@ fn note_reach(to: I32) void {
     reach_to.push(to)
 }
 
-fn note_mem_use(decl: I32) void { note_reach(-2 - decl) }
+fn note_mem_use(decl: I32) void => note_reach(-2 - decl)
 
 /// Whether mem k's expression waits, and the build just made can evaluate
 /// it: nothing it reaches is a `@comptime` mem still waiting (that one is
@@ -270,7 +270,7 @@ fn comptime_ready(k: I32) Bool {
 vec comptime_fuel: I32 = [-1]
 
 /// How many loop rounds a @comptime build may make.
-fn comptime_fuel_limit() I32 { 100000000 }
+fn comptime_fuel_limit() I32 => 100000000
 
 /// `fuel -= 1; if fuel == 0 { unreachable }`, a node.
 fn fuel_check() I32 {

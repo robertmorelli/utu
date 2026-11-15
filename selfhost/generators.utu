@@ -289,7 +289,7 @@ fn defer_bindings(i: I32, back: Bool) void {
 }
 
 /// Whether generator `gen`'s body has a `for (gen(…))` of its own.
-fn delegates_to_itself(gen: I32) Bool { calls_generator(last_child(decl_node[gen]), gen) }
+fn delegates_to_itself(gen: I32) Bool => calls_generator(last_child(decl_node[gen]), gen)
 
 /// Whether a `for` under `node` consumes generator `gen`.
 fn calls_generator(node: I32, gen: I32) Bool {
@@ -484,7 +484,7 @@ fn check_lone_generator(gen: I32) void {
 }
 
 /// A function declaration's `Param_list` node, or -1.
-fn param_list_of(decl: I32) I32 { child_of_kind(decl_node[decl], Node.Param_list) }
+fn param_list_of(decl: I32) I32 => child_of_kind(decl_node[decl], Node.Param_list)
 
 /// The innermost expansion whose generator the node is in, or -1; a node
 /// in a closure there belongs to the closure's body (its `try`, `errdefer`
@@ -614,7 +614,7 @@ vec prune_flag: I32
 /// And its loop.
 vec prune_loop: I32
 
-fn rec_array_heap(vt: I32) I32 { array_type(storage(vt), true) }
+fn rec_array_heap(vt: I32) I32 => array_type(storage(vt), true)
 
 /// A new array of 16 elements of vt's storage, in a new local.
 fn rec_new_array(vt: I32) I32 {

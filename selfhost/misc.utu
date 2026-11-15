@@ -338,7 +338,7 @@ fn guard_defers(base: I32, vt: I32, cx: Cx) void {
 
 /// Run the defers from `from` (an index in `defer_node`) on, newest first,
 /// at an exit that is not an error return: errdefers stay put.
-fn run_defers(from: I32, cx: Cx) void { run_exit_defers(from, -1, -1, cx) }
+fn run_defers(from: I32, cx: Cx) void => run_exit_defers(from, -1, -1, cx)
 
 /// Run the defers from `from` on, newest first. An errdefer (noted as its
 /// node) runs as `failed` says: -1 never, -2 always (a `try` returning an

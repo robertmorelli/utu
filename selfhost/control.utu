@@ -632,7 +632,7 @@ fn branch_join(from: I32, cx: Cx) I32 {
 }
 
 /// The value of a branch: a block's last expression, or the branch itself.
-fn branch_value(b: I32) I32 { if is_kind(b, Node.Block) { last_child(b) } else { b } }
+fn branch_value(b: I32) I32 => if is_kind(b, Node.Block) { last_child(b) } else { b }
 
 /// The enum two of its variants (or it) belong to, or -1.
 fn enum_join(a: I32, b: I32) I32 {
@@ -1093,7 +1093,7 @@ let unroll_max_nodes: I32 = 64
 
 /// A body worth unrolling: small, and neither looping, allocating, nor
 /// branching many ways (those got slower unrolled, measured on V8 in stage 0).
-fn unrollable(block: I32) Bool { unroll_nodes(block) <= unroll_max_nodes }
+fn unrollable(block: I32) Bool => unroll_nodes(block) <= unroll_max_nodes
 
 /// Calls are pasted into each copy by inlining, so a body is weighed as its
 /// IR (checked once, then dropped) with each call's callee in it: the copies

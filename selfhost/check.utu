@@ -55,12 +55,12 @@ struct Cx:
 
 //! = Function instances
 
-fn fi_hash(decl: I32, inst: I32, self_t: I32) I32 { (decl * -1640531535) ^ (inst * 40503) ^ (self_t * 97) }
+fn fi_hash(decl: I32, inst: I32, self_t: I32) I32 => (decl * -1640531535) ^ (inst * 40503) ^ (self_t * 97)
 
 /// The function instance of `decl` in module instance `inst`: made when
 /// new, with its wasm function, and queued to be checked (an intrinsic, or
 /// a `@wat` function, is not).
-fn fn_instance(decl: I32, inst: I32) I32 { fn_instance_on(decl, inst, -1) }
+fn fn_instance(decl: I32, inst: I32) I32 => fn_instance_on(decl, inst, -1)
 
 /// @fn_instance with the receiver a `self_t` (-1: the declaration's own):
 /// a protocol's `fn P.m` for a bounded T, so its body calls T's members.
@@ -126,7 +126,7 @@ fn enter_instance(inst: I32, site: I32) void {
     checking_inst.push(site)
 }
 
-fn leave_instance() void { checking_inst.resize(checking_inst.len() - 2) }
+fn leave_instance() void => checking_inst.resize(checking_inst.len() - 2)
 
 /// On a mistake just reported in a generic instance's code: which instance,
 /// and where it was first called.
@@ -162,7 +162,7 @@ fn with_first(list: I32, t: I32) I32 {
 }
 
 /// A function's block (its last child).
-fn fn_body(decl: I32) I32 { last_child(decl_node[decl]) }
+fn fn_body(decl: I32) I32 => last_child(decl_node[decl])
 
 /// The first child of `node` of a kind, or -1.
 fn child_of_kind(node: I32, kind: Node) I32 {
@@ -458,7 +458,7 @@ fn defers_after_value(vt: I32, m: I32, from: I32, cx: Cx) void {
 }
 
 /// A value checked as Void: dropped, if it is one.
-fn discard(t: I32) void { drop_value(t) }
+fn discard(t: I32) void => drop_value(t)
 
 /// Drop the value on top of the stack, if it has one.
 fn drop_value(t: I32) void {
@@ -526,7 +526,7 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
     expected
 }
 
-fn heap_of(vt: I32) I32 { vt_nullable(vt) }
+fn heap_of(vt: I32) I32 => vt_nullable(vt)
 
 //! = Diagnostics
 
@@ -901,7 +901,7 @@ fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
 }
 
 /// Whether `callee` is `wutu.show` (std:Wutu's).
-fn is_wutu_show(callee: I32) Bool { is_wutu_fn(callee, "show") }
+fn is_wutu_show(callee: I32) Bool => is_wutu_fn(callee, "show")
 
 /// Whether `callee` is std:Wutu's function `name` (`wutu.name`).
 fn is_wutu_fn(callee: I32, name: Str) Bool {
@@ -1400,9 +1400,9 @@ fn global_instance(decl: I32, inst: I32) I32 {
 }
 
 /// The instance a global is read in from code in instance `inst`.
-fn global_inst(decl: I32, inst: I32) I32 { instance_for(module_of(decl), inst) }
+fn global_inst(decl: I32, inst: I32) I32 => instance_for(module_of(decl), inst)
 
-fn global_type(decl: I32) I32 { global_type_in(decl, 0) }
+fn global_type(decl: I32) I32 => global_type_in(decl, 0)
 
 /// A global's type, seen from instance `inst` (an `@es` binding of a
 /// generic module has a type in each).
@@ -1430,7 +1430,7 @@ fn es_binding_type(t: I32) I32 {
 }
 
 /// A function named as a value: a `fun`.
-fn fn_value(decl: I32, cx: Cx) I32 { fn_value_in(decl, instance_for(module_of(decl), cx.inst)) }
+fn fn_value(decl: I32, cx: Cx) I32 => fn_value_in(decl, instance_for(module_of(decl), cx.inst))
 
 /// Function `decl` of module instance `inst` as a value (`f`, `m.f`, `T.f`).
 fn fn_value_in(decl: I32, inst: I32) I32 {
@@ -2644,7 +2644,7 @@ fn follow_on(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
 }
 
 /// Whether any mistake is reported yet.
-fn any_reported() Bool { diag_kind.len() > 0 }
+fn any_reported() Bool => diag_kind.len() > 0
 
 /// Arguments checked and pushed, after any already pushed since `m`; then
 /// the call (or the intrinsic, expanded).
@@ -2824,7 +2824,7 @@ fn check_lazy_signature(fi: I32, site: I32) void {
 }
 
 /// Whether a value of type t can cross into a chunk: a number, a Bool, a Str, or a host value.
-fn crosses_chunk(t: I32) Bool { in_words("I32 U32 I64 U64 F32 F64 Bool Str", type_text(t)) or is_foreign(t) }
+fn crosses_chunk(t: I32) Bool => in_words("I32 U32 I64 U64 F32 F64 Bool Str", type_text(t)) or is_foreign(t)
 
 /// Whether the program imports host declarations (std:JS, npm:…).
 fn has_foreign() Bool {
@@ -2959,7 +2959,7 @@ fn expand(fi: I32, m: I32) I32 {
     fi_result[fi]
 }
 
-fn vt_scalar(vt: I32) Bool { vt >= vt_i32 and vt <= vt_v128 }
+fn vt_scalar(vt: I32) Bool => vt >= vt_i32 and vt <= vt_v128
 
 /// Whether an `@ir` value of value type `got` can be a `want`: nothing for
 /// nothing, a scalar for the same, a reference for one it is a subtype of.
