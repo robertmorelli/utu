@@ -1,11 +1,11 @@
 {
-  "commit": "a3a4384fbf500b20f0c126491af2f36b8ef70019",
-  "selfhostTree": "39a60516eeffa4991f1a411285d4a21575712190",
-  "sourcesHash": "d741f06f8f1181275bf96926df3f85c648a2ebb9a53de10c651cba8dbe9fc368",
-  "sha256": "159f2cdbcea308565564989125b2b3fddc95d5c6bf6d18ed5613e134dc0dd7f9",
-  "bytes": 528464,
-  "builtBy": "bb53c1a8d9686ac423390c6ec020fafadfd4aa8d918e36d879a3f47ccefa0c55",
+  "commit": "05c1882a74288dbd451ccba962539abce80a4871",
+  "selfhostTree": "1cabd791035a96860393d27068c70dcca496d7d6",
+  "sourcesHash": "b965b914b83c52a9cc7149fa348484336b263d8243ca14d0c215a420be0be3c5",
+  "sha256": "c055cc442084a0736f1080c76b01458961236d9ab1fd5582718e9b58ba4778fe",
+  "bytes": 528628,
+  "builtBy": "159f2cdbcea308565564989125b2b3fddc95d5c6bf6d18ed5613e134dc0dd7f9",
   "node": "v25.8.1",
-  "date": "2026-11-15T11:43:55.880Z",
-  "reason": "Void and gn only"
+  "date": "2026-11-15T11:49:16.504Z",
+  "reason": "reads main { } and lib { }"
 }
