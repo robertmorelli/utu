@@ -52,7 +52,7 @@ async function buildChunks({ lazy, files, outDir, stdlib, optimize, safe }) {
       const args = params ? params.split(', ').map(param => param.split(':')[0]).join(', ') : '';
       return `    fn ${name}${signature.replace(/\) /, ') ')} { ${module}.${name}(${args}); }`;
     });
-    await fs.writeFile(wrapper, `using Browser from std:Browser;\nusing ${module} from ${JSON.stringify(file)};\n\nexport lib {\n${exported.join('\n')}\n}\n`);
+    await fs.writeFile(wrapper, `using Browser from std:Browser;\nusing ${module} from ${JSON.stringify(file)};\n\nlib {\n${exported.join('\n')}\n}\n`);
     try {
       await buildWithSelfhost({ entry: wrapper, outDir: temp, stdlib, optimize, safe, chunk: true });
       const digest = createHash('sha256').update(await fs.readFile(path.join(temp, 'app.wasm'))).update(await fs.readFile(path.join(temp, 'app.js'))).digest('hex').slice(0, 10);

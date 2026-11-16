@@ -50,6 +50,22 @@ set first", with a note naming the instance). An `@es` binding is host
 code, not a value the module holds: it is not copied per instance, and
 each instance imports it at its own type.
 
+A module can promote a function instead of a type. `fn &(…)` is called as
+the module itself, and `M[A]` alone is that function as a `fun` value:
+
+```utu
+mod twice[T] {
+    fn &(x: T) Str => `${x} ${x}`
+}
+
+let s = twice[I64](7)    // "7 7"
+let f = twice[Str]       // fun(Str) Str
+```
+
+A module's `&` is a type or a function, not both. A module promoting a type
+is capitalized (`Stack`), one promoting a function lowercase (`twice`); one
+promoting nothing (`mod geo`) is either.
+
 ## Bounds
 
 A type parameter can list protocols its argument must implement, the way a

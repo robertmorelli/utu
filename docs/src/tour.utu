@@ -704,6 +704,20 @@ mod tour {
         \\}
         \\using console from std:Console
     }
+    fn promoted_fn_sample() Str {
+        \\mod twice[T] {
+        \\    fn &(x: T) Str => `${x} ${x}`    // & is the module's own function
+        \\}
+        \\
+        \\fn apply(f: fun(I64) Str, x: I64) Str => f(x)
+        \\
+        \\main {
+        \\    console.log(twice[I64](7))          // 7 7
+        \\    console.log(twice[Str]("hi"))       // hi hi
+        \\    console.log(apply(twice[I64], 3))   // 3 3: twice[I64] alone is the function
+        \\}
+        \\using console from std:Console
+    }
     fn std_generic_sample() Str {
         \\using StrMap from std:StrMap
         \\
@@ -1610,6 +1624,34 @@ mod tour {
                 ", set by its own initializer.";
             }
             = code.block(generic_global_sample());
+            p {
+                "A module can promote a function instead of a type: ";
+                code {
+                    "fn &(…)";
+                }
+                " is called as the module itself, ";
+                code {
+                    "twice[I64](7)";
+                }
+                ", and ";
+                code {
+                    "twice[I64]";
+                }
+                " alone is that function as a value. A module's ";
+                code {
+                    "&";
+                }
+                " is a type or a function, not both; a module promoting a type is capitalized (";
+                code {
+                    "Stack";
+                }
+                "), one promoting a function lowercase (";
+                code {
+                    "twice";
+                }
+                ").";
+            }
+            = code.block(promoted_fn_sample());
             = code.block(std_generic_sample());
             = code.block(files_multi());
             h2 {
