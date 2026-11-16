@@ -8,8 +8,8 @@ struct State:
 main {
     let state = State { n: 0 };
     let app = @wutu/\
-    @reactive;
-    main { input { bind:value = state.n; } }
+    @reactive
+    main { input { bind:value = state.n } }
     \/;
     Browser.document.body.append(app);
 }

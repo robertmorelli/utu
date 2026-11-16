@@ -22,11 +22,11 @@ main {
     let world = sim.load(game.textContent, save.textContent) orelse fatal;
     let ui = view.Ui { w: world, speed: 1, selected: 3 };
     let app = @wutu/\
-    @reactive;
+    @reactive
     div.app {
-        = view.hud(ui);
-        main.map { canvas#map { width = "960"; height = "640"; } }
-        = view.panel(ui);
+        = view.hud(ui)
+        main.map { canvas#map { width = "960"; height = "640" } }
+        = view.panel(ui)
     }
     \/;
     document.body.append(app);

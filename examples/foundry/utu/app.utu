@@ -249,60 +249,60 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) Void {
         ~> {},
     }
     let app = @wutu/\
-    @reactive;
-    @style style.sheet();
+    @reactive
+    @style style.sheet()
     div.app {
-        = ui.hud(state);
-        = ui.palette(state);
+        = ui.hud(state)
+        = ui.palette(state)
         main.map {
             canvas#map as map {
                 on mousedown |event| {
-                    state.drag = true;
-                    state.dragged = false;
-                    state.drag_x = event.offsetX;
-                    state.drag_y = event.offsetY;
+                    state.drag = true
+                    state.dragged = false
+                    state.drag_x = event.offsetX
+                    state.drag_y = event.offsetY
                 }
                 on mousemove |event| {
-                    state.hover_x = Browser.Math.floor(state.cam_x + event.offsetX / state.zoom).i32();
-                    state.hover_y = Browser.Math.floor(state.cam_y + event.offsetY / state.zoom).i32();
+                    state.hover_x = Browser.Math.floor(state.cam_x + event.offsetX / state.zoom).i32()
+                    state.hover_y = Browser.Math.floor(state.cam_y + event.offsetY / state.zoom).i32()
                     if state.drag and (state.tool == ui.tool_none or event.buttons == 2) {
-                        let dx = event.offsetX - state.drag_x;
-                        let dy = event.offsetY - state.drag_y;
+                        let dx = event.offsetX - state.drag_x
+                        let dy = event.offsetY - state.drag_y
                         if Browser.Math.abs(dx) + Browser.Math.abs(dy) > 3 {
-                            state.dragged = true;
-                        };
+                            state.dragged = true
+                        }
                         if state.dragged {
-                            pan(state, 0.0 - dx / state.zoom, 0.0 - dy / state.zoom);
-                            state.drag_x = event.offsetX;
-                            state.drag_y = event.offsetY;
-                        };
-                    };
+                            pan(state, 0.0 - dx / state.zoom, 0.0 - dy / state.zoom)
+                            state.drag_x = event.offsetX
+                            state.drag_y = event.offsetY
+                        }
+                    }
                 }
                 on mouseup {
                     if not state.dragged {
-                        click_tile(state, state.hover_x, state.hover_y);
-                    };
-                    state.drag = false;
+                        click_tile(state, state.hover_x, state.hover_y)
+                    }
+                    state.drag = false
                 }
                 on mouseleave {
-                    state.drag = false;
-                    state.hover_x = -1;
+                    state.drag = false
+                    state.hover_x = -1
                 }
                 on wheel |event| {
-                    event.preventDefault();
-                    let before = state.zoom;
-                    state.zoom = Browser.Math.max(12, Browser.Math.min(48, state.zoom * (if event.deltaY < 0 { 1.15; } else { 0.87; })));
-                    state.cam_x += event.offsetX / before - event.offsetX / state.zoom;
-                    state.cam_y += event.offsetY / before - event.offsetY / state.zoom;
+                    event.preventDefault()
+                    let before = state.zoom
+                    state.zoom = Browser.Math.max(12, Browser.Math.min(48, state.zoom * (if event.deltaY < 0 { 1.15 } else { 0.87 })))
+                    state.cam_x += event.offsetX / before - event.offsetX / state.zoom
+                    state.cam_y += event.offsetY / before - event.offsetY / state.zoom
                 }
                 on contextmenu |event| {
-                    event.preventDefault();
+                    event.preventDefault()
                 }
             }
         }
-        = ui.inspector(state);
-        = ui.footer(state);
-        = ui.windows(state);
+        = ui.inspector(state)
+        = ui.footer(state)
+        = ui.windows(state)
     }
     \/
     document.body.append(app)

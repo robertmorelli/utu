@@ -5,8 +5,8 @@ using Browser from std:Browser;
 fn view(note: Str) Browser.HTMLElement {
     @wutu/\
     x-note {
-        oNclick = note;
-        "click me";
+        oNclick = note
+        "click me"
     }
     \/;
 }

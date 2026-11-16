@@ -211,230 +211,230 @@ mod data {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Typed JSON and indexes", "Data handling that stays in Wasm: a JSON parser and printer generated per type, and native range and spatial indexes.");
+            = ui.header("Typed JSON and indexes", "Data handling that stays in Wasm: a JSON parser and printer generated per type, and native range and spatial indexes.")
             h2 {
-                "Decode and encode";
+                "Decode and encode"
             }
             p {
                 code {
-                    "@json";
+                    "@json"
                 }
-                " reads JSON straight into utu structs, enums, and arrays, in Wasm, with no ";
+                " reads JSON straight into utu structs, enums, and arrays, in Wasm, with no "
                 code {
-                    "JSON.parse";
+                    "JSON.parse"
                 }
-                " and no boundary call per field. ";
+                " and no boundary call per field. "
                 code {
-                    "decode T text";
+                    "decode T text"
                 }
-                " is a ";
+                " is a "
                 code {
-                    "?T";
+                    "?T"
                 }
-                "; ";
+                "; "
                 code {
-                    "encode T value";
+                    "encode T value"
                 }
-                " writes compact JSON in field order.";
+                " writes compact JSON in field order."
             }
-            = code.block(decode_sample());
-            = code.block(encode_sample());
-            = code.block(roundtrip_sample());
+            = code.block(decode_sample())
+            = code.block(encode_sample())
+            = code.block(roundtrip_sample())
             h2 {
-                "Errors with positions";
+                "Errors with positions"
             }
             p {
                 code {
-                    "error T text";
+                    "error T text"
                 }
-                " is empty when the text matches, and otherwise says what is wrong and where.";
+                " is empty when the text matches, and otherwise says what is wrong and where."
             }
-            = code.block(error_sample());
+            = code.block(error_sample())
             h2 {
-                "Enums, recursion, and big integers";
+                "Enums, recursion, and big integers"
             }
-            = code.block(enums_sample());
-            = code.block(recursive_sample());
+            = code.block(enums_sample())
+            = code.block(recursive_sample())
             table {
                 tbody {
                     tr {
                         th {
                             code {
-                                "I32 U32 I64";
+                                "I32 U32 I64"
                             }
                         }
                         td {
-                            "integers, range-checked";
+                            "integers, range-checked"
                         }
                     }
                     tr {
                         th {
                             code {
-                                "F32 F64 Bool Str";
+                                "F32 F64 Bool Str"
                             }
                         }
                         td {
-                            "numbers, booleans, strings with every escape";
+                            "numbers, booleans, strings with every escape"
                         }
                     }
                     tr {
                         th {
                             code {
-                                "?T";
+                                "?T"
                             }
                         }
                         td {
-                            "null or a missing field";
+                            "null or a missing field"
                         }
                     }
                     tr {
                         th {
                             code {
-                                "Array[T]";
+                                "Array[T]"
                             }
                         }
                         td {
-                            "arrays";
+                            "arrays"
                         }
                     }
                     tr {
                         th {
-                            "structs";
+                            "structs"
                         }
                         td {
-                            "objects; unknown fields skipped, any field order";
+                            "objects; unknown fields skipped, any field order"
                         }
                     }
                     tr {
                         th {
-                            "enums";
+                            "enums"
                         }
                         td {
                             code {
-                                "\"Red\"";
+                                "\"Red\""
                             }
-                            " without fields, ";
+                            " without fields, "
                             code {
-                                "{\"kind\": \"Circle\", ...}";
+                                "{\"kind\": \"Circle\", ...}"
                             }
-                            " with them";
+                            " with them"
                         }
                     }
                 }
             }
             h2 {
-                "Structural match";
+                "Structural match"
             }
             p {
-                "When only part of a document matters, ";
+                "When only part of a document matters, "
                 code {
-                    "match";
+                    "match"
                 }
-                " describes that part: typed captures, defaults, literals that must match, and a required ";
+                " describes that part: typed captures, defaults, literals that must match, and a required "
                 code {
-                    "~>";
+                    "~>"
                 }
-                " arm that can bind the error.";
+                " arm that can bind the error."
             }
-            = code.block(match_sample());
-            = code.block(match_subtree_sample());
+            = code.block(match_sample())
+            = code.block(match_subtree_sample())
             p {
-                "A 4 MB save file of 40,000 entities decodes to native structs in 23 ms on V8. The generated code adds about 4 KB per module plus a few hundred bytes per type.";
+                "A 4 MB save file of 40,000 entities decodes to native structs in 23 ms on V8. The generated code adds about 4 KB per module plus a few hundred bytes per type."
             }
-            = ui.further("docs/json.md", "Typed JSON");
+            = ui.further("docs/json.md", "Typed JSON")
             h2 {
-                "Iterators";
+                "Iterators"
             }
             p {
-                "Pipelines such as ";
+                "Pipelines such as "
                 code {
-                    "map";
+                    "map"
                 }
-                ", ";
+                ", "
                 code {
-                    "filter";
+                    "filter"
                 }
-                ", ";
+                ", "
                 code {
-                    "group_by";
+                    "group_by"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "sort";
+                    "sort"
                 }
-                " compile to plain loops. They have ";
+                " compile to plain loops. They have "
                 a {
-                    href = "#/iterators";
-                    "their own page";
+                    href = "#/iterators"
+                    "their own page"
                 }
-                ".";
+                "."
             }
             h2 {
-                "Range indexes";
+                "Range indexes"
             }
             p {
                 code {
-                    "SegmentTree[T]";
+                    "SegmentTree[T]"
                 }
-                " answers range queries with any associative combiner in O(log n). ";
+                " answers range queries with any associative combiner in O(log n). "
                 code {
-                    "PersistentSegmentTree[T]";
+                    "PersistentSegmentTree[T]"
                 }
-                " returns a new version from each ";
+                " returns a new version from each "
                 code {
-                    "set";
+                    "set"
                 }
-                ".";
+                "."
             }
-            = code.block(segment_sample());
-            = code.block(segment_max_sample());
-            = code.block(persistent_sample());
+            = code.block(segment_sample())
+            = code.block(segment_max_sample())
+            = code.block(persistent_sample())
             h2 {
-                "Spatial indexes";
+                "Spatial indexes"
             }
             p {
                 code {
-                    "std:Spatial";
+                    "std:Spatial"
                 }
-                " is a static priority search tree: three-sided ";
+                " is a static priority search tree: three-sided "
                 code {
-                    "below";
+                    "below"
                 }
-                ", rectangles with ";
+                ", rectangles with "
                 code {
-                    "within";
+                    "within"
                 }
-                ", ";
+                ", "
                 code {
-                    "radius";
+                    "radius"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "nearest";
+                    "nearest"
                 }
-                ". Results come in no particular order.";
+                ". Results come in no particular order."
             }
-            = code.block(spatial_sample());
-            = ui.further("docs/queries.md", "Native range and spatial indexes");
+            = code.block(spatial_sample())
+            = ui.further("docs/queries.md", "Native range and spatial indexes")
             p {
-                "More modules (";
+                "More modules ("
                 code {
-                    "StrMap";
+                    "StrMap"
                 }
-                ", ";
+                ", "
                 code {
-                    "Random";
+                    "Random"
                 }
-                ", ";
+                ", "
                 code {
-                    "Stream";
+                    "Stream"
                 }
-                ", ...) are on the ";
+                ", ...) are on the "
                 a {
-                    href = "#/std";
-                    "standard library";
+                    href = "#/std"
+                    "standard library"
                 }
-                " page.";
+                " page."
             }
         }
         \/

@@ -88,7 +88,7 @@ try {
   for (const file of ['index.html', 'app.js', 'app.wasm']) await fs.access(path.join(out, file));
   assert.ok((await fs.readFile(path.join(out, 'index.html'), 'utf8')).includes('<title>A &lt;b> &amp; &quot;c&quot;</title>'));
   const broken = path.join(dir, 'broken.utu');
-  await fs.writeFile(broken, app('Broken').replace('"Broken";', '"Broken"'));
+  await fs.writeFile(broken, app('Broken').replace('"Broken";', '"Broken" "x"'));
   const failed = run('build', broken, '--out', path.join(dir, 'broken-out'), '--no-prerender');
   assert.equal(failed.status, 1);
   assert.match(failed.stderr, /broken\.utu:\d+:\d+/, 'build errors are positioned diagnostics');
@@ -125,7 +125,7 @@ try {
     for (const line of String(chunk).split('\n')) if (line.startsWith('data: ')) events.push(JSON.parse(line.slice(6)));
   }));
   await waitFor(() => connected, 'the event stream');
-  await fs.writeFile(entry, app('Second').replace('"Second";', '"Second"'));
+  await fs.writeFile(entry, app('Second').replace('"Second";', '"Second" "x"'));
   const error = await waitFor(() => events.find(event => event.error), 'a build error event');
   assert.match(error.error, /main\.utu:\d+:\d+/);
   assert.equal((await request(origin + '/')).status, 200, 'the last good build keeps serving');

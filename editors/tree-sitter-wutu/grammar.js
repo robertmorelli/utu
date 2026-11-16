@@ -6,15 +6,19 @@
 // highlight it (an expression alone is no utu file, so utu's grammar cannot
 // take it). A DSL inside that utu, `@name/\ … \/`, is a dsl_expr whose text
 // editors inject by name, Wutu again included; `@document` CSS is css_text.
+// A statement ends at a line break (or `;`, or the `}` closing its block),
+// as a utu statement does: see src/scanner.c.
 const KEYWORDS = [
   'let', 'cl', 'fun', 'if', 'else', 'match', 'alt', 'promote', 'orelse', 'not', 'and', 'or', 'xor',
   'true', 'false', 'null', 'return', 'await', 'try', 'catch', 'for', 'while', 'loop', 'break', 'continue',
   'defer', 'yield', 'fatal', 'assert', 'new',
 ];
+// Keywords a line can end on and go on from (`a and`, then `b`).
+const OPEN_KEYWORDS = ['else', 'orelse', 'not', 'and', 'or', 'xor'];
 
 module.exports = grammar({
   name: 'wutu',
-  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close, $.css_text],
+  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close, $.css_text, $._statement_end],
   extras: $ => [/\s/, $.comment],
   word: $ => $.name,
   rules: {
@@ -26,16 +30,18 @@ module.exports = grammar({
 
     // Directives
     _directive: $ => choice($.reactive, $.island, $.style_use, $.document, $.unmanaged),
-    reactive: _ => seq('@reactive', ';'),
-    island: $ => seq('@island', $.string, ';'),
-    style_use: $ => seq('@style', $.expression, ';'),
+    _end: $ => choice(';', $._statement_end),
+    reactive: $ => seq('@reactive', $._end),
+    island: $ => seq('@island', $.string, $._end),
+    style_use: $ => seq('@style', $.expression, $._end),
     document: $ => seq('@document', '{', optional($.css_text), '}'),
-    unmanaged: _ => seq('@unmanaged', ';'),
+    // (Ahead of a CSS at-rule's selector, which `@unmanaged }` would also match.)
+    unmanaged: $ => seq(alias(token(prec(1, '@unmanaged')), '@unmanaged'), $._end),
 
     // Children
     _node: $ => choice($.text, $.hole, $.if, $.for, $.element),
-    text: $ => seq($.string, ';'),
-    hole: $ => seq('=', $.expression, ';'),
+    text: $ => seq($.string, $._end),
+    hole: $ => seq('=', $.expression, $._end),
     if: $ => seq('if', alias($._condition, $.expression), $.branch,
       repeat(seq('else', 'if', alias($._condition, $.expression), $.branch)),
       optional(seq('else', $.branch))),
@@ -54,22 +60,24 @@ module.exports = grammar({
       $.css_declaration, $.css_rule, ';'),
     // (`for = "id";` on a label: `for` before `=` is an attribute, not a loop.)
     attribute: $ => choice(
-      seq($.attribute_name, choice(';', seq('=', $.expression, ';'))),
-      seq(alias('for', $.attribute_name), '=', $.expression, ';'),
+      seq($.attribute_name, choice($._end, seq('=', $.expression, $._end))),
+      seq(alias('for', $.attribute_name), '=', $.expression, $._end),
     ),
     // (`xlink:href`: a namespaced attribute; no CSS property has those prefixes.)
     attribute_name: $ => choice($.name, /(xlink|xmlns|xml):[a-zA-Z][a-zA-Z0-9_-]*/),
-    property: $ => seq('.', alias($.name, $.property_name), '=', $.expression, ';'),
-    binding: $ => seq(alias(/bind:[a-z]+/, $.binding_name), '=', $.expression, ';'),
+    property: $ => seq('.', alias($.name, $.property_name), '=', $.expression, $._end),
+    binding: $ => seq(alias(/bind:[a-z]+/, $.binding_name), '=', $.expression, $._end),
     event: $ => seq('on', alias($.name, $.event_name), optional('quiet'), optional($.capture),
-      choice($.handler, seq('=', $.expression, ';'))),
+      choice($.handler, seq('=', $.expression, $._end))),
     handler: $ => seq('{', repeat($._statement_token), '}'),
 
     // CSS
-    css_declaration: $ => seq($.css_property, ':', choice(seq('=', $.expression), $.css_value), ';'),
+    css_declaration: $ => seq($.css_property, ':', choice(seq('=', $.expression), $.css_value), $._end),
     css_property: $ => choice($.name, /--[a-zA-Z0-9_-]+/),
-    css_value: $ => repeat1(choice($.css_number, $.css_color, $.string, $.css_function, alias($.name, $.css_keyword),
-      $.css_url, ',', '/', '+', '-', '*', '!important', /'[^'\n]*'/)),
+    // (A `,` goes on to the next line: an item follows it.)
+    css_value: $ => repeat1(choice($._css_item, seq(',', $._css_item))),
+    _css_item: $ => choice($.css_number, $.css_color, $.string, $.css_function, alias($.name, $.css_keyword),
+      $.css_url, '/', '+', '-', '*', '!important', /'[^'\n]*'/),
     css_number: _ => /-?(\d+\.?\d*|\.\d+)([a-zA-Z%]+)?/,
     css_color: _ => /#[0-9a-fA-F]{3,8}/,
     css_url: _ => token(seq('url(', /[^)]*/, ')')),
@@ -78,8 +86,14 @@ module.exports = grammar({
     css_rule: $ => seq($.css_selector, '{', repeat(choice($.css_declaration, $.css_rule, ';')), '}'),
     css_selector: _ => token(seq(choice(':', '&', /@ /, /@[a-z-]+/), /[^{};]*/)),
 
-    // Utu, as tokens
-    expression: $ => repeat1(choice($._expression_token, $.brace_group)),
+    // Utu, as tokens. An expression's operators each take an operand after
+    // them, so a line ending in one goes on (`a +`, then `b`).
+    expression: $ => prec.right(repeat1(choice($._operand, seq(repeat1($._open), $._operand)))),
+    _operand: $ => choice(alias($._value_keyword, $.keyword), alias($.name, $.identifier), $.number, $.string,
+      $.template_string, $.dsl_expr, $.paren_group, $.bracket_group, $.brace_group),
+    _open: $ => choice(alias($._open_keyword, $.keyword), $.operator, '.', ',', ':', '?', '?.', '|'),
+    _value_keyword: _ => choice(...KEYWORDS.filter(k => !OPEN_KEYWORDS.includes(k))),
+    _open_keyword: _ => choice(...OPEN_KEYWORDS),
     _condition: $ => repeat1($._expression_token),
     _iterable: $ => repeat1($._iterable_token),
     _expression_token: $ => choice($._iterable_token, '|'),

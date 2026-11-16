@@ -8,8 +8,8 @@ struct State:
 main {
     let state = State { n: 3 };
     let app = @wutu/\
-    @reactive;
-    main { for 0..<state.n |i| { p { = i; } } }
+    @reactive
+    main { for 0..<state.n |i| { p { = i } } }
     \/;
     Browser.document.body.append(app);
 }

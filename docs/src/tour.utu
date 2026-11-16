@@ -1175,9 +1175,9 @@ mod tour {
         \\fn badge(label: Str) Browser.HTMLElement {
         \\    @wutu/\
         \\    span.badge {
-        \\        padding: 0.2rem 0.5rem;
-        \\        border-radius: 1rem;
-        \\        = label;
+        \\        padding: 0.2rem 0.5rem
+        \\        border-radius: 1rem
+        \\        = label
         \\    }
         \\    \/
         \\}
@@ -1204,810 +1204,810 @@ mod tour {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Language tour", "Every construct in utu, by example. Each sample is a whole program that type-checks against the current compiler; comments show what it prints or returns.");
+            = ui.header("Language tour", "Every construct in utu, by example. Each sample is a whole program that type-checks against the current compiler; comments show what it prints or returns.")
             h2 {
-                "Literals and numbers";
+                "Literals and numbers"
             }
             p {
-                "A literal with no type to take is the first of ";
+                "A literal with no type to take is the first of "
                 code {
-                    "I32";
+                    "I32"
                 }
-                ", ";
+                ", "
                 code {
-                    "U32";
+                    "U32"
                 }
-                ", ";
+                ", "
                 code {
-                    "I64";
+                    "I64"
                 }
-                ", ";
+                ", "
                 code {
-                    "U64";
+                    "U64"
                 }
-                " it fits; a float is ";
+                " it fits; a float is "
                 code {
-                    "F32";
+                    "F32"
                 }
-                " when it reads the same as F32 and as F64, else ";
+                " when it reads the same as F32 and as F64, else "
                 code {
-                    "F64";
+                    "F64"
                 }
-                ". An annotation or ";
+                ". An annotation or "
                 code {
-                    "F64(…)";
+                    "F64(…)"
                 }
-                " picks another type. Numeric types are nominal, so every conversion is written out and costs one instruction.";
+                " picks another type. Numeric types are nominal, so every conversion is written out and costs one instruction."
             }
-            = code.block(literals_sample());
-            = code.block(conversions_sample());
-            = code.block(nominal_sample());
-            = code.block(operators_sample());
+            = code.block(literals_sample())
+            = code.block(conversions_sample())
+            = code.block(nominal_sample())
+            = code.block(operators_sample())
             h2 {
-                "Bindings";
+                "Bindings"
             }
             p {
                 code {
-                    "let";
+                    "let"
                 }
-                " infers a type or takes an annotation. A local binding can be reassigned. A top-level ";
+                " infers a type or takes an annotation. A local binding can be reassigned. A top-level "
                 code {
-                    "let";
+                    "let"
                 }
-                " is a global: it needs a type annotation (";
+                " is a global: it needs a type annotation ("
                 code {
-                    "let g: I32 = 5;";
+                    "let g: I32 = 5;"
                 }
-                ", not ";
+                ", not "
                 code {
-                    "let g = 5;";
+                    "let g = 5;"
                 }
-                ") and is set once, so assigning to it is an error. For state that changes, keep a struct in a global and set its fields, or use a ";
+                ") and is set once, so assigning to it is an error. For state that changes, keep a struct in a global and set its fields, or use a "
                 code {
-                    "mem";
+                    "mem"
                 }
-                " or ";
+                " or "
                 code {
-                    "vec";
+                    "vec"
                 }
-                ". A global may be computed by any expression: the module sets it when it starts, in the order written, but always after the globals its initializer reads (directly or through the functions it calls). Two globals that need each other are an error.";
+                ". A global may be computed by any expression: the module sets it when it starts, in the order written, but always after the globals its initializer reads (directly or through the functions it calls). Two globals that need each other are an error."
             }
-            = code.block(let_sample());
-            = code.block(globals_sample());
-            = code.block(global_state_sample());
+            = code.block(let_sample())
+            = code.block(globals_sample())
+            = code.block(global_state_sample())
             h2 {
-                "Functions";
+                "Functions"
             }
             p {
-                "The result type follows the parameters, and the last expression is the result. A line break ends a statement, unless the next line goes on (it begins with ., an operator but -, and, or, else, or a stage like map |x|); ; puts two statements on one line.";
+                "The result type follows the parameters, and the last expression is the result. A line break ends a statement, unless the next line goes on (it begins with ., an operator but -, and, or, else, or a stage like map |x|); ; puts two statements on one line."
             }
-            = code.block(functions_sample());
-            = code.block(recursion_sample());
+            = code.block(functions_sample())
+            = code.block(recursion_sample())
             h2 {
-                "Blocks are expressions";
+                "Blocks are expressions"
             }
-            = code.block(blocks_sample());
+            = code.block(blocks_sample())
             h2 {
-                "if and else";
+                "if and else"
             }
             p {
                 code {
-                    "if";
+                    "if"
                 }
-                " is an expression whose branches must agree on a type; without ";
+                " is an expression whose branches must agree on a type; without "
                 code {
-                    "else";
+                    "else"
                 }
-                " it is a statement. Branches that make different variants of one enum join to the enum, and ";
+                " it is a statement. Branches that make different variants of one enum join to the enum, and "
                 code {
-                    "null";
+                    "null"
                 }
-                " beside a reference joins to its nullable type.";
+                " beside a reference joins to its nullable type."
             }
-            = code.block(if_sample());
-            = code.block(if_statement_sample());
+            = code.block(if_sample())
+            = code.block(if_statement_sample())
             h2 {
-                "Loops";
+                "Loops"
             }
             p {
                 code {
-                    "while";
+                    "while"
                 }
-                ", ";
+                ", "
                 code {
-                    "for";
+                    "for"
                 }
-                " over ranges and arrays (zipped when given several: arrays and ranges only, stopping at the shortest; a generator is looped alone; a body of one statement may go without braces, ";
+                " over ranges and arrays (zipped when given several: arrays and ranges only, stopping at the shortest; a generator is looped alone; a body of one statement may go without braces, "
                 code {
-                    "for (xs) |x| show(x)";
+                    "for (xs) |x| show(x)"
                 }
-                "), ";
+                "), "
                 code {
-                    "break";
+                    "break"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "continue";
+                    "continue"
                 }
-                ". Range captures are ";
+                ". Range captures are "
                 code {
-                    "I32";
+                    "I32"
                 }
-                ". A capture is read-only: to move a count, use ";
+                ". A capture is read-only: to move a count, use "
                 code {
-                    "while";
+                    "while"
                 }
-                " and a ";
+                " and a "
                 code {
-                    "let";
+                    "let"
                 }
-                ".";
+                "."
             }
-            = code.block(while_sample());
-            = code.block(ranges_sample());
-            = code.block(for_each_sample());
-            = code.block(break_sample());
+            = code.block(while_sample())
+            = code.block(ranges_sample())
+            = code.block(for_each_sample())
+            = code.block(break_sample())
             p {
-                "A block can have a name: ";
+                "A block can have a name: "
                 code {
-                    "break name";
+                    "break name"
                 }
-                " leaves it from anywhere inside it (loops included, closures not), and ";
+                " leaves it from anywhere inside it (loops included, closures not), and "
                 code {
-                    "break name value";
+                    "break name value"
                 }
-                " gives it a value. Its defers run as it is left.";
+                " gives it a value. Its defers run as it is left."
             }
-            = code.block(labeled_sample());
+            = code.block(labeled_sample())
             h2 {
-                "match and loop match";
+                "match and loop match"
             }
             p {
                 code {
-                    "match";
+                    "match"
                 }
-                " compares a scalar against literal patterns. ";
+                " compares a scalar against literal patterns. "
                 code {
-                    "loop match";
+                    "loop match"
                 }
-                " is a state machine: ";
+                " is a state machine: "
                 code {
-                    "continue state";
+                    "continue state"
                 }
-                " re-dispatches and ";
+                " re-dispatches and "
                 code {
-                    "break";
+                    "break"
                 }
-                " leaves.";
+                " leaves."
             }
-            = code.block(match_sample());
-            = code.block(loop_match_sample());
+            = code.block(match_sample())
+            = code.block(loop_match_sample())
             h2 {
-                "Structs";
+                "Structs"
             }
             p {
-                "Fields are listed behind bars. ";
+                "Fields are listed behind bars. "
                 code {
-                    "&{ ... }";
+                    "&{ ... }"
                 }
-                " builds a struct whose type the context already knows. Methods name their receiver in bars; an operator is a method named after it (";
+                " builds a struct whose type the context already knows. Methods name their receiver in bars; an operator is a method named after it ("
                 code {
-                    "add";
+                    "add"
                 }
-                ", ";
+                ", "
                 code {
-                    "sub";
+                    "sub"
                 }
-                ", ";
+                ", "
                 code {
-                    "mul";
+                    "mul"
                 }
-                ", ";
+                ", "
                 code {
-                    "eq";
+                    "eq"
                 }
-                ", ";
+                ", "
                 code {
-                    "lt";
+                    "lt"
                 }
-                ", ";
+                ", "
                 code {
-                    "neg";
+                    "neg"
                 }
-                ", ...).";
+                ", ...)."
             }
-            = code.block(struct_sample());
-            = code.block(methods_sample());
-            = code.block(struct_ops_sample());
+            = code.block(struct_sample())
+            = code.block(methods_sample())
+            = code.block(struct_ops_sample())
             h2 {
-                "Distinct types and aliases";
+                "Distinct types and aliases"
             }
             p {
-                "A distinct type has its base's representation and none of its identity. ";
+                "A distinct type has its base's representation and none of its identity. "
                 code {
-                    "using ... |name|";
+                    "using ... |name|"
                 }
-                " renames a module. A using's name is its file's: no mod, fn, or type there takes it too.";
+                " renames a module. A using's name is its file's: no mod, fn, or type there takes it too."
             }
-            = code.block(distinct_sample());
-            = code.block(alias_sample());
+            = code.block(distinct_sample())
+            = code.block(alias_sample())
             h2 {
-                "Enums and alt";
+                "Enums and alt"
             }
             p {
-                "Variants may carry fields. ";
+                "Variants may carry fields. "
                 code {
-                    "alt";
+                    "alt"
                 }
-                " picks the arm for a variant and binds it; ";
+                " picks the arm for a variant and binds it; "
                 code {
-                    "~>";
+                    "~>"
                 }
-                " covers the rest. Integer enums are small numbers with names, dispatched by ";
+                " covers the rest. Integer enums are small numbers with names, dispatched by "
                 code {
-                    "match";
+                    "match"
                 }
-                ". In a safe build, ";
+                ". In a safe build, "
                 code {
-                    "Level(v)";
+                    "Level(v)"
                 }
-                " traps when no variant has the value v.";
+                " traps when no variant has the value v."
             }
-            = code.block(enum_sample());
+            = code.block(enum_sample())
             p {
-                "A variant is named by its enum too: ";
+                "A variant is named by its enum too: "
                 code {
-                    "Shape.Circle { r: 2.0 }";
+                    "Shape.Circle { r: 2.0 }"
                 }
-                ", ";
+                ", "
                 code {
-                    "Shape.Dot";
+                    "Shape.Dot"
                 }
-                " (a variant without fields is a value), ";
+                " (a variant without fields is a value), "
                 code {
-                    "Shape.Dot => …";
+                    "Shape.Dot => …"
                 }
-                " in an alt, and ";
+                " in an alt, and "
                 code {
-                    "geo.Shape.Circle";
+                    "geo.Shape.Circle"
                 }
-                " from mod geo. Where two enums have a variant of one name, the bare name is an error, unless the alt's value or the type wanted says which. A declaration of that name (a struct, an enum, the enum itself) keeps it: the variant is then Shape.Circle, or bare where a Shape is wanted.";
+                " from mod geo. Where two enums have a variant of one name, the bare name is an error, unless the alt's value or the type wanted says which. A declaration of that name (a struct, an enum, the enum itself) keeps it: the variant is then Shape.Circle, or bare where a Shape is wanted."
             }
-            = code.block(enum_qualified_sample());
-            = code.block(enum_tag_sample());
-            = code.block(int_enum_sample());
+            = code.block(enum_qualified_sample())
+            = code.block(enum_tag_sample())
+            = code.block(int_enum_sample())
             h2 {
-                "Nullable values";
+                "Nullable values"
             }
             p {
                 code {
-                    "?T";
+                    "?T"
                 }
-                " may be ";
+                " may be "
                 code {
-                    "null";
+                    "null"
                 }
-                ". ";
+                ". "
                 code {
-                    "promote";
+                    "promote"
                 }
-                " unwraps it, ";
+                " unwraps it, "
                 code {
-                    "orelse";
+                    "orelse"
                 }
-                " supplies a default, and a statement containing ";
+                " supplies a default, and a statement containing "
                 code {
-                    "a?.b";
+                    "a?.b"
                 }
-                " runs only when ";
+                " runs only when "
                 code {
-                    "a";
+                    "a"
                 }
-                " is present.";
+                " is present."
             }
-            = code.block(promote_sample());
-            = code.block(orelse_sample());
-            = code.block(chain_sample());
+            = code.block(promote_sample())
+            = code.block(orelse_sample())
+            = code.block(chain_sample())
             h2 {
-                "Tuples";
+                "Tuples"
             }
             p {
-                "A function returns several values as a tuple (Wasm multi-value: no allocation), and ";
+                "A function returns several values as a tuple (Wasm multi-value: no allocation), and "
                 code {
-                    "let .{a, b}";
+                    "let .{a, b}"
                 }
-                " takes them apart. Tuples are only results.";
+                " takes them apart. Tuples are only results."
             }
-            = code.block(tuple_sample());
+            = code.block(tuple_sample())
             h2 {
-                "Function values and closures";
+                "Function values and closures"
             }
             p {
                 code {
-                    "fun";
+                    "fun"
                 }
-                " is a Wasm function reference with no environment: name a function to get one. ";
+                " is a Wasm function reference with no environment: name a function to get one. "
                 code {
-                    "cl";
+                    "cl"
                 }
-                " is a closure, held as a real JavaScript function so any callback API accepts it. A ";
+                " is a closure, held as a real JavaScript function so any callback API accepts it. A "
                 code {
-                    "fun";
+                    "fun"
                 }
-                " converts to a ";
+                " converts to a "
                 code {
-                    "cl";
+                    "cl"
                 }
-                ", never the reverse.";
+                ", never the reverse."
             }
-            = code.block(fun_sample());
-            = code.block(cl_sample());
-            = code.block(capture_sample());
+            = code.block(fun_sample())
+            = code.block(cl_sample())
+            = code.block(capture_sample())
             h2 {
-                "Modules and generics";
+                "Modules and generics"
             }
             p {
-                "A ";
+                "A "
                 code {
-                    "mod";
+                    "mod"
                 }
-                " groups functions and types; ";
+                " groups functions and types; "
                 code {
-                    "&";
+                    "&"
                 }
-                " is the module's own type. A module's type parameters make generic types: ";
+                " is the module's own type. A module's type parameters make generic types: "
                 code {
-                    "Stack[I32]";
+                    "Stack[I32]"
                 }
-                " instantiates ";
+                " instantiates "
                 code {
-                    "Stack";
+                    "Stack"
                 }
-                ". Files import modules with ";
+                ". Files import modules with "
                 code {
-                    "using";
+                    "using"
                 }
-                ".";
+                "."
             }
-            = code.block(mod_sample());
-            = code.block(mod_type_sample());
+            = code.block(mod_sample())
+            = code.block(mod_type_sample())
             p {
-                "A module's function or a type's, named without a call (";
+                "A module's function or a type's, named without a call ("
                 code {
-                    "temperature.to_fahrenheit";
+                    "temperature.to_fahrenheit"
                 }
-                ", ";
+                ", "
                 code {
-                    "Point.at";
+                    "Point.at"
                 }
-                "), is a ";
+                "), is a "
                 code {
-                    "fun";
+                    "fun"
                 }
-                " value. A method can be a generator, and a generator can be reached through a module or a type: ";
+                " value. A method can be a generator, and a generator can be reached through a module or a type: "
                 code {
-                    "for (nums.each()) |v|";
+                    "for (nums.each()) |v|"
                 }
-                ".";
+                "."
             }
-            = code.block(member_values_sample());
-            = code.block(generic_sample());
+            = code.block(member_values_sample())
+            = code.block(generic_sample())
             p {
-                "A global in a generic module is one per instance: ";
+                "A global in a generic module is one per instance: "
                 code {
-                    "Stash[I32]";
+                    "Stash[I32]"
                 }
-                " and ";
+                " and "
                 code {
-                    "Stash[Str]";
+                    "Stash[Str]"
                 }
-                " each have their own ";
+                " each have their own "
                 code {
-                    "items";
+                    "items"
                 }
-                ", set by its own initializer.";
+                ", set by its own initializer."
             }
-            = code.block(generic_global_sample());
+            = code.block(generic_global_sample())
             p {
-                "A module can promote a function instead of a type: ";
+                "A module can promote a function instead of a type: "
                 code {
-                    "fn &(…)";
+                    "fn &(…)"
                 }
-                " is called as the module itself, ";
+                " is called as the module itself, "
                 code {
-                    "twice[I64](7)";
+                    "twice[I64](7)"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "twice[I64]";
+                    "twice[I64]"
                 }
-                " alone is that function as a value. A module's ";
+                " alone is that function as a value. A module's "
                 code {
-                    "&";
+                    "&"
                 }
-                " is a type or a function, not both; a module promoting a type is capitalized (";
+                " is a type or a function, not both; a module promoting a type is capitalized ("
                 code {
-                    "Stack";
+                    "Stack"
                 }
-                "), one promoting a function lowercase (";
+                "), one promoting a function lowercase ("
                 code {
-                    "twice";
+                    "twice"
                 }
-                ").";
+                ")."
             }
-            = code.block(promoted_fn_sample());
-            = code.block(std_generic_sample());
-            = code.block(files_multi());
+            = code.block(promoted_fn_sample())
+            = code.block(std_generic_sample())
+            = code.block(files_multi())
             h2 {
-                "Functions of any type: $T";
+                "Functions of any type: $T"
             }
             p {
-                "A parameter typed ";
+                "A parameter typed "
                 code {
-                    "$T";
+                    "$T"
                 }
-                " makes T a type parameter of the function, which each call binds to that argument's type (a literal's waits for an argument that is not one). Other parameters and the result write ";
+                " makes T a type parameter of the function, which each call binds to that argument's type (a literal's waits for an argument that is not one). Other parameters and the result write "
                 code {
-                    "T";
+                    "T"
                 }
-                ". The body is checked for each binding, so one that does not fit (";
+                ". The body is checked for each binding, so one that does not fit ("
                 code {
-                    "x.str()";
+                    "x.str()"
                 }
-                " on a type with none) is a mistake at that call. ";
+                " on a type with none) is a mistake at that call. "
                 code {
-                    "console.log";
+                    "console.log"
                 }
-                " is one: it prints any value's ";
+                " is one: it prints any value's "
                 code {
-                    "str()";
+                    "str()"
                 }
-                ".";
+                "."
             }
-            = code.block(dollar_sample());
+            = code.block(dollar_sample())
             h2 {
-                "Protocols";
+                "Protocols"
             }
             p {
-                "A protocol lists getters, setters, and methods. A struct names the protocols it implements; ";
+                "A protocol lists getters, setters, and methods. A struct names the protocols it implements; "
                 code {
-                    "fn Proto[Type].method";
+                    "fn Proto[Type].method"
                 }
-                " implements one, and ";
+                " implements one, and "
                 code {
-                    "Array[Proto]";
+                    "Array[Proto]"
                 }
-                " holds any mix of implementors. A protocol method lists parameter types only, ";
+                " holds any mix of implementors. A protocol method lists parameter types only, "
                 code {
-                    "| hit(Vec3, Vec3) F64";
+                    "| hit(Vec3, Vec3) F64"
                 }
-                ", not ";
+                ", not "
                 code {
-                    "| hit(a: Vec3, b: Vec3) F64";
+                    "| hit(a: Vec3, b: Vec3) F64"
                 }
-                "; each implementation names them.";
+                "; each implementation names them."
             }
-            = code.block(proto_sample());
-            = code.block(proto_members_sample());
+            = code.block(proto_sample())
+            = code.block(proto_members_sample())
             p {
-                "A module's type parameter can be bounded: ";
+                "A module's type parameter can be bounded: "
                 code {
-                    "mod Largest[T[Ord]]";
+                    "mod Largest[T[Ord]]"
                 }
-                " takes only types that implement ";
+                " takes only types that implement "
                 code {
-                    "Ord";
+                    "Ord"
                 }
-                ", and its code calls their methods. Each instance calls its own type's, with no dispatch, so scalars implement protocols too. ";
+                ", and its code calls their methods. Each instance calls its own type's, with no dispatch, so scalars implement protocols too. "
                 code {
-                    "std:Ord";
+                    "std:Ord"
                 }
-                " has ";
+                " has "
                 code {
-                    "Ord";
+                    "Ord"
                 }
-                " for the numbers and ";
+                " for the numbers and "
                 code {
-                    "Str";
+                    "Str"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "Order[T[Ord]]";
+                    "Order[T[Ord]]"
                 }
-                ": max, min, clamp, sort, search.";
+                ": max, min, clamp, sort, search."
             }
-            = code.block(bounds_sample());
-            = code.block(std_bounds_sample());
+            = code.block(bounds_sample())
+            = code.block(std_bounds_sample())
             h2 {
-                "Strings";
+                "Strings"
             }
             p {
-                "A ";
+                "A "
                 code {
-                    "Str";
+                    "Str"
                 }
-                " is a JavaScript string. Template strings call ";
+                " is a JavaScript string. Template strings call "
                 code {
-                    "str";
+                    "str"
                 }
-                " on each ";
+                " on each "
                 code {
-                    "${...}";
+                    "${...}"
                 }
-                ". A ";
+                ". A "
                 code {
-                    "\\\\";
+                    "\\\\"
                 }
-                " line is raw text, and the string ends at the first line that is not one.";
+                " line is raw text, and the string ends at the first line that is not one."
             }
-            = code.block(strings_sample());
-            = code.block(templates_sample());
-            = code.block(escapes_sample());
-            = code.block(multiline_sample());
+            = code.block(strings_sample())
+            = code.block(templates_sample())
+            = code.block(escapes_sample())
+            = code.block(multiline_sample())
             h2 {
-                "Arrays, generators, and memories";
+                "Arrays, generators, and memories"
             }
             p {
-                "Arrays are WasmGC arrays; iterator stages like ";
+                "Arrays are WasmGC arrays; iterator stages like "
                 code {
-                    "filter";
+                    "filter"
                 }
-                " and ";
+                " and "
                 code {
-                    "fold";
+                    "fold"
                 }
-                " are syntax that compiles to one loop. ";
+                " are syntax that compiles to one loop. "
                 a {
-                    href = "#/iterators";
-                    "The iterators page";
+                    href = "#/iterators"
+                    "The iterators page"
                 }
-                " covers every stage. ";
+                " covers every stage. "
                 code {
-                    "mem";
+                    "mem"
                 }
-                " and ";
+                " and "
                 code {
-                    "vec";
+                    "vec"
                 }
-                " are top-level growable arrays of scalars for hot loops. An element is U8, I8, U16, I16, I32, U32, I64, U64, F32, F64, an integer enum, or a distinct type over one of these; not Bool, Str, or a struct (for flags, use U8 and store 0 or 1). A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error. Growing with resize(n) zero-fills the new elements. An index past the length (or negative) traps, as an array's does; smallUnsafe and fastUnsafe check only the capacity.";
+                " are top-level growable arrays of scalars for hot loops. An element is U8, I8, U16, I16, I32, U32, I64, U64, F32, F64, an integer enum, or a distinct type over one of these; not Bool, Str, or a struct (for flags, use U8 and store 0 or 1). A narrow element (U8, I8, U16, I16) keeps a computed value's low bits; a literal that does not fit is an error. Growing with resize(n) zero-fills the new elements. An index past the length (or negative) traps, as an array's does; smallUnsafe and fastUnsafe check only the capacity."
             }
-            = code.block(arrays_sample());
-            = code.block(generator_sample());
+            = code.block(arrays_sample())
+            = code.block(generator_sample())
             p {
-                "A generator cannot be zipped: ";
+                "A generator cannot be zipped: "
                 code {
-                    "for (evens(4), 0 ..< 4) |v, i|";
+                    "for (evens(4), 0 ..< 4) |v, i|"
                 }
-                " is an error. To number its values, count with a ";
+                " is an error. To number its values, count with a "
                 code {
-                    "let";
+                    "let"
                 }
-                ":";
+                ":"
             }
-            = code.block(generator_index_sample());
-            = code.block(mem_sample());
+            = code.block(generator_index_sample())
+            = code.block(mem_sample())
             h2 {
-                "Errors";
+                "Errors"
             }
             p {
                 code {
-                    "assert";
+                    "assert"
                 }
-                " and ";
+                " and "
                 code {
-                    "fatal";
+                    "fatal"
                 }
-                " trap, and a trap is never caught. JavaScript exceptions are caught with ";
+                " trap, and a trap is never caught. JavaScript exceptions are caught with "
                 code {
-                    "try";
+                    "try"
                 }
-                ", an expression like ";
+                ", an expression like "
                 code {
-                    "if";
+                    "if"
                 }
-                ".";
+                "."
             }
-            = code.block(assert_sample());
-            = code.block(try_sample());
-            = code.block(try_default_sample());
+            = code.block(assert_sample())
+            = code.block(try_sample())
+            = code.block(try_default_sample())
             p {
-                "A failure the caller should expect (bad input, a missing key) is a ";
+                "A failure the caller should expect (bad input, a missing key) is a "
                 code {
-                    "Result[T, E]";
+                    "Result[T, E]"
                 }
-                ", made with ";
+                ", made with "
                 code {
-                    "ok";
+                    "ok"
                 }
-                " or ";
+                " or "
                 code {
-                    "err";
+                    "err"
                 }
-                " and read with ";
+                " and read with "
                 code {
-                    "is_ok";
+                    "is_ok"
                 }
-                ", ";
+                ", "
                 code {
-                    "value";
+                    "value"
                 }
-                ", ";
+                ", "
                 code {
-                    "error";
+                    "error"
                 }
-                ", or ";
+                ", or "
                 code {
-                    "value_or";
+                    "value_or"
                 }
-                ". ";
+                ". "
                 code {
-                    "try r";
+                    "try r"
                 }
-                " is r's value, or returns r's error from a function whose Result has the same error type.";
+                " is r's value, or returns r's error from a function whose Result has the same error type."
             }
-            = code.block(result_sample());
+            = code.block(result_sample())
             h2 {
-                "defer";
+                "defer"
             }
-            = code.block(defer_sample());
-            = code.block(defer_return_sample());
+            = code.block(defer_sample())
+            = code.block(defer_return_sample())
             p {
                 code {
-                    "errdefer";
+                    "errdefer"
                 }
-                " runs only when the function returns an error: a ";
+                " runs only when the function returns an error: a "
                 code {
-                    "try";
+                    "try"
                 }
-                " that fails, or a returned Result that is one.";
+                " that fails, or a returned Result that is one."
             }
-            = code.block(errdefer_sample());
+            = code.block(errdefer_sample())
             h2 {
-                "Tests and benchmarks";
+                "Tests and benchmarks"
             }
             p {
                 code {
-                    "utu test";
+                    "utu test"
                 }
-                " runs each test, a mod's too (named ";
+                " runs each test, a mod's too (named "
                 code {
-                    "geo: name";
+                    "geo: name"
                 }
-                "); no two show one name. A test whose await waits on nothing (or on anything for 10 s) fails; so does one whose callback throws (one scheduled for now, before the next test starts); what throws after the tests is one more failure; the run ends after its summary, whatever timers are left. ";
+                "); no two show one name. A test whose await waits on nothing (or on anything for 10 s) fails; so does one whose callback throws (one scheduled for now, before the next test starts); what throws after the tests is one more failure; the run ends after its summary, whatever timers are left. "
                 code {
-                    "utu bench";
+                    "utu bench"
                 }
-                " runs each bench in timed runs: each run does the setup once (its ";
+                " runs each bench in timed runs: each run does the setup once (its "
                 code {
-                    "defer";
+                    "defer"
                 }
-                "s after), then the ";
+                "s after), then the "
                 code {
-                    "measure";
+                    "measure"
                 }
-                " block n times. It warms the engine up, doubles n until a run takes 20 ms, then prints the median time per iteration of 11 runs, less the median of runs of the setup alone. A bench fails as a test does (an await that never ends, a callback's error) and the other rows still print. A bench does not ";
+                " block n times. It warms the engine up, doubles n until a run takes 20 ms, then prints the median time per iteration of 11 runs, less the median of runs of the setup alone. A bench fails as a test does (an await that never ends, a callback's error) and the other rows still print. A bench does not "
                 code {
-                    "return";
+                    "return"
                 }
-                ". Every command checks tests and benches, an imported file's too (they run only from their own file), not only ";
+                ". Every command checks tests and benches, an imported file's too (they run only from their own file), not only "
                 code {
-                    "utu test";
+                    "utu test"
                 }
-                ".";
+                "."
             }
-            = code.block(tests_sample());
-            = code.shell(tests_shell());
+            = code.block(tests_sample())
+            = code.shell(tests_shell())
             h2 {
-                "Promises and await";
+                "Promises and await"
             }
             p {
                 code {
-                    "Promise[T]";
+                    "Promise[T]"
                 }
-                " is a real JavaScript promise. Any function may ";
+                " is a real JavaScript promise. Any function may "
                 code {
-                    "await";
+                    "await"
                 }
-                " (through JSPI: Chrome 126+, Node 23+, Bun); ";
+                " (through JSPI: Chrome 126+, Node 23+, Bun); "
                 code {
-                    ".then";
+                    ".then"
                 }
-                " runs anywhere. A closure utu calls may await too; one the host calls (a ";
+                " runs anywhere. A closure utu calls may await too; one the host calls (a "
                 code {
-                    ".then";
+                    ".then"
                 }
-                " callback, an event handler) may not: JSPI cannot suspend through the host's frame. ";
+                " callback, an event handler) may not: JSPI cannot suspend through the host's frame. "
                 code {
-                    "await for";
+                    "await for"
                 }
-                " reads a ";
+                " reads a "
                 code {
-                    "Stream[T]";
+                    "Stream[T]"
                 }
-                ".";
+                "."
             }
-            = code.block(await_sample());
-            = code.block(then_sample());
-            = code.block(stream_sample());
+            = code.block(await_sample())
+            = code.block(then_sample())
+            = code.block(stream_sample())
             h2 {
-                "Inline JavaScript";
+                "Inline JavaScript"
             }
             p {
                 code {
-                    "@es";
+                    "@es"
                 }
-                " binds a JavaScript function to a typed ";
+                " binds a JavaScript function to a typed "
                 code {
-                    "fun";
+                    "fun"
                 }
-                ". For whole libraries, see ";
+                ". For whole libraries, see "
                 a {
-                    href = "#/javascript";
-                    "JavaScript and npm";
+                    href = "#/javascript"
+                    "JavaScript and npm"
                 }
-                ".";
+                "."
             }
-            = code.block(es_sample());
+            = code.block(es_sample())
             h2 {
-                "Embedded languages";
+                "Embedded languages"
             }
             p {
-                "An ";
+                "An "
                 code {
-                    "@name/\\ ... \\/";
+                    "@name/\\ ... \\/"
                 }
-                " envelope hands its text to a language the compiler knows: ";
+                " envelope hands its text to a language the compiler knows: "
                 code {
-                    "@json";
+                    "@json"
                 }
-                " (";
+                " ("
                 a {
-                    href = "#/data";
-                    "typed JSON";
+                    href = "#/data"
+                    "typed JSON"
                 }
-                "), ";
+                "), "
                 code {
-                    "@wat";
+                    "@wat"
                 }
-                " (WebAssembly text), ";
+                " (WebAssembly text), "
                 code {
-                    "@css";
+                    "@css"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "@wutu";
+                    "@wutu"
                 }
-                " (";
+                " ("
                 a {
-                    href = "#/wutu";
-                    "markup";
+                    href = "#/wutu"
+                    "markup"
                 }
-                ").";
+                ")."
             }
-            = code.block(json_sample());
-            = code.block(wat_sample());
-            = code.block(css_sample());
-            = code.block(wutu_sample());
+            = code.block(json_sample())
+            = code.block(wat_sample())
+            = code.block(css_sample())
+            = code.block(wutu_sample())
             h2 {
-                "Entry points and doc comments";
+                "Entry points and doc comments"
             }
             p {
                 code {
-                    "main";
+                    "main"
                 }
-                " is a program; ";
+                " is a program; "
                 code {
-                    "lib";
+                    "lib"
                 }
-                " exports functions to JavaScript instead. ";
+                " exports functions to JavaScript instead. "
                 code {
-                    "///";
+                    "///"
                 }
-                " comments document the next declaration.";
+                " comments document the next declaration."
             }
-            = code.block(lib_sample());
-            = code.block(lib_js());
-            = ui.further("new_spec2.md", "the language specification");
+            = code.block(lib_sample())
+            = code.block(lib_js())
+            = ui.further("new_spec2.md", "the language specification")
         }
         \/
     }

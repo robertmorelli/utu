@@ -15,18 +15,18 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
         title:""
     };
     @wutu/\
-    @island "studio-form";
+    @island "studio-form"
     form.panel {
         label {
-            "Next piece of work";
+            "Next piece of work"
             input {
-                required = "";
-                bind:value = draft.title;
+                required = ""
+                bind:value = draft.title
             }
         }
         button.primary {
-            type = "submit";
-            "Add work";
+            type = "submit"
+            "Add work"
         }
         on submit {
             if draft.title.trim().len()>0 {
@@ -34,47 +34,47 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
                     id:Browser.crypto.randomUUID(),
                     title:draft.title,
                     stage:0
-                });
-                draft.title="";
-                wutu.save("studio-v2");
-                wutu.invalidate("studio-workspace");
-            };
+                })
+                draft.title=""
+                wutu.save("studio-v2")
+                wutu.invalidate("studio-workspace")
+            }
         }
     }
     \/;
 }
 fn workspace(state: StudioState) Browser.HTMLElement {
     @wutu/\
-    @island "studio-workspace";
+    @island "studio-workspace"
     section.workspace {
-        = studio_form(state);
+        = studio_form(state)
         div.grid {
             for ["Up next","In progress","Finished"] |name,index| {
                 section.well.stack {
                     h2 {
-                        = name;
+                        = name
                     }
-                    for (state.tasks filter |task| {task.stage==index.i64().i32();}) |task| key global task.id {
+                    for (state.tasks filter |task| {task.stage==index.i64().i32() }) |task| key global task.id {
                         article.panel.stack {
                             h3 {
-                                = task.title;
+                                = task.title
                             }
                             button {
-                                aria-label = "Move "+task.title;
+                                aria-label = "Move "+task.title
                                 = if task.stage==2 {
-                                    "Reopen ↺";
+                                    "Reopen ↺"
                                 }
                                 else {
-                                    "Move forward →";
-                                };
+                                    "Move forward →"
+                                }
                                 on click {
                                     task.stage=if task.stage==2 {
-                                        0;
+                                        0
                                     }
                                     else {
-                                        task.stage+1;
-                                    };
-                                    wutu.save("studio-v2");
+                                        task.stage+1
+                                    }
+                                    wutu.save("studio-v2")
                                 }
                             }
                         }
@@ -106,42 +106,42 @@ main {
         }
     \/;
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "studio";
+        data-theme = "studio"
         nav {
             strong {
-                "STUDIO / AN EVERYDAY TOOL";
+                "STUDIO / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "From a first thought to a finished thing.";
+                "From a first thought to a finished thing."
             }
             p.muted {
-                "A small board for your studio. Keep one piece moving, then make space for the next.";
+                "A small board for your studio. Keep one piece moving, then make space for the next."
             }
         }
-        = workspace(state);
+        = workspace(state)
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

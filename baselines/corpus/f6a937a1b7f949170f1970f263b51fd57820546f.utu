@@ -3,12 +3,12 @@ using Browser from std:Browser;
           struct Gauge:
               | pct: I32
           fn view(g: Gauge) Browser.HTMLElement {
-            @wutu/\ @reactive;
+            @wutu/\ @reactive
             div {
-              display: block;
-              width: = g.pct.str() + "%";
-              --level: = g.pct.str();
-              span { "gauge"; }
+              display: block
+              width: = g.pct.str() + "%"
+              --level: = g.pct.str()
+              span { "gauge" }
             }
             \/;
           }

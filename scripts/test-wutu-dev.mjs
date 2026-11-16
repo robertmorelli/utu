@@ -13,7 +13,7 @@ const browser=await chromium.launch();
 try{
  const deadline=Date.now()+30000;while(!/Wutu preview: (http:\/\/[^\s]+)/.test(log)){if(Date.now()>deadline)throw Error(log);await new Promise(r=>setTimeout(r,100));}
  const origin=/Wutu preview: (http:\/\/[^\s]+)/.exec(log)[1],page=await browser.newPage();await page.goto(origin);await page.getByText('First build',{exact:true}).waitFor();await page.getByLabel('Draft').fill('Keep this draft');
- await fs.writeFile(entry,source('Broken').replace('"Broken";','"Broken"'));
+ await fs.writeFile(entry,source('Broken').replace('"Broken";','"Broken" "x"'));
  await page.locator('#__wutu_error').waitFor();assert.match(await page.locator('#__wutu_error').textContent(),/main\.utu:\d+:\d+/);assert.equal(await page.locator('h1').textContent(),'First build');
  await fs.writeFile(entry,source('Recovered build'));await page.getByText('Recovered build',{exact:true}).waitFor();assert.equal(await page.locator('#__wutu_error').count(),0);await page.waitForFunction(()=>document.querySelector('input').value==='Keep this draft');
  console.log('Development preview: rebuild, positioned diagnostic overlay, last-good output, and recovery passed');

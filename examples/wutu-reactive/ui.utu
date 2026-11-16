@@ -4,8 +4,8 @@ mod ui {
     fn badge(text: Str) Browser.HTMLElement {
         @wutu/\
         small.badge {
-            padding:0.25rem;
-            = text;
+            padding:0.25rem
+            = text
         }
         \/
     }

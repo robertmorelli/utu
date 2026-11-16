@@ -19,19 +19,19 @@ fn days(start:Str,end:Str) I32 {
 }
 fn workspace(state: GroveState) Browser.HTMLElement {
     @wutu/\
-    @island "grove-workspace";
+    @island "grove-workspace"
     section.workspace {
         label.panel {
-            "Planning date";
+            "Planning date"
             input {
-                type = "date";
-                bind:value = state.date;
+                type = "date"
+                bind:value = state.date
             }
         }
         if state.date.len()!=10 {
             p {
-                role = "status";
-                "Choose a date to continue.";
+                role = "status"
+                "Choose a date to continue."
             }
         }
         div.grid {
@@ -39,35 +39,35 @@ fn workspace(state: GroveState) Browser.HTMLElement {
                 article.panel.stack {
                     p.eyebrow {
                         = if days(plant.watered,state.date)>=plant.interval {
-                            "CHECK THE SOIL";
+                            "CHECK THE SOIL"
                         }
                         else {
-                            "RESTING EASY";
-                        };
+                            "RESTING EASY"
+                        }
                     }
                     h2 {
-                        = plant.name;
+                        = plant.name
                     }
                     p.muted {
-                        = "Last watered "+plant.watered;
+                        = "Last watered "+plant.watered
                     }
                     p {
-                        = "Check roughly every "+wutu.number(plant.interval)+" days. Let the soil guide you.";
+                        = "Check roughly every "+wutu.number(plant.interval)+" days. Let the soil guide you."
                     }
                     button.primary {
-                        disabled = state.date.len()!=10;
-                        aria-label = "Watered "+plant.name;
-                        "Watered today ✓";
+                        disabled = state.date.len()!=10
+                        aria-label = "Watered "+plant.name
+                        "Watered today ✓"
                         on click {
-                            plant.watered=state.date;
-                            wutu.save("grove-v2");
+                            plant.watered=state.date
+                            wutu.save("grove-v2")
                         }
                     }
                 }
             }
         }
         p.muted {
-            "Intervals are reminders, not automatic watering instructions. Light, soil, pot size, and seasons change what plants need.";
+            "Intervals are reminders, not automatic watering instructions. Light, soil, pot size, and seasons change what plants need."
         }
     }
     \/;
@@ -97,42 +97,42 @@ main {
         }
     \/;
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "grove";
+        data-theme = "grove"
         nav {
             strong {
-                "GROVE / AN EVERYDAY TOOL";
+                "GROVE / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "A little attention. A greener room.";
+                "A little attention. A greener room."
             }
             p.muted {
-                "Keep watering notes for the plants that make your space feel alive. Pick a day to see what may need attention.";
+                "Keep watering notes for the plants that make your space feel alive. Pick a day to see what may need attention."
             }
         }
-        = workspace(state);
+        = workspace(state)
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

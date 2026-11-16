@@ -4,8 +4,8 @@ using Browser from std:Browser;
 
 fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
     @wutu/\
-    h2 { = title; }
-    p { "Some text"; }
+    h2 { = title }
+    p { "Some text" }
     \/;
 }
 

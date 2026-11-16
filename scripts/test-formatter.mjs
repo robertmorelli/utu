@@ -63,9 +63,9 @@ for (const [source, expected] of cases) {
 {
   const source = 'using Browser from std:Browser;\n\nmain {\n    let n = @wutu/\\\n    form { label { for="q"; "Find"; } input#q { display: grid; type="search"; } }\n    \\/;\n    Browser.document.body.append(n);\n}\n';
   const text = await formatUtuSource(source, { shape });
-  assert.match(text, /for="q";/);
+  assert.match(text, /for="q"\n/);
   assert.match(text, /input#q \{/);
-  assert.match(text, /display: grid;/);
+  assert.match(text, /display: grid\n/);
   assert.equal(await formatUtuSource(text, { shape }), text);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-format-'));
   for (const [name, body] of [['wutu.utu', text], ['templates.utu', await formatUtuSource(fs.readFileSync(path.join(ROOT, 'examples/templates.utu'), 'utf8'), { shape })]]) {

@@ -5,7 +5,7 @@ using Browser from std:Browser;
 fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
     @wutu/\
     section {
-        .card { h2 { = title; } }
+        .card { h2 { = title } }
     }
     \/;
 }

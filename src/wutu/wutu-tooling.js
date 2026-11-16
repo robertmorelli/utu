@@ -83,19 +83,38 @@ function compactExpression(value) {
   return result;
 }
 
+const STAGE_WORDS = new Set('map filter skip take skip_while take_while scan zip chain flat_map repeat fold each any all count_where first_index last_index sum fast_sum product count sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect'.split(' '));
+
+/**
+ * Whether a line break after `current` (with `rest` after it) ends the
+ * statement: in code, as utu's (the line does not end open, the next does
+ * not go on); in CSS, unless the line ends in `,`.
+ */
+function endsLine(current, rest, code) {
+  const tail = current.trimEnd();
+  if (!code) return !tail.endsWith(',');
+  if (/[+\-*/%=<>&|^~!,.?:]$/.test(tail) || /\b(and|or|xor|not|orelse|else|in)$/.test(tail)) return false;
+  const next = rest.trimStart();
+  if (/^(\.[a-z_](?![\w-]*[ \t]*=(?!=))|\?\.|[+*/%<>|^~!{]|==|(and|or|xor|orelse|else|catch)\b|collect\()/.test(next)) return false;
+  const stage = /^([a-z_]\w*)\s*(\([^)]*\))?\s*\|/.exec(next);
+  return !(stage && STAGE_WORDS.has(stage[1]));
+}
+
 class BodyFormatter {
   constructor() {
     this.lines = [];
   }
 
   add(depth, text) {
-    this.lines.push(INDENT.repeat(depth) + text);
+    // (A line ending open, as `x = item.` does, would go on to the next: its `;` stays.)
+    const open = /[+\-*/%=<>&|^~!,.?:]$/.test(text) || /\b(and|or|xor|not|orelse|else|in)$/.test(text);
+    this.lines.push(INDENT.repeat(depth) + text + (open ? ';' : ''));
   }
 
   format(tree) {
-    if (tree.scope) this.add(0, `@island ${tree.scope};`);
-    else if (tree.reactive) this.add(0, '@reactive;');
-    for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)};`);
+    if (tree.scope) this.add(0, `@island ${tree.scope}`);
+    else if (tree.reactive) this.add(0, '@reactive');
+    for (const use of tree.styleUses) this.add(0, `@style ${compactExpression(use.value)}`);
     for (const css of tree.global) this.block(`@document {${css}}`, 0);
     this.node(tree.root, 0);
     return '\n' + this.lines.join('\n') + '\n';
@@ -103,7 +122,9 @@ class BodyFormatter {
 
   /**
    * Lay out raw CSS or Utu code one statement per line, indenting by brace
-   * depth. In code mode, commas between block-level items also break lines.
+   * depth, with no `;` at a line's end (a statement ends at a `;` or a line
+   * break that ends it). In code mode, commas between block-level items also
+   * break lines.
    */
   block(text, depth, code = false) {
     let current = '', quote = '', parens = 0;
@@ -140,9 +161,11 @@ class BodyFormatter {
         flush();
         depth--;
         current = '}';
-        if (!/^\s*([;,)]|else\b)/.test(text.slice(i + 1))) flush();
+        // (What is written right after it, `}app`, stays with it: a line break there would end it.)
+        if (!/^\s*([,)]|else\b)/.test(text.slice(i + 1)) && !/^[\w"(\[.]/.test(text.slice(i + 1))) flush();
       } else if (c === ';' && parens === 0) {
-        current = current.trimEnd() + ';';
+        flush();
+      } else if (c === '\n' && parens === 0 && current.trim() && endsLine(current, text.slice(i + 1), code)) {
         flush();
       } else if (c === ',' && code && braces.at(-1) === parens && !inCaptures(current)) {
         current = current.trimEnd() + ',';
@@ -162,8 +185,8 @@ class BodyFormatter {
 
   node(node, depth) {
     switch (node.kind) {
-      case 'text': return this.block(`${node.expr};`, depth, true);
-      case 'expression': return this.block(`= ${node.expr};`, depth, true);
+      case 'text': return this.block(node.expr, depth, true);
+      case 'expression': return this.block(`= ${node.expr}`, depth, true);
       case 'if': return this.conditional(node, depth, 'if');
       case 'for': return this.loop(node, depth);
       default: return this.element(node, depth);
@@ -198,20 +221,20 @@ class BodyFormatter {
     const at = (start, emit) => items.push({ start, emit });
     for (const { name, value, property, dynamic, shorthand, start } of node.attrs) {
       if (shorthand) continue;
-      if (node.unmanaged && name === 'data-wutu-unmanaged') { at(start, () => this.add(depth + 1, '@unmanaged;')); continue; }
+      if (node.unmanaged && name === 'data-wutu-unmanaged') { at(start, () => this.add(depth + 1, '@unmanaged')); continue; }
       // `for = …` would open a loop: an attribute named like a keyword keeps its `=` tight.
       const eq = !property && (name === 'if' || name === 'for') ? '=' : ' = ';
-      if (!property && !dynamic && value === '""') at(start, () => this.add(depth + 1, `${name};`));
-      else at(start, () => this.add(depth + 1, `${property ? '.' : ''}${name}${eq}${dynamic ? compactExpression(value) : value};`));
+      if (!property && !dynamic && value === '""') at(start, () => this.add(depth + 1, name));
+      else at(start, () => this.add(depth + 1, `${property ? '.' : ''}${name}${eq}${dynamic ? compactExpression(value) : value}`));
     }
     for (const rule of node.css) at(rule.start, () => this.block(rule.source, depth + 1));
-    for (const style of node.styles ?? []) at(style.start, () => this.add(depth + 1, `${style.property}: = ${compactExpression(style.value)};`));
-    for (const binding of node.twoWay) at(binding.start, () => this.add(depth + 1, `bind:${binding.property} = ${compactExpression(binding.value)};`));
+    for (const style of node.styles ?? []) at(style.start, () => this.add(depth + 1, `${style.property}: = ${compactExpression(style.value)}`));
+    for (const binding of node.twoWay) at(binding.start, () => this.add(depth + 1, `bind:${binding.property} = ${compactExpression(binding.value)}`));
     for (const child of node.children) at(child.start, () => this.node(child, depth + 1));
     for (const event of node.events) {
       const head = `on ${event.name}${event.quiet ? ' quiet' : ''}`;
       if (event.shorthand) at(event.start, () => this.block(`${head}${event.param ? ` |${event.param}|` : ''} ${event.handler}`, depth + 1, true));
-      else at(event.start, () => this.block(`${head} = ${event.handler};`, depth + 1, true));
+      else at(event.start, () => this.block(`${head} = ${event.handler}`, depth + 1, true));
     }
     for (const { emit } of items.sort((a, b) => a.start - b.start)) emit();
     this.add(depth, '}');
@@ -254,17 +277,18 @@ export function formatWutuSource(source) {
 const WUTU_WORDS = new Set(['if', 'for', 'else', 'as', 'key', 'global', 'on', 'quiet']);
 
 /**
- * Whether `b` is `a` with only whitespace changed, and only beside `{`, `}`,
- * `;` or `=` (never after a keyword: `for =` is a loop, `for=` an
- * attribute), never inside a string; and both parse to the same tree.
+ * Whether `b` is `a` with only whitespace (and `;`, which a line break
+ * replaces) changed, and only beside `{`, `}`, `;` or `=` (never after a
+ * keyword: `for =` is a loop, `for=` an attribute), never inside a string;
+ * and both parse to the same tree.
  */
 function sameWutu(a, b) {
   let i = 0, j = 0, quoted = '', prev = '';
   for (;;) {
     const si = i, sj = j;
     if (!quoted) {
-      while (i < a.length && /\s/.test(a[i])) i++;
-      while (j < b.length && /\s/.test(b[j])) j++;
+      while (i < a.length && (/\s/.test(a[i]) || a[i] === ';')) i++;
+      while (j < b.length && (/\s/.test(b[j]) || b[j] === ';')) j++;
     }
     if (i === a.length || j === b.length) return i === a.length && j === b.length && !quoted && sameWutuTree(a, b);
     if (a[i] !== b[j]) return false;
@@ -289,7 +313,7 @@ function sameWutuTree(a, b) {
     try {
       return JSON.stringify(parseWutu(text), (key, value) =>
         key === 'start' || key === 'end' || /range$/i.test(key) ? undefined
-          : typeof value === 'string' ? value.replace(/\s+/g, '') : value);
+          : typeof value === 'string' ? value.replace(/[\s;]+/g, '') : value);
     } catch { return null; }
   };
   const shapeA = shape(a);

@@ -5,7 +5,7 @@ using Browser from std:Browser;
 fn view(url: Str) Browser.HTMLElement {
     @wutu/\
     div {
-        script { src = url; }
+        script { src = url }
     }
     \/;
 }

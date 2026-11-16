@@ -30,14 +30,14 @@ struct State:
 
 fn cell(label: Str) Browser.HTMLElement {
     @wutu/\
-    span.cell { = label; }
+    span.cell { = label }
     \/
 }
 
 /// Takes another component: it lands inside, not beside.
 fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
     @wutu/\
-    figure { header { "Title"; } = body; }
+    figure { header { "Title" } = body }
     \/
 }
 
@@ -45,28 +45,28 @@ fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
 fn byMethod(label: Str) Browser.HTMLElement {
     let r = Reader { k: 0 }
     @wutu/\
-    span#method { = label + r.read().str(); }
+    span#method { = label + r.read().str() }
     \/
 }
 
 /// The clock is new each time: never reused.
 fn byClock(label: Str) Browser.HTMLElement {
     @wutu/\
-    span#clock { = label + time.now().str(); }
+    span#clock { = label + time.now().str() }
     \/
 }
 
 fn beat(state: State) Browser.HTMLElement {
     wutu.interval("beat", 20.0, cl() Void { state.beats += 1 })
     @wutu/\
-    p#beat { "beating"; }
+    p#beat { "beating" }
     \/
 }
 
 fn icon(state: State) Browser.SVGElement {
     @wutu/\
-    @reactive;
-    svg { viewBox = "0 0 10 10"; circle { r = state.n.str(); } use#ns { xlink:href = "#c" + state.n.str(); xml:space = "preserve"; } }
+    @reactive
+    svg { viewBox = "0 0 10 10"; circle { r = state.n.str() } use#ns { xlink:href = "#c" + state.n.str(); xml:space = "preserve" } }
     \/
 }
 
@@ -79,53 +79,53 @@ main {
         timer: true, beats: 0, hidden: true, width: "40%", twice: 0, picks: [""],
     }
     let app = @wutu/\
-    @reactive;
+    @reactive
     main {
         form#form {
-            input#q { name = "q"; }
-            button#go { type = "submit"; "go"; }
-            on submit { state.n += 1; }
+            input#q { name = "q" }
+            button#go { type = "submit"; "go" }
+            on submit { state.n += 1 }
         }
-        p#n { = state.n; }
-        button#bump { "bump"; on click { state.n += 1; ticks[0] += 1; } }
-        p#hid { .hidden = state.hidden; "secret"; }
-        div { i#fill { width: = state.width; } }
-        p#tip { .title = "tip"; "tip"; }
-        label { for = "q"; "Query"; }
-        my-card as card { "custom"; }
+        p#n { = state.n }
+        button#bump { "bump"; on click { state.n += 1; ticks[0] += 1 } }
+        p#hid { .hidden = state.hidden; "secret" }
+        div { i#fill { width: = state.width } }
+        p#tip { .title = "tip"; "tip" }
+        label { for = "q"; "Query" }
+        my-card as card { "custom" }
         for state.rows |row| key row.id {
-            div.row { for row.cells |c| key c { = cell("same"); } }
+            div.row { for row.cells |c| key c { = cell("same") } }
         }
-        = byMethod("m");
-        = byClock("t");
-        input#number { type = "number"; bind:number = state.number; }
-        input#capped { type = "number"; max = "10"; bind:number = state.capped; }
-        button#numbers { "numbers"; on click { state.number = 7.0; state.capped = 20.0; } }
+        = byMethod("m")
+        = byClock("t")
+        input#number { type = "number"; bind:number = state.number }
+        input#capped { type = "number"; max = "10"; bind:number = state.capped }
+        button#numbers { "numbers"; on click { state.number = 7.0; state.capped = 20.0 } }
         select#pick {
-            bind:value = state.pick;
-            for state.options |o| { option { value = o; = o; } }
+            bind:value = state.pick
+            for state.options |o| { option { value = o; = o } }
         }
-        button#more { "more"; on click { state.options = ["a", "b", "c", "d"]; state.pick = "d"; } }
+        button#more { "more"; on click { state.options = ["a", "b", "c", "d"]; state.pick = "d" } }
         select#multi {
-            .multiple = true;
-            bind:values = state.picks;
-            option { value = ""; "none"; }
-            option { value = "x"; "x"; }
+            .multiple = true
+            bind:values = state.picks
+            option { value = ""; "none" }
+            option { value = "x"; "x" }
         }
-        p#tpl { = `a${`b;`}`; }
-        p#picks { = state.picks.len().str(); }
-        button#stop { "stop"; on click { state.timer = false; } }
-        p#beats { = state.beats; }
-        if state.timer { = beat(state); }
+        p#tpl { = `a${`b;`}` }
+        p#picks { = state.picks.len().str() }
+        button#stop { "stop"; on click { state.timer = false } }
+        p#beats { = state.beats }
+        if state.timer { = beat(state) }
         div as chart {
-            id = "chart";
-            @unmanaged;
-            on mount { chart.append(Browser.document.createTextNode("drawn;")); }
+            id = "chart"
+            @unmanaged
+            on mount { chart.append(Browser.document.createTextNode("drawn;")) }
         }
-        = icon(state);
+        = icon(state)
         div#nested {
-            = framed(cell(state.n.str()));
-            for state.rows |row| key row.id { = framed(cell(row.id)); }
+            = framed(cell(state.n.str()))
+            for state.rows |row| key row.id { = framed(cell(row.id)) }
         }
     }
     \/

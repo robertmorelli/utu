@@ -5,7 +5,7 @@ using Browser from std:Browser;
 fn view(note: Str) Browser.HTMLElement {
     @wutu/\
     div {
-        noscript { = note; }
+        noscript { = note }
     }
     \/;
 }

@@ -6,7 +6,7 @@ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
     @wutu/\
     section {
         # the heading
-        h2 { = title; }
+        h2 { = title }
     }
     \/;
 }

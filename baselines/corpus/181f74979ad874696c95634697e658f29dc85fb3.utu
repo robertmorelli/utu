@@ -1,2 +1,2 @@
 using Browser from std:Browser;
-main { Browser.document.body.append(@wutu/\ div { p { hreff = "/"; } } \/); }
+main { Browser.document.body.append(@wutu/\ div { p { hreff = "/" } } \/); }

@@ -13,11 +13,11 @@ fn greeting(name: Str) Browser.HTMLElement {
         display: grid
         gap: 1rem
         padding: 1.5rem
-        h2 { margin: 0; "Hello, "; = name; }
+        h2 { margin: 0; "Hello, "; = name }
         a {
             href="/about"
             color: oklch(45% 0.12 150)
-            :hover { text-decoration-thickness: 0.15em; }
+            :hover { text-decoration-thickness: 0.15em }
             "About this garden"
         }
     }
@@ -31,15 +31,21 @@ main {
 
 ## Syntax
 
-Every leaf statement requires a semicolon: attributes (including booleans), DOM
-properties, events, text, interpolations, and CSS declarations. This includes
-CSS declarations inside `@document`, selectors, and media blocks. Element,
-selector, and `if`/`for` blocks are brace-delimited and do not take a terminator.
-Missing semicolons are compile errors, not warnings or implicit separators.
+A statement ends at its line's end, as a utu statement does: attributes
+(including booleans), DOM properties, events, text, interpolations, and CSS
+declarations, inside `@document`, selectors, and media blocks too. `;` puts
+two on one line. An expression goes on to the next line when its line ends
+open (an operator, `,`, `=`) or the next line begins `.f`, `else`, an operator,
+or a stage like `map |x|`; a CSS value goes on when its line ends in `,` or
+the next line is indented past it. Element, selector, and `if`/`for` blocks
+are brace-delimited.
 
 ```wutu
-aria-hidden = "true";
-aspect-ratio: 0.68;
+aria-hidden = "true"
+aspect-ratio: 0.68
+grid-template-areas: "a b"
+    "c d"
+p { "Hi"; = name }
 ```
 
 Every element head starts with a tag. `button.primary#save { ... }` creates a
@@ -51,21 +57,21 @@ and returns that element, with its concrete browser type where available.
 | --- | --- |
 | `tag.class#id { ... }` | An HTML element; custom-element names are accepted |
 | `tag as name { ... }` | Name the node within its template subtree |
-| `property: value;` | CSS declaration attached to this element |
-| `name = "value";` | HTML attribute (`=` where CSS has `:`) |
-| `name = expression;` | Utu-valued attribute; ordinary attributes expect Str |
-| `disabled;` / `disabled = condition;` | Boolean attribute presence |
-| `.value = expression;` | Typed DOM **property** assignment |
-| `"text";` | A text node |
-| `= expression;` | Text or a node: a Str, a number or Bool (its `str()`), or a DOM node such as a component's result |
-| `property: = expression;` | A CSS value computed at render |
+| `property: value` | CSS declaration attached to this element |
+| `name = "value"` | HTML attribute (`=` where CSS has `:`) |
+| `name = expression` | Utu-valued attribute; ordinary attributes expect Str |
+| `disabled` / `disabled = condition` | Boolean attribute presence |
+| `.value = expression` | Typed DOM **property** assignment |
+| `"text"` | A text node |
+| `= expression` | Text or a node: a Str, a number or Bool (its `str()`), or a DOM node such as a component's result |
+| `property: = expression` | A CSS value computed at render |
 | `if cond { … } else if cond { … } else { … }` | Conditional children |
 | `for items \|item, i\| key item.id { … }` | Repeated children (keys may be any scalar or Str) |
 | `on click { … }` | An event handler, with no event variable |
 | `on click \|e\| { … }` | The same, with the event as `e`, typed as the DOM types it (`MouseEvent`) |
-| `on click = handler;` | A handler value: a `cl(Browser.Event) Void` |
-| `bind:value = state.text;` | Two-way bindings: `value`, `checked`, `number`, `group`, `values`, `files` |
-| `// comment` | A comment, first on a line or after a blank; `/* … */` also works. `#` is always text, so `color: #1f2535;` is a color |
+| `on click = handler` | A handler value: a `cl(Browser.Event) Void` |
+| `bind:value = state.text` | Two-way bindings: `value`, `checked`, `number`, `group`, `values`, `files` |
+| `// comment` | A comment, first on a line or after a blank; `/* … */` also works. `#` is always text, so `color: #1f2535` is a color |
 
 An expression stands on its own: `if`, `for`, and `key` read up to the block's
 `{` (`for` up to its `|item|`). An expression with braces or captures of its own
@@ -143,13 +149,13 @@ moved into the parent by the DOM's normal append semantics.
 ```utu
 @wutu/\
 section {
-    for (plants filter |plant| { not plant.watered; }) |plant, index| {
+    for (plants filter |plant| { not plant.watered }) |plant, index| {
         = plant_card(plant)
     }
     if empty {
-        p { "Everything is watered."; }
+        p { "Everything is watered." }
     } else {
-        p { "A little care goes a long way."; }
+        p { "A little care goes a long way." }
     }
 }
 \/
@@ -262,7 +268,7 @@ it. Keep page-specific rules next to the page that uses them:
 fn editor() Browser.HTMLElement {
     @wutu/\
     @document {
-        .editor > pre { margin: 0; }
+        .editor > pre { margin: 0 }
     }
     div.editor {
         pre {
@@ -375,7 +381,7 @@ using Browser from std:Browser
 mod guide {
     fn page(who: Str) Browser.HTMLElement {
         @wutu/\
-        article { h1 { = "Hello, " + who; } }
+        article { h1 { = "Hello, " + who } }
         \/
     }
 }
@@ -422,14 +428,14 @@ header from its title) costs nothing once rendered.
 main {
     label {
         "Search"
-        input { bind:value = state.query; }
+        input { bind:value = state.query }
     }
     for state.items |item| key item.id {
         article {
-            h2 { = item.title; }
+            h2 { = item.title }
             button {
                 "Finish"
-                on click { item.done = true; }
+                on click { item.done = true }
             }
         }
     }

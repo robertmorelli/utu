@@ -1,4 +1,4 @@
 using Browser from std:Browser;
 struct S:
     | t: Str
-main { let s = S { t: "" }; Browser.document.body.append(@wutu/\ div { input { bind:value = s.t; } } \/); }
+main { let s = S { t: "" }; Browser.document.body.append(@wutu/\ div { input { bind:value = s.t } } \/); }

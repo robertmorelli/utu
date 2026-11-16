@@ -4,8 +4,8 @@ using Browser from std:Browser;
 
 main {
     let app = @wutu/\
-    @reactive;
-    main { input { .value = "a"; .value = "b"; } }
+    @reactive
+    main { input { .value = "a"; .value = "b" } }
     \/;
     Browser.document.body.append(app);
 }

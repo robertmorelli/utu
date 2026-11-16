@@ -44,54 +44,54 @@ mod playground {
         \\main {
         \\    let state = State { draft: "", todos: [], made: 0 }
         \\    Browser.document.body.append(@wutu/\
-        \\    @reactive;
+        \\    @reactive
         \\    main {
-        \\        font-family: system-ui, sans-serif;
-        \\        max-width: 30rem;
-        \\        margin: 3rem auto;
-        \\        padding: 0 1rem;
-        \\        color: rgb(31 37 53);
+        \\        font-family: system-ui, sans-serif
+        \\        max-width: 30rem
+        \\        margin: 3rem auto
+        \\        padding: 0 1rem
+        \\        color: rgb(31 37 53)
         \\        h1 {
-        \\            color: rgb(228 119 44);
-        \\            "Things to do";
+        \\            color: rgb(228 119 44)
+        \\            "Things to do"
         \\        }
         \\        form {
-        \\            display: flex;
-        \\            gap: 0.5rem;
+        \\            display: flex
+        \\            gap: 0.5rem
         \\            input {
-        \\                placeholder = "Add something";
-        \\                flex: 1;
-        \\                padding: 0.5rem;
-        \\                bind:value = state.draft;
+        \\                placeholder = "Add something"
+        \\                flex: 1
+        \\                padding: 0.5rem
+        \\                bind:value = state.draft
         \\            }
         \\            button {
-        \\                padding: 0.5rem 1rem;
-        \\                "Add";
+        \\                padding: 0.5rem 1rem
+        \\                "Add"
         \\            }
         \\            on submit {
-        \\                state.add();
+        \\                state.add()
         \\            }
         \\        }
         \\        ul {
-        \\            padding: 0;
-        \\            list-style: none;
+        \\            padding: 0
+        \\            list-style: none
         \\            for state.todos |todo| key todo.id {
         \\                li {
-        \\                    padding: 0.4rem 0;
+        \\                    padding: 0.4rem 0
         \\                    label {
         \\                        input {
-        \\                            type = "checkbox";
-        \\                            bind:checked = todo.done;
+        \\                            type = "checkbox"
+        \\                            bind:checked = todo.done
         \\                        }
-        \\                        " ";
-        \\                        = todo.text;
+        \\                        " "
+        \\                        = todo.text
         \\                    }
         \\                }
         \\            }
         \\        }
         \\        p {
-        \\            color: rgb(101 108 126);
-        \\            = `${state.left()} left`;
+        \\            color: rgb(101 108 126)
+        \\            = `${state.left()} left`
         \\        }
         \\    }
         \\    \/)
@@ -137,156 +137,156 @@ mod playground {
         }
         @wutu/\
         article.page.playground {
-            = ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.");
+            = ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.")
             div.bench {
-                display:grid;
-                grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
-                gap:1rem;
-                margin-block:1.5rem;
-                inline-size:min(100%, 76rem);
+                display:grid
+                grid-template-columns:minmax(0, 1fr) minmax(0, 1fr)
+                gap:1rem
+                margin-block:1.5rem
+                inline-size:min(100%, 76rem)
                 @media (width < 72rem) {
-                    grid-template-columns: minmax(0, 1fr);
+                    grid-template-columns: minmax(0, 1fr)
                 }
                 div.editor {
-                    position:relative;
-                    block-size:36rem;
-                    background:var(--code-bg);
+                    position:relative
+                    block-size:36rem
+                    background:var(--code-bg)
                     @media (width < 72rem) {
-                        block-size: 26rem;
+                        block-size: 26rem
                     }
                     pre.code as overlay {
-                        aria-hidden = "true";
-                        position:absolute;
-                        inset:0;
-                        margin:0;
-                        overflow:hidden;
-                        white-space:pre;
-                        pointer-events:none;
-                        = code.spans(state.saved.source);
+                        aria-hidden = "true"
+                        position:absolute
+                        inset:0
+                        margin:0
+                        overflow:hidden
+                        white-space:pre
+                        pointer-events:none
+                        = code.spans(state.saved.source)
                     }
                     textarea as field {
-                        spellcheck = "false";
-                        autocapitalize = "off";
-                        autocomplete = "off";
-                        aria-label = "Wutu source";
-                        position:absolute;
-                        inset:0;
-                        inline-size:100%;
-                        block-size:100%;
-                        margin:0;
-                        padding:1.1rem 1.25rem;
-                        border:0;
-                        outline:none;
-                        resize:none;
-                        overflow:auto;
-                        white-space:pre;
-                        background:transparent;
-                        color:transparent;
-                        caret-color:var(--code-ink);
-                        font:400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-                        tab-size:4;
+                        spellcheck = "false"
+                        autocapitalize = "off"
+                        autocomplete = "off"
+                        aria-label = "Wutu source"
+                        position:absolute
+                        inset:0
+                        inline-size:100%
+                        block-size:100%
+                        margin:0
+                        padding:1.1rem 1.25rem
+                        border:0
+                        outline:none
+                        resize:none
+                        overflow:auto
+                        white-space:pre
+                        background:transparent
+                        color:transparent
+                        caret-color:var(--code-ink)
+                        font:400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace
+                        tab-size:4
                         @media (width < 40rem) {
-                            font-size: 0.78rem;
-                            padding: 0.9rem 1rem;
+                            font-size: 0.78rem
+                            padding: 0.9rem 1rem
                         }
                         ::selection {
-                            background: rgba(143, 214, 255, 0.3);
-                            color: transparent;
+                            background: rgba(143, 214, 255, 0.3)
+                            color: transparent
                         }
                         :focus-visible {
-                            box-shadow: inset 0 0 0 2px var(--orange);
+                            box-shadow: inset 0 0 0 2px var(--orange)
                         }
-                        bind:value = state.saved.source;
+                        bind:value = state.saved.source
                         on input {
-                            compile(state, 0);
+                            compile(state, 0)
                         }
                         on scroll {
-                            overlay.scrollTop = field.scrollTop;
-                            overlay.scrollLeft = field.scrollLeft;
+                            overlay.scrollTop = field.scrollTop
+                            overlay.scrollLeft = field.scrollLeft
                         }
                         on keydown |event| {
                             if event.key == "Tab" {
-                                event.preventDefault();
-                                field.setRangeText("    ", field.selectionStart, field.selectionEnd, "end");
-                                state.saved.source = field.value;
-                                compile(state, 0);
+                                event.preventDefault()
+                                field.setRangeText("    ", field.selectionStart, field.selectionEnd, "end")
+                                state.saved.source = field.value
+                                compile(state, 0)
                             }
                             else if event.key == "Enter" and (event.metaKey or event.ctrlKey) {
-                                event.preventDefault();
-                                compile(state, 0);
-                            };
+                                event.preventDefault()
+                                compile(state, 0)
+                            }
                         }
                     }
                 }
                 div.stage {
-                    display:grid;
-                    grid-template-rows:auto minmax(0, 1fr);
-                    block-size:36rem;
-                    border:1px solid var(--line);
-                    background:white;
+                    display:grid
+                    grid-template-rows:auto minmax(0, 1fr)
+                    block-size:36rem
+                    border:1px solid var(--line)
+                    background:white
                     @media (width < 72rem) {
-                        block-size: 30rem;
+                        block-size: 30rem
                     }
                     p.status {
-                        role = "status";
-                        class = if state.failed { "failed"; } else { "fine"; };
-                        margin:0;
-                        padding:0.5rem 0.75rem;
-                        font-size:0.85rem;
-                        color:var(--muted);
-                        background:var(--bg);
-                        border-block-end:1px solid var(--line);
+                        role = "status"
+                        class = if state.failed { "failed" } else { "fine" }
+                        margin:0
+                        padding:0.5rem 0.75rem
+                        font-size:0.85rem
+                        color:var(--muted)
+                        background:var(--bg)
+                        border-block-end:1px solid var(--line)
                         @ &.failed {
-                            color: var(--orange);
-                            font-weight: 600;
+                            color: var(--orange)
+                            font-weight: 600
                         }
-                        = state.status;
+                        = state.status
                     }
                     iframe {
-                        id = "play-preview";
-                        title = "The site your Wutu builds";
-                        sandbox = "allow-scripts allow-forms";
-                        inline-size:100%;
-                        block-size:100%;
-                        border:0;
-                        background:white;
+                        id = "play-preview"
+                        title = "The site your Wutu builds"
+                        sandbox = "allow-scripts allow-forms"
+                        inline-size:100%
+                        block-size:100%
+                        border:0
+                        background:white
                     }
                 }
             }
             if state.detail != "" {
                 pre.code.shell.diagnostics {
-                    margin-block-start:0;
-                    inline-size:min(100%, 76rem);
-                    white-space:pre-wrap;
-                    = state.detail;
+                    margin-block-start:0
+                    inline-size:min(100%, 76rem)
+                    white-space:pre-wrap
+                    = state.detail
                 }
             }
             p {
-                "It rebuilds as you type (a build takes a few milliseconds). Your source is kept in this browser. One file, with ";
+                "It rebuilds as you type (a build takes a few milliseconds). Your source is kept in this browser. One file, with "
                 code {
-                    "std:Browser";
+                    "std:Browser"
                 }
-                " and the standard library; npm packages need the ";
+                " and the standard library; npm packages need the "
                 a {
-                    href = "#/tooling";
-                    "wutu CLI";
+                    href = "#/tooling"
+                    "wutu CLI"
                 }
-                ".";
+                "."
             }
             p {
                 button.reset {
-                    type = "button";
-                    padding:0.4rem 0.8rem;
-                    font:inherit;
-                    font-size:0.9rem;
-                    color:var(--ink);
-                    background:var(--tint);
-                    border:1px solid var(--line);
-                    cursor:pointer;
-                    "Start over with the example";
+                    type = "button"
+                    padding:0.4rem 0.8rem
+                    font:inherit
+                    font-size:0.9rem
+                    color:var(--ink)
+                    background:var(--tint)
+                    border:1px solid var(--line)
+                    cursor:pointer
+                    "Start over with the example"
                     on click {
-                        state.saved.source = sample();
-                        compile(state, 0);
+                        state.saved.source = sample()
+                        compile(state, 0)
                     }
                 }
             }

@@ -85,8 +85,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
   test('wutu parser: errors explain the fix and point at the offending token', () => {
     const cases = [
       ['div { p { hreff = "/"; } }', 'unknown attribute hreff', 'hreff'],
-      ['div { p { "x" } }', 'expected ;', ' } }'],
-      ['div { title = "Hi " + name }', 'expected ;', '}'],
+      ['div { p { "x" "y" } }', 'expected a line break or ;', ' "y" } }'],
+      ['div { title = "Hi" name }', 'expected a line break or ;', ' name }'],
       ['button { @click = $[go]; }', 'events are written on click = handler', '@click'],
       ['div { foo { } }', "unknown element 'foo'", 'foo'],
       ['@island view; div { }', 'quoted island name', 'view'],
@@ -684,10 +684,9 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
     const okDiagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ ${ok} \\/; } }` });
     assertEq(okDiagnostics.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
     const bad = [
-      ['div { color: red margin: 0; }', 'CSS declarations require a semicolon'],
-      ['div { color: red\n href = "/x"; }', 'CSS declarations require a semicolon'],
-      ['div { color: red\n hidden; }', 'CSS declarations require a semicolon'],
-      ['div { color: red\n "x"; }', 'CSS declarations require a semicolon'],
+      ['div { color: red margin: 0 }', 'two CSS declarations on one line need ; between them'],
+      ['div { "a" "b" }', 'expected a line break or ; after Wutu statement'],
+      ['div { color: red {', 'expected a line break or ; after a CSS declaration'],
       ['div { widht: 1px; }', 'invalid CSS property widht; did you mean width?'],
       ['div { marign: 0; }', 'invalid CSS property marign; did you mean margin?'],
       ['div { on chnage { } }', 'unknown event chnage; did you mean change?'],
@@ -704,7 +703,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
   });
 
   test('wutu parser: legacy surface still parses', () => {
-    assertThrows(() => parseWutu('div { aria-hidden = "true" aspect-ratio: 0.68; }'), 'expected ;');
+    assertThrows(() => parseWutu('div { aria-hidden = "true" aspect-ratio: 0.68; }'), 'expected a line break or ;');
     const tree = parseWutu('section.a#b { data-x = x; hidden; svg { viewBox = "0 0 1 1"; } my-widget { anything = "ok"; } }');
     assertEq(tree.root.attrs.find(a => a.name === 'id').value, '"b"');
     assertEq(tree.root.children.length, 2);

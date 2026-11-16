@@ -27,91 +27,91 @@ main {
         }
     \/
     let app = @wutu/\
-    @reactive;
+    @reactive
     @document {
         body {
-            margin: 3rem auto;
-            padding: 1rem;
-            max-width: 45rem;
-            font: 1rem system-ui;
-            background: #f7f4ec;
+            margin: 3rem auto
+            padding: 1rem
+            max-width: 45rem
+            font: 1rem system-ui
+            background: #f7f4ec
         }
         button, input {
-            font: inherit;
-            padding: 0.7rem;
+            font: inherit
+            padding: 0.7rem
         }
     }
     main {
-        display:grid;
-        gap:1rem;
+        display:grid
+        gap:1rem
         h1 {
-            "A smoother Wutu";
+            "A smoother Wutu"
         }
         label {
-            "Search";
+            "Search"
             input {
-                type = "search";
-                bind:value = state.query;
+                type = "search"
+                bind:value = state.query
                 on input {
-                    state.changes += 1;
+                    state.changes += 1
                 }
             }
         }
         p {
-            id = "changes";
-            = state.changes.f64().toString();
+            id = "changes"
+            = state.changes.f64().toString()
         }
         label {
-            "Budget";
+            "Budget"
             input {
-                type = "number";
-                bind:number = state.budget;
+                type = "number"
+                bind:number = state.budget
             }
         }
         p {
-            id = "budget";
-            = state.budget.toString();
+            id = "budget"
+            = state.budget.toString()
         }
         p {
-            id = "storage";
-            = wutu.storage_error();
+            id = "storage"
+            = wutu.storage_error()
         }
         ul {
-            for (state.tasks filter |task| { task.title.includes(state.query); }) |task| key task.id {
+            for (state.tasks filter |task| { task.title.includes(state.query) }) |task| key task.id {
                 li {
-                    = ui.badge("Task");
-                    = ui.badge(task.title);
+                    = ui.badge("Task")
+                    = ui.badge(task.title)
                     label {
                         input {
-                            type = "checkbox";
-                            bind:checked = task.done;
+                            type = "checkbox"
+                            bind:checked = task.done
                         }
-                        = task.title;
+                        = task.title
                     }
                     button {
-                        aria-label = "Remove " + task.title;
-                        "Remove";
+                        aria-label = "Remove " + task.title
+                        "Remove"
                         on click {
                             state.tasks = state.tasks filter |item| {
-                                item.id != task.id;
+                                item.id != task.id
                             }
-                            collect(Task);
+                            collect(Task)
                         }
                     }
                 }
             }
         }
         form as form {
-            display:flex;
-            gap:1rem;
+            display:flex
+            gap:1rem
             input as field {
-                aria-label = "New task";
-                required = "";
-                bind:value = state.draft;
+                aria-label = "New task"
+                required = ""
+                bind:value = state.draft
             }
             button {
-                type = "submit";
-                "Add task";
+                type = "submit"
+                "Add task"
             }
             on submit {
                 if state.draft.trim().len() > 0 {
@@ -120,31 +120,31 @@ main {
                         title: state.draft.trim(),
                         done: false
                     }
-                    ]) collect(Task);
-                    state.draft = "";
-                    field.focus();
-                };
+                    ]) collect(Task)
+                    state.draft = ""
+                    field.focus()
+                }
             }
         }
         section {
             input as field {
-                aria-label = "Independent field";
+                aria-label = "Independent field"
             }
             button {
-                "Focus independent field";
+                "Focus independent field"
                 on click {
-                    field.focus();
+                    field.focus()
                 }
             }
         }
         button {
-            "Reverse tasks";
+            "Reverse tasks"
             on click {
                 state.tasks = state.tasks map |task,
                 index| {
-                    state.tasks[state.tasks.len() - 1 - index.i64().i32()];
+                    state.tasks[state.tasks.len() - 1 - index.i64().i32()]
                 }
-                collect(Task);
+                collect(Task)
             }
         }
     }

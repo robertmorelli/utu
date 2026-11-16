@@ -621,8 +621,8 @@ fn quiet_handler(body: Str, param: I32) Bool {
     let statements = 0
     let start = 0
     while (start <= code.len()) {
-        let end = text_index(code, ";", start)
-        if end < 0 { end = code.len() }
+        let end = start
+        while (end < code.len() and code.get(end) != 59 and code.get(end) != 10) { end += 1 }
         let statement = code.slice(start, end)
         if trim_end(statement).len() > 0 {
             if not quiet_statement(statement, param) { return false }

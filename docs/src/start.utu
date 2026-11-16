@@ -35,10 +35,10 @@ mod start {
         \\main {
         \\    let app = @wutu/\
         \\    main {
-        \\        padding: 2rem;
-        \\        font-family: system-ui;
-        \\        h1 { "Hello from utu"; }
-        \\        p { "This page is Wasm, HTML, and CSS from one source file."; }
+        \\        padding: 2rem
+        \\        font-family: system-ui
+        \\        h1 { "Hello from utu" }
+        \\        p { "This page is Wasm, HTML, and CSS from one source file." }
         \\    }
         \\    \/
         \\    Browser.document.body.append(app)
@@ -52,104 +52,104 @@ mod start {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Getting started", "utu lives in one repository. Clone it, build the bundle once, and the same compiler serves the command line, the editor, and the browser.");
+            = ui.header("Getting started", "utu lives in one repository. Clone it, build the bundle once, and the same compiler serves the command line, the editor, and the browser.")
             h2 {
-                "Build the compiler";
+                "Build the compiler"
             }
             p {
-                "You need Bun and Node. The build makes ";
+                "You need Bun and Node. The build makes "
                 code {
-                    "dist/utu.wasm";
+                    "dist/utu.wasm"
                 }
-                ", the self-hosted compiler, by bootstrapping it from the JavaScript compiler: stage 0 builds stage 1, stage 1 builds stage 2, and stage 2 must reproduce itself exactly.";
+                ", the self-hosted compiler, by bootstrapping it from the JavaScript compiler: stage 0 builds stage 1, stage 1 builds stage 2, and stage 2 must reproduce itself exactly."
             }
-            = code.shell(clone_sample());
+            = code.shell(clone_sample())
             h2 {
-                "Run a program";
+                "Run a program"
             }
             p {
-                "A program's entry point is ";
+                "A program's entry point is "
                 code {
-                    "main";
+                    "main"
                 }
-                ". A block's last expression is its value. A line break ends a statement, and ; puts two on one line.";
+                ". A block's last expression is its value. A line break ends a statement, and ; puts two on one line."
             }
-            = code.block(hello_sample());
-            = code.shell(run_sample());
+            = code.block(hello_sample())
+            = code.shell(run_sample())
             p {
-                "Builds are ";
+                "Builds are "
                 code {
-                    "-O small";
+                    "-O small"
                 }
-                " by default, the smallest module; pass ";
+                " by default, the smallest module; pass "
                 code {
-                    "-O fast";
+                    "-O fast"
                 }
-                " for the fastest. Both keep the checks Wasm does not make itself, such as a Buffer's length; ";
+                " for the fastest. Both keep the checks Wasm does not make itself, such as a Buffer's length; "
                 code {
-                    "-O smallUnsafe";
+                    "-O smallUnsafe"
                 }
-                " and ";
+                " and "
                 code {
-                    "-O fastUnsafe";
+                    "-O fastUnsafe"
                 }
-                " leave them out. ";
+                " leave them out. "
                 code {
-                    "build-exe";
+                    "build-exe"
                 }
-                " writes a standalone executable with Bun.";
+                " writes a standalone executable with Bun."
             }
             h2 {
-                "Install the editor extension";
+                "Install the editor extension"
             }
             p {
-                "The VS Code extension runs on the desktop and on the web. It provides syntax highlighting, compiler-backed diagnostics as you type, hover information, inlay hints, Wasm and WAT compilation, syntax and compiler-IR views, and runs ";
+                "The VS Code extension runs on the desktop and on the web. It provides syntax highlighting, compiler-backed diagnostics as you type, hover information, inlay hints, Wasm and WAT compilation, syntax and compiler-IR views, and runs "
                 code {
-                    "main";
+                    "main"
                 }
-                " from the editor.";
+                " from the editor."
             }
-            = code.shell(vscode_sample());
+            = code.shell(vscode_sample())
             p {
-                "Open any ";
+                "Open any "
                 code {
-                    ".utu";
+                    ".utu"
                 }
-                " file, or run a command from the UTU group in the command palette. Other editors speak to the same compiler through the language server; see ";
+                " file, or run a command from the UTU group in the command palette. Other editors speak to the same compiler through the language server; see "
                 a {
-                    href = "#/tooling";
-                    "Tooling";
+                    href = "#/tooling"
+                    "Tooling"
                 }
-                ".";
+                "."
             }
             h2 {
-                "Build a website";
+                "Build a website"
             }
             p {
-                "Wutu is the built-in DOM and CSS language. Write a ";
+                "Wutu is the built-in DOM and CSS language. Write a "
                 code {
-                    "main.utu";
+                    "main.utu"
                 }
-                " with a Wutu root, preview it with live reload, and build it into a folder with ";
+                " with a Wutu root, preview it with live reload, and build it into a folder with "
                 code {
-                    "index.html";
+                    "index.html"
                 }
-                ", ";
+                ", "
                 code {
-                    "app.js";
+                    "app.js"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "app.wasm";
+                    "app.wasm"
                 }
-                ". The HTML is prerendered in build-time Chromium, so the page reads before any script loads.";
+                ". The HTML is prerendered in build-time Chromium, so the page reads before any script loads."
             }
-            = code.block(site_sample());
-            = code.shell(wutu_sample());
+            = code.block(site_sample())
+            = code.shell(wutu_sample())
             p {
-                "In VS Code, run UTU: Create Wutu Website for a starter file and UTU: Preview Wutu Website for the live preview.";
+                "In VS Code, run UTU: Create Wutu Website for a starter file and UTU: Preview Wutu Website for the live preview."
             }
-            = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression");
+            = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression")
         }
         \/
     }

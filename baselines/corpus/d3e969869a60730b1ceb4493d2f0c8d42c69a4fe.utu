@@ -116,115 +116,115 @@ fn sessions(state: Conference) Browser.HTMLElement {
     } collect(Session);
     @wutu/\
     section {
-        id = "sessions";
-        display:grid;
-        gap:1rem;
+        id = "sessions"
+        display:grid
+        gap:1rem
         div {
-            display:flex;
-            gap:1rem;
-            align-items:center;
-            justify-content:space-between;
-            flex-wrap:wrap;
+            display:flex
+            gap:1rem
+            align-items:center
+            justify-content:space-between
+            flex-wrap:wrap
             p {
-                role = "status";
-                = number(count);
-                " in your agenda · ";
-                = number(visible.len());
-                " sessions shown";
+                role = "status"
+                = number(count)
+                " in your agenda · "
+                = number(visible.len())
+                " sessions shown"
             }
             if count>0 {
                 a {
-                    href = calendar(state);
-                    download = "signal-agenda.ics";
-                    padding:0.8rem 1rem;
-                    border:1px solid var(--accent);
-                    border-radius:0.5rem;
-                    color:var(--accent);
-                    "Download calendar ↓";
+                    href = calendar(state)
+                    download = "signal-agenda.ics"
+                    padding:0.8rem 1rem
+                    border:1px solid var(--accent)
+                    border-radius:0.5rem
+                    color:var(--accent)
+                    "Download calendar ↓"
                 }
             }
         }
         if conflicts>0 {
             p.conflict {
-                role = "alert";
-                padding:1rem;
-                border:1px solid var(--accent);
-                color:var(--accent);
-                "Some saved sessions overlap. Choose one session per time slot before exporting.";
+                role = "alert"
+                padding:1rem
+                border:1px solid var(--accent)
+                color:var(--accent)
+                "Some saved sessions overlap. Choose one session per time slot before exporting."
             }
         }
         for visible |session| key session.id {
             article.session {
-                display:grid;
-                grid-template-columns:6rem 1fr auto;
-                gap:1.5rem;
-                padding:1.75rem;
-                background:var(--panel);
-                border:1px solid var(--line);
-                border-radius:0.6rem;
-                align-items:center;
+                display:grid
+                grid-template-columns:6rem 1fr auto
+                gap:1.5rem
+                padding:1.75rem
+                background:var(--panel)
+                border:1px solid var(--line)
+                border-radius:0.6rem
+                align-items:center
                 @media (width < 42rem) {
-                    grid-template-columns: 1fr;
-                    gap: 1rem;
+                    grid-template-columns: 1fr
+                    gap: 1rem
                 }
                 div {
-                    display:grid;
-                    gap:0.5rem;
+                    display:grid
+                    gap:0.5rem
                     p.eyebrow {
-                        color:var(--muted);
-                        "DAY ";
-                        = number(session.day);
+                        color:var(--muted)
+                        "DAY "
+                        = number(session.day)
                     }
                     strong {
-                        font-size:1.5rem;
-                        = number(session.hour);
-                        ":00";
+                        font-size:1.5rem
+                        = number(session.hour)
+                        ":00"
                     }
                 }
                 div {
-                    display:grid;
-                    gap:0.75rem;
+                    display:grid
+                    gap:0.75rem
                     p.eyebrow {
-                        color:var(--accent);
-                        = session.track;
+                        color:var(--accent)
+                        = session.track
                     }
                     h3 {
-                        font-size:1.4rem;
-                        letter-spacing:-0.025em;
-                        = session.title;
+                        font-size:1.4rem
+                        letter-spacing:-0.025em
+                        = session.title
                     }
                     p.muted {
-                        = session.speaker;
-                        " · 60 minutes";
+                        = session.speaker
+                        " · 60 minutes"
                     }
                 }
                 button {
-                    id = "session-" + session.id;
-                    aria-label = if session.saved { "Remove " + session.title; } else { "Save " + session.title; };
-                    aria-pressed = if session.saved { "true"; } else { "false"; };
+                    id = "session-" + session.id
+                    aria-label = if session.saved { "Remove " + session.title } else { "Save " + session.title }
+                    aria-pressed = if session.saved { "true" } else { "false" }
                     = if session.saved {
-                        "Saved ✓";
+                        "Saved ✓"
                     }
                     else {
-                        "Save +";
-                    };
+                        "Save +"
+                    }
                     on click {
-                        session.saved = not session.saved;
+                        session.saved = not session.saved
                         persist("signal-" + session.id, if session.saved {
-                            "yes";
+                            "yes"
                         }
                         else {
-                            "no";
-                        });
-                        refresh(state);
-                        restore_focus("session-" + session.id);
+                            "no"
+                        })
+                        refresh(state)
+                        restore_focus("session-" + session.id)
                     }
                 }
             }
         }
         if visible.len() == 0 {
             p.empty {
-                "No sessions in this view. Explore the full programme and save a few favorites.";
+                "No sessions in this view. Explore the full programme and save a few favorites."
             }
         }
     }
@@ -324,259 +324,259 @@ main {
         };
     };
     let app = @wutu/\
-    @reactive;
+    @reactive
     @document {
         :root {
-            --bg: oklch(16% 0.012 260);
-            --ink: oklch(96% 0.01 100);
-            --accent: oklch(88% 0.2 120);
-            --panel: oklch(21% 0.015 260);
-            --muted: oklch(71% 0.02 260);
-            --line: oklch(34% 0.015 260);
-            --on-accent: oklch(16% 0.012 260);
-            font-family: system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--ink);
+            --bg: oklch(16% 0.012 260)
+            --ink: oklch(96% 0.01 100)
+            --accent: oklch(88% 0.2 120)
+            --panel: oklch(21% 0.015 260)
+            --muted: oklch(71% 0.02 260)
+            --line: oklch(34% 0.015 260)
+            --on-accent: oklch(16% 0.012 260)
+            font-family: system-ui, sans-serif
+            background: var(--bg)
+            color: var(--ink)
         }
         * {
-            box-sizing: border-box;
+            box-sizing: border-box
         }
         body {
-            margin: 0;
+            margin: 0
         }
         button, input, select, textarea {
-            font: inherit;
+            font: inherit
         }
         button, a, input, select, textarea {
-            touch-action: manipulation;
+            touch-action: manipulation
         }
         button {
-            cursor: pointer;
+            cursor: pointer
         }
         a {
-            color: inherit;
-            text-underline-offset: 0.25em;
+            color: inherit
+            text-underline-offset: 0.25em
         }
         h1, h2, h3, p {
-            margin: 0;
-            overflow-wrap: anywhere;
+            margin: 0
+            overflow-wrap: anywhere
         }
         button, input, select, textarea {
-            border: 1px solid var(--line);
-            border-radius: 0.6rem;
-            padding: 0.75rem 1rem;
-            background: var(--panel);
-            color: var(--ink);
-            min-inline-size: 0;
+            border: 1px solid var(--line)
+            border-radius: 0.6rem
+            padding: 0.75rem 1rem
+            background: var(--panel)
+            color: var(--ink)
+            min-inline-size: 0
         }
         button:hover {
-            border-color: var(--accent);
+            border-color: var(--accent)
         }
         :focus-visible {
-            outline: 3px solid var(--accent);
-            outline-offset: 3px;
+            outline: 3px solid var(--accent)
+            outline-offset: 3px
         }
         button:disabled {
-            opacity: 0.45;
-            cursor: default;
+            opacity: 0.45
+            cursor: default
         }
         label {
-            display: grid;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            font-weight: 650;
+            display: grid
+            gap: 0.5rem
+            font-size: 0.85rem
+            font-weight: 650
         }
         .primary {
-            background: var(--accent);
-            color: var(--on-accent);
-            border-color: var(--accent);
-            font-weight: 700;
+            background: var(--accent)
+            color: var(--on-accent)
+            border-color: var(--accent)
+            font-weight: 700
         }
         .muted {
-            color: var(--muted);
+            color: var(--muted)
         }
         .eyebrow {
-            font: 700 0.75rem system-ui, sans-serif;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
+            font: 700 0.75rem system-ui, sans-serif
+            letter-spacing: 0.15em
+            text-transform: uppercase
         }
         .toolbar {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            align-items: end;
+            display: flex
+            gap: 0.75rem
+            flex-wrap: wrap
+            align-items: end
         }
         .toolbar label {
-            flex: 1 1 10rem;
+            flex: 1 1 10rem
         }
         .empty {
-            padding: 2rem;
-            border: 1px dashed var(--line);
-            color: var(--muted);
+            padding: 2rem
+            border: 1px dashed var(--line)
+            color: var(--muted)
         }
         .site-nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-            padding-block: 1.25rem;
-            border-block-end: 1px solid var(--line);
-            font: 650 0.8rem system-ui, sans-serif;
+            display: flex
+            justify-content: space-between
+            align-items: center
+            gap: 1rem
+            flex-wrap: wrap
+            padding-block: 1.25rem
+            border-block-end: 1px solid var(--line)
+            font: 650 0.8rem system-ui, sans-serif
         }
         .site-nav nav {
-            display: flex;
-            gap: 1.25rem;
+            display: flex
+            gap: 1.25rem
         }
         .site-footer {
-            border-block-start: 1px solid var(--line);
-            padding-block: 1.5rem;
-            color: var(--muted);
-            font: 0.8rem system-ui, sans-serif;
-            display: flex;
-            gap: 1rem;
-            justify-content: space-between;
-            flex-wrap: wrap;
+            border-block-start: 1px solid var(--line)
+            padding-block: 1.5rem
+            color: var(--muted)
+            font: 0.8rem system-ui, sans-serif
+            display: flex
+            gap: 1rem
+            justify-content: space-between
+            flex-wrap: wrap
         }
         @media print {
             .site-nav, .site-footer, form, .toolbar, button {
-                display: none;
+                display: none
             }
             body {
-                background: white;
-                color: black;
+                background: white
+                color: black
             }
         }
     }
     main {
-        max-inline-size:78rem;
-        margin-inline:auto;
-        padding-inline:clamp(1.2rem, 5vw, 4rem);
-        display:grid;
-        gap:2.5rem;
+        max-inline-size:78rem
+        margin-inline:auto
+        padding-inline:clamp(1.2rem, 5vw, 4rem)
+        display:grid
+        gap:2.5rem
         header.site-nav {
             a {
-                href = "./";
-                "SIGNAL / 26";
+                href = "./"
+                "SIGNAL / 26"
             }
             nav {
                 a {
-                    href = "../";
-                    "All five sites";
+                    href = "../"
+                    "All five sites"
                 }
                 a {
-                    href = "source.html";
-                    "View Utu source ↗";
+                    href = "source.html"
+                    "View Utu source ↗"
                 }
             }
         }
         section {
-            display:grid;
-            gap:1.5rem;
-            padding-block:2rem;
+            display:grid
+            gap:1.5rem
+            padding-block:2rem
             p.eyebrow {
-                color:var(--accent);
-                "22—23 OCTOBER / A SAMPLE CONFERENCE";
+                color:var(--accent)
+                "22—23 OCTOBER / A SAMPLE CONFERENCE"
             }
             h1 {
-                font-size:clamp(4rem, 11vw, 9rem);
-                font-weight:800;
-                line-height:0.9;
-                letter-spacing:-0.08em;
-                "Less noise.";
+                font-size:clamp(4rem, 11vw, 9rem)
+                font-weight:800
+                line-height:0.9
+                letter-spacing:-0.08em
+                "Less noise."
                 br {
                 }
                 span {
-                    color:var(--accent);
-                    "More signal.";
+                    color:var(--accent)
+                    "More signal."
                 }
             }
             div {
-                display:flex;
-                justify-content:space-between;
-                gap:2rem;
-                flex-wrap:wrap;
-                padding-block-start:1.5rem;
+                display:flex
+                justify-content:space-between
+                gap:2rem
+                flex-wrap:wrap
+                padding-block-start:1.5rem
                 p.muted {
-                    line-height:1.7;
-                    max-inline-size:32rem;
-                    "Two days for people who care about what they build. Explore the programme, make your own agenda, and take the good ideas with you.";
+                    line-height:1.7
+                    max-inline-size:32rem
+                    "Two days for people who care about what they build. Explore the programme, make your own agenda, and take the good ideas with you."
                 }
                 p.eyebrow {
-                    align-self:end;
-                    "08 SESSIONS / 03 TRACKS / ALL TIMES UTC";
+                    align-self:end
+                    "08 SESSIONS / 03 TRACKS / ALL TIMES UTC"
                 }
             }
         }
         div.toolbar {
             label {
-                "Day";
+                "Day"
                 select as day {
-                    aria-label = "Day";
+                    aria-label = "Day"
                     option {
-                        value = "all";
-                        "Both days";
+                        value = "all"
+                        "Both days"
                     }
                     option {
-                        value = "1";
-                        "Thursday 22 Oct";
+                        value = "1"
+                        "Thursday 22 Oct"
                     }
                     option {
-                        value = "2";
-                        "Friday 23 Oct";
+                        value = "2"
+                        "Friday 23 Oct"
                     }
                     on change {
-                        state.day = day.value;
-                        refresh(state);
+                        state.day = day.value
+                        refresh(state)
                     }
                 }
             }
             label {
-                "Track";
+                "Track"
                 select as track {
-                    aria-label = "Track";
+                    aria-label = "Track"
                     option {
-                        "All tracks";
+                        "All tracks"
                     }
                     option {
-                        "Design";
+                        "Design"
                     }
                     option {
-                        "Engineering";
+                        "Engineering"
                     }
                     option {
-                        "Community";
+                        "Community"
                     }
                     on change {
-                        state.track = track.value;
-                        refresh(state);
+                        state.track = track.value
+                        refresh(state)
                     }
                 }
             }
             label {
-                display:flex;
-                align-items:center;
-                gap:0.75rem;
-                padding:0.8rem;
+                display:flex
+                align-items:center
+                gap:0.75rem
+                padding:0.8rem
                 input as agenda {
-                    type = "checkbox";
+                    type = "checkbox"
                     on change {
-                        state.agenda = agenda.checked;
-                        refresh(state);
+                        state.agenda = agenda.checked
+                        refresh(state)
                     }
                 }
-                "My agenda only";
+                "My agenda only"
             }
         }
-        = sessions(state);
+        = sessions(state)
         footer.site-footer {
             p {
-                "Fictional programme, real agenda tools. Calendar downloads use UTC.";
+                "Fictional programme, real agenda tools. Calendar downloads use UTC."
             }
             p {
-                id = "notice";
-                role = "status";
-                "Saved on this device. No account needed.";
+                id = "notice"
+                role = "status"
+                "Saved on this device. No account needed."
             }
         }
     }

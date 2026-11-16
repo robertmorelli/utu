@@ -12,65 +12,65 @@ struct AtlasState:
 | places: Array[Place]
 fn workspace(state: AtlasState) Browser.HTMLElement {
     @wutu/\
-    @island "atlas-workspace";
+    @island "atlas-workspace"
     section.workspace {
         div.bar {
             h2 {
-                "Your field notes";
+                "Your field notes"
             }
             label {
-                "Landscape";
+                "Landscape"
                 select {
-                    bind:value = state.region;
+                    bind:value = state.region
                     option {
-                        "All";
+                        "All"
                     }
                     option {
-                        "Coast";
+                        "Coast"
                     }
                     option {
-                        "Mountains";
+                        "Mountains"
                     }
                     option {
-                        "City";
+                        "City"
                     }
                 }
             }
         }
         div.grid {
-            for (state.places filter |place| {state.region == "All" or state.region == place.region;}) |place| key place.id {
+            for (state.places filter |place| {state.region == "All" or state.region == place.region }) |place| key place.id {
                 article.panel.stack {
                     p.eyebrow {
-                        = place.region;
+                        = place.region
                     }
                     h2 {
-                        = place.name;
+                        = place.name
                     }
                     p.muted {
-                        = place.note;
+                        = place.note
                     }
                     button {
-                        aria-pressed = if place.saved {"true";} else {"false";};
+                        aria-pressed = if place.saved {"true" } else {"false" }
                         = if place.saved {
-                            "Saved ✓";
+                            "Saved ✓"
                         }
                         else {
-                            "Save this place";
-                        };
+                            "Save this place"
+                        }
                         on click {
-                            place.saved = not place.saved;
-                            wutu.save("atlas-v2");
+                            place.saved = not place.saved
+                            wutu.save("atlas-v2")
                         }
                     }
-                    = @utu/\ @wutu/\ small { "Room for a slower day."; } \/ \/;
+                    = @utu/\ @wutu/\ small { "Room for a slower day."; } \/ \/
                 }
             }
         }
         p {
-            role = "status";
+            role = "status"
             = wutu.number(state.places count_where |p| {
-                p.saved;
-            }) + " places saved";
+                p.saved
+            }) + " places saved"
         }
     }
     \/;
@@ -113,42 +113,42 @@ main {
         }
     \/;
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "atlas";
+        data-theme = "atlas"
         nav {
             strong {
-                "ATLAS / AN EVERYDAY TOOL";
+                "ATLAS / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "Go somewhere that stays with you.";
+                "Go somewhere that stays with you."
             }
             p.muted {
-                "A personal shortlist for your next unhurried trip. Filter by landscape, save a place, and keep the details close.";
+                "A personal shortlist for your next unhurried trip. Filter by landscape, save a place, and keep the details close."
             }
         }
-        = workspace(state);
+        = workspace(state)
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

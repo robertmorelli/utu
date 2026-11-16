@@ -24,15 +24,15 @@ fn quote(state:PitchState) I32 {
 }
 fn workspace(state: PitchState) Browser.HTMLElement {
     @wutu/\
-    @island "pitch-workspace";
+    @island "pitch-workspace"
     section.workspace {
         label.panel {
-            "Prepared for";
+            "Prepared for"
             input {
-                maxlength = "100";
-                bind:value = state.client;
+                maxlength = "100"
+                bind:value = state.client
                 on change {
-                    wutu.save("pitch-v2");
+                    wutu.save("pitch-v2")
                 }
             }
         }
@@ -40,71 +40,71 @@ fn workspace(state: PitchState) Browser.HTMLElement {
             article.panel.bar {
                 div {
                     h2 {
-                        = service.name;
+                        = service.name
                     }
                     p.muted {
-                        = wutu.money(service.rate)+" / hour";
+                        = wutu.money(service.rate)+" / hour"
                     }
                 }
                 div.bar {
                     button {
-                        aria-label = "Fewer "+service.name;
-                        disabled = service.hours==0;
-                        "−";
+                        aria-label = "Fewer "+service.name
+                        disabled = service.hours==0
+                        "−"
                         on click {
-                            service.hours-=1;
-                            wutu.save("pitch-v2");
+                            service.hours-=1
+                            wutu.save("pitch-v2")
                         }
                     }
                     strong {
-                        = wutu.number(service.hours)+" hours";
+                        = wutu.number(service.hours)+" hours"
                     }
                     button {
-                        aria-label = "More "+service.name;
-                        disabled = service.hours==100;
-                        "+";
+                        aria-label = "More "+service.name
+                        disabled = service.hours==100
+                        "+"
                         on click {
-                            service.hours+=1;
-                            wutu.save("pitch-v2");
+                            service.hours+=1
+                            wutu.save("pitch-v2")
                         }
                     }
                     strong {
-                        = wutu.money(service.hours*service.rate);
+                        = wutu.money(service.hours*service.rate)
                     }
                 }
             }
         }
         label.panel.bar {
-            "Returning-client discount / 10%";
+            "Returning-client discount / 10%"
             input {
-                type = "checkbox";
-                bind:checked = state.discount;
+                type = "checkbox"
+                bind:checked = state.discount
                 on change {
-                    wutu.save("pitch-v2");
+                    wutu.save("pitch-v2")
                 }
             }
         }
         article.well.bar {
             div {
                 p.eyebrow {
-                    "ESTIMATE FOR";
+                    "ESTIMATE FOR"
                 }
                 h2 {
-                    = state.client;
+                    = state.client
                 }
             }
             strong.big {
-                = wutu.money(quote(state));
+                = wutu.money(quote(state))
             }
         }
         button.primary {
-            "Print estimate";
+            "Print estimate"
             on click {
-                Browser.window.print();
+                Browser.window.print()
             }
         }
         p.muted {
-            "USD. Estimate only; excludes taxes, expenses, and payment processing.";
+            "USD. Estimate only; excludes taxes, expenses, and payment processing."
         }
     }
     \/;
@@ -135,42 +135,42 @@ main {
         }
     \/;
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "pitch";
+        data-theme = "pitch"
         nav {
             strong {
-                "PITCH / AN EVERYDAY TOOL";
+                "PITCH / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "A clear scope makes a better start.";
+                "A clear scope makes a better start."
             }
             p.muted {
-                "Shape a straightforward project estimate. Adjust the work, include a returning-client discount, and print a quote you can talk through.";
+                "Shape a straightforward project estimate. Adjust the work, include a returning-client discount, and print a quote you can talk through."
             }
         }
-        = workspace(state);
+        = workspace(state)
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

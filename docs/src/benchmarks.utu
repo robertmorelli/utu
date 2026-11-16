@@ -4,395 +4,395 @@ mod benchmarks {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Benchmarks", "The same programs in utu and in nine other languages that compile for the browser: Rust, JavaScript, Dart, Kotlin, MoonBit, AssemblyScript, Go, Swift, and Haskell, each timed in V8, SpiderMonkey, and JavaScriptCore.");
+            = ui.header("Benchmarks", "The same programs in utu and in nine other languages that compile for the browser: Rust, JavaScript, Dart, Kotlin, MoonBit, AssemblyScript, Go, Swift, and Haskell, each timed in V8, SpiderMonkey, and JavaScriptCore.")
             p {
-                "Each program is written once per language, the same way: the same data structures, loops, and order of operations, with only the language's idiom differing. Every port's result is checked against the others in every engine before it is timed.";
+                "Each program is written once per language, the same way: the same data structures, loops, and order of operations, with only the language's idiom differing. Every port's result is checked against the others in every engine before it is timed."
             }
             p {
-                "Each port runs in each of the three engines' own shells, in a process of its own: V8 15.6.75.16 (d8, as in Chrome, Node, and Deno), SpiderMonkey 154.0 (as in Firefox), and JavaScriptCore built from WebKit in July 2026 (as in Safari and Bun). A time is the median of 20 samples after 5 warmups, in milliseconds.";
+                "Each port runs in each of the three engines' own shells, in a process of its own: V8 15.6.75.16 (d8, as in Chrome, Node, and Deno), SpiderMonkey 154.0 (as in Firefox), and JavaScriptCore built from WebKit in July 2026 (as in Safari and Bun). A time is the median of 20 samples after 5 warmups, in milliseconds."
             }
             p {
-                "A build time is from clean, the median of 3, as each toolchain's command line runs it; utu's is a warm compile in a running process (the whole utu build command takes about 70 ms, most of it starting Node), and Kotlin's has Gradle's daemon already running. A size is everything that must ship to run it: the Wasm and the JavaScript it needs, all minified alike, with gzip per file summed. For utu that JavaScript is the loader utu build writes; for Rust, MoonBit, and AssemblyScript a loader of the same kind; for Dart and Kotlin what their compilers emit; for Go, Swift, and Haskell a WASI shim; JavaScript is just its source.";
+                "A build time is from clean, the median of 3, as each toolchain's command line runs it; utu's is a warm compile in a running process (the whole utu build command takes about 70 ms, most of it starting Node), and Kotlin's has Gradle's daemon already running. A size is everything that must ship to run it: the Wasm and the JavaScript it needs, all minified alike, with gzip per file summed. For utu that JavaScript is the loader utu build writes; for Rust, MoonBit, and AssemblyScript a loader of the same kind; for Dart and Kotlin what their compilers emit; for Go, Swift, and Haskell a WASI shim; JavaScript is just its source."
             }
             p {
-                "utu is built four ways: ";
+                "utu is built four ways: "
                 code {
-                    "-O fast";
+                    "-O fast"
                 }
-                " and ";
+                " and "
                 code {
-                    "-O small";
+                    "-O small"
                 }
-                " (the default) keep the checks Wasm does not make itself, such as a Buffer's length; ";
+                " (the default) keep the checks Wasm does not make itself, such as a Buffer's length; "
                 code {
-                    "-O fastUnsafe";
+                    "-O fastUnsafe"
                 }
-                " and ";
+                " and "
                 code {
-                    "-O smallUnsafe";
+                    "-O smallUnsafe"
                 }
-                " drop them. Dart, Kotlin, and MoonBit compile to WasmGC, as utu does. Rust, AssemblyScript, Go, Swift, and Haskell (GHC's WebAssembly backend) compile to linear memory: Rust frees memory itself, while the others carry their own collector or runtime in the module, which is much of their size. Every language keeps its normal checks.";
+                " drop them. Dart, Kotlin, and MoonBit compile to WasmGC, as utu does. Rust, AssemblyScript, Go, Swift, and Haskell (GHC's WebAssembly backend) compile to linear memory: Rust frees memory itself, while the others carry their own collector or runtime in the module, which is much of their size. Every language keeps its normal checks."
             }
             p {
-                "Run them again with ";
+                "Run them again with "
                 code {
-                    "node scripts/benchmark-programs-d8.mjs --engines=v8,sm,jsc";
+                    "node scripts/benchmark-programs-d8.mjs --engines=v8,sm,jsc"
                 }
-                ".";
+                "."
             }
             h2 {
-                "DeltaBlue";
+                "DeltaBlue"
             }
             p {
-                "V8's incremental constraint solver: a graph of small objects, planned and re-planned. Chain and projection each solve 1,048 variables 20 times. Rc Rust is a graph of Rc<RefCell<_>> with no unsafe code; unsafe Rust uses an arena and unchecked indexing.";
+                "V8's incremental constraint solver: a graph of small objects, planned and re-planned. Chain and projection each solve 1,048 variables 20 times. Rc Rust is a graph of Rc<RefCell<_>> with no unsafe code; unsafe Rust uses an arena and unchecked indexing."
             }
             table.wide {
                 thead {
                     tr {
                         th {
-                            "";
+                            ""
                         }
                         th {
-                            "chain V8";
+                            "chain V8"
                         }
                         th {
-                            "chain SM";
+                            "chain SM"
                         }
                         th {
-                            "chain JSC";
+                            "chain JSC"
                         }
                         th {
-                            "proj. V8";
+                            "proj. V8"
                         }
                         th {
-                            "proj. SM";
+                            "proj. SM"
                         }
                         th {
-                            "proj. JSC";
+                            "proj. JSC"
                         }
                     }
                 }
                 tbody {
                     tr {
                         th {
-                            "utu fast";
+                            "utu fast"
                         }
                         td {
-                            "6.06";
+                            "6.06"
                         }
                         td {
-                            "9.26";
+                            "9.26"
                         }
                         td {
-                            "7.05";
+                            "7.05"
                         }
                         td {
-                            "4.91";
+                            "4.91"
                         }
                         td {
-                            "7.57";
+                            "7.57"
                         }
                         td {
-                            "6.95";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu fastUnsafe";
-                        }
-                        td {
-                            "5.96";
-                        }
-                        td {
-                            "8.59";
-                        }
-                        td {
-                            "6.94";
-                        }
-                        td {
-                            "4.77";
-                        }
-                        td {
-                            "7.60";
-                        }
-                        td {
-                            "7.12";
+                            "6.95"
                         }
                     }
                     tr {
                         th {
-                            "utu small";
+                            "utu fastUnsafe"
                         }
                         td {
-                            "8.86";
+                            "5.96"
                         }
                         td {
-                            "12.7";
+                            "8.59"
                         }
                         td {
-                            "12.1";
+                            "6.94"
                         }
                         td {
-                            "7.45";
+                            "4.77"
                         }
                         td {
-                            "10.5";
+                            "7.60"
                         }
                         td {
-                            "8.69";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu smallUnsafe";
-                        }
-                        td {
-                            "13.9";
-                        }
-                        td {
-                            "13.6";
-                        }
-                        td {
-                            "14.1";
-                        }
-                        td {
-                            "6.51";
-                        }
-                        td {
-                            "14.4";
-                        }
-                        td {
-                            "8.08";
+                            "7.12"
                         }
                     }
                     tr {
                         th {
-                            "Rc Rust";
+                            "utu small"
                         }
                         td {
-                            "16.6";
+                            "8.86"
                         }
                         td {
-                            "18.9";
+                            "12.7"
                         }
                         td {
-                            "14.6";
+                            "12.1"
                         }
                         td {
-                            "17.3";
+                            "7.45"
                         }
                         td {
-                            "8.98";
+                            "10.5"
                         }
                         td {
-                            "7.41";
+                            "8.69"
                         }
                     }
                     tr {
                         th {
-                            "unsafe Rust";
+                            "utu smallUnsafe"
                         }
                         td {
-                            "4.88";
+                            "13.9"
                         }
                         td {
-                            "5.81";
+                            "13.6"
                         }
                         td {
-                            "5.18";
+                            "14.1"
                         }
                         td {
-                            "4.12";
+                            "6.51"
                         }
                         td {
-                            "5.77";
+                            "14.4"
                         }
                         td {
-                            "4.48";
+                            "8.08"
                         }
                     }
                     tr {
                         th {
-                            "JavaScript";
+                            "Rc Rust"
                         }
                         td {
-                            "6.34";
+                            "16.6"
                         }
                         td {
-                            "26.3";
+                            "18.9"
                         }
                         td {
-                            "9.09";
+                            "14.6"
                         }
                         td {
-                            "5.42";
+                            "17.3"
                         }
                         td {
-                            "20.9";
+                            "8.98"
                         }
                         td {
-                            "6.92";
+                            "7.41"
                         }
                     }
                     tr {
                         th {
-                            "Dart";
+                            "unsafe Rust"
                         }
                         td {
-                            "9.40";
+                            "4.88"
                         }
                         td {
-                            "18.3";
+                            "5.81"
                         }
                         td {
-                            "13.8";
+                            "5.18"
                         }
                         td {
-                            "6.81";
+                            "4.12"
                         }
                         td {
-                            "14.3";
+                            "5.77"
                         }
                         td {
-                            "8.86";
+                            "4.48"
                         }
                     }
                     tr {
                         th {
-                            "Kotlin";
+                            "JavaScript"
                         }
                         td {
-                            "23.7";
+                            "6.34"
                         }
                         td {
-                            "46.6";
+                            "26.3"
                         }
                         td {
-                            "20.8";
+                            "9.09"
                         }
                         td {
-                            "13.4";
+                            "5.42"
                         }
                         td {
-                            "30.8";
+                            "20.9"
                         }
                         td {
-                            "16.3";
+                            "6.92"
                         }
                     }
                     tr {
                         th {
-                            "MoonBit";
+                            "Dart"
                         }
                         td {
-                            "16.5";
+                            "9.40"
                         }
                         td {
-                            "17.2";
+                            "18.3"
                         }
                         td {
-                            "15.3";
+                            "13.8"
                         }
                         td {
-                            "7.88";
+                            "6.81"
                         }
                         td {
-                            "13.3";
+                            "14.3"
                         }
                         td {
-                            "9.21";
+                            "8.86"
                         }
                     }
                     tr {
                         th {
-                            "AssemblyScript";
+                            "Kotlin"
                         }
                         td {
-                            "49.3";
+                            "23.7"
                         }
                         td {
-                            "29.3";
+                            "46.6"
                         }
                         td {
-                            "41.8";
+                            "20.8"
                         }
                         td {
-                            "39.1";
+                            "13.4"
                         }
                         td {
-                            "27.4";
+                            "30.8"
                         }
                         td {
-                            "31.1";
+                            "16.3"
                         }
                     }
                     tr {
                         th {
-                            "Go";
+                            "MoonBit"
                         }
                         td {
-                            "51.2";
+                            "16.5"
                         }
                         td {
-                            "38.6";
+                            "17.2"
                         }
                         td {
-                            "27.3";
+                            "15.3"
                         }
                         td {
-                            "44.2";
+                            "7.88"
                         }
                         td {
-                            "42.0";
+                            "13.3"
                         }
                         td {
-                            "33.0";
+                            "9.21"
                         }
                     }
                     tr {
                         th {
-                            "Swift";
+                            "AssemblyScript"
                         }
                         td {
-                            "7.88";
+                            "49.3"
                         }
                         td {
-                            "11.9";
+                            "29.3"
                         }
                         td {
-                            "7.33";
+                            "41.8"
                         }
                         td {
-                            "18.2";
+                            "39.1"
                         }
                         td {
-                            "14.1";
+                            "27.4"
                         }
                         td {
-                            "9.38";
+                            "31.1"
                         }
                     }
                     tr {
                         th {
-                            "Haskell";
+                            "Go"
                         }
                         td {
-                            "129";
+                            "51.2"
                         }
                         td {
-                            "115";
+                            "38.6"
                         }
                         td {
-                            "95.7";
+                            "27.3"
                         }
                         td {
-                            "86.1";
+                            "44.2"
                         }
                         td {
-                            "72.5";
+                            "42.0"
                         }
                         td {
-                            "58.0";
+                            "33.0"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Swift"
+                        }
+                        td {
+                            "7.88"
+                        }
+                        td {
+                            "11.9"
+                        }
+                        td {
+                            "7.33"
+                        }
+                        td {
+                            "18.2"
+                        }
+                        td {
+                            "14.1"
+                        }
+                        td {
+                            "9.38"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Haskell"
+                        }
+                        td {
+                            "129"
+                        }
+                        td {
+                            "115"
+                        }
+                        td {
+                            "95.7"
+                        }
+                        td {
+                            "86.1"
+                        }
+                        td {
+                            "72.5"
+                        }
+                        td {
+                            "58.0"
                         }
                     }
                 }
@@ -401,1366 +401,1366 @@ mod benchmarks {
                 thead {
                     tr {
                         th {
-                            "";
+                            ""
                         }
                         th {
-                            "build, ms";
+                            "build, ms"
                         }
                         th {
-                            "size, KB";
+                            "size, KB"
                         }
                         th {
-                            "gzip, KB";
+                            "gzip, KB"
                         }
                     }
                 }
                 tbody {
                     tr {
                         th {
-                            "utu fast";
+                            "utu fast"
                         }
                         td {
-                            "5.28";
+                            "5.28"
                         }
                         td {
-                            "11.1";
+                            "11.1"
                         }
                         td {
-                            "3.2";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu fastUnsafe";
-                        }
-                        td {
-                            "4.25";
-                        }
-                        td {
-                            "10.4";
-                        }
-                        td {
-                            "3.1";
+                            "3.2"
                         }
                     }
                     tr {
                         th {
-                            "utu small";
+                            "utu fastUnsafe"
                         }
                         td {
-                            "2.59";
+                            "4.25"
                         }
                         td {
-                            "4.8";
+                            "10.4"
                         }
                         td {
-                            "2.2";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu smallUnsafe";
-                        }
-                        td {
-                            "2.53";
-                        }
-                        td {
-                            "4.6";
-                        }
-                        td {
-                            "2.2";
+                            "3.1"
                         }
                     }
                     tr {
                         th {
-                            "Rc Rust";
+                            "utu small"
                         }
                         td {
-                            "330";
+                            "2.59"
                         }
                         td {
-                            "38.4";
+                            "4.8"
                         }
                         td {
-                            "15.3";
-                        }
-                    }
-                    tr {
-                        th {
-                            "unsafe Rust";
-                        }
-                        td {
-                            "289";
-                        }
-                        td {
-                            "32.4";
-                        }
-                        td {
-                            "13.3";
+                            "2.2"
                         }
                     }
                     tr {
                         th {
-                            "JavaScript";
+                            "utu smallUnsafe"
                         }
                         td {
-                            "—";
+                            "2.53"
                         }
                         td {
-                            "5.8";
+                            "4.6"
                         }
                         td {
-                            "1.8";
-                        }
-                    }
-                    tr {
-                        th {
-                            "Dart";
-                        }
-                        td {
-                            "814";
-                        }
-                        td {
-                            "42.2";
-                        }
-                        td {
-                            "17.0";
+                            "2.2"
                         }
                     }
                     tr {
                         th {
-                            "Kotlin";
+                            "Rc Rust"
                         }
                         td {
-                            "1,965";
+                            "330"
                         }
                         td {
-                            "17.4";
+                            "38.4"
                         }
                         td {
-                            "8.5";
-                        }
-                    }
-                    tr {
-                        th {
-                            "MoonBit";
-                        }
-                        td {
-                            "86.8";
-                        }
-                        td {
-                            "10.2";
-                        }
-                        td {
-                            "4.7";
+                            "15.3"
                         }
                     }
                     tr {
                         th {
-                            "AssemblyScript";
+                            "unsafe Rust"
                         }
                         td {
-                            "1,338";
+                            "289"
                         }
                         td {
-                            "14.6";
+                            "32.4"
                         }
                         td {
-                            "5.4";
-                        }
-                    }
-                    tr {
-                        th {
-                            "Go";
-                        }
-                        td {
-                            "1,207";
-                        }
-                        td {
-                            "1,895";
-                        }
-                        td {
-                            "562.0";
+                            "13.3"
                         }
                     }
                     tr {
                         th {
-                            "Swift";
+                            "JavaScript"
                         }
                         td {
-                            "1,920";
+                            "—"
                         }
                         td {
-                            "5,450";
+                            "5.8"
                         }
                         td {
-                            "1,672";
-                        }
-                    }
-                    tr {
-                        th {
-                            "Haskell";
-                        }
-                        td {
-                            "949";
-                        }
-                        td {
-                            "1,533";
-                        }
-                        td {
-                            "442.1";
-                        }
-                    }
-                }
-            }
-            h2 {
-                "Richards";
-            }
-            p {
-                "An operating-system task scheduler: tasks of four kinds, linked queues of packets, and dispatch on the kind of task, ten simulations per sample.";
-            }
-            table.wide {
-                thead {
-                    tr {
-                        th {
-                            "";
-                        }
-                        th {
-                            "V8, ms";
-                        }
-                        th {
-                            "SM, ms";
-                        }
-                        th {
-                            "JSC, ms";
-                        }
-                        th {
-                            "build, ms";
-                        }
-                        th {
-                            "size, KB";
-                        }
-                        th {
-                            "gzip, KB";
-                        }
-                    }
-                }
-                tbody {
-                    tr {
-                        th {
-                            "utu fast";
-                        }
-                        td {
-                            "4.20";
-                        }
-                        td {
-                            "6.13";
-                        }
-                        td {
-                            "4.59";
-                        }
-                        td {
-                            "1.95";
-                        }
-                        td {
-                            "3.0";
-                        }
-                        td {
-                            "1.2";
+                            "1.8"
                         }
                     }
                     tr {
                         th {
-                            "utu fastUnsafe";
+                            "Dart"
                         }
                         td {
-                            "4.24";
+                            "814"
                         }
                         td {
-                            "6.03";
+                            "42.2"
                         }
                         td {
-                            "4.50";
-                        }
-                        td {
-                            "1.89";
-                        }
-                        td {
-                            "2.9";
-                        }
-                        td {
-                            "1.1";
+                            "17.0"
                         }
                     }
                     tr {
                         th {
-                            "utu small";
+                            "Kotlin"
                         }
                         td {
-                            "4.68";
+                            "1,965"
                         }
                         td {
-                            "7.86";
+                            "17.4"
                         }
                         td {
-                            "5.69";
-                        }
-                        td {
-                            "1.34";
-                        }
-                        td {
-                            "2.0";
-                        }
-                        td {
-                            "1.1";
+                            "8.5"
                         }
                     }
                     tr {
                         th {
-                            "utu smallUnsafe";
+                            "MoonBit"
                         }
                         td {
-                            "4.84";
+                            "86.8"
                         }
                         td {
-                            "7.77";
+                            "10.2"
                         }
                         td {
-                            "5.55";
-                        }
-                        td {
-                            "1.27";
-                        }
-                        td {
-                            "2.0";
-                        }
-                        td {
-                            "1.1";
+                            "4.7"
                         }
                     }
                     tr {
                         th {
-                            "safe Rust";
+                            "AssemblyScript"
                         }
                         td {
-                            "7.84";
+                            "1,338"
                         }
                         td {
-                            "9.97";
+                            "14.6"
                         }
                         td {
-                            "7.30";
-                        }
-                        td {
-                            "238";
-                        }
-                        td {
-                            "28.8";
-                        }
-                        td {
-                            "12.1";
+                            "5.4"
                         }
                     }
                     tr {
                         th {
-                            "unsafe Rust";
+                            "Go"
                         }
                         td {
-                            "3.54";
+                            "1,207"
                         }
                         td {
-                            "3.68";
+                            "1,895"
                         }
                         td {
-                            "3.54";
-                        }
-                        td {
-                            "194";
-                        }
-                        td {
-                            "24.0";
-                        }
-                        td {
-                            "10.3";
+                            "562.0"
                         }
                     }
                     tr {
                         th {
-                            "JavaScript";
+                            "Swift"
                         }
                         td {
-                            "8.48";
+                            "1,920"
                         }
                         td {
-                            "15.0";
+                            "5,450"
                         }
                         td {
-                            "6.62";
-                        }
-                        td {
-                            "—";
-                        }
-                        td {
-                            "3.6";
-                        }
-                        td {
-                            "1.2";
+                            "1,672"
                         }
                     }
                     tr {
                         th {
-                            "Kotlin";
+                            "Haskell"
                         }
                         td {
-                            "5.39";
+                            "949"
                         }
                         td {
-                            "10.7";
+                            "1,533"
                         }
                         td {
-                            "5.14";
-                        }
-                        td {
-                            "1,366";
-                        }
-                        td {
-                            "8.5";
-                        }
-                        td {
-                            "4.5";
-                        }
-                    }
-                    tr {
-                        th {
-                            "MoonBit";
-                        }
-                        td {
-                            "5.36";
-                        }
-                        td {
-                            "8.82";
-                        }
-                        td {
-                            "4.74";
-                        }
-                        td {
-                            "66.4";
-                        }
-                        td {
-                            "2.4";
-                        }
-                        td {
-                            "1.4";
-                        }
-                    }
-                    tr {
-                        th {
-                            "AssemblyScript";
-                        }
-                        td {
-                            "18.9";
-                        }
-                        td {
-                            "13.7";
-                        }
-                        td {
-                            "15.2";
-                        }
-                        td {
-                            "1,222";
-                        }
-                        td {
-                            "10.6";
-                        }
-                        td {
-                            "4.2";
-                        }
-                    }
-                    tr {
-                        th {
-                            "Haskell";
-                        }
-                        td {
-                            "95.5";
-                        }
-                        td {
-                            "76.7";
-                        }
-                        td {
-                            "67.5";
-                        }
-                        td {
-                            "772";
-                        }
-                        td {
-                            "1,538";
-                        }
-                        td {
-                            "438.8";
+                            "442.1"
                         }
                     }
                 }
             }
             h2 {
-                "n-body";
+                "Richards"
             }
             p {
-                "Five planets under gravity, 20,000 steps, five times per sample: floating-point arithmetic on the fields of a few structs.";
+                "An operating-system task scheduler: tasks of four kinds, linked queues of packets, and dispatch on the kind of task, ten simulations per sample."
             }
             table.wide {
                 thead {
                     tr {
                         th {
-                            "";
+                            ""
                         }
                         th {
-                            "V8, ms";
+                            "V8, ms"
                         }
                         th {
-                            "SM, ms";
+                            "SM, ms"
                         }
                         th {
-                            "JSC, ms";
+                            "JSC, ms"
                         }
                         th {
-                            "build, ms";
+                            "build, ms"
                         }
                         th {
-                            "size, KB";
+                            "size, KB"
                         }
                         th {
-                            "gzip, KB";
+                            "gzip, KB"
                         }
                     }
                 }
                 tbody {
                     tr {
                         th {
-                            "utu fast";
+                            "utu fast"
                         }
                         td {
-                            "5.12";
+                            "4.20"
                         }
                         td {
-                            "5.39";
+                            "6.13"
                         }
                         td {
-                            "5.40";
+                            "4.59"
                         }
                         td {
-                            "1.23";
+                            "1.95"
                         }
                         td {
-                            "3.1";
+                            "3.0"
                         }
                         td {
-                            "1.1";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu fastUnsafe";
-                        }
-                        td {
-                            "5.08";
-                        }
-                        td {
-                            "5.35";
-                        }
-                        td {
-                            "5.48";
-                        }
-                        td {
-                            "1.18";
-                        }
-                        td {
-                            "3.1";
-                        }
-                        td {
-                            "1.1";
+                            "1.2"
                         }
                     }
                     tr {
                         th {
-                            "utu small";
+                            "utu fastUnsafe"
                         }
                         td {
-                            "5.09";
+                            "4.24"
                         }
                         td {
-                            "5.59";
+                            "6.03"
                         }
                         td {
-                            "5.11";
+                            "4.50"
                         }
                         td {
-                            "0.87";
+                            "1.89"
                         }
                         td {
-                            "1.7";
+                            "2.9"
                         }
                         td {
-                            "1.1";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "utu smallUnsafe";
+                            "utu small"
                         }
                         td {
-                            "5.10";
+                            "4.68"
                         }
                         td {
-                            "5.58";
+                            "7.86"
                         }
                         td {
-                            "5.10";
+                            "5.69"
                         }
                         td {
-                            "0.86";
+                            "1.34"
                         }
                         td {
-                            "1.7";
+                            "2.0"
                         }
                         td {
-                            "1.1";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "safe Rust";
+                            "utu smallUnsafe"
                         }
                         td {
-                            "3.41";
+                            "4.84"
                         }
                         td {
-                            "3.62";
+                            "7.77"
                         }
                         td {
-                            "3.82";
+                            "5.55"
                         }
                         td {
-                            "182";
+                            "1.27"
                         }
                         td {
-                            "3.5";
+                            "2.0"
                         }
                         td {
-                            "2.0";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "unsafe Rust";
+                            "safe Rust"
                         }
                         td {
-                            "4.96";
+                            "7.84"
                         }
                         td {
-                            "5.24";
+                            "9.97"
                         }
                         td {
-                            "4.96";
+                            "7.30"
                         }
                         td {
-                            "170";
+                            "238"
                         }
                         td {
-                            "22.4";
+                            "28.8"
                         }
                         td {
-                            "10.5";
+                            "12.1"
                         }
                     }
                     tr {
                         th {
-                            "JavaScript";
+                            "unsafe Rust"
                         }
                         td {
-                            "8.07";
+                            "3.54"
                         }
                         td {
-                            "12.3";
+                            "3.68"
                         }
                         td {
-                            "6.96";
+                            "3.54"
                         }
                         td {
-                            "—";
+                            "194"
                         }
                         td {
-                            "1.8";
+                            "24.0"
                         }
                         td {
-                            "0.9";
+                            "10.3"
                         }
                     }
                     tr {
                         th {
-                            "Kotlin";
+                            "JavaScript"
                         }
                         td {
-                            "5.22";
+                            "8.48"
                         }
                         td {
-                            "5.61";
+                            "15.0"
                         }
                         td {
-                            "5.28";
+                            "6.62"
                         }
                         td {
-                            "1,217";
+                            "—"
                         }
                         td {
-                            "8.0";
+                            "3.6"
                         }
                         td {
-                            "4.4";
+                            "1.2"
                         }
                     }
                     tr {
                         th {
-                            "MoonBit";
+                            "Kotlin"
                         }
                         td {
-                            "5.48";
+                            "5.39"
                         }
                         td {
-                            "5.64";
+                            "10.7"
                         }
                         td {
-                            "5.42";
+                            "5.14"
                         }
                         td {
-                            "65.3";
+                            "1,366"
                         }
                         td {
-                            "2.2";
+                            "8.5"
                         }
                         td {
-                            "1.3";
+                            "4.5"
                         }
                     }
                     tr {
                         th {
-                            "AssemblyScript";
+                            "MoonBit"
                         }
                         td {
-                            "21.5";
+                            "5.36"
                         }
                         td {
-                            "14.4";
+                            "8.82"
                         }
                         td {
-                            "20.3";
+                            "4.74"
                         }
                         td {
-                            "1,092";
+                            "66.4"
                         }
                         td {
-                            "7.2";
+                            "2.4"
                         }
                         td {
-                            "3.5";
+                            "1.4"
                         }
                     }
                     tr {
                         th {
-                            "Haskell";
+                            "AssemblyScript"
                         }
                         td {
-                            "189";
+                            "18.9"
                         }
                         td {
-                            "119";
+                            "13.7"
                         }
                         td {
-                            "96.8";
+                            "15.2"
                         }
                         td {
-                            "508";
+                            "1,222"
                         }
                         td {
-                            "1,571";
+                            "10.6"
                         }
                         td {
-                            "451.8";
+                            "4.2"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Haskell"
+                        }
+                        td {
+                            "95.5"
+                        }
+                        td {
+                            "76.7"
+                        }
+                        td {
+                            "67.5"
+                        }
+                        td {
+                            "772"
+                        }
+                        td {
+                            "1,538"
+                        }
+                        td {
+                            "438.8"
                         }
                     }
                 }
             }
             h2 {
-                "binary-trees";
+                "n-body"
             }
             p {
-                "Allocating and walking millions of short-lived binary trees: each engine's garbage collector against Rust's Box, and against an arena. SpiderMonkey's collector is the slow one here for every WasmGC language.";
+                "Five planets under gravity, 20,000 steps, five times per sample: floating-point arithmetic on the fields of a few structs."
             }
             table.wide {
                 thead {
                     tr {
                         th {
-                            "";
+                            ""
                         }
                         th {
-                            "V8, ms";
+                            "V8, ms"
                         }
                         th {
-                            "SM, ms";
+                            "SM, ms"
                         }
                         th {
-                            "JSC, ms";
+                            "JSC, ms"
                         }
                         th {
-                            "build, ms";
+                            "build, ms"
                         }
                         th {
-                            "size, KB";
+                            "size, KB"
                         }
                         th {
-                            "gzip, KB";
+                            "gzip, KB"
                         }
                     }
                 }
                 tbody {
                     tr {
                         th {
-                            "utu fast";
+                            "utu fast"
                         }
                         td {
-                            "10.6";
+                            "5.12"
                         }
                         td {
-                            "37.4";
+                            "5.39"
                         }
                         td {
-                            "11.6";
+                            "5.40"
                         }
                         td {
-                            "0.54";
+                            "1.23"
                         }
                         td {
-                            "0.9";
+                            "3.1"
                         }
                         td {
-                            "0.5";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu fastUnsafe";
-                        }
-                        td {
-                            "10.6";
-                        }
-                        td {
-                            "37.8";
-                        }
-                        td {
-                            "11.3";
-                        }
-                        td {
-                            "0.54";
-                        }
-                        td {
-                            "0.8";
-                        }
-                        td {
-                            "0.5";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "utu small";
+                            "utu fastUnsafe"
                         }
                         td {
-                            "10.7";
+                            "5.08"
                         }
                         td {
-                            "38.1";
+                            "5.35"
                         }
                         td {
-                            "11.8";
+                            "5.48"
                         }
                         td {
-                            "0.48";
+                            "1.18"
                         }
                         td {
-                            "0.6";
+                            "3.1"
                         }
                         td {
-                            "0.5";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "utu smallUnsafe";
+                            "utu small"
                         }
                         td {
-                            "11.0";
+                            "5.09"
                         }
                         td {
-                            "38.4";
+                            "5.59"
                         }
                         td {
-                            "11.4";
+                            "5.11"
                         }
                         td {
-                            "0.46";
+                            "0.87"
                         }
                         td {
-                            "0.6";
+                            "1.7"
                         }
                         td {
-                            "0.5";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "safe Rust";
+                            "utu smallUnsafe"
                         }
                         td {
-                            "40.9";
+                            "5.10"
                         }
                         td {
-                            "54.8";
+                            "5.58"
                         }
                         td {
-                            "43.4";
+                            "5.10"
                         }
                         td {
-                            "155";
+                            "0.86"
                         }
                         td {
-                            "21.1";
+                            "1.7"
                         }
                         td {
-                            "9.4";
+                            "1.1"
                         }
                     }
                     tr {
                         th {
-                            "unsafe Rust";
+                            "safe Rust"
                         }
                         td {
-                            "9.13";
+                            "3.41"
                         }
                         td {
-                            "10.0";
+                            "3.62"
                         }
                         td {
-                            "9.44";
+                            "3.82"
                         }
                         td {
-                            "164";
+                            "182"
                         }
                         td {
-                            "21.3";
+                            "3.5"
                         }
                         td {
-                            "9.5";
+                            "2.0"
                         }
                     }
                     tr {
                         th {
-                            "JavaScript";
+                            "unsafe Rust"
                         }
                         td {
-                            "20.1";
+                            "4.96"
                         }
                         td {
-                            "90.8";
+                            "5.24"
                         }
                         td {
-                            "16.9";
+                            "4.96"
                         }
                         td {
-                            "—";
+                            "170"
                         }
                         td {
-                            "0.5";
+                            "22.4"
                         }
                         td {
-                            "0.3";
+                            "10.5"
                         }
                     }
                     tr {
                         th {
-                            "Kotlin";
+                            "JavaScript"
                         }
                         td {
-                            "10.4";
+                            "8.07"
                         }
                         td {
-                            "39.9";
+                            "12.3"
                         }
                         td {
-                            "11.4";
+                            "6.96"
                         }
                         td {
-                            "1,087";
+                            "—"
                         }
                         td {
-                            "5.0";
+                            "1.8"
                         }
                         td {
-                            "2.6";
+                            "0.9"
                         }
                     }
                     tr {
                         th {
-                            "MoonBit";
+                            "Kotlin"
                         }
                         td {
-                            "11.1";
+                            "5.22"
                         }
                         td {
-                            "38.7";
+                            "5.61"
                         }
                         td {
-                            "11.7";
+                            "5.28"
                         }
                         td {
-                            "64.8";
+                            "1,217"
                         }
                         td {
-                            "0.8";
+                            "8.0"
                         }
                         td {
-                            "0.6";
+                            "4.4"
                         }
                     }
                     tr {
                         th {
-                            "AssemblyScript";
+                            "MoonBit"
                         }
                         td {
-                            "163";
+                            "5.48"
                         }
                         td {
-                            "149";
+                            "5.64"
                         }
                         td {
-                            "142";
+                            "5.42"
                         }
                         td {
-                            "1,024";
+                            "65.3"
                         }
                         td {
-                            "4.4";
+                            "2.2"
                         }
                         td {
-                            "2.3";
+                            "1.3"
                         }
                     }
                     tr {
                         th {
-                            "Haskell";
+                            "AssemblyScript"
                         }
                         td {
-                            "80.6";
+                            "21.5"
                         }
                         td {
-                            "51.9";
+                            "14.4"
                         }
                         td {
-                            "37.6";
+                            "20.3"
                         }
                         td {
-                            "345";
+                            "1,092"
                         }
                         td {
-                            "1,464";
+                            "7.2"
                         }
                         td {
-                            "428.2";
+                            "3.5"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Haskell"
+                        }
+                        td {
+                            "189"
+                        }
+                        td {
+                            "119"
+                        }
+                        td {
+                            "96.8"
+                        }
+                        td {
+                            "508"
+                        }
+                        td {
+                            "1,571"
+                        }
+                        td {
+                            "451.8"
                         }
                     }
                 }
             }
             h2 {
-                "fannkuch-redux";
+                "binary-trees"
             }
             p {
-                "Every permutation of nine elements, flipped by prefix reversal: small integer arrays, indexed in tight loops.";
+                "Allocating and walking millions of short-lived binary trees: each engine's garbage collector against Rust's Box, and against an arena. SpiderMonkey's collector is the slow one here for every WasmGC language."
             }
             table.wide {
                 thead {
                     tr {
                         th {
-                            "";
+                            ""
                         }
                         th {
-                            "V8, ms";
+                            "V8, ms"
                         }
                         th {
-                            "SM, ms";
+                            "SM, ms"
                         }
                         th {
-                            "JSC, ms";
+                            "JSC, ms"
                         }
                         th {
-                            "build, ms";
+                            "build, ms"
                         }
                         th {
-                            "size, KB";
+                            "size, KB"
                         }
                         th {
-                            "gzip, KB";
+                            "gzip, KB"
                         }
                     }
                 }
                 tbody {
                     tr {
                         th {
-                            "utu fast";
+                            "utu fast"
                         }
                         td {
-                            "13.0";
+                            "10.6"
                         }
                         td {
-                            "16.5";
+                            "37.4"
                         }
                         td {
-                            "16.4";
+                            "11.6"
                         }
                         td {
-                            "0.66";
+                            "0.54"
                         }
                         td {
-                            "1.3";
+                            "0.9"
                         }
                         td {
-                            "0.6";
-                        }
-                    }
-                    tr {
-                        th {
-                            "utu fastUnsafe";
-                        }
-                        td {
-                            "13.1";
-                        }
-                        td {
-                            "16.5";
-                        }
-                        td {
-                            "16.4";
-                        }
-                        td {
-                            "0.65";
-                        }
-                        td {
-                            "1.3";
-                        }
-                        td {
-                            "0.6";
+                            "0.5"
                         }
                     }
                     tr {
                         th {
-                            "utu small";
+                            "utu fastUnsafe"
                         }
                         td {
-                            "14.2";
+                            "10.6"
                         }
                         td {
-                            "13.6";
+                            "37.8"
                         }
                         td {
-                            "16.1";
+                            "11.3"
                         }
                         td {
-                            "0.56";
+                            "0.54"
                         }
                         td {
-                            "0.8";
+                            "0.8"
                         }
                         td {
-                            "0.6";
+                            "0.5"
                         }
                     }
                     tr {
                         th {
-                            "utu smallUnsafe";
+                            "utu small"
                         }
                         td {
-                            "14.2";
+                            "10.7"
                         }
                         td {
-                            "13.6";
+                            "38.1"
                         }
                         td {
-                            "16.0";
+                            "11.8"
                         }
                         td {
-                            "0.57";
+                            "0.48"
                         }
                         td {
-                            "0.8";
+                            "0.6"
                         }
                         td {
-                            "0.6";
+                            "0.5"
                         }
                     }
                     tr {
                         th {
-                            "safe Rust";
+                            "utu smallUnsafe"
                         }
                         td {
-                            "12.4";
+                            "11.0"
                         }
                         td {
-                            "12.8";
+                            "38.4"
                         }
                         td {
-                            "12.0";
+                            "11.4"
                         }
                         td {
-                            "182";
+                            "0.46"
                         }
                         td {
-                            "22.5";
+                            "0.6"
                         }
                         td {
-                            "10.0";
+                            "0.5"
                         }
                     }
                     tr {
                         th {
-                            "unsafe Rust";
+                            "safe Rust"
                         }
                         td {
-                            "13.5";
+                            "40.9"
                         }
                         td {
-                            "14.4";
+                            "54.8"
                         }
                         td {
-                            "13.9";
+                            "43.4"
                         }
                         td {
-                            "173";
+                            "155"
                         }
                         td {
-                            "21.9";
+                            "21.1"
                         }
                         td {
-                            "9.8";
+                            "9.4"
                         }
                     }
                     tr {
                         th {
-                            "JavaScript";
+                            "unsafe Rust"
                         }
                         td {
-                            "17.4";
+                            "9.13"
                         }
                         td {
-                            "18.0";
+                            "10.0"
                         }
                         td {
-                            "13.6";
+                            "9.44"
                         }
                         td {
-                            "—";
+                            "164"
                         }
                         td {
-                            "0.5";
+                            "21.3"
                         }
                         td {
-                            "0.3";
+                            "9.5"
                         }
                     }
                     tr {
                         th {
-                            "Kotlin";
+                            "JavaScript"
                         }
                         td {
-                            "14.8";
+                            "20.1"
                         }
                         td {
-                            "50.1";
+                            "90.8"
                         }
                         td {
-                            "24.7";
+                            "16.9"
                         }
                         td {
-                            "1,067";
+                            "—"
                         }
                         td {
-                            "5.4";
+                            "0.5"
                         }
                         td {
-                            "2.9";
+                            "0.3"
                         }
                     }
                     tr {
                         th {
-                            "MoonBit";
+                            "Kotlin"
                         }
                         td {
-                            "14.8";
+                            "10.4"
                         }
                         td {
-                            "13.9";
+                            "39.9"
                         }
                         td {
-                            "16.5";
+                            "11.4"
                         }
                         td {
-                            "63.6";
+                            "1,087"
                         }
                         td {
-                            "1.0";
+                            "5.0"
                         }
                         td {
-                            "0.7";
+                            "2.6"
                         }
                     }
                     tr {
                         th {
-                            "AssemblyScript";
+                            "MoonBit"
                         }
                         td {
-                            "98.6";
+                            "11.1"
                         }
                         td {
-                            "38.8";
+                            "38.7"
                         }
                         td {
-                            "72.0";
+                            "11.7"
                         }
                         td {
-                            "1,044";
+                            "64.8"
                         }
                         td {
-                            "4.9";
+                            "0.8"
                         }
                         td {
-                            "2.5";
+                            "0.6"
                         }
                     }
                     tr {
                         th {
-                            "Haskell";
+                            "AssemblyScript"
                         }
                         td {
-                            "28.2";
+                            "163"
                         }
                         td {
-                            "29.2";
+                            "149"
                         }
                         td {
-                            "25.9";
+                            "142"
                         }
                         td {
-                            "442";
+                            "1,024"
                         }
                         td {
-                            "1,469";
+                            "4.4"
                         }
                         td {
-                            "429.0";
+                            "2.3"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Haskell"
+                        }
+                        td {
+                            "80.6"
+                        }
+                        td {
+                            "51.9"
+                        }
+                        td {
+                            "37.6"
+                        }
+                        td {
+                            "345"
+                        }
+                        td {
+                            "1,464"
+                        }
+                        td {
+                            "428.2"
+                        }
+                    }
+                }
+            }
+            h2 {
+                "fannkuch-redux"
+            }
+            p {
+                "Every permutation of nine elements, flipped by prefix reversal: small integer arrays, indexed in tight loops."
+            }
+            table.wide {
+                thead {
+                    tr {
+                        th {
+                            ""
+                        }
+                        th {
+                            "V8, ms"
+                        }
+                        th {
+                            "SM, ms"
+                        }
+                        th {
+                            "JSC, ms"
+                        }
+                        th {
+                            "build, ms"
+                        }
+                        th {
+                            "size, KB"
+                        }
+                        th {
+                            "gzip, KB"
+                        }
+                    }
+                }
+                tbody {
+                    tr {
+                        th {
+                            "utu fast"
+                        }
+                        td {
+                            "13.0"
+                        }
+                        td {
+                            "16.5"
+                        }
+                        td {
+                            "16.4"
+                        }
+                        td {
+                            "0.66"
+                        }
+                        td {
+                            "1.3"
+                        }
+                        td {
+                            "0.6"
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu fastUnsafe"
+                        }
+                        td {
+                            "13.1"
+                        }
+                        td {
+                            "16.5"
+                        }
+                        td {
+                            "16.4"
+                        }
+                        td {
+                            "0.65"
+                        }
+                        td {
+                            "1.3"
+                        }
+                        td {
+                            "0.6"
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu small"
+                        }
+                        td {
+                            "14.2"
+                        }
+                        td {
+                            "13.6"
+                        }
+                        td {
+                            "16.1"
+                        }
+                        td {
+                            "0.56"
+                        }
+                        td {
+                            "0.8"
+                        }
+                        td {
+                            "0.6"
+                        }
+                    }
+                    tr {
+                        th {
+                            "utu smallUnsafe"
+                        }
+                        td {
+                            "14.2"
+                        }
+                        td {
+                            "13.6"
+                        }
+                        td {
+                            "16.0"
+                        }
+                        td {
+                            "0.57"
+                        }
+                        td {
+                            "0.8"
+                        }
+                        td {
+                            "0.6"
+                        }
+                    }
+                    tr {
+                        th {
+                            "safe Rust"
+                        }
+                        td {
+                            "12.4"
+                        }
+                        td {
+                            "12.8"
+                        }
+                        td {
+                            "12.0"
+                        }
+                        td {
+                            "182"
+                        }
+                        td {
+                            "22.5"
+                        }
+                        td {
+                            "10.0"
+                        }
+                    }
+                    tr {
+                        th {
+                            "unsafe Rust"
+                        }
+                        td {
+                            "13.5"
+                        }
+                        td {
+                            "14.4"
+                        }
+                        td {
+                            "13.9"
+                        }
+                        td {
+                            "173"
+                        }
+                        td {
+                            "21.9"
+                        }
+                        td {
+                            "9.8"
+                        }
+                    }
+                    tr {
+                        th {
+                            "JavaScript"
+                        }
+                        td {
+                            "17.4"
+                        }
+                        td {
+                            "18.0"
+                        }
+                        td {
+                            "13.6"
+                        }
+                        td {
+                            "—"
+                        }
+                        td {
+                            "0.5"
+                        }
+                        td {
+                            "0.3"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Kotlin"
+                        }
+                        td {
+                            "14.8"
+                        }
+                        td {
+                            "50.1"
+                        }
+                        td {
+                            "24.7"
+                        }
+                        td {
+                            "1,067"
+                        }
+                        td {
+                            "5.4"
+                        }
+                        td {
+                            "2.9"
+                        }
+                    }
+                    tr {
+                        th {
+                            "MoonBit"
+                        }
+                        td {
+                            "14.8"
+                        }
+                        td {
+                            "13.9"
+                        }
+                        td {
+                            "16.5"
+                        }
+                        td {
+                            "63.6"
+                        }
+                        td {
+                            "1.0"
+                        }
+                        td {
+                            "0.7"
+                        }
+                    }
+                    tr {
+                        th {
+                            "AssemblyScript"
+                        }
+                        td {
+                            "98.6"
+                        }
+                        td {
+                            "38.8"
+                        }
+                        td {
+                            "72.0"
+                        }
+                        td {
+                            "1,044"
+                        }
+                        td {
+                            "4.9"
+                        }
+                        td {
+                            "2.5"
+                        }
+                    }
+                    tr {
+                        th {
+                            "Haskell"
+                        }
+                        td {
+                            "28.2"
+                        }
+                        td {
+                            "29.2"
+                        }
+                        td {
+                            "25.9"
+                        }
+                        td {
+                            "442"
+                        }
+                        td {
+                            "1,469"
+                        }
+                        td {
+                            "429.0"
                         }
                     }
                 }

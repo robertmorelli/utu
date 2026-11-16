@@ -167,40 +167,40 @@ mod javascript {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface: import a declaration graph and call it in utu syntax. Only the operations a program uses become boundary code.");
+            = ui.header("JavaScript, the browser, and npm", "TypeScript declarations are utu's foreign-function interface: import a declaration graph and call it in utu syntax. Only the operations a program uses become boundary code.")
             h2 {
-                "The platform";
+                "The platform"
             }
             p {
                 code {
-                    "std:Browser";
+                    "std:Browser"
                 }
-                " is the DOM and standard JavaScript, linked from TypeScript's own ";
+                " is the DOM and standard JavaScript, linked from TypeScript's own "
                 code {
-                    "lib.dom";
+                    "lib.dom"
                 }
-                ". Literal overloads keep their precise results: ";
+                ". Literal overloads keep their precise results: "
                 code {
-                    "createElement(\"input\")";
+                    "createElement(\"input\")"
                 }
-                " is an ";
+                " is an "
                 code {
-                    "HTMLInputElement";
+                    "HTMLInputElement"
                 }
-                ".";
+                "."
             }
-            = code.block(dom_sample());
+            = code.block(dom_sample())
             table.modules {
                 thead {
                     tr {
                         th {
-                            "Module";
+                            "Module"
                         }
                         th {
-                            "Contents";
+                            "Contents"
                         }
                         th {
-                            "Runs on";
+                            "Runs on"
                         }
                     }
                 }
@@ -208,167 +208,167 @@ mod javascript {
                     tr {
                         td {
                             code {
-                                "std:JS";
+                                "std:JS"
                             }
                         }
                         td {
-                            "ECMAScript: Array, Map, Set, JSON, Math, Promise, Date, RegExp, Intl";
+                            "ECMAScript: Array, Map, Set, JSON, Math, Promise, Date, RegExp, Intl"
                         }
                         td {
-                            "any JavaScript host";
+                            "any JavaScript host"
                         }
                     }
                     tr {
                         td {
                             code {
-                                "std:Web";
+                                "std:Web"
                             }
                         }
                         td {
-                            "fetch, URL, TextEncoder, streams, AbortController, Blob, crypto, timers";
+                            "fetch, URL, TextEncoder, streams, AbortController, Blob, crypto, timers"
                         }
                         td {
-                            "Node, Bun, Deno, browsers, workers";
+                            "Node, Bun, Deno, browsers, workers"
                         }
                     }
                     tr {
                         td {
                             code {
-                                "std:Browser";
+                                "std:Browser"
                             }
                         }
                         td {
-                            "All of the above plus the DOM";
+                            "All of the above plus the DOM"
                         }
                         td {
-                            "browser pages";
+                            "browser pages"
                         }
                     }
                     tr {
                         td {
                             code {
-                                "std:Worker";
+                                "std:Worker"
                             }
                         }
                         td {
-                            "A worker's global scope: self, postMessage, importScripts";
+                            "A worker's global scope: self, postMessage, importScripts"
                         }
                         td {
-                            "web workers";
+                            "web workers"
                         }
                     }
                 }
             }
             h2 {
-                "Standard JavaScript";
+                "Standard JavaScript"
             }
             p {
-                "Numbers cross as ";
+                "Numbers cross as "
                 code {
-                    "F64";
+                    "F64"
                 }
-                ", strings as ";
+                ", strings as "
                 code {
-                    "Str";
+                    "Str"
                 }
-                ". A dynamic value (";
+                ". A dynamic value ("
                 code {
-                    "any";
+                    "any"
                 }
-                ") is checked with ";
+                ") is checked with "
                 code {
-                    "typeof";
+                    "typeof"
                 }
-                " when it reaches a typed slot.";
+                " when it reaches a typed slot."
             }
-            = code.block(builtins_sample());
-            = code.block(json_host_sample());
+            = code.block(builtins_sample())
+            = code.block(json_host_sample())
             h2 {
-                "Records, arrays, and callbacks";
-            }
-            p {
-                code {
-                    "&{ ... }";
-                }
-                " and array literals take their shape from the declaration they are passed to. Closures are real JavaScript functions, typed from the slot they reach.";
-            }
-            = code.block(records_sample());
-            = code.block(callbacks_sample());
-            h2 {
-                "Narrowing and absence";
-            }
-            = code.block(narrowing_sample());
-            h2 {
-                "Exceptions";
+                "Records, arrays, and callbacks"
             }
             p {
                 code {
-                    "try";
+                    "&{ ... }"
                 }
-                " catches JavaScript exceptions and is an expression. Wasm traps are never caught.";
+                " and array literals take their shape from the declaration they are passed to. Closures are real JavaScript functions, typed from the slot they reach."
             }
-            = code.block(try_sample());
+            = code.block(records_sample())
+            = code.block(callbacks_sample())
             h2 {
-                "Promises and the web APIs";
+                "Narrowing and absence"
             }
-            p {
-                "A host promise is a ";
-                code {
-                    "Promise[T]";
-                }
-                ", so ";
-                code {
-                    "await";
-                }
-                " works on it directly. ";
-                code {
-                    "std:Web";
-                }
-                " runs on servers as well as pages.";
-            }
-            = code.block(fetch_sample());
-            = code.block(timers_sample());
+            = code.block(narrowing_sample())
             h2 {
-                "npm and Node packages";
+                "Exceptions"
             }
             p {
                 code {
-                    "\"npm:pkg\"";
+                    "try"
                 }
-                " and ";
-                code {
-                    "\"node:mod\"";
-                }
-                " import a package's declarations through TypeScript's module resolution. The glue keeps named imports, so bundlers tree-shake the package.";
+                " catches JavaScript exceptions and is an expression. Wasm traps are never caught."
             }
-            = code.block(packages_sample());
+            = code.block(try_sample())
             h2 {
-                "Your own declarations, and Rust";
+                "Promises and the web APIs"
             }
             p {
-                "Link a ";
+                "A host promise is a "
                 code {
-                    ".d.ts";
+                    "Promise[T]"
                 }
-                " once and import the result. A wasm-pack crate arrives the same way; call ";
+                ", so "
                 code {
-                    "free()";
+                    "await"
                 }
-                " on its objects when done.";
+                " works on it directly. "
+                code {
+                    "std:Web"
+                }
+                " runs on servers as well as pages."
             }
-            = code.shell(link_shell());
-            = code.block(link_use_multi());
+            = code.block(fetch_sample())
+            = code.block(timers_sample())
             h2 {
-                "What it costs";
+                "npm and Node packages"
             }
             p {
-                "Built ";
                 code {
-                    "-O smallUnsafe";
+                    "\"npm:pkg\""
                 }
-                ", the browser task board is 2,565 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard 4,658. A thousand unused declarations add zero bytes. Each boundary crossing still costs time, so call once per operation, not once per element.";
+                " and "
+                code {
+                    "\"node:mod\""
+                }
+                " import a package's declarations through TypeScript's module resolution. The glue keeps named imports, so bundlers tree-shake the package."
             }
-            = ui.further("docs/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI");
+            = code.block(packages_sample())
+            h2 {
+                "Your own declarations, and Rust"
+            }
+            p {
+                "Link a "
+                code {
+                    ".d.ts"
+                }
+                " once and import the result. A wasm-pack crate arrives the same way; call "
+                code {
+                    "free()"
+                }
+                " on its objects when done."
+            }
+            = code.shell(link_shell())
+            = code.block(link_use_multi())
+            h2 {
+                "What it costs"
+            }
+            p {
+                "Built "
+                code {
+                    "-O smallUnsafe"
+                }
+                ", the browser task board is 2,565 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard 4,658. A thousand unused declarations add zero bytes. Each boundary crossing still costs time, so call once per operation, not once per element."
+            }
+            = ui.further("docs/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI")
         }
         \/
     }

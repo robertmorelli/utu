@@ -4,9 +4,9 @@ using Browser from std:Browser;
         fn second() Str { "p{color:blue}"; }
         main {
           Browser.document.body.append(@wutu/\
-          @style first();
-          @style second();
-          div { /* comment */ background: url(https://example.com/a.png); "x"; }
+          @style first()
+          @style second()
+          div { /* comment */ background: url(https://example.com/a.png); "x" }
           \/);
         }
       

@@ -291,11 +291,100 @@ class WutuParser {
     this.p = end < 0 ? this.text.length : end;
   }
 
-  expectSemicolon() {
+  /**
+   * A statement's end, as utu's: a line break, `;` (two on one line), the `}`
+   * closing its block, or the template's end. `;` is consumed; the rest stay.
+   */
+  expectEnd() {
     const statementEnd = this.p;
-    this.skipTrivia();
-    if (this.text[this.p] !== ';') this.fail('expected ; after Wutu statement', statementEnd);
-    this.p++;
+    const i = this.lineRest(statementEnd);
+    const c = this.text[i];
+    if (i >= this.text.length || c === '\n' || c === '}') { this.p = i; return; }
+    if (c !== ';') this.fail('expected a line break or ; after Wutu statement', statementEnd);
+    this.p = i + 1;
+  }
+
+  /** Past spaces, tabs, and comments from i, on its line. */
+  lineRest(i) {
+    const { text } = this;
+    while (i < text.length) {
+      const c = text[i];
+      if (c === ' ' || c === '\t' || c === '\r') i++;
+      else if (text.startsWith('/*', i)) {
+        const end = text.indexOf('*/', i + 2);
+        if (end < 0) return text.length;
+        i = end + 2;
+      } else if (text.startsWith('//', i) && this.afterBlank(i)) {
+        const end = text.indexOf('\n', i);
+        return end < 0 ? text.length : end;
+      } else return i;
+    }
+    return i;
+  }
+
+  /** Past blanks, line breaks, and comments from i: the next line's first token. */
+  nextToken(i) {
+    let j = this.lineRest(i);
+    while (this.text[j] === '\n') j = this.lineRest(j + 1);
+    return j;
+  }
+
+  /** How far the line holding offset i is indented. */
+  indentAt(i) {
+    let a = Math.min(i, this.text.length);
+    while (a > 0 && this.text[a - 1] !== '\n') a--;
+    let b = a;
+    while (this.text[b] === ' ' || this.text[b] === '\t') b++;
+    return b - a;
+  }
+
+  /**
+   * Whether the expression goes on past the line break at `nl`, as utu's
+   * does: its line ends open (`last`: its last character's offset, -1 for
+   * none; `opaque` when that ends a string or DSL), or the next line continues it.
+   */
+  continuesPast(last, opaque, nl) {
+    if (last < 0) return true;
+    if (!opaque) {
+      const c = this.text[last];
+      if ('+-*/%=<>&|^~!,.?:'.includes(c)) return true;
+      if (/\w/.test(c)) {
+        let a = last;
+        while (a > 0 && /\w/.test(this.text[a - 1])) a--;
+        if (['and', 'or', 'xor', 'not', 'orelse', 'else', 'in'].includes(this.text.slice(a, last + 1))) return true;
+      }
+    }
+    return this.continuesAt(this.nextToken(nl));
+  }
+
+  /**
+   * Whether the line whose first token is at j continues the statement
+   * before it, as a utu line does: `.f` (not `.name =`, a property), `?.`, a
+   * binary operator but `-`, `&` (a CSS rule) and a lone `=` (text), `{`,
+   * `and`, `or`, `xor`, `orelse`, `else`, `catch`, or a stage with its capture.
+   */
+  continuesAt(j) {
+    const { text } = this;
+    if (j >= text.length) return false;
+    const c = text[j], next = text[j + 1] ?? '';
+    if (c === '.') return /[a-z_]/.test(next) && !/^\.[\w-]+[ \t]*=(?!=)/.test(text.slice(j, j + 200));
+    if (c === '?') return next === '.';
+    if (c === '=') return next === '=';
+    if (c === '{') return true;
+    if ('+*/%<>|^~!'.includes(c)) return true;
+    const word = /^[a-z]\w*/.exec(text.slice(j, j + 40))?.[0];
+    if (!word) return false;
+    if (['and', 'or', 'xor', 'orelse', 'else', 'catch'].includes(word)) return true;
+    if (word === 'collect') return text[j + word.length] === '(';
+    if (!PIPELINE_TERMINALS.has(word) && !PIPELINE_STAGES.has(word)) return false;
+    return /^\s*(\([^)]*\))?\s*\|/.test(text.slice(j + word.length, j + word.length + 200));
+  }
+
+  /** Whether a statement ends at i (past its line's blanks). */
+  endsAt(i) {
+    const j = this.lineRest(i);
+    const c = this.text[j];
+    return j >= this.text.length || c === ';' || c === '}' || (c === '\n' && !this.continuesAt(this.nextToken(j)));
   }
 
   /** A quoted string, CSS or Utu: a backslash escapes the character after it. */
@@ -332,25 +421,30 @@ class WutuParser {
 
   // ── Utu expressions ────────────────────────────────────────────────────────
 
-  /** `= expression;` form: everything up to the statement's semicolon. */
+  /** `= expression`: up to the statement's end, going on past a line break as utu's does. */
   readBareExpression() {
     this.skipTrivia();
     const start = this.p;
-    let depth = 0;
+    let depth = 0, last = -1, opaque = false;
     while (!this.done) {
-      if (this.skipOpaqueUtu()) continue;
-      const c = this.text[this.p];
-      if (c === ';' && depth === 0) {
-        return { source: this.text.slice(start, this.p).trim(), range: { start, end: this.p } };
+      const p = this.p, c = this.text[p];
+      if (depth === 0 && (c === ';' || c === '}' || (c === '\n' && !this.continuesPast(last, opaque, p)))) break;
+      const comment = this.text.startsWith('//', p);
+      if (this.skipOpaqueUtu()) {
+        if (!comment) { last = this.p - 1; opaque = true; }
+        continue;
       }
       if ('([{'.includes(c)) depth++;
-      else if (')]}'.includes(c)) {
-        if (depth === 0) this.fail('expected ; after expression');
+      else if (')]'.includes(c)) {
+        if (depth === 0) this.fail('expected a line break or ; after expression');
         depth--;
-      }
+      } else if (c === '}') depth--;
+      if (!/\s/.test(c)) { last = p; opaque = false; }
       this.p++;
     }
-    this.fail('unterminated expression', start);
+    if (depth > 0) this.fail('unterminated expression', start);
+    const end = last < 0 ? start : last + 1;
+    return { source: this.text.slice(start, end), range: { start, end } };
   }
 
   /**
@@ -381,14 +475,14 @@ class WutuParser {
     this.fail(`unterminated ${what}`, start);
   }
 
-  /** `"text" name…`: a string, then (no operator) another statement: a forgotten `;`. */
+  /** `"text" name…`: a string, then (no operator) another statement on its line: a forgotten `;`. */
   checkLiteralThenName() {
-    const m = this.peek(/"(?:[^"\\\n]|\\.)*"(\s*)([A-Za-z_][\w-]*)/y);
-    if (m && !['and', 'or', 'not', 'orelse'].includes(m[2])) this.fail('expected ; after Wutu statement', this.p + m[0].length - m[1].length - m[2].length);
+    const m = this.peek(/"(?:[^"\\\n]|\\.)*"([ \t]*)([A-Za-z_][\w-]*)/y);
+    if (m && !['and', 'or', 'not', 'orelse'].includes(m[2])) this.fail('expected a line break or ; after Wutu statement', this.p + m[0].length - m[1].length - m[2].length);
   }
 
   failInterpolation() {
-    this.fail('Wutu no longer writes $[…]: an expression stands on its own (= expr; for text, name = expr; for an attribute, if cond {, prop: = expr;)');
+    this.fail('Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)');
   }
 
   /** A brace-delimited Utu block, returned with its braces. */
@@ -413,24 +507,29 @@ class WutuParser {
    * {} (a function, an attribute selector, a custom property's block) are
    * data, including semicolons in url(data:...).
    */
-  readCssUntil(delimiters) {
-    const start = this.p;
-    let depth = 0;
+  readCssUntil(delimiters, lines = false) {
+    const start = this.p, indent = this.indentAt(start);
+    let depth = 0, last = '', endAt = start;
     while (!this.done) {
       const c = this.text[this.p];
-      if (c === '"' || c === "'") { this.readQuoted(); continue; }
+      if (c === '"' || c === "'") { this.readQuoted(); last = c; endAt = this.p; continue; }
       if (this.at('/*')) {
         const end = this.text.indexOf('*/', this.p + 2);
         if (end < 0) this.fail('unterminated comment');
         this.p = end + 2;
         continue;
       }
+      if (lines && !depth && this.at('//') && this.afterBlank(this.p)) { this.skipLine(); continue; }
       if (!depth && delimiters.includes(c)) break;
+      // With `lines`, a line break ends it too, unless the line ends in `,` or
+      // the next is indented past this one.
+      if (lines && !depth && c === '\n' && last && last !== ',' && this.indentAt(this.nextToken(this.p)) <= indent) break;
       if ('([{'.includes(c)) depth++;
       else if (')]}'.includes(c)) depth--;
       this.p++;
+      if (!/\s/.test(c)) { last = c; endAt = this.p; }
     }
-    return this.text.slice(start, this.p).trim();
+    return this.text.slice(start, lines ? endAt : this.p).trim();
   }
 
   /**
@@ -463,8 +562,13 @@ class WutuParser {
       if (c === '(') parens++;
       else if (c === ')') parens--;
       if (c === '{') depth++;
+      // The `;` CSS needs where a declaration's line ends (one ending in `,` goes on).
+      if ((c === '}' || (c === '\n' && parens === 0)) && !';{},'.includes(last)) {
+        body += this.text.slice(start, this.p) + ';';
+        start = this.p;
+        last = ';';
+      }
       if (c === '}') {
-        if (!';{}'.includes(last)) this.fail('CSS declarations require a semicolon');
         if (--depth === 0) return body + this.text.slice(start, this.p++);
       }
       if (!/\s/.test(c)) last = c;
@@ -481,16 +585,16 @@ class WutuParser {
     const styleUses = [], global = [];
     if (this.at('@reactive')) {
       this.p += '@reactive'.length;
-      this.expectSemicolon();
+      this.expectEnd();
       reactive = true;
       this.skipTrivia();
     }
     if (this.at('@island')) {
       this.p += '@island'.length;
       this.skipTrivia();
-      if (this.text[this.p] !== '"') this.fail('expected a quoted island name: @island "name";');
+      if (this.text[this.p] !== '"') this.fail('expected a quoted island name: @island "name"');
       scope = this.readQuoted();
-      this.expectSemicolon();
+      this.expectEnd();
       reactive = true;
       this.skipTrivia();
     }
@@ -499,7 +603,7 @@ class WutuParser {
       this.skipTrivia();
       if (this.at('$[')) this.failInterpolation();
       const { source, range } = this.readBareExpression();
-      this.expectSemicolon();
+      this.expectEnd();
       styleUses.push({ value: source, range });
       this.skipTrivia();
     }
@@ -523,14 +627,14 @@ class WutuParser {
     const start = this.p;
     if (this.text[this.p] === '"') {
       const expr = this.readQuoted();
-      this.expectSemicolon();
+      this.expectEnd();
       return { kind: 'text', expr, start };
     }
     if (this.at('$[')) this.failInterpolation();
     if (this.text[this.p] === '=') {
       this.p++;
       const { source, range } = this.readBareExpression();
-      this.expectSemicolon();
+      this.expectEnd();
       return { kind: 'expression', expr: source, range, start };
     }
     if (this.peek(/if\s/y)) return this.parseIf();
@@ -548,6 +652,7 @@ class WutuParser {
       this.skipTrivia();
       if (this.done) this.fail('unterminated branch', open);
       if (this.text[this.p] === '}') { this.p++; return children; }
+      if (this.text[this.p] === ';') { this.p++; continue; }
       children.push(this.parseNode());
     }
   }
@@ -647,7 +752,7 @@ class WutuParser {
     this.svgElement = outerElement;
     if (VOID_TAGS.has(tag) && node.children.length) this.fail(`${tag} cannot have children`, start);
     const code = tag === 'script' && node.children.find(c => c.kind !== 'text');
-    if (code) this.fail('a script\'s text is code, so Wutu writes it only as written: script { "…"; }', code.start);
+    if (code) this.fail('a script\'s text is code, so Wutu writes it only as written: script { "…" }', code.start);
     // (An element's text and attributes are escaped.)
     const raw = RAW_TEXT_TAGS.has(tag) && node.children.find(c => c.kind !== 'text' && c.kind !== 'element');
     if (raw) this.fail(rawTextError(tag), raw.start);
@@ -669,7 +774,7 @@ class WutuParser {
       const start = this.p;
       this.p += match[0].length;
       const { source, range } = this.readBareExpression();
-      this.expectSemicolon();
+      this.expectEnd();
       node.twoWay.push({ property: match[1], value: source, range, start });
     } else if ((match = this.peek(/on\s+([\w-]+)(\s+quiet)?(?:\s*\|\s*([a-z_]\w*)\s*\|)?\s*(?=[{=])/y))) {
       // `on click [quiet] [|e|] { … }` or `on click = handler;`
@@ -679,29 +784,30 @@ class WutuParser {
       if (near) this.fail(`unknown event ${match[1]}; did you mean ${near}?`, start + match[0].indexOf(match[1], 2));
       const event = { name: match[1], quiet: !!match[2], param: match[3] ?? null, start };
       if (this.text[this.p] === '=') {
-        if (event.param) this.fail('a handler value names its own parameter: on click = cl(e) Void { … };');
+        if (event.param) this.fail('a handler value names its own parameter: on click = cl(e) Void { … }');
         this.p++;
         const { source, range } = this.readBareExpression();
-        this.expectSemicolon();
+        this.expectEnd();
         node.events.push({ ...event, handler: source, range, shorthand: false });
       } else {
         const { source, range } = this.readUtuBlock();
         node.events.push({ ...event, handler: source, range, shorthand: true });
       }
-    } else if (this.peek(/@unmanaged\s*;/y)) {
+    } else if (this.peek(/@unmanaged(?![\w-])/y) && this.endsAt(this.p + '@unmanaged'.length)) {
       // The template makes the element; what JavaScript does to its children
       // and its other attributes, renders leave alone.
-      this.p = this.text.indexOf(';', this.p) + 1;
+      this.p += '@unmanaged'.length;
+      this.expectEnd();
       node.unmanaged = true;
       node.attrs.push({ name: 'data-wutu-unmanaged', value: '""', property: false, dynamic: false, range: null, start: this.p });
     } else if (c === '<') {
       this.failOldAttribute();
     } else if ((match = this.peek(/@([\w-]+)\s*=/y))) {
-      this.fail(`events are written on ${match[1]} = handler; (or on ${match[1]} { … })`);
+      this.fail(`events are written on ${match[1]} = handler (or on ${match[1]} { … })`);
     } else if (this.peek(/\.[\w-]+\s*=(?!=)/y)) {
       this.p++;
       this.parseAttribute(node, true);
-    } else if (this.peek(/(?:(?:xlink|xmlns|xml):)?[a-z][\w-]*\s*(?:=(?!=)|;|\})/y)) {
+    } else if (this.peek(/(?:(?:xlink|xmlns|xml):)?[a-z][\w-]*[ \t]*(?:=(?!=)|;|\}|\/\/|\n|$)/y)) {
       // (`xlink:href = …;`: a namespaced attribute; no CSS property has those prefixes.)
       this.parseAttribute(node, false);
     } else if (c === ':' || c === '@' || c === '&') {
@@ -719,7 +825,7 @@ class WutuParser {
   atDirective() {
     const name = this.peek(/@([\w-]*)/y)[1];
     if (!name || AT_RULES.has(name) || name[0] === '-') return;
-    if (name === 'unmanaged') this.fail('expected ; after @unmanaged', this.p + 1 + name.length);
+    if (name === 'unmanaged') this.fail('expected a line break or ; after @unmanaged', this.p + 1 + name.length);
     const head = '@reactive @island @style @document';
     if (head.split(' ').includes('@' + name)) this.fail(`@${name} goes first in the template, before its root element`);
     const near = editDistance('@unmanaged', '@' + name, 3) < 3 ? '@unmanaged' : '';
@@ -730,7 +836,7 @@ class WutuParser {
   failOldAttribute() {
     const old = this.peek(/<(\.?)([\w-]+)/y);
     const spelled = old ? `${old[1]}${old[2]}` : 'name';
-    this.fail(`attributes are written without '<': ${spelled} = value; (or ${spelled}; for a boolean attribute)`);
+    this.fail(`attributes are written without '<': ${spelled} = value (or ${spelled} alone, for a boolean attribute)`);
   }
 
   /**
@@ -742,13 +848,15 @@ class WutuParser {
     const nameStart = this.p;
     const name = this.peek(isProperty ? /[\w-]+/y : /(?:(?:xlink|xmlns|xml):)?[\w-]+/y)[0];
     this.p += name.length;
-    this.skipTrivia();
+    // (On its line: an `=` on the next begins a hole.)
+    this.p = this.lineRest(this.p);
     let value = '""', dynamic = false, range = null;
     if (this.text[this.p] === '=') {
       this.p++;
       this.skipTrivia();
       if (this.at('$[')) this.failInterpolation();
-      const literal = this.text[this.p] === '"' && this.peek(/"(?:[^"\\\n]|\\.)*"\s*;/y);
+      const quoted = this.text[this.p] === '"' && this.peek(/"(?:[^"\\\n]|\\.)*"/y);
+      const literal = quoted && this.endsAt(this.p + quoted[0].length);
       if (literal) {
         value = this.readQuoted();
       } else {
@@ -759,15 +867,15 @@ class WutuParser {
         range = expression.range;
       }
     } else if (isProperty) {
-      this.fail('a property takes a value: .name = value;');
+      this.fail('a property takes a value: .name = value');
     }
-    this.expectSemicolon();
+    this.expectEnd();
     if (isOnName(name)) this.fail(`events are written on ${name.slice(2)} { … }, not as an attribute`, nameStart);
-    if (dynamic && node.tag === 'script') this.fail('a script\'s attributes are code or load it, so Wutu sets them only as written: src = "…";', nameStart);
-    if (dynamic && node.tag === 'base' && name === 'href') this.fail('a base\'s href moves every relative URL (scripts\' too), so Wutu sets it only as written: href = "/";', nameStart);
+    if (dynamic && node.tag === 'script') this.fail('a script\'s attributes are code or load it, so Wutu sets them only as written: src = "…"', nameStart);
+    if (dynamic && node.tag === 'base' && name === 'href') this.fail('a base\'s href moves every relative URL (scripts\' too), so Wutu sets it only as written: href = "/"', nameStart);
     if (dynamic && isProperty && name === 'protocol') this.fail('.protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;', nameStart);
     if (dynamic && isProperty && RAW_TEXT_TAGS.has(node.tag) && (name === 'textContent' || name === 'innerText')) this.fail(rawTextError(node.tag), nameStart);
-    if (dynamic && name === 'srcdoc') this.fail('srcdoc is HTML, so Wutu sets it only as written: srcdoc = "…"; (trusted HTML from a value: an `as` element\'s .srcdoc, in code)', nameStart);
+    if (dynamic && name === 'srcdoc') this.fail('srcdoc is HTML, so Wutu sets it only as written: srcdoc = "…" (trusted HTML from a value: an `as` element\'s .srcdoc, in code)', nameStart);
     if (!isProperty && !isAllowedAttribute(node.tag, name, this.svgElement)) this.fail(`unknown attribute ${name} on ${node.tag}`, nameStart);
     node.attrs.push({ name, value, property: isProperty, dynamic, range, start: nameStart });
   }
@@ -775,9 +883,10 @@ class WutuParser {
   /** Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules. */
   parseCssRule(node) {
     const start = this.p;
-    const selector = this.readCssUntil('{;');
-    if (this.text[this.p] === ';') {
-      this.p++;
+    const selector = this.readCssUntil('{;}', true);
+    if (this.text[this.p] !== '{') {
+      // A statement (`@import …`): up to its line's end or `;`.
+      this.expectEnd();
       node.css.push({ source: selector + ';', css: selector + ';', start });
       return;
     }
@@ -797,17 +906,17 @@ class WutuParser {
   }
 
   /**
-   * A value (`text[from, to)`) that runs onto the next line's declaration or
-   * rule (`padding: 1rem` then `gap: 2rem;`): its `;` is missing, at its line's end.
+   * A value (`text[from, to)`) with a second declaration on its line (`red
+   * margin: 0`), which needs a `;` between. A custom property's may hold
+   * anything balanced.
    */
   cssValueRunsOn(from, to, custom) {
+    if (custom) return;
     const text = this.text;
-    let depth = 0, quoted = custom;
+    let depth = 0;
     for (let i = from; i < to; i++) {
       const c = text[i];
-      let end = -1;
       if (c === '"' || c === "'") {
-        quoted = true;
         i++;
         while (i < to && text[i] !== c) i += text[i] === '\\' ? 2 : 1;
       } else if (text.startsWith('/*', i)) {
@@ -815,17 +924,11 @@ class WutuParser {
         i = close < 0 ? to : close + 1;
       } else if ('([{'.includes(c)) depth++;
       else if (')]}'.includes(c)) depth--;
-      else if (c === ':' && !depth && !custom) {
-        end = i;
+      else if (c === ':' && !depth) {
+        let end = i;
         while (end > from && /[\w-]/.test(text[end - 1])) end--;
-      } else if (c === '\n' && !depth) {
-        const next = text.slice(i + 1, i + 200);
-        const m = /^\s*((?:--|-?[a-z])[\w-]*)\s*([:{]|=(?!=)|;)/.exec(next);
-        if ((m && (m[2] !== ';' || BOOLEAN_ATTRIBUTES.has(m[1]))) || (!quoted && /^\s*"/.test(next) && i + 1 + next.search(/\S/) < to)) end = i;
-      }
-      if (end >= 0) {
         while (end > from && /\s/.test(text[end - 1])) end--;
-        this.fail('CSS declarations require a semicolon', end);
+        this.fail('two CSS declarations on one line need ; between them', end);
       }
     }
   }
@@ -846,17 +949,17 @@ class WutuParser {
       // with style.setProperty (allowed under a strict style-src policy).
       this.p++;
       const expression = this.readBareExpression();
-      this.expectSemicolon();
+      this.expectEnd();
       this.cssPropertyKnown(head, start);
       node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start });
       return;
     }
     const valueFrom = this.p;
     const custom = head.startsWith('--');
-    const value = this.readCssUntil(custom ? ';}' : ';{}');
+    const value = this.readCssUntil(custom ? ';}' : ';{}', true);
     this.cssValueRunsOn(valueFrom, this.p, custom);
-    if (this.text[this.p] !== ';') this.fail('CSS declarations require a semicolon');
-    this.p++;
+    if (this.text[this.p] === '{') this.fail('expected a line break or ; after a CSS declaration');
+    this.expectEnd();
     this.cssPropertyKnown(head, start);
     const declaration = `${head}:${value};`;
     node.css.push({ source: this.text.slice(start, this.p), css: declaration, start });

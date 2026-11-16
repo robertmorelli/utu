@@ -5,7 +5,7 @@ using Browser from std:Browser;
 fn view(root: Str) Browser.HTMLElement {
     @wutu/\
     div {
-        base { href = root; }
+        base { href = root }
     }
     \/;
 }

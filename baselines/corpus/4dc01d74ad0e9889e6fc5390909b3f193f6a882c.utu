@@ -5,10 +5,10 @@ using Browser from std:Browser;
           fn view(g: Gauge) Browser.HTMLElement {
             @wutu/\ 
             div {
-              display: block;
-              width: = g.pct.str() + "%";
-              --level: = g.pct.str();
-              span { "gauge"; }
+              display: block
+              width: = g.pct.str() + "%"
+              --level: = g.pct.str()
+              span { "gauge" }
             }
             \/;
           }

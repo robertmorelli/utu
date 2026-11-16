@@ -4,8 +4,8 @@ using Browser from std:Browser;
 
 main {
     let app = @wutu/\
-    @reactive;
-    @reactive;
+    @reactive
+    @reactive
     main { div { } }
     \/;
     Browser.document.body.append(app);

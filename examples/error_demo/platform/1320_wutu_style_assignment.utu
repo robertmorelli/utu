@@ -4,8 +4,8 @@ using Browser from std:Browser;
 
 main {
     let app = @wutu/\
-    @style = "p { color: red }";
-    div { "x"; }
+    @style = "p { color: red }"
+    div { "x" }
     \/;
     Browser.document.body.append(app);
 }

@@ -10,98 +10,98 @@ fn valid_tempo(state: TempoState) Bool {
 }
 fn workspace(state: TempoState) Browser.HTMLElement {
     @wutu/\
-    @island "tempo-workspace";
+    @island "tempo-workspace"
     section.workspace {
         = {
             wutu.on_cleanup(cl() Void {
-                state.running=false;
-            });
+                state.running=false
+            })
             wutu.interval("tempo-tick",1000.0,cl() Void {
                 if state.running and state.remaining>0 {
-                    state.remaining-=1;
+                    state.remaining-=1
                 };if state.remaining==0 {
-                    state.running=false;
-                };
-            });
-            "";
-        };
+                    state.running=false
+                }
+            })
+            ""
+        }
         article.well.stack {
-            text-align:center;
-            padding:3rem;
+            text-align:center
+            padding:3rem
             p.eyebrow {
                 = if state.running {
-                    "IN YOUR OWN TIME";
+                    "IN YOUR OWN TIME"
                 }
                 else {
-                    "READY WHEN YOU ARE";
-                };
+                    "READY WHEN YOU ARE"
+                }
             }
             strong {
-                id = "clock";
-                font-size:clamp(5rem,15vw,10rem);
-                line-height:1.1;
-                = wutu.number(state.remaining);
+                id = "clock"
+                font-size:clamp(5rem,15vw,10rem)
+                line-height:1.1
+                = wutu.number(state.remaining)
             }
             p {
-                "seconds remaining";
+                "seconds remaining"
             }
             progress {
-                max = wutu.number(state.duration);
-                value = wutu.number(state.duration-state.remaining);
+                max = wutu.number(state.duration)
+                value = wutu.number(state.duration-state.remaining)
             }
             div.bar {
-                justify-content:center;
+                justify-content:center
                 button.primary {
                     = if state.running {
-                        "Pause";
+                        "Pause"
                     }
                     else {
-                        "Start";
-                    };
+                        "Start"
+                    }
                     on click {
                         if state.remaining==0 {
-                            state.remaining=state.duration;
-                        };
-                        state.running=not state.running;
+                            state.remaining=state.duration
+                        }
+                        state.running=not state.running
                     }
                 }
                 button {
-                    "Reset";
+                    "Reset"
                     on click {
-                        state.running=false;
-                        state.remaining=state.duration;
+                        state.running=false
+                        state.remaining=state.duration
                     }
                 }
             }
         }
         div.panel.bar {
             p {
-                = "Interval length: "+wutu.number(state.duration)+" seconds";
+                = "Interval length: "+wutu.number(state.duration)+" seconds"
             }
             button {
-                disabled = state.duration<=15;
-                "− 15 seconds";
+                disabled = state.duration<=15
+                "− 15 seconds"
                 on click {
-                    state.duration-=15;
-                    state.remaining=state.duration;
-                    state.running=false;
-                    wutu.save("tempo-v2");
+                    state.duration-=15
+                    state.remaining=state.duration
+                    state.running=false
+                    wutu.save("tempo-v2")
                 }
             }
             button {
-                disabled = state.duration>=3600;
-                "+ 15 seconds";
+                disabled = state.duration>=3600
+                "+ 15 seconds"
                 on click {
-                    state.duration+=15;
-                    state.remaining=state.duration;
-                    state.running=false;
-                    wutu.save("tempo-v2");
+                    state.duration+=15
+                    state.remaining=state.duration
+                    state.running=false
+                    wutu.save("tempo-v2")
                 }
             }
         }
         a {
-            href = "#/about";
-            "About this timer";
+            href = "#/about"
+            "About this timer"
         }
     }
     \/
@@ -116,58 +116,58 @@ main {
         }
     \/
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "tempo";
+        data-theme = "tempo"
         nav {
             strong {
-                "TEMPO / AN EVERYDAY TOOL";
+                "TEMPO / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "Find a rhythm you can return to.";
+                "Find a rhythm you can return to."
             }
             p.muted {
-                "A small interval timer for focused practice, movement, or a quiet pause. Choose a duration and take one interval at a time.";
+                "A small interval timer for focused practice, movement, or a quiet pause. Choose a duration and take one interval at a time."
             }
         }
         if wutu.route()=="/about" {
             section.panel.stack {
                 h2 {
-                    "A quieter kind of timer";
+                    "A quieter kind of timer"
                 }
                 p {
-                    "The timer pauses when you leave its view. It runs locally and does not need an account.";
+                    "The timer pauses when you leave its view. It runs locally and does not need an account."
                 }
                 a {
-                    href = "#/";
-                    "Back to timer";
+                    href = "#/"
+                    "Back to timer"
                 }
             }
         }
         else {
-            = workspace(state);
+            = workspace(state)
         }
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

@@ -1,0 +1,15 @@
+// What: two text statements on one line, without ; between them
+// Expect: expected a line break or ; after Wutu statement (after "Hello")
+using Browser from std:Browser
+
+fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+    @wutu/\
+    section {
+        p { "Hello" "world" }
+    }
+    \/
+}
+
+main {
+    Browser.document.body.append(view("Plants", ["fern", "ivy"]))
+}

@@ -2168,8 +2168,8 @@ lib { fn run() I32 { f(Many.V1); } }
     ['fn clamp(n: I32) I32 { let n = 3; n; }\nlib { fn run() I32 { clamp(4); } }\n', 'Duplicate local n: already a parameter'],
     // A Str where a host Node is wanted: `appendChild<T extends Node>(node: T)` bound T to Str (accepted).
     ['using Browser from std:Browser;\nmain { Browser.document.body.appendChild("hello"); }\n', 'Expected Browser.Node, got Str'],
-    // Wutu CSS: a declaration without its `;` before the next, and a property's typo (accepted).
-    [`${wutuHead}        padding: 1rem\n        gap: 2rem;\n${wutuTail}`, 'CSS declarations require a semicolon'],
+    // Wutu CSS: two declarations on one line without `;` between, and a property's typo (accepted).
+    [`${wutuHead}        padding: 1rem gap: 2rem\n${wutuTail}`, 'two CSS declarations on one line need ; between them'],
     [`${wutuHead}        colr: red;\n${wutuTail}`, 'invalid CSS property colr; did you mean color?'],
   ]) {
     const { errors } = await selfhost(await write(source));

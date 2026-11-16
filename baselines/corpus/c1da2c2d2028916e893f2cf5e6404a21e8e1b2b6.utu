@@ -4,13 +4,13 @@ struct S:
 main {
     let s = S { n: 1 };
     Browser.document.body.append(@wutu/\
-    @reactive;
+    @reactive
     div {
-        title = 42;
-        p { = 7; }
-        button { on click = 42; }
-        input { bind:value = s.n; }
-        if s.n { "x"; }
+        title = 42
+        p { = 7 }
+        button { on click = 42 }
+        input { bind:value = s.n }
+        if s.n { "x" }
     }
     \/);
 }

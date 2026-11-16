@@ -15,91 +15,91 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
     };
     let amount=NumberField.new("");
     @wutu/\
-    @island "ledger-form";
+    @island "ledger-form"
     form.panel {
         label {
-            "Purchase";
+            "Purchase"
             input {
-                required = "";
-                bind:value = draft.title;
+                required = ""
+                bind:value = draft.title
             }
         }
         label {
-            "Amount ($)";
+            "Amount ($)"
             input {
-                inputmode = "decimal";
-                bind:value = amount.text;
+                inputmode = "decimal"
+                bind:value = amount.text
             }
         }
         p {
-            role = "status";
+            role = "status"
             = if amount.text.len()>0 {
-                amount.error(0.01,10000.0);
+                amount.error(0.01,10000.0)
             }
             else {
-                "";
-            };
+                ""
+            }
         }
         button.primary {
-            type = "submit";
-            "Record purchase";
+            type = "submit"
+            "Record purchase"
         }
         on submit {
             if draft.title.trim().len()>0 and amount.valid(0.01,10000.0) {
                 state.purchases=purchases.append(state.purchases, Purchase {
                     title:draft.title,
                     cents:(amount.value()*100.0+0.5).i32()
-                });
-                draft.title="";
-                amount.text="";
-                wutu.save("ledger-v2");
-                wutu.invalidate("ledger-workspace");
-            };
+                })
+                draft.title=""
+                amount.text=""
+                wutu.save("ledger-v2")
+                wutu.invalidate("ledger-workspace")
+            }
         }
     }
     \/;
 }
 fn workspace(state: LedgerState) Browser.HTMLElement {
     @wutu/\
-    @island "ledger-workspace";
+    @island "ledger-workspace"
     section.workspace {
-        = ledger_form(state);
+        = ledger_form(state)
         div.grid {
             article.well.stack {
                 p.eyebrow {
-                    "MONTHLY LIMIT";
+                    "MONTHLY LIMIT"
                 }
                 strong.big {
-                    "$500.00";
+                    "$500.00"
                 }
             }
             article.well.stack {
                 p.eyebrow {
-                    "REMAINING";
+                    "REMAINING"
                 }
                 strong.big {
                     = wutu.money(50000-(state.purchases map |p| {
-                        p.cents;
+                        p.cents
                     }
-                    sum));
+                    sum))
                 }
             }
         }
         for state.purchases |purchase,index| {
             article.panel.bar {
                 h3 {
-                    = purchase.title;
+                    = purchase.title
                 }
                 div.bar {
                     strong {
-                        = wutu.money(purchase.cents);
+                        = wutu.money(purchase.cents)
                     }
                     button {
-                        aria-label = "Remove "+purchase.title;
-                        "Remove";
+                        aria-label = "Remove "+purchase.title
+                        "Remove"
                         on click {
-                            state.purchases=purchases.remove_at(state.purchases, index.i64().i32());
-                            wutu.save("ledger-v2");
+                            state.purchases=purchases.remove_at(state.purchases, index.i64().i32())
+                            wutu.save("ledger-v2")
                         }
                     }
                 }
@@ -123,42 +123,42 @@ main {
         }
     \/;
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "ledger";
+        data-theme = "ledger"
         nav {
             strong {
-                "LEDGER / AN EVERYDAY TOOL";
+                "LEDGER / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "Give every good idea a little room.";
+                "Give every good idea a little room."
             }
             p.muted {
-                "A simple monthly spending notebook. Set a limit, record purchases, and see what remains before the next one.";
+                "A simple monthly spending notebook. Set a limit, record purchases, and see what remains before the next one."
             }
         }
-        = workspace(state);
+        = workspace(state)
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

@@ -390,16 +390,16 @@ mod stdlib {
         \\main {
         \\    let cart = Cart { cents: 1999, seconds: 0 }
         \\    let app = @wutu/\
-        \\    @reactive;
+        \\    @reactive
         \\    section {
-        \\        p { = wutu.money(cart.cents) + " at " + wutu.decimal(cart.cents.f64() / 3.0, 2); }
-        \\        p { = "open for " + wutu.number(cart.seconds) + " s, on " + wutu.route(); }
-        \\        input { id = "note"; }
+        \\        p { = wutu.money(cart.cents) + " at " + wutu.decimal(cart.cents.f64() / 3.0, 2) }
+        \\        p { = "open for " + wutu.number(cart.seconds) + " s, on " + wutu.route() }
+        \\        input { id = "note" }
         \\        button {
-        \\            "Add one";
+        \\            "Add one"
         \\            on click {
-        \\                cart.cents += 100;
-        \\                wutu.after_render(cl() Void { wutu.focus("note"); });
+        \\                cart.cents += 100
+        \\                wutu.after_render(cl() Void { wutu.focus("note") })
         \\            }
         \\        }
         \\    }
@@ -660,14 +660,14 @@ mod stdlib {
                 for rows |row| {
                     tr {
                         th {
-                            white-space:normal;
-                            inline-size:46%;
+                            white-space:normal
+                            inline-size:46%
                             code {
-                                = row.split("::")[0];
+                                = row.split("::")[0]
                             }
                         }
                         td {
-                            = row.split("::")[1];
+                            = row.split("::")[1]
                         }
                     }
                 }
@@ -679,20 +679,20 @@ mod stdlib {
     fn module(name: Str, line: Str, import: Str) Browser.HTMLElement {
         @wutu/\
         div {
-            margin-block:2.75rem 0;
+            margin-block:2.75rem 0
             h3 {
-                font-size:1.15rem;
-                font-weight:600;
-                margin-block-end:0.4rem;
+                font-size:1.15rem
+                font-weight:600
+                margin-block-end:0.4rem
                 code {
-                    = name;
+                    = name
                 }
             }
             p {
-                = line;
-                " ";
+                = line
+                " "
                 code {
-                    = import;
+                    = import
                 }
             }
         }
@@ -701,133 +701,133 @@ mod stdlib {
     fn group(id: Str, title: Str) Browser.HTMLElement {
         @wutu/\
         h2 {
-            id = id;
-            scroll-margin-block-start:1.5rem;
-            = title;
+            id = id
+            scroll-margin-block-start:1.5rem
+            = title
         }
         \/
     }
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("The standard library", "Every module, by example. Each sample is a whole program; the last comment is what it prints.");
+            = ui.header("The standard library", "Every module, by example. Each sample is a whole program; the last comment is what it prints.")
             nav {
-                aria-label = "Sections";
-                display:flex;
-                flex-wrap:wrap;
-                gap:0.5rem;
-                margin-block-start:1.75rem;
+                aria-label = "Sections"
+                display:flex
+                flex-wrap:wrap
+                gap:0.5rem
+                margin-block-start:1.75rem
                 for toc() |entry| {
                     button {
-                        type = "button";
-                        font:inherit;
-                        font-size:0.95rem;
-                        padding:0.35rem 0.85rem;
-                        color:var(--ink);
-                        background:var(--tint);
-                        border:1px solid var(--line);
-                        cursor:pointer;
+                        type = "button"
+                        font:inherit
+                        font-size:0.95rem
+                        padding:0.35rem 0.85rem
+                        color:var(--ink)
+                        background:var(--tint)
+                        border:1px solid var(--line)
+                        cursor:pointer
                         :hover {
-                            border-color: var(--orange);
+                            border-color: var(--orange)
                         }
-                        = entry.split("::")[0];
+                        = entry.split("::")[0]
                         on click {
-                            jump(entry.split("::")[1]);
+                            jump(entry.split("::")[1])
                         }
                     }
                 }
             }
             p {
-                margin-block-start:1.5rem;
-                "Prelude modules are always in scope. The rest come in with ";
+                margin-block-start:1.5rem
+                "Prelude modules are always in scope. The rest come in with "
                 code {
-                    "using Name from std:Name;";
+                    "using Name from std:Name;"
                 }
-                ". Each function ships only when a program calls it.";
+                ". Each function ships only when a program calls it."
             }
-            = api(overview_rows());
-            = group("std-scalars", "Scalars");
-            = module("I32 U32 I64 U64", "Integers. Operators are the type's own functions; conversions are explicit, one instruction each.", "prelude");
-            = code.block(ints_sample());
-            = code.block(wide_sample());
-            = api(int_rows());
-            = module("F64 F32", "Floats. F64 carries the host's Math; F32 has the instruction-level set.", "prelude");
-            = code.block(floats_sample());
-            = code.block(f32_sample());
-            = api(float_rows());
-            = module("Bool", "true and false, with and, or, xor, not. An integer is not a Bool.", "prelude");
-            = code.block(bool_sample());
-            = module("M32 M64 M128 V128", "Bit masks and 128-bit SIMD vectors: bitwise operators, zero(), ones(), andnot, bitselect, any_true. On a mask, >> shifts zeros in, as >>> does.", "prelude");
-            = code.block(masks_sample());
-            = module("I31 Externref", "A 31-bit integer in a GC reference (from_i32, get_s, get_u), and an opaque host value.", "prelude");
-            = code.block(i31_sample());
-            = group("std-text", "Text");
-            = module("Str", "Host strings, measured and indexed in UTF-16 code units. Most methods are one call to JavaScript's own.", "prelude");
-            = code.block(str_search_sample());
-            = code.block(str_shape_sample());
-            = code.block(str_split_sample());
-            = code.block(str_build_sample());
-            = api(str_rows());
-            = group("std-collections", "Collections");
-            = module("Array[T]", "A fixed-length mutable WasmGC array. Iterator stages (map, filter, sort, ...) work on it directly.", "prelude");
-            = code.block(array_sample());
-            = api(array_rows());
-            = module("Buffer[T]", "A growing array: push, then finish into an Array of the exact length.", "using Buffer from std:Buffer;");
-            = code.block(buffer_sample());
-            = module("List[T]", "Persistent edits on arrays: append and remove_at return a new array.", "using List from std:List;");
-            = code.block(list_sample());
-            = module("StrMap[V]", "Str keys to any values. Open addressing, no tombstones.", "using StrMap from std:StrMap;");
-            = code.block(strmap_sample());
-            = api(strmap_rows());
-            = module("IntMap", "I32 keys to I32 values, without a host call.", "using IntMap from std:IntMap;");
-            = code.block(intmap_sample());
-            = api(intmap_rows());
-            = module("Interner", "Byte strings to dense ids. A key is a string (its UTF-8 bytes), or bytes fed one at a time from an array or a mem.", "using Interner from std:Interner;");
-            = code.block(interner_sample());
-            = api(interner_rows());
-            = module("Ord  Order[T[Ord]]", "An order: a.cmp(b) for the numbers and Str, and a bounded module of what to do with one. Implement it for your own type with fn Ord[T].cmp.", "using Order from std:Ord;");
-            = code.block(ord_sample());
-            = api(ord_rows());
-            = ui.further("docs/generics.md", "Generics and bounds");
-            = module("Found[T] Group[K, T]", "What iterator terminals return: first_where gives ?Found[T], group_by gives Array[Group[K, T]].", "prelude");
-            = code.block(found_sample());
-            = group("std-indexes", "Indexes");
-            = module("SegmentTree[T]", "Range queries over any associative combine: sums, maxima, minima.", "using SegmentTree from std:SegmentTree;");
-            = code.block(segment_sample());
-            = code.block(segment_max_sample());
-            = module("PersistentSegmentTree[T]", "The same queries; set returns a new version and keeps the old.", "using PersistentSegmentTree from std:PersistentSegmentTree;");
-            = code.block(persistent_sample());
-            = api(segment_rows());
-            = module("Spatial", "A static 2D index of points with ids: rectangles, three-sided ranges, circles, nearest.", "using Spatial from std:Spatial;");
-            = code.block(spatial_sample());
-            = api(spatial_rows());
-            = ui.further("docs/queries.md", "Native range and spatial indexes");
-            = group("std-async", "Async");
-            = module("Promise[T]", "A real JavaScript promise. Await it, or subscribe with then and catch.", "prelude");
-            = code.block(promise_sample());
-            = module("Stream[T]", "A real JavaScript async iterable, read once with await for. Its values are awaited as they are read, so T is never a Promise: Stream[I32], not Stream[Promise[I32]].", "prelude");
-            = code.block(stream_sample());
-            = code.block(stream_js_sample());
-            = api(async_rows());
-            = group("std-host", "Host");
-            = module("console time", "Logging and clocks.", "using console from std:Console; using time from std:Time;");
-            = code.block(console_sample());
-            = module("Random", "xoshiro128** in utu: the same seed gives the same numbers on every host.", "using Random from std:Random;");
-            = code.block(random_sample());
-            = api(random_rows());
-            = module("NumberField", "A number input's text, valid or not, with its range check.", "using NumberField from std:NumberField;");
-            = code.block(number_field_sample());
-            = api(host_rows());
-            = module("wutu", "The Wutu runtime's helpers, for templates and the code around them.", "prelude");
-            = code.block(wutu_sample());
-            = api(wutu_rows());
-            = module("Browser JS Web Worker", "Typed declarations for the host, linked from TypeScript's libraries. Only what a program uses emits boundary code.", "using Browser from std:Browser;");
-            = code.block(browser_sample());
-            = code.block(js_sample());
-            = code.block(web_sample());
-            = api(binding_rows());
-            = ui.further("docs/typescript-abi.md", "The TypeScript declaration ABI");
-            = ui.further("std/README.md", "the standard library notes");
+            = api(overview_rows())
+            = group("std-scalars", "Scalars")
+            = module("I32 U32 I64 U64", "Integers. Operators are the type's own functions; conversions are explicit, one instruction each.", "prelude")
+            = code.block(ints_sample())
+            = code.block(wide_sample())
+            = api(int_rows())
+            = module("F64 F32", "Floats. F64 carries the host's Math; F32 has the instruction-level set.", "prelude")
+            = code.block(floats_sample())
+            = code.block(f32_sample())
+            = api(float_rows())
+            = module("Bool", "true and false, with and, or, xor, not. An integer is not a Bool.", "prelude")
+            = code.block(bool_sample())
+            = module("M32 M64 M128 V128", "Bit masks and 128-bit SIMD vectors: bitwise operators, zero(), ones(), andnot, bitselect, any_true. On a mask, >> shifts zeros in, as >>> does.", "prelude")
+            = code.block(masks_sample())
+            = module("I31 Externref", "A 31-bit integer in a GC reference (from_i32, get_s, get_u), and an opaque host value.", "prelude")
+            = code.block(i31_sample())
+            = group("std-text", "Text")
+            = module("Str", "Host strings, measured and indexed in UTF-16 code units. Most methods are one call to JavaScript's own.", "prelude")
+            = code.block(str_search_sample())
+            = code.block(str_shape_sample())
+            = code.block(str_split_sample())
+            = code.block(str_build_sample())
+            = api(str_rows())
+            = group("std-collections", "Collections")
+            = module("Array[T]", "A fixed-length mutable WasmGC array. Iterator stages (map, filter, sort, ...) work on it directly.", "prelude")
+            = code.block(array_sample())
+            = api(array_rows())
+            = module("Buffer[T]", "A growing array: push, then finish into an Array of the exact length.", "using Buffer from std:Buffer;")
+            = code.block(buffer_sample())
+            = module("List[T]", "Persistent edits on arrays: append and remove_at return a new array.", "using List from std:List;")
+            = code.block(list_sample())
+            = module("StrMap[V]", "Str keys to any values. Open addressing, no tombstones.", "using StrMap from std:StrMap;")
+            = code.block(strmap_sample())
+            = api(strmap_rows())
+            = module("IntMap", "I32 keys to I32 values, without a host call.", "using IntMap from std:IntMap;")
+            = code.block(intmap_sample())
+            = api(intmap_rows())
+            = module("Interner", "Byte strings to dense ids. A key is a string (its UTF-8 bytes), or bytes fed one at a time from an array or a mem.", "using Interner from std:Interner;")
+            = code.block(interner_sample())
+            = api(interner_rows())
+            = module("Ord  Order[T[Ord]]", "An order: a.cmp(b) for the numbers and Str, and a bounded module of what to do with one. Implement it for your own type with fn Ord[T].cmp.", "using Order from std:Ord;")
+            = code.block(ord_sample())
+            = api(ord_rows())
+            = ui.further("docs/generics.md", "Generics and bounds")
+            = module("Found[T] Group[K, T]", "What iterator terminals return: first_where gives ?Found[T], group_by gives Array[Group[K, T]].", "prelude")
+            = code.block(found_sample())
+            = group("std-indexes", "Indexes")
+            = module("SegmentTree[T]", "Range queries over any associative combine: sums, maxima, minima.", "using SegmentTree from std:SegmentTree;")
+            = code.block(segment_sample())
+            = code.block(segment_max_sample())
+            = module("PersistentSegmentTree[T]", "The same queries; set returns a new version and keeps the old.", "using PersistentSegmentTree from std:PersistentSegmentTree;")
+            = code.block(persistent_sample())
+            = api(segment_rows())
+            = module("Spatial", "A static 2D index of points with ids: rectangles, three-sided ranges, circles, nearest.", "using Spatial from std:Spatial;")
+            = code.block(spatial_sample())
+            = api(spatial_rows())
+            = ui.further("docs/queries.md", "Native range and spatial indexes")
+            = group("std-async", "Async")
+            = module("Promise[T]", "A real JavaScript promise. Await it, or subscribe with then and catch.", "prelude")
+            = code.block(promise_sample())
+            = module("Stream[T]", "A real JavaScript async iterable, read once with await for. Its values are awaited as they are read, so T is never a Promise: Stream[I32], not Stream[Promise[I32]].", "prelude")
+            = code.block(stream_sample())
+            = code.block(stream_js_sample())
+            = api(async_rows())
+            = group("std-host", "Host")
+            = module("console time", "Logging and clocks.", "using console from std:Console; using time from std:Time;")
+            = code.block(console_sample())
+            = module("Random", "xoshiro128** in utu: the same seed gives the same numbers on every host.", "using Random from std:Random;")
+            = code.block(random_sample())
+            = api(random_rows())
+            = module("NumberField", "A number input's text, valid or not, with its range check.", "using NumberField from std:NumberField;")
+            = code.block(number_field_sample())
+            = api(host_rows())
+            = module("wutu", "The Wutu runtime's helpers, for templates and the code around them.", "prelude")
+            = code.block(wutu_sample())
+            = api(wutu_rows())
+            = module("Browser JS Web Worker", "Typed declarations for the host, linked from TypeScript's libraries. Only what a program uses emits boundary code.", "using Browser from std:Browser;")
+            = code.block(browser_sample())
+            = code.block(js_sample())
+            = code.block(web_sample())
+            = api(binding_rows())
+            = ui.further("docs/typescript-abi.md", "The TypeScript declaration ABI")
+            = ui.further("std/README.md", "the standard library notes")
         }
         \/
     }

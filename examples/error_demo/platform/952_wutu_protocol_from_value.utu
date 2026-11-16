@@ -5,7 +5,7 @@ using Browser from std:Browser;
 fn view(scheme: Str) Browser.HTMLElement {
     @wutu/\
     div {
-        a { href = "mailto:me@example.com"; .protocol = scheme; "mail"; }
+        a { href = "mailto:me@example.com"; .protocol = scheme; "mail" }
     }
     \/;
 }

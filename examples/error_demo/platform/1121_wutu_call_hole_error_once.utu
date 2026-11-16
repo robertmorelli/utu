@@ -10,11 +10,11 @@ struct State:
 
 fn workspace(state: State) Browser.HTMLElement {
     @wutu/\
-    @island "w";
+    @island "w"
     section {
         for state.items |item| key item.id {
             p {
-                = wutu.number(item.nope);
+                = wutu.number(item.nope)
             }
         }
     }

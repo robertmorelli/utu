@@ -344,22 +344,17 @@ fn css_property_known(head: Str, at: I32) Void {
     if near.len() > 0 { wutu_fail("invalid CSS property " + head + "; did you mean " + near + "?", at) }
 }
 
-/// A value (`text[from ..< to]`) that runs on into the next statement: its
-/// `;` is missing, there. The next is a declaration on its line (`red
-/// margin: 0`; a standard property's value has no `:` outside `()`), or on
-/// the next: a declaration or rule, an attribute (`href = …`), a boolean one
-/// (`hidden;`), or text when the value has no string (else it may be
-/// `grid-template-areas`'s next row). A custom property's (`custom`) may hold
+/// A value (`text[from ..< to]`) with a second declaration on its line
+/// (`red margin: 0`: a standard property's value has no `:` outside `()`),
+/// which needs a `;` between. A custom property's (`custom`) may hold
 /// anything balanced.
 fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) Void {
+    if custom { return }
     let depth = 0
-    let quoted = custom
     let i = from
     while (i < to) {
         let c = text.get(i)
-        let end = -1
         if c == 34 or c == 39 {
-            quoted = true
             i += 1
             while (i < to and text.get(i) != c) { i += if text.get(i) == 92 { 2 } else { 1 } }
         } else if text_at(text, i, "/*") {
@@ -367,22 +362,11 @@ fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) Void {
             i = if close < 0 { to } else { close + 1 }
         } else if c == 40 or c == 91 or c == 123 { depth += 1 }
         else if c == 41 or c == 93 or c == 125 { depth -= 1 }
-        else if c == 58 and depth == 0 and not custom {
-            end = i
+        else if c == 58 and depth == 0 {
+            let end = i
             while (end > from and is_name_code(text.get(end - 1))) { end -= 1 }
-        } else if c == 10 and depth == 0 {
-            let j = skip_spaces(text, i + 1)
-            let k = j
-            while (k < text.len() and is_name_code(text.get(k))) { k += 1 }
-            let after = skip_spaces(text, k)
-            let next = if after < text.len() { text.get(after) } else { 0 }
-            let named = k > j and (is_lower_code(text.get(j)) or text.get(j) == 45)
-            if (named and (next == 58 or next == 123 or (next == 61 and not text_at(text, after, "==")) or (next == 59 and is_boolean_attribute(text.slice(j, k)))))
-                or (not quoted and j < to and text.get(j) == 34) { end = i }
-        }
-        if end >= 0 {
             while (end > from and is_space_code(text.get(end - 1))) { end -= 1 }
-            wutu_fail("CSS declarations require a semicolon", end)
+            wutu_fail("two CSS declarations on one line need ; between them", end)
         }
         i += 1
     }
@@ -432,11 +416,120 @@ fn wp_skip_line(text: Str) Void {
     wp_at[0] = if end < 0 { text.len() } else { end }
 }
 
-fn wp_semicolon(text: Str) Void {
+/// A statement's end, as utu's: a line break, `;` (two on one line), the `}`
+/// closing its block, or the template's end. `;` is consumed; the rest stay.
+fn wp_end(text: Str) Void {
     let statement_end = wp_at[0]
-    wp_trivia(text)
-    if wp_char(text) != 59 { wutu_fail("expected ; after Wutu statement", statement_end) }
-    wp_at[0] += 1
+    let i = line_rest(text, statement_end)
+    if i >= text.len() or text.get(i) == 10 or text.get(i) == 125 {
+        wp_at[0] = i
+        return
+    }
+    if text.get(i) != 59 { wutu_fail("expected a line break or ; after Wutu statement", statement_end) }
+    wp_at[0] = i + 1
+}
+
+/// Past spaces, tabs, and comments from i, on its line: where its line break,
+/// or what is next on the line, is.
+fn line_rest(text: Str, i: I32) I32 {
+    let j = i
+    while (j < text.len()) {
+        let c = text.get(j)
+        if c == 32 or c == 9 or c == 13 {
+            j += 1
+        } else if text_at(text, j, "/*") {
+            let end = text_index(text, "*/", j + 2)
+            if end < 0 { return text.len() }
+            j = end + 2
+        } else if text_at(text, j, "//") and wp_after_blank(text, j) {
+            let end = text_index(text, "\n", j)
+            return if end < 0 { text.len() } else { end }
+        } else {
+            return j
+        }
+    }
+    j
+}
+
+/// How far the line holding offset i is indented (its leading blanks).
+fn indent_at(text: Str, i: I32) I32 {
+    let a = if i > text.len() { text.len() } else { i }
+    while (a > 0 and text.get(a - 1) != 10) { a -= 1 }
+    let b = a
+    while (b < text.len() and (text.get(b) == 32 or text.get(b) == 9)) { b += 1 }
+    b - a
+}
+
+/// Past blanks, line breaks, and comments from i: the next line's first token.
+fn next_token(text: Str, i: I32) I32 {
+    let j = line_rest(text, i)
+    while (j < text.len() and text.get(j) == 10) { j = line_rest(text, j + 1) }
+    j
+}
+
+/// Whether the expression goes on past the line break at `nl`, as utu's does:
+/// its line ends open (an operator, `,`, `=`, `and`, …; `last` is its last
+/// character, -1 for none, `opaque` when that ends a string or DSL), or the
+/// next line continues it.
+fn wp_continues(text: Str, last: I32, opaque: Bool, nl: I32) Bool {
+    if last < 0 { return true }
+    if not opaque {
+        let c = text.get(last)
+        if text_index("+-*/%=<>&|^~!,.?:", Str.from_code_point(c), 0) >= 0 { return true }
+        if is_word_code(c) {
+            let a = last
+            while (a > 0 and is_word_code(text.get(a - 1))) { a -= 1 }
+            if in_words("and or xor not orelse else in", text.slice(a, last + 1)) { return true }
+        }
+    }
+    continues_at(text, next_token(text, nl))
+}
+
+/// Whether the line whose first token is at j continues the statement before
+/// it, as a utu line does: it begins `.f` (not `.name =`, a property), `?.`,
+/// a binary operator but `-` and `&` (a CSS rule) and a lone `=` (text),
+/// `{`, `and`, `or`, `xor`, `orelse`, `else`, `catch`, or an iterator stage
+/// with its capture (`map |x|`, `fold(0) |a, x|`, `collect(T)`).
+fn continues_at(text: Str, j: I32) Bool {
+    if j >= text.len() { return false }
+    let c = text.get(j)
+    let next = if j + 1 < text.len() { text.get(j + 1) } else { 0 }
+    if c == 46 { return (is_lower_code(next) or next == 95) and not assignment_head(text, j + 1, false) }
+    if c == 63 { return next == 46 }
+    if c == 61 { return next == 61 }
+    if c == 123 { return true }
+    if text_index("+*/%<>|^~!", Str.from_code_point(c), 0) >= 0 { return true }
+    if not is_lower_code(c) { return false }
+    let k = j
+    while (k < text.len() and is_word_code(text.get(k))) { k += 1 }
+    let word = text.slice(j, k)
+    if in_words("and or xor orelse else catch", word) { return true }
+    if word == "collect" { return k < text.len() and text.get(k) == 40 }
+    if not in_words("map filter skip take skip_while take_while scan zip chain flat_map repeat fold each any all count_where first_index last_index sum fast_sum product count sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", word) { return false }
+    let r = skip_spaces(text, k)
+    if r < text.len() and text.get(r) == 40 {
+        // `fold(0) |a, x|`: past its balanced arguments.
+        let depth = 0
+        while (r < text.len()) {
+            let d = text.get(r)
+            if d == 40 { depth += 1 } else if d == 41 {
+                depth -= 1
+                if depth == 0 { break }
+            }
+            r += 1
+        }
+        r = skip_spaces(text, r + 1)
+    }
+    r < text.len() and text.get(r) == 124
+}
+
+/// Whether a statement ends at i (past its line's blanks): `;`, `}`, the
+/// end, or a line break the next line does not continue past.
+fn ends_at(text: Str, i: I32) Bool {
+    let j = line_rest(text, i)
+    if j >= text.len() { return true }
+    let c = text.get(j)
+    c == 59 or c == 125 or (c == 10 and not continues_at(text, next_token(text, j)))
 }
 
 /// A quoted string, CSS or Utu: a backslash escapes the character after it.
@@ -524,29 +617,42 @@ fn skip_dsl(text: Str, start: I32) I32 {
 vec wx_from: I32 = [0]
 vec wx_to: I32 = [0]
 
-/// `= expression;`: up to the statement's semicolon.
+/// `= expression`: up to the statement's end (see wp_end), the expression
+/// going on past a line break as utu's does (see wp_continues).
 fn wp_bare_expression(text: Str) Str {
     wp_trivia(text)
     let start = wp_at[0]
     let depth = 0
+    // Its last character (not a comment's), and whether that ends a string or DSL.
+    let last = -1
+    let opaque = false
     while (not wp_done(text)) {
-        if not wp_opaque(text) {
-            let c = text.get(wp_at[0])
-            if c == 59 and depth == 0 {
-                wx_from[0] = start
-                wx_to[0] = wp_at[0]
-                return trim_text(text.slice(start, wp_at[0]))
+        let p = wp_at[0]
+        let c = text.get(p)
+        if depth == 0 and (c == 59 or c == 125 or (c == 10 and not wp_continues(text, last, opaque, p))) { break }
+        let comment = text_at(text, p, "//")
+        if wp_opaque(text) {
+            if not comment {
+                last = wp_at[0] - 1
+                opaque = true
             }
+        } else {
             if c == 40 or c == 91 or c == 123 { depth += 1 }
-            else if c == 41 or c == 93 or c == 125 {
-                if depth == 0 { wutu_fail("expected ; after expression", wp_at[0]) }
+            else if c == 41 or c == 93 {
+                if depth == 0 { wutu_fail("expected a line break or ; after expression", p) }
                 depth -= 1
+            } else if c == 125 { depth -= 1 }
+            if not is_space_code(c) {
+                last = p
+                opaque = false
             }
             wp_at[0] += 1
         }
     }
-    wutu_fail("unterminated expression", start)
-    ""
+    if depth > 0 { wutu_fail("unterminated expression", start) }
+    wx_from[0] = start
+    wx_to[0] = if last < 0 { start } else { last + 1 }
+    text.slice(start, wx_to[0])
 }
 
 /// `$[expression]`.
@@ -617,7 +723,7 @@ fn unparenthesized(source: Str) Str {
 }
 
 fn wp_fail_interpolation(text: Str) Void {
-    wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr; for text, name = expr; for an attribute, if cond {, prop: = expr;)", wp_at[0])
+    wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)", wp_at[0])
 }
 
 /// A brace-delimited Utu block, with its braces.
@@ -642,30 +748,46 @@ fn wp_utu_block(text: Str) Str {
 //! = CSS
 
 /// Up to a delimiter outside strings, comments, and (), [] and {} (a
-/// function, an attribute selector, a custom property's block).
-fn wp_css_until(text: Str, delimiters: Str) Str {
+/// function, an attribute selector, a custom property's block); with
+/// `lines`, or a line break there, unless the line ends in `,` or the next is
+/// indented past this one (`grid-template-areas: "a b"`, then `"c d"` under it).
+fn wp_css_until(text: Str, delimiters: Str, lines: Bool) Str {
     let start = wp_at[0]
+    let indent = indent_at(text, start)
     let depth = 0
+    let last = -1
+    // Past its last character (a trailing `//` comment is not the value's).
+    let end_at = start
     while (not wp_done(text)) {
         let c = text.get(wp_at[0])
-        if c == 34 or c == 39 { wp_quoted(text) }
-        else if wp_at_text(text, "/*") {
+        if c == 34 or c == 39 {
+            wp_quoted(text)
+            last = c
+            end_at = wp_at[0]
+        } else if wp_at_text(text, "/*") {
             let end = text_index(text, "*/", wp_at[0] + 2)
             if end < 0 { wutu_fail("unterminated comment", wp_at[0]) }
             wp_at[0] = end + 2
+        } else if lines and depth == 0 and text_at(text, wp_at[0], "//") and wp_after_blank(text, wp_at[0]) {
+            wp_skip_line(text)
         } else {
             if depth == 0 and text_index(delimiters, Str.from_code_point(c), 0) >= 0 { break }
+            if lines and depth == 0 and c == 10 and last >= 0 and last != 44 and indent_at(text, next_token(text, wp_at[0])) <= indent { break }
             if c == 40 or c == 91 or c == 123 { depth += 1 } else if c == 41 or c == 93 or c == 125 { depth -= 1 }
             wp_at[0] += 1
+            if not is_space_code(c) {
+                last = c
+                end_at = wp_at[0]
+            }
         }
     }
-    trim_text(text.slice(start, wp_at[0]))
+    trim_text(text.slice(start, if lines { end_at } else { wp_at[0] }))
 }
 
-/// The body of a `{ … }` CSS block (cursor on the brace), without its braces.
 /// A `{ … }` CSS block's body (the cursor on its brace), without its `//`
 /// comments (CSS has none; `url(http://…)` is not one: a comment starts first
-/// on a line or after a blank, outside parentheses).
+/// on a line or after a blank, outside parentheses), and with the `;` CSS
+/// needs where a declaration's line ends (one ending in `,` goes on).
 fn wp_css_block(text: Str) Str {
     let open = wp_at[0]
     wp_at[0] += 1
@@ -694,8 +816,12 @@ fn wp_css_block(text: Str) Str {
                 if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) { wutu_fail("Wutu comments are written // …", p) }
                 if c == 40 { parens += 1 } else if c == 41 { parens -= 1 }
                 if c == 123 { depth += 1 }
+                if (c == 125 or (c == 10 and parens == 0)) and not (last == 59 or last == 123 or last == 125 or last == 44) {
+                    body = body + text.slice(start, p) + ";"
+                    start = p
+                    last = 59
+                }
                 if c == 125 {
-                    if not (last == 59 or last == 123 or last == 125) { wutu_fail("CSS declarations require a semicolon", p) }
                     depth -= 1
                     if depth == 0 {
                         let block = body + text.slice(start, p)
@@ -721,16 +847,16 @@ fn parse_template(text: Str) I32 {
     wp_trivia(text)
     if wp_at_text(text, "@reactive") {
         wp_at[0] += 9
-        wp_semicolon(text)
+        wp_end(text)
         tw_reactive[0] = 1
         wp_trivia(text)
     }
     if wp_at_text(text, "@island") {
         wp_at[0] += 7
         wp_trivia(text)
-        if wp_char(text) != 34 { wutu_fail("expected a quoted island name: @island \"name\";", wp_at[0]) }
+        if wp_char(text) != 34 { wutu_fail("expected a quoted island name: @island \"name\"", wp_at[0]) }
         tw_scope[0] = intern_text(wp_quoted(text))
-        wp_semicolon(text)
+        wp_end(text)
         tw_reactive[0] = 1
         wp_trivia(text)
     }
@@ -738,11 +864,11 @@ fn parse_template(text: Str) I32 {
         wp_at[0] += 6
         wp_trivia(text)
         if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e;", wp_at[0]) }
+        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e", wp_at[0]) }
         let source = wp_bare_expression(text)
         let from = wx_from[0]
         let to = wx_to[0]
-        wp_semicolon(text)
+        wp_end(text)
         tw_style_value.push(intern_text(source))
         tw_style_from.push(from)
         tw_style_to.push(to)
@@ -769,7 +895,7 @@ fn parse_tnode(text: Str) I32 {
     let start = wp_at[0]
     if wp_char(text) == 34 {
         let expr = wp_quoted(text)
-        wp_semicolon(text)
+        wp_end(text)
         let n = new_tnode(0, start)
         tn_text[n] = intern_text(expr)
         return n
@@ -780,7 +906,7 @@ fn parse_tnode(text: Str) I32 {
         let source = wp_bare_expression(text)
         let from = wx_from[0]
         let to = wx_to[0]
-        wp_semicolon(text)
+        wp_end(text)
         let n = new_tnode(1, start)
         tn_text[n] = intern_text(source)
         tn_from[n] = from
@@ -804,6 +930,10 @@ fn parse_branch(text: Str, n: I32, otherwise: Bool) Void {
         if wp_char(text) == 125 {
             wp_at[0] += 1
             return
+        }
+        if wp_char(text) == 59 {
+            wp_at[0] += 1
+            continue
         }
         let c = parse_tnode(text)
         tn_parent[c] = n
@@ -960,14 +1090,14 @@ fn parse_telement(text: Str) I32 {
         while (c >= 0) {
             // (An element's text and attributes are escaped.)
             if tn_kind[c] != 0 and tn_kind[c] != 4 and tag != "script" { wutu_fail(raw_text_error(tag), tn_start[c]) }
-            if tn_kind[c] != 0 and tag == "script" { wutu_fail("a script's text is code, so Wutu writes it only as written: script { \"…\"; }", tn_start[c]) }
+            if tn_kind[c] != 0 and tag == "script" { wutu_fail("a script's text is code, so Wutu writes it only as written: script { \"…\" }", tn_start[c]) }
             c = tn_next[c]
         }
     }
     let i = tn_items[n]
     while (i >= 0) {
         if ti_kind[i] == 3 and word_text(ti_a[i]) == "values" and not (tag == "select" and has_attribute_item(n, "multiple")) {
-            wutu_fail("bind:values is a multiple select's: select { multiple; bind:values = …; }", ti_at[i])
+            wutu_fail("bind:values is a multiple select's: select { multiple; bind:values = … }", ti_at[i])
         }
         i = ti_next[i]
     }
@@ -982,7 +1112,7 @@ fn parse_telement(text: Str) I32 {
 fn is_raw_text_tag(tag: Str) Bool => in_words("style noscript iframe xmp noembed noframes plaintext", tag)
 
 fn raw_text_error(tag: Str) Str {
-    (if tag == "iframe" { "an " } else { "a " }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\"; }"
+    (if tag == "iframe" { "an " } else { "a " }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\" }"
 }
 
 /// Whether element n has an attribute item named `name`.
@@ -1028,7 +1158,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
                 let source = wp_bare_expression(text)
                 let from = wx_from[0]
                 let to = wx_to[0]
-                wp_semicolon(text)
+                wp_end(text)
                 add_item(n, 3, intern_text(property), intern_text(source), 0, from, to, p)
                 return
             }
@@ -1059,12 +1189,12 @@ fn parse_element_statement(text: Str, n: I32) Void {
             if near.len() > 0 { wutu_fail("unknown event " + name + "; did you mean " + near + "?", a) }
             let flags = if quiet { 4 } else { 0 }
             if text.get(r) == 61 {
-                if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) Void { … };", r) }
+                if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) Void { … }", r) }
                 wp_at[0] = r + 1
                 let source = wp_bare_expression(text)
                 let from = wx_from[0]
                 let to = wx_to[0]
-                wp_semicolon(text)
+                wp_end(text)
                 add_item(n, 2, intern_text(name), intern_text(source), flags, from, to, p)
                 return
             }
@@ -1076,12 +1206,13 @@ fn parse_element_statement(text: Str, n: I32) Void {
         }
     }
     if c == 60 { wutu_fail(old_attribute_text(text, p), p) }
-    // `@unmanaged;`: the template makes the element; what JavaScript does to
+    // `@unmanaged`: the template makes the element; what JavaScript does to
     // its children and its other attributes, renders leave alone.
-    if text_at(text, p, "@unmanaged") {
-        let r = skip_spaces(text, p + 10)
-        if r < text.len() and text.get(r) == 59 {
-            wp_at[0] = r + 1
+    if text_at(text, p, "@unmanaged") and not (p + 10 < text.len() and is_name_code(text.get(p + 10))) {
+        let r = line_rest(text, p + 10)
+        if r >= text.len() or text.get(r) == 10 or text.get(r) == 59 or text.get(r) == 125 {
+            wp_at[0] = p + 10
+            wp_end(text)
             add_item(n, 1, intern_text("data-wutu-unmanaged"), intern_text("\"\""), 0, -1, -1, wp_at[0])
             return
         }
@@ -1091,7 +1222,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
         while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
         let name = text.slice(p + 1, q)
         if in_words("reactive island style document", name) { wutu_fail("@" + name + " goes first in the template, before its root element", p) }
-        wutu_fail("events are written on " + name + " = handler; (or on " + name + " { … })", p)
+        wutu_fail("events are written on " + name + " = handler (or on " + name + " { … })", p)
     }
     if c == 46 and assignment_head(text, p + 1, true) {
         wp_at[0] += 1
@@ -1121,9 +1252,9 @@ fn at_directive(text: Str, p: I32, inside: Bool) Void {
     let head = "@reactive @island @style @document"
     if inside and in_words("media supports container layer keyframes font-face starting-style scope page property counter-style font-feature-values font-palette-values position-try view-transition", name) { return }
     if inside and text_at(name, 0, "-") { return }
-    if inside and name == "unmanaged" { wutu_fail("expected ; after @unmanaged", q) }
+    if inside and name == "unmanaged" { wutu_fail("expected a line break or ; after @unmanaged", q) }
     if inside and in_words(head, "@" + name) { wutu_fail("@" + name + " goes first in the template, before its root element", p) }
-    if not inside and name == "unmanaged" { wutu_fail("@unmanaged goes inside the element it is for: div { @unmanaged; }", p) }
+    if not inside and name == "unmanaged" { wutu_fail("@unmanaged goes inside the element it is for: div { @unmanaged }", p) }
     if not inside and in_words(head, "@" + name) { wutu_fail("@" + name + " is repeated or out of order: a template begins with " + head + ", in that order, @reactive and @island at most once", p) }
     let known = if inside { "@unmanaged" } else { head }
     let near = closest_word(known, "@" + name)
@@ -1177,17 +1308,17 @@ fn event_head(text: Str, p: I32) Bool {
     q < text.len() and text.get(q) == 61
 }
 
-/// A name at q, then `=` (not `==`), or `;` when `bare` (a boolean attribute).
+/// A name at q, then `=` (not `==`), or, when `bare` (a boolean attribute),
+/// the statement's end: a line break, `;`, or `}`.
 fn assignment_head(text: Str, q: I32, bare: Bool) Bool {
     let a = q
     let i = q
     while (i < text.len() and is_name_code(text.get(i))) { i += 1 }
     if i == a { return false }
-    i = skip_spaces(text, i)
-    if i >= text.len() { return false }
-    let c = text.get(i)
-    // (`name }` is an attribute without its semicolon, and says so.)
-    (c == 61 and not (i + 1 < text.len() and text.get(i + 1) == 61)) or (bare and (c == 59 or c == 125))
+    // (On its line: an `=` on the next begins a hole.)
+    i = line_rest(text, i)
+    if bare and (i >= text.len() or text.get(i) == 10 or text.get(i) == 59 or text.get(i) == 125) { return true }
+    i < text.len() and text.get(i) == 61 and not (i + 1 < text.len() and text.get(i + 1) == 61)
 }
 
 /// Past `xlink:`, `xml:` or `xmlns:` at q (a namespaced attribute's prefix,
@@ -1206,10 +1337,10 @@ fn old_attribute_text(text: Str, p: I32) Str {
     let a = q
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let spelled = if q > a { text.slice(p + 1, q) } else { "name" }
-    "attributes are written without '<': " + spelled + " = value; (or " + spelled + "; for a boolean attribute)"
+    "attributes are written without '<': " + spelled + " = value (or " + spelled + " alone, for a boolean attribute)"
 }
 
-/// `"text" name…`: a string, then (no operator) another statement: a forgotten `;`.
+/// `"text" name…`: a string, then (no operator) another statement on its line: a forgotten `;`.
 fn literal_then_name(text: Str, q: I32) Void {
     if q >= text.len() or text.get(q) != 34 { return }
     let i = q + 1
@@ -1219,18 +1350,17 @@ fn literal_then_name(text: Str, q: I32) Void {
     let e = w
     while (e < text.len() and is_name_code(text.get(e))) { e += 1 }
     if e > w and not (text.get(w) >= 48 and text.get(w) <= 57) and not in_words("and or not orelse", text.slice(w, e)) {
-        wutu_fail("expected ; after Wutu statement", i + 1)
+        wutu_fail("expected a line break or ; after Wutu statement", i + 1)
     }
 }
 
-/// Whether a string literal at q is the whole value: `"…"` then `;`.
+/// Whether a string literal at q is the whole value: `"…"`, then the statement's end.
 fn literal_value(text: Str, q: I32) Bool {
     if q >= text.len() or text.get(q) != 34 { return false }
     let i = q + 1
     while (i < text.len() and text.get(i) != 34 and text.get(i) != 10) { i += if text.get(i) == 92 { 2 } else { 1 } }
     if i >= text.len() or text.get(i) != 34 { return false }
-    let after = skip_spaces(text, i + 1)
-    after < text.len() and text.get(after) == 59
+    ends_at(text, i + 1)
 }
 
 /// Whether `name` is "on" and an event's name, in any case: an event
@@ -1261,8 +1391,7 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) Void {
     let q = if is_property or namespace_prefix(text, name_start) == 0 { name_start } else { namespace_prefix(text, name_start) }
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let name = text.slice(name_start, q)
-    wp_at[0] = q
-    wp_trivia(text)
+    wp_at[0] = line_rest(text, q)
     let value = "\"\""
     let dynamic = false
     let from = -1
@@ -1281,16 +1410,16 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) Void {
             to = wx_to[0]
         }
     } else if is_property {
-        wutu_fail("a property takes a value: .name = value;", name_start)
+        wutu_fail("a property takes a value: .name = value", name_start)
     }
-    wp_semicolon(text)
+    wp_end(text)
     let tag = word_text(tn_text[n])
     if is_on_name(name) { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start) }
-    if dynamic and tag == "script" { wutu_fail("a script's attributes are code or load it, so Wutu sets them only as written: src = \"…\";", name_start) }
-    if dynamic and tag == "base" and name == "href" { wutu_fail("a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = \"/\";", name_start) }
+    if dynamic and tag == "script" { wutu_fail("a script's attributes are code or load it, so Wutu sets them only as written: src = \"…\"", name_start) }
+    if dynamic and tag == "base" and name == "href" { wutu_fail("a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = \"/\"", name_start) }
     if dynamic and is_property and name == "protocol" { wutu_fail(".protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;", name_start) }
     if dynamic and is_property and is_raw_text_tag(tag) and in_words("textContent innerText", name) { wutu_fail(raw_text_error(tag), name_start) }
-    if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\"; (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start) }
+    if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\" (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start) }
     if not is_property and not is_allowed_attribute(tag, name, wp_svg[1] == 1) { wutu_fail("unknown attribute " + name + " on " + tag, name_start) }
     if name != "class" and has_item_named(n, name, is_property) { wutu_fail((if is_property { "." + name + " is assigned twice on this element" } else { "an element has one " + name + "; this is a second" }), name_start) }
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1 } else { 0 }) + (if dynamic { 2 } else { 0 }), from, to, name_start)
@@ -1308,9 +1437,10 @@ fn has_item_named(n: I32, name: Str, is_property: Bool) Bool {
 
 /// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
 fn parse_css_rule(text: Str, n: I32) Void {
-    let selector = wp_css_until(text, "{;")
-    if wp_char(text) == 59 {
-        wp_at[0] += 1
+    let selector = wp_css_until(text, "{;}", true)
+    if wp_char(text) != 123 {
+        // A statement (`@import …`): up to its line's end or `;`.
+        wp_end(text)
         let i = add_item(n, 4, -1, intern_text(selector + ";"), 0, -1, -1, wp_at[0])
         ti_c[i] = intern_text(selector + ";")
         return
@@ -1335,7 +1465,7 @@ fn scoped_selector(selector: Str) Str {
 /// `property: value;` in an element's body, or else a child element.
 fn parse_declaration_or_child(text: Str, n: I32) Void {
     let start = wp_at[0]
-    let head = wp_css_until(text, ":{};")
+    let head = wp_css_until(text, ":{};", false)
     if wp_char(text) != 58 {
         wp_at[0] = start
         add_child(n, parse_telement(text))
@@ -1350,17 +1480,17 @@ fn parse_declaration_or_child(text: Str, n: I32) Void {
         let source = wp_bare_expression(text)
         let from = wx_from[0]
         let to = wx_to[0]
-        wp_semicolon(text)
+        wp_end(text)
         css_property_known(head, start)
         add_item(n, 5, intern_text(head), intern_text(source), 0, from, to, start)
         return
     }
     let value_from = wp_at[0]
     let custom = text_at(head, 0, "--")
-    let value = wp_css_until(text, if custom { ";}" } else { ";{}" })
+    let value = wp_css_until(text, if custom { ";}" } else { ";{}" }, true)
     css_value_runs_on(text, value_from, wp_at[0], custom)
-    if wp_char(text) != 59 { wutu_fail("CSS declarations require a semicolon", wp_at[0]) }
-    wp_at[0] += 1
+    if wp_char(text) == 123 { wutu_fail("expected a line break or ; after a CSS declaration", wp_at[0]) }
+    wp_end(text)
     css_property_known(head, start)
     let declaration = head + ":" + value + ";"
     let i = add_item(n, 4, -1, intern_text(declaration), 0, -1, -1, start)

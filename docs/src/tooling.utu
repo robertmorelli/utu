@@ -69,220 +69,220 @@ mod tooling {
     fn page() Browser.HTMLElement {
         @wutu/\
         article.page {
-            = ui.header("Tooling", "One compiler answers every tool. Diagnostics, hover, definitions, formatting, and semantic tokens all come from the same bundle the command line runs; there is no second analyzer.");
+            = ui.header("Tooling", "One compiler answers every tool. Diagnostics, hover, definitions, formatting, and semantic tokens all come from the same bundle the command line runs; there is no second analyzer.")
             h2 {
-                "The command line";
+                "The command line"
             }
             p {
                 code {
-                    "cli/utu.mjs";
+                    "cli/utu.mjs"
                 }
-                " runs the self-hosted compiler from ";
+                " runs the self-hosted compiler from "
                 code {
-                    "dist/utu.wasm";
+                    "dist/utu.wasm"
                 }
-                ". It checks, runs, tests, and builds programs, and serves the language server.";
+                ". It checks, runs, tests, and builds programs, and serves the language server."
             }
-            = code.shell(cli_sample());
+            = code.shell(cli_sample())
             p {
-                "A program's arguments go after ";
+                "A program's arguments go after "
                 code {
-                    "--";
+                    "--"
                 }
-                ": ";
+                ": "
                 code {
-                    "utu tool.utu -- a b";
+                    "utu tool.utu -- a b"
                 }
-                ". The program reads them from the host, as a built one run by Node or Bun does: ";
+                ". The program reads them from the host, as a built one run by Node or Bun does: "
                 code {
-                    "process.argv.slice(2)";
+                    "process.argv.slice(2)"
                 }
-                ", through ";
+                ", through "
                 code {
-                    "@es";
+                    "@es"
                 }
-                " (";
+                " ("
                 code {
-                    "let arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;";
+                    "let arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;"
                 }
-                "). ";
+                "). "
                 code {
-                    "main";
+                    "main"
                 }
-                " returns nothing: a program prints with ";
+                " returns nothing: a program prints with "
                 code {
-                    "console.log";
+                    "console.log"
                 }
-                ", and ";
+                ", and "
                 code {
-                    "utu FILE";
+                    "utu FILE"
                 }
-                " (or ";
+                " (or "
                 code {
-                    "utu run FILE";
+                    "utu run FILE"
                 }
-                ") exits 0 unless it traps.";
+                ") exits 0 unless it traps."
             }
             p {
                 code {
-                    "utu grep";
+                    "utu grep"
                 }
-                " searches code by syntax and types rather than text: a pattern with ";
+                " searches code by syntax and types rather than text: a pattern with "
                 code {
-                    "$name";
+                    "$name"
                 }
-                " holes matches expressions, and ";
+                " holes matches expressions, and "
                 code {
-                    "--where";
+                    "--where"
                 }
-                " constrains a hole's type. ";
+                " constrains a hole's type. "
                 code {
-                    "--refs";
+                    "--refs"
                 }
-                " finds a declaration and every use that resolves to it.";
+                " finds a declaration and every use that resolves to it."
             }
-            = code.shell(grep_sample());
+            = code.shell(grep_sample())
             p {
-                "The Wutu command line formats, previews, and builds browser apps.";
+                "The Wutu command line formats, previews, and builds browser apps."
             }
-            = code.shell(wutu_sample());
+            = code.shell(wutu_sample())
             h2 {
-                "Diagnostics";
+                "Diagnostics"
             }
             p {
-                "Errors name the file, line, and column, show the source line, and underline the span. Diagnostics are collected rather than thrown, so one check reports every problem. ";
+                "Errors name the file, line, and column, show the source line, and underline the span. Diagnostics are collected rather than thrown, so one check reports every problem. "
                 code {
-                    "utu check";
+                    "utu check"
                 }
-                " makes both builds, the exports' and the tests'. A ";
+                " makes both builds, the exports' and the tests'. A "
                 code {
-                    "compressed-source";
+                    "compressed-source"
                 }
-                " warning flags lines dense enough to hurt reading.";
+                " warning flags lines dense enough to hurt reading."
             }
-            = code.shell(diagnostic_sample());
+            = code.shell(diagnostic_sample())
             h2 {
-                "Debugging";
+                "Debugging"
             }
             p {
-                "A trap in ";
+                "A trap in "
                 code {
-                    "utu FILE";
+                    "utu FILE"
                 }
-                " or ";
+                " or "
                 code {
-                    "utu test";
+                    "utu test"
                 }
-                " is shown at its line, with the utu functions it was in, each at its own line. It says which trap it is: a failed ";
+                " is shown at its line, with the utu functions it was in, each at its own line. It says which trap it is: a failed "
                 code {
-                    "assert";
+                    "assert"
                 }
-                ", a ";
+                ", a "
                 code {
-                    "fatal";
+                    "fatal"
                 }
-                ", a failed check of the standard library's (past a Buffer's length), an index out of bounds, division by zero, null, or a value no arm of a ";
+                ", a failed check of the standard library's (past a Buffer's length), an index out of bounds, division by zero, null, or a value no arm of a "
                 code {
-                    "match";
+                    "match"
                 }
-                " takes.";
+                " takes."
             }
-            = code.shell(trap_sample());
+            = code.shell(trap_sample())
             p {
-                "The place comes from a source map: the compiler notes where each instruction came from, and the trap's offset in the module, from the engine's stack, finds it. In ";
+                "The place comes from a source map: the compiler notes where each instruction came from, and the trap's offset in the module, from the engine's stack, finds it. In "
                 code {
-                    "-O debug";
+                    "-O debug"
                 }
-                " the map is exact. In ";
+                " the map is exact. In "
                 code {
-                    "small";
+                    "small"
                 }
-                " and ";
+                " and "
                 code {
-                    "fast";
+                    "fast"
                 }
-                " it is best effort: code the optimizer made is placed at the code around it, coarser but never elsewhere, and code inlined into another function says so. The unsafe modes have none. Node's stacks give the offsets; Bun's give none, so under Bun a trap says what, not where.";
-            }
-            p {
-                code {
-                    "utu build -O debug";
-                }
-                " writes ";
-                code {
-                    "NAME.wasm.map";
-                }
-                " beside the module: a standard source map, which browsers' devtools read, named by the module's ";
-                code {
-                    "sourceMappingURL";
-                }
-                " section. In small and fast, ";
-                code {
-                    "--source-map";
-                }
-                " asks for it.";
+                " it is best effort: code the optimizer made is placed at the code around it, coarser but never elsewhere, and code inlined into another function says so. The unsafe modes have none. Node's stacks give the offsets; Bun's give none, so under Bun a trap says what, not where."
             }
             p {
-                "The compiler recurses as a program nests. Under Node, a build too deep for the stack is done again in a worker with a 1 GB stack, so 100,000 nested parentheses compile; under Bun, whose workers keep a small stack, it is reported as nested too deeply.";
+                code {
+                    "utu build -O debug"
+                }
+                " writes "
+                code {
+                    "NAME.wasm.map"
+                }
+                " beside the module: a standard source map, which browsers' devtools read, named by the module's "
+                code {
+                    "sourceMappingURL"
+                }
+                " section. In small and fast, "
+                code {
+                    "--source-map"
+                }
+                " asks for it."
+            }
+            p {
+                "The compiler recurses as a program nests. Under Node, a build too deep for the stack is done again in a worker with a 1 GB stack, so 100,000 nested parentheses compile; under Bun, whose workers keep a small stack, it is reported as nested too deeply."
             }
             h2 {
-                "VS Code";
+                "VS Code"
             }
             p {
-                "The extension runs on the desktop and on the web with identical bytes. Beyond highlighting and diagnostics as you type, it shows inferred types, coercions, closure captures, and effects as inlay hints. Commands in the UTU palette group:";
+                "The extension runs on the desktop and on the web with identical bytes. Beyond highlighting and diagnostics as you type, it shows inferred types, coercions, closure captures, and effects as inlay hints. Commands in the UTU palette group:"
             }
             ul.commands {
                 li {
-                    "Compile Current File, Run Main, Show Generated WAT";
+                    "Compile Current File, Run Main, Show Generated WAT"
                 }
                 li {
-                    "Show Syntax Tree, Open Semantic X-Ray, Explore Compiler Graphs";
+                    "Show Syntax Tree, Open Semantic X-Ray, Explore Compiler Graphs"
                 }
                 li {
-                    "Show CSS Stencil, Create Wutu Website, Preview Wutu Website";
+                    "Show CSS Stencil, Create Wutu Website, Preview Wutu Website"
                 }
             }
             p {
-                "Settings choose when validation runs (";
+                "Settings choose when validation runs ("
                 code {
-                    "onType";
+                    "onType"
                 }
-                ", ";
+                ", "
                 code {
-                    "onSave";
+                    "onSave"
                 }
-                ", ";
+                ", "
                 code {
-                    "off";
+                    "off"
                 }
-                ") and whether inlay hints appear.";
+                ") and whether inlay hints appear."
             }
             h2 {
-                "The language server";
+                "The language server"
             }
             p {
                 code {
-                    "utu lsp";
+                    "utu lsp"
                 }
-                " speaks LSP on stdin and stdout for any editor. Every answer is read from a fresh build of the program whose entry is the file asked about; a build takes a few milliseconds, so nothing is incremental. It answers diagnostics, hover, go to definition, references and highlights, rename across files, outline, semantic tokens, and completion.";
+                " speaks LSP on stdin and stdout for any editor. Every answer is read from a fresh build of the program whose entry is the file asked about; a build takes a few milliseconds, so nothing is incremental. It answers diagnostics, hover, go to definition, references and highlights, rename across files, outline, semantic tokens, and completion."
             }
             p {
-                "Neovim (0.11 or later) and Helix each have an installer that sets up the language server with the tree-sitter grammars: highlighting, Wutu inside ";
+                "Neovim (0.11 or later) and Helix each have an installer that sets up the language server with the tree-sitter grammars: highlighting, Wutu inside "
                 code {
-                    "@wutu/\\ … \\/";
+                    "@wutu/\\ … \\/"
                 }
-                ", indentation, and text objects.";
+                ", indentation, and text objects."
             }
-            = code.shell(neovim_sample());
+            = code.shell(neovim_sample())
             p {
-                "Another editor takes the command alone:";
+                "Another editor takes the command alone:"
             }
-            = code.shell(helix_sample());
+            = code.shell(helix_sample())
             p {
-                "Zed, Sublime, Emacs, and Kakoune take the same command.";
+                "Zed, Sublime, Emacs, and Kakoune take the same command."
             }
-            = ui.further("docs/language-server.md", "The language server");
-            = ui.further("docs/diagnostics.md", "Diagnostics");
-            = ui.further("docs/grep.md", "utu grep");
+            = ui.further("docs/language-server.md", "The language server")
+            = ui.further("docs/diagnostics.md", "Diagnostics")
+            = ui.further("docs/grep.md", "utu grep")
         }
         \/
     }

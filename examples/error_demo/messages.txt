@@ -5036,7 +5036,7 @@ ok
 
 15 │         for state.items |item| key item.id {
 16 │             p {
-17 │                 = wutu.number(item.nope);
+17 │                 = wutu.number(item.nope)
    │                               ━━━━━━━━━
    │                               ╰─ no such field
 18 │             }
@@ -5048,8 +5048,8 @@ ok
         dsl-error · examples/error_demo/platform/1140_wutu_directive_repeated.utu:8:5
 
  6 │     let app = @wutu/\
- 7 │     @reactive;
- 8 │     @reactive;
+ 7 │     @reactive
+ 8 │     @reactive
    │     ━
    │     ╰─ here
  9 │     main { div { } }
@@ -5061,8 +5061,8 @@ ok
         dsl-error · examples/error_demo/platform/1141_wutu_property_twice.utu:8:35
 
  6 │     let app = @wutu/\
- 7 │     @reactive;
- 8 │     main { input { .value = "a"; .value = "b"; } }
+ 7 │     @reactive
+ 8 │     main { input { .value = "a"; .value = "b" } }
    │                                   ━
    │                                   ╰─ here
  9 │     \/;
@@ -5074,8 +5074,8 @@ ok
         dsl-error · examples/error_demo/platform/1142_wutu_id_twice.utu:8:20
 
  6 │     let app = @wutu/\
- 7 │     @reactive;
- 8 │     main { div#a { id = "b"; } }
+ 7 │     @reactive
+ 8 │     main { div#a { id = "b" } }
    │                    ━
    │                    ╰─ here
  9 │     \/;
@@ -5122,15 +5122,15 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/1320_wutu_style_assignment.utu
- ERROR  @style takes one expression, not an assignment: @style e;
+ ERROR  @style takes one expression, not an assignment: @style e
         dsl-error · examples/error_demo/platform/1320_wutu_style_assignment.utu:7:12
 
  5 │ main {
  6 │     let app = @wutu/\
- 7 │     @style = "p { color: red }";
+ 7 │     @style = "p { color: red }"
    │            ━
    │            ╰─ here
- 8 │     div { "x"; }
+ 8 │     div { "x" }
  9 │     \/;
 --- exit 1
 
@@ -5140,7 +5140,7 @@ ok
 
  5 │ main {
  6 │     let app = @wutu/\
- 7 │     div { @style = "p { color: red }"; "x"; }
+ 7 │     div { @style = "p { color: red }"; "x" }
    │           ━
    │           ╰─ here
  8 │     \/;
@@ -5152,8 +5152,8 @@ ok
         type-mismatch · examples/error_demo/platform/1322_wutu_bind_value_i32.utu:12:20
 
 10 │     let app = @wutu/\
-11 │     @reactive;
-12 │     main { input { bind:value = state.n; } }
+11 │     @reactive
+12 │     main { input { bind:value = state.n } }
    │                    ━━━━━━━━━━━━━━━━━━━━
    │                    ╰─ Str
 13 │     \/;
@@ -5161,12 +5161,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/1323_wutu_for_range_parens.utu
- ERROR  Invalid Utu interpolation at offset 232: 0..<state.n (a range needs parentheses: for (0 ..< n) |i|)
+ ERROR  Invalid Utu interpolation at offset 231: 0..<state.n (a range needs parentheses: for (0 ..< n) |i|)
         dsl-error · examples/error_demo/platform/1323_wutu_for_range_parens.utu:12:16
 
 10 │     let app = @wutu/\
-11 │     @reactive;
-12 │     main { for 0..<state.n |i| { p { = i; } } }
+11 │     @reactive
+12 │     main { for 0..<state.n |i| { p { = i } } }
    │                ━
    │                ╰─ here
 13 │     \/;
@@ -5960,7 +5960,7 @@ ok
 
 14 │     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
 15 │     let app = @wutu/\
-16 │     main { @reactive; p { = state.n; } }
+16 │     main { @reactive; p { = state.n } }
    │            ━
    │            ╰─ here
 17 │     \/;
@@ -5973,10 +5973,10 @@ ok
 
 14 │     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
 15 │     let app = @wutu/\
-16 │     @reactiv;
+16 │     @reactiv
    │     ━
    │     ╰─ here
-17 │     main { p { = state.n; } }
+17 │     main { p { = state.n } }
 18 │     \/;
 --- exit 1
 
@@ -5985,8 +5985,8 @@ ok
         dsl-error · examples/error_demo/platform/542_wutu_unmanaged_typo.utu:17:18
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { div { @unmanage; } }
+16 │     @reactive
+17 │     main { div { @unmanage } }
    │                  ━
    │                  ╰─ here
 18 │     \/;
@@ -5998,8 +5998,8 @@ ok
         dsl-error · examples/error_demo/platform/543_wutu_event_typo.utu:17:29
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { button { "+"; on clik { state.n += 1; } } }
+16 │     @reactive
+17 │     main { button { "+"; on clik { state.n += 1 } } }
    │                             ━
    │                             ╰─ here
 18 │     \/;
@@ -6011,7 +6011,7 @@ ok
         dsl-error · examples/error_demo/platform/544_wutu_two_ids.utu:17:17
 
 15 │     let app = @wutu/\
-16 │     @reactive;
+16 │     @reactive
 17 │     main { div#a#b { } }
    │                 ━
    │                 ╰─ here
@@ -6020,12 +6020,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/545_wutu_bind_values_input.utu
- ERROR  bind:values is a multiple select's: select { multiple; bind:values = …; }
+ ERROR  bind:values is a multiple select's: select { multiple; bind:values = … }
         dsl-error · examples/error_demo/platform/545_wutu_bind_values_input.utu:17:20
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { input { bind:values = state.tags; } }
+16 │     @reactive
+17 │     main { input { bind:values = state.tags } }
    │                    ━
    │                    ╰─ here
 18 │     \/;
@@ -6037,8 +6037,8 @@ ok
         wutu-hole · examples/error_demo/platform/546_wutu_hole_void.utu:17:18
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { p { = Browser.console.log("x"); } }
+16 │     @reactive
+17 │     main { p { = Browser.console.log("x") } }
    │                  ━━━━━━━━━━━━━━━━━━━━━━━━
    │                  ╰─ Void
 18 │     \/;
@@ -6050,8 +6050,8 @@ ok
         wutu-hole · examples/error_demo/platform/547_wutu_hole_array.utu:17:18
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { p { = state.tags; } }
+16 │     @reactive
+17 │     main { p { = state.tags } }
    │                  ━━━━━━━━━━
    │                  ╰─ Array[Str]
 18 │     \/;
@@ -6063,8 +6063,8 @@ ok
         wutu-key · examples/error_demo/platform/548_wutu_key_struct.utu:17:42
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { ul { for state.items |it| key it { li { = it.id; } } } }
+16 │     @reactive
+17 │     main { ul { for state.items |it| key it { li { = it.id } } } }
    │                                          ━━
    │                                          ╰─ Item
 18 │     \/;
@@ -6076,8 +6076,8 @@ ok
         type-mismatch · examples/error_demo/platform/549_wutu_property_type.utu:17:29
 
 15 │     let app = @wutu/\
-16 │     @reactive;
-17 │     main { input { .value = 5; } }
+16 │     @reactive
+17 │     main { input { .value = 5 } }
    │                             ━
    │                             ╰─ I32
 18 │     \/;
@@ -6102,7 +6102,7 @@ ok
 
 14 │     let state = State { n: 0, items: [Item { id: 1 }], tags: ["a"] };
 15 │     let app = @wutu/\
-16 │     main { p { "a\q"; } }
+16 │     main { p { "a\q" } }
    │                ━━━━━
    │                ╰─ here
 17 │     \/;
@@ -6545,21 +6545,21 @@ ok
  8 │         # the heading
    │         ━
    │         ╰─ here
- 9 │         h2 { = title; }
+ 9 │         h2 { = title }
 10 │     }
 --- exit 1
 
-=== utu check examples/error_demo/platform/80_wutu_text_missing_semicolon.utu
- ERROR  expected ; after Wutu statement
-        dsl-error · examples/error_demo/platform/80_wutu_text_missing_semicolon.utu:8:20
+=== utu check examples/error_demo/platform/80_wutu_two_texts_one_line.utu
+ ERROR  expected a line break or ; after Wutu statement
+        dsl-error · examples/error_demo/platform/80_wutu_two_texts_one_line.utu:8:20
 
  6 │     @wutu/\
  7 │     section {
- 8 │         p { "Hello" }
+ 8 │         p { "Hello" "world" }
    │                    ━
    │                    ╰─ here
  9 │     }
-10 │     \/;
+10 │     \/
 --- exit 1
 
 === utu check examples/error_demo/platform/810_ir_operand_type.utu
@@ -6610,17 +6610,17 @@ ok
  5 │ }
 --- exit 1
 
-=== utu check examples/error_demo/platform/81_wutu_css_missing_semicolon.utu
- ERROR  CSS declarations require a semicolon
-        dsl-error · examples/error_demo/platform/81_wutu_css_missing_semicolon.utu:8:22
+=== utu check examples/error_demo/platform/81_wutu_two_declarations_one_line.utu
+ ERROR  two CSS declarations on one line need ; between them
+        dsl-error · examples/error_demo/platform/81_wutu_two_declarations_one_line.utu:8:22
 
  6 │     @wutu/\
  7 │     section {
- 8 │         padding: 1rem
+ 8 │         padding: 1rem gap: 2rem
    │                      ━
    │                      ╰─ here
- 9 │         gap: 2rem;
-10 │         h2 { = title; }
+ 9 │         h2 { = title }
+10 │     }
 --- exit 1
 
 === utu check examples/error_demo/platform/82_wutu_unknown_tag.utu
@@ -6629,7 +6629,7 @@ ok
 
  6 │     @wutu/\
  7 │     section {
- 8 │         card { h2 { = title; } }
+ 8 │         card { h2 { = title } }
    │         ━
    │         ╰─ here
  9 │     }
@@ -6642,7 +6642,7 @@ ok
 
  6 │     @wutu/\
  7 │     section {
- 8 │         .card { h2 { = title; } }
+ 8 │         .card { h2 { = title } }
    │         ━
    │         ╰─ here
  9 │     }
@@ -6673,8 +6673,8 @@ ok
         dsl-error · examples/error_demo/platform/84_wutu_two_roots.utu:8:5
 
  6 │     @wutu/\
- 7 │     h2 { = title; }
- 8 │     p { "Some text"; }
+ 7 │     h2 { = title }
+ 8 │     p { "Some text" }
    │     ━
    │     ╰─ here
  9 │     \/;
@@ -6687,7 +6687,7 @@ ok
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
  6 │     @wutu/\
- 7 │     "Just text";
+ 7 │     "Just text"
    │     ━
    │     ╰─ here
  8 │     \/;
@@ -6700,7 +6700,7 @@ ok
 
  6 │     @wutu/\
  7 │     section {
- 8 │         img { src = "/fern.png"; "A fern"; }
+ 8 │         img { src = "/fern.png"; "A fern" }
    │         ━
    │         ╰─ here
  9 │     }
@@ -6713,10 +6713,10 @@ ok
 
  6 │     @wutu/\
  7 │     div {
- 8 │         href = "/plants";
+ 8 │         href = "/plants"
    │         ━
    │         ╰─ here
- 9 │         = title;
+ 9 │         = title
 10 │     }
 --- exit 1
 
@@ -6750,10 +6750,10 @@ ok
 
  6 │     @wutu/\
  7 │     button {
- 8 │         onclick = "go()";
+ 8 │         onclick = "go()"
    │         ━
    │         ╰─ here
- 9 │         "Go";
+ 9 │         "Go"
 10 │     }
 --- exit 1
 
@@ -6771,12 +6771,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/89_wutu_old_interpolation.utu
- ERROR  Wutu no longer writes $[…]: an expression stands on its own (= expr; for text, name = expr; for an attribute, if cond {, prop: = expr;)
+ ERROR  Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)
         dsl-error · examples/error_demo/platform/89_wutu_old_interpolation.utu:7:10
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
  6 │     @wutu/\
- 7 │     h2 { $[title]; }
+ 7 │     h2 { $[title] }
    │          ━
    │          ╰─ here
  8 │     \/;
@@ -6789,10 +6789,10 @@ ok
 
  6 │     @wutu/\
  7 │     section {
- 8 │         colr: red;
+ 8 │         colr: red
    │         ━
    │         ╰─ here
- 9 │         h2 { = title; }
+ 9 │         h2 { = title }
 10 │     }
 --- exit 1
 
@@ -6802,20 +6802,20 @@ ok
 
  6 │     @wutu/\
  7 │     x-note {
- 8 │         oNclick = note;
+ 8 │         oNclick = note
    │         ━
    │         ╰─ here
- 9 │         "click me";
+ 9 │         "click me"
 10 │     }
 --- exit 1
 
 === utu check examples/error_demo/platform/911_wutu_script_dynamic_src.utu
- ERROR  a script's attributes are code or load it, so Wutu sets them only as written: src = "…";
+ ERROR  a script's attributes are code or load it, so Wutu sets them only as written: src = "…"
         dsl-error · examples/error_demo/platform/911_wutu_script_dynamic_src.utu:8:18
 
  6 │     @wutu/\
  7 │     div {
- 8 │         script { src = url; }
+ 8 │         script { src = url }
    │                  ━
    │                  ╰─ here
  9 │     }
@@ -6823,12 +6823,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/912_wutu_script_dynamic_text.utu
- ERROR  a script's text is code, so Wutu writes it only as written: script { "…"; }
+ ERROR  a script's text is code, so Wutu writes it only as written: script { "…" }
         dsl-error · examples/error_demo/platform/912_wutu_script_dynamic_text.utu:8:18
 
  6 │     @wutu/\
  7 │     div {
- 8 │         script { = code; }
+ 8 │         script { = code }
    │                  ━
    │                  ╰─ here
  9 │     }
@@ -6844,7 +6844,7 @@ ok
  7 │     section {
    │     ━
    │     ╰─ here
- 8 │         h2 { = title; }
+ 8 │         h2 { = title }
  9 │     \/;
 --- exit 1
 
@@ -6852,7 +6852,7 @@ ok
  ERROR  expected what to iterate, then |item|
         dsl-error · examples/error_demo/platform/92_wutu_for_without_capture.utu:11:5
 
- 9 │             li { "item"; }
+ 9 │             li { "item" }
 10 │         }
 11 │     }
    │     ━
@@ -6949,9 +6949,9 @@ ok
  ERROR  Ambiguous element alias 'label'; reference it inside its own subtree
         dsl-error · examples/error_demo/platform/93_wutu_ambiguous_alias.utu:10:35
 
- 8 │         p as label { "a"; }
- 9 │         p as label { "b"; }
-10 │         button { "Go"; on click { label.textContent = "x"; } }
+ 8 │         p as label { "a" }
+ 9 │         p as label { "b" }
+10 │         button { "Go"; on click { label.textContent = "x" } }
    │                                   ━
    │                                   ╰─ here
 11 │     }
@@ -7085,7 +7085,7 @@ ok
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
  6 │     @wutu/\
- 7 │     h2 { = title + ; }
+ 7 │     h2 { = title + }
    │            ━
    │            ╰─ here
  8 │     \/;
@@ -7093,12 +7093,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/950_wutu_style_dynamic_text.utu
- ERROR  a style's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: style { "…"; }
+ ERROR  a style's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: style { "…" }
         dsl-error · examples/error_demo/platform/950_wutu_style_dynamic_text.utu:8:17
 
  6 │     @wutu/\
  7 │     div {
- 8 │         style { = css; }
+ 8 │         style { = css }
    │                 ━
    │                 ╰─ here
  9 │     }
@@ -7106,12 +7106,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu
- ERROR  a noscript's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: noscript { "…"; }
+ ERROR  a noscript's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: noscript { "…" }
         dsl-error · examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu:8:20
 
  6 │     @wutu/\
  7 │     div {
- 8 │         noscript { = note; }
+ 8 │         noscript { = note }
    │                    ━
    │                    ╰─ here
  9 │     }
@@ -7124,7 +7124,7 @@ ok
 
  6 │     @wutu/\
  7 │     div {
- 8 │         a { href = "mailto:me@example.com"; .protocol = scheme; "mail"; }
+ 8 │         a { href = "mailto:me@example.com"; .protocol = scheme; "mail" }
    │                                              ━
    │                                              ╰─ here
  9 │     }
@@ -7132,12 +7132,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/953_wutu_base_dynamic_href.utu
- ERROR  a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = "/";
+ ERROR  a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = "/"
         dsl-error · examples/error_demo/platform/953_wutu_base_dynamic_href.utu:8:16
 
  6 │     @wutu/\
  7 │     div {
- 8 │         base { href = root; }
+ 8 │         base { href = root }
    │                ━
    │                ╰─ here
  9 │     }
@@ -7145,12 +7145,12 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/95_wutu_property_without_value.utu
- ERROR  a property takes a value: .name = value;
+ ERROR  a property takes a value: .name = value
         dsl-error · examples/error_demo/platform/95_wutu_property_without_value.utu:8:10
 
  6 │     @wutu/\
  7 │     input {
- 8 │         .value;
+ 8 │         .value
    │          ━
    │          ╰─ here
  9 │     }
@@ -7176,7 +7176,7 @@ ok
 
  6 │     @wutu/\
  7 │     input {
- 8 │         .value = items.len();
+ 8 │         .value = items.len()
    │                  ━━━━━━━━━━━
    │                  ╰─ I32
  9 │     }
@@ -7189,24 +7189,11 @@ ok
 
  6 │     @wutu/\
  7 │     section {
- 8 │         background color: #eee;
+ 8 │         background color: #eee
    │         ━
    │         ╰─ here
- 9 │         h2 { = title; }
+ 9 │         h2 { = title }
 10 │     }
---- exit 1
-
-=== utu check examples/error_demo/platform/99_wutu_hover_block_semicolon.utu
- ERROR  CSS declarations require a semicolon
-        dsl-error · examples/error_demo/platform/99_wutu_hover_block_semicolon.utu:9:29
-
- 7 │     a {
- 8 │         href = "/plants";
- 9 │         :hover { color: red }
-   │                             ━
-   │                             ╰─ here
-10 │         "Plants";
-11 │     }
 --- exit 1
 
 === utu examples/error_demo/runtime/01_orelse_fatal_null.utu

@@ -16,21 +16,21 @@ mod ui {
     fn logo() Browser.SVGElement {
         @wutu/\
         svg.sun {
-            xmlns = "http://www.w3.org/2000/svg";
-            viewBox = "0 0 100 100";
-            role = "img";
-            aria-label = "Utu, the cuneiform sun sign";
+            xmlns = "http://www.w3.org/2000/svg"
+            viewBox = "0 0 100 100"
+            role = "img"
+            aria-label = "Utu, the cuneiform sun sign"
             circle {
-                cx = "50";
-                cy = "50";
-                r = "50";
-                fill = "#f7a21b";
+                cx = "50"
+                cy = "50"
+                r = "50"
+                fill = "#f7a21b"
             }
             g {
-                transform = "translate(50 50) scale(0.06 -0.06) translate(-524.5 -206.5)";
+                transform = "translate(50 50) scale(0.06 -0.06) translate(-524.5 -206.5)"
                 path {
-                    d = ud_path();
-                    fill = "#000000";
+                    d = ud_path()
+                    fill = "#000000"
                 }
             }
         }
@@ -40,10 +40,10 @@ mod ui {
     fn further(path: Str, label: Str) Browser.HTMLElement {
         @wutu/\
         p.further {
-            "Deep dive: ";
+            "Deep dive: "
             a {
-                href = repo() + "/blob/main/" + path;
-                = label;
+                href = repo() + "/blob/main/" + path
+                = label
             }
         }
         \/
@@ -52,10 +52,10 @@ mod ui {
         @wutu/\
         header.page-head {
             h1 {
-                = title;
+                = title
             }
             p.lede {
-                = lede;
+                = lede
             }
         }
         \/

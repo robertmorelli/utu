@@ -12,74 +12,74 @@ struct ReadroomState:
 | books: Array[Book]
 fn notes(book:Book) Browser.HTMLElement {
     @wutu/\
-    @island "readroom-notes";
+    @island "readroom-notes"
     section.panel.stack {
         a {
-            href = "#/";
-            "← Back to the shelf";
+            href = "#/"
+            "← Back to the shelf"
         }
         h2 {
-            = book.title;
+            = book.title
         }
         p.muted {
-            = book.author;
+            = book.author
         }
         label {
-            "Your notes";
+            "Your notes"
             textarea {
-                rows = "10";
-                placeholder = "A thought worth keeping…";
-                bind:value = book.note;
+                rows = "10"
+                placeholder = "A thought worth keeping…"
+                bind:value = book.note
                 on input {
-                    wutu.save("readroom-v2");
+                    wutu.save("readroom-v2")
                 }
             }
         }
         p.muted {
-            "Notes save on this device after you pause typing.";
+            "Notes save on this device after you pause typing."
         }
     }
     \/
 }
 fn workspace(state: ReadroomState) Browser.HTMLElement {
     @wutu/\
-    @island "readroom-workspace";
+    @island "readroom-workspace"
     section.workspace {
         div.grid {
             for state.books |book| key book.id {
                 article.panel.stack {
                     p.eyebrow {
                         = if book.finished {
-                            "FINISHED";
+                            "FINISHED"
                         }
                         else {
-                            "ON YOUR SHELF";
-                        };
+                            "ON YOUR SHELF"
+                        }
                     }
                     h2 {
-                        = book.title;
+                        = book.title
                     }
                     p.muted {
-                        = book.author;
+                        = book.author
                     }
                     a {
-                        href = "#/notes";
-                        "Open your notes ↗";
+                        href = "#/notes"
+                        "Open your notes ↗"
                         on click {
-                            state.selected=book.id;
-                            wutu.save("readroom-v2");
+                            state.selected=book.id
+                            wutu.save("readroom-v2")
                         }
                     }
                     button {
                         = if book.finished {
-                            "Read again";
+                            "Read again"
                         }
                         else {
-                            "Mark finished";
-                        };
+                            "Mark finished"
+                        }
                         on click {
-                            book.finished=not book.finished;
-                            wutu.save("readroom-v2");
+                            book.finished=not book.finished
+                            wutu.save("readroom-v2")
                         }
                     }
                 }
@@ -116,49 +116,49 @@ main {
         }
     \/
     let app = @wutu/\
-    @reactive;
-    @style theme.sheet();
+    @reactive
+    @style theme.sheet()
     main {
-        data-theme = "readroom";
+        data-theme = "readroom"
         nav {
             strong {
-                "READROOM / AN EVERYDAY TOOL";
+                "READROOM / AN EVERYDAY TOOL"
             }
             a {
-                href = "../";
-                "All five sites";
+                href = "../"
+                "All five sites"
             }
             a {
-                href = "source.html";
-                "Read source ↗";
+                href = "source.html"
+                "Read source ↗"
             }
         }
         header.hero {
             p.eyebrow {
-                "SMALL SOFTWARE. REAL LIFE.";
+                "SMALL SOFTWARE. REAL LIFE."
             }
             h1 {
-                "Read a little. Keep what stays.";
+                "Read a little. Keep what stays."
             }
             p.muted {
-                "A reading journal with room for a thought, a sentence, or a question. Finish books at your own pace.";
+                "A reading journal with room for a thought, a sentence, or a question. Finish books at your own pace."
             }
         }
         if wutu.route()=="/notes" {
-            for (state.books filter |book| {book.id==state.selected;}) |book| {
-                = notes(book);
+            for (state.books filter |book| {book.id==state.selected }) |book| {
+                = notes(book)
             }
         }
         else {
-            = workspace(state);
+            = workspace(state)
         }
         footer {
             p {
-                "Stored on this device. Built with Utu + Wutu.";
+                "Stored on this device. Built with Utu + Wutu."
             }
             p {
-                role = "status";
-                = wutu.storage_error();
+                role = "status"
+                = wutu.storage_error()
             }
         }
     }

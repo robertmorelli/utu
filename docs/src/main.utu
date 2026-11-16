@@ -153,521 +153,521 @@ main {
     icon.href = "data:image/svg+xml," + Browser.encodeURIComponent(ui.logo().outerHTML)
     Browser.document.head.append(icon)
     let app = @wutu/\
-    @reactive;
+    @reactive
     @document {
-        @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap");
+        @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap")
         :root {
-            --bg: #f7f6f2;
-            --ink: #1f2535;
-            --muted: #656c7e;
-            --line: #dcd9d1;
-            --tint: #edebe4;
-            --blue: #2d53c4;
-            --orange: #e4772c;
-            --sun: #f2a33a;
-            --code-bg: #171c30;
-            --code-ink: #e4e7f2;
-            --code-k: #c8bdff;
-            --code-s: #a7dfb1;
-            --code-c: #7d86a1;
-            --code-T: #ffd48a;
-            --code-n: #ffb3b3;
-            --code-a: #ff9ed6;
-            --code-d: #8fd6ff;
-            --code-y: #a6d4ff;
-            --code-f: #e4e7f2;
-            color-scheme: light dark;
+            --bg: #f7f6f2
+            --ink: #1f2535
+            --muted: #656c7e
+            --line: #dcd9d1
+            --tint: #edebe4
+            --blue: #2d53c4
+            --orange: #e4772c
+            --sun: #f2a33a
+            --code-bg: #171c30
+            --code-ink: #e4e7f2
+            --code-k: #c8bdff
+            --code-s: #a7dfb1
+            --code-c: #7d86a1
+            --code-T: #ffd48a
+            --code-n: #ffb3b3
+            --code-a: #ff9ed6
+            --code-d: #8fd6ff
+            --code-y: #a6d4ff
+            --code-f: #e4e7f2
+            color-scheme: light dark
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #121724;
-                --ink: #e2e4eb;
-                --muted: #9ba2b6;
-                --line: #2a3246;
-                --tint: #1d2437;
-                --blue: #93b0ff;
-                --orange: #f0924e;
-                --code-bg: #090c17;
+                --bg: #121724
+                --ink: #e2e4eb
+                --muted: #9ba2b6
+                --line: #2a3246
+                --tint: #1d2437
+                --blue: #93b0ff
+                --orange: #f0924e
+                --code-bg: #090c17
             }
         }
         * {
-            box-sizing: border-box;
+            box-sizing: border-box
         }
         html {
-            -webkit-text-size-adjust: 100%;
+            -webkit-text-size-adjust: 100%
         }
         body {
-            margin: 0;
-            background: var(--bg);
-            color: var(--ink);
-            font: 400 1.0625rem/1.6 "Bricolage Grotesque", system-ui, sans-serif;
-            font-optical-sizing: auto;
+            margin: 0
+            background: var(--bg)
+            color: var(--ink)
+            font: 400 1.0625rem/1.6 "Bricolage Grotesque", system-ui, sans-serif
+            font-optical-sizing: auto
         }
         a {
-            color: var(--blue);
-            text-underline-offset: 0.2em;
-            text-decoration-thickness: 1px;
-            text-decoration-color: color-mix(in srgb, var(--blue) 45%, transparent);
+            color: var(--blue)
+            text-underline-offset: 0.2em
+            text-decoration-thickness: 1px
+            text-decoration-color: color-mix(in srgb, var(--blue) 45%, transparent)
         }
         a:hover {
-            text-decoration-color: currentColor;
+            text-decoration-color: currentColor
         }
         :focus-visible {
-            outline: 2px solid var(--orange);
-            outline-offset: 3px;
+            outline: 2px solid var(--orange)
+            outline-offset: 3px
         }
         h1, h2, h3, p, ul, ol, table {
-            margin: 0;
-            overflow-wrap: anywhere;
+            margin: 0
+            overflow-wrap: anywhere
         }
         h1 {
-            font-weight: 600;
-            font-size: clamp(2.2rem, 1.4rem + 3vw, 3.5rem);
-            line-height: 1.04;
-            letter-spacing: -0.03em;
+            font-weight: 600
+            font-size: clamp(2.2rem, 1.4rem + 3vw, 3.5rem)
+            line-height: 1.04
+            letter-spacing: -0.03em
         }
         h2 {
-            font-weight: 600;
-            font-size: 1.45rem;
-            line-height: 1.2;
-            letter-spacing: -0.015em;
-            margin-block: 3.5rem 1rem;
+            font-weight: 600
+            font-size: 1.45rem
+            line-height: 1.2
+            letter-spacing: -0.015em
+            margin-block: 3.5rem 1rem
         }
         h2:first-of-type {
-            margin-block-start: 3rem;
+            margin-block-start: 3rem
         }
         p + p {
-            margin-block-start: 1rem;
+            margin-block-start: 1rem
         }
         .page {
-            max-inline-size: 64rem;
-            padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 6rem;
+            max-inline-size: 64rem
+            padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 6rem
         }
         .page > :is(p, ul, ol, h2, h3, .further) {
-            max-inline-size: 44rem;
+            max-inline-size: 44rem
         }
         .page-head + p {
-            margin-block-start: 2rem;
+            margin-block-start: 2rem
         }
         .page.playground {
-            max-inline-size: 84rem;
+            max-inline-size: 84rem
         }
         .page.playground > p {
-            max-inline-size: 44rem;
+            max-inline-size: 44rem
         }
         .page-head {
-            display: grid;
-            gap: 1.1rem;
-            padding-block-end: 2rem;
-            border-block-end: 1px solid var(--line);
+            display: grid
+            gap: 1.1rem
+            padding-block-end: 2rem
+            border-block-end: 1px solid var(--line)
         }
         .lede {
-            font-size: 1.15rem;
-            line-height: 1.5;
-            color: var(--muted);
-            max-inline-size: 36rem;
+            font-size: 1.15rem
+            line-height: 1.5
+            color: var(--muted)
+            max-inline-size: 36rem
         }
         .further {
-            margin-block-start: 1.75rem;
-            padding-inline-start: 1rem;
-            border-inline-start: 3px solid var(--orange);
-            color: var(--muted);
+            margin-block-start: 1.75rem
+            padding-inline-start: 1rem
+            border-inline-start: 3px solid var(--orange)
+            color: var(--muted)
         }
         .further + .further {
-            margin-block-start: 0.75rem;
+            margin-block-start: 0.75rem
         }
         code {
-            font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 0.86em;
+            font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace
+            font-size: 0.86em
         }
         p code, li code, td code, th code {
-            background: var(--tint);
-            padding: 0.1em 0.35em;
+            background: var(--tint)
+            padding: 0.1em 0.35em
         }
         pre.code {
-            margin: 1.4rem 0;
-            padding: 1.2rem 1.4rem;
-            background: var(--code-bg);
-            color: var(--code-ink);
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-            font: 400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-            tab-size: 4;
+            margin: 1.4rem 0
+            padding: 1.2rem 1.4rem
+            background: var(--code-bg)
+            color: var(--code-ink)
+            white-space: pre-wrap
+            overflow-wrap: anywhere
+            font: 400 0.84rem/1.65 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace
+            tab-size: 4
         }
         pre.code code {
-            font-size: inherit;
+            font-size: inherit
         }
         @media (width < 40rem) {
             pre.code {
-                font-size: 0.78rem;
-                padding: 0.9rem 1rem;
+                font-size: 0.78rem
+                padding: 0.9rem 1rem
             }
         }
         pre.code .k {
-            color: var(--code-k);
+            color: var(--code-k)
         }
         pre.code .s {
-            color: var(--code-s);
+            color: var(--code-s)
         }
         pre.code .c {
-            color: var(--code-c);
-            font-style: italic;
+            color: var(--code-c)
+            font-style: italic
         }
         pre.code .T {
-            color: var(--code-T);
+            color: var(--code-T)
         }
         pre.code .n {
-            color: var(--code-n);
+            color: var(--code-n)
         }
         pre.code .a {
-            color: var(--code-a);
-            font-weight: 500;
+            color: var(--code-a)
+            font-weight: 500
         }
         pre.code .d {
-            color: var(--code-d);
-            font-weight: 500;
+            color: var(--code-d)
+            font-weight: 500
         }
         pre.code .y {
-            color: var(--code-y);
+            color: var(--code-y)
         }
         pre.code .f {
-            color: var(--code-f);
+            color: var(--code-f)
         }
         table {
-            border-collapse: collapse;
-            inline-size: 100%;
-            margin-block: 1.4rem;
-            font-size: 0.95rem;
+            border-collapse: collapse
+            inline-size: 100%
+            margin-block: 1.4rem
+            font-size: 0.95rem
         }
         th, td {
-            text-align: start;
-            vertical-align: top;
-            padding: 0.7rem 0.75rem 0.7rem 0;
-            border-block-end: 1px solid var(--line);
+            text-align: start
+            vertical-align: top
+            padding: 0.7rem 0.75rem 0.7rem 0
+            border-block-end: 1px solid var(--line)
         }
         th {
-            font-weight: 600;
-            white-space: nowrap;
+            font-weight: 600
+            white-space: nowrap
         }
         thead th {
-            color: var(--muted);
-            font-weight: 500;
-            font-size: 0.85rem;
+            color: var(--muted)
+            font-weight: 500
+            font-size: 0.85rem
         }
         table.wide {
-            overflow-wrap: normal;
+            overflow-wrap: normal
         }
         table.wide td, table.wide thead th {
-            text-align: end;
-            font-variant-numeric: tabular-nums;
-            padding-inline: 0.75rem 0;
+            text-align: end
+            font-variant-numeric: tabular-nums
+            padding-inline: 0.75rem 0
         }
         table.wide th {
-            white-space: normal;
+            white-space: normal
         }
         table.wide thead th {
-            font-size: 0.9em;
+            font-size: 0.9em
         }
         @media (width < 40rem) {
             table.wide {
-                font-size: 0.74rem;
+                font-size: 0.74rem
             }
             table.wide th, table.wide td {
-                padding-inline: 0.3rem 0;
+                padding-inline: 0.3rem 0
             }
         }
         @media (width < 22rem) {
             table.wide {
-                font-size: 0.66rem;
+                font-size: 0.66rem
             }
         }
         ul, ol {
-            padding-inline-start: 1.25rem;
+            padding-inline-start: 1.25rem
         }
         li + li {
-            margin-block-start: 0.45rem;
+            margin-block-start: 0.45rem
         }
         .principles li {
-            padding-inline-start: 0.35rem;
+            padding-inline-start: 0.35rem
         }
         .principles li::marker {
-            color: var(--orange);
-            font-weight: 600;
+            color: var(--orange)
+            font-weight: 600
         }
         .home {
-            padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 5rem;
-            max-inline-size: 74rem;
-            display: grid;
-            gap: clamp(4rem, 8vw, 7rem);
+            padding: clamp(2rem, 6vw, 5rem) clamp(1.25rem, 5vw, 4rem) 5rem
+            max-inline-size: 74rem
+            display: grid
+            gap: clamp(4rem, 8vw, 7rem)
         }
         .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: clamp(2.5rem, 6vw, 5rem);
-            align-items: center;
+            display: grid
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
+            gap: clamp(2.5rem, 6vw, 5rem)
+            align-items: center
         }
         @media (width < 60rem) {
             .hero {
-                grid-template-columns: minmax(0, 1fr);
+                grid-template-columns: minmax(0, 1fr)
             }
         }
         .pitch {
-            display: grid;
-            gap: 1.75rem;
-            align-content: start;
+            display: grid
+            gap: 1.75rem
+            align-content: start
         }
         .pitch .sun {
-            inline-size: clamp(5rem, 9vw, 7rem);
-            block-size: auto;
-            display: block;
+            inline-size: clamp(5rem, 9vw, 7rem)
+            block-size: auto
+            display: block
         }
         .pitch h1 {
-            font-size: clamp(2.5rem, 1.4rem + 3.8vw, 4.4rem);
-            font-weight: 600;
-            max-inline-size: 12em;
+            font-size: clamp(2.5rem, 1.4rem + 3.8vw, 4.4rem)
+            font-weight: 600
+            max-inline-size: 12em
         }
         .pitch .lede {
-            font-size: 1.12rem;
-            max-inline-size: 32rem;
+            font-size: 1.12rem
+            max-inline-size: 32rem
         }
         .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem 1.75rem;
-            align-items: center;
-            margin-block-start: 0.5rem;
+            display: flex
+            flex-wrap: wrap
+            gap: 1rem 1.75rem
+            align-items: center
+            margin-block-start: 0.5rem
         }
         .button {
-            display: inline-block;
-            padding: 0.8rem 1.4rem;
-            background: var(--orange);
-            color: #1f2535;
-            text-decoration: none;
-            font-weight: 600;
+            display: inline-block
+            padding: 0.8rem 1.4rem
+            background: var(--orange)
+            color: #1f2535
+            text-decoration: none
+            font-weight: 600
         }
         .button:hover {
-            background: var(--sun);
+            background: var(--sun)
         }
         .sample {
-            display: grid;
-            gap: 0.85rem;
+            display: grid
+            gap: 0.85rem
         }
         .sample pre.code {
-            margin: 0;
-            font-size: 0.8rem;
+            margin: 0
+            font-size: 0.8rem
         }
         .caption {
-            color: var(--muted);
-            font-size: 0.95rem;
-            max-inline-size: 30rem;
+            color: var(--muted)
+            font-size: 0.95rem
+            max-inline-size: 30rem
         }
         .points {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-            gap: clamp(2.5rem, 5vw, 4rem);
+            display: grid
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr))
+            gap: clamp(2.5rem, 5vw, 4rem)
         }
         .point {
-            display: grid;
-            gap: 1rem;
-            align-content: start;
+            display: grid
+            gap: 1rem
+            align-content: start
         }
         .point h2 {
-            margin: 0;
-            font-size: 1.4rem;
-            max-inline-size: 22ch;
+            margin: 0
+            font-size: 1.4rem
+            max-inline-size: 22ch
         }
         .point pre.code {
-            margin: 0.25rem 0;
+            margin: 0.25rem 0
         }
         .measured {
-            display: grid;
-            gap: 0.75rem;
+            display: grid
+            gap: 0.75rem
         }
         .measured h2, .map h2 {
-            margin: 0;
+            margin: 0
         }
         .measured table {
-            margin-block: 1rem 0;
-            max-inline-size: 52rem;
+            margin-block: 1rem 0
+            max-inline-size: 52rem
         }
         .measured th {
-            font-size: 1.5rem;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-            padding-inline-end: 1.5rem;
-            font-variant-numeric: tabular-nums;
-            color: var(--orange);
+            font-size: 1.5rem
+            font-weight: 600
+            letter-spacing: -0.02em
+            padding-inline-end: 1.5rem
+            font-variant-numeric: tabular-nums
+            color: var(--orange)
         }
         .measured td {
-            color: var(--muted);
+            color: var(--muted)
         }
         .map ul {
-            list-style: none;
-            padding: 0;
-            margin-block-start: 1.25rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-            gap: 0 2.5rem;
+            list-style: none
+            padding: 0
+            margin-block-start: 1.25rem
+            display: grid
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr))
+            gap: 0 2.5rem
         }
         .map li {
-            display: grid;
-            gap: 0.2rem;
-            padding-block: 1rem;
-            border-block-start: 1px solid var(--line);
-            margin: 0;
+            display: grid
+            gap: 0.2rem
+            padding-block: 1rem
+            border-block-start: 1px solid var(--line)
+            margin: 0
         }
         .map li a {
-            font-weight: 600;
-            font-size: 1.05rem;
+            font-weight: 600
+            font-size: 1.05rem
         }
         .map li span {
-            color: var(--muted);
-            font-size: 0.95rem;
+            color: var(--muted)
+            font-size: 0.95rem
         }
     }
     div.shell {
-        display:grid;
-        grid-template-columns:17rem minmax(0, 1fr);
-        min-block-size:100dvh;
+        display:grid
+        grid-template-columns:17rem minmax(0, 1fr)
+        min-block-size:100dvh
         @media (width < 64rem) {
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: minmax(0, 1fr)
         }
         aside.side {
-            position:sticky;
-            top:0;
-            block-size:100dvh;
-            overflow-y:auto;
-            display:flex;
-            flex-direction:column;
-            gap:1.5rem;
-            padding:1.5rem 1.25rem;
-            border-inline-end:1px solid var(--line);
+            position:sticky
+            top:0
+            block-size:100dvh
+            overflow-y:auto
+            display:flex
+            flex-direction:column
+            gap:1.5rem
+            padding:1.5rem 1.25rem
+            border-inline-end:1px solid var(--line)
             @media (width < 64rem) {
-                position: static;
-                block-size: auto;
-                gap: 0.9rem;
-                padding: 1rem 1rem 0;
-                border-inline-end: 0;
-                border-block-end: 1px solid var(--line);
+                position: static
+                block-size: auto
+                gap: 0.9rem
+                padding: 1rem 1rem 0
+                border-inline-end: 0
+                border-block-end: 1px solid var(--line)
             }
             a.brand {
-                href = "#/";
-                display:flex;
-                align-items:center;
-                gap:0.7rem;
-                color:var(--ink);
-                text-decoration:none;
-                font-weight:600;
-                font-size:1.5rem;
-                letter-spacing:-0.03em;
+                href = "#/"
+                display:flex
+                align-items:center
+                gap:0.7rem
+                color:var(--ink)
+                text-decoration:none
+                font-weight:600
+                font-size:1.5rem
+                letter-spacing:-0.03em
                 :hover {
-                    color: var(--ink);
+                    color: var(--ink)
                 }
                 @ & > svg {
-                    inline-size: 2.1rem;
-                    block-size: 2.1rem;
-                    flex: none;
+                    inline-size: 2.1rem
+                    block-size: 2.1rem
+                    flex: none
                 }
-                = ui.logo();
-                "utu";
+                = ui.logo()
+                "utu"
                 span.sub {
-                    font-weight:400;
-                    font-size:0.95rem;
-                    color:var(--muted);
-                    letter-spacing:0;
-                    "docs";
+                    font-weight:400
+                    font-size:0.95rem
+                    color:var(--muted)
+                    letter-spacing:0
+                    "docs"
                 }
             }
             nav {
-                aria-label = "Pages";
-                display:grid;
+                aria-label = "Pages"
+                display:grid
                 @media (width < 64rem) {
-                    display: flex;
-                    gap: 0;
-                    overflow-x: auto;
-                    scrollbar-width: none;
-                    margin-inline: -1rem;
-                    padding-inline: 1rem;
+                    display: flex
+                    gap: 0
+                    overflow-x: auto
+                    scrollbar-width: none
+                    margin-inline: -1rem
+                    padding-inline: 1rem
                 }
                 for links() |link| key link.href {
                     a {
-                        href = "#" + link.href;
-                        class = if link.href == wutu.route() { "here"; } else { "elsewhere"; };
-                        aria-current = if link.href == wutu.route() { "page"; } else { "false"; };
-                        display:block;
-                        padding:0.5rem 0.75rem;
-                        text-decoration:none;
-                        font-size:0.98rem;
-                        white-space:nowrap;
-                        color:var(--muted);
-                        border-inline-start:3px solid transparent;
+                        href = "#" + link.href
+                        class = if link.href == wutu.route() { "here" } else { "elsewhere" }
+                        aria-current = if link.href == wutu.route() { "page" } else { "false" }
+                        display:block
+                        padding:0.5rem 0.75rem
+                        text-decoration:none
+                        font-size:0.98rem
+                        white-space:nowrap
+                        color:var(--muted)
+                        border-inline-start:3px solid transparent
                         :hover {
-                            color: var(--ink);
+                            color: var(--ink)
                         }
                         @ &.here {
-                            background: var(--tint);
-                            color: var(--ink);
-                            font-weight: 600;
-                            border-inline-start-color: var(--orange);
+                            background: var(--tint)
+                            color: var(--ink)
+                            font-weight: 600
+                            border-inline-start-color: var(--orange)
                         }
                         @media (width < 64rem) {
-                            border-inline-start: 0;
-                            border-block-end: 3px solid transparent;
+                            border-inline-start: 0
+                            border-block-end: 3px solid transparent
                             @ &.here {
-                                background: transparent;
-                                border-block-end-color: var(--orange);
+                                background: transparent
+                                border-block-end-color: var(--orange)
                             }
                         }
-                        = link.label;
+                        = link.label
                     }
                 }
             }
             p.aside-foot {
-                margin-block-start:auto;
-                font-size:0.85rem;
-                color:var(--muted);
-                line-height:1.5;
+                margin-block-start:auto
+                font-size:0.85rem
+                color:var(--muted)
+                line-height:1.5
                 @media (width < 64rem) {
-                    display: none;
+                    display: none
                 }
                 a {
-                    href = ui.repo();
-                    "GitHub";
+                    href = ui.repo()
+                    "GitHub"
                 }
                 br {
                 }
                 a {
-                    href = ui.repo() + "/tree/main/docs";
-                    "Markdown deep dives";
+                    href = ui.repo() + "/tree/main/docs"
+                    "Markdown deep dives"
                 }
             }
         }
         div.content {
-            min-inline-size:0;
-            = arrive(site, wutu.route());
-            = page(wutu.route(), play);
+            min-inline-size:0
+            = arrive(site, wutu.route())
+            = page(wutu.route(), play)
             footer {
-                padding:1.5rem clamp(1rem, 4vw, 3rem) 3rem;
-                border-block-start:1px solid var(--line);
-                color:var(--muted);
-                font-size:0.9rem;
-                display:flex;
-                flex-wrap:wrap;
-                gap:0.5rem 2rem;
-                justify-content:space-between;
+                padding:1.5rem clamp(1rem, 4vw, 3rem) 3rem
+                border-block-start:1px solid var(--line)
+                color:var(--muted)
+                font-size:0.9rem
+                display:flex
+                flex-wrap:wrap
+                gap:0.5rem 2rem
+                justify-content:space-between
                 p {
-                    "This site is written in utu and compiled to WasmGC. ";
+                    "This site is written in utu and compiled to WasmGC. "
                     a {
-                        href = ui.repo() + "/tree/main/docs/src";
-                        "Read its source";
+                        href = ui.repo() + "/tree/main/docs/src"
+                        "Read its source"
                     }
-                    ".";
+                    "."
                 }
                 p {
-                    "MIT licensed. ";
+                    "MIT licensed. "
                     a {
-                        href = ui.repo();
-                        "robertmorelli/utu";
+                        href = ui.repo()
+                        "robertmorelli/utu"
                     }
                 }
             }
