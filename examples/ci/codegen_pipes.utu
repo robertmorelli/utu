@@ -14,30 +14,30 @@ fn affine(scale: I32, value: I32, offset: I32) I32 {
     value * scale + offset
 }
 
-fn use_pipe(x: I32) I32 {
-    x -o inc -o double
+fn inc_then_double(x: I32) I32 {
+    double(inc(x))
 }
 
 fn clamp_unit(x: I32) I32 {
-    x -o clamp(&, 0, 10)
+    clamp(x, 0, 10)
 }
 
 fn scale_then_offset(x: I32) I32 {
-    x -o affine(3, &, 1)
+    affine(3, x, 1)
 }
 
-test "simple pipes become nested calls" {
-    assert use_pipe(3) == 8
+test "calls nest" {
+    assert inc_then_double(3) == 8
 }
 
-test "placeholder pipes can clamp low values" {
+test "clamp low values" {
     assert clamp_unit(-2) == 0
 }
 
-test "placeholder pipes can clamp high values" {
+test "clamp high values" {
     assert clamp_unit(18) == 10
 }
 
-test "placeholder position composes with other arguments" {
+test "an argument among others" {
     assert scale_then_offset(4) == 13
 }

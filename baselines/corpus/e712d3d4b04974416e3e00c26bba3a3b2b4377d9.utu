@@ -15,15 +15,15 @@ fn affine(scale: I32, value: I32, offset: I32) I32 {
 }
 
 fn use_pipe(x: I32) I32 {
-    x -o inc -o double;
+    double(inc(x));
 }
 
 fn clamp_unit(x: I32) I32 {
-    x -o clamp(&, 0, 10);
+    clamp(x, 0, 10);
 }
 
 fn scale_then_offset(x: I32) I32 {
-    x -o affine(3, &, 1);
+    affine(3, x, 1);
 }
 
 test "simple pipes become nested calls" {

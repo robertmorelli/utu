@@ -1091,7 +1091,7 @@ lib { fn run() I32 { ${source} } }` });
       'struct Pt:\n  | x : F32\nfn takes64(v: I64) I64 { v; }\nfn wide() I64 {\n  let a: I64 = 0;\n  let b: F32 = 1.0;\n  let c: U32 = 7;\n  let p: Pt = Pt { x: 2.0 };\n  takes64(41);\n}',
       'lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
       'fn double(x: I32) I32 { x * 2; }\nlib { fn run() I32 { double(2) + double(3); } }',
-      'lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { x -o clamp(&, 1, 10); }\n  fn mid(x: I32) I32 { x -o clamp(0, &, 10); }\n}',
+      'lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { clamp(x, 1, 10); }\n  fn mid(x: I32) I32 { clamp(0, x, 10); }\n}',
       'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) Void { self.v = n; }\nlib { fn go(b: Box) Void { b.set64(7); } }',
       'lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
     ]) {

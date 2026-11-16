@@ -3,7 +3,7 @@ let wrap: fun(Str) Str = @es/\(value) => `[${value}]`\/
 let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/
 
 fn greet(name: Str) Str {
-    name -o wrap
+    wrap(name)
 }
 
 fn main() I64 {

@@ -896,10 +896,6 @@
     "named": false
   },
   {
-    "type": "-o",
-    "named": false
-  },
-  {
     "type": ".",
     "named": false
   },

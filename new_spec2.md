@@ -576,9 +576,6 @@ and  or  not  xor
 // null fallback (else)
 orelse
 
-// pipe
-|>
-
 // assignment
 =  +=  -=  *=  /=  %=  &=  |=  ^=  <<=  >>=  >>>=  and=  or=  xor=
 ```
@@ -729,10 +726,6 @@ fn quarter(n: I32) Result[I32, Str] {
 
 // bind (let)
 let x: I32 = expr
-
-// pipe
-expr |> foo
-expr |> foo(&, extra)
 
 // assert / fatal
 assert cond

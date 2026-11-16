@@ -56,9 +56,9 @@ static const char *const STAGES[] = { "map", "filter", "flat_map", "skip_while",
  * Zero width: the end of a statement, where the grammar allows one (after
  * what cannot end a statement, `=` or `+`, it does not): before a `}` or
  * the end, or at a line break the next line does not go on from. A line
- * goes on that begins `.f` (not `.{`), `?.`, a binary operator but `-`
- * (`-o` goes on), `{`, `and`, `or`, `xor`, `orelse`, `else`, `catch`, or a
- * stage with its capture (`map |x|`, `fold(0) |a, x|`, `collect(T)`). The self-hosted parser's rule
+ * goes on that begins `.f` (not `.{`), `?.`, a binary operator but `-`,
+ * `{`, `and`, `or`, `xor`, `orelse`, `else`, `catch`, or a stage with its
+ * capture (`map |x|`, `fold(0) |a, x|`, `collect(T)`). The self-hosted parser's rule
  * (selfhost/parse.utu, `statement_end`).
  */
 static bool statement_end(TSLexer *l) {
@@ -96,11 +96,6 @@ static bool statement_end(TSLexer *l) {
     case '.': l->advance(l, false); return l->lookahead == '{';
     case '?': l->advance(l, false); return l->lookahead != '.';
     case '=': case '!': l->advance(l, false); return l->lookahead != '=';
-    case '-':
-      l->advance(l, false);
-      if (l->lookahead != 'o') return true;
-      l->advance(l, false);
-      return is_word_char(l->lookahead);
   }
   if (!is_word_char(c)) return true;
   char w[16];

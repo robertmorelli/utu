@@ -12,7 +12,6 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.assert_expr,
         $.unary_expr,
         $.binary_expr,
-        $.pipe_expr,
         $.iterator_expr,
         $.else_expr,
         $.promoted_module_call_expr,
@@ -163,27 +162,6 @@ exports.buildExpressionRules = function buildExpressionRules() {
     // "replace `\` with `orelse`")
     else_expr: ($) => prec.left(1, seq($._expr, 'orelse', $._expr)),
 
-    // pipe
-    pipe_expr: ($) => prec.left(0, seq($._expr, '-o', $.pipe_target)),
-    pipe_target: ($) => choice($._pipe_path, seq($._pipe_path, '(', $.pipe_args, ')')),
-    _pipe_path: ($) =>
-      prec.left(15, seq(
-        choice($.instantiated_module_ref, $.identifier, $.type_ident),
-        repeat(seq('.', choice($.identifier, $.type_ident))),
-      )),
-    pipe_args: ($) => choice($.pipe_args_no_placeholder, $.pipe_args_with_placeholder),
-    pipe_args_no_placeholder: ($) =>
-      seq(alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))), optional(',')),
-    // & is the pipe placeholder: foo(&, extra)
-    pipe_arg_placeholder: ($) => $.promoted_type,
-    pipe_args_with_placeholder: ($) =>
-      seq(
-        optional(seq(alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))), ',')),
-        $.pipe_arg_placeholder,
-        optional(seq(',', alias($._expr, $.pipe_arg), repeat(seq(',', alias($._expr, $.pipe_arg))))),
-        optional(','),
-      ),
-
     global_member_expr: ($) => prec.left(14, seq($._type_head, '.', choice($.identifier, $.type_ident))),
 
     assign_expr: ($) =>
@@ -252,7 +230,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
     yield_expr: ($) => prec.right(seq('yield', $._expr)),
     return_expr: ($) => prec.right(seq('return', optional($._expr))),
 
-    // `let x = a -o f` binds the pipe: a let takes the whole expression after `=`.
+    // A let takes the whole expression after `=` (`let x = a orelse b`).
     bind_expr: ($) => prec.right(-1, choice(
       seq('let', $.identifier, optional(seq(':', $._type)), '=', $._expr),
       // let .{node, ty} = f(); takes a tuple apart.
