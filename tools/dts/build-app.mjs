@@ -78,7 +78,14 @@ async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true,
   const result = await compileFile(utu, path.resolve(entry), { optimize, safe, ...(stdlib ? { stdlib } : {}) });
   // Warnings alone never fail a build.
   const errors = result.diagnostics.filter(d => d.severity !== 'warning');
-  if (!result.wasm || errors.length) throw new Error(format(errors, new Map(result.files.map(f => [f.key, f.text]))));
+  if (!result.wasm || errors.length) {
+    // Shown as `utu check` shows them: colored (on a terminal), the code as the compiler reads it.
+    const { highlighter } = await import('../../src/selfhost/highlight.js');
+    const env = process.env;
+    const color = !env.NO_COLOR && (env.FORCE_COLOR ? !['0', 'false'].includes(env.FORCE_COLOR) : !!process.stderr.isTTY);
+    const relative = key => key.startsWith('std:') ? key : path.relative(process.cwd(), key).length < key.length ? path.relative(process.cwd(), key) : key;
+    throw new Error(format(errors, new Map(result.files.map(f => [f.key, f.text])), { color, relative, highlight: highlighter(utu, result.files) }));
+  }
   const { wasm, spec } = result;
   // A chunk runs in a page that has std:Wutu's runtime already: it does not ship it again.
   if (chunk) for (const bindings of Object.values(spec.es ?? {}))

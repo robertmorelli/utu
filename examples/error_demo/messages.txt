@@ -3212,7 +3212,7 @@ ok
  5 │     counts.set("a", 1);
  6 │     console.log(counts.get("a", 0));
 
-  note  using StrMap from std:StrMap;
+  note  using StrMap from std:StrMap
 --- exit 1
 
 === utu check examples/error_demo/names/23_unknown_module_call_path.utu
@@ -3618,7 +3618,7 @@ ok
    │                    ╰─ no such type
  4 │ using console from std:Console
 
-  note  using time from std:Time; (the module is time)
+  note  using time from std:Time (the module is time)
 --- exit 1
 
 === utu check examples/error_demo/names/461_console_without_import.utu
@@ -3631,7 +3631,7 @@ ok
    │        ━━━━━━━
    │        ╰─ not defined
 
-  note  using console from std:Console;
+  note  using console from std:Console
 --- exit 1
 
 === utu check examples/error_demo/names/462_std_module_named_as_file.utu
@@ -3646,7 +3646,7 @@ ok
  4 │
  5 │ main { console.log(time.now()); }
 
-  note  using time from std:Time; (the module is time)
+  note  using time from std:Time (the module is time)
   note  The file has no mod Time: declare one there, mod Time { … }
 
  ERROR  Unknown variable time
@@ -3659,7 +3659,7 @@ ok
    │                    ╰─ not defined
  6 │ using console from std:Console
 
-  note  using time from std:Time;
+  note  using time from std:Time
 --- exit 1
 
 === utu check examples/error_demo/names/46_duplicate_closure_parameter.utu
@@ -8954,6 +8954,28 @@ FAIL after tests: boom
    │             ━
    │             ╰─ unexpected
  4 │     p { "Missing a brace"
+--- exit 1
+
+=== utu check examples/error_demo/syntax/551_html_without_browser.utu
+ ERROR  Unknown module Browser
+        unknown-module · examples/error_demo/syntax/551_html_without_browser.utu:3:1
+
+ 1 │ // What: html { } in a file that does not import std:Browser.
+ 2 │ // Expect: Unknown module Browser
+ 3 │ html {
+   │ ━━━━━━
+   │ ╰─ no such module
+ 4 │     body {
+ 5 │         h1 { "hi" }
+ 6 │     }
+ 7 │ }
+
+  note  wn and html { } build on std:Browser, which the file does not import
+
+  fix   import std:Browser
+ 1 │ using Browser from std:Browser
+ 2 │
+ 3 │ // What: html { } in a file that does not import std:Browser.
 --- exit 1
 
 === utu check examples/error_demo/syntax/55_closure_with_fun_keyword.utu

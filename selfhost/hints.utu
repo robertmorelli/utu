@@ -231,7 +231,11 @@ fn suggest(at: I32, meant: I32, decl: I32) Void {
 fn suggested(i: I32) Str {
     for (0 ..< diag_extra_n[i]) |k| {
         let r = diag_extra[i] + k
-        if extra_kind[r] == Extra.Fix.i32() { return word_text(extra_text[r]) }
+        // (A fix that adds lines, an import, is shown as a fix, not quoted here.)
+        if extra_kind[r] == Extra.Fix.i32() {
+            let t = word_text(extra_text[r])
+            return if text_index(t, "\n", 0) >= 0 { "" } else { t }
+        }
     }
     ""
 }
@@ -244,6 +248,15 @@ fn did_you_mean(i: I32) Str {
 
 /// Report a name that names nothing (a `seek`), suggesting the nearest one in scope.
 fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
+    // Generated code (a DSL's, wn's, html's) naming what was already said unknown: said there.
+    if dsl_site_of(node) >= 0 {
+        for (0 ..< diag_kind.len()) |i| {
+            if diag_word[i] == word and (diag_kind[i] == Diag.UnknownModule.i32() or diag_kind[i] == Diag.UnknownType.i32() or diag_kind[i] == Diag.UnknownVariable.i32()) {
+                diag_fresh[0] = 0
+                return
+            }
+        }
+    }
     // The same name again on one line is the same mistake.
     for (0 ..< diag_kind.len()) |i| {
         if diag_kind[i] == kind.i32() and diag_word[i] == word and diag_node[i] != node and same_line(diag_node[i], node) {
@@ -264,7 +277,7 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
     let m = std_module(t)
     // (A lowercase module is used as a value: `console.log(…)`.)
     if m.len() > 0 and (seek != Seek.Value or m == t) {
-        let line = "using " + m + " from std:" + std_file(m) + ";"
+        let line = "using " + m + " from std:" + std_file(m)
         diag_note(if m == t { line } else { line + " (the module is " + m + ")" })
         return
     }

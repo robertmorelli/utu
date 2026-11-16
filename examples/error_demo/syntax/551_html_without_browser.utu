@@ -1,0 +1,7 @@
+// What: html { } in a file that does not import std:Browser.
+// Expect: Unknown module Browser
+html {
+    body {
+        h1 { "hi" }
+    }
+}

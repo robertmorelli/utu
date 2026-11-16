@@ -1544,8 +1544,40 @@ fn desugar_wutu_surfaces() Void {
     let limit = file_root.len()
     for (0 ..< limit) |file| {
         if not is_own_file(file) or file_root[file] < 0 { continue }
+        let sugar = wutu_sugar_in(file_root[file])
+        if sugar >= 0 and not imports_browser(file_root[file]) {
+            // Said once, at the first `wn` or `html`, with the line to add.
+            report(Diag.UnknownModule, sugar, intern_text("Browser"))
+            diag_note("wn and html { } build on std:Browser, which the file does not import")
+            diag_fix(file_start[file], file_start[file], "using Browser from std:Browser\n\n", "import std:Browser")
+        }
         desugar_wutu_items(file_root[file])
     }
+}
+
+/// The first `wn` or `html` item under `parent` (into mods and lib), or -1.
+fn wutu_sugar_in(parent: I32) I32 {
+    let item = first_child(parent)
+    while (item >= 0) {
+        if is_kind(last_child(item), Node.Wutu_body) { return if is_kind(item, Node.Fn_decl) { first_child(item) } else { item } }
+        if is_kind(item, Node.Module_decl) or is_kind(item, Node.Export_lib_decl) {
+            let inner = wutu_sugar_in(item)
+            if inner >= 0 { return inner }
+        }
+        item = next_sibling(item)
+    }
+    -1
+}
+
+/// Whether a file's items include `using Browser …`.
+fn imports_browser(root: I32) Bool {
+    let browser = intern_text("Browser")
+    let item = first_child(root)
+    while (item >= 0) {
+        if is_kind(item, Node.Using_decl) and word_of(first_child(item)) == browser { return true }
+        item = next_sibling(item)
+    }
+    false
 }
 
 fn desugar_wutu_items(parent: I32) Void {

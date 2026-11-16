@@ -2189,9 +2189,9 @@ lib { fn run() I32 { f(Many.V1); } }
   }
   // A std module not imported: the note names the module, and its file.
   for (const [source, note] of [
-    ['lib { fn run() F64 { Time.now(); } }\n', 'using time from std:Time; (the module is time)'],
-    ['using Time from std:Time;\nlib { fn run() F64 { time.now(); } }\n', 'using time from std:Time; (the module is time)'],
-    ['main { console.log("hi"); }\n', 'using console from std:Console;'],
+    ['lib { fn run() F64 { Time.now(); } }\n', 'using time from std:Time (the module is time)'],
+    ['using Time from std:Time;\nlib { fn run() F64 { time.now(); } }\n', 'using time from std:Time (the module is time)'],
+    ['main { console.log("hi"); }\n', 'using console from std:Console'],
   ]) {
     const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
     assert.ok(diagnostics[0]?.notes?.includes(note), `${source}\n  notes: ${diagnostics[0]?.notes}`);
