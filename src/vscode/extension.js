@@ -115,7 +115,7 @@ export async function activate(context) {
     catch { throw new Error('Open the utu repository as the VS Code workspace to preview Wutu websites.'); }
     const terminal = vscode.window.createTerminal({ name: 'Wutu Website', cwd: folder.uri.fsPath });
     const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
-    terminal.sendText(`node ${quote(cli.fsPath)} dev ${quote(document.uri.fsPath)} --out ${quote(vscode.Uri.joinPath(folder.uri, 'dist', 'wutu-preview').fsPath)} --port 0`);
+    terminal.sendText(`node ${quote(cli.fsPath)} serve ${quote(document.uri.fsPath)} --out ${quote(vscode.Uri.joinPath(folder.uri, 'dist', 'wutu-preview').fsPath)} --port 0`);
     terminal.show();
     output.appendLine(`[wutu] Previewing ${displayName(document)}; open the localhost link in the Wutu Website terminal.`);
     return terminal;

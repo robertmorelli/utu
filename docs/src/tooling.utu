@@ -28,7 +28,7 @@ mod tooling {
     fn wutu_sample() Str {
         \\wutu format <files...> [--check]
         \\wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
-        \\wutu dev <entry.utu> [--out dist/wutu] [--port 4176]
+        \\wutu serve <entry.utu> [--port 4176] [--out dist/wutu]
     }
     fn neovim_sample() Str {
         \\vim.lsp.config('utu', { cmd = { 'node', '/path/to/utu/cli/utu.mjs', 'lsp' }, filetypes = { 'utu' } })

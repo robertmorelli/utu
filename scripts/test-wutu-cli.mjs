@@ -67,9 +67,12 @@ try {
     [['build', messy, '--bogus'], /unknown option --bogus/],
     [['build', messy, '--out', 'a', '--out', 'b'], /two outputs: a, b/],
     [['build', path.join(dir, 'none.utu')], /no file .*none\.utu/],
-    [['dev', messy, '--port', 'abc'], /--port needs a port/],
-    [['dev', messy, '--port', '99999'], /--port needs a port/],
-    [['dev', path.join(dir, 'none.utu')], /no file/],
+    [['serve', messy, '--port', 'abc'], /--port needs a port/],
+    [['serve', messy, '--port', '99999'], /--port needs a port/],
+    [['serve', path.join(dir, 'none.utu')], /no file/],
+    [['dev', messy], /wutu dev is wutu serve now/],
+    [['serve', messy, '--', 'port', '4176'], /did you mean --port\?/],
+    [['build', messy, '--no-prerender=1'], /--no-prerender takes no value/],
   ]) {
     const r = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', timeout: 30000 });
     assert.equal(r.status, 2, `${args.join(' ')}: ${r.stderr}`);
@@ -103,7 +106,7 @@ try {
 
   // dev
   const previewOut = path.join(dir, 'preview');
-  child = spawn(process.execPath, [cli, 'dev', entry, '--out', previewOut, '--port', '0'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+  child = spawn(process.execPath, [cli, 'serve', entry, '--out', previewOut, '--port', '0'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
   child.stdout.on('data', chunk => { log += chunk; });
   child.stderr.on('data', chunk => { log += chunk; });
@@ -132,7 +135,7 @@ try {
 
   // A port in use ends a second server, with the reason.
   const port = new URL(origin).port;
-  const second = spawnSync(process.execPath, [cli, 'dev', entry, '--out', path.join(dir, 'preview2'), '--port', port], { cwd: dir, encoding: 'utf8', timeout: 60000 });
+  const second = spawnSync(process.execPath, [cli, 'serve', entry, '--out', path.join(dir, 'preview2'), '--port', port], { cwd: dir, encoding: 'utf8', timeout: 60000 });
   assert.equal(second.status, 1, second.stderr);
   assert.match(second.stderr, /cannot serve on 127\.0\.0\.1:\d+: the port is in use/);
 
@@ -140,7 +143,7 @@ try {
   await new Promise(resolve => (child.exitCode !== null ? resolve() : child.once('exit', resolve)));
   const leftovers = await fs.readdir(previewOut).catch(() => []);
   assert.deepEqual(leftovers.filter(name => name.startsWith('.preview-')), [], 'preview builds are removed on exit');
-  console.log('wutu CLI: format, build diagnostics, dev serving, live-reload events, traversal guard, and cleanup passed');
+  console.log('wutu CLI: format, build diagnostics, serving, live-reload events, traversal guard, and cleanup passed');
 } finally {
   if (child && child.exitCode === null) child.kill('SIGKILL');
   await fs.rm(dir, { recursive: true, force: true });

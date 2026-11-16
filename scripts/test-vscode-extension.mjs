@@ -106,7 +106,7 @@ try {
   if (!(starterBinary instanceof Uint8Array)) throw new Error('Wutu starter did not compile');
   await commands.get('utu.previewWutuWebsite')(starter);
   const preview = globalThis.__utuVscodeStub.terminals.at(-1);
-  if (!preview?.sent?.includes('cli/wutu.mjs') || !preview.sent.includes('dev')) throw new Error('Wutu preview did not launch the dev CLI');
+  if (!preview?.sent?.includes('cli/wutu.mjs') || !preview.sent.includes('serve')) throw new Error('Wutu preview did not launch wutu serve');
 
   (nodeBundle.deactivate ?? nodeBundle.default?.deactivate)?.();
   for (const disposable of context.subscriptions.reverse()) disposable?.dispose?.();

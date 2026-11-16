@@ -511,10 +511,10 @@ See the [complete reactive example](../examples/wutu-reactive/main.utu) and
 ## Formatting, editor support, and preview
 
 ```sh
-node cli/wutu.mjs format examples/wutu-five/folio/main.utu
-node cli/wutu.mjs format examples/wutu-five/folio/main.utu --check
-node cli/wutu.mjs dev examples/wutu-five/folio/main.utu --port 4176
-node cli/wutu.mjs build examples/wutu-five/folio/main.utu --out dist/folio
+wutu format examples/wutu-five/folio/main.utu
+wutu format examples/wutu-five/folio/main.utu --check
+wutu serve examples/wutu-five/folio/main.utu --port 4176
+wutu build examples/wutu-five/folio/main.utu --out dist/folio
 ```
 
 The formatter lays out surrounding Utu and parsed Wutu islands together, while

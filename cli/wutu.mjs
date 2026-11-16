@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// wutu — format, build, and preview Wutu browser apps.
+// wutu — build, serve, and format Wutu sites.
 import fs from 'node:fs/promises';
 import { watch } from 'node:fs';
 import path from 'node:path';
@@ -11,9 +11,17 @@ import { prerender } from '../tools/dts/prerender.mjs';
 import { loadNodeCompiler } from '../src/selfhost/node.js';
 import { MODES } from '../src/selfhost/compiler.js';
 
-const USAGE = `wutu format <files...> [--check]
-wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender] [-O small|fast|smallUnsafe|fastUnsafe|debug]
-wutu dev <entry.utu> [--out dist/wutu] [--title Title] [--port 4176] [-O mode]
+const USAGE = `usage: wutu <command> [entry.utu] [options]
+
+  build [entry.utu]            a static site: index.html, app.js, app.wasm (pre-rendered)
+    [--out dist/wutu] [--title Title] [--no-prerender] [-O mode]
+  serve [entry.utu]            build it, serve it, rebuild and reload as you edit
+    [--port 4176] [--out dist/wutu] [--title Title] [-O mode]
+  format <files…> [--check]    lay out Wutu templates
+
+  entry.utu defaults to main.utu; --title to the entry's folder name
+  -O small (the default), fast, smallUnsafe, fastUnsafe, debug; --port 0 picks a free port
+  options take a value as --port 4176 or --port=4176
 
 exit status: 0 done; 1 the program is wrong or the build failed; 2 wutu was run wrong`;
 
@@ -38,20 +46,30 @@ class Usage extends Error {}
 const OPTIONS = {
   format: { '--check': true },
   build: { '--out': 'outputs', '--title': 'titles', '-O': 'build modes', '--no-prerender': true },
-  dev: { '--out': 'outputs', '--title': 'titles', '-O': 'build modes', '--port': 'ports' },
+  serve: { '--out': 'outputs', '--title': 'titles', '-O': 'build modes', '--port': 'ports' },
 };
 
 function parseArgs(command, args) {
   const known = OPTIONS[command];
   const positional = [], options = {};
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    let arg = args[i];
     if (arg.startsWith('-') && arg !== '-') {
+      // `--port=4176` as well as `--port 4176`.
+      const eq = arg.startsWith('--') ? arg.indexOf('=') : -1;
+      const inline = eq > 0 ? arg.slice(eq + 1) : undefined;
+      if (eq > 0) arg = arg.slice(0, eq);
+      if (arg === '--') throw new Usage(`-- takes no options here${args[i + 1] ? `: did you mean --${args[i + 1]}?` : ''}`);
       if (!Object.hasOwn(known, arg)) throw new Usage(`unknown option ${arg} for wutu ${command}`);
-      if (known[arg] === true) { options[arg] = true; continue; }
-      if (i + 1 >= args.length) throw new Usage(`${arg} needs a value`);
-      if (options[arg] !== undefined) throw new Usage(`two ${known[arg]}: ${options[arg]}, ${args[i + 1]}`);
-      options[arg] = args[++i];
+      if (known[arg] === true) {
+        if (inline !== undefined) throw new Usage(`${arg} takes no value`);
+        options[arg] = true;
+        continue;
+      }
+      if (inline === undefined && i + 1 >= args.length) throw new Usage(`${arg} needs a value`);
+      const value = inline ?? args[++i];
+      if (options[arg] !== undefined) throw new Usage(`two ${known[arg]}: ${options[arg]}, ${value}`);
+      options[arg] = value;
     } else {
       positional.push(arg);
     }
@@ -149,7 +167,7 @@ async function moveInto(from, to) {
  * successful build, so the browser never sees a half-written app. Connected
  * pages reload through server-sent events and show build errors in place.
  */
-async function devCommand(app, { port }) {
+async function serveCommand(app, { port }) {
   const clients = new Set();
   let active = null, lastError = '', revision = 0, busy = false, again = false, timer;
 
@@ -247,6 +265,7 @@ async function devCommand(app, { port }) {
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   if (!command || command === '--help' || command === '-h') return console.log(USAGE);
+  if (command === 'dev') throw new Usage('wutu dev is wutu serve now');
   if (!Object.hasOwn(OPTIONS, command)) throw new Usage(`unknown command ${command}`);
   const { positional, options } = parseArgs(command, rest);
   if (command === 'format') return formatCommand(positional, { check: options['--check'] === true });
@@ -259,7 +278,7 @@ async function main() {
   if (!Object.hasOwn(MODES, mode)) throw new Usage(`unknown build mode -O ${mode}: small, fast, smallUnsafe, fastUnsafe, debug`);
   const port = options['--port'] ?? '4176';
   // 0: any free port.
-  if (command === 'dev' && !(/^\d+$/.test(port) && Number(port) <= 65535)) throw new Usage(`--port needs a port, 0 to 65535, got ${port}`);
+  if (command === 'serve' && !(/^\d+$/.test(port) && Number(port) <= 65535)) throw new Usage(`--port needs a port, 0 to 65535, got ${port}`);
   const app = {
     entry,
     out: path.resolve(options['--out'] ?? 'dist/wutu'),
@@ -267,7 +286,7 @@ async function main() {
     // Like `utu build`: small (checked) unless asked.
     mode,
   };
-  if (command === 'dev') return devCommand(app, { port: Number(port) });
+  if (command === 'serve') return serveCommand(app, { port: Number(port) });
   await buildCommand(app, { prerender: !options['--no-prerender'] });
 }
 

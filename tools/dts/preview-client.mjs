@@ -1,4 +1,4 @@
-// Build-time helper: this client is injected only by `wutu dev`.
+// Build-time helper: this client is injected only by `wutu serve`.
 export function previewClient() {
   const key='__wutu_preview:'+location.pathname;
   const controls=()=>[...document.querySelectorAll('input,textarea,select')].filter(n=>!['password','file'].includes(n.type));

@@ -1,5 +1,5 @@
 // The utu documentation site, written in utu and Wutu.
-// Build it with `node scripts/build-docs.mjs`; preview with `node cli/wutu.mjs dev docs/src/main.utu`.
+// Build it with `node scripts/build-docs.mjs`; preview with `wutu serve docs/src/main.utu`.
 using Browser from std:Browser
 using ui from "./ui.utu"
 using home from "./home.utu"
