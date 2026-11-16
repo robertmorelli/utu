@@ -267,6 +267,7 @@ enum(U8) Diag:
     | ImportCycle     // the `using` that closes an import cycle
     | ExportFun       // an `export lib` parameter typed `fun` (JS gives a `cl`; a: its type, b: its number)
     | TemplateValue   // a `$T` function named as a value, with no `fun(…)` to bind its types
+    | PromotedFn      // `fn &(…)` (a: 0 outside a mod, 1 in a mod with a type &) or `M[A](…)` (a: 2, M has no fn &)
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from
@@ -740,12 +741,18 @@ fn names_promoted(item: I32) Bool {
     is_kind(name_at, Node.Promoted_type)
 }
 
-/// A free function's name, or -1 for a method or operator.
+/// A free function's name, or -1 for a method or operator. A mod's
+/// promoted function (`fn &(…)`) is named `&`, a word no identifier is.
 fn free_fn_word(item: I32) I32 {
     if not is_kind(item, Node.Fn_decl) { return -1 }
     let name = first_child(first_child(item))
-    if is_kind(name, Node.Identifier) and next_sibling(name) < 0 { word_of(name) } else { -1 }
+    if next_sibling(name) >= 0 { return -1 }
+    if is_kind(name, Node.Identifier) { word_of(name) } else if is_kind(name, Node.Promoted_type) { known_word(Known.PromotedFn) } else { -1 }
 }
+
+/// Whether an item is `fn &(…)`, its mod's promoted function.
+fn is_promoted_fn(item: I32) Bool => is_kind(item, Node.Fn_decl) and is_kind(first_child(first_child(item)), Node.Promoted_type)
+    and next_sibling(first_child(first_child(item))) < 0
 
 /// A function: named when free; a method or operator is found as its type's member.
 fn declare_fn(item: I32, owner: I32) I32 {
@@ -775,6 +782,7 @@ fn declare_module(item: I32) I32 {
         }
         c = next_sibling(c)
     }
+    let promoted_fn = -1
     while (c >= 0) {
         let kind = node_kind[c]
         let t = declare_type_item(c, decl)
@@ -789,11 +797,14 @@ fn declare_module(item: I32) I32 {
             }
         } else if kind == Node.Fn_decl.i32() or kind == Node.Op_decl.i32() {
             member_once(decl, declare_fn(c, decl))
+            if is_promoted_fn(c) and promoted_fn < 0 { promoted_fn = c }
         } else if kind == Node.Global_decl.i32() {
             member_once(decl, declare_named(Decl.Global, first_child(c), c, decl))
         }
         c = next_sibling(c)
     }
+    // `&` is the mod's type or its function, not both.
+    if promoted_fn >= 0 and decl_a[decl] >= 0 { report2(Diag.PromotedFn, first_child(first_child(promoted_fn)), -1, 1, -1) }
     decl
 }
 
@@ -850,7 +861,7 @@ fn bind_module_members(module: I32) Void {
     let d = module + 1
     while (d < decl_kind.len() and is_part_of(d, module)) {
         if decl_owner[d] == module and decl_kind[d] != Decl.ModuleParam.i32() and decl_name[d] >= 0 and d != decl_a[module] {
-            if decl_kind[d] != Decl.Fn.i32() or free_fn_word(decl_node[d]) >= 0 { bind(decl_name[d], d) }
+            if decl_kind[d] != Decl.Fn.i32() or (free_fn_word(decl_node[d]) >= 0 and not is_promoted_fn(decl_node[d])) { bind(decl_name[d], d) }
         } else if decl_is(d, Decl.Variant) and decl_is(decl_owner[d], Decl.Enum) {
             bind_variant(d, since)
         }
@@ -1380,6 +1391,7 @@ fn declare_entry_item(item: I32, first_entry: I32) Void {
     let kind = node_kind[item]
     let decl = declare_type_item(item, -1)
     if decl < 0 {
+        if is_promoted_fn(item) { report2(Diag.PromotedFn, first_child(first_child(item)), -1, 0, -1) }
         if kind == Node.Fn_decl.i32() or kind == Node.Op_decl.i32() {
             decl = declare_fn(item, -1)
         } else if kind == Node.Global_decl.i32() {
@@ -2231,11 +2243,12 @@ fn walk_compound(node: I32, kind: I32, w: Walk) Void {
         Node.Promoted_module_call_expr => {
             let name_at = first_child(node)
             let module = walk_module_name(name_at)
-            let args = next_sibling(name_at)
-            walk_types(args, w)
-            let name = next_sibling(args)
-            node_decl[name] = static_member(module, word_of(name))
-            walk_expr(next_sibling(name), w)
+            walk_types(next_sibling(name_at), w)
+            // `M[A](…)`: M's `fn &`, recorded on the call.
+            let name = module_call_name(node)
+            if name >= 0 { node_decl[name] = static_member(module, word_of(name)) }
+            else { node_decl[node] = if decl_is(module, Decl.Module) { member(module, known_word(Known.PromotedFn), Space.Member) } else { -1 } }
+            walk_expr(module_call_args(node), w)
         },
         Node.Null_expr => { as_type(first_child(node), walk_type_name(first_child(node), w)) },
         Node.Struct_init => {

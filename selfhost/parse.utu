@@ -936,6 +936,9 @@ fn fn_name(p: Parser) I32 {
     let first = p.pos
     if shaped(p) {
         identifier(p)
+    } else if is(p, Tok.Amp) and is_at(p, 1, Tok.LParen) {
+        // `fn &(…)`: the module's promoted function, called as `M[A](…)`.
+        promoted_type(p)
     } else {
         type_ident_or_promoted(p)
         if is(p, Tok.LBracket) { module_type_arg_list(p) }
@@ -1847,9 +1850,9 @@ fn word_expression(p: Parser) I32 {
         // `m[i]` indexes; `m[A]…` names an instantiated module only when the
         // brackets do not hold an index.
         if index_ahead(p) { return identifier(p) }
-        if not module_args_ahead(p) { return identifier(p) }
+        if not module_args_ahead(p) and not module_call_ahead(p) { return identifier(p) }
     }
-    // A type name begins `T.null`, `T.member`, `T { … }`, `M[A].f(…)`, or `M[A].T.member`.
+    // A type name begins `T.null`, `T.member`, `T { … }`, `M[A].f(…)`, `M[A](…)`, or `M[A].T.member`.
     if module_call_ahead(p) { return module_call(p) }
     let s = save(p)
     let type_name = not shaped(p)
@@ -1974,14 +1977,14 @@ fn module_args_ahead(p: Parser) Bool {
     found
 }
 
-/// Whether the cursor starts `name[types].identifier(`.
+/// Whether the cursor starts `name[types].identifier(` or `name[types](`.
 fn module_call_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false }
     let s = save(p)
     let found = try {
         module_name(p)
         module_type_arg_list(p)
-        is(p, Tok.Dot) and shaped_at(p, 1) and is_at(p, 2, Tok.LParen)
+        is(p, Tok.LParen) or (is(p, Tok.Dot) and shaped_at(p, 1) and is_at(p, 2, Tok.LParen))
     } catch {
         false
     }
@@ -1989,13 +1992,34 @@ fn module_call_ahead(p: Parser) Bool {
     found
 }
 
+/// `M[A].f(…)`'s `f`, or -1 in `M[A](…)` (a call of M's `fn &`).
+fn module_call_name(call: I32) I32 {
+    let n = next_sibling(next_sibling(first_child(call)))
+    if is_kind(n, Node.Identifier) { n } else { -1 }
+}
+
+/// `M[A].f(…)`'s or `M[A](…)`'s arguments, or -1 for none.
+fn module_call_args(call: I32) I32 {
+    let n = module_call_name(call)
+    if n >= 0 { next_sibling(n) } else { next_sibling(next_sibling(first_child(call))) }
+}
+
+/// What `M[A].f(…)` or `M[A](…)` calls (resolved), or -1.
+fn module_call_decl(call: I32) I32 {
+    let n = module_call_name(call)
+    node_decl[if n >= 0 { n } else { call }]
+}
+
 fn module_call(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     module_name(p)
     module_type_arg_list(p)
-    expect(p, Tok.Dot)
-    identifier(p)
+    // `M[A](…)` calls M's promoted function (`fn &(…)`).
+    if not is(p, Tok.LParen) {
+        expect(p, Tok.Dot)
+        identifier(p)
+    }
     expect(p, Tok.LParen)
     arg_list_or_none(p)
     expect(p, Tok.RParen)

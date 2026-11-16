@@ -10369,6 +10369,40 @@ FAIL after tests: boom
  8 │ using console from std:Console
 --- exit 1
 
+=== utu check examples/error_demo/types/1362_promoted_fn_outside_mod.utu
+ ERROR  fn & outside a mod: & is a mod's
+        promoted-fn · examples/error_demo/types/1362_promoted_fn_outside_mod.utu:3:4
+
+ 1 │ // What: fn &(…) outside a mod, where & names nothing.
+ 2 │ // Expect: fn & outside a mod: & is a mod's
+ 3 │ fn &(x: I32) I32 => x
+   │    ━
+   │    ╰─ &
+--- exit 1
+
+=== utu check examples/error_demo/types/1363_promoted_fn_and_type.utu
+ ERROR  A mod's & is a type or a function, not both
+        promoted-fn · examples/error_demo/types/1363_promoted_fn_and_type.utu:6:8
+
+ 4 │     struct &:
+ 5 │         | v: T
+ 6 │     fn &(x: T) T => x
+   │        ━
+   │        ╰─ &
+ 7 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1364_mod_call_without_promoted_fn.utu
+ ERROR  m has no fn &(…) to call
+        promoted-fn · examples/error_demo/types/1364_mod_call_without_promoted_fn.utu:6:15
+
+ 4 │     fn show(x: T) T => x
+ 5 │ }
+ 6 │ fn f() I32 => m[I32](1)
+   │               ━
+   │               ╰─ not callable
+--- exit 1
+
 === utu check examples/error_demo/types/13_if_else_branches.utu
  ERROR  Branches differ: I32 and Str
         type-mismatch · examples/error_demo/types/13_if_else_branches.utu:5:41

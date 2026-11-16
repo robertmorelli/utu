@@ -1,0 +1,6 @@
+// What: M[A](…) of a mod with no fn &.
+// Expect: m has no fn &(…) to call
+mod m[T] {
+    fn show(x: T) T => x
+}
+fn f() I32 => m[I32](1)

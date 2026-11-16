@@ -1,0 +1,25 @@
+using console from std:Console
+
+// `fn &(…)`: a mod's promoted function, called as the mod itself: `M[A](…)`.
+mod twice[T] {
+    fn &(x: T) Str => `${x} ${x}`
+}
+
+mod pick[A, B] {
+    fn &(first: Bool, a: A, b: B) Str => if first { a.str() } else { b.str() }
+    fn other(a: A) A => a
+}
+
+test "a promoted function is called through its mod" {
+    assert twice[I64](7) == "7 7"
+    assert twice[Str]("hi") == "hi hi"
+}
+
+test "a promoted function sits beside named ones" {
+    assert pick[I32, Str](false, 1, "b") == "b"
+    assert pick[I32, Str].other(3) == 3
+}
+
+main {
+    console.log(twice[F64](2.5))
+}

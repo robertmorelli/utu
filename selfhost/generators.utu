@@ -139,7 +139,7 @@ fn sole_call(for_node: I32) I32 {
 
 /// A call's argument list (-1 for none): `f(…)`'s, or `M[A].f(…)`'s.
 fn call_args(call: I32) I32 {
-    if is_kind(call, Node.Promoted_module_call_expr) { return next_sibling(next_sibling(next_sibling(first_child(call)))) }
+    if is_kind(call, Node.Promoted_module_call_expr) { return module_call_args(call) }
     next_sibling(first_child(call))
 }
 
@@ -148,7 +148,7 @@ fn call_args(call: I32) I32 {
 fn generator_decl_of(call: I32) I32 {
     let callee = first_child(call)
     let d = -1
-    if is_kind(call, Node.Promoted_module_call_expr) { d = node_decl[next_sibling(next_sibling(callee))] }
+    if is_kind(call, Node.Promoted_module_call_expr) { d = module_call_decl(call) }
     else if is_kind(callee, Node.Identifier) { d = node_decl[callee] }
     else if is_kind(callee, Node.Field_expr) and is_kind(first_child(callee), Node.Identifier) {
         let base = node_decl[first_child(callee)]

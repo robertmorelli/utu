@@ -5658,6 +5658,28 @@
    }
   }
  },
+ "examples/modules/promoted_functions.utu normal": {
+  "calls": {
+   "main": {
+    "result": null,
+    "printed": [
+     "2.5 2.5"
+    ]
+   }
+  }
+ },
+ "examples/modules/promoted_functions.utu test": {
+  "calls": {
+   "__test_0": {
+    "result": null,
+    "printed": []
+   },
+   "__test_1": {
+    "result": null,
+    "printed": []
+   }
+  }
+ },
  "examples/modules/top_level.utu normal": {
   "calls": {}
  },

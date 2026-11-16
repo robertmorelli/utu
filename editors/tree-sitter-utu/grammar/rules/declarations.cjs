@@ -97,6 +97,8 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     fn_name: ($) =>
       choice(
         $.identifier,
+        // `fn &(…)`: the mod's promoted function, called as `M[A](…)`
+        $.promoted_type,
         seq(
           choice($.type_ident, $.promoted_type),
           optional($.module_type_arg_list),

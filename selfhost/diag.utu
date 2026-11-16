@@ -302,6 +302,7 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.TryNotResult or k == Diag.TryPlace or k == Diag.TryErrorMismatch { return "invalid-try" }
     if k == Diag.ImportNotModule or k == Diag.ModNoType { return "unknown-type" }
     if k == Diag.UsingTwice { return "duplicate-declaration" }
+    if k == Diag.PromotedFn { return pick(diag_a[i] == 2, "not-callable", "duplicate-declaration") }
     if k == Diag.AmbiguousMethod { return "unknown-method" }
     if k == Diag.ImplNothing or k == Diag.ProtoNoMember { return "unknown-method" }
     if k == Diag.WutuHole or k == Diag.WutuKey { return "type-mismatch" }
@@ -610,6 +611,7 @@ fn diag_text(i: I32) Str {
         Diag.ImportNotModule => w + " is " + item_kind_text(a) + "; using imports a mod",
         Diag.ModNoType => if word == decl_name[a] { w + " is a mod with no type &" } else { w + " names mod " + word_text(decl_name[a]) + ", which has no type &" },
         Diag.UsingTwice => w + node_text(a) + " is open already",
+        Diag.PromotedFn => if a == 0 { "fn & outside a mod: & is a mod's" } else if a == 1 { "A mod's & is a type or a function, not both" } else { w + " has no fn &(…) to call" },
         Diag.AmbiguousMethod => w + " is both " + decl_text(decl_a[a]) + "'s and " + decl_text(decl_a[b]) + "'s",
         Diag.ImplNothing => decl_text(a) + "'s instances implement " + decl_text(b) + " together: fn " + decl_text(b) + "[&]." + w + " in " + decl_text(a),
         Diag.WutuHole => pick(ty_is(a, Ty.Void), "A hole needs a value: this gives none", "A hole shows text, a number, a Bool or a node, not " + type_text(a)),
@@ -862,6 +864,7 @@ fn diag_default_label(i: I32) Str {
         Diag.HostMissing => "not found",
         Diag.ImportNotModule => "not a mod",
         Diag.ModNoType => "a mod, not a type",
+        Diag.PromotedFn => if a == 2 { "not callable" } else { "&" },
         Diag.WutuHole => type_text(a),
         Diag.WutuKey => type_text(a),
         Diag.GenericGlobal => "differs per instance",

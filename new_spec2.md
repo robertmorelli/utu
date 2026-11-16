@@ -449,7 +449,17 @@ mod I32 {
 }
 ```
 
+```
+// module promoting a function — `&` is the mod's function, called as the mod itself
+mod twice[T] {
+    fn &(x: T) Str => `${x} ${x}`
+}
+
+twice[I64](7)     // "7 7"
+```
+
 Rules:
+- A mod's `&` is a type (`struct &`, `type & = …`, …) or a function (`fn &(…)`), not both; `fn &(…)` outside a mod is an error, and so is `M[A](…)` of a mod with no `fn &`.
 - A `mod` body may contain `type` declarations, structs, protocols, enums, functions, globals, tests, and benches.
 - A `mod` body may **not** contain another `mod`, or a `mem` (a mem is one memory of the program, declared at a file's top level).
 

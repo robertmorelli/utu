@@ -121,7 +121,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     promoted_module_call_expr: ($) =>
       prec.left(15, seq(
-        $.module_name, $.module_type_arg_list, '.', $.identifier, '(', optional($.arg_list), ')',
+        $.module_name, $.module_type_arg_list, optional(seq('.', $.identifier)), '(', optional($.arg_list), ')',
       )),
 
     field_expr: ($) => prec.left(14, seq($._expr, '.', choice($.identifier, $.type_ident))),

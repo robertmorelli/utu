@@ -1,0 +1,7 @@
+// What: a mod promoting both a type and a function.
+// Expect: A mod's & is a type or a function, not both
+mod m[T] {
+    struct &:
+        | v: T
+    fn &(x: T) T => x
+}
