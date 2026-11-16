@@ -27,8 +27,18 @@ mod playground {
         \\    | todos: Array[Todo]
         \\    | made: I32
         \\
-        \\fn Todo.left(todos: Array[Todo]) I32 {
-        \\    todos count_where |t| { not t.done }
+        \\fn State.left |s| () I32 {
+        \\    s.todos
+        \\        count_where |t| { not t.done }
+        \\}
+        \\
+        \\fn State.add |s| () Void {
+        \\    if s.draft == "" { return }
+        \\    s.made += 1
+        \\    let todo = Todo { id: s.made.str(), text: s.draft, done: false }
+        \\    s.todos = s.todos chain([todo])
+        \\        collect(Todo)
+        \\    s.draft = ""
         \\}
         \\
         \\main {
@@ -59,16 +69,7 @@ mod playground {
         \\                "Add";
         \\            }
         \\            on submit {
-        \\                if state.draft != "" {
-        \\                    state.made += 1;
-        \\                    let todo = Todo {
-        \\                        id: state.made.str(),
-        \\                        text: state.draft,
-        \\                        done: false
-        \\                    };
-        \\                    state.todos = state.todos chain([todo]) collect(Todo);
-        \\                    state.draft = "";
-        \\                };
+        \\                state.add();
         \\            }
         \\        }
         \\        ul {
@@ -90,7 +91,7 @@ mod playground {
         \\        }
         \\        p {
         \\            color: rgb(101 108 126);
-        \\            = `${Todo.left(state.todos)} left`;
+        \\            = `${state.left()} left`;
         \\        }
         \\    }
         \\    \/)
@@ -100,7 +101,7 @@ mod playground {
     /// browser's storage.
     fn saved() Saved {
         @stored/\
-        Saved "utu-playground-v2" Saved { source: sample() }
+        Saved "utu-playground-v3" Saved { source: sample() }
         \/
     }
     fn start() State {
