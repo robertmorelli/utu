@@ -320,6 +320,13 @@ async function check(file, { utu }) {
 }
 
 async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, out }) {
+  // An `html { … }` page runs in a browser: served (and rebuilt as it changes) as `wutu serve` does.
+  if (/^html[ \t]*\{/m.test(readFileSync(file, 'utf8'))) {
+    const { spawnSync } = await import('node:child_process');
+    const o = process.argv.indexOf('-O');
+    const served = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'wutu.mjs'), 'serve', file, ...(o > 0 ? ['-O', process.argv[o + 1]] : [])], { stdio: 'inherit' });
+    process.exit(served.status ?? 1);
+  }
   // Profiled, on the stack a plain run has, so --profile changes no output but at
   // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
   // Named functions and a source map, so a trap says which and where.

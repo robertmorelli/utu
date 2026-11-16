@@ -592,18 +592,19 @@ fn wutu_brace_end(i: I32, n: I32) I32 {
     -1
 }
 
-/// Whether the word at i begins its line (only blanks before it).
-fn starts_line(i: I32) Bool {
+/// Whether the word at i begins its line (only blanks before it, back to a
+/// line break or the file's start, `first`).
+fn starts_line(i: I32, first: I32) Bool {
     let k = i
-    while (k > 0 and (src[k - 1] == 32 or src[k - 1] == 9)) { k -= 1 }
-    k == 0 or src[k - 1] == 10
+    while (k > first and (src[k - 1] == 32 or src[k - 1] == 9)) { k -= 1 }
+    k == first or src[k - 1] == 10
 }
 
 /// Where the `{` of a Wutu body opens after the sugar word ending at j, or
 /// -1: `html {`, or `wn name … (…) {` on its line (the `{` right after the
 /// header's `)`). A `wn` or `html` anywhere else is a name.
-fn wutu_open(i: I32, j: I32, n: I32, html: Bool) I32 {
-    if not starts_line(i) { return -1 }
+fn wutu_open(i: I32, j: I32, n: I32, html: Bool, first: I32) I32 {
+    if not starts_line(i, first) { return -1 }
     let k = j
     while (k < n and (src[k] == 32 or src[k] == 9)) { k += 1 }
     if html { return if k < n and src[k] == 123 { k } else { -1 } }
@@ -719,8 +720,8 @@ fn lex_to(first: I32, n: I32) I32 {
         },
         1 => {  // accept_code
             let kind = kind_of[state]
-            if kind == Tok.Word.i32() and j - i == 2 and src[i] == 119 and src[i + 1] == 110 { wutu_at = wutu_open(i, j, n, false) }
-            if kind == Tok.Word.i32() and j - i == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 { wutu_at = wutu_open(i, j, n, true) }
+            if kind == Tok.Word.i32() and j - i == 2 and src[i] == 119 and src[i + 1] == 110 { wutu_at = wutu_open(i, j, n, false, first) }
+            if kind == Tok.Word.i32() and j - i == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 { wutu_at = wutu_open(i, j, n, true, first) }
             if kind == Tok.LBrace.i32() and i == wutu_at {
                 let end_ = wutu_brace_end(i, n)
                 if end_ < 0 { return tokens_end(put_token(t, Tok.Error.i32(), i, i)) }
