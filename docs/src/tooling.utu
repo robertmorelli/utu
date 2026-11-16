@@ -31,9 +31,8 @@ mod tooling {
         \\wutu serve <entry.utu> [--port 4176] [--out dist/wutu]
     }
     fn neovim_sample() Str {
-        \\vim.lsp.config('utu', { cmd = { 'node', '/path/to/utu/cli/utu.mjs', 'lsp' }, filetypes = { 'utu' } })
-        \\vim.lsp.enable('utu')
-        \\vim.filetype.add({ extension = { utu = 'utu' } })
+        \\node editors/neovim/install.mjs     # Neovim: language server, grammars, highlighting, folds
+        \\node editors/helix/install.mjs      # Helix: the same, through languages.toml
     }
     fn helix_sample() Str {
         \\[language-server.utu]
@@ -266,7 +265,17 @@ mod tooling {
                 }
                 " speaks LSP on stdin and stdout for any editor. Every answer is read from a fresh build of the program whose entry is the file asked about; a build takes a few milliseconds, so nothing is incremental. It answers diagnostics, hover, go to definition, references and highlights, rename across files, outline, semantic tokens, and completion.";
             }
+            p {
+                "Neovim (0.11 or later) and Helix each have an installer that sets up the language server with the tree-sitter grammars: highlighting, Wutu inside ";
+                code {
+                    "@wutu/\\ … \\/";
+                }
+                ", indentation, and text objects.";
+            }
             = code.shell(neovim_sample());
+            p {
+                "Another editor takes the command alone:";
+            }
             = code.shell(helix_sample());
             p {
                 "Zed, Sublime, Emacs, and Kakoune take the same command.";
