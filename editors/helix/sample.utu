@@ -63,62 +63,62 @@ main {
     let help = \\Type a task and press Enter.
                \\Tick it when it is done.
     Browser.document.body.append(@wutu/\
-    @reactive;
-    @style sheet();
+    @reactive
+    @style sheet()
     main {
-        font-family: system-ui, sans-serif;
-        max-width: 30rem;
-        margin: 3rem auto;
+        font-family: system-ui, sans-serif
+        max-width: 30rem
+        margin: 3rem auto
         h1 {
-            color: #e4772c;          // a hex color is text
-            = config.title;
+            color: #e4772c          // a hex color is text
+            = config.title
         }
         p {
-            = help;
+            = help
         }
         form {
-            display: flex;
-            gap: 0.5rem;
+            display: flex
+            gap: 0.5rem
             input {
-                placeholder = "Add something";
-                flex: 1;
-                bind:value = state.draft;
+                placeholder = "Add something"
+                flex: 1
+                bind:value = state.draft
             }
             button {
-                "Add";
+                "Add"
             }
             on submit {
                 if state.draft != "" and state.todos.len() < config.limit {
-                    state.made += 1;
-                    let todo = Todo { id: state.made, text: state.draft, done: false };
-                    state.todos = state.todos chain([todo]) collect(Todo);
-                    state.draft = "";
-                };
+                    state.made += 1
+                    let todo = Todo { id: state.made, text: state.draft, done: false }
+                    state.todos = state.todos chain([todo]) collect(Todo)
+                    state.draft = ""
+                }
             }
         }
         ul {
             for shown(state.todos, state.filter) |todo| key todo.id {
                 li {
-                    class = if todo.done { "done"; } else { ""; };
+                    class = if todo.done { "done" } else { "" }
                     label {
                         input {
-                            type = "checkbox";
-                            bind:checked = todo.done;
+                            type = "checkbox"
+                            bind:checked = todo.done
                         }
-                        " ";
-                        = todo.text;
+                        " "
+                        = todo.text
                     }
-                    = ui.badge(`#${todo.id}`);
+                    = ui.badge(`#${todo.id}`)
                 }
             }
         }
         p {
-            = left(state.todos);
-            " left, ";
-            = `${now() - started}`;
-            " ms since start";
+            = left(state.todos)
+            " left, "
+            = `${now() - started}`
+            " ms since start"
             on click |e| {
-                Browser.console.log(e.type);
+                Browser.console.log(e.type)
             }
         }
     }
