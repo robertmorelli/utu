@@ -1,11 +1,11 @@
 {
-  "commit": "a147e0c7a6bef403aca192e1b704433bcb21b870",
-  "selfhostTree": "7cb25148c53fcf833103c0689f2a13f1cf594e96",
-  "sourcesHash": "2f50f5b0863db0da9f941e0d24fa0288e37b6a48188e255a8fb2ea82a43f8dd7",
-  "sha256": "92321e0ea83e73f2dc5b17ff6c26308d634060f30a72600bf37fc0095ebd3317",
-  "bytes": 529549,
-  "builtBy": "68a2afd3f981c37dee892ce0125d9a9cbd7f417c9a1e706528623c62680fc1f0",
+  "commit": "adc89846049f0f5070dc3abc491f9f72bdeab3a0",
+  "selfhostTree": "a44fd027f2461f18654cc08ddf0f816227eeaf89",
+  "sourcesHash": "54fce807c220c2fc2bbbf15faf164f18f68861339cdce971cd57d3e0740ab7d5",
+  "sha256": "403ea3deb7e634cb4c3fd3a4d70415055502622a5c52d11b69c6ea68d82f4193",
+  "bytes": 532338,
+  "builtBy": "92321e0ea83e73f2dc5b17ff6c26308d634060f30a72600bf37fc0095ebd3317",
   "node": "v25.8.1",
-  "date": "2026-11-16T07:04:47.518Z",
-  "reason": "wutu without ;"
+  "date": "2026-11-16T07:56:52.955Z",
+  "reason": "wn, Component, html"
 }
