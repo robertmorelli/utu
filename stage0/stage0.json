@@ -1,11 +1,11 @@
 {
-  "commit": "29455c17ddebb50f4c609be0dd4794111aa1b3cd",
-  "selfhostTree": "be65c8b7e80dfe81de8601363e7af0b7b5804dc8",
-  "sourcesHash": "b6e5713804cf515efbaed8fe3ea0daf90dd8edc00206a1536cb0d19c6b836869",
-  "sha256": "579ef24283d404a0ac04250d8682b82c93d3a4edf337dbeda8f7025fb6627397",
-  "bytes": 529586,
-  "builtBy": "80e618232fe299eb789b3e7d83f1429e649f1ad9a90cd9ed14be4b1e37515926",
+  "commit": "3effef20f5295c28b258bf9d2de97f951e4aea17",
+  "selfhostTree": "1539dc0b206abf4fd6da106186f909fdafcec49f",
+  "sourcesHash": "96893381cb3acf4c61e8243e73d51b11fca3369ffbddd3476b14b325f77db903",
+  "sha256": "51e3248a69219993ad1a25b48cb27a8da4327223bf676ad00b966e6b38fa8d1c",
+  "bytes": 530259,
+  "builtBy": "579ef24283d404a0ac04250d8682b82c93d3a4edf337dbeda8f7025fb6627397",
   "node": "v25.8.1",
-  "date": "2026-11-16T01:10:57.606Z",
-  "reason": "fn &(…): promoted mod functions"
+  "date": "2026-11-16T02:15:52.157Z",
+  "reason": "M[A] values, mod name case"
 }
