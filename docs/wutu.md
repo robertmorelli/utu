@@ -149,6 +149,9 @@ Use `wn` at top level, in a module, as a method, or as a protocol method.
 A `Component` is a struct with `render()`. List the protocol and implement
 its method, then put the struct in a hole:
 
+`C` is short for `Component`, as `S` is for `Str`: `struct Counter[C]`,
+`wn C[Counter].render`, `Array[C]`. A file may declare its own `C`.
+
 The protocol declares `render() Externref`, so using `Component` alone does not
 load `std:Browser` into every program. An implementation may return a host
 type such as `Browser.HTMLElement`; only a host result may satisfy this opaque

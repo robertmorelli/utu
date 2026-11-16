@@ -1002,14 +1002,14 @@ fn imported_modules_text(item: I32) Str {
 
 /// A declaration of a file named like a module of the prelude, reported at
 /// its name: the compiler's own `Str` or `Array` is the prelude's. (A short
-/// name, `S` for Str, is a file's to declare.)
+/// name, `S` for Str or `C` for Component, is a file's to declare.)
 fn standard_name(decl: I32, name_at: I32) Void {
     if decl_name[decl] >= 0 and prelude_lookup(decl_name[decl]) >= 0 and not short_type_name(decl_name[decl]) { report(Diag.StandardName, name_at, decl_name[decl]) }
 }
 
 fn short_type_name(word: I32) Bool {
     let t = word_text(word)
-    t == "S" or t == "B" or t == "U" or t == "I" or t == "F"
+    t == "S" or t == "B" or t == "U" or t == "I" or t == "F" or t == "C"
 }
 
 /// The node naming a top-level item, or -1.
@@ -1070,8 +1070,8 @@ fn declare_program() Void {
         }
     }
     // Short names of common types, as the prelude's (a file's own S comes
-    // first). A name no file has written is not bound.
-    for (["S", "B", "U", "I", "F"], ["Str", "Bool", "U64", "I64", "F64"]) |short, long| {
+    // first; C is Component). A name no file has written is not bound.
+    for (["S", "B", "U", "I", "F", "C"], ["Str", "Bool", "U64", "I64", "F64", "Component"]) |short, long| {
         let s = intern_text(short)
         let l = intern_text(long)
         if s < word_top.len() and l < word_top.len() and lookup(l) >= 0 { bind(s, lookup(l)) }
