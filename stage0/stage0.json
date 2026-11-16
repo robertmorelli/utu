@@ -1,11 +1,11 @@
 {
-  "commit": "69eede87af55b0eb99ac7a46e73b4e129a7b7a12",
-  "selfhostTree": "fabcd6940fdfe95cd0de9cbdb7286a0542e182a6",
-  "sourcesHash": "086affc72aa988eedf72439eca77f3034c8ec4c59236ddde09e6d875071c9877",
-  "sha256": "68a2afd3f981c37dee892ce0125d9a9cbd7f417c9a1e706528623c62680fc1f0",
-  "bytes": 527822,
-  "builtBy": "51e3248a69219993ad1a25b48cb27a8da4327223bf676ad00b966e6b38fa8d1c",
+  "commit": "a147e0c7a6bef403aca192e1b704433bcb21b870",
+  "selfhostTree": "7cb25148c53fcf833103c0689f2a13f1cf594e96",
+  "sourcesHash": "2f50f5b0863db0da9f941e0d24fa0288e37b6a48188e255a8fb2ea82a43f8dd7",
+  "sha256": "92321e0ea83e73f2dc5b17ff6c26308d634060f30a72600bf37fc0095ebd3317",
+  "bytes": 529549,
+  "builtBy": "68a2afd3f981c37dee892ce0125d9a9cbd7f417c9a1e706528623c62680fc1f0",
   "node": "v25.8.1",
-  "date": "2026-11-16T06:05:11.864Z",
-  "reason": "remove -o"
+  "date": "2026-11-16T07:04:47.518Z",
+  "reason": "wutu without ;"
 }
