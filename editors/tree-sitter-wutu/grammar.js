@@ -73,7 +73,8 @@ module.exports = grammar({
     css_number: _ => /-?(\d+\.?\d*|\.\d+)([a-zA-Z%]+)?/,
     css_color: _ => /#[0-9a-fA-F]{3,8}/,
     css_url: _ => token(seq('url(', /[^)]*/, ')')),
-    css_function: $ => seq(alias(token(prec(1, /[a-zA-Z-]+\(/)), $.css_function_name), optional($.css_value), ')'),
+    // `rgb(…)`: the name, then `(` right after it (so the paren is a bracket, not the name's).
+    css_function: $ => seq(alias($.name, $.css_function_name), token.immediate('('), optional($.css_value), ')'),
     css_rule: $ => seq($.css_selector, '{', repeat(choice($.css_declaration, $.css_rule, ';')), '}'),
     css_selector: _ => token(seq(choice(':', '&', /@ /, /@[a-z-]+/), /[^{};]*/)),
 
