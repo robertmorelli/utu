@@ -82,6 +82,9 @@ export function createWutuRuntime() {
     const keep = new Set(wanted);
     for (const node of [...parent.childNodes]) {
       if (keep.has(node)) continue;
+      // The page's <head> (an `html { }` template may not write one) and Wutu's own
+      // stylesheets in it are no template's to drop.
+      if (node.nodeType === 1 && (node.nodeName === 'HEAD' || node.hasAttribute('data-wutu-style'))) continue;
       // During a render, removal waits: a globally keyed node may reappear elsewhere.
       if (active) active.removals.add(node);
       else { dispose(node); node.remove(); }
@@ -775,6 +778,7 @@ export function wutuStyle(sheet) {
   // Prerendered pages already contain their sheets.
   if ([...document.querySelectorAll('style')].some(node => node.textContent === css)) return;
   const node = document.createElement('style');
+  node.setAttribute('data-wutu-style', '');
   node.textContent = css;
   document.head.append(node);
 }

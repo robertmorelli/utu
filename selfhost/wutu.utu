@@ -133,7 +133,7 @@ fn expand_wutu(site: I32) Void {
     if css.len() > 0 {
         let key = es_string("wutu-" + wutu_hash(css))
         prelude = "let " + prefix + "install_css: fun() Void = @es/\\ () => { if (!document.getElementById(" + key + ")) { const s=document.createElement('style'); s.id=" + key
-            + "; s.textContent=" + es_string(css) + "; document.head.append(s); } } \\/; " + prefix + "install_css();\n" + prelude
+            + "; s.setAttribute('data-wutu-style',''); s.textContent=" + es_string(css) + "; document.head.append(s); } } \\/; " + prefix + "install_css();\n" + prelude
     }
     let declarations = ""
     for (0 ..< wu_decls.len()) |k| {
