@@ -1850,7 +1850,7 @@ fn word_expression(p: Parser) I32 {
         // `m[i]` indexes; `m[A]…` names an instantiated module only when the
         // brackets do not hold an index.
         if index_ahead(p) { return identifier(p) }
-        if not module_args_ahead(p) and not module_call_ahead(p) { return identifier(p) }
+        if not module_ref_ahead(p) { return identifier(p) }
     }
     // A type name begins `T.null`, `T.member`, `T { … }`, `M[A].f(…)`, `M[A](…)`, or `M[A].T.member`.
     if module_call_ahead(p) { return module_call(p) }
@@ -1893,7 +1893,9 @@ fn word_expression(p: Parser) I32 {
             identifier_or_type(p)
             return node(p, Node.Type_member_expr, at, first)
         }
-        expect(p, Tok.Dot)
+        // `M[A]` alone: M's promoted function, as a value.
+        if not is(p, Tok.Dot) { return node(p, Node.Instantiated_module_ref, at, first) }
+        advance(p)
         type_ident(p)
         node(p, Node.Inline_module_type_path, at, first)
         expect(p, Tok.Dot)
@@ -1948,6 +1950,14 @@ fn index_ahead(p: Parser) Bool {
     let found = try {
         advance(p)
         advance(p)
+        // `m[Array[T]]`: brackets of a bare `M[A]` (no index) hold types.
+        if module_ref_ahead(p) and not index_ahead(p) {
+            let inner = save(p)
+            module_name(p)
+            module_type_arg_list(p)
+            if is(p, Tok.RBracket) { fail(p) }
+            restore(p, inner)
+        }
         expression(p)
         if is(p, Tok.Comma) {
             advance(p)
@@ -1962,14 +1972,14 @@ fn index_ahead(p: Parser) Bool {
     found
 }
 
-/// Whether the cursor starts `name[types].`, a module instantiation.
-fn module_args_ahead(p: Parser) Bool {
+/// Whether the cursor starts `name[types]`: `M[A].x`, `M[A].f(…)`, `M[A](…)`, or `M[A]`.
+fn module_ref_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false }
     let s = save(p)
     let found = try {
         module_name(p)
         module_type_arg_list(p)
-        is(p, Tok.Dot)
+        true
     } catch {
         false
     }

@@ -34,7 +34,7 @@ lib {
     fn norm(x: F64, y: F64) F64 { distance(Point { x: x, y: y }, Point { x: 0.0, y: 0.0 }); }
 }
 `);
-  await fs.writeFile(path.join(dir, 'shapes.utu'), `mod shapes {
+  await fs.writeFile(path.join(dir, 'shapes.utu'), `mod Shapes {
     /// A shape. Mail a@b.com; \`inline @Point\` stays code.
     /// = Notes
     /// More, \`wrapped

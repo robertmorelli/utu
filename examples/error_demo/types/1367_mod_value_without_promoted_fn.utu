@@ -1,0 +1,8 @@
+// What: M[A] as a value, of a mod with no fn &.
+// Expect: m has no fn &(…)
+mod m[T] {
+    fn show(x: T) T => x
+}
+fn f() Void {
+    let g = m[I32]
+}

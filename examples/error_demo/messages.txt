@@ -3458,14 +3458,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/names/39_not_a_module_generic_fn.utu
- ERROR  Unexpected ']'
-        parse-error · examples/error_demo/names/39_not_a_module_generic_fn.utu:6:15
+ ERROR  Expected ';', got 'console'
+        parse-error · examples/error_demo/names/39_not_a_module_generic_fn.utu:6:16
 
  4 │
  5 │ main {
  6 │     square[I32]console.log((4));
-   │               ━
-   │               ╰─ unexpected
+   │                ━━━━━━━
+   │                ╰─ ';'?
  7 │ }
  8 │ using console from std:Console
 --- exit 1
@@ -10381,6 +10381,17 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/1363_promoted_fn_and_type.utu
+ ERROR  m promotes a type: a mod promoting a type is capitalized
+        mod-name-case · examples/error_demo/types/1363_promoted_fn_and_type.utu:3:5
+
+ 1 │ // What: a mod promoting both a type and a function.
+ 2 │ // Expect: A mod's & is a type or a function, not both
+ 3 │ mod m[T] {
+   │     ━
+   │     ╰─ capitalize it
+ 4 │     struct &:
+ 5 │         | v: T
+
  ERROR  A mod's & is a type or a function, not both
         promoted-fn · examples/error_demo/types/1363_promoted_fn_and_type.utu:6:8
 
@@ -10393,14 +10404,52 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/1364_mod_call_without_promoted_fn.utu
- ERROR  m has no fn &(…) to call
+ ERROR  m has no fn &(…)
         promoted-fn · examples/error_demo/types/1364_mod_call_without_promoted_fn.utu:6:15
 
  4 │     fn show(x: T) T => x
  5 │ }
  6 │ fn f() I32 => m[I32](1)
    │               ━
-   │               ╰─ not callable
+   │               ╰─ no fn &
+--- exit 1
+
+=== utu check examples/error_demo/types/1365_mod_promoting_type_lowercase.utu
+ ERROR  pair promotes a type: a mod promoting a type is capitalized
+        mod-name-case · examples/error_demo/types/1365_mod_promoting_type_lowercase.utu:3:5
+
+ 1 │ // What: a mod promoting a type, named lowercase.
+ 2 │ // Expect: pair promotes a type: a mod promoting a type is capitalized
+ 3 │ mod pair[T] {
+   │     ━━━━
+   │     ╰─ capitalize it
+ 4 │     struct &:
+ 5 │         | a: T
+--- exit 1
+
+=== utu check examples/error_demo/types/1366_mod_promoting_fn_capitalized.utu
+ ERROR  Twice promotes a function: a mod promoting a function is lowercase
+        mod-name-case · examples/error_demo/types/1366_mod_promoting_fn_capitalized.utu:3:5
+
+ 1 │ // What: a mod promoting a function, capitalized.
+ 2 │ // Expect: Twice promotes a function: a mod promoting a function is lowercase
+ 3 │ mod Twice[T] {
+   │     ━━━━━
+   │     ╰─ lowercase it
+ 4 │     fn &(x: T) T => x
+ 5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/types/1367_mod_value_without_promoted_fn.utu
+ ERROR  m has no fn &(…)
+        promoted-fn · examples/error_demo/types/1367_mod_value_without_promoted_fn.utu:7:13
+
+ 5 │ }
+ 6 │ fn f() Void {
+ 7 │     let g = m[I32]
+   │             ━
+   │             ╰─ no fn &
+ 8 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/13_if_else_branches.utu

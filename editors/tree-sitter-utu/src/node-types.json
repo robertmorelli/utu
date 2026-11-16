@@ -100,6 +100,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -304,6 +308,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -514,6 +522,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -710,6 +722,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -912,6 +928,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -1108,6 +1128,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -1310,6 +1334,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -1509,6 +1537,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -1705,6 +1737,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -1915,6 +1951,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -2119,6 +2159,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -2349,6 +2393,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -2567,6 +2615,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -2767,6 +2819,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -3107,6 +3163,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -3303,6 +3363,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -3555,6 +3619,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -3793,6 +3861,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -4072,6 +4144,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -4272,6 +4348,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -4570,6 +4650,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -4811,6 +4895,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -5035,6 +5123,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -5276,6 +5368,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -5738,6 +5834,10 @@
             "named": true
           },
           {
+            "type": "instantiated_module_ref",
+            "named": true
+          },
+          {
             "type": "iterator_expr",
             "named": true
           },
@@ -5929,6 +6029,10 @@
           },
           {
             "type": "index_expr",
+            "named": true
+          },
+          {
+            "type": "instantiated_module_ref",
             "named": true
           },
           {
@@ -6173,6 +6277,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -6380,6 +6488,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -6583,6 +6695,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -6779,6 +6895,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -7048,6 +7168,10 @@
           },
           {
             "type": "index_expr",
+            "named": true
+          },
+          {
+            "type": "instantiated_module_ref",
             "named": true
           },
           {
@@ -7460,6 +7584,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -7768,6 +7896,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -8033,6 +8165,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -8272,6 +8408,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -8542,6 +8682,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -8769,6 +8913,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -9240,6 +9388,10 @@
             "named": true
           },
           {
+            "type": "instantiated_module_ref",
+            "named": true
+          },
+          {
             "type": "iterator_expr",
             "named": true
           },
@@ -9445,6 +9597,10 @@
           },
           {
             "type": "index_expr",
+            "named": true
+          },
+          {
+            "type": "instantiated_module_ref",
             "named": true
           },
           {
@@ -9668,6 +9824,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -9929,6 +10089,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -10253,6 +10417,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -10506,6 +10674,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -10702,6 +10874,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {
@@ -11074,6 +11250,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -11362,6 +11542,10 @@
           "named": true
         },
         {
+          "type": "instantiated_module_ref",
+          "named": true
+        },
+        {
           "type": "iterator_expr",
           "named": true
         },
@@ -11558,6 +11742,10 @@
         },
         {
           "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "instantiated_module_ref",
           "named": true
         },
         {

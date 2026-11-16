@@ -20,6 +20,14 @@ test "a promoted function sits beside named ones" {
     assert pick[I32, Str].other(3) == 3
 }
 
+fn apply(f: fun(I64) Str, x: I64) Str => f(x)
+
+test "M[A] alone is the promoted function, as a value" {
+    let f = twice[I64]
+    assert f(4) == "4 4"
+    assert apply(twice[I64], 5) == "5 5"
+}
+
 main {
     console.log(twice[F64](2.5))
 }

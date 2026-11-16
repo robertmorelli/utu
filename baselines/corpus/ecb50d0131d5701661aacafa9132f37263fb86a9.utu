@@ -1,4 +1,4 @@
-using boxes |Box| from "./_boxes.utu";
+using Boxes |Box| from "./_boxes.utu";
 
 fn main() I32 {
     Box.score(Box.new(20));

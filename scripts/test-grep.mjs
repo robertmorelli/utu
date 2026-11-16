@@ -66,12 +66,12 @@ try {
   const found = JSON.parse(refs.stdout).map(m => [m.line, m.kind, Boolean(m.declaration)]);
   assert.deepEqual(found, [[5, 'Fn', true], [16, 'Local', true], [17, 'Local', false], [21, 'Fn', false]]);
   // An import's alias: each place its file names it. A module: also where its type is named by an alias.
-  await fs.writeFile(path.join(dir, 'pt.utu'), 'mod shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n}\n');
-  await fs.writeFile(path.join(dir, 'uses.utu'), 'using shapes |Point| from "./pt.utu";\nfn twice(p: Point) I32 { p.x * 2; }\nlib { fn run() I32 { twice(Point.new(1)); } }\n');
+  await fs.writeFile(path.join(dir, 'pt.utu'), 'mod Shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n}\n');
+  await fs.writeFile(path.join(dir, 'uses.utu'), 'using Shapes |Point| from "./pt.utu";\nfn twice(p: Point) I32 { p.x * 2; }\nlib { fn run() I32 { twice(Point.new(1)); } }\n');
   const refsOf = name => JSON.parse(spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'grep', '--refs', name, '--json', path.join(dir, 'uses.utu')], { encoding: 'utf8' }).stdout)
     .filter(m => m.file.endsWith('uses.utu')).map(m => [m.line, m.column]);
   assert.deepEqual(refsOf('Point'), [[1, 15], [2, 13], [3, 28]]);
-  assert.deepEqual(refsOf('shapes'), [[1, 7], [2, 13], [3, 28]]);
+  assert.deepEqual(refsOf('Shapes'), [[1, 7], [2, 13], [3, 28]]);
   // A member through a lowercase alias, in another file.
   await fs.writeFile(path.join(dir, 'ops.utu'), 'mod mathops { fn double(value: I32) I32 { return value * 2; } }\n');
   await fs.writeFile(path.join(dir, 'calls.utu'), 'using mathops |ops| from "./ops.utu";\nlib { fn run() I32 {\n    return ops.double(5);\n} }\n');

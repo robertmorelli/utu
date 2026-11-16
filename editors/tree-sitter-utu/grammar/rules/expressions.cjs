@@ -16,6 +16,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.iterator_expr,
         $.else_expr,
         $.promoted_module_call_expr,
+        // `M[A]` alone: M's promoted function, as a value. Where brackets
+        // read both ways (`m[Array[T]].f()`), they are M's arguments.
+        prec.dynamic(-1, $.instantiated_module_ref),
         $.type_member_expr,
         $.null_expr,
         $.field_expr,

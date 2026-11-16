@@ -12,7 +12,7 @@ import { createLanguageServer } from '../src/selfhost/lsp.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const SHAPES = `mod shapes {
+const SHAPES = `mod Shapes {
     /// A point in the plane.
     struct &:
         | x : I32
@@ -28,7 +28,7 @@ const SHAPES = `mod shapes {
     }
 }
 `;
-const MAIN = `using shapes |Point| from "./_shapes.utu";
+const MAIN = `using Shapes |Point| from "./_shapes.utu";
 
 /// Twice the *sum*
 /// of a point's coordinates.
@@ -146,7 +146,7 @@ try {
   assert.deepEqual(symbols.map(s => s.name), ['twice', 'run']);
   // A module's own type is known by the module's name.
   const outline = await ask('textDocument/documentSymbol', { textDocument: { uri: shapes } });
-  assert.deepEqual(outline.map(s => [s.name, s.children.map(c => c.name)]), [['shapes', ['shapes', 'new', 'sum']]]);
+  assert.deepEqual(outline.map(s => [s.name, s.children.map(c => c.name)]), [['Shapes', ['Shapes', 'new', 'sum']]]);
   assert.deepEqual(outline[0].children[0].selectionRange.start, { line: 2, character: 11 });
   const tokens = await ask('textDocument/semanticTokens/full', { textDocument: { uri: main } });
   assert.equal(tokens.data.length % 5, 0);
@@ -236,14 +236,14 @@ try {
     for (const name of ['new', 'I32', 'Str']) assert.ok((await call('textDocument/rename', { ...at(S, 'count', 1, s), newName: name })).error, name);
 
     // References and rename from an imported file reach the open files importing it.
-    const SH = 'mod shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n    fn &.sum |self| () I32 { self.x; }\n}\n';
-    const M = 'using shapes |Point| from "./sh.utu";\nlib { fn run() I32 { let p = Point.new(1); p.sum(); } }\n';
+    const SH = 'mod Shapes {\n    struct &:\n        | x: I32\n    fn &.new(x: I32) & { &{ x: x }; }\n    fn &.sum |self| () I32 { self.x; }\n}\n';
+    const M = 'using Shapes |Point| from "./sh.utu";\nlib { fn run() I32 { let p = Point.new(1); p.sum(); } }\n';
     const sh = await file('sh.utu', SH), m = await file('m.utu', M);
     await note('textDocument/didOpen', { textDocument: { uri: m, version: 1, text: M } });
     await note('textDocument/didOpen', { textDocument: { uri: sh, version: 1, text: SH } });
     const across = await call('textDocument/rename', { ...at(SH, 'sum', 0, sh), newName: 'total' });
     assert.deepEqual(Object.keys(across.changes).sort(), [m, sh].sort());
-    assert.deepEqual((await call('textDocument/references', { ...at(SH, 'shapes', 0, sh), context: { includeDeclaration: true } })).map(r => r.uri).filter((u, i, all) => all.indexOf(u) === i).sort(), [m, sh].sort());
+    assert.deepEqual((await call('textDocument/references', { ...at(SH, 'Shapes', 0, sh), context: { includeDeclaration: true } })).map(r => r.uri).filter((u, i, all) => all.indexOf(u) === i).sort(), [m, sh].sort());
 
     // A rename that would make a name mean another declaration, with no
     // mistake, is refused: a renamed name captured by one declared nearer
@@ -380,11 +380,11 @@ try {
     assert.deepEqual(await offered('opt.'), [], 'not without ?.');
 
     // Hover: a built-in type without its representation, a module's type by the module's name.
-    const H = 'using shapes |Point| from "./sh.utu";\nfn f(a: Array[I32], p: Point) I32 { a.len() + p.x; }\nlib { fn run() I32 { f([1], Point.new(1)); } }\n';
+    const H = 'using Shapes |Point| from "./sh.utu";\nfn f(a: Array[I32], p: Point) I32 { a.len() + p.x; }\nlib { fn run() I32 { f([1], Point.new(1)); } }\n';
     const h = await file('h.utu', H);
     await note('textDocument/didOpen', { textDocument: { uri: h, version: 1, text: H } });
     assert.match((await call('textDocument/hover', at(H, 'Array', 0, h))).contents.value, /^```utu\ntype Array\n```/);
-    assert.match((await call('textDocument/hover', at(H, 'new(1)', 0, h))).contents.value, /fn shapes\.new\(x: I32\) shapes/);
+    assert.match((await call('textDocument/hover', at(H, 'new(1)', 0, h))).contents.value, /fn Shapes\.new\(x: I32\) Shapes/);
 
     // An alt arm's bare variant two enums have is the tested enum's; an enum's hover shows its variants.
     const V = 'enum Shape:\n    | Circle { r: F64 }\n    | Dot {}\nenum Lens:\n    | Circle { f: F64 }\nfn a(s: Shape) F64 {\n    alt s {\n        Circle |c| => c.r,\n        Dot => 0.0,\n    };\n}\nfn b(l: Lens) F64 {\n    alt l {\n        Circle |c| => c.f,\n    };\n}\nlib { fn run() F64 { a(Shape.Dot) + b(Lens.Circle { f: 1.0 }); } }\n';

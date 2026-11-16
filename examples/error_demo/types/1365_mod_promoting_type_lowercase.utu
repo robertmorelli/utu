@@ -1,0 +1,6 @@
+// What: a mod promoting a type, named lowercase.
+// Expect: pair promotes a type: a mod promoting a type is capitalized
+mod pair[T] {
+    struct &:
+        | a: T
+}

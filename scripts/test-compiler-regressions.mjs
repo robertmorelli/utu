@@ -900,7 +900,7 @@ lib { fn run() I32 { f(${closureDepth}); } }
     // Struct literal fields run in the order written.
     ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nlib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
-    ['mod m[T] {\n    struct &:\n        | v: T\n        | next: ?m[T]\n    fn &.mk(v: T) m[T] { &{ v: v, next: null }; }\n}\nlib { fn run() I32 { let a = m[I32].mk(3); a.next = m[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    ['mod M[T] {\n    struct &:\n        | v: T\n        | next: ?M[T]\n    fn &.mk(v: T) M[T] { &{ v: v, next: null }; }\n}\nlib { fn run() I32 { let a = M[I32].mk(3); a.next = M[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
     // `a orelse b` (`br_on_non_null`): a once, b only when a is null, a `break` for b.
     ['struct N:\n    | v: I32\n    | next: ?N\nvec hits: I32 = [0];\nfn get(n: N) ?N { hits[0] += 1; n.next; }\n'
       + 'fn walk(a: ?N) I32 { let t = 0; let cur = a; while (true) { let c = cur orelse { break; }; t += c.v; cur = c.next; }; t; }\n'
@@ -2569,7 +2569,7 @@ lib { fn run() I32 {
     [{ 'main.utu': 'mod box[T] { fn id(v: T) T { v; } }\nusing box[F64] |B|;\nlib { fn run() F64 { B.id(1.5) + (2.5 -o B.id); } }\n' }, 4],
     [{ 'main.utu': 'mod num[T] { fn half(v: T) T { v / 2; } }\nusing num[U32] |N|;\nlib { fn run() I64 { let x: U32 = 4000000000; N.half(x).i64(); } }\n' }, 2000000000n],
     // A module's promoted type's function, called on the module (this said "sm has no member new").
-    [{ 'main.utu': 'mod sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nlib { fn run() I32 { sm.get(sm.new(3)); } }\n' }, 3],
+    [{ 'main.utu': 'mod Sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nlib { fn run() I32 { Sm.get(Sm.new(3)); } }\n' }, 3],
     // An @es binding of a generic module, typed in each instance.
     [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nlib { fn run() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).f64(); } }\n' }, 10.5],
     // One file's mod, imported twice (two spellings of its path): one name, one module.
@@ -2723,17 +2723,17 @@ lib { fn run() Str {
     Plain.one("{\"name\":\"a\"}") + "/" + Plain.tint(Green {}) + Pager[I32].two("{\"items\":[{\"name\":\"b\"}]}");
 } }
 ` }, '/["Green"]b{"items":[{"name":"b"}]}'],
-    // `using m;` of a mod with type & keeps m the mod (`m.f()` was "m is a type, not a value"); `S.S.new`,
+    // `using M;` of a mod with type & keeps M the mod (`M.f()` was "M is a type, not a value"); `S.S.new`,
     // a mod's type of its own name ("S is a type"); `fn P[geo.Sq].m`, an impl of a mod's type (dropped).
-    [{ 'main.utu': `mod m {
+    [{ 'main.utu': `mod M {
     fn f() I32 { 4; }
     let g: I32 = 5;
     struct &:
         | a: I32
     fn &.new(a: I32) & { &{ a: a }; }
-    fn twice() I32 { m.f() * 2; }
+    fn twice() I32 { M.f() * 2; }
 }
-using m;
+using M;
 mod S {
     struct S:
         | a: I32
@@ -2746,11 +2746,11 @@ proto Area:
     | area() I32
 fn Area[geo.Sq].area |q| () I32 { q.s * 3; }
 mod Tot[T[Area]] { fn of(x: T) I32 { x.area(); } }
-lib { fn run() I32 { m.f() + m.g + m.new(3).a + m.twice() * 10 + S.S.new(4).a * 100 + geo.Sq { s: 4 }.area() * 1000 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 100000; } }
+lib { fn run() I32 { M.f() + M.g + M.new(3).a + M.twice() * 10 + S.S.new(4).a * 100 + geo.Sq { s: 4 }.area() * 1000 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 100000; } }
 ` }, 312492],
-    [{ 'lib.utu': 'mod m {\n    fn f() I32 { 4; }\n    struct &:\n        | a: I32\n    fn &.new(a: I32) & { &{ a: a }; }\n}\nmod S {\n    struct S:\n        | a: I32\n    fn S.new(a: I32) S { S { a: a }; }\n}\nmod geo { struct Sq:\n    | s: I32\n}\n',
+    [{ 'lib.utu': 'mod M {\n    fn f() I32 { 4; }\n    struct &:\n        | a: I32\n    fn &.new(a: I32) & { &{ a: a }; }\n}\nmod S {\n    struct S:\n        | a: I32\n    fn S.new(a: I32) S { S { a: a }; }\n}\nmod geo { struct Sq:\n    | s: I32\n}\n',
       'impl.utu': 'using geo from "./lib.utu";\nmod shapes {\n    proto Area:\n        | area() I32\n    fn Area[geo.Sq].area |q| () I32 { q.s * 3; }\n}\n',
-      'main.utu': 'using m from "./lib.utu";\nusing S from "./lib.utu";\nusing geo from "./lib.utu";\nusing shapes from "./impl.utu";\nusing m;\nmod Tot[T[shapes.Area]] { fn of(x: T) I32 { x.area(); } }\nlib { fn run() I32 { m.f() + m.new(3).a + S.S.new(4).a * 10 + geo.Sq { s: 4 }.area() * 100 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 10000; } }\n' }, 31247],
+      'main.utu': 'using M from "./lib.utu";\nusing S from "./lib.utu";\nusing geo from "./lib.utu";\nusing shapes from "./impl.utu";\nusing M;\nmod Tot[T[shapes.Area]] { fn of(x: T) I32 { x.area(); } }\nlib { fn run() I32 { M.f() + M.new(3).a + S.S.new(4).a * 10 + geo.Sq { s: 4 }.area() * 100 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 10000; } }\n' }, 31247],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `lib { fn run() I32 {
     let a = 1;

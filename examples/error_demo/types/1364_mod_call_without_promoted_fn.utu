@@ -1,5 +1,5 @@
 // What: M[A](…) of a mod with no fn &.
-// Expect: m has no fn &(…) to call
+// Expect: m has no fn &(…)
 mod m[T] {
     fn show(x: T) T => x
 }

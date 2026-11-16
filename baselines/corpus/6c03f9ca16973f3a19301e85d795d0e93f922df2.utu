@@ -1,6 +1,6 @@
 using mathops |ops| from "./_ops.utu";
 
-mod boxes {
+mod Boxes {
     struct &:
         | value : I32
 

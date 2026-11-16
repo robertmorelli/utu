@@ -456,10 +456,12 @@ mod twice[T] {
 }
 
 twice[I64](7)     // "7 7"
+let f = twice[I64] // the function, as a value: f(7)
 ```
 
 Rules:
-- A mod's `&` is a type (`struct &`, `type & = …`, …) or a function (`fn &(…)`), not both; `fn &(…)` outside a mod is an error, and so is `M[A](…)` of a mod with no `fn &`.
+- A mod's `&` is a type (`struct &`, `type & = …`, …) or a function (`fn &(…)`), not both; `fn &(…)` outside a mod is an error, and so is `M[A](…)` or `M[A]` of a mod with no `fn &`.
+- A mod promoting a type is capitalized (`mod Pair`); a mod promoting a function is lowercase (`mod twice`). A mod promoting nothing is either.
 - A `mod` body may contain `type` declarations, structs, protocols, enums, functions, globals, tests, and benches.
 - A `mod` body may **not** contain another `mod`, or a `mem` (a mem is one memory of the program, declared at a file's top level).
 

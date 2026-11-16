@@ -1,0 +1,5 @@
+// What: a mod promoting a function, capitalized.
+// Expect: Twice promotes a function: a mod promoting a function is lowercase
+mod Twice[T] {
+    fn &(x: T) T => x
+}

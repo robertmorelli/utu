@@ -711,6 +711,7 @@ fn check_node(node: I32, expect: I32, cx: Cx) I32 {
         Node.Slice_expr => check_index(node, expect, cx),
         Node.Array_expr => check_array_lit(node, expect, cx),
         Node.Promoted_module_call_expr => check_promoted_call(node, expect, cx),
+        Node.Instantiated_module_ref => check_promoted_value(node, cx),
         Node.Alt_expr => check_alt(node, expect, cx),
         Node.Match_expr => check_match(node, expect, cx),
         Node.Loop_match_expr => check_match(node, expect, cx),
@@ -3443,6 +3444,25 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     if inst < 0 { return error_value() }
     let m = w_mark()
     call_with(fn_instance(decl, inst), args, 0, m, node, cx)
+}
+
+/// `M[A]` (not called): M's `fn &`, a `fun`.
+fn check_promoted_value(node: I32, cx: Cx) I32 {
+    let name_at = first_child(node)
+    let args_types = next_sibling(name_at)
+    let decl = node_decl[node]
+    if not decl_is(decl, Decl.Fn) {
+        let module = node_decl[name_node(name_at)]
+        if not decl_is(module, Decl.Module) or reported_within(node) { return error_value() }
+        // A mod promoting a type is a type here, not a value.
+        if decl_a[module] >= 0 { return not_value(name_at, module) }
+        report2(Diag.PromotedFn, name_at, decl_name[module], 2, -1)
+        return error_value()
+    }
+    if alias_given_args(name_at, args_types) { return error_value() }
+    let inst = instance_of_args(module_of(decl), args_types, node, cx)
+    if inst < 0 { return error_value() }
+    member_fn_value(node, decl, inst)
 }
 
 /// `T.x` (not called): a module's global, or an integer enum's variant.

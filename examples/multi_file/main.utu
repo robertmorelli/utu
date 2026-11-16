@@ -1,4 +1,4 @@
-using boxes |Box| from "./_boxes.utu"
+using Boxes |Box| from "./_boxes.utu"
 
 main {
     console.log(Box.score(Box.new(20)))

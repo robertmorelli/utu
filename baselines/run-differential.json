@@ -5677,6 +5677,10 @@
    "__test_1": {
     "result": null,
     "printed": []
+   },
+   "__test_2": {
+    "result": null,
+    "printed": []
    }
   }
  },

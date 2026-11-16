@@ -2256,6 +2256,14 @@
           "name": "promoted_module_call_expr"
         },
         {
+          "type": "PREC_DYNAMIC",
+          "value": -1,
+          "content": {
+            "type": "SYMBOL",
+            "name": "instantiated_module_ref"
+          }
+        },
+        {
           "type": "SYMBOL",
           "name": "type_member_expr"
         },

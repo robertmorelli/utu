@@ -729,7 +729,7 @@ mod tour {
         \\// boxes.utu
         \\using mathops |ops| from "./ops.utu"
         \\
-        \\mod boxes {
+        \\mod Boxes {
         \\    struct &:
         \\        | value: I32
         \\    fn &.new(value: I32) & { &{ value: value } }
@@ -737,7 +737,7 @@ mod tour {
         \\}
         \\
         \\// main.utu
-        \\using boxes |Box| from "./boxes.utu"
+        \\using Boxes |Box| from "./boxes.utu"
         \\
         \\main {
         \\    console.log(Box.new(21).score())   // 42
