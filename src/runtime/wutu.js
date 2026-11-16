@@ -784,6 +784,7 @@ export function wutuStyle(sheet) {
 export function createWutuLazy() {
   const lazies = new Map();         // lazy call's place -> { key, node, tries }: its placeholder
   let loading = 0;                  // chunks loading
+  prefetchWutuChunks();
   /**
    * A lazy module's function (`using m lazy from "…"`), called with `args`:
    * its placeholder, which the element the function makes fills once the
@@ -826,6 +827,26 @@ export function createWutuLazy() {
     });
     return node;
   };
+}
+
+/**
+ * Once the page has loaded and the browser is idle, import every lazy chunk
+ * (its JS, which fetches its Wasm), one at a time, so a later call finds its
+ * module ready: navigating to a lazy page then waits for no network. The
+ * module stays cached, and the call's own import() of the same URL resolves
+ * at once. Skipped when the visitor asked to save data; a failed prefetch is
+ * left for the call to try again.
+ */
+function prefetchWutuChunks() {
+  if (typeof window === 'undefined' || navigator.connection?.saveData) return;
+  const idle = callback => (window.requestIdleCallback ?? (f => setTimeout(f, 200)))(callback, { timeout: 3000 });
+  const start = () => idle(async () => {
+    for (const url of new Set(Object.values(globalThis.__wutuChunks ?? {}))) {
+      await import(url).catch(() => {});
+    }
+  });
+  if (document.readyState === 'complete') start();
+  else window.addEventListener('load', start, { once: true });
 }
 
 // Installed only by typed persistence. DOM-only applications do not ship codecs
