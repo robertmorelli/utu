@@ -112,7 +112,9 @@ fn own_sites() I32 => kept[5]
 /// Whether a node is in an own file (not the standard library), and its
 /// expansion has not failed (an expanded site is a parenthesis).
 fn dsl_in_program(node: I32) Bool {
-    is_own_file(file_of_token(node_first[node])) and not dsl_has_failed(node)
+    let file = file_of_token(node_first[node])
+    let origin = dsl_site_of(node)
+    (is_own_file(file) or origin >= 0 and dsl_in_program(origin)) and not dsl_has_failed(node)
 }
 
 /// Sites whose expansion failed (reported): left as they are, and checked as mistakes.

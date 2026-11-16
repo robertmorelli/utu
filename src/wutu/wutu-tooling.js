@@ -366,6 +366,8 @@ export async function formatUtu(source, { shape } = {}) {
   if (!shape) throw new Error('formatUtu needs a self-hosted parser shape function');
   const before = await shape(source);
   if (!before) return { text: source, refused: 'it does not parse' };
+  // Brace-bodied Wutu sugar is opaque to the Utu layout pass.
+  if (/^[ \t]*(?:wn|html)\b/m.test(source)) return { text: source, refused: null };
   const once = formatWutuSource(layoutUtu(source));
   if (once === source) return { text: source, refused: null };
   if (await shape(once) !== before) return { text: source, refused: 'its layout would parse differently' };

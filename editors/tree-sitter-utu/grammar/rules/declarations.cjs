@@ -87,6 +87,7 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // Functions: fn name self? ( params? ) return_type (block | => expr)
     fn_decl: ($) => choice(
       seq('fn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', $.return_type, $._fn_body),
+      seq('wn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', $.wutu_body),
       // `gn g(…) T { … }`: a generator of Ts, as `fn g(…) yield T` is.
       seq('gn', $.fn_name, optional($.self_param), '(', optional($.param_list), ')', alias($._yields, $.return_type), $._fn_body)),
     _yields: ($) => alias($._yielded, $.yield_type),
@@ -175,6 +176,8 @@ exports.buildDeclarationRules = function buildDeclarationRules() {
     // `lib { fn … }`: what JS calls; `main { … }`: the program.
     export_lib_decl: ($) => seq('lib', '{', repeat($._library_item), '}'),
     export_main_decl: ($) => seq('main', $.block),
+    export_html_decl: ($) => seq('html', $.wutu_body),
+    wutu_body: ($) => seq(alias($._wutu_open, '{'), optional(alias($._wutu_text, 'wutu_text')), alias($._wutu_close, '}')),
 
     // Tests and benchmarks
     test_decl: ($) => seq('test', $.string_lit, $.block),

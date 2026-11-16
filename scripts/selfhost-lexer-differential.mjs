@@ -29,7 +29,7 @@ const INSERTS = [' -o ', '-o', '?.', '?', ' in ', ' type ', ' test ', ' and ', '
   '&=', '|=', '=>', '|', '-', 'o', '>>=', '<<=', '>>>=', '..<', '...', '.5', '0x', '0b', 'e5', '"', '\\\\', '/\\', '\\/', '//', '`', '${', '` ${x} `', '$'];
 
 // Token kinds, in selfhost/lex.utu's order.
-const KINDS = ['End', 'Error', 'Word', 'Int', 'Float', 'String', 'MultilineLine', 'DslBody', 'Comment',
+const KINDS = ['End', 'Error', 'Word', 'Int', 'Float', 'String', 'MultilineLine', 'DslBody', 'WutuBody', 'Comment',
   'TemplateFull', 'TemplateHead', 'TemplateMiddle', 'TemplateTail'];
 const PUNCT = KINDS.length;
 
@@ -102,7 +102,7 @@ function leaves(root) {
   const out = [];
   const visit = node => {
     // (A DSL's envelope is one token to the lexer; the tree splits out its text for editors.)
-    if (node.children.length === 0 || node.type === 'dsl_body') out.push(node);
+    if (node.children.length === 0 || node.type === 'dsl_body' || node.type === 'wutu_body') out.push(node);
     else node.children.forEach(visit);
   };
   visit(root);
@@ -118,6 +118,7 @@ function expectedKind(leaf, text) {
     case 'string_lit': return 'String';
     case 'multiline_string_line': return 'MultilineLine';
     case 'dsl_body': return 'DslBody';
+    case 'wutu_body': return 'WutuBody';
     case 'template_full': return 'TemplateFull';
     case 'template_head': return 'TemplateHead';
     case 'template_middle': return 'TemplateMiddle';

@@ -29,6 +29,10 @@ export async function prerender(outDir) {
     const html=await page.evaluate(()=>{
       const clone=document.documentElement.cloneNode(true);
       clone.removeAttribute('data-utu-ready');
+      if(!clone.querySelector('script[src="./app.js"]')){
+        const script=document.createElement('script');script.type='module';script.src='./app.js';
+        clone.querySelector('body')?.append(script);
+      }
       for(const child of clone.querySelector('body').children)if(!['SCRIPT','STYLE','NOSCRIPT'].includes(child.tagName)&&!child.matches('[data-wutu-root]')&&!child.querySelector('[data-wutu-root]'))child.setAttribute('data-utu-static','');
       for(const root of clone.querySelectorAll('[data-wutu-root]'))root.setAttribute('data-wutu-prerender','');
       const originals=document.querySelectorAll('input,textarea,select');

@@ -6046,7 +6046,7 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/547_wutu_hole_array.utu
- ERROR  A hole shows text, a number, a Bool or a node, not Array[Str]
+ ERROR  Array[Str] is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
         wutu-hole · examples/error_demo/platform/547_wutu_hole_array.utu:17:18
 
 15 │     let app = @wutu/\
@@ -6069,6 +6069,18 @@ ok
    │                                          ╰─ Item
 18 │     \/;
 19 │     Browser.document.body.append(app);
+--- exit 1
+
+=== utu check examples/error_demo/platform/548_wutu_non_component.utu
+ ERROR  Plain is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
+        wutu-hole · examples/error_demo/platform/548_wutu_non_component.utu:9:50
+
+ 7 │
+ 8 │ main {
+ 9 │     Browser.document.body.append(@wutu/\ div { = Plain { value: 1 } } \/)
+   │                                                  ━━━━━━━━━━━━━━━━━━
+   │                                                  ╰─ Plain
+10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/549_wutu_property_type.utu
@@ -8908,6 +8920,18 @@ FAIL after tests: boom
 10 │ }
 --- exit 1
 
+=== utu check examples/error_demo/syntax/549_html_with_main.utu
+ ERROR  Two mains
+        entry-surface · examples/error_demo/syntax/549_html_with_main.utu:4:1
+
+ 2 │ // Expect: Two mains
+ 3 │ using Browser from std:Browser
+ 4 │ html { body { p { "Hello" } } }
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │ ╰─ here
+ 5 │ main { }
+--- exit 1
+
 === utu check examples/error_demo/syntax/54_empty_template_hole.utu
  ERROR  Unexpected '} items`'
         parse-error · examples/error_demo/syntax/54_empty_template_hole.utu:4:15
@@ -8918,6 +8942,18 @@ FAIL after tests: boom
    │               ━━━━━━━━
    │               ╰─ unexpected
  5 │ }
+--- exit 1
+
+=== utu check examples/error_demo/syntax/550_unbalanced_wn.utu
+ ERROR  Unexpected character '{'
+        parse-error · examples/error_demo/syntax/550_unbalanced_wn.utu:3:13
+
+ 1 │ // What: a wn body has no closing brace
+ 2 │ // Expect: Unexpected character '{'
+ 3 │ wn broken() {
+   │             ━
+   │             ╰─ unexpected
+ 4 │     p { "Missing a brace"
 --- exit 1
 
 === utu check examples/error_demo/syntax/55_closure_with_fun_keyword.utu

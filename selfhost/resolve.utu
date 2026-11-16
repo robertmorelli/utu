@@ -1500,6 +1500,7 @@ struct Walk:
 fn resolve_names() I32 {
     diag_reset()
     intern_known()
+    desugar_wutu_surfaces()
     // DSLs expand first: their expansions add nodes, words, and files.
     expand_dsls()
     generate_sources()
@@ -1533,6 +1534,49 @@ fn resolve_names() I32 {
     }
     save_diagnostics()
     diag_kind.len()
+}
+
+/// Replace sugar nodes after syntax clients have read the source tree, before
+/// declarations and DSLs are expanded.
+fn desugar_wutu_surfaces() Void {
+    let limit = file_root.len()
+    for (0 ..< limit) |file| {
+        if not is_own_file(file) or file_root[file] < 0 { continue }
+        desugar_wutu_items(file_root[file])
+    }
+}
+
+fn desugar_wutu_items(parent: I32) Void {
+    let item = first_child(parent)
+    while (item >= 0) {
+        if is_kind(item, Node.Module_decl) or is_kind(item, Node.Export_lib_decl) { desugar_wutu_items(item) }
+        let body = last_child(item)
+        if is_kind(body, Node.Wutu_body) {
+            let open = tok_start[node_first[body]]
+            let close = tok_end[node_first[body]]
+            let inside = bytes_text(open + 1, close - 1)
+            let code = if is_kind(item, Node.Export_html_decl) {
+                "main { wutu.page(@wutu/\\ @reactive; html { " + inside + " } \\/) }"
+            } else {
+                "fn" + bytes_text(tok_end[node_first[item]], open)
+                    + " Browser.HTMLElement => @wutu/\\ " + inside + " \\/"
+            }
+            dsl_current_site[0] = item
+            dsl_current_from[0] = -1
+            dsl_current_to[0] = -1
+            let root = parse_generated_file(code)
+            if root >= 0 {
+                let made = first_child(root)
+                node_kind[item] = node_kind[made]
+                node_child[item] = node_child[made]
+                node_child[made] = -1
+                node_child[root] = -1
+                let c = first_child(item)
+                while (c >= 0) { set_parent(c, item); c = next_sibling(c) }
+            }
+        }
+        item = next_sibling(item)
+    }
 }
 
 /// Resolution's diagnostics, kept so each build (exports, tests, `@comptime`)

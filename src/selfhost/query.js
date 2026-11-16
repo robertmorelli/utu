@@ -5,7 +5,7 @@
 // straight from its memories: go to definition and find references cost a
 // pass over the nodes, with no build.
 
-const COMMENT = 8;  // lex.utu's Tok.Comment
+const COMMENT = 9;  // lex.utu's Tok.Comment
 
 // The characters of a WAT identifier after its `$`.
 const WAT_ID = /[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]/;

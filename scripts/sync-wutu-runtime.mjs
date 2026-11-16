@@ -2,10 +2,19 @@ import fs from 'node:fs/promises';
 import {createWutuRuntime,installWutuStorage,wutuStyle} from '../src/runtime/wutu.js';
 export async function syncWutuRuntime() {
  const source=`// Generated from src/runtime/wutu.js by the build. No runtime ships unless used.
+mod Component {
+    proto &:
+        | render() Externref
+}
+
 mod wutu {
     fn init() Void {
         let install: fun() Void = @es/\\ () => { globalThis.__utuWutu ??= (${createWutuRuntime.toString()})(); } \\/;
         install();
+    }
+    fn page(root: Externref) Void {
+        let attach: fun(Externref) Void = @es/\\ root=>{if(root!==document.documentElement)document.replaceChild(root,document.documentElement)} \\/;
+        attach(root);
     }
     fn storage_init() Void {
         init();

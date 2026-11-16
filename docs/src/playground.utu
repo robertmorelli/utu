@@ -17,7 +17,7 @@ mod playground {
     fn sample() Str {
         \\using Browser from std:Browser
         \\
-        \\struct Todo:
+        \\struct Todo[Component]:
         \\    | id: Str
         \\    | text: Str
         \\    | done: Bool
@@ -41,10 +41,20 @@ mod playground {
         \\    s.draft = ""
         \\}
         \\
-        \\main {
-        \\    let state = State { draft: "", todos: [], made: 0 }
-        \\    Browser.document.body.append(@wutu/\
-        \\    @reactive
+        \\wn Component[Todo].render |todo| () {
+        \\    li {
+        \\        label {
+        \\            input { type = "checkbox"; bind:checked = todo.done }
+        \\            " "
+        \\            = todo.text
+        \\        }
+        \\    }
+        \\}
+        \\
+        \\let state: State = State { draft: "", todos: [], made: 0 }
+        \\html {
+        \\    head { title { "Things to do" } }
+        \\    body {
         \\    main {
         \\        font-family: system-ui, sans-serif
         \\        max-width: 30rem
@@ -76,17 +86,7 @@ mod playground {
         \\            padding: 0
         \\            list-style: none
         \\            for state.todos |todo| key todo.id {
-        \\                li {
-        \\                    padding: 0.4rem 0
-        \\                    label {
-        \\                        input {
-        \\                            type = "checkbox"
-        \\                            bind:checked = todo.done
-        \\                        }
-        \\                        " "
-        \\                        = todo.text
-        \\                    }
-        \\                }
+        \\                = todo
         \\            }
         \\        }
         \\        p {
@@ -94,7 +94,7 @@ mod playground {
         \\            = `${state.left()} left`
         \\        }
         \\    }
-        \\    \/)
+        \\    }
         \\}
     }
     /// The source the editor opens with: the last one edited, kept in this

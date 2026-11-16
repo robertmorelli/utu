@@ -11,7 +11,7 @@
 // Three tokens, so editors can inject a payload's own language into exactly
 // its text: `/\` (hidden), the text between (`dsl_text`, absent when empty),
 // and the `\/` that balances the opener (hidden).
-enum { DSL_OPEN, DSL_TEXT, DSL_CLOSE, STATEMENT_END };
+enum { DSL_OPEN, DSL_TEXT, DSL_CLOSE, STATEMENT_END, WUTU_OPEN, WUTU_TEXT, WUTU_CLOSE };
 
 void *tree_sitter_utu_external_scanner_create(void) { return NULL; }
 void tree_sitter_utu_external_scanner_destroy(void *p) { (void)p; }
@@ -26,6 +26,66 @@ static void skip_string(TSLexer *l) {
     if (c == '\\' && !l->eof(l) && l->lookahead != '\n') l->advance(l, false);
   }
   if (l->lookahead == '"') l->advance(l, false);
+}
+
+static void skip_quoted(TSLexer *l, int32_t quote) {
+  l->advance(l, false);
+  while (!l->eof(l) && l->lookahead != quote) {
+    int32_t c = l->lookahead;
+    l->advance(l, false);
+    if (c == '\\' && !l->eof(l)) l->advance(l, false);
+  }
+  if (l->lookahead == quote) l->advance(l, false);
+}
+
+static bool scan_wutu(TSLexer *l, const bool *valid) {
+  if (valid[WUTU_OPEN]) {
+    while (iswspace(l->lookahead)) l->advance(l, true);
+    if (l->lookahead != '{') return false;
+    l->advance(l, false);
+    l->mark_end(l);
+    l->result_symbol = WUTU_OPEN;
+    return true;
+  }
+  if (!valid[WUTU_TEXT] && !valid[WUTU_CLOSE]) return false;
+  unsigned depth = 1;
+  bool text = false;
+  while (!l->eof(l)) {
+    int32_t c = l->lookahead;
+    if (c == '}' && depth == 1) {
+      if (text) { l->result_symbol = WUTU_TEXT; return valid[WUTU_TEXT]; }
+      l->advance(l, false);
+      l->mark_end(l);
+      l->result_symbol = WUTU_CLOSE;
+      return valid[WUTU_CLOSE];
+    }
+    if (c == '"' || c == '\'' || c == '`') { skip_quoted(l, c); text = true; continue; }
+    l->advance(l, false);
+    if (c == '{') depth++;
+    else if (c == '}') depth--;
+    else if (c == '/' && l->lookahead == '/') {
+      while (!l->eof(l) && l->lookahead != '\n') l->advance(l, false);
+    } else if (c == '/' && l->lookahead == '*') {
+      l->advance(l, false);
+      while (!l->eof(l)) {
+        int32_t a = l->lookahead;
+        l->advance(l, false);
+        if (a == '*' && l->lookahead == '/') { l->advance(l, false); break; }
+      }
+    } else if (c == '/' && l->lookahead == '\\') {
+      l->advance(l, false);
+      unsigned nested = 1;
+      while (!l->eof(l) && nested) {
+        int32_t a = l->lookahead;
+        l->advance(l, false);
+        if (a == '"') skip_string(l);
+        else if (a == '/' && l->lookahead == '\\') { nested++; l->advance(l, false); }
+        else if (a == '\\' && l->lookahead == '/') { nested--; l->advance(l, false); }
+      }
+    }
+    text = true;
+  }
+  return false;
 }
 
 static bool is_word_char(int32_t c) { return iswalnum(c) || c == '_'; }
@@ -121,6 +181,8 @@ bool tree_sitter_utu_external_scanner_scan(void *p, TSLexer *l, const bool *vali
   (void)p;
   // (Error recovery asks for every token at once: none of these is a guess.)
   if (valid[DSL_OPEN] && valid[DSL_TEXT] && valid[DSL_CLOSE]) return false;
+  if (valid[WUTU_OPEN] && valid[WUTU_TEXT] && valid[WUTU_CLOSE]) return false;
+  if (valid[WUTU_OPEN] || valid[WUTU_TEXT] || valid[WUTU_CLOSE]) return scan_wutu(l, valid);
   if (valid[STATEMENT_END] && !valid[DSL_OPEN] && !valid[DSL_TEXT] && !valid[DSL_CLOSE]) return statement_end(l);
   if (valid[DSL_OPEN]) {
     while (iswspace(l->lookahead)) l->advance(l, true);

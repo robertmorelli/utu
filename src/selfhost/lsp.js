@@ -51,7 +51,7 @@ const PRELUDE_KINDS = new Set(['Module', 'Struct', 'Enum', 'IntEnum', 'Proto', '
 
 // lex.utu's Tok kinds completion offers nothing in: strings, DSL bodies,
 // comments, and a template's text.
-const QUIET_TOKENS = new Set([5, 6, 7, 8, 9, 10, 11, 12]);
+const QUIET_TOKENS = new Set([5, 6, 7, 8, 9, 10, 11, 12, 13]);
 
 // The name written where one is being typed, for completion's build.
 const PLACEHOLDER = '__utu_completing';

@@ -33,6 +33,7 @@ enum(U8) Node:
     | Multiline_string_line
     | Multiline_string_lit
     | Dsl_body
+    | Wutu_body
     | Platform_path
     | Void_type
     | Bool_lit
@@ -73,6 +74,7 @@ enum(U8) Node:
     | Captured_module_name
     | Export_lib_decl
     | Export_main_decl
+    | Export_html_decl
     | Test_decl
     | Bench_decl
     | Measure_decl
@@ -165,6 +167,7 @@ enum(U8) Kw:
     | Proto
     | Enum
     | Fn
+    | Wn
     | Let
     | Mem
     | Vec
@@ -174,6 +177,7 @@ enum(U8) Kw:
     | Distinct
     | Lib
     | Main
+    | Html
     | Test
     | Bench
     | Measure
@@ -329,6 +333,7 @@ fn tok_spelling(kind: I32) Str {
         Tok.String => "a string",
         Tok.MultilineLine => "\\\\",
         Tok.DslBody => "/\\",
+        Tok.WutuBody => "{",
         Tok.Comment => "//",
         Tok.TemplateFull => "a template string",
         Tok.TemplateHead => "a template string",
@@ -582,6 +587,7 @@ fn item(p: Parser) Void {
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
     if w == Kw.Proto.i32() { proto_decl(p); return }
     if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
+    if w == Kw.Wn.i32() { wn_decl(p); return }
     if w == Kw.Let.i32() {
         let e = begin_statement(p)
         global_decl(p)
@@ -602,6 +608,7 @@ fn item(p: Parser) Void {
     }
     // `main { … }`: the program, which returns nothing; `lib { fn … }`: what JS calls.
     if w == Kw.Main.i32() and is_at(p, 1, Tok.LBrace) { main_decl(p); return }
+    if w == Kw.Html.i32() and is_at(p, 1, Tok.WutuBody) { html_decl(p); return }
     if w == Kw.Lib.i32() and is_at(p, 1, Tok.LBrace) { lib_decl(p); return }
     if w == Kw.Export.i32() {
         let after = tok_word[ptok[p.pos + 1]]
@@ -628,6 +635,7 @@ fn module_item(p: Parser) Void {
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
     if w == Kw.Proto.i32() { proto_decl(p); return }
     if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
+    if w == Kw.Wn.i32() { wn_decl(p); return }
     if w == Kw.Let.i32() {
         let e = begin_statement(p)
         global_decl(p)
@@ -900,6 +908,21 @@ fn fn_or_op_decl(p: Parser) I32 {
     node(p, Node.Fn_decl, at, first)
 }
 
+/// A Wutu function's body is opaque until the Wutu expansion runs.
+fn wn_decl(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    expect_kw(p, Kw.Wn)
+    fn_name(p)
+    if is(p, Tok.Pipe) { self_param(p) }
+    expect(p, Tok.LParen)
+    if not is(p, Tok.RParen) { param_list(p) }
+    expect(p, Tok.RParen)
+    if not is(p, Tok.WutuBody) { fail(p) }
+    leaf(p, Node.Wutu_body)
+    node(p, Node.Fn_decl, at, first)
+}
+
 /// A `gn`'s result `T`: the type it yields, as `yield T` is.
 fn yields(p: Parser) I32 {
     let at = mark()
@@ -1093,13 +1116,24 @@ fn main_decl(p: Parser) I32 {
     node(p, Node.Export_main_decl, at, first)
 }
 
+fn html_decl(p: Parser) I32 {
+    let at = mark()
+    let first = p.pos
+    expect_kw(p, Kw.Html)
+    if not is(p, Tok.WutuBody) { fail(p) }
+    leaf(p, Node.Wutu_body)
+    node(p, Node.Export_html_decl, at, first)
+}
+
 /// `lib { fn … }`, as `lib { … }` was.
 fn lib_decl(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     advance(p)
     expect(p, Tok.LBrace)
-    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn)) { fn_or_op_decl(p) }
+    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn) or is_kw(p, Kw.Wn)) {
+        if is_kw(p, Kw.Wn) { wn_decl(p) } else { fn_or_op_decl(p) }
+    }
     expect(p, Tok.RBrace)
     node(p, Node.Export_lib_decl, at, first)
 }

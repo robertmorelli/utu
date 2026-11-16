@@ -14,7 +14,7 @@
 // They are read from the compiler's tokens (comments are tokens), so a
 // `///` inside a string is never one.
 
-const COMMENT = 8;  // lex.utu's Tok.Comment
+const COMMENT = 9;  // lex.utu's Tok.Comment
 
 /**
  * Doc comments over the program the compiler holds (`files` as the build

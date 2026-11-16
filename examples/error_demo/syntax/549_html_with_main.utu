@@ -1,0 +1,5 @@
+// What: html and main declare two programs
+// Expect: Two mains
+using Browser from std:Browser
+html { body { p { "Hello" } } }
+main { }

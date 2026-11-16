@@ -20,7 +20,7 @@ import { programIndex } from './query.js';
 
 const HOLE = '__utu_hole_';
 const MANY = '__utu_many_';
-const COMMENT = 8;  // lex.utu's Tok.Comment
+const COMMENT = 9;  // lex.utu's Tok.Comment
 
 /**
  * A pattern as the compiler parses it: a list of nodes (one, or a run of

@@ -16,6 +16,7 @@ exports.buildTopLevelRules = function buildTopLevelRules() {
         seq($.distinct_decl, $._end),
         $.export_lib_decl,
         $.export_main_decl,
+        $.export_html_decl,
         $.test_decl,
         $.bench_decl,
       ),

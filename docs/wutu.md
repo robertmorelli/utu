@@ -139,7 +139,43 @@ spelled as written: `viewBox`, `stdDeviation`, `stroke-width`. A namespaced one,
 `xlink:href = …;`, `xml:lang = …;` or `xmlns:xlink = …;`, is an attribute (no
 CSS property has those prefixes), set in its namespace.
 
-## Components, slots, lists, and conditions
+## Components
+
+`wn` declares a function that returns `Browser.HTMLElement`. Its brace body is
+Wutu text, so `wn card(title: Str) { article { = title } }` is the same as
+`fn card(title: Str) Browser.HTMLElement => @wutu/\ article { = title } \/`.
+Use `wn` at top level, in a module, as a method, or as a protocol method.
+
+A `Component` is a struct with `render()`. List the protocol and implement
+its method, then put the struct in a hole:
+
+```utu
+struct Counter[Component]:
+    | label: Str
+
+wn Component[Counter].render |counter| () {
+    button { = counter.label }
+}
+
+html {
+    head { title { "Counters" } }
+    body { = Counter { label: "One" } }
+}
+```
+
+The hole calls `render()` for a Component value, including a value held as
+`Component` or iterated from an `Array[Component]`. It still shows text,
+numbers, Bools, and DOM elements directly. A Component is a struct and is
+rendered on every update; the scalar argument memoization below applies to
+functions returning elements.
+
+Top-level `html { … }` is a program in place of `main` or `lib`. Its `head`
+children become `document.head`; its `body` children, attributes, and CSS
+become `document.body`. It is reactive by default, so a top-level `let` holding
+mutable state can drive a page without an explicit `@reactive` directive.
+Use `@wutu/\ … \/` when a template is an expression inside ordinary code.
+
+## Slots, lists, and conditions
 
 Components are ordinary typed Utu functions. Pass data or DOM nodes as normal
 parameters and insert returned nodes with `= component(args)`. There is no

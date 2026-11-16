@@ -1,0 +1,10 @@
+// What: a Wutu hole shows a struct without Component
+// Expect: Plain is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
+using Browser from std:Browser
+
+struct Plain:
+    | value: I32
+
+main {
+    Browser.document.body.append(@wutu/\ div { = Plain { value: 1 } } \/)
+}

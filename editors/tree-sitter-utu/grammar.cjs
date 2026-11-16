@@ -13,7 +13,7 @@ module.exports = grammar({
   word: options.word,
   // A DSL's envelope: `/\`, its text, and the balancing `\/` (src/scanner.c);
   // and the line end that ends `for … { … }` without its `;`.
-  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close, $._statement_end],
+  externals: $ => [$._dsl_open, $._dsl_text, $._dsl_close, $._statement_end, $._wutu_open, $._wutu_text, $._wutu_close],
   extras: options.extras,
   conflicts: options.conflicts,
   rules: {

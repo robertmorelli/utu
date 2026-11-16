@@ -16,6 +16,12 @@ lib {
 main {
     ...
 }
+
+// reactive Wutu page
+html {
+    head { title { "Page" } }
+    body { h1 { "Hello" } }
+}
 ```
 
 `main` may take parameters for a host that calls it with arguments; `utu FILE`
@@ -24,7 +30,12 @@ calls it with none, so it refuses a `main` that takes any.
 Rules:
 - `lib` is a codegen annotation surface. It contains **only functions** — no structs, enums, globals, or tests.
 - `lib` does not create any importable Utu interface. It only marks enclosed functions for Wasm export to JS.
-- `main` and `lib` are mutually exclusive in one entry file.
+- `main`, `lib`, and `html` are mutually exclusive in one entry file.
+
+`html` lowers to a `main` that mounts a reactive `@wutu` template rooted at
+`html`. A Wutu function `wn name(params) { template }` lowers to
+`fn name(params) Browser.HTMLElement => @wutu/\ template \/`. It works at
+the same declaration sites as `fn` and can implement a protocol method.
 
 ---
 
@@ -46,6 +57,11 @@ qualifier; reach for `tag` or `rec` when the compiler diagnostic recommends one.
 ---
 
 ## Protocols
+
+Wutu supplies `Component`, whose `render()` method is used by a template
+hole. A struct lists it with `struct Counter[Component]:` and implements
+`wn Component[Counter].render |counter| () { … }`. A `Component` value uses
+protocol dispatch, so an `Array[Component]` can hold different renderers.
 
 Protocol members are pipe-delimited. Getters, setters, and methods are all members.
 

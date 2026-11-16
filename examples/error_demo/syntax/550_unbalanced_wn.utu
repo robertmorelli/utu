@@ -1,0 +1,4 @@
+// What: a wn body has no closing brace
+// Expect: Unexpected character '{'
+wn broken() {
+    p { "Missing a brace"

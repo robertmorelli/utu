@@ -9,7 +9,7 @@
 import { programIndex } from './query.js';
 
 // lex.utu's Tok, as far as coloring tells them apart.
-const TOK = { Word: 2, Int: 3, Float: 4, String: 5, MultilineLine: 6, DslBody: 7, Comment: 8, TemplateFull: 9, TemplateHead: 10, TemplateMiddle: 11, TemplateTail: 12 };
+const TOK = { Word: 2, Int: 3, Float: 4, String: 5, MultilineLine: 6, DslBody: 7, WutuBody: 8, Comment: 9, TemplateFull: 10, TemplateHead: 11, TemplateMiddle: 12, TemplateTail: 13 };
 
 // resolve.utu's Decl kinds, as classes.
 const DECL_CLASS = {
@@ -53,7 +53,7 @@ export function highlighter(utu, files) {
       const cls = kind === TOK.Comment ? 'comment'
         : kind === TOK.Int || kind === TOK.Float ? 'number'
         : kind === TOK.String || kind === TOK.MultilineLine || (kind >= TOK.TemplateFull && kind <= TOK.TemplateTail) ? 'string'
-        : kind === TOK.DslBody ? 'dsl'
+        : kind === TOK.DslBody || kind === TOK.WutuBody ? 'dsl'
         : kind === TOK.Word && tokWord[t] >= 0 && tokWord[t] < keywords ? 'keyword'
         : kind === TOK.Word && /^[A-Z]/.test(file.text.slice(at(tokStart[t]), at(tokStart[t]) + 1)) ? 'type'
         : null;

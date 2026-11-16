@@ -4,6 +4,8 @@
 ((dsl_expr (identifier) @_name (dsl_body "dsl_text" @injection.content))
   (#eq? @_name "wutu")
   (#set! injection.language "wutu"))
+((wutu_body "wutu_text" @injection.content)
+  (#set! injection.language "wutu"))
 ((dsl_expr (identifier) @_name (dsl_body "dsl_text" @injection.content))
   (#eq? @_name "es")
   (#set! injection.language "javascript"))

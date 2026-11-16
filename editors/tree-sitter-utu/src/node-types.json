@@ -3895,6 +3895,21 @@
     }
   },
   {
+    "type": "export_html_decl",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "wutu_body",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "export_lib_decl",
     "named": true,
     "fields": {},
@@ -4414,6 +4429,10 @@
         },
         {
           "type": "self_param",
+          "named": true
+        },
+        {
+          "type": "wutu_body",
           "named": true
         }
       ]
@@ -9555,6 +9574,10 @@
           "named": true
         },
         {
+          "type": "export_html_decl",
+          "named": true
+        },
+        {
           "type": "export_lib_decl",
           "named": true
         },
@@ -10964,6 +10987,11 @@
     }
   },
   {
+    "type": "wutu_body",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "yield_expr",
     "named": true,
     "fields": {},
@@ -11567,6 +11595,10 @@
     "named": false
   },
   {
+    "type": "html",
+    "named": false
+  },
+  {
     "type": "identifier",
     "named": true
   },
@@ -11800,6 +11832,14 @@
   },
   {
     "type": "windows",
+    "named": false
+  },
+  {
+    "type": "wn",
+    "named": false
+  },
+  {
+    "type": "wutu_text",
     "named": false
   },
   {

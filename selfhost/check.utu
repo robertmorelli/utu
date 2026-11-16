@@ -859,6 +859,25 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
         str_of(rt, a, m, cx)
         return prelude(Prelude.Str)
     }
+    let component = promoted(prelude_lookup(intern_text("Component")))
+    let render = intern_text("render")
+    if component >= 0 and (ty_decl(rt) == component or implements(ty_decl(rt), component)) {
+        if ty_decl(rt) == component {
+            let name = last_child(first_child(node))
+            let token = node_first[name]
+            let old = tok_word[token]
+            tok_word[token] = render
+            let result = proto_call(rt, name, -1, 0, m, node, cx)
+            tok_word[token] = old
+            return result
+        }
+        let decl = impl_of(component, render, ty_decl(rt))
+        if decl >= 0 {
+            let fi = fn_instance(decl, ty_inst(rt))
+            coerce(rt, vl_item(fi_params[fi], 0), a)
+            return call_with(fi, -1, 1, m, node, cx)
+        }
+    }
     if not shows_as_itself(rt) {
         report2(Diag.WutuHole, unspliced(a), -1, rt, -1)
         return error_value()
@@ -953,6 +972,11 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
         f = static_member(node_decl[first_child(callee)], word_of(last_child(callee)))
     }
     if not decl_is(f, Decl.Fn) or not memo_safe_fn(f) { return false }
+    let component = promoted(prelude_lookup(intern_text("Component")))
+    if component >= 0 {
+        let result = fi_result[fn_instance(f, -1)]
+        if ty_decl(result) == component or implements(ty_decl(result), component) { return false }
+    }
     let args = next_sibling(callee)
     let a = if args >= 0 { first_child(args) } else { -1 }
     while (a >= 0) {
