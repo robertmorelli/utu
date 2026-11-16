@@ -5,9 +5,7 @@ fn label() Str {
 }
 
 fn wrap(value: Str) Str {
-    "["
-    -o str_concat(&, value)
-    -o str_concat(&, "]");
+    str_concat(str_concat("[", value), "]");
 }
 
 fn decorate(value: Str) Str {

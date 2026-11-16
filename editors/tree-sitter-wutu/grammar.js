@@ -95,7 +95,7 @@ module.exports = grammar({
     number: _ => /\d[\w.]*/,
     template_string: _ => token(seq('`', repeat(choice(/[^`\\]+/, /\\./)), '`')),
     operator: _ => choice('+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
-      '&', '^', '~', '<<', '>>', '=>', '~>', '-o', '..<', '...', '&{'),
+      '&', '^', '~', '<<', '>>', '=>', '~>', '..<', '...', '&{'),
 
     // A DSL inside utu: `@name/\ … \/`, its text injected by name.
     dsl_expr: $ => seq('@', alias($.name, $.dsl_name), $.dsl_body),

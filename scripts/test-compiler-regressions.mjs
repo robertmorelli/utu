@@ -2566,7 +2566,7 @@ lib { fn run() I32 {
       'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f(v: I32) I32 { ops.double(v); } }\n',
       'main.utu': 'using boxes from "./boxes.utu";\nmod ops { fn double(v: I32) I32 { v * 10; } }\nlib { fn run() I32 { ops.double(1) + boxes.f(1); } }\n' }, 12],
     // A capitalized alias of an instance, called and piped to (this built invalid Wasm).
-    [{ 'main.utu': 'mod box[T] { fn id(v: T) T { v; } }\nusing box[F64] |B|;\nlib { fn run() F64 { B.id(1.5) + (2.5 -o B.id); } }\n' }, 4],
+    [{ 'main.utu': 'mod box[T] { fn id(v: T) T { v; } }\nusing box[F64] |B|;\nlib { fn run() F64 { B.id(1.5) + B.id(2.5); } }\n' }, 4],
     [{ 'main.utu': 'mod num[T] { fn half(v: T) T { v / 2; } }\nusing num[U32] |N|;\nlib { fn run() I64 { let x: U32 = 4000000000; N.half(x).i64(); } }\n' }, 2000000000n],
     // A module's promoted type's function, called on the module (this said "sm has no member new").
     [{ 'main.utu': 'mod Sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nlib { fn run() I32 { Sm.get(Sm.new(3)); } }\n' }, 3],

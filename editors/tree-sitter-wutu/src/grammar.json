@@ -1545,10 +1545,6 @@
         },
         {
           "type": "STRING",
-          "value": "-o"
-        },
-        {
-          "type": "STRING",
           "value": "..<"
         },
         {

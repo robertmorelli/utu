@@ -725,7 +725,6 @@ fn check_node(node: I32, expect: I32, cx: Cx) I32 {
         Node.New_expr => check_new(node, expect, cx),
         Node.Prune_expr => check_prune(node),
         Node.Iterator_expr => check_iterator(node, expect, cx),
-        Node.Pipe_expr => check_pipe(node, expect, cx),
         Node.Defer_expr => check_defer(node),
         Node.Errdefer_expr => check_errdefer(node, cx),
         Node.Try_result_expr => check_try_result(node, cx),

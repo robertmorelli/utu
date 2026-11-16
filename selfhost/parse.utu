@@ -97,13 +97,6 @@ enum(U8) Node:
     | Binary_expr
     | Iterator_expr
     | Else_expr
-    | Pipe_expr
-    | Pipe_target
-    | Pipe_args
-    | Pipe_args_with_placeholder
-    | Pipe_args_no_placeholder
-    | Pipe_arg
-    | Pipe_arg_placeholder
     | Unary_op
     | Unary_expr
     | Block_expr
@@ -371,7 +364,6 @@ fn tok_spelling(kind: I32) Str {
         Tok.PlusEq => "+=",
         Tok.Minus => "-",
         Tok.MinusEq => "-=",
-        Tok.MinusO => "-o",
         Tok.Lt => "<",
         Tok.LtEq => "<=",
         Tok.Shl => "<<",
@@ -1318,7 +1310,7 @@ fn continues_line(i: I32) Bool {
     if k == Tok.QuestionDot.i32() or k == Tok.Plus.i32() or k == Tok.Star.i32() or k == Tok.Slash.i32() or k == Tok.Percent.i32()
         or k == Tok.Caret.i32() or k == Tok.Pipe.i32() or k == Tok.EqEq.i32() or k == Tok.BangEq.i32() or k == Tok.Lt.i32()
         or k == Tok.Gt.i32() or k == Tok.LtEq.i32() or k == Tok.GtEq.i32() or k == Tok.Shl.i32() or k == Tok.Shr.i32()
-        or k == Tok.Shr3.i32() or k == Tok.MinusO.i32() or k == Tok.LBrace.i32() {
+        or k == Tok.Shr3.i32() or k == Tok.LBrace.i32() {
         return true
     }
     if k != Tok.Word.i32() { return false }
@@ -1368,7 +1360,7 @@ fn open_end(k: I32, w: I32) Bool {
         or k == Tok.EqEq.i32() or k == Tok.BangEq.i32() or k == Tok.Lt.i32() or k == Tok.Gt.i32() or k == Tok.LtEq.i32()
         or k == Tok.GtEq.i32() or k == Tok.Shl.i32() or k == Tok.Shr.i32() or k == Tok.Shr3.i32() or k == Tok.Dot.i32()
         or k == Tok.QuestionDot.i32() or k == Tok.Comma.i32() or k == Tok.Colon.i32() or k == Tok.FatArrow.i32()
-        or k == Tok.TildeArrow.i32() or k == Tok.DotDotLt.i32() or k == Tok.DotDotDot.i32() or k == Tok.MinusO.i32()
+        or k == Tok.TildeArrow.i32() or k == Tok.DotDotLt.i32() or k == Tok.DotDotDot.i32()
 }
 
 fn capture(p: Parser) I32 {
@@ -1526,13 +1518,6 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
         expr(p, 1, false)
         return node(p, Node.Else_expr, at, node_first[left])
     }
-    if k == Tok.MinusO.i32() {
-        if not binds(0, min, or_equal) { return -1 }
-        let at = mark_below(left)
-        advance(p)
-        pipe_target(p)
-        return node(p, Node.Pipe_expr, at, node_first[left])
-    }
     -1
 }
 
@@ -1593,58 +1578,6 @@ fn iterator(p: Parser, left: I32, form: I32) I32 {
         block(p)
     }
     node(p, Node.Iterator_expr, at, node_first[left])
-}
-
-fn pipe_target(p: Parser) I32 {
-    let at = mark()
-    let first = p.pos
-    if not is_word(p) { fail(p) }
-    if is_at(p, 1, Tok.LBracket) {
-        let module = mark()
-        module_name(p)
-        module_type_arg_list(p)
-        node(p, Node.Instantiated_module_ref, module, first)
-    } else {
-        // Not a module: the path starts with a plain name.
-        identifier_or_type(p)
-    }
-    while (is(p, Tok.Dot)) {
-        advance(p)
-        identifier_or_type(p)
-    }
-    // Stage 0 reads the first dot of `...` or `..<` as a path's next `.`, which then has no name.
-    if is(p, Tok.DotDotDot) or is(p, Tok.DotDotLt) { fail(p) }
-    if is(p, Tok.LParen) {
-        advance(p)
-        pipe_args(p)
-        expect(p, Tok.RParen)
-    }
-    node(p, Node.Pipe_target, at, first)
-}
-
-fn pipe_args(p: Parser) I32 {
-    let at = mark()
-    let first = p.pos
-    let args = mark()
-    let placeholder = false
-    while (true) {
-        let arg = mark()
-        let start = p.pos
-        if is(p, Tok.Amp) {
-            if placeholder { fail(p) }
-            placeholder = true
-            promoted_type(p)
-            node(p, Node.Pipe_arg_placeholder, arg, start)
-        } else {
-            expression(p)
-            node(p, Node.Pipe_arg, arg, start)
-        }
-        if not is(p, Tok.Comma) { break }
-        advance(p)
-        if is(p, Tok.RParen) { break }
-    }
-    node(p, if placeholder { Node.Pipe_args_with_placeholder } else { Node.Pipe_args_no_placeholder }, args, first)
-    node(p, Node.Pipe_args, at, first)
 }
 
 /// How deeply the parse is nested (expressions, types, `else if`s), and the
@@ -1819,9 +1752,9 @@ fn template_string(p: Parser) I32 {
 }
 
 /// Whether the token at the cursor begins `return`'s or `continue`'s optional
-/// value. Operator words (`and`, `orelse`, …) and `-o` instead extend the
-/// bare `return`; an iterator word (`count`, `sum`, …) is a name, since a
-/// bare `return` has nothing to pipe.
+/// value. Operator words (`and`, `orelse`, …) instead extend the bare
+/// `return`; an iterator word (`count`, `sum`, …) is a name, since a bare
+/// `return` has nothing to pipe.
 fn starts_expression(p: Parser) Bool {
     if at_end(p) { return false }
     if is_word(p) {

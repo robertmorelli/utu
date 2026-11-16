@@ -2330,10 +2330,6 @@ fn walk_compound(node: I32, kind: I32, w: Walk) Void {
             let label = first_child(node)
             if label >= 0 { walk_expr(next_sibling(label), w) }
         },
-        Node.Pipe_expr => {
-            walk_expr(first_child(node), w)
-            walk_pipe_target(last_child(node), w)
-        },
         Node.Unary_expr => { walk_expr(last_child(node), w) },
         Node.Dsl_expr => {},
         Node.Literal => {},
@@ -2525,38 +2521,6 @@ fn walk_field_inits(first_init: I32, owner: I32, w: Walk) Void {
         if owner >= 0 { node_decl[name] = member(owner, word_of(name), Space.Member) }
         walk_expr(next_sibling(name), w)
         f = next_sibling(f)
-    }
-}
-
-/// `x -o f`, `x -o M.f(a, &)`, `x -o T.method`.
-fn walk_pipe_target(target: I32, w: Walk) Void {
-    let c = first_child(target)
-    let owner = -1
-    if is_kind(c, Node.Instantiated_module_ref) {
-        owner = walk_type_path(c, w)
-    } else if is_kind(c, Node.Identifier) {
-        let decl = lookup(word_of(c))
-        if ambiguous(decl, c) { decl = -1 } else if decl < 0 { report_unknown(Diag.UnknownVariable, c, word_of(c), Seek.Value) } else { node_decl[c] = decl }
-        owner = decl
-    } else {
-        owner = walk_owner_name(c)
-    }
-    c = next_sibling(c)
-    while (c >= 0 and (is_kind(c, Node.Identifier) or is_kind(c, Node.Type_ident))) {
-        let found = if decl_is(owner, Decl.Module) or (owner >= 0 and is_type_decl(owner)) { static_member(owner, word_of(c)) } else { -1 }
-        node_decl[c] = found
-        owner = found
-        c = next_sibling(c)
-    }
-    if c >= 0 { walk_pipe_args(c, w) }
-}
-
-fn walk_pipe_args(args: I32, w: Walk) Void {
-    let list = first_child(args)
-    let a = first_child(list)
-    while (a >= 0) {
-        if is_kind(a, Node.Pipe_arg) { walk_expr(first_child(a), w) }
-        a = next_sibling(a)
     }
 }
 

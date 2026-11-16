@@ -44,7 +44,7 @@ fn status(flag: Bool) Str {
 }
 
 fn greet(name: Str) Str {
-    name -o wrap -o str_concat(&, "!")
+    str_concat(wrap(name), "!")
 }
 
 fn build_todos() Array[Todo] {

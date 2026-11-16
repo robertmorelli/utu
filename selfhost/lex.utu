@@ -11,14 +11,13 @@
 //! names), and the parser joins `std` `:` `Str` into a platform path.
 //! Comments are tokens, so the parser can attach them to the tree.
 //!
-//! A few tokens depend on the token before them. `-o` (pipe), `?.` (optional
-//! field), and compound assignments (`&=`, `<<=`, …) only follow a finished
-//! expression: `x -o in` pipes to `in`, while `type &= …` declares the self
-//! type. So the machine has start states after an expression and not, and
+//! A few tokens depend on the token before them. `?.` (optional field) and
+//! compound assignments (`&=`, `<<=`, …) only follow a finished expression:
+//! `x &= m` assigns, while `type &= …` declares the self type. So the machine has start states after an expression and not, and
 //! the state a token ends in says which start state comes next. Words that
 //! begin an expression (`and`, `let`, …) are paths through the word states
 //! that end in a state of their own, except after `.` or `?.`, where a word
-//! is always a name (`Box.new -o f`, `row.cl >>>= 1`): that has a start
+//! is always a name (`row.cl >>>= 1`): that has a start
 //! state of its own too.
 //!
 //! The editors' grammar, tree-sitter-utu, is the reference: for every program
@@ -69,7 +68,6 @@ enum(U8) Tok:
     | PlusEq
     | Minus
     | MinusEq
-    | MinusO
     | Lt
     | LtEq
     | Shl
@@ -326,14 +324,13 @@ fn words(m: Machine) Void {
     for (0 ..< 256) |c| {
         if is_word_char(c) and (c < 48 or c > 57) { both(m, c, m.word) }
     }
-    // Words after which an expression begins, so a `-o`, `?.`, or compound
+    // Words after which an expression begins, so a `?.` or compound
     // assignment cannot follow them. Each is a path through word states,
     // from the start states where it is a keyword, ending in one whose token
     // is followed by the start state before an expression. The keywords that
     // begin an expression are keywords wherever they stand; elsewhere other
-    // words are names: `x -o in` pipes to `in`. Not `break`, which is a whole
-    // expression, nor `return` and `continue`, whose `-o` the parser reads as
-    // a pipe (`return -o f`).
+    // words are names. Not `break`, which is a whole expression, nor `return`
+    // and `continue`.
     for (["if", "match", "loop", "alt", "promote", "try", "for", "while", "defer", "yield", "let", "cl", "new",
             "await", "assert", "not"]) |word| {
         keyword_path(m, start_before, word, start_before)
@@ -421,9 +418,8 @@ fn punctuation(m: Machine) Void {
     both(m, 92, backslash)
     set(m, backslash, 92, line)
 
-    // `-`, and after an expression `-o` and `-=`.
-    let minus = compound(m, 45, Tok.Minus, Tok.MinusEq)
-    set(m, minus, 111, ends(m, Tok.MinusO, start_before))
+    // `-`, and after an expression `-=`.
+    compound(m, 45, Tok.Minus, Tok.MinusEq)
 
     // `<`, `<=`, `<<`, and after an expression `<<=`.
     for ([start_before, start_after]) |start| {
