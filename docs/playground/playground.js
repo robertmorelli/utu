@@ -3,7 +3,7 @@
 // builds runs in the page's sandboxed iframe (#play-preview), which loads
 // preview-runtime.js. build-docs copies this file to docs/playground/ and
 // stamps the ./vendor and ./preview-runtime.js references with content hashes.
-import { PLATFORM_SOURCES, catalogStdlib, compile, formatDiagnostics, loadCompiler } from './vendor/selfhost/utu.js?v=9fe5e64539f6';
+import { PLATFORM_SOURCES, catalogStdlib, compile, formatDiagnostics, loadCompiler } from './vendor/selfhost/utu.js?v=86eabb6d7e41';
 
 const FILENAME = 'file:///playground/main.utu';
 const RUNTIME = new URL('./preview-runtime.js?v=b04e93d2d453', import.meta.url).href;
@@ -21,7 +21,7 @@ let listening;
 
 async function loadUtu() {
   const [wasm, spec] = await Promise.all([
-    fetch(new URL('./vendor/utu.wasm?v=403ea3deb7e6', import.meta.url)).then(response => response.arrayBuffer()),
+    fetch(new URL('./vendor/utu.wasm?v=9d22a3231f60', import.meta.url)).then(response => response.arrayBuffer()),
     fetch(new URL('./vendor/utu.host.json?v=b0b65f6699e3', import.meta.url)).then(response => response.json()),
   ]);
   return loadCompiler(wasm, spec);
