@@ -1539,6 +1539,8 @@ fn resolve_names() I32 {
 /// Replace sugar nodes after syntax clients have read the source tree, before
 /// declarations and DSLs are expanded.
 fn desugar_wutu_surfaces() Void {
+    dsl_html_site.clear()
+    dsl_html_start.clear()
     let limit = file_root.len()
     for (0 ..< limit) |file| {
         if not is_own_file(file) or file_root[file] < 0 { continue }
@@ -1552,21 +1554,41 @@ fn desugar_wutu_items(parent: I32) Void {
         if is_kind(item, Node.Module_decl) or is_kind(item, Node.Export_lib_decl) { desugar_wutu_items(item) }
         let body = last_child(item)
         if is_kind(body, Node.Wutu_body) {
+            let original_first = first_child(item)
+            let original_header_end = -1
+            let h = original_first
+            while (h >= 0 and h != body) {
+                original_header_end = h
+                h = next_sibling(h)
+            }
             let open = tok_start[node_first[body]]
-            let close = tok_end[node_first[body]]
-            let inside = bytes_text(open + 1, close - 1)
             let code = if is_kind(item, Node.Export_html_decl) {
-                "main { wutu.page(@wutu/\\ @reactive; html { " + inside + " } \\/) }"
+                "main { wutu.page(@wutu/\\ \\/) }"
             } else {
                 "fn" + bytes_text(tok_end[node_first[item]], open)
-                    + " Browser.HTMLElement => @wutu/\\ " + inside + " \\/"
+                    + " Browser.HTMLElement => @wutu/\\ \\/"
             }
             dsl_current_site[0] = item
             dsl_current_from[0] = -1
             dsl_current_to[0] = -1
+            let site_at = dsl_sites.len()
             let root = parse_generated_file(code)
             if root >= 0 {
+                let site = dsl_sites[site_at]
+                let generated_body = last_child(site)
+                node_next[first_child(site)] = body
+                node_next[body] = -1
+                set_parent(body, site)
+                node_parent[generated_body] = -1
+                if is_kind(item, Node.Export_html_decl) {
+                    dsl_html_site.push(site)
+                    dsl_html_start.push(tok_start[node_first[item]])
+                }
                 let made = first_child(root)
+                if original_header_end >= 0 {
+                    node_next[original_header_end] = child_of_kind(made, Node.Return_type)
+                    node_child[made] = original_first
+                }
                 node_kind[item] = node_kind[made]
                 node_child[item] = node_child[made]
                 node_child[made] = -1

@@ -592,10 +592,36 @@ fn wutu_brace_end(i: I32, n: I32) I32 {
     -1
 }
 
-fn wutu_html_open(i: I32, n: I32) Bool {
-    let j = i
-    while (j < n and (src[j] == 32 or src[j] == 9 or src[j] == 10 or src[j] == 13)) { j += 1 }
-    j < n and src[j] == 123
+/// Whether the word at i begins its line (only blanks before it).
+fn starts_line(i: I32) Bool {
+    let k = i
+    while (k > 0 and (src[k - 1] == 32 or src[k - 1] == 9)) { k -= 1 }
+    k == 0 or src[k - 1] == 10
+}
+
+/// Where the `{` of a Wutu body opens after the sugar word ending at j, or
+/// -1: `html {`, or `wn name … (…) {` on its line (the `{` right after the
+/// header's `)`). A `wn` or `html` anywhere else is a name.
+fn wutu_open(i: I32, j: I32, n: I32, html: Bool) I32 {
+    if not starts_line(i) { return -1 }
+    let k = j
+    while (k < n and (src[k] == 32 or src[k] == 9)) { k += 1 }
+    if html { return if k < n and src[k] == 123 { k } else { -1 } }
+    // A name first, then the header up to its last `)`, on this line.
+    if k == j or k >= n or not ((src[k] >= 97 and src[k] <= 122) or (src[k] >= 65 and src[k] <= 90) or src[k] == 95) { return -1 }
+    let depth = 0
+    let closed = false
+    while (k < n and src[k] != 10) {
+        let c = src[k]
+        if c == 40 or c == 91 { depth += 1; closed = false }
+        else if c == 41 or c == 93 {
+            depth -= 1
+            closed = depth == 0 and c == 41
+        } else if c == 123 and depth == 0 { return if closed { k } else { -1 } }
+        else if not (c == 32 or c == 9) { closed = false }
+        k += 1
+    }
+    -1
 }
 
 /// Where the text of a template string that starts at `i` ends: at its
@@ -682,7 +708,8 @@ fn lex_to(first: I32, n: I32) I32 {
     template_opens.clear()
     template_ran_out[0] = 0
     let start = start_before
-    let wutu_body = false
+    // Where the `{` of a `wn` or `html` body is, once its word is read.
+    let wutu_at = -1
     let state = start
     let next = dfa[start * 256 + src[first]]
     loop match next {
@@ -692,15 +719,13 @@ fn lex_to(first: I32, n: I32) I32 {
         },
         1 => {  // accept_code
             let kind = kind_of[state]
-            if kind == Tok.Word.i32() and ((j - i == 2 and src[i] == 119 and src[i + 1] == 110)
-                    or (j - i == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 and wutu_html_open(j, n))) {
-                wutu_body = true
-            }
-            if kind == Tok.LBrace.i32() and wutu_body {
+            if kind == Tok.Word.i32() and j - i == 2 and src[i] == 119 and src[i + 1] == 110 { wutu_at = wutu_open(i, j, n, false) }
+            if kind == Tok.Word.i32() and j - i == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 { wutu_at = wutu_open(i, j, n, true) }
+            if kind == Tok.LBrace.i32() and i == wutu_at {
                 let end_ = wutu_brace_end(i, n)
                 if end_ < 0 { return tokens_end(put_token(t, Tok.Error.i32(), i, i)) }
                 t = put_token(t, Tok.WutuBody.i32(), i, end_)
-                wutu_body = false
+                wutu_at = -1
                 start = start_after
                 i = end_
                 j = end_

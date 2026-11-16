@@ -68,15 +68,15 @@ using console from std:Console
  5 │ }
  6 │ using console from std:Console`);
   // On a terminal, colored as the compiler reads it: \`add\` a function, \`I32\` a type, the string a string.
-  const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', COLORTERM: 'truecolor', UTU_THEME: 'dark' } }).stderr;
+  const colored = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '', FORCE_COLOR: '1', COLORTERM: 'truecolor', UTU_THEME: 'dark' } }).stderr;
   assert.match(colored, /\x1b\[38;2;130;170;255madd/);
   assert.match(colored, /\x1b\[38;2;125;207;255mI32/);
   assert.match(colored, /\x1b\[38;2;158;206;106m"two"/);
   // Without 24-bit color, the nearest of the 256.
-  const fewer = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', COLORTERM: '', TERM_PROGRAM: '', UTU_THEME: 'dark' } }).stderr;
+  const fewer = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '', FORCE_COLOR: '1', COLORTERM: '', TERM_PROGRAM: '', UTU_THEME: 'dark' } }).stderr;
   assert.match(fewer, /\x1b\[38;5;\d+madd/);
   // NO_COLOR wins; FORCE_COLOR=0 is no.
-  for (const env of [{ NO_COLOR: '1', FORCE_COLOR: '1' }, { FORCE_COLOR: '0' }]) {
+  for (const env of [{ NO_COLOR: '1', FORCE_COLOR: '1' }, { NO_COLOR: '', FORCE_COLOR: '0' }]) {
     const plain = spawnSync(process.execPath, [cli, 'check', 'bad.utu'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...env } }).stderr;
     assert.ok(!plain.includes('\x1b['), JSON.stringify(env));
   }

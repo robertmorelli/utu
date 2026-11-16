@@ -367,7 +367,7 @@ export async function formatUtu(source, { shape } = {}) {
   const before = await shape(source);
   if (!before) return { text: source, refused: 'it does not parse' };
   // Brace-bodied Wutu sugar is opaque to the Utu layout pass.
-  if (/^[ \t]*(?:wn|html)\b/m.test(source)) return { text: source, refused: null };
+  if (/^[ \t]*(?:wn[ \t]+|html[ \t]*\{)/m.test(source)) return { text: source, refused: 'brace-bodied Wutu declarations are not yet supported by the formatter' };
   const once = formatWutuSource(layoutUtu(source));
   if (once === source) return { text: source, refused: null };
   if (await shape(once) !== before) return { text: source, refused: 'its layout would parse differently' };

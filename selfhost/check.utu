@@ -863,13 +863,7 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
     let render = intern_text("render")
     if component >= 0 and (ty_decl(rt) == component or implements(ty_decl(rt), component)) {
         if ty_decl(rt) == component {
-            let name = last_child(first_child(node))
-            let token = node_first[name]
-            let old = tok_word[token]
-            tok_word[token] = render
-            let result = proto_call(rt, name, -1, 0, m, node, cx)
-            tok_word[token] = old
-            return result
+            return proto_call_named(rt, render, -1, -1, 0, m, node, cx)
         }
         let decl = impl_of(component, render, ty_decl(rt))
         if decl >= 0 {
@@ -974,7 +968,7 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
     if not decl_is(f, Decl.Fn) or not memo_safe_fn(f) { return false }
     let component = promoted(prelude_lookup(intern_text("Component")))
     if component >= 0 {
-        let result = fi_result[fn_instance(f, -1)]
+        let result = type_of(child_of_kind(decl_node[f], Node.Return_type), instance_for(module_of(f), cx.inst))
         if ty_decl(result) == component or implements(ty_decl(result), component) { return false }
     }
     let args = next_sibling(callee)

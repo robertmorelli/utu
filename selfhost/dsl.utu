@@ -135,10 +135,25 @@ fn dsl_container(node: I32) I32 {
     file_root[file_of_token(node_first[node])]
 }
 
-/// The body of a site: after `/\`, before `\/`, as written.
-fn dsl_inner_start(site: I32) I32 => tok_start[node_first[last_child(site)]] + 2
+/// An html declaration includes its `html` word in the template root.
+vec dsl_html_site: I32
+vec dsl_html_start: I32
 
-fn dsl_inner_end(site: I32) I32 => tok_end[node_first[last_child(site)]] - 2
+/// The body of a site, as written in the original file.
+fn dsl_inner_start(site: I32) I32 {
+    for (0 ..< dsl_html_site.len()) |i| {
+        if dsl_html_site[i] == site { return dsl_html_start[i] }
+    }
+    let token = node_first[last_child(site)]
+    tok_start[token] + if tok_kind[token] == Tok.WutuBody.i32() { 1 } else { 2 }
+}
+
+fn dsl_inner_end(site: I32) I32 {
+    let token = node_first[last_child(site)]
+    let html = false
+    for (0 ..< dsl_html_site.len()) |i| { if dsl_html_site[i] == site { html = true } }
+    tok_end[token] - if tok_kind[token] == Tok.WutuBody.i32() { if html { 0 } else { 1 } } else { 2 }
+}
 
 /// A site's body, as text.
 fn dsl_body(site: I32) Str => bytes_text(dsl_inner_start(site), dsl_inner_end(site))

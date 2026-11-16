@@ -884,6 +884,7 @@ fn parse_template(text: Str) I32 {
     if wp_char(text) == 64 { at_directive(text, wp_at[0], false) }
     let root = parse_tnode(text)
     if tn_kind[root] != 4 { wutu_fail("root must be an element", tn_start[root]) }
+    if word_text(tn_text[root]) == "html" { tw_reactive[0] = 1 }
     wp_trivia(text)
     if not wp_done(text) { wutu_fail("expected exactly one root element; use a component for siblings", wp_at[0]) }
     root

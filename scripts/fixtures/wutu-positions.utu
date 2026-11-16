@@ -1,0 +1,20 @@
+using Browser from std:Browser
+
+struct Thing:
+    | value: I32
+
+wn card(text: Str) {
+    section {
+        "ok"
+        p { = text.nope }
+    }
+}
+
+html {
+    head { title { "Test" } }
+    body {
+        = card("a")
+        p { = missing_name }
+        = Thing { value: 1 }
+    }
+}

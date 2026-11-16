@@ -57,7 +57,7 @@
 
 ; Keywords
 [
-  "fn" "let" "struct" "enum" "proto" "mod" "type" "distinct" "tag" "rec"
+  "fn" "gn" "wn" "html" "let" "struct" "enum" "proto" "mod" "type" "distinct" "tag" "rec"
   "mem" "vec" "const" "using" "from" "lazy" "export" "lib" "main" "test" "bench" "measure"
   "get" "set" "new" "cl" "fun"
 ] @keyword

@@ -31,6 +31,11 @@ for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   const { text, refused } = await formatUtu(source, { shape });
   const name = path.relative(ROOT, file);
+  if (/^[ \t]*(?:wn[ \t]+|html[ \t]*\{)/m.test(source)) {
+    assert.match(refused, /brace-bodied Wutu declarations/);
+    assert.equal(text, source, `${name}: a refused file changed`);
+    continue;
+  }
   assert.equal(refused, null, `${name}: left as is (${refused})`);
   assert.equal(await formatUtuSource(text, { shape }), text, `${name}: formatting twice differs from once`);
   if (text !== source) formatted++;

@@ -461,15 +461,20 @@ fn proto_test_cast(r: I32, heap: I32) I32 {
 /// `p.foo(args)`: the receiver is on the stack since `m`; the arguments
 /// from the `first`th (1 for `P.foo(p, …)`, whose first is p).
 fn proto_call(t: I32, name: I32, args: I32, first: I32, m: I32, at: I32, cx: Cx) I32 {
+    proto_call_named(t, word_of(name), name, args, first, m, at, cx)
+}
+
+/// Invoke a protocol method whose name is known without borrowing a source token.
+fn proto_call_named(t: I32, word: I32, name: I32, args: I32, first: I32, m: I32, at: I32, cx: Cx) I32 {
     let proto = ty_decl(t)
-    let pm = protocol_member(proto, word_of(name))
+    let pm = protocol_member(proto, word)
     if pm < 0 or not is_kind(decl_node[pm], Node.Proto_method) {
-        report2(Diag.UnknownMethod, at, word_of(name), t, -1)
+        report2(Diag.UnknownMethod, at, word, t, -1)
         return finish_error(args, m, cx)
     }
-    node_decl[name] = pm
+    if name >= 0 { node_decl[name] = pm }
     if mentions_self(decl_node[pm]) {
-        report2(Diag.ProtoSelfDynamic, at, word_of(name), t, -1)
+        report2(Diag.ProtoSelfDynamic, at, word, t, -1)
         diag_label("any " + type_text(t))
         return finish_error(args, m, cx)
     }
