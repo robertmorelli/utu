@@ -1,11 +1,11 @@
 {
-  "commit": "adc89846049f0f5070dc3abc491f9f72bdeab3a0",
-  "selfhostTree": "a44fd027f2461f18654cc08ddf0f816227eeaf89",
-  "sourcesHash": "54fce807c220c2fc2bbbf15faf164f18f68861339cdce971cd57d3e0740ab7d5",
-  "sha256": "403ea3deb7e634cb4c3fd3a4d70415055502622a5c52d11b69c6ea68d82f4193",
-  "bytes": 532338,
-  "builtBy": "92321e0ea83e73f2dc5b17ff6c26308d634060f30a72600bf37fc0095ebd3317",
+  "commit": "33e0aa236a047c99bb93006901292388f1b2f59b",
+  "selfhostTree": "25baed8df5a51104be40ad03782b219a77fe9d2c",
+  "sourcesHash": "47a94c68888e983cf219ff3648c4d2c944adbb91e6d4c0a27ff30bfe6a571103",
+  "sha256": "b791a9fd75a3abf435c00e10105722d38fd34462bff68306fe297902654dc308",
+  "bytes": 532805,
+  "builtBy": "403ea3deb7e634cb4c3fd3a4d70415055502622a5c52d11b69c6ea68d82f4193",
   "node": "v25.8.1",
-  "date": "2026-11-16T07:56:52.955Z",
-  "reason": "wn, Component, html"
+  "date": "2026-11-16T08:05:04.968Z",
+  "reason": "Browser import error"
 }
