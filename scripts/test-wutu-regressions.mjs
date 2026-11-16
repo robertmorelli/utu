@@ -11,7 +11,7 @@ import { chromium, webkit } from 'playwright';
 const out = await fs.mkdtemp(path.resolve('.tmp-wutu-regressions-'));
 let server, browser;
 try {
-  execFileSync('node', ['cli/wutu.mjs', 'build', 'examples/wutu-regressions/main.utu', '--out', out], { stdio: 'pipe' });
+  execFileSync('node', ['cli/utu.mjs', 'build', 'examples/wutu-regressions/main.utu', '--out', out], { stdio: 'pipe' });
   // A component passed to another lands inside it, prerendered too.
   const nested = (await fs.readFile(path.join(out, 'index.html'), 'utf8')).match(/<div id="nested"[^>]*>(.*?)<\/div>/)[1];
   assert.equal(nested.replace(/ (data-wutu|class)="[^"]*"/g, ''),

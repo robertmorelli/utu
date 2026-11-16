@@ -57,9 +57,9 @@ Wutu now supports reactive roots, keyed DOM reuse, scoped node aliases, two-way
 bindings, typed local storage, prerendering, and a compiler-backed preview.
 
 ```sh
-wutu serve examples/wutu-five/folio/main.utu
-wutu format examples/wutu-five/folio/main.utu
-wutu build examples/wutu-five/folio/main.utu --out dist/folio
+utu examples/wutu-five/folio/main.utu
+utu format examples/wutu-five/folio/main.utu
+utu build examples/wutu-five/folio/main.utu --out dist/folio
 ```
 
 The five-site gallery is built with `bun run demo:wutu-five`. Its source viewers

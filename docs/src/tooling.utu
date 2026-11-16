@@ -26,9 +26,9 @@ mod tooling {
         \\bun ./cli/utu.mjs grep --refs word_counts examples/
     }
     fn wutu_sample() Str {
-        \\wutu format <files...> [--check]
-        \\wutu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
-        \\wutu serve <entry.utu> [--port 4176] [--out dist/wutu]
+        \\utu format <files...> [--check]
+        \\utu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
+        \\utu <entry.utu> [--port 4176] [--out dist/wutu]
     }
     fn neovim_sample() Str {
         \\node editors/neovim/install.mjs     # Neovim: language server, grammars, highlighting, folds

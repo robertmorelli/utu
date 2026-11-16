@@ -395,7 +395,7 @@ type-checks it as usual (a missing file, a misspelled function, or a wrong
 argument is a compile error), but does not contain it: a call such as
 `guide.page("you")` returns a placeholder element, typed as the function
 declares (`Browser.HTMLElement`), that the module's chunk fills when it
-arrives. `wutu build` builds one chunk per lazy module, with exactly the
+arrives. `utu build` builds one chunk per lazy module, with exactly the
 functions the program calls, as `chunks/guide-<hash>/app.js` and `app.wasm`
 (named by their bytes, so they cache safely). A prerendered placeholder keeps
 its markup until the chunk arrives, and the prerenderer waits for chunks.
@@ -558,10 +558,10 @@ See the [complete reactive example](../examples/wutu-reactive/main.utu) and
 ## Formatting, editor support, and preview
 
 ```sh
-wutu format examples/wutu-five/folio/main.utu
-wutu format examples/wutu-five/folio/main.utu --check
-wutu serve examples/wutu-five/folio/main.utu --port 4176
-wutu build examples/wutu-five/folio/main.utu --out dist/folio
+utu format examples/wutu-five/folio/main.utu
+utu format examples/wutu-five/folio/main.utu --check
+utu examples/wutu-five/folio/main.utu --port 4176
+utu build examples/wutu-five/folio/main.utu --out dist/folio
 ```
 
 The formatter lays out surrounding Utu and parsed Wutu islands together, while
@@ -582,7 +582,7 @@ reload, not hot module replacement: arbitrary in-memory objects are not restored
 
 ## Prerendering and hydration
 
-`wutu build` prerenders by default using build-time Chromium. HTML contains real
+`utu build` prerenders by default using build-time Chromium. HTML contains real
 content and styles, so it remains readable without JavaScript or before Wasm
 loads. The runtime reuses marked DOM on startup, including keyed nodes, and
 loads the user's stored state. Form controls are disabled until hydration to
@@ -593,7 +593,7 @@ prerender, and replace their snapshot once on startup. Build-time rendering runs
 a clean browser context: render public defaults, never private build credentials
 or user data. The current prerenderer captures synchronous initialization; it is
 not an asynchronous data loader or routing system. `--no-prerender` skips this
-step. `wutu build` takes `utu build`'s modes: `-O small` (the default) and
+step. `utu build` takes these modes: `-O small` (the default) and
 `-O fast` keep the safety checks, `-O smallUnsafe` and `-O fastUnsafe` drop them. It builds
 beside `--out` and moves its files in only once the build and prerender succeed: a failed build
 leaves `--out` as it was, and other files there are kept. Playwright and the compiler are build tools; neither ships in the website.

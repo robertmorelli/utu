@@ -1,4 +1,4 @@
-// `wutu format` (formatUtuSource): every program in examples/, std/ and
+// `utu format` (formatUtuSource): every program in examples/, std/ and
 // docs/src formats to text that parses to the same tree, and formatting
 // twice is formatting once. Templates, `@wutu` attributes and selectors,
 // `|` fields and trailing comments keep their meaning; a file that does not
@@ -31,11 +31,6 @@ for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   const { text, refused } = await formatUtu(source, { shape });
   const name = path.relative(ROOT, file);
-  if (/^[ \t]*(?:wn[ \t]+|html[ \t]*\{)/m.test(source)) {
-    assert.match(refused, /brace-bodied Wutu declarations/);
-    assert.equal(text, source, `${name}: a refused file changed`);
-    continue;
-  }
   assert.equal(refused, null, `${name}: left as is (${refused})`);
   assert.equal(await formatUtuSource(text, { shape }), text, `${name}: formatting twice differs from once`);
   if (text !== source) formatted++;
@@ -55,6 +50,65 @@ for (const [source, expected] of cases) {
   const { text, refused } = await formatUtu(source, { shape });
   if (expected === null) assert.ok(refused && text === source, `left alone: ${source}`);
   else assert.equal(text, expected);
+}
+
+// Brace declarations are formatted even inside modules and alongside ordinary Utu.
+{
+  const source = 'using Browser from std:Browser\nmod ui {\nwn greeting(text: Str) { span { = text; } }\n}\nhtml { body { = ui.greeting("Hello  世界"); } }\n';
+  const expected = `using Browser from std:Browser
+mod ui {
+    wn greeting(text: Str) {
+        span {
+            = text;
+        }
+    }
+}
+html {
+    body {
+        = ui.greeting("Hello  世界");
+    }
+}
+`;
+  const result = await formatUtu(source, { shape });
+  assert.equal(result.refused, null);
+  assert.equal(result.text, expected);
+  assert.equal(await formatUtuSource(result.text, { shape }), expected);
+  assert.notEqual(shape(source), shape(source.replace('Hello  世界', 'Hello 世界')), 'string whitespace is meaningful');
+  assert.notEqual(shape(source), shape(source.replace('= text;', '= text; "extra";')), 'Wutu children are meaningful');
+}
+
+// Compile formatted brace bodies, including comments, CSS, handlers, and opaque JS.
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-format-braces-'));
+  try {
+    for (const [name, source] of [
+      ['components.utu', fs.readFileSync(path.join(ROOT, 'examples/wutu-components/main.utu'), 'utf8')],
+      ['reactive.utu', 'using Browser from std:Browser\nwn greeting() { @reactive; div { \"Hello\"; } }\nhtml { body { = greeting(); } }\n'],
+      ['page.utu', 'using Browser from std:Browser\nhtml { body { form { label { for="q"; "Find  世界"; } input#q { display: grid; type="search"; } } } }\n'],
+    ]) {
+      const { text, refused } = await formatUtu(source, { shape });
+      assert.equal(refused, null, name);
+      assert.notEqual(text, source, `${name}: actually formats`);
+      assert.equal(await formatUtuSource(text, { shape }), text, name);
+      if (name === 'components.utu') {
+        assert.ok(text.includes('// A brace in a comment does not end this wn: }'));
+        assert.ok(text.includes('() => { return 1 }'));
+      }
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, source);
+      const needsFormatting = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'format', file, '--check'], { encoding: 'utf8' });
+      assert.equal(needsFormatting.status, 1, needsFormatting.stderr);
+      const formatted = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'format', file], { encoding: 'utf8' });
+      assert.equal(formatted.status, 0, formatted.stderr);
+      assert.equal(fs.readFileSync(file, 'utf8'), text);
+      const checked = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'check', file], { encoding: 'utf8' });
+      assert.equal(checked.status, 0, `${name}: ${checked.stderr}`);
+      const cliCheck = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'format', file, '--check'], { encoding: 'utf8' });
+      assert.equal(cliCheck.status, 0, cliCheck.stderr);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 // Wutu: `}else{` formats like `} else {` (the island was once left as written).
@@ -81,4 +135,4 @@ for (const [source, expected] of cases) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-console.log(`formatter: ${files.length} programs (${formatted} reformatted) keep their tree and are stable; ${cases.length + 1} cases passed`);
+console.log(`formatter: ${files.length} programs (${formatted} reformatted) keep their tree and are stable; targeted layout, CLI, and compilation checks passed`);

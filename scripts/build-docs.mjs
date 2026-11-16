@@ -69,7 +69,7 @@ function run(command, args) {
 
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-docs-'));
 try {
-  const args = ['cli/wutu.mjs', 'build', entry, '--out', temp, '--title', 'utu'];
+  const args = ['cli/utu.mjs', 'build', entry, '--out', temp, '--title', 'utu'];
   if (process.argv.includes('--no-prerender')) args.push('--no-prerender');
   await run(process.execPath, args);
   await buildPlayground(temp);

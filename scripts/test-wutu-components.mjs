@@ -4,11 +4,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { createSyntaxShape, formatUtu } from '../src/wutu/wutu-tooling.js';
+import { loadNodeCompiler } from '../src/selfhost/node.js';
 
 const out = await fs.mkdtemp(path.join(os.tmpdir(), 'wutu-components-'));
 let browser;
 try {
-  const args = ['cli/wutu.mjs', 'build', 'examples/wutu-components/main.utu', '--out', out];
+  const source = await fs.readFile('examples/wutu-components/main.utu', 'utf8');
+  const formatted = await formatUtu(source, { shape: createSyntaxShape(await loadNodeCompiler()) });
+  assert.equal(formatted.refused, null);
+  const entry = path.join(out, 'main.utu');
+  await fs.writeFile(entry, formatted.text);
+  const args = ['cli/utu.mjs', 'build', entry, '--out', out];
   let build = spawnSync('node', args, { encoding: 'utf8' });
   if (build.status !== 0 && /listen EPERM/.test(build.stderr)) {
     build = spawnSync('node', [...args, '--no-prerender'], { encoding: 'utf8' });

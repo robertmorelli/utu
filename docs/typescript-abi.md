@@ -208,7 +208,7 @@ them from the module's default export, as a CommonJS module has no named ones. T
 the same specifier, so the package must be resolvable by the bundler or runtime.
 
 `utu build` bundles a package's browser build (package.json's `browser`
-field or condition), as `wutu build` does: the module then loads in a browser,
+field or condition), as `utu build` does: the module then loads in a browser,
 and in Node, which has the web APIs such builds use. A Node build may not load
 in a browser (nanoid's needs `Buffer`). `utu build --target node` bundles Node
 builds instead, for a module only Node runs.

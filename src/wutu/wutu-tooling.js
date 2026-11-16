@@ -2,7 +2,7 @@
 //
 // The formatter is conservative. Utu outside DSL islands keeps its tokens, and
 // formatting is driven by the Wutu parser rather than regex rewrites of
-// executable expressions. Bodies with comments are left untouched.
+// executable expressions. Legacy DSL bodies with comments are left untouched.
 import { dslLiterals, dslOpenerAt, skipDsl } from './dsl-envelope.js';
 import { parseWutu, wutuVocabulary } from './wutu-parse.js';
 
@@ -366,8 +366,6 @@ export async function formatUtu(source, { shape } = {}) {
   if (!shape) throw new Error('formatUtu needs a self-hosted parser shape function');
   const before = await shape(source);
   if (!before) return { text: source, refused: 'it does not parse' };
-  // Brace-bodied Wutu sugar is opaque to the Utu layout pass.
-  if (/^[ \t]*(?:wn[ \t]+|html[ \t]*\{)/m.test(source)) return { text: source, refused: 'brace-bodied Wutu declarations are not yet supported by the formatter' };
   const once = formatWutuSource(layoutUtu(source));
   if (once === source) return { text: source, refused: null };
   if (await shape(once) !== before) return { text: source, refused: 'its layout would parse differently' };
@@ -377,8 +375,9 @@ export async function formatUtu(source, { shape } = {}) {
 
 /**
  * A syntax shape function for formatUtu, made from a loaded self-hosted
- * compiler. It compares the parser's node structure and every token's text,
- * except Wutu bodies, which formatWutuSource validates separately.
+ * compiler. It compares the parser's node structure and every token's text.
+ * Brace bodies are one compiler token: compare their Wutu trees and literal
+ * text as well. Legacy DSL bodies are validated by formatWutuSource.
  */
 export function createSyntaxShape(utu) {
   const encoder = new TextEncoder(), decoder = new TextDecoder();
@@ -396,11 +395,23 @@ export function createSyntaxShape(utu) {
     const kinds = new Uint8Array(utu.node_kind.buffer);
     const text = t => decoder.decode(new Uint8Array(utu.src.buffer, start[t], end[t] - start[t]));
     const out = [];
-    const walk = n => {
+    const walk = (n, parentKind) => {
       const kind = utu.node_kind_name(kinds[n]);
       out.push('(', kind);
       if (kind === 'dsl_expr' && text(first[n] + 1) === 'wutu') {
         out.push('@wutu', ')');
+        return;
+      }
+      if (kind === 'wutu_body') {
+        // Keep every non-whitespace character, including whitespace inside strings.
+        // The Wutu parser also checks whether line breaks change statement boundaries.
+        const body = text(first[n]);
+        // Match desugaring: wn contains a template; html supplies its root tag.
+        const tree = parseWutu(parentKind === 'export_html_decl' ? `html ${body}` : body.slice(1, -1));
+        out.push(JSON.stringify(tree, (key, value) =>
+          key === 'start' || key === 'end' || /range$/i.test(key) ? undefined
+            : typeof value === 'string' ? value.replace(/[\s;]+/g, '') : value));
+        out.push(body.match(/"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\s]/g)?.join('') ?? '', ')');
         return;
       }
       const children = [];
@@ -408,13 +419,13 @@ export function createSyntaxShape(utu) {
       let t = first[n];
       for (const c of children) {
         while (t < first[c]) out.push(JSON.stringify(text(t++)));
-        walk(c);
+        walk(c, kind);
         t = last[c];
       }
       while (t < last[n]) out.push(JSON.stringify(kind === 'comment' ? text(t++).trimEnd() : text(t++)));
       out.push(')');
     };
-    walk(root);
+    try { walk(root); } catch { return null; }
     return out.join(' ');
   };
 }

@@ -7,7 +7,7 @@ const dir=await fs.mkdtemp(path.resolve('.wutu-preview-test-'));
 const entry=path.join(dir,'main.utu');
 const source=text=>`using Browser from std:Browser; main {let app=@wutu/\\ @reactive; main {h1 {"${text}";} input {aria-label="Draft";} } \\/;Browser.document.body.append(app);}`;
 await fs.writeFile(entry,source('First build'));
-const child=spawn(process.execPath,['cli/wutu.mjs','serve',entry,'--out',path.join(dir,'output'),'--port','0'],{stdio:['ignore','pipe','pipe']});
+const child=spawn(process.execPath,['cli/utu.mjs',entry,'--out',path.join(dir,'output'),'--port','0'],{stdio:['ignore','pipe','pipe']});
 let log='';child.stdout.on('data',b=>log+=b);child.stderr.on('data',b=>log+=b);
 const browser=await chromium.launch();
 try{

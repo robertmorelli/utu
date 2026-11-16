@@ -20,8 +20,8 @@ const CHUNK_FAILED = 'chunkError = error;';
 const FAILED = 'document.documentElement.setAttribute("data-utu-error",String(error.message??error));const notice=document.createElement("p");notice.setAttribute("role","status");notice.textContent="Interactive tools could not start. The page is still available to read. Try reloading in a browser with WebAssembly GC support.";document.body.append(notice);console.error(error);';
 
 /** Package any UTU main as browser Wasm and its generated JS loader. */
-export async function buildBrowserApp({ entry, outDir, stdlib, optimize = 'size', safe = true }) {
-  return buildWithSelfhost({ entry, outDir, stdlib, optimize, safe });
+export async function buildBrowserApp({ entry, outDir, stdlib, optimize = 'size', safe = true, compiled }) {
+  return buildWithSelfhost({ entry, outDir, stdlib, optimize, safe, compiled });
 }
 
 /**
@@ -69,13 +69,13 @@ async function buildChunks({ lazy, files, outDir, stdlib, optimize, safe }) {
 }
 
 /** buildBrowserApp with the self-hosted compiler: its module, glue, and loader. */
-async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true, chunk = false }) {
+async function buildWithSelfhost({ entry, outDir, stdlib, optimize, safe = true, chunk = false, compiled }) {
   const started = performance.now();
   const { compileFile, loadNodeCompiler } = await import('../../src/selfhost/node.js');
   const { glueSource, loaderSource } = await import('../../src/selfhost/loader.js');
   const { formatDiagnostics: format } = await import('../../src/selfhost/format.js');
   const utu = await loadNodeCompiler();
-  const result = await compileFile(utu, path.resolve(entry), { optimize, safe, ...(stdlib ? { stdlib } : {}) });
+  const result = compiled ?? await compileFile(utu, path.resolve(entry), { optimize, safe, ...(stdlib ? { stdlib } : {}) });
   // Warnings alone never fail a build.
   const errors = result.diagnostics.filter(d => d.severity !== 'warning');
   if (!result.wasm || errors.length) {

@@ -106,7 +106,7 @@ try {
   if (!(starterBinary instanceof Uint8Array)) throw new Error('Wutu starter did not compile');
   await commands.get('utu.previewWutuWebsite')(starter);
   const preview = globalThis.__utuVscodeStub.terminals.at(-1);
-  if (!preview?.sent?.includes('cli/wutu.mjs') || !preview.sent.includes('serve')) throw new Error('Wutu preview did not launch wutu serve');
+  if (!preview?.sent?.includes('cli/utu.mjs')) throw new Error('Wutu preview did not launch utu');
 
   (nodeBundle.deactivate ?? nodeBundle.default?.deactivate)?.();
   for (const disposable of context.subscriptions.reverse()) disposable?.dispose?.();
@@ -187,7 +187,7 @@ const workspace = {
   workspaceFolders: [{ uri: Uri.parse(${JSON.stringify(pathToFileURL(ROOT).href)}), name: 'utu', index: 0 }],
   getWorkspaceFolder() { return this.workspaceFolders[0]; },
   fs: {
-    async stat(uri) { if (uri.fsPath.endsWith('/cli/wutu.mjs') || state.files.has(uri.toString())) return {}; throw Object.assign(new Error('missing'), { code: 'FileNotFound' }); },
+    async stat(uri) { if (uri.fsPath.endsWith('/cli/utu.mjs') || state.files.has(uri.toString())) return {}; throw Object.assign(new Error('missing'), { code: 'FileNotFound' }); },
     async createDirectory() {},
     async writeFile(uri, bytes) { state.files.set(uri.toString(), new TextDecoder().decode(bytes)); },
     async readFile(uri) {

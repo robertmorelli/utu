@@ -45,9 +45,9 @@ mod start {
         \\}
     }
     fn wutu_sample() Str {
-        \\wutu serve main.utu          # live-reload preview
-        \\wutu format main.utu         # format source
-        \\wutu build main.utu --out dist/site
+        \\utu main.utu          # live-reload preview
+        \\utu format main.utu         # format source
+        \\utu build main.utu --out dist/site
     }
     fn page() Browser.HTMLElement {
         @wutu/\

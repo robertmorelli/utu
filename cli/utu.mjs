@@ -70,6 +70,14 @@ async function main() {
     if (extra !== undefined) fail(extra.startsWith('-') ? `Unknown option ${extra}` : `Extra argument ${extra}`, extra.startsWith('-') ? 'unknown-option' : 'extra-argument', ['utu lsp takes nothing: it speaks on stdin and stdout.']);
     return lsp();
   }
+  if (command === 'format') {
+    const args = process.argv.slice(3);
+    const unknown = args.find(arg => arg.startsWith('-') && arg !== '--check');
+    if (unknown) fail(`Unknown option ${unknown}`, 'unknown-option');
+    const files = args.filter(arg => arg !== '--check');
+    if (!files.length) fail('No files to format', 'missing-file');
+    return (await import('./site.mjs')).formatCommand(files, { check: args.includes('--check') });
+  }
   if (command === 'grep') return grepCommand(process.argv.slice(3));
   const commands = { check, run, test, bench, build, 'build-exe': buildExe };
   const [{ MODES }, { loadNodeCompiler }] = await Promise.all([import('../src/selfhost/compiler.js'), selfhost()]);
@@ -84,7 +92,7 @@ async function main() {
   const args = [fileArg, ...rest].filter(arg => arg !== undefined);
   const given = [];
   const files = [];
-  let out;
+  let out, title, port, noPrerender = false;
   // `--target node`: build bundles npm packages' Node builds, not their browser ones.
   let target;
   // `utu FILE -- a b`: what follows -- is the program's (process.argv.slice(2)).
@@ -96,14 +104,33 @@ async function main() {
   // A second of an option that takes one value: which was meant?
   const once = (now, value, what) => { if (now !== undefined) fail(`Two ${what}: ${now}, ${value}`, 'unknown-option'); };
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    let arg = args[i];
+    if (/^--(?:out|title|port)=/.test(arg)) {
+      const eq = arg.indexOf('=');
+      args.splice(i, 1, arg.slice(0, eq), arg.slice(eq + 1));
+      arg = args[i];
+    }
     if (arg === '--') {
       if (command !== 'run') fail('-- is only for running a file', 'unknown-option', ['utu FILE -- ARGS… gives the program ARGS as process.argv.slice(2).']);
       argv = args.slice(i + 1);
       break;
     }
     if (arg === '-O') given.push(args[++i] ?? '');
-    else if (arg === '--profile') {
+    else if (arg === '--title' || arg === '--port') {
+      if (command !== 'run' && command !== 'build') fail(`${arg} is only for pages`, 'unknown-option');
+      if (arg === '--port' && command !== 'run') fail('--port is only for running a page', 'unknown-option');
+      const value = args[++i];
+      if (!value || value.startsWith('-')) fail(`${arg} needs a value`, 'unknown-option');
+      if (arg === '--title') { once(title, value, 'titles'); title = value; }
+      else {
+        once(port, value, 'ports');
+        if (!/^\d+$/.test(value) || Number(value) > 65535) fail(`--port needs a port, 0 to 65535, got ${value}`, 'unknown-option');
+        port = Number(value);
+      }
+    } else if (arg === '--no-prerender') {
+      if (command !== 'build') fail('--no-prerender is only for build', 'unknown-option');
+      noPrerender = true;
+    } else if (arg === '--profile') {
       if (command !== 'run') fail(`${arg} is only for running a file`, 'unknown-option', ['utu FILE --profile samples the program and writes its profile.']);
     } else if (arg === '--interval') {
       const value = args[++i];
@@ -114,7 +141,7 @@ async function main() {
     } else if (arg === '-o' || arg === '--out') {
       const value = args[++i];
       const what = command === 'build-exe' ? 'file' : 'directory';
-      if (!WRITES.has(command) && !(command === 'run' && profile)) fail(`${arg} is only for build and build-exe`, 'unknown-option', [`utu ${command} writes nothing.`]);
+      if (!WRITES.has(command) && command !== 'run') fail(`${arg} is only for build and build-exe`, 'unknown-option', [`utu ${command} writes nothing.`]);
       if (value === undefined || value.startsWith('-')) fail(`${arg} needs a ${what}`, 'missing-output', [], `utu ${command} ${files[0] ?? '<file.utu>'} ${arg} <${what}>`);
       once(out, value, 'outputs');
       out = value;
@@ -152,7 +179,7 @@ async function main() {
   const asked = ours.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
+    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -319,19 +346,30 @@ async function check(file, { utu }) {
   console.log('ok');
 }
 
-async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, out }) {
-  // An `html { … }` page runs in a browser: served (and rebuilt as it changes) as `wutu serve` does.
-  if (/^html[ \t]*\{/m.test(readFileSync(file, 'utf8'))) {
-    const { spawnSync } = await import('node:child_process');
-    const o = process.argv.indexOf('-O');
-    const served = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'wutu.mjs'), 'serve', file, ...(o > 0 ? ['-O', process.argv[o + 1]] : [])], { stdio: 'inherit' });
-    process.exit(served.status ?? 1);
+// Only reachable runtime bindings are emitted; merely loading std:Wutu is not usage.
+function usesWutu(spec) {
+  return Object.values(spec.es ?? {}).some(bindings =>
+    Object.values(bindings).some(body => typeof body === 'string' && body.includes('function createWutuRuntime')));
+}
+
+function siteApp(file, { out, title, mode }) {
+  return { entry: file, out: path.resolve(out ?? 'dist/wutu'), title: title ?? path.basename(path.dirname(file)), mode };
+}
+
+async function run(file, options) {
+  const { utu, optimize, safe, argv, profile, interval = 0.25, out } = options;
+  // Pages run in a browser with rebuild and reload as they change.
+  if (/^html[ \t]*\{/m.test(readFileSync(file, 'utf8')) || options.port !== undefined || options.title !== undefined || out !== undefined && !profile) {
+    return (await import('./site.mjs')).serveCommand(siteApp(file, options), { port: options.port ?? 4176 });
   }
   // Profiled, on the stack a plain run has, so --profile changes no output but at
   // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
   // Named functions and a source map, so a trap says which and where.
   // An array main's result is read by the build's readers (`run`), to print as one.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile, run: true });
+  if (usesWutu(built.spec)) {
+    return (await import('./site.mjs')).serveCommand(siteApp(file, options), { port: options.port ?? 4176 });
+  }
   const profiler = profile ? (await import('../src/runtime/profile.js')).createProfiler({ frames: built.frames, interval }) : null;
   // A global's initializer runs here, and may trap.
   // (It runs before the sampler can start: its profile is empty, but written.)
@@ -643,8 +681,14 @@ function duration(ms) {
 }
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
-async function build(file, { utu, optimize, safe, out, sourceMap, blame, target }) {
+async function build(file, options) {
+  const { utu, optimize, safe, out, sourceMap, blame, target } = options;
   const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame });
+  if (usesWutu(built.spec)) {
+    if (target === 'node' || blame || sourceMap && options.mode !== 'debug') fail('Site builds do not support --target node, --blame, or --source-map', 'unknown-option');
+    return (await import('./site.mjs')).buildCommand({ ...siteApp(file, options), compiled: built }, { prerender: !options.noPrerender });
+  }
+  if (options.title !== undefined || options.noPrerender) fail('--title and --no-prerender require a Wutu site', 'unknown-option');
   const { spec } = built;
   const name = path.basename(file, '.utu');
   const dir = path.resolve(out ?? '.');
@@ -963,14 +1007,17 @@ function usage(code) {
        utu <command> <file.utu> [options]
 
   check <file>                 report what is wrong with the program
-  <file> [-O mode] [-- args]   build it, then call its main (also: run <file>)
+  <file> [-O mode] [-- args]   run main, or serve an html page (also: run <file>)
+    [--port 4176] [--out dir] [--title Title]  page preview options
     [--profile [--interval ms] [-o dir]]  sampled: NAME.folded, NAME.speedscope.json, NAME.flame.html
   test <file> [-O mode]           build its tests, then run each
   bench <file> [-O mode]          build its benches, then time each (median per iteration)
-  build <file> [-o dir] [-O mode] NAME.wasm, and NAME.mjs that loads it
+  build <file> [-o dir] [-O mode] NAME.wasm + NAME.mjs, or a pre-rendered Wutu site
+    [--title Title] [--no-prerender]  site options (default output: dist/wutu)
     [--source-map]             and NAME.wasm.map (always in debug)
     [--blame]                  and NAME.blame.json, NAME.blame.html: each byte on its source
     [--target browser|node]    npm packages' browser builds (the default), or Node's
+  format <files…> [--check]   format Utu and Wutu
   build-exe <file> [-o out]    a standalone executable (needs bun)
   lsp                          a language server on stdin and stdout
   grep <pattern> <paths…>      code by its syntax and types: '$v.push($x)' [--where 'x: I32']

@@ -567,9 +567,9 @@ mod web {
         \\}
     }
     fn build_shell() Str {
-        \\wutu serve main.utu --port 4176
-        \\wutu format main.utu --check
-        \\wutu build main.utu --out dist/site --title "My site"
+        \\utu main.utu --port 4176
+        \\utu format main.utu --check
+        \\utu build main.utu --out dist/site --title "My site"
     }
     fn page() Browser.HTMLElement {
         @wutu/\
