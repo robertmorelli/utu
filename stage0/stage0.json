@@ -1,11 +1,11 @@
 {
-  "commit": "285d5a1b01ebb6e6eb619b4715852bb3077942ed",
-  "selfhostTree": "2bb56d61e865f4094b21d6b95bbc163358df05fd",
-  "sourcesHash": "54c0c1e68285e3b5cce51e9739ab6be31e394877163f669920b489fccb20a1a2",
-  "sha256": "cd8dd803b6f3bbc8b682bad883b92f1db1c8399e1aac38ffa0d3dcb89d256df9",
-  "bytes": 532832,
-  "builtBy": "b791a9fd75a3abf435c00e10105722d38fd34462bff68306fe297902654dc308",
+  "commit": "d3d0aaa575041fb08a5aae5970967712cc2647f6",
+  "selfhostTree": "7dc3890b2b61530558db8e76f1c8ca9664c25d7d",
+  "sourcesHash": "b48c0c0e277d5b24af0d71834f4477ad1ad3a4557b24599b5dff4bd399d78486",
+  "sha256": "9d22a3231f608b534dce86eb4c1647ad219b8d21d8fc831176b99fd2571c3272",
+  "bytes": 532870,
+  "builtBy": "cd8dd803b6f3bbc8b682bad883b92f1db1c8399e1aac38ffa0d3dcb89d256df9",
   "node": "v25.8.1",
-  "date": "2026-11-16T09:18:15.681Z",
-  "reason": "C for Component"
+  "date": "2026-11-16T09:37:37.518Z",
+  "reason": "keep head on re-render"
 }
