@@ -18,7 +18,7 @@ main {
 }
 ```
 
-`main` may take parameters for a host that calls it with arguments; `utu run`
+`main` may take parameters for a host that calls it with arguments; `utu FILE`
 calls it with none, so it refuses a `main` that takes any.
 
 Rules:
@@ -602,7 +602,7 @@ a line of its own after the last one (a `;` on a `\\` line is text):
 
 ```
 let usage = \\usage: utu check <file.utu>
-            \\       utu run <file.utu>
+            \\       utu <file.utu>
 ;
 ```
 

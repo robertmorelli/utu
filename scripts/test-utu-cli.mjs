@@ -342,7 +342,7 @@ using console from std:Console
   r = utu('run', 'args.utu', '--', 'a', 'b c');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), '2 b c');
-  assert.match(utu('build', 'args.utu', '--', 'a').stderr, /-- is only for run/);
+  assert.match(utu('build', 'args.utu', '--', 'a').stderr, /-- is only for running a file/);
 
   // console.log of an array prints its elements' str: nested, empty, of strings,
   // of U32; a trap is still main's.

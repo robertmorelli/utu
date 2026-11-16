@@ -1,7 +1,7 @@
 // Result, try, and errdefer: reading "name=number" settings, where a bad
 // line is an error the caller handles, not a crash.
 //
-//   utu run examples/results.utu
+//   utu examples/results.utu
 using console from std:Console
 
 /// A whole number, or why the text is not one.

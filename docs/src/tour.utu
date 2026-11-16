@@ -893,7 +893,7 @@ mod tour {
         \\
         \\main {
         \\    let usage = \\usage: utu check <file.utu>
-        \\                \\       utu run <file.utu>
+        \\                \\       utu <file.utu>
         \\    console.log(usage)
         \\}
     }

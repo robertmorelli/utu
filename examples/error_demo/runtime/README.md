@@ -1,6 +1,6 @@
 # Runtime and CLI-misuse errors
 
-The `.utu` files here compile and then go wrong when run (`utu run FILE`, or
+The `.utu` files here compile and then go wrong when run (`utu FILE`, or
 `utu test FILE` for 40–48). The cases below are misuses of the CLI itself, so
 they are shell commands, not programs. Run them from the repository root.
 `R=examples/error_demo/runtime`.

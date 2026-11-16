@@ -9,7 +9,8 @@
 (type_binder) @type
 (module_name (identifier) @namespace)
 (module_name (type_ident) @namespace)
-(platform_path) @string.special.path
+; `std:Console`: a module, named like one (as the site shows it), not a string.
+(platform_path) @namespace
 
 ((type_ident) @type.builtin
   (#match? @type.builtin "^(I8|U8|I16|U16|I32|U32|I64|U64|F32|F64|Bool|Str|Externref|I31|M32|M64|M128|V128)$"))

@@ -235,7 +235,7 @@ using Api from "./bindings/Api.abi.json"
 
 The path is from the importing file, as any `using` path is. A relative
 `--module` is from the program's directory: `utu build` bundles it from there,
-and `utu run` imports it from there.
+and `utu FILE` imports it from there.
 
 Rust crates work the same way through wasm-bindgen's declarations:
 

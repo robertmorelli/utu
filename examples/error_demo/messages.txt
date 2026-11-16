@@ -7209,7 +7209,7 @@ ok
 11 │     }
 --- exit 1
 
-=== utu run examples/error_demo/runtime/01_orelse_fatal_null.utu
+=== utu examples/error_demo/runtime/01_orelse_fatal_null.utu
  TRAP  Reached fatal
        trap · examples/error_demo/runtime/01_orelse_fatal_null.utu:8:36
 
@@ -7224,7 +7224,7 @@ ok
   in main  examples/error_demo/runtime/01_orelse_fatal_null.utu:8:36
 --- exit 1
 
-=== utu run examples/error_demo/runtime/02_es_returns_null_for_str.utu
+=== utu examples/error_demo/runtime/02_es_returns_null_for_str.utu
  ERROR  Wrong type from JavaScript: a Str, not null
         uncaught-exception · examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
 
@@ -7239,11 +7239,11 @@ ok
   in main  examples/error_demo/runtime/02_es_returns_null_for_str.utu:6:16
 --- exit 1
 
-=== utu run examples/error_demo/runtime/03_es_returns_wrong_type.utu
+=== utu examples/error_demo/runtime/03_es_returns_wrong_type.utu
 13
 --- exit 0
 
-=== utu run examples/error_demo/runtime/04_array_index_oob.utu
+=== utu examples/error_demo/runtime/04_array_index_oob.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/04_array_index_oob.utu:7:18
 
@@ -7259,7 +7259,7 @@ ok
   in main  examples/error_demo/runtime/04_array_index_oob.utu:14:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/05_array_negative_index.utu
+=== utu examples/error_demo/runtime/05_array_negative_index.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/05_array_negative_index.utu:6:5
 
@@ -7274,7 +7274,7 @@ ok
   in main  examples/error_demo/runtime/05_array_negative_index.utu:6:5
 --- exit 1
 
-=== utu run examples/error_demo/runtime/06_buffer_past_length.utu
+=== utu examples/error_demo/runtime/06_buffer_past_length.utu
  TRAP  Buffer index out of range
        trap · examples/error_demo/runtime/06_buffer_past_length.utu:10:17
 
@@ -7290,7 +7290,7 @@ ok
   in main  examples/error_demo/runtime/06_buffer_past_length.utu:10:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/07_buffer_past_capacity.utu
+=== utu examples/error_demo/runtime/07_buffer_past_capacity.utu
  TRAP  Buffer index out of range
        trap · examples/error_demo/runtime/07_buffer_past_capacity.utu:8:17
 
@@ -7306,7 +7306,7 @@ ok
   in main  examples/error_demo/runtime/07_buffer_past_capacity.utu:8:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/08_buffer_pop_empty.utu
+=== utu examples/error_demo/runtime/08_buffer_pop_empty.utu
  TRAP  pop of an empty Buffer
        trap · examples/error_demo/runtime/08_buffer_pop_empty.utu:7:17
 
@@ -7322,7 +7322,7 @@ ok
   in main  examples/error_demo/runtime/08_buffer_pop_empty.utu:7:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/09_div_by_zero.utu
+=== utu examples/error_demo/runtime/09_div_by_zero.utu
  TRAP  Integer division by zero
        trap · examples/error_demo/runtime/09_div_by_zero.utu:4:5
 
@@ -7337,7 +7337,7 @@ ok
   in main  examples/error_demo/runtime/09_div_by_zero.utu:9:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/10_rem_by_zero.utu
+=== utu examples/error_demo/runtime/10_rem_by_zero.utu
  TRAP  Integer remainder by zero
        trap · examples/error_demo/runtime/10_rem_by_zero.utu:4:5
 
@@ -7352,7 +7352,7 @@ ok
   in main  examples/error_demo/runtime/10_rem_by_zero.utu:8:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/11_div_overflow.utu
+=== utu examples/error_demo/runtime/11_div_overflow.utu
  TRAP  Integer overflow
        trap · examples/error_demo/runtime/11_div_overflow.utu:6:17
 
@@ -7367,7 +7367,7 @@ ok
   in main  examples/error_demo/runtime/11_div_overflow.utu:6:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/12_i64_div_by_zero.utu
+=== utu examples/error_demo/runtime/12_i64_div_by_zero.utu
  TRAP  Integer division by zero
        trap · examples/error_demo/runtime/12_i64_div_by_zero.utu:6:17
 
@@ -7382,11 +7382,11 @@ ok
   in main  examples/error_demo/runtime/12_i64_div_by_zero.utu:6:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/13_float_to_int_conversion.utu
+=== utu examples/error_demo/runtime/13_float_to_int_conversion.utu
 2147483647
 --- exit 0
 
-=== utu run examples/error_demo/runtime/14_fatal_in_match.utu
+=== utu examples/error_demo/runtime/14_fatal_in_match.utu
  TRAP  Reached fatal
        trap · examples/error_demo/runtime/14_fatal_in_match.utu:4:38
 
@@ -7401,7 +7401,7 @@ ok
   in main  examples/error_demo/runtime/14_fatal_in_match.utu:8:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/15_assert_fails.utu
+=== utu examples/error_demo/runtime/15_assert_fails.utu
  TRAP  Failed assert
        trap · examples/error_demo/runtime/15_assert_fails.utu:4:5
 
@@ -7417,7 +7417,7 @@ ok
   in main  examples/error_demo/runtime/15_assert_fails.utu:9:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/16_wat_unreachable.utu
+=== utu examples/error_demo/runtime/16_wat_unreachable.utu
  TRAP  Reached unreachable code
        trap · examples/error_demo/runtime/16_wat_unreachable.utu:4:5
 
@@ -7432,7 +7432,7 @@ ok
   in main  examples/error_demo/runtime/16_wat_unreachable.utu:8:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/17_stack_overflow.utu
+=== utu examples/error_demo/runtime/17_stack_overflow.utu
  TRAP  Stack overflow
        trap · examples/error_demo/runtime/17_stack_overflow.utu:4:5
 
@@ -7446,7 +7446,7 @@ ok
   in count_down  examples/error_demo/runtime/17_stack_overflow.utu:4:5
 --- exit 1
 
-=== utu run examples/error_demo/runtime/18_out_of_memory.utu
+=== utu examples/error_demo/runtime/18_out_of_memory.utu
  TRAP  Array length negative or too large
        trap · examples/error_demo/runtime/18_out_of_memory.utu:4:14
 
@@ -7461,7 +7461,7 @@ ok
   in main  examples/error_demo/runtime/18_out_of_memory.utu:4:14
 --- exit 1
 
-=== utu run examples/error_demo/runtime/19_es_throws.utu
+=== utu examples/error_demo/runtime/19_es_throws.utu
  ERROR  not a number: twelve
         uncaught-exception · examples/error_demo/runtime/19_es_throws.utu:10:17
 
@@ -7476,7 +7476,7 @@ ok
   in main  examples/error_demo/runtime/19_es_throws.utu:10:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/20_es_throws_string.utu
+=== utu examples/error_demo/runtime/20_es_throws_string.utu
  ERROR  negative
         uncaught-exception · examples/error_demo/runtime/20_es_throws_string.utu:6:17
 
@@ -7491,7 +7491,7 @@ ok
   in main  examples/error_demo/runtime/20_es_throws_string.utu:6:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/21_rejected_promise.utu
+=== utu examples/error_demo/runtime/21_rejected_promise.utu
  ERROR  connection refused
         uncaught-exception · examples/error_demo/runtime/21_rejected_promise.utu:7:13
 
@@ -7506,7 +7506,7 @@ ok
   in main  examples/error_demo/runtime/21_rejected_promise.utu:7:13
 --- exit 1
 
-=== utu run examples/error_demo/runtime/22_trap_in_catch_try.utu
+=== utu examples/error_demo/runtime/22_trap_in_catch_try.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11
 
@@ -7521,7 +7521,7 @@ ok
   in main  examples/error_demo/runtime/22_trap_in_catch_try.utu:8:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/23_json_decode_fatal.utu
+=== utu examples/error_demo/runtime/23_json_decode_fatal.utu
  TRAP  Reached fatal
        trap · examples/error_demo/runtime/23_json_decode_fatal.utu:8:57
 
@@ -7536,7 +7536,7 @@ ok
   in main  examples/error_demo/runtime/23_json_decode_fatal.utu:8:57
 --- exit 1
 
-=== utu run examples/error_demo/runtime/24_enum_from_i32_bad.utu
+=== utu examples/error_demo/runtime/24_enum_from_i32_bad.utu
  TRAP  Level: no variant has this value
        trap · examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
 
@@ -7552,7 +7552,7 @@ ok
   in main  examples/error_demo/runtime/24_enum_from_i32_bad.utu:9:13
 --- exit 1
 
-=== utu run examples/error_demo/runtime/25_es_returns_wrong_struct.utu
+=== utu examples/error_demo/runtime/25_es_returns_wrong_struct.utu
  ERROR  type incompatibility when transforming from/to JS
         uncaught-exception · examples/error_demo/runtime/25_es_returns_wrong_struct.utu:10:21
 
@@ -7567,7 +7567,7 @@ ok
   in main  examples/error_demo/runtime/25_es_returns_wrong_struct.utu:10:21
 --- exit 1
 
-=== utu run examples/error_demo/runtime/26_es_callback_traps.utu
+=== utu examples/error_demo/runtime/26_es_callback_traps.utu
  TRAP  Integer division by zero
        trap · examples/error_demo/runtime/26_es_callback_traps.utu:7:37
 
@@ -7583,7 +7583,7 @@ ok
   in main  examples/error_demo/runtime/26_es_callback_traps.utu:7:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/27_async_trap_after_await.utu
+=== utu examples/error_demo/runtime/27_async_trap_after_await.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/27_async_trap_after_await.utu:9:17
 
@@ -7598,7 +7598,7 @@ ok
   in main  examples/error_demo/runtime/27_async_trap_after_await.utu:9:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/28_then_callback_traps.utu
+=== utu examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
  TRAP  Integer division by zero
        trap · examples/error_demo/runtime/28_then_callback_traps.utu:9:45
@@ -7614,7 +7614,7 @@ scheduled
   in closure  examples/error_demo/runtime/28_then_callback_traps.utu:9:45
 --- exit 1
 
-=== utu run examples/error_demo/runtime/29_deep_recursion_with_base.utu
+=== utu examples/error_demo/runtime/29_deep_recursion_with_base.utu
  TRAP  Stack overflow
        trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:45
 
@@ -7628,7 +7628,7 @@ scheduled
   in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:45
 --- exit 1
 
-=== utu run examples/error_demo/runtime/309_result_value_of_error.utu
+=== utu examples/error_demo/runtime/309_result_value_of_error.utu
  TRAP  Failed check in std:Result
        trap · examples/error_demo/runtime/309_result_value_of_error.utu:8:20
 
@@ -7643,7 +7643,7 @@ scheduled
   in main  examples/error_demo/runtime/309_result_value_of_error.utu:8:20
 --- exit 1
 
-=== utu run examples/error_demo/runtime/30_string_index_oob.utu
+=== utu examples/error_demo/runtime/30_string_index_oob.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/30_string_index_oob.utu:5:17
 
@@ -7658,7 +7658,7 @@ scheduled
   in main  examples/error_demo/runtime/30_string_index_oob.utu:5:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/31_slice_bad_range.utu
+=== utu examples/error_demo/runtime/31_slice_bad_range.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/31_slice_bad_range.utu:5:16
 
@@ -7673,7 +7673,7 @@ scheduled
   in main  examples/error_demo/runtime/31_slice_bad_range.utu:5:16
 --- exit 1
 
-=== utu run examples/error_demo/runtime/32_mem_out_of_bounds.utu
+=== utu examples/error_demo/runtime/32_mem_out_of_bounds.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/32_mem_out_of_bounds.utu:7:17
 
@@ -7688,7 +7688,7 @@ scheduled
   in main  examples/error_demo/runtime/32_mem_out_of_bounds.utu:7:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/33_vec_out_of_bounds.utu
+=== utu examples/error_demo/runtime/33_vec_out_of_bounds.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/33_vec_out_of_bounds.utu:7:17
 
@@ -7703,7 +7703,7 @@ scheduled
   in main  examples/error_demo/runtime/33_vec_out_of_bounds.utu:7:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/34_array_new_negative.utu
+=== utu examples/error_demo/runtime/34_array_new_negative.utu
  TRAP  Array length negative or too large
        trap · examples/error_demo/runtime/34_array_new_negative.utu:4:5
 
@@ -7718,7 +7718,7 @@ scheduled
   in main  examples/error_demo/runtime/34_array_new_negative.utu:8:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/35_orelse_fatal_field.utu
+=== utu examples/error_demo/runtime/35_orelse_fatal_field.utu
  TRAP  Reached fatal
        trap · examples/error_demo/runtime/35_orelse_fatal_field.utu:9:30
 
@@ -7733,7 +7733,7 @@ scheduled
   in main  examples/error_demo/runtime/35_orelse_fatal_field.utu:9:30
 --- exit 1
 
-=== utu run examples/error_demo/runtime/360_assert_inlined_fast.utu -O fast
+=== utu examples/error_demo/runtime/360_assert_inlined_fast.utu -O fast
  TRAP  Failed assert
        trap · examples/error_demo/runtime/360_assert_inlined_fast.utu:5:5
 
@@ -7749,14 +7749,14 @@ scheduled
   in main  examples/error_demo/runtime/360_assert_inlined_fast.utu:10:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/361_trap_unsafe_no_place.utu -O fastUnsafe
+=== utu examples/error_demo/runtime/361_trap_unsafe_no_place.utu -O fastUnsafe
  TRAP  Integer division by zero
        trap · examples/error_demo/runtime/361_trap_unsafe_no_place.utu
 
   in main
 --- exit 1
 
-=== utu run examples/error_demo/runtime/362_match_no_arm.utu
+=== utu examples/error_demo/runtime/362_match_no_arm.utu
  TRAP  Level: no variant has this value
        trap · examples/error_demo/runtime/362_match_no_arm.utu:12:23
 
@@ -7809,7 +7809,7 @@ pass after (… ms)
 1 passed, 1 failed
 --- exit 1
 
-=== utu run examples/error_demo/runtime/45_test_none.utu
+=== utu examples/error_demo/runtime/45_test_none.utu
 0
 --- exit 0
 
@@ -7829,7 +7829,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
 0 passed, 1 failed
 --- exit 1
 
-=== utu run examples/error_demo/runtime/493_reversed_slice.utu
+=== utu examples/error_demo/runtime/493_reversed_slice.utu
  TRAP  Slice ends before it starts
        trap · examples/error_demo/runtime/493_reversed_slice.utu:5:13
 
@@ -7844,7 +7844,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
   in main  examples/error_demo/runtime/493_reversed_slice.utu:5:13
 --- exit 1
 
-=== utu run examples/error_demo/runtime/494_string_index_past_end.utu
+=== utu examples/error_demo/runtime/494_string_index_past_end.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/494_string_index_past_end.utu:5:17
 
@@ -7859,21 +7859,21 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
   in main  examples/error_demo/runtime/494_string_index_past_end.utu:5:17
 --- exit 1
 
-=== utu run examples/error_demo/runtime/50_no_main.utu
+=== utu examples/error_demo/runtime/50_no_main.utu
  ERROR  No main in examples/error_demo/runtime/50_no_main.utu
         no-main
 
   note  Its lib exports rect_area: utu build makes a module of them.
 --- exit 1
 
-=== utu run examples/error_demo/runtime/51_main_not_exported.utu
+=== utu examples/error_demo/runtime/51_main_not_exported.utu
  ERROR  fn main at examples/error_demo/runtime/51_main_not_exported.utu:3 is a function, not the program
         no-main
 
   note  Write main { … } to run it.
 --- exit 1
 
-=== utu run examples/error_demo/runtime/52_syntax_error_run.utu
+=== utu examples/error_demo/runtime/52_syntax_error_run.utu
  ERROR  Expected ';', got '2'
         parse-error · examples/error_demo/runtime/52_syntax_error_run.utu:4:16
 
@@ -7886,7 +7886,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
  6 │ }
 --- exit 1
 
-=== utu run examples/error_demo/runtime/53_multiple_errors_check.utu
+=== utu examples/error_demo/runtime/53_multiple_errors_check.utu
  ERROR  s is Str, got I32
         type-mismatch · examples/error_demo/runtime/53_multiple_errors_check.utu:6:18
 
@@ -7926,7 +7926,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
 10 │ using console from std:Console
 --- exit 1
 
-=== utu run examples/error_demo/runtime/54_main_takes_args.utu
+=== utu examples/error_demo/runtime/54_main_takes_args.utu
  ERROR  Write main { … }, not export main()
         foreign-syntax · examples/error_demo/runtime/54_main_takes_args.utu:3:1
 
@@ -7941,7 +7941,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
   note  main returns nothing: print with console.log, or put a function JS calls in lib { … }
 --- exit 1
 
-=== utu run examples/error_demo/runtime/55_main_returns_struct.utu
+=== utu examples/error_demo/runtime/55_main_returns_struct.utu
  ERROR  No method Point.str
         unknown-method · std:Console:12:35
 
@@ -7961,11 +7961,11 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
   note  in log[Point]
 --- exit 1
 
-=== utu run examples/error_demo/runtime/56_main_void_ok.utu
+=== utu examples/error_demo/runtime/56_main_void_ok.utu
 42
 --- exit 0
 
-=== utu run examples/error_demo/runtime/650_global_init_trap.utu
+=== utu examples/error_demo/runtime/650_global_init_trap.utu
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/650_global_init_trap.utu:5:14
 
@@ -7981,7 +7981,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
   in start
 --- exit 1
 
-=== utu run examples/error_demo/runtime/651_slice_second_use.utu
+=== utu examples/error_demo/runtime/651_slice_second_use.utu
  TRAP  Slice ends before it starts
        trap · examples/error_demo/runtime/651_slice_second_use.utu:7:28
 

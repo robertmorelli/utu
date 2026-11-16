@@ -1,11 +1,11 @@
 # Profiling
 
-`utu run --profile` samples a program while it runs and writes where its
+`utu FILE --profile` samples a program while it runs and writes where its
 time went:
 
 ```
-utu run examples/float.utu -O fast --profile
-utu run app.utu --profile --interval 0.1 -o prof/
+utu examples/float.utu -O fast --profile
+utu app.utu --profile --interval 0.1 -o prof/
 ```
 
 It prints the ten functions with the most self time to stderr, and writes

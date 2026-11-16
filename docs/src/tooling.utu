@@ -53,7 +53,7 @@ mod tooling {
         \\    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     }
     fn trap_sample() Str {
-        \\$ utu run boom.utu
+        \\$ utu boom.utu
         \\ TRAP  Failed assert
         \\       trap · boom.utu:2:5
         \\
@@ -92,7 +92,7 @@ mod tooling {
                 }
                 ": ";
                 code {
-                    "utu run tool.utu -- a b";
+                    "utu tool.utu -- a b";
                 }
                 ". The program reads them from the host, as a built one run by Node or Bun does: ";
                 code {
@@ -106,39 +106,23 @@ mod tooling {
                 code {
                     "let arg: fun(I32) Str = @es/\\ (i) => process.argv[i + 2] \\/;";
                 }
-                "). An executable from ";
+                "). ";
                 code {
-                    "build-exe";
+                    "main";
                 }
-                " whose main returns ";
+                " returns nothing: a program prints with ";
                 code {
-                    "I32";
+                    "console.log";
                 }
-                " exits with that status; any other result is printed. ";
+                ", and ";
                 code {
-                    "utu run";
+                    "utu FILE";
                 }
-                " prints main's result, whatever its type, and exits 0; an array as one (";
+                " (or ";
                 code {
-                    "[[1, 2], []]";
+                    "utu run FILE";
                 }
-                ", strings quoted, null as ";
-                code {
-                    "null";
-                }
-                "), a struct in it by its type's name. (Its build exports readers of the array, ";
-                code {
-                    "run:len:0";
-                }
-                " and ";
-                code {
-                    "run:at:0";
-                }
-                " a level; ";
-                code {
-                    "utu build";
-                }
-                " does not.)";
+                ") exits 0 unless it traps.";
             }
             p {
                 code {
@@ -184,7 +168,7 @@ mod tooling {
             p {
                 "A trap in ";
                 code {
-                    "utu run";
+                    "utu FILE";
                 }
                 " or ";
                 code {

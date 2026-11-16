@@ -2,7 +2,7 @@
 // cli/utu.mjs — the utu command line, on the self-hosted compiler.
 //
 //   utu check <file.utu>                 report what is wrong
-//   utu run <file.utu> [-O mode]             build, then call main
+//   utu <file.utu> [-O mode]                 build, then call main (`utu run <file.utu>` too)
 //   utu test <file.utu> [-O mode]            build the tests, then run each
 //   utu bench <file.utu> [-O mode]           build the benches, then time each
 //   utu build <file.utu> [-o dir] [-O mode] [--source-map] [--blame] [--target browser|node]
@@ -44,6 +44,8 @@ delete process.env.UTU_WORKER_TTY;
 // A command that builds needs the compiler: it compiles (off this thread)
 // from here, as what drives it loads. loadNodeCompiler still checks it was
 // built from selfhost/ as it is.
+// `utu FILE.utu …` runs it: `utu run FILE.utu …` (still accepted) spelled short.
+if (process.argv[2]?.endsWith('.utu')) process.argv.splice(2, 0, 'run');
 const COMPILING = ['check', 'run', 'test', 'bench', 'build', 'build-exe'].includes(process.argv[2]) ? compileEarly() : null;
 
 function compileEarly() {
@@ -74,8 +76,6 @@ async function main() {
   // (Own names only: `utu constructor` is no command.)
   if (!Object.hasOwn(commands, command)) {
     const near = closest(command, [...Object.keys(commands), 'lsp', 'grep', ...VIEW_COMMANDS]);
-    // A file given without a command: it was meant for one.
-    if (command.endsWith('.utu')) fail(`No command for ${command}`, 'unknown-command', [], `utu check ${command}`);
     fail(`Unknown command ${command}${near ? `; did you mean ${near}?` : ''}`, 'unknown-command',
       [], near && fileArg ? `utu ${near} ${[fileArg, ...rest].join(' ')}` : null);
   }
@@ -87,7 +87,7 @@ async function main() {
   let out;
   // `--target node`: build bundles npm packages' Node builds, not their browser ones.
   let target;
-  // `utu run FILE -- a b`: what follows -- is the program's (process.argv.slice(2)).
+  // `utu FILE -- a b`: what follows -- is the program's (process.argv.slice(2)).
   let argv = [];
   // `--profile`: a profile build, sampled every `--interval` ms (src/runtime/profile.js).
   const ours = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
@@ -98,16 +98,16 @@ async function main() {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--') {
-      if (command !== 'run') fail('-- is only for run', 'unknown-option', ['utu run FILE -- ARGS… gives the program ARGS as process.argv.slice(2).']);
+      if (command !== 'run') fail('-- is only for running a file', 'unknown-option', ['utu FILE -- ARGS… gives the program ARGS as process.argv.slice(2).']);
       argv = args.slice(i + 1);
       break;
     }
     if (arg === '-O') given.push(args[++i] ?? '');
     else if (arg === '--profile') {
-      if (command !== 'run') fail(`${arg} is only for run`, 'unknown-option', ['utu run FILE --profile samples the program and writes its profile.']);
+      if (command !== 'run') fail(`${arg} is only for running a file`, 'unknown-option', ['utu FILE --profile samples the program and writes its profile.']);
     } else if (arg === '--interval') {
       const value = args[++i];
-      if (!profile) fail(`${arg} is only with --profile`, 'unknown-option', [], `utu run ${files[0] ?? '<file.utu>'} --profile --interval ${value ?? '0.25'}`);
+      if (!profile) fail(`${arg} is only with --profile`, 'unknown-option', [], `utu ${files[0] ?? '<file.utu>'} --profile --interval ${value ?? '0.25'}`);
       once(interval, value, 'intervals');
       interval = Number(value);
       if (!(interval > 0)) fail(`--interval needs a time in ms, got ${value ?? 'nothing'}`, 'unknown-option', ['The sampler reads the stack every this many milliseconds (0.25 by default).']);
@@ -347,7 +347,7 @@ async function run(file, { utu, optimize, safe, argv, profile, interval = 0.25, 
   // (The Wasm function's own length: Bun's WebAssembly.promising wrapper says 1.)
   if (instance.exports.main.length > 0) {
     const params = /export\s+main\s*\(([^)]*)\)/.exec(await fs.readFile(file, 'utf8'))?.[1].trim();
-    fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu run calls it with none`, 'main-arguments',
+    fail(`main takes ${params ? `(${params})` : `${exports.main.length} arguments`}, but utu calls it with none`, 'main-arguments',
       ['Give main no parameters to run it, or call it from JavaScript (utu build).']);
   }
   // The profile, written once: after main, or before a trap's exit (main's, or a callback's).
@@ -952,10 +952,11 @@ function colored(stream) {
 }
 
 function usage(code) {
-  console.log(`usage: utu <command> <file.utu> [options]
+  console.log(`usage: utu <file.utu> [options]          build it, then call its main
+       utu <command> <file.utu> [options]
 
   check <file>                 report what is wrong with the program
-  run <file> [-O mode] [-- args]  build it, then call its main
+  <file> [-O mode] [-- args]   build it, then call its main (also: run <file>)
     [--profile [--interval ms] [-o dir]]  sampled: NAME.folded, NAME.speedscope.json, NAME.flame.html
   test <file> [-O mode]           build its tests, then run each
   bench <file> [-O mode]          build its benches, then time each (median per iteration)

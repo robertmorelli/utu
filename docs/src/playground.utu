@@ -100,7 +100,7 @@ mod playground {
     /// browser's storage.
     fn saved() Saved {
         @stored/\
-        Saved "utu-playground-v1" Saved { source: sample() }
+        Saved "utu-playground-v2" Saved { source: sample() }
         \/
     }
     fn start() State {

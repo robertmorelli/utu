@@ -7,7 +7,7 @@
 //   node scripts/test-error-messages.mjs --record   rewrite messages.txt
 //
 // Programs under runtime/ compile, so they are run (`utu test` when they have
-// tests, `utu run` otherwise, with the flags a `// Flags:` line gives); every
+// tests, `utu FILE` otherwise, with the flags a `// Flags:` line gives); every
 // other program is checked (`utu check`). The record is the catalog the error
 // audit (docs/error-audit.md) reads: change a message on purpose, then record.
 import fs from 'node:fs';
@@ -32,7 +32,7 @@ function command(file) {
   const source = fs.readFileSync(file, 'utf8');
   const flags = source.match(/^\/\/ Flags: (.*)$/m)?.[1].trim().split(/\s+/) ?? [];
   if (!path.relative(DIR, file).startsWith(`runtime${path.sep}`)) return ['check', file];
-  return [/^\s*test\s+"/m.test(source) ? 'test' : 'run', file, ...flags];
+  return /^\s*test\s+"/m.test(source) ? ['test', file, ...flags] : [file, ...flags];
 }
 
 // The CLI's output for one program, as a user sees it (no colour), with the
@@ -56,7 +56,7 @@ function run(file) {
         .replace(/\(\d+(\.\d+)? ms\)/g, '(… ms)')
         .replace(/[ \t]+$/gm, '')
         .trimEnd();
-      const shown = ['utu', args[0], path.relative(ROOT, args[1]), ...args.slice(2)].join(' ');
+      const shown = ['utu', ...args.map(a => a === file ? path.relative(ROOT, a) : a)].join(' ');
       resolve(`=== ${shown}\n${text}\n--- exit ${signal ? `killed (${signal})` : code}\n`);
     });
   });
