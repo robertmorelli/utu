@@ -5311,8 +5311,13 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "SYMBOL",
-          "name": "_dsl_open"
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_dsl_open"
+          },
+          "named": false,
+          "value": "/\\"
         },
         {
           "type": "CHOICE",
@@ -5332,8 +5337,13 @@
           ]
         },
         {
-          "type": "SYMBOL",
-          "name": "_dsl_close"
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_dsl_close"
+          },
+          "named": false,
+          "value": "\\/"
         }
       ]
     },

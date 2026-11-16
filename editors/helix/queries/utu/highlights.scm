@@ -27,11 +27,13 @@
 (variant (type_ident) @type.enum.variant)
 
 ; Calls and members
+; (Any base: `a.b`, `a.b.c`, `T.x.y`.)
+(field_expr (_) (identifier) @variable.other.member .)
+(optional_field_expr (_) (identifier) @variable.other.member .)
+(type_member_expr (_) (identifier) @variable.other.member .)
 (call_expr (identifier) @function)
-(call_expr (field_expr (identifier) (identifier) @function.method))
-(call_expr (type_member_expr (type_ident) (identifier) @function))
-(field_expr (identifier) (identifier) @variable.other.member)
-(optional_field_expr (identifier) (identifier) @variable.other.member)
+(call_expr (field_expr (_) (identifier) @function.method .))
+(call_expr (type_member_expr (_) (identifier) @function .))
 
 ; Literals
 (int_lit) @constant.numeric.integer
@@ -49,9 +51,9 @@
 ; Embedded languages: `@wutu/\ … \/`, `@es/\ … \/`, …
 (dsl_expr (identifier) @function.macro)
 (dsl_expr "@" @function.macro)
-; (A DSL's text gets its own language: see injections.scm. One with no
-; grammar here, @ir or @wat, reads as a string.)
-(dsl_body) @string.special
+(dsl_body ["/\\" "\\/"] @function.macro)
+; (A DSL's text gets its own language: see injections.scm. It is not
+; captured itself, so it takes no string colour or background.)
 
 ; Keywords
 [

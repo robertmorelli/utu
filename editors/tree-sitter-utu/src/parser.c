@@ -494,9 +494,9 @@ static const char * const ts_symbol_names[] = {
   [sym_template_tail] = "template_tail",
   [sym_multiline_string_line] = "multiline_string_line",
   [sym_type_ident] = "type_ident",
-  [sym__dsl_open] = "_dsl_open",
+  [sym__dsl_open] = "/\\",
   [sym__dsl_text] = "dsl_text",
-  [sym__dsl_close] = "_dsl_close",
+  [sym__dsl_close] = "\\/",
   [sym__statement_end] = "_statement_end",
   [sym_source_file] = "source_file",
   [sym__item] = "_item",
@@ -1601,16 +1601,16 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
     .named = true,
   },
   [sym__dsl_open] = {
-    .visible = false,
-    .named = true,
+    .visible = true,
+    .named = false,
   },
   [sym__dsl_text] = {
     .visible = true,
     .named = false,
   },
   [sym__dsl_close] = {
-    .visible = false,
-    .named = true,
+    .visible = true,
+    .named = false,
   },
   [sym__statement_end] = {
     .visible = false,

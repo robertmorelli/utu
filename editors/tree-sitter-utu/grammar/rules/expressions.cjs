@@ -274,7 +274,8 @@ exports.buildExpressionRules = function buildExpressionRules() {
     // DSL escape: @name/\ raw body \/
     dsl_expr: ($) => seq('@', $.identifier, $.dsl_body),
     // The payload is an anonymous `dsl_text` token, which editors inject the
-    // DSL's own language into; the delimiters are hidden.
-    dsl_body: ($) => seq($._dsl_open, optional(alias($._dsl_text, 'dsl_text')), $._dsl_close),
+    // DSL's own language into. The delimiters are anonymous `/\` and `\/`
+    // tokens, so editors can colour them as the DSL's name.
+    dsl_body: ($) => seq(alias($._dsl_open, '/\\'), optional(alias($._dsl_text, 'dsl_text')), alias($._dsl_close, '\\/')),
   };
 };
