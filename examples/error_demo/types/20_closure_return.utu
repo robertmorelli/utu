@@ -1,7 +1,7 @@
 // What: a closure annotated to return I32 whose body is a Str
 // Expect: Type mismatch: expected I32, got Str at the closure body
 main {
-    let f = cl(x: I32) I32 { "n=" + x.str(); };
+    let f = cl(x: I32) I32 { return "n=" + x.str(); };
     console.log(f(1));
 }
 using console from std:Console

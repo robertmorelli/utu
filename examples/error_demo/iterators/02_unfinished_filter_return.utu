@@ -1,7 +1,7 @@
 // What: a function returns a filter pipeline without collecting it
 // Expect: filter pipeline is unfinished: the function returns Array[I32], so end it with collect(I32)
 fn evens(xs: Array[I32]) Array[I32] {
-    xs filter |n| { n % 2 == 0; };
+    return xs filter |n| { n % 2 == 0; };
 }
 
 main {

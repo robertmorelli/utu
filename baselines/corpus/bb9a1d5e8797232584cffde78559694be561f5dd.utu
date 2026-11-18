@@ -3,11 +3,11 @@ struct Vec:
     | right : I32
 
 fn Vec.new(left: I32, right: I32) Vec {
-    Vec { left: left, right: right };
+    return Vec { left: left, right: right };
 }
 
 fn Vec.total |self| () I32 {
-    self.left + self.right;
+    return self.left + self.right;
 }
 
 mod boxy[T] {
@@ -15,11 +15,11 @@ mod boxy[T] {
         | value : T
 
     fn Box.new(value: T) Box {
-        Box { value: value };
+        return Box { value: value };
     }
 
     fn Box.get |self| () T {
-        self.value;
+        return self.value;
     }
 }
 
@@ -29,30 +29,30 @@ mod Pair[L, R] {
         | right : R
 
     fn &.new(left: L, right: R) & {
-        &{ left: left, right: right };
+        return &{ left: left, right: right };
     }
 
     fn &.left |self| () L {
-        self.left;
+        return self.left;
     }
 
     fn &.right |self| () R {
-        self.right;
+        return self.right;
     }
 }
 
 using boxy[I32] |ints|;
 
 fn make_box(value: I32) ints.Box {
-    ints.Box.new(value);
+    return ints.Box.new(value);
 }
 
 fn make_pair() Pair[I32, I32] {
-    Pair[I32, I32].new(5, 6);
+    return Pair[I32, I32].new(5, 6);
 }
 
 fn maybe_pair(flag: Bool) ?Pair[I32, I32] {
-    if flag { Pair[I32, I32].new(2, 9); } else { null; };
+    return if flag { Pair[I32, I32].new(2, 9); } else { null; };
 }
 
 test "top level method sugar works on locals and direct call results" {

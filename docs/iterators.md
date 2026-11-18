@@ -69,7 +69,7 @@ struct Row:
     | score: I32
 
 fn rows() Array[Row] {
-    [3, 1, 2] map |n| { Row { score: n } }
+    return [3, 1, 2] map |n| { Row { score: n } }
         sort(Row) |a, b| { a.score < b.score }
 }
 ```
@@ -79,7 +79,7 @@ Use a typed initial variable for a nondefault fold accumulator:
 ```utu
 fn index_total(numbers: Array[I32]) U64 {
     let zero: U64 = 0
-    numbers fold(zero) |total, value, i| { total + i }
+    return numbers fold(zero) |total, value, i| { total + i }
 }
 ```
 

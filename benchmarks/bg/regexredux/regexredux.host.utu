@@ -35,12 +35,12 @@ struct Input:
 
 let input: Input = &{ text: to_string(heap.view(0, 0)) }
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 fn fnv_str(h0: I32, s: Str) I32 {
     let h = h0
     for (0..<s.len()) |i| { h = fnv(h, s[i]) }
-    h
+    return h
 }
 
 fn fnv_int(h0: I32, x: I32) I32 {
@@ -51,7 +51,7 @@ fn fnv_int(h0: I32, x: I32) I32 {
         h = fnv(h, 48 + x / p % 10)
         p = p / 10
     }
-    h
+    return h
 }
 
 fn regexredux() I32 {
@@ -84,7 +84,7 @@ fn regexredux() I32 {
     }
     h = fnv(fnv_int(fnv(h, 10), ilen), 10)
     h = fnv(fnv_int(h, slen), 10)
-    fnv(fnv_int(h, size), 10)
+    return fnv(fnv_int(h, size), 10)
 }
 
 // ---- input
@@ -122,7 +122,7 @@ let st: State = &{ seed: 42, h: 0 }
 
 
 fn alu() Str {
-    "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
+    return "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
 }
 
 // seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
@@ -228,5 +228,5 @@ test "regexredux 1000 is BG's output" {
 
 lib {
     fn setup(n: I32) Void { setup_input(n) }
-    fn bench(n: I32) I32 { regexredux() }
+    fn bench(n: I32) I32 { return regexredux() }
 }

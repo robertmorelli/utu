@@ -1,6 +1,6 @@
 // What: passing a ?Str where a Str is required
 // Expect: Type mismatch: expected Str, got ?Str (hint: promote or orelse)
-fn shout(s: Str) Str { s.to_upper(); }
+fn shout(s: Str) Str { return s.to_upper(); }
 
 main {
     let name: ?Str = null;

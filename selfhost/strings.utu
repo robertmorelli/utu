@@ -51,7 +51,7 @@ fn builtin(b: Builtin) I32 {
     let t = func_type_single(vl_end(m), vl_one(result))
     let f = add_import_func(name_add("wasm:js-string"), name_add(name), t)
     builtin_func[i] = f
-    f
+    return f
 }
 
 /// Calls a builtin with the arguments on the stack since `m`.
@@ -101,7 +101,7 @@ fn string_literal(node: I32) Bool {
     }
     if not ok { return false }
     push_lit_bytes()
-    true
+    return true
 }
 
 /// A template string's text, `src[start ..< end_]`, with its escapes, as a
@@ -110,7 +110,7 @@ fn template_text(start: I32, end_: I32) Bool {
     lit_bytes.clear()
     if not decode_string(start, end_) { return false }
     push_lit_bytes()
-    true
+    return true
 }
 
 /// The text in `lit_bytes`, as a constant. Its text is interned, so each
@@ -135,7 +135,7 @@ fn string_global(word: I32) I32 {
     let start = src.interned_start(word)
     let g = add_import_global(name_add("'"), name_from_src(start, start + src.interned_size(word)), vt_extern)
     word_string[word] = g
-    g
+    return g
 }
 
 /// Where @decode_string last found a bad escape (a byte in `src`), or -1 for
@@ -208,7 +208,7 @@ fn decode_string(start: I32, end_: I32) Bool {
             }
         }
     }
-    true
+    return true
 }
 
 /// The size of the UTF-8 character at `src[i]` (before `end_`), or -1 when
@@ -222,7 +222,7 @@ fn utf8_char_size(i: I32, end_: I32) I32 {
     // Not overlong, not a surrogate, not past U+10FFFF.
     let d = src[i + 1]
     if (c == 224 and d < 160) or (c == 237 and d > 159) or (c == 240 and d < 144) or (c == 244 and d > 143) { return -1 }
-    n
+    return n
 }
 
 /// The four hexadecimal digits at `src[at]`, or -1.
@@ -234,7 +234,7 @@ fn hex4(at: I32) I32 {
         if d < 0 { return -1 }
         v = v * 16 + d
     }
-    v
+    return v
 }
 
 fn utf8_push(cp: I32) Void {

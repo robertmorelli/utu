@@ -1,3 +1,3 @@
 struct Box:
   | value : Nope
-lib { fn bad() I32 { 0; } }
+lib { fn bad() I32 { return 0; } }

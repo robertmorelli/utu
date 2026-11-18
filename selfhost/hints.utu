@@ -47,7 +47,7 @@ fn word_distance(a: I32, b: I32, bound: I32) I32 {
         if low > bound and low1 > bound { return bound + 1 }
         low1 = low
     }
-    d[((na + 1) % 3) * w + nb]
+    return d[((na + 1) % 3) * w + nb]
 }
 
 /// The best candidate so far: its word, its distance, its declaration, and
@@ -75,7 +75,7 @@ fn max_distance(word: I32) I32 {
     if n < 3 { return 0 }
     if n <= 4 { return 1 }
     if n <= 8 { return 2 }
-    3
+    return 3
 }
 
 /// Weigh candidate `cand` (declared by `decl`, or -1) against `word`.
@@ -106,7 +106,7 @@ fn near_in_words(word: I32, list: Str) I32 {
         near_consider(word, intern_text(list.slice(i, end_)), -1)
         i = end_ + 1
     }
-    near_found()
+    return near_found()
 }
 
 /// Node's modules (`module.builtinModules`, Node 24, without `_…`).
@@ -115,7 +115,7 @@ fn node_modules() Str => "assert assert/strict async_hooks buffer child_process 
 /// The word found, or -1 when none is close, or two are as close.
 fn near_found() I32 {
     if near_tie[0] == 1 { return -1 }
-    near_word[0]
+    return near_word[0]
 }
 
 /// The names in scope, by what they declare: values (not types), types,
@@ -129,7 +129,7 @@ fn seek_fits(decl: I32, seek: Seek) Bool {
     if decl < 0 { return false }
     if seek == Seek.Module { return decl_is(decl, Decl.Module) or decl_is(decl, Decl.Foreign) or decl_is(decl, Decl.Alias) }
     if seek == Seek.Type { return is_type_decl(decl) }
-    not decl_is(decl, Decl.Main) and (not is_type_decl(decl) or decl_is(decl, Decl.Module) or decl_is(decl, Decl.Alias))
+    return not decl_is(decl, Decl.Main) and (not is_type_decl(decl) or decl_is(decl, Decl.Module) or decl_is(decl, Decl.Alias))
 }
 
 /// The name in scope nearest `word` that is a `seek`, or -1.
@@ -149,7 +149,7 @@ fn near_in_scope(word: I32, seek: Seek) I32 {
         for ([Narrow.U8, Narrow.I8, Narrow.U16, Narrow.I16]) |n| { near_consider(word, narrow_word(n), -1) }
     }
     near_cap[0] = -1
-    near_found()
+    return near_found()
 }
 
 /// The member of `owner` in `space` nearest `word`, or -1.
@@ -165,14 +165,14 @@ fn near_member(owner: I32, word: I32, space: Space) I32 {
         let key = member_key[h]
         if key >= 0 and member_owner[h] == owner and key % 4 == space.i32() { near_consider(word, key / 4, member_decl[h]) }
     }
-    near_found()
+    return near_found()
 }
 
 /// What other languages call a name utu spells another way: its utu word, or -1.
 fn alias_word(word: I32) I32 {
     let t = word_text(word)
     let u = match_alias(t)
-    if u.len() == 0 { -1 } else { intern_text(u) }
+    return if u.len() == 0 { -1 } else { intern_text(u) }
 }
 
 fn match_alias(t: Str) Str {
@@ -189,7 +189,7 @@ fn match_alias(t: Str) Str {
     if t == "append" { return "push" }
     if t == "True" { return "true" }
     if t == "False" { return "false" }
-    ""
+    return ""
 }
 
 /// The node naming declaration `decl`: within its declaring node, the name
@@ -197,7 +197,7 @@ fn match_alias(t: Str) Str {
 fn decl_name_at(decl: I32) I32 {
     if decl < 0 { return -1 }
     let found = named_within(decl_node[decl], decl, 3)
-    if found >= 0 { found } else { decl_node[decl] }
+    return if found >= 0 { found } else { decl_node[decl] }
 }
 
 fn named_within(node: I32, decl: I32, depth: I32) I32 {
@@ -210,7 +210,7 @@ fn named_within(node: I32, decl: I32, depth: I32) I32 {
         if found >= 0 { return found }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// Whether two nodes are in one file (a place elsewhere is not drawn).
@@ -237,13 +237,13 @@ fn suggested(i: I32) Str {
             return if text_index(t, "\n", 0) >= 0 { "" } else { t }
         }
     }
-    ""
+    return ""
 }
 
 /// "; did you mean x?", when a diagnostic suggests x.
 fn did_you_mean(i: I32) Str {
     let s = suggested(i)
-    if s.len() == 0 { "" } else { "; did you mean " + s + "?" }
+    return if s.len() == 0 { "" } else { "; did you mean " + s + "?" }
 }
 
 /// Report a name that names nothing (a `seek`), suggesting the nearest one in scope.
@@ -291,12 +291,12 @@ fn std_module(t: Str) Str {
     if t == "Time" or t == "time" { return "time" }
     if t == "StrMap" or t == "IntMap" or t == "List" or t == "Buffer" or t == "Interner" or t == "Random"
         or t == "SegmentTree" or t == "PersistentSegmentTree" or t == "Spatial" or t == "NumberField" { return t }
-    ""
+    return ""
 }
 
 /// The std file module `m` is in (`console` in std:Console).
 fn std_file(m: Str) Str {
-    if m == "console" { "Console" } else if m == "time" { "Time" } else { m }
+    return if m == "console" { "Console" } else if m == "time" { "Time" } else { m }
 }
 
 /// Suggest the member of `owner` in `space` nearest the name at `at`.
@@ -349,7 +349,7 @@ fn same_line(a: I32, b: I32) Bool {
         y = t
     }
     for (x ..< y) |k| { if src[k] == 10 { return false } }
-    true
+    return true
 }
 
 //! == Where an expected type came from
@@ -420,7 +420,7 @@ fn want_for(site: I32, t: I32) I32 {
         if want_ty[k] == t and tail_of(site, want_root[k]) { return k }
         k -= 1
     }
-    -1
+    return -1
 }
 
 /// Whether `site` is `root`'s value: itself, or its value's value.
@@ -431,7 +431,7 @@ fn tail_of(site: I32, root: I32) Bool {
         if p < 0 or not tail_child(p, s) { return false }
         s = p
     }
-    true
+    return true
 }
 
 /// Whether child c of p is p's value (or one of them).
@@ -439,7 +439,7 @@ fn tail_child(p: I32, c: I32) Bool {
     if is_kind(p, Node.Block) or is_kind(p, Node.Match_arm) or is_kind(p, Node.Alt_arm) { return last_child(p) == c }
     if is_kind(p, Node.Paren_expr) or is_kind(p, Node.Splice) or is_kind(p, Node.Block_expr) or is_kind(p, Node.Match_default) or is_kind(p, Node.Alt_default) { return true }
     if is_kind(p, Node.If_expr) or is_kind(p, Node.Match_expr) or is_kind(p, Node.Alt_expr) { return first_child(p) != c }
-    false
+    return false
 }
 
 /// Report a TypeMismatch at `site` with reason k (see @want_for): the
@@ -545,7 +545,7 @@ fn mismatch_text(i: I32) Str {
         if w == "and" or w == "or" or w == "not" or w == "xor" { return w + " takes Bool" + got }
         return "No " + operator_symbol(diag_word[i]) + " for " + e + " and " + type_text(diag_b[i]) + caused
     }
-    "Expected " + e + got
+    return "Expected " + e + got
 }
 
 //! == Parse errors
@@ -571,7 +571,7 @@ fn touching(a: I32, b: I32) Bool => tok_end[a] == tok_start[b]
 fn tok_before(file: I32, t: I32) I32 {
     let k = t - 1
     while (k >= file_tok[file] and tok_kind[k] == Tok.Comment.i32()) { k -= 1 }
-    if k < file_tok[file] { -1 } else { k }
+    return if k < file_tok[file] { -1 } else { k }
 }
 
 /// The token after t, not a comment (the End token stays put).
@@ -579,20 +579,20 @@ fn tok_after(t: I32) I32 {
     if tok_kind[t] == Tok.End.i32() { return t }
     let k = t + 1
     while (tok_kind[k] == Tok.Comment.i32()) { k += 1 }
-    k
+    return k
 }
 
 /// Whether a newline comes between the starts of tokens a and b.
 fn lines_apart(a: I32, b: I32) Bool {
     for (tok_start[a] ..< tok_start[b]) |k| { if src[k] == 10 { return true } }
-    false
+    return false
 }
 
 /// The first token of t's line in `file`.
 fn line_first(file: I32, t: I32) I32 {
     let k = t
     while (k > file_tok[file] and not lines_apart(k - 1, k)) { k -= 1 }
-    k
+    return k
 }
 
 /// The hint's message, for the last diagnostic (a ParseError).
@@ -679,7 +679,7 @@ fn parse_hint(file: I32, t: I32, wanted: I32) Void {
 /// A token as a message names it (a long one cut short).
 fn tok_shown(t: I32) Str {
     let text = tok_text(t)
-    if text.len() > 16 { text.slice(0, 16) + "…" } else { text }
+    return if text.len() > 16 { text.slice(0, 16) + "…" } else { text }
 }
 
 /// The outermost `{` of `file` that no `}` closes, or -1.
@@ -694,7 +694,7 @@ fn unclosed_brace(file: I32) I32 {
             depth -= 1
         }
     }
-    if depth > 0 { open } else { -1 }
+    return if depth > 0 { open } else { -1 }
 }
 
 /// Whether token k (on the error's line; the parser stopped at t) starts
@@ -850,7 +850,7 @@ fn foreign_habit(file: I32, k: I32, t: I32) Bool {
         parse_says("A closure is written cl(x) { … }")
         return true
     }
-    false
+    return false
 }
 
 /// Token t's word lowercased: all of it when it is all capitals (`INF`), else its first letter (`MaxSize`).
@@ -861,7 +861,7 @@ fn lowered(t: I32) Str {
     for (tok_start[t] ..< tok_end[t]) |i| {
         text = text + Str.from_code_point(if caps or i == tok_start[t] { lower_byte(src[i]) } else { src[i] })
     }
-    text
+    return text
 }
 
 /// The subject of the `match` whose arm token k is in, as written (`x` when not found).
@@ -871,7 +871,7 @@ fn match_subject(file: I32, k: I32) Str {
     let brace = m
     while (brace < k and not tok_is(brace, Tok.LBrace)) { brace += 1 }
     if not tok_says(m, "match") or brace == m + 1 or brace >= k { return "x" }
-    bytes_text(tok_start[m + 1], tok_end[brace - 1])
+    return bytes_text(tok_start[m + 1], tok_end[brace - 1])
 }
 
 /// Whether tokens k and k+1 are `..` (two dots, which utu does not have).
@@ -894,7 +894,7 @@ fn range_text(a: I32, b: I32) Str {
             k += 1
         }
     }
-    text + bytes_text(at, tok_end[b])
+    return text + bytes_text(at, tok_end[b])
 }
 
 /// Report a habit: tokens a to b written where `text` is utu's.
@@ -902,21 +902,21 @@ fn habit(a: I32, b: I32, text: Str, message: Str) Bool {
     diag_focus(a, b, text)
     diag_fix(tok_start[a], tok_end[b], text, "Use " + text)
     parse_says(message)
-    true
+    return true
 }
 
 /// Whether token t's line starts with whitespace (it is inside something).
 fn indented(t: I32) Bool {
     let k = tok_start[t]
     while (k > 0 and src[k - 1] != 10) { k -= 1 }
-    src[k] == 32 or src[k] == 9
+    return src[k] == 32 or src[k] == 9
 }
 
 /// Whether word w names something the user wrote (not one the compiler made, `__…`).
 fn named_word(w: I32) Bool {
     if w < 0 { return false }
     let t = word_text(w)
-    t.len() > 0 and not (t.len() > 1 and t.slice(0, 2) == "__")
+    return t.len() > 0 and not (t.len() > 1 and t.slice(0, 2) == "__")
 }
 
 //! == Codes
@@ -944,7 +944,7 @@ fn diag_code(i: I32) Str {
         if a == 5 { return "DuplicateMethod" }
     }
     if k == Diag.UnknownMethod and diag_b[i] == 1 { return "StaticAsMethod" }
-    Diag.name(k)
+    return Diag.name(k)
 }
 
 fn is_logical(w: I32) Bool => w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Not.i32() or w == Kw.Xor.i32()
@@ -953,14 +953,14 @@ fn is_logical(w: I32) Bool => w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.N
 fn is_callee(node: I32) Bool {
     if node < 0 { return false }
     let p = parent_of(node)
-    is_kind(p, Node.Call_expr) and first_child(p) == node
+    return is_kind(p, Node.Call_expr) and first_child(p) == node
 }
 
 /// A function's name as written (a method's after its type: `area` of `fn Rect.area`).
 fn fn_word(decl: I32) I32 {
     let at = decl_name_at(decl)
     if at >= 0 and at != decl_node[decl] and is_kind(at, Node.Identifier) { return word_of(at) }
-    decl_name[decl]
+    return decl_name[decl]
 }
 
 //! = Instances

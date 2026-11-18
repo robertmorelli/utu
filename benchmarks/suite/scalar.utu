@@ -6,6 +6,6 @@ lib {
       x ^= x << 13
       x ^= x >> 17
     }
-    x
+    return x
   }
 }

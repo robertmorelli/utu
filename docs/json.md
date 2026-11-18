@@ -19,14 +19,14 @@ struct Save:
     | items: Array[Item]
 
 fn load(text: Str) Save {
-    promote @json/\ decode Save text \/ {
+    return promote @json/\ decode Save text \/ {
         |save| => save,
         ~> Save { version: 1, items: [] },
     }
 }
 
 fn store(save: Save) Str {
-    @json/\ encode Save save \/
+    return @json/\ encode Save save \/
 }
 ```
 

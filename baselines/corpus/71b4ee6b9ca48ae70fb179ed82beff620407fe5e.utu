@@ -1,6 +1,6 @@
 struct P:
     | x: I32
-fn P.make() P { P { x: 1 }; }
-fn P.get |self| () I32 { self.x; }
+fn P.make() P { return P { x: 1 }; }
+fn P.get |self| () I32 { return self.x; }
 main { console.log(P.make(5).x); }
 using console from std:Console

@@ -2,7 +2,7 @@ using Browser from std:Browser
 using ui from "./ui.utu"
 mod benchmarks {
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.page {
             = ui.header("Benchmarks", "The same programs in utu and in nine other languages that compile for the browser: Rust, JavaScript, Dart, Kotlin, MoonBit, AssemblyScript, Go, Swift, and Haskell, each timed in V8, SpiderMonkey, and JavaScriptCore.")
             p {

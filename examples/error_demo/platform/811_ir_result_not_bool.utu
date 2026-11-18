@@ -1,8 +1,6 @@
 // What: @ir arithmetic for a Bool result (it made a Bool holding 4)
 // Expect: @ir gives an i32, not a comparison's Bool
-fn odd(a: I32) Bool {
-    @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \/;
-}
+fn odd(a: I32) Bool => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \/;
 
 main {
     console.log(odd(3));

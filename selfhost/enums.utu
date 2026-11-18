@@ -25,7 +25,7 @@ fn scalar_base(decl: I32) I32 => if decl_is(decl, Decl.IntEnum) { prelude(Prelud
 fn scalar_unsigned(decl: I32) Bool {
     let base = if decl_is(decl, Decl.IntEnum) { -1 } else { distinct_base(decl) }
     if base == prelude(Prelude.U32) or base == prelude(Prelude.U64) { return true }
-    decl_is(decl, Decl.IntEnum) and word_of(after_qualifier(decl_node[decl])) == known_word(Known.WordU32)
+    return decl_is(decl, Decl.IntEnum) and word_of(after_qualifier(decl_node[decl])) == known_word(Known.WordU32)
 }
 
 /// A comparison of two values of a scalar kind (on the stack since `m`).
@@ -52,7 +52,7 @@ fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
     }
     if op < 0 { return false }
     w_node(Op.Plain, vt_i32, op, 0, m)
-    true
+    return true
 }
 
 /// `x.i32()` of a scalar kind: the base type its value already is (the
@@ -60,7 +60,7 @@ fn scalar_compare(decl: I32, word: I32, m: I32) Bool {
 fn scalar_method(decl: I32, word: I32) I32 {
     let base = scalar_base(decl)
     if word != base_word(base) { return -1 }
-    base
+    return base
 }
 
 /// The old spelling `to_i32` of `i32`, for a base type.
@@ -69,12 +69,12 @@ fn old_conversion_word(base: I32) I32 => intern_text("to_" + word_text(base_word
 /// `i32` for I32: a value's conversion to a base type (`t.i32()`).
 fn base_word(base: I32) I32 {
     let name = Prelude.name(Prelude(prelude_index(base)))
-    intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()))
+    return intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()))
 }
 
 fn prelude_index(t: I32) I32 {
     for (0 ..< Prelude.count()) |p| { if prelude_ty[p] == t { return p } }
-    0
+    return 0
 }
 
 /// `Tag(i)`, `Meters(x)`: a scalar kind made from its base's value.
@@ -90,7 +90,7 @@ fn scalar_convert(decl: I32, inst: I32, args: I32, at: I32, cx: Cx) I32 {
     coerce(check_expr(a, base, cx), base, a)
     // A safe build traps on a value no variant has, here: not in a later match.
     if safe_checks[0] == 1 and decl_is(decl, Decl.IntEnum) { w_node(Op.Call, vt_i32, enum_from_helper(decl), 0, m) }
-    t
+    return t
 }
 
 /// `Tag.count()`, `Tag.name(t)`: static operations of an integer enum. -1
@@ -117,7 +117,7 @@ fn scalar_static(decl: I32, inst: I32, word: I32, args: I32, at: I32, cx: Cx) I3
         w_node(Op.Call, vt_extern, enum_name_helper(decl), 0, m)
         return prelude(Prelude.Str)
     }
-    -1
+    return -1
 }
 
 /// Pairs: enum declaration, function.
@@ -169,7 +169,7 @@ fn enum_from_helper(decl: I32) I32 {
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
     w_node(Op.Seq, vt_i32, 0, 0, m)
     func_body[f] = w_pop()
-    f
+    return f
 }
 
 /// How many variants an enum declares.
@@ -180,13 +180,13 @@ fn variant_count(decl: I32) I32 {
         if is_kind(c, Node.Variant) { n += 1 }
         c = next_sibling(c)
     }
-    n
+    return n
 }
 
 /// `Tag.Leaf`: its value.
 fn enum_variant_value(variant: I32, inst: I32) I32 {
     w_i32(variant_value[variant])
-    named(decl_owner[variant], inst)
+    return named(decl_owner[variant], inst)
 }
 
 /// Pairs: enum declaration, function.
@@ -229,7 +229,7 @@ fn enum_name_helper(decl: I32) I32 {
     text_constant(intern_text("?"))
     w_node(Op.Seq, vt_extern, 0, 0, m)
     func_body[f] = w_pop()
-    f
+    return f
 }
 
 // With four variants or more, values from lo to hi at most half gaps: the
@@ -251,7 +251,7 @@ fn variant_range(decl: I32) .{I32, I32, I32} {
         }
         c = next_sibling(c)
     }
-    .{n, lo, hi}
+    return .{n, lo, hi}
 }
 
 /// The number of values from the lowest variant's to the highest's, when the
@@ -259,7 +259,7 @@ fn variant_range(decl: I32) .{I32, I32, I32} {
 fn name_table_span(decl: I32) I32 {
     let .{n, lo, hi} = variant_range(decl)
     let span = hi - lo + 1
-    if n < 4 or span > n * 2 or span <= 0 { 0 } else { span }
+    return if n < 4 or span > n * 2 or span <= 0 { 0 } else { span }
 }
 
 /// Function f's body: the table's look-up, with its one local.
@@ -312,7 +312,7 @@ fn text_constant(word: I32) Void => w_leaf(Op.GlobalGet, vt_extern, string_globa
 fn is_variant_of(actual: I32, expected: I32) Bool {
     let v = ty_decl(actual)
     let e = ty_decl(expected)
-    decl_is(v, Decl.Variant) and decl_owner[v] == e and ty_inst(actual) == ty_inst(expected)
+    return decl_is(v, Decl.Variant) and decl_owner[v] == e and ty_inst(actual) == ty_inst(expected)
 }
 
 /// `alt e { V |x| => …, ~> … }`: e once, then each arm tests its variant.
@@ -375,9 +375,9 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
         if unknown { join_nodes.resize(from) } else { want_t = branch_join(from, cx) }
     }
     let t = alt_arms(arms, s, st, want_t, default_, cx)
-    if optimize_level[0] == 1 { cast_arms(w_stack[w_stack.len() - 1], s) }
+    if optimize_level[0] == 1 { cast_arms(w_stack[w_mark() - 1], s) }
     w_node(Op.Seq, repr(t), 0, 0, m)
-    t
+    return t
 }
 
 /// In size builds, the arms that bind their variant, from the first, as one
@@ -452,10 +452,10 @@ fn cast_arms(n: I32, s: I32) Void {
     w_op[n] = Op.CastArms.i32()
     w_a[n] = aux
     w_b[n] = k
-    w_first[n] = w_kids.len()
-    w_kids.push(subject)
-    for (0 ..< k) |i| { w_kids.push(arms[i]) }
-    w_kids.push(rest)
+    w_first[n] = w_kid_end()
+    w_append_kid(subject)
+    for (0 ..< k) |i| { w_append_kid(arms[i]) }
+    w_append_kid(rest)
     w_count[n] = k + 2
 }
 
@@ -467,7 +467,7 @@ fn alt_cast_arm(x: I32, s: I32) I32 {
     if w_op[test] != Op.RefTest.i32() or not is_get(w_kid(test, 0), s) { return -1 }
     let cast = first_run(w_kid(x, 1))
     if cast < 0 or w_op[cast] != Op.RefCast.i32() or w_a[cast] != w_a[test] or not is_get(w_kid(cast, 0), s) { return -1 }
-    w_a[test]
+    return w_a[test]
 }
 
 fn is_get(n: I32, local: I32) Bool => w_op[n] == Op.LocalGet.i32() and w_a[n] == local
@@ -486,7 +486,7 @@ fn first_run(n: I32) I32 {
         if op == Op.RefCast.i32() { return x }
         x = w_kid(x, 0)
     }
-    if w_op[x] == Op.Seq.i32() { -1 } else { x }
+    return if w_op[x] == Op.Seq.i32() { -1 } else { x }
 }
 
 /// The arms from `arm` on, as a chain of ifs; returns the result type.
@@ -565,9 +565,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                     bind_value(d, vt_, mb)
                     b = next_sibling(b)
                 }
-                let t1 = check_expr(b, exp, cx)
-                let t = if exp >= 0 { exp } else if ty_is(t1, Ty.Never) { -1 } else { t1 }
-                if t >= 0 { coerce(t1, t, b) }
+                let t = first_branch(check_expr(b, exp, cx), exp, b)
                 w_node(Op.Seq, if t >= 0 { repr(t) } else { vt_unreachable }, 0, 0, mt)
                 if last { result = if t >= 0 { t } else { ty_never() } }
                 else {
@@ -576,7 +574,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                     nodes[open] = a
                     ts[open] = t
                     open += 1
-                    exp = if t >= 0 { t } else { -1 }
+                    exp = if expect >= 0 { expect } else { t }
                     a = next_sibling(a)
                 }
             }
@@ -590,7 +588,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
         w_node(Op.If, repr(t), new_label(), 0, ms[open])
         result = t
     }
-    result
+    return result
 }
 
 /// The variant an alt arm names (`Circle`, or `Shape.Circle`).
@@ -602,7 +600,7 @@ fn alt_variant(pattern: I32, enum_decl: I32) I32 {
         if decl_is(named, Decl.Variant) and decl_owner[named] != enum_decl { return -1 }
     }
     let v = member(enum_decl, word, Space.Member)
-    if decl_is(v, Decl.Variant) { v } else { -1 }
+    return if decl_is(v, Decl.Variant) { v } else { -1 }
 }
 
 /// Two arms for one variant written differently, one by its enum (`Circle`,

@@ -5,7 +5,7 @@
 // errors for the block or function around it.
 
 fn accepts_number(value: I32) I32 {
-    value;
+    return value;
 }
 
 fn recovery_demo() I32 {
@@ -13,5 +13,5 @@ fn recovery_demo() I32 {
     let should_be_number: I32 = false;
     accepts_number(true);
     missing_value;
-    0;
+    return 0;
 }

@@ -3,7 +3,7 @@ using code from "./code.utu"
 using ui from "./ui.utu"
 mod data {
     fn decode_sample() Str {
-        \\struct Item:
+        return \\struct Item:
         \\    | name: Str
         \\    | count: I32
         \\    | note: ?Str            // may be null or missing
@@ -19,7 +19,7 @@ mod data {
         \\using console from std:Console
     }
     fn encode_sample() Str {
-        \\struct Item:
+        return \\struct Item:
         \\    | name: Str
         \\    | count: I32
         \\    | note: ?Str
@@ -40,7 +40,7 @@ mod data {
         \\using console from std:Console
     }
     fn roundtrip_sample() Str {
-        \\struct Point:
+        return \\struct Point:
         \\    | x: I32
         \\    | y: I32
         \\
@@ -53,7 +53,7 @@ mod data {
         \\using console from std:Console
     }
     fn error_sample() Str {
-        \\using console from std:Console
+        return \\using console from std:Console
         \\
         \\struct Item:
         \\    | name: Str
@@ -69,7 +69,7 @@ mod data {
         \\}
     }
     fn enums_sample() Str {
-        \\enum Color:
+        return \\enum Color:
         \\    | Red {}
         \\    | Green {}
         \\
@@ -90,7 +90,7 @@ mod data {
         \\using console from std:Console
     }
     fn recursive_sample() Str {
-        \\struct Folder:
+        return \\struct Folder:
         \\    | name: Str
         \\    | size: I64             // integers past 2^53 stay exact
         \\    | children: Array[Folder]
@@ -98,7 +98,7 @@ mod data {
         \\fn total(f: Folder) I64 {
         \\    let sum = f.size
         \\    for (f.children) |c| { sum += total(c) }
-        \\    sum
+        \\    return sum
         \\}
         \\
         \\main {
@@ -109,8 +109,8 @@ mod data {
         \\using console from std:Console
     }
     fn match_sample() Str {
-        \\fn handle(response: Str) Str {
-        \\    @json/\ match response {
+        return \\fn handle(response: Str) Str {
+        \\    return @json/\ match response {
         \\        { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 } } => `${name} is ${age}`,
         \\        { status: "error", message: |message| Str } => "error: " + message,
         \\        ~> |error| "unexpected: " + error,
@@ -128,12 +128,12 @@ mod data {
         \\using console from std:Console
     }
     fn match_subtree_sample() Str {
-        \\struct Line:
+        return \\struct Line:
         \\    | name: Str
         \\    | count: I32
         \\
         \\fn units(order: Str) I32 {
-        \\    @json/\ match order {
+        \\    return @json/\ match order {
         \\        { lines: |lines| Array[Line], "coupon-code": |code| ?Str } => {
         \\            let sum = 0;
         \\            for (lines) |line| { sum += line.count; };
@@ -152,10 +152,10 @@ mod data {
         \\using console from std:Console
     }
     fn segment_sample() Str {
-        \\using SegmentTree from std:SegmentTree
+        return \\using SegmentTree from std:SegmentTree
         \\
-        \\fn add(a: I32, b: I32) I32 { a + b }
-        \\fn reaches_ten(total: I32) Bool { total >= 10 }
+        \\fn add(a: I32, b: I32) I32 { return a + b }
+        \\fn reaches_ten(total: I32) Bool { return total >= 10 }
         \\
         \\main {
         \\    let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add)
@@ -168,9 +168,9 @@ mod data {
         \\using console from std:Console
     }
     fn segment_max_sample() Str {
-        \\using SegmentTree from std:SegmentTree
+        return \\using SegmentTree from std:SegmentTree
         \\
-        \\fn max(a: F64, b: F64) F64 { F64.max(a, b) }
+        \\fn max(a: F64, b: F64) F64 { return F64.max(a, b) }
         \\
         \\main {
         \\    let temps = SegmentTree[F64].new([12.5, 18.0, 9.5, 21.0, 15.0], F64.inf() * -1.0, max)
@@ -179,9 +179,9 @@ mod data {
         \\using console from std:Console
     }
     fn persistent_sample() Str {
-        \\using PersistentSegmentTree from std:PersistentSegmentTree
+        return \\using PersistentSegmentTree from std:PersistentSegmentTree
         \\
-        \\fn add(a: I32, b: I32) I32 { a + b }
+        \\fn add(a: I32, b: I32) I32 { return a + b }
         \\
         \\main {
         \\    let v1 = PersistentSegmentTree[I32].new([2, 3, 5], 0, add)
@@ -191,7 +191,7 @@ mod data {
         \\using console from std:Console
     }
     fn spatial_sample() Str {
-        \\using Spatial from std:Spatial
+        return \\using Spatial from std:Spatial
         \\
         \\main {
         \\    let index = Spatial.new([
@@ -209,7 +209,7 @@ mod data {
         \\using console from std:Console
     }
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.page {
             = ui.header("Typed JSON and indexes", "Data handling that stays in Wasm: a JSON parser and printer generated per type, and native range and spatial indexes.")
             h2 {

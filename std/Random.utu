@@ -19,12 +19,12 @@ mod Random {
 
     /// A generator seeded with `seed`: the state is filled by splitmix32, so
     /// nearby seeds give unrelated numbers.
-    fn &.new(seed: I32) & { seeded(seed) }
+    fn &.new(seed: I32) & { return seeded(seed) }
 
     /// A generator seeded from the host's randomness (`crypto.getRandomValues`).
     fn &.from_host() & {
         let seed: fun() I32 = @es/\ () => crypto.getRandomValues(new Int32Array(1))[0] \/
-        seeded(seed())
+        return seeded(seed())
     }
 
     /// The next 32 random bits.
@@ -37,12 +37,12 @@ mod Random {
         self.a = self.a ^ self.d
         self.c = self.c ^ t
         self.d = rotl(self.d, 11)
-        result
+        return result
     }
 
     /// A number in [0, 1), with 32 random bits.
     fn &.float |self| () F64 {
-        self.bits().u32().f64() / 4294967296.0
+        return self.bits().u32().f64() / 4294967296.0
     }
 
     /// An integer in [`low`, `high`), every one equally likely (empty: `low`).
@@ -59,15 +59,15 @@ mod Random {
                 fraction = product.u32()
             }
         }
-        low + (product >> 32.u64()).i32()
+        return low + (product >> 32.u64()).i32()
     }
 
     /// True with probability `p`.
-    fn &.chance |self| (p: F64) Bool { self.float() < p }
+    fn &.chance |self| (p: F64) Bool { return self.float() < p }
 
     fn seeded(seed: I32) & {
         let s = seed + -1640531527
-        &{ a: mix(s), b: mix(s + -1640531527), c: mix(s - 1013904242), d: mix(s + 626627285) }
+        return &{ a: mix(s), b: mix(s + -1640531527), c: mix(s - 1013904242), d: mix(s + 626627285) }
     }
 
     // splitmix32's output function.
@@ -75,8 +75,8 @@ mod Random {
         let z = x
         z = (z ^ (z >>> 16)) * -2048144789
         z = (z ^ (z >>> 13)) * -1028477387
-        z ^ (z >>> 16)
+        return z ^ (z >>> 16)
     }
 
-    fn rotl(x: I32, k: I32) I32 { (x << k) | (x >>> (32 - k)) }
+    fn rotl(x: I32, k: I32) I32 { return (x << k) | (x >>> (32 - k)) }
 }

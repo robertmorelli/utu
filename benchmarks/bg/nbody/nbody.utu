@@ -18,12 +18,12 @@ struct Body:
     | vz: F64
     | mass: F64
 
-fn pi() F64 { 3.141592653589793 }
-fn solar_mass() F64 { 4.0 * pi() * pi() }
-fn days_per_year() F64 { 365.24 }
+fn pi() F64 { return 3.141592653589793 }
+fn solar_mass() F64 { return 4.0 * pi() * pi() }
+fn days_per_year() F64 { return 365.24 }
 
 fn body(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
-    &{
+    return &{
         x: x,
         y: y,
         z: z,
@@ -61,7 +61,7 @@ fn create() Array[Body] {
     b0.vx = 0.0 - px / solar_mass()
     b0.vy = 0.0 - py / solar_mass()
     b0.vz = 0.0 - pz / solar_mass()
-    bodies
+    return bodies
 }
 
 fn advance(bodies: Array[Body], dt: F64) Void {
@@ -117,12 +117,12 @@ fn energy(bodies: Array[Body]) F64 {
             e -= bodyi.mass * bodyj.mass / distance
         }
     }
-    e
+    return e
 }
 
 // ---- output: FNV-1a over the bytes of "%.9f\n"
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 // x rounded to nanos, then its digits.
 fn fnv_fixed9(h0: I32, x: F64) I32 {
@@ -143,7 +143,7 @@ fn fnv_fixed9(h0: I32, x: F64) I32 {
         h = fnv(h, 48 + (frac / d % 10).i32())
         d = d / 10
     }
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 test "nbody prints BG's energies" {
@@ -159,6 +159,6 @@ lib {
         let bodies = create()
         let h = fnv_fixed9(-2128831035, energy(bodies))
         for (0..<n) { advance(bodies, 0.01) }
-        fnv_fixed9(h, energy(bodies))
+        return fnv_fixed9(h, energy(bodies))
     }
 }

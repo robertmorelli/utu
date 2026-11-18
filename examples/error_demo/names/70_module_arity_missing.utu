@@ -4,10 +4,10 @@ mod Stack[T] {
     struct &:
         | items: Array[T]
         | size: I32
-    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
+    fn &.new(fill: T) & { return &{ items: Array[T].new(16, fill), size: 0 }; }
 }
 
-fn depth(s: Stack) I32 { s.size; }
+fn depth(s: Stack) I32 { return s.size; }
 
 main {
     console.log(depth(Stack[I32].new(0)));

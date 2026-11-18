@@ -1,7 +1,7 @@
 // What: using P[I32] |q| on a module of two type parameters
 // Expect: P takes 2 type arguments, given 1 at the using; no crash, no follow-ons
 mod P[A, B] { struct Pr: | a : A | b : B
-  fn mk(x: A, y: B) Pr { Pr { a: x, b: y }; } }
+  fn mk(x: A, y: B) Pr { return Pr { a: x, b: y }; } }
 using P[I32] |q|;
 main { console.log(q.mk(3, 4).a); }
 using console from std:Console

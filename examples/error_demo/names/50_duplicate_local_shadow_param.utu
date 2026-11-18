@@ -2,7 +2,7 @@
 // Expect: Duplicate local binding 'n': 'n' is already a parameter
 fn clamp(n: I32) I32 {
     let n = if n > 10 { 10; } else { n; };
-    n;
+    return n;
 }
 
 main {

@@ -19,11 +19,11 @@ mod PersistentSegmentTree[T] {
         let mid = start + (end_ - start) / 2;
         let left = build(values, start, mid, combine) orelse fatal;
         let right = build(values, mid, end_, combine) orelse fatal;
-        Node { value: combine(left.value, right.value), left: left, right: right };
+        return Node { value: combine(left.value, right.value), left: left, right: right };
     }
 
     fn &.new(values: Array[T], identity: T, combine: fun(T, T) T) & {
-        &{ root: build(values, 0, values.len(), combine), length: values.len(), identity: identity };
+        return &{ root: build(values, 0, values.len(), combine), length: values.len(), identity: identity };
     }
 
     fn replace(node: Node, start: I32, end_: I32, index: I32, value: T, combine: fun(T, T) T) Node {
@@ -38,12 +38,12 @@ mod PersistentSegmentTree[T] {
         } else {
             right = replace(right, mid, end_, index, value, combine);
         };
-        Node { value: combine(left.value, right.value), left: left, right: right };
+        return Node { value: combine(left.value, right.value), left: left, right: right };
     }
 
     fn &.set |self| (index: I32, value: T, combine: fun(T, T) T) & {
         if index < 0 or index >= self.length { fatal; };
-        &{
+        return &{
             root: replace(self.root orelse fatal, 0, self.length, index, value, combine),
             length: self.length,
             identity: self.identity,
@@ -55,7 +55,7 @@ mod PersistentSegmentTree[T] {
         let current = node orelse fatal;
         if low <= start and end_ <= high { return current.value; };
         let mid = start + (end_ - start) / 2;
-        combine(
+        return combine(
             range(current.left, start, mid, low, high, identity, combine),
             range(current.right, mid, end_, low, high, identity, combine)
         );
@@ -63,6 +63,6 @@ mod PersistentSegmentTree[T] {
 
     fn &.query |self| (start: I32, end_: I32, combine: fun(T, T) T) T {
         if start < 0 or end_ < start or end_ > self.length { fatal; };
-        range(self.root, 0, self.length, start, end_, self.identity, combine);
+        return range(self.root, 0, self.length, start, end_, self.identity, combine);
     }
 }

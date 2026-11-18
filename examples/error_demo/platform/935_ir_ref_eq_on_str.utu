@@ -1,8 +1,6 @@
 // What: ref.eq on strings, which are host values (the engine said only "not valid Wasm")
 // Expect: @ir <ir-ref-eq> takes eqref, given externref
-fn same(a: Str, b: Str) Bool {
-    @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
-}
+fn same(a: Str, b: Str) Bool => @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
 
 main {
     console.log(same("a", "a"));

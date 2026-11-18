@@ -89,7 +89,7 @@ fn declare(kind: Decl, name: I32, node: I32, owner: I32) I32 {
     decl_node.push(node)
     decl_owner.push(owner)
     decl_a.push(-1)
-    id
+    return id
 }
 
 fn decl_is(decl: I32, kind: Decl) Bool => decl >= 0 and decl_kind[decl] == kind.i32()
@@ -97,7 +97,7 @@ fn decl_is(decl: I32, kind: Decl) Bool => decl >= 0 and decl_kind[decl] == kind.
 /// Whether a declaration names a type (a module names its promoted type).
 fn is_type_decl(decl: I32) Bool {
     let k = decl_kind[decl]
-    k == Decl.Module.i32() or k == Decl.Foreign.i32() or k == Decl.ModuleParam.i32() or k == Decl.Struct.i32()
+    return k == Decl.Module.i32() or k == Decl.Foreign.i32() or k == Decl.ModuleParam.i32() or k == Decl.Struct.i32()
         or k == Decl.Enum.i32() or k == Decl.IntEnum.i32() or k == Decl.Variant.i32()
         or k == Decl.Proto.i32() or k == Decl.TypeDecl.i32() or k == Decl.Distinct.i32()
         or k == Decl.Alias.i32()
@@ -393,7 +393,7 @@ fn diag_slot(node: I32, kind: I32, word: I32) I32 {
         if diag_node[i] == node and diag_kind[i] == kind and diag_word[i] == word { return i }
         h = (h + 1) & mask
     }
-    -1
+    return -1
 }
 
 fn diag_seen_add(i: I32, node: I32, kind: I32, word: I32) Void {
@@ -469,7 +469,7 @@ fn member_slot(owner: I32, key: I32) I32 {
     let mask = member_key.len() - 1
     let h = (owner * -1640531535 + key * 40503) & mask
     while (member_key[h] >= 0 and (member_key[h] != key or member_owner[h] != owner)) { h = (h + 1) & mask }
-    h
+    return h
 }
 
 fn members_reset(capacity: I32) Void {
@@ -497,7 +497,7 @@ fn add_member(owner: I32, name: I32, space: Space, decl: I32) I32 {
     member_key[h] = key
     member_decl[h] = decl
     member_fill[0] += 1
-    -1
+    return -1
 }
 
 fn grow_members() Void {
@@ -527,7 +527,7 @@ fn grow_members() Void {
 fn member(owner: I32, name: I32, space: Space) I32 {
     if owner < 0 or name < 0 { return -1 }
     let h = member_slot(owner, name * 4 + space.i32())
-    if member_key[h] < 0 { -1 } else { member_decl[h] }
+    return if member_key[h] < 0 { -1 } else { member_decl[h] }
 }
 
 //! = Scopes
@@ -567,7 +567,7 @@ fn scope_pop(mark: I32) Void {
 fn lookup(word: I32) I32 {
     if word < 0 { return -1 }
     let b = word_top[word]
-    if b < 0 { -1 } else { bind_decl[b] }
+    return if b < 0 { -1 } else { bind_decl[b] }
 }
 
 /// The declaration `word` names in the prelude's scope, or -1: what the
@@ -576,7 +576,7 @@ fn prelude_lookup(word: I32) I32 {
     if word < 0 or word >= word_top.len() { return -1 }
     let b = word_top[word]
     while (b >= prelude_binds[0]) { b = bind_prev[b] }
-    if b < 0 { -1 } else { bind_decl[b] }
+    return if b < 0 { -1 } else { bind_decl[b] }
 }
 
 /// The bindings below this are the prelude's scope.
@@ -596,7 +596,7 @@ fn scope_file(file: I32, entry: I32) I32 {
     if file_role[file] != FileRole.Generated.i32() { return file }
     // What is generated for an imported file's mems is in its scope.
     if gen_owner_of(file) >= 0 { return gen_owner_of(file) }
-    if entry >= 0 { entry } else { file }
+    return if entry >= 0 { entry } else { file }
 }
 
 /// Bring file `f`'s scope into scope (on top of the prelude's).
@@ -629,12 +629,12 @@ fn name_node(node: I32) I32 {
     if is_kind(node, Node.Module_name) or is_kind(node, Node.Module_ref) or is_kind(node, Node.Captured_module_name) {
         return name_node(first_child(node))
     }
-    if is_kind(node, Node.Identifier) or is_kind(node, Node.Type_ident) { node } else { -1 }
+    return if is_kind(node, Node.Identifier) or is_kind(node, Node.Type_ident) { node } else { -1 }
 }
 
 fn name_word(node: I32) I32 {
     let n = name_node(node)
-    if n < 0 { -1 } else { word_of(n) }
+    return if n < 0 { -1 } else { word_of(n) }
 }
 
 /// A declaration named by `name_at` (or by its module when that is `&`),
@@ -645,27 +645,27 @@ fn declare_named(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
     let decl = declare(kind, word, node, owner)
     let n = name_node(name_at)
     if n >= 0 { node_decl[n] = decl }
-    decl
+    return decl
 }
 
 /// A declaration (as @declare_named makes it), a member of `owner`.
 fn declare_member(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
     let decl = declare_named(kind, name_at, node, owner)
     add_member(owner, decl_name[decl], Space.Member, decl)
-    decl
+    return decl
 }
 
 /// A declaration (as @declare_named makes it), in scope from here.
 fn declare_in_scope(kind: Decl, name_at: I32, node: I32, owner: I32) I32 {
     let decl = declare_named(kind, name_at, node, owner)
     bind(decl_name[decl], decl)
-    decl
+    return decl
 }
 
 /// The first child that is not a nominal qualifier.
 fn after_qualifier(node: I32) I32 {
     let c = first_child(node)
-    if is_kind(c, Node.Nom_qualifier) { next_sibling(c) } else { c }
+    return if is_kind(c, Node.Nom_qualifier) { next_sibling(c) } else { c }
 }
 
 /// An enum's name node: after its qualifier, and after its representation
@@ -673,7 +673,7 @@ fn after_qualifier(node: I32) I32 {
 fn enum_name(node: I32) I32 {
     let c = after_qualifier(node)
     let after = next_sibling(c)
-    if is_kind(after, Node.Type_ident) or is_kind(after, Node.Promoted_type) { after } else { c }
+    return if is_kind(after, Node.Type_ident) or is_kind(after, Node.Promoted_type) { after } else { c }
 }
 
 fn is_int_enum(node: I32) Bool => enum_name(node) != after_qualifier(node)
@@ -717,7 +717,7 @@ fn declare_type_item(item: I32, owner: I32) I32 {
     }
     if kind == Node.Type_decl.i32() { return declare_named(Decl.TypeDecl, first_child(item), item, owner) }
     if kind == Node.Distinct_decl.i32() { return declare_named(Decl.Distinct, first_child(item), item, owner) }
-    -1
+    return -1
 }
 
 fn declare_fields(holder: I32, owner: I32) Void {
@@ -739,7 +739,7 @@ fn names_promoted(item: I32) Bool {
     let name_at = if kind == Node.Enum_decl.i32() { enum_name(item) }
         else if kind == Node.Struct_decl.i32() { after_qualifier(item) }
         else { first_child(item) }
-    is_kind(name_at, Node.Promoted_type)
+    return is_kind(name_at, Node.Promoted_type)
 }
 
 /// A free function's name, or -1 for a method or operator. A mod's
@@ -748,7 +748,7 @@ fn free_fn_word(item: I32) I32 {
     if not is_kind(item, Node.Fn_decl) { return -1 }
     let name = first_child(first_child(item))
     if next_sibling(name) >= 0 { return -1 }
-    if is_kind(name, Node.Identifier) { word_of(name) } else if is_kind(name, Node.Promoted_type) { known_word(Known.PromotedFn) } else { -1 }
+    return if is_kind(name, Node.Identifier) { word_of(name) } else if is_kind(name, Node.Promoted_type) { known_word(Known.PromotedFn) } else { -1 }
 }
 
 /// Whether an item is `fn &(…)`, its mod's promoted function.
@@ -764,7 +764,7 @@ fn declare_fn(item: I32, owner: I32) I32 {
     } else {
         node_decl[next_sibling(first_child(item))] = decl
     }
-    decl
+    return decl
 }
 
 fn declare_module(item: I32) I32 {
@@ -814,12 +814,12 @@ fn declare_module(item: I32) I32 {
         if decl_a[decl] >= 0 and not capital { report2(Diag.ModNameCase, first_child(item), word, 0, -1) }
         else if promoted_fn >= 0 and decl_a[decl] < 0 and capital { report2(Diag.ModNameCase, first_child(item), word, 1, -1) }
     }
-    decl
+    return decl
 }
 
 /// Whether `d` (what a name is bound to) is a variant, or variants.
 fn is_variant_name(d: I32) Bool {
-    decl_is(d, Decl.Variant) or (decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant))
+    return decl_is(d, Decl.Variant) or (decl_is(d, Decl.Ambiguous) and decl_is(decl_owner[d], Decl.Variant))
 }
 
 /// Variant `v`, a member of `module` by its name: a name two of its enums'
@@ -882,7 +882,7 @@ fn bind_module_members(module: I32) Void {
 fn is_part_of(decl: I32, module: I32) Bool {
     let o = decl_owner[decl]
     while (o >= 0 and o != module) { o = decl_owner[o] }
-    o == module
+    return o == module
 }
 
 /// A `using … |Alias|` declares the alias. `using M;` and `using M[A];`
@@ -910,13 +910,13 @@ fn has_alias(item: I32) Bool {
         if is_kind(c, Node.Captured_module_name) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// The path a `using … from` imports (a string or platform path), or -1.
 fn using_path(item: I32) I32 {
     let path = last_child(item)
-    if is_kind(path, Node.String_lit) or is_kind(path, Node.Platform_path) { path } else { -1 }
+    return if is_kind(path, Node.String_lit) or is_kind(path, Node.Platform_path) { path } else { -1 }
 }
 
 /// A module's members, opened. Where one hides a member another module
@@ -939,7 +939,7 @@ fn opened_from(decl: I32) I32 {
     let d = decl
     while (decl_is(d, Decl.Ambiguous)) { d = decl_a[d] }
     while (d >= 0 and not decl_is(d, Decl.Module)) { d = decl_owner[d] }
-    d
+    return d
 }
 
 /// Whether `decl` (what a name looked up) is ambiguous, which is reported at `node`.
@@ -950,7 +950,7 @@ fn ambiguous(decl: I32, node: I32) Bool {
     if decl_is(a, Decl.Variant) and decl_is(decl_owner[decl], Decl.Variant) {
         report2(Diag.AmbiguousVariant, node, decl_name[decl], decl_owner[a], decl_owner[decl_owner[decl]])
     } else { report2(Diag.AmbiguousName, node, decl_name[decl], a, decl_owner[decl]) }
-    true
+    return true
 }
 
 /// The module an import names, in the file it imports, recorded on its name.
@@ -981,7 +981,7 @@ fn imported_item_kind(item: I32, word: I32) I32 {
             }
         }
     }
-    -1
+    return -1
 }
 
 /// The mods the file `using` `item` imports declares: "'a', 'b'", or "no modules".
@@ -997,7 +997,7 @@ fn imported_modules_text(item: I32) Str {
             }
         }
     }
-    if out.len() == 0 { "no modules" } else { out }
+    return if out.len() == 0 { "no modules" } else { out }
 }
 
 /// A declaration of a file named like a module of the prelude, reported at
@@ -1009,7 +1009,7 @@ fn standard_name(decl: I32, name_at: I32) Void {
 
 fn short_type_name(word: I32) Bool {
     let t = word_text(word)
-    t == "S" or t == "B" or t == "U" or t == "I" or t == "F" or t == "C"
+    return t == "S" or t == "B" or t == "U" or t == "I" or t == "F" or t == "C"
 }
 
 /// The node naming a top-level item, or -1.
@@ -1019,7 +1019,7 @@ fn item_name_node(item: I32) I32 {
     if kind == Node.Enum_decl.i32() { return name_node(enum_name(item)) }
     if kind == Node.Fn_decl.i32() { return last_child(first_child(item)) }
     if kind == Node.Op_decl.i32() { return -1 }
-    name_node(first_child(item))
+    return name_node(first_child(item))
 }
 
 /// Lazy modules (`using … lazy from`), and each one's path as written (with its quotes).
@@ -1033,7 +1033,7 @@ fn same_path(i: I32, j: I32) Bool {
     let n = tok_end[node_last[import_path[i]] - 1] - a
     if tok_end[node_last[import_path[j]] - 1] - b != n { return false }
     for (0 ..< n) |k| { if src[a + k] != src[b + k] { return false } }
-    true
+    return true
 }
 
 /// Whether a `using` says `lazy`.
@@ -1042,13 +1042,13 @@ fn using_is_lazy(node: I32) Bool {
         let n = tok_end[t] - tok_start[t]
         if n == 4 and src[tok_start[t]] == 108 and src[tok_start[t] + 1] == 97 and src[tok_start[t] + 2] == 122 and src[tok_start[t] + 3] == 121 { return true }
     }
-    false
+    return false
 }
 
 /// The lazy module m's index in lazy_module, or -1.
 fn lazy_index(m: I32) I32 {
     for (0 ..< lazy_module.len()) |k| { if lazy_module[k] == m { return k } }
-    -1
+    return -1
 }
 
 /// Every declaration of the program: each file's modules (the prelude's
@@ -1200,7 +1200,7 @@ vec refused_module: I32
 
 fn refused(m: I32) Bool {
     for (0 ..< refused_module.len()) |k| { if refused_module[k] == m { return true } }
-    false
+    return false
 }
 
 /// The names a file's top-level items declare, in order (see @check_using_names),
@@ -1273,7 +1273,7 @@ fn is_module_item(item: I32) Bool => is_kind(item, Node.Using_decl) or is_kind(i
 
 /// Whether a file's `mod` and another of its items (not a method) share a name.
 fn mod_clash(m: I32, item: I32) Bool {
-    is_kind(m, Node.Module_decl) and not is_kind(item, Node.Module_decl) and not is_kind(item, Node.Using_decl)
+    return is_kind(m, Node.Module_decl) and not is_kind(item, Node.Module_decl) and not is_kind(item, Node.Using_decl)
         and (not is_kind(item, Node.Fn_decl) or free_fn_word(item) >= 0)
 }
 
@@ -1302,13 +1302,13 @@ fn same_import(a: I32, b: I32) Bool {
     if is_kind(next_sibling(first_child(a)), Node.Module_type_arg_list) or is_kind(next_sibling(first_child(b)), Node.Module_type_arg_list) { return false }
     if node_text(using_path(a)) == node_text(using_path(b)) { return true }
     let m = node_decl[name_node(first_child(a))]
-    m >= 0 and not decl_is(m, Decl.Foreign) and m == node_decl[name_node(first_child(b))]
+    return m >= 0 and not decl_is(m, Decl.Foreign) and m == node_decl[name_node(first_child(b))]
 }
 
 /// Whether an item is a type, function, global, or mem.
 fn names_in_file(item: I32) Bool {
     let k = node_kind[item]
-    k == Node.Fn_decl.i32() or k == Node.Struct_decl.i32() or k == Node.Enum_decl.i32() or k == Node.Proto_decl.i32()
+    return k == Node.Fn_decl.i32() or k == Node.Struct_decl.i32() or k == Node.Enum_decl.i32() or k == Node.Proto_decl.i32()
         or k == Node.Type_decl.i32() or k == Node.Distinct_decl.i32() or k == Node.Global_decl.i32() or k == Node.Mem_decl.i32()
 }
 
@@ -1319,13 +1319,13 @@ fn declares_item(file: I32, item: I32) Bool {
     let role = file_role[file]
     if role == FileRole.Entry.i32() or role == FileRole.Generated.i32() { return true }
     if role != FileRole.Import.i32() { return false }
-    names_in_file(item) or is_kind(item, Node.Op_decl)
+    return names_in_file(item) or is_kind(item, Node.Op_decl)
 }
 
 /// The entry file, or -1.
 fn entry_file() I32 {
     for (0 ..< file_role.len()) |f| { if file_role[f] == FileRole.Entry.i32() { return f } }
-    -1
+    return -1
 }
 
 /// A program has one `lib` or one `main`, not both.
@@ -1393,7 +1393,7 @@ fn shown_test_name(module: I32) I32 {
     let id = src.intern(start, src.len())
     // Already interned: its bytes are elsewhere.
     if id < before { src.resize(start) }
-    id
+    return id
 }
 
 fn declare_entry_item(item: I32, first_entry: I32) Void {
@@ -1444,7 +1444,7 @@ vec mem_clashes: I32
 
 fn clashes_mem(word: I32) Bool {
     for (0 ..< mem_clashes.len()) |i| { if mem_clashes[i] == word { return true } }
-    false
+    return false
 }
 
 /// `decl`, named as `first` is in one scope: reported at `decl`.
@@ -1533,7 +1533,7 @@ fn resolve_names() I32 {
         if missing_why[0] == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";") }
     }
     save_diagnostics()
-    diag_kind.len()
+    return diag_kind.len()
 }
 
 /// Replace sugar nodes after syntax clients have read the source tree, before
@@ -1566,7 +1566,7 @@ fn wutu_sugar_in(parent: I32) I32 {
         }
         item = next_sibling(item)
     }
-    -1
+    return -1
 }
 
 /// Whether a file's items include `using Browser …`.
@@ -1577,7 +1577,7 @@ fn imports_browser(root: I32) Bool {
         if is_kind(item, Node.Using_decl) and word_of(first_child(item)) == browser { return true }
         item = next_sibling(item)
     }
-    false
+    return false
 }
 
 fn desugar_wutu_items(parent: I32) Void {
@@ -1594,11 +1594,22 @@ fn desugar_wutu_items(parent: I32) Void {
                 h = next_sibling(h)
             }
             let open = tok_start[node_first[body]]
+            dsl_current_site[0] = item
+            let result_type = "Browser.HTMLElement"
+            if not is_kind(item, Node.Export_html_decl) {
+                // Invalid bodies are diagnosed by normal DSL expansion, at the
+                // original body span. This early parse only chooses the result type.
+                try {
+                    let template = parse_template(dsl_body(item))
+                    if tn_kind[template] == 5 { result_type = "Browser.DocumentFragment" }
+                    else if is_svg_tag(word_text(tn_text[template])) and not is_html_tag(word_text(tn_text[template])) { result_type = "Browser.SVGElement" }
+                } catch {}
+            }
             let code = if is_kind(item, Node.Export_html_decl) {
                 "main { wutu.page(@wutu/\\ \\/) }"
             } else {
                 "fn" + bytes_text(tok_end[node_first[item]], open)
-                    + " Browser.HTMLElement => @wutu/\\ \\/"
+                    + " " + result_type + " => @wutu/\\ \\/"
             }
             dsl_current_site[0] = item
             dsl_current_from[0] = -1
@@ -1894,7 +1905,7 @@ fn impl_target(args: I32) I32 {
     if is_kind(t, Node.Ref_type) { t = first_child(t) }
     // `m.T`; not `M[A].T`, an instance's.
     if is_kind(t, Node.Qualified_type_ref) and not is_kind(first_child(t), Node.Instantiated_module_ref) and not is_kind(next_sibling(first_child(t)), Node.Module_type_arg_list) { return name_node(last_child(t)) }
-    name_node(t)
+    return name_node(t)
 }
 
 /// `fn T:add |a, b|`: an operator of T.
@@ -1927,7 +1938,7 @@ fn walk_type_name(node: I32, w: Walk) I32 {
     if decl_is(decl, Decl.Alias) { node_alias[n] = decl }
     let t = promoted(decl)
     node_decl[n] = t
-    t
+    return t
 }
 
 /// `t`, named at `node` where a type goes: a mod with no type `&` is not one
@@ -1948,14 +1959,14 @@ fn as_type(node: I32, t: I32) I32 {
     } else {
         diag_note("|" + name + "| renames the mod; name a type in it: " + name + ".T")
     }
-    -1
+    return -1
 }
 
 /// A module (or an alias of one) stands for its promoted type, when it has one.
 fn promoted(decl: I32) I32 {
     let d = decl
     if decl_is(d, Decl.Alias) and decl_a[d] >= 0 { d = decl_a[d] }
-    if decl_is(d, Decl.Module) and decl_a[d] >= 0 { decl_a[d] } else { decl }
+    return if decl_is(d, Decl.Module) and decl_a[d] >= 0 { decl_a[d] } else { decl }
 }
 
 /// Names the language provides without a declaration: the narrow element
@@ -2006,7 +2017,7 @@ fn walk_type_path(node: I32, w: Walk) I32 {
         node_decl[n] = -1
         return -1
     }
-    t
+    return t
 }
 
 /// A type path (as @walk_type_path walks it) where a variant goes, a
@@ -2069,13 +2080,13 @@ fn walk_variant_path(node: I32, w: Walk) I32 {
         node_decl[n] = t
         return t
     }
-    -1
+    return -1
 }
 
 /// The enum of variants a name before `.V` names, or -1.
 fn enum_named(n: I32) I32 {
     let d = lookup(word_of(n))
-    if decl_is(d, Decl.Enum) { d } else { -1 }
+    return if decl_is(d, Decl.Enum) { d } else { -1 }
 }
 
 /// A module name: the module (through an alias), recorded on it.
@@ -2095,12 +2106,12 @@ fn walk_module_name(node: I32) I32 {
         return -1
     }
     node_decl[n] = decl
-    decl
+    return decl
 }
 
 /// An open `M` binds M's name to its type `&`; as a module name, it is M.
 fn module_named(decl: I32) I32 {
-    if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl_owner[decl] } else { decl }
+    return if decl >= 0 and decl_is(decl_owner[decl], Decl.Module) and decl_a[decl_owner[decl]] == decl { decl_owner[decl] } else { decl }
 }
 
 fn walk_type_item(item: I32, w: Walk) Void {
@@ -2157,7 +2168,7 @@ fn listed_before(list: I32, t: I32, d: I32) Bool {
         if node_decl[c] == d { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// `&` in a protocol's member (`cmp(&) I32`) is the type implementing it:
@@ -2178,7 +2189,7 @@ fn walk_impl_name(node: I32, w: Walk) I32 {
     if not is_kind(node, Node.Qualified_type_ref) { return walk_type_name(node, w) }
     let d = walk_type_path(node, w)
     node_decl[node] = d
-    d
+    return d
 }
 
 /// `mod M[T[P, Q]]`: each bound names a protocol.
@@ -2223,7 +2234,7 @@ fn declare_binders(node: I32, owner: I32, index: I32) I32 {
         i = declare_binders(c, owner, i)
         c = next_sibling(c)
     }
-    i
+    return i
 }
 
 fn walk_params(list: I32, owner: I32, w: Walk) Void {
@@ -2563,7 +2574,7 @@ fn walk_iterator(node: I32, w: Walk) Void {
 }
 
 fn is_type_node(kind: I32) Bool {
-    kind == Node.Ref_type.i32() or kind == Node.Nullable_type.i32() or kind == Node.Paren_type.i32()
+    return kind == Node.Ref_type.i32() or kind == Node.Nullable_type.i32() or kind == Node.Paren_type.i32()
         or kind == Node.Tuple_type.i32() or kind == Node.Func_type.i32() or kind == Node.Closure_type.i32()
         or kind == Node.Promoted_type.i32()
 }
@@ -2591,7 +2602,7 @@ fn walk_alt_arm(arm: I32, w: Walk) Void {
 /// binding is the identifier between the pattern and the arm's expression.
 fn arm_binding(arm: I32) I32 {
     let c = next_sibling(first_child(arm))
-    if is_kind(c, Node.Identifier) and next_sibling(c) >= 0 { c } else { -1 }
+    return if is_kind(c, Node.Identifier) and next_sibling(c) >= 0 { c } else { -1 }
 }
 
 /// `Tag.Leaf` (or `m.Tag.Leaf`) in a match: the integer enum and its variant.
@@ -2636,7 +2647,7 @@ fn walk_owner_name(node: I32) I32 {
         decl = decl_a[decl]
     }
     node_decl[node] = decl
-    decl
+    return decl
 }
 
 /// What `T.name` names: a member of a module (or of its promoted type: a
@@ -2650,5 +2661,5 @@ fn static_member(owner: I32, word: I32) I32 {
     if decl_is(owner, Decl.Module) and decl_a[owner] >= 0 { return static_member(decl_a[owner], word) }
     // `B.wrap` with B open, where B names its type `&`: B's function.
     if module_named(owner) != owner { return member(module_named(owner), word, Space.Member) }
-    -1
+    return -1
 }

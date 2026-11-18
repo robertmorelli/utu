@@ -1,6 +1,6 @@
 // What: a global array of funs, read where it is called.
 // Expect: fun() Str cannot be stored; use cl() Str
-fn hi() Str { "hi"; }
+fn hi() Str { return "hi"; }
 let greeters: Array[fun() Str] = [hi];
 
 main {

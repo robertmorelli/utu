@@ -3,22 +3,22 @@ mod boxy[T] {
         | value : T
 
     fn Box.new(value: T) Box {
-        Box { value: value }
+        return Box { value: value }
     }
 
     fn Box.get |self| () T {
-        self.value
+        return self.value
     }
 
     fn id(value: T) T {
-        value
+        return value
     }
 }
 
 using boxy[I32] |box_i32|
 
 fn read_inline(value: boxy[I32].Box) I32 {
-    value.get()
+    return value.get()
 }
 
 test "using aliases expose qualified types" {

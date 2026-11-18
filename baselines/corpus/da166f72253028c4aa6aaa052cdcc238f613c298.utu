@@ -5,7 +5,7 @@
 
       lib {
           fn describe(text: Str) Str {
-              @json/\ match text {
+              return @json/\ match text {
                   { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.str() + " " + (tier orelse "free"),
                   { status: "error", message: |message| Str } => "error: " + message,
                   { items: |items| Array[Item] } => "items " + items.len().str() + " " + items[1].price.str(),
@@ -14,7 +14,7 @@
               }\/;
           }
           fn first_wins(text: Str) I32 {
-              @json/\ match text {
+              return @json/\ match text {
                   { a: |a| I32 } => 1,
                   { a: |a| I32, b: |b| I32 } => 2,
                   ~> 0,

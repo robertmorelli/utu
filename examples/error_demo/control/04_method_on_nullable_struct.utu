@@ -4,10 +4,10 @@ struct Rect:
     | w: F64
     | h: F64
 
-fn Rect.area(r: Rect) F64 { r.w * r.h; }
+fn Rect.area(r: Rect) F64 { return r.w * r.h; }
 
 fn biggest(found: ?Rect) F64 {
-    found.area();
+    return found.area();
 }
 
 main {

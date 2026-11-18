@@ -3,8 +3,8 @@
 mod Money {
     struct &:
         | cents: I32
-    fn &.of(c: I32) & { &{ cents: c }; }
-    fn doubled(m: &) & { &{ cents: m.cents * 2 }; }
+    fn &.of(c: I32) & { return &{ cents: c }; }
+    fn doubled(m: &) & { return &{ cents: m.cents * 2 }; }
 }
 main {
     let m = Money.of(5);

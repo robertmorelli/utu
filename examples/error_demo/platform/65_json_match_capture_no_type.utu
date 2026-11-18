@@ -2,7 +2,7 @@
 // Expect: Expected a type for capture name
 
 fn name_of(text: Str) Str {
-    @json/\ match text {
+    return @json/\ match text {
         { user: { name: |name| } } => name,
         ~> "",
     }\/;

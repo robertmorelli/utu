@@ -16,14 +16,14 @@ const points = Array.from({length:31},(_,i)=>({x:(i*17%13)-6,y:(i*7%11)-5,id:i})
 const literal='['+points.map(p=>`Spatial.point(${p.x}.0, ${p.y}.0, ${p.id})`).join(',')+']';
 const {instance: spatial}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'spatial-oracle.utu',source:`
 using Spatial from std:Spatial;
-fn tree() Spatial { Spatial.new(${literal}); }
-fn mask(ids: Array[I32]) I64 { ids fold(0.i64()) |acc, id| { acc + (1.i64() << id.i64()); }; }
+fn tree() Spatial { return Spatial.new(${literal}); }
+fn mask(ids: Array[I32]) I64 { return ids fold(0.i64()) |acc, id| { acc + (1.i64() << id.i64()); }; }
 lib {
- fn box(a: F64,b: F64,c: F64,d: F64) I64 { mask(tree().within(a,b,c,d)); }
- fn below(a: F64,b: F64,c: F64) I64 { mask(tree().below(a,b,c)); }
- fn radius(x: F64,y: F64,r: F64) I64 { mask(tree().radius(x,y,r)); }
- fn nearest(x: F64,y: F64) I32 { (tree().nearest(x,y) orelse fatal).value; }
- fn empty() I32 { let points: Array[Spatial.Point]=[]; let t=Spatial.new(points); t.within(-1.0,1.0,-1.0,1.0).len(); }
+ fn box(a: F64,b: F64,c: F64,d: F64) I64 { return mask(tree().within(a,b,c,d)); }
+ fn below(a: F64,b: F64,c: F64) I64 { return mask(tree().below(a,b,c)); }
+ fn radius(x: F64,y: F64,r: F64) I64 { return mask(tree().radius(x,y,r)); }
+ fn nearest(x: F64,y: F64) I32 { return (tree().nearest(x,y) orelse fatal).value; }
+ fn empty() I32 { let points: Array[Spatial.Point]=[]; let t=Spatial.new(points); return t.within(-1.0,1.0,-1.0,1.0).len(); }
 }
 `});
 const mask=ps=>ps.reduce((a,p)=>a+(1n<<BigInt(p.id)),0n);
@@ -41,18 +41,18 @@ console.log('320 spatial queries match brute-force results');
 const {instance: ranges}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'range-oracle.utu',source:`
 using SegmentTree from std:SegmentTree;
 using PersistentSegmentTree from std:PersistentSegmentTree;
-fn add(a: I32,b: I32) I32 {a+b;}
-fn join(a: Str,b: Str) Str {a+b;}
+fn add(a: I32,b: I32) I32 {return a+b;}
+fn join(a: Str,b: Str) Str {return a+b;}
 lib {
  fn query(lo: I32,hi: I32,index: I32,value: I32) I32 {
-  let t=SegmentTree[I32].new([2,7,1,8,2,8,1,8],0,add); t.set(index,value,add); t.query(lo,hi,add);
+  let t=SegmentTree[I32].new([2,7,1,8,2,8,1,8],0,add); t.set(index,value,add); return t.query(lo,hi,add);
  }
  fn persistent(lo: I32,hi: I32,index: I32,value: I32) I32 {
   let t=PersistentSegmentTree[I32].new([2,7,1,8,2,8,1,8],0,add);
-  let other=t.set(index,value,add); assert t.query(0,8,add)==37; other.query(lo,hi,add);
+  let other=t.set(index,value,add); assert t.query(0,8,add)==37; return other.query(lo,hi,add);
  }
- fn order() Str {let t=SegmentTree[Str].new(["a","b","c","d","e"],"",join); t.query(1,5,join);}
- fn empty() I32 {let a:Array[I32]=[];let t=SegmentTree[I32].new(a,0,add);t.query(0,0,add);}
+ fn order() Str {let t=SegmentTree[Str].new(["a","b","c","d","e"],"",join); return t.query(1,5,join);}
+ fn empty() I32 {let a:Array[I32]=[];let t=SegmentTree[I32].new(a,0,add);return t.query(0,0,add);}
 }
 `});
 for(let lo=0;lo<=8;lo++)for(let hi=lo;hi<=8;hi++)for(let index=0;index<8;index++){
@@ -69,8 +69,8 @@ const {instance: edge}=await compileAndInstantiate({ROOT,makeCompiler,assertNoEr
 struct Item: | value: I32
 struct Counter: | calls: I32
 mod shadows {
- fn item() I32 {99;}
- fn score() I32 { [1,2,3] map |item| {item+1;} sum; }
+ fn item() I32 {return 99;}
+ fn score() I32 { return [1,2,3] map |item| {item+1;} sum; }
 }
 lib {
  fn check() I32 {
@@ -111,10 +111,10 @@ lib {
   let strings=["red","blue","red"] group_by(Str,Str)|s|{s;};
   assert strings.len()==2 and strings[0].values.len()==2;
   assert shadows.score()==9;
-  1;
+  return 1;
  }
- fn invalid_batch() I32 {([1] batched(I32,0)).len();}
- fn invalid_window() I32 {([1] windows(I32,-1)).len();}
+ fn invalid_batch() I32 {return ([1] batched(I32,0)).len();}
+ fn invalid_window() I32 {return ([1] windows(I32,-1)).len();}
 }
 `});
 assertEq(edge.exports.check(),1);

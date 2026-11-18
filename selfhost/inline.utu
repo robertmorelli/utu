@@ -114,13 +114,13 @@ fn inline_into(f: I32) Void {
 
 /// A function whose body can be copied into a caller.
 fn inlinable(g: I32) Bool {
-    func_kind[g] == FuncKind.Defined.i32() and func_body[g] >= 0 and func_code[g] < 0
+    return func_kind[g] == FuncKind.Defined.i32() and func_body[g] >= 0 and func_code[g] < 0
         and vl_len[ht_b[func_type_of[g]]] <= 1 and not returns_by_call(g) and not traps_by_name(g)
 }
 
 fn returns_by_call(g: I32) Bool {
     if inl_return_call[g] == 0 { inl_return_call[g] = if has_op(func_body[g], Op.ReturnCall.i32()) { 2 } else { 1 } }
-    inl_return_call[g] == 2
+    return inl_return_call[g] == 2
 }
 
 /// Whether done function `g` assigns its parameter `i`.
@@ -130,7 +130,7 @@ fn assigns_param(g: I32, i: I32) Bool {
         for (0 ..< vl_len[ht_a[func_type_of[g]]]) |k| { inl_param_set.push(0) }
         note_params_set(func_body[g], inl_params_at[g], vl_len[ht_a[func_type_of[g]]])
     }
-    inl_param_set[inl_params_at[g] + i] == 1
+    return inl_param_set[inl_params_at[g] + i] == 1
 }
 
 /// Flags the parameters (below `np`) assigned under node `n`, at `at`.
@@ -148,7 +148,7 @@ fn traps_by_name(g: I32) Bool {
         if from_helper_enum[i] == g { return true }
         i += 2
     }
-    false
+    return false
 }
 
 /// Call `c` in `f`, to `g`, becomes a block of g's body. `label` is the
@@ -191,16 +191,16 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
     inl_grown[0] += inl_size[g]
     // The call node becomes the block (its type, the call's result, stays).
     let n = w_mark() - m
-    w_first[c] = w_kids.len()
-    for (m ..< m + n) |i| { w_kids.push(w_stack[i]) }
+    w_first[c] = w_kid_end()
+    for (m ..< m + n) |i| { w_append_kid(w_stack[i]) }
     w_count[c] = n
-    w_stack.resize(m)
+    w_resize_stack(m)
     // No `return` to leave it by: no block (which a tee cannot reach into).
     let returns = has_op(func_body[g], Op.Return.i32())
     w_op[c] = if returns { Op.Block.i32() } else { Op.Seq.i32() }
     w_a[c] = if returns { block } else { 0 }
     w_b[c] = 0
-    block
+    return block
 }
 
 /// A new local of `f`, of value type `vt`: its index.
@@ -215,7 +215,7 @@ fn add_local(f: I32, vt: I32) I32 {
     }
     local_types.push(vt)
     func_local_count[f] = n + 1
-    vl_len[ht_a[func_type_of[f]]] + n
+    return vl_len[ht_a[func_type_of[f]]] + n
 }
 
 /// A copy of node `n` of the callee being inlined, in the caller's locals
@@ -225,8 +225,8 @@ fn inl_copy(n: I32) I32 {
     if w_op[n] == Op.LocalGet.i32() and w_a[n] < inl_subst.len() and inl_subst[w_a[n]] >= 0 { return inl_subst[w_a[n]] }
     // (Built in place, as w_node would: its kids' room first, then them.)
     let count = w_count[n]
-    let first = w_kids.len()
-    for (0 ..< count) |i| { w_kids.push(-1) }
+    let first = w_kid_end()
+    for (0 ..< count) |i| { w_append_kid(-1) }
     for (0 ..< count) |i| {
         let kid = inl_copy(w_kid(n, i))
         w_kids[first + i] = kid
@@ -247,27 +247,16 @@ fn inl_copy(n: I32) I32 {
     }
     let vt = w_type[n]
     if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple) }
-    let id = w_op.len()
-    w_op.push(op)
-    w_type.push(vt)
-    // Its syntax, the callee's, and the call it is inlined at: a source map places it so.
-    if inl_helper[0] >= 0 {
-        w_src.push(w_src[inl_helper[0]])
-        w_site.push(w_site[inl_helper[0]])
-    } else {
-        w_src.push(w_src[n])
-        w_site.push(inl_site[0])
-    }
-    w_a.push(a)
-    w_b.push(w_b[n])
-    w_first.push(first)
-    w_count.push(count)
-    id
+    // Preserve the callee's syntax and the call site for source maps.
+    let helper = inl_helper[0]
+    let source = if helper >= 0 { w_src[helper] } else { w_src[n] }
+    let site = if helper >= 0 { w_site[helper] } else { inl_site[0] }
+    return add_ir(op, vt, a, w_b[n], first, count, source, site)
 }
 
 /// An op whose `a` is a label: a block it opens, or one it branches to.
 fn is_labelled(op: I32) Bool {
-    op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.If.i32() or op == Op.Try.i32()
+    return op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.If.i32() or op == Op.Try.i32()
         or op == Op.Br.i32() or op == Op.BrIf.i32() or op == Op.Rethrow.i32()
 }
 
@@ -283,20 +272,20 @@ fn max_label(n: I32) I32 {
         let kid = max_label(w_kid(n, i))
         if kid > most { most = kid }
     }
-    most
+    return most
 }
 
 fn inl_nodes(n: I32) I32 {
     let total = 1
     for (0 ..< w_count[n]) |i| { total += inl_nodes(w_kid(n, i)) }
-    total
+    return total
 }
 
 /// Whether an op `op` is under node `n`.
 fn has_op(n: I32, op: I32) Bool {
     if w_op[n] == op { return true }
     for (0 ..< w_count[n]) |i| { if has_op(w_kid(n, i), op) { return true } }
-    false
+    return false
 }
 
 /// The calls under node `n` (`looped`: inside a loop), onto @inl_calls.
@@ -314,7 +303,7 @@ fn inl_assigns(n: I32, local: I32) Bool {
     let op = w_op[n]
     if (op == Op.LocalSet.i32() or op == Op.LocalTee.i32()) and w_a[n] == local { return true }
     for (0 ..< w_count[n]) |i| { if inl_assigns(w_kid(n, i), local) { return true } }
-    false
+    return false
 }
 
 //! == Known types
@@ -375,7 +364,7 @@ fn fold_canonical(x: I32) I32 {
         local = fold_copy_of[local]
         steps += 1
     }
-    -1
+    return -1
 }
 
 fn fold(n: I32) Void {
@@ -435,7 +424,7 @@ fn known_i32(n: I32) I32 {
     let v = n
     while ((w_op[v] == Op.Block.i32() or w_op[v] == Op.Seq.i32()) and w_count[v] == 1) { v = w_kid(v, 0) }
     if w_op[v] != Op.I32Const.i32() { return -1 }
-    if w_a[v] != 0 { 1 } else { 0 }
+    return if w_a[v] != 0 { 1 } else { 0 }
 }
 
 /// What `ref.test` node `n` gives, when the facts decide it: 1, 0, or -1.
@@ -456,7 +445,7 @@ fn known_test(n: I32) I32 {
         }
         i -= 1
     }
-    -1
+    return -1
 }
 
 /// Whether heap type t is u or a subtype of it.
@@ -466,7 +455,7 @@ fn heap_below(t: I32, u: I32) Bool {
         if h == u { return true }
         h = ht_super[h]
     }
-    false
+    return false
 }
 
 //! == Structs that stay in a function
@@ -516,7 +505,7 @@ fn h_walk_function(f: I32) Void {
     h_get_first.clear()
     h_get_last.clear()
     h_locals(total)
-    if h_index.len() < w_op.len() { h_index.resize(w_op.len()) }
+    if h_index.len() < w_node_count[0] { h_index.resize(w_node_count[0]) }
     // (Grown to the labels targeted, as the walk finds them.)
     h_targeted.clear()
     h_walk(func_body[f], -1, 0)
@@ -585,7 +574,7 @@ fn made_struct(n: I32) I32 {
         if not passes or w_count[v] == 0 { return -1 }
         v = w_kid(v, w_count[v] - 1)
     }
-    -1
+    return -1
 }
 
 /// By node of the walk: its position in @h_node.
@@ -646,7 +635,7 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
     // The allocation sets them, in order, and gives null.
     let nullable = vt_ref(t, true)
     let m = w_mark()
-    let fresh = w_op.len()
+    let fresh = w_node_count[0]
     if w_count[made] != ht_b[t] {
         // One call giving the fields (see @struct_returns): stored from the
         // stack, the last first.
@@ -667,13 +656,13 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
     let direct = w_kid(set, 0) == made
     if not direct { w_leaf(Op.RefNull, nullable, nullable, 0) }
     let count = w_mark() - m
-    w_first[made] = w_kids.len()
-    for (m ..< m + count) |i| { w_kids.push(w_stack[i]) }
+    w_first[made] = w_kid_end()
+    for (m ..< m + count) |i| { w_append_kid(w_stack[i]) }
     w_count[made] = count
-    w_stack.resize(m)
+    w_resize_stack(m)
     w_op[made] = Op.Seq.i32()
     w_type[made] = if direct { vt_none } else { nullable }
-    if h_index.len() < w_op.len() { h_index.resize(w_op.len()) }
+    if h_index.len() < w_node_count[0] { h_index.resize(w_node_count[0]) }
     for (0 ..< count) |i| {
         let s = w_kid(made, i)
         if s >= fresh {
@@ -702,7 +691,7 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
         let at = func_locals[f] + x - params
         if local_types[at] >= vt_defined and vt_is_ref(local_types[at]) { local_types[at] = vt_ref(vt_heap(local_types[at]), true) }
     }
-    true
+    return true
 }
 
 /// Whether the struct of type `t` in `local` is used only for its fields:
@@ -739,7 +728,7 @@ fn struct_stays(local: I32, t: I32) Bool {
             return false
         }
     }
-    true
+    return true
 }
 
 fn add_carriers(local: I32) Void {
@@ -849,7 +838,7 @@ fn struct_returns() Bool {
         if sr_changed[f] == 1 and sr_unshared(func_body[f]) { locals_for_structs(f) }
     }
     cur_src[0] = src
-    true
+    return true
 }
 
 /// Count each candidate's calls that gain and that lose, and drop those
@@ -887,14 +876,14 @@ fn sr_weigh(n: I32) Bool {
             dropped = true
         }
     }
-    dropped
+    return dropped
 }
 
 /// Whether a call under `n` is to a candidate.
 fn sr_calls_candidate(n: I32) Bool {
     if w_op[n] == Op.Call.i32() and sr_type[w_a[n]] >= 0 { return true }
     for (0 ..< w_count[n]) |i| { if sr_calls_candidate(w_kid(n, i)) { return true } }
-    false
+    return false
 }
 
 /// Whether call `c` (at `k` in the walk) would make no struct: it is
@@ -905,7 +894,7 @@ fn sr_gains(c: I32, k: I32, unshared: Bool) Bool {
     let p = h_parent[k]
     if p < 0 { return false }
     if w_op[p] == Op.Drop.i32() { return true }
-    w_op[p] == Op.LocalSet.i32() and unshared and h_set[w_a[p]] == p and struct_stays(w_a[p], sr_type[w_a[c]])
+    return w_op[p] == Op.LocalSet.i32() and unshared and h_set[w_a[p]] == p and struct_stays(w_a[p], sr_type[w_a[c]])
 }
 
 /// The struct type `f` may return as fields: it returns a struct of
@@ -923,21 +912,21 @@ fn sr_candidate(f: I32) I32 {
         if storage == vt_i8 or storage == vt_i16 { return -1 }
     }
     if not sr_unshared(func_body[f]) or has_op(func_body[f], Op.ReturnCall.i32()) { return -1 }
-    t
+    return t
 }
 
 /// Whether no node under `n` is held in two places (see sweep).
 fn sr_unshared(n: I32) Bool {
     if n < node_holders.len() and node_holders[n] > 1 { return false }
     for (0 ..< w_count[n]) |i| { if not sr_unshared(w_kid(n, i)) { return false } }
-    true
+    return true
 }
 
 /// The fields of struct type `t`, as a list of value types.
 fn sr_list(t: I32) I32 {
     let m = vl_begin()
     for (0 ..< ht_b[t]) |i| { vl_add(field_storage(t, i)) }
-    vl_end(m)
+    return vl_end(m)
 }
 
 /// The fields of struct type `t`, as one value type (a tuple for several).
@@ -945,7 +934,7 @@ fn sr_vt(t: I32) I32 {
     if ht_b[t] == 1 { return field_storage(t, 0) }
     let list = sr_list(t)
     func_type(vl_empty(), list)
-    vt_tuple_of(list)
+    return vt_tuple_of(list)
 }
 
 /// Whether every return of `f` is a struct of type `t` made for it: fills
@@ -971,17 +960,17 @@ fn sr_returns(f: I32, t: I32) Bool {
             if not ((op == Op.StructGet.i32() or op == Op.StructSet.i32()) and h_place[k] == 0) { return false }
         }
     }
-    true
+    return true
 }
 
 fn sr_has_local(x: I32) Bool {
     for (0 ..< sr_locals.len()) |i| { if sr_locals[i] == x { return true } }
-    false
+    return false
 }
 
 fn sr_returned(n: I32) Bool {
     for (0 ..< sr_ret.len()) |i| { if sr_ret[i] == n { return true } }
-    false
+    return false
 }
 
 /// Whether node `n`'s value is a struct of type `t` nothing else holds.
@@ -1019,7 +1008,7 @@ fn sr_fresh(n: I32, t: I32, top: Bool) Bool {
         if top { sr_path.push(n) }
         return sr_fresh(w_kid(n, 1), t, top) and sr_fresh(w_kid(n, 2), t, top)
     }
-    false
+    return false
 }
 
 /// Whether each branch to `label` carries a struct of type `t` nothing else holds.
@@ -1035,7 +1024,7 @@ fn sr_branches_fresh(label: I32, t: I32) Bool {
             for (0 ..< w_b[b]) |i| { if w_aux[w_a[b] + i] == label { return false } }
         }
     }
-    true
+    return true
 }
 
 /// Whether local `x` (not a parameter) is only ever stored a struct of type
@@ -1052,7 +1041,7 @@ fn sr_local_fresh(x: I32, t: I32) Bool {
             sets += 1
         }
     }
-    sets > 0
+    return sets > 0
 }
 
 /// `twin` (holding f's body) gives the fields of what f returned; f makes
@@ -1081,10 +1070,10 @@ fn sr_to_fields(f: I32, twin: I32, t: I32) Void {
                 w_node(Op.StructGet, field_storage(t, j), t, j, mj)
             }
             let count = w_mark() - m
-            w_first[n] = w_kids.len()
-            for (m ..< m + count) |j| { w_kids.push(w_stack[j]) }
+            w_first[n] = w_kid_end()
+            for (m ..< m + count) |j| { w_append_kid(w_stack[j]) }
             w_count[n] = count
-            w_stack.resize(m)
+            w_resize_stack(m)
             w_op[n] = Op.Seq.i32()
             w_a[n] = 0
         }
@@ -1121,18 +1110,18 @@ fn sr_rewrite_calls(f: I32, n: I32, parent: I32) Void {
         w_push(call)
         for (0 ..< ht_b[t]) |i| { w_leaf(Op.Drop, vt_none, 0, 0) }
         let count = w_mark() - md
-        w_first[parent] = w_kids.len()
-        for (md ..< md + count) |i| { w_kids.push(w_stack[i]) }
+        w_first[parent] = w_kid_end()
+        for (md ..< md + count) |i| { w_append_kid(w_stack[i]) }
         w_count[parent] = count
-        w_stack.resize(md)
+        w_resize_stack(md)
         w_op[parent] = Op.Seq.i32()
         return
     }
     w_op[n] = Op.StructNew.i32()
     w_a[n] = t
     w_b[n] = 0
-    w_first[n] = w_kids.len()
-    w_kids.push(call)
+    w_first[n] = w_kid_end()
+    w_append_kid(call)
     w_count[n] = 1
 }
 
@@ -1171,14 +1160,11 @@ vec sm_bad: U8
 vec sm_label: I32
 /// By function: how many of its first parameters are their arguments.
 vec sm_prefix: I32
-/// While weighing a callee: by parameter, its reads; the labels it
-/// branches to; and the deepest a branch can be.
-vec sm_reads: I32
+/// While weighing a callee: its branch targets and maximum depth width.
 vec sm_targets: I32
 vec sm_depth: I32 = [0]
 /// Bodies past this many nodes are not weighed (none would gain).
 let sm_most_nodes: I32 = 200
-vec sm_nodes: I32 = [0]
 /// While walking a body in order: the next parameter, and whether only
 /// reads of the parameters before it have run.
 vec sm_next: I32 = [0]
@@ -1189,6 +1175,7 @@ vec inl_subst: I32
 /// Rounds until none inlines (each sweeps after it); then each function
 /// called once moves there.
 fn inline_small() Void {
+    sm_begin_survey()
     let rounds = 0
     let fresh = false
     while (rounds < 16 and not fresh) {
@@ -1251,7 +1238,7 @@ fn sm_root(f: I32) I32 {
         sm_owner[k] = r
         k = next
     }
-    r
+    return r
 }
 
 /// Move each function called once to its call (after sm_survey), keeping
@@ -1275,7 +1262,7 @@ fn sm_move_all() Bool {
     sm_state.resize(n)
     for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and sm_movable(g) { 1 } else { 2 } }
     sm_size.resize(n)
-    for (0 ..< n) |f| { sm_size[f] = if sm_cap[0] > 0 and func_body[f] >= 0 { inl_nodes(func_body[f]) } else { 0 } }
+    for (0 ..< n) |f| { sm_size[f] = if sm_cap[0] > 0 and func_live[f] == 1 { sm_body_nodes[f] } else { 0 } }
     let any = false
     for (0 ..< n) |g| { if sm_state[g] == 1 { sm_move_down(g); any = true } }
     if not any { return false }
@@ -1304,27 +1291,35 @@ fn sm_move_all() Bool {
         }
     }
     let old = node_holders.len()
-    node_holders.resize(w_op.len())
-    for (old ..< w_op.len()) |k| { node_holders[k] = 1 }
-    sm_gone[0] == 1
+    node_holders.resize(w_node_count[0])
+    for (old ..< w_node_count[0]) |k| { node_holders[k] = 1 }
+    return sm_gone[0] == 1
 }
 
-/// Walk each live body (sm_walk), and count each function's calls; one by
-/// itself, or shared, is bad (@sm_bad).
-fn sm_survey() Void {
+/// The survey caches the facts about each body between inlining rounds.
+vec sm_dirty: U8
+vec sm_body_nodes: I32
+vec sm_calls_at: I32
+vec sm_calls_end: I32
+vec sm_body_calls: I32
+
+fn sm_begin_survey() Void {
     let n = func_kind.len()
+    sm_dirty.resize(n)
+    sm_body_nodes.resize(n)
+    sm_calls_at.resize(n)
+    sm_calls_end.resize(n)
     sm_label.resize(n)
     sm_count.resize(n)
     sm_bad.resize(n)
     sm_flags.resize(n)
     sm_params_at.resize(n)
-    sm_found.clear()
-    sm_found_in.clear()
+    sm_body_calls.clear()
     sm_assigned.clear()
     sm_param_reads.clear()
     for (0 ..< n) |f| {
-        sm_count[f] = 0
-        sm_bad[f] = 0
+        sm_dirty[f] = 1
+        sm_body_nodes[f] = 0
         sm_flags[f] = 0
         sm_label[f] = -1
         sm_params_at[f] = sm_assigned.len()
@@ -1334,15 +1329,52 @@ fn sm_survey() Void {
                 sm_assigned.push(0)
                 sm_param_reads.push(0)
             }
-            sm_label[f] = 0
-            sm_walk(f, func_body[f], np)
         }
     }
-    for (0 ..< sm_found.len()) |i| {
-        let c = sm_found[i]
-        let g = w_a[c]
-        sm_count[g] += 1
-        if sm_found_in[i] == g or node_holders[c] != 1 { sm_bad[g] = 1 }
+}
+
+/// Re-read a body after rewriting its call sites. Also re-read previously
+/// shared bodies because the sweep can remove a reference to a shared node.
+/// An unchanged, unshared body cannot gain references: inlining copies the
+/// callee's nodes and reuses arguments only from the rewritten caller.
+fn sm_refresh_body(f: I32) Void {
+    if sm_dirty[f] == 0 and sm_flags[f] & 2 == 0 { return }
+    sm_dirty[f] = 0
+    sm_label[f] = 0
+    sm_flags[f] = 0
+    let np = vl_len[ht_a[func_type_of[f]]]
+    let at = sm_params_at[f]
+    for (at ..< at + np) |i| {
+        sm_assigned[i] = 0
+        sm_param_reads[i] = 0
+    }
+    sm_calls_at[f] = sm_body_calls.len()
+    sm_body_nodes[f] = sm_walk(f, func_body[f], np)
+    sm_calls_end[f] = sm_body_calls.len()
+}
+
+/// Reassemble calls in the original function and preorder sequence. The
+/// current sweep's holder counts still decide which call sites may change.
+fn sm_survey() Void {
+    let n = func_kind.len()
+    sm_found.clear()
+    sm_found_in.clear()
+    for (0 ..< n) |f| {
+        sm_count[f] = 0
+        sm_bad[f] = 0
+    }
+    for (0 ..< n) |f| {
+        if optimizable(f) and func_code[f] < 0 {
+            sm_refresh_body(f)
+            for (sm_calls_at[f] ..< sm_calls_end[f]) |i| {
+                let c = sm_body_calls[i]
+                let g = w_a[c]
+                sm_found.push(c)
+                sm_found_in.push(f)
+                sm_count[g] += 1
+                if f == g or node_holders[c] != 1 { sm_bad[g] = 1 }
+            }
+        }
     }
 }
 
@@ -1352,19 +1384,18 @@ fn sm_add_local(f: I32, vt: I32) I32 {
     sm_pend_root.push(f)
     sm_pend_vt.push(vt)
     sm_pending[f] += 1
-    vl_len[ht_a[func_type_of[f]]] + func_local_count[f] + sm_pending[f] - 1
+    return vl_len[ht_a[func_type_of[f]]] + func_local_count[f] + sm_pending[f] - 1
 }
 
 /// Walks body node `n` of `f` (of `np` parameters): its calls, its
 /// greatest label, its parameters' reads and writes, and its @sm_flags.
-fn sm_walk(f: I32, n: I32, np: I32) Void {
+fn sm_walk(f: I32, n: I32, np: I32) I32 {
     let op = w_op[n]
     let a = w_a[n]
     // (The ops to note are all up to LocalTee, but `try` and `rethrow`.)
     if op <= Op.LocalTee.i32() {
         if op == Op.Call.i32() {
-            sm_found.push(n)
-            sm_found_in.push(f)
+            sm_body_calls.push(n)
         } else if op == Op.Return.i32() {
             sm_flags[f] = sm_flags[f] | 1
         } else if op == Op.ReturnCall.i32() {
@@ -1382,7 +1413,9 @@ fn sm_walk(f: I32, n: I32, np: I32) Void {
         sm_label[f] = a
     }
     if node_holders[n] != 1 { sm_flags[f] = sm_flags[f] | 2 }
-    for (0 ..< w_count[n]) |i| { sm_walk(f, w_kid(n, i), np) }
+    let size = 1
+    for (0 ..< w_count[n]) |i| { size += sm_walk(f, w_kid(n, i), np) }
+    return size
 }
 
 /// Moves `g` (to move), its caller first when that moves too: so each body
@@ -1407,7 +1440,7 @@ fn sm_move_down(g: I32) Void {
 /// exported, nor the start; one result; no `return_call`; its body its own;
 /// the call with syntax (as @sm_grows).
 fn sm_movable(g: I32) Bool {
-    func_kind[g] == FuncKind.Defined.i32() and func_body[g] >= 0 and func_code[g] < 0 and func_live[g] == 1
+    return func_kind[g] == FuncKind.Defined.i32() and func_body[g] >= 0 and func_code[g] < 0 and func_live[g] == 1
         and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g
         and vl_len[ht_b[func_type_of[g]]] <= 1 and not traps_by_name(g)
         and w_src[sm_found[sm_once[g]]] >= 0 and sm_flags[g] & 6 == 0
@@ -1473,10 +1506,10 @@ fn sm_move(f: I32, c: I32) Void {
     inl_subst.clear()
     // The call node becomes the block (its type, the call's result, stays).
     let count = w_mark() - m
-    w_first[c] = w_kids.len()
-    for (m ..< m + count) |i| { w_kids.push(w_stack[i]) }
+    w_first[c] = w_kid_end()
+    for (m ..< m + count) |i| { w_append_kid(w_stack[i]) }
     w_count[c] = count
-    w_stack.resize(m)
+    w_resize_stack(m)
     w_op[c] = if block > 0 { Op.Block.i32() } else { Op.Seq.i32() }
     w_a[c] = block
     w_b[c] = 0
@@ -1518,11 +1551,8 @@ fn inline_small_round() Bool {
     let n = func_kind.len()
     sm_chosen.resize(n)
     sm_called.resize(n)
-    sm_bad.resize(n)
-    sm_label.resize(n)
     sm_prefix.resize(n)
     sm_first.resize(n)
-    sm_count.resize(n)
     for (0 ..< n) |f| {
         sm_chosen[f] = 0
         sm_called[f] = 0
@@ -1550,8 +1580,11 @@ fn inline_small_round() Bool {
     for (0 ..< n) |g| { if sm_count[g] > 0 and sm_weigh(g) { any = true } }
     if not any { return false }
     for (0 ..< sm_call.len()) |k| { if sm_take[k] == 1 { sm_inline(sm_caller[k], sm_call[k]) } }
-    true
+    return true
 }
+
+/// Callees and function references found during the candidate's body scan.
+vec sm_callees: I32
 
 /// Choose which calls to `g` to inline (@sm_take). Whether any.
 fn sm_weigh(g: I32) Bool {
@@ -1562,22 +1595,19 @@ fn sm_weigh(g: I32) Bool {
     let body = func_body[g]
     if sm_called[g] == 1 { return false }
     let np = vl_len[ht_a[func_type_of[g]]]
-    sm_reads.resize(np)
-    for (0 ..< np) |i| { sm_reads[i] = 0 }
+    let size = sm_body_nodes[g]
+    if size > sm_most_nodes { return false }
+    let reads = sm_params_at[g]
     sm_targets.clear()
-    sm_nodes[0] = 0
+    sm_callees.clear()
     if not sm_scan(body, np) { return false }
-    sm_depth[0] = leb_len(sm_nodes[0])
-    if sm_calls_chosen(body) { return false }
+    sm_depth[0] = leb_len(size)
     let hi = sm_bytes(body, true)
     if hi >= 1000000 { return false }
-    // The body's least size, with the reads of its parameters.
-    let lo = sm_bytes(body, false)
-    for (0 ..< np) |i| { lo += sm_reads[i] * (1 + leb_len(i)) }
     // The first parameters, read first, in order, once each.
     sm_next[0] = 0
     sm_clean[0] = 1
-    sm_order(body)
+    sm_order(body, reads)
     sm_prefix[g] = sm_next[0]
     // Each call's growth: the copy, less the call, and the arguments' reads.
     let all = sm_bad[g] == 0
@@ -1598,15 +1628,18 @@ fn sm_weigh(g: I32) Bool {
     // little more break up code brotli matched; the compiler compressed
     // 0.3% bigger with them. Copies at several calls, each bigger than the
     // call, shift V8's own inlining: DeltaBlue ran 6% slower.)
-    if all and sm_count[g] == 1 and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g and total < lo {
-        sm_take[first] = 1
+    if all and sm_count[g] == 1 and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g and sm_take[first] == 0 {
+        // Only the one-use rule needs a lower bound on the body's size.
+        let lo = sm_bytes(body, false)
+        for (0 ..< np) |i| { lo += sm_param_reads[reads + i] * (1 + leb_len(i)) }
+        if total < lo { sm_take[first] = 1 }
     }
     let taken = false
     for (first ..< first + sm_count[g]) |k| { if sm_take[k] == 1 { taken = true } }
     if not taken { return false }
     sm_chosen[g] = 1
-    sm_mark_called(body)
-    true
+    for (0 ..< sm_callees.len()) |i| { sm_called[sm_callees[i]] = 1 }
+    return true
 }
 
 /// How much inlining call `c` to `g` (a copy of at most `hi` bytes, reads
@@ -1617,17 +1650,18 @@ fn sm_grows(c: I32, g: I32, np: I32, hi: I32) I32 {
     if w_src[c] < 0 { return 1000000 }
     // The call: at least `call` and a one-byte index.
     let grows = hi - 2
+    let reads = sm_params_at[g]
     for (sm_prefix[g] ..< np) |i| {
         let arg = w_kid(c, i)
         if w_op[arg] == Op.LocalGet.i32() {
-            grows += (sm_reads[i] - 1) * (1 + leb_len(w_a[arg]))
-        } else if sm_constant(arg) and sm_reads[i] <= 1 {
-            if sm_reads[i] == 0 { grows -= sm_bytes(arg, false) }
+            grows += (sm_param_reads[reads + i] - 1) * (1 + leb_len(w_a[arg]))
+        } else if sm_constant(arg) and sm_param_reads[reads + i] <= 1 {
+            if sm_param_reads[reads + i] == 0 { grows -= sm_bytes(arg, false) }
         } else {
             return 1000000
         }
     }
-    grows
+    return grows
 }
 
 /// Whether node `n` gives the same value wherever it runs, and runs alone
@@ -1638,12 +1672,13 @@ fn sm_constant(n: I32) Bool {
         let g = w_a[n]
         return glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] < 0 and glob_sets[g] == 0
     }
-    w_count[n] == 0 and (op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32()
+    return w_count[n] == 0 and (op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32()
         or op == Op.F64Const.i32() or op == Op.RefNull.i32() or op == Op.RefFunc.i32())
 }
 
 /// Call `c` in `f` becomes the body of its callee.
 fn sm_inline(f: I32, c: I32) Void {
+    sm_dirty[f] = 1
     let g = w_a[c]
     let np = vl_len[ht_a[func_type_of[g]]]
     inl_subst.resize(np)
@@ -1666,104 +1701,117 @@ fn sm_inline(f: I32, c: I32) Void {
     let copy = inl_copy(func_body[g])
     inl_subst.clear()
     // The call node becomes the copy (its type, the call's result, stays).
-    w_first[c] = w_kids.len()
-    w_kids.push(copy)
+    w_first[c] = w_kid_end()
+    w_append_kid(copy)
     w_count[c] = 1
     w_op[c] = Op.Seq.i32()
     w_a[c] = 0
     w_b[c] = 0
 }
 
-/// Whether a call under `n` is to a function chosen this round.
-fn sm_calls_chosen(n: I32) Bool {
-    if (w_op[n] == Op.Call.i32() or w_op[n] == Op.RefFunc.i32()) and sm_chosen[w_a[n]] == 1 { return true }
-    for (0 ..< w_count[n]) |i| { if sm_calls_chosen(w_kid(n, i)) { return true } }
-    false
-}
-
-fn sm_mark_called(n: I32) Void {
-    if w_op[n] == Op.Call.i32() or w_op[n] == Op.RefFunc.i32() { sm_called[w_a[n]] = 1 }
-    for (0 ..< w_count[n]) |i| { sm_mark_called(w_kid(n, i)) }
-}
-
-/// Notes the reads of parameters (below `np`) and the labels branched to
-/// under `n`; false when the body cannot be copied this way.
+/// Collect branch targets and callees and check that the body can be copied.
+/// A body that refers to an already chosen function cannot be copied.
 fn sm_scan(n: I32, np: I32) Bool {
     let op = w_op[n]
-    sm_nodes[0] += 1
-    if sm_nodes[0] > sm_most_nodes { return false }
     if op == Op.Return.i32() or op == Op.ReturnCall.i32() or op == Op.Loop.i32() or op == Op.Try.i32()
         or op == Op.Rethrow.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         return false
     }
     if op == Op.LocalGet.i32() {
         if w_a[n] >= np { return false }
-        sm_reads[w_a[n]] += 1
     } else if op == Op.Br.i32() or op == Op.BrIf.i32() {
         sm_targets.push(w_a[n])
     } else if op == Op.BrTable.i32() {
         for (0 ..< w_b[n]) |i| { sm_targets.push(w_aux[w_a[n] + i]) }
+    } else if op == Op.Call.i32() or op == Op.RefFunc.i32() {
+        let g = w_a[n]
+        if sm_chosen[g] == 1 { return false }
+        sm_callees.push(g)
     }
     for (0 ..< w_count[n]) |i| { if not sm_scan(w_kid(n, i), np) { return false } }
-    true
+    return true
 }
 
 fn sm_targeted(label: I32) Bool {
     for (0 ..< sm_targets.len()) |i| { if sm_targets[i] == label { return true } }
-    false
+    return false
 }
 
 /// Walks `n` in the order it runs, while only reads of the parameters
 /// before @sm_next have: a read of that one, its only read, is the next.
-fn sm_order(n: I32) Void {
+fn sm_order(n: I32, reads: I32) Void {
     if sm_clean[0] == 0 { return }
     let op = w_op[n]
     if op == Op.LocalGet.i32() {
-        if w_a[n] == sm_next[0] and sm_reads[w_a[n]] == 1 { sm_next[0] += 1 } else { sm_clean[0] = 0 }
+        if w_a[n] == sm_next[0] and sm_param_reads[reads + w_a[n]] == 1 { sm_next[0] += 1 } else { sm_clean[0] = 0 }
         return
     }
     // (A block nothing branches to encodes as its contents.)
     let open = op == Op.Seq.i32() or (op == Op.Block.i32() and not sm_targeted(w_a[n]))
     if op == Op.If.i32() {
-        sm_order(w_kid(n, 0))
+        sm_order(w_kid(n, 0), reads)
     } else if open or not (op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.Try.i32()) {
-        for (0 ..< w_count[n]) |i| { sm_order(w_kid(n, i)) }
+        for (0 ..< w_count[n]) |i| { sm_order(w_kid(n, i), reads) }
     }
     if not open { sm_clean[0] = 0 }
 }
 
-/// The bytes node `n` encodes to (reads of parameters aside): at most
-/// (`hi`), or at least; 1000000 for what is not weighed.
-fn sm_bytes(n: I32, hi: Bool) I32 {
-    let total = sm_own(n, hi)
-    if total < 0 { return 1000000 }
-    for (0 ..< w_count[n]) |i| {
-        total += sm_bytes(w_kid(n, i), hi)
-        if total >= 1000000 { return 1000000 }
-    }
-    total
+// Index widths used throughout one instruction tree. Their upper bounds
+// depend on module counts, so take the snapshot at the root of each estimate.
+let size_type_shift: I32 = 0
+let size_func_shift: I32 = 3
+let size_global_shift: I32 = 6
+let size_mem_shift: I32 = 9
+let size_heap_shift: I32 = 12
+let size_upper: I32 = 32768
+let size_multi_mem: I32 = 65536
+let size_one_each: I32 = (1 << size_type_shift) | (1 << size_func_shift) | (1 << size_global_shift)
+    | (1 << size_mem_shift) | (1 << size_heap_shift)
+
+fn sm_size_bounds(hi: Bool) I32 {
+    if not hi { return size_one_each }
+    let memories = memory_kind.len()
+    return size_upper | (if memories > 1 { size_multi_mem } else { 0 })
+        | (leb_len(ht_kind.len()) << size_type_shift) | (leb_len(func_kind.len()) << size_func_shift)
+        | (leb_len(glob_kind.len()) << size_global_shift) | (leb_len(memories) << size_mem_shift)
+        | (sleb_len(ht_kind.len()) << size_heap_shift)
 }
 
-/// The bytes of node `n`'s own instruction, as @sm_bytes; -1 for one not known.
-fn sm_own(n: I32, hi: Bool) I32 {
+fn sm_width(bounds: I32, shift: I32) I32 => (bounds >> shift) & 7
+
+/// The bytes node `n` encodes to, excluding parameter reads: at most
+/// (`hi`), or at least. Unknown encodings use the impossible cost 1000000.
+fn sm_bytes(n: I32, hi: Bool) I32 => sm_measure(n, sm_size_bounds(hi))
+
+fn sm_measure(n: I32, bounds: I32) I32 {
+    let total = sm_own(n, bounds)
+    if total < 0 { return 1000000 }
+    for (0 ..< w_count[n]) |i| {
+        total += sm_measure(w_kid(n, i), bounds)
+        if total >= 1000000 { return 1000000 }
+    }
+    return total
+}
+
+fn sm_own(n: I32, bounds: I32) I32 {
     let op = w_op[n]
     let a = w_a[n]
     let b = w_b[n]
-    // Indices: at most the bytes of the number of things indexed; at least one.
-    let t = if hi { leb_len(ht_kind.len()) } else { 1 }
-    let fi = if hi { leb_len(func_kind.len()) } else { 1 }
-    let gi = if hi { leb_len(glob_kind.len()) } else { 1 }
-    let mi = if hi { leb_len(memory_kind.len()) } else { 1 }
-    let heap = if a >= vt_defined and hi { sleb_len(ht_kind.len()) } else { 1 }
+    let hi = (bounds & size_upper) != 0
+    let t = sm_width(bounds, size_type_shift)
+    let fi = sm_width(bounds, size_func_shift)
+    let gi = sm_width(bounds, size_global_shift)
+    let mi = sm_width(bounds, size_mem_shift)
+    let heap = if a >= vt_defined { sm_width(bounds, size_heap_shift) } else { 1 }
     let depth = if hi { sm_depth[0] } else { 1 }
     let bt = if hi and w_type[n] > vt_v128 { 4 } else { 1 }
     let els = if w_count[n] > 2 { 1 } else { 0 }
     let block = if op == Op.Block.i32() and sm_targeted(a) { 2 + bt } else { 0 }
     // (`memarg`: alignment, the memory when not the first, offset.)
-    let access = if hi and memory_kind.len() > 1 { 3 + mi } else { 3 }
+    let access = if (bounds & size_multi_mem) != 0 { 3 + mi } else { 3 }
     let i64 = if b == (a >> 31) { 1 + sleb_len(a) } else if hi { 11 } else { 3 }
     let plain = if a < 256 { 1 } else { 1 + leb_len(a & 255) }
-    match Op(op) {
+    return match Op(op) {
         Op.Nop => 1,
         Op.Unreachable => 1,
         Op.Block => block,
@@ -1777,7 +1825,7 @@ fn sm_own(n: I32, hi: Bool) I32 {
         Op.Call => 1 + fi,
         Op.CallRef => 1 + t,
         Op.LocalGet => 0,
-        Op.GlobalGet => sm_global(a, hi, gi),
+        Op.GlobalGet => sm_global(a, bounds, gi),
         Op.GlobalSet => 1 + gi,
         Op.I32Const => 1 + sleb_len(a),
         Op.I64Const => i64,
@@ -1828,31 +1876,16 @@ fn sm_own(n: I32, hi: Bool) I32 {
 }
 
 /// A global's read, as @sm_own: its index, or the constant it may be folded to.
-fn sm_global(g: I32, hi: Bool, gi: I32) I32 {
+fn sm_global(g: I32, bounds: I32, gi: I32) I32 {
+    let hi = (bounds & size_upper) != 0
     let init = glob_init[g]
-    let folded = if init >= 0 and (w_op[init] == Op.I32Const.i32() or w_op[init] == Op.I64Const.i32()) { sm_own(init, hi) } else { 0 }
+    let folded = if init >= 0 and (w_op[init] == Op.I32Const.i32() or w_op[init] == Op.I64Const.i32()) { sm_own(init, bounds) } else { 0 }
     if hi and folded > 1 + gi { return folded }
-    if hi { 1 + gi } else { 2 }
+    return if hi { 1 + gi } else { 2 }
 }
 
-/// The bytes of `v` as an unsigned LEB128.
-fn leb_len(v: I32) I32 {
-    let x = v >>> 7
-    let len = 1
-    while (x != 0) {
-        x = x >>> 7
-        len += 1
-    }
-    len
-}
+/// Unsigned LEB128 uses groups of seven bits, with one byte even for zero.
+fn leb_len(v: I32) I32 => 1 + (31 - I32.clz(v | 1)) / 7
 
-/// The bytes of `v` as a signed LEB128.
-fn sleb_len(v: I32) I32 {
-    let x = v
-    let len = 1
-    while (x < -64 or x >= 64) {
-        x = x >> 7
-        len += 1
-    }
-    len
-}
+/// Signed LEB128 needs a sign bit after the bits that differ from the sign.
+fn sleb_len(v: I32) I32 => 1 + (32 - I32.clz(v ^ (v >> 31))) / 7

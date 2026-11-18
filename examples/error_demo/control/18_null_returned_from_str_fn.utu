@@ -2,7 +2,7 @@
 // Expect: Cannot return null from find_user: its result Str is not nullable (use ?Str)
 fn find_user(id: I32) Str {
     if id == 0 { return "root"; };
-    null;
+    return null;
 }
 
 main {

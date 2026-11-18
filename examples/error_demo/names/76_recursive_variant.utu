@@ -5,7 +5,7 @@ enum Expr:
     | Add { left: Expr, right: Expr }
 
 fn eval(e: Expr) I32 {
-    alt e {
+    return alt e {
         Num |n| => n.value,
         Add |a| => eval(a.left) + eval(a.right),
     };

@@ -2,7 +2,7 @@
 // Expect: if without else has no value; add an else branch
 fn sign(x: I32) I32 {
     let s: I32 = if x < 0 { -1; };
-    s;
+    return s;
 }
 
 main {

@@ -2,7 +2,7 @@
 // Expect: -1 is out of range for U32, with G[U32] marked where it is written
 mod G[T] {
     fn f(v: T) I32 {
-        match v {
+        return match v {
             -1 => 1,
             ~> 0,
         };

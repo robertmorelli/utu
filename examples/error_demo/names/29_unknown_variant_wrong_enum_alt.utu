@@ -9,7 +9,7 @@ enum Outcome:
     | Failed {}
 
 fn area(s: Shape) F64 {
-    alt s {
+    return alt s {
         Circle |c| => c.r,
         Ok => 0.0,
         ~> 1.0,

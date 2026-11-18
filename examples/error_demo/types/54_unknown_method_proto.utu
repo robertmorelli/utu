@@ -6,9 +6,9 @@ proto Shape:
 struct Circle[Shape]:
     | r: F64
 
-fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+fn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }
 
-fn edge(s: Shape) F64 { s.perimeter(); }
+fn edge(s: Shape) F64 { return s.perimeter(); }
 
 main { console.log(edge(Circle { r: 1.0 }).i32()); }
 using console from std:Console

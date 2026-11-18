@@ -7,7 +7,7 @@
 fn word_text(w: I32) Str {
     if w < 0 { return "" }
     let start = src.interned_start(w)
-    bytes_text(start, start + src.interned_size(w))
+    return bytes_text(start, start + src.interned_size(w))
 }
 
 /// The text of `src[start ..< end_]` (UTF-8).
@@ -44,26 +44,26 @@ fn bytes_text(start: I32, end_: I32) Str {
             i += n
         }
     }
-    Str.from_codes(codes, k)
+    return Str.from_codes(codes, k)
 }
 
 /// A declaration's name, or empty for none.
 fn decl_text(d: I32) Str {
     if d < 0 { return "" }
-    word_text(decl_name[d])
+    return word_text(decl_name[d])
 }
 
 /// A node's source, as written.
 fn node_text(node: I32) Str {
     if node < 0 { return "" }
-    bytes_text(tok_start[node_first[node]], tok_end[node_last[node] - 1])
+    return bytes_text(tok_start[node_first[node]], tok_end[node_last[node] - 1])
 }
 
 fn int_text(v: I32) Str => v.str()
 
 fn pick(c: Bool, yes: Str, no: Str) Str {
     if c { return yes }
-    no
+    return no
 }
 
 /// A type as stage 0 writes it: `I32`, `?Point`, `Array[I32]`, `fun(I32) Bool`, `.{I32, F64}`.
@@ -93,7 +93,7 @@ fn type_text(t: I32) Str {
     if inst > 0 and module >= 0 and (decl_a[module] == decl) {
         text = text + "[" + type_list_text(inst_args[inst]) + "]"
     }
-    text
+    return text
 }
 
 /// Whether @type_text names a module's type with its module (`a.S`).
@@ -117,7 +117,7 @@ fn expected_got(a: I32, b: I32) Str {
         qualify_types[0] = 0
         if ta == tb { return "Expected " + ta + ", got " + tb + " (another type of that name)" }
     }
-    "Expected " + ta + ", got " + tb
+    return "Expected " + ta + ", got " + tb
 }
 
 fn type_list_text(list: I32) Str {
@@ -126,7 +126,7 @@ fn type_list_text(list: I32) Str {
         if i > 0 { text = text + ", " }
         text = text + type_text(vl_item(list, i))
     }
-    text
+    return text
 }
 
 /// The symbol of an operator word (add is `+`).
@@ -153,7 +153,7 @@ fn operator_symbol(w: I32) Str {
     if w == known_word(Known.GetIndex) { return "[]" }
     if w == known_word(Known.GetSlice) { return "[,]" }
     if w == known_word(Known.SetIndex) { return "[]=" }
-    word_text(w)
+    return word_text(w)
 }
 
 /// Where InvalidBreak's argument a says which rule was broken.
@@ -179,7 +179,7 @@ fn view_array_name(s: Storage) Str {
     if s == Storage.I64 { return "BigInt64Array" }
     if s == Storage.U64 { return "BigUint64Array" }
     if s == Storage.F32 { return "Float32Array" }
-    "Float64Array"
+    return "Float64Array"
 }
 
 /// The `@comptime` expression a diagnostic is in (its index in
@@ -193,7 +193,7 @@ fn comptime_site(i: I32) I32 {
         // (From the `(` written before the expression.)
         if b >= comptime_text_start[k] - 1 and b < comptime_text_end[k] { return k }
     }
-    -1
+    return -1
 }
 
 /// The `@comptime` expression a parse error is in, or -1: the generated
@@ -203,20 +203,20 @@ fn comptime_parse_site(i: I32) I32 {
     let b = tok_start[diag_a[i]]
     let k = comptime_text_start.len() - 1
     while (k >= 0 and comptime_text_start[k] > b) { k -= 1 }
-    k
+    return k
 }
 
 /// Byte `b` of @comptime expression k's generated text, as the place in its
 /// mem's body (past its end: the body's end).
 fn comptime_byte(k: I32, b: I32) I32 {
     let at = if b < comptime_text_end[k] { b } else { comptime_text_end[k] }
-    dsl_text_start(comptime_text_node[k]) + at - comptime_text_start[k]
+    return dsl_text_start(comptime_text_node[k]) + at - comptime_text_start[k]
 }
 
 /// The kind's name, as stage 0 spells it.
 fn diag_kind_name(i: I32) Str {
     if comptime_site(i) >= 0 { return "type-mismatch" }
-    diag_kind_of(i)
+    return diag_kind_of(i)
 }
 
 /// A diagnostic's message for the host: one in a `@comptime` expression
@@ -227,12 +227,63 @@ fn diag_message(i: I32) Str {
     if k < 0 { return diag_text(i) }
     let line = 4
     for (comptime_text_start[k] ..< tok_start[node_first[diag_node[i]]]) |b| { if src[b] == 10 { line += 1 } }
-    "@comptime: " + diag_text(i) + " (line " + int_text(line) + ")"
+    return "@comptime: " + diag_text(i) + " (line " + int_text(line) + ")"
 }
 
-/// The kind name a diagnostic is reported under; several share one, as in stage 0.
+/// A name id per diagnostic kind, followed by the dictionary's little-endian
+/// offsets (including its end), and the ASCII bytes of the names.
+const vec diag_names: U8 = @comptime/\ pack_diag_names() \/
+
 fn diag_kind_of(i: I32) Str {
-    let k = Diag(diag_kind[i])
+    let kind = diag_kind[i]
+    if kind == Diag.PromotedFn.i32() and diag_a[i] == 2 { return "not-callable" }
+    if kind >= Diag.count() { return "type-mismatch" }
+    let at = Diag.count() + diag_names[kind] * 2
+    let start = diag_names[at] | (diag_names[at + 1] << 8)
+    let end_ = diag_names[at + 2] | (diag_names[at + 3] << 8)
+    let size = end_ - start
+    let codes = Array[I32].new(size, 0)
+    for (0 ..< size) |j| { codes[j] = diag_names[start + j] }
+    return Str.from_codes(codes, size)
+}
+
+/// Build the diagnostic names as data so the shipped compiler only needs
+/// the lookup and the shared strings.
+fn pack_diag_names() Array[I32] {
+    let count = Diag.count()
+    let names = Array[Str].new(count, "")
+    let ids = Array[I32].new(count, 0)
+    let unique = 0
+    let bytes = 0
+    for (0 ..< count) |i| {
+        let name = diag_name_for_kind(Diag(i))
+        let id = 0
+        while (id < unique and names[id] != name) { id += 1 }
+        if id == unique {
+            names[id] = name
+            unique += 1
+            bytes += name.len()
+        }
+        ids[i] = id
+    }
+    let start = count + (unique + 1) * 2
+    let data = Array[I32].new(start + bytes, 0)
+    for (0 ..< count) |i| { data[i] = ids[i] }
+    for (0 ..< unique + 1) |id| {
+        let at = count + id * 2
+        data[at] = start & 255
+        data[at + 1] = start >> 8
+        if id < unique {
+            let name = names[id]
+            for (0 ..< name.len()) |i| { data[start + i] = name[i] }
+            start += name.len()
+        }
+    }
+    return data
+}
+
+/// The kind name as reported in stage 0.
+fn diag_name_for_kind(k: Diag) Str {
     if k == Diag.UnknownVariable { return "unknown-variable" }
     if k == Diag.UnknownType or k == Diag.NotAModule or k == Diag.UnknownModule or k == Diag.UnknownVariant or k == Diag.MemKind or k == Diag.InvalidDistinct or k == Diag.MemView { return "unknown-type" }
     if k == Diag.UnknownImport { return "unknown-import" }
@@ -303,17 +354,16 @@ fn diag_kind_of(i: I32) Str {
     if k == Diag.ImportNotModule or k == Diag.ModNoType { return "unknown-type" }
     if k == Diag.UsingTwice { return "duplicate-declaration" }
     if k == Diag.ModNameCase { return "invalid-name" }
-    if k == Diag.PromotedFn { return pick(diag_a[i] == 2, "not-callable", "duplicate-declaration") }
+    if k == Diag.PromotedFn { return "duplicate-declaration" }
     if k == Diag.AmbiguousMethod { return "unknown-method" }
     if k == Diag.ImplNothing or k == Diag.ProtoNoMember { return "unknown-method" }
-    if k == Diag.WutuHole or k == Diag.WutuKey { return "type-mismatch" }
-    "type-mismatch"
+    return "type-mismatch"
 }
 
 /// `Promise[T]`'s T, `?Promise[T]`'s ?T.
 fn awaited_type(t: I32) I32 {
     if ty_is(t, Ty.Nullable) { return nullable(awaited_type(ty_a[t])) }
-    inst_arg(ty_inst(t), 0)
+    return inst_arg(ty_inst(t), 0)
 }
 
 /// Whether t is a `fun` type, or a nullable one.
@@ -337,7 +387,7 @@ fn vt_text(vt: I32) Str {
         if k == Heap.Array.i32() { return "an array of " + vt_text(ht_a[vt_heap(vt)]) }
         if k == Heap.Struct.i32() { return "a struct" }
     }
-    "a reference"
+    return "a reference"
 }
 
 /// A top-level item, by its node kind, after "is".
@@ -348,12 +398,12 @@ fn item_kind_text(kind: I32) Str {
     if k == Node.Enum_decl { return "an enum" }
     if k == Node.Proto_decl { return "a protocol" }
     if k == Node.Global_decl { return "a global" }
-    "not a mod"
+    return "not a mod"
 }
 
 /// Whether `t` names a number or Bool type: what match takes.
 fn is_scalar_name(t: Str) Bool {
-    t == "I32" or t == "U32" or t == "I64" or t == "U64" or t == "F32" or t == "F64" or t == "U8" or t == "I8"
+    return t == "I32" or t == "U32" or t == "I64" or t == "U64" or t == "F32" or t == "F64" or t == "U8" or t == "I8"
         or t == "U16" or t == "I16" or t == "Bool"
 }
 
@@ -363,7 +413,7 @@ fn alt_hint(t: I32) Str {
     let name = type_text(t)
     if is_scalar_name(name) { return "Use match" }
     if name == "Str" { return "Use if" }
-    ""
+    return ""
 }
 
 /// What a pipeline could read instead of a value of type `t`.
@@ -371,7 +421,7 @@ fn source_hint(t: I32) Str {
     if t >= 0 and ty_is(t, Ty.Nullable) { return "Unwrap with promote or orelse" }
     let name = type_text(t)
     if is_scalar_name(name) and name != "Bool" and name != "F32" and name != "F64" { return "Use a range: 0 ..< n" }
-    ""
+    return ""
 }
 
 /// A type's name after "a" or "an".
@@ -379,13 +429,13 @@ fn article(t: Str) Str {
     if t.len() == 0 { return t }
     let c = t.slice(0, 1)
     let vowel = c == "A" or c == "E" or c == "I" or c == "O" or c == "U" or c == "a" or c == "e" or c == "i" or c == "o" or c == "u"
-    pick(vowel, "an ", "a ") + t
+    return pick(vowel, "an ", "a ") + t
 }
 
 /// Why a `@comptime` evaluation trapped, by the code the host gives (see
 /// `comptimeTrapCode` in src/selfhost/compiler.js).
 fn comptime_trap_text(code: I32) Str {
-    match code {
+    return match code {
         1 => "an index out of bounds",
         2 => "it reached fatal, a failed assert, or a missing value",
         3 => "a division by zero",
@@ -409,7 +459,7 @@ fn break_rule_text(a: I32) Str {
     if r == BreakRule.ContinueInDefer { return "continue in defer" }
     if r == BreakRule.ReturnInDefer { return "return in defer" }
     if r == BreakRule.TryInDefer { return "try in defer" }
-    "defer must be a statement"
+    return "defer must be a statement"
 }
 
 /// Whether token t is a `\\` line whose text ends in `;` (meant to end the statement).
@@ -417,7 +467,7 @@ fn semicolon_in_multiline(t: I32) Bool {
     if t < 0 or tok_kind[t] != Tok.MultilineLine.i32() { return false }
     let e = tok_end[t] - 1
     while (e > tok_start[t] and (src[e] == 32 or src[e] == 9 or src[e] == 10 or src[e] == 13)) { e -= 1 }
-    src[e] == 59
+    return src[e] == 59
 }
 
 /// A diagnostic's message, in stage 0's words.
@@ -428,7 +478,7 @@ fn diag_text(i: I32) Str {
     let a = diag_a[i]
     let b = diag_b[i]
     let node = diag_node[i]
-    match k {
+    return match k {
         Diag.UnknownVariable => {
             // `main` is the module's entry, not a function the program (or a @comptime build) can call.
             if w == "main" and is_callee(node) { return "main is the entry point, not a function: move its body into a fn" }
@@ -779,14 +829,14 @@ fn found_text(t: I32) Str {
     }
     let text = bytes_text(tok_start[t], tok_end[t])
     if text.len() > 24 { return "'" + text.slice(0, 24) + "…'" }
-    "'" + text + "'"
+    return "'" + text + "'"
 }
 
 /// Whether extra row k of diagnostic i is a place (a label on its own span,
 /// or another node), not a note or a fix.
 fn is_place(i: I32, k: I32) Bool {
     let kind = extra_kind[diag_extra[i] + k]
-    kind != Extra.Note.i32() and kind != Extra.Fix.i32()
+    return kind != Extra.Note.i32() and kind != Extra.Fix.i32()
 }
 
 /// What hangs off a diagnostic's own span when its report gave no label:
@@ -796,7 +846,7 @@ fn diag_default_label(i: I32) Str {
     let a = diag_a[i]
     let b = diag_b[i]
     let w = word_text(diag_word[i])
-    match k {
+    return match k {
         Diag.TypeMismatch => if b >= 0 { type_text(b) } else { "wrong type" },
         Diag.NotNullable => "never null",
         Diag.NullableAccess => "may be null",
@@ -886,7 +936,7 @@ fn diag_start(i: I32) I32 {
     if f >= 0 { return dsl_file_from[f] }
     let node = diag_at(i)
     if node < 0 { return -1 }
-    tok_start[node_first[node]]
+    return tok_start[node_first[node]]
 }
 
 /// Where a diagnostic's span ends (see @diag_start).
@@ -898,7 +948,7 @@ fn diag_end(i: I32) I32 {
     if f >= 0 { return dsl_file_to[f] }
     let node = diag_at(i)
     if node < 0 { return -1 }
-    tok_end[node_last[node] - 1]
+    return tok_end[node_last[node] - 1]
 }
 
 /// The generated file of located code a diagnostic is in, or -1.
@@ -906,7 +956,7 @@ fn located_file(i: I32) I32 {
     let node = diag_node[i]
     if node < 0 or comptime_site(i) >= 0 { return -1 }
     let file = file_of_token(node_first[node])
-    if file < dsl_file_from.len() and dsl_file_from[file] >= 0 { file } else { -1 }
+    return if file < dsl_file_from.len() and dsl_file_from[file] >= 0 { file } else { -1 }
 }
 
 /// The node a diagnostic points at: its own, or the `@comptime` expression
@@ -920,7 +970,7 @@ fn diag_at(i: I32) I32 {
         let site = dsl_site_of(node)
         if site >= 0 { return site }
     }
-    node
+    return node
 }
 
 /// The file a diagnostic is in, or -1.
@@ -932,5 +982,5 @@ fn diag_file(i: I32) I32 {
         if diag_kind[i] == Diag.ParseError.i32() { return diag_word[i] }
         return -1
     }
-    file_of_token(node_first[node])
+    return file_of_token(node_first[node])
 }

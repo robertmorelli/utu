@@ -2,7 +2,7 @@
 // Expect: Duplicate declaration size, at the function
 mod Box[T] {
     let size: I32 = 1;
-    fn size() I32 { 2; }
+    fn size() I32 { return 2; }
 }
 
 main {

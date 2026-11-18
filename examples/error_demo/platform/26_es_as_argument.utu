@@ -1,6 +1,6 @@
 // What: @es used inline as a call argument instead of bound to a typed let
 // Expect: @es DSL must appear on the right-hand side of a typed let binding (let X: T = @es/\...\/)
-fn apply(f: fun(I32) I32, x: I32) I32 { f(x); }
+fn apply(f: fun(I32) I32, x: I32) I32 { return f(x); }
 
 main {
     console.log(apply(@es/\ (n) => n * 2 \/, 21));

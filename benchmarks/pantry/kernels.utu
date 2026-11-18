@@ -4,11 +4,11 @@ using JS from std:JS
 lib {
     fn analyze(items: JS.Array, category: Str, query: Str) F64 {
         let visible = items.filter(cl(item) Bool {
-            (category == "All" or item.category == category) and item.name.toLowerCase().includes(query)
+            return (category == "All" or item.category == category) and item.name.toLowerCase().includes(query)
         })
-        visible.sort(cl(a, b) F64 { a.price - b.price })
-        let total = items.reduce(cl(sum, item) F64 { sum + item.price * item.quantity }, 0)
-        total + visible.length
+        visible.sort(cl(a, b) F64 { return a.price - b.price })
+        let total = items.reduce(cl(sum, item) F64 { return sum + item.price * item.quantity }, 0)
+        return total + visible.length
     }
 
     // ── 2. The same shape of work on native data ──
@@ -42,7 +42,7 @@ lib {
         }
         let total: F64 = 0.0
         for (0..<n) |i| { let item = items[i]; total += item.price * item.quantity }
-        total + count.f64() + kept[0].price
+        return total + count.f64() + kept[0].price
     }
 }
 

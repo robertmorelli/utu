@@ -4953,6 +4953,11 @@
     }
   },
   {
+    "type": "identifier",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "if_expr",
     "named": true,
     "fields": {},
@@ -11597,10 +11602,6 @@
   {
     "type": "html",
     "named": false
-  },
-  {
-    "type": "identifier",
-    "named": true
   },
   {
     "type": "if",

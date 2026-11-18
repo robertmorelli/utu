@@ -1,7 +1,7 @@
 fn echo(value: Str) Str {
-    value;
+    return value;
 }
 
 fn main() Str {
-    echo("value");
+    return echo("value");
 }

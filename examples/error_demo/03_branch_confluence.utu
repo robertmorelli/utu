@@ -4,7 +4,7 @@
 // produces Bool, so the diagnostic should connect both branch declarations.
 
 fn branch_blame_demo(use_number: Bool) I32 {
-    if use_number {
+    return if use_number {
         let number: I32 = 42;
         number;
     } else {

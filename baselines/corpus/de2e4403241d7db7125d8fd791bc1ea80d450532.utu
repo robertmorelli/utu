@@ -15,31 +15,31 @@ struct Report:
     | transitions : I32
 
 fn is_space(c: I32) Bool {
-    c == 32 or c == 9 or c == 10 or c == 13;
+    return c == 32 or c == 9 or c == 10 or c == 13;
 }
 
 fn is_digit(c: I32) Bool {
-    c >= 48 and c <= 57;
+    return c >= 48 and c <= 57;
 }
 
 fn is_lower(c: I32) Bool {
-    c >= 97 and c <= 122;
+    return c >= 97 and c <= 122;
 }
 
 fn is_upper(c: I32) Bool {
-    c >= 65 and c <= 90;
+    return c >= 65 and c <= 90;
 }
 
 fn is_alpha(c: I32) Bool {
-    is_lower(c) or is_upper(c) or c == 95;
+    return is_lower(c) or is_upper(c) or c == 95;
 }
 
 fn is_word(c: I32) Bool {
-    is_alpha(c) or is_digit(c);
+    return is_alpha(c) or is_digit(c);
 }
 
 fn mix(hash: I32, value: I32) I32 {
-    (hash ^ value) * 16777619;
+    return (hash ^ value) * 16777619;
 }
 
 fn hash_forward(text: Str) I32 {
@@ -47,7 +47,7 @@ fn hash_forward(text: Str) I32 {
     for (0..<text.len()) |i| {
         hash = mix(hash, text[i]);
     };
-    hash;
+    return hash;
 }
 
 fn hash_stride(text: Str) I32 {
@@ -58,7 +58,7 @@ fn hash_stride(text: Str) I32 {
         hash = mix(hash, text[i] + i);
         i += 7;
     };
-    hash;
+    return hash;
 }
 
 fn count_lines(text: Str) I32 {
@@ -66,7 +66,7 @@ fn count_lines(text: Str) I32 {
     for (0..<text.len()) |i| {
         if text[i] == 10 { count += 1; };
     };
-    count;
+    return count;
 }
 
 fn count_words(text: Str) I32 {
@@ -77,7 +77,7 @@ fn count_words(text: Str) I32 {
         if word and not inside { count += 1; };
         inside = word;
     };
-    count;
+    return count;
 }
 
 fn longest_word(text: Str) I32 {
@@ -91,7 +91,7 @@ fn longest_word(text: Str) I32 {
             current = 0;
         };
     };
-    longest;
+    return longest;
 }
 
 fn count_numbers(text: Str) I32 {
@@ -102,7 +102,7 @@ fn count_numbers(text: Str) I32 {
         if digit and not inside { count += 1; };
         inside = digit;
     };
-    count;
+    return count;
 }
 
 fn sum_numbers(text: Str) I32 {
@@ -121,7 +121,7 @@ fn sum_numbers(text: Str) I32 {
         };
     };
     if inside { total += value; };
-    total;
+    return total;
 }
 
 fn count_strings(text: Str) I32 {
@@ -144,7 +144,7 @@ fn count_strings(text: Str) I32 {
             };
         };
     };
-    count;
+    return count;
 }
 
 fn count_comments(text: Str) I32 {
@@ -154,7 +154,7 @@ fn count_comments(text: Str) I32 {
         let b: I32 = text[i + 1];
         if a == 47 and (b == 47 or b == 42) { count += 1; };
     };
-    count;
+    return count;
 }
 
 fn bracket_score(text: Str) I32 {
@@ -171,7 +171,7 @@ fn bracket_score(text: Str) I32 {
         if c == 123 { curly += 1; };
         if c == 125 { curly -= 1; if curly < 0 { penalty += 1; curly = 0; }; };
     };
-    round * 3 + square * 5 + curly * 7 + penalty * 11;
+    return round * 3 + square * 5 + curly * 7 + penalty * 11;
 }
 
 fn count_operators(text: Str) I32 {
@@ -182,7 +182,7 @@ fn count_operators(text: Str) I32 {
             count += 1;
         };
     };
-    count;
+    return count;
 }
 
 fn count_patterns(text: Str) I32 {
@@ -196,7 +196,7 @@ fn count_patterns(text: Str) I32 {
         if a == 105 and b == 102 and is_space(c) { count += 7; };
         if a == 102 and b == 111 and c == 114 { count += 11; };
     };
-    count;
+    return count;
 }
 
 fn histogram_score(text: Str) I32 {
@@ -209,7 +209,7 @@ fn histogram_score(text: Str) I32 {
     for (0..<128) |j| {
         score = mix(score, bins[j] + j);
     };
-    score;
+    return score;
 }
 
 fn transition_score(text: Str) I32 {
@@ -220,7 +220,7 @@ fn transition_score(text: Str) I32 {
         score += (previous ^ c) * (i & 15);
         previous = c;
     };
-    score;
+    return score;
 }
 
 fn finish(report: Report) I32 {
@@ -237,7 +237,7 @@ fn finish(report: Report) I32 {
     result = mix(result, report.operators);
     result = mix(result, report.patterns);
     result = mix(result, report.histogram);
-    mix(result, report.transitions);
+    return mix(result, report.transitions);
 }
 
 lib {
@@ -258,6 +258,6 @@ lib {
             histogram: histogram_score(text),
             transitions: transition_score(text),
         };
-        finish(report);
+        return finish(report);
     }
 }

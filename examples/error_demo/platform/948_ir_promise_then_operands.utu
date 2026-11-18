@@ -1,8 +1,6 @@
 // What: a promise subscription of numbers (the engine said only "not valid Wasm")
 // Expect: @ir <ir-promise-then> takes externref, given i32
-fn listen(p: I32, f: I32) Void {
-    @ir/\ <ir-promise-then><ir-ident name="p"/><ir-ident name="f"/></ir-promise-then> \/;
-}
+fn listen(p: I32, f: I32) Void => @ir/\ <ir-promise-then><ir-ident name="p"/><ir-ident name="f"/></ir-promise-then> \/;
 
 main {
     listen(1, 2);

@@ -3,10 +3,10 @@
         | n : I32
       lib {
         fn maybe(flag: Bool) ?Counter {
-          if flag { Counter { n: 9 }; } else { null; };
+          return if flag { Counter { n: 9 }; } else { null; };
         }
         fn read(flag: Bool) I32 {
-          promote maybe(flag) {
+          return promote maybe(flag) {
             |value| => value.n,
             ~> 4,
           };

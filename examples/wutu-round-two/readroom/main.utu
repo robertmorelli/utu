@@ -11,7 +11,7 @@ struct ReadroomState:
 | selected: Str
 | books: Array[Book]
 fn notes(book:Book) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "readroom-notes"
     section.panel.stack {
         a {
@@ -42,7 +42,7 @@ fn notes(book:Book) Browser.HTMLElement {
     \/
 }
 fn workspace(state: ReadroomState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "readroom-workspace"
     section.workspace {
         div.grid {

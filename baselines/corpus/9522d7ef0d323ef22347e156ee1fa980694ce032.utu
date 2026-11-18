@@ -4,7 +4,7 @@
       lib {
         fn bad(element: Element) Document {
           let doc: Document = element;
-          doc;
+          return doc;
         }
       }
     

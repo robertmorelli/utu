@@ -1,4 +1,4 @@
 type N = distinct I32;
-fn f(n: N) I32 { 1; }
+fn f(n: N) I32 { return 1; }
 main { console.log(f(3)); }
 using console from std:Console

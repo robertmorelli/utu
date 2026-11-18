@@ -5,7 +5,7 @@ struct Node:
     | next: ?Node
 
 fn second_name(head: Node) Str {
-    head.next?.name;
+    return head.next?.name;
 }
 
 main { console.log(second_name(Node { name: "a", next: null })); }

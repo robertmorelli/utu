@@ -1,7 +1,7 @@
 // What: a generic mod is opened with no type arguments
 // Expect: cell takes 1 type arguments, given 0
 mod cell[T] {
-    fn mk(v: T) T { v; }
+    fn mk(v: T) T { return v; }
 }
 
 using cell;

@@ -5,5 +5,5 @@
 
 fn return_blame_demo() I32 {
     let status: Bool = true;
-    status;
+    return status;
 }

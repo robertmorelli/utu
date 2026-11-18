@@ -4,7 +4,7 @@
         | Rect { width: I32, height: I32 }
       lib {
         fn area(shape: Shape) I32 {
-          alt shape {
+          return alt shape {
             Circle |c| => c.radius,
             ~> 0,
           };

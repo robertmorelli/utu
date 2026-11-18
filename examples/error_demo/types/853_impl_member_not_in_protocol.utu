@@ -7,11 +7,11 @@ struct Sq[Area]:
     | s: I32
 
 fn Area[Sq].area |self| () I32 {
-    self.s * self.s;
+    return self.s * self.s;
 }
 
 fn Area[Sq].extra |self| () I32 {
-    1;
+    return 1;
 }
 
 main {

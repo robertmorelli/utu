@@ -15,7 +15,7 @@ fn quote(state:PitchState) I32 {
         service.hours*service.rate;
     }
     sum;
-    if state.discount {
+    return if state.discount {
         subtotal-subtotal/10;
     }
     else {
@@ -23,7 +23,7 @@ fn quote(state:PitchState) I32 {
     };
 }
 fn workspace(state: PitchState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "pitch-workspace"
     section.workspace {
         label.panel {

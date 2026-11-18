@@ -3,7 +3,7 @@
 fn count(xs: ?Array[Str]) I32 {
     let n = 0;
     for (xs) |x| { n += 1; };
-    n;
+    return n;
 }
 
 main {

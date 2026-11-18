@@ -31,7 +31,7 @@ let match_with: fun(Str, Str, Bool, Bool, Bool) Bool =
 // The pleasant part: the flattening can be hidden behind one utu function, so
 // callers still get the nominal struct and `&{}` construction.
 fn matches(target: Str, pattern: Str, o: Opts) Bool {
-    match_with(target, pattern, o.nocase, o.dot, o.match_base);
+    return match_with(target, pattern, o.nocase, o.dot, o.match_base);
 }
 
 let match_default: fun(Str, Str) Bool =

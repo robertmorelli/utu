@@ -7,25 +7,25 @@ mod Pair[L, R] {
         | one : L
 
     fn &.new(left: L, right: R) & {
-        &{ left: left, right: right };
+        return &{ left: left, right: right };
     }
 
     fn &.left |self| () L {
-        self.left;
+        return self.left;
     }
 
     fn &.right |self| () R {
-        self.right;
+        return self.right;
     }
 
     fn NotPair.only |self| () L {
-        self.one;
+        return self.one;
     }
 }
 
 
 fn maybe_pair(flag: Bool) ?Pair[I32, I32] {
-    if flag { Pair[I32, I32].new(2, 9); } else { null; };
+    return if flag { Pair[I32, I32].new(2, 9); } else { null; };
 }
 
 using Pair[I32, I32] |pair_i32|;

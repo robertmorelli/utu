@@ -1,6 +1,6 @@
 // What: a call to a misspelled function (squre for square)
 // Expect: Unknown function 'squre'; did you mean 'square'?
-fn square(x: I32) I32 { x * x; }
+fn square(x: I32) I32 { return x * x; }
 
 main {
     console.log(squre(7));

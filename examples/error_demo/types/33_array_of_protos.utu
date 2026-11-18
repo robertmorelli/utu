@@ -9,7 +9,7 @@ struct Circle[Shape]:
 struct Label:
     | text: Str
 
-fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+fn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }
 
 main {
     let shapes: Array[Shape] = [Circle { r: 1.0 }, Label { text: "x" }];

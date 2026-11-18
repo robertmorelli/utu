@@ -1,4 +1,4 @@
 mem s: U8;
-fn s() I32 { 1; }
+fn s() I32 { return 1; }
 main { console.log(1); }
 using console from std:Console

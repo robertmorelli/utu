@@ -45,7 +45,7 @@ fn fannkuch(n: I32) I64 {
         }
         perm_count += 1
     }
-    fatal
+    return fatal
 }
 
 test "fannkuch matches the Benchmarks Game's reference output" {
@@ -56,6 +56,6 @@ lib {
     fn bench(iterations: I32) I64 {
         let sink: I64 = 0
         for (0..<iterations) { sink += fannkuch(9) }
-        sink
+        return sink
     }
 }

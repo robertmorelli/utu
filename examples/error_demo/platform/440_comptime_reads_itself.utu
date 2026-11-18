@@ -1,6 +1,6 @@
 // What: a @comptime expression that reads its own mem
 // Expect: @comptime t reads itself
-fn tab() Array[I32] { [t.len()]; }
+fn tab() Array[I32] { return [t.len()]; }
 const mem t: I32 = @comptime/\ tab() \/;
 
 main {

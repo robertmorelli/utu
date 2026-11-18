@@ -6,7 +6,7 @@ mod Box[T] {
     struct &:
         | v: T
 }
-fn P[Box[I32]].m |b| () I32 { b.v; }
+fn P[Box[I32]].m |b| () I32 { return b.v; }
 
 main { console.log(0); }
 using console from std:Console

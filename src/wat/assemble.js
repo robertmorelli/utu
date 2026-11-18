@@ -374,7 +374,7 @@ const UTU_TYPES = { I32: 'i32', U32: 'i32', Bool: 'i32', M32: 'i32', I64: 'i64',
  * it is the function's.
  */
 export function assembleWat({ params, result, text, method = false }) {
-  const shape = 'fn f(x: I32) I32 { @wat/\\ … \\/; }';
+  const shape = 'fn f(x: I32) I32 => @wat/\\ … \\/;';
   if (method) return { error: { message: `a @wat function is a plain function: ${shape}`, start: null, end: null } };
   const wasmType = type => UTU_TYPES[type];
   const wrong = [...params.map(param => param.type), result].find(type => type !== 'void' && !wasmType(type));

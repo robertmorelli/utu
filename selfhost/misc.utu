@@ -79,7 +79,7 @@ fn run_outside() Void {
 
 /// Where this depth's entries in @defer_guard start.
 fn depth_guards() I32 {
-    if defer_running.len() > function_running[0] { running_guards[running_guards.len() - 1] } else { function_guards[0] }
+    return if defer_running.len() > function_running[0] { running_guards[running_guards.len() - 1] } else { function_guards[0] }
 }
 
 /// This depth's exit flag local (-1 none), made when `make`.
@@ -87,7 +87,7 @@ fn exit_flag(make: Bool) I32 {
     let k = function_flags[0] + defer_running.len() - function_running[0]
     while (exit_flags.len() <= k) { exit_flags.push(-1) }
     if make and exit_flags[k] < 0 { exit_flags[k] = new_local(vt_i32) }
-    exit_flags[k]
+    return exit_flags[k]
 }
 
 fn set_exit_flag(v: I32) Void {
@@ -100,7 +100,7 @@ fn set_exit_flag(v: I32) Void {
 /// Whether the defer at index `i` or a newer one may have a guard.
 fn guarded_from(i: I32) Bool {
     let n = defer_guard.len()
-    n > depth_guards() and defer_guard[n - 1] >= i
+    return n > depth_guards() and defer_guard[n - 1] >= i
 }
 
 /// A block that starts its depth's guards (`guards` its first entry) sets
@@ -118,7 +118,7 @@ fn check_defer(node: I32) I32 {
     if deferred_exit(first_child(node), false) >= 0 { return error_value() }
     defer_node.push(first_child(node))
     w_node(Op.Seq, vt_none, 0, 0, w_mark())
-    ty_void()
+    return ty_void()
 }
 
 /// Per plain defer of the open blocks, in order: where the code after it
@@ -143,7 +143,7 @@ vec throw_work: I32
 /// what it throws, the guard of defer `own` lets by (see @exit_flags).
 fn may_throw(m: I32, own: I32) Bool {
     throw_work.clear()
-    for (m ..< w_stack.len()) |i| { throw_work.push(w_stack[i]) }
+    for (m ..< w_mark()) |i| { throw_work.push(w_stack[i]) }
     while (throw_work.len() > 0) {
         let n = throw_work[throw_work.len() - 1]
         throw_work.resize(throw_work.len() - 1)
@@ -152,7 +152,7 @@ fn may_throw(m: I32, own: I32) Bool {
         if not passed and (op == Op.Call.i32() or op == Op.CallRef.i32() or op == Op.ReturnCall.i32() or op == Op.Throw.i32() or op == Op.Rethrow.i32()) { return true }
         if not passed { for (0 ..< w_count[n]) |i| { throw_work.push(w_kid(n, i)) } }
     }
-    false
+    return false
 }
 
 /// The code after each guard (`base` on), newest first, so a JS exception
@@ -274,13 +274,13 @@ fn check_errdefer(node: I32, cx: Cx) I32 {
     if deferred_exit(first_child(node), false) >= 0 { return error_value() }
     defer_node.push(node)
     w_node(Op.Seq, vt_none, 0, 0, w_mark())
-    ty_void()
+    return ty_void()
 }
 
 /// Whether an errdefer is among the defers from `from` on.
 fn errdefer_pending(from: I32) Bool {
     for (from ..< defer_node.len()) |i| { if defer_node[i] >= 0 and is_kind(defer_node[i], Node.Errdefer_expr) { return true } }
-    false
+    return false
 }
 
 /// Run the defers pending since `from` after a value of type `t` (on the
@@ -324,7 +324,7 @@ fn reset_optional() Void {
 
 fn optional_override(node: I32) I32 {
     for (0 ..< optional_node.len()) |i| { if optional_node[i] == node { return i } }
-    -1
+    return -1
 }
 
 /// The leftmost `?.` of a statement not yet being checked as present: one
@@ -342,7 +342,7 @@ fn leftmost_optional(node: I32) I32 {
         c = next_sibling(c)
     }
     if is_kind(node, Node.Optional_field_expr) and optional_override(node) < 0 { return node }
-    -1
+    return -1
 }
 
 /// A statement with `a?.b` in it runs only when a is present:
@@ -377,7 +377,7 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
     w_node(Op.Seq, vt_none, 0, 0, mt)
     w_node(Op.If, vt_none, new_label(), 0, mi)
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 /// Whether the program has an `a?.b` anywhere, counted once for the nodes
@@ -390,7 +390,7 @@ fn has_optionals() Bool {
         for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.i32() { optionals_seen[1] = 1 } }
         optionals_seen[0] = node_kind.len()
     }
-    optionals_seen[1] == 1
+    return optionals_seen[1] == 1
 }
 
 /// Whether a statement can run only when its `?.` is present: a call, an
@@ -398,7 +398,7 @@ fn has_optionals() Bool {
 /// jump, a branch) would skip more than the chain: its `?.` is a value.
 fn guardable(stmt: I32) Bool {
     let k = Node(node_kind[stmt])
-    k == Node.Call_expr or k == Node.Assign_expr or k == Node.Field_expr or k == Node.Optional_field_expr or k == Node.Index_expr
+    return k == Node.Call_expr or k == Node.Assign_expr or k == Node.Field_expr or k == Node.Optional_field_expr or k == Node.Index_expr
 }
 
 /// A statement: an optional chain's guard, or the expression.
@@ -411,7 +411,7 @@ fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
         return error_value()
     }
     if opt >= 0 and guardable(stmt) { return check_optional_statement(stmt, opt, cx) }
-    check_expr(stmt, expect, cx)
+    return check_expr(stmt, expect, cx)
 }
 
 /// The base of a field access, pushed: `a` of `a.b`, or the present value
@@ -428,7 +428,7 @@ fn check_base(field_node: I32, cx: Cx) I32 {
         w_get(repr(t), optional_local[i])
         return t
     }
-    check_expr(first_child(field_node), -1, cx)
+    return check_expr(first_child(field_node), -1, cx)
 }
 
 //! = Promises
@@ -451,7 +451,7 @@ fn reset_promises() Void {
 
 fn is_promise_type(t: I32) Bool {
     let decl = ty_decl(t)
-    decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise")
+    return decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise")
 }
 
 /// `await p`: the host's `utu.await_N` for the promise's value type, which
@@ -481,7 +481,7 @@ fn check_await(node: I32, cx: Cx) I32 {
     }
     let t = inst_arg(ty_inst(pt), 0)
     profile_await(await_import(t), repr(t), m)
-    t
+    return t
 }
 
 /// Whether node is in a closure's body (before any function's).
@@ -492,7 +492,7 @@ fn in_closure(node: I32) Bool {
         if is_kind(p, Node.Fn_decl) { return false }
         p = parent_of(p)
     }
-    false
+    return false
 }
 
 /// Whether a node is inside `main`.
@@ -502,7 +502,7 @@ fn in_main(node: I32) Bool {
         if is_kind(p, Node.Export_main_decl) { return true }
         p = parent_of(p)
     }
-    false
+    return false
 }
 
 /// `await for (s) |v| { body }` over a `Stream[T]` (`std:Stream`), or any type
@@ -585,7 +585,7 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     defer_node.resize(defer_node.len() - 1)
     discard(stream_call(close_fi, s, st, it, it_t, node, cx))
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 /// The streams being read, six each (close's instance, the stream's local
@@ -608,7 +608,7 @@ fn stream_method(st: I32, name: Str, at: I32) I32 {
         report2(Diag.UnknownMethod, at, word, st, -1)
         return -1
     }
-    fn_instance(decl, ty_inst(st))
+    return fn_instance(decl, ty_inst(st))
 }
 
 /// `s.f()`, or `s.f(x)` with local x (unless x is -1), the stream in local s;
@@ -628,7 +628,7 @@ fn stream_call(fi: I32, s: I32, st: I32, x: I32, xt: I32, at: I32, cx: Cx) I32 {
         w_get(cur_locals[x], x)
         coerce(xt, vl_item(params, 1), at)
     }
-    finish_call(fi, m, cx)
+    return finish_call(fi, m, cx)
 }
 
 /// `utu.await_N`, or `await_null_N` for a nullable value, whose host import
@@ -646,7 +646,7 @@ fn await_import(t: I32) I32 {
         func_type(vl_one(vt_externref), vl_of_result(vt)))
     await_types.push(key)
     await_types.push(f)
-    f
+    return f
 }
 
 /// `utu.promise_then(p, f)` / `promise_catch(p, f)`: `(externref, externref) → ()`
@@ -658,7 +658,7 @@ fn promise_op(catching: Bool) I32 {
     vl_add(vt_externref)
     let f = add_import_func(name_add("utu"), name_add(if catching { "promise_catch" } else { "promise_then" }), func_type(vl_end(m), vl_empty()))
     promise_ops[k] = f
-    f
+    return f
 }
 
 /// The promise imports and the exports that can await, for the host section.
@@ -767,5 +767,5 @@ fn calls_awaiting(node: I32) Bool {
     if (op == Op.Call.i32() or op == Op.ReturnCall.i32()) and awaiting[w_a[node]] == 1 { return true }
     if op == Op.CallRef.i32() and taken_awaits[0] == 1 { return true }
     for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true } }
-    false
+    return false
 }

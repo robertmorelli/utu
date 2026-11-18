@@ -6,7 +6,7 @@ struct Node:
 
 fn second_name(head: Node) Str {
     let n = head.next;
-    n.name;
+    return n.name;
 }
 
 main {

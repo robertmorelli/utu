@@ -141,6 +141,20 @@ class BodyFormatter {
         else if (c === quote) quote = '';
         continue;
       }
+      if (code && text.startsWith('//', i)) {
+        const end = text.indexOf('\n', i);
+        current += text.slice(i, end < 0 ? text.length : end);
+        flush();
+        i = end < 0 ? text.length : end;
+        continue;
+      }
+      if (code && text.startsWith('/*', i)) {
+        const end = text.indexOf('*/', i + 2);
+        if (end < 0) throw new Error('unterminated comment');
+        current += text.slice(i, end + 2);
+        i = end + 1;
+        continue;
+      }
       if (code && c === '`') {
         const end = templateEnd(text, i);
         if (end < 0) throw new Error('unterminated template');
@@ -185,8 +199,9 @@ class BodyFormatter {
 
   node(node, depth) {
     switch (node.kind) {
+      case 'fragment': return this.children(node.children, depth);
       case 'text': return this.block(node.expr, depth, true);
-      case 'expression': return this.block(`= ${node.expr}`, depth, true);
+      case 'expression': return this.block(`${node.sigil ?? '='} ${node.expr}`, depth, true);
       case 'if': return this.conditional(node, depth, 'if');
       case 'for': return this.loop(node, depth);
       default: return this.element(node, depth);
@@ -228,7 +243,10 @@ class BodyFormatter {
       else at(start, () => this.add(depth + 1, `${property ? '.' : ''}${name}${eq}${dynamic ? compactExpression(value) : value}`));
     }
     for (const rule of node.css) at(rule.start, () => this.block(rule.source, depth + 1));
-    for (const style of node.styles ?? []) at(style.start, () => this.add(depth + 1, `${style.property}: = ${compactExpression(style.value)}`));
+    for (const style of node.styles ?? []) at(style.start, () => {
+      if (style.block) this.block(`${style.property}: ${style.value}`, depth + 1, true);
+      else this.add(depth + 1, `${style.property}: = ${compactExpression(style.value)}`);
+    });
     for (const binding of node.twoWay) at(binding.start, () => this.add(depth + 1, `bind:${binding.property} = ${compactExpression(binding.value)}`));
     for (const child of node.children) at(child.start, () => this.node(child, depth + 1));
     for (const event of node.events) {
@@ -323,6 +341,8 @@ function sameWutuTree(a, b) {
 const EVENT_COMPLETIONS = ['click', 'input', 'change', 'submit', 'keydown', 'focus', 'blur'];
 
 const KEYWORD_COMPLETIONS = [
+  { label: '|', insertText: '| ', detail: 'Insert components or a component list' },
+  { label: '|>', insertText: '|> ', detail: 'Evaluate Utu code and insert its component result' },
   { label: 'bind:value', insertText: 'bind:value = state.value;', detail: 'Two-way string binding' },
   { label: 'bind:checked', insertText: 'bind:checked = state.checked;', detail: 'Two-way boolean binding' },
   { label: 'bind:number', insertText: 'bind:number = state.number;', detail: 'Two-way numeric binding' },

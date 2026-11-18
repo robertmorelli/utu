@@ -1,7 +1,7 @@
 
       lib {
-        fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }
-        fn lead(x: I32) I32 { clamp(x, 1, 10); }
-        fn mid(x: I32) I32 { clamp(0, x, 10); }
+        fn clamp(x: I32, lo: I32, hi: I32) I32 { return x + lo + hi; }
+        fn lead(x: I32) I32 { return clamp(x, 1, 10); }
+        fn mid(x: I32) I32 { return clamp(0, x, 10); }
       }
     

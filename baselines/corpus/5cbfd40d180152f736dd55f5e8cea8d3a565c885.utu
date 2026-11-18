@@ -1,9 +1,9 @@
 
       struct Pt:
         | x : I32
-      fn takes(n: I32) I32 { n; }
+      fn takes(n: I32) I32 { return n; }
       lib {
-        fn ok(p: Pt) I32 { takes(p.x); }
-        fn bad() I32 { takes(true); }
+        fn ok(p: Pt) I32 { return takes(p.x); }
+        fn bad() I32 { return takes(true); }
       }
     

@@ -266,7 +266,7 @@ fn name_of_listed(c: I32) I32 => if is_kind(c, Node.Closure_param) or is_kind(c,
 
 fn list_word(c: I32) I32 {
     let n = name_of_listed(c)
-    if is_kind(n, Node.Identifier) or is_kind(c, Node.Module_type_param) { word_of(n) } else { -1 }
+    return if is_kind(n, Node.Identifier) or is_kind(c, Node.Module_type_param) { word_of(n) } else { -1 }
 }
 
 /// By alt arm: the next arm of its alt whose pattern ends in the same word.
@@ -317,7 +317,7 @@ fn duplicate_alt_arms(node: I32) Void {
 /// The word of a node's last token, or -1.
 fn end_word(node: I32) I32 {
     if node < 0 or node_last[node] <= node_first[node] { return -1 }
-    tok_word[node_last[node] - 1]
+    return tok_word[node_last[node] - 1]
 }
 
 /// By word: the stamp of the block whose lets last named it; and the last stamp.
@@ -327,7 +327,7 @@ vec let_stamp: I32 = [0]
 /// A new stamp for @word_seen: no word seen with it yet.
 fn word_stamp() I32 {
     let_stamp[0] += 1
-    let_stamp[0]
+    return let_stamp[0]
 }
 
 /// Whether `word` was seen with `stamp` before; it is now.
@@ -340,13 +340,13 @@ fn word_seen(word: I32, stamp: I32) Bool {
     }
     if let_seen[word] == stamp { return true }
     let_seen[word] = stamp
-    false
+    return false
 }
 
 /// The `|self|` capture of method node `fn_node`, or -1.
 fn self_of(fn_node: I32) I32 {
     let c = next_sibling(first_child(fn_node))
-    if is_kind(c, Node.Self_param) { c } else { -1 }
+    return if is_kind(c, Node.Self_param) { c } else { -1 }
 }
 
 /// A parameter named as the method's `|self|` capture hides it.
@@ -406,7 +406,7 @@ fn body_params(block: I32) I32 {
         if is_kind(c, Node.Param_list) { return c }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// The parameter of `params` (a Param_list, or -1) named `word`, or -1.
@@ -418,7 +418,7 @@ fn param_named(params: I32, word: I32) I32 {
         p = next_sibling(p)
     }
     let sp = self_of(parent_of(params))
-    if sp >= 0 and word_of(first_child(sp)) == word { sp } else { -1 }
+    return if sp >= 0 and word_of(first_child(sp)) == word { sp } else { -1 }
 }
 
 /// `?I32`: a scalar has no null.
@@ -433,7 +433,7 @@ fn validate_nullable(node: I32) Void {
 
 fn is_scalar_decl(decl: I32) Bool {
     let x = ir_tree(last_child(last_child(decl_node[decl])))
-    x >= 0 and x_tag[x] == known_word(Known.IrWasmScalar)
+    return x >= 0 and x_tag[x] == known_word(Known.IrWasmScalar)
 }
 
 /// A tuple type is only a function's result.
@@ -485,13 +485,13 @@ fn reaching_field(from: I32, target: I32, depth: I32) I32 {
         }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// A method declared `yield T` (`fn &.each |s| () yield T`).
 fn is_method_generator(fn_node: I32) Bool {
     let ret = child_of_kind(fn_node, Node.Return_type)
-    ret >= 0 and is_kind(first_child(ret), Node.Yield_type) and next_sibling(first_child(first_child(fn_node))) >= 0
+    return ret >= 0 and is_kind(first_child(ret), Node.Yield_type) and next_sibling(first_child(first_child(fn_node))) >= 0
 }
 
 /// `yield` belongs in a generator, and not in a closure inside one (the
@@ -535,7 +535,7 @@ fn first_return(node: I32) I32 {
         if found >= 0 { return found }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// A defer is a statement of a block (or of a bench's setup), and its code
@@ -570,7 +570,7 @@ fn deferred_exit(node: I32, in_loop: Bool) I32 {
         if found >= 0 { return found }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// Whether `break label` leaves the defer it is in: no block of its label
@@ -582,7 +582,7 @@ fn leaves_defer(brk: I32) Bool {
         if is_kind(p, Node.Block_expr) and is_kind(first_child(p), Node.Identifier) and word_of(first_child(p)) == word { return false }
         p = parent_of(p)
     }
-    true
+    return true
 }
 
 /// `await for (…)` reads a generator call, or one stream (with one value bound).

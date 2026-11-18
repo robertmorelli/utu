@@ -224,6 +224,10 @@
       "required": true,
       "types": [
         {
+          "type": "brace_group",
+          "named": true
+        },
+        {
           "type": "css_property",
           "named": true
         },
@@ -828,6 +832,72 @@
     }
   },
   {
+    "type": "template_interpolation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "brace_group",
+          "named": true
+        },
+        {
+          "type": "bracket_group",
+          "named": true
+        },
+        {
+          "type": "dsl_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "keyword",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "operator",
+          "named": true
+        },
+        {
+          "type": "paren_group",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "template_string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "template_string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "template_interpolation",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "text",
     "named": true,
     "fields": {},
@@ -857,6 +927,10 @@
   },
   {
     "type": "#",
+    "named": false
+  },
+  {
+    "type": "${",
     "named": false
   },
   {
@@ -997,6 +1071,10 @@
   },
   {
     "type": "^",
+    "named": false
+  },
+  {
+    "type": "`",
     "named": false
   },
   {
@@ -1201,10 +1279,6 @@
     "named": true
   },
   {
-    "type": "template_string",
-    "named": true
-  },
-  {
     "type": "true",
     "named": false
   },
@@ -1230,6 +1304,10 @@
   },
   {
     "type": "|",
+    "named": false
+  },
+  {
+    "type": "|>",
     "named": false
   },
   {

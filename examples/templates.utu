@@ -7,25 +7,25 @@ struct Point:
 
 // A type takes part in templates by having a str.
 fn Point.str |self| () Str {
-    `(${self.x}, ${self.y})`
+    return `(${self.x}, ${self.y})`
 }
 
 fn describe(name: Str, age: I32, height: F64) Str {
-    `${name} is ${age} years old and ${height} m tall`
+    return `${name} is ${age} years old and ${height} m tall`
 }
 
 lib {
-    fn greeting() Str { describe("Ada", 36, 1.65) }
-    fn point() Str { `p = ${Point { x: 3, y: -4 }}` }
-    fn nested() Str { `[${`inner ${1 + 2}`}]` }
-    fn blocks() Str { `${if 2 > 1 { "yes" } else { "no" }} and ${{ let n = 6; n * 7 }}` }
-    fn escapes() Str { `a \` backtick, a \${ that is text, $5, $${"x"}, tab\tend` }
+    fn greeting() Str { return describe("Ada", 36, 1.65) }
+    fn point() Str { return `p = ${Point { x: 3, y: -4 }}` }
+    fn nested() Str { return `[${`inner ${1 + 2}`}]` }
+    fn blocks() Str { return `${if 2 > 1 { "yes" } else { "no" }} and ${{ let n = 6; n * 7 }}` }
+    fn escapes() Str { return `a \` backtick, a \${ that is text, $5, $${"x"}, tab\tend` }
     fn multiline() Str {
-        `first line
+        return `first line
 second line ${true}`
     }
-    fn plain() Str { `no substitutions` }
-    fn empty() Str { `` }
+    fn plain() Str { return `no substitutions` }
+    fn empty() Str { return `` }
 }
 
 test "a template is its pieces joined" {

@@ -1,11 +1,11 @@
 fn first_plus_len(xs: Array[I32]) I32 {
     let first: I32 = xs[0]
-    first + xs.len()
+    return first + xs.len()
 }
 
 fn filled_sum() I32 {
     let xs: Array[I32] = Array[I32].new(4, 3)
-    xs[0] + xs[3] + xs.len()
+    return xs[0] + xs[3] + xs.len()
 }
 
 fn fixed_sum() I32 {
@@ -13,20 +13,20 @@ fn fixed_sum() I32 {
     xs[0] = 4
     xs[1] = 5
     xs[2] = 6
-    xs[0] + xs[1] + xs[2]
+    return xs[0] + xs[1] + xs[2]
 }
 
 fn default_write() I32 {
     let xs: Array[I32] = Array[I32].new_default(3)
     xs[1] = 9
-    xs[1]
+    return xs[1]
 }
 
 fn overwrite_total() I32 {
     let values: Array[I32] = Array[I32].new(4, 1)
     values[1] = 7
     values[2] = 7
-    values[0] + values[1] + values[2] + values[3]
+    return values[0] + values[1] + values[2] + values[3]
 }
 
 test "Array get and len compose" {

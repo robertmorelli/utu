@@ -1,9 +1,9 @@
 // What: one module declares the same function twice
 // Expect: Duplicate declaration f, at the second
 mod M {
-    fn f() I32 { 1; }
-    fn f() I32 { 2; }
-    fn get() I32 { f(); }
+    fn f() I32 { return 1; }
+    fn f() I32 { return 2; }
+    fn get() I32 { return f(); }
 }
 
 main {

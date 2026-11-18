@@ -3,12 +3,12 @@
         let js_twice: fun(cl(I32) I32, I32) I32 = @es/\ (f, v) => f(f(v)) \/;
         lib {
           fn to_js(n: I32) I32 {
-            let f: cl(I32) I32 = cl(x) { x * n; };
-            js_apply(f, 5);
+            let f: cl(I32) I32 = cl(x) { return x * n; };
+            return js_apply(f, 5);
           }
           fn to_js_twice(n: I32) I32 {
-            let f: cl(I32) I32 = cl(x) { x + n; };
-            js_twice(f, 0);
+            let f: cl(I32) I32 = cl(x) { return x + n; };
+            return js_twice(f, 0);
           }
         }
       

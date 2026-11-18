@@ -3,7 +3,7 @@
 using Browser from std:Browser;
 
 fn load(text: Str) ?Browser.Element {
-    @json/\ decode Browser.Element text \/;
+    return @json/\ decode Browser.Element text \/;
 }
 
 main {

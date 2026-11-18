@@ -1,1 +1,1 @@
-lib { fn bad() I32 { missing_name; } }
+lib { fn bad() I32 { return missing_name; } }

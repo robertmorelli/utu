@@ -4,7 +4,7 @@ using Ord from std:Ord;
 using Order from std:Ord;
 
 mod Ranked[V] {
-    fn top(xs: Array[V]) V { Order[V].max_of(xs); }
+    fn top(xs: Array[V]) V { return Order[V].max_of(xs); }
 }
 
 main {

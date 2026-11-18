@@ -4,6 +4,6 @@ mod Found[T] {
     struct &:
         | value: T
     fn &.new(value: T) & {
-        &{ value: value };
+        return &{ value: value };
     }
 }

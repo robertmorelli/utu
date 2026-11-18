@@ -8,7 +8,7 @@ mod Buffer[T] {
         | length: I32
 
     fn &.new() & {
-        &{ values: [], length: 0 }
+        return &{ values: [], length: 0 }
     }
 
     fn &.push |self| (value: T) Void {
@@ -23,14 +23,14 @@ mod Buffer[T] {
         self.length += 1
     }
 
-    fn &.len |self| () I32 { self.length }
+    fn &.len |self| () I32 { return self.length }
 
-    fn &.is_empty |self| () Bool { self.length == 0 }
+    fn &.is_empty |self| () Bool { return self.length == 0 }
 
     // b[i] and b[i] = v.
     fn &.get_index |self| (i: I32) T {
         if checks() and (i < 0 or i >= self.length) { fatal }
-        self.values[i]
+        return self.values[i]
     }
 
     fn &.set_index |self| (i: I32, value: T) Void {
@@ -42,7 +42,7 @@ mod Buffer[T] {
     fn &.pop |self| () T {
         if checks() and self.length == 0 { fatal }
         self.length -= 1
-        self.values[self.length]
+        return self.values[self.length]
     }
 
     fn &.clear |self| () Void { self.length = 0 }
@@ -54,9 +54,9 @@ mod Buffer[T] {
     }
 
     // Whether the build is --safe.
-    fn checks() Bool { @ir/\ <ir-safe-checks/> \/ }
+    fn checks() Bool => @ir/\ <ir-safe-checks/> \/;
 
     fn &.finish |self| () Array[T] {
-        self.values.slice(0, self.length)
+        return self.values.slice(0, self.length)
     }
 }

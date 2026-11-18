@@ -1,9 +1,9 @@
 
-      fn __closure0() I32 { 30; }
+      fn __closure0() I32 { return 30; }
       lib {
         fn run() I32 {
           let n: I32 = 5;
-          let f: cl() I32 = cl() { n + __closure0(); }; f();
+          let f: cl() I32 = cl() { return n + __closure0(); }; return f();
         }
       }
     

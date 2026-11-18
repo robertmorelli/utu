@@ -1,6 +1,6 @@
 
       lib {
-        fn bad_call(x: I32) I32 { x(); 0; }
-        fn bad_await(x: I32) I32 { await x; }
+        fn bad_call(x: I32) I32 { x(); return 0; }
+        fn bad_await(x: I32) I32 { return await x; }
       }
     

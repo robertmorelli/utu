@@ -17,36 +17,24 @@ mod Array[T1] {
     // These are called by the compiler when it lowers a[i], a[s,e], a[i]=v.
 
     // a[i] — read element at index i.
-    fn &.get_index |self| (i: I32) T1 {
-        @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/
-    }
+    fn &.get_index |self| (i: I32) T1 => @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
 
     // a[i] = v — write element at index i (returns void).
-    fn &.set_index |self| (i: I32, v: T1) Void {
-        @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/
-    }
+    fn &.set_index |self| (i: I32, v: T1) Void => @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
 
     // a[s, e] — copy subrange [start, end) into a new array.
-    fn &.get_slice |self| (start: I32, end_: I32) & {
-        @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/
-    }
+    fn &.get_slice |self| (start: I32, end_: I32) & => @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
 
     // ── Named methods (explicit call syntax) ──────────────────────────────
 
     // Create an Array of n elements, initialized with fill.
-    fn &.new(n: I32, fill: T1) & {
-        @ir/\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \/
-    }
+    fn &.new(n: I32, fill: T1) & => @ir/\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \/;
 
     // Create an Array with Wasm's default value for T1 (zero or null).
-    fn &.new_default(n: I32) & {
-        @ir/\ <ir-array-new><ir-ident name="n"/></ir-array-new> \/
-    }
+    fn &.new_default(n: I32) & => @ir/\ <ir-array-new><ir-ident name="n"/></ir-array-new> \/;
 
     // Number of elements. Call as `array.len()`.
-    fn &.len |self| () I32 {
-        @ir/\ <ir-array-len><ir-ident name="self"/></ir-array-len> \/
-    }
+    fn &.len |self| () I32 => @ir/\ <ir-array-len><ir-ident name="self"/></ir-array-len> \/;
 
     // `[1, 2, 3]`: each element's str, between brackets (`console.log(xs)`).
     fn &.str |self| () Str {
@@ -55,29 +43,21 @@ mod Array[T1] {
             if i > 0 { out = out + ", " }
             out = out + x.str()
         }
-        out + "]"
+        return out + "]"
     }
 
     // Aliases kept for explicit call sites.
-    fn &.get |self| (i: I32) T1 {
-        @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/
-    }
-    fn &.set |self| (i: I32, v: T1) Void {
-        @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/
-    }
-    fn &.slice |self| (start: I32, end_: I32) & {
-        @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/
-    }
+    fn &.get |self| (i: I32) T1 => @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
+    fn &.set |self| (i: I32, v: T1) Void => @ir/\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \/;
+    fn &.slice |self| (start: I32, end_: I32) & => @ir/\ <ir-array-slice><ir-ident name="self"/><ir-ident name="start"/><ir-ident name="end_"/></ir-array-slice> \/;
 
     // self[at .. at+count) = source[start .. start+count), as one bulk copy.
     // Overlapping ranges of the same array copy correctly. Out of range traps.
-    fn &.copy_from |self| (at: I32, source: &, start: I32, count: I32) Void {
-        @ir/\ <ir-array-copy>
+    fn &.copy_from |self| (at: I32, source: &, start: I32, count: I32) Void => @ir/\ <ir-array-copy>
             <ir-ident name="self"/>
             <ir-ident name="at"/>
             <ir-ident name="source"/>
             <ir-ident name="start"/>
             <ir-ident name="count"/>
-        </ir-array-copy> \/
-    }
+        </ir-array-copy> \/;
 }

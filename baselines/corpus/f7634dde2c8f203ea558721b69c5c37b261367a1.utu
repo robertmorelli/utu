@@ -2,7 +2,7 @@ using Browser from std:Browser;
 
 fn money(value: F64) Str {
     let format = new Browser.Intl.NumberFormat("en-US", &{ style: "currency", currency: "USD" });
-    format.format(value);
+    return format.format(value);
 }
 
 fn load_favorites() Browser.Set {
@@ -14,7 +14,7 @@ fn load_favorites() Browser.Set {
         },
         ~> {},
     };
-    saved;
+    return saved;
 }
 
 fn save_favorites(favorites: Browser.Set) Void {
@@ -29,7 +29,7 @@ fn draw_chart(canvas: Browser.HTMLCanvasElement, items: Browser.Array) Void {
             ctx.font = "12px system-ui";
             for (0..<categories.len()) |i| {
                 let name = categories[i];
-                let count = items.filter(cl(item) Bool { item.category == name; }).length;
+                let count = items.filter(cl(item) Bool { return item.category == name; }).length;
                 let y = 16 + i.f64() * 40;
                 ctx.fillStyle = "#66756b";
                 ctx.fillText(name, 12, y + 14);
@@ -56,11 +56,11 @@ fn render(state: State) Void {
     let list = state.list;
     let query = state.query.toLowerCase();
     let visible = state.items.filter(cl(item) Bool {
-        (state.category == "All" or item.category == state.category)
+        return (state.category == "All" or item.category == state.category)
             and item.name.toLowerCase().includes(query);
     });
     visible.sort(cl(a, b) F64 {
-        if state.sort == "price" { a.price - b.price; }
+        return if state.sort == "price" { a.price - b.price; }
         else if state.sort == "quantity" { b.quantity - a.quantity; }
         else { a.name.localeCompare(b.name); };
     });
@@ -92,7 +92,7 @@ fn render(state: State) Void {
         row.append(star, text, price);
         list.append(row);
     });
-    let total = state.items.reduce(cl(sum, item) F64 { sum + item.price * item.quantity; }, 0);
+    let total = state.items.reduce(cl(sum, item) F64 { return sum + item.price * item.quantity; }, 0);
     count_up(state.total, total);
     draw_chart(state.chart, state.items);
     let url = new Browser.URL(Browser.location.href);
@@ -114,7 +114,7 @@ struct State:
     | status: Browser.HTMLElement
 
 fn by_id(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal;
+    return Browser.document.getElementById(id) orelse fatal;
 }
 
 main {

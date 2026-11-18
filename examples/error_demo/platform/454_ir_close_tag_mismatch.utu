@@ -1,8 +1,6 @@
 // What: @ir with a close tag of another name
 // Expect: @ir body is empty or not well-formed IR
-fn is_zero(a: I32) I32 {
-    @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \/;
-}
+fn is_zero(a: I32) I32 => @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \/;
 
 main {
     console.log(is_zero(7));

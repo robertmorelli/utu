@@ -3,7 +3,7 @@
 fn total(xs: ?Array[I32]) I32 {
     let t = 0;
     for (0 ..< xs.len()) |i| { t += i; };
-    t;
+    return t;
 }
 
 main {

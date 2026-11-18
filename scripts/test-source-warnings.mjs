@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { compressedSourceWarnings } from '../src/selfhost/source-warnings.js';
 import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
-const dense = 'lib { fn run() I32 { let first_value = 1; let second_value = 2; let third_value = 3; let fourth_value = 4; let fifth_value = 5; first_value + second_value + third_value + fourth_value + fifth_value; } }';
+const dense = 'lib { fn run() I32 { let first_value = 1; let second_value = 2; let third_value = 3; let fourth_value = 4; let fifth_value = 5; return first_value + second_value + third_value + fourth_value + fifth_value; } }';
 const warnings = compressedSourceWarnings('\n'+dense, 'test.utu');
 assert.equal(warnings.length, 1);
 assert.equal(warnings[0].severity, 'warning');
@@ -19,7 +19,7 @@ const logged = '    console.log(`first ${alpha_value} second ${beta_value} third
 assert.equal(compressedSourceWarnings(logged, 'test.utu').length, 0, logged);
 assert.equal(compressedSourceWarnings('let q = "\\""; '+dense, 'test.utu').length, 1, 'escaped quote');
 assert.equal(compressedSourceWarnings('let t = `a ${ {x} } b`; '+dense, 'test.utu').length, 1, 'template closed');
-for (const source of ['// '+dense, '/*\n'+dense+'\n*/', '\\\\'+dense, 'let text = "'+dense+'";', 'lib { fn run() I32 { 1; } }', dense.replaceAll('; ', ';\n')]) {
+for (const source of ['// '+dense, '/*\n'+dense+'\n*/', '\\\\'+dense, 'let text = "'+dense+'";', 'lib { fn run() I32 { return 1; } }', dense.replaceAll('; ', ';\n')]) {
  assert.equal(compressedSourceWarnings(source, 'test.utu').length, 0, source);
 }
 const dir=await fs.mkdtemp(path.join(os.tmpdir(),'utu-source-warning-'));

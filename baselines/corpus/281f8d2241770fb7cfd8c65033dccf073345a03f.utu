@@ -1,1 +1,1 @@
-lib { fn run() I32 { let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { n + __env; }; f(7); } }
+lib { fn run() I32 { let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { return n + __env; }; return f(7); } }

@@ -1,6 +1,6 @@
 
         let lucky: I32 = @es/\41\/;
         lib {
-          fn get_lucky() I32 { lucky; }
+          fn get_lucky() I32 { return lucky; }
         }
       

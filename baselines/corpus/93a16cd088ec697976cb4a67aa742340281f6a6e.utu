@@ -3,11 +3,11 @@ let wrap: fun(Str) Str = @es/\(value) => `[${value}]`\/;
 let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 fn greet(name: Str) Str {
-    wrap(name);
+    return wrap(name);
 }
 
 fn main() I64 {
-    3;
+    return 3;
 }
 
 test "imports can be called from test mode" {

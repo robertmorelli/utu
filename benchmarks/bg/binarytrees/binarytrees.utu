@@ -11,7 +11,7 @@ rec struct Node:
     | right: ?Node
 
 fn bottom_up_tree(depth: I32) Node {
-    if depth > 0 {
+    return if depth > 0 {
         Node { left: bottom_up_tree(depth - 1), right: bottom_up_tree(depth - 1) }
     } else {
         Node { left: null, right: null }
@@ -19,7 +19,7 @@ fn bottom_up_tree(depth: I32) Node {
 }
 
 fn Node.item_check |self| () I32 {
-    promote self.left {
+    return promote self.left {
         |left| => 1 + left.item_check() + (self.right orelse fatal).item_check(),
         ~> 1,
     }
@@ -27,12 +27,12 @@ fn Node.item_check |self| () I32 {
 
 // ---- output: FNV-1a over the bytes BG prints
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 fn fnv_str(h0: I32, s: Str) I32 {
     let h = h0
     for (0..<s.len()) |i| { h = fnv(h, s.get(i)) }
-    h
+    return h
 }
 
 // The decimal digits of x (with a '-' if negative).
@@ -46,7 +46,7 @@ fn fnv_int(h0: I32, x: I32) I32 {
         h = fnv(h, 48 + (v / p % 10).i32())
         p = p / 10
     }
-    h
+    return h
 }
 
 let min_depth: I32 = 4
@@ -84,7 +84,7 @@ fn binary_trees(n: I32) I32 {
     h = fnv_int(h, max_depth)
     h = fnv_str(h, "\t check: ")
     h = fnv_int(h, long_lived_tree.item_check())
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 test "binarytrees prints BG's output" {
@@ -93,5 +93,5 @@ test "binarytrees prints BG's output" {
 }
 
 lib {
-    fn bench(n: I32) I32 { binary_trees(n) }
+    fn bench(n: I32) I32 { return binary_trees(n) }
 }

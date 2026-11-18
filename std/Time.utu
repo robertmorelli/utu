@@ -5,12 +5,12 @@ mod time {
     /// where the host has it (`performance.now`): for measuring.
     fn now() F64 {
         let f: fun() F64 = @es/\ () => performance.now() \/
-        f()
+        return f()
     }
 
     /// Milliseconds since 1970-01-01 UTC (`Date.now`): for dates.
     fn epoch_ms() F64 {
         let f: fun() F64 = @es/\ () => Date.now() \/
-        f()
+        return f()
     }
 }

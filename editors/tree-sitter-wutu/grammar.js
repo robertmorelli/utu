@@ -41,7 +41,7 @@ module.exports = grammar({
     // Children
     _node: $ => choice($.text, $.hole, $.if, $.for, $.element),
     text: $ => seq($.string, $._end),
-    hole: $ => seq('=', $.expression, $._end),
+    hole: $ => seq(choice('=', '|', '|>'), $.expression, $._end),
     if: $ => seq('if', alias($._condition, $.expression), $.branch,
       repeat(seq('else', 'if', alias($._condition, $.expression), $.branch)),
       optional(seq('else', $.branch))),
@@ -72,7 +72,7 @@ module.exports = grammar({
     handler: $ => seq('{', repeat($._statement_token), '}'),
 
     // CSS
-    css_declaration: $ => seq($.css_property, ':', choice(seq('=', $.expression), $.css_value), $._end),
+    css_declaration: $ => seq($.css_property, ':', choice($.brace_group, seq('=', $.expression), $.css_value), $._end),
     css_property: $ => choice($.name, /--[a-zA-Z0-9_-]+/),
     // (A `,` goes on to the next line: an item follows it.)
     css_value: $ => repeat1(choice($._css_item, seq(',', $._css_item))),
@@ -108,7 +108,9 @@ module.exports = grammar({
     brace_group: $ => seq('{', repeat($._statement_token), '}'),
     keyword: _ => choice(...KEYWORDS),
     number: _ => /\d[\w.]*/,
-    template_string: _ => token(seq('`', repeat(choice(/[^`\\]+/, /\\./)), '`')),
+    template_string: $ => seq('`', repeat(choice($._template_text, $.template_interpolation)), token.immediate('`')),
+    _template_text: _ => token.immediate(choice(/[^`\\$]+/, /\\[\s\S]/, '$')),
+    template_interpolation: $ => seq(token.immediate('${'), repeat($._statement_token), '}'),
     operator: _ => choice('+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=',
       '&', '^', '~', '<<', '>>', '=>', '~>', '..<', '...', '&{'),
 

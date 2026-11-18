@@ -8,12 +8,12 @@ mod widgets {
     fn badge(o: Options) Browser.HTMLElement {
         let el = Browser.document.createElement("span");
         el.textContent = o.title;
-        el;
+        return el;
     }
     fn tally(counts: Array[I32]) Browser.HTMLElement {
         let el = Browser.document.createElement("span");
         el.textContent = counts.len().str();
-        el;
+        return el;
     }
-    fn total(n: I32) I32 { n * 2; }
+    fn total(n: I32) I32 { return n * 2; }
 }

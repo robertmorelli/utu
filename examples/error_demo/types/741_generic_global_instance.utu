@@ -2,7 +2,7 @@
 // Expect: v is Str, got I32
 mod Zero[T] {
     let v: T = 0;
-    fn get() T { v; }
+    fn get() T { return v; }
 }
 
 main { console.log(Zero[I32].get() + Zero[Str].get().len()); }

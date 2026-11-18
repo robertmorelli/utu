@@ -19,19 +19,19 @@ export lib {
     fn dfa_mem(n: I32) I32 {
         let s = 0; let c = 0;
         for (0 ..< n) |i| { s = table[(s << 8) + input[i]]; if s == 0 { c += 1; }; };
-        c;
+        return c;
     }
     fn dfa_array(t: Array[I32], n: I32) I32 {
         let s = 0; let c = 0;
         for (0 ..< n) |i| { s = t[(s << 8) + input[i]]; if s == 0 { c += 1; }; };
-        c;
+        return c;
     }
     fn dfa_str(text: Str, n: I32) I32 {
         let s = 0; let c = 0;
         for (0 ..< n) |i| { s = table[(s << 8) + text[i]]; if s == 0 { c += 1; }; };
-        c;
+        return c;
     }
-    fn make_table(n: I32) Array[I32] { Array[I32].new(n, 0); }
+    fn make_table(n: I32) Array[I32] { return Array[I32].new(n, 0); }
     fn set_table(t: Array[I32], i: I32, v: I32) void { t[i] = v; }
     fn size_input(n: I32) void { input.resize(n); }
     fn size_table(n: I32) void { table.resize(n); }

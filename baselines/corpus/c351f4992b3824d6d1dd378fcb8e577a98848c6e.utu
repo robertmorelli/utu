@@ -1,3 +1,3 @@
-fn f(t: .{I32, I32}) I32 { 1; }
+fn f(t: .{I32, I32}) I32 { return 1; }
 main { console.log(1); }
 using console from std:Console

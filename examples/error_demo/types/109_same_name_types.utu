@@ -3,7 +3,7 @@
 mod a {
     struct S:
         | x: I32
-    fn mk() S { S { x: 1 }; }
+    fn mk() S { return S { x: 1 }; }
 }
 
 struct S:

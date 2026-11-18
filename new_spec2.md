@@ -34,7 +34,10 @@ Rules:
 
 `html` lowers to a `main` that mounts a reactive `@wutu` template rooted at
 `html`. A Wutu function `wn name(params) { template }` lowers to
-`fn name(params) Browser.HTMLElement => @wutu/\ template \/`. It works at
+`fn name(params) Result => @wutu/\ template \/`, where `Result` is
+`Browser.HTMLElement` for a single HTML root, `Browser.SVGElement` for a single
+SVG root, or `Browser.DocumentFragment` for multiple roots, text, top-level
+control flow, or an empty body. It works at
 the same declaration sites as `fn` and can implement a protocol method.
 
 ---
@@ -218,7 +221,7 @@ apart with `let .{…}`:
 
 ```
 fn divmod(a: I32, b: I32) .{I32, I32} {
-    .{a / b, a % b};
+    return .{a / b, a % b};
 }
 let .{q, r} = divmod(17, 5);
 ```
@@ -248,7 +251,7 @@ with no marshalling, at the cost of a host boundary crossing per call.
 function, or by an `@es` import. It carries no environment.
 
 ```
-fn double(x: I32) I32 { x * 2; }
+fn double(x: I32) I32 { return x * 2; }
 
 let g: fun(I32) I32 = double;
 ```
@@ -257,10 +260,17 @@ let g: fun(I32) I32 = double;
 when the context supplies them, and written out otherwise. A return type may be
 given when it is not otherwise determined.
 
+Braced function and closure bodies require `return` to produce a result.
+Falling through produces `Void`, and is an error when a non-`Void` result is
+required. A closure can infer its result type from an explicit `return`.
+Functions may also use `=> expression` as an explicit expression body.
+Expression blocks, including blocks used by `if`, `match`, and iterator
+operators, still yield their final expression.
+
 ```
-let h: cl(I32) I32 = cl(x) { x * 2; };          // types from the annotation
+let h: cl(I32) I32 = cl(x) { return x * 2; };          // types from the annotation
 let t: cl() void   = cl() { count += 1; };
-let k: cl(I32) I32 = cl(x: I32) I32 { x * 2; }; // written out
+let k: cl(I32) I32 = cl(x: I32) I32 { return x * 2; }; // written out
 
 // as a callback argument — parameter types come from the declaration
 listen("click", cl(e) { handle(e); });
@@ -287,7 +297,7 @@ environment.
 fn on_each(f: cl(I32) void) void { ... }
 on_each(double);        // fun(I32) void decays to cl(I32) void
 
-let bad: fun(I32) I32 = cl(x) { x; };   // error: cl does not decay to fun
+let bad: fun(I32) I32 = cl(x) { return x; };   // error: cl does not decay to fun
 ```
 
 Decay and nullable widening are the only two implicit conversions in the
@@ -327,7 +337,7 @@ delay(n, 5).catch(cl(e) { report(e); });
 fn total(a: I32, b: I32) I32 {
     let first: I32  = await delay(a, 5);
     let second: I32 = await delay(b, 5);
-    first + second;
+    return first + second;
 }
 ```
 
@@ -359,7 +369,7 @@ held as an externref, as `Promise[T]` is a real promise. `await for` reads one:
 fn total(s: Stream[I32]) I32 {
     let sum = 0;
     await for (s) |v| { sum += v; };
-    sum;
+    return sum;
 }
 ```
 
@@ -456,12 +466,12 @@ mod Array[T1] {
 mod I32 {
     type & = @ir/\ <ir-wasm-scalar kind="I32"/> \/
 
-    fn &:add  |a, b| & { @ir/\ <ir-i32-add/> \/; }
-    fn &:sub  |a, b| & { @ir/\ <ir-i32-sub/> \/; }
-    fn &:mul  |a, b| & { @ir/\ <ir-i32-mul/> \/; }
-    fn &:eq   |a, b| Bool { @ir/\ <ir-i32-eq/> \/; }
+    fn &:add  |a, b| & => @ir/\ <ir-i32-add/> \/;
+    fn &:sub  |a, b| & => @ir/\ <ir-i32-sub/> \/;
+    fn &:mul  |a, b| & => @ir/\ <ir-i32-mul/> \/;
+    fn &:eq   |a, b| Bool => @ir/\ <ir-i32-eq/> \/;
     // ... etc.
-    fn clz(x: &) & { @ir/\ <ir-i32-clz/> \/; }
+    fn clz(x: &) & => @ir/\ <ir-i32-clz/> \/;
 }
 ```
 
@@ -548,7 +558,7 @@ using M1 |M2|;
 using M1[I32, F64] |NumMap|;
 
 // inline instantiation (no alias needed — compiler derives name automatically)
-fn f() Array[I32] { Array[I32].new(10); }
+fn f() Array[I32] { return Array[I32].new(10); }
 ```
 
 ---
@@ -731,13 +741,13 @@ for (walk(root)) |n| {
 // The function must return Result[U, E], the same E (never converted).
 // `try { … } catch …` stays the host form; `try` before anything else is this.
 // errdefer: a defer that runs only on an error return (a try returning, or a
-// return or final value whose Result is an error, tested where it returns),
+// return or expression body whose Result is an error, tested where it returns),
 // with the pending defers, newest first. Only in a function returning a Result.
 // Neither is allowed in a generator. See docs/errors.md.
 fn quarter(n: I32) Result[I32, Str] {
     errdefer log("failed");
     let h = try half(n);
-    half(h);
+    return half(h);
 }
 
 // bind (let)
@@ -944,12 +954,9 @@ let value: F64 = @utu/\ some.utu.expr \/;
 A function whose whole body is `@wat/\ … \/` is written in WebAssembly text:
 
 ```
-fn rotl(x: I32, k: I32) I32 {
-    @wat/\ local.get $x local.get $k i32.rotl \/;
-}
+fn rotl(x: I32, k: I32) I32 => @wat/\ local.get $x local.get $k i32.rotl \/;
 
-fn triangle(n: I32) I32 {
-    @wat/\
+fn triangle(n: I32) I32 => @wat/\
         (local $acc i32) (local $i i32)
         (block $done
           (loop $next
@@ -959,7 +966,6 @@ fn triangle(n: I32) I32 {
             (br $next)))
         local.get $acc
     \/;
-}
 ```
 
 - The parameters are locals, named as in utu (`$x`) or numbered; `(local …)`

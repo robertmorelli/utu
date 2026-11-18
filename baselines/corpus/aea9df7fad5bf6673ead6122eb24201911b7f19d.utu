@@ -6,10 +6,10 @@ struct TempoState:
 | remaining: I32
 | running: Bool
 fn valid_tempo(state: TempoState) Bool {
-    state.duration >= 15 and state.duration <= 3600 and state.remaining >= 0 and state.remaining <= state.duration;
+    return state.duration >= 15 and state.duration <= 3600 and state.remaining >= 0 and state.remaining <= state.duration;
 }
 fn workspace(state: TempoState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "tempo-workspace"
     section.workspace {
         = {

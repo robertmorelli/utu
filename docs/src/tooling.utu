@@ -3,7 +3,7 @@ using code from "./code.utu"
 using ui from "./ui.utu"
 mod tooling {
     fn cli_sample() Str {
-        \\usage: utu <command> <file.utu> [options]
+        return \\usage: utu <command> <file.utu> [options]
         \\
         \\  check <file>                 report what is wrong with the program
         \\  run <file> [-O mode] [-- args]  build it, then call its main
@@ -22,20 +22,20 @@ mod tooling {
         \\  -O debug        the module as code generation leaves it, checked
     }
     fn grep_sample() Str {
-        \\bun ./cli/utu.mjs grep '$v.push($x)' src/ --where 'x: I32'
+        return \\bun ./cli/utu.mjs grep '$v.push($x)' src/ --where 'x: I32'
         \\bun ./cli/utu.mjs grep --refs word_counts examples/
     }
     fn wutu_sample() Str {
-        \\utu format <files...> [--check]
+        return \\utu format <files...> [--check]
         \\utu build <entry.utu> [--out dist/wutu] [--title Title] [--no-prerender]
         \\utu <entry.utu> [--port 4176] [--out dist/wutu]
     }
     fn neovim_sample() Str {
-        \\node editors/neovim/install.mjs     # Neovim: language server, grammars, highlighting, folds
+        return \\node editors/neovim/install.mjs     # Neovim: language server, grammars, highlighting, folds
         \\node editors/helix/install.mjs      # Helix: the same, through languages.toml
     }
     fn helix_sample() Str {
-        \\[language-server.utu]
+        return \\[language-server.utu]
         \\command = "node"
         \\args = ["/path/to/utu/cli/utu.mjs", "lsp"]
         \\
@@ -46,13 +46,13 @@ mod tooling {
         \\language-servers = ["utu"]
     }
     fn diagnostic_sample() Str {
-        \\hello.utu:10:5: error: Unknown method 'F64.sqrt'
+        return \\hello.utu:10:5: error: Unknown method 'F64.sqrt'
         \\  9 | fn Point.length |self| () F64 {
         \\ 10 |     (self.x * self.x + self.y * self.y).sqrt();
         \\    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     }
     fn trap_sample() Str {
-        \\$ utu boom.utu
+        return \\$ utu boom.utu
         \\ TRAP  Failed assert
         \\       trap · boom.utu:2:5
         \\
@@ -67,7 +67,7 @@ mod tooling {
         \\  in main  boom.utu:8:5
     }
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.page {
             = ui.header("Tooling", "One compiler answers every tool. Diagnostics, hover, definitions, formatting, and semantic tokens all come from the same bundle the command line runs; there is no second analyzer.")
             h2 {

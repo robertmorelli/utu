@@ -20,23 +20,23 @@ mod StrMap[V] {
 
     /// An empty map.
     fn &.new() & {
-        &{ keys: Array[Str].new(0, ""), full: Array[I32].new(0, 0), hashes: Array[I32].new(0, 0), values: [], count: 0 }
+        return &{ keys: Array[Str].new(0, ""), full: Array[I32].new(0, 0), hashes: Array[I32].new(0, 0), values: [], count: 0 }
     }
 
     /// How many keys it has.
-    fn &.len |self| () I32 { self.count }
+    fn &.len |self| () I32 { return self.count }
 
     /// Whether it has `key`.
     fn &.has |self| (key: Str) Bool {
         if self.count == 0 { return false }
-        self.full[self.slot(key, hash(key))] != 0
+        return self.full[self.slot(key, hash(key))] != 0
     }
 
     /// The value of `key`, or `missing` when it has none.
     fn &.get |self| (key: Str, missing: V) V {
         if self.count == 0 { return missing }
         let i = self.slot(key, hash(key))
-        if self.full[i] == 0 { missing } else { self.values[i] }
+        return if self.full[i] == 0 { missing } else { self.values[i] }
     }
 
     /// `key`'s value is now `value`.
@@ -82,7 +82,7 @@ mod StrMap[V] {
         self.full[i] = 0
         self.keys[i] = ""
         self.count -= 1
-        true
+        return true
     }
 
     /// Its keys, in no particular order.
@@ -95,7 +95,7 @@ mod StrMap[V] {
                 k += 1
             }
         }
-        out
+        return out
     }
 
     // The slot of `key` (hash `h`), or the empty one where it would go.
@@ -107,7 +107,7 @@ mod StrMap[V] {
             if self.hashes[i] == h and self.keys[i] == key { return i }
             i = (i + 1) & mask
         }
-        i
+        return i
     }
 
     // Twice the room (16 at first); `fill` fills the new values.
@@ -136,6 +136,6 @@ mod StrMap[V] {
 
     fn hash(key: Str) I32 {
         let f: fun(Str) I32 = @es/\ (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h | 0; } \/
-        f(key)
+        return f(key)
     }
 }

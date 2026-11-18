@@ -5,11 +5,11 @@ let seed: I32 = 41;
 let banner: Str = "ok";
 
 fn next() I32 {
-    seed + 1;
+    return seed + 1;
 }
 
 fn loud() Str {
-    str_concat(banner, "!");
+    return str_concat(banner, "!");
 }
 
 test "top-level numeric globals lower to global.get" {

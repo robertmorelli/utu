@@ -3,22 +3,22 @@ mod cell[T] {
         | value : T
 
     fn Cell.new(value: T) Cell {
-        Cell { value: value }
+        return Cell { value: value }
     }
 
     fn Cell.get |self| () T {
-        self.value
+        return self.value
     }
 
     fn wrap(value: T) Cell {
-        Cell.new(value)
+        return Cell.new(value)
     }
 }
 
 using cell[I32]
 
 fn opened_sum(left: Cell, right: Cell) I32 {
-    left.get() + right.get()
+    return left.get() + right.get()
 }
 
 test "open using imports types" {

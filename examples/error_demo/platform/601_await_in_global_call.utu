@@ -4,7 +4,7 @@ let fetch_n: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
 let later: I32 = helper();
 
 fn helper() I32 {
-    await fetch_n(3);
+    return await fetch_n(3);
 }
 
 main {

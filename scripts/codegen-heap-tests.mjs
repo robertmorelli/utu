@@ -14,18 +14,18 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
           | value : I32
         tag enum Item[Score]:
           | Bonus { value: I32 }
-        fn Score[Point].score |self| (bonus: I32) I32 { self.value + bonus; }
-        fn Score[Bonus].score |self| (bonus: I32) I32 { self.value * 2 + bonus; }
+        fn Score[Point].score |self| (bonus: I32) I32 { return self.value + bonus; }
+        fn Score[Bonus].score |self| (bonus: I32) I32 { return self.value * 2 + bonus; }
         fn total(values: Array[Score]) I32 {
           let out: I32 = 0;
           for (0..<values.len()) |i| { out += values[i].score(1); };
-          out;
+          return out;
         }
         lib { fn run() I32 {
           let values: Array[Score] = Array[Score].new(2, Point { value: 0 });
           values[0] = Point { value: 3 };
           values[1] = Bonus { value: 4 };
-          total(values);
+          return total(values);
         } }
       `,
     });
@@ -50,7 +50,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
           let i: I32 = 2;
           let count: I32 = 0;
           while (i < n) { count = count + flags[i]; i = i + 1; };
-          count;
+          return count;
         }
       }
     ` });
@@ -65,15 +65,15 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       lib {
         fn make_x(a: I32, b: I32) I32 {
           let p: Point = Point { x: a, y: b };
-          p.x;
+          return p.x;
         }
         fn make_y(a: I32, b: I32) I32 {
           let p: Point = Point { x: a, y: b };
-          p.y;
+          return p.y;
         }
         fn swapped(a: I32, b: I32) I32 {
           let p: Point = Point { y: b, x: a };
-          p.x + p.y;
+          return p.x + p.y;
         }
       }
     ` });
@@ -96,7 +96,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
             start: Point { x: ax, y: ay },
             end: Point { x: bx, y: by },
           };
-          l.end.x - l.start.x;
+          return l.end.x - l.start.x;
         }
       }
     ` });
@@ -112,7 +112,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
           let c: Counter = Counter { n: start };
           c.n = c.n + 1;
           c.n = c.n + 1;
-          c.n;
+          return c.n;
         }
       }
     ` });
@@ -134,7 +134,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
             end: Point { x: 0, y: 0 },
           };
           l.start.x = l.start.x + 5;
-          l.start.x;
+          return l.start.x;
         }
       }
     ` });
@@ -147,10 +147,10 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | n : I32
       lib {
         fn maybe_counter(flag: Bool) ?Counter {
-          if flag { Counter { n: 41 }; } else { Counter.null; };
+          return if flag { Counter { n: 41 }; } else { Counter.null; };
         }
         fn read_counter(flag: Bool) I32 {
-          promote maybe_counter(flag) {
+          return promote maybe_counter(flag) {
             |c| => c.n + 1,
             ~> 0,
           };
@@ -168,7 +168,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       lib {
         fn from_let() I32 {
           let c: ?Counter = null;
-          promote c {
+          return promote c {
             |value| => value.n,
             ~> 7,
           };
@@ -183,7 +183,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       struct Point:
         | x : F64
       lib {
-        fn branch(flag: Bool) F64 { if flag { 1.0; } else { }; 2.0; }
+        fn branch(flag: Bool) F64 { if flag { 1.0; } else { }; return 2.0; }
         fn option(p: ?Point) Void { promote p { |v| => v.x, ~> {}, }; }
         fn binding() Void { let unused: F64 = 3.0; }
       }
@@ -199,10 +199,10 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | n : I32
       lib {
         fn maybe(flag: Bool) ?Counter {
-          if flag { Counter { n: 9 }; } else { null; };
+          return if flag { Counter { n: 9 }; } else { null; };
         }
         fn read(flag: Bool) I32 {
-          promote maybe(flag) {
+          return promote maybe(flag) {
             |value| => value.n,
             ~> 4,
           };
@@ -221,7 +221,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         fn read(outer: Bool, inner: Bool) I32 {
           let a: ?Box = if outer { Box { n: 7 }; } else { null; };
           let b: ?Box = if inner { Box { n: 3 }; } else { null; };
-          promote a {
+          return promote a {
             |x| => promote b {
               |y| => x.n + y.n,
               ~> x.n,
@@ -244,7 +244,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       lib {
         fn has_value(flag: Bool) Bool {
           let value: ?Counter = if flag { Counter { n: 1 }; } else { null; };
-          promote value {
+          return promote value {
             |counter| => true,
             ~> false,
           };
@@ -262,10 +262,10 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | n : I32
       lib {
         fn maybe(flag: Bool) ?Counter {
-          if flag { Counter { n: 7 }; } else { Counter.null; };
+          return if flag { Counter { n: 7 }; } else { Counter.null; };
         }
         fn unwrap(flag: Bool) I32 {
-          promote maybe(flag) { |c| => c.n, ~> 0, };
+          return promote maybe(flag) { |c| => c.n, ~> 0, };
         }
       }
     ` });
@@ -281,7 +281,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       lib {
         fn sum() I32 {
           let p: Pair = &{ a: 7, b: 8 };
-          p.a + p.b;
+          return p.a + p.b;
         }
       }
     ` });
@@ -294,11 +294,11 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | n : I32
       lib {
         fn maybe_counter(flag: Bool) ?Counter {
-          if flag { Counter { n: 7 }; } else { Counter.null; };
+          return if flag { Counter { n: 7 }; } else { Counter.null; };
         }
         fn pick(flag: Bool) I32 {
           let c: Counter = maybe_counter(flag) orelse Counter { n: 99 };
-          c.n;
+          return c.n;
         }
       }
     ` });
@@ -313,7 +313,7 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
       lib {
         fn radius() I32 {
           let c: Circle = Circle { radius: 7 };
-          c.radius;
+          return c.radius;
         }
       }
     ` });
@@ -328,21 +328,21 @@ export function registerCodegenHeapTests({ test, assert, assertEq, assertNoError
         | Triangle { base: I32, height: I32, skew: I32 }
       lib {
         fn classify(shape: Shape) I32 {
-          alt shape {
+          return alt shape {
             Circle => 7,
             ~> fallback(shape),
           };
         }
         fn fallback(shape: Shape) I32 {
-          alt shape {
+          return alt shape {
             Rect => 12,
             Triangle => 9,
             ~> 0,
           };
         }
-        fn circle() I32 { classify(Circle { radius: 7 }); }
-        fn rect() I32 { classify(Rect { width: 3, height: 4 }); }
-        fn triangle() I32 { classify(Triangle { base: 5, height: 4, skew: 1 }); }
+        fn circle() I32 { return classify(Circle { radius: 7 }); }
+        fn rect() I32 { return classify(Rect { width: 3, height: 4 }); }
+        fn triangle() I32 { return classify(Triangle { base: 5, height: 4, skew: 1 }); }
       }
     ` });
     assertEq(instance.exports.circle(), 7);

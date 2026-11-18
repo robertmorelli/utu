@@ -1,6 +1,6 @@
 // What: a tuple destructuring names both parts the same
 // Expect: Duplicate local binding 'q'
-fn divmod(a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }
+fn divmod(a: I32, b: I32) .{I32, I32} { return .{a / b, a % b}; }
 
 main {
     let .{q, q} = divmod(17, 5);

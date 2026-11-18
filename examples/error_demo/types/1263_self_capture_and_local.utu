@@ -5,7 +5,7 @@ struct S:
 
 fn S.g |s| () I32 {
     let s = 7;
-    s;
+    return s;
 }
 
 main { console.log(1); }

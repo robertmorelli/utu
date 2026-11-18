@@ -7,7 +7,7 @@ struct Seat:
 struct VenueState:
 | seats: Array[Seat]
 fn workspace(state: VenueState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "venue-workspace"
     section.workspace {
         div.panel.stack {

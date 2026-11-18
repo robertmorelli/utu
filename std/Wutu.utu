@@ -7,380 +7,477 @@ mod Component {
 mod wutu {
     fn init() Void {
         let install: fun() Void = @es/\ () => { globalThis.__utuWutu ??= (function createWutuRuntime() {
-  const metadata = new WeakMap();   // element -> { attrs, view }
-  const listeners = new WeakMap();  // element -> Map(event -> record)
-  const views = new Set();          // WeakRef<view> for every mounted root
-  const scopes = new Map();         // island name -> WeakRef<view>
-  const dirty = new Set();
-  const afterRender = [];
-  const mounted = new WeakSet();    // elements whose `on mount` has run
-  let memoNode = null;              // the element memoHit() found
-  /** Where a hole is: its call key and the keys around it (each length-prefixed, so none collide). */
-  const here = () => keys.map(k => k.value.length + ':' + k.value).join('|');
-  const identities = new WeakMap(); // element -> its identity (its data-wutu attribute)
-  let frames = [], active = null, keys = [], scheduled = false, generation = 0;
-  // The element (and its view) whose `on mount` or event handler is running: interval()'s owner outside a render.
-  let owner = null;
-  const timers = new Map();         // intervals no view owns
-  // A component's root, claimed loose: { root, index, used } for the render under `root`.
+  const fragments = new WeakMap, ranges = new WeakMap;
+  function rangeNodes(range, inclusive = !0) {
+    if (range.pending)
+      return inclusive ? [range.start, ...range.pending, range.end] : range.pending;
+    const nodes = [];
+    for (let node = inclusive ? range.start : range.start.nextSibling;node; node = node.nextSibling) {
+      if (node === range.end) {
+        if (inclusive)
+          nodes.push(node);
+        break;
+      }
+      nodes.push(node);
+    }
+    return nodes;
+  }
+  function connected(value) {
+    if (Array.isArray(value))
+      return value.every(connected);
+    const range = fragments.get(value);
+    return range ? range.start.isConnected && range.end.isConnected : !!value?.isConnected;
+  }
+  function descendants(root) {
+    const range = fragments.get(root);
+    if (!range)
+      return root?.querySelectorAll?.("[data-wutu]") ?? [];
+    return rangeNodes(range, !1).flatMap((node) => node.nodeType === 1 ? [node, ...node.querySelectorAll("[data-wutu]")] : []);
+  }
+  function fragment() {
+    const parent = frames.at(-1);
+    let from = 0, global = !1, explicit = !1;
+    for (let i = 0;i < keys.length; i++) {
+      if (keys[i].global) {
+        from = i;
+        global = keys[i].depth === frames.length;
+      }
+      if (keys[i].explicit)
+        explicit = keys[i].depth === frames.length;
+    }
+    const key = parent ? keys.slice(from).map((k) => `${k.explicit ? "k" : "c"}${k.value.length}:${k.value}`).join(":") : active?.scope ?? "", identity = `wutu:${run.h}:${encodeURIComponent(key)}`;
+    claimIdentity(parent, identity, global, explicit);
+    const index = (nodes) => {
+      const result = new Map;
+      for (const node of nodes)
+        if (node.nodeType === 8 && node.data.startsWith("wutu:")) {
+          let queue = result.get(node.data);
+          if (!queue)
+            result.set(node.data, queue = { nodes: [], index: 0 });
+          queue.nodes.push(node);
+        }
+      return result;
+    }, take = (map) => {
+      const queue = map.get(identity);
+      while (queue && queue.index < queue.nodes.length) {
+        const node = queue.nodes[queue.index++];
+        if (!parent?.used.has(node) && !loose?.used.has(node))
+          return node;
+      }
+    };
+    let start = parent && take(parent.ranges ??= index(parent.old));
+    if (!start && !parent)
+      start = fragments.get(active?.root)?.start;
+    if (!start) {
+      const outer = frames[0]?.node;
+      if (!loose || loose.root !== outer)
+        loose = { root: outer, index: null, used: new Set };
+      if (!loose.comments) {
+        const comments = [], scan = (node) => {
+          if (node.nodeType === 8 && (parent || !ranges.has(node)))
+            comments.push(node);
+          for (const child of node.childNodes ?? [])
+            scan(child);
+        }, outerRange = fragments.get(outer);
+        if (outerRange)
+          for (const node of rangeNodes(outerRange, !1))
+            scan(node);
+        else
+          scan(outer ?? document);
+        loose.comments = index(comments);
+      }
+      start = take(loose.comments);
+    }
+    let range = start && ranges.get(start);
+    if (!range && start) {
+      let end = start.nextSibling;
+      while (end && !(end.nodeType === 8 && end.data === "/" + identity))
+        end = end.nextSibling;
+      if (end)
+        range = { start, end, value: document.createDocumentFragment() };
+    }
+    if (!range) {
+      const value = document.createDocumentFragment();
+      range = { value, start: document.createComment(identity), end: document.createComment("/" + identity) };
+      value.append(range.start, range.end);
+    }
+    fragments.set(range.value, range);
+    ranges.set(range.start, range);
+    if (parent)
+      parent.used.add(range.start);
+    loose?.used.add(range.start);
+    run.fragment = range;
+    frames.push({ node: range.value, range, old: rangeNodes(range, !1), used: new Set, wanted: [], byKey: null, keyed: null });
+  }
+  const metadata = new WeakMap, listeners = new WeakMap, views = new Set, scopes = new Map, dirty = new Set, afterRender = [], mounted = new WeakSet;
+  let memoNode = null;
+  const here = () => keys.map((k) => k.value.length + ":" + k.value).join("|"), identities = new WeakMap;
+  let frames = [], active = null, keys = [], scheduled = !1, generation = 0, owner = null;
+  const timers = new Map;
   let loose = null;
-
   function autoSave() {
     api.autoSave?.();
   }
-
   function invalidate(name) {
     const view = scopes.get(name)?.deref();
-    if (!view) return;
-    view.dirty = true;
+    if (!view)
+      return;
+    view.dirty = !0;
     schedule(view);
   }
-
-  const NO_ATTRS = new Set();
-  const selectValues = new WeakMap(); // select -> the value a render gave it
-
-  /** A select's value (`bind:value`): set now, and again once its options are in place. */
+  const NO_ATTRS = new Set, selectValues = new WeakMap;
   function selectValue(node, value) {
     selectValues.set(node, value);
-    if (node.value !== value) node.value = value;
+    if (node.value !== value)
+      node.value = value;
   }
-
-  /** An element's identity, from its attribute the first time (a prerendered one). */
   function identityOfNode(node) {
     let identity = identities.get(node);
-    if (identity === undefined) identities.set(node, identity = node.getAttribute('data-wutu'));
+    if (identity === void 0)
+      identities.set(node, identity = node.getAttribute("data-wutu"));
     return identity;
   }
-
-  /** Make `parent`'s children exactly `wanted`, moving nodes and keeping focus. */
-  function place(parent, wanted) {
-    // Usually they already are.
-    const children = parent.childNodes;
+  function place(parent, wanted, range = null) {
+    const children = range ? rangeNodes(range, !1) : parent.childNodes;
     if (children.length === wanted.length) {
-      let same = true;
-      for (let i = 0; same && i < wanted.length; i++) same = children[i] === wanted[i];
-      if (same) return;
+      let same = !0;
+      for (let i = 0;same && i < wanted.length; i++)
+        same = children[i] === wanted[i];
+      if (same)
+        return;
     }
-    const focused = document.activeElement;
-    const selection = focused && 'selectionStart' in focused
-      ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection]
-      : null;
-    let cursor = parent.firstChild;
+    const focused = document.activeElement, selection = focused && "selectionStart" in focused ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection] : null;
+    let cursor = range ? range.start.nextSibling : parent.firstChild;
     for (const node of wanted) {
-      if (node === cursor) { cursor = cursor.nextSibling; continue; }
-      if (parent.moveBefore && node.parentNode === parent) parent.moveBefore(node, cursor);
-      else parent.insertBefore(node, cursor);
+      if (node === cursor) {
+        cursor = cursor.nextSibling;
+        continue;
+      }
+      if (parent.moveBefore && node.parentNode === parent)
+        parent.moveBefore(node, cursor);
+      else
+        parent.insertBefore(node, cursor);
     }
     const keep = new Set(wanted);
-    for (const node of [...parent.childNodes]) {
-      if (keep.has(node)) continue;
-      // The page's <head> (an `html { }` template may not write one) and Wutu's own
-      // stylesheets in it are no template's to drop.
-      if (node.nodeType === 1 && (node.nodeName === 'HEAD' || node.hasAttribute('data-wutu-style'))) continue;
-      // During a render, removal waits: a globally keyed node may reappear elsewhere.
-      if (active) active.removals.add(node);
-      else { dispose(node); node.remove(); }
+    for (const node of [...children]) {
+      if (keep.has(node))
+        continue;
+      if (node.nodeType === 1 && (node.nodeName === "HEAD" || node.hasAttribute("data-wutu-style")))
+        continue;
+      if (active)
+        active.removals.add(node);
+      else {
+        dispose(node);
+        node.remove();
+      }
     }
     if (focused?.isConnected && document.activeElement !== focused) {
-      focused.focus({ preventScroll: true });
-      if (selection?.[0] != null) focused.setSelectionRange(...selection);
+      focused.focus({ preventScroll: !0 });
+      if (selection?.[0] != null)
+        focused.setSelectionRange(...selection);
     }
   }
-
   function claimIdentity(parent, identity, global, explicit) {
     if (global && active) {
-      if (active.globalClaims.has(identity)) throw new Error('Duplicate global Wutu key: ' + identity);
+      if (active.globalClaims.has(identity))
+        throw Error("Duplicate global Wutu key: " + identity);
       active.globalClaims.add(identity);
     }
     if (explicit && parent) {
-      parent.keyed ??= new Set();
-      if (parent.keyed.has(identity)) throw new Error('Duplicate Wutu key: ' + keys.findLast(k => k.explicit).value);
+      parent.keyed ??= new Set;
+      if (parent.keyed.has(identity))
+        throw Error("Duplicate Wutu key: " + keys.findLast((k) => k.explicit).value);
       parent.keyed.add(identity);
     }
   }
-
-  /** The previous render's element for this identity, if one can be reused. */
   function reusable(parent, identity, tag, global) {
-    // Usually it is where it was last time.
     const at = parent?.old[parent.wanted.length];
-    if (at?.nodeType === 1 && at.localName === tag && identityOfNode(at) === identity && !parent.used.has(at)) return at;
+    if (at?.nodeType === 1 && at.localName === tag && identityOfNode(at) === identity && !parent.used.has(at))
+      return at;
     const queue = parent && byKey(parent).get(identity);
     while (queue && queue.index < queue.nodes.length) {
       const candidate = queue.nodes[queue.index++];
-      if (!parent.used.has(candidate) && candidate.localName === tag) return candidate;
+      if (!parent.used.has(candidate) && candidate.localName === tag)
+        return candidate;
     }
-    return global ? globalNode(identity) : undefined;
+    return global ? globalNode(identity) : void 0;
   }
-
-  /** A frame's previous child elements by identity (indexed when first asked). */
   function byKey(frame) {
-    if (frame.byKey) return frame.byKey;
-    frame.byKey = new Map();
+    if (frame.byKey)
+      return frame.byKey;
+    frame.byKey = new Map;
     for (const child of frame.old) {
-      if (child.nodeType !== 1) continue;
+      if (child.nodeType !== 1)
+        continue;
       const identity = identityOfNode(child);
       let queue = frame.byKey.get(identity);
-      if (!queue) frame.byKey.set(identity, queue = { nodes: [], index: 0 });
+      if (!queue)
+        frame.byKey.set(identity, queue = { nodes: [], index: 0 });
       queue.nodes.push(child);
     }
     return frame.byKey;
   }
-
-  /** The view's element of a global identity, from before this render (indexed when first asked). */
   function globalNode(identity) {
-    if (!active) return undefined;
+    if (!active)
+      return;
     if (!active.globalNodes) {
-      active.globalNodes = new Map();
-      for (const node of active.root?.querySelectorAll('[data-wutu]') ?? []) active.globalNodes.set(identityOfNode(node), node);
+      active.globalNodes = new Map;
+      for (const node of descendants(active.root))
+        active.globalNodes.set(identityOfNode(node), node);
     }
     return active.globalNodes.get(identity);
   }
-
-  /**
-   * A component's root from the last render, wherever it was placed: an
-   * argument to another component lands inside it, not in the frame open
-   * while it is made. (By identity, from the outermost element's subtree.)
-   */
   function looseNode(identity, tag) {
     const root = frames[0]?.node;
-    if (loose?.root !== root) loose = { root, index: null, used: new Set() };
+    if (loose?.root !== root)
+      loose = { root, index: null, used: new Set };
     if (!loose.index) {
-      loose.index = new Map();
-      for (const node of root?.querySelectorAll('[data-wutu]') ?? []) {
+      loose.index = new Map;
+      for (const node of descendants(root)) {
         const id = identityOfNode(node);
-        if (!loose.index.has(id)) loose.index.set(id, node);
+        if (!loose.index.has(id))
+          loose.index.set(id, node);
       }
     }
     const node = loose.index.get(identity);
-    if (!node || node.localName !== tag || loose.used.has(node)) return undefined;
+    if (!node || node.localName !== tag || loose.used.has(node))
+      return;
     loose.used.add(node);
     return node;
   }
-
-  /**
-   * The element for `site` here: last render's, a prerendered one, or what
-   * `make()` makes. It joins its parent's children where it is entered,
-   * except a component's root (`isLoose`): it joins those of the frame its
-   * value is put in (append()).
-   */
   function claim(site, key, tag, make, isLoose) {
     const parent = frames.at(-1);
-    // Identity: the site, then the keys pushed since the last global key.
-    let identity = site + (key ? ':' + key : ''), global = false, explicit = false;
+    let identity = site + (key ? ":" + key : ""), global = !1, explicit = !1;
     if (keys.length) {
-      // Keys are checked for duplicates where they are pushed: below that,
-      // an identity is unique when its key is.
       let from = 0;
-      for (let i = 0; i < keys.length; i++) {
-        if (keys[i].global) { from = i; global = keys[i].depth === frames.length; }
-        if (keys[i].explicit) explicit = keys[i].depth === frames.length;
+      for (let i = 0;i < keys.length; i++) {
+        if (keys[i].global) {
+          from = i;
+          global = keys[i].depth === frames.length;
+        }
+        if (keys[i].explicit)
+          explicit = keys[i].depth === frames.length;
       }
-      for (let i = from; i < keys.length; i++) {
+      for (let i = from;i < keys.length; i++) {
         const k = keys[i];
-        identity += `:${k.explicit ? 'k' : 'c'}${k.value.length}:${k.value}`;
+        identity += `:${k.explicit ? "k" : "c"}${k.value.length}:${k.value}`;
       }
     }
     claimIdentity(parent, identity, global, explicit);
     let node = reusable(parent, identity, tag, global);
-    if (isLoose && parent) node ??= looseNode(identity, tag);
-    else if (node) active?.retained.add(node);
-    // A root reuses its own previous element, or adopts prerendered markup:
-    // its controls, disabled until now, take input again (but a lazy
-    // placeholder's, until its chunk replaces them).
-    if (!parent) node = active?.root ?? document.querySelector(`[data-wutu-root="${site}"][data-wutu-prerender]`);
-    if (node?.hasAttribute('data-wutu-prerender')) {
-      node.removeAttribute('data-wutu-prerender');
-      for (const control of [node, ...node.querySelectorAll('[data-wutu-pending]')]) {
-        if (!control.hasAttribute('data-wutu-pending') || control.parentNode?.closest('[data-wutu-lazy]')) continue;
-        control.disabled = false;
-        control.removeAttribute('data-wutu-pending');
+    if (isLoose && parent)
+      node ??= looseNode(identity, tag);
+    else if (node)
+      active?.retained.add(node);
+    if (!parent)
+      node = active?.root ?? document.querySelector(`[data-wutu-root="${site}"][data-wutu-prerender]`);
+    if (node?.hasAttribute("data-wutu-prerender")) {
+      node.removeAttribute("data-wutu-prerender");
+      for (const control of [node, ...node.querySelectorAll("[data-wutu-pending]")]) {
+        if (!control.hasAttribute("data-wutu-pending") || control.parentNode?.closest("[data-wutu-lazy]"))
+          continue;
+        control.disabled = !1;
+        control.removeAttribute("data-wutu-pending");
       }
     }
-    if (!node || node.localName !== tag) node = make();
-    if (parent) parent.used.add(node);
-    if (parent && !isLoose) parent.wanted.push(node);
+    if (!node || node.localName !== tag)
+      node = make();
+    if (parent)
+      parent.used.add(node);
+    if (parent && !isLoose) {
+      parent.wanted.push(node);
+      parent.appended?.add(node);
+    }
     if (identities.get(node) !== identity) {
-      node.setAttribute('data-wutu', identity);
+      node.setAttribute("data-wutu", identity);
       identities.set(node, identity);
     }
     if (!parent) {
-      if (node.getAttribute('data-wutu-root') !== site) node.setAttribute('data-wutu-root', site);
-      if (active) active.root = node;
+      if (node.getAttribute("data-wutu-root") !== site)
+        node.setAttribute("data-wutu-root", site);
+      if (active)
+        active.root = node;
     }
     return node;
   }
-
-  /**
-   * Begin an element's children; `kept` names the attributes it has from its
-   * shell, which no render sets, and `set` (when known) those a render may set.
-   * (`old` is the live child list: they move only when this frame leaves.)
-   */
   function open(node, kept, set) {
-    // An element first seen (made, or prerendered) has had no render set its
-    // attributes: those it has now that a render may set (else all but its
-    // shell's) are what this render may drop. (A prerendered style or
-    // property-set attribute stays: no render sets it as an attribute.)
-    const meta = metadata.get(node);
-    const before = meta ? null : new Set([...node.attributes].map(a => a.name)
-      .filter(name => set ? set.has(name) : !name.startsWith('data-wutu') && !kept.includes(name)));
-    frames.push({ node, meta, before, old: node.childNodes, used: new Set(), wanted: [], attrs: null, byKey: null, keyed: null });
+    const meta = metadata.get(node), before = meta ? null : new Set([...node.attributes].map((a) => a.name).filter((name) => set ? set.has(name) : !name.startsWith("data-wutu") && !kept.includes(name)));
+    frames.push({ node, meta, before, old: node.childNodes, used: new Set, wanted: [], attrs: null, byKey: null, keyed: null });
     return node;
   }
-
   function enter(tag, svg, site, key) {
-    return open(claim(site, key, tag, () =>
-      svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag)), []);
+    return open(claim(site, key, tag, () => svg ? document.createElementNS("http://www.w3.org/2000/svg", tag) : document.createElement(tag)), []);
   }
-
-  // A description already parsed (a template program's): by the array itself.
-  const trees = new WeakMap();
+  const trees = new WeakMap;
   function prototypeOfTree(tree, svg) {
     let entry = trees.get(tree);
-    if (!entry) trees.set(tree, entry = prototypeOf(tree, svg));
+    if (!entry)
+      trees.set(tree, entry = prototypeOf(tree, svg));
     return entry;
   }
-
   function prototypeOf(tree, svg) {
     const build = ([tag, attributes, ...children], svg) => {
-      svg = svg || tag === 'svg';
-      const element = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
-      for (const name in attributes) setAttr(element, name, attributes[name]);
-      const childSvg = svg && tag !== 'foreignObject';
-      for (const child of children) element.append(typeof child === 'string' ? child : build(child, childSvg));
+      svg = svg || tag === "svg";
+      const element = svg ? document.createElementNS("http://www.w3.org/2000/svg", tag) : document.createElement(tag);
+      for (const name in attributes)
+        setAttr(element, name, attributes[name]);
+      const childSvg = svg && tag !== "foreignObject";
+      for (const child of children)
+        element.append(typeof child === "string" ? child : build(child, childSvg));
       return element;
     };
     return [build(tree, svg), Object.keys(tree[1])];
   }
-
-  /** Append a node (a component or slot) or text, reusing the text node in this position. */
   function append(value) {
-    const frame = frames.at(-1);
+    const frame = frames.at(-1), range = fragments.get(value);
+    if (range || Array.isArray(value) || value?.nodeType === 11) {
+      for (const child of range ? rangeNodes(range) : Array.isArray(value) ? value : [...value.childNodes])
+        append(child);
+      return;
+    }
     if (value?.nodeType) {
-      if (!frame.wanted.includes(value)) { frame.used.add(value); frame.wanted.push(value); }
-      // (Moved here from its old parent: that parent's place() must not remove it.)
+      frame.appended ??= new Set(frame.wanted);
+      if (!frame.appended.has(value)) {
+        frame.appended.add(value);
+        frame.used.add(value);
+        frame.wanted.push(value);
+      }
       active?.retained.add(value);
       return;
     }
-    const text = String(value ?? '');
+    const text = String(value ?? "");
     let node = frame.old[frame.wanted.length];
-    if (!node || node.nodeType !== 3 || frame.used.has(node)) node = document.createTextNode(text);
-    else if (node.data !== text) node.data = text;
+    if (!node || node.nodeType !== 3 || frame.used.has(node))
+      node = document.createTextNode(text);
+    else if (node.data !== text)
+      node.data = text;
     frame.used.add(node);
     frame.wanted.push(node);
   }
-
-  /** Set an attribute for this render; null/false remove it, true sets it empty. */
   function attr(node, name, value) {
-    (frames.at(-1).attrs ??= new Set()).add(name);
-    if (value === null || value === false || !safe(node, name, value)) {
+    (frames.at(-1).attrs ??= new Set).add(name);
+    if (value === null || value === !1 || !safe(node, name, value)) {
       node.removeAttribute(name);
       return;
     }
-    const text = value === true ? '' : String(value);
-    if (node.getAttribute(name) !== text) setAttr(node, name, text);
+    const text = value === !0 ? "" : String(value);
+    if (node.getAttribute(name) !== text)
+      setAttr(node, name, text);
   }
-
-  /** setAttribute, in its namespace for `xlink:href`, `xml:lang`, `xmlns:xlink`. */
   function setAttr(node, name, text) {
-    const ns = { xlink: 'http://www.w3.org/1999/xlink', xml: 'http://www.w3.org/XML/1998/namespace',
-      xmlns: 'http://www.w3.org/2000/xmlns/' }[name.split(':', 1)[0]];
-    if (ns && name.includes(':')) node.setAttributeNS(ns, name, text);
-    else node.setAttribute(name, text);
+    const ns = {
+      xlink: "http://www.w3.org/1999/xlink",
+      xml: "http://www.w3.org/XML/1998/namespace",
+      xmlns: "http://www.w3.org/2000/xmlns/"
+    }[name.split(":", 1)[0]];
+    if (ns && name.includes(":"))
+      node.setAttributeNS(ns, name, text);
+    else
+      node.setAttribute(name, text);
   }
-
-  // Attributes (and their properties) a browser follows or loads as a URL.
-  const URLS = new Set(['href', 'xlink:href', 'src', 'action', 'formaction', 'poster', 'cite', 'data',
-    'background', 'codebase', 'longdesc', 'manifest']);
-  // Attributes that hold several URLs, apart at whitespace (or commas).
-  const LISTS = new Set(['ping', 'srcset', 'imagesrcset']);
-  /**
-   * Whether a value from a render may go in attribute `name` (a name the
-   * compiler checked: no event handler's): srcdoc (HTML) takes none; a URL
-   * one takes no javascript: or vbscript: URL, and a data: URL only of an
-   * image, audio or video (an SVG one only in an img or SVG image, where it
-   * runs no script), or any in the href of an a or area with a download (it
-   * is saved, not opened);
-   * ping and srcset check each of theirs; a meta's content (a refresh's URL)
-   * has none of these schemes anywhere. A URL is read as a browser reads it:
-   * in any case, whitespace and control characters dropped.
-   */
+  const URLS = new Set([
+    "href",
+    "xlink:href",
+    "src",
+    "action",
+    "formaction",
+    "poster",
+    "cite",
+    "data",
+    "background",
+    "codebase",
+    "longdesc",
+    "manifest"
+  ]), LISTS = new Set(["ping", "srcset", "imagesrcset"]);
   function safe(node, name, value) {
     name = name.toLowerCase();
-    if (name === 'srcdoc') return false;
-    if (value === true) return true;
+    if (name === "srcdoc")
+      return !1;
+    if (value === !0)
+      return !0;
     value = String(value);
-    if (URLS.has(name)) return scheme(node, name, value);
-    if (LISTS.has(name)) return value.split(/[ ,]+/).every(u => scheme(node, name, u));
-    return name !== 'content' || node.localName !== 'meta' || !/javascript:|vbscript:|data:/.test(bare(value));
+    if (URLS.has(name))
+      return scheme(node, name, value);
+    if (LISTS.has(name))
+      return value.split(/[ ,]+/).every((u) => scheme(node, name, u));
+    return name !== "content" || node.localName !== "meta" || !/javascript:|vbscript:|data:/.test(bare(value));
   }
-
-  /** value's first n characters past whitespace and controls, which it drops, in lower case. */
   function bare(value, n = 1 / 0) {
-    let s = '';
-    for (const c of value) if (c > ' ' && (s += c).length >= n) break;
+    let s = "";
+    for (const c of value)
+      if (c > " " && (s += c).length >= n)
+        break;
     return s.toLowerCase();
   }
-
-  /** Whether one URL's scheme may go in node's attribute `name` (see safe). */
   function scheme(node, name, value) {
     const s = bare(value, 16), tag = node.localName;
-    if (/^(java|vb)script:/.test(s)) return false;
-    if (!s.startsWith('data:') || name === 'href' && (tag === 'a' || tag === 'area') && node.hasAttribute('download')) return true;
-    if (s.startsWith('data:image/svg')) return tag === 'img' || tag === 'image';
+    if (/^(java|vb)script:/.test(s))
+      return !1;
+    if (!s.startsWith("data:") || name === "href" && (tag === "a" || tag === "area") && node.hasAttribute("download"))
+      return !0;
+    if (s.startsWith("data:image/svg"))
+      return tag === "img" || tag === "image";
     return /^data:(image|audio|video)[/]/.test(s);
   }
-
-  /** A URL property set by a render (`.href = …`): as its attribute is, else the attribute goes. */
   function url(node, name, value) {
-    if (safe(node, name, value)) node[name] = value;
-    else node.removeAttribute(name.toLowerCase());
+    if (safe(node, name, value))
+      node[name] = value;
+    else
+      node.removeAttribute(name.toLowerCase());
   }
-
-  /**
-   * One DOM listener per element and event; each render replaces the handlers
-   * it calls, so closures always see the latest captures. Handling an event
-   * saves stores and schedules the owning view, unless every handler that ran
-   * was quiet (`~event`: it changed only DOM the template does not read).
-   * `mount` is no DOM event: its handler runs once per element, after the
-   * render that made it.
-   */
   function listen(node, event, handler) {
-    if (event === 'mount') {
-      if (mounted.has(node)) return;
+    if (event === "mount") {
+      if (mounted.has(node))
+        return;
       mounted.add(node);
       const view = active;
       queueMicrotask(() => {
         const outer = owner;
         owner = [node, view];
-        try { handler(new Event('mount')); } finally { owner = outer; }
+        try {
+          handler(new Event("mount"));
+        } finally {
+          owner = outer;
+        }
         autoSave();
-        if (view) schedule(view);
+        if (view)
+          schedule(view);
       });
       return;
     }
-    const quiet = event[0] === '~';
-    if (quiet) event = event.slice(1);
+    const quiet = event[0] === "~";
+    if (quiet)
+      event = event.slice(1);
     let map = listeners.get(node);
-    if (!map) listeners.set(node, map = new Map());
+    if (!map)
+      listeners.set(node, map = new Map);
     let record = map.get(event);
     if (!record) {
       record = { handlers: [], generation: -1, view: active };
       map.set(event, record);
-      node.addEventListener(event, e => {
-        let loud = false;
+      node.addEventListener(event, (e) => {
+        let loud = !1;
         const outer = owner;
         owner = [node, record.view];
         try {
           for (const [current, isQuiet] of [...record.handlers]) {
-            if (!isQuiet) loud = true;
+            if (!isQuiet)
+              loud = !0;
             const result = current(e);
-            if (result?.then) result.then(refresh, error => { refresh(); setTimeout(() => { throw error; }); });
+            if (result?.then)
+              result.then(refresh, (error) => {
+                refresh();
+                setTimeout(() => {
+                  throw error;
+                });
+              });
           }
         } finally {
           owner = outer;
           if (loud) {
             autoSave();
-            if (record.view) schedule(record.view);
+            if (record.view)
+              schedule(record.view);
           }
         }
       });
@@ -392,111 +489,96 @@ mod wutu {
     record.handlers.push([handler, quiet]);
     record.view = active;
   }
-
   function leave() {
     const frame = frames.pop(), node = frame.node, attrs = frame.attrs ?? NO_ATTRS;
-    // `@unmanaged`: its children, and attributes the template does not set, are JavaScript's.
-    if (node.hasAttribute('data-wutu-unmanaged')) {
-      // (Prerendered, what JavaScript drew is drawn again by its `on mount`.)
-      if (!frame.meta) node.replaceChildren();
+    if (node.hasAttribute("data-wutu-unmanaged")) {
+      if (!frame.meta)
+        node.replaceChildren();
       metadata.set(node, { ...metadata.get(node), attrs });
       return node;
     }
-    // The attributes a render set last time and not this time go.
     const meta = frame.meta;
-    for (const name of meta ? meta.attrs : frame.before) if (!attrs.has(name)) node.removeAttribute(name);
-    if (meta) meta.attrs = attrs;
-    else metadata.set(node, { attrs });
+    for (const name of meta ? meta.attrs : frame.before)
+      if (!attrs.has(name))
+        node.removeAttribute(name);
+    if (meta)
+      meta.attrs = attrs;
+    else
+      metadata.set(node, { attrs });
     place(node, frame.wanted);
     const value = selectValues.get(node);
-    if (value !== undefined && node.value !== value) node.value = value;
+    if (value !== void 0 && node.value !== value)
+      node.value = value;
     return node;
   }
-
-  // ── Template programs ──────────────────────────────────────────────────────
-  //
-  // A template compiled to data: its structure as a program of ops (JSON),
-  // run here as the module supplies its values, in order. Static ops run
-  // as soon as they are reached; a hole waits for its call:
-  //
-  //   ["s", i, tree, svg?]   a still subtree, element i
-  //   ["o", i, tree, svg?]   open element i from its shell; ["c"] closes it
-  //   ["t", text]            written text
-  //   ["a", name] ["m", classes] ["b", name] ["y", property]
-  //                          an attribute, a class merged after the static
-  //                          ones, a boolean attribute, a style value: put()
-  //   ["x", p] ["w"]         a value (with a call key, from slot()), a text: put()
-  //   ["v", i, event]        a listener on element i (`~event` quiet, `mount`
-  //                          once): put()
-  //   ["n", i]               element i, to the module: node()
-  //   ["i", then, else]      an if: arm()
-  //   ["f", mode, p, body]   a loop (mode 0 by index, 1 keyed, 2 globally
-  //                          keyed): item() per iteration, end() after
-  const programs = new Map();      // program text -> [its ops, its hash]
-  const BODY_END = ['end'];
-  let run = null;                  // the template running: { h, nodes, stack, loop }
-
-  /**
-   * A template begins. It is known by its program's hash (FNV-1a, base 36):
-   * the same on every render and in prerendered markup. (Two templates alike
-   * to the byte would share it, and could only share elements alike too.)
-   */
+  const programs = new Map, BODY_END = ["end"];
+  let run = null;
   function begin(text) {
     let program = programs.get(text);
     if (!program) {
       let n = 2166136261;
-      for (let i = 0; i < text.length; i++) n = Math.imul(n ^ text.charCodeAt(i), 16777619);
+      for (let i = 0;i < text.length; i++)
+        n = Math.imul(n ^ text.charCodeAt(i), 16777619);
       programs.set(text, program = [JSON.parse(text), (n >>> 0).toString(36)]);
     }
-    run = { h: program[1], nodes: [], stack: [{ ops: program[0], pc: 0, kind: 'top' }], outer: run, pending: null };
+    run = { h: program[1], nodes: [], stack: [{ ops: program[0], pc: 0, kind: "top" }], outer: run, pending: null, depth: frames.length, fragment: null };
   }
-
-  /** The attributes the ops after an 'o' (at `pc`) set: its a, m and b ops (by op list, then index). */
-  const settables = new WeakMap();
+  const settables = new WeakMap;
   function settable(ops, pc) {
     let byPc = settables.get(ops);
-    if (!byPc) settables.set(ops, byPc = []);
+    if (!byPc)
+      settables.set(ops, byPc = []);
     let names = byPc[pc];
     if (!names) {
-      names = byPc[pc] = new Set();
-      for (let i = pc; i < ops.length; i++) {
+      names = byPc[pc] = new Set;
+      for (let i = pc;i < ops.length; i++) {
         const [kind, name] = ops[i];
-        if (kind === 'a' || kind === 'b') names.add(name);
-        else if (kind === 'm') names.add('class');
-        else if (kind !== 'n' && kind !== 'y') break;
+        if (kind === "a" || kind === "b")
+          names.add(name);
+        else if (kind === "m")
+          names.add("class");
+        else if (kind !== "n" && kind !== "y")
+          break;
       }
     }
     return names;
   }
-
-  /** Run static ops up to the next hole, and return it (BODY_END at a loop body's end, null at the end). */
   function advance() {
-    for (;;) {
+    for (;; ) {
       const top = run.stack.at(-1);
       if (top.pc >= top.ops.length) {
-        if (top.kind === 'arm') { run.stack.pop(); continue; }
-        return top.kind === 'body' ? BODY_END : null;
+        if (top.kind === "arm") {
+          run.stack.pop();
+          continue;
+        }
+        return top.kind === "body" ? BODY_END : null;
       }
       const op = top.ops[top.pc++];
       switch (op[0]) {
-        case 's': {
+        case "r":
+          fragment();
+          break;
+        case "s": {
           const [element] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(true), op[1] === 0);
+          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, "", element.localName, () => element.cloneNode(!0), frames.length === run.depth);
           break;
         }
-        case 'o': {
+        case "o": {
           const [element, names] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false), op[1] === 0), names, settable(top.ops, top.pc));
+          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, "", element.localName, () => element.cloneNode(!1), frames.length === run.depth), names, settable(top.ops, top.pc));
           break;
         }
-        case 'c': leave(); break;
-        case 't': append(op[1]); break;
-        default: return op;
+        case "c":
+          leave();
+          break;
+        case "t":
+          append(op[1]);
+          break;
+        default:
+          return op;
       }
     }
   }
-
-  /** A value for the next hole. */
   function put(value) {
     if (run?.pending) {
       run.pending = null;
@@ -504,83 +586,109 @@ mod wutu {
       keys.pop();
       return;
     }
-    if (!run) { append(value); keys.pop(); return; }  // (from code made before programs)
+    if (!run) {
+      append(value);
+      keys.pop();
+      return;
+    }
     const op = advance(), node = frames.at(-1)?.node;
     switch (op[0]) {
-      case 'a': attr(node, op[1], value); break;
-      case 'm': attr(node, 'class', op[1] + value); break;
-      case 'b': attr(node, op[1], !!value); break;
-      case 'y': (frames.at(-1).attrs ??= new Set()).add('style'); node.style.setProperty(op[1], value); break;
-      case 'w': append(value); break;
-      case 'v': listen(run.nodes[op[1]], op[2], value); break;
-      default: throw new Error('Wutu: a value where the template has ' + JSON.stringify(op?.[0]));
+      case "a":
+        attr(node, op[1], value);
+        break;
+      case "m":
+        attr(node, "class", op[1] + value);
+        break;
+      case "b":
+        attr(node, op[1], !!value);
+        break;
+      case "y":
+        (frames.at(-1).attrs ??= new Set).add("style");
+        node.style.setProperty(op[1], value);
+        break;
+      case "w":
+        append(value);
+        break;
+      case "v":
+        listen(run.nodes[op[1]], op[2], value);
+        break;
+      default:
+        throw Error("Wutu: a value where the template has " + JSON.stringify(op?.[0]));
     }
   }
-
-  /** Before a value that may render (a component): its call key. */
   function slot() {
     const op = advance();
-    keys.push({ value: `call:${run.h}:${op[1]}`, explicit: false });
+    keys.push({ value: `call:${run.h}:${op[1]}`, explicit: !1 });
     run.pending = op;
   }
-
-  /** An if takes its then (1) or else (0) arm. */
   function arm(which) {
     const op = advance();
-    run.stack.push({ ops: which ? op[1] : op[2], pc: 0, kind: 'arm' });
+    run.stack.push({ ops: which ? op[1] : op[2], pc: 0, kind: "arm" });
   }
-
-  /** Ends the current iteration, if any; returns the loop. */
   function iteration() {
     const op = advance();
-    if (op !== BODY_END) return [op, null];
+    if (op !== BODY_END)
+      return [op, null];
     const body = run.stack.at(-1);
     keys.pop();
-    if (body.loop[1] === 0) keys.pop();
+    if (body.loop[1] === 0)
+      keys.pop();
     return [body.loop, body];
   }
-
-  /** The next iteration of a loop, known by `key` (its index, unkeyed). */
   function item(key) {
     const [loop, body] = iteration();
-    if (body) body.pc = 0;
-    else run.stack.push({ ops: loop[3], pc: 0, kind: 'body', loop });
+    if (body)
+      body.pc = 0;
+    else
+      run.stack.push({ ops: loop[3], pc: 0, kind: "body", loop });
     const value = String(key), mode = loop[1];
     if (mode === 0) {
-      keys.push({ value: `loop:${run.h}:${loop[2]}`, explicit: false });
-      keys.push({ value, explicit: false });
-    } else {
-      keys.push({ value, explicit: true, global: mode === 2, depth: frames.length });
-    }
+      keys.push({ value: `loop:${run.h}:${loop[2]}`, explicit: !1 });
+      keys.push({ value, explicit: !1 });
+    } else
+      keys.push({ value, explicit: !0, global: mode === 2, depth: frames.length });
   }
-
-  /** After a loop's last iteration. */
   function end() {
     const [, body] = iteration();
-    if (body) run.stack.pop();
+    if (body)
+      run.stack.pop();
   }
-
-  /** The element a node op names. */
-  function node() { return run.nodes[advance()[1]]; }
-
-  /** The template's end: its root element. */
+  function node() {
+    return run.nodes[advance()[1]];
+  }
   function done() {
-    while (advance() !== null) { /* (only static ops remain) */ }
-    const root = run.nodes[0];
+    while (advance() !== null)
+      ;
+    let root = run.nodes[0];
+    if (run.fragment) {
+      const frame = frames.pop(), range = run.fragment;
+      place(range.start.parentNode, frame.wanted, range);
+      if (active) {
+        range.pending = frame.wanted;
+        (active.pendingRanges ??= new Set).add(range);
+      }
+      root = range.value;
+      if (run.depth === 0) {
+        for (const node of frame.wanted)
+          if (node.nodeType === 1)
+            node.setAttribute("data-wutu-root", `fragment:${run.h}`);
+      }
+    }
     run = run.outer;
-    if (!run) loose = null;
+    if (!run)
+      loose = null;
     return root;
   }
-
   function render(view) {
-    const previous = [frames, active, keys, loose], focused = document.activeElement;
+    const previous = [frames, active, keys, loose, run], focused = document.activeElement;
     view.cleanupIndex = 0;
     view.cleanupCallbacks ??= [];
-    view.intervalsSeen = new Set();
-    view.removals = new Set();
-    view.retained = new Set();
+    view.intervalsSeen = new Set;
+    view.removals = new Set;
+    view.pendingRanges = null;
+    view.retained = new Set;
     view.globalNodes = null;
-    view.globalClaims = new Set();
+    view.globalClaims = new Set;
     frames = [];
     active = view;
     keys = [];
@@ -588,148 +696,195 @@ mod wutu {
     generation++;
     try {
       view.root = view.render();
-      // cleanup() registrations are positional: ones not repeated this render run now.
-      for (const callback of view.cleanupCallbacks.splice(view.cleanupIndex)) callback();
-      // So are intervals: one not started again this render stops.
-      for (const [key, timer] of view.effects) if (!timer.node && !view.intervalsSeen.has(key)) { clearInterval(timer.id); view.effects.delete(key); }
+      for (const callback of view.cleanupCallbacks.splice(view.cleanupIndex))
+        callback();
+      for (const [key, timer] of view.effects)
+        if (!timer.node && !view.intervalsSeen.has(key)) {
+          clearInterval(timer.id);
+          view.effects.delete(key);
+        }
       for (const node of view.removals) {
-        if (view.retained.has(node)) continue;
+        if (view.retained.has(node))
+          continue;
         dispose(node);
         node.remove();
       }
-      if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+      if (focused?.isConnected && document.activeElement !== focused)
+        focused.focus({ preventScroll: !0 });
     } finally {
-      [frames, active, keys, loose] = previous;
+      [frames, active, keys, loose, run] = previous;
       view.globalNodes = null;
+      if (view.pendingRanges)
+        for (const range of view.pendingRanges)
+          range.pending = null;
+      view.pendingRanges = null;
       view.removals.clear();
       view.retained.clear();
     }
     return view.root;
   }
-
-  /**
-   * Render a view. Inside another render, an unnamed view simply joins its
-   * parent. A named island renders once and is then reused until invalidated.
-   */
-  function mount(factory, scope = '') {
-    if (active && !scope) return factory();
+  function mount(factory, scope = "") {
+    if (active && !scope)
+      return factory();
     if (scope) {
       const existing = scopes.get(scope)?.deref();
-      if (existing?.root.isConnected) {
-        if (existing.dirty) { existing.dirty = false; render(existing); }
+      if (existing && connected(existing.root)) {
+        if (existing.dirty) {
+          existing.dirty = !1;
+          render(existing);
+        }
         return existing.root;
       }
     }
-    const view = { render: factory, root: null, scope, dirty: false, cleanupCallbacks: [], effects: new Map() };
-    const root = render(view);
+    const view = { render: factory, root: null, scope, dirty: !1, cleanupCallbacks: [], effects: new Map }, root = render(view);
     views.add(new WeakRef(view));
-    if (scope) scopes.set(scope, new WeakRef(view));
-    metadata.set(root, { ...metadata.get(root), view });
+    if (scope)
+      scopes.set(scope, new WeakRef(view));
+    const owner = fragments.get(root)?.start ?? root;
+    metadata.set(owner, { ...metadata.get(owner), view });
     return root;
   }
-
   function drain() {
-    scheduled = false;
+    scheduled = !1;
     const batch = [...dirty];
     dirty.clear();
     for (const view of batch) {
-      if (!view.root.isConnected) continue;
-      view.dirty = false;
+      if (!connected(view.root))
+        continue;
+      view.dirty = !1;
       render(view);
     }
-    for (const callback of afterRender.splice(0)) callback();
+    for (const callback of afterRender.splice(0))
+      callback();
   }
-
-  /** Synchronously re-render every connected view. */
   function refresh() {
     for (const ref of views) {
       const view = ref.deref();
-      if (!view) { views.delete(ref); continue; }
-      if (view.root.isConnected) dirty.add(view);
+      if (!view) {
+        views.delete(ref);
+        continue;
+      }
+      if (connected(view.root))
+        dirty.add(view);
     }
     autoSave();
     drain();
   }
-
-  /** Batch a re-render into the next microtask. */
   function schedule(view) {
-    if (view) dirty.add(view);
-    if (scheduled) return;
-    scheduled = true;
+    if (view)
+      dirty.add(view);
+    if (scheduled)
+      return;
+    scheduled = !0;
     queueMicrotask(drain);
   }
-
-  /** Run cleanups for views rooted at or below `node`. */
   function dispose(node) {
     const view = metadata.get(node)?.view;
     if (view) {
-      for (const callback of view.cleanupCallbacks.splice(0)) callback();
-      for (const timer of view.effects.values()) clearInterval(timer.id);
+      for (const callback of view.cleanupCallbacks.splice(0))
+        callback();
+      for (const timer of view.effects.values())
+        clearInterval(timer.id);
       view.effects.clear();
-      if (view.scope) scopes.delete(view.scope);
+      if (view.scope)
+        scopes.delete(view.scope);
     }
-    for (const child of node.children ?? []) dispose(child);
+    for (const child of node.childNodes ?? [])
+      dispose(child);
   }
-
-  // (Where there is a window: a DOM without one, in tests, has no routes.)
-  globalThis.addEventListener?.('hashchange', refresh);
-  globalThis.addEventListener?.('popstate', refresh);
-
+  globalThis.addEventListener?.("hashchange", refresh);
+  globalThis.addEventListener?.("popstate", refresh);
   const api = {
-    enter, append, attr, url, listen, leave, mount, refresh, invalidate, selectValue, here,
-    put, begin, slot, arm, item, end, node, done,
-    storageError: '',
+    enter,
+    append,
+    attr,
+    url,
+    listen,
+    leave,
+    mount,
+    refresh,
+    invalidate,
+    selectValue,
+    here,
+    put,
+    begin,
+    slot,
+    arm,
+    item,
+    end,
+    node,
+    done,
+    nodes(value) {
+      const range = fragments.get(value);
+      return range ? rangeNodes(range) : Array.isArray(value) ? value.flatMap(api.nodes) : value?.nodeType === 11 ? [...value.childNodes] : [value];
+    },
+    storageError: "",
     notify() {
       for (const ref of views) {
         const view = ref.deref();
-        if (view?.root.isConnected) schedule(view);
+        if (view && connected(view.root))
+          schedule(view);
       }
     },
-    /**
-     * A timer, started once per key. Started by a render, the view owns it:
-     * the first render that does not start it again stops it. Started by an
-     * `on mount` or event handler, its element does: it stops once the
-     * element is gone. Either stops when the view goes.
-     */
     interval(key, milliseconds, callback) {
       const [node, view] = active ? [null, active] : owner ?? [];
       if (!node) {
-        if (!view) return;
+        if (!view)
+          return;
         view.intervalsSeen.add(key);
       }
       const effects = view?.effects ?? timers, effect = effects.get(key);
-      if (effect?.node === node) { effect.callback = callback; return; }
-      // (Another element's is replaced: the same `on mount`, on an element made again.)
-      if (effect) clearInterval(effect.id);
+      if (effect?.node === node) {
+        effect.callback = callback;
+        return;
+      }
+      if (effect)
+        clearInterval(effect.id);
       const entry = { callback, id: 0, node };
       entry.id = setInterval(() => {
-        if (node && !node.isConnected) { clearInterval(entry.id); effects.delete(key); return; }
-        entry.callback(); autoSave(); schedule(view);
+        if (node && !node.isConnected) {
+          clearInterval(entry.id);
+          effects.delete(key);
+          return;
+        }
+        entry.callback();
+        autoSave();
+        schedule(view);
       }, Math.max(16, milliseconds));
       effects.set(key, entry);
     },
-    /**
-     * A hole that calls a function (`= f(a, b);`) with a key the compiler
-     * made from its arguments: if the call at this place in this view made
-     * its element last time with the same key, it is put back without the
-     * call. ("" is never reused.)
-     */
     memoHit(key) {
-      if (!key || !active) return false;
+      if (!key || !active)
+        return !1;
       const entry = active.memo?.get(here());
-      if (entry?.key !== key || !entry.node?.isConnected) return false;
+      if (entry?.key !== key || !connected(entry.node))
+        return !1;
       memoNode = entry.node;
-      return true;
+      return !0;
     },
-    memoLast() { return memoNode; },
-    memoKeep(key, node) { if (key && active) (active.memo ??= new Map()).set(here(), { key, node }); },
-    after(callback) { afterRender.push(callback); schedule(); },
-    focus(id) { afterRender.push(() => document.getElementById(id)?.focus()); schedule(); },
-    cleanup(callback) { if (active) active.cleanupCallbacks[active.cleanupIndex++] = callback; },
-    pushGlobal: key => keys.push({ value: String(key), explicit: true, global: true, depth: frames.length }),
-    pushKey: key => keys.push({ value: String(key), explicit: true, depth: frames.length }),
-    pushCall: key => keys.push({ value: key, explicit: false }),
-    popKey: () => keys.pop(),
+    memoLast() {
+      return memoNode;
+    },
+    memoKeep(key, node) {
+      if (key && active)
+        (active.memo ??= new Map).set(here(), { key, node });
+    },
+    after(callback) {
+      afterRender.push(callback);
+      schedule();
+    },
+    focus(id) {
+      afterRender.push(() => document.getElementById(id)?.focus());
+      schedule();
+    },
+    cleanup(callback) {
+      if (active)
+        active.cleanupCallbacks[active.cleanupIndex++] = callback;
+    },
+    pushGlobal: (key) => keys.push({ value: String(key), explicit: !0, global: !0, depth: frames.length }),
+    pushKey: (key) => keys.push({ value: String(key), explicit: !0, depth: frames.length }),
+    pushCall: (key) => keys.push({ value: key, explicit: !1 }),
+    popKey: () => keys.pop()
   };
   return api;
 })(); } \/;
@@ -744,88 +899,96 @@ mod wutu {
     fn storage_init() Void {
         init();
         let install: fun() Void = @es/\ () => { (function installWutuStorage(api) {
-  if (api.store) return;
-  // A non-finite F64 becomes null in JSON; keep the other stored fields.
-  api.storageReviveF64 = value => value === null ? 0 : value;
-  const stores = new Map();
-  const DEBOUNCE_MS = 180;
+  if (api.store)
+    return;
+  api.storageReviveF64 = (value) => value === null ? 0 : value;
+  const stores = new Map, DEBOUNCE_MS = 180;
   let timer;
-
   function report(cause) {
     const message = String(cause.message ?? cause);
-    if (api.storageError === message) return;
+    if (api.storageError === message)
+      return;
     api.storageError = message;
     api.notify();
   }
-
   function flush() {
-    clearTimeout(timer); timer = 0;
+    clearTimeout(timer);
+    timer = 0;
     for (const [key, store] of stores) {
-      if (!store.dirty || store.conflict) continue;
+      if (!store.dirty || store.conflict)
+        continue;
       try {
         const value = store.encode();
         if (value !== store.last) {
           localStorage.setItem(key, value);
           store.last = value;
         }
-        store.dirty = false;
+        store.dirty = !1;
       } catch (cause) {
         report(cause);
       }
     }
   }
-
   function save(key) {
     const store = stores.get(key);
-    if (!store) return;
-    store.conflict = false;
-    store.dirty = true;
-    // (A timer already waiting is kept: one every render restarts never fires while a clock ticks.)
-    if (!timer) timer = setTimeout(flush, DEBOUNCE_MS);
+    if (!store)
+      return;
+    store.conflict = !1;
+    store.dirty = !0;
+    if (!timer)
+      timer = setTimeout(flush, DEBOUNCE_MS);
   }
-
   api.flush = flush;
   api.save = save;
   api.autoSave = () => {
-    for (const [key, store] of stores) if (!store.manual && !store.conflict) save(key);
+    for (const [key, store] of stores)
+      if (!store.manual && !store.conflict)
+        save(key);
   };
-  api.store = (key, encode, manual = false, apply = null) => {
+  api.store = (key, encode, manual = !1, apply = null) => {
     let last = null;
-    try { last = localStorage.getItem(key); } catch { /* no store: reads '' */ }
-    stores.set(key, { encode, manual, apply, last, dirty: false });
+    try {
+      last = localStorage.getItem(key);
+    } catch {}
+    stores.set(key, { encode, manual, apply, last, dirty: !1 });
   };
-  api.reload = key => {
+  api.reload = (key) => {
     const store = stores.get(key);
-    if (!store) return;
+    if (!store)
+      return;
     try {
       const raw = localStorage.getItem(key);
-      store.apply?.(raw ?? '');
+      store.apply?.(raw ?? "");
       store.last = raw;
-      store.dirty = false;
-      store.conflict = false;
-      api.storageError = '';
+      store.dirty = !1;
+      store.conflict = !1;
+      api.storageError = "";
       api.refresh();
     } catch (cause) {
       report(cause);
     }
   };
-
-  const on = (...a) => globalThis.addEventListener?.(...a); on('pagehide', flush);
-  on('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
-  on('storage', event => {
-    // A null key is another tab's clear(): every store is removed.
+  const on = (...a) => globalThis.addEventListener?.(...a);
+  on("pagehide", flush);
+  on("visibilitychange", () => {
+    if (document.visibilityState === "hidden")
+      flush();
+  });
+  on("storage", (event) => {
     for (const store of event.key === null ? [...stores.values()] : [stores.get(event.key)]) {
-      if (!store) continue;
+      if (!store)
+        continue;
       if (store.dirty) {
-        store.conflict = true;
-        clearTimeout(timer); timer = 0;
-        report('Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.');
+        store.conflict = !0;
+        clearTimeout(timer);
+        timer = 0;
+        report("Unsaved local changes conflict with another tab. Reload or explicitly save to keep this tab.");
         continue;
       }
       try {
-        store.apply?.(event.newValue ?? '');
+        store.apply?.(event.newValue ?? "");
         store.last = event.newValue;
-        api.storageError = '';
+        api.storageError = "";
         api.refresh();
       } catch (cause) {
         report(cause);
@@ -837,7 +1000,7 @@ mod wutu {
     }
     fn stored_load(key: Str) Str {
         let load: fun(Str) Str = @es/\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \/;
-        load(key);
+        return load(key);
     }
     fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) Void) Void {
         let register: fun(Str,cl() Str,Bool,cl(Str) Void) Void = @es/\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \/;
@@ -847,40 +1010,44 @@ mod wutu {
     fn style(sheet: Str) Void {
         init();
         let install: fun(Str) Void = @es/\ (function wutuStyle(sheet) {
-  /** A shared sheet joins the `wutu.document` layer, below element styles; its `@import`s go first. */
   function layered(css) {
-    // (No regex here: this source ships inside an @es envelope, where a slash
-    // next to a backslash would end it.)
-    let imports = '', rest = '', i = 0;
-    for (let at = css.indexOf('@import', i); at >= 0; at = css.indexOf('@import', i)) {
-      // (The `;` outside strings and parentheses: a font URL may have some.)
-      let end = -1, quote = '', depth = 0;
-      for (let j = at; j < css.length && end < 0; j++) {
+    let imports = "", rest = "", i = 0;
+    for (let at = css.indexOf("@import", i);at >= 0; at = css.indexOf("@import", i)) {
+      let end = -1, quote = "", depth = 0;
+      for (let j = at;j < css.length && end < 0; j++) {
         const c = css[j];
-        if (quote) { if (c === '\\') j++; else if (c === quote) quote = ''; }
-        else if (c === '"' || c === "'") quote = c;
-        else if (c === '(') depth++;
-        else if (c === ')') depth--;
-        else if (c === ';' && depth <= 0) end = j;
+        if (quote) {
+          if (c === "\\")
+            j++;
+          else if (c === quote)
+            quote = "";
+        } else if (c === '"' || c === "'")
+          quote = c;
+        else if (c === "(")
+          depth++;
+        else if (c === ")")
+          depth--;
+        else if (c === ";" && depth <= 0)
+          end = j;
       }
-      if (end < 0) break;
+      if (end < 0)
+        break;
       const rule = css.slice(at, end);
       rest += css.slice(i, at);
-      imports += rule.includes('layer(') ? rule + ';' : rule + ' layer(wutu.document);';
+      imports += rule.includes("layer(") ? rule + ";" : rule + " layer(wutu.document);";
       i = end + 1;
     }
     rest += css.slice(i);
-    return imports + (rest.trim() ? '@layer wutu.document{' + rest + '}' : '');
+    return imports + (rest.trim() ? "@layer wutu.document{" + rest + "}" : "");
   }
-
-  const installed = globalThis.__wutuStyles ??= new Set();
-  const css = layered(sheet);
-  if (installed.has(css)) return;
+  const installed = globalThis.__wutuStyles ??= new Set, css = layered(sheet);
+  if (installed.has(css))
+    return;
   installed.add(css);
-  // Prerendered pages already contain their sheets.
-  if ([...document.querySelectorAll('style')].some(node => node.textContent === css)) return;
-  const node = document.createElement('style');
-  node.setAttribute('data-wutu-style', '');
+  if ([...document.querySelectorAll("style")].some((node) => node.textContent === css))
+    return;
+  const node = document.createElement("style");
+  node.setAttribute("data-wutu-style", "");
   node.textContent = css;
   document.head.append(node);
 }) \/;
@@ -913,35 +1080,48 @@ mod wutu {
     /// A template's text hole (`= x;`): a number or a Bool shows as its
     /// `str()`, a Str or a node as itself. The compiler picks which, by
     /// x's type; this body is never what runs.
+    fn show_list(values: Array[$T]) Externref {
+        let make: fun() Externref = @es/\ ()=>[] \/;
+        let push: fun(Externref, Externref) Void = @es/\ (a,v)=>{a.push(v)} \/;
+        let begin_item: fun(I32) Void = @es/\ i=>globalThis.__utuWutu.pushCall('list:'+i) \/;
+        let end_item: fun() Void = @es/\ ()=>globalThis.__utuWutu.popKey() \/;
+        let result = make();
+        for (values, 0 ..< values.len()) |value, index| {
+            begin_item(index);
+            push(result, wutu.show(value));
+            end_item();
+        }
+        return result;
+    }
     fn show(value: Externref) Externref {
-        value;
+        return value;
     }
     /// A keyed loop's key (`key k`) as text: a Str is itself, a number or
     /// a Bool its `str()`. The compiler picks which; this body is never
     /// what runs.
     fn key_text(value: Externref) Str {
-        "";
+        return "";
     }
     /// A text hole's reuse key (`= f(a, b);`): the compiler makes it, from
     /// the call and its arguments; this body is never what runs.
     fn memo_key(call: Externref, key: Str) Str {
-        key;
+        return key;
     }
     fn route() Str {
         let call: fun() Str = @es/\ ()=>location.hash.slice(1)||"/" \/;
-        call();
+        return call();
     }
     fn number(value: I32) Str {
         let format: fun(I32) Str = @es/\ value=>String(value) \/;
-        format(value);
+        return format(value);
     }
     fn money(cents: I32) Str {
         let format: fun(I32) Str = @es/\ cents=>(cents<0?"-$":"$")+(Math.abs(cents)/100).toFixed(2) \/;
-        format(cents);
+        return format(cents);
     }
     fn decimal(value: F64, digits: I32) Str {
         let format: fun(F64,I32) Str = @es/\ (value,digits)=>value.toFixed(Math.max(0,Math.min(20,digits))) \/;
-        format(value,digits);
+        return format(value,digits);
     }
     fn reload_store(key: Str) Void {
         let reload: fun(Str) Void = @es/\ key=>globalThis.__utuWutu?.reload?.(key) \/;
@@ -953,7 +1133,7 @@ mod wutu {
     }
     fn storage_error() Str {
         let read: fun() Str = @es/\ () => globalThis.__utuWutu?.storageError ?? "" \/;
-        read();
+        return read();
     }
     fn refresh() Void {
         let update: fun() Void = @es/\ () => globalThis.__utuWutu?.refresh() \/;

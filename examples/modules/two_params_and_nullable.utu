@@ -4,22 +4,22 @@ mod duo[L, R] {
         | right : R
 
     fn Pair.new(left: L, right: R) Pair {
-        Pair { left: left, right: right }
+        return Pair { left: left, right: right }
     }
 
     fn Pair.left |self| () L {
-        self.left
+        return self.left
     }
 
     fn Pair.right |self| () R {
-        self.right
+        return self.right
     }
 }
 
 using duo[I32, I32] |ints|
 
 fn maybe_pair(flag: Bool) ?ints.Pair {
-    if flag { ints.Pair.new(2, 9) } else { null }
+    return if flag { ints.Pair.new(2, 9) } else { null }
 }
 
 test "two type parameters fill struct fields" {

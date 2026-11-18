@@ -5,7 +5,7 @@
 // stay self-contained: no imports and no references to anything outside their
 // own bodies. Each ships only to the pages that use it.
 //
-// A view is a render callback plus the root element it produced. Rendering
+// A view is a render callback plus the element or fragment it produced. Rendering
 // walks the template again; enter()/leave() bracket each element and reuse the
 // element that had the same identity last time. Identity is the template site
 // plus the active key stack, so keyed loops move existing nodes instead of
@@ -15,6 +15,95 @@
 // child is text or another), and built as enter() builds, so the DOM is the
 // same as written: no HTML parser rearranges it.
 export function createWutuRuntime() {
+  // A DocumentFragment is the public transport; its anchors retain the live range
+  // after the browser consumes its children. Single-element templates need neither.
+  const fragments = new WeakMap();
+  const ranges = new WeakMap();
+  function rangeNodes(range, inclusive = true) {
+    // Deferred removals are still in the DOM until the enclosing render ends.
+    // A returned fragment contains only this render's wanted nodes.
+    if (range.pending) return inclusive ? [range.start, ...range.pending, range.end] : range.pending;
+    const nodes = [];
+    for (let node = inclusive ? range.start : range.start.nextSibling; node; node = node.nextSibling) {
+      if (node === range.end) { if (inclusive) nodes.push(node); break; }
+      nodes.push(node);
+    }
+    return nodes;
+  }
+  function connected(value) {
+    if (Array.isArray(value)) return value.every(connected);
+    const range = fragments.get(value);
+    return range ? range.start.isConnected && range.end.isConnected : !!value?.isConnected;
+  }
+  function descendants(root) {
+    const range = fragments.get(root);
+    if (!range) return root?.querySelectorAll?.('[data-wutu]') ?? [];
+    return rangeNodes(range, false).flatMap(node => node.nodeType === 1
+      ? [node, ...node.querySelectorAll('[data-wutu]')] : []);
+  }
+  function fragment() {
+    const parent = frames.at(-1);
+    let from = 0, global = false, explicit = false;
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i].global) { from = i; global = keys[i].depth === frames.length; }
+      if (keys[i].explicit) explicit = keys[i].depth === frames.length;
+    }
+    const key = parent ? keys.slice(from).map(k => `${k.explicit ? 'k' : 'c'}${k.value.length}:${k.value}`).join(':') : active?.scope ?? '';
+    const identity = `wutu:${run.h}:${encodeURIComponent(key)}`;
+    claimIdentity(parent, identity, global, explicit);
+    // Index sibling boundaries once, so a list of fragments reconciles linearly.
+    const index = nodes => {
+      const result = new Map();
+      for (const node of nodes) if (node.nodeType === 8 && node.data.startsWith('wutu:')) {
+        let queue = result.get(node.data);
+        if (!queue) result.set(node.data, queue = { nodes: [], index: 0 });
+        queue.nodes.push(node);
+      }
+      return result;
+    };
+    const take = map => {
+      const queue = map.get(identity);
+      while (queue && queue.index < queue.nodes.length) {
+        const node = queue.nodes[queue.index++];
+        if (!parent?.used.has(node) && !loose?.used.has(node)) return node;
+      }
+    };
+    let start = parent && take(parent.ranges ??= index(parent.old));
+    if (!start && !parent) start = fragments.get(active?.root)?.start;
+    if (!start) {
+      const outer = frames[0]?.node;
+      if (!loose || loose.root !== outer) loose = { root: outer, index: null, used: new Set() };
+      if (!loose.comments) {
+        const comments = [];
+        const scan = node => {
+          if (node.nodeType === 8 && (parent || !ranges.has(node))) comments.push(node);
+          for (const child of node.childNodes ?? []) scan(child);
+        };
+        const outerRange = fragments.get(outer);
+        if (outerRange) for (const node of rangeNodes(outerRange, false)) scan(node);
+        else scan(outer ?? document);
+        loose.comments = index(comments);
+      }
+      start = take(loose.comments);
+    }
+    let range = start && ranges.get(start);
+    if (!range && start) {
+      let end = start.nextSibling;
+      while (end && !(end.nodeType === 8 && end.data === '/' + identity)) end = end.nextSibling;
+      if (end) range = { start, end, value: document.createDocumentFragment() };
+    }
+    if (!range) {
+      const value = document.createDocumentFragment();
+      range = { value, start: document.createComment(identity), end: document.createComment('/' + identity) };
+      value.append(range.start, range.end);
+    }
+    fragments.set(range.value, range);
+    ranges.set(range.start, range);
+    if (parent) parent.used.add(range.start);
+    loose?.used.add(range.start);
+    run.fragment = range;
+    frames.push({ node: range.value, range, old: rangeNodes(range, false), used: new Set(), wanted: [], byKey: null, keyed: null });
+  }
   const metadata = new WeakMap();   // element -> { attrs, view }
   const listeners = new WeakMap();  // element -> Map(event -> record)
   const views = new Set();          // WeakRef<view> for every mounted root
@@ -61,9 +150,9 @@ export function createWutuRuntime() {
   }
 
   /** Make `parent`'s children exactly `wanted`, moving nodes and keeping focus. */
-  function place(parent, wanted) {
+  function place(parent, wanted, range = null) {
     // Usually they already are.
-    const children = parent.childNodes;
+    const children = range ? rangeNodes(range, false) : parent.childNodes;
     if (children.length === wanted.length) {
       let same = true;
       for (let i = 0; same && i < wanted.length; i++) same = children[i] === wanted[i];
@@ -73,14 +162,14 @@ export function createWutuRuntime() {
     const selection = focused && 'selectionStart' in focused
       ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection]
       : null;
-    let cursor = parent.firstChild;
+    let cursor = range ? range.start.nextSibling : parent.firstChild;
     for (const node of wanted) {
       if (node === cursor) { cursor = cursor.nextSibling; continue; }
       if (parent.moveBefore && node.parentNode === parent) parent.moveBefore(node, cursor);
       else parent.insertBefore(node, cursor);
     }
     const keep = new Set(wanted);
-    for (const node of [...parent.childNodes]) {
+    for (const node of [...children]) {
       if (keep.has(node)) continue;
       // The page's <head> (an `html { }` template may not write one) and Wutu's own
       // stylesheets in it are no template's to drop.
@@ -139,7 +228,7 @@ export function createWutuRuntime() {
     if (!active) return undefined;
     if (!active.globalNodes) {
       active.globalNodes = new Map();
-      for (const node of active.root?.querySelectorAll('[data-wutu]') ?? []) active.globalNodes.set(identityOfNode(node), node);
+      for (const node of descendants(active.root)) active.globalNodes.set(identityOfNode(node), node);
     }
     return active.globalNodes.get(identity);
   }
@@ -154,7 +243,7 @@ export function createWutuRuntime() {
     if (loose?.root !== root) loose = { root, index: null, used: new Set() };
     if (!loose.index) {
       loose.index = new Map();
-      for (const node of root?.querySelectorAll('[data-wutu]') ?? []) {
+      for (const node of descendants(root)) {
         const id = identityOfNode(node);
         if (!loose.index.has(id)) loose.index.set(id, node);
       }
@@ -206,7 +295,7 @@ export function createWutuRuntime() {
     }
     if (!node || node.localName !== tag) node = make();
     if (parent) parent.used.add(node);
-    if (parent && !isLoose) parent.wanted.push(node);
+    if (parent && !isLoose) { parent.wanted.push(node); parent.appended?.add(node); }
     if (identities.get(node) !== identity) {
       node.setAttribute('data-wutu', identity);
       identities.set(node, identity);
@@ -263,8 +352,14 @@ export function createWutuRuntime() {
   /** Append a node (a component or slot) or text, reusing the text node in this position. */
   function append(value) {
     const frame = frames.at(-1);
+    const range = fragments.get(value);
+    if (range || Array.isArray(value) || value?.nodeType === 11) {
+      for (const child of range ? rangeNodes(range) : Array.isArray(value) ? value : [...value.childNodes]) append(child);
+      return;
+    }
     if (value?.nodeType) {
-      if (!frame.wanted.includes(value)) { frame.used.add(value); frame.wanted.push(value); }
+      frame.appended ??= new Set(frame.wanted);
+      if (!frame.appended.has(value)) { frame.appended.add(value); frame.used.add(value); frame.wanted.push(value); }
       // (Moved here from its old parent: that parent's place() must not remove it.)
       active?.retained.add(value);
       return;
@@ -456,7 +551,7 @@ export function createWutuRuntime() {
       for (let i = 0; i < text.length; i++) n = Math.imul(n ^ text.charCodeAt(i), 16777619);
       programs.set(text, program = [JSON.parse(text), (n >>> 0).toString(36)]);
     }
-    run = { h: program[1], nodes: [], stack: [{ ops: program[0], pc: 0, kind: 'top' }], outer: run, pending: null };
+    run = { h: program[1], nodes: [], stack: [{ ops: program[0], pc: 0, kind: 'top' }], outer: run, pending: null, depth: frames.length, fragment: null };
   }
 
   /** The attributes the ops after an 'o' (at `pc`) set: its a, m and b ops (by op list, then index). */
@@ -487,14 +582,15 @@ export function createWutuRuntime() {
       }
       const op = top.ops[top.pc++];
       switch (op[0]) {
+        case 'r': fragment(); break;
         case 's': {
           const [element] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(true), op[1] === 0);
+          run.nodes[op[1]] = claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(true), frames.length === run.depth);
           break;
         }
         case 'o': {
           const [element, names] = prototypeOfTree(op[2], !!op[3]);
-          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false), op[1] === 0), names, settable(top.ops, top.pc));
+          run.nodes[op[1]] = open(claim(`v${run.h}:${op[1]}`, '', element.localName, () => element.cloneNode(false), frames.length === run.depth), names, settable(top.ops, top.pc));
           break;
         }
         case 'c': leave(); break;
@@ -571,21 +667,31 @@ export function createWutuRuntime() {
   /** The element a node op names. */
   function node() { return run.nodes[advance()[1]]; }
 
-  /** The template's end: its root element. */
+  /** The template's end: its element or retained fragment range. */
   function done() {
     while (advance() !== null) { /* (only static ops remain) */ }
-    const root = run.nodes[0];
+    let root = run.nodes[0];
+    if (run.fragment) {
+      const frame = frames.pop(), range = run.fragment;
+      place(range.start.parentNode, frame.wanted, range);
+      if (active) { range.pending = frame.wanted; (active.pendingRanges ??= new Set()).add(range); }
+      root = range.value;
+      if (run.depth === 0) {
+        for (const node of frame.wanted) if (node.nodeType === 1) node.setAttribute('data-wutu-root', `fragment:${run.h}`);
+      }
+    }
     run = run.outer;
     if (!run) loose = null;
     return root;
   }
 
   function render(view) {
-    const previous = [frames, active, keys, loose], focused = document.activeElement;
+    const previous = [frames, active, keys, loose, run], focused = document.activeElement;
     view.cleanupIndex = 0;
     view.cleanupCallbacks ??= [];
     view.intervalsSeen = new Set();
     view.removals = new Set();
+    view.pendingRanges = null;
     view.retained = new Set();
     view.globalNodes = null;
     view.globalClaims = new Set();
@@ -607,8 +713,10 @@ export function createWutuRuntime() {
       }
       if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
     } finally {
-      [frames, active, keys, loose] = previous;
+      [frames, active, keys, loose, run] = previous;
       view.globalNodes = null;
+      if (view.pendingRanges) for (const range of view.pendingRanges) range.pending = null;
+      view.pendingRanges = null;
       view.removals.clear();
       view.retained.clear();
     }
@@ -623,7 +731,7 @@ export function createWutuRuntime() {
     if (active && !scope) return factory();
     if (scope) {
       const existing = scopes.get(scope)?.deref();
-      if (existing?.root.isConnected) {
+      if (existing && connected(existing.root)) {
         if (existing.dirty) { existing.dirty = false; render(existing); }
         return existing.root;
       }
@@ -632,7 +740,8 @@ export function createWutuRuntime() {
     const root = render(view);
     views.add(new WeakRef(view));
     if (scope) scopes.set(scope, new WeakRef(view));
-    metadata.set(root, { ...metadata.get(root), view });
+    const owner = fragments.get(root)?.start ?? root;
+    metadata.set(owner, { ...metadata.get(owner), view });
     return root;
   }
 
@@ -641,7 +750,7 @@ export function createWutuRuntime() {
     const batch = [...dirty];
     dirty.clear();
     for (const view of batch) {
-      if (!view.root.isConnected) continue;
+      if (!connected(view.root)) continue;
       view.dirty = false;
       render(view);
     }
@@ -653,7 +762,7 @@ export function createWutuRuntime() {
     for (const ref of views) {
       const view = ref.deref();
       if (!view) { views.delete(ref); continue; }
-      if (view.root.isConnected) dirty.add(view);
+      if (connected(view.root)) dirty.add(view);
     }
     autoSave();
     drain();
@@ -676,7 +785,7 @@ export function createWutuRuntime() {
       view.effects.clear();
       if (view.scope) scopes.delete(view.scope);
     }
-    for (const child of node.children ?? []) dispose(child);
+    for (const child of node.childNodes ?? []) dispose(child);
   }
 
   // (Where there is a window: a DOM without one, in tests, has no routes.)
@@ -686,11 +795,16 @@ export function createWutuRuntime() {
   const api = {
     enter, append, attr, url, listen, leave, mount, refresh, invalidate, selectValue, here,
     put, begin, slot, arm, item, end, node, done,
+    nodes(value) {
+      const range = fragments.get(value);
+      return range ? rangeNodes(range) : Array.isArray(value) ? value.flatMap(api.nodes)
+        : value?.nodeType === 11 ? [...value.childNodes] : [value];
+    },
     storageError: '',
     notify() {
       for (const ref of views) {
         const view = ref.deref();
-        if (view?.root.isConnected) schedule(view);
+        if (view && connected(view.root)) schedule(view);
       }
     },
     /**
@@ -725,7 +839,7 @@ export function createWutuRuntime() {
     memoHit(key) {
       if (!key || !active) return false;
       const entry = active.memo?.get(here());
-      if (entry?.key !== key || !entry.node?.isConnected) return false;
+      if (entry?.key !== key || !connected(entry.node)) return false;
       memoNode = entry.node;
       return true;
     },
@@ -822,7 +936,13 @@ export function createWutuLazy() {
     import(tries ? url + '?retry=' + tries : url).then(chunk => {
       const make = chunk.exports?.[name];
       if (typeof make !== 'function') throw chunk.error ?? new Error('Wutu: chunk for ' + path + ' has no ' + name);
-      node.replaceChildren(make(...args));
+      const value = make(...args);
+      node.replaceChildren(...(globalThis.__utuWutu?.nodes(value) ?? [value]));
+      for (const control of node.querySelectorAll('[data-wutu-pending]')) {
+        if (control.closest('[data-wutu-lazy]') !== node) continue;
+        control.disabled = false;
+        control.removeAttribute('data-wutu-pending');
+      }
     }).catch(error => {
       node.setAttribute('data-wutu-lazy-error', '');
       console.error(error);

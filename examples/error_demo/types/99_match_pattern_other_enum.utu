@@ -9,7 +9,7 @@ enum(U8) Size:
     | Large
 
 fn f(c: Color) I32 {
-    match c {
+    return match c {
         Color.Red => 0,
         Size.Small => 1,
         ~> 2,

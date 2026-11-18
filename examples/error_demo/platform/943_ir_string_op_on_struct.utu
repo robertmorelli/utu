@@ -3,9 +3,7 @@
 struct Pt:
     | x: I32
 
-fn size(p: Pt) I32 {
-    @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
-}
+fn size(p: Pt) I32 => @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
 
 main {
     console.log(size(Pt { x: 1 }));

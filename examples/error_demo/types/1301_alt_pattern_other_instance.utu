@@ -4,7 +4,7 @@ mod cell[T] {
     enum E:
         | A { v : T }
         | B
-    fn mk(t: T) E { E.A { v: t }; }
+    fn mk(t: T) E { return E.A { v: t }; }
 }
 using cell[I32] |a|;
 using cell[Str] |b|;

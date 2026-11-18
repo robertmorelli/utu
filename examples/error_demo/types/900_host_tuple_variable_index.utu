@@ -4,7 +4,7 @@ using Shapes from "./bindings/Shapes.abi.json";
 
 fn at(i: I32) F64 {
     let c = Shapes.corner();
-    c[i];
+    return c[i];
 }
 
 main { at(0) }

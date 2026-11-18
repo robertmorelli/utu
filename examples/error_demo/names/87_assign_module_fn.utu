@@ -1,10 +1,10 @@
 // What: assigns to a module's function through its path
 // Expect: Cannot assign to immutable 'math.square'
 mod math {
-    fn square(x: I32) I32 { x * x; }
+    fn square(x: I32) I32 { return x * x; }
 }
 
-fn cube(x: I32) I32 { x * x * x; }
+fn cube(x: I32) I32 { return x * x * x; }
 
 main {
     math.square = cube;

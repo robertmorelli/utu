@@ -49,13 +49,13 @@ struct Scheduler:
     | queue_packet_count: I32
 
 fn Packet.new(link: ?Packet, identity: I32, kind: I32) Packet {
-    &{ link: link, identity: identity, kind: kind, datum: 0, data: Array[I32].new(data_size, 0) }
+    return &{ link: link, identity: identity, kind: kind, datum: 0, data: Array[I32].new(data_size, 0) }
 }
 
 // Adds packet to the end of the queue, which may be empty; the queue's head.
 fn append(packet: Packet, queue_head: ?Packet) Packet {
     packet.link = null
-    promote queue_head {
+    return promote queue_head {
         |head| => {
             let mouse = head
             let more = true
@@ -75,9 +75,9 @@ fn append(packet: Packet, queue_head: ?Packet) Packet {
 // ---------------------------------------------------------------------------
 // Task control blocks
 
-fn Task.is_task_holding_or_waiting |self| () Bool { self.task_holding or (not self.packet_pending and self.task_waiting) }
+fn Task.is_task_holding_or_waiting |self| () Bool { return self.task_holding or (not self.packet_pending and self.task_waiting) }
 
-fn Task.is_waiting_with_packet |self| () Bool { self.packet_pending and self.task_waiting and not self.task_holding }
+fn Task.is_waiting_with_packet |self| () Bool { return self.packet_pending and self.task_waiting and not self.task_holding }
 
 fn Task.add_input_and_check_priority |self| (packet: Packet, old_task: Task) Task {
     promote self.input {
@@ -88,7 +88,7 @@ fn Task.add_input_and_check_priority |self| (packet: Packet, old_task: Task) Tas
             if self.priority > old_task.priority { return self }
         },
     }
-    old_task
+    return old_task
 }
 
 fn Task.run_task |self| (s: Scheduler) ?Task {
@@ -110,14 +110,14 @@ fn Task.run_task |self| (s: Scheduler) ?Task {
             },
         }
     }
-    s.run_function(self.data, message)
+    return s.run_function(self.data, message)
 }
 
 // ---------------------------------------------------------------------------
 // The scheduler
 
 fn Scheduler.new() Scheduler {
-    &{
+    return &{
         task_list: null,
         current_task: null,
         current_task_identity: 0,
@@ -142,28 +142,28 @@ fn Scheduler.create_task |self| (identity: I32, priority: I32, work: ?Packet, pa
     self.task_list = t
 }
 
-fn Scheduler.current |self| () Task { self.current_task orelse fatal }
+fn Scheduler.current |self| () Task { return self.current_task orelse fatal }
 
-fn Scheduler.find_task |self| (identity: I32) Task { self.task_table[identity] orelse fatal }
+fn Scheduler.find_task |self| (identity: I32) Task { return self.task_table[identity] orelse fatal }
 
 fn Scheduler.hold_self |self| () ?Task {
     self.hold_count += 1
     let t = self.current()
     t.task_holding = true
-    t.link
+    return t.link
 }
 
 fn Scheduler.wait_task |self| () ?Task {
     let t = self.current()
     t.task_waiting = true
-    t
+    return t
 }
 
 fn Scheduler.release |self| (identity: I32) ?Task {
     let t = self.find_task(identity)
     t.task_holding = false
     let current = self.current()
-    if t.priority > current.priority { t } else { current }
+    return if t.priority > current.priority { t } else { current }
 }
 
 fn Scheduler.queue_packet |self| (packet: Packet) ?Task {
@@ -171,12 +171,12 @@ fn Scheduler.queue_packet |self| (packet: Packet) ?Task {
     self.queue_packet_count += 1
     packet.link = null
     packet.identity = self.current_task_identity
-    t.add_input_and_check_priority(packet, self.current())
+    return t.add_input_and_check_priority(packet, self.current())
 }
 
 // One run of a task of each kind, given the packet it received, if any.
 fn Scheduler.run_function |self| (data: TaskData, work: ?Packet) ?Task {
-    alt data {
+    return alt data {
         Idle |d| => {
             d.count -= 1
             if d.count == 0 {
@@ -299,7 +299,7 @@ fn richards() I64 {
     s.create_task(device_b, 5000, null, false, true, false, Device { pending: null })
 
     s.schedule()
-    s.queue_packet_count.i64() * 100000 + s.hold_count.i64()
+    return s.queue_packet_count.i64() * 100000 + s.hold_count.i64()
 }
 
 test "richards counts its packets and holds" {
@@ -313,6 +313,6 @@ lib {
     fn bench(iterations: I32) I64 {
         let sink: I64 = 0
         for (0..<iterations * inner_iterations) { sink += richards() }
-        sink
+        return sink
     }
 }

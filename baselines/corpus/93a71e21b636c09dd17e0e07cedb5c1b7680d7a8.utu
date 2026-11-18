@@ -1,7 +1,7 @@
 
         lib {
           fn dense_pick(x: I32) I32 {
-            match x {
+            return match x {
               0 => 10,
               1 => 20,
               2 => 30,
@@ -9,7 +9,7 @@
             };
           }
           fn sparse_pick(x: I32) I32 {
-            match x {
+            return match x {
               0   => 1,
               100 => 2,
               ~> 0,

@@ -109,7 +109,8 @@ static bool statement_end(TSLexer *l) {
   int32_t c = l->lookahead;
   switch (c) {
     case '{': return false;
-    case '+': case '*': case '%': case '^': case '|':
+    case '|': return true;
+    case '+': case '*': case '%': case '^':
       l->advance(l, false);
       return l->lookahead == '=';
     case '<': case '>':

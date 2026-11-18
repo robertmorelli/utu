@@ -1,8 +1,6 @@
 // What: @ir in a function nothing calls (it was never checked)
 // Expect: @ir names no parameter b
-fn twice(a: I32) I32 {
-    @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \/;
-}
+fn twice(a: I32) I32 => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \/;
 
 main {
     console.log(0);

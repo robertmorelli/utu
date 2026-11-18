@@ -4,7 +4,7 @@ fn first_even(xs: Array[I32]) I32 {
     for (xs) |x| {
         if x % 2 == 0 { break x; };
     };
-    -1;
+    return -1;
 }
 
 main {

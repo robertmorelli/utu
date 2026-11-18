@@ -3,7 +3,7 @@
 using console from std:Console;
 
 mod console {
-    fn f() I32 { 3; }
+    fn f() I32 { return 3; }
 }
 
 main {

@@ -1,7 +1,7 @@
 // What: calls a function of an unknown generic module twice.
 // Expect: Unknown module Nope
 fn g() I32 {
-    Nope[F64].x() + Nope[F64].x();
+    return Nope[F64].x() + Nope[F64].x();
 }
 
 main {

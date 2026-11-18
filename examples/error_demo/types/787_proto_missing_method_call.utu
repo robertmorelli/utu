@@ -9,7 +9,7 @@ struct Has[Counter]:
 struct NoStep[Counter]:
     | n: I32
 
-fn Counter[Has].step |h| () I32 { h.n + 1; }
+fn Counter[Has].step |h| () I32 { return h.n + 1; }
 
 main {
     let c: Counter = NoStep { n: 1 };

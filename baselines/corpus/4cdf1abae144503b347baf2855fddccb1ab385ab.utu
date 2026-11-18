@@ -1,3 +1,3 @@
 struct Node:
   | next : ?Node
-lib { fn bad() Node { Node { }; } }
+lib { fn bad() Node { return Node { }; } }

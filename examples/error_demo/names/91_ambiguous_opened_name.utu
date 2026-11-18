@@ -1,7 +1,7 @@
 // What: two opened modules both have `v`, and the call names neither
 // Expect: v is ambiguous: a.v or b.v
-mod a { fn v() I32 { 1; } }
-mod b { fn v() I32 { 2; } }
+mod a { fn v() I32 { return 1; } }
+mod b { fn v() I32 { return 2; } }
 using a;
 using b;
 

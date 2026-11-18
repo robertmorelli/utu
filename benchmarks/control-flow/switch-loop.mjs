@@ -18,7 +18,7 @@ const loopMatch = `export lib {
             3 => { if i < n { pc = code[pc + 1]; } else { pc += 2; }; continue code[pc]; },
             ~> { break; },
         };
-        acc;
+        return acc;
     }
 }`;
 
@@ -37,7 +37,7 @@ const whileMatch = `export lib {
                 ~> { running = false; },
             };
         };
-        acc;
+        return acc;
     }
 }`;
 
@@ -88,7 +88,7 @@ const makeText = `
                 k += 1;
             };
         };
-        text;
+        return text;
     }`;
 const lexLoopMatch = `export lib {${makeText}
     fn lex(text: Array[I32]) I32 {
@@ -123,7 +123,7 @@ const lexLoopMatch = `export lib {${makeText}
             },
             ~> {},
         };
-        words * 1000000 + numbers;
+        return words * 1000000 + numbers;
     }
 }`;
 const lexWhileMatch = `export lib {${makeText}
@@ -142,7 +142,7 @@ const lexWhileMatch = `export lib {${makeText}
                 ~> if c >= 97 { words += 1; 1; } else if c >= 48 { 2; } else { 0; },
             };
         };
-        words * 1000000 + numbers;
+        return words * 1000000 + numbers;
     }
 }`;
 

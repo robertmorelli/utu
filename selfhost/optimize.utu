@@ -33,18 +33,20 @@
 //! the first two sound. Nodes are rewritten in place: a store removed is an
 //! empty Seq, which emits nothing.
 
-/// The function's nodes, in walk order, each with its parent and its place there.
-vec opt_nodes: I32
-vec opt_parent: I32
-vec opt_place: I32
-/// By local: its reads.
+/// Parents with children, in breadth-first order. Their children stay in IR.
+vec opt_frontier: I32
+/// Local reads in the same order, with their absolute edge in w_kids (-1 at
+/// the root). A sunk read can move without changing its survey position.
+vec opt_read_nodes: I32
+vec opt_read_edges: I32
+/// Conditional nodes in breadth-first order, for the reverse logic pass.
+vec opt_ifs: I32
+/// By local: its reads and writes.
 vec opt_gets: I32
-/// By local: its writes.
 vec opt_sets: I32
-/// By local: the position (in @opt_nodes) of a read.
+/// By local: the last position in opt_read_nodes, and the last store's node.
 vec opt_get_at: I32
-/// By local: the position of a write.
-vec opt_set_at: I32
+vec opt_write: I32
 /// The locals a value being sunk reads, once each.
 vec opt_reads: I32
 /// The sink pass (a stamp), and the value's reads (a stamp: @opt_rd_mark).
@@ -59,10 +61,19 @@ vec opt_rd_len: I32
 vec opt_rd_pool: I32
 /// By local: the reads (their stamp) it is already in.
 vec opt_rd_mark: I32
-/// The Seqs, Blocks and Loops of @opt_nodes, in its order.
+/// By local: its last position in opt_reads. Check against the current
+/// list, since an old stamp can coincide after the counter wraps.
+vec opt_rd_index: I32
+/// The Seqs, Blocks and Loops of the survey, in its order.
 vec opt_blocks: I32
+/// Adjacent statement pairs whose first statement was a local store.
+/// Copies and sinking may erase a store, but cannot add one.
+vec opt_sink_edges: I32
 /// Whether a node of the walk is held in more than one place.
 vec opt_shared: U8 = [0]
+/// Upper bound on field reads in the current function. Constant folding and
+/// local substitution can drop or move a field read, but never duplicate one.
+vec opt_field_reads: I32 = [0]
 /// By local: its index once unused locals are gone.
 vec opt_renumber: I32
 
@@ -82,18 +93,30 @@ fn optimize_function(f: I32) Void {
     // A node held in two places (in one body or two; see sweep) would be
     // rewritten for both, so a body with one is left as it is.
     if opt_shared[0] == 1 { return }
-    // The rewrites keep the counts, and each local's one read or write
-    // (with its parent), as a new walk would find them. None moves a block,
-    // so the blocks stay in the walk's order. A fold may, so a new walk
-    // follows one.
+    // Local rewrites maintain the live counts, but the original survey
+    // still holds their detached nodes. A structural fold needs a new survey,
+    // as does any fold following such a rewrite. Constant-only changes made
+    // against a fresh survey leave its sparse indexes intact.
+    let surveyed = true
     let folded = fold_constants(f)
     while (true) {
-        if folded { opt_collect(f, total) }
-        while (propagate_copies(params) or sink_temporaries(params)) {}
+        if folded != cf_unchanged and (folded == cf_structure or not surveyed) {
+            opt_collect(f, total)
+            surveyed = true
+        }
+        let changed = false
+        while (propagate_copies(params) or sink_temporaries(params)) {
+            changed = true
+            surveyed = false
+        }
+        // A postorder fold that only replaced constant expressions settled
+        // their parents in the same pass. Structural rewrites can expose
+        // more folds even when the local rewrites did nothing.
+        if not changed and folded != cf_structure { break }
         folded = fold_constants(f)
-        if not folded { break }
+        if folded == cf_unchanged { break }
     }
-    if optimize_level[0] == 1 and reuse_loads(f) {
+    if optimize_level[0] == 1 and opt_field_reads[0] >= 3 and reuse_loads(f) {
         total = params + func_local_count[f]
         opt_collect(f, total)
     }
@@ -103,64 +126,70 @@ fn optimize_function(f: I32) Void {
     coalesce_locals(f, params)
 }
 
-/// Walk the body, noting each node's parent, and each local's reads and writes.
+/// Survey in breadth-first order. Queue parents rather than copying every
+/// child into a second tree; keep placement only for reads a rewrite can move.
 fn opt_collect(f: I32, total: I32) Void {
+    opt_gets.clear()
+    opt_sets.clear()
     opt_gets.resize(total)
     opt_sets.resize(total)
     opt_get_at.resize(total)
-    opt_set_at.resize(total)
-    for (0 ..< total) |l| {
-        opt_gets[l] = 0
-        opt_sets[l] = 0
-    }
+    opt_write.resize(total)
+    opt_frontier.clear()
+    opt_read_nodes.clear()
+    opt_read_edges.clear()
+    opt_ifs.clear()
     opt_blocks.clear()
+    opt_sink_edges.clear()
     opt_shared[0] = 0
-    // (Written in place, in room doubled as it fills, and cut to the walk at the end.)
-    opt_room(64)
-    opt_nodes[0] = func_body[f]
-    opt_parent[0] = -1
-    opt_place[0] = -1
-    let n = 1
-    let k = 0
-    while (k < n) {
-        let node = opt_nodes[k]
-        let op = w_op[node]
-        if node_holders[node] != 1 { opt_shared[0] = 1 }
-        if op == Op.LocalGet.i32() {
-            opt_gets[w_a[node]] += 1
-            opt_get_at[w_a[node]] = k
-        } else if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
-            opt_sets[w_a[node]] += 1
-            opt_set_at[w_a[node]] = k
-        } else if op == Op.Seq.i32() or op == Op.Block.i32() or op == Op.Loop.i32() {
-            opt_blocks.push(node)
+    opt_field_reads[0] = 0
+    opt_note(func_body[f], -1)
+    let head = 0
+    while (head < opt_frontier.len()) {
+        let parent = opt_frontier[head]
+        let first = w_first[parent]
+        let end_ = first + w_count[parent]
+        let op = w_op[parent]
+        let sequence = op == Op.Seq.i32() or op == Op.Block.i32()
+        for (first ..< end_) |edge| {
+            let node = w_kids[edge]
+            opt_note(node, edge)
+            if sequence and edge + 1 < end_ and w_op[node] == Op.LocalSet.i32() and w_count[node] == 1 {
+                opt_sink_edges.push(edge)
+            }
         }
-        let c = w_count[node]
-        if n + c > opt_nodes.len() { opt_room((n + c) * 2) }
-        let first = w_first[node]
-        for (0 ..< c) |i| {
-            opt_nodes[n] = w_kids[first + i]
-            opt_parent[n] = node
-            opt_place[n] = i
-            n += 1
-        }
-        k += 1
+        head += 1
     }
-    opt_room(n)
 }
 
-/// @opt_nodes, @opt_parent and @opt_place resized to `n`.
-fn opt_room(n: I32) Void {
-    opt_nodes.resize(n)
-    opt_parent.resize(n)
-    opt_place.resize(n)
+fn opt_note(node: I32, edge: I32) Void {
+    if w_count[node] > 0 { opt_frontier.push(node) }
+    if node_holders[node] != 1 { opt_shared[0] = 1 }
+    let op = w_op[node]
+    if op == Op.LocalGet.i32() {
+        let local = w_a[node]
+        opt_gets[local] += 1
+        opt_get_at[local] = opt_read_nodes.len()
+        opt_read_nodes.push(node)
+        opt_read_edges.push(edge)
+    } else if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
+        let local = w_a[node]
+        opt_sets[local] += 1
+        opt_write[local] = node
+    } else if op == Op.Seq.i32() or op == Op.Block.i32() or op == Op.Loop.i32() {
+        opt_blocks.push(node)
+    } else if op == Op.If.i32() {
+        opt_ifs.push(node)
+    } else if op >= Op.StructGet.i32() and op <= Op.StructGetU.i32() {
+        opt_field_reads[0] += 1
+    }
 }
 
 /// Computes a value without effects or traps, reading at most locals.
 fn opt_pure(node: I32) Bool {
     if not pure_op(node) { return false }
     for (0 ..< w_count[node]) |i| { if not opt_pure(w_kid(node, i)) { return false } }
-    true
+    return true
 }
 
 /// @opt_pure, noted by node for the sink pass: a value sunk into the next
@@ -171,7 +200,7 @@ fn sink_pure(node: I32) Bool {
     let pure = pure_op(node)
     for (0 ..< w_count[node]) |i| { if pure and not sink_pure(w_kid(node, i)) { pure = false } }
     opt_memo[node] = pass * 2 + if pure { 1 } else { 0 }
-    pure
+    return pure
 }
 
 /// Whether node `node`'s own operation is one @opt_pure allows.
@@ -185,7 +214,7 @@ fn pure_op(node: I32) Bool {
     // capture, from its environment) neither traps nor changes.
     let immutable_read = (op == Op.StructGet.i32() or op == Op.StructGetS.i32() or op == Op.StructGetU.i32())
         and ht_fields[ht_a[w_a[node]] + w_b[node] * 2 + 1] == 0 and non_null(w_type[w_kid(node, 0)])
-    op == Op.RefIsNull.i32() or op == Op.RefEq.i32() or op == Op.RefI31.i32() or op == Op.I31GetS.i32()
+    return op == Op.RefIsNull.i32() or op == Op.RefEq.i32() or op == Op.RefI31.i32() or op == Op.I31GetS.i32()
         or op == Op.I31GetU.i32() or op == Op.Select.i32() or (op == Op.Plain.i32() and pure_opcode(w_a[node])) or immutable_read
 }
 
@@ -197,7 +226,7 @@ fn pure_opcode(code: I32) Bool {
     if code >= 127 and code <= 130 { return false }
     if code >= 168 and code <= 171 { return false }
     if code >= 174 and code <= 177 { return false }
-    true
+    return true
 }
 
 fn non_null(vt: I32) Bool => vt == vt_extern or (vt >= vt_defined and vt < vt_tuple and (vt - vt_defined) % 2 == 1)
@@ -205,7 +234,7 @@ fn non_null(vt: I32) Bool => vt == vt_extern or (vt >= vt_defined and vt < vt_tu
 /// Whether node `n` is a number or a null.
 fn opt_literal(n: I32) Bool {
     let op = w_op[n]
-    w_count[n] == 0 and (op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32()
+    return w_count[n] == 0 and (op == Op.I32Const.i32() or op == Op.I64Const.i32() or op == Op.F32Const.i32()
         or op == Op.F64Const.i32() or op == Op.RefNull.i32())
 }
 
@@ -241,7 +270,7 @@ fn propagate_copies(params: I32) Bool {
     }
     for (params ..< opt_gets.len()) |l| {
         if opt_sets[l] == 1 {
-            let write = opt_nodes[opt_set_at[l]]
+            let write = opt_write[l]
             let source = if w_count[write] == 1 { w_kid(write, 0) } else { -1 }
             if optimize_level[0] == 1 and w_op[write] == Op.LocalSet.i32() and source >= 0 and opt_gets[l] > 0
                 and opt_literal(source) and (opt_gets[l] == 1 or sm_bytes(source, true) <= 2) {
@@ -266,8 +295,8 @@ fn propagate_copies(params: I32) Bool {
     // (No copy: no walk.)
     if not changed { return false }
     changed = false
-    for (0 ..< opt_nodes.len()) |k| {
-        let n = opt_nodes[k]
+    for (0 ..< opt_read_nodes.len()) |k| {
+        let n = opt_read_nodes[k]
         if w_op[n] == Op.LocalGet.i32() and opt_const_of[w_a[n]] >= 0 {
             let c = opt_const_of[w_a[n]]
             opt_gets[w_a[n]] -= 1
@@ -286,7 +315,7 @@ fn propagate_copies(params: I32) Bool {
             changed = true
         }
     }
-    changed
+    return changed
 }
 
 /// The temporaries rewrite, within each Seq or Block (a store and the
@@ -296,53 +325,47 @@ fn sink_temporaries(params: I32) Bool {
     // (The notes grow with the nodes; an older pass's are stale.)
     opt_pass[0] += 1
     opt_rd_pool.clear()
-    if opt_memo.len() < w_op.len() {
-        opt_memo.resize(w_op.len())
-        opt_rd_at.resize(w_op.len())
-        opt_rd_from.resize(w_op.len())
-        opt_rd_len.resize(w_op.len())
+    if opt_memo.len() < w_node_count[0] {
+        opt_memo.resize(w_node_count[0])
+        opt_rd_at.resize(w_node_count[0])
+        opt_rd_from.resize(w_node_count[0])
+        opt_rd_len.resize(w_node_count[0])
     }
-    if opt_rd_mark.len() < opt_gets.len() { opt_rd_mark.resize(opt_gets.len()) }
-    for (0 ..< opt_blocks.len()) |b| {
-        let block = opt_blocks[b]
-        let op = w_op[block]
-        if op == Op.Seq.i32() or op == Op.Block.i32() {
-            let i = 0
-            while (i + 1 < w_count[block]) {
-                let write = w_kid(block, i)
-                let l = w_a[write]
-                if w_op[write] == Op.LocalSet.i32() and w_count[write] == 1 and l >= params and opt_sets[l] == 1 and opt_gets[l] == 1 {
-                    let value = w_kid(write, 0)
-                    let at = opt_get_at[l]
-                    let read = opt_nodes[at]
-                    if sink_pure(value) and single_value(w_type[value]) and opt_parent[at] >= 0 {
-                        opt_reads.clear()
-                        opt_pass[1] += 1
-                        reads_of(value)
-                        opt_rd_at[value] = opt_pass[0]
-                        opt_rd_from[value] = opt_rd_pool.len()
-                        opt_rd_len[value] = opt_reads.len()
-                        for (0 ..< opt_reads.len()) |r| { opt_rd_pool.push(opt_reads[r]) }
-                        if sink_visit(w_kid(block, i + 1), read, false) == 1 {
-                            set_kid(opt_parent[at], opt_place[at], value)
-                            opt_erase(write)
-                            opt_gets[l] = 0
-                            opt_sets[l] = 0
-                            changed = true
-                            // The value's own read (if it is one) now sits where the sunk read was.
-                            if w_op[value] == Op.LocalGet.i32() and opt_gets[w_a[value]] == 1 {
-                                let v = opt_get_at[w_a[value]]
-                                opt_parent[v] = opt_parent[at]
-                                opt_place[v] = opt_place[at]
-                            }
-                        }
-                    }
+    if opt_rd_mark.len() < opt_gets.len() {
+        opt_rd_mark.resize(opt_gets.len())
+        opt_rd_index.resize(opt_gets.len())
+    }
+    for (0 ..< opt_sink_edges.len()) |i| {
+        let edge = opt_sink_edges[i]
+        let write = w_kids[edge]
+        let l = w_a[write]
+        if w_op[write] != Op.LocalSet.i32() or l < params or opt_sets[l] != 1 or opt_gets[l] != 1 { continue }
+        let value = w_kid(write, 0)
+        let at = opt_get_at[l]
+        let read = opt_read_nodes[at]
+        let use_edge = opt_read_edges[at]
+        if sink_pure(value) and single_value(w_type[value]) and use_edge >= 0 {
+            opt_reads.clear()
+            opt_pass[1] += 1
+            reads_of(value)
+            opt_rd_at[value] = opt_pass[0]
+            opt_rd_from[value] = opt_rd_pool.len()
+            opt_rd_len[value] = opt_reads.len()
+            for (0 ..< opt_reads.len()) |r| { opt_rd_pool.push(opt_reads[r]) }
+            if sink_visit(w_kids[edge + 1], read, false) == 1 {
+                w_kids[use_edge] = value
+                opt_erase(write)
+                opt_gets[l] = 0
+                opt_sets[l] = 0
+                changed = true
+                // The value's own read (if it is one) now sits where the sunk read was.
+                if w_op[value] == Op.LocalGet.i32() and opt_gets[w_a[value]] == 1 {
+                    opt_read_edges[opt_get_at[w_a[value]]] = use_edge
                 }
-                i += 1
             }
         }
     }
-    changed
+    return changed
 }
 
 /// `local.set x (v)` then a statement whose first instruction is
@@ -372,7 +395,7 @@ fn tee_stores() Bool {
             }
         }
     }
-    changed
+    return changed
 }
 
 /// The longest run of stores teed one into the next.
@@ -409,21 +432,21 @@ fn tee_into(parent: I32, from: I32, write: I32) Bool {
         holder = node
         place = 0
     }
-    false
+    return false
 }
 
 /// Whether `node` takes, somewhere in it, the value on the stack an arm starts with.
 fn holds_held(node: I32) Bool {
     if w_op[node] == Op.Held.i32() { return true }
     for (0 ..< w_count[node]) |i| { if holds_held(w_kid(node, i)) { return true } }
-    false
+    return false
 }
 
 /// Whether a node is only empty Seqs (what a removed store leaves).
 fn emits_nothing(node: I32) Bool {
     if w_op[node] != Op.Seq.i32() { return false }
     for (0 ..< w_count[node]) |i| { if not emits_nothing(w_kid(node, i)) { return false } }
-    true
+    return true
 }
 
 /// The locals `node` reads, into @opt_reads, once each; a value of this
@@ -441,6 +464,7 @@ fn reads_of(node: I32) Void {
 fn read_once(l: I32) Void {
     if opt_rd_mark[l] != opt_pass[1] {
         opt_rd_mark[l] = opt_pass[1]
+        opt_rd_index[l] = opt_reads.len()
         opt_reads.push(l)
     }
 }
@@ -457,9 +481,11 @@ fn sink_visit(node: I32, target: I32, in_loop: Bool) I32 {
     }
     let op = w_op[node]
     if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
-        for (0 ..< opt_reads.len()) |i| { if opt_reads[i] == w_a[node] { return 2 } }
+        let local = w_a[node]
+        let i = opt_rd_index[local]
+        if i < opt_reads.len() and opt_reads[i] == local { return 2 }
     }
-    0
+    return 0
 }
 
 /// The unused rewrite: each store to a local never read goes (or becomes a
@@ -540,32 +566,21 @@ vec co_noted: I32
 /// By label: whether something branches to it (labels in @co_target_list).
 vec co_targeted: U8
 vec co_target_list: I32
-/// The loops around the walk, outermost first.
-vec co_loops: I32
 /// The nodes that read or write a local.
 vec co_mentions: I32
-vec co_pos: I32 = [0]
-/// The slots locals share: each one's type, the end of the range it holds
-/// last, and the next slot of its type.
-vec co_slot_type: I32
-vec co_slot_end: I32
-vec co_slot_next: I32
-/// The slots' types, in the order they first appear, with each one's first
-/// and last slot.
+/// Types in first-appearance order, with the head and tail of their lists
+/// of locals. Each list retains stable range-start order.
 vec co_types: I32
 vec co_type_head: I32
 vec co_type_tail: I32
+vec co_type_count: I32
+vec co_next_local: I32
+/// By local: final slot relative to the first non-parameter.
+vec co_slot: I32
 /// Scratch for sorting.
 vec co_sort: I32
-/// By type, a tree of its slots' ends (each node the least below it; a slot
-/// not made yet, the most), to find the first slot free by a given start:
-/// where its tree starts, its leaves (a power of two), the slots made, and
-/// at its leaves' places, each slot.
+/// Scratch minimum tree for the current type. Each leaf holds a slot's end.
 vec co_tree: I32
-vec co_tree_at: I32
-vec co_tree_leaves: I32
-vec co_tree_made: I32
-vec co_tree_slot: I32
 
 /// Share locals whose ranges do not overlap: a local is live from its first
 /// mention to its last, and a mention inside a loop makes it live through
@@ -592,138 +607,114 @@ fn coalesce_locals(f: I32, params: I32) Void {
     co_loop_end.clear()
     co_loop_node.clear()
     co_loop_outer.clear()
-    co_loops.clear()
     co_mentions.clear()
     for (0 ..< co_target_list.len()) |i| { co_targeted[co_target_list[i]] = 0 }
     co_target_list.clear()
-    co_pos[0] = 0
-    co_walk(func_body[f])
+    co_walk(func_body[f], 0, -1)
     co_find_exposed(total)
-    // Each local's range, and the slot it takes: the first of its type free
-    // by then (locals in the order their ranges start).
+    // Widen the original ranges around loops before sorting. co_round_loop
+    // only uses one local's original range, so its end can be updated here.
     let start = Array[I32].new(total, 0)
-    let end = Array[I32].new(total, 0)
     for (params ..< total) |l| {
         start[l] = co_first[l]
-        end[l] = co_last[l]
         let lf = co_round_loop(l, co_loop_first[l])
         let ll = co_round_loop(l, co_loop_last[l])
         if lf >= 0 and co_loop_start[lf] < start[l] { start[l] = co_loop_start[lf] }
-        if ll >= 0 and co_loop_end[ll] > end[l] { end[l] = co_loop_end[ll] }
+        if ll >= 0 and co_loop_end[ll] > co_last[l] { co_last[l] = co_loop_end[ll] }
     }
     let order = Array[I32].new(n, 0)
     for (0 ..< n) |i| { order[i] = params + i }
     sort_by_key(order, start)
     let first = func_locals[f]
-    let slot_of = Array[I32].new(total, -1)
-    co_slot_type.clear()
-    co_slot_end.clear()
-    co_slot_next.clear()
+    co_group_locals(order, first, params, total)
+    // Slot reuse is independent between types. Allocate one type at a time
+    // in first-appearance order, so each new slot already has its final
+    // index and the same within-type priority as in the original walk.
+    co_slot.resize(total)
+    let count = 0
+    for (0 ..< co_types.len()) |t| {
+        let made = co_assign_slots(t, start, count)
+        co_type_count[t] = made
+        count += made
+    }
+    let runs = 1
+    for (1 ..< n) |i| { if local_types[first + i] != local_types[first + i - 1] { runs += 1 } }
+    if count == n and runs == co_types.len() { return }
+    let dest = first
+    for (0 ..< co_types.len()) |t| {
+        let vt = co_types[t]
+        let end_ = dest + co_type_count[t]
+        for (dest ..< end_) |i| { local_types[i] = vt }
+        dest = end_
+    }
+    func_local_count[f] = count
+    for (0 ..< co_mentions.len()) |k| {
+        let node = co_mentions[k]
+        let local = w_a[node]
+        if local >= params { w_a[node] = params + co_slot[local] }
+    }
+}
+
+fn co_group_locals(order: Array[I32], first: I32, params: I32, total: I32) Void {
     co_types.clear()
     co_type_head.clear()
     co_type_tail.clear()
-    // Each local's type (in the order types first appear), and a tree per type.
-    let type_of = Array[I32].new(total, 0)
-    co_tree_leaves.clear()
+    co_type_count.clear()
+    co_next_local.resize(total)
     for (order) |l| {
         let vt = local_types[first + l - params]
         let t = 0
         while (t < co_types.len() and co_types[t] != vt) { t += 1 }
+        co_next_local[l] = -1
         if t == co_types.len() {
             co_types.push(vt)
-            co_type_head.push(-1)
-            co_type_tail.push(-1)
-            co_tree_leaves.push(0)
-        }
-        type_of[l] = t
-        co_tree_leaves[t] += 1
-    }
-    co_tree_at.clear()
-    co_tree_made.clear()
-    let size = 0
-    for (0 ..< co_types.len()) |t| {
-        let leaves = 1
-        while (leaves < co_tree_leaves[t]) { leaves *= 2 }
-        co_tree_leaves[t] = leaves
-        co_tree_at.push(size)
-        co_tree_made.push(0)
-        size += leaves * 2
-    }
-    co_tree.resize(size)
-    co_tree_slot.resize(size)
-    for (0 ..< size) |i| { co_tree[i] = 2147483647 }
-    for (order) |l| {
-        let vt = local_types[first + l - params]
-        let t = type_of[l]
-        let slot = -1
-        let leaf = -1
-        if co_first[l] >= 0 and co_store_first[l] == 1 {
-            leaf = co_first_free(t, start[l])
-            if leaf >= 0 { slot = co_tree_slot[co_tree_at[t] + leaf] }
-        }
-        if slot < 0 {
-            slot = co_slot_type.len()
-            co_slot_type.push(vt)
-            co_slot_end.push(end[l])
-            co_slot_next.push(-1)
-            if co_type_tail[t] >= 0 { co_slot_next[co_type_tail[t]] = slot } else { co_type_head[t] = slot }
-            co_type_tail[t] = slot
-            leaf = co_tree_made[t]
-            co_tree_made[t] += 1
-            co_tree_slot[co_tree_at[t] + leaf] = slot
+            co_type_head.push(l)
+            co_type_tail.push(l)
+            co_type_count.push(1)
         } else {
-            co_slot_end[slot] = end[l]
+            co_next_local[co_type_tail[t]] = l
+            co_type_tail[t] = l
+            co_type_count[t] += 1
         }
-        co_tree_set(t, leaf, end[l])
-        slot_of[l] = slot
-    }
-    // The slots, declared grouped by type (in the order types first appear).
-    let count = co_slot_type.len()
-    let index = Array[I32].new(count, -1)
-    let next = 0
-    for (0 ..< co_types.len()) |t| {
-        let s = co_type_head[t]
-        while (s >= 0) {
-            index[s] = next
-            next += 1
-            s = co_slot_next[s]
-        }
-    }
-    // As they are when no two share and each type is one run already.
-    let runs = 1
-    for (1 ..< n) |i| { if local_types[first + i] != local_types[first + i - 1] { runs += 1 } }
-    if count == n and runs == co_types.len() { return }
-    for (0 ..< count) |s| { local_types[first + index[s]] = co_slot_type[s] }
-    func_local_count[f] = count
-    for (0 ..< co_mentions.len()) |k| {
-        let node = co_mentions[k]
-        if w_a[node] >= params { w_a[node] = params + index[slot_of[w_a[node]]] }
     }
 }
 
-/// Type t's first slot (as made) whose end is before `start`, as its leaf, or -1.
-fn co_first_free(t: I32, start: I32) I32 {
-    let at = co_tree_at[t]
-    let leaves = co_tree_leaves[t]
-    if co_tree[at + 1] >= start { return -1 }
-    let i = 1
-    while (i < leaves) {
-        i = if co_tree[at + i * 2] < start { i * 2 } else { i * 2 + 1 }
+/// Assign the first slot, in creation order, whose interval ends before the
+/// next local's. Leaves which have never held a local are treated as busy.
+fn co_assign_slots(t: I32, start: Array[I32], base: I32) I32 {
+    let leaves = 1
+    while (leaves < co_type_count[t]) { leaves *= 2 }
+    co_tree.resize(leaves * 2)
+    for (1 ..< leaves * 2) |i| { co_tree[i] = 2147483647 }
+    let made = 0
+    let local = co_type_head[t]
+    while (local >= 0) {
+        let leaf = -1
+        let at = start[local]
+        if co_first[local] >= 0 and co_store_first[local] == 1 and co_tree[1] < at {
+            let i = 1
+            while (i < leaves) { i = if co_tree[i * 2] < at { i * 2 } else { i * 2 + 1 } }
+            leaf = i - leaves
+        }
+        if leaf < 0 {
+            leaf = made
+            made += 1
+        }
+        co_slot[local] = base + leaf
+        co_tree_set(leaves + leaf, co_last[local])
+        local = co_next_local[local]
     }
-    i - leaves
+    return made
 }
 
-/// Type t's slot at `leaf` ends at `end`.
-fn co_tree_set(t: I32, leaf: I32, end: I32) Void {
-    let at = co_tree_at[t]
-    let i = co_tree_leaves[t] + leaf
-    co_tree[at + i] = end
-    i = i / 2
+fn co_tree_set(leaf: I32, end: I32) Void {
+    co_tree[leaf] = end
+    let i = leaf / 2
     while (i >= 1) {
-        let a = co_tree[at + i * 2]
-        let b = co_tree[at + i * 2 + 1]
-        co_tree[at + i] = if a < b { a } else { b }
-        i = i / 2
+        let a = co_tree[i * 2]
+        let b = co_tree[i * 2 + 1]
+        co_tree[i] = if a < b { a } else { b }
+        i /= 2
     }
 }
 
@@ -760,40 +751,37 @@ fn sort_by_key(order: Array[I32], key: Array[I32]) Void {
 
 /// Number the nodes in the order they run (operands first), noting each
 /// local's mentions and each loop's span.
-fn co_walk(node: I32) Void {
+fn co_walk(node: I32, start: I32, outer: I32) I32 {
     let op = w_op[node]
-    let span = -1
+    let loop_ = outer
     if op == Op.Loop.i32() {
-        span = co_loop_start.len()
-        co_loop_start.push(co_pos[0])
+        loop_ = co_loop_start.len()
+        co_loop_start.push(start)
         co_loop_end.push(-1)
         co_loop_node.push(node)
-        co_loop_outer.push(if co_loops.len() > 0 { co_loops[co_loops.len() - 1] } else { -1 })
-        co_loops.push(span)
+        co_loop_outer.push(outer)
     }
     if op == Op.Br.i32() or op == Op.BrIf.i32() {
         co_target(w_a[node])
     } else if op == Op.BrTable.i32() {
         for (0 ..< w_b[node]) |i| { co_target(w_aux[w_a[node] + i]) }
     }
-    for (0 ..< w_count[node]) |i| { co_walk(w_kid(node, i)) }
-    let at = co_pos[0]
-    co_pos[0] = at + 1
+    let at = start
+    let first = w_first[node]
+    for (first ..< first + w_count[node]) |edge| { at = co_walk(w_kids[edge], at, loop_) }
     if op == Op.LocalGet.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         let l = w_a[node]
         co_mentions.push(node)
         if co_first[l] < 0 {
             co_first[l] = at
             co_store_first[l] = if op == Op.LocalGet.i32() { 0 } else { 1 }
-            if co_loops.len() > 0 { co_loop_first[l] = co_loops[co_loops.len() - 1] }
+            co_loop_first[l] = loop_
         }
         co_last[l] = at
-        co_loop_last[l] = if co_loops.len() > 0 { co_loops[co_loops.len() - 1] } else { -1 }
+        co_loop_last[l] = loop_
     }
-    if span >= 0 {
-        co_loop_end[span] = at
-        co_loops.resize(co_loops.len() - 1)
-    }
+    if op == Op.Loop.i32() { co_loop_end[loop_] = at }
+    return at + 1
 }
 
 fn co_target(label: I32) Void {
@@ -825,7 +813,7 @@ fn co_round_loop(l: I32, inner: I32) I32 {
         if round { most = s }
         s = co_loop_outer[s]
     }
-    most
+    return most
 }
 
 /// No loop's exposed locals found yet (each is when asked: co_loop_exposed).
@@ -900,13 +888,13 @@ fn co_reads_first(n: I32, s: I32) Void {
 /// Fold each `if` of the function's walk, operands first. Whether any changed.
 fn fold_logic() Bool {
     let changed = false
-    let k = opt_nodes.len()
+    let k = opt_ifs.len()
     while (k > 0) {
         k -= 1
-        let n = opt_nodes[k]
+        let n = opt_ifs[k]
         if w_op[n] == Op.If.i32() and w_type[n] == vt_i32 and w_count[n] == 3 and fold_if(n) { changed = true }
     }
-    changed
+    return changed
 }
 
 fn fold_if(n: I32) Bool {
@@ -922,7 +910,7 @@ fn fold_if(n: I32) Bool {
     let other = if and_ { x } else if is_const(x, 1) { y } else { -1 }
     if other < 0 or not ((w_b[n] & 2) == 2 or bool_valued(other)) or cheap(other, 6) < 0 { return false }
     if range_test(n, c, other, and_) { return true }
-    relink(n, Op.Plain, if and_ { i32_and } else { i32_or }, c, other)
+    return relink(n, Op.Plain, if and_ { i32_and } else { i32_or }, c, other)
 }
 
 /// Node n rewritten in place as `op a` of kids k1 (and k2, if any), a
@@ -931,14 +919,14 @@ fn relink(n: I32, op: Op, a: I32, k1: I32, k2: I32) Bool {
     w_op[n] = op.i32()
     w_a[n] = a
     w_b[n] = 2
-    w_first[n] = w_kids.len()
-    w_kids.push(k1)
+    w_first[n] = w_kid_end()
+    w_append_kid(k1)
     w_count[n] = 1
     if k2 >= 0 {
-        w_kids.push(k2)
+        w_append_kid(k2)
         w_count[n] = 2
     }
-    true
+    return true
 }
 
 /// A branch's value: the node a Seq of one value holds, or -1.
@@ -948,7 +936,7 @@ fn seq_value(n: I32) I32 {
         if w_count[v] != 1 { return -1 }
         v = w_kid(v, 0)
     }
-    if w_type[v] == vt_i32 { v } else { -1 }
+    return if w_type[v] == vt_i32 { v } else { -1 }
 }
 
 fn is_const(n: I32, value: I32) Bool => w_op[n] == Op.I32Const.i32() and w_a[n] == value
@@ -966,7 +954,7 @@ fn bool_valued(n: I32) Bool {
         if code >= 69 and code <= 102 { return true }
         if code == i32_and or code == i32_or or code == i32_xor { return bool_valued(w_kid(n, 0)) and bool_valued(w_kid(n, 1)) }
     }
-    false
+    return false
 }
 
 /// What is left of `budget` instructions after n's, or -1 when n is more,
@@ -982,7 +970,7 @@ fn cheap(n: I32, budget: I32) I32 {
         left = cheap(w_kid(n, i), left)
         if left < 0 { return -1 }
     }
-    left
+    return left
 }
 
 /// By the last @range_bound: the local compared, and the bound (an `I64`).
@@ -1014,7 +1002,7 @@ fn range_bound(n: I32, negate: Bool) I32 {
     if code == 74 { rb_value[0] = v + 1.i64(); return 0 }
     if code == 76 { rb_value[0] = v; return 1 }
     rb_value[0] = v - 1.i64()
-    1
+    return 1
 }
 
 /// `x >= lo and x <= hi` as `x - lo <u hi - lo + 1`, and `x < lo or x > hi`
@@ -1046,9 +1034,9 @@ fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
     }
     // The new nodes, each held once.
     let old = node_holders.len()
-    node_holders.resize(w_op.len())
-    for (old ..< w_op.len()) |i| { node_holders[i] = 1 }
-    relink(n, Op.Seq, 0, w_pop(), -1)
+    node_holders.resize(w_node_count[0])
+    for (old ..< w_node_count[0]) |i| { node_holders[i] = 1 }
+    return relink(n, Op.Seq, 0, w_pop(), -1)
 }
 
 //! = Loads
@@ -1113,9 +1101,9 @@ fn reuse_loads(f: I32) Bool {
     }
     // The nodes made, each held once.
     let old = node_holders.len()
-    node_holders.resize(w_op.len())
-    for (old ..< w_op.len()) |i| { node_holders[i] = 1 }
-    true
+    node_holders.resize(w_node_count[0])
+    for (old ..< w_node_count[0]) |i| { node_holders[i] = 1 }
+    return true
 }
 
 fn ld_walk(n: I32) Void {
@@ -1148,26 +1136,26 @@ fn ld_forget(mark: I32) Void {
 /// Count `i` of @ld_local_writes or @ld_field_writes (0 when past its end).
 fn ld_count(counts: I32, i: I32) I32 {
     if counts == 0 { return if i < ld_local_writes.len() { ld_local_writes[i] } else { 0 } }
-    if i < ld_field_writes.len() { ld_field_writes[i] } else { 0 }
+    return if i < ld_field_writes.len() { ld_field_writes[i] } else { 0 }
 }
 
 /// Entry e still holds.
 fn ld_holds(e: I32) Bool {
     let r = ld_node[e]
-    ld_at_local[e] == ld_count(0, w_a[w_kid(r, 0)]) and ld_at_field[e] == ld_count(1, w_b[r])
+    return ld_at_local[e] == ld_count(0, w_a[w_kid(r, 0)]) and ld_at_field[e] == ld_count(1, w_b[r])
         and (ld_mutable[e] == 0 or ld_at_call[e] == ld_call_writes[0])
 }
 
 /// Reads r and n read the same: op, field, and local.
 fn ld_same(r: I32, n: I32) Bool {
-    w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == w_a[w_kid(n, 0)]
+    return w_op[r] == w_op[n] and w_a[r] == w_a[n] and w_b[r] == w_b[n] and w_a[w_kid(r, 0)] == w_a[w_kid(n, 0)]
 }
 
 /// (Mixed: reads of locals and types numbered in steps would fill runs of
 /// slots, which a probe walks to the end.)
 fn ld_hash(n: I32) I32 {
     let h = (((w_op[n] * 31 + w_a[n]) * 31 + w_b[n]) * 31 + w_a[w_kid(n, 0)]) * -1640531527
-    h ^ (h >>> 15)
+    return h ^ (h >>> 15)
 }
 
 /// The entry that holds and reads what n does, or -1.
@@ -1180,7 +1168,7 @@ fn ld_find(n: I32) I32 {
         if e < ld_node.len() and ld_same(ld_node[e], n) and ld_holds(e) { return e }
         h = (h + 1) & mask
     }
-    -1
+    return -1
 }
 
 /// Entry e in the slots: in an empty one, one whose entry is forgotten, or
@@ -1288,8 +1276,8 @@ fn ld_reuse(e: I32, n: I32) Void {
         w_op[r] = Op.LocalTee.i32()
         w_a[r] = t
         w_b[r] = 0
-        w_first[r] = w_kids.len()
-        w_kids.push(copy)
+        w_first[r] = w_kid_end()
+        w_append_kid(copy)
         w_count[r] = 1
         ld_node[e] = copy
     }
@@ -1311,13 +1299,16 @@ fn ld_reuse(e: I32, n: I32) Void {
 //! effects. A global never assigned is its constant. An `if`, `select` or
 //! `br_if` on a constant takes its one way.
 
+let cf_unchanged: I32 = 0
+let cf_constants: I32 = 1
+let cf_structure: I32 = 2
 vec cf_changed: I32 = [0]
 
-/// Fold function f's body; whether anything changed.
-fn fold_constants(f: I32) Bool {
-    cf_changed[0] = 0
+/// Fold the body and report whether the sparse survey is affected.
+fn fold_constants(f: I32) I32 {
+    cf_changed[0] = cf_unchanged
     func_body[f] = cf_fold(func_body[f])
-    cf_changed[0] == 1
+    return cf_changed[0]
 }
 
 /// Node n folded, its kids first: n (rewritten in place), or what replaces it.
@@ -1345,13 +1336,13 @@ fn cf_fold(n: I32) I32 {
         while (i + 1 < count) {
             if cf_diverges(w_kid(n, i)) {
                 w_count[n] = i + 1
-                cf_changed[0] = 1
+                cf_changed[0] = cf_structure
                 return n
             }
             i += 1
         }
     }
-    n
+    return n
 }
 
 /// Whether node n never completes: a `br`, `return` or `unreachable`, or
@@ -1363,7 +1354,7 @@ fn cf_diverges(n: I32) Bool {
     let count = w_count[n]
     if count == 0 or k == Op.Loop.i32() or k == Op.If.i32() or k == Op.Try.i32() or k == Op.NullElse.i32() or k == Op.CastArms.i32() { return false }
     if not cf_diverges(w_kid(n, count - 1)) { return false }
-    k != Op.Block.i32() or not cf_branches_to(n, w_a[n])
+    return k != Op.Block.i32() or not cf_branches_to(n, w_a[n])
 }
 
 /// Whether a `br`, `br_if` or `br_table` to `label` is in node n.
@@ -1374,7 +1365,7 @@ fn cf_branches_to(n: I32, label: I32) Bool {
         for (0 ..< w_b[n]) |i| { if w_aux[w_a[n] + i] == label { return true } }
     }
     for (0 ..< w_count[n]) |i| { if cf_branches_to(w_kid(n, i), label) { return true } }
-    false
+    return false
 }
 
 fn cf_const(n: I32) Bool => w_op[n] == Op.I32Const.i32() or w_op[n] == Op.I64Const.i32()
@@ -1382,37 +1373,42 @@ fn cf_const(n: I32) Bool => w_op[n] == Op.I32Const.i32() or w_op[n] == Op.I64Con
 /// A constant's value (an `i32`'s sign-extended).
 fn cf_val(n: I32) I64 {
     if w_op[n] == Op.I32Const.i32() { return w_a[n].i64() }
-    (w_b[n].i64() << 32) | (w_a[n].i64() & 4294967295)
+    return (w_b[n].i64() << 32) | (w_a[n].i64() & 4294967295)
 }
 
 /// The low 32 bits of v.
 fn cf_low(v: I64) I32 {
     let lo = v & 4294967295
     if lo >= 2147483648 { lo = lo - 4294967296 }
-    lo.i32()
+    return lo.i32()
 }
 
 /// Node n rewritten as the constant v (of type vt, `i32` or `i64`).
 fn cf_set(n: I32, vt: I32, v: I64) I32 {
+    if cf_changed[0] != cf_structure {
+        cf_changed[0] = cf_constants
+        for (0 ..< w_count[n]) |i| {
+            if not cf_const(w_kid(n, i)) { cf_changed[0] = cf_structure; break }
+        }
+    }
     w_op[n] = if vt == vt_i32 { Op.I32Const.i32() } else { Op.I64Const.i32() }
     w_type[n] = vt
     w_a[n] = cf_low(v)
     w_b[n] = if vt == vt_i32 { 0 } else { cf_low(v >> 32) }
     w_count[n] = 0
-    cf_changed[0] = 1
-    n
+    return n
 }
 
 /// x, replacing a node (a change).
 fn cf_take(x: I32) I32 {
-    cf_changed[0] = 1
-    x
+    cf_changed[0] = cf_structure
+    return x
 }
 
 /// v shifted right by k (0 to 63), zeros in.
 fn cf_shr_u(v: I64, k: I64) I64 {
     if k == 0 { return v }
-    (v >> k) & ((1.i64() << (64.i64() - k)) - 1)
+    return (v >> k) & ((1.i64() << (64.i64() - k)) - 1)
 }
 
 /// A binary `i32` or `i64` instruction.
@@ -1449,7 +1445,7 @@ fn cf_binary(n: I32) I32 {
         }
     }
     if op == 106 or op == 107 { return cf_reassociate(n, op, wide) }
-    n
+    return n
 }
 
 /// An `i32` comparison (by its opcode; `wide`, of `i64`s) of a and b.
@@ -1472,7 +1468,7 @@ fn cf_compare(op: I32, a: I64, b: I64, wide: Bool) Bool {
     if op == 72 or op == 73 { return x < y }
     if op == 74 or op == 75 { return x > y }
     if op == 76 or op == 77 { return x <= y }
-    x >= y
+    return x >= y
 }
 
 /// An `i32` arithmetic instruction (by its opcode; `wide`, of `i64`s) of a
@@ -1498,7 +1494,7 @@ fn cf_arith(op: I32, a: I64, b: I64, wide: Bool) I64 {
     // rotr by k is rotl by width - k.
     let left = if op == 119 { k } else { (width - k) & (width - 1) }
     if left == 0 { return a }
-    (u << left) | cf_shr_u(u, width - left)
+    return (u << left) | cf_shr_u(u, width - left)
 }
 
 /// n an add or sub of a constant and `x ± c` (or `c - x`): x plus a
@@ -1533,6 +1529,7 @@ fn cf_reassociate(n: I32, op: I32, wide: Bool) I32 {
     } else {
         return n
     }
+    cf_changed[0] = cf_structure
     cf_set(c, w_type[n], if negated { k - j } else { k + j })
     let minus = negated != x_negated
     if not minus and cf_val(c) == 0 { return x }
@@ -1545,7 +1542,7 @@ fn cf_reassociate(n: I32, op: I32, wide: Bool) I32 {
         set_kid(n, 0, x)
         set_kid(n, 1, c)
     }
-    n
+    return n
 }
 
 /// A unary `i32` or `i64` instruction.
@@ -1563,20 +1560,20 @@ fn cf_unary(n: I32) I32 {
         let drop: I64 = if code == 192 or code == 194 { 56 } else if code == 193 or code == 195 { 48 } else { 32 }
         return cf_set(n, if code <= 193 { vt_i32 } else { vt_i64 }, (a << drop) >> drop)
     }
-    n
+    return n
 }
 
 /// `select` on a constant: the value taken, when the other has no effects.
 fn cf_select(n: I32) I32 {
     let on = w_a[w_kid(n, 2)] != 0
     if not opt_pure(w_kid(n, if on { 1 } else { 0 })) { return n }
-    cf_take(w_kid(n, if on { 0 } else { 1 }))
+    return cf_take(w_kid(n, if on { 0 } else { 1 }))
 }
 
 /// `br_if` on a constant: `br`, or nothing (its value, if any).
 fn cf_br_if(n: I32) I32 {
     let count = w_count[n]
-    cf_changed[0] = 1
+    cf_changed[0] = cf_structure
     if w_a[w_kid(n, count - 1)] != 0 {
         w_op[n] = Op.Br.i32()
         w_count[n] = count - 1
@@ -1587,13 +1584,13 @@ fn cf_br_if(n: I32) I32 {
         opt_erase(n)
         return n
     }
-    w_kid(n, 0)
+    return w_kid(n, 0)
 }
 
 /// `if` on a constant: the arm taken, in a block of the `if`'s label and
 /// type (a branch to it still leaves it), or nothing.
 fn cf_if(n: I32) Void {
-    cf_changed[0] = 1
+    cf_changed[0] = cf_structure
     let on = w_a[w_kid(n, 0)] != 0
     if not on and w_count[n] == 2 {
         opt_erase(n)

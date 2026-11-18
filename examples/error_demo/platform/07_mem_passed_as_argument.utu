@@ -3,7 +3,7 @@
 mem samples: F64;
 
 fn total(xs: Array[F64]) F64 {
-    xs fold(0.0) |s, x| { s + x; };
+    return xs fold(0.0) |s, x| { s + x; };
 }
 
 main {

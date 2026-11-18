@@ -23,11 +23,11 @@ fn focus_after_render(id: Str) Void {
 
 fn count(state: Board, stage: Str) Str {
     let n = state.cards count_where |card| { card.stage == stage; };
-    n.f64().toString();
+    return n.f64().toString();
 }
 
 fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     section.lane {
         aria-label = label
         background:var(--well)

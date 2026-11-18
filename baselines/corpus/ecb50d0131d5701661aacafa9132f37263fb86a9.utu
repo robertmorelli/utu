@@ -1,5 +1,5 @@
 using Boxes |Box| from "./_boxes.utu";
 
 fn main() I32 {
-    Box.score(Box.new(20));
+    return Box.score(Box.new(20));
 }

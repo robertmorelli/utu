@@ -70,7 +70,7 @@ fn prof_mem() I32 {
     data_len.push(8)
     for ([8, 0, 0, 0, 0, 0, 0, 0]) |b| { data_bytes.push(b) }
     prof_memory[0] = m
-    m
+    return m
 }
 
 /// A frame of id `k` for body `block`, in declaration `decl` (instance `inst`).
@@ -78,7 +78,7 @@ fn prof_frame(block: I32, decl: I32, inst: I32) I32 {
     prof_node.push(block)
     prof_decl.push(decl)
     prof_inst.push(inst)
-    prof_node.len() - 1
+    return prof_node.len() - 1
 }
 
 /// Push frame `id`. The header `x` is the pointer (low half) and the push
@@ -153,7 +153,7 @@ fn profile_generator(gen: I32, inst: I32, k: I32) I32 {
         while (prof_gen.len() <= k) { prof_gen.push(-1) }
         prof_gen[k] = prof_node.len() - 1
     }
-    guards
+    return guards
 }
 
 /// The expansion's body is checked: as @profile_close.
@@ -172,7 +172,7 @@ fn profile_open(node: I32, decl: I32, inst: I32) I32 {
     let guards = defer_guard.len()
     prof_push(prof_frame(node, decl, inst))
     note_profile_defer(profile_pop_defer)
-    guards
+    return guards
 }
 
 /// The code is checked (void): its frame popped where it ends (a `return`
@@ -192,7 +192,7 @@ fn profile_yield(k: I32) I32 {
     let guards = defer_guard.len()
     prof_pop()
     note_profile_defer(profile_push_defer - prof_gen[k])
-    guards
+    return guards
 }
 
 /// The consumer's body is checked (still in its `continue` block): a JS
@@ -212,7 +212,7 @@ fn prof_import(resume: Bool) I32 {
     if prof_imports[k] >= 0 { return prof_imports[k] }
     let t = if resume { func_type(vl_one(vt_externref), vl_empty()) } else { func_type(vl_empty(), vl_one(vt_externref)) }
     prof_imports[k] = add_import_func(name_add("profile"), name_add(if resume { "resume" } else { "park" }), t)
-    prof_imports[k]
+    return prof_imports[k]
 }
 
 /// A call of await import `f` (of result `vt`), its promise on the stack
@@ -265,7 +265,7 @@ fn prof_owner_text(owner: I32, decl: I32, inst: I32) Str {
     if decl >= 0 and decl_node[decl] == owner { return prof_fn_text(decl, inst) }
     // `bench "sum loop"`, `test "adds"`: by its name.
     if is_kind(owner, Node.Bench_decl) or is_kind(owner, Node.Test_decl) { return owner_name(owner) + " " + node_text(first_child(owner)) }
-    owner_name(owner)
+    return owner_name(owner)
 }
 
 /// A function's name, its module's instance first: `Buffer[I32].push`.
@@ -281,5 +281,5 @@ fn prof_fn_text(decl: I32, inst: I32) Str {
     if inst > 0 and vl_len[inst_args[inst]] > 0 { text = text + "[" + type_list_text(inst_args[inst]) + "]" }
     // `&.push` is the module's type's.
     if src[start] == 38 { return text + bytes_text(start + 1, tok_end[t1 - 1]) }
-    text + "." + bytes_text(start, tok_end[t1 - 1])
+    return text + "." + bytes_text(start, tok_end[t1 - 1])
 }

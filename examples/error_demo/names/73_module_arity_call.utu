@@ -4,7 +4,7 @@ mod Pair[A, B] {
     struct &:
         | first: A
         | second: B
-    fn &.of(a: A, b: B) & { &{ first: a, second: b }; }
+    fn &.of(a: A, b: B) & { return &{ first: a, second: b }; }
 }
 
 main {

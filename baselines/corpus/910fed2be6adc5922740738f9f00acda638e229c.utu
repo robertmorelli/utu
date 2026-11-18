@@ -26,23 +26,23 @@ struct Shelf:
     | current : Measure
 
 fn Measure[Box].measure |self| () I32 {
-    self.width * self.height;
+    return self.width * self.height;
 }
 
 fn Measure[Square].measure |self| () I32 {
-    self.side * self.side;
+    return self.side * self.side;
 }
 
 fn CounterOps[Counter].bump |self| () I32 {
-    self.value + 1;
+    return self.value + 1;
 }
 
 fn total_measure(first: Measure, shelf: Shelf) I32 {
-    first.measure() + shelf.current.measure() + shelf.items[1].measure();
+    return first.measure() + shelf.current.measure() + shelf.items[1].measure();
 }
 
 fn maybe_box(flag: Bool) ?Box {
-    if flag { Box { width: 2, height: 5 }; } else { Box.null; };
+    return if flag { Box { width: 2, height: 5 }; } else { Box.null; };
 }
 
 test "protocol method sugar dispatches on tagged structs" {

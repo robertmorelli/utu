@@ -1,8 +1,6 @@
 // What: a string instruction given a number (the engine said only "not valid Wasm")
 // Expect: @ir <ir-string-measure-utf16> takes externref, given i32
-fn len(n: I32) I32 {
-    @ir/\ <ir-string-measure-utf16><ir-ident name="n"/></ir-string-measure-utf16> \/;
-}
+fn len(n: I32) I32 => @ir/\ <ir-string-measure-utf16><ir-ident name="n"/></ir-string-measure-utf16> \/;
 
 main {
     console.log(len(3));

@@ -8,7 +8,7 @@ tag struct Line[P]:
     | x : F32
     | y : F32
 
-fn P[Line].perimeter |self| () F32 { self.x; }
+fn P[Line].perimeter |self| () F32 { return self.x; }
 
 main {
     console.log(1);

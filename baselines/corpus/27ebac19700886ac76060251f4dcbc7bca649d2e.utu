@@ -20,8 +20,8 @@ mod Emitter {
     type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
 
     fn &.on |self| (event: Str, handler: cl(I32) Void) Void { emitter_on(self, event, handler); }
-    fn &.emit |self| (event: Str, value: I32) Bool { emitter_emit(self, event, value); }
-    fn &.count |self| (event: Str) I32 { emitter_count(self, event); }
+    fn &.emit |self| (event: Str, value: I32) Bool { return emitter_emit(self, event, value); }
+    fn &.count |self| (event: Str) I32 { return emitter_count(self, event); }
 }
 
 // A `new` expression becomes a zero-arg factory.
@@ -43,7 +43,7 @@ main {
 
 test "a utu closure is registered directly as a JS listener" {
     let e: Emitter = new_emitter();
-    e.on("tick", cl(v) { v + 1; });
+    e.on("tick", cl(v) { return v + 1; });
     assert e.count("tick") == 1;
 }
 

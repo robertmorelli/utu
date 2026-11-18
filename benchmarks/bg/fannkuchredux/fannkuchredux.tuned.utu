@@ -11,8 +11,7 @@
 // bench(n) returns the FNV-1a hash of the bytes BG prints.
 
 // The flips of permutation cur (0 if its first element is 0): gcc #6's inner loop.
-fn flips(cur: V128) I32 {
-    @wat/\
+fn flips(cur: V128) I32 => @wat/\
         (local $v0 v128) (local $v3 v128) (local $ramp v128) (local $f i32)
         (if (i32.eqz (i8x16.extract_lane_u 0 (local.get $cur))) (then (return (i32.const 0))))
         (local.set $ramp (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
@@ -25,32 +24,26 @@ fn flips(cur: V128) I32 {
           (local.set $f (i32.add (local.get $f) (i32.const 1)))
           (br_if $flip (i8x16.extract_lane_u 0 (local.get $v3))))
         (local.get $f)
-    \/
-}
+    \/;
 
 // The lane of the first count that may be incremented (count[i] < i).
-fn next_lane(counts: V128) I32 {
-    @wat/\
+fn next_lane(counts: V128) I32 => @wat/\
         (i32.ctz (i8x16.bitmask (i8x16.sub (local.get $counts)
           (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))))
-    \/
-}
+    \/;
 
 // Counts below lane i reset to 0, count i incremented.
-fn next_counts(counts: V128, i: I32) V128 {
-    @wat/\
+fn next_counts(counts: V128, i: I32) V128 => @wat/\
         (local $ramp v128) (local $v0 v128)
         (local.set $ramp (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
         (local.set $v0 (i8x16.splat (local.get $i)))
         (i8x16.sub
           (v128.andnot (local.get $counts) (i8x16.gt_s (local.get $v0) (local.get $ramp)))
           (i8x16.eq (local.get $v0) (local.get $ramp)))
-    \/
-}
+    \/;
 
 // The first i + 1 elements rotated left by one.
-fn rotate(cur: V128, i: I32) V128 {
-    @wat/\
+fn rotate(cur: V128, i: I32) V128 => @wat/\
         (local $ramp v128) (local $v0 v128)
         (local.set $ramp (v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15))
         (local.set $v0 (i8x16.splat (local.get $i)))
@@ -58,20 +51,17 @@ fn rotate(cur: V128, i: I32) V128 {
           (v128.andnot
             (i8x16.sub (local.get $ramp) (i8x16.gt_s (local.get $v0) (local.get $ramp)))
             (i8x16.eq (local.get $v0) (local.get $ramp))))
-    \/
-}
+    \/;
 
 // 16 bytes, lane j = byte j of lo (j < 8) or of hi.
-fn pack(lo: I64, hi: I64) V128 {
-    @wat/\ (i64x2.replace_lane 1 (i64x2.splat (local.get $lo)) (local.get $hi)) \/
-}
+fn pack(lo: I64, hi: I64) V128 => @wat/\ (i64x2.replace_lane 1 (i64x2.splat (local.get $lo)) (local.get $hi)) \/;
 
-fn shuffle(cur: V128, mask: V128) V128 { @wat/\ (i8x16.swizzle (local.get $cur) (local.get $mask)) \/ }
+fn shuffle(cur: V128, mask: V128) V128 => @wat/\ (i8x16.swizzle (local.get $cur) (local.get $mask)) \/;
 
 fn bytes(a: Array[I32], from: I32) I64 {
     let x: I64 = 0
     for (0..<8) |j| { x = x | ((a[from + j] & 255).i64() << (8 * j).i64()) }
-    x
+    return x
 }
 
 fn fannkuchredux(n: I32) I32 {
@@ -136,17 +126,17 @@ fn fannkuchredux(n: I32) I32 {
     h = fnv_int(h, n.i64())
     h = fnv_str(h, ") = ")
     h = fnv_int(h, max_flips.i64())
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 // ---- output: FNV-1a over the bytes BG prints
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 fn fnv_str(h0: I32, s: Str) I32 {
     let h = h0
     for (0..<s.len()) |i| { h = fnv(h, s.get(i)) }
-    h
+    return h
 }
 
 fn fnv_int(h0: I32, x: I64) I32 {
@@ -159,7 +149,7 @@ fn fnv_int(h0: I32, x: I64) I32 {
         h = fnv(h, 48 + (v / p % 10).i32())
         p = p / 10
     }
-    h
+    return h
 }
 
 test "fannkuchredux prints BG's output" {
@@ -168,5 +158,5 @@ test "fannkuchredux prints BG's output" {
 }
 
 lib {
-    fn bench(n: I32) I32 { fannkuchredux(n) }
+    fn bench(n: I32) I32 { return fannkuchredux(n) }
 }

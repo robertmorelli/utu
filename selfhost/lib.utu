@@ -121,7 +121,7 @@ lib {
     fn json_runtime_room(n: I32) I32 {
         json_rt[0] = abi_reserve(n)
         json_rt[1] = json_rt[0] + n
-        json_rt[0]
+        return json_rt[0]
     }
 
     /// The host cannot read the import's file (`why` as `missing_why`), whose
@@ -132,7 +132,7 @@ lib {
         missing_start[0] = src.len()
         src.resize(src.len() + n)
         missing_end[0] = src.len()
-        missing_start[0]
+        return missing_start[0]
     }
 
     /// Resolve every name. Returns the number of diagnostics.
@@ -291,7 +291,7 @@ lib {
         let w = decl_name[comptime_mem[k]]
         let text = ""
         for (src.interned_start(w) ..< src.interned_start(w) + src.interned_size(w)) |i| { text = text + Str.from_code_point(src[i]) }
-        text
+        return text
     }
 
     /// `@embed`: the files the host reads, by the byte span of their path in src.
@@ -311,7 +311,7 @@ lib {
     fn ir_invalid_room(n: I32) I32 {
         let at = src.len()
         src.resize(at + n)
-        at
+        return at
     }
 
     fn ir_invalid_report(at: I32, n: I32) Void {
@@ -328,7 +328,7 @@ lib {
         embed_bytes.resize(at + n)
         embed_start[k] = at
         embed_count[k] = n
-        at
+        return at
     }
 
     /// The file could not be read.
@@ -337,7 +337,7 @@ lib {
     /// The size of each value the host reads: 8 for 64-bit kinds, else 4.
     fn comptime_value_size(k: I32) I32 {
         let s = mem_storage(comptime_mem[k])
-        if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8 } else { 4 }
+        return if s == Storage.I64 or s == Storage.U64 or s == Storage.F64 { 8 } else { 4 }
     }
 
     /// Whether mem k's expression is still to be evaluated (1) or not (0).
@@ -366,7 +366,7 @@ lib {
         comptime_bytes.resize(at + count * comptime_value_size(k))
         comptime_start[k] = at
         comptime_count[k] = count
-        at
+        return at
     }
 
     fn diagnostic_kind(i: I32) Str => diag_kind_name(i)
@@ -401,7 +401,7 @@ lib {
     fn diagnostic_extra_file(i: I32, k: I32) I32 {
         let r = diag_extra[i] + k
         let node = extra_node[r]
-        if is_place(i, k) and node >= 0 and extra_end[r] < 0 { file_of_token(node_first[node]) } else { diag_file(i) }
+        return if is_place(i, k) and node >= 0 and extra_end[r] < 0 { file_of_token(node_first[node]) } else { diag_file(i) }
     }
 
     fn diagnostic_extra_start(i: I32, k: I32) I32 {
@@ -409,7 +409,7 @@ lib {
         if extra_kind[r] == Extra.Fix.i32() { return extra_node[r] }
         if not is_place(i, k) { return -1 }
         if extra_end[r] >= 0 { return extra_node[r] }
-        if extra_node[r] < 0 { diag_start(i) } else { tok_start[node_first[extra_node[r]]] }
+        return if extra_node[r] < 0 { diag_start(i) } else { tok_start[node_first[extra_node[r]]] }
     }
 
     fn diagnostic_extra_end(i: I32, k: I32) I32 {
@@ -417,7 +417,7 @@ lib {
         if extra_kind[r] == Extra.Fix.i32() { return extra_end[r] }
         if not is_place(i, k) { return -1 }
         if extra_end[r] >= 0 { return extra_end[r] }
-        if extra_node[r] < 0 { diag_end(i) } else { tok_end[node_last[extra_node[r]] - 1] }
+        return if extra_node[r] < 0 { diag_end(i) } else { tok_end[node_last[extra_node[r]] - 1] }
     }
 
     fn diagnostic_extra_text(i: I32, k: I32) Str => word_text(extra_text[diag_extra[i] + k])
@@ -456,7 +456,7 @@ lib {
         wat_bytes.resize(at + n)
         wat_start[k] = at
         wat_len[k] = n
-        at
+        return at
     }
 
     fn wat_fail(k: I32, from: I32, to: I32, n: I32) I32 {
@@ -466,7 +466,7 @@ lib {
         wat_message_end[k] = at + n
         wat_from[k] = from
         wat_to[k] = to
-        at
+        return at
     }
 
     fn decl_kind_name(decl: I32) Str => Decl.name(Decl(decl_kind[decl]))
@@ -480,7 +480,7 @@ lib {
     fn node_type(n: I32) Str {
         if n >= node_ty.len() { return "" }
         if node_ty[n] < 0 { return "" }
-        type_text(node_ty[n])
+        return type_text(node_ty[n])
     }
 
     /// Analysis only: check all own declarations, without emitting a module.
@@ -491,11 +491,11 @@ lib {
     fn edge_count() I32 => edge_from.len()
     fn edge_from_decl(k: I32) I32 {
         let from = edge_from[k]
-        if from <= -1000000 { -1000000 - from } else if from >= 0 and from < fi_decl.len() { fi_decl[from] } else { from }
+        return if from <= -1000000 { -1000000 - from } else if from >= 0 and from < fi_decl.len() { fi_decl[from] } else { from }
     }
     fn edge_to_decl(k: I32) I32 {
         let to = edge_to[k]
-        if to >= 0 and to < fi_decl.len() { fi_decl[to] } else { to }
+        return if to >= 0 and to < fi_decl.len() { fi_decl[to] } else { to }
     }
     fn edge_site_start(k: I32) I32 => span_start(edge_site[k])
     fn edge_site_end(k: I32) I32 => if edge_site[k] < 0 { -1 } else { tok_end[node_last[edge_site[k]] - 1] }
@@ -508,42 +508,42 @@ lib {
     fn coercion_kind(k: I32) I32 => co_kind[k]
     fn node_expected_type(n: I32) Str {
         if n < 0 or n >= node_expect.len() or node_expect[n] < 0 { return "" }
-        type_text(node_expect[n])
+        return type_text(node_expect[n])
     }
 
     /// A closure's captured declarations in source order.
     fn closure_capture_count(node: I32) I32 {
         if node < 0 or node >= node_kind.len() or not is_kind(node, Node.Closure_expr) { return 0 }
-        vl_len[captures_of(node)]
+        return vl_len[captures_of(node)]
     }
     fn closure_capture_decl(node: I32, k: I32) I32 {
         if node < 0 or node >= node_kind.len() or not is_kind(node, Node.Closure_expr) { return -1 }
         let list = captures_of(node)
-        if k < 0 or k >= vl_len[list] { -1 } else { vl_item(list, k) }
+        return if k < 0 or k >= vl_len[list] { -1 } else { vl_item(list, k) }
     }
 
     /// Direct effects: await=1, host=2, throws=4, traps=8.
     fn decl_effects(decl: I32) I32 {
         if decl < 0 or decl >= decl_kind.len() or not decl_is(decl, Decl.Fn) { return 0 }
-        effects_in(fn_body(decl))
+        return effects_in(fn_body(decl))
     }
 
     /// Wasm value representation of an expression, or "" if unchecked.
     fn node_wasm_type(n: I32) Str {
         if n < 0 or n >= node_ty.len() or node_ty[n] < 0 { return "" }
-        wasm_type_text(repr(node_ty[n]))
+        return wasm_type_text(repr(node_ty[n]))
     }
 
     /// A struct field's owner declaration and zero-based slot.
     fn node_field_owner(n: I32) I32 {
         if n < 0 or n >= node_kind.len() or not is_kind(n, Node.Field_expr) { return -1 }
         let d = node_decl[last_child(n)]
-        if decl_is(d, Decl.Field) { decl_owner[d] } else { -1 }
+        return if decl_is(d, Decl.Field) { decl_owner[d] } else { -1 }
     }
     fn node_field_index(n: I32) I32 {
         if n < 0 or n >= node_kind.len() or not is_kind(n, Node.Field_expr) { return -1 }
         let d = node_decl[last_child(n)]
-        if decl_is(d, Decl.Field) { decl_a[d] } else { -1 }
+        return if decl_is(d, Decl.Field) { decl_a[d] } else { -1 }
     }
 
     /// A local's or parameter's type, as the last build checked it ("" when
@@ -551,7 +551,7 @@ lib {
     fn decl_checked_type(decl: I32) Str {
         if decl >= decl_local.len() { return "" }
         if decl_local[decl] < 0 { return "" }
-        type_text(decl_ty[decl])
+        return type_text(decl_ty[decl])
     }
 
     /// The declaration of that type (a struct, an enum, a scalar's type;
@@ -561,7 +561,7 @@ lib {
         if decl_local[decl] < 0 { return -1 }
         let t = decl_ty[decl]
         if ty_is(t, Ty.Nullable) { t = ty_a[t] }
-        ty_decl(t)
+        return ty_decl(t)
     }
 
     /// The declaration of expression n's type, as the last build checked
@@ -574,7 +574,7 @@ lib {
             if through_null == 0 { return -1 }
             t = ty_a[t]
         }
-        ty_decl(t)
+        return ty_decl(t)
     }
 
     /// The lexer and parser alone, on one source (for their differentials):
@@ -582,7 +582,7 @@ lib {
     fn source(n: I32) I32 {
         unseal()
         reset_program()
-        file_start[add_file(n, FileRole.Entry)]
+        return file_start[add_file(n, FileRole.Entry)]
     }
 
     fn tokens(n: I32) I32 => lex(file_start[0], file_end[0])
@@ -591,13 +591,13 @@ lib {
         comment_nodes[0] = 1
         let root = parse_file(0)
         comment_nodes[0] = 0
-        root
+        return root
     }
 
     /// A node kind's name in tree-sitter's spelling.
     fn node_kind_name(kind: I32) Str {
         let name = Node.name(Node(kind))
-        Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len())
+        return Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len())
     }
 }
 
@@ -613,7 +613,7 @@ fn owner_of(node: I32) I32 {
             or k == Node.Test_decl.i32() or k == Node.Bench_decl.i32() or k == Node.Export_main_decl.i32() { return n }
         n = parent_of(n)
     }
-    -1
+    return -1
 }
 
 /// An owner's name, as a stack trace shows it.
@@ -624,7 +624,7 @@ fn owner_name(node: I32) Str {
     if is_kind(node, Node.Bench_decl) { return "bench" }
     if is_kind(node, Node.Export_main_decl) { return "main" }
     let name = first_child(node)
-    bytes_text(tok_start[node_first[name]], tok_end[node_last[name] - 1])
+    return bytes_text(tok_start[node_first[name]], tok_end[node_last[name] - 1])
 }
 
 /// Where the name of the mod an item is in starts (or ends), or -1.
@@ -632,7 +632,7 @@ fn mod_name_at(item: I32, end_: Bool) I32 {
     let p = parent_of(item)
     if p < 0 or not is_kind(p, Node.Module_decl) { return -1 }
     let n = name_node(first_child(p))
-    if end_ { tok_end[node_first[n]] } else { tok_start[node_first[n]] }
+    return if end_ { tok_end[node_first[n]] } else { tok_start[node_first[n]] }
 }
 
 /// The direct effects in one body; nested closures own their own effects.
@@ -649,7 +649,7 @@ fn effects_in(node: I32) I32 {
     }
     let c = first_child(node)
     while (c >= 0) { flags = flags | effects_in(c); c = next_sibling(c) }
-    flags
+    return flags
 }
 
 fn wasm_type_text(vt: I32) Str {
@@ -670,5 +670,5 @@ fn wasm_type_text(vt: I32) Str {
         return if vt_nullable(vt) == vt { "(ref null type " + vt_heap(vt).str() + ")" }
             else { "(ref type " + vt_heap(vt).str() + ")" }
     }
-    "value " + vt.str()
+    return "value " + vt.str()
 }

@@ -3,7 +3,7 @@
 struct S:
     | x: I32
 
-fn S.f |s| (s: I32) I32 { s; }
+fn S.f |s| (s: I32) I32 { return s; }
 
 main { console.log(1); }
 using console from std:Console

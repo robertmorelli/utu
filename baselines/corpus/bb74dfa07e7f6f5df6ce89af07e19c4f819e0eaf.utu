@@ -13,9 +13,9 @@
 mod YamlDoc {
     type & = @ir/\ <ir-wasm-ref type-repr="wasm-externref"/> \/
 
-    fn &.str |self| (key: Str) Str { yaml_get_str(self, key); }
-    fn &.int |self| (key: Str) I32 { yaml_get_int(self, key); }
-    fn &.has |self| (key: Str) Bool { yaml_has(self, key); }
+    fn &.str |self| (key: Str) Str { return yaml_get_str(self, key); }
+    fn &.int |self| (key: Str) I32 { return yaml_get_int(self, key); }
+    fn &.has |self| (key: Str) Bool { return yaml_has(self, key); }
 }
 
 let parse: fun(Str) YamlDoc =

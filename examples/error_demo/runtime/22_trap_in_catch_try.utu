@@ -1,7 +1,7 @@
 // What: a trap inside a try block (traps are not catchable)
 // Expect: the trap message, not swallowed by catch
 fn get(xs: Array[I32], i: I32) I32 {
-    try { xs[i]; } catch { -1; };
+    return try { xs[i]; } catch { -1; };
 }
 
 main {

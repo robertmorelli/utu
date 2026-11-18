@@ -26,19 +26,19 @@ struct Doc:
 
 lib {
     fn roundtrip(text: Str) Str {
-        promote @json/\ decode Doc text \/ {
+        return promote @json/\ decode Doc text \/ {
             |doc| => @json/\ encode Doc doc \/,
             ~> "invalid: " + @json/\ error Doc text \/,
         };
     }
     fn valid(text: Str) Bool {
-        promote @json/\ decode Doc text \/ {
+        return promote @json/\ decode Doc text \/ {
             |doc| => true,
             ~> false,
         };
     }
     fn total_ids(text: Str) I64 {
-        promote @json/\ decode Array[Node] text \/ {
+        return promote @json/\ decode Array[Node] text \/ {
             |nodes| => {
                 let zero: I64 = 0;
                 nodes fold(zero) |a, n| { a + n.id; };

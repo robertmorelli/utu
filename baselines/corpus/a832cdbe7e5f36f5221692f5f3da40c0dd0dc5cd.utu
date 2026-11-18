@@ -1,10 +1,10 @@
 
       lib {
-        fn widen(i: I32) F64 { i.f64(); }
-        fn narrow(f: F64) I32 { f.i32(); }
-        fn unsigned(f: F64) F64 { f.u32().f64(); }
-        fn wide(i: I32) F64 { i.i64().f64(); }
-        fn single(f: F64) F64 { f.f32().f64(); }
-        fn wrap(n: F64) I32 { n.i64().i32(); }
+        fn widen(i: I32) F64 { return i.f64(); }
+        fn narrow(f: F64) I32 { return f.i32(); }
+        fn unsigned(f: F64) F64 { return f.u32().f64(); }
+        fn wide(i: I32) F64 { return i.i64().f64(); }
+        fn single(f: F64) F64 { return f.f32().f64(); }
+        fn wrap(n: F64) I32 { return n.i64().i32(); }
       }
     

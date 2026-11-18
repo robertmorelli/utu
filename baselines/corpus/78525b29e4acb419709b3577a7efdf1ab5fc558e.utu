@@ -3,18 +3,18 @@ mod boxy[T] {
         | value : T
 
     fn Box.new(value: T) Box {
-        Box { value: value };
+        return Box { value: value };
     }
 
     fn Box.get |self| () T {
-        self.value;
+        return self.value;
     }
 }
 
 using boxy[I32] |box_i32|;
 
 fn double_inline(value: boxy[I32].Box) I32 {
-    value.get() * 2;
+    return value.get() * 2;
 }
 
 test "inline qualified types work in signatures" {

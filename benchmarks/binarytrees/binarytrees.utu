@@ -9,7 +9,7 @@ rec struct Node:
 
 // A perfect tree of the given depth, left subtree built first.
 fn bottom_up_tree(depth: I32) Node {
-    if depth > 0 {
+    return if depth > 0 {
         let left = bottom_up_tree(depth - 1)
         let right = bottom_up_tree(depth - 1)
         Node { left: left, right: right }
@@ -20,7 +20,7 @@ fn bottom_up_tree(depth: I32) Node {
 
 // The number of nodes in the tree.
 fn Node.check |self| () I32 {
-    promote self.left {
+    return promote self.left {
         |left| => 1 + left.check() + (self.right orelse fatal).check(),
         ~> 1,
     }
@@ -49,7 +49,7 @@ fn binary_trees() I64 {
     }
 
     checksum += long_lived.check().i64()
-    checksum
+    return checksum
 }
 
 test "binary trees counts its nodes" {
@@ -61,6 +61,6 @@ lib {
     fn bench(iterations: I32) I64 {
         let sink: I64 = 0
         for (0..<iterations) { sink += binary_trees() }
-        sink
+        return sink
     }
 }

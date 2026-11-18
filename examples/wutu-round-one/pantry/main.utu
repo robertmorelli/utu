@@ -9,7 +9,7 @@ struct Stock:
 struct PantryState:
 | items: Array[Stock]
 fn workspace(state: PantryState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "pantry-workspace"
     section.workspace {
         div.grid {

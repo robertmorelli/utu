@@ -1,6 +1,6 @@
 // What: a $T function binds T at two parameters
 // Expect: $T twice: bind it once, then write T
-fn same(a: $T, b: $T) Bool { a == b; }
+fn same(a: $T, b: $T) Bool { return a == b; }
 
 main { console.log(if same(1, 2) { 1; } else { 0; }); }
 using console from std:Console

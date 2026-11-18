@@ -2,7 +2,7 @@
 // Expect: @json match needs at least one pattern arm
 
 fn status(text: Str) I32 {
-    @json/\ match text {
+    return @json/\ match text {
         ~> 0,
     }\/;
 }

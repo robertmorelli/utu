@@ -8,16 +8,16 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
           | value : I32
         lib {
           fn nested(a: Bool, b: Bool) ?Cell {
-            if a { if b { null; } else { Cell { value: 7 }; }; } else { null; };
+            return if a { if b { null; } else { Cell { value: 7 }; }; } else { null; };
           }
           fn read(a: Bool, b: Bool) I32 {
-            promote nested(a, b) { |cell| => cell.value, ~> 3, };
+            return promote nested(a, b) { |cell| => cell.value, ~> 3, };
           }
           fn all_null(flag: Bool) ?Cell {
-            if flag { null; } else { null; };
+            return if flag { null; } else { null; };
           }
           fn default_only(value: I32) I32 {
-            match value { ~> 11, };
+            return match value { ~> 11, };
           }
         }
       ` });
@@ -34,7 +34,7 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
       struct Cell:
         | value : I32
       lib {
-        fn make() Array[?Cell] { Array[?Cell].new_default(2); }
+        fn make() Array[?Cell] { return Array[?Cell].new_default(2); }
       }
     `, async file => {
       const result = await compiler.compileFile(file);
@@ -52,12 +52,12 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
           | value : I32
         fn update(item: Value) I32 {
           item.value = 9;
-          item.value;
+          return item.value;
         }
         lib {
           fn run() I32 {
             let cell: Cell = Cell { value: 1 };
-            update(cell);
+            return update(cell);
           }
         }
       ` });
@@ -69,33 +69,33 @@ export function registerAdversarialCompilerTests({ test, assert, assertEq, asser
       ['invalid-module-arity', `
         mod Pair[A, B] {
           struct &: | left : A | right : B
-          fn &.new(left: A, right: B) & { &{ left: left, right: right }; }
+          fn &.new(left: A, right: B) & { return &{ left: left, right: right }; }
         }
-        lib { fn bad() Pair[I32] { Pair[I32].new(1, 2); } }
+        lib { fn bad() Pair[I32] { return Pair[I32].new(1, 2); } }
       `],
       ['non-defaultable-type', `
         struct Cell: | value : I32
-        lib { fn bad() Array[Cell] { Array[Cell].new_default(1); } }
+        lib { fn bad() Array[Cell] { return Array[Cell].new_default(1); } }
       `],
-      ['invalid-nullable-type', `lib { fn bad() ?I32 { null; } }`],
+      ['invalid-nullable-type', `lib { fn bad() ?I32 { return null; } }`],
       ['invalid-nullable-type', `lib { fn bad() Void { null; } }`],
       ['unknown-field', `struct Cell: | value : I32
-lib { fn bad() Cell { Cell { value: 1, extra: 2 }; } }`],
+lib { fn bad() Cell { return Cell { value: 1, extra: 2 }; } }`],
       ['duplicate-field', `struct Cell: | value : I32 | value : F32
-lib { fn ok() I32 { 1; } }`],
+lib { fn ok() I32 { return 1; } }`],
       ['duplicate-declaration', `tag enum Choice: | A | A
-lib { fn ok() I32 { 1; } }`],
-      ['duplicate-declaration', `lib { fn bad(x: I32, x: I32) I32 { x; } }`],
-      ['duplicate-declaration', `fn x() I32 { 1; } fn x() I32 { 2; } lib { fn bad() I32 { x(); } }`],
-      ['duplicate-declaration', `lib { fn bad(x: I32) I32 { match x { 1 => 2, 1 => 3, ~> 4, }; } }`],
+lib { fn ok() I32 { return 1; } }`],
+      ['duplicate-declaration', `lib { fn bad(x: I32, x: I32) I32 { return x; } }`],
+      ['duplicate-declaration', `fn x() I32 { return 1; } fn x() I32 { return 2; } lib { fn bad() I32 { return x(); } }`],
+      ['duplicate-declaration', `lib { fn bad(x: I32) I32 { return match x { 1 => 2, 1 => 3, ~> 4, }; } }`],
       ['unknown-method', `proto P: | value() I32
 tag struct Cell[P]: | value : I32
-lib { fn bad(p: P) I32 { p.value(); } }`],
+lib { fn bad(p: P) I32 { return p.value(); } }`],
       ['type-mismatch', `proto P: | value() I32
 tag struct Cell[P]: | value : I32
-fn P[Cell].value |self| (extra: I32) I32 { extra; }
-lib { fn bad(p: P) I32 { p.value(); } }`],
-      ['integer-literal-out-of-range', `lib { fn bad() I32 { 2147483648; } }`],
+fn P[Cell].value |self| (extra: I32) I32 { return extra; }
+lib { fn bad(p: P) I32 { return p.value(); } }`],
+      ['integer-literal-out-of-range', `lib { fn bad() I32 { return 2147483648; } }`],
     ];
 
     for (const target of ['analysis', 'normal']) {

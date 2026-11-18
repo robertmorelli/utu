@@ -2,7 +2,7 @@
 // Expect: m's instances nest more than 64 deep (it would never finish compiling)
 mod m[T] {
     fn f(n: I32) I32 {
-        if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
+        return if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
     }
 }
 

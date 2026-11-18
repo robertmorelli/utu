@@ -4,7 +4,7 @@ using console from std:Console;
 
 fn work() I32 {
     defer { console.log("done"); return 1; };
-    42;
+    return 42;
 }
 
 main {

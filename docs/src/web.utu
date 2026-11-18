@@ -3,10 +3,10 @@ using code from "./code.utu"
 using ui from "./ui.utu"
 mod web {
     fn hello_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn greeting(name: Str) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    section.greeting#hello {  // tag.class#id makes an element
         \\        h2 {  // a child element
         \\            "Hello, "  // a text node
@@ -24,14 +24,14 @@ mod web {
         \\}
     }
     fn namespaces_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn chart(done: Bool, draft: Str) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    figure {
         \\        canvas {
         \\            width = "600"  // attribute: the bitmap's resolution
-        \\            width: 300px  // CSS: its size on the page
+        \\            width: 300px
         \\            aria-label = "Sales"
         \\        }
         \\        input {
@@ -53,10 +53,10 @@ mod web {
         \\}
     }
     fn text_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn stats(user: Str, count: I32, ratio: F64) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    p {
         \\        title = "Stats for " + user  // an attribute built from text
         \\        "User "
@@ -75,14 +75,14 @@ mod web {
         \\}
     }
     fn events_closure_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Plant:
         \\    | name: Str
         \\    | watered: Bool
         \\
         \\fn plant_card(plant: Plant) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    article {
         \\        h2 { = plant.name }
         \\        button as toggle {  // name the node: toggle
@@ -102,7 +102,7 @@ mod web {
         \\}
     }
     fn events_on_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Counter:
         \\    | n: I32
@@ -131,10 +131,10 @@ mod web {
         \\}
     }
     fn components_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn badge(label: Str) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    span.badge {
         \\        padding: 0.1rem 0.5rem
         \\        border-radius: 1rem
@@ -145,7 +145,7 @@ mod web {
         \\}
         \\
         \\fn card(title: Str, body: Browser.HTMLElement) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    article.card {
         \\        h3 { = title; = badge("new") }  // a component is a function call
         \\        = body  // a slot is just a node parameter
@@ -160,11 +160,40 @@ mod web {
         \\    Browser.document.body.append(card("Slots", content))
         \\}
     }
+    fn component_insertions_sample() Str {
+        return \\using Browser from std:Browser
+        \\
+        \\struct Label[C]:
+        \\    | title: Str
+        \\    | featured: Bool
+        \\
+        \\wn C[Label].render |label| () {
+        \\    li { = label.title }
+        \\}
+        \\
+        \\let labels: Array[Label] = [Label { title: "Syntax", featured: true },
+        \\              Label { title: "Tooling", featured: false }]
+        \\
+        \\html {
+        \\    body {
+        \\        main {
+        \\            h2 { "All topics" }
+        \\            ul {
+        \\                | labels
+        \\            }
+        \\            h2 { "Featured topics" }
+        \\            ul {
+        \\                |> labels filter |label| { label.featured } collect(Label)
+        \\            }
+        \\        }
+        \\    }
+        \\}
+    }
     fn conditions_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn status(stock: I32) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    p {
         \\        if stock == 0 {
         \\            b { "Sold out" }
@@ -184,10 +213,10 @@ mod web {
         \\}
     }
     fn for_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn ranking(names: Array[Str]) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    ol {
         \\        for names |name, i| {  // the index is a U64
         \\            li {
@@ -200,7 +229,7 @@ mod web {
         \\}
         \\
         \\fn long_words(words: Array[Str]) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    ul {
         \\        for (words filter |w| { w.len() > 4 }) |w| {  // a pipeline, no temporary array
         \\            li { = w }
@@ -215,7 +244,7 @@ mod web {
         \\}
     }
     fn keyed_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Todo:
         \\    | id: Str
@@ -250,7 +279,7 @@ mod web {
         \\}
     }
     fn bind_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Order:
         \\    | name: Str
@@ -278,7 +307,7 @@ mod web {
         \\}
     }
     fn stored_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Prefs:
         \\    | name: Str
@@ -300,7 +329,7 @@ mod web {
         \\}
     }
     fn stored_manual_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Draft:
         \\    | text: Str
@@ -323,7 +352,7 @@ mod web {
         \\}
     }
     fn document_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\main {
         \\    let app = @wutu/\
@@ -345,10 +374,10 @@ mod web {
         \\}
     }
     fn local_css_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn toolbar() Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    nav {
         \\        display: flex
         \\        gap: 1rem
@@ -376,18 +405,18 @@ mod web {
         \\}
     }
     fn dynamic_css_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn meter(progress: I32, hue: I32) Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    div.bar {
-        \\        height: 0.5rem  // static: compiled to a shared class
+        \\        height: 0.5rem
         \\        background: lightgray
         \\        i {
         \\            display: block
         \\            height: 100%
-        \\            width: = progress.str() + "%"  // computed at render
-        \\            background: = "hsl(" + hue.str() + " 70% 50%)"
+        \\            width: { progress.str() + "%" }
+        \\            background: { "hsl(" + hue.str() + " 70% 50%)" }
         \\        }
         \\    }
         \\    \/
@@ -398,10 +427,10 @@ mod web {
         \\}
     }
     fn css_sheet_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn sheet() Str {
-        \\    @css/\
+        \\    return @css/\
         \\    @layer theme {
         \\        .card { border: 1px solid oklch(40% 0.12 150); border-radius: 8px; }
         \\    }
@@ -420,10 +449,10 @@ mod web {
         \\}
     }
     fn alias_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\fn search() Browser.HTMLElement {
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    form {
         \\        input as query { type = "search" }
         \\        output as result { "Nothing yet" }
@@ -444,7 +473,7 @@ mod web {
         \\}
     }
     fn route_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\main {
         \\    let app = @wutu/\
@@ -465,14 +494,14 @@ mod web {
         \\}
     }
     fn island_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Clock:
         \\    | ticks: I32
         \\
         \\fn clock(c: Clock) Browser.HTMLElement {
         \\    wutu.interval("tick", 1000.0, cl() { c.ticks += 1 })
-        \\    @wutu/\
+        \\    return @wutu/\
         \\    @island "clock"  // updates on its own
         \\    p { = `${c.ticks} seconds` }
         \\    \/
@@ -497,7 +526,7 @@ mod web {
         \\}
     }
     fn layers_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\main {
         \\    Browser.document.body.append(@wutu/\
@@ -514,7 +543,7 @@ mod web {
         \\}
     }
     fn unmanaged_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\main {
         \\    Browser.document.body.append(@wutu/\
@@ -539,7 +568,7 @@ mod web {
         \\}
     }
     fn lazy_multi() Str {
-        \\// main.utu
+        return \\// main.utu
         \\using Browser from std:Browser
         \\using guide lazy from "./guide.utu"    // its own chunk
         \\
@@ -560,21 +589,21 @@ mod web {
         \\using Browser from std:Browser
         \\mod guide {
         \\    fn page(reader: Str) Browser.HTMLElement {
-        \\        @wutu/\
+        \\        return @wutu/\
         \\        article { h1 { = "A guide for " + reader } }
         \\        \/
         \\    }
         \\}
     }
     fn build_shell() Str {
-        \\utu main.utu --port 4176
+        return \\utu main.utu --port 4176
         \\utu format main.utu --check
         \\utu build main.utu --out dist/site --title "My site"
     }
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.page {
-            = ui.header("Wutu", "Markup and CSS in one typed expression. A component is an ordinary function that returns a real DOM element.")
+            = ui.header("Wutu", "Markup and CSS in one typed expression. Compose elements, fragments, and typed components.")
             p {
                 "Every sample below is a whole program. Paste one into the "
                 a {
@@ -658,7 +687,27 @@ mod web {
             h2 {
                 "Components and slots"
             }
+            p {
+                code { "wn" }
+                " declares a function with a Wutu body. It returns an element for a single root or a document fragment for multiple roots. Use "
+                code { "= component(args)" }
+                " to insert the result of a function."
+            }
             = code.block(components_sample())
+            p {
+                "A struct that implements "
+                code { "Component" }
+                " renders through its "
+                code { "render()" }
+                " method. "
+                code { "C" }
+                " is a shorthand for the protocol. Use "
+                code { "| items" }
+                " to insert components you already have and "
+                code { "|> expression" }
+                " for a Utu expression such as a pipeline, conditional, or block. Start each insertion on its own line or separate them with a semicolon."
+            }
+            = code.block(component_insertions_sample())
             h2 {
                 "Conditions and lists"
             }
@@ -716,7 +765,7 @@ mod web {
             p {
                 "Static declarations become shared classes; "
                 code {
-                    "prop: = expr;"
+                    "prop: { expression }"
                 }
                 " values are set at render. "
                 code {

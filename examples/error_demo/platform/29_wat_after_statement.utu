@@ -2,7 +2,7 @@
 // Expect: @wat is a function's whole body: fn f(x: I32) I32 { @wat/\ … \/; }
 fn rotl(x: I32, k: I32) I32 {
     let y = x;
-    @wat/\ local.get $x local.get $k i32.rotl \/;
+    return @wat/\ local.get $x local.get $k i32.rotl \/;
 }
 
 main {

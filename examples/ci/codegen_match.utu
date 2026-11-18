@@ -6,7 +6,7 @@ enum Shape:
     | Triangle { base: I32, height: I32 }
 
 fn area(shape: Shape) I32 {
-    alt shape {
+    return alt shape {
         Circle |c| => c.radius * c.radius,
         Rect |r| => r.width * r.height,
         Triangle |t| => t.base * t.height / 2,
@@ -15,7 +15,7 @@ fn area(shape: Shape) I32 {
 }
 
 fn describe(shape: Shape) Str {
-    alt shape {
+    return alt shape {
         Circle => "circle",
         Rect => "rect",
         Triangle => "triangle",
@@ -24,7 +24,7 @@ fn describe(shape: Shape) Str {
 }
 
 fn tag(kind: I32) Str {
-    match kind {
+    return match kind {
         0 => "zero",
         1 => "one",
         ~> "many",

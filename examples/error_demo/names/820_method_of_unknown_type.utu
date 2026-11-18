@@ -4,7 +4,7 @@ struct Square:
     | side: I32
 
 fn Sqare.area |self| () I32 {
-    self.side * self.side;
+    return self.side * self.side;
 }
 
 main {

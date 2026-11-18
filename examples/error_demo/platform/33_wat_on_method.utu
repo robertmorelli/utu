@@ -3,9 +3,7 @@
 struct Counter:
     | n: I32
 
-fn Counter.bumped |self| () I32 {
-    @wat/\ local.get $self drop i32.const 1 \/;
-}
+fn Counter.bumped |self| () I32 => @wat/\ local.get $self drop i32.const 1 \/;
 
 main {
     console.log(Counter { n: 1 }.bumped());

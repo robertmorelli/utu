@@ -3,10 +3,10 @@
 struct Box:
     | n: I32
 
-fn Box.str(b: Box) Str { b.n.str(); }
+fn Box.str(b: Box) Str { return b.n.str(); }
 
 fn show(b: ?Box) Str {
-    b.str();
+    return b.str();
 }
 
 main {

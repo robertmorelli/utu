@@ -1,11 +1,11 @@
 // What: two `lib` blocks in one entry file.
 // Expect: entry surface: multiple lib declarations; merge them into one lib.
-fn area(w: F64, h: F64) F64 { w * h; }
+fn area(w: F64, h: F64) F64 { return w * h; }
 
 lib {
-    fn rect_area(w: F64, h: F64) F64 { area(w, h); }
+    fn rect_area(w: F64, h: F64) F64 { return area(w, h); }
 }
 
 lib {
-    fn square_area(s: F64) F64 { area(s, s); }
+    fn square_area(s: F64) F64 { return area(s, s); }
 }

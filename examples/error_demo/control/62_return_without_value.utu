@@ -4,7 +4,7 @@ fn find(xs: Array[I32], target: I32) I32 {
     for (xs, 0 ..< xs.len()) |x, i| {
         if x == target { return; };
     };
-    -1;
+    return -1;
 }
 
 main {

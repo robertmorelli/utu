@@ -1,15 +1,15 @@
 using Browser from std:Browser
 
 fn number(value: I32) Str {
-    value.f64().toString()
+    return value.f64().toString()
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2)
+    return "$" + (cents.f64() / 100.0).toFixed(2)
 }
 
 fn node(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal
+    return Browser.document.getElementById(id) orelse fatal
 }
 
 fn restore_focus(id: Str) Void {
@@ -70,7 +70,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
     sort(Stop)|a, b| {
         a.day<b.day
     }
-    @wutu/\
+    return @wutu/\
     section {
         id = "itinerary"
         display:grid

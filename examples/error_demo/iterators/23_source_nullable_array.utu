@@ -1,6 +1,6 @@
 // What: a pipeline over a nullable array without unwrapping it
 // Expect: the source is ?Array[I32], which may be null; unwrap it with orelse or promote
-fn maybe() ?Array[I32] { [1, 2, 3]; }
+fn maybe() ?Array[I32] { return [1, 2, 3]; }
 
 main {
     console.log(maybe() sum);

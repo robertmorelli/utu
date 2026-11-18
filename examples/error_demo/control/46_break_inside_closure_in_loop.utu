@@ -6,7 +6,7 @@ fn first_big(xs: Array[I32]) I32 {
         let test = cl(v: I32) Void { if v > 10 { break; }; };
         test(x);
     };
-    found;
+    return found;
 }
 
 main {

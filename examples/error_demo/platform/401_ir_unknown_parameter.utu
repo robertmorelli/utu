@@ -1,8 +1,6 @@
 // What: an @ir body that names a parameter the function does not have
 // Expect: @ir names no parameter b
-fn square(a: I32) I32 {
-    @ir/\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \/;
-}
+fn square(a: I32) I32 => @ir/\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \/;
 
 main {
     console.log(square(7));

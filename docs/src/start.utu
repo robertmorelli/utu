@@ -3,16 +3,16 @@ using code from "./code.utu"
 using ui from "./ui.utu"
 mod start {
     fn clone_sample() Str {
-        \\git clone https://github.com/robertmorelli/utu
+        return \\git clone https://github.com/robertmorelli/utu
         \\cd utu
         \\bun install
         \\bun run build
     }
     fn hello_sample() Str {
-        \\using console from std:Console
+        return \\using console from std:Console
         \\
         \\fn greeting(name: Str) Str {
-        \\    `hello, ${name}`
+        \\    return `hello, ${name}`
         \\}
         \\
         \\main {
@@ -20,37 +20,39 @@ mod start {
         \\}
     }
     fn run_sample() Str {
-        \\bun ./cli/utu.mjs check hello.utu    # report what is wrong with the program
+        return \\bun ./cli/utu.mjs check hello.utu    # report what is wrong with the program
         \\bun ./cli/utu.mjs run hello.utu      # build it, then call its main
         \\bun ./cli/utu.mjs test hello.utu     # build its tests, then run each
         \\bun ./cli/utu.mjs build hello.utu    # hello.wasm, and hello.mjs that loads it
     }
     fn vscode_sample() Str {
-        \\bun run package:vscode
+        return \\bun run package:vscode
         \\code --install-extension dist/utu-vscode.vsix
     }
     fn site_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
-        \\main {
-        \\    let app = @wutu/\
-        \\    main {
-        \\        padding: 2rem
-        \\        font-family: system-ui
-        \\        h1 { "Hello from utu" }
-        \\        p { "This page is Wasm, HTML, and CSS from one source file." }
+        \\html {
+        \\    head {
+        \\        title { "Hello from utu" }
         \\    }
-        \\    \/
-        \\    Browser.document.body.append(app)
+        \\    body {
+        \\        main {
+        \\            padding: 2rem
+        \\            font-family: system-ui
+        \\            h1 { "Hello from utu" }
+        \\            p { "This page is Wasm, HTML, and CSS from one source file." }
+        \\        }
+        \\    }
         \\}
     }
     fn wutu_sample() Str {
-        \\utu main.utu          # live-reload preview
+        return \\utu main.utu          # live-reload preview
         \\utu format main.utu         # format source
         \\utu build main.utu --out dist/site
     }
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.page {
             = ui.header("Getting started", "utu lives in one repository. Clone it, build the bundle once, and the same compiler serves the command line, the editor, and the browser.")
             h2 {
@@ -61,7 +63,7 @@ mod start {
                 code {
                     "dist/utu.wasm"
                 }
-                ", the self-hosted compiler, by bootstrapping it from the JavaScript compiler: stage 0 builds stage 1, stage 1 builds stage 2, and stage 2 must reproduce itself exactly."
+                ", the self-hosted compiler, using the checked-in Wasm compiler. Stage 0 builds stage 1, stage 1 builds stage 2, and stage 2 must reproduce itself exactly."
             }
             = code.shell(clone_sample())
             h2 {
@@ -72,7 +74,7 @@ mod start {
                 code {
                     "main"
                 }
-                ". A block's last expression is its value. A line break ends a statement, and ; puts two on one line."
+                ". Braced functions and closures use return to produce a value. Expression-bodied functions use =>. A line break ends a statement, and ; puts two on one line."
             }
             = code.block(hello_sample())
             = code.shell(run_sample())
@@ -130,7 +132,7 @@ mod start {
                 code {
                     "main.utu"
                 }
-                " with a Wutu root, preview it with live reload, and build it into a folder with "
+                " with a top-level html block, preview it with live reload, and build it into a folder with "
                 code {
                     "index.html"
                 }

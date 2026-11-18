@@ -55,7 +55,7 @@ let st: State = &{ seed: 42, h: 0 }
 
 
 fn alu() Str {
-    "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
+    return "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
 }
 
 // seq's n bases, 60 to a line: whole buffers of len lines, then the rest.
@@ -150,12 +150,12 @@ fn fasta(n: I32) Void {
 
 // ---- output: FNV-1a over what the program writes
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 fn write(h0: I32, len: I32) I32 {
     let h = h0
     for (0..<len) |i| { h = fnv(h, sbuf[i]) }
-    h
+    return h
 }
 
 // ---- reverse complement
@@ -280,7 +280,7 @@ fn read_into(dst: I32, src: I32, count: I32) I32 {
         if b == 62 and found < 0 and d > 0 { found = d }
         i += 1
     }
-    found
+    return found
 }
 
 
@@ -293,7 +293,7 @@ struct Reader:
 fn find_header(from: I32, to: I32) I32 {
     let i = from
     while (i < to and sbuf[i] != 62) { i += 1 }
-    if i < to { i } else { -1 }
+    return if i < to { i } else { -1 }
 }
 
 // The next sequence is sbuf[0 ..< next(r)], or -1 at the end.
@@ -320,7 +320,7 @@ fn next(r: Reader) I32 {
         if found < 0 and r.eof { found = sbuf.len() }
     }
     r.next_pos = found
-    found
+    return found
 }
 
 fn revcomp() I32 {
@@ -334,7 +334,7 @@ fn revcomp() I32 {
         h = write(h, end)
         end = next(r)
     }
-    h
+    return h
 }
 
 fn setup_input(n: I32) Void {
@@ -349,5 +349,5 @@ test "revcomp of fasta 1000 is BG's output" {
 
 lib {
     fn setup(n: I32) Void { setup_input(n) }
-    fn bench(n: I32) I32 { revcomp() }
+    fn bench(n: I32) I32 { return revcomp() }
 }

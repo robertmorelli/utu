@@ -5,7 +5,7 @@
         | Triangle { base: I32, height: I32, skew: I32 }
       lib {
         fn classify(shape: Shape) I32 {
-          alt shape {
+          return alt shape {
             Circle => 7,
             ~> 0,
           };

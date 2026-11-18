@@ -2,4 +2,4 @@ struct A:
   | b : B
 struct B:
   | a : A
-lib { fn bad() I32 { 0; } }
+lib { fn bad() I32 { return 0; } }

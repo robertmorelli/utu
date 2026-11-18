@@ -88,14 +88,14 @@ export async function loadSelfhost({ stage = Number(process.env.UTU_STAGE ?? 1) 
 }
 
 /** The self-hosted compiler (its bytes and host spec), built by a loaded self-hosted compiler. */
-export async function buildWith(compiler, { source } = {}) {
+export async function buildWith(compiler, { source, stdlib = host.stdlib } = {}) {
   const text = source ?? joinSelfhost().text;
-  const files = await loadProgram(compiler, JOINED, { readFile: async file => file === JOINED ? text : host.readFile(file) });
+  await loadProgram(compiler, JOINED, { stdlib, readFile: async file => file === JOINED ? text : host.readFile(file) });
   // (A compiler older than the limit builds without it.)
   compiler.set_move_limit?.(SELF_MOVE_LIMIT);
   const size = await compileProgram(compiler, 0);
   compiler.set_move_limit?.(0);
-  if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${files.diagnostics} diagnostics`);
+  if (size < 0) throw new Error(`the self-hosted compiler does not build itself: ${compiler.diagnostic_count()} diagnostics`);
   return builtModule(compiler, size);
 }
 

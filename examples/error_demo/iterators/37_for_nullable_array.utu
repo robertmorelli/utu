@@ -1,6 +1,6 @@
 // What: for over a nullable array without unwrapping it
 // Expect: for over ?Array[I32], which may be null; unwrap it with orelse or promote
-fn lookup() ?Array[I32] { [1, 2]; }
+fn lookup() ?Array[I32] { return [1, 2]; }
 
 main {
     let total = 0;

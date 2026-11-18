@@ -37,30 +37,30 @@ fn run${k}() ${float ? 'F64' : 'I64'} {
     m${k}.resize(70000);
     let kept = m${k}[9]${w};
     m${k}.clear();
-    total + kept + ${n('before')} + ${n(`m${k}.len()`)};
+    return total + kept + ${n('before')} + ${n(`m${k}.len()`)};
 }`;
 }).join('\n');
 const kinds = word => `${exercise(word)}
 lib {
-${KINDS.map(([kind], k) => `    fn run${k}_() ${kind.startsWith('F') ? 'F64' : 'I64'} { run${k}(); }`).join('\n')}
+${KINDS.map(([kind], k) => `    fn run${k}_() ${kind.startsWith('F') ? 'F64' : 'I64'} { return run${k}(); }`).join('\n')}
 }
 `;
 
 const growth = `
 vec v: I32;
-fn grow() I32 { for (0 ..< 100) |i| { v.push(i); }; 5; }
+fn grow() I32 { for (0 ..< 100) |i| { v.push(i); }; return 5; }
 lib {
-    fn caps() I32 { v.clear(); v.reserve(3); let a = v.cap(); v.reserve(4); let b = v.cap(); v.reserve(20); a * 10000 + b * 100 + v.cap(); }
-    fn read() I32 { v.clear(); v.push(1); v[grow()]; }
-    fn write() I32 { v.clear(); v.push(1); v[0] = grow(); v[0] * 1000 + v.len(); }
-    fn compound() I32 { v.clear(); v.push(1); v[0] += grow(); v[0]; }
+    fn caps() I32 { v.clear(); v.reserve(3); let a = v.cap(); v.reserve(4); let b = v.cap(); v.reserve(20); return a * 10000 + b * 100 + v.cap(); }
+    fn read() I32 { v.clear(); v.push(1); return v[grow()]; }
+    fn write() I32 { v.clear(); v.push(1); v[0] = grow(); return v[0] * 1000 + v.len(); }
+    fn compound() I32 { v.clear(); v.push(1); v[0] += grow(); return v[0]; }
 }
 `;
 const many = count => `${Array.from({ length: count }, (_, i) => `vec v${i}: I32;`).join('\n')}
-lib { fn total() I32 { ${Array.from({ length: count }, (_, i) => `v${i}.push(${i});`).join(' ')} v${count - 1}[0]; } }
+lib { fn total() I32 { ${Array.from({ length: count }, (_, i) => `v${i}.push(${i});`).join(' ')} return v${count - 1}[0]; } }
 `;
 const tooMany = `${Array.from({ length: 101 }, (_, i) => `mem m${i}: U8;`).join('\n')}
-lib { fn f() I32 { m0.len(); } }
+lib { fn f() I32 { return m0.len(); } }
 `;
 
 const utu = await loadNodeCompiler();

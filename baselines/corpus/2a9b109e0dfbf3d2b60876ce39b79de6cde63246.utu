@@ -1,1 +1,1 @@
-lib { fn bad() Nope { 0; } }
+lib { fn bad() Nope { return 0; } }

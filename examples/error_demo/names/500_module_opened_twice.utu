@@ -3,7 +3,7 @@
 mod cell[T] {
     struct Cell:
         | value: T
-    fn wrap(value: T) Cell { Cell { value: value }; }
+    fn wrap(value: T) Cell { return Cell { value: value }; }
 }
 using cell[I32];
 using cell[Str];

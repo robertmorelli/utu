@@ -3,7 +3,7 @@
 using Browser from std:Browser;
 
 fn view(note: Str) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     div {
         noscript { = note }
     }

@@ -6,7 +6,7 @@ let record: fun(I32) Void = @es/\ (v) => { globalThis.__v = v; } \/;
 main {
     later(1).then(cl(v) {
         let w: I32 = await later(v + 1);
-        record(w);
+        return record(w);
     });
     console.log(0);
 }

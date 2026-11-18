@@ -1,8 +1,8 @@
 
         lib {
-          fn len(s: Str) I32 { s.len(); }
-          fn get(s: Str, i: I32) I32 { s.get(i); }
-          fn index(s: Str, i: I32) I32 { s[i]; }
-          fn slice(s: Str) Str { s[1, 3]; }
+          fn len(s: Str) I32 { return s.len(); }
+          fn get(s: Str, i: I32) I32 { return s.get(i); }
+          fn index(s: Str, i: I32) I32 { return s[i]; }
+          fn slice(s: Str) Str { return s[1, 3]; }
         }
       

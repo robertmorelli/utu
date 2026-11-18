@@ -2,8 +2,8 @@ using SegmentTree from std:SegmentTree
 using Spatial from std:Spatial
 using PersistentSegmentTree from std:PersistentSegmentTree
 
-fn add(a: I32, b: I32) I32 { a + b }
-fn reaches_ten(value: I32) Bool { value >= 10 }
+fn add(a: I32, b: I32) I32 { return a + b }
+fn reaches_ten(value: I32) Bool { return value >= 10 }
 
 main {
     let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add)

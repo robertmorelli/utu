@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { bootstrap } from './selfhost-bootstrap.mjs';
 import { buildWith, instantiateBuilt, joinSelfhost, STAGE0 } from './selfhost.mjs';
 import { sourcesRecord } from '../src/selfhost/node.js';
+import { PLATFORM_SOURCES } from '../src/selfhost/platform-sources.generated.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const metaFile = path.join(ROOT, 'stage0', 'stage0.json');
@@ -26,12 +27,19 @@ function sourceAt(commit) {
     if (!text.endsWith('\n')) text += '\n';
     return text;
   }).join('');
-  return { tree, source };
+  // Provenance includes the library used to build the recorded compiler.
+  // Today's library may use different syntax or produce different Wasm.
+  const stdlib = new Map(PLATFORM_SOURCES);
+  for (const file of git('ls-tree', '-r', '--name-only', commit, 'std').split('\n')) {
+    if (!file.endsWith('.utu')) continue;
+    stdlib.set(`std:${path.basename(file, '.utu')}`, gitBytes('show', `${commit}:${file}`).toString('utf8').replaceAll('@@IR_WASM@@', 'ir-wasm-'));
+  }
+  return { tree, source, stdlib };
 }
 
-async function buildWithBytes(wasm, spec, source) {
+async function buildWithBytes(wasm, spec, source, stdlib) {
   const compiler = (await instantiateBuilt(wasm, spec)).instance.exports;
-  return buildWith(compiler, { source });
+  return buildWith(compiler, { source, stdlib });
 }
 
 function assertRecord(meta, wasm, source, tree) {
@@ -44,9 +52,9 @@ async function verify() {
   const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
   const wasm = fs.readFileSync(STAGE0);
   const spec = JSON.parse(fs.readFileSync(STAGE0.replace(/\.wasm$/, '.host.json'), 'utf8'));
-  const { tree, source } = sourceAt(meta.commit);
+  const { tree, source, stdlib } = sourceAt(meta.commit);
   assertRecord(meta, wasm, source, tree);
-  const built = await buildWithBytes(wasm, spec, source);
+  const built = await buildWithBytes(wasm, spec, source, stdlib);
   equal(built.wasm, wasm, 'stage0 wasm rebuilt from recorded sources');
   equal(Buffer.from(JSON.stringify(built.spec)), Buffer.from(JSON.stringify(spec)), 'stage0 spec rebuilt from recorded sources');
   console.log(`stage0 verified: ${meta.commit} ${meta.sha256}`);
@@ -61,11 +69,11 @@ async function verifyChain() {
     const spec = JSON.parse(git('show', `${commit}:stage0/utu.host.json`));
     const previous = gitBytes('show', `${commit}^:stage0/utu.wasm`);
     const previousSpec = JSON.parse(git('show', `${commit}^:stage0/utu.host.json`));
-    const { tree, source } = sourceAt(meta.commit);
+    const { tree, source, stdlib } = sourceAt(meta.commit);
     assertRecord(meta, wasm, source, tree);
     if (meta.builtBy !== sha256(previous)) throw new Error(`${commit}: builtBy differs from previous stage0`);
-    const first = await buildWithBytes(previous, previousSpec, source);
-    const second = await buildWithBytes(first.wasm, first.spec, source);
+    const first = await buildWithBytes(previous, previousSpec, source, stdlib);
+    const second = await buildWithBytes(first.wasm, first.spec, source, stdlib);
     equal(second.wasm, wasm, `${commit}: stage 2 wasm`);
     equal(Buffer.from(JSON.stringify(second.spec)), Buffer.from(JSON.stringify(spec)), `${commit}: stage 2 spec`);
     console.log(`verified chain link ${commit}`);

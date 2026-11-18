@@ -5,7 +5,7 @@ fn build(n: I32) Array[I32] {
     for (0 ..< n + 1) |i| {
         out[i] = i;
     };
-    out;
+    return out;
 }
 
 const mem squares: I32 = @comptime/\ build(4) \/;

@@ -1,7 +1,7 @@
 // Generated from data/style.css by tools/build-wutu.mjs. Do not edit.
 mod style {
     fn sheet() Str {
-        @css/\
+        return @css/\
 /* Foundry — one stylesheet, shared by the wutu, React, and Leptos builds. */
 :root {
   color-scheme: dark;

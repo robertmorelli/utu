@@ -1,5 +1,5 @@
 fn add_one(value: I64) I64 {
-    value + 1;
+    return value + 1;
 }
 
 fn main() I64 {
@@ -8,5 +8,5 @@ fn main() I64 {
         answer = add_one(41);
         return answer;
     };
-    answer;
+    return answer;
 }

@@ -257,6 +257,9 @@ enum(U8) Kw:
 /// The tokens the parser reads (positions of the lexer's tokens, without
 /// comments).
 export mem ptok: I32
+/// Token kinds in parser order, and the successor of each matched opener.
+mem pkind: U8
+mem pjump: I32
 
 /// The tree, by node id: its kind (a @Node). The `node_*` mems are its rows:
 /// its first token and the token after its last, its first child, and its next
@@ -272,6 +275,9 @@ vec node_parent: I32
 /// Nodes made but not yet any node's children: the next node finished takes
 /// those above its mark.
 vec pending: I32
+/// Parser-local node count, pending stack top, and first node in this parse.
+/// The exported node columns are cut to their logical size before returning.
+vec parse_size: I32 = [0, 0, 0]
 
 /// Throws, abandoning the rule that failed: an attempt that catches it
 /// restores its @Save.
@@ -297,16 +303,20 @@ fn fail(p: Parser) Void => fail_wanting(p, -1)
 /// Fails at the cursor, noting what was wanted there (a token kind, or
 /// @kw_wanted plus a keyword's word; -1 for nothing in particular).
 fn fail_wanting(p: Parser, wanted: I32) Void {
-    if p.pos > parse_furthest[0] {
-        parse_furthest[0] = p.pos
+    note_parse_failure(p.pos, wanted)
+    syntax_error()
+}
+
+/// A predictive rejection reports the same attempted token as a thrown one.
+fn note_parse_failure(pos: I32, wanted: I32) Void {
+    if pos > parse_furthest[0] {
+        parse_furthest[0] = pos
         parse_expected.clear()
     }
-    if p.pos == parse_furthest[0] and wanted >= 0 {
-        let seen = false
-        for (0 ..< parse_expected.len()) |i| { if parse_expected[i] == wanted { seen = true } }
-        if not seen { parse_expected.push(wanted) }
+    if pos == parse_furthest[0] and wanted >= 0 {
+        for (0 ..< parse_expected.len()) |i| { if parse_expected[i] == wanted { return } }
+        parse_expected.push(wanted)
     }
-    syntax_error()
 }
 
 /// What the furthest attempts wanted, in words: `"';'"`, `"';' or '}'"`, `"'(', ',' or ')'"`.
@@ -319,12 +329,12 @@ fn wanted_text() Str {
         let w = parse_expected[i]
         text = text + "'" + (if w >= kw_wanted { word_text(w - kw_wanted) } else { tok_spelling(w) }) + "'"
     }
-    text
+    return text
 }
 
 /// How a kind of token is written (or named, for the kinds with no one spelling).
 fn tok_spelling(kind: I32) Str {
-    match Tok(kind) {
+    return match Tok(kind) {
         Tok.End => "end of file",
         Tok.Error => "a character",
         Tok.Word => "a name",
@@ -393,6 +403,8 @@ fn tok_spelling(kind: I32) Str {
 /// The cursor: a position in @ptok.
 struct Parser:
     | pos: I32
+    // The current statement ends here, or -1 outside a statement.
+    | limit: I32
 
 /// Where an attempt began: the cursor and the sizes of the node mems and
 /// @pending, which @restore cuts back to.
@@ -401,20 +413,14 @@ struct Save:
     | nodes: I32
     | pending: I32
     | depth: I32
-    | limits: I32
+    | limit: I32
 
 //! = Tokens
 
-/// Where the statement being read ends (@statement_end): the parser reads a
-/// `;` there, so what it is in stops as at a written one. -1 outside one.
-vec stmt_limit: I32 = [-1]
+// The parser reads a virtual semicolon at or past the current statement's limit.
+fn past_limit(p: Parser, offset: I32) Bool => p.limit >= 0 and p.pos + offset >= p.limit
 
-fn past_limit(p: Parser, offset: I32) Bool {
-    let limit = stmt_limit[stmt_limit.len() - 1]
-    limit >= 0 and p.pos + offset >= limit
-}
-
-fn kind_at(p: Parser, offset: I32) I32 => if past_limit(p, offset) { Tok.Semi.i32() } else { tok_kind[ptok[p.pos + offset]] }
+fn kind_at(p: Parser, offset: I32) I32 => if past_limit(p, offset) { Tok.Semi.i32() } else { pkind[p.pos + offset] }
 
 fn is(p: Parser, kind: Tok) Bool => kind_at(p, 0) == kind.i32()
 
@@ -436,10 +442,11 @@ fn adjacent(a: I32, b: I32) Bool => tok_end[ptok[a]] == tok_start[ptok[b]]
 /// Identifier-shaped: a lowercase first letter, or `_` and more.
 fn shaped_at(p: Parser, offset: I32) Bool {
     if past_limit(p, offset) { return false }
-    let t = ptok[p.pos + offset]
-    if tok_kind[t] != Tok.Word.i32() { return false }
+    let at = p.pos + offset
+    if pkind[at] != Tok.Word.i32() { return false }
+    let t = ptok[at]
     let c = src[tok_start[t]]
-    (c >= 97 and c <= 122) or (c == 95 and tok_end[t] - tok_start[t] > 1)
+    return (c >= 97 and c <= 122) or (c == 95 and tok_end[t] - tok_start[t] > 1)
 }
 
 fn shaped(p: Parser) Bool => shaped_at(p, 0)
@@ -459,64 +466,103 @@ fn expect_kw(p: Parser, kw: Kw) Void {
 //! = Nodes
 
 /// Where the node about to begin starts on @pending.
-fn mark() I32 => pending.len()
+fn mark() I32 => parse_size[1]
 
-/// A node of the nodes made since `at` (on the @pending stack), spanning tokens `first ..< last`.
-fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
-    let id = node_kind.len()
-    let n = pending.len()
-    node_kind.push(kind.i32())
-    node_first.push(first)
-    node_last.push(last)
-    node_parent.push(-1)
-    if at < n {
-        node_child.push(pending[at])
-        for (at ..< n - 1) |k| {
-            node_next[pending[k]] = pending[k + 1]
-            node_parent[pending[k]] = id
+fn resize_parse_nodes(size: I32) Void {
+    node_kind.resize(size)
+    node_first.resize(size)
+    node_last.resize(size)
+    node_child.resize(size)
+    node_next.resize(size)
+    node_parent.resize(size)
+}
+
+fn start_parse_nodes() I32 {
+    let before = node_kind.len()
+    parse_size[0] = before
+    parse_size[1] = 0
+    parse_size[2] = before
+    return before
+}
+
+/// Append to aligned columns, growing them together only when full.
+fn append_parse_node(kind: Node, first: I32, last: I32, child: I32, next: I32, parent: I32) I32 {
+    let id = parse_size[0]
+    if id == node_kind.len() { resize_parse_nodes(id + (id - parse_size[2]) / 2 + 64) }
+    node_kind[id] = kind.i32()
+    node_first[id] = first
+    node_last[id] = last
+    node_child[id] = child
+    node_next[id] = next
+    node_parent[id] = parent
+    parse_size[0] = id + 1
+    return id
+}
+
+/// Collapse the nodes since `at` into a parent spanning lexer tokens.
+fn finish_tokens(kind: Node, at: I32, first: I32, last: I32) I32 {
+    let top = parse_size[1]
+    let child = if at < top { pending[at] } else { -1 }
+    let id = append_parse_node(kind, first, last, child, -1, -1)
+    if at < top {
+        let k = at
+        while (k + 1 < top) {
+            let node = pending[k]
+            k += 1
+            node_next[node] = pending[k]
+            node_parent[node] = id
         }
-        node_next[pending[n - 1]] = -1
-        node_parent[pending[n - 1]] = id
-    } else {
-        node_child.push(-1)
+        let tail = pending[k]
+        node_next[tail] = -1
+        node_parent[tail] = id
     }
-    node_next.push(-1)
-    pending.resize(at)
-    pending.push(id)
-    id
+    if at == pending.len() { pending.resize(at + at / 2 + 64) }
+    pending[at] = id
+    parse_size[1] = at + 1
+    return id
+}
+
+/// Translate parser positions when creating a node, so clients can read
+/// the lexer-token span directly and no second walk is needed.
+fn finish(kind: Node, at: I32, first: I32, last: I32) I32 {
+    let start = ptok[first]
+    let end_ = if last > first { ptok[last - 1] + 1 } else { start }
+    return finish_tokens(kind, at, start, end_)
 }
 
 /// A node from `at` up to the cursor.
 fn node(p: Parser, kind: Node, at: I32, first: I32) I32 => finish(kind, at, first, p.pos)
 
+/// A node from an existing left operand, after consuming an operator.
+fn extend_node(p: Parser, kind: Node, at: I32, left: I32) I32 {
+    return finish_tokens(kind, at, node_first[left], ptok[p.pos - 1] + 1)
+}
+
 /// A node of the token at the cursor.
 fn leaf(p: Parser, kind: Node) I32 {
-    let at = mark()
+    let token = ptok[p.pos]
     p.pos += 1
-    finish(kind, at, p.pos - 1, p.pos)
+    return finish_tokens(kind, mark(), token, token + 1)
 }
 
 /// The mark below `left`, the node on top of the stack, so a node can begin with it.
 fn mark_below(left: I32) I32 {
-    if pending[pending.len() - 1] != left { fatal }
-    pending.len() - 1
+    let below = parse_size[1] - 1
+    if pending[below] != left { fatal }
+    return below
 }
 
 /// Before an attempt that may be given up (@restore).
-fn save(p: Parser) Save => Save { pos: p.pos, nodes: node_kind.len(), pending: pending.len(), depth: parse_depth[0], limits: stmt_limit.len() }
+fn save(p: Parser) Save => Save { pos: p.pos, nodes: parse_size[0], pending: parse_size[1], depth: parse_depth[0], limit: p.limit }
 
 /// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
 fn restore(p: Parser, s: Save) Void {
     p.pos = s.pos
     parse_depth[0] = s.depth
-    stmt_limit.resize(s.limits)
-    node_kind.resize(s.nodes)
-    node_first.resize(s.nodes)
-    node_last.resize(s.nodes)
-    node_child.resize(s.nodes)
-    node_next.resize(s.nodes)
-    node_parent.resize(s.nodes)
-    pending.resize(s.pending)
+    p.limit = s.limit
+    parse_size[0] = s.nodes
+    for (parse_size[1] ..< s.pending) |k| { pending[k] = 0 }
+    parse_size[1] = s.pending
     let k = dsl_sites.len()
     while (k > 0 and dsl_sites[k - 1] >= s.nodes) { k -= 1 }
     dsl_sites.resize(k)
@@ -526,52 +572,50 @@ fn restore(p: Parser, s: Save) Void {
 
 fn identifier(p: Parser) I32 {
     if not shaped(p) { fail(p) }
-    leaf(p, Node.Identifier)
+    return leaf(p, Node.Identifier)
 }
 
 fn type_ident(p: Parser) I32 {
     if not is_word(p) { fail(p) }
-    leaf(p, Node.Type_ident)
+    return leaf(p, Node.Type_ident)
 }
 
 /// A type name where no keyword can stand.
 fn unreserved_type_ident(p: Parser) I32 {
     if is_keyword_id(word_id(p)) { fail(p) }
-    type_ident(p)
+    return type_ident(p)
 }
 
 /// `identifier` where the word is identifier-shaped, else `type_ident` (both fit here).
 fn identifier_or_type(p: Parser) I32 {
     if not is_word(p) { fail(p) }
-    leaf(p, if shaped(p) { Node.Identifier } else { Node.Type_ident })
+    return leaf(p, if shaped(p) { Node.Identifier } else { Node.Type_ident })
 }
 
 fn string_lit(p: Parser) I32 {
     if not is(p, Tok.String) { fail(p) }
-    leaf(p, Node.String_lit)
+    return leaf(p, Node.String_lit)
 }
 
 fn number(p: Parser) I32 {
     if is(p, Tok.Int) { return leaf(p, Node.Int_lit) }
     if is(p, Tok.Float) { return leaf(p, Node.Float_lit) }
     fail(p)
-    -1
+    return -1
 }
 
 fn int_lit(p: Parser) I32 {
     if not is(p, Tok.Int) { fail(p) }
-    leaf(p, Node.Int_lit)
+    return leaf(p, Node.Int_lit)
 }
 
 //! = Source file and items
 
 fn source_file(p: Parser) I32 {
-    // (A file that failed in a statement left its end behind.)
-    stmt_limit.resize(1)
     let at = mark()
     let first = p.pos
     while (not at_end(p)) { item(p) }
-    node(p, Node.Source_file, at, first)
+    return node(p, Node.Source_file, at, first)
 }
 
 /// A top-level declaration, by its first word (`export`'s by its second).
@@ -579,9 +623,9 @@ fn item(p: Parser) Void {
     let w = word_id(p)
     if w == Kw.Mod.i32() { module_decl(p); return }
     if w == Kw.Using.i32() {
-        let e = begin_statement(p)
+        let previous = begin_statement(p)
         using_decl(p)
-        end_statement(p, e)
+        end_statement(p, previous)
         return
     }
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
@@ -589,21 +633,21 @@ fn item(p: Parser) Void {
     if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
     if w == Kw.Wn.i32() { wn_decl(p); return }
     if w == Kw.Let.i32() {
-        let e = begin_statement(p)
+        let previous = begin_statement(p)
         global_decl(p)
-        end_statement(p, e)
+        end_statement(p, previous)
         return
     }
     if w == Kw.Mem.i32() or w == Kw.Vec.i32() or w == Kw.Const.i32() {
-        let e = begin_statement(p)
+        let previous = begin_statement(p)
         mem_decl(p)
-        end_statement(p, e)
+        end_statement(p, previous)
         return
     }
     if w == Kw.Type.i32() {
-        let e = begin_statement(p)
+        let previous = begin_statement(p)
         distinct_decl(p)
-        end_statement(p, e)
+        end_statement(p, previous)
         return
     }
     // `main { … }`: the program, which returns nothing; `lib { fn … }`: what JS calls.
@@ -615,9 +659,9 @@ fn item(p: Parser) Void {
         // (`lib` is `lib`, `main() T` is `main`: hints.utu says so.)
         if after == Kw.Lib.i32() or after == Kw.Main.i32() { fail(p) }
         if after == Kw.Const.i32() or after == Kw.Mem.i32() {
-            let e = begin_statement(p)
+            let previous = begin_statement(p)
             mem_decl(p)
-            end_statement(p, e)
+            end_statement(p, previous)
             return
         }
         fail(p)
@@ -637,9 +681,9 @@ fn module_item(p: Parser) Void {
     if w == Kw.Fn.i32() or w == Kw.Gn.i32() { fn_or_op_decl(p); return }
     if w == Kw.Wn.i32() { wn_decl(p); return }
     if w == Kw.Let.i32() {
-        let e = begin_statement(p)
+        let previous = begin_statement(p)
         global_decl(p)
-        end_statement(p, e)
+        end_statement(p, previous)
         return
     }
     if w == Kw.Test.i32() { test_decl(p); return }
@@ -656,14 +700,14 @@ fn module_decl(p: Parser) I32 {
     expect(p, Tok.LBrace)
     while (not is(p, Tok.RBrace)) { module_item(p) }
     expect(p, Tok.RBrace)
-    node(p, Node.Module_decl, at, first)
+    return node(p, Node.Module_decl, at, first)
 }
 
 fn module_name(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     identifier_or_type(p)
-    node(p, Node.Module_name, at, first)
+    return node(p, Node.Module_name, at, first)
 }
 
 fn module_type_param_list(p: Parser) I32 {
@@ -677,7 +721,7 @@ fn module_type_param_list(p: Parser) I32 {
         module_type_param(p)
     }
     expect(p, Tok.RBracket)
-    node(p, Node.Module_type_param_list, at, first)
+    return node(p, Node.Module_type_param_list, at, first)
 }
 
 fn module_type_param(p: Parser) I32 {
@@ -688,7 +732,7 @@ fn module_type_param(p: Parser) I32 {
     unreserved_type_ident(p)
     // `T[Ord]`: the protocols T must implement.
     if is(p, Tok.LBracket) { impl_list(p) }
-    node(p, Node.Module_type_param, at, first)
+    return node(p, Node.Module_type_param, at, first)
 }
 
 fn module_type_arg_list(p: Parser) I32 {
@@ -702,7 +746,7 @@ fn module_type_arg_list(p: Parser) I32 {
         type_(p)
     }
     expect(p, Tok.RBracket)
-    node(p, Node.Module_type_arg_list, at, first)
+    return node(p, Node.Module_type_arg_list, at, first)
 }
 
 fn impl_list(p: Parser) I32 {
@@ -718,7 +762,7 @@ fn impl_list(p: Parser) I32 {
         }
     }
     expect(p, Tok.RBracket)
-    node(p, Node.Impl_list, at, first)
+    return node(p, Node.Impl_list, at, first)
 }
 
 /// A protocol in an impl or bound list: `P`, `&`, or `m.P` from module m.
@@ -730,7 +774,7 @@ fn impl_name(p: Parser) I32 {
     node(p, Node.Module_ref, at, first)
     advance(p)
     type_ident(p)
-    node(p, Node.Qualified_type_ref, at, first)
+    return node(p, Node.Qualified_type_ref, at, first)
 }
 
 /// `.V` after `M.E` in a path: the variant V of M's enum E. Returns its
@@ -738,18 +782,18 @@ fn impl_name(p: Parser) I32 {
 fn variant_step(p: Parser) I32 {
     if not (is(p, Tok.Dot) and is_at(p, 1, Tok.Word)) { return -1 }
     advance(p)
-    type_ident(p)
+    return type_ident(p)
 }
 
 fn type_ident_or_promoted(p: Parser) I32 {
-    if is(p, Tok.Amp) { promoted_type(p) } else { type_ident(p) }
+    return if is(p, Tok.Amp) { promoted_type(p) } else { type_ident(p) }
 }
 
 fn promoted_type(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     expect(p, Tok.Amp)
-    node(p, Node.Promoted_type, at, first)
+    return node(p, Node.Promoted_type, at, first)
 }
 
 fn struct_or_enum(p: Parser) I32 {
@@ -767,7 +811,7 @@ fn struct_or_enum(p: Parser) I32 {
     if is_kw(p, Kw.Struct) { return struct_decl(p, at, first) }
     if is_kw(p, Kw.Enum) { return enum_decl(p, at, first) }
     fail(p)
-    -1
+    return -1
 }
 
 fn struct_decl(p: Parser, at: I32, first: I32) I32 {
@@ -779,7 +823,7 @@ fn struct_decl(p: Parser, at: I32, first: I32) I32 {
         advance(p)
         field(p)
     }
-    node(p, Node.Struct_decl, at, first)
+    return node(p, Node.Struct_decl, at, first)
 }
 
 fn field(p: Parser) I32 {
@@ -788,7 +832,7 @@ fn field(p: Parser) I32 {
     identifier(p)
     expect(p, Tok.Colon)
     type_(p)
-    node(p, Node.Field, at, first)
+    return node(p, Node.Field, at, first)
 }
 
 fn enum_decl(p: Parser, at: I32, first: I32) I32 {
@@ -805,7 +849,7 @@ fn enum_decl(p: Parser, at: I32, first: I32) I32 {
         advance(p)
         variant(p)
     }
-    node(p, Node.Enum_decl, at, first)
+    return node(p, Node.Enum_decl, at, first)
 }
 
 fn variant(p: Parser) I32 {
@@ -821,7 +865,7 @@ fn variant(p: Parser) I32 {
         if is(p, Tok.Minus) { advance(p) }
         int_lit(p)
     }
-    node(p, Node.Variant, at, first)
+    return node(p, Node.Variant, at, first)
 }
 
 fn field_list(p: Parser) I32 {
@@ -833,7 +877,7 @@ fn field_list(p: Parser) I32 {
         if is(p, Tok.RBrace) { break }
         field(p)
     }
-    node(p, Node.Field_list, at, first)
+    return node(p, Node.Field_list, at, first)
 }
 
 fn proto_decl(p: Parser) I32 {
@@ -846,7 +890,7 @@ fn proto_decl(p: Parser) I32 {
         advance(p)
         proto_member(p)
     }
-    node(p, Node.Proto_decl, at, first)
+    return node(p, Node.Proto_decl, at, first)
 }
 
 fn proto_member(p: Parser) I32 {
@@ -875,7 +919,7 @@ fn proto_member(p: Parser) I32 {
         return_type(p)
         node(p, Node.Proto_method, member, first)
     }
-    node(p, Node.Proto_member, at, first)
+    return node(p, Node.Proto_member, at, first)
 }
 
 fn fn_or_op_decl(p: Parser) I32 {
@@ -905,7 +949,7 @@ fn fn_or_op_decl(p: Parser) I32 {
     expect(p, Tok.RParen)
     if generator { yields(p) } else { return_type(p) }
     function_body(p)
-    node(p, Node.Fn_decl, at, first)
+    return node(p, Node.Fn_decl, at, first)
 }
 
 /// A Wutu function's body is opaque until the Wutu expansion runs.
@@ -920,7 +964,7 @@ fn wn_decl(p: Parser) I32 {
     expect(p, Tok.RParen)
     if not is(p, Tok.WutuBody) { fail(p) }
     leaf(p, Node.Wutu_body)
-    node(p, Node.Fn_decl, at, first)
+    return node(p, Node.Fn_decl, at, first)
 }
 
 /// A `gn`'s result `T`: the type it yields, as `yield T` is.
@@ -930,7 +974,7 @@ fn yields(p: Parser) I32 {
     let inner = mark()
     type_(p)
     node(p, Node.Yield_type, inner, first)
-    node(p, Node.Return_type, at, first)
+    return node(p, Node.Return_type, at, first)
 }
 
 /// A function's body: a block, or `=> expr`, a block of that one
@@ -940,10 +984,10 @@ fn function_body(p: Parser) I32 {
     let at = mark()
     let first = p.pos
     advance(p)
-    let e = begin_statement(p)
+    let previous = begin_statement(p)
     expression(p)
-    end_statement(p, e)
-    node(p, Node.Block, at, first)
+    end_statement(p, previous)
+    return node(p, Node.Block, at, first)
 }
 
 fn fn_name(p: Parser) I32 {
@@ -960,7 +1004,7 @@ fn fn_name(p: Parser) I32 {
         expect(p, Tok.Dot)
         identifier(p)
     }
-    node(p, Node.Fn_name, at, first)
+    return node(p, Node.Fn_name, at, first)
 }
 
 fn self_param(p: Parser) I32 {
@@ -969,7 +1013,7 @@ fn self_param(p: Parser) I32 {
     expect(p, Tok.Pipe)
     identifier(p)
     expect(p, Tok.Pipe)
-    node(p, Node.Self_param, at, first)
+    return node(p, Node.Self_param, at, first)
 }
 
 fn param_list(p: Parser) I32 {
@@ -981,7 +1025,7 @@ fn param_list(p: Parser) I32 {
         if is(p, Tok.RParen) { break }
         param(p)
     }
-    node(p, Node.Param_list, at, first)
+    return node(p, Node.Param_list, at, first)
 }
 
 fn param(p: Parser) I32 {
@@ -990,7 +1034,7 @@ fn param(p: Parser) I32 {
     identifier(p)
     expect(p, Tok.Colon)
     type_(p)
-    node(p, Node.Param, at, first)
+    return node(p, Node.Param, at, first)
 }
 
 fn return_type(p: Parser) I32 {
@@ -999,7 +1043,7 @@ fn return_type(p: Parser) I32 {
     // (`void` is `Void`, and `fn g() yield T` is `gn g() T`: hints.utu says so.)
     if is_kw(p, Kw.Void) or is_kw(p, Kw.Yield) { fail(p) }
     type_(p)
-    node(p, Node.Return_type, at, first)
+    return node(p, Node.Return_type, at, first)
 }
 
 fn type_list(p: Parser) I32 {
@@ -1010,7 +1054,7 @@ fn type_list(p: Parser) I32 {
         advance(p)
         type_(p)
     }
-    node(p, Node.Type_list, at, first)
+    return node(p, Node.Type_list, at, first)
 }
 
 fn global_decl(p: Parser) I32 {
@@ -1022,7 +1066,7 @@ fn global_decl(p: Parser) I32 {
     type_(p)
     expect(p, Tok.Eq)
     expression(p)
-    node(p, Node.Global_decl, at, first)
+    return node(p, Node.Global_decl, at, first)
 }
 
 fn mem_decl(p: Parser) I32 {
@@ -1040,7 +1084,7 @@ fn mem_decl(p: Parser) I32 {
         advance(p)
         expression(p)
     }
-    node(p, Node.Mem_decl, at, first)
+    return node(p, Node.Mem_decl, at, first)
 }
 
 fn distinct_decl(p: Parser) I32 {
@@ -1051,7 +1095,7 @@ fn distinct_decl(p: Parser) I32 {
     expect(p, Tok.Eq)
     expect_kw(p, Kw.Distinct)
     type_ident(p)
-    node(p, Node.Distinct_decl, at, first)
+    return node(p, Node.Distinct_decl, at, first)
 }
 
 fn type_decl(p: Parser) I32 {
@@ -1061,7 +1105,7 @@ fn type_decl(p: Parser) I32 {
     type_ident_or_promoted(p)
     expect(p, Tok.Eq)
     dsl_expr(p)
-    node(p, Node.Type_decl, at, first)
+    return node(p, Node.Type_decl, at, first)
 }
 
 /// Whether the token at position i spells `text`.
@@ -1070,7 +1114,7 @@ fn token_is(i: I32, text: Str) Bool {
     let n = tok_end[t] - tok_start[t]
     if n != text.len() { return false }
     for (0 ..< n) |k| { if src[tok_start[t] + k] != text.get(k) { return false } }
-    true
+    return true
 }
 
 fn using_decl(p: Parser) I32 {
@@ -1104,7 +1148,7 @@ fn using_decl(p: Parser) I32 {
             finish(Node.Platform_path, path, p.pos - 3, p.pos)
         }
     }
-    node(p, Node.Using_decl, at, first)
+    return node(p, Node.Using_decl, at, first)
 }
 
 /// `main { … }`, as `main() Void { … }` was.
@@ -1113,7 +1157,7 @@ fn main_decl(p: Parser) I32 {
     let first = p.pos
     advance(p)
     block(p)
-    node(p, Node.Export_main_decl, at, first)
+    return node(p, Node.Export_main_decl, at, first)
 }
 
 fn html_decl(p: Parser) I32 {
@@ -1122,7 +1166,7 @@ fn html_decl(p: Parser) I32 {
     expect_kw(p, Kw.Html)
     if not is(p, Tok.WutuBody) { fail(p) }
     leaf(p, Node.Wutu_body)
-    node(p, Node.Export_html_decl, at, first)
+    return node(p, Node.Export_html_decl, at, first)
 }
 
 /// `lib { fn … }`, as `lib { … }` was.
@@ -1135,7 +1179,7 @@ fn lib_decl(p: Parser) I32 {
         if is_kw(p, Kw.Wn) { wn_decl(p) } else { fn_or_op_decl(p) }
     }
     expect(p, Tok.RBrace)
-    node(p, Node.Export_lib_decl, at, first)
+    return node(p, Node.Export_lib_decl, at, first)
 }
 
 fn test_decl(p: Parser) I32 {
@@ -1144,7 +1188,7 @@ fn test_decl(p: Parser) I32 {
     advance(p)
     string_lit(p)
     block(p)
-    node(p, Node.Test_decl, at, first)
+    return node(p, Node.Test_decl, at, first)
 }
 
 fn bench_decl(p: Parser) I32 {
@@ -1160,7 +1204,7 @@ fn bench_decl(p: Parser) I32 {
     block(p)
     node(p, Node.Measure_decl, measure, start)
     expect(p, Tok.RBrace)
-    node(p, Node.Bench_decl, at, first)
+    return node(p, Node.Bench_decl, at, first)
 }
 
 //! = Types
@@ -1169,7 +1213,7 @@ fn type_(p: Parser) I32 {
     deeper(p)
     let made = type_at(p)
     parse_depth[0] -= 1
-    made
+    return made
 }
 
 fn type_at(p: Parser) I32 {
@@ -1180,7 +1224,7 @@ fn type_at(p: Parser) I32 {
         base_type(p)
         return node(p, Node.Nullable_type, at, first)
     }
-    base_type(p)
+    return base_type(p)
 }
 
 fn base_type(p: Parser) I32 {
@@ -1221,14 +1265,14 @@ fn base_type(p: Parser) I32 {
         return node(p, if closure { Node.Closure_type } else { Node.Func_type }, at, first)
     }
     ref_type(p)
-    node(p, Node.Ref_type, at, first)
+    return node(p, Node.Ref_type, at, first)
 }
 
 /// The inside of a `ref_type`: a type name, `M.T`, `M[A]`, `M[A].T`, or
 /// a variant of a mod's enum, `M.E.V`.
 fn ref_type(p: Parser) I32 {
     if not is_word(p) { fail(p) }
-    let s = save(p)
+    if not is_at(p, 1, Tok.LBracket) and not is_at(p, 1, Tok.Dot) { return type_ident(p) }
     let at = mark()
     let first = p.pos
     module_name(p)
@@ -1243,15 +1287,11 @@ fn ref_type(p: Parser) I32 {
         }
         return instantiated
     }
-    if is(p, Tok.Dot) {
-        node(p, Node.Module_ref, at, first)
-        advance(p)
-        type_ident(p)
-        variant_step(p)
-        return node(p, Node.Qualified_type_ref, at, first)
-    }
-    restore(p, s)
+    node(p, Node.Module_ref, at, first)
+    advance(p)
     type_ident(p)
+    variant_step(p)
+    return node(p, Node.Qualified_type_ref, at, first)
 }
 
 //! = Blocks
@@ -1262,7 +1302,7 @@ fn block(p: Parser) I32 {
     expect(p, Tok.LBrace)
     while (not is(p, Tok.RBrace)) { statement(p) }
     advance(p)
-    node(p, Node.Block, at, first)
+    return node(p, Node.Block, at, first)
 }
 
 /// A block's statement: an expression, ended as @statement_end finds (a
@@ -1274,29 +1314,28 @@ fn statement(p: Parser) Void {
         advance(p)
         return
     }
-    let e = begin_statement(p)
+    let previous = begin_statement(p)
     expression(p)
-    end_statement(p, e)
+    end_statement(p, previous)
 }
 
-/// Reading a statement from the cursor: where it ends, which the parser
-/// reads as a `;` until @end_statement.
+/// Install the virtual semicolon and return the enclosing statement's limit.
 fn begin_statement(p: Parser) I32 {
-    let e = statement_end(p)
-    stmt_limit.push(e)
-    e
+    let previous = p.limit
+    p.limit = statement_end(p)
+    return previous
 }
 
-/// After a statement: nothing may be left before its end `e`; a `;` there
-/// is read.
-fn end_statement(p: Parser, e: I32) Void {
-    stmt_limit.resize(stmt_limit.len() - 1)
-    if p.pos < e { fail_wanting(p, Tok.Semi.i32()) }
+/// Restore the enclosing boundary before inspecting the statement's end.
+fn end_statement(p: Parser, previous: I32) Void {
+    let end_ = p.limit
+    p.limit = previous
+    if p.pos < end_ { fail_wanting(p, Tok.Semi.i32()) }
     if written_semi(p) { advance(p) }
 }
 
 /// Whether a `;` is written at the cursor (not the end of a statement, read as one).
-fn written_semi(p: Parser) Bool => tok_kind[ptok[p.pos]] == Tok.Semi.i32()
+fn written_semi(p: Parser) Bool => pkind[p.pos] == Tok.Semi.i32()
 
 /// Where the statement at the cursor ends: at a `;`, at the `}` (or `)`,
 /// `]`) closing what it is in, at the end, or at a line break outside its
@@ -1308,20 +1347,73 @@ fn statement_end(p: Parser) I32 {
     let i = p.pos
     let depth = 0
     while (true) {
-        let k = tok_kind[ptok[i]]
+        let k = pkind[i]
         if k == Tok.End.i32() { return i }
         if depth == 0 {
             if k == Tok.Semi.i32() or k == Tok.RBrace.i32() or k == Tok.RParen.i32() or k == Tok.RBracket.i32() { return i }
             if i > p.pos and line_break_before(i) and not continues_line(i) { return i }
         }
-        if k == Tok.LParen.i32() or k == Tok.LBracket.i32() or k == Tok.LBrace.i32() or k == Tok.TemplateHead.i32() {
+        let flags = parse_flags[k]
+        if (flags & opens_delimiter) != 0 {
+            if depth == 0 {
+                // Nothing inside an opener can end this statement.
+                i = pjump[i]
+                continue
+            }
             depth += 1
-        } else if k == Tok.RParen.i32() or k == Tok.RBracket.i32() or k == Tok.RBrace.i32() or k == Tok.TemplateTail.i32() {
+        } else if (flags & closes_delimiter) != 0 {
             depth -= 1
         }
         i += 1
     }
-    i
+    return i
+}
+
+// Token properties used by the statement scanner and the expression parser.
+let opens_delimiter: I32 = 1
+let closes_delimiter: I32 = 2
+let continues_from_line: I32 = 4
+let continues_to_line: I32 = 8
+let assignment_token: I32 = 16
+let stops_expression: I32 = 32
+
+/// Token rows first, then keyword rows for the properties that need a word.
+const vec parse_flags: U8 = @comptime/\ build_parse_flags() \/
+
+fn build_parse_flags() Array[I32] {
+    let flags = Array[I32].new(Tok.count() + Kw.count(), 0)
+    for ([Tok.LParen, Tok.LBracket, Tok.LBrace, Tok.TemplateHead]) |k| { flags[k.i32()] |= opens_delimiter }
+    for ([Tok.RParen, Tok.RBracket, Tok.RBrace, Tok.TemplateTail]) |k| { flags[k.i32()] |= closes_delimiter }
+    for ([Tok.QuestionDot, Tok.Plus, Tok.Star, Tok.Slash, Tok.Percent, Tok.Caret, Tok.Pipe, Tok.EqEq,
+            Tok.BangEq, Tok.Lt, Tok.Gt, Tok.LtEq, Tok.GtEq, Tok.Shl, Tok.Shr, Tok.Shr3, Tok.LBrace]) |k| {
+        flags[k.i32()] |= continues_from_line
+    }
+    for ([Tok.Eq, Tok.PlusEq, Tok.MinusEq, Tok.StarEq, Tok.SlashEq, Tok.PercentEq, Tok.PipeEq, Tok.AmpEq,
+            Tok.CaretEq, Tok.ShlEq, Tok.ShrEq, Tok.Shr3Eq]) |k| {
+        flags[k.i32()] |= assignment_token | continues_to_line
+    }
+    for ([Tok.Plus, Tok.Minus, Tok.Star, Tok.Slash, Tok.Percent, Tok.Caret, Tok.Amp, Tok.EqEq, Tok.BangEq,
+            Tok.Lt, Tok.Gt, Tok.LtEq, Tok.GtEq, Tok.Shl, Tok.Shr, Tok.Shr3, Tok.Dot, Tok.QuestionDot,
+            Tok.Comma, Tok.Colon, Tok.FatArrow, Tok.TildeArrow, Tok.DotDotLt, Tok.DotDotDot]) |k| {
+        flags[k.i32()] |= continues_to_line
+    }
+    // A pipe can close a capture or an alias, and does not force continuation.
+    for ([Tok.Semi, Tok.RParen, Tok.Comma, Tok.RBrace, Tok.LBrace, Tok.RBracket, Tok.Colon, Tok.FatArrow, Tok.End]) |k| {
+        flags[k.i32()] |= stops_expression
+    }
+    for ([Kw.And, Kw.Or, Kw.Xor, Kw.Orelse, Kw.Else, Kw.Catch]) |w| {
+        flags[Tok.count() + w.i32()] |= continues_from_line | continues_to_line
+    }
+    for ([Kw.Not, Kw.Await, Kw.New, Kw.Let, Kw.If, Kw.Match, Kw.Alt, Kw.For, Kw.While, Kw.Try, Kw.Promote,
+            Kw.Defer, Kw.Errdefer, Kw.Yield, Kw.Assert, Kw.Loop]) |w| {
+        flags[Tok.count() + w.i32()] |= continues_to_line
+    }
+    return flags
+}
+
+fn parse_word_flags(word: I32) I32 {
+    if not is_keyword_id(word) { return 0 }
+    return parse_flags[Tok.count() + word]
 }
 
 /// Whether a line ends between the tokens at positions `i - 1` and `i`.
@@ -1330,71 +1422,46 @@ fn line_break_before(i: I32) Bool {
     // (A `\\` line's token holds its line's end.)
     if tok_kind[prev] == Tok.MultilineLine.i32() { return true }
     for (tok_end[prev] ..< tok_start[ptok[i]]) |b| { if src[b] == 10 { return true } }
-    false
+    return false
 }
 
 /// Whether the statement goes on across the line break before position `i`.
 fn continues_line(i: I32) Bool {
-    let k = tok_kind[ptok[i]]
-    let prev = tok_kind[ptok[i - 1]]
+    let k = pkind[i]
+    let prev = pkind[i - 1]
     if k == Tok.MultilineLine.i32() and prev == Tok.MultilineLine.i32() { return true }
-    if open_end(prev, tok_word[ptok[i - 1]]) { return true }
+    let previous = if prev == Tok.Word.i32() { parse_word_flags(tok_word[ptok[i - 1]]) } else { parse_flags[prev] }
+    if (previous & continues_to_line) != 0 { return true }
     // `.f()` goes on; `.{a, b}` is a tuple.
-    if k == Tok.Dot.i32() { return tok_kind[ptok[i + 1]] != Tok.LBrace.i32() }
-    if k == Tok.QuestionDot.i32() or k == Tok.Plus.i32() or k == Tok.Star.i32() or k == Tok.Slash.i32() or k == Tok.Percent.i32()
-        or k == Tok.Caret.i32() or k == Tok.Pipe.i32() or k == Tok.EqEq.i32() or k == Tok.BangEq.i32() or k == Tok.Lt.i32()
-        or k == Tok.Gt.i32() or k == Tok.LtEq.i32() or k == Tok.GtEq.i32() or k == Tok.Shl.i32() or k == Tok.Shr.i32()
-        or k == Tok.Shr3.i32() or k == Tok.LBrace.i32() {
-        return true
-    }
+    if k == Tok.Dot.i32() { return pkind[i + 1] != Tok.LBrace.i32() }
+    if (parse_flags[k] & continues_from_line) != 0 { return true }
     if k != Tok.Word.i32() { return false }
     let w = tok_word[ptok[i]]
-    if w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32() or w == Kw.Orelse.i32() or w == Kw.Else.i32() or w == Kw.Catch.i32() { return true }
+    if (parse_word_flags(w) & continues_from_line) != 0 { return true }
     // `from` in `using … from`; elsewhere a name.
     if w == Kw.From.i32() { return using_ahead(i) }
     // A stage with its capture, `map |x|`, `fold(0) |a, x|`, or `collect(T)`
     // (`sum`, `fold(x)` alone are a name, a call).
     if w < Kw.Map.i32() or w > Kw.Count.i32() { return false }
-    let next = tok_kind[ptok[i + 1]]
+    let next = pkind[i + 1]
     if next == Tok.Pipe.i32() { return true }
     if next != Tok.LParen.i32() { return false }
     if w == Kw.Collect.i32() { return true }
     let j = i + 2
     let depth = 1
-    while (depth > 0 and tok_kind[ptok[j]] != Tok.End.i32()) {
-        let k = tok_kind[ptok[j]]
+    while (depth > 0 and pkind[j] != Tok.End.i32()) {
+        let k = pkind[j]
         if k == Tok.LParen.i32() { depth += 1 } else if k == Tok.RParen.i32() { depth -= 1 }
         j += 1
     }
-    tok_kind[ptok[j]] == Tok.Pipe.i32()
+    return pkind[j] == Tok.Pipe.i32()
 }
 
 /// Whether the statement the token at position `i` is in begins `using`.
 fn using_ahead(i: I32) Bool {
     let j = i - 1
     while (j > 0 and not line_break_before(j)) { j -= 1 }
-    tok_word[ptok[j]] == Kw.Using.i32()
-}
-
-/// Whether a statement cannot end after a token of kind `k` (word `w`): an
-/// operator, `=`, `,`, `.`, or a word that wants more (`and`, `let`, `else`).
-/// (Not `|`: it closes a capture or an alias, `using m |a|`.)
-fn open_end(k: I32, w: I32) Bool {
-    if k == Tok.Word.i32() {
-        return w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32() or w == Kw.Orelse.i32() or w == Kw.Not.i32()
-            or w == Kw.Await.i32() or w == Kw.New.i32() or w == Kw.Let.i32() or w == Kw.If.i32() or w == Kw.Else.i32()
-            or w == Kw.Match.i32() or w == Kw.Alt.i32() or w == Kw.For.i32() or w == Kw.While.i32() or w == Kw.Try.i32()
-            or w == Kw.Promote.i32() or w == Kw.Defer.i32() or w == Kw.Errdefer.i32() or w == Kw.Yield.i32() or w == Kw.Assert.i32()
-            or w == Kw.Catch.i32() or w == Kw.Loop.i32()
-    }
-    k == Tok.Eq.i32() or k == Tok.PlusEq.i32() or k == Tok.MinusEq.i32() or k == Tok.StarEq.i32() or k == Tok.SlashEq.i32()
-        or k == Tok.PercentEq.i32() or k == Tok.PipeEq.i32() or k == Tok.AmpEq.i32() or k == Tok.CaretEq.i32() or k == Tok.ShlEq.i32()
-        or k == Tok.ShrEq.i32() or k == Tok.Shr3Eq.i32() or k == Tok.Plus.i32() or k == Tok.Minus.i32() or k == Tok.Star.i32()
-        or k == Tok.Slash.i32() or k == Tok.Percent.i32() or k == Tok.Caret.i32() or k == Tok.Amp.i32()
-        or k == Tok.EqEq.i32() or k == Tok.BangEq.i32() or k == Tok.Lt.i32() or k == Tok.Gt.i32() or k == Tok.LtEq.i32()
-        or k == Tok.GtEq.i32() or k == Tok.Shl.i32() or k == Tok.Shr.i32() or k == Tok.Shr3.i32() or k == Tok.Dot.i32()
-        or k == Tok.QuestionDot.i32() or k == Tok.Comma.i32() or k == Tok.Colon.i32() or k == Tok.FatArrow.i32()
-        or k == Tok.TildeArrow.i32() or k == Tok.DotDotLt.i32() or k == Tok.DotDotDot.i32()
+    return tok_word[ptok[j]] == Kw.Using.i32()
 }
 
 fn capture(p: Parser) I32 {
@@ -1407,7 +1474,7 @@ fn capture(p: Parser) I32 {
         identifier(p)
     }
     expect(p, Tok.Pipe)
-    node(p, Node.Capture, at, first)
+    return node(p, Node.Capture, at, first)
 }
 
 //! = Expressions
@@ -1419,7 +1486,7 @@ fn expression(p: Parser) I32 => expr(p, -1000, true)
 /// when `or_equal` (the rule this operand belongs to is right-associative).
 fn expr(p: Parser, min: I32, or_equal: Bool) I32 {
     deeper(p)
-    extend(p, prefix(p), min, or_equal)
+    return extend(p, prefix(p), min, or_equal)
 }
 
 /// `left` and the operations after it, as `expr` reads them; one `deeper` ends.
@@ -1432,17 +1499,17 @@ fn extend(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
         }
         left = next
     }
-    left
+    return left
 }
 
 fn binds(precedence: I32, min: I32, or_equal: Bool) Bool {
-    precedence > min or (precedence == min and or_equal)
+    return precedence > min or (precedence == min and or_equal)
 }
 
 /// The precedence of the binary operator at the cursor (a token or a
 /// keyword), or -1 if none. `^` (12) is the one right-associative.
-fn binary_precedence(p: Parser) I32 {
-    match Tok(kind_at(p, 0)) {
+fn binary_precedence(kind: I32, word: I32) I32 {
+    return match Tok(kind) {
         Tok.Caret => 12,
         Tok.Star => 11,
         Tok.Slash => 11,
@@ -1460,17 +1527,8 @@ fn binary_precedence(p: Parser) I32 {
         Tok.Gt => 5,
         Tok.LtEq => 5,
         Tok.GtEq => 5,
-        ~> {
-            let w = word_id(p)
-            if w == Kw.And.i32() { 4 } else if w == Kw.Xor.i32() { 3 } else if w == Kw.Or.i32() { 2 } else { -1 }
-        },
+        ~> if word == Kw.And.i32() { 4 } else if word == Kw.Xor.i32() { 3 } else if word == Kw.Or.i32() { 2 } else { -1 },
     }
-}
-
-fn is_assignment(k: I32) Bool {
-    k == Tok.Eq.i32() or k == Tok.PlusEq.i32() or k == Tok.MinusEq.i32() or k == Tok.StarEq.i32()
-        or k == Tok.SlashEq.i32() or k == Tok.PercentEq.i32() or k == Tok.ShlEq.i32() or k == Tok.ShrEq.i32()
-        or k == Tok.Shr3Eq.i32() or k == Tok.AmpEq.i32() or k == Tok.PipeEq.i32() or k == Tok.CaretEq.i32()
 }
 
 /// The form of an iterator keyword: 0 capture, 1 param-capture, 2 param,
@@ -1485,18 +1543,14 @@ fn iterator_form(w: I32) I32 {
     if w == Kw.Group_by.i32() or w == Kw.Distinct_by.i32() { return 5 }
     if w == Kw.Batched.i32() or w == Kw.Windows.i32() { return 6 }
     if w >= Kw.Sum.i32() and w <= Kw.Count.i32() { return 7 }
-    -1
+    return -1
 }
 
 /// Extend `left` by one postfix or infix operation, or return -1.
 fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     let k = kind_at(p, 0)
-    // What most often follows an expression ends it.
-    if k == Tok.Semi.i32() or k == Tok.RParen.i32() or k == Tok.Comma.i32() or k == Tok.RBrace.i32()
-        or k == Tok.LBrace.i32() or k == Tok.RBracket.i32() or k == Tok.Colon.i32() or k == Tok.FatArrow.i32()
-        or k == Tok.End.i32() {
-        return -1
-    }
+    let flags = parse_flags[k]
+    if (flags & stops_expression) != 0 { return -1 }
     let w = word_id(p)
     // Postfix: calls, fields, indexes (precedence 14).
     if binds(14, min, or_equal) {
@@ -1505,13 +1559,13 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
             advance(p)
             arg_list_or_none(p)
             expect(p, Tok.RParen)
-            return node(p, Node.Call_expr, at, node_first[left])
+            return extend_node(p, Node.Call_expr, at, left)
         }
         if k == Tok.Dot.i32() or k == Tok.QuestionDot.i32() {
             let at = mark_below(left)
             advance(p)
             identifier_or_type(p)
-            return node(p, if k == Tok.Dot.i32() { Node.Field_expr } else { Node.Optional_field_expr }, at, node_first[left])
+            return extend_node(p, if k == Tok.Dot.i32() { Node.Field_expr } else { Node.Optional_field_expr }, at, left)
         }
         if k == Tok.LBracket.i32() {
             let at = mark_below(left)
@@ -1521,24 +1575,24 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
                 advance(p)
                 expression(p)
                 expect(p, Tok.RBracket)
-                return node(p, Node.Slice_expr, at, node_first[left])
+                return extend_node(p, Node.Slice_expr, at, left)
             }
             expect(p, Tok.RBracket)
-            return node(p, Node.Index_expr, at, node_first[left])
+            return extend_node(p, Node.Index_expr, at, left)
         }
     }
     // Compound assignment keywords are one token: `x and= y`.
     if (w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32()) and is_at(p, 1, Tok.Eq) and adjacent(p.pos, p.pos + 1) {
         return assignment(p, left, 2)
     }
-    if is_assignment(k) { return assignment(p, left, 1) }
-    let precedence = binary_precedence(p)
+    if (flags & assignment_token) != 0 { return assignment(p, left, 1) }
+    let precedence = binary_precedence(k, w)
     if precedence >= 0 {
         if not binds(precedence, min, or_equal) { return -1 }
         let at = mark_below(left)
         advance(p)
         expr(p, precedence, precedence == 12)
-        return node(p, Node.Binary_expr, at, node_first[left])
+        return extend_node(p, Node.Binary_expr, at, left)
     }
     let form = iterator_form(w)
     if form >= 0 {
@@ -1550,9 +1604,9 @@ fn infix(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
         let at = mark_below(left)
         advance(p)
         expr(p, 1, false)
-        return node(p, Node.Else_expr, at, node_first[left])
+        return extend_node(p, Node.Else_expr, at, left)
     }
-    -1
+    return -1
 }
 
 /// An assignment to `left`, whatever the surrounding precedence: tree-sitter
@@ -1567,7 +1621,7 @@ fn assignment(p: Parser, left: I32, operator_tokens: I32) I32 {
     let at = mark_below(left)
     p.pos += operator_tokens
     expr(p, 0, true)
-    node(p, Node.Assign_expr, at, node_first[left])
+    return extend_node(p, Node.Assign_expr, at, left)
 }
 
 fn arg_list_or_none(p: Parser) Void {
@@ -1611,7 +1665,7 @@ fn iterator(p: Parser, left: I32, form: I32) I32 {
         capture(p)
         block(p)
     }
-    node(p, Node.Iterator_expr, at, node_first[left])
+    return extend_node(p, Node.Iterator_expr, at, left)
 }
 
 /// How deeply the parse is nested (expressions, types, `else if`s), and the
@@ -1671,13 +1725,13 @@ fn prefix(p: Parser) I32 {
     }
     if is(p, Tok.At) { return dsl_expr(p) }
     fail(p)
-    -1
+    return -1
 }
 
 /// Keywords that begin an expression; elsewhere these words are identifiers.
 /// (Keywords are the first words interned: any other is past them.)
 fn is_expression_keyword(w: I32) Bool {
-    w < Kw.count() and (w == Kw.If.i32() or w == Kw.Match.i32() or w == Kw.Loop.i32() or w == Kw.Alt.i32()
+    return w < Kw.count() and (w == Kw.If.i32() or w == Kw.Match.i32() or w == Kw.Loop.i32() or w == Kw.Alt.i32()
         or w == Kw.Promote.i32() or w == Kw.Try.i32() or w == Kw.For.i32() or w == Kw.While.i32()
         or w == Kw.Break.i32() or w == Kw.Continue.i32() or w == Kw.Defer.i32() or w == Kw.Errdefer.i32()
         or w == Kw.Yield.i32() or w == Kw.Return.i32() or w == Kw.Let.i32() or w == Kw.Cl.i32() or w == Kw.Fatal.i32()
@@ -1761,7 +1815,7 @@ fn keyword_expression(p: Parser) I32 {
     if w == Kw.For.i32() { return for_expr(p) }
     if w == Kw.While.i32() { return while_expr(p) }
     fail(p)
-    -1
+    return -1
 }
 
 /// `text ${expr} text`: its text pieces are tokens, the expressions between them.
@@ -1782,7 +1836,7 @@ fn template_string(p: Parser) I32 {
         if not is(p, Tok.TemplateMiddle) { fail(p) }
         leaf(p, Node.Template_middle)
     }
-    node(p, Node.Template_string, at, first)
+    return node(p, Node.Template_string, at, first)
 }
 
 /// Whether the token at the cursor begins `return`'s or `continue`'s optional
@@ -1795,7 +1849,7 @@ fn starts_expression(p: Parser) Bool {
         let w = word_id(p)
         return w != Kw.And.i32() and w != Kw.Or.i32() and w != Kw.Xor.i32() and w != Kw.Orelse.i32()
     }
-    is(p, Tok.Int) or is(p, Tok.Float) or is(p, Tok.String) or is(p, Tok.TemplateFull) or is(p, Tok.TemplateHead) or is(p, Tok.MultilineLine) or is(p, Tok.Minus)
+    return is(p, Tok.Int) or is(p, Tok.Float) or is(p, Tok.String) or is(p, Tok.TemplateFull) or is(p, Tok.TemplateHead) or is(p, Tok.MultilineLine) or is(p, Tok.Minus)
         or is(p, Tok.Tilde) or is(p, Tok.LParen) or is(p, Tok.LBracket) or is(p, Tok.Dot) or is(p, Tok.LBrace)
         or is(p, Tok.Amp) or is(p, Tok.At)
 }
@@ -1806,7 +1860,8 @@ fn word_expression(p: Parser) I32 {
     // `m.T { field: … }` and `M.T { field: … }` build a struct from module m or M.
     let qualified = qualified_struct_init(p)
     if qualified >= 0 { return qualified }
-    if shaped(p) {
+    let lower = shaped(p)
+    if lower {
         // `label: { … }`
         if is_at(p, 1, Tok.Colon) and is_at(p, 2, Tok.LBrace) {
             identifier(p)
@@ -1814,71 +1869,77 @@ fn word_expression(p: Parser) I32 {
             block(p)
             return node(p, Node.Block_expr, at, first)
         }
-        // `m[i]` indexes; `m[A]…` names an instantiated module only when the
-        // brackets do not hold an index.
-        if index_ahead(p) { return identifier(p) }
-        if not module_ref_ahead(p) { return identifier(p) }
+        // A lowercase name already owns its first postfix index when the
+        // brackets hold expressions. Indexing binds above every expr caller.
+        let indexed = try_named_index(p)
+        if indexed >= 0 { return indexed }
     }
-    // A type name begins `T.null`, `T.member`, `T { … }`, `M[A].f(…)`, `M[A](…)`, or `M[A].T.member`.
-    if module_call_ahead(p) { return module_call(p) }
-    let s = save(p)
-    let type_name = not shaped(p)
-    let name = leaf(p, if type_name { Node.Type_ident } else { Node.Identifier })
-    // `Tag(i)`, `Meters(x)`: a scalar kind made from its base (the call is infix's).
-    if type_name and is(p, Tok.LParen) { return name }
-    if type_name and is(p, Tok.LBrace) {
+    if is_at(p, 1, Tok.LBracket) {
+        // A successful module prefix already contains the two AST nodes the
+        // real expression needs. Keep it for a call, member, or bare instance.
+        if not try_module_prefix(p) {
+            if lower { return identifier(p) }
+            // Report the same failure at the required prefix of a type name.
+            module_prefix(p)
+        }
+        return module_expression(p, at, first)
+    }
+    if lower { return identifier(p) }
+
+    let name = type_ident(p)
+    // `Tag(i)`, `Meters(x)`: a scalar kind made from its base (infix owns the call).
+    if is(p, Tok.LParen) { return name }
+    if is(p, Tok.LBrace) {
         field_inits(p)
         return node(p, Node.Struct_init, at, first)
     }
-    if is(p, Tok.LBracket) {
-        restore(p, s)
-        // After `M[A]`, `.x` (a global of M[A]) or `.T.member` is left
-        // (`.f(…)` was a module call).
-        module_name(p)
-        module_type_arg_list(p)
-        // `M[A].V { f: x }`: a variant of M's type made.
-        if is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1) and is_at(p, 2, Tok.LBrace) and is_at(p, 3, Tok.Word) and is_at(p, 4, Tok.Colon) {
-            advance(p)
-            type_ident(p)
-            node(p, Node.Qualified_type_ref, at, first)
-            field_inits(p)
-            return node(p, Node.Struct_init, at, first)
-        }
-        // `M[A].E.V { f: x }`: a variant of M's enum E made.
-        if is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1) and is_at(p, 2, Tok.Dot) and is_at(p, 3, Tok.Word) and is_at(p, 4, Tok.LBrace) and is_at(p, 5, Tok.Word) and is_at(p, 6, Tok.Colon) {
-            advance(p)
-            type_ident(p)
-            variant_step(p)
-            node(p, Node.Qualified_type_ref, at, first)
-            field_inits(p)
-            return node(p, Node.Struct_init, at, first)
-        }
-        // (`M[A].V`, a variant of M's type, ends at the name; `M[A].T.member` goes on.)
-        if is(p, Tok.Dot) and (shaped_at(p, 1) or not is_at(p, 2, Tok.Dot)) {
-            node(p, Node.Instantiated_module_ref, at, first)
-            advance(p)
-            identifier_or_type(p)
-            return node(p, Node.Type_member_expr, at, first)
-        }
-        // `M[A]` alone: M's promoted function, as a value.
-        if not is(p, Tok.Dot) { return node(p, Node.Instantiated_module_ref, at, first) }
-        advance(p)
-        type_ident(p)
-        node(p, Node.Inline_module_type_path, at, first)
-        expect(p, Tok.Dot)
-        identifier_or_type(p)
-        return node(p, Node.Type_member_expr, at, first)
-    }
-    if not type_name or not is(p, Tok.Dot) { fail(p) }
+    if not is(p, Tok.Dot) { fail(p) }
     advance(p)
     if is_kw(p, Kw.Null) {
         advance(p)
         return node(p, Node.Null_expr, at, first)
     }
-    // `M.T {}` is the member `M.T` before an empty block, never a struct.
-    // (`M.T.member` is a field of `M.T`.)
     identifier_or_type(p)
-    node(p, Node.Type_member_expr, at, first)
+    return node(p, Node.Type_member_expr, at, first)
+}
+
+/// Finish a bracketed module expression after its name and type arguments.
+fn module_expression(p: Parser, at: I32, first: I32) I32 {
+    if is(p, Tok.LParen) or (is(p, Tok.Dot) and shaped_at(p, 1) and is_at(p, 2, Tok.LParen)) {
+        return module_call(p, at, first)
+    }
+    // `M[A].V { f: x }`: a variant of M's type made.
+    if is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1) and is_at(p, 2, Tok.LBrace) and is_at(p, 3, Tok.Word) and is_at(p, 4, Tok.Colon) {
+        advance(p)
+        type_ident(p)
+        node(p, Node.Qualified_type_ref, at, first)
+        field_inits(p)
+        return node(p, Node.Struct_init, at, first)
+    }
+    // `M[A].E.V { f: x }`: a variant of M's enum E made.
+    if is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1) and is_at(p, 2, Tok.Dot) and is_at(p, 3, Tok.Word) and is_at(p, 4, Tok.LBrace) and is_at(p, 5, Tok.Word) and is_at(p, 6, Tok.Colon) {
+        advance(p)
+        type_ident(p)
+        variant_step(p)
+        node(p, Node.Qualified_type_ref, at, first)
+        field_inits(p)
+        return node(p, Node.Struct_init, at, first)
+    }
+    // (`M[A].V`, a variant of M's type, ends at the name; `M[A].T.member` goes on.)
+    if is(p, Tok.Dot) and (shaped_at(p, 1) or not is_at(p, 2, Tok.Dot)) {
+        node(p, Node.Instantiated_module_ref, at, first)
+        advance(p)
+        identifier_or_type(p)
+        return node(p, Node.Type_member_expr, at, first)
+    }
+    // `M[A]` alone: M's promoted function, as a value.
+    if not is(p, Tok.Dot) { return node(p, Node.Instantiated_module_ref, at, first) }
+    advance(p)
+    type_ident(p)
+    node(p, Node.Inline_module_type_path, at, first)
+    expect(p, Tok.Dot)
+    identifier_or_type(p)
+    return node(p, Node.Type_member_expr, at, first)
 }
 
 /// `m.T { field: … }` or `m.E.V { field: … }` at the cursor, or -1 without
@@ -1889,7 +1950,22 @@ fn qualified_struct_init(p: Parser) I32 {
     // (The brace: after `m.T`, or after `m.E.V`, E and V capitalized.)
     let b = if is_at(p, 3, Tok.Dot) and is_at(p, 4, Tok.Word) and not shaped_at(p, 2) and not shaped_at(p, 4) { 5 } else { 3 }
     if not is_at(p, b, Tok.LBrace) { return -1 }
-    if not shaped(p) and is_at(p, b + 1, Tok.RBrace) { return -1 }
+    let field = b + 1
+    if is_at(p, field, Tok.RBrace) {
+        if not shaped(p) { return -1 }
+    } else {
+        // The first field must begin with an identifier and a colon.
+        // Record the failed attempt at the same token without building its
+        // tentative module and variant nodes or throwing for a normal block.
+        if not shaped_at(p, field) {
+            note_parse_failure(p.pos + field, -1)
+            return -1
+        }
+        if not is_at(p, field + 1, Tok.Colon) {
+            note_parse_failure(p.pos + field + 1, Tok.Colon.i32())
+            return -1
+        }
+    }
     let s = save(p)
     let made = try {
         let at = mark()
@@ -1907,91 +1983,128 @@ fn qualified_struct_init(p: Parser) I32 {
         -1
     }
     if made < 0 { restore(p, s) }
-    made
+    return made
 }
 
-/// Whether the cursor starts `name[index]` or `name[start, end]` with expressions inside.
+/// Parse the contents of a possible index, with the cursor after its `[`.
+/// A nested bracketed module may be a bare type argument instead.
+fn index_items(p: Parser) Bool {
+    if module_ref_ahead(p) and not index_ahead(p) {
+        let inner = save(p)
+        module_prefix(p)
+        if is(p, Tok.RBracket) { fail(p) }
+        restore(p, inner)
+    }
+    expression(p)
+    if not is(p, Tok.Comma) { return false }
+    advance(p)
+    expression(p)
+    return true
+}
+
+/// After the closing bracket, a capitalized member denotes a type.
+fn index_ends_here(p: Parser) Bool {
+    return not (is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1))
+}
+
+/// Decide which grammar owns the brackets of a nested name.
 fn index_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false }
-    let s = save(p)
+    let saved = save(p)
     let found = try {
-        advance(p)
-        advance(p)
-        // `m[Array[T]]`: brackets of a bare `M[A]` (no index) hold types.
-        if module_ref_ahead(p) and not index_ahead(p) {
-            let inner = save(p)
-            module_name(p)
-            module_type_arg_list(p)
-            if is(p, Tok.RBracket) { fail(p) }
-            restore(p, inner)
-        }
-        expression(p)
-        if is(p, Tok.Comma) {
+        p.pos += 2
+        index_items(p)
+        if is(p, Tok.RBracket) {
             advance(p)
-            expression(p)
+            index_ends_here(p)
+        } else {
+            false
         }
-        // `m[a.T].T.f(…)` names an instance: a capitalized word after `].` is a type, not a field.
-        if is(p, Tok.RBracket) { advance(p); not (is(p, Tok.Dot) and is_at(p, 1, Tok.Word) and not shaped_at(p, 1)) } else { false }
     } catch {
         false
     }
-    restore(p, s)
-    found
+    restore(p, saved)
+    return found
 }
 
-/// Whether the cursor starts `name[types]`: `M[A].x`, `M[A].f(…)`, `M[A](…)`, or `M[A]`.
-fn module_ref_ahead(p: Parser) Bool {
-    if not is_at(p, 1, Tok.LBracket) { return false }
-    let s = save(p)
-    let found = try {
-        module_name(p)
-        module_type_arg_list(p)
+/// The first index on a lowercase name. Keep the successful probe's tree
+/// so the postfix parser only has to read subsequent operations.
+fn try_named_index(p: Parser) I32 {
+    if not is_at(p, 1, Tok.LBracket) { return -1 }
+    let saved = save(p)
+    let at = mark()
+    let first = p.pos
+    let made = try {
+        identifier(p)
+        advance(p)
+        let slice = index_items(p)
+        if is(p, Tok.RBracket) {
+            advance(p)
+            if index_ends_here(p) {
+                node(p, if slice { Node.Slice_expr } else { Node.Index_expr }, at, first)
+            } else {
+                -1
+            }
+        } else {
+            -1
+        }
+    } catch {
+        -1
+    }
+    if made < 0 { restore(p, saved) }
+    return made
+}
+
+fn module_prefix(p: Parser) Void {
+    module_name(p)
+    module_type_arg_list(p)
+}
+
+/// Attempt a module prefix, leaving its nodes in place when it succeeds.
+fn try_module_prefix(p: Parser) Bool {
+    let saved = save(p)
+    let parsed = try {
+        module_prefix(p)
         true
     } catch {
         false
     }
-    restore(p, s)
-    found
+    if not parsed { restore(p, saved) }
+    return parsed
 }
 
-/// Whether the cursor starts `name[types].identifier(` or `name[types](`.
-fn module_call_ahead(p: Parser) Bool {
+fn module_ref_ahead(p: Parser) Bool {
     if not is_at(p, 1, Tok.LBracket) { return false }
-    let s = save(p)
-    let found = try {
-        module_name(p)
-        module_type_arg_list(p)
-        is(p, Tok.LParen) or (is(p, Tok.Dot) and shaped_at(p, 1) and is_at(p, 2, Tok.LParen))
+    let saved = save(p)
+    let parsed = try {
+        module_prefix(p)
+        true
     } catch {
         false
     }
-    restore(p, s)
-    found
+    restore(p, saved)
+    return parsed
 }
 
 /// `M[A].f(…)`'s `f`, or -1 in `M[A](…)` (a call of M's `fn &`).
 fn module_call_name(call: I32) I32 {
     let n = next_sibling(next_sibling(first_child(call)))
-    if is_kind(n, Node.Identifier) { n } else { -1 }
+    return if is_kind(n, Node.Identifier) { n } else { -1 }
 }
 
 /// `M[A].f(…)`'s or `M[A](…)`'s arguments, or -1 for none.
 fn module_call_args(call: I32) I32 {
     let n = module_call_name(call)
-    if n >= 0 { next_sibling(n) } else { next_sibling(next_sibling(first_child(call))) }
+    return if n >= 0 { next_sibling(n) } else { next_sibling(next_sibling(first_child(call))) }
 }
 
 /// What `M[A].f(…)` or `M[A](…)` calls (resolved), or -1.
 fn module_call_decl(call: I32) I32 {
     let n = module_call_name(call)
-    node_decl[if n >= 0 { n } else { call }]
+    return node_decl[if n >= 0 { n } else { call }]
 }
 
-fn module_call(p: Parser) I32 {
-    let at = mark()
-    let first = p.pos
-    module_name(p)
-    module_type_arg_list(p)
+fn module_call(p: Parser, at: I32, first: I32) I32 {
     // `M[A](…)` calls M's promoted function (`fn &(…)`).
     if not is(p, Tok.LParen) {
         expect(p, Tok.Dot)
@@ -2000,7 +2113,7 @@ fn module_call(p: Parser) I32 {
     expect(p, Tok.LParen)
     arg_list_or_none(p)
     expect(p, Tok.RParen)
-    node(p, Node.Promoted_module_call_expr, at, first)
+    return node(p, Node.Promoted_module_call_expr, at, first)
 }
 
 fn field_inits(p: Parser) Void {
@@ -2022,7 +2135,7 @@ fn field_init(p: Parser) I32 {
     identifier(p)
     expect(p, Tok.Colon)
     expression(p)
-    node(p, Node.Field_init, at, first)
+    return node(p, Node.Field_init, at, first)
 }
 
 fn paren_or_range(p: Parser) I32 {
@@ -2037,7 +2150,7 @@ fn paren_or_range(p: Parser) I32 {
         return node(p, Node.Range_expr, at, first)
     }
     expect(p, Tok.RParen)
-    node(p, Node.Paren_expr, at, first)
+    return node(p, Node.Paren_expr, at, first)
 }
 
 fn array_expr(p: Parser) I32 {
@@ -2053,7 +2166,7 @@ fn array_expr(p: Parser) I32 {
         }
     }
     expect(p, Tok.RBracket)
-    node(p, Node.Array_expr, at, first)
+    return node(p, Node.Array_expr, at, first)
 }
 
 fn tuple_expr(p: Parser) I32 {
@@ -2068,7 +2181,7 @@ fn tuple_expr(p: Parser) I32 {
         expression(p)
     }
     expect(p, Tok.RBrace)
-    node(p, Node.Tuple_expr, at, first)
+    return node(p, Node.Tuple_expr, at, first)
 }
 
 fn dsl_expr(p: Parser) I32 {
@@ -2080,7 +2193,7 @@ fn dsl_expr(p: Parser) I32 {
     leaf(p, Node.Dsl_body)
     let n = node(p, Node.Dsl_expr, at, first)
     dsl_sites.push(n)
-    n
+    return n
 }
 
 fn bind_expr(p: Parser) I32 {
@@ -2111,7 +2224,7 @@ fn bind_expr(p: Parser) I32 {
     }
     expect(p, Tok.Eq)
     expr(p, 0, true)
-    node(p, Node.Bind_expr, at, first)
+    return node(p, Node.Bind_expr, at, first)
 }
 
 fn closure_expr(p: Parser) I32 {
@@ -2133,7 +2246,7 @@ fn closure_expr(p: Parser) I32 {
     expect(p, Tok.RParen)
     if not is(p, Tok.LBrace) { return_type(p) }
     block(p)
-    node(p, Node.Closure_expr, at, first)
+    return node(p, Node.Closure_expr, at, first)
 }
 
 fn closure_param(p: Parser) I32 {
@@ -2144,7 +2257,7 @@ fn closure_param(p: Parser) I32 {
         advance(p)
         type_(p)
     }
-    node(p, Node.Closure_param, at, first)
+    return node(p, Node.Closure_param, at, first)
 }
 
 fn if_expr(p: Parser) I32 {
@@ -2161,7 +2274,7 @@ fn if_expr(p: Parser) I32 {
             parse_depth[0] -= 1
         } else { block(p) }
     }
-    node(p, Node.If_expr, at, first)
+    return node(p, Node.If_expr, at, first)
 }
 
 fn match_expr(p: Parser, kind: Node, at: I32, first: I32) I32 {
@@ -2177,7 +2290,7 @@ fn match_expr(p: Parser, kind: Node, at: I32, first: I32) I32 {
         node(p, Node.Match_default, default, start)
     }
     expect(p, Tok.RBrace)
-    node(p, kind, at, first)
+    return node(p, kind, at, first)
 }
 
 fn match_arm(p: Parser) I32 {
@@ -2187,7 +2300,7 @@ fn match_arm(p: Parser) I32 {
     expect(p, Tok.FatArrow)
     expression(p)
     expect(p, Tok.Comma)
-    node(p, Node.Match_arm, at, first)
+    return node(p, Node.Match_arm, at, first)
 }
 
 fn match_lit(p: Parser) I32 {
@@ -2205,7 +2318,7 @@ fn match_lit(p: Parser) I32 {
         if is(p, Tok.Minus) { advance(p) }
         number(p)
     }
-    node(p, Node.Match_lit, at, first)
+    return node(p, Node.Match_lit, at, first)
 }
 
 fn alt_expr(p: Parser) I32 {
@@ -2237,15 +2350,14 @@ fn alt_expr(p: Parser) I32 {
         node(p, Node.Alt_default, default, start)
     }
     expect(p, Tok.RBrace)
-    node(p, Node.Alt_expr, at, first)
+    return node(p, Node.Alt_expr, at, first)
 }
 
 fn alt_pattern(p: Parser) I32 {
-    let s = save(p)
-    let at = mark()
-    let first = p.pos
-    module_name(p)
-    if is(p, Tok.LBracket) or is(p, Tok.Dot) {
+    if is_at(p, 1, Tok.LBracket) or is_at(p, 1, Tok.Dot) {
+        let at = mark()
+        let first = p.pos
+        module_name(p)
         if is(p, Tok.LBracket) {
             module_type_arg_list(p)
             node(p, Node.Instantiated_module_ref, at, first)
@@ -2257,9 +2369,8 @@ fn alt_pattern(p: Parser) I32 {
         variant_step(p)
         return node(p, Node.Qualified_type_ref, at, first)
     }
-    restore(p, s)
     // A bare variant name cannot be a keyword; a module before `.` can.
-    unreserved_type_ident(p)
+    return unreserved_type_ident(p)
 }
 
 fn promote_expr(p: Parser) I32 {
@@ -2280,7 +2391,7 @@ fn promote_expr(p: Parser) I32 {
         expect(p, Tok.Comma)
     }
     expect(p, Tok.RBrace)
-    node(p, Node.Promote_expr, at, first)
+    return node(p, Node.Promote_expr, at, first)
 }
 
 /// `try { … } catch …` catches what the host throws; `try e` passes on e's error.
@@ -2312,7 +2423,7 @@ fn try_expr(p: Parser) I32 {
         expect(p, Tok.Pipe)
     }
     block(p)
-    node(p, Node.Try_expr, at, first)
+    return node(p, Node.Try_expr, at, first)
 }
 
 fn for_expr(p: Parser) I32 {
@@ -2339,7 +2450,7 @@ fn for_expr(p: Parser) I32 {
         expression(p)
         node(p, Node.Block, body, start_body)
     }
-    node(p, Node.For_expr, at, first)
+    return node(p, Node.For_expr, at, first)
 }
 
 fn for_source(p: Parser) I32 {
@@ -2350,7 +2461,7 @@ fn for_source(p: Parser) I32 {
         advance(p)
         expression(p)
     }
-    node(p, Node.For_source, at, first)
+    return node(p, Node.For_source, at, first)
 }
 
 fn while_expr(p: Parser) I32 {
@@ -2361,7 +2472,7 @@ fn while_expr(p: Parser) I32 {
     if not is(p, Tok.RParen) { expression(p) }
     expect(p, Tok.RParen)
     block(p)
-    node(p, Node.While_expr, at, first)
+    return node(p, Node.While_expr, at, first)
 }
 
 //! = Running the parser
@@ -2382,20 +2493,43 @@ fn intern_keywords() Void {
     }
 }
 
-/// List the tokens from `first` up to `last` the parser reads (all but
-/// comments) in @ptok.
+/// Compact away comments and index balanced regions in one pass. Until an
+/// opener is paired, its jump entry links to the previous unpaired opener.
 fn parser_tokens(first: I32, last: I32) Void {
-    ptok.resize(last - first + 4)
+    let room = last - first + 4
+    ptok.resize(room)
+    pkind.resize(room)
+    pjump.resize(room)
     let p = 0
+    let open = -1
     for (first ..< last) |t| {
-        if tok_kind[t] != Tok.Comment.i32() {
-            ptok[p] = t
-            p += 1
+        let kind = tok_kind[t]
+        if kind == Tok.Comment.i32() { continue }
+        ptok[p] = t
+        pkind[p] = kind
+        let flags = parse_flags[kind]
+        if (flags & opens_delimiter) != 0 {
+            pjump[p] = open
+            open = p
+        } else if (flags & closes_delimiter) != 0 and open >= 0 {
+            let previous = pjump[open]
+            pjump[open] = p + 1
+            open = previous
         }
+        p += 1
     }
-    // Lookahead past the end reads the End token again.
-    for (0 ..< 4) |k| { ptok[p + k] = last - 1 }
+    // An unclosed delimiter can only take the statement to End.
+    while (open >= 0) {
+        let previous = pjump[open]
+        pjump[open] = p - 1
+        open = previous
+    }
+    for (0 ..< 4) |k| {
+        ptok[p + k] = last - 1
+        pkind[p + k] = Tok.End.i32()
+    }
     ptok.resize(p + 4)
+    pkind.resize(p + 4)
 }
 
 /// Parse the tokens from `first` up to `last` (the last of them `End`), adding
@@ -2408,38 +2542,26 @@ fn parse(first: I32, last: I32) I32 {
         return -1
     }
     parser_tokens(first, last)
-    let before = node_kind.len()
-    pending.clear()
+    let before = start_parse_nodes()
     parse_depth[0] = 0
     parse_deepest[0] = 0
     parse_deepest[1] = -1
     parse_furthest[0] = 0
     parse_expected.clear()
-    try {
-        let root = source_file(Parser { pos: 0 })
-        token_spans(before, root, first, last - 1)
+    let root = try {
+        let root = source_file(Parser { pos: 0, limit: -1 })
+        node_first[root] = first
+        node_last[root] = last - 1
         if comment_nodes[0] == 1 { attach_comments(root) }
         root
     } catch {
         parse_error_at[0] = ptok[parse_furthest[0]]
         if parse_expected.len() > 0 { parse_error_wanted[0] = intern_text(wanted_text()) }
-        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limits: 1 })
+        restore(Parser { pos: 0, limit: -1 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limit: -1 })
         -1
     }
-}
-
-/// Node spans in the lexer's tokens (with comments) rather than the parser's,
-/// for the nodes from `before` on. The source file spans every token from
-/// `first` up to `end_` (the `End` token).
-fn token_spans(before: I32, root: I32, first: I32, end_: I32) Void {
-    for (before ..< node_kind.len()) |id| {
-        let a = node_first[id]
-        let b = node_last[id]
-        node_first[id] = ptok[a]
-        node_last[id] = if b > a { ptok[b - 1] + 1 } else { ptok[a] }
-    }
-    node_first[root] = first
-    node_last[root] = end_
+    resize_parse_nodes(parse_size[0])
+    return root
 }
 
 /// 1 when the tree should hold comments (see @attach_comments): only the
@@ -2479,13 +2601,7 @@ fn attach_within(parent: I32, comments: Comments) Void {
             before = c
             c = node_next[c]
         } else {
-            let id = node_kind.len()
-            node_kind.push(Node.Comment.i32())
-            node_first.push(t)
-            node_last.push(t + 1)
-            node_child.push(-1)
-            node_next.push(c)
-            node_parent.push(parent)
+            let id = append_parse_node(Node.Comment, t, t + 1, -1, c, parent)
             if before < 0 { node_child[parent] = id } else { node_next[before] = id }
             before = id
             comments.next += 1
@@ -2500,21 +2616,16 @@ fn attach_within(parent: I32, comments: Comments) Void {
 fn parse_expression(first: I32, last: I32) I32 {
     if tok_kind[last - 1] != Tok.End.i32() { return -1 }
     parser_tokens(first, last)
-    let before = node_kind.len()
-    pending.clear()
-    try {
-        let p = Parser { pos: 0 }
+    let before = start_parse_nodes()
+    let root = try {
+        let p = Parser { pos: 0, limit: -1 }
         let e = expression(p)
         if not at_end(p) { fail(p) }
-        for (before ..< node_kind.len()) |id| {
-            let a = node_first[id]
-            let b = node_last[id]
-            node_first[id] = ptok[a]
-            node_last[id] = if b > a { ptok[b - 1] + 1 } else { ptok[a] }
-        }
         e
     } catch {
-        restore(Parser { pos: 0 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limits: 1 })
+        restore(Parser { pos: 0, limit: -1 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limit: -1 })
         -1
     }
+    resize_parse_nodes(parse_size[0])
+    return root
 }

@@ -8,7 +8,7 @@ enum Lens:
     | Circle { focus: F64 }
 
 fn area(s: Shape) F64 {
-    alt s {
+    return alt s {
         Lens.Circle |c| => c.focus,
         ~> 0.0,
     };

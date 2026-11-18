@@ -14,7 +14,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
         title:""
     }
     let amount=NumberField.new("")
-    @wutu/\
+    return @wutu/\
     @island "ledger-form"
     form.panel {
         label {
@@ -60,7 +60,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
     \/
 }
 fn workspace(state: LedgerState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "ledger-workspace"
     section.workspace {
         = ledger_form(state)

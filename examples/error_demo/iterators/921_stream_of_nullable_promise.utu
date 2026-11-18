@@ -3,7 +3,7 @@
 fn count(s: Stream[?Promise[I32]]) I32 {
     let n = 0;
     await for (s) |p| { n += 1; };
-    n;
+    return n;
 }
 
 main { console.log(0); }

@@ -7,7 +7,7 @@ fn sum(xs: Array[I32]) I32 {
         total += xs[i];
         i += 1;
     };
-    total;
+    return total;
 }
 
 main {

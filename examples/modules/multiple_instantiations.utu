@@ -3,15 +3,15 @@ mod bucket[T] {
         | value : T
 
     fn Box.new(value: T) Box {
-        Box { value: value }
+        return Box { value: value }
     }
 
     fn Box.get |self| () T {
-        self.value
+        return self.value
     }
 
     fn id(value: T) T {
-        value
+        return value
     }
 }
 
@@ -19,11 +19,11 @@ using bucket[I32] |ints|
 using bucket[Bool] |flags|
 
 fn read_int(box: ints.Box) I32 {
-    box.get()
+    return box.get()
 }
 
 fn read_flag(box: flags.Box) Bool {
-    box.get()
+    return box.get()
 }
 
 test "multiple instantiations keep separate qualified types" {

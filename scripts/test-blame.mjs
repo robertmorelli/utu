@@ -42,11 +42,11 @@ tag struct Pair:
     | x: I32
     | y: I32
 
-fn toks() Array[Tok] { [Num { value: 3 }, End {}]; }
+fn toks() Array[Tok] { return [Num { value: 3 }, End {}]; }
 
 lib { fn run() I32 {
     let p = Pair { x: 1, y: 2 };
-    toks().len() + p.x + p.y;
+    return toks().len() + p.x + p.y;
 } }
 `);
 const labels = new Set((await compileFile(utu, named, { ...MODES.small, blame: true })).blame.decls.map(d => d.name));

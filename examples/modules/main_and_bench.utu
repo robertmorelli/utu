@@ -3,18 +3,18 @@ mod counter[T] {
         | value : T
 
     fn Box.new(value: T) Box {
-        Box { value: value }
+        return Box { value: value }
     }
 
     fn Box.get |self| () T {
-        self.value
+        return self.value
     }
 }
 
 using counter[I32] |ints|
 
 fn step(value: I32) ints.Box {
-    ints.Box.new(value + 1)
+    return ints.Box.new(value + 1)
 }
 
 bench "module counter get" {

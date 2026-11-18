@@ -1,5 +1,5 @@
 enum(U8) T:
     | A
-fn f(t: T) I32 { match t { T.A => 1, T.C => 2, ~> 3, }; }
+fn f(t: T) I32 { return match t { T.A => 1, T.C => 2, ~> 3, }; }
 main { console.log(1); }
 using console from std:Console

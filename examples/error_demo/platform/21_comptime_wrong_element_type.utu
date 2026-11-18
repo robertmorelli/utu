@@ -3,7 +3,7 @@
 fn halves(n: I32) Array[F64] {
     let out = Array[F64].new(n, 0.0);
     for (0 ..< n) |i| { out[i] = i.f64() / 2.0; };
-    out;
+    return out;
 }
 
 const mem table: I32 = @comptime/\ halves(8) \/;

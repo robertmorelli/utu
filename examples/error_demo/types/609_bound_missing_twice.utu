@@ -7,7 +7,7 @@ struct M:
     | v: I32
 
 mod Pick[T[Big]] {
-    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }
+    fn top(a: T, xs: Array[T]) T { return a.biggest(xs); }
 }
 
 main {

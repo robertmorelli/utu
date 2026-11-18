@@ -6,9 +6,9 @@ proto P:
 struct A[P]:
     | x: I32
 
-fn P[A].n |a| () I32 { a.x; }
-fn P.dflt |p| () I32 { p.n(); }
-fn P.dflt |p| () I32 { 99; }
+fn P[A].n |a| () I32 { return a.x; }
+fn P.dflt |p| () I32 { return p.n(); }
+fn P.dflt |p| () I32 { return 99; }
 
 main {
     let p: P = A { x: 1 };

@@ -6,7 +6,7 @@ using ui from "./ui.utu"
 mod stdlib {
     // ── Samples ──────────────────────────────────────────────────────────────
     fn ints_sample() Str {
-        \\main {
+        return \\main {
         \\    let n = 1000000
         \\    let wide = n.i64() * n.i64()   // I64: no overflow
         \\    let flags = 0b1011
@@ -18,7 +18,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn wide_sample() Str {
-        \\main {
+        return \\main {
         \\    let one: U64 = 1                     // an integer literal adopts the declared type
         \\    let top = one << 63
         \\    let signed = top.i64()            // the same bits, read signed
@@ -30,7 +30,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn floats_sample() Str {
-        \\main {
+        return \\main {
         \\    let angle = F64.pi() / 6.0
         \\    let two: F64 = 2
         \\    let hyp = two.hypot(3.0)
@@ -42,7 +42,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn f32_sample() Str {
-        \\main {
+        return \\main {
         \\    let x: F32 = 0.1
         \\    let y = x * 3.0
         \\    let bits = x.bits()                  // the IEEE 754 bits, as an I32
@@ -53,7 +53,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn bool_sample() Str {
-        \\main {
+        return \\main {
         \\    let ready = true
         \\    let late = 3 > 4
         \\    console.log(`${ready and not late} ${ready xor late} ${ready == late}`)
@@ -62,7 +62,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn masks_sample() Str {
-        \\main {
+        return \\main {
         \\    let read: M32 = 1
         \\    let write: M32 = 2
         \\    let both = read | write              // bitwise only: no + or * on a mask
@@ -73,7 +73,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn i31_sample() Str {
-        \\main {
+        return \\main {
         \\    let packed = I31.from_i32(-5)        // an integer in a GC reference slot
         \\    console.log(I31.get_s(packed) + I31.get_u(I31.from_i32(7)))
         \\}
@@ -81,7 +81,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn str_search_sample() Str {
-        \\main {
+        return \\main {
         \\    let s = "the cat sat on the mat"
         \\    let first = s.index_of("at", 0)
         \\    let next = s.index_of("at", first + 1)
@@ -93,7 +93,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn str_shape_sample() Str {
-        \\main {
+        return \\main {
         \\    let raw = "  Hello, World  "
         \\    let t = raw.trim()
         \\    let shouted = t.to_upper()
@@ -105,7 +105,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn str_split_sample() Str {
-        \\main {
+        return \\main {
         \\    let fields = "ada,36,,london".split(",")   // ["ada", "36", "", "london"]
         \\    let age = fields[1].parse_i32(0)
         \\    let bad = "twelve".parse_i32(-1)           // the fallback
@@ -117,7 +117,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn str_build_sample() Str {
-        \\main {
+        return \\main {
         \\    let codes = Array[I32].new(26, 0)
         \\    for (0 ..< 26) |i| { codes[i] = 97 + i }
         \\    let alphabet = Str.from_codes(codes, 26)   // build once, no concatenation
@@ -129,7 +129,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn array_sample() Str {
-        \\main {
+        return \\main {
         \\    let xs = [3, 1, 4, 1, 5]                // Array[I32]
         \\    xs[1] = 9
         \\    let zeros = Array[I32].new(4, 0)        // [0, 0, 0, 0]
@@ -142,14 +142,14 @@ mod stdlib {
         \\using console from std:Console
     }
     fn buffer_sample() Str {
-        \\using Buffer from std:Buffer
+        return \\using Buffer from std:Buffer
         \\
         \\fn even_squares(n: I32) Array[I32] {
         \\    let out = Buffer[I32].new()
         \\    for (0 ..< n) |i| {
         \\        if i % 2 == 0 { out.push(i * i) }
         \\    }
-        \\    out.finish()                            // exactly the pushed length
+        \\    return out.finish()                            // exactly the pushed length
         \\}
         \\
         \\main {
@@ -160,7 +160,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn list_sample() Str {
-        \\using List from std:List
+        return \\using List from std:List
         \\
         \\main {
         \\    let before = ["a", "b", "c"]
@@ -172,7 +172,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn strmap_sample() Str {
-        \\using StrMap from std:StrMap
+        return \\using StrMap from std:StrMap
         \\
         \\main {
         \\    let counts = StrMap[I32].new()
@@ -186,7 +186,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn intmap_sample() Str {
-        \\using IntMap from std:IntMap
+        return \\using IntMap from std:IntMap
         \\
         \\main {
         \\    let squares = IntMap.new()
@@ -197,12 +197,12 @@ mod stdlib {
         \\using console from std:Console
     }
     fn interner_sample() Str {
-        \\using Interner from std:Interner
+        return \\using Interner from std:Interner
         \\
         \\fn intern(names: Interner, bytes: Array[I32]) I32 {
         \\    names.begin()
         \\    for (0 ..< bytes.len()) |i| { names.byte(bytes[i]) }   // each 0 to 255
-        \\    names.finish()
+        \\    return names.finish()
         \\}
         \\
         \\main {
@@ -217,7 +217,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn found_sample() Str {
-        \\main {
+        return \\main {
         \\    let words = ["fig", "apple", "kiwi", "banana"]
         \\    let long = words first_where(Str) |w| { w.len() > 4 }      // ?Found[Str]
         \\    let none = words first_where(Str) |w| { w.len() > 9 }
@@ -230,10 +230,10 @@ mod stdlib {
         \\using console from std:Console
     }
     fn segment_sample() Str {
-        \\using SegmentTree from std:SegmentTree
+        return \\using SegmentTree from std:SegmentTree
         \\
-        \\fn add(a: I32, b: I32) I32 { a + b }
-        \\fn at_least_ten(sum: I32) Bool { sum >= 10 }
+        \\fn add(a: I32, b: I32) I32 { return a + b }
+        \\fn at_least_ten(sum: I32) Bool { return sum >= 10 }
         \\
         \\main {
         \\    let sums = SegmentTree[I32].new([2, 3, 5, 7, 1], 0, add)
@@ -247,12 +247,12 @@ mod stdlib {
         \\using console from std:Console
     }
     fn segment_max_sample() Str {
-        \\using SegmentTree from std:SegmentTree
+        return \\using SegmentTree from std:SegmentTree
         \\
-        \\fn larger(a: F64, b: F64) F64 { F64.max(a, b) }
+        \\fn larger(a: F64, b: F64) F64 { return F64.max(a, b) }
         \\
         \\main {
-        \\    let temps = [12.5, 18.0, 9.5, 21.0, 16.5]
+        \\    let temps: Array[F64] = [12.5, 18.0, 9.5, 21.0, 16.5]
         \\    let highs = SegmentTree[F64].new(temps, -F64.inf(), larger)
         \\    console.log(highs.query(0, 3, larger))
         \\}
@@ -260,9 +260,9 @@ mod stdlib {
         \\using console from std:Console
     }
     fn persistent_sample() Str {
-        \\using PersistentSegmentTree from std:PersistentSegmentTree
+        return \\using PersistentSegmentTree from std:PersistentSegmentTree
         \\
-        \\fn add(a: I32, b: I32) I32 { a + b }
+        \\fn add(a: I32, b: I32) I32 { return a + b }
         \\
         \\main {
         \\    let v1 = PersistentSegmentTree[I32].new([1, 2, 3, 4], 0, add)
@@ -273,7 +273,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn spatial_sample() Str {
-        \\using Spatial from std:Spatial
+        return \\using Spatial from std:Spatial
         \\
         \\main {
         \\    let index = Spatial.new([
@@ -292,13 +292,13 @@ mod stdlib {
         \\using console from std:Console
     }
     fn promise_sample() Str {
-        \\let later: fun(I32, I32) Promise[I32] =
+        return \\let later: fun(I32, I32) Promise[I32] =
         \\    @es/\ (value, ms) => new Promise(done => setTimeout(() => done(value), ms)) \/
         \\
         \\fn total() I32 {
         \\    let a = await later(20, 5)          // suspends here (JSPI), then resumes
         \\    let b = await later(22, 5)
-        \\    a + b
+        \\    return a + b
         \\}
         \\
         \\main {
@@ -310,15 +310,15 @@ mod stdlib {
         \\using console from std:Console
     }
     fn stream_sample() Str {
-        \\fn sum(s: Stream[I32]) I32 {
+        return \\fn sum(s: Stream[I32]) I32 {
         \\    let total = 0
         \\    await for (s) |v| { total += v }
-        \\    total
+        \\    return total
         \\}
         \\
         \\main {
-        \\    let evens = Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { v % 2 == 0 }).map(cl(v) { v * 10 })
-        \\    let squares = Stream[I32].generate(10, cl(i) { i * i }).skip(1).take(3)   // 1, 4, 9
+        \\    let evens = Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { return v % 2 == 0 }).map(cl(v) { return v * 10 })
+        \\    let squares = Stream[I32].generate(10, cl(i) { return i * i }).skip(1).take(3)   // 1, 4, 9
         \\    let both = Stream[I32].of([100]).chain(Stream[I32].of([1, 2]))
         \\    console.log(`${sum(evens)} ${sum(squares)} ${sum(both)}`)
         \\}
@@ -326,7 +326,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn stream_js_sample() Str {
-        \\let words: fun() Externref = @es/\ () => (async function* () {
+        return \\let words: fun() Externref = @es/\ () => (async function* () {
         \\    yield "alpha"; yield "beta"; yield "gamma";
         \\})() \/
         \\
@@ -342,7 +342,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn console_sample() Str {
-        \\using console from std:Console
+        return \\using console from std:Console
         \\using time from std:Time
         \\
         \\main {
@@ -355,7 +355,7 @@ mod stdlib {
         \\}
     }
     fn random_sample() Str {
-        \\using Random from std:Random
+        return \\using Random from std:Random
         \\
         \\main {
         \\    let r = Random.new(42)              // the same seed, the same numbers, on every host
@@ -370,7 +370,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn number_field_sample() Str {
-        \\using NumberField from std:NumberField
+        return \\using NumberField from std:NumberField
         \\
         \\main {
         \\    let good = NumberField.new("42.5")
@@ -381,7 +381,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn wutu_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Cart:
         \\    | cents: I32
@@ -409,7 +409,7 @@ mod stdlib {
         \\}
     }
     fn browser_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\main {
         \\    let title = Browser.document.createElement("h1")   // an HTMLHeadingElement
@@ -421,7 +421,7 @@ mod stdlib {
         \\}
     }
     fn js_sample() Str {
-        \\using JS from std:JS
+        return \\using JS from std:JS
         \\
         \\main {
         \\    let biggest = JS.Math.max(3.0, 7.0)
@@ -433,7 +433,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn web_sample() Str {
-        \\using Web from std:Web
+        return \\using Web from std:Web
         \\
         \\main {
         \\    let url = new Web.URL("https://example.com/a/b?q=utu")
@@ -445,7 +445,7 @@ mod stdlib {
     }
     // ── Surfaces: each row is "signature::what it does" ─────────────────────
     fn int_rows() Array[Str] {
-        [
+        return [
         "+ - * / %::arithmetic; / and % truncate (signed for I32 and I64, unsigned for U32 and U64)",
         "& | ^ ~ << >> >>>::bitwise; >> keeps the sign of a signed type, >>> shifts in zeros",
         "== != < <= > >=::comparison, signed or unsigned by type",
@@ -457,7 +457,7 @@ mod stdlib {
         ]
     }
     fn float_rows() Array[Str] {
-        [
+        return [
         "+ - * / and comparisons::IEEE 754; there is no % on floats",
         "F64.abs sqrt ceil floor trunc nearest (x)::one Wasm instruction each; nearest rounds half to even",
         "F64.min(a, b) F64.max(a, b)::NaN if either is NaN",
@@ -472,7 +472,7 @@ mod stdlib {
         ]
     }
     fn str_rows() Array[Str] {
-        [
+        return [
         "s.len()::length in UTF-16 code units",
         "s[i]  s.get(i)::the code unit at i, an I32; out of range traps",
         "s[a, b]  s.slice(a, b)::the text from a up to b; b past the end stops at it; a negative or reversed range is empty",
@@ -492,7 +492,7 @@ mod stdlib {
         ]
     }
     fn array_rows() Array[Str] {
-        [
+        return [
         "[a, b, c]::a literal; the element type comes from the elements or the context",
         "Array[T].new(n, fill)::n copies of fill",
         "Array[T].new_default(n)::n zeros or nulls (T must have a default)",
@@ -503,7 +503,7 @@ mod stdlib {
         ]
     }
     fn strmap_rows() Array[Str] {
-        [
+        return [
         "StrMap[V].new()::an empty map",
         "m.set(key, value)::insert or replace",
         "m.get(key, missing) V::the value, or missing",
@@ -513,7 +513,7 @@ mod stdlib {
         ]
     }
     fn ord_sample() Str {
-        \\using Ord from std:Ord
+        return \\using Ord from std:Ord
         \\using Order from std:Ord
         \\
         \\struct Version[Ord]:
@@ -521,7 +521,7 @@ mod stdlib {
         \\    | minor: I32
         \\
         \\fn Ord[Version].cmp |a| (b: Version) I32 {
-        \\    if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
+        \\    return if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
         \\}
         \\
         \\main {
@@ -533,7 +533,7 @@ mod stdlib {
         \\using console from std:Console
     }
     fn ord_rows() Array[Str] {
-        [
+        return [
         "a.cmp(b) I32::negative, zero, or positive: I32 U32 I64 U64 F32 F64 Str, and what implements Ord",
         "Order[T].max(a, b)  Order[T].min(a, b)::the greater, the lesser (a, when they tie)",
         "Order[T].clamp(x, low, high)::x, or the nearer end (low after high: low when x is before it, else high)",
@@ -543,14 +543,14 @@ mod stdlib {
         ]
     }
     fn intmap_rows() Array[Str] {
-        [
+        return [
         "IntMap.new()::an empty map from I32 to I32",
         "m.set(key, value)  m.get(key, missing)::insert or replace; read with a default",
         "m.has(key)  m.len()::membership; size"
         ]
     }
     fn interner_rows() Array[Str] {
-        [
+        return [
         "Interner.new()::an empty table",
         "t.begin()  t.byte(b)  t.finish() I32::feed one key a byte (0 to 255) at a time; its id, 0, 1, 2, ... in first-seen order",
         "t.str(s) I32::a string's id, as its UTF-8 bytes",
@@ -559,7 +559,7 @@ mod stdlib {
         ]
     }
     fn segment_rows() Array[Str] {
-        [
+        return [
         "SegmentTree[T].new(values, identity, combine)::build in O(n); combine is associative, identity neutral",
         "t.set(index, value, combine)::replace one value, O(log n)",
         "t.query(start, end, combine) T::combine values start up to end, O(log n)",
@@ -569,7 +569,7 @@ mod stdlib {
         ]
     }
     fn spatial_rows() Array[Str] {
-        [
+        return [
         "Spatial.point(x, y, id)::a point carrying your id",
         "Spatial.new(points)::build the index once; coordinates are copied",
         "s.within(min_x, max_x, min_y, max_y) Array[I32]::ids in a rectangle, edges included",
@@ -579,7 +579,7 @@ mod stdlib {
         ]
     }
     fn async_rows() Array[Str] {
-        [
+        return [
         "await p::the value of a Promise[T], suspending until it settles (JSPI)",
         "p.then(cl(v) { ... })::subscribe to fulfilment; works on any JS host. A rejection with no catch on p is reported unhandled",
         "p.catch(cl(reason) { ... })::subscribe to rejection; reason is an Externref. Attach it before p settles",
@@ -589,7 +589,7 @@ mod stdlib {
         ]
     }
     fn random_rows() Array[Str] {
-        [
+        return [
         "Random.new(seed)  Random.from_host()::a seeded generator, or one seeded by the host",
         "r.bits() I32::the next 32 random bits",
         "r.int(low, high) I32::uniform in [low, high)",
@@ -598,7 +598,7 @@ mod stdlib {
         ]
     }
     fn host_rows() Array[Str] {
-        [
+        return [
         "console.log(x) warn(x) error(x)::the host console, x any value with a str(); using console from std:Console",
         "time.now() F64::milliseconds for measuring (performance.now); using time from std:Time",
         "time.epoch_ms() F64::milliseconds since 1970 (Date.now)",
@@ -607,7 +607,7 @@ mod stdlib {
         ]
     }
     fn wutu_rows() Array[Str] {
-        [
+        return [
         "wutu.route() Str::the hash route, / when empty",
         "wutu.refresh()  wutu.invalidate(island)::render again: everything, or one island",
         "wutu.after_render(callback)  wutu.on_cleanup(callback)::run after this render; run when a node goes",
@@ -619,7 +619,7 @@ mod stdlib {
         ]
     }
     fn binding_rows() Array[Str] {
-        [
+        return [
         "std:Browser::the DOM and every standard JavaScript API (lib.dom and lib.es)",
         "std:JS::the ECMAScript subset: Math, JSON, Date, Map, Set, RegExp, Intl, ...",
         "std:Web::what every modern runtime shares: fetch, URL, streams, crypto, timers, ...",
@@ -627,7 +627,7 @@ mod stdlib {
         ]
     }
     fn overview_rows() Array[Str] {
-        [
+        return [
         "I32 U32 I64 U64::integers (prelude)",
         "F32 F64::floats and math (prelude)",
         "Bool M32 M64 M128 V128 I31 Externref::booleans, masks, SIMD, references (prelude)",
@@ -643,7 +643,7 @@ mod stdlib {
         ]
     }
     fn toc() Array[Str] {
-        ["Scalars::std-scalars", "Text::std-text", "Collections::std-collections", "Indexes::std-indexes", "Async::std-async", "Host::std-host"]
+        return ["Scalars::std-scalars", "Text::std-text", "Collections::std-collections", "Indexes::std-indexes", "Async::std-async", "Host::std-host"]
     }
     // ── Pieces ───────────────────────────────────────────────────────────────
     fn jump(id: Str) Void {
@@ -654,7 +654,7 @@ mod stdlib {
         }
     }
     fn api(rows: Array[Str]) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         table {
             tbody {
                 for rows |row| {
@@ -677,7 +677,7 @@ mod stdlib {
     }
     // A module's heading: its name, what it is, and how to bring it in.
     fn module(name: Str, line: Str, import: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             margin-block:2.75rem 0
             h3 {
@@ -699,7 +699,7 @@ mod stdlib {
         \/
     }
     fn group(id: Str, title: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         h2 {
             id = id
             scroll-margin-block-start:1.5rem
@@ -708,7 +708,7 @@ mod stdlib {
         \/
     }
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.page {
             = ui.header("The standard library", "Every module, by example. Each sample is a whole program; the last comment is what it prints.")
             nav {

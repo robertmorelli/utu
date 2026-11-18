@@ -2,12 +2,12 @@ struct Box:
     | value : I32
 
 fn maybe_box() ?Box {
-    Box.null;
+    return Box.null;
 }
 
 lib {
     fn test_promote() I32 {
-        promote maybe_box() {
+        return promote maybe_box() {
             |box| => box.value,
             ~> 0,
         };

@@ -43,7 +43,7 @@ if (wasmTools) {
     assert.match(printed, /v128\.const/);
     fs.writeFileSync(source, printed);
     execFileSync('wasm-tools', ['parse', source, '-o', roundtrip]);
-    const file = { key: 'features.utu', offset: 0, bytes: new TextEncoder().encode('fn test() V128 { 0; }\n'), text: 'fn test() V128 { 0; }\n' };
+    const file = { key: 'features.utu', offset: 0, bytes: new TextEncoder().encode('fn test() V128 { return 0; }\n'), text: 'fn test() V128 { return 0; }\n' };
     const annotated = await printWat(bytes, { source: true, map: { functions: [0] }, files: [file] });
     assert.match(annotated, /;; features\.utu:1 fn test/);
     fs.writeFileSync(source, annotated);

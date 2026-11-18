@@ -1,4 +1,4 @@
 fn main() Str {
     assert true
-    "ok"
+    return "ok"
 }

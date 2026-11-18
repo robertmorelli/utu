@@ -2,7 +2,7 @@
 // Expect: The ~> arm must be last in @json match
 
 fn status(text: Str) I32 {
-    @json/\ match text {
+    return @json/\ match text {
         ~> 0,
         { status: "ok" } => 1,
     }\/;

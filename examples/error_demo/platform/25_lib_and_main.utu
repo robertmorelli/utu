@@ -1,7 +1,7 @@
 // What: a file with both lib and main
 // Expect: entry surface: lib and main are mutually exclusive
 lib {
-    fn double(x: I32) I32 { x * 2; }
+    fn double(x: I32) I32 { return x * 2; }
 }
 
 main {

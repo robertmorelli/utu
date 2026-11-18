@@ -6,7 +6,7 @@ struct Node:
     | next: Node
 
 fn load(text: Str) ?Node {
-    @json/\ decode Node text \/;
+    return @json/\ decode Node text \/;
 }
 
 main {

@@ -22,18 +22,18 @@ let closed: fun() Bool = @es/\ () => globalThis.__closed === true \/
 fn total(s: Stream[I32]) I32 {
     let sum = 0
     await for (s) |v| { sum += v }
-    sum
+    return sum
 }
 
 lib {
     // Made, transformed, and read in utu.
     fn evens() I32 {
-        total(Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { v % 2 == 0 }).map(cl(v) { v * 10 }))
+        return total(Stream[I32].of([1, 2, 3, 4, 5, 6]).filter(cl(v) { return v % 2 == 0 }).map(cl(v) { return v * 10 }))
     }
 
     fn pieces() I32 {
-        let s = Stream[I32].generate(5, cl(i) { i * i }).skip(1).take(3).chain(Stream[I32].of([100]))
-        total(s)
+        let s = Stream[I32].generate(5, cl(i) { return i * i }).skip(1).take(3).chain(Stream[I32].of([100]))
+        return total(s)
     }
 
     // A host async generator, adopted.
@@ -43,7 +43,7 @@ lib {
             if w == "beta" { continue }
             out = `${out}${w} `
         }
-        out
+        return out
     }
 
     // `break` closes the stream, as JS's `for await` does.
@@ -51,9 +51,9 @@ lib {
         await for (Stream[Str].from_js(closing(words()))) |w| {
             if w == "beta" { break }
         }
-        closed()
+        return closed()
     }
 
     // A stream handed to JS is the async iterable itself.
-    fn handed() Stream[I32] { Stream[I32].of([7, 8, 9]) }
+    fn handed() Stream[I32] { return Stream[I32].of([7, 8, 9]) }
 }

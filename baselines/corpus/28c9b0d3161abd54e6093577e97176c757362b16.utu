@@ -3,8 +3,8 @@
         | v : I32
       lib {
         fn run(b: Box, n: I32) I32 {
-          let f: cl(I32) I32 = cl(x) { x + n; };
-          f(1);
+          let f: cl(I32) I32 = cl(x) { return x + n; };
+          return f(1);
         }
       }
     

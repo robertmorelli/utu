@@ -1,1 +1,1 @@
-lib { fn bad(flag: Bool) I32 { match flag { true => 1, }; } }
+lib { fn bad(flag: Bool) I32 { return match flag { true => 1, }; } }

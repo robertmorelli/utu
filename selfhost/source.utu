@@ -171,7 +171,7 @@ vec word_notes: I32
 
 fn word_note(word: I32, slot: I32) I32 {
     let i = word * 4 + slot
-    if word >= 0 and i < word_notes.len() { word_notes[i] } else { -1 }
+    return if word >= 0 and i < word_notes.len() { word_notes[i] } else { -1 }
 }
 
 fn set_word_note(word: I32, slot: I32, node: I32) Void {
@@ -189,7 +189,7 @@ fn intern_text(text: Str) I32 {
     let id = src.intern(start, src.len())
     // Already interned: its bytes are elsewhere.
     if id < before { src.resize(start) }
-    id
+    return id
 }
 
 /// Room for a file of `n` bytes, which the host then writes at @file_start.
@@ -207,7 +207,7 @@ fn add_file(n: I32, role: FileRole) I32 {
     file_error.push(-1)
     file_wanted.push(-1)
     file_std.push(0)
-    file
+    return file
 }
 
 /// Lex and parse a file the host has written, and list its imports. Returns
@@ -223,7 +223,7 @@ fn parse_file(file: I32) I32 {
         file_error[file] = parse_error_at[0]
         file_wanted[file] = parse_error_wanted[0]
     }
-    root
+    return root
 }
 
 fn list_imports(file: I32, root: I32) Void {
@@ -253,7 +253,7 @@ fn file_of_token(t: I32) I32 {
         let mid = (lo + hi + 1) / 2
         if file_start[mid] <= at { lo = mid } else { hi = mid - 1 }
     }
-    lo
+    return lo
 }
 
 //! = Tree helpers
@@ -267,7 +267,7 @@ fn child_count(node: I32) I32 {
         n += 1
         c = next_sibling(c)
     }
-    n
+    return n
 }
 
 /// A compiled program's tree has no comments (see @attach_comments), so a
@@ -279,7 +279,7 @@ fn last_child(node: I32) I32 {
         last = c
         c = node_next[c]
     }
-    last
+    return last
 }
 
 fn first_child(node: I32) I32 => node_child[node]

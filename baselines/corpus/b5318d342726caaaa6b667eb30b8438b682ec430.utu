@@ -59,19 +59,19 @@ tag rec enum Constraint:
     }
 
 fn stronger(s1: I32, s2: I32) Bool {
-    s1 < s2;
+    return s1 < s2;
 }
 
 fn weaker(s1: I32, s2: I32) Bool {
-    s1 > s2;
+    return s1 > s2;
 }
 
 fn weakest_of(s1: I32, s2: I32) I32 {
-    if s1 > s2 { s1; } else { s2; };
+    return if s1 > s2 { s1; } else { s2; };
 }
 
 fn next_weaker(strength: I32) I32 {
-    match strength {
+    return match strength {
         0 => weakest,
         1 => weak_default,
         2 => normal,
@@ -83,14 +83,14 @@ fn next_weaker(strength: I32) I32 {
 }
 
 fn ConstraintList.new(capacity: I32) ConstraintList {
-    ConstraintList {
+    return ConstraintList {
         items: Array[Constraint].new(capacity, EmptyConstraint {}),
         count: 0,
     };
 }
 
 fn Variable.new(value: I32, constraint_capacity: I32) Variable {
-    Variable {
+    return Variable {
         value: value,
         constraints: ConstraintList.new(constraint_capacity),
         determined_by: EmptyConstraint {},
@@ -101,19 +101,19 @@ fn Variable.new(value: I32, constraint_capacity: I32) Variable {
 }
 
 fn Variable.placeholder() Variable {
-    Variable.new(0, 1);
+    return Variable.new(0, 1);
 }
 
 fn VariableList.new(capacity: I32) VariableList {
     let dummy: Variable = Variable.placeholder();
-    VariableList {
+    return VariableList {
         items: Array[Variable].new(capacity, dummy),
         count: 0,
     };
 }
 
 fn Planner.new(variable_capacity: I32, constraint_capacity: I32) Planner {
-    Planner {
+    return Planner {
         current_mark: 0,
         variable_capacity: variable_capacity,
         constraint_capacity: constraint_capacity,
@@ -132,7 +132,7 @@ fn ConstraintList.pop_front |self| () Constraint {
         self.items[i] = self.items[i + 1];
     };
     self.count -= 1;
-    constraint;
+    return constraint;
 }
 
 fn ConstraintList.copy |self| (capacity: I32) ConstraintList {
@@ -140,7 +140,7 @@ fn ConstraintList.copy |self| (capacity: I32) ConstraintList {
     for (0..<self.count) |i| {
         out.append(self.items[i]);
     };
-    out;
+    return out;
 }
 
 fn VariableList.append |self| (value: Variable) Void {
@@ -155,7 +155,7 @@ fn VariableList.pop_front |self| () Variable {
         self.items[i] = self.items[i + 1];
     };
     self.count -= 1;
-    value;
+    return value;
 }
 
 fn Variable.add_constraint |self| (constraint: Constraint) Void {
@@ -185,15 +185,13 @@ fn Variable.remove_constraint |self| (constraint: Constraint) Void {
     };
 }
 
-fn Constraint.same |self| (other: Constraint) Bool {
-    @ir/\ <ir-ref-eq><ir-ident name="self"/><ir-ident name="other"/></ir-ref-eq> \/;
-}
+fn Constraint.same |self| (other: Constraint) Bool => @ir/\ <ir-ref-eq><ir-ident name="self"/><ir-ident name="other"/></ir-ref-eq> \/;
 
 fn noop() Void {
 }
 
 fn Constraint.strength |self| () I32 {
-    alt self {
+    return alt self {
         EmptyConstraint => (weakest),
         StayConstraint |stay| => stay.strength,
         EditConstraint |edit| => edit.strength,
@@ -204,21 +202,21 @@ fn Constraint.strength |self| () I32 {
 }
 
 fn Constraint.is_empty |self| () Bool {
-    alt self {
+    return alt self {
         EmptyConstraint => true,
         ~> false,
     };
 }
 
 fn Constraint.is_input |self| () Bool {
-    alt self {
+    return alt self {
         EditConstraint => true,
         ~> false,
     };
 }
 
 fn Constraint.is_satisfied |self| () Bool {
-    alt self {
+    return alt self {
         EmptyConstraint => false,
         StayConstraint |stay| => stay.satisfied,
         EditConstraint |edit| => edit.satisfied,
@@ -229,7 +227,7 @@ fn Constraint.is_satisfied |self| () Bool {
 }
 
 fn Constraint.input |self| () Variable {
-    alt self {
+    return alt self {
         EqualityConstraint |eq| => {
             if eq.direction == direction_forward { eq.v1; } else { eq.v2; };
         },
@@ -241,7 +239,7 @@ fn Constraint.input |self| () Variable {
 }
 
 fn Constraint.output |self| () Variable {
-    alt self {
+    return alt self {
         StayConstraint |stay| => stay.output,
         EditConstraint |edit| => edit.output,
         EqualityConstraint |eq| => {
@@ -471,7 +469,7 @@ fn Constraint.choose_method |self| (mark: I32) Void {
 }
 
 fn Constraint.inputs_known |self| (mark: I32) Bool {
-    alt self {
+    return alt self {
         EmptyConstraint => false,
         StayConstraint => true,
         EditConstraint => true,
@@ -550,7 +548,7 @@ fn Constraint.recalculate |self| () Void {
 
 fn Planner.new_mark |self| () I32 {
     self.current_mark += 1;
-    self.current_mark;
+    return self.current_mark;
 }
 
 fn Variable.add_constraints_consuming_to |self| (coll: ConstraintList) Void {
@@ -581,7 +579,7 @@ fn Planner.add_propagate |self| (constraint: Constraint, mark: I32) Bool {
         };
     };
 
-    valid;
+    return valid;
 }
 
 fn Planner.remove_propagate_from |self| (out: Variable) ConstraintList {
@@ -615,7 +613,7 @@ fn Planner.remove_propagate_from |self| (out: Variable) ConstraintList {
         };
     };
 
-    unsatisfied;
+    return unsatisfied;
 }
 
 fn Planner.incremental_add |self| (constraint: Constraint) Void {
@@ -665,7 +663,7 @@ fn Planner.make_plan |self| (sources: ConstraintList) ConstraintList {
         };
     };
 
-    plan;
+    return plan;
 }
 
 fn Planner.extract_plan_from_constraints |self| (constraints: ConstraintList) ConstraintList {
@@ -678,7 +676,7 @@ fn Planner.extract_plan_from_constraints |self| (constraints: ConstraintList) Co
         };
     };
 
-    self.make_plan(sources);
+    return self.make_plan(sources);
 }
 
 fn Constraint.add_constraint |self| (planner: Planner) Void {
@@ -706,7 +704,7 @@ fn Constraint.satisfy |self| (planner: Planner, mark: I32) Constraint {
         out.mark = mark;
         result = overridden;
     };
-    result;
+    return result;
 }
 
 fn Constraint.destroy |self| (planner: Planner) Void {
@@ -731,7 +729,7 @@ fn new_stay_constraint(variable: Variable, strength: I32, planner: Planner) Cons
         satisfied: false,
     };
     constraint.add_constraint(planner);
-    constraint;
+    return constraint;
 }
 
 fn new_edit_constraint(variable: Variable, strength: I32, planner: Planner) Constraint {
@@ -741,7 +739,7 @@ fn new_edit_constraint(variable: Variable, strength: I32, planner: Planner) Cons
         satisfied: false,
     };
     constraint.add_constraint(planner);
-    constraint;
+    return constraint;
 }
 
 fn new_equality_constraint(v1: Variable, v2: Variable, strength: I32, planner: Planner) Constraint {
@@ -752,7 +750,7 @@ fn new_equality_constraint(v1: Variable, v2: Variable, strength: I32, planner: P
         direction: direction_none,
     };
     constraint.add_constraint(planner);
-    constraint;
+    return constraint;
 }
 
 fn new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest: Variable, strength: I32, planner: Planner) Constraint {
@@ -765,7 +763,7 @@ fn new_scale_constraint(src: Variable, scale: Variable, offset: Variable, dest: 
         direction: direction_none,
     };
     constraint.add_constraint(planner);
-    constraint;
+    return constraint;
 }
 
 fn change(planner: Planner, variable: Variable, new_value: I32) Void {
@@ -826,7 +824,7 @@ fn chain_test(n: I32) I64 {
         };
     };
 
-    failures;
+    return failures;
 }
 
 fn projection_test(n: I32) I64 {
@@ -872,15 +870,15 @@ fn projection_test(n: I32) I64 {
         };
     };
 
-    failures;
+    return failures;
 }
 
 fn delta_blue_impl(n: I32) I64 {
-    chain_test(n) + projection_test(n);
+    return chain_test(n) + projection_test(n);
 }
 
 fn delta_blue(n: I32) I64 {
-    delta_blue_impl(n);
+    return delta_blue_impl(n);
 }
 
 test "faithful deltablue stays consistent on a small graph" {
@@ -917,5 +915,5 @@ lib { fn run(kind: I32, iterations: I32) I64 {
             sink += projection_test(1048);
         };
     };
-    sink;
+    return sink;
 } }

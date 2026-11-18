@@ -1,5 +1,5 @@
 fn qux() I64 {
-    0
+    return 0
 }
 
 fn quux(a: I64) I64 {
@@ -24,7 +24,7 @@ fn quux(a: I64) I64 {
     sink = sink + qux()
     sink = sink + qux()
     sink = sink + qux()
-    sink + a
+    return sink + a
 }
 
 fn baz(a: I64, b: I64) I64 {
@@ -49,7 +49,7 @@ fn baz(a: I64, b: I64) I64 {
     sink = sink + quux(a)
     sink = sink + quux(a)
     sink = sink + quux(a)
-    sink + b
+    return sink + b
 }
 
 fn bar(a: I64, b: I64, c: I64) I64 {
@@ -74,7 +74,7 @@ fn bar(a: I64, b: I64, c: I64) I64 {
     sink = sink + baz(a, b)
     sink = sink + baz(a, b)
     sink = sink + baz(a, b)
-    sink + c
+    return sink + c
 }
 
 fn foo(a: I64, b: I64, c: I64, d: I64) I64 {
@@ -99,7 +99,7 @@ fn foo(a: I64, b: I64, c: I64, d: I64) I64 {
     sink = sink + bar(a, b, c)
     sink = sink + bar(a, b, c)
     sink = sink + bar(a, b, c)
-    sink + d
+    return sink + d
 }
 
 fn test_calls() I64 {
@@ -128,7 +128,7 @@ fn test_calls() I64 {
     sink = sink + foo(one, two, three, four)
     sink = sink + foo(one, two, three, four)
     sink = sink + foo(one, two, three, four)
-    sink
+    return sink
 }
 
 bench "call-simple chain" {
@@ -142,5 +142,5 @@ bench "call-simple chain" {
 }
 
 fn main() I64 {
-    test_calls()
+    return test_calls()
 }

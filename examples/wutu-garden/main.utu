@@ -5,10 +5,10 @@ struct Plant:
     | days: I32
     | watered: Bool
 
-fn today() Str { new Browser.Date().toLocaleDateString("en-CA") }
+fn today() Str { return new Browser.Date().toLocaleDateString("en-CA") }
 
 fn card(plant: Plant) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     article.plant {
         display: grid
         gap: 1rem
@@ -49,7 +49,7 @@ fn card(plant: Plant) Browser.HTMLElement {
 fn listing(plants: Array[Plant], query: Str, by_frequency: Bool) Browser.HTMLElement {
     let ordered = if by_frequency { plants sort(Plant) |a, b| { a.days < b.days } } else { plants }
     let visible = ordered count_where |plant| { plant.name.toLowerCase().includes(query.toLowerCase()) }
-    @wutu/\
+    return @wutu/\
     section#plants {
         aria-label="Your plants"
         display: grid

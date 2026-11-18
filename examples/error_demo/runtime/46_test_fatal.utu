@@ -1,7 +1,7 @@
 // What: a test reaching `fatal` through `orelse fatal`
 // Expect: FAIL lookup finds bob: `orelse fatal` on null at 46_test_fatal.utu:8
 fn lookup(name: Str) ?Str {
-    if name == "ada" { "Ada Lovelace"; } else { null; };
+    return if name == "ada" { "Ada Lovelace"; } else { null; };
 }
 
 test "lookup finds bob" {

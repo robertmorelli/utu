@@ -11,7 +11,7 @@ struct AtlasState:
 | region: Str
 | places: Array[Place]
 fn workspace(state: AtlasState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "atlas-workspace"
     section.workspace {
         div.bar {

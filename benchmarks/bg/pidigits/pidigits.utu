@@ -23,7 +23,7 @@ fn big(v: I32) Big {
     d[0] = I32.abs(v).u32()
     let n = 1
     if v == 0 { n = 0 }
-    &{ d: d, n: n, neg: v < 0 }
+    return &{ d: d, n: n, neg: v < 0 }
 }
 
 // Room for cap limbs, keeping the value.
@@ -40,7 +40,7 @@ fn reserve(a: Big, cap: I32) Void {
 fn norm(d: Array[U32], n0: I32) I32 {
     let n = n0
     while (n > 0 and d[n - 1] == 0) { n -= 1 }
-    n
+    return n
 }
 
 fn set_zero(r: Big) Void {
@@ -50,7 +50,7 @@ fn set_zero(r: Big) Void {
 
 // |a| vs |b|: -1, 0, 1.
 fn cmp_mag(a: Big, b: Big) I32 {
-    if a.n != b.n {
+    return if a.n != b.n {
         if a.n < b.n { -1 } else { 1 }
     } else {
         let ad = a.d
@@ -69,7 +69,7 @@ fn cmp_mag(a: Big, b: Big) I32 {
 
 // mpz_cmp
 fn cmp(a: Big, b: Big) I32 {
-    if a.neg != b.neg {
+    return if a.neg != b.neg {
         if a.neg { -1 } else { 1 }
     } else {
         let c = cmp_mag(a, b)
@@ -79,7 +79,7 @@ fn cmp(a: Big, b: Big) I32 {
 
 // mpz_get_si (for values that fit)
 fn get_si(a: Big) I32 {
-    if a.n == 0 {
+    return if a.n == 0 {
         0
     } else {
         let v = a.d[0].i32()
@@ -311,7 +311,7 @@ fn tdiv_q(q: Big, a: Big, b: Big, un: Big, vn: Big) Void {
 
 // ---- output: FNV-1a over the bytes gcc #2 prints
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 // "\t:<i>\n"
 fn fnv_count(h0: I32, i: I32) I32 {
@@ -322,7 +322,7 @@ fn fnv_count(h0: I32, i: I32) I32 {
         h = fnv(h, 48 + i / p % 10)
         p = p / 10
     }
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 fn pidigits(n: I32) I32 {
@@ -373,7 +373,7 @@ fn pidigits(n: I32) I32 {
         for (0..<(10 - n % 10)) { h = fnv(h, 32) }
         h = fnv_count(h, n)
     }
-    h
+    return h
 }
 
 test "pidigits prints BG's digits" {
@@ -384,5 +384,5 @@ test "pidigits prints BG's digits" {
 }
 
 lib {
-    fn bench(n: I32) I32 { pidigits(n) }
+    fn bench(n: I32) I32 { return pidigits(n) }
 }

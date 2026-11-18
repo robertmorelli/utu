@@ -1,4 +1,4 @@
 
-      fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
-      lib { fn run(x: I32) I32 { apply(cl(n) { n; }, x); } }
+      fn apply(f: cl(I32) I32, x: I32) I32 { return f(x); }
+      lib { fn run(x: I32) I32 { return apply(cl(n) { return n; }, x); } }
     

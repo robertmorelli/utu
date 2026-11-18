@@ -4,7 +4,7 @@ struct Point:
     | x: F64
     | y: F64
 
-fn origin() Point { &{ x: 0.0 }; }
+fn origin() Point { return &{ x: 0.0 }; }
 
 main { console.log(origin().x.i32()); }
 using console from std:Console

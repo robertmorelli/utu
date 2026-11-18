@@ -1,1 +1,1 @@
-lib { fn bad() I32 { 2147483648; } }
+lib { fn bad() I32 { return 2147483648; } }

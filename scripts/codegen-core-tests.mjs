@@ -10,13 +10,13 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_arith.utu',
       source: `
         lib {
-          fn add(a: I32, b: I32) I32 { a + b; }
+          fn add(a: I32, b: I32) I32 { return a + b; }
           fn scaled_sum(a: I32, b: I32) I32 {
             let sum: I32 = add(a, b);
             let diff: I32 = a - b;
-            sum * 2 + diff;
+            return sum * 2 + diff;
           }
-          fn bit_mix(a: I32, b: I32) I32 { ((a << 2) ^ b) & 31; }
+          fn bit_mix(a: I32, b: I32) I32 { return ((a << 2) ^ b) & 31; }
         }
       `,
     });
@@ -33,8 +33,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_operator_literal_context.utu',
       source: `
         lib {
-          fn add_one_i64(value: I64) I64 { value + 1; }
-          fn half_f64(value: F64) F64 { value / 2.0; }
+          fn add_one_i64(value: I64) I64 { return value + 1; }
+          fn half_f64(value: F64) F64 { return value / 2.0; }
         }
       `,
     });
@@ -53,30 +53,30 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           struct Pair:
             | left : I32
             | right : I32
-          fn Pair.new(left: I32, right: I32) Pair { Pair { left: left, right: right }; }
-          fn Pair.sum |self| () I32 { self.left + self.right; }
-          fn inc(value: I32) I32 { value + 1; }
+          fn Pair.new(left: I32, right: I32) Pair { return Pair { left: left, right: right }; }
+          fn Pair.sum |self| () I32 { return self.left + self.right; }
+          fn inc(value: I32) I32 { return value + 1; }
         }
         mod boxy[T] {
           struct Box:
             | value : T
-          fn Box.new(value: T) Box { Box { value: value }; }
-          fn Box.get |self| () T { self.value; }
+          fn Box.new(value: T) Box { return Box { value: value }; }
+          fn Box.get |self| () T { return self.value; }
         }
         using boxy[I32] |box_i32|;
         mod cell[T] {
           struct Cell:
             | value : T
-          fn Cell.new(value: T) Cell { Cell { value: value }; }
-          fn Cell.get |self| () T { self.value; }
-          fn wrap(value: T) Cell { Cell.new(value); }
+          fn Cell.new(value: T) Cell { return Cell { value: value }; }
+          fn Cell.get |self| () T { return self.value; }
+          fn wrap(value: T) Cell { return Cell.new(value); }
         }
         using cell[I32];
         lib {
-          fn plain() I32 { math.inc(math.Pair.new(2, 3).sum()); }
-          fn parameterized() I32 { boxy[I32].Box.new(7).get(); }
-          fn alias_path() I32 { box_i32.Box.new(8).get(); }
-          fn open_path() I32 { wrap(9).get() + Cell.new(1).get(); }
+          fn plain() I32 { return math.inc(math.Pair.new(2, 3).sum()); }
+          fn parameterized() I32 { return boxy[I32].Box.new(7).get(); }
+          fn alias_path() I32 { return box_i32.Box.new(8).get(); }
+          fn open_path() I32 { return wrap(9).get() + Cell.new(1).get(); }
         }
       `,
     });
@@ -96,8 +96,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         let seed: I32 = 41;
         let banner: Str = "ok";
         lib {
-          fn next() I32 { seed + 1; }
-          fn loud() Str { banner + "!"; }
+          fn next() I32 { return seed + 1; }
+          fn loud() Str { return banner + "!"; }
         }
       `,
     });
@@ -108,7 +108,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: module metadata includes functions, exports, and size', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_explainability.utu', `
-      lib { fn add(a: I32, b: I32) I32 { a + b; } }
+      lib { fn add(a: I32, b: I32) I32 { return a + b; } }
     `, async file => {
       const result = await compiler.compileFile(file, { sourceMap: true });
       assertNoErrors(result);
@@ -130,12 +130,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       return { result, imports, exports: (await instantiateNode(result.wasm, result.spec, { root: ROOT })).exports };
     });
     const scalar = await inspect('codegen_import_shaking.utu', `
-      lib { fn add(a: I32, b: I32) I32 { a + b; } }
+      lib { fn add(a: I32, b: I32) I32 { return a + b; } }
     `);
     assert(!scalar.imports.some(item => item.module === 'wasm:js-string'), 'string-free module retained JS string imports');
     assertEq(scalar.exports.add(2, 3), 5);
     const concat = await inspect('codegen_string_import_shaking.utu', `
-      lib { fn join(a: Str, b: Str) Str { a + b; } }
+      lib { fn join(a: Str, b: Str) Str { return a + b; } }
     `);
     assertEq(concat.exports.join('a', 'b'), 'ab');
     assert(!concat.imports.some(item => /substring|charCodeAt|fromCodePoint|intoCharCodeArray/.test(item.name)), 'concat-only module retained unrelated string imports');
@@ -150,7 +150,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
             out = Str.slice(out, 0, middle) + piece + Str.slice(out, middle, size);
             i = i + 1;
           };
-          out;
+          return out;
         }
       }
     `);
@@ -166,10 +166,10 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_string_receiver_methods.utu',
       source: `
         lib {
-          fn len(s: Str) I32 { s.len(); }
-          fn get(s: Str, i: I32) I32 { s.get(i); }
-          fn index(s: Str, i: I32) I32 { s[i]; }
-          fn slice(s: Str) Str { s[1, 3]; }
+          fn len(s: Str) I32 { return s.len(); }
+          fn get(s: Str, i: I32) I32 { return s.get(i); }
+          fn index(s: Str, i: I32) I32 { return s[i]; }
+          fn slice(s: Str) Str { return s[1, 3]; }
         }
       `,
     });
@@ -182,7 +182,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: a wasm source map identifies the exported function', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map.utu', `
-      lib { fn add(a: I32, b: I32) I32 { a + b; } }
+      lib { fn add(a: I32, b: I32) I32 { return a + b; } }
     `, async file => {
       const result = await compiler.compileFile(file, { sourceMap: true });
       assertNoErrors(result);
@@ -195,7 +195,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('codegen: source maps cover string-using code', async ({ ROOT }) => {
     const compiler = await makeCompiler({ ROOT, target: 'normal' });
     await withTempUtu(ROOT, 'codegen_source_map_strings.utu', `
-      lib { fn greet_len() I32 { Str.len("hello"); } }
+      lib { fn greet_len() I32 { return Str.len("hello"); } }
     `, async file => {
       const result = await compiler.compileFile(file, { sourceMap: true });
       assertNoErrors(result);
@@ -211,18 +211,18 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_cf.utu',
       source: `
         lib {
-          fn abs(x: I32) I32 { if x < 0 { 0 - x; } else { x; }; }
+          fn abs(x: I32) I32 { return if x < 0 { 0 - x; } else { x; }; }
           fn sum_to(n: I32) I32 {
             let i: I32 = 0;
             let acc: I32 = 0;
             while (i <= n) { acc = acc + i; i = i + 1; };
-            acc;
+            return acc;
           }
           fn fact(n: I32) I32 {
             let acc: I32 = 1;
             let i: I32 = 1;
             while (i <= n) { acc = acc * i; i = i + 1; };
-            acc;
+            return acc;
           }
         }
       `,
@@ -244,12 +244,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           fn exclusive(n: I32) I32 {
             let total: I32 = 0;
             for (0..<n) |i| { total += i; };
-            total;
+            return total;
           }
           fn inclusive(n: I32) I32 {
             let total: I32 = 0;
             for (0...n) |i| { total += i; };
-            total;
+            return total;
           }
           fn first_three(n: I32) I32 {
             let total: I32 = 0;
@@ -257,28 +257,28 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
               if i == 3 { break; };
               total += i;
             };
-            total;
+            return total;
           }
           fn wide(end_: I64) I64 {
             let start: I64 = 0;
             let total: I64 = 0;
             for (start..<end_) |i| { total += i; };
-            total;
+            return total;
           }
           fn inclusive_u64_max(start: U64) U64 {
             let total: U64 = 0;
             for (start...start) |i| { total += 1; };
-            total;
+            return total;
           }
           fn zipped() I32 {
             let total: I32 = 0;
             for (0..<5, 10..<13) |left, right| { total += left + right; };
-            total;
+            return total;
           }
           fn no_capture() I32 {
             let total: I32 = 0;
             for (0..<3) { total += 1; };
-            total;
+            return total;
           }
         }
       `,
@@ -301,7 +301,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         lib {
           fn dense_pick(x: I32) I32 {
-            match x {
+            return match x {
               0 => 10,
               1 => 20,
               2 => 30,
@@ -309,7 +309,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
             };
           }
           fn sparse_pick(x: I32) I32 {
-            match x {
+            return match x {
               0   => 1,
               100 => 2,
               ~> 0,
@@ -336,7 +336,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         lib {
           fn pick(flag: Bool) I32 {
-            match flag { true => 11, false => 22, ~> 33, };
+            return match flag { true => 11, false => 22, ~> 33, };
           }
         }
       `,
@@ -354,7 +354,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         lib {
           fn dense64(x: I64) I32 {
-            match x {
+            return match x {
               0 => 10,
               1 => 20,
               2 => 30,
@@ -362,7 +362,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
             };
           }
           fn pick64(x: I64) I32 {
-            match x {
+            return match x {
               0 => 1,
               4294967296 => 2,
               ~> 0,
@@ -389,28 +389,28 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         lib {
           fn dense32(x: F32) I32 {
-            match x {
+            return match x {
               0.0 => 10,
               1.0 => 20,
               ~> 99,
             };
           }
           fn sparse32(x: F32) I32 {
-            match x {
+            return match x {
               0.0 => 1,
               100.5 => 2,
               ~> 0,
             };
           }
           fn dense64(x: F64) I32 {
-            match x {
+            return match x {
               0.0 => 10,
               1.0 => 20,
               ~> 99,
             };
           }
           fn sparse64(x: F64) I32 {
-            match x {
+            return match x {
               0.0 => 1,
               100.5 => 2,
               ~> 0,
@@ -442,7 +442,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let lucky: I32 = @es/\\41\\/;
         lib {
-          fn get_lucky() I32 { lucky; }
+          fn get_lucky() I32 { return lucky; }
         }
       `,
     });
@@ -458,7 +458,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let add: fun(I32, I32) I32 = @es/\\(a, b) => a + b\\/;
         lib {
-          fn sum(a: I32, b: I32) I32 { add(a, b); }
+          fn sum(a: I32, b: I32) I32 { return add(a, b); }
         }
       `,
     });
@@ -479,8 +479,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         let join: fun(Str, Str) Str = @es/\\ (await import('node:path')).join \\/;
         let sep: Str = @es/\\ (await import('node:path')).sep \\/;
         lib {
-          fn joined() Str { join("a", "b"); }
-          fn separator() Str { sep; }
+          fn joined() Str { return join("a", "b"); }
+          fn separator() Str { return sep; }
         }
       `,
     });
@@ -503,8 +503,8 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
             @es/\\ import { join } from 'node:path'; (a, b) => join(a, b) \\/;
         let sep: Str = @es/\\ import { sep } from 'node:path'; sep \\/;
         lib {
-          fn joined() Str { join("a", "b"); }
-          fn separator() Str { sep; }
+          fn joined() Str { return join("a", "b"); }
+          fn separator() Str { return sep; }
         }
       `,
     });
@@ -542,7 +542,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       source: `
         let cat: fun(Str, Str) Str = @es/\\(a, b) => a + b\\/;
         lib {
-          fn greet() Str { cat("hi ", "there"); }
+          fn greet() Str { return cat("hi ", "there"); }
         }
       `,
     });
@@ -553,7 +553,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     const compiler = await makeCompiler({ ROOT, target: 'analysis' });
     await withTempUtu(ROOT, 'es_missing_type.utu', `
       lib {
-        fn bad() I32 { @es/\\41\\/; }
+        fn bad() I32 { return @es/\\41\\/; }
       }
     `, async (file) => {
       const doc = await compiler.compileFile(file);
@@ -570,12 +570,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       name: 'codegen_fun_ptr.utu',
       source: `
         lib {
-          fn double(x: I32) I32 { x * 2; }
-          fn triple(x: I32) I32 { x * 3; }
+          fn double(x: I32) I32 { return x * 2; }
+          fn triple(x: I32) I32 { return x * 3; }
           fn apply(pick: Bool, n: I32) I32 {
             let f: fun(I32) I32 = double;
             let g: fun(I32) I32 = triple;
-            if pick { f(n); } else { g(n); };
+            return if pick { f(n); } else { g(n); };
           }
         }
       `,
@@ -601,30 +601,30 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
         struct Box:
           | v : I32
         lib {
-          fn double(x: I32) I32 { x * 2; }
+          fn double(x: I32) I32 { return x * 2; }
           fn scalar_capture(n: I32) I32 {
-            let f: cl(I32) I32 = cl(x) { x * n; };
-            f(3);
+            let f: cl(I32) I32 = cl(x) { return x * n; };
+            return f(3);
           }
           fn gc_capture(n: I32) I32 {
             let b: Box = Box { v: 10 };
-            let f: cl(I32) I32 = cl(x) { x + b.v + n; };
-            f(1);
+            let f: cl(I32) I32 = cl(x) { return x + b.v + n; };
+            return f(1);
           }
           fn nested(m: I32) I32 {
             let outer: cl(I32) I32 = cl(x) {
-              let inner: cl(I32) I32 = cl(y) { y + m; };
-              inner(x);
+              let inner: cl(I32) I32 = cl(y) { return y + m; };
+              return inner(x);
             };
-            outer(5);
+            return outer(5);
           }
           fn zero_arg() I32 {
-            let t: cl() I32 = cl() { 99; };
-            t();
+            let t: cl() I32 = cl() { return 99; };
+            return t();
           }
           fn decayed(n: I32) I32 {
             let c: cl(I32) I32 = double;
-            c(n);
+            return c(n);
           }
         }
       `,
@@ -649,22 +649,22 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           fn capture_modes() I32 {
             let base: I32 = 100;
             let c: Counter = Counter { n: 1 };
-            let read: cl() I32 = cl() { base + c.n; };
+            let read: cl() I32 = cl() { return base + c.n; };
             base = 999;
             c.n = 5;
-            read();
+            return read();
           }
           fn counter() I32 {
             let count: I32 = 0;
             let bump = cl() Void { count = count + 1; };
             bump(); bump(); bump();
-            count;
+            return count;
           }
           fn loop_capture() I32 {
             let i: I32 = 0;
-            let last = cl() I32 { i; };
+            let last = cl() I32 { return i; };
             while (i < 4) { i = i + 1; };
-            last();
+            return last();
           }
         }
       `,
@@ -679,12 +679,12 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   test('stdlib: numeric conversions are single instructions with saturating float → int', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'stdlib_conversions.utu', source: `
       lib {
-        fn widen(i: I32) F64 { i.f64(); }
-        fn narrow(f: F64) I32 { f.i32(); }
-        fn unsigned(f: F64) F64 { f.u32().f64(); }
-        fn wide(i: I32) F64 { i.i64().f64(); }
-        fn single(f: F64) F64 { f.f32().f64(); }
-        fn wrap(n: F64) I32 { n.i64().i32(); }
+        fn widen(i: I32) F64 { return i.f64(); }
+        fn narrow(f: F64) I32 { return f.i32(); }
+        fn unsigned(f: F64) F64 { return f.u32().f64(); }
+        fn wide(i: I32) F64 { return i.i64().f64(); }
+        fn single(f: F64) F64 { return f.f32().f64(); }
+        fn wrap(n: F64) I32 { return n.i64().i32(); }
       }
     ` });
     const e = instance.exports;
@@ -696,11 +696,11 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
 
   test('typing: integer literals adopt float types from context', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'int_literal_floats.utu', source: `
-      fn half(x: F64) F64 { x / 2; }
+      fn half(x: F64) F64 { return x / 2; }
       lib {
-        fn run() F64 { let a: F64 = 3; let b: F64 = 1.5; half(10) + a + 2 * b + b * 2; }
-        fn single() F32 { let x: F32 = 4; x; }
-        fn still_int() I32 { let n = 5; n; }
+        fn run() F64 { let a: F64 = 3; let b: F64 = 1.5; return half(10) + a + 2 * b + b * 2; }
+        fn single() F32 { let x: F32 = 4; return x; }
+        fn still_int() I32 { let n = 5; return n; }
       }
     ` });
     assertEq(instance.exports.run(), 14); assertEq(instance.exports.single(), 4); assertEq(instance.exports.still_int(), 5);
@@ -710,18 +710,18 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'array_literals.utu', source: `
       struct P:
         | v: I32
-      fn total(xs: Array[I32]) I32 { let t = 0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
+      fn total(xs: Array[I32]) I32 { let t = 0; for (0..<xs.len()) |i| { t += xs[i]; }; return t; }
       lib {
-        fn literals() I32 { let xs = [1, 2, 3]; total(xs) + total([10, 20]); }
-        fn floats() F64 { let x: F64 = 1.5; let mixed = [x, 2]; let typed: Array[F64] = [1, 2.5]; mixed[1] + typed[0]; }
-        fn locals() I32 { let a = 4; let xs = [a, a, 1]; xs[0] + xs[2]; }
-        fn structs() I32 { let p = P { v: 5 }; let ps = [p, P { v: 6 }, null]; promote ps[1] { |q| => q.v + ps.len(), ~> 0, }; }
-        fn nested() I32 { let grid = [[1, 2], [3, 4, 5]]; grid[1][2] + grid.len(); }
-        fn strings() I32 { let names = ["a", "bb"]; names[1].len(); }
-        fn empty() I32 { let none = []; none.len(); }
-        fn from_use() F64 { let xs = []; let t: F64 = 0.0; let ys = sum(xs); xs = [1.5, 2.5]; xs[1] + ys; }
+        fn literals() I32 { let xs = [1, 2, 3]; return total(xs) + total([10, 20]); }
+        fn floats() F64 { let x: F64 = 1.5; let mixed = [x, 2]; let typed: Array[F64] = [1, 2.5]; return mixed[1] + typed[0]; }
+        fn locals() I32 { let a = 4; let xs = [a, a, 1]; return xs[0] + xs[2]; }
+        fn structs() I32 { let p = P { v: 5 }; let ps = [p, P { v: 6 }, null]; return promote ps[1] { |q| => q.v + ps.len(), ~> 0, }; }
+        fn nested() I32 { let grid = [[1, 2], [3, 4, 5]]; return grid[1][2] + grid.len(); }
+        fn strings() I32 { let names = ["a", "bb"]; return names[1].len(); }
+        fn empty() I32 { let none = []; return none.len(); }
+        fn from_use() F64 { let xs = []; let t: F64 = 0.0; let ys = sum(xs); xs = [1.5, 2.5]; return xs[1] + ys; }
       }
-      fn sum(xs: Array[F64]) F64 { let t: F64 = 0.0; for (0..<xs.len()) |i| { t += xs[i]; }; t; }
+      fn sum(xs: Array[F64]) F64 { let t: F64 = 0.0; for (0..<xs.len()) |i| { t += xs[i]; }; return t; }
     ` });
     const e = instance.exports;
     assertEq(e.literals(), 36); assertEq(e.floats(), 3); assertEq(e.locals(), 5);
@@ -733,15 +733,15 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'web_friction.utu', source: `
       struct P:
         | v: I32
-      fn find(ok: Bool) ?P { if ok { P { v: 7 }; } else { null; }; }
-      fn keep(p: P) P { p; }
+      fn find(ok: Bool) ?P { return if ok { P { v: 7 }; } else { null; }; }
+      fn keep(p: P) P { return p; }
       lib {
-        fn factorial(n: I32) I32 { let fact = cl(k: I32) I32 { if k <= 1 { 1; } else { k * fact(k - 1); }; }; fact(n); }
-        fn countdown() I32 { let calls = 0; let tick = cl(k: I32) Void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); calls; }
-        fn captured() I32 { promote find(true) { |p| => { let read = cl() I32 { p.v; }; read(); }, ~> 0, }; }
-        fn required() I32 { let p = find(true) orelse fatal; p.v; }
-        fn scaled(i: I32) F64 { let y = 16 + i.f64() * 40; y + 14; }
-        fn loop_values() I32 { let last = P { v: 0 }; for (0..<3) |i| { keep(last); }; while (last.v < 2) { last.v += 1; keep(last); }; last.v; }
+        fn factorial(n: I32) I32 { let fact = cl(k: I32) I32 { return if k <= 1 { 1; } else { k * fact(k - 1); }; }; return fact(n); }
+        fn countdown() I32 { let calls = 0; let tick = cl(k: I32) Void { calls += 1; if k > 0 { tick(k - 1); }; }; tick(4); return calls; }
+        fn captured() I32 { return promote find(true) { |p| => { let read = cl() I32 { return p.v; }; read(); }, ~> 0, }; }
+        fn required() I32 { let p = find(true) orelse fatal; return p.v; }
+        fn scaled(i: I32) F64 { let y = 16 + i.f64() * 40; return y + 14; }
+        fn loop_values() I32 { let last = P { v: 0 }; for (0..<3) |i| { keep(last); }; while (last.v < 2) { last.v += 1; keep(last); }; return last.v; }
       }
     ` });
     const e = instance.exports;
@@ -757,7 +757,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       '      \\\\{"quoted": true}',
       '      \\\\second line',
       '    ;',
-      '    s;',
+      '    return s;',
       '  }',
       '}',
     ].join('\n') });
@@ -769,7 +769,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
       struct P:
         | v: I32
         | next: ?P
-      fn find(ok: Bool) ?P { if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
+      fn find(ok: Bool) ?P { return if ok { P { v: 1, next: P { v: 2, next: null } }; } else { null; }; }
       fn bump(p: P) Void { p.v += 1; }
       lib {
         fn run() I32 {
@@ -780,21 +780,21 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
           p?.next?.v = 7;
           p?.next?.next?.v = 99;
           p?.next?.v += 100;
-          promote p { |x| => { bump(x); x.v + (x.next orelse fatal).v; }, ~> 0, };
+          return promote p { |x| => { bump(x); x.v + (x.next orelse fatal).v; }, ~> 0, };
         }
       }
     ` });
     assertEq(instance.exports.run(), 118);
-    for (const body of ['let x = p?.v;', 'take(p?.v);', 'p?.v;']) {
+    for (const body of ['let x = p?.v;', 'return take(p?.v);', 'return p?.v;']) {
       const doc = await (await makeCompiler({ ROOT, target: 'normal' })).compileFile(await (async () => {
         const fs = await import('node:fs/promises'); const path = await import('node:path');
         const file = path.join(testTmp(ROOT), 'optional_rejected.utu');
         await fs.mkdir(path.dirname(file), { recursive: true });
         await fs.writeFile(file, `struct P:
   | v: I32
-fn take(v: I32) I32 { v; }
+fn take(v: I32) I32 { return v; }
 fn g(p: ?P) I32 { ${body} }
-lib { fn run() I32 { 0; } }`);
+lib { fn run() I32 { return 0; } }`);
         return file;
       })());
       assert(doc.diagnostics.some(diagnostic => /only (?:allowed )?in a? statements?/.test(diagnostic.message)), body);
@@ -802,10 +802,10 @@ lib { fn run() I32 { 0; } }`);
   });
 
   test('codegen: captures read the value before closure creation', async ({ ROOT }) => {
-    const source = (extra) => `lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { base; }; ${extra} read(); } }`;
+    const source = (extra) => `lib { fn run() I32 { let base: I32 = 7; let read = cl() I32 { return base; }; ${extra} return read(); } }`;
     const plain = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_plain_capture.utu', source: source('') });
     const before = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'codegen_early_write.utu',
-      source: `lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { base; }; read(); } }` });
+      source: `lib { fn run() I32 { let base: I32 = 1; base = 7; let read = cl() I32 { return base; }; return read(); } }` });
     assertEq(plain.instance.exports.run(), 7);
     assertEq(before.instance.exports.run(), 7);
   });
@@ -825,13 +825,13 @@ lib { fn run() I32 { 0; } }`);
         struct Holder:
           | cb : cl(I32) I32
         lib {
-          fn double(x: I32) I32 { x * 2; }
-          fn from_return() cl(I32) I32 { double; }
-          fn from_field() Holder { Holder { cb: double }; }
+          fn double(x: I32) I32 { return x * 2; }
+          fn from_return() cl(I32) I32 { return double; }
+          fn from_field() Holder { return Holder { cb: double }; }
           fn from_assign() I32 {
-            let c: cl(I32) I32 = cl(x) { x; };
+            let c: cl(I32) I32 = cl(x) { return x; };
             c = double;
-            c(21);
+            return c(21);
           }
         }
       `,
@@ -853,12 +853,12 @@ lib { fn run() I32 { 0; } }`);
         let js_twice: fun(cl(I32) I32, I32) I32 = @es/\\ (f, v) => f(f(v)) \\/;
         lib {
           fn to_js(n: I32) I32 {
-            let f: cl(I32) I32 = cl(x) { x * n; };
-            js_apply(f, 5);
+            let f: cl(I32) I32 = cl(x) { return x * n; };
+            return js_apply(f, 5);
           }
           fn to_js_twice(n: I32) I32 {
-            let f: cl(I32) I32 = cl(x) { x + n; };
-            js_twice(f, 0);
+            let f: cl(I32) I32 = cl(x) { return x + n; };
+            return js_twice(f, 0);
           }
         }
       `,
@@ -880,8 +880,8 @@ lib { fn run() I32 { 0; } }`);
         let js_call2: fun(cl(I32, I32) I32, I32, I32) I32 = @es/\\ (f, a, b) => f(a, b) \\/;
         lib {
           fn run(a: I32, b: I32) I32 {
-            let f: cl(I32, I32) I32 = cl(x, y) { x + y; };
-            js_call2(f, a, b);
+            let f: cl(I32, I32) I32 = cl(x, y) { return x + y; };
+            return js_call2(f, a, b);
           }
         }
       `,
@@ -893,7 +893,7 @@ lib { fn run() I32 { 0; } }`);
     const { instantiateNode } = await import('../src/selfhost/node.js');
     const compiler = await makeCompiler({ ROOT, target: 'test' });
     await withTempUtu(ROOT, 'codegen_test_target.utu', `
-      fn add(a: I32, b: I32) I32 { a + b; }
+      fn add(a: I32, b: I32) I32 { return a + b; }
       test "passes" { assert add(2, 2) == 4; }
       test "fails" { assert add(2, 2) == 5; }
     `, async (file) => {
@@ -917,7 +917,7 @@ lib { fn run() I32 { 0; } }`);
       name: 'codegen_promise_value.utu',
       source: `
         let make: fun(Str) Promise[Str] = @es/\\ (u) => Promise.resolve("body:" + u) \\/;
-        lib { fn get(u: Str) Promise[Str] { make(u); } }
+        lib { fn get(u: Str) Promise[Str] { return make(u); } }
       `,
     });
     const p = instance.exports.get('/x');
@@ -936,8 +936,8 @@ lib { fn run() I32 { 0; } }`);
         let record: fun(I32) Void = @es/\\ (v) => { globalThis.__utu_seen = v; } \\/;
         let seen: fun() I32 = @es/\\ () => globalThis.__utu_seen ?? -1 \\/;
         lib {
-          fn subscribe(n: I32) Void { later(n).then(cl(v) { record(v); }); }
-          fn observed() I32 { seen(); }
+          fn subscribe(n: I32) Void { later(n).then(cl(v) { return record(v); }); }
+          fn observed() I32 { return seen(); }
         }
       `,
     });
@@ -959,7 +959,7 @@ lib { fn run() I32 { 0; } }`);
         lib {
           fn compute(n: I32) I32 {
             let doubled: I32 = await later(n);
-            doubled + 1;
+            return doubled + 1;
           }
         }
       `,
@@ -1024,16 +1024,16 @@ lib { fn run() I32 { 0; } }`);
   // Salvaged from stage -1's compiler-quality-tests: closure hygiene, the
   // closure runtime ABI, and dead-code size.
   for (const [name, source, expected] of [
-    ['parameter', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { n + __env; }; f(7);', 12],
-    ['local', 'let n: I32 = 5; let f: cl() I32 = cl() { let __env: I32 = 7; n + __env; }; f();', 12],
-    ['capture', 'let __env: I32 = 5; let f: cl() I32 = cl() { __env; }; f();', 5],
-    ['shadow', 'let n: I32 = 5; let f: cl(I32) I32 = cl(n) { n + 1; }; f(7);', 8],
-    ['nested', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { let g: cl(I32) I32 = cl(__env0) { n + __env + __env0; }; g(3); }; f(7);', 15],
-    ['function name', 'let n: I32 = 5; let f: cl() I32 = cl() { n + __closure0(); }; f();', 35],
+    ['parameter', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { return n + __env; }; return f(7);', 12],
+    ['local', 'let n: I32 = 5; let f: cl() I32 = cl() { let __env: I32 = 7; return n + __env; }; return f();', 12],
+    ['capture', 'let __env: I32 = 5; let f: cl() I32 = cl() { return __env; }; return f();', 5],
+    ['shadow', 'let n: I32 = 5; let f: cl(I32) I32 = cl(n) { return n + 1; }; return f(7);', 8],
+    ['nested', 'let n: I32 = 5; let f: cl(I32) I32 = cl(__env) { let g: cl(I32) I32 = cl(__env0) { return n + __env + __env0; }; return g(3); }; return f(7);', 15],
+    ['function name', 'let n: I32 = 5; let f: cl() I32 = cl() { return n + __closure0(); }; return f();', 35],
   ]) {
     test(`codegen: closure environments do not shadow a user ${name}`, async ({ ROOT }) => {
       const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: `closure_hygiene_${name.replace(' ', '_')}.utu`,
-        source: `fn __closure0() I32 { 30; }
+        source: `fn __closure0() I32 { return 30; }
 lib { fn run() I32 { ${source} } }` });
       assertEq(instance.exports.run(), expected);
     });
@@ -1042,8 +1042,8 @@ lib { fn run() I32 { ${source} } }` });
   test('codegen: closures use the JS closure runtime; fun references need none', async ({ ROOT }) => {
     const imported = wasm => WebAssembly.Module.imports(new WebAssembly.Module(wasm)).map(i => `${i.module}.${i.name}`);
     const closures = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'closure_js_abi.utu', source: `lib {
-      fn run(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(7); }
-      fn callback(n: I32) cl(I32) I32 { cl(x) { x + n; }; }
+      fn run(n: I32) I32 { let f: cl(I32) I32 = cl(x) { return x + n; }; return f(7); }
+      fn callback(n: I32) cl(I32) I32 { return cl(x) { return x + n; }; }
     }` });
     const names = imported(closures.doc.wasm);
     assert(names.includes('utu.closure_new') && names.some(n => n.startsWith('utu.closure_call_')), names.join(', '));
@@ -1051,8 +1051,8 @@ lib { fn run() I32 { ${source} } }` });
     const callback = closures.instance.exports.callback(5);
     assertEq(typeof callback, 'function');
     assertEq([1, 2, 3].map(callback).join(','), '6,7,8');
-    const funs = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fun_abi.utu', source: `fn inc(n: I32) I32 { n + 1; }
-      lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; f(n); } }` });
+    const funs = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'fun_abi.utu', source: `fn inc(n: I32) I32 { return n + 1; }
+      lib { fn run(n: I32) I32 { let f: fun(I32) I32 = inc; return f(n); } }` });
     assert(!imported(funs.doc.wasm).some(n => n.includes('closure_')), imported(funs.doc.wasm).join(', '));
     assertEq(funs.instance.exports.run(5), 6);
   });
@@ -1064,8 +1064,8 @@ lib { fn run() I32 { ${source} } }` });
       assertNoErrors(result);
       return Buffer.from(result.wasm).toString('hex');
     });
-    const base = 'lib { fn answer() I32 { 42; } }';
-    assertEq(await bytes(`${base} fn unused(n: I32) I32 { let f: cl(I32) I32 = cl(x) { x + n; }; f(1); }`), await bytes(base));
+    const base = 'lib { fn answer() I32 { return 42; } }';
+    assertEq(await bytes(`${base} fn unused(n: I32) I32 { let f: cl(I32) I32 = cl(x) { return x + n; }; return f(1); }`), await bytes(base));
   });
 
   test('codegen: module host bindings coexist with intrinsic type methods; void tails keep effects', async ({ ROOT }) => {
@@ -1074,8 +1074,8 @@ lib { fn run() I32 { ${source} } }` });
       struct Cell: | value: I32
       fn update(cell: Cell) Void { cell.value = 42; cell.value; }
       lib {
-        fn host() F64 { Host.twice(F64.sqrt(441.0)); }
-        fn tail() I32 { let c: Cell = Cell { value: 0 }; update(c); c.value; }
+        fn host() F64 { return Host.twice(F64.sqrt(441.0)); }
+        fn tail() I32 { let c: Cell = Cell { value: 0 }; update(c); return c.value; }
       }
     ` });
     assertEq(instance.exports.host(), 42);
@@ -1086,14 +1086,14 @@ lib { fn run() I32 { ${source} } }` });
   test('analysis: valid programs report no diagnostics', async ({ ROOT }) => {
     const { selfhostDiagnostics } = await import('./test-harness.mjs');
     for (const source of [
-      'fn add(a: I32, b: I32) I32 { a + b; }\ntest "adds" {\n  assert add(2, 2) == 4;\n}',
+      'fn add(a: I32, b: I32) I32 { return a + b; }\ntest "adds" {\n  assert add(2, 2) == 4;\n}',
       'bench "counter" {\n  let total: I32 = 0;\n  measure { total += 1; }\n}',
-      'struct Pt:\n  | x : F32\nfn takes64(v: I64) I64 { v; }\nfn wide() I64 {\n  let a: I64 = 0;\n  let b: F32 = 1.0;\n  let c: U32 = 7;\n  let p: Pt = Pt { x: 2.0 };\n  takes64(41);\n}',
-      'lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    i;\n  }\n}',
-      'fn double(x: I32) I32 { x * 2; }\nlib { fn run() I32 { double(2) + double(3); } }',
-      'lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { x + lo + hi; }\n  fn lead(x: I32) I32 { clamp(x, 1, 10); }\n  fn mid(x: I32) I32 { clamp(0, x, 10); }\n}',
+      'struct Pt:\n  | x : F32\nfn takes64(v: I64) I64 { return v; }\nfn wide() I64 {\n  let a: I64 = 0;\n  let b: F32 = 1.0;\n  let c: U32 = 7;\n  let p: Pt = Pt { x: 2.0 };\n  return takes64(41);\n}',
+      'lib {\n  fn spin() I32 {\n    let i: I32 = 0;\n    while () { i += 1; if i == 3 { return i; }; };\n    return i;\n  }\n}',
+      'fn double(x: I32) I32 { return x * 2; }\nlib { fn run() I32 { return double(2) + double(3); } }',
+      'lib {\n  fn clamp(x: I32, lo: I32, hi: I32) I32 { return x + lo + hi; }\n  fn lead(x: I32) I32 { return clamp(x, 1, 10); }\n  fn mid(x: I32) I32 { return clamp(0, x, 10); }\n}',
       'struct Box:\n  | v : I64\nfn Box.set64 |self| (n: I64) Void { self.v = n; }\nlib { fn go(b: Box) Void { b.set64(7); } }',
-      'lib {\n  fn double(x: I32) I32 { x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; c(1); }\n}',
+      'lib {\n  fn double(x: I32) I32 { return x * 2; }\n  fn ok() I32 { let c: cl(I32) I32 = double; return c(1); }\n}',
     ]) {
       const diagnostics = await selfhostDiagnostics({ ROOT, name: 'valid_program.utu', source });
       assertEq(diagnostics.length, 0, `${source}\n  got ${diagnostics.map(d => `${d.kind}: ${d.message}`).join('; ')}`);

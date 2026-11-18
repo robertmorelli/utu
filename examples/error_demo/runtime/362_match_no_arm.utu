@@ -5,7 +5,7 @@ enum(U8) Level:
     | High
 
 fn label(l: Level) I32 {
-    match l { Level.Low => 1, Level.High => 2, };
+    return match l { Level.Low => 1, Level.High => 2, };
 }
 
 main {

@@ -1,6 +1,6 @@
 
         using Browser from std:Browser;
-        fn unused() Browser.HTMLElement { @wutu/\ div { color: magenta; "DEAD-COMPONENT" } \/; }
+        fn unused() Browser.HTMLElement { return @wutu/\ div { color: magenta; "DEAD-COMPONENT" } \/; }
         main {
           Browser.document.body.append(@wutu/\
           div.card {

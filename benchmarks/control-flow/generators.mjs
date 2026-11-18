@@ -36,7 +36,7 @@ const strategies = {
     fn produce(n: I32) Array[I32] {
         let out = Buffer[I32].new();
         for (0..<n) |i| { if i % 3 != 0 { out.push(i * i); }; };
-        out.finish();
+        return out.finish();
     }`,
     consumer: (name) => `fn ${name}(n: I32) I32 {
         let s = 0;
@@ -69,7 +69,7 @@ const strategies = {
             g.i += 1;
             if i % 3 != 0 { g.value = i * i; return true; };
         };
-        false;
+        return false;
     }`,
     consumer: (name) => `fn ${name}(n: I32) I32 {
         let g = Squares { i: 0, n: n, value: 0 };

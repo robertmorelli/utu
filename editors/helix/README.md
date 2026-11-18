@@ -25,5 +25,7 @@ The installer:
   Wutu's (`editors/tree-sitter-wutu/src/`), into
   `~/.config/helix/runtime/grammars/` (it needs a C compiler, `cc` or `$CC`).
 
-Run it again after the grammar or the queries change. `hx --health utu` shows
-what Helix found.
+Run the installer again after the grammar or queries change, then restart
+Helix to load them. `hx --health utu` and `hx --health wutu` show what Helix
+found. In a Wutu body, insertion lines starting with `|` or `|>` use operator
+highlighting. Capture bars such as `|item|` remain delimiters.

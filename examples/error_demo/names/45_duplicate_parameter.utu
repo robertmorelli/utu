@@ -1,7 +1,7 @@
 // What: a function declares the same parameter name twice
 // Expect: Duplicate parameter 'x'
 fn distance(x: F64, y: F64, x: F64) F64 {
-    x + y;
+    return x + y;
 }
 
 main {

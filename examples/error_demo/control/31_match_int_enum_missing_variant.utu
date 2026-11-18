@@ -6,7 +6,7 @@ enum(U8) Level:
     | High
 
 fn label(l: Level) Str {
-    match l { Level.Low => "calm", Level.Mid => "busy", };
+    return match l { Level.Low => "calm", Level.Mid => "busy", };
 }
 
 main {

@@ -21,13 +21,13 @@ const printed = async run => {
 
 try {
   await write('good.utu', `let twice: fun(I32) I32 = @es/\\ (n) => n * 2 \\/;
-fn add(a: I32, b: I32) I32 { a + b; }
+fn add(a: I32, b: I32) I32 { return a + b; }
 main { console.log(twice(add(1, 2))); }
 test "adds" { assert add(1, 2) == 3; }
 test "fails" { assert add(1, 2) == 4; }
 using console from std:Console
 `);
-  await write('bad.utu', `fn add(a: I32, b: I32) I32 { a + b; }
+  await write('bad.utu', `fn add(a: I32, b: I32) I32 { return a + b; }
 main {
     let x: I32 = add(1, "two");
     console.log(x + missing);
@@ -47,7 +47,7 @@ using console from std:Console
   assert.equal(r.stderr.trim(), `ERROR  add takes I32, got Str
         type-mismatch · bad.utu:3:25
 
- 1 │ fn add(a: I32, b: I32) I32 { a + b; }
+ 1 │ fn add(a: I32, b: I32) I32 { return a + b; }
    │                ──────
    │                ╰─ I32
  2 │ main {
@@ -99,7 +99,7 @@ using console from std:Console
 
   // utu bench: a row per bench, its median time per iteration and how many
   // runs of how many iterations; a bench that traps is a FAIL row.
-  await write('benches.utu', `fn add(a: I32, b: I32) I32 { a + b; }
+  await write('benches.utu', `fn add(a: I32, b: I32) I32 { return a + b; }
 bench "adding" {
     let total = 0;
     measure { total = add(total, 1); }
@@ -118,7 +118,7 @@ bench "trapping" {
 
   // A mod's tests and benches run, named by the mod (they were dropped).
   await write('mods.utu', `mod geo {
-    fn two() I32 { 2; }
+    fn two() I32 { return 2; }
     test "two" { assert two() == 3; }
     bench "two" { let s = 0; measure { s += two(); } }
 }
@@ -252,24 +252,24 @@ using console from std:Console
   // A trap at its line, with the functions it was in, by a source map:
   // each kind of trap, in debug (exact), small and fast (best effort).
   const traps = {
-    assert: ['fn boom(x: I32) I32 {\n    assert x > 5;\n    x * 2;\n}\nmain { console.log(boom(10) + boom(1)); }\nusing console from std:Console\n', 'Failed assert', '2:5', 'boom'],
-    fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    x;\n}\nmain { console.log(check(-1)); }\nusing console from std:Console\n', 'Reached fatal', '2:16', 'check'],
-    divide: ['fn div(a: I32, b: I32) I32 {\n    a / b;\n}\nmain { console.log(div(7, 0)); }\nusing console from std:Console\n', 'Integer division by zero', '2:5', 'div'],
-    bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:Console\n', 'Index out of bounds', '2:5', 'at'],
+    assert: ['fn boom(x: I32) I32 {\n    assert x > 5;\n    return x * 2;\n}\nmain { console.log(boom(10) + boom(1)); }\nusing console from std:Console\n', 'Failed assert', '2:5', 'boom'],
+    fatal: ['fn check(x: I32) I32 {\n    if x < 0 { fatal; };\n    return x;\n}\nmain { console.log(check(-1)); }\nusing console from std:Console\n', 'Reached fatal', '2:16', 'check'],
+    divide: ['fn div(a: I32, b: I32) I32 {\n    return a / b;\n}\nmain { console.log(div(7, 0)); }\nusing console from std:Console\n', 'Integer division by zero', '2:12', 'div'],
+    bounds: ['fn at(xs: Array[I32], i: I32) I32 {\n    return xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:Console\n', 'Index out of bounds', '2:12', 'at'],
     // A mem's or vec's index past its length (within its capacity), as an array's.
     mem_bounds: ['mem b: U8;\nfn put(i: I32) Void {\n    b[i] = 77;\n}\nmain { b.push(9); put(1); put(4); console.log(b.len()); }\nusing console from std:Console\n', 'Index out of bounds', '3:5', 'put'],
-    vec_bounds: ['vec b: I32;\nfn at(i: I32) I32 {\n    b[i] + 1;\n}\nmain { b.reserve(8); b.push(9); console.log(at(0) + at(3)); }\nusing console from std:Console\n', 'Index out of bounds', '3:5', 'at'],
+    vec_bounds: ['vec b: I32;\nfn at(i: I32) I32 {\n    return b[i] + 1;\n}\nmain { b.reserve(8); b.push(9); console.log(at(0) + at(3)); }\nusing console from std:Console\n', 'Index out of bounds', '3:12', 'at'],
     // `orelse fatal` is fatal's trap, not a null's.
-    null: ['fn pick(x: ?Str) Str {\n    x orelse fatal;\n}\nmain { console.log(pick(null)); }\nusing console from std:Console\n', 'Reached fatal', '2:14', 'pick'],
-    slice: ['fn cut(xs: Array[I32]) I32 {\n    xs[2, 1].len();\n}\nmain { console.log(cut([1, 2, 3])); }\nusing console from std:Console\n', 'Slice ends before it starts', '2:5', 'cut'],
+    null: ['fn pick(x: ?Str) Str {\n    return x orelse fatal;\n}\nmain { console.log(pick(null)); }\nusing console from std:Console\n', 'Reached fatal', '2:21', 'pick'],
+    slice: ['fn cut(xs: Array[I32]) I32 {\n    return xs[2, 1].len();\n}\nmain { console.log(cut([1, 2, 3])); }\nusing console from std:Console\n', 'Slice ends before it starts', '2:12', 'cut'],
     // In the slice helper every use shares: at this use, not the first.
-    slice2: ['fn n(x: I32) I32 { x; }\nfn ok(xs: Array[I32]) I32 { xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    xs[2, n(1)].len();\n}\nmain { let xs = [1, 2, 3]; console.log(ok(xs) + cut(xs)); }\nusing console from std:Console\n', 'Slice ends before it starts', '4:5', 'cut'],
+    slice2: ['fn n(x: I32) I32 { return x; }\nfn ok(xs: Array[I32]) I32 { return xs[0, 1].len(); }\nfn cut(xs: Array[I32]) I32 {\n    return xs[2, n(1)].len();\n}\nmain { let xs = [1, 2, 3]; console.log(ok(xs) + cut(xs)); }\nusing console from std:Console\n', 'Slice ends before it starts', '4:12', 'cut'],
     // (A safe build stops at Color(9), before the match could miss.)
     // A column counts characters, as check's do (an emoji is one, not two UTF-16 units).
-    emoji: ['fn at(xs: Array[I32], i: I32) I32 {\n    let s = "😀😀"; xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:Console\n', 'Index out of bounds', '2:19', 'at'],
+    emoji: ['fn at(xs: Array[I32], i: I32) I32 {\n    let s = "😀😀"; return xs[i];\n}\nmain { console.log(at([1, 2, 3], 5)); }\nusing console from std:Console\n', 'Index out of bounds', '2:26', 'at'],
     // A lone \r ends a line, as \n and \r\n do.
-    cr: ['fn at(xs: Array[I32], i: I32) I32 {\r    xs[i];\r}\rmain { console.log(at([1, 2, 3], 5)); }\r\nusing console from std:Console\n', 'Index out of bounds', '2:5', 'at'],
-    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    match c { Color.Red => 1, Color.Green => 2, };\n}\nmain { console.log(name(Color(9))); }\nusing console from std:Console\n', 'Color: no variant has this value', '7:25', 'main'],
+    cr: ['fn at(xs: Array[I32], i: I32) I32 {\r    return xs[i];\r}\rmain { console.log(at([1, 2, 3], 5)); }\r\nusing console from std:Console\n', 'Index out of bounds', '2:12', 'at'],
+    range: ['enum(U8) Color:\n    | Red\n    | Green\nfn name(c: Color) I32 {\n    return match c { Color.Red => 1, Color.Green => 2, };\n}\nmain { console.log(name(Color(9))); }\nusing console from std:Console\n', 'Color: no variant has this value', '7:25', 'main'],
   };
   for (const [name, [source, title, at, fn]] of Object.entries(traps)) {
     await write(`${name}.utu`, source);
@@ -285,7 +285,7 @@ using console from std:Console
   }
   assert.match(utu('run', 'assert.utu', '-O', 'fast').stderr, /in boom  assert\.utu:2:5  \(inlined into main\)/);
   // A trap in a global's initializer, as any other (it showed JavaScript's stack).
-  await write('global.utu', 'fn n(x: I32) I32 { x; }\nlet xs: Array[I32] = [1, 2];\nlet g: I32 = xs[n(5)];\nmain { console.log(g); }\ntest "g" { assert g == 1; }\nusing console from std:Console\n');
+  await write('global.utu', 'fn n(x: I32) I32 { return x; }\nlet xs: Array[I32] = [1, 2];\nlet g: I32 = xs[n(5)];\nmain { console.log(g); }\ntest "g" { assert g == 1; }\nusing console from std:Console\n');
   for (const command of ['run', 'test']) {
     r = utu(command, 'global.utu');
     assert.equal(r.status, 1, r.stdout);
@@ -350,7 +350,7 @@ using console from std:Console
   await write('empty.utu', 'main { let e: Array[I32] = []; console.log(e); }\nusing console from std:Console\n');
   await write('strs.utu', 'main { console.log(["a", "b\\"c", ""]); }\nusing console from std:Console\n');
   await write('u32s.utu', 'main { console.log([4000000000, 0]); }\nusing console from std:Console\n');
-  await write('arraytrap.utu', 'fn at(xs: Array[I32], i: I32) I32 { xs[i]; }\nmain { console.log([at([1], 3)]); }\nusing console from std:Console\n');
+  await write('arraytrap.utu', 'fn at(xs: Array[I32], i: I32) I32 { return xs[i]; }\nmain { console.log([at([1], 3)]); }\nusing console from std:Console\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     assert.equal(utu('run', 'arrays.utu', '-O', mode).stdout, '[[1, 2, 3], [], [4]]\n', mode);
     assert.equal(utu('run', 'empty.utu', '-O', mode).stdout, '[]\n', mode);
@@ -359,7 +359,7 @@ using console from std:Console
   }
   for (const mode of ['debug', 'fast']) {
     r = utu('run', 'arraytrap.utu', '-O', mode);
-    assert.ok(r.stderr.startsWith(' TRAP  Index out of bounds\n       trap · arraytrap.utu:1:37\n'), `${mode}:\n${r.stderr}`);
+    assert.ok(r.stderr.startsWith(' TRAP  Index out of bounds\n       trap · arraytrap.utu:1:44\n'), `${mode}:\n${r.stderr}`);
     assert.match(r.stderr, /in main  arraytrap\.utu:2:/, `${mode}:\n${r.stderr}`);
   }
   // A build has no readers.
@@ -468,10 +468,10 @@ using console from std:Console
   }
 
   // The views: source, declarations, syntax, WAT and graphs, from the self-hosted compiler.
-  await write('views.utu', 'fn twice(x: I32) I32 { x * 2; }\nmain { console.log(twice(3)); }\ntest "twice" { assert twice(2) == 4; }\nusing console from std:Console\n');
+  await write('views.utu', 'fn twice(x: I32) I32 { return x * 2; }\nmain { console.log(twice(3)); }\ntest "twice" { assert twice(2) == 4; }\nusing console from std:Console\n');
   r = utu('display', 'views.utu');
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^fn twice\(x: I32\) I32 \{ x \* 2; \}$/m);
+  assert.match(r.stdout, /^fn twice\(x: I32\) I32 \{ return x \* 2; \}$/m);
   r = utu('display:tests', 'views.utu');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /^3 │ test "twice"/m);
@@ -497,7 +497,7 @@ using console from std:Console
   // A module that does not exist: said, not a stack.
   await write('unknown-module.utu', 'using geometri |Point|;\nmain { console.log(1); }\nusing console from std:Console\n');
   // A @comptime loop that never ends: stopped, as the self-hosted compiler stops it.
-  await write('forever.utu', 'fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nmain { console.log(t.len()); }\nusing console from std:Console\n');
+  await write('forever.utu', 'fn f() Array[I32] { while (true) { }; return [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nmain { console.log(t.len()); }\nusing console from std:Console\n');
   // How it was run (2), or the program (1).
   for (const [args, said, status = 1] of [
     [['display'], /No file/, 2],
@@ -531,7 +531,7 @@ using console from std:Console
     assert.equal(ran.status, 0);
     assert.equal(ran.stdout.trim(), '6');
     // No main, no executable: it would do nothing.
-    await write('lib.utu', 'lib {\n    fn inc(x: I32) I32 { x + 1; }\n}\n');
+    await write('lib.utu', 'lib {\n    fn inc(x: I32) I32 { return x + 1; }\n}\n');
     r = utu('build-exe', 'lib.utu', '-o', 'lib');
     assert.equal(r.status, 1);
     assert.match(r.stderr, /No main in lib\.utu/);

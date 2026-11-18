@@ -14,12 +14,12 @@ struct Body:
     | vz: F64
     | mass: F64
 
-fn pi() F64 { 3.141592653589793 }
-fn solar_mass() F64 { 4.0 * pi() * pi() }
-fn days_per_year() F64 { 365.24 }
+fn pi() F64 { return 3.141592653589793 }
+fn solar_mass() F64 { return 4.0 * pi() * pi() }
+fn days_per_year() F64 { return 365.24 }
 
 fn Body.new(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
-    &{
+    return &{
         x: x,
         y: y,
         z: z,
@@ -37,7 +37,7 @@ fn Body.offset_momentum |self| (px: F64, py: F64, pz: F64) Void {
 }
 
 fn jupiter() Body {
-    Body.new(
+    return Body.new(
         4.84143144246472090e+00,
         -1.16032004402742839e+00,
         -1.03622044471123109e-01,
@@ -49,7 +49,7 @@ fn jupiter() Body {
 }
 
 fn saturn() Body {
-    Body.new(
+    return Body.new(
         8.34336671824457987e+00,
         4.12479856412430479e+00,
         -4.03523417114321381e-01,
@@ -61,7 +61,7 @@ fn saturn() Body {
 }
 
 fn uranus() Body {
-    Body.new(
+    return Body.new(
         1.28943695621391310e+01,
         -1.51111514016986312e+01,
         -2.23307578892655734e-01,
@@ -73,7 +73,7 @@ fn uranus() Body {
 }
 
 fn neptune() Body {
-    Body.new(
+    return Body.new(
         1.53796971148509165e+01,
         -2.59193146099879641e+01,
         1.79258772950371181e-01,
@@ -84,7 +84,7 @@ fn neptune() Body {
     )
 }
 
-fn sun() Body { Body.new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0) }
+fn sun() Body { return Body.new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0) }
 
 // The five bodies, with the Sun's velocity set so the total momentum is zero.
 fn create_bodies() Array[Body] {
@@ -99,7 +99,7 @@ fn create_bodies() Array[Body] {
         pz += b.vz * b.mass
     }
     bodies[0].offset_momentum(px, py, pz)
-    bodies
+    return bodies
 }
 
 fn advance(bodies: Array[Body], dt: F64) Void {
@@ -143,7 +143,7 @@ fn energy(bodies: Array[Body]) F64 {
             e = e - ib.mass * jb.mass / distance
         }
     }
-    e
+    return e
 }
 
 // One run: a fresh system advanced `steps` times; its energy in nano-units,
@@ -151,7 +151,7 @@ fn energy(bodies: Array[Body]) F64 {
 fn run(steps: I32) I64 {
     let bodies = create_bodies()
     for (0..<steps) { advance(bodies, 0.01) }
-    F64.floor(energy(bodies) * 1.0e9 + 0.5).i64()
+    return F64.floor(energy(bodies) * 1.0e9 + 0.5).i64()
 }
 
 test "nbody energy matches the Benchmarks Game reference" {
@@ -171,6 +171,6 @@ lib {
     fn bench(iterations: I32) I64 {
         let sum: I64 = 0
         for (0..<iterations) { sum += run(20000) }
-        sum
+        return sum
     }
 }

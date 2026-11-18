@@ -7,7 +7,7 @@ struct Pixel:
     | b: U8
 
 fn load(text: Str) ?Pixel {
-    @json/\ decode Pixel text \/;
+    return @json/\ decode Pixel text \/;
 }
 
 main {

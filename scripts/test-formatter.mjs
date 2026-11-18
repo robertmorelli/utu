@@ -38,11 +38,11 @@ for (const file of files) {
 
 const cases = [
   // Templates are text: `${` stays whole.
-  ['fn f(name: Str, age: I32) Str { `${name} is ${age}`; }\n', 'fn f(name: Str, age: I32) Str {\n    `${name} is ${age}`;\n}\n'],
+  ['fn f(name: Str, age: I32) Str { return `${name} is ${age}`; }\n', 'fn f(name: Str, age: I32) Str {\n    return `${name} is ${age}`;\n}\n'],
   // `|` fields stay under their struct; a trailing comment stays on its line.
-  ['struct P:\n| x: I32 // across\n| y: I32\n\nfn g() I32 { 1; } // one\n', 'struct P:\n    | x: I32 // across\n    | y: I32\n\nfn g() I32 {\n    1;\n} // one\n'],
+  ['struct P:\n| x: I32 // across\n| y: I32\n\nfn g() I32 { return 1; } // one\n', 'struct P:\n    | x: I32 // across\n    | y: I32\n\nfn g() I32 {\n    return 1;\n} // one\n'],
   // Captures are not split at their comma; an empty block stays `{}`.
-  ['fn h(xs: Array[I32]) I32 { xs fold(0) |a, b| { a + b; }; }\nfn k() Void {}\n', 'fn h(xs: Array[I32]) I32 {\n    xs fold(0) |a, b| {\n        a + b;\n    };\n}\nfn k() Void {}\n'],
+  ['fn h(xs: Array[I32]) I32 { return xs fold(0) |a, b| { a + b; }; }\nfn k() Void {}\n', 'fn h(xs: Array[I32]) I32 {\n    return xs fold(0) |a, b| {\n        a + b;\n    };\n}\nfn k() Void {}\n'],
   // Not a program: left alone.
   ['fn b(x: Bool) I32 {\n    if x { 1; } else { 2; } 3;\n}\n', null],
 ];

@@ -4,41 +4,41 @@
 mod F64 {
     type & = @ir/\ <ir-wasm-scalar type-repr="wasm-f64"/> \/
 
-    fn &:add  |a, b| & { @ir/\ <ir-f64-add><ir-ident name="a"/><ir-ident name="b"/></ir-f64-add> \/ }
-    fn &:sub  |a, b| & { @ir/\ <ir-f64-sub><ir-ident name="a"/><ir-ident name="b"/></ir-f64-sub> \/ }
-    fn &:mul  |a, b| & { @ir/\ <ir-f64-mul><ir-ident name="a"/><ir-ident name="b"/></ir-f64-mul> \/ }
-    fn &:div  |a, b| & { @ir/\ <ir-f64-div><ir-ident name="a"/><ir-ident name="b"/></ir-f64-div> \/ }
-    fn &:eq   |a, b| Bool { @ir/\ <ir-f64-eq><ir-ident name="a"/><ir-ident name="b"/></ir-f64-eq> \/ }
-    fn &:ne   |a, b| Bool { @ir/\ <ir-f64-ne><ir-ident name="a"/><ir-ident name="b"/></ir-f64-ne> \/ }
-    fn &:lt   |a, b| Bool { @ir/\ <ir-f64-lt><ir-ident name="a"/><ir-ident name="b"/></ir-f64-lt> \/ }
-    fn &:le   |a, b| Bool { @ir/\ <ir-f64-le><ir-ident name="a"/><ir-ident name="b"/></ir-f64-le> \/ }
-    fn &:gt   |a, b| Bool { @ir/\ <ir-f64-gt><ir-ident name="a"/><ir-ident name="b"/></ir-f64-gt> \/ }
-    fn &:ge   |a, b| Bool { @ir/\ <ir-f64-ge><ir-ident name="a"/><ir-ident name="b"/></ir-f64-ge> \/ }
-    fn &:neg  |a| & { @ir/\ <ir-f64-neg><ir-ident name="a"/></ir-f64-neg> \/ }
-    fn abs(x: &)  & { @ir/\ <ir-f64-abs><ir-ident name="x"/></ir-f64-abs> \/ }
-    fn sqrt(x: &) & { @ir/\ <ir-f64-sqrt><ir-ident name="x"/></ir-f64-sqrt> \/ }
-    fn ceil(x: &) & { @ir/\ <ir-f64-ceil><ir-ident name="x"/></ir-f64-ceil> \/ }
-    fn floor(x: &) & { @ir/\ <ir-f64-floor><ir-ident name="x"/></ir-f64-floor> \/ }
-    fn trunc(x: &) & { @ir/\ <ir-f64-trunc><ir-ident name="x"/></ir-f64-trunc> \/ }
-    fn nearest(x: &) & { @ir/\ <ir-f64-nearest><ir-ident name="x"/></ir-f64-nearest> \/ }
-    fn min(a: &, b: &) & { @ir/\ <ir-f64-min><ir-ident name="a"/><ir-ident name="b"/></ir-f64-min> \/ }
-    fn max(a: &, b: &) & { @ir/\ <ir-f64-max><ir-ident name="a"/><ir-ident name="b"/></ir-f64-max> \/ }
+    fn &:add  |a, b| & => @ir/\ <ir-f64-add><ir-ident name="a"/><ir-ident name="b"/></ir-f64-add> \/;
+    fn &:sub  |a, b| & => @ir/\ <ir-f64-sub><ir-ident name="a"/><ir-ident name="b"/></ir-f64-sub> \/;
+    fn &:mul  |a, b| & => @ir/\ <ir-f64-mul><ir-ident name="a"/><ir-ident name="b"/></ir-f64-mul> \/;
+    fn &:div  |a, b| & => @ir/\ <ir-f64-div><ir-ident name="a"/><ir-ident name="b"/></ir-f64-div> \/;
+    fn &:eq   |a, b| Bool => @ir/\ <ir-f64-eq><ir-ident name="a"/><ir-ident name="b"/></ir-f64-eq> \/;
+    fn &:ne   |a, b| Bool => @ir/\ <ir-f64-ne><ir-ident name="a"/><ir-ident name="b"/></ir-f64-ne> \/;
+    fn &:lt   |a, b| Bool => @ir/\ <ir-f64-lt><ir-ident name="a"/><ir-ident name="b"/></ir-f64-lt> \/;
+    fn &:le   |a, b| Bool => @ir/\ <ir-f64-le><ir-ident name="a"/><ir-ident name="b"/></ir-f64-le> \/;
+    fn &:gt   |a, b| Bool => @ir/\ <ir-f64-gt><ir-ident name="a"/><ir-ident name="b"/></ir-f64-gt> \/;
+    fn &:ge   |a, b| Bool => @ir/\ <ir-f64-ge><ir-ident name="a"/><ir-ident name="b"/></ir-f64-ge> \/;
+    fn &:neg  |a| & => @ir/\ <ir-f64-neg><ir-ident name="a"/></ir-f64-neg> \/;
+    fn abs(x: &)  & => @ir/\ <ir-f64-abs><ir-ident name="x"/></ir-f64-abs> \/;
+    fn sqrt(x: &) & => @ir/\ <ir-f64-sqrt><ir-ident name="x"/></ir-f64-sqrt> \/;
+    fn ceil(x: &) & => @ir/\ <ir-f64-ceil><ir-ident name="x"/></ir-f64-ceil> \/;
+    fn floor(x: &) & => @ir/\ <ir-f64-floor><ir-ident name="x"/></ir-f64-floor> \/;
+    fn trunc(x: &) & => @ir/\ <ir-f64-trunc><ir-ident name="x"/></ir-f64-trunc> \/;
+    fn nearest(x: &) & => @ir/\ <ir-f64-nearest><ir-ident name="x"/></ir-f64-nearest> \/;
+    fn min(a: &, b: &) & => @ir/\ <ir-f64-min><ir-ident name="a"/><ir-ident name="b"/></ir-f64-min> \/;
+    fn max(a: &, b: &) & => @ir/\ <ir-f64-max><ir-ident name="a"/><ir-ident name="b"/></ir-f64-max> \/;
 
     // Conversions are one wasm instruction each. Float → int saturates (NaN → 0), like Rust `as`.
-    fn &.f32 |self| () F32 { @ir/\ <ir-f32-demote><ir-ident name="self"/></ir-f32-demote> \/ }
-    fn &.i32 |self| () I32 { @ir/\ <ir-i32-trunc-s-sat-f64><ir-ident name="self"/></ir-i32-trunc-s-sat-f64> \/ }
-    fn &.u32 |self| () U32 { @ir/\ <ir-u32-trunc-u-sat-f64><ir-ident name="self"/></ir-u32-trunc-u-sat-f64> \/ }
-    fn &.i64 |self| () I64 { @ir/\ <ir-i64-trunc-s-sat-f64><ir-ident name="self"/></ir-i64-trunc-s-sat-f64> \/ }
-    fn &.u64 |self| () U64 { @ir/\ <ir-u64-trunc-u-sat-f64><ir-ident name="self"/></ir-u64-trunc-u-sat-f64> \/ }
+    fn &.f32 |self| () F32 => @ir/\ <ir-f32-demote><ir-ident name="self"/></ir-f32-demote> \/;
+    fn &.i32 |self| () I32 => @ir/\ <ir-i32-trunc-s-sat-f64><ir-ident name="self"/></ir-i32-trunc-s-sat-f64> \/;
+    fn &.u32 |self| () U32 => @ir/\ <ir-u32-trunc-u-sat-f64><ir-ident name="self"/></ir-u32-trunc-u-sat-f64> \/;
+    fn &.i64 |self| () I64 => @ir/\ <ir-i64-trunc-s-sat-f64><ir-ident name="self"/></ir-i64-trunc-s-sat-f64> \/;
+    fn &.u64 |self| () U64 => @ir/\ <ir-u64-trunc-u-sat-f64><ir-ident name="self"/></ir-u64-trunc-u-sat-f64> \/;
 
     // The IEEE 754 bits, and back.
-    fn &.bits |self| () I64 { @ir/\ <ir-i64-reinterpret><ir-ident name="self"/></ir-i64-reinterpret> \/ }
-    fn from_bits(bits: I64) & { @ir/\ <ir-f64-reinterpret><ir-ident name="bits"/></ir-f64-reinterpret> \/ }
+    fn &.bits |self| () I64 => @ir/\ <ir-i64-reinterpret><ir-ident name="self"/></ir-i64-reinterpret> \/;
+    fn from_bits(bits: I64) & => @ir/\ <ir-f64-reinterpret><ir-ident name="bits"/></ir-f64-reinterpret> \/;
 
     // Decimal text, as JavaScript's String() spells it. Ships only when used.
     fn &.str |self| () Str {
         let format: fun(F64) Str = @es/\ (v) => String(v) \/
-        format(self)
+        return format(self)
     }
 
     // ── Math ────────────────────────────────────────────────────────────────
@@ -47,102 +47,102 @@ mod F64 {
     /// The sine (of radians).
     fn &.sin |self| () & {
         let f: fun(&) & = @es/\ Math.sin \/
-        f(self)
+        return f(self)
     }
 
     /// The cosine.
     fn &.cos |self| () & {
         let f: fun(&) & = @es/\ Math.cos \/
-        f(self)
+        return f(self)
     }
 
     /// The tangent.
     fn &.tan |self| () & {
         let f: fun(&) & = @es/\ Math.tan \/
-        f(self)
+        return f(self)
     }
 
     /// The arcsine, in radians.
     fn &.asin |self| () & {
         let f: fun(&) & = @es/\ Math.asin \/
-        f(self)
+        return f(self)
     }
 
     /// The arccosine, in radians.
     fn &.acos |self| () & {
         let f: fun(&) & = @es/\ Math.acos \/
-        f(self)
+        return f(self)
     }
 
     /// The arctangent, in radians.
     fn &.atan |self| () & {
         let f: fun(&) & = @es/\ Math.atan \/
-        f(self)
+        return f(self)
     }
 
     /// $e^x$.
     fn &.exp |self| () & {
         let f: fun(&) & = @es/\ Math.exp \/
-        f(self)
+        return f(self)
     }
 
     /// The natural logarithm (NaN below 0).
     fn &.ln |self| () & {
         let f: fun(&) & = @es/\ Math.log \/
-        f(self)
+        return f(self)
     }
 
     /// The base-2 logarithm.
     fn &.log2 |self| () & {
         let f: fun(&) & = @es/\ Math.log2 \/
-        f(self)
+        return f(self)
     }
 
     /// The base-10 logarithm.
     fn &.log10 |self| () & {
         let f: fun(&) & = @es/\ Math.log10 \/
-        f(self)
+        return f(self)
     }
 
     /// The cube root.
     fn &.cbrt |self| () & {
         let f: fun(&) & = @es/\ Math.cbrt \/
-        f(self)
+        return f(self)
     }
 
     /// `self` to the power `exponent`.
     fn &.pow |self| (exponent: &) & {
         let f: fun(&, &) & = @es/\ Math.pow \/
-        f(self, exponent)
+        return f(self, exponent)
     }
 
     /// The angle of the point (`other`, `self`) from the x axis: `y.atan2(x)`, in radians.
     fn &.atan2 |self| (other: &) & {
         let f: fun(&, &) & = @es/\ Math.atan2 \/
-        f(self, other)
+        return f(self, other)
     }
 
     /// $sqrt(x^2 + y^2)$, without overflow on the way.
     fn &.hypot |self| (other: &) & {
         let f: fun(&, &) & = @es/\ Math.hypot \/
-        f(self, other)
+        return f(self, other)
     }
 
     /// Whether this is NaN, which is not equal even to itself.
-    fn &.is_nan |self| () Bool { self != self }
+    fn &.is_nan |self| () Bool { return self != self }
 
     /// Whether this is neither infinite nor NaN.
-    fn &.is_finite |self| () Bool { self - self == 0.0 }
+    fn &.is_finite |self| () Bool { return self - self == 0.0 }
 
     /// $pi$.
-    fn pi() & { 3.141592653589793 }
+    fn pi() & { return 3.141592653589793 }
 
     /// Euler's number $e$.
-    fn e() & { 2.718281828459045 }
+    fn e() & { return 2.718281828459045 }
 
     /// Positive infinity.
-    fn inf() & { 1.0 / 0.0 }
+    fn inf() & { return 1.0 / 0.0 }
 
     /// Not a number.
-    fn nan() & { 0.0 / 0.0 }
+    fn nan() & { return 0.0 / 0.0 }
 }

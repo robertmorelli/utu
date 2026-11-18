@@ -2,7 +2,7 @@
 // Expect: A tuple type is only a function result; pass the values separately.
 fn sum_pair(p: .{I32, I32}) I32 {
     let .{a, b} = p;
-    a + b;
+    return a + b;
 }
 
 main { console.log(0); }

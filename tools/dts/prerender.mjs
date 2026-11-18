@@ -43,7 +43,7 @@ export async function prerender(outDir) {
         else {el.setAttribute('value',original.value);el.toggleAttribute('checked',original.checked);}
       });
       // Avoid accepting edits before Wasm has attached handlers. Links and content stay usable.
-      for(const control of clone.querySelectorAll('[data-wutu-root] button,[data-wutu-root] input,[data-wutu-root] select,[data-wutu-root] textarea')) {
+      for(const control of clone.querySelectorAll('[data-wutu-root]:is(button,input,select,textarea),[data-wutu-root] button,[data-wutu-root] input,[data-wutu-root] select,[data-wutu-root] textarea')) {
         if(!control.disabled){control.disabled=true;control.setAttribute('data-wutu-pending','');}
       }
       return '<!doctype html>'+clone.outerHTML;

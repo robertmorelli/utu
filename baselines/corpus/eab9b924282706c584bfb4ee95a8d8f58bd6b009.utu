@@ -3,7 +3,7 @@ struct Point:
     | y : I32
 
 fn score(point: Point) I32 {
-    point.x * point.x + point.y * point.y;
+    return point.x * point.x + point.y * point.y;
 }
 
 main {

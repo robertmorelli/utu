@@ -1,10 +1,10 @@
 // What: a closure captures a name holding a function's tuple result.
 // Expect: A closure cannot capture tuple pair
-fn swap(a: I32, b: I32) .{I32, I32} { .{b, a}; }
+fn swap(a: I32, b: I32) .{I32, I32} { return .{b, a}; }
 
 main {
     let pair = swap(3, 4);
-    let first = cl() I32 { let .{a, b} = pair; a; };
+    let first = cl() I32 { let .{a, b} = pair; return a; };
     console.log(first());
 }
 using console from std:Console

@@ -18,7 +18,7 @@ see it happen.
 ```utu
 fn parse_digit(c: I32) Result[I32, Str] {
     if c < 48 or c > 57 { return Result[I32, Str].err("not a digit") }
-    Result[I32, Str].ok(c - 48)
+    return Result[I32, Str].ok(c - 48)
 }
 ```
 
@@ -45,7 +45,7 @@ right there.
 fn sum_digits(codes: Array[I32]) Result[I32, Str] {
     let total = 0
     for (codes) |c| { total += try parse_digit(c) }
-    Result[I32, Str].ok(total)
+    return Result[I32, Str].ok(total)
 }
 ```
 
@@ -71,7 +71,7 @@ fn load(path: Str) Result[Config, Str] {
     defer close(handle)                  // every return
     errdefer log("load failed: " + path) // error returns only
     let text = try read(handle)
-    parse(text)
+    return parse(text)
 }
 ```
 

@@ -2,7 +2,7 @@
 // Expect: mem scores clashes with fn scores (line 5); rename one of them
 mem scores: I32;
 
-fn scores() I32 { scores.len(); }
+fn scores() I32 { return scores.len(); }
 
 main {
     scores.push(10);

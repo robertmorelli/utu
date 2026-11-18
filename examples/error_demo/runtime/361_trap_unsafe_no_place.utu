@@ -2,7 +2,7 @@
 // Flags: -O fastUnsafe
 // Expect: Integer division by zero, no line: the unsafe modes keep no map
 fn ratio(a: I32, b: I32) I32 {
-    a / b;
+    return a / b;
 }
 
 main {

@@ -6,7 +6,7 @@ fn steps(n: I32) I32 {
         0 => { count += 1; continue 1; },
         ~> {},
     };
-    count;
+    return count;
 }
 
 main {

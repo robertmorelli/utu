@@ -29,12 +29,12 @@ mod Table {
         | upper: I32
 
     fn &.new() & {
-        &{ keys: Array[I64].new(4, 0), vals: Array[I32].new(4, 0), used: Array[I32].new(4, 0), size: 0, upper: 3 }
+        return &{ keys: Array[I64].new(4, 0), vals: Array[I32].new(4, 0), used: Array[I32].new(4, 0), size: 0, upper: 3 }
     }
 
     // C's CUSTOM_HASH_FUNCTION, truncated to khint32_t
     fn &.bucket |self| (key: I64) I32 {
-        (key ^ (key >>> 7)).i32() & (self.keys.len() - 1)
+        return (key ^ (key >>> 7)).i32() & (self.keys.len() - 1)
     }
 
     // The bucket holding key, or the empty one where it goes.
@@ -46,7 +46,7 @@ mod Table {
             step += 1
             i = (i + step) & mask
         }
-        i
+        return i
     }
 
     // kh_put, then value = 1 or value++
@@ -65,7 +65,7 @@ mod Table {
 
     fn &.get |self| (key: I64) I32 {
         let i = self.find(key)
-        if self.used[i] != 0 { self.vals[i] } else { 0 }
+        return if self.used[i] != 0 { self.vals[i] } else { 0 }
     }
 
     fn &.grow |self| () Void {
@@ -92,7 +92,7 @@ mod Table {
 
 // code_For_Nucleotide: " \0 \1\3  \2"[c & 7]
 fn code(c: I32) I32 {
-    match c & 7 {
+    return match c & 7 {
         1 => 0,
         3 => 1,
         7 => 2,
@@ -102,7 +102,7 @@ fn code(c: I32) I32 {
 }
 
 fn nucleotide(code: I64) I32 {
-    match (code & 3).i32() {
+    return match (code & 3).i32() {
         0 => 65,
         1 => 67,
         2 => 71,
@@ -122,15 +122,15 @@ fn count(length: I32) Table {
         key = ((key << 2) & mask) | poly[i].i64()
         table.increment(key)
     }
-    table
+    return table
 }
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 fn fnv_str(h0: I32, s: Str) I32 {
     let h = h0
     for (0..<s.len()) |i| { h = fnv(h, s[i]) }
-    h
+    return h
 }
 
 // "%.3f" of a percentage below 100: rounded to thousandths, then its digits.
@@ -140,7 +140,7 @@ fn fnv_fixed3(h0: I32, x: F64) I32 {
     h = fnv(h, 46)
     h = fnv(h, 48 + r / 100 % 10)
     h = fnv(h, 48 + r / 10 % 10)
-    fnv(h, 48 + r % 10)
+    return fnv(h, 48 + r % 10)
 }
 
 // generate_Frequencies_For_Desired_Length_Oligonucleotides, then the blank
@@ -177,7 +177,7 @@ fn frequencies(h0: I32, length: I32) I32 {
         h = fnv_fixed3(h, (hundred * vals[i].f32() / windows).f64())
         h = fnv(h, 10)
     }
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 // generate_Count_For_Oligonucleotide, then the newline main prints after it.
@@ -191,7 +191,7 @@ fn count_of(h0: I32, oligo: Str) I32 {
     let h = fnv_str(h0, table.get(key).str())
     h = fnv(h, 9)
     h = fnv_str(h, oligo)
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 // main: the codes of the lines after ">THREE", then the seven outputs in order.
@@ -230,7 +230,7 @@ fn knucleotide() I32 {
     h = count_of(h, "GGTA")
     h = count_of(h, "GGTATT")
     h = count_of(h, "GGTATTTTAATT")
-    count_of(h, "GGTATTTTAATTTATAGT")
+    return count_of(h, "GGTATTTTAATTTATAGT")
 }
 
 // ---- setup(n): BG fasta's output for n into src (ALU repeated for 2n, IUB
@@ -295,5 +295,5 @@ test "fasta 1000 gives BG's output" {
 
 lib {
     fn setup(n: I32) Void { fasta(n) }
-    fn bench(n: I32) I32 { knucleotide() }
+    fn bench(n: I32) I32 { return knucleotide() }
 }

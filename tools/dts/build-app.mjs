@@ -50,7 +50,7 @@ async function buildChunks({ lazy, files, outDir, stdlib, optimize, safe }) {
     const exported = [...functions].map(([name, signature]) => {
       const params = /^\((.*)\) /.exec(signature)[1];
       const args = params ? params.split(', ').map(param => param.split(':')[0]).join(', ') : '';
-      return `    fn ${name}${signature.replace(/\) /, ') ')} { ${module}.${name}(${args}); }`;
+      return `    fn ${name}${signature} { return ${module}.${name}(${args}); }`;
     });
     await fs.writeFile(wrapper, `using Browser from std:Browser;\nusing ${module} from ${JSON.stringify(file)};\n\nlib {\n${exported.join('\n')}\n}\n`);
     try {

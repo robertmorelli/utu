@@ -56,3 +56,6 @@
 ["{" "}" "(" ")" "[" "]"] @punctuation.bracket
 [";" "," ":" "." "|"] @punctuation.delimiter
 "=" @operator
+
+; Component insertion pipes are operators. Capture bars remain delimiters.
+(hole ["|" "|>"] @operator)

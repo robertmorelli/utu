@@ -27,13 +27,9 @@ mod Promise[T1] {
     // On rejection: with a `catch` on the same promise, attached before it
     // settles, only that `catch` runs. Without one, the rejection is reported
     // as unhandled, as JS's `p.then(f)` would. A trap in `on_value` is reported.
-    fn &.then |self| (on_value: cl(T1) Void) Void {
-        @ir/\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \/
-    }
+    fn &.then |self| (on_value: cl(T1) Void) Void => @ir/\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \/;
 
     // Subscribe to rejection. The reason is an opaque host value. Marks the
     // promise handled, so a `then` on it no longer reports the rejection.
-    fn &.catch |self| (on_error: cl(Externref) Void) Void {
-        @ir/\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \/
-    }
+    fn &.catch |self| (on_error: cl(Externref) Void) Void => @ir/\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \/;
 }

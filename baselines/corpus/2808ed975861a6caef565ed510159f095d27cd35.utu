@@ -10,21 +10,21 @@
       gn doubled(n: I32) I32 { for (squares(n)) |x| { yield x * 2; }; }
       gn points(n: I32) P { for (0..<n) |i| { yield P { v: i }; }; }
       gn guarded(l: Log) I32 { defer l.v += 100; yield 1; yield 2; }
-      fn bump(l: Log) I32 { l.v += 1; 3; }
-      fn first_over(limit: I32) I32 { for (squares(100)) |x| { if x > limit { return x; }; }; -1; }
+      fn bump(l: Log) I32 { l.v += 1; return 3; }
+      fn first_over(limit: I32) I32 { for (squares(100)) |x| { if x > limit { return x; }; }; return -1; }
       lib {
-          fn sum() I32 { let s = 0; for (squares(10)) |x| { s += x; }; s; }
-          fn broken() I32 { let s = 0; for (squares(100)) |x| { if x > 30 { break; }; s += x; }; s; }
-          fn skipped() I32 { let s = 0; for (squares(10)) |x| { if x == 16 { continue; }; s += x; }; s; }
-          fn ordered() I32 { let s = 0; for (three()) |x| { s = s * 10 + x; }; s; }
-          fn returned() I32 { let s = 0; for (upto(5)) |x| { s += x; }; s; }
-          fn hygiene() I32 { let s = 100; let x = 7; for (shadowing(3)) |v| { s += v + x; }; s; }
-          fn nested() I32 { let s = 0; for (doubled(10)) |x| { s += x; }; s; }
-          fn early() I32 { first_over(50); }
-          fn inner_loops() I32 { let s = 0; for (squares(5)) |x| { for (0..<3) |j| { if j == 1 { continue; }; s += x; }; }; s; }
-          fn structs() I32 { let s = 0; for (points(4)) |p| { s += p.v; }; s; }
-          fn deferred() I32 { let l = Log { v: 0 }; for (guarded(l)) |x| { if x == 1 { break; }; }; l.v; }
-          fn once() I32 { let l = Log { v: 0 }; let s = 0; for (upto(bump(l))) |x| { s += x; }; l.v * 100 + s; }
-          fn awaited() I32 { let s = 0; await for (squares(4)) |x| { s += x; }; s; }
+          fn sum() I32 { let s = 0; for (squares(10)) |x| { s += x; }; return s; }
+          fn broken() I32 { let s = 0; for (squares(100)) |x| { if x > 30 { break; }; s += x; }; return s; }
+          fn skipped() I32 { let s = 0; for (squares(10)) |x| { if x == 16 { continue; }; s += x; }; return s; }
+          fn ordered() I32 { let s = 0; for (three()) |x| { s = s * 10 + x; }; return s; }
+          fn returned() I32 { let s = 0; for (upto(5)) |x| { s += x; }; return s; }
+          fn hygiene() I32 { let s = 100; let x = 7; for (shadowing(3)) |v| { s += v + x; }; return s; }
+          fn nested() I32 { let s = 0; for (doubled(10)) |x| { s += x; }; return s; }
+          fn early() I32 { return first_over(50); }
+          fn inner_loops() I32 { let s = 0; for (squares(5)) |x| { for (0..<3) |j| { if j == 1 { continue; }; s += x; }; }; return s; }
+          fn structs() I32 { let s = 0; for (points(4)) |p| { s += p.v; }; return s; }
+          fn deferred() I32 { let l = Log { v: 0 }; for (guarded(l)) |x| { if x == 1 { break; }; }; return l.v; }
+          fn once() I32 { let l = Log { v: 0 }; let s = 0; for (upto(bump(l))) |x| { s += x; }; return l.v * 100 + s; }
+          fn awaited() I32 { let s = 0; await for (squares(4)) |x| { s += x; }; return s; }
       }
     

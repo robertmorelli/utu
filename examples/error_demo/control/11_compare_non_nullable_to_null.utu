@@ -1,7 +1,7 @@
 // What: compares a Str that can never be null against null.
 // Expect: name is Str, which is never null; this comparison is always false
 fn has_name(name: Str) Bool {
-    name != null;
+    return name != null;
 }
 
 main {

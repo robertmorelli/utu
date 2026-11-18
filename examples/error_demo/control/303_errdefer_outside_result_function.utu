@@ -4,7 +4,7 @@ using console from std:Console;
 
 fn work(n: I32) I32 {
     errdefer console.log("failed");
-    n * 2;
+    return n * 2;
 }
 
 main { console.log(work(4)); }

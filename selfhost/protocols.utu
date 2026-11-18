@@ -21,7 +21,7 @@ fn implements(t: I32, proto: I32) Bool {
         if node_decl[c] == proto { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Whether type `t` (a scalar, say) has an implementation of a method of `proto`.
@@ -34,13 +34,13 @@ fn has_impl(t: I32, proto: I32) Bool {
         if m >= 0 and is_kind(m, Node.Proto_method) and impl_of(proto, word_of(first_child(m)), d) >= 0 { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Whether a declaration is in a module with type parameters.
 fn in_generic(d: I32) Bool {
     let module = module_of(d)
-    module >= 0 and module_arity(module) > 0
+    return module >= 0 and module_arity(module) > 0
 }
 
 /// The `[P, …]` list of a struct or enum declaration, or -1.
@@ -51,7 +51,7 @@ fn impl_list_of(d: I32) I32 {
         if is_kind(c, Node.Impl_list) { return c }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// Whether a value of `actual` converts to protocol type `expected`.
@@ -59,13 +59,13 @@ fn converts_to_proto(actual: I32, expected: I32) Bool {
     let p = ty_decl(expected)
     if not decl_is(p, Decl.Proto) { return false }
     let t = ty_decl(actual)
-    t >= 0 and implements(t, p)
+    return t >= 0 and implements(t, p)
 }
 
 /// The struct types (and variants) implementing a protocol, in declaration order.
 fn implementers(proto: I32) I32 {
     proto_index()
-    if px_list[proto] >= 0 { px_list[proto] } else { vl_empty() }
+    return if px_list[proto] >= 0 { px_list[proto] } else { vl_empty() }
 }
 
 /// The implementations of a protocol method: `fn P[T].name`, in declaration
@@ -73,7 +73,7 @@ fn implementers(proto: I32) I32 {
 fn method_impls(proto: I32, word: I32) I32 {
     proto_index()
     let pm = protocol_member(proto, word)
-    if pm >= 0 and px_list[pm] >= 0 { px_list[pm] } else { vl_empty() }
+    return if pm >= 0 and px_list[pm] >= 0 { px_list[pm] } else { vl_empty() }
 }
 
 /// By protocol, its implementers; by method, its implementations (see
@@ -149,13 +149,13 @@ fn proto_index() Void {
 fn grown(a: Array[I32], n: I32) Array[I32] {
     let b = Array[I32].new(n, -1)
     for (0 ..< a.len()) |i| { b[i] = a[i] }
-    b
+    return b
 }
 
 /// The protocol member a word names, or -1.
 fn protocol_member(proto: I32, word: I32) I32 {
     let d = member(proto, word, Space.Member)
-    if decl_is(d, Decl.ProtoMember) { d } else { -1 }
+    return if decl_is(d, Decl.ProtoMember) { d } else { -1 }
 }
 
 /// The type of a protocol getter or setter, or a method's result.
@@ -183,7 +183,7 @@ fn proto_field_get(t: I32, name: I32, m: I32) I32 {
     w_node(Op.LocalSet, vt_none, r, 0, m)
     proto_field_site(proto, pm, r, ft, -1)
     w_node(Op.Seq, repr(ft), 0, 0, m)
-    ft
+    return ft
 }
 
 /// `p.x = v`, or with operator `op` (-1 for none) `p.x op= v`: the field x
@@ -219,7 +219,7 @@ fn proto_field_set(t: I32, name: I32, value: I32, op: I32, at: I32, m: I32, cx: 
     w_node(Op.LocalSet, vt_none, v, 0, mv)
     proto_field_site(proto, pm, r, ft, v)
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 /// Whether a protocol has a getter (`get x`, `get set x`) for `word`.
@@ -238,7 +238,7 @@ fn proto_has(proto: I32, word: I32, kind: Node) Bool {
         }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Each member of a protocol once, but a getter and a setter of one type.
@@ -280,7 +280,7 @@ fn proto_self_dynamic(t: I32, name: I32, m: I32) I32 {
     report2(Diag.ProtoSelfDynamic, parent_of(name), word_of(name), t, -1)
     diag_label("any " + type_text(t))
     w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
-    ty_error()
+    return ty_error()
 }
 
 /// Whether a protocol member's types mention `&`.
@@ -291,7 +291,7 @@ fn mentions_self(node: I32) Bool {
         if mentions_self(c) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// The type a protocol member's type node names, `&` read as `self_t`, the
@@ -304,7 +304,7 @@ fn sig_type(node: I32, self_t: I32) I32 {
     sig_self[0] = self_t
     let t = type_of(node, 0)
     sig_self[0] = outer
-    t
+    return t
 }
 
 //! A protocol member's dispatch is a function of its own, made once and
@@ -339,12 +339,12 @@ fn dispatch_ok(pm: I32, params: I32, rt: I32) Bool {
         pd_write.push(-1)
         pd_from.push(-1)
     }
-    true
+    return true
 }
 
 /// A dispatch function of `params` and result `rt`, named `P.word`.
 fn dispatch_fn(proto: I32, pm: I32, params: I32, rt: I32) I32 {
-    helper(params, vl_of_result(rt), vl_empty(), word_text(decl_name[proto]) + "." + word_text(decl_name[pm]))
+    return helper(params, vl_of_result(rt), vl_empty(), word_text(decl_name[proto]) + "." + word_text(decl_name[pm]))
 }
 
 /// Field `pm` of receiver local `r` read (or, when `v` is a local, `v`
@@ -429,7 +429,7 @@ fn proto_field_chain(impls: I32, i: I32, r: I32, word: I32, ft: I32, v: I32) Voi
     let result = if v >= 0 { vt_none } else { repr(ft) }
     let m = w_mark()
     let mt = proto_test_cast(r, heap)
-    let mf = w_stack.len() - 1
+    let mf = w_mark() - 1
     if v >= 0 {
         w_get(repr(ft), v)
         w_node(Op.StructSet, vt_none, heap, field, mf)
@@ -455,13 +455,13 @@ fn proto_test_cast(r: I32, heap: I32) I32 {
     let mcast = w_mark()
     w_get(vt_anyref, r)
     w_node(Op.RefCast, vt, vt, 0, mcast)
-    mt
+    return mt
 }
 
 /// `p.foo(args)`: the receiver is on the stack since `m`; the arguments
 /// from the `first`th (1 for `P.foo(p, …)`, whose first is p).
 fn proto_call(t: I32, name: I32, args: I32, first: I32, m: I32, at: I32, cx: Cx) I32 {
-    proto_call_named(t, word_of(name), name, args, first, m, at, cx)
+    return proto_call_named(t, word_of(name), name, args, first, m, at, cx)
 }
 
 /// Invoke a protocol method whose name is known without borrowing a source token.
@@ -510,7 +510,7 @@ fn proto_call_named(t: I32, word: I32, name: I32, args: I32, first: I32, m: I32,
     }
     proto_call_site(proto, pm, r, locals, types, n, rt, cx)
     w_node(Op.Seq, repr(rt), 0, 0, m)
-    rt
+    return rt
 }
 
 fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array[I32], n: I32, rt: I32, cx: Cx) Void {
@@ -527,7 +527,7 @@ fn proto_call_chain(impls: I32, i: I32, r: I32, locals: Array[I32], types: Array
     }
     let m = w_mark()
     let mt = proto_test_cast(r, vt_heap(repr(named(vl_item(impls, i * 2 + 1), 0))))
-    let mcall = w_stack.len() - 1
+    let mcall = w_mark() - 1
     for (0 ..< n) |k| { w_get(repr(types[k]), locals[k]) }
     finish_call(fn_instance(f, 0), mcall, cx)
     w_node(Op.Seq, repr(rt), 0, 0, mt)
@@ -585,7 +585,7 @@ fn impl_of(proto: I32, word: I32, t: I32) I32 {
         if pt_method[e] == k { return pt_fn[e] }
         e = pt_next[e]
     }
-    -1
+    return -1
 }
 
 /// Conformance of each type in the program's own files to the protocols it lists.
@@ -734,7 +734,7 @@ fn same_signature(f: I32, method: I32, self_t: I32) Bool {
         if is_kind(c, Node.Return_type) { ret = c }
         c = next_sibling(c)
     }
-    protocol_result_matches(type_of(ret, inst), sig_type(last_child(method), self_t))
+    return protocol_result_matches(type_of(ret, inst), sig_type(last_child(method), self_t))
 }
 
 /// A host reference can fulfill an opaque protocol result without boxing.
@@ -772,7 +772,7 @@ fn bound_lack(t: I32, proto: I32) I32 {
         }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// Type `rt`'s `fn P[X].word` for protocol `proto` (not another's word), or -1.
@@ -784,7 +784,7 @@ fn method_of(proto: I32, rt: I32, word: I32) I32 {
         if method_twice[k] == d and decl_a[method_twice[k + 1]] == proto { return method_twice[k + 1] }
         k += 2
     }
-    -1
+    return -1
 }
 
 /// Whether module parameter `param` lists `proto` among its bounds.
@@ -796,7 +796,7 @@ fn has_bound(param: I32, proto: I32) Bool {
         if node_decl[b] == proto { return true }
         b = next_sibling(b)
     }
-    false
+    return false
 }
 
 /// Whether `t`, the type of expression `e`, is a type argument of instance
@@ -813,7 +813,7 @@ fn bound_by(t: I32, proto: I32, inst: I32, e: I32) Bool {
         i += 1
         p = next_sibling(p)
     }
-    false
+    return false
 }
 
 /// The parameter of instance `inst`'s module that expression `e` is
@@ -848,7 +848,7 @@ fn declared_param(e: I32, inst: I32) I32 {
         let init = last_child(decl_node[d])
         return if next_sibling(at) != init { typed_param(next_sibling(at), inst) } else { declared_param(init, inst) }
     }
-    -2
+    return -2
 }
 
 /// @declared_param of a type as written.
@@ -856,7 +856,7 @@ fn typed_param(tn: I32, inst: I32) I32 {
     if not decl_is(inst_module[inst], Decl.Module) { return -2 }
     let p = arg_param(tn)
     if p < 0 { return -1 }
-    if decl_owner[p] == inst_module[inst] { p } else { -2 }
+    return if decl_owner[p] == inst_module[inst] { p } else { -2 }
 }
 
 /// A protocol's name as written: a module's promoted protocol by the module's.
@@ -887,7 +887,7 @@ fn bounded_text(module: I32, param: I32, proto: I32) Str {
         p = next_sibling(p)
         if p >= 0 { text = text + ", " }
     }
-    text + "]"
+    return text + "]"
 }
 
 /// A fix for the last diagnostic: `proto` added to `param`'s bounds.
@@ -933,7 +933,7 @@ fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
     diag_label(decl_text(found) + " is unbounded")
     diag_place(Extra.Related, first_child(decl_node[found]), "no " + proto_text(proto))
     bound_fix(found, proto)
-    true
+    return true
 }
 
 /// `c.m()` on a type argument bounded by P, with no m of its own: P's
@@ -965,7 +965,7 @@ fn bound_default(rt: I32, word: I32, at: I32, inst: I32, c: I32) I32 {
         i += 1
         p = next_sibling(p)
     }
-    found
+    return found
 }
 
 /// Protocol `proto`'s own function `fn P.word` (not a member's `fn P[T].word`), or -1.
@@ -974,7 +974,7 @@ fn proto_default(proto: I32, word: I32) I32 {
     let f = member(proto, word, Space.Method)
     if not decl_is(f, Decl.Fn) or decl_a[f] != proto or not is_kind(decl_node[f], Node.Fn_decl) { return -1 }
     if is_kind(next_sibling(first_child(first_child(decl_node[f]))), Node.Module_type_arg_list) { return -1 }
-    f
+    return f
 }
 
 /// A protocol with a method named `word`, or -1.
@@ -985,7 +985,7 @@ fn proto_with_method(word: I32) I32 {
             if pm >= 0 and is_kind(decl_node[pm], Node.Proto_method) { return d }
         }
     }
-    -1
+    return -1
 }
 
 /// Each instantiation in the program's own files (`Sorted[Point]`, `using
@@ -1007,7 +1007,7 @@ fn any_bounds() Bool {
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.ModuleParam) and is_kind(next_sibling(first_child(decl_node[d])), Node.Impl_list) { return true }
     }
-    false
+    return false
 }
 
 /// The generic module type argument list `args` instantiates, or -1 (`fn
@@ -1024,7 +1024,7 @@ fn instantiated_module(args: I32) I32 {
     let module = if decl_is(d, Decl.Module) { d } else { module_of(d) }
     if module < 0 or not is_generic(module) { return -1 }
     if d != module and decl_a[module] != d { return -1 }
-    module
+    return module
 }
 
 /// The bounds of `module`'s parameters, against the arguments `args` gives.
@@ -1100,13 +1100,13 @@ fn member_text(proto: I32, word: I32, t: I32) Str {
         i += 1
         q = next_sibling(q)
     }
-    text + ") " + type_text(sig_type(last_child(m), t)) + " { … }"
+    return text + ") " + type_text(sig_type(last_child(m), t)) + " { … }"
 }
 
 /// The module parameter a type argument is, by itself (`T`), or -1.
 fn arg_param(arg: I32) I32 {
     let n = if is_kind(arg, Node.Ref_type) { name_node(first_child(arg)) } else { name_node(arg) }
-    if n >= 0 and decl_is(node_decl[n], Decl.ModuleParam) { node_decl[n] } else { -1 }
+    return if n >= 0 and decl_is(node_decl[n], Decl.ModuleParam) { node_decl[n] } else { -1 }
 }
 
 /// Whether a type names a module parameter anywhere in it.
@@ -1117,6 +1117,6 @@ fn names_param(node: I32) Bool {
         if names_param(c) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 

@@ -6,7 +6,7 @@ fn total(xs: Array[I32]) I32 {
         if x < 0 { continue 0; };
         t += x;
     };
-    t;
+    return t;
 }
 
 main {

@@ -13,7 +13,7 @@ fn parse_number(text: Str) Result[I32, Str] {
         if c < 48 or c > 57 { return Result[I32, Str].err("not a number: " + text) }
         n = n * 10 + c - 48
     }
-    Result[I32, Str].ok(n)
+    return Result[I32, Str].ok(n)
 }
 
 /// The number of a "name=number" line.
@@ -22,7 +22,7 @@ fn setting(line: Str) Result[I32, Str] {
     if at < 0 { return Result[I32, Str].err("no '=' in " + line) }
     // try: the number, or parse_number's error returned as this function's.
     let n = try parse_number(line.slice(at + 1, line.len()))
-    Result[I32, Str].ok(n)
+    return Result[I32, Str].ok(n)
 }
 
 /// The sum of every line's number; the first bad line's error, if any.
@@ -34,7 +34,7 @@ fn total(lines: Array[Str]) Result[I32, Str] {
     for (lines) |line| {
         sum += try setting(line)
     }
-    Result[I32, Str].ok(sum)
+    return Result[I32, Str].ok(sum)
 }
 
 fn report(lines: Array[Str]) Void {

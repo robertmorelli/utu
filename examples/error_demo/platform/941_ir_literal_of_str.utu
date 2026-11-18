@@ -1,8 +1,6 @@
 // What: an integer literal typed Str (it was an i32)
 // Expect: @ir <ir-lit> is written wrong here
-fn answer() I32 {
-    @ir/\ <ir-lit kind="int" type-name="Str" value="42"/> \/;
-}
+fn answer() I32 => @ir/\ <ir-lit kind="int" type-name="Str" value="42"/> \/;
 
 main {
     console.log(answer());

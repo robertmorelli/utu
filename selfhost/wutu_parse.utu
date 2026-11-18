@@ -5,7 +5,7 @@
 //! items (classes, attributes, events, two-way bindings, CSS, style values).
 //! Ranges are offsets in the template's text (the body, inside `/\ … \/`).
 
-/// 0 text, 1 expression, 2 if, 3 for, 4 element.
+/// 0 text, 1 expression, 2 if, 3 for, 4 element, 5 fragment.
 vec tn_kind: I32
 vec tn_start: I32
 vec tn_parent: I32
@@ -134,7 +134,7 @@ fn new_tnode(kind: I32, start: I32) I32 {
     tn_index.push(-1)
     tn_items.push(-1)
     tn_items_last.push(-1)
-    n
+    return n
 }
 
 fn add_item(node: I32, kind: I32, a: I32, b: I32, flags: I32, from: I32, to: I32, at: I32) I32 {
@@ -150,7 +150,7 @@ fn add_item(node: I32, kind: I32, a: I32, b: I32, flags: I32, from: I32, to: I32
     ti_at.push(at)
     if tn_items[node] < 0 { tn_items[node] = i } else { ti_next[tn_items_last[node]] = i }
     tn_items_last[node] = i
-    i
+    return i
 }
 
 /// Append child c to a list whose first is at `first_of` (a node's children, or its else).
@@ -176,11 +176,11 @@ fn in_words(list: Str, w: Str) Bool {
         if (i == 0 or list.get(i - 1) == 32 or list.get(i - 1) == 10) and (end == list.len() or list.get(end) == 32 or list.get(end) == 10) { return true }
         i = text_index(list, w, i + 1)
     }
-    false
+    return false
 }
 
 fn is_boolean_attribute(name: Str) Bool {
-    in_words("hidden inert disabled required readonly checked multiple autofocus selected open reversed controls autoplay muted loop playsinline novalidate", name)
+    return in_words("hidden inert disabled required readonly checked multiple autofocus selected open reversed controls autoplay muted loop playsinline novalidate", name)
 }
 
 fn is_void_tag(tag: Str) Bool => in_words("area base br col embed hr img input link meta param source track wbr", tag)
@@ -188,16 +188,16 @@ fn is_void_tag(tag: Str) Bool => in_words("area base br col embed hr img input l
 /// SVG's elements (but `a`, `script`, `style`): `fe…` filter primitives,
 /// and the rest. (Inside `svg { }` any name is one: see parse_telement.)
 fn is_svg_tag(tag: Str) Bool {
-    (text_at(tag, 0, "fe") and tag.len() > 2 and is_upper_code(tag.get(2)))
+    return (text_at(tag, 0, "fe") and tag.len() > 2 and is_upper_code(tag.get(2)))
         or in_words("svg g path circle ellipse line polyline polygon rect text tspan textPath defs use symbol image switch view linearGradient radialGradient stop clipPath mask pattern marker filter title desc metadata foreignObject animate animateMotion animateTransform set mpath discard hatch hatchpath", tag)
 }
 
 fn is_html_tag(tag: Str) Bool {
-    in_words("html head embed param script area base link meta a abbr address article aside audio b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i iframe img input ins kbd label legend li main map mark menu meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp search section select slot small source span strong style sub summary sup table tbody td template textarea tfoot th thead time title tr track u ul var video wbr", tag)
+    return in_words("html head embed param script area base link meta a abbr address article aside audio b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i iframe img input ins kbd label legend li main map mark menu meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp search section select slot small source span strong style sub summary sup table tbody td template textarea tfoot th thead time title tr track u ul var video wbr", tag)
 }
 
 fn is_global_attribute(name: Str) Bool {
-    in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref xml:lang", name)
+    return in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref xml:lang", name)
 }
 
 /// The attributes an element of `tag` may have beyond the global ones (space-separated).
@@ -239,7 +239,7 @@ fn tag_attributes(tag: Str) Str {
     if tag == "audio" { return "src controls autoplay muted loop preload crossorigin" }
     if tag == "object" { return "data type name width height form usemap typemustmatch" }
     if tag == "iframe" { return "src srcdoc name title width height loading allow allowfullscreen sandbox referrerpolicy" }
-    ""
+    return ""
 }
 
 fn is_custom_element(tag: Str) Bool => text_index(tag, "-", 0) >= 0
@@ -249,7 +249,7 @@ fn is_known_tag(tag: Str) Bool => is_html_tag(tag) or is_svg_tag(tag) or is_cust
 /// Global, `aria-` and `data-` attributes, the tag's own, and anything on
 /// an SVG element (`svg`) or a custom one.
 fn is_allowed_attribute(tag: Str, name: Str, svg: Bool) Bool {
-    svg or is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
+    return svg or is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
         or is_custom_element(tag)
 }
 
@@ -265,13 +265,12 @@ fn is_css_property(head: Str) Bool {
     let i = if head.len() > 0 and head.get(0) == 45 { 1 } else { 0 }
     if i >= head.len() or not is_lower_code(head.get(i)) { return false }
     for (i + 1 ..< head.len()) |k| { if not is_name_code(head.get(k)) { return false } }
-    true
+    return true
 }
 
-/// The standard CSS properties (lib.dom's CSSStyleDeclaration, and newer
-/// ones): one literal, one string constant (not pieces joined at each call).
-fn css_properties() Str {
-    \\accent-color align-content align-items align-self alignment-baseline all anchor-name anchor-scope animation animation-composition animation-delay
+/// The standard CSS properties (lib.dom's CSSStyleDeclaration and newer ones).
+fn css_properties_text() Str {
+    return \\accent-color align-content align-items align-self alignment-baseline all anchor-name anchor-scope animation animation-composition animation-delay
     \\animation-direction animation-duration animation-fill-mode animation-iteration-count animation-name animation-play-state animation-range
     \\animation-range-end animation-range-start animation-timeline animation-timing-function appearance aspect-ratio backdrop-filter backface-visibility
     \\background background-attachment background-blend-mode background-clip background-color background-image background-origin background-position
@@ -324,6 +323,93 @@ fn css_properties() Str {
     \\zoom
 }
 
+/// Keep the two ASCII catalogs packed in the compiler artifact. The original
+/// text is used only while building the table, and decoded once at runtime.
+const vec web_catalog: U8 = @comptime/\ pack_web_catalog(css_properties_text() + Str.from_code_point(0) + dom_events_text()) \/
+struct WebCatalogCache:
+    | css: ?Str
+    | events: ?Str
+
+let web_catalog_cache: WebCatalogCache = WebCatalogCache { css: null, events: null }
+
+fn css_properties() Str {
+    if web_catalog_cache.css == null { unpack_web_catalog() }
+    return web_catalog_cache.css orelse fatal
+}
+
+fn dom_events() Str {
+    if web_catalog_cache.events == null { unpack_web_catalog() }
+    return web_catalog_cache.events orelse fatal
+}
+
+/// A literal ASCII byte or a back reference with length in the first byte
+/// and distance in the next two. The first two bytes give the decoded size.
+fn pack_web_catalog(text: Str) Array[I32] {
+    let size = text.len()
+    if size > 65535 { fatal }
+    let packed = Array[I32].new(size + 2, 0)
+    packed[0] = size & 255
+    packed[1] = size >>> 8
+    let recent = Array[I32].new(4096, -1)
+    let source = 0
+    let dest = 2
+    while (source < size) {
+        let byte = text.get(source)
+        if byte >= 128 { fatal }
+        let length = 0
+        let distance = 0
+        if source + 3 <= size {
+            let slot = ((byte * 251 + text.get(source + 1)) * 251 + text.get(source + 2)) & 4095
+            let previous = recent[slot]
+            recent[slot] = source
+            if previous >= 0 {
+                while (length < 130 and source + length < size and text.get(previous + length) == text.get(source + length)) {
+                    length += 1
+                }
+                distance = source - previous
+            }
+        }
+        if length >= 4 {
+            packed[dest] = 128 + length - 3
+            packed[dest + 1] = distance & 255
+            packed[dest + 2] = distance >>> 8
+            dest += 3
+            source += length
+        } else {
+            packed[dest] = byte
+            dest += 1
+            source += 1
+        }
+    }
+    return packed.slice(0, dest)
+}
+
+fn unpack_web_catalog() Void {
+    let size = web_catalog[0] + web_catalog[1] * 256
+    let codes = Array[I32].new(size, 0)
+    let source = 2
+    let dest = 0
+    while (source < web_catalog.len()) {
+        let code = web_catalog[source]
+        source += 1
+        if code < 128 {
+            codes[dest] = code
+            dest += 1
+        } else {
+            let count = code - 128 + 3
+            let distance = web_catalog[source] + web_catalog[source + 1] * 256
+            source += 2
+            for (dest ..< dest + count) |i| { codes[i] = codes[i - distance] }
+            dest += count
+        }
+    }
+    let split = 0
+    while (codes[split] != 0) { split += 1 }
+    let text = Str.from_codes(codes, size)
+    web_catalog_cache.css = text.slice(0, split)
+    web_catalog_cache.events = text.slice(split + 1, size)
+}
+
 /// The word of `list` one edit (or swap of neighbors) from `w`, unless `w`
 /// is in it, or "": a typo. (Two edits from a known word is likely a real
 /// word the list lacks: `marker-side`, `column-wrap`, an event `unmount`.)
@@ -331,7 +417,7 @@ fn typo_of(list: Str, w: Str) Str {
     if in_words(list, w) { return "" }
     let near = closest_word(list, w)
     if near.len() > 0 and word_distance(intern_text(near), intern_text(w), 3) > 1 { return "" }
-    near
+    return near
 }
 
 /// An invalid property name fails; so does a typo of a standard one (names
@@ -383,7 +469,7 @@ fn wp_at_text(text: Str, part: Str) Bool => text_at(text, wp_at[0], part)
 /// A word then whitespace at the cursor (`if `, `for `, `as `), not consumed.
 fn wp_keyword(text: Str, word: Str) Bool {
     let i = wp_at[0]
-    text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()))
+    return text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()))
 }
 
 /// Whether offset p starts the text or follows a blank (a `//` there is a
@@ -448,7 +534,7 @@ fn line_rest(text: Str, i: I32) I32 {
             return j
         }
     }
-    j
+    return j
 }
 
 /// How far the line holding offset i is indented (its leading blanks).
@@ -457,14 +543,14 @@ fn indent_at(text: Str, i: I32) I32 {
     while (a > 0 and text.get(a - 1) != 10) { a -= 1 }
     let b = a
     while (b < text.len() and (text.get(b) == 32 or text.get(b) == 9)) { b += 1 }
-    b - a
+    return b - a
 }
 
 /// Past blanks, line breaks, and comments from i: the next line's first token.
 fn next_token(text: Str, i: I32) I32 {
     let j = line_rest(text, i)
     while (j < text.len() and text.get(j) == 10) { j = line_rest(text, j + 1) }
-    j
+    return j
 }
 
 /// Whether the expression goes on past the line break at `nl`, as utu's does:
@@ -482,7 +568,7 @@ fn wp_continues(text: Str, last: I32, opaque: Bool, nl: I32) Bool {
             if in_words("and or xor not orelse else in", text.slice(a, last + 1)) { return true }
         }
     }
-    continues_at(text, next_token(text, nl))
+    return continues_at(text, next_token(text, nl))
 }
 
 /// Whether the line whose first token is at j continues the statement before
@@ -497,6 +583,9 @@ fn continues_at(text: Str, j: I32) Bool {
     if c == 46 { return (is_lower_code(next) or next == 95) and not assignment_head(text, j + 1, false) }
     if c == 63 { return next == 46 }
     if c == 61 { return next == 61 }
+    // A new component insertion ends the previous Wutu statement. Utu
+    // operators inside a parenthesized expression or block remain Utu.
+    if c == 124 { return false }
     if c == 123 { return true }
     if text_index("+*/%<>|^~!", Str.from_code_point(c), 0) >= 0 { return true }
     if not is_lower_code(c) { return false }
@@ -520,7 +609,7 @@ fn continues_at(text: Str, j: I32) Bool {
         }
         r = skip_spaces(text, r + 1)
     }
-    r < text.len() and text.get(r) == 124
+    return r < text.len() and text.get(r) == 124
 }
 
 /// Whether a statement ends at i (past its line's blanks): `;`, `}`, the
@@ -529,7 +618,7 @@ fn ends_at(text: Str, i: I32) Bool {
     let j = line_rest(text, i)
     if j >= text.len() { return true }
     let c = text.get(j)
-    c == 59 or c == 125 or (c == 10 and not continues_at(text, next_token(text, j)))
+    return c == 59 or c == 125 or (c == 10 and not continues_at(text, next_token(text, j)))
 }
 
 /// A quoted string, CSS or Utu: a backslash escapes the character after it.
@@ -558,7 +647,7 @@ fn wp_quoted(text: Str) Str {
         }
     }
     wutu_fail("unterminated string", start)
-    ""
+    return ""
 }
 
 /// Skip a Utu token whose contents are not delimiters: a nested DSL, a
@@ -579,7 +668,7 @@ fn wp_opaque(text: Str) Bool {
         wp_skip_line(text)
         return true
     }
-    false
+    return false
 }
 
 /// `@name/\ … \/` starting at `start`: the offset after it, else `start`.
@@ -610,7 +699,7 @@ fn skip_dsl(text: Str, start: I32) I32 {
         j += 1
     }
     wutu_fail("Unterminated DSL envelope", start)
-    start
+    return start
 }
 
 /// An expression read: its source, and its range, here.
@@ -652,7 +741,7 @@ fn wp_bare_expression(text: Str) Str {
     if depth > 0 { wutu_fail("unterminated expression", start) }
     wx_from[0] = start
     wx_to[0] = if last < 0 { start } else { last + 1 }
-    text.slice(start, wx_to[0])
+    return text.slice(start, wx_to[0])
 }
 
 /// `$[expression]`.
@@ -683,7 +772,7 @@ fn wp_expression_until(text: Str, ends: Str, what: Str) Str {
         }
     }
     wutu_fail("unterminated " + what, start)
-    ""
+    return ""
 }
 
 /// A `for` iterable (its range in wx_from/wx_to) without parentheses that
@@ -719,7 +808,7 @@ fn unparenthesized(source: Str) Str {
     if last.len() == 0 or in_words("fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", last) { return source }
     wx_from[0] += 1
     wx_to[0] -= 1
-    trim_text(source.slice(1, n - 1))
+    return trim_text(source.slice(1, n - 1))
 }
 
 fn wp_fail_interpolation(text: Str) Void {
@@ -727,7 +816,7 @@ fn wp_fail_interpolation(text: Str) Void {
 }
 
 /// A brace-delimited Utu block, with its braces.
-fn wp_utu_block(text: Str) Str {
+fn wp_utu_block(text: Str, context: Str) Str {
     let start = wp_at[0]
     let depth = 0
     let first = true
@@ -739,10 +828,10 @@ fn wp_utu_block(text: Str) Str {
             wp_at[0] += 1
         }
     }
-    if depth != 0 { wutu_fail("unterminated event handler", start) }
+    if depth != 0 { wutu_fail("unterminated " + context, start) }
     wx_from[0] = start
     wx_to[0] = wp_at[0]
-    text.slice(start, wp_at[0])
+    return text.slice(start, wp_at[0])
 }
 
 //! = CSS
@@ -781,7 +870,7 @@ fn wp_css_until(text: Str, delimiters: Str, lines: Bool) Str {
             }
         }
     }
-    trim_text(text.slice(start, if lines { end_at } else { wp_at[0] }))
+    return trim_text(text.slice(start, if lines { end_at } else { wp_at[0] }))
 }
 
 /// A `{ … }` CSS block's body (the cursor on its brace), without its `//`
@@ -835,12 +924,12 @@ fn wp_css_block(text: Str) Str {
         }
     }
     wutu_fail("unterminated CSS block", open)
-    ""
+    return ""
 }
 
 //! = Template structure
 
-/// The template; returns its root element.
+/// The template; returns its single element or a synthetic fragment.
 fn parse_template(text: Str) I32 {
     reset_template()
     wp_at[0] = 0
@@ -882,12 +971,23 @@ fn parse_template(text: Str) I32 {
         wp_trivia(text)
     }
     if wp_char(text) == 64 { at_directive(text, wp_at[0], false) }
-    let root = parse_tnode(text)
-    if tn_kind[root] != 4 { wutu_fail("root must be an element", tn_start[root]) }
-    if word_text(tn_text[root]) == "html" { tw_reactive[0] = 1 }
-    wp_trivia(text)
-    if not wp_done(text) { wutu_fail("expected exactly one root element; use a component for siblings", wp_at[0]) }
-    root
+    let fragment = new_tnode(5, wp_at[0])
+    let last = -1
+    while (not wp_done(text)) {
+        if wp_char(text) == 59 { wp_at[0] += 1; wp_trivia(text); continue }
+        let child = parse_tnode(text)
+        tn_parent[child] = fragment
+        if last < 0 { tn_first[fragment] = child } else { tn_next[last] = child }
+        last = child
+        wp_trivia(text)
+    }
+    let first = tn_first[fragment]
+    if first >= 0 and tn_next[first] < 0 and tn_kind[first] == 4 {
+        tn_parent[first] = -1
+        if word_text(tn_text[first]) == "html" { tw_reactive[0] = 1 }
+        return first
+    }
+    return fragment
 }
 
 /// Text, an expression, if, for, or an element.
@@ -902,8 +1002,9 @@ fn parse_tnode(text: Str) I32 {
         return n
     }
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-    if wp_char(text) == 61 {
-        wp_at[0] += 1
+    if wp_char(text) == 61 or wp_char(text) == 124 {
+        let code = wp_at_text(text, "|>")
+        wp_at[0] += if code { 2 } else { 1 }
         let source = wp_bare_expression(text)
         let from = wx_from[0]
         let to = wx_to[0]
@@ -916,7 +1017,7 @@ fn parse_tnode(text: Str) I32 {
     }
     if wp_keyword(text, "if") { return parse_tif(text) }
     if wp_keyword(text, "for") { return parse_tfor(text) }
-    parse_telement(text)
+    return parse_telement(text)
 }
 
 /// `{ nodes }`, into node n's children (or its otherwise).
@@ -969,7 +1070,7 @@ fn parse_tif(text: Str) I32 {
             parse_branch(text, n, true)
         }
     }
-    n
+    return n
 }
 
 /// `for e |x| { … }`, the cursor on `for`.
@@ -1002,7 +1103,7 @@ fn parse_tfor(text: Str) I32 {
         tn_key_to[n] = wx_to[0]
     }
     parse_branch(text, n, false)
-    n
+    return n
 }
 
 /// `|a|` or `|a, b|` at the cursor: "a" or "a, b" as written (consumed), or "".
@@ -1025,7 +1126,7 @@ fn wp_captures(text: Str) Str {
     i = skip_spaces(text, i)
     if i >= text.len() or text.get(i) != 124 { return "" }
     wp_at[0] = i + 1
-    text.slice(from, to)
+    return text.slice(from, to)
 }
 
 /// An element: its tag, classes, and `as` alias, then a `{ … }` body or `;`.
@@ -1105,7 +1206,7 @@ fn parse_telement(text: Str) I32 {
     if tn_first[n] >= 0 and has_attribute_item(n, "data-wutu-unmanaged") {
         wutu_fail("an @unmanaged " + tag + " has no children in its template: what is inside it is JavaScript's", start)
     }
-    n
+    return n
 }
 
 /// Elements whose text HTML holds unescaped (raw text; a script's is code):
@@ -1113,7 +1214,7 @@ fn parse_telement(text: Str) I32 {
 fn is_raw_text_tag(tag: Str) Bool => in_words("style noscript iframe xmp noembed noframes plaintext", tag)
 
 fn raw_text_error(tag: Str) Str {
-    (if tag == "iframe" { "an " } else { "a " }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\" }"
+    return (if tag == "iframe" { "an " } else { "a " }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\" }"
 }
 
 /// Whether element n has an attribute item named `name`.
@@ -1123,7 +1224,7 @@ fn has_attribute_item(n: I32, name: Str) Bool {
         if ti_kind[i] == 1 and word_text(ti_a[i]) == name { return true }
         i = ti_next[i]
     }
-    false
+    return false
 }
 
 fn add_child(n: I32, c: I32) Void {
@@ -1141,7 +1242,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
     }
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
     // (`for = "x";` is label's attribute: a loop's iterable never starts with `=`.)
-    if c == 34 or c == 61 or wp_keyword(text, "if") or (wp_keyword(text, "for") and not assignment_head(text, p, false)) {
+    if c == 34 or c == 61 or c == 124 or wp_keyword(text, "if") or (wp_keyword(text, "for") and not assignment_head(text, p, false)) {
         add_child(n, parse_tnode(text))
         return
     }
@@ -1200,7 +1301,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
                 return
             }
             wp_at[0] = r
-            let source = wp_utu_block(text)
+            let source = wp_utu_block(text, "event handler")
             let i = add_item(n, 2, intern_text(name), intern_text(source), 1 + flags, wx_from[0], wx_to[0], p)
             ti_c[i] = param
             return
@@ -1268,7 +1369,7 @@ fn at_directive(text: Str, p: I32, inside: Bool) Void {
 fn near_event(name: Str) Str {
     let known = "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange compositionstart compositionupdate compositionend selectionchange selectstart mount"
     if extends_word(known, name) { return "" }
-    typo_of(known, name)
+    return typo_of(known, name)
 }
 
 /// Whether `w` is a word of `list` (space-separated) and more.
@@ -1280,7 +1381,7 @@ fn extends_word(list: Str, w: Str) Bool {
         if j - i < w.len() and text_at(w, 0, list.slice(i, j)) { return true }
         i = j + 1
     }
-    false
+    return false
 }
 
 /// The word of `list` (as in_words) within two edits of `w`, or "".
@@ -1296,7 +1397,7 @@ fn closest_word(list: Str, w: Str) Str {
         if d < best_d { best = word; best_d = d }
         i = j + 1
     }
-    best
+    return best
 }
 
 /// `@name =` at p.
@@ -1306,7 +1407,7 @@ fn event_head(text: Str, p: I32) Bool {
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     if q == a { return false }
     q = skip_spaces(text, q)
-    q < text.len() and text.get(q) == 61
+    return q < text.len() and text.get(q) == 61
 }
 
 /// A name at q, then `=` (not `==`), or, when `bare` (a boolean attribute),
@@ -1319,7 +1420,7 @@ fn assignment_head(text: Str, q: I32, bare: Bool) Bool {
     // (On its line: an `=` on the next begins a hole.)
     i = line_rest(text, i)
     if bare and (i >= text.len() or text.get(i) == 10 or text.get(i) == 59 or text.get(i) == 125) { return true }
-    i < text.len() and text.get(i) == 61 and not (i + 1 < text.len() and text.get(i + 1) == 61)
+    return i < text.len() and text.get(i) == 61 and not (i + 1 < text.len() and text.get(i + 1) == 61)
 }
 
 /// Past `xlink:`, `xml:` or `xmlns:` at q (a namespaced attribute's prefix,
@@ -1328,7 +1429,7 @@ fn namespace_prefix(text: Str, q: I32) I32 {
     for (["xlink:", "xmlns:", "xml:"]) |prefix| {
         if text_at(text, q, prefix) { return q + prefix.len() }
     }
-    0
+    return 0
 }
 
 /// `<name = value;`, the spelling before attributes lost their `<`: the new one.
@@ -1338,7 +1439,7 @@ fn old_attribute_text(text: Str, p: I32) Str {
     let a = q
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let spelled = if q > a { text.slice(p + 1, q) } else { "name" }
-    "attributes are written without '<': " + spelled + " = value (or " + spelled + " alone, for a boolean attribute)"
+    return "attributes are written without '<': " + spelled + " = value (or " + spelled + " alone, for a boolean attribute)"
 }
 
 /// `"text" name…`: a string, then (no operator) another statement on its line: a forgotten `;`.
@@ -1361,7 +1462,7 @@ fn literal_value(text: Str, q: I32) Bool {
     let i = q + 1
     while (i < text.len() and text.get(i) != 34 and text.get(i) != 10) { i += if text.get(i) == 92 { 2 } else { 1 } }
     if i >= text.len() or text.get(i) != 34 { return false }
-    ends_at(text, i + 1)
+    return ends_at(text, i + 1)
 }
 
 /// Whether `name` is "on" and an event's name, in any case: an event
@@ -1369,20 +1470,20 @@ fn literal_value(text: Str, q: I32) Bool {
 /// and a custom element's `onfoo` are attributes.)
 fn is_on_name(name: Str) Bool {
     if name.len() < 3 or (name.get(0) | 32) != 111 or (name.get(1) | 32) != 110 { return false }
-    is_event_name(lower_text(name.slice(2, name.len())))
+    return is_event_name(lower_text(name.slice(2, name.len())))
 }
 
 /// `text` in ASCII lowercase.
 fn lower_text(text: Str) Str {
     let out = ""
     for (0 ..< text.len()) |i| { out = out + Str.from_code_point(lower_byte(text.get(i))) }
-    out
+    return out
 }
 
 /// The DOM events with a handler attribute (`on` + the name), in any browser.
-fn is_event_name(w: Str) Bool {
-    in_words("abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom", w)
-}
+fn dom_events_text() Str => "abort activate afterprint afterscriptexecute animationcancel animationend animationiteration animationstart appinstalled auxclick beforeactivate beforecopy beforecut beforedeactivate beforeinput beforeinstallprompt beforematch beforepaste beforeprint beforescriptexecute beforetoggle beforeunload beforexrselect begin blur cancel canplay canplaythrough change click close command contentvisibilityautostatechange contextlost contextmenu contextrestored copy cuechange cut dblclick deactivate devicemotion deviceorientation deviceorientationabsolute drag dragend dragenter dragexit dragleave dragover dragstart drop durationchange emptied encrypted end ended enterpictureinpicture error focus focusin focusout formdata freeze fullscreenchange fullscreenerror gamepadconnected gamepaddisconnected gesturechange gestureend gesturestart gotpointercapture hashchange help input interest invalid keydown keypress keyup languagechange leavepictureinpicture load loadeddata loadedmetadata loadstart loseinterest lostpointercapture message messageerror mousedown mouseenter mouseleave mousemove mouseout mouseover mouseup mousewheel mozfullscreenchange mozfullscreenerror mozpointerlockchange mozpointerlockerror offline online orientationchange overscroll pagehide pagereveal pageshow pageswap paste pause play playing pointercancel pointerdown pointerenter pointerleave pointerlockchange pointerlockerror pointermove pointerout pointerover pointerrawupdate pointerup popstate prerenderingchange progress ratechange readystatechange rejectionhandled repeat reset resize resume scroll scrollend scrollsnapchange scrollsnapchanging search securitypolicyviolation seeked seeking select selectionchange selectstart show slotchange stalled storage submit suspend timeupdate toggle touchcancel touchend touchmove touchstart transitioncancel transitionend transitionrun transitionstart unhandledrejection unload visibilitychange volumechange waiting waitingforkey webkitanimationend webkitanimationiteration webkitanimationstart webkitbeginfullscreen webkitcurrentplaybacktargetiswirelesschanged webkitendfullscreen webkitfullscreenchange webkitfullscreenerror webkitkeyadded webkitkeyerror webkitkeymessage webkitmouseforcechanged webkitmouseforcedown webkitmouseforceup webkitmouseforcewillbegin webkitneedkey webkitplaybacktargetavailabilitychanged webkitpresentationmodechanged webkittransitionend wheel zoom"
+
+fn is_event_name(w: Str) Bool => in_words(dom_events(), w)
 
 /// `name = value;` or `name;` (an attribute), `.name = value;` (a property);
 /// the cursor is on the name. A value that is one string literal is written
@@ -1433,7 +1534,7 @@ fn has_item_named(n: I32, name: Str, is_property: Bool) Bool {
         if ti_kind[i] == 1 and (ti_flags[i] & 1) == (if is_property { 1 } else { 0 }) and word_text(ti_a[i]) == name { return true }
         i = ti_next[i]
     }
-    false
+    return false
 }
 
 /// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
@@ -1460,7 +1561,7 @@ fn scoped_selector(selector: Str) Str {
         return if rest.len() > 0 { rest } else { "&, & *" }
     }
     if text_at(selector, 0, ":") { return "&" + selector }
-    selector
+    return selector
 }
 
 /// `property: value;` in an element's body, or else a child element.
@@ -1475,10 +1576,12 @@ fn parse_declaration_or_child(text: Str, n: I32) Void {
     wp_at[0] += 1
     wp_trivia(text)
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-    if wp_char(text) == 61 {
-        // `width: = expression;`: applied with style.setProperty at render.
-        wp_at[0] += 1
-        let source = wp_bare_expression(text)
+    if wp_char(text) == 61 or wp_char(text) == 123 {
+        // A leading block is Utu, including for custom properties.
+        // Keep the legacy `: = expression` spelling as well.
+        let block = wp_char(text) == 123
+        if not block { wp_at[0] += 1 }
+        let source = if block { wp_utu_block(text, "computed CSS value") } else { wp_bare_expression(text) }
         let from = wx_from[0]
         let to = wx_to[0]
         wp_end(text)

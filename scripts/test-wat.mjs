@@ -135,7 +135,7 @@ try {
 
   // `export main` may be a @wat function.
   const mainFile = path.join(dir, 'main.utu');
-  await fs.writeFile(mainFile, 'lib { fn run() I32 { @wat/\\ i32.const 37 \\/; } }\n');
+  await fs.writeFile(mainFile, 'lib { fn run() I32 => @wat/\\ i32.const 37 \\/; }\n');
   {
     const { exports, errors } = await selfhost(mainFile);
     assert.equal(exports?.run(), 37, String(errors));
@@ -143,19 +143,19 @@ try {
 
   // Mistakes: each at its place.
   const mistakes = [
-    ['fn f(x: I32) I32 { @wat/\\ (i64.add (local.get $x) (local.get $x)) \\/; }', '1:27 i64.add needs an i64, not an i32'],
-    ['fn f(x: I32) I32 {\n    @wat/\\\n        local.get $x\n        i32.lodd\n    \\/;\n}', "4:9 unknown instruction 'i32.lodd'"],
-    ['fn f(x: I32) I32 { @wat/\\ (i32.load (local.get $x)) \\/; }', '1:28 i32.load: a @wat function computes on its arguments; it has no memories, globals, calls, or references'],
-    ['fn f(x: I32) I32 { @wat/\\ local.get $x local.get $x \\/; }', '1:40 the function returns i32, but its body leaves 1 more value'],
-    ['fn f(x: Str) I32 { @wat/\\ i32.const 1 \\/; }', '1:20 a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, V128, M32, M64, or M128, not Str'],
-    ['fn f() I32 { let y = 1; @wat/\\ i32.const 1 \\/; }', "1:25 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
-    ['let w: I32 = @wat/\\ i32.const 1 \\/;', "1:14 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 { @wat/\\ … \\/; }"],
-    ['fn f(x: I32) I32 { @wat/\\ v128.const i32x4 1 2 \\/; }', '1:27 v128.const needs 5 immediates'],
+    ['fn f(x: I32) I32 => @wat/\\ (i64.add (local.get $x) (local.get $x)) \\/;', '1:28 i64.add needs an i64, not an i32'],
+    ['fn f(x: I32) I32 => @wat/\\\n        local.get $x\n        i32.lodd\n    \\/;', "3:9 unknown instruction 'i32.lodd'"],
+    ['fn f(x: I32) I32 => @wat/\\ (i32.load (local.get $x)) \\/;', '1:29 i32.load: a @wat function computes on its arguments; it has no memories, globals, calls, or references'],
+    ['fn f(x: I32) I32 => @wat/\\ local.get $x local.get $x \\/;', '1:41 the function returns i32, but its body leaves 1 more value'],
+    ['fn f(x: Str) I32 => @wat/\\ i32.const 1 \\/;', '1:21 a @wat function takes and returns I32, U32, I64, U64, F32, F64, Bool, V128, M32, M64, or M128, not Str'],
+    ['fn f() I32 { let y = 1; return @wat/\\ i32.const 1 \\/; }', "1:32 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 => @wat/\\ … \\/;"],
+    ['let w: I32 = @wat/\\ i32.const 1 \\/;', "1:14 @wat must be a function's whole body", "@wat is a function's whole body: fn f(x: I32) I32 => @wat/\\ … \\/;"],
+    ['fn f(x: I32) I32 => @wat/\\ v128.const i32x4 1 2 \\/;', '1:28 v128.const needs 5 immediates'],
   ];
   for (const [i, [source, want]] of mistakes.entries()) {
     const file = path.join(dir, `mistake${i}.utu`);
     await fs.writeFile(file, `${source}
-lib { fn g() I32 { 0; } }
+lib { fn g() I32 { return 0; } }
 `);
     const got = await selfhost(file);
     assert.deepEqual(got.errors, [want], source);
@@ -166,7 +166,7 @@ lib { fn g() I32 { 0; } }
     await fs.writeFile(file, `gn g(n: I32) I32 { @wat/\\ local.get $n \\/; }
 lib { fn t() I32 { ${call}; } }
 `);
-    const shape = 'a @wat function is a plain function: fn f(x: I32) I32 { @wat/\\ … \\/; }';
+    const shape = 'a @wat function is a plain function: fn f(x: I32) I32 => @wat/\\ … \\/;';
     assert.deepEqual((await selfhost(file)).errors?.map(e => e.replace(/^\d+:\d+ /, '')), [shape], `self-hosted: ${call}`);
   }
   console.log(`wat: ${functions.length} instructions (${checked}), ${accepted.length} spellings as wasm-tools has them, ${rejected.length} mistakes the assembler finds, examples/wat.utu and a @wat main with selfhost, ${mistakes.length} mistakes at their places`);

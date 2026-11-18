@@ -17,8 +17,8 @@ struct City[Ord, Named]:
     | people: F64
 
 // Higher scores come first: an order is whatever cmp says.
-fn Ord[Player].cmp |a| (b: Player) I32 { b.score - a.score }
-fn Ord[City].cmp |a| (b: City) I32 { b.people.cmp(a.people) }
+fn Ord[Player].cmp |a| (b: Player) I32 { return b.score - a.score }
+fn Ord[City].cmp |a| (b: City) I32 { return b.people.cmp(a.people) }
 
 /// The first `n` of `xs` in T's order, by name.
 mod Ranking[T[Ord, Named]] {
@@ -26,7 +26,7 @@ mod Ranking[T[Ord, Named]] {
         Order[T].sort(xs)
         let names = Array[Str].new(n, "")
         for (0 ..< n) |i| { names[i] = xs[i].name }
-        ", ".join(names)
+        return ", ".join(names)
     }
 }
 
@@ -36,9 +36,9 @@ mod Span[T[Ord]] {
     struct &:
         | low: T
         | high: T
-    fn &.of(a: T, b: T) & { &{ low: Order[T].min(a, b), high: Order[T].max(a, b) } }
-    fn &.holds |s| (x: T) Bool { s.low.cmp(x) <= 0 and x.cmp(s.high) <= 0 }
-    fn Ord[&].cmp |a| (b: &) I32 { a.low.cmp(b.low) }
+    fn &.of(a: T, b: T) & { return &{ low: Order[T].min(a, b), high: Order[T].max(a, b) } }
+    fn &.holds |s| (x: T) Bool { return s.low.cmp(x) <= 0 and x.cmp(s.high) <= 0 }
+    fn Ord[&].cmp |a| (b: &) I32 { return a.low.cmp(b.low) }
 }
 
 main {

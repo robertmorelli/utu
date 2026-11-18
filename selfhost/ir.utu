@@ -56,7 +56,7 @@ fn ir_tree(dsl: I32) I32 {
     x_space(at)
     if at.pos < at.end { root = -1 }
     x_cache[dsl] = root
-    root
+    return root
 }
 
 /// Where an `@ir` body is being read, and where it ends.
@@ -135,7 +135,7 @@ fn x_element(at: XmlAt) I32 {
         if last < 0 { x_child[id] = child } else { x_next[last] = child }
         last = child
     }
-    id
+    return id
 }
 
 /// The attribute named `name` (a word id) of an element, or -1.
@@ -145,13 +145,13 @@ fn x_attr(x: I32, name: I32) I32 {
         let a = x_attr_first[x] + i
         if attr_name[a] == name { return a }
     }
-    -1
+    return -1
 }
 
 fn attr_is(a: I32, text: Str) Bool {
     if attr_end[a] - attr_start[a] != text.len() { return false }
     for (0 ..< text.len()) |i| { if src[attr_start[a] + i] != text.get(i) { return false } }
-    true
+    return true
 }
 
 /// The attribute's value as a word id (to compare with names).
@@ -164,7 +164,7 @@ fn x_children(x: I32) I32 {
         n += 1
         c = x_next[c]
     }
-    n
+    return n
 }
 
 //! = Names the compiler knows
@@ -254,7 +254,7 @@ fn attr_type_repr() I32 => known_word(Known.TypeRepr)
 /// The tag names, and the opcodes of those that are one wasm instruction
 /// (0xFC00 + n and 0xFD00 + n for prefixed ones).
 fn opcode_table() Str {
-    "i32-eqz 69 i32-eq 70 i32-ne 71 i32-lt-s 72 i32-gt-s 74 i32-le-s 76 i32-ge-s 78 "
+    return "i32-eqz 69 i32-eq 70 i32-ne 71 i32-lt-s 72 i32-gt-s 74 i32-le-s 76 i32-ge-s 78 "
     + "u32-eq 70 u32-ne 71 u32-lt-u 73 u32-gt-u 75 u32-le-u 77 u32-ge-u 79 "
     + "i64-eqz 80 i64-eq 81 i64-ne 82 i64-lt-s 83 i64-gt-s 85 i64-le-s 87 i64-ge-s 89 "
     + "u64-eq 81 u64-ne 82 u64-lt-u 84 u64-gt-u 86 u64-le-u 88 u64-ge-u 90 "

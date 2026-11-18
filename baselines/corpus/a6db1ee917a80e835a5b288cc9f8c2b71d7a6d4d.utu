@@ -4,7 +4,7 @@
       lib {
         fn radius() I32 {
           let c: Circle = Circle { radius: 7 };
-          c.radius;
+          return c.radius;
         }
       }
     

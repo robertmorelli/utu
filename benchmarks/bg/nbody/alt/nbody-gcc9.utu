@@ -30,12 +30,12 @@ struct System:
     | rz: Array[F64]
     | w: Array[F64]
 
-fn pi() F64 { 3.141592653589793 }
-fn solar_mass() F64 { 4.0 * pi() * pi() }
-fn days_per_year() F64 { 365.24 }
+fn pi() F64 { return 3.141592653589793 }
+fn solar_mass() F64 { return 4.0 * pi() * pi() }
+fn days_per_year() F64 { return 365.24 }
 
 fn body(x: F64, y: F64, z: F64, vx: F64, vy: F64, vz: F64, mass: F64) Body {
-    &{
+    return &{
         x: x,
         y: y,
         z: z,
@@ -73,7 +73,7 @@ fn create() System {
     bodies[0].vy = py * k
     bodies[0].vz = pz * k
     let pairs = bodies.len() * (bodies.len() - 1) / 2
-    &{
+    return &{
         bodies: bodies,
         rx: Array[F64].new(pairs, 0.0),
         ry: Array[F64].new(pairs, 0.0),
@@ -88,7 +88,7 @@ fn rsqrt(s: F64) F64 {
     let one: F32 = 1.0
     let x = (one / F32.sqrt(s.f32())).f64()
     let y = s * x * x
-    x * (y * 0.375 * y - (y * 1.25 - 1.875))
+    return x * (y * 0.375 * y - (y * 1.25 - 1.875))
 }
 
 // r and w = 1/|r| for the pairs (i, j), j < i, in C's order.
@@ -130,7 +130,7 @@ fn energy(s: System) F64 {
             k += 1
         }
     }
-    e
+    return e
 }
 
 fn advance(s: System, n: I32, dt: F64) Void {
@@ -174,7 +174,7 @@ fn advance(s: System, n: I32, dt: F64) Void {
 
 // ---- output: FNV-1a over the bytes of "%.9f\n"
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 // x rounded to nanos, then its digits.
 fn fnv_fixed9(h0: I32, x: F64) I32 {
@@ -195,7 +195,7 @@ fn fnv_fixed9(h0: I32, x: F64) I32 {
         h = fnv(h, 48 + (frac / d % 10).i32())
         d = d / 10
     }
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 test "nbody prints BG's energies" {
@@ -211,6 +211,6 @@ lib {
         let s = create()
         let h = fnv_fixed9(-2128831035, energy(s))
         advance(s, n, 0.01)
-        fnv_fixed9(h, energy(s))
+        return fnv_fixed9(h, energy(s))
     }
 }

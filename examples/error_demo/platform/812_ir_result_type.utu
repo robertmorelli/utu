@@ -1,8 +1,6 @@
 // What: @ir giving an i64 where the function returns I32
 // Expect: @ir gives i64, not I32
-fn twice(a: I64) I32 {
-    @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \/;
-}
+fn twice(a: I64) I32 => @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \/;
 
 main {
     console.log(twice(3));

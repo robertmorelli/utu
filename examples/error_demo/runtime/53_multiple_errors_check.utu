@@ -1,6 +1,6 @@
 // What: `utu check` on a file with three independent errors
 // Expect: all three, in file order, with a count at the end
-fn add(a: I32, b: I32) I32 { a + b; }
+fn add(a: I32, b: I32) I32 { return a + b; }
 
 main {
     let s: Str = 5;

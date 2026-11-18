@@ -47,13 +47,13 @@ fn decl_syntax(d: I32) I32 => if d < 0 { -1 } else { decl_node[d] }
 /// Type `i` of the module.
 fn type_syntax(i: I32) I32 {
     let t = type_order[i]
-    if blame_ht_decl[t] >= 0 { decl_syntax(blame_ht_decl[t]) } else { ht_src[t] }
+    return if blame_ht_decl[t] >= 0 { decl_syntax(blame_ht_decl[t]) } else { ht_src[t] }
 }
 
 /// Function `i` of the module (imports first).
 fn func_syntax(i: I32) I32 {
     let f = func_order[i]
-    if blame_func_decl[f] >= 0 { decl_syntax(blame_func_decl[f]) } else { func_src[f] }
+    return if blame_func_decl[f] >= 0 { decl_syntax(blame_func_decl[f]) } else { func_src[f] }
 }
 
 /// Function `i`: 0 defined, 1 imported, 2 a helper the compiler made (data.utu), 3 `@wat`.
@@ -62,7 +62,7 @@ fn func_role(i: I32) I32 {
     if func_kind[f] == FuncKind.Import.i32() { return 1 }
     if func_code[f] >= 0 { return 3 }
     for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == f { return 2 } }
-    0
+    return 0
 }
 
 /// Function `i`'s name (as the name section has it): its UTF-8 bytes, a code unit each; "" for none.
@@ -71,19 +71,19 @@ fn func_name_text(i: I32) Str {
     if n < 0 { return "" }
     let codes = Array[I32].new(name_len[n], 0)
     for (0 ..< name_len[n]) |k| { codes[k] = names[name_start[n] + k] }
-    Str.from_codes(codes, name_len[n])
+    return Str.from_codes(codes, name_len[n])
 }
 
 /// Global `i` of the module (imports first).
 fn glob_syntax(i: I32) I32 {
     let g = glob_order[i]
-    if blame_glob_decl[g] >= 0 { decl_syntax(blame_glob_decl[g]) } else { glob_src[g] }
+    return if blame_glob_decl[g] >= 0 { decl_syntax(blame_glob_decl[g]) } else { glob_src[g] }
 }
 
 /// Memory `i` of the module (imports first).
 fn memory_syntax(i: I32) I32 {
     for (0 ..< memory_kind.len()) |m| { if memory_index[m] == i { return decl_syntax(blame_mem_decl[m]) } }
-    -1
+    return -1
 }
 
 /// The declaration a node is in: the outermost one, short of a module or
@@ -100,7 +100,7 @@ fn outer_decl(node: I32) I32 {
             or k == Node.Bench_decl.i32() or k == Node.Measure_decl.i32() { found = n }
         n = parent_of(n)
     }
-    found
+    return found
 }
 
 /// A declaration's name, as written (its first part, or a struct's or enum's
@@ -118,5 +118,5 @@ fn decl_label(node: I32) Str {
     let end_ = tok_end[node_last[c] - 1]
     // A long first part (a `using` list) is cut short.
     if end_ - start > 60 { return bytes_text(start, start + 60) + "…" }
-    bytes_text(start, end_)
+    return bytes_text(start, end_)
 }

@@ -65,7 +65,7 @@ fn reset_closures() Void {
 /// parameter, or a name a capture, arm, or `catch` binds.
 fn is_local_decl(d: I32) Bool {
     let k = decl_kind[d]
-    k == Decl.Local.i32() or k == Decl.Param.i32() or k == Decl.SelfParam.i32() or k == Decl.Capture.i32()
+    return k == Decl.Local.i32() or k == Decl.Param.i32() or k == Decl.SelfParam.i32() or k == Decl.Capture.i32()
         or k == Decl.ClosureParam.i32() or k == Decl.ArmBinding.i32() or k == Decl.Promoted.i32() or k == Decl.Caught.i32()
 }
 
@@ -82,7 +82,7 @@ fn captures_of(closure: I32) I32 {
     collect_captures(closure)
     mark_inside(closure, false)
     for (m ..< vl_pending.len()) |i| { cap_seen[vl_pending[i]] = 0 }
-    vl_end(m)
+    return vl_end(m)
 }
 
 /// Set @cap_inside (to 1 when `v`) for `node` and every node under it.
@@ -138,7 +138,7 @@ fn has_closure(node: I32) Bool {
         for (0 ..< node_kind.len()) |n| { closure_below[n] = 0 }
         for (0 ..< file_root.len()) |f| { if file_root[f] >= 0 { mark_closures_below(file_root[f]) } }
     }
-    closure_below[node] == 1
+    return closure_below[node] == 1
 }
 
 fn mark_closures_below(node: I32) Bool {
@@ -149,7 +149,7 @@ fn mark_closures_below(node: I32) Bool {
         c = node_next[c]
     }
     if found { closure_below[node] = 1 }
-    found
+    return found
 }
 
 /// Mark in @decl_boxed the variables of function body `body` that closures
@@ -200,7 +200,7 @@ fn assigned_after_capture(d: I32, closure: I32, node: I32) Bool {
         if assigned_after_capture(d, closure, c) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Whether `write`, to variable d, can be seen by `closure`, which captured d.
@@ -222,7 +222,7 @@ fn write_seen(d: I32, closure: I32, write: I32) Bool {
         if (is_kind(p, Node.For_expr) or is_kind(p, Node.While_expr) or is_kind(p, Node.Loop_match_expr) or is_kind(p, Node.Iterator_expr)) and node_contains(p, write) { return true }
         p = parent_of(p)
     }
-    false
+    return false
 }
 
 /// Whether a closure literal spells its whole type: each parameter's and its result's.
@@ -233,7 +233,7 @@ fn fully_typed(closure: I32) Bool {
         if next_sibling(first_child(p)) < 0 { return false }
         p = next_sibling(p)
     }
-    child_of_kind(closure, Node.Return_type) >= 0
+    return child_of_kind(closure, Node.Return_type) >= 0
 }
 
 /// The first name under `node` that refers to `d`, or -1.
@@ -245,12 +245,12 @@ fn self_use(node: I32, d: I32) I32 {
         if u >= 0 { return u }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// Whether node `outer` spans node `inner`.
 fn node_contains(outer: I32, inner: I32) Bool {
-    inner >= 0 and node_first[outer] <= node_first[inner] and node_last[inner] <= node_last[outer]
+    return inner >= 0 and node_first[outer] <= node_first[inner] and node_last[inner] <= node_last[outer]
 }
 
 /// The box struct of a value type: one mutable field.
@@ -265,7 +265,7 @@ fn box_type(vt: I32) I32 {
     struct_field(h, storage(vt), true)
     box_types.push(vt)
     box_types.push(h)
-    h
+    return h
 }
 
 /// Store the value on the stack (since `m`) as declaration `d`'s: in its
@@ -378,7 +378,7 @@ fn box_params(decls: I32, params: I32) I32 {
     }
     if not any { return -1 }
     w_node(Op.Seq, vt_none, 0, 0, m)
-    w_pop()
+    return w_pop()
 }
 
 //! = Setting the enclosing function aside
@@ -421,7 +421,7 @@ fn hide_loops() I32 {
         saved_loops.push(loop_break_defers[i])
     }
     clear_loops()
-    at
+    return at
 }
 
 /// Bring back the loops @hide_loops set aside at `at`.
@@ -472,7 +472,7 @@ vec env_types: I32
 
 fn same_fields(t: I32, vts: Array[I32]) Bool {
     for (0 ..< vts.len()) |k| { if field_storage(t, k) != vts[k] { return false } }
-    true
+    return true
 }
 
 /// The environment struct of fields `vts`.
@@ -484,7 +484,7 @@ fn env_type(vts: Array[I32]) I32 {
     let env = struct_type(-1, false)
     for (vts) |vt| { struct_field(env, vt, false) }
     env_types.push(env)
-    env
+    return env
 }
 
 fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
@@ -600,22 +600,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     // (A `return` in the body settled an unwritten result.)
     if result < 0 and lcx.result >= 0 {
         result = lcx.result
-        // A body that never completes was typed before the result was known: nothing is left on the stack.
-        if ty_is(actual, Ty.Never) { w_leaf(Op.Unreachable, vt_unreachable, 0, 0) }
         coerce(actual, result, body_node)
     }
     else if result < 0 { result = if ty_is(actual, Ty.Never) { ty_void() } else { actual } }
-    else if ty_is(result, Ty.Void) {
-        // A closure that says nothing of its result, where `cl(…) Void` is
-        // expected, ends without a value (with `void` written, a value is dropped).
-        if ret_node < 0 and not ty_is(actual, Ty.Void) and not ty_is(actual, Ty.Never) and not ty_is(actual, Ty.Error) {
-            let before = diag_kind.len()
-            mismatch(body_node, result, actual)
-            // Of the type expected, the closure is then mistaken in consequence.
-            if ret_node < 0 and expected >= 0 { fold_into(mismatch_since(before, body_node)) }
-        }
-        drop_value(actual)
-    }
+    else if ty_is(result, Ty.Void) { drop_value(actual) }
     else { coerce(actual, result, body_node) }
     w_node(Op.Seq, repr(result), 0, 0, mbody)
     let f = new_func(FuncKind.Defined, func_type(wasm_params, vl_of_result(repr(result))))
@@ -629,6 +617,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     closure_bodies.push(env_local)
     func_debug_name[f] = name_add("closure")
     func_body[f] = w_pop()
+    elide_tail_return(func_body[f], repr(result))
     record_locals(f, cur_params[0])
     restore_function()
     // The enclosing function's view of the captures again.
@@ -649,7 +638,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     let t = ty(Ty.Closure, types_list(ptypes, n), result)
     w_i32((if single { 2 } else { 0 }) + closure_bits(ty_a[t], result))
     w_node(Op.Call, vt_externref, closure_new(), 0, m)
-    t
+    return t
 }
 
 /// Whether a value type is a reference to a struct or an array (an `anyref`,
@@ -657,14 +646,14 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
 fn gc_ref(vt: I32) Bool {
     if vt < vt_defined or vt >= vt_tuple { return false }
     let kind = ht_kind[(vt - vt_defined) / 2]
-    kind == Heap.Struct.i32() or kind == Heap.Array.i32()
+    return kind == Heap.Struct.i32() or kind == Heap.Array.i32()
 }
 
 /// The first `n` of `ts`, as a list.
 fn types_list(ts: Array[I32], n: I32) I32 {
     let m = vl_begin()
     for (0 ..< n) |k| { vl_add(ts[k]) }
-    vl_end(m)
+    return vl_end(m)
 }
 
 /// The type a closure literal's annotations give it, when they give all of
@@ -694,7 +683,7 @@ fn closure_syntax_type(node: I32, inst: I32) I32 {
         vl_pending.resize(m)
         return ty_error()
     }
-    ty(Ty.Closure, vl_end(m), result)
+    return ty(Ty.Closure, vl_end(m), result)
 }
 
 /// `(fn: funcref, env: anyref, flags: i32) → externref`: a closure, made by
@@ -728,7 +717,7 @@ fn closure_new() I32 {
     w_node(Op.ExternConvertAny, vt_extern, 0, 0, mr)
     w_node(Op.Call, vt_externref, closure_new_func[0], 0, mc)
     func_body[f] = w_pop()
-    f
+    return f
 }
 
 /// The struct a closure's record is: its funcref and its environment.
@@ -738,7 +727,7 @@ fn closure_record() I32 {
     struct_field(h, vt_funcref, false)
     struct_field(h, vt_anyref, false)
     closure_parts[1] = h
-    h
+    return h
 }
 
 /// The import that calls closures of a signature: (closure, params…) → result.
@@ -756,7 +745,7 @@ fn closure_call(t: I32) I32 {
     let f = add_import_func(name_add("utu"), name_add("closure_call_" + (closure_calls.len() / 2).str()), ft)
     closure_calls.push(ft)
     closure_calls.push(f)
-    f
+    return f
 }
 
 /// A call of a closure value: the closure, the arguments, then its invoker.
@@ -766,7 +755,7 @@ fn call_closure(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         return error_since(m)
     }
     w_node(Op.Call, repr(ty_b[t]), closure_invoker(t), 0, m)
-    ty_b[t]
+    return ty_b[t]
 }
 
 /// `utu.closure_rec(closure: externref) → externref`: the record
@@ -775,7 +764,7 @@ fn closure_rec() I32 {
     if closure_parts[0] >= 0 { return closure_parts[0] }
     let f = add_import_func(name_add("utu"), name_add("closure_rec"), func_type(vl_one(vt_externref), vl_one(vt_externref)))
     closure_parts[0] = f
-    f
+    return f
 }
 
 /// The function that calls closures of signature `t`, (closure, params…) →
@@ -834,7 +823,7 @@ fn closure_invoker(t: I32) I32 {
     w_node(Op.Call, rvt, js, 0, mj)
     w_node(Op.Seq, rvt, 0, 0, m)
     func_body[f] = w_pop()
-    f
+    return f
 }
 
 /// In @closure_invoker: when the body is of function type `sig`, return its
@@ -952,7 +941,7 @@ fn named_fn(written: I32) I32 {
     while (is_kind(arg, Node.Paren_expr)) { arg = first_child(arg) }
     if not is_kind(arg, Node.Identifier) { return -1 }
     let d = node_decl[arg]
-    if d >= 0 and decl_is(d, Decl.Fn) { d } else { -1 }
+    return if d >= 0 and decl_is(d, Decl.Fn) { d } else { -1 }
 }
 
 /// The arguments of a call of function `decl` (-1: a host function's), from
@@ -989,7 +978,7 @@ fn to_host(decl: I32, p: I32) Bool {
         let dsl = only >= 0 and next_sibling(only) < 0 and is_kind(only, Node.Dsl_expr)
         param_to_host[p] = if dsl or passes_to_es(body, p) { 1 } else { 2 }
     }
-    param_to_host[p] == 1
+    return param_to_host[p] == 1
 }
 
 /// Whether, under `node`, an `@es` function is called with `p` as an argument.
@@ -1011,7 +1000,7 @@ fn passes_to_es(node: I32, p: I32) Bool {
         if passes_to_es(c, p) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// The first `await` under `node`, or call of a function by name that may
@@ -1029,7 +1018,7 @@ fn awaits_in(node: I32) I32 {
         if at >= 0 { return at }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// Whether function `decl` may await (see @decl_awaits).
@@ -1043,7 +1032,7 @@ fn fn_awaits(decl: I32) Bool {
         decl_awaits[decl] = 3
         decl_awaits[decl] = if awaits_in(fn_body(decl)) >= 0 { 1 } else { 2 }
     }
-    decl_awaits[decl] == 1
+    return decl_awaits[decl] == 1
 }
 
 //! = Small builds that never await
@@ -1173,7 +1162,7 @@ fn closures_recur(helper_: I32) Bool {
         if recur_reaches(recur_pairs[p + 1], recur_pairs[p]) { return true }
         p += 2
     }
-    false
+    return false
 }
 
 /// Whether function `from` calls `to`, itself or through others (by
@@ -1198,7 +1187,7 @@ fn recur_reaches(from: I32, to: I32) Bool {
             }
         }
     }
-    false
+    return false
 }
 
 /// @closures_recur's calls of function `f`: what it calls by name, and the
@@ -1280,5 +1269,5 @@ fn closure_call_of(ft: I32) I32 {
         if closure_calls[i] == ft { return closure_calls[i + 1] }
         i += 2
     }
-    -1
+    return -1
 }

@@ -7,7 +7,7 @@ struct User:
     | session: ?Session
 
 fn online(u: User) Bool {
-    if u.session.active { true; } else { false; };
+    return if u.session.active { true; } else { false; };
 }
 
 main {

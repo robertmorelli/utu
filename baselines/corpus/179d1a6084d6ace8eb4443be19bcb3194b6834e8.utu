@@ -1,18 +1,18 @@
 
       struct Pt:
         | x : I32
-      fn consume(p: Pt) I32 { p.x; }
-      fn invoke(f: fun(I32) I32) I32 { f(true); }
-      fn wrong(x: Bool) Bool { x; }
+      fn consume(p: Pt) I32 { return p.x; }
+      fn invoke(f: fun(I32) I32) I32 { return f(true); }
+      fn wrong(x: Bool) Bool { return x; }
       lib {
         fn explicit_return() I32 { return 1; }
-        fn bad_assert() I32 { assert 1; 0; }
+        fn bad_assert() I32 { assert 1; return 0; }
         fn closure_assignment() I32 {
-          let f: cl(I32) I32 = cl(x) { x; };
-          f = cl(y) { y; };
-          f(1);
+          let f: cl(I32) I32 = cl(x) { return x; };
+          f = cl(y) { return y; };
+          return f(1);
         }
-        fn implicit_argument() I32 { consume(&{ x: 1 }); }
-        fn bad_decay() I32 { let f: cl(I32) I32 = wrong; 0; }
+        fn implicit_argument() I32 { return consume(&{ x: 1 }); }
+        fn bad_decay() I32 { let f: cl(I32) I32 = wrong; return 0; }
       }
     

@@ -6,9 +6,9 @@ proto Shape:
 struct Circle[Shape]:
     | r: F64
 
-fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+fn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }
 
-fn big(s: Shape) F64 { s.area(2.0); }
+fn big(s: Shape) F64 { return s.area(2.0); }
 
 main { console.log(big(Circle { r: 1.0 }).i32()); }
 using console from std:Console

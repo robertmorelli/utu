@@ -1,7 +1,7 @@
 // What: a closure names itself before its type is known
 // Expect: f needs a type annotation to call itself
 main {
-    let f = cl() { f(); };
+    let f = cl() { return f(); };
     f();
     console.log(1);
 }

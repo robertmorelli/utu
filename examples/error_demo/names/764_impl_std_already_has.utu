@@ -3,7 +3,7 @@
 using Ord from std:Ord;
 using Order from std:Ord;
 
-fn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }
+fn Ord[Str].cmp |a| (b: Str) I32 { return a.len() - b.len(); }
 
 main {
     console.log(Order[Str].max_of(["aaaa", "b", "cc"]));

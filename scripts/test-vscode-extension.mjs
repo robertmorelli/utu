@@ -66,15 +66,15 @@ try {
   const references = await providers.references.provideReferences(document, document.positionAt(source.indexOf('x +')), { includeDeclaration: true });
   if (references.length !== 2) throw new Error(`find references returned ${references.length} entries instead of 2`);
   // Diagnostics from the self-hosted compiler: stage 0's kinds, located in the file.
-  const broken = makeDocument(vscode.Uri.parse('file:///broken.utu'), 'lib { fn run() I32 { let x: I32 = "no"; x + missing; } }');
+  const broken = makeDocument(vscode.Uri.parse('file:///broken.utu'), 'lib { fn run() I32 { let x: I32 = "no"; return x + missing; } }');
   globalThis.__utuVscodeStub.textDocuments.push(broken);
   const found = await api.compiler.diagnostics(broken);
   const summary = found.map(d => `${d.code} ${d.primary.start}-${d.primary.end}`).sort().join(', ');
-  if (summary !== 'type-mismatch 34-38, unknown-variable 44-51') throw new Error(`diagnostics were ${summary}`);
+  if (summary !== 'type-mismatch 34-38, unknown-variable 51-58') throw new Error(`diagnostics were ${summary}`);
   const hierarchy = await providers.calls.prepareCallHierarchy(document, document.positionAt(source.indexOf('main')));
   if (hierarchy?.name !== 'main') throw new Error('call hierarchy did not resolve main');
   // Inferred types, calls both ways, and the views, from the self-hosted compiler.
-  const callsSource = 'fn twice(n: I32) I32 { n * 2; }\nlib { fn run() I32 { let y = twice(20); y + 2; } }';
+  const callsSource = 'fn twice(n: I32) I32 { return n * 2; }\nlib { fn run() I32 { let y = twice(20); return y + 2; } }';
   const callsDocument = makeDocument(vscode.Uri.parse('file:///calls.utu'), callsSource);
   globalThis.__utuVscodeStub.textDocuments.push(callsDocument);
   const whole = new vscode.Range(callsDocument.positionAt(0), callsDocument.positionAt(callsSource.length));

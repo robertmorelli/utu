@@ -12,13 +12,13 @@ using SegmentTree from std:SegmentTree
 using PersistentSegmentTree from std:PersistentSegmentTree
 
 fn add(a: I32, b: I32) I32 {
-    a + b
+    return a + b
 }
 
 fn example() I32 {
     let sums = SegmentTree[I32].new([2, 3, 5, 7], 0, add)
     sums.set(1, 10, add)
-    sums.query(1, 3, add) // 15
+    return sums.query(1, 3, add) // 15
 }
 ```
 
@@ -54,7 +54,7 @@ implementation fields.
 fn versions() I32 {
     let before = PersistentSegmentTree[I32].new([2, 3, 5], 0, add)
     let after = before.set(1, 10, add)
-    before.query(0, 3, add) * 100 + after.query(0, 3, add) // 10, 17: 1017
+    return before.query(0, 3, add) * 100 + after.query(0, 3, add) // 10, 17: 1017
 }
 ```
 

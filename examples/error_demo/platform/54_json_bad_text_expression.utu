@@ -5,7 +5,7 @@ struct User:
     | age: I32
 
 fn load(parts: Array[Str]) ?User {
-    @json/\ decode User parts[0] + \/;
+    return @json/\ decode User parts[0] + \/;
 }
 
 main {

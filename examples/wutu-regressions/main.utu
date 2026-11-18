@@ -8,7 +8,7 @@ mem ticks: I32
 struct Reader:
     | k: I32
 
-fn Reader.read |self| () I32 { ticks[0] + self.k }
+fn Reader.read |self| () I32 { return ticks[0] + self.k }
 
 struct Row:
     | id: Str
@@ -29,14 +29,14 @@ struct State:
     | picks: Array[Str]
 
 fn cell(label: Str) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     span.cell { = label }
     \/
 }
 
 /// Takes another component: it lands inside, not beside.
 fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     figure { header { "Title" } = body }
     \/
 }
@@ -44,27 +44,27 @@ fn framed(body: Browser.HTMLElement) Browser.HTMLElement {
 /// Reused unless what it reads changes: a method that reads a mem does.
 fn byMethod(label: Str) Browser.HTMLElement {
     let r = Reader { k: 0 }
-    @wutu/\
+    return @wutu/\
     span#method { = label + r.read().str() }
     \/
 }
 
 /// The clock is new each time: never reused.
 fn byClock(label: Str) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     span#clock { = label + time.now().str() }
     \/
 }
 
 fn beat(state: State) Browser.HTMLElement {
     wutu.interval("beat", 20.0, cl() Void { state.beats += 1 })
-    @wutu/\
+    return @wutu/\
     p#beat { "beating" }
     \/
 }
 
 fn icon(state: State) Browser.SVGElement {
-    @wutu/\
+    return @wutu/\
     @reactive
     svg { viewBox = "0 0 10 10"; circle { r = state.n.str() } use#ns { xlink:href = "#c" + state.n.str(); xml:space = "preserve" } }
     \/

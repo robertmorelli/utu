@@ -2,8 +2,9 @@
 // (wutu.js) and the formatter (wutu-tooling.js); it never touches the IR.
 //
 // Node kinds:
+//   { kind: 'fragment', children }                 zero or multiple roots / root control flow
 //   { kind: 'text', expr }                         "literal";
-//   { kind: 'expression', expr, range }            = expr;  or  $[expr];
+//   { kind: 'expression', expr, range, sigil? }    = expr; | value; |> code;
 //   { kind: 'if', condition, conditionRange, children, otherwise, elseIf }
 //   { kind: 'for', iterable, iterableRange, captures, key, keyRange, globalKey, children }
 //   { kind: 'element', tag, classes, binding, attrs, events, twoWay, css, children }
@@ -370,6 +371,7 @@ class WutuParser {
     if (c === '.') return /[a-z_]/.test(next) && !/^\.[\w-]+[ \t]*=(?!=)/.test(text.slice(j, j + 200));
     if (c === '?') return next === '.';
     if (c === '=') return next === '=';
+    if (c === '|') return false;
     if (c === '{') return true;
     if ('+*/%<>|^~!'.includes(c)) return true;
     const word = /^[a-z]\w*/.exec(text.slice(j, j + 40))?.[0];
@@ -486,7 +488,7 @@ class WutuParser {
   }
 
   /** A brace-delimited Utu block, returned with its braces. */
-  readUtuBlock() {
+  readUtuBlock(context = 'event handler') {
     const start = this.p;
     let depth = 0;
     do {
@@ -496,7 +498,7 @@ class WutuParser {
       else if (c === '}') depth--;
       this.p++;
     } while (!this.done && depth > 0);
-    if (depth) this.fail('unterminated event handler', start);
+    if (depth) this.fail('unterminated ' + context, start);
     return { source: this.text.slice(start, this.p), range: { start, end: this.p } };
   }
 
@@ -614,10 +616,14 @@ class WutuParser {
       global.push(this.readCssBlock());
       this.skipTrivia();
     }
-    const root = this.parseNode();
-    if (root.kind !== 'element') this.fail('root must be an element', root.start);
-    this.skipTrivia();
-    if (!this.done) this.fail('expected exactly one root element; use a component for siblings');
+    const children = [];
+    while (!this.done) {
+      if (this.text[this.p] === ';') { this.p++; this.skipTrivia(); continue; }
+      children.push(this.parseNode());
+      this.skipTrivia();
+    }
+    const root = children.length === 1 && children[0].kind === 'element'
+      ? children[0] : { kind: 'fragment', children };
     return { root, global, reactive, scope, styleUses };
   }
 
@@ -631,11 +637,12 @@ class WutuParser {
       return { kind: 'text', expr, start };
     }
     if (this.at('$[')) this.failInterpolation();
-    if (this.text[this.p] === '=') {
-      this.p++;
+    if (this.text[this.p] === '=' || this.text[this.p] === '|') {
+      const sigil = this.at('|>') ? '|>' : this.text[this.p];
+      this.p += sigil.length;
       const { source, range } = this.readBareExpression();
       this.expectEnd();
-      return { kind: 'expression', expr: source, range, start };
+      return { kind: 'expression', expr: source, range, start, ...(sigil === '=' ? {} : { sigil }) };
     }
     if (this.peek(/if\s/y)) return this.parseIf();
     if (this.peek(/for\s/y)) return this.parseFor();
@@ -768,7 +775,7 @@ class WutuParser {
       this.p++;
     } else if (this.at('$[')) {
       this.failInterpolation();
-    } else if (c === '"' || c === '=' || this.peek(/(if|for)\s/y)) {
+    } else if (c === '"' || c === '=' || c === '|' || this.peek(/(if|for)\s/y)) {
       node.children.push(this.parseNode());
     } else if ((match = this.peek(/bind:(value|checked|number|group|values|files)\s*=/y))) {
       const start = this.p;
@@ -944,14 +951,13 @@ class WutuParser {
     this.p++;
     this.skipTrivia();
     if (this.at('$[')) this.failInterpolation();
-    if (this.text[this.p] === '=') {
-      // `width: = expression;` — a value computed at render time, applied
-      // with style.setProperty (allowed under a strict style-src policy).
-      this.p++;
-      const expression = this.readBareExpression();
+    if (this.text[this.p] === '=' || this.text[this.p] === '{') {
+      const block = this.text[this.p] === '{';
+      if (!block) this.p++;
+      const expression = block ? this.readUtuBlock('computed CSS value') : this.readBareExpression();
       this.expectEnd();
       this.cssPropertyKnown(head, start);
-      node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start });
+      node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start, ...(block ? { block: true } : {}) });
       return;
     }
     const valueFrom = this.p;

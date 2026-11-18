@@ -2,7 +2,7 @@
       using Array from std:Array;
       lib {
         fn make_arr() Array[I32] {
-          Array[I32].new(10, 0);
+          return Array[I32].new(10, 0);
         }
       }
     

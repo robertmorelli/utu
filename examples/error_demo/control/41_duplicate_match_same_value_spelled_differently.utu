@@ -1,7 +1,7 @@
 // What: two integer patterns with the same value written differently (16 and 0x10).
 // Expect: Duplicate match pattern '0x10' (same value as 16)
 fn name(n: I32) Str {
-    match n {
+    return match n {
         16 => "sixteen",
         0x10 => "hex sixteen",
         ~> "other",

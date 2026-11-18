@@ -6,7 +6,7 @@ struct Node:
 
 fn has_big_next(head: Node) Bool {
     if head.next?.count > 10 { return true; };
-    false;
+    return false;
 }
 
 main { console.log(if has_big_next(Node { count: 1, next: null }) { 1; } else { 0; }); }

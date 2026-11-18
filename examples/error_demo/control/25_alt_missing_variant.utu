@@ -6,7 +6,7 @@ enum Shape:
     | Dot {}
 
 fn area(shape: Shape) F64 {
-    alt shape {
+    return alt shape {
         Circle |c| => 3.0 * c.r * c.r,
         Rect |r| => r.w * r.h,
     };

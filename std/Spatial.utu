@@ -14,7 +14,7 @@ mod Spatial {
     }
 
     fn point(x: F64, y: F64, id: I32) Point {
-        Point { x: x, y: y, id: id }
+        return Point { x: x, y: y, id: id }
     }
 
     struct Node:
@@ -43,7 +43,7 @@ mod Spatial {
             index.i64().i32() != best
         } collect(Point)
         let mid = rest.len() / 2
-        Node {
+        return Node {
             point: points[best],
             left: build(rest.slice(0, mid)),
             right: build(rest.slice(mid, rest.len())),
@@ -62,7 +62,7 @@ mod Spatial {
         } sort(Point) |a, b| {
             a.x < b.x or (a.x == b.x and a.id < b.id)
         }
-        &{ root: build(copied) }
+        return &{ root: build(copied) }
     }
 
     fn rectangle(node: ?Node, min_x: F64, max_x: F64, min_y: F64, max_y: F64, out: Buffer[I32]) Void {
@@ -89,7 +89,7 @@ mod Spatial {
         if min_x > max_x or min_y > max_y { fatal }
         let out = Buffer[I32].new()
         rectangle(self.root, min_x, max_x, min_y, max_y, out)
-        out.finish()
+        return out.finish()
     }
 
     // Three-sided reporting: inclusive x interval, y <= ceiling.
@@ -114,7 +114,7 @@ mod Spatial {
         if min_x > max_x { fatal }
         let out = Buffer[I32].new()
         below_node(self.root, min_x, max_x, ceiling, out)
-        out.finish()
+        return out.finish()
     }
 
     fn box_distance(node: Node, x: F64, y: F64) F64 {
@@ -124,7 +124,7 @@ mod Spatial {
         let dy = if y < node.min_y { node.min_y - y } else {
             if y > node.max_y { y - node.max_y } else { 0.0 }
         }
-        dx * dx + dy * dy
+        return dx * dx + dy * dy
     }
 
     fn radius_node(node: ?Node, x: F64, y: F64, squared: F64, out: Buffer[I32]) Void {
@@ -148,7 +148,7 @@ mod Spatial {
         if radius < 0.0 { fatal }
         let out = Buffer[I32].new()
         radius_node(self.root, x, y, radius * radius, out)
-        out.finish()
+        return out.finish()
     }
 
     struct Nearest:
@@ -176,7 +176,7 @@ mod Spatial {
     fn &.nearest |self| (x: F64, y: F64) ?Found[I32] {
         check_coordinate(x)
         check_coordinate(y)
-        promote self.root {
+        return promote self.root {
             |root| => {
                 let dx = root.point.x - x
                 let dy = root.point.y - y

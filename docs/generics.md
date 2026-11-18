@@ -10,9 +10,9 @@ mod Stack[T] {
     struct &:
         | items: Array[T]
         | size: I32
-    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 } }
+    fn &.new(fill: T) & { return &{ items: Array[T].new(16, fill), size: 0 } }
     fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1 }
-    fn &.pop |s| () T { s.size -= 1; s.items[s.size] }
+    fn &.pop |s| () T { s.size -= 1; return s.items[s.size] }
 }
 
 let nums: Stack[I32] = Stack[I32].new(0)
@@ -33,7 +33,7 @@ using Buffer from std:Buffer
 mod Stash[T] {
     let items: Buffer[T] = Buffer[T].new()
     fn add(x: T) Void { items.push(x) }
-    fn size() I32 { items.len() }
+    fn size() I32 { return items.len() }
 }
 
 main {
@@ -92,15 +92,15 @@ struct Version[Ord]:
     | minor: I32
 
 fn Ord[Version].cmp |a| (b: Version) I32 {
-    if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
+    return if a.major != b.major { a.major - b.major } else { a.minor - b.minor }
 }
-fn Ord[I32].cmp |a| (b: I32) I32 { a - b }
+fn Ord[I32].cmp |a| (b: I32) I32 { return a - b }
 
 mod Largest[T[Ord]] {
     fn of(xs: Array[T]) T {
         let best = xs[0]
         for (xs) |x| { if x.cmp(best) > 0 { best = x } }
-        best
+        return best
     }
 }
 
@@ -157,8 +157,8 @@ binds it to that argument's type, and the other parameters and the result
 write `T`; `Array[$T]`, `?$T`, and `cl($T) $U` bind from inside a type.
 
 ```utu
-fn max(a: $T, b: T) T { if a > b { a; } else { b; }; }
-fn first(xs: Array[$T]) T { xs[0]; }
+fn max(a: $T, b: T) T { return if a > b { a; } else { b; }; }
+fn first(xs: Array[$T]) T { return xs[0]; }
 
 max(3, 7)           // max[I32]
 max(1, big)         // big: I64. A literal waits for an argument that is not one: max[I64]

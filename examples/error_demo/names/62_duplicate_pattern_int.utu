@@ -1,7 +1,7 @@
 // What: a match on an integer lists one value twice
 // Expect: Duplicate match pattern '2'
 fn name(n: I32) Str {
-    match n {
+    return match n {
         1 => "one",
         2 => "two",
         2 => "deux",

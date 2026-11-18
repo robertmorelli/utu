@@ -66,7 +66,7 @@ fn expand_dsl_round() Bool {
         expanded = true
         guard += 1
     }
-    found or expanded
+    return found or expanded
 }
 
 /// Expands the program's sites of DSL `a` or `b` (words; -1 for none) among
@@ -85,7 +85,7 @@ fn expand_each(a: I32, b: I32, end_: I32) Bool {
         }
         k += 1
     }
-    any
+    return any
 }
 
 /// Expands one site of DSL `name` (`utu`, `css`, `stored`, `wutu`); a
@@ -114,7 +114,7 @@ fn own_sites() I32 => kept[5]
 fn dsl_in_program(node: I32) Bool {
     let file = file_of_token(node_first[node])
     let origin = dsl_site_of(node)
-    (is_own_file(file) or origin >= 0 and dsl_in_program(origin)) and not dsl_has_failed(node)
+    return (is_own_file(file) or origin >= 0 and dsl_in_program(origin)) and not dsl_has_failed(node)
 }
 
 /// Sites whose expansion failed (reported): left as they are, and checked as mistakes.
@@ -122,7 +122,7 @@ vec dsl_failed: I32
 
 fn dsl_has_failed(node: I32) Bool {
     for (0 ..< dsl_failed.len()) |i| { if dsl_failed[i] == node { return true } }
-    false
+    return false
 }
 
 /// The module a node is in, or its file's root.
@@ -132,7 +132,7 @@ fn dsl_container(node: I32) I32 {
         if is_kind(p, Node.Module_decl) or is_kind(p, Node.Source_file) { return p }
         p = parent_of(p)
     }
-    file_root[file_of_token(node_first[node])]
+    return file_root[file_of_token(node_first[node])]
 }
 
 /// An html declaration includes its `html` word in the template root.
@@ -145,14 +145,14 @@ fn dsl_inner_start(site: I32) I32 {
         if dsl_html_site[i] == site { return dsl_html_start[i] }
     }
     let token = node_first[last_child(site)]
-    tok_start[token] + if tok_kind[token] == Tok.WutuBody.i32() { 1 } else { 2 }
+    return tok_start[token] + if tok_kind[token] == Tok.WutuBody.i32() { 1 } else { 2 }
 }
 
 fn dsl_inner_end(site: I32) I32 {
     let token = node_first[last_child(site)]
     let html = false
     for (0 ..< dsl_html_site.len()) |i| { if dsl_html_site[i] == site { html = true } }
-    tok_end[token] - if tok_kind[token] == Tok.WutuBody.i32() { if html { 0 } else { 1 } } else { 2 }
+    return tok_end[token] - if tok_kind[token] == Tok.WutuBody.i32() { if html { 0 } else { 1 } } else { 2 }
 }
 
 /// A site's body, as text.
@@ -194,13 +194,13 @@ vec dsl_cursor: I32 = [-1, 0, 0]
 /// The byte in src of UTF-16 offset `offset` in a site's body.
 fn dsl_byte(site: I32, offset: I32) I32 {
     dsl_walk(site, dsl_inner_end(site), offset)
-    dsl_cursor[1]
+    return dsl_cursor[1]
 }
 
 /// The UTF-16 offset in a site's body of byte `at`.
 fn dsl_units(site: I32, at: I32) I32 {
     dsl_walk(site, at, 2147483647)
-    dsl_cursor[2]
+    return dsl_cursor[2]
 }
 
 /// Moves @dsl_cursor through a site's body (from where it is, unless that
@@ -243,7 +243,7 @@ vec dsl_current_to: I32 = [-1]
 /// The site a generated node stands for, or -1.
 fn dsl_site_of(node: I32) I32 {
     let file = file_of_token(node_first[node])
-    if file < dsl_file_site.len() { dsl_file_site[file] } else { -1 }
+    return if file < dsl_file_site.len() { dsl_file_site[file] } else { -1 }
 }
 
 /// Parse `code` (an expression) and make it the site's value.
@@ -269,7 +269,7 @@ fn parse_expansion(code: Str) I32 {
     node_child[root] = -1
     node_child[block] = -1
     node_next[e] = -1
-    e
+    return e
 }
 
 /// Parse declarations and make them the container's first items.
@@ -315,7 +315,7 @@ fn parse_generated_file(code: Str) I32 {
     dsl_file_site[file] = dsl_current_site[0]
     dsl_file_from[file] = dsl_current_from[0]
     dsl_file_to[file] = dsl_current_to[0]
-    parse_file(file)
+    return parse_file(file)
 }
 
 //! = Splices
@@ -345,7 +345,7 @@ fn located_splice(site: I32, code: Str, from: I32, to: I32) Str {
     splice_code[k] = intern_text(code)
     splice_from[k] = dsl_byte(site, from)
     splice_to[k] = dsl_byte(site, to)
-    "__splice_" + int_text(k)
+    return "__splice_" + int_text(k)
 }
 
 /// The utu of `site`'s body at `offset` (`text` long), as a placeholder; -1
@@ -357,7 +357,7 @@ fn dsl_splice(site: I32, offset: I32, text: Str) Str {
     splice_end.push(start + utf8_length(text))
     splice_code.resize(k + 1)
     splice_code[k] = -1
-    "__splice_" + int_text(k)
+    return "__splice_" + int_text(k)
 }
 
 fn utf8_length(text: Str) I32 {
@@ -374,13 +374,13 @@ fn utf8_length(text: Str) I32 {
             i += 1
         }
     }
-    n
+    return n
 }
 
 /// Whether the utu at `src[start ..< end_]` parses as an expression.
 fn splice_parses(site: I32, offset: I32, text: Str) Bool {
     let start = dsl_byte(site, offset)
-    parse_span(start, start + utf8_length(text)) >= 0
+    return parse_span(start, start + utf8_length(text)) >= 0
 }
 
 /// The expression written at `src[start ..< end_]`, parsed in place, or -1.
@@ -390,7 +390,7 @@ fn parse_span(start: I32, end_: I32) I32 {
     let first = tok_kind.len()
     let last = lex(start, end_)
     src[end_] = saved
-    parse_expression(first, last)
+    return parse_expression(first, last)
 }
 
 /// Replace the placeholders under `node` with their expressions.
@@ -444,14 +444,14 @@ fn parse_located(k: I32) I32 {
     let e = parse_expansion(word_text(splice_code[k]))
     dsl_current_from[0] = -1
     if e >= 0 { fill_splices(e) }
-    e
+    return e
 }
 
 /// The number `text`'s decimal digits write.
 fn int_of(text: Str) I32 {
     let v = 0
     for (0 ..< text.len()) |i| { v = v * 10 + (text.get(i) - 48) }
-    v
+    return v
 }
 
 //! = Text
@@ -468,7 +468,7 @@ fn is_lower_code(c: I32) Bool => c >= 97 and c <= 122
 fn text_at(text: Str, at: I32, part: Str) Bool {
     if at < 0 or at + part.len() > text.len() { return false }
     for (0 ..< part.len()) |i| { if text.get(at + i) != part.get(i) { return false } }
-    true
+    return true
 }
 
 /// Where `part` first is in `text`, from `from` on, or -1 (JavaScript's
@@ -481,24 +481,24 @@ let str_index: fun(Str, Str, I32) I32 = @es/\ (t, p, f) => t.indexOf(p, f) \/
 fn skip_spaces(text: Str, i: I32) I32 {
     let j = i
     while (j < text.len() and is_space_code(text.get(j))) { j += 1 }
-    j
+    return j
 }
 
 fn trim_end(text: Str) Str {
     let n = text.len()
     while (n > 0 and is_space_code(text.get(n - 1))) { n -= 1 }
-    text.slice(0, n)
+    return text.slice(0, n)
 }
 
 fn without_spaces(text: Str) Str {
     let out = ""
     for (0 ..< text.len()) |i| { if not is_space_code(text.get(i)) { out = out + Str.from_code_point(text.get(i)) } }
-    out
+    return out
 }
 
 /// `text` with its first `find` replaced by `with`.
 fn replace_first(text: Str, find: Str, with: Str) Str {
     let at = text_index(text, find, 0)
     if at < 0 { return text }
-    text.slice(0, at) + with + text.slice(at + find.len(), text.len())
+    return text.slice(0, at) + with + text.slice(at + find.len(), text.len())
 }

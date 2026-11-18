@@ -227,15 +227,15 @@ mod sim {
         | sentinel: Entity
 
     fn imin(a: I32, b: I32) I32 {
-        if a < b { a } else { b }
+        return if a < b { a } else { b }
     }
 
     fn imax(a: I32, b: I32) I32 {
-        if a > b { a } else { b }
+        return if a > b { a } else { b }
     }
 
     fn dx(dir: I32) I32 {
-        match dir {
+        return match dir {
             1 => 1,
             3 => -1,
             ~> 0,
@@ -243,7 +243,7 @@ mod sim {
     }
 
     fn dy(dir: I32) I32 {
-        match dir {
+        return match dir {
             0 => -1,
             2 => 1,
             ~> 0,
@@ -251,15 +251,15 @@ mod sim {
     }
 
     fn is_crafter(c: I32) Bool {
-        c >= furnace_class and c <= centrifuge_class
+        return c >= furnace_class and c <= centrifuge_class
     }
 
     fn is_belt_like(c: I32) Bool {
-        c >= belt_class and c <= underground_class
+        return c >= belt_class and c <= underground_class
     }
 
     fn has_inventory(c: I32) Bool {
-        is_crafter(c) or c == chest_class or c == lab_class or c == silo_class
+        return is_crafter(c) or c == chest_class or c == lab_class or c == silo_class
     }
 
     fn class_of(name: Str) I32 {
@@ -272,13 +272,13 @@ mod sim {
                 found = i
             }
         }
-        found
+        return found
     }
 
     // ── lists ────────────────────────────────────────────────────────────────────
 
     fn list_new(sentinel: Entity) List {
-        List { items: Array[Entity].new(16, sentinel), n: 0 }
+        return List { items: Array[Entity].new(16, sentinel), n: 0 }
     }
 
     fn list_push(list: List, e: Entity) Void {
@@ -307,7 +307,7 @@ mod sim {
     fn new_entity(w: World, id: I32, machine: I32, x: I32, y: I32, dir: I32) Entity {
         let cls = w.mclass[machine]
         let none: Array[I32] = []
-        Entity {
+        return Entity {
             id: id, machine: machine, cls: cls, x: x, y: y, dir: dir,
             recipe: -1, progress: 0, busy: false, fuel: 0, burn: 0,
             heat: if machine == steel_furnace_id { 20 } else { 0 },
@@ -424,29 +424,29 @@ mod sim {
         for (game.start.recipes) |r| {
             w.recipe_unlocked[r] = 1
         }
-        w
+        return w
     }
 
     // ── queries ──────────────────────────────────────────────────────────────────
 
     fn inside(w: World, x: I32, y: I32) Bool {
-        x >= 0 and y >= 0 and x < w.width and y < w.height
+        return x >= 0 and y >= 0 and x < w.width and y < w.height
     }
 
     fn at(w: World, x: I32, y: I32) ?Entity {
-        if inside(w, x, y) { w.grid[y * w.width + x] } else { null }
+        return if inside(w, x, y) { w.grid[y * w.width + x] } else { null }
     }
 
     fn front(w: World, e: Entity, distance: I32) ?Entity {
-        at(w, e.x + dx(e.dir) * distance, e.y + dy(e.dir) * distance)
+        return at(w, e.x + dx(e.dir) * distance, e.y + dy(e.dir) * distance)
     }
 
     fn back(w: World, e: Entity, distance: I32) ?Entity {
-        at(w, e.x - dx(e.dir) * distance, e.y - dy(e.dir) * distance)
+        return at(w, e.x - dx(e.dir) * distance, e.y - dy(e.dir) * distance)
     }
 
     fn neighbor(w: World, e: Entity, side: I32) ?Entity {
-        at(w, e.x + dx(side), e.y + dy(side))
+        return at(w, e.x + dx(side), e.y + dy(side))
     }
 
     fn all_zero(counts: Array[I32]) Bool {
@@ -456,11 +456,11 @@ mod sim {
                 zero = false
             }
         }
-        zero
+        return zero
     }
 
     fn is_ore(w: World, tile: I32) Bool {
-        w.res_kind[tile] >= 0 and not w.is_fluid[w.res_kind[tile]] and w.res_amount[tile] > 0
+        return w.res_kind[tile] >= 0 and not w.is_fluid[w.res_kind[tile]] and w.res_amount[tile] > 0
     }
 
     // ── queries for views ────────────────────────────────────────────────────────
@@ -482,11 +482,11 @@ mod sim {
         if lo < all.n and all.items[lo].id == id {
             found = all.items[lo]
         }
-        found
+        return found
     }
 
     fn get_progress(w: World, id: I32) I32 {
-        promote entity(w, id) {
+        return promote entity(w, id) {
             |e| => e.progress / 1000,
             ~> 0,
         }
@@ -532,7 +532,7 @@ mod sim {
             let fy = y + dy(dir)
             return inside(w, fx, fy) and w.water[fy * w.width + fx] == 1
         }
-        true
+        return true
     }
 
     fn place(w: World, machine: I32, x: I32, y: I32, dir: I32) Bool {
@@ -541,7 +541,7 @@ mod sim {
         }
         add_entity(w, new_entity(w, w.next_id, machine, x, y, dir))
         w.next_id += 1
-        true
+        return true
     }
 
     fn remove(w: World, x: I32, y: I32) Void {
@@ -567,7 +567,7 @@ mod sim {
             6 => "centrifuge",
             ~> "",
         }
-        recipe.category == category and (e.machine != assembler_1_id or recipe.ingredients.len() <= 2)
+        return recipe.category == category and (e.machine != assembler_1_id or recipe.ingredients.len() <= 2)
     }
 
     fn set_recipe(w: World, e: Entity, r: I32) Void {
@@ -592,7 +592,7 @@ mod sim {
                 ready = false
             }
         }
-        ready
+        return ready
     }
 
     fn start_research(w: World, t: I32) Void {
@@ -686,7 +686,7 @@ mod sim {
         if (c == steam_class or e.machine == burner_miner_id) and item == coal_item {
             return fuel_up(e, n, commit)
         }
-        0
+        return 0
     }
 
     fn fuel_up(e: Entity, n: I32, commit: Bool) I32 {
@@ -694,7 +694,7 @@ mod sim {
         if commit {
             e.fuel += taken
         }
-        taken
+        return taken
     }
 
     fn push_fluid(w: World, amount: I32, fluid: I32, t: Entity) I32 {
@@ -707,7 +707,7 @@ mod sim {
         }
         t.amount += moved
         t.fluid = fluid
-        moved
+        return moved
     }
 
     // ── the tick ─────────────────────────────────────────────────────────────────
@@ -994,7 +994,7 @@ mod sim {
                 }
             }
         }
-        -1
+        return -1
     }
 
     fn mine(w: World, e: Entity) Void {
@@ -1057,7 +1057,7 @@ mod sim {
                 }
             }
         }
-        count
+        return count
     }
 
     fn craft(w: World, e: Entity) Void {
@@ -1238,7 +1238,7 @@ mod sim {
                 ~> {},
             }
         }
-        off
+        return off
     }
 
     fn swing(w: World, e: Entity) Void {
@@ -1355,11 +1355,11 @@ mod sim {
         t.belt_n += 2
         e.belt.copy_from(0, e.belt, 2, e.belt_n - 2)
         e.belt_n -= 2
-        true
+        return true
     }
 
     fn pass_to(e: Entity, target: ?Entity) Bool {
-        promote target {
+        return promote target {
             |t| => pass(e, t),
             ~> false,
         }
@@ -1436,7 +1436,7 @@ mod sim {
         for (0..<4) |k| {
             x = (x ^ ((v >> (8 * k)) & 255)) * 16777619
         }
-        x
+        return x
     }
 
     fn feed_list(h: I32, list: Array[I32], n: I32) I32 {
@@ -1444,11 +1444,11 @@ mod sim {
         for (0..<n) |i| {
             x = feed(x, list[i])
         }
-        x
+        return x
     }
 
     fn flag(b: Bool) I32 {
-        if b { 1 } else { 0 }
+        return if b { 1 } else { 0 }
     }
 
     fn hash(w: World) I32 {
@@ -1484,13 +1484,13 @@ mod sim {
                 h = feed(h, v)
             }
         }
-        h
+        return h
     }
 
     // ── loading and saving ───────────────────────────────────────────────────────
 
     fn load(game_text: Str, save_text: Str) ?World {
-        promote @json/\ decode GameData game_text \/ {
+        return promote @json/\ decode GameData game_text \/ {
             |game| => {
                 promote @json/\ decode Save save_text \/ {
                     |save| => world_from_save(game, save),
@@ -1503,15 +1503,15 @@ mod sim {
 
     fn load_error(game_text: Str, save_text: Str) Str {
         let game = @json/\ error GameData game_text \/
-        if game.len() > 0 { "game.json: " + game } else { "save: " + @json/\ error Save save_text \/ }
+        return if game.len() > 0 { "game.json: " + game } else { "save: " + @json/\ error Save save_text \/ }
     }
 
     fn save_text(w: World) Str {
-        @json/\ encode Save to_save(w) \/
+        return @json/\ encode Save to_save(w) \/
     }
 
     fn copy_counts(source: ?Array[I32], fallback: Array[I32]) Array[I32] {
-        promote source {
+        return promote source {
             |s| => {
                 let copy = Array[I32].new_default(s.len())
                 copy.copy_from(0, s, 0, s.len())
@@ -1583,11 +1583,11 @@ mod sim {
             e.moved = s.moved
             add_entity(w, e)
         }
-        w
+        return w
     }
 
     fn counts_or_null(counts: Array[I32], n: I32, present: Bool) ?Array[I32] {
-        if present { counts.slice(0, n) } else { null }
+        return if present { counts.slice(0, n) } else { null }
     }
 
     fn to_save(w: World) Save {
@@ -1617,7 +1617,7 @@ mod sim {
                 crafts: e.crafts, moved: e.moved,
             }
         } collect(SaveEntity)
-        Save {
+        return Save {
             version: 1, tick: w.tick, width: w.width, height: w.height, nextId: w.next_id,
             terrain: Str.from_codes(terrain, terrain.len()), resources: resources,
             revealed: Str.from_codes(revealed, revealed.len()),

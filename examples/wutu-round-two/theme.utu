@@ -1,6 +1,6 @@
 mod theme {
     fn sheet() Str {
-        @css/\
+        return @css/\
         @layer reset, theme, layout;
         @layer reset {
             * { box-sizing: border-box; }

@@ -25,12 +25,12 @@ struct Settings:
     | limit: I32
 
 fn settings() Settings {
-    @json/\ decode Settings `{"title": "Things to do", "limit": 20}` \/ orelse Settings { title: "Todo", limit: 10 }
+    return @json/\ decode Settings `{"title": "Things to do", "limit": 20}` \/ orelse Settings { title: "Todo", limit: 10 }
 }
 
 /// A shared stylesheet (the payload is highlighted as CSS).
 fn sheet() Str {
-    @css/\
+    return @css/\
     .badge { font-size: 0.8rem; }
     li.done { text-decoration: line-through; }
     \/
@@ -39,15 +39,15 @@ fn sheet() Str {
 /// Host JavaScript (the payload is highlighted as JavaScript).
 fn now() F64 {
     let read: fun() F64 = @es/\ () => performance.now() \/
-    read()
+    return read()
 }
 
 fn left(todos: Array[Todo]) I32 {
-    todos count_where |t| { not t.done }
+    return todos count_where |t| { not t.done }
 }
 
 fn shown(todos: Array[Todo], filter: Filter) Array[Todo] {
-    todos filter |t| {
+    return todos filter |t| {
         alt filter {
             All => true,
             Open => not t.done,

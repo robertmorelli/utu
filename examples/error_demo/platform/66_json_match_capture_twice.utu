@@ -2,7 +2,7 @@
 // Expect: name is captured twice in this pattern
 
 fn names(text: Str) Str {
-    @json/\ match text {
+    return @json/\ match text {
         { first: |name| Str, last: |name| Str } => name,
         ~> "",
     }\/;

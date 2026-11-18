@@ -5,15 +5,15 @@ let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 let ref_present: fun(Externref) Bool = @es/\value => value !== null ? 1 : 0\/;
 
 fn score() I32 {
-    lucky + 1;
+    return lucky + 1;
 }
 
 fn named() Bool {
-    str_eq(label, "utu");
+    return str_eq(label, "utu");
 }
 
 fn doc_present() Bool {
-    ref_present(document);
+    return ref_present(document);
 }
 
 test "imported numeric globals contribute to arithmetic" {

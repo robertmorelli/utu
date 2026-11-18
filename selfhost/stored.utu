@@ -49,7 +49,7 @@ fn uses_browser(file: I32) Bool {
         }
         item = next_sibling(item)
     }
-    false
+    return false
 }
 
 /// A body not of the form `Type "key" default`.
@@ -101,14 +101,14 @@ fn stored_fields(node: I32) Array[I32] {
         }
         f = next_sibling(f)
     }
-    fields
+    return fields
 }
 
 /// The file's struct of that name (the last, in order), or -1.
 fn stored_struct(type: Str, file: I32) I32 {
     let w = intern_text(type)
     let found = find_declared(file_root[file], w)
-    if found >= 0 and is_kind(found, Node.Struct_decl) { found } else { -1 }
+    return if found >= 0 and is_kind(found, Node.Struct_decl) { found } else { -1 }
 }
 
 fn trim_text(text: Str) Str => trim_end(text.slice(skip_spaces(text, 0), text.len()))
@@ -116,7 +116,7 @@ fn trim_text(text: Str) Str => trim_end(text.slice(skip_spaces(text, 0), text.le
 fn stored_fresh(prefix: Str) Str {
     let name = prefix + int_text(st_seq[0])
     st_seq[0] += 1
-    name
+    return name
 }
 
 /// A JS predicate that `v` matches the type.
@@ -133,7 +133,7 @@ fn stored_validate(type: Str, v: Str, file: I32) Str {
         if fields.len() > 0 { fields = fields + "&&" }
         fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")"
     }
-    v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")" + (if fields.len() > 0 { "&&" + fields } else { "" })
+    return v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")" + (if fields.len() > 0 { "&&" + fields } else { "" })
 }
 
 /// Utu converting validated JS data `v` into a native value.
@@ -157,7 +157,7 @@ fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
         if fields.len() > 0 { fields = fields + ", " }
         fields = fields + field_name(f) + ": " + stored_decode(field_type_text(f), v + "." + field_name(f), file, prefix)
     }
-    t + " { " + fields + " }"
+    return t + " { " + fields + " }"
 }
 
 /// Utu converting native value `v` into plain JS data.
@@ -175,7 +175,7 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
         if fields.len() > 0 { fields = fields + ", " }
         fields = fields + field_name(f) + ": " + stored_encode(field_type_text(f), v + "." + field_name(f), file, prefix)
     }
-    "&{ " + fields + " }"
+    return "&{ " + fields + " }"
 }
 
 /// Replace JSON's null for a non-finite F64, without changing other fields.
@@ -192,7 +192,7 @@ fn stored_sanitize(type: Str, v: Str, file: I32) Str {
         fields = fields + name + ":" + stored_sanitize(field_type_text(f), "v[" + name + "]", file)
     }
     // (Each level binds its value once: the text stays linear in the depth.)
-    "(v=>v!==null&&typeof v==='object'&&!Array.isArray(v)?{...v," + fields + "}:v)(" + v + ")"
+    return "(v=>v!==null&&typeof v==='object'&&!Array.isArray(v)?{...v," + fields + "}:v)(" + v + ")"
 }
 
 /// The expansion of a `@stored` site: its body parsed as
@@ -267,9 +267,9 @@ fn stored_code(site: I32, prefix: Str) Str {
     let copies = ""
     for (stored_fields(stored_struct(type, file))) |f| { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; " }
     let check = if validator.len() > 0 { "if not " + validator + "(candidate) {candidate=" + fallback + ";};" } else { "" }
-    "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) Void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data=" + stored_sanitize(type, "value.data", file) + ";if(!("
+    return "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) Void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data=" + stored_sanitize(type, "value.data", file) + ";if(!("
         + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="
         + prefix + "check(raw);let candidate:" + type + "=" + fallback + ";\n      if json.len()>0 {let " + data + "=Browser.JSON.parse(json);candidate=" + stored_decode(type, data, file, prefix) + ";};\n      " + check + "\n      "
         + trim_end(copies) + "\n    };\n    " + apply_raw + "(wutu.stored_load(" + key + "));\n    wutu.stored_register("
-        + key + ",cl() Str {Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true" } else { "false" }) + "," + apply_raw + ");\n    " + state + ";}"
+        + key + ",cl() Str {return Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true" } else { "false" }) + "," + apply_raw + ");\n    " + state + ";}"
 }

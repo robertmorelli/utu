@@ -160,7 +160,7 @@ fn end_if(cond_mark: I32, branch_mark: I32) Void {
 /// Ends an `if`'s first branch (since `then_mark`): where its `else` starts.
 fn else_begin(then_mark: I32) I32 {
     seq_void(then_mark)
-    w_mark()
+    return w_mark()
 }
 
 /// `br_if label`, the condition on the stack since `m`.
@@ -190,7 +190,7 @@ fn to_cleanup(p: Pipe) Void {
 fn stage_local(slot: I32, which: I32, vt: I32) I32 {
     let at = slot * 16 + which
     if st_locals[at] < 0 { st_locals[at] = new_local(vt) }
-    st_locals[at]
+    return st_locals[at]
 }
 
 fn stage_op(p: Pipe, k: I32) I32 => st_op[p.first_stage + k]
@@ -204,7 +204,7 @@ fn stage_param(node: I32) I32 {
         if not is_kind(c, Node.Capture) and not is_kind(c, Node.Block) and not is_type_node(node_kind[c]) { return c }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// `local = n`, of a stage's `(n)` (an I32).
@@ -226,7 +226,7 @@ fn stage_type(node: I32, which: I32) I32 {
         }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 fn stage_capture(node: I32) I32 => stage_part(node, Node.Capture)
@@ -240,7 +240,7 @@ fn stage_part(node: I32, kind: Node) I32 {
         if is_kind(c, kind) { return c }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// The operator of an iterator stage: the word after its source.
@@ -248,7 +248,7 @@ fn iterator_op(node: I32) I32 => tok_word[token_after(first_child(node))]
 
 /// Operators that end a pipeline.
 fn is_terminal(op: I32) Bool {
-    op == Kw.Fold.i32() or op == Kw.Each.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
+    return op == Kw.Fold.i32() or op == Kw.Each.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
         or op == Kw.Count_where.i32() or op == Kw.First_index.i32() or op == Kw.Last_index.i32()
         or op == Kw.Sum.i32() or op == Kw.Fast_sum.i32() or op == Kw.Product.i32() or op == Kw.Count.i32()
         or op == Kw.Collect.i32() or op == Kw.Sort.i32() or op == Kw.Group_by.i32() or op == Kw.Distinct_by.i32()
@@ -258,7 +258,7 @@ fn is_terminal(op: I32) Bool {
 
 /// Stages that never pass on more values than they receive.
 fn is_bounded_stage(op: I32) Bool {
-    op == Kw.Map.i32() or op == Kw.Filter.i32() or op == Kw.Skip.i32() or op == Kw.Take.i32()
+    return op == Kw.Map.i32() or op == Kw.Filter.i32() or op == Kw.Skip.i32() or op == Kw.Take.i32()
         or op == Kw.Skip_while.i32() or op == Kw.Take_while.i32() or op == Kw.Scan.i32() or op == Kw.Zip.i32()
 }
 
@@ -279,12 +279,12 @@ fn fusable_collect(input: I32, strict: Bool) I32 {
         if is_terminal(iterator_op(s)) or not pure_stage(s) or (strict and stage_may_trap(s)) { return -1 }
         s = past_splices(first_child(s))
     }
-    inner
+    return inner
 }
 
 /// Stages that can end the pipeline before its source does.
 fn stops_early(op: I32) Bool {
-    op == Kw.Take.i32() or op == Kw.Take_while.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
+    return op == Kw.Take.i32() or op == Kw.Take_while.i32() or op == Kw.Any.i32() or op == Kw.All.i32()
         or op == Kw.First_where.i32() or op == Kw.First_index.i32() or op == Kw.Zip.i32()
 }
 
@@ -299,7 +299,7 @@ fn pure_stage(stage: I32) Bool {
         if not pure_tree(part, lo, hi) { return false }
         part = next_sibling(part)
     }
-    true
+    return true
 }
 
 fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
@@ -337,7 +337,7 @@ fn pure_tree(node: I32, lo: I32, hi: I32) Bool {
         if not pure_tree(c, lo, hi) { return false }
         c = next_sibling(c)
     }
-    true
+    return true
 }
 
 /// The methods pure_method allows, interned once per program, and then
@@ -359,7 +359,7 @@ fn user_declares(word: I32) Bool {
             else if decl_name[d] == word { return true }
         }
     }
-    false
+    return false
 }
 
 /// @pure_flags's entry `i`.
@@ -370,19 +370,19 @@ fn pure_flag(i: I32) Bool {
         for (0 ..< pure_words.len()) |j| { pure_flags.push(if user_declares(pure_words[j]) { 1 } else { 0 }) }
         pure_flags.push(if user_declares(-1) { 1 } else { 0 })
     }
-    pure_flags[i] == 1
+    return pure_flags[i] == 1
 }
 
 /// Whether the program declares an operator of its own.
 fn user_operators() Bool {
     pure_flag(0)
-    pure_flag(pure_flags.len() - 1)
+    return pure_flag(pure_flags.len() - 1)
 }
 
 /// Whether a template's holes may call the program's own `str`.
 fn user_str() Bool {
     pure_flag(0)
-    pure_flag(pure_words.len() - 1)
+    return pure_flag(pure_words.len() - 1)
 }
 
 /// A method that only reads: std's conversions and reads, when the program
@@ -390,7 +390,7 @@ fn user_str() Bool {
 fn pure_method(word: I32) Bool {
     pure_flag(0)
     for (0 ..< pure_words.len() - 1) |i| { if pure_words[i] == word { return not pure_flag(i) } }
-    false
+    return false
 }
 
 /// Whether a stage's parts may trap or run without end: an index, a
@@ -401,7 +401,7 @@ fn stage_may_trap(stage: I32) Bool {
         if may_trap(part) { return true }
         part = next_sibling(part)
     }
-    false
+    return false
 }
 
 fn may_trap(node: I32) Bool {
@@ -426,7 +426,7 @@ fn may_trap(node: I32) Bool {
         if may_trap(c) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// An `Iterator_expr`: its whole pipeline, from the outermost stage, checked
@@ -489,7 +489,7 @@ fn check_iterator(node: I32, expect: I32, cx: Cx) I32 {
     st_counter.resize(first_stage)
     st_ordinal.resize(first_stage)
     st_locals.resize(first_stage * 16)
-    t
+    return t
 }
 
 /// The loop of a pipeline over `input` (an array or a range), its stages
@@ -506,7 +506,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     // The source: a range's bounds, or the array and its length.
     if p.range {
         if not range_source(p, input, cx) {
-            w_stack.resize(m)
+            w_resize_stack(m)
             return error_value()
         }
     } else {
@@ -514,7 +514,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
         p.hi = new_local(vt_i32)
         let ms = w_mark()
         if pipe_took_operator(input) {
-            w_stack.resize(m)
+            w_resize_stack(m)
             return error_value()
         }
         let at = check_expr(input, -1, cx)
@@ -525,7 +525,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
                 let hint = source_hint(at)
                 if hint.len() > 0 { diag_note(hint) }
             }
-            w_stack.resize(m)
+            w_resize_stack(m)
             return error_value()
         }
         p.elem = inst_arg(ty_inst(at), 0)
@@ -587,7 +587,7 @@ fn check_pipeline(input: I32, first_stage: I32, n: I32, cx: Cx) I32 {
     let rt = p.result_type
     if p.finish >= 0 { w_push(p.finish) } else if p.result >= 0 { lg(p.result) }
     w_node(Op.Seq, repr(rt), 0, 0, m)
-    rt
+    return rt
 }
 
 /// `ok and xs all |x| {…}`: a pipeline binds looser than every operator, so
@@ -604,7 +604,7 @@ fn pipe_took_operator(input: I32) Bool {
     diag_label("piped")
     diag_place(Extra.Related, last_child(input), "the source meant?")
     diag_note("Parenthesize the pipeline: a " + tok_text(t) + " (xs all |x| { … })")
-    true
+    return true
 }
 
 /// A range `(a ..< b)` or `(a ... b)` of I32, U32, I64, or U64 as a
@@ -653,7 +653,7 @@ fn range_source(p: Pipe, input: I32, cx: Cx) Bool {
     } else {
         end_if(mi, mt)
     }
-    true
+    return true
 }
 
 /// The loop over `[lo, hi)`: `value = element(i)`, then the stages.
@@ -792,7 +792,7 @@ fn bind_captures(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues
         j += 1
         c = next_sibling(c)
     }
-    true
+    return true
 }
 
 /// Whether something under `node` assigns variable `d`.
@@ -803,7 +803,7 @@ fn assigns(node: I32, d: I32) Bool {
         if assigns(c, d) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Bind declaration `d`, of type `t`, to the value on the stack since `m`.
@@ -831,26 +831,26 @@ fn ordinal_of(p: Pipe, k: I32) I32 {
         seq_void(m)
         to_setup(p)
     }
-    st_ordinal[slot]
+    return st_ordinal[slot]
 }
 
 fn counter_of(p: Pipe, k: I32) I32 {
     ordinal_of(p, k)
-    st_counter[p.first_stage + k]
+    return st_counter[p.first_stage + k]
 }
 
 /// Whether a stage reads its position: an index binding, or its operator.
 fn stage_counts(p: Pipe, k: I32, nvalues: I32) Bool {
     let op = stage_op(p, k)
     if op == Kw.Take.i32() or op == Kw.Skip.i32() or op == Kw.Zip.i32() or op == Kw.First_index.i32() or op == Kw.Last_index.i32() { return true }
-    child_count(stage_capture(stage_node(p, k))) > nvalues
+    return child_count(stage_capture(stage_node(p, k))) > nvalues
 }
 
 /// A stage's body checked with its captures bound; its value on the stack.
 fn stage_body(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark()
     if not bind_captures(p, k, values, types, nvalues) {
-        w_stack.resize(m)
+        w_resize_stack(m)
         return error_value()
     }
     let block = stage_block(stage_node(p, k))
@@ -858,20 +858,20 @@ fn stage_body(p: Pipe, k: I32, values: Array[I32], types: Array[I32], nvalues: I
     if expect >= 0 { coerce(t, expect, block) }
     let rt = if expect >= 0 { expect } else { t }
     w_node(Op.Seq, repr(rt), 0, 0, m)
-    rt
+    return rt
 }
 
 fn one(a: I32) Array[I32] {
     let x = Array[I32].new(1, 0)
     x[0] = a
-    x
+    return x
 }
 
 fn two(a: I32, b: I32) Array[I32] {
     let x = Array[I32].new(2, 0)
     x[0] = a
     x[1] = b
-    x
+    return x
 }
 
 /// The code for stage `k` and everything after it, given its value (a local of type `vt`).
@@ -1137,7 +1137,7 @@ fn other_array(p: Pipe, k: I32, expect: I32, cx: Cx) I32 {
             // What is wrong with it (an unfinished pipeline), which type_only dropped.
             let me = w_mark()
             discard(check_expr(param, -1, cx))
-            w_stack.resize(me)
+            w_resize_stack(me)
         }
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         // The stages after it are not checked: the pipeline has no type to give.
@@ -1151,7 +1151,7 @@ fn other_array(p: Pipe, k: I32, expect: I32, cx: Cx) I32 {
         ls(other, m)
         to_setup(p)
     }
-    ot
+    return ot
 }
 
 /// `flat_map |x| { … }`: each element of the array the body returns goes on.
@@ -1218,7 +1218,7 @@ fn check_flat_map(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) Void {
             report2(Diag.IteratorSource, block, -1, nt, 2)
             diag_label(type_text(nt))
         }
-        w_stack.resize(mn)
+        w_resize_stack(mn)
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         return
     }
@@ -1320,7 +1320,7 @@ fn has_float_literal(node: I32) Bool {
         if has_float_literal(c) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// setup and cleanup that make its result.
@@ -1531,13 +1531,13 @@ fn written_scalar(type_node: I32, bool_too: Bool) Bool {
     for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64]) |pr| {
         if w == intern_text(Prelude.name(pr)) { return true }
     }
-    bool_too and w == intern_text(Prelude.name(Prelude.Bool))
+    return bool_too and w == intern_text(Prelude.name(Prelude.Bool))
 }
 
 /// The word of the name a written type is (`&` aside), or -1.
 fn written_word(type_node: I32) I32 {
     let name = if is_kind(type_node, Node.Ref_type) { first_child(type_node) } else { type_node }
-    if is_kind(name, Node.Type_ident) { word_of(name) } else { -1 }
+    return if is_kind(name, Node.Type_ident) { word_of(name) } else { -1 }
 }
 
 fn buffer(p: Pipe, slot: I32, et: I32, type_node: I32) Buffer => buffer_at(p, slot, 0, et, if p.bounded { type_node } else { -1 }, p.bounded)
@@ -1571,7 +1571,7 @@ fn buffer_at(p: Pipe, slot: I32, base: I32, et: I32, type_node: I32, bounded: Bo
     }
     seq_void(m)
     to_setup(p)
-    b
+    return b
 }
 
 /// Appends `value` (of type `vt`, as `et`), doubling the array when it is full.
@@ -1651,7 +1651,7 @@ fn buffer_add(p: Pipe, b: Buffer, et: I32, value: I32, vt: I32, at: I32) Void {
 /// Whether `array.new_default` can make an array of `t` (as stage 0's `DEFAULTABLE`, by type).
 fn is_defaultable_type(t: I32) Bool {
     if ty_is(t, Ty.Nullable) { return true }
-    t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
+    return t == prelude(Prelude.I32) or t == prelude(Prelude.U32) or t == prelude(Prelude.I64) or t == prelude(Prelude.U64)
         or t == prelude(Prelude.F32) or t == prelude(Prelude.F64) or t == prelude(Prelude.Bool)
 }
 
@@ -1673,7 +1673,7 @@ fn buffer_done(b: Buffer) I32 {
     w_node(Op.Call, vt, array_slice_helper(heap), 0, me)
     w_node(Op.Seq, vt, 0, 0, me)
     w_node(Op.If, vt, new_label(), 0, m)
-    w_pop()
+    return w_pop()
 }
 
 //! = Loops and conditions, for the code below
@@ -1690,7 +1690,7 @@ fn loop_open() WLoop {
     let brk = new_label()
     let top = new_label()
     let mb = w_mark()
-    WLoop { brk: brk, top: top, mb: mb, ml: w_mark() }
+    return WLoop { brk: brk, top: top, mb: mb, ml: w_mark() }
 }
 
 /// Leave the loop unless the condition on the stack (since `m`) holds.
@@ -1748,7 +1748,7 @@ fn array_set_begin(arr: I32, index: I32) I32 {
     let m = w_mark()
     lg(arr)
     lg(index)
-    m
+    return m
 }
 
 fn array_set_end(arr: I32, m: I32) Void {
@@ -1845,7 +1845,7 @@ fn scalar_order(block: I32, capture: I32, et: I32) I32 {
     let op = tok_kind[token_after(l)]
     if op == Tok.Lt.i32() { return 1 }
     if op == Tok.Gt.i32() { return -1 }
-    0
+    return 0
 }
 
 /// Insertion-sorted runs of 24, then bottom-up merges through a second
@@ -2257,20 +2257,20 @@ fn std_new(module_name: Str, args: I32, m: I32, cx: Cx) I32 {
     if not decl_is(module, Decl.Module) { return -1 }
     let inst = instance(module, args)
     let f = member(decl_a[module], intern_text("new"), Space.Method)
-    finish_call(fn_instance(f, inst), m, cx)
+    return finish_call(fn_instance(f, inst), m, cx)
 }
 
 fn list1(t: I32) I32 {
     let m = vl_begin()
     vl_add(t)
-    vl_end(m)
+    return vl_end(m)
 }
 
 fn list2(a: I32, b: I32) I32 {
     let m = vl_begin()
     vl_add(a)
     vl_add(b)
-    vl_end(m)
+    return vl_end(m)
 }
 
 /// `first_where`, `min_by`, `max_by`, `reduce`: a `?Found[T]`.
@@ -2613,7 +2613,7 @@ fn key_hash_kind(kt: I32) I32 {
     let base = if is_scalar_kind(d) { scalar_base(d) } else { kt }
     if base == prelude(Prelude.I32) or base == prelude(Prelude.U32) { return 1 }
     if base == prelude(Prelude.I64) or base == prelude(Prelude.U64) { return 2 }
-    0
+    return 0
 }
 
 /// `at = hash(key) & mask`: `h = (key, folded to 32 bits) * -1640531527; h ^ (h >>> 15)`.
@@ -2871,7 +2871,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
         let t = if is_number_literal(a) and not is_number_literal(b) { type_only(b, -1, cx) } else { type_only(a, -1, cx) }
         if t != i32_t {
             if not ty_is(t, Ty.Error) { report2(Diag.IteratorSource, input, -1, t, 6) }
-            w_stack.resize(m)
+            w_resize_stack(m)
             return error_value()
         }
         let ma = w_mark()
@@ -2916,7 +2916,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     } else {
         let ms = w_mark()
         if pipe_took_operator(input) {
-            w_stack.resize(m)
+            w_resize_stack(m)
             return error_value()
         }
         let at = check_expr(input, -1, cx)
@@ -2927,7 +2927,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
                 let hint = source_hint(at)
                 if hint.len() > 0 { diag_note(hint) }
             }
-            w_stack.resize(m)
+            w_resize_stack(m)
             return error_value()
         }
         et = inst_arg(ty_inst(at), 0)
@@ -2977,7 +2977,7 @@ fn check_bisect(node: I32, input: I32, n: I32, cx: Cx) I32 {
     w_node(Op.Seq, vt_i32, 0, 0, me)
     w_node(Op.If, vt_i32, new_label(), 0, mif)
     w_node(Op.Seq, vt_i32, 0, 0, m)
-    i32_t
+    return i32_t
 }
 
 /// The test at position `at`: `{ let v = (start + at, or source[at]); [let i = at as U64;] body }`.
@@ -3006,7 +3006,7 @@ fn bisect_test(node: I32, range: Bool, source: I32, start: I32, at: I32, et: I32
 fn past_splices(node: I32) I32 {
     let n = node
     while (n >= 0 and is_kind(n, Node.Splice)) { n = first_child(n) }
-    n
+    return n
 }
 
 /// Whether a pipeline's own mistake was reported since diagnostic `from`.
@@ -3015,5 +3015,5 @@ fn pipeline_mistake_since(from: I32) Bool {
         let k = Diag(diag_kind[i])
         if k == Diag.IteratorTerminalInside or k == Diag.IteratorCaptures or k == Diag.IteratorSource or k == Diag.GeneratorCall { return true }
     }
-    false
+    return false
 }

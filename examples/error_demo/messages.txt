@@ -11,32 +11,28 @@
 13 │     store_count(local_count);
    │                 ━━━━━━━━━━━
    │                 ╰─ I32
-14 │     0;
+14 │     return 0;
 15 │ }
 --- exit 1
 
 === utu check examples/error_demo/02_return_blame.utu
  ERROR  return_blame_demo returns I32, got Bool
-        type-mismatch · examples/error_demo/02_return_blame.utu:8:5
+        type-mismatch · examples/error_demo/02_return_blame.utu:8:12
 
  6 │ fn return_blame_demo() I32 {
    │                        ───
    │                        ╰─ I32
  7 │     let status: Bool = true;
- 8 │     status;
-   │     ━━━━━━
-   │     ╰─ Bool
+ 8 │     return status;
+   │            ━━━━━━
+   │            ╰─ Bool
  9 │ }
 --- exit 1
 
 === utu check examples/error_demo/03_branch_confluence.utu
- ERROR  branch_blame_demo returns I32, got Bool
+ ERROR  Expected I32, got Bool
         type-mismatch · examples/error_demo/03_branch_confluence.utu:12:9
 
- 6 │ fn branch_blame_demo(use_number: Bool) I32 {
-   │                                        ───
-   │                                        ╰─ I32
-   ┆
 10 │     } else {
 11 │         let flag: Bool = false;
 12 │         flag;
@@ -100,7 +96,7 @@
    │                    ━━━━
    │                    ╰─ Bool
 15 │     missing_value;
-16 │     0;
+16 │     return 0;
 
  ERROR  Unknown variable missing_value
         unknown-variable · examples/error_demo/05_whole_file_recovery.utu:15:5
@@ -110,19 +106,19 @@
 15 │     missing_value;
    │     ━━━━━━━━━━━━━
    │     ╰─ not defined
-16 │     0;
+16 │     return 0;
 17 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/01_field_on_nullable_struct.utu
  ERROR  .name on nullable ?Node
-        nullable-access · examples/error_demo/control/01_field_on_nullable_struct.utu:9:5
+        nullable-access · examples/error_demo/control/01_field_on_nullable_struct.utu:9:12
 
  7 │ fn second_name(head: Node) Str {
  8 │     let n = head.next;
- 9 │     n.name;
-   │     ━━━━━━
-   │     ╰─ may be null
+ 9 │     return n.name;
+   │            ━━━━━━
+   │            ╰─ may be null
 10 │ }
 --- exit 1
 
@@ -141,61 +137,61 @@
 
 === utu check examples/error_demo/control/03_method_on_nullable_str.utu
  ERROR  .len on nullable ?Str
-        nullable-access · examples/error_demo/control/03_method_on_nullable_str.utu:4:5
+        nullable-access · examples/error_demo/control/03_method_on_nullable_str.utu:4:12
 
  2 │ // Expect: Cannot call method 'len' on ?Str: it may be null; use promote or orelse first
  3 │ fn name_length(name: ?Str) I32 {
- 4 │     name.len();
-   │     ━━━━━━━━
-   │     ╰─ may be null
+ 4 │     return name.len();
+   │            ━━━━━━━━
+   │            ╰─ may be null
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/04_method_on_nullable_struct.utu
  ERROR  .area on nullable ?Rect
-        nullable-access · examples/error_demo/control/04_method_on_nullable_struct.utu:10:5
+        nullable-access · examples/error_demo/control/04_method_on_nullable_struct.utu:10:12
 
  8 │
  9 │ fn biggest(found: ?Rect) F64 {
-10 │     found.area();
-   │     ━━━━━━━━━━
-   │     ╰─ may be null
+10 │     return found.area();
+   │            ━━━━━━━━━━
+   │            ╰─ may be null
 11 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/05_index_nullable_array.utu
  ERROR  No [] for ?Array[I32]
-        unknown-operator · examples/error_demo/control/05_index_nullable_array.utu:4:5
+        unknown-operator · examples/error_demo/control/05_index_nullable_array.utu:4:12
 
  2 │ // Expect: Cannot index ?Array[I32]: it may be null; use promote or orelse first
  3 │ fn first(xs: ?Array[I32]) I32 {
- 4 │     xs[0];
-   │     ━━━━━
-   │     ╰─ ?Array[I32]
+ 4 │     return xs[0];
+   │            ━━━━━
+   │            ╰─ ?Array[I32]
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/06_nullable_in_template.utu
  ERROR  ?Str may be null
-        nullable-access · examples/error_demo/control/06_nullable_in_template.utu:4:14
+        nullable-access · examples/error_demo/control/06_nullable_in_template.utu:4:21
 
  2 │ // Expect: Cannot turn ?Str into text: it may be null; use orelse "..." in the template
  3 │ fn greet(nickname: ?Str) Str {
- 4 │     `hello ${nickname}`;
-   │              ━━━━━━━━
-   │              ╰─ may be null
+ 4 │     return `hello ${nickname}`;
+   │                     ━━━━━━━━
+   │                     ╰─ may be null
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/07_nullable_to_str.utu
  ERROR  ?Box may be null
-        nullable-access · examples/error_demo/control/07_nullable_to_str.utu:9:5
+        nullable-access · examples/error_demo/control/07_nullable_to_str.utu:9:12
 
  7 │
  8 │ fn show(b: ?Box) Str {
- 9 │     b.str();
-   │     ━━━━━
-   │     ╰─ may be null
+ 9 │     return b.str();
+   │            ━━━━━
+   │            ╰─ may be null
 10 │ }
 --- exit 1
 
@@ -213,26 +209,26 @@
 
 === utu check examples/error_demo/control/09_promote_non_nullable.utu
  ERROR  Expected nullable, got Str
-        not-nullable · examples/error_demo/control/09_promote_non_nullable.utu:4:13
+        not-nullable · examples/error_demo/control/09_promote_non_nullable.utu:4:20
 
  2 │ // Expect: promote needs a nullable value; name is Str, which is never null
  3 │ fn initial(name: Str) Str {
- 4 │     promote name {
-   │             ━━━━
-   │             ╰─ never null
+ 4 │     return promote name {
+   │                    ━━━━
+   │                    ╰─ never null
  5 │         |n| => n.slice(0, 1),
  6 │         ~> "?",
 --- exit 1
 
 === utu check examples/error_demo/control/10_orelse_non_nullable.utu
  ERROR  Expected nullable, got I32
-        not-nullable · examples/error_demo/control/10_orelse_non_nullable.utu:4:5
+        not-nullable · examples/error_demo/control/10_orelse_non_nullable.utu:4:12
 
  2 │ // Expect: orelse needs a nullable value on its left; count is I32, which is never null
  3 │ fn shown(count: I32) I32 {
- 4 │     count orelse 0;
-   │     ━━━━━
-   │     ╰─ never null
+ 4 │     return count orelse 0;
+   │            ━━━━━
+   │            ╰─ never null
  5 │ }
 --- exit 1
 
@@ -274,13 +270,13 @@ ok
 
 === utu check examples/error_demo/control/11_compare_non_nullable_to_null.utu
  ERROR  name is Str, which is never null
-        not-nullable · examples/error_demo/control/11_compare_non_nullable_to_null.utu:4:5
+        not-nullable · examples/error_demo/control/11_compare_non_nullable_to_null.utu:4:12
 
  2 │ // Expect: name is Str, which is never null; this comparison is always false
  3 │ fn has_name(name: Str) Bool {
- 4 │     name != null;
-   │     ━━━━
-   │     ╰─ never null
+ 4 │     return name != null;
+   │            ━━━━
+   │            ╰─ never null
  5 │ }
 --- exit 1
 
@@ -318,7 +314,7 @@ ok
  3 │ fn lookup(key: ?I32) I32 {
    │                ━━━━
    │                ╰─ here
- 4 │     key orelse -1;
+ 4 │     return key orelse -1;
  5 │ }
 --- exit 1
 
@@ -376,13 +372,13 @@ ok
 
 === utu check examples/error_demo/control/18_null_returned_from_str_fn.utu
  ERROR  null needs a nullable type
-        bare-null · examples/error_demo/control/18_null_returned_from_str_fn.utu:5:5
+        bare-null · examples/error_demo/control/18_null_returned_from_str_fn.utu:5:12
 
  3 │ fn find_user(id: I32) Str {
  4 │     if id == 0 { return "root"; };
- 5 │     null;
-   │     ━━━━
-   │     ╰─ no type
+ 5 │     return null;
+   │            ━━━━
+   │            ╰─ no type
  6 │ }
 --- exit 1
 
@@ -427,13 +423,13 @@ ok
 
 === utu check examples/error_demo/control/22_null_compare_i32.utu
  ERROR  count is I32, which is never null
-        not-nullable · examples/error_demo/control/22_null_compare_i32.utu:4:5
+        not-nullable · examples/error_demo/control/22_null_compare_i32.utu:4:12
 
  2 │ // Expect: count is I32, which is never null; comparing it with null is always false
  3 │ fn missing(count: I32) Bool {
- 4 │     count == null;
-   │     ━━━━━
-   │     ╰─ never null
+ 4 │     return count == null;
+   │            ━━━━━
+   │            ╰─ never null
  5 │ }
 --- exit 1
 
@@ -452,25 +448,25 @@ ok
 
 === utu check examples/error_demo/control/24_nullable_access_in_condition.utu
  ERROR  .active on nullable ?Session
-        nullable-access · examples/error_demo/control/24_nullable_access_in_condition.utu:10:8
+        nullable-access · examples/error_demo/control/24_nullable_access_in_condition.utu:10:15
 
  8 │
  9 │ fn online(u: User) Bool {
-10 │     if u.session.active { true; } else { false; };
-   │        ━━━━━━━━━━━━━━━━
-   │        ╰─ may be null
+10 │     return if u.session.active { true; } else { false; };
+   │               ━━━━━━━━━━━━━━━━
+   │               ╰─ may be null
 11 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/25_alt_missing_variant.utu
  ERROR  alt misses Shape.Dot
-        non-exhaustive · examples/error_demo/control/25_alt_missing_variant.utu:9:5
+        non-exhaustive · examples/error_demo/control/25_alt_missing_variant.utu:9:12
 
  7 │
  8 │ fn area(shape: Shape) F64 {
- 9 │     alt shape {
-   │     ━━━━━━━━━━━
-   │     ╰─ no Dot
+ 9 │     return alt shape {
+   │            ━━━━━━━━━━━
+   │            ╰─ no Dot
 10 │         Circle |c| => 3.0 * c.r * c.r,
 11 │         Rect |r| => r.w * r.h,
 12 │     };
@@ -479,13 +475,13 @@ ok
 
 === utu check examples/error_demo/control/26_alt_missing_two_variants.utu
  ERROR  alt misses Token.Minus
-        non-exhaustive · examples/error_demo/control/26_alt_missing_two_variants.utu:10:5
+        non-exhaustive · examples/error_demo/control/26_alt_missing_two_variants.utu:10:12
 
  8 │
  9 │ fn weight(t: Token) I32 {
-10 │     alt t {
-   │     ━━━━━━━
-   │     ╰─ no Minus
+10 │     return alt t {
+   │            ━━━━━━━
+   │            ╰─ no Minus
 11 │         Num |n| => n.value,
 12 │         Plus => 1,
 13 │     };
@@ -508,13 +504,13 @@ ok
 
 === utu check examples/error_demo/control/28_match_int_no_default.utu
  ERROR  match over I32 needs a default arm
-        non-exhaustive · examples/error_demo/control/28_match_int_no_default.utu:4:5
+        non-exhaustive · examples/error_demo/control/28_match_int_no_default.utu:4:12
 
  2 │ // Expect: Match over I32 requires a default arm (~> ...)
  3 │ fn describe(n: I32) Str {
- 4 │     match n {
-   │     ━━━━━━━━━
-   │     ╰─ no ~>
+ 4 │     return match n {
+   │            ━━━━━━━━━
+   │            ╰─ no ~>
  5 │         0 => "zero",
  6 │         1 => "one",
  7 │     };
@@ -523,13 +519,13 @@ ok
 
 === utu check examples/error_demo/control/29_match_bool_missing_false.utu
  ERROR  match misses false
-        non-exhaustive · examples/error_demo/control/29_match_bool_missing_false.utu:4:5
+        non-exhaustive · examples/error_demo/control/29_match_bool_missing_false.utu:4:12
 
  2 │ // Expect: Missing Bool case 'false' in match
  3 │ fn bit(b: Bool) I32 {
- 4 │     match b { true => 1, };
-   │     ━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ no ~>
+ 4 │     return match b { true => 1, };
+   │            ━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ no ~>
  5 │ }
 --- exit 1
 
@@ -542,7 +538,7 @@ ok
  4 │     let n = try text.len();
    │                 ━━━━━━━━━━
    │                 ╰─ I32
- 5 │     Result[I32, Str].ok(n);
+ 5 │     return Result[I32, Str].ok(n);
  6 │ }
 --- exit 1
 
@@ -555,7 +551,7 @@ ok
  9 │     let c = try code(n);
    │                 ━━━━━━━
    │                 ╰─ I32 errors
-10 │     Result[Str, Str].ok("code " + c.str());
+10 │     return Result[Str, Str].ok("code " + c.str());
 11 │ }
 
   note  try returns the error as it is, unconverted
@@ -570,7 +566,7 @@ ok
  9 │     let h = try half(n);
    │             ━━━━━━━━━━━
    │             ╰─ no Result to return
-10 │     h / 2;
+10 │     return h / 2;
 11 │ }
 --- exit 1
 
@@ -583,7 +579,7 @@ ok
  6 │     errdefer console.log("failed");
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │     ╰─ no Result to return
- 7 │     n * 2;
+ 7 │     return n * 2;
  8 │ }
 --- exit 1
 
@@ -608,56 +604,56 @@ ok
  6 │     defer { try flush(); };
    │             ━━━━━━━━━━━
    │             ╰─ here
- 7 │     Result[I32, Str].ok(1);
+ 7 │     return Result[I32, Str].ok(1);
  8 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/306_try_in_closure_without_result_type.utu
  ERROR  try needs a function returning a Result
-        try-place · examples/error_demo/control/306_try_in_closure_without_result_type.utu:9:32
+        try-place · examples/error_demo/control/306_try_in_closure_without_result_type.utu:9:39
 
  7 │
  8 │ main {
- 9 │     let quarter = cl(n: I32) { try half(n); };
-   │                                ━━━━━━━━━━━
-   │                                ╰─ no Result to return
+ 9 │     let quarter = cl(n: I32) { return try half(n); };
+   │                                       ━━━━━━━━━━━
+   │                                       ╰─ no Result to return
 10 │     console.log(0);
 11 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/30_match_bool_missing_true.utu
  ERROR  match misses true
-        non-exhaustive · examples/error_demo/control/30_match_bool_missing_true.utu:4:5
+        non-exhaustive · examples/error_demo/control/30_match_bool_missing_true.utu:4:12
 
  2 │ // Expect: Missing Bool case 'true' in match
  3 │ fn negate(b: Bool) Bool {
- 4 │     match b { false => true, };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ no ~>
+ 4 │     return match b { false => true, };
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ no ~>
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/31_match_int_enum_missing_variant.utu
  ERROR  match misses Level.High
-        non-exhaustive · examples/error_demo/control/31_match_int_enum_missing_variant.utu:9:5
+        non-exhaustive · examples/error_demo/control/31_match_int_enum_missing_variant.utu:9:12
 
  7 │
  8 │ fn label(l: Level) Str {
- 9 │     match l { Level.Low => "calm", Level.Mid => "busy", };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ no High
+ 9 │     return match l { Level.Low => "calm", Level.Mid => "busy", };
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ no High
 10 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/32_match_f64_no_default.utu
  ERROR  match over F64 needs a default arm
-        non-exhaustive · examples/error_demo/control/32_match_f64_no_default.utu:4:5
+        non-exhaustive · examples/error_demo/control/32_match_f64_no_default.utu:4:12
 
  2 │ // Expect: Match over F64 requires a default arm
  3 │ fn name(x: F64) Str {
- 4 │     match x { 0.0 => "zero", 1.0 => "one", };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ no ~>
+ 4 │     return match x { 0.0 => "zero", 1.0 => "one", };
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ no ~>
  5 │ }
 --- exit 1
 
@@ -670,19 +666,19 @@ ok
  3 │ fn parity(b: U8) Str {
    │              ━━
    │              ╰─ here
- 4 │     match b % 2 { 0 => "even", 1 => "odd", };
+ 4 │     return match b % 2 { 0 => "even", 1 => "odd", };
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/34_alt_on_i32.utu
  ERROR  alt on I32
-        alt-not-enum · examples/error_demo/control/34_alt_on_i32.utu:4:9
+        alt-not-enum · examples/error_demo/control/34_alt_on_i32.utu:4:16
 
  2 │ // Expect: alt needs an enum value, got I32; use match for numbers
  3 │ fn describe(n: I32) Str {
- 4 │     alt n {
-   │         ━
-   │         ╰─ I32
+ 4 │     return alt n {
+   │                ━
+   │                ╰─ I32
  5 │         ~> "number",
  6 │     };
 
@@ -691,39 +687,39 @@ ok
 
 === utu check examples/error_demo/control/35_alt_on_struct.utu
  ERROR  alt on Point
-        alt-not-enum · examples/error_demo/control/35_alt_on_struct.utu:8:9
+        alt-not-enum · examples/error_demo/control/35_alt_on_struct.utu:8:16
 
  6 │
  7 │ fn kind(p: Point) Str {
- 8 │     alt p {
-   │         ━
-   │         ╰─ Point
+ 8 │     return alt p {
+   │                ━
+   │                ╰─ Point
  9 │         Point |q| => "point",
 10 │         ~> "other",
 --- exit 1
 
 === utu check examples/error_demo/control/36_alt_on_int_enum.utu
  ERROR  alt on Level
-        alt-not-enum · examples/error_demo/control/36_alt_on_int_enum.utu:8:9
+        alt-not-enum · examples/error_demo/control/36_alt_on_int_enum.utu:8:16
 
  6 │
  7 │ fn label(l: Level) Str {
- 8 │     alt l {
-   │         ━
-   │         ╰─ Level
+ 8 │     return alt l {
+   │                ━
+   │                ╰─ Level
  9 │         Low => "low",
 10 │         High => "high",
 --- exit 1
 
 === utu check examples/error_demo/control/37_alt_on_str.utu
  ERROR  alt on Str
-        alt-not-enum · examples/error_demo/control/37_alt_on_str.utu:4:9
+        alt-not-enum · examples/error_demo/control/37_alt_on_str.utu:4:16
 
  2 │ // Expect: alt needs an enum value, got Str; compare strings with if/else
  3 │ fn color(name: Str) I32 {
- 4 │     alt name {
-   │         ━━━━
-   │         ╰─ Str
+ 4 │     return alt name {
+   │                ━━━━
+   │                ╰─ Str
  5 │         ~> 0,
  6 │     };
 
@@ -820,14 +816,14 @@ ok
 
 === utu check examples/error_demo/control/40_duplicate_match_bool.utu
  ERROR  Duplicate pattern true
-        duplicate-pattern · examples/error_demo/control/40_duplicate_match_bool.utu:4:26
+        duplicate-pattern · examples/error_demo/control/40_duplicate_match_bool.utu:4:33
 
  2 │ // Expect: Duplicate match pattern 'true'
  3 │ fn bit(b: Bool) I32 {
- 4 │     match b { true => 1, true => 2, false => 0, };
-   │               ────       ━━━━━━━━━━
-   │               │          ╰─ already matched
-   │               ╰─ first here
+ 4 │     return match b { true => 1, true => 2, false => 0, };
+   │                      ────       ━━━━━━━━━━
+   │                      │          ╰─ already matched
+   │                      ╰─ first here
  5 │ }
 --- exit 1
 
@@ -835,7 +831,7 @@ ok
  ERROR  Duplicate pattern 0x10
         duplicate-pattern · examples/error_demo/control/41_duplicate_match_same_value_spelled_differently.utu:6:9
 
- 4 │     match n {
+ 4 │     return match n {
  5 │         16 => "sixteen",
    │         ──
    │         ╰─ first here
@@ -850,7 +846,7 @@ ok
  ERROR  Duplicate arm Circle: never runs
         duplicate-pattern · examples/error_demo/control/42_duplicate_alt_variant.utu:10:9
 
- 8 │     alt shape {
+ 8 │     return alt shape {
  9 │         Circle |c| => 3.0 * c.r * c.r,
    │         ──────
    │         ╰─ first here
@@ -865,7 +861,7 @@ ok
  ERROR  Shape has no variant Leaf
         unknown-variant · examples/error_demo/control/43_alt_variant_of_other_enum.utu:14:9
 
-12 │     alt shape {
+12 │     return alt shape {
 13 │         Circle |c| => c.r,
 14 │         Leaf => 0.0,
    │         ━━━━
@@ -883,7 +879,7 @@ ok
  4 │     if x > 100 { break; };
    │                  ━━━━━
    │                  ╰─ here
- 5 │     x;
+ 5 │     return x;
  6 │ }
 --- exit 1
 
@@ -896,7 +892,7 @@ ok
  4 │     if x < 0 { continue; };
    │                ━━━━━━━━
    │                ╰─ here
- 5 │     x;
+ 5 │     return x;
  6 │ }
 --- exit 1
 
@@ -1000,7 +996,7 @@ ok
  6 │     defer { console.log("done"); return 1; };
    │                                  ━━━━━━━━
    │                                  ╰─ here
- 7 │     42;
+ 7 │     return 42;
  8 │ }
 --- exit 1
 
@@ -1040,7 +1036,7 @@ ok
    │         ━━━━━━━━
    │         ╰─ here
  7 │     };
- 8 │     1;
+ 8 │     return 1;
 --- exit 1
 
 === utu check examples/error_demo/control/57_host_alt_arm_not_a_class.utu
@@ -1084,14 +1080,14 @@ ok
 
 === utu check examples/error_demo/control/608_negative_zero_pattern.utu
  ERROR  Duplicate pattern -0.0
-        duplicate-pattern · examples/error_demo/control/608_negative_zero_pattern.utu:4:25
+        duplicate-pattern · examples/error_demo/control/608_negative_zero_pattern.utu:4:32
 
  2 │ // Expect: Duplicate pattern -0.0
  3 │ fn f(x: F64) I32 {
- 4 │     match x { 0.0 => 1, -0.0 => 2, ~> 3, };
-   │               ───       ━━━━━━━━━━
-   │               │         ╰─ already matched
-   │               ╰─ first here
+ 4 │     return match x { 0.0 => 1, -0.0 => 2, ~> 3, };
+   │                      ───       ━━━━━━━━━━
+   │                      │         ╰─ already matched
+   │                      ╰─ first here
  5 │ }
 --- exit 1
 
@@ -1110,13 +1106,13 @@ ok
 
 === utu check examples/error_demo/control/61_alt_over_nullable_enum.utu
  ERROR  alt on nullable Shape
-        alt-not-enum · examples/error_demo/control/61_alt_over_nullable_enum.utu:8:9
+        alt-not-enum · examples/error_demo/control/61_alt_over_nullable_enum.utu:8:16
 
  6 │
  7 │ fn area(shape: ?Shape) F64 {
- 8 │     alt shape {
-   │         ━━━━━
-   │         ╰─ ?Shape
+ 8 │     return alt shape {
+   │                ━━━━━
+   │                ╰─ ?Shape
  9 │         Circle |c| => 3.0 * c.r * c.r,
 10 │         Dot => 0.0,
 
@@ -1133,7 +1129,7 @@ ok
    │                          ━━━━━━
    │                          ╰─ Void
  6 │     };
- 7 │     -1;
+ 7 │     return -1;
 --- exit 1
 
 === utu check examples/error_demo/control/63_return_value_from_void.utu
@@ -1189,21 +1185,21 @@ ok
    │            ───   ━━━━━━━━━━━━━━━━
    │            │     ╰─ Void
    │            ╰─ I32
- 5 │     s;
+ 5 │     return s;
  6 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/67_if_without_else_returned.utu
  ERROR  abs returns I32, got Void
-        type-mismatch · examples/error_demo/control/67_if_without_else_returned.utu:4:5
+        type-mismatch · examples/error_demo/control/67_if_without_else_returned.utu:4:12
 
  2 │ // Expect: abs must end with an I32 value; this if has no else branch
  3 │ fn abs(x: I32) I32 {
    │                ───
    │                ╰─ I32
- 4 │     if x < 0 { -x; };
-   │     ━━━━━━━━━━━━━━━━
-   │     ╰─ Void
+ 4 │     return if x < 0 { -x; };
+   │            ━━━━━━━━━━━━━━━━
+   │            ╰─ Void
  5 │ }
 --- exit 1
 
@@ -1222,27 +1218,22 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/69_branches_disagree.utu
- ERROR  label returns I32, got Str
-        type-mismatch · examples/error_demo/control/69_branches_disagree.utu:4:28
+ ERROR  Expected I32, got Str
+        type-mismatch · examples/error_demo/control/69_branches_disagree.utu:4:35
 
  2 │ // Expect: if branches disagree: then is I32, else is Str
  3 │ fn label(n: I32) I32 {
-   │                  ───
-   │                  ╰─ I32
- 4 │     if n > 0 { n; } else { "none"; };
-   │                            ━━━━━━
-   │                            ╰─ Str
+ 4 │     return if n > 0 { n; } else { "none"; };
+   │                                   ━━━━━━
+   │                                   ╰─ Str
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/70_match_arms_disagree.utu
- ERROR  describe returns Str, got I32
+ ERROR  Expected Str, got I32
         type-mismatch · examples/error_demo/control/70_match_arms_disagree.utu:6:14
 
- 3 │ fn describe(n: I32) Str {
-   │                     ───
-   │                     ╰─ Str
- 4 │     match n {
+ 4 │     return match n {
  5 │         0 => "zero",
  6 │         1 => 1,
    │              ━
@@ -1252,13 +1243,10 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/control/71_alt_arms_disagree.utu
- ERROR  area returns F64, got Str
+ ERROR  Expected F64, got Str
         type-mismatch · examples/error_demo/control/71_alt_arms_disagree.utu:10:16
 
- 7 │ fn area(shape: Shape) F64 {
-   │                       ───
-   │                       ╰─ F64
- 8 │     alt shape {
+ 8 │     return alt shape {
  9 │         Circle |c| => c.r * c.r,
 10 │         Dot => "none",
    │                ━━━━━━
@@ -1269,13 +1257,13 @@ ok
 
 === utu check examples/error_demo/control/72_condition_not_bool.utu
  ERROR  Condition is I32, not Bool
-        type-mismatch · examples/error_demo/control/72_condition_not_bool.utu:4:8
+        type-mismatch · examples/error_demo/control/72_condition_not_bool.utu:4:15
 
  2 │ // Expect: if condition must be Bool, got I32 (write count != 0)
  3 │ fn any(count: I32) I32 {
- 4 │     if count { 1; } else { 0; };
-   │        ━━━━━
-   │        ╰─ I32
+ 4 │     return if count { 1; } else { 0; };
+   │               ━━━━━
+   │               ╰─ I32
  5 │ }
 --- exit 1
 
@@ -1288,7 +1276,7 @@ ok
 10 │     while (cur) { n += 1; cur = null; };
    │            ━━━
    │            ╰─ ?Node
-11 │     n;
+11 │     return n;
 12 │ }
 --- exit 1
 
@@ -1311,7 +1299,7 @@ ok
  4 │     if s.len() == 0 { return "empty"; };
    │                              ━━━━━━━
    │                              ╰─ Str
- 5 │     s.len();
+ 5 │     return s.len();
  6 │ }
 --- exit 1
 
@@ -1325,34 +1313,32 @@ ok
    │                               ━
    │                               ╰─ a value, not a label
  6 │     };
- 7 │     -1;
+ 7 │     return -1;
 
   note  a loop's break takes no value; break name v leaves a block name: { … } with v
 --- exit 1
 
 === utu check examples/error_demo/control/78_missing_return_in_one_branch.utu
- ERROR  sign returns I32, got Void
-        type-mismatch · examples/error_demo/control/78_missing_return_in_one_branch.utu:6:29
+ ERROR  Expected I32, got Void
+        type-mismatch · examples/error_demo/control/78_missing_return_in_one_branch.utu:6:36
 
  4 │
  5 │ fn sign(x: I32) I32 {
-   │                 ───
-   │                 ╰─ I32
- 6 │     if x >= 0 { 1; } else { console.log("negative"); };
-   │                             ━━━━━━━━━━━━━━━━━━━━━━━
-   │                             ╰─ Void
+ 6 │     return if x >= 0 { 1; } else { console.log("negative"); };
+   │                                    ━━━━━━━━━━━━━━━━━━━━━━━
+   │                                    ╰─ Void
  7 │ }
 --- exit 1
 
 === utu check examples/error_demo/control/79_orelse_default_wrong_type.utu
  ERROR  Expected Str, got I32
-        type-mismatch · examples/error_demo/control/79_orelse_default_wrong_type.utu:4:21
+        type-mismatch · examples/error_demo/control/79_orelse_default_wrong_type.utu:4:28
 
  2 │ // Expect: Type mismatch: orelse default must be Str (from ?Str), got I32
  3 │ fn shown(nickname: ?Str) Str {
- 4 │     nickname orelse 0;
-   │                     ━
-   │                     ╰─ I32
+ 4 │     return nickname orelse 0;
+   │                            ━
+   │                            ╰─ I32
  5 │ }
 --- exit 1
 
@@ -1360,7 +1346,7 @@ ok
  ERROR  Expected Str, got I32
         type-mismatch · examples/error_demo/control/80_promote_arms_disagree.utu:6:12
 
- 4 │     promote name {
+ 4 │     return promote name {
  5 │         |n| => n.slice(0, 1),
  6 │         ~> 0,
    │            ━
@@ -1378,7 +1364,7 @@ ok
  5 │     await for (s) |v| { acc += v; };
    │           ━━━━━━━━━━━━━━━━━━━━━━━━━
    │           ╰─ may be null
- 6 │     acc;
+ 6 │     return acc;
  7 │ }
 --- exit 1
 
@@ -1391,7 +1377,7 @@ ok
  5 │     for (xs) |x| { n += 1; };
    │          ━━
    │          ╰─ here
- 6 │     n;
+ 6 │     return n;
  7 │ }
 --- exit 1
 
@@ -1417,7 +1403,7 @@ ok
  5 │     for (0 ..< xs.len()) |i| { t += i; };
    │                ━━━━━━
    │                ╰─ may be null
- 6 │     t;
+ 6 │     return t;
  7 │ }
 --- exit 1
 
@@ -1440,8 +1426,8 @@ ok
 
  5 │ main {
  6 │     let pair = swap(3, 4);
- 7 │     let first = cl() I32 { let .{a, b} = pair; a; };
-   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 7 │     let first = cl() I32 { let .{a, b} = pair; return a; };
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                 ╰─ here
  8 │     console.log(first());
  9 │ }
@@ -1449,23 +1435,23 @@ ok
 
 === utu check examples/error_demo/control/86_int_pattern_on_int_enum.utu
  ERROR  0 cannot match Level
-        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:15
+        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:22
 
  6 │
  7 │ fn label(l: Level) I32 {
- 8 │     match l { 0 => 10, 1 => 20, };
-   │               ━━━━━━━━
-   │               ╰─ here
+ 8 │     return match l { 0 => 10, 1 => 20, };
+   │                      ━━━━━━━━
+   │                      ╰─ here
  9 │ }
 
  ERROR  1 cannot match Level
-        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:24
+        match-pattern · examples/error_demo/control/86_int_pattern_on_int_enum.utu:8:31
 
  6 │
  7 │ fn label(l: Level) I32 {
- 8 │     match l { 0 => 10, 1 => 20, };
-   │                        ━━━━━━━━
-   │                        ╰─ here
+ 8 │     return match l { 0 => 10, 1 => 20, };
+   │                               ━━━━━━━━
+   │                               ╰─ here
  9 │ }
 --- exit 1
 
@@ -1484,13 +1470,13 @@ ok
 
 === utu check examples/error_demo/iterators/02_unfinished_filter_return.utu
  ERROR  Unfinished pipeline: filter
-        iterator-unfinished · examples/error_demo/iterators/02_unfinished_filter_return.utu:4:5
+        iterator-unfinished · examples/error_demo/iterators/02_unfinished_filter_return.utu:4:12
 
  2 │ // Expect: filter pipeline is unfinished: the function returns Array[I32], so end it with collect(I32)
  3 │ fn evens(xs: Array[I32]) Array[I32] {
- 4 │     xs filter |n| { n % 2 == 0; };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
+ 4 │     return xs filter |n| { n % 2 == 0; };
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ here
  5 │ }
 --- exit 1
 
@@ -2147,7 +2133,7 @@ ok
  4 │     for (0 ..< n) |i| { if i % 2 == 0 { yield i; }; };
    │                                         ━━━━━━━
    │                                         ╰─ here
- 5 │     0;
+ 5 │     return 0;
  6 │ }
 --- exit 1
 
@@ -2309,13 +2295,13 @@ ok
 
 === utu check examples/error_demo/iterators/56_prune_in_closure.utu
  ERROR  prune in a closure
-        prune-in-closure · examples/error_demo/iterators/56_prune_in_closure.utu:15:48
+        prune-in-closure · examples/error_demo/iterators/56_prune_in_closure.utu:15:55
 
 13 │     let count = 0;
 14 │     for (walk(root)) |n| {
-15 │         let skip = cl() { if n.name == "tmp" { prune; }; };
-   │                                                ━━━━━
-   │                                                ╰─ here
+15 │         let skip = cl() { return if n.name == "tmp" { prune; }; };
+   │                                                       ━━━━━
+   │                                                       ╰─ here
 16 │         skip();
 17 │         count += 1;
 --- exit 1
@@ -2448,7 +2434,7 @@ ok
  8 │         let w: I32 = await later(v + 1);
    │                      ━━━━━━━━━━━━━━━━━━
    │                      ╰─ suspends
- 9 │         record(w);
+ 9 │         return record(w);
 10 │     });
 
   note  A stack suspends only through utu's calls, not the host's; await outside the closure
@@ -2460,7 +2446,7 @@ ok
 
  4 │
  5 │ main {
- 6 │     let s = Stream[I32].of([1, 2]).map(cl(v) { let w: I32 = await later(v); w; });
+ 6 │     let s = Stream[I32].of([1, 2]).map(cl(v) { let w: I32 = await later(v); return w; });
    │                                        ──                   ━━━━━━━━━━━━━━
    │                                        │                    ╰─ suspends
    │                                        ╰─ the host calls it
@@ -2760,7 +2746,7 @@ ok
  ERROR  Unknown function squre; did you mean square?
         unknown-function · examples/error_demo/names/04_unknown_function_typo.utu:6:17
 
- 3 │ fn square(x: I32) I32 { x * x; }
+ 3 │ fn square(x: I32) I32 { return x * x; }
    │    ──────
    │    ╰─ declared here
  4 │
@@ -2777,20 +2763,20 @@ ok
 
 === utu check examples/error_demo/names/05_unknown_variable_in_closure.utu
  ERROR  Unknown variable offest; did you mean offset?
-        unknown-variable · examples/error_demo/names/05_unknown_variable_in_closure.utu:7:35
+        unknown-variable · examples/error_demo/names/05_unknown_variable_in_closure.utu:7:42
 
  5 │ main {
  6 │     let offset = 10;
    │         ──────
    │         ╰─ declared here
- 7 │     console.log(apply(cl(n) { n + offest; }, 5));
-   │                                   ━━━━━━
-   │                                   ╰─ not defined
+ 7 │     console.log(apply(cl(n) { return n + offest; }, 5));
+   │                                          ━━━━━━
+   │                                          ╰─ not defined
  8 │ }
  9 │ using console from std:Console
 
   fix   Use offset
- 7 │     console.log(apply(cl(n) { n + offset; }, 5));
+ 7 │     console.log(apply(cl(n) { return n + offset; }, 5));
 --- exit 1
 
 === utu check examples/error_demo/names/06_unknown_variable_field_value.utu
@@ -2813,13 +2799,13 @@ ok
 
 === utu check examples/error_demo/names/07_unknown_variable_self.utu
  ERROR  Unknown variable self
-        unknown-variable · examples/error_demo/names/07_unknown_variable_self.utu:8:5
+        unknown-variable · examples/error_demo/names/07_unknown_variable_self.utu:8:12
 
  6 │
  7 │ fn Rect.area |r| () I32 {
- 8 │     self.w * self.h;
-   │     ━━━━
-   │     ╰─ not defined
+ 8 │     return self.w * self.h;
+   │            ━━━━
+   │            ╰─ not defined
  9 │ }
 --- exit 1
 
@@ -2857,8 +2843,8 @@ ok
         member-clash · examples/error_demo/names/100_protocol_method_shadow.utu:10:7
 
  8 │
- 9 │ fn Sh[Sq].area |q| () I32 { q.s * q.s; }
-10 │ fn Sh.area |x| () I32 { 0; }
+ 9 │ fn Sh[Sq].area |q| () I32 { return q.s * q.s; }
+10 │ fn Sh.area |x| () I32 { return 0; }
    │       ━━━━
    │       ╰─ also in the protocol
 11 │
@@ -2937,7 +2923,7 @@ ok
  3 │ fn greet(name: Strng) Str {
    │                ━━━━━
    │                ╰─ no such type
- 4 │     "hello " + name;
+ 4 │     return "hello " + name;
  5 │ }
 
   fix   Use Str
@@ -2950,7 +2936,7 @@ ok
 
  2 │ // Expect: Unknown function nope (once); no "v needs a type" for the closure
  3 │ main {
- 4 │     nope(1).then(cl(v) { v; });
+ 4 │     nope(1).then(cl(v) { return v; });
    │     ━━━━
    │     ╰─ not defined
  5 │     console.log(1);
@@ -3021,7 +3007,7 @@ ok
 
  1 │ // What: a repeated parameter name still names the first in the body.
  2 │ // Expect: Duplicate parameter x
- 3 │ fn f(x: I32, x: Str) I32 { x; }
+ 3 │ fn f(x: I32, x: Str) I32 { return x; }
    │      ─       ━━━━━━
    │      │       ╰─ already declared
    │      ╰─ first here
@@ -3036,7 +3022,7 @@ ok
  3 │ fn add(a: i32, b: i32) i32 {
    │           ━━━
    │           ╰─ no such type
- 4 │     a + b;
+ 4 │     return a + b;
  5 │ }
 
   fix   Use I32
@@ -3052,7 +3038,7 @@ ok
  3 │ fn shout(s: String) String {
    │             ━━━━━━
    │             ╰─ no such type
- 4 │     s.to_upper();
+ 4 │     return s.to_upper();
  5 │ }
 
   fix   Use Str
@@ -3068,7 +3054,7 @@ ok
  3 │ fn is_even(n: I32) Booll {
    │                    ━━━━━
    │                    ╰─ no such type
- 4 │     n % 2 == 0;
+ 4 │     return n % 2 == 0;
  5 │ }
 
   fix   Use Bool
@@ -3104,7 +3090,7 @@ ok
  3 │ fn count(words: Array[Strng]) I32 {
    │                       ━━━━━
    │                       ╰─ no such type
- 4 │     words.len();
+ 4 │     return words.len();
  5 │ }
 
   fix   Use Str
@@ -3140,7 +3126,7 @@ ok
  9 │ fn norm(p: geometry.Pt) F64 {
    │                     ━━
    │                     ╰─ no such type
-10 │     p.x + p.y;
+10 │     return p.x + p.y;
 11 │ }
 --- exit 1
 
@@ -3150,14 +3136,14 @@ ok
 
  2 │ // Expect: Unknown type 'F46'; did you mean 'F64'?
  3 │ main {
- 4 │     let half = cl(x: F46) F64 { x / 2.0; };
+ 4 │     let half = cl(x: F46) F64 { return x / 2.0; };
    │                      ━━━
    │                      ╰─ no such type
  5 │     console.log(half(9.0));
  6 │ }
 
   fix   Use F64
- 4 │     let half = cl(x: F64) F64 { x / 2.0; };
+ 4 │     let half = cl(x: F64) F64 { return x / 2.0; };
 --- exit 1
 
 === utu check examples/error_demo/names/20_unknown_module_using.utu
@@ -3244,7 +3230,7 @@ ok
  9 │ fn norm(p: geom.Point) F64 {
    │            ━━━━
    │            ╰─ no such module
-10 │     p.x + p.y;
+10 │     return p.x + p.y;
 11 │ }
 --- exit 1
 
@@ -3257,7 +3243,7 @@ ok
    │       ╰─ declared here
    ┆
  7 │ fn area(s: Shape) F64 {
- 8 │     alt s {
+ 8 │     return alt s {
  9 │         Circel |c| => 3.0 * c.r * c.r,
    │         ━━━━━━
    │         ╰─ no such variant
@@ -3324,7 +3310,7 @@ ok
  ERROR  Shape has no variant Ok
         unknown-variant · examples/error_demo/names/29_unknown_variant_wrong_enum_alt.utu:14:9
 
-12 │     alt s {
+12 │     return alt s {
 13 │         Circle |c| => c.r,
 14 │         Ok => 0.0,
    │         ━━
@@ -3515,7 +3501,7 @@ ok
 
  4 │     | x: I32
  5 │
- 6 │ fn f(p: Point.Inner) I32 { 0; }
+ 6 │ fn f(p: Point.Inner) I32 { return 0; }
    │         ━━━━━
    │         ╰─ no such module
  7 │
@@ -3526,11 +3512,11 @@ ok
  ERROR  Duplicate declaration area
         duplicate-declaration · examples/error_demo/names/41_duplicate_function.utu:5:4
 
- 3 │ fn area(w: I32, h: I32) I32 { w * h; }
+ 3 │ fn area(w: I32, h: I32) I32 { return w * h; }
    │    ────
    │    ╰─ first here
  4 │
- 5 │ fn area(r: I32) I32 { 3 * r * r; }
+ 5 │ fn area(r: I32) I32 { return 3 * r * r; }
    │    ━━━━
    │    ╰─ again
  6 │
@@ -3603,7 +3589,7 @@ ok
    │             ─               ━━━━━━
    │             │               ╰─ already declared
    │             ╰─ first here
- 4 │     x + y;
+ 4 │     return x + y;
  5 │ }
 --- exit 1
 
@@ -3668,7 +3654,7 @@ ok
 
  2 │ // Expect: Duplicate parameter 'a'
  3 │ main {
- 4 │     let add = cl(a: I32, a: I32) I32 { a + a; };
+ 4 │     let add = cl(a: I32, a: I32) I32 { return a + a; };
    │                  ─       ━
    │                  │       ╰─ already declared
    │                  ╰─ first here
@@ -3753,7 +3739,7 @@ ok
  ERROR  name is both Pa's and Pb's
         ambiguous-method · examples/error_demo/names/501_method_of_two_protocols.utu:12:32
 
-10 │ fn Pb[X].name |x| () Str { "b"; }
+10 │ fn Pb[X].name |x| () Str { return "b"; }
 11 │
 12 │ main { console.log(X { id: 1 }.name()); }
    │                                ━━━━
@@ -3767,7 +3753,7 @@ ok
 
  7 │         | v: T
  8 │ }
- 9 │ fn P[Box[I32]].m |b| () I32 { b.v; }
+ 9 │ fn P[Box[I32]].m |b| () I32 { return b.v; }
    │      ━━━━━━━━
    │      ╰─ an instance
 10 │
@@ -3785,7 +3771,7 @@ ok
  4 │     let n = if n > 10 { 10; } else { n; };
    │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │     ╰─ already declared
- 5 │     n;
+ 5 │     return n;
  6 │ }
 --- exit 1
 
@@ -3834,7 +3820,7 @@ ok
  7 │ mod geometry {
    │     ━━━━━━━━
    │     ╰─ again
- 8 │     fn square(x: F64) F64 { x * x * 1.0; }
+ 8 │     fn square(x: F64) F64 { return x * x * 1.0; }
  9 │ }
 --- exit 1
 
@@ -3872,7 +3858,7 @@ ok
  3 │ mod Str {
    │     ━━━
    │     ╰─ a prelude name
- 4 │     fn len |s| () I32 { 0; }
+ 4 │     fn len |s| () I32 { return 0; }
  5 │ }
 --- exit 1
 
@@ -3881,10 +3867,10 @@ ok
         duplicate-method · examples/error_demo/names/56_duplicate_methods.utu:8:4
 
  6 │
- 7 │ fn Rect.area |r| () I32 { r.w * r.h; }
+ 7 │ fn Rect.area |r| () I32 { return r.w * r.h; }
    │         ────
    │         ╰─ first here
- 8 │ fn Rect.area |r| () I32 { r.h * r.w; }
+ 8 │ fn Rect.area |r| () I32 { return r.h * r.w; }
    │    ━━━━━━━━━
    │    ╰─ already declared
  9 │
@@ -3935,26 +3921,26 @@ ok
 
 === utu check examples/error_demo/names/607_unknown_module_twice.utu
  ERROR  Unknown module Nope
-        unknown-module · examples/error_demo/names/607_unknown_module_twice.utu:4:5
+        unknown-module · examples/error_demo/names/607_unknown_module_twice.utu:4:12
 
  2 │ // Expect: Unknown module Nope
  3 │ fn g() I32 {
- 4 │     Nope[F64].x() + Nope[F64].x();
-   │     ━━━━
-   │     ╰─ no such module
+ 4 │     return Nope[F64].x() + Nope[F64].x();
+   │            ━━━━
+   │            ╰─ no such module
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/names/60_duplicate_field_anon_literal.utu
  ERROR  Duplicate field y
-        duplicate-field · examples/error_demo/names/60_duplicate_field_anon_literal.utu:8:20
+        duplicate-field · examples/error_demo/names/60_duplicate_field_anon_literal.utu:8:27
 
  6 │
  7 │ fn origin() Point {
- 8 │     &{ x: 0, y: 0, y: 1 };
-   │              ─     ━━━━
-   │              │     ╰─ already given
-   │              ╰─ first here
+ 8 │     return &{ x: 0, y: 0, y: 1 };
+   │                     ─     ━━━━
+   │                     │     ╰─ already given
+   │                     ╰─ first here
  9 │ }
 --- exit 1
 
@@ -3992,7 +3978,7 @@ ok
  ERROR  Duplicate arm Circle: never runs
         duplicate-pattern · examples/error_demo/names/63_duplicate_pattern_alt.utu:10:9
 
- 8 │     alt s {
+ 8 │     return alt s {
  9 │         Circle |c| => 3.0 * c.r * c.r,
    │         ──────
    │         ╰─ first here
@@ -4007,7 +3993,7 @@ ok
  ERROR  Duplicate pattern 0x10
         duplicate-pattern · examples/error_demo/names/64_duplicate_pattern_same_value.utu:6:9
 
- 4 │     match n {
+ 4 │     return match n {
  5 │         16 => "sixteen",
    │         ──
    │         ╰─ first here
@@ -4089,7 +4075,7 @@ ok
 
  8 │ }
  9 │
-10 │ fn depth(s: Stack) I32 { s.size; }
+10 │ fn depth(s: Stack) I32 { return s.size; }
    │             ━━━━━
    │             ╰─ here
 11 │
@@ -4177,13 +4163,13 @@ ok
         duplicate-declaration · examples/error_demo/names/760_duplicate_fn_in_module.utu:5:8
 
  3 │ mod M {
- 4 │     fn f() I32 { 1; }
+ 4 │     fn f() I32 { return 1; }
    │        ─
    │        ╰─ first here
- 5 │     fn f() I32 { 2; }
+ 5 │     fn f() I32 { return 2; }
    │        ━
    │        ╰─ again
- 6 │     fn get() I32 { f(); }
+ 6 │     fn get() I32 { return f(); }
  7 │ }
 --- exit 1
 
@@ -4198,7 +4184,7 @@ ok
  5 │     let g: I32 = 4;
    │         ━
    │         ╰─ again
- 6 │     fn get() I32 { g; }
+ 6 │     fn get() I32 { return g; }
  7 │ }
 --- exit 1
 
@@ -4210,7 +4196,7 @@ ok
  4 │     let size: I32 = 1;
    │         ────
    │         ╰─ first here
- 5 │     fn size() I32 { 2; }
+ 5 │     fn size() I32 { return 2; }
    │        ━━━━
    │        ╰─ again
  6 │ }
@@ -4232,10 +4218,10 @@ ok
         duplicate-method · examples/error_demo/names/763_duplicate_protocol_impl.utu:10:4
 
  8 │
- 9 │ fn P[S].m |a| (b: S) I32 { 1; }
+ 9 │ fn P[S].m |a| (b: S) I32 { return 1; }
    │         ─
    │         ╰─ first here
-10 │ fn P[S].m |a| (b: S) I32 { 2; }
+10 │ fn P[S].m |a| (b: S) I32 { return 2; }
    │    ━━━━━━
    │    ╰─ already declared
 11 │
@@ -4248,7 +4234,7 @@ ok
 
  4 │ using Order from std:Ord;
  5 │
- 6 │ fn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }
+ 6 │ fn Ord[Str].cmp |a| (b: Str) I32 { return a.len() - b.len(); }
    │    ━━━━━━━━━━━━
    │    ╰─ already declared
  7 │
@@ -4288,7 +4274,7 @@ ok
  5 │ mod console {
    │     ━━━━━━━
    │     ╰─ again
- 6 │     fn f() I32 { 3; }
+ 6 │     fn f() I32 { return 3; }
  7 │ }
 --- exit 1
 
@@ -4332,7 +4318,7 @@ ok
    │                ──────
    │                ╰─ first here
  4 │
- 5 │ fn helper() I32 { 1; }
+ 5 │ fn helper() I32 { return 1; }
    │    ━━━━━━
    │    ╰─ again
  6 │
@@ -4410,7 +4396,7 @@ ok
  6 │ fn Sqare.area |self| () I32 {
    │    ━━━━━
    │    ╰─ no such type
- 7 │     self.side * self.side;
+ 7 │     return self.side * self.side;
  8 │ }
 
   fix   Use Square
@@ -4426,7 +4412,7 @@ ok
  6 │ fn Shape[Square].area |self| () I32 {
    │    ━━━━━
    │    ╰─ no such type
- 7 │     self.side * self.side;
+ 7 │     return self.side * self.side;
  8 │ }
 --- exit 1
 
@@ -4443,7 +4429,7 @@ ok
  7 │ mod util {
    │     ━━━━
    │     ╰─ again
- 8 │     fn v() I32 { 2; }
+ 8 │     fn v() I32 { return 2; }
  9 │ }
 --- exit 1
 
@@ -4490,7 +4476,7 @@ ok
         test-in-generic · examples/error_demo/names/833_test_in_generic_mod.utu:5:10
 
  3 │ mod Stack[T] {
- 4 │     fn top(xs: Array[T]) T { xs[xs.len() - 1]; }
+ 4 │     fn top(xs: Array[T]) T { return xs[xs.len() - 1]; }
  5 │     test "top" { assert true; }
    │          ━━━━━
    │          ╰─ runs in no instance
@@ -4540,7 +4526,7 @@ ok
    ┆
  5 │ }
  6 │
- 7 │ fn m() I32 { 2; }
+ 7 │ fn m() I32 { return 2; }
    │    ━
    │    ╰─ again
  8 │
@@ -4653,8 +4639,8 @@ ok
  9 │ }
 
    ╭─ examples/error_demo/names/lazy_parts/widgets.utu
-18 │     fn total(n: I32) I32 { n * 2; }
-   │     ───────────────────────────────
+18 │     fn total(n: I32) I32 { return n * 2; }
+   │     ──────────────────────────────────────
    │     ╰─ declared here
 --- exit 1
 
@@ -4760,7 +4746,7 @@ ok
         type-mismatch · examples/error_demo/names/961_variant_of_other_enum.utu:12:9
 
 10 │ fn area(s: Shape) F64 {
-11 │     alt s {
+11 │     return alt s {
 12 │         Lens.Circle |c| => c.focus,
    │         ━━━━━━━━━━━
    │         ╰─ Circle
@@ -4822,7 +4808,7 @@ ok
 
  4 │     | f: cl() I32
  5 │
- 6 │ fn P.f |p| () I32 { 2; }
+ 6 │ fn P.f |p| () I32 { return 2; }
    │      ━
    │      ╰─ also a field
  7 │
@@ -4871,7 +4857,7 @@ ok
    │ ━━━━━━━━━━━━━━━
    │ ╰─ here
  4 │
- 5 │ fn scores() I32 { scores.len(); }
+ 5 │ fn scores() I32 { return scores.len(); }
 --- exit 1
 
 === utu check examples/error_demo/platform/02_mem_declared_twice.utu
@@ -5227,13 +5213,13 @@ ok
 
 === utu check examples/error_demo/platform/17_vec_copy_in.utu
  ERROR  The host cannot see vec input: make it a mem
-        vec-host · examples/error_demo/platform/17_vec_copy_in.utu:9:9
+        vec-host · examples/error_demo/platform/17_vec_copy_in.utu:9:16
 
  7 │ lib {
  8 │     fn load(bytes: JS.Uint8Array) I32 {
- 9 │         input.copy_in(bytes);
-   │         ━━━━━━━━━━━━━
-   │         ╰─ here
+ 9 │         return input.copy_in(bytes);
+   │                ━━━━━━━━━━━━━
+   │                ╰─ here
 10 │     }
 11 │ }
 --- exit 1
@@ -5330,7 +5316,7 @@ ok
  3 │ lib {
    │ ━━━━━
    │ ╰─ here
- 4 │     fn add(a: I32, b: I32) I32 { a + b; }
+ 4 │     fn add(a: I32, b: I32) I32 { return a + b; }
  5 │ }
  6 │
  7 │ lib {
@@ -5345,7 +5331,7 @@ ok
  3 │ lib {
    │ ━━━━━
    │ ╰─ here
- 4 │     fn double(x: I32) I32 { x * 2; }
+ 4 │     fn double(x: I32) I32 { return x * 2; }
  5 │ }
  6 │
  7 │ main {
@@ -5392,62 +5378,66 @@ ok
 
 === utu check examples/error_demo/platform/29_wat_after_statement.utu
  ERROR  @wat must be a function's whole body
-        wat-place · examples/error_demo/platform/29_wat_after_statement.utu:5:5
+        wat-place · examples/error_demo/platform/29_wat_after_statement.utu:5:12
 
  3 │ fn rotl(x: I32, k: I32) I32 {
  4 │     let y = x;
- 5 │     @wat/\ local.get $x local.get $k i32.rotl \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
+ 5 │     return @wat/\ local.get $x local.get $k i32.rotl \/;
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ here
  6 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/30_wat_unknown_instruction.utu
  ERROR  unknown instruction 'i32.rotate'
-        dsl-error · examples/error_demo/platform/30_wat_unknown_instruction.utu:4:38
+        dsl-error · examples/error_demo/platform/30_wat_unknown_instruction.utu:3:65
 
+ 1 │ // What: a @wat body with a misspelled instruction
  2 │ // Expect: @wat: unknown instruction 'i32.rotate' (did you mean i32.rotl?)
- 3 │ fn rotl(x: I32, k: I32) I32 {
- 4 │     @wat/\ local.get $x local.get $k i32.rotate \/;
-   │                                      ━━━━━━━━━━
-   │                                      ╰─ here
- 5 │ }
+ 3 │ fn rotl(x: I32, k: I32) I32 => @wat/\ local.get $x local.get $k i32.rotate \/;
+   │                                                                 ━━━━━━━━━━
+   │                                                                 ╰─ here
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/31_wat_wrong_local.utu
  ERROR  there is no local $y
-        dsl-error · examples/error_demo/platform/31_wat_wrong_local.utu:4:32
+        dsl-error · examples/error_demo/platform/31_wat_wrong_local.utu:3:52
 
+ 1 │ // What: a @wat body that reads a parameter by the wrong name
  2 │ // Expect: there is no local $y
- 3 │ fn twice(x: I32) I32 {
- 4 │     @wat/\ (i32.add (local.get $y) (local.get $x)) \/;
-   │                                ━━
-   │                                ╰─ here
- 5 │ }
+ 3 │ fn twice(x: I32) I32 => @wat/\ (i32.add (local.get $y) (local.get $x)) \/;
+   │                                                    ━━
+   │                                                    ╰─ here
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/32_wat_stack_type.utu
  ERROR  the function's result needs an i32, not an i64
-        dsl-error · examples/error_demo/platform/32_wat_stack_type.utu:4:25
+        dsl-error · examples/error_demo/platform/32_wat_stack_type.utu:3:45
 
+ 1 │ // What: a @wat body that leaves an i64 where the function returns I32
  2 │ // Expect: the function's result needs an i32, not an i64
- 3 │ fn widen(x: I32) I32 {
- 4 │     @wat/\ local.get $x i64.extend_i32_s \/;
-   │                         ━━━━━━━━━━━━━━━━
-   │                         ╰─ here
- 5 │ }
+ 3 │ fn widen(x: I32) I32 => @wat/\ local.get $x i64.extend_i32_s \/;
+   │                                             ━━━━━━━━━━━━━━━━
+   │                                             ╰─ here
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/33_wat_on_method.utu
- ERROR  a @wat function is a plain function: fn f(x: I32) I32 { @wat/\ … \/; }
-        dsl-error · examples/error_demo/platform/33_wat_on_method.utu:7:5
+ ERROR  a @wat function is a plain function: fn f(x: I32) I32 => @wat/\ … \/;
+        dsl-error · examples/error_demo/platform/33_wat_on_method.utu:6:36
 
+ 4 │     | n: I32
  5 │
- 6 │ fn Counter.bumped |self| () I32 {
- 7 │     @wat/\ local.get $self drop i32.const 1 \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 8 │ }
+ 6 │ fn Counter.bumped |self| () I32 => @wat/\ local.get $self drop i32.const 1 \/;
+   │                                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                    ╰─ here
+ 7 │
+ 8 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/34_unknown_dsl_name.utu
@@ -5528,14 +5518,15 @@ ok
 
 === utu check examples/error_demo/platform/39_ir_unknown_op.utu
  ERROR  No @ir element <ir-i32-mull>
-        ir-unknown · examples/error_demo/platform/39_ir_unknown_op.utu:4:5
+        ir-unknown · examples/error_demo/platform/39_ir_unknown_op.utu:3:26
 
+ 1 │ // What: an @ir body with a misspelled intrinsic tag
  2 │ // Expect: @ir: unknown intrinsic <ir-i32-mull> (pointing at the tag)
- 3 │ fn square(a: I32) I32 {
- 4 │     @ir/\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ unknown
- 5 │ }
+ 3 │ fn square(a: I32) I32 => @ir/\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \/;
+   │                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                          ╰─ unknown
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/400_new_of_utu_function.utu
@@ -5553,26 +5544,28 @@ ok
 
 === utu check examples/error_demo/platform/401_ir_unknown_parameter.utu
  ERROR  @ir names no parameter b
-        ir-unknown · examples/error_demo/platform/401_ir_unknown_parameter.utu:4:5
+        ir-unknown · examples/error_demo/platform/401_ir_unknown_parameter.utu:3:26
 
+ 1 │ // What: an @ir body that names a parameter the function does not have
  2 │ // Expect: @ir names no parameter b
- 3 │ fn square(a: I32) I32 {
- 4 │     @ir/\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ unknown
- 5 │ }
+ 3 │ fn square(a: I32) I32 => @ir/\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \/;
+   │                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                          ╰─ unknown
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/40_ir_missing_operand.utu
  ERROR  @ir body is empty or not well-formed IR
-        dsl-place · examples/error_demo/platform/40_ir_missing_operand.utu:4:5
+        dsl-place · examples/error_demo/platform/40_ir_missing_operand.utu:3:26
 
+ 1 │ // What: an @ir body whose binary op has one operand (and is unclosed)
  2 │ // Expect: @ir: <ir-i32-mul> needs two operands / is not closed
- 3 │ fn square(a: I32) I32 {
- 4 │     @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 5 │ }
+ 3 │ fn square(a: I32) I32 => @ir/\ <ir-i32-mul><ir-ident name="a"/> \/;
+   │                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                          ╰─ here
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/41_generator_as_value.utu
@@ -5619,7 +5612,7 @@ ok
         comptime-cycle · examples/error_demo/platform/440_comptime_reads_itself.utu:4:20
 
  2 │ // Expect: @comptime t reads itself
- 3 │ fn tab() Array[I32] { [t.len()]; }
+ 3 │ fn tab() Array[I32] { return [t.len()]; }
  4 │ const mem t: I32 = @comptime/\ tab() \/;
    │                    ━━━━━━━━━━━━━━━━━━━━
    │                    ╰─ waits on itself
@@ -5631,8 +5624,8 @@ ok
  ERROR  @comptime t reads u, which waits on it
         comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:5:20
 
- 3 │ fn f() Array[I32] { [u.len()]; }
- 4 │ fn g() Array[I32] { [t.len()]; }
+ 3 │ fn f() Array[I32] { return [u.len()]; }
+ 4 │ fn g() Array[I32] { return [t.len()]; }
  5 │ const mem t: I32 = @comptime/\ f() \/;
    │                    ━━━━━━━━━━━━━━━━━━
    │                    ╰─ waits on u
@@ -5641,7 +5634,7 @@ ok
  ERROR  @comptime u reads t, which waits on it
         comptime-cycle · examples/error_demo/platform/441_comptime_cycle.utu:6:20
 
- 4 │ fn g() Array[I32] { [t.len()]; }
+ 4 │ fn g() Array[I32] { return [t.len()]; }
  5 │ const mem t: I32 = @comptime/\ f() \/;
  6 │ const mem u: I32 = @comptime/\ g() \/;
    │                    ━━━━━━━━━━━━━━━━━━
@@ -5654,7 +5647,7 @@ ok
  ERROR  @comptime t trapped: it ran too long (a hundred million loop rounds)
         comptime-trap · examples/error_demo/platform/442_comptime_never_ends.utu:7:20
 
- 5 │     [1];
+ 5 │     return [1];
  6 │ }
  7 │ const mem t: I32 = @comptime/\ f() \/;
    │                    ━━━━━━━━━━━━━━━━━━
@@ -5717,26 +5710,28 @@ ok
 
 === utu check examples/error_demo/platform/447_ir_array_len_on_i32.utu
  ERROR  @ir <ir-array-len> is written wrong here
-        ir-unknown · examples/error_demo/platform/447_ir_array_len_on_i32.utu:4:5
+        ir-unknown · examples/error_demo/platform/447_ir_array_len_on_i32.utu:3:23
 
+ 1 │ // What: @ir array-len on an I32 (the compiler crashed)
  2 │ // Expect: @ir <ir-array-len> is written wrong here
- 3 │ fn len(a: I32) I32 {
- 4 │     @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ malformed
- 5 │ }
+ 3 │ fn len(a: I32) I32 => @ir/\ <ir-array-len><ir-ident name="a"/></ir-array-len> \/;
+   │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                       ╰─ malformed
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/448_wat_select_param.utu
  ERROR  select takes only (result t)
-        dsl-error · examples/error_demo/platform/448_wat_select_param.utu:4:58
+        dsl-error · examples/error_demo/platform/448_wat_select_param.utu:3:93
 
+ 1 │ // What: a @wat select with a (param …)
  2 │ // Expect: select takes only (result t)
- 3 │ fn pick(c: I32, a: I32, b: I32) I32 {
- 4 │     @wat/\ local.get $a local.get $b local.get $c select (param i32) \/;
-   │                                                          ━━━━━━━━━━━
-   │                                                          ╰─ here
- 5 │ }
+ 3 │ fn pick(c: I32, a: I32, b: I32) I32 => @wat/\ local.get $a local.get $b local.get $c select (param i32) \/;
+   │                                                                                             ━━━━━━━━━━━
+   │                                                                                             ╰─ here
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/449_dsl_nested_too_deeply.utu
@@ -5792,13 +5787,13 @@ ok
 
 === utu check examples/error_demo/platform/452_comptime_calls_main.utu
  ERROR  main is the entry point, not a function: move its body into a fn
-        unknown-function · examples/error_demo/platform/452_comptime_calls_main.utu:3:24
+        unknown-function · examples/error_demo/platform/452_comptime_calls_main.utu:3:31
 
  1 │ // What: a @comptime helper calling main
  2 │ // Expect: main is the entry point, not a function: move its body into a fn
- 3 │ fn tab() Array[I32] { [main()]; }
-   │                        ━━━━
-   │                        ╰─ not defined
+ 3 │ fn tab() Array[I32] { return [main()]; }
+   │                               ━━━━
+   │                               ╰─ not defined
  4 │ const mem t: I32 = @comptime/\ tab() \/;
 --- exit 1
 
@@ -5819,14 +5814,15 @@ ok
 
 === utu check examples/error_demo/platform/454_ir_close_tag_mismatch.utu
  ERROR  @ir body is empty or not well-formed IR
-        dsl-place · examples/error_demo/platform/454_ir_close_tag_mismatch.utu:4:5
+        dsl-place · examples/error_demo/platform/454_ir_close_tag_mismatch.utu:3:27
 
+ 1 │ // What: @ir with a close tag of another name
  2 │ // Expect: @ir body is empty or not well-formed IR
- 3 │ fn is_zero(a: I32) I32 {
- 4 │     @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 5 │ }
+ 3 │ fn is_zero(a: I32) I32 => @ir/\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \/;
+   │                           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                           ╰─ here
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/45_foreign_record_unknown_field.utu
@@ -5907,37 +5903,37 @@ ok
 
 === utu check examples/error_demo/platform/50_json_misspelled_op.utu
  ERROR  @json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`
-        dsl-error · examples/error_demo/platform/50_json_misspelled_op.utu:8:13
+        dsl-error · examples/error_demo/platform/50_json_misspelled_op.utu:8:20
 
  6 │
  7 │ fn load(text: Str) ?User {
- 8 │     @json/\ parse User text \/;
-   │             ━
-   │             ╰─ here
+ 8 │     return @json/\ parse User text \/;
+   │                    ━
+   │                    ╰─ here
  9 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/51_json_missing_type.utu
  ERROR  Expected a type after decode
-        dsl-error · examples/error_demo/platform/51_json_missing_type.utu:8:20
+        dsl-error · examples/error_demo/platform/51_json_missing_type.utu:8:27
 
  6 │
  7 │ fn load(text: Str) ?User {
- 8 │     @json/\ decode text \/;
-   │                    ━━━━
-   │                    ╰─ here
+ 8 │     return @json/\ decode text \/;
+   │                           ━━━━
+   │                           ╰─ here
  9 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/52_json_missing_text.utu
  ERROR  @json decode needs a text expression after the type
-        dsl-error · examples/error_demo/platform/52_json_missing_text.utu:8:20
+        dsl-error · examples/error_demo/platform/52_json_missing_text.utu:8:27
 
  6 │
  7 │ fn load(text: Str) ?User {
- 8 │     @json/\ decode User \/;
-   │                    ━━━━
-   │                    ╰─ here
+ 8 │     return @json/\ decode User \/;
+   │                           ━━━━
+   │                           ╰─ here
  9 │ }
 --- exit 1
 
@@ -6046,14 +6042,14 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/547_wutu_hole_array.utu
- ERROR  Array[Str] is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
+ ERROR  Item is not a Component (a hole shows text, a number, a Bool, an element, or a Component)
         wutu-hole · examples/error_demo/platform/547_wutu_hole_array.utu:17:18
 
 15 │     let app = @wutu/\
 16 │     @reactive
-17 │     main { p { = state.tags } }
-   │                  ━━━━━━━━━━
-   │                  ╰─ Array[Str]
+17 │     main { p { = state.items } }
+   │                  ━━━━━━━━━━━
+   │                  ╰─ Item
 18 │     \/;
 19 │     Browser.document.body.append(app);
 --- exit 1
@@ -6098,13 +6094,13 @@ ok
 
 === utu check examples/error_demo/platform/54_json_bad_text_expression.utu
  ERROR  Invalid text expression
-        dsl-error · examples/error_demo/platform/54_json_bad_text_expression.utu:8:25
+        dsl-error · examples/error_demo/platform/54_json_bad_text_expression.utu:8:32
 
  6 │
  7 │ fn load(parts: Array[Str]) ?User {
- 8 │     @json/\ decode User parts[0] + \/;
-   │                         ━━━━━━━━━━
-   │                         ╰─ here
+ 8 │     return @json/\ decode User parts[0] + \/;
+   │                                ━━━━━━━━━━
+   │                                ╰─ here
  9 │ }
 --- exit 1
 
@@ -6123,61 +6119,61 @@ ok
 
 === utu check examples/error_demo/platform/55_json_nullable_scalar_field.utu
  ERROR  ?I32 is not supported: only reference types (Str, structs, enums, arrays) can be null
-        dsl-error · examples/error_demo/platform/55_json_nullable_scalar_field.utu:9:20
+        dsl-error · examples/error_demo/platform/55_json_nullable_scalar_field.utu:9:27
 
  7 │
  8 │ fn load(text: Str) ?Profile {
- 9 │     @json/\ decode Profile text \/;
-   │                    ━━━━━━━
-   │                    ╰─ here
+ 9 │     return @json/\ decode Profile text \/;
+   │                           ━━━━━━━
+   │                           ╰─ here
 10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/56_json_unsupported_field_type.utu
  ERROR  @json cannot use U8: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64
-        dsl-error · examples/error_demo/platform/56_json_unsupported_field_type.utu:10:20
+        dsl-error · examples/error_demo/platform/56_json_unsupported_field_type.utu:10:27
 
  8 │
  9 │ fn load(text: Str) ?Pixel {
-10 │     @json/\ decode Pixel text \/;
-   │                    ━━━━━
-   │                    ╰─ here
+10 │     return @json/\ decode Pixel text \/;
+   │                           ━━━━━
+   │                           ╰─ here
 11 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/57_json_enum_kind_field.utu
  ERROR  Event.Click has a field named kind, which @json uses to name the variant
-        dsl-error · examples/error_demo/platform/57_json_enum_kind_field.utu:9:20
+        dsl-error · examples/error_demo/platform/57_json_enum_kind_field.utu:9:27
 
  7 │
  8 │ fn load(text: Str) ?Event {
- 9 │     @json/\ decode Event text \/;
-   │                    ━━━━━
-   │                    ╰─ here
+ 9 │     return @json/\ decode Event text \/;
+   │                           ━━━━━
+   │                           ╰─ here
 10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/58_json_recursive_struct.utu
  ERROR  Node contains itself; make the recursive field ?Node or an Array
-        dsl-error · examples/error_demo/platform/58_json_recursive_struct.utu:9:20
+        dsl-error · examples/error_demo/platform/58_json_recursive_struct.utu:9:27
 
  7 │
  8 │ fn load(text: Str) ?Node {
- 9 │     @json/\ decode Node text \/;
-   │                    ━━━━
-   │                    ╰─ here
+ 9 │     return @json/\ decode Node text \/;
+   │                           ━━━━
+   │                           ╰─ here
 10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/59_json_unknown_type.utu
  ERROR  @json cannot use Usr: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64
-        dsl-error · examples/error_demo/platform/59_json_unknown_type.utu:8:20
+        dsl-error · examples/error_demo/platform/59_json_unknown_type.utu:8:27
 
  6 │
  7 │ fn load(text: Str) ?User {
- 8 │     @json/\ decode Usr text \/;
-   │                    ━━━
-   │                    ╰─ here
+ 8 │     return @json/\ decode Usr text \/;
+   │                           ━━━
+   │                           ╰─ here
  9 │ }
 --- exit 1
 
@@ -6228,13 +6224,13 @@ ok
 
 === utu check examples/error_demo/platform/60_json_host_type.utu
  ERROR  Expected a type after decode
-        dsl-error · examples/error_demo/platform/60_json_host_type.utu:6:20
+        dsl-error · examples/error_demo/platform/60_json_host_type.utu:6:27
 
  4 │
  5 │ fn load(text: Str) ?Browser.Element {
- 6 │     @json/\ decode Browser.Element text \/;
-   │                    ━━━━━━━━━━━━━━━
-   │                    ╰─ here
+ 6 │     return @json/\ decode Browser.Element text \/;
+   │                           ━━━━━━━━━━━━━━━
+   │                           ╰─ here
  7 │ }
 --- exit 1
 
@@ -6254,7 +6250,7 @@ ok
  ERROR  The ~> arm must be last in @json match
         dsl-error · examples/error_demo/platform/62_json_match_fallback_not_last.utu:7:9
 
- 5 │     @json/\ match text {
+ 5 │     return @json/\ match text {
  6 │         ~> 0,
  7 │         { status: "ok" } => 1,
    │         ━
@@ -6267,7 +6263,7 @@ ok
  ERROR  @json match needs at least one pattern arm
         dsl-error · examples/error_demo/platform/63_json_match_no_arms.utu:7:6
 
- 5 │     @json/\ match text {
+ 5 │     return @json/\ match text {
  6 │         ~> 0,
  7 │     }\/;
    │      ━
@@ -6277,13 +6273,13 @@ ok
 
 === utu check examples/error_demo/platform/64_json_match_no_text.utu
  ERROR  @json match needs the text to match: `match text { … }`
-        dsl-error · examples/error_demo/platform/64_json_match_no_text.utu:5:19
+        dsl-error · examples/error_demo/platform/64_json_match_no_text.utu:5:26
 
  3 │
  4 │ fn status(text: Str) I32 {
- 5 │     @json/\ match {
-   │                   ━
-   │                   ╰─ here
+ 5 │     return @json/\ match {
+   │                          ━
+   │                          ╰─ here
  6 │         { status: "ok" } => 1,
  7 │         ~> 0,
 --- exit 1
@@ -6293,7 +6289,7 @@ ok
         dsl-error · examples/error_demo/platform/65_json_match_capture_no_type.utu:6:32
 
  4 │ fn name_of(text: Str) Str {
- 5 │     @json/\ match text {
+ 5 │     return @json/\ match text {
  6 │         { user: { name: |name| } } => name,
    │                                ━
    │                                ╰─ here
@@ -6306,7 +6302,7 @@ ok
         dsl-error · examples/error_demo/platform/66_json_match_capture_twice.utu:6:37
 
  4 │ fn names(text: Str) Str {
- 5 │     @json/\ match text {
+ 5 │     return @json/\ match text {
  6 │         { first: |name| Str, last: |name| Str } => name,
    │                                     ━━━━
    │                                     ╰─ here
@@ -6319,7 +6315,7 @@ ok
         dsl-error · examples/error_demo/platform/67_json_match_missing_arrow.utu:5:26
 
  3 │ fn status(text: Str) I32 {
- 4 │     @json/\ match text {
+ 4 │     return @json/\ match text {
  5 │         { status: "ok" } 1,
    │                          ━
    │                          ╰─ here
@@ -6328,13 +6324,11 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/68_json_match_capture_wrong_type.utu
- ERROR  age_of returns I32, got Str
+ ERROR  Expected I32, got Str
         type-mismatch · examples/error_demo/platform/68_json_match_capture_wrong_type.utu:6:31
 
  4 │ fn age_of(text: Str) I32 {
-   │                      ───
-   │                      ╰─ I32
- 5 │     @json/\ match text {
+ 5 │     return @json/\ match text {
  6 │         { age: |age| Str } => age,
    │                               ━━━
    │                               ╰─ Str
@@ -6552,7 +6546,7 @@ ok
  ERROR  Wutu comments are written // …
         dsl-error · examples/error_demo/platform/79_wutu_hash_comment.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         # the heading
    │         ━
@@ -6565,7 +6559,7 @@ ok
  ERROR  expected a line break or ; after Wutu statement
         dsl-error · examples/error_demo/platform/80_wutu_two_texts_one_line.utu:8:20
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         p { "Hello" "world" }
    │                    ━
@@ -6576,57 +6570,61 @@ ok
 
 === utu check examples/error_demo/platform/810_ir_operand_type.utu
  ERROR  @ir <ir-i32-add> takes i32, given i64
-        ir-type · examples/error_demo/platform/810_ir_operand_type.utu:4:5
+        ir-type · examples/error_demo/platform/810_ir_operand_type.utu:3:25
 
+ 1 │ // What: @ir i32-add given an I64 (small folded it to 6; the other modes failed in the engine)
  2 │ // Expect: @ir <ir-i32-add> takes i32, given i64
- 3 │ fn twice(a: I64) I32 {
- 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ i64
- 5 │ }
+ 3 │ fn twice(a: I64) I32 => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
+   │                         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                         ╰─ i64
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/811_ir_result_not_bool.utu
  ERROR  @ir gives an i32, not a comparison's Bool
-        ir-type · examples/error_demo/platform/811_ir_result_not_bool.utu:4:5
+        ir-type · examples/error_demo/platform/811_ir_result_not_bool.utu:3:24
 
+ 1 │ // What: @ir arithmetic for a Bool result (it made a Bool holding 4)
  2 │ // Expect: @ir gives an i32, not a comparison's Bool
- 3 │ fn odd(a: I32) Bool {
- 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not Bool
- 5 │ }
+ 3 │ fn odd(a: I32) Bool => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \/;
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                        ╰─ not Bool
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/812_ir_result_type.utu
  ERROR  @ir gives i64, not I32
-        ir-type · examples/error_demo/platform/812_ir_result_type.utu:4:5
+        ir-type · examples/error_demo/platform/812_ir_result_type.utu:3:25
 
+ 1 │ // What: @ir giving an i64 where the function returns I32
  2 │ // Expect: @ir gives i64, not I32
- 3 │ fn twice(a: I64) I32 {
- 4 │     @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not I32
- 5 │ }
+ 3 │ fn twice(a: I64) I32 => @ir/\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \/;
+   │                         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                         ╰─ not I32
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/813_ir_literal_out_of_range.utu
  ERROR  2147483648 does not fit I32
-        integer-out-of-range · examples/error_demo/platform/813_ir_literal_out_of_range.utu:4:5
+        integer-out-of-range · examples/error_demo/platform/813_ir_literal_out_of_range.utu:3:17
 
+ 1 │ // What: an @ir literal past its type's range (it wrapped to -2147483648)
  2 │ // Expect: 2147483648 does not fit I32
- 3 │ fn big() I32 {
- 4 │     @ir/\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ I32
- 5 │ }
+ 3 │ fn big() I32 => @ir/\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \/;
+   │                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                 ╰─ I32
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/81_wutu_two_declarations_one_line.utu
  ERROR  two CSS declarations on one line need ; between them
         dsl-error · examples/error_demo/platform/81_wutu_two_declarations_one_line.utu:8:22
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         padding: 1rem gap: 2rem
    │                      ━
@@ -6639,7 +6637,7 @@ ok
  ERROR  expected an HTML tag, found unknown element 'card' (custom element names need a hyphen)
         dsl-error · examples/error_demo/platform/82_wutu_unknown_tag.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         card { h2 { = title } }
    │         ━
@@ -6652,7 +6650,7 @@ ok
  ERROR  expected an HTML tag (class-only heads do not create elements)
         dsl-error · examples/error_demo/platform/83_wutu_class_only_head.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         .card { h2 { = title } }
    │         ━
@@ -6681,27 +6679,34 @@ ok
 --- exit 1
 
 === utu check examples/error_demo/platform/84_wutu_two_roots.utu
- ERROR  expected exactly one root element; use a component for siblings
-        dsl-error · examples/error_demo/platform/84_wutu_two_roots.utu:8:5
+ ERROR  view returns Browser.HTMLElement, got Browser.DocumentFragment
+        type-mismatch · examples/error_demo/platform/84_wutu_two_roots.utu:6:12
 
- 6 │     @wutu/\
+ 4 │
+ 5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
+   │                                        ───────────────────
+   │                                        ╰─ Browser.HTMLElement
+ 6 │     return @wutu/\
+   │            ━━━━━━━
+   │            ╰─ Browser.DocumentFragment
  7 │     h2 { = title }
  8 │     p { "Some text" }
-   │     ━
-   │     ╰─ here
  9 │     \/;
 10 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/85_wutu_text_root.utu
- ERROR  root must be an element
-        dsl-error · examples/error_demo/platform/85_wutu_text_root.utu:7:5
+ ERROR  view returns Browser.HTMLElement, got Browser.DocumentFragment
+        type-mismatch · examples/error_demo/platform/85_wutu_text_root.utu:6:12
 
+ 4 │
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
- 6 │     @wutu/\
+   │                                        ───────────────────
+   │                                        ╰─ Browser.HTMLElement
+ 6 │     return @wutu/\
+   │            ━━━━━━━
+   │            ╰─ Browser.DocumentFragment
  7 │     "Just text"
-   │     ━
-   │     ╰─ here
  8 │     \/;
  9 │ }
 --- exit 1
@@ -6710,7 +6715,7 @@ ok
  ERROR  img cannot have children
         dsl-error · examples/error_demo/platform/86_wutu_void_children.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         img { src = "/fern.png"; "A fern" }
    │         ━
@@ -6723,7 +6728,7 @@ ok
  ERROR  unknown attribute href on div
         dsl-error · examples/error_demo/platform/87_wutu_unknown_attribute.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         href = "/plants"
    │         ━
@@ -6749,7 +6754,7 @@ ok
         callback-arity · examples/error_demo/platform/881_callback_extra_param_let.utu:7:42
 
  5 │ main {
- 6 │     let draw: cl(F64, F64, F64) Void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
+ 6 │     let draw: cl(F64, F64, F64) Void = cl(time, dx, dy) { return Browser.console.log(time + dx + dy); };
  7 │     Browser.window.requestAnimationFrame(draw);
    │                                          ━━━━
    │                                          ╰─ JS passes 1
@@ -6760,7 +6765,7 @@ ok
  ERROR  events are written on click { … }, not as an attribute
         dsl-error · examples/error_demo/platform/88_wutu_onclick_attribute.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     button {
  8 │         onclick = "go()"
    │         ━
@@ -6778,7 +6783,7 @@ ok
  7 │         text.copy_in(n);
    │                      ━
    │                      ╰─ I32
- 8 │         text.len();
+ 8 │         return text.len();
  9 │     }
 --- exit 1
 
@@ -6787,7 +6792,7 @@ ok
         dsl-error · examples/error_demo/platform/89_wutu_old_interpolation.utu:7:10
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     h2 { $[title] }
    │          ━
    │          ╰─ here
@@ -6799,7 +6804,7 @@ ok
  ERROR  invalid CSS property colr; did you mean color?
         dsl-error · examples/error_demo/platform/90_wutu_invalid_css_property.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         colr: red
    │         ━
@@ -6812,7 +6817,7 @@ ok
  ERROR  events are written on click { … }, not as an attribute
         dsl-error · examples/error_demo/platform/910_wutu_event_attribute_mixed_case.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     x-note {
  8 │         oNclick = note
    │         ━
@@ -6825,7 +6830,7 @@ ok
  ERROR  a script's attributes are code or load it, so Wutu sets them only as written: src = "…"
         dsl-error · examples/error_demo/platform/911_wutu_script_dynamic_src.utu:8:18
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         script { src = url }
    │                  ━
@@ -6838,7 +6843,7 @@ ok
  ERROR  a script's text is code, so Wutu writes it only as written: script { "…" }
         dsl-error · examples/error_demo/platform/912_wutu_script_dynamic_text.utu:8:18
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         script { = code }
    │                  ━
@@ -6852,7 +6857,7 @@ ok
         dsl-error · examples/error_demo/platform/91_wutu_unterminated_element.utu:7:5
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
    │     ━
    │     ╰─ here
@@ -6875,86 +6880,93 @@ ok
 
 === utu check examples/error_demo/platform/930_ir_bool_from_length.utu
  ERROR  @ir gives an i32, not a comparison's Bool
-        ir-type · examples/error_demo/platform/930_ir_bool_from_length.utu:4:5
+        ir-type · examples/error_demo/platform/930_ir_bool_from_length.utu:3:29
 
+ 1 │ // What: a string's length as a Bool (it was a Bool holding 3 in small)
  2 │ // Expect: @ir gives an i32, not a comparison's Bool
- 3 │ fn nonempty(s: Str) Bool {
- 4 │     @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not Bool
- 5 │ }
+ 3 │ fn nonempty(s: Str) Bool => @ir/\ <ir-string-measure-utf16><ir-ident name="s"/></ir-string-measure-utf16> \/;
+   │                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                             ╰─ not Bool
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/931_ir_uncalled.utu
  ERROR  @ir names no parameter b
-        ir-unknown · examples/error_demo/platform/931_ir_uncalled.utu:4:5
+        ir-unknown · examples/error_demo/platform/931_ir_uncalled.utu:3:25
 
+ 1 │ // What: @ir in a function nothing calls (it was never checked)
  2 │ // Expect: @ir names no parameter b
- 3 │ fn twice(a: I32) I32 {
- 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ unknown
- 5 │ }
+ 3 │ fn twice(a: I32) I32 => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \/;
+   │                         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                         ╰─ unknown
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/932_ir_v128_byte.utu
  ERROR  256 does not fit a byte
-        integer-out-of-range · examples/error_demo/platform/932_ir_v128_byte.utu:4:5
+        integer-out-of-range · examples/error_demo/platform/932_ir_v128_byte.utu:3:20
 
+ 1 │ // What: a v128 constant's byte past 255 (it spilled into the next lane)
  2 │ // Expect: 256 does not fit a byte
- 3 │ fn lanes() V128 {
- 4 │     @ir/\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ out of range
- 5 │ }
+ 3 │ fn lanes() V128 => @ir/\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \/;
+   │                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ out of range
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/933_ir_bool_literal.utu
  ERROR  2 does not fit Bool
-        integer-out-of-range · examples/error_demo/platform/933_ir_bool_literal.utu:4:5
+        integer-out-of-range · examples/error_demo/platform/933_ir_bool_literal.utu:3:18
 
+ 1 │ // What: a Bool @ir literal other than 0 or 1
  2 │ // Expect: 2 does not fit Bool
- 3 │ fn yes() Bool {
- 4 │     @ir/\ <ir-lit kind="bool" type-name="Bool" value="2"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ Bool
- 5 │ }
+ 3 │ fn yes() Bool => @ir/\ <ir-lit kind="bool" type-name="Bool" value="2"/> \/;
+   │                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                  ╰─ Bool
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/934_ir_string_op_on_number.utu
  ERROR  @ir <ir-string-measure-utf16> takes externref, given i32
-        ir-type · examples/error_demo/platform/934_ir_string_op_on_number.utu:4:5
+        ir-type · examples/error_demo/platform/934_ir_string_op_on_number.utu:3:23
 
+ 1 │ // What: a string instruction given a number (the engine said only "not valid Wasm")
  2 │ // Expect: @ir <ir-string-measure-utf16> takes externref, given i32
- 3 │ fn len(n: I32) I32 {
- 4 │     @ir/\ <ir-string-measure-utf16><ir-ident name="n"/></ir-string-measure-utf16> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ i32
- 5 │ }
+ 3 │ fn len(n: I32) I32 => @ir/\ <ir-string-measure-utf16><ir-ident name="n"/></ir-string-measure-utf16> \/;
+   │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                       ╰─ i32
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/935_ir_ref_eq_on_str.utu
  ERROR  @ir <ir-ref-eq> takes eqref, given externref
-        ir-type · examples/error_demo/platform/935_ir_ref_eq_on_str.utu:4:5
+        ir-type · examples/error_demo/platform/935_ir_ref_eq_on_str.utu:3:33
 
+ 1 │ // What: ref.eq on strings, which are host values (the engine said only "not valid Wasm")
  2 │ // Expect: @ir <ir-ref-eq> takes eqref, given externref
- 3 │ fn same(a: Str, b: Str) Bool {
- 4 │     @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ externref
- 5 │ }
+ 3 │ fn same(a: Str, b: Str) Bool => @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
+   │                                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                 ╰─ externref
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/936_ir_number_for_str.utu
  ERROR  @ir gives i32, not Str
-        ir-type · examples/error_demo/platform/936_ir_number_for_str.utu:4:5
+        ir-type · examples/error_demo/platform/936_ir_number_for_str.utu:3:24
 
+ 1 │ // What: @ir arithmetic for a Str result (the engine said only "not valid Wasm")
  2 │ // Expect: @ir gives i32, not Str
- 3 │ fn name(a: I32) Str {
- 4 │     @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not Str
- 5 │ }
+ 3 │ fn name(a: I32) Str => @ir/\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \/;
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                        ╰─ not Str
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/93_wutu_ambiguous_alias.utu
@@ -6972,75 +6984,79 @@ ok
 
 === utu check examples/error_demo/platform/940_ir_array_element_as_bool.utu
  ERROR  @ir gives an i32, not a comparison's Bool
-        ir-type · examples/error_demo/platform/940_ir_array_element_as_bool.utu:11:9
+        ir-type · examples/error_demo/platform/940_ir_array_element_as_bool.utu:8:37
 
- 9 │
-10 │     fn &.on |self| (i: I32) Bool {
-11 │         @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
-   │         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │         ╰─ not Bool
-12 │     }
-13 │ }
+ 6 │     fn &.new(n: I32, fill: T1) & => @ir/\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \/;
+ 7 │
+ 8 │     fn &.on |self| (i: I32) Bool => @ir/\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \/;
+   │                                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                     ╰─ not Bool
+ 9 │ }
 --- exit 1
 
 === utu check examples/error_demo/platform/941_ir_literal_of_str.utu
  ERROR  @ir <ir-lit> is written wrong here
-        ir-unknown · examples/error_demo/platform/941_ir_literal_of_str.utu:4:5
+        ir-unknown · examples/error_demo/platform/941_ir_literal_of_str.utu:3:20
 
+ 1 │ // What: an integer literal typed Str (it was an i32)
  2 │ // Expect: @ir <ir-lit> is written wrong here
- 3 │ fn answer() I32 {
- 4 │     @ir/\ <ir-lit kind="int" type-name="Str" value="42"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ malformed
- 5 │ }
+ 3 │ fn answer() I32 => @ir/\ <ir-lit kind="int" type-name="Str" value="42"/> \/;
+   │                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                    ╰─ malformed
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/942_ir_float_literal_too_big.utu
  ERROR  1000000000000000000000000000000000000000 does not fit F32
-        integer-out-of-range · examples/error_demo/platform/942_ir_float_literal_too_big.utu:4:5
+        integer-out-of-range · examples/error_demo/platform/942_ir_float_literal_too_big.utu:3:18
 
+ 1 │ // What: an integer literal past F32's range (a float's digits are rounded once; these are infinite)
  2 │ // Expect: 1000000000000000000000000000000000000000 does not fit F32
- 3 │ fn huge() F32 {
- 4 │     @ir/\ <ir-lit kind="int" type-name="F32" value="1000000000000000000000000000000000000000"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ F32
- 5 │ }
+ 3 │ fn huge() F32 => @ir/\ <ir-lit kind="int" type-name="F32" value="1000000000000000000000000000000000000000"/> \/;
+   │                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                  ╰─ F32
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/943_ir_string_op_on_struct.utu
  ERROR  @ir <ir-string-measure-utf16> takes externref, given a struct
-        ir-type · examples/error_demo/platform/943_ir_string_op_on_struct.utu:7:5
+        ir-type · examples/error_demo/platform/943_ir_string_op_on_struct.utu:6:23
 
+ 4 │     | x: I32
  5 │
- 6 │ fn size(p: Pt) I32 {
- 7 │     @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ a struct
- 8 │ }
+ 6 │ fn size(p: Pt) I32 => @ir/\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \/;
+   │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                       ╰─ a struct
+ 7 │
+ 8 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/944_ir_codes_of_i64.utu
  ERROR  @ir <ir-string-from-codes> takes an array of i32, given an array of i64
-        ir-type · examples/error_demo/platform/944_ir_codes_of_i64.utu:4:5
+        ir-type · examples/error_demo/platform/944_ir_codes_of_i64.utu:3:43
 
+ 1 │ // What: a string from an Array[I64]'s codes (the engine said only "not valid Wasm")
  2 │ // Expect: @ir <ir-string-from-codes> takes an array of i32, given an array of i64
- 3 │ fn text(codes: Array[I64], n: I32) Str {
- 4 │     @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="n"/></ir-string-from-codes> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ an array of i64
- 5 │ }
+ 3 │ fn text(codes: Array[I64], n: I32) Str => @ir/\ <ir-string-from-codes><ir-ident name="codes"/><ir-ident name="n"/></ir-string-from-codes> \/;
+   │                                           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                           ╰─ an array of i64
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/945_ir_array_for_str.utu
  ERROR  @ir gives an array of i32, not Str
-        ir-type · examples/error_demo/platform/945_ir_array_for_str.utu:4:5
+        ir-type · examples/error_demo/platform/945_ir_array_for_str.utu:3:31
 
+ 1 │ // What: an array given where Str is declared (the engine said only "not valid Wasm")
  2 │ // Expect: @ir gives an array of i32, not Str
- 3 │ fn name(a: Array[I32]) Str {
- 4 │     @ir/\ <ir-ident name="a"/> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ not Str
- 5 │ }
+ 3 │ fn name(a: Array[I32]) Str => @ir/\ <ir-ident name="a"/> \/;
+   │                               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                               ╰─ not Str
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/946_ir_unknown_type_repr.utu
@@ -7069,34 +7085,36 @@ ok
 
 === utu check examples/error_demo/platform/948_ir_promise_then_operands.utu
  ERROR  @ir <ir-promise-then> takes externref, given i32
-        ir-type · examples/error_demo/platform/948_ir_promise_then_operands.utu:4:5
+        ir-type · examples/error_demo/platform/948_ir_promise_then_operands.utu:3:35
 
+ 1 │ // What: a promise subscription of numbers (the engine said only "not valid Wasm")
  2 │ // Expect: @ir <ir-promise-then> takes externref, given i32
- 3 │ fn listen(p: I32, f: I32) Void {
- 4 │     @ir/\ <ir-promise-then><ir-ident name="p"/><ir-ident name="f"/></ir-promise-then> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ i32
- 5 │ }
+ 3 │ fn listen(p: I32, f: I32) Void => @ir/\ <ir-promise-then><ir-ident name="p"/><ir-ident name="f"/></ir-promise-then> \/;
+   │                                   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                                   ╰─ i32
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/949_ir_operand_of_nullary.utu
  ERROR  @ir <ir-safe-checks> is written wrong here
-        ir-unknown · examples/error_demo/platform/949_ir_operand_of_nullary.utu:4:5
+        ir-unknown · examples/error_demo/platform/949_ir_operand_of_nullary.utu:3:27
 
+ 1 │ // What: an operand inside an element that takes none (it was never read)
  2 │ // Expect: @ir <ir-safe-checks> is written wrong here
- 3 │ fn checks(a: I32) Bool {
- 4 │     @ir/\ <ir-safe-checks><ir-ident name="nothing"/></ir-safe-checks> \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ malformed
- 5 │ }
+ 3 │ fn checks(a: I32) Bool => @ir/\ <ir-safe-checks><ir-ident name="nothing"/></ir-safe-checks> \/;
+   │                           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │                           ╰─ malformed
+ 4 │
+ 5 │ main {
 --- exit 1
 
 === utu check examples/error_demo/platform/94_wutu_bad_interpolation.utu
- ERROR  Invalid Utu interpolation at offset 236: title +
+ ERROR  Invalid Utu interpolation at offset 243: title +
         dsl-error · examples/error_demo/platform/94_wutu_bad_interpolation.utu:7:12
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     h2 { = title + }
    │            ━
    │            ╰─ here
@@ -7108,7 +7126,7 @@ ok
  ERROR  a style's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: style { "…" }
         dsl-error · examples/error_demo/platform/950_wutu_style_dynamic_text.utu:8:17
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         style { = css }
    │                 ━
@@ -7121,7 +7139,7 @@ ok
  ERROR  a noscript's text is unescaped in HTML (a value could close it), so Wutu writes it only as written: noscript { "…" }
         dsl-error · examples/error_demo/platform/951_wutu_noscript_dynamic_text.utu:8:20
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         noscript { = note }
    │                    ━
@@ -7134,7 +7152,7 @@ ok
  ERROR  .protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;
         dsl-error · examples/error_demo/platform/952_wutu_protocol_from_value.utu:8:46
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         a { href = "mailto:me@example.com"; .protocol = scheme; "mail" }
    │                                              ━
@@ -7147,7 +7165,7 @@ ok
  ERROR  a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = "/"
         dsl-error · examples/error_demo/platform/953_wutu_base_dynamic_href.utu:8:16
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     div {
  8 │         base { href = root }
    │                ━
@@ -7160,7 +7178,7 @@ ok
  ERROR  a property takes a value: .name = value
         dsl-error · examples/error_demo/platform/95_wutu_property_without_value.utu:8:10
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     input {
  8 │         .value
    │          ━
@@ -7174,7 +7192,7 @@ ok
         dsl-error · examples/error_demo/platform/96_wutu_unterminated_string.utu:7:9
 
  5 │ fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     p { "Hello; }
    │         ━
    │         ╰─ here
@@ -7186,7 +7204,7 @@ ok
  ERROR  Expected Str, got I32
         type-mismatch · examples/error_demo/platform/97_wutu_property_type.utu:8:18
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     input {
  8 │         .value = items.len()
    │                  ━━━━━━━━━━━
@@ -7199,7 +7217,7 @@ ok
  ERROR  invalid CSS property
         dsl-error · examples/error_demo/platform/98_wutu_css_property_with_space.utu:8:9
 
- 6 │     @wutu/\
+ 6 │     return @wutu/\
  7 │     section {
  8 │         background color: #eee
    │         ━
@@ -7323,31 +7341,31 @@ ok
 
 === utu examples/error_demo/runtime/09_div_by_zero.utu
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/09_div_by_zero.utu:4:5
+       trap · examples/error_demo/runtime/09_div_by_zero.utu:4:12
 
  2 │ // Expect: trap: integer division by zero at 09_div_by_zero.utu:4
  3 │ fn average(total: I32, count: I32) I32 {
- 4 │     total / count;
-   │     ━━━━━━━━━━━━━
-   │     ╰─ here
+ 4 │     return total / count;
+   │            ━━━━━━━━━━━━━
+   │            ╰─ here
  5 │ }
 
-  in average  examples/error_demo/runtime/09_div_by_zero.utu:4:5  (inlined into main)
+  in average  examples/error_demo/runtime/09_div_by_zero.utu:4:12  (inlined into main)
   in main  examples/error_demo/runtime/09_div_by_zero.utu:9:17
 --- exit 1
 
 === utu examples/error_demo/runtime/10_rem_by_zero.utu
  TRAP  Integer remainder by zero
-       trap · examples/error_demo/runtime/10_rem_by_zero.utu:4:5
+       trap · examples/error_demo/runtime/10_rem_by_zero.utu:4:12
 
  2 │ // Expect: trap: integer remainder by zero at 10_rem_by_zero.utu:4
  3 │ fn bucket(hash: I32, buckets: I32) I32 {
- 4 │     hash % buckets;
-   │     ━━━━━━━━━━━━━━
-   │     ╰─ here
+ 4 │     return hash % buckets;
+   │            ━━━━━━━━━━━━━━
+   │            ╰─ here
  5 │ }
 
-  in bucket  examples/error_demo/runtime/10_rem_by_zero.utu:4:5  (inlined into main)
+  in bucket  examples/error_demo/runtime/10_rem_by_zero.utu:4:12  (inlined into main)
   in main  examples/error_demo/runtime/10_rem_by_zero.utu:8:17
 --- exit 1
 
@@ -7387,16 +7405,16 @@ ok
 
 === utu examples/error_demo/runtime/14_fatal_in_match.utu
  TRAP  Reached fatal
-       trap · examples/error_demo/runtime/14_fatal_in_match.utu:4:38
+       trap · examples/error_demo/runtime/14_fatal_in_match.utu:4:45
 
  2 │ // Expect: trap: fatal at 14_fatal_in_match.utu:4 (in `step`)
  3 │ fn step(state: I32) I32 {
- 4 │     match state { 0 => 1, 1 => 2, ~> fatal, };
-   │                                      ━━━━━
-   │                                      ╰─ here
+ 4 │     return match state { 0 => 1, 1 => 2, ~> fatal, };
+   │                                             ━━━━━
+   │                                             ╰─ here
  5 │ }
 
-  in step  examples/error_demo/runtime/14_fatal_in_match.utu:4:38
+  in step  examples/error_demo/runtime/14_fatal_in_match.utu:4:45
   in main  examples/error_demo/runtime/14_fatal_in_match.utu:8:17
 --- exit 1
 
@@ -7409,7 +7427,7 @@ ok
  4 │     assert b != 0;
    │     ━━━━━━━━━━━━━
    │     ╰─ here
- 5 │     a / b;
+ 5 │     return a / b;
  6 │ }
 
   in checked_div  examples/error_demo/runtime/15_assert_fails.utu:4:5  (inlined into main)
@@ -7418,31 +7436,32 @@ ok
 
 === utu examples/error_demo/runtime/16_wat_unreachable.utu
  TRAP  Reached unreachable code
-       trap · examples/error_demo/runtime/16_wat_unreachable.utu:4:5
+       trap · examples/error_demo/runtime/16_wat_unreachable.utu:3:25
 
+ 1 │ // What: an `unreachable` instruction in inline wat is reached
  2 │ // Expect: trap: unreachable at 16_wat_unreachable.utu:4
- 3 │ fn never(x: I32) I32 {
- 4 │     @wat/\ unreachable \/;
-   │     ━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
- 5 │ }
+ 3 │ fn never(x: I32) I32 => @wat/\ unreachable \/;
+   │                         ━━━━━━━━━━━━━━━━━━━━━
+   │                         ╰─ here
+ 4 │
+ 5 │ main {
 
-  in never  examples/error_demo/runtime/16_wat_unreachable.utu:4:5
-  in main  examples/error_demo/runtime/16_wat_unreachable.utu:8:17
+  in never  examples/error_demo/runtime/16_wat_unreachable.utu:3:25
+  in main  examples/error_demo/runtime/16_wat_unreachable.utu:6:17
 --- exit 1
 
 === utu examples/error_demo/runtime/17_stack_overflow.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/17_stack_overflow.utu:4:5
+       trap · examples/error_demo/runtime/17_stack_overflow.utu:4:12
 
  2 │ // Expect: stack overflow in `count_down` (recursion too deep) at 17_stack_overflow.utu:4
  3 │ fn count_down(n: I32) I32 {
- 4 │     count_down(n - 1) + 1;
-   │     ━━━━━━━━━━━━━━━━━
-   │     ╰─ here
+ 4 │     return count_down(n - 1) + 1;
+   │            ━━━━━━━━━━━━━━━━━
+   │            ╰─ here
  5 │ }
 
-  in count_down  examples/error_demo/runtime/17_stack_overflow.utu:4:5
+  in count_down  examples/error_demo/runtime/17_stack_overflow.utu:4:12
 --- exit 1
 
 === utu examples/error_demo/runtime/18_out_of_memory.utu
@@ -7507,16 +7526,16 @@ ok
 
 === utu examples/error_demo/runtime/22_trap_in_catch_try.utu
  TRAP  Index out of bounds
-       trap · examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11
+       trap · examples/error_demo/runtime/22_trap_in_catch_try.utu:4:18
 
  2 │ // Expect: the trap message, not swallowed by catch
  3 │ fn get(xs: Array[I32], i: I32) I32 {
- 4 │     try { xs[i]; } catch { -1; };
-   │           ━━━━━
-   │           ╰─ here
+ 4 │     return try { xs[i]; } catch { -1; };
+   │                  ━━━━━
+   │                  ╰─ here
  5 │ }
 
-  in get  examples/error_demo/runtime/22_trap_in_catch_try.utu:4:11  (inlined into main)
+  in get  examples/error_demo/runtime/22_trap_in_catch_try.utu:4:18  (inlined into main)
   in main  examples/error_demo/runtime/22_trap_in_catch_try.utu:8:17
 --- exit 1
 
@@ -7568,17 +7587,17 @@ ok
 
 === utu examples/error_demo/runtime/26_es_callback_traps.utu
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/26_es_callback_traps.utu:7:37
+       trap · examples/error_demo/runtime/26_es_callback_traps.utu:7:44
 
  5 │ main {
  6 │     let xs = [10, 20, 30];
- 7 │     console.log(map_all(xs, cl(i) { 100 / (i - 1); }));
-   │                                     ━━━━━━━━━━━━━
-   │                                     ╰─ here
+ 7 │     console.log(map_all(xs, cl(i) { return 100 / (i - 1); }));
+   │                                            ━━━━━━━━━━━━━
+   │                                            ╰─ here
  8 │ }
  9 │ using console from std:Console
 
-  in closure  examples/error_demo/runtime/26_es_callback_traps.utu:7:37
+  in closure  examples/error_demo/runtime/26_es_callback_traps.utu:7:44
   in main  examples/error_demo/runtime/26_es_callback_traps.utu:7:17
 --- exit 1
 
@@ -7600,31 +7619,31 @@ ok
 === utu examples/error_demo/runtime/28_then_callback_traps.utu
 scheduled
  TRAP  Integer division by zero
-       trap · examples/error_demo/runtime/28_then_callback_traps.utu:9:45
+       trap · examples/error_demo/runtime/28_then_callback_traps.utu:9:52
 
  7 │
  8 │ main {
- 9 │     delay(0, 5).then(cl(v) { console.log(`${10 / v}`); });
-   │                                             ━━━━━━
-   │                                             ╰─ here
+ 9 │     delay(0, 5).then(cl(v) { return console.log(`${10 / v}`); });
+   │                                                    ━━━━━━
+   │                                                    ╰─ here
 10 │     console.log("scheduled");
 11 │ }
 
-  in closure  examples/error_demo/runtime/28_then_callback_traps.utu:9:45
+  in closure  examples/error_demo/runtime/28_then_callback_traps.utu:9:52
 --- exit 1
 
 === utu examples/error_demo/runtime/29_deep_recursion_with_base.utu
  TRAP  Stack overflow
-       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:45
+       trap · examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:52
 
  2 │ // Expect: stack overflow in `sum_to` at 29_deep_recursion_with_base.utu:4; a short trace, not 10,000 frames
  3 │ fn sum_to(n: I32) I64 {
- 4 │     if n == 0 { 0.i64(); } else { n.i64() + sum_to(n - 1); };
-   │                                             ━━━━━━━━━━━━━
-   │                                             ╰─ here
+ 4 │     return if n == 0 { 0.i64(); } else { n.i64() + sum_to(n - 1); };
+   │                                                    ━━━━━━━━━━━━━
+   │                                                    ╰─ here
  5 │ }
 
-  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:45
+  in sum_to  examples/error_demo/runtime/29_deep_recursion_with_base.utu:4:52
 --- exit 1
 
 === utu examples/error_demo/runtime/309_result_value_of_error.utu
@@ -7704,16 +7723,16 @@ scheduled
 
 === utu examples/error_demo/runtime/34_array_new_negative.utu
  TRAP  Array length negative or too large
-       trap · examples/error_demo/runtime/34_array_new_negative.utu:4:5
+       trap · examples/error_demo/runtime/34_array_new_negative.utu:4:12
 
  2 │ // Expect: trap: negative array length -1 in Array[I32].new
  3 │ fn make(n: I32) Array[I32] {
- 4 │     Array[I32].new(n - 1, 0);
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ here
+ 4 │     return Array[I32].new(n - 1, 0);
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ here
  5 │ }
 
-  in make  examples/error_demo/runtime/34_array_new_negative.utu:4:5  (inlined into main)
+  in make  examples/error_demo/runtime/34_array_new_negative.utu:4:12  (inlined into main)
   in main  examples/error_demo/runtime/34_array_new_negative.utu:8:17
 --- exit 1
 
@@ -7741,7 +7760,7 @@ scheduled
  5 │     assert x >= 0;
    │     ━━━━━━━━━━━━━
    │     ╰─ here
- 6 │     x;
+ 6 │     return x;
  7 │ }
 
   in clamp  examples/error_demo/runtime/360_assert_inlined_fast.utu:5:5  (inlined into main)
@@ -7780,7 +7799,7 @@ pass clamp lifts low values (… ms)
 
 === utu test examples/error_demo/runtime/41_test_traps.utu
 pass first element (… ms)
-FAIL last element: Index out of bounds  at examples/error_demo/runtime/41_test_traps.utu:4:5  in last
+FAIL last element: Index out of bounds  at examples/error_demo/runtime/41_test_traps.utu:4:12  in last
 1 passed, 1 failed
 --- exit 1
 
@@ -7803,7 +7822,7 @@ pass still runs (… ms)
 --- exit 1
 
 === utu test examples/error_demo/runtime/44_test_stack_overflow.utu
-FAIL forever: Stack overflow  at examples/error_demo/runtime/44_test_stack_overflow.utu:4:5  in loop_forever
+FAIL forever: Stack overflow  at examples/error_demo/runtime/44_test_stack_overflow.utu:4:12  in loop_forever
 pass after (… ms)
 1 passed, 1 failed
 --- exit 1
@@ -7901,7 +7920,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
  ERROR  add takes I32, got Str
         type-mismatch · examples/error_demo/runtime/53_multiple_errors_check.utu:7:20
 
- 3 │ fn add(a: I32, b: I32) I32 { a + b; }
+ 3 │ fn add(a: I32, b: I32) I32 { return a + b; }
    │                ──────
    │                ╰─ I32
    ┆
@@ -7968,7 +7987,7 @@ FAIL third item: Buffer index out of range  at examples/error_demo/runtime/48_te
  TRAP  Index out of bounds
        trap · examples/error_demo/runtime/650_global_init_trap.utu:5:14
 
- 3 │ fn n(x: I32) I32 { x; }
+ 3 │ fn n(x: I32) I32 { return x; }
  4 │ let xs: Array[I32] = [1, 2];
  5 │ let g: I32 = xs[n(5)];
    │              ━━━━━━━━
@@ -8111,15 +8130,15 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/syntax/100_int_u64_max_default_i32.utu
  ERROR  all_ones returns I32, got U64
-        type-mismatch · examples/error_demo/syntax/100_int_u64_max_default_i32.utu:5:5
+        type-mismatch · examples/error_demo/syntax/100_int_u64_max_default_i32.utu:5:12
 
  3 │ fn all_ones() I32 {
    │               ───
    │               ╰─ I32
  4 │     let all_ones = 18446744073709551615
- 5 │     all_ones
-   │     ━━━━━━━━
-   │     ╰─ U64
+ 5 │     return all_ones
+   │            ━━━━━━━━
+   │            ╰─ U64
  6 │ }
 --- exit 1
 
@@ -8611,17 +8630,17 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/syntax/38_assign_in_condition.utu
  ERROR  = assigns; compare with ==
-        type-mismatch · examples/error_demo/syntax/38_assign_in_condition.utu:4:8
+        type-mismatch · examples/error_demo/syntax/38_assign_in_condition.utu:4:15
 
  2 │ // Expect: an assignment is not a condition; did you mean `==`?
  3 │ fn is_zero(n: I32) I32 {
- 4 │     if n = 0 { 1; } else { 0; };
-   │        ━━━━━
-   │        ╰─ Void
+ 4 │     return if n = 0 { 1; } else { 0; };
+   │               ━━━━━
+   │               ╰─ Void
  5 │ }
 
   fix   Use ==
- 4 │     if n == 0 { 1; } else { 0; };
+ 4 │     return if n == 0 { 1; } else { 0; };
 --- exit 1
 
 === utu check examples/error_demo/syntax/39_angle_bracket_generics.utu
@@ -9125,13 +9144,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/syntax/66_int_hex_mask_i32.utu
  ERROR  0xFFFFFFFF does not fit I32
-        integer-out-of-range · examples/error_demo/syntax/66_int_hex_mask_i32.utu:4:9
+        integer-out-of-range · examples/error_demo/syntax/66_int_hex_mask_i32.utu:4:16
 
  2 │ // Expect: Integer literal 0xFFFFFFFF is out of range for I32 (use U32, or -1).
  3 │ fn low_bits(x: I32) I32 {
- 4 │     x & 0xFFFFFFFF;
-   │         ━━━━━━━━━━
-   │         ╰─ I32
+ 4 │     return x & 0xFFFFFFFF;
+   │                ━━━━━━━━━━
+   │                ╰─ I32
  5 │ }
 --- exit 1
 
@@ -9171,7 +9190,7 @@ FAIL after tests: boom
    │                ━━━━━━━━━━━
    │                ╰─ here
  4 │     let .{a, b} = p;
- 5 │     a + b;
+ 5 │     return a + b;
 --- exit 1
 
 === utu check examples/error_demo/syntax/70_tuple_let_annotation.utu
@@ -9209,7 +9228,7 @@ FAIL after tests: boom
  3 │ fn split(a: I32) .{I32, .{I32, I32}} {
    │                         ━━━━━━━━━━━
    │                         ╰─ here
- 4 │     .{a, .{a / 2, a % 2}};
+ 4 │     return .{a, .{a / 2, a % 2}};
  5 │ }
 --- exit 1
 
@@ -9222,7 +9241,7 @@ FAIL after tests: boom
  3 │ fn make() cl(I32) .{I32, I32} {
    │                   ━━━━━━━━━━━
    │                   ╰─ here
- 4 │     cl(x) { .{x, x * 2}; };
+ 4 │     return cl(x) { return .{x, x * 2}; };
  5 │ }
 --- exit 1
 
@@ -9248,17 +9267,17 @@ FAIL after tests: boom
  3 │ fn pairs() Array[.{I32, I32}] {
    │                  ━━━━━━━━━━━
    │                  ╰─ here
- 4 │     Array[.{I32, I32}].new(0, .{0, 0});
+ 4 │     return Array[.{I32, I32}].new(0, .{0, 0});
  5 │ }
 
  ERROR  A tuple is only a function result
-        tuple-misplaced · examples/error_demo/syntax/75_tuple_array_type.utu:4:11
+        tuple-misplaced · examples/error_demo/syntax/75_tuple_array_type.utu:4:18
 
  2 │ // Expect: A tuple type is only a function result (or: Tuples cannot be stored in arrays).
  3 │ fn pairs() Array[.{I32, I32}] {
- 4 │     Array[.{I32, I32}].new(0, .{0, 0});
-   │           ━━━━━━━━━━━
-   │           ╰─ here
+ 4 │     return Array[.{I32, I32}].new(0, .{0, 0});
+   │                  ━━━━━━━━━━━
+   │                  ╰─ here
  5 │ }
 --- exit 1
 
@@ -9318,13 +9337,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/syntax/80_optional_as_block_value.utu
  ERROR  ?. only in a statement
-        optional-outside-statement · examples/error_demo/syntax/80_optional_as_block_value.utu:8:5
+        optional-outside-statement · examples/error_demo/syntax/80_optional_as_block_value.utu:8:12
 
  6 │
  7 │ fn second_name(head: Node) Str {
- 8 │     head.next?.name;
-   │     ━━━━━━━━━━━━━━━
-   │     ╰─ here
+ 8 │     return head.next?.name;
+   │            ━━━━━━━━━━━━━━━
+   │            ╰─ here
  9 │ }
 
   note  for a value, use promote
@@ -9339,7 +9358,7 @@ FAIL after tests: boom
  8 │     if head.next?.count > 10 { return true; };
    │        ━━━━━━━━━━━━━━━━
    │        ╰─ here
- 9 │     false;
+ 9 │     return false;
 10 │ }
 
   note  for a value, use promote
@@ -9363,12 +9382,12 @@ FAIL after tests: boom
  ERROR  Two lib blocks
         entry-surface · examples/error_demo/syntax/83_two_export_libs.utu:5:1
 
- 3 │ fn area(w: F64, h: F64) F64 { w * h; }
+ 3 │ fn area(w: F64, h: F64) F64 { return w * h; }
  4 │
  5 │ lib {
    │ ━━━━━
    │ ╰─ here
- 6 │     fn rect_area(w: F64, h: F64) F64 { area(w, h); }
+ 6 │     fn rect_area(w: F64, h: F64) F64 { return area(w, h); }
  7 │ }
  8 │
  9 │ lib {
@@ -9393,12 +9412,12 @@ FAIL after tests: boom
  ERROR  lib and main together: a program is one or the other
         entry-surface · examples/error_demo/syntax/85_lib_and_main.utu:5:1
 
- 3 │ fn area(w: F64, h: F64) F64 { w * h; }
+ 3 │ fn area(w: F64, h: F64) F64 { return w * h; }
  4 │
  5 │ lib {
    │ ━━━━━
    │ ╰─ here
- 6 │     fn rect_area(w: F64, h: F64) F64 { area(w, h); }
+ 6 │     fn rect_area(w: F64, h: F64) F64 { return area(w, h); }
  7 │ }
  8 │
  9 │ main {
@@ -9432,13 +9451,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/syntax/88_implicit_init_enum.utu
  ERROR  &{…} needs a struct type, not Shape
-        implicit-struct-init · examples/error_demo/syntax/88_implicit_init_enum.utu:8:5
+        implicit-struct-init · examples/error_demo/syntax/88_implicit_init_enum.utu:8:12
 
  6 │
  7 │ fn unit() Shape {
- 8 │     &{ r: 1.0 };
-   │     ━━━━━━━━━━━
-   │     ╰─ here
+ 8 │     return &{ r: 1.0 };
+   │            ━━━━━━━━━━━
+   │            ╰─ here
  9 │ }
 --- exit 1
 
@@ -9625,16 +9644,24 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/03_tail_expression.utu
- ERROR  is_empty returns Bool, got Str
-        type-mismatch · examples/error_demo/types/03_tail_expression.utu:4:23
+ ERROR  Expected Bool, got Str
+        type-mismatch · examples/error_demo/types/03_tail_expression.utu:4:30
 
  2 │ // Expect: Type mismatch: expected Bool, got Str at the tail expression
  3 │ fn is_empty(s: Str) Bool {
-   │                     ────
-   │                     ╰─ Bool
- 4 │     if s.len() == 0 { "yes"; } else { "no"; };
-   │                       ━━━━━
-   │                       ╰─ Str
+ 4 │     return if s.len() == 0 { "yes"; } else { "no"; };
+   │                              ━━━━━
+   │                              ╰─ Str
+ 5 │ }
+
+ ERROR  Expected Bool, got Str
+        type-mismatch · examples/error_demo/types/03_tail_expression.utu:4:46
+
+ 2 │ // Expect: Type mismatch: expected Bool, got Str at the tail expression
+ 3 │ fn is_empty(s: Str) Bool {
+ 4 │     return if s.len() == 0 { "yes"; } else { "no"; };
+   │                                              ━━━━
+   │                                              ╰─ Str
  5 │ }
 --- exit 1
 
@@ -9642,7 +9669,7 @@ FAIL after tests: boom
  ERROR  repeat_dash takes I32, got F64
         type-mismatch · examples/error_demo/types/04_argument.utu:7:29
 
- 3 │ fn repeat_dash(n: I32) Str { "-".repeat(n); }
+ 3 │ fn repeat_dash(n: I32) Str { return "-".repeat(n); }
    │                ──────
    │                ╰─ I32
    ┆
@@ -9736,11 +9763,11 @@ FAIL after tests: boom
  ERROR  Duplicate method P.dflt
         duplicate-method · examples/error_demo/types/1000_proto_default_twice.utu:11:4
 
- 9 │ fn P[A].n |a| () I32 { a.x; }
-10 │ fn P.dflt |p| () I32 { p.n(); }
+ 9 │ fn P[A].n |a| () I32 { return a.x; }
+10 │ fn P.dflt |p| () I32 { return p.n(); }
    │      ────
    │      ╰─ first here
-11 │ fn P.dflt |p| () I32 { 99; }
+11 │ fn P.dflt |p| () I32 { return 99; }
    │    ━━━━━━
    │    ╰─ already declared
 12 │
@@ -9753,7 +9780,7 @@ FAIL after tests: boom
 
  1 │ // What: a method declared on a generic module's type without its type argument
  2 │ // Expect: Array takes 1 type arguments, given 0
- 3 │ fn Array.first |xs| () I32 { xs[0]; }
+ 3 │ fn Array.first |xs| () I32 { return xs[0]; }
    │    ━━━━━
    │    ╰─ here
  4 │
@@ -9776,13 +9803,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/101_instances_without_end.utu
  ERROR  m's instances nest more than 64 deep
-        instance-depth · examples/error_demo/types/101_instances_without_end.utu:5:33
+        instance-depth · examples/error_demo/types/101_instances_without_end.utu:5:40
 
  3 │ mod m[T] {
  4 │     fn f(n: I32) I32 {
- 5 │         if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
-   │                                 ━━━━━━━━━━━━━━━━━━━━
-   │                                 ╰─ one more level
+ 5 │         return if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; };
+   │                                        ━━━━━━━━━━━━━━━━━━━━
+   │                                        ╰─ one more level
  6 │     }
  7 │ }
 --- exit 1
@@ -9796,7 +9823,7 @@ FAIL after tests: boom
  5 │         | v: ?T
    │              ━━
    │              ╰─ here
- 6 │     fn &.empty() & { &{ v: null }; }
+ 6 │     fn &.empty() & { return &{ v: null }; }
  7 │ }
    ┆
 10 │     let b = Box[I32].empty();
@@ -9821,7 +9848,7 @@ FAIL after tests: boom
 
  9 │ }
 10 │
-11 │ fn Sh[Box[I32]].name |b| () I32 { 1; }
+11 │ fn Sh[Box[I32]].name |b| () I32 { return 1; }
    │       ━━━━━━━━
    │       ╰─ an instance
 12 │
@@ -9869,13 +9896,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/106_closure_self_untyped.utu
  ERROR  f needs a type annotation to call itself
-        self-untyped · examples/error_demo/types/106_closure_self_untyped.utu:4:20
+        self-untyped · examples/error_demo/types/106_closure_self_untyped.utu:4:27
 
  2 │ // Expect: f needs a type annotation to call itself
  3 │ main {
- 4 │     let f = cl() { f(); };
-   │                    ━
-   │                    ╰─ type not known yet
+ 4 │     let f = cl() { return f(); };
+   │                           ━
+   │                           ╰─ type not known yet
  5 │     f();
  6 │     console.log(1);
 --- exit 1
@@ -9885,7 +9912,7 @@ FAIL after tests: boom
         match-pattern · examples/error_demo/types/107_match_pattern_past_i64.utu:5:9
 
  3 │ fn status(code: I64) I32 {
- 4 │     match code {
+ 4 │     return match code {
  5 │         18446744073709551615 => 1,
    │         ━━━━━━━━━━━━━━━━━━━━━━━━━━
    │         ╰─ here
@@ -10020,8 +10047,8 @@ FAIL after tests: boom
  ERROR  tick takes P, got F32
         type-mismatch · examples/error_demo/types/1200_proto_default_on_unimplementing_scalar.utu:7:27
 
- 5 │ fn P[I32].step |s| () I32 { s; }
- 6 │ fn P.tick |s| () I32 { s.step(); }
+ 5 │ fn P[I32].step |s| () I32 { return s; }
+ 6 │ fn P.tick |s| () I32 { return s.step(); }
    │           ───
    │           ╰─ P
  7 │ main { console.log(P.tick(7.5)); }
@@ -10035,7 +10062,7 @@ FAIL after tests: boom
         invalid-module-arity · examples/error_demo/types/1202_using_type_argument_count.utu:5:8
 
  3 │ mod P[A, B] { struct Pr: | a : A | b : B
- 4 │   fn mk(x: A, y: B) Pr { Pr { a: x, b: y }; } }
+ 4 │   fn mk(x: A, y: B) Pr { return Pr { a: x, b: y }; } }
  5 │ using P[I32] |q|;
    │        ━━━━━
    │        ╰─ here
@@ -10061,7 +10088,7 @@ FAIL after tests: boom
 
  2 │ // Expect: P takes 2 type arguments, given 1
  3 │ mod P[A, B] { struct Pr: | a : A | b : B }
- 4 │ fn f(x: ?P[I32].Pr) I32 { promote x { |p| => p.b, ~> 0, }; }
+ 4 │ fn f(x: ?P[I32].Pr) I32 { return promote x { |p| => p.b, ~> 0, }; }
    │          ━━━━━━
    │          ╰─ here
  5 │ main { console.log(f(null)); }
@@ -10161,7 +10188,7 @@ FAIL after tests: boom
         type-mismatch · examples/error_demo/types/1243_instances_of_one_mod.utu:6:22
 
  4 │ using cell[I32] |a|; using cell[Str] |b|;
- 5 │ fn f(x: a.Cell) I32 { x.value; }
+ 5 │ fn f(x: a.Cell) I32 { return x.value; }
    │      ─────────
    │      ╰─ Cell
  6 │ main { console.log(f(b.wrap("a"))); }
@@ -10176,7 +10203,7 @@ FAIL after tests: boom
 
  4 │     | x: I32
  5 │
- 6 │ fn Vec2:add |a| Vec2 { a; }
+ 6 │ fn Vec2:add |a| Vec2 { return a; }
    │             ━━━
    │             ╰─ takes 2, given 1
  7 │
@@ -10202,7 +10229,7 @@ FAIL after tests: boom
 
  4 │     | x: I32
  5 │
- 6 │ fn S.f |s| (s: I32) I32 { s; }
+ 6 │ fn S.f |s| (s: I32) I32 { return s; }
    │         ─   ━━━━━━
    │         │   ╰─ already declared
    │         ╰─ first here
@@ -10219,7 +10246,7 @@ FAIL after tests: boom
  7 │     let s = 7;
    │     ━━━━━━━━━
    │     ╰─ already declared
- 8 │     s;
+ 8 │     return s;
  9 │ }
 --- exit 1
 
@@ -10309,9 +10336,9 @@ FAIL after tests: boom
  ERROR  a takes 0 type arguments, given 1
         invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:5:10
 
- 3 │ mod m[T] { struct S: | x : T  fn mk(x: T) S { S { x: x }; } }
+ 3 │ mod m[T] { struct S: | x : T  fn mk(x: T) S { return S { x: x }; } }
  4 │ using m[I32] |a|;
- 5 │ fn h(v: a[Str].S) I32 { 1; }
+ 5 │ fn h(v: a[Str].S) I32 { return 1; }
    │          ━━━━━
    │          ╰─ here
  6 │ main { console.log(a[Str].mk(1).x); }
@@ -10321,7 +10348,7 @@ FAIL after tests: boom
         invalid-module-arity · examples/error_demo/types/1302_using_alias_type_arguments.utu:6:21
 
  4 │ using m[I32] |a|;
- 5 │ fn h(v: a[Str].S) I32 { 1; }
+ 5 │ fn h(v: a[Str].S) I32 { return 1; }
  6 │ main { console.log(a[Str].mk(1).x); }
    │                     ━━━━━
    │                     ╰─ here
@@ -10330,16 +10357,16 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/1303_type_named_as_type_parameter.utu
  ERROR  Duplicate declaration T
-        duplicate-declaration · examples/error_demo/types/1303_type_named_as_type_parameter.utu:3:19
+        duplicate-declaration · examples/error_demo/types/1303_type_named_as_type_parameter.utu:3:12
 
- 1 │ // What: struct T in mod m[T], hiding the type parameter
- 2 │ // Expect: Duplicate declaration T
- 3 │ mod m[T] { struct T: | x : I32  fn f(x: T) T { x; } }
-   │       ─           ━
-   │       │           ╰─ again
+ 1 │ // Expect: Duplicate declaration T
+ 2 │ mod m[T] {
+   │       ─
    │       ╰─ first here
- 4 │ main { console.log(m[I32].f(m[I32].T { x: 1 }).x); }
- 5 │ using console from std:Console
+ 3 │     struct T:
+   │            ━
+   │            ╰─ again
+ 4 │         | x: I32
 --- exit 1
 
 === utu check examples/error_demo/types/1356_dollar_bound_twice.utu
@@ -10348,7 +10375,7 @@ FAIL after tests: boom
 
  1 │ // What: a $T function binds T at two parameters
  2 │ // Expect: $T twice: bind it once, then write T
- 3 │ fn same(a: $T, b: $T) Bool { a == b; }
+ 3 │ fn same(a: $T, b: $T) Bool { return a == b; }
    │                   ━━
    │                   ╰─ already declared
  4 │
@@ -10394,7 +10421,7 @@ FAIL after tests: boom
 
  4 │ struct S[P]:
  5 │     | x: I32
- 6 │ fn P[S].tick |s| () Str { "bad"; }
+ 6 │ fn P[S].tick |s| () Str { return "bad"; }
    │                     ━━━
    │                     ╰─ here
  7 │ main { console.log(0); }
@@ -10407,7 +10434,7 @@ FAIL after tests: boom
 
  4 │ struct S[P]:
  5 │     | x: I32
- 6 │ fn P[S].tick |s| (n: Str) I32 { 0; }
+ 6 │ fn P[S].tick |s| (n: Str) I32 { return 0; }
    │                      ━━━
    │                      ╰─ here
  7 │ main { console.log(0); }
@@ -10512,13 +10539,10 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/14_alt_arms.utu
- ERROR  area returns F64, got Str
+ ERROR  Expected F64, got Str
         type-mismatch · examples/error_demo/types/14_alt_arms.utu:10:19
 
- 7 │ fn area(s: Shape) F64 {
-   │                   ───
-   │                   ╰─ F64
- 8 │     alt s {
+ 8 │     return alt s {
  9 │         Circle |c| => 3.14 * c.r * c.r,
 10 │         Square => "unknown",
    │                   ━━━━━━━━━
@@ -10528,13 +10552,10 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/15_match_arms.utu
- ERROR  name returns Str, got I32
+ ERROR  Expected Str, got I32
         type-mismatch · examples/error_demo/types/15_match_arms.utu:6:14
 
- 3 │ fn name(n: I32) Str {
-   │                 ───
-   │                 ╰─ Str
- 4 │     match n {
+ 4 │     return match n {
  5 │         0 => "zero",
  6 │         1 => 1,
    │              ━
@@ -10545,13 +10566,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/16_tuple_element_type.utu
  ERROR  Expected I32, got Str (+1 caused by this)
-        type-mismatch · examples/error_demo/types/16_tuple_element_type.utu:4:14
+        type-mismatch · examples/error_demo/types/16_tuple_element_type.utu:4:21
 
  2 │ // Expect: Type mismatch: expected I32, got Str
  3 │ fn divmod(a: I32, b: I32) .{I32, I32} {
- 4 │     .{a / b, "remainder"};
-   │              ━━━━━━━━━━━
-   │              ╰─ Str
+ 4 │     return .{a / b, "remainder"};
+   │                     ━━━━━━━━━━━
+   │                     ╰─ Str
  5 │ }
 --- exit 1
 
@@ -10600,14 +10621,14 @@ FAIL after tests: boom
 --- exit 1
 
 === utu check examples/error_demo/types/20_closure_return.utu
- ERROR  Expected I32, got Str
-        type-mismatch · examples/error_demo/types/20_closure_return.utu:4:30
+ ERROR  The closure returns I32, got Str
+        type-mismatch · examples/error_demo/types/20_closure_return.utu:4:37
 
  2 │ // Expect: Type mismatch: expected I32, got Str at the closure body
  3 │ main {
- 4 │     let f = cl(x: I32) I32 { "n=" + x.str(); };
-   │                              ━━━━━━━━━━━━━━
-   │                              ╰─ Str
+ 4 │     let f = cl(x: I32) I32 { return "n=" + x.str(); };
+   │                                     ━━━━━━━━━━━━━━
+   │                                     ╰─ Str
  5 │     console.log(f(1));
  6 │ }
 --- exit 1
@@ -10616,13 +10637,13 @@ FAIL after tests: boom
  ERROR  apply takes cl(I32) I32, got cl(F64) I32
         type-mismatch · examples/error_demo/types/21_closure_param_from_annotation.utu:6:23
 
- 3 │ fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+ 3 │ fn apply(f: cl(I32) I32, x: I32) I32 { return f(x); }
    │          ──────────────
    │          ╰─ cl(I32) I32
  4 │
  5 │ main {
- 6 │     console.log(apply(cl(x: F64) I32 { x.i32(); }, 3));
-   │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6 │     console.log(apply(cl(x: F64) I32 { return x.i32(); }, 3));
+   │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │                       ╰─ cl(F64) I32
  7 │ }
  8 │ using console from std:Console
@@ -10633,7 +10654,7 @@ FAIL after tests: boom
         type-mismatch · examples/error_demo/types/22_closure_call_argument.utu:5:24
 
  3 │ main {
- 4 │     let double: cl(I32) I32 = cl(x) { x * 2; };
+ 4 │     let double: cl(I32) I32 = cl(x) { return x * 2; };
  5 │     console.log(double("4"));
    │                        ━━━
    │                        ╰─ Str
@@ -10645,7 +10666,7 @@ FAIL after tests: boom
  ERROR  twice takes fun(I32) I32, got fun(F64) F64
         type-mismatch · examples/error_demo/types/23_fun_value_signature.utu:7:26
 
- 5 │ fn twice(f: fun(I32) I32, x: I32) I32 { f(f(x)); }
+ 5 │ fn twice(f: fun(I32) I32, x: I32) I32 { return f(f(x)); }
    │          ───────────────
    │          ╰─ fun(I32) I32
  6 │
@@ -10657,40 +10678,40 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/24_i32_plus_i64.utu
  ERROR  No + for I32 and I64
-        operand-mismatch · examples/error_demo/types/24_i32_plus_i64.utu:4:13
+        operand-mismatch · examples/error_demo/types/24_i32_plus_i64.utu:4:20
 
  2 │ // Expect: Type mismatch: expected I32, got I64 (or: I32 + I64 needs a conversion, use .i64())
  3 │ fn total(count: I32, bytes: I64) I64 {
- 4 │     count + bytes;
-   │     ─────   ━━━━━
-   │     │       ╰─ I64
-   │     ╰─ I32
+ 4 │     return count + bytes;
+   │            ─────   ━━━━━
+   │            │       ╰─ I64
+   │            ╰─ I32
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/25_f32_vs_f64.utu
  ERROR  No * for F32 and F64
-        operand-mismatch · examples/error_demo/types/25_f32_vs_f64.utu:4:9
+        operand-mismatch · examples/error_demo/types/25_f32_vs_f64.utu:4:16
 
  2 │ // Expect: Type mismatch: expected F32, got F64
  3 │ fn scale(x: F32, k: F64) F32 {
- 4 │     x * k;
-   │     ─   ━
-   │     │   ╰─ F64
-   │     ╰─ F32
+ 4 │     return x * k;
+   │            ─   ━
+   │            │   ╰─ F64
+   │            ╰─ F32
  5 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/26_u32_vs_i32.utu
  ERROR  No < for U32 and I32
-        operand-mismatch · examples/error_demo/types/26_u32_vs_i32.utu:4:13
+        operand-mismatch · examples/error_demo/types/26_u32_vs_i32.utu:4:20
 
  2 │ // Expect: Type mismatch: expected U32, got I32
  3 │ fn in_range(index: U32, limit: I32) Bool {
- 4 │     index < limit;
-   │     ─────   ━━━━━
-   │     │       ╰─ I32
-   │     ╰─ U32
+ 4 │     return index < limit;
+   │            ─────   ━━━━━
+   │            │       ╰─ I32
+   │            ╰─ U32
  5 │ }
 --- exit 1
 
@@ -10749,13 +10770,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/308_result_built_by_hand.utu
  ERROR  Result[I32, Str] is made by its own functions
-        std-own-struct · examples/error_demo/types/308_result_built_by_hand.utu:4:5
+        std-own-struct · examples/error_demo/types/308_result_built_by_hand.utu:4:12
 
  2 │ // Expect: Result[I32, Str] is made by its own functions (ok, err)
  3 │ fn half(n: I32) Result[I32, Str] {
- 4 │     &{ _ok: true, _value: n / 2 };
-   │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   │     ╰─ use its functions
+ 4 │     return &{ _ok: true, _value: n / 2 };
+   │            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │            ╰─ use its functions
  5 │ }
 --- exit 1
 
@@ -10828,7 +10849,7 @@ FAIL after tests: boom
  8 │         for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };
    │                           ━━━━━━━━━━━
    │                           ╰─ T is unbounded
- 9 │         best;
+ 9 │         return best;
 10 │     }
    ┆
 14 │     console.log(Largest[I32].of([3, 9, 4]));
@@ -10850,19 +10871,19 @@ FAIL after tests: boom
  6 │ mod Pairs[T[Point]] {
    │             ━━━━━
    │             ╰─ not a protocol
- 7 │     fn first(a: T, b: T) T { a; }
+ 7 │     fn first(a: T, b: T) T { return a; }
  8 │ }
 --- exit 1
 
 === utu check examples/error_demo/types/323_bound_not_passed_on.utu
  ERROR  V does not implement Ord (Order's T needs it)
-        bound-missing · examples/error_demo/types/323_bound_not_passed_on.utu:7:36
+        bound-missing · examples/error_demo/types/323_bound_not_passed_on.utu:7:43
 
  5 │
  6 │ mod Ranked[V] {
- 7 │     fn top(xs: Array[V]) V { Order[V].max_of(xs); }
-   │                                    ━
-   │                                    ╰─ V is unbounded
+ 7 │     fn top(xs: Array[V]) V { return Order[V].max_of(xs); }
+   │                                           ━
+   │                                           ╰─ V is unbounded
  8 │ }
 
    ╭─ std:Ord
@@ -10893,7 +10914,7 @@ FAIL after tests: boom
  ERROR  total takes Shape, got Label
         type-mismatch · examples/error_demo/types/32_proto_value_wrong_type.utu:16:26
 
-14 │ fn total(s: Shape) F64 { s.area(); }
+14 │ fn total(s: Shape) F64 { return s.area(); }
    │          ────────
    │          ╰─ Shape
 15 │
@@ -10921,7 +10942,7 @@ FAIL after tests: boom
  ERROR  shout takes Str, got ?Str
         type-mismatch · examples/error_demo/types/34_nullable_to_nonnull.utu:7:23
 
- 3 │ fn shout(s: Str) Str { s.to_upper(); }
+ 3 │ fn shout(s: Str) Str { return s.to_upper(); }
    │          ──────
    │          ╰─ Str
    ┆
@@ -10949,15 +10970,15 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/36_nullable_return.utu
  ERROR  shown returns Str, got ?Str
-        type-mismatch · examples/error_demo/types/36_nullable_return.utu:7:5
+        type-mismatch · examples/error_demo/types/36_nullable_return.utu:7:12
 
  5 │
  6 │ fn shown(u: User) Str {
    │                   ───
    │                   ╰─ Str
- 7 │     u.nickname;
-   │     ━━━━━━━━━━
-   │     ╰─ ?Str
+ 7 │     return u.nickname;
+   │            ━━━━━━━━━━
+   │            ╰─ ?Str
  8 │ }
 --- exit 1
 
@@ -10992,7 +11013,7 @@ FAIL after tests: boom
  ERROR  lookup takes UserId, got I32
         type-mismatch · examples/error_demo/types/39_distinct_vs_base.utu:9:24
 
- 5 │ fn lookup(id: UserId) I32 { id.i32(); }
+ 5 │ fn lookup(id: UserId) I32 { return id.i32(); }
    │           ──────────
    │           ╰─ UserId
    ┆
@@ -11050,7 +11071,7 @@ FAIL after tests: boom
  ERROR  paint takes Color, got Size
         type-mismatch · examples/error_demo/types/40_enum_variant_wrong_enum.utu:13:26
 
-11 │ fn paint(c: Color) I32 { c.i32(); }
+11 │ fn paint(c: Color) I32 { return c.i32(); }
    │          ────────
    │          ╰─ Color
 12 │
@@ -11208,7 +11229,7 @@ FAIL after tests: boom
  5 │         | item: ?T
    │                 ━━
    │                 ╰─ here
- 6 │     fn &.empty() & { &{ item: null }; }
+ 6 │     fn &.empty() & { return &{ item: null }; }
  7 │ }
    ┆
 10 │     let b = Box[I32].empty();
@@ -11261,13 +11282,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/503_generic_instance_mistake.utu
  ERROR  No + for Bool
-        unknown-operator · examples/error_demo/types/503_generic_instance_mistake.utu:4:24
+        unknown-operator · examples/error_demo/types/503_generic_instance_mistake.utu:4:31
 
  2 │ // Expect: No + for Bool, with a note: in G[Bool], and the call that made it
  3 │ mod G[T] {
- 4 │     fn twice(x: T) T { x + x; }
-   │                        ━━━━━
-   │                        ╰─ Bool
+ 4 │     fn twice(x: T) T { return x + x; }
+   │                               ━━━━━
+   │                               ╰─ Bool
  5 │ }
  6 │
    ┆
@@ -11319,7 +11340,7 @@ FAIL after tests: boom
  8 │     console.log(take(cl(m) Str {
    │                         ━
    │                         ╰─ cl(m: T)
- 9 │         m;
+ 9 │         return m;
 10 │     }));
 --- exit 1
 
@@ -11341,7 +11362,7 @@ FAIL after tests: boom
         match-pattern · examples/error_demo/types/523_generic_literal_instance.utu:6:13
 
  4 │     fn f(v: T) I32 {
- 5 │         match v {
+ 5 │         return match v {
  6 │             -1 => 1,
    │             ━━━━━━━━
    │             ╰─ here
@@ -11387,13 +11408,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/54_unknown_method_proto.utu
  ERROR  No method Shape.perimeter
-        unknown-method · examples/error_demo/types/54_unknown_method_proto.utu:11:25
+        unknown-method · examples/error_demo/types/54_unknown_method_proto.utu:11:32
 
- 9 │ fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+ 9 │ fn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }
 10 │
-11 │ fn edge(s: Shape) F64 { s.perimeter(); }
-   │                         ━━━━━━━━━━━━━
-   │                         ╰─ no such method
+11 │ fn edge(s: Shape) F64 { return s.perimeter(); }
+   │                                ━━━━━━━━━━━━━
+   │                                ╰─ no such method
 12 │
 13 │ main { console.log(edge(Circle { r: 1.0 }).i32()); }
 --- exit 1
@@ -11467,7 +11488,7 @@ FAIL after tests: boom
         fun-in-field · examples/error_demo/types/605_fun_array_global_read.utu:4:34
 
  2 │ // Expect: fun() Str cannot be stored; use cl() Str
- 3 │ fn hi() Str { "hi"; }
+ 3 │ fn hi() Str { return "hi"; }
  4 │ let greeters: Array[fun() Str] = [hi];
    │                                  ━━━━
    │                                  ╰─ here
@@ -11590,7 +11611,7 @@ FAIL after tests: boom
         wrong-arity · examples/error_demo/types/66_arity_closure.utu:5:17
 
  3 │ main {
- 4 │     let inc = cl(x: I32) I32 { x + 1; };
+ 4 │     let inc = cl(x: I32) I32 { return x + 1; };
  5 │     console.log(inc(1, 2));
    │                 ━━━━━━━━━
    │                 ╰─ takes 1, given 2
@@ -11600,25 +11621,25 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/67_arity_fun_value.utu
  ERROR  Takes 1, given 0
-        wrong-arity · examples/error_demo/types/67_arity_fun_value.utu:3:33
+        wrong-arity · examples/error_demo/types/67_arity_fun_value.utu:3:40
 
  1 │ // What: calling a fun(I32) I32 value with no arguments
  2 │ // Expect: Wrong arity: expected 1, got 0
- 3 │ fn twice(f: fun(I32) I32) I32 { f(); }
-   │                                 ━━━
-   │                                 ╰─ takes 1, given 0
- 4 │ fn double(x: I32) I32 { x * 2; }
+ 3 │ fn twice(f: fun(I32) I32) I32 { return f(); }
+   │                                        ━━━
+   │                                        ╰─ takes 1, given 0
+ 4 │ fn double(x: I32) I32 { return x * 2; }
 --- exit 1
 
 === utu check examples/error_demo/types/68_arity_proto_method.utu
  ERROR  Takes 0, given 1
-        wrong-arity · examples/error_demo/types/68_arity_proto_method.utu:11:24
+        wrong-arity · examples/error_demo/types/68_arity_proto_method.utu:11:31
 
- 9 │ fn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }
+ 9 │ fn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }
 10 │
-11 │ fn big(s: Shape) F64 { s.area(2.0); }
-   │                        ━━━━━━━━━━━
-   │                        ╰─ takes 0, given 1
+11 │ fn big(s: Shape) F64 { return s.area(2.0); }
+   │                               ━━━━━━━━━━━
+   │                               ╰─ takes 0, given 1
 12 │
 13 │ main { console.log(big(Circle { r: 1.0 }).i32()); }
 --- exit 1
@@ -11706,7 +11727,7 @@ FAIL after tests: boom
  9 │     let y0: I32 = P[I32].get() + 1;
    │                   ━━━━━━━━━━━━━━━━
    │                   ╰─ needs x
-10 │     fn y() I32 { y0; }
+10 │     fn y() I32 { return y0; }
 11 │ }
 
   note  in Q[Str]
@@ -11722,7 +11743,7 @@ FAIL after tests: boom
    │            ─   ━
    │            │   ╰─ I32
    │            ╰─ Str
- 5 │     fn get() T { v; }
+ 5 │     fn get() T { return v; }
  6 │ }
 
   note  in Zero[Str]
@@ -11779,7 +11800,7 @@ FAIL after tests: boom
         unknown-field · examples/error_demo/types/77_unknown_field_variant.utu:9:23
 
  7 │ fn size(s: Shape) F64 {
- 8 │     alt s {
+ 8 │     return alt s {
  9 │         Circle |c| => c.radius,
    │                       ━━━━━━━━
    │                       ╰─ no such field
@@ -11826,7 +11847,7 @@ FAIL after tests: boom
    │ ╰─ here
 10 │     | n: I32
 11 │
-12 │ fn Counter[Has].step |h| () I32 { h.n + 1; }
+12 │ fn Counter[Has].step |h| () I32 { return h.n + 1; }
 --- exit 1
 
 === utu check examples/error_demo/types/78_unknown_field_proto.utu
@@ -11902,15 +11923,15 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/81_missing_field_implicit.utu
  ERROR  Point needs a value for y
-        missing-field · examples/error_demo/types/81_missing_field_implicit.utu:7:21
+        missing-field · examples/error_demo/types/81_missing_field_implicit.utu:7:28
 
  5 │     | y: F64
    │       ─
    │       ╰─ declared here
  6 │
- 7 │ fn origin() Point { &{ x: 0.0 }; }
-   │                     ━━━━━━━━━━━
-   │                     ╰─ y?
+ 7 │ fn origin() Point { return &{ x: 0.0 }; }
+   │                            ━━━━━━━━━━━
+   │                            ╰─ y?
  8 │
  9 │ main { console.log(origin().x.i32()); }
 --- exit 1
@@ -11943,7 +11964,7 @@ FAIL after tests: boom
    │ ╰─ here
  7 │     | side: F64
  8 │
- 9 │ fn total(s: Shape) F64 { s.area(); }
+ 9 │ fn total(s: Shape) F64 { return s.area(); }
 --- exit 1
 
 === utu check examples/error_demo/types/84_proto_missing_getter.utu
@@ -11957,7 +11978,7 @@ FAIL after tests: boom
    │ ╰─ here
  8 │     | side: F64
  9 │
-10 │ fn Shape[Square].area |s| () F64 { s.side * s.side; }
+10 │ fn Shape[Square].area |s| () F64 { return s.side * s.side; }
 --- exit 1
 
 === utu check examples/error_demo/types/850_impl_list_not_a_protocol.utu
@@ -11994,7 +12015,7 @@ FAIL after tests: boom
  9 │ fn Rec[Sq].area |self| () I32 {
    │    ━━━
    │    ╰─ not a protocol
-10 │     self.s * self.s;
+10 │     return self.s * self.s;
 11 │ }
 --- exit 1
 
@@ -12007,7 +12028,7 @@ FAIL after tests: boom
 13 │ fn Area[Sq].extra |self| () I32 {
    │             ━━━━━
    │             ╰─ not in Area
-14 │     1;
+14 │     return 1;
 15 │ }
 --- exit 1
 
@@ -12025,13 +12046,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/855_bound_default_ambiguous.utu
  ERROR  t is both A's and B's
-        ambiguous-method · examples/error_demo/types/855_bound_default_ambiguous.utu:16:23
+        ambiguous-method · examples/error_demo/types/855_bound_default_ambiguous.utu:16:30
 
 14 │
 15 │ mod Run[T[A, B]] {
-16 │     fn go(c: T) I32 { c.t(); }
-   │                       ━━━━━
-   │                       ╰─ as which protocol?
+16 │     fn go(c: T) I32 { return c.t(); }
+   │                              ━━━━━
+   │                              ╰─ as which protocol?
 17 │ }
 18 │
    ┆
@@ -12061,7 +12082,7 @@ FAIL after tests: boom
 
  7 │     | side: F64
  8 │
- 9 │ fn Shape[Square].area |s| () I32 { s.side.i32() * s.side.i32(); }
+ 9 │ fn Shape[Square].area |s| () I32 { return s.side.i32() * s.side.i32(); }
    │                              ━━━
    │                              ╰─ here
 10 │
@@ -12074,8 +12095,8 @@ FAIL after tests: boom
 
  7 │     | side: F64
  8 │
- 9 │ fn Shape[Square].area |s| (scale: F64) F64 { s.side * s.side * scale; }
-   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 9 │ fn Shape[Square].area |s| (scale: F64) F64 { return s.side * s.side * scale; }
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    │ ╰─ here
 10 │
 11 │ main { console.log(0); }
@@ -12087,7 +12108,7 @@ FAIL after tests: boom
 
  2 │ // Expect: Closure parameter 'x' needs a type: cl(x: I32) ...
  3 │ main {
- 4 │     let inc = cl(x) { x + 1; };
+ 4 │     let inc = cl(x) { return x + 1; };
    │                  ━
    │                  ╰─ cl(x: T)
  5 │     console.log(inc(1));
@@ -12109,13 +12130,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/900_host_tuple_variable_index.utu
  ERROR  Shapes.[F64, Str] takes a constant index: its elements differ in type
-        tuple-index · examples/error_demo/types/900_host_tuple_variable_index.utu:7:7
+        tuple-index · examples/error_demo/types/900_host_tuple_variable_index.utu:7:14
 
  5 │ fn at(i: I32) F64 {
  6 │     let c = Shapes.corner();
- 7 │     c[i];
-   │       ━
-   │       ╰─ not a constant
+ 7 │     return c[i];
+   │              ━
+   │              ╰─ not a constant
  8 │ }
 --- exit 1
 
@@ -12172,13 +12193,13 @@ FAIL after tests: boom
 
 === utu check examples/error_demo/types/93_match_type_enum.utu
  ERROR  match takes a number or Bool, not Shape; use alt for enum variants
-        match-type · examples/error_demo/types/93_match_type_enum.utu:8:11
+        match-type · examples/error_demo/types/93_match_type_enum.utu:8:18
 
  6 │
  7 │ fn kind(s: Shape) I32 {
- 8 │     match s {
-   │           ━
-   │           ╰─ here
+ 8 │     return match s {
+   │                  ━
+   │                  ╰─ here
  9 │         Shape.Dot => 0,
 10 │         ~> 1,
 --- exit 1
@@ -12203,7 +12224,7 @@ FAIL after tests: boom
         match-pattern · examples/error_demo/types/95_match_pattern_not_bool.utu:5:9
 
  3 │ fn bit(b: Bool) I32 {
- 4 │     match b {
+ 4 │     return match b {
  5 │         1 => 1,
    │         ━━━━━━━
    │         ╰─ here
@@ -12215,7 +12236,7 @@ FAIL after tests: boom
  ERROR  1.5 cannot match I32
         match-pattern · examples/error_demo/types/96_match_pattern_float_on_int.utu:6:9
 
- 4 │     match n {
+ 4 │     return match n {
  5 │         0 => 10,
  6 │         1.5 => 20,
    │         ━━━━━━━━━━
@@ -12228,7 +12249,7 @@ FAIL after tests: boom
  ERROR  true cannot match I32
         match-pattern · examples/error_demo/types/97_match_pattern_bool_on_int.utu:6:9
 
- 4 │     match n {
+ 4 │     return match n {
  5 │         0 => 10,
  6 │         true => 20,
    │         ━━━━━━━━━━━
@@ -12241,7 +12262,7 @@ FAIL after tests: boom
  ERROR  -1 is out of range for U32
         match-pattern · examples/error_demo/types/98_match_pattern_out_of_range.utu:6:9
 
- 4 │     match code {
+ 4 │     return match code {
  5 │         0 => 0,
  6 │         -1 => 1,
    │         ━━━━━━━━
@@ -12254,7 +12275,7 @@ FAIL after tests: boom
  ERROR  Color has no variant Small
         unknown-variant · examples/error_demo/types/99_match_pattern_other_enum.utu:14:9
 
-12 │     match c {
+12 │     return match c {
 13 │         Color.Red => 0,
 14 │         Size.Small => 1,
    │         ━━━━━━━━━━━━━━━━

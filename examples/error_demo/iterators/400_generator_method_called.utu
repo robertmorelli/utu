@@ -3,7 +3,7 @@
 mod Bag {
     struct &:
         | n: I32
-    fn &.new() & { &{ n: 3 }; }
+    fn &.new() & { return &{ n: 3 }; }
     gn &.each |b| () I32 {
         for (0 ..< b.n) |i| { yield i; };
     }

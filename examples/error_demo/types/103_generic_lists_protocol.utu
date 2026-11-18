@@ -8,7 +8,7 @@ mod Box[T] {
         | v: T
 }
 
-fn Sh[Box[I32]].name |b| () I32 { 1; }
+fn Sh[Box[I32]].name |b| () I32 { return 1; }
 
 main { console.log(0); }
 using console from std:Console

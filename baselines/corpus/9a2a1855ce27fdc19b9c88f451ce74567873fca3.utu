@@ -2,6 +2,6 @@
       struct Cell:
         | value : I32
       lib {
-        fn make() Array[?Cell] { Array[?Cell].new_default(2); }
+        fn make() Array[?Cell] { return Array[?Cell].new_default(2); }
       }
     

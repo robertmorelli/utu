@@ -15,7 +15,7 @@ let tdiv_q: fun(Externref, Externref) Externref = @es/\ (a, b) => a / b \/
 let equal: fun(Externref, Externref) Bool = @es/\ (a, b) => a === b \/
 let get_si: fun(Externref) I32 = @es/\ (a) => Number(a) \/
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 // "\t:<i>\n"
 fn fnv_count(h0: I32, i: I32) I32 {
@@ -26,7 +26,7 @@ fn fnv_count(h0: I32, i: I32) I32 {
         h = fnv(h, 48 + i / p % 10)
         p = p / 10
     }
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 fn pidigits(n: I32) I32 {
@@ -66,7 +66,7 @@ fn pidigits(n: I32) I32 {
         for (0..<(10 - n % 10)) { h = fnv(h, 32) }
         h = fnv_count(h, n)
     }
-    h
+    return h
 }
 
 test "pidigits prints BG's digits" {
@@ -75,5 +75,5 @@ test "pidigits prints BG's digits" {
 }
 
 lib {
-    fn bench(n: I32) I32 { pidigits(n) }
+    fn bench(n: I32) I32 { return pidigits(n) }
 }

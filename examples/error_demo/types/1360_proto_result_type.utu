@@ -3,6 +3,6 @@ proto P:
     | tick() I32
 struct S[P]:
     | x: I32
-fn P[S].tick |s| () Str { "bad"; }
+fn P[S].tick |s| () Str { return "bad"; }
 main { console.log(0); }
 using console from std:Console

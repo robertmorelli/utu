@@ -4,7 +4,7 @@ struct User:
     | nickname: ?Str
 
 fn shown(u: User) Str {
-    u.nickname;
+    return u.nickname;
 }
 
 main { console.log(shown(User { nickname: "x" }).len()); }

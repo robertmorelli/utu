@@ -13,7 +13,7 @@ struct Bench:
     | work: Array[F64]
 
 fn tile_px(state: ui.Ui, tile: I32, camera: F64) F64 {
-    (tile.f64() - camera) * state.zoom
+    return (tile.f64() - camera) * state.zoom
 }
 
 fn draw_map(state: ui.Ui, ctx: Browser.CanvasRenderingContext2D, width: F64, height: F64) Void {
@@ -185,11 +185,11 @@ fn pan(state: ui.Ui, dx: F64, dy: F64) Void {
 }
 
 fn param(name: Str) ?Str {
-    new Browser.URL(Browser.location.href).searchParams.get(name)
+    return new Browser.URL(Browser.location.href).searchParams.get(name)
 }
 
 fn param_int(name: Str, fallback: I32) I32 {
-    promote param(name) {
+    return promote param(name) {
         |text| => Browser.parseInt(text, 10).i32(),
         ~> fallback,
     }
@@ -216,11 +216,11 @@ fn after_render(f: cl() Void) Void {
 
 fn percentile(values: Array[F64], fraction: F64) F64 {
     let sorted = values sort(F64) |a, b| { a < b }
-    if sorted.len() == 0 { 0.0 } else { sorted[sim.imin(sorted.len() - 1, (sorted.len().f64() * fraction).i32())] }
+    return if sorted.len() == 0 { 0.0 } else { sorted[sim.imin(sorted.len() - 1, (sorted.len().f64() * fraction).i32())] }
 }
 
 fn average(values: Array[F64]) F64 {
-    if values.len() == 0 { 0.0 } else { (values fold(0.0) |a, v| { a + v }) / values.len().f64() }
+    return if values.len() == 0 { 0.0 } else { (values fold(0.0) |a, v| { a + v }) / values.len().f64() }
 }
 
 fn report(state: ui.Ui, bench: Bench) Void {

@@ -3,7 +3,7 @@
 struct User:
     | name: Str
 
-fn make_user() User { User { name: "x" }; }
+fn make_user() User { return User { name: "x" }; }
 
 main {
     console.log(promote make_user() {

@@ -14,7 +14,7 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
     let draft=Draft {
         title:""
     }
-    @wutu/\
+    return @wutu/\
     @island "studio-form"
     form.panel {
         label {
@@ -44,7 +44,7 @@ fn studio_form(state: StudioState) Browser.HTMLElement {
     \/
 }
 fn workspace(state: StudioState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "studio-workspace"
     section.workspace {
         = studio_form(state)

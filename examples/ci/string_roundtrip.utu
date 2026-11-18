@@ -1,17 +1,17 @@
 let str_concat: fun(Str, Str) Str = @es/\(a, b) => a + b\/
 
 fn label() Str {
-    "done"
+    return "done"
 }
 
 fn wrap(value: Str) Str {
-    str_concat(str_concat("[", value), "]")
+    return str_concat(str_concat("[", value), "]")
 }
 
 fn decorate(value: Str) Str {
-    wrap(value)
+    return wrap(value)
 }
 
 fn main() Str {
-    decorate(label())
+    return decorate(label())
 }

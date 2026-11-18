@@ -5,7 +5,7 @@ struct Point:
     | y: F64
 
 fn kind(p: Point) Str {
-    alt p {
+    return alt p {
         Point |q| => "point",
         ~> "other",
     };

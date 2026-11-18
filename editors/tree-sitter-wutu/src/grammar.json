@@ -278,8 +278,21 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "="
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "="
+            },
+            {
+              "type": "STRING",
+              "value": "|"
+            },
+            {
+              "type": "STRING",
+              "value": "|>"
+            }
+          ]
         },
         {
           "type": "SYMBOL",
@@ -878,6 +891,10 @@
         {
           "type": "CHOICE",
           "members": [
+            {
+              "type": "SYMBOL",
+              "name": "brace_group"
+            },
             {
               "type": "SEQ",
               "members": [
@@ -1719,36 +1736,79 @@
       "value": "\\d[\\w.]*"
     },
     "template_string": {
-      "type": "TOKEN",
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "STRING",
-            "value": "`"
-          },
-          {
-            "type": "REPEAT",
-            "content": {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "PATTERN",
-                  "value": "[^`\\\\]+"
-                },
-                {
-                  "type": "PATTERN",
-                  "value": "\\\\."
-                }
-              ]
-            }
-          },
-          {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "`"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_template_text"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "template_interpolation"
+              }
+            ]
+          }
+        },
+        {
+          "type": "IMMEDIATE_TOKEN",
+          "content": {
             "type": "STRING",
             "value": "`"
           }
+        }
+      ]
+    },
+    "_template_text": {
+      "type": "IMMEDIATE_TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "[^`\\\\$]+"
+          },
+          {
+            "type": "PATTERN",
+            "value": "\\\\[\\s\\S]"
+          },
+          {
+            "type": "STRING",
+            "value": "$"
+          }
         ]
       }
+    },
+    "template_interpolation": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "IMMEDIATE_TOKEN",
+          "content": {
+            "type": "STRING",
+            "value": "${"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_statement_token"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "}"
+        }
+      ]
     },
     "operator": {
       "type": "CHOICE",

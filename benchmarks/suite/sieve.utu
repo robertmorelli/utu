@@ -18,6 +18,6 @@ lib {
     for (2..<n) |i| {
       count += flags[i]
     }
-    count
+    return count
   }
 }

@@ -9,7 +9,7 @@ enum Tree:
     | Branch { size: I32 }
 
 fn area(shape: Shape) F64 {
-    alt shape {
+    return alt shape {
         Circle |c| => c.r,
         Leaf => 0.0,
         ~> 1.0,

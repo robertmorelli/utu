@@ -5,7 +5,7 @@ enum Shape:
     | Dot {}
 
 fn size(s: Shape) F64 {
-    alt s {
+    return alt s {
         Circle |c| => c.radius,
         Dot => 0.0,
     };

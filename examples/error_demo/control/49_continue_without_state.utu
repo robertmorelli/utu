@@ -11,7 +11,7 @@ fn count_words(text: Str) I32 {
         },
         ~> { break; },
     };
-    words;
+    return words;
 }
 
 main {

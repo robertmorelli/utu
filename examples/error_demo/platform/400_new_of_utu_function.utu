@@ -3,7 +3,7 @@
 struct P:
     | x: I32
 
-fn mk() P { P { x: 1 }; }
+fn mk() P { return P { x: 1 }; }
 
 main {
     let p = new mk();

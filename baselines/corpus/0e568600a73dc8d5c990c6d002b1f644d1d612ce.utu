@@ -5,20 +5,20 @@
         | Triangle { base: I32, height: I32, skew: I32 }
       lib {
         fn classify(shape: Shape) I32 {
-          alt shape {
+          return alt shape {
             Circle => 7,
             ~> fallback(shape),
           };
         }
         fn fallback(shape: Shape) I32 {
-          alt shape {
+          return alt shape {
             Rect => 12,
             Triangle => 9,
             ~> 0,
           };
         }
-        fn circle() I32 { classify(Circle { radius: 7 }); }
-        fn rect() I32 { classify(Rect { width: 3, height: 4 }); }
-        fn triangle() I32 { classify(Triangle { base: 5, height: 4, skew: 1 }); }
+        fn circle() I32 { return classify(Circle { radius: 7 }); }
+        fn rect() I32 { return classify(Rect { width: 3, height: 4 }); }
+        fn triangle() I32 { return classify(Triangle { base: 5, height: 4, skew: 1 }); }
       }
     

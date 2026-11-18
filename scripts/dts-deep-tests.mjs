@@ -37,60 +37,60 @@ async function test(name, fn) { await fn(); passed++; console.log(`✓ ${name}`)
 await test('constructors, inferred locals, inherited members and deep returned properties', async () => {
   const { exports } = await run(`fn run() F64 {
     let c = Fixture.Counter(2.0); c.label = "counter";
-    let n = c.increment(3.0); Fixture.sum(n, c.doubled, Fixture.constants.nested.answer);
+    let n = c.increment(3.0); return Fixture.sum(n, c.doubled, Fixture.constants.nested.answer);
   }`);
   assert.equal(exports.run(), 57);
 });
 await test('overloads, omitted optional arguments, rest arguments and generic identity', async () => {
   const { exports } = await run(`
-    fn text() Str { Fixture.overloaded(Fixture.echo("hello")); }
-    fn number() F64 { Fixture.overloaded(Fixture.echo(5.0)); }
-    fn optional() F64 { Fixture.optional(4.0); }
-    fn rest() F64 { Fixture.sum(1.0, 2.0, 3.0, 4.0); }
+    fn text() Str { return Fixture.overloaded(Fixture.echo("hello")); }
+    fn number() F64 { return Fixture.overloaded(Fixture.echo(5.0)); }
+    fn optional() F64 { return Fixture.optional(4.0); }
+    fn rest() F64 { return Fixture.sum(1.0, 2.0, 3.0, 4.0); }
   `);
   assert.equal(exports.text(), 'HELLO'); assert.equal(exports.number(), 6);
   assert.equal(exports.optional(), 8); assert.equal(exports.rest(), 10);
 });
 await test('contextual closures preserve real JS boolean results', async () => {
   const { exports } = await run(`
-    fn apply() F64 { Fixture.apply(3.0, cl(value) { value + 2.0; }); }
-    fn boolean() Bool { Fixture.booleanCallback(cl(value) { not value; }); }
+    fn apply() F64 { return Fixture.apply(3.0, cl(value) { return value + 2.0; }); }
+    fn boolean() Bool { return Fixture.booleanCallback(cl(value) { return not value; }); }
   `);
   assert.equal(exports.apply(), 5); assert.equal(exports.boolean(), true);
 });
 await test('object arguments use normal contextual record syntax and JS primitives', async () => {
   const { exports } = await run(`fn run() Str {
-    let result = Fixture.make(&{ label: "hello", count: 2.0, enabled: true }); result.label;
+    let result = Fixture.make(&{ label: "hello", count: 2.0, enabled: true }); return result.label;
   }`);
   assert.equal(exports.run(), 'hello');
 });
 await test('index getters and setters, nested namespaces and constant enums', async () => {
   const { exports } = await run(`fn run() F64 {
     Fixture.dictionary["deep"] = 8.0;
-    Fixture.dictionary["deep"] + Fixture.Util.Nested.answer;
+    return Fixture.dictionary["deep"] + Fixture.Util.Nested.answer;
   }`);
   assert.equal(exports.run(), 50);
   await test('a constant enum member adds as its literal', async () => {
     const { exports } = await run(`fn run() F64 {
       Fixture.dictionary["deep"] = 8.0;
-      Fixture.dictionary["deep"] + Fixture.Util.Nested.answer + Fixture.ConstMode.Second;
+      return Fixture.dictionary["deep"] + Fixture.Util.Nested.answer + Fixture.ConstMode.Second;
     }`);
     assert.equal(exports.run(), 72);
   });
 });
 await test('exported unique symbol keys preserve method receivers', async () => {
-  const { exports } = await run(`fn run() Str { let value = Fixture.symbolic(); value[Fixture.token](); }`);
+  const { exports } = await run(`fn run() Str { let value = Fixture.symbolic(); return value[Fixture.token](); }`);
   assert.equal(exports.run(), 'symbol works');
 });
 await test('nullable return values retain their type through promote', async () => {
   const { exports } = await run(`fn run(present: Bool) Str {
-    promote Fixture.optionalText(present) { |text| => text, ~> "absent", };
+    return promote Fixture.optionalText(present) { |text| => text, ~> "absent", };
   }`);
   assert.equal(exports.run(true), 'present'); assert.equal(exports.run(false), 'absent');
 });
 await test('nullable numbers unbox naturally after promote', async () => {
   const { exports } = await run(`fn run(present: Bool) F64 {
-    promote Fixture.optionalNumber(present) { |number| => number, ~> 0.0, };
+    return promote Fixture.optionalNumber(present) { |number| => number, ~> 0.0, };
   }`);
   assert.equal(exports.run(true), 42); assert.equal(exports.run(false), 0);
 });
@@ -111,27 +111,27 @@ await test('readonly members and incorrect arguments produce diagnostics', async
 });
 await test('real nanoid package uses natural named exports', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'node_modules/nanoid/index.d.ts')], prefix: 'Nano', moduleSpecifier: 'nanoid' });
-  const { exports } = await run('fn run() Str { Nano.nanoid(12.0); }', output);
+  const { exports } = await run('fn run() Str { return Nano.nanoid(12.0); }', output);
   assert.equal(exports.run().length, 12);
 });
 await test('foreign Promise results work with UTU await', async () => {
   if (typeof WebAssembly.Suspending !== 'function') return;
-  const { exports } = await run('fn run() Str { await Fixture.later("later"); }');
+  const { exports } = await run('fn run() Str { return await Fixture.later("later"); }');
   assert.equal(await exports.run(), 'later');
 });
 await test('CommonJS callable exports retain attached properties', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/export-equals.d.cts')], prefix: 'Common', moduleSpecifier: path.join(ROOT, 'scripts/fixtures/dts/export-equals.cjs') });
-  const { exports } = await run('fn run() Str { Common.default.label; }', output);
+  const { exports } = await run('fn run() Str { return Common.default.label; }', output);
   assert.equal(exports.run(), 'callable namespace');
 });
 await test('node:path exposes deep methods without accessor names', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'node_modules/@types/node/path.d.ts')], prefix: 'Path', moduleSpecifier: 'node:path' });
-  const { exports } = await run('fn run() Str { Path.default.posix.join("a", "b", "c"); }', output);
+  const { exports } = await run('fn run() Str { return Path.default.posix.join("a", "b", "c"); }', output);
   assert.equal(exports.run(), 'a/b/c');
 });
 await test('Floating UI factory returns a typed middleware object', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'node_modules/@floating-ui/dom/dist/floating-ui.dom.d.ts')], prefix: 'Floating', moduleSpecifier: '@floating-ui/dom' });
-  const { exports } = await run('fn run() Str { Floating.offset(8.0).name; }', output);
+  const { exports } = await run('fn run() Str { return Floating.offset(8.0).name; }', output);
   assert.equal(exports.run(), 'offset');
 });
 await test('mitt callbacks retain identity for subscribe and unsubscribe', async () => {
@@ -145,14 +145,14 @@ await test('mitt callbacks retain identity for subscribe and unsubscribe', async
 });
 await test('ABI files load directly with lowercase module aliases', async () => {
   const source = `using Fixture |api| from "/fixture.abi.json";
-    lib { fn run() F64 { let c = api.Counter(3.0); c.doubled; } }`;
+    lib { fn run() F64 { let c = api.Counter(3.0); return c.doubled; } }`;
   const doc = await compile(source, fixture, { readFile: async file => file.endsWith('.abi.json') ? JSON.stringify(fixture) : source });
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.run(), 6);
 });
 await test('explicit new selects the construct signature of callable constructors', async () => {
   const source = `using Browser from std:Browser; lib { fn run() F64 {
-    let date = new Browser.Date(0.0); date.getUTCFullYear();
+    let date = new Browser.Date(0.0); return date.getUTCFullYear();
   } }`;
   const doc = await compile(source);
   const instance = { exports: await load(doc) };
@@ -160,14 +160,14 @@ await test('explicit new selects the construct signature of callable constructor
 });
 await test('mutable globals use direct assignment while const globals stay readonly', async () => {
   const output = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/globals.d.ts')], prefix: 'Globals' });
-  const { exports } = await run('fn run() F64 { Globals.abiCounter = 40.0; Globals.abiCounter += 2.0; Globals.abiCounter; }', output);
+  const { exports } = await run('fn run() F64 { Globals.abiCounter = 40.0; Globals.abiCounter += 2.0; return Globals.abiCounter; }', output);
   try { assert.equal(exports.run(), 42); } finally { delete globalThis.abiCounter; }
   const doc = await compile('using Globals from std:Globals; main { Globals.abiFixed = 0.0; }', output);
   assert(doc.errors.some(m => /readonly/.test(m)));
 });
 await test('generic calls retain foreign identities across separate ABI imports', async () => {
   const doc = await compile(`using Fixture from std:Fixture; using Browser from std:Browser;
-    lib { fn run() F64 { let date = Fixture.echo(new Browser.Date(0.0)); date.getUTCFullYear(); } }`);
+    lib { fn run() F64 { let date = Fixture.echo(new Browser.Date(0.0)); return date.getUTCFullYear(); } }`);
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.run(), 1970);
 });
@@ -187,7 +187,7 @@ async function withDom(fn) {
 await test('union slots accept any member: strings, subtypes, closures and records', async () => {
   let fired = 0;
   const exports = await runBrowser(`
-    fn params() Str { let p = new Browser.URLSearchParams("a=1&b=2"); p.append("c", "3"); p.toString(); }
+    fn params() Str { let p = new Browser.URLSearchParams("a=1&b=2"); p.append("c", "3"); return p.toString(); }
     fn timer() Void { Browser.setTimeout(cl() Void { Browser.console.info("timer"); }, 0.0); }
     fn once() F64 {
       let seen = Browser.Array();
@@ -195,10 +195,10 @@ await test('union slots accept any member: strings, subtypes, closures and recor
       target.addEventListener("ping", cl(event) Void { seen.push(event.type); }, &{ once: true });
       target.dispatchEvent(new Browser.Event("ping"));
       target.dispatchEvent(new Browser.Event("ping"));
-      seen.length;
+      return seen.length;
     }
-    fn detail() F64 { let event = new Browser.CustomEvent("x", &{ detail: 5.0 }); event.detail; }
-    fn nothing() Str { Browser.JSON.stringify(null); }
+    fn detail() F64 { let event = new Browser.CustomEvent("x", &{ detail: 5.0 }); return event.detail; }
+    fn nothing() Str { return Browser.JSON.stringify(null); }
   `);
   assert.equal(exports.params(), 'a=1&b=2&c=3');
   const info = console.info; console.info = () => fired++;
@@ -210,16 +210,16 @@ await test('union slots accept any member: strings, subtypes, closures and recor
 });
 await test('generic callbacks infer results, accept shorter arity and bind later closures', async () => {
   const exports = await runBrowser(`
-    fn upper() Str { Browser.Array.of("x", "y").map(cl(s) Str { s.toUpperCase(); }).join(","); }
+    fn upper() Str { return Browser.Array.of("x", "y").map(cl(s) Str { return s.toUpperCase(); }).join(","); }
     fn doubled() Str {
       let out = Browser.Array();
       Browser.Array.of(1.0, 2.0, 3.0).forEach(cl(n) Void { out.push(n * 2.0); });
-      out.join(",");
+      return out.join(",");
     }
     fn later() F64 {
-      let square = cl(n) F64 { n * n; };
+      let square = cl(n) F64 { return n * n; };
       let values = Browser.Array.of(2.0, 3.0).map(square);
-      values[0.0] + values[1.0];
+      return values[0.0] + values[1.0];
     }
   `);
   assert.equal(exports.upper(), 'X,Y');
@@ -228,13 +228,13 @@ await test('generic callbacks infer results, accept shorter arity and bind later
 });
 await test('UTU strings and numbers use declared String and Number members', async () => {
   const exports = await runBrowser(`
-    fn upper() Str { "abc".toUpperCase(); }
-    fn padded() Str { "7".padStart(3.0, "0"); }
-    fn parts() F64 { "a,b,c".lastIndexOf(","); }
-    fn replaced() Str { "a-b-c".replaceAll("-", "+"); }
-    fn fixed() Str { let n = 3.14159; n.toFixed(2.0); }
-    fn native() I32 { "abc".len(); }
-    fn width() F64 { let s = "hello"; s.length; }
+    fn upper() Str { return "abc".toUpperCase(); }
+    fn padded() Str { return "7".padStart(3.0, "0"); }
+    fn parts() F64 { return "a,b,c".lastIndexOf(","); }
+    fn replaced() Str { return "a-b-c".replaceAll("-", "+"); }
+    fn fixed() Str { let n = 3.14159; return n.toFixed(2.0); }
+    fn native() I32 { return "abc".len(); }
+    fn width() F64 { let s = "hello"; return s.length; }
   `);
   assert.equal(exports.upper(), 'ABC'); assert.equal(exports.padded(), '007');
   assert.equal(exports.parts(), 3); assert.equal(exports.replaced(), 'a+b+c');
@@ -245,7 +245,7 @@ await test('alt narrows host values by runtime class', async () => {
     fn kind(index: F64) Str {
       let values = Browser.Array();
       values.push(new Browser.Date(0.0)); values.push(new Browser.URL("https://utu.dev/x")); values.push("plain");
-      alt values[index] {
+      return alt values[index] {
         Browser.Date |date| => date.toISOString().slice(0, 4),
         Browser.URL |url| => url.hostname,
         ~> "other",
@@ -267,7 +267,7 @@ await test('DOM: tag-name narrowing, index-signature properties, union rest argu
         row.append("label ", document.createElement("span"));
         row.classList.toggle("active");
         document.body.appendChild(row);
-        document.body.innerHTML;
+        return document.body.innerHTML;
       }
     `);
     const html = exports.build();
@@ -289,7 +289,7 @@ await test('DOM: tag-name narrowing, index-signature properties, union rest argu
           input.removeEventListener("change", handler);
           input.dispatchEvent(new Browser.Event("change"));
         }, ~> {}, };
-        log.join("|");
+        return log.join("|");
       }`);
       assert.equal(later.target(), 'typed');
     });
@@ -297,13 +297,13 @@ await test('DOM: tag-name narrowing, index-signature properties, union rest argu
 });
 await test('array literals become JS arrays for array, array-like, iterable and dynamic slots', async () => {
   const exports = await runBrowser(`
-    fn json() Str { Browser.JSON.stringify([1, "two", true, &{ n: 3 }]); }
-    fn from() F64 { let values = Browser.Array.from([1.0, 2.0, 4.0]); values[2.0] + values.length; }
-    fn blob() F64 { let b = new Browser.Blob(["hello ", "world"], &{ type: "text/plain" }); b.size; }
-    fn set() F64 { let s = new Browser.Set(["a", "b", "a"]); s.size; }
+    fn json() Str { return Browser.JSON.stringify([1, "two", true, &{ n: 3 }]); }
+    fn from() F64 { let values = Browser.Array.from([1.0, 2.0, 4.0]); return values[2.0] + values.length; }
+    fn blob() F64 { let b = new Browser.Blob(["hello ", "world"], &{ type: "text/plain" }); return b.size; }
+    fn set() F64 { let s = new Browser.Set(["a", "b", "a"]); return s.size; }
   `);
   assert.equal(exports.json(), '[1,"two",true,{"n":3}]');
-  const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; days[1].getUTCDate() + days.len().f64(); }`);
+  const native = await runBrowser(`fn dates() F64 { let days = [new Browser.Date(0), new Browser.Date(86400000)]; return days[1].getUTCDate() + days.len().f64(); }`);
   assert.equal(native.dates(), 4);
   // A literal given to JavaScript, or used through JS array members, is a JS array.
   // An empty `[]` nothing constrains is a native Array[I32], JS members or not
@@ -312,10 +312,10 @@ await test('array literals become JS arrays for array, array-like, iterable and 
     const empty = await compile('using Browser from std:Browser; main { let items = []; items.push("a"); }');
     assert.deepEqual(empty.errors, ['No method Array[I32].push']);
     const host = await runBrowser(`
-      fn direct() Str { Browser.JSON.stringify([1, 2]); }
-      fn bound() Str { let xs = [3, 1, 2]; xs.sort(); Browser.JSON.stringify(xs); }
-      fn pushed() F64 { let items = Browser.Array(); items.push("a"); items.push("b"); items.length; }
-      fn logged() F64 { let xs = [1, 2]; Browser.console.debug(xs); xs[1]; }
+      fn direct() Str { return Browser.JSON.stringify([1, 2]); }
+      fn bound() Str { let xs = [3, 1, 2]; xs.sort(); return Browser.JSON.stringify(xs); }
+      fn pushed() F64 { let items = Browser.Array(); items.push("a"); items.push("b"); return items.length; }
+      fn logged() F64 { let xs = [1, 2]; Browser.console.debug(xs); return xs[1]; }
     `);
     assert.equal(host.direct(), '[1,2]'); assert.equal(host.bound(), '[1,2,3]');
     assert.equal(host.pushed(), 2); assert.equal(host.logged(), 2);
@@ -348,13 +348,13 @@ await test('undefined results are absence for promote; generic constraints flow 
     fn lookup(key: Str) F64 {
       let m = new Browser.Map();
       m.set("a", 1.0);
-      promote m.get(key) { |value| => 10.0, ~> -1.0, };
+      return promote m.get(key) { |value| => 10.0, ~> -1.0, };
     }
     fn first(min: F64) Str {
       let words = Browser.Array.of("a", "bbb", "cc");
-      promote words.find(cl(w) Bool { w.length >= min; }) { |w| => w.toUpperCase(), ~> "none", };
+      return promote words.find(cl(w) Bool { return w.length >= min; }) { |w| => w.toUpperCase(), ~> "none", };
     }
-    fn kept() Str { Browser.Array.of("a", "bbb", "cc").filter(cl(w) Bool { w.length > 1.0; }).join("+"); }
+    fn kept() Str { return Browser.Array.of("a", "bbb", "cc").filter(cl(w) Bool { return w.length > 1.0; }).join("+"); }
   `);
   assert.equal(exports.lookup('a'), 10); assert.equal(exports.lookup('z'), -1);
   assert.equal(exports.first(2), 'BBB'); assert.equal(exports.first(9), 'none');
@@ -374,27 +374,27 @@ await test('checked programs keep precise declaration types in diagnostics', asy
 });
 await test('default exports, booleans, unions, never, namespaces and const enums read naturally', async () => {
   const { exports } = await run(`
-    fn greeting() Str { Fixture.default("UTU"); }
-    fn boolean() Bool { Fixture.flip(false); }
+    fn greeting() Str { return Fixture.default("UTU"); }
+    fn boolean() Bool { return Fixture.flip(false); }
     fn failure() Void { Fixture.fail(); }
-    fn namespace() F64 { Fixture.Util.scale(21.0); }
+    fn namespace() F64 { return Fixture.Util.scale(21.0); }
   `);
   assert.equal(exports.greeting(), 'Hello UTU'); assert.equal(exports.boolean(), true);
   assert.throws(() => exports.failure(), /fixture failure/);
   assert.equal(exports.namespace(), 42);
   await test('a union result reads as the member a slot wants', async () => {
-    const { exports } = await run('fn number() F64 { Fixture.union(42.0); } fn text() Str { Fixture.union("choice"); }');
+    const { exports } = await run('fn number() F64 { return Fixture.union(42.0); } fn text() Str { return Fixture.union("choice"); }');
     assert.equal(exports.number(), 42); assert.equal(exports.text(), 'choice');
   });
   await test('const enum members read naturally', async () => {
-    const { exports } = await run('fn constant() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }');
+    const { exports } = await run('fn constant() F64 { return Fixture.ConstMode.First + Fixture.ConstMode.Second; }');
     assert.equal(exports.constant(), 42);
   });
 });
 await test('enum members of every kind are literals with no host read', async () => {
   const { exports, glue } = await run(`
-    fn number() F64 { Fixture.ConstMode.First + Fixture.ConstMode.Second; }
-    fn text() Str { Fixture.Tone.Warm; }
+    fn number() F64 { return Fixture.ConstMode.First + Fixture.ConstMode.Second; }
+    fn text() Str { return Fixture.Tone.Warm; }
   `);
   assert.equal(exports.number(), 42); assert.equal(exports.text(), 'warm');
   assert.equal(glue, '', 'enum members must not become imports');
@@ -403,9 +403,9 @@ await test('a Rust crate links through its wasm-bindgen declarations', async () 
   const pkg = path.join(ROOT, 'scripts/fixtures/rust-geom/pkg');
   const geom = linkFiles({ files: [path.join(pkg, 'geom.d.ts')], prefix: 'Geom', moduleSpecifier: path.join(pkg, 'geom.js') });
   const { exports, glue } = await run(`
-    fn hello() Str { Geom.greet("UTU"); }
-    fn parsed(text: Str) F64 { promote Geom.parse_number(text) { |n| => n, ~> -1.0, }; }
-    fn average() F64 { Geom.mean([2, 4, 9]); }
+    fn hello() Str { return Geom.greet("UTU"); }
+    fn parsed(text: Str) F64 { return promote Geom.parse_number(text) { |n| => n, ~> -1.0, }; }
+    fn average() F64 { return Geom.mean([2, 4, 9]); }
     fn polygon() F64 {
       let p = new Geom.Polygon(4.0, 2.5);
       p.label = "square";
@@ -413,13 +413,13 @@ await test('a Rust crate links through its wasm-bindgen declarations', async () 
       let square = if p.kind() == Geom.Shape.Square { 100.0; } else { 0.0; };
       let result = grown + p.perimeter + p.vertices().length + square;
       p.free();
-      result;
+      return result;
     }
     fn steps() F64 {
       let seen = new Geom.Polygon(0.0, 0.0);
       Geom.each_step(3.0, cl(i: F64) Void { seen.scale(1.0); });
       seen.free();
-      3.0;
+      return 3.0;
     }
   `, geom);
   assert.equal(exports.hello(), 'Hello, UTU!');
@@ -431,24 +431,24 @@ await test('a Rust crate links through its wasm-bindgen declarations', async () 
 await test('std:JS is the ECMAScript library alone, sharing the browser\'s standard types', async () => {
   const doc = await compile(`using JS from std:JS; lib { fn run() Str {
     let m = new JS.Map(); m.set("a", 1); let d = new JS.Date(0);
-    JS.JSON.stringify([JS.Math.max(1, 5), m.size, d.getUTCFullYear(), "x".padStart(3, "-")]);
+    return JS.JSON.stringify([JS.Math.max(1, 5), m.size, d.getUTCFullYear(), "x".padStart(3, "-")]);
   } }`);
   const instance = { exports: await load(doc) };
   assert.equal(instance.exports.run(), '[5,1,1970,"--x"]');
   const dom = await compile('using JS from std:JS; main { JS.document.title = "x"; }');
   assert(dom.errors.includes('No member JS.document'));
   const both = await compile(`using JS from std:JS; using Browser from std:Browser;
-    lib { fn run() F64 { let m: Browser.Map = new JS.Map(); m.size; } }`);
+    lib { fn run() F64 { let m: Browser.Map = new JS.Map(); return m.size; } }`);
   assert.deepEqual(both.errors, []);
 });
 await test('std:Web runs the common web APIs on any JS runtime; std:Worker types worker globals', async () => {
   const doc = await compile(`using Web from std:Web; lib {
-    fn url() Str { let u = new Web.URL("https://utu.dev/a?q=1"); u.searchParams.set("q", "2"); u.href; }
-    fn bytes() F64 { let encoded = new Web.TextEncoder().encode("héllo"); encoded.length; }
-    fn base64() Str { Web.atob(Web.btoa("utu")); }
-    fn uuid() I32 { Web.crypto.randomUUID().len(); }
-    fn aborted() Bool { let c = new Web.AbortController(); c.abort(); c.signal.aborted; }
-    fn body() Str { await new Web.Response("from a Response").text(); }
+    fn url() Str { let u = new Web.URL("https://utu.dev/a?q=1"); u.searchParams.set("q", "2"); return u.href; }
+    fn bytes() F64 { let encoded = new Web.TextEncoder().encode("héllo"); return encoded.length; }
+    fn base64() Str { return Web.atob(Web.btoa("utu")); }
+    fn uuid() I32 { return Web.crypto.randomUUID().len(); }
+    fn aborted() Bool { let c = new Web.AbortController(); c.abort(); return c.signal.aborted; }
+    fn body() Str { return await new Web.Response("from a Response").text(); }
   }`);
   const instance = { exports: await load(doc) };
   const { exports } = instance;
@@ -476,7 +476,7 @@ await test('keyof over an index signature accepts any key (mitt handlers need no
     let total: F64 = 0.0;
     emitter.on("add", cl(value: F64) Void { total = total + value; });
     emitter.emit("add", 2); emitter.emit("add", 3);
-    total;
+    return total;
   }`, output);
   assert.equal(exports.run(), 5);
 });
@@ -485,10 +485,10 @@ await test('try/catch catches host exceptions as values, nests, and yields a res
   const members = await compile('using JS from std:JS; main { try { JS.JSON.parse("{"); } catch |e| { e.name; }; }');
   assert.deepEqual(members.errors, ['Externref has no field name']);
   const doc = await compile(`using JS from std:JS; lib {
-    fn message(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { JS.String(e); }; }
-    fn counted() F64 { let failures: F64 = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; failures; }
+    fn message(text: Str) Str { return try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { JS.String(e); }; }
+    fn counted() F64 { let failures: F64 = 0.0; try { JS.JSON.parse("nope"); } catch { failures = failures + 1.0; }; return failures; }
     fn nested() Str {
-      try { try { JS.JSON.parse("{"); "inner ok"; } catch |inner| { JS.JSON.parse("]"); "inner caught"; }; }
+      return try { try { JS.JSON.parse("{"); "inner ok"; } catch |inner| { JS.JSON.parse("]"); "inner caught"; }; }
       catch |outer| { "outer caught"; };
     }
   }`);
@@ -505,12 +505,12 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
         \\\\[{"price": 2, "n": 3}, {"price": 1.5, "n": 2}]
       ;
       let items = Browser.JSON.parse(text);
-      items.sort(cl(a, b) F64 { if a.price > b.price { a.price - b.price; } else { b.n - a.n; }; });
-      items.reduce(cl(sum, item) F64 { sum + item.price * item.n; }, 0);
+      items.sort(cl(a, b) F64 { return if a.price > b.price { a.price - b.price; } else { b.n - a.n; }; });
+      return items.reduce(cl(sum, item) F64 { return sum + item.price * item.n; }, 0);
     }
-    fn count() I32 { let ids = Browser.JSON.parse("[4,5,6]"); let t = 0; for (0..<ids.length.i32()) |i| { t += i; }; t; }
-    fn same() Bool { let a = new Browser.EventTarget(); let b = a; a == b and a != new Browser.EventTarget(); }
-    fn from_set() Str { let s = new Browser.Set(); s.add("x"); s.add("y"); Browser.Array.from(s).join(""); }
+    fn count() I32 { let ids = Browser.JSON.parse("[4,5,6]"); let t = 0; for (0..<ids.length.i32()) |i| { t += i; }; return t; }
+    fn same() Bool { let a = new Browser.EventTarget(); let b = a; return a == b and a != new Browser.EventTarget(); }
+    fn from_set() Str { let s = new Browser.Set(); s.add("x"); s.add("y"); return Browser.Array.from(s).join(""); }
     fn dataset() Str {
       let text =
         \\\\{"id": "z"}
@@ -518,13 +518,13 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
       let item = Browser.JSON.parse(text);
       let map = new Browser.Map();
       map.set("k", item.id);
-      map.get("k");
+      return map.get("k");
     }
   `);
   assert.equal(exports.total(), 9); assert.equal(exports.count(), 3); assert.equal(exports.same(), true);
   assert.equal(exports.from_set(), 'xy'); assert.equal(exports.dataset(), 'z');
   await test('web friction: array literals take JS array members', async () => {
-    const chips = await runBrowser('fn chips() Str { let out = Browser.Array(); ["a", "b"].forEach(cl(name) Void { out.push(name + "!"); }); out.join(","); }');
+    const chips = await runBrowser('fn chips() Str { let out = Browser.Array(); ["a", "b"].forEach(cl(name) Void { out.push(name + "!"); }); return out.join(","); }');
     assert.equal(chips.chips(), 'a!,b!');
   });
   const typed = await compile(`using Browser from std:Browser; main {
@@ -537,9 +537,9 @@ await test('web friction: dynamic JSON arithmetic, host equality, structural ite
 });
 await test('closures whose first parameter is `this` receive the JS receiver', async () => {
   const { exports } = await run(`
-    fn label() Str { Fixture.arbitrary(cl(this, first) Str { this.label; }); }
-    fn count() F64 { Fixture.arbitrary(cl(this, first: F64, second: Str) F64 { this.count + first; }); }
-    fn bound() Str { let read = cl(this) Str { this.label; }; Fixture.arbitrary(read); }
+    fn label() Str { return Fixture.arbitrary(cl(this, first) Str { return this.label; }); }
+    fn count() F64 { return Fixture.arbitrary(cl(this, first: F64, second: Str) F64 { return this.count + first; }); }
+    fn bound() Str { let read = cl(this) Str { return this.label; }; return Fixture.arbitrary(read); }
   `);
   assert.equal(exports.label(), 'receiver'); assert.equal(exports.count(), 43); assert.equal(exports.bound(), 'receiver');
   const dom = await runBrowser(`
@@ -548,24 +548,24 @@ await test('closures whose first parameter is `this` receive the JS receiver', a
       let seen = Browser.Array();
       target.addEventListener("ping", cl(this, event) Void { seen.push(Browser.Object.is(this, target)); });
       target.dispatchEvent(new Browser.Event("ping"));
-      Browser.JSON.stringify(seen);
+      return Browser.JSON.stringify(seen);
     }
   `);
   assert.equal(dom.click(), '[true]');
 });
 await test('host values keep exact identity through dynamic slots', async () => {
   const exports = await runBrowser(`
-    fn big() Bool { let n = Browser.BigInt("99999999999999999999999999999999999999"); Browser.Object.is(n, Browser.structuredClone(n)); }
-    fn symbol() Bool { let s = Browser.Symbol("unique"); let box = Browser.Array.of(s); Browser.Object.is(s, box[0.0]); }
+    fn big() Bool { let n = Browser.BigInt("99999999999999999999999999999999999999"); return Browser.Object.is(n, Browser.structuredClone(n)); }
+    fn symbol() Bool { let s = Browser.Symbol("unique"); let box = Browser.Array.of(s); return Browser.Object.is(s, box[0.0]); }
   `);
   assert.equal(exports.big(), true); assert.equal(exports.symbol(), true);
 });
 await test('CommonJS callables and wildcard ambient modules link to their runtime module', async () => {
   const common = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/export-equals.d.cts')], prefix: 'Common', moduleSpecifier: path.join(ROOT, 'scripts/fixtures/dts/export-equals.cjs') });
-  const { exports } = await run('fn call() F64 { Common.default(21.0); } fn label() Str { Common.default.label; }', common);
+  const { exports } = await run('fn call() F64 { return Common.default(21.0); } fn label() Str { return Common.default.label; }', common);
   assert.equal(exports.call(), 42); assert.equal(exports.label(), 'callable namespace');
   const asset = linkFiles({ files: [path.join(ROOT, 'scripts/fixtures/dts/assets.d.ts')], prefix: 'Asset', moduleSpecifier: path.join(ROOT, 'scripts/fixtures/dts/theme.mjs') });
-  const { exports: theme } = await run('fn color() Str { Asset.default.color; }', asset);
+  const { exports: theme } = await run('fn color() Str { return Asset.default.color; }', asset);
   assert.equal(theme.color(), 'green');
 });
 await test('closure parameters without any context are diagnosed instead of crashing', async () => {

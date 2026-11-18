@@ -4,7 +4,7 @@
       lib {
         fn has_value(flag: Bool) Bool {
           let value: ?Counter = if flag { Counter { n: 1 }; } else { null; };
-          promote value {
+          return promote value {
             |counter| => true,
             ~> false,
           };

@@ -1,2 +1,2 @@
-fn Box.make(a: I32, b: I32) I32 { a + b; }
-lib { fn bad() I32 { Box.make(1); } }
+fn Box.make(a: I32, b: I32) I32 { return a + b; }
+lib { fn bad() I32 { return Box.make(1); } }

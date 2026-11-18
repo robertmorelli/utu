@@ -2,7 +2,7 @@
 // Expect: Expected cell[I32].K, got cell[Str].K
 mod cell[T] {
     enum(U8) K: | A | B
-    fn k(t: T) K { K.B; }
+    fn k(t: T) K { return K.B; }
 }
 using cell[I32] |a|;
 using cell[Str] |b|;

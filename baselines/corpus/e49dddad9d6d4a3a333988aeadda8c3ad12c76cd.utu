@@ -11,7 +11,7 @@
             start: Point { x: ax, y: ay },
             end: Point { x: bx, y: by },
           };
-          l.end.x - l.start.x;
+          return l.end.x - l.start.x;
         }
       }
     

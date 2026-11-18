@@ -1,12 +1,12 @@
 // What: a closure with an untyped parameter, passed where a Str is wanted
 // Expect: m needs a type (one error, not also "got cl(unknown) Str")
 fn take(s: Str) I32 {
-    s.len();
+    return s.len();
 }
 
 main {
     console.log(take(cl(m) Str {
-        m;
+        return m;
     }));
 }
 using console from std:Console

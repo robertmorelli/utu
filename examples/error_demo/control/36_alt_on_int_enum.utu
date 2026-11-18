@@ -5,7 +5,7 @@ enum(U8) Level:
     | High
 
 fn label(l: Level) Str {
-    alt l {
+    return alt l {
         Low => "low",
         High => "high",
     };

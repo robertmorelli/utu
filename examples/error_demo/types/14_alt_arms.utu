@@ -5,7 +5,7 @@ enum Shape:
     | Square { side: F64 }
 
 fn area(s: Shape) F64 {
-    alt s {
+    return alt s {
         Circle |c| => 3.14 * c.r * c.r,
         Square => "unknown",
     };

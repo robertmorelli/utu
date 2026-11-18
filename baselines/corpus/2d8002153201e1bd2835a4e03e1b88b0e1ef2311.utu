@@ -8,7 +8,7 @@ mod view {
         | selected: I32
 
     fn hud(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "hud"
         header.hud {
             span.hud-title { "FOUNDRY" }
@@ -29,7 +29,7 @@ mod view {
     }
 
     fn panel(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "inspector"
         aside.inspector {
             if ui.selected > 0 {

@@ -13,7 +13,7 @@ struct Kitchen:
     | step: I32
 
 fn amount(item: Ingredient, servings: F64) Str {
-    (item.quantity * servings / 2.0).toFixed(1) + " " + item.unit
+    return (item.quantity * servings / 2.0).toFixed(1) + " " + item.unit
 }
 
 main {

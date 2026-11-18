@@ -1,9 +1,9 @@
 // What: two lib blocks in one file
 // Expect: entry surface: multiple lib declarations; merge them into one lib { … } (pointing at the second)
 lib {
-    fn add(a: I32, b: I32) I32 { a + b; }
+    fn add(a: I32, b: I32) I32 { return a + b; }
 }
 
 lib {
-    fn sub(a: I32, b: I32) I32 { a - b; }
+    fn sub(a: I32, b: I32) I32 { return a - b; }
 }

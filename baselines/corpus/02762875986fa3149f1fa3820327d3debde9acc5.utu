@@ -7,7 +7,7 @@ fn element(document: Browser.Document, tag: Str, class_name: Str, label: Str) Br
     let node = document.createElement(tag);
     node.className = class_name;
     node.textContent = label;
-    node;
+    return node;
 }
 
 fn save(document: Browser.Document) Void {

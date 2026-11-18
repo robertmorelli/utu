@@ -4,7 +4,7 @@ struct Point:
     | x: F64
     | y: F64
 
-fn Point.new(x: F64, y: F64) Point { Point { x: x, y: y }; }
+fn Point.new(x: F64, y: F64) Point { return Point { x: x, y: y }; }
 
 main {
     let p = Point.new(1.0);

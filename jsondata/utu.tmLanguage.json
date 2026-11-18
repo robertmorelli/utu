@@ -420,6 +420,12 @@
               }
             },
             {
+              "match": "(?:^|(?<=[{;]))\\s*(\\|>?)",
+              "captures": {
+                "1": { "name": "keyword.operator.wutu" }
+              }
+            },
+            {
               "match": "\\b(?:as|if|else|for|key|on)\\b",
               "name": "keyword.control.wutu"
             },

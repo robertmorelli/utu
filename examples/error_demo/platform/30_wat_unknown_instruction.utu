@@ -1,8 +1,6 @@
 // What: a @wat body with a misspelled instruction
 // Expect: @wat: unknown instruction 'i32.rotate' (did you mean i32.rotl?)
-fn rotl(x: I32, k: I32) I32 {
-    @wat/\ local.get $x local.get $k i32.rotate \/;
-}
+fn rotl(x: I32, k: I32) I32 => @wat/\ local.get $x local.get $k i32.rotate \/;
 
 main {
     console.log(rotl(1, 4));

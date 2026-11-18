@@ -1,5 +1,5 @@
 
       lib {
-        fn bad() I32 { @es/\41\/; }
+        fn bad() I32 { return @es/\41\/; }
       }
     

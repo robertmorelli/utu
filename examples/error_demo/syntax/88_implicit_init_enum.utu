@@ -5,7 +5,7 @@ enum Shape:
     | Square { side: F64 }
 
 fn unit() Shape {
-    &{ r: 1.0 };
+    return &{ r: 1.0 };
 }
 
 main { console.log(0); }

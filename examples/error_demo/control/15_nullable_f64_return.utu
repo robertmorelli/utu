@@ -4,7 +4,7 @@ fn average(xs: Array[F64]) ?F64 {
     if xs.len() == 0 { return null; };
     let total: F64 = 0.0;
     for (xs) |x| { total += x; };
-    total / xs.len().f64();
+    return total / xs.len().f64();
 }
 
 main {

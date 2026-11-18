@@ -3,11 +3,11 @@
 mod Counter {
     struct &:
         | n: I32
-    fn &.new(n: I32) & { &{ n: n }; }
-    fn &.iterator |self| () I32 { 0; }
-    fn &.next |self| (it: I32) I32 { it + 1; }
-    fn &.done |self| (r: I32) Bool { r > self.n; }
-    fn &.value |self| (r: I32) I32 { r; }
+    fn &.new(n: I32) & { return &{ n: n }; }
+    fn &.iterator |self| () I32 { return 0; }
+    fn &.next |self| (it: I32) I32 { return it + 1; }
+    fn &.done |self| (r: I32) Bool { return r > self.n; }
+    fn &.value |self| (r: I32) I32 { return r; }
     fn &.close |self| (it: I32) Void { }
 }
 

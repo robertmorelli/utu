@@ -4,6 +4,6 @@ let map_all: fun(Array[I32], cl(I32) I32) I32 = @es/\ (xs, f) => { let s = 0; fo
 
 main {
     let xs = [10, 20, 30];
-    console.log(map_all(xs, cl(i) { 100 / (i - 1); }));
+    console.log(map_all(xs, cl(i) { return 100 / (i - 1); }));
 }
 using console from std:Console

@@ -1,7 +1,7 @@
 // What: a match lists the same number in two spellings (16 and 0x10)
 // Expect: Duplicate match pattern '0x10' (16 is already matched)
 fn kind(n: I32) Str {
-    match n {
+    return match n {
         16 => "sixteen",
         0x10 => "hex sixteen",
         ~> "other",

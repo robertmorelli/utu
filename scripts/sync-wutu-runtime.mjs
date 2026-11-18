@@ -25,7 +25,7 @@ mod wutu {
     }
     fn stored_load(key: Str) Str {
         let load: fun(Str) Str = @es/\\ key=>{try{return localStorage.getItem(key)??'';}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;
-        load(key);
+        return load(key);
     }
     fn stored_register(key: Str, encode: cl() Str, manual: Bool, apply: cl(Str) Void) Void {
         let register: fun(Str,cl() Str,Bool,cl(Str) Void) Void = @es/\\ (key,encode,manual,apply)=>globalThis.__utuWutu.store(key,encode,!!manual,apply) \\/;
@@ -64,35 +64,48 @@ mod wutu {
     /// A template's text hole (\`= x;\`): a number or a Bool shows as its
     /// \`str()\`, a Str or a node as itself. The compiler picks which, by
     /// x's type; this body is never what runs.
+    fn show_list(values: Array[$T]) Externref {
+        let make: fun() Externref = @es/\\ ()=>[] \\/;
+        let push: fun(Externref, Externref) Void = @es/\\ (a,v)=>{a.push(v)} \\/;
+        let begin_item: fun(I32) Void = @es/\\ i=>globalThis.__utuWutu.pushCall('list:'+i) \\/;
+        let end_item: fun() Void = @es/\\ ()=>globalThis.__utuWutu.popKey() \\/;
+        let result = make();
+        for (values, 0 ..< values.len()) |value, index| {
+            begin_item(index);
+            push(result, wutu.show(value));
+            end_item();
+        }
+        return result;
+    }
     fn show(value: Externref) Externref {
-        value;
+        return value;
     }
     /// A keyed loop's key (\`key k\`) as text: a Str is itself, a number or
     /// a Bool its \`str()\`. The compiler picks which; this body is never
     /// what runs.
     fn key_text(value: Externref) Str {
-        "";
+        return "";
     }
     /// A text hole's reuse key (\`= f(a, b);\`): the compiler makes it, from
     /// the call and its arguments; this body is never what runs.
     fn memo_key(call: Externref, key: Str) Str {
-        key;
+        return key;
     }
     fn route() Str {
         let call: fun() Str = @es/\\ ()=>location.hash.slice(1)||"/" \\/;
-        call();
+        return call();
     }
     fn number(value: I32) Str {
         let format: fun(I32) Str = @es/\\ value=>String(value) \\/;
-        format(value);
+        return format(value);
     }
     fn money(cents: I32) Str {
         let format: fun(I32) Str = @es/\\ cents=>(cents<0?"-$":"$")+(Math.abs(cents)/100).toFixed(2) \\/;
-        format(cents);
+        return format(cents);
     }
     fn decimal(value: F64, digits: I32) Str {
         let format: fun(F64,I32) Str = @es/\\ (value,digits)=>value.toFixed(Math.max(0,Math.min(20,digits))) \\/;
-        format(value,digits);
+        return format(value,digits);
     }
     fn reload_store(key: Str) Void {
         let reload: fun(Str) Void = @es/\\ key=>globalThis.__utuWutu?.reload?.(key) \\/;
@@ -104,7 +117,7 @@ mod wutu {
     }
     fn storage_error() Str {
         let read: fun() Str = @es/\\ () => globalThis.__utuWutu?.storageError ?? "" \\/;
-        read();
+        return read();
     }
     fn refresh() Void {
         let update: fun() Void = @es/\\ () => globalThis.__utuWutu?.refresh() \\/;

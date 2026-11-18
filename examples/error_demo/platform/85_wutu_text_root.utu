@@ -1,9 +1,9 @@
-// What: a template whose root is a text node
-// Expect: root must be an element
+// What: a text fragment returned with a single-element annotation
+// Expect: Expected Browser.HTMLElement, got Browser.DocumentFragment
 using Browser from std:Browser;
 
 fn view(title: Str, items: Array[Str]) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     "Just text"
     \/;
 }

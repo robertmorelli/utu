@@ -25,11 +25,11 @@ fn __json_codes(s: Str) Array[I32] {
     for (0..<s.len()) |i| {
         codes[i] = s[i]
     }
-    codes
+    return codes
 }
 
 fn __json_reader(text: Str) JsonReader__ {
-    JsonReader__ { text: text, at: 0, n: text.len(), failed: 0, reason: "", ks: 0, kl: 0, key: "", depth: 0, names: __json_codes(__json_names()), where: "", matched: 0 }
+    return JsonReader__ { text: text, at: 0, n: text.len(), failed: 0, reason: "", ks: 0, kl: 0, key: "", depth: 0, names: __json_codes(__json_names()), where: "", matched: 0 }
 }
 
 // Start over from the beginning, for the next match arm.
@@ -79,7 +79,7 @@ fn __json_ws(r: JsonReader__) Void {
 
 fn __json_peek(r: JsonReader__) I32 {
     __json_ws(r)
-    if r.at < r.n { r.text[r.at] } else { -1 }
+    return if r.at < r.n { r.text[r.at] } else { -1 }
 }
 
 fn __json_open(r: JsonReader__, c: I32, why: Str) Void {
@@ -107,7 +107,7 @@ fn __json_colon(r: JsonReader__) Void {
 
 // After an opening bracket: whether the container has a first element.
 fn __json_first(r: JsonReader__, close: I32) Bool {
-    if __json_peek(r) == close {
+    return if __json_peek(r) == close {
         r.at += 1
         r.depth -= 1
         false
@@ -119,7 +119,7 @@ fn __json_first(r: JsonReader__, close: I32) Bool {
 // After an element: whether another one follows.
 fn __json_next(r: JsonReader__, close: I32) Bool {
     let c = __json_peek(r)
-    if c == 44 {
+    return if c == 44 {
         r.at += 1
         true
     } else {
@@ -154,7 +154,7 @@ fn __json_word(r: JsonReader__, word: Str) Bool {
     if ok {
         r.at += n
     }
-    ok
+    return ok
 }
 
 fn __json_hex(r: JsonReader__, at: I32) I32 {
@@ -164,7 +164,7 @@ fn __json_hex(r: JsonReader__, at: I32) I32 {
         let d = if c >= 48 and c <= 57 { c - 48 } else { if c >= 97 and c <= 102 { c - 87 } else { if c >= 65 and c <= 70 { c - 55 } else { -1 } } }
         v = if d < 0 or v < 0 { -1 } else { v * 16 + d }
     }
-    v
+    return v
 }
 
 // Read a string token. Without escapes it stays a span of the input
@@ -260,7 +260,7 @@ fn __json_span(r: JsonReader__) Void {
 
 // Whether the string just read equals names[at ..< at + n].
 fn __json_is(r: JsonReader__, at: I32, n: I32) Bool {
-    if r.ks < 0 {
+    return if r.ks < 0 {
         let ok = r.key.len() == n
         let i = 0
         while (ok and i < n) {
@@ -281,12 +281,12 @@ fn __json_is(r: JsonReader__, at: I32, n: I32) Bool {
 
 fn __json_str(r: JsonReader__) Str {
     __json_span(r)
-    if r.ks < 0 { r.key } else { r.text.slice(r.ks, r.ks + r.kl) }
+    return if r.ks < 0 { r.key } else { r.text.slice(r.ks, r.ks + r.kl) }
 }
 
 fn __json_bool(r: JsonReader__) Bool {
     let c = __json_peek(r)
-    if c == 116 and __json_word(r, "true") {
+    return if c == 116 and __json_word(r, "true") {
         true
     } else {
         if not (c == 102 and __json_word(r, "false")) {
@@ -297,7 +297,7 @@ fn __json_bool(r: JsonReader__) Bool {
 }
 
 fn __json_null(r: JsonReader__) Bool {
-    __json_peek(r) == 110 and __json_word(r, "null")
+    return __json_peek(r) == 110 and __json_word(r, "null")
 }
 
 fn __json_digits(r: JsonReader__, at: I32) I32 {
@@ -305,7 +305,7 @@ fn __json_digits(r: JsonReader__, at: I32) I32 {
     while (i < r.n and r.text[i] >= 48 and r.text[i] <= 57) {
         i += 1
     }
-    i
+    return i
 }
 
 // Scan a number token from r.at. Returns its end, or -1 if it is malformed.
@@ -342,7 +342,7 @@ fn __json_number_end(r: JsonReader__) I32 {
             return -1
         }
     }
-    i
+    return i
 }
 
 fn __json_f64(r: JsonReader__) F64 {
@@ -356,7 +356,7 @@ fn __json_f64(r: JsonReader__) F64 {
     r.at = end
     let negative = r.text[start] == 45
     let whole = if negative { start + 1 } else { start }
-    if r.kl == 0 and end - whole <= 15 {
+    return if r.kl == 0 and end - whole <= 15 {
         // Integers below 10^15 are exact in F64: no host call.
         let v: F64 = 0.0
         for (whole..<end) |k| {
@@ -381,7 +381,7 @@ fn __json_f32(r: JsonReader__) F32 {
         r.at = start
         __json_fail(r, "number out of range")
     }
-    v
+    return v
 }
 
 // Integers are read exactly, digit by digit, on the negative side so that
@@ -411,7 +411,7 @@ fn __json_i64(r: JsonReader__) I64 {
         return 0
     }
     r.at = end
-    if negative { v } else { 0 - v }
+    return if negative { v } else { 0 - v }
 }
 
 fn __json_i32(r: JsonReader__) I32 {
@@ -420,7 +420,7 @@ fn __json_i32(r: JsonReader__) I32 {
     let v = __json_i64(r)
     let low: I64 = -2147483648
     let high: I64 = 2147483647
-    if v < low or v > high {
+    return if v < low or v > high {
         r.at = start
         __json_fail(r, "integer out of range")
         0
@@ -438,7 +438,7 @@ fn __json_u32(r: JsonReader__) U32 {
         r.at = start
         __json_fail(r, "integer out of range")
     }
-    v.u32()
+    return v.u32()
 }
 
 // Skip one value of any shape (unknown fields).
@@ -513,11 +513,11 @@ fn __json_describe(r: JsonReader__) Str {
         }
     }
     let place = if r.where.len() > 0 { r.where + ": " } else { "" }
-    place + r.reason + " at line " + line.str() + ", column " + column.str()
+    return place + r.reason + " at line " + line.str() + ", column " + column.str()
 }
 
 fn __json_writer(capacity: I32) JsonWriter__ {
-    JsonWriter__ { buf: Array[I32].new_default(capacity), n: 0, names: __json_codes(__json_names()) }
+    return JsonWriter__ { buf: Array[I32].new_default(capacity), n: 0, names: __json_codes(__json_names()) }
 }
 
 // Make room for count more code units, so writes can skip the check.
@@ -569,7 +569,7 @@ fn __json_tag(w: JsonWriter__, at: I32, n: I32) Void {
 }
 
 fn __json_hex_digit(v: I32) I32 {
-    if v < 10 { v + 48 } else { v + 87 }
+    return if v < 10 { v + 48 } else { v + 87 }
 }
 
 fn __json_put_str(w: JsonWriter__, s: Str) Void {

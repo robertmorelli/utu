@@ -22,7 +22,7 @@ mod SegmentTree[T] {
             nodes[i] = combine(nodes[i * 2], nodes[i * 2 + 1]);
             i -= 1;
         };
-        &{ nodes: nodes, size: size, length: values.len(), identity: identity };
+        return &{ nodes: nodes, size: size, length: values.len(), identity: identity };
     }
 
     fn &.set |self| (index: I32, value: T, combine: fun(T, T) T) Void {
@@ -53,7 +53,7 @@ mod SegmentTree[T] {
             left /= 2;
             right /= 2;
         };
-        combine(before, after);
+        return combine(before, after);
     }
 
     // First index whose inclusive prefix satisfies a monotone false->true predicate.
@@ -71,6 +71,6 @@ mod SegmentTree[T] {
                 i = i * 2 + 1;
             };
         };
-        i - self.size;
+        return i - self.size;
     }
 }

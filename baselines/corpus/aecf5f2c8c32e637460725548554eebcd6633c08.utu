@@ -1,4 +1,4 @@
 struct Box:
   | x : I32
-fn Box.get |b| () I32 { b.x; }
-lib { fn bad(b: ?Box) I32 { b.get(); } }
+fn Box.get |b| () I32 { return b.x; }
+lib { fn bad(b: ?Box) I32 { return b.get(); } }

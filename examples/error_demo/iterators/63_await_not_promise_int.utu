@@ -1,6 +1,6 @@
 // What: awaiting a plain number
 // Expect: Cannot await non-promise I32
-fn compute() I32 { 42; }
+fn compute() I32 { return 42; }
 
 main {
     let v = await compute();

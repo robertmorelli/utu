@@ -2,7 +2,7 @@
 // Expect: all_ones returns I32, got U64 (it once wrapped to -1)
 fn all_ones() I32 {
     let all_ones = 18446744073709551615
-    all_ones
+    return all_ones
 }
 
 main { all_ones() }

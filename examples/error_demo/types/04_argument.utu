@@ -1,6 +1,6 @@
 // What: passing an F64 where the parameter is I32
 // Expect: Type mismatch: expected I32, got F64 at the argument
-fn repeat_dash(n: I32) Str { "-".repeat(n); }
+fn repeat_dash(n: I32) Str { return "-".repeat(n); }
 
 main {
     let width: F64 = 4.5;

@@ -37,7 +37,7 @@ wn heading(text: Str) {
 
 fn heading_value(text: Str) Browser.HTMLElement {
     let render = heading
-    render(text)
+    return render(text)
 }
 
 html {

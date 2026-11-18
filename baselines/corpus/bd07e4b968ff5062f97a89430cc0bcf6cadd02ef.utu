@@ -24,12 +24,8 @@ mod Promise[T1] {
     // function — the host hands it straight to `p.then` with nothing between.
     // Both operands are externref whatever T1 is, so this needs one host
     // import rather than one per instantiation.
-    fn &.then |self| (on_value: cl(T1) Void) Void {
-        @ir/\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \/;
-    }
+    fn &.then |self| (on_value: cl(T1) Void) Void => @ir/\ <ir-promise-then><ir-ident name="self"/><ir-ident name="on_value"/></ir-promise-then> \/;
 
     // Subscribe to rejection. The reason is an opaque host value.
-    fn &.catch |self| (on_error: cl(Externref) Void) Void {
-        @ir/\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \/;
-    }
+    fn &.catch |self| (on_error: cl(Externref) Void) Void => @ir/\ <ir-promise-catch><ir-ident name="self"/><ir-ident name="on_error"/></ir-promise-catch> \/;
 }

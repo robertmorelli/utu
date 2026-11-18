@@ -17,11 +17,11 @@ mod IntMap {
         | shift: I32
 
     fn &.new() & {
-        &{ keys: Array[I32].new(16, 0), values: Array[I32].new(16, 0), full: Array[I32].new(16, 0), count: 0, shift: 28 };
+        return &{ keys: Array[I32].new(16, 0), values: Array[I32].new(16, 0), full: Array[I32].new(16, 0), count: 0, shift: 28 };
     }
 
     fn &.len |self| () I32 {
-        self.count;
+        return self.count;
     }
 
     // The slot holding key, or the empty slot where it belongs.
@@ -29,16 +29,16 @@ mod IntMap {
         let mask = self.keys.len() - 1;
         let i = (key * -1640531535) >>> self.shift;
         while (self.full[i] != 0 and self.keys[i] != key) { i = (i + 1) & mask; };
-        i;
+        return i;
     }
 
     fn &.has |self| (key: I32) Bool {
-        self.full[self.slot(key)] != 0;
+        return self.full[self.slot(key)] != 0;
     }
 
     fn &.get |self| (key: I32, missing: I32) I32 {
         let i = self.slot(key);
-        if self.full[i] != 0 { self.values[i]; } else { missing; };
+        return if self.full[i] != 0 { self.values[i]; } else { missing; };
     }
 
     fn &.set |self| (key: I32, value: I32) Void {

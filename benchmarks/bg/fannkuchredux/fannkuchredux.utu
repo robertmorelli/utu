@@ -85,17 +85,17 @@ fn fannkuch(n: I32, fact: Array[I32], idx_min: I32, idx_max: I32) .{I32, I32} {
         }
         sign = not sign
     }
-    .{checksum, max_flips}
+    return .{checksum, max_flips}
 }
 
 // ---- output: FNV-1a over the bytes BG prints
 
-fn fnv(h: I32, byte: I32) I32 { (h ^ byte) * 16777619 }
+fn fnv(h: I32, byte: I32) I32 { return (h ^ byte) * 16777619 }
 
 fn fnv_str(h0: I32, s: Str) I32 {
     let h = h0
     for (0..<s.len()) |i| { h = fnv(h, s.get(i)) }
-    h
+    return h
 }
 
 // The decimal digits of x (with a '-' if negative).
@@ -109,7 +109,7 @@ fn fnv_int(h0: I32, x: I32) I32 {
         h = fnv(h, 48 + (v / p % 10).i32())
         p = p / 10
     }
-    h
+    return h
 }
 
 fn fannkuchredux(n: I32) I32 {
@@ -137,7 +137,7 @@ fn fannkuchredux(n: I32) I32 {
     h = fnv_int(h, n)
     h = fnv_str(h, ") = ")
     h = fnv_int(h, flips)
-    fnv(h, 10)
+    return fnv(h, 10)
 }
 
 test "fannkuchredux prints BG's output" {
@@ -146,5 +146,5 @@ test "fannkuchredux prints BG's output" {
 }
 
 lib {
-    fn bench(n: I32) I32 { fannkuchredux(n) }
+    fn bench(n: I32) I32 { return fannkuchredux(n) }
 }

@@ -1,7 +1,7 @@
 // What: a function is called through a module that does not exist (mathh.square)
 // Expect: Unknown module 'mathh'; did you mean 'math'?
 mod math {
-    fn square(x: I32) I32 { x * x; }
+    fn square(x: I32) I32 { return x * x; }
 }
 
 main {

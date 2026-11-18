@@ -3,7 +3,7 @@
 mod Box[T] {
     struct &:
         | value: T
-    fn &.new(v: T) & { &{ value: v }; }
+    fn &.new(v: T) & { return &{ value: v }; }
 }
 
 main {

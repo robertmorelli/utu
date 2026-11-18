@@ -61,6 +61,286 @@ async function diagnose(compiler, ROOT, source) {
 }
 
 export function registerWutuTests({ test, assert, assertEq, assertThrows, assertNoErrors, makeCompiler }) {
+  test('wutu CSS blocks: computed properties and custom properties update in place', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_css_blocks.utu', source: `${BROWSER}
+        struct State:
+            | percent: I32
+        let state: State = State { percent: 20 }
+        wn page() {
+          @reactive
+          div {
+            display: block
+            width: {
+              // A comment's } is not the end of the block.
+              let value = state.percent.str()
+              value + "%"
+            }
+            background-color: {
+              if state.percent >= 80 { "seagreen" } else { "tomato" }
+            }
+            --level: { state.percent.str() }
+            --braces: { "{literal}" }
+            height: = "10px"
+            span { "content" }
+          }
+        }
+        lib {
+          fn render() Browser.HTMLElement => page()
+          fn update() Void { state.percent = 90; wutu.refresh() }
+        }
+      `});
+      const root = instance.exports.render(); document.body.append(root);
+      assertEq(root.style.getPropertyValue('width'), '20%');
+      assertEq(root.style.getPropertyValue('background-color'), 'tomato');
+      assertEq(root.style.getPropertyValue('--level'), '20');
+      assertEq(root.style.getPropertyValue('--braces'), '{literal}');
+      assertEq(root.style.getPropertyValue('height'), '10px');
+      const child = root.firstChild;
+      instance.exports.update();
+      assertEq(root.style.getPropertyValue('width'), '90%');
+      assertEq(root.style.getPropertyValue('background-color'), 'seagreen');
+      assertEq(root.style.getPropertyValue('--level'), '90');
+      assert(root.firstChild === child);
+    });
+  });
+
+  test('wutu CSS blocks: formatting and source spans preserve Utu blocks', () => {
+    const source = `div {
+      width: {
+        // } remains a comment
+        let width = if full { "100%" } else { "50%" }
+        width
+      }
+      --token: { "{value}" }
+      height: = "10px"
+      color: red
+    }`;
+    const tree = parseWutu(source);
+    assertEq(tree.root.styles.length, 3);
+    assert(tree.root.styles[0].block && tree.root.styles[1].block);
+    assert(!tree.root.styles[2].block);
+    for (const style of tree.root.styles) assertEq(source.slice(style.range.start, style.range.end), style.value);
+    const formatted = formatWutuBody(source);
+    assertEq(formatWutuBody(formatted), formatted);
+    assert(formatted.includes('width: {'));
+    assert(formatted.includes('// } remains a comment'));
+    assertEq(parseWutu(formatted).root.styles.length, 3);
+    assert(syntaxError('div { width: { "1px"').message.includes('unterminated computed CSS value'));
+  });
+
+  test('wutu CSS blocks: diagnostics point at the Utu value', async ({ compiler, ROOT }) => {
+    const source = `${BROWSER}wn page() { div { width: { missing } } }\nmain { Browser.document.body.append(page()) }`;
+    const diagnostics = await diagnose(compiler, ROOT, source);
+    assert(diagnostics.some(d => d.kind === 'unknown-variable' && d.text === 'missing'), JSON.stringify(diagnostics));
+    const wrong = await selfhostDiagnostics({ ROOT, source: `${BROWSER}wn page() { div { width: { 3 } } }\nmain { Browser.document.body.append(page()) }` });
+    assert(wrong.some(d => d.severity === 'error' && d.message.includes('Str')), JSON.stringify(wrong));
+  });
+
+  test('wutu pipes: lists and arbitrary Utu blocks render and update', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_pipes.utu', source: `${BROWSER}
+        struct State:
+            | count: I32
+        let state: State = State { count: 1 }
+        struct Label[Component]:
+            | text: Str
+        wn Component[Label].render |label| () { span { = label.text }; b { = state.count } }
+        let labels: Array[Component] = [Label { text: "a" }, Label { text: "b" }]
+        wn pair() { i { "first" }; i { "second" } }
+        wn page() {
+          @reactive
+          main {
+            width: = state.count.str() + "px"
+            | labels
+            |> {
+              let local: Array[Component] = if state.count == 1 { labels } else { [] }
+              local
+            }
+            |> labels map |label| { label } collect(Component)
+            |> pair()
+            = "end"
+          }
+        }
+        lib {
+          fn render() Browser.HTMLElement => page()
+          fn update() Void { state.count = 2; wutu.refresh() }
+        }
+      `});
+      document.body.append(instance.exports.render());
+      const root = document.querySelector('main'), first = root.querySelector('span');
+      assertEq(root.textContent, 'a1b1a1b1a1b1firstsecondend');
+      assertEq(root.style.getPropertyValue('width'), '1px');
+      instance.exports.update();
+      assertEq(root.textContent, 'a2b2a2b2firstsecondend');
+      assertEq(root.style.getPropertyValue('width'), '2px');
+      assert(root.querySelector('span') === first);
+    });
+  });
+
+  test('wutu pipes: formatter preserves sigils and adjacent statement boundaries', () => {
+    const source = `div {
+      title = title
+      | labels
+      |> if show { labels } else { [] }
+      |> { let x = labels; x }
+      |> labels map |label| { label } collect(Component)
+      = count
+      | more
+    }`;
+    const tree = parseWutu(source);
+    assertEq(tree.root.children.map(n => n.sigil ?? '=').join(','), '|,|>,|>,|>,=,|');
+    const formatted = formatWutuBody(source);
+    assertEq(formatWutuBody(formatted), formatted);
+    assertEq(parseWutu(formatted).root.children.length, 6);
+    for (const node of tree.root.children) assertEq(source.slice(node.range.start, node.range.end), node.expr);
+  });
+
+  test('wutu pipes: errors point at authored Utu expressions', async ({ compiler, ROOT }) => {
+    for (const sigil of ['|', '|>']) {
+      const source = `${BROWSER}wn page() { main { ${sigil} missing } }\nmain { Browser.document.body.append(page()) }`;
+      const diagnostics = await diagnose(compiler, ROOT, source);
+      assert(diagnostics.some(d => d.kind === 'unknown-variable' && d.text === 'missing'), JSON.stringify(diagnostics));
+    }
+  });
+
+  test('wutu fragments: sibling wn roots, component arrays, nested lists and SVG', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_fragments.utu', source: `${BROWSER}
+        struct Pair[Component]:
+            | label: Str
+        wn Component[Pair].render |pair| () {
+          dt { = pair.label }
+          dd { = pair.label + " value" }
+        }
+        wn shapes() {
+          circle { r = "2" }
+          rect { width = "3" }
+        }
+        wn empty() {}
+        wn page() {
+          @reactive
+          main {
+            dl { = [Pair { label: "a" }, Pair { label: "b" }] }
+            section { = [["x", "y"], ["z"]] }
+            svg { = shapes() }
+            = empty()
+          }
+        }
+        lib { fn render() Browser.HTMLElement => page() }
+      `});
+      const root = instance.exports.render(); document.body.append(root);
+      assertEq(root.querySelector('dl').textContent, 'aa valuebb value');
+      assertEq(root.querySelector('section').textContent, 'xyz');
+      assertEq(root.querySelectorAll('dt').length, 2);
+      const first = root.querySelector('dt');
+      globalThis.__utuWutu.refresh();
+      assert(root.querySelector('dt') === first, 'list entries retain their DOM');
+      assertEq(root.querySelector('circle').namespaceURI, 'http://www.w3.org/2000/svg');
+    });
+  });
+
+  test('wutu fragments: reactive empty roots grow, reorder and shrink without wrappers', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_fragment_updates.utu', source: `${BROWSER}
+        struct State:
+            | items: Array[I32]
+        wn rows(state: State) {
+          @reactive
+          for state.items |item| key item {
+            input { .value = item.str() }
+            span { = item }
+          }
+        }
+        lib {
+          fn state() State => State { items: [] }
+          fn render(state: State) Browser.DocumentFragment => rows(state)
+          fn set(state: State, mode: I32) Void {
+            state.items = if mode == 1 { [1, 2] } else if mode == 2 { [2, 1, 3] } else { [] }
+            wutu.refresh()
+          }
+        }
+      `});
+      const state = instance.exports.state();
+      const before = document.createElement('b'), after = document.createElement('b');
+      document.body.append(before, instance.exports.render(state), after);
+      instance.exports.set(state, 1);
+      const inputs = [...document.querySelectorAll('input')];
+      assertEq(inputs.length, 2);
+      instance.exports.set(state, 2);
+      const moved = [...document.querySelectorAll('input')];
+      assert(moved[0] === inputs[1] && moved[1] === inputs[0], 'keyed roots move in place');
+      assertEq(document.body.textContent, '213');
+      instance.exports.set(state, 0);
+      assertEq(document.querySelectorAll('input').length, 0);
+      assert(document.body.firstChild === before && document.body.lastChild === after, 'range preserves adjacent content');
+      instance.exports.set(state, 1);
+      assertEq(document.querySelectorAll('span').length, 2);
+    });
+  });
+
+  test('wutu fragments: protocol arrays and conditional roots update under a parent', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_fragment_protocol.utu', source: `${BROWSER}
+        struct State:
+            | visible: Bool
+        struct Item[Component]:
+            | state: State
+        wn Component[Item].render |item| () {
+          if item.state.visible { p { "first" }; p { "second" } }
+        }
+        wn page(items: Array[Component]) { main { = items } }
+        lib {
+          fn state() State => State { visible: false }
+          fn render(state: State) Browser.HTMLElement {
+            let items: Array[Component] = [Item { state: state }, Item { state: state }]
+            return @wutu/\\ @reactive; section { = page(items) } \\/
+          }
+          fn toggle(state: State) Void { state.visible = not state.visible; wutu.refresh() }
+        }
+      `});
+      const state = instance.exports.state(); document.body.append(instance.exports.render(state));
+      assertEq(document.querySelectorAll('p').length, 0);
+      instance.exports.toggle(state);
+      assertEq(document.querySelectorAll('p').length, 4);
+      instance.exports.toggle(state);
+      assertEq(document.querySelectorAll('p').length, 0);
+    });
+  });
+
+  test('wutu fragments: component list factories do not memoize mutable render state', async ({ ROOT }) => {
+    await withDom(async document => {
+      const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_fragment_list_memo.utu', source: `${BROWSER}
+        struct State:
+            | count: I32
+        let state: State = State { count: 1 }
+        struct Item[Component]:
+            | label: Str
+        wn Component[Item].render |item| () { span { = item.label }; b { = state.count } }
+        fn items() Array[Item] => [Item { label: "count" }]
+        wn page() { @reactive; main { = items() } }
+        lib {
+          fn render() Browser.HTMLElement => page()
+          fn update() Void { state.count = 2; wutu.refresh() }
+        }
+      `});
+      document.body.append(instance.exports.render());
+      assertEq(document.body.textContent, 'count1');
+      const node = document.querySelector('b');
+      instance.exports.update();
+      assertEq(document.body.textContent, 'count2');
+      assert(document.querySelector('b') === node);
+    });
+  });
+
+  test('wutu fragments: formatter preserves siblings, empty bodies and top-level control flow', () => {
+    for (const body of ['', 'dt { "name" }; dd { "value" }', 'if show { p { "yes" } }', 'for items |item| { = item }', '"text"; = value']) {
+      const formatted = formatWutuBody(body);
+      assertEq(formatWutuBody(formatted), formatted);
+      assertEq(parseWutu(formatted).root.kind, 'fragment');
+    }
+  });
+
   test('wutu parser: else-if chains, block comments, and flexible alias spacing', () => {
     const tree = parseWutu(`div {
       // a line comment
@@ -162,14 +442,14 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       await withDom(async (document) => {
         const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: `wutu_else_if_${reactive}.utu`, source: `${BROWSER}
           fn view(n: I32) Browser.HTMLElement {
-            @wutu/\\ ${reactive ? '@reactive;' : ''}
+            return @wutu/\\ ${reactive ? '@reactive;' : ''}
             p {
               if n == 1 { "one"; } else if n == 2 { "two"; } else if n == 3 { b { "three"; } } else { "many"; }
             }
             \\/;
           }
           lib {
-            fn render(n: I32) Browser.HTMLElement { view(n); }
+            fn render(n: I32) Browser.HTMLElement { return view(n); }
           }
         `});
         const text = n => {
@@ -189,7 +469,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
           struct Gauge:
               | pct: I32
           fn view(g: Gauge) Browser.HTMLElement {
-            @wutu/\\ ${reactive ? '@reactive;' : ''}
+            return @wutu/\\ ${reactive ? '@reactive;' : ''}
             div {
               display: block;
               width: = g.pct.str() + "%";
@@ -199,8 +479,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             \\/;
           }
           lib {
-            fn make(pct: I32) Gauge { Gauge { pct: pct }; }
-            fn render(g: Gauge) Browser.HTMLElement { view(g); }
+            fn make(pct: I32) Gauge { return Gauge { pct: pct }; }
+            fn render(g: Gauge) Browser.HTMLElement { return view(g); }
             fn set(g: Gauge, pct: I32) Void { g.pct = pct; wutu.refresh(); }
           }
         `});
@@ -222,10 +502,10 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
   test('wutu: @style installs in static projects and preserves source order', async ({ ROOT }) => {
     await withDom(async (document) => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_static_style.utu', source: `${BROWSER}
-        fn first() Str { "p{color:red}"; }
-        fn second() Str { "p{color:blue}"; }
+        fn first() Str { return "p{color:red}"; }
+        fn second() Str { return "p{color:blue}"; }
         lib { fn run() Browser.HTMLElement {
-          @wutu/\\
+          return @wutu/\\
           @style first();
           @style second();
           div { /* comment */ background: url(https://example.com/a.png); "x"; }
@@ -253,7 +533,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
             | items: Array[Item]
         lib { fn run() Browser.HTMLElement {
           let state = State { text: "start", items: [Item { id: "a" }, Item { id: "b" }] };
-          @wutu/\\
+          return @wutu/\\
           @reactive;
           main {
             input { bind:value = state.text; }
@@ -294,11 +574,11 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_signed_zero.utu', source: `${BROWSER}
         struct State:
             | x: F64
-        fn sign(x: F64) Browser.HTMLElement { @wutu/\\ span { = (1.0 / x).str(); } \\/; }
+        fn sign(x: F64) Browser.HTMLElement { return @wutu/\\ span { = (1.0 / x).str(); } \\/; }
         lib {
             fn main() Browser.HTMLElement {
                 let state = State { x: -0.0 };
-                @wutu/\\ @reactive; main { = sign(state.x); button { on click { state.x = 0.0; } } } \\/;
+                return @wutu/\\ @reactive; main { = sign(state.x); button { on click { state.x = 0.0; } } } \\/;
             }
         }
       ` });
@@ -317,13 +597,13 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
         struct State:
             | n: I32
             | words: Array[Str]
-        fn card(body: Browser.HTMLElement) Browser.HTMLElement { @wutu/\\ figure { header { "Title"; } = body; } \\/; }
-        fn tag(word: Str) Browser.HTMLElement { @wutu/\\ em { = word; } \\/; }
-        fn badge(n: I32) Browser.HTMLElement { card(tag(n.str())); }
-        fn plain() Browser.HTMLElement { @wutu/\\ main { = card(tag("hello")); } \\/; }
+        fn card(body: Browser.HTMLElement) Browser.HTMLElement { return @wutu/\\ figure { header { "Title"; } = body; } \\/; }
+        fn tag(word: Str) Browser.HTMLElement { return @wutu/\\ em { = word; } \\/; }
+        fn badge(n: I32) Browser.HTMLElement { return card(tag(n.str())); }
+        fn plain() Browser.HTMLElement { return @wutu/\\ main { = card(tag("hello")); } \\/; }
         fn view() Browser.HTMLElement {
           let state = State { n: 1, words: ["a", "b"] };
-          @wutu/\\
+          return @wutu/\\
           @reactive;
           main {
             section#one { = card(tag("hello")); }
@@ -336,8 +616,8 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
           \\/;
         }
         lib {
-            fn once() Browser.HTMLElement { plain(); }
-            fn reactive() Browser.HTMLElement { view(); }
+            fn once() Browser.HTMLElement { return plain(); }
+            fn reactive() Browser.HTMLElement { return view(); }
         }
       `});
       const strip = html => html.replace(/ data-wutu(-root)?="[^"]*"/g, '');
@@ -374,9 +654,9 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
 
   test('wutu diagnostics: template errors point at the attribute, alias, binding, or interpolation', async ({ ROOT }) => {
     const cases = [
-      [`${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { p { hreff = "/"; } } \\/; } }`, 'invalid-dsl-usage', 'h'],
-      [`${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) Void { x.focus(); }; } } \\/; } }`, 'invalid-dsl-usage', 'x'],
-      [`${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { = 1 +; } \\/; } }`, 'invalid-dsl-usage', '1'],
+      [`${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { p { hreff = "/"; } } \\/; } }`, 'invalid-dsl-usage', 'h'],
+      [`${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { p as x { "a"; } p as x { "b"; } button { on click = cl(e) Void { x.focus(); }; } } \\/; } }`, 'invalid-dsl-usage', 'x'],
+      [`${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { = 1 +; } \\/; } }`, 'invalid-dsl-usage', '1'],
     ];
     for (const [source, kind, text] of cases) {
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
@@ -391,7 +671,7 @@ export function registerWutuTests({ test, assert, assertEq, assertThrows, assert
     | n: I32
 lib { fn run() Browser.HTMLElement {
     let s = S { n: 1 };
-    @wutu/\\
+    return @wutu/\\
     @reactive;
     div {
         title = 42;
@@ -417,7 +697,7 @@ lib { fn run() Browser.HTMLElement {
     const program = (name) => `${BROWSER}lib { fn run() Browser.HTMLElement {
     // wutu.invalidate("commented-out") is ignored
     wutu.invalidate("${name}");
-    @wutu/\\ @island "board"; div { "x"; } \\/;
+    return @wutu/\\ @island "board"; div { "x"; } \\/;
 } }`;
     const warned = (await selfhostDiagnostics({ ROOT, source: program('bored') })).filter(d => d.kind === 'unknown-island');
     assertEq(warned.length, 1);
@@ -492,7 +772,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
       struct St:
           | u: Str
       fn view(st: St) Browser.HTMLElement {
-          @wutu/\\
+          return @wutu/\\
           @reactive;
           main {
               input { type = "text"; bind:value = st.u; }
@@ -507,7 +787,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
           }
           \\/;
       }
-      lib { fn run() Browser.HTMLElement { view(St { u: "/safe" }); } }
+      lib { fn run() Browser.HTMLElement { return view(St { u: "/safe" }); } }
     `;
     const BAD = ['javascript:window.__pwned=1', 'JAVASCRIPT:alert(1)', ' javascript:alert(1)', 'java\tscript:alert(1)',
       '\u0001javascript:alert(1)', 'jav\nascript:x', 'vbscript:msgbox', 'data:text/html,<script>alert(1)</script>'];
@@ -546,13 +826,13 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
 
   test('wutu: a srcdoc from a value is an error (it is HTML); a written one stays', async ({ ROOT }) => {
     for (const item of ['srcdoc = h;', '.srcdoc = h;']) {
-      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "<b>x</b>"; @wutu/\\ iframe { ${item} } \\/; } }`;
+      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "<b>x</b>"; return @wutu/\\ iframe { ${item} } \\/; } }`;
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
       const match = diagnostics.find(d => d.severity === 'error' && d.message.includes('srcdoc is HTML'));
       assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
       assertEq(source.slice(match.start, match.start + 6), 'srcdoc', `${item}: located at the name`);
     }
-    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ iframe { srcdoc = "<b>x</b>"; } \\/; } }` });
+    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ iframe { srcdoc = "<b>x</b>"; } \\/; } }` });
     assertEq(written.filter(d => d.severity === 'error').length, 0);
   });
 
@@ -561,13 +841,13 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
       ['p { OnMouseOver = h; }', 'expected an HTML tag', 'OnMouseOver'], ['x-note { .oNmouseover = h; }', 'events are written on mouseover', 'oNmouseover'],
       ['script { src = h; }', "a script's attributes are code", 'src'], ['script { .src = h; }', "a script's attributes are code", 'src'],
       ['script { = h; }', "a script's text is code", '= h'], ['script { for ([h]) |x| { "a"; } }', "a script's text is code", 'for']]) {
-      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "alert(1)"; @wutu/\\ div { ${item} } \\/; } }`;
+      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "alert(1)"; return @wutu/\\ div { ${item} } \\/; } }`;
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
       const match = diagnostics.find(d => d.severity === 'error' && d.message.includes(message));
       assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
       assertEq(source.slice(match.start, match.start + at.length), at, `${item}: located`);
     }
-    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { script { src = "/a.js"; type = "module"; "let a = 1;"; } } \\/; } }` });
+    const written = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { script { src = "/a.js"; type = "module"; "let a = 1;"; } } \\/; } }` });
     assertEq(written.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
   });
 
@@ -576,17 +856,17 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
       ['iframe { if true { = h; } }', "an iframe's text is unescaped", 'if true'], ['noscript { .textContent = h; }', "a noscript's text is unescaped", 'textContent'],
       ['a { href = "mailto:x"; .protocol = h; }', '.protocol from a value', 'protocol'], ['base { href = h; }', "a base's href moves every relative URL", 'href'],
       ['x-note { onClick = h; }', 'events are written on Click', 'onClick'], ['x-note { .ONLOAD = h; }', 'events are written on LOAD', 'ONLOAD']]) {
-      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "</style><img src=x onerror=alert(1)>"; @wutu/\\ div { ${item} } \\/; } }`;
+      const source = `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "</style><img src=x onerror=alert(1)>"; return @wutu/\\ div { ${item} } \\/; } }`;
       const diagnostics = await selfhostDiagnostics({ ROOT, source });
       const match = diagnostics.find(d => d.severity === 'error' && d.message.includes(message));
       assert(match, `${item}: ${diagnostics.map(d => d.message).join('; ')}`);
       assertEq(source.slice(match.start, match.start + at.length), at, `${item}: located`);
     }
-    const fine = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "x"; @wutu/\\ div { x-note { one = h; online = h; only; onfoo = h; } style { "p { color: red; }"; } noscript { p { title = h; = h; } } base { href = "/"; } a { href = h; .protocol = "https:"; } } \\/; } }` });
+    const fine = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "x"; return @wutu/\\ div { x-note { one = h; online = h; only; onfoo = h; } style { "p { color: red; }"; } noscript { p { title = h; = h; } } base { href = "/"; } a { href = h; .protocol = "https:"; } } \\/; } }` });
     assertEq(fine.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
     await withDom(async () => {
       const { instance } = await compileAndInstantiateSelfhost({ ROOT, name: 'wutu_on_names.utu', mode: 'debug',
-        source: `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "x"; @wutu/\\ x-note { one = h; online = h; onfoo = h; } \\/; } }` });
+        source: `${BROWSER}lib { fn run() Browser.HTMLElement { let h = "x"; return @wutu/\\ x-note { one = h; online = h; onfoo = h; } \\/; } }` });
       const root = instance.exports.run();
       assertEq(['one', 'online', 'onfoo'].map(n => root.getAttribute(n)).join(' '), 'x x x', 'set at run time');
     });
@@ -595,7 +875,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
   test('wutu: ping, srcset and a meta\'s content from a value drop javascript: anywhere in them', async ({ ROOT }) => {
     const source = `${BROWSER}
       fn view(u: Str) Browser.HTMLElement {
-          @wutu/\\
+          return @wutu/\\
           div {
               a { ping = u; "p"; }
               img { srcset = u; }
@@ -605,7 +885,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
           }
           \\/;
       }
-      lib { fn render(u: Str) Browser.HTMLElement { view(u); } }
+      lib { fn render(u: Str) Browser.HTMLElement { return view(u); } }
     `;
     const { MODES } = await import('../src/selfhost/compiler.js');
     for (const mode of Object.keys(MODES)) {
@@ -628,19 +908,19 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
 
   test('wutu: a root SVG-only tag is SVG; object takes data, checked as a URL; on changed is a custom event', async ({ ROOT }) => {
     const source = `${BROWSER}
-      fn dot(k: I32) Browser.SVGElement { @wutu/\\ circle.dot { r = k.str(); } \\/; }
-      fn grp() Browser.SVGElement { @wutu/\\ g { rect { width = "2"; } } \\/; }
-      fn link() Browser.HTMLElement { @wutu/\\ a { href = "/x"; "x"; } \\/; }
-      fn obj(u: Str) Browser.HTMLElement { @wutu/\\ object#ob { data = u; } \\/; }
+      fn dot(k: I32) Browser.SVGElement { return @wutu/\\ circle.dot { r = k.str(); } \\/; }
+      fn grp() Browser.SVGElement { return @wutu/\\ g { rect { width = "2"; } } \\/; }
+      fn link() Browser.HTMLElement { return @wutu/\\ a { href = "/x"; "x"; } \\/; }
+      fn obj(u: Str) Browser.HTMLElement { return @wutu/\\ object#ob { data = u; } \\/; }
       fn custom() Browser.HTMLElement {
-          @wutu/\\ div { on changed { } on resized { } on closed { } on scrolled { } on paused { } on toggled { } on selected { } } \\/;
+          return @wutu/\\ div { on changed { } on resized { } on closed { } on scrolled { } on paused { } on toggled { } on selected { } } \\/;
       }
       lib {
-          fn d() Browser.SVGElement { dot(3); }
-          fn g() Browser.SVGElement { grp(); }
-          fn a() Browser.HTMLElement { link(); }
-          fn o(u: Str) Browser.HTMLElement { obj(u); }
-          fn c() Browser.HTMLElement { custom(); }
+          fn d() Browser.SVGElement { return dot(3); }
+          fn g() Browser.SVGElement { return grp(); }
+          fn a() Browser.HTMLElement { return link(); }
+          fn o(u: Str) Browser.HTMLElement { return obj(u); }
+          fn c() Browser.HTMLElement { return custom(); }
       }
     `;
     await withDom(async () => {
@@ -653,7 +933,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
       assertEq(x.o('data:text/html,x').getAttribute('data'), null);
       x.c();
     });
-    const typo = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ div { on clik { } } \\/; } }` });
+    const typo = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ div { on clik { } } \\/; } }` });
     assert(typo.some(d => d.severity === 'error' && d.message.includes('unknown event clik; did you mean click?')), typo.map(d => d.message).join('; '));
   });
 
@@ -662,10 +942,10 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
       margin: 1px /* a; */ 2px;
       padding: 1px /* note
         color: red */ 2px;
-      --cfg: { "a": 1 };
+      --cfg: { "one" };
       --deep: {
-        a: 1;
-        b: [2, 3]
+        let value = "two";
+        value
       };
       COLOR: red;
       marker-side: match-self;
@@ -681,7 +961,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
       "x";
     }`;
     parseWutu(ok);
-    const okDiagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { @wutu/\\ ${ok} \\/; } }` });
+    const okDiagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { return @wutu/\\ ${ok} \\/; } }` });
     assertEq(okDiagnostics.filter(d => d.severity === 'error').map(d => d.message).join('; '), '');
     const bad = [
       ['div { color: red margin: 0 }', 'two CSS declarations on one line need ; between them'],
@@ -697,7 +977,7 @@ main { let s = @stored/\\ S "k" S { n: missing } \\/; }`, 'unknown-variable', 'm
     ];
     for (const [text, message] of bad) {
       assert(syntaxError(text).message.includes(message), `js ${text}: ${syntaxError(text).message}`);
-      const diagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { let f = 1; @wutu/\\ ${text} \\/; } }` });
+      const diagnostics = await selfhostDiagnostics({ ROOT, source: `${BROWSER}lib { fn run() Browser.HTMLElement { let f = 1; return @wutu/\\ ${text} \\/; } }` });
       assert(diagnostics.some(d => d.severity === 'error' && d.message.includes(message)), `selfhost ${text}: ${diagnostics.map(d => d.message).join('; ')}`);
     }
   });

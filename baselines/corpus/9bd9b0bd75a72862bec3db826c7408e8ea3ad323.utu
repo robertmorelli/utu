@@ -1,2 +1,2 @@
 tag enum Choice: | A | A
-lib { fn ok() I32 { 1; } }
+lib { fn ok() I32 { return 1; } }

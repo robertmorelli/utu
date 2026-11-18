@@ -3,7 +3,7 @@
 // Expect: Failed assert at the assert, in clamp (inlined into main), then main at the call
 fn clamp(x: I32) I32 {
     assert x >= 0;
-    x;
+    return x;
 }
 
 main {

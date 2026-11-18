@@ -6,7 +6,7 @@ proto Shape:
 struct Square[Shape]:
     | side: F64
 
-fn Shape[Square].area |s| (scale: F64) F64 { s.side * s.side * scale; }
+fn Shape[Square].area |s| (scale: F64) F64 { return s.side * s.side * scale; }
 
 main { console.log(0); }
 using console from std:Console

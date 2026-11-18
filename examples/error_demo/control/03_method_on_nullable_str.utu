@@ -1,7 +1,7 @@
 // What: calls .len() on a ?Str parameter.
 // Expect: Cannot call method 'len' on ?Str: it may be null; use promote or orelse first
 fn name_length(name: ?Str) I32 {
-    name.len();
+    return name.len();
 }
 
 main {

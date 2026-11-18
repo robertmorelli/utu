@@ -2,7 +2,7 @@
 // Expect: Type mismatch: expected I32 (parse's result), got Str
 fn parse(s: Str) I32 {
     if s.len() == 0 { return "empty"; };
-    s.len();
+    return s.len();
 }
 
 main {

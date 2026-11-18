@@ -60,8 +60,8 @@ assert.ok(!WebAssembly.Module.exports(new WebAssembly.Module(plain.wasm, { built
 // Sampled: the hot function shows, as folded stacks and speedscope.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'utu-profile-'));
 const hot = path.join(dir, 'hot.utu');
-fs.writeFileSync(hot, `fn fib(n: I32) I32 { if n < 2 { return n; }; fib(n - 1) + fib(n - 2); }
-fn spin() I32 { let t = 0; for (0 ..< 400) |_i| { t += fib(20); }; t; }
+fs.writeFileSync(hot, `fn fib(n: I32) I32 { if n < 2 { return n; }; return fib(n - 1) + fib(n - 2); }
+fn spin() I32 { let t = 0; for (0 ..< 400) |_i| { t += fib(20); }; return t; }
 main { console.log(spin()); }
 using console from std:Console
 `);
@@ -76,7 +76,7 @@ assert.match(run.stderr, /hot\.flame\.html/);
 assert.ok(fs.existsSync(path.join(dir, 'hot.flame.html')));
 // Deep recursion a normal run survives: profiled too, in every mode.
 const deep = path.join(dir, 'deep.utu');
-fs.writeFileSync(deep, `fn down(n: I32) I32 { if n == 0 { return 0; }; 1 + down(n - 1); }
+fs.writeFileSync(deep, `fn down(n: I32) I32 { if n == 0 { return 0; }; return 1 + down(n - 1); }
 main { let t = 0; for (0 ..< 3000) |_i| { t = down(10000); }; console.log(t); }
 using console from std:Console
 `);
@@ -89,7 +89,7 @@ for (const mode of ['debug', 'small', 'fast']) {
 // --profile changes no output: a recursion too deep traps both ways, one that fits runs both ways.
 for (const n of [10000, 10000000]) {
   const file = path.join(dir, `rec${n}.utu`);
-  fs.writeFileSync(file, `fn deep(n: I32) I32 { if n == 0 { 0; } else { 1 + deep(n - 1); }; }
+  fs.writeFileSync(file, `fn deep(n: I32) I32 { return if n == 0 { 0; } else { 1 + deep(n - 1); }; }
 main { console.log(deep(${n})); }
 using console from std:Console
 `);
@@ -105,7 +105,7 @@ using console from std:Console
 }
 // A trap in a global's initializer, before sampling can start: an empty profile, written.
 const early = path.join(dir, 'early.utu');
-fs.writeFileSync(early, 'fn pick(xs: Array[I32], i: I32) I32 { xs[i]; }\nlet v: I32 = pick([1], 4);\nmain { console.log(v); }\nusing console from std:Console\n');
+fs.writeFileSync(early, 'fn pick(xs: Array[I32], i: I32) I32 { return xs[i]; }\nlet v: I32 = pick([1], 4);\nmain { console.log(v); }\nusing console from std:Console\n');
 const trapped = spawnSync(process.execPath, [path.join(ROOT, 'cli', 'utu.mjs'), 'run', early, '--profile', '-o', dir], { encoding: 'utf8' });
 assert.equal(trapped.status, 1);
 assert.match(trapped.stderr, /Index out of bounds/);

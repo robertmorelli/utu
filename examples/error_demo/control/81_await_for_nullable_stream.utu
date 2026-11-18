@@ -3,7 +3,7 @@
 fn sum(s: ?Stream[I32]) I32 {
     let acc = 0;
     await for (s) |v| { acc += v; };
-    acc;
+    return acc;
 }
 
 main {

@@ -12,7 +12,7 @@ fn fields_holder(decl: I32) I32 {
         let list = next_sibling(first_child(node))
         return if is_kind(list, Node.Field_list) { list } else { -1 }
     }
-    node
+    return node
 }
 
 /// A field declaration's type, in instance `inst`.
@@ -46,7 +46,7 @@ fn check_struct_init(node: I32, expect: I32, cx: Cx) I32 {
 /// The declaration of the named type expected (through `?`), or -1.
 fn expected_decl(expect: I32) I32 {
     let t = if expect >= 0 and ty_is(expect, Ty.Nullable) { ty_a[expect] } else { expect }
-    if t >= 0 and ty_is(t, Ty.Named) { ty_decl(t) } else { -1 }
+    return if t >= 0 and ty_is(t, Ty.Named) { ty_decl(t) } else { -1 }
 }
 
 /// A variant name two enums have, in a literal: the variant of the enum (or
@@ -67,7 +67,7 @@ fn expected_variant(name: I32, expect: I32) Bool {
         return true
     }
     ambiguous(node_decl[name], name)
-    false
+    return false
 }
 
 /// `V {…}` where V names a declaration, not a variant, and an enum with a
@@ -90,7 +90,7 @@ fn check_implicit_init(node: I32, expect: I32, cx: Cx) I32 {
         report2(Diag.ImplicitStructInit, node, -1, t, -1)
         return error_value()
     }
-    build_struct(t, decl, next_sibling(first_child(node)), node, cx)
+    return build_struct(t, decl, next_sibling(first_child(node)), node, cx)
 }
 
 /// `struct.new` of `t` from the initializers from `first_init` on, each
@@ -209,7 +209,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
     let vt = repr(t)
     w_node(Op.StructNew, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m)
     if m > mt { w_node(Op.Seq, vt_ref(vt_heap(vt), false), 0, 0, mt) }
-    t
+    return t
 }
 
 /// Whether a node is in the standard library's code.
@@ -219,7 +219,7 @@ fn from_std(node: I32) Bool => file_std[file_of_token(node_first[node])] == 1
 /// with `_`. Only std's code names it (Result's `_ok`, `_value`, `_error`).
 fn std_own(field: I32) Bool {
     let name = first_child(decl_node[field])
-    src[tok_start[node_first[name]]] == 95 and from_std(name)
+    return src[tok_start[node_first[name]]] == 95 and from_std(name)
 }
 
 /// Whether a struct has a field of std's own.
@@ -230,7 +230,7 @@ fn has_std_own(decl: I32) Bool {
         if is_kind(c, Node.Field) and std_own(node_decl[first_child(c)]) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Push Wasm's default value of a field's storage `vt`: zero, or null.
@@ -258,7 +258,7 @@ fn inits_in_order(holder: I32, first_init: I32) Bool {
         c = next_sibling(c)
         f = next_sibling(f)
     }
-    true
+    return true
 }
 
 /// Whether an initializer neither has effects nor sees them: a literal.
@@ -272,7 +272,7 @@ fn child_count_from(node: I32) I32 {
         n += 1
         c = next_sibling(c)
     }
-    n
+    return n
 }
 
 /// A struct field of the value on the stack (of type `t`), named by node `name`.
@@ -296,7 +296,7 @@ fn field_of(t: I32, name: I32) I32 {
         return -1
     }
     node_decl[name] = field
-    field
+    return field
 }
 
 /// `x.f`: a field.
@@ -317,7 +317,7 @@ fn check_field_get(node: I32, expect: I32, cx: Cx) I32 {
     }
     let ft = field_type(field, ty_inst(t))
     w_node(Op.StructGet, repr(ft), vt_heap(repr(t)), decl_a[field], m)
-    ft
+    return ft
 }
 
 /// `x.f = v`, `x.f += v`.
@@ -359,7 +359,7 @@ fn check_field_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
         apply_operator(compound_word(op, node_last[target]), ft, value, at, cx, mg)
     }
     w_node(Op.StructSet, vt_none, heap, index, m)
-    ty_void()
+    return ty_void()
 }
 
 //! = Arrays
@@ -426,7 +426,7 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
             // struct to make), whose diagnostic type_only dropped: report it.
             let me = w_mark()
             discard(check_expr(from, -1, cx))
-            w_stack.resize(me)
+            w_resize_stack(me)
             return error_value()
         }
         if has_null and not vt_is_ref(repr(elem)) {
@@ -461,7 +461,7 @@ fn check_array_lit(node: I32, expect: I32, cx: Cx) I32 {
     }
     let vt = repr(t)
     w_node(Op.ArrayNewFixed, vt_ref(vt_heap(vt), false), vt_heap(vt), 0, m)
-    t
+    return t
 }
 
 /// Whether array literal `node` holds only number and Bool literals, nulls,
@@ -479,7 +479,7 @@ fn plain_array_literal(node: I32) Bool {
         }
         c = next_sibling(c)
     }
-    true
+    return true
 }
 
 /// The type @check_array_lit gives plain array literal `node` (see
@@ -501,7 +501,7 @@ fn plain_array_type(node: I32, cx: Cx) I32 {
     if ty_is(elem, Ty.Error) { return ty_error() }
     if has_null { elem = nullable(elem) }
     if ty_is(elem, Ty.Error) { return ty_error() }
-    array_of(elem)
+    return array_of(elem)
 }
 
 /// The most elements `array.new_fixed` may make (wasm's limit).
@@ -542,7 +542,7 @@ fn long_array_literal(node: I32, t: I32, elem: I32, cx: Cx) I32 {
     }
     w_get(vt, all)
     w_node(Op.Seq, vt, 0, 0, m)
-    t
+    return t
 }
 
 /// `Array[elem]`, the type.
@@ -551,7 +551,7 @@ fn array_of(elem: I32) I32 {
     if not decl_is(module, Decl.Module) { return ty_error() }
     let m = vl_begin()
     vl_add(elem)
-    named(decl_a[module], instance(module, vl_end(m)))
+    return named(decl_a[module], instance(module, vl_end(m)))
 }
 
 fn is_empty_array(node: I32) Bool => is_kind(node, Node.Array_expr) and first_child(node) < 0
@@ -565,7 +565,7 @@ fn later_array_type(decl: I32, let_node: I32, cx: Cx) I32 {
         if t >= 0 { return t }
         s = next_sibling(s)
     }
-    -1
+    return -1
 }
 
 fn array_use_type(node: I32, decl: I32, cx: Cx) I32 {
@@ -602,7 +602,7 @@ fn array_use_type(node: I32, decl: I32, cx: Cx) I32 {
         if t >= 0 { return t }
         c = next_sibling(c)
     }
-    -1
+    return -1
 }
 
 /// The type `let` node `node` is annotated with, or -1.
@@ -613,20 +613,20 @@ fn let_annotation(node: I32, cx: Cx) I32 {
     let diags = diag_kind.len()
     let at = type_of(t, cx.inst)
     diag_truncate(diags)
-    at
+    return at
 }
 
 /// The annotated type of the local identifier `node` names, or -1.
 fn annotated_type(node: I32, cx: Cx) I32 {
     if not is_kind(node, Node.Identifier) or not decl_is(node_decl[node], Decl.Local) { return -1 }
     let let_node = decl_node[node_decl[node]]
-    if is_kind(let_node, Node.Bind_expr) { let_annotation(let_node, cx) } else { -1 }
+    return if is_kind(let_node, Node.Bind_expr) { let_annotation(let_node, cx) } else { -1 }
 }
 
 /// Whether `t` is an `Array[T]`.
 fn is_array_type(t: I32) Bool {
     let decl = ty_decl(t)
-    decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == known_word(Known.WordArray)
+    return decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == known_word(Known.WordArray)
 }
 
 /// `a[i]`, `a[s, e]`, `a[i] = v`: the receiver's `get_index`, `get_slice`, `set_index`.
@@ -654,7 +654,7 @@ fn check_index(node: I32, expect: I32, cx: Cx) I32 {
         i += 1
         a = next_sibling(a)
     }
-    finish_call(fi, m, cx)
+    return finish_call(fi, m, cx)
 }
 
 /// `a[i] = v` and `a[i] op= v`: a mem's store, a host value's index, or the
@@ -707,7 +707,7 @@ fn check_index_set(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     apply_operator(compound_word(op, node_last[target]), vt_, value, at, cx, mg)
     finish_call(fi, mc, cx)
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 //! = Intrinsics of data
@@ -717,13 +717,13 @@ fn intrinsic_array_fi(fi: I32) Bool {
     let module = module_of(fi_decl[fi])
     if module < 0 or not decl_is(module, Decl.Module) or decl_a[module] < 0 { return false }
     let vt = repr(named(decl_a[module], fi_inst[fi]))
-    vt_is_ref(vt) and vt >= vt_defined and vt < vt_tuple and ht_kind[vt_heap(vt)] == Heap.Array.i32()
+    return vt_is_ref(vt) and vt >= vt_defined and vt < vt_tuple and ht_kind[vt_heap(vt)] == Heap.Array.i32()
 }
 
 /// The array type of an intrinsic's module (Array's `&` in the instance).
 fn intrinsic_array_heap(fi: I32) I32 {
     let module = module_of(fi_decl[fi])
-    vt_heap(repr(named(decl_a[module], fi_inst[fi])))
+    return vt_heap(repr(named(decl_a[module], fi_inst[fi])))
 }
 
 /// The element type of an intrinsic's array (Array's `T1` in the instance).
@@ -736,7 +736,7 @@ fn translate_kids(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         if not translate(c, decls, args, locals, direct, fi) { return false }
         c = x_next[c]
     }
-    true
+    return true
 }
 
 /// The string and array tags. 1: done; 0: not one of them; -1: failed.
@@ -752,12 +752,12 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         or tag == known_word(Known.IrStringNe) or tag == known_word(Known.IrStringMeasure) or tag == known_word(Known.IrStringSlice)
         or tag == known_word(Known.IrStringGet) or tag == known_word(Known.IrStringFromCodePoint)
     if not string_tag and not intrinsic_array_fi(fi) {
-        w_stack.resize(m)
+        w_resize_stack(m)
         ir_malformed(x)
         return -1
     }
     if not ir_kids_typed(x, decls, fi, m, data_sig(tag)) {
-        w_stack.resize(m)
+        w_resize_stack(m)
         return -1
     }
     if tag == known_word(Known.IrStringConcat) { call_builtin(Builtin.Concat, m) }
@@ -783,10 +783,10 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         else if tag == known_word(Known.IrArrayNew) {
             // (A tuple element is reported where it is written: TupleMisplaced.)
             let et = intrinsic_array_elem(fi)
-            if w_stack.len() - m == 1 and not defaultable(et) and not ty_is(et, Ty.Tuple) {
+            if w_mark() - m == 1 and not defaultable(et) and not ty_is(et, Ty.Tuple) {
                 report2(Diag.NonDefaultable, call_site[0], -1, et, -1)
             }
-            if w_stack.len() - m == 2 {
+            if w_mark() - m == 2 {
                 // (n, fill) → array.new takes the fill first.
                 let fill = w_pop()
                 let n = w_pop()
@@ -800,7 +800,7 @@ fn translate_data(x: I32, decls: I32, args: Array[I32], locals: Array[I32], dire
         else if tag == known_word(Known.IrArraySlice) { w_node(Op.Call, ref, array_slice_helper(heap), 0, m) }
         else { w_node(Op.ArrayCopy, vt_none, heap, heap, m) }
     }
-    1
+    return 1
 }
 
 /// Whether a type has a value to start from (a scalar, a nullable or host
@@ -810,7 +810,7 @@ fn defaultable(t: I32) Bool {
     if ty_is(t, Ty.Closure) or ty_is(t, Ty.Tuple) or t == prelude(Prelude.Str) or t == prelude(Prelude.I31) { return false }
     let decl = ty_decl(t)
     if decl_is(decl, Decl.Struct) or decl_is(decl, Decl.Enum) or decl_is(decl, Decl.Variant) or decl_is(decl, Decl.Proto) { return false }
-    not is_array_type(t)
+    return not is_array_type(t)
 }
 
 /// I31, reference equality, promise subscriptions, v128 constants.
@@ -902,7 +902,7 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
     }
     else if k == Known.IrPromiseThen.i32() { w_node(Op.Call, vt_none, promise_op(false), 0, m) }
     else { w_node(Op.Call, vt_none, promise_op(true), 0, m) }
-    1
+    return 1
 }
 
 /// What a string or array element's operands are, one letter each: `i` an
@@ -921,13 +921,13 @@ fn data_sig(tag: I32) Str {
     if tag == known_word(Known.IrStringFromCodePoint) { return "i" }
     if tag == known_word(Known.IrArraySet) { return "ri*" }
     if tag == known_word(Known.IrArrayCopy) { return "ririi" }
-    "n"
+    return "n"
 }
 
 /// Whether an `@ir` element's operands, on the stack since `m`, are as
 /// `sig` (see data_sig) says: else it is reported as mistyped or malformed.
 fn ir_kids_typed(x: I32, decls: I32, fi: I32, m: I32, sig: Str) Bool {
-    let n = w_stack.len() - m
+    let n = w_mark() - m
     let want = if sig != "n" { sig } else if n == 1 { "i" } else { "i*" }
     if n != want.len() { return ir_malformed(x) }
     let c = x_child[x]
@@ -952,19 +952,19 @@ fn ir_kids_typed(x: I32, decls: I32, fi: I32, m: I32, sig: Str) Bool {
         if got != vt_unreachable and s == 101 and not eq { return ir_mistyped(x, vt_eqref, got) }
         c = x_next[c]
     }
-    true
+    return true
 }
 
 /// Whether a value of value type `got` can be stored as an element of storage type `elem`.
 fn elem_fits(elem: I32, got: I32) Bool {
     if elem == vt_i8 or elem == vt_i16 { return got == vt_i32 }
     if vt_is_ref(elem) and vt_is_ref(got) { return ref_fits(elem, got) }
-    elem == got
+    return elem == got
 }
 
 fn is_data_tag(tag: I32) Bool {
     for (Known.IrStringConcat.i32() ... Known.IrArrayCopy.i32()) |k| { if known[k] == tag { return true } }
-    false
+    return false
 }
 
 /// Whether an `@ir` tree reorders its operands, so its arguments must be
@@ -976,7 +976,7 @@ fn reorders(x: I32) Bool {
         if reorders(c) { return true }
         c = x_next[c]
     }
-    false
+    return false
 }
 
 //! = Helper functions
@@ -1001,7 +1001,7 @@ fn helper(params: I32, results: I32, locals: I32, name: Str) I32 {
     func_locals[f] = local_types.len()
     func_local_count[f] = vl_len[locals]
     for (0 ..< vl_len[locals]) |i| { local_types.push(vl_item(locals, i)) }
-    f
+    return f
 }
 
 /// `(src, start, end)` → a new array of `src[start ..< end)`.
@@ -1056,14 +1056,14 @@ fn array_slice_helper(heap: I32) I32 {
     w_get(ref, 4)
     w_node(Op.Seq, ref, 0, 0, m)
     func_body[f] = w_pop()
-    f
+    return f
 }
 
 /// `substring` of the string, start, and end since `m`, a negative or
 /// reversed range empty: engines differ there (one reads an index unsigned,
 /// another clamps it).
 fn string_slice(m: I32) Void {
-    let a = if w_stack.len() == m + 3 { w_stack[m + 1] } else { -1 }
+    let a = if w_mark() == m + 3 { w_stack[m + 1] } else { -1 }
     let b = if a >= 0 { w_stack[m + 2] } else { -1 }
     // Not one, or constants already in order: as they are.
     if a < 0 or (w_op[a] == Op.I32Const.i32() and w_op[b] == Op.I32Const.i32() and w_a[a] >= 0 and w_a[b] >= w_a[a]) {
@@ -1073,7 +1073,7 @@ fn string_slice(m: I32) Void {
     let la = new_local(vt_i32)
     let lb = new_local(vt_i32)
     // (s, a, select(b, a, a >= 0 and b >= a)): out of order, (a, a), empty.
-    w_stack.resize(m + 2)
+    w_resize_stack(m + 2)
     w_node(Op.LocalTee, vt_i32, la, 0, m + 1)
     w_push(b)
     w_node(Op.LocalTee, vt_i32, lb, 0, m + 2)
@@ -1150,7 +1150,7 @@ fn from_codes_helper(heap: I32) I32 {
     call_builtin(Builtin.FromCharCodeArray, mr)
     w_node(Op.Seq, vt_extern, 0, 0, m)
     func_body[f] = w_pop()
-    f
+    return f
 }
 
 /// Forget the helper functions, before a program is checked.

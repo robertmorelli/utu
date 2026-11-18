@@ -1,7 +1,7 @@
 // What: a lookup returns null and the caller unwraps it with `orelse fatal`
 // Expect: trap: null value unwrapped by `orelse fatal` at 01_orelse_fatal_null.utu:8:29
 fn find_user(id: I32) ?Str {
-    if id == 1 { "ada"; } else { null; };
+    return if id == 1 { "ada"; } else { null; };
 }
 
 main {

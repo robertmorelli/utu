@@ -102,7 +102,7 @@ async function programs(directory) {
     } else if (entry.name.endsWith('.utu')) {
       const source = await fs.readFile(file, 'utf8');
       // Entry files only: imported modules are compiled through them.
-      if (/^\s*export\s+(main|lib)\b/m.test(source)) out.push(file);
+      if (/^\s*(?:export\s+)?(?:main|lib)\s*\{|^\s*html\s*\/\\/m.test(source)) out.push(file);
     }
   }
   return out.sort();

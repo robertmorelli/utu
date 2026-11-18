@@ -37,10 +37,10 @@ const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-streams-'));
 try {
   // Each case: the body and its diagnostic.
   const cases = [
-    ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; t; }', 'No method I32.iterator'],
-    ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; t; }', 'await for needs a generator call or a stream'],
-    ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; t; }', 'A stream loop binds one value'],
-    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; t; }', '?Stream[I32] may be null'],
+    ['fn f() I32 { let t = 0; await for (5) |v| { t += v; }; return t; }', 'No method I32.iterator'],
+    ['fn f() I32 { let t = 0; await for (0 ..< 3) |v| { t += v; }; return t; }', 'await for needs a generator call or a stream'],
+    ['fn f(s: Stream[I32]) I32 { let t = 0; await for (s) |v, w| { t += v; }; return t; }', 'A stream loop binds one value'],
+    ['fn f(s: ?Stream[I32]) I32 { let t = 0; await for (s) |v| { t += v; }; return t; }', '?Stream[I32] may be null'],
   ];
   for (const [i, [body, message]] of cases.entries()) {
     const file = path.join(dir, `case${i}.utu`);
@@ -57,27 +57,27 @@ try {
     | n : I32
 struct It:
     | at : I32
-fn Counter.iterator |self| () It { It { at: 0 }; }
+fn Counter.iterator |self| () It { return It { at: 0 }; }
 let resolved: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;
-fn Counter.next |self| (it: It) Promise[I32] { it.at += 1; resolved(it.at); }
-fn Counter.done |self| (r: I32) Bool { r > self.n; }
-fn Counter.value |self| (r: I32) I32 { r * 10; }
+fn Counter.next |self| (it: It) Promise[I32] { it.at += 1; return resolved(it.at); }
+fn Counter.done |self| (r: I32) Bool { return r > self.n; }
+fn Counter.value |self| (r: I32) I32 { return r * 10; }
 fn Counter.close |self| (it: It) Void { }
 let source: fun() Stream[I32] = @es/\\ () => { const s = (async function* () { yield 1; yield 2; yield 3; })(); const ret = s.return.bind(s); s.return = v => { globalThis.__returns = (globalThis.__returns ?? 0) + 1; return ret(v); }; return s; } \\/;
 let closed: fun() I32 = @es/\\ () => { const n = globalThis.__returns ?? 0; globalThis.__returns = 0; return n; } \\/;
-fn first(s: Stream[I32]) I32 { await for (s) |v| { return v; }; 0; }
-fn apply(f: fun(Stream[I32]) I32, s: Stream[I32]) I32 { f(s) * 100; }
+fn first(s: Stream[I32]) I32 { await for (s) |v| { return v; }; return 0; }
+fn apply(f: fun(Stream[I32]) I32, s: Stream[I32]) I32 { return f(s) * 100; }
 lib {
     fn nested() I32 {
         let t = 0;
         await for (Stream[I32].of([1, 2])) |a| { await for (Stream[I32].of([10, 20])) |b| { t += a * b; }; };
-        t;
+        return t;
     }
-    fn custom() I32 { let t = 0; await for (Counter { n: 3 }) |v| { t += v; }; t; }
-    fn returned() I32 { first(source()) * 10 + closed(); }
-    fn broken() I32 { await for (source()) |v| { break; }; closed(); }
-    fn finished() I32 { let t = 0; await for (source()) |v| { t += v; }; t * 10 + closed(); }
-    fn passed() I32 { apply(first, source()) + closed(); }
+    fn custom() I32 { let t = 0; await for (Counter { n: 3 }) |v| { t += v; }; return t; }
+    fn returned() I32 { return first(source()) * 10 + closed(); }
+    fn broken() I32 { await for (source()) |v| { break; }; return closed(); }
+    fn finished() I32 { let t = 0; await for (source()) |v| { t += v; }; return t * 10 + closed(); }
+    fn passed() I32 { return apply(first, source()) + closed(); }
 }
 `);
   const more = await build(file);

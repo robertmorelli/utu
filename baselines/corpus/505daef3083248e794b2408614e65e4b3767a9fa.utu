@@ -9,15 +9,15 @@ struct Todo:
     | done : Bool
 
 fn make_vec() Vec2 {
-    Vec2 { x: 1.0, y: 2.0 };
+    return Vec2 { x: 1.0, y: 2.0 };
 }
 
 fn get_x(v: Vec2) F32 {
-    v.x;
+    return v.x;
 }
 
 fn new_todo(text: Str) Todo {
-    Todo { text: text, done: false };
+    return Todo { text: text, done: false };
 }
 
 fn toggle(todo: Todo) Void {
@@ -25,7 +25,7 @@ fn toggle(todo: Todo) Void {
 }
 
 fn done_text(todo: Todo) Str {
-    if todo.done { "done"; } else { todo.text; };
+    return if todo.done { "done"; } else { todo.text; };
 }
 
 test "struct construction feeds field access" {

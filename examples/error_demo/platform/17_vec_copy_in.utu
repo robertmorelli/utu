@@ -6,6 +6,6 @@ vec input: U8;
 
 lib {
     fn load(bytes: JS.Uint8Array) I32 {
-        input.copy_in(bytes);
+        return input.copy_in(bytes);
     }
 }

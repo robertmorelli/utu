@@ -1,7 +1,7 @@
 // What: matches an I32 against a few literals with no default arm.
 // Expect: Match over I32 requires a default arm (~> ...)
 fn describe(n: I32) Str {
-    match n {
+    return match n {
         0 => "zero",
         1 => "one",
     };

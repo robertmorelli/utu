@@ -43,19 +43,19 @@ struct Doc:
 
 lib {
     fn roundtrip(text: Str) Str {
-        promote @json/\\ decode Doc text \\/ {
+        return promote @json/\\ decode Doc text \\/ {
             |doc| => @json/\\ encode Doc doc \\/,
             ~> "invalid: " + @json/\\ error Doc text \\/,
         };
     }
     fn valid(text: Str) Bool {
-        promote @json/\\ decode Doc text \\/ {
+        return promote @json/\\ decode Doc text \\/ {
             |doc| => true,
             ~> false,
         };
     }
     fn total_ids(text: Str) I64 {
-        promote @json/\\ decode Array[Node] text \\/ {
+        return promote @json/\\ decode Array[Node] text \\/ {
             |nodes| => {
                 let zero: I64 = 0;
                 nodes fold(zero) |a, n| { a + n.id; };
@@ -167,7 +167,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
 
       lib {
           fn describe(text: Str) Str {
-              @json/\\ match text {
+              return @json/\\ match text {
                   { status: "ok", user: { name: |name| Str, age: |age| I32 = 18 }, plan: { tier: |tier| ?Str } } => name + " " + age.str() + " " + (tier orelse "free"),
                   { status: "error", message: |message| Str } => "error: " + message,
                   { items: |items| Array[Item] } => "items " + items.len().str() + " " + items[1].price.str(),
@@ -176,7 +176,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
               }\\/;
           }
           fn first_wins(text: Str) I32 {
-              @json/\\ match text {
+              return @json/\\ match text {
                   { a: |a| I32 } => 1,
                   { a: |a| I32, b: |b| I32 } => 2,
                   ~> 0,
@@ -209,7 +209,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
   });
 
   test('json: malformed match sites are compile errors', async ({ compiler, ROOT }) => {
-    const site = body => `lib { fn run() I32 { @json/\\ match "{}" { ${body} }\\/; } }`;
+    const site = body => `lib { fn run() I32 { return @json/\\ match "{}" { ${body} }\\/; } }`;
     const cases = [
       [site('{ a: |a| I32 } => a,'), 'needs a ~> arm'],
       [site('~> 0,'), 'at least one pattern arm'],
@@ -234,7 +234,7 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
           struct Table:
               | rows: Array[Row]
           fn count(text: Str) I32 {
-              promote @json/\\ decode Table text \\/ {
+              return promote @json/\\ decode Table text \\/ {
                   |t| => t.rows.len(),
                   ~> -1,
               };
@@ -243,8 +243,8 @@ export function registerJsonTests({ test, assert, assertEq, assertNoErrors, make
       struct Row:
           | name: Str
       lib {
-          fn rows(text: Str) I32 { store.count(text); }
-          fn name(text: Str) Str { promote @json/\\ decode Row text \\/ { |r| => r.name, ~> "?", }; }
+          fn rows(text: Str) I32 { return store.count(text); }
+          fn name(text: Str) Str { return promote @json/\\ decode Row text \\/ { |r| => r.name, ~> "?", }; }
       }
     `});
     assertEq(instance.exports.rows('{"rows": [{"id": 1, "tags": null}, {"id": 2, "tags": ["a"]}]}'), 2);

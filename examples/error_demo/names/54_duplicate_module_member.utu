@@ -1,11 +1,11 @@
 // What: one file declares mod geometry twice, both with the same function
 // Expect: Duplicate declaration geometry, at the second mod
 mod geometry {
-    fn square(x: F64) F64 { x * x; }
+    fn square(x: F64) F64 { return x * x; }
 }
 
 mod geometry {
-    fn square(x: F64) F64 { x * x * 1.0; }
+    fn square(x: F64) F64 { return x * x * 1.0; }
 }
 
 main {

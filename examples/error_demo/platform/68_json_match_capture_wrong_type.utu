@@ -2,7 +2,7 @@
 // Expect: Type mismatch: expected I32, got Str (pointing at the arm body inside the @json match)
 
 fn age_of(text: Str) I32 {
-    @json/\ match text {
+    return @json/\ match text {
         { age: |age| Str } => age,
         ~> 0,
     }\/;

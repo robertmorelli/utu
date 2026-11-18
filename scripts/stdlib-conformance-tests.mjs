@@ -26,7 +26,7 @@ async function compileCases(ROOT, makeCompiler, assertNoErrors, cases, name, imp
   await fs.mkdir(testTmp(ROOT), { recursive: true });
 
   const helpers = [...new Set(cases.flatMap((c) => c.helpers ?? []))].join('\n');
-  const functions = cases.map((c) => `      fn ${c.name}(${c.params}) ${c.returnType} { ${c.expr}; }`).join('\n');
+  const functions = cases.map((c) => `      fn ${c.name}(${c.params}) ${c.returnType} { return ${c.expr}; }`).join('\n');
   await fs.writeFile(tmp, `${helpers}
 lib {
 ${functions}
@@ -73,7 +73,10 @@ function declaredOps(src) {
   const ops = [];
   const re = /\bfn\s+(?:&:)?([A-Za-z_][A-Za-z0-9_]*)\b/g;
   let match;
-  while ((match = re.exec(src))) ops.push(match[1]);
+  while ((match = re.exec(src))) {
+    // Build-mode probes are covered by the safe/unsafe compiler suites.
+    if (match[1] !== 'checks') ops.push(match[1]);
+  }
   return ops;
 }
 
@@ -195,6 +198,7 @@ function strCases() {
     stdCase('Str', 'len', 'std_str_len', '', 'I32', 'Str.len("hello")', [], 5),
     stdCase('Str', 'len', 'std_str_len_non_ascii', '', 'I32', 'Str.len("hé")', [], 2),
     stdCase('Str', 'slice', 'std_str_slice_roundtrip', '', 'I32', 'if Str.slice("hello", 1, 3) == "el" { 1; } else { 0; }', [], 1),
+    stdCase('Str', 'slice_unchecked', 'std_str_slice_unchecked', '', 'Str', 'Str.slice_unchecked("hello", 1, 3)', [], 'el'),
     stdCase('Str', 'get', 'std_str_get', '', 'I32', 'Str.get("hello", 4)', [], 111),
     stdCase('Str', 'from_code_point', 'std_str_from_code_point', '', 'I32', 'if Str.from_code_point(65) + Str.from_code_point(128512) == "A😀" { 1; } else { 0; }', [], 1),
     stdCase('Str', 'lt', 'std_str_lt', '', 'I32', 'if "B" < "a" and "ab" < "b" and not ("a" < "a") { 1; } else { 0; }', [], 1),

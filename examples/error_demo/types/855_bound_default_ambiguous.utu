@@ -9,11 +9,11 @@ proto B:
 struct S[A, B]:
     | n: I32
 
-fn A.t |c| () I32 { c.n; }
-fn B.t |c| () I32 { c.n + 1; }
+fn A.t |c| () I32 { return c.n; }
+fn B.t |c| () I32 { return c.n + 1; }
 
 mod Run[T[A, B]] {
-    fn go(c: T) I32 { c.t(); }
+    fn go(c: T) I32 { return c.t(); }
 }
 
 main {

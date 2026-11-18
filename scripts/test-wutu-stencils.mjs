@@ -14,7 +14,7 @@ const css=String.raw`@layer reset, theme;
 @supports selector(:has(*)) { [data-x="a;b"] { background: url("data:image/svg+xml,%3Csvg%3E"); } }
 /* Unicode preserved: 🌱 */`;
 assert.equal(stencilCss(css),css);
-const prefix='mod styles {\n fn sheet() Str { @css/\\',suffix='\\/; }\n}';
+const prefix='mod styles {\n fn sheet() Str => @css/\\',suffix='\\/;\n}';
 const source=prefix+css+suffix,projected=cssProjection(source);
 assert.equal(projected.length,source.length);
 assert.equal(projected.slice(prefix.length,prefix.length+css.length),css);
@@ -31,9 +31,9 @@ for(const round of ['one','two'])for(const name of await fs.readdir(`examples/wu
 {
  // Blank lines between statements survive (one at most); `else` stays on its
  // closing brace's line; a `\"` in a string is not its end.
- const source='fn a() Str { "say \\"hi\\" {"; }\n\n\nfn b(x: Bool) I32 {\n    if x { 1; }\n    else { 2; };\n}\n';
+ const source='fn a() Str { return "say \\"hi\\" {"; }\n\n\nfn b(x: Bool) I32 {\n    return if x { 1; }\n    else { 2; };\n}\n';
  const formatted=await formatUtuSource(source, { shape });
- assert.equal(formatted,'fn a() Str {\n    "say \\"hi\\" {";\n}\n\nfn b(x: Bool) I32 {\n    if x {\n        1;\n    } else {\n        2;\n    };\n}\n');
+ assert.equal(formatted,'fn a() Str {\n    return "say \\"hi\\" {";\n}\n\nfn b(x: Bool) I32 {\n    return if x {\n        1;\n    } else {\n        2;\n    };\n}\n');
  assert.equal(await formatUtuSource(formatted, { shape }),formatted,'blank line idempotence');
 }
 console.log('CSS payload/offset preservation, balanced DSL envelopes, and ten-source formatter idempotence passed');

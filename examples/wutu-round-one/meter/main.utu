@@ -8,7 +8,7 @@ struct Habit:
 struct MeterState:
 | habits: Array[Habit]
 fn workspace(state: MeterState) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "meter-workspace"
     section.workspace {
         for state.habits |habit| key habit.id {

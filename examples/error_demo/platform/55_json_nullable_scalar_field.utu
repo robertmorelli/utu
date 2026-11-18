@@ -6,7 +6,7 @@ struct Profile:
     | age: ?I32
 
 fn load(text: Str) ?Profile {
-    @json/\ decode Profile text \/;
+    return @json/\ decode Profile text \/;
 }
 
 main {

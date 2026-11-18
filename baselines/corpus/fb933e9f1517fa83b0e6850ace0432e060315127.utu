@@ -3,7 +3,7 @@ enum Shape:
   | Rect { width: I32 }
 lib {
   fn bad(s: Shape) I32 {
-    alt s {
+    return alt s {
       Circle => 1,
     };
   }

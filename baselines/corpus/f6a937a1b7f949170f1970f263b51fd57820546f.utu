@@ -3,7 +3,7 @@ using Browser from std:Browser;
           struct Gauge:
               | pct: I32
           fn view(g: Gauge) Browser.HTMLElement {
-            @wutu/\ @reactive
+            return @wutu/\ @reactive
             div {
               display: block
               width: = g.pct.str() + "%"
@@ -13,8 +13,8 @@ using Browser from std:Browser;
             \/;
           }
           lib {
-            fn make(pct: I32) Gauge { Gauge { pct: pct }; }
-            fn render(g: Gauge) Browser.HTMLElement { view(g); }
+            fn make(pct: I32) Gauge { return Gauge { pct: pct }; }
+            fn render(g: Gauge) Browser.HTMLElement { return view(g); }
             fn set(g: Gauge, pct: I32) Void { g.pct = pct; wutu.refresh(); }
           }
         

@@ -5,22 +5,22 @@
           fn capture_modes() I32 {
             let base: I32 = 100;
             let c: Counter = Counter { n: 1 };
-            let read: cl() I32 = cl() { base + c.n; };
+            let read: cl() I32 = cl() { return base + c.n; };
             base = 999;
             c.n = 5;
-            read();
+            return read();
           }
           fn counter() I32 {
             let count: I32 = 0;
             let bump = cl() Void { count = count + 1; };
             bump(); bump(); bump();
-            count;
+            return count;
           }
           fn loop_capture() I32 {
             let i: I32 = 0;
-            let last = cl() I32 { i; };
+            let last = cl() I32 { return i; };
             while (i < 4) { i = i + 1; };
-            last();
+            return last();
           }
         }
       

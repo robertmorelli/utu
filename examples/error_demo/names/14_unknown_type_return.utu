@@ -1,7 +1,7 @@
 // What: a function's return type misspelled (Booll)
 // Expect: Unknown type 'Booll'; did you mean 'Bool'?
 fn is_even(n: I32) Booll {
-    n % 2 == 0;
+    return n % 2 == 0;
 }
 
 main {

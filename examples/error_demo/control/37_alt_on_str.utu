@@ -1,7 +1,7 @@
 // What: tries to alt on a Str, as if alt were a string switch.
 // Expect: alt needs an enum value, got Str; compare strings with if/else
 fn color(name: Str) I32 {
-    alt name {
+    return alt name {
         ~> 0,
     };
 }

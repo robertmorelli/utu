@@ -3,7 +3,7 @@
 using Browser from std:Browser;
 
 fn view(scheme: Str) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     div {
         a { href = "mailto:me@example.com"; .protocol = scheme; "mail" }
     }

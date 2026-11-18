@@ -1,7 +1,7 @@
 // What: a test that recurses forever
 // Expect: FAIL forever: stack overflow (in `loop_forever`)
 fn loop_forever(n: I32) I32 {
-    loop_forever(n + 1);
+    return loop_forever(n + 1);
 }
 
 test "forever" {

@@ -5,7 +5,7 @@ enum Shape:
     | Dot {}
 
 fn kind(s: Shape) I32 {
-    match s {
+    return match s {
         Shape.Dot => 0,
         ~> 1,
     };

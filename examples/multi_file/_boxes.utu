@@ -5,10 +5,10 @@ mod Boxes {
         | value : I32
 
     fn &.new(value: I32) & {
-        &{ value: value }
+        return &{ value: value }
     }
 
     fn &.score |self| () I32 {
-        ops.double(self.value) + ops.triple(1)
+        return ops.double(self.value) + ops.triple(1)
     }
 }

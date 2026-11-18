@@ -5,7 +5,7 @@ struct Rect:
     | h: I32
 
 fn Rect.area |r| () I32 {
-    self.w * self.h;
+    return self.w * self.h;
 }
 
 main {

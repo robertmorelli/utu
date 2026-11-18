@@ -1,5 +1,13 @@
-// What: struct T in mod m[T], hiding the type parameter
 // Expect: Duplicate declaration T
-mod m[T] { struct T: | x : I32  fn f(x: T) T { x; } }
-main { console.log(m[I32].f(m[I32].T { x: 1 }).x); }
-using console from std:Console
+mod m[T] {
+    struct T:
+        | x: I32
+
+    fn f(x: T) T {
+        return x
+    }
+}
+
+main {
+    m[I32].f(&{ x: 1 })
+}

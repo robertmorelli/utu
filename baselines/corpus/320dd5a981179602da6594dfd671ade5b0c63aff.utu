@@ -12,7 +12,7 @@
             end: Point { x: 0, y: 0 },
           };
           l.start.x = l.start.x + 5;
-          l.start.x;
+          return l.start.x;
         }
       }
     

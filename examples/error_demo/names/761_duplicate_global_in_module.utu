@@ -3,7 +3,7 @@
 mod M {
     let g: I32 = 3;
     let g: I32 = 4;
-    fn get() I32 { g; }
+    fn get() I32 { return g; }
 }
 
 main {

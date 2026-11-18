@@ -4,7 +4,7 @@ let _console_log: fun(Str) Void = @es/\console.log\/;
 
 fn greeting(name: Str) Str {
     _console_log("hello ");
-    "hi";
+    return "hi";
 }
 
 bench "hello-name format" {
@@ -14,5 +14,5 @@ bench "hello-name format" {
 }
 
 fn main() Str {
-    greeting("utu");
+    return greeting("utu");
 }

@@ -4,7 +4,7 @@ mod Stack[T] {
     struct &:
         | items: Array[T]
         | size: I32
-    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }
+    fn &.new(fill: T) & { return &{ items: Array[T].new(16, fill), size: 0 }; }
 }
 
 main {

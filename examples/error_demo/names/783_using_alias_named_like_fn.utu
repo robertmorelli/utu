@@ -2,7 +2,7 @@
 // Expect: Duplicate declaration helper, at the fn
 using helpers |helper| from "./lib/489_helper_lib.utu";
 
-fn helper() I32 { 1; }
+fn helper() I32 { return 1; }
 
 main {
     console.log(helper());

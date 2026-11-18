@@ -4,8 +4,8 @@ struct Rect:
     | w: I32
     | h: I32
 
-fn Rect.area |r| () I32 { r.w * r.h; }
-fn Rect.area |r| () I32 { r.h * r.w; }
+fn Rect.area |r| () I32 { return r.w * r.h; }
+fn Rect.area |r| () I32 { return r.h * r.w; }
 
 main {
     console.log(Rect { w: 2, h: 3 }.area());

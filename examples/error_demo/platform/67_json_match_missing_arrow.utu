@@ -1,7 +1,7 @@
 // What: a @json match arm without =>
 // Expect: Expected '=>' in @json match
 fn status(text: Str) I32 {
-    @json/\ match text {
+    return @json/\ match text {
         { status: "ok" } 1,
         ~> 0,
     }\/;

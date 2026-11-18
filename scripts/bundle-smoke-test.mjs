@@ -5,7 +5,7 @@ import { compile, instantiate, loadCompiler, PLATFORM_SOURCES } from '../dist/se
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sourceFile = path.join(ROOT, '.tmp', 'bundle-smoke.utu');
-const source = 'lib { fn answer() I32 { 42; } }\n';
+const source = 'lib { fn answer() I32 { return 42; } }\n';
 const compilerWasm = await fs.readFile(path.join(ROOT, 'dist', 'utu.wasm'));
 const compilerSpec = JSON.parse(await fs.readFile(path.join(ROOT, 'dist', 'utu.host.json'), 'utf8'));
 

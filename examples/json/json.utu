@@ -33,26 +33,26 @@ fn push(stack: Stack, kind: I32) Void {
 }
 
 fn top(stack: Stack) I32 {
-    if stack.size == 0 { 0 } else { stack.kinds[stack.size - 1] }
+    return if stack.size == 0 { 0 } else { stack.kinds[stack.size - 1] }
 }
 
 fn is_space(c: I32) Bool {
-    c == 32 or c == 10 or c == 13 or c == 9
+    return c == 32 or c == 10 or c == 13 or c == 9
 }
 
 fn is_digit(c: I32) Bool {
-    c >= 48 and c <= 57
+    return c >= 48 and c <= 57
 }
 
 fn is_hex(c: I32) Bool {
-    is_digit(c) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
+    return is_digit(c) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
 }
 
 // Does `text` contain `word` at `at`?
 fn matches(text: Str, at: I32, word: Str) Bool {
     if at + word.len() > text.len() { return false }
     for (0..<word.len()) |k| { if text[at + k] != word[k] { return false } }
-    true
+    return true
 }
 
 fn analyze(text: Str) Stats {
@@ -178,16 +178,16 @@ fn analyze(text: Str) Stats {
         },
         ~> {},
     }
-    stats
+    return stats
 }
 
 lib {
     fn parse(text: Str) I32 {
         let stats = analyze(text)
-        if stats.error >= 0 { -(stats.error + 1) } else { stats.values }
+        return if stats.error >= 0 { -(stats.error + 1) } else { stats.values }
     }
 
     fn depth(text: Str) I32 {
-        analyze(text).depth
+        return analyze(text).depth
     }
 }

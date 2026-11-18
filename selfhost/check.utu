@@ -109,7 +109,7 @@ fn fn_instance_on(decl: I32, inst: I32, self_t: I32) I32 {
         let wat = wat_of(body)
         if wat >= 0 { func_code[f] = wat } else if not is_generator(decl) { fi_queue.push(id) }
     }
-    id
+    return id
 }
 
 /// Per function instance: the first call of it, or -1.
@@ -158,7 +158,7 @@ fn with_first(list: I32, t: I32) I32 {
     let m = vl_begin()
     vl_add(t)
     for (1 ..< vl_len[list]) |i| { vl_add(vl_item(list, i)) }
-    vl_end(m)
+    return vl_end(m)
 }
 
 /// A function's block (its last child).
@@ -168,7 +168,7 @@ fn fn_body(decl: I32) I32 => last_child(decl_node[decl])
 fn child_of_kind(node: I32, kind: Node) I32 {
     let c = first_child(node)
     while (c >= 0 and not is_kind(c, kind)) { c = next_sibling(c) }
-    c
+    return c
 }
 
 /// Whether capture `decl` is a range's count, not a copy (an array's element,
@@ -185,7 +185,7 @@ fn capture_is_count(decl: I32) Bool {
     }
     // A range has its two ends.
     let source = nth_child(first_child(loop_), k)
-    source >= 0 and next_sibling(first_child(source)) >= 0
+    return source >= 0 and next_sibling(first_child(source)) >= 0
 }
 
 /// Child `i` of `node` (from 0), or -1.
@@ -196,7 +196,7 @@ fn nth_child(node: I32, i: I32) I32 {
         c = next_sibling(c)
         k += 1
     }
-    c
+    return c
 }
 
 /// A new defined wasm function of parameter types `params` (a list) and
@@ -204,7 +204,7 @@ fn nth_child(node: I32, i: I32) I32 {
 fn defined_func(params: I32, result: I32) I32 {
     let m = vl_begin()
     for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))) }
-    new_func(FuncKind.Defined, func_type(vl_end(m), vl_of_result(repr(result))))
+    return new_func(FuncKind.Defined, func_type(vl_end(m), vl_of_result(repr(result))))
 }
 
 /// The `@ir` tree of a body that is one `@ir/\ … \/` expression, or -1.
@@ -212,7 +212,7 @@ fn intrinsic_body(block: I32) I32 {
     let e = first_child(block)
     if e < 0 or next_sibling(e) >= 0 or not is_kind(e, Node.Dsl_expr) { return -1 }
     if word_of(first_child(e)) != known_word(Known.Ir) { return -1 }
-    ir_tree(e)
+    return ir_tree(e)
 }
 
 fn fn_debug_name(decl: I32) I32 {
@@ -221,7 +221,7 @@ fn fn_debug_name(decl: I32) I32 {
     let t0 = node_first[name]
     let t1 = node_last[name]
     if is_kind(node, Node.Op_decl) { t1 = node_last[next_sibling(name)] }
-    name_from_src(tok_start[t0], tok_end[t1 - 1])
+    return name_from_src(tok_start[t0], tok_end[t1 - 1])
 }
 
 // A function's parameter types (self first) and result type, in an instance.
@@ -284,7 +284,7 @@ fn receiver_type(decl: I32, inst: I32) I32 {
     if is_kind(node, Node.Fn_decl) and not decl_is(owner, Decl.Module) and is_generic(module_of(owner)) and instance_for(module_of(owner), inst) == 0 {
         return no_instance(r, module_of(owner))
     }
-    decl_type(owner, inst)
+    return decl_type(owner, inst)
 }
 
 /// The parameter declarations of a function, in order: self, then the rest
@@ -311,7 +311,7 @@ fn param_decls(decl: I32) I32 {
         }
         c = next_sibling(c)
     }
-    vl_end(m)
+    return vl_end(m)
 }
 
 //! = Checking functions
@@ -321,12 +321,12 @@ fn new_local(vt: I32) I32 {
     // A value that never arrives (an expression that does not complete, or
     // none) still gets a local of some type; nothing reads it.
     cur_locals.push(if vt == vt_none or vt == vt_unreachable or vt >= vt_tuple { vt_i32 } else { vt })
-    cur_locals.len() - 1
+    return cur_locals.len() - 1
 }
 
 fn new_label() I32 {
     next_label[0] += 1
-    next_label[0]
+    return next_label[0]
 }
 
 /// A function's checking starts: no locals, labels, loops, or defers yet.
@@ -346,6 +346,7 @@ fn begin_function() Void {
 /// Check a function instance's body into its wasm function.
 fn check_function(fi: I32) Void {
     let decl = fi_decl[fi]
+    let body = fn_body(decl)
     begin_function()
     cur_fn[0] = fi
     let params = fi_params[fi]
@@ -358,13 +359,13 @@ fn check_function(fi: I32) Void {
     }
     cur_params.resize(1)
     cur_params[0] = cur_locals.len()
-    mark_boxes(fn_body(decl))
+    mark_boxes(body)
     let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] }
     let outer = cur_inst[0]
     cur_inst[0] = cx.inst
     enter_instance(fi_inst[fi], fi_site[fi])
-    want(fn_body(decl), cx.result, Why.Returns, decl, -1)
-    finish_function(fi_func[fi], fn_body(decl), cx, box_params(decls, params))
+    want(body, cx.result, Why.Returns, decl, -1)
+    finish_function(fi_func[fi], body, cx, box_params(decls, params))
     unwant()
     leave_instance()
     cur_inst[0] = outer
@@ -383,8 +384,23 @@ fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) Void {
     if ty_is(cx.result, Ty.Void) { drop_value(t) } else { coerce(t, cx.result, body_node) }
     w_node(Op.Seq, repr(cx.result), 0, 0, m)
     func_body[f] = w_pop()
+    elide_tail_return(func_body[f], repr(cx.result))
     record_locals(f, cur_params[0])
     cur_src[0] = outer
+}
+
+/// A return at the end of a function needs no branch or inlining wrapper.
+/// Only sequences are transparent: crossing a try or labeled block is not.
+fn elide_tail_return(node: I32, result: I32) Bool {
+    if w_op[node] == Op.Return.i32() {
+        w_op[node] = Op.Seq.i32()
+        w_type[node] = result
+        return true
+    }
+    if w_op[node] != Op.Seq.i32() or w_count[node] == 0 { return false }
+    if not elide_tail_return(w_kid(node, w_count[node] - 1), result) { return false }
+    w_type[node] = result
+    return true
 }
 
 /// Function `f`'s locals: those of @cur_locals from `first` (past its parameters).
@@ -394,29 +410,36 @@ fn record_locals(f: I32, first: I32) Void {
     for (first ..< cur_locals.len()) |i| { local_types.push(cur_locals[i]) }
 }
 
-/// Statements of a block; its value is its last one's. Its defers run at
-/// its end, after its value.
+/// Expression blocks yield their last statement; braced function and closure
+/// bodies discard it. Their results come only from explicit returns.
 fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let m = w_mark()
     let defers = defer_node.len()
     defer_marks.push(defers)
     let guards = defer_guard.len()
     let reads = flag_reads[0]
+    let discard_tail = block == body_block[0] and tok_is(node_first[block], Tok.LBrace)
     if block == body_block[0] and profiling() { profile_body(block, cx) }
     let c = first_child(block)
     let t = ty_void()
+    let exits = false
     while (c >= 0) {
         let next = next_sibling(c)
         let noted = defer_node.len()
-        if next < 0 {
+        if next < 0 and not discard_tail and not exits {
             t = check_statement(c, expect, cx)
         } else {
-            // A statement's value is dropped: it is checked as Void, so
-            // branches of different types are fine there.
-            coerce(check_statement(c, ty_void(), cx), ty_void(), c)
+            let statement = check_statement(c, ty_void(), cx)
+            drop_value(statement)
+            if ty_is(statement, Ty.Never) { exits = true }
+            else if ty_is(statement, Ty.Error) and next < 0 { t = statement }
         }
         note_defer_guards(noted)
         c = next
+    }
+    if exits {
+        t = ty_never()
+        if not cf_diverges(w_stack[w_mark() - 1]) { w_leaf(Op.Unreachable, vt_unreachable, 0, 0) }
     }
     // The defers run inside the guards, so one that throws lets the older run.
     let vt = repr(t)
@@ -430,7 +453,7 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     init_exit_flag(m, guards, reads)
     defer_marks.resize(defer_marks.len() - 1)
     w_node(Op.Seq, repr(t), 0, 0, m)
-    t
+    return t
 }
 
 /// Run the defers pending since `from` after a value (of value type `vt`,
@@ -492,7 +515,7 @@ fn note_coercion(at: I32, actual: I32, expected: I32, kind: I32) I32 {
         co_to.push(expected)
         co_kind.push(kind)
     }
-    expected
+    return expected
 }
 
 fn coerce(actual: I32, expected: I32, at: I32) I32 {
@@ -523,7 +546,7 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
     // A type made of an unknown one (`Array[I32Z]`) was said once.
     if ty_has_error(actual) or ty_has_error(expected) { return expected }
     mismatch(at, expected, actual)
-    expected
+    return expected
 }
 
 fn heap_of(vt: I32) I32 => vt_nullable(vt)
@@ -570,13 +593,13 @@ fn mismatch_since(from: I32, node: I32) I32 {
     for (from ..< diag_kind.len()) |i| {
         if diag_kind[i] == Diag.TypeMismatch.i32() and diag_node[i] == site { return i }
     }
-    -1
+    return -1
 }
 
 /// The first mismatch reported since diagnostic `from`, or -1.
 fn any_mismatch_since(from: I32) I32 {
     for (from ..< diag_kind.len()) |i| { if diag_kind[i] == Diag.TypeMismatch.i32() { return i } }
-    -1
+    return -1
 }
 
 /// Where a value comes from, to point at: a block's is its last expression's.
@@ -586,7 +609,7 @@ fn value_site(node: I32) I32 {
     // the expansion wrote around one.
     if is_kind(node, Node.Splice) { return value_site(first_child(node)) }
     if is_kind(node, Node.Paren_expr) and dsl_site_of(node) >= 0 and is_kind(first_child(node), Node.Splice) { return value_site(first_child(node)) }
-    node
+    return node
 }
 
 /// Whether an operand's type is unknown to stage 0: a name, or a call of
@@ -595,7 +618,7 @@ fn unresolved(node: I32) Bool {
     if is_kind(node, Node.Paren_expr) or is_kind(node, Node.Splice) { return unresolved(first_child(node)) }
     if is_kind(node, Node.Identifier) { return node_decl[node] < 0 }
     if is_kind(node, Node.Call_expr) { return unresolved(first_child(node)) }
-    false
+    return false
 }
 
 /// Something the compiler cannot do yet: reported, and checking goes on.
@@ -604,7 +627,7 @@ fn unsupported(at: I32) I32 {
     // (A host module whose declarations were not found is reported at its using.)
     let d = if is_kind(at, Node.Identifier) { node_decl[at] } else { -1 }
     if not reported_within(at) and not (decl_is(d, Decl.Foreign) and decl_a[d] < 0) { report(Diag.Unsupported, at, -1) }
-    error_value()
+    return error_value()
 }
 
 /// Whether a diagnostic is about a node within `at` (its tokens).
@@ -614,13 +637,13 @@ fn reported_within(at: I32) Bool {
         let n = diag_node[i]
         if n >= 0 and node_first[n] >= node_first[at] and node_first[n] < node_last[at] { return true }
     }
-    false
+    return false
 }
 
 /// `module.name` where the module has no such member: reported, and its value an error.
 fn module_member_missing(module: I32, name: I32) I32 {
     report_module_member_missing(module, name)
-    error_value()
+    return error_value()
 }
 
 fn report_module_member_missing(module: I32, name: I32) Void {
@@ -632,7 +655,7 @@ fn report_module_member_missing(module: I32, name: I32) Void {
 /// surrogate (which no constant's name can hold).
 fn bad_literal(at: I32) I32 {
     report_bad_literal(at)
-    error_value()
+    return error_value()
 }
 
 fn report_bad_literal(at: I32) Void {
@@ -647,14 +670,14 @@ fn report_bad_literal(at: I32) Void {
 /// A mistaken expression's value: `unreachable`, of type Error.
 fn error_value() I32 {
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
-    ty_error()
+    return ty_error()
 }
 
 /// A mistaken expression whose code is on the stack since `m`: that code,
 /// then `unreachable`, of type Error.
 fn error_since(m: I32) I32 {
     w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
-    ty_error()
+    return ty_error()
 }
 
 //! = Expressions
@@ -672,14 +695,20 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     let outer = cur_src[0]
     cur_src[0] = node
     let t = check_node(node, expect, cx)
+    // Wasm's validator does not infer that every arm of a block exits.
+    if ty_is(t, Ty.Never) and not cf_diverges(w_stack[w_mark() - 1]) {
+        let m = w_mark() - 1
+        w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
+        w_node(Op.Seq, vt_unreachable, 0, 0, m)
+    }
     cur_src[0] = outer
     if node < node_ty.len() { node_ty[node] = t; node_expect[node] = expect }
-    t
+    return t
 }
 
 /// @check_expr's work, by the node's kind.
 fn check_node(node: I32, expect: I32, cx: Cx) I32 {
-    match Node(node_kind[node]) {
+    return match Node(node_kind[node]) {
         Node.Identifier => if binder_count(node_decl[node]) > 0 { binder_fn_value(node_decl[node], node, expect) } else { check_ident(node, cx) },
         Node.Literal => check_literal(node, expect, cx),
         Node.Template_string => check_template(node, cx),
@@ -771,7 +800,7 @@ fn check_ident(node: I32, cx: Cx) I32 {
     if is_type_decl(decl) { return not_value(node, decl) }
     let t = decl_ty[decl]
     read_value(decl, t)
-    t
+    return t
 }
 
 //! = Literals
@@ -800,7 +829,7 @@ fn check_literal(node: I32, expect: I32, cx: Cx) I32 {
         if not string_literal(c) { return bad_literal(node) }
         return prelude(Prelude.Str)
     }
-    unsupported(node)
+    return unsupported(node)
 }
 
 /// `text ${e} text`: its pieces joined with Str's `+`, left to right, each
@@ -833,7 +862,7 @@ fn check_template(node: I32, cx: Cx) I32 {
         lit_bytes.clear()
         push_lit_bytes()
     }
-    str_t
+    return str_t
 }
 
 /// `${e}`: `e.str()`.
@@ -859,6 +888,23 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
         str_of(rt, a, m, cx)
         return prelude(Prelude.Str)
     }
+    if is_array_type(rt) {
+        // Validate the element at the authored hole, before instantiating the
+        // generic list renderer (whose body otherwise owns the diagnostic).
+        let element = rt
+        while (is_array_type(element)) { element = vl_item(inst_args[ty_inst(element)], 0) }
+        let protocol = promoted(prelude_lookup(intern_text("Component")))
+        let component_element = protocol >= 0 and (ty_decl(element) == protocol or implements(ty_decl(element), protocol))
+        if not shows_as_itself(element) and not in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(element)) and not component_element {
+            report2(Diag.WutuHole, unspliced(a), -1, element, -1)
+            return error_value()
+        }
+        let callee = first_child(node)
+        let module = node_decl[first_child(callee)]
+        let decl = static_member(module, intern_text("show_list"))
+        w_resize_stack(m)
+        return call_template(decl, args, m, node, cx)
+    }
     let component = promoted(prelude_lookup(intern_text("Component")))
     let render = intern_text("render")
     if component >= 0 and (ty_decl(rt) == component or implements(ty_decl(rt), component)) {
@@ -876,21 +922,21 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
         report2(Diag.WutuHole, unspliced(a), -1, rt, -1)
         return error_value()
     }
-    rt
+    return rt
 }
 
 /// The node a splice holds (where it is written).
 fn unspliced(n: I32) I32 {
     let x = n
     while (is_kind(x, Node.Splice) and first_child(x) >= 0) { x = first_child(x) }
-    x
+    return x
 }
 
 /// Whether a hole shows a value of type t as it is: a Str, a host value (a
 /// node), or null.
 fn shows_as_itself(t: I32) Bool {
     if ty_is(t, Ty.Null) or is_foreign_or_nullable(t) { return true }
-    ty_is(t, Ty.Named) and in_words("Str Externref", type_text(t))
+    return ty_is(t, Ty.Named) and in_words("Str Externref", type_text(t))
 }
 
 /// `wutu.key_text(k)`, what a loop's `key k` becomes: a Str is itself, a
@@ -910,7 +956,7 @@ fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
     }
     if ty_is(rt, Ty.Named) and type_text(rt) == "Str" { return rt }
     report2(Diag.WutuKey, unspliced(a), -1, rt, -1)
-    error_value()
+    return error_value()
 }
 
 /// Whether `callee` is `wutu.show` (std:Wutu's).
@@ -921,7 +967,7 @@ fn is_wutu_fn(callee: I32, name: Str) Bool {
     if not is_kind(callee, Node.Field_expr) { return false }
     let base = first_child(callee)
     // (The declaration first: a module's is rare, and the text is made.)
-    is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module) and word_text(word_of(base)) == "wutu"
+    return is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module) and word_text(word_of(base)) == "wutu"
         and word_text(word_of(last_child(callee))) == name
 }
 
@@ -950,7 +996,7 @@ fn check_memo_key(node: I32, args: I32, cx: Cx) I32 {
     if memoizable_call(call, cx) { return check_expr(key, prelude(Prelude.Str), cx) }
     lit_bytes.clear()
     push_lit_bytes()
-    prelude(Prelude.Str)
+    return prelude(Prelude.Str)
 }
 
 /// Whether `call` is `f(args)` with f memo-safe and each argument a scalar or
@@ -969,6 +1015,9 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
     let component = promoted(prelude_lookup(intern_text("Component")))
     if component >= 0 {
         let result = type_of(child_of_kind(decl_node[f], Node.Return_type), instance_for(module_of(f), cx.inst))
+        // Rendering a component list may read mutable state even when the
+        // function that constructs the list is pure.
+        while (is_array_type(result)) { result = vl_item(inst_args[ty_inst(result)], 0) }
         if ty_decl(result) == component or implements(ty_decl(result), component) { return false }
     }
     let args = next_sibling(callee)
@@ -978,12 +1027,12 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
         // Its type, by checking it once and dropping the code.
         let m = w_mark()
         let t = check_expr(a, -1, cx)
-        while (w_stack.len() > m) { w_pop() }
+        while (w_mark() > m) { w_pop() }
         // The string key loses signed zero; redraw float props instead.
         if ty_is(t, Ty.Error) or not in_words("I32 U32 I64 U64 Bool Str", type_text(t)) { return false }
         a = next_sibling(a)
     }
-    true
+    return true
 }
 
 /// By declaration: 0 not yet known, 1 being decided, 2 memo-safe, 3 not.
@@ -1001,7 +1050,7 @@ fn memo_safe_fn(decl: I32) Bool {
     let node = decl_node[decl]
     let ok = if file_std[file_of_token(node_first[node])] == 1 { std_memo_safe(decl) } else { memo_safe_node(node) }
     memo_state[decl] = if ok { 2 } else { 3 }
-    ok
+    return ok
 }
 
 /// A std function: all are memo-safe but those that ask the host for
@@ -1014,7 +1063,7 @@ fn std_memo_safe(decl: I32) Bool {
     let name = if w >= 0 { word_text(w) } else { "" }
     if m == "time" or m == "Stream" or (m == "Random" and name == "from_host") { return false }
     if m != "wutu" { return true }
-    in_words("init show memo_key key_text number money decimal", name)
+    return in_words("init show memo_key key_text number money decimal", name)
 }
 
 /// A method call's every candidate (`x.f(…)`: any type's method f, its
@@ -1025,7 +1074,7 @@ fn memo_safe_methods(word: I32) Bool {
         if decl_is(k, Decl.Fn) and decl_a[k] >= 0 and fn_word(k) == word and not memo_safe_fn(k) { return false }
         k += 1
     }
-    true
+    return true
 }
 
 /// Whether the code at `n` keeps a function memo-safe.
@@ -1075,7 +1124,7 @@ fn memo_safe_node(n: I32) Bool {
         if not memo_safe_node(c) { return false }
         c = next_sibling(c)
     }
-    true
+    return true
 }
 
 /// The value of type rt (checked, its code from mark m) as `.str()`.
@@ -1126,7 +1175,7 @@ fn int_value(node: I32) I64 {
         v = v * 10 + (src[i] - 48).i64()
         i += 1
     }
-    v
+    return v
 }
 
 /// The type an integer literal takes: the one expected, when integers
@@ -1139,7 +1188,7 @@ fn int_literal(node: I32, at: I32, expect: I32, negate: Bool) I32 {
         in_instance(cur_inst[0])
     }
     push_number(t, literal_bits(node, t, negate), true)
-    t
+    return t
 }
 
 /// Whether an integer literal is past what 64 bits hold (it would wrap as
@@ -1164,14 +1213,14 @@ fn past_64_bits(node: I32) Bool {
         let m = max[k]
         if d != m { return d > m }
     }
-    false
+    return false
 }
 
 /// Whether integer literal `node`, negated or not, is in -neg ..= pos: its
 /// magnitude, read as 64 unsigned bits, against `neg` or `pos`.
 fn int_in(node: I32, negate: Bool, neg: U64, pos: U64) Bool {
     if past_64_bits(node) { return false }
-    int_value(node).u64() <= if negate { neg } else { pos }
+    return int_value(node).u64() <= if negate { neg } else { pos }
 }
 
 /// Whether a literal (integer or float), negated or not, fits numeric type
@@ -1189,7 +1238,7 @@ fn literal_fits(node: I32, t: I32, negate: Bool) Bool {
     if t == prelude(Prelude.U32) or t == prelude(Prelude.M32) { return int_fits(node, negate, 32, false) }
     if t == prelude(Prelude.I64) { return int_fits(node, negate, 64, true) }
     if t == prelude(Prelude.U64) or t == prelude(Prelude.M64) { return int_fits(node, negate, 64, false) }
-    int_in(node, negate, 18446744073709551615, 18446744073709551615)
+    return int_in(node, negate, 18446744073709551615, 18446744073709551615)
 }
 
 /// Whether integer literal `node`, negated or not, fits an integer of
@@ -1198,7 +1247,7 @@ fn int_fits(node: I32, negate: Bool, bits: I32, signed: Bool) Bool {
     let one: U64 = 1
     let top = one << (bits - 1).u64()
     if signed { return int_in(node, negate, top, top - one) }
-    int_in(node, negate, 0, top - one + top)
+    return int_in(node, negate, 0, top - one + top)
 }
 
 /// The bits a literal (integer or float), negated or not, makes as numeric
@@ -1225,14 +1274,14 @@ fn literal_bits(node: I32, t: I32, negate: Bool) I64 {
         let d = v.u64().f64()
         return (if negate { -d } else { d }).bits()
     }
-    if negate { 0 - v } else { v }
+    return if negate { 0 - v } else { v }
 }
 
 /// A token's source text.
 fn token_text(t: I32) Str {
     let text = ""
     for (tok_start[t] ..< tok_end[t]) |i| { text = text + Str.from_code_point(src[i]) }
-    text
+    return text
 }
 
 /// Push a constant of numeric type `t`: the integer `v`, or (when `is_bits`)
@@ -1289,7 +1338,7 @@ fn literal_default(node: I32, negate: Bool) I32 {
     if literal_fits(node, prelude(Prelude.U32), negate) { return prelude(Prelude.U32) }
     if literal_fits(node, prelude(Prelude.I64), negate) { return prelude(Prelude.I64) }
     if negate or literal_fits(node, prelude(Prelude.U64), negate) { return prelude(if negate { Prelude.I64 } else { Prelude.U64 }) }
-    prelude(Prelude.U64)
+    return prelude(Prelude.U64)
 }
 
 fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
@@ -1297,7 +1346,7 @@ fn float_literal(node: I32, expect: I32, negate: Bool) I32 {
     let ft = if expect >= 0 and is_float(expect) { expect } else if is_foreign_or_nullable(expect) { prelude(Prelude.F64) } else { literal_default(node, negate) }
     if not literal_fits(node, ft, negate) { report2(Diag.FloatOutOfRange, node, -1, ft, if negate { 1 } else { 0 }) }
     push_number(ft, literal_bits(node, ft, negate), true)
-    ft
+    return ft
 }
 
 //! = Locals and globals
@@ -1376,7 +1425,7 @@ fn check_let(node: I32, cx: Cx) I32 {
         return ty_void()
     }
     bind_value(decl, t, m)
-    ty_void()
+    return ty_void()
 }
 
 //! == Global instances
@@ -1414,7 +1463,7 @@ fn global_instance(decl: I32, inst: I32) I32 {
     gi_init.push(-1)
     gi_next.push(decl_gi[decl])
     decl_gi[decl] = id
-    id
+    return id
 }
 
 /// The instance a global is read in from code in instance `inst`.
@@ -1428,7 +1477,7 @@ fn global_type_in(decl: I32, inst: I32) I32 {
     let t = type_of(next_sibling(first_child(decl_node[decl])), inst)
     if is_es(last_child(decl_node[decl])) { t = es_binding_type(t) }
     decl_ty[decl] = t
-    t
+    return t
 }
 
 /// An `@es` binding's type, each `fun(…)` parameter read as `cl(…)`:
@@ -1444,7 +1493,7 @@ fn es_binding_type(t: I32) I32 {
         let p = vl_item(params, i)
         vl_add(if ty_is(p, Ty.Fun) { ty(Ty.Closure, ty_a[p], ty_b[p]) } else { p })
     }
-    ty(Ty.Fun, vl_end(mark), ty_b[t])
+    return ty(Ty.Fun, vl_end(mark), ty_b[t])
 }
 
 /// A function named as a value: a `fun`.
@@ -1457,7 +1506,7 @@ fn fn_value_in(decl: I32, inst: I32) I32 {
     let f = function_of(fi)
     let t = ty(Ty.Fun, fi_params[fi], fi_result[fi])
     w_leaf(Op.RefFunc, vt_ref(func_type_of[f], false), f, 0)
-    t
+    return t
 }
 
 /// Global `decl` of module instance `inst`, read.
@@ -1477,7 +1526,7 @@ fn global_get(decl: I32, inst: I32) I32 {
         note_edge(-2 - gi, -1)
         if glob_type[g] != repr(t) { w_node(Op.RefAsNonNull, repr(t), 0, 0, w_mark() - 1) }
     }
-    t
+    return t
 }
 
 /// A top-level `let` (global instance gi): a wasm global holding its
@@ -1487,7 +1536,7 @@ fn global_of(gi: I32) I32 {
     enter_instance(gi_inst[gi], -1)
     let g = make_global(gi)
     leave_instance()
-    g
+    return g
 }
 
 /// @global_of's work, in gi's instance.
@@ -1501,7 +1550,7 @@ fn make_global(gi: I32) I32 {
     let cx = Cx { inst: gi_inst[gi], fi: -1, result: t }
     let actual = constant(init, t, cx)
     if actual < 0 {
-        w_stack.resize(m)
+        w_resize_stack(m)
         if is_wat(init) and not dsl_has_failed(init) {
             gi_global[gi] = -2
             report(Diag.WatPlace, init, -1)
@@ -1514,7 +1563,7 @@ fn make_global(gi: I32) I32 {
     unwant()
     let g = add_global(repr(t), false, w_pop())
     gi_global[gi] = g
-    g
+    return g
 }
 
 //! == Computed globals
@@ -1587,7 +1636,7 @@ fn computed_global(gi: I32, t: I32, init: I32) I32 {
     record_locals(f, 0)
     restore_function()
     cur_fn[0] = outer
-    g
+    return g
 }
 
 /// After checking: the order the computed globals are set in (see above),
@@ -1667,7 +1716,7 @@ fn edge_source(from: I32, nf: I32) I32 {
     if from >= 0 { return from }
     // (Neither `main`'s calls, -1000000 - its declaration, nor none.)
     if from == -1 or from <= -1000000 { return -1 }
-    nf + gi_init[-2 - from]
+    return nf + gi_init[-2 - from]
 }
 
 /// Computed global k set (`global.set g (call init)`), after its
@@ -1710,7 +1759,7 @@ fn constant(node: I32, expect: I32, cx: Cx) I32 {
         if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Int_lit) { return int_literal(lit, node, expect, true) }
         if is_kind(last_child(node), Node.Literal) and is_kind(lit, Node.Float_lit) { return float_literal(lit, expect, true) }
     }
-    -1
+    return -1
 }
 
 /// `x = e`, `x += e`, …
@@ -1755,7 +1804,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
             let tt = type_only(target, -1, cx)
             let m = w_mark()
             coerce(check_expr(value, tt, cx), tt, value)
-            w_stack.resize(m)
+            w_resize_stack(m)
         }
         return error_value()
     }
@@ -1782,7 +1831,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
         apply_operator(word, t, value, node, cx, m2)
     }
     write_end(decl, t, m)
-    ty_void()
+    return ty_void()
 }
 
 /// The operator a compound assignment applies (`+=` adds).
@@ -1799,7 +1848,7 @@ fn compound_word(op: I32, t: I32) I32 {
     if op == Tok.ShrEq.i32() { return known_word(Known.Shr) }
     if op == Tok.Shr3Eq.i32() { return known_word(Known.Ushr) }
     // `and=`, `or=`, `xor=`: the word before `=`.
-    tok_word[t]
+    return tok_word[t]
 }
 
 //! = Operators
@@ -1825,17 +1874,17 @@ fn operator_word(t: I32) I32 {
     if k == Tok.LtEq.i32() { return known_word(Known.Le) }
     if k == Tok.Gt.i32() { return known_word(Known.Gt) }
     if k == Tok.GtEq.i32() { return known_word(Known.Ge) }
-    tok_word[t]
+    return tok_word[t]
 }
 
 fn is_comparison(word: I32) Bool {
-    word == known_word(Known.Eq) or word == known_word(Known.Ne) or word == known_word(Known.Lt)
+    return word == known_word(Known.Eq) or word == known_word(Known.Ne) or word == known_word(Known.Lt)
         or word == known_word(Known.Le) or word == known_word(Known.Gt) or word == known_word(Known.Ge)
 }
 
 /// Whether `word` is an arithmetic or bitwise operator (`+` … `>>>`).
 fn is_arith_word(word: I32) Bool {
-    word == known_word(Known.Add) or word == known_word(Known.Sub) or word == known_word(Known.Mul)
+    return word == known_word(Known.Add) or word == known_word(Known.Sub) or word == known_word(Known.Mul)
         or word == known_word(Known.Div) or word == known_word(Known.Rem) or word == known_word(Known.Band)
         or word == known_word(Known.Bor) or word == known_word(Known.Bxor) or word == known_word(Known.Shl)
         or word == known_word(Known.Shr) or word == known_word(Known.Ushr)
@@ -1845,7 +1894,7 @@ fn is_arith_word(word: I32) Bool {
 fn token_after(node: I32) I32 {
     let t = node_last[node]
     while (tok_kind[t] == Tok.Comment.i32()) { t += 1 }
-    t
+    return t
 }
 
 fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
@@ -1882,7 +1931,7 @@ fn check_binary(node: I32, expect: I32, cx: Cx) I32 {
     } else {
         t = check_expr(left, operand_expect, cx)
     }
-    apply_operator(word, t, right, node, cx, m)
+    return apply_operator(word, t, right, node, cx, m)
 }
 
 /// With the left operand on the stack (since `m`): check the right against
@@ -1935,7 +1984,7 @@ fn apply_operator(word: I32, t: I32, right: I32, at: I32, cx: Cx, m: I32) I32 {
     unwant()
     // Operands that do not meet have no result to check further.
     if any_mismatch_since(before) >= 0 { return error_since(m) }
-    finish_call(fi, m, cx)
+    return finish_call(fi, m, cx)
 }
 
 /// A number literal, or literals under parens, `-`, `~` and arithmetic or
@@ -1947,7 +1996,7 @@ fn is_number_literal(node: I32) Bool {
         return is_arith_word(operator_word(token_after(first_child(node)))) and is_number_literal(first_child(node)) and is_number_literal(last_child(node))
     }
     let c = first_child(node)
-    is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit))
+    return is_kind(node, Node.Literal) and (is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit))
 }
 
 /// Above 0 while code is checked only for its type (its diagnostics dropped).
@@ -1965,12 +2014,13 @@ vec spec_fi: I32
 fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     if spec_ty.len() <= node {
         let n = node_first.len()
-        while (spec_ty.len() < n) {
-            spec_ty.push(0)
-            spec_expect.push(0)
-            spec_inst.push(0)
-            spec_fi.push(0)
-        }
+        let first = spec_ty.len()
+        spec_ty.resize(n)
+        spec_expect.resize(n)
+        spec_inst.resize(n)
+        spec_fi.resize(n)
+        // An empty type slot makes the other columns irrelevant.
+        for (first ..< n) |i| { spec_ty[i] = 0 }
     }
     if spec_ty[node] > 0 and spec_expect[node] == expect and spec_inst[node] == cx.inst and spec_fi[node] == cx.fi { return spec_ty[node] - 1 }
     let m = w_mark()
@@ -1978,13 +2028,13 @@ fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     speculating[0] += 1
     let t = check_expr(node, expect, cx)
     speculating[0] -= 1
-    w_stack.resize(m)
+    w_resize_stack(m)
     diag_truncate(diags)
     spec_ty[node] = t + 1
     spec_expect[node] = expect
     spec_inst[node] = cx.inst
     spec_fi[node] = cx.fi
-    t
+    return t
 }
 
 /// `a and b` is `if a { b } else { false }`; `a or b`, `if a { true } else { b }`.
@@ -2012,7 +2062,7 @@ fn check_logical(node: I32, word: I32, cx: Cx) I32 {
     unwant()
     // Its condition and values are Bools (optimize.utu folds it).
     w_node(Op.If, vt_i32, new_label(), 3, m)
-    bool_t
+    return bool_t
 }
 
 fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
@@ -2041,7 +2091,7 @@ fn check_unary(node: I32, expect: I32, cx: Cx) I32 {
         report2(Diag.UnknownOperator, node, word, t, -1)
         return error_since(m)
     }
-    finish_call(fn_instance(decl, ty_inst(t)), m, cx)
+    return finish_call(fn_instance(decl, ty_inst(t)), m, cx)
 }
 
 //! = Calls
@@ -2061,7 +2111,7 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx) }
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx) }
     if is_kind(callee, Node.Type_ident) { return call_scalar_kind(node, callee, args, m, cx) }
-    call_value(callee, args, m, node, cx)
+    return call_value(callee, args, m, node, cx)
 }
 
 /// `Tag.from_i32(i)` (`name` the from_i32, `owner` the Tag), or another
@@ -2074,7 +2124,7 @@ fn old_scalar_static(decl: I32, name: I32, owner: I32, node: I32) Bool {
     report2(Diag.UnknownMethod, node, word_of(name), named(decl, -1), -1)
     let made = node_text(owner)
     diag_fix(tok_start[node_first[owner]], tok_end[node_last[name] - 1], made, "Use " + made + "(…)")
-    true
+    return true
 }
 
 /// `Point(1.0, 2.0)` for a struct: a note of its literal, and a fix when
@@ -2116,14 +2166,14 @@ fn suggest_struct_init(node: I32, decl: I32, args: I32) Void {
 fn fn_params(decl: I32) I32 {
     let c = first_child(decl_node[decl])
     while (c >= 0 and not is_kind(c, Node.Param_list)) { c = next_sibling(c) }
-    c
+    return c
 }
 
 /// How many `$T` function `decl` binds: 0 for one that is not a template.
 fn binder_count(decl: I32) I32 {
     if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return 0 }
     let params = fn_params(decl)
-    if params < 0 { 0 } else { binders_in(params, decl, 0) }
+    return if params < 0 { 0 } else { binders_in(params, decl, 0) }
 }
 
 fn binders_in(node: I32, decl: I32, n: I32) I32 {
@@ -2137,7 +2187,7 @@ fn binders_in(node: I32, decl: I32, n: I32) I32 {
         most = binders_in(c, decl, most)
         c = next_sibling(c)
     }
-    most
+    return most
 }
 
 /// The index of the type parameter of template `decl` that type node `tn`
@@ -2147,7 +2197,7 @@ fn var_of(tn: I32, decl: I32) I32 {
     if is_kind(n, Node.Type_binder) or is_kind(n, Node.Ref_type) { n = first_child(n) }
     if not is_kind(n, Node.Type_ident) { return -1 }
     let v = node_decl[n]
-    if decl_is(v, Decl.ModuleParam) and decl_owner[v] == decl { decl_a[v] } else { -1 }
+    return if decl_is(v, Decl.ModuleParam) and decl_owner[v] == decl { decl_a[v] } else { -1 }
 }
 
 /// Whether type node `tn` names a type parameter of template `decl`.
@@ -2158,7 +2208,7 @@ fn mentions_var(tn: I32, decl: I32) Bool {
         if mentions_var(c, decl) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// Bind the type parameters of template `decl` that type node `tn` names to
@@ -2213,7 +2263,7 @@ fn wider_literal(a: I32, b: I32) I32 {
         if order[i] == a { ra = i }
         if order[i] == b { rb = i }
     }
-    if ra >= rb { a } else { b }
+    return if ra >= rb { a } else { b }
 }
 
 /// Template `decl` named as a value: its instance for the `fun(…)` expected
@@ -2239,7 +2289,7 @@ fn binder_fn_value(decl: I32, node: I32, expect: I32) I32 {
         if complete { return fn_value_in(decl, instance(decl, types)) }
     }
     report(Diag.TemplateValue, node, decl_name[decl])
-    error_value()
+    return error_value()
 }
 
 /// A call of template `decl`: its instance for the arguments' types, called.
@@ -2264,7 +2314,7 @@ fn call_template(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let list = vl_begin()
     for (0 ..< n) |i| { vl_add(if bound[i] >= 0 { bound[i] } else if literal[i] >= 0 { literal[i] } else { ty_error() }) }
     let inst = instance(decl, vl_end(list))
-    call_with(fn_instance(decl, inst), args, 0, m, at, cx)
+    return call_with(fn_instance(decl, inst), args, 0, m, at, cx)
 }
 
 /// `F64(x)`, `I64(n)`: a number as number type `t`. A literal is read as
@@ -2284,7 +2334,7 @@ fn numeric_convert(t: I32, args: I32, at: I32, m: I32, cx: Cx) I32 {
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
         return ty_error()
     }
-    call_with(fn_instance(decl, ty_inst(rt)), -1, 1, m, at, cx)
+    return call_with(fn_instance(decl, ty_inst(rt)), -1, 1, m, at, cx)
 }
 
 /// `Tag(i)`, `Meters(x)`: an integer enum or a distinct type, made from its
@@ -2299,7 +2349,7 @@ fn call_scalar_kind(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
         if decl_is(decl, Decl.Struct) { suggest_struct_init(node, decl, args) }
         return finish_error(args, m, cx)
     }
-    scalar_convert(decl, inst, args, node, cx)
+    return scalar_convert(decl, inst, args, node, cx)
 }
 
 /// `f(…)`: a function, a host function, or a `fun` or `cl` value, by name.
@@ -2330,7 +2380,7 @@ fn call_name(node: I32, callee: I32, args: I32, m: I32, cx: Cx) I32 {
         return finish_error(args, m, cx)
     }
     if binder_count(decl) > 0 { return call_template(decl, args, m, node, cx) }
-    call_with(fn_instance(decl, instance_for(module_of(decl), cx.inst)), args, 0, m, node, cx)
+    return call_with(fn_instance(decl, instance_for(module_of(decl), cx.inst)), args, 0, m, node, cx)
 }
 
 /// `x.f(…)`: a function of a module, alias, or module's type (`m.T.f`), a
@@ -2409,7 +2459,7 @@ fn call_field(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I3
             return check_foreign_method(node, js, word_of(name), args, m, expect, cx)
         }
     }
-    call_method(node, callee, args, m, expect, cx)
+    return call_method(node, callee, args, m, expect, cx)
 }
 
 /// `x.f(…)`, a method: the receiver is its first argument.
@@ -2459,7 +2509,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
             let ft = field_type(field, ty_inst(rt))
             if ty_is(ft, Ty.Closure) or ty_is(ft, Ty.Fun) {
                 // (The receiver is read again, as the callee's base.)
-                while (w_stack.len() > m) { w_pop() }
+                while (w_mark() > m) { w_pop() }
                 return call_value(callee, args, m, node, cx)
             }
         }
@@ -2516,7 +2566,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
         return finish_error(args, m, cx)
     }
     coerce(rt, vl_item(fi_params[fi], 0), first_child(callee))
-    call_with(fi, args, 1, m, node, cx)
+    return call_with(fi, args, 1, m, node, cx)
 }
 
 /// `x.m()`, where x's type has `fn P[X].m` (`decl`) and other protocols'
@@ -2535,7 +2585,7 @@ fn known_as(decl: I32, rt: I32, recv: I32, cx: Cx) I32 {
         }
         k += 2
     }
-    chosen
+    return chosen
 }
 
 /// `T.f(…)`: a static function of a type, a host root's, or a scalar's.
@@ -2580,7 +2630,7 @@ fn call_type_member(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: 
             return call_with(fn_instance_on(decl, inst, rt), args, 0, m, node, cx)
         }
     }
-    call_with(fn_instance(decl, inst), args, 0, m, node, cx)
+    return call_with(fn_instance(decl, inst), args, 0, m, node, cx)
 }
 
 /// `Ord.cmp(a, b)`, cmp a method of protocol `owner_decl`: as `a.cmp(b)`, a's
@@ -2597,7 +2647,7 @@ fn call_proto_static(owner_decl: I32, callee: I32, args: I32, m: I32, node: I32,
         report2(Diag.UnknownMethod, node, word, rt, -1)
         return finish_error(args, m, cx)
     }
-    call_with(fn_instance(f, ty_inst(rt)), args, 0, m, node, cx)
+    return call_with(fn_instance(f, ty_inst(rt)), args, 0, m, node, cx)
 }
 
 /// The module instance `T.x` names x in: M's (`M.x`, `alias.x`, `M[A].x`),
@@ -2613,7 +2663,7 @@ fn member_instance(node: I32, cx: Cx) I32 {
         }
     }
     let sp = static_type_path(base, cx)
-    ty_inst(if sp >= 0 { sp } else { type_path(base, cx.inst) })
+    return ty_inst(if sp >= 0 { sp } else { type_path(base, cx.inst) })
 }
 
 /// `module`'s instance for type arguments `args` (`M[A]` at `at`); -1 reported.
@@ -2624,7 +2674,7 @@ fn instance_of_args(module: I32, args: I32, at: I32, cx: Cx) I32 {
         return -1
     }
     let inst = instance(module, targs)
-    if too_deep(inst, at) { -1 } else { inst }
+    return if too_deep(inst, at) { -1 } else { inst }
 }
 
 /// The instance of `module` that `M.f` or `alias.f` (`alias` the alias, or
@@ -2637,7 +2687,7 @@ fn module_instance(module: I32, alias: I32, at: I32, cx: Cx) I32 {
         report2(Diag.InvalidModuleArity, first_child(at), decl_name[module], module_arity(module), 0)
         return -1
     }
-    inst
+    return inst
 }
 
 /// A call of any other expression: a `fun` or `cl` value.
@@ -2648,7 +2698,7 @@ fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     if foreign_callable(t) { return check_foreign_value_call(at, callee, t, args, m, -1, cx) }
     if ty_is(t, Ty.Error) { return follow_on(callee, args, m, at, cx) }
     report2(Diag.NotCallable, at, -1, t, -1)
-    finish_error(args, m, cx)
+    return finish_error(args, m, cx)
 }
 
 /// A callee of type Error: checked again, so its mistake is reported (a
@@ -2656,9 +2706,9 @@ fn call_value(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
 fn follow_on(callee: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     let mc = w_mark()
     discard(check_expr(callee, -1, cx))
-    w_stack.resize(mc)
+    w_resize_stack(mc)
     if not any_reported() { return unsupported(at) }
-    finish_error(args, m, cx)
+    return finish_error(args, m, cx)
 }
 
 /// Whether any mistake is reported yet.
@@ -2697,7 +2747,7 @@ fn call_with(fi: I32, args: I32, first_param: I32, m: I32, at: I32, cx: Cx) I32 
     }
     // (An argument's own calls moved it.)
     call_site[0] = at
-    finish_call(fi, m, cx)
+    return finish_call(fi, m, cx)
 }
 
 /// A call of an `@es` function: its import, directly.
@@ -2712,7 +2762,7 @@ fn call_es(decl: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
         return error_since(m)
     }
     w_node(Op.Call, repr(ty_b[t]), decl_es[decl], 0, m)
-    ty_b[t]
+    return ty_b[t]
 }
 
 /// A call of a `fun` value: the arguments, then the value, then `call_ref`.
@@ -2722,7 +2772,7 @@ fn call_ref(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
     }
     check_expr(callee, t, cx)
     w_node(Op.CallRef, repr(ty_b[t]), fun_heap(t), 0, m)
-    ty_b[t]
+    return ty_b[t]
 }
 
 /// Check the arguments against parameter types (from `first`); false after
@@ -2744,7 +2794,7 @@ fn check_args(params: I32, args: I32, first: I32, at: I32, cx: Cx) Bool {
         report2(Diag.WrongArity, at, -1, vl_len[params] - first, i - first)
         return false
     }
-    true
+    return true
 }
 
 fn finish_error(args: I32, m: I32, cx: Cx) I32 {
@@ -2753,7 +2803,7 @@ fn finish_error(args: I32, m: I32, cx: Cx) I32 {
         drop_value(check_expr(a, if is_kind(a, Node.Closure_expr) or is_kind(a, Node.Implicit_struct_init) { ty_error() } else { -1 }, cx))
         a = next_sibling(a)
     }
-    error_since(m)
+    return error_since(m)
 }
 
 /// The wasm function of a function instance. An intrinsic has none until
@@ -2778,7 +2828,7 @@ fn function_of(fi: I32) I32 {
     record_locals(f, vl_len[params])
     cur_locals.clear()
     for (0 ..< saved.len()) |i| { cur_locals.push(saved[i]) }
-    f
+    return f
 }
 
 //! = Lazy modules
@@ -2847,7 +2897,7 @@ fn crosses_chunk(t: I32) Bool => in_words("I32 U32 I64 U64 F32 F64 Bool Str", ty
 /// Whether the program imports host declarations (std:JS, npm:…).
 fn has_foreign() Bool {
     for (0 ..< import_target.len()) |i| { if import_target[i] == -2 { return true } }
-    false
+    return false
 }
 
 /// The call being checked, for intrinsics' diagnostics.
@@ -2867,7 +2917,7 @@ fn finish_call(fi: I32, m: I32, cx: Cx) I32 {
     if stubbed { check_lazy_signature(fi, if call_site.len() > 0 { call_site[0] } else { -1 }) }
     let target = if stubbed { lazy_stub_func(fi, lazy) } else { fi_func[fi] }
     w_node(Op.Call, repr(result), target, 0, m)
-    result
+    return result
 }
 
 /// By function instance: its lazy stub, or -1.
@@ -2895,7 +2945,7 @@ fn lazy_stub_func(fi: I32, lazy: I32) I32 {
     record_locals(f, vl_len[params])
     cur_locals.clear()
     for (0 ..< saved.len()) |i| { cur_locals.push(saved[i]) }
-    f
+    return f
 }
 
 //! = Intrinsics
@@ -2929,7 +2979,7 @@ fn expand(fi: I32, m: I32) I32 {
     let n = vl_len[decls]
     let args = Array[I32].new(n, 0)
     for (0 ..< n) |i| { args[i] = w_stack[m + i] }
-    w_stack.resize(m)
+    w_resize_stack(m)
     let locals = Array[I32].new(n, -1)
     if not direct {
         for (0 ..< n) |i| {
@@ -2947,7 +2997,7 @@ fn expand(fi: I32, m: I32) I32 {
     ir_failed_shape[0] = 0
     let ok = translate(x, decls, args, locals, direct, fi)
     if not ok {
-        w_stack.resize(m)
+        w_resize_stack(m)
         let bad = ir_failed[0]
         let body = first_child(fn_body(fi_decl[fi]))
         if bad < 0 or reported_within(body) { return unsupported(decl_node[fi_decl[fi]]) }
@@ -2965,16 +3015,16 @@ fn expand(fi: I32, m: I32) I32 {
         report2(Diag.IrUnknown, body, if ident and why == 1 { if named >= 0 { attr_word(named) } else { -1 } } else { x_tag[bad] }, why, -1)
         return error_value()
     }
-    let got = if w_stack.len() > m { ir_vt(x, decls, fi, w_stack[w_stack.len() - 1]) } else { vt_none }
+    let got = if w_mark() > m { ir_vt(x, decls, fi, w_stack[w_mark() - 1]) } else { vt_none }
     let bool_t = prelude(Prelude.Bool)
     if not ir_fits(result_vt, got) or (fi_result[fi] == bool_t and got == vt_i32 and not ir_bool(x, decls, fi)) {
-        w_stack.resize(m)
+        w_resize_stack(m)
         let body = first_child(fn_body(fi_decl[fi]))
         if not reported_within(body) { report3(Diag.IrType, body, -1, fi_result[fi], got, 1) }
         return error_value()
     }
     if pre > 0 { w_node(Op.Seq, result_vt, 0, 0, m) }
-    fi_result[fi]
+    return fi_result[fi]
 }
 
 fn vt_scalar(vt: I32) Bool => vt >= vt_i32 and vt <= vt_v128
@@ -2986,7 +3036,7 @@ fn ir_fits(want: I32, got: I32) Bool {
     let b = vt_class(got)
     if a < 0 or b < 0 { return true }
     if a == 6 and b == 6 { return ref_fits(want, got) }
-    a == b
+    return a == b
 }
 
 /// Whether a reference of value type `got` is a `want`: the same, or its
@@ -3008,13 +3058,13 @@ fn ref_fits(want: I32, got: I32) Bool {
         if h == vt_heap(want) { return true }
         h = ht_super[h]
     }
-    false
+    return false
 }
 
 /// Nothing, each scalar, or a reference; -1 another (unreachable, a tuple).
 fn vt_class(vt: I32) I32 {
     if vt == vt_none or vt_scalar(vt) { return vt }
-    if vt_is_ref(vt) { 6 } else { -1 }
+    return if vt_is_ref(vt) { 6 } else { -1 }
 }
 
 /// Check each `@ir` body of the program's own once, its parameters for
@@ -3036,7 +3086,7 @@ fn check_own_ir() Void {
             enter_instance(fi_inst[fi], -1)
             expand(fi, m)
             leave_instance()
-            w_stack.resize(m)
+            w_resize_stack(m)
         }
     }
     cur_locals.clear()
@@ -3065,7 +3115,7 @@ fn check_ir_types() Void {
 /// parameter's by its type, not its argument's at this call.
 fn ir_vt(x: I32, decls: I32, fi: I32, node: I32) I32 {
     if x_tag[x] == known_word(Known.IrIdent) { return repr(vl_item(fi_params[fi], param_index(x, decls))) }
-    w_type[node]
+    return w_type[node]
 }
 
 /// Whether an `@ir` element gives a Bool: a comparison, a Bool parameter
@@ -3094,7 +3144,7 @@ fn ir_bool(x: I32, decls: I32, fi: I32) Bool {
         if not ir_bool(c, decls, fi) { return false }
         c = x_next[c]
     }
-    true
+    return true
 }
 
 /// An `@ir` operand of the wrong value type: `want`, given `got`.
@@ -3103,7 +3153,7 @@ fn ir_mistyped(x: I32, want: I32, got: I32) Bool {
     ir_failed_shape[0] = 3
     ir_fault[0] = want
     ir_fault[1] = got
-    false
+    return false
 }
 
 /// The value type a plain instruction's operands take.
@@ -3121,7 +3171,7 @@ fn opcode_operand(op: I32) I32 {
     if op == 182 or op == 189 or op == 170 or op == 171 or op == 176 or op == 177 { return vt_f64 }
     if op <= 191 { return vt_f32 }
     if op >= 64512 and op <= 64519 { return if (op - 64512) % 4 < 2 { vt_f32 } else { vt_f64 } }
-    vt_v128
+    return vt_v128
 }
 
 /// How many operands a plain instruction takes.
@@ -3130,7 +3180,7 @@ fn opcode_arity(op: I32) I32 {
     if (op >= 139 and op <= 145) or (op >= 153 and op <= 159) or (op >= 167 and op <= 191) { return 1 }
     if (op >= 64512 and op <= 64519) or op == 64845 or op == 64851 { return 1 }
     if op == 64850 { return 3 }
-    2
+    return 2
 }
 
 /// By function instance, for @expand: its parameter declarations (-1: not
@@ -3142,7 +3192,7 @@ vec expand_direct: U8
 fn ident_uses(x: I32, decls: I32) I32 {
     let m = vl_begin()
     collect_uses(x, decls)
-    vl_end(m)
+    return vl_end(m)
 }
 
 fn collect_uses(x: I32, decls: I32) Void {
@@ -3162,7 +3212,7 @@ fn param_index(x: I32, decls: I32) I32 {
     if a < 0 { return -1 }
     let word = attr_word(a)
     for (0 ..< vl_len[decls]) |i| { if decl_name[vl_item(decls, i)] == word { return i } }
-    -1
+    return -1
 }
 
 /// The `@ir` element @translate did not know, or -1.
@@ -3181,7 +3231,7 @@ vec user_ir_fi: I32
 fn ir_malformed(x: I32) Bool {
     ir_failed[0] = x
     ir_failed_shape[0] = 1
-    false
+    return false
 }
 
 /// The engine found the module invalid (`message`, a word): reported at
@@ -3263,14 +3313,14 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     let want = opcode_operand(opcode)
     while (c >= 0) {
         if not translate(c, decls, args, locals, direct, fi) { return false }
-        let got = ir_vt(c, decls, fi, w_stack[w_stack.len() - 1])
+        let got = ir_vt(c, decls, fi, w_stack[w_mark() - 1])
         if got != want and got != vt_unreachable { return ir_mistyped(x, want, got) }
         n += 1
         c = x_next[c]
     }
     if n != opcode_arity(opcode) { return ir_malformed(x) }
     w_node(Op.Plain, opcode_result(opcode), opcode, 0, m)
-    true
+    return true
 }
 
 /// Whether an `@ir` literal's digits `s ..< e` (after its minus, when
@@ -3295,7 +3345,7 @@ fn ir_lit_fits(s: I32, e: I32, neg: Bool, t: I32) Bool {
     let top = one << (bits - 1).u64()
     if neg and not signed { return v == 0 }
     if signed { return v <= if neg { top } else { top - one } }
-    v <= top - one + top
+    return v <= top - one + top
 }
 
 /// The value type a plain instruction leaves.
@@ -3315,7 +3365,7 @@ fn opcode_result(op: I32) I32 {
     if op >= 64512 and op <= 64515 { return vt_i32 }
     if op >= 64516 and op <= 64519 { return vt_i64 }
     if op == 64851 { return vt_i32 }
-    vt_v128
+    return vt_v128
 }
 
 /// `m.T` or `M.T` (naming a type of module or alias `m`): that type, in
@@ -3339,13 +3389,13 @@ fn static_type_path(node: I32, cx: Cx) I32 {
     }
     let t = member(module, word_of(last_child(node)), Space.Member)
     if t < 0 or not is_type_decl(t) { return -1 }
-    named(t, inst)
+    return named(t, inst)
 }
 
 /// `m.x`: `m` names a module.
 fn is_module_path(node: I32) Bool {
     let base = first_child(node)
-    is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module)
+    return is_kind(base, Node.Identifier) and decl_is(node_decl[base], Decl.Module)
 }
 
 /// A name of a module or type, used as a value: reported (a host module
@@ -3355,7 +3405,7 @@ fn not_value(at: I32, decl: I32) I32 {
     // (An alias of a module that is not there.)
     if decl_is(decl, Decl.Alias) and not decl_is(decl_a[decl], Decl.Module) and any_reported() { return error_value() }
     if not reported_within(at) { report2(Diag.NotValue, at, decl_name[decl], if decl_is(decl, Decl.Module) or decl_is(decl, Decl.Alias) or decl_is(decl, Decl.Foreign) { 1 } else { 0 }, -1) }
-    error_value()
+    return error_value()
 }
 
 /// `E.V` of an enum whose variants are structs: the variant `V {}`, when it
@@ -3366,14 +3416,14 @@ fn fieldless_variant(node: I32, v: I32, inst: I32, cx: Cx) I32 {
         report2(Diag.VariantNotValue, node, word_of(last_child(node)), decl_owner[v], -1)
         return error_value()
     }
-    build_struct(named(v, inst), v, -1, node, cx)
+    return build_struct(named(v, inst), v, -1, node, cx)
 }
 
 /// The enum `m.E` or `M.E` (a path before `.V`) names, or -1.
 fn path_enum(base: I32) I32 {
     if not is_kind(base, Node.Field_expr) and not is_kind(base, Node.Type_member_expr) { return -1 }
     let e = node_decl[last_child(base)]
-    if decl_is(e, Decl.Enum) or decl_is(e, Decl.IntEnum) { e } else { -1 }
+    return if decl_is(e, Decl.Enum) or decl_is(e, Decl.IntEnum) { e } else { -1 }
 }
 
 /// `x.f` (not called): a module's global, or a field.
@@ -3421,7 +3471,7 @@ fn check_field(node: I32, expect: I32, cx: Cx) I32 {
             return member_fn_value(node, f, alias_instance(node_decl[base]))
         }
     }
-    check_field_get(node, expect, cx)
+    return check_field_get(node, expect, cx)
 }
 
 /// `m.f` or `T.f` named, not called: a `fun`. A generator is not a value.
@@ -3434,7 +3484,7 @@ fn member_fn_value(node: I32, decl: I32, inst: I32) I32 {
         report(Diag.GeneratorCall, node, word_of(last_child(node)))
         return error_value()
     }
-    fn_value_in(decl, inst)
+    return fn_value_in(decl, inst)
 }
 
 /// `M[A].f(…)`: a function of the instance `M[A]` (a static method of its type).
@@ -3460,7 +3510,7 @@ fn check_promoted_call(node: I32, expect: I32, cx: Cx) I32 {
     let inst = instance_of_args(module_of(decl), args_types, node, cx)
     if inst < 0 { return error_value() }
     let m = w_mark()
-    call_with(fn_instance(decl, inst), args, 0, m, node, cx)
+    return call_with(fn_instance(decl, inst), args, 0, m, node, cx)
 }
 
 /// `M[A]` (not called): M's `fn &`, a `fun`.
@@ -3479,7 +3529,7 @@ fn check_promoted_value(node: I32, cx: Cx) I32 {
     if alias_given_args(name_at, args_types) { return error_value() }
     let inst = instance_of_args(module_of(decl), args_types, node, cx)
     if inst < 0 { return error_value() }
-    member_fn_value(node, decl, inst)
+    return member_fn_value(node, decl, inst)
 }
 
 /// `T.x` (not called): a module's global, or an integer enum's variant.
@@ -3515,7 +3565,7 @@ fn check_type_member(node: I32, expect: I32, cx: Cx) I32 {
         return error_value()
     }
     if decl >= 0 and is_type_decl(decl) { return not_value(node, decl) }
-    unsupported(node)
+    return unsupported(node)
 }
 
 //! = Control
@@ -3548,7 +3598,7 @@ fn check_labeled(node: I32, expect: I32, cx: Cx) I32 {
     coerce(check_block(block, t, cx), t, block)
     close_label()
     w_node(Op.Block, repr(t), label, 0, m)
-    t
+    return t
 }
 
 /// The type of a labeled block nothing is expected of: its last statement's,
@@ -3559,7 +3609,7 @@ fn labeled_type(node: I32, cx: Cx) I32 {
     let seen = label_seen[label_seen.len() - 1]
     close_label()
     if not ty_is(tail, Ty.Never) { return tail }
-    if seen >= 0 { seen } else { ty_void() }
+    return if seen >= 0 { seen } else { ty_void() }
 }
 
 fn open_label(node: I32, label: I32, t: I32) Void {
@@ -3588,7 +3638,7 @@ fn label_target(brk: I32) I32 {
         if is_kind(p, Node.Block_expr) and is_kind(first_child(p), Node.Identifier) and word_of(first_child(p)) == word { return p }
         p = parent_of(p)
     }
-    -1
+    return -1
 }
 
 /// Whether a labeled block is around `brk` (in its function or closure).
@@ -3598,7 +3648,7 @@ fn labeled_around(brk: I32) Bool {
         if is_kind(p, Node.Block_expr) and is_kind(first_child(p), Node.Identifier) { return true }
         p = parent_of(p)
     }
-    false
+    return false
 }
 
 /// The block a `break label` in a closure means, outside the closure, or -1.
@@ -3611,7 +3661,7 @@ fn label_past_closure(brk: I32) I32 {
         if crossed and is_kind(p, Node.Block_expr) and is_kind(first_child(p), Node.Identifier) and word_of(first_child(p)) == word { return p }
         p = parent_of(p)
     }
-    -1
+    return -1
 }
 
 /// `break label` and `break label v`: the value (checked against the
@@ -3653,7 +3703,7 @@ fn check_break_label(node: I32, cx: Cx) I32 {
     }
     if defer_node.len() > label_defers[k] { defers_after_value(if carried { repr(t) } else { vt_none }, m, label_defers[k], cx) }
     w_node(Op.Br, vt_unreachable, label_wasm[k], 0, m)
-    ty_never()
+    return ty_never()
 }
 
 fn check_if(node: I32, expected: I32, cx: Cx) I32 {
@@ -3695,7 +3745,7 @@ fn check_if(node: I32, expected: I32, cx: Cx) I32 {
     if expect < 0 and t >= 0 { unwant() }
     // Its condition is a Bool, and its values when t is (optimize.utu folds it).
     w_node(Op.If, repr(t), label, if t == bool_t { 3 } else { 1 }, m)
-    t
+    return t
 }
 
 /// The type of a two-way choice (an `if`'s value, `promote`, `try`), from
@@ -3703,9 +3753,11 @@ fn check_if(node: I32, expected: I32, cx: Cx) I32 {
 /// expected, else t1; or -1 when the branch does not complete, so the
 /// other decides.
 fn first_branch(t1: I32, expect: I32, at: I32) I32 {
+    // Discarding a value must not turn a returning branch into fallthrough.
+    if ty_is(t1, Ty.Never) and expect >= 0 and ty_is(expect, Ty.Void) { return -1 }
     let t = if expect >= 0 { expect } else if ty_is(t1, Ty.Never) { -1 } else { t1 }
     if t >= 0 { coerce(t1, t, at) }
-    t
+    return t
 }
 
 /// The choice's type, its other branch (at `at`, of type `t2`) checked
@@ -3713,7 +3765,7 @@ fn first_branch(t1: I32, expect: I32, at: I32) I32 {
 fn other_branch(t: I32, t2: I32, at: I32) I32 {
     if t < 0 { return t2 }
     coerce(t2, t, at)
-    t
+    return t
 }
 
 /// `while (c) { … }`:
@@ -3742,7 +3794,7 @@ fn check_while(node: I32, cx: Cx) I32 {
     w_leaf(Op.Br, vt_unreachable, top, 0)
     w_node(Op.Loop, vt_none, top, 0, ml)
     w_node(Op.Block, vt_none, brk, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
@@ -3762,7 +3814,7 @@ fn check_break(node: I32, is_break: Bool, cx: Cx) I32 {
     run_defers(if is_break { loop_break_defers[loop_break_defers.len() - 1] } else { loop_defers[loop_defers.len() - 1] }, cx)
     w_leaf(Op.Br, vt_unreachable, label, 0)
     w_node(Op.Seq, vt_unreachable, 0, 0, m)
-    ty_never()
+    return ty_never()
 }
 
 /// `return v` where the function (or closure, or main) is written `void`: a
@@ -3810,7 +3862,7 @@ fn check_return(node: I32, cx: Cx) I32 {
         else { defers_after_value(vt_none, m, function_defers[0], cx) }
     }
     w_node(Op.Return, vt_unreachable, 0, 0, m)
-    ty_never()
+    return ty_never()
 }
 
 /// `assert c` traps unless c.
@@ -3825,7 +3877,7 @@ fn check_assert(node: I32, cx: Cx) I32 {
     w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
     w_node(Op.Seq, vt_none, 0, 0, mt)
     w_node(Op.If, vt_none, new_label(), 0, m)
-    ty_void()
+    return ty_void()
 }
 
 //! = Entry points
@@ -4076,7 +4128,7 @@ fn compile(target: Target) I32 {
     drop_located_repeats()
     if diag_kind.len() > 0 { return -1 }
     if target == Target.Analysis { return 0 }
-    encode_module()
+    return encode_module()
 }
 
 /// A test or bench: every build checks it; a test build exports the entry
@@ -4123,7 +4175,7 @@ fn has_prefix(word: I32, prefix: Str) Bool {
     if src.interned_size(word) < prefix.len() { return false }
     let start = src.interned_start(word)
     for (0 ..< prefix.len()) |i| { if src[start + i] != prefix.get(i) { return false } }
-    true
+    return true
 }
 
 /// Enqueue a function declaration (or those of an `lib`).
@@ -4228,7 +4280,7 @@ fn in_target(node: I32, target: Target) Bool {
         // Tests and benches: in every build but a @comptime one.
         if kind == Node.Test_decl.i32() or kind == Node.Bench_decl.i32() { return target != Target.Comptime }
     }
-    true
+    return true
 }
 
 /// A bench build's benches, in the order of their exports (`__bench_0`, …).
@@ -4408,7 +4460,7 @@ fn run_reader(t: I32, word: I32, name: Str) I32 {
     w_node(Op.Seq, repr(result), 0, 0, m)
     func_body[f] = w_pop()
     record_locals(f, cur_params[0])
-    result
+    return result
 }
 
 /// `fn T.f` of an own file whose receiver T names no type, or -1.
@@ -4420,7 +4472,7 @@ fn module_fn_of(t: I32, word: I32) I32 {
     let module = decl_owner[d]
     if not decl_is(module, Decl.Module) or decl_a[module] != d { return -1 }
     let f = member(module, word, Space.Member)
-    if decl_is(f, Decl.Fn) { f } else { -1 }
+    return if decl_is(f, Decl.Fn) { f } else { -1 }
 }
 
 fn method_of_unknown(receiver: I32, name: I32) I32 {
@@ -4431,5 +4483,5 @@ fn method_of_unknown(receiver: I32, name: I32) I32 {
                 and is_own_file(file_of_token(node_first[fn_name])) { return d }
         }
     }
-    -1
+    return -1
 }

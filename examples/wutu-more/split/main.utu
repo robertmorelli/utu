@@ -17,22 +17,22 @@ struct Balance:
     | cents: I32
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2)
+    return "$" + (cents.f64() / 100.0).toFixed(2)
 }
 
 fn total(state: Trip) I32 {
-    state.expenses map |expense| { expense.cents } sum
+    return state.expenses map |expense| { expense.cents } sum
 }
 
 fn paid(state: Trip, person: Str) I32 {
-    state.expenses filter |expense| { expense.payer == person } map |expense| { expense.cents } sum
+    return state.expenses filter |expense| { expense.payer == person } map |expense| { expense.cents } sum
 }
 
 fn transfer(debtor: Balance, creditor: Balance) Browser.HTMLElement {
     let amount = if -debtor.cents < creditor.cents { -debtor.cents } else { creditor.cents }
     debtor.cents += amount
     creditor.cents -= amount
-    @wutu/\
+    return @wutu/\
     p.transfer {
         padding-block:1rem
         border-top:1px solid #52689b
@@ -50,7 +50,7 @@ fn settlement(state: Trip) Browser.HTMLElement {
         Balance { name: "Ben", cents: paid(state, "Ben") - share - if remainder > 1 { 1 } else { 0 } },
         Balance { name: "Cleo", cents: paid(state, "Cleo") - share }
     ]
-    @wutu/\
+    return @wutu/\
     section.panel.stack {
         background:var(--ink)
         color:#fff

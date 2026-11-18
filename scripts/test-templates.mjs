@@ -38,17 +38,17 @@ try {
   const write = async (name, text) => { const file = path.join(dir, name); await fs.writeFile(file, text); return file; };
   const errors = await build(await write('errors.utu', `struct P:
     | x : I32
-fn f(p: P, q: ?Str) Str { \`p=\${p} q=\${q}\`; }
-lib { fn run() Str { f(P { x: 1 }, null); } }
+fn f(p: P, q: ?Str) Str { return \`p=\${p} q=\${q}\`; }
+lib { fn run() Str { return f(P { x: 1 }, null); } }
 `));
   assert.deepEqual(errors.errors, ['?Str may be null', 'No method P.str']);
 
   // A comment inside `${…}`, and every escape's text.
   const text = await build(await write('text.utu', `lib {
-    fn commented() Str { \`\${ // the value
+    fn commented() Str { return \`\${ // the value
         1 }\`; }
-    fn escapes() Str { \`\\$\\u0041\\"\`; }
-    fn quoted() Str { "\\'\\u0042\\/"; }
+    fn escapes() Str { return \`\\$\\u0041\\"\`; }
+    fn quoted() Str { return "\\'\\u0042\\/"; }
 }
 `));
   assert.ok(text.exports, String(text.errors));
@@ -58,8 +58,8 @@ lib { fn run() Str { f(P { x: 1 }, null); } }
 
   // A \u without its four digits, in a template or a string, is a mistake.
   const escapes = await build(await write('escapes.utu', `lib {
-    fn a() Str { \`\\u{41}\`; }
-    fn b() Str { "\\u41"; }
+    fn a() Str { return \`\\u{41}\`; }
+    fn b() Str { return "\\u41"; }
 }
 `));
   assert.deepEqual(escapes.errors, Array(2).fill('\\u needs four hex digits'));
@@ -74,7 +74,7 @@ lib { fn run() Str { f(P { x: 1 }, null); } }
     const wrong = await build(await write('str.utu', `struct P:
     | x : I32
 fn P.str |self| ${signature} { fatal; }
-lib { fn run() Str { \`\${P { x: 1 }}\`; } }
+lib { fn run() Str { return \`\${P { x: 1 }}\`; } }
 `));
     assert.deepEqual(wrong.errors, [message], signature);
   }

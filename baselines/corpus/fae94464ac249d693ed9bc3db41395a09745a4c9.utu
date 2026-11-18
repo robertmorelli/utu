@@ -5,7 +5,7 @@ mod Buffer[T] {
         | length: I32
 
     fn &.new() & {
-        &{ values: [], length: 0 };
+        return &{ values: [], length: 0 };
     }
 
     fn &.push |self| (value: T) Void {
@@ -25,6 +25,6 @@ mod Buffer[T] {
     }
 
     fn &.finish |self| () Array[T] {
-        self.values.slice(0, self.length);
+        return self.values.slice(0, self.length);
     }
 }

@@ -5,6 +5,6 @@ mem text: U8;
 lib {
     fn load(n: I32) I32 {
         text.copy_in(n);
-        text.len();
+        return text.len();
     }
 }

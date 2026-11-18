@@ -1,7 +1,7 @@
 // What: matches a Bool but only handles false.
 // Expect: Missing Bool case 'true' in match
 fn negate(b: Bool) Bool {
-    match b { false => true, };
+    return match b { false => true, };
 }
 
 main {

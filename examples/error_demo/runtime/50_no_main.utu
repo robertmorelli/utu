@@ -1,7 +1,7 @@
 // What: `utu run` on a library file that has no `main`
 // Expect: 50_no_main.utu has no `main { … }` to run; it exports area (try `utu build`)
-fn area(w: F64, h: F64) F64 { w * h; }
+fn area(w: F64, h: F64) F64 { return w * h; }
 
 lib {
-    fn rect_area(w: F64, h: F64) F64 { area(w, h); }
+    fn rect_area(w: F64, h: F64) F64 { return area(w, h); }
 }

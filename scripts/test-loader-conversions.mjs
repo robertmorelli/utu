@@ -6,7 +6,7 @@ import { loaderSource } from '../src/selfhost/loader.js';
 import { convertExports } from '../src/runtime/host-imports.js';
 
 const dir = await fs.mkdtemp('/tmp/utu-loader-conversions-');
-await fs.writeFile(`${dir}/module.utu`, 'lib { fn bench(n: I32) I32 { n; } }');
+await fs.writeFile(`${dir}/module.utu`, 'lib { fn bench(n: I32) I32 { return n; } }');
 const built = spawnSync(process.execPath, [new URL('../cli/utu.mjs', import.meta.url).pathname, 'build', `${dir}/module.utu`, '-O', 'small', '-o', dir], { encoding: 'utf8' });
 assert.equal(built.status, 0, built.stderr);
 const wasm = await fs.readFile(`${dir}/module.wasm`);

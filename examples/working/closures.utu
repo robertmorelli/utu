@@ -1,6 +1,6 @@
 main {
     let scale: I32 = 7
-    let multiply: cl(I32) I32 = cl(value) { value * scale }
+    let multiply: cl(I32) I32 = cl(value) { return value * scale }
     console.log(multiply(6))
 }
 using console from std:Console

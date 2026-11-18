@@ -3,7 +3,7 @@
         | value() I32
       struct Line[P]:
         | x : I32
-      fn accept(value: P) I32 { 1; }
+      fn accept(value: P) I32 { return 1; }
       main { console.log(accept(Line { x: 3 })); }
     
 using console from std:Console

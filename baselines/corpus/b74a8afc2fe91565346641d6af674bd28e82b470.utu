@@ -1,2 +1,2 @@
 struct Cell: | value : I32
-lib { fn bad() Cell { Cell { value: 1, extra: 2 }; } }
+lib { fn bad() Cell { return Cell { value: 1, extra: 2 }; } }

@@ -1,2 +1,2 @@
-fn f() I32 { 1; }
-lib { fn bad() I32 { f = 2; 0; } }
+fn f() I32 { return 1; }
+lib { fn bad() I32 { f = 2; return 0; } }

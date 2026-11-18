@@ -1,7 +1,7 @@
 // What: a mod called as a function
 // Expect: m is a module, not a value
 mod m {
-    fn f() I32 { 1; }
+    fn f() I32 { return 1; }
 }
 
 main {

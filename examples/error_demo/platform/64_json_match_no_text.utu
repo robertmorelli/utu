@@ -2,7 +2,7 @@
 // Expect: @json match needs the text to match: `match text { … }`
 
 fn status(text: Str) I32 {
-    @json/\ match {
+    return @json/\ match {
         { status: "ok" } => 1,
         ~> 0,
     }\/;

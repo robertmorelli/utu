@@ -8,7 +8,7 @@ any typed npm package ([details](typescript-abi.md)). Import those bindings once
 using Browser from std:Browser
 
 fn greeting(name: Str) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     section.greeting {
         display: grid
         gap: 1rem
@@ -50,8 +50,10 @@ p { "Hi"; = name }
 
 Every element head starts with a tag. `button.primary#save { ... }` creates a
 button; `.primary` alone never silently creates a div. Brace nesting replaces
-Emmet's linear `>`, `+`, and `^` operators. A DSL expression has one root element
-and returns that element, with its concrete browser type where available.
+Emmet's linear `>`, `+`, and `^` operators. A DSL expression with one root element returns that element, with its concrete
+browser type where available. Multiple siblings, text, a top-level `if` or `for`,
+and an empty body return a `Browser.DocumentFragment`. Fragments insert their
+children directly, without a wrapper element.
 
 | Form | Meaning |
 | --- | --- |
@@ -64,7 +66,9 @@ and returns that element, with its concrete browser type where available.
 | `.value = expression` | Typed DOM **property** assignment |
 | `"text"` | A text node |
 | `= expression` | Text or a node: a Str, a number or Bool (its `str()`), or a DOM node such as a component's result |
-| `property: = expression` | A CSS value computed at render |
+| `\| components` | Insert a component list, rendering its members via `.render()` |
+| `\|> expression` | Evaluate Utu code and insert its resulting components |
+| `property: { expression }` | A CSS value computed from a Utu block at render |
 | `if cond { … } else if cond { … } else { … }` | Conditional children |
 | `for items \|item, i\| key item.id { … }` | Repeated children (keys may be any scalar or Str) |
 | `on click { … }` | An event handler, with no event variable |
@@ -141,8 +145,9 @@ CSS property has those prefixes), set in its namespace.
 
 ## Components
 
-`wn` declares a function that returns `Browser.HTMLElement`. Its brace body is
-Wutu text, so `wn card(title: Str) { article { = title } }` is the same as
+`wn` declares a function whose brace body is Wutu text. A single HTML root
+returns `Browser.HTMLElement`, a single SVG root returns `Browser.SVGElement`,
+and a fragment body returns `Browser.DocumentFragment`. For example, `wn card(title: Str) { article { = title } }` is the same as
 `fn card(title: Str) Browser.HTMLElement => @wutu/\ article { = title } \/`.
 Use `wn` at top level, in a module, as a method, or as a protocol method.
 
@@ -154,7 +159,7 @@ its method, then put the struct in a hole:
 
 The protocol declares `render() Externref`, so using `Component` alone does not
 load `std:Browser` into every program. An implementation may return a host
-type such as `Browser.HTMLElement`; only a host result may satisfy this opaque
+type such as `Browser.HTMLElement` or `Browser.DocumentFragment`; only a host result may satisfy this opaque
 `Externref` result.
 
 ```utu
@@ -172,10 +177,13 @@ html {
 ```
 
 The hole calls `render()` for a Component value, including a value held as
-`Component` or iterated from an `Array[Component]`. It still shows text,
-numbers, Bools, and DOM elements directly. A Component is a struct and is
+`Component`. A hole also accepts an `Array[Component]`, arrays of concrete
+component structs, arrays of other renderable values, and nested arrays; their
+results appear in order. Text, numbers, Bools, and DOM nodes still work directly.
+Array entries use their index for identity. Use an explicit `for … key …` when
+items can reorder and their DOM state should follow the item. A Component is a struct and is
 rendered on every update; the scalar argument memoization below applies to
-functions returning elements.
+functions returning elements or fragments.
 
 Top-level `html { … }` is a program in place of `main` or `lib`. Its `head`
 children become `document.head`; its `body` children, attributes, and CSS
@@ -183,7 +191,49 @@ become `document.body`. It is reactive by default, so a top-level `let` holding
 mutable state can drive a page without an explicit `@reactive` directive.
 Use `@wutu/\ … \/` when a template is an expression inside ordinary code.
 
+A component can return siblings directly:
+
+```utu
+wn entry(label: Str, value: Str) {
+    dt { = label }
+    dd { = value }
+}
+
+wn entries(items: Array[Component]) {
+    dl { | items }
+}
+```
+
+Top-level conditions and loops may produce zero or more nodes. Reactive
+fragments retain comment boundaries even while empty, so later updates insert
+at the same position. Keyed nodes, listeners, focus, memoized results, and island
+cleanup work across all roots. Single-element templates keep their existing
+runtime path. A fragment is a DOM insertion value: after native `append`, its
+children live in the parent; Wutu retains the range for subsequent updates.
+
 ## Slots, lists, and conditions
+
+Use `|` to insert an existing component list, and `|>` to embed Utu code that
+produces components. `|>` is the two adjacent ASCII characters `|` and `>`;
+it is not a function-call operator. Its expression can be a block, conditional,
+pipeline, function call, or any other Utu expression:
+
+```utu
+main {
+    | labels
+    |> if expanded { full_labels } else { short_labels }
+    |> {
+        let chosen = labels filter |label| { label.visible } collect(Label)
+        chosen
+    }
+}
+```
+
+Both forms use the existing insertion path, including `.render()` dispatch,
+list identity, and fragment handling. Single components and `wn` results work
+too. Existing `= expression` insertions remain supported. Separate insertions
+with a newline or semicolon; wrap a Utu expression in parentheses or a block
+when continuing it onto a line that starts with a pipe operator.
 
 Components are ordinary typed Utu functions. Pass data or DOM nodes as normal
 parameters and insert returned nodes with `= component(args)`. There is no
@@ -269,25 +319,34 @@ button {
 An element's own declaration whose property (ASCII case-insensitive) is one
 edit or swap from a standard one is a typo and fails: `colr: red;` says "did
 you mean color?". Custom (`--x`) and prefixed (`-webkit-…`) properties, and
-ones further from a standard name, pass as written. A custom property's value
-is any balanced run (`--cfg: { "a": 1 };`); comments in a value are skipped.
+ones further from a standard name, pass as written. A value beginning with
+`{` is a computed Utu block, including for custom properties (`--x`). Other
+custom-property values remain CSS tokens; comments in static values are skipped.
 A value that runs on into the next statement is a missing `;`: a declaration
 on its line (`color: red margin: 0;`) or the next, or an attribute, boolean
 attribute or text there (`color: red` then `hidden;`).
 
-A declaration whose value is `= ...` is computed when the template renders
-and applied with `style.setProperty`, which a strict `style-src` policy allows:
+An element-local declaration whose value is `{ ... }` evaluates the block as
+Utu whenever the template renders. Its result must be CSS text (`Str`), including
+units where needed. The runtime applies it with `style.setProperty`:
 
-```css
+```utu
 div.bar {
     i {
-        width: = progress.str() + "%";
-        --hue: = hue.str();
+        width: { progress.str() + "%" }
+        background-color: {
+            if progress >= 80 { "seagreen" } else { "tomato" }
+        }
+        --hue: { hue.str() }
     }
 }
 ```
 
-Static declarations on the same element still compile to a shared class.
+Blocks can contain local declarations and nested expressions; their final value
+is the CSS text. For example, `--config: { "{literal}" }` computes the literal
+text `{literal}`. In a reactive view, these values update with the view. The
+older `property: = expression` spelling remains supported. Static declarations
+on the same element still compile to a shared class.
 
 `@ selector { ... }` is an explicitly scoped selector rule, not an element.
 `@ { ... }` targets the element and its descendants. `@document { ... }` before
@@ -310,7 +369,7 @@ it. Keep page-specific rules next to the page that uses them:
 
 ```utu
 fn editor() Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @document {
         .editor > pre { margin: 0 }
     }
@@ -424,7 +483,7 @@ using Browser from std:Browser
 
 mod guide {
     fn page(who: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article { h1 { = "Hello, " + who } }
         \/
     }
@@ -610,7 +669,7 @@ Put a stylesheet in a standard `@css` envelope and return it from a normal modul
 ```utu
 mod theme {
     fn sheet() Str {
-        @css/\
+        return @css/\
         @layer theme {
             .card { color: oklch(40% .12 150); }
         }

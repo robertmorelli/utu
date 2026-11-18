@@ -1,7 +1,7 @@
 // What: Array.new with a negative length computed at runtime
 // Expect: trap: negative array length -1 in Array[I32].new
 fn make(n: I32) Array[I32] {
-    Array[I32].new(n - 1, 0);
+    return Array[I32].new(n - 1, 0);
 }
 
 main {

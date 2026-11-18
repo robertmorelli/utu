@@ -13,15 +13,15 @@ enum(U8) Strength:
     | WeakDefault
     | Weakest
 
-fn Strength.stronger |self| (other: Strength) Bool { self.i32() < other.i32() }
+fn Strength.stronger |self| (other: Strength) Bool { return self.i32() < other.i32() }
 
-fn Strength.weaker |self| (other: Strength) Bool { self.i32() > other.i32() }
+fn Strength.weaker |self| (other: Strength) Bool { return self.i32() > other.i32() }
 
-fn Strength.weakest_of |self| (other: Strength) Strength { if self.weaker(other) { self } else { other } }
+fn Strength.weakest_of |self| (other: Strength) Strength { return if self.weaker(other) { self } else { other } }
 
 // As the original has it: Required's next weaker is Weakest.
 fn Strength.next_weaker |self| () Strength {
-    match self.i32() {
+    return match self.i32() {
         0 => Strength.Weakest,
         1 => Strength.WeakDefault,
         2 => Strength.Normal,
@@ -62,10 +62,10 @@ struct Planner:
     | current_mark: I32
 
 // Constraints are compared by identity.
-fn Constraint:eq |a, b| Bool { @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/ }
+fn Constraint:eq |a, b| Bool => @ir/\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \/;
 
 fn Variable.new(value: I32) Variable {
-    &{ value: value, constraints: Buffer[Constraint].new(), determined_by: null, mark: 0, walk_strength: Strength.Weakest, stay: true }
+    return &{ value: value, constraints: Buffer[Constraint].new(), determined_by: null, mark: 0, walk_strength: Strength.Weakest, stay: true }
 }
 
 fn Variable.add_constraint |self| (c: Constraint) Void { self.constraints.push(c) }
@@ -85,17 +85,17 @@ fn Variable.remove_constraint |self| (c: Constraint) Void {
 }
 
 fn Variable.is_determined |self| () Bool {
-    promote self.determined_by {
+    return promote self.determined_by {
         |d| => true,
         ~> false,
     }
 }
 
-fn Variable.is_determined_by |self| (c: Constraint) Bool { c.is(self.determined_by) }
+fn Variable.is_determined_by |self| (c: Constraint) Bool { return c.is(self.determined_by) }
 
 // Whether this is `other`, which may be null.
 fn Constraint.is |self| (other: ?Constraint) Bool {
-    promote other {
+    return promote other {
         |o| => self == o,
         ~> false,
     }
@@ -105,7 +105,7 @@ fn Constraint.is |self| (other: ?Constraint) Bool {
 // Constraints
 
 fn Constraint.strength |self| () Strength {
-    alt self {
+    return alt self {
         Stay |c| => c.strength,
         Edit |c| => c.strength,
         Equality |c| => c.strength,
@@ -114,14 +114,14 @@ fn Constraint.strength |self| () Strength {
 }
 
 fn Constraint.is_input |self| () Bool {
-    alt self {
+    return alt self {
         Edit => true,
         ~> false,
     }
 }
 
 fn Constraint.is_satisfied |self| () Bool {
-    alt self {
+    return alt self {
         Stay |c| => c.satisfied,
         Edit |c| => c.satisfied,
         Equality |c| => c.direction != Direction.Unset,
@@ -130,12 +130,12 @@ fn Constraint.is_satisfied |self| () Bool {
 }
 
 // A binary constraint's input and output, by its direction.
-fn input_of(direction: Direction, v1: Variable, v2: Variable) Variable { if direction == Direction.Forward { v1 } else { v2 } }
+fn input_of(direction: Direction, v1: Variable, v2: Variable) Variable { return if direction == Direction.Forward { v1 } else { v2 } }
 
-fn output_of(direction: Direction, v1: Variable, v2: Variable) Variable { if direction == Direction.Forward { v2 } else { v1 } }
+fn output_of(direction: Direction, v1: Variable, v2: Variable) Variable { return if direction == Direction.Forward { v2 } else { v1 } }
 
 fn Constraint.input |self| () Variable {
-    alt self {
+    return alt self {
         Equality |c| => input_of(c.direction, c.v1, c.v2),
         Scale |c| => input_of(c.direction, c.v1, c.v2),
         ~> fatal,
@@ -143,7 +143,7 @@ fn Constraint.input |self| () Variable {
 }
 
 fn Constraint.output |self| () Variable {
-    alt self {
+    return alt self {
         Stay |c| => c.output,
         Edit |c| => c.output,
         Equality |c| => output_of(c.direction, c.v1, c.v2),
@@ -216,7 +216,7 @@ fn choose_direction(v1: Variable, v2: Variable, strength: Strength, mark: I32) D
     } else {
         direction = if strength.stronger(v2.walk_strength) { Direction.Forward } else { Direction.Backward }
     }
-    direction
+    return direction
 }
 
 fn Constraint.choose_method |self| (mark: I32) Void {
@@ -268,7 +268,7 @@ fn Constraint.mark_inputs |self| (mark: I32) Void {
 }
 
 fn Constraint.inputs_known |self| (mark: I32) Bool {
-    alt self {
+    return alt self {
         Stay => true,
         Edit => true,
         ~> {
@@ -340,14 +340,14 @@ fn Constraint.satisfy |self| (planner: Planner, mark: I32) ?Constraint {
     out.determined_by = self
     if not planner.add_propagate(self, mark) { fatal }
     out.mark = mark
-    overridden
+    return overridden
 }
 
 // Adds a new constraint to the graph and satisfies it.
 fn Constraint.add |self| (planner: Planner) Constraint {
     self.add_to_graph()
     planner.incremental_add(self)
-    self
+    return self
 }
 
 fn Constraint.destroy |self| (planner: Planner) Void {
@@ -355,29 +355,29 @@ fn Constraint.destroy |self| (planner: Planner) Void {
 }
 
 fn stay(v: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Stay { output: v, strength: strength, satisfied: false }, planner)
+    return Constraint.add(Stay { output: v, strength: strength, satisfied: false }, planner)
 }
 
 fn edit(v: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Edit { output: v, strength: strength, satisfied: false }, planner)
+    return Constraint.add(Edit { output: v, strength: strength, satisfied: false }, planner)
 }
 
 fn equality(v1: Variable, v2: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Equality { v1: v1, v2: v2, strength: strength, direction: Direction.Unset }, planner)
+    return Constraint.add(Equality { v1: v1, v2: v2, strength: strength, direction: Direction.Unset }, planner)
 }
 
 fn scale(src: Variable, scale: Variable, offset: Variable, dest: Variable, strength: Strength, planner: Planner) Constraint {
-    Constraint.add(Scale { v1: src, v2: dest, scale: scale, offset: offset, strength: strength, direction: Direction.Unset }, planner)
+    return Constraint.add(Scale { v1: src, v2: dest, scale: scale, offset: offset, strength: strength, direction: Direction.Unset }, planner)
 }
 
 // ---------------------------------------------------------------------------
 // The planner
 
-fn Planner.new() Planner { &{ current_mark: 0 } }
+fn Planner.new() Planner { return &{ current_mark: 0 } }
 
 fn Planner.new_mark |self| () I32 {
     self.current_mark += 1
-    self.current_mark
+    return self.current_mark
 }
 
 fn Planner.incremental_add |self| (c: Constraint) Void {
@@ -423,7 +423,7 @@ fn Planner.add_propagate |self| (c: Constraint, mark: I32) Bool {
         d.recalculate()
         add_constraints_consuming_to(out, todo)
     }
-    true
+    return true
 }
 
 fn add_constraints_consuming_to(v: Variable, coll: Buffer[Constraint]) Void {
@@ -457,7 +457,7 @@ fn Planner.remove_propagate_from |self| (out: Variable) Buffer[Constraint] {
             }
         }
     }
-    unsatisfied
+    return unsatisfied
 }
 
 // The order to run the constraints downstream of `sources` in (which it uses up).
@@ -474,7 +474,7 @@ fn Planner.make_plan |self| (sources: Buffer[Constraint]) Buffer[Constraint] {
             add_constraints_consuming_to(out, todo)
         }
     }
-    plan
+    return plan
 }
 
 fn Planner.extract_plan_from_constraints |self| (constraints: Buffer[Constraint]) Buffer[Constraint] {
@@ -483,7 +483,7 @@ fn Planner.extract_plan_from_constraints |self| (constraints: Buffer[Constraint]
         let c = constraints[i]
         if c.is_input() and c.is_satisfied() { sources.push(c) }
     }
-    self.make_plan(sources)
+    return self.make_plan(sources)
 }
 
 fn execute_plan(plan: Buffer[Constraint]) Void {
@@ -497,7 +497,7 @@ fn execute_plan(plan: Buffer[Constraint]) Void {
 fn plan_for(planner: Planner, edit: Constraint) Buffer[Constraint] {
     let edits = Buffer[Constraint].new()
     edits.push(edit)
-    planner.extract_plan_from_constraints(edits)
+    return planner.extract_plan_from_constraints(edits)
 }
 
 // A chain of n equality constraints, whose first value must reach its last.
@@ -526,7 +526,7 @@ fn chain_test(n: I32) I64 {
         execute_plan(plan)
         if tail.value != i { failures += 1 }
     }
-    failures
+    return failures
 }
 
 fn change(planner: Planner, v: Variable, value: I32) Void {
@@ -571,7 +571,7 @@ fn projection_test(n: I32) I64 {
     for (0..<n - 1) |i| {
         if dests[i].value != i * 5 + 2000 { failures += 1 }
     }
-    failures
+    return failures
 }
 
 test "deltablue solves small graphs" {
@@ -602,5 +602,5 @@ lib { fn run(kind: I32, iterations: I32) I64 {
     } else {
         for (0..<iterations) { sink += projection_test(1048) }
     }
-    sink
+    return sink
 } }

@@ -45,6 +45,110 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 const click = (window, node) => node.dispatchEvent(new window.Event('click'));
 
 export function registerWutuRuntimeTests({ test, assert, assertEq }) {
+  test('wutu fragments: islands retain empty boundaries and dispose once', () => withRuntime(async ({ api, document }) => {
+    const program = JSON.stringify([['r'], ['i', [['s', 0, ['input', {}]], ['s', 1, ['span', {}, 'island']]], []]]);
+    let visible = false, showIsland = true, renders = 0, cleaned = 0;
+    const island = () => api.mount(() => {
+      renders++; api.cleanup(() => cleaned++);
+      api.begin(program); api.arm(visible ? 1 : 0); return api.done();
+    }, 'fragment-island');
+    const root = api.mount(() => {
+      api.enter('main', false, 'parent', '');
+      if (showIsland) api.append(island());
+      api.enter('footer', false, 'footer', ''); api.append('after'); api.leave();
+      return api.leave();
+    });
+    document.body.append(root);
+    assertEq(root.querySelectorAll('input').length, 0);
+    visible = true; api.invalidate('fragment-island'); await settle();
+    const input = root.querySelector('input'); assert(input);
+    assertEq(renders, 2);
+    // Only rendering the parent reuses the island, including all its siblings.
+    api.notify(); await settle();
+    assert(root.querySelector('input') === input);
+    visible = false; api.invalidate('fragment-island'); await settle();
+    assertEq(root.querySelectorAll('input').length, 0);
+    showIsland = false; api.refresh();
+    assertEq(cleaned, 1);
+    assertEq(root.textContent, 'after');
+  }));
+
+  test('wutu fragments: memo hits preserve all roots and empty results', () => withRuntime(({ api, document }) => {
+    let calls = 0, empty = false;
+    const parent = JSON.stringify([['o', 0, ['main', {}]], ['x', 1], ['c']]);
+    const child = JSON.stringify([['r'], ['i', [['s', 0, ['i', {}, 'one']], ['s', 1, ['b', {}, 'two']]], []]]);
+    const root = api.mount(() => {
+      api.begin(parent); api.slot();
+      const key = String(empty);
+      if (api.memoHit(key)) api.put(api.memoLast());
+      else {
+        calls++; api.begin(child); api.arm(empty ? 0 : 1); const value = api.done();
+        api.memoKeep(key, value); api.put(value);
+      }
+      return api.done();
+    });
+    document.body.append(root);
+    const first = root.querySelector('i');
+    api.refresh(); assertEq(calls, 1); assert(root.querySelector('i') === first);
+    empty = true; api.refresh(); assertEq(calls, 2); assertEq(root.textContent, '');
+    api.refresh(); assertEq(calls, 2);
+  }));
+
+  test('wutu fragments: hydration adopts a root range and enables controls', () => withRuntime(({ api, document }) => {
+    const program = JSON.stringify([['r'], ['o', 0, ['button', {}]], ['w'], ['c'], ['s', 1, ['p', {}, 'tail']]]);
+    let label = 'old';
+    const draw = runtime => runtime.mount(() => {
+      runtime.begin(program); runtime.put(label); return runtime.done();
+    });
+    document.body.append(draw(api));
+    // Serialize/reparse as prerendering does, and create a fresh client runtime.
+    document.body.innerHTML = document.body.innerHTML;
+    const button = document.querySelector('button');
+    button.setAttribute('data-wutu-prerender', ''); button.setAttribute('data-wutu-pending', ''); button.disabled = true;
+    const fresh = createWutuRuntime(); label = 'new'; document.body.append(draw(fresh));
+    assert(document.querySelector('button') === button, 'hydrate rather than replace');
+    assertEq(document.querySelectorAll('button').length, 1);
+    assertEq(button.textContent, 'new'); assert(!button.disabled);
+    label = 'again'; fresh.refresh(); assertEq(button.textContent, 'again');
+  }));
+
+  test('wutu fragments: separate root instances do not steal each others range', () => withRuntime(({ api, document }) => {
+    const program = JSON.stringify([['r'], ['s', 0, ['p', {}, 'a']], ['s', 1, ['p', {}, 'b']]]);
+    const draw = () => api.mount(() => { api.begin(program); return api.done(); });
+    document.body.append(draw()); document.body.append(draw());
+    assertEq(document.querySelectorAll('p').length, 4);
+    api.refresh(); assertEq(document.querySelectorAll('p').length, 4);
+  }));
+
+  test('wutu fragments: global keys move whole ranges and reject duplicates', () => withRuntime(({ api, document }) => {
+    let side = 0, duplicate = false;
+    const child = JSON.stringify([['r'], ['s', 0, ['input', {}]], ['s', 1, ['b', {}, 'tail']]]);
+    const root = api.mount(() => {
+      api.enter('main', false, 'root', '');
+      for (let i = 0; i < 2; i++) {
+        api.enter('section', false, 'side' + i, '');
+        if (side === i || duplicate) {
+          api.pushCall('different-parent-' + i);
+          api.pushGlobal('same');
+          api.begin(child); api.append(api.done());
+          api.popKey(); api.popKey();
+        }
+        api.leave();
+      }
+      return api.leave();
+    });
+    document.body.append(root);
+    const input = root.querySelector('input');
+    side = 1; api.refresh();
+    assert(root.children[1].querySelector('input') === input, 'range moves between parents');
+    assertEq(root.children[0].textContent, '');
+    duplicate = true;
+    let error; try { api.refresh(); } catch (e) { error = e; }
+    assert(error?.message.includes('Duplicate global Wutu key'));
+    duplicate = false; api.refresh();
+    assertEq(root.querySelectorAll('input').length, 1);
+  }));
+
   test('wutu storage: non-finite F64 does not discard other fields on reload', () => withRuntime(async ({ api }) => {
     installWutuStorage(api);
     const saved = JSON.stringify({ version: 1, data: { bad: Infinity, alsoBad: NaN, good: 7 } });

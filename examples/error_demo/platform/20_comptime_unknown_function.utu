@@ -3,7 +3,7 @@
 fn make_table(n: I32) Array[I32] {
     let out = Array[I32].new(n, 0);
     for (0 ..< n) |i| { out[i] = i * i; };
-    out;
+    return out;
 }
 
 const mem squares: I32 = @comptime/\ make_tabel(16) \/;

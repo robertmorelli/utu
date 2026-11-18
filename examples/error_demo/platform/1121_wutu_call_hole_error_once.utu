@@ -9,7 +9,7 @@ struct State:
     | items: Array[Stock]
 
 fn workspace(state: State) Browser.HTMLElement {
-    @wutu/\
+    return @wutu/\
     @island "w"
     section {
         for state.items |item| key item.id {

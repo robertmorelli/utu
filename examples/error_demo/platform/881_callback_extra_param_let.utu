@@ -3,6 +3,6 @@
 using Browser from std:Browser;
 
 main {
-    let draw: cl(F64, F64, F64) Void = cl(time, dx, dy) { Browser.console.log(time + dx + dy); };
+    let draw: cl(F64, F64, F64) Void = cl(time, dx, dy) { return Browser.console.log(time + dx + dy); };
     Browser.window.requestAnimationFrame(draw);
 }

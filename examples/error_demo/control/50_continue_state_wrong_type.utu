@@ -6,7 +6,7 @@ fn run() I32 {
         0 => { n += 1; continue true; },
         ~> { break; },
     };
-    n;
+    return n;
 }
 
 main {

@@ -1,1 +1,1 @@
-lib { fn answer() I32 { 42; } }
+lib { fn answer() I32 { return 42; } }

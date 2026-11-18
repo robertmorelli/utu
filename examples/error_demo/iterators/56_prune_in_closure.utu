@@ -12,7 +12,7 @@ main {
     let root = Node { name: "/", kids: [Node { name: "tmp", kids: [] }] };
     let count = 0;
     for (walk(root)) |n| {
-        let skip = cl() { if n.name == "tmp" { prune; }; };
+        let skip = cl() { return if n.name == "tmp" { prune; }; };
         skip();
         count += 1;
     };

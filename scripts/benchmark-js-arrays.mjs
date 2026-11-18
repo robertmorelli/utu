@@ -13,14 +13,14 @@ const source = `using Bench from std:Bench;
   lib {
     fn indexed(values: Bench.Numbers) F64 {
       let n: F64 = values.length; let total: F64 = 0.0; let i: F64 = 0.0;
-      while (i < n) { total = total + values[i]; i = i + 1.0; }; total;
+      while (i < n) { total = total + values[i]; i = i + 1.0; }; return total;
     }
     fn generic(values: Bench.OpaqueNumbers) F64 {
       let n: F64 = values.length; let total: F64 = 0.0; let i: F64 = 0.0;
-      while (i < n) { total = total + values[i]; i = i + 1.0; }; total;
+      while (i < n) { total = total + values[i]; i = i + 1.0; }; return total;
     }
-    fn callback(values: Bench.Numbers) F64 { values.reduce( cl(a, b) { a + b; }, 0.0); }
-    fn batch(values: Bench.Numbers) F64 { Bench.sum(values); }
+    fn callback(values: Bench.Numbers) F64 { return values.reduce( cl(a, b) { return a + b; }, 0.0); }
+    fn batch(values: Bench.Numbers) F64 { return Bench.sum(values); }
   }`;
 const host = nodeHost({ root, stdlib: new Map([...nodeStdlib(), ['std:Bench', async () => ({ abi })]]) });
 const result = await compile(utu, '/array-benchmark.utu', { ...host, optimize: 'size', readFile: async () => source, resolvePath: (_, p) => p });

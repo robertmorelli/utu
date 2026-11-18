@@ -42,7 +42,7 @@ fn pattern_value(lit: I32, t: I32) I64 {
     if decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v }
     if not is_numeric(t) { pattern_fault[0] = 3; return v }
     if not literal_fits(c, t, negate) { pattern_fault[0] = 0 }
-    v
+    return v
 }
 
 /// Push the comparison of local `s` (of type `t`) with a pattern's value.
@@ -89,7 +89,7 @@ fn arm_slot(v: I64) I32 {
     let mask = arm_slots.len() - 1
     let i = ((v.i32() ^ (v >> 32).i32()) * -1640531535) & mask
     while (arm_slots[i] >= 0 and arm_values[arm_slots[i]] != v) { i = (i + 1) & mask }
-    i
+    return i
 }
 
 /// `match e { p => a, …, ~> d }` and `loop match`.
@@ -183,7 +183,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     arm_nodes.resize(first_arm)
     arm_values.resize(first_arm)
     w_node(Op.Seq, repr(t), 0, 0, m)
-    t
+    return t
 }
 
 /// A match without a default must cover every value: both Bools, or every
@@ -275,7 +275,7 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
         w_node(Op.Plain, vt_i32, 107, 0, mt)
     }
     w_node(Op.BrTable, vt_unreachable, targets, span + 1, mt)
-    let t = if in_loop { ty_void() } else { expect }
+    let t = if in_loop { ty_void() } else { -1 }
     // (Labels are numbered in order: arm p's is labels[0] + p.)
     let lm = loop_matches.len()
     if in_loop { for ([s, lo.i32(), span, n, copies, def, labels[0], first, -1]) |x| { loop_matches.push(x) } }
@@ -283,16 +283,18 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
         // Close arm p's block, then its code.
         w_node(Op.Block, vt_none, labels[p], 0, marks[total - 1 - p])
         if in_loop { loop_matches[lm + 8] = p }
-        t = arm_body(arm_nodes[first + p % n], t, cx, in_loop)
+        let arm_t = arm_body(arm_nodes[first + p % n], if expect >= 0 { expect } else { t }, cx, in_loop)
+        if arm_t >= 0 { t = arm_t }
         if not in_loop { w_node(Op.Br, vt_unreachable, end_, 0, w_mark() - 1) }
         else { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0) }
     }
     loop_matches.resize(lm)
     w_node(Op.Block, vt_none, def, 0, m_def)
-    t = default_body(default_, t, cx, in_loop)
+    let default_t = default_body(default_, if expect >= 0 { expect } else { t }, cx, in_loop)
+    if default_t >= 0 { t = default_t }
     let result = if t >= 0 { t } else { ty_never() }
     w_node(Op.Block, repr(result), end_, 0, m_end)
-    result
+    return result
 }
 
 /// An arm's expression as the match's value (or dropped in a loop match).
@@ -304,12 +306,13 @@ fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
         return t
     }
     let actual = check_expr(e, t, cx)
+    if ty_is(actual, Ty.Never) and t >= 0 and ty_is(t, Ty.Void) { return -1 }
     if t >= 0 {
         coerce(actual, t, e)
         return t
     }
     if ty_is(actual, Ty.Never) { return -1 }
-    actual
+    return actual
 }
 
 /// The default arm, as @arm_body does an arm (`unreachable` when there is none).
@@ -317,9 +320,9 @@ fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
     if default_ < 0 {
         // Every value has an arm; another can only come from Tag(i).
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
-        return t
+        return if in_loop { t } else { -1 }
     }
-    arm_body(default_, t, cx, in_loop)
+    return arm_body(default_, t, cx, in_loop)
 }
 
 /// Arms `first` to `last` as a chain of ifs comparing `s` with each value, the
@@ -359,7 +362,7 @@ fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32,
         w_node(Op.Seq, repr(result), 0, 0, mes[i])
         w_node(Op.If, repr(result), new_label(), 0, ms[i])
     }
-    result
+    return result
 }
 
 /// Per enclosing loop: a loop match's state local, else -1.
@@ -380,7 +383,7 @@ fn loop_match(s: I32, st: I32, first: I32, last: I32, default_: I32, cx: Cx) I32
     leave_loop()
     w_node(Op.Loop, vt_none, top, 0, ml)
     w_node(Op.Block, vt_none, brk, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 vec loop_state_type: I32
@@ -404,7 +407,7 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
         // A constant state: straight to its arm when that is ahead.
         let label = lm_target(lm, w_a[w_stack[m]])
         if label >= 0 {
-            w_stack.resize(m)
+            w_resize_stack(m)
             run_defers(loop_defers[k], cx)
             w_leaf(Op.Br, vt_unreachable, label, 0)
             w_node(Op.Seq, vt_unreachable, 0, 0, m)
@@ -434,7 +437,7 @@ fn check_continue_state(node: I32, cx: Cx) I32 {
         w_node(Op.BrTable, vt_unreachable, targets, loop_matches[lm + 2] + 1, mt)
     } else { w_leaf(Op.Br, vt_unreachable, loop_continue[k], 0) }
     w_node(Op.Seq, vt_unreachable, 0, 0, m)
-    ty_never()
+    return ty_never()
 }
 
 /// Per loop match dispatched by a table, while its arms are checked, nine
@@ -459,7 +462,7 @@ fn lm_target(lm: I32, v: I32) I32 {
     let at = loop_matches[lm + 8]
     let copy = at / n
     if arm <= at % n { copy += 1 }
-    if copy >= loop_matches[lm + 4] { -1 } else { loop_matches[lm + 6] + copy * n + arm }
+    return if copy >= loop_matches[lm + 4] { -1 } else { loop_matches[lm + 6] + copy * n + arm }
 }
 
 //! = Nullable values
@@ -517,7 +520,7 @@ fn check_promote(node: I32, expect: I32, cx: Cx) I32 {
     w_node(Op.Seq, repr(t), 0, 0, me)
     w_node(Op.If, repr(t), new_label(), 0, mi)
     w_node(Op.Seq, repr(t), 0, 0, m)
-    t
+    return t
 }
 
 /// `a orelse b`: a's value when there is one, else b.
@@ -566,7 +569,7 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     // a, kept when not null (`br_on_non_null`), else b: no local, no `if`.
     coerce(check_expr(b, t, cx), t, b)
     w_node(Op.NullElse, repr(t), 0, 0, m)
-    t
+    return t
 }
 
 /// `T.null`.
@@ -574,7 +577,7 @@ fn check_null_expr(node: I32, cx: Cx) I32 {
     let t = nullable(type_path(first_child(node), cx.inst))
     let vt = repr(t)
     w_leaf(Op.RefNull, vt, heap_of(vt), 0)
-    t
+    return t
 }
 
 /// Whether a node is the literal `null`.
@@ -628,7 +631,7 @@ fn branch_join(from: I32, cx: Cx) I32 {
     join_nodes.resize(from)
     if not shaped or t < 0 or not (has_null or differ) { return -1 }
     if has_null { return if vt_is_ref(repr(t)) { nullable(t) } else { -1 } }
-    t
+    return t
 }
 
 /// The value of a branch: a block's last expression, or the branch itself.
@@ -638,16 +641,16 @@ fn branch_value(b: I32) I32 => if is_kind(b, Node.Block) { last_child(b) } else 
 fn enum_join(a: I32, b: I32) I32 {
     let ea = enum_of(ty_decl(a))
     if ea < 0 or ea != enum_of(ty_decl(b)) or ty_inst(a) != ty_inst(b) { return -1 }
-    named(ea, ty_inst(a))
+    return named(ea, ty_inst(a))
 }
 
 fn enum_of(d: I32) I32 {
     if decl_is(d, Decl.Variant) and decl_is(decl_owner[d], Decl.Enum) { return decl_owner[d] }
-    if decl_is(d, Decl.Enum) { d } else { -1 }
+    return if decl_is(d, Decl.Enum) { d } else { -1 }
 }
 
 fn is_null_literal(node: I32) Bool {
-    is_kind(node, Node.Literal) and first_child(node) < 0 and tok_word[node_first[node]] == Kw.Null.i32()
+    return is_kind(node, Node.Literal) and first_child(node) < 0 and tok_word[node_first[node]] == Kw.Null.i32()
 }
 
 /// `x == null`, `x != null` (either side): `ref.is_null`.
@@ -660,7 +663,7 @@ fn check_null_compare(other: I32, equal: Bool, cx: Cx) I32 {
     }
     w_node(Op.RefIsNull, vt_i32, 0, 0, m)
     if not equal { w_node(Op.Plain, vt_i32, 69, 0, m) }
-    prelude(Prelude.Bool)
+    return prelude(Prelude.Bool)
 }
 
 //! = try
@@ -700,7 +703,7 @@ fn check_try(node: I32, expected: I32, cx: Cx) I32 {
     t = other_branch(t, check_block(handler, t, cx), handler)
     w_node(Op.Seq, repr(t), 0, 0, mh)
     w_node(Op.Try, repr(t), new_label(), 0, m)
-    t
+    return t
 }
 
 //! = Result
@@ -712,7 +715,7 @@ fn check_try(node: I32, expected: I32, cx: Cx) I32 {
 fn is_result_type(t: I32) Bool {
     let decl = if t >= 0 { ty_decl(t) } else { -1 }
     // (A struct of no module is not one.)
-    decl >= 0 and decl_is(decl, Decl.Struct) and module_of(decl) >= 0 and decl_name[module_of(decl)] == known_word(Known.WordResult)
+    return decl >= 0 and decl_is(decl, Decl.Struct) and module_of(decl) >= 0 and decl_name[module_of(decl)] == known_word(Known.WordResult)
         and from_std(decl_node[decl])
 }
 
@@ -780,7 +783,7 @@ fn check_try_result(node: I32, cx: Cx) I32 {
     w_get(rvt, r)
     w_node(Op.StructGet, repr(value_t), heap, 1, mv)
     w_node(Op.Seq, repr(value_t), 0, 0, m)
-    value_t
+    return value_t
 }
 
 //! = Tuples
@@ -811,7 +814,7 @@ fn check_tuple(node: I32, expect: I32, cx: Cx) I32 {
     for (0 ..< n) |k| { vl_add(types[k]) }
     let t = ty(Ty.Tuple, vl_end(mv), 0)
     w_node(Op.Seq, repr(t), 0, 0, m)
-    t
+    return t
 }
 
 /// `let .{a, b} = e;`: e's values into a and b (the last is on top).
@@ -844,7 +847,7 @@ fn check_let_tuple(node: I32, cx: Cx) I32 {
         k -= 1
     }
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 fn reset_control() Void {
@@ -935,7 +938,7 @@ fn check_for(node: I32, cx: Cx) I32 {
                 } else {
                     report2(Diag.InvalidForSource, s, -1, 0, t)
                 }
-                w_stack.resize(m)
+                w_resize_stack(m)
                 return error_value()
             }
             types[i] = t
@@ -953,7 +956,7 @@ fn check_for(node: I32, cx: Cx) I32 {
             let at = check_expr(lo, -1, cx)
             if not is_array_type(at) {
                 if not ty_is(at, Ty.Error) { report2(Diag.InvalidForSource, lo, -1, 0, at) }
-                w_stack.resize(m)
+                w_resize_stack(m)
                 return error_value()
             }
             types[i] = inst_arg(ty_inst(at), 0)
@@ -1052,7 +1055,7 @@ fn check_for(node: I32, cx: Cx) I32 {
     w_node(Op.Loop, vt_none, top, 0, ml)
     w_node(Op.Block, vt_none, brk, 0, mb)
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 /// The comparison that ends a count: the counter (of value type `vt`) is past
@@ -1060,7 +1063,7 @@ fn check_for(node: I32, cx: Cx) I32 {
 fn past_end_op(vt: I32, unsigned: Bool, inclusive: Bool) I32 {
     // i64.gt_u, gt_s, ge_u, ge_s; i32's.
     if vt == vt_i64 { return if inclusive { if unsigned { 86 } else { 85 } } else { if unsigned { 90 } else { 89 } } }
-    if inclusive { if unsigned { 75 } else { 74 } } else { if unsigned { 79 } else { 78 } }
+    return if inclusive { if unsigned { 75 } else { 74 } } else { if unsigned { 79 } else { 78 } }
 }
 
 /// `counter += 1` (of value type `vt`).
@@ -1116,9 +1119,9 @@ fn unroll_fits(block: I32, d: I32, ty: I32, counter: I32, brk: I32, cx: Cx) Bool
     speculating[0] -= 1
     let total = 0
     for (m ..< w_mark()) |i| { total += unroll_weight(w_stack[i], 0) }
-    w_stack.resize(m)
+    w_resize_stack(m)
     diag_truncate(diags)
-    total <= unroll_max_ir
+    return total <= unroll_max_ir
 }
 
 /// IR node `n`'s nodes, a direct call's callee's body in them (to depth 3);
@@ -1134,7 +1137,7 @@ fn unroll_weight(n: I32, depth: I32) I32 {
         total += unroll_weight(w_kid(n, i), depth)
         if total > unroll_max_ir { return total }
     }
-    total
+    return total
 }
 
 /// The nodes of a body, or more than the most when it may not be unrolled.
@@ -1159,7 +1162,7 @@ fn unroll_nodes(node: I32) I32 {
         if total > unroll_max_nodes { return total }
         c = next_sibling(c)
     }
-    total
+    return total
 }
 
 /// A method that allocates, which keeps a loop body from being unrolled.
@@ -1167,7 +1170,7 @@ fn allocating_method(word: I32) Bool {
     for (["slice", "get_slice", "new", "new_default", "copy_from", "push"]) |name| {
         if word == intern_text(name) { return true }
     }
-    false
+    return false
 }
 
 /// The unrolled loop of `for (a ..< b) |i|`, counting in local `counter` to local `end_`.

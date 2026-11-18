@@ -15,7 +15,7 @@ mod playground {
     | failed: Bool
     | started: Bool
     fn sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
         \\struct Todo[Component]:
         \\    | id: Str
@@ -28,7 +28,7 @@ mod playground {
         \\    | made: I32
         \\
         \\fn State.left |s| () I32 {
-        \\    s.todos
+        \\    return s.todos
         \\        count_where |t| { not t.done }
         \\}
         \\
@@ -86,7 +86,7 @@ mod playground {
         \\            padding: 0
         \\            list-style: none
         \\            for state.todos |todo| key todo.id {
-        \\                = todo
+        \\                | todo
         \\            }
         \\        }
         \\        p {
@@ -100,12 +100,12 @@ mod playground {
     /// The source the editor opens with: the last one edited, kept in this
     /// browser's storage.
     fn saved() Saved {
-        @stored/\
+        return @stored/\
         Saved "utu-playground-v3" Saved { source: sample() }
         \/
     }
     fn start() State {
-        State {
+        return State {
             saved: saved(),
             status: "Loading the compiler…",
             detail: "",
@@ -135,7 +135,7 @@ mod playground {
                 compile(state, 0)
             })
         }
-        @wutu/\
+        return @wutu/\
         article.page.playground {
             = ui.header("Playground", "Edit Wutu and the site it builds runs beside it. The compiler is utu's own, compiled to WasmGC, running in your browser.")
             div.bench {

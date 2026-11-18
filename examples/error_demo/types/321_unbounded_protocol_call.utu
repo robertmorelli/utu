@@ -6,7 +6,7 @@ mod Largest[T] {
     fn of(xs: Array[T]) T {
         let best = xs[0];
         for (xs) |x| { if x.cmp(best) > 0 { best = x; }; };
-        best;
+        return best;
     }
 }
 

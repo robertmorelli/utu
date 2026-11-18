@@ -1,7 +1,7 @@
 // What: a closure parameter's type misspelled (F46 for F64)
 // Expect: Unknown type 'F46'; did you mean 'F64'?
 main {
-    let half = cl(x: F46) F64 { x / 2.0; };
+    let half = cl(x: F46) F64 { return x / 2.0; };
     console.log(half(9.0));
 }
 using console from std:Console

@@ -3,7 +3,7 @@
 struct Vec2:
     | x: I32
 
-fn Vec2:add |a| Vec2 { a; }
+fn Vec2:add |a| Vec2 { return a; }
 
 main { console.log(1); }
 using console from std:Console

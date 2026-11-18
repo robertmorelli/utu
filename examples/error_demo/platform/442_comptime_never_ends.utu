@@ -2,7 +2,7 @@
 // Expect: @comptime t trapped: it ran too long (a hundred million loop rounds)
 fn f() Array[I32] {
     while (true) { };
-    [1];
+    return [1];
 }
 const mem t: I32 = @comptime/\ f() \/;
 

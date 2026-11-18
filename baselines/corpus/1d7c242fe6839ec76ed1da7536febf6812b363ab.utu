@@ -23,17 +23,17 @@ tag struct Line[P]:
     | y2 : F32
 
 fn P[Circle].perimeter |self| () F32 {
-    2.0 * 3.14 * self.r;
+    return 2.0 * 3.14 * self.r;
 }
 
 fn P[Oval].perimeter |self| () F32 {
-    3.14 * (self.r + self.r2);
+    return 3.14 * (self.r + self.r2);
 }
 
 fn P[Line].perimeter |self| () F32 {
     let dx: F32 = self.x2 - self.x;
     let dy: F32 = self.y2 - self.y;
-    F32.sqrt(dx * dx + dy * dy);
+    return F32.sqrt(dx * dx + dy * dy);
 }
 
 fn perimeter_sum(l: Array[P]) F32 {
@@ -41,7 +41,7 @@ fn perimeter_sum(l: Array[P]) F32 {
     for (0..<l.len()) |i| {
         s = s + l[i].perimeter();
     };
-    s;
+    return s;
 }
 
 main {

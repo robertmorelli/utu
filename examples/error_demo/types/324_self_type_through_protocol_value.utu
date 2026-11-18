@@ -5,7 +5,7 @@ using Ord from std:Ord;
 struct Version[Ord]:
     | major: I32
 
-fn Ord[Version].cmp |a| (b: Version) I32 { a.major - b.major; }
+fn Ord[Version].cmp |a| (b: Version) I32 { return a.major - b.major; }
 
 main {
     let all: Array[Ord] = [Version { major: 2 }, Version { major: 3 }];

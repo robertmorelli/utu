@@ -3,7 +3,7 @@
 struct Rect:
     | w: F64
 
-fn Rect.square(side: F64) Rect { Rect { w: side }; }
+fn Rect.square(side: F64) Rect { return Rect { w: side }; }
 
 main {
     let r = Rect { w: 1.0 };

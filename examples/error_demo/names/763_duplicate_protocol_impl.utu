@@ -6,8 +6,8 @@ proto P:
 struct S[P]:
     | v: I32
 
-fn P[S].m |a| (b: S) I32 { 1; }
-fn P[S].m |a| (b: S) I32 { 2; }
+fn P[S].m |a| (b: S) I32 { return 1; }
+fn P[S].m |a| (b: S) I32 { return 2; }
 
 main {
     console.log(S { v: 0 }.m(S { v: 1 }));

@@ -1002,7 +1002,7 @@ fn f(
     a998: I32,
     a999: I32,
     a1000: I32
-) I32 { a0; }
+) I32 { return a0; }
 
 main { console.log(1); }
 using console from std:Console

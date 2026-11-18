@@ -84,11 +84,11 @@ struct Machine:
 
 // Printable ASCII and newline may appear in source; anything else is an error.
 fn illegal(c: I32) Bool {
-    c != 10 and (c < 32 or c > 126);
+    return c != 10 and (c < 32 or c > 126);
 }
 
 fn illegal_in_string(c: I32) Bool {
-    c < 32 or c > 126;
+    return c < 32 or c > 126;
 }
 
 fn set(m: Machine, from: I32, c: I32, to: I32) Void {
@@ -96,7 +96,7 @@ fn set(m: Machine, from: I32, c: I32, to: I32) Void {
 }
 
 fn get(m: Machine, from: I32, c: I32) I32 {
-    m.tabs[from * 256 + c];
+    return m.tabs[from * 256 + c];
 }
 
 fn set_range(m: Machine, from: I32, lo: I32, hi: I32, to: I32) Void {
@@ -107,7 +107,7 @@ fn restricted(m: Machine, kind: Kind) I32 {
     let state = m.next;
     m.next += 1;
     m.kinds[state] = kind.i32();
-    state;
+    return state;
 }
 
 // Ends its token before any legal byte it has no edge for.
@@ -116,7 +116,7 @@ fn permissive(m: Machine, kind: Kind) I32 {
     for (0 ..< 256) |c| {
         set(m, state, c, if illegal(c) { error_state; } else { accept_state; });
     };
-    state;
+    return state;
 }
 
 fn variable_state(m: Machine, var_state: I32) I32 {
@@ -125,7 +125,7 @@ fn variable_state(m: Machine, var_state: I32) I32 {
     set_range(m, state, 97, 122, var_state);
     set_range(m, state, 65, 90, var_state);
     set_range(m, state, 48, 57, var_state);
-    state;
+    return state;
 }
 
 fn self_legal(m: Machine, state: I32) Void {
@@ -213,7 +213,7 @@ fn variables(m: Machine) I32 {
     set_range(m, state, 65, 90, state);
     set_range(m, state, 48, 57, state);
     set(m, state, 95, state);
-    state;
+    return state;
 }
 
 // Keywords are paths through the identifier states; each ends in its kind.
@@ -290,7 +290,7 @@ fn build() Machine {
     continuations(m);
     m.tabs = m.tabs.slice(0, m.next * 256);
     m.kinds = m.kinds.slice(0, m.next);
-    m;
+    return m;
 }
 
 fn name_bytes() Array[I32] {
@@ -303,13 +303,13 @@ fn name_bytes() Array[I32] {
             n += 1;
         };
     };
-    out.slice(0, n);
+    return out.slice(0, n);
 }
 
 fn name_offsets() Array[I32] {
     let at = Array[I32].new(Kind.count() + 1, 0);
     for (0 ..< Kind.count()) |k| { at[k + 1] = at[k] + Kind.name(Kind(k)).len(); };
-    at;
+    return at;
 }
 
 // ── Lexing ───────────────────────────────────────────────────────────────────
@@ -366,14 +366,14 @@ fn lex() I32 {
     starts[n] = i;
     ends[n] = j;
     kinds[n] = Kind.END_OF_FILE;
-    n + 1;
+    return n + 1;
 }
 
 // ── Printing ─────────────────────────────────────────────────────────────────
 
 fn emit_bytes(at: I32, text: Str) I32 {
     for (0 ..< text.len()) |k| { out[at + k] = text.get(k); };
-    at + text.len();
+    return at + text.len();
 }
 
 // The token listing, in the Zig compiler's format, into `out`. Returns its length.
@@ -415,7 +415,7 @@ fn listing(n: I32) I32 {
         out[at] = 10;
         at += 1;
     };
-    at;
+    return at;
 }
 
 // A growable GC array, indexed like one.
@@ -425,10 +425,10 @@ mod Vec[T] {
         | len: I32
 
     fn &.new() & {
-        &{ items: Array[T].new_default(16), len: 0 };
+        return &{ items: Array[T].new_default(16), len: 0 };
     }
     fn &.get_index |self| (i: I32) T {
-        self.items[i];
+        return self.items[i];
     }
     fn &.set_index |self| (i: I32, v: T) Void {
         self.items[i] = v;
@@ -472,7 +472,7 @@ struct Scanner:
 fn new_scanner(end: I32, env: Env) Scanner {
     let s = Scanner { cursor: 0, kind: Kind.Start, op: 0, hi: 0, lo: 0, last_hi: 0, last_lo: 0, pos: 0, end: end, env: env };
     s.scan();
-    s;
+    return s;
 }
 
 let syntax_error: fun() Void = @es/\ () => { throw new SyntaxError('jpl'); } \/;
@@ -548,7 +548,7 @@ fn Scanner.take |s| () Kind {
     s.last_lo = s.lo;
     s.scan();
     s.pos += 1;
-    kind;
+    return kind;
 }
 
 fn Scanner.expect |s| (kind: Kind) Void {
@@ -558,14 +558,14 @@ fn Scanner.expect |s| (kind: Kind) Void {
 
 // The current name, interned.
 fn Scanner.name |s| () I32 {
-    src.intern(s.hi, s.lo);
+    return src.intern(s.hi, s.lo);
 }
 
 fn Scanner.expect_name |s| () I32 {
     if s.kind != Kind.VARIABLE { fail(); };
     let name = s.name();
     s.take();
-    name;
+    return name;
 }
 
 // A decimal I64; a value past 2^63 - 1 is a syntax error, as in Zig.
@@ -576,7 +576,7 @@ fn parse_int(i: I32, j: I32) I64 {
         if value > (9223372036854775807 - digit) / 10 { fail(); };
         value = value * 10 + digit;
     };
-    value;
+    return value;
 }
 
 // Digits [. digits]; a value too large for an F64 is a syntax error.
@@ -596,7 +596,7 @@ fn parse_float(i: I32, j: I32) F64 {
         };
     };
     if value > 1.7976931348623157e308 { fail(); };
-    value;
+    return value;
 }
 
 // ── Nodes ────────────────────────────────────────────────────────────────────
@@ -635,12 +635,12 @@ fn node(tag: Tag, a: I32, b: I32, at: I32) I32 {
     node_a.push(a);
     node_b.push(b);
     node_token.push(at);
-    id;
+    return id;
 }
 
 fn typed_node(tag: Tag, a: I32, b: I32, at: I32, type_id: I32) I32 {
     node_type.push(type_id);
-    node(tag, a, b, at);
+    return node(tag, a, b, at);
 }
 
 fn reset_nodes() Void {
@@ -671,7 +671,7 @@ fn precedence_table() Array[I32] {
     table[42] = 4;
     table[47] = 4;
     table[37] = 4;
-    table;
+    return table;
 }
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
@@ -681,7 +681,7 @@ fn precedence_table() Array[I32] {
 fn string_leaf(s: Scanner) I32 {
     let at = s.pos;
     s.expect(Kind.STRING);
-    node(Tag.Leaf, s.last_hi, s.last_lo, at);
+    return node(Tag.Leaf, s.last_hi, s.last_lo, at);
 }
 
 fn expr_list(s: Scanner, close: Kind) I32 {
@@ -694,7 +694,7 @@ fn expr_list(s: Scanner, close: Kind) I32 {
         };
     };
     s.expect(close);
-    list;
+    return list;
 }
 
 fn loop_expr(s: Scanner, array: Bool, at: I32) I32 {
@@ -713,13 +713,13 @@ fn loop_expr(s: Scanner, array: Bool, at: I32) I32 {
     };
     s.expect(Kind.RSQUARE);
     let body = expr(s, 0);
-    node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at);
+    return node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at);
 }
 
 fn prefix(s: Scanner) I32 {
     let at = s.pos;
     let code = if s.kind == Kind.OP { s.op; } else { 0; };
-    match s.take() {
+    return match s.take() {
         Kind.VARIABLE => node(Tag.Leaf, at, 0, 0),
         Kind.TRUE => node(Tag.Leaf, at, 0, 0),
         Kind.FALSE => node(Tag.Leaf, at, 0, 0),
@@ -784,7 +784,7 @@ fn expr(s: Scanner, min: I32) I32 {
             left = node(Tag.Binary, left, expr(s, binding + 1), operator);
         };
     };
-    left;
+    return left;
 }
 
 fn type_expr(s: Scanner) I32 {
@@ -804,12 +804,12 @@ fn type_expr(s: Scanner) I32 {
         s.expect(Kind.RSQUARE);
         result = node(Tag.TypeNode, result, rank, 0);
     };
-    result;
+    return result;
 }
 
 fn annotation(s: Scanner) I32 {
     s.expect(Kind.COLON);
-    type_expr(s);
+    return type_expr(s);
 }
 
 fn lvalue(s: Scanner, binding: Bool) I32 {
@@ -841,7 +841,7 @@ fn lvalue(s: Scanner, binding: Bool) I32 {
         return result;
     };
     if binding { result = node(Tag.Binding, result, annotation(s), 0); };
-    result;
+    return result;
 }
 
 fn stmt(s: Scanner) I32 {
@@ -864,7 +864,7 @@ fn stmt(s: Scanner) I32 {
         },
     };
     s.expect(Kind.NEWLINE);
-    result;
+    return result;
 }
 
 // Every command but `time` ends its line.
@@ -944,7 +944,7 @@ fn command(s: Scanner) I32 {
         },
     };
     s.expect(Kind.NEWLINE);
-    result;
+    return result;
 }
 
 fn program(s: Scanner) I32 {
@@ -956,13 +956,13 @@ fn program(s: Scanner) I32 {
             root = node(Tag.List, root, command(s), 0);
         };
     };
-    root;
+    return root;
 }
 
 // Parse `src` into the node mems. Returns the token count, or -1 for a syntax error.
 fn parse() I32 {
     reset_nodes();
-    try {
+    return try {
         let s = new_scanner(src.len() - 1, new_env());
         program(s);
         s.pos;
@@ -1039,7 +1039,7 @@ struct Env:
     | dim_names: Vec[I32]
 
 fn new_env() Env {
-    Env { bound: Vec[I32].new(), sym_tag: Vec[SymbolTag].new(), sym_type: Vec[I32].new(), sym_params_start: Vec[I32].new(), sym_params_len: Vec[I32].new(), type_tag: Vec[TypeTag].new(), type_element: Vec[I32].new(), type_rank: Vec[I32].new(), type_fields_start: Vec[I32].new(), type_fields_len: Vec[I32].new(), field_name: Vec[I32].new(), field_type: Vec[I32].new(), fn_types: Vec[I32].new(), locals: Vec[I32].new(), fn_params: Vec[I32].new(), pat_tag: Vec[PatternTag].new(), pat_name: Vec[I32].new(), pat_node: Vec[I32].new(), pat_declared: Vec[I32].new(), pat_first: Vec[I32].new(), pat_last: Vec[I32].new(), pat_next: Vec[I32].new(), pat_count: Vec[I32].new(), pat_dim_start: Vec[I32].new(), pat_dim_count: Vec[I32].new(), dim_names: Vec[I32].new() };
+    return Env { bound: Vec[I32].new(), sym_tag: Vec[SymbolTag].new(), sym_type: Vec[I32].new(), sym_params_start: Vec[I32].new(), sym_params_len: Vec[I32].new(), type_tag: Vec[TypeTag].new(), type_element: Vec[I32].new(), type_rank: Vec[I32].new(), type_fields_start: Vec[I32].new(), type_fields_len: Vec[I32].new(), field_name: Vec[I32].new(), field_type: Vec[I32].new(), fn_types: Vec[I32].new(), locals: Vec[I32].new(), fn_params: Vec[I32].new(), pat_tag: Vec[PatternTag].new(), pat_name: Vec[I32].new(), pat_node: Vec[I32].new(), pat_declared: Vec[I32].new(), pat_first: Vec[I32].new(), pat_last: Vec[I32].new(), pat_next: Vec[I32].new(), pat_count: Vec[I32].new(), pat_dim_start: Vec[I32].new(), pat_dim_count: Vec[I32].new(), dim_names: Vec[I32].new() };
 }
 
 
@@ -1054,17 +1054,17 @@ fn new_env() Env {
 fn intern_text(text: Str) I32 {
     let start = src.len();
     for (0 ..< text.len()) |k| { src.push(text.get(k)); };
-    src.intern(start, src.len());
+    return src.intern(start, src.len());
 }
 
 fn symbol_of(e: Env, name: I32) I32 {
-    if name < e.bound.len { e.bound[name]; } else { -1; };
+    return if name < e.bound.len { e.bound[name]; } else { -1; };
 }
 
 fn lookup(e: Env, name: I32) I32 {
     let symbol = symbol_of(e, name);
     if symbol < 0 { fail(); };
-    symbol;
+    return symbol;
 }
 
 fn bind(e: Env, name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
@@ -1077,7 +1077,7 @@ fn bind(e: Env, name: I32, tag: SymbolTag, type_id: I32, local: Bool) I32 {
     e.sym_params_len.push(0);
     e.bound[name] = symbol;
     if local { e.locals.push(name); };
-    symbol;
+    return symbol;
 }
 
 fn unbind_to(e: Env, mark: I32) Void {
@@ -1095,14 +1095,14 @@ fn new_type(e: Env, tag: TypeTag, element: I32, rank: I32, start: I32, count: I3
     e.type_rank.push(rank);
     e.type_fields_start.push(start);
     e.type_fields_len.push(count);
-    id;
+    return id;
 }
 
 fn array_type(e: Env, element: I32, rank: I32) I32 {
     for (0 ..< e.type_tag.len) |t| {
         if e.type_tag[t] == TypeTag.ArrayType and e.type_element[t] == element and e.type_rank[t] == rank { return t; };
     };
-    new_type(e, TypeTag.ArrayType, element, rank, 0, 0);
+    return new_type(e, TypeTag.ArrayType, element, rank, 0, 0);
 }
 
 fn field_type_of(e: Env, record: I32, name: I32) I32 {
@@ -1110,7 +1110,7 @@ fn field_type_of(e: Env, record: I32, name: I32) I32 {
     for (start ..< start + e.type_fields_len[record]) |f| {
         if e.field_name[f] == name { return e.field_type[f]; };
     };
-    0;
+    return 0;
 }
 
 fn builtin(e: Env, name: Str, result: I32, first: I32, second: I32) Void {
@@ -1182,7 +1182,7 @@ fn typed_string(s: Scanner) I32 {
     let e = s.env;
     let at = s.pos;
     s.expect(Kind.STRING);
-    typed_node(Tag.Leaf, s.last_hi, s.last_lo, at, 0);
+    return typed_node(Tag.Leaf, s.last_hi, s.last_lo, at, 0);
 }
 
 // An array literal's elements, which share one type: .{node, count, type}.
@@ -1206,7 +1206,7 @@ fn typed_elements(s: Scanner) .{I32, I32, I32} {
         };
     };
     s.expect(Kind.RSQUARE);
-    .{list, count, element};
+    return .{list, count, element};
 }
 
 // Indices, which are Ints: .{node, count}.
@@ -1225,7 +1225,7 @@ fn typed_indices(s: Scanner) .{I32, I32} {
         };
     };
     s.expect(Kind.RSQUARE);
-    .{list, count};
+    return .{list, count};
 }
 
 // Arguments or record fields, typed as `expected[start ..< start + count]`
@@ -1248,7 +1248,7 @@ fn typed_arguments(s: Scanner, close: Kind, fields: Bool, start: I32, count: I32
     };
     s.expect(close);
     if n != count { fail(); };
-    list;
+    return list;
 }
 
 // `array[i : n, …] body` and `sum[…] body`: .{node, type}.
@@ -1278,7 +1278,7 @@ fn typed_loop(s: Scanner, array: Bool, at: I32) .{I32, I32} {
     if not array and body_type != t_int and body_type != t_float { fail(); };
     let result = if array { array_type(e, body_type, count); } else { body_type; };
     unbind_to(e, mark);
-    .{typed_node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at, result), result};
+    return .{typed_node(if array { Tag.ArrayExpr; } else { Tag.Loop; }, bindings, body, at, result), result};
 }
 
 // A prefix expression: .{node, type, bare name}. A name of a function or
@@ -1290,7 +1290,7 @@ fn typed_prefix(s: Scanner) .{I32, I32, I32} {
     let kind = s.kind;
     let name = if kind == Kind.VARIABLE { s.name(); } else { unnamed; };
     s.take();
-    match kind {
+    return match kind {
         Kind.VARIABLE => {
             let symbol = lookup(e, name);
             let value = if e.sym_tag[symbol] == SymbolTag.Variable { e.sym_type[symbol]; } else { 0; };
@@ -1352,7 +1352,7 @@ fn operator_type(code: I32, left: I32, right: I32) I32 {
     };
     if left != right or (left != t_int and left != t_float) { fail(); };
     let compares = code == 60 or code == 62 or code == 61 or code == 126;
-    if compares { t_bool; } else { left; };
+    return if compares { t_bool; } else { left; };
 }
 
 // An expression whose operators bind at least `min`: .{node, type, bare name}.
@@ -1409,7 +1409,7 @@ fn typed_expr(s: Scanner, min: I32) .{I32, I32, I32} {
         bare = unnamed;
     };
     if left_type == 0 { fail(); };
-    .{left, left_type, bare};
+    return .{left, left_type, bare};
 }
 
 fn typed_type(s: Scanner) I32 {
@@ -1440,13 +1440,13 @@ fn typed_type(s: Scanner) I32 {
         s.expect(Kind.RSQUARE);
         result = array_type(e, result, rank);
     };
-    result;
+    return result;
 }
 
 fn typed_annotation(s: Scanner) I32 {
     let e = s.env;
     s.expect(Kind.COLON);
-    typed_type(s);
+    return typed_type(s);
 }
 
 // A binding target: `x`, `a[i, j]`, or `point{x, y}` (with `: type` on
@@ -1511,7 +1511,7 @@ fn pattern(s: Scanner, parameter: Bool) I32 {
         target = typed_node(Tag.Binding, target, 0, at, e.pat_declared[id]);
     };
     e.pat_node[id] = target;
-    id;
+    return id;
 }
 
 fn bind_pattern(e: Env, id: I32, expected: I32, local: Bool) Void {
@@ -1567,7 +1567,7 @@ fn typed_stmt(s: Scanner, returns: I32) .{I32, Bool} {
         },
     };
     s.expect(Kind.NEWLINE);
-    result;
+    return result;
 }
 
 fn typed_struct(s: Scanner, at: I32) I32 {
@@ -1592,7 +1592,7 @@ fn typed_struct(s: Scanner, at: I32) I32 {
     };
     s.expect(Kind.RCURLY);
     bind(e, name, SymbolTag.Alias, new_type(e, TypeTag.Record, 0, 0, start, e.field_name.len - start), false);
-    typed_node(Tag.Command, fields, 0, at, t_void);
+    return typed_node(Tag.Command, fields, 0, at, t_void);
 }
 
 fn typed_fn(s: Scanner, at: I32) I32 {
@@ -1634,7 +1634,7 @@ fn typed_fn(s: Scanner, at: I32) I32 {
     s.expect(Kind.RCURLY);
     if returns != t_void and not returned { fail(); };
     unbind_to(e, mark);
-    typed_node(Tag.Command, body, 0, at, t_void);
+    return typed_node(Tag.Command, body, 0, at, t_void);
 }
 
 // Every command but `time` ends its line.
@@ -1685,7 +1685,7 @@ fn typed_command(s: Scanner) I32 {
         },
     };
     s.expect(Kind.NEWLINE);
-    result;
+    return result;
 }
 
 fn typed_program(s: Scanner) I32 {
@@ -1698,7 +1698,7 @@ fn typed_program(s: Scanner) I32 {
             root = typed_node(Tag.List, root, typed_command(s), 0, 0);
         };
     };
-    root;
+    return root;
 }
 
 // Parse and type check `src`. Returns the token count + 1 (as Zig reports
@@ -1720,7 +1720,7 @@ fn check() .{I32, I32, I32} {
     let result = .{tokens, e.sym_tag.len, e.type_tag.len};
     // Drop the builtin names init_env appended after the sentinel.
     src.resize(end + 1);
-    result;
+    return result;
 }
 
 // ── The command line ───────────────────────────────────────────────────────────
@@ -1749,7 +1749,7 @@ fn time(runs: I32, print: Bool) F64 {
         if print { listing(n); };
         if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
     };
-    (samples sort(F64) |a, b| { a < b; })[runs / 2];
+    return (samples sort(F64) |a, b| { a < b; })[runs / 2];
 }
 
 // jpl <file.jpl> -l       token listing, as the Zig compiler prints it
@@ -1811,5 +1811,5 @@ fn time_parse(runs: I32, types: Bool) F64 {
         if types { let .{_t, _s, _y} = check(); } else { parse(); };
         if r >= 3 { samples[r - 3] = Web.performance.now() - begin; };
     };
-    (samples sort(F64) |a, b| { a < b; })[runs / 2];
+    return (samples sort(F64) |a, b| { a < b; })[runs / 2];
 }

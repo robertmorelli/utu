@@ -1,11 +1,11 @@
 // What: one file declares two mods of one name
 // Expect: Duplicate declaration util, at the second mod
 mod util {
-    fn v() I32 { 1; }
+    fn v() I32 { return 1; }
 }
 
 mod util {
-    fn v() I32 { 2; }
+    fn v() I32 { return 2; }
 }
 
 main {

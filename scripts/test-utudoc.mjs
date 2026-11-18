@@ -23,7 +23,7 @@ struct Point:
 fn distance(a: Point, b: Point) F64 {
     let dx = a.x - b.x;
     let dy = a.y - b.y;
-    (dx * dx + dy * dy).sqrt();
+    return (dx * dx + dy * dy).sqrt();
 }
 
 //! = Exported
@@ -31,7 +31,7 @@ fn distance(a: Point, b: Point) F64 {
 
 lib {
     /// From the origin; see @Point; and @nowhere.
-    fn norm(x: F64, y: F64) F64 { distance(Point { x: x, y: y }, Point { x: 0.0, y: 0.0 }); }
+    fn norm(x: F64, y: F64) F64 { return distance(Point { x: x, y: y }, Point { x: 0.0, y: 0.0 }); }
 }
 `);
   await fs.writeFile(path.join(dir, 'shapes.utu'), `mod Shapes {
@@ -72,7 +72,7 @@ lib {
   assert.match(typ, /The width\./);
   // A doc comment reads no file: typst's root holds only the document.
   const other = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-doc-read-'));
-  await fs.writeFile(path.join(other, 'reads.utu'), '/// #read("/etc/hosts")\nfn f() I32 { 1; }\n');
+  await fs.writeFile(path.join(other, 'reads.utu'), '/// #read("/etc/hosts")\nfn f() I32 { return 1; }\n');
   const reads = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'utudoc', 'utudoc.mjs'), other, '-o', path.join(other, 'docs.pdf')], { encoding: 'utf8' });
   await fs.rm(other, { recursive: true, force: true });
   if (!/not installed/.test(reads.stdout)) {

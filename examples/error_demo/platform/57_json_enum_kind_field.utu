@@ -6,7 +6,7 @@ enum Event:
     | Key { code: I32 }
 
 fn load(text: Str) ?Event {
-    @json/\ decode Event text \/;
+    return @json/\ decode Event text \/;
 }
 
 main {

@@ -1,7 +1,7 @@
 // What: a misspelled type inside a generic argument (Array[Strng])
 // Expect: Unknown type 'Strng'; did you mean 'Str'?
 fn count(words: Array[Strng]) I32 {
-    words.len();
+    return words.len();
 }
 
 main {

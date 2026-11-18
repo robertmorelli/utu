@@ -8,7 +8,7 @@ fn length(head: ?Node) I32 {
     let n = 0;
     let cur = head;
     while (cur) { n += 1; cur = null; };
-    n;
+    return n;
 }
 
 main {

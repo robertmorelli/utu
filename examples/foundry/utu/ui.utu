@@ -52,7 +52,7 @@ mod ui {
     let item_count: I32 = 26
 
     fn categories() Array[Str] {
-        ["extraction", "smelting", "production", "logistics", "storage", "energy", "science", "circuits"]
+        return ["extraction", "smelting", "production", "logistics", "storage", "energy", "science", "circuits"]
     }
 
     fn category_color(category: Str) Str {
@@ -64,7 +64,7 @@ mod ui {
                 color = colors[i]
             }
         }
-        color
+        return color
     }
 
     // Two capital letters from a machine name: "electric-miner" → "EM".
@@ -77,14 +77,14 @@ mod ui {
             }
         }
         codes[1] = if dash > 0 and dash + 1 < name.len() { name[dash + 1] - 32 } else { name[1] - 32 }
-        Str.from_codes(codes, 2)
+        return Str.from_codes(codes, 2)
     }
 
     fn new_ui(w: sim.World, game_text: Str, starter_text: Str) Ui {
         let machines = w.game.machines
         let empty_alerts: Array[Alert] = []
         let none: Array[I32] = []
-        Ui {
+        return Ui {
             w: w, game_text: game_text, starter_text: starter_text, speed: 1, tool: tool_none, dir: 1, tab: 0,
             cam_x: 0.0, cam_y: 0.0, zoom: 24.0, selected: -1, pinned: none, hover_x: -1, hover_y: -1, windows: [],
             prod: Array[I32].new_default(60 * item_count), prod10: Array[I32].new_default(60 * item_count),
@@ -162,18 +162,18 @@ mod ui {
         for (0..<60) |s| {
             total += if ui.range10 { ui.prod10[s * item_count + item] } else { ui.prod[s * item_count + item] }
         }
-        if ui.range10 { total / 10 } else { total }
+        return if ui.range10 { total / 10 } else { total }
     }
 
     // ── small widgets ────────────────────────────────────────────────────────
 
     fn percent(value: I32, max: I32) Str {
         let p = if max <= 0 { 0 } else { sim.imin(100, sim.imax(0, value * 100 / max)) }
-        p.str() + "%"
+        return p.str() + "%"
     }
 
     fn bar(value: I32, max: I32, kind: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.bar {
             class = kind
             i {
@@ -184,7 +184,7 @@ mod ui {
     }
 
     fn row(label: Str, value: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.row {
             span.muted { = label }
             b { = value }
@@ -193,7 +193,7 @@ mod ui {
     }
 
     fn meter_row(label: Str, value: I32, max: I32, kind: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.row {
             span.muted { = label }
             = bar(value, max, kind)
@@ -202,11 +202,11 @@ mod ui {
     }
 
     fn item_name(ui: Ui, item: I32) Str {
-        if item < 0 { "empty" } else { ui.w.game.items[item].label }
+        return if item < 0 { "empty" } else { ui.w.game.items[item].label }
     }
 
     fn slot(ui: Ui, item: I32, count: I32) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.slot {
             title = item_name(ui, item)
             if item >= 0 {
@@ -221,7 +221,7 @@ mod ui {
 
     // Nonzero counts as slots.
     fn slots(ui: Ui, counts: Array[I32]) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.slots {
             for ((0..<counts.len()) filter |i| { counts[i] > 0 }) |i| key i.str() {
                 = slot(ui, i, counts[i])
@@ -231,7 +231,7 @@ mod ui {
     }
 
     fn lane(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.lane {
             for (0..<(e.belt_n / 2)) |k| key k.str() {
                 i {
@@ -244,7 +244,7 @@ mod ui {
     }
 
     fn state_name(e: sim.Entity) Str {
-        match e.state {
+        return match e.state {
             0 => "idle",
             1 => "carrying",
             ~> "returning",
@@ -252,14 +252,14 @@ mod ui {
     }
 
     fn neighbor_name(ui: Ui, x: I32, y: I32) Str {
-        promote sim.at(ui.w, x, y) {
+        return promote sim.at(ui.w, x, y) {
             |n| => ui.w.game.machines[n.machine].label,
             ~> "nothing",
         }
     }
 
     fn fluid_gauge(ui: Ui, item: I32, amount: I32, max: I32) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             title = item_name(ui, item) + ": " + amount.str()
             div.gauge {
@@ -280,11 +280,11 @@ mod ui {
         let minutes = phase * 1440 / 25200
         let hours = minutes / 60
         let mins = minutes % 60
-        (if hours < 10 { "0" } else { "" }) + hours.str() + ":" + (if mins < 10 { "0" } else { "" }) + mins.str()
+        return (if hours < 10 { "0" } else { "" }) + hours.str() + ":" + (if mins < 10 { "0" } else { "" }) + mins.str()
     }
 
     fn hud(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "hud"
         header.hud {
             span.hud-title { "FOUNDRY" }
@@ -347,18 +347,18 @@ mod ui {
 
     fn research_name(ui: Ui) Str {
         let r = ui.w.research_current
-        if r < 0 { "No research" } else { ui.w.game.techs[r].label }
+        return if r < 0 { "No research" } else { ui.w.game.techs[r].label }
     }
 
     fn research_percent(ui: Ui) Str {
         let r = ui.w.research_current
-        if r < 0 { "0%" } else { percent(ui.w.research_progress, ui.w.game.techs[r].units) }
+        return if r < 0 { "0%" } else { percent(ui.w.research_progress, ui.w.game.techs[r].units) }
     }
 
     // ── palette ──────────────────────────────────────────────────────────────
 
     fn palette(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "palette"
         nav.palette {
             div.tabs {
@@ -420,7 +420,7 @@ mod ui {
     // ── inspector ────────────────────────────────────────────────────────────
 
     fn is_pinned(ui: Ui, id: I32) Bool {
-        ui.pinned any |p| { p == id }
+        return ui.pinned any |p| { p == id }
     }
 
     fn toggle_pin(ui: Ui, id: I32) Void {
@@ -442,11 +442,11 @@ mod ui {
                 ~> {},
             }
         }
-        found
+        return found
     }
 
     fn inspector(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "inspector"
         aside.inspector {
             for inspected(ui) |e| key "panel-" + e.id.str() {
@@ -460,7 +460,7 @@ mod ui {
     }
 
     fn machine_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         section.panel {
             class = if e.id == ui.selected { "selected" } else { "" }
             div.panel-head {
@@ -505,7 +505,7 @@ mod ui {
     }
 
     fn panel_body(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        match e.machine {
+        return match e.machine {
             0 => burner_miner(ui, e),
             1 => electric_miner(ui, e),
             2 => offshore_pump(ui, e),
@@ -549,15 +549,15 @@ mod ui {
     // ── extraction ───────────────────────────────────────────────────────────
 
     fn tile_ore(ui: Ui, x: I32, y: I32) I32 {
-        if sim.inside(ui.w, x, y) { ui.w.res_kind[y * ui.w.width + x] } else { -1 }
+        return if sim.inside(ui.w, x, y) { ui.w.res_kind[y * ui.w.width + x] } else { -1 }
     }
 
     fn tile_amount(ui: Ui, x: I32, y: I32) I32 {
-        if sim.inside(ui.w, x, y) { ui.w.res_amount[y * ui.w.width + x] } else { 0 }
+        return if sim.inside(ui.w, x, y) { ui.w.res_amount[y * ui.w.width + x] } else { 0 }
     }
 
     fn burner_miner(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 span.muted { "Fuel" }
@@ -575,7 +575,7 @@ mod ui {
     }
 
     fn electric_miner(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.grid3 {
                 for (0..<9) |k| key k.str() {
@@ -599,7 +599,7 @@ mod ui {
         let target = sim.back(ui.w, e, 1)
         let fill = promote target { |t| => t.amount, ~> 0, }
         let capacity = promote target { |t| => ui.w.speed[t.machine], ~> 100, }
-        @wutu/\
+        return @wutu/\
         div {
             = row("Flow", if e.busy { "600 / s" } else { "0 / s" })
             = meter_row("Target pipe", fill, capacity, "info")
@@ -609,7 +609,7 @@ mod ui {
 
     fn pumpjack(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         let field = tile_amount(ui, e.x, e.y)
-        @wutu/\
+        return @wutu/\
         div {
             = row("Yield", (sim.imax(100, sim.imin(1000, field / 100)) / 10).str() + "%")
             = row("Oil field", field.str())
@@ -624,7 +624,7 @@ mod ui {
     // ── smelting ─────────────────────────────────────────────────────────────
 
     fn recipe_name(ui: Ui, r: I32) Str {
-        if r < 0 { "none" } else { ui.w.game.recipes[r].name }
+        return if r < 0 { "none" } else { ui.w.game.recipes[r].name }
     }
 
     fn first_item(counts: Array[I32]) I32 {
@@ -634,11 +634,11 @@ mod ui {
                 found = i
             }
         }
-        found
+        return found
     }
 
     fn furnace_slots(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 span.flame {
@@ -657,7 +657,7 @@ mod ui {
     }
 
     fn stone_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 span.muted { "Fuel" }
@@ -670,7 +670,7 @@ mod ui {
     }
 
     fn steel_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 span.muted { "Fuel" }
@@ -693,7 +693,7 @@ mod ui {
     }
 
     fn electric_furnace(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = row("Power draw", if e.busy { (180 * ui.w.satisfaction / 1000).str() + " kW" } else { "idle" })
             = furnace_slots(ui, e)
@@ -705,7 +705,7 @@ mod ui {
     // ── production ───────────────────────────────────────────────────────────
 
     fn ingredients(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         table {
             if e.recipe >= 0 {
                 for ui.w.game.recipes[e.recipe].ingredients |ing| key "in" + ing[0].str() {
@@ -732,7 +732,7 @@ mod ui {
 
     fn progress_ring(e: sim.Entity, time: I32) Browser.Element {
         let fraction = if time <= 0 { 0.0 } else { e.progress.f64() / (time * 1000).f64() }
-        @wutu/\
+        return @wutu/\
         svg {
             viewBox = "0 0 40 40"
             width: 40px
@@ -761,15 +761,15 @@ mod ui {
     }
 
     fn recipe_time(ui: Ui, e: sim.Entity) I32 {
-        if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time } else { 0 }
+        return if e.recipe >= 0 { ui.w.game.recipes[e.recipe].time } else { 0 }
     }
 
     fn allowed_recipes(ui: Ui, e: sim.Entity) Array[I32] {
-        (0..<ui.w.game.recipes.len()) filter |r| { sim.recipe_allowed(ui.w, e, r) } collect(I32)
+        return (0..<ui.w.game.recipes.len()) filter |r| { sim.recipe_allowed(ui.w, e, r) } collect(I32)
     }
 
     fn assembler_1(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.recipe-grid {
                 for allowed_recipes(ui, e) |r| key r.str() {
@@ -791,11 +791,11 @@ mod ui {
     }
 
     fn effective_speed(ui: Ui, e: sim.Entity) I32 {
-        (ui.w.speed[e.machine] + 250 * sim.beacons(ui.w, e) * ui.w.satisfaction / 1000) * ui.w.satisfaction / 1000
+        return (ui.w.speed[e.machine] + 250 * sim.beacons(ui.w, e) * ui.w.satisfaction / 1000) * ui.w.satisfaction / 1000
     }
 
     fn assembler_2(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             select as pick {
                 aria-label = "Recipe"
@@ -823,7 +823,7 @@ mod ui {
     }
 
     fn assembler_3(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             input as query {
                 type = "search"
@@ -852,7 +852,7 @@ mod ui {
     }
 
     fn fluid_side(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.gauges {
             if e.recipe >= 0 {
                 for (ui.w.game.recipes[e.recipe].ingredients filter |ing| { ui.w.is_fluid[ing[0]] }) |ing| key "fi" + ing[0].str() {
@@ -868,7 +868,7 @@ mod ui {
     }
 
     fn chemical_plant(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             select as pick {
                 aria-label = "Recipe"
@@ -896,7 +896,7 @@ mod ui {
     }
 
     fn oil_refinery(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.gauges {
                 = fluid_gauge(ui, 23, e.inv[23], 200)
@@ -910,7 +910,7 @@ mod ui {
     }
 
     fn centrifuge(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 = progress_ring(e, 720)
@@ -928,7 +928,7 @@ mod ui {
     // ── logistics ────────────────────────────────────────────────────────────
 
     fn belt_items(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.items {
             for (0..<(e.belt_n / 2)) |k| key k.str() {
                 span {
@@ -944,7 +944,7 @@ mod ui {
     }
 
     fn belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = lane(ui, e)
             = belt_items(ui, e)
@@ -954,7 +954,7 @@ mod ui {
     }
 
     fn fast_belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = lane(ui, e)
             = meter_row("Compression", (e.belt_n / 2) * 64, 256, "info")
@@ -964,7 +964,7 @@ mod ui {
     }
 
     fn express_belt(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = lane(ui, e)
             = row("State", if e.belt_n > 0 and e.belt[1] >= 256 { "blocked" } else { "moving" })
@@ -974,7 +974,7 @@ mod ui {
     }
 
     fn splitter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 for (0..<3) |p| key p.str() {
@@ -1022,11 +1022,11 @@ mod ui {
                 ~> {},
             }
         }
-        found
+        return found
     }
 
     fn underground(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 button {
@@ -1051,14 +1051,14 @@ mod ui {
     }
 
     fn connected(ui: Ui, e: sim.Entity, side: I32) Bool {
-        promote sim.neighbor(ui.w, e, side) {
+        return promote sim.neighbor(ui.w, e, side) {
             |n| => n.cls == 10,
             ~> false,
         }
     }
 
     fn pipe(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = row("Fluid", if e.fluid >= 0 { item_name(ui, e.fluid) } else { "empty" })
             = meter_row("Amount", e.amount, 100, "info")
@@ -1071,7 +1071,7 @@ mod ui {
     }
 
     fn storage_tank(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.tank {
                 i {
@@ -1089,7 +1089,7 @@ mod ui {
         let reach = ui.w.reach[e.machine]
         let dxs = [0, 1, 0, -1]
         let dys = [-1, 0, 1, 0]
-        @wutu/\
+        return @wutu/\
         div {
             = row("State", state_name(e))
             = meter_row("Swing", e.timer, ui.w.speed[e.machine], "info")
@@ -1105,11 +1105,11 @@ mod ui {
     }
 
     fn inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        inserter_common(ui, e)
+        return inserter_common(ui, e)
     }
 
     fn long_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.reach {
                 for (0..<5) |k| key k.str() {
@@ -1124,7 +1124,7 @@ mod ui {
     }
 
     fn fast_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = row("State", state_name(e))
             div.row {
@@ -1138,7 +1138,7 @@ mod ui {
     }
 
     fn filter_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.items {
                 for (0..<22) |i| key i.str() {
@@ -1162,7 +1162,7 @@ mod ui {
     }
 
     fn stack_inserter(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             label.row {
                 span.muted { = "Stack size " + e.stack.str() }
@@ -1188,12 +1188,12 @@ mod ui {
     // ── storage ──────────────────────────────────────────────────────────────
 
     fn used_slots(counts: Array[I32]) I32 {
-        counts fold(0) |a, c| { a + (c + 49) / 50 }
+        return counts fold(0) |a, c| { a + (c + 49) / 50 }
     }
 
     fn chest_grid(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         let stacks = (0..<e.inv.len()) flat_map |i| { (0..<((e.inv[i] + 49) / 50)) map |k| { i } collect(I32) } collect(I32)
-        @wutu/\
+        return @wutu/\
         div.chest-grid {
             for (0..<ui.w.speed[e.machine]) |s| key s.str() {
                 div {
@@ -1209,7 +1209,7 @@ mod ui {
     }
 
     fn wooden_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = chest_grid(ui, e)
             = row("Used", used_slots(e.inv).str() + " of 16 slots")
@@ -1218,7 +1218,7 @@ mod ui {
     }
 
     fn steel_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = chest_grid(ui, e)
             = meter_row("Used", used_slots(e.inv), 48, "")
@@ -1235,7 +1235,7 @@ mod ui {
     }
 
     fn requester_chest(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         table {
             for ((0..<e.inv.len()) filter |i| { e.inv[i] > 0 }) |i| key i.str() {
                 tr {
@@ -1253,7 +1253,7 @@ mod ui {
     // ── energy ───────────────────────────────────────────────────────────────
 
     fn steam_engine(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 span.muted { "Fuel" }
@@ -1269,7 +1269,7 @@ mod ui {
 
     fn solar_panel(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         let angle = (ui.w.tick % 25200).f64() / 25200.0 * 6.2832
-        @wutu/\
+        return @wutu/\
         div {
             svg {
                 viewBox = "0 0 100 50"
@@ -1295,7 +1295,7 @@ mod ui {
     }
 
     fn accumulator(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = meter_row("Charge", e.charge, 5000, "good")
             = row("Stored", e.charge.str() + " / 5000")
@@ -1308,7 +1308,7 @@ mod ui {
 
     fn lab(ui: Ui, e: sim.Entity) Browser.HTMLElement {
         let r = ui.w.research_current
-        @wutu/\
+        return @wutu/\
         div {
             = row("Research", research_name(ui))
             div.slots {
@@ -1323,7 +1323,7 @@ mod ui {
     }
 
     fn radar(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = meter_row("Sweep", e.progress, 300000, "info")
             = row("Chunks revealed", e.crafts.str())
@@ -1338,7 +1338,7 @@ mod ui {
                 ~> false,
             }
         }
-        @wutu/\
+        return @wutu/\
         div {
             = row("Crafters in range", count.str())
             = row("Bonus each", "+" + (25 * ui.w.satisfaction / 1000).str() + "% speed")
@@ -1347,14 +1347,14 @@ mod ui {
     }
 
     fn combinator_source(ui: Ui, e: sim.Entity) I32 {
-        promote sim.back(ui.w, e, 1) {
+        return promote sim.back(ui.w, e, 1) {
             |s| => if s.inv.len() > 0 { s.inv[e.cond_item] } else { 0 },
             ~> 0,
         }
     }
 
     fn combinator(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 select as item {
@@ -1400,7 +1400,7 @@ mod ui {
     }
 
     fn lamp(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.lamp {
                 class = if e.signal { "on" } else { "" }
@@ -1411,14 +1411,14 @@ mod ui {
     }
 
     fn connected_combinator(ui: Ui, e: sim.Entity, side: I32) Bool {
-        promote sim.neighbor(ui.w, e, side) {
+        return promote sim.neighbor(ui.w, e, side) {
             |n| => n.cls == 19,
             ~> false,
         }
     }
 
     fn silo(ui: Ui, e: sim.Entity) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             = meter_row("Rocket", e.held, 20, "good")
             = meter_row("Part", e.progress, 180000, "info")
@@ -1442,7 +1442,7 @@ mod ui {
     // ── footer ───────────────────────────────────────────────────────────────
 
     fn footer(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "footer"
         footer.footer {
             div.alerts {
@@ -1473,7 +1473,7 @@ mod ui {
         let x = ui.hover_x
         let y = ui.hover_y
         let inside = sim.inside(ui.w, x, y)
-        @wutu/\
+        return @wutu/\
         div {
             if inside {
                 = row("Tile", "(" + x.str() + ", " + y.str() + ")")
@@ -1490,7 +1490,7 @@ mod ui {
     // ── windows ──────────────────────────────────────────────────────────────
 
     fn is_open(ui: Ui, name: Str) Bool {
-        ui.windows any |w| { w == name }
+        return ui.windows any |w| { w == name }
     }
 
     fn toggle_window(ui: Ui, name: Str) Void {
@@ -1502,12 +1502,12 @@ mod ui {
     }
 
     fn window_title(name: Str) Str {
-        name.slice(0, 1).to_upper() + name.slice(1, name.len())
+        return name.slice(0, 1).to_upper() + name.slice(1, name.len())
     }
 
     // The open windows, side by side.
     fn windows(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         @island "windows"
         div {
             if ui.windows.len() > 0 {
@@ -1535,7 +1535,7 @@ mod ui {
     }
 
     fn window_body(ui: Ui, name: Str) Browser.HTMLElement {
-        if name == "research" { research_window(ui) } else {
+        return if name == "research" { research_window(ui) } else {
             if name == "production" { production_window(ui) } else {
                 if name == "power" { power_window(ui) } else { saves_window(ui) }
             }
@@ -1543,7 +1543,7 @@ mod ui {
     }
 
     fn tech_state(ui: Ui, t: I32) Str {
-        if ui.w.done[t] == 1 { "done" } else {
+        return if ui.w.done[t] == 1 { "done" } else {
             if ui.w.research_current == t { "current" } else {
                 if sim.research_available(ui.w, t) { "available" } else { "locked" }
             }
@@ -1553,11 +1553,11 @@ mod ui {
     fn unlocks(ui: Ui, t: I32) Str {
         let tech = ui.w.game.techs[t]
         let parts = (tech.machines map |m| { ui.w.game.machines[m].label } collect(Str)) chain(tech.recipes map |r| { ui.w.game.recipes[r].name } collect(Str)) collect(Str)
-        parts fold("") |text, part, i| { if i == 0 { part } else { text + ", " + part } }
+        return parts fold("") |text, part, i| { if i == 0 { part } else { text + ", " + part } }
     }
 
     fn research_window(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.techs {
             for (0..<ui.w.game.techs.len()) |t| key t.str() {
                 button.tech {
@@ -1584,13 +1584,13 @@ mod ui {
             if ui.range10 { ui.prod10[s * item_count + item] } else { ui.prod[s * item_count + item] }
         } collect(I32)
         let high = sim.imax(1, values fold(0) |m, v| { sim.imax(m, v) })
-        values fold("") |d, v, k| {
+        return values fold("") |d, v, k| {
             d + (if k == 0 { "M" } else { " L" }) + k.str() + " " + (20 - v * 18 / high).str()
         }
     }
 
     fn production_window(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div {
             div.row {
                 button {
@@ -1635,7 +1635,7 @@ mod ui {
     }
 
     fn graph_path(values: Array[I32], start: I32, high: I32) Str {
-        (0..<60) fold("") |d, k| {
+        return (0..<60) fold("") |d, k| {
             let v = values[(start + k) % 60]
             d + (if k == 0 { "M" } else { " L" }) + (k * 10).str() + " " + (118 - v * 110 / sim.imax(1, high)).str()
         }
@@ -1650,13 +1650,13 @@ mod ui {
                 totals[e.machine] += ui.w.power[e.machine]
             }
         }
-        totals
+        return totals
     }
 
     fn power_window(ui: Ui) Browser.HTMLElement {
         let high = sim.imax(ui.supply fold(0) |m, v| { sim.imax(m, v) }, ui.demand fold(0) |m, v| { sim.imax(m, v) })
         let totals = demand_by_machine(ui)
-        @wutu/\
+        return @wutu/\
         div {
             = row("Satisfaction", (ui.w.satisfaction / 10).str() + "%")
             = row("Supply / demand", ui.w.supply.str() + " / " + ui.w.demand.str() + " kW")
@@ -1702,7 +1702,7 @@ mod ui {
     }
 
     fn saves_window(ui: Ui) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         div.saves {
             for (1...3) |n| key n.str() {
                 div.row {

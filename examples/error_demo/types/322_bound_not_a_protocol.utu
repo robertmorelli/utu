@@ -4,7 +4,7 @@ struct Point:
     | x: I32
 
 mod Pairs[T[Point]] {
-    fn first(a: T, b: T) T { a; }
+    fn first(a: T, b: T) T { return a; }
 }
 
 main {

@@ -12,7 +12,7 @@ let str_concat: fun(Str, Str) Str = @es/\(a, b) => a + b\/;
 let str_eq: fun(Str, Str) Bool = @es/\(a, b) => a === b ? 1 : 0\/;
 
 fn new_todo(text: Str) Todo {
-    Todo { text: text, done: false };
+    return Todo { text: text, done: false };
 }
 
 fn toggle(todo: Todo) Void {
@@ -20,7 +20,7 @@ fn toggle(todo: Todo) Void {
 }
 
 fn matches(todo: Todo, filter: Filter) Bool {
-    alt filter {
+    return alt filter {
         All => true,
         Active => not todo.done,
         Completed => todo.done,
@@ -35,23 +35,23 @@ fn count(todos: Array[Todo], filter: Filter) I32 {
             n += 1;
         };
     };
-    n;
+    return n;
 }
 
 fn status(flag: Bool) Str {
     let maybe: ?Str = if flag { "online"; } else { null; };
-    maybe orelse "offline";
+    return maybe orelse "offline";
 }
 
 fn greet(name: Str) Str {
-    str_concat(wrap(name), "!");
+    return str_concat(wrap(name), "!");
 }
 
 fn build_todos() Array[Todo] {
     let todos: Array[Todo] = Array[Todo].new(3, new_todo("learn utu"));
     todos[1] = new_todo("ship compiler");
     todos[2] = new_todo("write tests");
-    todos;
+    return todos;
 }
 
 test "composition keeps Array mutations visible to matches" {

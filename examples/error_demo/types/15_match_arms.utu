@@ -1,7 +1,7 @@
 // What: match arms producing I32 and Str
 // Expect: Type mismatch: expected Str, got I32 at the arm 1 => 1
 fn name(n: I32) Str {
-    match n {
+    return match n {
         0 => "zero",
         1 => 1,
         ~> "many",

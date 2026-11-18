@@ -1,7 +1,7 @@
 using Browser from std:Browser;
 
-        fn first() Str { "p{color:red}"; }
-        fn second() Str { "p{color:blue}"; }
+        fn first() Str { return "p{color:red}"; }
+        fn second() Str { return "p{color:blue}"; }
         main {
           Browser.document.body.append(@wutu/\
           @style first()

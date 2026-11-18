@@ -5,7 +5,7 @@ using console from std:Console;
 fn answer() I32 {
     return 42;
     console.log("never printed");
-    0;
+    return 0;
 }
 
 main {

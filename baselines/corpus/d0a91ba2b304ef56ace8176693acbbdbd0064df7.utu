@@ -21,13 +21,13 @@ mod Interner {
         | hash: I32
 
     fn &.new() & {
-        &{ bytes: Array[I32].new(256, 0), used: 0, starts: Array[I32].new(64, 0), hashes: Array[I32].new(64, 0),
+        return &{ bytes: Array[I32].new(256, 0), used: 0, starts: Array[I32].new(64, 0), hashes: Array[I32].new(64, 0),
            count: 0, table: Array[I32].new(64, 0), start: 0, hash: 0 };
     }
 
     // Distinct keys so far.
     fn &.len |self| () I32 {
-        self.count;
+        return self.count;
     }
 
     fn &.begin |self| () Void {
@@ -74,7 +74,7 @@ mod Interner {
         self.count += 1;
         self.table[i] = id + 1;
         if self.count * 2 > self.table.len() { self.rehash(); };
-        id;
+        return id;
     }
 
     fn &.same |self| (id: I32, length: I32) Bool {
@@ -83,7 +83,7 @@ mod Interner {
         for (0 ..< length) |k| {
             if self.bytes[at + k] != self.bytes[self.start + k] { return false; };
         };
-        true;
+        return true;
     }
 
     fn &.rehash |self| () Void {
@@ -99,15 +99,15 @@ mod Interner {
 
     // Byte length of a key.
     fn &.size |self| (id: I32) I32 {
-        self.starts[id + 1] - self.starts[id];
+        return self.starts[id + 1] - self.starts[id];
     }
 
     fn &.byte_at |self| (id: I32, k: I32) I32 {
-        self.bytes[self.starts[id] + k];
+        return self.bytes[self.starts[id] + k];
     }
 
     // The key as a string, one character per byte (exact for ASCII).
     fn &.ascii |self| (id: I32) Str {
-        Str.from_codes(self.bytes.slice(self.starts[id], self.starts[id + 1]), self.size(id));
+        return Str.from_codes(self.bytes.slice(self.starts[id], self.starts[id + 1]), self.size(id));
     }
 }

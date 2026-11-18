@@ -1,7 +1,7 @@
 
         lib {
           fn pick(flag: Bool) I32 {
-            match flag { true => 11, false => 22, ~> 33, };
+            return match flag { true => 11, false => 22, ~> 33, };
           }
         }
       

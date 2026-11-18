@@ -3,7 +3,7 @@
 mod Box[T] {
     struct &:
         | item: ?T
-    fn &.empty() & { &{ item: null }; }
+    fn &.empty() & { return &{ item: null }; }
 }
 
 main {

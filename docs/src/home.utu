@@ -3,10 +3,9 @@ using code from "./code.utu"
 using ui from "./ui.utu"
 mod home {
     fn greeting_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\
-        \\fn greeting(name: Str) Browser.HTMLElement {
-        \\    @wutu/\
+        \\wn greeting(name: Str) {
         \\    section.greeting {
         \\        display: grid
         \\        gap: 1rem
@@ -17,7 +16,6 @@ mod home {
         \\            "Start here"
         \\        }
         \\    }
-        \\    \/
         \\}
         \\
         \\main {
@@ -25,7 +23,7 @@ mod home {
         \\}
     }
     fn npm_sample() Str {
-        \\using Browser from std:Browser
+        return \\using Browser from std:Browser
         \\using Nano from "npm:nanoid"
         \\
         \\main {
@@ -35,7 +33,7 @@ mod home {
         \\}
     }
     fn pipeline_sample() Str {
-        \\main {
+        return \\main {
         \\    console.log([1, 2, 3, 4, 5]
         \\        map |n| { n * 2 }
         \\        filter |n| { n > 4 }
@@ -44,7 +42,7 @@ mod home {
         \\using console from std:Console
     }
     fn page() Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         article.home {
             section.hero {
                 div.pitch {
@@ -113,7 +111,7 @@ mod home {
                     "Measured, not estimated"
                 }
                 p {
-                    "Every number below is recorded in the repository and checked by its test suite."
+                    "These measurements cover representative programs and the self-hosted compiler."
                 }
                 table {
                     tbody {
@@ -135,18 +133,18 @@ mod home {
                         }
                         tr {
                             th {
-                                "94 ms"
+                                "127 ms on Bun · 123 ms on d8"
                             }
                             td {
-                                "The self-hosted compiler compiling itself. Stage 2 and stage 3 of the bootstrap are byte-identical."
+                                "Median warm self-compilation for the size build. Stages 2 and 3 produce identical Wasm and host metadata."
                             }
                         }
                         tr {
                             th {
-                                "126 KB"
+                                "468,253 bytes"
                             }
                             td {
-                                "The whole compiler as brotli-compressed Wasm. It is what the CLI, the editor, and the web playground run."
+                                "The raw compiler Wasm used by the CLI, editor, and playground."
                             }
                         }
                     }

@@ -3,16 +3,16 @@
           | value : I32
         lib {
           fn nested(a: Bool, b: Bool) ?Cell {
-            if a { if b { null; } else { Cell { value: 7 }; }; } else { null; };
+            return if a { if b { null; } else { Cell { value: 7 }; }; } else { null; };
           }
           fn read(a: Bool, b: Bool) I32 {
-            promote nested(a, b) { |cell| => cell.value, ~> 3, };
+            return promote nested(a, b) { |cell| => cell.value, ~> 3, };
           }
           fn all_null(flag: Bool) ?Cell {
-            if flag { null; } else { null; };
+            return if flag { null; } else { null; };
           }
           fn default_only(value: I32) I32 {
-            match value { ~> 11, };
+            return match value { ~> 11, };
           }
         }
       

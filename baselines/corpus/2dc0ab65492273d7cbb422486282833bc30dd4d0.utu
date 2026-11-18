@@ -1,1 +1,1 @@
-lib { fn bad() ?I32 { null; } }
+lib { fn bad() ?I32 { return null; } }

@@ -10,23 +10,23 @@ mod code {
     | kinds: Array[Str]
     | texts: Array[Str]
     fn is_digit(c: I32) Bool {
-        c >= 48 and c <= 57
+        return c >= 48 and c <= 57
     }
     fn is_upper(c: I32) Bool {
-        c >= 65 and c <= 90
+        return c >= 65 and c <= 90
     }
     fn is_ident_start(c: I32) Bool {
-        (c >= 97 and c <= 122) or is_upper(c) or c == 95
+        return (c >= 97 and c <= 122) or is_upper(c) or c == 95
     }
     fn is_ident(c: I32) Bool {
-        is_ident_start(c) or is_digit(c)
+        return is_ident_start(c) or is_digit(c)
     }
     fn is_space(c: I32) Bool {
-        c == 32 or c == 9 or c == 10 or c == 13
+        return c == 32 or c == 9 or c == 10 or c == 13
     }
     fn keyword(word: Str) Bool {
         let words = [
-        "fn", "let", "struct", "enum", "proto", "mod", "using", "from", "export", "main", "lib",
+        "fn", "gn", "wn", "html", "let", "struct", "enum", "proto", "mod", "using", "from", "export", "main", "lib",
         "if", "else", "for", "while", "loop", "match", "alt", "promote", "orelse", "return",
         "break", "continue", "cl", "fun", "await", "try", "catch", "not", "and", "or", "xor",
         "true", "false", "null", "new", "test", "bench", "measure", "assert", "fatal", "tag",
@@ -38,7 +38,7 @@ mod code {
         "error", "in", "product", "fast_sum", "first_index", "last_index", "repeat", "yield",
         "prune", "defer", "errdefer"
         ]
-        words any |w| {
+        return words any |w| {
             w == word
         }
     }
@@ -48,7 +48,7 @@ mod code {
         while (i < n and source[i] != 10) {
             i += 1
         }
-        i
+        return i
     }
     fn string_end(source: Str, from: I32, quote: I32) I32 {
         let i = from + 1
@@ -63,7 +63,7 @@ mod code {
                 i += 1
             }
         }
-        n
+        return n
     }
     fn block_comment_end(source: Str, from: I32) I32 {
         let i = from + 2
@@ -74,7 +74,7 @@ mod code {
             }
             i += 1
         }
-        n
+        return n
     }
     fn ident_end(source: Str, from: I32) I32 {
         let i = from
@@ -82,7 +82,7 @@ mod code {
         while (i < n and is_ident(source[i])) {
             i += 1
         }
-        i
+        return i
     }
     fn number_end(source: Str, from: I32) I32 {
         let i = from
@@ -92,7 +92,7 @@ mod code {
         while (i < n and (is_ident(source[i]) or (source[i] == 46 and i + 1 < n and is_digit(source[i + 1])))) {
             i += 1
         }
-        i
+        return i
     }
     // A run of punctuation and spaces that starts no other token.
     fn plain_end(source: Str, from: I32) I32 {
@@ -105,10 +105,10 @@ mod code {
             }
             i += 1
         }
-        n
+        return n
     }
     fn at(source: Str, i: I32) I32 {
-        if i < source.len() {
+        return if i < source.len() {
             source[i]
         } else {
             0
@@ -198,14 +198,14 @@ mod code {
             kinds.push("t")
             texts.push(plain)
         }
-        Tokens {
+        return Tokens {
             kinds: kinds.finish(),
             texts: texts.finish()
         }
     }
     fn block(source: Str) Browser.HTMLElement {
         let parts = tokens(source)
-        @wutu/\
+        return @wutu/\
         pre.code {
             code {
                 for parts.kinds |kind, index| {
@@ -226,7 +226,7 @@ mod code {
         } else {
             source
         })
-        @wutu/\
+        return @wutu/\
         code {
             for parts.kinds |kind, index| {
                 span {
@@ -238,7 +238,7 @@ mod code {
         \/
     }
     fn shell(source: Str) Browser.HTMLElement {
-        @wutu/\
+        return @wutu/\
         pre.code.shell {
             code {
                 = source

@@ -14,7 +14,7 @@ const optimize = process.argv.includes('--speed') ? 'speed' : 'size';
 
 const css = await fs.readFile(path.join(FOUNDRY, 'data/style.css'), 'utf8');
 await fs.writeFile(path.join(FOUNDRY, 'utu/style.utu'),
-  `// Generated from data/style.css by tools/build-wutu.mjs. Do not edit.\nmod style {\n    fn sheet() Str {\n        @css/\\\n${css}\\/;\n    }\n}\n`);
+  `// Generated from data/style.css by tools/build-wutu.mjs. Do not edit.\nmod style {\n    fn sheet() Str {\n        return @css/\\\n${css}\\/;\n    }\n}\n`);
 const report = await buildBrowserApp({ entry: path.join(FOUNDRY, 'utu/app.utu'), outDir: out, optimize });
 await writePage(out, { script: 'app.js', css: false });
 console.log(JSON.stringify(report));

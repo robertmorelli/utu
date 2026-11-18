@@ -2,7 +2,7 @@
 // Expect: try needs a Result, not I32
 fn count(text: Str) Result[I32, Str] {
     let n = try text.len();
-    Result[I32, Str].ok(n);
+    return Result[I32, Str].ok(n);
 }
 
 main { console.log(count("abc").value()); }

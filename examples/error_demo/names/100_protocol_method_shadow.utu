@@ -6,8 +6,8 @@ proto Sh:
 struct Sq[Sh]:
     | s: I32
 
-fn Sh[Sq].area |q| () I32 { q.s * q.s; }
-fn Sh.area |x| () I32 { 0; }
+fn Sh[Sq].area |q| () I32 { return q.s * q.s; }
+fn Sh.area |x| () I32 { return 0; }
 
 main {
     let s: Sh = Sq { s: 3 };

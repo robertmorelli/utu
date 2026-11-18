@@ -117,7 +117,7 @@ fn reset_generators() Void {
 fn is_generator(decl: I32) Bool {
     if not decl_is(decl, Decl.Fn) or not is_kind(decl_node[decl], Node.Fn_decl) { return false }
     let ret = child_of_kind(decl_node[decl], Node.Return_type)
-    ret >= 0 and is_kind(first_child(ret), Node.Yield_type)
+    return ret >= 0 and is_kind(first_child(ret), Node.Yield_type)
 }
 
 /// The generator a `for` loop consumes: its one source is a call of one,
@@ -125,7 +125,7 @@ fn is_generator(decl: I32) Bool {
 /// type: see @generator_source.
 fn generator_call(for_node: I32) I32 {
     let call = sole_call(for_node)
-    if call >= 0 and generator_decl_of(call) >= 0 { call } else { -1 }
+    return if call >= 0 and generator_decl_of(call) >= 0 { call } else { -1 }
 }
 
 /// A `for` loop's one source, when it is a call; else -1.
@@ -134,13 +134,13 @@ fn sole_call(for_node: I32) I32 {
     let source = first_child(sources)
     if source < 0 or next_sibling(source) >= 0 or next_sibling(first_child(source)) >= 0 { return -1 }
     let call = first_child(source)
-    if is_kind(call, Node.Call_expr) or is_kind(call, Node.Promoted_module_call_expr) { call } else { -1 }
+    return if is_kind(call, Node.Call_expr) or is_kind(call, Node.Promoted_module_call_expr) { call } else { -1 }
 }
 
 /// A call's argument list (-1 for none): `f(…)`'s, or `M[A].f(…)`'s.
 fn call_args(call: I32) I32 {
     if is_kind(call, Node.Promoted_module_call_expr) { return module_call_args(call) }
-    next_sibling(first_child(call))
+    return next_sibling(first_child(call))
 }
 
 /// The generator a call names: `g(…)`, `m.g(…)` (a module's or an alias's),
@@ -155,7 +155,7 @@ fn generator_decl_of(call: I32) I32 {
         if decl_is(base, Decl.Module) { d = node_decl[last_child(callee)] }
         else if decl_is(base, Decl.Alias) and decl_is(decl_a[base], Decl.Module) { d = static_member(decl_a[base], word_of(last_child(callee))) }
     } else if is_kind(callee, Node.Type_member_expr) { d = node_decl[last_child(callee)] }
-    if is_generator(d) { d } else { -1 }
+    return if is_generator(d) { d } else { -1 }
 }
 
 /// The generator call a `for` loop consumes, a method's (`x.each()`, by x's
@@ -171,7 +171,7 @@ fn generator_source(for_node: I32, cx: Cx) I32 {
     let d = member(ty_decl(rt), word_of(last_child(callee)), Space.Method)
     if not is_generator(d) { return -1 }
     node_decl[last_child(callee)] = d
-    call
+    return call
 }
 
 /// The module instance a named generator call (see @generator_decl_of) runs in.
@@ -184,7 +184,7 @@ fn generator_inst(call: I32, gen: I32, cx: Cx) I32 {
         let t = type_path(base, cx.inst)
         return if ty_is(t, Ty.Error) { -1 } else { ty_inst(t) }
     }
-    instance_for(module_of(gen), cx.inst)
+    return instance_for(module_of(gen), cx.inst)
 }
 
 /// The declarations of a generator (its parameters and locals): those
@@ -197,7 +197,7 @@ fn generator_decls(gen: I32) I32 {
         vl_add(d - 1)
         d = fl_next[d - 1]
     }
-    vl_end(m)
+    return vl_end(m)
 }
 
 /// By node: a function's first and last local declaration, plus one (0 for
@@ -302,7 +302,7 @@ fn calls_generator(node: I32, gen: I32) Bool {
         if calls_generator(c, gen) { return true }
         c = next_sibling(c)
     }
-    false
+    return false
 }
 
 /// `for (g(…)) |v| { yield v; }`: the loop yields each value, and nothing else.
@@ -313,7 +313,7 @@ fn is_delegation(loop_: I32) Bool {
     let y = first_child(body)
     if y < 0 or next_sibling(y) >= 0 or not is_kind(y, Node.Yield_expr) { return false }
     let v = first_child(y)
-    is_kind(v, Node.Identifier) and first_child(v) < 0 and word_of(v) == word_of(first_child(capture))
+    return is_kind(v, Node.Identifier) and first_child(v) < 0 and word_of(v) == word_of(first_child(capture))
 }
 
 /// `for (gen(args)) |x| { body }`: the generator's body in place of the
@@ -369,7 +369,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     if delegates_to_itself(gen) {
         // (A method's would pass its receiver along: not done.)
         if receiver >= 0 {
-            w_stack.resize(m)
+            w_resize_stack(m)
             report(Diag.GeneratorRecursion, node, word_of(last_child(first_child(call))))
             diag_note("a method generator cannot consume itself")
             return error_value()
@@ -405,7 +405,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     }
     if a >= 0 or p >= 0 {
         report2(Diag.GeneratorArity, node, decl_name[gen], child_count(params), child_count(args))
-        w_stack.resize(m)
+        w_resize_stack(m)
         bring_back()
         return error_value()
     }
@@ -424,7 +424,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
     end_expansion()
     bring_back()
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 /// Each generator of the program's own items that no `for` expanded:
@@ -498,7 +498,7 @@ fn expansion_of(node: I32) I32 {
         if is_kind(p, Node.Closure_expr) { return -1 }
         p = parent_of(p)
     }
-    k
+    return k
 }
 
 /// The innermost expansion whose generator's text the node is in, or -1.
@@ -512,7 +512,7 @@ fn expansion_around(node: I32) I32 {
         }
         k -= 1
     }
-    -1
+    return -1
 }
 
 /// `yield v`: v into the consumer's capture, then its body, which `continue`
@@ -557,7 +557,7 @@ fn check_yield(node: I32, cx: Cx) I32 {
     w_node(Op.Block, vt_none, resume, 0, mr)
     profile_yield_end(pg, k)
     w_node(Op.Seq, vt_none, 0, 0, m)
-    ty_void()
+    return ty_void()
 }
 
 /// `return;` inside a generator's expansion ends the generation.
@@ -573,7 +573,7 @@ fn generator_return(node: I32, cx: Cx) I32 {
     run_defers(gen_defers[k], cx)
     w_leaf(Op.Br, vt_unreachable, gen_whole[k], 0)
     w_node(Op.Seq, vt_unreachable, 0, 0, m)
-    ty_never()
+    return ty_never()
 }
 
 //! = Recursive generators
@@ -624,7 +624,7 @@ fn rec_new_array(vt: I32) I32 {
     w_i32(16)
     w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, m)
     ls(local, m)
-    local
+    return local
 }
 
 /// `array[index]` = the value just pushed (at `m`); `index` is a local.
@@ -687,7 +687,7 @@ fn rec_item_arrays(r: I32) Array[I32] {
     arrays[0] = rec_kind[r]
     arrays[1] = rec_val[r]
     for (0 ..< n) |i| { arrays[i + 2] = vl_item(rec_args[r], i) }
-    arrays
+    return arrays
 }
 
 /// `kind[top] = kind_; top += 1` (after the item's own sets).
@@ -712,7 +712,7 @@ fn rec_push_value(r: I32, value: I32, cx: Cx) I32 {
     rec_set(rec_val[r], rec_top[r], ms)
     rec_finish_item(r, 0)
     seq_void(m)
-    ty_void()
+    return ty_void()
 }
 
 /// The arguments of a call checked against `ptypes` (a list), each into a
@@ -729,7 +729,7 @@ fn args_into_locals(args: I32, ptypes: I32, cx: Cx) Array[I32] {
         ls(locals[i], ma)
         a = next_sibling(a)
     }
-    locals
+    return locals
 }
 
 /// `for (walk(…)) |v| { yield v; }` in a recursive generation: a call item.
@@ -750,7 +750,7 @@ fn rec_push_call(r: I32, node: I32, call: I32, cx: Cx) I32 {
     }
     rec_finish_item(r, 1)
     seq_void(m)
-    ty_void()
+    return ty_void()
 }
 
 /// The locals of a recursive generation's loop.
@@ -1017,7 +1017,7 @@ fn check_recursive_loop(node: I32, call: I32, gen: I32, cap: I32, elem: I32, ins
     w_node(Op.Block, vt_none, whole, 0, mw)
     bring_back()
     seq_void(m)
-    ty_void()
+    return ty_void()
 }
 
 /// `prune;` in the body of a recursive generator's consumer.
@@ -1038,5 +1038,5 @@ fn check_prune(node: I32) I32 {
     let m = w_mark()
     w_i32(1)
     ls(prune_flag[prune_flag.len() - 1], m)
-    ty_void()
+    return ty_void()
 }

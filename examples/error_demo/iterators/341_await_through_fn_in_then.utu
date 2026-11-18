@@ -2,7 +2,7 @@
 // Expect: a closure the host calls cannot await, through a call too: the function it calls suspends
 let later: fun(I32) Promise[I32] = @es/\ (v) => Promise.resolve(v) \/;
 
-fn slow(n: I32) I32 { await later(n) + 1; }
+fn slow(n: I32) I32 { return await later(n) + 1; }
 
 main {
     later(1).then(cl(v) { let w = slow(v); });

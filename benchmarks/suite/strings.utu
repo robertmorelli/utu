@@ -6,6 +6,6 @@ lib {
       let middle: I32 = size / 2
       out = out.slice(0, middle) + piece + out.slice(middle, size)
     }
-    out
+    return out
   }
 }

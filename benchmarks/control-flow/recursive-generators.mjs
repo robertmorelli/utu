@@ -24,7 +24,7 @@ tag enum Node:
 struct Rng:
     | s: I32
 
-fn next(r: Rng) I32 { r.s = r.s * 1103515245 + 12345; (r.s >>> 8) & 65535; }
+fn next(r: Rng) I32 { r.s = r.s * 1103515245 + 12345; return (r.s >>> 8) & 65535; }
 
 fn grow(r: Rng, depth: I32) Node {
     let pick = next(r) % 16;
@@ -33,7 +33,7 @@ fn grow(r: Rng, depth: I32) Node {
     let k = 2 + next(r) % 4;
     let xs = Array[Node].new(k, Leaf { v: 0 });
     for (0..<k) |i| { xs[i] = grow(r, depth - 1); };
-    List { xs: xs };
+    return List { xs: xs };
 }
 
 // The root is a list of WIDTH subtrees, so the size does not hinge on one coin flip.
@@ -41,7 +41,7 @@ fn forest(seed: I32, width: I32, depth: I32) Node {
     let r = Rng { s: seed };
     let xs = Array[Node].new(width, Leaf { v: 0 });
     for (0..<width) |i| { xs[i] = grow(r, depth); };
-    List { xs: xs };
+    return List { xs: xs };
 }
 
 fn children(n: Node) yield Node {
@@ -52,8 +52,8 @@ fn children(n: Node) yield Node {
     };
 }
 
-fn value(n: Node) I32 { alt n { Leaf |x| => x.v, ~> 0, }; }
-fn is_wide(n: Node) Bool { alt n { List |k| => k.xs.len() == 5, ~> false, }; }
+fn value(n: Node) I32 { return alt n { Leaf |x| => x.v, ~> 0, }; }
+fn is_wide(n: Node) Bool { return alt n { List |k| => k.xs.len() == 5, ~> false, }; }
 `;
 
 const strategies = {
@@ -62,20 +62,20 @@ fn walk(n: Node) yield Node {
     for (children(n)) |c| { yield c; for (walk(c)) |d| { yield d; }; };
 }
 export lib {
-    fn tree(seed: I32, width: I32, depth: I32) Node { forest(seed, width, depth); }
-    fn full(root: Node) I32 { let s = 0; for (walk(root)) |n| { s += value(n) + 1; }; s; }
-    fn pruned(root: Node) I32 { let s = 0; for (walk(root)) |n| { if is_wide(n) { prune; }; s += value(n) + 1; }; s; }
-    fn find(root: Node, limit: I32) I32 { let s = 0; for (walk(root)) |n| { s += value(n) + 1; if s > limit { break; }; }; s; }
+    fn tree(seed: I32, width: I32, depth: I32) Node { return forest(seed, width, depth); }
+    fn full(root: Node) I32 { let s = 0; for (walk(root)) |n| { s += value(n) + 1; }; return s; }
+    fn pruned(root: Node) I32 { let s = 0; for (walk(root)) |n| { if is_wide(n) { prune; }; s += value(n) + 1; }; return s; }
+    fn find(root: Node, limit: I32) I32 { let s = 0; for (walk(root)) |n| { s += value(n) + 1; if s > limit { break; }; }; return s; }
 }`,
   recursion: `
 struct Acc:
     | s: I32
     | done: Bool
-fn full_from(n: Node) I32 { let s = 0; for (children(n)) |c| { s += value(c) + 1 + full_from(c); }; s; }
+fn full_from(n: Node) I32 { let s = 0; for (children(n)) |c| { s += value(c) + 1 + full_from(c); }; return s; }
 fn pruned_from(n: Node) I32 {
     let s = 0;
     for (children(n)) |c| { s += value(c) + 1; if not is_wide(c) { s += pruned_from(c); }; };
-    s;
+    return s;
 }
 fn find_from(n: Node, limit: I32, a: Acc) void {
     for (children(n)) |c| {
@@ -86,10 +86,10 @@ fn find_from(n: Node, limit: I32, a: Acc) void {
     };
 }
 export lib {
-    fn tree(seed: I32, width: I32, depth: I32) Node { forest(seed, width, depth); }
-    fn full(root: Node) I32 { full_from(root); }
-    fn pruned(root: Node) I32 { pruned_from(root); }
-    fn find(root: Node, limit: I32) I32 { let a = Acc { s: 0, done: false }; find_from(root, limit, a); a.s; }
+    fn tree(seed: I32, width: I32, depth: I32) Node { return forest(seed, width, depth); }
+    fn full(root: Node) I32 { return full_from(root); }
+    fn pruned(root: Node) I32 { return pruned_from(root); }
+    fn find(root: Node, limit: I32) I32 { let a = Acc { s: 0, done: false }; find_from(root, limit, a); return a.s; }
 }`,
   callback: `
 struct Acc:
@@ -102,9 +102,9 @@ fn pruned_from(n: Node, a: Acc) void {
     for_each_child(n, cl(c: Node) void { a.s += value(c) + 1; if not is_wide(c) { pruned_from(c, a); }; });
 }
 export lib {
-    fn tree(seed: I32, width: I32, depth: I32) Node { forest(seed, width, depth); }
-    fn full(root: Node) I32 { let a = Acc { s: 0 }; full_from(root, a); a.s; }
-    fn pruned(root: Node) I32 { let a = Acc { s: 0 }; pruned_from(root, a); a.s; }
+    fn tree(seed: I32, width: I32, depth: I32) Node { return forest(seed, width, depth); }
+    fn full(root: Node) I32 { let a = Acc { s: 0 }; full_from(root, a); return a.s; }
+    fn pruned(root: Node) I32 { let a = Acc { s: 0 }; pruned_from(root, a); return a.s; }
 }`,
 };
 

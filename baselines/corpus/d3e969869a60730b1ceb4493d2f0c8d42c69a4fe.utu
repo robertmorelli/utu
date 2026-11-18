@@ -1,15 +1,15 @@
 using Browser from std:Browser;
 
 fn number(value: I32) Str {
-    value.f64().toString();
+    return value.f64().toString();
 }
 
 fn money(cents: I32) Str {
-    "$" + (cents.f64() / 100.0).toFixed(2);
+    return "$" + (cents.f64() / 100.0).toFixed(2);
 }
 
 fn node(id: Str) Browser.HTMLElement {
-    Browser.document.getElementById(id) orelse fatal;
+    return Browser.document.getElementById(id) orelse fatal;
 }
 
 fn restore_focus(id: Str) Void {
@@ -45,7 +45,7 @@ struct Conference:
 
 fn matches(session: Session,
 state: Conference) Bool {
-    (state.day == "all" or number(session.day) == state.day) and (state.track == "All tracks" or session.track == state.track) and (not state.agenda or session.saved);
+    return (state.day == "all" or number(session.day) == state.day) and (state.track == "All tracks" or session.track == state.track) and (not state.agenda or session.saved);
 }
 
 fn calendar(state: Conference) Str {
@@ -92,7 +92,7 @@ fn calendar(state: Conference) Str {
             + "END:VEVENT"
             + newline;
     };
-    "data:text/calendar;charset=utf-8," + Browser.encodeURIComponent(text + "END:VCALENDAR" + newline);
+    return "data:text/calendar;charset=utf-8," + Browser.encodeURIComponent(text + "END:VCALENDAR" + newline);
 }
 
 fn refresh(state: Conference) Void {
@@ -114,7 +114,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
     let visible = state.sessions filter |s| {
         matches(s, state);
     } collect(Session);
-    @wutu/\
+    return @wutu/\
     section {
         id = "sessions"
         display:grid

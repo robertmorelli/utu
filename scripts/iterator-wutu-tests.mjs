@@ -8,35 +8,35 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     const {instance,doc}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterators.utu',source:`
       struct Counter: | value: I32
       lib {
-        fn fused() I32 { [1,2,3,4,5] map |x| { x*2; } filter |x| {x>4;} skip(1) take(2) fold(0) |a,x| {a+x;}; }
-        fn indexes() U64 { let zero: U64 = 0; [4,5,6,7] filter |x| {x>5;} fold(zero) |a,x,i| {a+i;}; }
-        fn once() I32 { let c = Counter {value:0}; [1,2,3,4] map |x| {c.value+=1;x;} any |x| {x==2;}; c.value; }
-        fn zip_once() I32 { let c=Counter{value:0}; [1,2,3] map |x| {c.value+=1;x;} zip([10]) |a,b| {a+b;} count; c.value; }
-        fn chain_after_take() I32 { [1,2,3] take(1) chain([10,20]) sum; }
-        fn take_after_chain() I32 { [1,2,3] chain([10,20]) take(1) sum; }
-        fn chain_mixed() I32 { [1,2,3] take(0) chain([10,20]) take(1) chain([30]) sum; }
-        fn no_work() I32 { let c = Counter {value:0}; [1,2,3] map |x| {c.value+=1;x;} take(0) count; c.value; }
-        fn while_stages() I32 { [1,2,3,2,1] skip_while |x| {x<3;} take_while |x| {x>1;} sum; }
-        fn flattened() I32 { [[1,2],[3,4]] flat_map |xs| {xs;} sum; }
-        fn zipped() I32 { [1,2,3] zip([10,20]) |a,b| {a+b;} sum; }
-        fn chained() I32 { [1,2] map |x| {x*2;} chain([10,20]) chain([30]) filter |x| {x>2;} sum; }
-        fn repeated() I32 { [1,2] repeat(3) sum; }
-        fn nested() I32 { [1,2] map |x| {[x,x] sum;} sum; }
-        fn every() Bool { [1,2,3] all |x| {x>0;}; }
-        fn empty_all() Bool { [] all |x| {x>0;}; }
-        fn empty_any() Bool { [] any |x| {x>0;}; }
-        fn product_() I32 { [2,3,4] product; }
-        fn count_() I32 { [1,2,3,4] count_where |x| {x%2==0;}; }
-        fn first_() I32 { [1,2,3,2] first_index |x| {x==2;}; }
-        fn last_() I32 { [1,2,3,2] last_index |x| {x==2;}; }
-        fn absent() I32 { [] first_index |x| {true;}; }
+        fn fused() I32 { return [1,2,3,4,5] map |x| { x*2; } filter |x| {x>4;} skip(1) take(2) fold(0) |a,x| {a+x;}; }
+        fn indexes() U64 { let zero: U64 = 0; return [4,5,6,7] filter |x| {x>5;} fold(zero) |a,x,i| {a+i;}; }
+        fn once() I32 { let c = Counter {value:0}; [1,2,3,4] map |x| {c.value+=1;x;} any |x| {x==2;}; return c.value; }
+        fn zip_once() I32 { let c=Counter{value:0}; [1,2,3] map |x| {c.value+=1;x;} zip([10]) |a,b| {a+b;} count; return c.value; }
+        fn chain_after_take() I32 { return [1,2,3] take(1) chain([10,20]) sum; }
+        fn take_after_chain() I32 { return [1,2,3] chain([10,20]) take(1) sum; }
+        fn chain_mixed() I32 { return [1,2,3] take(0) chain([10,20]) take(1) chain([30]) sum; }
+        fn no_work() I32 { let c = Counter {value:0}; [1,2,3] map |x| {c.value+=1;x;} take(0) count; return c.value; }
+        fn while_stages() I32 { return [1,2,3,2,1] skip_while |x| {x<3;} take_while |x| {x>1;} sum; }
+        fn flattened() I32 { return [[1,2],[3,4]] flat_map |xs| {xs;} sum; }
+        fn zipped() I32 { return [1,2,3] zip([10,20]) |a,b| {a+b;} sum; }
+        fn chained() I32 { return [1,2] map |x| {x*2;} chain([10,20]) chain([30]) filter |x| {x>2;} sum; }
+        fn repeated() I32 { return [1,2] repeat(3) sum; }
+        fn nested() I32 { return [1,2] map |x| {[x,x] sum;} sum; }
+        fn every() Bool { return [1,2,3] all |x| {x>0;}; }
+        fn empty_all() Bool { return [] all |x| {x>0;}; }
+        fn empty_any() Bool { return [] any |x| {x>0;}; }
+        fn product_() I32 { return [2,3,4] product; }
+        fn count_() I32 { return [1,2,3,4] count_where |x| {x%2==0;}; }
+        fn first_() I32 { return [1,2,3,2] first_index |x| {x==2;}; }
+        fn last_() I32 { return [1,2,3,2] last_index |x| {x==2;}; }
+        fn absent() I32 { return [] first_index |x| {true;}; }
       }
     `});
     for (const [name,value] of Object.entries({fused:18,indexes:1n,once:2,zip_once:1,chain_after_take:31,take_after_chain:1,chain_mixed:40,no_work:0,while_stages:5,flattened:10,zipped:33,chained:64,repeated:9,nested:6,every:true,empty_all:true,empty_any:false,product_:24,count_:2,first_:1,last_:3,absent:-1})) assertEq(instance.exports[name](),value,name);
   });
   test('iterators: canonical WAT has one fused loop and no intermediate arrays or indirect body calls',async({ROOT})=>{
     const {doc,instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_wat.utu',source:`
-      lib { fn run(n: I32) I32 { [n,n+1,n+2] map |x| {x*2;} filter |x| {x>3;} fold(0) |a,x| {a+x;}; } }
+      lib { fn run(n: I32) I32 { return [n,n+1,n+2] map |x| {x*2;} filter |x| {x>3;} fold(0) |a,x| {a+x;}; } }
     `});
     const wat=await printWat(doc.wasm);
     assertEq((wat.match(/^\s+loop\b/gm)??[]).length,1);
@@ -46,8 +46,8 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   });
   test('iterators: generic module specializations infer their own element types',async({ROOT})=>{
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_generics.utu',source:`
-      mod Sum[T] { fn total(xs: Array[T]) T { xs sum; } }
-      lib { fn run() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; Sum[I32].total(a).f64()+Sum[F64].total(b); } }
+      mod Sum[T] { fn total(xs: Array[T]) T { return xs sum; } }
+      lib { fn run() F64 { let a: Array[I32] = [1,2]; let b: Array[F64] = [1.5,2.5]; return Sum[I32].total(a).f64()+Sum[F64].total(b); } }
     `});
     assertEq(instance.exports.run(),7);
   });
@@ -55,14 +55,14 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'iterator_collect.utu',source:`
       struct Item: | value: I32
       lib {
-        fn growth() I32 { let a = [1,2,3,4,5] repeat(4) collect(I32); a.len()*100+a[19]; }
-        fn empty() I32 { let a = [Item {value:1}] filter |x| {false;} collect(Item); a.len(); }
-        fn structs() I32 { let a = [1,2,3] map |x| {Item {value:x};} collect(Item); a[2].value; }
-        fn float_sum() F64 { [F64(1.5),2.5] map |x| {x*2.0;} sum; }
-        fn empty_product() F64 { let a: Array[F64] = []; a product; }
-        fn wide_sum() I64 { let a: Array[I64] = [3,4]; a sum; }
-        fn sorted() I32 { let a=[5,3,1,8,2,4] sort(I32) |a,b| {a<b;}; a[0]*100+a[5]; }
-        fn floats() F64 { let a = [1,2] map |x| {x.f64()/2.0;} collect(F64); a[0]+a[1]; }
+        fn growth() I32 { let a = [1,2,3,4,5] repeat(4) collect(I32); return a.len()*100+a[19]; }
+        fn empty() I32 { let a = [Item {value:1}] filter |x| {false;} collect(Item); return a.len(); }
+        fn structs() I32 { let a = [1,2,3] map |x| {Item {value:x};} collect(Item); return a[2].value; }
+        fn float_sum() F64 { return [F64(1.5),2.5] map |x| {x*2.0;} sum; }
+        fn empty_product() F64 { let a: Array[F64] = []; return a product; }
+        fn wide_sum() I64 { let a: Array[I64] = [3,4]; return a sum; }
+        fn sorted() I32 { let a=[5,3,1,8,2,4] sort(I32) |a,b| {a<b;}; return a[0]*100+a[5]; }
+        fn floats() F64 { let a = [1,2] map |x| {x.f64()/2.0;} collect(F64); return a[0]+a[1]; }
       }
     `});
     assertEq(instance.exports.growth(),2005);assertEq(instance.exports.empty(),0);assertEq(instance.exports.structs(),3);assertEq(instance.exports.floats(),1.5);
@@ -75,9 +75,9 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
     try {
       const {instance,spec}=await compileAndInstantiateSelfhost({ROOT,name:'wutu_dom.utu',source:`
         using Browser from std:Browser;
-        fn unused() Browser.HTMLElement { @wutu/\\ div { color: magenta; "DEAD-COMPONENT"; } \\/; }
+        fn unused() Browser.HTMLElement { return @wutu/\\ div { color: magenta; "DEAD-COMPONENT"; } \\/; }
         lib { fn run() Browser.HTMLElement {
-          @wutu/\\
+          return @wutu/\\
           div.card {
             color: red;
             class="extra";
@@ -109,8 +109,8 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   test('codegen: local @es functions use unique imports and retain their callable types',async({ROOT})=>{
     const {instance}=await compileAndInstantiate({ROOT,makeCompiler,assertNoErrors,name:'local_es_functions.utu',source:`
       lib {
-        fn first() I32 { let f: fun(I32) I32 = @es/\\ x => x + 1 \\/; f(10); }
-        fn second() I32 { let f: fun(I32) I32 = @es/\\ x => x + 2 \\/; f(10); }
+        fn first() I32 { let f: fun(I32) I32 = @es/\\ x => x + 1 \\/; return f(10); }
+        fn second() I32 { let f: fun(I32) I32 = @es/\\ x => x + 2 \\/; return f(10); }
       }
     `});
     assertEq(instance.exports.first(),11);assertEq(instance.exports.second(),12);
@@ -118,7 +118,7 @@ export function registerIteratorWutuTests({test,assert,assertEq,assertThrows,ass
   test('syntax diagnostics: invalid pipelines report their site, and Utu islands retain exact ranges',async({ROOT})=>{
     for (const [source,kind,text] of [
       ['main { [1,2] map |x| {x;}; }','invalid-iterator-usage','[1,2] map |x| {x;}'],
-      ['lib { fn run() I32 { [1] map |x,y,z| {x;} sum; } }','invalid-iterator-usage','[1] map |x,y,z| {x;} sum'],
+      ['lib { fn run() I32 { return [1] map |x,y,z| {x;} sum; } }','invalid-iterator-usage','[1] map |x,y,z| {x;} sum'],
     ]) {
       const errors=(await selfhostDiagnostics({ROOT,name:'invalid_new_syntax.utu',source})).filter(d=>d.severity==='error');
       assertEq(errors.length,1,JSON.stringify(errors));assertEq(errors[0].kind,kind);assertEq(errors[0].text,text);

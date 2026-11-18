@@ -5,6 +5,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
         $.literal,
         $.template_string,
         $.identifier,
+        // Pipeline words remain identifiers where an expression starts.
+        // In particular, `return count` returns the variable `count`.
+        alias($._pipeline_name, $.identifier),
         $.tuple_expr,
         $.array_expr,
         $.paren_expr,
@@ -52,6 +55,14 @@ exports.buildExpressionRules = function buildExpressionRules() {
         alias('prune', $.prune_expr),
         $.dsl_expr,
       ),
+
+    _pipeline_name: _ => choice(
+      'map', 'filter', 'flat_map', 'skip_while', 'take_while', 'each', 'any', 'all',
+      'count_where', 'first_index', 'last_index', 'fold', 'scan', 'skip', 'take',
+      'chain', 'repeat', 'zip', 'sort', 'min_by', 'max_by', 'first_where', 'reduce',
+      'partition', 'collect', 'group_by', 'distinct_by', 'batched', 'windows',
+      'bisect', 'sum', 'fast_sum', 'product', 'count',
+    ),
 
     // Pipelines bind below arithmetic, above assignment. Parameters are
     // parenthesized so a capture's | can never be parsed as bitwise-or.
@@ -166,7 +177,7 @@ exports.buildExpressionRules = function buildExpressionRules() {
 
     assign_expr: ($) =>
       prec.right(0, seq(
-        choice($.identifier, $.field_expr, $.optional_field_expr, $.index_expr, alias($.global_member_expr, $.type_member_expr)),
+        choice($.identifier, alias($._pipeline_name, $.identifier), $.field_expr, $.optional_field_expr, $.index_expr, alias($.global_member_expr, $.type_member_expr)),
         choice('=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', 'and=', 'or=', 'xor='),
         $._expr,
       )),
@@ -228,7 +239,9 @@ exports.buildExpressionRules = function buildExpressionRules() {
     // errdefer expr — like defer, run only when the function returns an error.
     errdefer_expr: ($) => prec.right(seq('errdefer', $._expr)),
     yield_expr: ($) => prec.right(seq('yield', $._expr)),
-    return_expr: ($) => prec.right(seq('return', optional($._expr))),
+    // At pipeline precedence, prefer a value to an empty return followed by
+    // a pipeline named `count`, `sum`, or `take`.
+    return_expr: ($) => prec.right(1, seq('return', optional($._expr))),
 
     // A let takes the whole expression after `=` (`let x = a orelse b`).
     bind_expr: ($) => prec.right(-1, choice(

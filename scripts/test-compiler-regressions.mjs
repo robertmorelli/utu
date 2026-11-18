@@ -60,14 +60,14 @@ try {
   const literal = Array.from({ length: 25000 }, (_, i) => i % 7).join(', ');
   const programs = [
     // Wasm makes at most 10,000 elements with one array.new_fixed.
-    [`lib { fn total() I32 { let a = [${literal}]; let t = 0; for (a) |v| { t += v; }; t + a.len() * 1000; } }`,
+    [`lib { fn total() I32 { let a = [${literal}]; let t = 0; for (a) |v| { t += v; }; return t + a.len() * 1000; } }`,
       { total: Array.from({ length: 25000 }, (_, i) => i % 7).reduce((a, b) => a + b) + 25000 * 1000 }],
     // A field holding a closure, called as a method is.
     [`struct P:
     | f : cl(I32) I32
-lib { fn run() I32 { let p = P { f: cl(x: I32) I32 { x + 1; } }; p.f(4); } }`, { run: 5 }],
+lib { fn run() I32 { let p = P { f: cl(x: I32) I32 { return x + 1; } }; return p.f(4); } }`, { run: 5 }],
     // A replacement is its text, \`$\` and all.
-    ['lib { fn run() Str { "ab-ab".replace("a", "$&$$") + "|" + "xay".replace("a", "$\'"); } }', { run: "$&$$b-$&$$b|x$'y" }],
+    ['lib { fn run() Str { return "ab-ab".replace("a", "$&$$") + "|" + "xay".replace("a", "$\'"); } }', { run: "$&$$b-$&$$b|x$'y" }],
   ];
   for (const [source, expected] of programs) {
     const file = await write(source);
@@ -79,15 +79,15 @@ lib { fn run() I32 { let p = P { f: cl(x: I32) I32 { x + 1; } }; p.f(4); } }`, {
 
   // An @ir function named as a value, in the middle of another function's
   // locals, which its making once overwrote (stage 0 cannot build this).
-  const valued = await selfhost(await write(`fn plus(a: I32, b: I32) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }
-fn apply(f: fun(I32, I32) I32, a: I32, b: I32) I32 { f(a, b); }
+  const valued = await selfhost(await write(`fn plus(a: I32, b: I32) I32 => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/;
+fn apply(f: fun(I32, I32) I32, a: I32, b: I32) I32 { return f(a, b); }
 lib {
     fn run() F64 {
         let s = "text";
         let x: F64 = 1.5;
         let r = apply(plus, 1, 2);
         let z: F64 = 10.0;
-        r.f64() * 1000.0 + x * 100.0 + z + s.len().f64();
+        return r.f64() * 1000.0 + x * 100.0 + z + s.len().f64();
     }
 }
 `));
@@ -106,7 +106,7 @@ lib {
         let h: Holder = &{ task: a };
         let b: Task = &{ identity: 7 };
         h.task = b;
-        h.task.identity;
+        return h.task.identity;
     }
 }
 `), { optimize: 'speed' });
@@ -119,7 +119,7 @@ struct State:
     | good: I32
 lib { fn run() I32 {
     let state = @stored/\\ State "probe" State { bad: 1.0, good: 2 } \\/;
-    state.good * 10 + state.bad.i32();
+    return state.good * 10 + state.bad.i32();
 } }
 `));
   assert.ok(persisted.wasm, persisted.diagnostics?.map(d => d.message).join('\n'));
@@ -140,7 +140,7 @@ lib { fn run() I32 {
 
   // A CRLF file's `@css` body: its carriage returns stay in the text (they
   // once ended the JS string literal it became, "Unterminated string literal").
-  const crlfCss = await compileFile(utu, await write('lib {\n    fn sheet() Str { @css/\\\r\n.a { color: red; }\r\n.b { margin: 0; }\r\n\\/; }\n}\n'));
+  const crlfCss = await compileFile(utu, await write('lib {\n    fn sheet() Str { return @css/\\\r\n.a { color: red; }\r\n.b { margin: 0; }\r\n\\/; }\n}\n'));
   assert.equal((await instantiateNode(crlfCss.wasm, crlfCss.spec)).exports.sheet(), '\r\n.a { color: red; }\r\n.b { margin: 0; }\r\n', crlfCss.diagnostics?.map(d => d.message).join('\n'));
   checked++;
 
@@ -153,25 +153,25 @@ lib { fn run() I32 {
   const large = await write(`enum(U8) Many:
 ${variants}
 fn dense(x: I32) I32 {
-    match x {
+    return match x {
 ${arms}
         ~> -1,
     };
 }
-fn sparse(x: I32) I32 { match x { 5 => 1, 500 => 2, 50000 => 3, -7 => 4, ~> 0, }; }
+fn sparse(x: I32) I32 { return match x { 5 => 1, 500 => 2, 50000 => 3, -7 => 4, ~> 0, }; }
 fn square(m: Many) I32 {
-    match m {
+    return match m {
 ${covered}
     };
 }
 fn deep_len() I32 {
     let a = ${deep};
     let inner = a${'[0]'.repeat(300)};
-    inner.len() * 100 + (inner[1] orelse fatal).len() * 10 + (inner[1] orelse fatal)[1];
+    return inner.len() * 100 + (inner[1] orelse fatal).len() * 10 + (inner[1] orelse fatal)[1];
 }
 lib {
     fn run() I32 {
-        dense(5998) * 10000 + dense(4) * 1000 + dense(3) + 2 + sparse(-7) * 100 + sparse(50000) * 10 + square(Many.V39) + deep_len();
+        return dense(5998) * 10000 + dense(4) * 1000 + dense(3) + 2 + sparse(-7) * 100 + sparse(50000) * 10 + square(Many.V39) + deep_len();
     }
 }
 `);
@@ -188,8 +188,8 @@ lib {
   // nested (each capturing the last's variable), an alt over 2,500 variants,
   // 1,500 types of one protocol, and @json over a struct of 1,500 fields.
   const nest = depth => {
-    const body = (i, ind) => i === depth ? `${ind}v${depth - 1} + 0;\n`
-      : `${ind}let v${i} = v${i - 1} + 1;\n${ind}let f${i + 1} = cl() I32 {\n${body(i + 1, ind + '    ')}${ind}};\n${ind}f${i + 1}();\n`;
+    const body = (i, ind) => i === depth ? `${ind}return v${depth - 1} + 0;\n`
+      : `${ind}let v${i} = v${i - 1} + 1;\n${ind}let f${i + 1} = cl() I32 {\n${body(i + 1, ind + '    ')}${ind}};\n${ind}return f${i + 1}();\n`;
     return `fn nest() I32 {\n    let v0 = 1;\n${body(1, '    ')}}\n`;
   };
   const many = (n, f, sep = '\n') => Array.from({ length: n }, (_, i) => f(i)).join(sep);
@@ -197,29 +197,29 @@ lib {
 enum E:
 ${many(2500, i => `    | V${i} {}`)}
 fn pick(e: E) I32 {
-    alt e {
+    return alt e {
 ${many(2500, i => `        V${i} => ${i},`)}
     };
 }
 proto Shape:
     | area() I32
-${many(1500, i => `struct C${i}[Shape]:\n    | k: I32\nfn Shape[C${i}].area |c| () I32 { c.k * ${i}; }`)}
+${many(1500, i => `struct C${i}[Shape]:\n    | k: I32\nfn Shape[C${i}].area |c| () I32 { return c.k * ${i}; }`)}
 struct Big:
 ${many(1500, i => `    | f${i}: I32`)}
 lib {
-    fn deep() I32 { nest(); }
-    fn last() I32 { pick(V2499 {}); }
+    fn deep() I32 { return nest(); }
+    fn last() I32 { return pick(V2499 {}); }
     fn shapes() I32 {
         let xs: Array[Shape] = [${many(1500, i => `C${i} { k: 1 }`, ', ')}];
         let t = 0;
         for (xs) |s| { t += s.area(); };
-        t;
+        return t;
     }
     fn json() I32 {
         let b = Big { ${many(1500, i => `f${i}: ${i}`, ', ')} };
         let s = @json/\\ encode Big b \\/;
         let r = @json/\\ decode Big s \\/ orelse fatal;
-        r.f1499;
+        return r.f1499;
     }
 }
 `);
@@ -241,11 +241,11 @@ fn taken() Str {
     let s = "";
     for (0 ..< trail.len()) |i| { s = s + Str.from_code_point(trail[i]); };
     trail.clear();
-    s;
+    return s;
 }
 fn digit(c: I32) Result[I32, Str] {
     if c < 48 or c > 57 { return Result[I32, Str].err("bad " + c.str()); };
-    Result[I32, Str].ok(c - 48);
+    return Result[I32, Str].ok(c - 48);
 }
 fn sum(codes: Array[I32]) Result[I32, Str] {
     defer note("D");
@@ -256,28 +256,28 @@ fn sum(codes: Array[I32]) Result[I32, Str] {
         errdefer note("e");
         t += try digit(c);
     };
-    Result[I32, Str].ok(t);
+    return Result[I32, Str].ok(t);
 }
 fn twice(codes: Array[I32]) Result[Str, Str] {
     errdefer note("T");
     let a = try sum(codes);
     let b = try sum(codes);
-    Result[Str, Str].ok((a + b).str());
+    return Result[Str, Str].ok((a + b).str());
 }
 fn picky(n: I32) Result[I32, Str] {
     errdefer note("p");
     if n == 0 { return Result[I32, Str].err("zero"); };
     let r = if n > 9 { Result[I32, Str].err("big"); } else { Result[I32, Str].ok(n); };
-    r;
+    return r;
 }
 fn via_closure(c: I32) Result[I32, Str] {
     let f = cl(k: I32) Result[I32, Str] {
         errdefer note("c");
         let v = try digit(k);
-        Result[I32, Str].ok(v * 2);
+        return Result[I32, Str].ok(v * 2);
     };
     let v = try f(c);
-    Result[I32, Str].ok(v + 1);
+    return Result[I32, Str].ok(v + 1);
 }
 fn labeled(c: I32, leave: Bool) Result[I32, Str] {
     errdefer note("o");
@@ -287,26 +287,26 @@ fn labeled(c: I32, leave: Bool) Result[I32, Str] {
         if leave { break found 7; };
         try digit(c);
     };
-    Result[I32, Str].ok(v);
+    return Result[I32, Str].ok(v);
 }
 fn show(r: Result[I32, Str]) Str {
-    taken() + "|" + if r.is_ok() { r.value().str(); } else { r.error(); };
+    return taken() + "|" + if r.is_ok() { r.value().str(); } else { r.error(); };
 }
 lib {
-    fn ok_sum() Str { show(sum([49, 50, 51])); }
-    fn err_sum() Str { show(sum([49, 120, 51])); }
+    fn ok_sum() Str { return show(sum([49, 50, 51])); }
+    fn err_sum() Str { return show(sum([49, 120, 51])); }
     fn nested_ok() Str {
         let r = twice([52]);
-        taken() + "|" + r.value();
+        return taken() + "|" + r.value();
     }
     fn nested_err() Str {
         let r = twice([97]);
-        taken() + "|" + r.error();
+        return taken() + "|" + r.error();
     }
-    fn returns() Str { show(picky(0)) + "," + show(picky(5)) + "," + show(picky(12)); }
-    fn closure() Str { show(via_closure(51)) + "," + show(via_closure(65)); }
-    fn defaults() I32 { digit(55).value_or(-1) * 10 + digit(1).value_or(-1); }
-    fn labels() Str { show(labeled(50, true)) + "," + show(labeled(50, false)) + "," + show(labeled(120, false)); }
+    fn returns() Str { return show(picky(0)) + "," + show(picky(5)) + "," + show(picky(12)); }
+    fn closure() Str { return show(via_closure(51)) + "," + show(via_closure(65)); }
+    fn defaults() I32 { return digit(55).value_or(-1) * 10 + digit(1).value_or(-1); }
+    fn labels() Str { return show(labeled(50, true)) + "," + show(labeled(50, false)) + "," + show(labeled(120, false)); }
 }
 `);
   for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
@@ -323,7 +323,7 @@ lib {
   // Code after a constant-true `if` that returns is dropped: a guarded
   // defer's `rethrow` there was left outside its try (JavaScriptCore: "rethrow
   // doesn't refer to a catch block"), in every mode.
-  const dead = await write(`fn bump(p: I32) I32 { p + 1; }
+  const dead = await write(`fn bump(p: I32) I32 { return p + 1; }
 lib {
     fn run(p: I32) I32 {
         let h = 17;
@@ -340,7 +340,7 @@ lib {
                 };
             },
         };
-        h;
+        return h;
     }
     fn labeled(p: I32) I32 {
         let h = 17;
@@ -348,13 +348,13 @@ lib {
             if 7 < 12 { return h * 7 + p; };
         };
         defer { };
-        h + p;
+        return h + p;
     }
     fn valued(p: I32) I32 {
         let h = 17;
         let v = if 1 <= 14 { return h * 3 + p; } else { bump(p); };
         defer { };
-        bump(h + v);
+        return bump(h + v);
     }
 }
 `);
@@ -371,20 +371,20 @@ lib {
   // argument never read is kept, a function called once moves there; and
   // the small builds have fewer functions than debug.
   const shrinks = await write(`vec trail: I32;
-fn tick(v: I32) I32 { trail.push(v); v; }
-fn less(a: I32, b: I32) I32 { a - b; }
-fn scaled(a: I32, b: I32) I32 { a * 10 + b; }
-fn second(a: I32, b: I32) I32 { b; }
-fn sign(x: I32) I32 { if x < 0 { -1; } else { 1; }; }
+fn tick(v: I32) I32 { trail.push(v); return v; }
+fn less(a: I32, b: I32) I32 { return a - b; }
+fn scaled(a: I32, b: I32) I32 { return a * 10 + b; }
+fn second(a: I32, b: I32) I32 { return b; }
+fn sign(x: I32) I32 { return if x < 0 { -1; } else { 1; }; }
 lib {
     fn run() I32 {
         let x = 7;
-        less(tick(9), tick(4)) * 1000 + scaled(tick(3), x) * 10 + scaled(less(x, 2), 1) + second(tick(2), 5) + sign(x - 10);
+        return less(tick(9), tick(4)) * 1000 + scaled(tick(3), x) * 10 + scaled(less(x, 2), 1) + second(tick(2), 5) + sign(x - 10);
     }
     fn ran() I32 {
         let t = 0;
         for (0 ..< trail.len()) |i| { t = t * 10 + trail[i]; };
-        t;
+        return t;
     }
 }
 `);
@@ -411,7 +411,7 @@ lib {
   // in order, and its locals share a caller loop's slots without coming round.
   const once = await write(`using JS from std:JS;
 vec trail: I32;
-fn tick(v: I32) I32 { trail.push(v); v; }
+fn tick(v: I32) I32 { trail.push(v); return v; }
 fn note(v: I32) Void { trail.push(v); }
 fn digits(n: I32, base: I32) I32 {
     if n == 0 { return 1; };
@@ -420,7 +420,7 @@ fn digits(n: I32, base: I32) I32 {
         n = n / base;
         count += 1;
     };
-    count;
+    return count;
 }
 fn squares(k: I32) I32 {
     let total = 0;
@@ -428,31 +428,31 @@ fn squares(k: I32) I32 {
         let sq = i * i;
         total += sq;
     };
-    total;
+    return total;
 }
-fn parsed(text: Str) Str { try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { "bad"; }; }
+fn parsed(text: Str) Str { return try { JS.JSON.stringify(JS.JSON.parse(text)); } catch |e| { "bad"; }; }
 fn first_over(limit: I32, a: I32, b: I32, c: I32) I32 {
     defer note(0);
     for ([a, b, c]) |v| { if v > limit { return v; }; };
-    -1;
+    return -1;
 }
-fn inner(x: I32) I32 { let y = x * 3; y + 1; }
-fn inner2(x: I32) I32 { x - 1; }
-fn outer(x: I32) I32 { let z = inner(x) + inner2(x); z * 2; }
-fn poly(x: I32, c: I32) I32 { c * x * x + c * x + c; }
+fn inner(x: I32) I32 { let y = x * 3; return y + 1; }
+fn inner2(x: I32) I32 { return x - 1; }
+fn outer(x: I32) I32 { let z = inner(x) + inner2(x); return z * 2; }
+fn poly(x: I32, c: I32) I32 { return c * x * x + c * x + c; }
 lib {
     fn run() I32 {
         let sum = 0;
         for (0 ..< 3) |r| { sum += squares(r + 2); };
-        digits(tick(1234), tick(10)) * 100000 + digits(0, 10) * 10000 + sum * 100 + first_over(tick(5), tick(3), tick(9), tick(7));
+        return digits(tick(1234), tick(10)) * 100000 + digits(0, 10) * 10000 + sum * 100 + first_over(tick(5), tick(3), tick(9), tick(7));
     }
     fn ran() Str {
         let s = "";
         for (0 ..< trail.len()) |i| { s = if i == 0 { \`\${trail[i]}\`; } else { \`\${s},\${trail[i]}\`; }; };
-        s;
+        return s;
     }
-    fn json() Str { parsed("[1,2]") + parsed("{"); }
-    fn nested() I32 { outer(5) + poly(3, 2); }
+    fn json() Str { return parsed("[1,2]") + parsed("{"); }
+    fn nested() I32 { return outer(5) + poly(3, 2); }
 }
 `);
   const onceDebug = functions((await compileFile(utu, once, { mode: 'debug' })).wasm);
@@ -472,15 +472,15 @@ lib {
   // fast): every build mode gives what debug gives, and the optimized ones
   // return fields (a function type of several results) where `fields` says.
   const P = 'struct P:\n    | x: I32\n    | y: I32\n\nstruct Box:\n    | p: P\n\n'
-    + 'fn same(a: P, b: P) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\n\n'
+    + 'fn same(a: P, b: P) Bool => @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/;\n\n'
     // Recursive (so it stays a call), several paths, one returning a call.
-    + 'fn make(a: I32, n: I32) P {\n    if n > 0 { return make(a + 1, n - 1); };\n    if a > 100 { return &{ x: 100, y: a }; };\n    &{ x: a, y: a * 2 };\n}\n\n';
+    + 'fn make(a: I32, n: I32) P {\n    if n > 0 { return make(a + 1, n - 1); };\n    if a > 100 { return &{ x: 100, y: a }; };\n    return &{ x: a, y: a * 2 };\n}\n\n';
   const returned = [
     // Read only for its fields; copied and changed through the copy; kept in
     // a box and changed through it; compared by reference; dropped.
     [P + `lib {
-    fn fields() I32 { let p = make(3, 2); let q = make(200, 1); p.x + p.y + q.x + q.y; }
-    fn alias() I32 { let p = make(3, 1); let q = p; q.x = 50; let r = make(1, 1); p.x + q.y + r.x + r.y; }
+    fn fields() I32 { let p = make(3, 2); let q = make(200, 1); return p.x + p.y + q.x + q.y; }
+    fn alias() I32 { let p = make(3, 1); let q = p; q.x = 50; let r = make(1, 1); return p.x + q.y + r.x + r.y; }
     fn kept() I32 {
         let b = Box { p: P { x: 0, y: 0 } };
         let p = make(5, 1);
@@ -488,7 +488,7 @@ lib {
         b.p.x = 9;
         let r = make(2, 2);
         let s = make(4, 0);
-        p.x * 100 + b.p.y + r.x + s.y;
+        return p.x * 100 + b.p.y + r.x + s.y;
     }
     fn identity() I32 {
         let p = make(1, 1);
@@ -496,24 +496,24 @@ lib {
         let r = make(1, 1);
         let s = make(1, 1);
         make(2, 2);
-        (if same(p, q) { 1; } else { 0; }) + (if same(p, r) { 10; } else { 0; }) + s.x + s.y;
+        return (if same(p, q) { 1; } else { 0; }) + (if same(p, r) { 10; } else { 0; }) + s.x + s.y;
     }
 }
 `, { fields: 316, alias: 64, kept: 924, identity: 7 }, true],
     // Escaping: captured, stored in an array, passed on, taken as a value.
-    [P + `fn id(p: P) P { p; }
+    [P + `fn id(p: P) P { return p; }
 lib {
     fn escapes() I32 {
         let arr: Array[P] = [make(6, 1), make(7, 0)];
         arr[0].x = 40;
         let c = make(8, 2);
-        let read = cl() I32 { c.x + c.y; };
+        let read = cl() I32 { return c.x + c.y; };
         c.x = 1;
         let d = id(make(2, 0));
         d.y = 5;
-        arr[0].x + arr[1].y + read() + d.y + make(9, 1).y;
+        return arr[0].x + arr[1].y + read() + d.y + make(9, 1).y;
     }
-    fn as_value() I32 { let f: fun(I32, I32) P = make; let p = make(4, 1); f(2, 2).y + p.x; }
+    fn as_value() I32 { let f: fun(I32, I32) P = make; let p = make(4, 1); return f(2, 2).y + p.x; }
 }
 `, { escapes: 100, as_value: 13 }, false],
     // The callee keeps what it returns: it is returned as itself.
@@ -521,14 +521,14 @@ lib {
     if n > 0 { return stash(b, a, n - 1); };
     let p: P = &{ x: a, y: 1 };
     b.p = p;
-    p;
+    return p;
 }
 lib {
     fn callee_keeps() I32 {
         let b = Box { p: P { x: 0, y: 0 } };
         let r = stash(b, 4, 2);
         b.p.x = 77;
-        r.x + if same(r, b.p) { 1000; } else { 0; };
+        return r.x + if same(r, b.p) { 1000; } else { 0; };
     }
 }
 `, { callee_keeps: 1077 }, false],
@@ -538,15 +538,15 @@ lib {
     struct &:
         | a: T
         | b: T
-    fn &.of(a: T, b: T) & { &{ a: a, b: b }; }
+    fn &.of(a: T, b: T) & { return &{ a: a, b: b }; }
 }
 mod Res[T, E] {
     struct &:
         | ok: Bool
         | value: T
         | err: E
-    fn &.good(v: T, e: E) & { &{ ok: true, value: v, err: e }; }
-    fn &.bad(v: T, e: E) & { &{ ok: false, value: v, err: e }; }
+    fn &.good(v: T, e: E) & { return &{ ok: true, value: v, err: e }; }
+    fn &.bad(v: T, e: E) & { return &{ ok: false, value: v, err: e }; }
 }
 tag enum Shape:
     | Dot { at: I32 }
@@ -554,21 +554,21 @@ tag enum Shape:
 fn divmod(a: I32, b: I32) Pair[I32] {
     if a < b { return Pair[I32].of(0, a); };
     let d = divmod(a - b, b);
-    Pair[I32].of(d.a + 1, d.b);
+    return Pair[I32].of(d.a + 1, d.b);
 }
 fn parse(s: I32, n: I32) Res[I32, Str] {
     if n > 0 { return parse(s, n - 1); };
-    if s < 0 { Res[I32, Str].bad(0, "negative"); } else { Res[I32, Str].good(s * 2, ""); };
+    return if s < 0 { Res[I32, Str].bad(0, "negative"); } else { Res[I32, Str].good(s * 2, ""); };
 }
 fn built(a: I32, n: I32) Pair[I32] {
     if n > 0 { return built(a, n - 1); };
     let p = Pair[I32].of(a, 0);
     p.b = p.a + 7;
-    p;
+    return p;
 }
 fn span(s: Shape, n: I32) Pair[I32] {
     if n > 0 { return span(s, n - 1); };
-    alt s {
+    return alt s {
         Dot |d| => Pair[I32].of(d.at, d.at),
         Bar |b| => if b.from < b.to { Pair[I32].of(b.from, b.to); } else { Pair[I32].of(b.to, b.from); },
     };
@@ -577,19 +577,19 @@ lib {
     fn generic() I32 {
         let t = 0;
         for (0 ..< 50) |i| { let d = divmod(i * 7 + 3, 5); t += d.a * 10 + d.b; };
-        t;
+        return t;
     }
     fn result() I32 {
         let g = parse(21, 3);
         let b = parse(-1, 2);
-        (if g.ok { g.value; } else { -1; }) + (if b.ok { 1000; } else { b.err.len(); });
+        return (if g.ok { g.value; } else { -1; }) + (if b.ok { 1000; } else { b.err.len(); });
     }
-    fn local_made() I32 { let p = built(4, 3); p.a * 10 + p.b; }
+    fn local_made() I32 { let p = built(4, 3); return p.a * 10 + p.b; }
     fn shapes() I32 {
         let a = span(Dot { at: 4 }, 2);
         let b = span(Bar { from: 9, to: 2 }, 1);
         let c = span(Bar { from: 1, to: 5 }, 0);
-        a.a + a.b * 10 + b.a * 100 + b.b * 1000 + c.a * 10000 + c.b * 100000;
+        return a.a + a.b * 10 + b.a * 100 + b.b * 1000 + c.a * 10000 + c.b * 100000;
     }
 }
 `, { generic: 17350, result: 50, local_made: 51, shapes: 519244 }, true],
@@ -616,33 +616,33 @@ let js_double: fun() cl(I32) I32 = @es/\\ () => (x) => x * 2 \\/;
 let js_call: fun(cl(I32) I32, I32) I32 = @es/\\ (f, x) => f(x) \\/;
 struct Box:
     | f: cl(I32) I32
-fn slow(n: I32) I32 { await delay(n, 1) + 1; }
-fn apply(f: cl(I32) I32, x: I32) I32 { f(x); }
+fn slow(n: I32) I32 { return await delay(n, 1) + 1; }
+fn apply(f: cl(I32) I32, x: I32) I32 { return f(x); }
 gn ticks(n: I32) I32 { for (0 ..< n) |i| { yield await delay(i, 1); }; }
 lib {
-    fn through() I32 { apply(cl(n) { slow(n); }, 41); }
+    fn through() I32 { return apply(cl(n) { return slow(n); }, 41); }
     fn nested() I32 {
         let k = 10;
-        let outer = cl(n: I32) I32 { let inner = cl(m: I32) I32 { await delay(m + k, 1); }; inner(n) + await delay(1, 1); };
-        outer(5);
+        let outer = cl(n: I32) I32 { let inner = cl(m: I32) I32 { return await delay(m + k, 1); }; return inner(n) + await delay(1, 1); };
+        return outer(5);
     }
     fn stored() I32 {
-        let b = Box { f: cl(n) { await delay(n * 3, 1); } };
-        let fs = [cl(n: I32) I32 { slow(n); }, cl(n: I32) I32 { n; }];
-        b.f(7) * 100 + fs[0](1) + fs[1](2);
+        let b = Box { f: cl(n) { return await delay(n * 3, 1); } };
+        let fs = [cl(n: I32) I32 { return slow(n); }, cl(n: I32) I32 { return n; }];
+        return b.f(7) * 100 + fs[0](1) + fs[1](2);
     }
-    fn generator() I32 { let total = cl() I32 { let t = 0; for (ticks(4)) |v| { t += v; }; t; }; total(); }
+    fn generator() I32 { let total = cl() I32 { let t = 0; for (ticks(4)) |v| { t += v; }; return t; }; return total(); }
     fn pipeline() I32 {
-        let piped = cl(xs: Array[I32]) I32 { xs filter |x| { await delay(x, 1) > 1; } fold(0) |s, x| { s + await delay(x, 1); }; };
-        piped([1, 2, 3]);
+        let piped = cl(xs: Array[I32]) I32 { return xs filter |x| { await delay(x, 1) > 1; } fold(0) |s, x| { s + await delay(x, 1); }; };
+        return piped([1, 2, 3]);
     }
-    fn identity() I32 { let f = cl(n: I32) I32 { n + 1; }; if same(f, f) { js_call(f, 1); } else { 0; }; }
-    fn js_function() I32 { apply(js_double(), 21); }
+    fn identity() I32 { let f = cl(n: I32) I32 { return n + 1; }; return if same(f, f) { js_call(f, 1); } else { 0; }; }
+    fn js_function() I32 { return apply(js_double(), 21); }
     fn calls() I32 {
         let k = 3;
         let s = 0;
-        for (0 ..< 2000000) |i| { s = s + apply(cl(n) { n * k; }, i) % 7; };
-        s;
+        for (0 ..< 2000000) |i| { s = s + apply(cl(n) { return n * k; }, i) % 7; };
+        return s;
     }
 }
 `);
@@ -660,18 +660,18 @@ lib {
   // U32 mem (once sign-extended). Stage 0 reads several of these wrong.
   const literalSource = `const mem zero: F64 = [-0.0];
 const mem ones: U32 = @comptime/\\ ones_list() \\/;
-fn ones_list() Array[U32] { let a: U32 = 4294967295; [a]; }
+fn ones_list() Array[U32] { let a: U32 = 4294967295; return [a]; }
 enum(U32) Big:
     | A = 3000000000
 lib {
-    fn big() F64 { let a: F64 = 10000000000000000000; a; }
-    fn below() F64 { let a: F64 = -18446744073709551615; a; }
-    fn near() F64 { let a: F32 = 1.000000059604644775390625001; a.f64(); }
-    fn wide() F64 { let a: F32 = 1152921573326323713; a.f64(); }
-    fn tie() F64 { let a: F32 = 1.000000178813934326171875; a.f64(); }
-    fn negzero() F64 { 1.0 / zero[0]; }
-    fn all_ones() F64 { ones[0].f64(); }
-    fn variant() I32 { Big.A.i32(); }
+    fn big() F64 { let a: F64 = 10000000000000000000; return a; }
+    fn below() F64 { let a: F64 = -18446744073709551615; return a; }
+    fn near() F64 { let a: F32 = 1.000000059604644775390625001; return a.f64(); }
+    fn wide() F64 { let a: F32 = 1152921573326323713; return a.f64(); }
+    fn tie() F64 { let a: F32 = 1.000000178813934326171875; return a.f64(); }
+    fn negzero() F64 { return 1.0 / zero[0]; }
+    fn all_ones() F64 { return ones[0].f64(); }
+    fn variant() I32 { return Big.A.i32(); }
 }
 `;
   const literalFile = await write(literalSource);
@@ -690,34 +690,34 @@ lib {
   // constants, wrapping), `x * 0` and `x & 0` keeping x's effects, and an
   // `if` or loop condition that is constant.
   const foldFile = await write(`vec calls: I32 = [0];
-fn bump() I32 { calls[0] += 1; calls[0]; }
+fn bump() I32 { calls[0] += 1; return calls[0]; }
 let depth: I32 = 14;
 lib {
-    fn max_plus() I32 { 2147483647 + 1; }
-    fn min_minus() I32 { -2147483648 - 1; }
-    fn min_times() I32 { -2147483648 * -1; }
-    fn big_mul() I32 { 65537 * 65537; }
-    fn max64_plus() I64 { let m: I64 = 9223372036854775807; m + 1; }
-    fn min64_minus() I64 { let m: I64 = -9223372036854775808; m - 1; }
-    fn shl33() I32 { 1 << 33; }
-    fn shr35() I32 { -8 >> 35; }
-    fn shru33() I32 { -1 >>> 33; }
-    fn shl65() I64 { let one: I64 = 1; one << 65; }
-    fn shru64() I64 { let m: I64 = -1; m >>> 64; }
-    fn cmp_u() Bool { let m: I64 = -1; m.u64() > 1.u64(); }
-    fn global_plus() I32 { depth + 1; }
-    fn reassoc(x: I32) I32 { 1 << (depth - x + 4); }
-    fn reassoc_neg(x: I32) I32 { (x - 5) + -7 - -3; }
-    fn reassoc_wrap(x: I32) I32 { (x + 2147483647) + 2; }
-    fn reassoc64(x: I64) I64 { let a: I64 = -3; (a - x) - 9223372036854775807; }
-    fn times_zero() I32 { let before = calls[0]; let r = bump() * 0; r + (calls[0] - before) * 10; }
-    fn and_zero() I32 { let before = calls[0]; let r = bump() & 0; r + (calls[0] - before) * 10; }
-    fn idents(x: I32) I32 { ((((x + 0) * 1) | 0) ^ 0) & -1 << 32; }
-    fn if_const() I32 { if 3 > 2 { 1; } else { 2; }; }
-    fn if_const_else() I32 { let t = 0; if 1 == 2 { t = bump(); } else { t = 7; }; t; }
-    fn if_no_else() I32 { let t = 1; if 2 < 1 { t = bump(); }; t; }
-    fn while_false() I32 { let n = 0; while (1 > 2) { n += 1; }; n; }
-    fn while_true() I32 { let n = 0; while (true) { n += 1; if n == 5 { break; }; }; n; }
+    fn max_plus() I32 { return 2147483647 + 1; }
+    fn min_minus() I32 { return -2147483648 - 1; }
+    fn min_times() I32 { return -2147483648 * -1; }
+    fn big_mul() I32 { return 65537 * 65537; }
+    fn max64_plus() I64 { let m: I64 = 9223372036854775807; return m + 1; }
+    fn min64_minus() I64 { let m: I64 = -9223372036854775808; return m - 1; }
+    fn shl33() I32 { return 1 << 33; }
+    fn shr35() I32 { return -8 >> 35; }
+    fn shru33() I32 { return -1 >>> 33; }
+    fn shl65() I64 { let one: I64 = 1; return one << 65; }
+    fn shru64() I64 { let m: I64 = -1; return m >>> 64; }
+    fn cmp_u() Bool { let m: I64 = -1; return m.u64() > 1.u64(); }
+    fn global_plus() I32 { return depth + 1; }
+    fn reassoc(x: I32) I32 { return 1 << (depth - x + 4); }
+    fn reassoc_neg(x: I32) I32 { return (x - 5) + -7 - -3; }
+    fn reassoc_wrap(x: I32) I32 { return (x + 2147483647) + 2; }
+    fn reassoc64(x: I64) I64 { let a: I64 = -3; return (a - x) - 9223372036854775807; }
+    fn times_zero() I32 { let before = calls[0]; let r = bump() * 0; return r + (calls[0] - before) * 10; }
+    fn and_zero() I32 { let before = calls[0]; let r = bump() & 0; return r + (calls[0] - before) * 10; }
+    fn idents(x: I32) I32 { return ((((x + 0) * 1) | 0) ^ 0) & -1 << 32; }
+    fn if_const() I32 { return if 3 > 2 { 1; } else { 2; }; }
+    fn if_const_else() I32 { let t = 0; if 1 == 2 { t = bump(); } else { t = 7; }; return t; }
+    fn if_no_else() I32 { let t = 1; if 2 < 1 { t = bump(); }; return t; }
+    fn while_false() I32 { let n = 0; while (1 > 2) { n += 1; }; return n; }
+    fn while_true() I32 { let n = 0; while (true) { n += 1; if n == 5 { break; }; }; return n; }
 }
 `);
   for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
@@ -740,60 +740,60 @@ lib {
   // struct T, a scalar T (`fn Ord[I32].cmp`), two bounds, and a T that is a
   // generic module's instance (`fn Ord[&].cmp`) passed on by a bounded T.
   const ord = `proto Ord:\n    | cmp(&) I32\nproto Named:\n    | get name : Str\n`
-    + `fn Ord[I32].cmp |a| (b: I32) I32 { a - b; }\n`
-    + `mod Sorted[T[Ord]] {\n    fn max(a: T, b: T) T { if a.cmp(b) >= 0 { a; } else { b; }; }\n`
+    + `fn Ord[I32].cmp |a| (b: I32) I32 { return a - b; }\n`
+    + `mod Sorted[T[Ord]] {\n    fn max(a: T, b: T) T { return if a.cmp(b) >= 0 { a; } else { b; }; }\n`
     + `    fn sort(xs: Array[T]) Void { for (1 ..< xs.len()) |i| { let j = i; while (j > 0 and xs[j - 1].cmp(xs[j]) > 0) { let t = xs[j]; xs[j] = xs[j - 1]; xs[j - 1] = t; j -= 1; }; }; }\n}\n`;
   const bounded = [
     [`${ord}struct P[Ord]:
     | x: I32
-fn Ord[P].cmp |a| (b: P) I32 { a.x - b.x; }
-lib { fn run() I32 { Sorted[P].max(P { x: 4 }, P { x: 9 }).x; } }
+fn Ord[P].cmp |a| (b: P) I32 { return a.x - b.x; }
+lib { fn run() I32 { return Sorted[P].max(P { x: 4 }, P { x: 9 }).x; } }
 `, 9],
-    [`${ord}lib { fn run() I32 { let xs = [5, 2, 9, 1]; Sorted[I32].sort(xs); xs[0] * 1000 + xs[1] * 100 + xs[2] * 10 + xs[3] + Sorted[I32].max(3, 7); } }\n`, 1266],
-    [`${ord}struct P[Ord, Named]:\n    | name: Str\n    | x: I32\nfn Ord[P].cmp |a| (b: P) I32 { a.x - b.x; }\n`
-      + `mod Best[T[Ord, Named]] {\n    fn best(a: T, b: T) Str { Sorted[T].max(a, b).name; }\n}\n`
-      + `lib { fn run() Str { Best[P].best(P { name: "a", x: 7 }, P { name: "b", x: 2 }); } }
+    [`${ord}lib { fn run() I32 { let xs = [5, 2, 9, 1]; Sorted[I32].sort(xs); return xs[0] * 1000 + xs[1] * 100 + xs[2] * 10 + xs[3] + Sorted[I32].max(3, 7); } }\n`, 1266],
+    [`${ord}struct P[Ord, Named]:\n    | name: Str\n    | x: I32\nfn Ord[P].cmp |a| (b: P) I32 { return a.x - b.x; }\n`
+      + `mod Best[T[Ord, Named]] {\n    fn best(a: T, b: T) Str { return Sorted[T].max(a, b).name; }\n}\n`
+      + `lib { fn run() Str { return Best[P].best(P { name: "a", x: 7 }, P { name: "b", x: 2 }); } }
 `, 'a'],
-    [`${ord}mod Box[T[Ord]] {\n    struct &:\n        | v: T\n    fn &.new(v: T) & { &{ v: v }; }\n    fn Ord[&].cmp |a| (b: &) I32 { a.v.cmp(b.v); }\n}\n`
-      + `lib { fn run() I32 { Sorted[Box[I32]].max(Box[I32].new(4), Box[I32].new(8)).v; } }
+    [`${ord}mod Box[T[Ord]] {\n    struct &:\n        | v: T\n    fn &.new(v: T) & { return &{ v: v }; }\n    fn Ord[&].cmp |a| (b: &) I32 { return a.v.cmp(b.v); }\n}\n`
+      + `lib { fn run() I32 { return Sorted[Box[I32]].max(Box[I32].new(4), Box[I32].new(8)).v; } }
 `, 8],
     // `c.tick()` on a T bounded by Counter is Counter's `fn Counter.tick` (it was "No method ByOne.tick"),
     // as on a Counter and as `Counter.tick(c)`; a T's own tick comes first.
     [`proto Counter:\n    | get set count : I32\n    | step() I32\nstruct ByOne[Counter]:\n    | count: I32\nstruct Own[Counter]:\n    | count: I32\n`
-      + `fn Counter[ByOne].step |c| () I32 { 1; }\nfn Counter[Own].step |c| () I32 { 2; }\nfn Own.tick |c| () Void { c.count = c.count + 100; }\n`
-      + `fn Counter.tick |c| () Void { c.count = c.count + c.step(); }\nmod Run[T[Counter]] {\n    fn twice(c: T) I32 { c.tick(); Counter.tick(c); c.count; }\n}\n`
-      + `fn on(c: Counter) I32 { c.tick(); c.count; }\n`
-      + `lib { fn run() I32 { Run[ByOne].twice(ByOne { count: 4 }) * 1000 + Run[Own].twice(Own { count: 1 }) * 10 + on(ByOne { count: 0 }); } }
+      + `fn Counter[ByOne].step |c| () I32 { return 1; }\nfn Counter[Own].step |c| () I32 { return 2; }\nfn Own.tick |c| () Void { c.count = c.count + 100; }\n`
+      + `fn Counter.tick |c| () Void { c.count = c.count + c.step(); }\nmod Run[T[Counter]] {\n    fn twice(c: T) I32 { c.tick(); Counter.tick(c); return c.count; }\n}\n`
+      + `fn on(c: Counter) I32 { c.tick(); return c.count; }\n`
+      + `lib { fn run() I32 { return Run[ByOne].twice(ByOne { count: 4 }) * 1000 + Run[Own].twice(Own { count: 1 }) * 10 + on(ByOne { count: 0 }); } }
 `, 6000 + 1030 + 1],
     // `x.label()` and `Tag.label(x)` on a bounded T that is a scalar, Str or enum (it was "Expected Tag, got I32"):
     // the default is checked for T, so `t.tagv()`, `t.base()` and `Tag.base(t)` in it call T's.
-    [`proto Tag:\n    | tagv() I32\nfn Tag.base |t|() I32 { t.tagv() * 10; }\nfn Tag.label |t|() I32 { t.base() + Tag.base(t) + t.tagv() + 7; }\n`
-      + `fn Tag[I32].tagv |t|() I32 { t; }\nfn Tag[Str].tagv |t|() I32 { t.len(); }\nstruct P[Tag]:\n    | v: I32\nfn Tag[P].tagv |t|() I32 { t.v; }\n`
-      + `tag enum Shape:\n    | Sq\n    | Ci\nfn Tag[Shape].tagv |t|() I32 { alt t { Sq => 1, Ci => 2, }; }\n`
-      + `mod Use[T[Tag]] {\n    fn go(x: T) I32 { x.label(); }\n    fn go2(x: T) I32 { Tag.label(x); }\n}\n`
-      + `lib { fn run() I32 { Use[I32].go(5) * 1000000 + Use[Str].go("ab") * 10000 + Use[P].go(P { v: 3 }) * 100 + Use[Shape].go(Ci {}) + Use[I32].go2(1) - Use[Shape].go2(Sq {}); } }
+    [`proto Tag:\n    | tagv() I32\nfn Tag.base |t|() I32 { return t.tagv() * 10; }\nfn Tag.label |t|() I32 { return t.base() + Tag.base(t) + t.tagv() + 7; }\n`
+      + `fn Tag[I32].tagv |t|() I32 { return t; }\nfn Tag[Str].tagv |t|() I32 { return t.len(); }\nstruct P[Tag]:\n    | v: I32\nfn Tag[P].tagv |t|() I32 { return t.v; }\n`
+      + `tag enum Shape:\n    | Sq\n    | Ci\nfn Tag[Shape].tagv |t|() I32 { return alt t { Sq => 1, Ci => 2, }; }\n`
+      + `mod Use[T[Tag]] {\n    fn go(x: T) I32 { return x.label(); }\n    fn go2(x: T) I32 { return Tag.label(x); }\n}\n`
+      + `lib { fn run() I32 { return Use[I32].go(5) * 1000000 + Use[Str].go("ab") * 10000 + Use[P].go(P { v: 3 }) * 100 + Use[Shape].go(Ci {}) + Use[I32].go2(1) - Use[Shape].go2(Sq {}); } }
 `,
       112000000 + 490000 + 7000 + 49 + 28 - 28],
   ];
   // A default is the receiver's parameter's bounds', decided where it is written (both were by the
   // type argument: `y.twice()` took X's A.twice for M[Pt, Pt], and X's and Y's twice were ambiguous).
-  const twiceAB = `proto A:\n    | get v : I32\nproto B:\n    | get w : I32\nstruct Pt[A, B]:\n    | v: I32\n    | w: I32\nfn A.twice |t| () I32 { t.v * 2; }\n`;
-  bounded.push([`${twiceAB}fn B.twice |t| () I32 { t.w * 3; }\nmod M[X[A], Y[B]] {\n    fn id(y: Y) Y { y; }\n`
-    + `    fn run(x: X, y: Y) I32 { let a = x; let b: Y = y; (a).twice() + b.twice() * 100 + id(y).twice() * 10000 + A.twice(x) * 1000000; }\n}\n`
-    + `lib { fn run() I32 { M[Pt, Pt].run(Pt { v: 1, w: 2 }, Pt { v: 5, w: 7 }); } }
+  const twiceAB = `proto A:\n    | get v : I32\nproto B:\n    | get w : I32\nstruct Pt[A, B]:\n    | v: I32\n    | w: I32\nfn A.twice |t| () I32 { return t.v * 2; }\n`;
+  bounded.push([`${twiceAB}fn B.twice |t| () I32 { return t.w * 3; }\nmod M[X[A], Y[B]] {\n    fn id(y: Y) Y { return y; }\n`
+    + `    fn run(x: X, y: Y) I32 { let a = x; let b: Y = y; return (a).twice() + b.twice() * 100 + id(y).twice() * 10000 + A.twice(x) * 1000000; }\n}\n`
+    + `lib { fn run() I32 { return M[Pt, Pt].run(Pt { v: 1, w: 2 }, Pt { v: 5, w: 7 }); } }
 `, 2212102]);
   for (const source of [
     // Y is bounded by B, which has no twice.
     `${twiceAB}mod M[X[A], Y[B]] {
-    fn run(x: X, y: Y) I32 { y.twice(); }
+    fn run(x: X, y: Y) I32 { return y.twice(); }
 }
-lib { fn run() I32 { M[Pt, Pt].run(Pt { v: 1, w: 2 }, Pt { v: 5, w: 7 }); } }
+lib { fn run() I32 { return M[Pt, Pt].run(Pt { v: 1, w: 2 }, Pt { v: 5, w: 7 }); } }
 `,
     // A concrete type has no defaults, in a bounded mod as outside.
     `${twiceAB}mod M[X[A]] {
-    fn run(x: X) I32 { let p = Pt { v: 9, w: 0 }; p.twice(); }
+    fn run(x: X) I32 { let p = Pt { v: 9, w: 0 }; return p.twice(); }
 }
-lib { fn run() I32 { M[Pt].run(Pt { v: 1, w: 2 }); } }
+lib { fn run() I32 { return M[Pt].run(Pt { v: 1, w: 2 }); } }
 `,
   ]) {
     const file = await write(source);
@@ -807,7 +807,7 @@ lib { fn run() I32 { M[Pt].run(Pt { v: 1, w: 2 }); } }
     const file = await write(source);
     for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
       const built = await compileFile(utu, file, { mode });
-      assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}`);
+      assert.ok(built.wasm, `${mode}: ${built.diagnostics?.map(d => d.message).join('\n')}\n${source}`);
       assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), expected, `${mode}: ${source.slice(-80)}`);
       checked++;
     }
@@ -823,228 +823,228 @@ lib { fn run() I32 { M[Pt].run(Pt { v: 1, w: 2 }); } }
   const closureDepth = process.versions.bun ? 1500 : 3000;
   const everyMode = [
     // Int-enum statics in a generic mod's instance: `K(i)`, `K.name`, `K.count`, in it and through an alias.
-    ['mod m[T] {\n    enum(U8) K: | A | B\n    fn nm(k: K) Str { K.name(k); }\n    fn rt(i: I32) K { K(i); }\n    fn n() I32 { K.count(); }\n}\nusing m[I32] |a|;\nlib { fn run() I32 { let k: a.K = a.K(1); m[I32].nm(m[I32].rt(1)).len() + a.K.name(k).len() * 10 + a.K.count() * 100 + m[Str].n(); } }\n', 213],
+    ['mod m[T] {\n    enum(U8) K: | A | B\n    fn nm(k: K) Str { return K.name(k); }\n    fn rt(i: I32) K { return K(i); }\n    fn n() I32 { return K.count(); }\n}\nusing m[I32] |a|;\nlib { fn run() I32 { let k: a.K = a.K(1); return m[I32].nm(m[I32].rt(1)).len() + a.K.name(k).len() * 10 + a.K.count() * 100 + m[Str].n(); } }\n', 213],
     // `M[A].E.V { f: x }` builds a struct variant; `m[a.T].T.f(…)` names an instance whose argument is a path.
-    ['mod opt[T] {\n    enum E:\n        | None\n        | Some { v : T }\n}\nmod cell[T] {\n    struct Cell: | value : T\n    fn Cell.new(value: T) Cell { Cell { value: value }; }\n    fn Cell.get |self| () T { self.value; }\n}\nusing cell[I32] |a|;\nlib { fn run() I32 { let b: opt[I32].E = opt[I32].E.Some { v: 3 }; let n = alt b { Some |q| => q.v, None => 0, }; let c = cell[cell[I32].Cell].Cell.new(a.Cell.new(4)); let d = cell[a.Cell].Cell.new(a.Cell.new(5)); n + c.get().get() * 10 + d.get().get() * 100; } }\n', 543],
+    ['mod opt[T] {\n    enum E:\n        | None\n        | Some { v : T }\n}\nmod cell[T] {\n    struct Cell: | value : T\n    fn Cell.new(value: T) Cell { return Cell { value: value }; }\n    fn Cell.get |self| () T { return self.value; }\n}\nusing cell[I32] |a|;\nlib { fn run() I32 { let b: opt[I32].E = opt[I32].E.Some { v: 3 }; let n = alt b { Some |q| => q.v, None => 0, }; let c = cell[cell[I32].Cell].Cell.new(a.Cell.new(4)); let d = cell[a.Cell].Cell.new(a.Cell.new(5)); return n + c.get().get() * 10 + d.get().get() * 100; } }\n', 543],
     // An empty `[]` before the other elements took Array[I32] (`[[], [1.5]]` was "Elements are I32, got F64"): it takes the type of the first element that is not empty, as `[[1.5], []]` did.
-    ['lib { fn run() I32 { let u = [[], [1.5]]; let v = [[], [], ["a", "b"]]; let w = [[1.5], []]; u[0].len() * 1000 + u[1].len() * 100 + v[0].len() * 10 + v[2].len() + w[1].len() * 10000; } }\n', 102],
+    ['lib { fn run() I32 { let u = [[], [1.5]]; let v = [[], [], ["a", "b"]]; let w = [[1.5], []]; return u[0].len() * 1000 + u[1].len() * 100 + v[0].len() * 10 + v[2].len() + w[1].len() * 10000; } }\n', 102],
     // A hosted mem's copy_in takes an Externref, with no std:JS loaded (it crashed the compiler).
-    ['mem text: U8;\nlet bytes: fun() Externref = @es/\\ () => new Uint8Array([5, 6, 7]) \\/;\nlib { fn run() I32 { text.copy_in(bytes()); text.len() * 100 + text[2]; } }\n', 307],
+    ['mem text: U8;\nlet bytes: fun() Externref = @es/\\ () => new Uint8Array([5, 6, 7]) \\/;\nlib { fn run() I32 { text.copy_in(bytes()); return text.len() * 100 + text[2]; } }\n', 307],
     // An alt arm whose value is a bare name (it was read as the arm's binding).
-    ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { alt p { Ka => 1, Kc => q, }; }\nlib { fn run() I32 { f(Kc {}, 5); } }\n', 5],
+    ['enum E:\n    | Ka {}\n    | Kc {}\nfn f(p: E, q: I32) I32 { return alt p { Ka => 1, Kc => q, }; }\nlib { fn run() I32 { return f(Kc {}, 5); } }\n', 5],
     // `Ord.cmp(a, b)` on a mod's protocol (was "Not supported yet"); `P.tick(7)` of a default method on a scalar implementer
     // (was "tick takes P, got I32"); `xs[0].step()` with `xs: Array[T]` keeps T's bound (was "step is both P's and Q's");
     // a scalar `fn P[I32].step` beside struct implementers no longer breaks a protocol value's dispatch (invalid wasm).
-    ['using Ord from std:Ord;\nlib { fn run() I32 { Ord.cmp(2, 1) + Ord.cmp("a", "b") + 10; } }\n', 10],
-    ['proto P:\n    | step() I32\nfn P[I32].step |s| () I32 { s; }\nfn P.tick |s| () I32 { s.step(); }\nlib { fn run() I32 { P.tick(7); } }\n', 7],
-    ['proto P:\n    | step() I32\nproto Q:\n    | step() I32\nfn P[I32].step |s| () I32 { 1; }\nfn Q[I32].step |s| () I32 { 2; }\nmod M[T[Q]] {\n    fn go(xs: Array[T]) I32 { xs[0].step(); }\n}\nlib { fn run() I32 { M[I32].go([0]); } }\n', 2],
-    ['proto P:\n    | step() I32\nstruct S[P]:\n    | n: I32\nfn P[S].step |s| () I32 { s.n; }\nfn P[I32].step |s| () I32 { s; }\nlib { fn run() I32 { let p: P = S { n: 3 }; p.step(); } }\n', 3],
+    ['using Ord from std:Ord;\nlib { fn run() I32 { return Ord.cmp(2, 1) + Ord.cmp("a", "b") + 10; } }\n', 10],
+    ['proto P:\n    | step() I32\nfn P[I32].step |s| () I32 { return s; }\nfn P.tick |s| () I32 { return s.step(); }\nlib { fn run() I32 { return P.tick(7); } }\n', 7],
+    ['proto P:\n    | step() I32\nproto Q:\n    | step() I32\nfn P[I32].step |s| () I32 { return 1; }\nfn Q[I32].step |s| () I32 { return 2; }\nmod M[T[Q]] {\n    fn go(xs: Array[T]) I32 { return xs[0].step(); }\n}\nlib { fn run() I32 { return M[I32].go([0]); } }\n', 2],
+    ['proto P:\n    | step() I32\nstruct S[P]:\n    | n: I32\nfn P[S].step |s| () I32 { return s.n; }\nfn P[I32].step |s| () I32 { return s; }\nlib { fn run() I32 { let p: P = S { n: 3 }; return p.step(); } }\n', 3],
     // A nullable variant or implementer is a nullable enum or protocol value (`?Ci` as `?Sh`, `?A` as `?P` were type mismatches).
-    ['proto P:\n    | get k : I32\n    | f() I32\nstruct A[P]:\n    | k: I32\nfn P[A].f |a| () I32 { a.k + 1; }\nenum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n'
-      + 'fn mk(c: Bool) ?A { if c { A { k: 4 }; } else { null; }; }\nfn mkc(c: Bool) ?Ci { if c { Ci { r: 7 }; } else { null; }; }\nfn up(a: ?A) ?P { a; }\nfn upc(a: ?Ci) ?Sh { a; }\n'
-      + 'lib { fn run() I32 { let p: ?P = up(mk(true)); let q: ?P = up(mk(false)); let s: ?Sh = upc(mkc(true)); let t: ?Sh = upc(mkc(false)); let u = t orelse Sq { s: 1 }; let w = s orelse Sq { s: 1 }; (p orelse A { k: 0 }).f() + (q orelse A { k: 10 }).f() + alt u { Ci |c| => 1000, Sq |c| => 100, } + alt w { Ci |c| => c.r * 10000, Sq |c| => 0, }; } }\n', 5 + 11 + 100 + 70000],
+    ['proto P:\n    | get k : I32\n    | f() I32\nstruct A[P]:\n    | k: I32\nfn P[A].f |a| () I32 { return a.k + 1; }\nenum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n'
+      + 'fn mk(c: Bool) ?A { return if c { A { k: 4 }; } else { null; }; }\nfn mkc(c: Bool) ?Ci { return if c { Ci { r: 7 }; } else { null; }; }\nfn up(a: ?A) ?P { return a; }\nfn upc(a: ?Ci) ?Sh { return a; }\n'
+      + 'lib { fn run() I32 { let p: ?P = up(mk(true)); let q: ?P = up(mk(false)); let s: ?Sh = upc(mkc(true)); let t: ?Sh = upc(mkc(false)); let u = t orelse Sq { s: 1 }; let w = s orelse Sq { s: 1 }; return (p orelse A { k: 0 }).f() + (q orelse A { k: 10 }).f() + alt u { Ci |c| => 1000, Sq |c| => 100, } + alt w { Ci |c| => c.r * 10000, Sq |c| => 0, }; } }\n', 5 + 11 + 100 + 70000],
     // Variants named by their enum (and mod): literals, field-less values, alt arms, types; a bare name
     // two enums have, where the alt's value or the type wanted says which.
     ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\n    | Z {}\n'
-      + 'fn f(a: A) I32 { alt a { V |v| => v.x, A.W => 100, }; }\nfn g(b: B) I32 { alt b { B.V |v| => v.y * 10, B.Z => 1000, }; }\n'
-      + 'fn h(v: B.V) I32 { v.y; }\nfn mk() A { V { x: 4 }; }\n'
-      + 'lib { fn run() I32 { let a: A = V { x: 1 }; let n: ?B = V { y: 6 }; f(a) + g(B.V { y: 2 }) + f(A.W) + g(B.Z) + h(B.V { y: 3 }) + f(mk()) + f(A.V { x: 5 }); } }\n', 1 + 20 + 100 + 1000 + 3 + 4 + 5],
+      + 'fn f(a: A) I32 { return alt a { V |v| => v.x, A.W => 100, }; }\nfn g(b: B) I32 { return alt b { B.V |v| => v.y * 10, B.Z => 1000, }; }\n'
+      + 'fn h(v: B.V) I32 { return v.y; }\nfn mk() A { return V { x: 4 }; }\n'
+      + 'lib { fn run() I32 { let a: A = V { x: 1 }; let n: ?B = V { y: 6 }; return f(a) + g(B.V { y: 2 }) + f(A.W) + g(B.Z) + h(B.V { y: 3 }) + f(mk()) + f(A.V { x: 5 }); } }\n', 1 + 20 + 100 + 1000 + 3 + 4 + 5],
     ['using m |mm|;\nmod m {\n    enum(U8) L:\n        | Lo\n        | Hi\n    enum S:\n        | C { r: I32 }\n        | D {}\n    enum T:\n        | C { s: I32 }\n        | E {}\n'
-      + '    fn s(v: S) I32 { alt v { C |c| => c.r, D => 7, }; }\n}\nmod Geo {\n    enum S:\n        | P { q: I32 }\n        | O {}\n    fn s(v: S) I32 { alt v { P |p| => p.q, O => 50, }; }\n}\n'
-      + 'fn t(v: m.T) I32 { alt v { m.T.C |c| => c.s, m.T.E => 9, }; }\nfn tc(c: m.T.C) I32 { c.s; }\n'
-      + 'lib { fn run() I32 { m.L.Hi.i32() + mm.L.Hi.i32() * 10 + m.s(m.S.C { r: 100 }) + m.s(m.S.D) + t(m.T.C { s: 1000 }) + t(mm.T.E) + tc(mm.T.C { s: 2000 }) + Geo.s(Geo.S.P { q: 30000 }) + Geo.s(Geo.S.O); } }\n',
+      + '    fn s(v: S) I32 { return alt v { C |c| => c.r, D => 7, }; }\n}\nmod Geo {\n    enum S:\n        | P { q: I32 }\n        | O {}\n    fn s(v: S) I32 { return alt v { P |p| => p.q, O => 50, }; }\n}\n'
+      + 'fn t(v: m.T) I32 { return alt v { m.T.C |c| => c.s, m.T.E => 9, }; }\nfn tc(c: m.T.C) I32 { return c.s; }\n'
+      + 'lib { fn run() I32 { return m.L.Hi.i32() + mm.L.Hi.i32() * 10 + m.s(m.S.C { r: 100 }) + m.s(m.S.D) + t(m.T.C { s: 1000 }) + t(mm.T.E) + tc(mm.T.C { s: 2000 }) + Geo.s(Geo.S.P { q: 30000 }) + Geo.s(Geo.S.O); } }\n',
       1 + 10 + 100 + 7 + 1000 + 9 + 2000 + 30000 + 50],
-    ['using geo |g|;\nmod geo {\n    enum(U8) Level:\n        | Low\n        | Mid\n        | High\n}\nfn label(l: geo.Level) I32 { match l { geo.Level.Low => 1, g.Level.Mid => 20, ~> 300, }; }\n'
-      + 'lib { fn run() I32 { label(geo.Level.Low) + label(geo.Level.Mid) + label(g.Level.High); } }\n', 321],
+    ['using geo |g|;\nmod geo {\n    enum(U8) Level:\n        | Low\n        | Mid\n        | High\n}\nfn label(l: geo.Level) I32 { return match l { geo.Level.Low => 1, g.Level.Mid => 20, ~> 300, }; }\n'
+      + 'lib { fn run() I32 { return label(geo.Level.Low) + label(geo.Level.Mid) + label(g.Level.High); } }\n', 321],
     // A file's own variant hides an opened mod's of one name: the type wanted picks the mod's (a let, a return, a parameter).
     ['mod geo {\n    enum Form:\n        | Blob { n: I32 }\n        | Dot\n}\nusing geo;\nenum Shape:\n    | Blob { n: I32 }\n'
-      + 'fn mk() geo.Form { Blob { n: 5 }; }\nfn take(f: geo.Form) I32 { alt f { Blob |b| => b.n, ~> 0, }; }\n'
-      + 'lib { fn run() I32 { let t: geo.Form = Blob { n: 4 }; let s: Shape = Blob { n: 10 }; let k = alt s { Blob |b| => b.n, }; alt t { geo.Form.Blob |b| => b.n, ~> 0, } + take(mk()) + k + take(Blob { n: 100 }); } }\n', 119],
+      + 'fn mk() geo.Form { return Blob { n: 5 }; }\nfn take(f: geo.Form) I32 { return alt f { Blob |b| => b.n, ~> 0, }; }\n'
+      + 'lib { fn run() I32 { let t: geo.Form = Blob { n: 4 }; let s: Shape = Blob { n: 10 }; let k = alt s { Blob |b| => b.n, }; return alt t { geo.Form.Blob |b| => b.n, ~> 0, } + take(mk()) + k + take(Blob { n: 100 }); } }\n', 119],
     // A variant named like a declaration (its own enum, another enum, a struct; in a mod too): the name is the
     // declaration's, the variant is E.V (or bare where E is wanted); m.E's static operations; joins to the enum.
-    ["enum Shape:\n    | Shape { r: I32 }\n    | Dot\nfn r(s: Shape) I32 { alt s { Shape |c| => c.r, Dot => 1, }; }\nlib { fn run() I32 {\n    let s: Shape = Shape.Dot;\n    let t: Shape = Shape { r: 4 };\n    let u = Shape.Shape { r: 30 };\n    r(s) + r(t) * 10 + alt u { Shape.Shape |c| => c.r, ~> 0, } * 100;\n} }\n", 3041],
-    ["enum Dot:\n    | Circle { r: I32 }\n    | Blank\nenum Shape:\n    | Dot { r: I32 }\n    | Other\nlib { fn run() I32 {\n    let d: Dot = Dot.Circle { r: 4 };\n    let s: Shape = Shape.Dot { r: 5 };\n    let s2: Shape = Dot { r: 6 };\n    alt d { Dot.Circle |c| => c.r, ~> 0, } + alt s { Dot |x| => x.r, ~> 0, } * 10 + alt s2 { Shape.Dot |x| => x.r, ~> 0, } * 100;\n} }\n", 654],
-    ["enum Shape:\n    | Dot { r: I32 }\n    | Other\nenum Dot:\n    | Circle { r: I32 }\n    | Blank\nlib { fn run() I32 {\n    let d: Dot = Dot.Circle { r: 4 };\n    let s: Shape = Shape.Dot { r: 5 };\n    alt d { Dot.Circle |c| => c.r, ~> 0, } + alt s { Dot |x| => x.r, ~> 0, } * 10;\n} }\n", 54],
-    ["enum Shape:\n    | Circle { r: I32 }\n    | Other\nenum Circle:\n    | Big { r: I32 }\n    | Small\nfn f(c: Circle) I32 { alt c { Big |b| => b.r, Small => 2, }; }\nlib { fn run() I32 {\n    let s: Shape = Circle { r: 3 };\n    let q = Shape.Circle { r: 4 };\n    f(Circle.Big { r: 5 }) * 100 + alt s { Circle |c| => c.r, ~> 0, } + q.r * 10;\n} }\n", 543],
-    ["mod geo {\n    struct Circle:\n        | q: I32\n    enum Shape:\n        | Circle { r: I32 }\n        | Other\n    enum Lens:\n        | Lens { r: I32 }\n        | Flat\n    fn mk() Shape { Circle { r: 7 }; }\n}\nlib { fn run() I32 {\n    let s: geo.Shape = geo.Shape.Circle { r: 3 };\n    let c = geo.Circle { q: 4 };\n    let l: geo.Lens = geo.Lens.Lens { r: 9 };\n    alt s { geo.Shape.Circle |x| => x.r, ~> 0, } + c.q * 10 + alt geo.mk() { Circle |x| => x.r, ~> 0, } * 100 + alt l { Lens |x| => x.r, ~> 0, } * 1000;\n} }\n", 9743],
-    ["mod m {\n    enum(U8) Y:\n        | P\n        | Q = 1\n        | R\n}\nusing m |mm|;\nlib { fn run() I32 {\n    let y = m.Y(2);\n    let z = mm.Y(1);\n    match y { m.Y.R => 7, ~> 0, } + m.Y.count() * 10 + mm.Y.name(z).len() * 100 + y.i32() * 1000;\n} }\n", 2137],
-    ["enum Shape:\n    | Circle { r: I32 }\n    | Dot\nfn r(s: Shape) I32 { alt s { Circle |c| => c.r, Dot => 1, }; }\nlib { fn run() I32 {\n    let arr = [Shape.Circle { r: 4 }, Shape.Dot];\n    let b = [Shape.Circle { r: 4 }, Shape.Circle { r: 5 }];\n    let s = Shape.Circle { r: 6 };\n    let k = alt s { Circle |c| => c.r, Dot => 0, };\n    r(arr[0]) + r(arr[1]) * 10 + b[1].r * 100 + k * 1000;\n} }\n", 6514],
+    ["enum Shape:\n    | Shape { r: I32 }\n    | Dot\nfn r(s: Shape) I32 { return alt s { Shape |c| => c.r, Dot => 1, }; }\nlib { fn run() I32 {\n    let s: Shape = Shape.Dot;\n    let t: Shape = Shape { r: 4 };\n    let u = Shape.Shape { r: 30 };\n    return r(s) + r(t) * 10 + alt u { Shape.Shape |c| => c.r, ~> 0, } * 100;\n} }\n", 3041],
+    ["enum Dot:\n    | Circle { r: I32 }\n    | Blank\nenum Shape:\n    | Dot { r: I32 }\n    | Other\nlib { fn run() I32 {\n    let d: Dot = Dot.Circle { r: 4 };\n    let s: Shape = Shape.Dot { r: 5 };\n    let s2: Shape = Dot { r: 6 };\n    return alt d { Dot.Circle |c| => c.r, ~> 0, } + alt s { Dot |x| => x.r, ~> 0, } * 10 + alt s2 { Shape.Dot |x| => x.r, ~> 0, } * 100;\n} }\n", 654],
+    ["enum Shape:\n    | Dot { r: I32 }\n    | Other\nenum Dot:\n    | Circle { r: I32 }\n    | Blank\nlib { fn run() I32 {\n    let d: Dot = Dot.Circle { r: 4 };\n    let s: Shape = Shape.Dot { r: 5 };\n    return alt d { Dot.Circle |c| => c.r, ~> 0, } + alt s { Dot |x| => x.r, ~> 0, } * 10;\n} }\n", 54],
+    ["enum Shape:\n    | Circle { r: I32 }\n    | Other\nenum Circle:\n    | Big { r: I32 }\n    | Small\nfn f(c: Circle) I32 { return alt c { Big |b| => b.r, Small => 2, }; }\nlib { fn run() I32 {\n    let s: Shape = Circle { r: 3 };\n    let q = Shape.Circle { r: 4 };\n    return f(Circle.Big { r: 5 }) * 100 + alt s { Circle |c| => c.r, ~> 0, } + q.r * 10;\n} }\n", 543],
+    ["mod geo {\n    struct Circle:\n        | q: I32\n    enum Shape:\n        | Circle { r: I32 }\n        | Other\n    enum Lens:\n        | Lens { r: I32 }\n        | Flat\n    fn mk() Shape { return Circle { r: 7 }; }\n}\nlib { fn run() I32 {\n    let s: geo.Shape = geo.Shape.Circle { r: 3 };\n    let c = geo.Circle { q: 4 };\n    let l: geo.Lens = geo.Lens.Lens { r: 9 };\n    return alt s { geo.Shape.Circle |x| => x.r, ~> 0, } + c.q * 10 + alt geo.mk() { Circle |x| => x.r, ~> 0, } * 100 + alt l { Lens |x| => x.r, ~> 0, } * 1000;\n} }\n", 9743],
+    ["mod m {\n    enum(U8) Y:\n        | P\n        | Q = 1\n        | R\n}\nusing m |mm|;\nlib { fn run() I32 {\n    let y = m.Y(2);\n    let z = mm.Y(1);\n    return match y { m.Y.R => 7, ~> 0, } + m.Y.count() * 10 + mm.Y.name(z).len() * 100 + y.i32() * 1000;\n} }\n", 2137],
+    ["enum Shape:\n    | Circle { r: I32 }\n    | Dot\nfn r(s: Shape) I32 { return alt s { Circle |c| => c.r, Dot => 1, }; }\nlib { fn run() I32 {\n    let arr = [Shape.Circle { r: 4 }, Shape.Dot];\n    let b = [Shape.Circle { r: 4 }, Shape.Circle { r: 5 }];\n    let s = Shape.Circle { r: 6 };\n    let k = alt s { Circle |c| => c.r, Dot => 0, };\n    return r(arr[0]) + r(arr[1]) * 10 + b[1].r * 100 + k * 1000;\n} }\n", 6514],
     // A parameter assigned after an alt tested it: the inner test still runs.
-    ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nlib { fn run() I32 { let fp: fun(Shape) I32 = f; fp(Circle {}); } }\n', 2],
+    ['enum Shape:\n    | Circle {}\n    | Sq {}\nfn f(sh: Shape) I32 { return alt sh { Circle => { sh = Sq {}; alt sh { Circle |c| => 1, Sq |s| => 2, }; }, Sq => 0, }; }\nlib { fn run() I32 { let fp: fun(Shape) I32 = f; return fp(Circle {}); } }\n', 2],
     // Closures see writes to a captured let moved in a loop, alt and promote bindings, and their own (a for's capture takes no writes).
-    ['enum E:\n    | A { n: I32 }\n    | B {}\nlib { fn run() I32 {\n    let t = 0;\n    for ([1, 2]) |x0| { let x = x0; let f = cl() { x += 10; }; f(); t += x; };\n    let i = 0;\n    while (i < 5) { let g = cl() I32 { i; }; i = i + 1; t += g() * 100; i += 1; };\n    let e: E = A { n: 3 };\n    t += alt e { A |a| => { let h = cl() { a = A { n: 9 }; }; h(); a.n * 1000; }, B => 0, };\n    let s: ?Str = "hi";\n    promote s { |v| => { let h = cl() { v = v + "!"; }; h(); t += v.len() * 100000; }, ~> {}, };\n    let c = 0;\n    let inc = cl() { c += 1; };\n    inc(); inc();\n    t + c * 10000;\n} }\n', 23 + 900 + 9000 + 20000 + 300000],
+    ['enum E:\n    | A { n: I32 }\n    | B {}\nlib { fn run() I32 {\n    let t = 0;\n    for ([1, 2]) |x0| { let x = x0; let f = cl() { x += 10; }; f(); t += x; };\n    let i = 0;\n    while (i < 5) { let g = cl() I32 { return i; }; i = i + 1; t += g() * 100; i += 1; };\n    let e: E = A { n: 3 };\n    t += alt e { A |a| => { let h = cl() { a = A { n: 9 }; }; h(); a.n * 1000; }, B => 0, };\n    let s: ?Str = "hi";\n    promote s { |v| => { let h = cl() { v = v + "!"; }; h(); t += v.len() * 100000; }, ~> {}, };\n    let c = 0;\n    let inc = cl() { c += 1; };\n    inc(); inc();\n    return t + c * 10000;\n} }\n', 23 + 900 + 9000 + 20000 + 300000],
     // A write in a loop match, after the closure.
-    ['lib { fn run() I32 { let n = 10; let f = cl() I32 { n; }; let k = 0; loop match k { 0 => { n = 30; continue 1; }, ~> break, }; f(); } }\n', 30],
+    ['lib { fn run() I32 { let n = 10; let f = cl() I32 { return n; }; let k = 0; loop match k { 0 => { n = 30; continue 1; }, ~> break, }; return f(); } }\n', 30],
     // A recursive closure assigned with `=`.
-    ['lib { fn run() I32 { let fact: cl(I32) I32 = cl(x) { 0; }; fact = cl(x) { if x <= 1 { 1; } else { x * fact(x - 1); }; }; fact(5); } }\n', 120],
+    ['lib { fn run() I32 { let fact: cl(I32) I32 = cl(x) { return 0; }; fact = cl(x) { return if x <= 1 { 1; } else { x * fact(x - 1); }; }; return fact(5); } }\n', 120],
     // Closures that recurse 3000 deep: small called them through the host, JS frames each level (overflowed near 800).
-    [`lib { fn run() I32 { let d: cl(I32) I32 = cl(n) { 0; }; d = cl(n) { if n == 0 { 0; } else { 1 + d(n - 1); }; }; d(${closureDepth}); } }
+    [`lib { fn run() I32 { let d: cl(I32) I32 = cl(n) { return 0; }; d = cl(n) { return if n == 0 { 0; } else { 1 + d(n - 1); }; }; return d(${closureDepth}); } }
 `, closureDepth],
-    [`fn f(n: I32) I32 { let c = cl(k: I32) I32 { if k == 0 { 0; } else { 1 + f(k - 1); }; }; c(n); }
-lib { fn run() I32 { f(${closureDepth}); } }
+    [`fn f(n: I32) I32 { let c = cl(k: I32) I32 { return if k == 0 { 0; } else { 1 + f(k - 1); }; }; return c(n); }
+lib { fn run() I32 { return f(${closureDepth}); } }
 `, closureDepth],
     // A generator's parameter, captured, then assigned.
-    ['gn g(a: I32) I32 { let c: cl(I32) I32 = cl(x) { x + a; }; a = 5; yield c(1); }\nlib { fn run() I32 { let t = 0; for (g(1)) |v| { t += v; }; t; } }\n', 6],
+    ['gn g(a: I32) I32 { let c: cl(I32) I32 = cl(x) { return x + a; }; a = 5; yield c(1); }\nlib { fn run() I32 { let t = 0; for (g(1)) |v| { t += v; }; return t; } }\n', 6],
     // A name from a tuple, captured, then assigned.
-    ['fn two() .{I32, I32} { .{1, 2}; }\nlib { fn run() I32 { let .{a, b} = two(); let c: cl() I32 = cl() { a + b; }; a = 10; c(); } }\n', 12],
+    ['fn two() .{I32, I32} { return .{1, 2}; }\nlib { fn run() I32 { let .{a, b} = two(); let c: cl() I32 = cl() { return a + b; }; a = 10; return c(); } }\n', 12],
     // Operators declared on a distinct type.
-    ['type Id = distinct I32;\nfn Id:eq |a, b| Bool { false; }\nfn Id:add |a, b| Id { Id(a.i32() + b.i32() + 100); }\nlib { fn run() I32 { let a = Id(3); (a + a).i32() + (if a == a { 1000; } else { 0; }); } }\n', 106],
+    ['type Id = distinct I32;\nfn Id:eq |a, b| Bool { return false; }\nfn Id:add |a, b| Id { return Id(a.i32() + b.i32() + 100); }\nlib { fn run() I32 { let a = Id(3); return (a + a).i32() + (if a == a { 1000; } else { 0; }); } }\n', 106],
     // `op=` on a protocol member.
-    ['proto Sh:\n    | get set k: I32\nstruct Sq[Sh]:\n    | k: I32\nlib { fn run() I32 { let s: Sh = Sq { k: 3 }; s.k += 4; s.k; } }\n', 7],
+    ['proto Sh:\n    | get set k: I32\nstruct Sq[Sh]:\n    | k: I32\nlib { fn run() I32 { let s: Sh = Sq { k: 3 }; s.k += 4; return s.k; } }\n', 7],
     // Getter, setter and method dispatch through a protocol value, over two implementers.
-    ['proto C:\n    | get set n: I32\n    | step(I32) I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | tag: I32\n    | n: I32\nfn C[A].step |a| (k: I32) I32 { a.n + k; }\nfn C[B].step |b| (k: I32) I32 { b.n * k + b.tag; }\n'
-      + 'lib { fn run() I32 { let xs: Array[C] = [A { n: 1 }, B { tag: 7, n: 2 }]; let t = 0; for (xs) |c| { c.n = c.n + 10; c.n += 1; t = t * 100 + c.step(3) + c.n; }; t; } }\n', 2759],
+    ['proto C:\n    | get set n: I32\n    | step(I32) I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | tag: I32\n    | n: I32\nfn C[A].step |a| (k: I32) I32 { return a.n + k; }\nfn C[B].step |b| (k: I32) I32 { return b.n * k + b.tag; }\n'
+      + 'lib { fn run() I32 { let xs: Array[C] = [A { n: 1 }, B { tag: 7, n: 2 }]; let t = 0; for (xs) |c| { c.n = c.n + 10; c.n += 1; t = t * 100 + c.step(3) + c.n; }; return t; } }\n', 2759],
     // `| get n` and `| set n` on two lines are one member: read, written, and `op=` (`set` then `get` too).
-    ['proto C:\n    | get n: I32\n    | set n: I32\nstruct S[C]:\n    | n: I32\nlib { fn run() I32 { let c: C = S { n: 1 }; c.n = 5; c.n; } }\n', 5],
-    ['proto C:\n    | set n: I32\n    | get n: I32\nstruct S[C]:\n    | n: I32\nlib { fn run() I32 { let c: C = S { n: 1 }; c.n = 5; c.n += 4; c.n; } }\n', 9],
+    ['proto C:\n    | get n: I32\n    | set n: I32\nstruct S[C]:\n    | n: I32\nlib { fn run() I32 { let c: C = S { n: 1 }; c.n = 5; return c.n; } }\n', 5],
+    ['proto C:\n    | set n: I32\n    | get n: I32\nstruct S[C]:\n    | n: I32\nlib { fn run() I32 { let c: C = S { n: 1 }; c.n = 5; c.n += 4; return c.n; } }\n', 9],
     // Struct literal fields run in the order written.
-    ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nlib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
+    ['struct P:\n    | a: I32\n    | b: I32\n    | c: I32\nlib { fn run() I32 { let n = 0; let p = P { b: { n += 1; n * 10; }, c: 7, a: { n += 1; n; } }; return p.a * 1000 + p.b * 10 + p.c; } }\n', 2107],
     // A generic module's own name, with its arguments, inside it.
-    ['mod M[T] {\n    struct &:\n        | v: T\n        | next: ?M[T]\n    fn &.mk(v: T) M[T] { &{ v: v, next: null }; }\n}\nlib { fn run() I32 { let a = M[I32].mk(3); a.next = M[I32].mk(4); let n = a.next orelse fatal; a.v + n.v; } }\n', 7],
+    ['mod M[T] {\n    struct &:\n        | v: T\n        | next: ?M[T]\n    fn &.mk(v: T) M[T] { return &{ v: v, next: null }; }\n}\nlib { fn run() I32 { let a = M[I32].mk(3); a.next = M[I32].mk(4); let n = a.next orelse fatal; return a.v + n.v; } }\n', 7],
     // `a orelse b` (`br_on_non_null`): a once, b only when a is null, a `break` for b.
-    ['struct N:\n    | v: I32\n    | next: ?N\nvec hits: I32 = [0];\nfn get(n: N) ?N { hits[0] += 1; n.next; }\n'
-      + 'fn walk(a: ?N) I32 { let t = 0; let cur = a; while (true) { let c = cur orelse { break; }; t += c.v; cur = c.next; }; t; }\n'
+    ['struct N:\n    | v: I32\n    | next: ?N\nvec hits: I32 = [0];\nfn get(n: N) ?N { hits[0] += 1; return n.next; }\n'
+      + 'fn walk(a: ?N) I32 { let t = 0; let cur = a; while (true) { let c = cur orelse { break; }; t += c.v; cur = c.next; }; return t; }\n'
       + 'lib { fn run() I32 {\n    let a = N { v: 1, next: N { v: 2, next: null } };\n    let b = get(a) orelse a;\n    let z = get(b) orelse N { v: 40, next: null };\n    let w = (get(z) orelse b).v;\n'
-      + '    walk(a) * 100000 + b.v * 1000 + z.v + w * 10 + hits[0] * 10000;\n} }\n', 332060],
+      + '    return walk(a) * 100000 + b.v * 1000 + z.v + w * 10 + hits[0] * 10000;\n} }\n', 332060],
     // `and`/`or` as i32.and/i32.or, range tests as one unsigned comparison (small):
     // the right side runs after the left (which it may read), bounds at the ends of I32.
-    ['vec seen: I32 = [0];\nfn bump() Bool { seen[0] += 1; seen[0] > 2; }\nfn h(acc: I32, b: Bool) I32 { acc * 31 + if b { 1; } else { 0; }; }\n'
+    ['vec seen: I32 = [0];\nfn bump() Bool { seen[0] += 1; return seen[0] > 2; }\nfn h(acc: I32, b: Bool) I32 { return acc * 31 + if b { 1; } else { 0; }; }\n'
       + 'fn ranges(x: I32) I32 {\n    let a = 0;\n    a = h(a, x >= 48 and x <= 57);\n    a = h(a, 48 <= x and x <= 57);\n    a = h(a, x > -10 and x < 10);\n'
       + '    a = h(a, x >= -2147483648 and x <= 5);\n    a = h(a, x >= 0 and x <= 2147483647);\n    a = h(a, x >= -2147483648 and x <= 2147483647);\n'
       + '    a = h(a, x >= 5 and x <= 5);\n    a = h(a, x >= 6 and x <= 5);\n    a = h(a, x < 65 or x > 90);\n    a = h(a, 90 < x or x < 65);\n'
-      + '    a = h(a, x <= -1 or x >= 100);\n    a = h(a, x >= 0 and x < 2147483647);\n    a = h(a, x > -2147483648 and x <= 0);\n    a;\n}\nstruct B:\n'
-      + '    | ok: Bool\nfn is_ok(b: ?B) Bool { promote b { |o| => o.ok, ~> false, }; }\nfn nonnull(b: ?B) Bool { promote b { |o| => true, ~> false, }; }\n'
+      + '    a = h(a, x <= -1 or x >= 100);\n    a = h(a, x >= 0 and x < 2147483647);\n    a = h(a, x > -2147483648 and x <= 0);\n    return a;\n}\nstruct B:\n'
+      + '    | ok: Bool\nfn is_ok(b: ?B) Bool { return promote b { |o| => o.ok, ~> false, }; }\nfn nonnull(b: ?B) Bool { return promote b { |o| => true, ~> false, }; }\n'
       + 'lib { fn run() I32 {\n'
       + '    let xs = [-2147483648, -2147483647, -11, -10, -9, -1, 0, 1, 4, 5, 6, 9, 10, 47, 48, 50, 57, 58, 64, 65, 77, 90, 91, 99, 100, 101, 2147483646, 2147483647];\n'
       + '    let acc = 0;\n    for (xs) |x| { acc = acc * 7 + ranges(x); };\n    let flag = false;\n    let t = 0;\n    for (0 ..< 5) |i| {\n'
       + '        if bump() and seen[0] > 3 { t += 1; };\n        flag = i > 2;\n        if i == 1 or flag { t += 10; };\n'
       + '        if flag and i != 4 { t += 100; };\n    };\n    let b: ?B = B { ok: true };\n    let n: ?B = null;\n'
-      + '    acc + t * 1000 + (if is_ok(b) { 1; } else { 0; }) + (if is_ok(n) { 2; } else { 0; }) + (if nonnull(b) { 4; } else { 0; }) + (if nonnull(n) { 8; } else { 0; }) + seen[0];\n'
+      + '    return acc + t * 1000 + (if is_ok(b) { 1; } else { 0; }) + (if is_ok(n) { 2; } else { 0; }) + (if nonnull(b) { 4; } else { 0; }) + (if nonnull(n) { 8; } else { 0; }) + seen[0];\n'
       + '} }\n', 2137102356],
     // alt arms that bind, as br_on_cast (small): a default, none, an unsafe build's untested last arm,
     // arms that break, return, or capture (boxed), arms that make the alt's own type.
     ['enum Sh:\n    | Circle { r: I32 }\n    | Sq { s: I32 }\n    | Rect { w: I32, h: I32 }\n    | Tri { a: I32, b: I32, c: I32 }\n    | Dot {}\n'
-      + 'fn area(x: Sh) I32 {\n    alt x {\n        Circle |c| => c.r * 3,\n        Sq |q| => q.s * q.s,\n        Rect |r| => r.w * r.h,\n'
-      + '        Tri |t| => t.a + t.b + t.c,\n        Dot => 1,\n    };\n}\nfn kind(x: Sh) I32 {\n    alt x {\n        Circle |c| => c.r,\n        Sq |q| => q.s,\n'
+      + 'fn area(x: Sh) I32 {\n    return alt x {\n        Circle |c| => c.r * 3,\n        Sq |q| => q.s * q.s,\n        Rect |r| => r.w * r.h,\n'
+      + '        Tri |t| => t.a + t.b + t.c,\n        Dot => 1,\n    };\n}\nfn kind(x: Sh) I32 {\n    return alt x {\n        Circle |c| => c.r,\n        Sq |q| => q.s,\n'
       + '        Rect |r| => r.w,\n        ~> 99,\n    };\n}\nfn first(xs: Array[Sh]) I32 {\n    let t = 0;\n    for (xs) |x| {\n        alt x {\n'
       + '            Circle |c| => { t += c.r; },\n            Sq |q| => { if q.s > 5 { break; }; t += 1000; },\n'
-      + '            Rect |r| => { if r.w == 0 { return -1; }; t += r.w; },\n            Tri |tr| => { let f: cl() I32 = cl() { tr.a * 2; }; t += f(); },\n'
-      + '            Dot => { t += 7; },\n        };\n    };\n    t;\n}\nfn ret(x: Sh) Sh {\n    alt x {\n        Circle |c| => Sq { s: c.r },\n'
+      + '            Rect |r| => { if r.w == 0 { return -1; }; t += r.w; },\n            Tri |tr| => { let f: cl() I32 = cl() { return tr.a * 2; }; t += f(); },\n'
+      + '            Dot => { t += 7; },\n        };\n    };\n    return t;\n}\nfn ret(x: Sh) Sh {\n    return alt x {\n        Circle |c| => Sq { s: c.r },\n'
       + '        Sq |q| => Rect { w: q.s, h: 2 },\n        Rect |r| => r,\n        Tri |t| => { return Dot {}; },\n        Dot => x,\n    };\n}\n'
-      + 'fn boxed(x: Sh) I32 {\n    alt x {\n        Circle |c| => { let g: cl() I32 = cl() { c.r + 1; }; c = Circle { r: 50 }; g(); },\n        Sq |q| => q.s,\n'
+      + 'fn boxed(x: Sh) I32 {\n    return alt x {\n        Circle |c| => { let g: cl() I32 = cl() { return c.r + 1; }; c = Circle { r: 50 }; g(); },\n        Sq |q| => q.s,\n'
       + '        Rect |r| => r.h,\n        Tri |t| => t.c,\n        Dot => 0,\n    };\n}\nlib { fn run() I32 {\n'
       + '    let xs: Array[Sh] = [Circle { r: 2 }, Sq { s: 3 }, Rect { w: 4, h: 5 }, Tri { a: 1, b: 2, c: 3 }, Dot {}];\n    let t = 0;\n'
       + '    for (xs) |x| { t = t * 7 + area(x) + kind(x) * 3 + boxed(x) * 11 + area(ret(x)) * 13; };\n'
-      + '    t + first(xs) * 100000 + first([Circle { r: 1 }, Sq { s: 9 }, Dot {}]) * 1000000 + first([Rect { w: 0, h: 1 }]);\n} }\n', 104064628],
+      + '    return t + first(xs) * 100000 + first([Circle { r: 1 }, Sq { s: 9 }, Dot {}]) * 1000000 + first([Rect { w: 0, h: 1 }]);\n} }\n', 104064628],
     // A field read again (small): kept in a local only while no call, struct.set of the field,
     // assignment of the local, or loop writing them, comes between.
     ['struct P:\n    | x: I32\n    | y: I32\n    | next: ?P\nfn poke(p: P) Void { p.x += 100; }\nfn alias(a: P, b: P) I32 {\n    let s = a.x + a.x;\n    b.x = 7;\n'
-      + '    s + a.x + a.x + a.x;\n}\nfn calls(a: P) I32 {\n    let s = a.x + a.x;\n    poke(a);\n    s * 1000 + a.x + a.x + a.x;\n}\nfn loop_write(a: P) I32 {\n'
-      + '    let s = a.y + a.y + a.y;\n    let i = 0;\n    while (i < 3) {\n        s += a.y + a.y;\n        a.y += 1;\n        i += 1;\n    };\n    s + a.y;\n}\n'
-      + 'fn reassign(a: P, b: P) I32 {\n    let p = a;\n    let s = p.x + p.x + p.x;\n    p = b;\n    s * 1000 + p.x + p.x + p.x;\n}\nfn branch(a: P, c: Bool) I32 {\n'
-      + '    let s = 0;\n    if c { s = a.y + a.y; } else { s = 1; };\n    s * 10 + a.y + a.y + a.y;\n}\nfn hoist(a: P) I32 {\n    let s = a.x;\n'
-      + '    for (0 ..< 4) |i| { s += a.x * i + a.y + a.x; };\n    s;\n}\nlib { fn run() I32 {\n    let a = P { x: 1, y: 2, next: null };\n'
+      + '    return s + a.x + a.x + a.x;\n}\nfn calls(a: P) I32 {\n    let s = a.x + a.x;\n    poke(a);\n    return s * 1000 + a.x + a.x + a.x;\n}\nfn loop_write(a: P) I32 {\n'
+      + '    let s = a.y + a.y + a.y;\n    let i = 0;\n    while (i < 3) {\n        s += a.y + a.y;\n        a.y += 1;\n        i += 1;\n    };\n    return s + a.y;\n}\n'
+      + 'fn reassign(a: P, b: P) I32 {\n    let p = a;\n    let s = p.x + p.x + p.x;\n    p = b;\n    return s * 1000 + p.x + p.x + p.x;\n}\nfn branch(a: P, c: Bool) I32 {\n'
+      + '    let s = 0;\n    if c { s = a.y + a.y; } else { s = 1; };\n    return s * 10 + a.y + a.y + a.y;\n}\nfn hoist(a: P) I32 {\n    let s = a.x;\n'
+      + '    for (0 ..< 4) |i| { s += a.x * i + a.y + a.x; };\n    return s;\n}\nlib { fn run() I32 {\n    let a = P { x: 1, y: 2, next: null };\n'
       + '    let b = P { x: 3, y: 4, next: a };\n    let r = alias(a, a) * 1 + alias(a, b) * 100;\n    r = r * 7 + calls(b);\n    r = r * 7 + loop_write(a);\n'
-      + '    r = r * 7 + reassign(a, b);\n    r = r * 7 + branch(a, true) + branch(b, false) * 3;\n    r * 7 + hoist(a);\n} }\n', 94651822],
+      + '    r = r * 7 + reassign(a, b);\n    r = r * 7 + branch(a, true) + branch(b, false) * 3;\n    return r * 7 + hoist(a);\n} }\n', 94651822],
     // batched and windows after chain or flat_map, which run the pipeline twice (the second made new locals: Null).
-    ['lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
+    ['lib { fn run() I32 { let a = [1, 2, 3, 4]; let w = a chain(a) windows(I32, 3); let b = a flat_map |x| { [x, x]; } batched(I32, 3); return w.len() * 100 + b.len() * 10 + b[2].len(); } }\n', 632],
     // Labeled blocks: `break name v` leaves nested loops with a value; the
     // block's defers run; the type comes from the tail, else the breaks.
-    ['fn find(xs: Array[I32], want: I32) I32 {\n    found: {\n        for (0 ..< xs.len()) |i| { for (0 ..< 3) |j| { if xs[i] + j == want { break found i * 10 + j; }; }; };\n        -1;\n    };\n}\n'
-      + 'fn early() I32 { let n = 0; out_: { defer n += 100; n += 1; if n > 0 { break out_; }; n += 1000; }; n; }\n'
+    ['fn find(xs: Array[I32], want: I32) I32 {\n    return found: {\n        for (0 ..< xs.len()) |i| { for (0 ..< 3) |j| { if xs[i] + j == want { break found i * 10 + j; }; }; };\n        -1;\n    };\n}\n'
+      + 'fn early() I32 { let n = 0; out_: { defer n += 100; n += 1; if n > 0 { break out_; }; n += 1000; }; return n; }\n'
       + 'lib { fn run() I32 {\n    let a = blk: { 3; };\n    let b: I64 = big: { break big 7; };\n    let c = word: { if a > 2 { break word "yes"; }; "no"; };\n    let d = done: { for ([3, 5, 8]) |x| { if x % 2 == 0 { break done x; }; }; break done 0; };\n'
-      + '    find([5, 9, 12], 13) + a * 100 + b.i32() * 1000 + c.len() * 10000 + d * 100000 + early() * 1000000;\n} }\n', 21 + 300 + 7000 + 30000 + 800000 + 101000000],
+      + '    return find([5, 9, 12], 13) + a * 100 + b.i32() * 1000 + c.len() * 10000 + d * 100000 + early() * 1000000;\n} }\n', 21 + 300 + 7000 + 30000 + 800000 + 101000000],
     // A module's and a type's functions as values (`m.f`, `T.f`, an alias's).
-    ['mod m { fn twice(x: I32) I32 { x * 2; } }\nmod Box[T] {\n    struct &:\n        | v: T\n    fn &.make(v: T) & { &{ v: v }; }\n    fn &.get |b| () T { b.v; }\n    fn wrap(v: T) & { &{ v: v }; }\n}\nusing Box[I32] |ints|;\n'
-      + 'struct P:\n    | x: I32\nfn P.make(x: I32) P { P { x: x }; }\nfn P.get |self| () I32 { self.x; }\nfn apply(f: fun(I32) I32, x: I32) I32 { f(x); }\nfn apply_cl(f: cl(I32) I32, x: I32) I32 { f(x); }\n'
-      + 'lib { fn run() I32 { let g = m.twice; let mk = P.make; let get = P.get; let w = ints.wrap; let bm = ints.make;\n    g(1) + apply(m.twice, 10) + apply_cl(m.twice, 100) + get(mk(1000)) + w(10000).get() + bm(100000).get(); } }\n', 111222],
+    ['mod m { fn twice(x: I32) I32 { return x * 2; } }\nmod Box[T] {\n    struct &:\n        | v: T\n    fn &.make(v: T) & { return &{ v: v }; }\n    fn &.get |b| () T { return b.v; }\n    fn wrap(v: T) & { return &{ v: v }; }\n}\nusing Box[I32] |ints|;\n'
+      + 'struct P:\n    | x: I32\nfn P.make(x: I32) P { return P { x: x }; }\nfn P.get |self| () I32 { return self.x; }\nfn apply(f: fun(I32) I32, x: I32) I32 { return f(x); }\nfn apply_cl(f: cl(I32) I32, x: I32) I32 { return f(x); }\n'
+      + 'lib { fn run() I32 { let g = m.twice; let mk = P.make; let get = P.get; let w = ints.wrap; let bm = ints.make;\n    return g(1) + apply(m.twice, 10) + apply_cl(m.twice, 100) + get(mk(1000)) + w(10000).get() + bm(100000).get(); } }\n', 111222],
     // Compound assignment on host fields and indexes: the object and index once each.
-    ['using JS from std:JS;\nlib { fn run() I32 {\n    let a = new JS.Int32Array(4);\n    a[1] = 5;\n    a[1] += 3;\n    a[1] *= 2;\n    let b = new JS.Array();\n    b.length += 2;\n    b.length *= 3;\n    a[1].i32() * 100 + b.length.i32();\n} }\n', 1606],
+    ['using JS from std:JS;\nlib { fn run() I32 {\n    let a = new JS.Int32Array(4);\n    a[1] = 5;\n    a[1] += 3;\n    a[1] *= 2;\n    let b = new JS.Array();\n    b.length += 2;\n    b.length *= 3;\n    return a[1].i32() * 100 + b.length.i32();\n} }\n', 1606],
     // Computed globals: each set after the globals it reads (directly or
     // through a function); structs, arrays, strings, nullables, and funs.
-    ['struct Pt:\n    | x: I32\n    | y: I32\nfn compute() I32 { 3 * 7; }\nfn twice_base() I32 { base * 2; }\nfn twice(x: I32) I32 { x * 2; }\n'
+    ['struct Pt:\n    | x: I32\n    | y: I32\nfn compute() I32 { return 3 * 7; }\nfn twice_base() I32 { return base * 2; }\nfn twice(x: I32) I32 { return x * 2; }\n'
       + 'let doubled: I32 = twice_base();\nlet base: I32 = compute();\nlet origin: Pt = Pt { x: base, y: 2 };\nlet squares: Array[I32] = [1, 4, 9, 16];\nlet name: Str = "utu " + base.str();\nlet maybe: ?Pt = null;\nlet total: I64 = squares.len().i64() * 1000.i64();\nlet pick: fun(I32) I32 = twice;\n'
-      + 'lib { fn run() I32 { let n = if maybe == null { 1; } else { 0; }; doubled + origin.x * 100 + squares[3] * 10000 + total.i32() * 1000 + n * 100000000 + pick(name.len()) * 1000000; } }\n', 42 + 2100 + 160000 + 4000000 + 100000000 + 12000000],
+      + 'lib { fn run() I32 { let n = if maybe == null { 1; } else { 0; }; return doubled + origin.x * 100 + squares[3] * 10000 + total.i32() * 1000 + n * 100000000 + pick(name.len()) * 1000000; } }\n', 42 + 2100 + 160000 + 4000000 + 100000000 + 12000000],
     // Generators through a module, an alias, a type, and a method (`x.each()`).
-    ['mod seq { gn squares(n: I32) I32 { for (0 ..< n) |i| { yield i * i; }; } }\nmod Stack[T] {\n    struct &:\n        | items: Array[T]\n        | size: I32\n    fn &.new(fill: T) & { &{ items: Array[T].new(16, fill), size: 0 }; }\n    fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1; }\n'
+    ['mod seq { gn squares(n: I32) I32 { for (0 ..< n) |i| { yield i * i; }; } }\nmod Stack[T] {\n    struct &:\n        | items: Array[T]\n        | size: I32\n    fn &.new(fill: T) & { return &{ items: Array[T].new(16, fill), size: 0 }; }\n    fn &.push |s| (v: T) Void { s.items[s.size] = v; s.size += 1; }\n'
       + '    gn &.each |s| () T { let i = s.size - 1; while (i >= 0) { yield s.items[i]; i -= 1; }; }\n    gn &.upto(n: I32) I32 { for (0 ..< n) |i| { yield i; }; }\n}\nusing seq |s|;\nstruct Range:\n    | lo: I32\n    | hi: I32\n'
       + 'gn Range.each |r| () I32 { for (r.lo ..< r.hi) |i| { yield i; }; }\ngn Range.below(n: I32) I32 { for (0 ..< n) |i| { yield i; }; }\n'
       + 'lib { fn run() I32 {\n    let total = 0;\n    for (seq.squares(4)) |v| { total += v; };\n    for (s.squares(3)) |v| { total += v * 100; };\n    let st = Stack[I32].new(0);\n    st.push(1);\n    st.push(2);\n    st.push(3);\n    let order = 0;\n    for (st.each()) |v| { order = order * 10 + v; };\n'
-      + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    total + order * 1000000;\n} }\n', 321393514],
+      + '    for (Stack[I32].upto(3)) |v| { total += v * 1000; };\n    for (Range { lo: 2, hi: 5 }.each()) |v| { total += v * 10000; };\n    for (Range.below(3)) |v| { total += v * 100000; };\n    return total + order * 1000000;\n} }\n', 321393514],
     // An unconditional break after a defer in a generator's consumer: the second yield's expansion is dead code,
     // left out (JavaScriptCore: "rethrow doesn't refer to a catch block" for a try there).
-    ['vec seen: I32;\ngn items() I64 { yield 1; yield 2; }\nlib { fn run() I32 { for (items()) |x| { defer seen.push(7); seen.push(1); break; }; seen[0] * 10 + seen[1]; } }\n', 17],
+    ['vec seen: I32;\ngn items() I64 { yield 1; yield 2; }\nlib { fn run() I32 { for (items()) |x| { defer seen.push(7); seen.push(1); break; }; return seen[0] * 10 + seen[1]; } }\n', 17],
     // A closure whose result is not written takes it from its first `return` (the compiler crashed: Out of bounds array.get).
-    ['fn a() I32 { let k = cl(x: I32) { if x > 1 { return x * 2; }; x; }; k(1) + k(5); }\nlib { fn run() I32 { cl() { return; }; a(); } }\n', 11],
+    ['fn a() I32 { let k = cl(x: I32) { if x > 1 { return x * 2; }; return x; }; return k(1) + k(5); }\nlib { fn run() I32 { cl() { return; }; return a(); } }\n', 11],
     // A generator's `return;` runs its defers.
-    ['gn g(n: I32) I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nlib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; t + seen[0] * 10; } }\n', 71],
+    ['gn g(n: I32) I32 { let k = 0; defer seen[0] = 7; for (0 ..< n) |i| { if i == 2 { return; }; yield i; }; }\nvec seen: I32 = [0];\nlib { fn run() I32 { let t = 0; for (g(5)) |v| { t += v; }; return t + seen[0] * 10; } }\n', 71],
     // A return or break out of nested expansions of one generator runs each one's defers with its own
     // parameters and locals (the outer one's ran with the inner one's).
-    ['vec seen: I32;\ngn gen(t: I32, k: I32) I32 {\n    let u = t + k;\n    let f = cl() I32 { u; };\n    defer seen.push(t * 10 + k);\n    defer seen.push(f());\n    yield t;\n    yield t + 1;\n}\n'
-      + 'fn three() I32 {\n    for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { for (gen(5, 6)) |c| { if b == 4 and c == 6 { return a * 100 + b * 10 + c; }; }; }; };\n    0;\n}\n'
-      + 'fn left() I32 { out: { for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { if b == 4 { break out a + b; }; }; }; 0; }; }\n'
-      + 'lib { fn run() Str {\n    let r = three().str() + "|" + left().str() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].str() + ","; };\n    r;\n} }\n', '146|5|11,56,11,56,7,34,3,12,7,34,3,12,'],
+    ['vec seen: I32;\ngn gen(t: I32, k: I32) I32 {\n    let u = t + k;\n    let f = cl() I32 { return u; };\n    defer seen.push(t * 10 + k);\n    defer seen.push(f());\n    yield t;\n    yield t + 1;\n}\n'
+      + 'fn three() I32 {\n    for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { for (gen(5, 6)) |c| { if b == 4 and c == 6 { return a * 100 + b * 10 + c; }; }; }; };\n    return 0;\n}\n'
+      + 'fn left() I32 { return out: { for (gen(1, 2)) |a| { for (gen(3, 4)) |b| { if b == 4 { break out a + b; }; }; }; 0; }; }\n'
+      + 'lib { fn run() Str {\n    let r = three().str() + "|" + left().str() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].str() + ","; };\n    return r;\n} }\n', '146|5|11,56,11,56,7,34,3,12,7,34,3,12,'],
     // And an error return or a failed `try` there, before the function's errdefers.
-    ['vec seen: I32;\ngn gen(t: I32) I32 { defer seen.push(t); yield t; yield t + 1; }\nfn digit(c: I32) Result[I32, Str] { if c > 9 { return Result[I32, Str].err("bad"); }; Result[I32, Str].ok(c); }\n'
-      + 'fn f(mode: I32) Result[I32, Str] {\n    errdefer seen.push(0);\n    for (gen(1)) |a| { for (gen(10)) |b| {\n        if b == 11 and mode == 0 { return Result[I32, Str].err("ret"); };\n        if b == 11 { let x = try digit(b); };\n    }; };\n    Result[I32, Str].ok(0);\n}\n'
-      + 'lib { fn run() Str {\n    let r = f(0).error() + f(1).error() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].str() + ","; };\n    r;\n} }\n', 'retbad|10,1,0,10,1,0,'],
+    ['vec seen: I32;\ngn gen(t: I32) I32 { defer seen.push(t); yield t; yield t + 1; }\nfn digit(c: I32) Result[I32, Str] { if c > 9 { return Result[I32, Str].err("bad"); }; return Result[I32, Str].ok(c); }\n'
+      + 'fn f(mode: I32) Result[I32, Str] {\n    errdefer seen.push(0);\n    for (gen(1)) |a| { for (gen(10)) |b| {\n        if b == 11 and mode == 0 { return Result[I32, Str].err("ret"); };\n        if b == 11 { let x = try digit(b); };\n    }; };\n    return Result[I32, Str].ok(0);\n}\n'
+      + 'lib { fn run() Str {\n    let r = f(0).error() + f(1).error() + "|";\n    for (0 ..< seen.len()) |i| { r = r + seen[i].str() + ","; };\n    return r;\n} }\n', 'retbad|10,1,0,10,1,0,'],
     // An alias of a generic module's instance is its type there.
-    ['mod B[T] {\n    struct &:\n        | v: T\n    fn of(x: T) & { &{ v: x }; }\n}\nmod L[T] {\n    enum &:\n        | Nil {}\n        | Cons { h: T, t: & }\n    fn cons(h: T, t: &) & { Cons { h: h, t: t }; }\n}\nusing B[I32] |bi|;\nusing B[Str] |bs|;\nusing L[I32] |li|;\nfn f(x: bi) I32 { x.v; }\nfn mk() bs { B[Str].of("in"); }\nfn len(x: li) I32 { alt x { Nil => 0, Cons |c| => 1 + len(c.t), }; }\nlib { fn run() I32 { let c: bi = &{ v: 3 }; let n: li = li.Nil {}; f(c) + mk().v.len() + len(L[I32].cons(1, n)); } }\n', 6],
+    ['mod B[T] {\n    struct &:\n        | v: T\n    fn of(x: T) & { return &{ v: x }; }\n}\nmod L[T] {\n    enum &:\n        | Nil {}\n        | Cons { h: T, t: & }\n    fn cons(h: T, t: &) & { return Cons { h: h, t: t }; }\n}\nusing B[I32] |bi|;\nusing B[Str] |bs|;\nusing L[I32] |li|;\nfn f(x: bi) I32 { return x.v; }\nfn mk() bs { return B[Str].of("in"); }\nfn len(x: li) I32 { return alt x { Nil => 0, Cons |c| => 1 + len(c.t), }; }\nlib { fn run() I32 { let c: bi = &{ v: 3 }; let n: li = li.Nil {}; return f(c) + mk().v.len() + len(L[I32].cons(1, n)); } }\n', 6],
     // `using M;` and `using M[A];` of a module whose type is `&`.
-    ['mod B[T] {\n    struct &:\n        | v: T\n    fn wrap(x: T) & { &{ v: x }; }\n}\nusing B[I32];\nmod C {\n    struct &:\n        | v: I32\n    fn mk(x: I32) & { &{ v: x }; }\n}\nusing C;\nlib { fn run() I32 { B.wrap(3).v + wrap(4).v + C.mk(5).v * 10; } }\n', 57],
+    ['mod B[T] {\n    struct &:\n        | v: T\n    fn wrap(x: T) & { return &{ v: x }; }\n}\nusing B[I32];\nmod C {\n    struct &:\n        | v: I32\n    fn mk(x: I32) & { return &{ v: x }; }\n}\nusing C;\nlib { fn run() I32 { return B.wrap(3).v + wrap(4).v + C.mk(5).v * 10; } }\n', 57],
     // group_by and distinct_by keys: distinct types, integer enums, host values, a generic key.
-    ['using JS from std:JS;\ntype Uid = distinct I32;\ntype Big = distinct U64;\nenum(U8) Lv:\n    | Lo\n    | Hi\nmod G[K] {\n    fn count(xs: Array[K]) I32 { (xs group_by(K, K) |r| { r; }).len(); }\n}\nlib { fn run() I32 {\n    let g = [Uid(1), Uid(2), Uid(1)] group_by(Uid, Uid) |r| { r; };\n    let gb = [Big(5), Big(5)] group_by(Big, Big) |r| { r; };\n    let ls = [Lv.Lo, Lv.Hi, Lv.Lo];\n    let d = ls distinct_by(Lv, Lv) |r| { r; };\n    let m = new JS.Map();\n    let ms: Array[JS.Map] = [m, new JS.Map(), m];\n    let hm = ms group_by(JS.Map, JS.Map) |r| { r; };\n    g.len() * 10000 + gb.len() * 1000 + d.len() * 100 + hm.len() * 10 + G[I32].count([1, 2, 1, 3]);\n} }\n', 21223],
+    ['using JS from std:JS;\ntype Uid = distinct I32;\ntype Big = distinct U64;\nenum(U8) Lv:\n    | Lo\n    | Hi\nmod G[K] {\n    fn count(xs: Array[K]) I32 { return (xs group_by(K, K) |r| { r; }).len(); }\n}\nlib { fn run() I32 {\n    let g = [Uid(1), Uid(2), Uid(1)] group_by(Uid, Uid) |r| { r; };\n    let gb = [Big(5), Big(5)] group_by(Big, Big) |r| { r; };\n    let ls = [Lv.Lo, Lv.Hi, Lv.Lo];\n    let d = ls distinct_by(Lv, Lv) |r| { r; };\n    let m = new JS.Map();\n    let ms: Array[JS.Map] = [m, new JS.Map(), m];\n    let hm = ms group_by(JS.Map, JS.Map) |r| { r; };\n    return g.len() * 10000 + gb.len() * 1000 + d.len() * 100 + hm.len() * 10 + G[I32].count([1, 2, 1, 3]);\n} }\n', 21223],
     // Branches of different variants join to their enum; null and a Str to ?Str.
-    ['enum Sh:\n    | C { r: I32 }\n    | R { w: I32 }\n    | T { h: I32 }\nfn area(s: Sh) I32 { alt s { C |c| => c.r, R |r| => r.w * 2, T |t| => t.h * 3, }; }\nfn pick(n: I32) Sh { let s = if n == 0 { C { r: 1 }; } else if n == 1 { R { w: 1 }; } else { T { h: 1 }; }; s; }\nlib { fn run() I32 {\n    let k = 2;\n    let m = match k { 1 => C { r: 5 }, 2 => R { w: 5 }, ~> T { h: 5 }, };\n    let s = if k > 5 { null; } else { "a"; };\n    area(pick(0)) + area(pick(1)) + area(pick(2)) + area(m) + (if s == null { 0; } else { 100; });\n} }\n', 116],
+    ['enum Sh:\n    | C { r: I32 }\n    | R { w: I32 }\n    | T { h: I32 }\nfn area(s: Sh) I32 { return alt s { C |c| => c.r, R |r| => r.w * 2, T |t| => t.h * 3, }; }\nfn pick(n: I32) Sh { let s = if n == 0 { C { r: 1 }; } else if n == 1 { R { w: 1 }; } else { T { h: 1 }; }; return s; }\nlib { fn run() I32 {\n    let k = 2;\n    let m = match k { 1 => C { r: 5 }, 2 => R { w: 5 }, ~> T { h: 5 }, };\n    let s = if k > 5 { null; } else { "a"; };\n    return area(pick(0)) + area(pick(1)) + area(pick(2)) + area(m) + (if s == null { 0; } else { 100; });\n} }\n', 116],
     // `Awaited<T>` of a generic call's result (Promise<Awaited<T>> was an unknown type), a record for `object` / `{}`
     // (No property a), and a record picking the overload it fits (freeze's first is T extends Function: Missing property apply).
-    ['using JS from std:JS;\nlib { fn run() I32 {\n    let x: Promise[Str] = JS.Promise.resolve("abc");\n    let y: Promise[F64] = JS.Promise.resolve(JS.Promise.resolve(5.0));\n    let k = JS.Object.keys(&{ a: 1.0, b: 2.0 });\n    let f = JS.Object.freeze(&{ q: 1.0 });\n    k.length.i32() * 100 + JS.JSON.stringify(f).length.i32();\n} }\n', 207],
+    ['using JS from std:JS;\nlib { fn run() I32 {\n    let x: Promise[Str] = JS.Promise.resolve("abc");\n    let y: Promise[F64] = JS.Promise.resolve(JS.Promise.resolve(5.0));\n    let k = JS.Object.keys(&{ a: 1.0, b: 2.0 });\n    let f = JS.Object.freeze(&{ q: 1.0 });\n    return k.length.i32() * 100 + JS.JSON.stringify(f).length.i32();\n} }\n', 207],
     // A JS closure from @es is called with a boolean and an unsigned U32 (it got 1 and -1), and its undefined ?Str is null (it was the string "undefined").
-    ['let getb: fun() cl(Bool, U32) Str = @es/\\() => (b, u) => typeof b + ":" + u\\/;\nlet getn: fun() cl() ?Str = @es/\\() => () => undefined\\/;\nlib { fn run() I32 { let s = getb()(true, 4294967295); promote getn()() { |x| => 0, ~> s.len(), }; } }\n', 18],
+    ['let getb: fun() cl(Bool, U32) Str = @es/\\() => (b, u) => typeof b + ":" + u\\/;\nlet getn: fun() cl() ?Str = @es/\\() => () => undefined\\/;\nlib { fn run() I32 { let s = getb()(true, 4294967295); return promote getn()() { |x| => 0, ~> s.len(), }; } }\n', 18],
     // An export lib result of a distinct U64 reaches JS unsigned (it came back -1n).
-    ['type Id = distinct U64;\nlib { fn run() Id { Id(18446744073709551615); } }\n', 18446744073709551615n],
+    ['type Id = distinct U64;\nlib { fn run() Id { return Id(18446744073709551615); } }\n', 18446744073709551615n],
     // Tag(i) of a value a variant has, in an enum with gaps.
-    ['enum(I32) Gap:\n    | A = 1\n    | B = 5\nlib { fn run() I32 { Gap(5).i32() + Gap(1).i32(); } }\n', 6],
+    ['enum(I32) Gap:\n    | A = 1\n    | B = 5\nlib { fn run() I32 { return Gap(5).i32() + Gap(1).i32(); } }\n', 6],
     // $T: each call binds T to the argument written `$T`'s type (a literal's waits for one that is not a literal), an instance per binding.
-    ['fn mx(a: $T, b: T) T { if a > b { a; } else { b; }; }\nfn first(xs: Array[$T]) T { xs[0]; }\nfn pair(a: $A, b: $B) Str { `${a}${b}`; }\n'
-      + 'lib { fn run() I64 { let big: I64 = 5000000000; mx(1, big) + mx(3, 7).i64() + first([2.5, 1.0]).i64() + pair(1, "x").len().i64(); } }\n', 5000000011n],
+    ['fn mx(a: $T, b: T) T { return if a > b { a; } else { b; }; }\nfn first(xs: Array[$T]) T { return xs[0]; }\nfn pair(a: $A, b: $B) Str { return `${a}${b}`; }\n'
+      + 'lib { fn run() I64 { let big: I64 = 5000000000; return mx(1, big) + mx(3, 7).i64() + first([2.5, 1.0]).i64() + pair(1, "x").len().i64(); } }\n', 5000000011n],
     // A $T function as a value takes its types from the fun(…) wanted.
-    ['fn show(x: $T) Str { `<${x}>`; }\nfn apply(f: fun(I32) Str) I32 { f(7).len(); }\nlib { fn run() I32 { apply(show); } }\n', 3],
+    ['fn show(x: $T) Str { return `<${x}>`; }\nfn apply(f: fun(I32) Str) I32 { return f(7).len(); }\nlib { fn run() I32 { return apply(show); } }\n', 3],
     // Literals with no type to take: the first of I32, U32, I64, U64 they fit (3000000000 a U32, which wraps);
     // a float F32 when it reads as F32 the same as F64 (0.5; h.f64() is no F64 method), else F64 (0.1).
-    ['lib { fn run() U32 { let a = 3000000000; a + a; } }\n', 1705032704],
+    ['lib { fn run() U32 { let a = 3000000000; return a + a; } }\n', 1705032704],
     // A line break ends a statement, unless the next line only goes on (`+ x`, `.f()`, `else`);
     // a line beginning `-` is a new statement. `;` puts two on one line.
-    ['fn f() I32 {\n    let x = 1\n    -x\n}\nfn g() I32 {\n    let y = 2\n    y\n        + 10\n}\n'
-      + 'fn h(c: Bool) I32 {\n    if c {\n        1\n    }\n    else {\n        2\n    }\n}\n'
-      + 'lib { fn run() I32 { let a = f(); let b = g()\n    a * 100 + b + h(false) * 1000 + "ab"\n        .len() * 10000 } }\n', 21912],
-    ['lib { fn run() F64 { let h = 0.5; let t = 0.1; h.f64() + t + F64(0.25); } }\n', 0.85],
+    ['fn f() I32 {\n    let x = 1\n    return -x\n}\nfn g() I32 {\n    let y = 2\n    return y\n        + 10\n}\n'
+      + 'fn h(c: Bool) I32 {\n    return if c {\n        1\n    }\n    else {\n        2\n    }\n}\n'
+      + 'lib { fn run() I32 { let a = f(); let b = g()\n    return a * 100 + b + h(false) * 1000 + "ab"\n        .len() * 10000 } }\n', 21912],
+    ['lib { fn run() F64 { let h = 0.5; let t = 0.1; return h.f64() + t + F64(0.25); } }\n', 0.85],
     // A computed global in a program with no `export main` (it crashed the compiler).
-    ['let n: I32 = 1 + 1;\nlet k: cl() I32 = cl() { n * 10; };\nlib { fn run() I32 { k() + n; } }\n', 22],
+    ['let n: I32 = 1 + 1;\nlet k: cl() I32 = cl() { return n * 10; };\nlib { fn run() I32 { return k() + n; } }\n', 22],
     // A closure in a generator has its own try, errdefer, and return.
-    ['fn parse(s: Str) Result[I32, Str] { if s == "x" { Result[I32, Str].err("bad"); } else { Result[I32, Str].ok(s.len()); }; }\ngn g(n: I32) I32 {\n    let f = cl(s: Str) Result[I32, Str] { errdefer { n; }; let v = try parse(s); Result[I32, Str].ok(v + n); };\n    let r = cl(k: I32) I32 { if k > 1 { return 100; }; k; };\n    yield f("abc").value();\n    yield r(5);\n    yield r(1);\n}\nlib { fn run() I32 { let s = 0; for (g(10)) |v| { s += v; }; s; } }\n', 114],
+    ['fn parse(s: Str) Result[I32, Str] { return if s == "x" { Result[I32, Str].err("bad"); } else { Result[I32, Str].ok(s.len()); }; }\ngn g(n: I32) I32 {\n    let f = cl(s: Str) Result[I32, Str] { errdefer { n; }; let v = try parse(s); return Result[I32, Str].ok(v + n); };\n    let r = cl(k: I32) I32 { if k > 1 { return 100; }; return k; };\n    yield f("abc").value();\n    yield r(5);\n    yield r(1);\n}\nlib { fn run() I32 { let s = 0; for (g(10)) |v| { s += v; }; return s; } }\n', 114],
     // `&` in a protocol member's type arguments.
-    ['proto Big:\n    | biggest(Array[&]) &\nstruct N[Big]:\n    | v: I32\nfn Big[N].biggest |a| (xs: Array[N]) N { let b = a; for (xs) |x| { if x.v > b.v { b = x; }; }; b; }\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nlib { fn run() I32 { let xs: Array[N] = [N { v: 3 }, N { v: 9 }]; Pick[N].top(N { v: 1 }, xs).v + Pick[N].top(N { v: 20 }, xs).v; } }\n', 29],
+    ['proto Big:\n    | biggest(Array[&]) &\nstruct N[Big]:\n    | v: I32\nfn Big[N].biggest |a| (xs: Array[N]) N { let b = a; for (xs) |x| { if x.v > b.v { b = x; }; }; return b; }\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { return a.biggest(xs); }\n}\nlib { fn run() I32 { let xs: Array[N] = [N { v: 3 }, N { v: 9 }]; return Pick[N].top(N { v: 1 }, xs).v + Pick[N].top(N { v: 20 }, xs).v; } }\n', 29],
     // A generic mod's globals that do not depend on T; unused generators, checked and dropped.
-    ['mod Arr[T] {\n    let k: I32 = 3;\n    let s: Str = "ab" + "c";\n    fn count(xs: Array[T]) I32 { xs.len() + k + s.len(); }\n}\nstruct P:\n    | x: I32\ngn g(n: I32, p: P) I32 { defer { n; }; let f = cl() I32 { n + p.x; }; for (0 ..< n) |i| { if i > 3 { return; }; yield f() + i; }; }\ngn walk(n: I32) I32 { if n > 0 { for (walk(n - 1)) |v| { yield v; }; }; yield n; }\ngn P.each |q| () I32 { yield q.x; }\nlib { fn run() I32 { Arr[I32].count([1, 2]) + Arr[F64].count([1.0]); } }\n', 15],
+    ['mod Arr[T] {\n    let k: I32 = 3;\n    let s: Str = "ab" + "c";\n    fn count(xs: Array[T]) I32 { return xs.len() + k + s.len(); }\n}\nstruct P:\n    | x: I32\ngn g(n: I32, p: P) I32 { defer { n; }; let f = cl() I32 { return n + p.x; }; for (0 ..< n) |i| { if i > 3 { return; }; yield f() + i; }; }\ngn walk(n: I32) I32 { if n > 0 { for (walk(n - 1)) |v| { yield v; }; }; yield n; }\ngn P.each |q| () I32 { yield q.x; }\nlib { fn run() I32 { return Arr[I32].count([1, 2]) + Arr[F64].count([1.0]); } }\n', 15],
     // A generic mod's globals, one per instance: `Buffer[T]`, read through each kind of alias.
-    ['using Buffer from std:Buffer;\nmod Stash[T] {\n    let items: Buffer[T] = Buffer[T].new();\n    fn add(x: T) Void { items.push(x); }\n    fn size() I32 { items.len(); }\n}\nusing Stash[I32] |S|;\nusing Stash[Str] |s|;\nlib { fn run() I32 { Stash[I32].add(1); S.add(2); Stash[Str].add("a"); Stash[I32].size() * 100 + Stash[Str].size() * 10 + s.items.len(); } }\n', 211],
+    ['using Buffer from std:Buffer;\nmod Stash[T] {\n    let items: Buffer[T] = Buffer[T].new();\n    fn add(x: T) Void { items.push(x); }\n    fn size() I32 { return items.len(); }\n}\nusing Stash[I32] |S|;\nusing Stash[Str] |s|;\nlib { fn run() I32 { Stash[I32].add(1); S.add(2); Stash[Str].add("a"); return Stash[I32].size() * 100 + Stash[Str].size() * 10 + s.items.len(); } }\n', 211],
     // Per instance: `?T`, `Array[T]`, the mod's own types and functions, one global from another, and one without T.
-    ['struct P:\n    | x: I32\nmod Box[T] {\n    struct &:\n        | v: T\n    struct Tag:\n        | k: I32\n    let item: Array[?T] = [null];\n    let all: Array[T] = [];\n    let made: Array[I32] = [0];\n    let base: I32 = start() + 1;\n    let twice: I32 = base * 2;\n    let tag: Tag = Tag { k: twice };\n    let none: ?& = null;\n    fn start() I32 { 10; }\n    fn put(x: T) Void { item[0] = x; made[0] += 1; }\n    fn empty() Bool { item[0] == null and none == null; }\n    fn total() I32 { all.len() + made[0] * 1000 + tag.k; }\n}\nlib { fn run() I32 {\n    Box[P].put(P { x: 1 });\n    Box[P].put(P { x: 2 });\n    Box[Str].put("a");\n    let e = (if Box[P].empty() { 1; } else { 0; }) + (if Box[Array[I32]].empty() { 10; } else { 0; });\n    Box[P].total() * 10 + Box[Str].total() + e * 100000;\n} }\n', 1021242],
+    ['struct P:\n    | x: I32\nmod Box[T] {\n    struct &:\n        | v: T\n    struct Tag:\n        | k: I32\n    let item: Array[?T] = [null];\n    let all: Array[T] = [];\n    let made: Array[I32] = [0];\n    let base: I32 = start() + 1;\n    let twice: I32 = base * 2;\n    let tag: Tag = Tag { k: twice };\n    let none: ?& = null;\n    fn start() I32 { return 10; }\n    fn put(x: T) Void { item[0] = x; made[0] += 1; }\n    fn empty() Bool { return item[0] == null and none == null; }\n    fn total() I32 { return all.len() + made[0] * 1000 + tag.k; }\n}\nlib { fn run() I32 {\n    Box[P].put(P { x: 1 });\n    Box[P].put(P { x: 2 });\n    Box[Str].put("a");\n    let e = (if Box[P].empty() { 1; } else { 0; }) + (if Box[Array[I32]].empty() { 10; } else { 0; });\n    return Box[P].total() * 10 + Box[Str].total() + e * 100000;\n} }\n', 1021242],
     // A bounded mod's global.
-    ['using Ord from std:Ord;\nusing Buffer from std:Buffer;\nmod Best[T[Ord]] {\n    let top: Buffer[T] = Buffer[T].new();\n    fn offer(x: T) Void { if top.len() == 0 { top.push(x); } else if x.cmp(top.get_index(0)) > 0 { top.set_index(0, x); }; }\n    fn best(d: T) T { if top.len() == 0 { d; } else { top.get_index(0); }; }\n}\nlib { fn run() I32 { Best[I32].offer(3); Best[I32].offer(9); Best[I32].offer(4); Best[Str].offer("bb"); Best[Str].offer("a"); Best[I32].best(0) * 100 + Best[Str].best("").len() * 10 + Best[F64].best(1.0).i32(); } }\n', 921],
+    ['using Ord from std:Ord;\nusing Buffer from std:Buffer;\nmod Best[T[Ord]] {\n    let top: Buffer[T] = Buffer[T].new();\n    fn offer(x: T) Void { if top.len() == 0 { top.push(x); } else if x.cmp(top.get_index(0)) > 0 { top.set_index(0, x); }; }\n    fn best(d: T) T { return if top.len() == 0 { d; } else { top.get_index(0); }; }\n}\nlib { fn run() I32 { Best[I32].offer(3); Best[I32].offer(9); Best[I32].offer(4); Best[Str].offer("bb"); Best[Str].offer("a"); return Best[I32].best(0) * 100 + Best[Str].best("").len() * 10 + Best[F64].best(1.0).i32(); } }\n', 921],
     // An iterator word in scope as a value is a value after return, continue, break label, yield and defer.
     ['let log: Array[I32] = [0];\n'
       + 'fn count(n: I32) Void { log[0] += n; }\n'
       + 'fn params(count: I32, sum: I32, product: I32) I32 { return count + sum * product; }\n'
       + 'fn local() I32 { let count: I32 = 5; let sum: I32 = count; return sum; }\n'
       + 'fn scaled(product: I32) I32 { return product * 2; }\n'
-      + 'fn brk(sum: I32) I32 { outer: { break outer sum; }; }\n'
+      + 'fn brk(sum: I32) I32 { return outer: { break outer sum; }; }\n'
       + 'gn gen(count: I32) I32 { yield count; }\n'
-      + 'fn steps(count: I32) I32 { let hits = 0; loop match 0 { 0 => { hits += 1; continue count; }, 3 => { hits += 10; break; }, ~> break, }; hits; }\n'
+      + 'fn steps(count: I32) I32 { let hits = 0; loop match 0 { 0 => { hits += 1; continue count; }, 3 => { hits += 10; break; }, ~> break, }; return hits; }\n'
       + 'fn deferred() I32 { defer count(100); return 1; }\n'
       + 'fn piped() I32 { let xs = [1, 2, 3]; return xs count; }\n'
-      + 'lib { fn run() I32 { let t = 0; for (gen(6)) |v| { t += v; }; params(1, 2, 3) + local() + scaled(4) + brk(9) + t + steps(3) + deferred() + piped() + log[0]; } }\n', 150],
+      + 'lib { fn run() I32 { let t = 0; for (gen(6)) |v| { t += v; }; return params(1, 2, 3) + local() + scaled(4) + brk(9) + t + steps(3) + deferred() + piped() + log[0]; } }\n', 150],
   ];
   for (const [source, value] of everyMode) {
     const file = await write(source);
@@ -1062,27 +1062,27 @@ lib { fn run() I32 { f(${closureDepth}); } }
   const throwing = await write(String.raw`let boom: fun(I32) Void = @es/\ (n) => { if (n >= 0) { globalThis.__err = "e" + n; throw new Error("e" + n); } } \/;
 let mark: fun(I32) Void = @es/\ (s) => { globalThis.__log = (globalThis.__log ?? "") + s; } \/;
 let log: fun() Str = @es/\ () => { const s = (globalThis.__err ?? "") + ":" + (globalThis.__log ?? ""); globalThis.__log = ""; globalThis.__err = ""; return s; } \/;
-fn ends() I32 { defer mark(1); defer boom(0); defer mark(3); 5; }
-fn returns(x: I32) I32 { defer mark(1); defer boom(0); defer mark(3); if x > 0 { return 7; }; 5; }
-fn unwinds() I32 { defer mark(1); defer boom(0); defer mark(3); boom(9); 5; }
-fn loops() I32 { let i = 0; while (i < 3) { defer mark(1); defer boom(i); defer mark(3); i += 1; if i == 1 { continue; }; break; }; 5; }
-fn inner() I32 { defer mark(1); { defer boom(2); defer mark(3); mark(4); }; mark(5); 6; }
-fn both() I32 { defer mark(1); defer boom(0); defer boom(1); 5; }
-fn after() I32 { defer mark(1); defer boom(2); boom(3); 5; }
-fn small(i: I32) I32 { defer mark(1); defer boom(if i == 0 { 0; } else { -1; }); if i == 2 { boom(5); }; i; }
-fn rounds() I32 { let n = 0; for (0 ..< 3) |i| { n += try { small(i); } catch |e| { mark(9); 0; }; }; n; }
+fn ends() I32 { defer mark(1); defer boom(0); defer mark(3); return 5; }
+fn returns(x: I32) I32 { defer mark(1); defer boom(0); defer mark(3); if x > 0 { return 7; }; return 5; }
+fn unwinds() I32 { defer mark(1); defer boom(0); defer mark(3); boom(9); return 5; }
+fn loops() I32 { let i = 0; while (i < 3) { defer mark(1); defer boom(i); defer mark(3); i += 1; if i == 1 { continue; }; break; }; return 5; }
+fn inner() I32 { defer mark(1); { defer boom(2); defer mark(3); mark(4); }; mark(5); return 6; }
+fn both() I32 { defer mark(1); defer boom(0); defer boom(1); return 5; }
+fn after() I32 { defer mark(1); defer boom(2); boom(3); return 5; }
+fn small(i: I32) I32 { defer mark(1); defer boom(if i == 0 { 0; } else { -1; }); if i == 2 { boom(5); }; return i; }
+fn rounds() I32 { let n = 0; for (0 ..< 3) |i| { n += try { small(i); } catch |e| { mark(9); 0; }; }; return n; }
 fn caught(x: I32) I32 {
     defer mark(1);
     let r = try { { defer boom(x); defer mark(2); return 4; }; } catch |e| { mark(7); 8; };
     mark(6);
     boom(x + 10);
-    r;
+    return r;
 }
-fn nested() I32 { defer mark(1); defer { defer mark(2); boom(0); mark(3); }; mark(4); 5; }
-fn closure() I32 { let c = cl() I32 { defer mark(1); defer boom(0); defer mark(3); 5; }; c(); }
-fn calm() I32 { let t = 0; defer mark(1); { defer mark(2); t += 1; }; for (0 ..< 2) |i| { defer mark(3); if i == 0 { continue; }; t += 10; }; t; }
+fn nested() I32 { defer mark(1); defer { defer mark(2); boom(0); mark(3); }; mark(4); return 5; }
+fn closure() I32 { let c = cl() I32 { defer mark(1); defer boom(0); defer mark(3); return 5; }; return c(); }
+fn calm() I32 { let t = 0; defer mark(1); { defer mark(2); t += 1; }; for (0 ..< 2) |i| { defer mark(3); if i == 0 { continue; }; t += 10; }; return t; }
 fn run_one(k: I32) I32 {
-    match k {
+    return match k {
         0 => ends(), 1 => returns(1), 2 => unwinds(), 3 => loops(), 4 => inner(), 5 => both(),
         6 => after(), 7 => rounds(), 8 => caught(0), 9 => nested(), 10 => closure(), ~> calm(),
     };
@@ -1090,7 +1090,7 @@ fn run_one(k: I32) I32 {
 lib { fn run() Str {
     let s = "";
     for (0 ..< 12) |k| { let r = try { run_one(k); } catch |e| { -1; }; s = s + r.str() + log() + " "; };
-    s;
+    return s;
 } }
 `);
   for (const mode of modes) {
@@ -1104,10 +1104,10 @@ lib { fn run() Str {
   // An @es body bound to a fun or cl type that is not plainly a function is
   // tested as the glue loads: one that is no function fails there, named.
   for (const [source, message] of [
-    ['let f: fun(I32) I32 = @es/\\ 5 \\/;\nlib { fn run() I32 { f(1); } }\n', /f: @es gave number, not a function/],
-    ['let g: fun(Bool) I32 = @es/\\ ({upper: 1}) \\/;\nlib { fn run() I32 { g(true); } }\n', /g: @es gave object, not a function/],
-    ['let c: cl(I32) I32 = @es/\\ null \\/;\nlib { fn run() I32 { c(1); } }\n', /c: @es gave null, not a function/],
-    ['let a: fun(I32) I32 = @es/\\ Math.abs \\/;\nlet b: fun(Bool) I32 = @es/\\ [b => b ? 2 : 3][0] \\/;\nlib { fn run() I32 { a(-5) * 10 + b(true); } }\n', null],
+    ['let f: fun(I32) I32 = @es/\\ 5 \\/;\nlib { fn run() I32 { return f(1); } }\n', /f: @es gave number, not a function/],
+    ['let g: fun(Bool) I32 = @es/\\ ({upper: 1}) \\/;\nlib { fn run() I32 { return g(true); } }\n', /g: @es gave object, not a function/],
+    ['let c: cl(I32) I32 = @es/\\ null \\/;\nlib { fn run() I32 { return c(1); } }\n', /c: @es gave null, not a function/],
+    ['let a: fun(I32) I32 = @es/\\ Math.abs \\/;\nlet b: fun(Bool) I32 = @es/\\ [b => b ? 2 : 3][0] \\/;\nlib { fn run() I32 { return a(-5) * 10 + b(true); } }\n', null],
   ]) {
     const file = await write(source);
     for (const mode of ['debug', 'small']) {
@@ -1120,8 +1120,8 @@ lib { fn run() Str {
   }
 
   // A generic mod's globals from another file, one per instance.
-  await fs.writeFile(path.join(dir, 'counter.utu'), 'mod Counter[T] {\n    let n: Array[I32] = [0];\n    let seen: Array[T] = [];\n    fn bump() Void { n[0] += 1; }\n    fn get() I32 { n[0] + seen.len(); }\n}\n');
-  const counted = await write('using Counter from "./counter.utu";\nlib { fn run() I32 { Counter[I32].bump(); Counter[I32].bump(); Counter[Str].bump(); Counter[I32].get() * 10 + Counter[Str].get(); } }\n');
+  await fs.writeFile(path.join(dir, 'counter.utu'), 'mod Counter[T] {\n    let n: Array[I32] = [0];\n    let seen: Array[T] = [];\n    fn bump() Void { n[0] += 1; }\n    fn get() I32 { return n[0] + seen.len(); }\n}\n');
+  const counted = await write('using Counter from "./counter.utu";\nlib { fn run() I32 { Counter[I32].bump(); Counter[I32].bump(); Counter[Str].bump(); return Counter[I32].get() * 10 + Counter[Str].get(); } }\n');
   for (const mode of modes) {
     const built = await compileFile(utu, counted, { mode });
     assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), 21, `${mode}: ${built.diagnostics?.map(d => d.message)}`);
@@ -1129,7 +1129,7 @@ lib { fn run() Str {
   }
 
   // A computed value stored into a narrow mem wraps (a literal past it is an error).
-  const wrapped = await write('mem m: U8;\nmem n: I8;\nvec v: U16;\nvec w: U8;\nlib { fn run() I32 {\n    let big = 256;\n    m.push(big); m.push(0 - 1); n.push(big - 385); v.push(big * 273 + 112); w.push(-big + 255);\n    m[0] += 250; m[0] += 250; w[0] = big + 3;\n    m[0] * 1000000 + m[1] * 10000 + n[0] + 1000 + v[0] + w[0];\n} }\n');
+  const wrapped = await write('mem m: U8;\nmem n: I8;\nvec v: U16;\nvec w: U8;\nlib { fn run() I32 {\n    let big = 256;\n    m.push(big); m.push(0 - 1); n.push(big - 385); v.push(big * 273 + 112); w.push(-big + 255);\n    m[0] += 250; m[0] += 250; w[0] = big + 3;\n    return m[0] * 1000000 + m[1] * 10000 + n[0] + 1000 + v[0] + w[0];\n} }\n');
   for (const mode of modes) {
     const built = await compileFile(utu, wrapped, { mode });
     assert.equal((await instantiateNode(built.wasm, built.spec)).exports.run(), 246555594, `${mode}: ${built.diagnostics?.map(d => d.message)}`);
@@ -1137,7 +1137,7 @@ lib { fn run() Str {
   }
 
   // A mem resized below zero traps, where the build checks.
-  const resized = await write('mem m: I32;\nlib { fn run() I32 { m.push(1); m.resize(-1); m.len(); } }\n');
+  const resized = await write('mem m: I32;\nlib { fn run() I32 { m.push(1); m.resize(-1); return m.len(); } }\n');
   for (const mode of ['debug', 'small', 'fast']) {
     const built = await compileFile(utu, resized, { mode });
     const { exports } = await instantiateNode(built.wasm, built.spec);
@@ -1152,10 +1152,10 @@ lib { fn run() Str {
     const bounded = await write(`${kind} b: ${type};
 fn fill() Void { b.clear(); b.reserve(16); b.push(9); b.push(9); b.push(9); }
 lib {
-    fn read(i: I32) I32 { fill(); b[i]; }
-    fn store(i: I32) I32 { fill(); b[i] = 77; b[i] + 1000 * b.len(); }
-    fn bump(i: I32) I32 { fill(); b[i] += 5; b[i] + 1000 * b.len(); }
-    fn bump_at(i: I32) I32 { fill(); let k = [i]; b[k[0]] -= 2; b[k[0] + 0] + 1000 * b.len(); }
+    fn read(i: I32) I32 { fill(); return b[i]; }
+    fn store(i: I32) I32 { fill(); b[i] = 77; return b[i] + 1000 * b.len(); }
+    fn bump(i: I32) I32 { fill(); b[i] += 5; return b[i] + 1000 * b.len(); }
+    fn bump_at(i: I32) I32 { fill(); let k = [i]; b[k[0]] -= 2; return b[k[0] + 0] + 1000 * b.len(); }
 }
 `);
     for (const mode of modes) {
@@ -1190,10 +1190,10 @@ lib {
     const zero = type.startsWith('F') ? '0.0' : '0';
     const value = type === 'U8' || type === 'I16' ? 'I32' : type;
     const grown = await write(`${kind} b: ${type}${init};
-fn bump() ${value} { for (0 ..< 40) |k| { b.push(${zero}); }; ${five}; }
+fn bump() ${value} { for (0 ..< 40) |k| { b.push(${zero}); }; return ${five}; }
 lib {
-    fn regrow() I32 { b.clear(); b.resize(3); let a = b[0] == ${zero} and b[2] == ${zero}; b[1] = ${five}; b.resize(1); b.resize(2); if a and b[1] == ${zero} and b.len() == 2 { 1; } else { 0; }; }
-    fn late() I32 { b.clear(); b.push(${zero}); b[1] = bump(); b[40] = ${five}; if b[1] == ${five} and b[40] == ${five} { b.len(); } else { 0; }; }
+    fn regrow() I32 { b.clear(); b.resize(3); let a = b[0] == ${zero} and b[2] == ${zero}; b[1] = ${five}; b.resize(1); b.resize(2); return if a and b[1] == ${zero} and b.len() == 2 { 1; } else { 0; }; }
+    fn late() I32 { b.clear(); b.push(${zero}); b[1] = bump(); b[40] = ${five}; return if b[1] == ${five} and b[40] == ${five} { b.len(); } else { 0; }; }
 }
 `);
     for (const mode of modes) {
@@ -1207,7 +1207,7 @@ lib {
     }
   }
   // The same of a mem the host makes (copy_in).
-  const hosted = await write('using JS from std:JS;\nmem text: U8;\nlib {\n    fn load(bytes: JS.Uint8Array) I32 { text.copy_in(bytes); text.len(); }\n    fn regrow() I32 { text.clear(); text.resize(4); text[0] + text[3] + text.len(); }\n}\n');
+  const hosted = await write('using JS from std:JS;\nmem text: U8;\nlib {\n    fn load(bytes: JS.Uint8Array) I32 { text.copy_in(bytes); return text.len(); }\n    fn regrow() I32 { text.clear(); text.resize(4); return text[0] + text[3] + text.len(); }\n}\n');
   for (const mode of modes) {
     const built = await compileFile(utu, hosted, { mode });
     const { exports } = await instantiateNode(built.wasm, built.spec);
@@ -1221,14 +1221,14 @@ lib {
     const two = type.startsWith('F') ? '2.0' : '2';
     const value = type === 'U8' || type === 'I8' ? 'I32' : type;
     const shrunk = await write(`${kind} b: ${type};
-fn cut() ${value} { b.resize(1); ${two}; }
-fn wipe() ${value} { b.clear(); ${two}; }
-fn grow() ${value} { b.push(${two}); ${two}; }
+fn cut() ${value} { b.resize(1); return ${two}; }
+fn wipe() ${value} { b.clear(); return ${two}; }
+fn grow() ${value} { b.push(${two}); return ${two}; }
 lib {
     fn fill() Void { b.clear(); b.push(${two}); b.push(${two}); b.push(${two}); }
-    fn times() I32 { b[1] *= cut(); b.len(); }
-    fn plus() I32 { b[0] += wipe(); b.len(); }
-    fn ok() I32 { b[2] += grow(); if b[2] == ${two} + ${two} { b.len(); } else { 0; }; }
+    fn times() I32 { b[1] *= cut(); return b.len(); }
+    fn plus() I32 { b[0] += wipe(); return b.len(); }
+    fn ok() I32 { b[2] += grow(); return if b[2] == ${two} + ${two} { b.len(); } else { 0; }; }
 }
 `);
     for (const mode of modes) {
@@ -1247,7 +1247,7 @@ lib {
   }
 
   // A slice ending before it starts traps, and `orelse fatal` on null, in every mode.
-  const traps = await write('lib {\n    fn reversed() I32 { let a = [1, 2, 3]; a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; (s orelse fatal).len(); }\n}\n');
+  const traps = await write('lib {\n    fn reversed() I32 { let a = [1, 2, 3]; return a[2, 1].len(); }\n    fn none() I32 { let s: ?Str = null; return (s orelse fatal).len(); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const built = await compileFile(utu, traps, { mode });
     const { exports } = await instantiateNode(built.wasm, built.spec);
@@ -1260,32 +1260,32 @@ lib {
   const control = await write(`struct N:
     | next: ?N
     | v: I32
-fn pair() .{I32, Str} { let k = 0; defer k = 1; .{2, "bb"}; }
-fn triple(c: Bool) .{F64, Str, I32} { let k = 0; defer k = 1; if c { return .{1.5, "x", 3}; }; .{2.5, "yy", 4}; }
+fn pair() .{I32, Str} { let k = 0; defer k = 1; return .{2, "bb"}; }
+fn triple(c: Bool) .{F64, Str, I32} { let k = 0; defer k = 1; if c { return .{1.5, "x", 3}; }; return .{2.5, "yy", 4}; }
 lib {
     // \`continue <state>\` runs the defers it leaves, as break does.
     fn state_defers() I32 {
         let log = 0;
         loop match 0 { 0 => { defer log = log * 10 + 1; continue 1; }, 1 => { defer log = log * 10 + 2; break; }, ~> { break; }, };
         loop match 0 { 0 => { for (0 ..< 3) |i| { defer log = log * 10 + 3; if i == 1 { continue 1; }; }; }, ~> { break; }, };
-        log;
+        return log;
     }
     // \`defer a?.b = v;\` runs only when a is there, as in a block.
     fn optional_defer() I32 {
         let b = N { next: null, v: 1 };
         let a = N { next: b, v: 1 };
         { defer a.next?.v = 9; defer b.next?.v = 5; };
-        b.v;
+        return b.v;
     }
     // A name bound to a value that never arrives.
-    fn never_let(c: I32) I32 { if c > 0 { let z = return 3; z; } else { 4; }; }
+    fn never_let(c: I32) I32 { return if c > 0 { let z = return 3; z; } else { 4; }; }
     // Tuples past a defer, dropped whole, and destructured.
     fn tuples() I32 {
         pair();
         triple(true);
         let .{a, b} = pair();
         let .{x, y, z} = triple(false);
-        a * 1000 + b.len() * 100 + y.len() * 10 + z + (x * 2.0).i32();
+        return a * 1000 + b.len() * 100 + y.len() * 10 + z + (x * 2.0).i32();
     }
     // An inclusive range through the type's largest value ends.
     fn inclusive_max() I32 {
@@ -1296,10 +1296,10 @@ lib {
         for (hi - 1.i64() ... hi) |v| { d += 1; if d > 9 { break; }; };
         let e = 0;
         for ((-2).u32() ... (-1).u32()) |u| { e += 1; if e > 9 { break; }; };
-        c * 100 + d * 10 + e;
+        return c * 100 + d * 10 + e;
     }
     // A loop that moves its count twice a pass.
-    fn count_moved() I32 { let t = 0; let i = 0; while (i < 8) { t += i; i += 2; i += 1; }; t; }
+    fn count_moved() I32 { let t = 0; let i = 0; while (i < 8) { t += i; i += 2; i += 1; }; return t; }
 }
 `);
   const controlWant = { state_defers: 1233, optional_defer: 9, tuples: 2000 + 200 + 20 + 4 + 5, inclusive_max: 322, count_moved: 9 };
@@ -1317,69 +1317,69 @@ lib {
     | v: I32
     | kids: Array[Node]
 gn walk(n: Node) Node { yield n; for (n.kids) |k| { for (walk(k)) |d| { yield d; }; }; }
-fn tree() Node { Node { v: 1, kids: [Node { v: 2, kids: [] }] }; }
-fn show(xs: Array[I32]) Str { xs fold("") |acc, v, i| { if i == 0 { \`\${v}\`; } else { \`\${acc},\${v}\`; }; }; }
+fn tree() Node { return Node { v: 1, kids: [Node { v: 2, kids: [] }] }; }
+fn show(xs: Array[I32]) Str { return xs fold("") |acc, v, i| { if i == 0 { \`\${v}\`; } else { \`\${acc},\${v}\`; }; }; }
 mod Box {
     struct &:
         | v: I32
-    fn &.new(v: I32) & { &{ v: v }; }
-    fn &.len |self| () I32 { self.v += 100; self.v; }
+    fn &.new(v: I32) & { return &{ v: v }; }
+    fn &.len |self| () I32 { self.v += 100; return self.v; }
 }
 `;
   const selfhostPrograms = [
     // A recursive generator's loop, run again, starts over (it yielded nothing).
     [`${tree}lib {
-    fn again() Str { let out = ""; for (0 ..< 3) |r| { for (walk(tree())) |n| { out = \`\${out}\${n.v}\`; }; out = \`\${out}|\`; }; out; }
-    fn nested() Str { let out = ""; for (walk(tree())) |a| { for (walk(tree())) |b| { out = \`\${out}\${a.v}\${b.v} \`; }; }; out; }
+    fn again() Str { let out = ""; for (0 ..< 3) |r| { for (walk(tree())) |n| { out = \`\${out}\${n.v}\`; }; out = \`\${out}|\`; }; return out; }
+    fn nested() Str { let out = ""; for (walk(tree())) |a| { for (walk(tree())) |b| { out = \`\${out}\${a.v}\${b.v} \`; }; }; return out; }
 }`, { again: '12|12|12|', nested: '11 12 21 22 ' }],
     // (… collect(T)) … is one loop only when no one can tell.
     [`${tree}lib {
-    fn writes() Str { let xs = [1, 2, 3, 4]; let k = 10; show((xs map |n| { n * k; } collect(I32)) map |v| { k += 1; v; } collect(I32)); }
-    fn source() Str { let ys = [1, 2, 3, 4]; show((ys map |n| { ys[0] + n; } collect(I32)) map |v| { ys[0] = 100; v; } collect(I32)); }
-    fn own_len() I32 { let bs = [Box.new(1), Box.new(2), Box.new(3)]; let r = (bs map |b| { b.len(); } collect(I32)) take(1) sum; r * 1000 + bs[2].v; }
-    fn fused_bisect() I32 { ([1, 2, 3, 4] map |n| { n * 2; } collect(I32)) bisect |n| { n < 5; }; }
+    fn writes() Str { let xs = [1, 2, 3, 4]; let k = 10; return show((xs map |n| { n * k; } collect(I32)) map |v| { k += 1; v; } collect(I32)); }
+    fn source() Str { let ys = [1, 2, 3, 4]; return show((ys map |n| { ys[0] + n; } collect(I32)) map |v| { ys[0] = 100; v; } collect(I32)); }
+    fn own_len() I32 { let bs = [Box.new(1), Box.new(2), Box.new(3)]; let r = (bs map |b| { b.len(); } collect(I32)) take(1) sum; return r * 1000 + bs[2].v; }
+    fn fused_bisect() I32 { return ([1, 2, 3, 4] map |n| { n * 2; } collect(I32)) bisect |n| { n < 5; }; }
 }`, { writes: '10,20,30,40', source: '2,3,4,5', own_len: 101103, fused_bisect: 2 }],
     // Ranges as sources: to the type's greatest, wider than 2^31, of I64, U32 and U64.
     [`lib {
-    fn to_max() I32 { let hi = 2147483647; (hi - 2 ... hi) count; }
-    fn wide_take() I32 { (-2000000000 ..< 2000000000) take(3) count; }
-    fn wide_skip() I32 { (-2147483648 ..< 2147483647) skip(2147483647) take(2) sum; }
-    fn longs() I64 { let big: I64 = 5000000000; (big ..< big + 4) sum; }
-    fn unsigned() I32 { let u: U32 = 4294967294; (u ... 4294967295) count; }
-    fn u64_max() I32 { let u: U64 = 18446744073709551614; (u ... 18446744073709551615) count; }
-    fn to_max_bisect() I32 { let hi = 2147483647; (hi - 3 ... hi) bisect |v| { v < hi; }; }
+    fn to_max() I32 { let hi = 2147483647; return (hi - 2 ... hi) count; }
+    fn wide_take() I32 { return (-2000000000 ..< 2000000000) take(3) count; }
+    fn wide_skip() I32 { return (-2147483648 ..< 2147483647) skip(2147483647) take(2) sum; }
+    fn longs() I64 { let big: I64 = 5000000000; return (big ..< big + 4) sum; }
+    fn unsigned() I32 { let u: U32 = 4294967294; return (u ... 4294967295) count; }
+    fn u64_max() I32 { let u: U64 = 18446744073709551614; return (u ... 18446744073709551615) count; }
+    fn to_max_bisect() I32 { let hi = 2147483647; return (hi - 3 ... hi) bisect |v| { v < hi; }; }
 }`, { to_max: 3, wide_take: 3, wide_skip: -1, longs: 20000000006n, unsigned: 2, u64_max: 2, to_max_bisect: 3 }],
     // Str's order (by code units), I32's and I64's min, max, abs, and a protocol's own function called as a method.
     [`proto Shape:
     | area() I32
 struct Sq[Shape]:
     | s: I32
-fn Shape[Sq].area |q| () I32 { q.s * q.s; }
-fn Shape.twice |s| () I32 { s.area() * 2; }
+fn Shape[Sq].area |q| () I32 { return q.s * q.s; }
+fn Shape.twice |s| () I32 { return s.area() * 2; }
 lib {
-    fn order() Str { ",".join(["bo", "Al", "al", "b"] sort(Str) |a, b| { a < b; }); }
-    fn cmp() I32 { Str.compare("a", "b") * 100 + Str.compare("b", "b") * 10 + Str.compare("c", "b"); }
-    fn tests() Bool { "a" <= "a" and "b" > "a" and "B" < "a" and "ab" >= "a"; }
-    fn ints() I32 { I32.min(3, -4) * 100 + I32.max(3, -4) * 10 + I32.abs(-7); }
-    fn longs() I64 { I64.abs(-9.i64()) + I64.max(2.i64(), 5.i64()); }
-    fn proto_method() I32 { let s: Shape = Sq { s: 3 }; s.twice(); }
+    fn order() Str { return ",".join(["bo", "Al", "al", "b"] sort(Str) |a, b| { a < b; }); }
+    fn cmp() I32 { return Str.compare("a", "b") * 100 + Str.compare("b", "b") * 10 + Str.compare("c", "b"); }
+    fn tests() Bool { return "a" <= "a" and "b" > "a" and "B" < "a" and "ab" >= "a"; }
+    fn ints() I32 { return I32.min(3, -4) * 100 + I32.max(3, -4) * 10 + I32.abs(-7); }
+    fn longs() I64 { return I64.abs(-9.i64()) + I64.max(2.i64(), 5.i64()); }
+    fn proto_method() I32 { let s: Shape = Sq { s: 3 }; return s.twice(); }
 }`, { order: 'Al,al,b,bo', cmp: -99, tests: true, ints: -363, longs: 14n, proto_method: 18 }],
     // Calls in a loop's body (unrolled -O fast only when the inlined copies
     // stay small), and locals sharing slots through loops (-O fast's coalescing).
     [`fn step(x: I32) I32 {
     let t = x * 3;
-    t ^ (t >> 2);
+    return t ^ (t >> 2);
 }
 fn spread(x: I32) I32 {
     let s = 0;
     for (0 ..< 4) |k| { s += step(x + k); };
-    s;
+    return s;
 }
 lib {
     fn calls() I32 {
         let s = 0;
         for (0 ..< 11) |i| { s += step(i) + spread(i); };
-        s;
+        return s;
     }
     fn last_set() I32 {
         let found = -1;
@@ -1389,7 +1389,7 @@ lib {
             let w = v + 1;
             found = w;
         };
-        found;
+        return found;
     }
     fn nested() I32 {
         let total = 0;
@@ -1403,26 +1403,26 @@ lib {
             let after = base + 1;
             total += after;
         };
-        total;
+        return total;
     }
 }`, { calls: 1096, last_set: 43, nested: 420 }],
     // Literals under operators, left of a typed operand, take its type as one
     // literal does (once I32: "No + for I32 and I64").
-    [`fn a(x: I64) I64 { let k = (1 + 2) + x; k; }
-fn b(x: U32) Bool { (1 + 2) < x; }
-fn c(x: I64) Bool { ((1 ^ 2) | x) == 3; }
-fn d(x: I64) Bool { (0 - 4294967296) + x >= 0; }
-fn e(x: U64) U64 { ((1 << 40) - -(2 * 3)) + x; }
-fn g(x: I64) I64 { -(1 + 2) * x + (4 / 2); }
+    [`fn a(x: I64) I64 { let k = (1 + 2) + x; return k; }
+fn b(x: U32) Bool { return (1 + 2) < x; }
+fn c(x: I64) Bool { return ((1 ^ 2) | x) == 3; }
+fn d(x: I64) Bool { return (0 - 4294967296) + x >= 0; }
+fn e(x: U64) U64 { return ((1 << 40) - -(2 * 3)) + x; }
+fn g(x: I64) I64 { return -(1 + 2) * x + (4 / 2); }
 lib {
-    fn sum() I64 { a(5); }
-    fn less() Bool { b(4); }
-    fn bits() Bool { c(1); }
-    fn wide() Bool { d(4294967296) and not d(4294967295); }
-    fn unsigned() U64 { e(1); }
-    fn float() F64 { let x: F64 = 0.5; (1 + 2) * x; }
-    fn negated() I64 { g(2); }
-    fn both() I32 { let k = (1 + 2) + 3; k; }
+    fn sum() I64 { return a(5); }
+    fn less() Bool { return b(4); }
+    fn bits() Bool { return c(1); }
+    fn wide() Bool { return d(4294967296) and not d(4294967295); }
+    fn unsigned() U64 { return e(1); }
+    fn float() F64 { let x: F64 = 0.5; return (1 + 2) * x; }
+    fn negated() I64 { return g(2); }
+    fn both() I32 { let k = (1 + 2) + 3; return k; }
 }`, { sum: 8n, less: true, bits: true, wide: true, unsigned: 1099511627783n, float: 1.5, negated: -4n, both: 6 }],
   ];
   for (const [source, expected] of selfhostPrograms) {
@@ -1437,7 +1437,7 @@ lib {
   }
   // A trap in a collected pipeline stays when the consumer takes less.
   const trapping = await compileFile(utu, await write(`lib {
-    fn run() I32 { let xs = [1, 0]; let ys = [5]; (xs map |v, i| { ys[i.i32()] / v; } collect(I32)) take(1) sum; }
+    fn run() I32 { let xs = [1, 0]; let ys = [5]; return (xs map |v, i| { ys[i.i32()] / v; } collect(I32)) take(1) sum; }
 }`));
   await assert.rejects(async () => (await instantiateNode(trapping.wasm, trapping.spec)).exports.run());
   checked++;
@@ -1456,11 +1456,11 @@ lib {
         let d = names.str("a😀b");
         let e = names.str(Str.from_codes([55296], 1));
         let f = names.str(Str.from_codes([55297], 1));
-        \`\${a} \${b} \${c} \${d} \${e} \${f} \${names.size(d)} \${names.byte_at(d, 1)} \${names.size(e)} \${names.ascii(names.str("ok"))}\`;
+        return \`\${a} \${b} \${c} \${d} \${e} \${f} \${names.size(d)} \${names.byte_at(d, 1)} \${names.size(e)} \${names.ascii(names.str("ok"))}\`;
     }
-    fn wide() I32 { let names = Interner.new(); names.begin(); names.byte(8364); names.finish(); }
-    fn past() I32 { let names = Interner.new(); let a = names.str("a"); names.str("b"); names.byte_at(a, 1); }
-    fn negative() I32 { let names = Interner.new(); let a = names.str("a"); names.byte_at(a, -1); }
+    fn wide() I32 { let names = Interner.new(); names.begin(); names.byte(8364); return names.finish(); }
+    fn past() I32 { let names = Interner.new(); let a = names.str("a"); names.str("b"); return names.byte_at(a, 1); }
+    fn negative() I32 { let names = Interner.new(); let a = names.str("a"); return names.byte_at(a, -1); }
 }`);
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const built = await compileFile(utu, interning, { mode });
@@ -1482,8 +1482,8 @@ lib {
   const rejecting = await write(`let fail: fun() Promise[I32] = @es/\\ () => Promise.reject(new Error("boom")) \\/;
 let note: fun(Str) Void = @es/\\ (s) => { (globalThis.__seen ??= []).push(s); } \\/;
 lib {
-    fn both() Void { let q = fail(); q.then(cl(v) { note("value"); }); q.catch(cl(e) { note("caught"); }); }
-    fn alone() Void { fail().then(cl(v) { note("value"); }); }
+    fn both() Void { let q = fail(); q.then(cl(v) { return note("value"); }); q.catch(cl(e) { return note("caught"); }); }
+    fn alone() Void { fail().then(cl(v) { return note("value"); }); }
 }`);
   const settled = await compileFile(utu, rejecting);
   assert.ok(settled.wasm, settled.diagnostics?.map(d => d.message).join('\n'));
@@ -1505,25 +1505,25 @@ lib {
   // in every build mode: what each export returns.
   const boundary = [
     // Results as JS has them: Bool true/false, U32 and U64 unsigned.
-    ['lib { fn u() U32 { 4000000000; } fn w() U64 { 18446744073709551615; } fn yes() Bool { true; } }',
+    ['lib { fn u() U32 { return 4000000000; } fn w() U64 { return 18446744073709551615; } fn yes() Bool { return true; } }',
       { u: 4000000000, w: 18446744073709551615n, yes: true }],
     // @es arguments and results convert; undefined is absent.
     [`let none: fun() ?Str = @es/\\ () => undefined \\/;
 let two: fun() Bool = @es/\\ () => 2 \\/;
 let show: fun(Bool, U32, U64) Str = @es/\\ (b, u, w) => typeof b + " " + u + " " + w \\/;
 lib {
-    fn absent() Bool { promote none() { |v| => false, ~> true, }; }
-    fn bool() Bool { two() == true; }
-    fn shown() Str { show(true, 4000000000, 18446744073709551615); }
+    fn absent() Bool { return promote none() { |v| => false, ~> true, }; }
+    fn bool() Bool { return two() == true; }
+    fn shown() Str { return show(true, 4000000000, 18446744073709551615); }
 }`, { absent: true, bool: true, shown: 'boolean 4000000000 18446744073709551615' }],
     // A dynamic value into ?Str: undefined is absent, a number a TypeError; orelse and promote take it.
     [`using JS from std:JS;
 lib {
-    fn missing() Bool { let m = new JS.Map(); let h: ?Str = m.get("nope"); h == null; }
-    fn wrong() Str { try { let x: ?Str = JS.JSON.parse("5"); "accepted"; } catch |e| { "caught"; }; }
-    fn fallback() Str { let m = new JS.Map(); let s: Str = m.get("nope") orelse "d"; s; }
-    fn code() F64 { "x".codePointAt(5.0) orelse -1.0; }
-    fn chars() Str { JS.Array.from("abc").join("-"); }
+    fn missing() Bool { let m = new JS.Map(); let h: ?Str = m.get("nope"); return h == null; }
+    fn wrong() Str { return try { let x: ?Str = JS.JSON.parse("5"); "accepted"; } catch |e| { "caught"; }; }
+    fn fallback() Str { let m = new JS.Map(); let s: Str = m.get("nope") orelse "d"; return s; }
+    fn code() F64 { return "x".codePointAt(5.0) orelse -1.0; }
+    fn chars() Str { return JS.Array.from("abc").join("-"); }
 }`, { missing: true, wrong: 'caught', fallback: 'd', code: -1, chars: 'a-b-c' }],
     // @json: depth, -0, escaped and exponent literals, required objects, int enums, lone surrogates, error places.
     [`enum(U8) Level:
@@ -1535,12 +1535,12 @@ struct N:
     | next: ?N
 struct Z:
     | x: F64
-fn deep() Str { let a = ""; let b = ""; for (0 ..< 20000) |i| { a = a + "{\\"next\\":"; b = b + "}"; }; a + b; }
+fn deep() Str { let a = ""; let b = ""; for (0 ..< 20000) |i| { a = a + "{\\"next\\":"; b = b + "}"; }; return a + b; }
 lib {
-    fn depth() Str { @json/\\ error N deep() \\/; }
-    fn negzero() F64 { let z = @json/\\ decode Z "{\\"x\\":-0}" \\/ orelse fatal; 1.0 / z.x; }
+    fn depth() Str { return @json/\\ error N deep() \\/; }
+    fn negzero() F64 { let z = @json/\\ decode Z "{\\"x\\":-0}" \\/ orelse fatal; return 1.0 / z.x; }
     fn literal(text: Str) Str {
-        @json/\\ match text {
+        return @json/\\ match text {
             { a: "q\\"t" } => "quote",
             { "q\\"k": |v| I32 } => "key",
             { b: 1e5 } => "exp",
@@ -1549,9 +1549,9 @@ lib {
             ~> |e| e,
         }\\/;
     }
-    fn level() Str { @json/\\ encode L L { l: Level.High } \\/; }
-    fn lone() Str { @json/\\ encode Array[Str] [Str.from_code_point(55296)] \\/; }
-    fn range() Str { @json/\\ error L "{\\"l\\":\\"Mid\\"}" \\/; }
+    fn level() Str { return @json/\\ encode L L { l: Level.High } \\/; }
+    fn lone() Str { return @json/\\ encode Array[Str] [Str.from_code_point(55296)] \\/; }
+    fn range() Str { return @json/\\ error L "{\\"l\\":\\"Mid\\"}" \\/; }
 }`, { depth: 'nested too deeply at line 1, column 4098', negzero: -Infinity, level: '{"l":"High"}', lone: '["\\ud800"]', range: 'unknown Level variant "Mid" at line 1, column 6' },
       { literal: [['{"a":"q\\"t"}', 'quote'], ['{"q\\"k":1}', 'key'], ['{"b":100000}', 'exp'], ['{"plan":{}}', 'plan'], ['{}', 'x,y']] }],
     // A recursive enum's encode: past its alt's tested arms, no instruction runs first (first_run -1); size builds indexed it and trapped.
@@ -1560,9 +1560,9 @@ lib {
     | Add { l: Expr }
     | Many { xs: Array[Expr] }
 lib {
-    fn num() Str { @json/\\ encode Expr Num { v: 2 } \\/; }
-    fn deep() Str { @json/\\ encode Expr Add { l: Add { l: Num { v: 3 } } } \\/; }
-    fn many() Str { @json/\\ encode Expr Many { xs: Array[Expr].new(1, Num { v: 4 }) } \\/; }
+    fn num() Str { return @json/\\ encode Expr Num { v: 2 } \\/; }
+    fn deep() Str { return @json/\\ encode Expr Add { l: Add { l: Num { v: 3 } } } \\/; }
+    fn many() Str { return @json/\\ encode Expr Many { xs: Array[Expr].new(1, Num { v: 4 }) } \\/; }
 }`, { num: '{"kind":"Num","v":2}', deep: '{"kind":"Add","l":{"kind":"Add","l":{"kind":"Num","v":3}}}', many: '{"kind":"Many","xs":[{"kind":"Num","v":4}]}' }],
     // @json builds each type and variant by its declaration: E0's and E1's Circle, not E2's; the file's P, not mod m's.
     // An enum(U8) root reads through error and match, and encodes.
@@ -1589,15 +1589,15 @@ mod m {
         | b: Str
 }
 lib {
-    fn n() I32 { promote @json/\\ decode S "{\\"zed\\":\\"Circle\\",\\"e1\\":{\\"kind\\":\\"Dot\\"},\\"c\\":\\"Red\\",\\"n\\":4}" \\/ { |v| => v.n, ~> 0, }; }
-    fn round(text: Str) Str { promote @json/\\ decode S text \\/ { |v| => @json/\\ encode S v \\/, ~> "none", }; }
-    fn top() I32 { promote @json/\\ decode P "{\\"a\\":5}" \\/ { |v| => v.a, ~> 0, }; }
-    fn col(text: Str) Str { let c = @json/\\ match text { |c| Col => c, ~> Col.Red, }\\/; @json/\\ encode Col c \\/; }
-    fn colerr() Str { @json/\\ error Col "\\"Blue\\"" \\/; }
+    fn n() I32 { return promote @json/\\ decode S "{\\"zed\\":\\"Circle\\",\\"e1\\":{\\"kind\\":\\"Dot\\"},\\"c\\":\\"Red\\",\\"n\\":4}" \\/ { |v| => v.n, ~> 0, }; }
+    fn round(text: Str) Str { return promote @json/\\ decode S text \\/ { |v| => @json/\\ encode S v \\/, ~> "none", }; }
+    fn top() I32 { return promote @json/\\ decode P "{\\"a\\":5}" \\/ { |v| => v.a, ~> 0, }; }
+    fn col(text: Str) Str { let c = @json/\\ match text { |c| Col => c, ~> Col.Red, }\\/; return @json/\\ encode Col c \\/; }
+    fn colerr() Str { return @json/\\ error Col "\\"Blue\\"" \\/; }
     // Integers are read exactly; nesting stops at 512, in a skipped field too; \\b and \\f encode as \\u00XX.
-    fn whole() Str { @json/\\ error P "{\\"a\\":1.0}" \\/ + "; " + @json/\\ error P "{\\"a\\":1e2}" \\/; }
-    fn skipped() Str { let d = ""; for (0 ..< 513) |i| { d = d + "["; }; for (0 ..< 513) |i| { d = d + "]"; }; @json/\\ error P "{\\"x\\":" + d + ",\\"a\\":1}" \\/; }
-    fn escapes() Str { @json/\\ encode Array[Str] [Str.from_code_point(8) + Str.from_code_point(12) + Str.from_code_point(9)] \\/; }
+    fn whole() Str { return @json/\\ error P "{\\"a\\":1.0}" \\/ + "; " + @json/\\ error P "{\\"a\\":1e2}" \\/; }
+    fn skipped() Str { let d = ""; for (0 ..< 513) |i| { d = d + "["; }; for (0 ..< 513) |i| { d = d + "]"; }; return @json/\\ error P "{\\"x\\":" + d + ",\\"a\\":1}" \\/; }
+    fn escapes() Str { return @json/\\ encode Array[Str] [Str.from_code_point(8) + Str.from_code_point(12) + Str.from_code_point(9)] \\/; }
 }`, { n: 4, top: 5, colerr: 'unknown Col variant "Blue" at line 1, column 1', whole: 'expected an integer at line 1, column 6; expected an integer at line 1, column 6', skipped: 'nested too deeply at line 1, column 518', escapes: '["\\u0008\\u000c\\t"]' },
       { round: [['{"zed":"Circle","e1":{"kind":"Circle","zed":7},"c":"Green","n":-2}', '{"zed":"Circle","e1":{"kind":"Circle","zed":7},"c":"Green","n":-2}']],
         col: [['"Green"', '"Green"'], ['"Blue"', '"Red"']] }],
@@ -1606,19 +1606,19 @@ lib {
     | A { x: I32 }
     | B { y: I32 }
 fn f(e: E) I32 {
-    alt e {
+    return alt e {
         A |a| => a.x,
         B |b| => b.y,
     };
 }
-lib { fn run() I32 { f(A { x: 1 }); } }`, { run: 1 }],
+lib { fn run() I32 { return f(A { x: 1 }); } }`, { run: 1 }],
     [`enum E:
     | A { x: I32 }
     | B { y: I32 }
     | C { z: I32 }
     | D { w: I32 }
 fn f(e: E) I32 {
-    alt e {
+    return alt e {
         A |a| => a.x,
         B |b| => b.y,
         C |c| => c.z,
@@ -1628,33 +1628,33 @@ fn f(e: E) I32 {
         },
     };
 }
-lib { fn run() I32 { f(D { w: 4 }); } }`, { run: 9 }],
+lib { fn run() I32 { return f(D { w: 4 }); } }`, { run: 9 }],
     [`enum E:
     | A { x: I32 }
     | B { y: I32 }
 fn f(e: ?E) I32 {
-    alt e orelse A { x: 9 } {
+    return alt e orelse A { x: 9 } {
         A |a| => a.x,
         B |b| => b.y,
     };
 }
-lib { fn run() I32 { let o: ?E = B { y: 6 }; f(o); } }`, { run: 6 }],
+lib { fn run() I32 { let o: ?E = B { y: 6 }; return f(o); } }`, { run: 6 }],
     [`proto P:
     | get x: I32
     | total() I32
 enum E[P]:
     | A { x: I32 }
     | B { x: I32, y: I32 }
-fn P[A].total |self| () I32 { self.x; }
-fn P[B].total |self| () I32 { self.x + self.y; }
+fn P[A].total |self| () I32 { return self.x; }
+fn P[B].total |self| () I32 { return self.x + self.y; }
 fn g(e: E) I32 {
-    alt e {
+    return alt e {
         A |a| => a.x,
         B |b| => b.y * 10,
     };
 }
-fn f(p: P, e: E) I32 { p.total() + p.x + g(e); }
-lib { fn run() I32 { let b = B { x: 2, y: 5 }; f(b, b); } }`, { run: 59 }],
+fn f(p: P, e: E) I32 { return p.total() + p.x + g(e); }
+lib { fn run() I32 { let b = B { x: 2, y: 5 }; return f(b, b); } }`, { run: 59 }],
     // An alt on an arm's binding: the arm's value (on the stack, its br_on_cast's) was teed into the inner alt's value, inside its blocks.
     [`enum E:
     | A { x: I32 }
@@ -1663,7 +1663,7 @@ enum F:
     | G { e: E }
     | H { n: I32 }
 fn f(v: F) I32 {
-    alt v {
+    return alt v {
         G |g| => alt g.e {
             A |a| => a.x,
             B |b| => b.y,
@@ -1671,7 +1671,7 @@ fn f(v: F) I32 {
         H |h| => h.n,
     };
 }
-lib { fn run() I32 { f(G { e: B { y: 7 } }); } }`, { run: 7 }],
+lib { fn run() I32 { return f(G { e: B { y: 7 } }); } }`, { run: 7 }],
   ];
   for (const [source, expected, calls = {}] of boundary) {
     const file = await write(source);
@@ -1689,7 +1689,7 @@ lib { fn run() I32 { f(G { e: B { y: 7 } }); } }`, { run: 7 }],
 
   // Benches: a bench build exports `__bench_k(n)`, its setup once and its
   // measured block n times; a test build checks them.
-  const benchFile = await write('let calls: Array[I32] = [0];\nlib { fn count() I32 { calls[0]; } }\nbench "adds" {\n    let k = 2;\n    measure { calls[0] += k; }\n}\nbench "nothing" {\n    measure {}\n}\n');
+  const benchFile = await write('let calls: Array[I32] = [0];\nlib { fn count() I32 { return calls[0]; } }\nbench "adds" {\n    let k = 2;\n    measure { calls[0] += k; }\n}\nbench "nothing" {\n    measure {}\n}\n');
   for (const mode of modes) {
     const benched = await compileFile(utu, benchFile, { target: 'bench', mode });
     assert.deepEqual(benched.benches, [{ export: '__bench_0', name: 'adds' }, { export: '__bench_1', name: 'nothing' }], `${mode}: ${benched.diagnostics?.map(d => d.message)}`);
@@ -1699,7 +1699,7 @@ lib { fn run() I32 { f(G { e: B { y: 7 } }); } }`, { run: 7 }],
     exports.__bench_1(3);
     checked++;
   }
-  const badBench = await compileFile(utu, await write('lib { fn run() I32 { 0; } }\nbench "sum" {\n    measure { let s: I32 = "x"; }\n}\n'), { target: 'test' });
+  const badBench = await compileFile(utu, await write('lib { fn run() I32 { return 0; } }\nbench "sum" {\n    measure { let s: I32 = "x"; }\n}\n'), { target: 'test' });
   assert.deepEqual(badBench.diagnostics.map(d => d.message), ['s is I32, got Str']);
   checked++;
   // Tuple results convert at the boundary as scalar ones do; safe builds
@@ -1710,19 +1710,19 @@ enum(U8) Lv:
     | Lo
     | Hi
 lib {
-    fn trio() .{U32, Bool, U64} { .{4294967295, true, 18446744073709551615}; }
-    fn keep(s: Str) Str { s; }
-    fn absent(s: ?Str) Bool { s == null; }
-    fn px(p: P) I32 { p.x; }
-    fn mk() P { P { x: 7 }; }
-    fn lv(i: I32) I32 { Lv(i).i32(); }
-    fn flag(b: Bool) Str { if b { "y"; } else { "n"; }; }
-    fn inc(x: I32) I32 { x + 1; }
-    fn uinc(x: U32) U32 { x + 1; }
-    fn half(x: F64) F64 { x / 2.0; }
-    fn third(x: F32) F32 { x / 3.0; }
-    fn wide(x: I64) I64 { x + 1; }
-    fn uwide(x: U64) U64 { x + 1; }
+    fn trio() .{U32, Bool, U64} { return .{4294967295, true, 18446744073709551615}; }
+    fn keep(s: Str) Str { return s; }
+    fn absent(s: ?Str) Bool { return s == null; }
+    fn px(p: P) I32 { return p.x; }
+    fn mk() P { return P { x: 7 }; }
+    fn lv(i: I32) I32 { return Lv(i).i32(); }
+    fn flag(b: Bool) Str { return if b { "y"; } else { "n"; }; }
+    fn inc(x: I32) I32 { return x + 1; }
+    fn uinc(x: U32) U32 { return x + 1; }
+    fn half(x: F64) F64 { return x / 2.0; }
+    fn third(x: F32) F32 { return x / 3.0; }
+    fn wide(x: I64) I64 { return x + 1; }
+    fn uwide(x: U64) U64 { return x + 1; }
 }`);
   for (const mode of ['small', 'fast', 'smallUnsafe', 'fastUnsafe', 'debug']) {
     const built = await compileFile(utu, edges, { mode });
@@ -1775,8 +1775,8 @@ lib {
   checked++;
   // A byte that is not UTF-8 (0xFF, the lexer's end of input, too), in code or a comment, is
   // said so: it does not end the file early.
-  for (const [before, after] of [['fn g() I32 { 1; }\n', '\nfn g() I32 { 2; }\nlib { fn run() I32 { g(); } }\n'],
-    ['lib { fn run() I32 { let x', ' = 3; x; } }\n'], ['// a ', ' comment\nlib { fn run() I32 { 1; } }\n'], ['lib { fn run() I32 { 1; } }\n', '']]) {
+  for (const [before, after] of [['fn g() I32 { return 1; }\n', '\nfn g() I32 { return 2; }\nlib { fn run() I32 { return g(); } }\n'],
+    ['lib { fn run() I32 { let x', ' = 3; x; } }\n'], ['// a ', ' comment\nlib { fn run() I32 { return 1; } }\n'], ['lib { fn run() I32 { return 1; } }\n', '']]) {
     for (const byte of [0xff, 0xfe, 0x80]) {
       const file = path.join(dir, 'ff.utu');
       await fs.writeFile(file, Buffer.concat([Buffer.from(before), Buffer.from([byte]), Buffer.from(after)]));
@@ -1788,10 +1788,10 @@ lib {
   // In a string, a template, or a DSL body too (@es, @css, @wutu text): said once, at the byte
   // (not the opening quote; a DSL body is not re-sliced around it, nor crashes the compiler).
   for (const [before, bytes, after] of [
-    ['let f: fun(F64) F64 = @es/\\Math.sq', [0xff], 'rt\\/;\nlib { fn run() F64 { f(4.0); } }\n'],
-    ['let f: fun() Str = @es/\\() => "x', [0xc3], 'ABCy"\\/;\nlib { fn run() Str { f(); } }\n'],
-    ['let c: Str = @css/\\ a { color: r', [0xe2, 0x82], 'ed; } \\/;\nlib { fn run() Str { c; } }\n'],
-    ['using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab', [0xf4, 0x90, 0x80, 0x80], 'cd"; }\n    }\n    \\/;\n}\nmain { Browser.document.body.append(view()); }\n'],
+    ['let f: fun(F64) F64 = @es/\\Math.sq', [0xff], 'rt\\/;\nlib { fn run() F64 { return f(4.0); } }\n'],
+    ['let f: fun() Str = @es/\\() => "x', [0xc3], 'ABCy"\\/;\nlib { fn run() Str { return f(); } }\n'],
+    ['let c: Str = @css/\\ a { color: r', [0xe2, 0x82], 'ed; } \\/;\nlib { fn run() Str { return c; } }\n'],
+    ['using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    return @wutu/\\\n    section {\n        p { "ab', [0xf4, 0x90, 0x80, 0x80], 'cd"; }\n    }\n    \\/;\n}\nmain { Browser.document.body.append(view()); }\n'],
     ['lib { fn run() I32 {\n    let s = "ab', [0xc3], '";\n    s.len();\n} }\n'],
     ['lib { fn run() I32 {\n    let s = "ab\\', [0xc3], '";\n    s.len();\n} }\n'],
     ['lib { fn run() Str { `a${1}b', [0xed, 0xa0, 0x80], 'c`; } }\n'],
@@ -1806,13 +1806,13 @@ lib {
   // larger file ran for minutes): checked in a child, under a time limit.
   {
     const file = path.join(dir, 'bad_wutu.utu');
-    await fs.writeFile(file, Buffer.concat([Buffer.from('using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n        p { "ab'), Buffer.from([0xf4, 0xbf, 0xbf, 0xbf]), Buffer.from('cd"; }\n    }\n    \\/;\n}\nmain { Browser.document.body.append(view()); }\n')]));
+    await fs.writeFile(file, Buffer.concat([Buffer.from('using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    return @wutu/\\\n    section {\n        p { "ab'), Buffer.from([0xf4, 0xbf, 0xbf, 0xbf]), Buffer.from('cd"; }\n    }\n    \\/;\n}\nmain { Browser.document.body.append(view()); }\n')]));
     const run = spawnSync(process.execPath, [path.join(ROOT, 'cli/utu.mjs'), 'check', file], { encoding: 'utf8', timeout: 60000 });
     assert.equal(run.signal, null, 'timed out');
     assert.equal((run.stdout + run.stderr).match(/ERROR/g)?.length, 1, run.stdout + run.stderr);
     checked++;
   }
-  const crlf = await selfhost(await write('lib {\r\n    fn m() Str { let m = \\\\a\r\n        \\\\b\r\n    ; m; }\r\n    fn t() Str { `a\r\nb`; }\r\n}\r\n'));
+  const crlf = await selfhost(await write('lib {\r\n    fn m() Str { let m = \\\\a\r\n        \\\\b\r\n    ; return m; }\r\n    fn t() Str { return `a\r\nb`; }\r\n}\r\n'));
   assert.equal(crlf.exports?.m(), 'a\nb', crlf.errors?.join('\n'));
   assert.equal(crlf.exports.t(), 'a\nb');
   checked++;
@@ -1822,157 +1822,157 @@ lib {
     // A bound the type argument does not implement, an unbounded call, a bound that is not a protocol.
     [`${ord}struct Q:
     | x: I32
-lib { fn run() I32 { Sorted[Q].max(Q { x: 1 }, Q { x: 2 }).x; } }
+lib { fn run() I32 { return Sorted[Q].max(Q { x: 1 }, Q { x: 2 }).x; } }
 `, "Q does not implement Ord (Sorted's T needs it)"],
     [`${ord}mod Top[T] {
-    fn top(a: T, b: T) T { if a.cmp(b) > 0 { a; } else { b; }; }
+    fn top(a: T, b: T) T { return if a.cmp(b) > 0 { a; } else { b; }; }
 }
-lib { fn run() I32 { Top[I32].top(1, 2); } }
+lib { fn run() I32 { return Top[I32].top(1, 2); } }
 `, 'T has no method cmp; bound it: mod Top[T[Ord]]'],
     [`${ord}mod Top[T] {
-    fn top(a: T, b: T) T { Sorted[T].max(a, b); }
+    fn top(a: T, b: T) T { return Sorted[T].max(a, b); }
 }
-lib { fn run() I32 { Top[I32].top(1, 2); } }
+lib { fn run() I32 { return Top[I32].top(1, 2); } }
 `, "T does not implement Ord (Sorted's T needs it)"],
     [`struct Q:
     | x: I32
 mod Top[T[Q]] {
-    fn top(a: T) T { a; }
+    fn top(a: T) T { return a; }
 }
-lib { fn run() I32 { Top[I32].top(1); } }
+lib { fn run() I32 { return Top[I32].top(1); } }
 `, 'Q is not a protocol; a bound names one'],
-    [`${ord}lib { fn run() I32 { let xs: Array[Ord] = []; xs[0].cmp(xs[1]); } }\n`, 'Ord.cmp uses &, so only a bounded T calls it: mod M[T[Ord]]'],
+    [`${ord}lib { fn run() I32 { let xs: Array[Ord] = []; return xs[0].cmp(xs[1]); } }\n`, 'Ord.cmp uses &, so only a bounded T calls it: mod M[T[Ord]]'],
     // A generator's body cannot leave its consumer's loop.
-    ['gn g() I32 { yield 1; break; }\nlib { fn run() I32 { let t = 0; for (0 ..< 2) |i| { for (g()) |v| { t += v; }; }; t; } }\n', 'break outside a loop'],
+    ['gn g() I32 { yield 1; break; }\nlib { fn run() I32 { let t = 0; for (0 ..< 2) |i| { for (g()) |v| { t += v; }; }; return t; } }\n', 'break outside a loop'],
     // Element types the pipeline's values are not (these built invalid Wasm).
-    ['lib { fn run() I32 { [1, 2, 3] chain(["a"]) count; } }\n', 'Elements are I32, got Str'],
-    ['lib { fn run() I32 { let w = [1, 2] windows(Str, 1); w.len(); } }\n', 'Expected Str, got I32'],
-    ['lib { fn run() Str { ["a", "b"] sum; } }\n', 'sum needs numbers, not Str'],
-    ['lib { fn run() I32 { [1, 2] bisect |v, i, j| { true; }; } }\n', 'bisect takes 1 name and an optional index'],
-    ['mod B {\n    struct &:\n        | x: I32\n    fn &.new() & { &{ x: 1 }; }\n    gn &.each |b| () I32 { yield b.x; }\n}\nlib { fn run() I32 { B.new().each(); 0; } }\n', 'each is a generator: for (each(…)) |v| { … }'],
-    ['mod seq { gn squares(n: I32) I32 { yield n; } }\nlib { fn run() I32 { let f = seq.squares; 0; } }\n', 'squares is a generator: for (squares(…)) |v| { … }'],
+    ['lib { fn run() I32 { return [1, 2, 3] chain(["a"]) count; } }\n', 'Elements are I32, got Str'],
+    ['lib { fn run() I32 { let w = [1, 2] windows(Str, 1); return w.len(); } }\n', 'Expected Str, got I32'],
+    ['lib { fn run() Str { return ["a", "b"] sum; } }\n', 'sum needs numbers, not Str'],
+    ['lib { fn run() I32 { return [1, 2] bisect |v, i, j| { true; }; } }\n', 'bisect takes 1 name and an optional index'],
+    ['mod B {\n    struct &:\n        | x: I32\n    fn &.new() & { return &{ x: 1 }; }\n    gn &.each |b| () I32 { yield b.x; }\n}\nlib { fn run() I32 { B.new().each(); return 0; } }\n', 'each is a generator: for (each(…)) |v| { … }'],
+    ['mod seq { gn squares(n: I32) I32 { yield n; } }\nlib { fn run() I32 { let f = seq.squares; return 0; } }\n', 'squares is a generator: for (squares(…)) |v| { … }'],
     ['lib {\n    gn squares(n: I32) I32 { yield n; }\n}\n', 'squares is a generator: it expands into each for that reads it, so it cannot be exported'],
     // Labeled blocks.
-    ['lib { fn run() I32 { outer: { break nowhere 1; 2; }; } }\n', 'No block labeled nowhere around this break'],
-    ['lib { fn run() I32 { outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'break cannot leave a closure'],
-    ['lib { fn run() I32 { let b: I32 = outer: { break outer "x"; }; b; } }\n', 'Expected I32, got Str'],
-    ['lib { fn run() I32 { outer: { defer { break outer; }; }; 0; } }\n', 'break in defer'],
+    ['lib { fn run() I32 { return outer: { break nowhere 1; 2; }; } }\n', 'No block labeled nowhere around this break'],
+    ['lib { fn run() I32 { return outer: { let f = cl() I32 { break outer 1; }; f(); }; } }\n', 'break cannot leave a closure'],
+    ['lib { fn run() I32 { let b: I32 = outer: { break outer "x"; }; return b; } }\n', 'Expected I32, got Str'],
+    ['lib { fn run() I32 { outer: { defer { break outer; }; }; return 0; } }\n', 'break in defer'],
     // Computed globals that need each other.
-    ['fn get_b() I32 { b + 1; }\nlet a: I32 = get_b();\nlet b: I32 = a * 2;\nlib { fn run() I32 { a; } }\n', 'Globals b and a each need the other set first'],
-    ['let c: I32 = c + 1;\nlib { fn run() I32 { c; } }\n', 'Global c is read while it is being set'],
-    ['let d: cl() I32 = cl() I32 { e; };\nlet e: I32 = d();\nlib { fn run() I32 { e; } }\n', 'Globals e and d each need the other set first'],
+    ['fn get_b() I32 { return b + 1; }\nlet a: I32 = get_b();\nlet b: I32 = a * 2;\nlib { fn run() I32 { return a; } }\n', 'Globals b and a each need the other set first'],
+    ['let c: I32 = c + 1;\nlib { fn run() I32 { return c; } }\n', 'Global c is read while it is being set'],
+    ['let d: cl() I32 = cl() I32 { return e; };\nlet e: I32 = d();\nlib { fn run() I32 { return e; } }\n', 'Globals e and d each need the other set first'],
     // Names that are not values, and other plain mistakes (once "Not supported yet").
-    ['mod m { fn f() I32 { 1; } }\nlib { fn run() I32 { let x = m; 0; } }\n', 'm is a module, not a value'],
-    ['mod m { fn f() I32 { 1; } }\nlib { fn run() I32 { m = 3; 0; } }\n', 'm is a module, not a value'],
-    ['mod geo { fn g() I32 { 1; } }\nusing geo;\nlib { fn run() I32 { for (0..<3) |i| { geo += 1; }; geo.g(); } }\n', 'geo is a module, not a value'],
-    ['mod M[T, T] { fn g(x: T) T { x; } }\nlib { fn run() I32 { M[I32, I32].g(3); } }\n', 'Duplicate parameter T'],
-    ['mod m {\n    struct P:\n        | x: I32\n}\nlib { fn run() I32 { m.P(1); 0; } }\n', 'P is a type, not a value'],
-    ['struct P:\n    | x: I32\nlib { fn run() I32 { let v = P.x; 0; } }\n', 'x is a field: read it from a value'],
-    ['mod m { let k: I32 = 3; }\nlib { fn run() I32 { m.k(1); } }\n', 'I32 is not callable'],
-    ['enum(U8) E:\n    | A\n    | B\nlib { fn run() I32 { let e = E { x: 1 }; 0; } }\n', 'E is not a struct: it has no fields to set'],
-    ['struct P:\n    | x: I32\nfn mk() P { P { x: 1 }; }\nlib { fn run() I32 { let p = new mk(); 0; } }\n', 'new makes host objects; mk is not a host class'],
-    ['fn sq(a: I32) I32 {\n    @ir/\\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \\/;\n}\nlib { fn run() I32 { sq(7); } }\n', 'No @ir element <ir-i32-mull>'],
-    ['fn sq(a: I32) I32 {\n    @ir/\\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \\/;\n}\nlib { fn run() I32 { sq(7); } }\n', '@ir names no parameter b'],
-    ['using JS from std:JS;\nlib { fn run() I32 { let f = cl(x) { x; }; 0; } }\n', 'x needs a type'],
-    ['lib { fn run() I32 { (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F32'],
+    ['mod m { fn f() I32 { return 1; } }\nlib { fn run() I32 { let x = m; return 0; } }\n', 'm is a module, not a value'],
+    ['mod m { fn f() I32 { return 1; } }\nlib { fn run() I32 { m = 3; return 0; } }\n', 'm is a module, not a value'],
+    ['mod geo { fn g() I32 { return 1; } }\nusing geo;\nlib { fn run() I32 { for (0..<3) |i| { geo += 1; }; return geo.g(); } }\n', 'geo is a module, not a value'],
+    ['mod M[T, T] { fn g(x: T) T { return x; } }\nlib { fn run() I32 { return M[I32, I32].g(3); } }\n', 'Duplicate parameter T'],
+    ['mod m {\n    struct P:\n        | x: I32\n}\nlib { fn run() I32 { m.P(1); return 0; } }\n', 'P is a type, not a value'],
+    ['struct P:\n    | x: I32\nlib { fn run() I32 { let v = P.x; return 0; } }\n', 'x is a field: read it from a value'],
+    ['mod m { let k: I32 = 3; }\nlib { fn run() I32 { return m.k(1); } }\n', 'I32 is not callable'],
+    ['enum(U8) E:\n    | A\n    | B\nlib { fn run() I32 { let e = E { x: 1 }; return 0; } }\n', 'E is not a struct: it has no fields to set'],
+    ['struct P:\n    | x: I32\nfn mk() P { return P { x: 1 }; }\nlib { fn run() I32 { let p = new mk(); return 0; } }\n', 'new makes host objects; mk is not a host class'],
+    ['fn sq(a: I32) I32 => @ir/\\ <ir-i32-mull><ir-ident name="a"/><ir-ident name="a"/></ir-i32-mull> \\/;\nlib { fn run() I32 { return sq(7); } }\n', 'No @ir element <ir-i32-mull>'],
+    ['fn sq(a: I32) I32 => @ir/\\ <ir-i32-mul><ir-ident name="b"/><ir-ident name="a"/></ir-i32-mul> \\/;\nlib { fn run() I32 { return sq(7); } }\n', '@ir names no parameter b'],
+    ['using JS from std:JS;\nlib { fn run() I32 { let f = cl(x) { return x; }; return 0; } }\n', 'x needs a type'],
+    ['lib { fn run() I32 { return (0.5 ..< 2.0) count; } }\n', 'Cannot pipe a range of F32'],
     // Only Externref holds any host value: not Str.
-    ['using JS from std:JS;\nlib { fn run() I32 { let s: Str = new JS.Map(); s.len(); } }\n', 's is Str, got JS.Map<any, any>'],
-    ['fn take(s: Str) I32 { s.len(); }\nlib { fn run() I32 { take(cl() Void {}); } }\n', 'take takes Str, got cl() Void'],
-    ['using JS from std:JS;\nlib { fn run() Str { "hello".replace("l", cl(m) Str { m; }); } }\n', 'replace takes Str, got cl(unknown) Str'],
+    ['using JS from std:JS;\nlib { fn run() I32 { let s: Str = new JS.Map(); return s.len(); } }\n', 's is Str, got JS.Map<any, any>'],
+    ['fn take(s: Str) I32 { return s.len(); }\nlib { fn run() I32 { return take(cl() Void {}); } }\n', 'take takes Str, got cl() Void'],
+    ['using JS from std:JS;\nlib { fn run() Str { return "hello".replace("l", cl(m) Str { return m; }); } }\n', 'replace takes Str, got cl(unknown) Str'],
     // A bare /\\ in a body nests.
-    ['let f: fun(Str) I32 = @es/\\ (s) => s.split(/\\s\\//).length \\/;\nlib { fn run() I32 { f("a"); } }\n', 'This /\\ opens a nested body, so the body ends at a later \\/'],
+    ['let f: fun(Str) I32 = @es/\\ (s) => s.split(/\\s\\//).length \\/;\nlib { fn run() I32 { return f("a"); } }\n', 'This /\\ opens a nested body, so the body ends at a later \\/'],
     ['let f: fun(Str) Str = @es/\\ (s) => s.replace(/\\//g, "-") \\/;\nlib { fn run() I32 { 0; } }\n', 'No \\/ ends this body: the /\\ at line 1 opens another'],
-    ['lib { fn a() I32 { 1; } }\nlib { fn b() I32 { 2; } }\n', 'Two lib blocks'],
+    ['lib { fn a() I32 { return 1; } }\nlib { fn b() I32 { return 2; } }\n', 'Two lib blocks'],
     ['main { 1 }\nmain { 2 }\n', 'Two mains'],
-    ['lib { fn a() I32 { 1; } }\nmain { 2 }\n', 'lib and main together: a program is one or the other'],
+    ['lib { fn a() I32 { return 1; } }\nmain { 2 }\n', 'lib and main together: a program is one or the other'],
     // A function of a type without self, called on a value of it.
-    ['struct P:\n    | x : I32\nfn P.make() I32 { 1; }\nlib { fn run() I32 { P { x: 1 }.make(); } }\n', 'P.make is a function, not a method: P.make(value)'],
-    ['struct R:\n    | w: F64\nfn R.sq(s: F64) R { R { w: s }; }\nlib { fn run() I32 { let r = R { w: 1.0 }; r.sq(2.0).w.i32(); } }\n', 'R.sq is a function, not a method: R.sq(value)'],
+    ['struct P:\n    | x : I32\nfn P.make() I32 { return 1; }\nlib { fn run() I32 { return P { x: 1 }.make(); } }\n', 'P.make is a function, not a method: P.make(value)'],
+    ['struct R:\n    | w: F64\nfn R.sq(s: F64) R { return R { w: s }; }\nlib { fn run() I32 { let r = R { w: 1.0 }; return r.sq(2.0).w.i32(); } }\n', 'R.sq is a function, not a method: R.sq(value)'],
     // A protocol getter's field of another type.
-    ['proto S:\n    | get name : Str\nstruct Q[S]:\n    | name: I32\nlib { fn run() I32 { 0; } }\n', 'S.name is Str, got I32'],
+    ['proto S:\n    | get name : Str\nstruct Q[S]:\n    | name: I32\nlib { fn run() I32 { return 0; } }\n', 'S.name is Str, got I32'],
     // A for's names, one per source.
-    ['lib { fn run() I32 { let t = 0; for ([1, 2]) |x, i| { t += x * i; }; t; } }\n', 'for over 1 source binds 1 value, got 2; for an index add a range: (xs, 0 ..< n)'],
-    ['lib { fn run() I32 { let t = 0; for ([1], [2]) |x| { t += x; }; t; } }\n', 'for over 2 sources bind 2 values, got 1'],
+    ['lib { fn run() I32 { let t = 0; for ([1, 2]) |x, i| { t += x * i; }; return t; } }\n', 'for over 1 source binds 1 value, got 2; for an index add a range: (xs, 0 ..< n)'],
+    ['lib { fn run() I32 { let t = 0; for ([1], [2]) |x| { t += x; }; return t; } }\n', 'for over 2 sources bind 2 values, got 1'],
     // A Node module that is none.
-    ['using Fs from "node:fss";\nlib { fn run() Bool { Fs.existsSync("x"); } }\n', 'No Node module node:fss; did you mean node:fs?'],
+    ['using Fs from "node:fss";\nlib { fn run() Bool { return Fs.existsSync("x"); } }\n', 'No Node module node:fss; did you mean node:fs?'],
     // null compared with what is never null.
-    ['fn f(name: Str) Bool { name != null; }\nlib { fn run() I32 { if f("x") { 1; } else { 0; }; } }\n', 'name is Str, which is never null'],
+    ['fn f(name: Str) Bool { return name != null; }\nlib { fn run() I32 { return if f("x") { 1; } else { 0; }; } }\n', 'name is Str, which is never null'],
     // A keyword as a name; a ; before else.
-    ['lib { fn run() I32 { let match = 1; 0; } }\n', "'match' is a keyword"],
-    ['fn s(n: I32) I32 {\n    if n < 0 {\n        -1;\n    };\n    else {\n        1;\n    };\n}\nlib { fn run() I32 { s(5); } }\n', 'The ; before else ends the if'],
+    ['lib { fn run() I32 { let match = 1; return 0; } }\n', "'match' is a keyword"],
+    ['fn s(n: I32) I32 {\n    if n < 0 {\n        -1;\n    };\n    else {\n        1;\n    };\n}\nlib { fn run() I32 { return s(5); } }\n', 'The ; before else ends the if'],
     // using of a struct.
-    ['struct Pt:\n    | x: I32\nusing Pt |P|;\nlib { fn run() I32 { 0; } }\n', 'Pt is a struct; using imports a mod'],
+    ['struct Pt:\n    | x: I32\nusing Pt |P|;\nlib { fn run() I32 { return 0; } }\n', 'Pt is a struct; using imports a mod'],
     // An implementation of a protocol for a type that is not there (this trapped).
-    ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { 0.0; }\nfn sum(l: Array[P]) F32 { l[0].perimeter(); }\nlib { fn run() I32 { 0; } }\n',
+    ['proto P:\n    | perimeter() F32\ntag enum Shape[P]:\n    | Circle {\n    }\nfn P[Nope].perimeter |self| () F32 { return 0.0; }\nfn sum(l: Array[P]) F32 { return l[0].perimeter(); }\nlib { fn run() I32 { return 0; } }\n',
       'Unknown type Nope'],
     // What the parser wanted, spelled by its token kind (once off by the template kinds: "expected '...'").
     // Literals past their type, once wrapped as they were read.
-    ['lib { fn run() U64 { let a = 18446744073709551616; a; } }\n', '18446744073709551616 does not fit U64'],
-    ['lib { fn run() I32 { let a: I32 = -18446744073709551615; a; } }\n', '-18446744073709551615 does not fit I32'],
-    ['lib { fn run() I64 { let a: I64 = -9223372036854775809; a; } }\n', '-9223372036854775809 does not fit I64'],
-    ['lib { fn run() U64 { let a: U64 = -5; a; } }\n', '-5 does not fit U64'],
-    ['lib { fn run() I32 { let m: M64 = -1; 0; } }\n', '-1 does not fit M64'],
-    ['lib { fn run() F32 { let a: F32 = 1.0e39; a; } }\n', '1.0e39 does not fit F32'],
-    ['let g: I32 = 0xffffffffffffffff;\nlib { fn run() I32 { g; } }\n', '0xffffffffffffffff does not fit I32'],
-    ['fn s(x: I64) I32 { match x { 18446744073709551615 => 1, ~> 2, }; }\nlib { fn run() I32 { s(0); } }\n', '18446744073709551615 is out of range for I64'],
-    ['const mem t: I32 = [~5, 3];\nlib { fn run() I32 { t[0]; } }\n', 'mem t: numbers only'],
-    ['const mem t: I32 = [not 5];\nlib { fn run() I32 { t[0]; } }\n', 'mem t: numbers only'],
-    ['const mem t: I32 = [4294967296];\nlib { fn run() I32 { t[0]; } }\n', '4294967296 does not fit I32'],
+    ['lib { fn run() U64 { let a = 18446744073709551616; return a; } }\n', '18446744073709551616 does not fit U64'],
+    ['lib { fn run() I32 { let a: I32 = -18446744073709551615; return a; } }\n', '-18446744073709551615 does not fit I32'],
+    ['lib { fn run() I64 { let a: I64 = -9223372036854775809; return a; } }\n', '-9223372036854775809 does not fit I64'],
+    ['lib { fn run() U64 { let a: U64 = -5; return a; } }\n', '-5 does not fit U64'],
+    ['lib { fn run() I32 { let m: M64 = -1; return 0; } }\n', '-1 does not fit M64'],
+    ['lib { fn run() F32 { let a: F32 = 1.0e39; return a; } }\n', '1.0e39 does not fit F32'],
+    ['let g: I32 = 0xffffffffffffffff;\nlib { fn run() I32 { return g; } }\n', '0xffffffffffffffff does not fit I32'],
+    ['fn s(x: I64) I32 { return match x { 18446744073709551615 => 1, ~> 2, }; }\nlib { fn run() I32 { return s(0); } }\n', '18446744073709551615 is out of range for I64'],
+    ['const mem t: I32 = [~5, 3];\nlib { fn run() I32 { return t[0]; } }\n', 'mem t: numbers only'],
+    ['const mem t: I32 = [not 5];\nlib { fn run() I32 { return t[0]; } }\n', 'mem t: numbers only'],
+    ['const mem t: I32 = [4294967296];\nlib { fn run() I32 { return t[0]; } }\n', '4294967296 does not fit I32'],
     // A literal stored into a narrow mem must fit it, as in its initializer.
-    ['mem m: U8;\nlib { fn run() I32 { m.push(256); m[0]; } }\n', '256 does not fit U8'],
-    ['mem m: U8;\nlib { fn run() I32 { m.push(-1); m[0]; } }\n', '-1 does not fit U8'],
-    ['mem m: I8;\nlib { fn run() I32 { m.push(-129); m[0]; } }\n', '-129 does not fit I8'],
-    ['vec v: U16;\nlib { fn run() I32 { v.push(70000); v[0]; } }\n', '70000 does not fit U16'],
-    ['vec v: U8;\nlib { fn run() I32 { v.push(-1); v[0]; } }\n', '-1 does not fit U8'],
-    ['mem m: I16;\nlib { fn run() I32 { m.push(0); m[0] = 32768; m[0]; } }\n', '32768 does not fit I16'],
-    ['vec v: U8;\nlib { fn run() I32 { v.push(0); v[0] = 256; v[0]; } }\n', '256 does not fit U8'],
-    ['mem m: U8;\nlib { fn run() I32 { m.push(0); m[0] += 300; m[0]; } }\n', '300 does not fit U8'],
+    ['mem m: U8;\nlib { fn run() I32 { m.push(256); return m[0]; } }\n', '256 does not fit U8'],
+    ['mem m: U8;\nlib { fn run() I32 { m.push(-1); return m[0]; } }\n', '-1 does not fit U8'],
+    ['mem m: I8;\nlib { fn run() I32 { m.push(-129); return m[0]; } }\n', '-129 does not fit I8'],
+    ['vec v: U16;\nlib { fn run() I32 { v.push(70000); return v[0]; } }\n', '70000 does not fit U16'],
+    ['vec v: U8;\nlib { fn run() I32 { v.push(-1); return v[0]; } }\n', '-1 does not fit U8'],
+    ['mem m: I16;\nlib { fn run() I32 { m.push(0); m[0] = 32768; return m[0]; } }\n', '32768 does not fit I16'],
+    ['vec v: U8;\nlib { fn run() I32 { v.push(0); v[0] = 256; return v[0]; } }\n', '256 does not fit U8'],
+    ['mem m: U8;\nlib { fn run() I32 { m.push(0); m[0] += 300; return m[0]; } }\n', '300 does not fit U8'],
     // Integer enums: counted in 64 bits, over an integer of at most 32.
-    ['enum(I32) E:\n    | A = 2147483647\n    | B\nlib { fn run() I32 { E.A.i32(); } }\n', '2147483648 does not fit I32'],
-    ['enum(I32) E:\n    | A = 4294967296\nlib { fn run() I32 { E.A.i32(); } }\n', '4294967296 does not fit I32'],
-    ['enum(U32) E:\n    | A = 4294967295\n    | B\nlib { fn run() I32 { E.A.i32(); } }\n', '4294967296 does not fit U32'],
-    ['enum(I64) E:\n    | A = 5000000000\nlib { fn run() I32 { 0; } }\n', 'enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32'],
-    ['enum(Str) E:\n    | A\nlib { fn run() I32 { 0; } }\n', 'enum(Str) is not an integer enum; use U8, I8, U16, I16, I32, or U32'],
-    ['enum L:\n    | A = 3\n    | B {}\nlib { fn run() I32 { 0; } }\n', "L.A has a value; only an integer enum's variants do"],
-    ['type Id = distinct U32;\nlib { fn run() I32 { let i = Id.from_i32(5); 0; } }\n', 'No method Id.from_i32; did you mean Id?'],
+    ['enum(I32) E:\n    | A = 2147483647\n    | B\nlib { fn run() I32 { return E.A.i32(); } }\n', '2147483648 does not fit I32'],
+    ['enum(I32) E:\n    | A = 4294967296\nlib { fn run() I32 { return E.A.i32(); } }\n', '4294967296 does not fit I32'],
+    ['enum(U32) E:\n    | A = 4294967295\n    | B\nlib { fn run() I32 { return E.A.i32(); } }\n', '4294967296 does not fit U32'],
+    ['enum(I64) E:\n    | A = 5000000000\nlib { fn run() I32 { return 0; } }\n', 'enum(I64) is not an integer enum; use U8, I8, U16, I16, I32, or U32'],
+    ['enum(Str) E:\n    | A\nlib { fn run() I32 { return 0; } }\n', 'enum(Str) is not an integer enum; use U8, I8, U16, I16, I32, or U32'],
+    ['enum L:\n    | A = 3\n    | B {}\nlib { fn run() I32 { return 0; } }\n', "L.A has a value; only an integer enum's variants do"],
+    ['type Id = distinct U32;\nlib { fn run() I32 { let i = Id.from_i32(5); return 0; } }\n', 'No method Id.from_i32; did you mean Id?'],
     // Arrays new_default cannot fill: their elements are never null.
-    ['lib { fn run() I32 { Array[Str].new_default(2).len(); } }\n', 'Str has no default: Array[Str].new(n, fill)'],
-    ['lib { fn run() I32 { Array[cl() I32].new_default(2).len(); } }\n', 'cl() I32 has no default: Array[cl() I32].new(n, fill)'],
-    ['proto Sh:\n    | area() I32\nlib { fn run() I32 { Array[Sh].new_default(2).len(); } }\n', 'Sh has no default: Array[Sh].new(n, fill)'],
+    ['lib { fn run() I32 { return Array[Str].new_default(2).len(); } }\n', 'Str has no default: Array[Str].new(n, fill)'],
+    ['lib { fn run() I32 { return Array[cl() I32].new_default(2).len(); } }\n', 'cl() I32 has no default: Array[cl() I32].new(n, fill)'],
+    ['proto Sh:\n    | area() I32\nlib { fn run() I32 { return Array[Sh].new_default(2).len(); } }\n', 'Sh has no default: Array[Sh].new(n, fill)'],
     // Scalars that cannot be null, also once a generic is instantiated.
-    ['type Id = distinct I32;\nlib { fn run() I32 { let x: ?Id = null; 0; } }\n', 'Id cannot be nullable'],
-    ['enum(I32) L:\n    | A\n    | B\nlib { fn run() I32 { let x: ?L = null; 0; } }\n', 'L cannot be nullable'],
-    ['mod Box[T] {\n    struct &:\n        | v: ?T\n    fn &.empty() & { &{ v: null }; }\n}\nlib { fn run() I32 { let b = Box[I32].empty(); 0; } }\n', 'I32 cannot be nullable'],
+    ['type Id = distinct I32;\nlib { fn run() I32 { let x: ?Id = null; return 0; } }\n', 'Id cannot be nullable'],
+    ['enum(I32) L:\n    | A\n    | B\nlib { fn run() I32 { let x: ?L = null; return 0; } }\n', 'L cannot be nullable'],
+    ['mod Box[T] {\n    struct &:\n        | v: ?T\n    fn &.empty() & { return &{ v: null }; }\n}\nlib { fn run() I32 { let b = Box[I32].empty(); return 0; } }\n', 'I32 cannot be nullable'],
     // A generic type listing a protocol (this crashed the compiler).
-    ['proto Sh:\n    | name() I32\nmod Box[T] {\n    struct &[Sh]:\n        | v: T\n}\nfn Sh[Box[I32]].name |b| () I32 { 1; }\nlib { fn run() I32 { 0; } }\n', 'A generic type cannot list protocol Sh'],
+    ['proto Sh:\n    | name() I32\nmod Box[T] {\n    struct &[Sh]:\n        | v: T\n}\nfn Sh[Box[I32]].name |b| () I32 { return 1; }\nlib { fn run() I32 { return 0; } }\n', 'A generic type cannot list protocol Sh'],
     // A closure naming itself with no type to go by.
-    ['lib { fn run() I32 { let f = cl() { f; }; f(); 1; } }\n', 'f needs a type annotation to call itself'],
+    ['lib { fn run() I32 { let f = cl() { return f; }; f(); return 1; } }\n', 'f needs a type annotation to call itself'],
     // Protocol get and set.
-    ['proto Sh:\n    | get size: I32\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size = 5; 0; } }\n', 'Sh.size is get-only'],
-    ['proto Sh:\n    | set size: I32\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size; } }\n', 'Sh.size is set-only'],
+    ['proto Sh:\n    | get size: I32\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { let s: Sh = Sq { size: 2 }; s.size = 5; return 0; } }\n', 'Sh.size is get-only'],
+    ['proto Sh:\n    | set size: I32\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { let s: Sh = Sq { size: 2 }; return s.size; } }\n', 'Sh.size is set-only'],
     // A getter and a setter of one name on two lines must agree; any other repeat is a duplicate.
-    ['proto Sh:\n    | get size: I32\n    | set size: F64\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { 0; } }\n', 'Sh.size gets I32 but sets F64'],
-    ['proto Sh:\n    | get size: I32\n    | get set size: I32\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { 0; } }\n', 'Duplicate declaration size'],
+    ['proto Sh:\n    | get size: I32\n    | set size: F64\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { return 0; } }\n', 'Sh.size gets I32 but sets F64'],
+    ['proto Sh:\n    | get size: I32\n    | get set size: I32\nstruct Sq[Sh]:\n    | size: I32\nlib { fn run() I32 { return 0; } }\n', 'Duplicate declaration size'],
     // A member through a protocol value, an implementer lacking it (getter and setter crashed the compiler).
-    ['proto C:\n    | get n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nlib { fn run() I32 { let c: C = B { m: 1 }; c.n; } }\n', 'B lacks C.n'],
-    ['proto C:\n    | get set n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nlib { fn run() I32 { let c: C = B { m: 1 }; c.n = 5; c.n += 1; 0; } }\n', 'B lacks C.n'],
-    ['proto C:\n    | step() I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nfn C[A].step |a| () I32 { a.n; }\nlib { fn run() I32 { let c: C = B { m: 1 }; c.step(); } }\n', 'B lacks C.step'],
+    ['proto C:\n    | get n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nlib { fn run() I32 { let c: C = B { m: 1 }; return c.n; } }\n', 'B lacks C.n'],
+    ['proto C:\n    | get set n: I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nlib { fn run() I32 { let c: C = B { m: 1 }; c.n = 5; c.n += 1; return 0; } }\n', 'B lacks C.n'],
+    ['proto C:\n    | step() I32\nstruct A[C]:\n    | n: I32\nstruct B[C]:\n    | m: I32\nfn C[A].step |a| () I32 { return a.n; }\nlib { fn run() I32 { let c: C = B { m: 1 }; return c.step(); } }\n', 'B lacks C.step'],
     // Two things `p.f()` could call.
-    ['struct P:\n    | f: cl() I32\nfn P.f |p| () I32 { 2; }\nlib { fn run() I32 { 0; } }\n', 'P.f is both a field and a method'],
-    ['proto Sh:\n    | area() I32\nfn Sh.area |x| () I32 { 0; }\nlib { fn run() I32 { 0; } }\n', 'Sh.area is already a protocol member'],
-    ['enum Color:\n    | R { v: I32 }\n    | G\nlib { fn run() I32 { let c = Color.R; 0; } }\n', 'Color.R is a type, not a value'],
+    ['struct P:\n    | f: cl() I32\nfn P.f |p| () I32 { return 2; }\nlib { fn run() I32 { return 0; } }\n', 'P.f is both a field and a method'],
+    ['proto Sh:\n    | area() I32\nfn Sh.area |x| () I32 { return 0; }\nlib { fn run() I32 { return 0; } }\n', 'Sh.area is already a protocol member'],
+    ['enum Color:\n    | R { v: I32 }\n    | G\nlib { fn run() I32 { let c = Color.R; return 0; } }\n', 'Color.R is a type, not a value'],
     // A bare variant two enums declare, where nothing says which (it meant the later's); another enum's in an alt; one E lacks.
-    ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nlib { fn run() I32 { let v = V { x: 1 }; v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
-    ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nfn f(v: V) I32 { 0; }\nlib { fn run() I32 { 0; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
-    ['mod m {\n    enum A:\n        | V { x: I32 }\n    enum B:\n        | V { y: I32 }\n}\nlib { fn run() I32 { let v = m.V { x: 1 }; v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nlib { fn run() I32 { let v = V { x: 1 }; return v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    ['enum A:\n    | V { x: I32 }\nenum B:\n    | V { y: I32 }\nfn f(v: V) I32 { return 0; }\nlib { fn run() I32 { return 0; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
+    ['mod m {\n    enum A:\n        | V { x: I32 }\n    enum B:\n        | V { y: I32 }\n}\nlib { fn run() I32 { let v = m.V { x: 1 }; return v.x; } }\n', 'V is a variant of A and of B: write A.V or B.V'],
     // A declaration keeps a variant's name: with no Shape wanted, the bare name is the declaration's.
-    ["enum Shape:\n    | Circle { r: I32 }\n    | Other\nenum Circle:\n    | Big { r: I32 }\n    | Small\nlib { fn run() I32 {\n    let x = Circle { r: 3 };\n    5;\n} }\n", "Circle is not a struct: it has no fields to set"],
-    ["mod geo {\n    enum Shape:\n        | Circle { r: I32 }\n        | Other\n    struct Circle:\n        | q: I32\n}\nlib { fn run() I32 {\n    let c = geo.Circle { q: 4 };\n    let s: geo.Shape = geo.Circle { r: 4 };\n    c.q;\n} }\n", "s is Shape, got Circle"],
-    ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\nfn f(a: A) I32 { alt a { B.V |v| => v.y, ~> 0, }; }\nlib { fn run() I32 { 0; } }\n', 'Expected A, got V'],
-    ['enum A:\n    | V { x: I32 }\nlib { fn run() I32 { let v = A.Q { x: 1 }; 0; } }\n', 'A has no variant Q'],
-    ['mod geo {\n    enum(U8) L:\n        | Lo\n}\nfn f(l: geo.L) I32 { match l { geo.M.Lo => 1, ~> 0, }; }\nlib { fn run() I32 { 0; } }\n', 'Unknown type M'],
-    ['enum A:\n    | V { x: I32 }\n    | W {}\nfn f(a: A) I32 { alt a { V |v| => v.x, A.V => 5, ~> 0, }; }\nlib { fn run() I32 { 0; } }\n', 'Duplicate arm A.V: never runs'],
-    ['mod m {\n    enum(U8) L:\n        | Lo\n}\nlib { fn run() I32 { m.L.Hi.i32(); } }\n', 'L has no variant Hi'],
+    ["enum Shape:\n    | Circle { r: I32 }\n    | Other\nenum Circle:\n    | Big { r: I32 }\n    | Small\nlib { fn run() I32 {\n    let x = Circle { r: 3 };\n    return 5;\n} }\n", "Circle is not a struct: it has no fields to set"],
+    ["mod geo {\n    enum Shape:\n        | Circle { r: I32 }\n        | Other\n    struct Circle:\n        | q: I32\n}\nlib { fn run() I32 {\n    let c = geo.Circle { q: 4 };\n    let s: geo.Shape = geo.Circle { r: 4 };\n    return c.q;\n} }\n", "s is Shape, got Circle"],
+    ['enum A:\n    | V { x: I32 }\n    | W {}\nenum B:\n    | V { y: I32 }\nfn f(a: A) I32 { return alt a { B.V |v| => v.y, ~> 0, }; }\nlib { fn run() I32 { return 0; } }\n', 'Expected A, got V'],
+    ['enum A:\n    | V { x: I32 }\nlib { fn run() I32 { let v = A.Q { x: 1 }; return 0; } }\n', 'A has no variant Q'],
+    ['mod geo {\n    enum(U8) L:\n        | Lo\n}\nfn f(l: geo.L) I32 { return match l { geo.M.Lo => 1, ~> 0, }; }\nlib { fn run() I32 { return 0; } }\n', 'Unknown type M'],
+    ['enum A:\n    | V { x: I32 }\n    | W {}\nfn f(a: A) I32 { return alt a { V |v| => v.x, A.V => 5, ~> 0, }; }\nlib { fn run() I32 { return 0; } }\n', 'Duplicate arm A.V: never runs'],
+    ['mod m {\n    enum(U8) L:\n        | Lo\n}\nlib { fn run() I32 { return m.L.Hi.i32(); } }\n', 'L has no variant Hi'],
     // `?.` guards a call or an assignment, not a return, an assert, a jump, or a value inside one.
     ...['if c { return a.next?.v; }; -1;', 'assert a.next?.v == 1; 0;', 'let x = 0; x = if a.next?.v == 1 { 5; } else { 6; }; x;',
       'let s = "i"; s = a.next?.s orelse "d"; 0;', 'loop match 0 { 0 => { continue a.next?.v; }, ~> { break; }, }; 0;'].map(body =>
@@ -1980,192 +1980,192 @@ lib { fn run() I32 { Top[I32].top(1); } }
     | next: ?N
     | v: I32
     | s: ?Str
-fn f(a: N, c: Bool) I32 { ${body} }
-lib { fn run() I32 { 0; } }
+fn f(a: N, c: Bool) I32 => { ${body} }
+lib { fn run() I32 { return 0; } }
 `, '?. only in a statement']),
     // A let of no value (it crashed the compiler).
-    ['fn nothing() Void {}\nlib { fn run() I32 { let x = nothing(); x; 0; } }\n', 'x would hold no value'],
+    ['fn nothing() Void {}\nlib { fn run() I32 { let x = nothing(); x; return 0; } }\n', 'x would hold no value'],
     // A tuple result must be destructured when bound.
-    ['fn sw(a: I32, b: I32) .{I32, I32} { .{b, a}; }\nlib { fn run() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; a; }; f(); } }\n', 'A closure cannot capture tuple t'],
+    ['fn sw(a: I32, b: I32) .{I32, I32} { return .{b, a}; }\nlib { fn run() I32 { let t = sw(3, 4); let f = cl() I32 { let .{a, b} = t; return a; }; return f(); } }\n', 'A closure cannot capture tuple t'],
     // An integer is no variant of an integer enum.
-    ['enum(U8) A:\n    | X\n    | Y\nlib { fn run() I32 { match A.X { 0 => 10, 1 => 20, }; } }\n', '0 cannot match A'],
+    ['enum(U8) A:\n    | X\n    | Y\nlib { fn run() I32 { return match A.X { 0 => 10, 1 => 20, }; } }\n', '0 cannot match A'],
     // Two opened modules with one name: neither is meant (this said "Unknown variable v").
-    ['mod a { fn v() I32 { 1; } }\nmod b { fn v() I32 { 2; } }\nusing a;\nusing b;\nlib { fn run() I32 { v(); } }\n', 'v is ambiguous: a.v or b.v'],
+    ['mod a { fn v() I32 { return 1; } }\nmod b { fn v() I32 { return 2; } }\nusing a;\nusing b;\nlib { fn run() I32 { return v(); } }\n', 'v is ambiguous: a.v or b.v'],
     // A declaration named like a prelude module (the prelude's own `using Found` once found it).
-    ['struct Found:\n    | x: I32\nlib { fn run() I32 { let s = Found { x: 4 }; s.x; } }\n', 'Found is a standard type'],
+    ['struct Found:\n    | x: I32\nlib { fn run() I32 { let s = Found { x: 4 }; return s.x; } }\n', 'Found is a standard type'],
     // A generic module's function called with no instance (this built invalid Wasm).
-    ['mod gb[T] { fn id(v: T) T { v; } }\nlib { fn run() F64 { gb.id(1.5); } }\n', 'gb takes 1 type arguments, given 0'],
+    ['mod gb[T] { fn id(v: T) T { return v; } }\nlib { fn run() F64 { return gb.id(1.5); } }\n', 'gb takes 1 type arguments, given 0'],
     // Two types of one name, told apart.
-    ['mod a {\n    struct S:\n        | x: I32\n    fn mk() S { S { x: 1 }; }\n}\nstruct S:\n    | x: I32\nlib { fn run() I32 { let s: S = a.mk(); s.x; } }\n', 's is S, got a.S'],
+    ['mod a {\n    struct S:\n        | x: I32\n    fn mk() S { return S { x: 1 }; }\n}\nstruct S:\n    | x: I32\nlib { fn run() I32 { let s: S = a.mk(); return s.x; } }\n', 's is S, got a.S'],
     // A module instantiating a bigger type each time it recurses (this ran for a minute, then crashed).
-    ['mod m[T] {\n    fn f(n: I32) I32 { if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; }; }\n}\nlib { fn run() I32 { m[I32].f(3); } }\n', "m's instances nest more than 64 deep"],
+    ['mod m[T] {\n    fn f(n: I32) I32 { return if n == 0 { 0; } else { m[Array[T]].f(n - 1) + 1; }; }\n}\nlib { fn run() I32 { return m[I32].f(3); } }\n', "m's instances nest more than 64 deep"],
     // Past what a Wasm function takes (the engine refused the module).
-    [`fn f(${Array.from({ length: 1001 }, (_, i) => `a${i}: I32`).join(', ')}) I32 { a0; }
-lib { fn run() I32 { 1; } }
+    [`fn f(${Array.from({ length: 1001 }, (_, i) => `a${i}: I32`).join(', ')}) I32 { return a0; }
+lib { fn run() I32 { return 1; } }
 `, 'f has 1001 parameters (max 1000)'],
     // Nesting past the compiler's stack: a diagnostic, not a JavaScript stack.
     [`lib { fn run() I32 {
-    ${'('.repeat(30000)}1${')'.repeat(30000)};
+    return ${'('.repeat(30000)}1${')'.repeat(30000)};
 } }
 `, 'Program nested too deeply (at about line 2)'],
     ['fn f() I32 {\n    let x = 1 2;\n    x;\n}\n', "Expected ';', got '2'"],
     // Other languages' habits, and names that are nearly right.
     ['fn f(a: Bool, b: Bool) Bool { a && b; }\n', 'Write and, not &&'],
-    ['fn f() I32 {\n    let total = 1;\n    totl;\n}\n', 'Unknown variable totl; did you mean total?'],
+    ['fn f() I32 {\n    let total = 1;\n    return totl;\n}\n', 'Unknown variable totl; did you mean total?'],
     // Where an expected type came from: a parameter, a result.
-    ['fn g(n: I32) I32 { n; }\nfn f() I32 { g("x"); }\n', 'g takes I32, got Str'],
-    ['fn f() I32 { "x"; }\n', 'f returns I32, got Str'],
+    ['fn g(n: I32) I32 { return n; }\nfn f() I32 { return g("x"); }\n', 'g takes I32, got Str'],
+    ['fn f() I32 { return "x"; }\n', 'f returns I32, got Str'],
     // Arms of one value, and enum variants without one, found by value.
-    ['fn f(x: I32) I32 { match x { 1 => 1, 2 => 2, 1 => 3, ~> 0, }; }\nlib { fn run() I32 { f(1); } }\n', 'Duplicate pattern 1'],
+    ['fn f(x: I32) I32 { return match x { 1 => 1, 2 => 2, 1 => 3, ~> 0, }; }\nlib { fn run() I32 { return f(1); } }\n', 'Duplicate pattern 1'],
     // A name twice in one module, or one T's protocol method twice (std's too): last one won.
-    ['mod M { fn f() I32 { 1; } fn f() I32 { 2; } fn get() I32 { f(); } }\nlib { fn run() I32 { M.get(); } }\n', 'Duplicate declaration f'],
-    ['mod M { let g: I32 = 3; let g: I32 = 4; fn get() I32 { g; } }\nlib { fn run() I32 { M.get(); } }\n', 'Duplicate declaration g'],
-    ['mod M[T] { fn f() I32 { 1; } fn f() I32 { 2; } fn get() I32 { f(); } }\nlib { fn run() I32 { M[I32].get(); } }\n', 'Duplicate declaration f'],
+    ['mod M { fn f() I32 { return 1; } fn f() I32 { return 2; } fn get() I32 { return f(); } }\nlib { fn run() I32 { return M.get(); } }\n', 'Duplicate declaration f'],
+    ['mod M { let g: I32 = 3; let g: I32 = 4; fn get() I32 { return g; } }\nlib { fn run() I32 { return M.get(); } }\n', 'Duplicate declaration g'],
+    ['mod M[T] { fn f() I32 { return 1; } fn f() I32 { return 2; } fn get() I32 { return f(); } }\nlib { fn run() I32 { return M[I32].get(); } }\n', 'Duplicate declaration f'],
     // A using's name is the file's: its own mod, fn, or type of that name is reported (the using won silently).
-    ['using console from std:Console;\nmod console { fn f() I32 { 3; } }\nlib { fn run() I32 { console.f(); } }\n', 'Duplicate declaration console'],
-    ['mod console { fn f() I32 { 3; } }\nusing console from std:Console;\nlib { fn run() I32 { console.f(); } }\n', 'Duplicate declaration console'],
-    ['mod Stack[T] { fn f() I32 { 1; } }\nusing Stack[I32] |W|;\nstruct W:\n    | a: I32\nlib { fn run() I32 { 0; } }\n', 'Duplicate declaration W'],
-    ['mod Stack[T] { fn f() I32 { 1; } }\nusing Stack[I32] |W|;\nusing Stack[Str] |W|;\nlib { fn run() I32 { 0; } }\n', 'Duplicate declaration W'],
-    ['proto P:\n    | m(&) I32\nstruct S[P]:\n    | v: I32\nfn P[S].m |a| (b: S) I32 { 1; }\nfn P[S].m |a| (b: S) I32 { 2; }\nlib { fn run() I32 { 0; } }\n', 'Duplicate method P[S].m'],
-    ['using Ord from std:Ord;\nusing Order from std:Ord;\nfn Ord[Str].cmp |a| (b: Str) I32 { a.len() - b.len(); }\nlib { fn run() Str { Order[Str].max_of(["aaaa", "b", "cc"]); } }\n', 'Duplicate method Ord[Str].cmp'],
+    ['using console from std:Console;\nmod console { fn f() I32 { return 3; } }\nlib { fn run() I32 { return console.f(); } }\n', 'Duplicate declaration console'],
+    ['mod console { fn f() I32 { return 3; } }\nusing console from std:Console;\nlib { fn run() I32 { return console.f(); } }\n', 'Duplicate declaration console'],
+    ['mod Stack[T] { fn f() I32 { return 1; } }\nusing Stack[I32] |W|;\nstruct W:\n    | a: I32\nlib { fn run() I32 { return 0; } }\n', 'Duplicate declaration W'],
+    ['mod Stack[T] { fn f() I32 { return 1; } }\nusing Stack[I32] |W|;\nusing Stack[Str] |W|;\nlib { fn run() I32 { return 0; } }\n', 'Duplicate declaration W'],
+    ['proto P:\n    | m(&) I32\nstruct S[P]:\n    | v: I32\nfn P[S].m |a| (b: S) I32 { return 1; }\nfn P[S].m |a| (b: S) I32 { return 2; }\nlib { fn run() I32 { return 0; } }\n', 'Duplicate method P[S].m'],
+    ['using Ord from std:Ord;\nusing Order from std:Ord;\nfn Ord[Str].cmp |a| (b: Str) I32 { return a.len() - b.len(); }\nlib { fn run() Str { return Order[Str].max_of(["aaaa", "b", "cc"]); } }\n', 'Duplicate method Ord[Str].cmp'],
     [`enum(U8) Many:
 ${variants}
 fn f(m: Many) I32 { match m {
 ${covered.split('\n').filter(l => !l.includes('V17 ')).join('\n')}
 }; }
-lib { fn run() I32 { f(Many.V1); } }
+lib { fn run() I32 { return f(Many.V1); } }
 `, 'match misses Many.V17'],
     // try and errdefer: a Result, in a function returning one with the same error type.
-    ['fn f() Result[I32, Str] { let x = try 5; Result[I32, Str].ok(x); }\nlib { fn run() I32 { f().value(); } }\n', 'try needs a Result, not I32'],
-    ['fn g() Result[I32, I32] { Result[I32, I32].ok(1); }\nfn f() Result[I32, Str] { Result[I32, Str].ok(try g()); }\nlib { fn run() I32 { f().value(); } }\n',
+    ['fn f() Result[I32, Str] { let x = try 5; return Result[I32, Str].ok(x); }\nlib { fn run() I32 { return f().value(); } }\n', 'try needs a Result, not I32'],
+    ['fn g() Result[I32, I32] { return Result[I32, I32].ok(1); }\nfn f() Result[I32, Str] { return Result[I32, Str].ok(try g()); }\nlib { fn run() I32 { return f().value(); } }\n',
       "try passes on I32; the function's errors are Str"],
-    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() I32 { try g(); }\nlib { fn run() I32 { f(); } }\n', 'try in a function returning I32, not a Result'],
-    ['fn f() I32 { errdefer f(); 2; }\nlib { fn run() I32 { f(); } }\n', 'errdefer in a function returning I32, not a Result'],
-    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\ngn gen() I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; Result[I32, Str].ok(s); }\nlib { fn run() I32 { f().value(); } }\n',
+    ['fn g() Result[I32, Str] { return Result[I32, Str].ok(1); }\nfn f() I32 { return try g(); }\nlib { fn run() I32 { return f(); } }\n', 'try in a function returning I32, not a Result'],
+    ['fn f() I32 { errdefer f(); return 2; }\nlib { fn run() I32 { return f(); } }\n', 'errdefer in a function returning I32, not a Result'],
+    ['fn g() Result[I32, Str] { return Result[I32, Str].ok(1); }\ngn gen() I32 { yield try g(); }\nfn f() Result[I32, Str] { let s = 0; for (gen()) |v| { s += v; }; return Result[I32, Str].ok(s); }\nlib { fn run() I32 { return f().value(); } }\n',
       'try in a generator'],
-    ['fn g() Result[I32, Str] { Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; g(); }\nlib { fn run() I32 { f().value(); } }\n', 'try in defer'],
-    ['lib { fn run() I32 { let r = Result[I32, Str].ok(1); r._value; } }\n', 'Result has no field _value'],
-    ['lib { fn run() I32 { let r: Result[I32, Str] = &{ _ok: true, _value: 1 }; 0; } }\n', 'Result[I32, Str] is made by its own functions'],
+    ['fn g() Result[I32, Str] { return Result[I32, Str].ok(1); }\nfn f() Result[I32, Str] { defer { try g(); }; return g(); }\nlib { fn run() I32 { return f().value(); } }\n', 'try in defer'],
+    ['lib { fn run() I32 { let r = Result[I32, Str].ok(1); return r._value; } }\n', 'Result has no field _value'],
+    ['lib { fn run() I32 { let r: Result[I32, Str] = &{ _ok: true, _value: 1 }; return 0; } }\n', 'Result[I32, Str] is made by its own functions'],
     // Real programs' mistakes, said as what to write.
     ['fn f() I32 {\n    let t = 0;\n    for i in 0..10 { t += i; };\n    t;\n}\n', 'Write for (0 ..< 10) |i|, not for i in'],
     ['let INF = 1;\n', 'Names of values and functions start lowercase (a capital starts a type)'],
     ['fn F() I32 { 1; }\n', 'Names of values and functions start lowercase (a capital starts a type)'],
     ['fn f() I32 {\n    let i = 0;\n    i++;\n    i;\n}\n', 'utu has no ++; write += 1'],
     ['fn f(s: Str) I32 { match s { "+" => 1, ~> 0, }; }\n', 'match takes number, Bool, and enum patterns, not strings'],
-    ['fn f() Bool { true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
+    ['fn f() Bool { return true and (0 ..< 5) all |i| { i < 9; }; }\n', 'A pipeline binds looser than and: its source is all of this'],
     // A closure the host calls cannot suspend: JSPI cannot suspend through the host's frame.
     ['let each: fun(cl(I32) Void) Void = @es/\\ (f) => f(1) \\/;\nlet later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nmain { each(cl(v) { let w: I32 = await later(v); }); }\n',
       'A closure the host calls cannot await'],
     // @comptime and the other DSLs (each crashed, hung, or passed silently).
-    ['fn tab() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { t[0]; } }\n', '@comptime t reads itself'],
-    ['fn f() Array[I32] { [u.len()]; }\nfn g() Array[I32] { [t.len()]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nconst mem u: I32 = @comptime/\\ g() \\/;\nlib { fn run() I32 { t[0]; } }\n', '@comptime t reads u, which waits on it'],
-    ['fn f() Array[I32] { while (true) { }; [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nlib { fn run() I32 { t.len(); } }\n', '@comptime t trapped: it ran too long (a hundred million loop rounds)'],
-    ['const mem t: I32 = @comptime/\\ [1, 2] ; __comptime_t.push(99) \\/;\nlib { fn run() I32 { t.len(); } }\n', "@comptime takes one expression: Expected ')', got ';'"],
-    ['const mem a: U8 = @comptime/\\  \\/;\nlib { fn run() I32 { a.len(); } }\n', '@comptime needs an expression'],
-    ['const mem a: U8 = @embed/\\ \\/;\nlib { fn run() I32 { a.len(); } }\n', '@embed needs a file path'],
-    ['enum(U8) Color: | Red | Green | Blue\nconst mem cs: Color = [2, 7, 1];\nlib { fn run() I32 { cs.len(); } }\n', '7 is no Color'],
-    ['enum(U8) Color: | Red | Green | Blue\nfn cs_() Array[I32] { [2, 7]; }\nconst mem cs: Color = @comptime/\\ cs_() \\/;\nlib { fn run() I32 { cs.len(); } }\n', '7 is no Color'],
+    ['fn tab() Array[I32] { return [t.len()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { return t[0]; } }\n', '@comptime t reads itself'],
+    ['fn f() Array[I32] { return [u.len()]; }\nfn g() Array[I32] { return [t.len()]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nconst mem u: I32 = @comptime/\\ g() \\/;\nlib { fn run() I32 { return t[0]; } }\n', '@comptime t reads u, which waits on it'],
+    ['fn f() Array[I32] { while (true) { }; return [1]; }\nconst mem t: I32 = @comptime/\\ f() \\/;\nlib { fn run() I32 { return t.len(); } }\n', '@comptime t trapped: it ran too long (a hundred million loop rounds)'],
+    ['const mem t: I32 = @comptime/\\ [1, 2] ; __comptime_t.push(99) \\/;\nlib { fn run() I32 { return t.len(); } }\n', "@comptime takes one expression: Expected ')', got ';'"],
+    ['const mem a: U8 = @comptime/\\  \\/;\nlib { fn run() I32 { return a.len(); } }\n', '@comptime needs an expression'],
+    ['const mem a: U8 = @embed/\\ \\/;\nlib { fn run() I32 { return a.len(); } }\n', '@embed needs a file path'],
+    ['enum(U8) Color: | Red | Green | Blue\nconst mem cs: Color = [2, 7, 1];\nlib { fn run() I32 { return cs.len(); } }\n', '7 is no Color'],
+    ['enum(U8) Color: | Red | Green | Blue\nfn cs_() Array[I32] { return [2, 7]; }\nconst mem cs: Color = @comptime/\\ cs_() \\/;\nlib { fn run() I32 { return cs.len(); } }\n', '7 is no Color'],
     // A program's @ir: what the compiler would crash on, or not see, is a mistake at the body.
-    ['fn f(a: I32) I32 { @ir/\\ <ir-array-len><ir-ident name="a"/></ir-array-len> \\/; }\nlib { fn run() I32 { f(1); } }\n', '@ir <ir-array-len> is written wrong here'],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-string-from-codes><ir-ident name="a"/></ir-string-from-codes> \\/; }\nlib { fn run() I32 { f(1); } }\n', '@ir <ir-string-from-codes> is written wrong here'],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-lit value="1"/> \\/; }\nlib { fn run() I32 { f(1); } }\n', '@ir <ir-lit> is written wrong here'],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { f(1); } }\n', '@ir body is empty or not well-formed IR'],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-ident name="a"/> junk \\/; }\nlib { fn run() I32 { f(1); } }\n', '@ir body is empty or not well-formed IR'],
-    ['fn f(c: I32, a: I32) I32 { @wat/\\ local.get $a local.get $a local.get $c select (param i32) \\/; }\nlib { fn run() I32 { f(1, 2); } }\n', 'select takes only (result t)'],
-    [`lib { fn run() I32 { ${'@utu/\\ '.repeat(17)}1${' \\/'.repeat(17)}; } }
+    ['fn f(a: I32) I32 => @ir/\\ <ir-array-len><ir-ident name="a"/></ir-array-len> \\/;\nlib { fn run() I32 { return f(1); } }\n', '@ir <ir-array-len> is written wrong here'],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-string-from-codes><ir-ident name="a"/></ir-string-from-codes> \\/;\nlib { fn run() I32 { return f(1); } }\n', '@ir <ir-string-from-codes> is written wrong here'],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-lit value="1"/> \\/;\nlib { fn run() I32 { return f(1); } }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-i32-eqz><ir-ident name="a"/></ir-i32-add> \\/;\nlib { fn run() I32 { return f(1); } }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-ident name="a"/> junk \\/;\nlib { fn run() I32 { return f(1); } }\n', '@ir body is empty or not well-formed IR'],
+    ['fn f(c: I32, a: I32) I32 => @wat/\\ local.get $a local.get $a local.get $c select (param i32) \\/;\nlib { fn run() I32 { return f(1, 2); } }\n', 'select takes only (result t)'],
+    [`lib { fn run() I32 { return ${'@utu/\\ '.repeat(17)}1${' \\/'.repeat(17)}; } }
 `, 'DSLs nested too deeply (max 16)'],
-    ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nlib { fn run() I32 { 1; } }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
-    ['struct P:\n    | name: Str\nlib { fn run() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; a.name; } }\n', '@stored needs using Browser from std:Browser'],
-    ['fn tab() Array[I32] { [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { 5; } }\n', 'main is the entry point, not a function: move its body into a fn'],
+    ['mod t7 {\n    mem m7: I32 = [5, 6];\n}\nlib { fn run() I32 { return 1; } }\n', "Unexpected 'mem': a mem goes at the top level of a file"],
+    ['struct P:\n    | name: Str\nlib { fn run() Str { let a = @stored/\\ P "k" P { name: "x" } \\/; return a.name; } }\n', '@stored needs using Browser from std:Browser'],
+    ['fn tab() Array[I32] { return [main()]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { return 5; } }\n', 'main is the entry point, not a function: move its body into a fn'],
     ['lib {\n    fn f(x: ?I32) I32 { promote x { |v| => v, ~> 0 }; }\n}\n', 'Missing , after 0'],
     // A generic module's type with no type arguments (this built invalid Wasm).
-    ['mod B[T] {\n    struct &:\n        | v: T\n}\nfn f(x: B) I32 { x.v; }\nlib { fn run() I32 { 0; } }\n', 'B takes 1 type arguments, given 0'],
-    ['mod cell[T] {\n    struct Cell:\n        | v: T\n}\nfn f(x: cell.Cell) I32 { 0; }\nlib { fn run() I32 { 0; } }\n', 'cell takes 1 type arguments, given 0'],
+    ['mod B[T] {\n    struct &:\n        | v: T\n}\nfn f(x: B) I32 { return x.v; }\nlib { fn run() I32 { return 0; } }\n', 'B takes 1 type arguments, given 0'],
+    ['mod cell[T] {\n    struct Cell:\n        | v: T\n}\nfn f(x: cell.Cell) I32 { return 0; }\nlib { fn run() I32 { return 0; } }\n', 'cell takes 1 type arguments, given 0'],
     // An alias's instance: its fields have its types (this built invalid Wasm).
-    ['mod B[T] {\n    struct &:\n        | v: T\n}\nusing B[I32] |bi|;\nlib { fn run() I32 { let c: bi = &{ v: "hello" }; c.v; } }\n', 'Field v is I32, got Str'],
+    ['mod B[T] {\n    struct &:\n        | v: T\n}\nusing B[I32] |bi|;\nlib { fn run() I32 { let c: bi = &{ v: "hello" }; return c.v; } }\n', 'Field v is I32, got Str'],
     // null beside a scalar in an array literal (this built invalid Wasm).
-    ['lib { fn run() I32 { [1, null].len(); } }\n', 'I32 cannot be nullable'],
-    ['lib { fn run() I32 { [null].len(); } }\n', 'null needs a nullable type'],
+    ['lib { fn run() I32 { return [1, null].len(); } }\n', 'I32 cannot be nullable'],
+    ['lib { fn run() I32 { return [null].len(); } }\n', 'null needs a nullable type'],
     // An unfinished pipeline in chain(…).
-    ['lib { fn run() I32 { let xs = [1, 2]; xs chain(xs map |x| { x; }) sum; } }\n', 'Unfinished pipeline: map'],
+    ['lib { fn run() I32 { let xs = [1, 2]; return xs chain(xs map |x| { x; }) sum; } }\n', 'Unfinished pipeline: map'],
     // A user type named I32 is not hashed as an integer (this built invalid Wasm).
-    ['mod M {\n    struct I32:\n        | z: F64\n    fn mk() I32 { &{ z: 1.5 }; }\n}\nusing M;\nlib { fn run() F64 { let q: I32 = mk(); let xs = [q] group_by(I32, I32) |v| { v; }; q.z; } }\n', 'No == for I32'],
+    ['mod M {\n    struct I32:\n        | z: F64\n    fn mk() I32 { return &{ z: 1.5 }; }\n}\nusing M;\nlib { fn run() F64 { let q: I32 = mk(); let xs = [q] group_by(I32, I32) |v| { v; }; return q.z; } }\n', 'No == for I32'],
     // Two instances of one module opened.
-    ['mod cell[T] {\n    struct Cell:\n        | value: T\n    fn wrap(value: T) Cell { Cell { value: value }; }\n}\nusing cell[I32];\nusing cell[Str];\nlib { fn run() I32 { 0; } }\n', 'cell[I32] is open already'],
+    ['mod cell[T] {\n    struct Cell:\n        | value: T\n    fn wrap(value: T) Cell { return Cell { value: value }; }\n}\nusing cell[I32];\nusing cell[Str];\nlib { fn run() I32 { return 0; } }\n', 'cell[I32] is open already'],
     // x.m() with two protocols' m.
-    ['proto Pa:\n    | name() Str\nproto Pb:\n    | name() Str\nstruct X[Pa, Pb]:\n    | id: I32\nfn Pa[X].name |x| () Str { "a"; }\nfn Pb[X].name |x| () Str { "b"; }\nlib { fn run() Str { X { id: 1 }.name(); } }\n', "name is both Pa's and Pb's"],
+    ['proto Pa:\n    | name() Str\nproto Pb:\n    | name() Str\nstruct X[Pa, Pb]:\n    | id: I32\nfn Pa[X].name |x| () Str { return "a"; }\nfn Pb[X].name |x| () Str { return "b"; }\nlib { fn run() Str { return X { id: 1 }.name(); } }\n', "name is both Pa's and Pb's"],
     // A protocol's implementation for one instance, which nothing would find.
-    ['proto P:\n    | m() I32\nmod Box[T] {\n    struct &:\n        | v: T\n}\nfn P[Box[I32]].m |b| () I32 { 1; }\nlib { fn run() I32 { 0; } }\n', "Box's instances implement P together: fn P[&].m in Box"],
+    ['proto P:\n    | m() I32\nmod Box[T] {\n    struct &:\n        | v: T\n}\nfn P[Box[I32]].m |b| () I32 { return 1; }\nlib { fn run() I32 { return 0; } }\n', "Box's instances implement P together: fn P[&].m in Box"],
     // await where the module's start runs it, or where the host calls a named function.
-    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet later: I32 = await d(4);\nlib { fn run() I32 { later; } }\n', "A global's initializer cannot await"],
-    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet later: I32 = helper();\nfn helper() I32 { await d(3); }\nlib { fn run() I32 { later; } }\n', "A global's initializer cannot await"],
-    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet call: fun(fun() I32) I32 = @es/\\ (f) => f() \\/;\nfn waits() I32 { await d(3); }\nlib { fn run() I32 { call(waits); } }\n', 'A function the host calls cannot await'],
+    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet later: I32 = await d(4);\nlib { fn run() I32 { return later; } }\n', "A global's initializer cannot await"],
+    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet later: I32 = helper();\nfn helper() I32 { return await d(3); }\nlib { fn run() I32 { return later; } }\n', "A global's initializer cannot await"],
+    ['let d: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nlet call: fun(fun() I32) I32 = @es/\\ (f) => f() \\/;\nfn waits() I32 { return await d(3); }\nlib { fn run() I32 { return call(waits); } }\n', 'A function the host calls cannot await'],
     // A generic mod's globals, one per instance: a cycle in one, or across two.
-    ['mod C[T] {\n    let a: I32 = b + 1;\n    let b: I32 = a + 1;\n    fn get() I32 { a; }\n}\nlib { fn run() I32 { C[I32].get() + C[Str].get(); } }\n', 'Globals b and a each need the other set first'],
-    ['mod P[T] {\n    let x: I32 = Q[Str].y() + 1;\n    fn get() I32 { x; }\n}\nmod Q[T] {\n    let y0: I32 = P[I32].get() + 1;\n    fn y() I32 { y0; }\n}\nlib { fn run() I32 { P[I32].get(); } }\n', 'Globals y0 and x each need the other set first'],
-    ['mod Zero[T] {\n    let v: T = 0;\n    fn get() T { v; }\n}\nlib { fn run() I32 { Zero[I32].get() + Zero[Str].get().len(); } }\n', 'v is Str, got I32'],
+    ['mod C[T] {\n    let a: I32 = b + 1;\n    let b: I32 = a + 1;\n    fn get() I32 { return a; }\n}\nlib { fn run() I32 { return C[I32].get() + C[Str].get(); } }\n', 'Globals b and a each need the other set first'],
+    ['mod P[T] {\n    let x: I32 = Q[Str].y() + 1;\n    fn get() I32 { return x; }\n}\nmod Q[T] {\n    let y0: I32 = P[I32].get() + 1;\n    fn y() I32 { return y0; }\n}\nlib { fn run() I32 { return P[I32].get(); } }\n', 'Globals y0 and x each need the other set first'],
+    ['mod Zero[T] {\n    let v: T = 0;\n    fn get() T { return v; }\n}\nlib { fn run() I32 { return Zero[I32].get() + Zero[Str].get().len(); } }\n', 'v is Str, got I32'],
     // A global first read where only its type is wanted: its mistakes still said.
-    ['fn hi() Str { "hi"; }\nlet fs: Array[fun() Str] = [hi];\nlib { fn run() Str { fs[0](); } }\n', 'fun() Str cannot be stored; use cl() Str'],
+    ['fn hi() Str { return "hi"; }\nlet fs: Array[fun() Str] = [hi];\nlib { fn run() Str { return fs[0](); } }\n', 'fun() Str cannot be stored; use cl() Str'],
     // An unused generator is checked.
-    ['gn g() I32 { let a: I32 = "s"; yield a; }\nlib { fn run() I32 { 0; } }\n', 'a is I32, got Str'],
+    ['gn g() I32 { let a: I32 = "s"; yield a; }\nlib { fn run() I32 { return 0; } }\n', 'a is I32, got Str'],
     // An unknown generic module called twice (it crashed the compiler).
-    ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nlib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
+    ['fn g() I32 { return Nope[F64].x() + Nope[F64].x(); }\nlib { fn run() I32 { return g(); } }\n', 'Unknown module Nope'],
     // -0.0 after 0.0.
-    ['fn f(x: F64) I32 { match x { 0.0 => 1, -0.0 => 2, ~> 3, }; }\nlib { fn run() I32 { f(1.0); } }\n', 'Duplicate pattern -0.0'],
+    ['fn f(x: F64) I32 { return match x { 0.0 => 1, -0.0 => 2, ~> 3, }; }\nlib { fn run() I32 { return f(1.0); } }\n', 'Duplicate pattern -0.0'],
     // Literals under operators take the other operand's type, and must fit it.
-    ['fn f(x: U32) U32 { (1 + 5000000000) + x; }\nlib { fn run() I32 { 0; } }\n', '5000000000 does not fit U32'],
-    ['fn f(x: U64) U64 { (-1 + 2) + x; }\nlib { fn run() I32 { 0; } }\n', '-1 does not fit U64'],
+    ['fn f(x: U32) U32 { return (1 + 5000000000) + x; }\nlib { fn run() I32 { return 0; } }\n', '5000000000 does not fit U32'],
+    ['fn f(x: U64) U64 { return (-1 + 2) + x; }\nlib { fn run() I32 { return 0; } }\n', '-1 does not fit U64'],
     // @json in a mod sees the file's top-level types, not a type parameter or another mod's types.
-    ['mod Pager[T] {\n    fn two(x: T) Str { @json/\\ encode T x \\/; }\n}\nlib { fn run() Str { Pager[I32].two(1); } }\n',
+    ['mod Pager[T] {\n    fn two(x: T) Str { return @json/\\ encode T x \\/; }\n}\nlib { fn run() Str { return Pager[I32].two(1); } }\n',
       '@json cannot use T: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
-    ['mod geo {\n    struct Pt:\n        | x: I32\n}\nmod M {\n    fn f(p: geo.Pt) Str { @json/\\ encode Pt p \\/; }\n}\nlib { fn run() I32 { 1; } }\n',
+    ['mod geo {\n    struct Pt:\n        | x: I32\n}\nmod M {\n    fn f(p: geo.Pt) Str { return @json/\\ encode Pt p \\/; }\n}\nlib { fn run() I32 { return 1; } }\n',
       '@json cannot use Pt: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
-    ['mod geo {\n    struct Pt:\n        | x: I32\n}\nfn f(p: geo.Pt) Str { @json/\\ encode Pt p \\/; }\nlib { fn run() I32 { 1; } }\n',
+    ['mod geo {\n    struct Pt:\n        | x: I32\n}\nfn f(p: geo.Pt) Str { return @json/\\ encode Pt p \\/; }\nlib { fn run() I32 { return 1; } }\n',
       '@json cannot use Pt: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64'],
     // decode gives ?T, and an enum(U8) cannot be null.
-    ['enum(U8) Col:\n    | Red\n    | Green\nlib { fn run() I32 { let d = @json/\\ decode Col "1" \\/; 0; } }\n',
+    ['enum(U8) Col:\n    | Red\n    | Green\nlib { fn run() I32 { let d = @json/\\ decode Col "1" \\/; return 0; } }\n',
       '@json decode gives ?Col, and an enum(U8) cannot be null: decode a struct with a Col field, or use error or match'],
-    ['enum(U8) Col:\n    | Red\nstruct T:\n    | c: ?Col\nlib { fn run() Str { @json/\\ error T "{}" \\/; } }\n',
+    ['enum(U8) Col:\n    | Red\nstruct T:\n    | c: ?Col\nlib { fn run() Str { return @json/\\ error T "{}" \\/; } }\n',
       '?Col is not supported: an enum(U8) cannot be null; use Col'],
     // $T: bound once; a value needs its types; a body that does not fit a call's types is a mistake at that call.
-    ['fn f(a: $T, b: $T) I32 { 0; }\nlib { fn run() I32 { f(1, 2); } }\n', '$T twice: bind it once, then write T'],
-    ['fn show(x: $T) Str { "a"; }\nlib { fn run() I32 { let g = show; 0; } }\n', 'show has a $ type: call it, or name its types (let g: fun(I32) Str = show)'],
-    ['using console from std:Console;\nstruct Q:\n    | x: I32\nlib { fn run() I32 { console.log(Q { x: 1 }); 0; } }\n', 'No method Q.str'],
-    ['fn f(a: $T, b: T) T { a; }\nlib { fn run() I32 { let x: I64 = 1; f("s", x); 0; } }\n', 'f takes Str, got I64'],
+    ['fn f(a: $T, b: $T) I32 { return 0; }\nlib { fn run() I32 { return f(1, 2); } }\n', '$T twice: bind it once, then write T'],
+    ['fn show(x: $T) Str { return "a"; }\nlib { fn run() I32 { let g = show; return 0; } }\n', 'show has a $ type: call it, or name its types (let g: fun(I32) Str = show)'],
+    ['using console from std:Console;\nstruct Q:\n    | x: I32\nlib { fn run() I32 { console.log(Q { x: 1 }); return 0; } }\n', 'No method Q.str'],
+    ['fn f(a: $T, b: T) T { return a; }\nlib { fn run() I32 { let x: I64 = 1; f("s", x); return 0; } }\n', 'f takes Str, got I64'],
     // F64(x), I64(n): a literal of that type, or x converted.
-    ['lib { fn run() I32 { let s = F64("a"); 0; } }\n', 'No method Str.f64'],
+    ['lib { fn run() I32 { let s = F64("a"); return 0; } }\n', 'No method Str.f64'],
   ];
   for (const [source, message] of mistakes) {
     const { errors } = await selfhost(await write(source));
     assert.ok(errors?.includes(message), `${source.slice(0, 300)}\n  reported: ${errors}`);
     checked++;
   }
-  const wutuHead = 'using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    @wutu/\\\n    section {\n';
+  const wutuHead = 'using Browser from std:Browser;\nfn view() Browser.HTMLElement {\n    return @wutu/\\\n    section {\n';
   const wutuTail = '        "x";\n    }\n    \\/;\n}\nmain { Browser.document.body.append(view()); }\n';
   // A missing bound, said once for its type however many places use it; an unknown module once.
   for (const [source, message] of [
-    ['proto Big:\n    | biggest(Array[&]) &\nstruct M:\n    | v: I32\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { a.biggest(xs); }\n}\nlib { fn run() I32 { let xs: Array[M] = [M { v: 3 }]; Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 2 }, xs).v; } }\n', "M does not implement Big (Pick's T needs it)"],
-    ['fn g() I32 { Nope[F64].x() + Nope[F64].x(); }\nlib { fn run() I32 { g(); } }\n', 'Unknown module Nope'],
+    ['proto Big:\n    | biggest(Array[&]) &\nstruct M:\n    | v: I32\nmod Pick[T[Big]] {\n    fn top(a: T, xs: Array[T]) T { return a.biggest(xs); }\n}\nlib { fn run() I32 { let xs: Array[M] = [M { v: 3 }]; return Pick[M].top(M { v: 1 }, xs).v + Pick[M].top(M { v: 2 }, xs).v; } }\n', "M does not implement Big (Pick's T needs it)"],
+    ['fn g() I32 { return Nope[F64].x() + Nope[F64].x(); }\nlib { fn run() I32 { return g(); } }\n', 'Unknown module Nope'],
     // A stream's values are awaited as read (JS async generators): never a promise (it typed Promise[I32] and held the number).
-    ['let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn f(s: Stream[Promise[I32]]) I32 { 0; }\n'
-      + 'lib { fn run() I32 { let t = 0; await for (Stream[Promise[I32]].of([later(5)])) |p| { t += await p; }; t; } }\n',
+    ['let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn f(s: Stream[Promise[I32]]) I32 { return 0; }\n'
+      + 'lib { fn run() I32 { let t = 0; await for (Stream[Promise[I32]].of([later(5)])) |p| { t += await p; }; return t; } }\n',
       "A stream's values are awaited as they are read: use Stream[I32], not Stream[Promise[I32]]"],
-    ['fn f(s: Stream[?Promise[Str]]) I32 { 0; }\nlib { fn run() I32 { 0; } }\n',
+    ['fn f(s: Stream[?Promise[Str]]) I32 { return 0; }\nlib { fn run() I32 { return 0; } }\n',
       "A stream's values are awaited as they are read: use Stream[?Str], not Stream[?Promise[Str]]"],
     // A host module not found, said at its using only (a capitalized one's uses said "Not supported yet").
-    ['using Pad from "npm:missing";\nlib { fn run() I32 { let a = Pad.x; let b: Pad.T = Pad.f(); Pad.g().h(); 0; } }\n', 'No declarations for npm:missing; is it installed?'],
-    ['using pad from "npm:missing";\nlib { fn run() I32 { pad.f(); 0; } }\n', 'No declarations for npm:missing; is it installed?'],
+    ['using Pad from "npm:missing";\nlib { fn run() I32 { let a = Pad.x; let b: Pad.T = Pad.f(); Pad.g().h(); return 0; } }\n', 'No declarations for npm:missing; is it installed?'],
+    ['using pad from "npm:missing";\nlib { fn run() I32 { pad.f(); return 0; } }\n', 'No declarations for npm:missing; is it installed?'],
     // copy_in of a value not from the host, with no std:JS loaded (it crashed the compiler).
-    ['mem text: U8;\nlib { fn load(x: I32) I32 { text.copy_in(x); text.len(); } }\n', 'Expected Externref, got I32'],
+    ['mem text: U8;\nlib { fn load(x: I32) I32 { text.copy_in(x); return text.len(); } }\n', 'Expected Externref, got I32'],
     // An element's or a generator's value, captured, is a copy: a write to it was lost (accepted).
-    ['lib { fn run() I32 { let xs = [1, 2]; for (xs) |x| { x = x * 2; }; xs[0]; } }\n', 'Cannot assign to capture x'],
-    ['gn g() I32 { yield 1; }\nlib { fn run() I32 { let t = 0; for (g()) |v| { v += 1; t += v; }; t; } }\n', 'Cannot assign to capture v'],
+    ['lib { fn run() I32 { let xs = [1, 2]; for (xs) |x| { x = x * 2; }; return xs[0]; } }\n', 'Cannot assign to capture x'],
+    ['gn g() I32 { yield 1; }\nlib { fn run() I32 { let t = 0; for (g()) |v| { v += 1; t += v; }; return t; } }\n', 'Cannot assign to capture v'],
     // A range's count, set by the range: a write moved it (accepted), in the body or a closure.
-    ['lib { fn run() I32 { let t = 0; for (0 ..< 8) |i| { t += i; i += 2; }; t; } }\n', 'Cannot assign to capture i'],
-    ['lib { fn run() I32 { let t = 0; for (0 ..< 5) |i| { let f = cl() { i = i + 1; }; f(); t += i; }; t; } }\n', 'Cannot assign to capture i'],
-    ['lib { fn run() I32 { let t = 0; for ([1, 2], 0 ..< 2) |x, k| { k = 1; t += x; }; t; } }\n', 'Cannot assign to capture k'],
+    ['lib { fn run() I32 { let t = 0; for (0 ..< 8) |i| { t += i; i += 2; }; return t; } }\n', 'Cannot assign to capture i'],
+    ['lib { fn run() I32 { let t = 0; for (0 ..< 5) |i| { let f = cl() { i = i + 1; }; f(); t += i; }; return t; } }\n', 'Cannot assign to capture i'],
+    ['lib { fn run() I32 { let t = 0; for ([1, 2], 0 ..< 2) |x, k| { k = 1; t += x; }; return t; } }\n', 'Cannot assign to capture k'],
     // A let in a function's body of a parameter's name (accepted).
-    ['fn clamp(n: I32) I32 { let n = 3; n; }\nlib { fn run() I32 { clamp(4); } }\n', 'Duplicate local n: already a parameter'],
+    ['fn clamp(n: I32) I32 { let n = 3; return n; }\nlib { fn run() I32 { return clamp(4); } }\n', 'Duplicate local n: already a parameter'],
     // A Str where a host Node is wanted: `appendChild<T extends Node>(node: T)` bound T to Str (accepted).
     ['using Browser from std:Browser;\nmain { Browser.document.body.appendChild("hello"); }\n', 'Expected Browser.Node, got Str'],
     // Wutu CSS: two declarations on one line without `;` between, and a property's typo (accepted).
@@ -2179,7 +2179,7 @@ lib { fn run() I32 { f(Many.V1); } }
   // Their neighbours stay right: a parameter assigned, a parameter's name in an inner block, an element
   // where `T extends Node` is wanted, custom, prefixed and unlisted CSS properties, a value over lines.
   for (const source of [
-    'fn f(n: I32) I32 { n = n + 1; if n > 0 { let n = 2; n; } else { n; }; }\nlib { fn run() I32 { f(1); } }\n',
+    'fn f(n: I32) I32 { n = n + 1; return if n > 0 { let n = 2; n; } else { n; }; }\nlib { fn run() I32 { return f(1); } }\n',
     'using Browser from std:Browser;\nmain { let d = Browser.document.createElement("div"); Browser.document.body.appendChild(d); }\n',
     `${wutuHead}        --gap: 1rem;\n        -webkit-line-clamp: 2;\n        anchor-name: --a;\n        grid-template-columns:\n            repeat(2, 1fr);\n        font-family: a,\n            b;\n${wutuTail}`,
   ]) {
@@ -2189,8 +2189,8 @@ lib { fn run() I32 { f(Many.V1); } }
   }
   // A std module not imported: the note names the module, and its file.
   for (const [source, note] of [
-    ['lib { fn run() F64 { Time.now(); } }\n', 'using time from std:Time (the module is time)'],
-    ['using Time from std:Time;\nlib { fn run() F64 { time.now(); } }\n', 'using time from std:Time (the module is time)'],
+    ['lib { fn run() F64 { return Time.now(); } }\n', 'using time from std:Time (the module is time)'],
+    ['using Time from std:Time;\nlib { fn run() F64 { return time.now(); } }\n', 'using time from std:Time (the module is time)'],
     ['main { console.log("hi"); }\n', 'using console from std:Console'],
   ]) {
     const { diagnostics } = await compileFile(utu, await write(source), { optimize: 'size' });
@@ -2200,68 +2200,68 @@ lib { fn run() I32 { f(Many.V1); } }
 
   // A generic array mod of a program's own, for the @ir cases below (its methods follow).
   const IR_ARR = 'mod Arr[T1] {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=T1:mut=true"/> \\/\n'
-    + '    fn &.new(n: I32, fill: T1) & { @ir/\\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \\/; }\n';
+    + '    fn &.new(n: I32, fill: T1) & => @ir/\\ <ir-array-new><ir-ident name="n"/><ir-ident name="fill"/></ir-array-new> \\/;\n';
   // A program's @ir giving one reference for another: said by the compiler (it once reached the engine).
-  const badIr = await selfhost(await write('fn f(a: Str) I31 { @ir/\\ <ir-ident name="a"/> \\/; }\nlib { fn run() I32 { I31.get_s(f("x")); } }\n'));
+  const badIr = await selfhost(await write('fn f(a: Str) I31 => @ir/\\ <ir-ident name="a"/> \\/;\nlib { fn run() I32 { return I31.get_s(f("x")); } }\n'));
   assert.ok(badIr.errors?.includes('@ir gives externref, not I31'), String(badIr.errors));
   checked++;
   // A plain instruction's operands, the result, and a literal: checked by the
   // compiler, so in every mode (small folded `i32.add` of two i64s to a number).
   for (const [source, message] of [
-    ['fn f(a: I64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { f(3); } }\n', '@ir <ir-i32-add> takes i32, given i64'],
-    ['fn f(a: I32, b: I32) I64 { @ir/\\ <ir-i64-add><ir-ident name="a"/><ir-ident name="b"/></ir-i64-add> \\/; }\nlib { fn run() I64 { f(1, 2); } }\n', '@ir <ir-i64-add> takes i64, given i32'],
-    ['fn f(a: F64, b: F64) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/; }\nlib { fn run() I32 { f(1.0, 2.0); } }\n', '@ir <ir-i32-add> takes i32, given f64'],
-    ['fn f(a: I64) I32 { @ir/\\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \\/; }\nlib { fn run() I32 { f(3); } }\n', '@ir gives i64, not I32'],
-    ['fn f(a: I32) Bool { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \\/; }\nlib { fn run() Bool { f(3); } }\n', "@ir gives an i32, not a comparison's Bool"],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-i32-add><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { f(3); } }\n', '@ir <ir-i32-add> is written wrong here'],
-    ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \\/; }\nlib { fn run() I32 { f(); } }\n', '2147483648 does not fit I32'],
-    ['fn f() U32 { @ir/\\ <ir-lit kind="int" type-name="U32" value="-1"/> \\/; }\nlib { fn run() U32 { f(); } }\n', '-1 does not fit U32'],
-    ['fn f() U64 { @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551616"/> \\/; }\nlib { fn run() U64 { f(); } }\n', '18446744073709551616 does not fit U64'],
+    ['fn f(a: I64) I32 => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/;\nlib { fn run() I32 { return f(3); } }\n', '@ir <ir-i32-add> takes i32, given i64'],
+    ['fn f(a: I32, b: I32) I64 => @ir/\\ <ir-i64-add><ir-ident name="a"/><ir-ident name="b"/></ir-i64-add> \\/;\nlib { fn run() I64 { return f(1, 2); } }\n', '@ir <ir-i64-add> takes i64, given i32'],
+    ['fn f(a: F64, b: F64) I32 => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="b"/></ir-i32-add> \\/;\nlib { fn run() I32 { return f(1.0, 2.0); } }\n', '@ir <ir-i32-add> takes i32, given f64'],
+    ['fn f(a: I64) I32 => @ir/\\ <ir-i64-add><ir-ident name="a"/><ir-ident name="a"/></ir-i64-add> \\/;\nlib { fn run() I32 { return f(3); } }\n', '@ir gives i64, not I32'],
+    ['fn f(a: I32) Bool => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="1"/></ir-i32-add> \\/;\nlib { fn run() Bool { return f(3); } }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-i32-add><ir-ident name="a"/></ir-i32-add> \\/;\nlib { fn run() I32 { return f(3); } }\n', '@ir <ir-i32-add> is written wrong here'],
+    ['fn f() I32 => @ir/\\ <ir-lit kind="int" type-name="I32" value="2147483648"/> \\/;\nlib { fn run() I32 { return f(); } }\n', '2147483648 does not fit I32'],
+    ['fn f() U32 => @ir/\\ <ir-lit kind="int" type-name="U32" value="-1"/> \\/;\nlib { fn run() U32 { return f(); } }\n', '-1 does not fit U32'],
+    ['fn f() U64 => @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551616"/> \\/;\nlib { fn run() U64 { return f(); } }\n', '18446744073709551616 does not fit U64'],
     // Only a comparison or Bools make a Bool: a string's length was a Bool holding 3 in small.
-    ['fn ln(a: Str) Bool { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\nlib { fn run() I32 { if ln("abc") { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
-    ['fn g(a: Str) Bool { @ir/\\ <ir-string-get-wtf16><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="0"/></ir-string-get-wtf16> \\/; }\nlib { fn run() I32 { if g("a") { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
-    ['fn g(a: I31) Bool { @ir/\\ <ir-i31-get-s><ir-ident name="a"/></ir-i31-get-s> \\/; }\nlib { fn run() I32 { if g(I31.from_i32(5)) { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn ln(a: Str) Bool => @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/;\nlib { fn run() I32 { return if ln("abc") { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn g(a: Str) Bool => @ir/\\ <ir-string-get-wtf16><ir-ident name="a"/><ir-lit kind="int" type-name="I32" value="0"/></ir-string-get-wtf16> \\/;\nlib { fn run() I32 { return if g("a") { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn g(a: I31) Bool => @ir/\\ <ir-i31-get-s><ir-ident name="a"/></ir-i31-get-s> \\/;\nlib { fn run() I32 { return if g(I31.from_i32(5)) { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
     // Checked though nothing calls it.
-    ['fn f(a: I32) Bool { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { 0; } }\n', "@ir gives an i32, not a comparison's Bool"],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-bogus><ir-ident name="a"/></ir-bogus> \\/; }\nlib { fn run() I32 { 0; } }\n', 'No @ir element <ir-bogus>'],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-ident name="zz"/> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir names no parameter zz'],
+    ['fn f(a: I32) Bool => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/;\nlib { fn run() I32 { return 0; } }\n', "@ir gives an i32, not a comparison's Bool"],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-bogus><ir-ident name="a"/></ir-bogus> \\/;\nlib { fn run() I32 { return 0; } }\n', 'No @ir element <ir-bogus>'],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-ident name="zz"/> \\/;\nlib { fn run() I32 { return 0; } }\n', '@ir names no parameter zz'],
     // A v128 constant's bytes (256 spilled into the next lane), a Bool literal, a lone minus.
-    ['fn f() V128 { @ir/\\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \\/; }\nlib { fn run() I32 { 0; } }\n', '256 does not fit a byte'],
-    ['fn f() V128 { @ir/\\ <ir-v128-const data-type-name="V128" bytes="1,2,3"/> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir <ir-v128-const> is written wrong here'],
-    ['fn f() Bool { @ir/\\ <ir-lit kind="bool" type-name="Bool" value="2"/> \\/; }\nlib { fn run() I32 { 0; } }\n', '2 does not fit Bool'],
-    ['fn f() Bool { @ir/\\ <ir-lit kind="bool" type-name="Bool" value="-7"/> \\/; }\nlib { fn run() I32 { 0; } }\n', '-7 does not fit Bool'],
-    ['fn f() F64 { @ir/\\ <ir-lit kind="float" type-name="F64" value="-"/> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f() V128 => @ir/\\ <ir-v128-const data-type-name="V128" bytes="256,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \\/;\nlib { fn run() I32 { return 0; } }\n', '256 does not fit a byte'],
+    ['fn f() V128 => @ir/\\ <ir-v128-const data-type-name="V128" bytes="1,2,3"/> \\/;\nlib { fn run() I32 { return 0; } }\n', '@ir <ir-v128-const> is written wrong here'],
+    ['fn f() Bool => @ir/\\ <ir-lit kind="bool" type-name="Bool" value="2"/> \\/;\nlib { fn run() I32 { return 0; } }\n', '2 does not fit Bool'],
+    ['fn f() Bool => @ir/\\ <ir-lit kind="bool" type-name="Bool" value="-7"/> \\/;\nlib { fn run() I32 { return 0; } }\n', '-7 does not fit Bool'],
+    ['fn f() F64 => @ir/\\ <ir-lit kind="float" type-name="F64" value="-"/> \\/;\nlib { fn run() I32 { return 0; } }\n', '@ir <ir-lit> is written wrong here'],
     // References and nothing: said by the compiler, not the engine.
-    ['fn f(a: I32) Str { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir gives i32, not Str'],
-    ['fn f(a: I32) Void { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir gives i32, not Void'],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\nlib { fn run() I32 { f(3); } }\n', '@ir <ir-string-measure-utf16> takes externref, given i32'],
-    ['fn f(a: I32, b: I32) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir <ir-ref-eq> takes eqref, given i32'],
-    ['fn f(a: Str, b: Str) Bool { @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/; }\nlib { fn run() I32 { 0; } }\n', '@ir <ir-ref-eq> takes eqref, given externref'],
+    ['fn f(a: I32) Str => @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/;\nlib { fn run() I32 { return 0; } }\n', '@ir gives i32, not Str'],
+    ['fn f(a: I32) Void { @ir/\\ <ir-i32-add><ir-ident name="a"/><ir-ident name="a"/></ir-i32-add> \\/; }\nlib { fn run() I32 { return 0; } }\n', '@ir gives i32, not Void'],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/;\nlib { fn run() I32 { return f(3); } }\n', '@ir <ir-string-measure-utf16> takes externref, given i32'],
+    ['fn f(a: I32, b: I32) Bool => @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/;\nlib { fn run() I32 { return 0; } }\n', '@ir <ir-ref-eq> takes eqref, given i32'],
+    ['fn f(a: Str, b: Str) Bool => @ir/\\ <ir-ref-eq><ir-ident name="a"/><ir-ident name="b"/></ir-ref-eq> \\/;\nlib { fn run() I32 { return 0; } }\n', '@ir <ir-ref-eq> takes eqref, given externref'],
     // An Array[I32]'s element is no Bool: it held 5 in small.
-    [IR_ARR + '    fn &.bget |self| (i: I32) Bool { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n}\n'
-      + 'lib { fn run() I32 { if Arr[I32].new(2, 5).bget(0) { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
+    [IR_ARR + '    fn &.bget |self| (i: I32) Bool => @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/;\n}\n'
+      + 'lib { fn run() I32 { return if Arr[I32].new(2, 5).bget(0) { 1; } else { 0; }; } }\n', "@ir gives an i32, not a comparison's Bool"],
     // A literal's type is a number's or Bool's (Str, V128 were an i32); a float's, past F32.
-    ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="Str" value="42"/> \\/; }\nlib { fn run() I32 { f(); } }\n', '@ir <ir-lit> is written wrong here'],
-    ['fn f() I32 { @ir/\\ <ir-lit kind="int" type-name="V128" value="5"/> \\/; }\nlib { fn run() I32 { f(); } }\n', '@ir <ir-lit> is written wrong here'],
-    [`fn f() F32 { @ir/\\ <ir-lit kind="int" type-name="F32" value="1${'0'.repeat(39)}"/> \\/; }
-lib { fn run() F32 { f(); } }
+    ['fn f() I32 => @ir/\\ <ir-lit kind="int" type-name="Str" value="42"/> \\/;\nlib { fn run() I32 { return f(); } }\n', '@ir <ir-lit> is written wrong here'],
+    ['fn f() I32 => @ir/\\ <ir-lit kind="int" type-name="V128" value="5"/> \\/;\nlib { fn run() I32 { return f(); } }\n', '@ir <ir-lit> is written wrong here'],
+    [`fn f() F32 => @ir/\\ <ir-lit kind="int" type-name="F32" value="1${'0'.repeat(39)}"/> \\/;
+lib { fn run() F32 { return f(); } }
 `, `1${'0'.repeat(39)} does not fit F32`],
     // Each reference operand of its kind (each reached the engine).
-    ['struct Pt:\n    | x: I32\nfn f(p: Pt) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \\/; }\nlib { fn run() I32 { f(Pt { x: 1 }); } }\n', '@ir <ir-string-measure-utf16> takes externref, given a struct'],
-    ['fn f(s: Str) I32 { @ir/\\ <ir-i31-get-s><ir-ident name="s"/></ir-i31-get-s> \\/; }\nlib { fn run() I32 { f("x"); } }\n', '@ir <ir-i31-get-s> takes i31ref, given externref'],
-    ['fn f(a: Array[I64], n: I32) Str { @ir/\\ <ir-string-from-codes><ir-ident name="a"/><ir-ident name="n"/></ir-string-from-codes> \\/; }\nlib { fn run() I32 { f(Array[I64].new(2, 65), 2).len(); } }\n', '@ir <ir-string-from-codes> takes an array of i32, given an array of i64'],
+    ['struct Pt:\n    | x: I32\nfn f(p: Pt) I32 => @ir/\\ <ir-string-measure-utf16><ir-ident name="p"/></ir-string-measure-utf16> \\/;\nlib { fn run() I32 { return f(Pt { x: 1 }); } }\n', '@ir <ir-string-measure-utf16> takes externref, given a struct'],
+    ['fn f(s: Str) I32 => @ir/\\ <ir-i31-get-s><ir-ident name="s"/></ir-i31-get-s> \\/;\nlib { fn run() I32 { return f("x"); } }\n', '@ir <ir-i31-get-s> takes i31ref, given externref'],
+    ['fn f(a: Array[I64], n: I32) Str => @ir/\\ <ir-string-from-codes><ir-ident name="a"/><ir-ident name="n"/></ir-string-from-codes> \\/;\nlib { fn run() I32 { return f(Array[I64].new(2, 65), 2).len(); } }\n', '@ir <ir-string-from-codes> takes an array of i32, given an array of i64'],
     [IR_ARR + '    fn &.put |self| (i: I32, v: Str) Void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n}\n'
-      + 'lib { fn run() I32 { Arr[I32].new(2, 0).put(0, "x"); 1; } }\n', '@ir <ir-array-set> takes i32, given externref'],
-    [IR_ARR + '    fn &.size |self| (x: Str) I32 { @ir/\\ <ir-array-len><ir-ident name="x"/></ir-array-len> \\/; }\n}\n'
-      + 'lib { fn run() I32 { Arr[I32].new(2, 0).size("x"); } }\n', '@ir <ir-array-len> takes an array of i32, given externref'],
-    ['fn f(a: I32, b: I32) Void { @ir/\\ <ir-promise-then><ir-ident name="a"/><ir-ident name="b"/></ir-promise-then> \\/; }\nlib { fn run() I32 { f(1, 2); 1; } }\n', '@ir <ir-promise-then> takes externref, given i32'],
-    ['fn f(a: I32) Void { @ir/\\ <ir-promise-catch><ir-ident name="a"/></ir-promise-catch> \\/; }\nlib { fn run() I32 { f(1); 1; } }\n', '@ir <ir-promise-catch> is written wrong here'],
+      + 'lib { fn run() I32 { Arr[I32].new(2, 0).put(0, "x"); return 1; } }\n', '@ir <ir-array-set> takes i32, given externref'],
+    [IR_ARR + '    fn &.size |self| (x: Str) I32 => @ir/\\ <ir-array-len><ir-ident name="x"/></ir-array-len> \\/;\n}\n'
+      + 'lib { fn run() I32 { return Arr[I32].new(2, 0).size("x"); } }\n', '@ir <ir-array-len> takes an array of i32, given externref'],
+    ['fn f(a: I32, b: I32) Void { @ir/\\ <ir-promise-then><ir-ident name="a"/><ir-ident name="b"/></ir-promise-then> \\/; }\nlib { fn run() I32 { f(1, 2); return 1; } }\n', '@ir <ir-promise-then> takes externref, given i32'],
+    ['fn f(a: I32) Void { @ir/\\ <ir-promise-catch><ir-ident name="a"/></ir-promise-catch> \\/; }\nlib { fn run() I32 { f(1); return 1; } }\n', '@ir <ir-promise-catch> is written wrong here'],
     // A reference result by its type: an array is no Str.
-    ['fn f(a: Array[I32]) Str { @ir/\\ <ir-ident name="a"/> \\/; }\nlib { fn run() I32 { f([1]).len(); } }\n', '@ir gives an array of i32, not Str'],
+    ['fn f(a: Array[I32]) Str => @ir/\\ <ir-ident name="a"/> \\/;\nlib { fn run() I32 { return f([1]).len(); } }\n', '@ir gives an array of i32, not Str'],
     // A type-repr the compiler does not know (it was an i32), an array element naming no type; an operand of a nullary element.
-    ['mod W {\n    type & = @ir/\\ <ir-wasm-scalar type-repr="wasm-foo"/> \\/\n}\nlib { fn run() I32 { 1; } }\n', 'No @ir type-repr wasm-foo'],
-    ['mod W {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=Nope:mut=true"/> \\/\n}\nlib { fn run() I32 { 1; } }\n', "@ir array element Nope is not its mod's parameter or a standard type"],
-    ['fn f(a: I32) I32 { @ir/\\ <ir-safe-checks><ir-ident name="zzz"/></ir-safe-checks> \\/; }\nlib { fn run() I32 { 1; } }\n', '@ir <ir-safe-checks> is written wrong here'],
+    ['mod W {\n    type & = @ir/\\ <ir-wasm-scalar type-repr="wasm-foo"/> \\/\n}\nlib { fn run() I32 { return 1; } }\n', 'No @ir type-repr wasm-foo'],
+    ['mod W {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=Nope:mut=true"/> \\/\n}\nlib { fn run() I32 { return 1; } }\n', "@ir array element Nope is not its mod's parameter or a standard type"],
+    ['fn f(a: I32) I32 => @ir/\\ <ir-safe-checks><ir-ident name="zzz"/></ir-safe-checks> \\/;\nlib { fn run() I32 { return 1; } }\n', '@ir <ir-safe-checks> is written wrong here'],
   ]) {
     const file = await write(source);
     for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
@@ -2271,16 +2271,16 @@ lib { fn run() F32 { f(); } }
     }
   }
   // What @ir may give: a comparison, Bools and'ed, a Bool literal, string equality for Bool; literals at their types' edges.
-  const goodIr = await write('fn lt(a: I32, b: I32) Bool { @ir/\\ <ir-i32-lt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-lt-s> \\/; }\n'
-    + 'fn both(a: Bool, b: Bool) Bool { @ir/\\ <ir-i32-and><ir-ident name="a"/><ir-ident name="b"/></ir-i32-and> \\/; }\n'
-    + 'fn yes() Bool { @ir/\\ <ir-lit kind="int" type-name="Bool" value="1"/> \\/; }\n'
-    + 'fn lo() I32 { @ir/\\ <ir-lit kind="int" type-name="I32" value="-2147483648"/> \\/; }\n'
-    + 'fn hi() U64 { @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551615"/> \\/; }\n'
-    + 'fn wide(a: I32) I64 { @ir/\\ <ir-i64-extend-s><ir-ident name="a"/></ir-i64-extend-s> \\/; }\n'
-    + 'fn same(a: Str, b: Str) Bool { @ir/\\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \\/; }\n'
-    + 'fn len(a: Str) I32 { @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/; }\n'
-    + 'fn top() V128 { @ir/\\ <ir-v128-const data-type-name="V128" bytes="255,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \\/; }\n'
-    + 'lib { fn run() Str { lt(1, 2).str() + " " + both(true, lt(3, 2)).str() + " " + yes().str() + " " + lo().str() + " " + hi().str() + " " + wide(-5).str()'
+  const goodIr = await write('fn lt(a: I32, b: I32) Bool => @ir/\\ <ir-i32-lt-s><ir-ident name="a"/><ir-ident name="b"/></ir-i32-lt-s> \\/;\n'
+    + 'fn both(a: Bool, b: Bool) Bool => @ir/\\ <ir-i32-and><ir-ident name="a"/><ir-ident name="b"/></ir-i32-and> \\/;\n'
+    + 'fn yes() Bool => @ir/\\ <ir-lit kind="int" type-name="Bool" value="1"/> \\/;\n'
+    + 'fn lo() I32 => @ir/\\ <ir-lit kind="int" type-name="I32" value="-2147483648"/> \\/;\n'
+    + 'fn hi() U64 => @ir/\\ <ir-lit kind="int" type-name="U64" value="18446744073709551615"/> \\/;\n'
+    + 'fn wide(a: I32) I64 => @ir/\\ <ir-i64-extend-s><ir-ident name="a"/></ir-i64-extend-s> \\/;\n'
+    + 'fn same(a: Str, b: Str) Bool => @ir/\\ <ir-string-eq><ir-ident name="a"/><ir-ident name="b"/></ir-string-eq> \\/;\n'
+    + 'fn len(a: Str) I32 => @ir/\\ <ir-string-measure-utf16><ir-ident name="a"/></ir-string-measure-utf16> \\/;\n'
+    + 'fn top() V128 => @ir/\\ <ir-v128-const data-type-name="V128" bytes="255,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0"/> \\/;\n'
+    + 'lib { fn run() Str { return lt(1, 2).str() + " " + both(true, lt(3, 2)).str() + " " + yes().str() + " " + lo().str() + " " + hi().str() + " " + wide(-5).str()'
     + ' + " " + same("a", "a").str() + " " + len("abc").str() + " " + V128.any_true(top()).str(); } }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, goodIr, { mode });
@@ -2290,18 +2290,18 @@ lib { fn run() F32 { f(); } }
   }
   // Integer literals of a float type past I64, rounded once from their digits (they wrapped: 1e20 was
   // 7766279631452242000); an array type of a fixed element in a mod not generic (it was an i32); a Bool element.
-  const goodIr2 = await write('fn big() F64 { @ir/\\ <ir-lit kind="int" type-name="F64" value="99999999999999999999"/> \\/; }\n'
-    + 'fn top() F64 { @ir/\\ <ir-lit kind="int" type-name="F64" value="18446744073709551615"/> \\/; }\n'
-    + 'fn low() F64 { @ir/\\ <ir-lit kind="int" type-name="F64" value="-9223372036854775809"/> \\/; }\n'
-    + 'fn odd() F32 { @ir/\\ <ir-lit kind="int" type-name="F32" value="16777217"/> \\/; }\n'
+  const goodIr2 = await write('fn big() F64 => @ir/\\ <ir-lit kind="int" type-name="F64" value="99999999999999999999"/> \\/;\n'
+    + 'fn top() F64 => @ir/\\ <ir-lit kind="int" type-name="F64" value="18446744073709551615"/> \\/;\n'
+    + 'fn low() F64 => @ir/\\ <ir-lit kind="int" type-name="F64" value="-9223372036854775809"/> \\/;\n'
+    + 'fn odd() F32 => @ir/\\ <ir-lit kind="int" type-name="F32" value="16777217"/> \\/;\n'
     + 'mod Words {\n    type & = @ir/\\ <ir-wasm-array type-repr="wasm-array:elem=I64:mut=true"/> \\/\n'
-    + '    fn new(n: I32) & { @ir/\\ <ir-array-new><ir-ident name="n"/></ir-array-new> \\/; }\n'
-    + '    fn &.get |self| (i: I32) I64 { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n'
+    + '    fn new(n: I32) & => @ir/\\ <ir-array-new><ir-ident name="n"/></ir-array-new> \\/;\n'
+    + '    fn &.get |self| (i: I32) I64 => @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/;\n'
     + '    fn &.set |self| (i: I32, v: I64) Void { @ir/\\ <ir-array-set><ir-ident name="self"/><ir-ident name="i"/><ir-ident name="v"/></ir-array-set> \\/; }\n'
-    + '    fn &.len |self| () I32 { @ir/\\ <ir-array-len><ir-ident name="self"/></ir-array-len> \\/; }\n}\n'
-    + IR_ARR + '    fn &.bget |self| (i: I32) Bool { @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/; }\n}\n'
+    + '    fn &.len |self| () I32 => @ir/\\ <ir-array-len><ir-ident name="self"/></ir-array-len> \\/;\n}\n'
+    + IR_ARR + '    fn &.bget |self| (i: I32) Bool => @ir/\\ <ir-array-get><ir-ident name="self"/><ir-ident name="i"/></ir-array-get> \\/;\n}\n'
     + 'lib { fn run() Str {\n    let w = Words.new(3);\n    w.set(1, 40);\n    let b = Arr[Bool].new(2, true);\n'
-    + '    big().str() + " " + top().str() + " " + low().str() + " " + odd().str() + " " + (w.get(1) + w.len().i64()).str() + " " + b.bget(1).str();\n} }\n');
+    + '    return big().str() + " " + top().str() + " " + low().str() + " " + odd().str() + " " + (w.get(1) + w.len().i64()).str() + " " + b.bget(1).str();\n} }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, goodIr2, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2312,7 +2312,7 @@ lib { fn run() F32 { f(); } }
   // An awaited ?T is null when the promise gives undefined, as a sync @es result is; a T is unchanged.
   const awaitUndefined = await write('let s: fun() Promise[?Str] = @es/\\ () => Promise.resolve(undefined) \\/;\n'
     + 'let t: fun() Promise[Str] = @es/\\ () => Promise.resolve("t") \\/;\n'
-    + 'lib { fn run() Str {\n    let x: ?Str = await s();\n    let y: Str = await t();\n    promote x { |v| => "got [" + v + "]", ~> "absent " + y, };\n} }\n');
+    + 'lib { fn run() Str {\n    let x: ?Str = await s();\n    let y: Str = await t();\n    return promote x { |v| => "got [" + v + "]", ~> "absent " + y, };\n} }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, awaitUndefined, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2328,10 +2328,10 @@ lib { fn run() F32 { f(); } }
     + 'let same: fun(Shape) Shape = @es/\\ (s) => s \\/;\n'
     + 'let maybe: fun(Bool, P) ?P = @es/\\ (b, p) => b ? p : undefined \\/;\n'
     + 'let apply: fun(fun(I32) I32, I32) I32 = @es/\\ (f, n) => f(n) + 1 \\/;\n'
-    + 'fn twice(i: I32) I32 { i * 2; }\n'
+    + 'fn twice(i: I32) I32 { return i * 2; }\n'
     + 'lib { fn run() F64 {\n    let o = keep(P { x: 3.0 }, ["a", "b"]);\n    let side = alt same(Square { side: 5.0 }) { Circle |c| => c.r, Square |q| => q.side, };\n'
     + '    let m = promote maybe(false, p_of(o)) { |v| => v.x, ~> 100.0, };\n'
-    + '    p_of(o).x + a_of(o).len().f64() * 10.0 + side * 1000.0 + peek(a_of(o)) + m + apply(twice, 10).f64() * 10000.0;\n} }\n');
+    + '    return p_of(o).x + a_of(o).len().f64() * 10.0 + side * 1000.0 + peek(a_of(o)) + m + apply(twice, 10).f64() * 10000.0;\n} }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, esHandles, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2339,7 +2339,7 @@ lib { fn run() F32 { f(); } }
     checked++;
   }
   // JS gives a struct it made: the boundary's TypeError, not a wrong value.
-  const madeStruct = await write('struct P:\n    | x: F64\nlet mk: fun(F64) P = @es/\\ (x) => ({ x }) \\/;\nlib { fn run() F64 { mk(3.0).x; } }\n');
+  const madeStruct = await write('struct P:\n    | x: F64\nlet mk: fun(F64) P = @es/\\ (x) => ({ x }) \\/;\nlib { fn run() F64 { return mk(3.0).x; } }\n');
   for (const mode of ['small', 'fastUnsafe']) {
     const result = await compileFile(utu, madeStruct, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2349,8 +2349,8 @@ lib { fn run() F32 { f(); } }
   }
   // JS gives a function: a fun result is an error naming the cl it is.
   for (const [source, message] of [
-    ['let add: fun(I32) fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nlib { fn run() I32 { add(1)(2); } }\n', 'add gets a JS function: that is a cl, not fun(I32) I32'],
-    ['let add: cl(I32) ?fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nlib { fn run() I32 { let f = add(1); 0; } }\n', 'add gets a JS function: that is a cl, not ?fun(I32) I32'],
+    ['let add: fun(I32) fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nlib { fn run() I32 { return add(1)(2); } }\n', 'add gets a JS function: that is a cl, not fun(I32) I32'],
+    ['let add: cl(I32) ?fun(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\nlib { fn run() I32 { let f = add(1); return 0; } }\n', 'add gets a JS function: that is a cl, not ?fun(I32) I32'],
   ]) {
     const file = await write(source);
     const { diagnostics } = await compileFile(utu, file, { mode: 'small' });
@@ -2360,7 +2360,7 @@ lib { fn run() F32 { f(); } }
   // What the fun result is instead: a cl. std:Stream hands back what utu gave (a Stream of structs).
   const clResult = await write('using Stream from std:Stream;\nstruct P:\n    | x: I32\n'
     + 'let add: fun(I32) cl(I32) I32 = @es/\\ (n) => (x) => x + n \\/;\n'
-    + 'lib { fn run() I32 { let f = add(1); let t = 0; await for (Stream[P].of([P { x: 10 }, P { x: 20 }])) |p| { t += p.x; }; f(2) + t - 30; } }\n');
+    + 'lib { fn run() I32 { let f = add(1); let t = 0; await for (Stream[P].of([P { x: 10 }, P { x: 20 }])) |p| { t += p.x; }; return f(2) + t - 30; } }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, clResult, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2369,7 +2369,7 @@ lib { fn run() F32 { f(); } }
   }
   // A promise inside a stream's value is not awaited: Stream[Array[Promise[I32]]] is fine.
   const arrayOfPromises = await write('let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\n'
-    + 'lib { fn run() I32 { let t = 0; await for (Stream[Array[Promise[I32]]].of([[later(5)], [later(7)]])) |a| { t += await a[0]; }; t; } }\n');
+    + 'lib { fn run() I32 { let t = 0; await for (Stream[Array[Promise[I32]]].of([[later(5)], [later(7)]])) |a| { t += await a[0]; }; return t; } }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, arrayOfPromises, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2378,23 +2378,23 @@ lib { fn run() F32 { f(); } }
   }
 
   // An @es Str result is a string, checked where it crosses (null passed as a Str, and trapped later).
-  const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nlib { fn run() I32 { f().len(); } }\n'));
+  const nullStr = await selfhost(await write('let f: fun() Str = @es/\\ () => null \\/;\nlib { fn run() I32 { return f().len(); } }\n'));
   assert.throws(() => nullStr.exports.run(), /Wrong type from JavaScript: a Str, not null/);
   checked++;
   // A handle (struct, array, protocol) from JS is not null, and a protocol's is a wasm
   // object: checked where it crosses, in every build (wasm took null, and a protocol any
   // object, and trapped later). ?P takes null and undefined. A closure JS calls is given
   // no null for a handle in safe builds (as an export's arguments are checked).
-  const shapes = 'proto Shape:\n    | area() F64\nstruct Circle[Shape]:\n    | r: F64\nfn Shape[Circle].area |c| () F64 { 3.0 * c.r * c.r; }\nstruct P:\n    | x: I32\n';
+  const shapes = 'proto Shape:\n    | area() F64\nstruct Circle[Shape]:\n    | r: F64\nfn Shape[Circle].area |c| () F64 { return 3.0 * c.r * c.r; }\nstruct P:\n    | x: I32\n';
   const nullHandles = await write(shapes
     + 'let p: fun() P = @es/\\ () => null \\/;\nlet a: fun() Array[I32] = @es/\\ () => null \\/;\n'
     + 'let s: fun() Shape = @es/\\ () => null \\/;\nlet o: fun() Shape = @es/\\ () => ({ area() { return 9; } }) \\/;\n'
     + 'let np: fun() ?P = @es/\\ () => null \\/;\nlet nu: fun() ?P = @es/\\ () => undefined \\/;\nlet ns: fun() ?Shape = @es/\\ () => null \\/;\n'
     + 'let id: fun(Shape) Shape = @es/\\ (v) => v \\/;\nlet ida: fun(Array[I32]) Array[I32] = @es/\\ (v) => v \\/;\nlet idp: fun(P) P = @es/\\ (v) => v \\/;\n'
     + 'let call: fun(cl(P) I32) I32 = @es/\\ (g) => g(null) \\/;\n'
-    + 'lib {\n    fn p_() I32 { p().x; }\n    fn a_() I32 { a().len(); }\n    fn s_() F64 { s().area(); }\n    fn o_() F64 { o().area(); }\n    fn cl_() I32 { call(cl(q) { q.x; }); }\n'
+    + 'lib {\n    fn p_() I32 { return p().x; }\n    fn a_() I32 { return a().len(); }\n    fn s_() F64 { return s().area(); }\n    fn o_() F64 { return o().area(); }\n    fn cl_() I32 { return call(cl(q) { return q.x; }); }\n'
     + '    fn ok() F64 {\n        let x = np() orelse P { x: 1 };\n        let y = nu() orelse P { x: 2 };\n        let z: Shape = ns() orelse Circle { r: 1.0 };\n'
-    + '        (x.x + y.x + ida([4, 5])[1] + idp(P { x: 10 }).x).f64() + z.area() + id(Circle { r: 2.0 }).area();\n    }\n}\n');
+    + '        return (x.x + y.x + ida([4, 5])[1] + idp(P { x: 10 }).x).f64() + z.area() + id(Circle { r: 2.0 }).area();\n    }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, nullHandles, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2408,7 +2408,7 @@ lib { fn run() F32 { f(); } }
     checked++;
   }
   // A value binding's, as the glue loads.
-  const nullValue = await compileFile(utu, await write('struct P:\n    | x: I32\nlet v: P = @es/\\ null \\/;\nlib { fn run() I32 { v.x; } }\n'), { mode: 'small' });
+  const nullValue = await compileFile(utu, await write('struct P:\n    | x: I32\nlet v: P = @es/\\ null \\/;\nlib { fn run() I32 { return v.x; } }\n'), { mode: 'small' });
   await assert.rejects(async () => (await instantiateNode(nullValue.wasm, nullValue.spec)).exports.run(), /Wrong type from JavaScript: a P, not null/);
   checked++;
 
@@ -2426,7 +2426,7 @@ lib { fn run() F32 { f(); } }
   checked++;
   // A mod's tests and benches run, named by their mod (they were dropped);
   // a generic mod's run in no instance.
-  const modTests = await write('let calls: Array[I32] = [0];\nmod geo {\n    fn two() I32 { 2; }\n    test "two" { assert two() == 2; }\n    test "fails" { assert two() == 3; }\n    bench "adds" { let k = two(); measure { calls[0] += k; } }\n}\ntest "two" { assert geo.two() == 2; }\n');
+  const modTests = await write('let calls: Array[I32] = [0];\nmod geo {\n    fn two() I32 { return 2; }\n    test "two" { assert two() == 2; }\n    test "fails" { assert two() == 3; }\n    bench "adds" { let k = two(); measure { calls[0] += k; } }\n}\ntest "two" { assert geo.two() == 2; }\n');
   for (const mode of modes) {
     const tested = await compileFile(utu, modTests, { target: 'test', mode });
     assert.deepEqual(tested.tests.map(t => t.name), ['geo: two', 'geo: fails', 'two'], `${mode}: ${tested.diagnostics?.map(d => d.message)}`);
@@ -2438,14 +2438,14 @@ lib { fn run() F32 { f(); } }
     assert.deepEqual(benched.benches, [{ export: '__bench_0', name: 'geo: adds' }], mode);
     checked++;
   }
-  const genericTests = await compileFile(utu, await write('mod Box[T] {\n    fn id(x: T) T { x; }\n    test "id" { assert true; }\n    bench "id" { measure {} }\n}\nlib { fn run() I32 { 0; } }\n'), {});
+  const genericTests = await compileFile(utu, await write('mod Box[T] {\n    fn id(x: T) T { return x; }\n    test "id" { assert true; }\n    bench "id" { measure {} }\n}\nlib { fn run() I32 { return 0; } }\n'), {});
   assert.deepEqual(genericTests.diagnostics.map(d => d.message), ['Test in generic mod Box', 'Bench in generic mod Box']);
   checked++;
   // A bench returns from neither its setup nor its measure (the run timed
   // nothing: "0.00 ns"); a closure in it may.
   for (const body of ['let x = 1; if x > 0 { return; }; measure {}', 'measure { return; }']) {
     const returns = await compileFile(utu, await write(`bench "r" { ${body} }
-lib { fn run() I32 { 0; } }
+lib { fn run() I32 { return 0; } }
 `), { target: 'bench' });
     assert.deepEqual(returns.diagnostics.map(d => d.message), ['return in a bench'], body);
     checked++;
@@ -2464,22 +2464,22 @@ lib { fn run() I32 { 0; } }
   }
   // Every build checks the tests (and benches), not only a test build.
   for (const target of ['normal', 'test', 'bench']) {
-    const typed = await compileFile(utu, await write('lib { fn run() I32 { 1; } }\ntest "bad" { let a: I32 = 1.5; assert a == 1; }\nbench "worse" { measure { let b: Str = 2; } }\n'), { target });
+    const typed = await compileFile(utu, await write('lib { fn run() I32 { return 1; } }\ntest "bad" { let a: I32 = 1.5; assert a == 1; }\nbench "worse" { measure { let b: Str = 2; } }\n'), { target });
     assert.deepEqual(typed.diagnostics.map(d => d.message), ['a is I32, got F32', 'b is Str, got I32'], target);
     checked++;
   }
   // An imported file's tests and benches (its mods' too) are checked, not run.
-  const lib = await write('mod geo {\n    fn dbl(x: I32) I32 { x * 2; }\n    test "x" { let s: Str = dbl(1); }\n    bench "y" { measure { let t: Str = dbl(1); } }\n}\ntest "top" { let u: Str = 3; }\n');
+  const lib = await write('mod geo {\n    fn dbl(x: I32) I32 { return x * 2; }\n    test "x" { let s: Str = dbl(1); }\n    bench "y" { measure { let t: Str = dbl(1); } }\n}\ntest "top" { let u: Str = 3; }\n');
   for (const target of ['normal', 'test', 'bench']) {
     const typed = await compileFile(utu, await write(`using geo from "./${path.basename(lib)}";
-lib { fn run() I32 { geo.dbl(2); } }
+lib { fn run() I32 { return geo.dbl(2); } }
 `), { target });
     assert.deepEqual(typed.diagnostics.map(d => d.message), ['s is Str, got I32', 't is Str, got I32', 'u is Str, got I32'], target);
     checked++;
   }
-  const goodLib = await write('mod geo {\n    fn dbl(x: I32) I32 { x * 2; }\n    test "x" { assert dbl(1) == 2; }\n    bench "y" { let s = 0; measure { s += dbl(1); } }\n}\ntest "top" { assert true; }\n');
+  const goodLib = await write('mod geo {\n    fn dbl(x: I32) I32 { return x * 2; }\n    test "x" { assert dbl(1) == 2; }\n    bench "y" { let s = 0; measure { s += dbl(1); } }\n}\ntest "top" { assert true; }\n');
   const usesGood = await write(`using geo from "./${path.basename(goodLib)}";
-lib { fn run() I32 { geo.dbl(2); } }
+lib { fn run() I32 { return geo.dbl(2); } }
 test "mine" { assert geo.dbl(1) == 2; }
 `);
   for (const mode of modes) {
@@ -2498,15 +2498,15 @@ test "mine" { assert geo.dbl(1) == 2; }
   // closure is wanted (not also "got cl(unknown) Str"); a tuple element
   // (not also "has no default").
   for (const [source, message] of [
-    ['fn take(s: Str) I32 { s.len(); }\nlib { fn run() I32 { take(cl(m) Str { m; }); } }\n', 'm needs a type'],
-    ['lib { fn run() I32 { let a = Array[.{I32, Str}].new_default(2); 0; } }\n', 'A tuple is only a function result'],
+    ['fn take(s: Str) I32 { return s.len(); }\nlib { fn run() I32 { return take(cl(m) Str { return m; }); } }\n', 'm needs a type'],
+    ['lib { fn run() I32 { let a = Array[.{I32, Str}].new_default(2); return 0; } }\n', 'A tuple is only a function result'],
   ]) {
     const one = await compileFile(utu, await write(source), {});
     assert.deepEqual(one.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], source);
     checked++;
   }
   // A literal out of range in a generic module: the instance named where it was written.
-  const generic = await compileFile(utu, await write('mod G[T] {\n    fn f(v: T) I32 {\n        match v {\n            -1 => 1,\n            ~> 0,\n        };\n    }\n}\nlib { fn run() I32 {\n    G[U32].f(3);\n} }\n'), {});
+  const generic = await compileFile(utu, await write('mod G[T] {\n    fn f(v: T) I32 {\n        return match v {\n            -1 => 1,\n            ~> 0,\n        };\n    }\n}\nlib { fn run() I32 {\n    return G[U32].f(3);\n} }\n'), {});
   assert.equal(generic.diagnostics.length, 1);
   assert.ok(JSON.stringify(generic.diagnostics[0]).includes('in G[U32]'), JSON.stringify(generic.diagnostics[0]));
   checked++;
@@ -2519,22 +2519,22 @@ test "mine" { assert geo.dbl(1) == 2; }
     [`enum E:
 ${altVariants}
 fn f(e: E) I32 {
-    alt e {
+    return alt e {
 ${altArms}
     };
 }
 lib { fn run() I32 {
-    f(V2999 { x: 1 });
+    return f(V2999 { x: 1 });
 } }
 `, 3000],
     [`fn f(x: I32) I32 {
-    match x {
+    return match x {
 ${matchArms}
         ~> -1,
     };
 }
 lib { fn run() I32 {
-    f(7 * 2999);
+    return f(7 * 2999);
 } }
 `, 2999],
   ]) {
@@ -2559,83 +2559,83 @@ lib { fn run() I32 {
   for (let k = 0; k < 3000; k++) teed = (Math.imul(teed, 3) + k % 7) | 0;
   const built = [
     // An imported module's file's own function, not the entry's of the same name (this gave 2000).
-    [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { helper(); } }\n',
-      'main.utu': 'using hm |H| from "./hf.utu";\nfn helper() I32 { 1000; }\nlib { fn run() I32 { H.f() + helper(); } }\n' }, 1002],
+    [{ 'hf.utu': 'fn helper() I32 { return 2; }\nmod hm { fn f() I32 { return helper(); } }\n',
+      'main.utu': 'using hm |H| from "./hf.utu";\nfn helper() I32 { return 1000; }\nlib { fn run() I32 { return H.f() + helper(); } }\n' }, 1002],
     // An imported file's alias stays in its file (it hid the entry's own `ops`).
-    [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n',
-      'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f(v: I32) I32 { ops.double(v); } }\n',
-      'main.utu': 'using boxes from "./boxes.utu";\nmod ops { fn double(v: I32) I32 { v * 10; } }\nlib { fn run() I32 { ops.double(1) + boxes.f(1); } }\n' }, 12],
+    [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { return v * 2; } }\n',
+      'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f(v: I32) I32 { return ops.double(v); } }\n',
+      'main.utu': 'using boxes from "./boxes.utu";\nmod ops { fn double(v: I32) I32 { return v * 10; } }\nlib { fn run() I32 { return ops.double(1) + boxes.f(1); } }\n' }, 12],
     // A capitalized alias of an instance, called and piped to (this built invalid Wasm).
-    [{ 'main.utu': 'mod box[T] { fn id(v: T) T { v; } }\nusing box[F64] |B|;\nlib { fn run() F64 { B.id(1.5) + B.id(2.5); } }\n' }, 4],
-    [{ 'main.utu': 'mod num[T] { fn half(v: T) T { v / 2; } }\nusing num[U32] |N|;\nlib { fn run() I64 { let x: U32 = 4000000000; N.half(x).i64(); } }\n' }, 2000000000n],
+    [{ 'main.utu': 'mod box[T] { fn id(v: T) T { return v; } }\nusing box[F64] |B|;\nlib { fn run() F64 { return B.id(1.5) + B.id(2.5); } }\n' }, 4],
+    [{ 'main.utu': 'mod num[T] { fn half(v: T) T { return v / 2; } }\nusing num[U32] |N|;\nlib { fn run() I64 { let x: U32 = 4000000000; return N.half(x).i64(); } }\n' }, 2000000000n],
     // A module's promoted type's function, called on the module (this said "sm has no member new").
-    [{ 'main.utu': 'mod Sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { &{ v: v }; }\n    fn get(s: &) I32 { s.v; }\n}\nlib { fn run() I32 { Sm.get(Sm.new(3)); } }\n' }, 3],
+    [{ 'main.utu': 'mod Sm {\n    struct &: | v: I32\n    fn &.new(v: I32) & { return &{ v: v }; }\n    fn get(s: &) I32 { return s.v; }\n}\nlib { fn run() I32 { return Sm.get(Sm.new(3)); } }\n' }, 3],
     // An @es binding of a generic module, typed in each instance.
-    [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { add_(t, c); }\n}\nlib { fn run() F64 { Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).f64(); } }\n' }, 10.5],
+    [{ 'main.utu': 'mod Adder[T] {\n    let add_: fun(T, T) T = @es/\\ (a, b) => a + b \\/;\n    fn add(t: T, c: T) T { return add_(t, c); }\n}\nlib { fn run() F64 { return Adder[F64].add(2.5, 3.0) + Adder[I32].add(2, 3).f64(); } }\n' }, 10.5],
     // One file's mod, imported twice (two spellings of its path): one name, one module.
-    [{ 'lib/a.utu': 'mod api { fn x() I32 { 7; } }\n', 'main.utu': 'using api from "./lib/a.utu";\nusing api from "./lib/../lib/a.utu";\nlib { fn run() I32 { api.x(); } }\n' }, 7],
+    [{ 'lib/a.utu': 'mod api { fn x() I32 { return 7; } }\n', 'main.utu': 'using api from "./lib/a.utu";\nusing api from "./lib/../lib/a.utu";\nlib { fn run() I32 { return api.x(); } }\n' }, 7],
     // Two files' mods of one name are two modules (this said "Duplicate util__v").
-    [{ 'x.utu': 'mod util { fn v() I32 { 100; } }\n', 'y.utu': 'mod util { fn v() I32 { 200; } }\n',
-      'main.utu': 'using util |u| from "./x.utu";\nusing util |w| from "./y.utu";\nlib { fn run() I32 { u.v() + w.v(); } }\n' }, 300],
-    [{ 'x.utu': 'mod P {\n    struct &:\n        | a: I32\n    fn &.get |self| () I32 { self.a; }\n    fn make() & { &{a: 7}; }\n}\n',
-      'y.utu': 'mod P {\n    struct &:\n        | a: F64\n        | b: I32\n    fn &.get |self| () I32 { self.b; }\n    fn make() & { &{a: 1.5, b: 30}; }\n}\n',
-      'main.utu': 'using P |X| from "./x.utu";\nusing P |Y| from "./y.utu";\nlib { fn run() I32 { X.make().get() + Y.make().get(); } }\n' }, 37],
-    [{ 'x.utu': 'mod G[T] {\n    struct &:\n        | v: T\n    fn &.k |self| () I32 { 1; }\n    fn mk(v: T) & { &{v: v}; }\n}\n',
-      'y.utu': 'mod G[T] {\n    struct &:\n        | v: T\n        | w: I32\n    fn &.k |self| () I32 { self.w; }\n    fn mk(v: T) & { &{v: v, w: 300}; }\n}\n',
-      'main.utu': 'using G |A| from "./x.utu";\nusing G |B| from "./y.utu";\nlib { fn run() I32 { A[I32].mk(3).k() + B[I32].mk(4).k(); } }\n' }, 301],
+    [{ 'x.utu': 'mod util { fn v() I32 { return 100; } }\n', 'y.utu': 'mod util { fn v() I32 { return 200; } }\n',
+      'main.utu': 'using util |u| from "./x.utu";\nusing util |w| from "./y.utu";\nlib { fn run() I32 { return u.v() + w.v(); } }\n' }, 300],
+    [{ 'x.utu': 'mod P {\n    struct &:\n        | a: I32\n    fn &.get |self| () I32 { return self.a; }\n    fn make() & { return &{a: 7}; }\n}\n',
+      'y.utu': 'mod P {\n    struct &:\n        | a: F64\n        | b: I32\n    fn &.get |self| () I32 { return self.b; }\n    fn make() & { return &{a: 1.5, b: 30}; }\n}\n',
+      'main.utu': 'using P |X| from "./x.utu";\nusing P |Y| from "./y.utu";\nlib { fn run() I32 { return X.make().get() + Y.make().get(); } }\n' }, 37],
+    [{ 'x.utu': 'mod G[T] {\n    struct &:\n        | v: T\n    fn &.k |self| () I32 { return 1; }\n    fn mk(v: T) & { return &{v: v}; }\n}\n',
+      'y.utu': 'mod G[T] {\n    struct &:\n        | v: T\n        | w: I32\n    fn &.k |self| () I32 { return self.w; }\n    fn mk(v: T) & { return &{v: v, w: 300}; }\n}\n',
+      'main.utu': 'using G |A| from "./x.utu";\nusing G |B| from "./y.utu";\nlib { fn run() I32 { return A[I32].mk(3).k() + B[I32].mk(4).k(); } }\n' }, 301],
     // A computed global of an imported file, read by the entry's: set first.
-    [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; a; }\n    let squares: Array[I32] = build();\n}\n',
-      'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nlib { fn run() I32 { last; } }\n' }, 10],
+    [{ 'table.utu': 'mod table {\n    fn build() Array[I32] { let a = Array[I32].new(4, 0); for (0 ..< 4) |i| { a[i] = i * i; }; return a; }\n    let squares: Array[I32] = build();\n}\n',
+      'main.utu': 'using table from "./table.utu";\nlet last: I32 = table.squares[3] + 1;\nlib { fn run() I32 { return last; } }\n' }, 10],
     // An imported file's own mems, read by its functions and modules; a
     // @comptime mem there; an @embed path relative to that file (each was "Unknown variable").
-    [{ 'lib.utu': 'mem m: I32 = [5, 6];\nfn top() I32 { m[1]; }\nfn sq() Array[I32] { [0, 1, 4, 9]; }\nconst mem tab: I32 = @comptime/\\ sq() \\/;\nconst mem raw: U8 = @embed/\\ data.bin \\/;\nmod t { fn n() I32 { top() + m[0] + tab[3] * 10 + raw.len() * 100; } }\n',
-      'data.bin': 'abc', 'main.utu': 'using t from "./lib.utu";\nlib { fn run() I32 { t.n(); } }\n' }, 401],
+    [{ 'lib.utu': 'mem m: I32 = [5, 6];\nfn top() I32 { return m[1]; }\nfn sq() Array[I32] { return [0, 1, 4, 9]; }\nconst mem tab: I32 = @comptime/\\ sq() \\/;\nconst mem raw: U8 = @embed/\\ data.bin \\/;\nmod t { fn n() I32 { return top() + m[0] + tab[3] * 10 + raw.len() * 100; } }\n',
+      'data.bin': 'abc', 'main.utu': 'using t from "./lib.utu";\nlib { fn run() I32 { return t.n(); } }\n' }, 401],
     // A @comptime mem read by another's expression is evaluated first (the second read it empty).
-    [{ 'main.utu': 'fn sq() Array[I32] { [0, 1, 4, 9, 16]; }\nfn plus() Array[I32] { let a = Array[I32].new(first.len(), 0); for (0 ..< first.len()) |i| { a[i] = first[i] + 1; }; a; }\nconst mem second: I32 = @comptime/\\ plus() \\/;\nconst mem first: I32 = @comptime/\\ sq() \\/;\nlib { fn run() I32 { second.len() * 100 + second[4]; } }\n' }, 517],
+    [{ 'main.utu': 'fn sq() Array[I32] { return [0, 1, 4, 9, 16]; }\nfn plus() Array[I32] { let a = Array[I32].new(first.len(), 0); for (0 ..< first.len()) |i| { a[i] = first[i] + 1; }; return a; }\nconst mem second: I32 = @comptime/\\ plus() \\/;\nconst mem first: I32 = @comptime/\\ sq() \\/;\nlib { fn run() I32 { return second.len() * 100 + second[4]; } }\n' }, 517],
     // A @comptime expression that awaits (its run gave a promise, read as nothing).
-    [{ 'main.utu': 'let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn tab() Array[I32] { [await later(5)]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { t.len() * 100 + t[0]; } }\n' }, 105],
+    [{ 'main.utu': 'let later: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;\nfn tab() Array[I32] { return [await later(5)]; }\nconst mem t: I32 = @comptime/\\ tab() \\/;\nlib { fn run() I32 { return t.len() * 100 + t[0]; } }\n' }, 105],
     // A @wat Bool is 0 or 1, returned or left (6 read as true, and == true was false).
-    [{ 'main.utu': 'fn six() Bool { @wat/\\ i32.const 6 \\/; }\nfn nine() Bool { @wat/\\ i32.const 9 return \\/; }\nlib { fn run() I32 { if six() == true and nine() == true { 1; } else { 0; }; } }\n' }, 1],
+    [{ 'main.utu': 'fn six() Bool => @wat/\\ i32.const 6 \\/;\nfn nine() Bool => @wat/\\ i32.const 9 return \\/;\nlib { fn run() I32 { return if six() == true and nine() == true { 1; } else { 0; }; } }\n' }, 1],
     // A cl @es binding is the JS function, passed or called (its accessor called it: NaN).
-    [{ 'main.utu': 'let js_double: cl(I32) I32 = @es/\\ (x) => x * 2 \\/;\nfn apply(f: cl(I32) I32, x: I32) I32 { f(x); }\nlib { fn run() I32 { apply(js_double, 4) + js_double(5) * 10; } }\n' }, 108],
+    [{ 'main.utu': 'let js_double: cl(I32) I32 = @es/\\ (x) => x * 2 \\/;\nfn apply(f: cl(I32) I32, x: I32) I32 { return f(x); }\nlib { fn run() I32 { return apply(js_double, 4) + js_double(5) * 10; } }\n' }, 108],
     // A JavaScript exception runs the defers it unwinds through, newest first, before the catch; not errdefers.
     [{ 'main.utu': `let risky: fun(I32) I32 = @es/\\ (x) => { if (x < 0) throw new Error("neg"); return x; } \\/;
 let log: fun(I32) Void = @es/\\ (v) => { globalThis.__dlog = (globalThis.__dlog ?? 0) * 10 + v; } \\/;
 let logged: fun() I32 = @es/\\ () => { const v = globalThis.__dlog ?? 0; globalThis.__dlog = 0; return v; } \\/;
-fn inner() I32 { defer log(3); risky(-1); }
-fn outer() I32 { defer log(4); let v = inner(); v + 1; }
-fn res() Result[I32, Str] { defer log(6); errdefer log(7); Result[I32, Str].ok(risky(-1)); }
+fn inner() I32 { defer log(3); return risky(-1); }
+fn outer() I32 { defer log(4); let v = inner(); return v + 1; }
+fn res() Result[I32, Str] { defer log(6); errdefer log(7); return Result[I32, Str].ok(risky(-1)); }
 lib { fn run() I32 {
     let r = try { log(1); defer log(2); defer log(5); risky(-1); } catch { log(9); 0; };
     let s = try { outer(); } catch { log(8); 0; };
     let e = try { res().value_or(0); } catch { log(9); 0; };
     let ok = try { defer log(1); risky(7); } catch { 0; };
-    r + s + e + ok - 7 + logged();
+    return r + s + e + ok - 7 + logged();
 } }
 ` }, 1529348691],
     // try/catch's branches meet as an if's: null in either beside a reference is a ?T ("null needs a nullable type").
     [{ 'main.utu': `using JS from std:JS;
-fn parse(text: Str) ?Externref { let p = try { JS.JSON.parse(text); } catch |e| { null; }; p; }
-fn parse2(text: Str) ?Externref { let p = try { null; } catch { JS.JSON.parse(text); }; p; }
-fn bad(text: Str) ?Externref { let p = try { JS.JSON.parse(text); JS.JSON.parse("{"); } catch { null; }; p; }
+fn parse(text: Str) ?Externref { let p = try { JS.JSON.parse(text); } catch |e| { null; }; return p; }
+fn parse2(text: Str) ?Externref { let p = try { null; } catch { JS.JSON.parse(text); }; return p; }
+fn bad(text: Str) ?Externref { let p = try { JS.JSON.parse(text); JS.JSON.parse("{"); } catch { null; }; return p; }
 lib { fn run() I32 {
     let a = if parse("[1]") == null { 0; } else { 1; };
     let b = if parse("[") == null { 0; } else { 10; };
     let c = if parse2("[1]") == null { 0; } else { 100; };
     let d = if bad("[1]") == null { 0; } else { 1000; };
-    a + b + c + d;
+    return a + b + c + d;
 } }
 ` }, 1],
     // An end past the string clamps (a negative or reversed range traps in safe builds, as Array's slice does: d0756ea).
-    [{ 'main.utu': 'fn n(x: I32) I32 { x; }\nlib { fn run() I32 {\n    let s = "hello";\n    Str.slice(s, 1, 3).len() * 1000 + s.slice(2, n(99)).len() * 10000;\n} }\n' }, 32000],
+    [{ 'main.utu': 'fn n(x: I32) I32 { return x; }\nlib { fn run() I32 {\n    let s = "hello";\n    return Str.slice(s, 1, 3).len() * 1000 + s.slice(2, n(99)).len() * 10000;\n} }\n' }, 32000],
     // A mod's own named struct and protocol, opened (in its file, and imported then opened).
-    [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo;\nlib { fn run() I32 { let p = Pt { x: 2 }; let q: geo.Pt = p; q.x; } }\n' }, 2],
+    [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo;\nlib { fn run() I32 { let p = Pt { x: 2 }; let q: geo.Pt = p; return q.x; } }\n' }, 2],
     [{ 'shp.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\n',
-      'main.utu': 'using shapes from "./shp.utu";\nusing shapes;\nstruct Tri[Area]:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nlib { fn run() I32 { let x: Area = Tri { base: 2 }; x.area(); } }\n' }, 2],
+      'main.utu': 'using shapes from "./shp.utu";\nusing shapes;\nstruct Tri[Area]:\n    | base: I32\nfn Area[Tri].area |t| () I32 { return t.base; }\nlib { fn run() I32 { let x: Area = Tri { base: 2 }; return x.area(); } }\n' }, 2],
     // A struct literal from a capitalized module or alias (`Geo.Pt { … }` was "Expected ';'"), and a
     // module's protocol in an impl or bound list (`[shapes.Area]` was "Expected ']'"); `Color.Red {}`
     // and `Color.Red { … }` after if are still a member before a block.
-    [{ 'lib.utu': 'mod Geo {\n    struct Pt:\n        | x: I32\n        | y: I32\n    fn Pt.sum |p| () I32 { p.x + p.y; }\n}\nmod shapes {\n    proto Area:\n        | get area : I32\n}\n',
+    [{ 'lib.utu': 'mod Geo {\n    struct Pt:\n        | x: I32\n        | y: I32\n    fn Pt.sum |p| () I32 { return p.x + p.y; }\n}\nmod shapes {\n    proto Area:\n        | get area : I32\n}\n',
       'main.utu': `using Geo from "./lib.utu";
 using Geo |G| from "./lib.utu";
 using shapes from "./lib.utu";
@@ -2648,20 +2648,20 @@ mod Local {
 }
 struct Tri[shapes.Area]:
     | area: I32
-mod Pick[T[shapes.Area]] { fn big(a: T, b: T) I32 { if a.area > b.area { a.area; } else { b.area; }; } }
-fn total(a: shapes.Area) I32 { a.area; }
+mod Pick[T[shapes.Area]] { fn big(a: T, b: T) I32 { return if a.area > b.area { a.area; } else { b.area; }; } }
+fn total(a: shapes.Area) I32 { return a.area; }
 fn tone(c: Color) I32 {
     let n = 0;
     if c == Color.Red {};
     if c == Color.Red { n = 1; };
-    n + match c == Color.Green { true => 10, ~> 0, };
+    return n + match c == Color.Green { true => 10, ~> 0, };
 }
 lib { fn run() I32 {
     let p = Geo.Pt { x: 2, y: 3 };
     let q = G.Pt { x: 4, y: 5 };
     let b = Local.Box { v: 7 };
     let t = Tri { area: 3 };
-    p.sum() * 100000 + q.sum() * 10000 + b.v * 1000 + total(t) * 100 + Pick[Tri].big(t, Tri { area: 8 }) * 10 + tone(Color.Red) + tone(Color.Green);
+    return p.sum() * 100000 + q.sum() * 10000 + b.v * 1000 + total(t) * 100 + Pick[Tri].big(t, Tri { area: 8 }) * 10 + tone(Color.Red) + tone(Color.Green);
 } }
 ` }, 597391],
     // Str.from_codes inlined into a loop: its index started where the last call left it (each string
@@ -2671,7 +2671,7 @@ struct P:
     | a: I32
 struct Q:
     | s: Str
-fn enc(k: I32) Str { @json/\ encode P P { a: k } \/; }
+fn enc(k: I32) Str { return @json/\ encode P P { a: k } \/; }
 lib { fn run() Str {
     let out = "";
     for (0..<3) |k| {
@@ -2698,7 +2698,7 @@ lib { fn run() Str {
         names.byte(98);
         out += names.ascii(names.finish());
     };
-    out + n.str();
+    return out + n.str();
 } }
 ` }, '{"a":0}|{"a":1}|{"a":2}|{"a":0}{"a":1}{"a":2}{"a":3}{"s":"x"}{"a":0}5{"s":"x"}{"a":1}5k0k0k0abbbcb1000'],
     // @json in a mod uses the file's top-level structs and enums (it said "@json cannot use Item").
@@ -2708,54 +2708,54 @@ enum Color:
     | Red
     | Green
 mod Plain {
-    fn one(text: Str) Str { @json/\ error Item text \/; }
-    fn tint(c: Color) Str { @json/\ encode Array[Color] [c] \/; }
+    fn one(text: Str) Str { return @json/\ error Item text \/; }
+    fn tint(c: Color) Str { return @json/\ encode Array[Color] [c] \/; }
 }
 mod Pager[T] {
     struct Page:
         | items: Array[Item]
     fn two(text: Str) Str {
         let p = @json/\ decode Page text \/ orelse fatal;
-        p.items[0].name + @json/\ encode Page p \/;
+        return p.items[0].name + @json/\ encode Page p \/;
     }
 }
 lib { fn run() Str {
-    Plain.one("{\"name\":\"a\"}") + "/" + Plain.tint(Green {}) + Pager[I32].two("{\"items\":[{\"name\":\"b\"}]}");
+    return Plain.one("{\"name\":\"a\"}") + "/" + Plain.tint(Green {}) + Pager[I32].two("{\"items\":[{\"name\":\"b\"}]}");
 } }
 ` }, '/["Green"]b{"items":[{"name":"b"}]}'],
     // `using M;` of a mod with type & keeps M the mod (`M.f()` was "M is a type, not a value"); `S.S.new`,
     // a mod's type of its own name ("S is a type"); `fn P[geo.Sq].m`, an impl of a mod's type (dropped).
     [{ 'main.utu': `mod M {
-    fn f() I32 { 4; }
+    fn f() I32 { return 4; }
     let g: I32 = 5;
     struct &:
         | a: I32
-    fn &.new(a: I32) & { &{ a: a }; }
-    fn twice() I32 { M.f() * 2; }
+    fn &.new(a: I32) & { return &{ a: a }; }
+    fn twice() I32 { return M.f() * 2; }
 }
 using M;
 mod S {
     struct S:
         | a: I32
-    fn S.new(a: I32) S { S { a: a }; }
+    fn S.new(a: I32) S { return S { a: a }; }
 }
 mod geo { struct Sq:
     | s: I32
 }
 proto Area:
     | area() I32
-fn Area[geo.Sq].area |q| () I32 { q.s * 3; }
-mod Tot[T[Area]] { fn of(x: T) I32 { x.area(); } }
-lib { fn run() I32 { M.f() + M.g + M.new(3).a + M.twice() * 10 + S.S.new(4).a * 100 + geo.Sq { s: 4 }.area() * 1000 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 100000; } }
+fn Area[geo.Sq].area |q| () I32 { return q.s * 3; }
+mod Tot[T[Area]] { fn of(x: T) I32 { return x.area(); } }
+lib { fn run() I32 { return M.f() + M.g + M.new(3).a + M.twice() * 10 + S.S.new(4).a * 100 + geo.Sq { s: 4 }.area() * 1000 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 100000; } }
 ` }, 312492],
-    [{ 'lib.utu': 'mod M {\n    fn f() I32 { 4; }\n    struct &:\n        | a: I32\n    fn &.new(a: I32) & { &{ a: a }; }\n}\nmod S {\n    struct S:\n        | a: I32\n    fn S.new(a: I32) S { S { a: a }; }\n}\nmod geo { struct Sq:\n    | s: I32\n}\n',
-      'impl.utu': 'using geo from "./lib.utu";\nmod shapes {\n    proto Area:\n        | area() I32\n    fn Area[geo.Sq].area |q| () I32 { q.s * 3; }\n}\n',
-      'main.utu': 'using M from "./lib.utu";\nusing S from "./lib.utu";\nusing geo from "./lib.utu";\nusing shapes from "./impl.utu";\nusing M;\nmod Tot[T[shapes.Area]] { fn of(x: T) I32 { x.area(); } }\nlib { fn run() I32 { M.f() + M.new(3).a + S.S.new(4).a * 10 + geo.Sq { s: 4 }.area() * 100 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 10000; } }\n' }, 31247],
+    [{ 'lib.utu': 'mod M {\n    fn f() I32 { return 4; }\n    struct &:\n        | a: I32\n    fn &.new(a: I32) & { return &{ a: a }; }\n}\nmod S {\n    struct S:\n        | a: I32\n    fn S.new(a: I32) S { return S { a: a }; }\n}\nmod geo { struct Sq:\n    | s: I32\n}\n',
+      'impl.utu': 'using geo from "./lib.utu";\nmod shapes {\n    proto Area:\n        | area() I32\n    fn Area[geo.Sq].area |q| () I32 { return q.s * 3; }\n}\n',
+      'main.utu': 'using M from "./lib.utu";\nusing S from "./lib.utu";\nusing geo from "./lib.utu";\nusing shapes from "./impl.utu";\nusing M;\nmod Tot[T[shapes.Area]] { fn of(x: T) I32 { return x.area(); } }\nlib { fn run() I32 { return M.f() + M.new(3).a + S.S.new(4).a * 10 + geo.Sq { s: 4 }.area() * 100 + Tot[geo.Sq].of(geo.Sq { s: 1 }) * 10000; } }\n' }, 31247],
     // Thousands of statements each reading the one before (teed into one another, they overflowed code generation's stack).
     [{ 'main.utu': `lib { fn run() I32 {
     let a = 1;
 ${tee}
-    a;
+    return a;
 } }
 ` }, teed],
   ];
@@ -2772,51 +2772,51 @@ ${tee}
   }
   // What a file does not import, it does not see.
   const unseen = [
-    [{ 'hf.utu': 'fn helper() I32 { 2; }\nmod hm { fn f() I32 { 1; } }\n', 'main.utu': 'using hm from "./hf.utu";\nlib { fn run() I32 { helper(); } }\n' }, 'Unknown function helper'],
-    [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { v * 2; } }\n', 'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f() I32 { 1; } }\n',
-      'main.utu': 'using boxes from "./boxes.utu";\nlib { fn run() I32 { ops.double(21); } }\n' }, 'Unknown variable ops'],
+    [{ 'hf.utu': 'fn helper() I32 { return 2; }\nmod hm { fn f() I32 { return 1; } }\n', 'main.utu': 'using hm from "./hf.utu";\nlib { fn run() I32 { return helper(); } }\n' }, 'Unknown function helper'],
+    [{ 'ops.utu': 'mod mathops { fn double(v: I32) I32 { return v * 2; } }\n', 'boxes.utu': 'using mathops |ops| from "./ops.utu";\nmod boxes { fn f() I32 { return 1; } }\n',
+      'main.utu': 'using boxes from "./boxes.utu";\nlib { fn run() I32 { return ops.double(21); } }\n' }, 'Unknown variable ops'],
     // An imported file's mem is its own too.
-    [{ 'mf.utu': 'mem m: I32 = [1];\nmod mm { fn f() I32 { m[0]; } }\n', 'main.utu': 'using mm from "./mf.utu";\nlib { fn run() I32 { m[0]; } }\n' }, 'Unknown variable m'],
+    [{ 'mf.utu': 'mem m: I32 = [1];\nmod mm { fn f() I32 { return m[0]; } }\n', 'main.utu': 'using mm from "./mf.utu";\nlib { fn run() I32 { return m[0]; } }\n' }, 'Unknown variable m'],
     // A parse error in an imported file is the mistake (it showed as "Unknown module t8").
-    [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nlib { fn run() I32 { t8.n(); } }\n' }, "Unexpected ';'"],
+    [{ 't8.utu': 'mod t8 {\n    fn n() I32 { 1 +; }\n}\n', 'main.utu': 'using t8 from "./t8.utu";\nlib { fn run() I32 { return t8.n(); } }\n' }, "Unexpected ';'"],
     // Only a mod is imported: said at the using.
-    [{ 'hf.utu': 'fn helper() I32 { 2; }\n', 'main.utu': 'using helper from "./hf.utu";\nlib { fn run() I32 { helper(); } }\n' }, 'helper is a function; using imports a mod'],
+    [{ 'hf.utu': 'fn helper() I32 { return 2; }\n', 'main.utu': 'using helper from "./hf.utu";\nlib { fn run() I32 { return helper(); } }\n' }, 'helper is a function; using imports a mod'],
     // One name, two files' mods: said at the second using (it was "Duplicate api__x", in b.utu).
-    [{ 'a.utu': 'mod api { fn x() I32 { 1; } }\n', 'b.utu': 'mod api { fn x() I32 { 2; } }\n',
-      'main.utu': 'using api from "./a.utu";\nusing api from "./b.utu";\nlib { fn run() I32 { api.x(); } }\n' }, 'Duplicate declaration api'],
+    [{ 'a.utu': 'mod api { fn x() I32 { return 1; } }\n', 'b.utu': 'mod api { fn x() I32 { return 2; } }\n',
+      'main.utu': 'using api from "./a.utu";\nusing api from "./b.utu";\nlib { fn run() I32 { return api.x(); } }\n' }, 'Duplicate declaration api'],
     // One file's two mods of one name, said in the user's words (it was "Duplicate util__v").
-    [{ 'main.utu': 'mod util { fn v() I32 { 1; } }\nmod util { fn v() I32 { 2; } }\nlib { fn run() I32 { util.v(); } }\n' }, 'Duplicate declaration util'],
+    [{ 'main.utu': 'mod util { fn v() I32 { return 1; } }\nmod util { fn v() I32 { return 2; } }\nlib { fn run() I32 { return util.v(); } }\n' }, 'Duplicate declaration util'],
     // A method or impl of an undeclared name (each was dropped, unsaid).
-    [{ 'main.utu': 'lib { fn run() I32 { 1; } }\nstruct Sq:\n    | s: I32\nfn Nope.area |self| () I32 { 1; }\n' }, 'Unknown type Nope'],
-    [{ 'main.utu': 'lib { fn run() I32 { Sq{s:3}.area(); } }\nstruct Sq:\n    | s: I32\nfn Zork[Sq].area |self| () I32 { 1; }\n' }, 'Unknown type Zork'],
+    [{ 'main.utu': 'lib { fn run() I32 { return 1; } }\nstruct Sq:\n    | s: I32\nfn Nope.area |self| () I32 { return 1; }\n' }, 'Unknown type Nope'],
+    [{ 'main.utu': 'lib { fn run() I32 { return Sq{s:3}.area(); } }\nstruct Sq:\n    | s: I32\nfn Zork[Sq].area |self| () I32 { return 1; }\n' }, 'Unknown type Zork'],
     // `using geo |Pt|` renames mod geo; a mod with no type & is not a type (these trapped or built invalid Wasm).
-    [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo |Pt|;\nlib { fn run() I32 { let p = Pt { x: 2 }; p.x; } }\n' }, 'Pt names mod geo, which has no type &'],
-    [{ 'geo.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\n', 'main.utu': 'using geo |Pt| from "./geo.utu";\nlib { fn run() I32 { let p = Pt { x: 2 }; p.x; } }\n' }, 'Pt names mod geo, which has no type &'],
-    [{ 'main.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\nusing shapes |Area|;\nstruct Tri[Area]:\n    | base: I32\nlib { fn run() I32 { let t = Tri { base: 2 }; let x: Area = t; 2; } }\n' }, 'Area names mod shapes, which has no type &'],
+    [{ 'main.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\nusing geo |Pt|;\nlib { fn run() I32 { let p = Pt { x: 2 }; return p.x; } }\n' }, 'Pt names mod geo, which has no type &'],
+    [{ 'geo.utu': 'mod geo {\n    struct Pt:\n        | x: I32\n}\n', 'main.utu': 'using geo |Pt| from "./geo.utu";\nlib { fn run() I32 { let p = Pt { x: 2 }; return p.x; } }\n' }, 'Pt names mod geo, which has no type &'],
+    [{ 'main.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\nusing shapes |Area|;\nstruct Tri[Area]:\n    | base: I32\nlib { fn run() I32 { let t = Tri { base: 2 }; let x: Area = t; return 2; } }\n' }, 'Area names mod shapes, which has no type &'],
     [{ 'shp.utu': 'mod shapes {\n    proto Area:\n        | area() I32\n}\n',
-      'main.utu': 'using shapes |Area| from "./shp.utu";\nstruct Tri:\n    | base: I32\nfn Area[Tri].area |t| () I32 { t.base; }\nlib { fn run() I32 { 2; } }\n' }, 'Area names mod shapes, which has no type &'],
-    [{ 'main.utu': 'mod Geo {\n    struct Pt:\n        | x: I32\n}\nlib { fn run() I32 { let p = Geo { x: 2 }; p.x; } }\n' }, 'Geo is a mod with no type &'],
-    [{ 'main.utu': 'mod Box[T] {\n    fn one() I32 { 1; }\n}\nfn Box[I32].two() I32 { 2; }\nlib { fn run() I32 { 2; } }\n' }, 'Box is a mod with no type &'],
+      'main.utu': 'using shapes |Area| from "./shp.utu";\nstruct Tri:\n    | base: I32\nfn Area[Tri].area |t| () I32 { return t.base; }\nlib { fn run() I32 { return 2; } }\n' }, 'Area names mod shapes, which has no type &'],
+    [{ 'main.utu': 'mod Geo {\n    struct Pt:\n        | x: I32\n}\nlib { fn run() I32 { let p = Geo { x: 2 }; return p.x; } }\n' }, 'Geo is a mod with no type &'],
+    [{ 'main.utu': 'mod Box[T] {\n    fn one() I32 { return 1; }\n}\nfn Box[I32].two() I32 { return 2; }\nlib { fn run() I32 { return 2; } }\n' }, 'Box is a mod with no type &'],
     // A module's protocol in an impl or bound list resolves as a type path does.
-    [{ 'main.utu': 'mod shapes { proto Area:\n    | get area : I32\n}\nstruct Sq[shapes.Nope]:\n    | area: I32\nlib { fn run() I32 { 1; } }\n' }, 'Unknown type Nope'],
-    [{ 'main.utu': 'mod shapes { struct Pt:\n    | x: I32\n}\nmod M[T[shapes.Pt]] { fn f(a: T) T { a; } }\nlib { fn run() I32 { 1; } }\n' }, 'Pt is not a protocol; a bound names one'],
+    [{ 'main.utu': 'mod shapes { proto Area:\n    | get area : I32\n}\nstruct Sq[shapes.Nope]:\n    | area: I32\nlib { fn run() I32 { return 1; } }\n' }, 'Unknown type Nope'],
+    [{ 'main.utu': 'mod shapes { struct Pt:\n    | x: I32\n}\nmod M[T[shapes.Pt]] { fn f(a: T) T { return a; } }\nlib { fn run() I32 { return 1; } }\n' }, 'Pt is not a protocol; a bound names one'],
     [{ 'main.utu': 'mod Geo { struct Pt:\n    | x: I32\n}\nlib { fn run() I32 { let p = Geo.Pt { x: 1 }; let q = Geo.Pt {}; 1; } }\n' }, "Expected ';', got '{'"],
     // A mod and a function (or type) of one name (it was "No method fun() I32.f" at a use).
-    [{ 'main.utu': 'mod m { fn f() I32 { 1; } }\nfn m() I32 { 2; }\nlib { fn run() I32 { m.f(); } }\n' }, 'Duplicate declaration m'],
-    [{ 'lib.utu': 'mod m { fn f() I32 { 1; } }\nstruct m:\n    | a: I32\n', 'main.utu': 'using m from "./lib.utu";\nlib { fn run() I32 { m.f(); } }\n' }, 'Duplicate declaration m'],
+    [{ 'main.utu': 'mod m { fn f() I32 { return 1; } }\nfn m() I32 { return 2; }\nlib { fn run() I32 { return m.f(); } }\n' }, 'Duplicate declaration m'],
+    [{ 'lib.utu': 'mod m { fn f() I32 { return 1; } }\nstruct m:\n    | a: I32\n', 'main.utu': 'using m from "./lib.utu";\nlib { fn run() I32 { return m.f(); } }\n' }, 'Duplicate declaration m'],
     // A mod called (it trapped at run time).
-    [{ 'main.utu': 'mod m { fn f() I32 { 1; } }\nlib { fn run() I32 { m() + 2; } }\n' }, 'm is a module, not a value'],
-    [{ 'u.utu': 'mod util { fn f() I32 { 1; } }\n', 'main.utu': 'using util |helper| from "./u.utu";\nlib { fn run() I32 { helper() + 1; } }\n' }, 'helper is a module, not a value'],
+    [{ 'main.utu': 'mod m { fn f() I32 { return 1; } }\nlib { fn run() I32 { return m() + 2; } }\n' }, 'm is a module, not a value'],
+    [{ 'u.utu': 'mod util { fn f() I32 { return 1; } }\n', 'main.utu': 'using util |helper| from "./u.utu";\nlib { fn run() I32 { return helper() + 1; } }\n' }, 'helper is a module, not a value'],
     // An impl list, an impl's head, and an impl's member name protocols and their members (each was accepted).
-    [{ 'main.utu': 'struct Rec:\n    | x: I32\nstruct B[Rec]:\n    | x: I32\nlib { fn run() I32 { B { x: 1 }.x; } }\n' }, 'Rec is not a protocol; a struct lists protocols'],
-    [{ 'main.utu': 'struct B[I32]:\n    | x: I32\nlib { fn run() I32 { B { x: 1 }.x; } }\n' }, 'I32 is not a protocol; a struct lists protocols'],
-    [{ 'main.utu': 'struct Rec:\n    | x: I32\nmod Box {\n    struct &[Rec]:\n        | x: I32\n}\nlib { fn run() I32 { 1; } }\n' }, 'Rec is not a protocol; a struct lists protocols'],
-    [{ 'main.utu': 'struct Rec:\n    | x: I32\nenum E[Rec]:\n    | P\n    | Q\nlib { fn run() I32 { 1; } }\n' }, 'Rec is not a protocol; an enum lists protocols'],
-    [{ 'main.utu': 'struct Rec:\n    | x: I32\nstruct Sq:\n    | s: I32\nfn Rec[Sq].area |self| () I32 { 1; }\nlib { fn run() I32 { Sq { s: 1 }.s; } }\n' }, 'Rec is not a protocol'],
-    [{ 'main.utu': 'proto Area:\n    | area() I32\nstruct Sq[Area]:\n    | s: I32\nfn Area[Sq].area |self| () I32 { self.s; }\nfn Area[Sq].extra |self| () I32 { 1; }\nlib { fn run() I32 { Sq { s: 1 }.extra(); } }\n' }, 'Area has no member extra'],
-    [{ 'main.utu': 'proto Area:\n    | area() I32\nstruct A[Area, Area]:\n    | s: I32\nfn Area[A].area |self| () I32 { self.s; }\nlib { fn run() I32 { A { s: 1 }.area(); } }\n' }, 'Duplicate protocol Area'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nstruct B[Rec]:\n    | x: I32\nlib { fn run() I32 { return B { x: 1 }.x; } }\n' }, 'Rec is not a protocol; a struct lists protocols'],
+    [{ 'main.utu': 'struct B[I32]:\n    | x: I32\nlib { fn run() I32 { return B { x: 1 }.x; } }\n' }, 'I32 is not a protocol; a struct lists protocols'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nmod Box {\n    struct &[Rec]:\n        | x: I32\n}\nlib { fn run() I32 { return 1; } }\n' }, 'Rec is not a protocol; a struct lists protocols'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nenum E[Rec]:\n    | P\n    | Q\nlib { fn run() I32 { return 1; } }\n' }, 'Rec is not a protocol; an enum lists protocols'],
+    [{ 'main.utu': 'struct Rec:\n    | x: I32\nstruct Sq:\n    | s: I32\nfn Rec[Sq].area |self| () I32 { return 1; }\nlib { fn run() I32 { return Sq { s: 1 }.s; } }\n' }, 'Rec is not a protocol'],
+    [{ 'main.utu': 'proto Area:\n    | area() I32\nstruct Sq[Area]:\n    | s: I32\nfn Area[Sq].area |self| () I32 { return self.s; }\nfn Area[Sq].extra |self| () I32 { return 1; }\nlib { fn run() I32 { return Sq { s: 1 }.extra(); } }\n' }, 'Area has no member extra'],
+    [{ 'main.utu': 'proto Area:\n    | area() I32\nstruct A[Area, Area]:\n    | s: I32\nfn Area[A].area |self| () I32 { return self.s; }\nlib { fn run() I32 { return A { s: 1 }.area(); } }\n' }, 'Duplicate protocol Area'],
     // Two bounds' `fn P.t`: which one is not said.
-    [{ 'main.utu': 'proto A:\n    | get n : I32\nproto B:\n    | get n : I32\nstruct S[A, B]:\n    | n: I32\nfn A.t |c| () I32 { 1; }\nfn B.t |c| () I32 { 2; }\nmod Run[T[A, B]] {\n    fn go(c: T) I32 { c.t(); }\n}\nlib { fn run() I32 { Run[S].go(S { n: 0 }); } }\n' }, "t is both A's and B's"],
+    [{ 'main.utu': 'proto A:\n    | get n : I32\nproto B:\n    | get n : I32\nstruct S[A, B]:\n    | n: I32\nfn A.t |c| () I32 { return 1; }\nfn B.t |c| () I32 { return 2; }\nmod Run[T[A, B]] {\n    fn go(c: T) I32 { return c.t(); }\n}\nlib { fn run() I32 { return Run[S].go(S { n: 0 }); } }\n' }, "t is both A's and B's"],
   ];
   for (const [files, message] of unseen) {
     const result = await compileFile(utu, await project(files), {});
@@ -2832,12 +2832,12 @@ ${tee}
   const apifix = { 'node_modules/apifix/package.json': '{"name":"apifix","version":"1.0.0","type":"module","main":"index.js","types":"index.d.ts"}',
     'node_modules/apifix/index.d.ts': callbacks, 'node_modules/apifix/index.js': callbacksJs };
   for (const [body, message] of [
-    ['Api.cb(cl(x, y, z) F64 { x + z; })', 'Callback takes 3 parameters; JS passes 1'],
-    ['let f: cl(F64, F64) F64 = cl(x, y) { x + y; };\n    Api.cb(f)', 'Callback takes 2 parameters; JS passes 1'],
-    ['Api.opt(cl(x, y, z) F64 { x; })', 'Callback takes 3 parameters; JS passes 2'],
+    ['Api.cb(cl(x, y, z) F64 { return x + z; })', 'Callback takes 3 parameters; JS passes 1'],
+    ['let f: cl(F64, F64) F64 = cl(x, y) { return x + y; };\n    Api.cb(f)', 'Callback takes 2 parameters; JS passes 1'],
+    ['Api.opt(cl(x, y, z) F64 { return x; })', 'Callback takes 3 parameters; JS passes 2'],
   ]) {
     const result = await compileFile(utu, await project({ ...apifix, 'main.utu': `using Api from "npm:apifix";
-lib { fn run() F64 {
+lib { fn run() F64 => {
     ${body};
 } }
 ` }), { mode: 'small' });
@@ -2845,12 +2845,12 @@ lib { fn run() F64 {
     checked++;
   }
   const fewer = await project({ ...apifix, 'main.utu': 'using Api from "npm:apifix";\n'
-    + 'lib { fn run() F64 {\n    Api.cb(cl(x) F64 { x + 1.0; }) + Api.cb(cl() F64 { 7.0; }) + Api.many(cl(a, b, c) F64 { a + b + c; }) + Api.opt(cl(x, y) F64 { x; });\n} }\n' });
+    + 'lib { fn run() F64 {\n    return Api.cb(cl(x) F64 { return x + 1.0; }) + Api.cb(cl() F64 { return 7.0; }) + Api.many(cl(a, b, c) F64 { return a + b + c; }) + Api.opt(cl(x, y) F64 { return x; });\n} }\n' });
   // A linked declaration file (`tools/dts/cli.mjs` writes it) is imported as a package is;
   // a relative module is from the program's directory.
   const { linkFiles } = await import('../tools/dts/link.mjs');
   const linked = await project({ 'api.d.ts': callbacks, 'api.js': callbacksJs, 'main.utu': 'using Api from "./bindings/Api.abi.json";\n'
-    + 'lib { fn run() F64 {\n    Api.cb(cl(x) F64 { x + 1.0; }) + Api.many(cl(a, b, c) F64 { a + b + c; });\n} }\n' });
+    + 'lib { fn run() F64 {\n    return Api.cb(cl(x) F64 { return x + 1.0; }) + Api.many(cl(a, b, c) F64 { return a + b + c; });\n} }\n' });
   await fs.mkdir(path.join(path.dirname(linked), 'node_modules'));
   const abi = linkFiles({ files: [path.join(path.dirname(linked), 'api.d.ts')], prefix: 'Api', moduleSpecifier: './api.js' });
   await fs.mkdir(path.join(path.dirname(linked), 'bindings'));
@@ -2864,14 +2864,14 @@ lib { fn run() F64 {
     }
   }
   await fs.writeFile(path.join(path.dirname(linked), 'bindings/Bad.abi.json'), '{"version":2}');
-  await fs.writeFile(path.join(path.dirname(linked), 'bad.utu'), 'using Bad from "./bindings/Bad.abi.json";\nlib { fn run() F64 { 1.0; } }\n');
+  await fs.writeFile(path.join(path.dirname(linked), 'bad.utu'), 'using Bad from "./bindings/Bad.abi.json";\nlib { fn run() F64 { return 1.0; } }\n');
   const badAbi = await compileFile(utu, path.join(path.dirname(linked), 'bad.utu'), {});
   assert.deepEqual(badAbi.diagnostics.map(d => d.message), ['No ABI in ./bindings/Bad.abi.json: missing, or not one tools/dts/cli.mjs wrote']);
   // A linked `bigint` is an I64; a native Promise[T] is a linked `Promise<T>` (T unbound).
   const big = await project({ 'api.d.ts': 'export declare function bigs(a: bigint): bigint;\nexport declare function aw<T>(p: Promise<T>): Promise<Awaited<T>>;\n',
     'api.js': 'export const bigs = a => a * 2n;\nexport const aw = async p => await p;\n',
     'main.utu': 'using Api from "./bindings/Api.abi.json";\nlet pr: fun(F64) Promise[F64] = @es/\\ (x) => Promise.resolve(x) \\/;\n'
-      + 'lib {\n    fn twice() I64 { let b: I64 = Api.bigs(21); b; }\n    fn wait() Promise[F64] { let p: Promise[F64] = Api.aw(pr(3.0)); p; }\n}\n' });
+      + 'lib {\n    fn twice() I64 { let b: I64 = Api.bigs(21); return b; }\n    fn wait() Promise[F64] { let p: Promise[F64] = Api.aw(pr(3.0)); return p; }\n}\n' });
   await fs.mkdir(path.join(path.dirname(big), 'bindings'));
   await fs.writeFile(path.join(path.dirname(big), 'bindings/Api.abi.json'), JSON.stringify(linkFiles({ files: [path.join(path.dirname(big), 'api.d.ts')], prefix: 'Api', moduleSpecifier: './api.js' })));
   const bigBuilt = await compileFile(utu, big, {});
@@ -2908,10 +2908,10 @@ lib { fn run() F64 {
   const hostHead = 'using A from "npm:hosta";\nusing B from "npm:hostb";\n';
   const hostTypes = await project({ ...hosts, 'main.utu': hostHead + 'lib { fn run() F64 {\n'
     + '    let t = A.mixed();\n    let f = A.getFn();\n    let m: A.Mode = 5.0;\n'
-    + '    t[0] + t[1].len().f64() + f(2.0) + B.callIt(f)\n'
-    + '        + A.cbOpt(cl(a, b) F64 { promote b { |v| => v, ~> 100.0, }; }) + B.callLoose(cl(x) F64 { x * 2.0; })\n'
+    + '    return t[0] + t[1].len().f64() + f(2.0) + B.callIt(f)\n'
+    + '        + A.cbOpt(cl(a, b) F64 { return promote b { |v| => v, ~> 100.0, }; }) + B.callLoose(cl(x) F64 { return x * 2.0; })\n'
     + '        + (promote A.firstOf([4.0, 5.0]) { |v| => v, ~> 0.0, }) + A.named([&{ name: "ab", n: 1.0 }]).len().f64()\n'
-    + '        + A.withCb(cl(g) Str { g("q"); }).len().f64() + A.strMaybe(cl() Str { "s"; }).len().f64() + A.useMode(m);\n} }\n' });
+    + '        + A.withCb(cl(g) Str { return g("q"); }).len().f64() + A.strMaybe(cl() Str { return "s"; }).len().f64() + A.useMode(m);\n} }\n' });
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, hostTypes, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -2921,13 +2921,13 @@ lib { fn run() F64 {
   for (const [body, message] of [
     ['let t = A.mixed(); let x: F64 = t[1]; x', 'x is F64, got Str'],
     ['let i = 1; let t = A.mixed(); t[i]', 'A.[F64, Str, Bool] takes a constant index: its elements differ in type'],
-    ['A.cbOpt(cl(a, b) F64 { b; })', 'Expected F64, got ?F64'],
+    ['A.cbOpt(cl(a, b) F64 { return b; })', 'The closure returns F64, got ?F64'],
     ['let s: Str = A.firstOf([1.0]); 0.0', 's is Str, got ?F64'],
     ['let m: A.Mode = 99.0; 0.0', 'A.Mode has no value 99.0'],
     ['A.useMode(3.0)', 'A.Mode has no value 3.0'],
     ['let t: A.Tag = "a"; 0.0', 'A.Tag is a string enum: it takes its members, not "a"'],
   ]) {
-    const result = await compileFile(utu, await project({ ...hosts, 'main.utu': `${hostHead}lib { fn run() F64 {\n    ${body};\n} }\n` }), { mode: 'small' });
+    const result = await compileFile(utu, await project({ ...hosts, 'main.utu': `${hostHead}lib { fn run() F64 => {\n    ${body};\n} }\n` }), { mode: 'small' });
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), [message], body);
     checked++;
   }
@@ -2945,7 +2945,7 @@ lib { fn run() F64 {
     + 'fn tick(x: I32) Void { bump(); }\n'
     + 'lib { fn run() I32 {\n    reset();\n    let t: Externref = et();\n    let f: fun(I32) Void = tick;\n'
     + '    on(t, "x", f);\n    fire(t, "x");\n    off(t, "x", f);\n    fire(t, "x");\n'
-    + '    on(t, "y", tick);\n    fire(t, "y");\n    off(t, "y", tick);\n    fire(t, "y");\n    hits();\n} }\n');
+    + '    on(t, "y", tick);\n    fire(t, "y");\n    off(t, "y", tick);\n    fire(t, "y");\n    return hits();\n} }\n');
   const hostC = 'export declare function add(f: (a: number, b?: number) => void): void;\n'
     + 'export declare function remove(f: (a: number, b?: number) => void): boolean;\n';
   const hostCJs = 'const fs = new Set();\nexport function add(f) { fs.add(f); }\nexport function remove(f) { return fs.delete(f); }\n';
@@ -2953,7 +2953,7 @@ lib { fn run() F64 {
     + 'lib { fn run() I32 {\n    let n = 0;\n    let h = cl(a, b) Void { n += 1; };\n    let g = cl(this, a) Void { n += 1; };\n'
     + '    C.add(h);\n    C.add(g);\n    let r = (if C.remove(h) { 1; } else { 0; }) + (if C.remove(g) { 10; } else { 0; });\n'
     + '    let t = new Web.EventTarget();\n    t.addEventListener("x", cl(e: Web.Event) { n += 100; });\n'
-    + '    t.dispatchEvent(new Web.Event("x"));\n    r + n;\n} }\n' });
+    + '    t.dispatchEvent(new Web.Event("x"));\n    return r + n;\n} }\n' });
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     for (const [file, expected] of [[decayed, 2], [kept, 111]]) {
       const result = await compileFile(utu, file, { mode });
@@ -2997,10 +2997,10 @@ lib { fn run() F64 {
   const tupleHead = 'using C from "npm:hostt";\n';
   const tuples = await project({ ...pkg('hostt', hostT, hostTJs), 'main.utu': tupleHead + 'lib { fn run() F64 {\n'
     + '    let t = C.rest();\n'
-    + '    C.tupOf([1.0, 2.0]) + C.pairs([3.0, 4.0]) + C.nested([["ab", 1.0]]).len().f64() + C.firstU([5.0, 6.0])\n'
+    + '    return C.tupOf([1.0, 2.0]) + C.pairs([3.0, 4.0]) + C.nested([["ab", 1.0]]).len().f64() + C.firstU([5.0, 6.0])\n'
     + '        + C.inTup([1.0, "a"]).len().f64() + C.inRest([1.0, "a", "b"]) + t[2].len().f64()\n'
     + '        + C.applyRest(C.fixed2()) + C.applyTwo(C.opt2()) + C.applyRest(C.nums())\n'
-    + '        + C.cbU(cl() F64 { 4.0; }).len().f64() + C.litU("x").len().f64() + C.litU(C.pick()).len().f64();\n} }\n' });
+    + '        + C.cbU(cl() F64 { return 4.0; }).len().f64() + C.litU("x").len().f64() + C.litU(C.pick()).len().f64();\n} }\n' });
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, tuples, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -3018,9 +3018,9 @@ lib { fn run() F64 {
     ['C.inRest([3.0, 4.0])', ['Expected Str, got F32']],
     ['C.applyStrRest(C.nums())', ['Expected C.(...a: string[]) => number, got C.(...a: number[]) => number']],
     ['let s = "x"; C.litU(s).len().f64()', ['"x" | "y" takes its values, not any Str']],
-    ['C.cbLit(cl() Str { "p"; }).len().f64()', ['"p" | "q" takes its values, not any Str']],
+    ['C.cbLit(cl() Str { return "p"; }).len().f64()', ['"p" | "q" takes its values, not any Str']],
   ]) {
-    const result = await compileFile(utu, await project({ ...pkg('hostt', hostT, hostTJs), 'main.utu': `${tupleHead}lib { fn run() F64 {\n    ${body};\n} }\n` }), { mode: 'small' });
+    const result = await compileFile(utu, await project({ ...pkg('hostt', hostT, hostTJs), 'main.utu': `${tupleHead}lib { fn run() F64 => {\n    ${body};\n} }\n` }), { mode: 'small' });
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
     checked++;
   }
@@ -3059,10 +3059,10 @@ lib { fn run() F64 {
   const hostDTypes = await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': hostDHead + 'lib { fn run() F64 {\n'
     + '    let xs = [1.0, 2.0, 3.0];\n    let e = [];\n    let ys = [4.0];\n    let k = D.ks()[1];\n    let n: F64 = 0.0;\n'
     + '    let b = new D.Bus();\n    b.on("data", cl(v) Void { n += v; });\n    b.emit("data", 5.0);\n'
-    + '    let v = D.get(&{ a: 1.0 }, "z");\n    let m = D.mapVals(&{ a: 1.0 }, cl(x) Str { `#${x}`; });\n'
-    + '    D.total(D.counts) + D.sum(xs) + D.sum(e) + D.iter([1.0, 2.0]) + D.iter(ys) + D.keyName(k).len().f64() + n\n'
+    + '    let v = D.get(&{ a: 1.0 }, "z");\n    let m = D.mapVals(&{ a: 1.0 }, cl(x) Str { return `#${x}`; });\n'
+    + '    return D.total(D.counts) + D.sum(xs) + D.sum(e) + D.iter([1.0, 2.0]) + D.iter(ys) + D.keyName(k).len().f64() + n\n'
     + '        + D.defaultTo(v, 7.0) + D.defaultTo(D.get(&{ a: 1.0 }, "a"), 7.0) + m["a"].len().f64() + new D.Sq(3.0).area()\n'
-    + '        + D.fnLike(cl(x: F64) F64 { x * 2.0; });\n} }\n' });
+    + '        + D.fnLike(cl(x: F64) F64 { return x * 2.0; });\n} }\n' });
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, hostDTypes, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -3078,9 +3078,9 @@ lib { fn run() F64 {
     ['let k = D.ks()[0]; k = "x"; D.keyName(k).len().f64()', ['D.Key takes its values, not any Str']],
     ['let xs = [1.0]; let n = xs.len(); D.sum(xs)', ['Expected D.F64[], got Array[F32]']],
     ['new D.Shape(); 0.0', ['D.Shape is abstract: make one of a class that extends it']],
-    ['D.fnLike(cl(x) F64 { x * 2.0; })', ['x needs a type']],
+    ['D.fnLike(cl(x) F64 { return x * 2.0; })', ['x needs a type']],
   ]) {
-    const result = await compileFile(utu, await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': `${hostDHead}lib { fn run() F64 {\n    ${body};\n} }\n` }), { mode: 'small' });
+    const result = await compileFile(utu, await project({ ...pkg('hostd', hostD, hostDJs), 'main.utu': `${hostDHead}lib { fn run() F64 => {\n    ${body};\n} }\n` }), { mode: 'small' });
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
     checked++;
   }
@@ -3103,9 +3103,9 @@ lib { fn run() F64 {
     + 'export function nev() { throw new Error("never"); }\nexport function pp() { return Promise.resolve(Promise.resolve("deep")); }\n';
   const hostEHead = 'using E from "npm:hoste";\n';
   const hostETypes = await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': hostEHead
-    + 'fn f(b: Bool) F64 { if b { return 1.0; }; E.nev(); }\n'
+    + 'fn f(b: Bool) F64 { if b { return 1.0; }; return E.nev(); }\n'
     + 'lib { fn run() F64 {\n    let s = E.mkShape(1.0);\n    let k: Str = s.kind;\n'
-    + '    E.area(&{ kind: "sq", s: 2.0 }) + E.area(&{ kind: "circle", r: 1.0 }) + E.area(s) + E.ovl("a") + E.gen(1.0, 2.0) + f(true)\n'
+    + '    return E.area(&{ kind: "sq", s: 2.0 }) + E.area(&{ kind: "circle", r: 1.0 }) + E.area(s) + E.ovl("a") + E.gen(1.0, 2.0) + f(true)\n'
     + '        + (k + E.lit("b") + E.excl("b") + E.tl("id-1.5") + E.mkRo().name).len().f64();\n} }\n' });
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, hostETypes, { mode });
@@ -3130,12 +3130,12 @@ lib { fn run() F64 {
     ['let s: Str = E.unwrap(5.0); 0.0', ['s is Str, got F64']],
     ['E.trio()[3]', ['E.[F64, F64, F64] has no element 3: it has 3 elements']],
   ]) {
-    const result = await compileFile(utu, await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': `${hostEHead}lib { fn run() F64 {\n    ${body};\n} }\n` }), { mode: 'small' });
+    const result = await compileFile(utu, await project({ ...pkg('hoste', hostE, hostEJs), 'main.utu': `${hostEHead}lib { fn run() F64 => {\n    ${body};\n} }\n` }), { mode: 'small' });
     assert.deepEqual(result.diagnostics.filter(d => d.severity !== 'warning').map(d => d.message), messages, body);
     checked++;
   }
   // An export lib's struct is an opaque handle to JS: it goes back in, but has no fields there, and a JS object is no struct.
-  const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nlib {\n    fn make() Point { Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
+  const handles = await write('struct Point:\n    | x: F64\n    | y: F64\nlib {\n    fn make() Point { return Point { x: 3.0, y: 4.0 }; }\n    fn norm(p: Point) F64 { return F64.sqrt(p.x * p.x + p.y * p.y); }\n}\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, handles, { mode });
     const { exports } = await instantiateNode(result.wasm, result.spec);
@@ -3146,9 +3146,9 @@ lib { fn run() F64 {
     checked++;
   }
   // A write inside a pipeline body, or in a defer, is seen by a closure that captured the variable: it is shared, not copied.
-  const sharedWrites = await write('fn z() I32 { 0; }\nfn each_loop() I32 {\n    let fs: Array[cl() I32] = Array[cl() I32].new(3, z);\n    let x = 0; let k = 0;\n    [10, 20, 30] each |v| { x = v; fs[k] = cl() { x; }; k += 1; };\n    fs[0]() + fs[1]() * 1000 + fs[2]() * 1000000;\n}\n'
-    + 'fn deferred() cl() I32 { let x = 1; defer x += 5; let f: cl() I32 = cl() { x; }; f; }\n'
-    + 'lib { fn run() I32 { each_loop() + deferred()() * 100000000; } }\n');
+  const sharedWrites = await write('fn z() I32 { return 0; }\nfn each_loop() I32 {\n    let fs: Array[cl() I32] = Array[cl() I32].new(3, z);\n    let x = 0; let k = 0;\n    [10, 20, 30] each |v| { x = v; fs[k] = cl() { return x; }; k += 1; };\n    return fs[0]() + fs[1]() * 1000 + fs[2]() * 1000000;\n}\n'
+    + 'fn deferred() cl() I32 { let x = 1; defer x += 5; let f: cl() I32 = cl() { return x; }; return f; }\n'
+    + 'lib { fn run() I32 { return each_loop() + deferred()() * 100000000; } }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const result = await compileFile(utu, sharedWrites, { mode });
     assert.ok(result.wasm, `${mode}: ${result.diagnostics.map(d => d.message).join('\n')}`);
@@ -3158,7 +3158,7 @@ lib { fn run() F64 {
   // A source map changes no byte of the module, in any mode; its entries
   // are in offset order, each in the code, and the program's own lines are
   // where they are.
-  const mapped = await write('fn boom(x: I32) I32 {\n    assert x > 5;\n    x * 2;\n}\nfn twice(n: I32) I32 { boom(n) + boom(n + 1); }\nlib { fn run() I32 { twice(10); } }\n');
+  const mapped = await write('fn boom(x: I32) I32 {\n    assert x > 5;\n    return x * 2;\n}\nfn twice(n: I32) I32 { return boom(n) + boom(n + 1); }\nlib { fn run() I32 { return twice(10); } }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const plain = await compileFile(utu, mapped, { mode, debugNames: true });
     const withMap = await compileFile(utu, mapped, { mode, debugNames: true, sourceMap: true });
@@ -3169,18 +3169,18 @@ lib { fn run() F64 {
     checked++;
   }
   // An `@es` body ending in a `//` comment: the wrapped glue's closing paren is on its own line.
-  const commented = await compileFile(utu, await write('let flip: fun(Bool) Bool = @es/\\ (b) => !b // negate\n\\/;\nlet five: fun() I32 = @es/\\ (() => 5) // thunk\n\\/;\nlib { fn run() I32 { if flip(false) { five(); } else { 0; }; } }\n'));
+  const commented = await compileFile(utu, await write('let flip: fun(Bool) Bool = @es/\\ (b) => !b // negate\n\\/;\nlet five: fun() I32 = @es/\\ (() => 5) // thunk\n\\/;\nlib { fn run() I32 { return if flip(false) { five(); } else { 0; }; } }\n'));
   assert.equal((await instantiateNode(commented.wasm, commented.spec)).exports?.run(), 5, commented.diagnostics?.map(d => d.message).join('\n'));
   checked++;
   // A closure called from `@es`: a U32 or U64 result is unsigned there, and `undefined` for a nullable parameter is null.
-  const fromJs = await write('let big: fun(cl() U32) Str = @es/\\ f => String(f()) \\/;\nlet wide: fun(cl() U64) Str = @es/\\ f => String(f()) \\/;\nlet none: fun(cl(?Str) Str) Str = @es/\\ f => f(undefined) \\/;\nlib { fn run() Str { big(cl() U32 { 4294967295; }) + " " + wide(cl() U64 { 18446744073709551615; }) + " " + none(cl(z: ?Str) Str { z orelse "none"; }); } }\n');
+  const fromJs = await write('let big: fun(cl() U32) Str = @es/\\ f => String(f()) \\/;\nlet wide: fun(cl() U64) Str = @es/\\ f => String(f()) \\/;\nlet none: fun(cl(?Str) Str) Str = @es/\\ f => f(undefined) \\/;\nlib { fn run() Str { return big(cl() U32 { return 4294967295; }) + " " + wide(cl() U64 { return 18446744073709551615; }) + " " + none(cl(z: ?Str) Str { return z orelse "none"; }); } }\n');
   for (const mode of ['debug', 'small', 'fast', 'smallUnsafe', 'fastUnsafe']) {
     const built = await compileFile(utu, fromJs, { mode });
     assert.equal((await instantiateNode(built.wasm, built.spec)).exports?.run(), '4294967295 18446744073709551615 none', mode);
     checked++;
   }
   // An integer @json pattern beyond F64's exact range compares the token's text too.
-  const bigJson = await compileFile(utu, await write('lib {\n    fn result(text: Str) Str {\n        @json/\\ match text {\n            9007199254740992 => "matched",\n            ~> "different",\n        } \\/;\n    }\n}\n'));
+  const bigJson = await compileFile(utu, await write('lib {\n    fn result(text: Str) Str {\n        return @json/\\ match text {\n            9007199254740992 => "matched",\n            ~> "different",\n        } \\/;\n    }\n}\n'));
   const largeLib = (await instantiateNode(bigJson.wasm, bigJson.spec)).exports;
   assert.deepEqual([largeLib.result('9007199254740992'), largeLib.result('9007199254740993')], ['matched', 'different'], bigJson.diagnostics?.map(d => d.message).join('\n'));
   checked++;
@@ -3206,27 +3206,27 @@ lib { fn run() F64 {
     }
   };
   // A literal just under the F32 overflow midpoint rounds to the largest F32.
-  await gen1('lib { fn run() F32 {\n    3.4028235677973366e38;\n} }\n', 3.4028234663852886e38);
+  await gen1('lib { fn run() F32 {\n    return 3.4028235677973366e38;\n} }\n', 3.4028234663852886e38);
   // A protocol method of 17 parameters called through a protocol value.
   await gen1('proto P:\n | f(I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32, I32) I32\nstruct S[P]: | n: I32\n'
-    + 'fn P[S].f |s| (a0: I32, a1: I32, a2: I32, a3: I32, a4: I32, a5: I32, a6: I32, a7: I32, a8: I32, a9: I32, a10: I32, a11: I32, a12: I32, a13: I32, a14: I32, a15: I32, a16: I32) I32 { a16; }\n'
-    + 'lib { fn run() I32 { let s: P = S {n: 0}; s.f(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16); } }\n', 16);
+    + 'fn P[S].f |s| (a0: I32, a1: I32, a2: I32, a3: I32, a4: I32, a5: I32, a6: I32, a7: I32, a8: I32, a9: I32, a10: I32, a11: I32, a12: I32, a13: I32, a14: I32, a15: I32, a16: I32) I32 { return a16; }\n'
+    + 'lib { fn run() I32 { let s: P = S {n: 0}; return s.f(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16); } }\n', 16);
   // Right-nested literal-led operators are checked once per level, not twice.
-  await gen1('lib { fn run() I32 { let x = 3; 1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (x)))))))))))))))))))))))); } }\n', 27);
+  await gen1('lib { fn run() I32 { let x = 3; return 1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (1 + (x)))))))))))))))))))))))); } }\n', 27);
   // Unannotated joins of one enum's variants: if, match, and alt.
-  await gen1('enum E: | A | B\nlib { fn run() I32 {\n    let c = true;\n    let e = if c { E.A; } else { E.B; };\n    let f = match c { true => E.A, false => E.B, };\n    let g = alt E.B { A => E.A, B => E.B, };\n    alt e { A => 1, B => 2, } + alt f { A => 10, B => 20, } + alt g { A => 100, B => 200, };\n} }\n', 211);
+  await gen1('enum E: | A | B\nlib { fn run() I32 {\n    let c = true;\n    let e = if c { E.A; } else { E.B; };\n    let f = match c { true => E.A, false => E.B, };\n    let g = alt E.B { A => E.A, B => E.B, };\n    return alt e { A => 1, B => 2, } + alt f { A => 10, B => 20, } + alt g { A => 100, B => 200, };\n} }\n', 211);
   // Variants of an enum in a generic mod, named from outside (by alias, by `M[A]`): int enums, tag enums, and construction.
-  await gen1('mod M[T] {\n    enum(U8) E: | A | B = 5\n    fn f(e: E) I32 { match e { E.A => 1, E.B => 2, }; }\n    fn g() I32 { f(E.B); }\n}\nusing M[I32] |MI|;\nlib { fn run() I32 { M[I32].f(M[I32].E.A) + MI.f(MI.E.B) * 10 + M[Str].g() * 100 + M[I32].g() * 1000; } }\n', 2221);
-  await gen1('mod Opt[T] {\n    tag enum &:\n        | Some { v: T }\n        | None\n    fn get(o: &) T { alt o { Some |s| => s.v, None => 0, }; }\n}\nusing Opt[I32] |IntOpt|;\nmod M[T] {\n    enum E: | A | B\n    fn f(e: E) I32 { alt e { A => 1, B => 2, }; }\n}\nusing M[I32] |MI|;\n'
-    + 'lib { fn run() I32 {\n    let n: IntOpt = IntOpt.None;\n    let o: Opt[I32] = Opt[I32].Some { v: 3 };\n    Opt[I32].get(o) + Opt[I32].get(n) + MI.f(MI.E.B) * 10 + M[I32].f(M[I32].E.A) * 100;\n} }\n', 123);
+  await gen1('mod M[T] {\n    enum(U8) E: | A | B = 5\n    fn f(e: E) I32 { return match e { E.A => 1, E.B => 2, }; }\n    fn g() I32 { return f(E.B); }\n}\nusing M[I32] |MI|;\nlib { fn run() I32 { return M[I32].f(M[I32].E.A) + MI.f(MI.E.B) * 10 + M[Str].g() * 100 + M[I32].g() * 1000; } }\n', 2221);
+  await gen1('mod Opt[T] {\n    tag enum &:\n        | Some { v: T }\n        | None\n    fn get(o: &) T { return alt o { Some |s| => s.v, None => 0, }; }\n}\nusing Opt[I32] |IntOpt|;\nmod M[T] {\n    enum E: | A | B\n    fn f(e: E) I32 { return alt e { A => 1, B => 2, }; }\n}\nusing M[I32] |MI|;\n'
+    + 'lib { fn run() I32 {\n    let n: IntOpt = IntOpt.None;\n    let o: Opt[I32] = Opt[I32].Some { v: 3 };\n    return Opt[I32].get(o) + Opt[I32].get(n) + MI.f(MI.E.B) * 10 + M[I32].f(M[I32].E.A) * 100;\n} }\n', 123);
   // A protocol method returning a tuple, called on the type and through a protocol value.
-  await gen1('proto Calc:\n | divmod(I32, I32) .{I32, I32}\nstruct IC[Calc]:\nfn Calc[IC].divmod |s| (a: I32, b: I32) .{I32, I32} { .{a / b, a % b}; }\n'
-    + 'fn use(c: Calc) I32 { let .{q, r} = c.divmod(17, 5); q * 10 + r; }\n'
-    + 'lib { fn run() I32 { let c = IC {}; let .{q, r} = c.divmod(17, 5); q * 100 + r + use(c); } }\n', 334);
+  await gen1('proto Calc:\n | divmod(I32, I32) .{I32, I32}\nstruct IC[Calc]:\nfn Calc[IC].divmod |s| (a: I32, b: I32) .{I32, I32} { return .{a / b, a % b}; }\n'
+    + 'fn use(c: Calc) I32 { let .{q, r} = c.divmod(17, 5); return q * 10 + r; }\n'
+    + 'lib { fn run() I32 { let c = IC {}; let .{q, r} = c.divmod(17, 5); return q * 100 + r + use(c); } }\n', 334);
   // A closure with no written result whose body is an if or match where every arm returns.
-  await gen1('lib { fn run() I32 { let n = cl(x: I32) { if x > 0 { return 1; } else { return 2; }; }; let k = cl(x: I32) { match x { 0 => { return 5; }, ~> { return 6; }, }; }; n(1) + k(0) * 10 + k(3) * 100; } }\n', 651);
+  await gen1('lib { fn run() I32 { let n = cl(x: I32) { return if x > 0 { return 1; } else { return 2; }; }; let k = cl(x: I32) { return match x { 0 => { return 5; }, ~> { return 6; }, }; }; return n(1) + k(0) * 10 + k(3) * 100; } }\n', 651);
   // An alt whose arms of different variants include one that binds.
-  await gen1('enum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n    | Pt\nfn f(s: Sh) I32 { let a = alt s { Ci |c| => Sh.Sq { s: c.r }, Sq => Sh.Pt, Pt => Sh.Pt, }; alt a { Sq |q| => q.s, Ci => 0, Pt => 7, }; }\nlib { fn run() I32 { f(Sh.Ci { r: 4 }) * 10 + f(Sh.Sq { s: 1 }); } }\n', 47);
+  await gen1('enum Sh:\n    | Ci { r: I32 }\n    | Sq { s: I32 }\n    | Pt\nfn f(s: Sh) I32 { let a = alt s { Ci |c| => Sh.Sq { s: c.r }, Sq => Sh.Pt, Pt => Sh.Pt, }; return alt a { Sq |q| => q.s, Ci => 0, Pt => 7, }; }\nlib { fn run() I32 { return f(Sh.Ci { r: 4 }) * 10 + f(Sh.Sq { s: 1 }); } }\n', 47);
   // Closures called from JS: Bool arguments normalized, distinct/enum unsigned results unsigned, nullable arguments past the 13th.
   {
     const ps = Array.from({ length: 14 }, (_, i) => String.fromCharCode(97 + i));
@@ -3234,11 +3234,11 @@ lib { fn run() F64 {
 type M = distinct U64;
 enum(U32) E: | A = 4000000000 | B
 lib {
-    fn mkn() cl() N { cl() N { N(4000000000); }; }
-    fn mkm() cl() M { cl() M { M(18446744073709551615); }; }
-    fn mke() cl() E { cl() E { E.A; }; }
-    fn mkb() cl(Bool, Bool) I32 { cl(a: Bool, b: Bool) I32 { if a and b { 1; } else { 0; }; }; }
-    fn mk14() cl(${ps.slice(1).map(() => 'I32').join(', ')}, ?Str) Bool { cl(${ps.join(', ')}) Bool { promote ${ps[13]} { |v| => true, ~> false, }; }; }
+    fn mkn() cl() N { return cl() N { return N(4000000000); }; }
+    fn mkm() cl() M { return cl() M { return M(18446744073709551615); }; }
+    fn mke() cl() E { return cl() E { return E.A; }; }
+    fn mkb() cl(Bool, Bool) I32 { return cl(a: Bool, b: Bool) I32 { return if a and b { 1; } else { 0; }; }; }
+    fn mk14() cl(${ps.slice(1).map(() => 'I32').join(', ')}, ?Str) Bool { return cl(${ps.join(', ')}) Bool { return promote ${ps[13]} { |v| => true, ~> false, }; }; }
 }
 `));
     assert.ok(built.wasm, built.diagnostics?.map(d => d.message).join("\n"));
@@ -3258,11 +3258,11 @@ import { join } from 'node:path';
 \\/;
 let delay: fun(I32) Promise[I32] = @es/\\ (v) => Promise.resolve(v) \\/;
 lib {
-    fn joined() Str { j("a", "b"); }
-    fn call(f: cl(U32, Bool, U64) Str) Str { f(4294967295, true, 18446744073709551615); }
-    fn text(f: cl() Str) Str { f(); }
-    fn flag(f: cl() Bool) I32 { if f() { 1; } else { 0; }; }
-    fn wait(a: I32) I32 { let v: I32 = await delay(a); v; }
+    fn joined() Str { return j("a", "b"); }
+    fn call(f: cl(U32, Bool, U64) Str) Str { return f(4294967295, true, 18446744073709551615); }
+    fn text(f: cl() Str) Str { return f(); }
+    fn flag(f: cl() Bool) I32 { return if f() { 1; } else { 0; }; }
+    fn wait(a: I32) I32 { let v: I32 = await delay(a); return v; }
 }
 `), { mode });
     assert.ok(built.wasm, `${mode}: ${built.diagnostics.map(d => d.message).join('\n')}`);
@@ -3283,11 +3283,11 @@ lib {
   await gen1('struct P:\n    | x: I32\n    | y: I32\nstruct Q:\n    | alpha: Str\n    | beta: Bool\n'
     + 'lib { fn run() Str {\n    let a = @json/\\ encode P P{ x: 1, y: 2 } \\/;\n'
     + '    let c = @utu/\\ @utu/\\ @json/\\ decode Q "{\\"alpha\\":\\"k\\",\\"beta\\":true}" \\/ \\/ \\/;\n'
-    + '    a + (promote c { |q| => q.alpha, ~> "none", });\n} }\n', '{"x":1,"y":2}k');
+    + '    return a + (promote c { |q| => q.alpha, ~> "none", });\n} }\n', '{"x":1,"y":2}k');
   // @json decode of a float beyond its type reports it (it was +Infinity, then encoded as null).
   await gen1('struct N:\n    | d: F64\n    | e: F32\n'
-    + 'fn t(s: Str) Str { @json/\\ error N s \\/; }\n'
-    + 'lib { fn run() Str { t("{\\"d\\":1e400,\\"e\\":0}") + "|" + t("{\\"d\\":0,\\"e\\":1e39}") + "|" + t("{\\"d\\":1e308,\\"e\\":3.4e38}"); } }\n',
+    + 'fn t(s: Str) Str { return @json/\\ error N s \\/; }\n'
+    + 'lib { fn run() Str { return t("{\\"d\\":1e400,\\"e\\":0}") + "|" + t("{\\"d\\":0,\\"e\\":1e39}") + "|" + t("{\\"d\\":1e308,\\"e\\":3.4e38}"); } }\n',
     'number out of range at line 1, column 6|number out of range at line 1, column 12|');
   console.log(`compiler regressions: ${checked} builds as they should be`);
 } finally {

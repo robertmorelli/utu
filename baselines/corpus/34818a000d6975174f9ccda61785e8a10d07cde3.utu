@@ -4,7 +4,7 @@
       lib {
         fn from_let() I32 {
           let c: ?Counter = null;
-          promote c {
+          return promote c {
             |value| => value.n,
             ~> 7,
           };

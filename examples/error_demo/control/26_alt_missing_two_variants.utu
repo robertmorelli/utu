@@ -7,7 +7,7 @@ enum Token:
     | Times {}
 
 fn weight(t: Token) I32 {
-    alt t {
+    return alt t {
         Num |n| => n.value,
         Plus => 1,
     };

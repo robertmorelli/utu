@@ -5,7 +5,7 @@ struct User:
     | age: I32
 
 fn load(text: Str) ?User {
-    @json/\ parse User text \/;
+    return @json/\ parse User text \/;
 }
 
 main {

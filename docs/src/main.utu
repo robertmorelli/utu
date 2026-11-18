@@ -21,7 +21,7 @@ struct Link:
 struct Site:
 | route: Str
 fn links() Array[Link] {
-    [
+    return [
     Link {
         href: "/",
         label: "Overview"
@@ -76,7 +76,7 @@ fn title(route: Str) Str {
     let found = links() first_where(Link) |link| {
         link.href == route
     }
-    promote found {
+    return promote found {
         |link| => if link.value.href == "/" {
             "utu"
         } else {
@@ -88,7 +88,7 @@ fn title(route: Str) Str {
 // The overview and the playground are part of the site; every other page is
 // a lazy module (above), so the site starts with only the page it shows.
 fn page(route: Str, play: playground.State) Browser.HTMLElement {
-    if route == "/playground" {
+    return if route == "/playground" {
         playground.page(play)
     } else if route == "/start" {
         start.page()
@@ -139,7 +139,7 @@ fn arrive(site: Site, route: Str) Str {
             })
         }
     }
-    ""
+    return ""
 }
 main {
     let site = Site {

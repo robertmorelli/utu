@@ -3,10 +3,10 @@ using sim from "./sim.utu"
 
 lib {
     fn create(game_text: Str, save_text: Str) ?sim.World {
-        sim.load(game_text, save_text)
+        return sim.load(game_text, save_text)
     }
     fn load_error(game_text: Str, save_text: Str) Str {
-        sim.load_error(game_text, save_text)
+        return sim.load_error(game_text, save_text)
     }
     fn run(w: sim.World, ticks: I32) Void {
         for (0..<ticks) |i| {
@@ -14,12 +14,12 @@ lib {
         }
     }
     fn state_hash(w: sim.World) I32 {
-        sim.hash(w)
+        return sim.hash(w)
     }
     fn entity_count(w: sim.World) I32 {
-        w.entities.n
+        return w.entities.n
     }
     fn save_text(w: sim.World) Str {
-        sim.save_text(w)
+        return sim.save_text(w)
     }
 }
