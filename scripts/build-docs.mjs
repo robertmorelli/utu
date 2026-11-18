@@ -59,6 +59,21 @@ async function buildPlayground(directory) {
   });
 }
 
+/** Embed only the benchmark fields shown by the site, without sample traces. */
+async function prepareBenchmarkRecords() {
+  const source = await fs.readFile(path.join(root, 'benchmarks/bg/results.json'), 'utf8');
+  const { programs } = JSON.parse(source);
+  const records = Object.fromEntries(Object.entries(programs).map(([name, result]) => [
+    name,
+    {
+      n: result.n, d8: result.d8, date: result.date.slice(0, 10),
+      ports: result.ports.map(({ key, name, median, wasm, js, gzip, times }) =>
+        ({ key, name, median, wasm, js, gzip, samples: times?.length ?? result.samples })),
+    },
+  ]));
+  await fs.writeFile(path.join(root, 'docs/src/benchmark-frontiers.json'), JSON.stringify({ programs: records }) + '\n');
+}
+
 function run(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: root, stdio: 'inherit' });
@@ -69,6 +84,7 @@ function run(command, args) {
 
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'utu-docs-'));
 try {
+  await prepareBenchmarkRecords();
   const args = ['cli/utu.mjs', 'build', entry, '--out', temp, '--title', 'utu'];
   if (process.argv.includes('--no-prerender')) args.push('--no-prerender');
   await run(process.execPath, args);

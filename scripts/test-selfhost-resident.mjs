@@ -12,7 +12,8 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileFile, loadNodeCompiler } from '../src/selfhost/node.js';
+import { compile } from '../src/selfhost/compiler.js';
+import { compileFile, loadNodeCompiler, nodeHost } from '../src/selfhost/node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const programs = [
@@ -42,3 +43,21 @@ for (const file of programs) {
   }
 }
 console.log(`kept host declarations: ${programs.length} programs build as on a fresh compiler`);
+
+// An implicit operator call can be the first edge in a new program. It must
+// not inherit the explicit call site left by the previous program.
+const queryCompiler = await loadNodeCompiler();
+const queryHost = nodeHost({ root: ROOT });
+async function analyze(source) {
+  const built = await compile(queryCompiler, path.join(ROOT, 'resident-query.utu'), {
+    ...queryHost, target: 'analysis', readFile: async () => source,
+  });
+  assert.deepEqual(built.diagnostics, []);
+  assert.equal(queryCompiler.edge_count(), 1);
+  return [queryCompiler.edge_site_start(0), queryCompiler.edge_site_end(0)];
+}
+
+const [start, end] = await analyze('fn identity(n: I32) I32 { return n }\nmain { identity(1) }');
+assert.ok(start >= 0 && end > start, 'explicit call has a source span');
+assert.deepEqual(await analyze('lib { fn bump(n: I32) I32 { return n + 5 } }'), [-1, -1]);
+console.log('resident call edges do not retain a previous program’s source span');

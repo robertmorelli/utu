@@ -1,33 +1,38 @@
-# Wutu: markup and CSS in one expression
+# Wutu: pages, components, and CSS
 
-Wutu is a built-in Utu DSL. It constructs real DOM nodes through Utu's typed
-browser bindings, the same TypeScript-declaration interface that lets Utu call
-any typed npm package ([details](typescript-abi.md)). Import those bindings once:
+Start a Wutu page with a top-level `html { … }` block. Use `wn` to define
+reusable functions with Wutu bodies and `|` or `|>` to insert their results or
+other components. Wutu builds real DOM nodes through Utu's [typed browser
+bindings](typescript-abi.md).
 
 ```utu
 using Browser from std:Browser
 
-fn greeting(name: Str) Browser.HTMLElement {
-    return @wutu/\
-    section.greeting {
+wn greeting(name: Str) {
+    section.greeting#hello {
         display: grid
         gap: 1rem
-        padding: 1.5rem
-        h2 { margin: 0; "Hello, "; = name }
-        a {
-            href="/about"
-            color: oklch(45% 0.12 150)
-            :hover { text-decoration-thickness: 0.15em }
-            "About this garden"
-        }
+        h2 { "Hello, "; = name }
+        p.note.quiet { "Welcome back." }
     }
-    \/
 }
 
-main {
-    Browser.document.body.append(greeting("friend"))
+html {
+    head { title { "Greetings" } }
+    body {
+        |> greeting("friend")
+    }
 }
 ```
+
+The `head` and `body` blocks supply the document's head and body. A top-level
+`html` block is reactive by default, so top-level state can drive the page
+without an `@reactive` directive. Run `utu main.utu` to preview with live
+reload, or `utu build main.utu --out dist/site` to build the site.
+
+Use `| value` to insert a component value or list you already have, and
+`|> expression` to insert the result of code written at the insertion site.
+[Components](#components) covers the `Component` protocol and lists.
 
 ## Syntax
 
@@ -185,10 +190,6 @@ items can reorder and their DOM state should follow the item. A Component is a s
 rendered on every update; the scalar argument memoization below applies to
 functions returning elements or fragments.
 
-Top-level `html { … }` is a program in place of `main` or `lib`. Its `head`
-children become `document.head`; its `body` children, attributes, and CSS
-become `document.body`. It is reactive by default, so a top-level `let` holding
-mutable state can drive a page without an explicit `@reactive` directive.
 Use `@wutu/\ … \/` when a template is an expression inside ordinary code.
 
 A component can return siblings directly:
@@ -213,30 +214,46 @@ children live in the parent; Wutu retains the range for subsequent updates.
 
 ## Slots, lists, and conditions
 
-Use `|` to insert an existing component list, and `|>` to embed Utu code that
-produces components. `|>` is the two adjacent ASCII characters `|` and `>`;
-it is not a function-call operator. Its expression can be a block, conditional,
-pipeline, function call, or any other Utu expression:
+Both component insertion forms accept a single component, a component list,
+or the element or fragment returned by a `wn` function. The `|>` marker is
+written with the adjacent characters `|` and `>`. Its expression can be a
+pipeline, conditional, block, or function call.
 
 ```utu
-main {
-    | labels
-    |> if expanded { full_labels } else { short_labels }
-    |> {
-        let chosen = labels filter |label| { label.visible } collect(Label)
-        chosen
+using Browser from std:Browser
+
+struct Label[C]:
+    | title: Str
+    | featured: Bool
+
+wn C[Label].render |label| () {
+    li { = label.title }
+}
+
+let labels: Array[Label] = [Label { title: "Syntax", featured: true },
+                            Label { title: "Tooling", featured: false }]
+
+html {
+    body {
+        h2 { "All topics" }
+        ul {
+            | labels
+        }
+        h2 { "Featured topics" }
+        ul {
+            |> labels filter |label| { label.featured } collect(Label)
+        }
     }
 }
 ```
 
-Both forms use the existing insertion path, including `.render()` dispatch,
-list identity, and fragment handling. Single components and `wn` results work
-too. Existing `= expression` insertions remain supported. Separate insertions
-with a newline or semicolon; wrap a Utu expression in parentheses or a block
-when continuing it onto a line that starts with a pipe operator.
+Start each insertion on a new line or separate insertions with semicolons.
+Wrap a Utu expression in parentheses or braces if one of its continuation
+lines begins with a pipe operator. Use `= expression` for text or scalar
+values.
 
 Components are ordinary typed Utu functions. Pass data or DOM nodes as normal
-parameters and insert returned nodes with `= component(args)`. There is no
+parameters and insert returned nodes with `|> component(args)`. There is no
 separate component registry or wrapper element. A node supplied as a slot is
 moved into the parent by the DOM's normal append semantics.
 

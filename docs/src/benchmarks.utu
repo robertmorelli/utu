@@ -1,5 +1,6 @@
 using Browser from std:Browser
 using ui from "./ui.utu"
+using frontiers from "./benchmark-frontiers.utu"
 mod benchmarks {
     fn page() Browser.HTMLElement {
         return @wutu/\
@@ -40,6 +41,14 @@ mod benchmarks {
                 }
                 "."
             }
+            h2 {
+                "Benchmarks Game size and speed"
+            }
+            p {
+                "Each chart plots recorded d8 runtime against gzipped Wasm and JavaScript shipped together. Lower and farther left means faster and smaller. The orange line connects the Pareto frontier, where no other port is as fast and as small with a strict improvement in either. Orange dots are Utu ports. Open a workload for its chart and complete results."
+            }
+            = frontiers.panel()
+            = ui.further("benchmarks/bg/results.json", "Recorded results and sample times")
             h2 {
                 "DeltaBlue"
             }

@@ -25,7 +25,7 @@ mod compiler {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("The compiler", "The shipped compiler is a 468,253-byte Wasm module. A checked-in Wasm compiler builds it from the utu source, and the new compiler reproduces itself exactly.")
+            = ui.header("The compiler", "The shipped compiler is a 468,258-byte Wasm module. A checked-in Wasm compiler builds it from the utu source, and the new compiler reproduces itself exactly.")
             h2 {
                 "Pipeline"
             }
@@ -60,7 +60,7 @@ mod compiler {
                 "Bootstrap performance"
             }
             p {
-                "The size build took a median of 127 ms on Bun 1.4.2 and 123 ms on d8 (V8 15.6.75.16) on an Apple M1 Pro. Each measurement includes loading the same compiler sources and emitting Wasm and host metadata into an already instantiated compiler. The runs used eight warmups followed by fifteen measured builds per runtime."
+                "The size build took a median of 122 ms on Bun 1.4.2 and 118 ms on d8 (V8 15.6.75.16) on an Apple M1 Pro. Each measurement includes loading the same compiler sources and emitting Wasm and host metadata into an already instantiated compiler. The runs used eight warmups followed by fifteen measured builds per runtime."
             }
             p {
                 "The lexer builds its transition table once. The parser skips indexed delimiter spans and keeps successful lookahead parses. IR construction reuses operand and child storage, and the optimizer uses sparse indexes for local rewrites. A before-and-after comparison covered 4,566 builds with identical Wasm, host metadata, and compiler diagnostics."

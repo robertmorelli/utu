@@ -1,0 +1,124 @@
+using Browser from std:Browser
+using JS from std:JS
+
+// Generated from the recorded results by scripts/build-docs.mjs.
+const mem records: U8 = @embed/\ benchmark-frontiers.json \/
+
+mod frontiers {
+    fn panel() Browser.HTMLElement {
+        let render: fun(JS.Uint8Array) Browser.HTMLElement = @es/\
+        bytes => {
+            const { programs } = JSON.parse(new TextDecoder().decode(bytes));
+            const svgNamespace = "http://www.w3.org/2000/svg";
+            const count = new Intl.NumberFormat("en-US");
+            const measured = value => count.format(Number(value.toPrecision(4)));
+            const html = (tag, text) => {
+                const node = document.createElement(tag);
+                if (text !== undefined) node.textContent = text;
+                return node;
+            };
+            const svg = (tag, attributes, text) => {
+                const node = document.createElementNS(svgNamespace, tag);
+                for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+                if (text !== undefined) node.textContent = text;
+                return node;
+            };
+            const axis = (values, start, end) => {
+                const min = Math.log(Math.min(...values));
+                const max = Math.log(Math.max(...values));
+                const padding = Math.max((max - min) * 0.06, 0.04);
+                const low = min - padding;
+                const high = max + padding;
+                return {
+                    at: value => start + (Math.log(value) - low) / (high - low) * (end - start),
+                    ticks: Array.from({ length: 5 }, (_, i) => Math.exp(low + i * (high - low) / 4)),
+                };
+            };
+            const resultTable = ports => {
+                const table = html("table");
+                table.className = "wide";
+                const header = table.createTHead().insertRow();
+                for (const title of ["Port", "Median (ms)", "Wasm (B)", "JS (B)", "Gzip (B)", "Samples"]) {
+                    const cell = html("th", title);
+                    cell.scope = "col";
+                    header.append(cell);
+                }
+                const body = table.createTBody();
+                for (const port of ports) {
+                    const row = body.insertRow();
+                    const label = html("th", port.name);
+                    label.scope = "row";
+                    row.append(label);
+                    for (const value of [measured(port.median), count.format(port.wasm),
+                        count.format(port.js), count.format(port.gzip), count.format(port.samples)]) row.insertCell().textContent = value;
+                }
+                return table;
+            };
+            const plot = (name, ports, frontier) => {
+                const left = 76, right = 580, top = 15, bottom = 228;
+                const x = axis(ports.map(port => port.gzip), left, right);
+                const y = axis(ports.map(port => port.median), bottom, top);
+                const chart = svg("svg", {
+                    viewBox: "0 0 608 280", role: "img", "aria-label": `Size and runtime for ${name}`,
+                    "data-benchmark": name,
+                });
+                chart.style.display = "block";
+                chart.style.width = "100%";
+                chart.style.maxWidth = "760px";
+                chart.style.minWidth = "32rem";
+                chart.append(svg("desc", {}, "Both axes are logarithmic. Lower left means smaller and faster. The line connects ports whose size and time are not both matched or improved by any other port with a strict improvement in one."));
+                const text = (label, attributes) => svg("text", {fill:"currentColor", "font-size":11, ...attributes}, label);
+                for (const tick of x.ticks) {
+                    const at = x.at(tick);
+                    chart.append(svg("line", {x1:at, x2:at, y1:top, y2:bottom, stroke:"currentColor", opacity:0.18}));
+                    chart.append(text(measured(tick), {x:at, y:246, "text-anchor":"middle"}));
+                }
+                for (const tick of y.ticks) {
+                    const at = y.at(tick);
+                    chart.append(svg("line", {x1:left, x2:right, y1:at, y2:at, stroke:"currentColor", opacity:0.18}));
+                    chart.append(text(measured(tick), {x:left - 10, y:at + 4, "text-anchor":"end"}));
+                }
+                chart.append(text("Shipped bytes (gzip, log scale)", {x:(left + right) / 2, y:270, "text-anchor":"middle"}));
+                chart.append(text("Median runtime (ms, log scale)", {x:13, y:122, transform:"rotate(-90 13 122)", "text-anchor":"middle"}));
+                // Equal sizes are ordered fastest first. Equal times keep the
+                // smaller point, so every step trades more bytes for less time.
+                const points = frontier.map(port => `${x.at(port.gzip)},${y.at(port.median)}`).join(" ");
+                chart.append(svg("polyline", {points, fill:"none", stroke:"#bd5927", "stroke-width":2.5, "data-pareto":""}));
+                for (const port of ports) {
+                    const point = svg("circle", {
+                        cx:x.at(port.gzip), cy:y.at(port.median), r:frontier.includes(port) ? 5 : 3.5,
+                        fill:port.key.startsWith("utu-") ? "#bd5927" : "#637e97",
+                    });
+                    point.append(svg("title", {}, `${port.name} · ${measured(port.median)} ms · ${count.format(port.gzip)} B gzip`));
+                    chart.append(point);
+                }
+                return chart;
+            };
+            const section = html("div");
+            for (const [name, record] of Object.entries(programs)) {
+                const ports = record.ports.filter(port => Number.isFinite(port.median) && port.median > 0 && port.gzip > 0)
+                    .sort((a, b) => a.gzip - b.gzip || a.median - b.median);
+                if (ports.length === 0) continue;
+                const frontier = [];
+                for (const port of ports) {
+                    if (frontier.length === 0 || port.median < frontier.at(-1).median) frontier.push(port);
+                }
+                const panel = html("details");
+                panel.open = section.childElementCount === 0;
+                panel.append(html("summary", name));
+                panel.append(html("p", `Input ${count.format(record.n)} · d8 ${record.d8} · recorded ${record.date}`));
+                const figure = html("figure");
+                figure.style.margin = "0";
+                figure.style.overflowX = "auto";
+                figure.append(plot(name, ports, frontier));
+                panel.append(figure);
+                panel.append(html("p", `Pareto frontier from smallest to fastest: ${frontier.map(port => port.name).join(" → ")}.`));
+                panel.append(resultTable(ports));
+                section.append(panel);
+            }
+            return section;
+        }
+        \/
+        return render(records.view(0, records.len()))
+    }
+}

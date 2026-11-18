@@ -3934,6 +3934,9 @@ fn reset_check() Void {
     edge_from.clear()
     edge_to.clear()
     edge_site.clear()
+    // A resident compiler must not attach a previous program's AST node to
+    // an implicit call made before this program's first explicit call.
+    call_site.clear()
     co_node.clear()
     co_from.clear()
     co_to.clear()

@@ -133,7 +133,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "127 ms on Bun · 123 ms on d8"
+                                "122 ms on Bun · 118 ms on d8"
                             }
                             td {
                                 "Median warm self-compilation for the size build. Stages 2 and 3 produce identical Wasm and host metadata."
@@ -141,7 +141,7 @@ mod home {
                         }
                         tr {
                             th {
-                                "468,253 bytes"
+                                "468,258 bytes"
                             }
                             td {
                                 "The raw compiler Wasm used by the CLI, editor, and playground."

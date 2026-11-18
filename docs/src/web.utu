@@ -5,22 +5,20 @@ mod web {
     fn hello_sample() Str {
         return \\using Browser from std:Browser
         \\
-        \\fn greeting(name: Str) Browser.HTMLElement {
-        \\    return @wutu/\
-        \\    section.greeting#hello {  // tag.class#id makes an element
-        \\        h2 {  // a child element
-        \\            "Hello, "  // a text node
-        \\            = name  // text from an expression
-        \\        }
-        \\        p.note.quiet {  // several classes
-        \\            "Welcome back."
-        \\        }
+        \\wn greeting(name: Str) {
+        \\    section.greeting#hello {
+        \\        display: grid
+        \\        gap: 1rem
+        \\        h2 { "Hello, "; = name }
+        \\        p.note.quiet { "Welcome back." }
         \\    }
-        \\    \/
         \\}
         \\
-        \\main {
-        \\    Browser.document.body.append(greeting("friend"))
+        \\html {
+        \\    head { title { "Greetings" } }
+        \\    body {
+        \\        |> greeting("friend")
+        \\    }
         \\}
     }
     fn namespaces_sample() Str {
@@ -133,31 +131,26 @@ mod web {
     fn components_sample() Str {
         return \\using Browser from std:Browser
         \\
-        \\fn badge(label: Str) Browser.HTMLElement {
-        \\    return @wutu/\
+        \\wn badge(label: Str) {
         \\    span.badge {
         \\        padding: 0.1rem 0.5rem
         \\        border-radius: 1rem
         \\        background: gold
         \\        = label
         \\    }
-        \\    \/
         \\}
         \\
-        \\fn card(title: Str, body: Browser.HTMLElement) Browser.HTMLElement {
-        \\    return @wutu/\
+        \\wn card(title: Str, content: Browser.HTMLElement) {
         \\    article.card {
-        \\        h3 { = title; = badge("new") }  // a component is a function call
-        \\        = body  // a slot is just a node parameter
+        \\        h3 { = title }
+        \\        | content
         \\    }
-        \\    \/
         \\}
         \\
-        \\main {
-        \\    let content = @wutu/\
-        \\    p { "Any element can go in the slot." }
-        \\    \/
-        \\    Browser.document.body.append(card("Slots", content))
+        \\html {
+        \\    body {
+        \\        |> card("Slots", badge("new"))
+        \\    }
         \\}
     }
     fn component_insertions_sample() Str {
@@ -603,7 +596,7 @@ mod web {
     fn page() Browser.HTMLElement {
         return @wutu/\
         article.page {
-            = ui.header("Wutu", "Markup and CSS in one typed expression. Compose elements, fragments, and typed components.")
+            = ui.header("Wutu", "Write a page with html, define reusable views with wn, and compose them with | and |>.")
             p {
                 "Every sample below is a whole program. Paste one into the "
                 a {
@@ -611,6 +604,48 @@ mod web {
                     "Playground"
                 }
                 " to see it run."
+            }
+            h2 {
+                "Pages and functions"
+            }
+            p {
+                "Start with a top-level "
+                code { "html { … }" }
+                " block. Its head and body become the document's head and body, and the page is reactive by default. A "
+                code { "wn" }
+                " function builds a reusable view. "
+                code { "|> greeting(name)" }
+                " inserts the result of calling it."
+            }
+            = code.block(hello_sample())
+            h2 {
+                "Components and slots"
+            }
+            p {
+                code { "wn" }
+                " declares a typed function with a Wutu body. A single element root returns that element, and a body with multiple roots returns a document fragment. Pass a DOM node as a parameter for a slot."
+            }
+            = code.block(components_sample())
+            p {
+                "A struct that implements "
+                code { "Component" }
+                " renders through its "
+                code { "render()" }
+                " method. "
+                code { "C" }
+                " is a shorthand for the protocol. Use "
+                code { "| items" }
+                " to insert components you already have and "
+                code { "|> expression" }
+                " for a Utu expression such as a pipeline, conditional, or block. Start each insertion on its own line or separate them with a semicolon."
+            }
+            = code.block(component_insertions_sample())
+            p {
+                "Inside ordinary Utu code, use "
+                code { "@wutu/\\ … \\/" }
+                " to build a template as an expression. Use "
+                code { "= expression" }
+                " for text and scalar values as well as DOM insertion."
             }
             h2 {
                 "Elements, classes, and text"
@@ -626,7 +661,6 @@ mod web {
                 }
                 " starts a comment, as in utu; # is always text, so hex colors just work."
             }
-            = code.block(hello_sample())
             h2 {
                 "Attributes, properties, and CSS"
             }
@@ -684,30 +718,6 @@ mod web {
             }
             = code.block(events_closure_sample())
             = code.block(events_on_sample())
-            h2 {
-                "Components and slots"
-            }
-            p {
-                code { "wn" }
-                " declares a function with a Wutu body. It returns an element for a single root or a document fragment for multiple roots. Use "
-                code { "= component(args)" }
-                " to insert the result of a function."
-            }
-            = code.block(components_sample())
-            p {
-                "A struct that implements "
-                code { "Component" }
-                " renders through its "
-                code { "render()" }
-                " method. "
-                code { "C" }
-                " is a shorthand for the protocol. Use "
-                code { "| items" }
-                " to insert components you already have and "
-                code { "|> expression" }
-                " for a Utu expression such as a pipeline, conditional, or block. Start each insertion on its own line or separate them with a semicolon."
-            }
-            = code.block(component_insertions_sample())
             h2 {
                 "Conditions and lists"
             }
