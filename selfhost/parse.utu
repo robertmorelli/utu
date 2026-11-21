@@ -1029,6 +1029,7 @@ fn directive(p: Parser) Void {
     parse_pending = at
     dir_node.push(d)
     dir_fn.push(-1)
+    if not line_break_before(p.pos) { fail(p) }
 }
 
 /// Forget the directives of nodes from `nodes` on (given up, or not kept).

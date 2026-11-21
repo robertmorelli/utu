@@ -1788,7 +1788,7 @@ lib {
       assert(errors[0].message.includes(message), errors[0].message);
     }
     // A directive before what is not a function, or not written as one, is a syntax error.
-    for (const [source, text] of [['#inline\nstruct S:\n    | v: I32', 'struct'], ['# inline\nfn f() I32 => 1', 'inline'], ['#cache(x)\nfn f() I32 => 1', 'x']]) {
+    for (const [source, text] of [['#inline\nstruct S:\n    | v: I32', 'struct'], ['# inline\nfn f() I32 => 1', 'inline'], ['#cache(x)\nfn f() I32 => 1', 'x'], ['#inline fn f() I32 => 1', 'fn'], ['#inline #cache\nfn f() I32 => 1', '#']]) {
       const errors = await errorsOf(compiler, ROOT, source + lib);
       assert(errors.some(e => e.kind === 'parse-error' && e.text === text), `${source}\n  got ${describe(errors)}`);
     }
