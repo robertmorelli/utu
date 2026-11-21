@@ -190,7 +190,7 @@ fn build_struct(t: I32, decl: I32, first_init: I32, at: I32, cx: Cx) I32 {
                 // A misnamed field (reported) is the mistake, not the one it meant.
                 if not missing and not unknown {
                     report2(Diag.MissingField, at, decl_name[field], decl, -1)
-                    if same_file(at, c) { diag_place(Extra.Related, first_child(c), "declared here") }
+                    if same_file(at, c) { diag_place(Extra.Related, first_child(c), sms(Sml.DeclaredHere)) }
                 }
                 missing = true
                 w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
@@ -830,7 +830,7 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
     let m = w_mark()
     if k == Known.IrV128Const.i32() {
         // bytes="b0,…,b15" in w_aux as four little-endian words
-        let a = x_attr(x, intern_text("bytes"))
+        let a = x_attr(x, intern_text(sms(Sml.Bytes)))
         if a < 0 or x_child[x] >= 0 {
             ir_malformed(x)
             return -1
@@ -888,8 +888,8 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
         return 1
     }
     if not translate_kids(x, decls, args, locals, direct, fi) { return -1 }
-    let sig = if k == Known.IrI31New.i32() { "i" } else if k == Known.IrI31GetS.i32() or k == Known.IrI31GetU.i32() { "3" }
-        else if k == Known.IrRefEq.i32() or k == Known.IrRefNe.i32() { "ee" } else { "xx" }
+    let sig = if k == Known.IrI31New.i32() { "i" } else if k == Known.IrI31GetS.i32() or k == Known.IrI31GetU.i32() { sms(Sml.N3) }
+        else if k == Known.IrRefEq.i32() or k == Known.IrRefNe.i32() { sms(Sml.Ee) } else { sms(Sml.Xx) }
     if not ir_kids_typed(x, decls, fi, m, sig) { return -1 }
     // (A `ref.i31` makes a `(ref i31)`: a nullable i31 local holds it.)
     if k == Known.IrI31New.i32() { w_node(Op.RefI31, vt_i31ref, 0, 0, m) }
@@ -910,17 +910,17 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
 /// `*` its element, `c` an array of i32 (codes), `x` a host value (a
 /// promise, a closure), `e` one `ref.eq` compares; `n` for `array.new`, one or two.
 fn data_sig(tag: I32) Str {
-    if tag == known_word(Known.IrStringConcat) or tag == known_word(Known.IrStringEq) or tag == known_word(Known.IrStringNe) { return "ss" }
-    if tag == known_word(Known.IrStringMeasure) { return "s" }
+    if tag == known_word(Known.IrStringConcat) or tag == known_word(Known.IrStringEq) or tag == known_word(Known.IrStringNe) { return sms(Sml.Ss) }
+    if tag == known_word(Known.IrStringMeasure) { return sms(Sml.S) }
     if tag == known_word(Known.IrArrayLen) { return "r" }
-    if tag == known_word(Known.IrStringSlice) { return "sii" }
-    if tag == known_word(Known.IrArraySlice) { return "rii" }
-    if tag == known_word(Known.IrStringGet) { return "si" }
-    if tag == known_word(Known.IrStringFromCodes) { return "ci" }
-    if tag == known_word(Known.IrArrayGet) { return "ri" }
+    if tag == known_word(Known.IrStringSlice) { return sms(Sml.Sii) }
+    if tag == known_word(Known.IrArraySlice) { return sms(Sml.Rii) }
+    if tag == known_word(Known.IrStringGet) { return sms(Sml.Si) }
+    if tag == known_word(Known.IrStringFromCodes) { return sms(Sml.Ci) }
+    if tag == known_word(Known.IrArrayGet) { return sms(Sml.Ri) }
     if tag == known_word(Known.IrStringFromCodePoint) { return "i" }
-    if tag == known_word(Known.IrArraySet) { return "ri*" }
-    if tag == known_word(Known.IrArrayCopy) { return "ririi" }
+    if tag == known_word(Known.IrArraySet) { return sms(Sml.RiStar) }
+    if tag == known_word(Known.IrArrayCopy) { return sms(Sml.Ririi) }
     return "n"
 }
 
@@ -928,7 +928,7 @@ fn data_sig(tag: I32) Str {
 /// `sig` (see data_sig) says: else it is reported as mistyped or malformed.
 fn ir_kids_typed(x: I32, decls: I32, fi: I32, m: I32, sig: Str) Bool {
     let n = w_mark() - m
-    let want = if sig != "n" { sig } else if n == 1 { "i" } else { "i*" }
+    let want = if sig != "n" { sig } else if n == 1 { "i" } else { sms(Sml.I) }
     if n != want.len() { return ir_malformed(x) }
     let c = x_child[x]
     for (0 ..< n) |i| {
@@ -1020,7 +1020,7 @@ fn array_slice_helper(heap: I32) I32 {
     let ml = vl_begin()
     vl_add(vt_i32)
     vl_add(ref)
-    let f = helper(params, vl_one(ref), vl_end(ml), "array.slice")
+    let f = helper(params, vl_one(ref), vl_end(ml), sms(Sml.ArraySlice))
     slice_helper.push(heap)
     slice_helper.push(f)
     // len = end - start; out = array.new_default(len); array.copy(out, 0, src, start, len); out
@@ -1105,7 +1105,7 @@ fn from_codes_helper(heap: I32) I32 {
     let ml = vl_begin()
     vl_add(uref)
     vl_add(vt_i32)
-    let f = helper(params, vl_one(vt_extern), vl_end(ml), "Str.from_codes")
+    let f = helper(params, vl_one(vt_extern), vl_end(ml), sms(Sml.StrFromCodes))
     codes_helper.push(f)
     let brk = 1
     let top = 2

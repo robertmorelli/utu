@@ -342,7 +342,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
                 return rec_push_call(gen_rec[i], node, call, cx)
             }
             report(Diag.GeneratorRecursion, node, if receiver >= 0 { word_of(last_child(first_child(call))) } else { decl_name[gen] })
-            if receiver >= 0 { diag_note("a method generator cannot consume itself") }
+            if receiver >= 0 { diag_note(sms(Sml.AMethodGeneratorCannotConsumeItself)) }
             return error_value()
         }
     }
@@ -371,7 +371,7 @@ fn check_generator_loop(node: I32, call: I32, cx: Cx) I32 {
         if receiver >= 0 {
             w_resize_stack(m)
             report(Diag.GeneratorRecursion, node, word_of(last_child(first_child(call))))
-            diag_note("a method generator cannot consume itself")
+            diag_note(sms(Sml.AMethodGeneratorCannotConsumeItself))
             return error_value()
         }
         return check_recursive_loop(node, call, gen, cap, elem, inst, cx)

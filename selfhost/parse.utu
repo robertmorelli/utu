@@ -327,9 +327,9 @@ fn wanted_text() Str {
     if n == 0 { return "" }
     let text = ""
     for (0 ..< n) |i| {
-        if i > 0 { text = text + (if i == n - 1 { " or " } else { ", " }) }
+        if i > 0 { text = text + (if i == n - 1 { sms(Sml.Or) } else { ", " }) }
         let w = parse_expected[i]
-        text = text + "'" + (if w >= kw_wanted { word_text(w - kw_wanted) } else { tok_spelling(w) }) + "'"
+        text = sms2(Sml.ATickBTick, text, (if w >= kw_wanted { word_text(w - kw_wanted) } else { tok_spelling(w) }))
     }
     return text
 }
@@ -337,66 +337,66 @@ fn wanted_text() Str {
 /// How a kind of token is written (or named, for the kinds with no one spelling).
 fn tok_spelling(kind: I32) Str {
     return match Tok(kind) {
-        Tok.End => "end of file",
-        Tok.Error => "a character",
-        Tok.Word => "a name",
-        Tok.Int => "an integer",
-        Tok.Float => "a number",
-        Tok.String => "a string",
-        Tok.MultilineLine => "\\\\",
-        Tok.DslBody => "/\\",
+        Tok.End => sms(Sml.EndOfFile),
+        Tok.Error => sms(Sml.ACharacter),
+        Tok.Word => sms(Sml.AName),
+        Tok.Int => sms(Sml.AnInteger),
+        Tok.Float => sms(Sml.ANumber),
+        Tok.String => sms(Sml.AString),
+        Tok.MultilineLine => sms(Sml.BackslashBackslash),
+        Tok.DslBody => sms(Sml.SlashBackslash),
         Tok.WutuBody => "{",
         Tok.Comment => "//",
-        Tok.TemplateFull => "a template string",
-        Tok.TemplateHead => "a template string",
-        Tok.TemplateMiddle => "a template string",
-        Tok.TemplateTail => "a template string",
-        Tok.LParen => "(",
+        Tok.TemplateFull => sms(Sml.ATemplateString),
+        Tok.TemplateHead => sms(Sml.ATemplateString),
+        Tok.TemplateMiddle => sms(Sml.ATemplateString),
+        Tok.TemplateTail => sms(Sml.ATemplateString),
+        Tok.LParen => sms(Sml.Open),
         Tok.RParen => ")",
         Tok.LBrace => "{",
         Tok.RBrace => "}",
         Tok.LBracket => "[",
         Tok.RBracket => "]",
         Tok.Comma => ",",
-        Tok.Semi => ";",
+        Tok.Semi => sms(Sml.Semi),
         Tok.Colon => ":",
-        Tok.At => "@",
-        Tok.Dollar => "$",
+        Tok.At => sms(Sml.At),
+        Tok.Dollar => sms(Sml.Dollar),
         Tok.Dot => ".",
-        Tok.DotDotDot => "...",
-        Tok.DotDotLt => "..<",
+        Tok.DotDotDot => sms(Sml.DotDotDot),
+        Tok.DotDotLt => sms(Sml.DotDotLt),
         Tok.Pipe => "|",
-        Tok.PipeEq => "|=",
-        Tok.Amp => "&",
-        Tok.AmpEq => "&=",
-        Tok.Caret => "^",
-        Tok.CaretEq => "^=",
-        Tok.Star => "*",
-        Tok.StarEq => "*=",
-        Tok.Slash => "/",
-        Tok.SlashEq => "/=",
-        Tok.Percent => "%",
-        Tok.PercentEq => "%=",
-        Tok.Plus => "+",
-        Tok.PlusEq => "+=",
+        Tok.PipeEq => sms(Sml.BarEq),
+        Tok.Amp => sms(Sml.Amp),
+        Tok.AmpEq => sms(Sml.AmpEq),
+        Tok.Caret => sms(Sml.Caret),
+        Tok.CaretEq => sms(Sml.CaretEq),
+        Tok.Star => sms(Sml.Star),
+        Tok.StarEq => sms(Sml.StarEq),
+        Tok.Slash => sms(Sml.Slash),
+        Tok.SlashEq => sms(Sml.SlashEq),
+        Tok.Percent => sms(Sml.Pct),
+        Tok.PercentEq => sms(Sml.PctEq),
+        Tok.Plus => sms(Sml.Plus),
+        Tok.PlusEq => sms(Sml.PlusEq),
         Tok.Minus => "-",
-        Tok.MinusEq => "-=",
-        Tok.Lt => "<",
-        Tok.LtEq => "<=",
-        Tok.Shl => "<<",
-        Tok.ShlEq => "<<=",
-        Tok.Gt => ">",
-        Tok.GtEq => ">=",
-        Tok.Shr => ">>",
-        Tok.ShrEq => ">>=",
-        Tok.Shr3 => ">>>",
-        Tok.Shr3Eq => ">>>=",
+        Tok.MinusEq => sms(Sml.DashEq),
+        Tok.Lt => sms(Sml.Lt),
+        Tok.LtEq => sms(Sml.LtEq),
+        Tok.Shl => sms(Sml.LtLt),
+        Tok.ShlEq => sms(Sml.LtLtEq),
+        Tok.Gt => sms(Sml.Gt),
+        Tok.GtEq => sms(Sml.GtEq),
+        Tok.Shr => sms(Sml.GtGt),
+        Tok.ShrEq => sms(Sml.GtGtEq),
+        Tok.Shr3 => sms(Sml.GtGtGt),
+        Tok.Shr3Eq => sms(Sml.GtGtGtEq),
         Tok.Eq => "=",
         Tok.EqEq => "==",
         Tok.FatArrow => "=>",
-        Tok.BangEq => "!=",
+        Tok.BangEq => sms(Sml.BangEq),
         Tok.Question => "?",
-        Tok.QuestionDot => "?.",
+        Tok.QuestionDot => sms(Sml.QDot),
         Tok.Tilde => "~",
         Tok.TildeArrow => "~>",
     }
@@ -1165,7 +1165,7 @@ fn using_decl(p: Parser) I32 {
         node(p, Node.Captured_module_name, captured, start)
     }
     // `lazy`: the module builds as its own chunk (a word here, not a keyword).
-    if is(p, Tok.Word) and token_is(p.pos, "lazy") { advance(p) }
+    if is(p, Tok.Word) and token_is(p.pos, sms(Sml.Lazy)) { advance(p) }
     if is_kw(p, Kw.From) {
         advance(p)
         if is(p, Tok.String) {
@@ -2517,7 +2517,7 @@ fn intern_keywords() Void {
     src.resize(abi_kept)
     src.intern_reset()
     for (0 ..< Kw.count()) |k| {
-        let name = Kw.name(Kw(k))
+        let name = kw_name(Kw(k))
         let start = src.len()
         for (0 ..< name.len()) |c| {
             let b = name.get(c)

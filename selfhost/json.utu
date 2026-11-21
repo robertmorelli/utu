@@ -15,7 +15,7 @@ let json_rt_start: I32 = 0
 let json_rt_end: I32 = 0
 
 /// The runtime, as utu source text.
-fn json_runtime() Str => "\n" + bytes_text(json_rt_start, json_rt_end)
+fn json_runtime() Str => jss1(Jst.NlA, bytes_text(json_rt_start, json_rt_end))
 
 /// The container being expanded: its types, names, and generated functions.
 let jp_container: I32 = -1
@@ -78,10 +78,10 @@ fn json_expand_container(container: I32, json: I32, count: I32) Void {
     let before = -1
     let item = first_child(container)
     while (item >= 0) {
-        if is_kind(item, Node.Fn_decl) and word_text(word_of(first_child(first_child(item)))) == "__json_names" { names_fn = item }
+        if is_kind(item, Node.Fn_decl) and word_text(word_of(first_child(first_child(item)))) == jss(Jst.JsonNames) { names_fn = item }
         if names_fn < 0 { before = item }
         if is_kind(item, Node.Fn_decl) and next_sibling(first_child(first_child(item))) < 0 { jp_define_word(word_of(first_child(first_child(item)))) }
-        if is_kind(item, Node.Struct_decl) and word_text(word_of(first_child(item))) == "JsonReader__" { has_runtime = true }
+        if is_kind(item, Node.Struct_decl) and word_text(word_of(first_child(item))) == jss(Jst.JsonReader) { has_runtime = true }
         item = next_sibling(item)
     }
     // An earlier round's name table: this round's extends it.
@@ -94,7 +94,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) Void {
         let n = dsl_sites[s]
         if node_kind[n] == Node.Dsl_expr.i32() and word_of(first_child(n)) == json and dsl_in_program(n) and dsl_container(n) == container {
             if first_site < 0 { first_site = n }
-            let prefix = "__json" + int_text(jp_serial) + "_"
+            let prefix = jss1(Jst.Json, int_text(jp_serial))
             jp_serial += 1
             jc_pending.clear()
             jc_site = n
@@ -110,7 +110,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) Void {
     }
     if first_site < 0 { return }
     let source = if has_runtime { "" } else { json_runtime() }
-    for (0 ..< jp_functions.len()) |k| { source = source + word_text(jp_functions[k]) + "\n" }
+    for (0 ..< jp_functions.len()) |k| { source = jss2(Jst.ABNl, source, word_text(jp_functions[k])) }
     let names = old_names
     for (0 ..< jp_name_words.len()) |k| { names = names + word_text(jp_name_words[k]) }
     if old_slot < 0 {
@@ -123,7 +123,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) Void {
     if names_fn >= 0 {
         if before >= 0 { node_next[before] = node_next[names_fn] } else { node_child[container] = node_next[names_fn] }
     }
-    source = source + "fn __json_names() Str {\n    return " + js_string(names) + ";\n}\n"
+    source = jss2(Jst.FnJsonNamesStrReturn, source, js_string(names))
     dsl_current_site = first_site
     graft_declarations(container, source)
 }
@@ -137,7 +137,7 @@ fn name_ref(name: Str) Str {
         jp_name_at[w] = jp_names_len + 1
         jp_names_len += word_text(w).len()
     }
-    return int_text(jp_name_at[w] - 1) + ", " + int_text(name.len())
+    return jss2(Jst.ACommaSpaceB, int_text(jp_name_at[w] - 1), int_text(name.len()))
 }
 
 /// @jp_name_at and @jp_word_defined reach word w.
@@ -170,10 +170,10 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     let i = skip_spaces(raw, 0)
     if text_at(raw, i, "match") and (i + 5 >= raw.len() or not is_word_code(raw.get(i + 5))) { return json_match(raw, prefix) }
     // `decode|encode|error`, a type (with nested brackets), then the expression.
-    let op = if text_at(raw, i, "decode") { "decode" } else if text_at(raw, i, "encode") { "encode" } else if text_at(raw, i, "error") { "error" } else { "" }
+    let op = if text_at(raw, i, "decode") { "decode" } else if text_at(raw, i, "encode") { "encode" } else if text_at(raw, i, jss(Jst.Error)) { jss(Jst.Error) } else { "" }
     let after = i + op.len()
     if op.len() == 0 or after >= raw.len() or not is_space_code(raw.get(after)) {
-        dsl_fail("@json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`", first_non_space(raw), 1)
+        dsl_fail(jss(Jst.JsonExpectsDecodeTypeTextEncode), first_non_space(raw), 1)
     }
     let type_start = skip_spaces(raw, after)
     let j = type_start
@@ -185,40 +185,39 @@ fn json_expand_site(site: I32, prefix: Str) Str {
     }
     let type = raw.slice(type_start, j)
     if not is_written_type(type) {
-        dsl_fail("Expected a type after " + op, type_start, if type.len() > 1 { type.len() } else { 1 })
+        dsl_fail(jss1(Jst.ExpectedATypeAfter, op), type_start, if type.len() > 1 { type.len() } else { 1 })
     }
     let expr_start = skip_spaces(raw, j)
     if expr_start >= trim_end(raw).len() {
-        let what = if op == "encode" { "value" } else { "text" }
-        dsl_fail("@json " + op + " needs a " + what + " expression after the type", type_start, type.len())
+        let what = if op == "encode" { "value" } else { jss(Jst.Text) }
+        dsl_fail(jss2(Jst.JsonNeedsAExpressionAfterThe, op, what), type_start, type.len())
     }
     let expr = raw.slice(expr_start, raw.len())
     jc_type_at = type_start
     jc_type_len = type.len()
     let kind = shape_kind(type)
     if kind == Shape.Scalar or kind == Shape.Nullable {
-        dsl_fail("@json " + op + " works on a struct, enum, or Array; wrap " + type + " in a struct field", type_start, type.len())
+        dsl_fail(jss2(Jst.JsonWorksOnAStructEnum, op, type), type_start, type.len())
     }
     // decode gives ?T, and an integer enum cannot be null.
     if op == "decode" and kind == Shape.Enum and is_int_enum(declared_type(without_spaces(type))) {
-        dsl_fail("@json decode gives ?" + type + ", and an enum(U8) cannot be null: decode a struct with a " + type + " field, or use error or match", type_start, type.len())
+        dsl_fail(jss2(Jst.JsonDecodeGivesAndAnEnum, type, type), type_start, type.len())
     }
     if not splice_parses(site, expr_start, expr) {
-        let what = if op == "encode" { "value" } else { "text" }
-        dsl_fail("Invalid " + what + " expression", expr_start, trim_end(expr).len())
+        let what = if op == "encode" { "value" } else { jss(Jst.Text) }
+        dsl_fail(jss1(Jst.InvalidExpression, what), expr_start, trim_end(expr).len())
     }
     let input = dsl_splice(site, expr_start, expr)
-    let r = prefix + "reader"
-    let w = prefix + "writer"
-    let value = prefix + "value"
-    let out = prefix + "out"
-    if op == "encode" { return "{ let " + w + " = __json_writer(64); " + json_write(type, input, w) + " Str.from_codes(" + w + ".buf, " + w + ".n); }" }
+    let r = jss1(Jst.Reader, prefix)
+    let w = jss1(Jst.Writer, prefix)
+    let value = jss1(Jst.Value, prefix)
+    let out = jss1(Jst.Out, prefix)
+    if op == "encode" { return jss4(Jst.LetJsonWriter64StrFrom, w, json_write(type, input, w), w, w) }
     let read = json_read(type, r)
     if op == "decode" {
-        return "{ let " + r + " = __json_reader(" + input + "); let " + value + " = " + read + "; __json_end(" + r + "); let " + out + ": ?" + type_ref(type)
-            + " = null; if " + r + ".failed == 0 { " + out + " = " + value + "; }; " + out + "; }"
+        return jss4(Jst.LetJsonReaderLetJsonEnd, r, input, value, read) + jss4(Jst.LetNullIfFailed0, r, out, type_ref(type), r) + jss3(Jst.ASpaceEqSpaceBSemiSpaceBraceEndSemiSpaceCSemiSpa, out, value, out)
     }
-    return "{ let " + r + " = __json_reader(" + input + "); let " + value + " = " + read + "; __json_end(" + r + "); __json_describe(" + r + "); }"
+    return jss4(Jst.LetJsonReaderLetJsonEnd, r, input, value, read) + jss2(Jst.JsonDescribe, r, r)
 }
 
 fn first_non_space(text: Str) I32 => skip_spaces(text, 0)
@@ -258,9 +257,9 @@ fn shape_kind(written: Str) Shape {
     if is_json_scalar(type) { return Shape.Scalar }
     if type.len() > 0 and type.get(0) == 63 {
         let inner = shape_kind(type.slice(1, type.len()))
-        if inner == Shape.Scalar and type.slice(1, type.len()) != "Str" { json_fail(type + " is not supported: only reference types (Str, structs, enums, arrays) can be null") }
-        if inner == Shape.Nullable { json_fail(type + " is not supported") }
-        if inner == Shape.Enum and is_int_enum(declared_type(type.slice(1, type.len()))) { json_fail(type + " is not supported: an enum(U8) cannot be null; use " + type.slice(1, type.len())) }
+        if inner == Shape.Scalar and type.slice(1, type.len()) != "Str" { json_fail(jss1(Jst.IsNotSupportedOnlyReferenceTypes, type)) }
+        if inner == Shape.Nullable { json_fail(jss1(Jst.IsNotSupported, type)) }
+        if inner == Shape.Enum and is_int_enum(declared_type(type.slice(1, type.len()))) { json_fail(jss2(Jst.IsNotSupportedAnEnumU8, type, type.slice(1, type.len()))) }
         return Shape.Nullable
     }
     if text_at(type, 0, "Array[") and type.get(type.len() - 1) == 93 {
@@ -268,7 +267,7 @@ fn shape_kind(written: Str) Shape {
         return Shape.Array
     }
     let node = declared_type(type)
-    if node < 0 { json_fail("@json cannot use " + type + ": use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64") }
+    if node < 0 { json_fail(jss1(Jst.JsonCannotUseUseALocal, type)) }
     if is_kind(node, Node.Struct_decl) { return Shape.Struct }
     // Enum variants name their kind with a field `kind`: none may have one.
     let v = first_child(node)
@@ -277,8 +276,8 @@ fn shape_kind(written: Str) Shape {
             let fields = variant_fields(v)
             let f = if fields >= 0 { first_child(fields) } else { -1 }
             while (f >= 0) {
-                if is_kind(f, Node.Field) and word_text(word_of(first_child(f))) == "kind" {
-                    json_fail(type + "." + word_text(word_of(first_child(v))) + " has a field named kind, which @json uses to name the variant")
+                if is_kind(f, Node.Field) and word_text(word_of(first_child(f))) == jss(Jst.Kind) {
+                    json_fail(jss2(Jst.HasAFieldNamedKindWhich, type, word_text(word_of(first_child(v)))))
                 }
                 f = next_sibling(f)
             }
@@ -363,7 +362,7 @@ fn json_pin(name_at: I32, name: Str) Str {
     } else {
         jp_pin_of.resize(name_at * 2 + 2)
     }
-    let text = name + "__json" + int_text(jp_pin_name.len())
+    let text = jss2(Jst.Json2, name, int_text(jp_pin_name.len()))
     jp_pin_of[name_at] = jp_pin_name.len() + 1
     jp_pin_word.push(intern_text(text))
     jp_pin_name.push(name_at)
@@ -382,8 +381,8 @@ fn bind_json_pins() Void {
 fn type_ref(written: Str) Str {
     let type = without_spaces(written)
     if is_json_scalar(type) { return type }
-    if type.get(0) == 63 { return "?" + type_ref(type.slice(1, type.len())) }
-    if text_at(type, 0, "Array[") { return "Array[" + type_ref(inner_type(type)) + "]" }
+    if type.get(0) == 63 { return jss1(Jst.QA, type_ref(type.slice(1, type.len()))) }
+    if text_at(type, 0, "Array[") { return jss1(Jst.Array, type_ref(inner_type(type))) }
     let node = declared_type(type)
     return if node < 0 { type } else { json_pin(type_name_at(node), type) }
 }
@@ -393,7 +392,7 @@ fn variant_ref(variant: I32) Str => json_pin(first_child(variant), word_text(wor
 
 /// A field-less variant as a value: `Red {}`, or an integer enum's `Level.Low`.
 fn json_variant(node: I32, v: I32) Str {
-    return if is_int_enum(node) { json_pin(type_name_at(node), word_text(type_word(node))) + "." + word_text(word_of(first_child(v))) } else { variant_ref(v) + " {}" }
+    return if is_int_enum(node) { jss2(Jst.ADotB, json_pin(type_name_at(node), word_text(type_word(node))), word_text(word_of(first_child(v)))) } else { jss1(Jst.ASpaceBraceBraceEnd, variant_ref(v)) }
 }
 
 fn variant_fields(variant: I32) I32 {
@@ -424,13 +423,13 @@ fn mangle(type: Str) Str {
     let out = ""
     for (0 ..< type.len()) |i| {
         let c = type.get(i)
-        if c == 63 { out = out + "opt_" } else if is_word_code(c) { out = out + Str.from_code_point(c) } else { out = out + "_" }
+        if c == 63 { out = jss1(Jst.Opt, out) } else if is_word_code(c) { out = out + Str.from_code_point(c) } else { out = jss1(Jst.AX, out) }
     }
     return out
 }
 
 fn scalar_zero(type: Str) Str {
-    if type == "F32" or type == "F64" { return "0.0" }
+    if type == "F32" or type == "F64" { return jss(Jst.N00) }
     if type == "Bool" { return "false" }
     if type == "Str" { return "\"\"" }
     return "0"
@@ -442,17 +441,17 @@ fn scalar_read(type: Str) Str {
     if type == "I64" { return "i64" }
     if type == "F32" { return "f32" }
     if type == "F64" { return "f64" }
-    if type == "Bool" { return "bool" }
-    return "str"
+    if type == "Bool" { return jss(Jst.Bool) }
+    return jss(Jst.Str)
 }
 
 fn scalar_write(type: Str, v: Str, w: Str) Str {
-    if type == "I32" or type == "U32" { return "__json_put_i64(" + w + ", " + v + ".i64());" }
-    if type == "I64" { return "__json_put_i64(" + w + ", " + v + ");" }
-    if type == "F32" { return "__json_put_f32(" + w + ", " + v + ");" }
-    if type == "F64" { return "__json_put_f64(" + w + ", " + v + ");" }
-    if type == "Bool" { return "__json_raw(" + w + ", if " + v + " { \"true\"; } else { \"false\"; });" }
-    return "__json_put_str(" + w + ", " + v + ");"
+    if type == "I32" or type == "U32" { return jss2(Jst.JsonPutI64I64, w, v) }
+    if type == "I64" { return jss2(Jst.JsonPutI64, w, v) }
+    if type == "F32" { return jss2(Jst.JsonPutF32, w, v) }
+    if type == "F64" { return jss2(Jst.JsonPutF64, w, v) }
+    if type == "Bool" { return jss2(Jst.JsonRawIfTrueElseFalse, w, v) }
+    return jss2(Jst.JsonPutStr, w, v)
 }
 
 /// Generate a function once, by name, unless the container already has it:
@@ -474,14 +473,14 @@ fn json_zero(written: Str, visiting: I32) Str {
     if kind == Shape.Nullable { return "null" }
     if kind == Shape.Array { return "[]" }
     let w = intern_text(type)
-    if visiting >= 0 and list_has(visiting, w) { json_fail(type + " contains itself; make the recursive field ?" + type + " or an Array") }
-    let name = "__json_zero_" + mangle(type)
+    if visiting >= 0 and list_has(visiting, w) { json_fail(jss2(Jst.ContainsItselfMakeTheRecursiveField, type, type)) }
+    let name = jss1(Jst.JsonZero, mangle(type))
     let next = list_with(visiting, w)
     let node = declared_type(type)
     let t = type_ref(type)
     if json_define(name) {
         let body = ""
-        if kind == Shape.Struct { body = t + " { " + construct_fields(node, next) + " }" }
+        if kind == Shape.Struct { body = jss2(Jst.ASpaceBraceSpaceBSpaceBraceEnd, t, construct_fields(node, next)) }
         else {
             let usable = -1
             let v = first_child(node)
@@ -489,12 +488,12 @@ fn json_zero(written: Str, visiting: I32) Str {
                 if is_kind(v, Node.Variant) and fields_constructible(fields_holder_of(v), next) { usable = v }
                 v = next_sibling(v)
             }
-            if usable < 0 { json_fail(type + " has no variant without a recursive field") }
-            body = if is_int_enum(node) { json_variant(node, usable) } else { variant_ref(usable) + " { " + construct_fields(fields_holder_of(usable), next) + " }" }
+            if usable < 0 { json_fail(jss1(Jst.HasNoVariantWithoutARecursive, type)) }
+            body = if is_int_enum(node) { json_variant(node, usable) } else { jss2(Jst.ASpaceBraceSpaceBSpaceBraceEnd, variant_ref(usable), construct_fields(fields_holder_of(usable), next)) }
         }
-        json_emit("fn " + name + "() " + t + " {\n    return " + body + ";\n}")
+        json_emit(jss3(Jst.FnReturn, name, t, body))
     }
-    return name + "()"
+    return jss1(Jst.AOpenClose, name)
 }
 
 fn construct_fields(holder: I32, visiting: I32) Str {
@@ -503,8 +502,8 @@ fn construct_fields(holder: I32, visiting: I32) Str {
     let first = true
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            if not first { out = out + ", " }
-            out = out + field_name(f) + ": " + json_zero(field_type_text(f), visiting)
+            if not first { out = jss1(Jst.ACommaSpace, out) }
+            out = jss3(Jst.ABColonSpaceC, out, field_name(f), json_zero(field_type_text(f), visiting))
             first = false
         }
         f = next_sibling(f)
@@ -558,22 +557,22 @@ fn list_with(list: I32, w: I32) I32 {
 fn json_read(written: Str, r: Str) Str {
     let type = without_spaces(written)
     let kind = shape_kind(type)
-    if kind == Shape.Scalar { return "__json_" + scalar_read(type) + "(" + r + ")" }
-    let name = "__json_read_" + mangle(type)
+    if kind == Shape.Scalar { return jss2(Jst.JsonOpenClose, scalar_read(type), r) }
+    let name = jss1(Jst.JsonRead, mangle(type))
     let t = type_ref(type)
     if json_define(name) {
         if kind == Shape.Nullable {
-            json_emit("fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = null;\n    if not __json_null(r) {\n        out = " + json_read(inner_type(type), "r") + ";\n    };\n    return out;\n}")
+            json_emit(jss4(Jst.FnRJsonReaderLetOutNull, name, t, t, json_read(inner_type(type), "r")))
         } else if kind == Shape.Array {
             json_emit(array_reader(name, type))
         } else if kind == Shape.Struct {
             let node = declared_type(type)
-            json_emit("fn " + name + "(r: JsonReader__) " + t + " {\n" + fields_reader(node, t + " { " + fields_result(node) + " }", true) + "\n}")
+            json_emit(jss3(Jst.FnRJsonReader, name, t, fields_reader(node, jss2(Jst.ASpaceBraceSpaceBSpaceBraceEnd, t, fields_result(node)), true)))
         } else {
             json_emit(enum_reader(name, type))
         }
     }
-    return name + "(" + r + ")"
+    return jss2(Jst.AOpenBClose, name, r)
 }
 
 fn fields_result(holder: I32) Str {
@@ -582,8 +581,8 @@ fn fields_result(holder: I32) Str {
     let f = if holder >= 0 { first_child(holder) } else { -1 }
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            if i > 0 { out = out + ", " }
-            out = out + field_name(f) + ": f" + int_text(i)
+            if i > 0 { out = jss1(Jst.ACommaSpace, out) }
+            out = jss3(Jst.F, out, field_name(f), int_text(i))
             i += 1
         }
         f = next_sibling(f)
@@ -596,9 +595,7 @@ fn array_reader(name: Str, type: Str) Str {
     let element = type_ref(inner_type(type))
     let read = json_read(inner_type(type), "r")
     let t = type_ref(type)
-    return "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = [];\n    __json_open(r, 91, \"expected an array\");\n    if __json_first(r, 93) {\n        let first = " + read
-        + ";\n        let items = Array[" + element + "].new(8, first);\n        let count = 1;\n        while (__json_next(r, 93)) {\n            let item = " + read
-        + ";\n            if count == items.len() {\n                let grown = Array[" + element + "].new(count * 2, first);\n                grown.copy_from(0, items, 0, count);\n                items = grown;\n            };\n            items[count] = item;\n            count += 1;\n        };\n        out = if count == items.len() { items; } else { items.slice(0, count); };\n    };\n    return out;\n}"
+    return jss4(Jst.FnRJsonReaderLetOutJson, name, t, t, read) + jss3(Jst.New8FirstLetCount1, element, read, element)
 }
 
 /// The body of an object reader: one local per field, matched by name, then
@@ -613,17 +610,17 @@ fn fields_reader(holder: I32, result: Str, open: Bool) Str {
     while (f >= 0) {
         if is_kind(f, Node.Field) {
             let type = field_type_text(f)
-            if i > 0 { locals = locals + "\n" }
-            locals = locals + "    let f" + int_text(i) + ": " + type_ref(type) + " = " + json_zero(type, -1) + ";\n    let s" + int_text(i) + " = false;"
-            matcher = matcher + "if __json_is(r, " + name_ref(field_name(f)) + ") {\n            f" + int_text(i) + " = " + json_read(type, "r") + ";\n            s" + int_text(i) + " = true;\n        } else "
-            if type.get(0) != 63 { required = required + "    if not s" + int_text(i) + " {\n        __json_missing(r, " + js_string(field_name(f)) + ");\n    };\n" }
+            if i > 0 { locals = jss1(Jst.ANl, locals) }
+            locals = jss4(Jst.LetFLetS, locals, int_text(i), type_ref(type), json_zero(type, -1)) + jss1(Jst.False, int_text(i))
+            matcher = jss4(Jst.IfJsonIsRFS, matcher, name_ref(field_name(f)), int_text(i), json_read(type, "r")) + jss1(Jst.TrueElse, int_text(i))
+            if type.get(0) != 63 { required = jss3(Jst.IfNotSJsonMissingR, required, int_text(i), js_string(field_name(f))) }
             i += 1
         }
         f = next_sibling(f)
     }
-    matcher = matcher + "{\n            __json_skip(r);\n        };"
-    let start = if open { "    __json_open(r, 123, \"expected an object\");\n    let more = __json_first(r, 125);" } else { "    let more = __json_next(r, 125);" }
-    return locals + "\n" + start + "\n    while (more) {\n        __json_span(r);\n        __json_colon(r);\n        " + matcher + "\n        more = __json_next(r, 125);\n    };\n" + required + "    return " + result + ";"
+    matcher = jss1(Jst.JsonSkipR, matcher)
+    let start = if open { jss(Jst.JsonOpenR123ExpectedAn) } else { jss(Jst.LetMoreJsonNextR125) }
+    return jss4(Jst.WhileMoreJsonSpanRJson, locals, start, matcher, required) + jss1(Jst.ASemi, result)
 }
 
 /// Whether some variant of an enum has fields (it is then read and written
@@ -656,37 +653,35 @@ fn enum_reader(name: Str, type: Str) Str {
     let zero_value = json_zero(type, -1)
     // It names the variant read, when its text is plain (`unknown Expr variant "Mul"`).
     let quote = js_string(Str.from_code_point(34))
-    let unknown = js_string("unknown " + type + " variant ") + " + " + quote + " + r.text.slice(r.ks, r.ks + r.kl) + " + quote
+    let unknown = jss3(Jst.RTextSliceRKsR, js_string(jss1(Jst.UnknownVariant, type)), quote, quote)
     if not is_tagged(node) {
         let arms = ""
         let v = first_child(node)
         while (v >= 0) {
             if is_kind(v, Node.Variant) {
                 let vname = word_text(word_of(first_child(v)))
-                arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n        out = " + json_variant(node, v) + ";\n    } else "
+                arms = jss3(Jst.IfJsonIsROutElse, arms, name_ref(vname), json_variant(node, v))
             }
             v = next_sibling(v)
         }
-        return "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = " + zero_value + ";\n    __json_ws(r);\n    let start = r.at;\n    __json_span(r);\n    " + arms + "{\n        r.at = start;\n        __json_fail(r, " + unknown + ");\n    };\n    return out;\n}"
+        return jss4(Jst.FnRJsonReaderLetOutJsonOpenColonCloseBr, name, t, t, zero_value) + jss2(Jst.RAtStartJsonFailR, arms, unknown)
     }
     let arms = ""
     let v = first_child(node)
     while (v >= 0) {
         if is_kind(v, Node.Variant) {
             let vname = word_text(word_of(first_child(v)))
-            let reader = "__json_variant_" + mangle(type) + "_" + vname
+            let reader = jss2(Jst.JsonVariant, mangle(type), vname)
             if json_define(reader) {
                 let holder = variant_fields(v)
-                json_emit("fn " + reader + "(r: JsonReader__) " + t + " {\n" + fields_reader(holder, variant_ref(v) + " { " + fields_result(holder) + " }", false) + "\n}")
+                json_emit(jss3(Jst.FnRJsonReader, reader, t, fields_reader(holder, jss2(Jst.ASpaceBraceSpaceBSpaceBraceEnd, variant_ref(v), fields_result(holder)), false)))
             }
-            arms = arms + "if __json_is(r, " + name_ref(vname) + ") {\n            out = " + reader + "(r);\n        } else "
+            arms = jss3(Jst.IfJsonIsROutR, arms, name_ref(vname), reader)
         }
         v = next_sibling(v)
     }
-    let kind_ref = name_ref("kind")
-    return "fn " + name + "(r: JsonReader__) " + t + " {\n    let out: " + t + " = " + zero_value + ";\n    __json_open(r, 123, \"expected an object\");\n    if __json_first(r, 125) {\n        __json_span(r);\n        if not __json_is(r, " + kind_ref
-        + ") {\n            __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n        };\n        __json_colon(r);\n        __json_ws(r);\n        let start = r.at;\n        __json_span(r);\n        " + arms + "{\n            r.at = start;\n            __json_fail(r, " + unknown
-        + ");\n        };\n    } else {\n        __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n    };\n    return out;\n}"
+    let kind_ref = name_ref(jss(Jst.Kind))
+    return jss4(Jst.FnRJsonReaderLetOutJsonLc, name, t, t, zero_value) + jss3(Jst.JsonFailRExpectedKindAs, kind_ref, arms, unknown)
 }
 
 //! = Writers
@@ -696,13 +691,13 @@ fn json_write(written: Str, value: Str, w: Str) Str {
     let type = without_spaces(written)
     let kind = shape_kind(type)
     if kind == Shape.Scalar { return scalar_write(type, value, w) }
-    let name = "__json_write_" + mangle(type)
+    let name = jss1(Jst.JsonWrite, mangle(type))
     if json_define(name) {
         let body = ""
         if kind == Shape.Nullable {
-            body = "promote v {\n        |x| => {\n            " + json_write(inner_type(type), "x", "w") + "\n        },\n        ~> {\n            __json_raw(w, \"null\");\n        },\n    };"
+            body = jss1(Jst.PromoteVXJsonRawW, json_write(inner_type(type), "x", "w"))
         } else if kind == Shape.Array {
-            body = "__json_put(w, 91);\n    for (0..<v.len()) |i| {\n        if i > 0 {\n            __json_put(w, 44);\n        };\n        " + json_write(inner_type(type), "v[i]", "w") + "\n    };\n    __json_put(w, 93);"
+            body = jss1(Jst.JsonPutW91For0, json_write(inner_type(type), jss(Jst.VI), "w"))
         } else if kind == Shape.Struct {
             body = object_writer(declared_type(type), "v", true)
         } else {
@@ -714,25 +709,25 @@ fn json_write(written: Str, value: Str, w: Str) Str {
             while (v >= 0) {
                 if is_kind(v, Node.Variant) {
                     let vname = word_text(word_of(first_child(v)))
-                    let tag = "__json_tag(w, " + name_ref(vname) + ");"
-                    if not first { arms = arms + "\n" }
+                    let tag = jss1(Jst.JsonTagW, name_ref(vname))
+                    if not first { arms = jss1(Jst.ANl, arms) }
                     first = false
                     let holder = variant_fields(v)
-                    if is_int_enum(node) { arms = arms + "if v == " + json_variant(node, v) + " {\n        " + tag + "\n    } else " }
-                    else if not tagged { arms = arms + "        " + vname + " => {\n            " + tag + "\n        }," }
+                    if is_int_enum(node) { arms = jss3(Jst.IfVElse, arms, json_variant(node, v), tag) }
+                    else if not tagged { arms = jss3(Jst.ASpaceBSpaceEqGtSpaceBraceNlSpaceCNlSpaceBraceEn, arms, vname, tag) }
                     else {
-                        let kind_ = "__json_name(w, 123, " + name_ref("kind") + ");\n            " + tag
-                        if holder < 0 or child_count_of(holder, Node.Field) == 0 { arms = arms + "        " + vname + " => {\n            " + kind_ + "\n            __json_put(w, 125);\n        }," }
-                        else { arms = arms + "        " + vname + " |x| => {\n            " + kind_ + "\n            " + object_writer(holder, "x", false) + "\n        }," }
+                        let kind_ = jss2(Jst.JsonNameW123, name_ref(jss(Jst.Kind)), tag)
+                        if holder < 0 or child_count_of(holder, Node.Field) == 0 { arms = jss3(Jst.JsonPutW125, arms, vname, kind_) }
+                        else { arms = jss4(Jst.XBarBarEqGtBraceN, arms, vname, kind_, object_writer(holder, "x", false)) }
                     }
                 }
                 v = next_sibling(v)
             }
-            body = if is_int_enum(node) { arms + "{};" } else { "alt v {\n" + arms + "\n        ~> {},\n    };" }
+            body = if is_int_enum(node) { jss1(Jst.ABraceBraceEndSemi, arms) } else { jss1(Jst.AltV, arms) }
         }
-        json_emit("fn " + name + "(w: JsonWriter__, v: " + type_ref(type) + ") Void {\n    " + body + "\n}")
+        json_emit(jss3(Jst.FnWJsonWriterVVoid, name, type_ref(type), body))
     }
-    return name + "(" + w + ", " + value + ");"
+    return jss3(Jst.AOpenBCommaSpaceCCloseSemi, name, w, value)
 }
 
 /// Fields as "name":value pairs; `opens` writes the `{` (else the object
@@ -743,15 +738,15 @@ fn object_writer(holder: I32, value: Str, opens: Bool) Str {
     let f = if holder >= 0 { first_child(holder) } else { -1 }
     while (f >= 0) {
         if is_kind(f, Node.Field) {
-            if i > 0 { parts = parts + "\n    " }
+            if i > 0 { parts = jss1(Jst.ANlSpace, parts) }
             let open = if i == 0 and opens { 123 } else { 44 }
-            parts = parts + "__json_name(w, " + int_text(open) + ", " + name_ref(field_name(f)) + ");\n    " + json_write(field_type_text(f), value + "." + field_name(f), "w")
+            parts = jss4(Jst.JsonNameW, parts, int_text(open), name_ref(field_name(f)), json_write(field_type_text(f), jss2(Jst.ADotB, value, field_name(f)), "w"))
             i += 1
         }
         f = next_sibling(f)
     }
-    if i == 0 { return if opens { "__json_raw(w, \"{}\");" } else { "__json_put(w, 125);" } }
-    return parts + "\n    __json_put(w, 125);"
+    if i == 0 { return if opens { jss(Jst.JsonRawW) } else { jss(Jst.JsonPutW125OpenCommaCloseSe) } }
+    return jss1(Jst.JsonPutW125NlOpenCommaClose, parts)
 }
 
 //! = match: structural patterns over JSON
@@ -789,7 +784,7 @@ fn sc_peek(raw: Str, text: Str) Bool {
 
 fn sc_expect(raw: Str, text: Str) Void {
     sc_ws(raw)
-    if not text_at(raw, sc_at, text) { dsl_fail("Expected '" + text + "' in @json match", sc_at, 1) }
+    if not text_at(raw, sc_at, text) { dsl_fail(jss1(Jst.ExpectedInJsonMatch, text), sc_at, 1) }
     sc_at += text.len()
 }
 
@@ -934,11 +929,11 @@ fn parse_pattern(raw: Str) I32 {
             let key_start = sc_ws(raw)
             let quoted = sc_string(raw)
             let key = if quoted.len() > 0 { json_unescape(quoted) } else { sc_word(raw, true) }
-            if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at, 1) }
+            if key.len() == 0 { dsl_fail(jss(Jst.ExpectedAFieldNameInJson), sc_at, 1) }
             let written = if quoted.len() > 0 { quoted.len() } else { key.len() }
             let f = pat_first[p]
             while (f >= 0) {
-                if word_text(pat_key[f]) == key { dsl_fail("Field " + key + " appears twice in this pattern", key_start, written) }
+                if word_text(pat_key[f]) == key { dsl_fail(jss1(Jst.FieldAppearsTwiceInThisPattern, key), key_start, written) }
                 f = pat_next[f]
             }
             sc_expect(raw, ":")
@@ -955,11 +950,11 @@ fn parse_pattern(raw: Str) I32 {
         sc_expect(raw, "|")
         let name_start = sc_ws(raw)
         let name = sc_word(raw, false)
-        if name.len() == 0 { dsl_fail("Expected a capture name: |name| Type", sc_at, 1) }
+        if name.len() == 0 { dsl_fail(jss(Jst.ExpectedACaptureNameNameType), sc_at, 1) }
         sc_expect(raw, "|")
         let type_start = sc_ws(raw)
         let type = sc_capture_type(raw)
-        if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at, 1) }
+        if type.len() == 0 { dsl_fail(jss1(Jst.ExpectedATypeForCapture, name), sc_at, 1) }
         let p = new_pattern(Pat.Capture)
         pat_name[p] = intern_text(name)
         pat_name_start[p] = name_start
@@ -975,7 +970,7 @@ fn parse_pattern(raw: Str) I32 {
     let token = sc_string(raw)
     if token.len() == 0 { token = sc_number(raw) }
     if token.len() == 0 { token = sc_keyword(raw) }
-    if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at, 1) }
+    if token.len() == 0 { dsl_fail(jss(Jst.ExpectedNameTypeOrALiteral), sc_at, 1) }
     let p = new_pattern(Pat.Literal)
     pat_text[p] = intern_text(token)
     return p
@@ -1067,7 +1062,7 @@ fn fresh_name(prefix: Str, name: Str) Str {
 /// A slice of the body as utu: in parentheses, once it parses.
 fn json_splice(text: Str, start: I32, what: Str) Str {
     if not splice_parses(jc_site, start, text) {
-        dsl_fail("Invalid " + what + " in @json match", start, if text.len() > 1 { text.len() } else { 1 })
+        dsl_fail(jss1(Jst.InvalidInJsonMatch, what), start, if text.len() > 1 { text.len() } else { 1 })
     }
     return dsl_splice(jc_site, start, text)
 }
@@ -1091,7 +1086,7 @@ fn json_match(raw: Str, prefix: Str) Str {
     sc_at = text_index(raw, "match", 0) + 5
     let text = sc_until(raw, "{")
     let text_start = sc_until_start
-    if text.len() == 0 { dsl_fail("@json match needs the text to match: `match text { … }`", sc_at, 1) }
+    if text.len() == 0 { dsl_fail(jss(Jst.JsonMatchNeedsTheTextTo), sc_at, 1) }
     sc_expect(raw, "{")
     let arm_pattern = Array[I32].new(64, -1)
     let arm_body = Array[I32].new(64, -1)
@@ -1102,22 +1097,22 @@ fn json_match(raw: Str, prefix: Str) Str {
     let fallback_binding = -1
     while (not sc_peek(raw, "}")) {
         if sc_peek(raw, "~>") {
-            if fallback_body >= 0 { dsl_fail("@json match has more than one ~> arm", sc_at, 2) }
+            if fallback_body >= 0 { dsl_fail(jss(Jst.JsonMatchHasMoreThanOne), sc_at, 2) }
             sc_expect(raw, "~>")
             if sc_peek(raw, "|") {
                 sc_expect(raw, "|")
                 let binding = sc_word(raw, false)
-                if binding.len() == 0 { dsl_fail("Expected a name for the error: ~> |error| …", sc_at, 1) }
+                if binding.len() == 0 { dsl_fail(jss(Jst.ExpectedANameForTheError), sc_at, 1) }
                 fallback_binding = intern_text(binding)
                 sc_expect(raw, "|")
             }
             fallback_body = intern_text(sc_until(raw, ",}"))
             fallback_start = sc_until_start
         } else {
-            if fallback_body >= 0 { dsl_fail("The ~> arm must be last in @json match", sc_at, 1) }
+            if fallback_body >= 0 { dsl_fail(jss(Jst.TheArmMustBeLastIn), sc_at, 1) }
             let pattern = parse_pattern(raw)
             sc_expect(raw, "=>")
-            if narms == 64 { dsl_fail("@json match supports at most 64 pattern arms", sc_at, 1) }
+            if narms == 64 { dsl_fail(jss(Jst.JsonMatchSupportsAtMost64), sc_at, 1) }
             arm_pattern[narms] = pattern
             arm_body[narms] = intern_text(sc_until(raw, ",}"))
             arm_body_start[narms] = sc_until_start
@@ -1126,16 +1121,16 @@ fn json_match(raw: Str, prefix: Str) Str {
         if not sc_peek(raw, "}") { sc_expect(raw, ",") }
     }
     sc_expect(raw, "}")
-    if sc_ws(raw) < raw.len() { dsl_fail("Unexpected text after @json match", sc_at, 1) }
-    if narms == 0 { dsl_fail("@json match needs at least one pattern arm", sc_at, 1) }
-    if fallback_body < 0 { dsl_fail("@json match needs a ~> arm for text that matches no pattern", sc_at, 1) }
+    if sc_ws(raw) < raw.len() { dsl_fail(jss(Jst.UnexpectedTextAfterJsonMatch), sc_at, 1) }
+    if narms == 0 { dsl_fail(jss(Jst.JsonMatchNeedsAtLeastOne), sc_at, 1) }
+    if fallback_body < 0 { dsl_fail(jss(Jst.JsonMatchNeedsAArmFor), sc_at, 1) }
     // Generate.
-    let r = fresh_name(prefix, "reader")
-    let best = fresh_name(prefix, "error")
-    let best_at = fresh_name(prefix, "errorAt")
-    let best_matched = fresh_name(prefix, "errorMatched")
-    let fallback = json_splice(word_text(fallback_body), fallback_start, "fallback")
-    let code = "{ " + (if fallback_binding >= 0 { "let " + word_text(fallback_binding) + " = " + best + ";" } else { "" }) + " " + fallback + "; }"
+    let r = fresh_name(prefix, jss(Jst.ReaderLc))
+    let best = fresh_name(prefix, jss(Jst.Error))
+    let best_at = fresh_name(prefix, jss(Jst.ErrorAt))
+    let best_matched = fresh_name(prefix, jss(Jst.ErrorMatched))
+    let fallback = json_splice(word_text(fallback_body), fallback_start, jss(Jst.Fallback))
+    let code = jss2(Jst.BraceSpaceASpaceBSemiSpaceBraceEnd, (if fallback_binding >= 0 { jss2(Jst.Let, word_text(fallback_binding), best) } else { "" }), fallback)
     let index = narms - 1
     while (index >= 0) {
         cap_name.clear()
@@ -1144,7 +1139,7 @@ fn json_match(raw: Str, prefix: Str) Str {
         jm_declare.clear()
         let read = read_pattern(arm_pattern[index], "", r, prefix)
         let declare = ""
-        for (0 ..< jm_declare.len()) |k| { declare = declare + word_text(jm_declare[k]) + " " }
+        for (0 ..< jm_declare.len()) |k| { declare = jss2(Jst.ABSpace, declare, word_text(jm_declare[k])) }
         // Each capture is marked present where it is read; a default fills
         // one whose field was absent; then each is bound by its name.
         let marked = read
@@ -1154,23 +1149,20 @@ fn json_match(raw: Str, prefix: Str) Str {
         for (0 ..< cap_name.len()) |k| {
             let p = cap_pat[k]
             let local = word_text(cap_local[k])
-            let has = fresh_name(prefix, "has")
-            has_decls = has_decls + "let " + has + " = false; "
-            marked = replace_first(marked, local + " = ", has + " = true; " + local + " = ")
+            let has = fresh_name(prefix, jss(Jst.Has))
+            has_decls = jss2(Jst.LetFalse, has_decls, has)
+            marked = replace_first(marked, jss1(Jst.ASpaceEqSpace, local), jss2(Jst.True, has, local))
             if pat_fallback[p] >= 0 {
-                let value = json_splice(word_text(pat_fallback[p]), pat_fallback_start[p], "default for " + word_text(pat_name[p]))
-                fill = fill + "if not " + has + " { " + local + " = " + value + "; }; "
+                let value = json_splice(word_text(pat_fallback[p]), pat_fallback_start[p], jss1(Jst.DefaultFor, word_text(pat_name[p])))
+                fill = jss4(Jst.IfNot, fill, has, local, value)
             }
-            bind = bind + "let " + word_text(cap_name[k]) + ": " + type_ref(word_text(pat_type[p])) + " = " + local + "; "
+            bind = jss4(Jst.LetColonEqSemi, bind, word_text(cap_name[k]), type_ref(word_text(pat_type[p])), local)
         }
-        let body = json_splice(word_text(arm_body[index]), arm_body_start[index], "arm body")
-        code = "{ " + (if index > 0 { "__json_restart(" + r + ");" } else { "" }) + "\n      " + declare + " " + has_decls + "\n      " + marked
-            + "\n      __json_end(" + r + ");\n      if " + r + ".failed == 0 { " + fill + " " + bind + " " + body + "; } else {\n        if " + r + ".matched > " + best_matched
-            + " or (" + r + ".matched == " + best_matched + " and " + r + ".failed > " + best_at + ") {\n          " + best_matched + " = " + r + ".matched; " + best_at + " = " + r
-            + ".failed; " + best + " = __json_describe(" + r + ");\n        };\n        " + code + ";\n      };\n    }"
+        let body = json_splice(word_text(arm_body[index]), arm_body_start[index], jss(Jst.ArmBody))
+        code = jss4(Jst.JsonEnd, (if index > 0 { jss1(Jst.JsonRestart, r) } else { "" }), declare, has_decls, marked) + jss4(Jst.IfFailed0, r, r, fill, bind) + jss4(Jst.ElseIfMatchedOrMatched, body, r, best_matched, r) + jss4(Jst.AndFailed, best_matched, r, best_at, best_matched) + jss4(Jst.MatchedFailedJsonDescribe, r, best_at, r, best) + jss2(Jst.ACloseSemiNlSpaceBraceEndSemiNlSpaceBSemiNlSpace, r, code)
         index -= 1
     }
-    return "{ let " + r + " = __json_reader(" + json_splice(text, text_start, "text expression") + "); let " + best + " = \"\"; let " + best_at + " = 0; let " + best_matched + " = -1; " + code + "; }"
+    return jss4(Jst.LetJsonReaderLetLet0, r, json_splice(text, text_start, jss(Jst.TextExpression)), best, best_at) + jss2(Jst.N1, best_matched, code)
 }
 
 /// Statements reading pattern p from r, assigning its captures; its
@@ -1180,68 +1172,430 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
     if pat_is(p, Pat.Capture) {
         let name = word_text(pat_name[p])
         for (0 ..< cap_name.len()) |k| {
-            if cap_name[k] == pat_name[p] { dsl_fail(name + " is captured twice in this pattern", pat_name_start[p], name.len()) }
+            if cap_name[k] == pat_name[p] { dsl_fail(jss1(Jst.IsCapturedTwiceInThisPattern, name), pat_name_start[p], name.len()) }
         }
         let type = word_text(pat_type[p])
         jc_type_at = pat_type_start[p]
         jc_type_len = type.len()
         shape_kind(type)
-        let local = fresh_name(prefix, "capture_" + name + "_")
+        let local = fresh_name(prefix, jss1(Jst.Capture, name))
         cap_name.push(pat_name[p])
         cap_local.push(intern_text(local))
         cap_pat.push(p)
         let ok = fresh_name(prefix, "ok")
         let read = json_read(type, r)
         let zero = json_zero(type, -1)
-        jm_declare.push(intern_text("let " + local + ": " + type_ref(type) + " = " + zero + ";"))
-        return "let " + ok + " = " + r + ".failed == 0; " + local + " = " + read + "; __json_at(" + r + ", " + ok + ", " + where + ");"
+        jm_declare.push(intern_text(jss3(Jst.LetLc, local, type_ref(type), zero)))
+        return jss4(Jst.LetFailed0JsonAt, ok, r, local, read) + jss3(Jst.ACommaSpaceBCommaSpaceCCloseSemi, r, ok, where)
     }
     if pat_is(p, Pat.Literal) {
         let ok = fresh_name(prefix, "ok")
         let text = word_text(pat_text[p])
-        let expected = js_string("expected " + text)
+        let expected = js_string(jss1(Jst.Expected, text))
         let c = text.get(0)
         let check = if c == 34 {
-            "__json_span(" + r + "); if " + r + ".failed == 0 and not __json_is(" + r + ", " + name_ref(json_unescape(text)) + ") { __json_fail(" + r + ", " + expected + "); };"
+            jss4(Jst.JsonSpanIfFailed0And, r, r, r, name_ref(json_unescape(text))) + jss2(Jst.ACommaSpaceBCloseSemiSpaceBraceEndSemi, r, expected)
         } else if c == 116 or c == 102 {
-            "if __json_bool(" + r + ") != " + text + " { __json_fail(" + r + ", " + expected + "); };"
+            jss4(Jst.IfJsonBoolJsonFail, r, text, r, expected)
         } else if c == 110 {
-            "if not __json_null(" + r + ") { __json_fail(" + r + ", " + expected + "); };"
+            jss3(Jst.IfNotJsonNullJsonFail, r, r, expected)
         } else {
             // An integer literal matches only an integer token (kl: no fraction or exponent).
-            let integer = float_text(text) == text + ".0"
+            let integer = float_text(text) == jss1(Jst.N0, text)
             // A long one is an F64 beyond its exact range: the token's text is compared too.
-            let exact = if integer and text.len() > 15 { " or " + r + ".at < " + int_text(text.len()) + " or " + r + ".text.slice(" + r + ".at - " + int_text(text.len()) + ", " + r + ".at) != " + js_string(text) } else { "" }
-            "if __json_f64(" + r + ") != " + float_text(text) + (if integer { " or " + r + ".kl != 0" + exact } else { "" }) + " { __json_fail(" + r + ", " + expected + "); };"
+            let exact = if integer and text.len() > 15 { jss4(Jst.OrAtOrTextSliceAt, r, int_text(text.len()), r, r) + jss3(Jst.At, int_text(text.len()), r, js_string(text)) } else { "" }
+            jss4(Jst.IfJsonF64JsonFail, r, float_text(text), (if integer { jss2(Jst.OrKl0, r, exact) } else { "" }), r) + jss1(Jst.ACloseSemiSpaceBraceEndSemi, expected)
         }
-        return "let " + ok + " = " + r + ".failed == 0; " + check + " __json_at(" + r + ", " + ok + ", " + where + ");"
+        return jss4(Jst.LetFailed0JsonAtEqDotEqEqSemiOpe, ok, r, check, r) + jss2(Jst.ACommaSpaceBCloseSemi, ok, where)
     }
     // An object: one pass over its fields, matching the ones the pattern names.
-    let more = fresh_name(prefix, "more")
+    let more = fresh_name(prefix, jss(Jst.More))
     let arms = ""
     let required = ""
     let f = pat_first[p]
     while (f >= 0) {
         let key = word_text(pat_key[f])
-        let seen = fresh_name(prefix, "seen")
-        let read = read_pattern(f, if path.len() > 0 { path + "." + key } else { key }, r, prefix)
-        jm_declare.push(intern_text("let " + seen + " = false;"))
-        arms = arms + "if __json_is(" + r + ", " + name_ref(key) + ") { " + read + " " + seen + " = true; } else "
+        let seen = fresh_name(prefix, jss(Jst.Seen))
+        let read = read_pattern(f, if path.len() > 0 { jss2(Jst.ADotB, path, key) } else { key }, r, prefix)
+        jm_declare.push(intern_text(jss1(Jst.LetFalseEqSemi, seen)))
+        arms = jss4(Jst.IfJsonIs, arms, r, name_ref(key), read) + jss1(Jst.TrueElseEqSemiBraceEnd, seen)
         if not pattern_optional(f) {
-            required = required + "if not " + seen + " { if " + r + ".failed == 0 { " + r + ".where = " + where + "; }; __json_missing(" + r + ", " + js_string(key) + "); }; "
+            required = jss4(Jst.IfNotIfFailed0Where, required, seen, r, r) + jss3(Jst.JsonMissing, where, r, js_string(key))
         }
         f = pat_next[f]
     }
     let ok = fresh_name(prefix, "ok")
-    return "let " + ok + " = " + r + ".failed == 0; __json_open(" + r + ", 123, \"expected an object\"); __json_at(" + r + ", " + ok + ", " + where + ");\n        let " + more + " = __json_first(" + r
-        + ", 125);\n        while (" + more + ") { __json_span(" + r + "); __json_colon(" + r + "); " + arms + "{ __json_skip(" + r + "); }; " + more + " = __json_next(" + r + ", 125); };\n        " + required
+    return jss4(Jst.LetFailed0JsonOpen123, ok, r, r, r) + jss4(Jst.LetJsonFirst125While, ok, where, more, r) + jss4(Jst.JsonSpanJsonColonJsonSkip, more, r, r, arms) + jss4(Jst.JsonNext125, r, more, r, required)
 }
 
 /// A JSON number as a utu F64 literal: `3` is `3.0`, `1e5` is `1.0e5`.
 fn float_text(text: Str) Str {
     if text_index(text, ".", 0) >= 0 { return text }
-    let e = text_index(text, "e", 0)
-    if e < 0 { e = text_index(text, "E", 0) }
-    if e < 0 { return text + ".0" }
-    return text.slice(0, e) + ".0" + text.slice(e, text.len())
+    let e = text_index(text, jss(Jst.E), 0)
+    if e < 0 { e = text_index(text, jss(Jst.E2), 0) }
+    if e < 0 { return jss1(Jst.N0, text) }
+    return jss2(Jst.N0Dot, text.slice(0, e), text.slice(e, text.len()))
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Jst:
+    | NlA
+    | Json
+    | ABNl
+    | FnJsonNamesStrReturn
+    | ACommaSpaceB
+    | ExpectedATypeAfter
+    | JsonNeedsAExpressionAfterThe
+    | JsonWorksOnAStructEnum
+    | JsonDecodeGivesAndAnEnum
+    | InvalidExpression
+    | Reader
+    | Writer
+    | Value
+    | Out
+    | LetJsonWriter64StrFrom
+    | LetJsonReaderLetJsonEnd
+    | LetNullIfFailed0
+    | ASpaceEqSpaceBSemiSpaceBraceEndSemiSpaceCSemiSpa
+    | JsonDescribe
+    | IsNotSupportedOnlyReferenceTypes
+    | IsNotSupported
+    | IsNotSupportedAnEnumU8
+    | JsonCannotUseUseALocal
+    | HasAFieldNamedKindWhich
+    | Json2
+    | QA
+    | Array
+    | ADotB
+    | ASpaceBraceBraceEnd
+    | Opt
+    | AX
+    | JsonPutI64I64
+    | JsonPutI64
+    | JsonPutF32
+    | JsonPutF64
+    | JsonRawIfTrueElseFalse
+    | JsonPutStr
+    | ContainsItselfMakeTheRecursiveField
+    | JsonZero
+    | ASpaceBraceSpaceBSpaceBraceEnd
+    | HasNoVariantWithoutARecursive
+    | FnReturn
+    | AOpenClose
+    | ACommaSpace
+    | ABColonSpaceC
+    | JsonOpenClose
+    | JsonRead
+    | FnRJsonReaderLetOutNull
+    | FnRJsonReader
+    | AOpenBClose
+    | F
+    | FnRJsonReaderLetOutJson
+    | New8FirstLetCount1
+    | ANl
+    | LetFLetS
+    | False
+    | IfJsonIsRFS
+    | TrueElse
+    | IfNotSJsonMissingR
+    | JsonSkipR
+    | WhileMoreJsonSpanRJson
+    | ASemi
+    | UnknownVariant
+    | RTextSliceRKsR
+    | IfJsonIsROutElse
+    | FnRJsonReaderLetOutJsonOpenColonCloseBr
+    | RAtStartJsonFailR
+    | JsonVariant
+    | IfJsonIsROutR
+    | FnRJsonReaderLetOutJsonLc
+    | JsonFailRExpectedKindAs
+    | JsonWrite
+    | PromoteVXJsonRawW
+    | JsonPutW91For0
+    | JsonTagW
+    | IfVElse
+    | ASpaceBSpaceEqGtSpaceBraceNlSpaceCNlSpaceBraceEn
+    | JsonNameW123
+    | JsonPutW125
+    | XBarBarEqGtBraceN
+    | ABraceBraceEndSemi
+    | AltV
+    | FnWJsonWriterVVoid
+    | AOpenBCommaSpaceCCloseSemi
+    | ANlSpace
+    | JsonNameW
+    | JsonPutW125NlOpenCommaClose
+    | ExpectedInJsonMatch
+    | FieldAppearsTwiceInThisPattern
+    | ExpectedATypeForCapture
+    | InvalidInJsonMatch
+    | BraceSpaceASpaceBSemiSpaceBraceEnd
+    | Let
+    | ABSpace
+    | LetFalse
+    | ASpaceEqSpace
+    | True
+    | DefaultFor
+    | IfNot
+    | LetColonEqSemi
+    | JsonEnd
+    | IfFailed0
+    | ElseIfMatchedOrMatched
+    | AndFailed
+    | MatchedFailedJsonDescribe
+    | ACloseSemiNlSpaceBraceEndSemiNlSpaceBSemiNlSpace
+    | JsonRestart
+    | LetJsonReaderLetLet0
+    | N1
+    | IsCapturedTwiceInThisPattern
+    | Capture
+    | LetLc
+    | LetFailed0JsonAt
+    | ACommaSpaceBCommaSpaceCCloseSemi
+    | Expected
+    | JsonSpanIfFailed0And
+    | ACommaSpaceBCloseSemiSpaceBraceEndSemi
+    | IfJsonBoolJsonFail
+    | IfNotJsonNullJsonFail
+    | N0
+    | OrAtOrTextSliceAt
+    | At
+    | IfJsonF64JsonFail
+    | ACloseSemiSpaceBraceEndSemi
+    | OrKl0
+    | LetFailed0JsonAtEqDotEqEqSemiOpe
+    | ACommaSpaceBCloseSemi
+    | LetFalseEqSemi
+    | IfJsonIs
+    | TrueElseEqSemiBraceEnd
+    | IfNotIfFailed0Where
+    | JsonMissing
+    | LetFailed0JsonOpen123
+    | LetJsonFirst125While
+    | JsonSpanJsonColonJsonSkip
+    | JsonNext125
+    | N0Dot
+    | JsonNames
+    | JsonReader
+    | Error
+    | JsonExpectsDecodeTypeTextEncode
+    | Text
+    | Kind
+    | N00
+    | Bool
+    | Str
+    | JsonOpenR123ExpectedAn
+    | LetMoreJsonNextR125
+    | VI
+    | JsonRawW
+    | JsonPutW125OpenCommaCloseSe
+    | ExpectedAFieldNameInJson
+    | ExpectedACaptureNameNameType
+    | ExpectedNameTypeOrALiteral
+    | JsonMatchNeedsTheTextTo
+    | JsonMatchHasMoreThanOne
+    | ExpectedANameForTheError
+    | TheArmMustBeLastIn
+    | JsonMatchSupportsAtMost64
+    | UnexpectedTextAfterJsonMatch
+    | JsonMatchNeedsAtLeastOne
+    | JsonMatchNeedsAArmFor
+    | ReaderLc
+    | ErrorAt
+    | ErrorMatched
+    | Fallback
+    | Has
+    | ArmBody
+    | TextExpression
+    | More
+    | Seen
+    | E
+    | E2
+
+fn jss_src(t: Jst) Str {
+    return match t {
+        Jst.NlA => "\n{0}",
+        Jst.Json => "__json{0}_",
+        Jst.ABNl => "{0}{1}\n",
+        Jst.FnJsonNamesStrReturn => "{0}fn __json_names() Str {\n    return {1};\n}\n",
+        Jst.ACommaSpaceB => "{0}, {1}",
+        Jst.ExpectedATypeAfter => "Expected a type after {0}",
+        Jst.JsonNeedsAExpressionAfterThe => "@json {0} needs a {1} expression after the type",
+        Jst.JsonWorksOnAStructEnum => "@json {0} works on a struct, enum, or Array; wrap {1} in a struct field",
+        Jst.JsonDecodeGivesAndAnEnum => "@json decode gives ?{0}, and an enum(U8) cannot be null: decode a struct with a {1} field, or use error or match",
+        Jst.InvalidExpression => "Invalid {0} expression",
+        Jst.Reader => "{0}reader",
+        Jst.Writer => "{0}writer",
+        Jst.Value => "{0}value",
+        Jst.Out => "{0}out",
+        Jst.LetJsonWriter64StrFrom => "{ let {0} = __json_writer(64); {1} Str.from_codes({2}.buf, {3}.n); }",
+        Jst.LetJsonReaderLetJsonEnd => "{ let {0} = __json_reader({1}); let {2} = {3}; __json_end(",
+        Jst.LetNullIfFailed0 => "{0}); let {1}: ?{2} = null; if {3}.failed == 0 { ",
+        Jst.ASpaceEqSpaceBSemiSpaceBraceEndSemiSpaceCSemiSpa => "{0} = {1}; }; {2}; }",
+        Jst.JsonDescribe => "{0}); __json_describe({1}); }",
+        Jst.IsNotSupportedOnlyReferenceTypes => "{0} is not supported: only reference types (Str, structs, enums, arrays) can be null",
+        Jst.IsNotSupported => "{0} is not supported",
+        Jst.IsNotSupportedAnEnumU8 => "{0} is not supported: an enum(U8) cannot be null; use {1}",
+        Jst.JsonCannotUseUseALocal => "@json cannot use {0}: use a local struct or enum, Array, ?T, Str, Bool, I32, U32, I64, F32, or F64",
+        Jst.HasAFieldNamedKindWhich => "{0}.{1} has a field named kind, which @json uses to name the variant",
+        Jst.Json2 => "{0}__json{1}",
+        Jst.QA => "?{0}",
+        Jst.Array => "Array[{0}]",
+        Jst.ADotB => "{0}.{1}",
+        Jst.ASpaceBraceBraceEnd => "{0} {}",
+        Jst.Opt => "{0}opt_",
+        Jst.AX => "{0}_",
+        Jst.JsonPutI64I64 => "__json_put_i64({0}, {1}.i64());",
+        Jst.JsonPutI64 => "__json_put_i64({0}, {1});",
+        Jst.JsonPutF32 => "__json_put_f32({0}, {1});",
+        Jst.JsonPutF64 => "__json_put_f64({0}, {1});",
+        Jst.JsonRawIfTrueElseFalse => "__json_raw({0}, if {1} { \"true\"; } else { \"false\"; });",
+        Jst.JsonPutStr => "__json_put_str({0}, {1});",
+        Jst.ContainsItselfMakeTheRecursiveField => "{0} contains itself; make the recursive field ?{1} or an Array",
+        Jst.JsonZero => "__json_zero_{0}",
+        Jst.ASpaceBraceSpaceBSpaceBraceEnd => "{0} { {1} }",
+        Jst.HasNoVariantWithoutARecursive => "{0} has no variant without a recursive field",
+        Jst.FnReturn => "fn {0}() {1} {\n    return {2};\n}",
+        Jst.AOpenClose => "{0}()",
+        Jst.ACommaSpace => "{0}, ",
+        Jst.ABColonSpaceC => "{0}{1}: {2}",
+        Jst.JsonOpenClose => "__json_{0}({1})",
+        Jst.JsonRead => "__json_read_{0}",
+        Jst.FnRJsonReaderLetOutNull => "fn {0}(r: JsonReader__) {1} {\n    let out: {2} = null;\n    if not __json_null(r) {\n        out = {3};\n    };\n    return out;\n}",
+        Jst.FnRJsonReader => "fn {0}(r: JsonReader__) {1} {\n{2}\n}",
+        Jst.AOpenBClose => "{0}({1})",
+        Jst.F => "{0}{1}: f{2}",
+        Jst.FnRJsonReaderLetOutJson => "fn {0}(r: JsonReader__) {1} {\n    let out: {2} = [];\n    __json_open(r, 91, \"expected an array\");\n    if __json_first(r, 93) {\n        let first = {3};\n        let items = Array[",
+        Jst.New8FirstLetCount1 => "{0}].new(8, first);\n        let count = 1;\n        while (__json_next(r, 93)) {\n            let item = {1};\n            if count == items.len() {\n                let grown = Array[{2}].new(count * 2, first);\n                grown.copy_from(0, items, 0, count);\n                items = grown;\n            };\n            items[count] = item;\n            count += 1;\n        };\n        out = if count == items.len() { items; } else { items.slice(0, count); };\n    };\n    return out;\n}",
+        Jst.ANl => "{0}\n",
+        Jst.LetFLetS => "{0}    let f{1}: {2} = {3};\n    let s",
+        Jst.False => "{0} = false;",
+        Jst.IfJsonIsRFS => "{0}if __json_is(r, {1}) {\n            f{2} = {3};\n            s",
+        Jst.TrueElse => "{0} = true;\n        } else ",
+        Jst.IfNotSJsonMissingR => "{0}    if not s{1} {\n        __json_missing(r, {2});\n    };\n",
+        Jst.JsonSkipR => "{0}{\n            __json_skip(r);\n        };",
+        Jst.WhileMoreJsonSpanRJson => "{0}\n{1}\n    while (more) {\n        __json_span(r);\n        __json_colon(r);\n        {2}\n        more = __json_next(r, 125);\n    };\n{3}    return ",
+        Jst.ASemi => "{0};",
+        Jst.UnknownVariant => "unknown {0} variant ",
+        Jst.RTextSliceRKsR => "{0} + {1} + r.text.slice(r.ks, r.ks + r.kl) + {2}",
+        Jst.IfJsonIsROutElse => "{0}if __json_is(r, {1}) {\n        out = {2};\n    } else ",
+        Jst.FnRJsonReaderLetOutJsonOpenColonCloseBr => "fn {0}(r: JsonReader__) {1} {\n    let out: {2} = {3};\n    __json_ws(r);\n    let start = r.at;\n    __json_span(r);\n    ",
+        Jst.RAtStartJsonFailR => "{0}{\n        r.at = start;\n        __json_fail(r, {1});\n    };\n    return out;\n}",
+        Jst.JsonVariant => "__json_variant_{0}_{1}",
+        Jst.IfJsonIsROutR => "{0}if __json_is(r, {1}) {\n            out = {2}(r);\n        } else ",
+        Jst.FnRJsonReaderLetOutJsonLc => "fn {0}(r: JsonReader__) {1} {\n    let out: {2} = {3};\n    __json_open(r, 123, \"expected an object\");\n    if __json_first(r, 125) {\n        __json_span(r);\n        if not __json_is(r, ",
+        Jst.JsonFailRExpectedKindAs => "{0}) {\n            __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n        };\n        __json_colon(r);\n        __json_ws(r);\n        let start = r.at;\n        __json_span(r);\n        {1}{\n            r.at = start;\n            __json_fail(r, {2});\n        };\n    } else {\n        __json_fail(r, \"expected \\\"kind\\\" as the first field\");\n    };\n    return out;\n}",
+        Jst.JsonWrite => "__json_write_{0}",
+        Jst.PromoteVXJsonRawW => "promote v {\n        |x| => {\n            {0}\n        },\n        ~> {\n            __json_raw(w, \"null\");\n        },\n    };",
+        Jst.JsonPutW91For0 => "__json_put(w, 91);\n    for (0..<v.len()) |i| {\n        if i > 0 {\n            __json_put(w, 44);\n        };\n        {0}\n    };\n    __json_put(w, 93);",
+        Jst.JsonTagW => "__json_tag(w, {0});",
+        Jst.IfVElse => "{0}if v == {1} {\n        {2}\n    } else ",
+        Jst.ASpaceBSpaceEqGtSpaceBraceNlSpaceCNlSpaceBraceEn => "{0}        {1} => {\n            {2}\n        },",
+        Jst.JsonNameW123 => "__json_name(w, 123, {0});\n            {1}",
+        Jst.JsonPutW125 => "{0}        {1} => {\n            {2}\n            __json_put(w, 125);\n        },",
+        Jst.XBarBarEqGtBraceN => "{0}        {1} |x| => {\n            {2}\n            {3}\n        },",
+        Jst.ABraceBraceEndSemi => "{0}{};",
+        Jst.AltV => "alt v {\n{0}\n        ~> {},\n    };",
+        Jst.FnWJsonWriterVVoid => "fn {0}(w: JsonWriter__, v: {1}) Void {\n    {2}\n}",
+        Jst.AOpenBCommaSpaceCCloseSemi => "{0}({1}, {2});",
+        Jst.ANlSpace => "{0}\n    ",
+        Jst.JsonNameW => "{0}__json_name(w, {1}, {2});\n    {3}",
+        Jst.JsonPutW125NlOpenCommaClose => "{0}\n    __json_put(w, 125);",
+        Jst.ExpectedInJsonMatch => "Expected '{0}' in @json match",
+        Jst.FieldAppearsTwiceInThisPattern => "Field {0} appears twice in this pattern",
+        Jst.ExpectedATypeForCapture => "Expected a type for capture {0}",
+        Jst.InvalidInJsonMatch => "Invalid {0} in @json match",
+        Jst.BraceSpaceASpaceBSemiSpaceBraceEnd => "{ {0} {1}; }",
+        Jst.Let => "let {0} = {1};",
+        Jst.ABSpace => "{0}{1} ",
+        Jst.LetFalse => "{0}let {1} = false; ",
+        Jst.ASpaceEqSpace => "{0} = ",
+        Jst.True => "{0} = true; {1} = ",
+        Jst.DefaultFor => "default for {0}",
+        Jst.IfNot => "{0}if not {1} { {2} = {3}; }; ",
+        Jst.LetColonEqSemi => "{0}let {1}: {2} = {3}; ",
+        Jst.JsonEnd => "{ {0}\n      {1} {2}\n      {3}\n      __json_end(",
+        Jst.IfFailed0 => "{0});\n      if {1}.failed == 0 { {2} {3} ",
+        Jst.ElseIfMatchedOrMatched => "{0}; } else {\n        if {1}.matched > {2} or ({3}.matched == ",
+        Jst.AndFailed => "{0} and {1}.failed > {2}) {\n          {3} = ",
+        Jst.MatchedFailedJsonDescribe => "{0}.matched; {1} = {2}.failed; {3} = __json_describe(",
+        Jst.ACloseSemiNlSpaceBraceEndSemiNlSpaceBSemiNlSpace => "{0});\n        };\n        {1};\n      };\n    }",
+        Jst.JsonRestart => "__json_restart({0});",
+        Jst.LetJsonReaderLetLet0 => "{ let {0} = __json_reader({1}); let {2} = \"\"; let {3} = 0; let ",
+        Jst.N1 => "{0} = -1; {1}; }",
+        Jst.IsCapturedTwiceInThisPattern => "{0} is captured twice in this pattern",
+        Jst.Capture => "capture_{0}_",
+        Jst.LetLc => "let {0}: {1} = {2};",
+        Jst.LetFailed0JsonAt => "let {0} = {1}.failed == 0; {2} = {3}; __json_at(",
+        Jst.ACommaSpaceBCommaSpaceCCloseSemi => "{0}, {1}, {2});",
+        Jst.Expected => "expected {0}",
+        Jst.JsonSpanIfFailed0And => "__json_span({0}); if {1}.failed == 0 and not __json_is({2}, {3}) { __json_fail(",
+        Jst.ACommaSpaceBCloseSemiSpaceBraceEndSemi => "{0}, {1}); };",
+        Jst.IfJsonBoolJsonFail => "if __json_bool({0}) != {1} { __json_fail({2}, {3}); };",
+        Jst.IfNotJsonNullJsonFail => "if not __json_null({0}) { __json_fail({1}, {2}); };",
+        Jst.N0 => "{0}.0",
+        Jst.OrAtOrTextSliceAt => " or {0}.at < {1} or {2}.text.slice({3}.at - ",
+        Jst.At => "{0}, {1}.at) != {2}",
+        Jst.IfJsonF64JsonFail => "if __json_f64({0}) != {1}{2} { __json_fail({3}, ",
+        Jst.ACloseSemiSpaceBraceEndSemi => "{0}); };",
+        Jst.OrKl0 => " or {0}.kl != 0{1}",
+        Jst.LetFailed0JsonAtEqDotEqEqSemiOpe => "let {0} = {1}.failed == 0; {2} __json_at({3}, ",
+        Jst.ACommaSpaceBCloseSemi => "{0}, {1});",
+        Jst.LetFalseEqSemi => "let {0} = false;",
+        Jst.IfJsonIs => "{0}if __json_is({1}, {2}) { {3} ",
+        Jst.TrueElseEqSemiBraceEnd => "{0} = true; } else ",
+        Jst.IfNotIfFailed0Where => "{0}if not {1} { if {2}.failed == 0 { {3}.where = ",
+        Jst.JsonMissing => "{0}; }; __json_missing({1}, {2}); }; ",
+        Jst.LetFailed0JsonOpen123 => "let {0} = {1}.failed == 0; __json_open({2}, 123, \"expected an object\"); __json_at({3}, ",
+        Jst.LetJsonFirst125While => "{0}, {1});\n        let {2} = __json_first({3}, 125);\n        while (",
+        Jst.JsonSpanJsonColonJsonSkip => "{0}) { __json_span({1}); __json_colon({2}); {3}{ __json_skip(",
+        Jst.JsonNext125 => "{0}); }; {1} = __json_next({2}, 125); };\n        {3}",
+        Jst.N0Dot => "{0}.0{1}",
+        Jst.JsonNames => "__json_names",
+        Jst.JsonReader => "JsonReader__",
+        Jst.Error => "error",
+        Jst.JsonExpectsDecodeTypeTextEncode => "@json expects `decode Type text`, `encode Type value`, `error Type text`, or `match text { … }`",
+        Jst.Text => "text",
+        Jst.Kind => "kind",
+        Jst.N00 => "0.0",
+        Jst.Bool => "bool",
+        Jst.Str => "str",
+        Jst.JsonOpenR123ExpectedAn => "    __json_open(r, 123, \"expected an object\");\n    let more = __json_first(r, 125);",
+        Jst.LetMoreJsonNextR125 => "    let more = __json_next(r, 125);",
+        Jst.VI => "v[i]",
+        Jst.JsonRawW => "__json_raw(w, \"{}\");",
+        Jst.JsonPutW125OpenCommaCloseSe => "__json_put(w, 125);",
+        Jst.ExpectedAFieldNameInJson => "Expected a field name in @json pattern",
+        Jst.ExpectedACaptureNameNameType => "Expected a capture name: |name| Type",
+        Jst.ExpectedNameTypeOrALiteral => "Expected {…}, |name| Type, or a literal in @json pattern",
+        Jst.JsonMatchNeedsTheTextTo => "@json match needs the text to match: `match text { … }`",
+        Jst.JsonMatchHasMoreThanOne => "@json match has more than one ~> arm",
+        Jst.ExpectedANameForTheError => "Expected a name for the error: ~> |error| …",
+        Jst.TheArmMustBeLastIn => "The ~> arm must be last in @json match",
+        Jst.JsonMatchSupportsAtMost64 => "@json match supports at most 64 pattern arms",
+        Jst.UnexpectedTextAfterJsonMatch => "Unexpected text after @json match",
+        Jst.JsonMatchNeedsAtLeastOne => "@json match needs at least one pattern arm",
+        Jst.JsonMatchNeedsAArmFor => "@json match needs a ~> arm for text that matches no pattern",
+        Jst.ReaderLc => "reader",
+        Jst.ErrorAt => "errorAt",
+        Jst.ErrorMatched => "errorMatched",
+        Jst.Fallback => "fallback",
+        Jst.Has => "has",
+        Jst.ArmBody => "arm body",
+        Jst.TextExpression => "text expression",
+        Jst.More => "more",
+        Jst.Seen => "seen",
+        Jst.E => "e",
+        Jst.E2 => "E",
+    }
+}
+
+fn jss(t: Jst) Str => st(st_json + t.i32())
+fn jss1(t: Jst, a: Str) Str => stf(st_json + t.i32(), a, "", "", "")
+fn jss2(t: Jst, a: Str, b: Str) Str => stf(st_json + t.i32(), a, b, "", "")
+fn jss3(t: Jst, a: Str, b: Str, c: Str) Str => stf(st_json + t.i32(), a, b, c, "")
+fn jss4(t: Jst, a: Str, b: Str, c: Str, d: Str) Str => stf(st_json + t.i32(), a, b, c, d)

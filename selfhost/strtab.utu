@@ -1,0 +1,1083 @@
+//! = Static text
+//!
+//! The compiler's messages, word lists, and code templates are tables: an
+//! enum names each string, and a function for the build (`*_src`) gives its
+//! text. When the compiler is built, @st_pack lays every table's strings end
+//! to end, each ended by a 0, and compresses them into @strtab: byte-pair
+//! encoding (a byte past those the text uses stands for two others), then
+//! copies of what came before (LZ77), chosen to make the fewest bytes, then
+//! Huffman codes for the bytes that result. A compiler decodes it whole,
+//! into one string, the first time it needs one of them (about half a
+//! millisecond).
+//!
+//! A template's text has holes: `{0}` … `{3}`, which @stf fills, and a
+//! diagnostic's own (`{w}`, `{ta}`, …; see @st_hole and @diag_hole). They are
+//! bytes 1 to 30 (not 9 or 10); byte 31 parts a diagnostic's templates. A
+//! character past ASCII is a byte from 128, which the header maps to its
+//! code unit.
+
+/// The decoded length (3 bytes); the count of tables (1) and each one's
+/// count of strings (2 bytes); the count of characters past ASCII (1)
+/// and their code units (2 bytes each); the count of pairs (1) and each
+/// pair's two bytes, the pairs numbered from the bytes past ASCII; then the
+/// codes, Huffman-coded (see @st_huffman): a byte below @st_copy (a pair or
+/// a character), or a copy of 3 + k bytes for byte @st_copy + k (k = 15: 18
+/// + the next byte), from the distance that follows (7 bits a byte, low
+/// first).
+const vec strtab: U8 = @comptime/\ st_pack() \/
+
+/// The first copy code.
+let st_copy: I32 = 240
+
+/// Decoded: every string, each ended by a 0, and by string, where it starts.
+struct StTable:
+    | text: Str
+    | at: Array[I32]
+
+let st_table: StTable = StTable { text: "", at: Array[I32].new(0, 0) }
+
+/// String `id`.
+fn st(id: I32) Str {
+    let at = st_ready()
+    return st_table.text.slice(at[id], at[id + 1] - 1)
+}
+
+/// Template `id`, its holes `{0}` … `{3}` filled with `a` … `d`.
+fn stf(id: I32, a: Str, b: Str, c: Str, d: Str) Str {
+    let run = st_ready()[id]
+    let text = st_table.text
+    let out = ""
+    let j = run
+    while (text.get(j) != 0) {
+        let h = text.get(j)
+        if h < 5 {
+            out = out + text.slice(run, j) + (if h == 1 { a } else if h == 2 { b } else if h == 3 { c } else { d })
+            run = j + 1
+        }
+        j += 1
+    }
+    return out + text.slice(run, j)
+}
+
+/// Whether `w` is one of string `id`'s words (between spaces or lines).
+fn st_has_word(id: I32, w: Str) Bool {
+    let at = st_ready()
+    let n = w.len()
+    if n == 0 { return false }
+    let text = st_table.text
+    let i = text_index(text, w, at[id])
+    while (i >= 0 and i < at[id + 1]) {
+        let c = text.get(i + n)
+        if (i == at[id] or text.get(i - 1) <= 32) and c <= 32 { return true }
+        i = text_index(text, w, i + 1)
+    }
+    return false
+}
+
+/// Decode @strtab, once; by string, where it starts.
+fn st_ready() Array[I32] {
+    if st_table.at.len() > 0 { return st_table.at }
+    let n = strtab[0] | (strtab[1] << 8) | (strtab[2] << 16)
+    let tables = strtab[3]
+    let h = 4 + 2 * tables
+    let high = 128 + strtab[h]
+    let pairs = h + 2 - 256
+    let tokens = st_huffman(2 * high + pairs + 2 * strtab[h + 1 + 2 * strtab[h]])
+    let at = 0
+    let codes = Array[I32].new(n, 0)
+    let stack = Array[I32].new(256, 0)
+    let out = 0
+    while (out < n) {
+        let c = tokens[at]
+        at += 1
+        if c >= st_copy {
+            let size = c - st_copy + 3
+            if c == 255 {
+                size += tokens[at]
+                at += 1
+            }
+            let d = 0
+            let shift = 0
+            let b = 128
+            while (b >= 128) {
+                b = tokens[at]
+                at += 1
+                d = d | ((b & 127) << shift)
+                shift += 7
+            }
+            for (0 ..< size) |k| {
+                codes[out] = codes[out - d]
+                out += 1
+            }
+        } else {
+            stack[0] = c
+            let sp = 1
+            while (sp > 0) {
+                sp -= 1
+                let s = stack[sp]
+                if s >= high {
+                    stack[sp] = strtab[pairs + 2 * s + 1]
+                    stack[sp + 1] = strtab[pairs + 2 * s]
+                    sp += 2
+                } else {
+                    codes[out] = if s < 128 { s } else { (strtab[h + 2 * s - 255] << 8) | strtab[h + 2 * s - 254] }
+                    out += 1
+                }
+            }
+        }
+    }
+    // Table k's string j starts at `starts[1024 * k + j]`; one more slot
+    // past its last ends it.
+    let starts = Array[I32].new(1024 * tables, 0)
+    let slot = 0
+    let table = 0
+    let left = strtab[4] | (strtab[5] << 8)
+    for (0 ..< n) |i| {
+        if codes[i] == 0 {
+            slot += 1
+            starts[slot] = i + 1
+            left -= 1
+            if left == 0 and table + 1 < tables {
+                table += 1
+                slot = 1024 * table
+                starts[slot] = i + 1
+                left = strtab[4 + 2 * table] | (strtab[5 + 2 * table] << 8)
+            }
+        }
+    }
+    st_table.text = Str.from_codes(codes, n)
+    st_table.at = starts
+    return starts
+}
+
+/// The codes, Huffman-coded from `at`: their count (3 bytes), each byte's
+/// code length (4 bits, low first; 0 for none), then the canonical codes,
+/// high bit first.
+fn st_huffman(at: I32) Array[I32] {
+    let count = Array[I32].new(16, 0)
+    let symbols = Array[I32].new(256, 0)
+    let place = Array[I32].new(16, 0)
+    for (0 ..< 2) |pass| {
+        for (0 ..< 256) |c| {
+            let l = (strtab[at + 3 + (c >> 1)] >> (4 * (c & 1))) & 15
+            if pass == 0 { count[l] += 1 } else if l > 0 {
+                symbols[place[l]] = c
+                place[l] += 1
+            }
+        }
+        count[0] = 0
+        for (1 ..< 16) |l| { place[l] = place[l - 1] + count[l - 1] }
+    }
+    let tokens = Array[I32].new(strtab[at] | (strtab[at + 1] << 8) | (strtab[at + 2] << 16), 0)
+    let bit = (at + 131) * 8
+    for (0 ..< tokens.len()) |t| {
+        let code = 0
+        let first = 0
+        let index = 0
+        let l = 1
+        while (l > 0) {
+            code = code | ((strtab[bit >> 3] >> (7 - (bit & 7))) & 1)
+            bit += 1
+            if code - first < count[l] {
+                tokens[t] = symbols[index + code - first]
+                l = 0
+            } else {
+                index += count[l]
+                first = (first + count[l]) << 1
+                code = code << 1
+                l += 1
+            }
+        }
+    }
+    return tokens
+}
+
+//! == Packing (when the compiler is built)
+
+/// The tables' bytes, the code units past ASCII in the order their bytes
+/// number them, and each table's count of strings.
+vec st_build: I32
+vec st_high: I32
+vec st_counts: I32
+
+fn st_pack() Array[I32] {
+    st_tables()
+    let n = st_build.len()
+    let high = 128 + st_high.len()
+    let out = Array[I32].new(n + 1024, 0)
+    out[0] = n & 255
+    out[1] = (n >> 8) & 255
+    out[2] = n >> 16
+    out[3] = st_counts.len()
+    let at = 4
+    for (0 ..< st_counts.len()) |k| {
+        out[at] = st_counts[k] & 255
+        out[at + 1] = st_counts[k] >> 8
+        at += 2
+    }
+    out[at] = st_high.len()
+    at += 1
+    for (0 ..< st_high.len()) |k| {
+        out[at] = st_high[k] >> 8
+        out[at + 1] = st_high[k] & 255
+        at += 2
+    }
+    // Pairs: each round, the most frequent pairs of codes (more than 3
+    // times), up to 8 and no two sharing a code, each get the next byte.
+    let text = Array[I32].new(n, 0)
+    let seq = Array[I32].new(n, 0)
+    for (0 ..< n) |i| {
+        text[i] = st_build[i]
+        seq[i] = st_build[i]
+    }
+    let size = Array[I32].new(256, 1)
+    let counts = Array[I32].new(65536, 0)
+    // A pair's byte this round (or 0), the round's 16 most frequent pairs
+    // (most first), and by code, the last round a pair took it.
+    let pick = Array[I32].new(65536, 0)
+    let top = Array[I32].new(16, -1)
+    let taken_in = Array[I32].new(256, 0)
+    let round = 0
+    let len = n
+    let code = high
+    let pairs_at = at
+    at += 1
+    while (code < st_copy) {
+        round += 1
+        for (1 ..< len) |i| { counts[seq[i - 1] * 256 + seq[i]] += 1 }
+        for (0 ..< 16) |t| { top[t] = -1 }
+        for (0 ..< 65536) |k| {
+            if counts[k] > 3 and (top[15] < 0 or counts[k] > counts[top[15]]) {
+                let t = 15
+                while (t > 0 and (top[t - 1] < 0 or counts[k] > counts[top[t - 1]])) {
+                    top[t] = top[t - 1]
+                    t -= 1
+                }
+                top[t] = k
+            }
+        }
+        if top[0] < 0 { break }
+        let taken = 0
+        for (0 ..< 16) |t| {
+            let k = top[t]
+            if k >= 0 and taken < 8 and code < st_copy and taken_in[k >> 8] != round and taken_in[k & 255] != round {
+                taken_in[k >> 8] = round
+                taken_in[k & 255] = round
+                pick[k] = code
+                out[at] = k >> 8
+                out[at + 1] = k & 255
+                at += 2
+                size[code] = size[k >> 8] + size[k & 255]
+                code += 1
+                taken += 1
+            }
+        }
+        let j = 0
+        let i = 0
+        while (i < len) {
+            let c = if i + 1 < len { pick[seq[i] * 256 + seq[i + 1]] } else { 0 }
+            if c > 0 {
+                seq[j] = c
+                i += 2
+            } else {
+                seq[j] = seq[i]
+                i += 1
+            }
+            j += 1
+        }
+        len = j
+        for (0 ..< 16) |t| { if top[t] >= 0 { pick[top[t]] = 0 } }
+        for (0 ..< 65536) |k| { counts[k] = 0 }
+    }
+    out[pairs_at] = code - high
+    // Copies: the cheapest path through the codes, each step a code or a
+    // copy of earlier bytes that ends where a code does.
+    let pos = Array[I32].new(len + 1, 0)
+    for (0 ..< len) |s| { pos[s + 1] = pos[s] + size[seq[s]] }
+    let cost = Array[I32].new(len + 1, 1073741824)
+    let from = Array[I32].new(len + 1, 0)
+    let copy_size = Array[I32].new(len + 1, 0)
+    let copy_from = Array[I32].new(len + 1, 0)
+    let head = Array[I32].new(65536, -1)
+    let prev = Array[I32].new(n, -1)
+    cost[0] = 0
+    let put = 0
+    for (0 ..< len) |s| {
+        let i = pos[s]
+        while (put < i) {
+            if put + 2 < n {
+                let h = st_hash(text, put)
+                prev[put] = head[h]
+                head[h] = put
+            }
+            put += 1
+        }
+        if cost[s] + 1 < cost[s + 1] {
+            cost[s + 1] = cost[s] + 1
+            from[s + 1] = s
+            copy_size[s + 1] = 0
+        }
+        if i + 3 <= n {
+            let j = head[st_hash(text, i)]
+            // Nearer copies first: a farther one only for its longer lengths.
+            let tries = 0
+            let e = s + 1
+            while (j >= 0 and tries < 16) {
+                let l = 0
+                while (l < 273 and i + l < n and text[j + l] == text[i + l]) { l += 1 }
+                let d = i - j
+                while (e <= len and pos[e] - i <= l) {
+                    let m = pos[e] - i
+                    let c = cost[s] + 2 + (if m >= 18 { 1 } else { 0 }) + (if d < 128 { 0 } else if d < 16384 { 1 } else { 2 })
+                    if m >= 3 and c < cost[e] {
+                        cost[e] = c
+                        from[e] = s
+                        copy_size[e] = m
+                        copy_from[e] = d
+                    }
+                    e += 1
+                }
+                j = prev[j]
+                tries += 1
+            }
+        }
+    }
+    // The path, back to front, then its codes.
+    let codes_at = at
+    let steps = Array[I32].new(len + 1, 0)
+    let count = 0
+    let e = len
+    while (e > 0) {
+        steps[count] = e
+        count += 1
+        e = from[e]
+    }
+    if at + cost[len] + 8 > out.len() { out = st_grow(out, at + cost[len] + 8) }
+    while (count > 0) {
+        count -= 1
+        let step = steps[count]
+        let m = copy_size[step]
+        if m == 0 {
+            out[at] = seq[from[step]]
+            at += 1
+        } else {
+            let k = if m >= 18 { 15 } else { m - 3 }
+            out[at] = st_copy + k
+            at += 1
+            if k == 15 {
+                out[at] = m - 18
+                at += 1
+            }
+            let d = copy_from[step]
+            while (d >= 128) {
+                out[at] = 128 | (d & 127)
+                at += 1
+                d = d >> 7
+            }
+            out[at] = d
+            at += 1
+        }
+    }
+    return st_pack_huffman(out, codes_at, at)
+}
+
+/// `out` with its codes from `from` Huffman-coded (see @st_huffman).
+fn st_pack_huffman(out: Array[I32], from: I32, end_: I32) Array[I32] {
+    let n = end_ - from
+    let freq = Array[I32].new(256, 0)
+    for (from ..< end_) |i| { freq[out[i]] += 1 }
+    let size = st_code_sizes(freq)
+    // Canonical codes: by size, then byte.
+    let code = Array[I32].new(256, 0)
+    let next = 0
+    for (1 ..< 16) |l| {
+        for (0 ..< 256) |c| {
+            if size[c] == l {
+                code[c] = next
+                next += 1
+            }
+        }
+        next = next << 1
+    }
+    let packed = Array[I32].new(from + 131 + n + 8, 0)
+    for (0 ..< from) |i| { packed[i] = out[i] }
+    packed[from] = n & 255
+    packed[from + 1] = (n >> 8) & 255
+    packed[from + 2] = n >> 16
+    for (0 ..< 256) |c| { packed[from + 3 + (c >> 1)] = packed[from + 3 + (c >> 1)] | (size[c] << (4 * (c & 1))) }
+    let bit = (from + 131) * 8
+    for (from ..< end_) |i| {
+        let c = out[i]
+        for (0 ..< size[c]) |k| {
+            let b = (code[c] >> (size[c] - 1 - k)) & 1
+            packed[bit >> 3] = packed[bit >> 3] | (b << (7 - (bit & 7)))
+            bit += 1
+        }
+    }
+    return packed.slice(0, (bit + 7) >> 3)
+}
+
+/// Huffman code sizes for these byte counts, at most 15 bits (rare bytes
+/// counted as more common until they fit).
+fn st_code_sizes(freq: Array[I32]) Array[I32] {
+    let floor = 0
+    while (true) {
+        // Nodes: the bytes, then the merged; each one's weight and parent.
+        let weight = Array[I32].new(512, 0)
+        let parent = Array[I32].new(512, -1)
+        let live = Array[I32].new(512, 0)
+        let nodes = 256
+        for (0 ..< 256) |c| {
+            if freq[c] > 0 {
+                weight[c] = if freq[c] < floor { floor } else { freq[c] }
+                live[c] = 1
+            }
+        }
+        let left = 0
+        for (0 ..< 256) |c| { left += live[c] }
+        while (left > 1) {
+            let a = -1
+            let b = -1
+            for (0 ..< nodes) |x| {
+                if live[x] == 1 {
+                    if a < 0 or weight[x] < weight[a] {
+                        b = a
+                        a = x
+                    } else if b < 0 or weight[x] < weight[b] { b = x }
+                }
+            }
+            weight[nodes] = weight[a] + weight[b]
+            live[nodes] = 1
+            live[a] = 0
+            live[b] = 0
+            parent[a] = nodes
+            parent[b] = nodes
+            nodes += 1
+            left -= 1
+        }
+        let size = Array[I32].new(256, 0)
+        let most = 0
+        for (0 ..< 256) |c| {
+            if freq[c] > 0 {
+                let x = c
+                while (parent[x] >= 0) {
+                    size[c] += 1
+                    x = parent[x]
+                }
+                if size[c] > most { most = size[c] }
+            }
+        }
+        if most <= 15 { return size }
+        floor = floor * 2 + 1
+    }
+    return freq
+}
+
+fn st_hash(text: Array[I32], i: I32) I32 => ((text[i] * 251 + text[i + 1]) * 251 + text[i + 2]) & 65535
+
+fn st_grow(a: Array[I32], size: I32) Array[I32] {
+    let b = Array[I32].new(size, 0)
+    b.copy_from(0, a, 0, a.len())
+    return b
+}
+
+/// Add a string (its holes made bytes) to the tables.
+fn st_put(text: Str) Void {
+    let i = 0
+    while (i < text.len()) {
+        let c = text.get(i)
+        let close = if c == 123 { text_index(text, "}", i) } else { -1 }
+        let hole = if close > i and close - i < 8 { st_hole(text.slice(i + 1, close)) } else { 0 }
+        if hole > 0 {
+            st_build.push(hole)
+            i = close + 1
+        } else {
+            if c >= 128 {
+                let k = 0
+                while (k < st_high.len() and st_high[k] != c) { k += 1 }
+                if k == st_high.len() { st_high.push(c) }
+                c = 128 + k
+            } else if c < 32 and c != 9 and c != 10 {
+                // (No control characters: they are holes.)
+                fatal
+            }
+            st_build.push(c)
+            i += 1
+        }
+    }
+    st_build.push(0)
+}
+
+/// Add a diagnostic's templates, `sub` 0, 1, …, parted by byte 31.
+fn st_put_part(text: Str, sub: I32) Void {
+    if sub > 0 { st_build[st_build.len() - 1] = 31 }
+    st_put(text)
+}
+
+/// A hole's byte, by its name, or 0.
+fn st_hole(name: Str) I32 {
+    let names = "0 1 2 3 . . . . w dym ta tb ia ib ic wa wb wc na nb da db dc node mem x y kind"
+    let k = 0
+    let at = 0
+    while (at < names.len()) {
+        let end_ = text_index(names, " ", at)
+        if end_ < 0 { end_ = names.len() }
+        if names.slice(at, end_) == name { return if k < 8 { k + 1 } else { k + 3 } }
+        k += 1
+        at = end_ + 1
+    }
+    return 0
+}
+
+//! == The tables
+//!
+//! Table k's string j is number `1024 * k + j`; each table's first number
+//! is a constant here, which @st_end_table checks against its place.
+
+/// Why a @comptime evaluation trapped, by its code (diag.utu).
+let st_trap: I32 = 0
+/// CSS properties, DOM events (wutu_parse.utu).
+let st_web: I32 = 1024
+/// Hints and notes (hints.utu).
+let st_hints: I32 = 2048
+/// Wutu's parser (wutu_parse.utu).
+let st_wutu_parse: I32 = 3072
+/// `@json`'s code and messages (json.utu).
+let st_json: I32 = 4096
+/// Wutu's code (wutu.utu).
+let st_wutu: I32 = 5120
+/// `@stored`'s code (stored.utu).
+let st_stored: I32 = 6144
+/// The language parts written as utu source (gen.utu).
+let st_gen: I32 = 7168
+/// `@ir`'s words and opcodes (ir.utu).
+let st_ir: I32 = 8192
+/// Host declarations (foreign.utu).
+let st_foreign: I32 = 9216
+/// Diagnostics' messages, by kind (diag.utu).
+let st_diag: I32 = 10240
+/// Diagnostics' labels, by kind (diag.utu).
+let st_label: I32 = 11264
+/// Diagnostic kinds' names, as stage 0 spells them (diag.utu).
+let st_kind: I32 = 12288
+/// The rest of diag.utu's.
+let st_dg: I32 = 13312
+/// Enum variants' names (below).
+let st_prelude_name: I32 = 14336
+let st_storage_name: I32 = 15360
+let st_diag_name: I32 = 16384
+let st_mem_method_name: I32 = 17408
+let st_decl_kind_text: I32 = 18432
+let st_node_name_of: I32 = 19456
+let st_kw_name: I32 = 20480
+let st_narrow_name: I32 = 21504
+/// check.utu's.
+let st_check: I32 = 22528
+/// host.utu's (JavaScript glue).
+let st_host: I32 = 23552
+/// resolve.utu's.
+let st_resolve: I32 = 24576
+/// The smaller files' (@Sml, below).
+let st_small: I32 = 25600
+
+fn st_tables() Void {
+    for (0 ..< 9) |k| { st_put(comptime_trap_src(k)) }
+    st_end_table(st_trap)
+    st_put(css_properties_text())
+    st_put(dom_events_text())
+    st_end_table(st_web)
+    for (0 ..< Ht.count()) |k| { st_put(hs_src(Ht(k))) }
+    st_end_table(st_hints)
+    for (0 ..< Wpt.count()) |k| { st_put(wps_src(Wpt(k))) }
+    st_end_table(st_wutu_parse)
+    for (0 ..< Jst.count()) |k| { st_put(jss_src(Jst(k))) }
+    st_end_table(st_json)
+    for (0 ..< Wut.count()) |k| { st_put(wus_src(Wut(k))) }
+    st_end_table(st_wutu)
+    for (0 ..< Stt.count()) |k| { st_put(sts_src(Stt(k))) }
+    st_end_table(st_stored)
+    for (0 ..< Gnt.count()) |k| { st_put(gns_src(Gnt(k))) }
+    st_end_table(st_gen)
+    for (0 ..< Irt.count()) |k| { st_put(irs_src(Irt(k))) }
+    st_end_table(st_ir)
+    for (0 ..< Fgt.count()) |k| { st_put(fgs_src(Fgt(k))) }
+    st_end_table(st_foreign)
+    for (0 ..< Diag.count()) |k| {
+        let parts = diag_text_src(Diag(k))
+        for (0 ..< parts.len()) |sub| { st_put_part(parts[sub], sub) }
+    }
+    st_end_table(st_diag)
+    for (0 ..< Diag.count()) |k| {
+        let parts = diag_label_src(Diag(k))
+        for (0 ..< parts.len()) |sub| { st_put_part(parts[sub], sub) }
+    }
+    st_end_table(st_label)
+    for (0 ..< Diag.count()) |k| { st_put(diag_name_for_kind(Diag(k))) }
+    st_end_table(st_kind)
+    for (0 ..< Dgt.count()) |k| { st_put(dgs_src(Dgt(k))) }
+    st_end_table(st_dg)
+    for (0 ..< Prelude.count()) |k| { st_put(Prelude.name(Prelude(k))) }
+    st_end_table(st_prelude_name)
+    for (0 ..< Storage.count()) |k| { st_put(Storage.name(Storage(k))) }
+    st_end_table(st_storage_name)
+    for (0 ..< Diag.count()) |k| { st_put(Diag.name(Diag(k))) }
+    st_end_table(st_diag_name)
+    for (0 ..< MemMethod.count()) |k| { st_put(MemMethod.name(MemMethod(k))) }
+    st_end_table(st_mem_method_name)
+    for (0 ..< Decl.count()) |k| { st_put(Decl.name(Decl(k))) }
+    st_end_table(st_decl_kind_text)
+    for (0 ..< Node.count()) |k| { st_put(Node.name(Node(k))) }
+    st_end_table(st_node_name_of)
+    for (0 ..< Kw.count()) |k| { st_put(Kw.name(Kw(k))) }
+    st_end_table(st_kw_name)
+    for (0 ..< Narrow.count()) |k| { st_put(Narrow.name(Narrow(k))) }
+    st_end_table(st_narrow_name)
+    for (0 ..< Ckt.count()) |k| { st_put(cks_src(Ckt(k))) }
+    st_end_table(st_check)
+    for (0 ..< Hot.count()) |k| { st_put(hos_src(Hot(k))) }
+    st_end_table(st_host)
+    for (0 ..< Rst.count()) |k| { st_put(rss_src(Rst(k))) }
+    st_end_table(st_resolve)
+    for (0 ..< Sml.count()) |k| { st_put(sms_src(Sml(k))) }
+    st_end_table(st_small)
+}
+
+/// The strings put since the last table: the table numbered from `first`.
+fn st_end_table(first: I32) Void {
+    // (Out of place, or past 1024 strings: a mistake here.)
+    if first != 1024 * st_counts.len() { fatal }
+    let before = 0
+    for (0 ..< st_counts.len()) |k| { before += st_counts[k] }
+    let count = 0
+    for (0 ..< st_build.len()) |i| { if st_build[i] == 0 { count += 1 } }
+    if count - before > 1024 { fatal }
+    st_counts.push(count - before)
+}
+
+//! == Enum names
+//!
+//! A variant's name, as `.name()` gives it, from a table of each enum's (so
+//! the names are not each a string constant of the compiler).
+
+fn prelude_name(v: Prelude) Str => st(st_prelude_name + v.i32())
+fn storage_name(v: Storage) Str => st(st_storage_name + v.i32())
+fn diag_name(v: Diag) Str => st(st_diag_name + v.i32())
+fn mem_method_name(v: MemMethod) Str => st(st_mem_method_name + v.i32())
+fn decl_kind_text(v: Decl) Str => st(st_decl_kind_text + v.i32())
+fn node_name_of(v: Node) Str => st(st_node_name_of + v.i32())
+fn kw_name(v: Kw) Str => st(st_kw_name + v.i32())
+fn narrow_name(v: Narrow) Str => st(st_narrow_name + v.i32())
+
+//! == The smaller files' strings
+//!
+//! Those of closures, misc, protocols, mems, iterators, parse, lib, data,
+//! types, strings, control, profile, dsl, generators, wasm, enums, and
+//! validate (.utu), and their templates.
+
+enum(U8) Sml:
+    | ClT
+    | ClosureCall
+    | Closure
+    | ClosureNew
+    | ClosureNewDot
+    | ClosureRec
+    | ClosureCallDot
+    | ClosuresNew
+    | Calls
+    | Sigs
+    | QuoteCommaQuote
+    | QuoteBracketEnd
+    | MaySuspend
+    | AStackSuspendsOnlyThroughUtu
+    | Suspends
+    | TheHostCallsIt
+    | AStackSuspendsOnlyThroughUtuTickCommaTickSem
+    | Await
+    | ForAValueUsePromote
+    | Promise
+    | Iterator
+    | Next
+    | Done
+    | Close
+    | Null
+    | PromiseCatch
+    | PromiseThen
+    | PromisesAwaits
+    | Ops
+    | PromiseThenQuoteQuote
+    | PromiseCatchQuoteQuote
+    | AsyncExports
+    | BracketEndBraceEnd
+    | Any
+    | ADotB
+    | Mod
+    | ABracket
+    | ACommaSpace
+    | ABracketEnd
+    | BoundBy
+    | BracketABracketEnd
+    | IsUnbounded
+    | No
+    | Needs
+    | BoundIt
+    | DoesNotMatch
+    | ItsIsNotS
+    | ImplementIt
+    | AField
+    | FnA
+    | ABColonSpaceC
+    | ACloseSpaceBSpaceBraceSpaceEllipsisSpaceBraceEnd
+    | Bcdefgh
+    | Mem
+    | MemCopyIn
+    | MemView
+    | NameKindHostTrue
+    | Start
+    | MemSet
+    | MemReserve
+    | MemGrow
+    | MemPush
+    | MemResize
+    | Vec
+    | MemLc
+    | Mems
+    | ParenthesizeThePipelineAXsAll
+    | U32
+    | U64
+    | Len
+    | Abs
+    | Sqrt
+    | Min
+    | Max
+    | Piped
+    | TheSourceMeant
+    | EndsHere
+    | CannotFollow
+    | Group
+    | ATickBTick
+    | Or
+    | EndOfFile
+    | ACharacter
+    | AName
+    | AnInteger
+    | ANumber
+    | AString
+    | BackslashBackslash
+    | SlashBackslash
+    | ATemplateString
+    | Open
+    | Semi
+    | At
+    | Dollar
+    | DotDotDot
+    | DotDotLt
+    | BarEq
+    | Amp
+    | AmpEq
+    | Caret
+    | CaretEq
+    | Star
+    | StarEq
+    | Slash
+    | SlashEq
+    | Pct
+    | PctEq
+    | Plus
+    | PlusEq
+    | DashEq
+    | Lt
+    | LtEq
+    | LtLt
+    | LtLtEq
+    | Gt
+    | GtEq
+    | GtGt
+    | GtGtEq
+    | GtGtGt
+    | GtGtGtEq
+    | BangEq
+    | QDot
+    | Lazy
+    | RefNullType
+    | RefType
+    | Value
+    | Test
+    | Bench
+    | V128
+    | RefNullExtern
+    | RefExtern
+    | RefNullI31
+    | RefNullFunc
+    | RefNullEq
+    | RefNullAny
+    | Unreachable
+    | DeclaredHere
+    | Bytes
+    | N3
+    | Ee
+    | Xx
+    | Ss
+    | S
+    | Sii
+    | Rii
+    | Si
+    | Ci
+    | Ri
+    | RiStar
+    | Ririi
+    | I
+    | ArraySlice
+    | StrFromCodes
+    | Stream
+    | WasmI32
+    | WasmI64
+    | WasmF32
+    | WasmF64
+    | WasmV128
+    | WasmExternref
+    | WasmStringref
+    | WasmI31
+    | WasmArrayElem
+    | MutTrue
+    | Concat
+    | Equals
+    | Length
+    | Substring
+    | CharCodeAt
+    | FromCodePoint
+    | FromCharCodeArray
+    | WasmJsString
+    | TryReturnsTheErrorAsIt
+    | Slice
+    | GetSlice
+    | NewDefault
+    | CopyFrom
+    | Push
+    | ClosureIn
+    | ASpaceB
+    | ABracketBBracketEnd
+    | UtuProfile
+    | Profile
+    | Resume
+    | Park
+    | TopLevel
+    | FnExpansionVoid
+    | Splice
+    | Css
+    | Stored
+    | Json
+    | Splice2
+    | AMethodGeneratorCannotConsumeItself
+    | Comptime
+    | JsTag
+    | To
+    | EnumName
+    | TheParameter
+
+fn sms_src(t: Sml) Str {
+    return match t {
+        Sml.ClT => "cl({0}: T)",
+        Sml.ClosureCall => "closure_call_{0}",
+        Sml.Closure => "closure",
+        Sml.ClosureNew => "closure_new",
+        Sml.ClosureNewDot => "closure.new",
+        Sml.ClosureRec => "closure_rec",
+        Sml.ClosureCallDot => "closure.call",
+        Sml.ClosuresNew => "\"closures\":{\"new\":",
+        Sml.Calls => ",\"calls\":[",
+        Sml.Sigs => ",\"sigs\":[\"",
+        Sml.QuoteCommaQuote => "\",\"",
+        Sml.QuoteBracketEnd => "\"]",
+        Sml.MaySuspend => "may suspend",
+        Sml.AStackSuspendsOnlyThroughUtu => "A stack suspends only through utu's calls, not the host's; pass a function that does not await",
+        Sml.Suspends => "suspends",
+        Sml.TheHostCallsIt => "the host calls it",
+        Sml.AStackSuspendsOnlyThroughUtuTickCommaTickSem => "A stack suspends only through utu's calls, not the host's; await outside the closure",
+        Sml.Await => "await_{0}{1}",
+        Sml.ForAValueUsePromote => "for a value, use promote",
+        Sml.Promise => "Promise",
+        Sml.Iterator => "iterator",
+        Sml.Next => "next",
+        Sml.Done => "done",
+        Sml.Close => "close",
+        Sml.Null => "null_",
+        Sml.PromiseCatch => "promise_catch",
+        Sml.PromiseThen => "promise_then",
+        Sml.PromisesAwaits => "\"promises\":{\"awaits\":[",
+        Sml.Ops => "],\"ops\":[",
+        Sml.PromiseThenQuoteQuote => "\"promise_then\"",
+        Sml.PromiseCatchQuoteQuote => "\"promise_catch\"",
+        Sml.AsyncExports => "],\"asyncExports\":[",
+        Sml.BracketEndBraceEnd => "]}",
+        Sml.Any => "any {0}",
+        Sml.ADotB => "{0}.{1}",
+        Sml.Mod => "mod {0}[",
+        Sml.ABracket => "{0}[",
+        Sml.ACommaSpace => "{0}, ",
+        Sml.ABracketEnd => "{0}]",
+        Sml.BoundBy => "bound {0} by {1}",
+        Sml.BracketABracketEnd => "[{0}]",
+        Sml.IsUnbounded => "{0} is unbounded",
+        Sml.No => "no {0}",
+        Sml.Needs => "needs {0}",
+        Sml.BoundIt => "bound it: {0}",
+        Sml.DoesNotMatch => "{0} does not match",
+        Sml.ItsIsNotS => "its {0} is not {1}'s",
+        Sml.ImplementIt => "implement it: {0}",
+        Sml.AField => "a field {0}: {1}",
+        Sml.FnA => "fn {0}[{1}].{2} |a| (",
+        Sml.ABColonSpaceC => "{0}{1}: {2}",
+        Sml.ACloseSpaceBSpaceBraceSpaceEllipsisSpaceBraceEnd => "{0}) {1} { … }",
+        Sml.Bcdefgh => "bcdefgh",
+        Sml.Mem => "mem_{0}",
+        Sml.MemCopyIn => "mem_copy_in_{0}",
+        Sml.MemView => "mem_view_{0}",
+        Sml.NameKindHostTrue => "{\"name\":\"{0}\",\"kind\":\"{1}\",\"host\":true}",
+        Sml.Start => "start",
+        Sml.MemSet => "mem.set",
+        Sml.MemReserve => "mem.reserve",
+        Sml.MemGrow => "mem.grow",
+        Sml.MemPush => "mem.push",
+        Sml.MemResize => "mem.resize",
+        Sml.Vec => "vec",
+        Sml.MemLc => "mem",
+        Sml.Mems => "\"mems\":[",
+        Sml.ParenthesizeThePipelineAXsAll => "Parenthesize the pipeline: a {0} (xs all |x| { … })",
+        Sml.U32 => "u32",
+        Sml.U64 => "u64",
+        Sml.Len => "len",
+        Sml.Abs => "abs",
+        Sml.Sqrt => "sqrt",
+        Sml.Min => "min",
+        Sml.Max => "max",
+        Sml.Piped => "piped",
+        Sml.TheSourceMeant => "the source meant?",
+        Sml.EndsHere => "ends here",
+        Sml.CannotFollow => "cannot follow",
+        Sml.Group => "Group",
+        Sml.ATickBTick => "{0}'{1}'",
+        Sml.Or => " or ",
+        Sml.EndOfFile => "end of file",
+        Sml.ACharacter => "a character",
+        Sml.AName => "a name",
+        Sml.AnInteger => "an integer",
+        Sml.ANumber => "a number",
+        Sml.AString => "a string",
+        Sml.BackslashBackslash => "\\\\",
+        Sml.SlashBackslash => "/\\",
+        Sml.ATemplateString => "a template string",
+        Sml.Open => "(",
+        Sml.Semi => ";",
+        Sml.At => "@",
+        Sml.Dollar => "$",
+        Sml.DotDotDot => "...",
+        Sml.DotDotLt => "..<",
+        Sml.BarEq => "|=",
+        Sml.Amp => "&",
+        Sml.AmpEq => "&=",
+        Sml.Caret => "^",
+        Sml.CaretEq => "^=",
+        Sml.Star => "*",
+        Sml.StarEq => "*=",
+        Sml.Slash => "/",
+        Sml.SlashEq => "/=",
+        Sml.Pct => "%",
+        Sml.PctEq => "%=",
+        Sml.Plus => "+",
+        Sml.PlusEq => "+=",
+        Sml.DashEq => "-=",
+        Sml.Lt => "<",
+        Sml.LtEq => "<=",
+        Sml.LtLt => "<<",
+        Sml.LtLtEq => "<<=",
+        Sml.Gt => ">",
+        Sml.GtEq => ">=",
+        Sml.GtGt => ">>",
+        Sml.GtGtEq => ">>=",
+        Sml.GtGtGt => ">>>",
+        Sml.GtGtGtEq => ">>>=",
+        Sml.BangEq => "!=",
+        Sml.QDot => "?.",
+        Sml.Lazy => "lazy",
+        Sml.RefNullType => "(ref null type {0})",
+        Sml.RefType => "(ref type {0})",
+        Sml.Value => "value {0}",
+        Sml.Test => "test",
+        Sml.Bench => "bench",
+        Sml.V128 => "v128",
+        Sml.RefNullExtern => "(ref null extern)",
+        Sml.RefExtern => "(ref extern)",
+        Sml.RefNullI31 => "(ref null i31)",
+        Sml.RefNullFunc => "(ref null func)",
+        Sml.RefNullEq => "(ref null eq)",
+        Sml.RefNullAny => "(ref null any)",
+        Sml.Unreachable => "unreachable",
+        Sml.DeclaredHere => "declared here",
+        Sml.Bytes => "bytes",
+        Sml.N3 => "3",
+        Sml.Ee => "ee",
+        Sml.Xx => "xx",
+        Sml.Ss => "ss",
+        Sml.S => "s",
+        Sml.Sii => "sii",
+        Sml.Rii => "rii",
+        Sml.Si => "si",
+        Sml.Ci => "ci",
+        Sml.Ri => "ri",
+        Sml.RiStar => "ri*",
+        Sml.Ririi => "ririi",
+        Sml.I => "i*",
+        Sml.ArraySlice => "array.slice",
+        Sml.StrFromCodes => "Str.from_codes",
+        Sml.Stream => "Stream",
+        Sml.WasmI32 => "wasm-i32",
+        Sml.WasmI64 => "wasm-i64",
+        Sml.WasmF32 => "wasm-f32",
+        Sml.WasmF64 => "wasm-f64",
+        Sml.WasmV128 => "wasm-v128",
+        Sml.WasmExternref => "wasm-externref",
+        Sml.WasmStringref => "wasm-stringref",
+        Sml.WasmI31 => "wasm-i31",
+        Sml.WasmArrayElem => "wasm-array:elem=",
+        Sml.MutTrue => ":mut=true",
+        Sml.Concat => "concat",
+        Sml.Equals => "equals",
+        Sml.Length => "length",
+        Sml.Substring => "substring",
+        Sml.CharCodeAt => "charCodeAt",
+        Sml.FromCodePoint => "fromCodePoint",
+        Sml.FromCharCodeArray => "fromCharCodeArray",
+        Sml.WasmJsString => "wasm:js-string",
+        Sml.TryReturnsTheErrorAsIt => "try returns the error as it is, unconverted",
+        Sml.Slice => "slice",
+        Sml.GetSlice => "get_slice",
+        Sml.NewDefault => "new_default",
+        Sml.CopyFrom => "copy_from",
+        Sml.Push => "push",
+        Sml.ClosureIn => "closure in {0}",
+        Sml.ASpaceB => "{0} {1}",
+        Sml.ABracketBBracketEnd => "{0}[{1}]",
+        Sml.UtuProfile => "utu_profile",
+        Sml.Profile => "profile",
+        Sml.Resume => "resume",
+        Sml.Park => "park",
+        Sml.TopLevel => "(top level)",
+        Sml.FnExpansionVoid => "fn __expansion() Void { {0}; }",
+        Sml.Splice => "__splice_{0}",
+        Sml.Css => "css",
+        Sml.Stored => "stored",
+        Sml.Json => "json",
+        Sml.Splice2 => "__splice_",
+        Sml.AMethodGeneratorCannotConsumeItself => "a method generator cannot consume itself",
+        Sml.Comptime => "__comptime_",
+        Sml.JsTag => "js_tag",
+        Sml.To => "to_{0}",
+        Sml.EnumName => "enum.name",
+        Sml.TheParameter => "the parameter",
+    }
+}
+
+fn sms(t: Sml) Str => st(st_small + t.i32())
+fn sms1(t: Sml, a: Str) Str => stf(st_small + t.i32(), a, "", "", "")
+fn sms2(t: Sml, a: Str, b: Str) Str => stf(st_small + t.i32(), a, b, "", "")
+fn sms3(t: Sml, a: Str, b: Str, c: Str) Str => stf(st_small + t.i32(), a, b, c, "")

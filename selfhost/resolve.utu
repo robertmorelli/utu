@@ -991,12 +991,12 @@ fn imported_modules_text(item: I32) Str {
         if import_node[i] == item and file >= 0 and file_root[file] >= 0 {
             let c = first_child(file_root[file])
             while (c >= 0) {
-                if is_kind(c, Node.Module_decl) { out = out + pick(out.len() == 0, "'", ", '") + word_text(name_word(first_child(c))) + "'" }
+                if is_kind(c, Node.Module_decl) { out = rss3(Rst.ABCTick, out, pick(out.len() == 0, "'", rss(Rst.CommaSpaceTick)), word_text(name_word(first_child(c)))) }
                 c = next_sibling(c)
             }
         }
     }
-    return if out.len() == 0 { "no modules" } else { out }
+    return if out.len() == 0 { rss(Rst.NoModules) } else { out }
 }
 
 /// A declaration of a file named like a module of the prelude, reported at
@@ -1008,7 +1008,7 @@ fn standard_name(decl: I32, name_at: I32) Void {
 
 fn short_type_name(word: I32) Bool {
     let t = word_text(word)
-    return t == "S" or t == "B" or t == "U" or t == "I" or t == "F" or t == "C"
+    return t == "S" or t == "B" or t == "U" or t == "I" or t == rss(Rst.F) or t == rss(Rst.C)
 }
 
 /// The node naming a top-level item, or -1.
@@ -1070,7 +1070,7 @@ fn declare_program() Void {
     }
     // Short names of common types, as the prelude's (a file's own S comes
     // first; C is Component). A name no file has written is not bound.
-    for (["S", "B", "U", "I", "F", "C"], ["Str", "Bool", "U64", "I64", "F64", "Component"]) |short, long| {
+    for (["S", "B", "U", "I", rss(Rst.F), rss(Rst.C)], ["Str", "Bool", "U64", "I64", "F64", rss(Rst.Component)]) |short, long| {
         let s = intern_text(short)
         let l = intern_text(long)
         if s < word_top.len() and l < word_top.len() and lookup(l) >= 0 { bind(s, lookup(l)) }
@@ -1107,18 +1107,18 @@ fn declare_program() Void {
             let text = node_text(path)
             if text.starts_with(Str.from_code_point(34)) { text = text.slice(1, text.len() - 1) }
             // `"node:fss"`: no module of Node's, whatever the host found.
-            let node_name = if text.starts_with("node:") { text.slice(5, text.len()) } else { "" }
+            let node_name = if text.starts_with(rss(Rst.NodeColon)) { text.slice(5, text.len()) } else { "" }
             if node_name.len() > 0 and not in_words(node_modules(), node_name) {
                 decl_a[m] = -1
                 report2(Diag.HostMissing, path, intern_text(text), 1, -1)
                 let near = near_in_words(intern_text(node_name), node_modules())
                 // (Inside the quotes: the fix's text is the name's.)
                 let e = tok_end[node_last[path] - 1] - (node_text(path).len() - text.len()) / 2
-                if near >= 0 { diag_fix(e - text.len(), e, "node:" + word_text(near), "Use node:" + word_text(near)) }
+                if near >= 0 { diag_fix(e - text.len(), e, rss1(Rst.Node, word_text(near)), rss1(Rst.UseNode, word_text(near))) }
             } else if decl_a[m] < 0 {
                 // The host found none (an npm package not installed).
                 report(Diag.HostMissing, path, intern_text(text))
-                if node_name.len() > 0 { diag_note("node: modules' declarations come from @types/node in node_modules") }
+                if node_name.len() > 0 { diag_note(rss(Rst.NodeModulesDeclarationsComeFromTypes)) }
             }
         }
     }
@@ -1249,7 +1249,7 @@ fn check_using_names(root: I32) Void {
             let b = top_item[j]
             if word_of(top_name[k]) == word and (is_kind(a, Node.Using_decl) or is_kind(b, Node.Using_decl) or mod_clash(a, b) or mod_clash(b, a)) and not same_import(a, b) {
                 report(Diag.DuplicateDeclaration, b, word)
-                if top_name[j] != b { diag_focus(node_first[top_name[j]], node_last[top_name[j]] - 1, "again") }
+                if top_name[j] != b { diag_focus(node_first[top_name[j]], node_last[top_name[j]] - 1, rss(Rst.Again)) }
                 diag_place(Extra.Related, top_name[k], "first here")
                 // The file's own mod is the name's (no cascade through the import).
                 if is_kind(a, Node.Module_decl) { bind(word, node_decl[top_name[k]]) }
@@ -1450,7 +1450,7 @@ fn clashes_mem(word: I32) Bool {
 fn report_twice(decl: I32, first: I32) Void {
     report(Diag.DuplicateDeclaration, decl_node[decl], decl_name[decl])
     let again = decl_name_at(decl)
-    if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, "again") }
+    if again != decl_node[decl] { diag_focus(node_first[again], node_last[again] - 1, rss(Rst.Again)) }
     diag_place(Extra.Related, decl_name_at(first), "first here")
 }
 
@@ -1529,7 +1529,7 @@ fn resolve_names() I32 {
         report2(if missing_why == 1 { Diag.ImportCycle } else { Diag.UnknownImport }, at, -1, missing_why, -1)
         // (`using console from std:Consle`: the std module it names.)
         let m = std_module(node_text(name_node(first_child(at))))
-        if missing_why == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";") }
+        if missing_why == 2 and m.len() > 0 { diag_note(rss2(Rst.UsingFromStd, m, std_file(m))) }
     }
     save_diagnostics()
     return diag_kind.len()
@@ -1546,9 +1546,9 @@ fn desugar_wutu_surfaces() Void {
         let sugar = wutu_sugar_in(file_root[file])
         if sugar >= 0 and not imports_browser(file_root[file]) {
             // Said once, at the first `wn` or `html`, with the line to add.
-            report(Diag.UnknownModule, sugar, intern_text("Browser"))
-            diag_note("wn and html { } build on std:Browser, which the file does not import")
-            diag_fix(file_start[file], file_start[file], "using Browser from std:Browser\n\n", "import std:Browser")
+            report(Diag.UnknownModule, sugar, intern_text(rss(Rst.Browser)))
+            diag_note(rss(Rst.WnAndHtmlBuildOnStd))
+            diag_fix(file_start[file], file_start[file], rss(Rst.UsingBrowserFromStdBrowser), rss(Rst.ImportStdBrowser))
         }
         desugar_wutu_items(file_root[file])
     }
@@ -1570,7 +1570,7 @@ fn wutu_sugar_in(parent: I32) I32 {
 
 /// Whether a file's items include `using Browser …`.
 fn imports_browser(root: I32) Bool {
-    let browser = intern_text("Browser")
+    let browser = intern_text(rss(Rst.Browser))
     let item = first_child(root)
     while (item >= 0) {
         if is_kind(item, Node.Using_decl) and word_of(first_child(item)) == browser { return true }
@@ -1594,21 +1594,20 @@ fn desugar_wutu_items(parent: I32) Void {
             }
             let open = tok_start[node_first[body]]
             dsl_current_site = item
-            let result_type = "Browser.HTMLElement"
+            let result_type = rss(Rst.BrowserHTMLElement)
             if not is_kind(item, Node.Export_html_decl) {
                 // Invalid bodies are diagnosed by normal DSL expansion, at the
                 // original body span. This early parse only chooses the result type.
                 try {
                     let template = parse_template(dsl_body(item))
-                    if tn_kind[template] == 5 { result_type = "Browser.DocumentFragment" }
-                    else if is_svg_tag(word_text(tn_text[template])) and not is_html_tag(word_text(tn_text[template])) { result_type = "Browser.SVGElement" }
+                    if tn_kind[template] == 5 { result_type = rss(Rst.BrowserDocumentFragment) }
+                    else if is_svg_tag(word_text(tn_text[template])) and not is_html_tag(word_text(tn_text[template])) { result_type = rss(Rst.BrowserSVGElement) }
                 } catch {}
             }
             let code = if is_kind(item, Node.Export_html_decl) {
-                "main { wutu.page(@wutu/\\ \\/) }"
+                rss(Rst.MainWutuPageWutu)
             } else {
-                "fn" + bytes_text(tok_end[node_first[item]], open)
-                    + " " + result_type + " => @wutu/\\ \\/"
+                rss2(Rst.FnWutu, bytes_text(tok_end[node_first[item]], open), result_type)
             }
             dsl_current_site = item
             dsl_current_from = -1
@@ -1811,15 +1810,15 @@ fn walk_using(item: I32, w: Walk) Void {
         let kind = imported_item_kind(item, word_of(n))
         // `using Point |P|` with `struct Point`: the same, in this file.
         let found = lookup(word_of(n))
-        if kind < 0 and using_path(item) < 0 and found >= 0 and decl_node[found] >= 0 and item_kind_text(node_kind[decl_node[found]]) != "not a mod" { kind = node_kind[decl_node[found]] }
+        if kind < 0 and using_path(item) < 0 and found >= 0 and decl_node[found] >= 0 and item_kind_text(node_kind[decl_node[found]]) != rss(Rst.NotAMod) { kind = node_kind[decl_node[found]] }
         if kind >= 0 {
             report2(Diag.ImportNotModule, n, word_of(n), kind, -1)
-            if using_path(item) >= 0 { diag_note("Declare it in a mod there (mod m { … }) and import that") }
+            if using_path(item) >= 0 { diag_note(rss(Rst.DeclareItInAModThere)) }
         } else {
             report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module)
             // (An import names a mod of the file: `mod guide { … }` for `using guide … from`.)
             if using_path(item) >= 0 and diag_fresh == 1 { diag_a[diag_a.len() - 1] = item }
-            if using_path(item) >= 0 { diag_note("The file has no mod " + word_text(word_of(n)) + ": declare one there, mod " + word_text(word_of(n)) + " { … }") }
+            if using_path(item) >= 0 { diag_note(rss2(Rst.TheFileHasNoModDeclare, word_text(word_of(n)), word_text(word_of(n)))) }
         }
         return
     }
@@ -1848,7 +1847,7 @@ fn register_method(item: I32, w: Walk) Void {
         // `fn Rec[Sq].m`: the head names a protocol (read on as Sq's, said once).
         if owner >= 0 and not decl_is(owner, Decl.Proto) {
             report2(Diag.BoundNotProto, receiver, -1, owner, 3)
-            diag_label("not a protocol")
+            diag_label(rss(Rst.NotAProtocol))
             // (A generic type's `[I32]` is its instance, not the type read on.)
             let n = if is_generic(module_of(owner)) { -1 } else { impl_target(args) }
             owner = if n >= 0 { node_decl[n] } else { -1 }
@@ -1953,11 +1952,11 @@ fn as_type(node: I32, t: I32) I32 {
     let mod_name = word_text(decl_name[m])
     let name = word_text(word_of(n))
     if word_of(n) == decl_name[m] {
-        diag_note("Name a type in it (" + mod_name + ".T), or declare one: struct &: …")
+        diag_note(rss1(Rst.NameATypeInItT, mod_name))
     } else if inner >= 0 and is_type_decl(inner) {
-        diag_note("|" + name + "| renames the mod; to name its " + name + ", open it: using " + mod_name + ";")
+        diag_note(rss3(Rst.RenamesTheModToNameIts, name, name, mod_name))
     } else {
-        diag_note("|" + name + "| renames the mod; name a type in it: " + name + ".T")
+        diag_note(rss2(Rst.RenamesTheModNameAType, name, name))
     }
     return -1
 }
@@ -1990,7 +1989,7 @@ fn walk_type(node: I32, w: Walk) Void {
     let kind = node_kind[node]
     // `Void` (or `V`) where no declaration has the name: no value.
     if kind == Node.Ref_type.i32() and is_kind(first_child(node), Node.Type_ident) and lookup(word_of(first_child(node))) < 0
-        and (node_text(first_child(node)) == "Void" or node_text(first_child(node)) == "V") {
+        and (node_text(first_child(node)) == "Void" or node_text(first_child(node)) == rss(Rst.V)) {
         node_kind[node] = Node.Void_type.i32()
         return
     }
@@ -2131,7 +2130,7 @@ fn walk_type_item(item: I32, w: Walk) Void {
                 let d = as_type(t, walk_impl_name(t, w))
                 if d >= 0 and not decl_is(d, Decl.Proto) {
                     report2(Diag.BoundNotProto, t, -1, d, if is_kind(item, Node.Enum_decl) { 2 } else { 1 })
-                    diag_label("not a protocol")
+                    diag_label(rss(Rst.NotAProtocol))
                 } else if d >= 0 and listed_before(c, t, d) {
                     report2(Diag.DuplicateDeclaration, t, decl_name[d], 7, -1)
                 }
@@ -2203,7 +2202,7 @@ fn walk_bounds(list: I32, w: Walk) Void {
                 let d = walk_impl_name(b, w)
                 if d >= 0 and not decl_is(d, Decl.Proto) {
                     report2(Diag.BoundNotProto, b, -1, d, -1)
-                    diag_label("not a protocol")
+                    diag_label(rss(Rst.NotAProtocol))
                 }
                 b = next_sibling(b)
             }
@@ -2663,3 +2662,77 @@ fn static_member(owner: I32, word: I32) I32 {
     if module_named(owner) != owner { return member(module_named(owner), word, Space.Member) }
     return -1
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Rst:
+    | ABCTick
+    | Node
+    | UseNode
+    | UsingFromStd
+    | FnWutu
+    | TheFileHasNoModDeclare
+    | NameATypeInItT
+    | RenamesTheModToNameIts
+    | RenamesTheModNameAType
+    | CommaSpaceTick
+    | NoModules
+    | F
+    | C
+    | Component
+    | NodeColon
+    | NodeModulesDeclarationsComeFromTypes
+    | Again
+    | Browser
+    | WnAndHtmlBuildOnStd
+    | UsingBrowserFromStdBrowser
+    | ImportStdBrowser
+    | BrowserHTMLElement
+    | BrowserDocumentFragment
+    | BrowserSVGElement
+    | MainWutuPageWutu
+    | NotAMod
+    | DeclareItInAModThere
+    | NotAProtocol
+    | V
+
+fn rss_src(t: Rst) Str {
+    return match t {
+        Rst.ABCTick => "{0}{1}{2}'",
+        Rst.Node => "node:{0}",
+        Rst.UseNode => "Use node:{0}",
+        Rst.UsingFromStd => "using {0} from std:{1};",
+        Rst.FnWutu => "fn{0} {1} => @wutu/\\ \\/",
+        Rst.TheFileHasNoModDeclare => "The file has no mod {0}: declare one there, mod {1} { … }",
+        Rst.NameATypeInItT => "Name a type in it ({0}.T), or declare one: struct &: …",
+        Rst.RenamesTheModToNameIts => "|{0}| renames the mod; to name its {1}, open it: using {2};",
+        Rst.RenamesTheModNameAType => "|{0}| renames the mod; name a type in it: {1}.T",
+        Rst.CommaSpaceTick => ", '",
+        Rst.NoModules => "no modules",
+        Rst.F => "F",
+        Rst.C => "C",
+        Rst.Component => "Component",
+        Rst.NodeColon => "node:",
+        Rst.NodeModulesDeclarationsComeFromTypes => "node: modules' declarations come from @types/node in node_modules",
+        Rst.Again => "again",
+        Rst.Browser => "Browser",
+        Rst.WnAndHtmlBuildOnStd => "wn and html { } build on std:Browser, which the file does not import",
+        Rst.UsingBrowserFromStdBrowser => "using Browser from std:Browser\n\n",
+        Rst.ImportStdBrowser => "import std:Browser",
+        Rst.BrowserHTMLElement => "Browser.HTMLElement",
+        Rst.BrowserDocumentFragment => "Browser.DocumentFragment",
+        Rst.BrowserSVGElement => "Browser.SVGElement",
+        Rst.MainWutuPageWutu => "main { wutu.page(@wutu/\\ \\/) }",
+        Rst.NotAMod => "not a mod",
+        Rst.DeclareItInAModThere => "Declare it in a mod there (mod m { … }) and import that",
+        Rst.NotAProtocol => "not a protocol",
+        Rst.V => "V",
+    }
+}
+
+fn rss(t: Rst) Str => st(st_resolve + t.i32())
+fn rss1(t: Rst, a: Str) Str => stf(st_resolve + t.i32(), a, "", "", "")
+fn rss2(t: Rst, a: Str, b: Str) Str => stf(st_resolve + t.i32(), a, b, "", "")
+fn rss3(t: Rst, a: Str, b: Str, c: Str) Str => stf(st_resolve + t.i32(), a, b, c, "")

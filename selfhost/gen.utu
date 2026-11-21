@@ -113,16 +113,16 @@ fn generate_for_mem(item: I32) Void {
         // fn __comptime_run_NAME() I32 { let values: Array[V] = (EXPR); … }
         // The parentheses keep EXPR one expression.
         let value = comptime_value_name(elem)
-        gen_template("\nexport mem __comptime_$: ", name)
+        gen_template(gns(Gnt.ExportMemComptime), name)
         gen_text(value)
-        gen_template(";\nfn __comptime_run_$() I32 {\n    let values: Array[", name)
+        gen_template(gns(Gnt.FnComptimeRunI32LetValues), name)
         gen_text(value)
-        gen_text("] = (")
+        gen_text(gns(Gnt.BracketEndSpaceEqSpaceOpen))
         comptime_text_start.push(src.len())
         comptime_text_node.push(init)
         gen_span(dsl_text_start(init), dsl_text_end(init))
         comptime_text_end.push(src.len())
-        gen_template(");\n    __comptime_$.clear();\n    for (values) |v| { __comptime_$.push(v); };\n    return values.len();\n}\n", name)
+        gen_template(gns(Gnt.ComptimeClearForValuesVComptime), name)
     }
 }
 
@@ -165,32 +165,13 @@ fn representation_word(w: I32) I32 {
 /// A byte mem's interner, its name written `$`: the same table stage 0
 /// generates, so word ids agree between the two compilers.
 fn interner_template() Str {
-    return "\nvec __$_slots: I32;\nvec __$_starts: I32;\nvec __$_sizes: I32;\nvec __$_hashes: I32;\n"
-    + "fn __mem_$_intern_reset() Void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n"
-    + "    __$_starts.clear();\n    __$_sizes.clear();\n    __$_hashes.clear();\n}\n"
-    + "fn __mem_$_interned() I32 { return __$_starts.len(); }\n"
-    + "fn __mem_$_interned_start(id: I32) I32 { return __$_starts[id]; }\n"
-    + "fn __mem_$_interned_size(id: I32) I32 { return __$_sizes[id]; }\n"
-    + "fn __mem_$_intern_same(a: I32, b: I32, size: I32) Bool {\n    for (0 ..< size) |k| {\n"
-    + "        if $[a + k] != $[b + k] { return false; };\n    };\n    return true;\n}\n"
-    + "fn __mem_$_intern_rehash() Void {\n    let size = __$_slots.len() * 2;\n    __$_slots.resize(size);\n"
-    + "    for (0 ..< size) |slot| { __$_slots[slot] = 0; };\n    let mask = size - 1;\n"
-    + "    for (0 ..< __$_starts.len()) |id| {\n        let slot = __$_hashes[id] & mask;\n"
-    + "        while (__$_slots[slot] != 0) { slot = (slot + 1) & mask; };\n        __$_slots[slot] = id + 1;\n    };\n}\n"
-    + "fn __mem_$_intern(start: I32, stop: I32) I32 {\n    if __$_slots.len() == 0 { __mem_$_intern_reset(); };\n"
-    + "    let hash = -2128831035;\n    for (start ..< stop) |k| { hash = (hash ^ ($[k] & 255)) * 16777619; };\n"
-    + "    let size = stop - start;\n    let mask = __$_slots.len() - 1;\n    let slot = hash & mask;\n"
-    + "    while (__$_slots[slot] != 0) {\n        let id = __$_slots[slot] - 1;\n"
-    + "        if __$_hashes[id] == hash and __$_sizes[id] == size and __mem_$_intern_same(__$_starts[id], start, size) { return id; };\n"
-    + "        slot = (slot + 1) & mask;\n    };\n    let id = __$_starts.len();\n    __$_starts.push(start);\n"
-    + "    __$_sizes.push(size);\n    __$_hashes.push(hash);\n    __$_slots[slot] = id + 1;\n"
-    + "    if (id + 1) * 2 > __$_slots.len() { __mem_$_intern_rehash(); };\n    return id;\n}\n"
+    return gns(Gnt.VecSlotsI32VecStartsI32)
 }
 
 /// The generated function `__mem_NAME_METHOD` of a mem, or -1.
 fn generated_mem_fn(mem_decl: I32, method: I32) I32 {
     let start = src.len()
-    gen_text("__mem_")
+    gen_text(gns(Gnt.Mem))
     gen_word(decl_name[mem_decl])
     gen_text("_")
     gen_word(mem_method_word[method])
@@ -239,7 +220,7 @@ fn note_mem_use(decl: I32) Void => note_reach(-2 - decl)
 fn comptime_ready(k: I32) Bool {
     comptime_blocker = -1
     if comptime_start[k] != -1 { return false }
-    let word = intern_text("__comptime_run_" + word_text(decl_name[comptime_mem[k]]))
+    let word = intern_text(gns1(Gnt.ComptimeRun, word_text(decl_name[comptime_mem[k]])))
     let reached = Array[Bool].new(fi_decl.len(), false)
     for (0 ..< fi_decl.len()) |f| { if decl_name[fi_decl[f]] == word { reached[f] = true } }
     let changed = true
@@ -291,3 +272,31 @@ fn fuel_check() I32 {
     w_node(Op.Seq, vt_none, 0, 0, m)
     return w_pop()
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Gnt:
+    | VecSlotsI32VecStartsI32
+    | ComptimeRun
+    | ExportMemComptime
+    | FnComptimeRunI32LetValues
+    | BracketEndSpaceEqSpaceOpen
+    | ComptimeClearForValuesVComptime
+    | Mem
+
+fn gns_src(t: Gnt) Str {
+    return match t {
+        Gnt.VecSlotsI32VecStartsI32 => "\nvec __$_slots: I32;\nvec __$_starts: I32;\nvec __$_sizes: I32;\nvec __$_hashes: I32;\nfn __mem_$_intern_reset() Void {\n    __$_slots.resize(1024);\n    for (0 ..< 1024) |slot| { __$_slots[slot] = 0; };\n    __$_starts.clear();\n    __$_sizes.clear();\n    __$_hashes.clear();\n}\nfn __mem_$_interned() I32 { return __$_starts.len(); }\nfn __mem_$_interned_start(id: I32) I32 { return __$_starts[id]; }\nfn __mem_$_interned_size(id: I32) I32 { return __$_sizes[id]; }\nfn __mem_$_intern_same(a: I32, b: I32, size: I32) Bool {\n    for (0 ..< size) |k| {\n        if $[a + k] != $[b + k] { return false; };\n    };\n    return true;\n}\nfn __mem_$_intern_rehash() Void {\n    let size = __$_slots.len() * 2;\n    __$_slots.resize(size);\n    for (0 ..< size) |slot| { __$_slots[slot] = 0; };\n    let mask = size - 1;\n    for (0 ..< __$_starts.len()) |id| {\n        let slot = __$_hashes[id] & mask;\n        while (__$_slots[slot] != 0) { slot = (slot + 1) & mask; };\n        __$_slots[slot] = id + 1;\n    };\n}\nfn __mem_$_intern(start: I32, stop: I32) I32 {\n    if __$_slots.len() == 0 { __mem_$_intern_reset(); };\n    let hash = -2128831035;\n    for (start ..< stop) |k| { hash = (hash ^ ($[k] & 255)) * 16777619; };\n    let size = stop - start;\n    let mask = __$_slots.len() - 1;\n    let slot = hash & mask;\n    while (__$_slots[slot] != 0) {\n        let id = __$_slots[slot] - 1;\n        if __$_hashes[id] == hash and __$_sizes[id] == size and __mem_$_intern_same(__$_starts[id], start, size) { return id; };\n        slot = (slot + 1) & mask;\n    };\n    let id = __$_starts.len();\n    __$_starts.push(start);\n    __$_sizes.push(size);\n    __$_hashes.push(hash);\n    __$_slots[slot] = id + 1;\n    if (id + 1) * 2 > __$_slots.len() { __mem_$_intern_rehash(); };\n    return id;\n}\n",
+        Gnt.ComptimeRun => "__comptime_run_{0}",
+        Gnt.ExportMemComptime => "\nexport mem __comptime_$: ",
+        Gnt.FnComptimeRunI32LetValues => ";\nfn __comptime_run_$() I32 {\n    let values: Array[",
+        Gnt.BracketEndSpaceEqSpaceOpen => "] = (",
+        Gnt.ComptimeClearForValuesVComptime => ");\n    __comptime_$.clear();\n    for (values) |v| { __comptime_$.push(v); };\n    return values.len();\n}\n",
+        Gnt.Mem => "__mem_",
+    }
+}
+
+fn gns(t: Gnt) Str => st(st_gen + t.i32())
+fn gns1(t: Gnt, a: Str) Str => stf(st_gen + t.i32(), a, "", "", "")

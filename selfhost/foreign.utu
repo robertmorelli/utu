@@ -106,7 +106,7 @@ fn resolved(r: Ref) Ref {
             if c >= 0 { return resolved(Ref { doc: r.doc, at: c, env: r.env }) }
             return any_slot(r.doc)
         }
-        let indexed = jget(at, "indexed")
+        let indexed = jget(at, fgs(Fgt.Indexed))
         if indexed >= 0 {
             // The key, past its parameter: `M[K]` with K bound to "click".
             let key = jget(resolved(Ref { doc: r.doc, at: jget(at, "key"), env: r.env }).at, "literal")
@@ -120,17 +120,17 @@ fn resolved(r: Ref) Ref {
             return any_slot(r.doc)
         }
         // `Awaited<T>`: a promise's value (past nested promises), else T.
-        let awaited = jget(at, "awaited")
+        let awaited = jget(at, fgs(Fgt.Awaited))
         if awaited >= 0 { return awaited_of(resolved(Ref { doc: r.doc, at: awaited, env: r.env })) }
         // `keyof E` of a generic E (TypeScript spells a known one's as its literals): a string.
-        if jget(at, "keys") >= 0 { return Ref { doc: r.doc, at: prim_ref(prelude(Prelude.Str)), env: -1 } }
+        if jget(at, fgs(Fgt.Keys)) >= 0 { return Ref { doc: r.doc, at: prim_ref(prelude(Prelude.Str)), env: -1 } }
     }
     if jis_object(at) {
         // A generic instance is its declaration with its parameters bound.
-        let template = jget(at, "template")
+        let template = jget(at, fgs(Fgt.Template))
         if template >= 0 {
             let params = jget(abi_type(r.doc, jint(template)), "parameters")
-            return Ref { doc: r.doc, at: template, env: bindings(params, jget(at, "arguments"), r.env) }
+            return Ref { doc: r.doc, at: template, env: bindings(params, jget(at, fgs(Fgt.Arguments)), r.env) }
         }
     }
     if jis_number(at) { return Ref { doc: r.doc, at: at, env: closed_env(abi_type(r.doc, jint(at)), r.env) } }
@@ -144,7 +144,7 @@ fn awaited_of(x: Ref) Ref {
     let decl = abi_type(x.doc, jint(x.at))
     let lib = jget(decl, "lib")
     let named = if lib >= 0 { jstring_text(lib) } else { decl_name_text(decl) }
-    if not (named == "Promise" or named.len() > 8 and named.slice(0, 8) == "Promise<") { return x }
+    if not (named == "Promise" or named.len() > 8 and named.slice(0, 8) == fgs(Fgt.Promise)) { return x }
     let p = jfirst(jget(decl, "parameters"))
     if p < 0 { return x }
     let bound = binding_of(x.env, jstring_word(p))
@@ -198,7 +198,7 @@ fn closed_env(decl: I32, env: I32) I32 {
 let any_at: I32 = -1
 
 fn any_ref() I32 {
-    if any_at < 0 { any_at = abi_text("\"any\"") }
+    if any_at < 0 { any_at = abi_text(fgs(Fgt.Any)) }
     return any_at
 }
 
@@ -232,21 +232,21 @@ fn canonical(r: Ref) Str {
     if jis_number(at) {
         let decl = abi_type(x.doc, jint(at))
         let lib = jget(decl, "lib")
-        let text = if lib >= 0 { "lib:" + jstring_text(lib) } else { "d" + int_text(x.doc) + ":" + int_text(jint(at)) }
+        let text = if lib >= 0 { fgs1(Fgt.Lib, jstring_text(lib)) } else { fgs2(Fgt.D, int_text(x.doc), int_text(jint(at))) }
         let params = jget(decl, "parameters")
         if jlen(params) > 0 {
             // A generic declaration: with its arguments (`any` where unbound).
-            text = text + "<"
+            text = fgs1(Fgt.ALt, text)
             let p = jfirst(params)
             let first = true
             while (p >= 0) {
-                if not first { text = text + "," }
+                if not first { text = fgs1(Fgt.AComma, text) }
                 let bound = binding_of(x.env, jstring_word(p))
                 text = text + if bound >= 0 { canonical(Ref { doc: x.doc, at: bound, env: bind_env }) } else { "any" }
                 first = false
                 p = jnext(p)
             }
-            return text + ">"
+            return fgs1(Fgt.AGt, text)
         }
         // An anonymous declaration may mention its context's parameters.
         if x.env >= 0 and jget(decl, "bases") < 0 { text = text + env_text(x) }
@@ -260,10 +260,10 @@ fn env_text(r: Ref) Str {
     let text = "{"
     let i = 0
     while (i < vl_len[r.env]) {
-        text = text + word_text(vl_item(r.env, i)) + "=" + canonical(Ref { doc: r.doc, at: vl_item(r.env, i + 1), env: vl_item(r.env, i + 2) }) + ";"
+        text = fgs3(Fgt.ABEqCSemi, text, word_text(vl_item(r.env, i)), canonical(Ref { doc: r.doc, at: vl_item(r.env, i + 1), env: vl_item(r.env, i + 2) }))
         i += 3
     }
-    return text + "}"
+    return fgs1(Fgt.ABraceEnd, text)
 }
 
 /// The host value type a reference names (no primitive, no union).
@@ -303,14 +303,14 @@ fn foreign_type(r: Ref, view: I32) I32 {
         if ref_is(x, "Str") { return prelude(Prelude.Str) }
         if ref_is(x, "F64") { return prelude(Prelude.F64) }
         if ref_is(x, "Bool") { return prelude(Prelude.Bool) }
-        if ref_is(x, "bigint") { return prelude(Prelude.I64) }
+        if ref_is(x, fgs(Fgt.Bigint)) { return prelude(Prelude.I64) }
         if ref_is(x, "unknown") { return foreign_any(view) }
         return foreign_named(x, view)
     }
     if jis_object(at) {
         let base = jget(at, "base")
         if base >= 0 { return foreign_type(Ref { doc: x.doc, at: base, env: -1 }, view) }
-        if jget(at, "symbol") >= 0 { return foreign_named(x, view) }
+        if jget(at, fgs(Fgt.Symbol)) >= 0 { return foreign_named(x, view) }
     }
     let d = describe(x)
     let union = desc_get(d, "union")
@@ -329,7 +329,7 @@ fn union_type(d: Ref, union: I32, view: I32) I32 {
     while (m >= 0) {
         let r = Ref { doc: d.doc, at: m, env: d.env }
         if ref_dynamic(r) { return foreign_any(view) }
-        if ref_is(r, "null") or ref_is(r, "undefined") { absent = true }
+        if ref_is(r, "null") or ref_is(r, fgs(Fgt.UndefinedLc)) { absent = true }
         else if not ref_is(r, "never") {
             npresent += 1
             if present < 0 { present = m }
@@ -364,7 +364,7 @@ vec boxed_at: I32
 
 fn boxed_type(t: I32, view: I32) I32 {
     let k = if t == prelude(Prelude.F64) { 0 } else { 1 }
-    let text = if k == 0 { "{\"boxed\":\"F64\"}" } else { "{\"boxed\":\"Bool\"}" }
+    let text = if k == 0 { fgs(Fgt.BoxedF64) } else { fgs(Fgt.BoxedBool) }
     if boxed_at[k] < 0 { boxed_at[k] = abi_text(text) }
     return foreign_named(Ref { doc: view_doc[view], at: boxed_at[k], env: -1 }, view)
 }
@@ -372,7 +372,7 @@ fn boxed_type(t: I32, view: I32) I32 {
 /// The primitive a boxed type holds, or -1.
 fn boxed_primitive(t: I32) I32 {
     if not is_foreign(t) { return -1 }
-    let b = jget(fty_at[t], "boxed")
+    let b = jget(fty_at[t], fgs(Fgt.Boxed))
     if b < 0 { return -1 }
     return if jstring_is_text(b, "F64") { prelude(Prelude.F64) } else { prelude(Prelude.Bool) }
 }
@@ -383,7 +383,7 @@ fn boxed_primitive(t: I32) I32 {
 fn foreign_text(t: I32) Str {
     let view = fty_view[t]
     // (a boxed number is utu's F64, of no view)
-    let prefix = if view >= 0 and boxed_primitive(t) < 0 { word_text(view_prefix[view]) + "." } else { "" }
+    let prefix = if view >= 0 and boxed_primitive(t) < 0 { fgs1(Fgt.ADot, word_text(view_prefix[view])) } else { "" }
     return prefix + display(ref_of(t), 0)
 }
 
@@ -394,7 +394,7 @@ fn display(r: Ref, depth: I32) Str {
     if jis_object(at) {
         let literal = jget(at, "literal")
         if literal >= 0 { return bytes_text(literal, jend(literal)) }
-        let boxed = jget(at, "boxed")
+        let boxed = jget(at, fgs(Fgt.Boxed))
         if boxed >= 0 { return jstring_text(boxed) }
         let p = jget(at, "parameter")
         if p >= 0 {
@@ -420,14 +420,14 @@ fn display(r: Ref, depth: I32) Str {
             while (m >= 0) {
                 if is_absence(m) { absent = true }
                 else {
-                    if text.len() > 0 { text = text + " | " }
+                    if text.len() > 0 { text = fgs1(Fgt.ASpaceBarSpace, text) }
                     text = text + display(Ref { doc: d.doc, at: m, env: d.env }, depth + 1)
                     n += 1
                 }
                 m = jnext(m)
             }
-            if absent and n == 1 { return "?" + text }
-            if absent { return "?(" + text + ")" }
+            if absent and n == 1 { return fgs1(Fgt.QA, text) }
+            if absent { return fgs1(Fgt.QOpenAClose, text) }
             return text
         }
         return decl_name_text(d.at)
@@ -473,12 +473,12 @@ fn found_member(doc: I32, at: I32, env: I32, readonly: Bool) Bool {
 fn foreign_member(t: I32, key: I32, view: I32) Bool {
     let d = describe(ref_of(t))
     let prop = jget_word(desc_get(d, "properties"), key)
-    if prop >= 0 { return found_member(d.doc, jget(prop, "type"), d.env, jis_true(jget(prop, "readonly"))) }
+    if prop >= 0 { return found_member(d.doc, jget(prop, "type"), d.env, jis_true(jget(prop, fgs(Fgt.Readonly)))) }
     // A string index signature makes every other name a property (`dataset.id`).
     let index = jfirst(desc_get(d, "indexes"))
     while (index >= 0) {
         if foreign_type(Ref { doc: d.doc, at: jget(index, "key"), env: d.env }, view) == prelude(Prelude.Str) {
-            return found_member(d.doc, jget(index, "type"), d.env, jis_true(jget(index, "readonly")))
+            return found_member(d.doc, jget(index, "type"), d.env, jis_true(jget(index, fgs(Fgt.Readonly))))
         }
         index = jnext(index)
     }
@@ -502,7 +502,7 @@ fn union_member(d: Ref, union: I32, key: I32) Bool {
             let prop = jget_word(desc_get(md, "properties"), key)
             if prop < 0 or md.env != d.env { return false }
             let pt = jget(prop, "type")
-            readonly = readonly or jis_true(jget(prop, "readonly"))
+            readonly = readonly or jis_true(jget(prop, fgs(Fgt.Readonly)))
             if first < 0 { first = pt }
             else if not bytes_equal(first, jend(first), pt, jend(pt)) { readonly = true }
             text = text + (if text.len() > 0 { "," } else { "" }) + bytes_text(pt, jend(pt))
@@ -510,15 +510,15 @@ fn union_member(d: Ref, union: I32, key: I32) Bool {
         m = jnext(m)
     }
     if first < 0 { return false }
-    return found_member(d.doc, if readonly { abi_text("{\"union\":[" + text + "]}") } else { first }, d.env, readonly)
+    return found_member(d.doc, if readonly { abi_text(fgs1(Fgt.Union, text)) } else { first }, d.env, readonly)
 }
 
 /// Whether a view exports `key`; the export is then in the `member_*` vecs (see @member_ref).
 fn root_member(view: I32, key: I32) Bool {
-    let at = jget_word(jget(view_json[view], "exports"), key)
+    let at = jget_word(jget(view_json[view], fgs(Fgt.Exports)), key)
     if at < 0 { return false }
     let start = src.interned_start(key)
-    let readonly = not jarray_has(jget(view_json[view], "mutableGlobals"), start, start + src.interned_size(key))
+    let readonly = not jarray_has(jget(view_json[view], fgs(Fgt.MutableGlobals)), start, start + src.interned_size(key))
     return found_member(view_doc[view], at, -1, readonly)
 }
 
@@ -557,9 +557,9 @@ fn foreign_op(params: I32, result: I32, body: Str) I32 {
     let m = vl_begin()
     for (0 ..< vl_len[params]) |i| { vl_add(repr(vl_item(params, i))) }
     let ft = func_type(vl_end(m), vl_of_result(repr(result)))
-    let key = intern_text(body + "|" + ft.str())
+    let key = intern_text(fgs2(Fgt.ABarB, body, ft.str()))
     for (0 ..< fop_key.len()) |i| { if fop_key[i] == key { return fop_func[i] } }
-    let name = "__foreign_" + fop_key.len().str()
+    let name = fgs1(Fgt.Foreign, fop_key.len().str())
     let f = add_import_func(name_add("es"), name_add(name), ft)
     func_debug_name[f] = name_add(name)
     let start = src.len()
@@ -636,15 +636,15 @@ let safe_checks: I32 = 0
 /// builtins make free. Other builds keep one import per name.
 fn foreign_member_op(params: I32, result: I32, body: Str, m: I32, key: I32, root: Bool) I32 {
     if optimize_level != 1 { return foreign_call_op(params, result, body, m) }
-    let named = (if root { "globalThis[" } else { "self[" }) + js_key(key) + "]"
+    let named = fgs2(Fgt.ABBracketEnd, (if root { fgs(Fgt.GlobalThisBracket) } else { fgs(Fgt.SelfBracket) }), js_key(key))
     let at = text_index(body, named, 0)
     if at < 0 or text_index(body, named, at + 1) >= 0 { return foreign_call_op(params, result, body, m) }
-    let shared = body.slice(0, at) + (if root { "globalThis[k]" } else { "self[k]" }) + body.slice(at + named.len(), body.len())
+    let shared = body.slice(0, at) + (if root { fgs(Fgt.GlobalThisK) } else { "self[k]" }) + body.slice(at + named.len(), body.len())
     if root {
-        shared = if text_at(shared, 0, "()") { "(k)" + shared.slice(2, shared.len()) } else { "(k," + shared.slice(1, shared.len()) }
+        shared = if text_at(shared, 0, fgs(Fgt.OpenClose)) { fgs1(Fgt.K, shared.slice(2, shared.len())) } else { fgs1(Fgt.KOpenComma, shared.slice(1, shared.len())) }
     } else {
-        if not text_at(shared, 0, "(self") { return foreign_call_op(params, result, body, m) }
-        shared = "(self,k" + shared.slice(5, shared.len())
+        if not text_at(shared, 0, fgs(Fgt.SelfOpen)) { return foreign_call_op(params, result, body, m) }
+        shared = fgs1(Fgt.SelfK, shared.slice(5, shared.len()))
     }
     // The name, as a string constant, after the receiver (first, at a root).
     let at_arg = if root { 0 } else { 1 }
@@ -668,19 +668,19 @@ fn js_string(text: Str) Str {
     let out = "\""
     for (0 ..< text.len()) |i| {
         let c = text.get(i)
-        if c == 34 { out = out + "\\\"" }
-        else if c == 92 { out = out + "\\\\" }
-        else if c == 10 { out = out + "\\n" }
-        else if c == 13 { out = out + "\\r" }
+        if c == 34 { out = fgs1(Fgt.ABackslashQuote, out) }
+        else if c == 92 { out = fgs1(Fgt.ABackslashBackslash, out) }
+        else if c == 10 { out = fgs1(Fgt.ABackslashX, out) }
+        else if c == 13 { out = fgs1(Fgt.R, out) }
         else { out = out + Str.from_code_point(c) }
     }
-    return out + "\""
+    return fgs1(Fgt.AQuote, out)
 }
 
 fn typeof_name(t: I32) Str {
     if t == prelude(Prelude.F64) { return "number" }
-    if t == prelude(Prelude.Str) { return "string" }
-    if t == prelude(Prelude.Bool) { return "boolean" }
+    if t == prelude(Prelude.Str) { return fgs(Fgt.String) }
+    if t == prelude(Prelude.Bool) { return fgs(Fgt.Boolean) }
     return ""
 }
 
@@ -688,30 +688,30 @@ fn typeof_name(t: I32) Str {
 /// (for a dynamic value read as a primitive) after testing its `typeof`.
 fn js_output(expr: Str, t: I32, checked: Bool) Str {
     if checked and typeof_name(t).len() > 0 {
-        let value = if t == prelude(Prelude.Bool) { "+v" } else { "v" }
+        let value = if t == prelude(Prelude.Bool) { fgs(Fgt.V) } else { "v" }
         let name = typeof_name(t)
-        return "(v => typeof v === " + js_string(name) + " ? " + value + " : (() => { throw new TypeError(" + js_string("expected " + name) + "); })())(" + expr + ")"
+        return fgs4(Fgt.VTypeofVThrowNewTypeError, js_string(name), value, js_string(fgs1(Fgt.Expected, name)), expr)
     }
-    if t == prelude(Prelude.Bool) { return "(" + expr + ") ? 1 : 0" }
-    if ty_is(t, Ty.Nullable) { return "(" + expr + ") ?? null" }
+    if t == prelude(Prelude.Bool) { return fgs1(Fgt.N10, expr) }
+    if ty_is(t, Ty.Nullable) { return fgs1(Fgt.Null, expr) }
     return expr
 }
 
 /// A utu value to JS: `Bool` as a boolean.
-fn js_input(name: Str, t: I32) Str => if t == prelude(Prelude.Bool) { "!!" + name } else { name }
+fn js_input(name: Str, t: I32) Str => if t == prelude(Prelude.Bool) { fgs1(Fgt.BangBangA, name) } else { name }
 
 /// A value for a declaration slot: absent as undefined where the slot
 /// admits undefined but not null.
 fn js_argument(slot: Ref, name: Str, t: I32) Str {
     if ty_is(t, Ty.Nullable) {
         let union = desc_get(describe(slot), "union")
-        if union >= 0 and union_has(union, "undefined") and not union_has(union, "null") { return name + " ?? undefined" }
+        if union >= 0 and union_has(union, fgs(Fgt.UndefinedLc)) and not union_has(union, "null") { return fgs1(Fgt.Undefined, name) }
     }
     return js_input(name, t)
 }
 
 /// Whether a union member is no value: `null`, `undefined`, or `never`.
-fn is_absence(m: I32) Bool => jstring_is_text(m, "null") or jstring_is_text(m, "undefined") or jstring_is_text(m, "never")
+fn is_absence(m: I32) Bool => jstring_is_text(m, "null") or jstring_is_text(m, fgs(Fgt.UndefinedLc)) or jstring_is_text(m, "never")
 
 fn union_has(union: I32, text: Str) Bool {
     let m = jfirst(union)
@@ -771,8 +771,8 @@ fn host_assignable(actual: I32, expected: I32) Bool {
         let host = is_host_value(a)
         if host and (is_dynamic(e) or is_dynamic(a)) { return true }
         let name = decl_name_text(describe(ref_of(e)).at)
-        if name == "Function" and ty_is(a, Ty.Closure) { return true }
-        if (name == "Object" or name == "object" or name == "{}") and (is_foreign(a) or ty_is(a, Ty.Closure)) { return true }
+        if name == fgs(Fgt.Function) and ty_is(a, Ty.Closure) { return true }
+        if (name == fgs(Fgt.Object) or name == fgs(Fgt.ObjectLc) or name == fgs(Fgt.BraceBraceEnd)) and (is_foreign(a) or ty_is(a, Ty.Closure)) { return true }
         if is_foreign(a) and same_template_any(a, e) { return true }
         if is_foreign(a) and structurally(a, e) { return true }
         if is_foreign(a) and calls_fit(a, e) { return true }
@@ -804,10 +804,10 @@ fn same_promise(u: I32, h: I32) Bool {
 /// Whether a string is one: an `ArrayLike` or `Iterable` of strings.
 fn string_like(e: I32) Bool {
     let lib = jget(describe(ref_of(e)).at, "lib")
-    if lib < 0 or not (jstring_is_text(lib, "ArrayLike") or jstring_is_text(lib, "Iterable")) { return false }
+    if lib < 0 or not (jstring_is_text(lib, fgs(Fgt.ArrayLike)) or jstring_is_text(lib, fgs(Fgt.Iterable))) { return false }
     // `Iterable<T, …>`: T, its first argument.
     let env = ref_of(e).env
-    if jstring_is_text(lib, "Iterable") {
+    if jstring_is_text(lib, fgs(Fgt.Iterable)) {
         return env >= 0 and vl_len[env] >= 3 and foreign_type(Ref { doc: fty_doc[e], at: vl_item(env, 1), env: vl_item(env, 2) }, fty_view[e]) == prelude(Prelude.Str)
     }
     let el = element_of(ref_of(e), 0)
@@ -846,7 +846,7 @@ fn same_template_any(a: I32, e: I32) Bool {
 /// member satisfies it (`Set` is an `Iterable`).
 fn structurally(a: I32, e: I32) Bool {
     let want = describe(ref_of(e))
-    if desc_get(want, "union") >= 0 or ref_dynamic(ref_of(e)) or jlen(desc_get(want, "calls")) > 0 or jlen(desc_get(want, "constructors")) > 0 { return false }
+    if desc_get(want, "union") >= 0 or ref_dynamic(ref_of(e)) or jlen(desc_get(want, "calls")) > 0 or jlen(desc_get(want, fgs(Fgt.Constructors))) > 0 { return false }
     let required = 0
     let p = jfirst(desc_get(want, "properties"))
     while (p >= 0) {
@@ -972,7 +972,7 @@ fn host_coerce(actual: I32, expected: I32) Bool {
             let mt = vl_begin()
             vl_add(nullable(foreign_any(fty_view[actual])))
             let present = if typeof_name(inner).len() > 0 { js_output("value", inner, true) } else { "value" }
-            foreign_call_op(vl_end(mt), expected, "(value) => value == null ? null : " + present, m)
+            foreign_call_op(vl_end(mt), expected, fgs1(Fgt.ValueValueNullNull, present), m)
             return true
         }
     }
@@ -1003,7 +1003,7 @@ fn dynamic_nullable(t: I32) I32 {
     w_push(v)
     let mt = vl_begin()
     vl_add(t)
-    return foreign_call_op(vl_end(mt), nullable(t), "(value) => value ?? null", m)
+    return foreign_call_op(vl_end(mt), nullable(t), fgs(Fgt.ValueValueNull), m)
 }
 
 fn foreign_unbox(from: I32, to: I32, checked: Bool) Void {
@@ -1012,7 +1012,7 @@ fn foreign_unbox(from: I32, to: I32, checked: Bool) Void {
     w_push(v)
     let mt = vl_begin()
     vl_add(nullable(foreign_any(fty_view[from])))
-    foreign_call_op(vl_end(mt), to, "(value) => " + js_output("value", to, checked), m)
+    foreign_call_op(vl_end(mt), to, fgs1(Fgt.Value, js_output("value", to, checked)), m)
 }
 
 //! = Checking
@@ -1025,17 +1025,17 @@ let access_prologue: I32 = 0
 
 fn member_access(view: I32, key: I32, root: Bool) Str {
     access_prologue = intern_text("")
-    if not root { return "self[" + js_key(key) + "]" }
-    let spec = jget(view_json[view], "moduleSpecifier")
-    if not jis_string(spec) { return "globalThis[" + js_key(key) + "]" }
+    if not root { return fgs1(Fgt.Self, js_key(key)) }
+    let spec = jget(view_json[view], fgs(Fgt.ModuleSpecifier))
+    if not jis_string(spec) { return fgs1(Fgt.GlobalThis, js_key(key)) }
     // Named by the import (numbered among the program's host declaration
     // imports), not the view, which may have been kept from an earlier program.
     // (an `export =` module's members are its default export's: CommonJS has no named ones)
-    let assigned = jis_true(jget(view_json[view], "exportAssignment")) and word_text(key) != "default"
-    let name = if assigned { intern_text("default") } else { key }
-    let alias = "__abi" + int_text(foreign_ordinal(view_import[view])) + "_" + hex_name(word_text(name))
-    access_prologue = intern_text("import { " + js_key(name) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ")
-    return if assigned { alias + "[" + js_key(key) + "]" } else { alias }
+    let assigned = jis_true(jget(view_json[view], fgs(Fgt.ExportAssignment))) and word_text(key) != fgs(Fgt.Default)
+    let name = if assigned { intern_text(fgs(Fgt.Default)) } else { key }
+    let alias = fgs2(Fgt.Abi, int_text(foreign_ordinal(view_import[view])), hex_name(word_text(name)))
+    access_prologue = intern_text(fgs3(Fgt.ImportAsFrom, js_key(name), alias, bytes_text(spec, jend(spec))))
+    return if assigned { fgs2(Fgt.ABracketBBracketEnd, alias, js_key(key)) } else { alias }
 }
 
 /// Which of the program's imports of host declarations import `i` is (0 for the first).
@@ -1048,21 +1048,21 @@ fn foreign_ordinal(i: I32) I32 {
 /// The parameters of an operation's JS: `p0,p1,…`, `n` of them.
 fn param_names(n: I32) Str {
     let out = ""
-    for (0 ..< n) |i| { out = out + (if i > 0 { ",p" } else { "p" }) + int_text(i) }
+    for (0 ..< n) |i| { out = out + (if i > 0 { fgs(Fgt.PComma) } else { "p" }) + int_text(i) }
     return out
 }
 
 fn hex_name(text: Str) Str {
     let out = ""
     for (0 ..< text.len()) |i| {
-        if i > 0 { out = out + "_" }
+        if i > 0 { out = fgs1(Fgt.AX, out) }
         out = out + hex_of(text.get(i))
     }
     return out
 }
 
 fn hex_of(v: I32) Str {
-    let digits = "0123456789abcdef"
+    let digits = fgs(Fgt.N0123456789abcdef)
     let out = ""
     let x = v
     if x == 0 { return "0" }
@@ -1081,7 +1081,7 @@ fn missing_member(at: I32, owner: I32, key: I32, m: I32) I32 {
 }
 
 fn unknown_member(at: I32, view: I32, owner: I32, key: I32) I32 {
-    let owner_text = if owner >= 0 { decl_name_text(describe(ref_of(owner)).at) + "." } else { "" }
+    let owner_text = if owner >= 0 { fgs1(Fgt.ADot, decl_name_text(describe(ref_of(owner)).at)) } else { "" }
     report3(Diag.UnknownForeignMember, at, key, view, -1, intern_text(owner_text))
     return error_value()
 }
@@ -1106,7 +1106,7 @@ fn check_foreign_root(node: I32, view: I32, key: I32, expect: I32) I32 {
     let checked = result_checked == 1
     let access = member_access(view, key, true)
     let m = w_mark()
-    return foreign_member_op(vl_empty(), t, word_text(access_prologue) + "() => " + js_output(access, t, checked), m, key, true)
+    return foreign_member_op(vl_empty(), t, fgs2(Fgt.AOpenCloseSpaceEqGtSpaceB, word_text(access_prologue), js_output(access, t, checked)), m, key, true)
 }
 
 /// `Api.Mode.On`: an enum member (const or not) is its literal, with no
@@ -1116,7 +1116,7 @@ fn check_foreign_constant(node: I32) I32 {
     if not is_kind(base, Node.Type_member_expr) { return -1 }
     let owner = node_decl[first_child(base)]
     if not decl_is(owner, Decl.Foreign) or decl_a[owner] < 0 or not root_member(decl_a[owner], word_of(last_child(base))) { return -1 }
-    let value = jget_word(desc_get(describe(member_ref()), "constants"), word_of(last_child(node)))
+    let value = jget_word(desc_get(describe(member_ref()), fgs(Fgt.Constants)), word_of(last_child(node)))
     if jis_string(value) {
         w_leaf(Op.GlobalGet, vt_extern, string_global(jstring_word(value)), 0)
         return prelude(Prelude.Str)
@@ -1150,7 +1150,7 @@ fn check_foreign_root_set(node: I32, view: I32, key: I32, value: I32, word: I32,
     }
     let ms = if word < 0 { m } else { w_mark() - 1 }
     let access = member_access(view, key, true)
-    foreign_member_op(one_type(vt), ty_void(), word_text(access_prologue) + "(value) => { " + access + " = " + js_argument(slot, "value", vt) + "; }", ms, key, true)
+    foreign_member_op(one_type(vt), ty_void(), fgs3(Fgt.ValueOpenCloseEqGtBra, word_text(access_prologue), access, js_argument(slot, "value", vt)), ms, key, true)
     if word >= 0 { w_node(Op.Seq, vt_none, 0, 0, m) }
     return ty_void()
 }
@@ -1161,7 +1161,7 @@ fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
     if not foreign_member(owner, key, view) { return missing_member(node, owner, key, m) }
     let t = foreign_result(member_ref(), view, expect)
     let checked = result_checked == 1
-    return foreign_member_op(one_type(erased(owner, view)), t, "(self) => " + js_output(member_access(view, key, false), t, checked), m, key, false)
+    return foreign_member_op(one_type(erased(owner, view)), t, fgs1(Fgt.SelfOpenCloseEqGt, js_output(member_access(view, key, false), t, checked)), m, key, false)
 }
 
 /// `x.key = value`: the value of host type `owner` is on the stack since `m`.
@@ -1178,7 +1178,7 @@ fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx
     let mt = vl_begin()
     vl_add(erased(owner, view))
     vl_add(vt)
-    let body = "(self,value) => { " + member_access(view, key, false) + " = " + js_argument(slot, "value", vt) + "; }"
+    let body = fgs2(Fgt.SelfValue, member_access(view, key, false), js_argument(slot, "value", vt))
     return foreign_member_op(vl_end(mt), ty_void(), body, m, key, false)
 }
 
@@ -1208,7 +1208,7 @@ fn check_foreign_update(node: I32, owner: I32, key: I32, value: I32, word: I32, 
     let mt = vl_begin()
     vl_add(erased(owner, view))
     vl_add(ft)
-    let body = "(self,value) => { " + member_access(view, key, false) + " = " + js_argument(slot, "value", ft) + "; }"
+    let body = fgs2(Fgt.SelfValue, member_access(view, key, false), js_argument(slot, "value", ft))
     foreign_member_op(vl_end(mt), ty_void(), body, ms, key, false)
     w_node(Op.Seq, vt_none, 0, 0, m)
     return ty_void()
@@ -1238,7 +1238,7 @@ vec prim_at: I32
 fn prim_ref(t: I32) I32 {
     let k = if t == prelude(Prelude.Str) { 0 } else if t == prelude(Prelude.F64) { 1 } else if t == prelude(Prelude.Bool) { 2 } else { 3 }
     if prim_at[k] < 0 {
-        prim_at[k] = abi_text(if k == 0 { "\"Str\"" } else if k == 1 { "\"F64\"" } else if k == 2 { "\"Bool\"" } else { "\"void\"" })
+        prim_at[k] = abi_text(if k == 0 { fgs(Fgt.Str) } else if k == 1 { fgs(Fgt.F64) } else if k == 2 { fgs(Fgt.Bool) } else { fgs(Fgt.Void) })
     }
     return prim_at[k]
 }
@@ -1296,7 +1296,7 @@ fn element_of(slot: Ref, depth: I32) I32 {
         element_env = -1
         return any_ref()
     }
-    let element = desc_get(d, "element")
+    let element = desc_get(d, fgs(Fgt.Element))
     if element >= 0 {
         element_env = d.env
         return element
@@ -1304,7 +1304,7 @@ fn element_of(slot: Ref, depth: I32) I32 {
     // `Iterable<T, TReturn, TNext>`: T, its first parameter.
     let lib = desc_get(d, "lib")
     let first = jfirst(desc_get(d, "parameters"))
-    if lib >= 0 and first >= 0 and jstring_is_text(lib, "Iterable") {
+    if lib >= 0 and first >= 0 and jstring_is_text(lib, fgs(Fgt.Iterable)) {
         let bound = binding_of(d.env, jstring_word(first))
         if bound >= 0 {
             element_env = bind_env
@@ -1353,7 +1353,7 @@ fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let union = desc_get(d, "union")
     if union >= 0 { return accept_union(s, d, union, arg, view, cx) }
     if jlen(desc_get(d, "calls")) > 0 and is_closure_arg(arg, cx) { return callback_type(d, arg, view, cx) }
-    if decl_name_text(d.at) == "Function" and is_closure_arg(arg, cx) {
+    if decl_name_text(d.at) == fgs(Fgt.Function) and is_closure_arg(arg, cx) {
         // (a parameter of no written type: checked as `Function`, which reports it)
         let t = host_type(arg, cx)
         if ty_is(t, Ty.Closure) and not untyped_params(t) { return t }
@@ -1392,7 +1392,7 @@ fn accept_union(s: Ref, d: Ref, union: I32, arg: I32, view: I32, cx: Cx) I32 {
             let r = Ref { doc: d.doc, at: m, env: d.env }
             let md = describe(r)
             let fit = if is_untyped_array(arg) { if element_of(r, 0) >= 0 { 9 } else { 0 } }
-                else if is_closure_arg(arg, cx) { if jlen(desc_get(md, "calls")) > 0 or decl_name_text(md.at) == "Function" { 9 } else { 0 } }
+                else if is_closure_arg(arg, cx) { if jlen(desc_get(md, "calls")) > 0 or decl_name_text(md.at) == fgs(Fgt.Function) { 9 } else { 0 } }
                 else if is_record(arg) and jlen(desc_get(md, "calls")) == 0 { record_fit(md, arg) }
                 else { 0 }
             if fit > best_fit {
@@ -1461,7 +1461,7 @@ fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) Void {
     }
     if literal_in(d, arg) != 0 { return }
     let text = is_kind(first_child(lit), Node.String_lit) and lit == arg
-    report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), intern_text(node_text(arg)), -1, if text and jis_true(jget(d.at, "enum")) { 1 } else { 0 })
+    report3(Diag.HostLiteral, arg, literal_union_name(slot, d, view), intern_text(node_text(arg)), -1, if text and jis_true(jget(d.at, fgs(Fgt.Enum))) { 1 } else { 0 })
 }
 
 /// A number literal's value, for @literal_fit.
@@ -1500,11 +1500,11 @@ fn literal_in(d: Ref, arg: I32) I32 {
 /// number `fit_x`) is member `m`'s value (of union, or literal, `d`): 1; 0
 /// not; -1 when `m` is no literal type.
 fn literal_fit(m: I32, d: Ref, text: Bool, lo: I32, hi: I32) I32 {
-    let pattern = jget(m, "pattern")
+    let pattern = jget(m, fgs(Fgt.Pattern))
     if pattern >= 0 { return if text and pattern_fits(jfirst(pattern), lo + 1, hi - 1) { 1 } else { 0 } }
     let value = jget(m, "literal")
     if value < 0 { return -1 }
-    if text and jis_string(value) and not jis_true(jget(d.at, "enum")) and bytes_equal(value, jend(value), lo, hi) { return 1 }
+    if text and jis_string(value) and not jis_true(jget(d.at, fgs(Fgt.Enum))) and bytes_equal(value, jend(value), lo, hi) { return 1 }
     if not text and jis_number(value) and json_number(value) == fit_x { return 1 }
     return 0
 }
@@ -1518,7 +1518,7 @@ fn pattern_fits(part: I32, i: I32, end_: I32) Bool {
     let hole = jnext(part)
     if hole < 0 { return i + n == end_ }
     for (i + n ..< end_ + 1) |j| {
-        let fits = jstring_is_text(hole, "Str") or number_text(i + n, j, jstring_is_text(hole, "bigint"))
+        let fits = jstring_is_text(hole, "Str") or number_text(i + n, j, jstring_is_text(hole, fgs(Fgt.Bigint)))
         if fits and pattern_fits(jnext(hole), j, end_) { return true }
     }
     return false
@@ -1561,9 +1561,9 @@ fn literal_result(slot: Ref, arg: I32, view: I32, cx: Cx) Void {
 /// A union of literals by name: an alias by its view's name; `"x" | "y"` as it is.
 fn literal_union_name(slot: Ref, d: Ref, view: I32) I32 {
     let name = decl_name_text(d.at)
-    let prefix = word_text(view_prefix[view]) + "."
+    let prefix = fgs1(Fgt.ADot, word_text(view_prefix[view]))
     // (`keyof M` names M: `keyof Api.M`)
-    if name.len() > 6 and name.slice(0, 6) == "keyof " { return intern_text("keyof " + prefix + name.slice(6, name.len())) }
+    if name.len() > 6 and name.slice(0, 6) == fgs(Fgt.KeyofLc) { return intern_text(fgs2(Fgt.Keyof, prefix, name.slice(6, name.len()))) }
     // (a literal, `"b"`, and a pattern, `` `id-${number}` ``, as they are)
     let alias = not has_byte(name, 124) and jget(d.at, "base") < 0
     return intern_text((if alias { prefix } else { "" }) + display(slot, 0))
@@ -1601,12 +1601,12 @@ fn assigned_after(let_node: I32, decl: I32) Bool {
 /// Whether `d` (a union's members but absence) are all string literals or patterns.
 fn string_literals(d: Ref) Bool {
     let union = desc_get(d, "union")
-    if union < 0 { return jis_string(jget(d.at, "literal")) or jget(d.at, "pattern") >= 0 }
+    if union < 0 { return jis_string(jget(d.at, "literal")) or jget(d.at, fgs(Fgt.Pattern)) >= 0 }
     let any = false
     let m = jfirst(union)
     while (m >= 0) {
         if not is_absence(m) {
-            if not jis_string(jget(m, "literal")) and jget(m, "pattern") < 0 { return false }
+            if not jis_string(jget(m, "literal")) and jget(m, fgs(Fgt.Pattern)) < 0 { return false }
             any = true
         }
         m = jnext(m)
@@ -1710,13 +1710,13 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     if c < 0 {
         let t = host_type(arg, cx)
         // (its first parameter may be the receiver)
-        let receiver = if jget(sig, "receiver") >= 0 { 1 } else { 0 }
+        let receiver = if jget(sig, fgs(Fgt.Receiver)) >= 0 { 1 } else { 0 }
         if ty_is(t, Ty.Closure) { callback_arity(sig, vl_len[ty_a[t]] - receiver, arg) }
         return t
     }
     let list = first_child(c)
     let own = if is_kind(list, Node.Closure_param_list) { first_child(list) } else { -1 }
-    let receiver = own >= 0 and word_text(word_of(first_child(own))) == "this"
+    let receiver = own >= 0 and word_text(word_of(first_child(own))) == fgs(Fgt.This)
     let arity = if is_kind(list, Node.Closure_param_list) { child_count(list) } else { 0 }
     if receiver { arity -= 1 }
     // (once reported, a `let`'s closure is checked as its own type: the mistake is said once)
@@ -1725,7 +1725,7 @@ fn callback_type(d: Ref, arg: I32, view: I32, cx: Cx) I32 {
     let params = jget(sig, "params")
     let m = vl_begin()
     if receiver {
-        let r = jget(sig, "receiver")
+        let r = jget(sig, fgs(Fgt.Receiver))
         vl_add(if r >= 0 { foreign_type(Ref { doc: d.doc, at: r, env: d.env }, view) } else { foreign_any(view) })
         own = next_sibling(own)
     }
@@ -2133,7 +2133,7 @@ fn bound_in_pending(m: I32, w: I32) Bool {
 }
 
 /// `{"literal":"input","base":"Str"}` for a string literal argument, in src.
-fn literal_json(arg: I32) I32 => abi_text("{\"literal\":" + node_text(arg) + ",\"base\":\"Str\"}")
+fn literal_json(arg: I32) I32 => abi_text(fgs1(Fgt.LiteralBaseStr, node_text(arg)))
 
 /// A call of host function `fn_ref`, reached in JS as `access` (with its
 /// receiver, of type `receiver`, on the stack since `m`; -1 for none).
@@ -2142,7 +2142,7 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
     let a = arg_nodes(args)
     let n = child_count(args)
     let calls = desc_get(d, "calls")
-    let ctors = desc_get(d, "constructors")
+    let ctors = desc_get(d, fgs(Fgt.Constructors))
     let use_ctors = construct or (jlen(calls) == 0 and jlen(ctors) > 0)
     let sig = pick_signature(if use_ctors { ctors } else { calls }, a, n, d, view, cx)
     let dynamic = ref_dynamic(fn_ref)
@@ -2152,7 +2152,7 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
         return error_value()
     }
     let env = if sig >= 0 { unify_args(sig, a, n, d, cx) } else { -1 }
-    if sig >= 0 and use_ctors and jis_true(jget(sig, "abstract")) {
+    if sig >= 0 and use_ctors and jis_true(jget(sig, fgs(Fgt.Abstract))) {
         report2(Diag.HostAbstract, node, -1, foreign_type(Ref { doc: d.doc, at: jget(sig, "result"), env: env }, view), -1)
     }
     let mt = vl_begin()
@@ -2162,16 +2162,16 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
         let slot = if sig >= 0 { sig_slot(sig, i, env, d.doc) } else { any_slot(d.doc) }
         let pt = check_argument(slot, a[i], view, cx)
         vl_add(erased(pt, view))
-        let name = "p" + int_text(i)
-        if i > 0 { invocation = invocation + "," }
-        invocation = invocation + if receiver_closure(a[i]) { kept_callback(name, "this", "function (...a) { return " + name + "(this, ...a); }") } else { js_callback(name, pt, js_argument(slot, name, pt)) }
+        let name = fgs1(Fgt.P, int_text(i))
+        if i > 0 { invocation = fgs1(Fgt.AComma, invocation) }
+        invocation = invocation + if receiver_closure(a[i]) { kept_callback(name, fgs(Fgt.This), fgs1(Fgt.FunctionAReturnThisA, name)) } else { js_callback(name, pt, js_argument(slot, name, pt)) }
     }
     if sig >= 0 { env = bind_from_context(jget(sig, "result"), d.doc, env, expect) }
     let result_ref = if sig >= 0 { Ref { doc: d.doc, at: jget(sig, "result"), env: env } } else { any_slot(d.doc) }
     let t = foreign_result(result_ref, view, expect)
     let checked = result_checked == 1
-    let self_ = if receiver >= 0 { if n > 0 { "self," } else { "self" } } else { "" }
-    let body = prologue + "(" + self_ + param_names(n) + ") => " + js_output((if construct or use_ctors { "new " } else { "" }) + access + "(" + invocation + ")", t, checked)
+    let self_ = if receiver >= 0 { if n > 0 { fgs(Fgt.SelfComma) } else { fgs(Fgt.SelfLc) } } else { "" }
+    let body = fgs4(Fgt.AOpenBCCloseSpaceEqGtSpaceD, prologue, self_, param_names(n), js_output(fgs3(Fgt.ABOpenCClose, (if construct or use_ctors { fgs(Fgt.New) } else { "" }), access, invocation), t, checked))
     let r = if key >= 0 { foreign_member_op(vl_end(mt), t, body, m, key, receiver < 0) } else { foreign_call_op(vl_end(mt), t, body, m) }
     // A `never` result does not return: it fits any type.
     if not ref_is(resolved(result_ref), "never") { return r }
@@ -2185,7 +2185,7 @@ fn check_foreign_value_call(node: I32, callee: I32, t: I32, args: I32, m: I32, e
     let r = check_foreign_symbol_call(node, callee, t, args, m, expect, cx)
     if r >= 0 { return r }
     check_expr(callee, t, cx)
-    return check_foreign_invoke(node, ref_of(t), fty_view[t], args, t, -1, "self", "", false, m, expect, cx)
+    return check_foreign_invoke(node, ref_of(t), fty_view[t], args, t, -1, fgs(Fgt.SelfLc), "", false, m, expect, cx)
 }
 
 /// Whether a host type is a function's (has a call signature).
@@ -2202,16 +2202,16 @@ fn js_callback(name: Str, pt: I32, plain: Str) Str {
     if not absent { return plain }
     let args = ""
     for (0 ..< vl_len[params]) |k| {
-        if k > 0 { args = args + "," }
-        args = args + "a[" + int_text(k) + "]" + if ty_is(vl_item(params, k), Ty.Nullable) { " ?? null" } else { "" }
+        if k > 0 { args = fgs1(Fgt.AComma, args) }
+        args = fgs3(Fgt.A, args, int_text(k), if ty_is(vl_item(params, k), Ty.Nullable) { " ?? null" } else { "" })
     }
-    return kept_callback(name, "js", "(...a) => " + name + "(" + args + ")")
+    return kept_callback(name, fgs(Fgt.Js), fgs2(Fgt.AOpenDotDotDotClo, name, args))
 }
 
 /// A JS function wrapping closure `name`, made once per closure and kept on
 /// it (under `utu.<key>`): `removeEventListener` finds what `add…` was given.
 fn kept_callback(name: Str, key: Str, wrapper: Str) Str {
-    return "(" + name + "[Symbol.for('utu." + key + "')] ??= " + wrapper + ")"
+    return fgs3(Fgt.SymbolForUtu, name, key, wrapper)
 }
 
 /// `cl(this, event) {…}` receives the JS receiver first.
@@ -2219,7 +2219,7 @@ fn receiver_closure(arg: I32) Bool {
     let c = closure_node(arg)
     if c < 0 { return false }
     let list = first_child(c)
-    return is_kind(list, Node.Closure_param_list) and first_child(list) >= 0 and word_text(word_of(first_child(first_child(list)))) == "this"
+    return is_kind(list, Node.Closure_param_list) and first_child(list) >= 0 and word_text(word_of(first_child(first_child(list)))) == fgs(Fgt.This)
 }
 
 /// `x.m(args)`: `x`, of host type `owner`, is on the stack since `m`.
@@ -2275,7 +2275,7 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
         let mt = vl_begin()
         vl_add(erased(owner, view))
         vl_add(erased(kt, view))
-        return foreign_call_op(vl_end(mt), st, "(self,k) => " + js_output("self[k]", st, result_checked == 1), m)
+        return foreign_call_op(vl_end(mt), st, fgs1(Fgt.SelfKOpenCommaCloseEq, js_output("self[k]", st, result_checked == 1)), m)
     }
     let info = index_for(d, kt, view)
     if info < 0 and not ref_dynamic(ref_of(owner)) {
@@ -2305,15 +2305,15 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
     let mt = vl_begin()
     vl_add(erased(owner, view))
     vl_add(erased(kt, view))
-    return foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), m)
+    return foreign_call_op(vl_end(mt), t, fgs1(Fgt.SelfKOpenCommaCloseEq, js_output("self[k]", t, checked)), m)
 }
 
 /// The type of `d`'s member keyed by `unique symbol` type `kt`
 /// (`[token](): string`), or -1.
 fn symbol_member(d: Ref, kt: I32) I32 {
-    let sym = if is_foreign(kt) { jget(fty_at[kt], "symbol") } else { -1 }
+    let sym = if is_foreign(kt) { jget(fty_at[kt], fgs(Fgt.Symbol)) } else { -1 }
     if not jis_string(sym) { return -1 }
-    let prop = jget_word(desc_get(d, "properties"), intern_text("@@" + jstring_text(sym)))
+    let prop = jget_word(desc_get(d, "properties"), intern_text(fgs1(Fgt.AtAtA, jstring_text(sym))))
     return if prop >= 0 { jget(prop, "type") } else { -1 }
 }
 
@@ -2324,19 +2324,19 @@ fn check_foreign_symbol_call(node: I32, callee: I32, t: I32, args: I32, m: I32, 
     let rt = host_type(first_child(callee), cx)
     let kt = host_type(last_child(callee), cx)
     if not is_foreign(rt) or symbol_member(describe(ref_of(rt)), kt) < 0 { return -1 }
-    let sym = jget(fty_at[kt], "symbol")
+    let sym = jget(fty_at[kt], fgs(Fgt.Symbol))
     let view = fty_view[kt]
     // (the symbol is its declaration's export: the key, imported, needs no value)
     if not root_member(view, jstring_word(sym)) { return -1 }
     check_expr(first_child(callee), rt, cx)
-    let access = "self[" + member_access(view, jstring_word(sym), true) + "]"
+    let access = fgs1(Fgt.Self, member_access(view, jstring_word(sym), true))
     return check_foreign_invoke(node, ref_of(t), fty_view[t], args, rt, -1, access, word_text(access_prologue), false, m, expect, cx)
 }
 
 /// Whether a declaration is a tuple's (`[T0, T1]`).
 fn is_tuple(d: Ref) Bool {
     let name = decl_name_text(d.at)
-    return jget(d.at, "element") >= 0 and name.len() > 0 and name.get(0) == 91
+    return jget(d.at, fgs(Fgt.Element)) >= 0 and name.len() > 0 and name.get(0) == 91
 }
 
 /// Whether a tuple's elements (its rest's too) are all of one utu type.
@@ -2366,9 +2366,9 @@ fn tuple_counts(t: I32) Str {
     let d = describe(ref_of(t))
     let low = tuple_required(d)
     let high = tuple_fixed(d)
-    let words = if (if tuple_has_rest(d) or low < high { low } else { high }) == 1 { " element" } else { " elements" }
-    if tuple_has_rest(d) { return "at least " + int_text(low) + words }
-    if low < high { return int_text(low) + " to " + int_text(high) + " elements" }
+    let words = if (if tuple_has_rest(d) or low < high { low } else { high }) == 1 { fgs(Fgt.Element2) } else { fgs(Fgt.Elements) }
+    if tuple_has_rest(d) { return fgs2(Fgt.AtLeast, int_text(low), words) }
+    if low < high { return fgs2(Fgt.ToElements, int_text(low), int_text(high)) }
     return int_text(high) + words
 }
 
@@ -2404,7 +2404,7 @@ let open_record: I32 = -1
 /// Whether declaration `d` is `object` or `{}`, which any record fits.
 fn is_open_object(d: Ref) Bool {
     let name = decl_name_text(d.at)
-    return name == "{}" or name == "object"
+    return name == fgs(Fgt.BraceBraceEnd) or name == fgs(Fgt.ObjectLc)
 }
 
 /// `&{ a: x, b: y }` where a host object is expected: a JS object.
@@ -2428,8 +2428,8 @@ fn check_foreign_record(node: I32, t: I32, cx: Cx) I32 {
             let value = last_child(f)
             let pt = check_argument(slot, value, view, cx)
             vl_add(erased(pt, view))
-            if i > 0 { fields = fields + "," }
-            fields = fields + "[" + js_key(key) + "]:" + js_argument(slot, "p" + int_text(i), pt)
+            if i > 0 { fields = fgs1(Fgt.AComma, fields) }
+            fields = fgs3(Fgt.ABracketBBracketEndColonC, fields, js_key(key), js_argument(slot, fgs1(Fgt.P, int_text(i)), pt))
             i += 1
         }
         f = next_sibling(f)
@@ -2440,7 +2440,7 @@ fn check_foreign_record(node: I32, t: I32, cx: Cx) I32 {
         if not jis_true(jget(jvalue(p), "optional")) and not record_names(node, p) { report2(Diag.ForeignRecordMissing, node, jstring_word(p), -1, -1) }
         p = jnext(p)
     }
-    return foreign_call_op(vl_end(mt), t, "(" + param_names(i) + ") => ({" + fields + "})", m)
+    return foreign_call_op(vl_end(mt), t, fgs2(Fgt.OpenACloseSpaceEqGtSpaceOpenBraceBBraceEndClose, param_names(i), fields), m)
 }
 
 /// The index signature of declaration `d` whose key is of type `kt` (else
@@ -2495,21 +2495,21 @@ fn check_foreign_array(node: I32, t: I32, cx: Cx) I32 {
         let own = if tuple { tuple_slot(d, i) } else { slot }
         let pt = check_argument(if own.at >= 0 { own } else { slot }, c, view, cx)
         vl_add(erased(pt, view))
-        if i > 0 { items = items + "," }
-        items = items + js_input("p" + int_text(i), pt)
+        if i > 0 { items = fgs1(Fgt.AComma, items) }
+        items = items + js_input(fgs1(Fgt.P, int_text(i)), pt)
         i += 1
         c = next_sibling(c)
     }
     let lib = jget(describe(ref_of(t)).at, "lib")
     let typed = if lib >= 0 { jstring_text(lib) } else { "" }
-    let value = if is_typed_array(typed) { "new globalThis." + typed + "([" + items + "])" } else { "[" + items + "]" }
-    return foreign_call_op(vl_end(mt), t, "(" + param_names(i) + ") => " + value, m)
+    let value = if is_typed_array(typed) { fgs2(Fgt.NewGlobalThis, typed, items) } else { fgs1(Fgt.BracketABracketEnd, items) }
+    return foreign_call_op(vl_end(mt), t, fgs2(Fgt.OpenACloseSpaceEqGtSpaceB, param_names(i), value), m)
 }
 
 fn is_typed_array(name: Str) Bool {
-    return name == "Int8Array" or name == "Uint8Array" or name == "Uint8ClampedArray" or name == "Int16Array" or name == "Uint16Array"
-        or name == "Int32Array" or name == "Uint32Array" or name == "Float16Array" or name == "Float32Array" or name == "Float64Array"
-        or name == "BigInt64Array" or name == "BigUint64Array"
+    return name == fgs(Fgt.Int8Array) or name == fgs(Fgt.Uint8Array) or name == fgs(Fgt.Uint8ClampedArray) or name == fgs(Fgt.Int16Array) or name == fgs(Fgt.Uint16Array)
+        or name == fgs(Fgt.Int32Array) or name == fgs(Fgt.Uint32Array) or name == fgs(Fgt.Float16Array) or name == fgs(Fgt.Float32Array) or name == fgs(Fgt.Float64Array)
+        or name == fgs(Fgt.BigInt64Array) or name == fgs(Fgt.BigUint64Array)
 }
 
 /// `a == b`, `a != b` on host values: JavaScript's identity, `===`.
@@ -2523,8 +2523,8 @@ fn foreign_equal_op(left_t: I32, rt: I32, equal: Bool, m: I32) I32 {
     let mt = vl_begin()
     vl_add(erased(left_t, view))
     vl_add(erased(rt, view))
-    let same = if equal { "===" } else { "!==" }
-    return foreign_call_op(vl_end(mt), prelude(Prelude.Bool), "(a,b) => " + js_output("a " + same + " b", prelude(Prelude.Bool), false), m)
+    let same = if equal { fgs(Fgt.EqEqEq) } else { fgs(Fgt.BangEqEq) }
+    return foreign_call_op(vl_end(mt), prelude(Prelude.Bool), fgs1(Fgt.AB, js_output(fgs1(Fgt.ABLc, same), prelude(Prelude.Bool), false)), m)
 }
 
 fn is_foreign_or_nullable(t: I32) Bool => is_foreign(t) or (t >= 0 and ty_is(t, Ty.Nullable) and is_foreign(ty_a[t]))
@@ -2544,7 +2544,7 @@ fn view_of_doc(doc: I32) I32 {
 /// The host type (`String`, `Number`) whose member `key` a value of type `t`
 /// reads, or -1.
 fn primitive_host_type(t: I32, key: I32) I32 {
-    let name = if t == prelude(Prelude.Str) { "String" } else if t == prelude(Prelude.F64) { "Number" } else { "" }
+    let name = if t == prelude(Prelude.Str) { fgs(Fgt.String2) } else if t == prelude(Prelude.F64) { fgs(Fgt.Number) } else { "" }
     if name.len() == 0 { return -1 }
     let w = intern_text(name)
     for (0 ..< view_doc.len()) |v| {
@@ -2562,7 +2562,7 @@ fn check_foreign_primitive_get(t: I32, host: I32, key: I32, m: I32, expect: I32)
     foreign_member(host, key, view)
     let rt = foreign_result(member_ref(), view, expect)
     let checked = result_checked == 1
-    return foreign_member_op(one_type(t), rt, "(self) => " + js_output(member_access(view, key, false), rt, checked), m, key, false)
+    return foreign_member_op(one_type(t), rt, fgs1(Fgt.SelfOpenCloseEqGt, js_output(member_access(view, key, false), rt, checked)), m, key, false)
 }
 
 fn check_foreign_primitive_method(node: I32, t: I32, host: I32, key: I32, args: I32, m: I32, expect: I32, cx: Cx) I32 {
@@ -2582,7 +2582,7 @@ fn check_foreign_index_set(owner: I32, key_node: I32, value: I32, m: I32, cx: Cx
     vl_add(erased(owner, view))
     vl_add(erased(kt, view))
     vl_add(erased(vt, view))
-    return foreign_call_op(vl_end(mt), ty_void(), "(self,k,value) => { self[k] = " + js_argument(slot, "value", vt) + "; }", m)
+    return foreign_call_op(vl_end(mt), ty_void(), fgs1(Fgt.SelfKValueSelfK, js_argument(slot, "value", vt)), m)
 }
 
 /// `x[k] op= v` on a host value (operator `word`): `x` is on the stack since
@@ -2612,7 +2612,7 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
     let mt = vl_begin()
     vl_add(erased(owner, view))
     vl_add(erased(kt, view))
-    foreign_call_op(vl_end(mt), t, "(self,k) => " + js_output("self[k]", t, checked), mv)
+    foreign_call_op(vl_end(mt), t, fgs1(Fgt.SelfKOpenCommaCloseEq, js_output("self[k]", t, checked)), mv)
     let v = foreign_operate(t, word, value, node, mv, cx)
     if v < 0 { return error_since(m) }
     let ms = w_mark()
@@ -2623,7 +2623,7 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
     vl_add(erased(owner, view))
     vl_add(erased(kt, view))
     vl_add(erased(t, view))
-    foreign_call_op(vl_end(ms2), ty_void(), "(self,k,value) => { self[k] = " + js_argument(slot, "value", t) + "; }", ms)
+    foreign_call_op(vl_end(ms2), ty_void(), fgs1(Fgt.SelfKValueSelfK, js_argument(slot, "value", t)), ms)
     w_node(Op.Seq, vt_none, 0, 0, m)
     return ty_void()
 }
@@ -2639,7 +2639,7 @@ fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
     let c = if elem == prelude(Prelude.I32) { first_child(literal) } else { -1 }
     while (c >= 0 and is_number_literal(c)) { c = next_sibling(c) }
     if elem == prelude(Prelude.I32) and c < 0 { elem = prelude(Prelude.F64) }
-    let w = intern_text("Array")
+    let w = intern_text(fgs(Fgt.Array))
     for (0 ..< view_doc.len()) |v| {
         let at = if view_live(v) { jget_word(jget(view_json[v], "names"), w) } else { -1 }
         if at >= 0 and ref_of_type(elem) {
@@ -2789,7 +2789,7 @@ fn host_argument_type(call: I32, i: I32, after: I32, cx: Cx) I32 {
     let a = arg_nodes(args)
     let n = child_count(args)
     let calls = desc_get(d, "calls")
-    let sig = pick_signature(if jlen(calls) == 0 { desc_get(d, "constructors") } else { calls }, a, n, d, view, cx)
+    let sig = pick_signature(if jlen(calls) == 0 { desc_get(d, fgs(Fgt.Constructors)) } else { calls }, a, n, d, view, cx)
     if sig < 0 { return -1 }
     let env = unify_args(sig, a, n, d, cx)
     return accept(sig_slot(sig, i, env, d.doc), a[i], view, cx)
@@ -2809,15 +2809,15 @@ fn display_generic(r: Ref, depth: I32) Str {
     let n = 0
     let p = jfirst(jget(decl, "parameters"))
     while (p >= 0) {
-        if n > 0 { args = args + ", " }
+        if n > 0 { args = fgs1(Fgt.ACommaSpace, args) }
         let bound = binding_of(r.env, jstring_word(p))
         args = args + if bound >= 0 { display(Ref { doc: r.doc, at: bound, env: bind_env }, depth + 1) } else { "any" }
         n += 1
         p = jnext(p)
     }
-    if n == 1 and base.len() >= 2 and base.slice(base.len() - 2, base.len()) == "[]" { return args + "[]" }
-    if base.len() > 0 and base.get(0) == 91 { return "[" + args + "]" }
-    return base + "<" + args + ">"
+    if n == 1 and base.len() >= 2 and base.slice(base.len() - 2, base.len()) == "[]" { return fgs1(Fgt.ABracketBracketEnd, args) }
+    if base.len() > 0 and base.get(0) == 91 { return fgs1(Fgt.BracketABracketEnd, args) }
+    return fgs2(Fgt.ALtBGt, base, args)
 }
 
 /// The value type of a host promise type (`Promise<T>`'s T), or -1.
@@ -2828,7 +2828,7 @@ fn host_promise_value(t: I32) I32 {
     let decl = abi_type(r.doc, jint(r.at))
     let lib = jget(decl, "lib")
     let named = if lib >= 0 { jstring_text(lib) } else { decl_name_text(decl) }
-    if not (named == "Promise" or named.len() > 8 and named.slice(0, 8) == "Promise<") { return -1 }
+    if not (named == "Promise" or named.len() > 8 and named.slice(0, 8) == fgs(Fgt.Promise)) { return -1 }
     let p = jfirst(jget(decl, "parameters"))
     if p < 0 { return foreign_any(fty_view[t]) }
     let bound = binding_of(r.env, jstring_word(p))
@@ -2934,7 +2934,7 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
     let view = decl_a[owner]
     let class = word_of(name_node(last_child(pattern)))
     let narrowed = foreign_named_type(view, class)
-    if narrowed < 0 or jget_word(jget(view_json[view], "exports"), class) < 0 {
+    if narrowed < 0 or jget_word(jget(view_json[view], fgs(Fgt.Exports)), class) < 0 {
         report2(Diag.HostAltClass, a, class, view, -1)
         return error_value()
     }
@@ -2945,7 +2945,7 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
     w_leaf(Op.LocalGet, repr(st), s, 0)
     let access = member_access(view, class, true)
     let params = one_type(erased(st, view))
-    foreign_call_op(params, nullable(narrowed), word_text(access_prologue) + "(value) => value instanceof " + access + " ? value : null", mt)
+    foreign_call_op(params, nullable(narrowed), fgs2(Fgt.ValueValueInstanceofValueNull, word_text(access_prologue), access), mt)
     w_node(Op.LocalSet, vt_none, tested, 0, mt)
     // if tested != null: bind, then the arm; else the next arms.
     let mi = w_mark()
@@ -2973,3 +2973,296 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
     w_node(Op.Seq, repr(t), 0, 0, m)
     return t
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Fgt:
+    | Lib
+    | D
+    | ALt
+    | AComma
+    | AGt
+    | ABEqCSemi
+    | ABraceEnd
+    | ADot
+    | ASpaceBarSpace
+    | QA
+    | QOpenAClose
+    | Union
+    | ABarB
+    | Foreign
+    | ABBracketEnd
+    | K
+    | KOpenComma
+    | SelfK
+    | ABackslashQuote
+    | ABackslashBackslash
+    | ABackslashX
+    | R
+    | AQuote
+    | VTypeofVThrowNewTypeError
+    | Expected
+    | N10
+    | Null
+    | BangBangA
+    | Undefined
+    | ValueValueNullNull
+    | Value
+    | Self
+    | GlobalThis
+    | Abi
+    | ImportAsFrom
+    | ABracketBBracketEnd
+    | AX
+    | AOpenCloseSpaceEqGtSpaceB
+    | ValueOpenCloseEqGtBra
+    | SelfOpenCloseEqGt
+    | SelfValue
+    | Keyof
+    | LiteralBaseStr
+    | P
+    | FunctionAReturnThisA
+    | AOpenBCCloseSpaceEqGtSpaceD
+    | ABOpenCClose
+    | A
+    | AOpenDotDotDotClo
+    | SymbolForUtu
+    | SelfKOpenCommaCloseEq
+    | AtAtA
+    | AtLeast
+    | ToElements
+    | ABracketBBracketEndColonC
+    | OpenACloseSpaceEqGtSpaceOpenBraceBBraceEndClose
+    | NewGlobalThis
+    | BracketABracketEnd
+    | OpenACloseSpaceEqGtSpaceB
+    | AB
+    | ABLc
+    | SelfKValueSelfK
+    | ACommaSpace
+    | ABracketBracketEnd
+    | ALtBGt
+    | ValueValueInstanceofValueNull
+    | Indexed
+    | Awaited
+    | Keys
+    | Template
+    | Arguments
+    | Promise
+    | Any
+    | Bigint
+    | Symbol
+    | UndefinedLc
+    | BoxedF64
+    | BoxedBool
+    | Boxed
+    | Readonly
+    | Exports
+    | MutableGlobals
+    | GlobalThisBracket
+    | SelfBracket
+    | GlobalThisK
+    | OpenClose
+    | SelfOpen
+    | String
+    | Boolean
+    | V
+    | Function
+    | Object
+    | ObjectLc
+    | BraceBraceEnd
+    | ArrayLike
+    | Iterable
+    | Constructors
+    | ValueValueNull
+    | ModuleSpecifier
+    | ExportAssignment
+    | Default
+    | PComma
+    | N0123456789abcdef
+    | Constants
+    | Str
+    | F64
+    | Bool
+    | Void
+    | Element
+    | Enum
+    | Pattern
+    | KeyofLc
+    | Receiver
+    | This
+    | Abstract
+    | SelfComma
+    | SelfLc
+    | New
+    | Js
+    | Element2
+    | Elements
+    | Int8Array
+    | Uint8Array
+    | Uint8ClampedArray
+    | Int16Array
+    | Uint16Array
+    | Int32Array
+    | Uint32Array
+    | Float16Array
+    | Float32Array
+    | Float64Array
+    | BigInt64Array
+    | BigUint64Array
+    | EqEqEq
+    | BangEqEq
+    | String2
+    | Number
+    | Array
+
+fn fgs_src(t: Fgt) Str {
+    return match t {
+        Fgt.Lib => "lib:{0}",
+        Fgt.D => "d{0}:{1}",
+        Fgt.ALt => "{0}<",
+        Fgt.AComma => "{0},",
+        Fgt.AGt => "{0}>",
+        Fgt.ABEqCSemi => "{0}{1}={2};",
+        Fgt.ABraceEnd => "{0}}",
+        Fgt.ADot => "{0}.",
+        Fgt.ASpaceBarSpace => "{0} | ",
+        Fgt.QA => "?{0}",
+        Fgt.QOpenAClose => "?({0})",
+        Fgt.Union => "{\"union\":[{0}]}",
+        Fgt.ABarB => "{0}|{1}",
+        Fgt.Foreign => "__foreign_{0}",
+        Fgt.ABBracketEnd => "{0}{1}]",
+        Fgt.K => "(k){0}",
+        Fgt.KOpenComma => "(k,{0}",
+        Fgt.SelfK => "(self,k{0}",
+        Fgt.ABackslashQuote => "{0}\\\"",
+        Fgt.ABackslashBackslash => "{0}\\\\",
+        Fgt.ABackslashX => "{0}\\n",
+        Fgt.R => "{0}\\r",
+        Fgt.AQuote => "{0}\"",
+        Fgt.VTypeofVThrowNewTypeError => "(v => typeof v === {0} ? {1} : (() => { throw new TypeError({2}); })())({3})",
+        Fgt.Expected => "expected {0}",
+        Fgt.N10 => "({0}) ? 1 : 0",
+        Fgt.Null => "({0}) ?? null",
+        Fgt.BangBangA => "!!{0}",
+        Fgt.Undefined => "{0} ?? undefined",
+        Fgt.ValueValueNullNull => "(value) => value == null ? null : {0}",
+        Fgt.Value => "(value) => {0}",
+        Fgt.Self => "self[{0}]",
+        Fgt.GlobalThis => "globalThis[{0}]",
+        Fgt.Abi => "__abi{0}_{1}",
+        Fgt.ImportAsFrom => "import { {0} as {1} } from {2}; ",
+        Fgt.ABracketBBracketEnd => "{0}[{1}]",
+        Fgt.AX => "{0}_",
+        Fgt.AOpenCloseSpaceEqGtSpaceB => "{0}() => {1}",
+        Fgt.ValueOpenCloseEqGtBra => "{0}(value) => { {1} = {2}; }",
+        Fgt.SelfOpenCloseEqGt => "(self) => {0}",
+        Fgt.SelfValue => "(self,value) => { {0} = {1}; }",
+        Fgt.Keyof => "keyof {0}{1}",
+        Fgt.LiteralBaseStr => "{\"literal\":{0},\"base\":\"Str\"}",
+        Fgt.P => "p{0}",
+        Fgt.FunctionAReturnThisA => "function (...a) { return {0}(this, ...a); }",
+        Fgt.AOpenBCCloseSpaceEqGtSpaceD => "{0}({1}{2}) => {3}",
+        Fgt.ABOpenCClose => "{0}{1}({2})",
+        Fgt.A => "{0}a[{1}]{2}",
+        Fgt.AOpenDotDotDotClo => "(...a) => {0}({1})",
+        Fgt.SymbolForUtu => "({0}[Symbol.for('utu.{1}')] ??= {2})",
+        Fgt.SelfKOpenCommaCloseEq => "(self,k) => {0}",
+        Fgt.AtAtA => "@@{0}",
+        Fgt.AtLeast => "at least {0}{1}",
+        Fgt.ToElements => "{0} to {1} elements",
+        Fgt.ABracketBBracketEndColonC => "{0}[{1}]:{2}",
+        Fgt.OpenACloseSpaceEqGtSpaceOpenBraceBBraceEndClose => "({0}) => ({{1}})",
+        Fgt.NewGlobalThis => "new globalThis.{0}([{1}])",
+        Fgt.BracketABracketEnd => "[{0}]",
+        Fgt.OpenACloseSpaceEqGtSpaceB => "({0}) => {1}",
+        Fgt.AB => "(a,b) => {0}",
+        Fgt.ABLc => "a {0} b",
+        Fgt.SelfKValueSelfK => "(self,k,value) => { self[k] = {0}; }",
+        Fgt.ACommaSpace => "{0}, ",
+        Fgt.ABracketBracketEnd => "{0}[]",
+        Fgt.ALtBGt => "{0}<{1}>",
+        Fgt.ValueValueInstanceofValueNull => "{0}(value) => value instanceof {1} ? value : null",
+        Fgt.Indexed => "indexed",
+        Fgt.Awaited => "awaited",
+        Fgt.Keys => "keys",
+        Fgt.Template => "template",
+        Fgt.Arguments => "arguments",
+        Fgt.Promise => "Promise<",
+        Fgt.Any => "\"any\"",
+        Fgt.Bigint => "bigint",
+        Fgt.Symbol => "symbol",
+        Fgt.UndefinedLc => "undefined",
+        Fgt.BoxedF64 => "{\"boxed\":\"F64\"}",
+        Fgt.BoxedBool => "{\"boxed\":\"Bool\"}",
+        Fgt.Boxed => "boxed",
+        Fgt.Readonly => "readonly",
+        Fgt.Exports => "exports",
+        Fgt.MutableGlobals => "mutableGlobals",
+        Fgt.GlobalThisBracket => "globalThis[",
+        Fgt.SelfBracket => "self[",
+        Fgt.GlobalThisK => "globalThis[k]",
+        Fgt.OpenClose => "()",
+        Fgt.SelfOpen => "(self",
+        Fgt.String => "string",
+        Fgt.Boolean => "boolean",
+        Fgt.V => "+v",
+        Fgt.Function => "Function",
+        Fgt.Object => "Object",
+        Fgt.ObjectLc => "object",
+        Fgt.BraceBraceEnd => "{}",
+        Fgt.ArrayLike => "ArrayLike",
+        Fgt.Iterable => "Iterable",
+        Fgt.Constructors => "constructors",
+        Fgt.ValueValueNull => "(value) => value ?? null",
+        Fgt.ModuleSpecifier => "moduleSpecifier",
+        Fgt.ExportAssignment => "exportAssignment",
+        Fgt.Default => "default",
+        Fgt.PComma => ",p",
+        Fgt.N0123456789abcdef => "0123456789abcdef",
+        Fgt.Constants => "constants",
+        Fgt.Str => "\"Str\"",
+        Fgt.F64 => "\"F64\"",
+        Fgt.Bool => "\"Bool\"",
+        Fgt.Void => "\"void\"",
+        Fgt.Element => "element",
+        Fgt.Enum => "enum",
+        Fgt.Pattern => "pattern",
+        Fgt.KeyofLc => "keyof ",
+        Fgt.Receiver => "receiver",
+        Fgt.This => "this",
+        Fgt.Abstract => "abstract",
+        Fgt.SelfComma => "self,",
+        Fgt.SelfLc => "self",
+        Fgt.New => "new ",
+        Fgt.Js => "js",
+        Fgt.Element2 => " element",
+        Fgt.Elements => " elements",
+        Fgt.Int8Array => "Int8Array",
+        Fgt.Uint8Array => "Uint8Array",
+        Fgt.Uint8ClampedArray => "Uint8ClampedArray",
+        Fgt.Int16Array => "Int16Array",
+        Fgt.Uint16Array => "Uint16Array",
+        Fgt.Int32Array => "Int32Array",
+        Fgt.Uint32Array => "Uint32Array",
+        Fgt.Float16Array => "Float16Array",
+        Fgt.Float32Array => "Float32Array",
+        Fgt.Float64Array => "Float64Array",
+        Fgt.BigInt64Array => "BigInt64Array",
+        Fgt.BigUint64Array => "BigUint64Array",
+        Fgt.EqEqEq => "===",
+        Fgt.BangEqEq => "!==",
+        Fgt.String2 => "String",
+        Fgt.Number => "Number",
+        Fgt.Array => "Array",
+    }
+}
+
+fn fgs(t: Fgt) Str => st(st_foreign + t.i32())
+fn fgs1(t: Fgt, a: Str) Str => stf(st_foreign + t.i32(), a, "", "", "")
+fn fgs2(t: Fgt, a: Str, b: Str) Str => stf(st_foreign + t.i32(), a, b, "", "")
+fn fgs3(t: Fgt, a: Str, b: Str, c: Str) Str => stf(st_foreign + t.i32(), a, b, c, "")
+fn fgs4(t: Fgt, a: Str, b: Str, c: Str, d: Str) Str => stf(st_foreign + t.i32(), a, b, c, d)

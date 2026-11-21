@@ -146,7 +146,7 @@ fn report_bare_openers() Void {
             vl_add(tok_end[t])
             let at = first_bare_opener(tok_start[t] + 2, tok_end[t] - 2)
             while (at >= 0) {
-                report3(Diag.DslError, n, intern_text("This /\\ opens a nested body, so the body ends at a later \\/"), at, at + 2, -1)
+                report3(Diag.DslError, n, intern_text(hos(Hot.ThisOpensANestedBodySo)), at, at + 2, -1)
                 at = first_bare_opener(at + 2, tok_end[t] - 2)
             }
         }
@@ -234,8 +234,8 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
     let unsure = (ty_is(t, Ty.Fun) or ty_is(t, Ty.Closure)) and not es_plain_function(split, end)
     if open.len() > 0 or unsure {
         let body = bytes_text(split, end)
-        if unsure { body = "$utuFn(\"" + word_text(decl_name[decl]) + "\", " + body + "\n)" }
-        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { open + body + "\n)" } else { body }))
+        if unsure { body = hos2(Hot.UtuFn, word_text(decl_name[decl]), body) }
+        gen_text_utf8(bytes_text(at, split) + (if open.len() > 0 { hos2(Hot.ABNlClose, open, body) } else { body }))
         at = made
         end = src.len()
     }
@@ -249,7 +249,7 @@ fn es_import(decl: I32, dsl: I32, t: I32) I32 {
             return es_func[k]
         }
     }
-    let f = add_import_func(name_add("es"), name_add("__es_" + es_func.len().str()), ft)
+    let f = add_import_func(name_add("es"), name_add(hos1(Hot.Es, es_func.len().str())), ft)
     let w = decl_name[decl]
     func_debug_name[f] = name_from_src(src.interned_start(w), src.interned_start(w) + src.interned_size(w))
     decl_es[decl] = f
@@ -272,7 +272,7 @@ fn es_check_native(decl: I32, t: I32) Void {
     if es_fun_type(r) {
         report3(Diag.EsNative, at, decl_name[decl], r, 0, -1)
         let u = if ty_is(r, Ty.Nullable) { ty_a[r] } else { r }
-        diag_note("A JS function is a closure: type it " + type_text(ty(Ty.Closure, ty_a[u], ty_b[u])) + ".")
+        diag_note(hos1(Hot.AJSFunctionIsAClosure, type_text(ty(Ty.Closure, ty_a[u], ty_b[u]))))
     }
 }
 
@@ -285,37 +285,37 @@ fn es_wrap(t: I32) Str {
     // cl) must not be taken for the accessor itself.
     if not ty_is(t, Ty.Fun) {
         let out = es_out("v", t)
-        return if out == "v" { "(v => () => v)(" } else { "(v => (w => () => w)(" + out + "))(" }
+        return if out == "v" { hos(Hot.VV) } else { hos1(Hot.VWW, out) }
     }
     let params = ty_a[t]
     let names = ""
     let args = ""
     let changed = false
     for (0 ..< vl_len[params]) |i| {
-        let name = "p" + i.str()
+        let name = hos1(Hot.P, i.str())
         let arg = es_in(name, vl_item(params, i))
         if arg != name { changed = true }
         names = names + (if i > 0 { "," } else { "" }) + name
         args = args + (if i > 0 { "," } else { "" }) + arg
     }
-    let call = "f(" + args + ")"
+    let call = hos1(Hot.F, args)
     let out = es_out(call, ty_b[t])
     if not changed and out == call { return "" }
-    return "(f => (" + names + ") => " + out + ")("
+    return hos2(Hot.FOpenEqGtOpenClos, names, out)
 }
 
 /// A wasm value to JS: Bool a boolean, U32 and U64 unsigned.
 fn es_in(name: Str, t0: I32) Str {
     let t = unsigned_view(t0)
-    if t == prelude(Prelude.Bool) { return "!!" + name }
-    if t == prelude(Prelude.U32) { return name + " >>> 0" }
-    if t == prelude(Prelude.U64) { return "BigInt.asUintN(64, " + name + ")" }
+    if t == prelude(Prelude.Bool) { return hos1(Hot.BangBangA, name) }
+    if t == prelude(Prelude.U32) { return hos1(Hot.N0, name) }
+    if t == prelude(Prelude.U64) { return hos1(Hot.BigIntAsUintN64, name) }
     return name
 }
 
 /// A JS value to wasm: Bool 1 or 0, undefined null.
 fn es_out(expr: Str, t: I32) Str {
-    if t == prelude(Prelude.Bool) { return expr + " ? 1 : 0" }
+    if t == prelude(Prelude.Bool) { return hos1(Hot.N10, expr) }
     // A JS function utu will call: its arguments reach it as a host reads them
     // (a Bool a boolean, a U32 or U64 unsigned), its result as wasm takes it.
     if ty_is(t, Ty.Closure) {
@@ -324,28 +324,27 @@ fn es_out(expr: Str, t: I32) Str {
         let args = ""
         let changed = false
         for (0 ..< vl_len[params]) |i| {
-            let name = "p" + i.str()
+            let name = hos1(Hot.P, i.str())
             let arg = es_in(name, vl_item(params, i))
             if arg != name { changed = true }
             names = names + (if i > 0 { "," } else { "" }) + name
             args = args + (if i > 0 { "," } else { "" }) + arg
         }
-        let out = es_out("c(" + args + ")", ty_b[t])
-        if not changed and out == "c(" + args + ")" { return expr }
-        return "(c => (" + names + ") => " + out + ")(" + expr + ")"
+        let out = es_out(hos1(Hot.C, args), ty_b[t])
+        if not changed and out == hos1(Hot.C, args) { return expr }
+        return hos3(Hot.COpenEqGtOpenClos, names, out, expr)
     }
-    if ty_is(t, Ty.Nullable) { return expr + " ?? null" }
+    if ty_is(t, Ty.Nullable) { return hos1(Hot.Null, expr) }
     // A Str must be a string: anything else would pass as one, and trap later.
     if t == prelude(Prelude.Str) {
-        return "(s => typeof s === \"string\" ? s : (() => { throw new TypeError(`Wrong type from JavaScript: a Str, not ${s === null ? \"null\" : s instanceof Promise ? \"a Promise (await it: Promise[Str])\" : typeof s}`); })())(" + expr + ")"
+        return hos1(Hot.STypeofSStringSThrow, expr)
     }
     // A handle must not be null (wasm would take it, and trap later); a
     // protocol's must be a wasm object (wasm would take any as an anyref).
     if js_handle(t) {
         let name = type_text(t)
         let proto = decl_is(ty_decl(t), Decl.Proto)
-        return "(h => h != null" + (if proto { " && Object.getPrototypeOf(h) === null && !Object.isExtensible(h)" } else { "" })
-            + " ? h : (() => { throw new TypeError(`Wrong type from JavaScript: a" + (if name.get(0) == 65 or name.get(0) == 69 or name.get(0) == 73 or name.get(0) == 79 or name.get(0) == 85 { "n " } else { " " }) + name + ", not ${h === null ? \"null\" : typeof h}`); })())(" + expr + ")"
+        return hos4(Hot.HHNullHThrowNew, (if proto { hos(Hot.ObjectGetPrototypeOfHNullObjectIsExtensi) } else { "" }), (if name.get(0) == 65 or name.get(0) == 69 or name.get(0) == 73 or name.get(0) == 79 or name.get(0) == 85 { hos(Hot.N) } else { " " }), name, expr)
     }
     return expr
 }
@@ -420,7 +419,7 @@ fn es_imports_end(at: I32, end_: I32) I32 {
             }
             else { more = false }
         }
-        if not (i + 7 <= end_ and bytes_text(i, i + 6) == "import" and is_space(src[i + 6])) { return done }
+        if not (i + 7 <= end_ and bytes_text(i, i + 6) == hos(Hot.Import) and is_space(src[i + 6])) { return done }
         while (i < end_ and src[i] != 59) { i += 1 }
         if i >= end_ { return done }
         i += 1
@@ -433,8 +432,8 @@ fn es_imports_end(at: I32, end_: I32) I32 {
 /// function, an arrow or `function`, as src/selfhost/loader.js tells.
 fn es_plain_function(at: I32, end_: I32) Bool {
     let i = es_space(at, end_)
-    if es_word(i, end_, "async") { i = es_space(i + 5, end_) }
-    if es_word(i, end_, "function") { return true }
+    if es_word(i, end_, hos(Hot.Async)) { i = es_space(i + 5, end_) }
+    if es_word(i, end_, hos(Hot.Function)) { return true }
     if i < end_ and src[i] == 40 {
         i += 1
         while (i < end_ and src[i] != 41) {
@@ -492,11 +491,11 @@ fn json_string(start: I32, end_: I32) Void {
         if c == 34 or c == 92 {
             json_byte(92)
             json_byte(c)
-        } else if c == 10 { json_text("\\n") }
-        else if c == 13 { json_text("\\r") }
-        else if c == 9 { json_text("\\t") }
+        } else if c == 10 { json_text(hos(Hot.BackslashX)) }
+        else if c == 13 { json_text(hos(Hot.R)) }
+        else if c == 9 { json_text(hos(Hot.BackslashX2)) }
         else if c < 32 {
-            json_text("\\u00")
+            json_text(hos(Hot.U00))
             json_byte(hex_digit(c >> 4))
             json_byte(hex_digit(c & 15))
         } else {
@@ -572,7 +571,7 @@ fn write_es_json() Void {
     let any = false
     for (0 ..< es_func.len()) |i| { if func_live[es_func[i]] == 1 { any = true } }
     if not any { return }
-    json_text("\"es\":{\"es\":{")
+    json_text(hos(Hot.EsEs))
     let first = true
     for (0 ..< es_func.len()) |i| {
         let f = es_func[i]
@@ -587,7 +586,7 @@ fn write_es_json() Void {
             if es_start[i] < 0 { json_text_string(word_text(es_end[i])) } else { json_string(es_start[i], es_end[i]) }
         }
     }
-    json_text("}}")
+    json_text(hos(Hot.BraceEndBraceEnd))
 }
 
 /// A JSON string of `text` (ASCII, as the compiler writes its own JS).
@@ -618,19 +617,19 @@ fn write_exports_json() Void {
         let checked = false
         for (0 ..< vl_len[params]) |i| { if js_param_kind(vl_item(params, i)).len() > 0 { checked = true } }
         if (r.len() > 0 or checked) and func_live[f] == 1 and func_field_name[f] >= 0 {
-            json_text(if first { "\"exports\":{" } else { "," })
+            json_text(if first { hos(Hot.Exports) } else { "," })
             first = false
             json_byte(34)
             let name = func_field_name[f]
             for (0 ..< name_len[name]) |i| { json_byte(names[name_start[name] + i]) }
-            json_text("\":")
+            json_text(hos(Hot.QuoteColon))
             if not checked and not tuple {
                 json_text_string(r)
             } else {
-                json_text("{\"r\":")
+                json_text(hos(Hot.RBraceQuoteQuoteC))
                 if tuple and r.len() > 0 { json_text(r) } else { json_text_string(r) }
                 if checked {
-                    json_text(",\"p\":[")
+                    json_text(hos(Hot.PCommaQuoteQuoteC))
                     for (0 ..< vl_len[params]) |i| {
                         if i > 0 { json_byte(44) }
                         json_text_string(js_param_kind(vl_item(params, i)))
@@ -665,9 +664,9 @@ fn tuple_result_kinds(list: I32) Str {
     for (0 ..< vl_len[list]) |i| {
         let k = js_result_kind(vl_item(list, i))
         if k.len() > 0 { any = true }
-        out = out + (if i > 0 { "," } else { "" }) + "\"" + k + "\""
+        out = hos3(Hot.ABQuoteCQuote, out, (if i > 0 { "," } else { "" }), k)
     }
-    return if any { out + "]" } else { "" }
+    return if any { hos1(Hot.ABracketEnd, out) } else { "" }
 }
 
 /// A JS function given for a closure parameter is wrapped as an `@es` one is
@@ -680,14 +679,14 @@ fn closure_param_kind(t: I32) Str {
     let any = false
     for (0 ..< vl_len[params]) |i| {
         let u = unsigned_view(vl_item(params, i))
-        let c = if u == prelude(Prelude.Bool) { "B" } else if u == prelude(Prelude.U32) { "U" } else if u == prelude(Prelude.U64) { "W" } else { "." }
+        let c = if u == prelude(Prelude.Bool) { "B" } else if u == prelude(Prelude.U32) { "U" } else if u == prelude(Prelude.U64) { hos(Hot.W) } else { "." }
         if c != "." { any = true }
         args = args + c
     }
     let r = ty_b[t]
-    let rc = if r == prelude(Prelude.Bool) { "b" } else if r == prelude(Prelude.Str) { "S" } else if r >= 0 and ty_is(r, Ty.Nullable) { "n" } else { "." }
+    let rc = if r == prelude(Prelude.Bool) { hos(Hot.B) } else if r == prelude(Prelude.Str) { "S" } else if r >= 0 and ty_is(r, Ty.Nullable) { "n" } else { "." }
     if rc != "." { any = true }
-    return if any { "cl:" + args + ":" + rc } else { "" }
+    return if any { hos2(Hot.Cl, args, rc) } else { "" }
 }
 
 /// What an argument of type t must be: "Bool" any value, by its truthiness,
@@ -703,34 +702,151 @@ fn js_param_kind(t: I32) Str {
     }
     if safe_checks != 1 { return "" }
     if t == prelude(Prelude.Str) { return "Str" }
-    if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { "?Str" } else { "?" } }
+    if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { hos(Hot.Str) } else { "?" } }
     let vt = repr(t)
-    if vt == vt_i32 { return "int" }
-    if vt == vt_i64 { return "big" }
-    if vt == vt_f32 or vt == vt_f64 { return "num" }
+    if vt == vt_i32 { return hos(Hot.Int) }
+    if vt == vt_i64 { return hos(Hot.Big) }
+    if vt == vt_f32 or vt == vt_f64 { return hos(Hot.Num) }
     if ty_is(t, Ty.Closure) { return "cl" }
     if is_foreign(t) or t == prelude(Prelude.Externref) or not vt_is_ref(vt) { return "" }
-    return "ref"
+    return hos(Hot.Ref)
 }
 
 /// The lazy modules' functions the program calls (see lazy_stub), for the
 /// build that makes their chunks: path, module, name, signature, file.
 fn write_lazy_json() Void {
     if lazy_call_fn.len() == 0 { return }
-    json_text("\"lazy\":[")
+    json_text(hos(Hot.Lazy))
     for (0 ..< lazy_call_fn.len()) |k| {
         if k > 0 { json_byte(44) }
         let decl = lazy_call_fn[k]
         let module = module_of(decl)
-        json_text("{\"path\":")
+        json_text(hos(Hot.Path))
         json_text_string(word_text(lazy_path[lazy_call_path[k]]))
-        json_text(",\"module\":")
+        json_text(hos(Hot.Module))
         json_text_string(word_text(decl_name[module]))
-        json_text(",\"name\":")
+        json_text(hos(Hot.Name))
         json_text_string(word_text(decl_name[decl]))
-        json_text(",\"signature\":")
+        json_text(hos(Hot.Signature))
         json_text_string(word_text(lazy_call_sig[k]))
-        json_text(",\"file\":" + file_of_token(node_first[decl_node[module]]).str() + "}")
+        json_text(hos1(Hot.File, file_of_token(node_first[decl_node[module]]).str()))
     }
     json_byte(93)
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Hot:
+    | UtuFn
+    | ABNlClose
+    | Es
+    | AJSFunctionIsAClosure
+    | VWW
+    | P
+    | F
+    | FOpenEqGtOpenClos
+    | BangBangA
+    | N0
+    | BigIntAsUintN64
+    | N10
+    | C
+    | COpenEqGtOpenClos
+    | Null
+    | STypeofSStringSThrow
+    | HHNullHThrowNew
+    | ABQuoteCQuote
+    | ABracketEnd
+    | Cl
+    | File
+    | ThisOpensANestedBodySo
+    | VV
+    | ObjectGetPrototypeOfHNullObjectIsExtensi
+    | N
+    | Import
+    | Async
+    | Function
+    | BackslashX
+    | R
+    | BackslashX2
+    | U00
+    | EsEs
+    | BraceEndBraceEnd
+    | Exports
+    | QuoteColon
+    | RBraceQuoteQuoteC
+    | PCommaQuoteQuoteC
+    | W
+    | B
+    | Str
+    | Int
+    | Big
+    | Num
+    | Ref
+    | Lazy
+    | Path
+    | Module
+    | Name
+    | Signature
+
+fn hos_src(t: Hot) Str {
+    return match t {
+        Hot.UtuFn => "$utuFn(\"{0}\", {1}\n)",
+        Hot.ABNlClose => "{0}{1}\n)",
+        Hot.Es => "__es_{0}",
+        Hot.AJSFunctionIsAClosure => "A JS function is a closure: type it {0}.",
+        Hot.VWW => "(v => (w => () => w)({0}))(",
+        Hot.P => "p{0}",
+        Hot.F => "f({0})",
+        Hot.FOpenEqGtOpenClos => "(f => ({0}) => {1})(",
+        Hot.BangBangA => "!!{0}",
+        Hot.N0 => "{0} >>> 0",
+        Hot.BigIntAsUintN64 => "BigInt.asUintN(64, {0})",
+        Hot.N10 => "{0} ? 1 : 0",
+        Hot.C => "c({0})",
+        Hot.COpenEqGtOpenClos => "(c => ({0}) => {1})({2})",
+        Hot.Null => "{0} ?? null",
+        Hot.STypeofSStringSThrow => "(s => typeof s === \"string\" ? s : (() => { throw new TypeError(`Wrong type from JavaScript: a Str, not ${s === null ? \"null\" : s instanceof Promise ? \"a Promise (await it: Promise[Str])\" : typeof s}`); })())({0})",
+        Hot.HHNullHThrowNew => "(h => h != null{0} ? h : (() => { throw new TypeError(`Wrong type from JavaScript: a{1}{2}, not ${h === null ? \"null\" : typeof h}`); })())({3})",
+        Hot.ABQuoteCQuote => "{0}{1}\"{2}\"",
+        Hot.ABracketEnd => "{0}]",
+        Hot.Cl => "cl:{0}:{1}",
+        Hot.File => ",\"file\":{0}}",
+        Hot.ThisOpensANestedBodySo => "This /\\ opens a nested body, so the body ends at a later \\/",
+        Hot.VV => "(v => () => v)(",
+        Hot.ObjectGetPrototypeOfHNullObjectIsExtensi => " && Object.getPrototypeOf(h) === null && !Object.isExtensible(h)",
+        Hot.N => "n ",
+        Hot.Import => "import",
+        Hot.Async => "async",
+        Hot.Function => "function",
+        Hot.BackslashX => "\\n",
+        Hot.R => "\\r",
+        Hot.BackslashX2 => "\\t",
+        Hot.U00 => "\\u00",
+        Hot.EsEs => "\"es\":{\"es\":{",
+        Hot.BraceEndBraceEnd => "}}",
+        Hot.Exports => "\"exports\":{",
+        Hot.QuoteColon => "\":",
+        Hot.RBraceQuoteQuoteC => "{\"r\":",
+        Hot.PCommaQuoteQuoteC => ",\"p\":[",
+        Hot.W => "W",
+        Hot.B => "b",
+        Hot.Str => "?Str",
+        Hot.Int => "int",
+        Hot.Big => "big",
+        Hot.Num => "num",
+        Hot.Ref => "ref",
+        Hot.Lazy => "\"lazy\":[",
+        Hot.Path => "{\"path\":",
+        Hot.Module => ",\"module\":",
+        Hot.Name => ",\"name\":",
+        Hot.Signature => ",\"signature\":",
+    }
+}
+
+fn hos(t: Hot) Str => st(st_host + t.i32())
+fn hos1(t: Hot, a: Str) Str => stf(st_host + t.i32(), a, "", "", "")
+fn hos2(t: Hot, a: Str, b: Str) Str => stf(st_host + t.i32(), a, b, "", "")
+fn hos3(t: Hot, a: Str, b: Str, c: Str) Str => stf(st_host + t.i32(), a, b, c, "")
+fn hos4(t: Hot, a: Str, b: Str, c: Str, d: Str) Str => stf(st_host + t.i32(), a, b, c, d)

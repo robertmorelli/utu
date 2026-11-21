@@ -469,7 +469,7 @@ lib {
         return at
     }
 
-    fn decl_kind_name(decl: I32) Str => Decl.name(Decl(decl_kind[decl]))
+    fn decl_kind_name(decl: I32) Str => decl_kind_text(Decl(decl_kind[decl]))
 
     fn decl_count() I32 => decl_kind.len()
 
@@ -596,7 +596,7 @@ lib {
 
     /// A node kind's name in tree-sitter's spelling.
     fn node_kind_name(kind: I32) Str {
-        let name = Node.name(Node(kind))
+        let name = node_name_of(Node(kind))
         return Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len())
     }
 }
@@ -619,9 +619,9 @@ fn owner_of(node: I32) I32 {
 /// An owner's name, as a stack trace shows it.
 fn owner_name(node: I32) Str {
     if node < 0 { return "" }
-    if is_kind(node, Node.Closure_expr) { return "closure" }
-    if is_kind(node, Node.Test_decl) { return "test" }
-    if is_kind(node, Node.Bench_decl) { return "bench" }
+    if is_kind(node, Node.Closure_expr) { return sms(Sml.Closure) }
+    if is_kind(node, Node.Test_decl) { return sms(Sml.Test) }
+    if is_kind(node, Node.Bench_decl) { return sms(Sml.Bench) }
     if is_kind(node, Node.Export_main_decl) { return "main" }
     let name = first_child(node)
     return bytes_text(tok_start[node_first[name]], tok_end[node_last[name] - 1])
@@ -658,17 +658,17 @@ fn wasm_type_text(vt: I32) Str {
     if vt == vt_i64 { return "i64" }
     if vt == vt_f32 { return "f32" }
     if vt == vt_f64 { return "f64" }
-    if vt == vt_v128 { return "v128" }
-    if vt == vt_externref { return "(ref null extern)" }
-    if vt == vt_extern { return "(ref extern)" }
-    if vt == vt_i31ref { return "(ref null i31)" }
-    if vt == vt_funcref { return "(ref null func)" }
-    if vt == vt_eqref { return "(ref null eq)" }
-    if vt == vt_anyref { return "(ref null any)" }
-    if vt == vt_unreachable { return "unreachable" }
+    if vt == vt_v128 { return sms(Sml.V128) }
+    if vt == vt_externref { return sms(Sml.RefNullExtern) }
+    if vt == vt_extern { return sms(Sml.RefExtern) }
+    if vt == vt_i31ref { return sms(Sml.RefNullI31) }
+    if vt == vt_funcref { return sms(Sml.RefNullFunc) }
+    if vt == vt_eqref { return sms(Sml.RefNullEq) }
+    if vt == vt_anyref { return sms(Sml.RefNullAny) }
+    if vt == vt_unreachable { return sms(Sml.Unreachable) }
     if vt >= vt_defined and vt < vt_tuple {
-        return if vt_nullable(vt) == vt { "(ref null type " + vt_heap(vt).str() + ")" }
-            else { "(ref type " + vt_heap(vt).str() + ")" }
+        return if vt_nullable(vt) == vt { sms1(Sml.RefNullType, vt_heap(vt).str()) }
+            else { sms1(Sml.RefType, vt_heap(vt).str()) }
     }
-    return "value " + vt.str()
+    return sms1(Sml.Value, vt.str())
 }

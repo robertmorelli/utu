@@ -63,7 +63,7 @@ fn prof_mem() I32 {
     memory_kind.push(FuncKind.Defined.i32())
     memory_pages.push(profile_pages)
     memory_module_name.push(-1)
-    memory_field_name.push(name_add("utu_profile"))
+    memory_field_name.push(name_add(sms(Sml.UtuProfile)))
     // The stack pointer, 8; no pushes yet.
     data_memory.push(m)
     data_start.push(data_bytes.len())
@@ -211,7 +211,7 @@ fn prof_import(resume: Bool) I32 {
     let k = if resume { 1 } else { 0 }
     if prof_imports[k] >= 0 { return prof_imports[k] }
     let t = if resume { func_type(vl_one(vt_externref), vl_empty()) } else { func_type(vl_empty(), vl_one(vt_externref)) }
-    prof_imports[k] = add_import_func(name_add("profile"), name_add(if resume { "resume" } else { "park" }), t)
+    prof_imports[k] = add_import_func(name_add(sms(Sml.Profile)), name_add(if resume { sms(Sml.Resume) } else { sms(Sml.Park) }), t)
     return prof_imports[k]
 }
 
@@ -260,11 +260,11 @@ fn prof_resume(s: I32) Void {
 fn profile_text(k: I32) Str => prof_owner_text(owner_of(prof_node[k]), prof_decl[k], prof_inst[k])
 
 fn prof_owner_text(owner: I32, decl: I32, inst: I32) Str {
-    if owner < 0 { return "(top level)" }
-    if is_kind(owner, Node.Closure_expr) { return "closure in " + prof_owner_text(owner_of(parent_of(owner)), decl, inst) }
+    if owner < 0 { return sms(Sml.TopLevel) }
+    if is_kind(owner, Node.Closure_expr) { return sms1(Sml.ClosureIn, prof_owner_text(owner_of(parent_of(owner)), decl, inst)) }
     if decl >= 0 and decl_node[decl] == owner { return prof_fn_text(decl, inst) }
     // `bench "sum loop"`, `test "adds"`: by its name.
-    if is_kind(owner, Node.Bench_decl) or is_kind(owner, Node.Test_decl) { return owner_name(owner) + " " + node_text(first_child(owner)) }
+    if is_kind(owner, Node.Bench_decl) or is_kind(owner, Node.Test_decl) { return sms2(Sml.ASpaceB, owner_name(owner), node_text(first_child(owner))) }
     return owner_name(owner)
 }
 
@@ -278,8 +278,8 @@ fn prof_fn_text(decl: I32, inst: I32) Str {
     let module = module_of(decl)
     if module < 0 { return bytes_text(start, tok_end[t1 - 1]) }
     let text = word_text(decl_name[module])
-    if inst > 0 and vl_len[inst_args[inst]] > 0 { text = text + "[" + type_list_text(inst_args[inst]) + "]" }
+    if inst > 0 and vl_len[inst_args[inst]] > 0 { text = sms2(Sml.ABracketBBracketEnd, text, type_list_text(inst_args[inst])) }
     // `&.push` is the module's type's.
     if src[start] == 38 { return text + bytes_text(start + 1, tok_end[t1 - 1]) }
-    return text + "." + bytes_text(start, tok_end[t1 - 1])
+    return sms2(Sml.ADotB, text, bytes_text(start, tok_end[t1 - 1]))
 }

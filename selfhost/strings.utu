@@ -36,20 +36,20 @@ fn builtin(b: Builtin) I32 {
     let m = vl_begin()
     let result = vt_extern
     let name = ""
-    if b == Builtin.Concat { vl_add(vt_externref); vl_add(vt_externref); name = "concat" }
-    else if b == Builtin.Equals { vl_add(vt_externref); vl_add(vt_externref); result = vt_i32; name = "equals" }
-    else if b == Builtin.Length { vl_add(vt_externref); result = vt_i32; name = "length" }
-    else if b == Builtin.Substring { vl_add(vt_externref); vl_add(vt_i32); vl_add(vt_i32); name = "substring" }
-    else if b == Builtin.CharCodeAt { vl_add(vt_externref); vl_add(vt_i32); result = vt_i32; name = "charCodeAt" }
-    else if b == Builtin.FromCodePoint { vl_add(vt_i32); name = "fromCodePoint" }
+    if b == Builtin.Concat { vl_add(vt_externref); vl_add(vt_externref); name = sms(Sml.Concat) }
+    else if b == Builtin.Equals { vl_add(vt_externref); vl_add(vt_externref); result = vt_i32; name = sms(Sml.Equals) }
+    else if b == Builtin.Length { vl_add(vt_externref); result = vt_i32; name = sms(Sml.Length) }
+    else if b == Builtin.Substring { vl_add(vt_externref); vl_add(vt_i32); vl_add(vt_i32); name = sms(Sml.Substring) }
+    else if b == Builtin.CharCodeAt { vl_add(vt_externref); vl_add(vt_i32); result = vt_i32; name = sms(Sml.CharCodeAt) }
+    else if b == Builtin.FromCodePoint { vl_add(vt_i32); name = sms(Sml.FromCodePoint) }
     else {
         vl_add(vt_ref(code_units_type(), true))
         vl_add(vt_i32)
         vl_add(vt_i32)
-        name = "fromCharCodeArray"
+        name = sms(Sml.FromCharCodeArray)
     }
     let t = func_type_single(vl_end(m), vl_one(result))
-    let f = add_import_func(name_add("wasm:js-string"), name_add(name), t)
+    let f = add_import_func(name_add(sms(Sml.WasmJsString)), name_add(name), t)
     builtin_func[i] = f
     return f
 }

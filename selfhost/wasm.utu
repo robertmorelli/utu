@@ -961,7 +961,7 @@ fn mark_memories() Void {
 
 /// Whether name `name` (-1: none) begins `__comptime_`.
 fn is_comptime_value(name: I32) Bool {
-    let prefix = "__comptime_"
+    let prefix = sms(Sml.Comptime)
     if name < 0 or name_len[name] < prefix.len() { return false }
     for (0 ..< prefix.len()) |i| { if names[name_start[name] + i] != prefix.get(i) { return false } }
     return true
@@ -1480,7 +1480,7 @@ fn encode_imports() Void {
     }
     if tag_used == 1 {
         put_text("utu")
-        put_text("js_tag")
+        put_text(sms(Sml.JsTag))
         sec.push(4)
         sec.push(0)
         leb_u(false, type_index[js_tag_type()])

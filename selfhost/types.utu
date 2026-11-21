@@ -144,7 +144,7 @@ vec inst_bad: I32
 /// `Stream[Promise[T]]` or `Stream[?Promise[T]]`: a stream is a JS async
 /// generator, whose `yield` awaits a promise, so its values are never promises.
 fn stream_of_promise(module: I32, args: I32) Bool {
-    if module < 0 or vl_len[args] != 1 or decl_name[module] != intern_text("Stream") or not from_std(decl_node[module]) { return false }
+    if module < 0 or vl_len[args] != 1 or decl_name[module] != intern_text(sms(Sml.Stream)) or not from_std(decl_node[module]) { return false }
     let t = vl_item(args, 0)
     if ty_is(t, Ty.Nullable) { t = ty_a[t] }
     return ty_is(t, Ty.Named) and is_promise_type(t)
@@ -272,7 +272,7 @@ fn prelude(p: Prelude) I32 => prelude_ty[p.i32()]
 fn find_prelude_types() Void {
     prelude_ty.resize(Prelude.count())
     for (0 ..< Prelude.count()) |p| {
-        let word = intern_text(Prelude.name(Prelude(p)))
+        let word = intern_text(prelude_name(Prelude(p)))
         let decl = promoted(prelude_lookup(word))
         prelude_ty[p] = if decl >= 0 { named(decl, 0) } else { ty_error() }
     }
@@ -653,20 +653,20 @@ fn type_decl_repr(decl: I32, inst: I32) I32 {
 
 /// The value type a `type-repr` names (all but an array's), or -1.
 fn repr_named(r: I32) I32 {
-    if attr_is(r, "wasm-i32") { return vt_i32 }
-    if attr_is(r, "wasm-i64") { return vt_i64 }
-    if attr_is(r, "wasm-f32") { return vt_f32 }
-    if attr_is(r, "wasm-f64") { return vt_f64 }
-    if attr_is(r, "wasm-v128") { return vt_v128 }
-    if attr_is(r, "wasm-externref") or attr_is(r, "wasm-stringref") { return vt_externref }
-    if attr_is(r, "wasm-i31") { return vt_i31ref }
+    if attr_is(r, sms(Sml.WasmI32)) { return vt_i32 }
+    if attr_is(r, sms(Sml.WasmI64)) { return vt_i64 }
+    if attr_is(r, sms(Sml.WasmF32)) { return vt_f32 }
+    if attr_is(r, sms(Sml.WasmF64)) { return vt_f64 }
+    if attr_is(r, sms(Sml.WasmV128)) { return vt_v128 }
+    if attr_is(r, sms(Sml.WasmExternref)) or attr_is(r, sms(Sml.WasmStringref)) { return vt_externref }
+    if attr_is(r, sms(Sml.WasmI31)) { return vt_i31ref }
     return -1
 }
 
 /// `wasm-array:elem=T:mut=true`'s T, as a word; else -1.
 fn array_elem_word(r: I32) I32 {
-    let head = "wasm-array:elem="
-    let tail = ":mut=true"
+    let head = sms(Sml.WasmArrayElem)
+    let tail = sms(Sml.MutTrue)
     let s = attr_start[r]
     let e = attr_end[r]
     if e - s <= head.len() + tail.len() { return -1 }

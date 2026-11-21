@@ -36,6 +36,13 @@ itself, and that build (checked to build itself to the same bytes) is
 `src/selfhost/` drives it from JavaScript; `cli/utu.mjs` is its command
 line.
 
+Its text (messages, word lists, code templates, enum names) is not string
+constants but tables (`strtab.utu`): each file's strings are an enum and a
+`*_src` function that runs only while the compiler is built, when a
+`@comptime` packs all of them (byte pairs, then LZ77 copies, then Huffman
+codes) into one const vec; a compiler decodes it once, the first time it
+needs a string. A template's `{0}` … `{3}` are filled where it is used.
+
 ## Lexer
 
 A state machine, built during compilation into a const mem: lexing is one
@@ -231,7 +238,9 @@ behaved and diagnosed as stage -1's did, or differed on purpose
 
 A diagnostic is recorded as a kind, a node, and up to four arguments (a
 word, types, counts, declarations); `diag.utu` makes its name, message, and
-span when the host asks for them. As in stage 0, a missing import or a file
+span when the host asks for them: each kind's messages are templates
+(`diag_text_src`), and `diag_text` picks one and fills its holes (`{w}` the
+word, `{ta}` type a, …). As in stage 0, a missing import or a file
 that does not parse ends the build, any other mistake does not stop
 checking, and a mismatch that follows from another (a local typed by a
 mistaken initializer) is counted under it: `(+1 caused by this)`.

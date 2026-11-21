@@ -181,65 +181,65 @@ fn in_words(list: Str, w: Str) Bool {
 }
 
 fn is_boolean_attribute(name: Str) Bool {
-    return in_words("hidden inert disabled required readonly checked multiple autofocus selected open reversed controls autoplay muted loop playsinline novalidate", name)
+    return in_words(wps(Wpt.HiddenInertDisabledRequiredReadonlyCheck), name)
 }
 
-fn is_void_tag(tag: Str) Bool => in_words("area base br col embed hr img input link meta param source track wbr", tag)
+fn is_void_tag(tag: Str) Bool => in_words(wps(Wpt.AreaBaseBrColEmbedHr), tag)
 
 /// SVG's elements (but `a`, `script`, `style`): `fe…` filter primitives,
 /// and the rest. (Inside `svg { }` any name is one: see parse_telement.)
 fn is_svg_tag(tag: Str) Bool {
-    return (text_at(tag, 0, "fe") and tag.len() > 2 and is_upper_code(tag.get(2)))
-        or in_words("svg g path circle ellipse line polyline polygon rect text tspan textPath defs use symbol image switch view linearGradient radialGradient stop clipPath mask pattern marker filter title desc metadata foreignObject animate animateMotion animateTransform set mpath discard hatch hatchpath", tag)
+    return (text_at(tag, 0, wps(Wpt.Fe)) and tag.len() > 2 and is_upper_code(tag.get(2)))
+        or in_words(wps(Wpt.SvgGPathCircleEllipseLine), tag)
 }
 
 fn is_html_tag(tag: Str) Bool {
-    return in_words("html head embed param script area base link meta a abbr address article aside audio b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i iframe img input ins kbd label legend li main map mark menu meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp search section select slot small source span strong style sub summary sup table tbody td template textarea tfoot th thead time title tr track u ul var video wbr", tag)
+    return in_words(wps(Wpt.HtmlHeadEmbedParamScriptArea), tag)
 }
 
 fn is_global_attribute(name: Str) Bool {
-    return in_words("id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref xml:lang", name)
+    return in_words(wps(Wpt.IdClassTitleRoleTabindexHidden), name)
 }
 
 /// The attributes an element of `tag` may have beyond the global ones (space-separated).
 fn tag_attributes(tag: Str) Str {
-    if tag == "script" { return "src type async defer nonce crossorigin integrity referrerpolicy nomodule fetchpriority blocking" }
-    if tag == "style" { return "media nonce type" }
-    if tag == "embed" { return "src type width height" }
-    if tag == "param" { return "name value" }
-    if tag == "area" { return "alt coords shape href target download rel" }
-    if tag == "base" { return "href target" }
-    if tag == "link" { return "href rel type media sizes crossorigin as fetchpriority integrity referrerpolicy imagesrcset imagesizes hreflang blocking disabled" }
-    if tag == "meta" { return "name content charset http-equiv" }
-    if tag == "a" { return "href target rel download hreflang type referrerpolicy ping" }
-    if tag == "button" { return "type disabled name value form popovertarget popovertargetaction formaction formmethod formenctype formtarget formnovalidate command commandfor" }
-    if tag == "input" { return "type name value placeholder required disabled readonly checked min max step minlength maxlength pattern multiple accept autocomplete size form list capture dirname alt src width height formaction formmethod formenctype formtarget formnovalidate popovertarget popovertargetaction" }
-    if tag == "textarea" { return "name placeholder required disabled readonly rows cols minlength maxlength autocomplete form wrap dirname" }
-    if tag == "form" { return "action method enctype target autocomplete novalidate name rel accept-charset" }
-    if tag == "label" { return "for" }
-    if tag == "img" { return "src alt width height loading decoding srcset sizes fetchpriority crossorigin referrerpolicy usemap ismap" }
-    if tag == "source" { return "src srcset sizes type media" }
-    if tag == "select" { return "name required disabled multiple size form autocomplete" }
-    if tag == "option" { return "value selected disabled label" }
-    if tag == "optgroup" { return "label disabled" }
-    if tag == "fieldset" { return "disabled form name" }
-    if tag == "output" { return "for form name" }
-    if tag == "details" { return "open name" }
-    if tag == "dialog" { return "open" }
-    if tag == "progress" { return "value max" }
-    if tag == "meter" { return "value min max low high optimum" }
-    if tag == "ol" { return "start reversed type" }
-    if tag == "li" { return "value" }
-    if tag == "time" { return "datetime" }
-    if tag == "del" or tag == "ins" { return "datetime cite" }
-    if tag == "blockquote" or tag == "q" { return "cite" }
-    if tag == "canvas" { return "width height" }
-    if tag == "td" { return "colspan rowspan headers" }
-    if tag == "th" { return "colspan rowspan headers scope abbr" }
-    if tag == "video" { return "src controls autoplay muted loop playsinline poster width height preload crossorigin disablepictureinpicture disableremoteplayback" }
-    if tag == "audio" { return "src controls autoplay muted loop preload crossorigin" }
-    if tag == "object" { return "data type name width height form usemap typemustmatch" }
-    if tag == "iframe" { return "src srcdoc name title width height loading allow allowfullscreen sandbox referrerpolicy" }
+    if tag == "script" { return wps(Wpt.SrcTypeAsyncDeferNonceCrossorigin) }
+    if tag == wps(Wpt.Style) { return wps(Wpt.MediaNonceType) }
+    if tag == "embed" { return wps(Wpt.SrcTypeWidthHeight) }
+    if tag == wps(Wpt.Param) { return wps(Wpt.NameValue) }
+    if tag == wps(Wpt.Area) { return wps(Wpt.AltCoordsShapeHrefTargetDownload) }
+    if tag == "base" { return wps(Wpt.HrefTarget) }
+    if tag == wps(Wpt.Link) { return wps(Wpt.HrefRelTypeMediaSizesCrossorigin) }
+    if tag == wps(Wpt.Meta) { return wps(Wpt.NameContentCharsetHttpEquiv) }
+    if tag == "a" { return wps(Wpt.HrefTargetRelDownloadHreflangType) }
+    if tag == wps(Wpt.Button) { return wps(Wpt.TypeDisabledNameValueFormPopovertarget) }
+    if tag == wps(Wpt.Input) { return wps(Wpt.TypeNameValuePlaceholderRequiredDisabled) }
+    if tag == wps(Wpt.Textarea) { return wps(Wpt.NamePlaceholderRequiredDisabledReadonlyR) }
+    if tag == wps(Wpt.Form) { return wps(Wpt.ActionMethodEnctypeTargetAutocompleteNov) }
+    if tag == wps(Wpt.Label) { return "for" }
+    if tag == wps(Wpt.Img) { return wps(Wpt.SrcAltWidthHeightLoadingDecoding) }
+    if tag == wps(Wpt.Source) { return wps(Wpt.SrcSrcsetSizesTypeMedia) }
+    if tag == "select" { return wps(Wpt.NameRequiredDisabledMultipleSizeForm) }
+    if tag == wps(Wpt.Option) { return wps(Wpt.ValueSelectedDisabledLabel) }
+    if tag == wps(Wpt.Optgroup) { return wps(Wpt.LabelDisabled) }
+    if tag == wps(Wpt.Fieldset) { return wps(Wpt.DisabledFormName) }
+    if tag == wps(Wpt.Output) { return wps(Wpt.ForFormName) }
+    if tag == wps(Wpt.Details) { return wps(Wpt.OpenName) }
+    if tag == wps(Wpt.Dialog) { return wps(Wpt.Open) }
+    if tag == wps(Wpt.Progress) { return wps(Wpt.ValueMax) }
+    if tag == wps(Wpt.Meter) { return wps(Wpt.ValueMinMaxLowHighOptimum) }
+    if tag == wps(Wpt.Ol) { return wps(Wpt.StartReversedType) }
+    if tag == wps(Wpt.Li) { return "value" }
+    if tag == "time" { return wps(Wpt.Datetime) }
+    if tag == wps(Wpt.Del) or tag == wps(Wpt.Ins) { return wps(Wpt.DatetimeCite) }
+    if tag == wps(Wpt.Blockquote) or tag == wps(Wpt.Q) { return wps(Wpt.Cite) }
+    if tag == wps(Wpt.Canvas) { return wps(Wpt.WidthHeight) }
+    if tag == wps(Wpt.Td) { return wps(Wpt.ColspanRowspanHeaders) }
+    if tag == wps(Wpt.Th) { return wps(Wpt.ColspanRowspanHeadersScopeAbbr) }
+    if tag == wps(Wpt.Video) { return wps(Wpt.SrcControlsAutoplayMutedLoopPlaysinline) }
+    if tag == wps(Wpt.Audio) { return wps(Wpt.SrcControlsAutoplayMutedLoopPreload) }
+    if tag == wps(Wpt.Object) { return wps(Wpt.DataTypeNameWidthHeightForm) }
+    if tag == wps(Wpt.Iframe) { return wps(Wpt.SrcSrcdocNameTitleWidthHeight) }
     return ""
 }
 
@@ -250,7 +250,7 @@ fn is_known_tag(tag: Str) Bool => is_html_tag(tag) or is_svg_tag(tag) or is_cust
 /// Global, `aria-` and `data-` attributes, the tag's own, and anything on
 /// an SVG element (`svg`) or a custom one.
 fn is_allowed_attribute(tag: Str, name: Str, svg: Bool) Bool {
-    return svg or is_global_attribute(name) or text_at(name, 0, "aria-") or text_at(name, 0, "data-") or in_words(tag_attributes(tag), name)
+    return svg or is_global_attribute(name) or text_at(name, 0, wps(Wpt.Aria)) or text_at(name, 0, wps(Wpt.Data)) or in_words(tag_attributes(tag), name)
         or is_custom_element(tag)
 }
 
@@ -324,92 +324,9 @@ fn css_properties_text() Str {
     \\zoom
 }
 
-/// Keep the two ASCII catalogs packed in the compiler artifact. The original
-/// text is used only while building the table, and decoded once at runtime.
-const vec web_catalog: U8 = @comptime/\ pack_web_catalog(css_properties_text() + Str.from_code_point(0) + dom_events_text()) \/
-struct WebCatalogCache:
-    | css: ?Str
-    | events: ?Str
-
-let web_catalog_cache: WebCatalogCache = WebCatalogCache { css: null, events: null }
-
-fn css_properties() Str {
-    if web_catalog_cache.css == null { unpack_web_catalog() }
-    return web_catalog_cache.css orelse fatal
-}
-
-fn dom_events() Str {
-    if web_catalog_cache.events == null { unpack_web_catalog() }
-    return web_catalog_cache.events orelse fatal
-}
-
-/// A literal ASCII byte or a back reference with length in the first byte
-/// and distance in the next two. The first two bytes give the decoded size.
-fn pack_web_catalog(text: Str) Array[I32] {
-    let size = text.len()
-    if size > 65535 { fatal }
-    let packed = Array[I32].new(size + 2, 0)
-    packed[0] = size & 255
-    packed[1] = size >>> 8
-    let recent = Array[I32].new(4096, -1)
-    let source = 0
-    let dest = 2
-    while (source < size) {
-        let byte = text.get(source)
-        if byte >= 128 { fatal }
-        let length = 0
-        let distance = 0
-        if source + 3 <= size {
-            let slot = ((byte * 251 + text.get(source + 1)) * 251 + text.get(source + 2)) & 4095
-            let previous = recent[slot]
-            recent[slot] = source
-            if previous >= 0 {
-                while (length < 130 and source + length < size and text.get(previous + length) == text.get(source + length)) {
-                    length += 1
-                }
-                distance = source - previous
-            }
-        }
-        if length >= 4 {
-            packed[dest] = 128 + length - 3
-            packed[dest + 1] = distance & 255
-            packed[dest + 2] = distance >>> 8
-            dest += 3
-            source += length
-        } else {
-            packed[dest] = byte
-            dest += 1
-            source += 1
-        }
-    }
-    return packed.slice(0, dest)
-}
-
-fn unpack_web_catalog() Void {
-    let size = web_catalog[0] + web_catalog[1] * 256
-    let codes = Array[I32].new(size, 0)
-    let source = 2
-    let dest = 0
-    while (source < web_catalog.len()) {
-        let code = web_catalog[source]
-        source += 1
-        if code < 128 {
-            codes[dest] = code
-            dest += 1
-        } else {
-            let count = code - 128 + 3
-            let distance = web_catalog[source] + web_catalog[source + 1] * 256
-            source += 2
-            for (dest ..< dest + count) |i| { codes[i] = codes[i - distance] }
-            dest += count
-        }
-    }
-    let split = 0
-    while (codes[split] != 0) { split += 1 }
-    let text = Str.from_codes(codes, size)
-    web_catalog_cache.css = text.slice(0, split)
-    web_catalog_cache.events = text.slice(split + 1, size)
-}
+/// The catalogs, from the string table (see strtab.utu).
+fn css_properties() Str => st(st_web)
+fn dom_events() Str => st(st_web + 1)
 
 /// The word of `list` one edit (or swap of neighbors) from `w`, unless `w`
 /// is in it, or "": a typo. (Two edits from a known word is likely a real
@@ -426,9 +343,9 @@ fn typo_of(list: Str, w: Str) Str {
 /// `--x`, is not checked).
 fn css_property_known(head: Str, at: I32) Void {
     let name = if text_at(head, 0, "--") { head } else { lower_text(head) }
-    if not is_css_property(name) { wutu_fail("invalid CSS property", at) }
+    if not is_css_property(name) { wutu_fail(wps(Wpt.InvalidCSSProperty), at) }
     let near = if name.get(0) == 45 { "" } else { typo_of(css_properties(), name) }
-    if near.len() > 0 { wutu_fail("invalid CSS property " + head + "; did you mean " + near + "?", at) }
+    if near.len() > 0 { wutu_fail(wps2(Wpt.InvalidCSSPropertyDidYouMean, head, near), at) }
 }
 
 /// A value (`text[from ..< to]`) with a second declaration on its line
@@ -453,7 +370,7 @@ fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) Void {
             let end = i
             while (end > from and is_name_code(text.get(end - 1))) { end -= 1 }
             while (end > from and is_space_code(text.get(end - 1))) { end -= 1 }
-            wutu_fail("two CSS declarations on one line need ; between them", end)
+            wutu_fail(wps(Wpt.TwoCSSDeclarationsOnOneLine), end)
         }
         i += 1
     }
@@ -487,10 +404,10 @@ fn wp_trivia(text: Str) Void {
         } else if text_at(text, p, "//") and wp_after_blank(text, p) {
             wp_skip_line(text)
         } else if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) {
-            wutu_fail("Wutu comments are written // …", p)
+            wutu_fail(wps(Wpt.WutuCommentsAreWritten), p)
         } else if text_at(text, p, "/*") {
             let end = text_index(text, "*/", p + 2)
-            if end < 0 { wutu_fail("unterminated comment", p) }
+            if end < 0 { wutu_fail(wps(Wpt.UnterminatedComment), p) }
             wp_at = end + 2
         } else {
             return
@@ -512,7 +429,7 @@ fn wp_end(text: Str) Void {
         wp_at = i
         return
     }
-    if text.get(i) != 59 { wutu_fail("expected a line break or ; after Wutu statement", statement_end) }
+    if text.get(i) != 59 { wutu_fail(wps(Wpt.ExpectedALineBreakOrAfter), statement_end) }
     wp_at = i + 1
 }
 
@@ -562,11 +479,11 @@ fn wp_continues(text: Str, last: I32, opaque: Bool, nl: I32) Bool {
     if last < 0 { return true }
     if not opaque {
         let c = text.get(last)
-        if text_index("+-*/%=<>&|^~!,.?:", Str.from_code_point(c), 0) >= 0 { return true }
+        if text_index(wps(Wpt.PlusDashStarSlashPctEqLtGtAmpBarCaretTildeBangCo), Str.from_code_point(c), 0) >= 0 { return true }
         if is_word_code(c) {
             let a = last
             while (a > 0 and is_word_code(text.get(a - 1))) { a -= 1 }
-            if in_words("and or xor not orelse else in", text.slice(a, last + 1)) { return true }
+            if in_words(wps(Wpt.AndOrXorNotOrelseElse), text.slice(a, last + 1)) { return true }
         }
     }
     return continues_at(text, next_token(text, nl))
@@ -588,14 +505,14 @@ fn continues_at(text: Str, j: I32) Bool {
     // operators inside a parenthesized expression or block remain Utu.
     if c == 124 { return false }
     if c == 123 { return true }
-    if text_index("+*/%<>|^~!", Str.from_code_point(c), 0) >= 0 { return true }
+    if text_index(wps(Wpt.PlusStarSlashPctLtGtBarCaretTildeBang), Str.from_code_point(c), 0) >= 0 { return true }
     if not is_lower_code(c) { return false }
     let k = j
     while (k < text.len() and is_word_code(text.get(k))) { k += 1 }
     let word = text.slice(j, k)
-    if in_words("and or xor orelse else catch", word) { return true }
-    if word == "collect" { return k < text.len() and text.get(k) == 40 }
-    if not in_words("map filter skip take skip_while take_while scan zip chain flat_map repeat fold each any all count_where first_index last_index sum fast_sum product count sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", word) { return false }
+    if in_words(wps(Wpt.AndOrXorOrelseElseCatch), word) { return true }
+    if word == wps(Wpt.Collect) { return k < text.len() and text.get(k) == 40 }
+    if not in_words(wps(Wpt.MapFilterSkipTakeSkipWhile), word) { return false }
     let r = skip_spaces(text, k)
     if r < text.len() and text.get(r) == 40 {
         // `fold(0) |a, x|`: past its balanced arguments.
@@ -647,7 +564,7 @@ fn wp_quoted(text: Str) Str {
             if c == quote { return text.slice(start, wp_at) }
         }
     }
-    wutu_fail("unterminated string", start)
+    wutu_fail(wps(Wpt.UnterminatedString), start)
     return ""
 }
 
@@ -699,7 +616,7 @@ fn skip_dsl(text: Str, start: I32) I32 {
         }
         j += 1
     }
-    wutu_fail("Unterminated DSL envelope", start)
+    wutu_fail(wps(Wpt.UnterminatedDSLEnvelope), start)
     return start
 }
 
@@ -729,7 +646,7 @@ fn wp_bare_expression(text: Str) Str {
         } else {
             if c == 40 or c == 91 or c == 123 { depth += 1 }
             else if c == 41 or c == 93 {
-                if depth == 0 { wutu_fail("expected a line break or ; after expression", p) }
+                if depth == 0 { wutu_fail(wps(Wpt.ExpectedALineBreakOrAfterSemi), p) }
                 depth -= 1
             } else if c == 125 { depth -= 1 }
             if not is_space_code(c) {
@@ -739,7 +656,7 @@ fn wp_bare_expression(text: Str) Str {
             wp_at += 1
         }
     }
-    if depth > 0 { wutu_fail("unterminated expression", start) }
+    if depth > 0 { wutu_fail(wps(Wpt.UnterminatedExpression), start) }
     wx_from = start
     wx_to = if last < 0 { start } else { last + 1 }
     return text.slice(start, wx_to)
@@ -759,20 +676,20 @@ fn wp_expression_until(text: Str, ends: Str, what: Str) Str {
             let c = text.get(wp_at)
             if depth == 0 and text_index(ends, Str.from_code_point(c), 0) >= 0 {
                 let source = trim_end(text.slice(start, wp_at))
-                if source.len() == 0 { wutu_fail("expected " + what, wp_at) }
+                if source.len() == 0 { wutu_fail(wps1(Wpt.Expected, what), wp_at) }
                 wx_from = start
                 wx_to = start + source.len()
                 return source
             }
             if c == 40 or c == 91 or c == 123 { depth += 1 }
             else if c == 41 or c == 93 or c == 125 {
-                if depth == 0 { wutu_fail("expected " + what, wp_at) }
+                if depth == 0 { wutu_fail(wps1(Wpt.Expected, what), wp_at) }
                 depth -= 1
             }
             wp_at += 1
         }
     }
-    wutu_fail("unterminated " + what, start)
+    wutu_fail(wps1(Wpt.Unterminated, what), start)
     return ""
 }
 
@@ -802,18 +719,18 @@ fn unparenthesized(source: Str) Str {
             let w = i
             while (i + 1 < n and is_word_code(source.get(i + 1))) { i += 1 }
             let word = source.slice(w, i + 1)
-            if in_words("fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", word) or in_words("map filter skip take skip_while take_while scan zip chain flat_map repeat", word) { last = word }
+            if in_words(wps(Wpt.FoldEachAnyAllCountWhere), word) or in_words(wps(Wpt.MapFilterSkipTakeSkipWhileLc), word) { last = word }
         }
         i += 1
     }
-    if last.len() == 0 or in_words("fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", last) { return source }
+    if last.len() == 0 or in_words(wps(Wpt.FoldEachAnyAllCountWhere), last) { return source }
     wx_from += 1
     wx_to -= 1
     return trim_text(source.slice(1, n - 1))
 }
 
 fn wp_fail_interpolation(text: Str) Void {
-    wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)", wp_at)
+    wutu_fail(wps(Wpt.WutuNoLongerWritesAnExpression), wp_at)
 }
 
 /// A brace-delimited Utu block, with its braces.
@@ -829,7 +746,7 @@ fn wp_utu_block(text: Str, context: Str) Str {
             wp_at += 1
         }
     }
-    if depth != 0 { wutu_fail("unterminated " + context, start) }
+    if depth != 0 { wutu_fail(wps1(Wpt.Unterminated, context), start) }
     wx_from = start
     wx_to = wp_at
     return text.slice(start, wp_at)
@@ -856,7 +773,7 @@ fn wp_css_until(text: Str, delimiters: Str, lines: Bool) Str {
             end_at = wp_at
         } else if wp_at_text(text, "/*") {
             let end = text_index(text, "*/", wp_at + 2)
-            if end < 0 { wutu_fail("unterminated comment", wp_at) }
+            if end < 0 { wutu_fail(wps(Wpt.UnterminatedComment), wp_at) }
             wp_at = end + 2
         } else if lines and depth == 0 and text_at(text, wp_at, "//") and wp_after_blank(text, wp_at) {
             wp_skip_line(text)
@@ -891,7 +808,7 @@ fn wp_css_block(text: Str) Str {
         let p = wp_at
         if wp_at_text(text, "/*") {
             let end = text_index(text, "*/", p + 2)
-            if end < 0 { wutu_fail("unterminated CSS comment", p) }
+            if end < 0 { wutu_fail(wps(Wpt.UnterminatedCSSComment), p) }
             wp_at = end + 2
         } else if text_at(text, p, "//") and parens == 0 and wp_after_blank(text, p) {
             body = body + text.slice(start, p)
@@ -903,11 +820,11 @@ fn wp_css_block(text: Str) Str {
                 wp_quoted(text)
                 last = c
             } else {
-                if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) { wutu_fail("Wutu comments are written // …", p) }
+                if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) { wutu_fail(wps(Wpt.WutuCommentsAreWritten), p) }
                 if c == 40 { parens += 1 } else if c == 41 { parens -= 1 }
                 if c == 123 { depth += 1 }
                 if (c == 125 or (c == 10 and parens == 0)) and not (last == 59 or last == 123 or last == 125 or last == 44) {
-                    body = body + text.slice(start, p) + ";"
+                    body = wps2(Wpt.ABSemi, body, text.slice(start, p))
                     start = p
                     last = 59
                 }
@@ -924,7 +841,7 @@ fn wp_css_block(text: Str) Str {
             }
         }
     }
-    wutu_fail("unterminated CSS block", open)
+    wutu_fail(wps(Wpt.UnterminatedCSSBlock), open)
     return ""
 }
 
@@ -935,26 +852,26 @@ fn parse_template(text: Str) I32 {
     reset_template()
     wp_at = 0
     wp_trivia(text)
-    if wp_at_text(text, "@reactive") {
+    if wp_at_text(text, wps(Wpt.Reactive)) {
         wp_at += 9
         wp_end(text)
         tw_reactive = 1
         wp_trivia(text)
     }
-    if wp_at_text(text, "@island") {
+    if wp_at_text(text, wps(Wpt.Island)) {
         wp_at += 7
         wp_trivia(text)
-        if wp_char(text) != 34 { wutu_fail("expected a quoted island name: @island \"name\"", wp_at) }
+        if wp_char(text) != 34 { wutu_fail(wps(Wpt.ExpectedAQuotedIslandNameIsland), wp_at) }
         tw_scope = intern_text(wp_quoted(text))
         wp_end(text)
         tw_reactive = 1
         wp_trivia(text)
     }
-    while (wp_at_text(text, "@style")) {
+    while (wp_at_text(text, wps(Wpt.StyleAt))) {
         wp_at += 6
         wp_trivia(text)
         if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e", wp_at) }
+        if wp_char(text) == 61 { wutu_fail(wps(Wpt.StyleTakesOneExpressionNotAn), wp_at) }
         let source = wp_bare_expression(text)
         let from = wx_from
         let to = wx_to
@@ -964,10 +881,10 @@ fn parse_template(text: Str) I32 {
         tw_style_to.push(to)
         wp_trivia(text)
     }
-    while (wp_at_text(text, "@document")) {
+    while (wp_at_text(text, wps(Wpt.Document))) {
         wp_at += 9
         wp_trivia(text)
-        if wp_char(text) != 123 { wutu_fail("expected document CSS block", wp_at) }
+        if wp_char(text) != 123 { wutu_fail(wps(Wpt.ExpectedDocumentCSSBlock), wp_at) }
         tw_global.push(intern_text(wp_css_block(text)))
         wp_trivia(text)
     }
@@ -985,7 +902,7 @@ fn parse_template(text: Str) I32 {
     let first = tn_first[fragment]
     if first >= 0 and tn_next[first] < 0 and tn_kind[first] == 4 {
         tn_parent[first] = -1
-        if word_text(tn_text[first]) == "html" { tw_reactive = 1 }
+        if word_text(tn_text[first]) == wps(Wpt.Html) { tw_reactive = 1 }
         return first
     }
     return fragment
@@ -1004,7 +921,7 @@ fn parse_tnode(text: Str) I32 {
     }
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
     if wp_char(text) == 61 or wp_char(text) == 124 {
-        let code = wp_at_text(text, "|>")
+        let code = wp_at_text(text, wps(Wpt.BarGt))
         wp_at += if code { 2 } else { 1 }
         let source = wp_bare_expression(text)
         let from = wx_from
@@ -1025,11 +942,11 @@ fn parse_tnode(text: Str) I32 {
 fn parse_branch(text: Str, n: I32, otherwise: Bool) Void {
     wp_trivia(text)
     let open = wp_at
-    if wp_char(text) != 123 { wutu_fail("expected {", wp_at) }
+    if wp_char(text) != 123 { wutu_fail(wps(Wpt.ExpectedBrace), wp_at) }
     wp_at += 1
     while (true) {
         wp_trivia(text)
-        if wp_done(text) { wutu_fail("unterminated branch", open) }
+        if wp_done(text) { wutu_fail(wps(Wpt.UnterminatedBranch), open) }
         if wp_char(text) == 125 {
             wp_at += 1
             return
@@ -1048,7 +965,7 @@ fn parse_branch(text: Str, n: I32, otherwise: Bool) Void {
 fn parse_tif(text: Str) I32 {
     let start = wp_at
     wp_at += 2
-    let condition = wp_expression_until(text, "{", "a condition before {")
+    let condition = wp_expression_until(text, "{", wps(Wpt.AConditionBefore))
     let n = new_tnode(2, start)
     tn_text[n] = intern_text(condition)
     tn_from[n] = wx_from
@@ -1080,7 +997,7 @@ fn parse_tfor(text: Str) I32 {
     wp_at += 3
     // (The loop's body joins the iterable's pipeline: parentheses that only
     // hide its own `|…|` go.)
-    let iterable = unparenthesized(wp_expression_until(text, "|", "what to iterate, then |item|"))
+    let iterable = unparenthesized(wp_expression_until(text, "|", wps(Wpt.WhatToIterateThenItem)))
     let n = new_tnode(3, start)
     tn_text[n] = intern_text(iterable)
     tn_from[n] = wx_from
@@ -1088,18 +1005,18 @@ fn parse_tfor(text: Str) I32 {
     wp_trivia(text)
     // |item| or |item, index|
     let captures = wp_captures(text)
-    if captures.len() == 0 { wutu_fail("expected |item| or |item, index| after iterable", wp_at) }
+    if captures.len() == 0 { wutu_fail(wps(Wpt.ExpectedItemOrItemIndexAfter), wp_at) }
     tn_captures[n] = intern_text(captures)
     wp_trivia(text)
     if wp_keyword(text, "key") {
         wp_at += 3
         wp_trivia(text)
-        if wp_keyword(text, "global") {
+        if wp_keyword(text, wps(Wpt.Global)) {
             wp_at += 6
             wp_trivia(text)
             tn_global[n] = 1
         }
-        tn_key[n] = intern_text(wp_expression_until(text, "{", "a key before {"))
+        tn_key[n] = intern_text(wp_expression_until(text, "{", wps(Wpt.AKeyBefore)))
         tn_key_from[n] = wx_from
         tn_key_to[n] = wx_to
     }
@@ -1134,13 +1051,13 @@ fn wp_captures(text: Str) Str {
 fn parse_telement(text: Str) I32 {
     let start = wp_at
     let p = start
-    if p >= text.len() or not is_lower_code(text.get(p)) { wutu_fail("expected an HTML tag (class-only heads do not create elements)", p) }
+    if p >= text.len() or not is_lower_code(text.get(p)) { wutu_fail(wps(Wpt.ExpectedAnHTMLTagClassOnly), p) }
     let q = p
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let tag = text.slice(p, q)
     let outer = wp_svg_kids
     let outer_el = wp_svg_el
-    if outer == 0 and not is_known_tag(tag) { wutu_fail("expected an HTML tag, found unknown element '" + tag + "' (custom element names need a hyphen)", p) }
+    if outer == 0 and not is_known_tag(tag) { wutu_fail(wps1(Wpt.ExpectedAnHTMLTagFoundUnknown, tag), p) }
     wp_at = q
     let n = new_tnode(4, start)
     tn_text[n] = intern_text(tag)
@@ -1150,35 +1067,35 @@ fn parse_telement(text: Str) I32 {
         let a = wp_at
         let b = a
         while (b < text.len() and is_name_code(text.get(b))) { b += 1 }
-        if b == a { wutu_fail("expected class or id", a) }
+        if b == a { wutu_fail(wps(Wpt.ExpectedClassOrId), a) }
         let name = text.slice(a, b)
         wp_at = b
         if shorthand == 46 { add_item(n, 0, intern_text(name), -1, 0, -1, -1, a) }
         else {
-            if has_attribute_item(n, "id") { wutu_fail("an element has one id; #" + name + " is a second", a - 1) }
-            add_item(n, 1, intern_text("id"), intern_text(js_string(name)), 0, -1, -1, wp_at)
+            if has_attribute_item(n, wps(Wpt.Id)) { wutu_fail(wps1(Wpt.AnElementHasOneIdIs, name), a - 1) }
+            add_item(n, 1, intern_text(wps(Wpt.Id)), intern_text(js_string(name)), 0, -1, -1, wp_at)
         }
     }
     wp_trivia(text)
-    if wp_keyword(text, "as") {
+    if wp_keyword(text, wps(Wpt.As)) {
         wp_at += 2
         wp_trivia(text)
         let a = wp_at
-        if a >= text.len() or not (is_lower_code(text.get(a)) or text.get(a) == 95) { wutu_fail("expected node binding", a) }
+        if a >= text.len() or not (is_lower_code(text.get(a)) or text.get(a) == 95) { wutu_fail(wps(Wpt.ExpectedNodeBinding), a) }
         let b = a
         while (b < text.len() and is_word_code(text.get(b))) { b += 1 }
         tn_binding[n] = intern_text(text.slice(a, b))
         wp_at = b
         wp_trivia(text)
     }
-    if wp_char(text) != 123 { wutu_fail("expected { after element head", wp_at) }
+    if wp_char(text) != 123 { wutu_fail(wps(Wpt.ExpectedAfterElementHead), wp_at) }
     wp_at += 1
     let svg = outer == 1 or is_svg_tag(tag) and not is_html_tag(tag)
     wp_svg_el = if svg { 1 } else { 0 }
-    wp_svg_kids = if svg and tag != "foreignObject" { 1 } else { 0 }
+    wp_svg_kids = if svg and tag != wps(Wpt.ForeignObject) { 1 } else { 0 }
     while (true) {
         wp_trivia(text)
-        if wp_done(text) { wutu_fail("unterminated element '" + tag + "'", start) }
+        if wp_done(text) { wutu_fail(wps1(Wpt.UnterminatedElement, tag), start) }
         if wp_char(text) == 125 {
             wp_at += 1
             break
@@ -1187,35 +1104,35 @@ fn parse_telement(text: Str) I32 {
     }
     wp_svg_kids = outer
     wp_svg_el = outer_el
-    if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start) }
+    if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(wps1(Wpt.CannotHaveChildren, tag), start) }
     if tag == "script" or is_raw_text_tag(tag) {
         let c = tn_first[n]
         while (c >= 0) {
             // (An element's text and attributes are escaped.)
             if tn_kind[c] != 0 and tn_kind[c] != 4 and tag != "script" { wutu_fail(raw_text_error(tag), tn_start[c]) }
-            if tn_kind[c] != 0 and tag == "script" { wutu_fail("a script's text is code, so Wutu writes it only as written: script { \"…\" }", tn_start[c]) }
+            if tn_kind[c] != 0 and tag == "script" { wutu_fail(wps(Wpt.AScriptSTextIsCode), tn_start[c]) }
             c = tn_next[c]
         }
     }
     let i = tn_items[n]
     while (i >= 0) {
-        if ti_kind[i] == 3 and word_text(ti_a[i]) == "values" and not (tag == "select" and has_attribute_item(n, "multiple")) {
-            wutu_fail("bind:values is a multiple select's: select { multiple; bind:values = … }", ti_at[i])
+        if ti_kind[i] == 3 and word_text(ti_a[i]) == "values" and not (tag == "select" and has_attribute_item(n, wps(Wpt.Multiple))) {
+            wutu_fail(wps(Wpt.BindValuesIsAMultipleSelect), ti_at[i])
         }
         i = ti_next[i]
     }
-    if tn_first[n] >= 0 and has_attribute_item(n, "data-wutu-unmanaged") {
-        wutu_fail("an @unmanaged " + tag + " has no children in its template: what is inside it is JavaScript's", start)
+    if tn_first[n] >= 0 and has_attribute_item(n, wps(Wpt.DataWutuUnmanaged)) {
+        wutu_fail(wps1(Wpt.AnUnmanagedHasNoChildrenIn, tag), start)
     }
     return n
 }
 
 /// Elements whose text HTML holds unescaped (raw text; a script's is code):
 /// prerendered, a value there could close the element and start markup.
-fn is_raw_text_tag(tag: Str) Bool => in_words("style noscript iframe xmp noembed noframes plaintext", tag)
+fn is_raw_text_tag(tag: Str) Bool => in_words(wps(Wpt.StyleNoscriptIframeXmpNoembedNoframes), tag)
 
 fn raw_text_error(tag: Str) Str {
-    return (if tag == "iframe" { "an " } else { "a " }) + tag + "'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: " + tag + " { \"…\" }"
+    return wps3(Wpt.STextIsUnescapedInHTML, (if tag == wps(Wpt.Iframe) { wps(Wpt.An) } else { "a " }), tag, tag)
 }
 
 /// Whether element n has an attribute item named `name`.
@@ -1248,10 +1165,10 @@ fn parse_element_statement(text: Str, n: I32) Void {
         return
     }
     // bind:value|checked|number|group|values|files =
-    if text_at(text, p, "bind:") {
+    if text_at(text, p, wps(Wpt.Bind)) {
         let q = p + 5
         let property = ""
-        for (["value", "checked", "number", "group", "values", "files"]) |candidate| {
+        for (["value", wps(Wpt.Checked), "number", wps(Wpt.Group), "values", wps(Wpt.Files)]) |candidate| {
             if property.len() == 0 and text_at(text, q, candidate) and not (q + candidate.len() < text.len() and is_name_code(text.get(q + candidate.len()))) { property = candidate }
         }
         if property.len() > 0 {
@@ -1273,7 +1190,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
         let a = q
         while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
         let r = skip_spaces(text, q)
-        let quiet = text_at(text, r, "quiet") and r + 5 < text.len() and not is_name_code(text.get(r + 5))
+        let quiet = text_at(text, r, wps(Wpt.Quiet)) and r + 5 < text.len() and not is_name_code(text.get(r + 5))
         if quiet { r = skip_spaces(text, r + 5) }
         let param = -1
         if r < text.len() and text.get(r) == 124 {
@@ -1289,10 +1206,10 @@ fn parse_element_statement(text: Str, n: I32) Void {
         if q > a and r < text.len() and (text.get(r) == 123 or text.get(r) == 61) {
             let name = text.slice(a, q)
             let near = near_event(name)
-            if near.len() > 0 { wutu_fail("unknown event " + name + "; did you mean " + near + "?", a) }
+            if near.len() > 0 { wutu_fail(wps2(Wpt.UnknownEventDidYouMean, name, near), a) }
             let flags = if quiet { 4 } else { 0 }
             if text.get(r) == 61 {
-                if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) Void { … }", r) }
+                if param >= 0 { wutu_fail(wps(Wpt.AHandlerValueNamesItsOwn), r) }
                 wp_at = r + 1
                 let source = wp_bare_expression(text)
                 let from = wx_from
@@ -1302,7 +1219,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
                 return
             }
             wp_at = r
-            let source = wp_utu_block(text, "event handler")
+            let source = wp_utu_block(text, wps(Wpt.EventHandler))
             let i = add_item(n, 2, intern_text(name), intern_text(source), 1 + flags, wx_from, wx_to, p)
             ti_c[i] = param
             return
@@ -1311,12 +1228,12 @@ fn parse_element_statement(text: Str, n: I32) Void {
     if c == 60 { wutu_fail(old_attribute_text(text, p), p) }
     // `@unmanaged`: the template makes the element; what JavaScript does to
     // its children and its other attributes, renders leave alone.
-    if text_at(text, p, "@unmanaged") and not (p + 10 < text.len() and is_name_code(text.get(p + 10))) {
+    if text_at(text, p, wps(Wpt.Unmanaged)) and not (p + 10 < text.len() and is_name_code(text.get(p + 10))) {
         let r = line_rest(text, p + 10)
         if r >= text.len() or text.get(r) == 10 or text.get(r) == 59 or text.get(r) == 125 {
             wp_at = p + 10
             wp_end(text)
-            add_item(n, 1, intern_text("data-wutu-unmanaged"), intern_text("\"\""), 0, -1, -1, wp_at)
+            add_item(n, 1, intern_text(wps(Wpt.DataWutuUnmanaged)), intern_text("\"\""), 0, -1, -1, wp_at)
             return
         }
     }
@@ -1324,8 +1241,8 @@ fn parse_element_statement(text: Str, n: I32) Void {
         let q = p + 1
         while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
         let name = text.slice(p + 1, q)
-        if in_words("reactive island style document", name) { wutu_fail("@" + name + " goes first in the template, before its root element", p) }
-        wutu_fail("events are written on " + name + " = handler (or on " + name + " { … })", p)
+        if in_words(wps(Wpt.ReactiveIslandStyleDocument), name) { wutu_fail(wps1(Wpt.GoesFirstInTheTemplateBefore, name), p) }
+        wutu_fail(wps2(Wpt.EventsAreWrittenOnHandlerOr, name, name), p)
     }
     if c == 46 and assignment_head(text, p + 1, true) {
         wp_at += 1
@@ -1352,23 +1269,23 @@ fn at_directive(text: Str, p: I32, inside: Bool) Void {
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let name = text.slice(p + 1, q)
     if name.len() == 0 { return }
-    let head = "@reactive @island @style @document"
-    if inside and in_words("media supports container layer keyframes font-face starting-style scope page property counter-style font-feature-values font-palette-values position-try view-transition", name) { return }
+    let head = wps(Wpt.ReactiveIslandStyleDocumentAtAtAtAt)
+    if inside and in_words(wps(Wpt.MediaSupportsContainerLayerKeyframesFont), name) { return }
     if inside and text_at(name, 0, "-") { return }
-    if inside and name == "unmanaged" { wutu_fail("expected a line break or ; after @unmanaged", q) }
-    if inside and in_words(head, "@" + name) { wutu_fail("@" + name + " goes first in the template, before its root element", p) }
-    if not inside and name == "unmanaged" { wutu_fail("@unmanaged goes inside the element it is for: div { @unmanaged }", p) }
-    if not inside and in_words(head, "@" + name) { wutu_fail("@" + name + " is repeated or out of order: a template begins with " + head + ", in that order, @reactive and @island at most once", p) }
-    let known = if inside { "@unmanaged" } else { head }
-    let near = closest_word(known, "@" + name)
-    wutu_fail("unknown directive @" + name + (if near.len() > 0 { "; did you mean " + near + "?" } else { "; " + (if inside { "an element takes @unmanaged, or a CSS at-rule" } else { "a template begins with " + head }) }), p)
+    if inside and name == wps(Wpt.UnmanagedLc) { wutu_fail(wps(Wpt.ExpectedALineBreakOrAfterSemiAt), q) }
+    if inside and in_words(head, wps1(Wpt.AtA, name)) { wutu_fail(wps1(Wpt.GoesFirstInTheTemplateBefore, name), p) }
+    if not inside and name == wps(Wpt.UnmanagedLc) { wutu_fail(wps(Wpt.UnmanagedGoesInsideTheElementIt), p) }
+    if not inside and in_words(head, wps1(Wpt.AtA, name)) { wutu_fail(wps2(Wpt.IsRepeatedOrOutOfOrder, name, head), p) }
+    let known = if inside { wps(Wpt.Unmanaged) } else { head }
+    let near = closest_word(known, wps1(Wpt.AtA, name))
+    wutu_fail(wps2(Wpt.UnknownDirective, name, (if near.len() > 0 { wps1(Wpt.DidYouMean, near) } else { wps1(Wpt.SemiSpaceA, (if inside { wps(Wpt.AnElementTakesUnmanagedOrA) } else { wps1(Wpt.ATemplateBeginsWith, head) })) })), p)
 }
 
 /// A DOM event `name` is a typo of (one edit or swap from a common one:
 /// `clik`, `chnage`), or "" for a known event or a custom one: two edits
 /// from one (`unmount`), or one that adds to one's name (`changed`, `clicks`).
 fn near_event(name: Str) Str {
-    let known = "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange compositionstart compositionupdate compositionend selectionchange selectstart mount"
+    let known = wps(Wpt.ClickDblclickAuxclickContextmenuMousedow)
     if extends_word(known, name) { return "" }
     return typo_of(known, name)
 }
@@ -1427,7 +1344,7 @@ fn assignment_head(text: Str, q: I32, bare: Bool) Bool {
 /// Past `xlink:`, `xml:` or `xmlns:` at q (a namespaced attribute's prefix,
 /// never a CSS property's), or 0.
 fn namespace_prefix(text: Str, q: I32) I32 {
-    for (["xlink:", "xmlns:", "xml:"]) |prefix| {
+    for ([wps(Wpt.Xlink), wps(Wpt.Xmlns), wps(Wpt.Xml)]) |prefix| {
         if text_at(text, q, prefix) { return q + prefix.len() }
     }
     return 0
@@ -1440,7 +1357,7 @@ fn old_attribute_text(text: Str, p: I32) Str {
     let a = q
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let spelled = if q > a { text.slice(p + 1, q) } else { "name" }
-    return "attributes are written without '<': " + spelled + " = value (or " + spelled + " alone, for a boolean attribute)"
+    return wps2(Wpt.AttributesAreWrittenWithoutValueOr, spelled, spelled)
 }
 
 /// `"text" name…`: a string, then (no operator) another statement on its line: a forgotten `;`.
@@ -1452,8 +1369,8 @@ fn literal_then_name(text: Str, q: I32) Void {
     let w = skip_spaces(text, i + 1)
     let e = w
     while (e < text.len() and is_name_code(text.get(e))) { e += 1 }
-    if e > w and not (text.get(w) >= 48 and text.get(w) <= 57) and not in_words("and or not orelse", text.slice(w, e)) {
-        wutu_fail("expected a line break or ; after Wutu statement", i + 1)
+    if e > w and not (text.get(w) >= 48 and text.get(w) <= 57) and not in_words(wps(Wpt.AndOrNotOrelse), text.slice(w, e)) {
+        wutu_fail(wps(Wpt.ExpectedALineBreakOrAfter), i + 1)
     }
 }
 
@@ -1513,18 +1430,18 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) Void {
             to = wx_to
         }
     } else if is_property {
-        wutu_fail("a property takes a value: .name = value", name_start)
+        wutu_fail(wps(Wpt.APropertyTakesAValueName), name_start)
     }
     wp_end(text)
     let tag = word_text(tn_text[n])
-    if is_on_name(name) { wutu_fail("events are written on " + name.slice(2, name.len()) + " { … }, not as an attribute", name_start) }
-    if dynamic and tag == "script" { wutu_fail("a script's attributes are code or load it, so Wutu sets them only as written: src = \"…\"", name_start) }
-    if dynamic and tag == "base" and name == "href" { wutu_fail("a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = \"/\"", name_start) }
-    if dynamic and is_property and name == "protocol" { wutu_fail(".protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;", name_start) }
-    if dynamic and is_property and is_raw_text_tag(tag) and in_words("textContent innerText", name) { wutu_fail(raw_text_error(tag), name_start) }
-    if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\" (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start) }
-    if not is_property and not is_allowed_attribute(tag, name, wp_svg_el == 1) { wutu_fail("unknown attribute " + name + " on " + tag, name_start) }
-    if name != "class" and has_item_named(n, name, is_property) { wutu_fail((if is_property { "." + name + " is assigned twice on this element" } else { "an element has one " + name + "; this is a second" }), name_start) }
+    if is_on_name(name) { wutu_fail(wps1(Wpt.EventsAreWrittenOnNotAs, name.slice(2, name.len())), name_start) }
+    if dynamic and tag == "script" { wutu_fail(wps(Wpt.AScriptSAttributesAreCode), name_start) }
+    if dynamic and tag == "base" and name == wps(Wpt.Href) { wutu_fail(wps(Wpt.ABaseSHrefMovesEvery), name_start) }
+    if dynamic and is_property and name == wps(Wpt.Protocol) { wutu_fail(wps(Wpt.ProtocolFromAValueCouldMake), name_start) }
+    if dynamic and is_property and is_raw_text_tag(tag) and in_words(wps(Wpt.TextContentInnerText), name) { wutu_fail(raw_text_error(tag), name_start) }
+    if dynamic and name == wps(Wpt.Srcdoc) { wutu_fail(wps(Wpt.SrcdocIsHTMLSoWutuSets), name_start) }
+    if not is_property and not is_allowed_attribute(tag, name, wp_svg_el == 1) { wutu_fail(wps2(Wpt.UnknownAttributeOn, name, tag), name_start) }
+    if name != "class" and has_item_named(n, name, is_property) { wutu_fail((if is_property { wps1(Wpt.IsAssignedTwiceOnThisElement, name) } else { wps1(Wpt.AnElementHasOneThisIs, name) }), name_start) }
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1 } else { 0 }) + (if dynamic { 2 } else { 0 }), from, to, name_start)
 }
 
@@ -1540,35 +1457,35 @@ fn has_item_named(n: I32, name: Str, is_property: Bool) Bool {
 
 /// Pseudo-classes, at-rules, `& selector` and `@ selector` scoped rules.
 fn parse_css_rule(text: Str, n: I32) Void {
-    let selector = wp_css_until(text, "{;}", true)
+    let selector = wp_css_until(text, wps(Wpt.BraceSemiBraceEnd), true)
     if wp_char(text) != 123 {
         // A statement (`@import …`): up to its line's end or `;`.
         wp_end(text)
-        let i = add_item(n, 4, -1, intern_text(selector + ";"), 0, -1, -1, wp_at)
-        ti_c[i] = intern_text(selector + ";")
+        let i = add_item(n, 4, -1, intern_text(wps1(Wpt.ASemi, selector)), 0, -1, -1, wp_at)
+        ti_c[i] = intern_text(wps1(Wpt.ASemi, selector))
         return
     }
     let block = wp_css_block(text)
-    let i = add_item(n, 4, -1, intern_text(selector + "{" + block + "}"), 0, -1, -1, wp_at)
-    ti_c[i] = intern_text(scoped_selector(selector) + "{" + block + "}")
+    let i = add_item(n, 4, -1, intern_text(wps2(Wpt.ABraceBBraceEnd, selector, block)), 0, -1, -1, wp_at)
+    ti_c[i] = intern_text(wps2(Wpt.ABraceBBraceEnd, scoped_selector(selector), block))
 }
 
 /// A scoped CSS rule's selector, relative to the element (`&`): `@` alone is
 /// the element and all inside it, `@ sel` is `sel`, a pseudo-class is on `&`.
 fn scoped_selector(selector: Str) Str {
-    if selector == "@" { return "&, & *" }
-    if text_at(selector, 0, "@ ") {
+    if selector == "@" { return wps(Wpt.AmpCommaSpaceAmpSpaceStar) }
+    if text_at(selector, 0, wps(Wpt.AtSpace)) {
         let rest = selector.slice(2, selector.len())
-        return if rest.len() > 0 { rest } else { "&, & *" }
+        return if rest.len() > 0 { rest } else { wps(Wpt.AmpCommaSpaceAmpSpaceStar) }
     }
-    if text_at(selector, 0, ":") { return "&" + selector }
+    if text_at(selector, 0, ":") { return wps1(Wpt.AmpA, selector) }
     return selector
 }
 
 /// `property: value;` in an element's body, or else a child element.
 fn parse_declaration_or_child(text: Str, n: I32) Void {
     let start = wp_at
-    let head = wp_css_until(text, ":{};", false)
+    let head = wp_css_until(text, wps(Wpt.ColonBraceBraceEndSemi), false)
     if wp_char(text) != 58 {
         wp_at = start
         add_child(n, parse_telement(text))
@@ -1582,7 +1499,7 @@ fn parse_declaration_or_child(text: Str, n: I32) Void {
         // Keep the legacy `: = expression` spelling as well.
         let block = wp_char(text) == 123
         if not block { wp_at += 1 }
-        let source = if block { wp_utu_block(text, "computed CSS value") } else { wp_bare_expression(text) }
+        let source = if block { wp_utu_block(text, wps(Wpt.ComputedCSSValue)) } else { wp_bare_expression(text) }
         let from = wx_from
         let to = wx_to
         wp_end(text)
@@ -1592,12 +1509,406 @@ fn parse_declaration_or_child(text: Str, n: I32) Void {
     }
     let value_from = wp_at
     let custom = text_at(head, 0, "--")
-    let value = wp_css_until(text, if custom { ";}" } else { ";{}" }, true)
+    let value = wp_css_until(text, if custom { ";}" } else { wps(Wpt.SemiBraceBraceEnd) }, true)
     css_value_runs_on(text, value_from, wp_at, custom)
-    if wp_char(text) == 123 { wutu_fail("expected a line break or ; after a CSS declaration", wp_at) }
+    if wp_char(text) == 123 { wutu_fail(wps(Wpt.ExpectedALineBreakOrAfterLc), wp_at) }
     wp_end(text)
     css_property_known(head, start)
-    let declaration = head + ":" + value + ";"
+    let declaration = wps2(Wpt.AColonBSemi, head, value)
     let i = add_item(n, 4, -1, intern_text(declaration), 0, -1, -1, start)
     ti_c[i] = intern_text(declaration)
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Wpt:
+    | InvalidCSSPropertyDidYouMean
+    | Expected
+    | Unterminated
+    | ABSemi
+    | ExpectedAnHTMLTagFoundUnknown
+    | AnElementHasOneIdIs
+    | UnterminatedElement
+    | CannotHaveChildren
+    | AnUnmanagedHasNoChildrenIn
+    | STextIsUnescapedInHTML
+    | UnknownEventDidYouMean
+    | GoesFirstInTheTemplateBefore
+    | EventsAreWrittenOnHandlerOr
+    | AtA
+    | IsRepeatedOrOutOfOrder
+    | UnknownDirective
+    | DidYouMean
+    | SemiSpaceA
+    | ATemplateBeginsWith
+    | AttributesAreWrittenWithoutValueOr
+    | EventsAreWrittenOnNotAs
+    | UnknownAttributeOn
+    | IsAssignedTwiceOnThisElement
+    | AnElementHasOneThisIs
+    | ASemi
+    | ABraceBBraceEnd
+    | AmpA
+    | AColonBSemi
+    | HiddenInertDisabledRequiredReadonlyCheck
+    | AreaBaseBrColEmbedHr
+    | Fe
+    | SvgGPathCircleEllipseLine
+    | HtmlHeadEmbedParamScriptArea
+    | IdClassTitleRoleTabindexHidden
+    | SrcTypeAsyncDeferNonceCrossorigin
+    | Style
+    | MediaNonceType
+    | SrcTypeWidthHeight
+    | Param
+    | NameValue
+    | Area
+    | AltCoordsShapeHrefTargetDownload
+    | HrefTarget
+    | Link
+    | HrefRelTypeMediaSizesCrossorigin
+    | Meta
+    | NameContentCharsetHttpEquiv
+    | HrefTargetRelDownloadHreflangType
+    | Button
+    | TypeDisabledNameValueFormPopovertarget
+    | Input
+    | TypeNameValuePlaceholderRequiredDisabled
+    | Textarea
+    | NamePlaceholderRequiredDisabledReadonlyR
+    | Form
+    | ActionMethodEnctypeTargetAutocompleteNov
+    | Label
+    | Img
+    | SrcAltWidthHeightLoadingDecoding
+    | Source
+    | SrcSrcsetSizesTypeMedia
+    | NameRequiredDisabledMultipleSizeForm
+    | Option
+    | ValueSelectedDisabledLabel
+    | Optgroup
+    | LabelDisabled
+    | Fieldset
+    | DisabledFormName
+    | Output
+    | ForFormName
+    | Details
+    | OpenName
+    | Dialog
+    | Open
+    | Progress
+    | ValueMax
+    | Meter
+    | ValueMinMaxLowHighOptimum
+    | Ol
+    | StartReversedType
+    | Li
+    | Datetime
+    | Del
+    | Ins
+    | DatetimeCite
+    | Blockquote
+    | Q
+    | Cite
+    | Canvas
+    | WidthHeight
+    | Td
+    | ColspanRowspanHeaders
+    | Th
+    | ColspanRowspanHeadersScopeAbbr
+    | Video
+    | SrcControlsAutoplayMutedLoopPlaysinline
+    | Audio
+    | SrcControlsAutoplayMutedLoopPreload
+    | Object
+    | DataTypeNameWidthHeightForm
+    | Iframe
+    | SrcSrcdocNameTitleWidthHeight
+    | Aria
+    | Data
+    | InvalidCSSProperty
+    | TwoCSSDeclarationsOnOneLine
+    | WutuCommentsAreWritten
+    | UnterminatedComment
+    | ExpectedALineBreakOrAfter
+    | PlusDashStarSlashPctEqLtGtAmpBarCaretTildeBangCo
+    | AndOrXorNotOrelseElse
+    | PlusStarSlashPctLtGtBarCaretTildeBang
+    | AndOrXorOrelseElseCatch
+    | Collect
+    | MapFilterSkipTakeSkipWhile
+    | UnterminatedString
+    | UnterminatedDSLEnvelope
+    | ExpectedALineBreakOrAfterSemi
+    | UnterminatedExpression
+    | FoldEachAnyAllCountWhere
+    | MapFilterSkipTakeSkipWhileLc
+    | WutuNoLongerWritesAnExpression
+    | UnterminatedCSSComment
+    | UnterminatedCSSBlock
+    | Reactive
+    | Island
+    | ExpectedAQuotedIslandNameIsland
+    | StyleAt
+    | StyleTakesOneExpressionNotAn
+    | Document
+    | ExpectedDocumentCSSBlock
+    | Html
+    | BarGt
+    | ExpectedBrace
+    | UnterminatedBranch
+    | AConditionBefore
+    | WhatToIterateThenItem
+    | ExpectedItemOrItemIndexAfter
+    | Global
+    | AKeyBefore
+    | ExpectedAnHTMLTagClassOnly
+    | ExpectedClassOrId
+    | Id
+    | As
+    | ExpectedNodeBinding
+    | ExpectedAfterElementHead
+    | ForeignObject
+    | AScriptSTextIsCode
+    | Multiple
+    | BindValuesIsAMultipleSelect
+    | DataWutuUnmanaged
+    | StyleNoscriptIframeXmpNoembedNoframes
+    | An
+    | Bind
+    | Checked
+    | Group
+    | Files
+    | Quiet
+    | AHandlerValueNamesItsOwn
+    | EventHandler
+    | Unmanaged
+    | ReactiveIslandStyleDocument
+    | ReactiveIslandStyleDocumentAtAtAtAt
+    | MediaSupportsContainerLayerKeyframesFont
+    | UnmanagedLc
+    | ExpectedALineBreakOrAfterSemiAt
+    | UnmanagedGoesInsideTheElementIt
+    | AnElementTakesUnmanagedOrA
+    | ClickDblclickAuxclickContextmenuMousedow
+    | Xlink
+    | Xmlns
+    | Xml
+    | AndOrNotOrelse
+    | APropertyTakesAValueName
+    | AScriptSAttributesAreCode
+    | Href
+    | ABaseSHrefMovesEvery
+    | Protocol
+    | ProtocolFromAValueCouldMake
+    | TextContentInnerText
+    | Srcdoc
+    | SrcdocIsHTMLSoWutuSets
+    | BraceSemiBraceEnd
+    | AmpCommaSpaceAmpSpaceStar
+    | AtSpace
+    | ColonBraceBraceEndSemi
+    | ComputedCSSValue
+    | SemiBraceBraceEnd
+    | ExpectedALineBreakOrAfterLc
+
+fn wps_src(t: Wpt) Str {
+    return match t {
+        Wpt.InvalidCSSPropertyDidYouMean => "invalid CSS property {0}; did you mean {1}?",
+        Wpt.Expected => "expected {0}",
+        Wpt.Unterminated => "unterminated {0}",
+        Wpt.ABSemi => "{0}{1};",
+        Wpt.ExpectedAnHTMLTagFoundUnknown => "expected an HTML tag, found unknown element '{0}' (custom element names need a hyphen)",
+        Wpt.AnElementHasOneIdIs => "an element has one id; #{0} is a second",
+        Wpt.UnterminatedElement => "unterminated element '{0}'",
+        Wpt.CannotHaveChildren => "{0} cannot have children",
+        Wpt.AnUnmanagedHasNoChildrenIn => "an @unmanaged {0} has no children in its template: what is inside it is JavaScript's",
+        Wpt.STextIsUnescapedInHTML => "{0}{1}'s text is unescaped in HTML (a value could close it), so Wutu writes it only as written: {2} { \"…\" }",
+        Wpt.UnknownEventDidYouMean => "unknown event {0}; did you mean {1}?",
+        Wpt.GoesFirstInTheTemplateBefore => "@{0} goes first in the template, before its root element",
+        Wpt.EventsAreWrittenOnHandlerOr => "events are written on {0} = handler (or on {1} { … })",
+        Wpt.AtA => "@{0}",
+        Wpt.IsRepeatedOrOutOfOrder => "@{0} is repeated or out of order: a template begins with {1}, in that order, @reactive and @island at most once",
+        Wpt.UnknownDirective => "unknown directive @{0}{1}",
+        Wpt.DidYouMean => "; did you mean {0}?",
+        Wpt.SemiSpaceA => "; {0}",
+        Wpt.ATemplateBeginsWith => "a template begins with {0}",
+        Wpt.AttributesAreWrittenWithoutValueOr => "attributes are written without '<': {0} = value (or {1} alone, for a boolean attribute)",
+        Wpt.EventsAreWrittenOnNotAs => "events are written on {0} { … }, not as an attribute",
+        Wpt.UnknownAttributeOn => "unknown attribute {0} on {1}",
+        Wpt.IsAssignedTwiceOnThisElement => ".{0} is assigned twice on this element",
+        Wpt.AnElementHasOneThisIs => "an element has one {0}; this is a second",
+        Wpt.ASemi => "{0};",
+        Wpt.ABraceBBraceEnd => "{0}{{1}}",
+        Wpt.AmpA => "&{0}",
+        Wpt.AColonBSemi => "{0}:{1};",
+        Wpt.HiddenInertDisabledRequiredReadonlyCheck => "hidden inert disabled required readonly checked multiple autofocus selected open reversed controls autoplay muted loop playsinline novalidate",
+        Wpt.AreaBaseBrColEmbedHr => "area base br col embed hr img input link meta param source track wbr",
+        Wpt.Fe => "fe",
+        Wpt.SvgGPathCircleEllipseLine => "svg g path circle ellipse line polyline polygon rect text tspan textPath defs use symbol image switch view linearGradient radialGradient stop clipPath mask pattern marker filter title desc metadata foreignObject animate animateMotion animateTransform set mpath discard hatch hatchpath",
+        Wpt.HtmlHeadEmbedParamScriptArea => "html head embed param script area base link meta a abbr address article aside audio b bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i iframe img input ins kbd label legend li main map mark menu meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp search section select slot small source span strong style sub summary sup table tbody td template textarea tfoot th thead time title tr track u ul var video wbr",
+        Wpt.IdClassTitleRoleTabindexHidden => "id class title role tabindex hidden inert lang dir draggable contenteditable spellcheck translate slot accesskey part exportparts inputmode enterkeyhint autocapitalize autocorrect autofocus nonce is popover writingsuggestions itemprop itemscope itemtype itemid itemref xml:lang",
+        Wpt.SrcTypeAsyncDeferNonceCrossorigin => "src type async defer nonce crossorigin integrity referrerpolicy nomodule fetchpriority blocking",
+        Wpt.Style => "style",
+        Wpt.MediaNonceType => "media nonce type",
+        Wpt.SrcTypeWidthHeight => "src type width height",
+        Wpt.Param => "param",
+        Wpt.NameValue => "name value",
+        Wpt.Area => "area",
+        Wpt.AltCoordsShapeHrefTargetDownload => "alt coords shape href target download rel",
+        Wpt.HrefTarget => "href target",
+        Wpt.Link => "link",
+        Wpt.HrefRelTypeMediaSizesCrossorigin => "href rel type media sizes crossorigin as fetchpriority integrity referrerpolicy imagesrcset imagesizes hreflang blocking disabled",
+        Wpt.Meta => "meta",
+        Wpt.NameContentCharsetHttpEquiv => "name content charset http-equiv",
+        Wpt.HrefTargetRelDownloadHreflangType => "href target rel download hreflang type referrerpolicy ping",
+        Wpt.Button => "button",
+        Wpt.TypeDisabledNameValueFormPopovertarget => "type disabled name value form popovertarget popovertargetaction formaction formmethod formenctype formtarget formnovalidate command commandfor",
+        Wpt.Input => "input",
+        Wpt.TypeNameValuePlaceholderRequiredDisabled => "type name value placeholder required disabled readonly checked min max step minlength maxlength pattern multiple accept autocomplete size form list capture dirname alt src width height formaction formmethod formenctype formtarget formnovalidate popovertarget popovertargetaction",
+        Wpt.Textarea => "textarea",
+        Wpt.NamePlaceholderRequiredDisabledReadonlyR => "name placeholder required disabled readonly rows cols minlength maxlength autocomplete form wrap dirname",
+        Wpt.Form => "form",
+        Wpt.ActionMethodEnctypeTargetAutocompleteNov => "action method enctype target autocomplete novalidate name rel accept-charset",
+        Wpt.Label => "label",
+        Wpt.Img => "img",
+        Wpt.SrcAltWidthHeightLoadingDecoding => "src alt width height loading decoding srcset sizes fetchpriority crossorigin referrerpolicy usemap ismap",
+        Wpt.Source => "source",
+        Wpt.SrcSrcsetSizesTypeMedia => "src srcset sizes type media",
+        Wpt.NameRequiredDisabledMultipleSizeForm => "name required disabled multiple size form autocomplete",
+        Wpt.Option => "option",
+        Wpt.ValueSelectedDisabledLabel => "value selected disabled label",
+        Wpt.Optgroup => "optgroup",
+        Wpt.LabelDisabled => "label disabled",
+        Wpt.Fieldset => "fieldset",
+        Wpt.DisabledFormName => "disabled form name",
+        Wpt.Output => "output",
+        Wpt.ForFormName => "for form name",
+        Wpt.Details => "details",
+        Wpt.OpenName => "open name",
+        Wpt.Dialog => "dialog",
+        Wpt.Open => "open",
+        Wpt.Progress => "progress",
+        Wpt.ValueMax => "value max",
+        Wpt.Meter => "meter",
+        Wpt.ValueMinMaxLowHighOptimum => "value min max low high optimum",
+        Wpt.Ol => "ol",
+        Wpt.StartReversedType => "start reversed type",
+        Wpt.Li => "li",
+        Wpt.Datetime => "datetime",
+        Wpt.Del => "del",
+        Wpt.Ins => "ins",
+        Wpt.DatetimeCite => "datetime cite",
+        Wpt.Blockquote => "blockquote",
+        Wpt.Q => "q",
+        Wpt.Cite => "cite",
+        Wpt.Canvas => "canvas",
+        Wpt.WidthHeight => "width height",
+        Wpt.Td => "td",
+        Wpt.ColspanRowspanHeaders => "colspan rowspan headers",
+        Wpt.Th => "th",
+        Wpt.ColspanRowspanHeadersScopeAbbr => "colspan rowspan headers scope abbr",
+        Wpt.Video => "video",
+        Wpt.SrcControlsAutoplayMutedLoopPlaysinline => "src controls autoplay muted loop playsinline poster width height preload crossorigin disablepictureinpicture disableremoteplayback",
+        Wpt.Audio => "audio",
+        Wpt.SrcControlsAutoplayMutedLoopPreload => "src controls autoplay muted loop preload crossorigin",
+        Wpt.Object => "object",
+        Wpt.DataTypeNameWidthHeightForm => "data type name width height form usemap typemustmatch",
+        Wpt.Iframe => "iframe",
+        Wpt.SrcSrcdocNameTitleWidthHeight => "src srcdoc name title width height loading allow allowfullscreen sandbox referrerpolicy",
+        Wpt.Aria => "aria-",
+        Wpt.Data => "data-",
+        Wpt.InvalidCSSProperty => "invalid CSS property",
+        Wpt.TwoCSSDeclarationsOnOneLine => "two CSS declarations on one line need ; between them",
+        Wpt.WutuCommentsAreWritten => "Wutu comments are written // …",
+        Wpt.UnterminatedComment => "unterminated comment",
+        Wpt.ExpectedALineBreakOrAfter => "expected a line break or ; after Wutu statement",
+        Wpt.PlusDashStarSlashPctEqLtGtAmpBarCaretTildeBangCo => "+-*/%=<>&|^~!,.?:",
+        Wpt.AndOrXorNotOrelseElse => "and or xor not orelse else in",
+        Wpt.PlusStarSlashPctLtGtBarCaretTildeBang => "+*/%<>|^~!",
+        Wpt.AndOrXorOrelseElseCatch => "and or xor orelse else catch",
+        Wpt.Collect => "collect",
+        Wpt.MapFilterSkipTakeSkipWhile => "map filter skip take skip_while take_while scan zip chain flat_map repeat fold each any all count_where first_index last_index sum fast_sum product count sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect",
+        Wpt.UnterminatedString => "unterminated string",
+        Wpt.UnterminatedDSLEnvelope => "Unterminated DSL envelope",
+        Wpt.ExpectedALineBreakOrAfterSemi => "expected a line break or ; after expression",
+        Wpt.UnterminatedExpression => "unterminated expression",
+        Wpt.FoldEachAnyAllCountWhere => "fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect",
+        Wpt.MapFilterSkipTakeSkipWhileLc => "map filter skip take skip_while take_while scan zip chain flat_map repeat",
+        Wpt.WutuNoLongerWritesAnExpression => "Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)",
+        Wpt.UnterminatedCSSComment => "unterminated CSS comment",
+        Wpt.UnterminatedCSSBlock => "unterminated CSS block",
+        Wpt.Reactive => "@reactive",
+        Wpt.Island => "@island",
+        Wpt.ExpectedAQuotedIslandNameIsland => "expected a quoted island name: @island \"name\"",
+        Wpt.StyleAt => "@style",
+        Wpt.StyleTakesOneExpressionNotAn => "@style takes one expression, not an assignment: @style e",
+        Wpt.Document => "@document",
+        Wpt.ExpectedDocumentCSSBlock => "expected document CSS block",
+        Wpt.Html => "html",
+        Wpt.BarGt => "|>",
+        Wpt.ExpectedBrace => "expected {",
+        Wpt.UnterminatedBranch => "unterminated branch",
+        Wpt.AConditionBefore => "a condition before {",
+        Wpt.WhatToIterateThenItem => "what to iterate, then |item|",
+        Wpt.ExpectedItemOrItemIndexAfter => "expected |item| or |item, index| after iterable",
+        Wpt.Global => "global",
+        Wpt.AKeyBefore => "a key before {",
+        Wpt.ExpectedAnHTMLTagClassOnly => "expected an HTML tag (class-only heads do not create elements)",
+        Wpt.ExpectedClassOrId => "expected class or id",
+        Wpt.Id => "id",
+        Wpt.As => "as",
+        Wpt.ExpectedNodeBinding => "expected node binding",
+        Wpt.ExpectedAfterElementHead => "expected { after element head",
+        Wpt.ForeignObject => "foreignObject",
+        Wpt.AScriptSTextIsCode => "a script's text is code, so Wutu writes it only as written: script { \"…\" }",
+        Wpt.Multiple => "multiple",
+        Wpt.BindValuesIsAMultipleSelect => "bind:values is a multiple select's: select { multiple; bind:values = … }",
+        Wpt.DataWutuUnmanaged => "data-wutu-unmanaged",
+        Wpt.StyleNoscriptIframeXmpNoembedNoframes => "style noscript iframe xmp noembed noframes plaintext",
+        Wpt.An => "an ",
+        Wpt.Bind => "bind:",
+        Wpt.Checked => "checked",
+        Wpt.Group => "group",
+        Wpt.Files => "files",
+        Wpt.Quiet => "quiet",
+        Wpt.AHandlerValueNamesItsOwn => "a handler value names its own parameter: on click = cl(e) Void { … }",
+        Wpt.EventHandler => "event handler",
+        Wpt.Unmanaged => "@unmanaged",
+        Wpt.ReactiveIslandStyleDocument => "reactive island style document",
+        Wpt.ReactiveIslandStyleDocumentAtAtAtAt => "@reactive @island @style @document",
+        Wpt.MediaSupportsContainerLayerKeyframesFont => "media supports container layer keyframes font-face starting-style scope page property counter-style font-feature-values font-palette-values position-try view-transition",
+        Wpt.UnmanagedLc => "unmanaged",
+        Wpt.ExpectedALineBreakOrAfterSemiAt => "expected a line break or ; after @unmanaged",
+        Wpt.UnmanagedGoesInsideTheElementIt => "@unmanaged goes inside the element it is for: div { @unmanaged }",
+        Wpt.AnElementTakesUnmanagedOrA => "an element takes @unmanaged, or a CSS at-rule",
+        Wpt.ClickDblclickAuxclickContextmenuMousedow => "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout wheel keydown keyup keypress pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture focus blur focusin focusout input beforeinput change submit reset invalid select search toggle beforetoggle close cancel load error abort scroll scrollend resize drag dragstart dragend dragenter dragleave dragover drop touchstart touchend touchmove touchcancel animationstart animationend animationiteration animationcancel transitionstart transitionend transitionrun transitioncancel copy cut paste play pause ended playing waiting seeking seeked timeupdate volumechange ratechange durationchange progress loadstart loadeddata loadedmetadata canplay canplaythrough emptied stalled suspend formdata slotchange fullscreenchange compositionstart compositionupdate compositionend selectionchange selectstart mount",
+        Wpt.Xlink => "xlink:",
+        Wpt.Xmlns => "xmlns:",
+        Wpt.Xml => "xml:",
+        Wpt.AndOrNotOrelse => "and or not orelse",
+        Wpt.APropertyTakesAValueName => "a property takes a value: .name = value",
+        Wpt.AScriptSAttributesAreCode => "a script's attributes are code or load it, so Wutu sets them only as written: src = \"…\"",
+        Wpt.Href => "href",
+        Wpt.ABaseSHrefMovesEvery => "a base's href moves every relative URL (scripts' too), so Wutu sets it only as written: href = \"/\"",
+        Wpt.Protocol => "protocol",
+        Wpt.ProtocolFromAValueCouldMake => ".protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;",
+        Wpt.TextContentInnerText => "textContent innerText",
+        Wpt.Srcdoc => "srcdoc",
+        Wpt.SrcdocIsHTMLSoWutuSets => "srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\" (trusted HTML from a value: an `as` element's .srcdoc, in code)",
+        Wpt.BraceSemiBraceEnd => "{;}",
+        Wpt.AmpCommaSpaceAmpSpaceStar => "&, & *",
+        Wpt.AtSpace => "@ ",
+        Wpt.ColonBraceBraceEndSemi => ":{};",
+        Wpt.ComputedCSSValue => "computed CSS value",
+        Wpt.SemiBraceBraceEnd => ";{}",
+        Wpt.ExpectedALineBreakOrAfterLc => "expected a line break or ; after a CSS declaration",
+    }
+}
+
+fn wps(t: Wpt) Str => st(st_wutu_parse + t.i32())
+fn wps1(t: Wpt, a: Str) Str => stf(st_wutu_parse + t.i32(), a, "", "", "")
+fn wps2(t: Wpt, a: Str, b: Str) Str => stf(st_wutu_parse + t.i32(), a, b, "", "")
+fn wps3(t: Wpt, a: Str, b: Str, c: Str) Str => stf(st_wutu_parse + t.i32(), a, b, c, "")

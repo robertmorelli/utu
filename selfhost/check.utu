@@ -136,9 +136,9 @@ fn instance_note() Void {
     let inst = checking_inst[n - 2]
     // (Too deep: the instance is what is wrong, and too long to say.)
     if inst <= 0 or inst >= inst_module.len() or diag_kind[diag_kind.len() - 1] == Diag.InstanceDepth.i32() { return }
-    let text = word_text(decl_name[inst_module[inst]]) + "[" + type_list_text(inst_args[inst]) + "]"
-    diag_note("in " + text)
-    if checking_inst[n - 1] >= 0 { diag_place(Extra.Related, checking_inst[n - 1], "as " + text + " here") }
+    let text = cks2(Ckt.ABracketBBracketEnd, word_text(decl_name[inst_module[inst]]), type_list_text(inst_args[inst]))
+    diag_note(cks1(Ckt.In, text))
+    if checking_inst[n - 1] >= 0 { diag_place(Extra.Related, checking_inst[n - 1], cks1(Ckt.AsHere, text)) }
 }
 
 fn fi_grow() Void {
@@ -880,7 +880,7 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
     let m = w_mark()
     let rt = check_expr(a, -1, cx)
     if ty_is(rt, Ty.Error) { return rt }
-    if in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(rt)) {
+    if in_words(cks(Ckt.I32U32I64U64F32F64), type_text(rt)) {
         str_of(rt, a, m, cx)
         return prelude(Prelude.Str)
     }
@@ -889,20 +889,20 @@ fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
         // generic list renderer (whose body otherwise owns the diagnostic).
         let element = rt
         while (is_array_type(element)) { element = vl_item(inst_args[ty_inst(element)], 0) }
-        let protocol = promoted(prelude_lookup(intern_text("Component")))
+        let protocol = promoted(prelude_lookup(intern_text(cks(Ckt.Component))))
         let component_element = protocol >= 0 and (ty_decl(element) == protocol or implements(ty_decl(element), protocol))
-        if not shows_as_itself(element) and not in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(element)) and not component_element {
+        if not shows_as_itself(element) and not in_words(cks(Ckt.I32U32I64U64F32F64), type_text(element)) and not component_element {
             report2(Diag.WutuHole, unspliced(a), -1, element, -1)
             return error_value()
         }
         let callee = first_child(node)
         let module = node_decl[first_child(callee)]
-        let decl = static_member(module, intern_text("show_list"))
+        let decl = static_member(module, intern_text(cks(Ckt.ShowList)))
         w_resize_stack(m)
         return call_template(decl, args, m, node, cx)
     }
-    let component = promoted(prelude_lookup(intern_text("Component")))
-    let render = intern_text("render")
+    let component = promoted(prelude_lookup(intern_text(cks(Ckt.Component))))
+    let render = intern_text(cks(Ckt.Render))
     if component >= 0 and (ty_decl(rt) == component or implements(ty_decl(rt), component)) {
         if ty_decl(rt) == component {
             return proto_call_named(rt, render, -1, -1, 0, m, node, cx)
@@ -932,7 +932,7 @@ fn unspliced(n: I32) I32 {
 /// node), or null.
 fn shows_as_itself(t: I32) Bool {
     if ty_is(t, Ty.Null) or is_foreign_or_nullable(t) { return true }
-    return ty_is(t, Ty.Named) and in_words("Str Externref", type_text(t))
+    return ty_is(t, Ty.Named) and in_words(cks(Ckt.StrExternref), type_text(t))
 }
 
 /// `wutu.key_text(k)`, what a loop's `key k` becomes: a Str is itself, a
@@ -946,7 +946,7 @@ fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
     let m = w_mark()
     let rt = check_expr(a, -1, cx)
     if ty_is(rt, Ty.Error) { return rt }
-    if in_words("I32 U32 I64 U64 F32 F64 Bool", type_text(rt)) {
+    if in_words(cks(Ckt.I32U32I64U64F32F64), type_text(rt)) {
         str_of(rt, a, m, cx)
         return prelude(Prelude.Str)
     }
@@ -956,7 +956,7 @@ fn check_wutu_key(node: I32, args: I32, cx: Cx) I32 {
 }
 
 /// Whether `callee` is `wutu.show` (std:Wutu's).
-fn is_wutu_show(callee: I32) Bool => is_wutu_fn(callee, "show")
+fn is_wutu_show(callee: I32) Bool => is_wutu_fn(callee, cks(Ckt.Show))
 
 /// Whether `callee` is std:Wutu's function `name` (`wutu.name`).
 fn is_wutu_fn(callee: I32, name: Str) Bool {
@@ -1008,7 +1008,7 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
         f = static_member(node_decl[first_child(callee)], word_of(last_child(callee)))
     }
     if not decl_is(f, Decl.Fn) or not memo_safe_fn(f) { return false }
-    let component = promoted(prelude_lookup(intern_text("Component")))
+    let component = promoted(prelude_lookup(intern_text(cks(Ckt.Component))))
     if component >= 0 {
         let result = type_of(child_of_kind(decl_node[f], Node.Return_type), instance_for(module_of(f), cx.inst))
         // Rendering a component list may read mutable state even when the
@@ -1025,7 +1025,7 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
         let t = check_expr(a, -1, cx)
         while (w_mark() > m) { w_pop() }
         // The string key loses signed zero; redraw float props instead.
-        if ty_is(t, Ty.Error) or not in_words("I32 U32 I64 U64 Bool Str", type_text(t)) { return false }
+        if ty_is(t, Ty.Error) or not in_words(cks(Ckt.I32U32I64U64BoolStr), type_text(t)) { return false }
         a = next_sibling(a)
     }
     return true
@@ -1057,9 +1057,9 @@ fn std_memo_safe(decl: I32) Bool {
     let m = word_text(decl_name[module])
     let w = fn_word(decl)
     let name = if w >= 0 { word_text(w) } else { "" }
-    if m == "time" or m == "Stream" or (m == "Random" and name == "from_host") { return false }
+    if m == "time" or m == cks(Ckt.Stream) or (m == cks(Ckt.Random) and name == cks(Ckt.FromHost)) { return false }
     if m != "wutu" { return true }
-    return in_words("init show memo_key key_text number money decimal", name)
+    return in_words(cks(Ckt.InitShowMemoKeyKeyText), name)
 }
 
 /// A method call's every candidate (`x.f(…)`: any type's method f, its
@@ -1078,7 +1078,7 @@ fn memo_safe_node(n: I32) Bool {
     if n < 0 { return true }
     if is_kind(n, Node.Bind_expr) and is_es(last_child(n)) {
         // A template's own helper bindings are trusted; another `@es` is the host.
-        return text_at(word_text(word_of(first_child(n))), 0, "__wutu_")
+        return text_at(word_text(word_of(first_child(n))), 0, cks(Ckt.Wutu))
     }
     if is_kind(n, Node.Dsl_expr) and is_es(n) { return false }
     if is_kind(n, Node.Identifier) {
@@ -1194,7 +1194,7 @@ fn past_64_bits(node: I32) Bool {
     let t = node_first[node]
     let i = tok_start[t]
     let end_ = tok_end[t]
-    let max = "18446744073709551615"
+    let max = cks(Ckt.N18446744073709551615)
     let per = 0
     if end_ - i > 2 and src[i] == 48 and (src[i + 1] == 120 or src[i + 1] == 98) {
         per = if src[i + 1] == 120 { 16 } else { 64 }
@@ -1638,7 +1638,7 @@ fn computed_global(gi: I32, t: I32, init: I32) I32 {
     gi_init[gi] = computed_gi.len()
     computed_gi.push(gi)
     let f = defined_func(vl_empty(), t)
-    func_debug_name[f] = name_add(word_text(decl_name[decl]) + ".init")
+    func_debug_name[f] = name_add(cks1(Ckt.Init, word_text(decl_name[decl])))
     computed_init.push(f)
     let outer = cur_fn
     cur_fn = -2 - gi
@@ -1651,8 +1651,8 @@ fn computed_global(gi: I32, t: I32, init: I32) I32 {
     let at = awaits_in(init)
     if at >= 0 {
         report(Diag.AwaitInGlobal, at, -1)
-        diag_label(if is_kind(at, Node.Await_expr) { "suspends" } else { "may suspend" })
-        diag_note("Globals are set as the module starts, before anything can suspend; await in a function")
+        diag_label(if is_kind(at, Node.Await_expr) { cks(Ckt.Suspends) } else { cks(Ckt.MaySuspend) })
+        diag_note(cks(Ckt.GlobalsAreSetAsTheModule))
     }
     want(init, t, Why.Annotation, next_sibling(first_child(decl_node[decl])), decl_name[decl])
     coerce(check_expr(init, t, cx), t, init)
@@ -1732,7 +1732,7 @@ fn start_globals() Void {
     let m = w_mark()
     for (0 ..< n) |i| { set_global_after(by_place[i], deps, deps_first, state) }
     w_node(Op.Seq, vt_none, 0, 0, m)
-    let f = helper(vl_empty(), vl_empty(), vl_empty(), "start")
+    let f = helper(vl_empty(), vl_empty(), vl_empty(), cks(Ckt.Start))
     func_body[f] = w_pop()
     start_func = f
 }
@@ -1758,7 +1758,7 @@ fn set_global_after(k: I32, deps: Array[I32], deps_first: Array[I32], state: Arr
             // (A generic mod's: which instance, said in a note.)
             enter_instance(gi_inst[computed_gi[k]], -1)
             report2(Diag.GlobalCycle, last_child(decl_node[d]), decl_name[d], if j == k { -1 } else { o }, -1)
-            if j != k { diag_place(Extra.Related, first_child(decl_node[o]), "needs " + word_text(decl_name[d])) }
+            if j != k { diag_place(Extra.Related, first_child(decl_node[o]), cks1(Ckt.Needs, word_text(decl_name[d]))) }
             leave_instance()
         } else {
             set_global_after(j, deps, deps_first, state)
@@ -1828,7 +1828,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
             return error_value()
         }
         report(Diag.AssignmentToImmutable, name, word_of(name))
-        diag_label(pick(decl_is(node_decl[name], Decl.Fn), "function", "constant"))
+        diag_label(pick(decl_is(node_decl[name], Decl.Fn), cks(Ckt.Function), cks(Ckt.Constant)))
         return error_value()
     }
     if not is_kind(target, Node.Identifier) {
@@ -1855,8 +1855,8 @@ fn check_assign(node: I32, cx: Cx) I32 {
     // `for (0..<n) |i| { i += 2; }`: the range sets the count.
     if decl_is(decl, Decl.Capture) {
         report2(Diag.AssignmentToImmutable, target, word_of(target), 1, -1)
-        diag_place(Extra.Related, decl_node[decl], "the capture")
-        diag_note(pick(capture_is_count(decl), "the range sets the count: use a while loop with a let to move it", "a capture is a copy: write to the array (xs[i]) or a let"))
+        diag_place(Extra.Related, decl_node[decl], cks(Ckt.TheCapture))
+        diag_note(pick(capture_is_count(decl), cks(Ckt.TheRangeSetsTheCountUse), cks(Ckt.ACaptureIsACopyWrite)))
         return error_value()
     }
     let t = decl_ty[decl]
@@ -2148,8 +2148,8 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
     while (is_kind(callee, Node.Splice)) { callee = first_child(callee) }
     let m = w_mark()
     if is_wutu_show(callee) { return check_wutu_show(node, args, cx) }
-    if is_wutu_fn(callee, "memo_key") { return check_memo_key(node, args, cx) }
-    if is_wutu_fn(callee, "key_text") { return check_wutu_key(node, args, cx) }
+    if is_wutu_fn(callee, cks(Ckt.MemoKey)) { return check_memo_key(node, args, cx) }
+    if is_wutu_fn(callee, cks(Ckt.KeyText)) { return check_wutu_key(node, args, cx) }
     if is_kind(callee, Node.Identifier) { return call_name(node, callee, args, m, cx) }
     if is_kind(callee, Node.Field_expr) or is_kind(callee, Node.Optional_field_expr) { return call_field(node, callee, args, m, expect, cx) }
     if is_kind(callee, Node.Type_member_expr) { return call_type_member(node, callee, args, m, expect, cx) }
@@ -2163,10 +2163,10 @@ fn check_call(node: I32, expect: I32, cx: Cx) I32 {
 fn old_scalar_static(decl: I32, name: I32, owner: I32, node: I32) Bool {
     if not is_scalar_kind(decl) { return false }
     let w = word_text(word_of(name))
-    if not (w == "from_i32" or w == "from_u32" or w == "from_i64" or w == "from_u64" or w == "from_f32" or w == "from_f64") { return false }
+    if not (w == cks(Ckt.FromI32) or w == cks(Ckt.FromU32) or w == cks(Ckt.FromI64) or w == cks(Ckt.FromU64) or w == cks(Ckt.FromF32) or w == cks(Ckt.FromF64)) { return false }
     report2(Diag.UnknownMethod, node, word_of(name), named(decl, -1), -1)
     let made = node_text(owner)
-    diag_fix(tok_start[node_first[owner]], tok_end[node_last[name] - 1], made, "Use " + made + "(…)")
+    diag_fix(tok_start[node_first[owner]], tok_end[node_last[name] - 1], made, cks1(Ckt.Use, made))
     return true
 }
 
@@ -2183,16 +2183,16 @@ fn suggest_struct_init(node: I32, decl: I32, args: I32) Void {
         if is_kind(c, Node.Field) {
             let field = word_text(word_of(first_child(c)))
             let sep = if fields == 0 { "" } else { ", " }
-            shown = shown + sep + field + ": …"
-            made = made + sep + field + ": " + if a >= 0 { node_text(a) } else { "" }
+            shown = cks3(Ckt.ABCColonSpaceEllipsis, shown, sep, field)
+            made = cks4(Ckt.ABCColonSpaceD, made, sep, field, if a >= 0 { node_text(a) } else { "" })
             if a >= 0 { a = next_sibling(a) }
             fields += 1
         }
         c = next_sibling(c)
     }
-    diag_note(name + " is a struct: write " + name + " { " + shown + " }")
+    diag_note(cks3(Ckt.IsAStructWrite, name, name, shown))
     if fields > 0 and args >= 0 and fields == child_count(args) {
-        diag_fix(tok_start[node_first[node]], tok_end[node_last[node] - 1], name + " { " + made + " }", "Use " + name + " { … }")
+        diag_fix(tok_start[node_first[node]], tok_end[node_last[node] - 1], cks2(Ckt.ASpaceBraceSpaceBSpaceBraceEnd, name, made), cks1(Ckt.UseBraceEllipsisBra, name))
     }
 }
 
@@ -2531,7 +2531,7 @@ fn call_method(node: I32, callee: I32, args: I32, m: I32, expect: I32, cx: Cx) I
             report2(Diag.UnknownMethod, node, word_of(name), rt, -1)
             let t = node_first[name]
             let now = word_text(base_word(base))
-            diag_fix(tok_start[t], tok_end[t], now, "Use " + now)
+            diag_fix(tok_start[t], tok_end[t], now, cks1(Ckt.Use2, now))
             return finish_error(args, m, cx)
         }
         if scalar >= 0 {
@@ -2895,15 +2895,15 @@ vec lazy_call_path: I32
 fn lazy_stub(fi: I32, f: I32, lazy: I32, m: I32) Void {
     let decl = fi_decl[fi]
     let params = fi_params[fi]
-    let sig = "("
+    let sig = cks(Ckt.Open)
     for (0 ..< vl_len[params]) |i| {
-        if i > 0 { sig = sig + ", " }
-        sig = sig + "a" + i.str() + ": " + type_text(vl_item(params, i))
+        if i > 0 { sig = cks1(Ckt.ACommaSpace, sig) }
+        sig = cks3(Ckt.A, sig, i.str(), type_text(vl_item(params, i)))
     }
     let r = fi_result[fi]
-    sig = sig + ") " + type_text(r)
-    let body = "(...a)=>globalThis.__wutuLazy(" + word_text(lazy_path[lazy]) + ",\"" + word_text(decl_name[decl]) + "\",a)"
-    let imp = add_import_func(name_add("es"), name_add("__es_" + es_func.len().str()), func_type_of[f])
+    sig = cks2(Ckt.ACloseSpaceB, sig, type_text(r))
+    let body = cks2(Ckt.AGlobalThisWutuLazyA, word_text(lazy_path[lazy]), word_text(decl_name[decl]))
+    let imp = add_import_func(name_add("es"), name_add(cks1(Ckt.Es, es_func.len().str())), func_type_of[f])
     es_func.push(imp)
     es_start.push(-1)
     es_end.push(intern_text(body))
@@ -2925,17 +2925,17 @@ fn check_lazy_signature(fi: I32, site: I32) Void {
         let t = vl_item(params, i)
         if not crosses_chunk(t) {
             report2(Diag.LazyValue, at, decl_name[decl], t, -1)
-            diag_place(Extra.Related, if list >= 0 { nth_child(list, i) } else { decl_node[decl] }, "declared here")
+            diag_place(Extra.Related, if list >= 0 { nth_child(list, i) } else { decl_node[decl] }, cks(Ckt.DeclaredHere))
         }
     }
     if not is_foreign(fi_result[fi]) {
         report2(Diag.LazyValue, at, decl_name[decl], fi_result[fi], 1)
-        diag_place(Extra.Related, decl_node[decl], "declared here")
+        diag_place(Extra.Related, decl_node[decl], cks(Ckt.DeclaredHere))
     }
 }
 
 /// Whether a value of type t can cross into a chunk: a number, a Bool, a Str, or a host value.
-fn crosses_chunk(t: I32) Bool => in_words("I32 U32 I64 U64 F32 F64 Bool Str", type_text(t)) or is_foreign(t)
+fn crosses_chunk(t: I32) Bool => in_words(cks(Ckt.I32U32I64U64F32F642), type_text(t)) or is_foreign(t)
 
 /// Whether the program imports host declarations (std:JS, npm:…).
 fn has_foreign() Bool {
@@ -3376,7 +3376,7 @@ fn ir_lit_fits(s: I32, e: I32, neg: Bool, t: I32) Bool {
     let signed = t == prelude(Prelude.I32) or t == prelude(Prelude.I64)
     let i = s
     while (i < e - 1 and src[i] == 48) { i += 1 }
-    let max = "18446744073709551615"
+    let max = cks(Ckt.N18446744073709551615)
     if e - i > max.len() { return false }
     if e - i == max.len() {
         if signed or bits == 32 or neg { return false }
@@ -3722,10 +3722,10 @@ fn check_break_label(node: I32, cx: Cx) I32 {
         let valued = value < 0 and past < 0 and not labeled_around(node)
         report2(Diag.UnknownLabel, name, word_of(name), if past >= 0 { 2 } else if valued { 1 } else { -1 }, -1)
         if past >= 0 {
-            diag_place(Extra.Related, first_child(past), "outside the closure")
-            diag_note("a closure cannot leave the block it is in")
+            diag_place(Extra.Related, first_child(past), cks(Ckt.OutsideTheClosure))
+            diag_note(cks(Ckt.AClosureCannotLeaveTheBlock))
         } else if value < 0 {
-            diag_note("a loop's break takes no value; break name v leaves a block name: { … } with v")
+            diag_note(cks(Ckt.ALoopSBreakTakesNo))
         }
         let me = w_mark()
         if value >= 0 { discard(check_expr(value, -1, cx)) }
@@ -3874,7 +3874,7 @@ fn suggest_result_type(node: I32, t: I32) Void {
     if rt < 0 or not is_kind(first_child(rt), Node.Void_type) { return }
     let text = type_text(t)
     let at = node_first[rt]
-    diag_fix(tok_start[at], tok_end[at], text, "Return " + text)
+    diag_fix(tok_start[at], tok_end[at], text, cks1(Ckt.Return, text))
 }
 
 fn check_return(node: I32, cx: Cx) I32 {
@@ -4036,7 +4036,7 @@ fn compile(target: Target) I32 {
     comptime_fuel = -1
     if target == Target.Comptime {
         comptime_fuel = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()))
-        glob_field_name[comptime_fuel] = name_add("__comptime_fuel")
+        glob_field_name[comptime_fuel] = name_add(cks(Ckt.ComptimeFuel))
     }
     reset_profile()
     check_open_instances()
@@ -4120,7 +4120,7 @@ fn compile(target: Target) I32 {
         if target == Target.Comptime and file_role[file] == FileRole.Generated.i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file])
             while (item >= 0) {
-                if is_kind(item, Node.Fn_decl) and has_prefix(word_of(last_child(first_child(item))), "__comptime_run_") {
+                if is_kind(item, Node.Fn_decl) and has_prefix(word_of(last_child(first_child(item))), cks(Ckt.ComptimeRun)) {
                     export_fn(node_decl[last_child(first_child(item))])
                 }
                 if is_kind(item, Node.Mem_decl) and mem_is_exported(node_decl[first_child(item)]) { memory_of(node_decl[first_child(item)]) }
@@ -4203,7 +4203,7 @@ fn export_fn(decl: I32) Void {
         if es_fun_type(t) and list >= 0 {
             report3(Diag.ExportFun, last_child(nth_child(list, i)), decl_name[decl], t, i + 1, -1)
             let u = if ty_is(t, Ty.Nullable) { ty_a[t] } else { t }
-            diag_note("A JS function is a closure: type it " + type_text(ty(Ty.Closure, ty_a[u], ty_b[u])) + ".")
+            diag_note(cks1(Ckt.AJSFunctionIsAClosure, type_text(ty(Ty.Closure, ty_a[u], ty_b[u]))))
         }
     }
 }
@@ -4341,7 +4341,7 @@ fn bench_function(item: I32, k: I32) Void {
     let mp = vl_begin()
     vl_add(i32_t)
     let f = defined_func(vl_end(mp), ty_void())
-    let name = name_add(if k >= 0 { "__bench_" + k.str() } else { "bench" })
+    let name = name_add(if k >= 0 { cks1(Ckt.Bench, k.str()) } else { cks(Ckt.BenchLc) })
     func_debug_name[f] = name
     if k >= 0 {
         func_field_name[f] = name
@@ -4417,7 +4417,7 @@ fn entry_function(item: I32, name: I32, test_index: I32) Void {
     let params = vl_end(m)
     let f = defined_func(params, result)
     let export_name = if name >= 0 { name_from_src(src.interned_start(name), src.interned_start(name) + src.interned_size(name)) }
-        else if test_index >= 0 { name_add("__test_" + test_index.str()) } else { name_add("test") }
+        else if test_index >= 0 { name_add(cks1(Ckt.Test, test_index.str())) } else { name_add(cks(Ckt.TestLc)) }
     func_debug_name[f] = export_name
     func_src[f] = item
     if name >= 0 or test_index >= 0 {
@@ -4469,8 +4469,8 @@ fn run_readers(item: I32) Void {
     if ty_is(t, Ty.Tuple) or js_handle(t) { run_elem = t }
     while (is_array_type(t)) {
         let k = run_depth.str()
-        run_reader(t, intern_text("len"), "run:len:" + k)
-        let elem = run_reader(t, known_word(Known.GetIndex), "run:at:" + k)
+        run_reader(t, intern_text(cks(Ckt.Len)), cks1(Ckt.RunLen, k))
+        let elem = run_reader(t, known_word(Known.GetIndex), cks1(Ckt.RunAt, k))
         run_depth += 1
         run_elem = elem
         t = if ty_is(elem, Ty.Nullable) { ty_a[elem] } else { elem }
@@ -4526,3 +4526,148 @@ fn method_of_unknown(receiver: I32, name: I32) I32 {
     }
     return -1
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Ckt:
+    | ABracketBBracketEnd
+    | In
+    | AsHere
+    | Init
+    | Needs
+    | Use
+    | ABCColonSpaceEllipsis
+    | ABCColonSpaceD
+    | IsAStructWrite
+    | ASpaceBraceSpaceBSpaceBraceEnd
+    | UseBraceEllipsisBra
+    | Use2
+    | ACommaSpace
+    | A
+    | ACloseSpaceB
+    | AGlobalThisWutuLazyA
+    | Es
+    | Return
+    | AJSFunctionIsAClosure
+    | Bench
+    | Test
+    | RunLen
+    | RunAt
+    | I32U32I64U64F32F64
+    | Component
+    | ShowList
+    | Render
+    | StrExternref
+    | Show
+    | I32U32I64U64BoolStr
+    | Stream
+    | Random
+    | FromHost
+    | InitShowMemoKeyKeyText
+    | Wutu
+    | N18446744073709551615
+    | Suspends
+    | MaySuspend
+    | GlobalsAreSetAsTheModule
+    | Start
+    | Function
+    | Constant
+    | TheCapture
+    | TheRangeSetsTheCountUse
+    | ACaptureIsACopyWrite
+    | MemoKey
+    | KeyText
+    | FromI32
+    | FromU32
+    | FromI64
+    | FromU64
+    | FromF32
+    | FromF64
+    | Open
+    | DeclaredHere
+    | I32U32I64U64F32F642
+    | OutsideTheClosure
+    | AClosureCannotLeaveTheBlock
+    | ALoopSBreakTakesNo
+    | ComptimeFuel
+    | ComptimeRun
+    | BenchLc
+    | TestLc
+    | Len
+
+fn cks_src(t: Ckt) Str {
+    return match t {
+        Ckt.ABracketBBracketEnd => "{0}[{1}]",
+        Ckt.In => "in {0}",
+        Ckt.AsHere => "as {0} here",
+        Ckt.Init => "{0}.init",
+        Ckt.Needs => "needs {0}",
+        Ckt.Use => "Use {0}(…)",
+        Ckt.ABCColonSpaceEllipsis => "{0}{1}{2}: …",
+        Ckt.ABCColonSpaceD => "{0}{1}{2}: {3}",
+        Ckt.IsAStructWrite => "{0} is a struct: write {1} { {2} }",
+        Ckt.ASpaceBraceSpaceBSpaceBraceEnd => "{0} { {1} }",
+        Ckt.UseBraceEllipsisBra => "Use {0} { … }",
+        Ckt.Use2 => "Use {0}",
+        Ckt.ACommaSpace => "{0}, ",
+        Ckt.A => "{0}a{1}: {2}",
+        Ckt.ACloseSpaceB => "{0}) {1}",
+        Ckt.AGlobalThisWutuLazyA => "(...a)=>globalThis.__wutuLazy({0},\"{1}\",a)",
+        Ckt.Es => "__es_{0}",
+        Ckt.Return => "Return {0}",
+        Ckt.AJSFunctionIsAClosure => "A JS function is a closure: type it {0}.",
+        Ckt.Bench => "__bench_{0}",
+        Ckt.Test => "__test_{0}",
+        Ckt.RunLen => "run:len:{0}",
+        Ckt.RunAt => "run:at:{0}",
+        Ckt.I32U32I64U64F32F64 => "I32 U32 I64 U64 F32 F64 Bool",
+        Ckt.Component => "Component",
+        Ckt.ShowList => "show_list",
+        Ckt.Render => "render",
+        Ckt.StrExternref => "Str Externref",
+        Ckt.Show => "show",
+        Ckt.I32U32I64U64BoolStr => "I32 U32 I64 U64 Bool Str",
+        Ckt.Stream => "Stream",
+        Ckt.Random => "Random",
+        Ckt.FromHost => "from_host",
+        Ckt.InitShowMemoKeyKeyText => "init show memo_key key_text number money decimal",
+        Ckt.Wutu => "__wutu_",
+        Ckt.N18446744073709551615 => "18446744073709551615",
+        Ckt.Suspends => "suspends",
+        Ckt.MaySuspend => "may suspend",
+        Ckt.GlobalsAreSetAsTheModule => "Globals are set as the module starts, before anything can suspend; await in a function",
+        Ckt.Start => "start",
+        Ckt.Function => "function",
+        Ckt.Constant => "constant",
+        Ckt.TheCapture => "the capture",
+        Ckt.TheRangeSetsTheCountUse => "the range sets the count: use a while loop with a let to move it",
+        Ckt.ACaptureIsACopyWrite => "a capture is a copy: write to the array (xs[i]) or a let",
+        Ckt.MemoKey => "memo_key",
+        Ckt.KeyText => "key_text",
+        Ckt.FromI32 => "from_i32",
+        Ckt.FromU32 => "from_u32",
+        Ckt.FromI64 => "from_i64",
+        Ckt.FromU64 => "from_u64",
+        Ckt.FromF32 => "from_f32",
+        Ckt.FromF64 => "from_f64",
+        Ckt.Open => "(",
+        Ckt.DeclaredHere => "declared here",
+        Ckt.I32U32I64U64F32F642 => "I32 U32 I64 U64 F32 F64 Bool Str",
+        Ckt.OutsideTheClosure => "outside the closure",
+        Ckt.AClosureCannotLeaveTheBlock => "a closure cannot leave the block it is in",
+        Ckt.ALoopSBreakTakesNo => "a loop's break takes no value; break name v leaves a block name: { … } with v",
+        Ckt.ComptimeFuel => "__comptime_fuel",
+        Ckt.ComptimeRun => "__comptime_run_",
+        Ckt.BenchLc => "bench",
+        Ckt.TestLc => "test",
+        Ckt.Len => "len",
+    }
+}
+
+fn cks(t: Ckt) Str => st(st_check + t.i32())
+fn cks1(t: Ckt, a: Str) Str => stf(st_check + t.i32(), a, "", "", "")
+fn cks2(t: Ckt, a: Str, b: Str) Str => stf(st_check + t.i32(), a, b, "", "")
+fn cks3(t: Ckt, a: Str, b: Str, c: Str) Str => stf(st_check + t.i32(), a, b, c, "")
+fn cks4(t: Ckt, a: Str, b: Str, c: Str, d: Str) Str => stf(st_check + t.i32(), a, b, c, d)

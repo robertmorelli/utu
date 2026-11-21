@@ -188,7 +188,7 @@ fn memory_of(decl: I32) I32 {
     memory_pages.push(1)
     memory_module_name.push(if hosted { name_add("utu") } else { -1 })
     if hosted {
-        memory_field_name.push(name_add("mem_" + word_text(decl_name[decl])))
+        memory_field_name.push(name_add(sms1(Sml.Mem, word_text(decl_name[decl]))))
         mem_memory[decl] = m
         let count = mem_initial_data(decl, m)
         mem_len[decl] = add_global(vt_i32, true, w_i32_detached(count))
@@ -316,7 +316,7 @@ fn finish_mems() Void {
     // Before the computed globals are set (their initializers may read mems).
     if start_func >= 0 { w_leaf(Op.Call, vt_none, start_func, 0) }
     w_node(Op.Seq, vt_none, 0, 0, m)
-    let f = helper(vl_empty(), vl_empty(), vl_empty(), "start")
+    let f = helper(vl_empty(), vl_empty(), vl_empty(), sms(Sml.Start))
     func_body[f] = w_pop()
     start_func = f
     mark_late(f)
@@ -605,7 +605,7 @@ fn mem_store_helper(decl: I32) I32 {
     let mp = vl_begin()
     vl_add(vt_i32)
     vl_add(vt)
-    let f = helper(vl_end(mp), vl_empty(), vl_empty(), "mem.set")
+    let f = helper(vl_end(mp), vl_empty(), vl_empty(), sms(Sml.MemSet))
     let m = w_mark()
     let in_array = mem_array[decl] >= 0
     if in_array { w_mem_array(decl) }
@@ -869,7 +869,7 @@ vec mem_method_word: I32
 fn mem_method(word: I32) I32 {
     if mem_method_word.len() == 0 {
         for (0 ..< MemMethod.count()) |k| {
-            let name = MemMethod.name(MemMethod(k))
+            let name = mem_method_name(MemMethod(k))
             mem_method_word.push(intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len())))
         }
     }
@@ -921,7 +921,7 @@ fn memory_reserve_helper(decl: I32) I32 {
     let locals = vl_begin()
     vl_add(vt_i32)  // need
     vl_add(vt_i32)  // size
-    let reserve = helper(vl_one(vt_i32), vl_empty(), vl_end(locals), "mem.reserve")
+    let reserve = helper(vl_one(vt_i32), vl_empty(), vl_end(locals), sms(Sml.MemReserve))
     let m = w_mark()
     let mn = w_mark()
     w_get(vt_i32, 0)
@@ -1002,7 +1002,7 @@ fn array_grow_helper(h: I32) I32 {
     let ml = vl_begin()
     vl_add(vt_i32)  // the length
     vl_add(vt_ref(h, true))  // the new array
-    let grow = helper(params, vl_one(arr), vl_end(ml), "mem.grow")
+    let grow = helper(params, vl_one(arr), vl_end(ml), sms(Sml.MemGrow))
     mem_grow.push(h)
     mem_grow.push(grow)
     let m = w_mark()
@@ -1072,7 +1072,7 @@ fn mem_push_helper(decl: I32) I32 {
     let len_g = mem_len[decl]
     if mem_array[decl] >= 0 {
         let h = mem_array_heap(s)
-        let push = helper(vl_one(vt), vl_empty(), vl_empty(), "mem.push")
+        let push = helper(vl_one(vt), vl_empty(), vl_empty(), sms(Sml.MemPush))
         let p = w_mark()
         let pa = w_mark()
         w_mem_array(decl)
@@ -1091,7 +1091,7 @@ fn mem_push_helper(decl: I32) I32 {
     }
     let locals = vl_begin()
     vl_add(vt_i32)  // at
-    let push = helper(vl_one(vt), vl_empty(), vl_end(locals), "mem.push")
+    let push = helper(vl_one(vt), vl_empty(), vl_end(locals), sms(Sml.MemPush))
     let p = w_mark()
     let pa = w_mark()
     w_leaf(Op.GlobalGet, vt_i32, len_g, 0)
@@ -1139,7 +1139,7 @@ fn array_push_helper(h: I32, vt: I32) I32 {
     vl_add(arr)
     vl_add(vt_i32)
     vl_add(vt)
-    let push = helper(vl_end(mp), vl_one(arr), vl_empty(), "mem.push")
+    let push = helper(vl_end(mp), vl_one(arr), vl_empty(), sms(Sml.MemPush))
     mem_array_push.push(h)
     mem_array_push.push(push)
     let m = w_mark()
@@ -1176,7 +1176,7 @@ fn array_push_helper(h: I32, vt: I32) I32 {
 /// `resize(n)`: `reserve(n); if n > len { elements [len, n) = 0 }; len = n`
 /// (a safe build traps on a negative n).
 fn mem_resize_helper(decl: I32) Void {
-    let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize")
+    let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), sms(Sml.MemResize))
     let r = w_mark()
     if safe_checks == 1 {
         let mif = w_mark()
@@ -1266,8 +1266,8 @@ fn mem_is_vec(decl: I32) Bool => tok_word[node_first[decl_node[decl]]] == Kw.Vec
 
 /// How a mem or vec is spoken of, for a diagnostic about the one named `w`.
 fn mem_word(w: I32) Str {
-    for (0 ..< decl_kind.len()) |d| { if decl_is(d, Decl.Mem) and decl_name[d] == w and mem_is_vec(d) { return "vec" } }
-    return "mem"
+    for (0 ..< decl_kind.len()) |d| { if decl_is(d, Decl.Mem) and decl_name[d] == w and mem_is_vec(d) { return sms(Sml.Vec) } }
+    return sms(Sml.MemLc)
 }
 
 /// A program declares at most `max_memories` mems; the first past that is reported.
@@ -1316,11 +1316,11 @@ fn check_mem_host_op(decl: I32, method: I32, args: I32, m: I32, cx: Cx) I32 {
     memory_of(decl)
     if mem_host_ops[decl] < 0 {
         let name = word_text(decl_name[decl])
-        mem_host_ops[decl] = add_import_func(name_add("utu"), name_add("mem_copy_in_" + name), func_type(vl_one(vt_externref), vl_of_result(vt_i32)))
+        mem_host_ops[decl] = add_import_func(name_add("utu"), name_add(sms1(Sml.MemCopyIn, name)), func_type(vl_one(vt_externref), vl_of_result(vt_i32)))
         let mp = vl_begin()
         vl_add(vt_i32)
         vl_add(vt_i32)
-        add_import_func(name_add("utu"), name_add("mem_view_" + name), func_type(vl_end(mp), vl_of_result(vt_externref)))
+        add_import_func(name_add("utu"), name_add(sms1(Sml.MemView, name)), func_type(vl_end(mp), vl_of_result(vt_externref)))
     }
     let a = if args >= 0 { first_child(args) } else { -1 }
     if method == MemMethod.Copy_in.i32() {
@@ -1356,13 +1356,13 @@ fn write_mems_json() Void {
         if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 { any = true }
     }
     if not any { return }
-    json_text("\"mems\":[")
+    json_text(sms(Sml.Mems))
     let first = true
     for (0 ..< decl_kind.len()) |d| {
         if decl_is(d, Decl.Mem) and mem_memory[d] >= 0 and mem_hosted[d] == 1 {
             if not first { json_byte(44) }
             first = false
-            json_text("{\"name\":\"" + word_text(decl_name[d]) + "\",\"kind\":\"" + Storage.name(mem_storage(d)) + "\",\"host\":true}")
+            json_text(sms2(Sml.NameKindHostTrue, word_text(decl_name[d]), storage_name(mem_storage(d))))
         }
     }
     json_byte(93)

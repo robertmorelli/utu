@@ -365,7 +365,7 @@ fn user_declares(word: I32) Bool {
 /// @pure_flags's entry `i`.
 fn pure_flag(i: I32) Bool {
     if pure_words.len() == 0 {
-        for (["i32", "u32", "i64", "u64", "f32", "f64", "len", "abs", "sqrt", "min", "max"]) |name| { pure_words.push(intern_text(name)) }
+        for (["i32", sms(Sml.U32), "i64", sms(Sml.U64), "f32", "f64", sms(Sml.Len), sms(Sml.Abs), sms(Sml.Sqrt), sms(Sml.Min), sms(Sml.Max)]) |name| { pure_words.push(intern_text(name)) }
         pure_words.push(known_word(Known.ToStr))
         for (0 ..< pure_words.len()) |j| { pure_flags.push(if user_declares(pure_words[j]) { 1 } else { 0 }) }
         pure_flags.push(if user_declares(-1) { 1 } else { 0 })
@@ -601,9 +601,9 @@ fn pipe_took_operator(input: I32) Bool {
     let logical = w == Kw.And.i32() or w == Kw.Or.i32() or w == Kw.Xor.i32()
     if not (logical or k == Tok.EqEq or k == Tok.BangEq or k == Tok.Lt or k == Tok.Gt or k == Tok.LtEq or k == Tok.GtEq) { return false }
     report2(Diag.IteratorSource, input, intern_text(tok_text(t)), -1, 7)
-    diag_label("piped")
-    diag_place(Extra.Related, last_child(input), "the source meant?")
-    diag_note("Parenthesize the pipeline: a " + tok_text(t) + " (xs all |x| { … })")
+    diag_label(sms(Sml.Piped))
+    diag_place(Extra.Related, last_child(input), sms(Sml.TheSourceMeant))
+    diag_note(sms1(Sml.ParenthesizeThePipelineAXsAll, tok_text(t)))
     return true
 }
 
@@ -884,8 +884,8 @@ fn stage_at(p: Pipe, k: I32, value: I32, vt: I32, cx: Cx) Void {
         report(Diag.IteratorTerminalInside, stage_node(p, k), op)
         let here = stage_node(p, k)
         let next = stage_node(p, k + 1)
-        diag_focus(node_last[first_child(here)], node_last[here] - 1, "ends here")
-        diag_place_tokens(Extra.Related, node_last[first_child(next)], node_last[next] - 1, "cannot follow")
+        diag_focus(node_last[first_child(here)], node_last[here] - 1, sms(Sml.EndsHere))
+        diag_place_tokens(Extra.Related, node_last[first_child(next)], node_last[next] - 1, sms(Sml.CannotFollow))
         seq_void(m)
         return
     }
@@ -1529,9 +1529,9 @@ fn written_scalar(type_node: I32, bool_too: Bool) Bool {
     let w = written_word(type_node)
     if w < 0 { return false }
     for ([Prelude.I32, Prelude.U32, Prelude.I64, Prelude.U64, Prelude.F32, Prelude.F64]) |pr| {
-        if w == intern_text(Prelude.name(pr)) { return true }
+        if w == intern_text(prelude_name(pr)) { return true }
     }
-    return bool_too and w == intern_text(Prelude.name(Prelude.Bool))
+    return bool_too and w == intern_text(prelude_name(Prelude.Bool))
 }
 
 /// The word of the name a written type is (`&` aside), or -1.
@@ -2398,7 +2398,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) Void {
     let et = type_of(type_node, cx.inst)
     let kt = type_of(key_node, cx.inst)
     let grouping = op == Kw.Group_by.i32()
-    let gmodule = prelude_lookup(intern_text("Group"))
+    let gmodule = prelude_lookup(intern_text(sms(Sml.Group)))
     let group_t = if grouping { named(decl_a[gmodule], instance(gmodule, list2(kt, et))) } else { et }
     let keys = buffer_at(p, slot, 0, kt, -1, false)
     let out = buffer_at(p, slot, 3, group_t, -1, false)
@@ -2495,7 +2495,7 @@ fn check_group(p: Pipe, k: I32, op: I32, value: I32, vt: I32, cx: Cx) Void {
         let g = new_local(repr(group_t))
         let mg = w_mark()
         lg(key)
-        std_new("Group", list2(kt, et), mg, cx)
+        std_new(sms(Sml.Group), list2(kt, et), mg, cx)
         ls(g, mg)
         buffer_add(p, out, group_t, g, group_t, node)
     } else {

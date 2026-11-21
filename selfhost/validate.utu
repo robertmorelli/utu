@@ -398,7 +398,7 @@ fn duplicate_lets(block: I32) Void {
             if word_seen(word, stamp) {
                 let param = param_named(params, word)
                 report2(Diag.DuplicateDeclaration, c, word, if param >= 0 { 8 } else { 3 }, -1)
-                if param >= 0 { diag_place(Extra.Related, first_child(param), "the parameter") }
+                if param >= 0 { diag_place(Extra.Related, first_child(param), sms(Sml.TheParameter)) }
                 // The first: looked for only once there is a mistake.
                 let other = first_child(block)
                 while (other != c) {

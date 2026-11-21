@@ -51,7 +51,7 @@ fn wutu_hash(text: Str) Str {
     for (0 ..< text.len()) |i| { n = (n ^ text.get(i)) * 16777619 }
     let v = n.i64() & 4294967295
     if v == 0 { return "0" }
-    let digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    let digits = wus(Wut.N0123456789abcdefghijklmnopqrstuvwxyz)
     let out = ""
     while (v > 0) {
         out = Str.from_code_point(digits.get((v % 36).i32())) + out
@@ -68,7 +68,7 @@ fn es_string(text: Str) Str {
         let c = json.get(i)
         let next_is_backslash = i + 1 < json.len() and json.get(i + 1) == 92
         let after_backslash = i > 0 and json.get(i - 1) == 92
-        if c == 47 and (next_is_backslash or after_backslash) { out = out + "\\u002f" } else { out = out + Str.from_code_point(c) }
+        if c == 47 and (next_is_backslash or after_backslash) { out = wus1(Wut.U002f, out) } else { out = out + Str.from_code_point(c) }
     }
     return out
 }
@@ -84,7 +84,7 @@ fn expand_wutu(site: I32) Void {
     let prefix = ""
     let searching = true
     while (searching) {
-        prefix = "__wutu_" + int_text(wu_serial) + "_"
+        prefix = wus1(Wut.Wutu, int_text(wu_serial))
         wu_serial += 1
         searching = text_index(whole, prefix, 0) >= 0
     }
@@ -117,39 +117,38 @@ fn expand_wutu(site: I32) Void {
     // (A root `circle` or `g` is SVG; `a`, `title`, `script`, `style` are HTML.)
     let svg = is_svg_tag(tag) and not is_html_tag(tag)
     let fragment = tn_kind[root] == 5
-    if fragment { wd_op(ops, "[\"r\"]") }
+    if fragment { wd_op(ops, wus(Wut.R)) }
     let code = if fragment { wd_fragment(tn_first[root], false, ops) } else { wd_element(root, svg, ops) }
     let events = ""
     for (0 ..< wx_events.len()) |k| { events = events + word_text(wx_events[k]) }
     for (0 ..< wx_event_ops.len()) |k| { wd_op(ops, word_text(wx_event_ops[k])) }
-    code = wutu_helper("begin") + "(" + js_string("[" + ops.text + "]") + ");\n" + code
-    events = events + wutu_typed_fn("done", if fragment { "fragment" } else { tag }, svg) + "()"
+    code = wus3(Wut.AOpenBCloseSemiNlC, wutu_helper(wus(Wut.Begin)), js_string(wus1(Wut.BracketABracketEnd, ops.text)), code)
+    events = wus2(Wut.ABOpenClose, events, wutu_typed_fn("done", if fragment { wus(Wut.Fragment) } else { tag }, svg))
     // Shared sheets install in source order, so later ones win the cascade.
     let prelude = ""
     for (0 ..< tw_style_value.len()) |k| {
-        prelude = prelude + "wutu.style(" + wutu_island(word_text(tw_style_value[k]), tw_style_from[k], tw_style_to[k], root) + ");\n"
+        prelude = wus2(Wut.WutuStyle, prelude, wutu_island(word_text(tw_style_value[k]), tw_style_from[k], tw_style_to[k], root))
     }
     let css = ""
     for (0 ..< wu_style_css.len()) |k| { css = css + word_text(wu_style_css[k]) }
     css = layered_document_css(without_hash_lines(document)) + without_hash_lines(css)
     if css.len() > 0 {
-        let key = es_string("wutu-" + wutu_hash(css))
-        prelude = "let " + prefix + "install_css: fun() Void = @es/\\ () => { if (!document.getElementById(" + key + ")) { const s=document.createElement('style'); s.id=" + key
-            + "; s.setAttribute('data-wutu-style',''); s.textContent=" + es_string(css) + "; document.head.append(s); } } \\/; " + prefix + "install_css();\n" + prelude
+        let key = es_string(wus1(Wut.WutuDash, wutu_hash(css)))
+        prelude = wus4(Wut.LetInstallCssFunVoidEs, prefix, key, key, es_string(css)) + wus2(Wut.InstallCss, prefix, prelude)
     }
     let declarations = ""
     for (0 ..< wu_decls.len()) |k| {
-        if k > 0 { declarations = declarations + "\n" }
+        if k > 0 { declarations = wus1(Wut.ANl, declarations) }
         declarations = declarations + word_text(wu_decls[k])
     }
-    let render = "{ " + declarations + " " + prelude + code + " " + events + "; }"
+    let render = wus4(Wut.BraceSpaceASpaceBCSpaceDSemiSpaceBraceEnd, declarations, prelude, code, events)
     let value = render
     if tw_reactive == 1 {
-        let mount = wutu_helper(if fragment { "mount_fragment" } else if svg { "mount_svg" } else { "mount" })
+        let mount = wutu_helper(if fragment { wus(Wut.MountFragment) } else if svg { wus(Wut.MountSvg) } else { wus(Wut.Mount) })
         let last = word_text(wu_decls[wu_decls.len() - 1])
-        value = last + " " + mount + "(cl() " + (if fragment { "Browser.DocumentFragment " } else if svg { "Browser.SVGElement " } else { "Browser.HTMLElement " }) + "{ return " + render + "; }" + ", " + (if tw_scope >= 0 { word_text(tw_scope) } else { "\"\"" }) + ")"
+        value = wus4(Wut.ClReturn, last, mount, (if fragment { wus(Wut.BrowserDocumentFragment) } else if svg { wus(Wut.BrowserSVGElement) } else { wus(Wut.BrowserHTMLElementDot) }), render) + wus1(Wut.AClose, (if tw_scope >= 0 { word_text(tw_scope) } else { "\"\"" }))
     }
-    graft_expression(site, "{ wutu.init(); " + value + "; }")
+    graft_expression(site, wus1(Wut.WutuInit, value))
 }
 
 /// The `;` ending the CSS statement at `at`, outside strings and parentheses, or -1.
@@ -183,18 +182,18 @@ fn layered_document_css(css: Str) Str {
     let imports = ""
     let rest = ""
     let i = 0
-    let at = text_index(css, "@import", 0)
+    let at = text_index(css, wus(Wut.Import), 0)
     while (at >= 0) {
         let end = css_statement_end(css, at)
         if end < 0 { break }
         let rule = css.slice(at, end)
         rest = rest + css.slice(i, at)
-        imports = imports + (if text_index(rule, "layer(", 0) >= 0 { rule + ";" } else { rule + " layer(wutu.document);" })
+        imports = imports + (if text_index(rule, wus(Wut.Layer), 0) >= 0 { wus1(Wut.ASemi, rule) } else { wus1(Wut.LayerWutuDocument, rule) })
         i = end + 1
-        at = text_index(css, "@import", i)
+        at = text_index(css, wus(Wut.Import), i)
     }
     rest = rest + css.slice(i, css.len())
-    return imports + (if trim_end(rest).len() > 0 { "@layer wutu.document{" + rest + "}" } else { "" })
+    return imports + (if trim_end(rest).len() > 0 { wus1(Wut.LayerWutuDocumentAtDotBraceBraceE, rest) } else { "" })
 }
 
 /// The CSS without its comment lines (those that begin with `# `).
@@ -252,7 +251,7 @@ fn wutu_prepare(n: I32) Void {
 }
 
 /// The local that holds template element n.
-fn node_uid(n: I32) Str => wutu_prefix() + "node" + int_text(tn_index[n])
+fn node_uid(n: I32) Str => wus2(Wut.Node, wutu_prefix(), int_text(tn_index[n]))
 
 /// Whether template node n is node `ancestor` or under it.
 fn tn_within(n: I32, ancestor: I32) Bool {
@@ -280,7 +279,7 @@ fn resolve_alias(name: I32, owner: I32, offset: I32) I32 {
             }
         }
         if count == 1 { return found }
-        if count > 1 { wutu_fail("Ambiguous element alias '" + word_text(name) + "'; reference it inside its own subtree", offset) }
+        if count > 1 { wutu_fail(wus1(Wut.AmbiguousElementAliasReferenceItInside, word_text(name)), offset) }
         scope = tn_parent[scope]
     }
     return -1
@@ -300,8 +299,8 @@ fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
         let shown = if source.len() > 100 { source.slice(0, 100) } else { source }
         // (A range needs parentheses here: `for (0 ..< n) |i|`.)
         let range = false
-        for (0 ..< source.len()) |k| { if text_at(source, k, "..") { range = true } }
-        wutu_fail("Invalid Utu interpolation at offset " + int_text(absolute) + ": " + shown + (if range and not (source.get(0) == 40) { " (a range needs parentheses: for (0 ..< n) |i|)" } else { "" }), from)
+        for (0 ..< source.len()) |k| { if text_at(source, k, wus(Wut.DotDot)) { range = true } }
+        wutu_fail(wus3(Wut.InvalidUtuInterpolationAtOffset, int_text(absolute), shown, (if range and not (source.get(0) == 40) { wus(Wut.ARangeNeedsParenthesesFor0) } else { "" })), from)
     }
     let placeholder = dsl_splice(site, from, text)
     let k = splice_start.len() - 1
@@ -388,112 +387,112 @@ fn wutu_helper(kind: Str) Str {
     let params = ""
     let result = "Void"
     let js = ""
-    if kind == "attr" {
-        params = "Browser.Element, Str, Str"
-        js = "(n,k,v)=>globalThis.__utuWutu.attr(n,k,v)"
-    } else if kind == "boolean" {
-        params = "Browser.Element, Str, Bool"
-        js = "(n,k,v)=>globalThis.__utuWutu.attr(n,k,!!v)"
-    } else if kind == "append" {
-        params = "Externref"
-        js = "(v)=>globalThis.__utuWutu.append(v)"
+    if kind == wus(Wut.Attr) {
+        params = wus(Wut.BrowserElementStrStr)
+        js = wus(Wut.NKVGlobalThisUtuWutuAttr)
+    } else if kind == wus(Wut.Boolean) {
+        params = wus(Wut.BrowserElementStrBool)
+        js = wus(Wut.NKVGlobalThisUtuWutuAttrOpenCommaCommaCl)
+    } else if kind == wus(Wut.Append) {
+        params = wus(Wut.Externref)
+        js = wus(Wut.VGlobalThisUtuWutuAppendV)
     } else if kind == "put" {
-        params = "Externref"
-        js = "(v)=>globalThis.__utuWutu.put(v)"
-    } else if kind == "put_text" {
+        params = wus(Wut.Externref)
+        js = wus(Wut.VGlobalThisUtuWutuPutV)
+    } else if kind == wus(Wut.PutText) {
         params = "Str"
-        js = "(v)=>globalThis.__utuWutu.put(v)"
-    } else if kind == "url" {
-        params = "Browser.Element, Str, Str"
-        js = "(n,k,v)=>globalThis.__utuWutu.url(n,k,v)"
-    } else if kind == "flag" {
+        js = wus(Wut.VGlobalThisUtuWutuPutV)
+    } else if kind == wus(Wut.Url) {
+        params = wus(Wut.BrowserElementStrStr)
+        js = wus(Wut.NKVGlobalThisUtuWutuUrl)
+    } else if kind == wus(Wut.Flag) {
         params = "Bool"
-        js = "(v)=>globalThis.__utuWutu.put(v)"
+        js = wus(Wut.VGlobalThisUtuWutuPutV)
     } else if kind == "on" {
-        params = "cl(Browser.Event) Void"
-        js = "(v)=>globalThis.__utuWutu.put(v)"
-    } else if kind == "begin" {
+        params = wus(Wut.ClBrowserEventVoid)
+        js = wus(Wut.VGlobalThisUtuWutuPutV)
+    } else if kind == wus(Wut.Begin) {
         params = "Str"
-        js = "(p)=>globalThis.__utuWutu.begin(p)"
-    } else if kind == "slot" {
-        js = "()=>globalThis.__utuWutu.slot()"
-    } else if kind == "arm" {
+        js = wus(Wut.PGlobalThisUtuWutuBeginP)
+    } else if kind == wus(Wut.Slot) {
+        js = wus(Wut.GlobalThisUtuWutuSlot)
+    } else if kind == wus(Wut.Arm) {
         params = "I32"
-        js = "(n)=>globalThis.__utuWutu.arm(n)"
-    } else if kind == "item" {
+        js = wus(Wut.NGlobalThisUtuWutuArmN)
+    } else if kind == wus(Wut.Item) {
         params = "Str"
-        js = "(k)=>globalThis.__utuWutu.item(k)"
-    } else if kind == "item_index" {
+        js = wus(Wut.KGlobalThisUtuWutuItemK)
+    } else if kind == wus(Wut.ItemIndex) {
         params = "U64"
-        js = "(i)=>globalThis.__utuWutu.item(i)"
-    } else if kind == "end" {
-        js = "()=>globalThis.__utuWutu.end()"
-    } else if kind == "node" {
-        params = "Browser.Node"
-        js = "(v)=>globalThis.__utuWutu.append(v)"
-    } else if kind == "event" {
-        params = "Browser.Element, Str, cl(Browser.Event) Void"
-        js = "(n,e,h)=>globalThis.__utuWutu.listen(n,e,h)"
-    } else if kind == "leave" {
-        js = "()=>{globalThis.__utuWutu.leave()}"
-    } else if kind == "index" {
+        js = wus(Wut.IGlobalThisUtuWutuItemI)
+    } else if kind == wus(Wut.End) {
+        js = wus(Wut.GlobalThisUtuWutuEnd)
+    } else if kind == wus(Wut.NodeLc) {
+        params = wus(Wut.BrowserNode)
+        js = wus(Wut.VGlobalThisUtuWutuAppendV)
+    } else if kind == wus(Wut.Event) {
+        params = wus(Wut.BrowserElementStrClBrowserEvent)
+        js = wus(Wut.NEHGlobalThisUtuWutuListen)
+    } else if kind == wus(Wut.Leave) {
+        js = wus(Wut.GlobalThisUtuWutuLeave)
+    } else if kind == wus(Wut.IndexLc) {
         params = "U64"
-        js = "(i)=>globalThis.__utuWutu.pushCall(String(i))"
-    } else if kind == "call" {
+        js = wus(Wut.IGlobalThisUtuWutuPushCallStringI)
+    } else if kind == wus(Wut.Call) {
         // A slot's or a loop's key: the template's hash and the site's
         // position (one string per template, not one per site).
-        params = "Str, I32"
-        js = "(h,p)=>globalThis.__utuWutu.pushCall(\"call:\"+h+\":\"+p)"
+        params = wus(Wut.StrI32)
+        js = wus(Wut.HPGlobalThisUtuWutuPushCallCall)
     } else if kind == "loop" {
-        params = "Str, I32"
-        js = "(h,p)=>globalThis.__utuWutu.pushCall(\"loop:\"+h+\":\"+p)"
-    } else if kind == "globalKey" {
+        params = wus(Wut.StrI32)
+        js = wus(Wut.HPGlobalThisUtuWutuPushCallLoop)
+    } else if kind == wus(Wut.GlobalKey) {
         params = "Str"
-        js = "(k)=>globalThis.__utuWutu.pushGlobal(k)"
+        js = wus(Wut.KGlobalThisUtuWutuPushGlobalK)
     } else if kind == "key" {
         params = "Str"
-        js = "(k)=>globalThis.__utuWutu.pushKey(k)"
-    } else if kind == "unkey" {
-        js = "()=>globalThis.__utuWutu.popKey()"
-    } else if kind == "mount" {
-        params = "cl() Browser.HTMLElement, Str"
+        js = wus(Wut.KGlobalThisUtuWutuPushKeyK)
+    } else if kind == wus(Wut.Unkey) {
+        js = wus(Wut.GlobalThisUtuWutuPopKey)
+    } else if kind == wus(Wut.Mount) {
+        params = wus(Wut.ClBrowserHTMLElementStr)
         result = "Browser.HTMLElement"
-        js = "(f,k)=>globalThis.__utuWutu.mount(f,k)"
-    } else if kind == "mount_fragment" {
-        params = "cl() Browser.DocumentFragment, Str"
+        js = wus(Wut.FKGlobalThisUtuWutuMountF)
+    } else if kind == wus(Wut.MountFragment) {
+        params = wus(Wut.ClBrowserDocumentFragmentStr)
         result = "Browser.DocumentFragment"
-        js = "(f,k)=>globalThis.__utuWutu.mount(f,k)"
-    } else if kind == "mount_svg" {
-        params = "cl() Browser.SVGElement, Str"
+        js = wus(Wut.FKGlobalThisUtuWutuMountF)
+    } else if kind == wus(Wut.MountSvg) {
+        params = wus(Wut.ClBrowserSVGElementStr)
         result = "Browser.SVGElement"
-        js = "(f,k)=>globalThis.__utuWutu.mount(f,k)"
-    } else if kind == "memo_hit" {
+        js = wus(Wut.FKGlobalThisUtuWutuMountF)
+    } else if kind == wus(Wut.MemoHit) {
         // A reused hole (see memo_reuse): its key's last element, if it is unchanged.
         params = "Str"
         result = "Bool"
-        js = "(k)=>globalThis.__utuWutu.memoHit(k)"
-    } else if kind == "memo_last" {
-        result = "Externref"
-        js = "()=>globalThis.__utuWutu.memoLast()"
-    } else if kind == "memo_keep" {
-        params = "Str, Externref"
-        js = "(k,n)=>globalThis.__utuWutu.memoKeep(k,n)"
-    } else if kind == "select_set" {
+        js = wus(Wut.KGlobalThisUtuWutuMemoHitK)
+    } else if kind == wus(Wut.MemoLast) {
+        result = wus(Wut.Externref)
+        js = wus(Wut.GlobalThisUtuWutuMemoLast)
+    } else if kind == wus(Wut.MemoKeep) {
+        params = wus(Wut.StrExternref)
+        js = wus(Wut.KNGlobalThisUtuWutuMemoKeepK)
+    } else if kind == wus(Wut.SelectSet) {
         // `bind:values`: a multiple select's chosen values, joined by U+001F, both ways.
-        params = "Browser.Element, Str"
+        params = wus(Wut.BrowserElementStr)
         // (Applied again after the render: on the first, its options come after it.)
-        js = "(n,v)=>{const w=new Set(v===''?[]:v.slice(1).split('\\u001f'));const a=()=>{for(const o of n.options)o.selected=w.has(o.value)};a();queueMicrotask(a)}"
-    } else if kind == "select_value" {
-        params = "Browser.HTMLSelectElement, Str"
-        js = "(n,v)=>globalThis.__utuWutu.selectValue(n,v)"
-    } else if kind == "select_get" {
-        params = "Browser.Element"
+        js = wus(Wut.NVConstWNewSet)
+    } else if kind == wus(Wut.SelectValue) {
+        params = wus(Wut.BrowserHTMLSelectElementStr)
+        js = wus(Wut.NVGlobalThisUtuWutuSelectValueN)
+    } else if kind == wus(Wut.SelectGet) {
+        params = wus(Wut.BrowserElement)
         result = "Str"
-        js = "(n)=>{const a=Array.from(n.selectedOptions,o=>o.value);return a.length?'\\u001f'+a.join('\\u001f'):''}"
+        js = wus(Wut.NConstAArrayFromN)
     } else {
-        wutu_fail("internal: no Wutu helper " + kind, 0)
+        wutu_fail(wus1(Wut.InternalNoWutuHelper, kind), 0)
     }
-    wu_decls.push(intern_text("let " + name + ": fun(" + params + ") " + result + " = @es/\\ " + js + " \\/;"))
+    wu_decls.push(intern_text(wus4(Wut.LetFunEs, name, params, result, js)))
     wu_declared_kind.push(w)
     wu_declared_name.push(intern_text(name))
     return name
@@ -502,12 +501,12 @@ fn wutu_helper(kind: Str) Str {
 /// The reconciler's `node()` or `done()` (`entry`), typed to give the
 /// element's own interface.
 fn wutu_typed_fn(entry: Str, tag: Str, svg: Bool) Str {
-    let kind = entry + "_" + (if svg { "svg_" } else { "" }) + tag
+    let kind = wus3(Wut.AXBC, entry, (if svg { wus(Wut.Svg) } else { "" }), tag)
     let w = intern_text(kind)
     for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]) } }
-    let type = if tag == "fragment" { "Browser.DocumentFragment" } else if svg { "Browser.SVGElement" } else { "Browser.HTML" + element_interface(tag) + "Element" }
+    let type = if tag == wus(Wut.Fragment) { "Browser.DocumentFragment" } else if svg { "Browser.SVGElement" } else { wus1(Wut.BrowserHTMLElement, element_interface(tag)) }
     let name = wutu_prefix() + ident_part(kind)
-    wu_decls.push(intern_text("let " + name + ": fun() " + type + " = @es/\\ ()=>globalThis.__utuWutu." + entry + "() \\/;"))
+    wu_decls.push(intern_text(wus3(Wut.LetFunEsGlobalThisUtuWutu, name, type, entry)))
     wu_declared_kind.push(w)
     wu_declared_name.push(intern_text(name))
     return name
@@ -518,7 +517,7 @@ fn ident_part(tag: Str) Str {
     let out = ""
     for (0 ..< tag.len()) |i| {
         let c = tag.get(i)
-        out = out + (if c == 45 { "_x" } else if c == 95 { "__" } else { Str.from_code_point(c) })
+        out = out + (if c == 45 { wus(Wut.X2) } else if c == 95 { "__" } else { Str.from_code_point(c) })
     }
     return out
 }
@@ -526,41 +525,41 @@ fn ident_part(tag: Str) Str {
 /// What goes between `HTML` and `Element` in the interface of a tag the
 /// `Browser` declarations type more closely; empty for the rest.
 fn element_interface(tag: Str) Str {
-    if tag == "input" { return "Input" }
-    if tag == "select" { return "Select" }
-    if tag == "textarea" { return "TextArea" }
-    if tag == "form" { return "Form" }
-    if tag == "button" { return "Button" }
-    if tag == "a" { return "Anchor" }
-    if tag == "img" { return "Image" }
-    if tag == "canvas" { return "Canvas" }
-    if tag == "video" { return "Video" }
-    if tag == "audio" { return "Audio" }
-    if tag == "option" { return "Option" }
-    if tag == "label" { return "Label" }
-    if tag == "details" { return "Details" }
-    if tag == "dialog" { return "Dialog" }
-    if tag == "progress" { return "Progress" }
-    if tag == "meter" { return "Meter" }
-    if tag == "output" { return "Output" }
+    if tag == wus(Wut.Input) { return wus(Wut.Input2) }
+    if tag == "select" { return wus(Wut.Select) }
+    if tag == wus(Wut.Textarea) { return wus(Wut.TextArea) }
+    if tag == wus(Wut.Form) { return wus(Wut.Form2) }
+    if tag == wus(Wut.Button) { return wus(Wut.Button2) }
+    if tag == "a" { return wus(Wut.Anchor) }
+    if tag == wus(Wut.Img) { return wus(Wut.Image) }
+    if tag == wus(Wut.Canvas) { return wus(Wut.Canvas2) }
+    if tag == wus(Wut.Video) { return wus(Wut.Video2) }
+    if tag == wus(Wut.Audio) { return wus(Wut.Audio2) }
+    if tag == wus(Wut.Option) { return wus(Wut.Option2) }
+    if tag == wus(Wut.Label) { return wus(Wut.Label2) }
+    if tag == wus(Wut.Details) { return wus(Wut.Details2) }
+    if tag == wus(Wut.Dialog) { return wus(Wut.Dialog2) }
+    if tag == wus(Wut.Progress) { return wus(Wut.Progress2) }
+    if tag == wus(Wut.Meter) { return wus(Wut.Meter2) }
+    if tag == wus(Wut.Output) { return wus(Wut.Output2) }
     return ""
 }
 
 /// The `Browser` event type a listener of event `name` takes, or empty for
 /// a plain `Event`.
 fn event_type(name: Str) Str {
-    if in_words("click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout", name) { return "MouseEvent" }
-    if name == "wheel" { return "WheelEvent" }
-    if in_words("keydown keyup keypress", name) { return "KeyboardEvent" }
-    if in_words("pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture", name) { return "PointerEvent" }
-    if in_words("focus blur focusin focusout", name) { return "FocusEvent" }
-    if name == "beforeinput" { return "InputEvent" }
-    if name == "submit" { return "SubmitEvent" }
-    if in_words("drag dragstart dragend dragenter dragleave dragover drop", name) { return "DragEvent" }
-    if in_words("touchstart touchend touchmove touchcancel", name) { return "TouchEvent" }
-    if in_words("animationstart animationend animationiteration animationcancel", name) { return "AnimationEvent" }
-    if in_words("transitionstart transitionend transitionrun transitioncancel", name) { return "TransitionEvent" }
-    if in_words("copy cut paste", name) { return "ClipboardEvent" }
+    if in_words(wus(Wut.ClickDblclickAuxclickContextmenuMousedow), name) { return wus(Wut.MouseEvent) }
+    if name == wus(Wut.Wheel) { return wus(Wut.WheelEvent) }
+    if in_words(wus(Wut.KeydownKeyupKeypress), name) { return wus(Wut.KeyboardEvent) }
+    if in_words(wus(Wut.PointerdownPointerupPointermovePointeren), name) { return wus(Wut.PointerEvent) }
+    if in_words(wus(Wut.FocusBlurFocusinFocusout), name) { return wus(Wut.FocusEvent) }
+    if name == wus(Wut.Beforeinput) { return wus(Wut.InputEvent) }
+    if name == wus(Wut.Submit) { return wus(Wut.SubmitEvent) }
+    if in_words(wus(Wut.DragDragstartDragendDragenterDragleaveDr), name) { return wus(Wut.DragEvent) }
+    if in_words(wus(Wut.TouchstartTouchendTouchmoveTouchcancel), name) { return wus(Wut.TouchEvent) }
+    if in_words(wus(Wut.AnimationstartAnimationendAnimationitera), name) { return wus(Wut.AnimationEvent) }
+    if in_words(wus(Wut.TransitionstartTransitionendTransitionru), name) { return wus(Wut.TransitionEvent) }
+    if in_words(wus(Wut.CopyCutPaste), name) { return wus(Wut.ClipboardEvent) }
     return ""
 }
 
@@ -582,12 +581,12 @@ vec wx_event_ops: I32
 /// -1 for none) is the event, typed as HTMLElementEventMap types it (`on
 /// click |e|` gets a MouseEvent). `on submit` also prevents navigation.
 fn event_listener(name: Str, handler: Str, param: I32) Str {
-    let prevent = if name == "submit" { "__wutu_event.preventDefault();" } else { "" }
+    let prevent = if name == wus(Wut.Submit) { wus(Wut.WutuEventPreventDefault) } else { "" }
     let type = event_type(name)
-    if param < 0 { return "cl(__wutu_event) Void { " + prevent + " " + handler + "; }" }
+    if param < 0 { return wus2(Wut.ClWutuEventVoid, prevent, handler) }
     let e = word_text(param)
-    if type.len() > 0 { return "cl(__wutu_event) Void { " + prevent + " alt __wutu_event { Browser." + type + " |" + e + "| => { " + handler + "; }, ~> {}, }; }" }
-    return "cl(__wutu_event) Void { " + prevent + " let " + e + " = __wutu_event; " + handler + "; }"
+    if type.len() > 0 { return wus4(Wut.ClWutuEventVoidAltWutu, prevent, type, e, handler) }
+    return wus3(Wut.ClWutuEventVoidLetWutu, prevent, e, handler)
 }
 
 /// Whether an `on` handler can only change its own elements: every statement
@@ -604,7 +603,7 @@ fn quiet_handler(body: Str, param: I32) Bool {
         if c == 34 {
             i += 1
             while (i < body.len() and body.get(i) != 34 and body.get(i) != 10) { i += if body.get(i) == 92 { 2 } else { 1 } }
-            code = code + "\"\""
+            code = wus1(Wut.AQuoteQuote, code)
         } else if c == 47 and i + 1 < body.len() and body.get(i + 1) == 47 {
             // A line comment says nothing.
             while (i + 1 < body.len() and body.get(i + 1) != 10) { i += 1 }
@@ -667,7 +666,7 @@ fn quiet_statement(statement: Str, param: I32) Bool {
             let w = i
             while (i < statement.len() and word_byte(statement.get(i))) { i += 1 }
             let word = statement.slice(w, i)
-            if not is_alias_name(word) and not (param >= 0 and word == word_text(param)) and not in_words("true false null not and or", word) { return false }
+            if not is_alias_name(word) and not (param >= 0 and word == word_text(param)) and not in_words(wus(Wut.TrueFalseNullNotAndOr), word) { return false }
         } else {
             i += 1
         }
@@ -694,8 +693,8 @@ fn wutu_classes(n: I32) Str {
         i = ti_next[i]
     }
     if css.len() > 0 {
-        let key = "w" + wutu_hash(css)
-        wutu_style(key, "." + key + "{" + css + "}")
+        let key = wus1(Wut.W, wutu_hash(css))
+        wutu_style(key, wus2(Wut.DotABraceBBraceEnd, key, css))
         classes = classes + (if classes.len() > 0 { " " } else { "" }) + key
     }
     return classes
@@ -714,16 +713,16 @@ fn wutu_json(text: Str) Str {
     let out = "\""
     for (0 ..< text.len()) |i| {
         let c = text.get(i)
-        if c == 34 { out = out + "\\\"" }
-        else if c == 92 { out = out + "\\\\" }
-        else if c < 32 { out = out + "\\u00" + (if c < 16 { "0" } else { "1" }) + "0123456789abcdef".slice(c % 16, c % 16 + 1) }
+        if c == 34 { out = wus1(Wut.ABackslashQuote, out) }
+        else if c == 92 { out = wus1(Wut.ABackslashBackslash, out) }
+        else if c < 32 { out = wus3(Wut.U00, out, (if c < 16 { "0" } else { wus(Wut.N1) }), wus(Wut.N0123456789abcdef).slice(c % 16, c % 16 + 1)) }
         else { out = out + Str.from_code_point(c) }
     }
-    return out + "\""
+    return wus1(Wut.AQuote, out)
 }
 
 /// Whether property `name` is a URL a browser follows or loads (see `safe` in src/runtime/wutu.js).
-fn is_url_property(name: Str) Bool => in_words("href src action formAction poster cite data background codeBase longDesc ping srcset imageSrcset content", name)
+fn is_url_property(name: Str) Bool => in_words(wus(Wut.HrefSrcActionFormActionPosterCite), name)
 
 /// Whether attribute item i is known when compiling (written, not a property),
 /// so it comes in the element's shell. A written class merges, so it does not.
@@ -740,16 +739,16 @@ fn wutu_static_attributes(n: I32, classes: Str) Str {
         i = ti_next[i]
     }
     let out = "{"
-    if classes.len() > 0 and not written_class { out = out + "\"class\":" + wutu_json(classes) }
+    if classes.len() > 0 and not written_class { out = wus2(Wut.Class, out, wutu_json(classes)) }
     i = tn_items[n]
     while (i >= 0) {
         if wutu_baked(i) {
             let value = word_text(ti_b[i])
-            out = out + (if out.len() > 1 { "," } else { "" }) + wutu_json(word_text(ti_a[i])) + ":" + wutu_json(value.slice(1, value.len() - 1))
+            out = wus4(Wut.ABCColonD, out, (if out.len() > 1 { "," } else { "" }), wutu_json(word_text(ti_a[i])), wutu_json(value.slice(1, value.len() - 1)))
         }
         i = ti_next[i]
     }
-    return out + "}"
+    return wus1(Wut.ABraceEnd, out)
 }
 
 /// Whether nothing in element n's subtree changes between renders: no
@@ -758,7 +757,7 @@ fn wutu_static_attributes(n: I32, classes: Str) Str {
 fn wutu_still(n: I32) Bool {
     if tn_binding[n] >= 0 { return false }
     let tag = word_text(tn_text[n])
-    if tag == "script" or tag == "style" or tag == "textarea" or tag == "template" { return false }
+    if tag == "script" or tag == wus(Wut.Style) or tag == wus(Wut.Textarea) or tag == wus(Wut.Template) { return false }
     let i = tn_items[n]
     while (i >= 0) {
         let k = ti_kind[i]
@@ -777,17 +776,17 @@ fn wutu_still(n: I32) Bool {
 
 /// A still subtree's description: `[tag, {attributes}, ...children]`, as JSON.
 fn wutu_description(n: I32) Str {
-    let out = "[" + wutu_json(word_text(tn_text[n])) + "," + wutu_static_attributes(n, wutu_classes(n))
+    let out = wus2(Wut.BracketACommaB, wutu_json(word_text(tn_text[n])), wutu_static_attributes(n, wutu_classes(n)))
     let c = tn_first[n]
     while (c >= 0) {
-        if tn_kind[c] == 4 { out = out + "," + wutu_description(c) }
+        if tn_kind[c] == 4 { out = wus2(Wut.ACommaB, out, wutu_description(c)) }
         else {
             let text = word_text(tn_text[c])
-            out = out + "," + wutu_json(text.slice(1, text.len() - 1))
+            out = wus2(Wut.ACommaB, out, wutu_json(text.slice(1, text.len() - 1)))
         }
         c = tn_next[c]
     }
-    return out + "]"
+    return wus1(Wut.ABracketEnd, out)
 }
 
 //! = Templates as data
@@ -821,20 +820,20 @@ fn wd_needs_node(n: I32) Bool {
 /// listeners go to @wx_events and @wx_event_ops).
 fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
     let tag = word_text(tn_text[n])
-    let svg = outer_svg or tag == "svg" or (is_svg_tag(tag) and not is_html_tag(tag))
-    let flag = if svg { ",1" } else { "" }
+    let svg = outer_svg or tag == wus(Wut.SvgLc) or (is_svg_tag(tag) and not is_html_tag(tag))
+    let flag = if svg { wus(Wut.N1Comma) } else { "" }
     let index = int_text(tn_index[n])
     if wutu_still(n) {
-        wd_op(o, "[\"s\"," + index + "," + wutu_description(n) + flag + "]")
+        wd_op(o, wus3(Wut.S, index, wutu_description(n), flag))
         return ""
     }
     let classes = wutu_classes(n)
-    wd_op(o, "[\"o\"," + index + ",[" + wutu_json(tag) + "," + wutu_static_attributes(n, classes) + "]" + flag + "]")
+    wd_op(o, wus4(Wut.O, index, wutu_json(tag), wutu_static_attributes(n, classes), flag))
     let id = node_uid(n)
     let code = ""
     if wd_needs_node(n) {
-        wd_op(o, "[\"n\"," + index + "]")
-        code = "let " + id + " = " + wutu_typed_fn("node", tag, svg) + "();\n"
+        wd_op(o, wus1(Wut.N, index))
+        code = wus2(Wut.Let, id, wutu_typed_fn(wus(Wut.NodeLc), tag, svg))
     }
     let properties = ""
     let i = tn_items[n]
@@ -843,24 +842,23 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
             let name = word_text(ti_a[i])
             let value = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
             if (ti_flags[i] & 1) != 0 and name == "value" and tag == "select" {
-                properties = properties + select_value(id, value) + ";\n"
+                properties = wus2(Wut.ABSemiNl, properties, select_value(id, value))
             } else if (ti_flags[i] & 1) != 0 {
                 // An unchanged value is not assigned: selection and caret
                 // survive updates. (The value is assigned to a local of the
                 // property's type first, so a wrong one says so.)
-                let was = id + "_" + name + "_was"
-                let now = id + "_" + name + "_now"
+                let was = wus2(Wut.Was, id, name)
+                let now = wus2(Wut.Now, id, name)
                 // (A URL one goes through the runtime's check, as its attribute does.)
-                let set = if is_url_property(name) { wutu_helper("url") + "(" + id + ", \"" + name + "\", " + now + ")" } else { id + "." + name + " = " + now }
-                properties = properties + "let " + was + " = " + id + "." + name + "; let " + now + " = " + was + "; " + now + " = (" + value + ");\n"
-                    + "if " + was + " != " + now + " { " + set + "; };\n"
+                let set = if is_url_property(name) { wus4(Wut.AOpenBCommaSpaceQuoteCQuoteCommaSpaceDClose, wutu_helper(wus(Wut.Url)), id, name, now) } else { wus3(Wut.ADotBSpaceEqSpaceC, id, name, now) }
+                properties = wus4(Wut.LetLet, properties, was, id, name) + wus4(Wut.If, now, was, now, value) + wus3(Wut.ASpaceBangEqSpaceBSpaceBraceSpaceCSemiSpaceBrace, was, now, set)
             } else if is_boolean_attribute(name) and (ti_flags[i] & 2) != 0 {
-                wd_op(o, "[\"b\"," + wutu_json(name) + "]")
-                code = code + wutu_helper("flag") + "((" + value + "));\n"
+                wd_op(o, wus1(Wut.B, wutu_json(name)))
+                code = wus3(Wut.ABOpenOpenCCloseCloseSemiNl, code, wutu_helper(wus(Wut.Flag)), value)
             } else {
-                wd_op(o, if name == "class" and classes.len() > 0 { "[\"m\"," + wutu_json(classes + " ") + "]" } else { "[\"a\"," + wutu_json(name) + "]" })
+                wd_op(o, if name == "class" and classes.len() > 0 { wus1(Wut.M, wutu_json(wus1(Wut.ASpace, classes))) } else { wus1(Wut.A, wutu_json(name)) })
                 // (An attribute's value is text.)
-                code = code + wutu_helper("put_text") + "((" + value + "));\n"
+                code = wus3(Wut.ABOpenOpenCCloseCloseSemiNl, code, wutu_helper(wus(Wut.PutText)), value)
             }
         }
         i = ti_next[i]
@@ -868,18 +866,18 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
     i = tn_items[n]
     while (i >= 0) {
         if ti_kind[i] == 5 {
-            wd_op(o, "[\"y\"," + wutu_json(word_text(ti_a[i])) + "]")
-            code = code + wutu_helper("put_text") + "((" + wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n) + "));\n"
+            wd_op(o, wus1(Wut.Y, wutu_json(word_text(ti_a[i]))))
+            code = wus3(Wut.ABOpenOpenCCloseCloseSemiNl, code, wutu_helper(wus(Wut.PutText)), wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n))
         }
         i = ti_next[i]
     }
-    let child_svg = svg and tag != "foreignObject"
+    let child_svg = svg and tag != wus(Wut.ForeignObject)
     let c = tn_first[n]
     while (c >= 0) {
         code = code + wd_child(c, child_svg, o)
         c = tn_next[c]
     }
-    wd_op(o, "[\"c\"]")
+    wd_op(o, wus(Wut.C))
     code = code + properties
     i = tn_items[n]
     while (i >= 0) {
@@ -890,8 +888,8 @@ fn wd_element(n: I32, outer_svg: Bool, o: WOps) Str {
             let shorthand = (ti_flags[i] & 1) != 0
             let listener = if shorthand { event_listener(name, handler, ti_c[i]) } else { handler }
             let quiet = (ti_flags[i] & 4) != 0 or (shorthand and quiet_handler(word_text(ti_b[i]), ti_c[i]))
-            wx_events.push(intern_text(wutu_helper("on") + "((" + listener + "));\n"))
-            wx_event_ops.push(intern_text("[\"v\"," + index + "," + wutu_json((if quiet { "~" } else { "" }) + name) + "]"))
+            wx_events.push(intern_text(wus2(Wut.AOpenOpenBCloseCloseSemiNl, wutu_helper("on"), listener)))
+            wx_event_ops.push(intern_text(wus2(Wut.V, index, wutu_json((if quiet { "~" } else { "" }) + name))))
         }
         i = ti_next[i]
     }
@@ -904,24 +902,24 @@ fn wd_binding(n: I32, i: I32) Str {
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
     let kind = word_text(ti_a[i])
     let update = located_splice(wu_site, binding_update(kind, id, target), ti_at[i], ti_to[i])
-    wx_events.push(intern_text(wutu_helper("on") + "(cl(__wutu_event) Void { " + update + "; });\n"))
-    wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + binding_event(kind) + "\"]"))
-    if kind == "value" and word_text(tn_text[n]) == "select" { return located_splice(wu_site, select_value(id, target), ti_at[i], ti_to[i]) + ";\n" }
+    wx_events.push(intern_text(wus2(Wut.ClWutuEventVoidOpenOpenCloseBra, wutu_helper("on"), update)))
+    wx_event_ops.push(intern_text(wus2(Wut.VBracketQuoteQuot, int_text(tn_index[n]), binding_event(kind))))
+    if kind == "value" and word_text(tn_text[n]) == "select" { return wus1(Wut.ASemiNl, located_splice(wu_site, select_value(id, target), ti_at[i], ti_to[i])) }
     return binding_sync_code(kind, id, target, i)
 }
 
 /// A select's value: set again once its options are in place (they may come with this render).
-fn select_value(id: Str, value: Str) Str => wutu_helper("select_value") + "(" + id + ", (" + value + "))"
+fn select_value(id: Str, value: Str) Str => wus3(Wut.AOpenBCommaSpaceOpenCCloseClose, wutu_helper(wus(Wut.SelectValue)), id, value)
 
 /// A binding's sync (state into the element, on render), located at the
 /// bind statement; empty for `files`, which is read-only.
 fn binding_sync_code(kind: Str, id: Str, target: Str, i: I32) Str {
     let sync = binding_sync(kind, id, target)
-    return if sync.len() == 0 { "" } else { located_splice(wu_site, sync, ti_at[i], ti_to[i]) + ";\n" }
+    return if sync.len() == 0 { "" } else { wus1(Wut.ASemiNl, located_splice(wu_site, sync, ti_at[i], ti_to[i])) }
 }
 
 /// `bind:values` crosses as one string: U+001F before each chosen value ("" for none, so `[""]` differs).
-fn values_separator() Str => "\"\\u001f\""
+fn values_separator() Str => wus(Wut.U001fQuoteBackslashQu)
 
 /// A binding's sync code:
 ///   value / checked   a string / a Bool property
@@ -931,29 +929,29 @@ fn values_separator() Str => "\"\\u001f\""
 ///   files             a file input's ?Browser.FileList (read-only: none)
 fn binding_sync(kind: Str, id: Str, target: Str) Str {
     // (Only an entry the input cannot parse is kept: a value out of range or step still shows.)
-    if kind == "number" { return "if not " + id + ".validity.badInput and " + id + ".valueAsNumber != (" + target + ") { " + id + ".valueAsNumber = (" + target + "); }" }
-    if kind == "group" { return "if " + id + ".checked != (" + id + ".value == (" + target + ")) { " + id + ".checked = " + id + ".value == (" + target + "); }" }
-    if kind == "values" { return wutu_helper("select_set") + "(" + id + ", if (" + target + ").len() == 0 { \"\"; } else { " + values_separator() + " + " + values_separator() + ".join(" + target + "); })" }
-    if kind == "files" { return "" }
-    return "if " + id + "." + kind + " != (" + target + ") { " + id + "." + kind + " = (" + target + "); }"
+    if kind == "number" { return wus4(Wut.IfNotValidityBadInputAndValueAsNumber, id, id, target, id) + wus1(Wut.ACloseSemiSpaceBraceEnd, target) }
+    if kind == wus(Wut.Group) { return wus4(Wut.IfCheckedValueChecked, id, id, target, id) + wus2(Wut.Value, id, target) }
+    if kind == "values" { return wus4(Wut.IfLen0Else, wutu_helper(wus(Wut.SelectSet)), id, target, values_separator()) + wus2(Wut.Join, values_separator(), target) }
+    if kind == wus(Wut.FilesLc) { return "" }
+    return wus4(Wut.IfDotBangEqOpenClo, id, kind, target, id) + wus2(Wut.ASpaceEqSpaceOpenBCloseSemiSpaceBraceEnd, kind, target)
 }
 
 /// What reads a binding back into the state, when its event fires.
 fn binding_update(kind: Str, id: Str, target: Str) Str {
     // NaN != NaN: an unparsable number leaves the state as it is.
-    if kind == "number" { return "if " + id + ".valueAsNumber == " + id + ".valueAsNumber { " + target + " = " + id + ".valueAsNumber; }" }
-    if kind == "group" { return "if " + id + ".checked { " + target + " = " + id + ".value; }" }
+    if kind == "number" { return wus4(Wut.IfValueAsNumberValueAsNumberValueAsNumbe, id, id, target, id) }
+    if kind == wus(Wut.Group) { return wus3(Wut.IfCheckedValue, id, target, id) }
     // (One expression: the update is spliced in as one.)
     if kind == "values" {
-        let chosen = wutu_helper("select_get") + "(" + id + ")"
-        return target + " = if " + chosen + ".len() == 0 { Array[Str].new(0, \"\"); } else { " + chosen + ".slice(1, " + chosen + ".len()).split(" + values_separator() + "); }"
+        let chosen = wus2(Wut.AOpenBClose, wutu_helper(wus(Wut.SelectGet)), id)
+        return wus4(Wut.IfLen0ArrayStrNew, target, chosen, chosen, chosen) + wus1(Wut.ACloseSemiSpaceBraceEnd, values_separator())
     }
-    if kind == "files" { return target + " = " + id + ".files" }
-    return target + " = " + id + "." + kind
+    if kind == wus(Wut.FilesLc) { return wus2(Wut.Files, target, id) }
+    return wus3(Wut.ASpaceEqSpaceBDotC, target, id, kind)
 }
 
 /// The event a binding listens to.
-fn binding_event(kind: Str) Str => if kind == "value" or kind == "number" { "input" } else { "change" }
+fn binding_event(kind: Str) Str => if kind == "value" or kind == "number" { wus(Wut.Input) } else { wus(Wut.Change) }
 
 /// The children from `first`, as ops into `o`, then their listeners.
 fn wd_fragment(first: I32, svg: Bool, o: WOps) Str {
@@ -983,27 +981,27 @@ fn wd_child(child: I32, svg: Bool, o: WOps) Str {
         let condition = wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child)
         let a = wd_fragment(tn_first[child], svg, then)
         let b = wd_fragment(tn_else[child], svg, otherwise)
-        wd_op(o, "[\"i\",[" + then.text + "],[" + otherwise.text + "]]")
-        return "if (" + condition + ") { " + wutu_helper("arm") + "(1); " + a + " } else { " + wutu_helper("arm") + "(0); " + b + " };\n"
+        wd_op(o, wus2(Wut.I, then.text, otherwise.text))
+        return wus4(Wut.If1Else0, condition, wutu_helper(wus(Wut.Arm)), a, wutu_helper(wus(Wut.Arm))) + wus1(Wut.ASpaceBraceEndSemiNl, b)
     }
     if kind == 3 { return wd_loop(child, svg, o) }
     // Written text is data; another value is a hole (with a call key, for
     // the elements a component it calls makes).
     let source = word_text(tn_text[child])
     if tn_from[child] < 0 and plain_literal(source) {
-        wd_op(o, "[\"t\"," + wutu_json(source.slice(1, source.len() - 1)) + "]")
+        wd_op(o, wus1(Wut.T, wutu_json(source.slice(1, source.len() - 1))))
         return ""
     }
     if tn_from[child] < 0 {
         // Written text with escapes: utu where it is written (a bad escape is reported there).
-        wd_op(o, "[\"w\"]")
-        return wutu_helper("put") + "((" + wutu_island(source, tn_start[child], tn_start[child] + source.len(), child) + "));\n"
+        wd_op(o, wus(Wut.WBracketQuoteQuot))
+        return wus2(Wut.AOpenOpenBCloseCloseSemiNl, wutu_helper("put"), wutu_island(source, tn_start[child], tn_start[child] + source.len(), child))
     }
     let value = shown(wutu_island(source, tn_from[child], tn_to[child], child), tn_from[child])
-    wd_op(o, "[\"x\"," + int_text(tn_from[child]) + "]")
+    wd_op(o, wus1(Wut.XBracketQuoteQuot, int_text(tn_from[child])))
     let reuse = memo_reuse(child, value)
-    if reuse.len() > 0 { return wutu_helper("slot") + "();\n" + reuse }
-    return wutu_helper("slot") + "();\n" + wutu_helper("put") + "(" + value + ");\n"
+    if reuse.len() > 0 { return wus2(Wut.AOpenCloseSemiNlB, wutu_helper(wus(Wut.Slot)), reuse) }
+    return wus3(Wut.AOpenCloseSemiNlBOpenCCloseSemiNl, wutu_helper(wus(Wut.Slot)), wutu_helper("put"), value)
 }
 
 /// A hole that calls a function (`= f(a, b);`), as code that puts back the
@@ -1019,7 +1017,7 @@ fn memo_reuse(child: I32, value: Str) Str {
     if i == 0 or i >= source.len() or source.get(i) != 40 or source.get(source.len() - 1) != 41 { return "" }
     let name = source.slice(0, i)
     // Its arguments: top-level commas, outside strings and brackets.
-    let key = "`" + name
+    let key = wus1(Wut.BacktickA, name)
     let depth = 0
     let start = i + 1
     let j = i
@@ -1040,18 +1038,16 @@ fn memo_reuse(child: I32, value: Str) Str {
             let b = j
             while (a < b and is_space_code(source.get(a))) { a += 1 }
             while (b > a and is_space_code(source.get(b - 1))) { b -= 1 }
-            if b > a { key = key + "\\u001f${" + wutu_island(source.slice(a, b), from + a, from + b, child) + "}" }
+            if b > a { key = wus2(Wut.U001f, key, wutu_island(source.slice(a, b), from + a, from + b, child)) }
             start = j + 1
         }
         j += 1
     }
-    key = key + "`"
+    key = wus1(Wut.ABacktick, key)
     let call = wutu_island(source, from, tn_to[child], child)
-    let k = wutu_prefix() + "key" + int_text(from)
-    let n = wutu_prefix() + "made" + int_text(from)
-    return "let " + k + " = wutu.memo_key(" + call + ", " + key + ");\n"
-        + "if " + wutu_helper("memo_hit") + "(" + k + ") { " + wutu_helper("put") + "(" + wutu_helper("memo_last") + "()); } else { let " + n + " = " + value + "; "
-        + wutu_helper("memo_keep") + "(" + k + ", " + n + "); " + wutu_helper("put") + "(" + n + "); };\n"
+    let k = wus2(Wut.Key, wutu_prefix(), int_text(from))
+    let n = wus2(Wut.Made, wutu_prefix(), int_text(from))
+    return wus4(Wut.LetWutuMemoKeyIf, k, call, key, wutu_helper(wus(Wut.MemoHit))) + wus4(Wut.ElseLet, k, wutu_helper("put"), wutu_helper(wus(Wut.MemoLast)), n) + wus4(Wut.ASemiSpaceBOpenCCommaSpaceDCloseSemiSpace, value, wutu_helper(wus(Wut.MemoKeep)), k, n) + wus2(Wut.AOpenBCloseSemiSpaceBraceEndSemiNl, wutu_helper("put"), n)
 }
 
 /// A `for`: its body as a program of its own, run per `item()`.
@@ -1063,25 +1059,25 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
     let captures = written
     if comma >= 0 { index = trim_text(written.slice(comma + 1, written.len())) }
     else if not keyed {
-        index = wutu_prefix() + "index" + int_text(wu_node_count)
+        index = wus2(Wut.Index, wutu_prefix(), int_text(wu_node_count))
         wu_node_count += 1
-        captures = written + ", " + index
+        captures = wus2(Wut.ACommaSpaceB, written, index)
     }
     let iterable = wutu_island(word_text(tn_text[n]), tn_from[n], tn_to[n], n)
-    let next = if keyed { wutu_helper("item") + "(wutu.key_text(" + wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n) + "));" }
-        else { wutu_helper("item_index") + "(" + index + ");" }
+    let next = if keyed { wus2(Wut.WutuKeyText, wutu_helper(wus(Wut.Item)), wutu_island(word_text(tn_key[n]), tn_key_from[n], tn_key_to[n], n)) }
+        else { wus2(Wut.AOpenBCloseSemi, wutu_helper(wus(Wut.ItemIndex)), index) }
     let body = WOps { text: "" }
     let fragment = wd_fragment(tn_first[n], svg, body)
     let mode = if not keyed { 0 } else if tn_global[n] == 1 { 2 } else { 1 }
-    wd_op(o, "[\"f\"," + int_text(mode) + "," + int_text(tn_from[n]) + ",[" + body.text + "]]")
-    return iterable + " each |" + captures + "| { " + next + " " + fragment + " };\n" + wutu_helper("end") + "();\n"
+    wd_op(o, wus3(Wut.F, int_text(mode), int_text(tn_from[n]), body.text))
+    return wus4(Wut.Each, iterable, captures, next, fragment) + wus1(Wut.AOpenCloseSemiNl, wutu_helper(wus(Wut.End)))
 }
 
 //! = Children
 
 /// A text hole's value: `= x;` is `wutu.show(x)` (a number or Bool shows as
 /// its str, a Str or a node as itself); written text (from < 0) is itself.
-fn shown(value: Str, from: I32) Str => if from < 0 { "(" + value + ")" } else { "wutu.show(" + value + ")" }
+fn shown(value: Str, from: I32) Str => if from < 0 { wus1(Wut.OpenAClose, value) } else { wus1(Wut.WutuShow, value) }
 
 /// Whether an identifier refers to a value (not a field, member, or
 /// parameter name, nor a binding being declared).
@@ -1092,3 +1088,532 @@ fn is_reference(node: I32) Bool {
     if (is_kind(p, Node.Field_init) or is_kind(p, Node.Bind_expr)) and first_child(p) == node { return false }
     return not (is_kind(p, Node.Param) or is_kind(p, Node.Capture) or is_kind(p, Node.Closure_param) or is_kind(p, Node.Closure_param_list) or is_kind(p, Node.Self_param))
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U16) Wut:
+    | U002f
+    | Wutu
+    | AOpenBCloseSemiNlC
+    | BracketABracketEnd
+    | ABOpenClose
+    | WutuStyle
+    | WutuDash
+    | LetInstallCssFunVoidEs
+    | InstallCss
+    | ANl
+    | BraceSpaceASpaceBCSpaceDSemiSpaceBraceEnd
+    | ClReturn
+    | AClose
+    | WutuInit
+    | ASemi
+    | LayerWutuDocument
+    | LayerWutuDocumentAtDotBraceBraceE
+    | Node
+    | AmbiguousElementAliasReferenceItInside
+    | InvalidUtuInterpolationAtOffset
+    | InternalNoWutuHelper
+    | LetFunEs
+    | AXBC
+    | BrowserHTMLElement
+    | LetFunEsGlobalThisUtuWutu
+    | ClWutuEventVoid
+    | ClWutuEventVoidAltWutu
+    | ClWutuEventVoidLetWutu
+    | AQuoteQuote
+    | W
+    | DotABraceBBraceEnd
+    | ABackslashQuote
+    | ABackslashBackslash
+    | U00
+    | AQuote
+    | Class
+    | ABCColonD
+    | ABraceEnd
+    | BracketACommaB
+    | ACommaB
+    | ABracketEnd
+    | S
+    | O
+    | N
+    | Let
+    | ABSemiNl
+    | Was
+    | Now
+    | AOpenBCommaSpaceQuoteCQuoteCommaSpaceDClose
+    | ADotBSpaceEqSpaceC
+    | LetLet
+    | If
+    | ASpaceBangEqSpaceBSpaceBraceSpaceCSemiSpaceBrace
+    | B
+    | ABOpenOpenCCloseCloseSemiNl
+    | M
+    | ASpace
+    | A
+    | Y
+    | AOpenOpenBCloseCloseSemiNl
+    | V
+    | ClWutuEventVoidOpenOpenCloseBra
+    | VBracketQuoteQuot
+    | ASemiNl
+    | AOpenBCommaSpaceOpenCCloseClose
+    | IfNotValidityBadInputAndValueAsNumber
+    | ACloseSemiSpaceBraceEnd
+    | IfCheckedValueChecked
+    | Value
+    | IfLen0Else
+    | Join
+    | IfDotBangEqOpenClo
+    | ASpaceEqSpaceOpenBCloseSemiSpaceBraceEnd
+    | IfValueAsNumberValueAsNumberValueAsNumbe
+    | IfCheckedValue
+    | AOpenBClose
+    | IfLen0ArrayStrNew
+    | Files
+    | ASpaceEqSpaceBDotC
+    | I
+    | If1Else0
+    | ASpaceBraceEndSemiNl
+    | T
+    | XBracketQuoteQuot
+    | AOpenCloseSemiNlB
+    | AOpenCloseSemiNlBOpenCCloseSemiNl
+    | BacktickA
+    | U001f
+    | ABacktick
+    | Key
+    | Made
+    | LetWutuMemoKeyIf
+    | ElseLet
+    | ASemiSpaceBOpenCCommaSpaceDCloseSemiSpace
+    | AOpenBCloseSemiSpaceBraceEndSemiNl
+    | Index
+    | ACommaSpaceB
+    | WutuKeyText
+    | AOpenBCloseSemi
+    | F
+    | Each
+    | AOpenCloseSemiNl
+    | OpenAClose
+    | WutuShow
+    | N0123456789abcdefghijklmnopqrstuvwxyz
+    | R
+    | Begin
+    | Fragment
+    | MountFragment
+    | MountSvg
+    | Mount
+    | BrowserDocumentFragment
+    | BrowserSVGElement
+    | BrowserHTMLElementDot
+    | Import
+    | Layer
+    | DotDot
+    | ARangeNeedsParenthesesFor0
+    | Attr
+    | BrowserElementStrStr
+    | NKVGlobalThisUtuWutuAttr
+    | Boolean
+    | BrowserElementStrBool
+    | NKVGlobalThisUtuWutuAttrOpenCommaCommaCl
+    | Append
+    | Externref
+    | VGlobalThisUtuWutuAppendV
+    | VGlobalThisUtuWutuPutV
+    | PutText
+    | Url
+    | NKVGlobalThisUtuWutuUrl
+    | Flag
+    | ClBrowserEventVoid
+    | PGlobalThisUtuWutuBeginP
+    | Slot
+    | GlobalThisUtuWutuSlot
+    | Arm
+    | NGlobalThisUtuWutuArmN
+    | Item
+    | KGlobalThisUtuWutuItemK
+    | ItemIndex
+    | IGlobalThisUtuWutuItemI
+    | End
+    | GlobalThisUtuWutuEnd
+    | NodeLc
+    | BrowserNode
+    | Event
+    | BrowserElementStrClBrowserEvent
+    | NEHGlobalThisUtuWutuListen
+    | Leave
+    | GlobalThisUtuWutuLeave
+    | IndexLc
+    | IGlobalThisUtuWutuPushCallStringI
+    | Call
+    | StrI32
+    | HPGlobalThisUtuWutuPushCallCall
+    | HPGlobalThisUtuWutuPushCallLoop
+    | GlobalKey
+    | KGlobalThisUtuWutuPushGlobalK
+    | KGlobalThisUtuWutuPushKeyK
+    | Unkey
+    | GlobalThisUtuWutuPopKey
+    | ClBrowserHTMLElementStr
+    | FKGlobalThisUtuWutuMountF
+    | ClBrowserDocumentFragmentStr
+    | ClBrowserSVGElementStr
+    | MemoHit
+    | KGlobalThisUtuWutuMemoHitK
+    | MemoLast
+    | GlobalThisUtuWutuMemoLast
+    | MemoKeep
+    | StrExternref
+    | KNGlobalThisUtuWutuMemoKeepK
+    | SelectSet
+    | BrowserElementStr
+    | NVConstWNewSet
+    | SelectValue
+    | BrowserHTMLSelectElementStr
+    | NVGlobalThisUtuWutuSelectValueN
+    | SelectGet
+    | BrowserElement
+    | NConstAArrayFromN
+    | Svg
+    | X2
+    | Input
+    | Input2
+    | Select
+    | Textarea
+    | TextArea
+    | Form
+    | Form2
+    | Button
+    | Button2
+    | Anchor
+    | Img
+    | Image
+    | Canvas
+    | Canvas2
+    | Video
+    | Video2
+    | Audio
+    | Audio2
+    | Option
+    | Option2
+    | Label
+    | Label2
+    | Details
+    | Details2
+    | Dialog
+    | Dialog2
+    | Progress
+    | Progress2
+    | Meter
+    | Meter2
+    | Output
+    | Output2
+    | ClickDblclickAuxclickContextmenuMousedow
+    | MouseEvent
+    | Wheel
+    | WheelEvent
+    | KeydownKeyupKeypress
+    | KeyboardEvent
+    | PointerdownPointerupPointermovePointeren
+    | PointerEvent
+    | FocusBlurFocusinFocusout
+    | FocusEvent
+    | Beforeinput
+    | InputEvent
+    | Submit
+    | SubmitEvent
+    | DragDragstartDragendDragenterDragleaveDr
+    | DragEvent
+    | TouchstartTouchendTouchmoveTouchcancel
+    | TouchEvent
+    | AnimationstartAnimationendAnimationitera
+    | AnimationEvent
+    | TransitionstartTransitionendTransitionru
+    | TransitionEvent
+    | CopyCutPaste
+    | ClipboardEvent
+    | WutuEventPreventDefault
+    | TrueFalseNullNotAndOr
+    | N1
+    | N0123456789abcdef
+    | HrefSrcActionFormActionPosterCite
+    | Style
+    | Template
+    | SvgLc
+    | N1Comma
+    | ForeignObject
+    | C
+    | U001fQuoteBackslashQu
+    | Group
+    | FilesLc
+    | Change
+    | WBracketQuoteQuot
+
+fn wus_src(t: Wut) Str {
+    return match t {
+        Wut.U002f => "{0}\\u002f",
+        Wut.Wutu => "__wutu_{0}_",
+        Wut.AOpenBCloseSemiNlC => "{0}({1});\n{2}",
+        Wut.BracketABracketEnd => "[{0}]",
+        Wut.ABOpenClose => "{0}{1}()",
+        Wut.WutuStyle => "{0}wutu.style({1});\n",
+        Wut.WutuDash => "wutu-{0}",
+        Wut.LetInstallCssFunVoidEs => "let {0}install_css: fun() Void = @es/\\ () => { if (!document.getElementById({1})) { const s=document.createElement('style'); s.id={2}; s.setAttribute('data-wutu-style',''); s.textContent={3}; document.head.append(s); } } \\/; ",
+        Wut.InstallCss => "{0}install_css();\n{1}",
+        Wut.ANl => "{0}\n",
+        Wut.BraceSpaceASpaceBCSpaceDSemiSpaceBraceEnd => "{ {0} {1}{2} {3}; }",
+        Wut.ClReturn => "{0} {1}(cl() {2}{ return {3}; }, ",
+        Wut.AClose => "{0})",
+        Wut.WutuInit => "{ wutu.init(); {0}; }",
+        Wut.ASemi => "{0};",
+        Wut.LayerWutuDocument => "{0} layer(wutu.document);",
+        Wut.LayerWutuDocumentAtDotBraceBraceE => "@layer wutu.document{{0}}",
+        Wut.Node => "{0}node{1}",
+        Wut.AmbiguousElementAliasReferenceItInside => "Ambiguous element alias '{0}'; reference it inside its own subtree",
+        Wut.InvalidUtuInterpolationAtOffset => "Invalid Utu interpolation at offset {0}: {1}{2}",
+        Wut.InternalNoWutuHelper => "internal: no Wutu helper {0}",
+        Wut.LetFunEs => "let {0}: fun({1}) {2} = @es/\\ {3} \\/;",
+        Wut.AXBC => "{0}_{1}{2}",
+        Wut.BrowserHTMLElement => "Browser.HTML{0}Element",
+        Wut.LetFunEsGlobalThisUtuWutu => "let {0}: fun() {1} = @es/\\ ()=>globalThis.__utuWutu.{2}() \\/;",
+        Wut.ClWutuEventVoid => "cl(__wutu_event) Void { {0} {1}; }",
+        Wut.ClWutuEventVoidAltWutu => "cl(__wutu_event) Void { {0} alt __wutu_event { Browser.{1} |{2}| => { {3}; }, ~> {}, }; }",
+        Wut.ClWutuEventVoidLetWutu => "cl(__wutu_event) Void { {0} let {1} = __wutu_event; {2}; }",
+        Wut.AQuoteQuote => "{0}\"\"",
+        Wut.W => "w{0}",
+        Wut.DotABraceBBraceEnd => ".{0}{{1}}",
+        Wut.ABackslashQuote => "{0}\\\"",
+        Wut.ABackslashBackslash => "{0}\\\\",
+        Wut.U00 => "{0}\\u00{1}{2}",
+        Wut.AQuote => "{0}\"",
+        Wut.Class => "{0}\"class\":{1}",
+        Wut.ABCColonD => "{0}{1}{2}:{3}",
+        Wut.ABraceEnd => "{0}}",
+        Wut.BracketACommaB => "[{0},{1}",
+        Wut.ACommaB => "{0},{1}",
+        Wut.ABracketEnd => "{0}]",
+        Wut.S => "[\"s\",{0},{1}{2}]",
+        Wut.O => "[\"o\",{0},[{1},{2}]{3}]",
+        Wut.N => "[\"n\",{0}]",
+        Wut.Let => "let {0} = {1}();\n",
+        Wut.ABSemiNl => "{0}{1};\n",
+        Wut.Was => "{0}_{1}_was",
+        Wut.Now => "{0}_{1}_now",
+        Wut.AOpenBCommaSpaceQuoteCQuoteCommaSpaceDClose => "{0}({1}, \"{2}\", {3})",
+        Wut.ADotBSpaceEqSpaceC => "{0}.{1} = {2}",
+        Wut.LetLet => "{0}let {1} = {2}.{3}; let ",
+        Wut.If => "{0} = {1}; {2} = ({3});\nif ",
+        Wut.ASpaceBangEqSpaceBSpaceBraceSpaceCSemiSpaceBrace => "{0} != {1} { {2}; };\n",
+        Wut.B => "[\"b\",{0}]",
+        Wut.ABOpenOpenCCloseCloseSemiNl => "{0}{1}(({2}));\n",
+        Wut.M => "[\"m\",{0}]",
+        Wut.ASpace => "{0} ",
+        Wut.A => "[\"a\",{0}]",
+        Wut.Y => "[\"y\",{0}]",
+        Wut.AOpenOpenBCloseCloseSemiNl => "{0}(({1}));\n",
+        Wut.V => "[\"v\",{0},{1}]",
+        Wut.ClWutuEventVoidOpenOpenCloseBra => "{0}(cl(__wutu_event) Void { {1}; });\n",
+        Wut.VBracketQuoteQuot => "[\"v\",{0},\"{1}\"]",
+        Wut.ASemiNl => "{0};\n",
+        Wut.AOpenBCommaSpaceOpenCCloseClose => "{0}({1}, ({2}))",
+        Wut.IfNotValidityBadInputAndValueAsNumber => "if not {0}.validity.badInput and {1}.valueAsNumber != ({2}) { {3}.valueAsNumber = (",
+        Wut.ACloseSemiSpaceBraceEnd => "{0}); }",
+        Wut.IfCheckedValueChecked => "if {0}.checked != ({1}.value == ({2})) { {3}.checked = ",
+        Wut.Value => "{0}.value == ({1}); }",
+        Wut.IfLen0Else => "{0}({1}, if ({2}).len() == 0 { \"\"; } else { {3} + ",
+        Wut.Join => "{0}.join({1}); })",
+        Wut.IfDotBangEqOpenClo => "if {0}.{1} != ({2}) { {3}.",
+        Wut.ASpaceEqSpaceOpenBCloseSemiSpaceBraceEnd => "{0} = ({1}); }",
+        Wut.IfValueAsNumberValueAsNumberValueAsNumbe => "if {0}.valueAsNumber == {1}.valueAsNumber { {2} = {3}.valueAsNumber; }",
+        Wut.IfCheckedValue => "if {0}.checked { {1} = {2}.value; }",
+        Wut.AOpenBClose => "{0}({1})",
+        Wut.IfLen0ArrayStrNew => "{0} = if {1}.len() == 0 { Array[Str].new(0, \"\"); } else { {2}.slice(1, {3}.len()).split(",
+        Wut.Files => "{0} = {1}.files",
+        Wut.ASpaceEqSpaceBDotC => "{0} = {1}.{2}",
+        Wut.I => "[\"i\",[{0}],[{1}]]",
+        Wut.If1Else0 => "if ({0}) { {1}(1); {2} } else { {3}(0); ",
+        Wut.ASpaceBraceEndSemiNl => "{0} };\n",
+        Wut.T => "[\"t\",{0}]",
+        Wut.XBracketQuoteQuot => "[\"x\",{0}]",
+        Wut.AOpenCloseSemiNlB => "{0}();\n{1}",
+        Wut.AOpenCloseSemiNlBOpenCCloseSemiNl => "{0}();\n{1}({2});\n",
+        Wut.BacktickA => "`{0}",
+        Wut.U001f => "{0}\\u001f${{1}}",
+        Wut.ABacktick => "{0}`",
+        Wut.Key => "{0}key{1}",
+        Wut.Made => "{0}made{1}",
+        Wut.LetWutuMemoKeyIf => "let {0} = wutu.memo_key({1}, {2});\nif {3}(",
+        Wut.ElseLet => "{0}) { {1}({2}()); } else { let {3} = ",
+        Wut.ASemiSpaceBOpenCCommaSpaceDCloseSemiSpace => "{0}; {1}({2}, {3}); ",
+        Wut.AOpenBCloseSemiSpaceBraceEndSemiNl => "{0}({1}); };\n",
+        Wut.Index => "{0}index{1}",
+        Wut.ACommaSpaceB => "{0}, {1}",
+        Wut.WutuKeyText => "{0}(wutu.key_text({1}));",
+        Wut.AOpenBCloseSemi => "{0}({1});",
+        Wut.F => "[\"f\",{0},{1},[{2}]]",
+        Wut.Each => "{0} each |{1}| { {2} {3} };\n",
+        Wut.AOpenCloseSemiNl => "{0}();\n",
+        Wut.OpenAClose => "({0})",
+        Wut.WutuShow => "wutu.show({0})",
+        Wut.N0123456789abcdefghijklmnopqrstuvwxyz => "0123456789abcdefghijklmnopqrstuvwxyz",
+        Wut.R => "[\"r\"]",
+        Wut.Begin => "begin",
+        Wut.Fragment => "fragment",
+        Wut.MountFragment => "mount_fragment",
+        Wut.MountSvg => "mount_svg",
+        Wut.Mount => "mount",
+        Wut.BrowserDocumentFragment => "Browser.DocumentFragment ",
+        Wut.BrowserSVGElement => "Browser.SVGElement ",
+        Wut.BrowserHTMLElementDot => "Browser.HTMLElement ",
+        Wut.Import => "@import",
+        Wut.Layer => "layer(",
+        Wut.DotDot => "..",
+        Wut.ARangeNeedsParenthesesFor0 => " (a range needs parentheses: for (0 ..< n) |i|)",
+        Wut.Attr => "attr",
+        Wut.BrowserElementStrStr => "Browser.Element, Str, Str",
+        Wut.NKVGlobalThisUtuWutuAttr => "(n,k,v)=>globalThis.__utuWutu.attr(n,k,v)",
+        Wut.Boolean => "boolean",
+        Wut.BrowserElementStrBool => "Browser.Element, Str, Bool",
+        Wut.NKVGlobalThisUtuWutuAttrOpenCommaCommaCl => "(n,k,v)=>globalThis.__utuWutu.attr(n,k,!!v)",
+        Wut.Append => "append",
+        Wut.Externref => "Externref",
+        Wut.VGlobalThisUtuWutuAppendV => "(v)=>globalThis.__utuWutu.append(v)",
+        Wut.VGlobalThisUtuWutuPutV => "(v)=>globalThis.__utuWutu.put(v)",
+        Wut.PutText => "put_text",
+        Wut.Url => "url",
+        Wut.NKVGlobalThisUtuWutuUrl => "(n,k,v)=>globalThis.__utuWutu.url(n,k,v)",
+        Wut.Flag => "flag",
+        Wut.ClBrowserEventVoid => "cl(Browser.Event) Void",
+        Wut.PGlobalThisUtuWutuBeginP => "(p)=>globalThis.__utuWutu.begin(p)",
+        Wut.Slot => "slot",
+        Wut.GlobalThisUtuWutuSlot => "()=>globalThis.__utuWutu.slot()",
+        Wut.Arm => "arm",
+        Wut.NGlobalThisUtuWutuArmN => "(n)=>globalThis.__utuWutu.arm(n)",
+        Wut.Item => "item",
+        Wut.KGlobalThisUtuWutuItemK => "(k)=>globalThis.__utuWutu.item(k)",
+        Wut.ItemIndex => "item_index",
+        Wut.IGlobalThisUtuWutuItemI => "(i)=>globalThis.__utuWutu.item(i)",
+        Wut.End => "end",
+        Wut.GlobalThisUtuWutuEnd => "()=>globalThis.__utuWutu.end()",
+        Wut.NodeLc => "node",
+        Wut.BrowserNode => "Browser.Node",
+        Wut.Event => "event",
+        Wut.BrowserElementStrClBrowserEvent => "Browser.Element, Str, cl(Browser.Event) Void",
+        Wut.NEHGlobalThisUtuWutuListen => "(n,e,h)=>globalThis.__utuWutu.listen(n,e,h)",
+        Wut.Leave => "leave",
+        Wut.GlobalThisUtuWutuLeave => "()=>{globalThis.__utuWutu.leave()}",
+        Wut.IndexLc => "index",
+        Wut.IGlobalThisUtuWutuPushCallStringI => "(i)=>globalThis.__utuWutu.pushCall(String(i))",
+        Wut.Call => "call",
+        Wut.StrI32 => "Str, I32",
+        Wut.HPGlobalThisUtuWutuPushCallCall => "(h,p)=>globalThis.__utuWutu.pushCall(\"call:\"+h+\":\"+p)",
+        Wut.HPGlobalThisUtuWutuPushCallLoop => "(h,p)=>globalThis.__utuWutu.pushCall(\"loop:\"+h+\":\"+p)",
+        Wut.GlobalKey => "globalKey",
+        Wut.KGlobalThisUtuWutuPushGlobalK => "(k)=>globalThis.__utuWutu.pushGlobal(k)",
+        Wut.KGlobalThisUtuWutuPushKeyK => "(k)=>globalThis.__utuWutu.pushKey(k)",
+        Wut.Unkey => "unkey",
+        Wut.GlobalThisUtuWutuPopKey => "()=>globalThis.__utuWutu.popKey()",
+        Wut.ClBrowserHTMLElementStr => "cl() Browser.HTMLElement, Str",
+        Wut.FKGlobalThisUtuWutuMountF => "(f,k)=>globalThis.__utuWutu.mount(f,k)",
+        Wut.ClBrowserDocumentFragmentStr => "cl() Browser.DocumentFragment, Str",
+        Wut.ClBrowserSVGElementStr => "cl() Browser.SVGElement, Str",
+        Wut.MemoHit => "memo_hit",
+        Wut.KGlobalThisUtuWutuMemoHitK => "(k)=>globalThis.__utuWutu.memoHit(k)",
+        Wut.MemoLast => "memo_last",
+        Wut.GlobalThisUtuWutuMemoLast => "()=>globalThis.__utuWutu.memoLast()",
+        Wut.MemoKeep => "memo_keep",
+        Wut.StrExternref => "Str, Externref",
+        Wut.KNGlobalThisUtuWutuMemoKeepK => "(k,n)=>globalThis.__utuWutu.memoKeep(k,n)",
+        Wut.SelectSet => "select_set",
+        Wut.BrowserElementStr => "Browser.Element, Str",
+        Wut.NVConstWNewSet => "(n,v)=>{const w=new Set(v===''?[]:v.slice(1).split('\\u001f'));const a=()=>{for(const o of n.options)o.selected=w.has(o.value)};a();queueMicrotask(a)}",
+        Wut.SelectValue => "select_value",
+        Wut.BrowserHTMLSelectElementStr => "Browser.HTMLSelectElement, Str",
+        Wut.NVGlobalThisUtuWutuSelectValueN => "(n,v)=>globalThis.__utuWutu.selectValue(n,v)",
+        Wut.SelectGet => "select_get",
+        Wut.BrowserElement => "Browser.Element",
+        Wut.NConstAArrayFromN => "(n)=>{const a=Array.from(n.selectedOptions,o=>o.value);return a.length?'\\u001f'+a.join('\\u001f'):''}",
+        Wut.Svg => "svg_",
+        Wut.X2 => "_x",
+        Wut.Input => "input",
+        Wut.Input2 => "Input",
+        Wut.Select => "Select",
+        Wut.Textarea => "textarea",
+        Wut.TextArea => "TextArea",
+        Wut.Form => "form",
+        Wut.Form2 => "Form",
+        Wut.Button => "button",
+        Wut.Button2 => "Button",
+        Wut.Anchor => "Anchor",
+        Wut.Img => "img",
+        Wut.Image => "Image",
+        Wut.Canvas => "canvas",
+        Wut.Canvas2 => "Canvas",
+        Wut.Video => "video",
+        Wut.Video2 => "Video",
+        Wut.Audio => "audio",
+        Wut.Audio2 => "Audio",
+        Wut.Option => "option",
+        Wut.Option2 => "Option",
+        Wut.Label => "label",
+        Wut.Label2 => "Label",
+        Wut.Details => "details",
+        Wut.Details2 => "Details",
+        Wut.Dialog => "dialog",
+        Wut.Dialog2 => "Dialog",
+        Wut.Progress => "progress",
+        Wut.Progress2 => "Progress",
+        Wut.Meter => "meter",
+        Wut.Meter2 => "Meter",
+        Wut.Output => "output",
+        Wut.Output2 => "Output",
+        Wut.ClickDblclickAuxclickContextmenuMousedow => "click dblclick auxclick contextmenu mousedown mouseup mousemove mouseenter mouseleave mouseover mouseout",
+        Wut.MouseEvent => "MouseEvent",
+        Wut.Wheel => "wheel",
+        Wut.WheelEvent => "WheelEvent",
+        Wut.KeydownKeyupKeypress => "keydown keyup keypress",
+        Wut.KeyboardEvent => "KeyboardEvent",
+        Wut.PointerdownPointerupPointermovePointeren => "pointerdown pointerup pointermove pointerenter pointerleave pointerover pointerout pointercancel gotpointercapture lostpointercapture",
+        Wut.PointerEvent => "PointerEvent",
+        Wut.FocusBlurFocusinFocusout => "focus blur focusin focusout",
+        Wut.FocusEvent => "FocusEvent",
+        Wut.Beforeinput => "beforeinput",
+        Wut.InputEvent => "InputEvent",
+        Wut.Submit => "submit",
+        Wut.SubmitEvent => "SubmitEvent",
+        Wut.DragDragstartDragendDragenterDragleaveDr => "drag dragstart dragend dragenter dragleave dragover drop",
+        Wut.DragEvent => "DragEvent",
+        Wut.TouchstartTouchendTouchmoveTouchcancel => "touchstart touchend touchmove touchcancel",
+        Wut.TouchEvent => "TouchEvent",
+        Wut.AnimationstartAnimationendAnimationitera => "animationstart animationend animationiteration animationcancel",
+        Wut.AnimationEvent => "AnimationEvent",
+        Wut.TransitionstartTransitionendTransitionru => "transitionstart transitionend transitionrun transitioncancel",
+        Wut.TransitionEvent => "TransitionEvent",
+        Wut.CopyCutPaste => "copy cut paste",
+        Wut.ClipboardEvent => "ClipboardEvent",
+        Wut.WutuEventPreventDefault => "__wutu_event.preventDefault();",
+        Wut.TrueFalseNullNotAndOr => "true false null not and or",
+        Wut.N1 => "1",
+        Wut.N0123456789abcdef => "0123456789abcdef",
+        Wut.HrefSrcActionFormActionPosterCite => "href src action formAction poster cite data background codeBase longDesc ping srcset imageSrcset content",
+        Wut.Style => "style",
+        Wut.Template => "template",
+        Wut.SvgLc => "svg",
+        Wut.N1Comma => ",1",
+        Wut.ForeignObject => "foreignObject",
+        Wut.C => "[\"c\"]",
+        Wut.U001fQuoteBackslashQu => "\"\\u001f\"",
+        Wut.Group => "group",
+        Wut.FilesLc => "files",
+        Wut.Change => "change",
+        Wut.WBracketQuoteQuot => "[\"w\"]",
+    }
+}
+
+fn wus(t: Wut) Str => st(st_wutu + t.i32())
+fn wus1(t: Wut, a: Str) Str => stf(st_wutu + t.i32(), a, "", "", "")
+fn wus2(t: Wut, a: Str, b: Str) Str => stf(st_wutu + t.i32(), a, b, "", "")
+fn wus3(t: Wut, a: Str, b: Str, c: Str) Str => stf(st_wutu + t.i32(), a, b, c, "")
+fn wus4(t: Wut, a: Str, b: Str, c: Str, d: Str) Str => stf(st_wutu + t.i32(), a, b, c, d)

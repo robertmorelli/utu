@@ -12,7 +12,7 @@
 fn expand_utu(site: I32) Void {
     let body = dsl_body(site)
     if not splice_parses(site, 0, body) {
-        dsl_fail("standard dsls (utu): could not parse DSL body as expression", 0, 1)
+        dsl_fail(sts(Stt.StandardDslsUtuCouldNotParse), 0, 1)
     }
     graft_expression(site, dsl_splice(site, 0, body))
 }
@@ -24,9 +24,9 @@ fn expand_css(site: I32) Void {
     let safe = ""
     for (0 ..< literal.len()) |i| {
         let c = literal.get(i)
-        if c == 47 { safe = safe + "\\u002f" } else { safe = safe + Str.from_code_point(c) }
+        if c == 47 { safe = sts1(Stt.U002f, safe) } else { safe = safe + Str.from_code_point(c) }
     }
-    graft_expression(site, "{let value:fun() Str=@es/\\ ()=>" + safe + " \\/;value();}")
+    graft_expression(site, sts1(Stt.LetValueFunStrEsValue, safe))
 }
 
 //! = @stored
@@ -45,7 +45,7 @@ fn uses_browser(file: I32) Bool {
         if is_kind(item, Node.Using_decl) and using_path(item) >= 0 {
             let name = first_child(item)
             let path = using_path(item)
-            if node_text(name) == "Browser" and node_text(path) == "std:Browser" { return true }
+            if node_text(name) == "Browser" and node_text(path) == sts(Stt.StdBrowser) { return true }
         }
         item = next_sibling(item)
     }
@@ -53,12 +53,12 @@ fn uses_browser(file: I32) Bool {
 }
 
 /// A body not of the form `Type "key" default`.
-fn stored_syntax(raw: Str) Void => dsl_fail("@stored expects Type \"storage-key\" default-expression", first_non_space(raw), 1)
+fn stored_syntax(raw: Str) Void => dsl_fail(sts(Stt.StoredExpectsTypeStorageKeyDefault), first_non_space(raw), 1)
 
 /// `@stored/\ … \/`: the state, loaded and registered with the host's store.
 /// Each site's names start with its own prefix.
 fn expand_stored(site: I32) Void {
-    let prefix = "__stored" + int_text(st_serial) + "_"
+    let prefix = sts1(Stt.Stored, int_text(st_serial))
     st_serial += 1
     st_seq = 0
     graft_expression(site, stored_code(site, prefix))
@@ -69,16 +69,16 @@ fn is_stored_scalar(type: Str) Bool => type == "Str" or type == "Bool" or type =
 /// Checks that a type can be stored (scalars, arrays, acyclic local structs).
 fn stored_shape(written: Str, visiting: I32, file: I32) Void {
     let type = trim_text(written)
-    if type.len() == 0 { stored_fail("Unsupported type in stored schema") }
+    if type.len() == 0 { stored_fail(sts(Stt.UnsupportedTypeInStoredSchema)) }
     if is_stored_scalar(type) { return }
     if text_at(type, 0, "Array[") {
         stored_shape(type.slice(6, type.len() - 1), visiting, file)
         return
     }
     let w = intern_text(type)
-    if visiting >= 0 and list_has(visiting, w) { stored_fail("Stored schemas must be acyclic") }
+    if visiting >= 0 and list_has(visiting, w) { stored_fail(sts(Stt.StoredSchemasMustBeAcyclic)) }
     let node = stored_struct(type, file)
-    if node < 0 { stored_fail("Unsupported stored type " + type + "; use local structs, Array, Str, Bool, I32, or F64") }
+    if node < 0 { stored_fail(sts1(Stt.UnsupportedStoredTypeUseLocalStructs, type)) }
     let next = list_with(visiting, w)
     for (stored_fields(node)) |f| { stored_shape(field_type_text(f), next, file) }
 }
@@ -122,18 +122,18 @@ fn stored_fresh(prefix: Str) Str {
 /// A JS predicate that `v` matches the type.
 fn stored_validate(type: Str, v: Str, file: I32) Str {
     let t = trim_text(type)
-    if text_at(t, 0, "Array[") { return "Array.isArray(" + v + ")&&" + v + ".length<=100000&&" + v + ".every(v=>" + stored_validate(t.slice(6, t.len() - 1), "v", file) + ")" }
-    if t == "Str" { return "typeof " + v + "==='string'" }
-    if t == "Bool" { return "typeof " + v + "==='boolean'" }
-    if t == "I32" { return "Number.isInteger(" + v + ")&&" + v + ">=-2147483648&&" + v + "<=2147483647" }
-    if t == "F64" { return "typeof " + v + "==='number'&&Number.isFinite(" + v + ")" }
+    if text_at(t, 0, "Array[") { return sts4(Stt.ArrayIsArrayLength100000EveryV, v, v, v, stored_validate(t.slice(6, t.len() - 1), "v", file)) }
+    if t == "Str" { return sts1(Stt.TypeofString, v) }
+    if t == "Bool" { return sts1(Stt.TypeofBoolean, v) }
+    if t == "I32" { return sts3(Stt.NumberIsInteger21474836482147483647, v, v, v) }
+    if t == "F64" { return sts2(Stt.TypeofNumberNumberIsFinite, v, v) }
     let node = stored_struct(t, file)
     let fields = ""
     for (stored_fields(node)) |f| {
-        if fields.len() > 0 { fields = fields + "&&" }
-        fields = fields + "(" + stored_validate(field_type_text(f), v + "[" + js_string(field_name(f)) + "]", file) + ")"
+        if fields.len() > 0 { fields = sts1(Stt.AAmpAmp, fields) }
+        fields = sts2(Stt.AOpenBClose, fields, stored_validate(field_type_text(f), sts2(Stt.ABracketBBracketEnd, v, js_string(field_name(f))), file))
     }
-    return v + "!==null&&typeof " + v + "==='object'&&!Array.isArray(" + v + ")" + (if fields.len() > 0 { "&&" + fields } else { "" })
+    return sts4(Stt.NullTypeofObjectArrayIsArray, v, v, v, (if fields.len() > 0 { sts1(Stt.AmpAmpA, fields) } else { "" }))
 }
 
 /// Utu converting validated JS data `v` into a native value.
@@ -145,19 +145,17 @@ fn stored_decode(type: Str, v: Str, file: I32, prefix: Str) Str {
         let length = stored_fresh(prefix)
         let i = stored_fresh(prefix)
         let item = stored_fresh(prefix)
-        return "{let " + length + ":F64=" + v + ".length;let " + array + ":Array[" + element + "]=[];\n        if " + length + ">0.0 {let " + item + "=" + stored_decode(element, v + "[0]", file, prefix) + ";" + array
-            + "=Array[" + element + "].new(" + length + ".i32()," + item + ");let " + i + ":I32=1;while(" + i + "<" + length + ".i32()){" + array + "[" + i + "]="
-            + stored_decode(element, v + "[" + i + ".f64()]", file, prefix) + ";" + i + "+=1;};};" + array + ";}"
+        return sts4(Stt.LetF64LengthLetArrayIf, length, v, array, element) + sts4(Stt.N00LetArray, length, item, stored_decode(element, sts1(Stt.N0, v), file, prefix), array) + sts4(Stt.NewI32LetI321While, element, length, item, i) + sts4(Stt.I32, i, length, array, i) + sts3(Stt.N1, stored_decode(element, sts2(Stt.F64, v, i), file, prefix), i, array)
     }
-    if t == "I32" { return "{let " + prefix + "number:F64=" + v + ";" + prefix + "number.i32();}" }
+    if t == "I32" { return sts3(Stt.LetNumberF64NumberI32, prefix, v, prefix) }
     if is_stored_scalar(t) { return v }
     let node = stored_struct(t, file)
     let fields = ""
     for (stored_fields(node)) |f| {
-        if fields.len() > 0 { fields = fields + ", " }
-        fields = fields + field_name(f) + ": " + stored_decode(field_type_text(f), v + "." + field_name(f), file, prefix)
+        if fields.len() > 0 { fields = sts1(Stt.ACommaSpace, fields) }
+        fields = sts3(Stt.ABColonSpaceC, fields, field_name(f), stored_decode(field_type_text(f), sts2(Stt.ADotB, v, field_name(f)), file, prefix))
     }
-    return t + " { " + fields + " }"
+    return sts2(Stt.ASpaceBraceSpaceBSpaceBraceEnd, t, fields)
 }
 
 /// Utu converting native value `v` into plain JS data.
@@ -166,33 +164,33 @@ fn stored_encode(type: Str, v: Str, file: I32, prefix: Str) Str {
     if text_at(t, 0, "Array[") {
         let array = stored_fresh(prefix)
         let item = stored_fresh(prefix)
-        return "{let " + array + "=Browser.Array();" + v + " each |" + item + "|{" + array + ".push(" + stored_encode(t.slice(6, t.len() - 1), item, file, prefix) + ");};" + array + ";}"
+        return sts4(Stt.LetBrowserArrayEachPush, array, v, item, array) + sts2(Stt.ACloseSemiBraceEndSemiBSemiBraceEnd, stored_encode(t.slice(6, t.len() - 1), item, file, prefix), array)
     }
     if is_stored_scalar(t) { return v }
     let node = stored_struct(t, file)
     let fields = ""
     for (stored_fields(node)) |f| {
-        if fields.len() > 0 { fields = fields + ", " }
-        fields = fields + field_name(f) + ": " + stored_encode(field_type_text(f), v + "." + field_name(f), file, prefix)
+        if fields.len() > 0 { fields = sts1(Stt.ACommaSpace, fields) }
+        fields = sts3(Stt.ABColonSpaceC, fields, field_name(f), stored_encode(field_type_text(f), sts2(Stt.ADotB, v, field_name(f)), file, prefix))
     }
-    return "&{ " + fields + " }"
+    return sts1(Stt.AmpBraceSpaceASpaceBraceEnd, fields)
 }
 
 /// Replace JSON's null for a non-finite F64, without changing other fields.
 fn stored_sanitize(type: Str, v: Str, file: I32) Str {
     let t = trim_text(type)
-    if t == "F64" { return "globalThis.__utuWutu.storageReviveF64(" + v + ")" }
+    if t == "F64" { return sts1(Stt.GlobalThisUtuWutuStorageReviveF64, v) }
     // (A value of the wrong shape is left as it is: validation then reports the mismatch.)
-    if text_at(t, 0, "Array[") { return "(v=>Array.isArray(v)?v.map(v=>" + stored_sanitize(t.slice(6, t.len() - 1), "v", file) + "):v)(" + v + ")" }
+    if text_at(t, 0, "Array[") { return sts2(Stt.VArrayIsArrayVVMap, stored_sanitize(t.slice(6, t.len() - 1), "v", file), v) }
     if is_stored_scalar(t) { return v }
     let fields = ""
     for (stored_fields(stored_struct(t, file))) |f| {
-        if fields.len() > 0 { fields = fields + "," }
+        if fields.len() > 0 { fields = sts1(Stt.AComma, fields) }
         let name = js_string(field_name(f))
-        fields = fields + name + ":" + stored_sanitize(field_type_text(f), "v[" + name + "]", file)
+        fields = sts3(Stt.ABColonC, fields, name, stored_sanitize(field_type_text(f), sts1(Stt.V, name), file))
     }
     // (Each level binds its value once: the text stays linear in the depth.)
-    return "(v=>v!==null&&typeof v==='object'&&!Array.isArray(v)?{...v," + fields + "}:v)(" + v + ")"
+    return sts2(Stt.VVNullTypeofVObject, fields, v)
 }
 
 /// The expansion of a `@stored` site: its body parsed as
@@ -202,7 +200,7 @@ fn stored_code(site: I32, prefix: Str) Str {
     let raw = dsl_body(site)
     let file = file_of_token(node_first[site])
     // The state is kept by the host's store, read through Browser.
-    if not uses_browser(file) { dsl_fail("@stored needs using Browser from std:Browser", first_non_space(raw), 1) }
+    if not uses_browser(file) { dsl_fail(sts(Stt.StoredNeedsUsingBrowserFromStd), first_non_space(raw), 1) }
     // Type "key" [manual] [validate fn] default
     let i = skip_spaces(raw, 0)
     let type_start = i
@@ -214,7 +212,7 @@ fn stored_code(site: I32, prefix: Str) Str {
     st_type_at = type_start
     st_type_len = type.len()
     if is_stored_scalar(type) or text_at(type, 0, "Array[") {
-        stored_fail("@stored state must be a struct so updates can apply in place; wrap " + type + " in a struct field")
+        stored_fail(sts1(Stt.StoredStateMustBeAStruct, type))
     }
     let gap = i
     i = skip_spaces(raw, i)
@@ -236,12 +234,12 @@ fn stored_code(site: I32, prefix: Str) Str {
     let more = true
     while (more) {
         more = false
-        if text_at(raw, i, "manual") and i + 6 < raw.len() and is_space_code(raw.get(i + 6)) {
+        if text_at(raw, i, sts(Stt.Manual)) and i + 6 < raw.len() and is_space_code(raw.get(i + 6)) {
             manual = true
             i += 6
             i = skip_spaces(raw, i)
             more = true
-        } else if text_at(raw, i, "validate") and i + 8 < raw.len() and is_space_code(raw.get(i + 8)) {
+        } else if text_at(raw, i, sts(Stt.Validate)) and i + 8 < raw.len() and is_space_code(raw.get(i + 8)) {
             let j = skip_spaces(raw, i + 8)
             if j < raw.len() and (is_lower_code(raw.get(j)) or raw.get(j) == 95) {
                 let k = j
@@ -258,18 +256,145 @@ fn stored_code(site: I32, prefix: Str) Str {
     }
     let default_source = raw.slice(i, raw.len())
     stored_shape(type, -1, file)
-    if not splice_parses(site, i, default_source) { dsl_fail("Invalid @stored default expression", i, trim_end(default_source).len()) }
+    if not splice_parses(site, i, default_source) { dsl_fail(sts(Stt.InvalidStoredDefaultExpression), i, trim_end(default_source).len()) }
     let fallback = dsl_splice(site, i, default_source)
     if validator.len() > 0 { validator = dsl_splice(site, validator_at, validator) }
-    let state = prefix + "state"
-    let data = prefix + "data"
-    let apply_raw = prefix + "decode"
+    let state = sts1(Stt.State, prefix)
+    let data = sts1(Stt.Data, prefix)
+    let apply_raw = sts1(Stt.Decode, prefix)
     let copies = ""
-    for (stored_fields(stored_struct(type, file))) |f| { copies = copies + state + "." + field_name(f) + "=candidate." + field_name(f) + "; " }
-    let check = if validator.len() > 0 { "if not " + validator + "(candidate) {candidate=" + fallback + ";};" } else { "" }
-    return "{wutu.storage_init();let " + state + ":" + type + "=" + fallback + ";\n    let " + apply_raw + "=cl(raw:Str) Void {\n      let " + prefix + "check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data=" + stored_sanitize(type, "value.data", file) + ";if(!("
-        + stored_validate(type, "value.data", file) + "))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json="
-        + prefix + "check(raw);let candidate:" + type + "=" + fallback + ";\n      if json.len()>0 {let " + data + "=Browser.JSON.parse(json);candidate=" + stored_decode(type, data, file, prefix) + ";};\n      " + check + "\n      "
-        + trim_end(copies) + "\n    };\n    " + apply_raw + "(wutu.stored_load(" + key + "));\n    wutu.stored_register("
-        + key + ",cl() Str {return Browser.JSON.stringify(&{version:1,data:" + stored_encode(type, state, file, prefix) + "});}," + (if manual { "true" } else { "false" }) + "," + apply_raw + ");\n    " + state + ";}"
+    for (stored_fields(stored_struct(type, file))) |f| { copies = sts4(Stt.Candidate, copies, state, field_name(f), field_name(f)) }
+    let check = if validator.len() > 0 { sts2(Stt.IfNotCandidateCandidate, validator, fallback) } else { "" }
+    return sts4(Stt.WutuStorageInitLetLetCl, state, type, fallback, apply_raw) + sts4(Stt.CheckFunStrStrEsRaw, prefix, stored_sanitize(type, sts(Stt.ValueData), file), stored_validate(type, sts(Stt.ValueData), file), prefix) + sts4(Stt.IfJsonLen0LetBrowser, type, fallback, data, stored_decode(type, data, file, prefix)) + sts4(Stt.WutuStoredLoadWutuStoredRegister, check, trim_end(copies), apply_raw, key) + sts4(Stt.ClStrReturnBrowserJSONStringify, key, stored_encode(type, state, file, prefix), (if manual { "true" } else { "false" }), apply_raw) + sts1(Stt.ASemiBraceEnd, state)
 }
+
+//! == Text
+//!
+//! This file's strings and templates, in the string table (strtab.utu).
+
+enum(U8) Stt:
+    | U002f
+    | LetValueFunStrEsValue
+    | Stored
+    | UnsupportedStoredTypeUseLocalStructs
+    | ArrayIsArrayLength100000EveryV
+    | TypeofString
+    | TypeofBoolean
+    | NumberIsInteger21474836482147483647
+    | TypeofNumberNumberIsFinite
+    | AAmpAmp
+    | AOpenBClose
+    | ABracketBBracketEnd
+    | NullTypeofObjectArrayIsArray
+    | AmpAmpA
+    | LetF64LengthLetArrayIf
+    | N00LetArray
+    | NewI32LetI321While
+    | I32
+    | N1
+    | N0
+    | F64
+    | LetNumberF64NumberI32
+    | ACommaSpace
+    | ABColonSpaceC
+    | ADotB
+    | ASpaceBraceSpaceBSpaceBraceEnd
+    | LetBrowserArrayEachPush
+    | ACloseSemiBraceEndSemiBSemiBraceEnd
+    | AmpBraceSpaceASpaceBraceEnd
+    | GlobalThisUtuWutuStorageReviveF64
+    | VArrayIsArrayVVMap
+    | AComma
+    | ABColonC
+    | V
+    | VVNullTypeofVObject
+    | StoredStateMustBeAStruct
+    | State
+    | Data
+    | Decode
+    | Candidate
+    | IfNotCandidateCandidate
+    | WutuStorageInitLetLetCl
+    | CheckFunStrStrEsRaw
+    | IfJsonLen0LetBrowser
+    | WutuStoredLoadWutuStoredRegister
+    | ClStrReturnBrowserJSONStringify
+    | ASemiBraceEnd
+    | StandardDslsUtuCouldNotParse
+    | StdBrowser
+    | StoredExpectsTypeStorageKeyDefault
+    | UnsupportedTypeInStoredSchema
+    | StoredSchemasMustBeAcyclic
+    | StoredNeedsUsingBrowserFromStd
+    | Manual
+    | Validate
+    | InvalidStoredDefaultExpression
+    | ValueData
+
+fn sts_src(t: Stt) Str {
+    return match t {
+        Stt.U002f => "{0}\\u002f",
+        Stt.LetValueFunStrEsValue => "{let value:fun() Str=@es/\\ ()=>{0} \\/;value();}",
+        Stt.Stored => "__stored{0}_",
+        Stt.UnsupportedStoredTypeUseLocalStructs => "Unsupported stored type {0}; use local structs, Array, Str, Bool, I32, or F64",
+        Stt.ArrayIsArrayLength100000EveryV => "Array.isArray({0})&&{1}.length<=100000&&{2}.every(v=>{3})",
+        Stt.TypeofString => "typeof {0}==='string'",
+        Stt.TypeofBoolean => "typeof {0}==='boolean'",
+        Stt.NumberIsInteger21474836482147483647 => "Number.isInteger({0})&&{1}>=-2147483648&&{2}<=2147483647",
+        Stt.TypeofNumberNumberIsFinite => "typeof {0}==='number'&&Number.isFinite({1})",
+        Stt.AAmpAmp => "{0}&&",
+        Stt.AOpenBClose => "{0}({1})",
+        Stt.ABracketBBracketEnd => "{0}[{1}]",
+        Stt.NullTypeofObjectArrayIsArray => "{0}!==null&&typeof {1}==='object'&&!Array.isArray({2}){3}",
+        Stt.AmpAmpA => "&&{0}",
+        Stt.LetF64LengthLetArrayIf => "{let {0}:F64={1}.length;let {2}:Array[{3}]=[];\n        if ",
+        Stt.N00LetArray => "{0}>0.0 {let {1}={2};{3}=Array[",
+        Stt.NewI32LetI321While => "{0}].new({1}.i32(),{2});let {3}:I32=1;while(",
+        Stt.I32 => "{0}<{1}.i32()){{2}[{3}]=",
+        Stt.N1 => "{0};{1}+=1;};};{2};}",
+        Stt.N0 => "{0}[0]",
+        Stt.F64 => "{0}[{1}.f64()]",
+        Stt.LetNumberF64NumberI32 => "{let {0}number:F64={1};{2}number.i32();}",
+        Stt.ACommaSpace => "{0}, ",
+        Stt.ABColonSpaceC => "{0}{1}: {2}",
+        Stt.ADotB => "{0}.{1}",
+        Stt.ASpaceBraceSpaceBSpaceBraceEnd => "{0} { {1} }",
+        Stt.LetBrowserArrayEachPush => "{let {0}=Browser.Array();{1} each |{2}|{{3}.push(",
+        Stt.ACloseSemiBraceEndSemiBSemiBraceEnd => "{0});};{1};}",
+        Stt.AmpBraceSpaceASpaceBraceEnd => "&{ {0} }",
+        Stt.GlobalThisUtuWutuStorageReviveF64 => "globalThis.__utuWutu.storageReviveF64({0})",
+        Stt.VArrayIsArrayVVMap => "(v=>Array.isArray(v)?v.map(v=>{0}):v)({1})",
+        Stt.AComma => "{0},",
+        Stt.ABColonC => "{0}{1}:{2}",
+        Stt.V => "v[{0}]",
+        Stt.VVNullTypeofVObject => "(v=>v!==null&&typeof v==='object'&&!Array.isArray(v)?{...v,{0}}:v)({1})",
+        Stt.StoredStateMustBeAStruct => "@stored state must be a struct so updates can apply in place; wrap {0} in a struct field",
+        Stt.State => "{0}state",
+        Stt.Data => "{0}data",
+        Stt.Decode => "{0}decode",
+        Stt.Candidate => "{0}{1}.{2}=candidate.{3}; ",
+        Stt.IfNotCandidateCandidate => "if not {0}(candidate) {candidate={1};};",
+        Stt.WutuStorageInitLetLetCl => "{wutu.storage_init();let {0}:{1}={2};\n    let {3}=cl(raw:Str) Void {\n      let ",
+        Stt.CheckFunStrStrEsRaw => "{0}check:fun(Str) Str=@es/\\ raw=>{try{if(!raw)return '';const value=JSON.parse(raw);if(value.version!==1)throw Error('Stored schema mismatch');value.data={1};if(!({2}))throw Error('Stored schema mismatch');return JSON.stringify(value.data);}catch(e){globalThis.__utuWutu.storageError=String(e.message??e);return '';}} \\/;\n      let json={3}check(raw);let candidate:",
+        Stt.IfJsonLen0LetBrowser => "{0}={1};\n      if json.len()>0 {let {2}=Browser.JSON.parse(json);candidate={3};};\n      ",
+        Stt.WutuStoredLoadWutuStoredRegister => "{0}\n      {1}\n    };\n    {2}(wutu.stored_load({3}));\n    wutu.stored_register(",
+        Stt.ClStrReturnBrowserJSONStringify => "{0},cl() Str {return Browser.JSON.stringify(&{version:1,data:{1}});},{2},{3});\n    ",
+        Stt.ASemiBraceEnd => "{0};}",
+        Stt.StandardDslsUtuCouldNotParse => "standard dsls (utu): could not parse DSL body as expression",
+        Stt.StdBrowser => "std:Browser",
+        Stt.StoredExpectsTypeStorageKeyDefault => "@stored expects Type \"storage-key\" default-expression",
+        Stt.UnsupportedTypeInStoredSchema => "Unsupported type in stored schema",
+        Stt.StoredSchemasMustBeAcyclic => "Stored schemas must be acyclic",
+        Stt.StoredNeedsUsingBrowserFromStd => "@stored needs using Browser from std:Browser",
+        Stt.Manual => "manual",
+        Stt.Validate => "validate",
+        Stt.InvalidStoredDefaultExpression => "Invalid @stored default expression",
+        Stt.ValueData => "value.data",
+    }
+}
+
+fn sts(t: Stt) Str => st(st_stored + t.i32())
+fn sts1(t: Stt, a: Str) Str => stf(st_stored + t.i32(), a, "", "", "")
+fn sts2(t: Stt, a: Str, b: Str) Str => stf(st_stored + t.i32(), a, b, "", "")
+fn sts3(t: Stt, a: Str, b: Str, c: Str) Str => stf(st_stored + t.i32(), a, b, c, "")
+fn sts4(t: Stt, a: Str, b: Str, c: Str, d: Str) Str => stf(st_stored + t.i32(), a, b, c, d)

@@ -520,7 +520,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
                 return error_value()
             }
             report(Diag.ClosureParamType, p, word_of(first_child(p)))
-            diag_label("cl(" + word_text(word_of(first_child(p))) + ": T)")
+            diag_label(sms1(Sml.ClT, word_text(word_of(first_child(p)))))
             // Where a closure isn't wanted, that mismatch would only repeat this.
             if exp >= 0 and expected < 0 { return error_value() }
             t = ty_error()
@@ -614,7 +614,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     closure_bodies.push(func_type(vl_end(me2), vl_of_result(repr(result))))
     closure_bodies.push(cast)
     closure_bodies.push(env_local)
-    func_debug_name[f] = name_add("closure")
+    func_debug_name[f] = name_add(sms(Sml.Closure))
     func_body[f] = w_pop()
     elide_tail_return(func_body[f], repr(result))
     record_locals(f, cur_params)
@@ -701,8 +701,8 @@ fn closure_new() I32 {
     vl_add(vt_anyref)
     vl_add(vt_i32)
     vl_add(vt_externref)
-    closure_new_func = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m4), vl_one(vt_externref)))
-    let f = helper(ps, vl_one(vt_externref), vl_empty(), "closure.new")
+    closure_new_func = add_import_func(name_add("utu"), name_add(sms(Sml.ClosureNew)), func_type(vl_end(m4), vl_one(vt_externref)))
+    let f = helper(ps, vl_one(vt_externref), vl_empty(), sms(Sml.ClosureNewDot))
     closure_parts[2] = f
     let rec = closure_record()
     let mc = w_mark()
@@ -741,7 +741,7 @@ fn closure_call(t: I32) I32 {
         if closure_calls[i] == ft { return closure_calls[i + 1] }
         i += 2
     }
-    let f = add_import_func(name_add("utu"), name_add("closure_call_" + (closure_calls.len() / 2).str()), ft)
+    let f = add_import_func(name_add("utu"), name_add(sms1(Sml.ClosureCall, (closure_calls.len() / 2).str())), ft)
     closure_calls.push(ft)
     closure_calls.push(f)
     return f
@@ -761,7 +761,7 @@ fn call_closure(callee: I32, t: I32, args: I32, m: I32, at: I32, cx: Cx) I32 {
 /// @closure_new gave the host, or null for a JS function utu did not make.
 fn closure_rec() I32 {
     if closure_parts[0] >= 0 { return closure_parts[0] }
-    let f = add_import_func(name_add("utu"), name_add("closure_rec"), func_type(vl_one(vt_externref), vl_one(vt_externref)))
+    let f = add_import_func(name_add("utu"), name_add(sms(Sml.ClosureRec)), func_type(vl_one(vt_externref), vl_one(vt_externref)))
     closure_parts[0] = f
     return f
 }
@@ -790,7 +790,7 @@ fn closure_invoker(t: I32) I32 {
     let ml = vl_begin()
     vl_add(rec_vt)
     vl_add(vt_funcref)
-    let f = helper(ht_a[ft], ht_b[ft], vl_end(ml), "closure.call")
+    let f = helper(ht_a[ft], ht_b[ft], vl_end(ml), sms(Sml.ClosureCallDot))
     closure_invokers.push(ft)
     closure_invokers.push(f)
     let r = np + 1
@@ -871,9 +871,9 @@ fn write_closure_json() Void {
         i += 2
     }
     if not any and not calls { return }
-    json_text("\"closures\":{\"new\":")
+    json_text(sms(Sml.ClosuresNew))
     json_text(if any { "true" } else { "false" })
-    json_text(",\"calls\":[")
+    json_text(sms(Sml.Calls))
     let first = true
     i = 1
     while (i < closure_calls.len()) {
@@ -890,12 +890,12 @@ fn write_closure_json() Void {
     }
     json_text("]")
     if closure_sigs.len() > 0 {
-        json_text(",\"sigs\":[\"")
+        json_text(sms(Sml.Sigs))
         for (0 ..< closure_sigs.len()) |k| {
             let c = closure_sigs[k]
-            if c == 0 { if k + 1 < closure_sigs.len() { json_text("\",\"") } } else { json_byte(c) }
+            if c == 0 { if k + 1 < closure_sigs.len() { json_text(sms(Sml.QuoteCommaQuote)) } } else { json_byte(c) }
         }
-        json_text("\"]")
+        json_text(sms(Sml.QuoteBracketEnd))
     }
     json_text("}")
 }
@@ -922,16 +922,16 @@ fn host_callback(arg: I32) Void {
         let d = named_fn(arg)
         if d < 0 or not fn_awaits(d) { return }
         report(Diag.AwaitInClosure, arg, -1)
-        diag_label("may suspend")
-        diag_note("A stack suspends only through utu's calls, not the host's; pass a function that does not await")
+        diag_label(sms(Sml.MaySuspend))
+        diag_note(sms(Sml.AStackSuspendsOnlyThroughUtu))
         return
     }
     let at = awaits_in(last_child(c))
     if at < 0 { return }
     report(Diag.AwaitInClosure, at, -1)
-    diag_label(if is_kind(at, Node.Await_expr) { "suspends" } else { "may suspend" })
-    diag_place_tokens(Extra.Related, node_first[c], node_first[c], "the host calls it")
-    diag_note("A stack suspends only through utu's calls, not the host's; await outside the closure")
+    diag_label(if is_kind(at, Node.Await_expr) { sms(Sml.Suspends) } else { sms(Sml.MaySuspend) })
+    diag_place_tokens(Extra.Related, node_first[c], node_first[c], sms(Sml.TheHostCallsIt))
+    diag_note(sms(Sml.AStackSuspendsOnlyThroughUtuTickCommaTickSem))
 }
 
 /// The function declaration an argument names (in parentheses, too); or -1.
@@ -1061,7 +1061,7 @@ fn lean_closures() Void {
         vl_add(vt_funcref)
         vl_add(vt_anyref)
         vl_add(vt_i32)
-        plain = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m), vl_one(vt_externref)))
+        plain = add_import_func(name_add("utu"), name_add(sms(Sml.ClosureNew)), func_type(vl_end(m), vl_one(vt_externref)))
         closure_new_func = plain
     }
     for (0 ..< func_kind.len()) |f| {

@@ -748,7 +748,7 @@ fn check_try_result(node: I32, cx: Cx) I32 {
     let fn_error = inst_arg(ty_inst(ft), 1)
     if error_t != fn_error {
         report2(Diag.TryErrorMismatch, operand, -1, error_t, fn_error)
-        diag_note("try returns the error as it is, unconverted")
+        diag_note(sms(Sml.TryReturnsTheErrorAsIt))
         return error_since(m)
     }
     let rvt = repr(rt)
@@ -1166,7 +1166,7 @@ fn unroll_nodes(node: I32) I32 {
 
 /// A method that allocates, which keeps a loop body from being unrolled.
 fn allocating_method(word: I32) Bool {
-    for (["slice", "get_slice", "new", "new_default", "copy_from", "push"]) |name| {
+    for ([sms(Sml.Slice), sms(Sml.GetSlice), "new", sms(Sml.NewDefault), sms(Sml.CopyFrom), sms(Sml.Push)]) |name| {
         if word == intern_text(name) { return true }
     }
     return false

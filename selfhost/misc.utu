@@ -407,7 +407,7 @@ fn check_statement(stmt: I32, expect: I32, cx: Cx) I32 {
     if opt >= 0 and expect >= 0 and not ty_is(expect, Ty.Void) {
         // A statement whose value is used (a block's last) is not guarded.
         report(Diag.OptionalOutsideStatement, opt, -1)
-        diag_note("for a value, use promote")
+        diag_note(sms(Sml.ForAValueUsePromote))
         return error_value()
     }
     if opt >= 0 and guardable(stmt) { return check_optional_statement(stmt, opt, cx) }
@@ -421,7 +421,7 @@ fn check_base(field_node: I32, cx: Cx) I32 {
         let i = optional_override(field_node)
         if i < 0 {
             report(Diag.OptionalOutsideStatement, field_node, -1)
-            diag_note("for a value, use promote")
+            diag_note(sms(Sml.ForAValueUsePromote))
             return error_value()
         }
         let t = optional_type[i]
@@ -451,7 +451,7 @@ fn reset_promises() Void {
 
 fn is_promise_type(t: I32) Bool {
     let decl = ty_decl(t)
-    return decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text("Promise")
+    return decl >= 0 and decl_is(decl, Decl.TypeDecl) and decl_name[module_of(decl)] == intern_text(sms(Sml.Promise))
 }
 
 /// `await p`: the host's `utu.await_N` for the promise's value type, which
@@ -526,7 +526,7 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
     let st = check_expr(source, -1, cx)
     if ty_is(st, Ty.Error) { return finish_error(-1, m, cx) }
     if ty_is(st, Ty.Nullable) {
-        report2(Diag.NullableAccess, node, intern_text("iterator"), st, -1)
+        report2(Diag.NullableAccess, node, intern_text(sms(Sml.Iterator)), st, -1)
         return finish_error(-1, m, cx)
     }
     let s = new_local(repr(st))
@@ -537,12 +537,12 @@ fn check_stream_for(node: I32, cx: Cx) I32 {
         return finish_error(-1, m, cx)
     }
     // Not a stream: its first call is reported, as stage 0 does.
-    let it_fi = stream_method(st, "iterator", node)
+    let it_fi = stream_method(st, sms(Sml.Iterator), node)
     if it_fi < 0 { return finish_error(-1, m, cx) }
-    let next_fi = stream_method(st, "next", node)
-    let done_fi = stream_method(st, "done", node)
+    let next_fi = stream_method(st, sms(Sml.Next), node)
+    let done_fi = stream_method(st, sms(Sml.Done), node)
     let value_fi = stream_method(st, "value", node)
-    let close_fi = stream_method(st, "close", node)
+    let close_fi = stream_method(st, sms(Sml.Close), node)
     if next_fi < 0 or done_fi < 0 or value_fi < 0 or close_fi < 0 { return finish_error(-1, m, cx) }
     let mi = w_mark()
     let it_t = stream_call(it_fi, s, st, -1, -1, node, cx)
@@ -642,7 +642,7 @@ fn await_import(t: I32) I32 {
         if await_types[i] == key { return await_types[i + 1] }
         i += 2
     }
-    let f = add_import_func(name_add("utu"), name_add("await_" + (if absent { "null_" } else { "" }) + (await_types.len() / 2).str()),
+    let f = add_import_func(name_add("utu"), name_add(sms2(Sml.Await, (if absent { sms(Sml.Null) } else { "" }), (await_types.len() / 2).str())),
         func_type(vl_one(vt_externref), vl_of_result(vt)))
     await_types.push(key)
     await_types.push(f)
@@ -656,7 +656,7 @@ fn promise_op(catching: Bool) I32 {
     let m = vl_begin()
     vl_add(vt_externref)
     vl_add(vt_externref)
-    let f = add_import_func(name_add("utu"), name_add(if catching { "promise_catch" } else { "promise_then" }), func_type(vl_end(m), vl_empty()))
+    let f = add_import_func(name_add("utu"), name_add(if catching { sms(Sml.PromiseCatch) } else { sms(Sml.PromiseThen) }), func_type(vl_end(m), vl_empty()))
     promise_ops[k] = f
     return f
 }
@@ -671,7 +671,7 @@ fn write_promise_json() Void {
     }
     let ops = (promise_ops[0] >= 0 and func_live[promise_ops[0]] == 1) or (promise_ops[1] >= 0 and func_live[promise_ops[1]] == 1)
     if not awaits and not ops { return }
-    json_text("\"promises\":{\"awaits\":[")
+    json_text(sms(Sml.PromisesAwaits))
     let first = true
     i = 1
     while (i < await_types.len()) {
@@ -687,18 +687,18 @@ fn write_promise_json() Void {
         }
         i += 2
     }
-    json_text("],\"ops\":[")
+    json_text(sms(Sml.Ops))
     first = true
     for ([0, 1]) |k| {
         if promise_ops[k] >= 0 and func_live[promise_ops[k]] == 1 {
             if not first { json_byte(44) }
             first = false
-            json_text(if k == 0 { "\"promise_then\"" } else { "\"promise_catch\"" })
+            json_text(if k == 0 { sms(Sml.PromiseThenQuoteQuote) } else { sms(Sml.PromiseCatchQuoteQuote) })
         }
     }
-    json_text("],\"asyncExports\":[")
+    json_text(sms(Sml.AsyncExports))
     write_async_exports()
-    json_text("]}")
+    json_text(sms(Sml.BracketEndBraceEnd))
 }
 
 /// Exports that reach an await, through calls: they must be entered through

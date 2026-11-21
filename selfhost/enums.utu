@@ -64,11 +64,11 @@ fn scalar_method(decl: I32, word: I32) I32 {
 }
 
 /// The old spelling `to_i32` of `i32`, for a base type.
-fn old_conversion_word(base: I32) I32 => intern_text("to_" + word_text(base_word(base)))
+fn old_conversion_word(base: I32) I32 => intern_text(sms1(Sml.To, word_text(base_word(base))))
 
 /// `i32` for I32: a value's conversion to a base type (`t.i32()`).
 fn base_word(base: I32) I32 {
-    let name = Prelude.name(Prelude(prelude_index(base)))
+    let name = prelude_name(Prelude(prelude_index(base)))
     return intern_text(Str.from_code_point(name.get(0) + 32) + name.slice(1, name.len()))
 }
 
@@ -200,7 +200,7 @@ fn enum_name_helper(decl: I32) I32 {
         i += 2
     }
     let tabled = name_table_span(decl) > 0
-    let f = helper(vl_one(vt_i32), vl_one(vt_extern), if tabled { vl_one(vt_i32) } else { vl_empty() }, "enum.name")
+    let f = helper(vl_one(vt_i32), vl_one(vt_extern), if tabled { vl_one(vt_i32) } else { vl_empty() }, sms(Sml.EnumName))
     name_helper_enum.push(decl)
     name_helper_enum.push(f)
     if tabled {

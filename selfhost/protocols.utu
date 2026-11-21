@@ -278,7 +278,7 @@ fn validate_proto_members(proto: I32) Void {
 /// protocol value: which type `&` is is not known there.
 fn proto_self_dynamic(t: I32, name: I32, m: I32) I32 {
     report2(Diag.ProtoSelfDynamic, parent_of(name), word_of(name), t, -1)
-    diag_label("any " + type_text(t))
+    diag_label(sms1(Sml.Any, type_text(t)))
     w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
     return ty_error()
 }
@@ -344,7 +344,7 @@ fn dispatch_ok(pm: I32, params: I32, rt: I32) Bool {
 
 /// A dispatch function of `params` and result `rt`, named `P.word`.
 fn dispatch_fn(proto: I32, pm: I32, params: I32, rt: I32) I32 {
-    return helper(params, vl_of_result(rt), vl_empty(), word_text(decl_name[proto]) + "." + word_text(decl_name[pm]))
+    return helper(params, vl_of_result(rt), vl_empty(), sms2(Sml.ADotB, word_text(decl_name[proto]), word_text(decl_name[pm])))
 }
 
 /// Field `pm` of receiver local `r` read (or, when `v` is a local, `v`
@@ -475,7 +475,7 @@ fn proto_call_named(t: I32, word: I32, name: I32, args: I32, first: I32, m: I32,
     if name >= 0 { node_decl[name] = pm }
     if mentions_self(decl_node[pm]) {
         report2(Diag.ProtoSelfDynamic, at, word, t, -1)
-        diag_label("any " + type_text(t))
+        diag_label(sms1(Sml.Any, type_text(t)))
         return finish_error(args, m, cx)
     }
     let rt = proto_member_type(pm)
@@ -678,7 +678,7 @@ fn conforms(t: I32, proto: I32) Void {
                     // A field of another type: "Shape.name is Str, got I32" at the field's type.
                     let got = type_of(last_child(decl_node[field]), 0)
                     let want = sig_type(last_child(m), decl_type(t, 0))
-                    if got != want and not ty_has_error(got) and not ty_has_error(want) { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(decl_text(proto) + "." + word_text(word)), want, got, Why.Annotation.i32() * 65536) }
+                    if got != want and not ty_has_error(got) and not ty_has_error(want) { report3(Diag.TypeMismatch, last_child(decl_node[field]), intern_text(sms2(Sml.ADotB, decl_text(proto), word_text(word))), want, got, Why.Annotation.i32() * 65536) }
                 }
             }
         }
@@ -865,7 +865,7 @@ fn proto_text(proto: I32) Str => type_text(decl_type(proto, 0))
 /// `mod Sorted[T[Ord]]`: `module`'s parameters as written, with `proto`
 /// added to `param`'s bounds.
 fn bounded_text(module: I32, param: I32, proto: I32) Str {
-    let text = "mod " + decl_text(module) + "["
+    let text = sms1(Sml.Mod, decl_text(module))
     let p = first_child(next_sibling(first_child(decl_node[module])))
     while (p >= 0) {
         let name = first_child(p)
@@ -873,35 +873,35 @@ fn bounded_text(module: I32, param: I32, proto: I32) Str {
         let listed = if is_kind(bounds, Node.Impl_list) { child_count(bounds) } else { 0 }
         text = text + node_text(name)
         if listed > 0 or node_decl[name] == param {
-            text = text + "["
+            text = sms1(Sml.ABracket, text)
             if listed > 0 {
                 let inner = node_text(bounds)
                 text = text + inner.slice(1, inner.len() - 1)
             }
             if node_decl[name] == param {
-                if listed > 0 { text = text + ", " }
+                if listed > 0 { text = sms1(Sml.ACommaSpace, text) }
                 text = text + proto_text(proto)
             }
-            text = text + "]"
+            text = sms1(Sml.ABracketEnd, text)
         }
         p = next_sibling(p)
-        if p >= 0 { text = text + ", " }
+        if p >= 0 { text = sms1(Sml.ACommaSpace, text) }
     }
-    return text + "]"
+    return sms1(Sml.ABracketEnd, text)
 }
 
 /// A fix for the last diagnostic: `proto` added to `param`'s bounds.
 fn bound_fix(param: I32, proto: I32) Void {
     let name = first_child(decl_node[param])
     let bounds = next_sibling(name)
-    let label = "bound " + decl_text(param) + " by " + proto_text(proto)
+    let label = sms2(Sml.BoundBy, decl_text(param), proto_text(proto))
     if is_kind(bounds, Node.Impl_list) {
         let close = tok_start[node_last[bounds] - 1]
         let sep = if child_count(bounds) > 0 { ", " } else { "" }
         diag_fix(close, close, sep + proto_text(proto), label)
     } else {
         let after = tok_end[node_last[name] - 1]
-        diag_fix(after, after, "[" + proto_text(proto) + "]", label)
+        diag_fix(after, after, sms1(Sml.BracketABracketEnd, proto_text(proto)), label)
     }
 }
 
@@ -930,8 +930,8 @@ fn unbounded_call(rt: I32, word: I32, f: I32, at: I32, inst: I32) Bool {
     }
     if found < 0 { return false }
     report3(Diag.UnboundedCall, at, word, found, proto, module)
-    diag_label(decl_text(found) + " is unbounded")
-    diag_place(Extra.Related, first_child(decl_node[found]), "no " + proto_text(proto))
+    diag_label(sms1(Sml.IsUnbounded, decl_text(found)))
+    diag_place(Extra.Related, first_child(decl_node[found]), sms1(Sml.No, proto_text(proto)))
     bound_fix(found, proto)
     return true
 }
@@ -1055,9 +1055,9 @@ fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) Void {
     if outer >= 0 {
         if has_bound(outer, proto) { return }
         report3(Diag.BoundMissing, arg, decl_name[outer], -1, proto, param)
-        diag_label(decl_text(outer) + " is unbounded")
-        diag_place(Extra.Expected, bound, "needs " + proto_text(proto))
-        diag_note("bound it: " + bounded_text(decl_owner[outer], outer, proto))
+        diag_label(sms1(Sml.IsUnbounded, decl_text(outer)))
+        diag_place(Extra.Expected, bound, sms1(Sml.Needs, proto_text(proto)))
+        diag_note(sms1(Sml.BoundIt, bounded_text(decl_owner[outer], outer, proto)))
         bound_fix(outer, proto)
         return
     }
@@ -1079,28 +1079,28 @@ fn check_bound(arg: I32, proto: I32, bound: I32, param: I32) Void {
     let f = if ty_decl(t) >= 0 { member(ty_decl(t), lack, Space.Method) } else { -1 }
     let own = decl_is(f, Decl.Fn) and decl_a[f] != proto
     let mismatched = decl_is(f, Decl.Fn) and decl_a[f] == proto
-    diag_label(if mismatched { word_text(lack) + " does not match" } else if own { "its " + word_text(lack) + " is not " + proto_text(proto) + "'s" } else { "no " + word_text(lack) })
-    diag_place(Extra.Expected, bound, "needs " + proto_text(proto))
-    diag_note("implement it: " + member_text(proto, lack, t))
+    diag_label(if mismatched { sms1(Sml.DoesNotMatch, word_text(lack)) } else if own { sms2(Sml.ItsIsNotS, word_text(lack), proto_text(proto)) } else { sms1(Sml.No, word_text(lack)) })
+    diag_place(Extra.Expected, bound, sms1(Sml.Needs, proto_text(proto)))
+    diag_note(sms1(Sml.ImplementIt, member_text(proto, lack, t)))
 }
 
 /// What implements member `word` of `proto` for type `t`, as written:
 /// `fn Ord[Point].cmp |a| (b: Point) I32 { … }`, or a field `name: Str`.
 fn member_text(proto: I32, word: I32, t: I32) Str {
     let m = decl_node[protocol_member(proto, word)]
-    if not is_kind(m, Node.Proto_method) { return "a field " + word_text(word) + ": " + type_text(sig_type(last_child(m), t)) }
-    let text = "fn " + proto_text(proto) + "[" + type_text(t) + "]." + word_text(word) + " |a| ("
+    if not is_kind(m, Node.Proto_method) { return sms2(Sml.AField, word_text(word), type_text(sig_type(last_child(m), t))) }
+    let text = sms3(Sml.FnA, proto_text(proto), type_text(t), word_text(word))
     let list = next_sibling(first_child(m))
     let q = if is_kind(list, Node.Type_list) { first_child(list) } else { -1 }
-    let names = "bcdefgh"
+    let names = sms(Sml.Bcdefgh)
     let i = 0
     while (q >= 0) {
-        if i > 0 { text = text + ", " }
-        text = text + names.slice(i % 7, i % 7 + 1) + ": " + type_text(sig_type(q, t))
+        if i > 0 { text = sms1(Sml.ACommaSpace, text) }
+        text = sms3(Sml.ABColonSpaceC, text, names.slice(i % 7, i % 7 + 1), type_text(sig_type(q, t)))
         i += 1
         q = next_sibling(q)
     }
-    return text + ") " + type_text(sig_type(last_child(m), t)) + " { … }"
+    return sms2(Sml.ACloseSpaceBSpaceBraceSpaceEllipsisSpaceBraceEnd, text, type_text(sig_type(last_child(m), t)))
 }
 
 /// The module parameter a type argument is, by itself (`T`), or -1.

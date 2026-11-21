@@ -113,7 +113,7 @@ fn reset_program() Void {
     reset_wat()
     if kept[0] > 0 { intern_kept() } else {
         intern_keywords()
-        for (0 ..< Narrow.count()) |k| { intern_text(Narrow.name(Narrow(k))) }
+        for (0 ..< Narrow.count()) |k| { intern_text(narrow_name(Narrow(k))) }
     }
     tokens_room(kept[1])
     let nodes = kept[2]

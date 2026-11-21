@@ -23,7 +23,7 @@ fn expand_dsls() Void {
     while (k < dsl_sites.len()) {
         let n = dsl_sites[k]
         let w = word_text(word_of(first_child(n)))
-        if node_kind[n] == Node.Dsl_expr.i32() and dsl_in_program(n) and (w == "utu" or w == "css" or w == "stored" or w == "json" or w == "wutu") {
+        if node_kind[n] == Node.Dsl_expr.i32() and dsl_in_program(n) and (w == "utu" or w == sms(Sml.Css) or w == sms(Sml.Stored) or w == sms(Sml.Json) or w == "wutu") {
             if not reported { report2(Diag.DslTooDeep, n, -1, 16, -1) }
             reported = true
             dsl_failed.push(n)
@@ -36,9 +36,9 @@ fn expand_dsls() Void {
 /// container's `@json` sites. Whether any was expanded.
 fn expand_dsl_round() Bool {
     let before = node_kind.len()
-    let expanded = expand_each(intern_text("utu"), intern_text("css"), before)
-    if expand_each(intern_text("stored"), -1, before) { expanded = true }
-    let json = intern_text("json")
+    let expanded = expand_each(intern_text("utu"), intern_text(sms(Sml.Css)), before)
+    if expand_each(intern_text(sms(Sml.Stored)), -1, before) { expanded = true }
+    let json = intern_text(sms(Sml.Json))
     let containers = Array[I32].new(64, -1)
     let ncontainers = 0
     let found = false
@@ -93,8 +93,8 @@ fn expand_each(a: I32, b: I32, end_: I32) Bool {
 fn expand_site(n: I32, name: Str) Void {
     try {
         if name == "utu" { expand_utu(n) }
-        else if name == "css" { expand_css(n) }
-        else if name == "stored" { expand_stored(n) }
+        else if name == sms(Sml.Css) { expand_css(n) }
+        else if name == sms(Sml.Stored) { expand_stored(n) }
         else { expand_wutu(n) }
     } catch {
         report_dsl_error(n)
@@ -263,7 +263,7 @@ fn graft_expression(site: I32, code: Str) Void {
 /// Expression `code`, parsed as a generated file, out of the file (which is
 /// left empty): its node, or -1.
 fn parse_expansion(code: Str) I32 {
-    let root = parse_generated_file("fn __expansion() Void { " + code + "; }")
+    let root = parse_generated_file(sms1(Sml.FnExpansionVoid, code))
     if root < 0 { return -1 }
     let block = last_child(first_child(root))
     let e = first_child(block)
@@ -347,7 +347,7 @@ fn located_splice(site: I32, code: Str, from: I32, to: I32) Str {
     splice_code[k] = intern_text(code)
     splice_from[k] = dsl_byte(site, from)
     splice_to[k] = dsl_byte(site, to)
-    return "__splice_" + int_text(k)
+    return sms1(Sml.Splice, int_text(k))
 }
 
 /// The utu of `site`'s body at `offset` (`text` long), as a placeholder; -1
@@ -359,7 +359,7 @@ fn dsl_splice(site: I32, offset: I32, text: Str) Str {
     splice_end.push(start + utf8_length(text))
     splice_code.resize(k + 1)
     splice_code[k] = -1
-    return "__splice_" + int_text(k)
+    return sms1(Sml.Splice, int_text(k))
 }
 
 fn utf8_length(text: Str) I32 {
@@ -400,7 +400,7 @@ fn fill_splices(node: I32) Void {
     if node < 0 { return }
     if is_kind(node, Node.Identifier) {
         let name = word_text(word_of(node))
-        if text_at(name, 0, "__splice_") {
+        if text_at(name, 0, sms(Sml.Splice2)) {
             let k = int_of(name.slice(9, name.len()))
             let e = if splice_start[k] >= 0 { parse_span(splice_start[k], splice_end[k]) } else { parse_located(k) }
             if e >= 0 {

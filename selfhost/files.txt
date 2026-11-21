@@ -24,6 +24,7 @@ data.utu
 mems.utu
 host.utu
 enums.utu
+strtab.utu
 diag.utu
 hints.utu
 dsl.utu
