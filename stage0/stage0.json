@@ -1,11 +1,11 @@
 {
-  "commit": "9b5b5d173b3bf51ed327b3a0577c030e0547b67c",
-  "selfhostTree": "471aadf9629b0922001c5bf568ca95a16a13fa55",
-  "sourcesHash": "91d40a75f791d1b8cebd26de5b8d3fef722044c161e1bdef4cee8302c7e98baa",
-  "sha256": "4639cc83fc673b22071bf33f74a4c1d4e09e1129be8fdad3a6a70c2ba52dca76",
-  "bytes": 420061,
-  "builtBy": "97f62f57d43e560d6f733c47c3220193b1be8205937066dc2190c16c6c97a8a5",
+  "commit": "588045e0e4a00a7c9a4ceb444627a192d628fdd0",
+  "selfhostTree": "2d6b608719f036ff803012e50d7f2da75e41e9cb",
+  "sourcesHash": "4633bd8ce5622c3446491817eae7b684fee500e09bed0b50a0837e7f7749ddc5",
+  "sha256": "ae6930e8ae0fcd30a61846897c4a16daeb430cc5f5f4821ac022432c561d6989",
+  "bytes": 432916,
+  "builtBy": "4639cc83fc673b22071bf33f74a4c1d4e09e1129be8fdad3a6a70c2ba52dca76",
   "node": "v25.8.1",
-  "date": "2026-11-21T19:56:31.508Z",
-  "reason": "mutable globals, fast lexer/validator, backend pass fusion, packed string table"
+  "date": "2026-11-21T22:18:27.290Z",
+  "reason": "#inline, #noinline, and #cache directives"
 }
