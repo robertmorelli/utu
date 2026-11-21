@@ -119,12 +119,13 @@ fn validate_program() Void {
     validate_protocols()
     validate_bounds()
     validate_impls()
+    mark_validated()
     for (0 ..< file_root.len()) |file| {
         if file_root[file] < 0 {
             report2(Diag.ParseError, -1, file, file_error[file], file_wanted[file])
             parse_hint(file, file_error[file], file_wanted[file])
         } else if is_own_file(file) {
-            validate_tree(file_root[file])
+            validate_within(file_root[file])
         }
     }
     validate_recursive_structs()
@@ -154,27 +155,40 @@ fn validate_module_members() Void {
     }
 }
 
-/// Validate each node of the tree, in order.
-fn validate_tree(node: I32) Void {
-    if validated_kinds.len() == 0 {
-        validated_kinds.resize(Node.count())
-        for (0 ..< Node.count()) |k| { validated_kinds[k] = 0 }
-        for ([Node.Param_list, Node.Struct_decl, Node.Field_list, Node.Enum_decl, Node.Block, Node.Closure_param_list, Node.Tuple_pattern,
-            Node.Capture, Node.Alt_expr, Node.Nullable_type, Node.Tuple_type, Node.Field, Node.Distinct_decl, Node.Yield_expr,
-            Node.Defer_expr, Node.Errdefer_expr, Node.Await_expr, Node.Global_decl, Node.Bench_decl, Node.Module_type_param_list]) |k| { validated_kinds[k.i32()] = 1 }
+/// By node: @validate_stamp when it is, or holds, a node of
+/// @validated_kinds; the last validation's stamp.
+vec validate_mark: I32
+vec validate_stamp: I32 = [0]
+
+/// Mark every node of @validate_list, and its ancestors (by @parent_of, which
+/// grafts keep), so a walk goes only where a rule applies.
+fn mark_validated() Void {
+    validate_stamp[0] += 1
+    let stamp = validate_stamp[0]
+    let n = node_kind.len()
+    if validate_mark.len() < n {
+        let old = validate_mark.len()
+        validate_mark.resize(n)
+        for (old ..< n) |k| { validate_mark[k] = 0 }
     }
-    validate_within(node)
+    for (0 ..< validate_list.len()) |k| {
+        let p = validate_list[k]
+        if p < n and validated_kinds[node_kind[p]] == 1 {
+            while (p >= 0 and validate_mark[p] != stamp) {
+                validate_mark[p] = stamp
+                p = node_parent[p]
+            }
+        }
+    }
 }
 
-/// By Node: 1 for the kinds @validate_node has a rule for (its arms).
-vec validated_kinds: U8
-
+/// Validate each node of the tree, in order: the marked ones (@mark_validated).
 fn validate_within(node: I32) Void {
     if validated_kinds[node_kind[node]] == 1 { validate_node(node) }
+    let stamp = validate_stamp[0]
     let c = node_child[node]
     while (c >= 0) {
-        // (Most nodes are leaves of no rule: no call for them.)
-        if node_child[c] >= 0 { validate_within(c) } else if validated_kinds[node_kind[c]] == 1 { validate_node(c) }
+        if c >= validate_mark.len() or validate_mark[c] == stamp { validate_within(c) }
         c = node_next[c]
     }
 }
@@ -362,6 +376,10 @@ fn self_clash(params: I32) Void {
 
 /// The lets of a block, each name once; a function's body also not a parameter's.
 fn duplicate_lets(block: I32) Void {
+    // (A block without a let names nothing twice.)
+    let any = first_child(block)
+    while (any >= 0 and not (is_kind(any, Node.Bind_expr) and is_kind(first_child(any), Node.Identifier))) { any = next_sibling(any) }
+    if any < 0 { return }
     let stamp = word_stamp()
     let params = body_params(block)
     if params >= 0 {

@@ -127,7 +127,29 @@ let end_byte: I32 = 255
 /// the next start states, then transition runs of (length minus one, state).
 /// Build the machine once and expand the transitions once per compiler instance.
 const vec lexer_table: U8 = @comptime/\ pack_lexer(build()) \/
-vec dfa: U8
+/// The machine, unpacked (@unpack_dfa): a row of 256 next states per state,
+/// then by state its token kind, its backed-off kind, and its next start
+/// state, then by byte 1 for those that continue a word.
+mem dfa: U8
+/// By start state and byte (as @dfa's rows): how @lex_to takes a token that
+/// starts there without walking @dfa. @fast_skip, @fast_word, or
+/// @fast_single with the token's kind << 8, its next start state << 16, and
+/// 1 << 24 for a brace (which a template or a Wutu body may take); else 0.
+mem lex_fast: I32
+
+/// Words @lex_to has read, so a repeated one is not hashed again: 4096
+/// slots of (its first byte in @src, its length, its id, @word_cache_gen
+/// when written). A slot is good for the lex that wrote it: the interner
+/// may be reset between them.
+mem word_cache: I32
+vec word_cache_gen: I32 = [0]
+
+/// In @lex_fast: whitespace, dropped.
+let fast_skip: I32 = 3
+/// In @lex_fast: a word, its word characters run on.
+let fast_word: I32 = 1
+/// In @lex_fast: a token of this one byte.
+let fast_single: I32 = 2
 
 fn pack_lexer(machine: Machine) Array[I32] {
     let states = machine.next
@@ -154,7 +176,8 @@ fn pack_lexer(machine: Machine) Array[I32] {
 }
 
 fn unpack_dfa(states: I32) Void {
-    dfa.resize(states * 256)
+    let rows = states * 256
+    dfa.resize(rows + states * 3 + 256)
     let at = 0
     let run = 1 + states * 3
     while (run < lexer_table.len()) {
@@ -164,6 +187,69 @@ fn unpack_dfa(states: I32) Void {
         at = end_
         run += 2
     }
+    for (0 ..< states * 3) |k| { dfa[rows + k] = lexer_table[1 + k] }
+    let kinds = rows
+    let afters = rows + states * 2
+    let class_ = rows + states * 3
+    // The plain word state (any word after `.`), which word characters keep.
+    let word = dfa[start_member * 256 + 97]
+    for (0 ..< 256) |c| { dfa[class_ + c] = if dfa[word * 256 + c] == word { 1 } else { 0 } }
+    // Whether every word state goes on by a word character to a word state
+    // and ends before any other byte: then a word is its run of word characters.
+    let plain = true
+    for (template_code + 1 ..< states) |s| {
+        if dfa[kinds + s] == Tok.Word.i32() {
+            for (0 ..< 256) |c| {
+                let to = dfa[s * 256 + c]
+                if dfa[class_ + c] == 1 {
+                    if to <= template_code or dfa[kinds + to] != Tok.Word.i32() { plain = false }
+                } else if to != accept_code { plain = false }
+            }
+        }
+    }
+    lex_fast.resize((start_type + 1) * 256)
+    for (0 ..< start_before * 256) |k| { lex_fast[k] = 0 }
+    for (start_before ... start_type) |s| {
+        for (0 ..< 256) |c| {
+            let to = dfa[s * 256 + c]
+            let fast = 0
+            if to == skip_code { fast = fast_skip }
+            else if to > template_code and dfa[kinds + to] == Tok.Word.i32() {
+                let lengths = word_lengths(to, 1, word, dfa[afters + word], afters, class_)
+                if plain and lengths >= 0 { fast = fast_word | (lengths << 8) }
+            } else if to > template_code and dfa[afters + to] != same_start and ends_at_once(to) {
+                let kind = dfa[kinds + to]
+                let brace = if kind == Tok.LBrace.i32() or kind == Tok.RBrace.i32() { 1 } else { 0 }
+                fast = fast_single | (kind << 8) | (dfa[afters + to] << 16) | (brace << 24)
+            }
+            lex_fast[s * 256 + c] = fast
+        }
+    }
+}
+
+/// The lengths (bit L for L bytes, up to 15) of words that reach `state` at
+/// `depth` bytes and end in a state whose next start state is not the plain
+/// word state's (`word`, `after`): a word with a path of its own. -1 when
+/// such a path is longer.
+fn word_lengths(state: I32, depth: I32, word: I32, after: I32, afters: I32, class_: I32) I32 {
+    if state == word { return 0 }
+    if depth > 15 { return -1 }
+    let lengths = if dfa[afters + state] != after { 1 << depth } else { 0 }
+    for (0 ..< 256) |c| {
+        let to = dfa[state * 256 + c]
+        if dfa[class_ + c] == 1 and to != word {
+            let more = word_lengths(to, depth + 1, word, after, afters, class_)
+            if more < 0 { return -1 }
+            lengths |= more
+        }
+    }
+    return lengths
+}
+
+/// Whether state `s`'s token ends whatever byte follows.
+fn ends_at_once(s: I32) Bool {
+    for (0 ..< 256) |c| { if dfa[s * 256 + c] != accept_code { return false } }
+    return true
 }
 
 /// The program's bytes: each file's, followed by @end_byte, and the text of
@@ -745,9 +831,19 @@ fn runs_to(s: I32, k: I32) Bool {
 
 fn lex_to(first: I32, n: I32) I32 {
     let states = lexer_table[0] + 1
-    let backs = 1 + states
-    let afters = 1 + states * 2
+    let kinds = states * 256
+    let backs = kinds + states
+    let afters = kinds + states * 2
+    let class_ = kinds + states * 3
     if dfa.len() == 0 { unpack_dfa(states) }
+    let word = dfa[start_member * 256 + 97]
+    let word_after = dfa[afters + word]
+    if word_cache.len() == 0 {
+        word_cache.resize(4096 * 4)
+        for (0 ..< 4096 * 4) |k| { word_cache[k] = 0 }
+    }
+    word_cache_gen[0] += 1
+    let gen = word_cache_gen[0]
     // Room for a token every 4 bytes, and more as @put_token needs it
     // (@tokens_end cuts the mems back to those written).
     let t = tok_kind.len()
@@ -761,14 +857,72 @@ fn lex_to(first: I32, n: I32) I32 {
     // Where the `{` of a `wn` or `html` body is, once its word is read.
     let wutu_at = -1
     while (true) {
-        // Whitespace at a token boundary can be consumed without dispatch.
+        // Whitespace at a token boundary is dropped without dispatch; a word
+        // and a token of one byte are taken by @lex_fast, as @dfa would.
         let start_row = start * 256
-        let next = dfa[start_row + src[j]]
-        while (next == skip_code) {
+        let fast = lex_fast[start_row + src[j]]
+        while (fast == fast_skip) {
             j += 1
-            next = dfa[start_row + src[j]]
+            fast = lex_fast[start_row + src[j]]
         }
         let i = j
+        if (fast & 3) == fast_word {
+            j += 1
+            while (dfa[class_ + src[j]] == 1) { j += 1 }
+            let len = j - i
+            // Its next start state: the plain word state's, unless a word of
+            // its length and first byte has a path of its own (@word_lengths),
+            // which the walk to its state tells.
+            let after = word_after
+            if len < 16 and ((fast >> (8 + len)) & 1) == 1 {
+                let state = dfa[start_row + src[i]]
+                let k = i + 1
+                while (state != word and k < j) {
+                    state = dfa[state * 256 + src[k]]
+                    k += 1
+                }
+                after = dfa[afters + state]
+            }
+            if len == 2 and src[i] == 119 and src[i + 1] == 110 { wutu_at = wutu_open(i, j, n, false, first) }
+            if len == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 { wutu_at = wutu_open(i, j, n, true, first) }
+            // (@put_token's, written out: V8 does not inline a call here.)
+            if t == tok_kind.len() { tokens_room(t * 2) }
+            tok_kind[t] = Tok.Word.i32()
+            tok_start[t] = i
+            tok_end[t] = j
+            // Its id: the cached one when the word was read before, else interned.
+            let slot = ((((src[i] * 31 + src[i + 1]) * 31 + src[j - 1]) * 8 + len) & 4095) * 4
+            let id = -1
+            if word_cache[slot + 3] == gen and word_cache[slot + 1] == len {
+                let s = word_cache[slot]
+                let m = 0
+                while (m < len and src[s + m] == src[i + m]) { m += 1 }
+                if m == len { id = word_cache[slot + 2] }
+            }
+            if id < 0 {
+                id = src.intern(i, j)
+                word_cache[slot] = i
+                word_cache[slot + 1] = len
+                word_cache[slot + 2] = id
+                word_cache[slot + 3] = gen
+            }
+            tok_word[t] = id
+            t += 1
+            if after != same_start { start = after }
+            continue
+        }
+        if (fast & 3) == fast_single and ((fast >> 24) == 0 or (open == 0 and i != wutu_at)) {
+            j += 1
+            if t == tok_kind.len() { tokens_room(t * 2) }
+            tok_kind[t] = (fast >> 8) & 255
+            tok_start[t] = i
+            tok_end[t] = j
+            tok_word[t] = -1
+            t += 1
+            start = (fast >> 16) & 255
+            continue
+        }
+        let next = dfa[start_row + src[j]]
         let state = start
         // Traverse the DFA to its next action. A self-loop uses one row for
         // the whole run, without dispatching after each byte.
@@ -788,7 +942,7 @@ fn lex_to(first: I32, n: I32) I32 {
                 return tokens_end(put_token(t, Tok.Error.i32(), i, i + (if width > 0 { width } else { 0 })))
             },
             1 => {  // accept_code
-                let kind = lexer_table[1 + state]
+                let kind = dfa[kinds + state]
                 if kind == Tok.Word.i32() and j - i == 2 and src[i] == 119 and src[i + 1] == 110 { wutu_at = wutu_open(i, j, n, false, first) }
                 if kind == Tok.Word.i32() and j - i == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 { wutu_at = wutu_open(i, j, n, true, first) }
                 if kind == Tok.LBrace.i32() and i == wutu_at {
@@ -826,18 +980,18 @@ fn lex_to(first: I32, n: I32) I32 {
                 if open > 0 and kind == Tok.LBrace.i32() { template_braces[open - 1] += 1 }
                 if open > 0 and kind == Tok.RBrace.i32() { template_braces[open - 1] -= 1 }
                 t = put_token(t, kind, i, j)
-                let after = lexer_table[afters + state]
+                let after = dfa[afters + state]
                 if after != same_start { start = after }
             },
             2 => {  // back1_code
                 j -= 1
-                t = put_token(t, lexer_table[backs + state], i, j)
-                start = lexer_table[afters + state]
+                t = put_token(t, dfa[backs + state], i, j)
+                start = dfa[afters + state]
             },
             3 => {  // back2_code
                 j -= 2
-                t = put_token(t, lexer_table[backs + state], i, j)
-                start = lexer_table[afters + state]
+                t = put_token(t, dfa[backs + state], i, j)
+                start = dfa[afters + state]
             },
             4 => {  // skip_code
                 j += 1

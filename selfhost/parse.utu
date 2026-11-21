@@ -271,10 +271,10 @@ export mem node_child: I32
 export mem node_next: I32
 /// By node: its parent, or -1. Recorded as nodes are linked: @finish for a
 /// node's children, a comment's (@attach_within), and a graft's (@set_parent).
-vec node_parent: I32
+mem node_parent: I32
 /// Nodes made but not yet any node's children: the next node finished takes
 /// those above its mark.
-vec pending: I32
+mem pending: I32
 /// Parser-local node count, pending stack top, and first node in this parse.
 /// The exported node columns are cut to their logical size before returning.
 let parse_nodes: I32 = 0
@@ -498,6 +498,7 @@ fn append_parse_node(kind: Node, first: I32, last: I32, child: I32, next: I32, p
     node_next[id] = next
     node_parent[id] = parent
     parse_nodes = id + 1
+    if validated_kinds[kind.i32()] == 1 { validate_list.push(id) }
     return id
 }
 
@@ -568,6 +569,36 @@ fn restore(p: Parser, s: Save) Void {
     let k = dsl_sites.len()
     while (k > 0 and dsl_sites[k - 1] >= s.nodes) { k -= 1 }
     dsl_sites.resize(k)
+    k = validate_list.len()
+    while (k > 0 and validate_list[k - 1] >= s.nodes) { k -= 1 }
+    validate_list.resize(k)
+}
+
+/// By Node: 1 for the kinds validation has a rule for (@validate_node's arms).
+const vec validated_kinds: U8 = @comptime/\ build_validated_kinds() \/
+
+fn build_validated_kinds() Array[I32] {
+    let kinds = Array[I32].new(Node.count(), 0)
+    for ([Node.Param_list, Node.Struct_decl, Node.Field_list, Node.Enum_decl, Node.Block, Node.Closure_param_list, Node.Tuple_pattern,
+        Node.Capture, Node.Alt_expr, Node.Nullable_type, Node.Tuple_type, Node.Field, Node.Distinct_decl, Node.Yield_expr,
+        Node.Defer_expr, Node.Errdefer_expr, Node.Await_expr, Node.Global_decl, Node.Bench_decl, Node.Module_type_param_list]) |k| { kinds[k.i32()] = 1 }
+    return kinds
+}
+
+/// The nodes made of @validated_kinds, as they are made (@restore drops
+/// those it gives up), so validation finds them without walking every tree.
+vec validate_list: I32
+
+/// Only the nodes below `nodes` stay (a new program keeps the sealed ones).
+fn keep_validate_list(nodes: I32) Void {
+    let kept_ = 0
+    for (0 ..< validate_list.len()) |k| {
+        if validate_list[k] < nodes {
+            validate_list[kept_] = validate_list[k]
+            kept_ += 1
+        }
+    }
+    validate_list.resize(kept_)
 }
 
 //! = Words
@@ -2499,10 +2530,12 @@ fn intern_keywords() Void {
 /// Compact away comments and index balanced regions in one pass. Until an
 /// opener is paired, its jump entry links to the previous unpaired opener.
 fn parser_tokens(first: I32, last: I32) Void {
+    // Room only grows: what is past the tokens is never read, and a mem
+    // that grows again is cleared again.
     let room = last - first + 4
-    ptok.resize(room)
-    pkind.resize(room)
-    pjump.resize(room)
+    if ptok.len() < room { ptok.resize(room) }
+    if pkind.len() < room { pkind.resize(room) }
+    if pjump.len() < room { pjump.resize(room) }
     let p = 0
     let open = -1
     for (first ..< last) |t| {
@@ -2531,8 +2564,6 @@ fn parser_tokens(first: I32, last: I32) Void {
         ptok[p + k] = last - 1
         pkind[p + k] = Tok.End.i32()
     }
-    ptok.resize(p + 4)
-    pkind.resize(p + 4)
 }
 
 /// Parse the tokens from `first` up to `last` (the last of them `End`), adding

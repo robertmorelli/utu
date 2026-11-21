@@ -1632,6 +1632,7 @@ fn desugar_wutu_items(parent: I32) Void {
                     node_child[made] = original_first
                 }
                 node_kind[item] = node_kind[made]
+                if validated_kinds[node_kind[item]] == 1 { validate_list.push(item) }
                 node_child[item] = node_child[made]
                 node_child[made] = -1
                 node_child[root] = -1
