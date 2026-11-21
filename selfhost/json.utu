@@ -11,13 +11,14 @@
 //! table of the field and variant names they read and write.
 
 /// Where the host wrote `std:JsonRuntime` in `src` (@json_runtime_room): start, end.
-vec json_rt: I32 = [0, 0]
+let json_rt_start: I32 = 0
+let json_rt_end: I32 = 0
 
 /// The runtime, as utu source text.
-fn json_runtime() Str => "\n" + bytes_text(json_rt[0], json_rt[1])
+fn json_runtime() Str => "\n" + bytes_text(json_rt_start, json_rt_end)
 
 /// The container being expanded: its types, names, and generated functions.
-vec jp_container: I32 = [-1]
+let jp_container: I32 = -1
 /// The name table, in order.
 vec jp_name_words: I32
 /// Words of the functions generated (or the container's own)
@@ -26,14 +27,14 @@ vec jp_defined: I32
 /// @jp_defined; the table's length so far.
 vec jp_name_at: I32
 vec jp_word_defined: U8
-vec jp_names_len: I32 = [0]
+let jp_names_len: I32 = 0
 /// By container, the name table (as a word) an earlier round grafted.
 vec jp_prev_container: I32
 vec jp_prev_names: I32
 /// The generated functions' sources, as words, in order.
 vec jp_functions: I32
 /// A counter for each site's fresh names (`__json0_`).
-vec jp_serial: I32 = [0]
+let jp_serial: I32 = 0
 /// Pinned names: a word generated code names a declaration by (`Circle__json0`),
 /// and that declaration's name node. Resolution binds each under every scope
 /// (@bind_json_pins), so no same-named type or variant hides it.
@@ -50,25 +51,25 @@ vec jd_at: I32
 vec jd_stamp: I32 = [0, 0, 0]
 
 /// The type span of the site being expanded, for a codec's mistakes.
-vec jc_type_at: I32 = [0]
-vec jc_type_len: I32 = [0]
+let jc_type_at: I32 = 0
+let jc_type_len: I32 = 0
 /// Functions the current site generated, as words.
 vec jc_pending: I32
 /// The site being expanded.
-vec jc_site: I32 = [-1]
+let jc_site: I32 = -1
 
 /// Each `@json` site in `container` replaced by its expansion, then the
 /// runtime (unless the container has it), the generated codecs, and the name
 /// table added to the container.
 fn json_expand_container(container: I32, json: I32, count: I32) Void {
-    jp_container[0] = container
+    jp_container = container
     jd_stamp[1] = 0
     jd_stamp[2] = 0
     for (0 ..< jp_name_words.len()) |k| { jp_name_at[jp_name_words[k]] = 0 }
     for (0 ..< jp_defined.len()) |k| { jp_word_defined[jp_defined[k]] = 0 }
     jp_name_words.clear()
     jp_defined.clear()
-    jp_names_len[0] = 0
+    jp_names_len = 0
     jp_functions.clear()
     let has_runtime = false
     let old_slot = -1
@@ -86,17 +87,17 @@ fn json_expand_container(container: I32, json: I32, count: I32) Void {
     // An earlier round's name table: this round's extends it.
     let old_names = ""
     if names_fn >= 0 and old_slot >= 0 { old_names = word_text(jp_prev_names[old_slot]) }
-    jp_names_len[0] = old_names.len()
+    jp_names_len = old_names.len()
     let first_site = -1
     let s = own_sites()
     while (s < dsl_sites.len() and dsl_sites[s] < count) {
         let n = dsl_sites[s]
         if node_kind[n] == Node.Dsl_expr.i32() and word_of(first_child(n)) == json and dsl_in_program(n) and dsl_container(n) == container {
             if first_site < 0 { first_site = n }
-            let prefix = "__json" + int_text(jp_serial[0]) + "_"
-            jp_serial[0] += 1
+            let prefix = "__json" + int_text(jp_serial) + "_"
+            jp_serial += 1
             jc_pending.clear()
-            jc_site[0] = n
+            jc_site = n
             try {
                 graft_expression(n, json_expand_site(n, prefix))
                 for (0 ..< jc_pending.len()) |k| { jp_functions.push(jc_pending[k]) }
@@ -123,7 +124,7 @@ fn json_expand_container(container: I32, json: I32, count: I32) Void {
         if before >= 0 { node_next[before] = node_next[names_fn] } else { node_child[container] = node_next[names_fn] }
     }
     source = source + "fn __json_names() Str {\n    return " + js_string(names) + ";\n}\n"
-    dsl_current_site[0] = first_site
+    dsl_current_site = first_site
     graft_declarations(container, source)
 }
 
@@ -133,8 +134,8 @@ fn name_ref(name: Str) Str {
     jp_word_room(w)
     if jp_name_at[w] == 0 {
         jp_name_words.push(w)
-        jp_name_at[w] = jp_names_len[0] + 1
-        jp_names_len[0] += word_text(w).len()
+        jp_name_at[w] = jp_names_len + 1
+        jp_names_len += word_text(w).len()
     }
     return int_text(jp_name_at[w] - 1) + ", " + int_text(name.len())
 }
@@ -192,8 +193,8 @@ fn json_expand_site(site: I32, prefix: Str) Str {
         dsl_fail("@json " + op + " needs a " + what + " expression after the type", type_start, type.len())
     }
     let expr = raw.slice(expr_start, raw.len())
-    jc_type_at[0] = type_start
-    jc_type_len[0] = type.len()
+    jc_type_at = type_start
+    jc_type_len = type.len()
     let kind = shape_kind(type)
     if kind == Shape.Scalar or kind == Shape.Nullable {
         dsl_fail("@json " + op + " works on a struct, enum, or Array; wrap " + type + " in a struct field", type_start, type.len())
@@ -237,7 +238,7 @@ fn is_written_type(type: Str) Bool {
 //! 0 scalar, 1 optional, 2 array, 3 struct, 4 enum. A codec's mistakes point
 //! at the site's type.
 
-fn json_fail(message: Str) Void => dsl_fail(message, jc_type_at[0], jc_type_len[0])
+fn json_fail(message: Str) Void => dsl_fail(message, jc_type_at, jc_type_len)
 
 fn is_json_scalar(type: Str) Bool {
     return type == "I32" or type == "U32" or type == "I64" or type == "F32" or type == "F64" or type == "Bool" or type == "Str"
@@ -292,13 +293,13 @@ fn shape_kind(written: Str) Shape {
 /// file's top-level one.
 fn declared_type(type: Str) I32 {
     let w = intern_text(type)
-    if is_kind(jp_container[0], Node.Module_decl) {
-        let own = json_declared_in(jp_container[0], w, 0)
+    if is_kind(jp_container, Node.Module_decl) {
+        let own = json_declared_in(jp_container, w, 0)
         if own >= 0 { return own }
-        let file = parent_of(jp_container[0])
+        let file = parent_of(jp_container)
         return if file >= 0 { json_declared_in(file, w, 1) } else { -1 }
     }
-    return json_declared_in(jp_container[0], w, 0)
+    return json_declared_in(jp_container, w, 0)
 }
 
 /// The first struct or enum of that name directly in `node` (indexed in
@@ -764,17 +765,17 @@ fn object_writer(holder: I32, value: Str, opens: Bool) Str {
 //!
 //! Patterns list only what the program needs; other fields are skipped.
 
-vec sc_at: I32 = [0]
+let sc_at: I32 = 0
 
 /// Past spaces and `//` comments.
 fn sc_ws(raw: Str) I32 {
-    let i = sc_at[0]
+    let i = sc_at
     while (true) {
         i = skip_spaces(raw, i)
         if text_at(raw, i, "//") {
             while (i < raw.len() and raw.get(i) != 10) { i += 1 }
         } else {
-            sc_at[0] = i
+            sc_at = i
             return i
         }
     }
@@ -783,21 +784,21 @@ fn sc_ws(raw: Str) I32 {
 
 fn sc_peek(raw: Str, text: Str) Bool {
     sc_ws(raw)
-    return text_at(raw, sc_at[0], text)
+    return text_at(raw, sc_at, text)
 }
 
 fn sc_expect(raw: Str, text: Str) Void {
     sc_ws(raw)
-    if not text_at(raw, sc_at[0], text) { dsl_fail("Expected '" + text + "' in @json match", sc_at[0], 1) }
-    sc_at[0] += text.len()
+    if not text_at(raw, sc_at, text) { dsl_fail("Expected '" + text + "' in @json match", sc_at, 1) }
+    sc_at += text.len()
 }
 
 /// Source up to the first of `stops` at nesting depth 0 (`sc_until_start` says where it began).
-vec sc_until_start: I32 = [0]
+let sc_until_start: I32 = 0
 
 fn sc_until(raw: Str, stops: Str) Str {
     sc_ws(raw)
-    let from = sc_at[0]
+    let from = sc_at
     let i = from
     let depth = 0
     while (i < raw.len()) {
@@ -816,8 +817,8 @@ fn sc_until(raw: Str, stops: Str) Str {
             i += 1
         }
     }
-    sc_at[0] = i
-    sc_until_start[0] = from
+    sc_at = i
+    sc_until_start = from
     return trim_end(raw.slice(from, i))
 }
 
@@ -825,25 +826,25 @@ fn sc_until(raw: Str, stops: Str) Str {
 /// `upper` allows uppercase too), or "".
 fn sc_word(raw: Str, upper: Bool) Str {
     sc_ws(raw)
-    let i = sc_at[0]
+    let i = sc_at
     if i >= raw.len() { return "" }
     let c = raw.get(i)
     if not (is_lower_code(c) or c == 95 or upper and is_upper_code(c)) { return "" }
     let j = i
     while (j < raw.len() and is_word_code(raw.get(j))) { j += 1 }
-    sc_at[0] = j
+    sc_at = j
     return raw.slice(i, j)
 }
 
 /// A JSON string literal at the cursor (with its quotes), or "".
 fn sc_string(raw: Str) Str {
     sc_ws(raw)
-    let i = sc_at[0]
+    let i = sc_at
     if i >= raw.len() or raw.get(i) != 34 { return "" }
     let j = i + 1
     while (j < raw.len() and raw.get(j) != 34) { j += if raw.get(j) == 92 { 2 } else { 1 } }
     if j >= raw.len() { return "" }
-    sc_at[0] = j + 1
+    sc_at = j + 1
     return raw.slice(i, j + 1)
 }
 
@@ -933,7 +934,7 @@ fn parse_pattern(raw: Str) I32 {
             let key_start = sc_ws(raw)
             let quoted = sc_string(raw)
             let key = if quoted.len() > 0 { json_unescape(quoted) } else { sc_word(raw, true) }
-            if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at[0], 1) }
+            if key.len() == 0 { dsl_fail("Expected a field name in @json pattern", sc_at, 1) }
             let written = if quoted.len() > 0 { quoted.len() } else { key.len() }
             let f = pat_first[p]
             while (f >= 0) {
@@ -954,11 +955,11 @@ fn parse_pattern(raw: Str) I32 {
         sc_expect(raw, "|")
         let name_start = sc_ws(raw)
         let name = sc_word(raw, false)
-        if name.len() == 0 { dsl_fail("Expected a capture name: |name| Type", sc_at[0], 1) }
+        if name.len() == 0 { dsl_fail("Expected a capture name: |name| Type", sc_at, 1) }
         sc_expect(raw, "|")
         let type_start = sc_ws(raw)
         let type = sc_capture_type(raw)
-        if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at[0], 1) }
+        if type.len() == 0 { dsl_fail("Expected a type for capture " + name, sc_at, 1) }
         let p = new_pattern(Pat.Capture)
         pat_name[p] = intern_text(name)
         pat_name_start[p] = name_start
@@ -967,14 +968,14 @@ fn parse_pattern(raw: Str) I32 {
         if sc_peek(raw, "=") and not sc_peek(raw, "=>") {
             sc_expect(raw, "=")
             pat_fallback[p] = intern_text(sc_until(raw, ",}"))
-            pat_fallback_start[p] = sc_until_start[0]
+            pat_fallback_start[p] = sc_until_start
         }
         return p
     }
     let token = sc_string(raw)
     if token.len() == 0 { token = sc_number(raw) }
     if token.len() == 0 { token = sc_keyword(raw) }
-    if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at[0], 1) }
+    if token.len() == 0 { dsl_fail("Expected {…}, |name| Type, or a literal in @json pattern", sc_at, 1) }
     let p = new_pattern(Pat.Literal)
     pat_text[p] = intern_text(token)
     return p
@@ -982,7 +983,7 @@ fn parse_pattern(raw: Str) I32 {
 
 /// `?Name`, `Name`, `Name[…]` (one level of nested brackets), or "".
 fn sc_capture_type(raw: Str) Str {
-    let i = sc_at[0]
+    let i = sc_at
     let j = i
     if j < raw.len() and raw.get(j) == 63 { j += 1 }
     if j >= raw.len() or not is_upper_code(raw.get(j)) { return "" }
@@ -1001,12 +1002,12 @@ fn sc_capture_type(raw: Str) Str {
             j += 1
         }
     }
-    sc_at[0] = j
+    sc_at = j
     return raw.slice(i, j)
 }
 
 fn sc_number(raw: Str) Str {
-    let i = sc_at[0]
+    let i = sc_at
     let j = i
     if j < raw.len() and raw.get(j) == 45 { j += 1 }
     if j >= raw.len() or raw.get(j) < 48 or raw.get(j) > 57 { return "" }
@@ -1023,15 +1024,15 @@ fn sc_number(raw: Str) Str {
             while (j < raw.len() and raw.get(j) >= 48 and raw.get(j) <= 57) { j += 1 }
         }
     }
-    sc_at[0] = j
+    sc_at = j
     return raw.slice(i, j)
 }
 
 fn sc_keyword(raw: Str) Str {
-    let i = sc_at[0]
+    let i = sc_at
     for (["true", "false", "null"]) |k| {
         if text_at(raw, i, k) and (i + k.len() >= raw.len() or not is_word_code(raw.get(i + k.len()))) {
-            sc_at[0] = i + k.len()
+            sc_at = i + k.len()
             return k
         }
     }
@@ -1047,7 +1048,7 @@ fn pattern_optional(p: I32) Bool {
 
 // The site's fresh names, and an arm's captures.
 
-vec jm_serial: I32 = [0]
+let jm_serial: I32 = 0
 /// By capture: its name (a word)
 vec cap_name: I32
 /// Its local (a word)
@@ -1058,23 +1059,23 @@ vec cap_pat: I32
 vec jm_declare: I32
 
 fn fresh_name(prefix: Str, name: Str) Str {
-    let text = prefix + name + int_text(jm_serial[0])
-    jm_serial[0] += 1
+    let text = prefix + name + int_text(jm_serial)
+    jm_serial += 1
     return text
 }
 
 /// A slice of the body as utu: in parentheses, once it parses.
 fn json_splice(text: Str, start: I32, what: Str) Str {
-    if not splice_parses(jc_site[0], start, text) {
+    if not splice_parses(jc_site, start, text) {
         dsl_fail("Invalid " + what + " in @json match", start, if text.len() > 1 { text.len() } else { 1 })
     }
-    return dsl_splice(jc_site[0], start, text)
+    return dsl_splice(jc_site, start, text)
 }
 
 /// `@json/\ match text { pattern => value, …, ~> fallback }` as utu: a
 /// reader over `text`, then each arm's pattern tried in order.
 fn json_match(raw: Str, prefix: Str) Str {
-    jm_serial[0] = 0
+    jm_serial = 0
     pat_kind.clear()
     pat_name.clear()
     pat_name_start.clear()
@@ -1087,10 +1088,10 @@ fn json_match(raw: Str, prefix: Str) Str {
     pat_next.clear()
     pat_key.clear()
     // Parse: the text, then arms, then one ~> arm.
-    sc_at[0] = text_index(raw, "match", 0) + 5
+    sc_at = text_index(raw, "match", 0) + 5
     let text = sc_until(raw, "{")
-    let text_start = sc_until_start[0]
-    if text.len() == 0 { dsl_fail("@json match needs the text to match: `match text { … }`", sc_at[0], 1) }
+    let text_start = sc_until_start
+    if text.len() == 0 { dsl_fail("@json match needs the text to match: `match text { … }`", sc_at, 1) }
     sc_expect(raw, "{")
     let arm_pattern = Array[I32].new(64, -1)
     let arm_body = Array[I32].new(64, -1)
@@ -1101,33 +1102,33 @@ fn json_match(raw: Str, prefix: Str) Str {
     let fallback_binding = -1
     while (not sc_peek(raw, "}")) {
         if sc_peek(raw, "~>") {
-            if fallback_body >= 0 { dsl_fail("@json match has more than one ~> arm", sc_at[0], 2) }
+            if fallback_body >= 0 { dsl_fail("@json match has more than one ~> arm", sc_at, 2) }
             sc_expect(raw, "~>")
             if sc_peek(raw, "|") {
                 sc_expect(raw, "|")
                 let binding = sc_word(raw, false)
-                if binding.len() == 0 { dsl_fail("Expected a name for the error: ~> |error| …", sc_at[0], 1) }
+                if binding.len() == 0 { dsl_fail("Expected a name for the error: ~> |error| …", sc_at, 1) }
                 fallback_binding = intern_text(binding)
                 sc_expect(raw, "|")
             }
             fallback_body = intern_text(sc_until(raw, ",}"))
-            fallback_start = sc_until_start[0]
+            fallback_start = sc_until_start
         } else {
-            if fallback_body >= 0 { dsl_fail("The ~> arm must be last in @json match", sc_at[0], 1) }
+            if fallback_body >= 0 { dsl_fail("The ~> arm must be last in @json match", sc_at, 1) }
             let pattern = parse_pattern(raw)
             sc_expect(raw, "=>")
-            if narms == 64 { dsl_fail("@json match supports at most 64 pattern arms", sc_at[0], 1) }
+            if narms == 64 { dsl_fail("@json match supports at most 64 pattern arms", sc_at, 1) }
             arm_pattern[narms] = pattern
             arm_body[narms] = intern_text(sc_until(raw, ",}"))
-            arm_body_start[narms] = sc_until_start[0]
+            arm_body_start[narms] = sc_until_start
             narms += 1
         }
         if not sc_peek(raw, "}") { sc_expect(raw, ",") }
     }
     sc_expect(raw, "}")
-    if sc_ws(raw) < raw.len() { dsl_fail("Unexpected text after @json match", sc_at[0], 1) }
-    if narms == 0 { dsl_fail("@json match needs at least one pattern arm", sc_at[0], 1) }
-    if fallback_body < 0 { dsl_fail("@json match needs a ~> arm for text that matches no pattern", sc_at[0], 1) }
+    if sc_ws(raw) < raw.len() { dsl_fail("Unexpected text after @json match", sc_at, 1) }
+    if narms == 0 { dsl_fail("@json match needs at least one pattern arm", sc_at, 1) }
+    if fallback_body < 0 { dsl_fail("@json match needs a ~> arm for text that matches no pattern", sc_at, 1) }
     // Generate.
     let r = fresh_name(prefix, "reader")
     let best = fresh_name(prefix, "error")
@@ -1182,8 +1183,8 @@ fn read_pattern(p: I32, path: Str, r: Str, prefix: Str) Str {
             if cap_name[k] == pat_name[p] { dsl_fail(name + " is captured twice in this pattern", pat_name_start[p], name.len()) }
         }
         let type = word_text(pat_type[p])
-        jc_type_at[0] = pat_type_start[p]
-        jc_type_len[0] = type.len()
+        jc_type_at = pat_type_start[p]
+        jc_type_len = type.len()
         shape_kind(type)
         let local = fresh_name(prefix, "capture_" + name + "_")
         cap_name.push(pat_name[p])

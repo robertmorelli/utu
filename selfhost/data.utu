@@ -821,7 +821,7 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
             ir_malformed(x)
             return -1
         }
-        w_i32(safe_checks[0])
+        w_i32(safe_checks)
         return 1
     }
     let k = -1
@@ -849,10 +849,10 @@ fn translate_other(x: I32, tag: I32, decls: I32, args: Array[I32], locals: Array
                 let value = 0
                 for (from ..< i) |j| { if value <= 255 { value = value * 10 + src[j] - 48 } }
                 if value > 255 {
-                    ir_failed[0] = x
-                    ir_failed_shape[0] = 4
-                    ir_fault[0] = -1
-                    ir_fault[1] = src.intern(from, i)
+                    ir_failed = x
+                    ir_failed_shape = 4
+                    ir_fault_want = -1
+                    ir_fault_given = src.intern(from, i)
                     return -1
                 }
                 if i < attr_end[a] { commas += 1 }
@@ -1031,7 +1031,7 @@ fn array_slice_helper(heap: I32) I32 {
     w_i32_op(i32_sub, ms)
     w_node(Op.LocalSet, vt_none, 3, 0, ms)
     // A safe build: a slice ending before it starts traps as itself, not as "array too large".
-    if safe_checks[0] == 1 {
+    if safe_checks == 1 {
         let mi = w_mark()
         let mc = w_mark()
         w_get(vt_i32, 3)

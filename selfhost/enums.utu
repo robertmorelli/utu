@@ -89,7 +89,7 @@ fn scalar_convert(decl: I32, inst: I32, args: I32, at: I32, cx: Cx) I32 {
     }
     coerce(check_expr(a, base, cx), base, a)
     // A safe build traps on a value no variant has, here: not in a later match.
-    if safe_checks[0] == 1 and decl_is(decl, Decl.IntEnum) { w_node(Op.Call, vt_i32, enum_from_helper(decl), 0, m) }
+    if safe_checks == 1 and decl_is(decl, Decl.IntEnum) { w_node(Op.Call, vt_i32, enum_from_helper(decl), 0, m) }
     return t
 }
 
@@ -375,7 +375,7 @@ fn check_alt(node: I32, expect: I32, cx: Cx) I32 {
         if unknown { join_nodes.resize(from) } else { want_t = branch_join(from, cx) }
     }
     let t = alt_arms(arms, s, st, want_t, default_, cx)
-    if optimize_level[0] == 1 { cast_arms(w_stack[w_mark() - 1], s) }
+    if optimize_level == 1 { cast_arms(w_stack[w_mark() - 1], s) }
     w_node(Op.Seq, repr(t), 0, 0, m)
     return t
 }
@@ -547,7 +547,7 @@ fn alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) I32 {
                 // tested (binding it casts, which wasm checks), unless the build is safe.
                 let rest = next_sibling(a)
                 while (rest >= 0 and not is_kind(rest, Node.Alt_arm)) { rest = next_sibling(rest) }
-                let last = default_ < 0 and rest < 0 and safe_checks[0] == 0
+                let last = default_ < 0 and rest < 0 and safe_checks == 0
                 if not last {
                     let mc = w_mark()
                     w_get(repr(st), s)

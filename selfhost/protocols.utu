@@ -300,10 +300,10 @@ fn sig_type(node: I32, self_t: I32) I32 {
     if is_kind(node, Node.Promoted_type) { return self_t }
     if is_kind(node, Node.Nullable_type) { return nullable(sig_type(first_child(node), self_t)) }
     if is_kind(node, Node.Paren_type) or is_kind(node, Node.Return_type) { return sig_type(first_child(node), self_t) }
-    let outer = sig_self[0]
-    sig_self[0] = self_t
+    let outer = sig_self
+    sig_self = self_t
     let t = type_of(node, 0)
-    sig_self[0] = outer
+    sig_self = outer
     return t
 }
 
@@ -389,14 +389,14 @@ fn proto_call_site(proto: I32, pm: I32, r: I32, locals: Array[I32], types: Array
     if f < 0 {
         f = dispatch_fn(proto, pm, params, repr(rt))
         pd_read[pm] = f
-        pd_from[pm] = cur_fn[0]
+        pd_from[pm] = cur_fn
         let args = Array[I32].new(n + 1, 0)
         for (0 ..< n) |k| { args[k] = k + 1 }
         proto_call_chain(impls, 0, 0, args, types, n, rt, cx)
         func_body[f] = w_pop()
-    } else if pd_from[pm] != cur_fn[0] {
+    } else if pd_from[pm] != cur_fn {
         // What this function calls, through it.
-        pd_from[pm] = cur_fn[0]
+        pd_from[pm] = cur_fn
         let i = 0
         while (i < vl_len[impls]) {
             note_edge(fn_instance(vl_item(impls, i), 0), -1)

@@ -17,8 +17,8 @@
 vec defer_node: I32
 /// Per open block: where its defers start.
 vec defer_marks: I32
-/// At `[0]`: where the current function's defers start.
-vec function_defers: I32
+/// Where the current function's defers start.
+let function_defers: I32 = 0
 
 fn reset_defers() Void {
     defer_node.clear()
@@ -28,8 +28,7 @@ fn reset_defers() Void {
     exit_flags.clear()
     stream_closes.clear()
     defer_marks.clear()
-    function_defers.resize(1)
-    function_defers[0] = 0
+    function_defers = 0
     begin_exit_flag()
 }
 
@@ -48,21 +47,21 @@ fn reset_defers() Void {
 vec exit_flags: I32
 /// Where the current function's entries in @exit_flags, @defer_guard and
 /// @defer_running start.
-vec function_flags: I32 = [0]
-vec function_guards: I32 = [0]
-vec function_running: I32 = [0]
+let function_flags: I32 = 0
+let function_guards: I32 = 0
+let function_running: I32 = 0
 /// The defers whose code is being written (at an exit or in a handler),
 /// innermost last, and how long @defer_guard was then.
 vec defer_running: I32
 vec running_guards: I32
 /// Flag sets and handler reads written so far.
-vec flag_sets: I32 = [0]
-vec flag_reads: I32 = [0]
+let flag_sets: I32 = 0
+let flag_reads: I32 = 0
 
 fn begin_exit_flag() Void {
-    function_flags[0] = exit_flags.len()
-    function_guards[0] = defer_guard.len()
-    function_running[0] = defer_running.len()
+    function_flags = exit_flags.len()
+    function_guards = defer_guard.len()
+    function_running = defer_running.len()
 }
 
 fn run_inside(i: I32) Void {
@@ -79,12 +78,12 @@ fn run_outside() Void {
 
 /// Where this depth's entries in @defer_guard start.
 fn depth_guards() I32 {
-    return if defer_running.len() > function_running[0] { running_guards[running_guards.len() - 1] } else { function_guards[0] }
+    return if defer_running.len() > function_running { running_guards[running_guards.len() - 1] } else { function_guards }
 }
 
 /// This depth's exit flag local (-1 none), made when `make`.
 fn exit_flag(make: Bool) I32 {
-    let k = function_flags[0] + defer_running.len() - function_running[0]
+    let k = function_flags + defer_running.len() - function_running
     while (exit_flags.len() <= k) { exit_flags.push(-1) }
     if make and exit_flags[k] < 0 { exit_flags[k] = new_local(vt_i32) }
     return exit_flags[k]
@@ -106,7 +105,7 @@ fn guarded_from(i: I32) Bool {
 /// A block that starts its depth's guards (`guards` its first entry) sets
 /// the flag to none first, when a handler in it reads the flag: the code since `m`.
 fn init_exit_flag(m: I32, guards: I32, reads: I32) Void {
-    if flag_reads[0] == reads or guards != depth_guards() or exit_flag(false) < 0 { return }
+    if flag_reads == reads or guards != depth_guards() or exit_flag(false) < 0 { return }
     set_exit_flag(-1)
     w_insert(m, w_pop())
 }
@@ -185,7 +184,7 @@ fn guard_defers(base: I32, vt: I32, cx: Cx) Void {
                 w_i32_op(i32_lt_u, mc)
                 w_push(run)
                 w_node(Op.If, vt_none, new_label(), 0, mc)
-                flag_reads[0] += 1
+                flag_reads += 1
             }
             w_leaf(Op.Rethrow, vt_unreachable, label, 0)
             w_node(Op.Seq, vt_unreachable, 0, 0, mh)
@@ -211,7 +210,7 @@ fn run_defers(from: I32, cx: Cx) Void => run_exit_defers(from, -1, -1, cx)
 /// node) runs as `failed` says: -1 never, -2 always (a `try` returning an
 /// error), else when the Result (of type `rt`) in local `failed` is an error.
 fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) Void {
-    let sets = flag_sets[0]
+    let sets = flag_sets
     let i = defer_node.len() - 1
     while (i >= from) {
         let mi = w_mark()
@@ -242,12 +241,12 @@ fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) Void {
                 let run = w_pop()
                 set_exit_flag(i)
                 w_push(run)
-                flag_sets[0] += 1
+                flag_sets += 1
             }
         }
         i -= 1
     }
-    if flag_sets[0] > sets { set_exit_flag(-1) }
+    if flag_sets > sets { set_exit_flag(-1) }
 }
 
 //! = errdefer
@@ -259,7 +258,7 @@ fn run_exit_defers(from: I32, failed: I32, rt: I32, cx: Cx) Void {
 //! one.
 
 /// The function body being checked (a closure's, in a closure).
-vec body_block: I32 = [-1]
+let body_block: I32 = -1
 
 /// `errdefer e;`: noted, for @run_exit_defers.
 fn check_errdefer(node: I32, cx: Cx) I32 {
@@ -381,16 +380,17 @@ fn check_optional_statement(stmt: I32, opt: I32, cx: Cx) I32 {
 }
 
 /// Whether the program has an `a?.b` anywhere, counted once for the nodes
-/// there are (`[0]`: how many nodes were looked at, `[1]`: 1 when one was found).
-vec optionals_seen: I32 = [0, 0]
+/// there are (how many nodes were looked at, and 1 when one was found).
+let optionals_looked: I32 = 0
+let optionals_found: I32 = 0
 
 fn has_optionals() Bool {
-    if optionals_seen[0] != node_kind.len() {
-        optionals_seen[1] = 0
-        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.i32() { optionals_seen[1] = 1 } }
-        optionals_seen[0] = node_kind.len()
+    if optionals_looked != node_kind.len() {
+        optionals_found = 0
+        for (0 ..< node_kind.len()) |n| { if node_kind[n] == Node.Optional_field_expr.i32() { optionals_found = 1 } }
+        optionals_looked = node_kind.len()
     }
-    return optionals_seen[1] == 1
+    return optionals_found == 1
 }
 
 /// Whether a statement can run only when its `?.` is present: a call, an
@@ -708,7 +708,7 @@ fn write_promise_json() Void {
 vec awaiting: U8
 /// By function: named by ref.func.
 vec taken: U8
-vec taken_awaits: U8 = [0]
+let taken_awaits: I32 = 0
 
 /// Mark @awaiting, to a fixpoint over the encoded bodies, and write the
 /// exports among them as a JSON list of names.
@@ -726,14 +726,14 @@ fn write_async_exports() Void {
     taken.resize(n)
     for (0 ..< n) |f| { taken[f] = 0 }
     for (0 ..< n) |f| { if func_live[f] == 1 and func_body[f] >= 0 { mark_taken(func_body[f]) } }
-    taken_awaits[0] = 0
+    taken_awaits = 0
     // To a fixpoint: a function awaits when it calls one that does.
     let changed = true
     while (changed) {
         changed = false
         for (0 ..< n) |f| {
-            if awaiting[f] == 1 and taken[f] == 1 and taken_awaits[0] == 0 {
-                taken_awaits[0] = 1
+            if awaiting[f] == 1 and taken[f] == 1 and taken_awaits == 0 {
+                taken_awaits = 1
                 changed = true
             }
             if awaiting[f] == 0 and func_live[f] == 1 and func_body[f] >= 0 and calls_awaiting(func_body[f]) {
@@ -765,7 +765,7 @@ fn mark_taken(node: I32) Void {
 fn calls_awaiting(node: I32) Bool {
     let op = w_op[node]
     if (op == Op.Call.i32() or op == Op.ReturnCall.i32()) and awaiting[w_a[node]] == 1 { return true }
-    if op == Op.CallRef.i32() and taken_awaits[0] == 1 { return true }
+    if op == Op.CallRef.i32() and taken_awaits == 1 { return true }
     for (0 ..< w_count[node]) |i| { if calls_awaiting(w_kid(node, i)) { return true } }
     return false
 }

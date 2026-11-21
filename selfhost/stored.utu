@@ -31,12 +31,12 @@ fn expand_css(site: I32) Void {
 
 //! = @stored
 
-vec st_serial: I32 = [0]
-vec st_seq: I32 = [0]
-vec st_type_at: I32 = [0]
-vec st_type_len: I32 = [0]
+let st_serial: I32 = 0
+let st_seq: I32 = 0
+let st_type_at: I32 = 0
+let st_type_len: I32 = 0
 
-fn stored_fail(message: Str) Void => dsl_fail(message, st_type_at[0], st_type_len[0])
+fn stored_fail(message: Str) Void => dsl_fail(message, st_type_at, st_type_len)
 
 /// Whether a file has `using Browser from std:Browser` (with or without an alias).
 fn uses_browser(file: I32) Bool {
@@ -58,9 +58,9 @@ fn stored_syntax(raw: Str) Void => dsl_fail("@stored expects Type \"storage-key\
 /// `@stored/\ … \/`: the state, loaded and registered with the host's store.
 /// Each site's names start with its own prefix.
 fn expand_stored(site: I32) Void {
-    let prefix = "__stored" + int_text(st_serial[0]) + "_"
-    st_serial[0] += 1
-    st_seq[0] = 0
+    let prefix = "__stored" + int_text(st_serial) + "_"
+    st_serial += 1
+    st_seq = 0
     graft_expression(site, stored_code(site, prefix))
 }
 
@@ -114,8 +114,8 @@ fn stored_struct(type: Str, file: I32) I32 {
 fn trim_text(text: Str) Str => trim_end(text.slice(skip_spaces(text, 0), text.len()))
 
 fn stored_fresh(prefix: Str) Str {
-    let name = prefix + int_text(st_seq[0])
-    st_seq[0] += 1
+    let name = prefix + int_text(st_seq)
+    st_seq += 1
     return name
 }
 
@@ -211,8 +211,8 @@ fn stored_code(site: I32, prefix: Str) Str {
     // `Array[Str]` (to the space after it): no struct either.
     if i < raw.len() and raw.get(i) == 91 { while (i < raw.len() and not is_space_code(raw.get(i))) { i += 1 } }
     let type = raw.slice(type_start, i)
-    st_type_at[0] = type_start
-    st_type_len[0] = type.len()
+    st_type_at = type_start
+    st_type_len = type.len()
     if is_stored_scalar(type) or text_at(type, 0, "Array[") {
         stored_fail("@stored state must be a struct so updates can apply in place; wrap " + type + " in a struct field")
     }

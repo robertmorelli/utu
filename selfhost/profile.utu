@@ -21,9 +21,9 @@
 //! on what runs meanwhile.
 
 /// Whether builds are for the profiler (1), or not (0, the default).
-vec profile_build: I32 = [0]
+let profile_build: I32 = 0
 /// This build's profile memory, or -1.
-vec prof_memory: I32 = [-1]
+let prof_memory: I32 = -1
 /// Its `profile.park` and `profile.resume` imports, or -1.
 vec prof_imports: I32 = [-1, -1]
 /// By id: the body (a block) the frame is, the function declaration it is
@@ -41,7 +41,7 @@ let profile_push_defer: I32 = -1000000001
 let profile_pages: I32 = 64
 
 fn reset_profile() Void {
-    prof_memory[0] = -1
+    prof_memory = -1
     prof_imports[0] = -1
     prof_imports[1] = -1
     prof_node.clear()
@@ -51,14 +51,14 @@ fn reset_profile() Void {
 }
 
 /// Whether this build profiles: asked for, and not a @comptime build.
-fn profiling() Bool => profile_build[0] == 1 and comptime_fuel[0] < 0
+fn profiling() Bool => profile_build == 1 and comptime_fuel < 0
 
 /// Whether defer entry `d` is the profiler's.
 fn is_profile_defer(d: I32) Bool => d <= profile_pop_defer
 
 /// The profile memory, made when first needed.
 fn prof_mem() I32 {
-    if prof_memory[0] >= 0 { return prof_memory[0] }
+    if prof_memory >= 0 { return prof_memory }
     let m = memory_kind.len()
     memory_kind.push(FuncKind.Defined.i32())
     memory_pages.push(profile_pages)
@@ -69,7 +69,7 @@ fn prof_mem() I32 {
     data_start.push(data_bytes.len())
     data_len.push(8)
     for ([8, 0, 0, 0, 0, 0, 0, 0]) |b| { data_bytes.push(b) }
-    prof_memory[0] = m
+    prof_memory = m
     return m
 }
 

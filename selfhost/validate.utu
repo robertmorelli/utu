@@ -322,12 +322,12 @@ fn end_word(node: I32) I32 {
 
 /// By word: the stamp of the block whose lets last named it; and the last stamp.
 vec let_seen: I32
-vec let_stamp: I32 = [0]
+let let_stamp: I32 = 0
 
 /// A new stamp for @word_seen: no word seen with it yet.
 fn word_stamp() I32 {
-    let_stamp[0] += 1
-    return let_stamp[0]
+    let_stamp += 1
+    return let_stamp
 }
 
 /// Whether `word` was seen with `stamp` before; it is now.

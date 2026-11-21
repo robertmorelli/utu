@@ -175,7 +175,7 @@ fn ht_new(kind: Heap, a: I32, b: I32) I32 {
     ht_super.push(-1)
     ht_open.push(0)
     ht_single.push(0)
-    ht_src.push(cur_src[0])
+    ht_src.push(cur_src)
     return id
 }
 
@@ -302,7 +302,7 @@ vec data_bytes: U8
 vec data_src: I32
 
 /// At `[0]`: 1 when the JS exception tag is imported.
-vec tag_used: U8
+let tag_used: I32 = 0
 
 /// Names (import and export names, debug names): spans of bytes.
 vec names: U8
@@ -358,7 +358,7 @@ fn new_func(kind: FuncKind, t: I32) I32 {
     func_module_name.push(-1)
     func_field_name.push(-1)
     func_debug_name.push(-1)
-    func_src.push(cur_src[0])
+    func_src.push(cur_src)
     func_index.push(-1)
     func_code.push(-1)
     return f
@@ -374,7 +374,7 @@ fn add_global(t: I32, mutable: Bool, init: I32) I32 {
     glob_module_name.push(-1)
     glob_field_name.push(-1)
     glob_index.push(-1)
-    glob_src.push(cur_src[0])
+    glob_src.push(cur_src)
     return g
 }
 
@@ -388,7 +388,7 @@ fn add_import_global(module: I32, field: I32, t: I32) I32 {
 
 /// Forgets the module being built.
 fn reset_wasm() Void {
-    start_func[0] = -1
+    start_func = -1
     vl_start.clear()
     vl_len.clear()
     vl_items.clear()
@@ -432,8 +432,7 @@ fn reset_wasm() Void {
     data_len.clear()
     data_bytes.clear()
     data_src.clear()
-    tag_used.resize(1)
-    tag_used[0] = 0
+    tag_used = 0
     names.clear()
     name_start.clear()
     name_len.clear()
@@ -577,19 +576,20 @@ vec w_src: I32
 /// For a copy inlining made: the syntax of the call it replaced, or -1.
 vec w_site: I32
 /// The syntax node being checked, whose code nodes made now are (-1: none).
-vec cur_src: I32 = [-1]
+let cur_src: I32 = -1
 
 /// The columns retain their capacity between builds. Only this prefix is live.
-vec w_node_count: I32 = [0]
+let w_node_count: I32 = 0
 /// Logical ends for the retained operand stack and child arena.
-vec w_edges: I32 = [0, 0]
+let w_stack_top: I32 = 0
+let w_kids_top: I32 = 0
 
 fn reset_ir() Void {
-    w_node_count[0] = 0
-    w_edges[0] = 0
-    w_edges[1] = 0
+    w_node_count = 0
+    w_stack_top = 0
+    w_kids_top = 0
     w_aux.clear()
-    cur_src[0] = -1
+    cur_src = -1
 }
 
 fn grow_ir(capacity: I32) Void {
@@ -604,7 +604,7 @@ fn grow_ir(capacity: I32) Void {
 }
 
 fn add_ir(op: I32, vt: I32, a: I32, b: I32, first: I32, count: I32, source: I32, site: I32) I32 {
-    let id = w_node_count[0]
+    let id = w_node_count
     if id == w_op.len() { grow_ir(id + id / 2 + 64) }
     w_op[id] = op
     w_type[id] = vt
@@ -614,12 +614,12 @@ fn add_ir(op: I32, vt: I32, a: I32, b: I32, first: I32, count: I32, source: I32,
     w_count[id] = count
     w_src[id] = source
     w_site[id] = site
-    w_node_count[0] = id + 1
+    w_node_count = id + 1
     return id
 }
 
-fn w_mark() I32 => w_edges[0]
-fn w_kid_end() I32 => w_edges[1]
+fn w_mark() I32 => w_stack_top
+fn w_kid_end() I32 => w_kids_top
 
 /// Grow physical storage in batches. Most stack changes only lower the top.
 fn reserve_stack(end_: I32) Void {
@@ -629,7 +629,7 @@ fn reserve_stack(end_: I32) Void {
 fn w_resize_stack(end_: I32) Void {
     if end_ > w_stack.len() { reserve_stack(end_) }
     for (w_mark() ..< end_) |i| { w_stack[i] = 0 }
-    w_edges[0] = end_
+    w_stack_top = end_
 }
 
 fn reserve_kids(end_: I32) Void {
@@ -640,27 +640,27 @@ fn w_append_kid(node: I32) Void {
     let at = w_kid_end()
     if at == w_kids.len() { reserve_kids(at + 1) }
     w_kids[at] = node
-    w_edges[1] = at + 1
+    w_kids_top = at + 1
 }
 
 /// A node of the nodes built since `mark`, pushed in their place.
 fn w_node(op: Op, vt: I32, a: I32, b: I32, mark: I32) I32 {
     // A @comptime build's loops burn fuel, so one that never ends stops.
-    if op == Op.Loop and comptime_fuel[0] >= 0 { w_insert(mark, fuel_check()) }
+    if op == Op.Loop and comptime_fuel >= 0 { w_insert(mark, fuel_check()) }
     // A block with several results is typed by a function type, which must
     // exist before encoding numbers the types.
     if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple) }
     let n = w_mark()
     let count = n - mark
     let first = w_kid_end()
-    let id = add_ir(op.i32(), vt, a, b, first, count, cur_src[0], -1)
+    let id = add_ir(op.i32(), vt, a, b, first, count, cur_src, -1)
     if count > 0 {
         let end_ = first + count
         if end_ > w_kids.len() { reserve_kids(end_) }
         for (0 ..< count) |i| { w_kids[first + i] = w_stack[mark + i] }
-        w_edges[1] = end_
+        w_kids_top = end_
     }
-    if mark > n { w_resize_stack(mark) } else { w_edges[0] = mark }
+    if mark > n { w_resize_stack(mark) } else { w_stack_top = mark }
     w_push(id)
     return id
 }
@@ -671,7 +671,7 @@ fn w_leaf(op: Op, vt: I32, a: I32, b: I32) I32 => w_node(op, vt, a, b, w_mark())
 fn w_pop() I32 {
     let at = w_mark() - 1
     let id = w_stack[at]
-    w_edges[0] = at
+    w_stack_top = at
     return id
 }
 
@@ -679,7 +679,7 @@ fn w_push(id: I32) Void {
     let at = w_mark()
     if at == w_stack.len() { reserve_stack(at + 1) }
     w_stack[at] = id
-    w_edges[0] = at + 1
+    w_stack_top = at + 1
 }
 
 /// Put node `id` on the stack at position `at`, after the ones before it.
@@ -802,34 +802,34 @@ fn append_code_bytes() Void {
 vec func_live: U8
 vec glob_live: U8
 mem live_work: I32
-vec live_top: I32 = [0]
+let live_top: I32 = 0
 
 fn live_reserve(end_: I32) Void {
     if end_ > live_work.len() { live_work.resize(end_ + end_ / 2 + 64) }
 }
 
 fn live_push(node: I32) Void {
-    let top = live_top[0]
+    let top = live_top
     if top == live_work.len() { live_reserve(top + 1) }
     live_work[top] = node
-    live_top[0] = top + 1
+    live_top = top + 1
 }
 
 fn live_pop() I32 {
-    let top = live_top[0] - 1
-    live_top[0] = top
+    let top = live_top - 1
+    live_top = top
     return live_work[top]
 }
 
 /// Push children in their original order, reserving room for the whole span.
 fn live_push_children(node: I32) Void {
     let count = w_count[node]
-    let start = live_top[0]
+    let start = live_top
     let end_ = start + count
     if end_ > live_work.len() { live_reserve(end_) }
     let children = w_first[node]
     for (0 ..< count) |i| { live_work[start + i] = w_kids[children + i] }
-    live_top[0] = end_
+    live_top = end_
 }
 
 /// By node: how many places in the live code hold it.
@@ -851,13 +851,13 @@ fn sweep() Void {
     func_uses.clear()
     glob_uses.clear()
     glob_sets.clear()
-    node_holders.resize(w_node_count[0])
+    node_holders.resize(w_node_count)
     func_live.resize(func_kind.len())
     glob_live.resize(glob_kind.len())
     func_uses.resize(func_kind.len())
     glob_uses.resize(glob_kind.len())
     glob_sets.resize(glob_kind.len())
-    live_top[0] = 0
+    live_top = 0
     for (0 ..< func_kind.len()) |f| {
         if func_kind[f] == FuncKind.Defined.i32() and func_field_name[f] >= 0 { mark_func(f) }
     }
@@ -865,7 +865,7 @@ fn sweep() Void {
         if glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0 { mark_global(g) }
     }
     // (The start function the computed globals made; see check.utu.)
-    if start_func[0] >= 0 { mark_func(start_func[0]) }
+    if start_func >= 0 { mark_func(start_func) }
     scan_live_roots()
 }
 
@@ -885,8 +885,8 @@ fn mark_global(g: I32) Void {
 fn scan_live_roots() Void {
     // Late helpers may have added nodes. Reserve their counters before the
     // traversal so the common path only loads and increments each counter.
-    if live_top[0] > 0 and node_holders.len() < w_node_count[0] { node_holders.resize(w_node_count[0]) }
-    while (live_top[0] > 0) { scan_live(live_pop(), 0) }
+    if live_top > 0 and node_holders.len() < w_node_count { node_holders.resize(w_node_count) }
+    while (live_top > 0) { scan_live(live_pop(), 0) }
 }
 
 fn scan_live(node: I32, depth: I32) Void {
@@ -928,12 +928,12 @@ vec memory_live: U8
 fn mark_memories() Void {
     let n = memory_kind.len()
     memory_live.resize(n)
-    for (0 ..< n) |m| { memory_live[m] = if comptime_fuel[0] < 0 or memory_kind[m] == FuncKind.Import.i32() or is_comptime_value(memory_field_name[m]) { 1 } else { 0 } }
-    if comptime_fuel[0] < 0 { return }
-    live_top[0] = 0
+    for (0 ..< n) |m| { memory_live[m] = if comptime_fuel < 0 or memory_kind[m] == FuncKind.Import.i32() or is_comptime_value(memory_field_name[m]) { 1 } else { 0 } }
+    if comptime_fuel < 0 { return }
+    live_top = 0
     for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_body[f] >= 0 { live_push(func_body[f]) } }
     for (0 ..< glob_kind.len()) |g| { if glob_live[g] == 1 and glob_init[g] >= 0 { live_push(glob_init[g]) } }
-    while (live_top[0] > 0) {
+    while (live_top > 0) {
         let node = live_pop()
         let op = w_op[node]
         if op == Op.Load.i32() or op == Op.Store.i32() or op == Op.MemorySize.i32() or op == Op.MemoryGrow.i32()
@@ -967,8 +967,8 @@ vec func_order: I32
 /// Live globals in index order.
 vec glob_order: I32
 /// How many of func_order are imports.
-vec func_imported: I32 = [0]
-vec glob_imported: I32 = [0]
+let func_imported: I32 = 0
+let glob_imported: I32 = 0
 
 fn assign_indices() Void {
     memory_index.resize(memory_kind.len())
@@ -981,13 +981,13 @@ fn assign_indices() Void {
         }
     }
     for (0 ..< memory_kind.len()) |m| {
-        memory_index[m] = if memory_kind[m] == FuncKind.Import.i32() or m == prof_memory[0] { memory_index[m] } else if memory_live[m] == 0 { -1 } else {
+        memory_index[m] = if memory_kind[m] == FuncKind.Import.i32() or m == prof_memory { memory_index[m] } else if memory_live[m] == 0 { -1 } else {
             next_m += 1
             next_m - 1
         }
     }
     // The profiler's is last, so the program's keep their indices.
-    if prof_memory[0] >= 0 { memory_index[prof_memory[0]] = next_m }
+    if prof_memory >= 0 { memory_index[prof_memory] = next_m }
     let n = ht_kind.len()
     sweep_types()
     type_index.resize(n)
@@ -1009,7 +1009,7 @@ fn assign_indices() Void {
             func_index[sort_items[i]] = func_order.len()
             func_order.push(sort_items[i])
         }
-        if kind == FuncKind.Import { func_imported[0] = func_order.len() }
+        if kind == FuncKind.Import { func_imported = func_order.len() }
     }
     glob_order.clear()
     for ([FuncKind.Import, FuncKind.Defined]) |kind| {
@@ -1024,7 +1024,7 @@ fn assign_indices() Void {
             glob_index[sort_items[i]] = glob_order.len()
             glob_order.push(sort_items[i])
         }
-        if kind == FuncKind.Import { glob_imported[0] = glob_order.len() }
+        if kind == FuncKind.Import { glob_imported = glob_order.len() }
     }
 }
 
@@ -1242,7 +1242,7 @@ fn sweep_types() Void {
         type_uses[t] = 0
     }
     type_work.clear()
-    live_top[0] = 0
+    live_top = 0
     label_targeted.clear()
     func_target_base.resize(func_kind.len())
     func_target_end.resize(func_kind.len())
@@ -1263,9 +1263,9 @@ fn sweep_types() Void {
             if glob_init[g] >= 0 { live_push(glob_init[g]) }
         }
     }
-    if tag_used[0] == 1 { mark_type(js_tag_type()) }
+    if tag_used == 1 { mark_type(js_tag_type()) }
     let owner = -1
-    while (live_top[0] > 0) {
+    while (live_top > 0) {
         let node = live_pop()
         if node < 0 {
             if owner >= 0 { func_target_end[owner] = label_targeted.len() }
@@ -1452,19 +1452,19 @@ fn encode_types() Void {
 }
 
 fn encode_imports() Void {
-    let count = func_imported[0] + glob_imported[0]
+    let count = func_imported + glob_imported
     for (0 ..< memory_kind.len()) |m| { if memory_kind[m] == FuncKind.Import.i32() { count += 1 } }
-    if tag_used[0] == 1 { count += 1 }
+    if tag_used == 1 { count += 1 }
     if count == 0 { return }
     leb_u(false, count)
-    for (0 ..< func_imported[0]) |i| {
+    for (0 ..< func_imported) |i| {
         let f = func_order[i]
         put_name(false, func_module_name[f])
         put_name(false, func_field_name[f])
         sec.push(0)
         leb_u(false, type_index[func_type_of[f]])
     }
-    if tag_used[0] == 1 {
+    if tag_used == 1 {
         put_text("utu")
         put_text("js_tag")
         sec.push(4)
@@ -1479,7 +1479,7 @@ fn encode_imports() Void {
             put_limits(memory_pages[m])
         }
     }
-    for (0 ..< glob_imported[0]) |i| {
+    for (0 ..< glob_imported) |i| {
         let g = glob_order[i]
         put_name(false, glob_module_name[g])
         put_name(false, glob_field_name[g])
@@ -1496,7 +1496,7 @@ fn js_tag_type() I32 => func_type_single(vl_one(vt_externref), vl_empty())
 /// Import the JS exception tag (for `try` and `throw`).
 fn use_js_tag() Void {
     js_tag_type()
-    tag_used[0] = 1
+    tag_used = 1
 }
 
 fn put_limits(pages: I32) Void {
@@ -1506,10 +1506,10 @@ fn put_limits(pages: I32) Void {
 }
 
 fn encode_functions() Void {
-    let count = func_order.len() - func_imported[0]
+    let count = func_order.len() - func_imported
     if count == 0 { return }
     leb_u(false, count)
-    for (func_imported[0] ..< func_order.len()) |i| { leb_u(false, type_index[func_type_of[func_order[i]]]) }
+    for (func_imported ..< func_order.len()) |i| { leb_u(false, type_index[func_type_of[func_order[i]]]) }
     flush_section(3)
 }
 
@@ -1519,10 +1519,10 @@ fn encode_memories() Void {
     if count == 0 { return }
     leb_u(false, count)
     for (0 ..< memory_kind.len()) |m| {
-        if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 and m != prof_memory[0] { put_limits(memory_pages[m]) }
+        if memory_kind[m] == FuncKind.Defined.i32() and memory_index[m] >= 0 and m != prof_memory { put_limits(memory_pages[m]) }
     }
     // The profiler's: shared, of a fixed size.
-    if prof_memory[0] >= 0 {
+    if prof_memory >= 0 {
         sec.push(3)
         leb_u(false, profile_pages)
         leb_u(false, profile_pages)
@@ -1531,10 +1531,10 @@ fn encode_memories() Void {
 }
 
 fn encode_globals() Void {
-    let count = glob_order.len() - glob_imported[0]
+    let count = glob_order.len() - glob_imported
     if count == 0 { return }
     leb_u(false, count)
-    for (glob_imported[0] ..< glob_order.len()) |k| {
+    for (glob_imported ..< glob_order.len()) |k| {
         let g = glob_order[k]
         put_valtype(false, glob_type[g])
         sec.push(glob_mutable[g])
@@ -1547,11 +1547,11 @@ fn encode_globals() Void {
 }
 
 /// The function run when the module is instantiated, or -1.
-vec start_func: I32 = [-1]
+let start_func: I32 = -1
 
 fn encode_start() Void {
-    if start_func[0] < 0 { return }
-    leb_u(false, func_index[start_func[0]])
+    if start_func < 0 { return }
+    leb_u(false, func_index[start_func])
     flush_section(8)
 }
 
@@ -1627,17 +1627,17 @@ fn encode_data_count() Void {
 /// The code section: each live function's locals and body, or a `@wat`
 /// function's code as the host assembled it.
 fn encode_code() Void {
-    let count = func_order.len() - func_imported[0]
+    let count = func_order.len() - func_imported
     if count == 0 { return }
     leb_u(false, count)
-    for (func_imported[0] ..< func_order.len()) |n| {
+    for (func_imported ..< func_order.len()) |n| {
         let f = func_order[n]
         if func_code[f] >= 0 {
             // Assembled already: locals, instructions, and end.
             let k = func_code[f]
             leb_u(false, wat_len[k])
             // One entry, the `@wat` text's place: its code is the host's.
-            if source_map[0] == 1 {
+            if source_map == 1 {
                 map_at.push(sec.len())
                 map_node.push(wat_site[k])
                 map_site.push(-1)
@@ -1646,10 +1646,10 @@ fn encode_code() Void {
         } else {
             code_bytes.clear()
             encode_locals(f)
-            active_target_base[0] = func_target_base[f]
-            active_target_end[0] = func_target_end[f]
+            active_target_base = func_target_base[f]
+            active_target_end = func_target_end[f]
             let first = map_at.len()
-            if source_map[0] == 1 { map_function(f) }
+            if source_map == 1 { map_function(f) }
             emit(func_body[f], f)
             code_bytes.push(11)
             leb_u(false, code_bytes.len())
@@ -1658,16 +1658,16 @@ fn encode_code() Void {
             append_code_bytes()
         }
     }
-    map_code_size[0] = sec.len()
-    map_func[0] = -1
+    map_code_size = sec.len()
+    map_func = -1
 }
 
 // A slice per function, filled by the same walk that collects used types.
 vec label_targeted: U8
 vec func_target_base: I32
 vec func_target_end: I32
-vec active_target_base: I32 = [0]
-vec active_target_end: I32 = [0]
+let active_target_base: I32 = 0
+let active_target_end: I32 = 0
 
 fn count_branch_targets(node: I32, op: I32, base: I32) Void {
     if op == Op.Br.i32() or op == Op.BrIf.i32() or op == Op.Rethrow.i32() {
@@ -1690,8 +1690,8 @@ fn mark_target(index: I32) Void {
 fn targeted(label: I32) Bool => targets(label) > 0
 
 fn targets(label: I32) I32 {
-    let index = active_target_base[0] + label
-    return if index < active_target_end[0] { label_targeted[index] } else { 0 }
+    let index = active_target_base + label
+    return if index < active_target_end { label_targeted[index] } else { 0 }
 }
 
 /// Locals after the parameters, run-length encoded by type.
@@ -1763,21 +1763,21 @@ fn encode_names() Void {
 /// encoded section by section. Returns their number.
 fn encode_module() I32 {
     // Nodes made from here (inlining, cleaning up) have no syntax of their own.
-    cur_src[0] = -1
+    cur_src = -1
     lean_closures()
     sweep()
     // -O3 inlines (inline.utu); what is no longer called is then swept out,
     // before the mems' late functions are made (and marked live).
-    if optimize_level[0] == 2 {
+    if optimize_level == 2 {
         inline_module()
         sweep()
     }
     // -O small inlines what shrinks the module (it sweeps as it goes).
-    if optimize_level[0] == 1 { inline_small() }
+    if optimize_level == 1 { inline_small() }
     // Structs returned as their fields (inline.utu).
-    if optimize_level[0] != 0 and struct_returns() { sweep() }
+    if optimize_level != 0 and struct_returns() { sweep() }
     finish_mems()
-    if optimize_level[0] != 0 { optimize_module() }
+    if optimize_level != 0 { optimize_module() }
     write_host_json()
     assign_indices()
     out.clear()
@@ -1789,7 +1789,7 @@ fn encode_module() I32 {
     map_node.clear()
     map_site.clear()
     w_near.clear()
-    map_func[0] = -1
+    map_func = -1
     declared.clear()
     func_declared.resize(func_kind.len())
     for (0 ..< func_kind.len()) |f| { func_declared[f] = 0 }
@@ -1807,10 +1807,10 @@ fn encode_module() I32 {
     encode_elements()
     encode_data_count()
     flush_section(10)
-    let moved = out.len() - map_code_size[0]
+    let moved = out.len() - map_code_size
     for (0 ..< map_at.len()) |i| { map_at[i] += moved }
     encode_data()
-    if debug_names[0] == 1 { encode_names() }
+    if debug_names == 1 { encode_names() }
     return out.len()
 }
 
@@ -1822,7 +1822,7 @@ export mem host_json: U8
 
 /// Whether the module carries a name section (function names for stack
 /// traces): off unless asked for, as stage 0 has none.
-vec debug_names: I32 = [0]
+let debug_names: I32 = 0
 
 //! = Source maps
 //!
@@ -1835,34 +1835,34 @@ vec debug_names: I32 = [0]
 //! coarser place, never another one.
 
 /// Whether builds keep a source map (1), or not (0, the default).
-vec source_map: I32 = [0]
+let source_map: I32 = 0
 /// By entry: an instruction's byte offset in the module, its syntax node,
 /// and the call it was inlined at (-1: none).
 vec map_at: I32
 vec map_node: I32
 vec map_site: I32
 /// The code section's size, before its header.
-vec map_code_size: I32 = [0]
+let map_code_size: I32 = 0
 /// While a body is encoded: by IR node, the nearest node with syntax (it, or
 /// one around it), or -1.
 vec w_near: I32
 /// The function being encoded.
-vec map_func: I32 = [-1]
+let map_func: I32 = -1
 
 /// Function `f`'s body is next: @w_near for its nodes, and an entry at its
 /// start (its locals), for what precedes its first instruction.
 fn map_function(f: I32) Void {
-    map_func[0] = f
-    if w_near.len() < w_node_count[0] {
+    map_func = f
+    if w_near.len() < w_node_count {
         let old = w_near.len()
-        w_near.resize(w_node_count[0])
-        for (old ..< w_node_count[0]) |n| { w_near[n] = -1 }
+        w_near.resize(w_node_count)
+        for (old ..< w_node_count) |n| { w_near[n] = -1 }
     }
     let body = func_body[f]
     w_near[body] = if w_src[body] >= 0 { body } else { -1 }
-    live_top[0] = 0
+    live_top = 0
     live_push(body)
-    while (live_top[0] > 0) {
+    while (live_top > 0) {
         let n = live_pop()
         for (0 ..< w_count[n]) |i| {
             let k = w_kid(n, i)
@@ -1878,10 +1878,10 @@ fn map_function(f: I32) Void {
 
 /// An entry for node's instruction, next in @code_bytes, unless its syntax is the last entry's.
 fn map_note(node: I32) Void {
-    if map_func[0] < 0 { return }
+    if map_func < 0 { return }
     // A global's folded initializer is no body's node: its own syntax, or its function's.
     let near = if w_src[node] >= 0 { node } else if node < w_near.len() { w_near[node] } else { -1 }
-    let s = if near >= 0 { w_src[near] } else { func_src[map_func[0]] }
+    let s = if near >= 0 { w_src[near] } else { func_src[map_func] }
     let site = if near >= 0 { w_site[near] } else { -1 }
     let last = map_node.len() - 1
     if map_node[last] == s and map_site[last] == site { return }
@@ -2347,7 +2347,7 @@ fn emit_regular(recipe: I32, a: I32, b: I32) Void {
 }
 
 fn emit_own(node: I32) Void {
-    if source_map[0] == 1 { map_note(node) }
+    if source_map == 1 { map_note(node) }
     let op = w_op[node]
     let a = w_a[node]
     let b = w_b[node]

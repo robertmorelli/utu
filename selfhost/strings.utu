@@ -68,7 +68,7 @@ vec lit_bytes: U8
 
 /// Pushes a string literal (or a multiline one) as a constant. False when its
 /// text is not well-formed UTF-16 (a lone surrogate), which cannot be an import
-/// name, or has a bad escape (see @bad_escape).
+/// name, or has a bad escape (see @bad_escape_at).
 fn string_literal(node: I32) Bool {
     lit_bytes.clear()
     let ok = true
@@ -86,8 +86,8 @@ fn string_literal(node: I32) Bool {
             while (i < end_) {
                 let n = utf8_char_size(i, end_)
                 if n < 0 {
-                    bad_escape[0] = i
-                    bad_escape[1] = 2
+                    bad_escape_at = i
+                    bad_escape_why = 2
                     return false
                 }
                 for (i ..< i + n) |k| { lit_bytes.push(src[k]) }
@@ -139,18 +139,19 @@ fn string_global(word: I32) I32 {
 }
 
 /// Where @decode_string last found a bad escape (a byte in `src`), or -1 for
-/// a lone surrogate; `[1]` is 1 when the escape is not one utu has, 2 when
+/// a lone surrogate; @bad_escape_why is 1 when the escape is not one utu has, 2 when
 /// the bytes there are not UTF-8, 0 when it is a `\u` without four
 /// hexadecimal digits.
-vec bad_escape: I32 = [-1, 0]
+let bad_escape_at: I32 = -1
+let bad_escape_why: I32 = 0
 
 /// JSON's escapes, and `` \` `` `\$` `\'` for template strings, from
 /// `src[start ..< end_]` into `lit_bytes` as UTF-8, a line break (CRLF or
 /// CR) as LF. False at a bad escape, a lone surrogate, or bytes that are not
 /// UTF-8.
 fn decode_string(start: I32, end_: I32) Bool {
-    bad_escape[0] = -1
-    bad_escape[1] = 0
+    bad_escape_at = -1
+    bad_escape_why = 0
     let i = start
     while (i < end_) {
         let c = src[i]
@@ -160,8 +161,8 @@ fn decode_string(start: I32, end_: I32) Bool {
         } else if c != 92 {
             let n = utf8_char_size(i, end_)
             if n < 0 {
-                bad_escape[0] = i
-                bad_escape[1] = 2
+                bad_escape_at = i
+                bad_escape_why = 2
                 return false
             }
             for (i ..< i + n) |k| { lit_bytes.push(src[k]) }
@@ -177,7 +178,7 @@ fn decode_string(start: I32, end_: I32) Bool {
             else if e == 117 {
                 let unit = if i + 4 <= end_ { hex4(i) } else { -1 }
                 if unit < 0 {
-                    bad_escape[0] = i - 2
+                    bad_escape_at = i - 2
                     return false
                 }
                 i += 4
@@ -186,7 +187,7 @@ fn decode_string(start: I32, end_: I32) Bool {
                     if i + 6 <= end_ and src[i] == 92 and src[i + 1] == 117 {
                         let low = hex4(i + 2)
                         if low < 0 {
-                            bad_escape[0] = i
+                            bad_escape_at = i
                             return false
                         }
                         if low >= 56320 and low <= 57343 {
@@ -202,8 +203,8 @@ fn decode_string(start: I32, end_: I32) Bool {
             }
             else if e == 34 or e == 92 or e == 47 or e == 96 or e == 36 or e == 39 { lit_bytes.push(e) }
             else {
-                bad_escape[0] = i - 2
-                bad_escape[1] = 1
+                bad_escape_at = i - 2
+                bad_escape_why = 1
                 return false
             }
         }

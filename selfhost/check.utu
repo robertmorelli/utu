@@ -39,10 +39,10 @@ vec decl_local: I32
 vec decl_ty: I32
 /// Value types of its locals, parameters first.
 vec cur_locals: I32
-/// At `[0]`: how many of them are parameters.
-vec cur_params: I32
-/// One value, at `[0]`.
-vec next_label: I32
+/// How many of them are parameters.
+let cur_params: I32 = 0
+/// The next label.
+let next_label: I32 = 0
 /// Per enclosing loop, innermost last.
 vec loop_break: I32
 vec loop_continue: I32
@@ -88,9 +88,9 @@ fn fn_instance_on(decl: I32, inst: I32, self_t: I32) I32 {
     enter_instance(inst, -1)
     signature(decl, inst)
     leave_instance()
-    if self_t >= 0 { sig_params[0] = with_first(sig_params[0], self_t) }
-    fi_params.push(sig_params[0])
-    fi_result.push(sig_result[0])
+    if self_t >= 0 { sig_params = with_first(sig_params, self_t) }
+    fi_params.push(sig_params)
+    fi_result.push(sig_result)
     let body = fn_body(decl)
     let ir = intrinsic_body(body)
     if ir >= 0 {
@@ -225,10 +225,10 @@ fn fn_debug_name(decl: I32) I32 {
 }
 
 // A function's parameter types (self first) and result type, in an instance.
-/// One value, at `[0]`.
-vec sig_params: I32
-/// One value, at `[0]`.
-vec sig_result: I32
+/// Its parameter types.
+let sig_params: I32 = 0
+/// Its result type.
+let sig_result: I32 = 0
 
 /// Sets @sig_params and @sig_result for `decl` in instance `inst`.
 fn signature(decl: I32, inst: I32) Void {
@@ -260,10 +260,8 @@ fn signature(decl: I32, inst: I32) Void {
         }
         c = next_sibling(c)
     }
-    sig_params.resize(1)
-    sig_result.resize(1)
-    sig_params[0] = vl_end(m)
-    sig_result[0] = result
+    sig_params = vl_end(m)
+    sig_result = result
 }
 
 /// The type a method or operator belongs to, in an instance (Error for a free function).
@@ -325,8 +323,8 @@ fn new_local(vt: I32) I32 {
 }
 
 fn new_label() I32 {
-    next_label[0] += 1
-    return next_label[0]
+    next_label += 1
+    return next_label
 }
 
 /// A function's checking starts: no locals, labels, loops, or defers yet.
@@ -334,11 +332,10 @@ fn begin_function() Void {
     want_reset()
     cur_entry.clear()
     cur_locals.clear()
-    next_label.resize(1)
-    next_label[0] = 0
+    next_label = 0
     clear_loops()
     defer_node.clear()
-    function_defers[0] = 0
+    function_defers = 0
     exit_flags.clear()
     begin_exit_flag()
 }
@@ -348,7 +345,7 @@ fn check_function(fi: I32) Void {
     let decl = fi_decl[fi]
     let body = fn_body(decl)
     begin_function()
-    cur_fn[0] = fi
+    cur_fn = fi
     let params = fi_params[fi]
     let decls = param_decls(decl)
     for (0 ..< vl_len[decls]) |i| {
@@ -357,36 +354,35 @@ fn check_function(fi: I32) Void {
         decl_local[d] = new_local(repr(t))
         decl_ty[d] = t
     }
-    cur_params.resize(1)
-    cur_params[0] = cur_locals.len()
+    cur_params = cur_locals.len()
     mark_boxes(body)
     let cx = Cx { inst: fi_inst[fi], fi: fi, result: fi_result[fi] }
-    let outer = cur_inst[0]
-    cur_inst[0] = cx.inst
+    let outer = cur_inst
+    cur_inst = cx.inst
     enter_instance(fi_inst[fi], fi_site[fi])
     want(body, cx.result, Why.Returns, decl, -1)
     finish_function(fi_func[fi], body, cx, box_params(decls, params))
     unwant()
     leave_instance()
-    cur_inst[0] = outer
+    cur_inst = outer
 }
 
 /// A body checked against the result type, as function `f`'s (after
 /// `prologue`, when it is a node: moving boxed parameters into their boxes).
 fn finish_function(f: I32, body_node: I32, cx: Cx, prologue: I32) Void {
-    let outer = cur_src[0]
-    cur_src[0] = body_node
+    let outer = cur_src
+    cur_src = body_node
     func_src[f] = body_node
     let m = w_mark()
     if prologue >= 0 { w_push(prologue) }
-    body_block[0] = body_node
+    body_block = body_node
     let t = check_block(body_node, cx.result, cx)
     if ty_is(cx.result, Ty.Void) { drop_value(t) } else { coerce(t, cx.result, body_node) }
     w_node(Op.Seq, repr(cx.result), 0, 0, m)
     func_body[f] = w_pop()
     elide_tail_return(func_body[f], repr(cx.result))
-    record_locals(f, cur_params[0])
-    cur_src[0] = outer
+    record_locals(f, cur_params)
+    cur_src = outer
 }
 
 /// A return at the end of a function needs no branch or inlining wrapper.
@@ -417,9 +413,9 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let defers = defer_node.len()
     defer_marks.push(defers)
     let guards = defer_guard.len()
-    let reads = flag_reads[0]
-    let discard_tail = block == body_block[0] and tok_is(node_first[block], Tok.LBrace)
-    if block == body_block[0] and profiling() { profile_body(block, cx) }
+    let reads = flag_reads
+    let discard_tail = block == body_block and tok_is(node_first[block], Tok.LBrace)
+    if block == body_block and profiling() { profile_body(block, cx) }
     let c = first_child(block)
     let t = ty_void()
     let exits = false
@@ -445,7 +441,7 @@ fn check_block(block: I32, expect: I32, cx: Cx) I32 {
     let vt = repr(t)
     if defer_node.len() > defers and vt != vt_unreachable {
         // A function's body ends in a return, which may be an error's.
-        if block == body_block[0] { return_defers(t, w_mark() - 1, defers, cx) }
+        if block == body_block { return_defers(t, w_mark() - 1, defers, cx) }
         else { defers_after_value(vt, w_mark() - 1, defers, cx) }
     }
     guard_defers(guards, vt, cx)
@@ -660,10 +656,10 @@ fn bad_literal(at: I32) I32 {
 
 fn report_bad_literal(at: I32) Void {
     // A lone surrogate: half of a pair, which a string cannot hold alone.
-    if bad_escape[0] < 0 { report2(Diag.InvalidEscape, at, -1, 1, -1) }
-    else if bad_escape[1] == 2 { report2(Diag.InvalidEscape, at, -1, 3, -1) }
+    if bad_escape_at < 0 { report2(Diag.InvalidEscape, at, -1, 1, -1) }
+    else if bad_escape_why == 2 { report2(Diag.InvalidEscape, at, -1, 3, -1) }
     // `\d`: the escape's two bytes, as a word, for the message.
-    else if bad_escape[1] == 1 { report2(Diag.InvalidEscape, at, src.intern(bad_escape[0], bad_escape[0] + 2), 2, -1) }
+    else if bad_escape_why == 1 { report2(Diag.InvalidEscape, at, src.intern(bad_escape_at, bad_escape_at + 2), 2, -1) }
     else { report(Diag.InvalidEscape, at, -1) }
 }
 
@@ -692,8 +688,8 @@ vec node_expect: I32
 /// push its IR node, record its type in @node_ty, and return the type.
 fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
     // The code made for it is its (a source map's spans), its parts' their own.
-    let outer = cur_src[0]
-    cur_src[0] = node
+    let outer = cur_src
+    cur_src = node
     let t = check_node(node, expect, cx)
     // Wasm's validator does not infer that every arm of a block exits.
     if ty_is(t, Ty.Never) and not cf_diverges(w_stack[w_mark() - 1]) {
@@ -701,7 +697,7 @@ fn check_expr(node: I32, expect: I32, cx: Cx) I32 {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         w_node(Op.Seq, vt_unreachable, 0, 0, m)
     }
-    cur_src[0] = outer
+    cur_src = outer
     if node < node_ty.len() { node_ty[node] = t; node_expect[node] = expect }
     return t
 }
@@ -1185,7 +1181,7 @@ fn int_literal(node: I32, at: I32, expect: I32, negate: Bool) I32 {
     let t = if expect >= 0 and is_numeric(expect) { expect } else { literal_default(node, negate) }
     if not literal_fits(node, t, negate) {
         report2(Diag.IntegerOutOfRange, at, -1, t, if negate { 1 } else { 0 })
-        in_instance(cur_inst[0])
+        in_instance(cur_inst)
     }
     push_number(t, literal_bits(node, t, negate), true)
     return t
@@ -1513,7 +1509,7 @@ fn fn_value_in(decl: I32, inst: I32) I32 {
 fn global_get(decl: I32, inst: I32) I32 {
     let gi = global_instance(decl, inst)
     // Its initializer is checked where its diagnostics are kept.
-    if speculating[0] > 0 and gi_global[gi] == -1 {
+    if speculating > 0 and gi_global[gi] == -1 {
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         return global_type_in(decl, inst)
     }
@@ -1536,7 +1532,7 @@ fn global_set(decl: I32, inst: I32, value: I32, op: I32, node: I32, cx: Cx) I32 
     let gi = global_instance(decl, inst)
     let m = w_mark()
     // (As @global_get: its initializer is checked where its diagnostics are kept.)
-    if speculating[0] > 0 and gi_global[gi] == -1 {
+    if speculating > 0 and gi_global[gi] == -1 {
         check_expr(value, global_type_in(decl, inst), cx)
         w_node(Op.Drop, vt_none, 0, 0, m)
         return ty_void()
@@ -1611,7 +1607,7 @@ vec computed_gi: I32
 vec computed_init: I32
 /// What the code being checked belongs to: a function instance; -1 an
 /// entry function; -2 - g global instance g's initializer.
-vec cur_fn: I32 = [-1]
+let cur_fn: I32 = -1
 /// What code reads or calls, from (as @cur_fn) to (a function instance, or
 /// -2 - g for computed global instance g).
 vec edge_from: I32
@@ -1623,7 +1619,7 @@ vec edge_site: I32
 vec cur_entry: I32
 
 fn note_edge(to: I32, site: I32) Void {
-    let from = if cur_fn[0] != -1 { cur_fn[0] } else if cur_entry.len() > 0 { -1000000 - cur_entry[0] } else { return }
+    let from = if cur_fn != -1 { cur_fn } else if cur_entry.len() > 0 { -1000000 - cur_entry[0] } else { return }
     edge_from.push(from)
     edge_to.push(to)
     edge_site.push(site)
@@ -1644,10 +1640,10 @@ fn computed_global(gi: I32, t: I32, init: I32) I32 {
     let f = defined_func(vl_empty(), t)
     func_debug_name[f] = name_add(word_text(decl_name[decl]) + ".init")
     computed_init.push(f)
-    let outer = cur_fn[0]
-    cur_fn[0] = -2 - gi
+    let outer = cur_fn
+    cur_fn = -2 - gi
     save_function()
-    cur_params[0] = 0
+    cur_params = 0
     mark_boxes(init)
     let m = w_mark()
     let cx = Cx { inst: gi_inst[gi], fi: -1, result: t }
@@ -1665,7 +1661,7 @@ fn computed_global(gi: I32, t: I32, init: I32) I32 {
     func_body[f] = w_pop()
     record_locals(f, 0)
     restore_function()
-    cur_fn[0] = outer
+    cur_fn = outer
     return g
 }
 
@@ -1738,7 +1734,7 @@ fn start_globals() Void {
     w_node(Op.Seq, vt_none, 0, 0, m)
     let f = helper(vl_empty(), vl_empty(), vl_empty(), "start")
     func_body[f] = w_pop()
-    start_func[0] = f
+    start_func = f
 }
 
 /// Where an edge's source is in @start_globals' arrays, or -1 (an entry function).
@@ -2047,7 +2043,7 @@ fn is_number_literal(node: I32) Bool {
 }
 
 /// Above 0 while code is checked only for its type (its diagnostics dropped).
-vec speculating: I32
+let speculating: I32 = 0
 
 /// Each node's last speculated type (plus 1; 0 for none), with the expected
 /// type and instances it was found for: a right operand typed first and then
@@ -2072,9 +2068,9 @@ fn type_only(node: I32, expect: I32, cx: Cx) I32 {
     if spec_ty[node] > 0 and spec_expect[node] == expect and spec_inst[node] == cx.inst and spec_fi[node] == cx.fi { return spec_ty[node] - 1 }
     let m = w_mark()
     let diags = diag_kind.len()
-    speculating[0] += 1
+    speculating += 1
     let t = check_expr(node, expect, cx)
-    speculating[0] -= 1
+    speculating -= 1
     w_resize_stack(m)
     diag_truncate(diags)
     spec_ty[node] = t + 1
@@ -3040,25 +3036,25 @@ fn expand(fi: I32, m: I32) I32 {
     }
     let pre = w_mark() - m
     let result_vt = repr(fi_result[fi])
-    ir_failed[0] = -1
-    ir_failed_shape[0] = 0
+    ir_failed = -1
+    ir_failed_shape = 0
     let ok = translate(x, decls, args, locals, direct, fi)
     if not ok {
         w_resize_stack(m)
-        let bad = ir_failed[0]
+        let bad = ir_failed
         let body = first_child(fn_body(fi_decl[fi]))
         if bad < 0 or reported_within(body) { return unsupported(decl_node[fi_decl[fi]]) }
-        if ir_failed_shape[0] == 3 {
-            report3(Diag.IrType, body, x_tag[bad], ir_fault[0], ir_fault[1], 0)
+        if ir_failed_shape == 3 {
+            report3(Diag.IrType, body, x_tag[bad], ir_fault_want, ir_fault_given, 0)
             return error_value()
         }
-        if ir_failed_shape[0] == 4 {
-            report3(Diag.IntegerOutOfRange, body, ir_fault[1], ir_fault[0], 0, -1)
+        if ir_failed_shape == 4 {
+            report3(Diag.IntegerOutOfRange, body, ir_fault_given, ir_fault_want, 0, -1)
             return error_value()
         }
         let ident = x_tag[bad] == known_word(Known.IrIdent)
         let named = x_attr(bad, known_word(Known.Name))
-        let why = if ir_failed_shape[0] == 1 { 2 } else if ident { 1 } else { 0 }
+        let why = if ir_failed_shape == 1 { 2 } else if ident { 1 } else { 0 }
         report2(Diag.IrUnknown, body, if ident and why == 1 { if named >= 0 { attr_word(named) } else { -1 } } else { x_tag[bad] }, why, -1)
         return error_value()
     }
@@ -3124,7 +3120,7 @@ fn check_own_ir() Void {
         for (0 ..< vl_len[params]) |i| { if ty_is(vl_item(params, i), Ty.Error) { typed = false } }
         if typed {
             begin_function()
-            cur_fn[0] = -1
+            cur_fn = -1
             let m = w_mark()
             for (0 ..< vl_len[params]) |i| {
                 let vt = repr(vl_item(params, i))
@@ -3196,10 +3192,10 @@ fn ir_bool(x: I32, decls: I32, fi: I32) Bool {
 
 /// An `@ir` operand of the wrong value type: `want`, given `got`.
 fn ir_mistyped(x: I32, want: I32, got: I32) Bool {
-    ir_failed[0] = x
-    ir_failed_shape[0] = 3
-    ir_fault[0] = want
-    ir_fault[1] = got
+    ir_failed = x
+    ir_failed_shape = 3
+    ir_fault_want = want
+    ir_fault_given = got
     return false
 }
 
@@ -3263,12 +3259,13 @@ fn param_index(x: I32, decls: I32) I32 {
 }
 
 /// The `@ir` element @translate did not know, or -1.
-vec ir_failed: I32 = [-1]
+let ir_failed: I32 = -1
 /// Why: 0 an element the compiler does not know (or a name no parameter has), 1 one it knows written wrong,
 /// 3 an operand of the wrong value type, 4 a literal out of range.
-vec ir_failed_shape: I32 = [0]
+let ir_failed_shape: I32 = 0
 /// For 3: the value type wanted, and given; for 4: the type, and the literal as a word.
-vec ir_fault: I32 = [0, 0]
+let ir_fault_want: I32 = 0
+let ir_fault_given: I32 = 0
 /// The functions of a program's own files whose bodies are @ir, in the last build.
 vec user_ir_decl: I32
 /// Their function instances.
@@ -3276,8 +3273,8 @@ vec user_ir_fi: I32
 
 /// The element being translated is malformed (an attribute or operand missing, of the wrong kind).
 fn ir_malformed(x: I32) Bool {
-    ir_failed[0] = x
-    ir_failed_shape[0] = 1
+    ir_failed = x
+    ir_failed_shape = 1
     return false
 }
 
@@ -3300,7 +3297,7 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     if tag == known_word(Known.IrIdent) {
         let i = param_index(x, decls)
         if i < 0 {
-            ir_failed[0] = x
+            ir_failed = x
             return false
         }
         if direct { w_push(args[i]) } else { w_leaf(Op.LocalGet, repr(vl_item(fi_params[fi], i)), locals[i], 0) }
@@ -3332,10 +3329,10 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
             bits = if t == prelude(Prelude.F32) { d.f32().bits().i64() & 4294967295 } else { d.bits() }
         }
         if not bool_ok or not finite or (not is_float(t) and not ir_lit_fits(attr_start[v] + if neg { 1 } else { 0 }, attr_end[v], neg, t)) {
-            ir_failed[0] = x
-            ir_failed_shape[0] = 4
-            ir_fault[0] = t
-            ir_fault[1] = attr_word(v)
+            ir_failed = x
+            ir_failed_shape = 4
+            ir_fault_want = t
+            ir_fault_given = attr_word(v)
             return false
         }
         if is_float(t) {
@@ -3351,7 +3348,7 @@ fn translate(x: I32, decls: I32, args: Array[I32], locals: Array[I32], direct: B
     if data != 0 { return data > 0 }
     let opcode = tag_opcode(tag)
     if opcode < 0 {
-        ir_failed[0] = x
+        ir_failed = x
         return false
     }
     let m = w_mark()
@@ -3904,9 +3901,9 @@ fn check_return(node: I32, cx: Cx) I32 {
         mismatch(node, cx.result, ty_void())
     }
     // The value first, then every pending defer of the function.
-    if defer_node.len() > function_defers[0] {
-        if value >= 0 { return_defers(cx.result, m, function_defers[0], cx) }
-        else { defers_after_value(vt_none, m, function_defers[0], cx) }
+    if defer_node.len() > function_defers {
+        if value >= 0 { return_defers(cx.result, m, function_defers, cx) }
+        else { defers_after_value(vt_none, m, function_defers, cx) }
     }
     w_node(Op.Return, vt_unreachable, 0, 0, m)
     return ty_never()
@@ -3964,7 +3961,7 @@ fn reset_check() Void {
     user_ir_fi.clear()
     reach_from.clear()
     reach_to.clear()
-    checking_fi[0] = -1
+    checking_fi = -1
     cur_locals.clear()
     decl_local.resize(decl_kind.len())
     decl_ty.resize(decl_kind.len())
@@ -3988,7 +3985,7 @@ fn reset_check() Void {
     co_from.clear()
     co_to.clear()
     co_kind.clear()
-    cur_fn[0] = -1
+    cur_fn = -1
     node_ty.resize(node_kind.len())
     node_expect.resize(node_kind.len())
     for (0 ..< node_kind.len()) |n| { node_ty[n] = -1; node_expect[n] = -1 }
@@ -4011,10 +4008,7 @@ fn reset_check() Void {
     reset_optional()
     reset_promises()
     // Sized here too: a computed global's initializer may be checked first.
-    cur_params.resize(1)
-    next_label.resize(1)
-    speculating.resize(1)
-    speculating[0] = 0
+    speculating = 0
     spec_ty.clear()
     spec_expect.clear()
     spec_inst.clear()
@@ -4032,17 +4026,17 @@ vec test_node: I32
 /// size in `out`, or -1 when there are diagnostics.
 fn compile(target: Target) I32 {
     restore_diagnostics()
-    if missing_import[0] >= 0 { return -1 }
+    if missing_import >= 0 { return -1 }
     reset_wasm()
     reset_types()
     reset_ir_trees()
     intern_known()
     find_prelude_types()
     reset_check()
-    comptime_fuel[0] = -1
+    comptime_fuel = -1
     if target == Target.Comptime {
-        comptime_fuel[0] = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()))
-        glob_field_name[comptime_fuel[0]] = name_add("__comptime_fuel")
+        comptime_fuel = add_global(vt_i32, true, w_i32_detached(comptime_fuel_limit()))
+        glob_field_name[comptime_fuel] = name_add("__comptime_fuel")
     }
     reset_profile()
     check_open_instances()
@@ -4079,8 +4073,8 @@ fn compile(target: Target) I32 {
     }
     test_node.clear()
     bench_node.clear()
-    run_depth[0] = 0
-    run_elem[0] = -1
+    run_depth = 0
+    run_elem = -1
     for (0 ..< file_root.len()) |file| {
         if file_role[file] == FileRole.Entry.i32() and file_root[file] >= 0 {
             let item = first_child(file_root[file])
@@ -4095,7 +4089,7 @@ fn compile(target: Target) I32 {
                 }
                 if (target == Target.Normal or target == Target.Analysis) and is_kind(item, Node.Export_main_decl) {
                     entry_function(item, intern_text("main"), -1)
-                    if run_build[0] == 1 { run_readers(item) }
+                    if run_build == 1 { run_readers(item) }
                 }
                 // Every mem of the entry file is a memory of the module, as in stage 0.
                 if is_kind(item, Node.Mem_decl) {
@@ -4166,12 +4160,12 @@ fn compile(target: Target) I32 {
     for (0 ..< 2) |pass| {
         if pass == 1 { check_unused_generators() }
         while (next < fi_queue.len()) {
-            checking_fi[0] = fi_queue[next]
+            checking_fi = fi_queue[next]
             check_function(fi_queue[next])
             next += 1
         }
     }
-    checking_fi[0] = -1
+    checking_fi = -1
     check_own_ir()
     check_ir_types()
     start_globals()
@@ -4356,10 +4350,9 @@ fn bench_function(item: I32, k: I32) Void {
         export_params.push(vl_one(i32_t))
     }
     begin_function()
-    cur_fn[0] = -1
+    cur_fn = -1
     let n = new_local(vt_i32)
-    cur_params.resize(1)
-    cur_params[0] = cur_locals.len()
+    cur_params = cur_locals.len()
     mark_boxes(item)
     let cx = Cx { inst: 0, fi: -1, result: ty_void() }
     let m = w_mark()
@@ -4440,7 +4433,7 @@ fn entry_function(item: I32, name: I32, test_index: I32) Void {
         return
     }
     begin_function()
-    cur_fn[0] = -1
+    cur_fn = -1
     if name >= 0 {
         for (0 ..< decl_node.len()) |d| { if decl_node[d] == item and decl_is(d, Decl.Main) { cur_entry.push(d) } }
     }
@@ -4451,36 +4444,35 @@ fn entry_function(item: I32, name: I32, test_index: I32) Void {
         decl_ty[d] = vl_item(params, i)
         p = next_sibling(p)
     }
-    cur_params.resize(1)
-    cur_params[0] = cur_locals.len()
+    cur_params = cur_locals.len()
     mark_boxes(last_child(item))
     finish_function(f, last_child(item), Cx { inst: 0, fi: -1, result: result }, -1)
 }
 
 /// `utu run`'s builds (1), which export readers of an array main's result.
-vec run_build: I32 = [0]
+let run_build: I32 = 0
 /// The last run build's array levels (0: main returns no array), and the
 /// type in its innermost one.
-vec run_depth: I32 = [0]
-vec run_elem: I32 = [-1]
+let run_depth: I32 = 0
+let run_elem: I32 = -1
 
 /// `main` (or `?Array`, nested) in a run build: for each
 /// array level k, `run:len:k` and `run:at:k`, its `len()` and `[i]`, so
 /// `utu run` prints the result as `[[1, 2], []]`. (`:` is in no utu name.)
 /// A tuple or handle main's type is @run_elem too: printed `[1, P]`, `P`.
 fn run_readers(item: I32) Void {
-    run_depth[0] = 0
+    run_depth = 0
     let ret = child_of_kind(item, Node.Return_type)
     if ret < 0 { return }
     let t = type_of(ret, 0)
     if ty_is(t, Ty.Nullable) { t = ty_a[t] }
-    if ty_is(t, Ty.Tuple) or js_handle(t) { run_elem[0] = t }
+    if ty_is(t, Ty.Tuple) or js_handle(t) { run_elem = t }
     while (is_array_type(t)) {
-        let k = run_depth[0].str()
+        let k = run_depth.str()
         run_reader(t, intern_text("len"), "run:len:" + k)
         let elem = run_reader(t, known_word(Known.GetIndex), "run:at:" + k)
-        run_depth[0] += 1
-        run_elem[0] = elem
+        run_depth += 1
+        run_elem = elem
         t = if ty_is(elem, Ty.Nullable) { ty_a[elem] } else { elem }
     }
 }
@@ -4499,17 +4491,16 @@ fn run_reader(t: I32, word: I32, name: Str) I32 {
     export_result.push(result)
     export_params.push(params)
     begin_function()
-    cur_fn[0] = -1
+    cur_fn = -1
     for (0 ..< vl_len[params]) |i| { new_local(repr(vl_item(params, i))) }
-    cur_params.resize(1)
-    cur_params[0] = cur_locals.len()
+    cur_params = cur_locals.len()
     let m = w_mark()
     let args = w_mark()
     for (0 ..< vl_len[params]) |i| { w_get(cur_locals[i], i) }
     finish_call(fi, args, Cx { inst: 0, fi: -1, result: result })
     w_node(Op.Seq, repr(result), 0, 0, m)
     func_body[f] = w_pop()
-    record_locals(f, cur_params[0])
+    record_locals(f, cur_params)
     return result
 }
 

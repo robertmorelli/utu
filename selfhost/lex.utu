@@ -687,7 +687,7 @@ vec template_opens: I32
 
 /// 1 when the last lex's Error is a template's backtick whose text after a
 /// `${ … }` ran to the end (see @runs_to).
-vec template_ran_out: I32 = [0]
+let template_ran_out: I32 = 0
 
 /// Lex the bytes of `src` from `first` to the end byte at `n`, appending
 /// their tokens. The last token is `End`, or `Error` (at the start of the
@@ -739,7 +739,7 @@ fn runs_to(s: I32, k: I32) Bool {
         }
         return j >= k
     }
-    if c == 96 or c == 125 { return template_text_end(s + 1, k) == -1 or template_ran_out[0] == 1 }
+    if c == 96 or c == 125 { return template_text_end(s + 1, k) == -1 or template_ran_out == 1 }
     return c == 47 and src[s + 1] == 92
 }
 
@@ -756,7 +756,7 @@ fn lex_to(first: I32, n: I32) I32 {
     let open = 0  // template strings in a `${`
     template_braces.clear()
     template_opens.clear()
-    template_ran_out[0] = 0
+    template_ran_out = 0
     let start = start_before
     // Where the `{` of a `wn` or `html` body is, once its word is read.
     let wutu_at = -1
@@ -805,7 +805,7 @@ fn lex_to(first: I32, n: I32) I32 {
                     j = template_text_end(i + 1, n)
                     // (A template the source ends in is unclosed at its backtick.)
                     if j == -1 {
-                        template_ran_out[0] = 1
+                        template_ran_out = 1
                         return tokens_end(put_token(t, Tok.Error.i32(), template_opens[open - 1], template_opens[open - 1]))
                     }
                     if j < 0 { return tokens_end(put_token(t, Tok.Error.i32(), i, i)) }

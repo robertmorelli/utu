@@ -277,7 +277,9 @@ vec node_parent: I32
 vec pending: I32
 /// Parser-local node count, pending stack top, and first node in this parse.
 /// The exported node columns are cut to their logical size before returning.
-vec parse_size: I32 = [0, 0, 0]
+let parse_nodes: I32 = 0
+let parse_pending: I32 = 0
+let parse_first: I32 = 0
 
 /// Throws, abandoning the rule that failed: an attempt that catches it
 /// restores its @Save.
@@ -287,13 +289,13 @@ let syntax_error: fun() Void = @es/\ () => { throw new SyntaxError('utu syntax')
 // any attempt failed at is where the error is reported, with what the
 // attempts that got that far wanted there.
 /// The furthest position any attempt failed at.
-vec parse_furthest: I32 = [0]
+let parse_furthest: I32 = 0
 /// At the furthest token: Tok kinds, and keywords as kw_wanted + their word.
 vec parse_expected: I32
 /// The token a failed parse reports.
-vec parse_error_at: I32 = [0]
+let parse_error_at: I32 = 0
 /// And the word of what it wanted there ("';' or '}'"), or -1.
-vec parse_error_wanted: I32 = [-1]
+let parse_error_wanted: I32 = -1
 
 /// In @parse_expected, a keyword is this plus its word id; a token kind is itself.
 let kw_wanted: I32 = 1000
@@ -309,11 +311,11 @@ fn fail_wanting(p: Parser, wanted: I32) Void {
 
 /// A predictive rejection reports the same attempted token as a thrown one.
 fn note_parse_failure(pos: I32, wanted: I32) Void {
-    if pos > parse_furthest[0] {
-        parse_furthest[0] = pos
+    if pos > parse_furthest {
+        parse_furthest = pos
         parse_expected.clear()
     }
-    if pos == parse_furthest[0] and wanted >= 0 {
+    if pos == parse_furthest and wanted >= 0 {
         for (0 ..< parse_expected.len()) |i| { if parse_expected[i] == wanted { return } }
         parse_expected.push(wanted)
     }
@@ -466,7 +468,7 @@ fn expect_kw(p: Parser, kw: Kw) Void {
 //! = Nodes
 
 /// Where the node about to begin starts on @pending.
-fn mark() I32 => parse_size[1]
+fn mark() I32 => parse_pending
 
 fn resize_parse_nodes(size: I32) Void {
     node_kind.resize(size)
@@ -479,29 +481,29 @@ fn resize_parse_nodes(size: I32) Void {
 
 fn start_parse_nodes() I32 {
     let before = node_kind.len()
-    parse_size[0] = before
-    parse_size[1] = 0
-    parse_size[2] = before
+    parse_nodes = before
+    parse_pending = 0
+    parse_first = before
     return before
 }
 
 /// Append to aligned columns, growing them together only when full.
 fn append_parse_node(kind: Node, first: I32, last: I32, child: I32, next: I32, parent: I32) I32 {
-    let id = parse_size[0]
-    if id == node_kind.len() { resize_parse_nodes(id + (id - parse_size[2]) / 2 + 64) }
+    let id = parse_nodes
+    if id == node_kind.len() { resize_parse_nodes(id + (id - parse_first) / 2 + 64) }
     node_kind[id] = kind.i32()
     node_first[id] = first
     node_last[id] = last
     node_child[id] = child
     node_next[id] = next
     node_parent[id] = parent
-    parse_size[0] = id + 1
+    parse_nodes = id + 1
     return id
 }
 
 /// Collapse the nodes since `at` into a parent spanning lexer tokens.
 fn finish_tokens(kind: Node, at: I32, first: I32, last: I32) I32 {
-    let top = parse_size[1]
+    let top = parse_pending
     let child = if at < top { pending[at] } else { -1 }
     let id = append_parse_node(kind, first, last, child, -1, -1)
     if at < top {
@@ -518,7 +520,7 @@ fn finish_tokens(kind: Node, at: I32, first: I32, last: I32) I32 {
     }
     if at == pending.len() { pending.resize(at + at / 2 + 64) }
     pending[at] = id
-    parse_size[1] = at + 1
+    parse_pending = at + 1
     return id
 }
 
@@ -547,22 +549,22 @@ fn leaf(p: Parser, kind: Node) I32 {
 
 /// The mark below `left`, the node on top of the stack, so a node can begin with it.
 fn mark_below(left: I32) I32 {
-    let below = parse_size[1] - 1
+    let below = parse_pending - 1
     if pending[below] != left { fatal }
     return below
 }
 
 /// Before an attempt that may be given up (@restore).
-fn save(p: Parser) Save => Save { pos: p.pos, nodes: parse_size[0], pending: parse_size[1], depth: parse_depth[0], limit: p.limit }
+fn save(p: Parser) Save => Save { pos: p.pos, nodes: parse_nodes, pending: parse_pending, depth: parse_depth, limit: p.limit }
 
 /// Gives up an attempt: the cursor goes back, and the nodes made since are gone.
 fn restore(p: Parser, s: Save) Void {
     p.pos = s.pos
-    parse_depth[0] = s.depth
+    parse_depth = s.depth
     p.limit = s.limit
-    parse_size[0] = s.nodes
-    for (parse_size[1] ..< s.pending) |k| { pending[k] = 0 }
-    parse_size[1] = s.pending
+    parse_nodes = s.nodes
+    for (parse_pending ..< s.pending) |k| { pending[k] = 0 }
+    parse_pending = s.pending
     let k = dsl_sites.len()
     while (k > 0 and dsl_sites[k - 1] >= s.nodes) { k -= 1 }
     dsl_sites.resize(k)
@@ -1212,7 +1214,7 @@ fn bench_decl(p: Parser) I32 {
 fn type_(p: Parser) I32 {
     deeper(p)
     let made = type_at(p)
-    parse_depth[0] -= 1
+    parse_depth -= 1
     return made
 }
 
@@ -1494,7 +1496,7 @@ fn extend(p: Parser, left: I32, min: I32, or_equal: Bool) I32 {
     while (true) {
         let next = infix(p, left, min, or_equal)
         if next < 0 {
-            parse_depth[0] -= 1
+            parse_depth -= 1
             return left
         }
         left = next
@@ -1671,14 +1673,15 @@ fn iterator(p: Parser, left: I32, form: I32) I32 {
 /// How deeply the parse is nested (expressions, types, `else if`s), and the
 /// most it has been and the token where: a program nested deeper than the
 /// compiler's stack bears is reported there (see src/selfhost/compiler.js).
-vec parse_depth: I32 = [0]
-vec parse_deepest: I32 = [0, -1]
+let parse_depth: I32 = 0
+let parse_deepest: I32 = 0
+let parse_deepest_token: I32 = -1
 
 fn deeper(p: Parser) Void {
-    parse_depth[0] += 1
-    if parse_depth[0] > parse_deepest[0] {
-        parse_deepest[0] = parse_depth[0]
-        parse_deepest[1] = ptok[p.pos]
+    parse_depth += 1
+    if parse_depth > parse_deepest {
+        parse_deepest = parse_depth
+        parse_deepest_token = ptok[p.pos]
     }
 }
 
@@ -2271,7 +2274,7 @@ fn if_expr(p: Parser) I32 {
         if is_kw(p, Kw.If) {
             deeper(p)
             if_expr(p)
-            parse_depth[0] -= 1
+            parse_depth -= 1
         } else { block(p) }
     }
     return node(p, Node.If_expr, at, first)
@@ -2480,7 +2483,7 @@ fn while_expr(p: Parser) I32 {
 /// Intern every keyword, at the start of `src`, so a word's id is its
 /// keyword's when it is one. Files follow.
 fn intern_keywords() Void {
-    src.resize(abi_kept[0])
+    src.resize(abi_kept)
     src.intern_reset()
     for (0 ..< Kw.count()) |k| {
         let name = Kw.name(Kw(k))
@@ -2536,37 +2539,37 @@ fn parser_tokens(first: I32, last: I32) Void {
 /// their nodes. Returns the source file node, or -1 when the tokens do not
 /// parse (and adds no nodes).
 fn parse(first: I32, last: I32) I32 {
-    parse_error_wanted[0] = -1
+    parse_error_wanted = -1
     if tok_kind[last - 1] != Tok.End.i32() {
-        parse_error_at[0] = last - 1
+        parse_error_at = last - 1
         return -1
     }
     parser_tokens(first, last)
     let before = start_parse_nodes()
-    parse_depth[0] = 0
-    parse_deepest[0] = 0
-    parse_deepest[1] = -1
-    parse_furthest[0] = 0
+    parse_depth = 0
+    parse_deepest = 0
+    parse_deepest_token = -1
+    parse_furthest = 0
     parse_expected.clear()
     let root = try {
         let root = source_file(Parser { pos: 0, limit: -1 })
         node_first[root] = first
         node_last[root] = last - 1
-        if comment_nodes[0] == 1 { attach_comments(root) }
+        if comment_nodes == 1 { attach_comments(root) }
         root
     } catch {
-        parse_error_at[0] = ptok[parse_furthest[0]]
-        if parse_expected.len() > 0 { parse_error_wanted[0] = intern_text(wanted_text()) }
+        parse_error_at = ptok[parse_furthest]
+        if parse_expected.len() > 0 { parse_error_wanted = intern_text(wanted_text()) }
         restore(Parser { pos: 0, limit: -1 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limit: -1 })
         -1
     }
-    resize_parse_nodes(parse_size[0])
+    resize_parse_nodes(parse_nodes)
     return root
 }
 
 /// 1 when the tree should hold comments (see @attach_comments): only the
 /// parser's differential asks for them.
-vec comment_nodes: I32 = [0]
+let comment_nodes: I32 = 0
 
 struct Comments:
     | next: I32
@@ -2626,6 +2629,6 @@ fn parse_expression(first: I32, last: I32) I32 {
         restore(Parser { pos: 0, limit: -1 }, Save { pos: 0, nodes: before, pending: 0, depth: 0, limit: -1 })
         -1
     }
-    resize_parse_nodes(parse_size[0])
+    resize_parse_nodes(parse_nodes)
     return root
 }

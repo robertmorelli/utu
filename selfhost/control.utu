@@ -7,9 +7,9 @@
 
 /// A match pattern's value, as 64 bits (an integer, a float's bits, a Bool,
 /// an integer enum's variant). When it is not one of the scrutinee's type,
-/// `pattern_fault[0]` says why: 0 out of range, 1 not a Bool, 2 not an
+/// `pattern_fault` says why: 0 out of range, 1 not a Bool, 2 not an
 /// integer, 3 of another kind, 4 not a variant (as MatchPattern's argument).
-vec pattern_fault: I32
+let pattern_fault: I32 = 0
 
 fn pattern_value(lit: I32, t: I32) I64 {
     let c = first_child(lit)
@@ -19,29 +19,29 @@ fn pattern_value(lit: I32, t: I32) I64 {
         let by = node_alias[c]
         let at = if decl_is(by, Decl.Alias) and is_generic(decl_a[by]) { alias_instance(by) } else { ty_inst(t) }
         if not decl_is(variant, Decl.Variant) or named(decl_owner[variant], at) != t {
-            pattern_fault[0] = 4
+            pattern_fault = 4
             return 0
         }
         return variant_value[variant].i64()
     }
     if is_kind(c, Node.Bool_lit) {
-        if t != prelude(Prelude.Bool) { pattern_fault[0] = 3 }
+        if t != prelude(Prelude.Bool) { pattern_fault = 3 }
         return if tok_word[node_first[c]] == Kw.True.i32() { 1 } else { 0 }
     }
     let negate = tok_kind[node_first[lit]] == Tok.Minus.i32()
     if is_kind(c, Node.Float_lit) {
-        if not is_float(t) { pattern_fault[0] = if t == prelude(Prelude.Bool) { 1 } else { 2 }; return 0 }
-        if not literal_fits(c, t, negate) { pattern_fault[0] = 0 }
+        if not is_float(t) { pattern_fault = if t == prelude(Prelude.Bool) { 1 } else { 2 }; return 0 }
+        if not literal_fits(c, t, negate) { pattern_fault = 0 }
         // `-0.0` matches what `0.0` does (they compare equal): the same pattern.
         if negate and literal_bits(c, t, false) == 0.i64() { return 0.i64() }
         return literal_bits(c, t, negate)
     }
     if negate and is_float(t) and literal_bits(c, t, false) == 0.i64() { return 0.i64() }
     let v = literal_bits(c, t, negate)
-    if t == prelude(Prelude.Bool) { pattern_fault[0] = 1; return v }
-    if decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault[0] = 3; return v }
-    if not is_numeric(t) { pattern_fault[0] = 3; return v }
-    if not literal_fits(c, t, negate) { pattern_fault[0] = 0 }
+    if t == prelude(Prelude.Bool) { pattern_fault = 1; return v }
+    if decl_is(ty_decl(t), Decl.IntEnum) { pattern_fault = 3; return v }
+    if not is_numeric(t) { pattern_fault = 3; return v }
+    if not literal_fits(c, t, negate) { pattern_fault = 0 }
     return v
 }
 
@@ -120,13 +120,12 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     }
     arm_table(count)
     c = next_sibling(scrutinee)
-    pattern_fault.resize(1)
     while (c >= 0) {
         if is_kind(c, Node.Match_default) { default_ = c }
         else if is_kind(c, Node.Match_arm) {
-            pattern_fault[0] = -1
+            pattern_fault = -1
             let v = pattern_value(first_child(c), st)
-            let fault = pattern_fault[0]
+            let fault = pattern_fault
             if fault >= 0 { faulted = true }
             if fault == 4 {
                 let name = last_child(first_child(c))
@@ -243,12 +242,12 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     // it is the smaller (an arm of a chain is about 9 bytes, of a table
     // about 5, and the table a byte per value from lo to hi).
     let values = hi - lo + 1.i64()
-    let dense = vt == vt_i32 and n >= 3 and (if optimize_level[0] == 1 { values < (n * 4 - 8).i64() } else { hi - lo < (n * 3 + 8).i64() })
+    let dense = vt == vt_i32 and n >= 3 and (if optimize_level == 1 { values < (n * 4 - 8).i64() } else { hi - lo < (n * 3 + 8).i64() })
     if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop) }
     let end_ = new_label()
     let def = new_label()
     // In a loop match a speed build lays the arms out twice (see @threaded_continue).
-    let copies = if in_loop and optimize_level[0] == 2 { 2 } else { 1 }
+    let copies = if in_loop and optimize_level == 2 { 2 } else { 1 }
     let total = n * copies
     let labels = Array[I32].new(total, 0)
     for (0 ..< total) |k| { labels[k] = new_label() }
@@ -541,7 +540,7 @@ fn check_orelse(node: I32, expect: I32, cx: Cx) I32 {
     // `x orelse fatal`: wasm's own null check, with no branch, in an unsafe
     // build; else fatal's own `unreachable` where it is null (below), so the
     // trap is fatal's, not a null's.
-    if is_kind(b, Node.Fatal_expr) and safe_checks[0] == 0 {
+    if is_kind(b, Node.Fatal_expr) and safe_checks == 0 {
         w_node(Op.RefAsNonNull, repr(t), 0, 0, m)
         if boxed >= 0 {
             foreign_unbox(t, boxed, false)
@@ -685,7 +684,7 @@ fn check_try(node: I32, expected: I32, cx: Cx) I32 {
     }
     let m = w_mark()
     let mb = w_mark()
-    let sets = flag_sets[0]
+    let sets = flag_sets
     let t = first_branch(check_block(body_, expect, cx), expect, body_)
     w_node(Op.Seq, if t >= 0 { repr(t) } else { vt_unreachable }, 0, 0, mb)
     let mh = w_mark()
@@ -699,7 +698,7 @@ fn check_try(node: I32, expected: I32, cx: Cx) I32 {
         w_leaf(Op.Drop, vt_none, 0, 0)
     }
     // An exit in the body whose defer threw left the exit flag set.
-    if flag_sets[0] > sets and exit_flag(false) >= 0 { set_exit_flag(-1) }
+    if flag_sets > sets and exit_flag(false) >= 0 { set_exit_flag(-1) }
     t = other_branch(t, check_block(handler, t, cx), handler)
     w_node(Op.Seq, repr(t), 0, 0, mh)
     w_node(Op.Try, repr(t), new_label(), 0, m)
@@ -771,10 +770,10 @@ fn check_try_result(node: I32, cx: Cx) I32 {
         w_node(Op.StructGet, repr(error_t), heap, 2, me)
         w_node(Op.StructNew, vt_ref(fheap, false), fheap, 0, mn)
     }
-    if defer_node.len() > function_defers[0] {
+    if defer_node.len() > function_defers {
         let local = new_local(repr(ft))
         w_node(Op.LocalSet, vt_none, local, 0, mt)
-        run_exit_defers(function_defers[0], -2, ft, cx)
+        run_exit_defers(function_defers, -2, ft, cx)
         w_leaf(Op.LocalGet, repr(ft), local, 0)
     }
     w_node(Op.Return, vt_unreachable, 0, 0, mt)
@@ -979,7 +978,7 @@ fn check_for(node: I32, cx: Cx) I32 {
     let top = new_label()
     let next = new_label()
     let d0 = if capture >= 0 { node_decl[first_child(capture)] } else { -1 }
-    if optimize_level[0] == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0))
+    if optimize_level == 2 and n == 1 and kinds[0] == 0 and unrollable(block) and not (d0 >= 0 and assigns(block, d0))
         and unroll_fits(block, d0, types[0], counters[0], brk, cx) {
         unrolled_for(block, counters[0], ends[0], repr(types[0]), types[0] == prelude(Prelude.U32) or types[0] == prelude(Prelude.U64), brk, top, cx)
         w_node(Op.Seq, vt_none, 0, 0, m)
@@ -1112,11 +1111,11 @@ fn unroll_fits(block: I32, d: I32, ty: I32, counter: I32, brk: I32, cx: Cx) Bool
     }
     let m = w_mark()
     let diags = diag_kind.len()
-    speculating[0] += 1
+    speculating += 1
     enter_loop(brk, new_label(), -1, -1)
     discard(check_block(block, ty_void(), cx))
     leave_loop()
-    speculating[0] -= 1
+    speculating -= 1
     let total = 0
     for (m ..< w_mark()) |i| { total += unroll_weight(w_stack[i], 0) }
     w_resize_stack(m)

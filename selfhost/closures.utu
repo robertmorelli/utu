@@ -28,8 +28,8 @@ vec box_types: I32
 vec closure_calls: I32
 /// The parameter kinds of closure signatures (see closure_bits), each ended by 0.
 vec closure_sigs: U8
-/// At `[0]`: the closure_new import, or -1.
-vec closure_new_func: I32
+/// The closure_new import, or -1.
+let closure_new_func: I32 = 0
 /// Pairs: wasm function type of the call, its invoker (see @closure_invoker).
 vec closure_invokers: I32
 /// The closure_rec import, the record struct type, and @closure_new's helper, or -1.
@@ -49,8 +49,7 @@ fn reset_closures() Void {
     closure_calls.clear()
     closure_sigs.clear()
     env_types.clear()
-    closure_new_func.resize(1)
-    closure_new_func[0] = -1
+    closure_new_func = -1
     closure_invokers.clear()
     closure_bodies.clear()
     decl_awaits.clear()
@@ -393,19 +392,19 @@ vec saved_loops: I32
 /// Set the enclosing function's checking state aside (its locals, labels,
 /// loops, and defers), to check a closure's body as a function of its own.
 fn save_function() Void {
-    saved_marks.push(function_flags[0])
-    saved_marks.push(function_guards[0])
-    saved_marks.push(function_running[0])
+    saved_marks.push(function_flags)
+    saved_marks.push(function_guards)
+    saved_marks.push(function_running)
     begin_exit_flag()
-    saved_marks.push(function_defers[0])
-    function_defers[0] = defer_node.len()
+    saved_marks.push(function_defers)
+    function_defers = defer_node.len()
     saved_marks.push(saved_locals.len())
     for (0 ..< cur_locals.len()) |i| { saved_locals.push(cur_locals[i]) }
-    saved_marks.push(cur_params[0])
-    saved_marks.push(next_label[0])
+    saved_marks.push(cur_params)
+    saved_marks.push(next_label)
     saved_marks.push(hide_loops())
     cur_locals.clear()
-    next_label[0] = 0
+    next_label = 0
 }
 
 /// Set the loops aside, so that none is in reach; where they went in
@@ -447,17 +446,17 @@ fn restore_function() Void {
     let label = saved_marks[n - 2]
     let params = saved_marks[n - 3]
     let locals_at = saved_marks[n - 4]
-    function_defers[0] = saved_marks[n - 5]
-    function_running[0] = saved_marks[n - 6]
-    function_guards[0] = saved_marks[n - 7]
-    exit_flags.resize(function_flags[0])
-    function_flags[0] = saved_marks[n - 8]
+    function_defers = saved_marks[n - 5]
+    function_running = saved_marks[n - 6]
+    function_guards = saved_marks[n - 7]
+    exit_flags.resize(function_flags)
+    function_flags = saved_marks[n - 8]
     saved_marks.resize(n - 8)
     cur_locals.clear()
     for (locals_at ..< saved_locals.len()) |i| { cur_locals.push(saved_locals[i]) }
     saved_locals.resize(locals_at)
-    cur_params[0] = params
-    next_label[0] = label
+    cur_params = params
+    next_label = label
     show_loops(loops_at)
 }
 
@@ -571,7 +570,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
         decl_local[pd[k]] = new_local(repr(ptypes[k]))
         decl_ty[pd[k]] = ptypes[k]
     }
-    cur_params[0] = cur_locals.len()
+    cur_params = cur_locals.len()
     mark_boxes(body_node)
     let mbody = w_mark()
     // Prologue: the environment, cast; each capture from it (one alone is it).
@@ -593,10 +592,10 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     let boxed_params = box_params(types_list(pd, n), types_list(ptypes, n))
     if boxed_params >= 0 { w_push(boxed_params) }
     let lcx = Cx { inst: cx.inst, fi: cx.fi, result: if result >= 0 { result } else { -1 } }
-    let outer_body = body_block[0]
-    body_block[0] = body_node
+    let outer_body = body_block
+    body_block = body_node
     let actual = check_block(body_node, lcx.result, lcx)
-    body_block[0] = outer_body
+    body_block = outer_body
     // (A `return` in the body settled an unwritten result.)
     if result < 0 and lcx.result >= 0 {
         result = lcx.result
@@ -618,7 +617,7 @@ fn check_closure(node: I32, expect: I32, cx: Cx) I32 {
     func_debug_name[f] = name_add("closure")
     func_body[f] = w_pop()
     elide_tail_return(func_body[f], repr(result))
-    record_locals(f, cur_params[0])
+    record_locals(f, cur_params)
     restore_function()
     // The enclosing function's view of the captures again.
     for (0 ..< ncap) |k| {
@@ -702,7 +701,7 @@ fn closure_new() I32 {
     vl_add(vt_anyref)
     vl_add(vt_i32)
     vl_add(vt_externref)
-    closure_new_func[0] = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m4), vl_one(vt_externref)))
+    closure_new_func = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m4), vl_one(vt_externref)))
     let f = helper(ps, vl_one(vt_externref), vl_empty(), "closure.new")
     closure_parts[2] = f
     let rec = closure_record()
@@ -715,7 +714,7 @@ fn closure_new() I32 {
     w_get(vt_anyref, 1)
     w_node(Op.StructNew, vt_ref(rec, false), rec, 0, mr)
     w_node(Op.ExternConvertAny, vt_extern, 0, 0, mr)
-    w_node(Op.Call, vt_externref, closure_new_func[0], 0, mc)
+    w_node(Op.Call, vt_externref, closure_new_func, 0, mc)
     func_body[f] = w_pop()
     return f
 }
@@ -864,7 +863,7 @@ fn decay_fun(fun_t: I32, m: I32) Void {
 
 /// The closure imports the module has, for the host section.
 fn write_closure_json() Void {
-    let any = closure_new_func[0] >= 0 and func_live[closure_new_func[0]] == 1
+    let any = closure_new_func >= 0 and func_live[closure_new_func] == 1
     let calls = false
     let i = 1
     while (i < closure_calls.len()) {
@@ -1045,7 +1044,7 @@ fn fn_awaits(decl: I32) Bool {
 /// helper are left out.
 fn lean_closures() Void {
     // (With no call of a closure in utu, nothing reads the records, at any level.)
-    if (optimize_level[0] != 1 or await_types.len() > 0) and closure_invokers.len() > 0 { return }
+    if (optimize_level != 1 or await_types.len() > 0) and closure_invokers.len() > 0 { return }
     // (By function, once: a scan of the invokers at every call is slow.)
     lean_invoker.resize(func_kind.len())
     for (0 ..< func_kind.len()) |f| { lean_invoker[f] = 0 }
@@ -1063,7 +1062,7 @@ fn lean_closures() Void {
         vl_add(vt_anyref)
         vl_add(vt_i32)
         plain = add_import_func(name_add("utu"), name_add("closure_new"), func_type(vl_end(m), vl_one(vt_externref)))
-        closure_new_func[0] = plain
+        closure_new_func = plain
     }
     for (0 ..< func_kind.len()) |f| {
         if func_kind[f] == FuncKind.Defined.i32() and func_body[f] >= 0 and f != helper_ and not is_invoker(f) { retarget(func_body[f], helper_, plain) }

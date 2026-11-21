@@ -57,9 +57,9 @@ vec ti_at: I32
 // The template's header.
 
 /// 1 when the template is reactive (`@reactive;`, or an `@island`).
-vec tw_reactive: I32 = [0]
+let tw_reactive: I32 = 0
 /// `@island "name"`: the quoted name (a word), or -1.
-vec tw_scope: I32 = [-1]
+let tw_scope: I32 = -1
 /// `@style e;`: the sources (words), and their ranges.
 vec tw_style_value: I32
 vec tw_style_from: I32
@@ -68,10 +68,11 @@ vec tw_style_to: I32
 vec tw_global: I32
 
 /// The cursor: an offset in the template's text.
-vec wp_at: I32 = [0]
-/// Whether the element being parsed is SVG ([1]), and its children ([0]:
+let wp_at: I32 = 0
+/// Whether the element being parsed is SVG (@wp_svg_el), and its children (@wp_svg_kids:
 /// not a foreignObject's).
-vec wp_svg: I32 = [0, 0]
+let wp_svg_kids: I32 = 0
+let wp_svg_el: I32 = 0
 
 /// A syntax error in the template, at `offset` in its text.
 fn wutu_fail(message: Str, offset: I32) Void => dsl_fail(message, offset, 1)
@@ -104,14 +105,14 @@ fn reset_template() Void {
     ti_from.clear()
     ti_to.clear()
     ti_at.clear()
-    tw_reactive[0] = 0
-    tw_scope[0] = -1
+    tw_reactive = 0
+    tw_scope = -1
     tw_style_value.clear()
     tw_style_from.clear()
     tw_style_to.clear()
     tw_global.clear()
-    wp_svg[0] = 0
-    wp_svg[1] = 0
+    wp_svg_kids = 0
+    wp_svg_el = 0
 }
 
 fn new_tnode(kind: I32, start: I32) I32 {
@@ -460,15 +461,15 @@ fn css_value_runs_on(text: Str, from: I32, to: I32, custom: Bool) Void {
 
 //! = The parser
 
-fn wp_done(text: Str) Bool => wp_at[0] >= text.len()
+fn wp_done(text: Str) Bool => wp_at >= text.len()
 
-fn wp_char(text: Str) I32 => if wp_at[0] < text.len() { text.get(wp_at[0]) } else { -1 }
+fn wp_char(text: Str) I32 => if wp_at < text.len() { text.get(wp_at) } else { -1 }
 
-fn wp_at_text(text: Str, part: Str) Bool => text_at(text, wp_at[0], part)
+fn wp_at_text(text: Str, part: Str) Bool => text_at(text, wp_at, part)
 
 /// A word then whitespace at the cursor (`if `, `for `, `as `), not consumed.
 fn wp_keyword(text: Str, word: Str) Bool {
-    let i = wp_at[0]
+    let i = wp_at
     return text_at(text, i, word) and i + word.len() < text.len() and is_space_code(text.get(i + word.len()))
 }
 
@@ -478,11 +479,11 @@ fn wp_after_blank(text: Str, p: I32) Bool => p == 0 or is_space_code(text.get(p 
 
 /// Whitespace, `//` comments (first on a line or after a blank), and CSS comments.
 fn wp_trivia(text: Str) Void {
-    while (wp_at[0] < text.len()) {
-        let p = wp_at[0]
+    while (wp_at < text.len()) {
+        let p = wp_at
         let c = text.get(p)
         if is_space_code(c) {
-            wp_at[0] += 1
+            wp_at += 1
         } else if text_at(text, p, "//") and wp_after_blank(text, p) {
             wp_skip_line(text)
         } else if c == 35 and p + 1 < text.len() and (text.get(p + 1) == 32 or text.get(p + 1) == 9) {
@@ -490,7 +491,7 @@ fn wp_trivia(text: Str) Void {
         } else if text_at(text, p, "/*") {
             let end = text_index(text, "*/", p + 2)
             if end < 0 { wutu_fail("unterminated comment", p) }
-            wp_at[0] = end + 2
+            wp_at = end + 2
         } else {
             return
         }
@@ -498,21 +499,21 @@ fn wp_trivia(text: Str) Void {
 }
 
 fn wp_skip_line(text: Str) Void {
-    let end = text_index(text, "\n", wp_at[0])
-    wp_at[0] = if end < 0 { text.len() } else { end }
+    let end = text_index(text, "\n", wp_at)
+    wp_at = if end < 0 { text.len() } else { end }
 }
 
 /// A statement's end, as utu's: a line break, `;` (two on one line), the `}`
 /// closing its block, or the template's end. `;` is consumed; the rest stay.
 fn wp_end(text: Str) Void {
-    let statement_end = wp_at[0]
+    let statement_end = wp_at
     let i = line_rest(text, statement_end)
     if i >= text.len() or text.get(i) == 10 or text.get(i) == 125 {
-        wp_at[0] = i
+        wp_at = i
         return
     }
     if text.get(i) != 59 { wutu_fail("expected a line break or ; after Wutu statement", statement_end) }
-    wp_at[0] = i + 1
+    wp_at = i + 1
 }
 
 /// Past spaces, tabs, and comments from i, on its line: where its line break,
@@ -623,27 +624,27 @@ fn ends_at(text: Str, i: I32) Bool {
 
 /// A quoted string, CSS or Utu: a backslash escapes the character after it.
 fn wp_quoted(text: Str) Str {
-    let start = wp_at[0]
+    let start = wp_at
     let quote = text.get(start)
-    wp_at[0] += 1
-    while (wp_at[0] < text.len()) {
-        let c = text.get(wp_at[0])
+    wp_at += 1
+    while (wp_at < text.len()) {
+        let c = text.get(wp_at)
         if c == 92 {
-            wp_at[0] += 2
-        } else if quote == 96 and c == 36 and wp_at[0] + 1 < text.len() and text.get(wp_at[0] + 1) == 123 {
+            wp_at += 2
+        } else if quote == 96 and c == 36 and wp_at + 1 < text.len() and text.get(wp_at + 1) == 123 {
             // A template's `${ … }` holds an expression: strings and templates in it nest.
-            wp_at[0] += 2
+            wp_at += 2
             let depth = 1
-            while (wp_at[0] < text.len() and depth > 0) {
+            while (wp_at < text.len() and depth > 0) {
                 if not wp_opaque(text) {
-                    let d = text.get(wp_at[0])
+                    let d = text.get(wp_at)
                     if d == 123 { depth += 1 } else if d == 125 { depth -= 1 }
-                    wp_at[0] += 1
+                    wp_at += 1
                 }
             }
         } else {
-            wp_at[0] += 1
-            if c == quote { return text.slice(start, wp_at[0]) }
+            wp_at += 1
+            if c == quote { return text.slice(start, wp_at) }
         }
     }
     wutu_fail("unterminated string", start)
@@ -653,12 +654,12 @@ fn wp_quoted(text: Str) Str {
 /// Skip a Utu token whose contents are not delimiters: a nested DSL, a
 /// string, or a line comment. Whether it skipped one.
 fn wp_opaque(text: Str) Bool {
-    let p = wp_at[0]
+    let p = wp_at
     let c = text.get(p)
     if c == 64 {
         let end = skip_dsl(text, p)
         if end > p {
-            wp_at[0] = end
+            wp_at = end
             return true
         }
     } else if c == 34 or c == 96 {
@@ -703,26 +704,26 @@ fn skip_dsl(text: Str, start: I32) I32 {
 }
 
 /// An expression read: its source, and its range, here.
-vec wx_from: I32 = [0]
-vec wx_to: I32 = [0]
+let wx_from: I32 = 0
+let wx_to: I32 = 0
 
 /// `= expression`: up to the statement's end (see wp_end), the expression
 /// going on past a line break as utu's does (see wp_continues).
 fn wp_bare_expression(text: Str) Str {
     wp_trivia(text)
-    let start = wp_at[0]
+    let start = wp_at
     let depth = 0
     // Its last character (not a comment's), and whether that ends a string or DSL.
     let last = -1
     let opaque = false
     while (not wp_done(text)) {
-        let p = wp_at[0]
+        let p = wp_at
         let c = text.get(p)
         if depth == 0 and (c == 59 or c == 125 or (c == 10 and not wp_continues(text, last, opaque, p))) { break }
         let comment = text_at(text, p, "//")
         if wp_opaque(text) {
             if not comment {
-                last = wp_at[0] - 1
+                last = wp_at - 1
                 opaque = true
             }
         } else {
@@ -735,13 +736,13 @@ fn wp_bare_expression(text: Str) Str {
                 last = p
                 opaque = false
             }
-            wp_at[0] += 1
+            wp_at += 1
         }
     }
     if depth > 0 { wutu_fail("unterminated expression", start) }
-    wx_from[0] = start
-    wx_to[0] = if last < 0 { start } else { last + 1 }
-    return text.slice(start, wx_to[0])
+    wx_from = start
+    wx_to = if last < 0 { start } else { last + 1 }
+    return text.slice(start, wx_to)
 }
 
 /// `$[expression]`.
@@ -751,24 +752,24 @@ fn wp_bare_expression(text: Str) Str {
 fn wp_expression_until(text: Str, ends: Str, what: Str) Str {
     wp_trivia(text)
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-    let start = wp_at[0]
+    let start = wp_at
     let depth = 0
     while (not wp_done(text)) {
         if not wp_opaque(text) {
-            let c = text.get(wp_at[0])
+            let c = text.get(wp_at)
             if depth == 0 and text_index(ends, Str.from_code_point(c), 0) >= 0 {
-                let source = trim_end(text.slice(start, wp_at[0]))
-                if source.len() == 0 { wutu_fail("expected " + what, wp_at[0]) }
-                wx_from[0] = start
-                wx_to[0] = start + source.len()
+                let source = trim_end(text.slice(start, wp_at))
+                if source.len() == 0 { wutu_fail("expected " + what, wp_at) }
+                wx_from = start
+                wx_to = start + source.len()
                 return source
             }
             if c == 40 or c == 91 or c == 123 { depth += 1 }
             else if c == 41 or c == 93 or c == 125 {
-                if depth == 0 { wutu_fail("expected " + what, wp_at[0]) }
+                if depth == 0 { wutu_fail("expected " + what, wp_at) }
                 depth -= 1
             }
-            wp_at[0] += 1
+            wp_at += 1
         }
     }
     wutu_fail("unterminated " + what, start)
@@ -806,32 +807,32 @@ fn unparenthesized(source: Str) Str {
         i += 1
     }
     if last.len() == 0 or in_words("fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect", last) { return source }
-    wx_from[0] += 1
-    wx_to[0] -= 1
+    wx_from += 1
+    wx_to -= 1
     return trim_text(source.slice(1, n - 1))
 }
 
 fn wp_fail_interpolation(text: Str) Void {
-    wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)", wp_at[0])
+    wutu_fail("Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)", wp_at)
 }
 
 /// A brace-delimited Utu block, with its braces.
 fn wp_utu_block(text: Str, context: Str) Str {
-    let start = wp_at[0]
+    let start = wp_at
     let depth = 0
     let first = true
     while (first or (not wp_done(text) and depth > 0)) {
         first = false
         if not wp_opaque(text) {
-            let c = text.get(wp_at[0])
+            let c = text.get(wp_at)
             if c == 123 { depth += 1 } else if c == 125 { depth -= 1 }
-            wp_at[0] += 1
+            wp_at += 1
         }
     }
     if depth != 0 { wutu_fail("unterminated " + context, start) }
-    wx_from[0] = start
-    wx_to[0] = wp_at[0]
-    return text.slice(start, wp_at[0])
+    wx_from = start
+    wx_to = wp_at
+    return text.slice(start, wp_at)
 }
 
 //! = CSS
@@ -841,36 +842,36 @@ fn wp_utu_block(text: Str, context: Str) Str {
 /// `lines`, or a line break there, unless the line ends in `,` or the next is
 /// indented past this one (`grid-template-areas: "a b"`, then `"c d"` under it).
 fn wp_css_until(text: Str, delimiters: Str, lines: Bool) Str {
-    let start = wp_at[0]
+    let start = wp_at
     let indent = indent_at(text, start)
     let depth = 0
     let last = -1
     // Past its last character (a trailing `//` comment is not the value's).
     let end_at = start
     while (not wp_done(text)) {
-        let c = text.get(wp_at[0])
+        let c = text.get(wp_at)
         if c == 34 or c == 39 {
             wp_quoted(text)
             last = c
-            end_at = wp_at[0]
+            end_at = wp_at
         } else if wp_at_text(text, "/*") {
-            let end = text_index(text, "*/", wp_at[0] + 2)
-            if end < 0 { wutu_fail("unterminated comment", wp_at[0]) }
-            wp_at[0] = end + 2
-        } else if lines and depth == 0 and text_at(text, wp_at[0], "//") and wp_after_blank(text, wp_at[0]) {
+            let end = text_index(text, "*/", wp_at + 2)
+            if end < 0 { wutu_fail("unterminated comment", wp_at) }
+            wp_at = end + 2
+        } else if lines and depth == 0 and text_at(text, wp_at, "//") and wp_after_blank(text, wp_at) {
             wp_skip_line(text)
         } else {
             if depth == 0 and text_index(delimiters, Str.from_code_point(c), 0) >= 0 { break }
-            if lines and depth == 0 and c == 10 and last >= 0 and last != 44 and indent_at(text, next_token(text, wp_at[0])) <= indent { break }
+            if lines and depth == 0 and c == 10 and last >= 0 and last != 44 and indent_at(text, next_token(text, wp_at)) <= indent { break }
             if c == 40 or c == 91 or c == 123 { depth += 1 } else if c == 41 or c == 93 or c == 125 { depth -= 1 }
-            wp_at[0] += 1
+            wp_at += 1
             if not is_space_code(c) {
                 last = c
-                end_at = wp_at[0]
+                end_at = wp_at
             }
         }
     }
-    return trim_text(text.slice(start, if lines { end_at } else { wp_at[0] }))
+    return trim_text(text.slice(start, if lines { end_at } else { wp_at }))
 }
 
 /// A `{ … }` CSS block's body (the cursor on its brace), without its `//`
@@ -878,24 +879,24 @@ fn wp_css_until(text: Str, delimiters: Str, lines: Bool) Str {
 /// on a line or after a blank, outside parentheses), and with the `;` CSS
 /// needs where a declaration's line ends (one ending in `,` goes on).
 fn wp_css_block(text: Str) Str {
-    let open = wp_at[0]
-    wp_at[0] += 1
-    let start = wp_at[0]
+    let open = wp_at
+    wp_at += 1
+    let start = wp_at
     let body = ""
     let depth = 1
     let parens = 0
     // The last character outside comments, strings counting as their quote.
     let last = 59
     while (not wp_done(text)) {
-        let p = wp_at[0]
+        let p = wp_at
         if wp_at_text(text, "/*") {
             let end = text_index(text, "*/", p + 2)
             if end < 0 { wutu_fail("unterminated CSS comment", p) }
-            wp_at[0] = end + 2
+            wp_at = end + 2
         } else if text_at(text, p, "//") and parens == 0 and wp_after_blank(text, p) {
             body = body + text.slice(start, p)
             wp_skip_line(text)
-            start = wp_at[0]
+            start = wp_at
         } else {
             let c = text.get(p)
             if c == 34 or c == 39 {
@@ -914,12 +915,12 @@ fn wp_css_block(text: Str) Str {
                     depth -= 1
                     if depth == 0 {
                         let block = body + text.slice(start, p)
-                        wp_at[0] += 1
+                        wp_at += 1
                         return block
                     }
                 }
                 if not is_space_code(c) { last = c }
-                wp_at[0] += 1
+                wp_at += 1
             }
         }
     }
@@ -932,31 +933,31 @@ fn wp_css_block(text: Str) Str {
 /// The template; returns its single element or a synthetic fragment.
 fn parse_template(text: Str) I32 {
     reset_template()
-    wp_at[0] = 0
+    wp_at = 0
     wp_trivia(text)
     if wp_at_text(text, "@reactive") {
-        wp_at[0] += 9
+        wp_at += 9
         wp_end(text)
-        tw_reactive[0] = 1
+        tw_reactive = 1
         wp_trivia(text)
     }
     if wp_at_text(text, "@island") {
-        wp_at[0] += 7
+        wp_at += 7
         wp_trivia(text)
-        if wp_char(text) != 34 { wutu_fail("expected a quoted island name: @island \"name\"", wp_at[0]) }
-        tw_scope[0] = intern_text(wp_quoted(text))
+        if wp_char(text) != 34 { wutu_fail("expected a quoted island name: @island \"name\"", wp_at) }
+        tw_scope = intern_text(wp_quoted(text))
         wp_end(text)
-        tw_reactive[0] = 1
+        tw_reactive = 1
         wp_trivia(text)
     }
     while (wp_at_text(text, "@style")) {
-        wp_at[0] += 6
+        wp_at += 6
         wp_trivia(text)
         if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e", wp_at[0]) }
+        if wp_char(text) == 61 { wutu_fail("@style takes one expression, not an assignment: @style e", wp_at) }
         let source = wp_bare_expression(text)
-        let from = wx_from[0]
-        let to = wx_to[0]
+        let from = wx_from
+        let to = wx_to
         wp_end(text)
         tw_style_value.push(intern_text(source))
         tw_style_from.push(from)
@@ -964,17 +965,17 @@ fn parse_template(text: Str) I32 {
         wp_trivia(text)
     }
     while (wp_at_text(text, "@document")) {
-        wp_at[0] += 9
+        wp_at += 9
         wp_trivia(text)
-        if wp_char(text) != 123 { wutu_fail("expected document CSS block", wp_at[0]) }
+        if wp_char(text) != 123 { wutu_fail("expected document CSS block", wp_at) }
         tw_global.push(intern_text(wp_css_block(text)))
         wp_trivia(text)
     }
-    if wp_char(text) == 64 { at_directive(text, wp_at[0], false) }
-    let fragment = new_tnode(5, wp_at[0])
+    if wp_char(text) == 64 { at_directive(text, wp_at, false) }
+    let fragment = new_tnode(5, wp_at)
     let last = -1
     while (not wp_done(text)) {
-        if wp_char(text) == 59 { wp_at[0] += 1; wp_trivia(text); continue }
+        if wp_char(text) == 59 { wp_at += 1; wp_trivia(text); continue }
         let child = parse_tnode(text)
         tn_parent[child] = fragment
         if last < 0 { tn_first[fragment] = child } else { tn_next[last] = child }
@@ -984,7 +985,7 @@ fn parse_template(text: Str) I32 {
     let first = tn_first[fragment]
     if first >= 0 and tn_next[first] < 0 and tn_kind[first] == 4 {
         tn_parent[first] = -1
-        if word_text(tn_text[first]) == "html" { tw_reactive[0] = 1 }
+        if word_text(tn_text[first]) == "html" { tw_reactive = 1 }
         return first
     }
     return fragment
@@ -993,7 +994,7 @@ fn parse_template(text: Str) I32 {
 /// Text, an expression, if, for, or an element.
 fn parse_tnode(text: Str) I32 {
     wp_trivia(text)
-    let start = wp_at[0]
+    let start = wp_at
     if wp_char(text) == 34 {
         let expr = wp_quoted(text)
         wp_end(text)
@@ -1004,10 +1005,10 @@ fn parse_tnode(text: Str) I32 {
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
     if wp_char(text) == 61 or wp_char(text) == 124 {
         let code = wp_at_text(text, "|>")
-        wp_at[0] += if code { 2 } else { 1 }
+        wp_at += if code { 2 } else { 1 }
         let source = wp_bare_expression(text)
-        let from = wx_from[0]
-        let to = wx_to[0]
+        let from = wx_from
+        let to = wx_to
         wp_end(text)
         let n = new_tnode(1, start)
         tn_text[n] = intern_text(source)
@@ -1023,18 +1024,18 @@ fn parse_tnode(text: Str) I32 {
 /// `{ nodes }`, into node n's children (or its otherwise).
 fn parse_branch(text: Str, n: I32, otherwise: Bool) Void {
     wp_trivia(text)
-    let open = wp_at[0]
-    if wp_char(text) != 123 { wutu_fail("expected {", wp_at[0]) }
-    wp_at[0] += 1
+    let open = wp_at
+    if wp_char(text) != 123 { wutu_fail("expected {", wp_at) }
+    wp_at += 1
     while (true) {
         wp_trivia(text)
         if wp_done(text) { wutu_fail("unterminated branch", open) }
         if wp_char(text) == 125 {
-            wp_at[0] += 1
+            wp_at += 1
             return
         }
         if wp_char(text) == 59 {
-            wp_at[0] += 1
+            wp_at += 1
             continue
         }
         let c = parse_tnode(text)
@@ -1045,28 +1046,28 @@ fn parse_branch(text: Str, n: I32, otherwise: Bool) Void {
 
 /// `if e { … } else { … }`, the cursor on `if`.
 fn parse_tif(text: Str) I32 {
-    let start = wp_at[0]
-    wp_at[0] += 2
+    let start = wp_at
+    wp_at += 2
     let condition = wp_expression_until(text, "{", "a condition before {")
     let n = new_tnode(2, start)
     tn_text[n] = intern_text(condition)
-    tn_from[n] = wx_from[0]
-    tn_to[n] = wx_to[0]
+    tn_from[n] = wx_from
+    tn_to[n] = wx_to
     parse_branch(text, n, false)
     wp_trivia(text)
-    let p = wp_at[0]
+    let p = wp_at
     if text_at(text, p, "else") {
         let i = p + 4
         let gap = i
         i = skip_spaces(text, i)
         if i > gap and text_at(text, i, "if") and i + 2 < text.len() and is_space_code(text.get(i + 2)) {
-            wp_at[0] = p + 4
+            wp_at = p + 4
             wp_trivia(text)
             let inner = parse_tif(text)
             tn_parent[inner] = n
             tn_else[n] = inner
         } else if i < text.len() and text.get(i) == 123 {
-            wp_at[0] = p + 4
+            wp_at = p + 4
             parse_branch(text, n, true)
         }
     }
@@ -1075,32 +1076,32 @@ fn parse_tif(text: Str) I32 {
 
 /// `for e |x| { … }`, the cursor on `for`.
 fn parse_tfor(text: Str) I32 {
-    let start = wp_at[0]
-    wp_at[0] += 3
+    let start = wp_at
+    wp_at += 3
     // (The loop's body joins the iterable's pipeline: parentheses that only
     // hide its own `|…|` go.)
     let iterable = unparenthesized(wp_expression_until(text, "|", "what to iterate, then |item|"))
     let n = new_tnode(3, start)
     tn_text[n] = intern_text(iterable)
-    tn_from[n] = wx_from[0]
-    tn_to[n] = wx_to[0]
+    tn_from[n] = wx_from
+    tn_to[n] = wx_to
     wp_trivia(text)
     // |item| or |item, index|
     let captures = wp_captures(text)
-    if captures.len() == 0 { wutu_fail("expected |item| or |item, index| after iterable", wp_at[0]) }
+    if captures.len() == 0 { wutu_fail("expected |item| or |item, index| after iterable", wp_at) }
     tn_captures[n] = intern_text(captures)
     wp_trivia(text)
     if wp_keyword(text, "key") {
-        wp_at[0] += 3
+        wp_at += 3
         wp_trivia(text)
         if wp_keyword(text, "global") {
-            wp_at[0] += 6
+            wp_at += 6
             wp_trivia(text)
             tn_global[n] = 1
         }
         tn_key[n] = intern_text(wp_expression_until(text, "{", "a key before {"))
-        tn_key_from[n] = wx_from[0]
-        tn_key_to[n] = wx_to[0]
+        tn_key_from[n] = wx_from
+        tn_key_to[n] = wx_to
     }
     parse_branch(text, n, false)
     return n
@@ -1108,7 +1109,7 @@ fn parse_tfor(text: Str) I32 {
 
 /// `|a|` or `|a, b|` at the cursor: "a" or "a, b" as written (consumed), or "".
 fn wp_captures(text: Str) Str {
-    let p = wp_at[0]
+    let p = wp_at
     if wp_char(text) != 124 { return "" }
     let i = skip_spaces(text, p + 1)
     let from = i
@@ -1125,67 +1126,67 @@ fn wp_captures(text: Str) Str {
     let to = i
     i = skip_spaces(text, i)
     if i >= text.len() or text.get(i) != 124 { return "" }
-    wp_at[0] = i + 1
+    wp_at = i + 1
     return text.slice(from, to)
 }
 
 /// An element: its tag, classes, and `as` alias, then a `{ … }` body or `;`.
 fn parse_telement(text: Str) I32 {
-    let start = wp_at[0]
+    let start = wp_at
     let p = start
     if p >= text.len() or not is_lower_code(text.get(p)) { wutu_fail("expected an HTML tag (class-only heads do not create elements)", p) }
     let q = p
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let tag = text.slice(p, q)
-    let outer = wp_svg[0]
-    let outer_el = wp_svg[1]
+    let outer = wp_svg_kids
+    let outer_el = wp_svg_el
     if outer == 0 and not is_known_tag(tag) { wutu_fail("expected an HTML tag, found unknown element '" + tag + "' (custom element names need a hyphen)", p) }
-    wp_at[0] = q
+    wp_at = q
     let n = new_tnode(4, start)
     tn_text[n] = intern_text(tag)
     while (wp_char(text) == 46 or wp_char(text) == 35) {
         let shorthand = wp_char(text)
-        wp_at[0] += 1
-        let a = wp_at[0]
+        wp_at += 1
+        let a = wp_at
         let b = a
         while (b < text.len() and is_name_code(text.get(b))) { b += 1 }
         if b == a { wutu_fail("expected class or id", a) }
         let name = text.slice(a, b)
-        wp_at[0] = b
+        wp_at = b
         if shorthand == 46 { add_item(n, 0, intern_text(name), -1, 0, -1, -1, a) }
         else {
             if has_attribute_item(n, "id") { wutu_fail("an element has one id; #" + name + " is a second", a - 1) }
-            add_item(n, 1, intern_text("id"), intern_text(js_string(name)), 0, -1, -1, wp_at[0])
+            add_item(n, 1, intern_text("id"), intern_text(js_string(name)), 0, -1, -1, wp_at)
         }
     }
     wp_trivia(text)
     if wp_keyword(text, "as") {
-        wp_at[0] += 2
+        wp_at += 2
         wp_trivia(text)
-        let a = wp_at[0]
+        let a = wp_at
         if a >= text.len() or not (is_lower_code(text.get(a)) or text.get(a) == 95) { wutu_fail("expected node binding", a) }
         let b = a
         while (b < text.len() and is_word_code(text.get(b))) { b += 1 }
         tn_binding[n] = intern_text(text.slice(a, b))
-        wp_at[0] = b
+        wp_at = b
         wp_trivia(text)
     }
-    if wp_char(text) != 123 { wutu_fail("expected { after element head", wp_at[0]) }
-    wp_at[0] += 1
+    if wp_char(text) != 123 { wutu_fail("expected { after element head", wp_at) }
+    wp_at += 1
     let svg = outer == 1 or is_svg_tag(tag) and not is_html_tag(tag)
-    wp_svg[1] = if svg { 1 } else { 0 }
-    wp_svg[0] = if svg and tag != "foreignObject" { 1 } else { 0 }
+    wp_svg_el = if svg { 1 } else { 0 }
+    wp_svg_kids = if svg and tag != "foreignObject" { 1 } else { 0 }
     while (true) {
         wp_trivia(text)
         if wp_done(text) { wutu_fail("unterminated element '" + tag + "'", start) }
         if wp_char(text) == 125 {
-            wp_at[0] += 1
+            wp_at += 1
             break
         }
         parse_element_statement(text, n)
     }
-    wp_svg[0] = outer
-    wp_svg[1] = outer_el
+    wp_svg_kids = outer
+    wp_svg_el = outer_el
     if is_void_tag(tag) and tn_first[n] >= 0 { wutu_fail(tag + " cannot have children", start) }
     if tag == "script" or is_raw_text_tag(tag) {
         let c = tn_first[n]
@@ -1234,10 +1235,10 @@ fn add_child(n: I32, c: I32) Void {
 
 /// One statement of an element's body: an item, a CSS rule, or a child node.
 fn parse_element_statement(text: Str, n: I32) Void {
-    let p = wp_at[0]
+    let p = wp_at
     let c = text.get(p)
     if c == 59 {
-        wp_at[0] += 1
+        wp_at += 1
         return
     }
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
@@ -1256,10 +1257,10 @@ fn parse_element_statement(text: Str, n: I32) Void {
         if property.len() > 0 {
             let r = skip_spaces(text, q + property.len())
             if r < text.len() and text.get(r) == 61 {
-                wp_at[0] = r + 1
+                wp_at = r + 1
                 let source = wp_bare_expression(text)
-                let from = wx_from[0]
-                let to = wx_to[0]
+                let from = wx_from
+                let to = wx_to
                 wp_end(text)
                 add_item(n, 3, intern_text(property), intern_text(source), 0, from, to, p)
                 return
@@ -1292,17 +1293,17 @@ fn parse_element_statement(text: Str, n: I32) Void {
             let flags = if quiet { 4 } else { 0 }
             if text.get(r) == 61 {
                 if param >= 0 { wutu_fail("a handler value names its own parameter: on click = cl(e) Void { … }", r) }
-                wp_at[0] = r + 1
+                wp_at = r + 1
                 let source = wp_bare_expression(text)
-                let from = wx_from[0]
-                let to = wx_to[0]
+                let from = wx_from
+                let to = wx_to
                 wp_end(text)
                 add_item(n, 2, intern_text(name), intern_text(source), flags, from, to, p)
                 return
             }
-            wp_at[0] = r
+            wp_at = r
             let source = wp_utu_block(text, "event handler")
-            let i = add_item(n, 2, intern_text(name), intern_text(source), 1 + flags, wx_from[0], wx_to[0], p)
+            let i = add_item(n, 2, intern_text(name), intern_text(source), 1 + flags, wx_from, wx_to, p)
             ti_c[i] = param
             return
         }
@@ -1313,9 +1314,9 @@ fn parse_element_statement(text: Str, n: I32) Void {
     if text_at(text, p, "@unmanaged") and not (p + 10 < text.len() and is_name_code(text.get(p + 10))) {
         let r = line_rest(text, p + 10)
         if r >= text.len() or text.get(r) == 10 or text.get(r) == 59 or text.get(r) == 125 {
-            wp_at[0] = p + 10
+            wp_at = p + 10
             wp_end(text)
-            add_item(n, 1, intern_text("data-wutu-unmanaged"), intern_text("\"\""), 0, -1, -1, wp_at[0])
+            add_item(n, 1, intern_text("data-wutu-unmanaged"), intern_text("\"\""), 0, -1, -1, wp_at)
             return
         }
     }
@@ -1327,7 +1328,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
         wutu_fail("events are written on " + name + " = handler (or on " + name + " { … })", p)
     }
     if c == 46 and assignment_head(text, p + 1, true) {
-        wp_at[0] += 1
+        wp_at += 1
         parse_attribute(text, n, true)
         return
     }
@@ -1489,27 +1490,27 @@ fn is_event_name(w: Str) Bool => in_words(dom_events(), w)
 /// the cursor is on the name. A value that is one string literal is written
 /// into the element; anything else is an expression.
 fn parse_attribute(text: Str, n: I32, is_property: Bool) Void {
-    let name_start = wp_at[0]
+    let name_start = wp_at
     let q = if is_property or namespace_prefix(text, name_start) == 0 { name_start } else { namespace_prefix(text, name_start) }
     while (q < text.len() and is_name_code(text.get(q))) { q += 1 }
     let name = text.slice(name_start, q)
-    wp_at[0] = line_rest(text, q)
+    wp_at = line_rest(text, q)
     let value = "\"\""
     let dynamic = false
     let from = -1
     let to = -1
     if wp_char(text) == 61 {
-        wp_at[0] += 1
+        wp_at += 1
         wp_trivia(text)
         if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-        if literal_value(text, wp_at[0]) {
+        if literal_value(text, wp_at) {
             value = wp_quoted(text)
         } else {
-            literal_then_name(text, wp_at[0])
+            literal_then_name(text, wp_at)
             value = wp_bare_expression(text)
             dynamic = true
-            from = wx_from[0]
-            to = wx_to[0]
+            from = wx_from
+            to = wx_to
         }
     } else if is_property {
         wutu_fail("a property takes a value: .name = value", name_start)
@@ -1522,7 +1523,7 @@ fn parse_attribute(text: Str, n: I32, is_property: Bool) Void {
     if dynamic and is_property and name == "protocol" { wutu_fail(".protocol from a value could make a URL javascript:, past the URL check; set the whole URL: .href = url;", name_start) }
     if dynamic and is_property and is_raw_text_tag(tag) and in_words("textContent innerText", name) { wutu_fail(raw_text_error(tag), name_start) }
     if dynamic and name == "srcdoc" { wutu_fail("srcdoc is HTML, so Wutu sets it only as written: srcdoc = \"…\" (trusted HTML from a value: an `as` element's .srcdoc, in code)", name_start) }
-    if not is_property and not is_allowed_attribute(tag, name, wp_svg[1] == 1) { wutu_fail("unknown attribute " + name + " on " + tag, name_start) }
+    if not is_property and not is_allowed_attribute(tag, name, wp_svg_el == 1) { wutu_fail("unknown attribute " + name + " on " + tag, name_start) }
     if name != "class" and has_item_named(n, name, is_property) { wutu_fail((if is_property { "." + name + " is assigned twice on this element" } else { "an element has one " + name + "; this is a second" }), name_start) }
     add_item(n, 1, intern_text(name), intern_text(value), (if is_property { 1 } else { 0 }) + (if dynamic { 2 } else { 0 }), from, to, name_start)
 }
@@ -1543,12 +1544,12 @@ fn parse_css_rule(text: Str, n: I32) Void {
     if wp_char(text) != 123 {
         // A statement (`@import …`): up to its line's end or `;`.
         wp_end(text)
-        let i = add_item(n, 4, -1, intern_text(selector + ";"), 0, -1, -1, wp_at[0])
+        let i = add_item(n, 4, -1, intern_text(selector + ";"), 0, -1, -1, wp_at)
         ti_c[i] = intern_text(selector + ";")
         return
     }
     let block = wp_css_block(text)
-    let i = add_item(n, 4, -1, intern_text(selector + "{" + block + "}"), 0, -1, -1, wp_at[0])
+    let i = add_item(n, 4, -1, intern_text(selector + "{" + block + "}"), 0, -1, -1, wp_at)
     ti_c[i] = intern_text(scoped_selector(selector) + "{" + block + "}")
 }
 
@@ -1566,34 +1567,34 @@ fn scoped_selector(selector: Str) Str {
 
 /// `property: value;` in an element's body, or else a child element.
 fn parse_declaration_or_child(text: Str, n: I32) Void {
-    let start = wp_at[0]
+    let start = wp_at
     let head = wp_css_until(text, ":{};", false)
     if wp_char(text) != 58 {
-        wp_at[0] = start
+        wp_at = start
         add_child(n, parse_telement(text))
         return
     }
-    wp_at[0] += 1
+    wp_at += 1
     wp_trivia(text)
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
     if wp_char(text) == 61 or wp_char(text) == 123 {
         // A leading block is Utu, including for custom properties.
         // Keep the legacy `: = expression` spelling as well.
         let block = wp_char(text) == 123
-        if not block { wp_at[0] += 1 }
+        if not block { wp_at += 1 }
         let source = if block { wp_utu_block(text, "computed CSS value") } else { wp_bare_expression(text) }
-        let from = wx_from[0]
-        let to = wx_to[0]
+        let from = wx_from
+        let to = wx_to
         wp_end(text)
         css_property_known(head, start)
         add_item(n, 5, intern_text(head), intern_text(source), 0, from, to, start)
         return
     }
-    let value_from = wp_at[0]
+    let value_from = wp_at
     let custom = text_at(head, 0, "--")
     let value = wp_css_until(text, if custom { ";}" } else { ";{}" }, true)
-    css_value_runs_on(text, value_from, wp_at[0], custom)
-    if wp_char(text) == 123 { wutu_fail("expected a line break or ; after a CSS declaration", wp_at[0]) }
+    css_value_runs_on(text, value_from, wp_at, custom)
+    if wp_char(text) == 123 { wutu_fail("expected a line break or ; after a CSS declaration", wp_at) }
     wp_end(text)
     css_property_known(head, start)
     let declaration = head + ":" + value + ";"

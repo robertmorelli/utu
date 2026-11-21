@@ -63,10 +63,10 @@ vec import_target: I32
 /// The import the host could not read, which ends the build (as in stage
 /// 0), or -1; why (0: no file, 1: it closes an import cycle, 2: no such
 /// platform module); and the path the host looked for, a span of `src`.
-vec missing_import: I32 = [-1]
-vec missing_why: I32 = [0]
-vec missing_start: I32 = [0]
-vec missing_end: I32 = [0]
+let missing_import: I32 = -1
+let missing_why: I32 = 0
+let missing_start: I32 = 0
+let missing_end: I32 = 0
 
 /// What the host sealed (see @seal) besides host declarations:
 /// the standard library's prelude, parsed. Its words, tokens, nodes, files,
@@ -75,10 +75,10 @@ vec kept: I32 = [0, 0, 0, 0, 0, 0]
 
 /// Keep nothing for the programs that follow.
 fn unseal() Void {
-    abi_kept[0] = 0
+    abi_kept = 0
     for (0 ..< kept.len()) |k| { kept[k] = 0 }
-    kept_reactive[0] = -1
-    known_kept[0] = 0
+    kept_reactive = -1
+    known_kept = 0
 }
 
 /// Forget every file, and start a program. What the host has sealed stays,
@@ -86,20 +86,20 @@ fn unseal() Void {
 /// documents at the same offsets, so their indexes still hold; the prelude's
 /// files are the same tokens and nodes, its words the same ids.
 fn reset_program() Void {
-    missing_import[0] = -1
-    if abi_kept[0] > 0 {
+    missing_import = -1
+    if abi_kept > 0 {
         for (0 ..< view_import.len()) |v| { view_import[v] = -1 }
     } else {
         reset_abi()
     }
     dsl_failed.clear()
-    jp_serial[0] = 0
+    jp_serial = 0
     jp_prev_container.clear()
     jp_prev_names.clear()
     jp_pin_word.clear()
     jp_pin_name.clear()
-    st_serial[0] = 0
-    dsl_cursor[0] = -1
+    st_serial = 0
+    dsl_cursor_site = -1
     splice_start.clear()
     splice_end.clear()
     splice_code.clear()
@@ -108,7 +108,7 @@ fn reset_program() Void {
     splice_rename_k.clear()
     splice_rename_at.clear()
     splice_rename_to.clear()
-    wu_serial[0] = 0
+    wu_serial = 0
     dsl_file_site.clear()
     reset_wat()
     if kept[0] > 0 { intern_kept() } else {
@@ -142,7 +142,7 @@ fn reset_program() Void {
     dsl_sites.resize(kept[5])
     reset_resolve()
     // Words are interned anew for each program; kept views spell theirs again.
-    if abi_kept[0] > 0 {
+    if abi_kept > 0 {
         for (0 ..< view_prefix.len()) |v| {
             let p = jget(view_json[v], "prefix")
             view_prefix[v] = if p >= 0 { jstring_word(p) } else { -1 }
@@ -160,7 +160,7 @@ fn intern_kept() Void {
         starts[w] = src.interned_start(w)
         ends[w] = starts[w] + src.interned_size(w)
     }
-    src.resize(abi_kept[0])
+    src.resize(abi_kept)
     src.intern_reset()
     for (0 ..< n) |w| { src.intern(starts[w], ends[w]) }
 }
@@ -220,8 +220,8 @@ fn parse_file(file: I32) I32 {
     let root = parse(first, last)
     file_root[file] = root
     if root >= 0 { list_imports(file, root) } else {
-        file_error[file] = parse_error_at[0]
-        file_wanted[file] = parse_error_wanted[0]
+        file_error[file] = parse_error_at
+        file_wanted[file] = parse_error_wanted
     }
     return root
 }

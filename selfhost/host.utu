@@ -55,11 +55,11 @@ vec wat_message_end: I32
 /// And where it is in the text (UTF-16 offsets).
 vec wat_from: I32
 vec wat_to: I32
-vec wat_found: I32 = [0]
+let wat_found: I32 = 0
 export mem wat_bytes: U8
 
 fn reset_wat() Void {
-    wat_found[0] = 0
+    wat_found = 0
     wat_site.clear()
     wat_start.clear()
     wat_len.clear()
@@ -74,8 +74,8 @@ fn is_wat(node: I32) Bool => is_kind(node, Node.Dsl_expr) and word_of(first_chil
 
 /// Finds the program's `@wat` functions' sites (once). Returns how many.
 fn find_wat() I32 {
-    if wat_found[0] == 1 { return wat_site.len() }
-    wat_found[0] = 1
+    if wat_found == 1 { return wat_site.len() }
+    wat_found = 1
     intern_known()
     for (0 ..< dsl_sites.len()) |k| {
         let n = dsl_sites[k]
@@ -368,7 +368,7 @@ fn closure_bits(params: I32, result: I32) I32 {
         let c = 46
         if ty_is(p, Ty.Nullable) { c = 110 }
         else if unsigned_view(p) == prelude(Prelude.Bool) { c = 98 }
-        else if safe_checks[0] == 1 and js_handle(p) { c = 104 }
+        else if safe_checks == 1 and js_handle(p) { c = 104 }
         closure_sigs.push(c)
     }
     while (closure_sigs.len() > start and closure_sigs[closure_sigs.len() - 1] == 46) { closure_sigs.resize(closure_sigs.len() - 1) }
@@ -531,7 +531,7 @@ fn is_space(c: I32) Bool => c == 32 or c == 10 or c == 9 or c == 13
 /// Writes the host section for what the module imports (after the sweep):
 /// `host_json`, empty when there is nothing to say.
 fn write_host_json() Void {
-    if optimize_level[0] != 0 { number_es_imports() }
+    if optimize_level != 0 { number_es_imports() }
     host_json.clear()
     json_byte(123)
     json_part(0)
@@ -701,7 +701,7 @@ fn js_param_kind(t: I32) Str {
         let k = closure_param_kind(t)
         if k.len() > 0 { return k }
     }
-    if safe_checks[0] != 1 { return "" }
+    if safe_checks != 1 { return "" }
     if t == prelude(Prelude.Str) { return "Str" }
     if ty_is(t, Ty.Nullable) { return if ty_a[t] == prelude(Prelude.Str) { "?Str" } else { "?" } }
     let vt = repr(t)

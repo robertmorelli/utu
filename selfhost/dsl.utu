@@ -164,9 +164,9 @@ fn dsl_body(site: I32) Str => bytes_text(dsl_inner_start(site), dsl_inner_end(si
 //! start, and a length); expanding stops there, and it is reported.
 
 /// A word.
-vec dsl_err_message: I32 = [-1]
-vec dsl_err_offset: I32 = [0]
-vec dsl_err_length: I32 = [0]
+let dsl_err_message: I32 = -1
+let dsl_err_offset: I32 = 0
+let dsl_err_length: I32 = 0
 
 let dsl_throw: fun() Void = @es/\ () => { throw new SyntaxError('utu dsl'); } \/
 
@@ -174,53 +174,55 @@ let dsl_throw: fun() Void = @es/\ () => { throw new SyntaxError('utu dsl'); } \/
 /// `length` long. It throws, and the expansion's `catch` reports it
 /// (@report_dsl_error) and leaves the site as it is.
 fn dsl_fail(message: Str, offset: I32, length: I32) Void {
-    dsl_err_message[0] = intern_text(message)
-    dsl_err_offset[0] = offset
-    dsl_err_length[0] = length
+    dsl_err_message = intern_text(message)
+    dsl_err_offset = offset
+    dsl_err_length = length
     dsl_throw()
 }
 
 fn report_dsl_error(site: I32) Void {
-    let start = dsl_byte(site, dsl_err_offset[0])
-    report3(Diag.DslError, site, dsl_err_message[0], start, start + dsl_err_length[0], -1)
+    let start = dsl_byte(site, dsl_err_offset)
+    report3(Diag.DslError, site, dsl_err_message, start, start + dsl_err_length, -1)
 }
 
 /// The last answer of @dsl_byte or @dsl_units. Each walks a site's body
 /// from it when it is before the place asked for (expansions ask in order),
 /// so a body is read once, not once per ask: the site, the byte, and the
 /// UTF-16 offset.
-vec dsl_cursor: I32 = [-1, 0, 0]
+let dsl_cursor_site: I32 = -1
+let dsl_cursor_byte: I32 = 0
+let dsl_cursor_units: I32 = 0
 
 /// The byte in src of UTF-16 offset `offset` in a site's body.
 fn dsl_byte(site: I32, offset: I32) I32 {
     dsl_walk(site, dsl_inner_end(site), offset)
-    return dsl_cursor[1]
+    return dsl_cursor_byte
 }
 
 /// The UTF-16 offset in a site's body of byte `at`.
 fn dsl_units(site: I32, at: I32) I32 {
     dsl_walk(site, at, 2147483647)
-    return dsl_cursor[2]
+    return dsl_cursor_units
 }
 
-/// Moves @dsl_cursor through a site's body (from where it is, unless that
+/// Moves the cursor (@dsl_cursor_site) through a site's body (from where it is, unless that
 /// is past the place) to byte `to` or UTF-16 offset `units`, whichever
 /// comes first.
 fn dsl_walk(site: I32, to: I32, units: I32) Void {
     let b = dsl_inner_start(site)
     let u = 0
-    if dsl_cursor[0] == site and dsl_cursor[1] <= to and dsl_cursor[2] <= units {
-        b = dsl_cursor[1]
-        u = dsl_cursor[2]
+    if dsl_cursor_site == site and dsl_cursor_byte <= to and dsl_cursor_units <= units {
+        b = dsl_cursor_byte
+        u = dsl_cursor_units
     }
     while (b < to and u < units) {
         let n = utf8_size(src[b])
         u += if n == 4 { 2 } else { 1 }
         b += n
     }
-    dsl_cursor[0] = site
-    dsl_cursor[1] = b
-    dsl_cursor[2] = u
+    dsl_cursor_site = site
+    dsl_cursor_byte = b
+    dsl_cursor_units = u
 }
 
 /// The length of the UTF-8 sequence a lead byte starts.
@@ -236,9 +238,9 @@ vec dsl_file_site: I32
 /// By file: the part of the site it stands for (bytes), or -1.
 vec dsl_file_from: I32
 vec dsl_file_to: I32
-vec dsl_current_site: I32 = [-1]
-vec dsl_current_from: I32 = [-1]
-vec dsl_current_to: I32 = [-1]
+let dsl_current_site: I32 = -1
+let dsl_current_from: I32 = -1
+let dsl_current_to: I32 = -1
 
 /// The site a generated node stands for, or -1.
 fn dsl_site_of(node: I32) I32 {
@@ -248,7 +250,7 @@ fn dsl_site_of(node: I32) I32 {
 
 /// Parse `code` (an expression) and make it the site's value.
 fn graft_expression(site: I32, code: Str) Void {
-    dsl_current_site[0] = site
+    dsl_current_site = site
     let expr = parse_expansion(code)
     // Reported once, as its generated file; not expanded again each round.
     if expr < 0 { dsl_failed.push(site); return }
@@ -312,9 +314,9 @@ fn parse_generated_file(code: Str) I32 {
         dsl_file_site[f] = -1
         dsl_file_from[f] = -1
     }
-    dsl_file_site[file] = dsl_current_site[0]
-    dsl_file_from[file] = dsl_current_from[0]
-    dsl_file_to[file] = dsl_current_to[0]
+    dsl_file_site[file] = dsl_current_site
+    dsl_file_from[file] = dsl_current_from
+    dsl_file_to[file] = dsl_current_to
     return parse_file(file)
 }
 
@@ -439,10 +441,10 @@ fn apply_renames(node: I32, k: I32) Void {
 
 /// A located splice's code, parsed (its own placeholders filled).
 fn parse_located(k: I32) I32 {
-    dsl_current_from[0] = splice_from[k]
-    dsl_current_to[0] = splice_to[k]
+    dsl_current_from = splice_from[k]
+    dsl_current_to = splice_to[k]
     let e = parse_expansion(word_text(splice_code[k]))
-    dsl_current_from[0] = -1
+    dsl_current_from = -1
     if e >= 0 { fill_splices(e) }
     return e
 }

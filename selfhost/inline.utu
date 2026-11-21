@@ -27,18 +27,18 @@ vec inl_param_set: U8
 /// While copying a callee: its locals' indices in the caller.
 vec inl_local_map: I32
 /// While copying: how far its labels move, and where a `return` goes.
-vec inl_label_offset: I32 = [0]
-vec inl_return_label: I32 = [0]
+let inl_label_offset: I32 = 0
+let inl_return_label: I32 = 0
 /// The call's syntax (see w_site).
-vec inl_site: I32 = [-1]
+let inl_site: I32 = -1
 /// The call, when the callee is a helper (data.utu), else -1: its copy is
 /// the call's syntax, as its own is its first use's.
-vec inl_helper: I32 = [-1]
+let inl_helper: I32 = -1
 /// The calls found in a body, and whether each is inside a loop (1) or not (0).
 vec inl_calls: I32
 vec inl_call_loop: U8
 /// How many nodes the calls inlined so far added to the body.
-vec inl_grown: I32 = [0]
+let inl_grown: I32 = 0
 
 /// Inlined at every call. The limits are the smallest code found as fast as
 /// any for the programs in benchmarks/ (V8): below 300 DeltaBlue slows
@@ -93,7 +93,7 @@ fn inline_into(f: I32) Void {
     for (calls) |c| { if inlinable(w_a[c]) { inline_into(w_a[c]) } }
     let size = inl_nodes(func_body[f])
     let label = max_label(func_body[f])
-    inl_grown[0] = 0
+    inl_grown = 0
     let before = size
     for (0 ..< calls.len()) |i| {
         let c = calls[i]
@@ -107,7 +107,7 @@ fn inline_into(f: I32) Void {
         }
     }
     inl_state[f] = 2
-    inl_size[f] = before + inl_grown[0]
+    inl_size[f] = before + inl_grown
     // Each copy's labels are past those before it, and its block past them.
     inl_label[f] = label
 }
@@ -168,12 +168,12 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
         inl_local_map[i] = if same { w_a[arg] } else { add_local(f, vl_item(params, i)) }
     }
     for (0 ..< nl) |i| { inl_local_map[np + i] = add_local(f, local_types[func_locals[g] + i]) }
-    inl_label_offset[0] = label
+    inl_label_offset = label
     let block = label + inl_label[g] + 1
-    inl_return_label[0] = block
-    inl_site[0] = w_src[c]
-    inl_helper[0] = -1
-    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c } }
+    inl_return_label = block
+    inl_site = w_src[c]
+    inl_helper = -1
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper = c } }
     // The arguments set the parameters, in order; then the body.
     let m = w_mark()
     for (0 ..< np) |i| {
@@ -182,13 +182,13 @@ fn inline_call(f: I32, c: I32, g: I32, label: I32) I32 {
             let ms = w_mark()
             w_push(arg)
             w_node(Op.LocalSet, vt_none, inl_local_map[i], 0, ms)
-            inl_grown[0] += 1
+            inl_grown += 1
         } else {
-            inl_grown[0] -= 1
+            inl_grown -= 1
         }
     }
     w_push(inl_copy(func_body[g]))
-    inl_grown[0] += inl_size[g]
+    inl_grown += inl_size[g]
     // The call node becomes the block (its type, the call's result, stays).
     let n = w_mark() - m
     w_first[c] = w_kid_end()
@@ -236,21 +236,21 @@ fn inl_copy(n: I32) I32 {
     if op == Op.LocalGet.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         a = inl_local_map[a]
     } else if is_labelled(op) {
-        if a > 0 { a += inl_label_offset[0] }
+        if a > 0 { a += inl_label_offset }
     } else if op == Op.BrTable.i32() {
         let start = w_aux.len()
-        for (0 ..< w_b[n]) |i| { w_aux.push(w_aux[w_a[n] + i] + inl_label_offset[0]) }
+        for (0 ..< w_b[n]) |i| { w_aux.push(w_aux[w_a[n] + i] + inl_label_offset) }
         a = start
     } else if op == Op.Return.i32() {
         op = Op.Br.i32()
-        a = inl_return_label[0]
+        a = inl_return_label
     }
     let vt = w_type[n]
     if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple) }
     // Preserve the callee's syntax and the call site for source maps.
-    let helper = inl_helper[0]
+    let helper = inl_helper
     let source = if helper >= 0 { w_src[helper] } else { w_src[n] }
-    let site = if helper >= 0 { w_site[helper] } else { inl_site[0] }
+    let site = if helper >= 0 { w_site[helper] } else { inl_site }
     return add_ir(op, vt, a, w_b[n], first, count, source, site)
 }
 
@@ -482,10 +482,10 @@ vec h_get_next: I32
 vec h_targeted: U8
 
 /// The function `locals_for_structs` is working on.
-vec current_fold_function: I32 = [0]
+let current_fold_function: I32 = 0
 
 fn locals_for_structs(f: I32) Void {
-    current_fold_function[0] = f
+    current_fold_function = f
     let total = vl_len[ht_a[func_type_of[f]]] + func_local_count[f]
     h_walk_function(f)
     // (A struct replaced keeps the walk's notes up to date: see @replace_struct.)
@@ -505,7 +505,7 @@ fn h_walk_function(f: I32) Void {
     h_get_first.clear()
     h_get_last.clear()
     h_locals(total)
-    if h_index.len() < w_node_count[0] { h_index.resize(w_node_count[0]) }
+    if h_index.len() < w_node_count { h_index.resize(w_node_count) }
     // (Grown to the labels targeted, as the walk finds them.)
     h_targeted.clear()
     h_walk(func_body[f], -1, 0)
@@ -635,7 +635,7 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
     // The allocation sets them, in order, and gives null.
     let nullable = vt_ref(t, true)
     let m = w_mark()
-    let fresh = w_node_count[0]
+    let fresh = w_node_count
     if w_count[made] != ht_b[t] {
         // One call giving the fields (see @struct_returns): stored from the
         // stack, the last first.
@@ -662,7 +662,7 @@ fn replace_struct(f: I32, local: I32, set: I32) Bool {
     w_resize_stack(m)
     w_op[made] = Op.Seq.i32()
     w_type[made] = if direct { vt_none } else { nullable }
-    if h_index.len() < w_node_count[0] { h_index.resize(w_node_count[0]) }
+    if h_index.len() < w_node_count { h_index.resize(w_node_count) }
     for (0 ..< count) |i| {
         let s = w_kid(made, i)
         if s >= fresh {
@@ -701,7 +701,7 @@ fn struct_stays(local: I32, t: I32) Bool {
     h_carriers.clear()
     h_uses.clear()
     h_copies.clear()
-    let params = vl_len[ht_a[func_type_of[current_fold_function[0]]]]
+    let params = vl_len[ht_a[func_type_of[current_fold_function]]]
     if local < params { return false }
     h_family.push(local)
     add_carriers(local)
@@ -822,8 +822,8 @@ fn struct_returns() Bool {
     sr_twin.resize(all)
     sr_changed.resize(all)
     // (Nodes made here are placed by what holds them; see w_src.)
-    let src = cur_src[0]
-    cur_src[0] = -1
+    let src = cur_src
+    cur_src = -1
     for (n ..< all) |g| {
         func_live[g] = 1
         func_uses[g] = 0
@@ -837,7 +837,7 @@ fn struct_returns() Bool {
     for (0 ..< all) |f| {
         if sr_changed[f] == 1 and sr_unshared(func_body[f]) { locals_for_structs(f) }
     }
-    cur_src[0] = src
+    cur_src = src
     return true
 }
 
@@ -853,7 +853,7 @@ fn sr_weigh(n: I32) Bool {
         if sr_calls[h] == 1 {
             // (A candidate's walk notes what it returns.)
             if sr_type[h] < 0 or not sr_returns(h, sr_type[h]) {
-                current_fold_function[0] = h
+                current_fold_function = h
                 h_walk_function(h)
                 sr_ret.clear()
             }
@@ -871,7 +871,7 @@ fn sr_weigh(n: I32) Bool {
         // (Building small, a wrapper kept for other uses, or as many calls
         // making the struct as not, would grow the module.)
         let kept = func_field_name[f] >= 0 or func_uses[f] > sr_gain[f] + sr_loss[f]
-        if sr_type[f] >= 0 and (sr_gain[f] == 0 or (optimize_level[0] == 1 and (kept or sr_gain[f] <= sr_loss[f]))) {
+        if sr_type[f] >= 0 and (sr_gain[f] == 0 or (optimize_level == 1 and (kept or sr_gain[f] <= sr_loss[f]))) {
             sr_type[f] = -1
             dropped = true
         }
@@ -940,7 +940,7 @@ fn sr_vt(t: I32) I32 {
 /// Whether every return of `f` is a struct of type `t` made for it: fills
 /// @sr_ret, @sr_path, and @sr_locals.
 fn sr_returns(f: I32, t: I32) Bool {
-    current_fold_function[0] = f
+    current_fold_function = f
     h_walk_function(f)
     sr_ret.clear()
     sr_path.clear()
@@ -1030,7 +1030,7 @@ fn sr_branches_fresh(label: I32, t: I32) Bool {
 /// Whether local `x` (not a parameter) is only ever stored a struct of type
 /// `t` nothing else holds.
 fn sr_local_fresh(x: I32, t: I32) Bool {
-    if x < vl_len[ht_a[func_type_of[current_fold_function[0]]]] { return false }
+    if x < vl_len[ht_a[func_type_of[current_fold_function]]] { return false }
     let sets = 0
     for (0 ..< h_node.len()) |k| {
         let n = h_node[k]
@@ -1162,13 +1162,13 @@ vec sm_label: I32
 vec sm_prefix: I32
 /// While weighing a callee: its branch targets and maximum depth width.
 vec sm_targets: I32
-vec sm_depth: I32 = [0]
+let sm_depth: I32 = 0
 /// Bodies past this many nodes are not weighed (none would gain).
 let sm_most_nodes: I32 = 200
 /// While walking a body in order: the next parameter, and whether only
 /// reads of the parameters before it have run.
-vec sm_next: I32 = [0]
-vec sm_clean: U8 = [1]
+let sm_next: I32 = 0
+let sm_clean: I32 = 1
 /// While copying: by parameter, the argument its read becomes, or -1.
 vec inl_subst: I32
 
@@ -1215,11 +1215,11 @@ vec sm_pending: I32
 vec sm_pend_root: I32
 vec sm_pend_vt: I32
 /// Whether a use may have gone (a constant argument never read).
-vec sm_gone: U8 = [0]
+let sm_gone: I32 = 0
 /// The most nodes a body grows to by moves (0, the default: no limit; see
 /// set_move_limit), and by function while moving, its nodes with what moved
 /// into it.
-vec sm_cap: I32 = [0]
+let sm_cap: I32 = 0
 vec sm_size: I32
 /// By function (sm_survey): 1 its body returns, 2 it holds a node held
 /// elsewhere too, 4 it returns by a call; where its parameters start in
@@ -1257,12 +1257,12 @@ fn sm_move_all() Bool {
     for (0 ..< sm_found.len()) |i| { sm_once[w_a[sm_found[i]]] = i }
     sm_pend_root.clear()
     sm_pend_vt.clear()
-    sm_gone[0] = 0
+    sm_gone = 0
     // (1: moves; 2: stays; 3: moved.)
     sm_state.resize(n)
     for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and sm_movable(g) { 1 } else { 2 } }
     sm_size.resize(n)
-    for (0 ..< n) |f| { sm_size[f] = if sm_cap[0] > 0 and func_live[f] == 1 { sm_body_nodes[f] } else { 0 } }
+    for (0 ..< n) |f| { sm_size[f] = if sm_cap > 0 and func_live[f] == 1 { sm_body_nodes[f] } else { 0 } }
     let any = false
     for (0 ..< n) |g| { if sm_state[g] == 1 { sm_move_down(g); any = true } }
     if not any { return false }
@@ -1291,9 +1291,9 @@ fn sm_move_all() Bool {
         }
     }
     let old = node_holders.len()
-    node_holders.resize(w_node_count[0])
-    for (old ..< w_node_count[0]) |k| { node_holders[k] = 1 }
-    return sm_gone[0] == 1
+    node_holders.resize(w_node_count)
+    for (old ..< w_node_count) |k| { node_holders[k] = 1 }
+    return sm_gone == 1
 }
 
 /// The survey caches the facts about each body between inlining rounds.
@@ -1427,7 +1427,7 @@ fn sm_move_down(g: I32) Void {
     if sm_state[caller] == 1 { sm_move_down(caller) }
     let f = sm_root(caller)
     if f == g { return }
-    if sm_cap[0] > 0 and sm_size[f] + sm_size[g] > sm_cap[0] {
+    if sm_cap > 0 and sm_size[f] + sm_size[g] > sm_cap {
         sm_state[g] = 2
         return
     }
@@ -1441,7 +1441,7 @@ fn sm_move_down(g: I32) Void {
 /// the call with syntax (as @sm_grows).
 fn sm_movable(g: I32) Bool {
     return func_kind[g] == FuncKind.Defined.i32() and func_body[g] >= 0 and func_code[g] < 0 and func_live[g] == 1
-        and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g
+        and func_uses[g] == 1 and func_field_name[g] < 0 and start_func != g
         and vl_len[ht_b[func_type_of[g]]] <= 1 and not traps_by_name(g)
         and w_src[sm_found[sm_once[g]]] >= 0 and sm_flags[g] & 6 == 0
 }
@@ -1474,7 +1474,7 @@ fn sm_move(f: I32, c: I32) Void {
             let reads = sm_param_reads[at + i]
             if w_op[arg] == Op.RefFunc.i32() { func_uses[w_a[arg]] += reads - 1 }
             if w_op[arg] == Op.GlobalGet.i32() { glob_uses[w_a[arg]] += reads - 1 }
-            if reads == 0 and (w_op[arg] == Op.RefFunc.i32() or w_op[arg] == Op.GlobalGet.i32()) { sm_gone[0] = 1 }
+            if reads == 0 and (w_op[arg] == Op.RefFunc.i32() or w_op[arg] == Op.GlobalGet.i32()) { sm_gone = 1 }
         }
     }
     for (0 ..< nl) |i| { inl_local_map[np + i] = sm_add_local(f, local_types[func_locals[g] + i]) }
@@ -1485,13 +1485,13 @@ fn sm_move(f: I32, c: I32) Void {
         sm_label[f] += 1
         block = sm_label[f]
     }
-    inl_label_offset[0] = offset
-    inl_return_label[0] = block
+    inl_label_offset = offset
+    inl_return_label = block
     // The call in the function the trap is in: this one's, or the one its
     // body moved there by.
-    inl_site[0] = if w_site[c] >= 0 { w_site[c] } else { w_src[c] }
-    inl_helper[0] = -1
-    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c } }
+    inl_site = if w_site[c] >= 0 { w_site[c] } else { w_src[c] }
+    inl_helper = -1
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper = c } }
     let m = w_mark()
     for (0 ..< np) |i| {
         let arg = w_kid(c, i)
@@ -1529,20 +1529,20 @@ fn sm_renumber(n: I32) Void {
     } else if op == Op.LocalGet.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
         w_a[n] = inl_local_map[a]
     } else if is_labelled(op) {
-        if a > 0 { w_a[n] = a + inl_label_offset[0] }
+        if a > 0 { w_a[n] = a + inl_label_offset }
     } else if op == Op.BrTable.i32() {
         let start = w_aux.len()
-        for (0 ..< w_b[n]) |i| { w_aux.push(w_aux[a + i] + inl_label_offset[0]) }
+        for (0 ..< w_b[n]) |i| { w_aux.push(w_aux[a + i] + inl_label_offset) }
         w_a[n] = start
     } else if op == Op.Return.i32() {
         w_op[n] = Op.Br.i32()
-        w_a[n] = inl_return_label[0]
+        w_a[n] = inl_return_label
     }
-    if inl_helper[0] >= 0 {
-        w_src[n] = w_src[inl_helper[0]]
-        w_site[n] = w_site[inl_helper[0]]
+    if inl_helper >= 0 {
+        w_src[n] = w_src[inl_helper]
+        w_site[n] = w_site[inl_helper]
     } else {
-        w_site[n] = inl_site[0]
+        w_site[n] = inl_site
     }
     for (0 ..< w_count[n]) |i| { sm_renumber(w_kid(n, i)) }
 }
@@ -1601,14 +1601,14 @@ fn sm_weigh(g: I32) Bool {
     sm_targets.clear()
     sm_callees.clear()
     if not sm_scan(body, np) { return false }
-    sm_depth[0] = leb_len(size)
+    sm_depth = leb_len(size)
     let hi = sm_bytes(body, true)
     if hi >= 1000000 { return false }
     // The first parameters, read first, in order, once each.
-    sm_next[0] = 0
-    sm_clean[0] = 1
+    sm_next = 0
+    sm_clean = 1
     sm_order(body, reads)
-    sm_prefix[g] = sm_next[0]
+    sm_prefix[g] = sm_next
     // Each call's growth: the copy, less the call, and the arguments' reads.
     let all = sm_bad[g] == 0
     let total = 0
@@ -1628,7 +1628,7 @@ fn sm_weigh(g: I32) Bool {
     // little more break up code brotli matched; the compiler compressed
     // 0.3% bigger with them. Copies at several calls, each bigger than the
     // call, shift V8's own inlining: DeltaBlue ran 6% slower.)
-    if all and sm_count[g] == 1 and func_uses[g] == 1 and func_field_name[g] < 0 and start_func[0] != g and sm_take[first] == 0 {
+    if all and sm_count[g] == 1 and func_uses[g] == 1 and func_field_name[g] < 0 and start_func != g and sm_take[first] == 0 {
         // Only the one-use rule needs a lower bound on the body's size.
         let lo = sm_bytes(body, false)
         for (0 ..< np) |i| { lo += sm_param_reads[reads + i] * (1 + leb_len(i)) }
@@ -1693,11 +1693,11 @@ fn sm_inline(f: I32, c: I32) Void {
             inl_local_map[i] = -1
         }
     }
-    inl_label_offset[0] = sm_label[f]
+    inl_label_offset = sm_label[f]
     sm_label[f] += sm_label[g]
-    inl_site[0] = w_src[c]
-    inl_helper[0] = -1
-    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper[0] = c } }
+    inl_site = w_src[c]
+    inl_helper = -1
+    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper = c } }
     let copy = inl_copy(func_body[g])
     inl_subst.clear()
     // The call node becomes the copy (its type, the call's result, stays).
@@ -1740,10 +1740,10 @@ fn sm_targeted(label: I32) Bool {
 /// Walks `n` in the order it runs, while only reads of the parameters
 /// before @sm_next have: a read of that one, its only read, is the next.
 fn sm_order(n: I32, reads: I32) Void {
-    if sm_clean[0] == 0 { return }
+    if sm_clean == 0 { return }
     let op = w_op[n]
     if op == Op.LocalGet.i32() {
-        if w_a[n] == sm_next[0] and sm_param_reads[reads + w_a[n]] == 1 { sm_next[0] += 1 } else { sm_clean[0] = 0 }
+        if w_a[n] == sm_next and sm_param_reads[reads + w_a[n]] == 1 { sm_next += 1 } else { sm_clean = 0 }
         return
     }
     // (A block nothing branches to encodes as its contents.)
@@ -1753,7 +1753,7 @@ fn sm_order(n: I32, reads: I32) Void {
     } else if open or not (op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.Try.i32()) {
         for (0 ..< w_count[n]) |i| { sm_order(w_kid(n, i), reads) }
     }
-    if not open { sm_clean[0] = 0 }
+    if not open { sm_clean = 0 }
 }
 
 // Index widths used throughout one instruction tree. Their upper bounds
@@ -1803,7 +1803,7 @@ fn sm_own(n: I32, bounds: I32) I32 {
     let gi = sm_width(bounds, size_global_shift)
     let mi = sm_width(bounds, size_mem_shift)
     let heap = if a >= vt_defined { sm_width(bounds, size_heap_shift) } else { 1 }
-    let depth = if hi { sm_depth[0] } else { 1 }
+    let depth = if hi { sm_depth } else { 1 }
     let bt = if hi and w_type[n] > vt_v128 { 4 } else { 1 }
     let els = if w_count[n] > 2 { 1 } else { 0 }
     let block = if op == Op.Block.i32() and sm_targeted(a) { 2 + bt } else { 0 }

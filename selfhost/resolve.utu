@@ -299,7 +299,7 @@ vec extra_end: I32
 vec extra_text: I32
 vec extra_label: I32
 /// Whether the last report made a diagnostic (a repeat makes none, and its extras go nowhere).
-vec diag_fresh: U8 = [0]
+let diag_fresh: I32 = 0
 
 /// What an extra row is. A place's kind is the role it plays: where the
 /// requirement came from, where the value came from, or other context.
@@ -312,7 +312,7 @@ enum(U8) Extra:
     | Fix
 
 fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) Void {
-    if diag_fresh[0] == 0 { return }
+    if diag_fresh == 0 { return }
     let i = diag_kind.len() - 1
     if diag_extra_n[i] == 0 { diag_extra[i] = extra_kind.len() }
     extra_kind.push(kind.i32())
@@ -325,32 +325,32 @@ fn add_extra(kind: Extra, node: I32, end_: I32, text: I32, label: I32) Void {
 
 /// A label on the last diagnostic's own span.
 fn diag_label(label: Str) Void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Here, -1, -1, intern_text(label), -1) }
+    if diag_fresh == 1 { add_extra(Extra.Here, -1, -1, intern_text(label), -1) }
 }
 
 /// The part of the last diagnostic's span to show (tokens `first` to `last`), with a label.
 fn diag_focus(first: I32, last: I32, label: Str) Void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Here, tok_start[first], tok_end[last], intern_text(label), -1) }
+    if diag_fresh == 1 { add_extra(Extra.Here, tok_start[first], tok_end[last], intern_text(label), -1) }
 }
 
 /// Another place the last diagnostic is about, by tokens `first` to `last`.
 fn diag_place_tokens(role: Extra, first: I32, last: I32, label: Str) Void {
-    if first >= 0 and diag_fresh[0] == 1 { add_extra(role, tok_start[first], tok_end[last], intern_text(label), -1) }
+    if first >= 0 and diag_fresh == 1 { add_extra(role, tok_start[first], tok_end[last], intern_text(label), -1) }
 }
 
 /// Another place the last diagnostic is about: node, its role, and a label.
 fn diag_place(role: Extra, node: I32, label: Str) Void {
-    if node >= 0 and diag_fresh[0] == 1 { add_extra(role, node, -1, intern_text(label), -1) }
+    if node >= 0 and diag_fresh == 1 { add_extra(role, node, -1, intern_text(label), -1) }
 }
 
 /// A note on the last diagnostic: one sentence that teaches the rule.
 fn diag_note(text: Str) Void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Note, -1, -1, intern_text(text), -1) }
+    if diag_fresh == 1 { add_extra(Extra.Note, -1, -1, intern_text(text), -1) }
 }
 
 /// A fix for the last diagnostic: source bytes `start ..< end_` become `text`.
 fn diag_fix(start: I32, end_: I32, text: Str, label: Str) Void {
-    if diag_fresh[0] == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)) }
+    if diag_fresh == 1 { add_extra(Extra.Fix, start, end_, intern_text(text), intern_text(label)) }
 }
 
 fn report(kind: Diag, node: I32, word: I32) Void => report3(kind, node, word, -1, -1, -1)
@@ -360,9 +360,9 @@ fn report2(kind: Diag, node: I32, word: I32, a: I32, b: I32) Void => report3(kin
 /// Report a mistake (once per node, kind, and word).
 fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) Void {
     // Once for a node: a name resolved, or a type read, twice is still one mistake.
-    diag_fresh[0] = 0
+    diag_fresh = 0
     if node >= 0 and diag_slot(node, kind.i32(), word) >= 0 { return }
-    diag_fresh[0] = 1
+    diag_fresh = 1
     if node >= 0 { diag_seen_add(diag_kind.len(), node, kind.i32(), word) }
     diag_extra.push(-1)
     diag_extra_n.push(0)
@@ -379,13 +379,13 @@ fn report3(kind: Diag, node: I32, word: I32, a: I32, b: I32, c: I32) Void {
 /// over their indexes (-1 empty), for @report3 to find a repeat. Rebuilt
 /// when diagnostics are dropped or moved (`diag_seen_ok` 0).
 vec diag_seen: I32
-vec diag_seen_ok: U8 = [0]
+let diag_seen_ok: I32 = 0
 
 fn diag_hash(node: I32, kind: I32, word: I32) I32 => (node * -1640531535) ^ (kind * 40503) ^ (word * 9973)
 
 /// The diagnostic about `node` of `kind` and `word`, or -1.
 fn diag_slot(node: I32, kind: I32, word: I32) I32 {
-    if diag_seen_ok[0] == 0 or (diag_kind.len() + 1) * 2 > diag_seen.len() { diag_seen_rebuild() }
+    if diag_seen_ok == 0 or (diag_kind.len() + 1) * 2 > diag_seen.len() { diag_seen_rebuild() }
     let mask = diag_seen.len() - 1
     let h = diag_hash(node, kind, word) & mask
     while (diag_seen[h] >= 0) {
@@ -409,12 +409,12 @@ fn diag_seen_rebuild() Void {
     diag_seen.resize(n)
     for (0 ..< n) |h| { diag_seen[h] = -1 }
     for (0 ..< diag_kind.len()) |i| { if diag_node[i] >= 0 { diag_seen_add(i, diag_node[i], diag_kind[i], diag_word[i]) } }
-    diag_seen_ok[0] = 1
+    diag_seen_ok = 1
 }
 
 /// Keep the first n diagnostics.
 fn diag_truncate(n: I32) Void {
-    diag_seen_ok[0] = 0
+    diag_seen_ok = 0
     diag_kind.resize(n)
     diag_node.resize(n)
     diag_word.resize(n)
@@ -423,7 +423,7 @@ fn diag_truncate(n: I32) Void {
     diag_c.resize(n)
     diag_extra.resize(n)
     diag_extra_n.resize(n)
-    diag_fresh[0] = 0
+    diag_fresh = 0
 }
 
 /// No diagnostics, and no extra rows: a build starting over.
@@ -437,7 +437,7 @@ fn diag_reset() Void {
 }
 
 fn diag_move(from: I32, to: I32) Void {
-    diag_seen_ok[0] = 0
+    diag_seen_ok = 0
     diag_kind[to] = diag_kind[from]
     diag_node[to] = diag_node[from]
     diag_word[to] = diag_word[from]
@@ -458,12 +458,12 @@ enum(U8) Space:
     | Operator
 
 /// The member table, by slot: owner, key (word × 4 + Space), declaration.
-/// Open addressing; a slot is empty when its key is -1. `member_fill[0]`
+/// Open addressing; a slot is empty when its key is -1. `member_fill`
 /// counts the slots in use.
 vec member_owner: I32
 vec member_key: I32
 vec member_decl: I32
-vec member_fill: I32
+let member_fill: I32 = 0
 
 fn member_slot(owner: I32, key: I32) I32 {
     let mask = member_key.len() - 1
@@ -477,8 +477,7 @@ fn members_reset(capacity: I32) Void {
     member_key.resize(capacity)
     member_decl.resize(capacity)
     for (0 ..< capacity) |i| { member_key[i] = -1 }
-    member_fill.resize(1)
-    member_fill[0] = 0
+    member_fill = 0
     method_twice.clear()
 }
 
@@ -489,14 +488,14 @@ vec method_twice: I32
 /// Add a member; returns the declaration already there under that name, or -1.
 fn add_member(owner: I32, name: I32, space: Space, decl: I32) I32 {
     if name < 0 { return -1 }
-    if (member_fill[0] + 1) * 2 > member_key.len() { grow_members() }
+    if (member_fill + 1) * 2 > member_key.len() { grow_members() }
     let key = name * 4 + space.i32()
     let h = member_slot(owner, key)
     if member_key[h] >= 0 { return member_decl[h] }
     member_owner[h] = owner
     member_key[h] = key
     member_decl[h] = decl
-    member_fill[0] += 1
+    member_fill += 1
     return -1
 }
 
@@ -510,9 +509,9 @@ fn grow_members() Void {
         keys[i] = member_key[i]
         decls[i] = member_decl[i]
     }
-    let fill = member_fill[0]
+    let fill = member_fill
     members_reset(n * 2)
-    member_fill[0] = fill
+    member_fill = fill
     for (0 ..< n) |i| {
         if keys[i] >= 0 {
             let h = member_slot(owners[i], keys[i])
@@ -575,12 +574,12 @@ fn lookup(word: I32) I32 {
 fn prelude_lookup(word: I32) I32 {
     if word < 0 or word >= word_top.len() { return -1 }
     let b = word_top[word]
-    while (b >= prelude_binds[0]) { b = bind_prev[b] }
+    while (b >= prelude_binds) { b = bind_prev[b] }
     return if b < 0 { -1 } else { bind_decl[b] }
 }
 
 /// The bindings below this are the prelude's scope.
-vec prelude_binds: I32 = [0]
+let prelude_binds: I32 = 0
 
 /// By file: its scope, the bindings `scope_word`/`scope_decl` from
 /// `file_scope` to `file_scope_end`, made once (@declare_program) and bound
@@ -1076,7 +1075,7 @@ fn declare_program() Void {
         let l = intern_text(long)
         if s < word_top.len() and l < word_top.len() and lookup(l) >= 0 { bind(s, lookup(l)) }
     }
-    prelude_binds[0] = scope_mark()
+    prelude_binds = scope_mark()
     for (0 ..< import_file.len()) |i| { bind_import(i) }
     // `using tour lazy from "./tour.utu"`: the modules that file declares are
     // lazy; their functions the program calls are stubs (see lazy_stub).
@@ -1178,7 +1177,7 @@ fn declare_file_scope(file: I32) Void {
         item = next_sibling(item)
     }
     let entry = file_role[file] == FileRole.Entry.i32()
-    items_since[0] = scope_mark()
+    items_since = scope_mark()
     for (file ..< file_root.len()) |f| {
         let owner = if entry { -1 } else { file }
         let generated = file_role[f] == FileRole.Generated.i32() and gen_owner_of(f) == owner
@@ -1460,13 +1459,13 @@ fn bind_variants(decl: I32) Void {
     if not decl_is(decl, Decl.Enum) { return }
     let d = decl + 1
     while (d < decl_kind.len() and decl_owner[d] >= decl and decl_owner[d] <= d) {
-        if decl_owner[d] == decl { bind_variant(d, items_since[0]) }
+        if decl_owner[d] == decl { bind_variant(d, items_since) }
         d += 1
     }
 }
 
 /// Where a file's (or mod's) own declarations begin to be bound.
-vec items_since: I32 = [0]
+let items_since: I32 = 0
 
 /// Variant `v` in scope by its name. A name a variant of another enum bound
 /// since `since` (one file's, one mod's) has is ambiguous: `E.V` says which.
@@ -1524,13 +1523,13 @@ fn resolve_names() I32 {
     find_comptime_mems()
     // An import the host could not read ends the build, but names resolve
     // (for an editor): its mistake is the one said.
-    if missing_import[0] >= 0 {
+    if missing_import >= 0 {
         diag_reset()
-        let at = import_node[missing_import[0]]
-        report2(if missing_why[0] == 1 { Diag.ImportCycle } else { Diag.UnknownImport }, at, -1, missing_why[0], -1)
+        let at = import_node[missing_import]
+        report2(if missing_why == 1 { Diag.ImportCycle } else { Diag.UnknownImport }, at, -1, missing_why, -1)
         // (`using console from std:Consle`: the std module it names.)
         let m = std_module(node_text(name_node(first_child(at))))
-        if missing_why[0] == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";") }
+        if missing_why == 2 and m.len() > 0 { diag_note("using " + m + " from std:" + std_file(m) + ";") }
     }
     save_diagnostics()
     return diag_kind.len()
@@ -1594,7 +1593,7 @@ fn desugar_wutu_items(parent: I32) Void {
                 h = next_sibling(h)
             }
             let open = tok_start[node_first[body]]
-            dsl_current_site[0] = item
+            dsl_current_site = item
             let result_type = "Browser.HTMLElement"
             if not is_kind(item, Node.Export_html_decl) {
                 // Invalid bodies are diagnosed by normal DSL expansion, at the
@@ -1611,9 +1610,9 @@ fn desugar_wutu_items(parent: I32) Void {
                 "fn" + bytes_text(tok_end[node_first[item]], open)
                     + " " + result_type + " => @wutu/\\ \\/"
             }
-            dsl_current_site[0] = item
-            dsl_current_from[0] = -1
-            dsl_current_to[0] = -1
+            dsl_current_site = item
+            dsl_current_from = -1
+            dsl_current_to = -1
             let site_at = dsl_sites.len()
             let root = parse_generated_file(code)
             if root >= 0 {
@@ -1818,7 +1817,7 @@ fn walk_using(item: I32, w: Walk) Void {
         } else {
             report_unknown(Diag.UnknownModule, n, word_of(n), Seek.Module)
             // (An import names a mod of the file: `mod guide { … }` for `using guide … from`.)
-            if using_path(item) >= 0 and diag_fresh[0] == 1 { diag_a[diag_a.len() - 1] = item }
+            if using_path(item) >= 0 and diag_fresh == 1 { diag_a[diag_a.len() - 1] = item }
             if using_path(item) >= 0 { diag_note("The file has no mod " + word_text(word_of(n)) + ": declare one there, mod " + word_text(word_of(n)) + " { … }") }
         }
         return

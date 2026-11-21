@@ -45,15 +45,15 @@ lib {
     /// programs that follow (`reset_keep`), with what is learned of it.
     fn seal() Void {
         intern_known()
-        known_kept[0] = 1
-        abi_kept[0] = src.len()
+        known_kept = 1
+        abi_kept = src.len()
         kept[0] = src.interned()
         kept[1] = tok_kind.len()
         kept[2] = node_kind.len()
         kept[3] = file_start.len()
         kept[4] = import_file.len()
         kept[5] = dsl_sites.len()
-        kept_reactive[0] = -1
+        kept_reactive = -1
     }
 
     /// A view of a document, its JSON at `at`, serving no import yet.
@@ -80,7 +80,7 @@ lib {
     fn file_first_token(file: I32) I32 => file_tok[file]
 
     /// Where the last parse was most deeply nested: a byte in `src`, or -1.
-    fn parse_deepest_at() I32 => if parse_deepest[1] >= 0 { tok_start[parse_deepest[1]] } else { -1 }
+    fn parse_deepest_at() I32 => if parse_deepest_token >= 0 { tok_start[parse_deepest_token] } else { -1 }
 
     fn file_end_token(file: I32) I32 => file_tok_end[file]
 
@@ -119,20 +119,20 @@ lib {
     /// Room for `std:JsonRuntime`, `n` bytes the host writes at the offset
     /// returned, before `seal()`.
     fn json_runtime_room(n: I32) I32 {
-        json_rt[0] = abi_reserve(n)
-        json_rt[1] = json_rt[0] + n
-        return json_rt[0]
+        json_rt_start = abi_reserve(n)
+        json_rt_end = json_rt_start + n
+        return json_rt_start
     }
 
     /// The host cannot read the import's file (`why` as `missing_why`), whose
     /// path is `n` bytes the host writes at the offset returned. This ends the build.
     fn import_missing(i: I32, n: I32, why: I32) I32 {
-        missing_import[0] = i
-        missing_why[0] = why
-        missing_start[0] = src.len()
+        missing_import = i
+        missing_why = why
+        missing_start = src.len()
         src.resize(src.len() + n)
-        missing_end[0] = src.len()
-        return missing_start[0]
+        missing_end = src.len()
+        return missing_start
     }
 
     /// Resolve every name. Returns the number of diagnostics.
@@ -149,10 +149,10 @@ lib {
     fn host_json_size() I32 => host_json.len()
 
     /// Function names in the modules built (1), or none (0, the default).
-    fn set_debug_names(on: I32) Void { debug_names[0] = on }
+    fn set_debug_names(on: I32) Void { debug_names = on }
 
     /// A source map of the modules built (1: "Source maps" in wasm.utu), or none (0, the default).
-    fn set_source_map(on: I32) Void { source_map[0] = on }
+    fn set_source_map(on: I32) Void { source_map = on }
 
     /// The last module's source map: its entries, each an instruction's
     /// byte offset in the module and its syntax node's byte span in src
@@ -226,16 +226,16 @@ lib {
     fn blame_decl_name(node: I32) Str => decl_label(node)
 
     /// Profile builds (1: "Profiling" in profile.utu), or none (0, the default).
-    fn set_profile(on: I32) Void { profile_build[0] = on }
+    fn set_profile(on: I32) Void { profile_build = on }
 
     /// Run builds (1: `run_readers` in check.utu), or none (0, the default).
-    fn set_run(on: I32) Void { run_build[0] = on }
+    fn set_run(on: I32) Void { run_build = on }
 
     /// The last run build's array levels (0: none), and its innermost one's
     /// element type, as written (a tuple or handle main's own; "" none).
-    fn run_levels() I32 => run_depth[0]
+    fn run_levels() I32 => run_depth
 
-    fn run_leaf() Str => if run_elem[0] >= 0 { type_text(run_elem[0]) } else { "" }
+    fn run_leaf() Str => if run_elem >= 0 { type_text(run_elem) } else { "" }
 
     /// The last profile build's frames: how many, and frame k's name and
     /// where its function starts in src.
@@ -246,14 +246,14 @@ lib {
     fn profile_at(k: I32) I32 => span_start(owner_of(prof_node[k]))
 
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
-    fn set_optimize(level: I32) Void { optimize_level[0] = level }
+    fn set_optimize(level: I32) Void { optimize_level = level }
 
     /// -O small moves a function called once into its caller, a body
     /// growing to at most this many nodes (0, the default: any).
-    fn set_move_limit(nodes: I32) Void { sm_cap[0] = nodes }
+    fn set_move_limit(nodes: I32) Void { sm_cap = nodes }
 
     /// Whether builds keep the checks wasm makes anyway (1), or not (0, the default).
-    fn set_safe(on: I32) Void { safe_checks[0] = on }
+    fn set_safe(on: I32) Void { safe_checks = on }
 
     /// A test build's tests: how many, and where test k's name (a string
     /// literal, quotes and all) is in src.
@@ -351,7 +351,7 @@ lib {
     fn comptime_cycle(k: I32) Void {
         comptime_ready(k)
         comptime_start[k] = -3
-        comptime_count[k] = comptime_blocker[0]
+        comptime_count[k] = comptime_blocker
     }
 
     /// Mem k's evaluation trapped, for the reason `code` names (see ComptimeTrap's message).
@@ -588,9 +588,9 @@ lib {
     fn tokens(n: I32) I32 => lex(file_start[0], file_end[0])
 
     fn nodes(n: I32) I32 {
-        comment_nodes[0] = 1
+        comment_nodes = 1
         let root = parse_file(0)
-        comment_nodes[0] = 0
+        comment_nodes = 0
         return root
     }
 

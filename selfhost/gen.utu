@@ -220,14 +220,14 @@ fn generated_mem_fn(mem_decl: I32, method: I32) I32 {
 vec reach_from: I32
 vec reach_to: I32
 /// The function instance being checked, or -1.
-vec checking_fi: I32 = [-1]
+let checking_fi: I32 = -1
 /// The mem a waiting expression reaches, found by @comptime_ready.
-vec comptime_blocker: I32 = [-1]
+let comptime_blocker: I32 = -1
 
 /// Function instance `fi` names `to` (or uses mem `-2 - to`), while checked.
 fn note_reach(to: I32) Void {
-    if checking_fi[0] < 0 { return }
-    reach_from.push(checking_fi[0])
+    if checking_fi < 0 { return }
+    reach_from.push(checking_fi)
     reach_to.push(to)
 }
 
@@ -237,7 +237,7 @@ fn note_mem_use(decl: I32) Void => note_reach(-2 - decl)
 /// it: nothing it reaches is a `@comptime` mem still waiting (that one is
 /// left in @comptime_blocker).
 fn comptime_ready(k: I32) Bool {
-    comptime_blocker[0] = -1
+    comptime_blocker = -1
     if comptime_start[k] != -1 { return false }
     let word = intern_text("__comptime_run_" + word_text(decl_name[comptime_mem[k]]))
     let reached = Array[Bool].new(fi_decl.len(), false)
@@ -257,7 +257,7 @@ fn comptime_ready(k: I32) Bool {
         if reached[reach_from[e]] and reach_to[e] <= -2 {
             let other = comptime_index(-2 - reach_to[e])
             if other >= 0 and (comptime_start[other] == -1 or comptime_start[other] == -3) {
-                comptime_blocker[0] = comptime_mem[other]
+                comptime_blocker = comptime_mem[other]
                 return false
             }
         }
@@ -267,14 +267,14 @@ fn comptime_ready(k: I32) Bool {
 
 /// A @comptime build's fuel: a global each loop round takes one from, and
 /// traps at zero (the host reads it, exported, to say why).
-vec comptime_fuel: I32 = [-1]
+let comptime_fuel: I32 = -1
 
 /// How many loop rounds a @comptime build may make.
 fn comptime_fuel_limit() I32 => 100000000
 
 /// `fuel -= 1; if fuel == 0 { unreachable }`, a node.
 fn fuel_check() I32 {
-    let g = comptime_fuel[0]
+    let g = comptime_fuel
     let m = w_mark()
     let ms = w_mark()
     w_leaf(Op.GlobalGet, vt_i32, g, 0)

@@ -314,11 +314,11 @@ fn finish_mems() Void {
     }
     if w_mark() == m { return }
     // Before the computed globals are set (their initializers may read mems).
-    if start_func[0] >= 0 { w_leaf(Op.Call, vt_none, start_func[0], 0) }
+    if start_func >= 0 { w_leaf(Op.Call, vt_none, start_func, 0) }
     w_node(Op.Seq, vt_none, 0, 0, m)
     let f = helper(vl_empty(), vl_empty(), vl_empty(), "start")
     func_body[f] = w_pop()
-    start_func[0] = f
+    start_func = f
     mark_late(f)
 }
 
@@ -565,7 +565,7 @@ fn mem_address(s: Storage, m: I32) Void {
 /// A safe build traps when index i is outside the mem's length.
 /// An unsafe build's access checks only the capacity.
 fn checked_index(decl: I32, m: I32) Void {
-    if safe_checks[0] == 0 { return }
+    if safe_checks == 0 { return }
     let i = w_pop()
     let op = w_op[i]
     let again = op == Op.LocalGet.i32() or op == Op.I32Const.i32()
@@ -680,8 +680,8 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
         // The index is checked against the length at the store: when the
         // value may change it, index and value are kept in locals first (a
         // size build passes them to a function of the mem's).
-        if safe_checks[0] == 1 and w_mark() == mv + 1 and changes_len(w_stack[mv], mem_len[decl]) {
-            if optimize_level[0] == 1 {
+        if safe_checks == 1 and w_mark() == mv + 1 and changes_len(w_stack[mv], mem_len[decl]) {
+            if optimize_level == 1 {
                 w_node(Op.Call, vt_none, mem_store_helper(decl), 0, m)
                 return ty_void()
             }
@@ -738,10 +738,10 @@ fn check_mem_store(target: I32, value: I32, op: I32, at: I32, cx: Cx) I32 {
     if op != Tok.ShlEq.i32() and op != Tok.ShrEq.i32() and op != Tok.Shr3Eq.i32() { check_narrow_literal(decl, value) }
     // When the value may change the length, the index is checked again at
     // the store (as `name[i] = v` does): v = value; name[checked(at)] = v.
-    if safe_checks[0] == 1 and w_mark() == mg + 1 and changes_len(w_stack[mg], mem_len[decl]) {
+    if safe_checks == 1 and w_mark() == mg + 1 and changes_len(w_stack[mg], mem_len[decl]) {
         let v = w_pop()
         while (w_mark() > ms) { w_pop() }  // (the unchecked address)
-        if optimize_level[0] == 1 {
+        if optimize_level == 1 {
             w_get(vt_i32, at_local)
             w_push(v)
             w_node(Op.Call, vt_none, mem_store_helper(decl), 0, ms)
@@ -958,7 +958,7 @@ fn memory_reserve_helper(decl: I32) I32 {
     let mgrow2 = w_mark()
     pages_short()
     w_node(Op.MemoryGrow, vt_i32, mem_id, 0, mgrow2)
-    if safe_checks[0] == 1 {
+    if safe_checks == 1 {
         w_i32(-1)
         w_i32_op(i32_eq, mgrow2)
         let trap = w_mark()
@@ -1178,7 +1178,7 @@ fn array_push_helper(h: I32, vt: I32) I32 {
 fn mem_resize_helper(decl: I32) Void {
     let resize = helper(vl_one(vt_i32), vl_empty(), vl_empty(), "mem.resize")
     let r = w_mark()
-    if safe_checks[0] == 1 {
+    if safe_checks == 1 {
         let mif = w_mark()
         w_get(vt_i32, 0)
         w_i32(0)

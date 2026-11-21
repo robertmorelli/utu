@@ -283,12 +283,12 @@ fn opcode_table() Str {
 }
 
 /// Sealed with the prelude (see `seal` in lib.utu): its words are kept, and so the same ids.
-vec known_kept: I32 = [0]
+let known_kept: I32 = 0
 
 /// Interns the @Known words and the tags of @opcode_table, with their
 /// opcodes in @word_opcode. After `seal`, the words kept stand.
 fn intern_known() Void {
-    if known_kept[0] == 1 { return }
+    if known_kept == 1 { return }
     word_opcode.clear()
     known.resize(Known.count())
     let names = ["ir-ident", "ir-lit", "name", "kind", "value", "type-name", "type-repr", "main",

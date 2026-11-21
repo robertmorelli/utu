@@ -52,25 +52,25 @@ fn word_distance(a: I32, b: I32, bound: I32) I32 {
 
 /// The best candidate so far: its word, its distance, its declaration, and
 /// whether another word is as close (then none is suggested).
-vec near_word: I32 = [-1]
-vec near_dist: I32 = [0]
-vec near_decl: I32 = [-1]
-vec near_tie: U8 = [0]
+let near_word: I32 = -1
+let near_dist: I32 = 0
+let near_decl: I32 = -1
+let near_tie: I32 = 0
 /// A tighter bound on the distance, or -1 (a module's name: one edit).
-vec near_cap: I32 = [-1]
+let near_cap: I32 = -1
 
 /// Start looking for the word nearest `word`.
 fn near_start(word: I32) Void {
-    near_word[0] = -1
-    near_dist[0] = 1 + max_distance(word)
-    near_decl[0] = -1
-    near_tie[0] = 0
+    near_word = -1
+    near_dist = 1 + max_distance(word)
+    near_decl = -1
+    near_tie = 0
 }
 
 /// How far a meant word may be from what was written: one edit in a short
 /// word, two in a longer one, three in a long one.
 fn max_distance(word: I32) I32 {
-    if near_cap[0] >= 0 { return near_cap[0] }
+    if near_cap >= 0 { return near_cap }
     let n = src.interned_size(word)
     if n < 3 { return 0 }
     if n <= 4 { return 1 }
@@ -80,19 +80,19 @@ fn max_distance(word: I32) I32 {
 
 /// Weigh candidate `cand` (declared by `decl`, or -1) against `word`.
 fn near_consider(word: I32, cand: I32, decl: I32) Void {
-    if cand < 0 or cand == word or cand == near_word[0] { return }
+    if cand < 0 or cand == word or cand == near_word { return }
     // A name the compiler made (`__…`) is not one to suggest.
     if src.interned_size(cand) > 1 and src[src.interned_start(cand)] == 95 and src[src.interned_start(cand) + 1] == 95 { return }
     // Past the bound or past `max_distance`, no distance changes anything.
     let most = max_distance(word)
-    let d = word_distance(word, cand, if near_dist[0] < most { near_dist[0] } else { most })
-    if d < near_dist[0] {
-        near_word[0] = cand
-        near_dist[0] = d
-        near_decl[0] = decl
-        near_tie[0] = 0
-    } else if d == near_dist[0] and d <= max_distance(word) {
-        near_tie[0] = 1
+    let d = word_distance(word, cand, if near_dist < most { near_dist } else { most })
+    if d < near_dist {
+        near_word = cand
+        near_dist = d
+        near_decl = decl
+        near_tie = 0
+    } else if d == near_dist and d <= max_distance(word) {
+        near_tie = 1
     }
 }
 
@@ -114,8 +114,8 @@ fn node_modules() Str => "assert assert/strict async_hooks buffer child_process 
 
 /// The word found, or -1 when none is close, or two are as close.
 fn near_found() I32 {
-    if near_tie[0] == 1 { return -1 }
-    return near_word[0]
+    if near_tie == 1 { return -1 }
+    return near_word
 }
 
 /// The names in scope, by what they declare: values (not types), types,
@@ -134,11 +134,11 @@ fn seek_fits(decl: I32, seek: Seek) Bool {
 
 /// The name in scope nearest `word` that is a `seek`, or -1.
 fn near_in_scope(word: I32, seek: Seek) I32 {
-    near_cap[0] = if seek == Seek.Module and src.interned_size(word) > 2 { 1 } else { -1 }
+    near_cap = if seek == Seek.Module and src.interned_size(word) > 2 { 1 } else { -1 }
     near_start(word)
     let alias = alias_word(word)
     if alias >= 0 and seek_fits(lookup(alias), seek) {
-        near_decl[0] = lookup(alias)
+        near_decl = lookup(alias)
         return alias
     }
     for (0 ..< bind_word.len()) |i| {
@@ -148,7 +148,7 @@ fn near_in_scope(word: I32, seek: Seek) I32 {
     if seek == Seek.Type {
         for ([Narrow.U8, Narrow.I8, Narrow.U16, Narrow.I16]) |n| { near_consider(word, narrow_word(n), -1) }
     }
-    near_cap[0] = -1
+    near_cap = -1
     return near_found()
 }
 
@@ -158,7 +158,7 @@ fn near_member(owner: I32, word: I32, space: Space) I32 {
     if owner < 0 { return -1 }
     let alias = alias_word(word)
     if alias >= 0 and member(owner, alias, space) >= 0 {
-        near_decl[0] = member(owner, alias, space)
+        near_decl = member(owner, alias, space)
         return alias
     }
     for (0 ..< member_key.len()) |h| {
@@ -252,7 +252,7 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
     if dsl_site_of(node) >= 0 {
         for (0 ..< diag_kind.len()) |i| {
             if diag_word[i] == word and (diag_kind[i] == Diag.UnknownModule.i32() or diag_kind[i] == Diag.UnknownType.i32() or diag_kind[i] == Diag.UnknownVariable.i32()) {
-                diag_fresh[0] = 0
+                diag_fresh = 0
                 return
             }
         }
@@ -260,19 +260,19 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
     // The same name again on one line is the same mistake.
     for (0 ..< diag_kind.len()) |i| {
         if diag_kind[i] == kind.i32() and diag_word[i] == word and diag_node[i] != node and same_line(diag_node[i], node) {
-            diag_fresh[0] = 0
+            diag_fresh = 0
             return
         }
     }
     // A name `using` could not import is reported there.
     for (0 ..< diag_kind.len()) |i| {
         if diag_kind[i] == Diag.ImportNotModule.i32() and diag_word[i] == word {
-            diag_fresh[0] = 0
+            diag_fresh = 0
             return
         }
     }
     report(kind, node, word)
-    if diag_fresh[0] == 0 { return }
+    if diag_fresh == 0 { return }
     let t = word_text(word)
     let m = std_module(t)
     // (A lowercase module is used as a value: `console.log(…)`.)
@@ -281,7 +281,7 @@ fn report_unknown(kind: Diag, node: I32, word: I32, seek: Seek) Void {
         diag_note(if m == t { line } else { line + " (the module is " + m + ")" })
         return
     }
-    suggest(node, near_in_scope(word, seek), near_decl[0])
+    suggest(node, near_in_scope(word, seek), near_decl)
 }
 
 /// The standard module a file must import (`using`) that `t` names, by
@@ -301,12 +301,12 @@ fn std_file(m: Str) Str {
 
 /// Suggest the member of `owner` in `space` nearest the name at `at`.
 fn suggest_member(owner: I32, at: I32, space: Space) Void {
-    if diag_fresh[0] == 1 and at >= 0 { suggest(at, near_member(owner, word_of(at), space), near_decl[0]) }
+    if diag_fresh == 1 and at >= 0 { suggest(at, near_member(owner, word_of(at), space), near_decl) }
 }
 
 /// A note for `x.m()` with no method m (and no name suggested): where m is found.
 fn method_note(t: I32, word: I32) Void {
-    if diag_fresh[0] == 0 or suggested(diag_kind.len() - 1).len() > 0 { return }
+    if diag_fresh == 0 or suggested(diag_kind.len() - 1).len() > 0 { return }
     let m = word_text(word)
     if is_array_type(t) and (m == "push" or m == "append" or m == "pop" or m == "insert") {
         diag_note("An Array's length is fixed; a Buffer[T] grows: using Buffer from std:Buffer;")
@@ -322,12 +322,12 @@ fn method_note(t: I32, word: I32) Void {
 /// Suggest the field of `owner` nearest the name at `at`, or a method of
 /// that name, called (`s.length` → `s.len()`).
 fn suggest_field(owner: I32, at: I32) Void {
-    if diag_fresh[0] == 0 or at < 0 { return }
+    if diag_fresh == 0 or at < 0 { return }
     let word = word_of(at)
     let f = near_member(owner, word, Space.Member)
     // (Not a field of std's own: a program cannot name it.)
-    if f >= 0 and decl_is(near_decl[0], Decl.Field) and not std_own(near_decl[0]) {
-        suggest(at, f, near_decl[0])
+    if f >= 0 and decl_is(near_decl, Decl.Field) and not std_own(near_decl) {
+        suggest(at, f, near_decl)
         return
     }
     let m = near_member(owner, word, Space.Method)
@@ -491,13 +491,13 @@ fn report_wanted(k: I32, site: I32, expected: I32, actual: I32) Void {
     for (0 ..< diag_kind.len()) |i| {
         if diag_kind[i] == Diag.TypeMismatch.i32() and diag_a[i] == expected and diag_b[i] == actual and diag_word[i] == word
             and diag_c[i] >= 0 and diag_c[i] / 65536 == want_why[k] and diag_node[i] >= 0 and tail_of(diag_node[i], want_root[k]) {
-            diag_fresh[0] = 0
+            diag_fresh = 0
             return
         }
     }
     report3(Diag.TypeMismatch, site, word, expected, actual, want_why[k] * 65536)
     if word == known_word(Known.Eq) and why == Why.Condition { diag_fix(tok_start[op], tok_end[op], "==", "Use ==") }
-    if diag_fresh[0] == 1 and place >= 0 and same_file(place, site) and not within(site, place) and not within(place, site) {
+    if diag_fresh == 1 and place >= 0 and same_file(place, site) and not within(site, place) and not within(place, site) {
         diag_place(Extra.Expected, place, type_text(expected))
     }
 }
@@ -515,15 +515,15 @@ fn mismatch_text(i: I32) Str {
     let g = type_text(diag_b[i])
     // Two types of one name: said with their modules (or, when that is the same too, as two).
     if e == g and diag_a[i] != diag_b[i] {
-        qualify_types[0] = 1
+        qualify_types = 1
         e = type_text(diag_a[i])
         g = type_text(diag_b[i])
         if e == g {
-            qualify_types[0] = 2
+            qualify_types = 2
             e = type_text(diag_a[i])
             g = type_text(diag_b[i])
         }
-        qualify_types[0] = 0
+        qualify_types = 0
         if e == g { g = g + " (another type of that name)" }
     }
     let got = ", got " + g + caused
@@ -597,18 +597,18 @@ fn line_first(file: I32, t: I32) I32 {
 
 /// The hint's message, for the last diagnostic (a ParseError).
 fn parse_says(text: Str) Void {
-    if diag_fresh[0] == 1 { diag_c[diag_kind.len() - 1] = intern_text(text) }
+    if diag_fresh == 1 { diag_c[diag_kind.len() - 1] = intern_text(text) }
 }
 
 /// What a ParseError at token t (in `file`, the parser wanting `wanted`)
 /// recognizes; see the section's comment.
 fn parse_hint(file: I32, t: I32, wanted: I32) Void {
     // `'\/'` in a DSL body: its `\/` ended the body (only a "…" string keeps one).
-    if diag_fresh[0] == 1 and t > 0 and tok_kind[t] == Tok.Error.i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.i32() {
+    if diag_fresh == 1 and t > 0 and tok_kind[t] == Tok.Error.i32() and src[tok_start[t]] == 39 and tok_kind[t - 1] == Tok.DslBody.i32() {
         diag_note("\\/ ends a DSL body, except inside \"…\": write \"\\/\" there, not '\\/'")
         return
     }
-    if diag_fresh[0] == 0 or t < 0 or tok_kind[t] == Tok.Error.i32() { return }
+    if diag_fresh == 0 or t < 0 or tok_kind[t] == Tok.Error.i32() { return }
     if tok_is(t, Tok.End) {
         let prev = tok_before(file, t)
         if prev >= 3 and tok_says(prev, "fn") and tok_says(prev - 3, "proto") and tok_is(prev - 1, Tok.Colon) {
@@ -966,7 +966,7 @@ fn fn_word(decl: I32) I32 {
 //! = Instances
 
 /// The instance of a generic module the function being checked is in (0 none).
-vec cur_inst: I32 = [0]
+let cur_inst: I32 = 0
 
 /// The last diagnostic was found checking instance `inst` (of a generic
 /// module): name it, at the place it was written when known.

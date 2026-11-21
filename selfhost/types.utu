@@ -115,8 +115,8 @@ fn inst_hash(module: I32, args: I32) I32 => (module * -1640531535) ^ (args * 405
 /// The instance of `module` with type arguments `args` (a list of types),
 /// interned.
 fn instance(module: I32, args: I32) I32 {
-    let site = inst_here[0]
-    inst_here[0] = -1
+    let site = inst_here
+    inst_here = -1
     if (inst_module.len() + 1) * 2 > inst_table.len() { inst_grow() }
     let mask = inst_table.len() - 1
     let h = inst_hash(module, args) & mask
@@ -153,7 +153,7 @@ fn stream_of_promise(module: I32, args: I32) Bool {
 /// By instance: the `[U32]` of where it was first written (`G[U32]`), or -1.
 vec inst_site: I32
 /// The type arguments @type_args last read, for @instance to keep as its site.
-vec inst_here: I32 = [-1]
+let inst_here: I32 = -1
 
 /// By instance: how deep its type arguments nest instances (`m[Array[I32]]` is 2).
 vec inst_depth: I32
@@ -292,7 +292,7 @@ fn is_float(t: I32) Bool => t == prelude(Prelude.F32) or t == prelude(Prelude.F6
 fn type_of(node: I32, inst: I32) I32 {
     if node < 0 { return ty_error() }
     let kind = node_kind[node]
-    if kind == Node.Promoted_type.i32() and sig_self[0] >= 0 { return sig_self[0] }
+    if kind == Node.Promoted_type.i32() and sig_self >= 0 { return sig_self }
     if kind == Node.Ref_type.i32() { return type_path(first_child(node), inst) }
     if kind == Node.Type_ident.i32() or kind == Node.Promoted_type.i32() { return type_path(node, inst) }
     if kind == Node.Nullable_type.i32() {
@@ -340,7 +340,7 @@ fn type_of(node: I32, inst: I32) I32 {
 
 /// While a protocol member's type is read (see @sig_type): the type `&`
 /// stands for; else -1.
-vec sig_self: I32 = [-1]
+let sig_self: I32 = -1
 
 /// The type a name or path names: `T`, `&`, `M[A]`, `M.T`, `M[A].T`.
 fn type_path(node: I32, inst: I32) I32 {
@@ -437,7 +437,7 @@ fn type_args(list: I32, inst: I32) I32 {
         vl_add(type_of(c, inst))
         c = next_sibling(c)
     }
-    inst_here[0] = list
+    inst_here = list
     return vl_end(m)
 }
 
@@ -470,7 +470,7 @@ fn fit_args(list: I32, n: I32) I32 {
         vl_add(if c >= 0 { type_of(c, 0) } else { ty_error() })
         if c >= 0 { c = next_sibling(c) }
     }
-    inst_here[0] = list
+    inst_here = list
     return vl_end(m)
 }
 

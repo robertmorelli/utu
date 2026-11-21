@@ -36,7 +36,7 @@ vec view_import: I32
 
 /// The bytes of src that host declarations sealed with `seal` fill (from
 /// 0), kept from program to program; 0 when none are.
-vec abi_kept: I32 = [0]
+let abi_kept: I32 = 0
 
 /// Forget the documents, views, and indexes: a new program, when no host
 /// declarations are sealed.

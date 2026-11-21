@@ -7,10 +7,10 @@
 //! rendered: under an `@reactive` root it re-renders with the root; elsewhere
 //! it renders once. (Stage 0 does not compile Wutu.)
 
-vec wu_reconcile: I32 = [0]
-vec wu_site: I32 = [-1]
-vec wu_serial: I32 = [0]
-vec wu_node_count: I32 = [0]
+let wu_reconcile: I32 = 0
+let wu_site: I32 = -1
+let wu_serial: I32 = 0
+let wu_node_count: I32 = 0
 /// Elements with an `as` alias, in order.
 vec wu_aliases: I32
 /// The site's stylesheets: keys and CSS (words), in order.
@@ -22,8 +22,8 @@ vec wu_decls: I32
 vec wu_declared_kind: I32
 vec wu_declared_name: I32
 /// A word.
-vec wu_prefix: I32 = [-1]
-vec wu_view_hash: I32 = [-1]
+let wu_prefix: I32 = -1
+let wu_view_hash: I32 = -1
 
 // Island renames: by splice, identifiers that name element aliases.
 vec splice_rename_k: I32
@@ -33,10 +33,10 @@ vec splice_rename_at: I32
 vec splice_rename_to: I32
 
 /// The prefix of the site's generated names, `__wutu_N_`: one its body does not use.
-fn wutu_prefix() Str => word_text(wu_prefix[0])
+fn wutu_prefix() Str => word_text(wu_prefix)
 
 /// Whether the kept nodes have a reactive site: 1 or 0, or -1 until asked.
-vec kept_reactive: I32 = [-1]
+let kept_reactive: I32 = -1
 
 /// Whether `src[at ..< hi]` starts with `text` (ASCII).
 fn bytes_at(at: I32, hi: I32, text: Str) Bool {
@@ -84,15 +84,15 @@ fn expand_wutu(site: I32) Void {
     let prefix = ""
     let searching = true
     while (searching) {
-        prefix = "__wutu_" + int_text(wu_serial[0]) + "_"
-        wu_serial[0] += 1
+        prefix = "__wutu_" + int_text(wu_serial) + "_"
+        wu_serial += 1
         searching = text_index(whole, prefix, 0) >= 0
     }
-    wu_prefix[0] = intern_text(prefix)
-    wu_view_hash[0] = intern_text(wutu_hash(whole))
-    wu_site[0] = site
-    wu_reconcile[0] = 1
-    wu_node_count[0] = 0
+    wu_prefix = intern_text(prefix)
+    wu_view_hash = intern_text(wutu_hash(whole))
+    wu_site = site
+    wu_reconcile = 1
+    wu_node_count = 0
     wu_aliases.clear()
     wu_style_key.clear()
     wu_style_css.clear()
@@ -144,10 +144,10 @@ fn expand_wutu(site: I32) Void {
     }
     let render = "{ " + declarations + " " + prelude + code + " " + events + "; }"
     let value = render
-    if tw_reactive[0] == 1 {
+    if tw_reactive == 1 {
         let mount = wutu_helper(if fragment { "mount_fragment" } else if svg { "mount_svg" } else { "mount" })
         let last = word_text(wu_decls[wu_decls.len() - 1])
-        value = last + " " + mount + "(cl() " + (if fragment { "Browser.DocumentFragment " } else if svg { "Browser.SVGElement " } else { "Browser.HTMLElement " }) + "{ return " + render + "; }" + ", " + (if tw_scope[0] >= 0 { word_text(tw_scope[0]) } else { "\"\"" }) + ")"
+        value = last + " " + mount + "(cl() " + (if fragment { "Browser.DocumentFragment " } else if svg { "Browser.SVGElement " } else { "Browser.HTMLElement " }) + "{ return " + render + "; }" + ", " + (if tw_scope >= 0 { word_text(tw_scope) } else { "\"\"" }) + ")"
     }
     graft_expression(site, "{ wutu.init(); " + value + "; }")
 }
@@ -235,8 +235,8 @@ fn wutu_style(key: Str, css: Str) Void {
 /// Number the elements and collect their aliases, in order.
 fn wutu_prepare(n: I32) Void {
     if tn_kind[n] == 4 {
-        tn_index[n] = wu_node_count[0]
-        wu_node_count[0] += 1
+        tn_index[n] = wu_node_count
+        wu_node_count += 1
         if tn_binding[n] >= 0 { wu_aliases.push(n) }
     }
     let c = tn_first[n]
@@ -290,7 +290,7 @@ fn resolve_alias(name: I32, owner: I32, offset: I32) I32 {
 /// without a range (a string literal) is written as it is.
 fn wutu_island(source: Str, from: I32, to: I32, owner: I32) Str {
     if from < 0 { return source }
-    let site = wu_site[0]
+    let site = wu_site
     let start = dsl_byte(site, from)
     let stop = dsl_byte(site, to)
     let text = bytes_text(start, stop)
@@ -314,7 +314,7 @@ fn rename_aliases(node: I32, root: I32, k: I32, owner: I32) Void {
         let name = word_of(node)
         if not island_shadowed(node, name, root) {
             let at = tok_start[node_first[node]]
-            let offset = dsl_units(wu_site[0], at)
+            let offset = dsl_units(wu_site, at)
             let alias = resolve_alias(name, owner, offset)
             if alias >= 0 {
                 splice_rename_k.push(k)
@@ -903,10 +903,10 @@ fn wd_binding(n: I32, i: I32) Str {
     let id = node_uid(n)
     let target = wutu_island(word_text(ti_b[i]), ti_from[i], ti_to[i], n)
     let kind = word_text(ti_a[i])
-    let update = located_splice(wu_site[0], binding_update(kind, id, target), ti_at[i], ti_to[i])
+    let update = located_splice(wu_site, binding_update(kind, id, target), ti_at[i], ti_to[i])
     wx_events.push(intern_text(wutu_helper("on") + "(cl(__wutu_event) Void { " + update + "; });\n"))
     wx_event_ops.push(intern_text("[\"v\"," + int_text(tn_index[n]) + ",\"" + binding_event(kind) + "\"]"))
-    if kind == "value" and word_text(tn_text[n]) == "select" { return located_splice(wu_site[0], select_value(id, target), ti_at[i], ti_to[i]) + ";\n" }
+    if kind == "value" and word_text(tn_text[n]) == "select" { return located_splice(wu_site, select_value(id, target), ti_at[i], ti_to[i]) + ";\n" }
     return binding_sync_code(kind, id, target, i)
 }
 
@@ -917,7 +917,7 @@ fn select_value(id: Str, value: Str) Str => wutu_helper("select_value") + "(" + 
 /// bind statement; empty for `files`, which is read-only.
 fn binding_sync_code(kind: Str, id: Str, target: Str, i: I32) Str {
     let sync = binding_sync(kind, id, target)
-    return if sync.len() == 0 { "" } else { located_splice(wu_site[0], sync, ti_at[i], ti_to[i]) + ";\n" }
+    return if sync.len() == 0 { "" } else { located_splice(wu_site, sync, ti_at[i], ti_to[i]) + ";\n" }
 }
 
 /// `bind:values` crosses as one string: U+001F before each chosen value ("" for none, so `[""]` differs).
@@ -1063,8 +1063,8 @@ fn wd_loop(n: I32, svg: Bool, o: WOps) Str {
     let captures = written
     if comma >= 0 { index = trim_text(written.slice(comma + 1, written.len())) }
     else if not keyed {
-        index = wutu_prefix() + "index" + int_text(wu_node_count[0])
-        wu_node_count[0] += 1
+        index = wutu_prefix() + "index" + int_text(wu_node_count)
+        wu_node_count += 1
         captures = written + ", " + index
     }
     let iterable = wutu_island(word_text(tn_text[n]), tn_from[n], tn_to[n], n)

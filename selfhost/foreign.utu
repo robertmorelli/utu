@@ -44,7 +44,7 @@ fn reset_foreign() Void {
     fty_at.clear()
     fty_env.clear()
     fty_view.clear()
-    any_at[0] = -1
+    any_at = -1
     // (resize keeps what a mem held before, so these are set, not cleared)
     boxed_at.resize(2)
     boxed_at[0] = -1
@@ -63,15 +63,15 @@ fn is_foreign(t: I32) Bool => t >= 0 and ty_is(t, Ty.Foreign)
 /// Whether the reference is the JSON string `text`.
 fn ref_is(r: Ref, text: Str) Bool => jstring_is_text(r.at, text)
 
-// A generic parameter's binding, or -1 (its at), with its env in bind_env[0].
-vec bind_env: I32 = [0]
+// A generic parameter's binding, or -1 (its at), with its env in bind_env.
+let bind_env: I32 = 0
 
 fn binding_of(env: I32, word: I32) I32 {
     if env < 0 { return -1 }
     let i = 0
     while (i < vl_len[env]) {
         if vl_item(env, i) == word {
-            bind_env[0] = vl_item(env, i + 2)
+            bind_env = vl_item(env, i + 2)
             return vl_item(env, i + 1)
         }
         i += 3
@@ -87,7 +87,7 @@ fn open_param(r: Ref) I32 {
         if not jis_object(x.at) or jget(x.at, "parameter") < 0 { return -1 }
         let bound = binding_of(x.env, jstring_word(jget(x.at, "parameter")))
         if bound < 0 { return x.at }
-        x = Ref { doc: x.doc, at: bound, env: bind_env[0] }
+        x = Ref { doc: x.doc, at: bound, env: bind_env }
     }
     return -1
 }
@@ -101,7 +101,7 @@ fn resolved(r: Ref) Ref {
         let p = jget(at, "parameter")
         if p >= 0 {
             let bound = binding_of(r.env, jstring_word(p))
-            if bound >= 0 { return resolved(Ref { doc: r.doc, at: bound, env: bind_env[0] }) }
+            if bound >= 0 { return resolved(Ref { doc: r.doc, at: bound, env: bind_env }) }
             let c = jget(at, "constraint")
             if c >= 0 { return resolved(Ref { doc: r.doc, at: c, env: r.env }) }
             return any_slot(r.doc)
@@ -149,7 +149,7 @@ fn awaited_of(x: Ref) Ref {
     if p < 0 { return x }
     let bound = binding_of(x.env, jstring_word(p))
     if bound < 0 { return any_slot(x.doc) }
-    return awaited_of(resolved(Ref { doc: x.doc, at: bound, env: bind_env[0] }))
+    return awaited_of(resolved(Ref { doc: x.doc, at: bound, env: bind_env }))
 }
 
 /// A declaration's parameters bound to arguments (references in `env`), in
@@ -195,11 +195,11 @@ fn closed_env(decl: I32, env: I32) I32 {
 }
 
 /// The JSON text `"any"`, written once into src.
-vec any_at: I32 = [-1]
+let any_at: I32 = -1
 
 fn any_ref() I32 {
-    if any_at[0] < 0 { any_at[0] = abi_text("\"any\"") }
-    return any_at[0]
+    if any_at < 0 { any_at = abi_text("\"any\"") }
+    return any_at
 }
 
 /// A reference to `any`, in document `doc`.
@@ -242,7 +242,7 @@ fn canonical(r: Ref) Str {
             while (p >= 0) {
                 if not first { text = text + "," }
                 let bound = binding_of(x.env, jstring_word(p))
-                text = text + if bound >= 0 { canonical(Ref { doc: x.doc, at: bound, env: bind_env[0] }) } else { "any" }
+                text = text + if bound >= 0 { canonical(Ref { doc: x.doc, at: bound, env: bind_env }) } else { "any" }
                 first = false
                 p = jnext(p)
             }
@@ -399,7 +399,7 @@ fn display(r: Ref, depth: I32) Str {
         let p = jget(at, "parameter")
         if p >= 0 {
             let bound = binding_of(r.env, jstring_word(p))
-            if bound >= 0 { return display(Ref { doc: r.doc, at: bound, env: bind_env[0] }, depth + 1) }
+            if bound >= 0 { return display(Ref { doc: r.doc, at: bound, env: bind_env }, depth + 1) }
             let c = jget(at, "constraint")
             if c >= 0 and not jstring_is_text(c, "any") and not jstring_is_text(c, "unknown") {
                 return display(Ref { doc: r.doc, at: c, env: r.env }, depth + 1)
@@ -452,19 +452,19 @@ fn decl_name_text(decl: I32) Str {
 //! signature's), or of a view's root (an export). Found, its type is in
 //! member_ref, and whether it is read-only in member_readonly.
 
-vec member_doc: I32 = [0]
-vec member_at: I32 = [0]
-vec member_env: I32 = [0]
-vec member_readonly: I32 = [0]
+let member_doc: I32 = 0
+let member_at: I32 = 0
+let member_env: I32 = 0
+let member_readonly: I32 = 0
 
 /// The member @foreign_member or @root_member found last.
-fn member_ref() Ref => Ref { doc: member_doc[0], at: member_at[0], env: member_env[0] }
+fn member_ref() Ref => Ref { doc: member_doc, at: member_at, env: member_env }
 
 fn found_member(doc: I32, at: I32, env: I32, readonly: Bool) Bool {
-    member_doc[0] = doc
-    member_at[0] = at
-    member_env[0] = env
-    member_readonly[0] = if readonly { 1 } else { 0 }
+    member_doc = doc
+    member_at = at
+    member_env = env
+    member_readonly = if readonly { 1 } else { 0 }
     return true
 }
 
@@ -622,12 +622,12 @@ fn foreign_call_op(params: I32, result: I32, body: Str, m: I32) I32 {
 
 /// How builds are optimized, as stage 0's `optimize`: 0 none, 1 size (the
 /// default), 2 speed.
-vec optimize_level: I32 = [1]
+let optimize_level: I32 = 1
 
 /// Whether builds keep the checks wasm makes anyway (1, `--safe`): std's
 /// `<ir-safe-checks/>` is this, an exhaustive `alt` tests its last arm, and
 /// a mem that cannot grow traps where it fails.
-vec safe_checks: I32 = [0]
+let safe_checks: I32 = 0
 
 /// A member operation (a read, write, or call of member `key`; of a view's
 /// root when `root`). Size-optimized builds share one import per shape, as
@@ -635,7 +635,7 @@ vec safe_checks: I32 = [0]
 /// `(self,k) => self[k]`, with the name a string constant, which JS string
 /// builtins make free. Other builds keep one import per name.
 fn foreign_member_op(params: I32, result: I32, body: Str, m: I32, key: I32, root: Bool) I32 {
-    if optimize_level[0] != 1 { return foreign_call_op(params, result, body, m) }
+    if optimize_level != 1 { return foreign_call_op(params, result, body, m) }
     let named = (if root { "globalThis[" } else { "self[" }) + js_key(key) + "]"
     let at = text_index(body, named, 0)
     if at < 0 or text_index(body, named, at + 1) >= 0 { return foreign_call_op(params, result, body, m) }
@@ -723,22 +723,22 @@ fn union_has(union: I32, text: Str) Bool {
 }
 
 // The result an operation gives: a dynamic one becomes the primitive its
-// context expects, checked (result_checked[0] = 1).
-vec result_checked: I32 = [0]
+// context expects, checked (result_checked = 1).
+let result_checked: I32 = 0
 
 fn foreign_result(r: Ref, view: I32, expect: I32) I32 {
-    result_checked[0] = 0
+    result_checked = 0
     let wanted = if expect >= 0 and typeof_name(expect).len() > 0 { expect } else { -1 }
     if ref_dynamic(r) {
         if wanted >= 0 {
-            result_checked[0] = 1
+            result_checked = 1
             return wanted
         }
         return foreign_any(view)
     }
     let t = foreign_type(r, view)
     if is_dynamic(t) and wanted >= 0 {
-        result_checked[0] = 1
+        result_checked = 1
         return wanted
     }
     return t
@@ -811,7 +811,7 @@ fn string_like(e: I32) Bool {
         return env >= 0 and vl_len[env] >= 3 and foreign_type(Ref { doc: fty_doc[e], at: vl_item(env, 1), env: vl_item(env, 2) }, fty_view[e]) == prelude(Prelude.Str)
     }
     let el = element_of(ref_of(e), 0)
-    return el >= 0 and foreign_type(Ref { doc: fty_doc[e], at: el, env: element_env[0] }, fty_view[e]) == prelude(Prelude.Str)
+    return el >= 0 and foreign_type(Ref { doc: fty_doc[e], at: el, env: element_env }, fty_view[e]) == prelude(Prelude.Str)
 }
 
 /// Whether host type `t` has base `b` (through its bases' bases).
@@ -887,17 +887,17 @@ fn has_index(t: I32, want: Ref, view: I32) Bool {
 /// of one declaration is that of another, by its first call signature. A
 /// value of it takes no more required parameters than wanted, each of a type
 /// the wanted one passes, and gives a result the wanted one takes.
-vec fit_depth: I32 = [0]
+let fit_depth: I32 = 0
 
 fn calls_fit(a: I32, e: I32) Bool {
     let da = describe(ref_of(a))
     let de = describe(ref_of(e))
     let sa = jfirst(desc_get(da, "calls"))
     let se = jfirst(desc_get(de, "calls"))
-    if sa < 0 or se < 0 or jlen(desc_get(de, "properties")) > 0 or fit_depth[0] > 8 { return false }
-    fit_depth[0] += 1
+    if sa < 0 or se < 0 or jlen(desc_get(de, "properties")) > 0 or fit_depth > 8 { return false }
+    fit_depth += 1
     let fits = sig_fits(da, sa, de, se, fty_view[e])
-    fit_depth[0] -= 1
+    fit_depth -= 1
     return fits
 }
 
@@ -939,7 +939,7 @@ fn param_type(d: Ref, p: I32, view: I32) I32 {
     let r = Ref { doc: d.doc, at: jget(p, "type"), env: d.env }
     if jis_true(jget(p, "rest")) {
         let e = element_of(r, 0)
-        r = if e >= 0 { Ref { doc: d.doc, at: e, env: element_env[0] } } else { any_slot(d.doc) }
+        r = if e >= 0 { Ref { doc: d.doc, at: e, env: element_env } } else { any_slot(d.doc) }
     }
     return foreign_type(r, view)
 }
@@ -1021,10 +1021,10 @@ fn foreign_unbox(from: I32, to: I32, checked: Bool) Void {
 // `globalThis["key"]` (a package's, its import), and the prologue that
 // imports it.
 /// A word: the prologue's text ("" for none).
-vec access_prologue: I32 = [0]
+let access_prologue: I32 = 0
 
 fn member_access(view: I32, key: I32, root: Bool) Str {
-    access_prologue[0] = intern_text("")
+    access_prologue = intern_text("")
     if not root { return "self[" + js_key(key) + "]" }
     let spec = jget(view_json[view], "moduleSpecifier")
     if not jis_string(spec) { return "globalThis[" + js_key(key) + "]" }
@@ -1034,7 +1034,7 @@ fn member_access(view: I32, key: I32, root: Bool) Str {
     let assigned = jis_true(jget(view_json[view], "exportAssignment")) and word_text(key) != "default"
     let name = if assigned { intern_text("default") } else { key }
     let alias = "__abi" + int_text(foreign_ordinal(view_import[view])) + "_" + hex_name(word_text(name))
-    access_prologue[0] = intern_text("import { " + js_key(name) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ")
+    access_prologue = intern_text("import { " + js_key(name) + " as " + alias + " } from " + bytes_text(spec, jend(spec)) + "; ")
     return if assigned { alias + "[" + js_key(key) + "]" } else { alias }
 }
 
@@ -1103,10 +1103,10 @@ fn one_type(t: I32) I32 {
 fn check_foreign_root(node: I32, view: I32, key: I32, expect: I32) I32 {
     if not root_member(view, key) { return unknown_member(node, view, -1, key) }
     let t = foreign_result(member_ref(), view, expect)
-    let checked = result_checked[0] == 1
+    let checked = result_checked == 1
     let access = member_access(view, key, true)
     let m = w_mark()
-    return foreign_member_op(vl_empty(), t, word_text(access_prologue[0]) + "() => " + js_output(access, t, checked), m, key, true)
+    return foreign_member_op(vl_empty(), t, word_text(access_prologue) + "() => " + js_output(access, t, checked), m, key, true)
 }
 
 /// `Api.Mode.On`: an enum member (const or not) is its literal, with no
@@ -1135,7 +1135,7 @@ fn check_foreign_root_set(node: I32, view: I32, key: I32, value: I32, word: I32,
         w_pop()
         return unknown_member(node, view, -1, key)
     }
-    if member_readonly[0] == 1 {
+    if member_readonly == 1 {
         report2(Diag.ForeignReadonly, node, key, -1, -1)
         return error_value()
     }
@@ -1150,7 +1150,7 @@ fn check_foreign_root_set(node: I32, view: I32, key: I32, value: I32, word: I32,
     }
     let ms = if word < 0 { m } else { w_mark() - 1 }
     let access = member_access(view, key, true)
-    foreign_member_op(one_type(vt), ty_void(), word_text(access_prologue[0]) + "(value) => { " + access + " = " + js_argument(slot, "value", vt) + "; }", ms, key, true)
+    foreign_member_op(one_type(vt), ty_void(), word_text(access_prologue) + "(value) => { " + access + " = " + js_argument(slot, "value", vt) + "; }", ms, key, true)
     if word >= 0 { w_node(Op.Seq, vt_none, 0, 0, m) }
     return ty_void()
 }
@@ -1160,7 +1160,7 @@ fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
     let view = fty_view[owner]
     if not foreign_member(owner, key, view) { return missing_member(node, owner, key, m) }
     let t = foreign_result(member_ref(), view, expect)
-    let checked = result_checked[0] == 1
+    let checked = result_checked == 1
     return foreign_member_op(one_type(erased(owner, view)), t, "(self) => " + js_output(member_access(view, key, false), t, checked), m, key, false)
 }
 
@@ -1168,7 +1168,7 @@ fn check_foreign_get(node: I32, owner: I32, key: I32, m: I32, expect: I32) I32 {
 fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx) I32 {
     let view = fty_view[owner]
     if not foreign_member(owner, key, view) { return missing_member(node, owner, key, m) }
-    if member_readonly[0] == 1 {
+    if member_readonly == 1 {
         report2(Diag.ForeignReadonly, node, key, -1, -1)
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
         return error_value()
@@ -1188,7 +1188,7 @@ fn check_foreign_set(node: I32, owner: I32, key: I32, value: I32, m: I32, cx: Cx
 fn check_foreign_update(node: I32, owner: I32, key: I32, value: I32, word: I32, m: I32, cx: Cx) I32 {
     let view = fty_view[owner]
     if not foreign_member(owner, key, view) { return missing_member(node, owner, key, m) }
-    if member_readonly[0] == 1 {
+    if member_readonly == 1 {
         report2(Diag.ForeignReadonly, node, key, -1, -1)
         w_node(Op.Unreachable, vt_unreachable, 0, 0, m)
         return error_value()
@@ -1244,18 +1244,18 @@ fn prim_ref(t: I32) I32 {
 }
 
 // A utu type as a declaration reference (for a generic binding), or false.
-vec typed_ref_at: I32 = [0]
-vec typed_ref_env: I32 = [0]
+let typed_ref_at: I32 = 0
+let typed_ref_env: I32 = 0
 
 fn ref_of_type(t: I32) Bool {
     if is_foreign(t) {
-        typed_ref_at[0] = fty_at[t]
-        typed_ref_env[0] = fty_env[t]
+        typed_ref_at = fty_at[t]
+        typed_ref_env = fty_env[t]
         return true
     }
     if t == prelude(Prelude.Str) or t == prelude(Prelude.F64) or t == prelude(Prelude.Bool) {
-        typed_ref_at[0] = prim_ref(t)
-        typed_ref_env[0] = -1
+        typed_ref_at = prim_ref(t)
+        typed_ref_env = -1
         return true
     }
     return false
@@ -1287,18 +1287,18 @@ fn is_record(arg: I32) Bool => is_kind(arg, Node.Implicit_struct_init)
 fn is_untyped_array(arg: I32) Bool => is_kind(arg, Node.Array_expr)
 
 // The element a JS array must hold for an array, array-like, or iterable slot, or -1.
-vec element_env: I32 = [0]
+let element_env: I32 = 0
 
 fn element_of(slot: Ref, depth: I32) I32 {
     if depth > 8 { return -1 }
     let d = describe(slot)
     if ref_dynamic(slot) {
-        element_env[0] = -1
+        element_env = -1
         return any_ref()
     }
     let element = desc_get(d, "element")
     if element >= 0 {
-        element_env[0] = d.env
+        element_env = d.env
         return element
     }
     // `Iterable<T, TReturn, TNext>`: T, its first parameter.
@@ -1307,16 +1307,16 @@ fn element_of(slot: Ref, depth: I32) I32 {
     if lib >= 0 and first >= 0 and jstring_is_text(lib, "Iterable") {
         let bound = binding_of(d.env, jstring_word(first))
         if bound >= 0 {
-            element_env[0] = bind_env[0]
+            element_env = bind_env
             return bound
         }
-        element_env[0] = -1
+        element_env = -1
         return any_ref()
     }
     let index = jfirst(desc_get(d, "indexes"))
     while (index >= 0) {
         if jstring_is_text(jget(index, "key"), "F64") {
-            element_env[0] = d.env
+            element_env = d.env
             return jget(index, "type")
         }
         index = jnext(index)
@@ -1338,7 +1338,7 @@ fn element_of(slot: Ref, depth: I32) I32 {
 /// dynamic slot; else the slot's type.
 fn accept(slot: Ref, arg: I32, view: I32, cx: Cx) I32 {
     // `&{…}` for a generic `T extends { name: string }` is T: it may have more fields.
-    if is_record(arg) and open_param(slot) >= 0 { open_record[0] = arg }
+    if is_record(arg) and open_param(slot) >= 0 { open_record = arg }
     let s = resolved(slot)
     if ref_dynamic(s) {
         if is_null_literal(arg) { return nullable(foreign_any(view)) }
@@ -1465,7 +1465,7 @@ fn host_literal(given: Ref, arg: I32, view: I32, cx: Cx) Void {
 }
 
 /// A number literal's value, for @literal_fit.
-vec fit_x: F64 = [0.0]
+let fit_x: F64 = 0.0
 
 /// Whether literal `arg` (`"x"`, `2.0`, `-1`) is a value of literal type `d`
 /// (a literal, a pattern, a union of them): 1; 0 not; -1 when `d` has a
@@ -1479,8 +1479,8 @@ fn literal_in(d: Ref, arg: I32) I32 {
     let text = is_kind(c, Node.String_lit) and not negate
     let number = is_kind(c, Node.Int_lit) or is_kind(c, Node.Float_lit)
     if not text and not number { return -1 }
-    fit_x[0] = if is_kind(c, Node.Int_lit) { int_value(c).u64().f64() } else if number { parse_number(token_text(node_first[c])) } else { 0.0 }
-    if negate { fit_x[0] = 0.0 - fit_x[0] }
+    fit_x = if is_kind(c, Node.Int_lit) { int_value(c).u64().f64() } else if number { parse_number(token_text(node_first[c])) } else { 0.0 }
+    if negate { fit_x = 0.0 - fit_x }
     let lo = tok_start[node_first[c]]
     let hi = tok_end[node_last[c] - 1]
     let union = desc_get(d, "union")
@@ -1505,7 +1505,7 @@ fn literal_fit(m: I32, d: Ref, text: Bool, lo: I32, hi: I32) I32 {
     let value = jget(m, "literal")
     if value < 0 { return -1 }
     if text and jis_string(value) and not jis_true(jget(d.at, "enum")) and bytes_equal(value, jend(value), lo, hi) { return 1 }
-    if not text and jis_number(value) and json_number(value) == fit_x[0] { return 1 }
+    if not text and jis_number(value) and json_number(value) == fit_x { return 1 }
     return 0
 }
 
@@ -1796,7 +1796,7 @@ fn callback_slot(d: Ref, params: I32, i: I32, fixed: I32, rest: I32) Ref {
     if i < fixed { return Ref { doc: d.doc, at: jget(jitem(params, i), "type"), env: d.env } }
     if rest >= 0 {
         let e = element_of(Ref { doc: d.doc, at: jget(rest, "type"), env: d.env }, 0)
-        if e >= 0 { return Ref { doc: d.doc, at: e, env: element_env[0] } }
+        if e >= 0 { return Ref { doc: d.doc, at: e, env: element_env } }
     }
     return any_slot(d.doc)
 }
@@ -1829,7 +1829,7 @@ fn sig_slot(sig: I32, i: I32, env: I32, doc: I32) Ref {
     let p = jitem(params, if i < np - 1 { i } else { np - 1 })
     if jis_true(jget(p, "rest")) {
         let e = element_of(Ref { doc: doc, at: jget(p, "type"), env: env }, 0)
-        if e >= 0 { return Ref { doc: doc, at: e, env: element_env[0] } }
+        if e >= 0 { return Ref { doc: doc, at: e, env: element_env } }
         return any_slot(doc)
     }
     if i >= np { return any_slot(doc) }
@@ -1987,8 +1987,8 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 let senv = if jget(jget(slot.at, "constraint"), "parameter") >= 0 { pending_env(m) } else { slot.env }
                 if ref_of_type(t) and within_constraint(t, Ref { doc: slot.doc, at: slot.at, env: senv }, d) {
                     vl_add(jstring_word(p))
-                    vl_add(typed_ref_at[0])
-                    vl_add(typed_ref_env[0])
+                    vl_add(typed_ref_at)
+                    vl_add(typed_ref_env)
                 }
             }
         }
@@ -2006,7 +2006,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
         // A host array where `T[]` is wanted: `T` is its element's type.
         if p < 0 and closure_node(args[k]) < 0 {
             let el = element_of(slot, 0)
-            let ep = if el >= 0 { open_param(Ref { doc: d.doc, at: el, env: element_env[0] }) } else { -1 }
+            let ep = if el >= 0 { open_param(Ref { doc: d.doc, at: el, env: element_env }) } else { -1 }
             if ep >= 0 and not bound_in_pending(m, jstring_word(jget(ep, "parameter"))) {
                 if not is_untyped_array(args[k]) {
                     let at_ = host_type(args[k], cx)
@@ -2014,7 +2014,7 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                     if ae >= 0 {
                         vl_add(jstring_word(jget(ep, "parameter")))
                         vl_add(ae)
-                        vl_add(element_env[0])
+                        vl_add(element_env)
                     }
                 }
             }
@@ -2043,8 +2043,8 @@ fn unify_args(sig: I32, args: Array[I32], n: I32, d: Ref, cx: Cx) I32 {
                 }
                 if ret >= 0 and ref_of_type(ret) {
                     vl_add(jstring_word(rp))
-                    vl_add(typed_ref_at[0])
-                    vl_add(typed_ref_env[0])
+                    vl_add(typed_ref_at)
+                    vl_add(typed_ref_env)
                 }
             }
         }
@@ -2063,7 +2063,7 @@ fn unify_elements(slot: Ref, arg: I32, m: I32, d: Ref, depth: I32, cx: Cx) Void 
     let tuple = is_tuple(sd)
     let el = if tuple { -1 } else { element_of(slot, 0) }
     if not tuple and el < 0 { return }
-    let element = Ref { doc: slot.doc, at: el, env: element_env[0] }
+    let element = Ref { doc: slot.doc, at: el, env: element_env }
     let c = first_child(arg)
     let i = 0
     while (c >= 0 and (tuple or i == 0)) {
@@ -2088,8 +2088,8 @@ fn bind_param(ep: I32, arg: I32, m: I32, d: Ref, cx: Cx) Void {
         vl_add(-1)
     } else if ref_of_type(host_type(arg, cx)) {
         vl_add(w)
-        vl_add(typed_ref_at[0])
-        vl_add(typed_ref_env[0])
+        vl_add(typed_ref_at)
+        vl_add(typed_ref_env)
     }
 }
 
@@ -2169,7 +2169,7 @@ fn check_foreign_invoke(node: I32, fn_ref: Ref, view: I32, args: I32, receiver: 
     if sig >= 0 { env = bind_from_context(jget(sig, "result"), d.doc, env, expect) }
     let result_ref = if sig >= 0 { Ref { doc: d.doc, at: jget(sig, "result"), env: env } } else { any_slot(d.doc) }
     let t = foreign_result(result_ref, view, expect)
-    let checked = result_checked[0] == 1
+    let checked = result_checked == 1
     let self_ = if receiver >= 0 { if n > 0 { "self," } else { "self" } } else { "" }
     let body = prologue + "(" + self_ + param_names(n) + ") => " + js_output((if construct or use_ctors { "new " } else { "" }) + access + "(" + invocation + ")", t, checked)
     let r = if key >= 0 { foreign_member_op(vl_end(mt), t, body, m, key, receiver < 0) } else { foreign_call_op(vl_end(mt), t, body, m) }
@@ -2233,7 +2233,7 @@ fn check_foreign_method(node: I32, owner: I32, key: I32, args: I32, m: I32, expe
 fn check_foreign_root_call(node: I32, view: I32, key: I32, args: I32, construct: Bool, m: I32, expect: I32, cx: Cx) I32 {
     if not root_member(view, key) { return unknown_member(node, view, -1, key) }
     let access = member_access(view, key, true)
-    return check_foreign_invoke(node, member_ref(), view, args, -1, key, access, word_text(access_prologue[0]), construct, m, expect, cx)
+    return check_foreign_invoke(node, member_ref(), view, args, -1, key, access, word_text(access_prologue), construct, m, expect, cx)
 }
 
 /// `new Browser.C(args)`, `new Browser.Intl.NumberFormat(args)`.
@@ -2275,7 +2275,7 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
         let mt = vl_begin()
         vl_add(erased(owner, view))
         vl_add(erased(kt, view))
-        return foreign_call_op(vl_end(mt), st, "(self,k) => " + js_output("self[k]", st, result_checked[0] == 1), m)
+        return foreign_call_op(vl_end(mt), st, "(self,k) => " + js_output("self[k]", st, result_checked == 1), m)
     }
     let info = index_for(d, kt, view)
     if info < 0 and not ref_dynamic(ref_of(owner)) {
@@ -2301,7 +2301,7 @@ fn check_foreign_index(node: I32, owner: I32, key_node: I32, m: I32, expect: I32
         }
     }
     let t = foreign_result(slot, view, expect)
-    let checked = result_checked[0] == 1
+    let checked = result_checked == 1
     let mt = vl_begin()
     vl_add(erased(owner, view))
     vl_add(erased(kt, view))
@@ -2330,7 +2330,7 @@ fn check_foreign_symbol_call(node: I32, callee: I32, t: I32, args: I32, m: I32, 
     if not root_member(view, jstring_word(sym)) { return -1 }
     check_expr(first_child(callee), rt, cx)
     let access = "self[" + member_access(view, jstring_word(sym), true) + "]"
-    return check_foreign_invoke(node, ref_of(t), fty_view[t], args, rt, -1, access, word_text(access_prologue[0]), false, m, expect, cx)
+    return check_foreign_invoke(node, ref_of(t), fty_view[t], args, rt, -1, access, word_text(access_prologue), false, m, expect, cx)
 }
 
 /// Whether a declaration is a tuple's (`[T0, T1]`).
@@ -2395,11 +2395,11 @@ fn tuple_slot(d: Ref, i: I32) Ref {
     let params = desc_get(d, "parameters")
     let bound = binding_of(d.env, jstring_word(jitem(params, jlen(params) - 1)))
     if bound < 0 { return any_slot(d.doc) }
-    return Ref { doc: d.doc, at: bound, env: bind_env[0] }
+    return Ref { doc: d.doc, at: bound, env: bind_env }
 }
 
 /// The record last given a generic parameter's slot (see @accept).
-vec open_record: I32 = [-1]
+let open_record: I32 = -1
 
 /// Whether declaration `d` is `object` or `{}`, which any record fits.
 fn is_open_object(d: Ref) Bool {
@@ -2412,7 +2412,7 @@ fn check_foreign_record(node: I32, t: I32, cx: Cx) I32 {
     let view = fty_view[t]
     let d = describe(ref_of(t))
     let props = desc_get(d, "properties")
-    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t)) or open_record[0] == node or is_open_object(d)
+    let open = jlen(desc_get(d, "indexes")) > 0 or ref_dynamic(ref_of(t)) or open_record == node or is_open_object(d)
     let m = w_mark()
     let mt = vl_begin()
     let fields = ""
@@ -2479,7 +2479,7 @@ fn check_foreign_array(node: I32, t: I32, cx: Cx) I32 {
         report2(Diag.ForeignNotArray, node, -1, t, -1)
         return error_value()
     }
-    let slot = Ref { doc: fty_doc[t], at: e, env: element_env[0] }
+    let slot = Ref { doc: fty_doc[t], at: e, env: element_env }
     // A tuple: each element its own type, as many as it takes.
     let d = describe(ref_of(t))
     let tuple = is_tuple(d)
@@ -2561,7 +2561,7 @@ fn check_foreign_primitive_get(t: I32, host: I32, key: I32, m: I32, expect: I32)
     let view = fty_view[host]
     foreign_member(host, key, view)
     let rt = foreign_result(member_ref(), view, expect)
-    let checked = result_checked[0] == 1
+    let checked = result_checked == 1
     return foreign_member_op(one_type(t), rt, "(self) => " + js_output(member_access(view, key, false), rt, checked), m, key, false)
 }
 
@@ -2608,7 +2608,7 @@ fn check_foreign_index_update(node: I32, owner: I32, key_node: I32, value: I32, 
     w_get(vo, o)
     w_get(repr(kt), k)
     let t = foreign_result(slot, view, -1)
-    let checked = result_checked[0] == 1
+    let checked = result_checked == 1
     let mt = vl_begin()
     vl_add(erased(owner, view))
     vl_add(erased(kt, view))
@@ -2646,8 +2646,8 @@ fn js_array_receiver(literal: I32, key: I32, cx: Cx) I32 {
             let params = jget(abi_type(view_doc[v], jint(at)), "parameters")
             let m = vl_begin()
             vl_add(jstring_word(jfirst(params)))
-            vl_add(typed_ref_at[0])
-            vl_add(typed_ref_env[0])
+            vl_add(typed_ref_at)
+            vl_add(typed_ref_env)
             let t = foreign_type(Ref { doc: view_doc[v], at: at, env: vl_end(m) }, v)
             if is_foreign(t) and foreign_member(t, key, v) { return t }
         }
@@ -2773,9 +2773,9 @@ fn host_argument_type(call: I32, i: I32, after: I32, cx: Cx) I32 {
         if rt < 0 {
             let m = w_mark()
             let diags = diag_kind.len()
-            speculating[0] += 1
+            speculating += 1
             rt = check_base(callee, cx)
-            speculating[0] -= 1
+            speculating -= 1
             w_resize_stack(m)
             diag_truncate(diags)
         }
@@ -2811,7 +2811,7 @@ fn display_generic(r: Ref, depth: I32) Str {
     while (p >= 0) {
         if n > 0 { args = args + ", " }
         let bound = binding_of(r.env, jstring_word(p))
-        args = args + if bound >= 0 { display(Ref { doc: r.doc, at: bound, env: bind_env[0] }, depth + 1) } else { "any" }
+        args = args + if bound >= 0 { display(Ref { doc: r.doc, at: bound, env: bind_env }, depth + 1) } else { "any" }
         n += 1
         p = jnext(p)
     }
@@ -2833,7 +2833,7 @@ fn host_promise_value(t: I32) I32 {
     if p < 0 { return foreign_any(fty_view[t]) }
     let bound = binding_of(r.env, jstring_word(p))
     if bound < 0 { return foreign_any(fty_view[t]) }
-    let v = foreign_type(Ref { doc: r.doc, at: bound, env: bind_env[0] }, fty_view[t])
+    let v = foreign_type(Ref { doc: r.doc, at: bound, env: bind_env }, fty_view[t])
     // (`Promise<Promise<T>>` resolves to T, as JS and TypeScript's Awaited have it)
     let inner = host_promise_value(v)
     return if inner >= 0 { inner } else { v }
@@ -2945,7 +2945,7 @@ fn host_alt_arms(arm: I32, s: I32, st: I32, expect: I32, default_: I32, cx: Cx) 
     w_leaf(Op.LocalGet, repr(st), s, 0)
     let access = member_access(view, class, true)
     let params = one_type(erased(st, view))
-    foreign_call_op(params, nullable(narrowed), word_text(access_prologue[0]) + "(value) => value instanceof " + access + " ? value : null", mt)
+    foreign_call_op(params, nullable(narrowed), word_text(access_prologue) + "(value) => value instanceof " + access + " ? value : null", mt)
     w_node(Op.LocalSet, vt_none, tested, 0, mt)
     // if tested != null: bind, then the arm; else the next arms.
     let mi = w_mark()
