@@ -77,6 +77,14 @@ let opt_shared: I32 = 0
 let opt_field_reads: I32 = 0
 /// By local: its index once unused locals are gone.
 vec opt_renumber: I32
+/// Whether a local rewrite put a constant, or an add or sub, where a read
+/// was: only that can give a fold (@cf_candidate) where a settled tree had
+/// none. (A copy reads another local. A value sunk is pure: it never
+/// leaves a block, and reads no global.)
+vec opt_fold_cue: U8 = [0]
+/// Whether the walk found a node constant folding would change (see
+/// @cf_candidate): with none, a fold of the tree as surveyed changes nothing.
+vec opt_foldable: U8 = [0]
 
 /// The cleanup, over each live function with a body, after the sweep.
 fn optimize_module() Void {
@@ -99,29 +107,42 @@ fn optimize_function(f: I32) Void {
     // as does any fold following such a rewrite. Constant-only changes made
     // against a fresh survey leave its sparse indexes intact.
     let surveyed = true
-    let folded = fold_constants(f)
+    // (Whether the tree is as last surveyed: then its walk knows whether a fold changes anything.)
+    let pristine = true
+    let folded = if opt_foldable[0] == 1 { fold_surveyed(f) } else { cf_unchanged }
     while (true) {
         if folded != cf_unchanged and (folded == cf_structure or not surveyed) {
             opt_collect(f, total)
             surveyed = true
+            pristine = true
+        } else if folded != cf_unchanged {
+            pristine = false
         }
         let changed = false
+        opt_fold_cue[0] = 0
         while (propagate_copies(params) or sink_temporaries(params)) {
             changed = true
             surveyed = false
+            pristine = false
         }
         // A postorder fold that only replaced constant expressions settled
         // their parents in the same pass. Structural rewrites can expose
         // more folds even when the local rewrites did nothing.
         if not changed and folded != cf_structure { break }
-        folded = fold_constants(f)
+        // Nor do the local rewrites, unless one put a constant or a sum
+        // where a read was (see @opt_fold_cue).
+        if folded != cf_structure and opt_fold_cue[0] == 0 { break }
+        folded = if not pristine { fold_constants(f) } else if opt_foldable[0] == 1 { fold_surveyed(f) } else { cf_unchanged }
         if folded == cf_unchanged { break }
     }
     if optimize_level == 1 and opt_field_reads >= 3 and reuse_loads(f) {
         total = params + func_local_count[f]
         opt_collect(f, total)
     }
-    if optimize_level == 1 and fold_logic() { opt_collect(f, total) }
+    // (Logic keeps the survey good for what follows: it drops a read only
+    // in a range test, which counts it, and the blocks it leaves or makes
+    // hold no store.)
+    if optimize_level == 1 { fold_logic() }
     tee_stores()
     remove_unused_locals(f, params, total)
     coalesce_locals(f, params)
@@ -144,6 +165,7 @@ fn opt_collect(f: I32, total: I32) Void {
     opt_sink_edges.clear()
     opt_shared = 0
     opt_field_reads = 0
+    opt_foldable[0] = 0
     opt_note(func_body[f], -1)
     let head = 0
     while (head < opt_frontier.len()) {
@@ -151,6 +173,7 @@ fn opt_collect(f: I32, total: I32) Void {
         let first = w_first[parent]
         let end_ = first + w_count[parent]
         let op = w_op[parent]
+        if opt_foldable[0] == 0 and cf_candidate(parent, op) { opt_foldable[0] = 1 }
         let sequence = op == Op.Seq.i32() or op == Op.Block.i32()
         for (first ..< end_) |edge| {
             let node = w_kids[edge]
@@ -183,6 +206,8 @@ fn opt_note(node: I32, edge: I32) Void {
         opt_ifs.push(node)
     } else if op >= Op.StructGet.i32() and op <= Op.StructGetU.i32() {
         opt_field_reads += 1
+    } else if op == Op.GlobalGet.i32() and glob_folded(w_a[node]) {
+        opt_foldable[0] = 1
     }
 }
 
@@ -305,6 +330,7 @@ fn propagate_copies(params: I32) Bool {
             w_type[n] = w_type[c]
             w_a[n] = w_a[c]
             w_b[n] = w_b[c]
+            opt_fold_cue[0] = 1
             changed = true
         } else if w_op[n] == Op.LocalGet.i32() and opt_copy_of[w_a[n]] >= 0 {
             let l = w_a[n]
@@ -354,6 +380,11 @@ fn sink_temporaries(params: I32) Bool {
             opt_rd_len[value] = opt_reads.len()
             for (0 ..< opt_reads.len()) |r| { opt_rd_pool.push(opt_reads[r]) }
             if sink_visit(w_kids[edge + 1], read, false) == 1 {
+                let vop = w_op[value]
+                if cf_const(value) or (vop == Op.Plain.i32() and w_count[value] == 2
+                    and (w_a[value] == 106 or w_a[value] == 107 or w_a[value] == 124 or w_a[value] == 125)) {
+                    opt_fold_cue[0] = 1
+                }
                 w_kids[use_edge] = value
                 opt_erase(write)
                 opt_gets[l] = 0
@@ -805,11 +836,16 @@ fn co_round_loop(l: I32, inner: I32) I32 {
     let s = inner
     while (s >= 0) {
         let round = co_first[l] < co_loop_start[s] or co_last[l] > co_loop_end[s]
-        if not round and co_exposed_at[s] < 0 { co_loop_exposed(s) }
-        let k = co_exposed_at[s]
-        while (not round and k < co_exposed_at[s] + co_exposed_count[s]) {
-            if co_exposed[k] == l { round = true }
-            k += 1
+        if not round and co_loop_node.len() <= 64 {
+            if co_masked[0] == 0 { co_find_masks() }
+            round = (co_exp_mask[l] >> s.i64()) & 1.i64() == 1.i64()
+        } else if not round {
+            if co_exposed_at[s] < 0 { co_loop_exposed(s) }
+            let k = co_exposed_at[s]
+            while (not round and k < co_exposed_at[s] + co_exposed_count[s]) {
+                if co_exposed[k] == l { round = true }
+                k += 1
+            }
         }
         if round { most = s }
         s = co_loop_outer[s]
@@ -829,6 +865,93 @@ fn co_find_exposed(total: I32) Void {
     co_exposed_at.resize(co_loop_node.len())
     co_exposed_count.resize(co_loop_node.len())
     for (0 ..< co_loop_node.len()) |s| { co_exposed_at[s] = -1 }
+    co_masked[0] = 0
+}
+
+//! A function of at most 64 loops has every loop's exposed locals found at
+//! once, by one walk of its outermost loops (not a walk of each loop, an
+//! inner one walked again for each around it). A local written on every
+//! path so far is written since entering each loop around it out to the
+//! innermost it was written in (those were entered before the write): its
+//! state is that loop's depth, and a read of it is a first read in each
+//! loop deeper.
+
+/// By local: the loops it is read in before written (bit s for loop s).
+vec co_exp_mask: I64
+/// While walking: by local, the depth (among the loops around) of the
+/// innermost it is written in on every path so far, or -1; the log of those
+/// changed (the local, its depth before), to undo a branch's; by depth, the
+/// loops around up to it (their bits); the next loop.
+vec co_wdepth: I32
+vec co_wlog: I32
+vec co_around: I64
+vec co_next_loop: I32 = [0]
+/// Whether @co_exp_mask is found for the function.
+vec co_masked: U8 = [0]
+
+fn co_find_masks() Void {
+    co_masked[0] = 1
+    let total = co_written.len()
+    co_wdepth.resize(total)
+    co_exp_mask.resize(total)
+    for (0 ..< total) |l| {
+        co_wdepth[l] = -1
+        co_exp_mask[l] = 0.i64()
+    }
+    co_wlog.clear()
+    co_around.resize(co_loop_node.len() + 1)
+    co_around[0] = 0.i64()
+    for (0 ..< co_loop_node.len()) |s| {
+        if co_loop_outer[s] < 0 {
+            co_next_loop[0] = s
+            co_mask_walk(co_loop_node[s], 0)
+        }
+    }
+}
+
+/// @co_reads_first for every loop around `n` at once (`depth` of them).
+fn co_mask_walk(n: I32, depth: I32) Void {
+    let op = w_op[n]
+    if op == Op.LocalGet.i32() {
+        let l = w_a[n]
+        let t = co_wdepth[l]
+        if t + 1 < depth { co_exp_mask[l] = co_exp_mask[l] | (co_around[depth] ^ co_around[t + 1]) }
+        return
+    }
+    let d = depth
+    if op == Op.Loop.i32() {
+        let id = co_next_loop[0]
+        co_next_loop[0] = id + 1
+        co_around[d + 1] = co_around[d] | (1.i64() << id.i64())
+        d += 1
+    }
+    let maybe = op == Op.Loop.i32() or op == Op.Try.i32()
+        or (op == Op.Block.i32() and w_a[n] < co_targeted.len() and co_targeted[w_a[n]] == 1)
+    let branches = op == Op.If.i32() or op == Op.NullElse.i32() or op == Op.CastArms.i32() or op == Op.Try.i32()
+    let mark = co_wlog.len()
+    for (0 ..< w_count[n]) |i| {
+        if branches and i > 0 { co_mask_undo(mark) }
+        co_mask_walk(w_kid(n, i), d)
+        if branches and i == 0 and op != Op.Try.i32() { mark = co_wlog.len() }
+    }
+    if maybe or branches { co_mask_undo(mark) }
+    if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
+        let l = w_a[n]
+        if co_wdepth[l] < d - 1 {
+            co_wlog.push(l)
+            co_wlog.push(co_wdepth[l])
+            co_wdepth[l] = d - 1
+        }
+    }
+}
+
+fn co_mask_undo(mark: I32) Void {
+    let i = co_wlog.len()
+    while (i > mark) {
+        i -= 2
+        co_wdepth[co_wlog[i]] = co_wlog[i + 1]
+    }
+    co_wlog.resize(mark)
 }
 
 /// Loop `s`'s locals read before written in it, onto @co_exposed.
@@ -1020,6 +1143,8 @@ fn range_test(n: I32, a: I32, b: I32, and_: Bool) Bool {
     if lo > hi or span >= 65536.i64() * 65536.i64() { return false }
     let x = if ka == 0 { w_kid(a, 0) } else { w_kid(b, 0) }
     if w_op[x] != Op.LocalGet.i32() { x = if ka == 0 { w_kid(a, 1) } else { w_kid(b, 1) } }
+    // (Of the two reads of the local, one is left.)
+    opt_gets[la] -= 1
     let m = w_mark()
     w_push(x)
     if span == 1.i64() {
@@ -1312,6 +1437,65 @@ fn fold_constants(f: I32) I32 {
     return cf_changed
 }
 
+/// By node, for @fold_surveyed: the fold that changed it or something under
+/// it (a stamp), and what replaces it.
+vec cf_mark: I32
+vec cf_repl: I32
+vec cf_stamp: I32 = [0]
+
+/// @fold_constants of the tree as last surveyed (@opt_collect, nothing
+/// changed since): the walk's parents, last first (each after its kids), and
+/// only where a fold may change something: a node @cf_candidate says may,
+/// or one with something changed under it. Node for node a full fold.
+fn fold_surveyed(f: I32) I32 {
+    cf_changed = cf_unchanged
+    let count = opt_frontier.len()
+    if count == 0 {
+        func_body[f] = cf_fold(func_body[f])
+        return cf_changed
+    }
+    if cf_mark.len() < w_node_count {
+        cf_mark.resize(w_node_count)
+        cf_repl.resize(w_node_count)
+    }
+    cf_stamp[0] += 1
+    let stamp = cf_stamp[0]
+    let i = count
+    while (i > 0) {
+        i -= 1
+        let n = opt_frontier[i]
+        let dirty = false
+        let first = w_first[n]
+        for (first ..< first + w_count[n]) |edge| {
+            let k = w_kids[edge]
+            // (A leaf folds only as a global's value: in place.)
+            if w_count[k] == 0 and w_op[k] == Op.GlobalGet.i32() and glob_folded(w_a[k]) {
+                cf_fold(k)
+                cf_mark[k] = stamp
+                cf_repl[k] = k
+            }
+            if cf_mark[k] == stamp {
+                dirty = true
+                if cf_repl[k] != k { w_kids[edge] = cf_repl[k] }
+            }
+        }
+        if dirty or cf_candidate(n, w_op[n]) {
+            let before = cf_changed
+            cf_changed = cf_unchanged
+            let r = cf_step(n)
+            if dirty or cf_changed != cf_unchanged {
+                cf_mark[n] = stamp
+                cf_repl[n] = r
+            }
+            // (Structure over constants over unchanged.)
+            if before > cf_changed { cf_changed = before }
+        }
+    }
+    let root = func_body[f]
+    if cf_mark[root] == stamp { func_body[f] = cf_repl[root] }
+    return cf_changed
+}
+
 /// Node n folded, its kids first: n (rewritten in place), or what replaces it.
 fn cf_fold(n: I32) I32 {
     for (0 ..< w_count[n]) |i| {
@@ -1319,6 +1503,11 @@ fn cf_fold(n: I32) I32 {
         let r = cf_fold(k)
         if r != k { set_kid(n, i, r) }
     }
+    return cf_step(n)
+}
+
+/// Node n folded, its kids folded already.
+fn cf_step(n: I32) I32 {
     let op = w_op[n]
     let count = w_count[n]
     // A global never set is its constant (as encoding emits it).
@@ -1344,6 +1533,59 @@ fn cf_fold(n: I32) I32 {
         }
     }
     return n
+}
+
+/// Whether @cf_fold may change node n (with kids, of op `op`), its kids as
+/// they are: false only when it cannot. A tree with no such node folds to
+/// itself (each node's kids unchanged, it is unchanged).
+fn cf_candidate(n: I32, op: I32) Bool {
+    let count = w_count[n]
+    if op == Op.GlobalGet.i32() { return glob_folded(w_a[n]) }
+    if op == Op.Plain.i32() {
+        if count == 1 { return cf_const(w_kid(n, 0)) }
+        return count == 2 and cf_binary_candidate(n)
+    }
+    if op == Op.Select.i32() { return count == 3 and cf_const(w_kid(n, 2)) }
+    if op == Op.BrIf.i32() { return cf_const(w_kid(n, count - 1)) }
+    if op == Op.If.i32() { return count >= 2 and cf_const(w_kid(n, 0)) }
+    if op == Op.Seq.i32() or op == Op.Block.i32() or op == Op.Loop.i32() {
+        for (0 ..< count - 1) |i| { if cf_may_diverge(w_kid(n, i)) { return true } }
+    }
+    return false
+}
+
+/// @cf_diverges, but for a Block whether a branch leaves it (so true where
+/// it is, and maybe where it is not): no walk of the Block.
+fn cf_may_diverge(n: I32) Bool {
+    let k = w_op[n]
+    if k == Op.Br.i32() or k == Op.Return.i32() or k == Op.Unreachable.i32() { return true }
+    let count = w_count[n]
+    if count == 0 or k == Op.Loop.i32() or k == Op.If.i32() or k == Op.Try.i32() or k == Op.NullElse.i32() or k == Op.CastArms.i32() { return false }
+    return cf_may_diverge(w_kid(n, count - 1))
+}
+
+/// @cf_candidate of a binary Plain: what @cf_binary may change.
+fn cf_binary_candidate(n: I32) Bool {
+    let code = w_a[n]
+    let wide = (code >= 81 and code <= 90) or (code >= 124 and code <= 138)
+    if not (wide or (code >= 70 and code <= 79) or (code >= 106 and code <= 120)) { return false }
+    let op = if code >= 124 { code - 18 } else if code >= 81 and code <= 90 { code - 11 } else { code }
+    let l = w_kid(n, 0)
+    let r = w_kid(n, 1)
+    let lc = cf_const(l)
+    let rc = cf_const(r)
+    if lc and rc { return true }
+    if op <= 79 or not (lc or rc) { return false }
+    let v = cf_val(if rc { r } else { l })
+    if v == 0 and (op == 106 or op == 107 or op == 108 or op == 113 or op == 114 or op == 115) { return true }
+    if (v == 1 and op == 108) or (v == -1 and op == 113) { return true }
+    if op >= 116 and op <= 120 and (v & 31) == 0 { return true }
+    if op == 106 or op == 107 {
+        let other = if rc { l } else { r }
+        let add = if wide { 124 } else { 106 }
+        return w_op[other] == Op.Plain.i32() and w_count[other] == 2 and (w_a[other] == add or w_a[other] == add + 1)
+    }
+    return false
 }
 
 /// Whether node n never completes: a `br`, `return` or `unreachable`, or

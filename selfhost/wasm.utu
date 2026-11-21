@@ -574,6 +574,7 @@ mem w_stack: I32
 /// The syntax node each was made for (@cur_src then), or -1: a source map's spans.
 vec w_src: I32
 /// For a copy inlining made: the syntax of the call it replaced, or -1.
+/// Only a source map reads it: kept only while @source_map is on.
 vec w_site: I32
 /// The syntax node being checked, whose code nodes made now are (-1: none).
 let cur_src: I32 = -1
@@ -600,7 +601,7 @@ fn grow_ir(capacity: I32) Void {
     w_first.resize(capacity)
     w_count.resize(capacity)
     w_src.resize(capacity)
-    w_site.resize(capacity)
+    if source_map == 1 { w_site.resize(capacity) }
 }
 
 fn add_ir(op: I32, vt: I32, a: I32, b: I32, first: I32, count: I32, source: I32, site: I32) I32 {
@@ -613,7 +614,10 @@ fn add_ir(op: I32, vt: I32, a: I32, b: I32, first: I32, count: I32, source: I32,
     w_first[id] = first
     w_count[id] = count
     w_src[id] = source
-    w_site[id] = site
+    if source_map == 1 {
+        if id >= w_site.len() { w_site.resize(w_op.len()) }
+        w_site[id] = site
+    }
     w_node_count = id + 1
     return id
 }
@@ -707,8 +711,18 @@ fn w_i32_op(opcode: I32, mark: I32) I32 => w_node(Op.Plain, vt_i32, opcode, 0, m
 export mem out: U8
 /// The section being written.
 vec sec: U8
-/// The function body being written.
+/// The function body being written: its first @cb_at bytes (the rest, room
+/// to write into without growing it per byte).
 vec code_bytes: U8
+vec cb_at: I32 = [0]
+
+/// Byte `b` next in the function body.
+fn cb_put(b: I32) Void {
+    let at = cb_at[0]
+    if at == code_bytes.len() { code_bytes.resize(at + at + 4096) }
+    code_bytes[at] = b
+    cb_at[0] = at + 1
+}
 
 fn leb_u(in_body: Bool, value: I32) Void {
     let v = value
@@ -720,7 +734,7 @@ fn leb_u(in_body: Bool, value: I32) Void {
 }
 
 /// Where bytes go: the section, or (when `in_body`) the function body.
-fn put(in_body: Bool, b: I32) Void => if in_body { code_bytes.push(b) } else { sec.push(b) }
+fn put(in_body: Bool, b: I32) Void => if in_body { cb_put(b) } else { sec.push(b) }
 
 fn leb_s(in_body: Bool, value: I32) Void {
     let v = value
@@ -789,7 +803,7 @@ fn flush_section(id: I32) Void {
 /// Append the encoded body to the section without growing it per byte.
 fn append_code_bytes() Void {
     let start = sec.len()
-    let count = code_bytes.len()
+    let count = cb_at[0]
     sec.resize(start + count)
     for (0 ..< count) |i| { sec[start + i] = code_bytes[i] }
 }
@@ -1538,7 +1552,7 @@ fn encode_globals() Void {
         let g = glob_order[k]
         put_valtype(false, glob_type[g])
         sec.push(glob_mutable[g])
-        code_bytes.clear()
+        cb_at[0] = 0
         emit(glob_init[g], -1)
         append_code_bytes()
         sec.push(11)
@@ -1644,15 +1658,15 @@ fn encode_code() Void {
             }
             for (wat_start[k] ..< wat_start[k] + wat_len[k]) |i| { sec.push(wat_bytes[i]) }
         } else {
-            code_bytes.clear()
+            cb_at[0] = 0
             encode_locals(f)
             active_target_base = func_target_base[f]
             active_target_end = func_target_end[f]
             let first = map_at.len()
             if source_map == 1 { map_function(f) }
             emit(func_body[f], f)
-            code_bytes.push(11)
-            leb_u(false, code_bytes.len())
+            cb_put(11)
+            leb_u(false, cb_at[0])
             // The map's offsets, from the body's to the section's.
             for (first ..< map_at.len()) |i| { map_at[i] += sec.len() }
             append_code_bytes()
@@ -1742,7 +1756,7 @@ fn encode_names() Void {
     for (0 ..< func_kind.len()) |f| { if func_live[f] == 1 and func_debug_name[f] >= 0 { count += 1 } }
     if count == 0 { return }
     put_text("name")
-    code_bytes.clear()
+    cb_at[0] = 0
     leb_u(true, count)
     // In index order.
     for (0 ..< func_order.len()) |i| {
@@ -1753,7 +1767,7 @@ fn encode_names() Void {
         }
     }
     sec.push(1)
-    leb_u(false, code_bytes.len())
+    leb_u(false, cb_at[0])
     append_code_bytes()
     flush_section(0)
 }
@@ -1885,7 +1899,7 @@ fn map_note(node: I32) Void {
     let site = if near >= 0 { w_site[near] } else { -1 }
     let last = map_node.len() - 1
     if map_node[last] == s and map_site[last] == site { return }
-    map_at.push(code_bytes.len())
+    map_at.push(cb_at[0])
     map_node.push(s)
     map_site.push(site)
 }
@@ -1910,7 +1924,7 @@ fn depth_of(label: I32) I32 {
 }
 
 fn block_type(vt: I32) Void {
-    if vt == vt_none or vt == vt_unreachable { code_bytes.push(64); return }
+    if vt == vt_none or vt == vt_unreachable { cb_put(64); return }
     if vt >= vt_tuple {
         leb_s(true, type_index[func_type(vl_empty(), vt - vt_tuple)])
         return
@@ -1967,10 +1981,10 @@ fn close_block() Void {
     op1(11)
 }
 
-fn op1(b: I32) Void => code_bytes.push(b)
+fn op1(b: I32) Void => cb_put(b)
 
 fn op_fb(sub: I32) Void {
-    code_bytes.push(251)
+    cb_put(251)
     leb_u(true, sub)
 }
 

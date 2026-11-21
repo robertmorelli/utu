@@ -250,7 +250,7 @@ fn inl_copy(n: I32) I32 {
     // Preserve the callee's syntax and the call site for source maps.
     let helper = inl_helper
     let source = if helper >= 0 { w_src[helper] } else { w_src[n] }
-    let site = if helper >= 0 { w_site[helper] } else { inl_site }
+    let site = if helper < 0 { inl_site } else if source_map == 1 { w_site[helper] } else { -1 }
     return add_ir(op, vt, a, w_b[n], first, count, source, site)
 }
 
@@ -786,17 +786,30 @@ fn struct_returns() Bool {
         sr_twin[f] = -1
         sr_changed[f] = 0
     }
-    // (Candidates only drop, so a function calling none never counts.)
-    sr_calls.resize(n)
-    for (0 ..< n) |f| { sr_calls[f] = if optimizable(f) and sr_calls_candidate(func_body[f]) { 1 } else { 0 } }
     // To a fixpoint: a return of a call is of fields while the callee's is,
     // and a function returns fields where its calls gain by it.
+    let surveyed = false
     while (true) {
         let dropped = false
+        let left = false
         for (0 ..< n) |f| {
             if sr_type[f] >= 0 and not sr_returns(f, sr_type[f]) {
                 sr_type[f] = -1
                 dropped = true
+            }
+            if sr_type[f] >= 0 { left = true }
+        }
+        // (None left: weighing counts nothing.)
+        if not left { break }
+        // The callers, found once, of what is left (candidates only drop, so
+        // a function calling none never counts).
+        if not surveyed {
+            surveyed = true
+            sr_calls.resize(n)
+            if optimize_level == 1 {
+                sr_survey_calls(n)
+            } else {
+                for (0 ..< n) |f| { sr_calls[f] = if optimizable(f) and sr_calls_candidate(func_body[f]) { 1 } else { 0 } }
             }
         }
         if not dropped and not sr_weigh(n) { break }
@@ -877,6 +890,21 @@ fn sr_weigh(n: I32) Bool {
         }
     }
     return dropped
+}
+
+/// @sr_calls at -O small, from what inlining found: the calls its last
+/// survey found (@sm_found) are those in the bodies, but the calls of what
+/// moved (now blocks), each now in the function its body moved into
+/// (@sm_root). (A @wat function, not surveyed, is walked.)
+fn sr_survey_calls(n: I32) Void {
+    for (0 ..< n) |f| { sr_calls[f] = if optimizable(f) and func_code[f] >= 0 and sr_calls_candidate(func_body[f]) { 1 } else { 0 } }
+    for (0 ..< sm_found.len()) |i| {
+        let c = sm_found[i]
+        if w_op[c] == Op.Call.i32() and sr_type[w_a[c]] >= 0 {
+            let f = sm_root(sm_found_in[i])
+            if optimizable(f) { sr_calls[f] = 1 }
+        }
+    }
 }
 
 /// Whether a call under `n` is to a candidate.
@@ -1103,7 +1131,7 @@ fn sr_rewrite_calls(f: I32, n: I32, parent: I32) Void {
     let call = w_node(Op.Call, sr_vt(t), sr_twin[g], 0, m)
     w_pop()
     w_src[call] = w_src[n]
-    w_site[call] = w_site[n]
+    if source_map == 1 { w_site[call] = w_site[n] }
     sr_changed[f] = 1
     if parent >= 0 and w_op[parent] == Op.Drop.i32() {
         let md = w_mark()
@@ -1176,11 +1204,18 @@ vec inl_subst: I32
 /// called once moves there.
 fn inline_small() Void {
     sm_begin_survey()
+    // (No helper is made while inlining.)
+    sm_helper.resize(func_kind.len())
+    for (0 ..< func_kind.len()) |f| { sm_helper[f] = 0 }
+    for (0 ..< helper_funcs.len()) |k| { sm_helper[helper_funcs[k]] = 1 }
     let rounds = 0
     let fresh = false
     while (rounds < 16 and not fresh) {
+        sm_full[0] = 0
+        sm_fell.clear()
+        sm_fell_glob.clear()
         if inline_small_round() {
-            sweep()
+            sm_resweep()
             rounds += 1
         } else {
             fresh = true
@@ -1204,6 +1239,8 @@ fn inline_small() Void {
 //! A body moves as it is, its nodes renumbered in place (one sharing a node
 //! with another body stays).
 
+/// By function: 1 for a helper (in @helper_funcs).
+vec sm_helper: U8
 /// By function: the function its body moved into (itself when it has not).
 vec sm_owner: I32
 /// By function: its one call (in @sm_found), or -1.
@@ -1489,9 +1526,8 @@ fn sm_move(f: I32, c: I32) Void {
     inl_return_label = block
     // The call in the function the trap is in: this one's, or the one its
     // body moved there by.
-    inl_site = if w_site[c] >= 0 { w_site[c] } else { w_src[c] }
-    inl_helper = -1
-    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper = c } }
+    inl_site = if source_map == 1 and w_site[c] >= 0 { w_site[c] } else { w_src[c] }
+    inl_helper = if sm_helper[g] == 1 { c } else { -1 }
     let m = w_mark()
     for (0 ..< np) |i| {
         let arg = w_kid(c, i)
@@ -1540,8 +1576,8 @@ fn sm_renumber(n: I32) Void {
     }
     if inl_helper >= 0 {
         w_src[n] = w_src[inl_helper]
-        w_site[n] = w_site[inl_helper]
-    } else {
+        if source_map == 1 { w_site[n] = w_site[inl_helper] }
+    } else if source_map == 1 {
         w_site[n] = inl_site
     }
     for (0 ..< w_count[n]) |i| { sm_renumber(w_kid(n, i)) }
@@ -1683,21 +1719,28 @@ fn sm_inline(f: I32, c: I32) Void {
     let np = vl_len[ht_a[func_type_of[g]]]
     inl_subst.resize(np)
     inl_local_map.resize(np)
+    // What a sweep would find (see @sm_resweep): the call and its arguments
+    // go; the copy (holding the arguments read) comes.
+    func_uses[g] -= 1
+    if func_uses[g] == 0 { sm_fell.push(g) }
     for (0 ..< np) |i| {
         let arg = w_kid(c, i)
+        sm_unscan(arg)
         if i >= sm_prefix[g] and w_op[arg] == Op.LocalGet.i32() {
             inl_subst[i] = -1
             inl_local_map[i] = w_a[arg]
         } else {
             inl_subst[i] = arg
             inl_local_map[i] = -1
+            // A function or global passed, never read: what only it reached
+            // (a cycle) is not found by counting uses.
+            if (w_op[arg] == Op.RefFunc.i32() or w_op[arg] == Op.GlobalGet.i32()) and sm_param_reads[sm_params_at[g] + i] == 0 { sm_full[0] = 1 }
         }
     }
     inl_label_offset = sm_label[f]
     sm_label[f] += sm_label[g]
     inl_site = w_src[c]
-    inl_helper = -1
-    for (0 ..< helper_funcs.len()) |k| { if helper_funcs[k] == g { inl_helper = c } }
+    inl_helper = if sm_helper[g] == 1 { c } else { -1 }
     let copy = inl_copy(func_body[g])
     inl_subst.clear()
     // The call node becomes the copy (its type, the call's result, stays).
@@ -1707,6 +1750,77 @@ fn sm_inline(f: I32, c: I32) Void {
     w_op[c] = Op.Seq.i32()
     w_a[c] = 0
     w_b[c] = 0
+    let old = node_holders.len()
+    if old < w_node_count { node_holders.resize(w_node_count) }
+    live_push(copy)
+    scan_live_roots()
+}
+
+//! === Sweeping a round
+//!
+//! A sweep counts, from the exports, each path to a node (@node_holders),
+//! and the uses of each function and global on them. A round of inlining
+//! changes only its calls: each one's arguments are counted out (as a
+//! sweep's walk, undone: @sm_unscan) and the copy counted in (it holds the
+//! arguments read, once per read). What a round leaves with no use dies,
+//! and what its code used is counted out in turn. Inlining keeps every
+//! use but the call's (a copy uses what the body did), so what has a use is
+//! still reached; but an argument never read (a function or global passed)
+//! may have been all that reached a cycle: that round is swept in full.
+
+/// Whether the round is swept in full; the functions and globals whose uses fell to none.
+vec sm_full: U8 = [0]
+vec sm_fell: I32
+vec sm_fell_glob: I32
+
+/// The sweep after a round, from what it changed (or a sweep).
+fn sm_resweep() Void {
+    if sm_full[0] == 1 {
+        sweep()
+        return
+    }
+    while (sm_fell.len() > 0 or sm_fell_glob.len() > 0) {
+        if sm_fell.len() > 0 {
+            let g = sm_fell[sm_fell.len() - 1]
+            sm_fell.resize(sm_fell.len() - 1)
+            let root = (func_kind[g] == FuncKind.Defined.i32() and func_field_name[g] >= 0) or start_func == g
+            if func_uses[g] == 0 and func_live[g] == 1 and not root {
+                func_live[g] = 0
+                if func_body[g] >= 0 { sm_unscan(func_body[g]) }
+            }
+        } else {
+            let g = sm_fell_glob[sm_fell_glob.len() - 1]
+            sm_fell_glob.resize(sm_fell_glob.len() - 1)
+            let root = glob_kind[g] == FuncKind.Defined.i32() and glob_field_name[g] >= 0
+            if glob_uses[g] == 0 and glob_live[g] == 1 and not root {
+                glob_live[g] = 0
+                if glob_init[g] >= 0 { sm_unscan(glob_init[g]) }
+            }
+        }
+    }
+    if node_holders.len() < w_node_count { node_holders.resize(w_node_count) }
+}
+
+/// A sweep's count of node `n` (one path to it) undone: its holder, and
+/// the uses under it. Those falling to none are noted (@sm_fell).
+fn sm_unscan(n: I32) Void {
+    live_push(n)
+    while (live_top > 0) {
+        let node = live_pop()
+        node_holders[node] -= 1
+        let op = w_op[node]
+        if op == Op.Call.i32() or op == Op.ReturnCall.i32() or op == Op.RefFunc.i32() {
+            let g = w_a[node]
+            func_uses[g] -= 1
+            if func_uses[g] == 0 { sm_fell.push(g) }
+        } else if op == Op.GlobalGet.i32() or op == Op.GlobalSet.i32() {
+            let g = w_a[node]
+            glob_uses[g] -= 1
+            if op == Op.GlobalSet.i32() { glob_sets[g] -= 1 }
+            if glob_uses[g] == 0 { sm_fell_glob.push(g) }
+        }
+        live_push_children(node)
+    }
 }
 
 /// Collect branch targets and callees and check that the body can be copied.
