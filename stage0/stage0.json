@@ -1,11 +1,11 @@
 {
-  "commit": "dce77027dc4bc030b807424a2a193c103958ffa9",
-  "selfhostTree": "44497c46b3a6ea33174570b6dd8fcbb950746445",
-  "sourcesHash": "81cf83da1355b28281ffbcfe434636311413660445394b79117cafd7df607ddf",
-  "sha256": "97f62f57d43e560d6f733c47c3220193b1be8205937066dc2190c16c6c97a8a5",
-  "bytes": 468739,
-  "builtBy": "9d22a3231f608b534dce86eb4c1647ad219b8d21d8fc831176b99fd2571c3272",
+  "commit": "9b5b5d173b3bf51ed327b3a0577c030e0547b67c",
+  "selfhostTree": "471aadf9629b0922001c5bf568ca95a16a13fa55",
+  "sourcesHash": "91d40a75f791d1b8cebd26de5b8d3fef722044c161e1bdef4cee8302c7e98baa",
+  "sha256": "4639cc83fc673b22071bf33f74a4c1d4e09e1129be8fdad3a6a70c2ba52dca76",
+  "bytes": 420061,
+  "builtBy": "97f62f57d43e560d6f733c47c3220193b1be8205937066dc2190c16c6c97a8a5",
   "node": "v25.8.1",
-  "date": "2026-11-21T18:57:53.241Z",
-  "reason": "mutable top-level let globals"
+  "date": "2026-11-21T19:56:31.508Z",
+  "reason": "mutable globals, fast lexer/validator, backend pass fusion, packed string table"
 }
