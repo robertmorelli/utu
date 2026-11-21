@@ -602,6 +602,8 @@ fn reset_ir() Void {
     cur_src = -1
 }
 
+/// (`#noinline`: rare, so @add_ir stays small.)
+#noinline
 fn grow_ir(capacity: I32) Void {
     w_op.resize(capacity)
     w_type.resize(capacity)
@@ -1900,6 +1902,8 @@ fn map_function(f: I32) Void {
 }
 
 /// An entry for node's instruction, next in @code_bytes, unless its syntax is the last entry's.
+/// (`#noinline`: only with a source map, so kept out of @emit_own.)
+#noinline
 fn map_note(node: I32) Void {
     if map_func < 0 { return }
     // A global's folded initializer is no body's node: its own syntax, or its function's.

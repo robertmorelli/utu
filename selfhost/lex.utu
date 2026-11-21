@@ -176,6 +176,8 @@ fn pack_lexer(machine: Machine) Array[I32] {
     return packed.slice(0, used)
 }
 
+/// @lexer_table unpacked into @dfa, once (`#noinline`: kept out of @lex_to).
+#noinline
 fn unpack_dfa(states: I32) Void {
     let rows = states * 256
     dfa.resize(rows + states * 3 + 256)
@@ -630,12 +632,18 @@ fn build() Machine {
 
 /// Token t, written in the room lex made (doubled when full; a word
 /// interned, as it is read); the one after it.
-fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 {
+fn put_token(t: I32, kind: I32, start: I32, end_: I32) I32 =>
+    put_tok(t, kind, start, end_, if kind == Tok.Word.i32() { src.intern(start, end_) } else { -1 })
+
+/// Token t, of word id `word` (-1: none); the one after it. (`#inline`:
+/// @lex_to's fast paths take it, where V8 does not inline a call.)
+#inline
+fn put_tok(t: I32, kind: I32, start: I32, end_: I32, word: I32) I32 {
     if t == tok_kind.len() { tokens_room(t * 2) }
     tok_kind[t] = kind
     tok_start[t] = start
     tok_end[t] = end_
-    tok_word[t] = if kind == Tok.Word.i32() { src.intern(start, end_) } else { -1 }
+    tok_word[t] = word
     return t + 1
 }
 
@@ -680,6 +688,8 @@ fn dsl_end(i: I32, n: I32) I32 {
 }
 
 /// The closing brace of a Wutu sugar body, skipping strings, comments and DSLs.
+/// (`#noinline`: rare, so kept out of @lex_to.)
+#noinline
 fn wutu_brace_end(i: I32, n: I32) I32 {
     let j = i + 1
     let depth = 1
@@ -887,11 +897,6 @@ fn lex_to(first: I32, n: I32) I32 {
             }
             if len == 2 and src[i] == 119 and src[i + 1] == 110 { wutu_at = wutu_open(i, j, n, false, first) }
             if len == 4 and src[i] == 104 and src[i + 1] == 116 and src[i + 2] == 109 and src[i + 3] == 108 { wutu_at = wutu_open(i, j, n, true, first) }
-            // (@put_token's, written out: V8 does not inline a call here.)
-            if t == tok_kind.len() { tokens_room(t * 2) }
-            tok_kind[t] = Tok.Word.i32()
-            tok_start[t] = i
-            tok_end[t] = j
             // Its id: the cached one when the word was read before, else interned.
             let slot = ((((src[i] * 31 + src[i + 1]) * 31 + src[j - 1]) * 8 + len) & 4095) * 4
             let id = -1
@@ -908,19 +913,13 @@ fn lex_to(first: I32, n: I32) I32 {
                 word_cache[slot + 2] = id
                 word_cache[slot + 3] = gen
             }
-            tok_word[t] = id
-            t += 1
+            t = put_tok(t, Tok.Word.i32(), i, j, id)
             if after != same_start { start = after }
             continue
         }
         if (fast & 3) == fast_single and ((fast >> 24) == 0 or (open == 0 and i != wutu_at)) {
             j += 1
-            if t == tok_kind.len() { tokens_room(t * 2) }
-            tok_kind[t] = (fast >> 8) & 255
-            tok_start[t] = i
-            tok_end[t] = j
-            tok_word[t] = -1
-            t += 1
+            t = put_tok(t, (fast >> 8) & 255, i, j, -1)
             start = (fast >> 16) & 255
             continue
         }
