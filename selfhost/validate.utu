@@ -149,11 +149,11 @@ fn directive_kind(d: I32) I32 {
     return 0
 }
 
-/// A `#cache` directive's size: 0 (no bound) when it gives none, or -1 when
-/// it is no size (negative, not a power of 2, or past 2^30).
+/// A `#cache` directive's size: 256 when it gives none, 0 for no bound, or
+/// -1 when it is no size (negative, not a power of 2, or past 2^30).
 fn directive_cache_size(d: I32) I32 {
     let lit = next_sibling(first_child(d))
-    if lit < 0 { return 0 }
+    if lit < 0 { return 256 }
     if tok_kind[node_first[lit] - 1] == Tok.Minus.i32() { return -1 }
     let v = int_value(lit)
     let most: I64 = 1 << 30
@@ -216,7 +216,8 @@ fn fn_inline_directive(item: I32) I32 {
 }
 
 /// A function's `#cache` size (its declaration's node): -1 for none, 0 for
-/// no bound, else its entries (a power of 2). For the cache's code to read.
+/// no bound, else its entries (a power of 2; 256 for `#cache`). For
+/// cache.utu to read.
 fn fn_cache_directive(item: I32) I32 {
     for (0 ..< dir_node.len()) |k| {
         if dir_fn[k] == item and directive_kind(dir_node[k]) == 3 {

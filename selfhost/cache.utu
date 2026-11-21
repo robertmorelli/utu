@@ -1,0 +1,1203 @@
+//! = `#cache`
+//!
+//! A `#cache` function keeps its results: a call with arguments it was
+//! given before returns what it returned then, without running again
+//! (validate.utu reads the size, check.utu lists the instances). Its wasm
+//! function becomes the cache, and its checked body moves to a function of
+//! its own (`f:impl`) the cache calls on a miss. A call in the body (a
+//! recursion) is a call of the cache, so dynamic programming is recursion.
+//!
+//! Removing `#cache` changes no result. So a cached function is pure
+//! (check.utu's memo-safety, in its `#cache` mode), and its parameters and
+//! result are values the cache can hash, compare, and copy: scalars (by
+//! their bits: -0.0 is not 0.0, a NaN is itself), Str, `?T`, tuples (a
+//! result), structs, enums, and arrays of them. Keys are copied as they go
+//! in (a caller writing into its array later changes no key), and results
+//! as they go in and come out (a caller writing into one changes no entry).
+//!
+//! A function's entries are `Slot { hits: (mut i8), hash: i32, k0 … kn,
+//! v0 … vm }`, in an `Array[?Slot]` global made as the module is (no start
+//! function). `#cache` (256 entries) and `#cache(N)`: sets of 4 ways (N
+//! of them when N is 1 or 2), filled in order; a full set's victim is a
+//! random way (xorshift32), but not the most hit. `#cache(0)`: open
+//! addressing from 64 slots, doubled (by the stored hashes) when half full.
+//!
+//! Each type's hash, equality, and copy is a function, made once when a
+//! cache first needs it (@cache_helper): a program with no `#cache` has none.
+
+/// The instances of `#cache` functions (fi), as they are made.
+vec cache_fis: I32
+/// Helpers made, as triples: what (0 hash, 1 equality, 2 copy, 3 the
+/// random step), the type, the function. Their bodies are made after the
+/// caches' (@build_caches), in order; making one may add more.
+vec cache_help: I32
+/// The random step's state (a global), or -1 until a set evicts.
+let cache_rand_state: I32 = -1
+/// The types @cache_bad is inside (a recursive struct's fields lead back).
+vec cache_path: I32
+/// By declaration: 1 when an assignment writes it (or into it), once
+/// @cache_assigned_ready.
+vec cache_assigned: U8
+let cache_assigned_ready: I32 = 0
+
+fn reset_cache() Void {
+    cache_fis.clear()
+    cache_help.clear()
+    cache_rand_state = -1
+    cache_path.clear()
+    cache_assigned.clear()
+    cache_assigned_ready = 0
+}
+
+//! == What a cache can keep
+
+/// What the cache does with a value of type `t` (@cache_norm'd): 0 nothing
+/// (it cannot), 1 an i32, 2 an i64, 3 an f32, 4 an f64 (by their bits), 5 a
+/// Str, 6 a ?Str, 7 an array, 8 a struct (or variant), 9 an enum.
+fn cache_kind(t: I32) I32 {
+    if ty_is(t, Ty.Nullable) { return if cache_kind(ty_a[t]) == 5 { 6 } else { 0 } }
+    let d = ty_decl(t)
+    if d < 0 { return 0 }
+    if decl_is(d, Decl.Struct) or decl_is(d, Decl.Variant) { return 8 }
+    if decl_is(d, Decl.Enum) { return 9 }
+    if decl_is(d, Decl.IntEnum) { return 1 }
+    if not decl_is(d, Decl.TypeDecl) { return 0 }
+    if t == prelude(Prelude.Str) { return 5 }
+    if is_array_type(t) { return 7 }
+    let vt = repr(t)
+    if vt == vt_i32 { return 1 }
+    if vt == vt_i64 { return 2 }
+    if vt == vt_f32 { return 3 }
+    if vt == vt_f64 { return 4 }
+    return 0
+}
+
+/// A type as the cache sees it: a distinct type's base; `?T` T when T is a
+/// struct, enum, or array (their helpers take null too).
+fn cache_norm(t: I32) I32 {
+    while (ty_decl(t) >= 0 and decl_is(ty_decl(t), Decl.Distinct)) { t = distinct_base(ty_decl(t)) }
+    if not ty_is(t, Ty.Nullable) { return t }
+    let inner = cache_norm(ty_a[t])
+    return if cache_kind(inner) >= 7 { inner } else { nullable(inner) }
+}
+
+/// Whether a value of type `t` is copied going in and out (it can be written into).
+fn cache_copies(t: I32) Bool => cache_kind(cache_norm(t)) >= 7
+
+/// An array type's element type.
+fn cache_elem(t: I32) I32 => inst_arg(ty_inst(t), 0)
+
+/// The field types of struct or variant `decl` in instance `inst`, as a list.
+fn cache_fields(decl: I32, inst: I32) I32 {
+    let m = vl_begin()
+    let holder = fields_holder(decl)
+    let c = if holder >= 0 { first_child(holder) } else { -1 }
+    while (c >= 0) {
+        if is_kind(c, Node.Field) { vl_add(type_of(next_sibling(first_child(c)), inst)) }
+        c = next_sibling(c)
+    }
+    return vl_end(m)
+}
+
+/// Enum `decl`'s variants (declarations), as a list.
+fn cache_variants(decl: I32) I32 {
+    let m = vl_begin()
+    let c = first_child(decl_node[decl])
+    while (c >= 0) {
+        if is_kind(c, Node.Variant) { vl_add(node_decl[first_child(c)]) }
+        c = next_sibling(c)
+    }
+    return vl_end(m)
+}
+
+/// The part of type `t` a cache cannot keep (a closure, a host value, a
+/// protocol, …), or -1 when there is none.
+fn cache_bad(t: I32) I32 {
+    let n = cache_norm(t)
+    let k = cache_kind(n)
+    if k == 0 { return t }
+    if k < 7 { return -1 }
+    for (0 ..< cache_path.len()) |i| { if cache_path[i] == n { return -1 } }
+    cache_path.push(n)
+    let bad = -1
+    if k == 7 { bad = cache_bad(cache_elem(n)) }
+    else if k == 8 { bad = cache_bad_list(cache_fields(ty_decl(n), ty_inst(n))) }
+    else {
+        let vs = cache_variants(ty_decl(n))
+        for (0 ..< vl_len[vs]) |i| { if bad < 0 { bad = cache_bad_list(cache_fields(vl_item(vs, i), ty_inst(n))) } }
+    }
+    cache_path.resize(cache_path.len() - 1)
+    return bad
+}
+
+fn cache_bad_list(list: I32) I32 {
+    for (0 ..< vl_len[list]) |i| {
+        let bad = cache_bad(vl_item(list, i))
+        if bad >= 0 { return bad }
+    }
+    return -1
+}
+
+/// Whether global `d` is a constant to a cache: a scalar or Str nothing
+/// assigns (an initializer is not an assignment).
+fn cache_constant_global(d: I32) Bool {
+    let node = decl_node[d]
+    if not decl_is(d, Decl.Global) or not is_kind(node, Node.Global_decl) or is_es(last_child(node)) { return false }
+    let module = module_of(d)
+    if module >= 0 and is_generic(module) { return false }
+    let k = cache_kind(cache_norm(type_of(next_sibling(first_child(node)), 0)))
+    if k < 1 or k > 5 { return false }
+    if cache_assigned_ready == 0 {
+        cache_assigned_ready = 1
+        cache_assigned.resize(decl_kind.len())
+        for (0 ..< decl_kind.len()) |i| { cache_assigned[i] = 0 }
+        for (0 ..< node_kind.len()) |n| {
+            if node_kind[n] == Node.Assign_expr.i32() {
+                let w = node_decl[cache_root(first_child(n))]
+                if w >= 0 and w < cache_assigned.len() { cache_assigned[w] = 1 }
+            }
+        }
+    }
+    return d >= cache_assigned.len() or cache_assigned[d] == 0
+}
+
+/// What an assignment's target writes into: `a` of `a.b[i].c`.
+fn cache_root(n: I32) I32 {
+    while (n >= 0 and (is_kind(n, Node.Field_expr) or is_kind(n, Node.Index_expr))) { n = first_child(n) }
+    return n
+}
+
+/// Whether an assignment's target is in a parameter's value (`a[i]`, `p.x`):
+/// a write the caller sees.
+fn cache_writes_argument(target: I32) Bool {
+    let root = cache_root(target)
+    if root == target or root < 0 or not is_kind(root, Node.Identifier) { return false }
+    let d = node_decl[root]
+    return decl_is(d, Decl.Param) or decl_is(d, Decl.SelfParam)
+}
+
+//! == Diagnostics
+
+/// Each `#cache` function that cannot be cached: a generator, `@wat`,
+/// `@es`, or not pure; then each instance's types.
+fn check_caches() Void {
+    for (0 ..< dir_node.len()) |k| {
+        let d = dir_node[k]
+        if dir_fn[k] >= 0 and directive_kind(d) == 3 and directive_cache_size(d) >= 0 and cache_directive_at(dir_fn[k]) == d
+            and is_own_file(file_of_token(node_first[d])) { check_cache_fn(dir_fn[k], d) }
+    }
+    for (0 ..< cache_fis.len()) |i| { check_cache_types(cache_fis[i]) }
+}
+
+/// The `#cache` directive of function `item` (its Fn_decl or Op_decl), or -1.
+fn cache_directive_at(item: I32) I32 {
+    for (0 ..< dir_node.len()) |k| { if dir_fn[k] == item and directive_kind(dir_node[k]) == 3 { return dir_node[k] } }
+    return -1
+}
+
+fn check_cache_fn(item: I32, d: I32) Void {
+    let decl = if is_kind(item, Node.Op_decl) { node_decl[next_sibling(first_child(item))] } else { node_decl[last_child(first_child(item))] }
+    if not decl_is(decl, Decl.Fn) { return }
+    let w = decl_name[decl]
+    let e = first_child(fn_body(decl))
+    let only = e >= 0 and next_sibling(e) < 0
+    let rule = -1
+    if is_generator(decl) { rule = CacheRule.Generator.i32() }
+    else if only and is_wat(e) { rule = CacheRule.Wat.i32() }
+    else if only and is_es(e) { rule = CacheRule.Es.i32() }
+    if rule >= 0 {
+        report2(Diag.InvalidCache, d, w, rule, -1)
+        return
+    }
+    memo_mode = 1
+    memo_culprit = -1
+    let pure = memo_safe_fn(decl)
+    memo_mode = 0
+    if pure { return }
+    report2(Diag.InvalidCache, if memo_culprit >= 0 { memo_culprit } else { d }, w, CacheRule.State.i32() + memo_why - 1, -1)
+}
+
+/// An instance's result and parameter types.
+fn check_cache_types(fi: I32) Void {
+    let decl = fi_decl[fi]
+    let item = decl_node[decl]
+    let at = cache_directive_at(item)
+    if at < 0 or not is_own_file(file_of_token(node_first[at])) or fi_func[fi] < 0 or func_code[fi_func[fi]] >= 0 { return }
+    let only = first_child(fn_body(decl))
+    if only >= 0 and next_sibling(only) < 0 and is_es(only) { return }
+    let w = decl_name[decl]
+    let result = fi_result[fi]
+    if ty_is(result, Ty.Void) {
+        report2(Diag.InvalidCache, at, w, CacheRule.NoResult.i32(), -1)
+        return
+    }
+    let params = fi_params[fi]
+    let decls = param_decls(decl)
+    for (0 ..< vl_len[params]) |i| {
+        let t = vl_item(params, i)
+        let bad = if ty_has_error(t) { -1 } else { cache_bad(t) }
+        if bad >= 0 {
+            let p = if i < vl_len[decls] { decl_node[vl_item(decls, i)] } else { at }
+            let tn = if is_kind(p, Node.Param) { next_sibling(first_child(p)) } else { p }
+            report2(Diag.InvalidCache, tn, w, CacheRule.Param.i32(), t)
+            cache_bad_note(t, bad)
+        }
+    }
+    if ty_has_error(result) { return }
+    let parts = if ty_is(result, Ty.Tuple) { ty_a[result] } else { vl_one(result) }
+    let bad = cache_bad_list(parts)
+    if bad >= 0 {
+        let rt = child_of_kind(item, Node.Return_type)
+        report2(Diag.InvalidCache, if rt >= 0 { rt } else { at }, w, CacheRule.Result.i32(), result)
+        cache_bad_note(result, bad)
+    }
+}
+
+/// Which part of type t is `bad`, when not all of it.
+fn cache_bad_note(t: I32, bad: I32) Void {
+    if bad != t { diag_note(type_text(bad) + " cannot be cached: a cache keeps scalars, Str, ?T, tuples, structs, enums, and arrays of them") }
+}
+
+//! == The code
+//!
+//! Functions are made one at a time: a cache's, then the helpers it asked
+//! for (@cache_helper makes a helper's function, its body later).
+
+/// The function being made: its locals' value types (its parameters
+/// first), how many are parameters, its last label, and the i64 local a
+/// hash folds through (-1: none yet).
+vec cg_locals: I32
+let cg_params: I32 = 0
+let cg_labels: I32 = 0
+let cg_i64: I32 = -1
+/// Each open @cg_for loop: its mark, then its label (the block's; the loop's is next).
+vec cg_loops: I32
+
+fn cg_begin(params: I32) Void {
+    cg_locals.clear()
+    for (0 ..< vl_len[params]) |i| { cg_locals.push(vl_item(params, i)) }
+    cg_params = cg_locals.len()
+    cg_labels = 0
+    cg_i64 = -1
+}
+
+fn cg_local(vt: I32) I32 {
+    cg_locals.push(vt)
+    return cg_locals.len() - 1
+}
+
+fn cg_label() I32 {
+    cg_labels += 1
+    return cg_labels
+}
+
+/// Function f's body: the nodes since `m`, of value type `vt`.
+fn cg_end(f: I32, vt: I32, m: I32) Void {
+    w_node(Op.Seq, vt, 0, 0, m)
+    func_body[f] = w_pop()
+    func_locals[f] = local_types.len()
+    func_local_count[f] = cg_locals.len() - cg_params
+    for (cg_params ..< cg_locals.len()) |i| { local_types.push(cg_locals[i]) }
+}
+
+fn cg_get(l: I32) I32 => w_get(cg_locals[l], l)
+
+/// Local l = the value since `m`.
+fn cg_set(l: I32, m: I32) I32 => w_node(Op.LocalSet, vt_none, l, 0, m)
+
+/// `if (the condition since m) { return c }`, or `return` local l when l >= 0.
+fn cg_return_if(m: I32, c: I32, l: I32) Void {
+    let mt = w_mark()
+    if l >= 0 { cg_get(l) } else { w_i32(c) }
+    w_node(Op.Return, vt_unreachable, 0, 0, mt)
+    w_node(Op.Seq, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, cg_label(), 0, m)
+}
+
+/// `for (0 ..< n) |i| {` (closed by @cg_for_end): local i counts to local n.
+fn cg_for(i: I32, n: I32) Void {
+    let mz = w_mark()
+    w_i32(0)
+    cg_set(i, mz)
+    let done = cg_label()
+    cg_label()
+    cg_loops.push(w_mark())
+    cg_loops.push(done)
+    let mc = w_mark()
+    cg_get(i)
+    cg_get(n)
+    w_i32_op(i32_ge_u, mc)
+    w_node(Op.BrIf, vt_none, done, 0, mc)
+}
+
+fn cg_for_end(i: I32) Void {
+    let k = cg_loops.len()
+    let m = cg_loops[k - 2]
+    let done = cg_loops[k - 1]
+    cg_loops.resize(k - 2)
+    let mi = w_mark()
+    cg_get(i)
+    w_i32(1)
+    w_i32_op(i32_add, mi)
+    cg_set(i, mi)
+    w_leaf(Op.Br, vt_unreachable, done + 1, 0)
+    w_node(Op.Loop, vt_none, done + 1, 0, m)
+    w_node(Op.Block, vt_none, done, 0, m)
+}
+
+/// h = (h ^ the i32 since m) * 0x9E3779B1.
+fn cg_mix(h: I32, m: I32) Void {
+    cg_get(h)
+    w_i32_op(i32_xor, m)
+    w_i32(-1640531535)
+    w_i32_op(i32_mul, m)
+    cg_set(h, m)
+}
+
+/// The value of type t since `m` as its hash, an i32.
+fn cg_hash(t: I32, m: I32) Void {
+    let n = cache_norm(t)
+    let k = cache_kind(n)
+    if k == 1 { return }
+    if k == 3 {
+        w_node(Op.Plain, vt_i32, 188, 0, m)   // i32.reinterpret_f32
+        return
+    }
+    if k == 2 or k == 4 {
+        // Its two halves, xored.
+        if k == 4 { w_node(Op.Plain, vt_i64, 189, 0, m) }   // i64.reinterpret_f64
+        if cg_i64 < 0 { cg_i64 = cg_local(vt_i64) }
+        w_node(Op.LocalTee, vt_i64, cg_i64, 0, m)
+        w_node(Op.Plain, vt_i32, i32_wrap_i64, 0, m)
+        let mh = w_mark()
+        cg_get(cg_i64)
+        w_leaf(Op.I64Const, vt_i64, 32, 0)
+        w_node(Op.Plain, vt_i64, i64_shr_u, 0, mh)
+        w_node(Op.Plain, vt_i32, i32_wrap_i64, 0, mh)
+        w_i32_op(i32_xor, m)
+        return
+    }
+    w_node(Op.Call, vt_i32, cache_helper(0, n), 0, m)
+}
+
+/// The two values of type t since `m` as whether they are the same, an i32.
+fn cg_eq(t: I32, m: I32) Void {
+    let n = cache_norm(t)
+    let k = cache_kind(n)
+    if k == 3 or k == 4 {
+        // By their bits.
+        let vt = if k == 3 { vt_i32 } else { vt_i64 }
+        let op = if k == 3 { 188 } else { 189 }
+        let b = w_pop()
+        w_node(Op.Plain, vt, op, 0, m)
+        let mb = w_mark()
+        w_push(b)
+        w_node(Op.Plain, vt, op, 0, mb)
+    }
+    if k == 1 or k == 3 { w_i32_op(i32_eq, m) }
+    else if k == 2 or k == 4 { w_i32_op(i64_eq, m) }
+    else if k == 5 or k == 6 { call_builtin(Builtin.Equals, m) }
+    else { w_node(Op.Call, vt_i32, cache_helper(1, n), 0, m) }
+}
+
+/// The value of type t since `m` as a copy of it, when it can be written into.
+fn cg_copy(t: I32, m: I32) Void {
+    let n = cache_norm(t)
+    if cache_kind(n) >= 7 { w_node(Op.Call, repr(n), cache_helper(2, n), 0, m) }
+}
+
+/// The helper `what` (0 hash, 1 equality, 2 copy) of type t (@cache_norm'd).
+fn cache_helper(what: I32, t: I32) I32 {
+    let k = 0
+    while (k < cache_help.len()) {
+        if cache_help[k] == what and cache_help[k + 1] == t { return cache_help[k + 2] }
+        k += 3
+    }
+    let vt = repr(t)
+    let mp = vl_begin()
+    vl_add(vt)
+    if what == 1 { vl_add(vt) }
+    let params = vl_end(mp)
+    let f = new_func(FuncKind.Defined, func_type(params, vl_one(if what == 2 { vt } else { vt_i32 })))
+    func_debug_name[f] = name_add(if what == 0 { "cache_hash" } else if what == 1 { "cache_eq" } else { "cache_copy" })
+    cache_help.push(what)
+    cache_help.push(t)
+    cache_help.push(f)
+    return f
+}
+
+/// The xorshift32 step (a set's victim), made once: its function.
+fn cache_rand() I32 {
+    let k = 0
+    while (k < cache_help.len()) {
+        if cache_help[k] == 3 { return cache_help[k + 2] }
+        k += 3
+    }
+    w_i32(-1640531535)
+    cache_rand_state = add_global(vt_i32, true, w_pop())
+    let f = new_func(FuncKind.Defined, func_type(vl_empty(), vl_one(vt_i32)))
+    func_debug_name[f] = name_add("cache_rand")
+    cache_help.push(3)
+    cache_help.push(0)
+    cache_help.push(f)
+    return f
+}
+
+/// Each cache, then the helpers they need.
+fn build_caches() Void {
+    let outer = cur_src
+    cur_src = -1
+    for (0 ..< cache_fis.len()) |i| { build_cache(cache_fis[i]) }
+    let k = 0
+    while (k < cache_help.len()) {
+        build_helper(cache_help[k], cache_help[k + 1], cache_help[k + 2])
+        k += 3
+    }
+    cur_src = outer
+}
+
+fn build_helper(what: I32, t: I32, f: I32) Void {
+    cg_begin(ht_a[func_type_of[f]])
+    let m = w_mark()
+    if what == 3 {
+        // x ^= x << 13; x ^= x >>> 17; x ^= x << 5
+        let x = cg_local(vt_i32)
+        let mg = w_mark()
+        w_leaf(Op.GlobalGet, vt_i32, cache_rand_state, 0)
+        cg_set(x, mg)
+        for ([13, 17, 5]) |s| {
+            let ms = w_mark()
+            cg_get(x)
+            let mx = w_mark()
+            cg_get(x)
+            w_i32(s)
+            w_i32_op(if s == 17 { i32_shr_u } else { i32_shl }, mx)
+            w_i32_op(i32_xor, ms)
+            cg_set(x, ms)
+        }
+        let ms = w_mark()
+        cg_get(x)
+        w_node(Op.GlobalSet, vt_none, cache_rand_state, 0, ms)
+        cg_get(x)
+        cg_end(f, vt_i32, m)
+        return
+    }
+    let k = cache_kind(t)
+    if what == 0 { hash_body(t, k) } else if what == 1 { eq_body(t, k) } else { copy_body(t, k) }
+    cg_end(f, if what == 2 { repr(t) } else { vt_i32 }, m)
+}
+
+/// A null's hash.
+let cache_null_hash: I32 = 1853189228
+
+/// `if (local l is null) { return … }`: an i32 `c`, or l when c < 0.
+fn cg_null_return(l: I32, c: I32) Void {
+    let mi = w_mark()
+    cg_get(l)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mi)
+    cg_return_if(mi, c, if c < 0 { l } else { -1 })
+}
+
+/// A value's hash (local 0): its parts' mixed.
+fn hash_body(t: I32, k: I32) Void {
+    let h = cg_local(vt_i32)
+    if k == 6 {
+        // ?Str: null's, or its Str's.
+        cg_null_return(0, cache_null_hash)
+        let mc = w_mark()
+        cg_get(0)
+        w_node(Op.Call, vt_i32, cache_helper(0, ty_a[t]), 0, mc)
+        return
+    }
+    if k >= 7 { cg_null_return(0, cache_null_hash) }
+    if k == 5 or k == 7 {
+        // The length, then each code unit or element.
+        let n = cg_local(vt_i32)
+        let i = cg_local(vt_i32)
+        let ml = w_mark()
+        cg_get(0)
+        if k == 5 { call_builtin(Builtin.Length, ml) } else { w_node(Op.ArrayLen, vt_i32, 0, 0, ml) }
+        w_node(Op.LocalTee, vt_i32, n, 0, ml)
+        cg_set(h, ml)
+        cg_for(i, n)
+        let me = w_mark()
+        cg_get(0)
+        cg_get(i)
+        if k == 5 { call_builtin(Builtin.CharCodeAt, me) } else {
+            let heap = vt_heap(repr(t))
+            w_node(Op.ArrayGet, ht_a[heap], heap, 0, me)
+            cg_hash(cache_elem(t), me)
+        }
+        cg_mix(h, me)
+        cg_for_end(i)
+    }
+    if k == 8 {
+        let mz = w_mark()
+        w_i32(0)
+        cg_set(h, mz)
+        hash_fields(ty_decl(t), ty_inst(t), vt_heap(repr(t)), 0, h)
+    }
+    if k == 9 {
+        // The variant's number, then its fields.
+        let vs = cache_variants(ty_decl(t))
+        for (0 ..< vl_len[vs]) |j| {
+            let v = vl_item(vs, j)
+            let heap = struct_heap_of(v, ty_inst(t))
+            let c = variant_test(0, heap)
+            let mz = w_mark()
+            w_i32(j + 1)
+            cg_set(h, mz)
+            hash_fields(v, ty_inst(t), heap, c, h)
+            variant_end(h)
+        }
+        let mz = w_mark()
+        w_i32(0)
+        cg_set(h, mz)
+    }
+    cg_get(h)
+}
+
+/// Mix the hash of each field of the struct in local l (of struct
+/// or variant `decl`, heap type `heap`) into local h.
+fn hash_fields(decl: I32, inst: I32, heap: I32, l: I32, h: I32) Void {
+    let fields = cache_fields(decl, inst)
+    for (0 ..< vl_len[fields]) |j| {
+        let mf = w_mark()
+        cg_get(l)
+        w_node(Op.StructGet, field_storage(heap, j), heap, j, mf)
+        cg_hash(vl_item(fields, j), mf)
+        cg_mix(h, mf)
+    }
+}
+
+/// Opens `if (ref.test heap l) { c = ref.cast heap l; …`, closed by
+/// @variant_end: local c.
+fn variant_test(l: I32, heap: I32) I32 {
+    let vref = vt_ref(heap, false)
+    let c = cg_local(vt_ref(heap, true))
+    cg_loops.push(w_mark())
+    let mi = w_mark()
+    cg_get(l)
+    w_node(Op.RefTest, vt_i32, vref, 0, mi)
+    cg_loops.push(w_mark())
+    let mc = w_mark()
+    cg_get(l)
+    w_node(Op.RefCast, vref, vref, 0, mc)
+    cg_set(c, mc)
+    return c
+}
+
+/// … `return` local r (or the i32 -1 - r when r < 0) `}`.
+fn variant_end(r: I32) Void {
+    let mr = w_mark()
+    if r >= 0 { cg_get(r) } else { w_i32(-1 - r) }
+    w_node(Op.Return, vt_unreachable, 0, 0, mr)
+    let k = cg_loops.len()
+    let mt = cg_loops[k - 1]
+    let mi = cg_loops[k - 2]
+    cg_loops.resize(k - 2)
+    w_node(Op.Seq, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, cg_label(), 0, mi)
+}
+
+/// Whether two values (locals 0 and 1) are the same: the same reference,
+/// or both not null and their parts the same.
+fn eq_body(t: I32, k: I32) Void {
+    let mi = w_mark()
+    cg_get(0)
+    cg_get(1)
+    w_node(Op.RefEq, vt_i32, 0, 0, mi)
+    cg_return_if(mi, 1, -1)
+    let mn = w_mark()
+    cg_get(0)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mn)
+    cg_get(1)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mn + 1)
+    w_i32_op(i32_or, mn)
+    cg_return_if(mn, 0, -1)
+    if k == 7 {
+        let n = cg_local(vt_i32)
+        let i = cg_local(vt_i32)
+        let ml = w_mark()
+        cg_get(0)
+        w_node(Op.ArrayLen, vt_i32, 0, 0, ml)
+        w_node(Op.LocalTee, vt_i32, n, 0, ml)
+        let mb = w_mark()
+        cg_get(1)
+        w_node(Op.ArrayLen, vt_i32, 0, 0, mb)
+        w_i32_op(i32_ne, ml)
+        cg_return_if(ml, 0, -1)
+        cg_for(i, n)
+        let heap = vt_heap(repr(t))
+        let me = w_mark()
+        for (0 ..< 2) |side| {
+            let ms = w_mark()
+            cg_get(side)
+            cg_get(i)
+            w_node(Op.ArrayGet, ht_a[heap], heap, 0, ms)
+        }
+        cg_eq(cache_elem(t), me)
+        w_i32_op(i32_eqz, me)
+        cg_return_if(me, 0, -1)
+        cg_for_end(i)
+        w_i32(1)
+        return
+    }
+    if k == 8 {
+        eq_fields(ty_decl(t), ty_inst(t), vt_heap(repr(t)), 0, 1)
+        w_i32(1)
+        return
+    }
+    // An enum: the same variant, and its fields the same.
+    let vs = cache_variants(ty_decl(t))
+    for (0 ..< vl_len[vs]) |j| {
+        let v = vl_item(vs, j)
+        let heap = struct_heap_of(v, ty_inst(t))
+        let a = variant_test(0, heap)
+        let b = cg_local(vt_ref(heap, true))
+        let mt = w_mark()
+        cg_get(1)
+        w_node(Op.RefTest, vt_i32, vt_ref(heap, false), 0, mt)
+        w_i32_op(i32_eqz, mt)
+        cg_return_if(mt, 0, -1)
+        let mc = w_mark()
+        cg_get(1)
+        w_node(Op.RefCast, vt_ref(heap, false), vt_ref(heap, false), 0, mc)
+        cg_set(b, mc)
+        eq_fields(v, ty_inst(t), heap, a, b)
+        variant_end(-2)
+    }
+    w_i32(0)
+}
+
+/// `return 0` when a field of the structs in locals a and b differs.
+fn eq_fields(decl: I32, inst: I32, heap: I32, a: I32, b: I32) Void {
+    let fields = cache_fields(decl, inst)
+    for (0 ..< vl_len[fields]) |j| {
+        let me = w_mark()
+        for ([a, b]) |side| {
+            let ms = w_mark()
+            cg_get(side)
+            w_node(Op.StructGet, field_storage(heap, j), heap, j, ms)
+        }
+        cg_eq(vl_item(fields, j), me)
+        w_i32_op(i32_eqz, me)
+        cg_return_if(me, 0, -1)
+    }
+}
+
+/// A copy of a value (local 0): a new array or struct, its parts copied
+/// when they can be written into; null as it is.
+fn copy_body(t: I32, k: I32) Void {
+    cg_null_return(0, -1)
+    if k == 7 {
+        let heap = vt_heap(repr(t))
+        let n = cg_local(vt_i32)
+        let out = cg_local(vt_ref(heap, true))
+        let mo = w_mark()
+        cg_get(0)
+        w_node(Op.ArrayLen, vt_i32, 0, 0, mo)
+        w_node(Op.LocalTee, vt_i32, n, 0, mo)
+        w_node(Op.ArrayNewDefault, vt_ref(heap, false), heap, 0, mo)
+        cg_set(out, mo)
+        let elem = cache_elem(t)
+        if cache_copies(elem) {
+            let i = cg_local(vt_i32)
+            cg_for(i, n)
+            let ms = w_mark()
+            cg_get(out)
+            cg_get(i)
+            let mg = w_mark()
+            cg_get(0)
+            cg_get(i)
+            w_node(Op.ArrayGet, ht_a[heap], heap, 0, mg)
+            cg_copy(elem, mg)
+            w_node(Op.ArraySet, vt_none, heap, 0, ms)
+            cg_for_end(i)
+        } else {
+            // One array.copy.
+            let mc = w_mark()
+            cg_get(out)
+            w_i32(0)
+            cg_get(0)
+            w_i32(0)
+            cg_get(n)
+            w_node(Op.ArrayCopy, vt_none, heap, heap, mc)
+        }
+        cg_get(out)
+        return
+    }
+    if k == 8 {
+        copy_fields(ty_decl(t), ty_inst(t), vt_heap(repr(t)), 0)
+        return
+    }
+    // An enum: its variant's, a variant of no fields as it is.
+    let vs = cache_variants(ty_decl(t))
+    for (0 ..< vl_len[vs]) |j| {
+        let v = vl_item(vs, j)
+        if vl_len[cache_fields(v, ty_inst(t))] > 0 {
+            let heap = struct_heap_of(v, ty_inst(t))
+            let c = variant_test(0, heap)
+            let r = cg_local(repr(t))
+            let mr = w_mark()
+            copy_fields(v, ty_inst(t), heap, c)
+            cg_set(r, mr)
+            variant_end(r)
+        }
+    }
+    cg_get(0)
+}
+
+/// A new struct of heap type `heap`, of the fields of the one in local l, copied.
+fn copy_fields(decl: I32, inst: I32, heap: I32, l: I32) Void {
+    let fields = cache_fields(decl, inst)
+    let mn = w_mark()
+    for (0 ..< vl_len[fields]) |j| {
+        let mf = w_mark()
+        cg_get(l)
+        w_node(Op.StructGet, field_storage(heap, j), heap, j, mf)
+        cg_copy(vl_item(fields, j), mf)
+    }
+    w_node(Op.StructNew, vt_ref(heap, false), heap, 0, mn)
+}
+
+//! == A cache
+
+/// A cache's slot type, table, and the locals its code shares.
+struct Cache:
+    | slot: I32       // its Slot struct type
+    | arr: I32        // Array[?Slot]
+    | table: I32      // the global
+    | count: I32      // #cache(0): the global counting entries; else -1
+    | ways: I32       // a set's ways; 0 for #cache(0)
+    | g: I32          // the body's function
+    | params: I32     // its parameter types (a list)
+    | parts: I32      // its result's types (a list: a tuple's, or the one)
+    | h: I32          // locals
+    | tab: I32
+    | s: I32
+    | i: I32
+    | base: I32       // where the set starts (#cache(0): the mask)
+    | r: I32          // the first of the result's locals
+
+/// Instance fi's function becomes its cache; its body moves to `f:impl`.
+fn build_cache(fi: I32) Void {
+    let f = fi_func[fi]
+    if f < 0 or func_code[f] >= 0 or func_body[f] < 0 { return }
+    let size = func_cache[f]
+    let ft = func_type_of[f]
+    let g = new_func(FuncKind.Defined, ft)
+    func_body[g] = func_body[f]
+    func_locals[g] = func_locals[f]
+    func_local_count[g] = func_local_count[f]
+    func_src[g] = func_src[f]
+    func_debug_name[g] = name_with(func_debug_name[f], ":impl")
+    let params = fi_params[fi]
+    let result = fi_result[fi]
+    let parts = if ty_is(result, Ty.Tuple) { ty_a[result] } else { vl_one(result) }
+    let np = vl_len[params]
+    let nr = vl_len[parts]
+    // Slot { hits: (mut i8), hash: i32, k0 … kn, v0 … vm }
+    let mv = vl_begin()
+    for (0 ..< np) |i| { vl_add(storage(repr(vl_item(params, i)))) }
+    for (0 ..< nr) |j| { vl_add(storage(repr(vl_item(parts, j)))) }
+    let fields = vl_end(mv)
+    let slot = struct_type(-1, false)
+    ht_a[slot] = ht_fields.len()
+    struct_field(slot, vt_i8, true)
+    struct_field(slot, vt_i32, false)
+    for (0 ..< vl_len[fields]) |i| { struct_field(slot, vl_item(fields, i), false) }
+    let arr = array_type(vt_ref(slot, true), true)
+    let mg = w_mark()
+    w_i32(if size == 0 { 64 } else { size })
+    w_node(Op.ArrayNewDefault, vt_ref(arr, false), arr, 0, mg)
+    let table = add_global(vt_ref(arr, false), size == 0, w_pop())
+    let count = -1
+    if size == 0 {
+        w_i32(0)
+        count = add_global(vt_i32, true, w_pop())
+    }
+    cg_begin(ht_a[ft])
+    let c = Cache {
+        slot: slot, arr: arr, table: table, count: count, ways: if size >= 4 { 4 } else { size }, g: g, params: params, parts: parts,
+        h: cg_local(vt_i32), tab: cg_local(vt_ref(arr, true)), s: cg_local(vt_ref(slot, true)), i: cg_local(vt_i32), base: cg_local(vt_i32), r: -1,
+    }
+    c.r = cg_locals.len()
+    for (0 ..< nr) |j| { cg_local(repr(vl_item(parts, j))) }
+    let m = w_mark()
+    // h: the arguments' hashes mixed, then their bits spread (the set is h's low bits).
+    let mh = w_mark()
+    w_i32(np)
+    cg_set(c.h, mh)
+    for (0 ..< np) |p| {
+        let mp = w_mark()
+        cg_get(p)
+        cg_hash(vl_item(params, p), mp)
+        cg_mix(c.h, mp)
+    }
+    for ([16, -2048144789, 13]) |x| {
+        let ms = w_mark()
+        cg_get(c.h)
+        if x < 0 { w_i32(x) } else {
+            let mx = w_mark()
+            cg_get(c.h)
+            w_i32(x)
+            w_i32_op(i32_shr_u, mx)
+        }
+        w_i32_op(if x < 0 { i32_mul } else { i32_xor }, ms)
+        cg_set(c.h, ms)
+    }
+    if size == 0 { open_lookup(c) } else { set_lookup(c, size) }
+    // A miss: the body's results, kept.
+    let mc = w_mark()
+    for (0 ..< np) |p| { cg_get(p) }
+    w_node(Op.Call, repr(result), g, 0, mc)
+    if nr == 1 { cg_set(c.r, mc) } else {
+        let j = nr - 1
+        while (j >= 0) {
+            w_leaf(Op.LocalSet, vt_none, c.r + j, 0)
+            j -= 1
+        }
+        w_node(Op.Seq, vt_none, 0, 0, mc)
+    }
+    if size == 0 { open_insert(c) } else { set_insert(c) }
+    // tab[i] = Slot { 0, h, the keys and results copied }
+    let ma = w_mark()
+    cg_get(c.tab)
+    cg_get(c.i)
+    let mn = w_mark()
+    w_i32(0)
+    cg_get(c.h)
+    for (0 ..< np) |p| {
+        let mp = w_mark()
+        cg_get(p)
+        cg_copy(vl_item(params, p), mp)
+    }
+    for (0 ..< nr) |j| {
+        let mp = w_mark()
+        cg_get(c.r + j)
+        cg_copy(vl_item(parts, j), mp)
+    }
+    w_node(Op.StructNew, vt_ref(slot, false), slot, 0, mn)
+    w_node(Op.ArraySet, vt_none, arr, 0, ma)
+    if size == 0 {
+        let mi = w_mark()
+        w_leaf(Op.GlobalGet, vt_i32, count, 0)
+        w_i32(1)
+        w_i32_op(i32_add, mi)
+        w_node(Op.GlobalSet, vt_none, count, 0, mi)
+    }
+    let mr = w_mark()
+    for (0 ..< nr) |j| { cg_get(c.r + j) }
+    w_node(Op.Seq, repr(result), 0, 0, mr)
+    cg_end(f, repr(result), m)
+}
+
+/// Name `name` and `suffix` after it.
+fn name_with(name: I32, suffix: Str) I32 {
+    let id = name_start.len()
+    name_start.push(names.len())
+    if name >= 0 { for (0 ..< name_len[name]) |k| { names.push(names[name_start[name] + k]) } }
+    for (0 ..< suffix.len()) |k| { names.push(suffix.get(k)) }
+    name_len.push(names.len() - name_start[id])
+    return id
+}
+
+/// Local s = tab[i].
+fn slot_at(c: Cache) Void {
+    let ms = w_mark()
+    cg_get(c.tab)
+    cg_get(c.i)
+    w_node(Op.ArrayGet, vt_ref(c.slot, true), c.arr, 0, ms)
+    cg_set(c.s, ms)
+}
+
+/// `if (s.hash == h and its keys are the arguments) { s.hits += 1 (to
+/// 255); return its results (copied) }`, s not null.
+fn hit(c: Cache) Void {
+    let np = vl_len[c.params]
+    let mi = w_mark()
+    cg_get(c.s)
+    w_node(Op.StructGet, vt_i32, c.slot, 1, mi)
+    cg_get(c.h)
+    w_i32_op(i32_eq, mi)
+    let mt = w_mark()
+    let mk = w_mark()
+    for (0 ..< np) |p| {
+        let me = w_mark()
+        cg_get(c.s)
+        w_node(Op.StructGet, field_storage(c.slot, 2 + p), c.slot, 2 + p, me)
+        cg_get(p)
+        cg_eq(vl_item(c.params, p), me)
+        if p > 0 { w_i32_op(i32_and, mk) }
+    }
+    if np == 0 { w_i32(1) }
+    let mu = w_mark()
+    cg_get(c.s)
+    let mv = w_mark()
+    for (0 ..< 2) |_k| {
+        let mg = w_mark()
+        cg_get(c.s)
+        w_node(Op.StructGetU, vt_i32, c.slot, 0, mg)
+    }
+    w_i32(255)
+    w_i32_op(i32_ne, mv + 1)
+    w_i32_op(i32_add, mv)
+    w_node(Op.StructSet, vt_none, c.slot, 0, mu)
+    let mr = w_mark()
+    for (0 ..< vl_len[c.parts]) |j| {
+        let field = 2 + np + j
+        let mj = w_mark()
+        cg_get(c.s)
+        w_node(Op.StructGet, field_storage(c.slot, field), c.slot, field, mj)
+        cg_copy(vl_item(c.parts, j), mj)
+    }
+    w_node(Op.Return, vt_unreachable, 0, 0, mr)
+    w_node(Op.Seq, vt_none, 0, 0, mu)
+    w_node(Op.If, vt_none, cg_label(), 0, mk)
+    w_node(Op.Seq, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, cg_label(), 0, mi)
+}
+
+/// `if (s != null) { … }`: the condition at `mn`, the body what follows it.
+fn if_slot(mn: I32) Void {
+    w_node(Op.Seq, vt_none, 0, 0, mn + 1)
+    w_node(Op.If, vt_none, cg_label(), 0, mn)
+}
+
+/// The condition `s != null`, pushed.
+fn slot_taken(c: Cache) Void {
+    let mn = w_mark()
+    cg_get(c.s)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mn)
+    w_i32_op(i32_eqz, mn)
+}
+
+/// i += 1 (and `& mask` for #cache(0)), the value left when `tee`.
+fn step(c: Cache, tee: Bool) Void {
+    let mi = w_mark()
+    cg_get(c.i)
+    w_i32(1)
+    w_i32_op(i32_add, mi)
+    if c.ways == 0 {
+        cg_get(c.base)
+        w_i32_op(i32_and, mi)
+    }
+    w_node(if tee { Op.LocalTee } else { Op.LocalSet }, if tee { vt_i32 } else { vt_none }, c.i, 0, mi)
+}
+
+/// A set's look-up: tab = the table; base = h's set's first way; each way
+/// i (from base), a hit returns. Leaves i past the set.
+fn set_lookup(c: Cache, size: I32) Void {
+    let mt = w_mark()
+    w_leaf(Op.GlobalGet, vt_ref(c.arr, false), c.table, 0)
+    cg_set(c.tab, mt)
+    let mb = w_mark()
+    cg_get(c.h)
+    w_i32(size / c.ways - 1)
+    w_i32_op(i32_and, mb)
+    w_i32(if c.ways == 4 { 2 } else if c.ways == 2 { 1 } else { 0 })
+    w_i32_op(i32_shl, mb)
+    w_node(Op.LocalTee, vt_i32, c.base, 0, mb)
+    cg_set(c.i, mb)
+    let top = cg_label()
+    let ml = w_mark()
+    slot_at(c)
+    let mn = w_mark()
+    slot_taken(c)
+    hit(c)
+    if_slot(mn)
+    // while (++i < base + ways)
+    let mw = w_mark()
+    step(c, true)
+    cg_get(c.base)
+    w_i32(c.ways)
+    w_i32_op(i32_add, mw + 1)
+    w_i32_op(i32_lt_u, mw)
+    w_node(Op.BrIf, vt_none, top, 0, mw)
+    w_node(Op.Loop, vt_none, top, 0, ml)
+}
+
+/// i = where the set keeps the new entry: its first empty way, else a
+/// random one, but the next when that is the most hit.
+fn set_insert(c: Cache) Void {
+    let mz = w_mark()
+    cg_get(c.base)
+    cg_set(c.i, mz)
+    if c.ways == 1 { return }
+    let found = cg_label()
+    let top = cg_label()
+    let mb = w_mark()
+    let ml = w_mark()
+    let mc = w_mark()
+    cg_get(c.tab)
+    cg_get(c.i)
+    w_node(Op.ArrayGet, vt_ref(c.slot, true), c.arr, 0, mc)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc)
+    w_node(Op.BrIf, vt_none, found, 0, mc)
+    let mw = w_mark()
+    step(c, true)
+    cg_get(c.base)
+    w_i32(c.ways)
+    w_i32_op(i32_add, mw + 1)
+    w_i32_op(i32_lt_u, mw)
+    w_node(Op.BrIf, vt_none, top, 0, mw)
+    w_node(Op.Loop, vt_none, top, 0, ml)
+    // Full. best (in s's place: an i32 is wanted, so i's after) = the most hit way.
+    let best = cg_local(vt_i32)
+    let m0 = w_mark()
+    w_i32(0)
+    cg_set(best, m0)
+    for (1 ..< c.ways) |j| {
+        let mi = w_mark()
+        hits_of(c, -1 - j)
+        hits_of(c, best)
+        w_i32_op(i32_gt_u, mi)
+        let mt = w_mark()
+        let ms = w_mark()
+        w_i32(j)
+        cg_set(best, ms)
+        w_node(Op.Seq, vt_none, 0, 0, mt)
+        w_node(Op.If, vt_none, cg_label(), 0, mi)
+    }
+    // v = rand & (ways - 1); v = (v + (v == best)) & (ways - 1); i = base + v
+    let mr = w_mark()
+    w_node(Op.Call, vt_i32, cache_rand(), 0, mr)
+    w_i32(c.ways - 1)
+    w_i32_op(i32_and, mr)
+    w_node(Op.LocalTee, vt_i32, c.i, 0, mr)
+    let me = w_mark()
+    cg_get(c.i)
+    cg_get(best)
+    w_i32_op(i32_eq, me)
+    w_i32_op(i32_add, mr)
+    w_i32(c.ways - 1)
+    w_i32_op(i32_and, mr)
+    cg_get(c.base)
+    w_i32_op(i32_add, mr)
+    cg_set(c.i, mr)
+    w_node(Op.Block, vt_none, found, 0, mb)
+}
+
+/// tab[base + way].hits, `way` a local, or the constant -1 - way when negative.
+fn hits_of(c: Cache, way: I32) Void {
+    let m = w_mark()
+    cg_get(c.tab)
+    cg_get(c.base)
+    if way >= 0 { cg_get(way) } else { w_i32(-1 - way) }
+    w_i32_op(i32_add, m + 1)
+    w_node(Op.ArrayGet, vt_ref(c.slot, true), c.arr, 0, m)
+    w_node(Op.StructGetU, vt_i32, c.slot, 0, m)
+}
+
+/// tab = the table; base = its mask; from i = h & mask, each slot until
+/// an empty one, a hit returns.
+fn open_lookup(c: Cache) Void {
+    open_start(c)
+    let top = cg_label()
+    let ml = w_mark()
+    slot_at(c)
+    let mn = w_mark()
+    slot_taken(c)
+    hit(c)
+    step(c, false)
+    w_leaf(Op.Br, vt_unreachable, top, 0)
+    if_slot(mn)
+    w_node(Op.Loop, vt_none, top, 0, ml)
+}
+
+/// tab = the table, base = its mask, i = h & mask.
+fn open_start(c: Cache) Void {
+    let mt = w_mark()
+    w_leaf(Op.GlobalGet, vt_ref(c.arr, false), c.table, 0)
+    w_node(Op.LocalTee, vt_ref(c.arr, true), c.tab, 0, mt)
+    w_node(Op.ArrayLen, vt_i32, 0, 0, mt)
+    w_i32(1)
+    w_i32_op(i32_sub, mt)
+    w_node(Op.LocalTee, vt_i32, c.base, 0, mt)
+    cg_get(c.h)
+    w_i32_op(i32_and, mt)
+    cg_set(c.i, mt)
+}
+
+/// After a miss (whose recursion may have added entries, or grown the
+/// table): the table doubled when half full (each entry where its stored
+/// hash says), then i = the first empty slot from h & mask.
+fn open_insert(c: Cache) Void {
+    // if (count * 2 >= len(table)) {
+    let mi = w_mark()
+    w_leaf(Op.GlobalGet, vt_i32, c.count, 0)
+    w_i32(1)
+    w_i32_op(i32_shl, mi)
+    w_leaf(Op.GlobalGet, vt_ref(c.arr, false), c.table, 0)
+    w_node(Op.ArrayLen, vt_i32, 0, 0, mi + 1)
+    w_i32_op(i32_ge_u, mi)
+    let mt = w_mark()
+    // old = table (in tab); n = len(old); new = array.new_default(n * 2) (in the table); mask = n * 2 - 1
+    let n = cg_local(vt_i32)
+    let j = cg_local(vt_i32)
+    let fresh = cg_local(vt_ref(c.arr, true))
+    let mo = w_mark()
+    w_leaf(Op.GlobalGet, vt_ref(c.arr, false), c.table, 0)
+    w_node(Op.LocalTee, vt_ref(c.arr, true), c.tab, 0, mo)
+    w_node(Op.ArrayLen, vt_i32, 0, 0, mo)
+    w_node(Op.LocalTee, vt_i32, n, 0, mo)
+    w_i32(1)
+    w_i32_op(i32_shl, mo)
+    w_node(Op.LocalTee, vt_i32, c.base, 0, mo)
+    w_node(Op.ArrayNewDefault, vt_ref(c.arr, false), c.arr, 0, mo)
+    w_node(Op.LocalTee, vt_ref(c.arr, true), fresh, 0, mo)
+    w_node(Op.RefAsNonNull, vt_ref(c.arr, false), 0, 0, mo)
+    w_node(Op.GlobalSet, vt_none, c.table, 0, mo)
+    let mm = w_mark()
+    cg_get(c.base)
+    w_i32(1)
+    w_i32_op(i32_sub, mm)
+    cg_set(c.base, mm)
+    // for each j: s = old[j]; if s != null { i = s.hash & mask; while (new[i] != null) { i = (i + 1) & mask }; new[i] = s }
+    cg_for(j, n)
+    let ms = w_mark()
+    cg_get(c.tab)
+    cg_get(j)
+    w_node(Op.ArrayGet, vt_ref(c.slot, true), c.arr, 0, ms)
+    cg_set(c.s, ms)
+    let mn = w_mark()
+    slot_taken(c)
+    let mh = w_mark()
+    cg_get(c.s)
+    w_node(Op.StructGet, vt_i32, c.slot, 1, mh)
+    cg_get(c.base)
+    w_i32_op(i32_and, mh)
+    cg_set(c.i, mh)
+    probe(c, fresh)
+    let mp = w_mark()
+    cg_get(fresh)
+    cg_get(c.i)
+    cg_get(c.s)
+    w_node(Op.ArraySet, vt_none, c.arr, 0, mp)
+    if_slot(mn)
+    cg_for_end(j)
+    w_node(Op.Seq, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, cg_label(), 0, mi)
+    // }
+    open_start(c)
+    probe(c, c.tab)
+}
+
+/// `while (table[i] != null) { i = (i + 1) & mask }`, the table in local t.
+fn probe(c: Cache, t: I32) Void {
+    let top = cg_label()
+    let ml = w_mark()
+    let mc = w_mark()
+    cg_get(t)
+    cg_get(c.i)
+    w_node(Op.ArrayGet, vt_ref(c.slot, true), c.arr, 0, mc)
+    w_node(Op.RefIsNull, vt_i32, 0, 0, mc)
+    w_i32_op(i32_eqz, mc)
+    let mt = w_mark()
+    step(c, false)
+    w_leaf(Op.Br, vt_unreachable, top, 0)
+    w_node(Op.Seq, vt_none, 0, 0, mt)
+    w_node(Op.If, vt_none, cg_label(), 0, mc)
+    w_node(Op.Loop, vt_none, top, 0, ml)
+}

@@ -26,6 +26,7 @@
 //!   `protocols.utu`, `data.utu`, `strings.utu`, `mems.utu`, `enums.utu`,
 //!   `ir.utu` (the standard library's `@ir` bodies), and `host.utu` (what
 //!   the module imports). `gen.utu` writes parts of the language as utu source.
+//!   `cache.utu` makes each `#cache` function's cache, once all are checked.
 //! + DSLs expand into utu source: `dsl.utu`, `json.utu` (its runtime is `std:JsonRuntime`),
 //!   `stored.utu`, `wutu_parse.utu`, `wutu.utu`.
 //! + `optimize.utu` cleans up each function's IR, and `wasm.utu` encodes the

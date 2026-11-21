@@ -108,6 +108,7 @@ fn fn_instance_on(decl: I32, inst: I32, self_t: I32) I32 {
         if dir_node.len() > 0 {
             func_inline[f] = fn_inline_directive(decl_node[decl])
             func_cache[f] = fn_cache_directive(decl_node[decl])
+            if func_cache[f] >= 0 { cache_fis.push(id) }
         }
         // A @wat function's body is its code, which the host assembled.
         let wat = wat_of(body)
@@ -1035,21 +1036,40 @@ fn memoizable_call(call: I32, cx: Cx) Bool {
     return true
 }
 
-/// By declaration: 0 not yet known, 1 being decided, 2 memo-safe, 3 not.
+/// By declaration, two bits for each @memo_mode: 0 not yet known, 1 being
+/// decided, 2 memo-safe, 3 not.
 vec memo_state: I32
+
+/// 0 while Wutu asks, 1 while `#cache` does (cache.utu): then a global
+/// nothing assigns, of a scalar or Str, is a constant, and a write into an
+/// argument (`a[i] = x`, `p.x = y`) is an effect.
+let memo_mode: I32 = 0
+/// The code that last made @memo_safe_node false (the outermost), and why:
+/// 1 a global or mem, 2 the host, 3 a call of what is not memo-safe, 4 a
+/// write into an argument.
+let memo_culprit: I32 = -1
+let memo_why: I32 = 0
+
+/// False, with `n` the culprit, for `why`.
+fn memo_unsafe(n: I32, why: I32) Bool {
+    memo_culprit = n
+    memo_why = why
+    return false
+}
 
 /// Whether function `decl` is memo-safe (see above). A function in a file
 /// that is not the program's own (std's) is, but std:Wutu's effects.
 fn memo_safe_fn(decl: I32) Bool {
     if not decl_is(decl, Decl.Fn) { return false }
     while (memo_state.len() <= decl) { memo_state.push(0) }
-    let state = memo_state[decl]
+    let shift = memo_mode * 2
+    let state = (memo_state[decl] >> shift) & 3
     if state == 2 or state == 1 { return true }
     if state == 3 { return false }
-    memo_state[decl] = 1
+    memo_state[decl] += 1 << shift
     let node = decl_node[decl]
     let ok = if file_std[file_of_token(node_first[node])] == 1 { std_memo_safe(decl) } else { memo_safe_node(node) }
-    memo_state[decl] = if ok { 2 } else { 3 }
+    memo_state[decl] += (if ok { 1 } else { 2 }) << shift
     return ok
 }
 
@@ -1082,16 +1102,21 @@ fn memo_safe_node(n: I32) Bool {
     if n < 0 { return true }
     if is_kind(n, Node.Bind_expr) and is_es(last_child(n)) {
         // A template's own helper bindings are trusted; another `@es` is the host.
-        return text_at(word_text(word_of(first_child(n))), 0, cks(Ckt.Wutu))
+        return text_at(word_text(word_of(first_child(n))), 0, cks(Ckt.Wutu)) or memo_unsafe(n, 2)
     }
-    if is_kind(n, Node.Dsl_expr) and is_es(n) { return false }
+    if is_kind(n, Node.Dsl_expr) and is_es(n) { return memo_unsafe(n, 2) }
     if is_kind(n, Node.Identifier) {
         let d = node_decl[n]
         // A global, a mem, or a host module (`Browser`, an npm package).
-        if decl_is(d, Decl.Global) or decl_is(d, Decl.Mem) or decl_is(d, Decl.Foreign) { return false }
-        if decl_is(d, Decl.Fn) { return memo_safe_fn(d) }
+        if decl_is(d, Decl.Global) or decl_is(d, Decl.Mem) or decl_is(d, Decl.Foreign) {
+            if memo_mode == 1 and cache_constant_global(d) { return true }
+            let host = decl_is(d, Decl.Foreign) or (is_kind(decl_node[d], Node.Global_decl) and is_es(last_child(decl_node[d])))
+            return memo_unsafe(n, if host { 2 } else { 1 })
+        }
+        if decl_is(d, Decl.Fn) { return memo_safe_fn(d) or memo_unsafe(n, 3) }
         return true
     }
+    if memo_mode == 1 and is_kind(n, Node.Assign_expr) and cache_writes_argument(first_child(n)) { return memo_unsafe(first_child(n), 4) }
     if is_kind(n, Node.Field_expr) or is_kind(n, Node.Type_member_expr) {
         let base = first_child(n)
         // (`Browser.document` is a type member: its base a type name.)
@@ -1099,23 +1124,24 @@ fn memo_safe_node(n: I32) Bool {
         if named {
             let d = node_decl[base]
             if d < 0 and first_child(base) >= 0 { d = node_decl[first_child(base)] }
-            if decl_is(d, Decl.Foreign) { return false }
+            if decl_is(d, Decl.Foreign) { return memo_unsafe(n, 2) }
             // An unresolved base is a host name (`Browser.document`).
-            if d < 0 { return false }
+            if d < 0 { return memo_unsafe(n, 2) }
             if decl_is(d, Decl.Module) or decl_is(d, Decl.Struct) or decl_is(d, Decl.Enum) {
                 let f = static_member(d, word_of(last_child(n)))
                 // (No utu member by that name: a module's is a host's, `Browser.document`.)
-                if f < 0 { return not decl_is(d, Decl.Module) }
-                if decl_is(f, Decl.Fn) { return memo_safe_fn(f) }
-                return not (decl_is(f, Decl.Global) or decl_is(f, Decl.Mem))
+                if f < 0 { return not decl_is(d, Decl.Module) or memo_unsafe(n, 2) }
+                if decl_is(f, Decl.Fn) { return memo_safe_fn(f) or memo_unsafe(n, 3) }
+                if memo_mode == 1 and cache_constant_global(f) { return true }
+                return not (decl_is(f, Decl.Global) or decl_is(f, Decl.Mem)) or memo_unsafe(n, 1)
             }
         }
         // `x.f(…)`: a method of x's type.
         let p = parent_of(n)
         if is_kind(n, Node.Field_expr) and p >= 0 and is_kind(p, Node.Call_expr) and first_child(p) == n {
             let m = node_decl[last_child(n)]
-            if decl_is(m, Decl.Fn) { if not memo_safe_fn(m) { return false } }
-            else if not memo_safe_methods(word_of(last_child(n))) { return false }
+            if decl_is(m, Decl.Fn) { if not memo_safe_fn(m) { return memo_unsafe(n, 3) } }
+            else if not memo_safe_methods(word_of(last_child(n))) { return memo_unsafe(n, 3) }
         }
         return memo_safe_node(base)
     }
@@ -4003,6 +4029,7 @@ fn reset_check() Void {
     reset_mems()
     reset_host()
     reset_enums()
+    reset_cache()
     reset_control()
     reset_closures()
     reset_generators()
@@ -4170,12 +4197,14 @@ fn compile(target: Target) I32 {
         }
     }
     checking_fi = -1
+    if dir_node.len() > 0 { check_caches() }
     check_own_ir()
     check_ir_types()
     start_globals()
     drop_located_repeats()
     if diag_kind.len() > 0 { return -1 }
     if target == Target.Analysis { return 0 }
+    if cache_fis.len() > 0 { build_caches() }
     return encode_module()
 }
 

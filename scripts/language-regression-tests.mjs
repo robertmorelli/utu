@@ -1805,4 +1805,377 @@ lib { fn run() I32 => a() + b() + c() }
 `);
     assertEq(fine.length, 0, describe(fine));
   });
+
+  // ── #cache: memoization ─────────────────────────────────────────────────────
+
+  // Removing every directive (the Erasure Rule) must give the same results.
+  const erase = source => source.replace(/^\s*#cache(\(\d+\))?\n/gm, '');
+
+  // Exponential without a cache (fib(45) is 3.7e9 calls; paths(16, 16) is
+  // C(32, 16) leaves; wb's strings branch 2^38 ways): instant with one.
+  const dpSource = `
+#cache
+fn fib(n: I32) I32 {
+    if n < 2 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+#cache(0)
+fn fib0(n: I32) I64 {
+    if n < 2 { return n.i64() }
+    return fib0(n - 1) + fib0(n - 2)
+}
+
+#cache
+fn binom(n: I32, k: I32) I64 {
+    if k == 0 or k == n { return 1.i64() }
+    return binom(n - 1, k - 1) + binom(n - 1, k)
+}
+
+struct P:
+    | x: I32
+    | y: I32
+
+#cache
+fn paths(p: P) I64 {
+    if p.x == 0 or p.y == 0 { return 1.i64() }
+    return paths(P { x: p.x - 1, y: p.y }) + paths(P { x: p.x, y: p.y - 1 })
+}
+
+// House robber over an Array[I32]: the array is part of every key.
+#cache
+fn rob(a: Array[I32], i: I32) I32 {
+    if i >= a.len() { return 0 }
+    let take = a[i] + rob(a, i + 2)
+    let skip = rob(a, i + 1)
+    return if take > skip { take } else { skip }
+}
+
+// Word break over an Array[Str].
+#cache(0)
+fn wb(s: Str, i: I32, words: Array[Str]) Bool {
+    if i == s.len() { return true }
+    for (words) |w| {
+        if i + w.len() <= s.len() and s.slice(i, i + w.len()) == w and wb(s, i + w.len(), words) { return true }
+    }
+    return false
+}
+
+lib {
+    fn run_fib() I32 => fib(45)
+    fn run_fib0() I64 => fib0(90)
+    fn run_binom() I64 => binom(60, 30)
+    fn run_paths() I64 => paths(P { x: 16, y: 16 })
+    fn run_rob(n: I32) I32 {
+        let a = Array[I32].new(n, 0)
+        for (0 ..< n) |i| { a[i] = (i * 37) % 11 }
+        return rob(a, 0)
+    }
+    fn run_wb(n: I32, tail: Str) Bool {
+        let s = ""
+        for (0 ..< n) |_i| { s = s + "a" }
+        return wb(s + tail, 0, ["a", "aa", "aaa", "aaaa"])
+    }
+}
+`;
+
+  test('cache: recursive DP is memoized at -O small and -O fast', async ({ ROOT }) => {
+    const rob = n => {
+      const a = Array.from({ length: n }, (_, i) => (i * 37) % 11), memo = new Map();
+      const go = i => i >= n ? 0 : memo.get(i) ?? (memo.set(i, Math.max(a[i] + go(i + 2), go(i + 1))), memo.get(i));
+      return go(0);
+    };
+    for (const optimize of ['size', 'speed']) {
+      const { instance, wat } = await instantiateAt(ROOT, `cache_dp_${optimize}.utu`, dpSource, optimize);
+      const e = instance.exports;
+      const started = performance.now();
+      assertEq(e.run_fib(), 1134903170, `${optimize}: fib(45)`);
+      assertEq(e.run_fib0(), 2880067194370816120n, `${optimize}: fib0(90)`);
+      assertEq(e.run_binom(), 118264581564861424n, `${optimize}: binom(60, 30)`);
+      assertEq(e.run_paths(), 601080390n, `${optimize}: paths(16, 16)`);
+      assertEq(e.run_rob(80), rob(80), `${optimize}: rob`);
+      assertEq(e.run_wb(38, 'b'), false, `${optimize}: wb no`);
+      assertEq(e.run_wb(38, 'aa'), true, `${optimize}: wb yes`);
+      // Each a fresh array: equal keys by structure, not by reference.
+      assertEq(e.run_rob(80), rob(80), `${optimize}: rob again`);
+      assert(performance.now() - started < 3000, `${optimize}: memoized (${Math.round(performance.now() - started)} ms)`);
+      // No start function: the tables are made as the module is.
+      assert(!/\(start /.test(await wat()), `${optimize}: no start function`);
+    }
+  });
+
+  const keysSource = `
+struct P:
+    | x: I32
+    | y: I32
+
+enum Sh:
+    | Circle { r: F64 }
+    | Sq { s: I32 }
+    | Empty
+
+type Meters = distinct F64
+
+enum(U8) Color:
+    | Red
+    | Green
+    | Blue
+
+#cache(0)
+fn area(s: Sh) F64 {
+    return alt s {
+        Circle |c| => c.r * c.r * 3.0,
+        Sq |q| => q.s.f64() * q.s.f64(),
+        Empty => 0.5,
+    }
+}
+
+#cache(4)
+fn divmod(a: I32, b: I32) .{I32, I32} => .{a / b, a % b}
+
+#cache(2)
+fn len_or(s: ?Str) I32 {
+    if s == null { return -1 }
+    return (s orelse "").len()
+}
+
+#cache(2)
+fn px(p: ?P) I32 {
+    if p == null { return -1 }
+    return (p orelse P { x: 0, y: 0 }).x
+}
+
+#cache(1)
+fn inv(x: F64) F64 => 1.0 / x
+
+#cache
+fn is_nan(x: F64) Bool => x != x
+
+#cache
+fn answer() I32 => 42
+
+#cache
+fn mixed(c: Color, b: Bool, u: U64, f: F32, m: Meters) I64 => c.i32().i64() * 1000 + (if b { 100.i64() } else { 0.i64() }) + u.i64() + f.i64() + m.f64().i64()
+
+#cache
+fn sum(a: Array[I32]) I32 {
+    let t = 0
+    for (a) |x| { t += x }
+    return t
+}
+
+#cache
+fn total(ws: Array[Str]) I32 {
+    let t = 0
+    for (0 ..< ws.len()) |i| { t += (i + 1) * ws[i].len() }
+    return t
+}
+
+#cache
+fn grid_sum(g: Array[Array[I32]]) I32 {
+    let t = 0
+    for (g) |row| { t += sum(row) }
+    return t
+}
+
+#cache
+fn make(n: I32) Array[I32] => Array[I32].new(n, 7)
+
+#cache
+fn P.norm1 |p| () I32 => p.x + p.y
+
+mod Box[T] {
+    #cache
+    fn count(xs: Array[T]) I32 => xs.len()
+}
+
+lib {
+    fn shapes() F64 => area(Sh.Circle { r: 2.0 }) + area(Sh.Sq { s: 3 }) * 10.0 + area(Sh.Empty) + area(Sh.Sq { s: 3 }) * 100.0 + area(Sh.Circle { r: 2.0 }) * 1000.0 + area(Sh.Sq { s: 4 })
+    fn tuples() I32 {
+        let .{q, r} = divmod(17, 5)
+        let .{q2, r2} = divmod(17, 5)
+        let .{q3, r3} = divmod(-17, 5)
+        return q * 10000 + r * 1000 + q2 * 100 + r2 * 10 + q3 + r3
+    }
+    fn nullables() I32 => len_or(null) + len_or("abc") * 10 + len_or(null) * 100 + len_or("abc") * 1000 + len_or("") * 10000
+        + px(null) * 100000 + px(P { x: 5, y: 1 }) * 1000000 + px(P { x: 5, y: 2 }) * 10000000
+    fn zero() F64 => inv(0.0)
+    fn negative_zero() F64 => inv(-0.0)
+    fn nan_twice() I32 => (if is_nan(0.0 / 0.0) { 1 } else { 0 }) + (if is_nan(0.0 / 0.0) { 10 } else { 0 }) + (if is_nan(1.0) { 100 } else { 0 })
+    fn answers() I32 => answer() + answer()
+    fn scalars() I64 => mixed(Color.Blue, true, 5.u64(), 2.5, Meters(1.5)) + mixed(Color.Blue, true, 5.u64(), 2.5, Meters(1.5)) * 10 + mixed(Color.Red, false, 5.u64(), 2.5, Meters(3.0)) * 100000
+    fn keys_copied() I32 {
+        let a = [1, 2, 3]
+        let s1 = sum(a)
+        a[0] = 10
+        return s1 * 100 + sum(a)
+    }
+    fn strs_copied() I32 {
+        let ws = ["ab", "c"]
+        let t1 = total(ws)
+        ws[1] = "cdef"
+        return t1 * 100 + total(ws) + total(["ab", "c"]) * 10000
+    }
+    fn nested_copied() I32 {
+        let g = [[1, 2], [3, 4]]
+        let n1 = grid_sum(g)
+        g[1][0] = 30
+        return n1 * 100 + grid_sum(g)
+    }
+    fn results_copied() I32 {
+        let m = make(3)
+        m[0] = 99
+        return m[0] * 100 + make(3)[0]
+    }
+    fn structs_copied() I32 {
+        let p = P { x: 1, y: 2 }
+        let a = p.norm1()
+        p.x = 10
+        return a * 100 + p.norm1()
+    }
+    fn generic() I32 => Box[I32].count([1, 2]) * 10 + Box[Str].count(["a"])
+}
+`;
+
+  test('cache: keys hash and compare by structure, and are copied (erasing #cache changes nothing)', async ({ ROOT }) => {
+    const expected = {
+      shapes: 12 + 9 * 10 + 0.5 + 9 * 100 + 12 * 1000 + 16,
+      tuples: 3 * 10000 + 2 * 1000 + 3 * 100 + 2 * 10 + -3 + -2,
+      nullables: -1 + 30 - 100 + 3000 + 0 - 100000 + 5000000 + 50000000,
+      zero: Infinity, negative_zero: -Infinity, nan_twice: 11, answers: 84,
+      scalars: 2108n + 21080n + 10n * 100000n,
+      keys_copied: 615, strs_copied: 400 + 10 + 40000, nested_copied: 1037, results_copied: 9907, structs_copied: 312, generic: 21,
+    };
+    for (const [optimize, source, label] of [['size', keysSource, 'small'], ['speed', keysSource, 'fast'], ['size', erase(keysSource), 'erased']]) {
+      const { instance } = await instantiateAt(ROOT, `cache_keys_${label}.utu`, source, optimize);
+      const e = instance.exports;
+      for (const [name, value] of Object.entries(expected)) {
+        // -0.0 and 0.0 are different keys: 1/x tells them apart.
+        if (name === 'zero') e.zero();
+        assertEq(e[name](), value, `${label}: ${name}`);
+      }
+      assertEq(e.zero(), Infinity, `${label}: zero after -0.0`);
+    }
+  });
+
+  test('cache: #cache(16) evicts but keeps hot keys; #cache(0) grows past 100 keys', async ({ ROOT }) => {
+    const source = `
+#cache(16)
+fn fib16(n: I32) I64 {
+    if n < 2 { return n.i64() }
+    return fib16(n - 1) + fib16(n - 2)
+}
+
+fn slow(n: I32) I32 {
+    if n < 2 { return n }
+    return slow(n - 1) + slow(n - 2)
+}
+
+// The hot key costs slow(32) (~7M calls) each time it runs.
+#cache(16)
+fn heavy(k: I32) I32 {
+    if k >= 1000 { return k }
+    return slow(32) + k
+}
+
+#cache(0)
+fn collatz(n: I64) I32 {
+    if n == 1.i64() { return 0 }
+    if n % 2.i64() == 0.i64() { return 1 + collatz(n / 2.i64()) }
+    return 1 + collatz(n * 3.i64() + 1.i64())
+}
+
+#cache(0)
+fn square(n: I32) I32 => n * n
+
+lib {
+    fn run_fib16() I64 => fib16(80)
+    fn run_heavy(rounds: I32) I32 {
+        let h = 0
+        for (0 ..< rounds) |i| { h += heavy(7); h += heavy(1000 + i) }
+        return h
+    }
+    fn run_collatz(n: I32) I32 {
+        let t = 0
+        for (1 ..< n) |i| { t += collatz(i.i64()) }
+        return t
+    }
+    // 1000 keys in, then each read back.
+    fn run_squares() I32 {
+        let t = 0
+        for (0 ..< 1000) |i| { t += square(i) }
+        for (0 ..< 1000) |i| { if square(i) != i * i { t = -1 } }
+        return t
+    }
+}
+`;
+    const collatz = n => { let t = 0; for (let i = 1; i < n; i++) { let x = i; while (x !== 1) { x = x % 2 === 0 ? x / 2 : 3 * x + 1; t++; } } return t; };
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `cache_evict_${optimize}.utu`, source, optimize);
+      const e = instance.exports;
+      assertEq(e.run_fib16(), 23416728348467685n, `${optimize}: fib16(80) with 16 entries`);
+      const started = performance.now();
+      // Evicted even once in 16 misses of its set, ~500 runs of slow(32): seconds.
+      assertEq(e.run_heavy(8000), Number(BigInt.asIntN(32, 8000n * (2178309n + 7n) + 8000n * 1000n + (8000n * 7999n) / 2n)), `${optimize}: heavy`);
+      assert(performance.now() - started < 1000, `${optimize}: the hot key stays (${Math.round(performance.now() - started)} ms)`);
+      assertEq(e.run_collatz(30000), collatz(30000), `${optimize}: collatz`);
+      assertEq(e.run_squares(), 332833500, `${optimize}: squares`);
+    }
+  });
+
+  test('cache: what cannot be cached is diagnosed', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    const prelude = `let count: I32 = 0
+let limit: I32 = 100
+let label: Str = "x"
+let log: fun(Str) Void = @es/\\console.log\\/
+vec v: I32
+
+struct Q:
+    | f: cl(I32) I32
+
+fn bump() I32 {
+    count += 1
+    return count
+}
+`;
+    const lib = '\nlib { fn run() I32 => bump() + v[0] }\n';
+    for (const [source, text, message] of [
+      ['#cache\nfn f(n: I32) I32 {\n    count += 1\n    return n\n}', 'count', '#cache f is not pure: it uses count'],
+      ['#cache\nfn f(n: I32) I32 => n + count', 'count', 'it uses count, which can change'],
+      ['#cache\nfn f(n: I32) I32 => v[n]', 'v', 'it uses v'],
+      ['#cache\nfn f(n: I32) I32 {\n    log("x")\n    return n\n}', 'log', 'it calls the host (log)'],
+      ['#cache\nfn f() I32 => bump()', 'bump', 'it calls bump, which is not pure'],
+      ['#cache\nfn f(xs: Array[I32]) I32 {\n    xs[0] = 1\n    return 0\n}', 'xs[0]', 'writes into its argument (xs[0])'],
+      ['#cache\nfn f(g: cl(I32) I32) I32 => g(1)', 'cl(I32) I32', 'parameter type cl(I32) I32 cannot be a cache key'],
+      ['#cache\nfn f(g: fun(I32) I32) I32 => g(1)', 'fun(I32) I32', 'parameter type fun(I32) I32 cannot be a cache key'],
+      ['#cache\nfn f(x: Externref) I32 => 0', 'Externref', 'parameter type Externref cannot be a cache key'],
+      ['#cache\nfn f(q: Array[Q]) I32 => 0', 'Array[Q]', 'parameter type Array[Q] cannot be a cache key'],
+      ['#cache\nfn f(n: I32) cl() I32 => cl() I32 { return n }', 'cl() I32', 'result type cl() I32 cannot be cached'],
+      ['#cache\nfn f(n: I32) Void {}', '#cache', '#cache f returns nothing'],
+      ['#cache(8)\ngn f() I32 {\n    yield 1\n}', '#cache(8)', '#cache cannot apply to generator f'],
+    ]) {
+      const errors = await errorsOf(compiler, ROOT, prelude + source + lib);
+      assertEq(errors.length, 1, `${source}\n  got ${describe(errors)}`);
+      assertEq(errors[0].kind, 'invalid-cache', describe(errors));
+      assertEq(errors[0].text, text, describe(errors));
+      assert(errors[0].message.includes(message), errors[0].message);
+    }
+    // A part of a type that cannot be: said in a note.
+    const nested = await errorsOf(compiler, ROOT, prelude + '#cache\nfn f(q: ?Q) I32 => 0' + lib);
+    assertEq(nested.length, 1, describe(nested));
+    assertEq(nested[0].text, '?Q', describe(nested));
+    assert(nested[0].notes.some(n => n.startsWith('cl(I32) I32 cannot be cached')), JSON.stringify(nested[0].notes));
+    // Pure, with constants (a global nothing assigns): none.
+    const fine = await errorsOf(compiler, ROOT, prelude + `#cache
+fn a(n: I32) I32 => n + limit + label.len()
+#cache(0)
+fn b(xs: Array[I32]) I32 {
+    let ys = Array[I32].new(xs.len(), 0)
+    ys[0] = a(1)
+    return ys[0] + xs.len()
+}
+` + lib);
+    assertEq(fine.length, 0, describe(fine));
+  });
 }
