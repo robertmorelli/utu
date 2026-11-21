@@ -61,7 +61,7 @@ lib {
   | x : I32
 fn Box.get |b| () I32 { return b.x; }
 lib { fn bad(b: ?Box) I32 { return b.get(); } }`, 'nullable-access', '.get on nullable ?Box'],
-  ['assign global immutable', `let g: I32 = 1;
+  ['assign es global immutable', `let g: I32 = @es/\\1\\/;
 lib { fn bad() I32 { g = 2; return g; } }`, 'assignment-to-immutable', 'g is immutable'],
   ['assign function immutable', `fn f() I32 { return 1; }
 lib { fn bad() I32 { f = 2; return 0; } }`, 'assignment-to-immutable', 'f is immutable'],

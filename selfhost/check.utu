@@ -1529,6 +1529,36 @@ fn global_get(decl: I32, inst: I32) I32 {
     return t
 }
 
+/// Global `decl` of module instance `inst`, assigned (`g = e`, `g += e`):
+/// its wasm global is made mutable by the sweep that counts the write, so
+/// a global nothing writes stays a constant.
+fn global_set(decl: I32, inst: I32, value: I32, op: I32, node: I32, cx: Cx) I32 {
+    let gi = global_instance(decl, inst)
+    let m = w_mark()
+    // (As @global_get: its initializer is checked where its diagnostics are kept.)
+    if speculating[0] > 0 and gi_global[gi] == -1 {
+        check_expr(value, global_type_in(decl, inst), cx)
+        w_node(Op.Drop, vt_none, 0, 0, m)
+        return ty_void()
+    }
+    let g = global_of(gi)
+    if g < 0 { return error_value() }
+    let t = gi_ty[gi]
+    if op == Tok.Eq.i32() {
+        want(value, t, Why.Variable, decl, -1)
+        coerce(check_expr(value, t, cx), t, value)
+        unwant()
+    } else {
+        // `g op= e` is `g = g op e`.
+        global_get(decl, inst)
+        apply_operator(compound_word(op, node_last[first_child(node)]), t, value, node, cx, m)
+    }
+    // A computed global written: noted, so the write follows its initializer.
+    if gi_init[gi] >= 0 { note_edge(-2 - gi, -1) }
+    w_node(Op.GlobalSet, vt_none, g, 0, m)
+    return ty_void()
+}
+
 /// A top-level `let` (global instance gi): a wasm global holding its
 /// constant value, or one its initializer sets.
 fn global_of(gi: I32) I32 {
@@ -1769,6 +1799,17 @@ fn check_assign(node: I32, cx: Cx) I32 {
     let op = tok_kind[node_last[target]]
     // A parenthesis (a DSL's splice) is its expression.
     while (is_kind(target, Node.Splice)) { target = first_child(target) }
+    // `ints.x = …` with `using M[A] |ints|`: M[A]'s global x.
+    if is_kind(target, Node.Field_expr) and is_kind(first_child(target), Node.Identifier) {
+        let alias = node_decl[first_child(target)]
+        if decl_is(alias, Decl.Alias) and decl_is(decl_a[alias], Decl.Module) {
+            let f = static_member(decl_a[alias], word_of(last_child(target)))
+            if decl_is(f, Decl.Global) and not is_es(last_child(decl_node[f])) {
+                node_decl[last_child(target)] = f
+                return global_set(f, alias_instance(alias), value, op, node, cx)
+            }
+        }
+    }
     if (is_kind(target, Node.Field_expr) and not is_module_path(target)) or is_kind(target, Node.Optional_field_expr) { return check_field_set(target, value, op, node, cx) }
     if is_kind(target, Node.Index_expr) { return check_index_set(target, value, op, node, cx) }
     // `T.Variant = …` or `module.f = …`: a constant, not a variable.
@@ -1777,6 +1818,11 @@ fn check_assign(node: I32, cx: Cx) I32 {
         let host = node_decl[first_child(target)]
         if is_kind(target, Node.Type_member_expr) and decl_is(host, Decl.Foreign) and decl_a[host] >= 0 {
             return check_foreign_root_set(target, decl_a[host], word_of(name), value, if op == Tok.Eq.i32() { -1 } else { compound_word(op, node_last[target]) }, cx)
+        }
+        let gd = node_decl[name]
+        if decl_is(gd, Decl.Global) and not is_es(last_child(decl_node[gd])) {
+            let inst = if is_kind(target, Node.Type_member_expr) { member_instance(target, cx) } else { module_instance(host, node_alias[first_child(target)], target, cx) }
+            return if inst < 0 { error_value() } else { global_set(gd, inst, value, op, node, cx) }
         }
         if node_decl[name] < 0 {
             let owner = node_decl[first_child(target)]
@@ -1797,6 +1843,7 @@ fn check_assign(node: I32, cx: Cx) I32 {
     if decl < 0 { return error_value() }
     // `m = 3`: a module or type has no storage.
     if is_type_decl(decl) { return not_value(target, decl) }
+    if decl_is(decl, Decl.Global) and not is_es(last_child(decl_node[decl])) { return global_set(decl, global_inst(decl, cx.inst), value, op, node, cx) }
     if decl_is(decl, Decl.Global) or decl_is(decl, Decl.Fn) or decl_is(decl, Decl.Mem) {
         report(Diag.AssignmentToImmutable, target, word_of(target))
         // The value is still checked against what it would replace.

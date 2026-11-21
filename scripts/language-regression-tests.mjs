@@ -57,6 +57,144 @@ export function registerLanguageRegressionTests({ test, assert, assertEq, assert
     }
   });
 
+  const mutableGlobals = `
+    struct P: | x: I32 | y: I32
+    let count: I32 = 0
+    let big: I64 = 10
+    let ratio: F64 = 1.5
+    let flag: Bool = false
+    let name: Str = "a"
+    let unwritten: I32 = 424242
+    let p: P = P { x: 1, y: 2 }
+    let maybe: ?P = null
+    let arr: Array[I32] = Array[I32].new(3, 0)
+    fn grow() I32 {
+      arr = Array[I32].new(5, 1)
+      return arr.len()
+    }
+    let grown: I32 = grow()
+    mod Counter {
+      let n: I32 = 0
+      fn bump() Void { n += 1 }
+    }
+    mod Tally[T] {
+      let hits: I32 = 0
+      fn hit() Void { hits += 1 }
+    }
+    using Tally[Bool] |tb|
+    fn bump(k: I32) Void { count += k }
+    lib {
+      fn aliased() I32 {
+        tb.hits = 4
+        tb.hits += 1
+        return Tally[Bool].hits
+      }
+      fn ints() I32 {
+        for (0 ..< 5) |i| { bump(i) }
+        while (count < 100) { count += count }
+        return count
+      }
+      fn wide() I64 {
+        big *= 3
+        big -= 1
+        return big
+      }
+      fn float() F64 {
+        ratio = ratio * 2.0
+        return ratio
+      }
+      fn toggle() Bool {
+        flag = not flag
+        return flag
+      }
+      fn text() Str {
+        name += "bc"
+        return name
+      }
+      fn folded() I32 => unwritten + 1
+      fn refs() I32 {
+        let before = p.x
+        p = P { x: 7, y: 8 }
+        maybe = p
+        return before * 100 + p.x + p.y + (if maybe == null { 0 } else { 1000 })
+      }
+      fn computed() I32 => grown * 10 + arr.len()
+      fn modules() I32 {
+        Counter.bump()
+        Counter.bump()
+        let a = Counter.n
+        Counter.n = 10
+        Counter.n += 5
+        Tally[I32].hit()
+        Tally[I32].hit()
+        Tally[Str].hit()
+        let add: cl(I32) Void = cl(k) { Counter.n += k }
+        add(3)
+        return a * 10000 + Counter.n * 100 + Tally[I32].hits * 10 + Tally[Str].hits
+      }
+    }`;
+
+  for (const optimize of ['size', 'speed']) {
+    test(`globals: top-level and module lets are assignable (${optimize})`, async ({ ROOT }) => {
+      const { instance, wat } = await instantiateAt(ROOT, `mutable_globals_${optimize}.utu`, mutableGlobals, optimize);
+      const e = instance.exports;
+      assertEq(e.ints(), 160);
+      assertEq(e.ints(), 170);
+      assertEq(e.wide(), 29n);
+      assertEq(e.float(), 3);
+      assertEq(e.toggle(), true);
+      assertEq(e.toggle(), false);
+      assertEq(e.text(), 'abc');
+      assertEq(e.text(), 'abcbc');
+      assertEq(e.folded(), 424243);
+      assertEq(e.refs(), 1115);
+      assertEq(e.computed(), 55);
+      assertEq(e.modules(), 21821);
+      assertEq(e.aliased(), 5);
+      const text = await wat();
+      // An unwritten global is still folded into its readers; a written one is mutable.
+      assert(text.includes('i32.const 424243') || text.includes('i32.const 424242'), 'unwritten global not folded');
+      assert(!/\(global .* i32\.const 424242/.test(text), 'unwritten global was emitted');
+      assert(/\(global .*\(mut i64\) i64\.const 10\b/.test(text), 'written I64 global not mutable');
+      assert(/\(global .*\(mut f64\) f64\.const/.test(text), 'written F64 global not mutable');
+    });
+  }
+
+  test('globals: an unwritten global compiles as before, a constant', async ({ ROOT }) => {
+    const { wat } = await instantiateAt(ROOT, 'const_globals.utu', `
+      let k: F64 = 2.5
+      let n: I32 = 7
+      lib { fn f() F64 => k * n.f64() }`, 'size');
+    const text = await wat();
+    assert(!text.includes('(mut'), text);
+    assert(/\(global .* f64\.const/.test(text), text);
+  });
+
+  test('globals: an @es global and a function stay unassignable; a write is type-checked', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'normal' });
+    const errors = await errorsOf(compiler, ROOT, `
+      let lucky: I32 = @es/\\41\\/
+      let g: I32 = 1
+      mod M { let x: I32 = 0 }
+      fn f() I32 { return 1 }
+      lib {
+        fn bad() I32 {
+          lucky = 2
+          lucky += 1
+          f = 2
+          g = true
+          M.x = "s"
+          return g
+        }
+      }`);
+    const kinds = errors.map(e => `${e.kind}@${e.text}`);
+    assertEq(kinds.filter(k => k === 'assignment-to-immutable@lucky').length, 2, describe(errors));
+    assert(kinds.includes('assignment-to-immutable@f'), describe(errors));
+    assert(kinds.includes('type-mismatch@true'), describe(errors));
+    assert(kinds.includes('type-mismatch@"s"'), describe(errors));
+    assertEq(errors.length, 6, describe(errors));
+  });
+
   test('returns: explicit returns preserve expression blocks, closures and defers', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({ ROOT, makeCompiler, assertNoErrors, name: 'explicit_returns.utu', source: `
       struct Cell: | value: I32

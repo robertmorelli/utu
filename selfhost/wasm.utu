@@ -897,7 +897,11 @@ fn scan_live(node: I32, depth: I32) Void {
         mark_func(w_a[node])
     } else if op == Op.GlobalGet.i32() or op == Op.GlobalSet.i32() {
         glob_uses[w_a[node]] += 1
-        if op == Op.GlobalSet.i32() { glob_sets[w_a[node]] += 1 }
+        // (A global written is mutable; one nothing writes stays a constant.)
+        if op == Op.GlobalSet.i32() {
+            glob_sets[w_a[node]] += 1
+            glob_mutable[w_a[node]] = 1
+        }
         mark_global(w_a[node])
     }
     let first = w_first[node]
