@@ -269,6 +269,7 @@ enum(U8) Diag:
     | TemplateValue   // a `$T` function named as a value, with no `fun(…)` to bind its types
     | ModNameCase     // a mod promoting a type named lowercase (a: 0), or a function capitalized (a: 1)
     | PromotedFn      // `fn &(…)` (a: 0 outside a mod, 1 in a mod with a type &) or `M[A](…)` (a: 2, M has no fn &)
+    | InvalidDirective    // a: @DirectiveRule broken (word: the directive's name; b: #cache's argument)
 
 /// A diagnostic: its kind, the node it is about, a word, and up to three
 /// more arguments (types, counts, declarations) its message is made from

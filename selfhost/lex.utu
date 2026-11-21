@@ -89,6 +89,7 @@ enum(U8) Tok:
     | Tilde
     | TildeArrow
     | Dollar          // `$T`: a type a call's argument decides
+    | Hash            // `#inline`: a directive before a `fn`
 
 // What the table says to do next, below the real states:
 /// No token can continue or start here.
@@ -509,6 +510,7 @@ fn punctuation(m: Machine) Void {
     single(m, 58, Tok.Colon, start_before)
     single(m, 64, Tok.At, start_before)
     single(m, 36, Tok.Dollar, start_before)
+    single(m, 35, Tok.Hash, start_before)
 
     // `.`, `...`, `..<`; `..` alone is two dots.
     let dot = ends(m, Tok.Dot, start_member)

@@ -168,6 +168,14 @@ enum(U8) BreakRule:
     | DeferNotStatement
     | TryInDefer
 
+/// Where InvalidDirective's argument a says which rule was broken.
+enum(U8) DirectiveRule:
+    | Unknown       // no directive of that name
+    | NoArgument    // `#inline(1)`: only #cache takes one
+    | CacheSize     // `#cache(3)`: 0 (no bound) or a power of 2
+    | Conflict      // `#inline` and `#noinline` on one function
+    | Twice         // one directive twice on one function
+
 /// The JS typed array a mem's view is.
 fn view_array_name(s: Storage) Str {
     if s == Storage.U8 { return dgs(Dgt.Uint8Array) }
@@ -312,6 +320,7 @@ fn diag_name_for_kind(k: Diag) Str {
     if k == Diag.PromotedFn { return "duplicate-declaration" }
     if k == Diag.AmbiguousMethod { return "unknown-method" }
     if k == Diag.ImplNothing or k == Diag.ProtoNoMember { return "unknown-method" }
+    if k == Diag.InvalidDirective { return "invalid-directive" }
     return "type-mismatch"
 }
 
@@ -605,6 +614,7 @@ fn diag_text(i: I32) Str {
         Diag.AwaitForSource => if a == 1 { 0 } else { 1 },
         // b == 1: exactly that many (sort's two values to compare), no index
         Diag.IteratorCaptures => if b == 1 { 0 } else if a == 1 { 1 } else { 2 },
+        Diag.InvalidDirective => a,
         Diag.ProtoSignature => {
             if c >= 0 { x = type_text(c) }
             if c >= 0 { 1 } else { 0 }
@@ -921,6 +931,7 @@ fn diag_text_src(k: Diag) Array[Str] {
             "{x} is not a protocol; an enum lists protocols", "{x} is not a protocol", "{x} is not a protocol; a bound names one"],
         Diag.ProtoNoMember => ["{da} has no member {w}"],
         Diag.ProtoSelfDynamic => ["{ta}.{w} uses &, so only a bounded T calls it: mod M[T[{ta}]]"],
+        Diag.InvalidDirective => ["Unknown directive #{w}", "#{w} takes no argument", "{node}: a cache holds 0 (no bound) or a power of 2 entries", "#inline and #noinline contradict each other", "Duplicate directive #{w}"],
         ~> ["{kind}"],
     }
 }
@@ -982,6 +993,7 @@ fn diag_default_label(i: I32) Str {
         Diag.HostLiteral => if c == 1 { 0 } else if c == 2 { 1 } else { 2 },
         Diag.PromotedFn => if a == 2 { 0 } else { 1 },
         Diag.ModNameCase => if a == 0 { 0 } else { 1 },
+        Diag.InvalidDirective => a,
         ~> 0,
     }
     return diag_fill(st_label + k.i32(), sub, i, x, x)
@@ -1066,6 +1078,7 @@ fn diag_label_src(k: Diag) Array[Str] {
         Diag.GenericGlobal => ["differs per instance"],
         Diag.ReturnInBench => ["would end the timing"],
         Diag.TestInGeneric => ["runs in no instance"],
+        Diag.InvalidDirective => ["unknown", "no argument", "not a power of 2", "contradicts", "given already"],
         ~> ["here"],
     }
 }

@@ -1626,4 +1626,183 @@ lib {
       assert(!errors.some(e => /parse error\(s\)/.test(e.message)), 'no generic summary');
     }
   });
+
+  // ── Directives: #inline, #noinline, #cache ─────────────────────────────────
+
+  const calls = wat => (wat.match(/^\s*call\b/gm) ?? []).length;
+  const funcs = wat => (wat.match(/\(func \(;/g) ?? []).length;
+
+  // A body of many nodes (past -O fast's sizes, far past a call at -O small), with locals.
+  const chain = (name, steps) => {
+    const lines = [`let a0 = x * 3 + 1`];
+    for (let k = 1; k <= steps; k++) lines.push(`let a${k} = (a${k - 1} * 3 + ${k}) ^ x`);
+    return `${name}(x: I32) I32 {\n${lines.map(l => `    ${l}`).join('\n')}\n    return a${steps}\n}`;
+  };
+  const chainJs = steps => x => {
+    let a = (Math.imul(x, 3) + 1) | 0;
+    for (let k = 1; k <= steps; k++) a = ((Math.imul(a, 3) + k) | 0) ^ x;
+    return a;
+  };
+
+  const inlineSource = directive => `${directive}
+fn ${chain('big', 90)}
+
+mod m {
+    ${directive}
+    fn ${chain('twice', 90).replace(/\n/g, '\n    ')}
+}
+
+struct P:
+    | v: I32
+
+${directive}
+fn ${chain('P.score |p| ', 90).replace('(x: I32)', '()').replace('let a0 = x * 3 + 1', 'let x = p.v\n    let a0 = x * 3 + 1')}
+
+lib {
+    fn run(n: I32) I32 {
+        return big(n) ^ big(n + 1) ^ big(n + 2) ^ m.twice(n) ^ m.twice(n * 2) ^ P { v: n }.score() ^ P { v: n + 5 }.score()
+    }
+}
+`;
+
+  test('directives: #inline inlines every call, whatever its size, at -O small and -O fast', async ({ ROOT }) => {
+    const f = chainJs(90);
+    const ref = n => f(n) ^ f(n + 1) ^ f(n + 2) ^ f(n) ^ f(n * 2) ^ f(n) ^ f(n + 5);
+    for (const optimize of ['size', 'speed']) {
+      // Without it, calls this big stay calls.
+      const plain = await instantiateAt(ROOT, `directive_plain_${optimize}.utu`, inlineSource(''), optimize);
+      const plainWat = await plain.wat();
+      assertEq(calls(plainWat), 7, `${optimize}: calls without #inline`);
+      const { instance, wat } = await instantiateAt(ROOT, `directive_inline_${optimize}.utu`, inlineSource('#inline'), optimize);
+      const text = await wat();
+      assertEq(calls(text), 0, `${optimize}: no call left`);
+      assertEq(funcs(text), 1, `${optimize}: only run is left`);
+      for (const n of [0, 1, 7, -3, 123456]) {
+        assertEq(instance.exports.run(n), ref(n), `${optimize}: run(${n})`);
+        assertEq(plain.instance.exports.run(n), ref(n), `${optimize}: plain run(${n})`);
+      }
+    }
+  });
+
+  test('directives: #inline keeps recursive calls as calls', async ({ ROOT }) => {
+    const source = `#inline
+fn fact(n: I32) I32 {
+    if n <= 1 { return 1 }
+    return n * fact(n - 1)
+}
+
+#inline
+fn even(n: I32) Bool {
+    if n == 0 { return true }
+    return odd(n - 1)
+}
+
+#inline
+fn odd(n: I32) Bool {
+    if n == 0 { return false }
+    return even(n - 1)
+}
+
+lib {
+    fn run(n: I32) I32 {
+        return fact(n) + fact(n + 1) + (if even(n) { 1000 } else { 0 })
+    }
+}
+`;
+    const fact = n => (n <= 1 ? 1 : n * fact(n - 1));
+    for (const optimize of ['size', 'speed']) {
+      const { instance } = await instantiateAt(ROOT, `directive_recursive_${optimize}.utu`, source, optimize);
+      for (const n of [0, 1, 5, 8]) assertEq(instance.exports.run(n), fact(n) + fact(n + 1) + (n % 2 === 0 ? 1000 : 0), `${optimize}: run(${n})`);
+    }
+  });
+
+  // Without #noinline, -O small inlines `same` (its copy is smaller than a
+  // call) and moves the others, each called once, to their calls; -O fast inlines all.
+  const noinlineSource = directive => `${directive}
+fn same(x: I32) I32 => x
+
+${directive}
+fn once(x: I32) I32 {
+    let y = x * 7
+    return y - 2
+}
+
+mod m {
+    ${directive}
+    fn inc(x: I32) I32 => x + 2
+}
+
+struct P:
+    | v: I32
+
+${directive}
+fn P.get |p| () I32 => p.v
+
+lib {
+    fn run(n: I32) I32 {
+        let a = n * 2
+        let p = P { v: n }
+        return same(n) + same(a) + once(n) + m.inc(a) + p.get()
+    }
+}
+`;
+
+  test('directives: #noinline keeps the function and its calls at -O small and -O fast', async ({ ROOT }) => {
+    const ref = n => n + n * 2 + (n * 7 - 2) + (n * 2 + 2) + n;
+    for (const optimize of ['size', 'speed']) {
+      // Without it, each is inlined (or, called once, moved to its call).
+      const plain = await instantiateAt(ROOT, `directive_inlined_${optimize}.utu`, noinlineSource(''), optimize);
+      const plainWat = await plain.wat();
+      assertEq(calls(plainWat), 0, `${optimize}: calls without #noinline`);
+      assertEq(funcs(plainWat), 1, `${optimize}: functions without #noinline`);
+      const { instance, wat } = await instantiateAt(ROOT, `directive_noinline_${optimize}.utu`, noinlineSource('#noinline'), optimize);
+      const text = await wat();
+      assertEq(calls(text), 5, `${optimize}: every call stays`);
+      assertEq(funcs(text), 5, `${optimize}: every function stays`);
+      for (const n of [0, 3, -9]) assertEq(instance.exports.run(n), ref(n), `${optimize}: run(${n})`);
+    }
+  });
+
+  test('directives: wrong ones are diagnosed where they are written', async ({ ROOT }) => {
+    const compiler = await makeCompiler({ ROOT, target: 'analysis' });
+    const lib = '\nlib { fn run() I32 => 1 }\n';
+    for (const [source, text, message] of [
+      ['#bogus\nfn f() I32 => 1', '#bogus', 'Unknown directive #bogus'],
+      ['#inline(1)\nfn f() I32 => 1', '#inline(1)', '#inline takes no argument'],
+      ['#noinline(0)\nfn f() I32 => 1', '#noinline(0)', '#noinline takes no argument'],
+      ['#cache(3)\nfn f() I32 => 1', '#cache(3)', 'a power of 2'],
+      ['#cache(-4)\nfn f() I32 => 1', '#cache(-4)', 'a power of 2'],
+      ['#inline\n#noinline\nfn f() I32 => 1', '#noinline', '#inline and #noinline contradict each other'],
+      ['#noinline\n#inline\nfn f() I32 => 1', '#inline', '#inline and #noinline contradict each other'],
+      ['#inline\n#inline\nfn f() I32 => 1', '#inline', 'Duplicate directive #inline'],
+      ['#cache\n#cache(8)\nfn f() I32 => 1', '#cache(8)', 'Duplicate directive #cache'],
+      ['mod m {\n    #bogus\n    fn f() I32 => 1\n}', '#bogus', 'Unknown directive #bogus'],
+      ['struct P:\n    | v: I32\n#inline(2)\nfn P.get |p| () I32 => p.v', '#inline(2)', '#inline takes no argument'],
+      ['lib {\n    #cache(12)\n    fn g() I32 => 1\n}', '#cache(12)', 'a power of 2'],
+    ]) {
+      const program = source.startsWith('lib') ? source : source + lib;
+      const errors = await errorsOf(compiler, ROOT, program);
+      assertEq(errors.length, 1, `${source}\n  got ${describe(errors)}`);
+      assertEq(errors[0].kind, 'invalid-directive', describe(errors));
+      assertEq(errors[0].text, text, describe(errors));
+      assert(errors[0].message.includes(message), errors[0].message);
+    }
+    // A directive before what is not a function, or not written as one, is a syntax error.
+    for (const [source, text] of [['#inline\nstruct S:\n    | v: I32', 'struct'], ['# inline\nfn f() I32 => 1', 'inline'], ['#cache(x)\nfn f() I32 => 1', 'x']]) {
+      const errors = await errorsOf(compiler, ROOT, source + lib);
+      assert(errors.some(e => e.kind === 'parse-error' && e.text === text), `${source}\n  got ${describe(errors)}`);
+    }
+    // Right ones: none.
+    const fine = await errorsOf(compiler, ROOT, `#cache
+fn a() I32 => 1
+#cache(0)
+#noinline
+fn b() I32 => 2
+#cache(1024)
+#inline
+fn c() I32 => 3
+lib { fn run() I32 => a() + b() + c() }
+`);
+    assertEq(fine.length, 0, describe(fine));
+  });
 }

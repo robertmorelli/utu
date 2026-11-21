@@ -130,6 +130,101 @@ fn validate_program() Void {
     }
     validate_recursive_structs()
     validate_module_members()
+    validate_directives()
+}
+
+//! = Directives
+//!
+//! `#inline`, `#noinline`, `#cache`, and `#cache(N)` before a function
+//! (parse.utu lists them, @dir_node). Each is known, takes an argument only
+//! when it is #cache's (0, no bound, or a power of 2), and is given once; a
+//! function is not both #inline and #noinline.
+
+/// What a directive's name says: 0 unknown, 1 `#inline`, 2 `#noinline`, 3 `#cache`.
+fn directive_kind(d: I32) I32 {
+    let w = word_text(word_of(first_child(d)))
+    if w == "inline" { return 1 }
+    if w == "noinline" { return 2 }
+    if w == "cache" { return 3 }
+    return 0
+}
+
+/// A `#cache` directive's size: 0 (no bound) when it gives none, or -1 when
+/// it is no size (negative, not a power of 2, or past 2^30).
+fn directive_cache_size(d: I32) I32 {
+    let lit = next_sibling(first_child(d))
+    if lit < 0 { return 0 }
+    if tok_kind[node_first[lit] - 1] == Tok.Minus.i32() { return -1 }
+    let v = int_value(lit)
+    let most: I64 = 1 << 30
+    if v > most or (v & (v - 1)) != 0 { return -1 }
+    return v.i32()
+}
+
+fn validate_directives() Void {
+    for (0 ..< dir_node.len()) |k| {
+        if is_own_file(file_of_token(node_first[dir_node[k]])) { validate_directive(k) }
+    }
+}
+
+fn validate_directive(k: I32) Void {
+    let d = dir_node[k]
+    let w = word_of(first_child(d))
+    let kind = directive_kind(d)
+    if kind == 0 {
+        report2(Diag.InvalidDirective, d, w, DirectiveRule.Unknown.i32(), -1)
+        diag_note("A function's directives are #inline, #noinline, #cache, and #cache(N)")
+        return
+    }
+    if kind != 3 and next_sibling(first_child(d)) >= 0 {
+        report2(Diag.InvalidDirective, d, w, DirectiveRule.NoArgument.i32(), -1)
+        return
+    }
+    if kind == 3 and directive_cache_size(d) < 0 {
+        report2(Diag.InvalidDirective, d, w, DirectiveRule.CacheSize.i32(), -1)
+        return
+    }
+    // The function's directives are listed together: those before this one.
+    let j = k - 1
+    while (j >= 0 and dir_fn[j] == dir_fn[k]) {
+        let other = directive_kind(dir_node[j])
+        if other == kind {
+            report2(Diag.InvalidDirective, d, w, DirectiveRule.Twice.i32(), -1)
+            diag_place(Extra.Related, dir_node[j], "first here")
+            return
+        }
+        if other + kind == 3 and other != 0 {
+            report2(Diag.InvalidDirective, d, w, DirectiveRule.Conflict.i32(), -1)
+            diag_place(Extra.Related, dir_node[j], "and here")
+            return
+        }
+        j -= 1
+    }
+}
+
+/// What a function's directives say of inlining it (its declaration's node,
+/// a Fn_decl or Op_decl): 0 nothing, 1 `#inline`, 2 `#noinline` (both: nothing).
+fn fn_inline_directive(item: I32) I32 {
+    let says = 0
+    for (0 ..< dir_node.len()) |k| {
+        if dir_fn[k] == item {
+            let kind = directive_kind(dir_node[k])
+            if kind == 1 or kind == 2 { says = if says == 0 or says == kind { kind } else { -1 } }
+        }
+    }
+    return if says < 0 { 0 } else { says }
+}
+
+/// A function's `#cache` size (its declaration's node): -1 for none, 0 for
+/// no bound, else its entries (a power of 2). For the cache's code to read.
+fn fn_cache_directive(item: I32) I32 {
+    for (0 ..< dir_node.len()) |k| {
+        if dir_fn[k] == item and directive_kind(dir_node[k]) == 3 {
+            let size = directive_cache_size(dir_node[k])
+            return if size < 0 { -1 } else { size }
+        }
+    }
+    return -1
 }
 
 //! = Modules of one name

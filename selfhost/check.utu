@@ -105,6 +105,10 @@ fn fn_instance_on(decl: I32, inst: I32, self_t: I32) I32 {
         fi_func[id] = f
         func_debug_name[f] = fn_debug_name(decl)
         func_src[f] = decl_node[decl]
+        if dir_node.len() > 0 {
+            func_inline[f] = fn_inline_directive(decl_node[decl])
+            func_cache[f] = fn_cache_directive(decl_node[decl])
+        }
         // A @wat function's body is its code, which the host assembled.
         let wat = wat_of(body)
         if wat >= 0 { func_code[f] = wat } else if not is_generator(decl) { fi_queue.push(id) }

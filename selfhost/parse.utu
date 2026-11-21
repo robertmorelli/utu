@@ -154,6 +154,7 @@ enum(U8) Node:
     | Try_result_expr
     | Errdefer_expr
     | Type_binder      // `$T` in a parameter's type: T, bound by the argument
+    | Directive        // `#inline`, `#cache(64)`: before a `fn`, kept out of the tree (see @dir_node)
 
 /// Every keyword of the grammar, as interned word ids: each is its variant's
 /// name with the first letter lowercased (`Flat_map` is `flat_map`). Where a
@@ -362,6 +363,7 @@ fn tok_spelling(kind: I32) Str {
         Tok.Colon => ":",
         Tok.At => sms(Sml.At),
         Tok.Dollar => sms(Sml.Dollar),
+        Tok.Hash => "#",
         Tok.Dot => ".",
         Tok.DotDotDot => sms(Sml.DotDotDot),
         Tok.DotDotLt => sms(Sml.DotDotLt),
@@ -572,6 +574,7 @@ fn restore(p: Parser, s: Save) Void {
     k = validate_list.len()
     while (k > 0 and validate_list[k - 1] >= s.nodes) { k -= 1 }
     validate_list.resize(k)
+    forget_directives(s.nodes)
 }
 
 /// By Node: 1 for the kinds validation has a rule for (@validate_node's arms).
@@ -653,6 +656,7 @@ fn source_file(p: Parser) I32 {
 
 /// A top-level declaration, by its first word (`export`'s by its second).
 fn item(p: Parser) Void {
+    if is(p, Tok.Hash) { directed_fn(p); return }
     let w = word_id(p)
     if w == Kw.Mod.i32() { module_decl(p); return }
     if w == Kw.Using.i32() {
@@ -707,6 +711,7 @@ fn item(p: Parser) Void {
 
 /// A declaration inside a `mod`.
 fn module_item(p: Parser) Void {
+    if is(p, Tok.Hash) { directed_fn(p); return }
     let w = word_id(p)
     if w == Kw.Type.i32() { type_decl(p); return }
     if w == Kw.Tag.i32() or w == Kw.Rec.i32() or w == Kw.Struct.i32() or w == Kw.Enum.i32() { struct_or_enum(p); return }
@@ -985,6 +990,55 @@ fn fn_or_op_decl(p: Parser) I32 {
     return node(p, Node.Fn_decl, at, first)
 }
 
+/// Directives, by the order they are made: each one's Directive node (its
+/// name, and its argument when written: an Int_lit, after a `-` when
+/// negative), and the function it is before (a Fn_decl or Op_decl). They are
+/// out of the tree (no walk of it meets one); each one's parent is its
+/// function. validate.utu checks them, check.utu reads them.
+vec dir_node: I32
+vec dir_fn: I32
+
+/// `#inline fn …`: directives, then the function they are for.
+fn directed_fn(p: Parser) Void {
+    let from = dir_node.len()
+    while (is(p, Tok.Hash)) { directive(p) }
+    if not (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn)) { fail_wanting(p, kw_wanted + Kw.Fn.i32()) }
+    let f = fn_or_op_decl(p)
+    for (from ..< dir_node.len()) |k| {
+        dir_fn[k] = f
+        node_parent[dir_node[k]] = f
+    }
+}
+
+/// `#name` or `#name(N)`, `#` and the name written together.
+fn directive(p: Parser) Void {
+    let at = mark()
+    let first = p.pos
+    advance(p)
+    if not (is_word(p) and adjacent(p.pos - 1, p.pos)) { fail(p) }
+    leaf(p, Node.Identifier)
+    if is(p, Tok.LParen) {
+        advance(p)
+        if is(p, Tok.Minus) { advance(p) }
+        if not is(p, Tok.Int) { fail_wanting(p, Tok.Int.i32()) }
+        int_lit(p)
+        expect(p, Tok.RParen)
+    }
+    let d = node(p, Node.Directive, at, first)
+    // Taken off the stack: no node takes it as a child.
+    parse_pending = at
+    dir_node.push(d)
+    dir_fn.push(-1)
+}
+
+/// Forget the directives of nodes from `nodes` on (given up, or not kept).
+fn forget_directives(nodes: I32) Void {
+    let k = dir_node.len()
+    while (k > 0 and dir_node[k - 1] >= nodes) { k -= 1 }
+    dir_node.resize(k)
+    dir_fn.resize(k)
+}
+
 /// A Wutu function's body is opaque until the Wutu expansion runs.
 fn wn_decl(p: Parser) I32 {
     let at = mark()
@@ -1208,8 +1262,8 @@ fn lib_decl(p: Parser) I32 {
     let first = p.pos
     advance(p)
     expect(p, Tok.LBrace)
-    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn) or is_kw(p, Kw.Wn)) {
-        if is_kw(p, Kw.Wn) { wn_decl(p) } else { fn_or_op_decl(p) }
+    while (is_kw(p, Kw.Fn) or is_kw(p, Kw.Gn) or is_kw(p, Kw.Wn) or is(p, Tok.Hash)) {
+        if is(p, Tok.Hash) { directed_fn(p) } else if is_kw(p, Kw.Wn) { wn_decl(p) } else { fn_or_op_decl(p) }
     }
     expect(p, Tok.RBrace)
     return node(p, Node.Export_lib_decl, at, first)

@@ -10,6 +10,11 @@
 //!
 //! Callees are inlined into first, so a copy is of what the callee became.
 //! A call back into a function being inlined into (recursion) stays a call.
+//!
+//! A function's directives overrule the sizes, here and at -O small
+//! (@func_inline): a call to an `#inline` function is inlined whatever its
+//! size (at -O small, first, by @inline_forced), and one to a `#noinline`
+//! function never is, nor moved there.
 
 /// By function: 0 not yet, 1 being inlined into, 2 done.
 vec inl_state: U8
@@ -54,6 +59,35 @@ let inline_caller_nodes: I32 = 20000
 
 /// Inline through every live function (after the sweep; sweep again after).
 fn inline_module() Void {
+    inl_begin()
+    for (0 ..< func_kind.len()) |f| { if optimizable(f) and func_code[f] < 0 { inline_into(f) } }
+    for (0 ..< func_kind.len()) |f| {
+        if optimizable(f) and func_code[f] < 0 and inl_state[f] == 2 {
+            fold_known_tests(f)
+            locals_for_structs(f)
+        }
+    }
+}
+
+/// 1 while only calls to `#inline` functions are inlined (@inline_forced).
+vec inl_forced_only: U8 = [0]
+
+/// -O small, first: each call to an `#inline` function becomes its body, as
+/// at -O3, whatever its size (a call back into a function being inlined
+/// into still stays a call). Whether any function is `#inline` (then sweep).
+fn inline_forced() Bool {
+    let any = false
+    for (0 ..< func_kind.len()) |f| { if func_inline[f] == 1 and optimizable(f) { any = true } }
+    if not any { return false }
+    inl_begin()
+    inl_forced_only[0] = 1
+    for (0 ..< func_kind.len()) |f| { if optimizable(f) and func_code[f] < 0 { inline_into(f) } }
+    inl_forced_only[0] = 0
+    return true
+}
+
+/// Every function not yet inlined into.
+fn inl_begin() Void {
     inl_state.resize(func_kind.len())
     inl_size.resize(func_kind.len())
     inl_label.resize(func_kind.len())
@@ -66,13 +100,6 @@ fn inline_module() Void {
         inl_label[f] = 0
         inl_return_call[f] = 0
         inl_params_at[f] = -1
-    }
-    for (0 ..< func_kind.len()) |f| { if optimizable(f) and func_code[f] < 0 { inline_into(f) } }
-    for (0 ..< func_kind.len()) |f| {
-        if optimizable(f) and func_code[f] < 0 and inl_state[f] == 2 {
-            fold_known_tests(f)
-            locals_for_structs(f)
-        }
     }
 }
 
@@ -98,10 +125,14 @@ fn inline_into(f: I32) Void {
     for (0 ..< calls.len()) |i| {
         let c = calls[i]
         let g = w_a[c]
-        if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and size + inl_size[g] <= inline_caller_nodes
+        // `#inline`: whatever its size; `#noinline`: never.
+        let forced = func_inline[g] == 1
+        if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and func_inline[g] != 2
+            and (forced or inl_forced_only[0] == 0)
             and not has_op(func_body[g], Op.MemoryGrow.i32())
-            and (inl_size[g] <= inline_always_nodes or (looped[i] and inl_size[g] <= inline_loop_nodes)
-                or (func_uses[g] == 1 and inl_size[g] <= inline_once_nodes)) {
+            and (forced or (size + inl_size[g] <= inline_caller_nodes
+                and (inl_size[g] <= inline_always_nodes or (looped[i] and inl_size[g] <= inline_loop_nodes)
+                    or (func_uses[g] == 1 and inl_size[g] <= inline_once_nodes)))) {
             label = inline_call(f, c, g, label)
             size += inl_size[g]
         }
@@ -1203,6 +1234,7 @@ vec inl_subst: I32
 /// Rounds until none inlines (each sweeps after it); then each function
 /// called once moves there.
 fn inline_small() Void {
+    if inline_forced() { sweep() }
     sm_begin_survey()
     // (No helper is made while inlining.)
     sm_helper.resize(func_kind.len())
@@ -1297,7 +1329,7 @@ fn sm_move_all() Bool {
     sm_gone = 0
     // (1: moves; 2: stays; 3: moved.)
     sm_state.resize(n)
-    for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and sm_movable(g) { 1 } else { 2 } }
+    for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and func_inline[g] != 2 and sm_movable(g) { 1 } else { 2 } }
     sm_size.resize(n)
     for (0 ..< n) |f| { sm_size[f] = if sm_cap > 0 and func_live[f] == 1 { sm_body_nodes[f] } else { 0 } }
     let any = false
@@ -1464,7 +1496,7 @@ fn sm_move_down(g: I32) Void {
     if sm_state[caller] == 1 { sm_move_down(caller) }
     let f = sm_root(caller)
     if f == g { return }
-    if sm_cap > 0 and sm_size[f] + sm_size[g] > sm_cap {
+    if sm_cap > 0 and sm_size[f] + sm_size[g] > sm_cap and func_inline[g] != 1 {
         sm_state[g] = 2
         return
     }
@@ -1625,7 +1657,7 @@ vec sm_callees: I32
 /// Choose which calls to `g` to inline (@sm_take). Whether any.
 fn sm_weigh(g: I32) Bool {
     if func_kind[g] != FuncKind.Defined.i32() or func_body[g] < 0 or func_code[g] >= 0 or func_live[g] != 1
-        or func_local_count[g] != 0 or vl_len[ht_b[func_type_of[g]]] > 1 or traps_by_name(g) {
+        or func_local_count[g] != 0 or vl_len[ht_b[func_type_of[g]]] > 1 or traps_by_name(g) or func_inline[g] == 2 {
         return false
     }
     let body = func_body[g]
@@ -1655,7 +1687,8 @@ fn sm_weigh(g: I32) Bool {
             all = false
         } else {
             total += grows
-            if grows <= 0 and sm_caller[k] != g and node_holders[sm_call[k]] == 1 { sm_take[k] = 1 }
+            // (`#inline`: whatever it grows.)
+            if (grows <= 0 or func_inline[g] == 1) and sm_caller[k] != g and node_holders[sm_call[k]] == 1 { sm_take[k] = 1 }
         }
     }
     // Its one use a call: the body moves there, when the call and the body

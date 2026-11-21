@@ -125,6 +125,7 @@ fn reset_program() Void {
     // The kept nodes' parents are the same (nothing grafts into the prelude).
     node_parent.resize(nodes)
     keep_validate_list(nodes)
+    forget_directives(nodes)
     let files = kept[3]
     file_start.resize(files)
     file_end.resize(files)

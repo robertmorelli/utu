@@ -268,6 +268,11 @@ vec func_src: I32
 vec func_index: I32
 /// A @wat function: its site (host.utu), whose code is its body; else -1.
 vec func_code: I32
+/// Its declaration's directives (validate.utu): inlining, 0 as the
+/// optimizer decides, 1 `#inline` (every call, where it can be), 2
+/// `#noinline` (no call); and `#cache`'s size, -1 for none, 0 for no bound.
+vec func_inline: U8
+vec func_cache: I32
 vec local_types: I32
 
 /// FuncKind
@@ -361,6 +366,8 @@ fn new_func(kind: FuncKind, t: I32) I32 {
     func_src.push(cur_src)
     func_index.push(-1)
     func_code.push(-1)
+    func_inline.push(0)
+    func_cache.push(-1)
     return f
 }
 
@@ -414,6 +421,8 @@ fn reset_wasm() Void {
     func_src.clear()
     func_index.clear()
     func_code.clear()
+    func_inline.clear()
+    func_cache.clear()
     local_types.clear()
     glob_kind.clear()
     glob_type.clear()
