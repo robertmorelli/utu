@@ -1,11 +1,11 @@
 {
-  "commit": "d3d0aaa575041fb08a5aae5970967712cc2647f6",
-  "selfhostTree": "7dc3890b2b61530558db8e76f1c8ca9664c25d7d",
-  "sourcesHash": "b48c0c0e277d5b24af0d71834f4477ad1ad3a4557b24599b5dff4bd399d78486",
-  "sha256": "9d22a3231f608b534dce86eb4c1647ad219b8d21d8fc831176b99fd2571c3272",
-  "bytes": 532870,
-  "builtBy": "cd8dd803b6f3bbc8b682bad883b92f1db1c8399e1aac38ffa0d3dcb89d256df9",
+  "commit": "dce77027dc4bc030b807424a2a193c103958ffa9",
+  "selfhostTree": "44497c46b3a6ea33174570b6dd8fcbb950746445",
+  "sourcesHash": "81cf83da1355b28281ffbcfe434636311413660445394b79117cafd7df607ddf",
+  "sha256": "97f62f57d43e560d6f733c47c3220193b1be8205937066dc2190c16c6c97a8a5",
+  "bytes": 468739,
+  "builtBy": "9d22a3231f608b534dce86eb4c1647ad219b8d21d8fc831176b99fd2571c3272",
   "node": "v25.8.1",
-  "date": "2026-11-16T09:37:37.518Z",
-  "reason": "keep head on re-render"
+  "date": "2026-11-21T18:57:53.241Z",
+  "reason": "mutable top-level let globals"
 }
