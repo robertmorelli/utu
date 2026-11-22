@@ -127,9 +127,9 @@ fn sessions(state: Conference) Browser.HTMLElement {
             flex-wrap:wrap
             p {
                 role = "status"
-                = number(count)
+                |> number(count)
                 " in your agenda · "
-                = number(visible.len())
+                |> number(visible.len())
                 " sessions shown"
             }
             if count>0 {
@@ -173,11 +173,11 @@ fn sessions(state: Conference) Browser.HTMLElement {
                     p.eyebrow {
                         color:var(--muted)
                         "DAY "
-                        = number(session.day)
+                        |> number(session.day)
                     }
                     strong {
                         font-size:1.5rem
-                        = number(session.hour)
+                        |> number(session.hour)
                         ":00"
                     }
                 }
@@ -186,15 +186,15 @@ fn sessions(state: Conference) Browser.HTMLElement {
                     gap:0.75rem
                     p.eyebrow {
                         color:var(--accent)
-                        = session.track
+                        | session.track
                     }
                     h3 {
                         font-size:1.4rem
                         letter-spacing:-0.025em
-                        = session.title
+                        | session.title
                     }
                     p.muted {
-                        = session.speaker
+                        | session.speaker
                         " · 60 minutes"
                     }
                 }
@@ -202,7 +202,7 @@ fn sessions(state: Conference) Browser.HTMLElement {
                     id = "session-" + session.id
                     aria-label = if session.saved { "Remove " + session.title } else { "Save " + session.title }
                     aria-pressed = if session.saved { "true" } else { "false" }
-                    = if session.saved {
+                    |> if session.saved {
                         "Saved ✓"
                     }
                     else {
@@ -568,7 +568,7 @@ main {
                 "My agenda only"
             }
         }
-        = sessions(state)
+        |> sessions(state)
         footer.site-footer {
             p {
                 "Fictional programme, real agenda tools. Calendar downloads use UTC."

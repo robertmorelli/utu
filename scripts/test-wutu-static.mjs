@@ -17,7 +17,7 @@ try{
  console.log('Static prerender preserves readable HTML, starts without duplicate content, and enables its controls');
  // A value inside a raw-text element (a noscript's p) is escaped prerendered: loaded, it closes nothing.
  const raw=path.join(dir,'raw'),rawOut=path.join(raw,'out');await fs.mkdir(raw);
- await fs.writeFile(path.join(raw,'main.utu'),'using Browser from std:Browser; main {let v = "</noscript></style><img src=x onerror=\\"window.__pwn=1\\">"; Browser.document.body.append(@wutu/\\ main {noscript {p {title = v; = v;}} style {"p { color: red; }";} } \\/);}');
+ await fs.writeFile(path.join(raw,'main.utu'),'using Browser from std:Browser; main {let v = "</noscript></style><img src=x onerror=\\"window.__pwn=1\\">"; Browser.document.body.append(@wutu/\\ main {noscript {p {title = v; | v;}} style {"p { color: red; }";} } \\/);}');
  await buildBrowserApp({entry:path.join(raw,'main.utu'),outDir:rawOut});await fs.writeFile(path.join(rawOut,'index.html'),'<!doctype html><html><body><script type="module" src="./app.js"></script></body></html>');
  const rawHtml=await prerender(rawOut);assert.ok(rawHtml.includes('&lt;/noscript&gt;'),rawHtml);
  const loaded=await browser.newPage();await loaded.route('**/*.js',r=>r.abort());await loaded.setContent(rawHtml);await loaded.waitForTimeout(200);

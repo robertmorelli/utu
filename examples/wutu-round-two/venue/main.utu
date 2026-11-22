@@ -29,7 +29,7 @@ fn workspace(state: VenueState) Browser.HTMLElement {
                     button {
                         aria-label = "Seat "+seat.name
                         aria-pressed = if seat.selected {"true" } else {"false" }
-                        = seat.name
+                        | seat.name
                         on click {
                             seat.selected=not seat.selected
                             wutu.save("venue-v2")
@@ -44,7 +44,7 @@ fn workspace(state: VenueState) Browser.HTMLElement {
                     "YOUR GROUP"
                 }
                 strong.big {
-                    = wutu.number(state.seats count_where |seat| {
+                    |> wutu.number(state.seats count_where |seat| {
                         seat.selected
                     })+" seats"
                 }
@@ -54,7 +54,7 @@ fn workspace(state: VenueState) Browser.HTMLElement {
                     "PLANNED COST / $12 A SEAT"
                 }
                 strong.big {
-                    = wutu.money((state.seats count_where |seat| {
+                    |> wutu.money((state.seats count_where |seat| {
                         seat.selected
                     })*1200)
                 }
@@ -166,14 +166,14 @@ main {
                 "Plan a small gathering before you send the invitations. Choose seats, keep a running total, and reset the room when plans change."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

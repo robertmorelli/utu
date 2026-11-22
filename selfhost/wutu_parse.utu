@@ -920,7 +920,8 @@ fn parse_tnode(text: Str) I32 {
         return n
     }
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-    if wp_char(text) == 61 or wp_char(text) == 124 {
+    if wp_char(text) == 61 { wutu_fail(wps(Wpt.ChildExpressionsUsePipe), start) }
+    if wp_char(text) == 124 {
         let code = wp_at_text(text, wps(Wpt.BarGt))
         wp_at += if code { 2 } else { 1 }
         let source = wp_bare_expression(text)
@@ -935,6 +936,7 @@ fn parse_tnode(text: Str) I32 {
     }
     if wp_keyword(text, "if") { return parse_tif(text) }
     if wp_keyword(text, "for") { return parse_tfor(text) }
+    if wp_keyword(text, "match") { return parse_tmatch(text) }
     return parse_telement(text)
 }
 
@@ -1021,6 +1023,57 @@ fn parse_tfor(text: Str) I32 {
         tn_key_to[n] = wx_to
     }
     parse_branch(text, n, false)
+    return n
+}
+
+/// `match e { pat => { … } ~> { … } }`, the cursor on `match`.
+fn parse_tmatch(text: Str) I32 {
+    let start = wp_at
+    wp_at += 5
+    let scrutinee = wp_expression_until(text, "{", wps(Wpt.AScrutineeBefore))
+    let n = new_tnode(6, start)
+    tn_text[n] = intern_text(scrutinee)
+    tn_from[n] = wx_from
+    tn_to[n] = wx_to
+    wp_trivia(text)
+    let open = wp_at
+    if wp_char(text) != 123 { wutu_fail(wps(Wpt.ExpectedBrace), wp_at) }
+    wp_at += 1
+    while (true) {
+        wp_trivia(text)
+        if wp_done(text) { wutu_fail(wps(Wpt.UnterminatedMatch), open) }
+        if wp_char(text) == 125 {
+            wp_at += 1
+            return n
+        }
+        if wp_char(text) == 44 or wp_char(text) == 59 {
+            wp_at += 1
+            continue
+        }
+        let arm_start = wp_at
+        let arm = new_tnode(7, arm_start)
+        if wp_at_text(text, "~>") {
+            wp_at += 2
+        } else {
+            let pstart = wp_at
+            while (not wp_done(text) and not wp_at_text(text, "=>")) {
+                if wp_char(text) == 123 or wp_char(text) == 125 or wp_char(text) == 10 {
+                    wutu_fail(wps(Wpt.ExpectedFatArrowInMatch), wp_at)
+                }
+                wp_at += 1
+            }
+            if not wp_at_text(text, "=>") { wutu_fail(wps(Wpt.ExpectedFatArrowInMatch), wp_at) }
+            let pat = trim_end(text.slice(pstart, wp_at))
+            if pat.len() == 0 { wutu_fail(wps(Wpt.ExpectedPatternInMatch), pstart) }
+            tn_text[arm] = intern_text(pat)
+            tn_from[arm] = pstart
+            tn_to[arm] = pstart + pat.len()
+            wp_at += 2
+        }
+        parse_branch(text, arm, false)
+        tn_parent[arm] = n
+        append_child(n, arm, false)
+    }
     return n
 }
 
@@ -1160,7 +1213,7 @@ fn parse_element_statement(text: Str, n: I32) Void {
     }
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
     // (`for = "x";` is label's attribute: a loop's iterable never starts with `=`.)
-    if c == 34 or c == 61 or c == 124 or wp_keyword(text, "if") or (wp_keyword(text, "for") and not assignment_head(text, p, false)) {
+    if c == 34 or c == 61 or c == 124 or wp_keyword(text, "if") or (wp_keyword(text, "for") and not assignment_head(text, p, false)) or (wp_keyword(text, "match") and not assignment_head(text, p, false)) {
         add_child(n, parse_tnode(text))
         return
     }
@@ -1494,12 +1547,10 @@ fn parse_declaration_or_child(text: Str, n: I32) Void {
     wp_at += 1
     wp_trivia(text)
     if wp_at_text(text, "$[") { wp_fail_interpolation(text) }
-    if wp_char(text) == 61 or wp_char(text) == 123 {
+    if wp_char(text) == 61 { wutu_fail(wps(Wpt.ComputedCssValuesUseBraces), wp_at) }
+    if wp_char(text) == 123 {
         // A leading block is Utu, including for custom properties.
-        // Keep the legacy `: = expression` spelling as well.
-        let block = wp_char(text) == 123
-        if not block { wp_at += 1 }
-        let source = if block { wp_utu_block(text, wps(Wpt.ComputedCSSValue)) } else { wp_bare_expression(text) }
+        let source = wp_utu_block(text, wps(Wpt.ComputedCSSValue))
         let from = wx_from
         let to = wx_to
         wp_end(text)
@@ -1713,6 +1764,12 @@ enum(U8) Wpt:
     | ComputedCSSValue
     | SemiBraceBraceEnd
     | ExpectedALineBreakOrAfterLc
+    | ChildExpressionsUsePipe
+    | ComputedCssValuesUseBraces
+    | AScrutineeBefore
+    | UnterminatedMatch
+    | ExpectedFatArrowInMatch
+    | ExpectedPatternInMatch
 
 fn wps_src(t: Wpt) Str {
     return match t {
@@ -1837,7 +1894,7 @@ fn wps_src(t: Wpt) Str {
         Wpt.UnterminatedExpression => "unterminated expression",
         Wpt.FoldEachAnyAllCountWhere => "fold each any all count_where first_index last_index sum fast_sum product count collect sort group_by distinct_by partition batched windows min_by max_by first_where reduce bisect",
         Wpt.MapFilterSkipTakeSkipWhileLc => "map filter skip take skip_while take_while scan zip chain flat_map repeat",
-        Wpt.WutuNoLongerWritesAnExpression => "Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)",
+        Wpt.WutuNoLongerWritesAnExpression => "Wutu no longer writes $[…]: an expression stands on its own (| value or |> expr for children, name = expr for an attribute, if cond {, prop: { expr })",
         Wpt.UnterminatedCSSComment => "unterminated CSS comment",
         Wpt.UnterminatedCSSBlock => "unterminated CSS block",
         Wpt.Reactive => "@reactive",
@@ -1905,6 +1962,12 @@ fn wps_src(t: Wpt) Str {
         Wpt.ComputedCSSValue => "computed CSS value",
         Wpt.SemiBraceBraceEnd => ";{}",
         Wpt.ExpectedALineBreakOrAfterLc => "expected a line break or ; after a CSS declaration",
+        Wpt.ChildExpressionsUsePipe => "child expressions use | value or |> expr, not = expr",
+        Wpt.ComputedCssValuesUseBraces => "computed CSS values use prop: { expr }, not prop: = expr",
+        Wpt.AScrutineeBefore => "a match value before {",
+        Wpt.UnterminatedMatch => "unterminated match",
+        Wpt.ExpectedFatArrowInMatch => "expected => after match pattern",
+        Wpt.ExpectedPatternInMatch => "expected a pattern before =>",
     }
 }
 

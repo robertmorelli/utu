@@ -252,8 +252,8 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) Void {
     @reactive
     @style style.sheet()
     div.app {
-        = ui.hud(state)
-        = ui.palette(state)
+        |> ui.hud(state)
+        |> ui.palette(state)
         main.map {
             canvas#map as map {
                 on mousedown |event| {
@@ -300,9 +300,9 @@ fn start(game_text: Str, save_text: Str, starter_text: Str) Void {
                 }
             }
         }
-        = ui.inspector(state)
-        = ui.footer(state)
-        = ui.windows(state)
+        |> ui.inspector(state)
+        |> ui.footer(state)
+        |> ui.windows(state)
     }
     \/
     document.body.append(app)

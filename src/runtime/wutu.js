@@ -628,10 +628,10 @@ export function createWutuRuntime() {
     run.pending = op;
   }
 
-  /** An if takes its then (1) or else (0) arm. */
+  /** An if takes its then (1) or else (0) arm; a match takes arm `which`. */
   function arm(which) {
     const op = advance();
-    run.stack.push({ ops: which ? op[1] : op[2], pc: 0, kind: 'arm' });
+    run.stack.push({ ops: op[0] === 'k' ? op[1][which] : (which ? op[1] : op[2]), pc: 0, kind: 'arm' });
   }
 
   /** Ends the current iteration, if any; returns the loop. */

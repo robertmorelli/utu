@@ -36,7 +36,7 @@ fn transfer(debtor: Balance, creditor: Balance) Browser.HTMLElement {
     p.transfer {
         padding-block:1rem
         border-top:1px solid #52689b
-        = debtor.name + " → " + creditor.name + "   " + money(amount)
+        |> debtor.name + " → " + creditor.name + "   " + money(amount)
     }
     \/
 }
@@ -69,7 +69,7 @@ fn settlement(state: Trip) Browser.HTMLElement {
         for balances |debtor| {
             for balances |creditor| {
                 if debtor.cents < 0 and creditor.cents > 0 {
-                    = transfer(debtor, creditor)
+                    |> transfer(debtor, creditor)
                 }
             }
         }
@@ -283,7 +283,7 @@ main {
                 strong {
                     id = "total"
                     font-size:2.5rem
-                    = money(total(state))
+                    |> money(total(state))
                 }
             }
             article.panel.stack {
@@ -292,7 +292,7 @@ main {
                 }
                 strong {
                     font-size:2.5rem
-                    = "$" + (total(state).f64() / 300.0).toFixed(2)
+                    |> "$" + (total(state).f64() / 300.0).toFixed(2)
                 }
             }
             article.panel.stack {
@@ -301,7 +301,7 @@ main {
                 }
                 strong {
                     font-size:2.5rem
-                    = state.expenses.len().f64().toString()
+                    |> state.expenses.len().f64().toString()
                 }
             }
         }
@@ -321,15 +321,15 @@ main {
                     article.expense.panel.bar {
                         div {
                             h3 {
-                                = expense.title
+                                | expense.title
                             }
                             p.muted {
-                                = expense.payer + " paid for everyone"
+                                |> expense.payer + " paid for everyone"
                             }
                         }
                         div.bar {
                             strong {
-                                = money(expense.cents)
+                                |> money(expense.cents)
                             }
                             button {
                                 aria-label = "Remove " + expense.title
@@ -349,7 +349,7 @@ main {
                         "Your notebook is empty. Start with coffee, fuel, or a place to stay."
                     }
                 }
-                = settlement(state)
+                |> settlement(state)
             }
             form.panel.stack {
                 h2 {
@@ -423,7 +423,7 @@ main {
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

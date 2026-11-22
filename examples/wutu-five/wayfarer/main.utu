@@ -89,7 +89,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                 }
                 strong {
                     font-size:2rem
-                    = number(state.stops.len())
+                    |> number(state.stops.len())
                 }
             }
             article {
@@ -102,7 +102,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                 }
                 strong {
                     font-size:2rem
-                    = number(done)
+                    |> number(done)
                 }
             }
             article {
@@ -116,13 +116,13 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                 strong {
                     id = "trip-total"
                     font-size:clamp(1.2rem, 3vw, 2rem)
-                    = "$" + (total / 100.0).toFixed(2)
+                    |> "$" + (total / 100.0).toFixed(2)
                 }
             }
         }
         p.muted {
             role = "status"
-            = number(visible.len())
+            |> number(visible.len())
             " stops in this view. Costs are your own estimates."
         }
         for visible |stop| key stop.id {
@@ -145,17 +145,17 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                     padding:0.7rem
                     border-radius:50%
                     "D"
-                    = number(stop.day)
+                    |> number(stop.day)
                 }
                 div {
                     display:grid
                     gap:0.5rem
                     h3 {
                         font-size:1.15rem
-                        = stop.title
+                        | stop.title
                     }
                     p.muted {
-                        = money(stop.cost)
+                        |> money(stop.cost)
                         " planned"
                     }
                 }
@@ -169,7 +169,7 @@ fn itinerary(state: Trip) Browser.HTMLElement {
                     button {
                         id = "stop-" + stop.id
                         aria-pressed = if stop.done { "true" } else { "false" }
-                        = if stop.done {
+                        |> if stop.done {
                             "Visited ✓"
                         }
                         else {
@@ -511,7 +511,7 @@ main {
                         }
                     }
                 }
-                = itinerary(state)
+                |> itinerary(state)
             }
             aside {
                 display:grid

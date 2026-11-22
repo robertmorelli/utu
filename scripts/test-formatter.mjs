@@ -54,18 +54,18 @@ for (const [source, expected] of cases) {
 
 // Brace declarations are formatted even inside modules and alongside ordinary Utu.
 {
-  const source = 'using Browser from std:Browser\nmod ui {\nwn greeting(text: Str) { span { = text; } }\n}\nhtml { body { = ui.greeting("Hello  世界"); } }\n';
+  const source = 'using Browser from std:Browser\nmod ui {\nwn greeting(text: Str) { span { | text; } }\n}\nhtml { body { |> ui.greeting("Hello  世界"); } }\n';
   const expected = `using Browser from std:Browser
 mod ui {
     wn greeting(text: Str) {
         span {
-            = text;
+            | text;
         }
     }
 }
 html {
     body {
-        = ui.greeting("Hello  世界");
+        |> ui.greeting("Hello  世界");
     }
 }
 `;
@@ -74,7 +74,7 @@ html {
   assert.equal(result.text, expected);
   assert.equal(await formatUtuSource(result.text, { shape }), expected);
   assert.notEqual(shape(source), shape(source.replace('Hello  世界', 'Hello 世界')), 'string whitespace is meaningful');
-  assert.notEqual(shape(source), shape(source.replace('= text;', '= text; "extra";')), 'Wutu children are meaningful');
+  assert.notEqual(shape(source), shape(source.replace('| text;', '| text; "extra";')), 'Wutu children are meaningful');
 }
 
 // Compile formatted brace bodies, including comments, CSS, handlers, and opaque JS.
@@ -83,7 +83,7 @@ html {
   try {
     for (const [name, source] of [
       ['components.utu', fs.readFileSync(path.join(ROOT, 'examples/wutu-components/main.utu'), 'utf8')],
-      ['reactive.utu', 'using Browser from std:Browser\nwn greeting() { @reactive; div { \"Hello\"; } }\nhtml { body { = greeting(); } }\n'],
+      ['reactive.utu', 'using Browser from std:Browser\nwn greeting() { @reactive; div { \"Hello\"; } }\nhtml { body { |> greeting(); } }\n'],
       ['page.utu', 'using Browser from std:Browser\nhtml { body { form { label { for="q"; "Find  世界"; } input#q { display: grid; type="search"; } } } }\n'],
     ]) {
       const { text, refused } = await formatUtu(source, { shape });

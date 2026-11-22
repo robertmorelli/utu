@@ -11,19 +11,19 @@ struct Counter[Component]:
 
 mod ui {
     wn badge(text: Str) {
-        strong { = text }
+        strong { | text }
     }
 }
 
 wn Counter.caption |c| () {
-    span { = c.label }
+    span { | c.label }
 }
 
 wn Component[Counter].render |c| () {
     button {
         // A brace in a comment does not end this wn: }
-        = c.caption()
-        = state.count
+        |> c.caption()
+        | state.count
         on click {
             let step: fun() I32 = @es/\ () => { return 1 } \/
             state.count += step()
@@ -32,10 +32,10 @@ wn Component[Counter].render |c| () {
 }
 
 wn heading(text: Str) {
-    h1 { = text; "}" }
+    h1 { | text; "}" }
 }
 
-fn heading_value(text: Str) Browser.HTMLElement {
+fn heading_value(text: Str) Externref {
     let render = heading
     return render(text)
 }
@@ -47,11 +47,11 @@ html {
     }
     body {
         font-family: system-ui
-        = heading_value("Components")
-        = ui.badge("ready")
-        = Counter { label: "Clicks: " }
+        |> heading_value("Components")
+        |> ui.badge("ready")
+        |> Counter { label: "Clicks: " }
         for counters |item| {
-            = item
+            | item
         }
     }
 }

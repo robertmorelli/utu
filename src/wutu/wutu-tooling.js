@@ -201,9 +201,10 @@ class BodyFormatter {
     switch (node.kind) {
       case 'fragment': return this.children(node.children, depth);
       case 'text': return this.block(node.expr, depth, true);
-      case 'expression': return this.block(`${node.sigil ?? '='} ${node.expr}`, depth, true);
+      case 'expression': return this.block(`${node.sigil ?? '|'} ${node.expr}`, depth, true);
       case 'if': return this.conditional(node, depth, 'if');
       case 'for': return this.loop(node, depth);
+      case 'match': return this.matchBlock(node, depth);
       default: return this.element(node, depth);
     }
   }
@@ -224,6 +225,17 @@ class BodyFormatter {
     const key = node.key ? ` key ${node.globalKey ? 'global ' : ''}${grouped(compactExpression(node.key), '{')}` : '';
     this.add(depth, `for ${grouped(compactExpression(node.iterable), '{|')} |${node.captures}|${key} {`);
     this.children(node.children, depth + 1);
+    this.add(depth, '}');
+  }
+
+  matchBlock(node, depth) {
+    this.add(depth, `match ${grouped(compactExpression(node.scrutinee), '{')} {`);
+    for (const arm of node.arms) {
+      const head = arm.pattern === null ? '~> {' : `${arm.pattern} => {`;
+      this.add(depth + 1, head);
+      this.children(arm.children, depth + 2);
+      this.add(depth + 1, '}');
+    }
     this.add(depth, '}');
   }
 
@@ -292,7 +304,7 @@ export function formatWutuSource(source) {
   return source;
 }
 
-const WUTU_WORDS = new Set(['if', 'for', 'else', 'as', 'key', 'global', 'on', 'quiet']);
+const WUTU_WORDS = new Set(['if', 'for', 'else', 'as', 'key', 'global', 'on', 'quiet', 'match']);
 
 /**
  * Whether `b` is `a` with only whitespace (and `;`, which a line break

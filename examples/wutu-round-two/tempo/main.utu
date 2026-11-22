@@ -12,7 +12,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
     return @wutu/\
     @island "tempo-workspace"
     section.workspace {
-        = {
+        |> {
             wutu.on_cleanup(cl() Void {
                 state.running=false
             })
@@ -29,7 +29,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
             text-align:center
             padding:3rem
             p.eyebrow {
-                = if state.running {
+                |> if state.running {
                     "IN YOUR OWN TIME"
                 }
                 else {
@@ -40,7 +40,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
                 id = "clock"
                 font-size:clamp(5rem,15vw,10rem)
                 line-height:1.1
-                = wutu.number(state.remaining)
+                |> wutu.number(state.remaining)
             }
             p {
                 "seconds remaining"
@@ -52,7 +52,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
             div.bar {
                 justify-content:center
                 button.primary {
-                    = if state.running {
+                    |> if state.running {
                         "Pause"
                     }
                     else {
@@ -76,7 +76,7 @@ fn workspace(state: TempoState) Browser.HTMLElement {
         }
         div.panel.bar {
             p {
-                = "Interval length: "+wutu.number(state.duration)+" seconds"
+                |> "Interval length: "+wutu.number(state.duration)+" seconds"
             }
             button {
                 disabled = state.duration<=15
@@ -159,7 +159,7 @@ main {
             }
         }
         else {
-            = workspace(state)
+            |> workspace(state)
         }
         footer {
             p {
@@ -167,7 +167,7 @@ main {
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

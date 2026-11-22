@@ -1545,13 +1545,6 @@ fn desugar_wutu_surfaces() Void {
     let limit = file_root.len()
     for (0 ..< limit) |file| {
         if not is_own_file(file) or file_root[file] < 0 { continue }
-        let sugar = wutu_sugar_in(file_root[file])
-        if sugar >= 0 and not imports_browser(file_root[file]) {
-            // Said once, at the first `wn` or `html`, with the line to add.
-            report(Diag.UnknownModule, sugar, intern_text(rss(Rst.Browser)))
-            diag_note(rss(Rst.WnAndHtmlBuildOnStd))
-            diag_fix(file_start[file], file_start[file], rss(Rst.UsingBrowserFromStdBrowser), rss(Rst.ImportStdBrowser))
-        }
         desugar_wutu_items(file_root[file])
     }
 }
@@ -1596,16 +1589,7 @@ fn desugar_wutu_items(parent: I32) Void {
             }
             let open = tok_start[node_first[body]]
             dsl_current_site = item
-            let result_type = rss(Rst.BrowserHTMLElement)
-            if not is_kind(item, Node.Export_html_decl) {
-                // Invalid bodies are diagnosed by normal DSL expansion, at the
-                // original body span. This early parse only chooses the result type.
-                try {
-                    let template = parse_template(dsl_body(item))
-                    if tn_kind[template] == 5 { result_type = rss(Rst.BrowserDocumentFragment) }
-                    else if is_svg_tag(word_text(tn_text[template])) and not is_html_tag(word_text(tn_text[template])) { result_type = rss(Rst.BrowserSVGElement) }
-                } catch {}
-            }
+            let result_type = "Externref"
             let code = if is_kind(item, Node.Export_html_decl) {
                 rss(Rst.MainWutuPageWutu)
             } else {

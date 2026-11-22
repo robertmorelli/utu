@@ -6,13 +6,11 @@ other components. Wutu builds real DOM nodes through Utu's [typed browser
 bindings](typescript-abi.md).
 
 ```utu
-using Browser from std:Browser
-
 wn greeting(name: Str) {
     section.greeting#hello {
         display: grid
         gap: 1rem
-        h2 { "Hello, "; = name }
+        h2 { "Hello, "; | name }
         p.note.quiet { "Welcome back." }
     }
 }
@@ -50,7 +48,7 @@ aria-hidden = "true"
 aspect-ratio: 0.68
 grid-template-areas: "a b"
     "c d"
-p { "Hi"; = name }
+p { "Hi"; | name }
 ```
 
 Every element head starts with a tag. `button.primary#save { ... }` creates a
@@ -70,11 +68,11 @@ children directly, without a wrapper element.
 | `disabled` / `disabled = condition` | Boolean attribute presence |
 | `.value = expression` | Typed DOM **property** assignment |
 | `"text"` | A text node |
-| `= expression` | Text or a node: a Str, a number or Bool (its `str()`), or a DOM node such as a component's result |
-| `\| components` | Insert a component list, rendering its members via `.render()` |
-| `\|> expression` | Evaluate Utu code and insert its resulting components |
+| `\| value` | Insert a value: text, number/Bool (its `str()`), component (`.render()`), component list, `?T` (`null` renders nothing), or DOM node |
+| `\|> expression` | Evaluate Utu code and insert its result; distributes into `match`, `if`/`else`, and block tails so mixed renderables unify |
 | `property: { expression }` | A CSS value computed from a Utu block at render |
 | `if cond { … } else if cond { … } else { … }` | Conditional children |
+| `match expr { pat => { … } ~> { … } }` | Pattern-matched children |
 | `for items \|item, i\| key item.id { … }` | Repeated children (keys may be any scalar or Str) |
 | `on click { … }` | An event handler, with no event variable |
 | `on click \|e\| { … }` | The same, with the event as `e`, typed as the DOM types it (`MouseEvent`) |
@@ -150,10 +148,8 @@ CSS property has those prefixes), set in its namespace.
 
 ## Components
 
-`wn` declares a function whose brace body is Wutu text. A single HTML root
-returns `Browser.HTMLElement`, a single SVG root returns `Browser.SVGElement`,
-and a fragment body returns `Browser.DocumentFragment`. For example, `wn card(title: Str) { article { = title } }` is the same as
-`fn card(title: Str) Browser.HTMLElement => @wutu/\ article { = title } \/`.
+`wn` declares a function whose brace body is Wutu text. Every `wn` returns `Externref` (matching `Component.render() Externref`), so adding or removing sibling elements or switching between HTML, SVG, fragments, and `Component` never changes its return type, and `using Browser from std:Browser` is only needed when your code explicitly references `Browser.*` APIs or typed DOM events (`on click |e|`). For example, `wn card(title: Str) { article { | title } }` is the same as
+`fn card(title: Str) Externref => @wutu/\ article { | title } \/`.
 Use `wn` at top level, in a module, as a method, or as a protocol method.
 
 A `Component` is a struct with `render()`. List the protocol and implement
@@ -172,19 +168,23 @@ struct Counter[Component]:
     | label: Str
 
 wn Component[Counter].render |counter| () {
-    button { = counter.label }
+    button { | counter.label }
 }
 
 html {
     head { title { "Counters" } }
-    body { = Counter { label: "One" } }
+    body { |> Counter { label: "One" } }
 }
 ```
 
 The hole calls `render()` for a Component value, including a value held as
 `Component`. A hole also accepts an `Array[Component]`, arrays of concrete
-component structs, arrays of other renderable values, and nested arrays; their
-results appear in order. Text, numbers, Bools, and DOM nodes still work directly.
+component structs, arrays of other renderable values, `?T` optionals (`null`
+renders nothing), and nested arrays; their results appear in order. When the
+expression is a `match`, `if`/`else`, or block ending in one, Wutu distributes
+rendering into each arm so components, `wn` calls, `@wutu` templates, strings,
+numbers, and `null` unify cleanly. Text, numbers, Bools, and DOM nodes still
+work directly.
 Array entries use their index for identity. Use an explicit `for … key …` when
 items can reorder and their DOM state should follow the item. A Component is a struct and is
 rendered on every update; the scalar argument memoization below applies to
@@ -196,8 +196,8 @@ A component can return siblings directly:
 
 ```utu
 wn entry(label: Str, value: Str) {
-    dt { = label }
-    dd { = value }
+    dt { | label }
+    dd { | value }
 }
 
 wn entries(items: Array[Component]) {
@@ -220,14 +220,12 @@ written with the adjacent characters `|` and `>`. Its expression can be a
 pipeline, conditional, block, or function call.
 
 ```utu
-using Browser from std:Browser
-
 struct Label[C]:
     | title: Str
     | featured: Bool
 
 wn C[Label].render |label| () {
-    li { = label.title }
+    li { | label.title }
 }
 
 let labels: Array[Label] = [Label { title: "Syntax", featured: true },
@@ -249,8 +247,8 @@ html {
 
 Start each insertion on a new line or separate insertions with semicolons.
 Wrap a Utu expression in parentheses or braces if one of its continuation
-lines begins with a pipe operator. Use `= expression` for text or scalar
-values.
+lines begins with a pipe operator. Use `| value` or `|> expression` for any
+dynamic child (text, scalars, components, lists, or DOM nodes).
 
 Components are ordinary typed Utu functions. Pass data or DOM nodes as normal
 parameters and insert returned nodes with `|> component(args)`. There is no
@@ -261,7 +259,7 @@ moved into the parent by the DOM's normal append semantics.
 @wutu/\
 section {
     for (plants filter |plant| { not plant.watered }) |plant, index| {
-        = plant_card(plant)
+        |> plant_card(plant)
     }
     if empty {
         p { "Everything is watered." }
@@ -293,10 +291,10 @@ references, shared struct state, and persistence.
 ```utu
 button as toggle {
     type = "button"
-    = if plant.watered { "Watered ✓"; } else { "Water me"; }
+    |> if plant.watered { "Watered ✓" } else { "Water me" }
     on click {
         plant.watered = not plant.watered
-        toggle.textContent = if plant.watered { "Watered ✓"; } else { "Water me"; }
+        toggle.textContent = if plant.watered { "Watered ✓" } else { "Water me" }
     }
 }
 ```
@@ -307,10 +305,10 @@ sets the node back to what the template says. Change state and let the
 template show it:
 
 ```utu
-p { = s.msg; }
+p { | s.msg }
 button {
-    on click { s.msg = "Saved"; }
-    = "Save"
+    on click { s.msg = "Saved" }
+    "Save"
 }
 ```
 
@@ -361,8 +359,7 @@ div.bar {
 
 Blocks can contain local declarations and nested expressions; their final value
 is the CSS text. For example, `--config: { "{literal}" }` computes the literal
-text `{literal}`. In a reactive view, these values update with the view. The
-older `property: = expression` spelling remains supported. Static declarations
+text `{literal}`. In a reactive view, these values update with the view. Static declarations
 on the same element still compile to a shared class.
 
 `@ selector { ... }` is an explicitly scoped selector rule, not an element.

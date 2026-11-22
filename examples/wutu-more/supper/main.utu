@@ -249,7 +249,7 @@ main {
                         "Your ingredients"
                     }
                     p.muted {
-                        = (state.ingredients count_where |item| {
+                        |> (state.ingredients count_where |item| {
                             item.packed
                         }).f64().toString() + " / 6 ready"
                     }
@@ -269,7 +269,7 @@ main {
                         }
                         strong {
                             id = "servings"
-                            = state.servings.toString() + " servings"
+                            |> state.servings.toString() + " servings"
                         }
                         button {
                             aria-label = "More servings"
@@ -294,10 +294,10 @@ main {
                             bind:checked = item.packed
                         }
                         span {
-                            = item.name
+                            | item.name
                         }
                         strong {
-                            = amount(item, state.servings)
+                            |> amount(item, state.servings)
                         }
                     }
                 }
@@ -317,7 +317,7 @@ main {
                         "Let’s cook"
                     }
                     span.eyebrow {
-                        = "STEP " + (state.step + 1).f64().toString() + " / 4"
+                        |> "STEP " + (state.step + 1).f64().toString() + " / 4"
                     }
                 }
                 progress {
@@ -332,7 +332,7 @@ main {
                     align-content:start
                     p {
                         font:clamp(1.35rem, 3vw, 2rem)/1.45 Georgia, serif
-                        = instructions[state.step]
+                        |> instructions[state.step]
                     }
                 }
                 div.bar {
@@ -367,7 +367,7 @@ main {
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

@@ -21,10 +21,10 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                     article.panel.bar {
                         div {
                             h3 {
-                                = item.name
+                                | item.name
                             }
                             p.muted {
-                                = wutu.number(item.count)+" in stock"
+                                |> wutu.number(item.count)+" in stock"
                             }
                         }
                         div.bar {
@@ -56,10 +56,10 @@ fn workspace(state: PantryState) Browser.HTMLElement {
                 for (state.items filter |item| {item.count<item.target }) |item| key item.id {
                     div.panel.bar {
                         p {
-                            = item.name
+                            | item.name
                         }
                         strong {
-                            = wutu.number(item.target-item.count)
+                            |> wutu.number(item.target-item.count)
                         }
                     }
                 }
@@ -139,14 +139,14 @@ main {
                 "Keep an honest count of what you have. Your shopping list appears as staples run low."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

@@ -63,7 +63,7 @@ state: Library) Browser.HTMLElement {
             align-content:start
             p.eyebrow {
                 color:var(--accent)
-                = if book.finished {
+                |> if book.finished {
                     "FINISHED"
                 }
                 else {
@@ -72,10 +72,10 @@ state: Library) Browser.HTMLElement {
             }
             h3 {
                 font:500 1.5rem Georgia, serif
-                = book.title
+                | book.title
             }
             p.muted {
-                = book.author
+                | book.author
             }
             div {
                 display:flex
@@ -84,7 +84,7 @@ state: Library) Browser.HTMLElement {
                 button {
                     id = "book-" + book.id
                     aria-pressed = if book.finished { "true" } else { "false" }
-                    = if book.finished {
+                    |> if book.finished {
                         "Read again"
                     }
                     else {
@@ -134,14 +134,14 @@ fn results(state: Library) Browser.HTMLElement {
             }
             p.muted {
                 role = "status"
-                = number(count)
+                |> number(count)
                 " shown · "
-                = number(finished)
+                |> number(finished)
                 " finished"
             }
         }
         for (state.books filter |book| { matches(book, state) }) |book| key book.id {
-            = book_card(book, state)
+            |> book_card(book, state)
         }
         if count == 0 {
             p.empty {
@@ -391,7 +391,7 @@ main {
                         }
                     }
                 }
-                = results(state)
+                |> results(state)
             }
             aside {
                 display:grid

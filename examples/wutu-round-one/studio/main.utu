@@ -47,21 +47,21 @@ fn workspace(state: StudioState) Browser.HTMLElement {
     return @wutu/\
     @island "studio-workspace"
     section.workspace {
-        = studio_form(state)
+        |> studio_form(state)
         div.grid {
             for ["Up next","In progress","Finished"] |name,index| {
                 section.well.stack {
                     h2 {
-                        = name
+                        | name
                     }
                     for (state.tasks filter |task| {task.stage==index.i64().i32() }) |task| key global task.id {
                         article.panel.stack {
                             h3 {
-                                = task.title
+                                | task.title
                             }
                             button {
                                 aria-label = "Move "+task.title
-                                = if task.stage==2 {
+                                |> if task.stage==2 {
                                     "Reopen ↺"
                                 }
                                 else {
@@ -134,14 +134,14 @@ main {
                 "A small board for your studio. Keep one piece moving, then make space for the next."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

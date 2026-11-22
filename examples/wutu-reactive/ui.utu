@@ -5,7 +5,7 @@ mod ui {
         return @wutu/\
         small.badge {
             padding:0.25rem
-            = text
+            | text
         }
         \/
     }

@@ -41,17 +41,17 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
             for (state.places filter |place| {state.region == "All" or state.region == place.region }) |place| key place.id {
                 article.panel.stack {
                     p.eyebrow {
-                        = place.region
+                        | place.region
                     }
                     h2 {
-                        = place.name
+                        | place.name
                     }
                     p.muted {
-                        = place.note
+                        | place.note
                     }
                     button {
                         aria-pressed = if place.saved {"true" } else {"false" }
-                        = if place.saved {
+                        |> if place.saved {
                             "Saved ✓"
                         }
                         else {
@@ -62,13 +62,13 @@ fn workspace(state: AtlasState) Browser.HTMLElement {
                             wutu.save("atlas-v2")
                         }
                     }
-                    = @utu/\ @wutu/\ small { "Room for a slower day."; } \/ \/
+                    |> @utu/\ @wutu/\ small { "Room for a slower day."; } \/ \/
                 }
             }
         }
         p {
             role = "status"
-            = wutu.number(state.places count_where |p| {
+            |> wutu.number(state.places count_where |p| {
                 p.saved
             }) + " places saved"
         }
@@ -141,14 +141,14 @@ main {
                 "A personal shortlist for your next unhurried trip. Filter by landscape, save a place, and keep the details close."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

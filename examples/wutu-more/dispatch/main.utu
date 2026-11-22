@@ -39,10 +39,10 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
         min-block-size:22rem
         header.bar {
             h2 {
-                = label
+                | label
             }
             span.count {
-                = count(state, stage)
+                |> count(state, stage)
             }
         }
         for (state.cards filter |card| { card.stage == stage and card.title.toLowerCase().includes(state.query.toLowerCase()) }) |card| key card.id {
@@ -54,17 +54,17 @@ fn lane(state: Board, stage: Str, label: Str, next: Str) Browser.HTMLElement {
                 box-shadow:0 3px 0 var(--line)
                 p.eyebrow {
                     color:var(--muted)
-                    = card.category
+                    | card.category
                 }
                 h3 {
                     font-size:1.15rem
-                    = card.title
+                    | card.title
                 }
                 div.bar {
                     button {
                         id = "move-" + card.id
                         aria-label = "Move " + card.title
-                        = if next == "doing" {
+                        |> if next == "doing" {
                             "Start →"
                         }
                         else {
@@ -364,9 +364,9 @@ main {
             @media (width < 55rem) {
                 grid-template-columns: 1fr
             }
-            = lane(state, "todo", "01 / Up next", "doing")
-            = lane(state, "doing", "02 / In progress", "done")
-            = lane(state, "done", "03 / Finished", "todo")
+            |> lane(state, "todo", "01 / Up next", "doing")
+            |> lane(state, "doing", "02 / In progress", "done")
+            |> lane(state, "done", "03 / Finished", "todo")
         }
         footer.bar {
             p {
@@ -374,7 +374,7 @@ main {
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

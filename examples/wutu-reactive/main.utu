@@ -59,7 +59,7 @@ main {
         }
         p {
             id = "changes"
-            = state.changes.f64().toString()
+            |> state.changes.f64().toString()
         }
         label {
             "Budget"
@@ -70,23 +70,23 @@ main {
         }
         p {
             id = "budget"
-            = state.budget.toString()
+            |> state.budget.toString()
         }
         p {
             id = "storage"
-            = wutu.storage_error()
+            |> wutu.storage_error()
         }
         ul {
             for (state.tasks filter |task| { task.title.includes(state.query) }) |task| key task.id {
                 li {
-                    = ui.badge("Task")
-                    = ui.badge(task.title)
+                    |> ui.badge("Task")
+                    |> ui.badge(task.title)
                     label {
                         input {
                             type = "checkbox"
                             bind:checked = task.done
                         }
-                        = task.title
+                        | task.title
                     }
                     button {
                         aria-label = "Remove " + task.title

@@ -67,16 +67,16 @@ state: Menu) Browser.HTMLElement {
         background:var(--panel)
         p.eyebrow {
             color:var(--accent)
-            = dish.category
+            | dish.category
         }
         h3 {
             font:500 1.8rem Georgia, serif
-            = dish.title
+            | dish.title
         }
         p.muted {
             line-height:1.65
             min-block-size:3.5rem
-            = dish.description
+            | dish.description
         }
         div {
             display:flex
@@ -84,7 +84,7 @@ state: Menu) Browser.HTMLElement {
             align-items:center
             gap:1rem
             strong {
-                = money(dish.price)
+                |> money(dish.price)
             }
             button {
                 id = "add-" + dish.id
@@ -112,7 +112,7 @@ fn menu(state: Menu) Browser.HTMLElement {
         grid-template-columns:repeat(auto-fit, minmax(min(100%, 16rem), 1fr))
         gap:1rem
         for (state.dishes filter |dish| { state.category == "All" or dish.category == state.category }) |dish| key dish.id {
-            = dish_card(dish, state)
+            |> dish_card(dish, state)
         }
     }
     \/
@@ -144,8 +144,8 @@ fn basket(state: Menu) Browser.HTMLElement {
         }
         p.muted {
             role = "status"
-            = number(count)
-            = if count == 1 {
+            |> number(count)
+            |> if count == 1 {
                 " item · a draft, not a placed order"
             }
             else {
@@ -160,10 +160,10 @@ fn basket(state: Menu) Browser.HTMLElement {
                 padding-block-end:1rem
                 border-block-end:1px solid var(--line)
                 strong {
-                    = dish.title
+                    | dish.title
                 }
                 span {
-                    = money(dish.price * dish.quantity)
+                    |> money(dish.price * dish.quantity)
                 }
                 div {
                     grid-column:1 / -1
@@ -186,7 +186,7 @@ fn basket(state: Menu) Browser.HTMLElement {
                         }
                     }
                     span {
-                        = number(dish.quantity)
+                        |> number(dish.quantity)
                     }
                     button {
                         id = "plus-" + dish.id
@@ -218,7 +218,7 @@ fn basket(state: Menu) Browser.HTMLElement {
             }
             strong {
                 id = "subtotal"
-                = money(total)
+                |> money(total)
             }
         }
         p.muted {
@@ -548,9 +548,9 @@ main {
                         }
                     }
                 }
-                = menu(state)
+                |> menu(state)
             }
-            = basket(state)
+            |> basket(state)
         }
         footer.site-footer {
             p {

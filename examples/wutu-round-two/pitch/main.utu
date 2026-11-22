@@ -39,10 +39,10 @@ fn workspace(state: PitchState) Browser.HTMLElement {
             article.panel.bar {
                 div {
                     h2 {
-                        = service.name
+                        | service.name
                     }
                     p.muted {
-                        = wutu.money(service.rate)+" / hour"
+                        |> wutu.money(service.rate)+" / hour"
                     }
                 }
                 div.bar {
@@ -56,7 +56,7 @@ fn workspace(state: PitchState) Browser.HTMLElement {
                         }
                     }
                     strong {
-                        = wutu.number(service.hours)+" hours"
+                        |> wutu.number(service.hours)+" hours"
                     }
                     button {
                         aria-label = "More "+service.name
@@ -68,7 +68,7 @@ fn workspace(state: PitchState) Browser.HTMLElement {
                         }
                     }
                     strong {
-                        = wutu.money(service.hours*service.rate)
+                        |> wutu.money(service.hours*service.rate)
                     }
                 }
             }
@@ -89,11 +89,11 @@ fn workspace(state: PitchState) Browser.HTMLElement {
                     "ESTIMATE FOR"
                 }
                 h2 {
-                    = state.client
+                    | state.client
                 }
             }
             strong.big {
-                = wutu.money(quote(state))
+                |> wutu.money(quote(state))
             }
         }
         button.primary {
@@ -162,14 +162,14 @@ main {
                 "Shape a straightforward project estimate. Adjust the work, include a returning-client discount, and print a quote you can talk through."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

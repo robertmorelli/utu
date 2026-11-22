@@ -126,7 +126,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     display:block
                     padding-block-start:0.6rem
                     font-size:clamp(1.3rem, 3vw, 2.5rem)
-                    = "$" + (total / 100.0).toFixed(2)
+                    |> "$" + (total / 100.0).toFixed(2)
                 }
             }
             article {
@@ -141,7 +141,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     display:block
                     padding-block-start:0.6rem
                     font-size:2.5rem
-                    = hours.toFixed(1)
+                    |> hours.toFixed(1)
                 }
             }
             article {
@@ -156,7 +156,7 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     display:block
                     padding-block-start:0.6rem
                     font-size:2.5rem
-                    = number(state.lines.len())
+                    |> number(state.lines.len())
                 }
             }
         }
@@ -173,17 +173,17 @@ fn estimate(state: Estimate) Browser.HTMLElement {
                     display:grid
                     gap:0.5rem
                     h3 {
-                        = line.title
+                        | line.title
                     }
                     p.muted {
-                        = line.hours.toString()
+                        |> line.hours.toString()
                         " h × "
-                        = money(line.rate)
+                        |> money(line.rate)
                         " / h"
                     }
                 }
                 strong {
-                    = money(amount(line))
+                    |> money(amount(line))
                 }
                 div {
                     grid-column:1 / -1
@@ -484,7 +484,7 @@ main {
             @media (width < 54rem) {
                 grid-template-columns: 1fr
             }
-            = estimate(state)
+            |> estimate(state)
             aside {
                 display:grid
                 gap:1.5rem
@@ -538,7 +538,7 @@ main {
                     button.primary {
                         id = "submit"
                         type = "submit"
-                        = if state.edit == "" {
+                        |> if state.edit == "" {
                             "Add work item"
                         }
                         else {

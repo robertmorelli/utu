@@ -19,10 +19,10 @@ fn notes(book:Book) Browser.HTMLElement {
             "← Back to the shelf"
         }
         h2 {
-            = book.title
+            | book.title
         }
         p.muted {
-            = book.author
+            | book.author
         }
         label {
             "Your notes"
@@ -49,7 +49,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
             for state.books |book| key book.id {
                 article.panel.stack {
                     p.eyebrow {
-                        = if book.finished {
+                        |> if book.finished {
                             "FINISHED"
                         }
                         else {
@@ -57,10 +57,10 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
                         }
                     }
                     h2 {
-                        = book.title
+                        | book.title
                     }
                     p.muted {
-                        = book.author
+                        | book.author
                     }
                     a {
                         href = "#/notes"
@@ -71,7 +71,7 @@ fn workspace(state: ReadroomState) Browser.HTMLElement {
                         }
                     }
                     button {
-                        = if book.finished {
+                        |> if book.finished {
                             "Read again"
                         }
                         else {
@@ -146,11 +146,11 @@ main {
         }
         if wutu.route()=="/notes" {
             for (state.books filter |book| {book.id==state.selected }) |book| {
-                = notes(book)
+                |> notes(book)
             }
         }
         else {
-            = workspace(state)
+            |> workspace(state)
         }
         footer {
             p {
@@ -158,7 +158,7 @@ main {
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

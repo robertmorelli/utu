@@ -534,7 +534,7 @@ fn coerce(actual: I32, expected: I32, at: I32) I32 {
     if ty_is(expected, Ty.Nullable) and is_variant_of(actual, ty_a[expected]) { return note_coercion(at, actual, expected, 2) }
     // ?V to ?E, ?T to ?P: the same reference, as V to E and T to P.
     if ty_is(expected, Ty.Nullable) and ty_is(actual, Ty.Nullable) and (is_variant_of(ty_a[actual], ty_a[expected]) or converts_to_proto(ty_a[actual], ty_a[expected])) { return note_coercion(at, actual, expected, 1) }
-    if ty_is(actual, Ty.Null) and ty_is(expected, Ty.Nullable) {
+    if ty_is(actual, Ty.Null) and (ty_is(expected, Ty.Nullable) or expected == prelude(Prelude.Externref)) {
         w_pop()
         w_leaf(Op.RefNull, repr(expected), heap_of(repr(expected)), 0)
         return note_coercion(at, actual, expected, 5)
@@ -874,56 +874,197 @@ fn template_value(e: I32, cx: Cx) Void {
     str_of(rt, e, m, cx)
 }
 
-/// `wutu.show(x)`, what a Wutu text hole (`= x;`) becomes: a number or a
-/// Bool is its `str()`, a Str or a node is itself (as stage 0 lowers it).
+/// Active `wutu.show(...)` call node while distributing `wutu.show` into
+/// `match` arms, `if` branches, and block tails; -1 otherwise.
+let wutu_show_call: I32 = -1
+
+/// `wutu.show(x)`, what a Wutu child hole (`| x` / `|> x`) becomes: a number
+/// or a Bool is its `str()`, a Component calls `.render()`, an Array renders
+/// its elements, a `?T` renders nothing on null, and `match` / `if` / blocks
+/// distribute `wutu.show` into each arm/branch so mixed renderables unify.
 fn check_wutu_show(node: I32, args: I32, cx: Cx) I32 {
     let a = if args >= 0 { first_child(args) } else { -1 }
     if a < 0 or next_sibling(a) >= 0 {
         report2(Diag.WrongArity, node, -1, 1, if args >= 0 { child_count(args) } else { 0 })
         return error_value()
     }
+    return check_wutu_show_expr(a, node, cx)
+}
+
+/// Evaluate expression `e` as a Wutu child hole, producing `Externref` (or `Never`/`Error`).
+fn check_wutu_show_expr(e: I32, call_node: I32, cx: Cx) I32 {
+    if is_kind(e, Node.Splice) or is_kind(e, Node.Paren_expr) {
+        return check_wutu_show_expr(first_child(e), call_node, cx)
+    }
+    if is_null_literal(e) {
+        w_leaf(Op.RefNull, vt_externref, heap_of(vt_externref), 0)
+        return prelude(Prelude.Externref)
+    }
+    if is_kind(e, Node.Block) {
+        return check_wutu_show_block(e, call_node, cx)
+    }
+    if is_kind(e, Node.If_expr) {
+        let cond = first_child(e)
+        let then_ = next_sibling(cond)
+        let else_ = next_sibling(then_)
+        if else_ >= 0 {
+            let ext = prelude(Prelude.Externref)
+            let bool_t = prelude(Prelude.Bool)
+            let m = w_mark()
+            want(cond, bool_t, Why.Condition, -1, -1)
+            coerce(check_expr(cond, bool_t, cx), bool_t, cond)
+            unwant()
+            let label = new_label()
+            let t1 = check_wutu_show_expr(then_, call_node, cx)
+            let t2 = check_wutu_show_expr(else_, call_node, cx)
+            if ty_is(t1, Ty.Never) and ty_is(t2, Ty.Never) {
+                w_node(Op.If, vt_unreachable, label, 1, m)
+                return ty_never()
+            }
+            w_node(Op.If, repr(ext), label, 1, m)
+            return ext
+        }
+    }
+    if is_kind(e, Node.Match_expr) {
+        let prev = wutu_show_call
+        wutu_show_call = call_node
+        let t = check_match(e, prelude(Prelude.Externref), cx)
+        wutu_show_call = prev
+        return t
+    }
     let m = w_mark()
-    let rt = check_expr(a, -1, cx)
-    if ty_is(rt, Ty.Error) { return rt }
+    let rt = check_expr(e, -1, cx)
+    return check_wutu_show_value(rt, e, m, call_node, cx)
+}
+
+/// Evaluate block `block` with `wutu.show` distributed into its tail expression.
+fn check_wutu_show_block(block: I32, call_node: I32, cx: Cx) I32 {
+    let m = w_mark()
+    let defers = defer_node.len()
+    defer_marks.push(defers)
+    let guards = defer_guard.len()
+    let reads = flag_reads
+    let c = first_child(block)
+    let t = ty_void()
+    let exits = false
+    while (c >= 0) {
+        let next = next_sibling(c)
+        let noted = defer_node.len()
+        if next < 0 and not exits {
+            if is_kind(c, Node.Bind_expr) or is_kind(c, Node.Defer_expr) {
+                t = check_statement(c, ty_void(), cx)
+                t = check_wutu_show_value(t, c, w_mark(), call_node, cx)
+            } else {
+                t = check_wutu_show_expr(c, call_node, cx)
+            }
+        } else {
+            let statement = check_statement(c, ty_void(), cx)
+            drop_value(statement)
+            if ty_is(statement, Ty.Never) { exits = true }
+            else if ty_is(statement, Ty.Error) and next < 0 { t = statement }
+        }
+        note_defer_guards(noted)
+        c = next
+    }
+    if exits {
+        t = ty_never()
+        if not cf_diverges(w_stack[w_mark() - 1]) { w_leaf(Op.Unreachable, vt_unreachable, 0, 0) }
+    } else if first_child(block) < 0 {
+        t = check_wutu_show_value(ty_void(), block, w_mark(), call_node, cx)
+    }
+    let vt = repr(t)
+    if defer_node.len() > defers and vt != vt_unreachable {
+        defers_after_value(vt, w_mark() - 1, defers, cx)
+    }
+    guard_defers(guards, vt, cx)
+    defer_node.resize(defers)
+    init_exit_flag(m, guards, reads)
+    defer_marks.resize(defer_marks.len() - 1)
+    w_node(Op.Seq, repr(t), 0, 0, m)
+    return t
+}
+
+/// Whether a non-null type `t` is valid inside a Wutu child hole.
+fn is_wutu_showable(t: I32) Bool {
+    if ty_is(t, Ty.Error) or ty_is(t, Ty.Never) { return true }
+    if ty_is(t, Ty.Nullable) { return is_wutu_showable(ty_a[t]) }
+    if shows_as_itself(t) or in_words(cks(Ckt.I32U32I64U64F32F64), type_text(t)) { return true }
+    if is_array_type(t) { return is_wutu_showable(vl_item(inst_args[ty_inst(t)], 0)) }
+    let component = promoted(prelude_lookup(intern_text(cks(Ckt.Component))))
+    return component >= 0 and (ty_decl(t) == component or implements(ty_decl(t), component))
+}
+
+/// Convert a value of type `rt` already on the stack at mark `m` to `Externref`.
+fn check_wutu_show_value(rt: I32, a: I32, m: I32, call_node: I32, cx: Cx) I32 {
+    let ext = prelude(Prelude.Externref)
+    if ty_is(rt, Ty.Error) or ty_is(rt, Ty.Never) { return rt }
     if in_words(cks(Ckt.I32U32I64U64F32F64), type_text(rt)) {
         str_of(rt, a, m, cx)
-        return prelude(Prelude.Str)
+        return ext
+    }
+    if ty_is(rt, Ty.Nullable) {
+        let inner = ty_a[rt]
+        if not is_wutu_showable(inner) {
+            report2(Diag.WutuHole, unspliced(a), -1, rt, -1)
+            return error_value()
+        }
+        if shows_as_itself(inner) { return ext }
+        // Nullable Component or Array: null renders nothing, non-null delegates.
+        let s = new_local(repr(rt))
+        w_node(Op.LocalSet, vt_none, s, 0, m)
+        let mi = w_mark()
+        w_leaf(Op.LocalGet, repr(rt), s, 0)
+        w_node(Op.RefIsNull, vt_i32, 0, 0, mi)
+        let mt = w_mark()
+        w_leaf(Op.RefNull, vt_externref, heap_of(vt_externref), 0)
+        w_node(Op.Seq, vt_externref, 0, 0, mt)
+        let me = w_mark()
+        w_leaf(Op.LocalGet, repr(rt), s, 0)
+        w_node(Op.RefAsNonNull, repr(inner), 0, 0, me)
+        check_wutu_show_value(inner, a, me, call_node, cx)
+        w_node(Op.Seq, vt_externref, 0, 0, me)
+        w_node(Op.If, vt_externref, new_label(), 0, mi)
+        w_node(Op.Seq, vt_externref, 0, 0, m)
+        return ext
     }
     if is_array_type(rt) {
         // Validate the element at the authored hole, before instantiating the
         // generic list renderer (whose body otherwise owns the diagnostic).
         let element = rt
         while (is_array_type(element)) { element = vl_item(inst_args[ty_inst(element)], 0) }
-        let protocol = promoted(prelude_lookup(intern_text(cks(Ckt.Component))))
-        let component_element = protocol >= 0 and (ty_decl(element) == protocol or implements(ty_decl(element), protocol))
-        if not shows_as_itself(element) and not in_words(cks(Ckt.I32U32I64U64F32F64), type_text(element)) and not component_element {
+        if not is_wutu_showable(element) {
             report2(Diag.WutuHole, unspliced(a), -1, element, -1)
             return error_value()
         }
-        let callee = first_child(node)
+        let callee = first_child(call_node)
         let module = node_decl[first_child(callee)]
         let decl = static_member(module, intern_text(cks(Ckt.ShowList)))
-        w_resize_stack(m)
-        return call_template(decl, args, m, node, cx)
+        let elem_t = vl_item(inst_args[ty_inst(rt)], 0)
+        let list = vl_begin()
+        vl_add(elem_t)
+        let inst = instance(decl, vl_end(list))
+        let fi = fn_instance(decl, inst)
+        return call_with(fi, -1, 1, m, call_node, cx)
     }
     let component = promoted(prelude_lookup(intern_text(cks(Ckt.Component))))
     let render = intern_text(cks(Ckt.Render))
     if component >= 0 and (ty_decl(rt) == component or implements(ty_decl(rt), component)) {
         if ty_decl(rt) == component {
-            return proto_call_named(rt, render, -1, -1, 0, m, node, cx)
+            return proto_call_named(rt, render, -1, -1, 0, m, call_node, cx)
         }
         let decl = impl_of(component, render, ty_decl(rt))
         if decl >= 0 {
             let fi = fn_instance(decl, ty_inst(rt))
             coerce(rt, vl_item(fi_params[fi], 0), a)
-            return call_with(fi, -1, 1, m, node, cx)
+            return call_with(fi, -1, 1, m, call_node, cx)
         }
     }
     if not shows_as_itself(rt) {
         report2(Diag.WutuHole, unspliced(a), -1, rt, -1)
         return error_value()
     }
-    return rt
+    coerce(rt, ext, a)
+    return ext
 }
 
 /// The node a splice holds (where it is written).
@@ -2958,14 +3099,14 @@ fn check_lazy_signature(fi: I32, site: I32) Void {
             diag_place(Extra.Related, if list >= 0 { nth_child(list, i) } else { decl_node[decl] }, cks(Ckt.DeclaredHere))
         }
     }
-    if not is_foreign(fi_result[fi]) {
+    if not is_foreign(fi_result[fi]) and fi_result[fi] != prelude(Prelude.Externref) {
         report2(Diag.LazyValue, at, decl_name[decl], fi_result[fi], 1)
         diag_place(Extra.Related, decl_node[decl], cks(Ckt.DeclaredHere))
     }
 }
 
 /// Whether a value of type t can cross into a chunk: a number, a Bool, a Str, or a host value.
-fn crosses_chunk(t: I32) Bool => in_words(cks(Ckt.I32U32I64U64F32F642), type_text(t)) or is_foreign(t)
+fn crosses_chunk(t: I32) Bool => in_words(cks(Ckt.I32U32I64U64F32F642), type_text(t)) or is_foreign(t) or t == prelude(Prelude.Externref)
 
 /// Whether the program imports host declarations (std:JS, npm:…).
 fn has_foreign() Bool {

@@ -484,7 +484,7 @@ class WutuParser {
   }
 
   failInterpolation() {
-    this.fail('Wutu no longer writes $[…]: an expression stands on its own (= expr for text, name = expr for an attribute, if cond {, prop: = expr)');
+    this.fail('Wutu no longer writes $[…]: an expression stands on its own (| value or |> expr for children, name = expr for an attribute, if cond {, prop: { expr })');
   }
 
   /** A brace-delimited Utu block, returned with its braces. */
@@ -637,15 +637,17 @@ class WutuParser {
       return { kind: 'text', expr, start };
     }
     if (this.at('$[')) this.failInterpolation();
-    if (this.text[this.p] === '=' || this.text[this.p] === '|') {
-      const sigil = this.at('|>') ? '|>' : this.text[this.p];
+    if (this.text[this.p] === '=') this.fail('child expressions use | value or |> expr, not = expr', start);
+    if (this.text[this.p] === '|') {
+      const sigil = this.at('|>') ? '|>' : '|';
       this.p += sigil.length;
       const { source, range } = this.readBareExpression();
       this.expectEnd();
-      return { kind: 'expression', expr: source, range, start, ...(sigil === '=' ? {} : { sigil }) };
+      return { kind: 'expression', expr: source, range, start, sigil };
     }
     if (this.peek(/if\s/y)) return this.parseIf();
     if (this.peek(/for\s/y)) return this.parseFor();
+    if (this.peek(/match\s/y)) return this.parseMatch();
     return this.parseElement();
   }
 
@@ -716,6 +718,42 @@ class WutuParser {
     };
   }
 
+  parseMatch() {
+    const start = this.p;
+    this.p += 'match'.length;
+    const scrutinee = this.readExpressionUntil('{', 'a match value before {');
+    this.skipTrivia();
+    const open = this.p;
+    if (this.text[this.p] !== '{') this.fail('expected {');
+    this.p++;
+    const arms = [];
+    for (;;) {
+      this.skipTrivia();
+      if (this.done) this.fail('unterminated match', open);
+      if (this.text[this.p] === '}') { this.p++; break; }
+      if (this.text[this.p] === ',' || this.text[this.p] === ';') { this.p++; continue; }
+      const armStart = this.p;
+      let pattern = null, patternRange = null;
+      if (this.at('~>')) {
+        this.p += 2;
+      } else {
+        const pstart = this.p;
+        while (!this.done && !this.at('=>')) {
+          const ch = this.text[this.p];
+          if (ch === '{' || ch === '}' || ch === '\n') this.fail('expected => after match pattern');
+          this.p++;
+        }
+        if (!this.at('=>')) this.fail('expected => after match pattern');
+        pattern = this.text.slice(pstart, this.p).trimEnd();
+        if (!pattern) this.fail('expected a pattern before =>', pstart);
+        patternRange = { start: pstart, end: pstart + pattern.length };
+        this.p += 2;
+      }
+      arms.push({ pattern, patternRange, children: this.parseBranch(), start: armStart });
+    }
+    return { kind: 'match', scrutinee: scrutinee.source, scrutineeRange: scrutinee.range, arms, start };
+  }
+
   parseElement() {
     const start = this.p;
     const head = this.peek(/[a-z][\w-]*/y);
@@ -775,7 +813,7 @@ class WutuParser {
       this.p++;
     } else if (this.at('$[')) {
       this.failInterpolation();
-    } else if (c === '"' || c === '=' || c === '|' || this.peek(/(if|for)\s/y)) {
+    } else if (c === '"' || c === '=' || c === '|' || this.peek(/(if|for|match)\s/y)) {
       node.children.push(this.parseNode());
     } else if ((match = this.peek(/bind:(value|checked|number|group|values|files)\s*=/y))) {
       const start = this.p;
@@ -951,13 +989,12 @@ class WutuParser {
     this.p++;
     this.skipTrivia();
     if (this.at('$[')) this.failInterpolation();
-    if (this.text[this.p] === '=' || this.text[this.p] === '{') {
-      const block = this.text[this.p] === '{';
-      if (!block) this.p++;
-      const expression = block ? this.readUtuBlock('computed CSS value') : this.readBareExpression();
+    if (this.text[this.p] === '=') this.fail('computed CSS values use prop: { expr }, not prop: = expr');
+    if (this.text[this.p] === '{') {
+      const expression = this.readUtuBlock('computed CSS value');
       this.expectEnd();
       this.cssPropertyKnown(head, start);
-      node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start, ...(block ? { block: true } : {}) });
+      node.styles.push({ property: head.trim(), value: expression.source, range: expression.range, start, block: true });
       return;
     }
     const valueFrom = this.p;

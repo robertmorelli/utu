@@ -8,6 +8,7 @@
 //! it renders once. (Stage 0 does not compile Wutu.)
 
 let wu_reconcile: I32 = 0
+let wu_has_browser: I32 = 0
 let wu_site: I32 = -1
 let wu_serial: I32 = 0
 let wu_node_count: I32 = 0
@@ -75,6 +76,16 @@ fn es_string(text: Str) Str {
 
 //! = A site
 
+/// The Source_file root containing `node` (walking past desugared wrappers).
+fn site_source_file(node: I32) I32 {
+    let p = node
+    while (p >= 0) {
+        if is_kind(p, Node.Source_file) { return p }
+        p = parent_of(p)
+    }
+    return file_root[file_of_token(node_first[node])]
+}
+
 /// Expand one `@wutu` site in place: a block that creates its elements,
 /// installs its CSS and attaches its listeners, and whose value is the root
 /// element. With `reconcile`, each element goes through `std:Wutu`'s
@@ -92,6 +103,7 @@ fn expand_wutu(site: I32) Void {
     wu_view_hash = intern_text(wutu_hash(whole))
     wu_site = site
     wu_reconcile = 1
+    wu_has_browser = if imports_browser(site_source_file(site)) { 1 } else { 0 }
     wu_node_count = 0
     wu_aliases.clear()
     wu_style_key.clear()
@@ -144,9 +156,10 @@ fn expand_wutu(site: I32) Void {
     let render = wus4(Wut.BraceSpaceASpaceBCSpaceDSemiSpaceBraceEnd, declarations, prelude, code, events)
     let value = render
     if tw_reactive == 1 {
-        let mount = wutu_helper(if fragment { wus(Wut.MountFragment) } else if svg { wus(Wut.MountSvg) } else { wus(Wut.Mount) })
+        let mount = wutu_helper(if wu_has_browser == 0 { wus(Wut.MountExt) } else if fragment { wus(Wut.MountFragment) } else if svg { wus(Wut.MountSvg) } else { wus(Wut.Mount) })
         let last = word_text(wu_decls[wu_decls.len() - 1])
-        value = wus4(Wut.ClReturn, last, mount, (if fragment { wus(Wut.BrowserDocumentFragment) } else if svg { wus(Wut.BrowserSVGElement) } else { wus(Wut.BrowserHTMLElementDot) }), render) + wus1(Wut.AClose, (if tw_scope >= 0 { word_text(tw_scope) } else { "\"\"" }))
+        let ret_t = if wu_has_browser == 0 { wus(Wut.ExternrefSpace) } else if fragment { wus(Wut.BrowserDocumentFragment) } else if svg { wus(Wut.BrowserSVGElement) } else { wus(Wut.BrowserHTMLElementDot) }
+        value = wus4(Wut.ClReturn, last, mount, ret_t, render) + wus1(Wut.AClose, (if tw_scope >= 0 { word_text(tw_scope) } else { "\"\"" }))
     }
     graft_expression(site, wus1(Wut.WutuInit, value))
 }
@@ -409,8 +422,11 @@ fn wutu_helper(kind: Str) Str {
         params = "Bool"
         js = wus(Wut.VGlobalThisUtuWutuPutV)
     } else if kind == "on" {
-        params = wus(Wut.ClBrowserEventVoid)
+        params = if wu_has_browser == 1 { wus(Wut.ClBrowserEventVoid) } else { wus(Wut.ClExternrefVoid) }
         js = wus(Wut.VGlobalThisUtuWutuPutV)
+    } else if kind == wus(Wut.PreventDefault) {
+        params = wus(Wut.Externref)
+        js = wus(Wut.EPreventDefault)
     } else if kind == wus(Wut.Begin) {
         params = "Str"
         js = wus(Wut.PGlobalThisUtuWutuBeginP)
@@ -466,6 +482,10 @@ fn wutu_helper(kind: Str) Str {
         params = wus(Wut.ClBrowserSVGElementStr)
         result = "Browser.SVGElement"
         js = wus(Wut.FKGlobalThisUtuWutuMountF)
+    } else if kind == wus(Wut.MountExt) {
+        params = wus(Wut.ClExternrefStr)
+        result = "Externref"
+        js = wus(Wut.FKGlobalThisUtuWutuMountF)
     } else if kind == wus(Wut.MemoHit) {
         // A reused hole (see memo_reuse): its key's last element, if it is unchanged.
         params = "Str"
@@ -504,7 +524,7 @@ fn wutu_typed_fn(entry: Str, tag: Str, svg: Bool) Str {
     let kind = wus3(Wut.AXBC, entry, (if svg { wus(Wut.Svg) } else { "" }), tag)
     let w = intern_text(kind)
     for (0 ..< wu_declared_kind.len()) |k| { if wu_declared_kind[k] == w { return word_text(wu_declared_name[k]) } }
-    let type = if tag == wus(Wut.Fragment) { "Browser.DocumentFragment" } else if svg { "Browser.SVGElement" } else { wus1(Wut.BrowserHTMLElement, element_interface(tag)) }
+    let type = if entry == "done" and wu_has_browser == 0 { "Externref" } else if tag == wus(Wut.Fragment) { "Browser.DocumentFragment" } else if svg { "Browser.SVGElement" } else { wus1(Wut.BrowserHTMLElement, element_interface(tag)) }
     let name = wutu_prefix() + ident_part(kind)
     wu_decls.push(intern_text(wus3(Wut.LetFunEsGlobalThisUtuWutu, name, type, entry)))
     wu_declared_kind.push(w)
@@ -581,7 +601,7 @@ vec wx_event_ops: I32
 /// -1 for none) is the event, typed as HTMLElementEventMap types it (`on
 /// click |e|` gets a MouseEvent). `on submit` also prevents navigation.
 fn event_listener(name: Str, handler: Str, param: I32) Str {
-    let prevent = if name == wus(Wut.Submit) { wus(Wut.WutuEventPreventDefault) } else { "" }
+    let prevent = if name == wus(Wut.Submit) { wus1(Wut.PreventCall, wutu_helper(wus(Wut.PreventDefault))) } else { "" }
     let type = event_type(name)
     if param < 0 { return wus2(Wut.ClWutuEventVoid, prevent, handler) }
     let e = word_text(param)
@@ -985,6 +1005,29 @@ fn wd_child(child: I32, svg: Bool, o: WOps) Str {
         return wus4(Wut.If1Else0, condition, wutu_helper(wus(Wut.Arm)), a, wutu_helper(wus(Wut.Arm))) + wus1(Wut.ASpaceBraceEndSemiNl, b)
     }
     if kind == 3 { return wd_loop(child, svg, o) }
+    if kind == 6 {
+        let scrutinee = wutu_island(word_text(tn_text[child]), tn_from[child], tn_to[child], child)
+        let arm_fn = wutu_helper(wus(Wut.Arm))
+        let arms_ops = ""
+        let arms_code = ""
+        let idx = 0
+        let a = tn_first[child]
+        while (a >= 0) {
+            let aops = WOps { text: "" }
+            let acode = wd_fragment(tn_first[a], svg, aops)
+            if idx > 0 { arms_ops = wus2(Wut.ACommaB, arms_ops, wus1(Wut.BracketABracketEnd, aops.text)) }
+            else { arms_ops = wus1(Wut.BracketABracketEnd, aops.text) }
+            if tn_text[a] >= 0 {
+                arms_code = arms_code + wus4(Wut.MatchArmCode, word_text(tn_text[a]), arm_fn, int_text(idx), acode)
+            } else {
+                arms_code = arms_code + wus3(Wut.MatchDefCode, arm_fn, int_text(idx), acode)
+            }
+            idx += 1
+            a = tn_next[a]
+        }
+        wd_op(o, wus1(Wut.KMatch, arms_ops))
+        return wus2(Wut.MatchStmt, scrutinee, arms_code)
+    }
     // Written text is data; another value is a hole (with a call key, for
     // the elements a component it calls makes).
     let source = word_text(tn_text[child])
@@ -1350,6 +1393,17 @@ enum(U16) Wut:
     | FilesLc
     | Change
     | WBracketQuoteQuot
+    | MountExt
+    | ExternrefSpace
+    | ClExternrefVoid
+    | ClExternrefStr
+    | PreventDefault
+    | EPreventDefault
+    | PreventCall
+    | KMatch
+    | MatchStmt
+    | MatchArmCode
+    | MatchDefCode
 
 fn wus_src(t: Wut) Str {
     return match t {
@@ -1609,6 +1663,17 @@ fn wus_src(t: Wut) Str {
         Wut.FilesLc => "files",
         Wut.Change => "change",
         Wut.WBracketQuoteQuot => "[\"w\"]",
+        Wut.MountExt => "mount_ext",
+        Wut.ExternrefSpace => "Externref ",
+        Wut.ClExternrefVoid => "cl(Externref) Void",
+        Wut.ClExternrefStr => "cl() Externref, Str",
+        Wut.PreventDefault => "prevent_default",
+        Wut.EPreventDefault => "(e)=>e.preventDefault()",
+        Wut.PreventCall => "{0}(__wutu_event);",
+        Wut.KMatch => "[\"k\",[{0}]]",
+        Wut.MatchStmt => "match ({0}) { {1} };\n",
+        Wut.MatchArmCode => "{0} => { {1}({2}); {3} }, ",
+        Wut.MatchDefCode => "~> { {0}({1}); {2} }, ",
     }
 }
 

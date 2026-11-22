@@ -15,10 +15,10 @@ fn workspace(state: MeterState) Browser.HTMLElement {
             article.panel.stack {
                 div.bar {
                     h2 {
-                        = habit.name
+                        | habit.name
                     }
                     p {
-                        = wutu.number(habit.days count_where |done| {
+                        |> wutu.number(habit.days count_where |done| {
                             done
                         })+" / 7"
                     }
@@ -28,7 +28,7 @@ fn workspace(state: MeterState) Browser.HTMLElement {
                         button {
                             aria-label = habit.name+" day "+wutu.number(index.i64().i32()+1)
                             aria-pressed = if habit.days[index.i64().i32()] {"true" } else {"false" }
-                            = day
+                            | day
                             on click {
                                 let i=index.i64().i32()
                                 habit.days[i]=not habit.days[i]
@@ -100,14 +100,14 @@ main {
                 "A weekly rhythm you choose yourself. Tap a day, keep your streak in perspective, and start again when you need to."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }

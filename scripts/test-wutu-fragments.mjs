@@ -21,12 +21,12 @@ struct State:
     | visible: Bool
     | reverse: Bool
 let state: State = State { visible: false, reverse: false }
-wn pair(n: I32) { input { .value = n.str() }; span { = n } }
+wn pair(n: I32) { input { .value = n.str() }; span { | n } }
 wn island() {
     @island "details"
     if state.visible { em { "island first" }; em { "island second" } }
 }
-wn app() {
+fn app() Browser.DocumentFragment => @wutu/\\
     @reactive
     button#toggle { "toggle"; on click { state.visible = not state.visible; wutu.invalidate("details") } }
     button#reverse { "reverse"; on click { state.reverse = not state.reverse } }
@@ -34,7 +34,7 @@ wn app() {
     |> island()
     if state.visible { b { "visible first" }; b { "visible second" } }
     section { width: { if state.reverse { "20px" } else { "10px" } }; |> deferred.page() }
-}
+\\/
 main { Browser.document.body.append(app()) }
 `);
   const out = path.join(dir, 'out');

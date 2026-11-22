@@ -95,6 +95,8 @@ fn arm_slot(v: I64) I32 {
 /// `match e { p => a, …, ~> d }` and `loop match`.
 fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     let looping = is_kind(node, Node.Loop_match_expr)
+    let show_call = if looping { -1 } else { wutu_show_call }
+    wutu_show_call = -1
     let scrutinee = first_child(node)
     let m = w_mark()
     let st = check_expr(scrutinee, -1, cx)
@@ -177,7 +179,7 @@ fn check_match(node: I32, expect: I32, cx: Cx) I32 {
     if looping {
         t = loop_match(s, st, first_arm, last_arm, default_, cx)
     } else {
-        t = dispatch(s, st, first_arm, last_arm, default_, want_t, cx, false)
+        t = dispatch(s, st, first_arm, last_arm, default_, want_t, cx, false, show_call)
     }
     arm_nodes.resize(first_arm)
     arm_values.resize(first_arm)
@@ -229,7 +231,7 @@ fn match_exhaustive(node: I32, st: I32, first_arm: I32, last_arm: I32) Void {
 /// end
 /// ```
 /// Others, a chain of ifs.
-fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool) I32 {
+fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool, show_call: I32) I32 {
     let vt = repr(st)
     let n = last - first
     let lo: I64 = 0
@@ -243,7 +245,7 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
     // about 5, and the table a byte per value from lo to hi).
     let values = hi - lo + 1.i64()
     let dense = vt == vt_i32 and n >= 3 and (if optimize_level == 1 { values < (n * 4 - 8).i64() } else { hi - lo < (n * 3 + 8).i64() })
-    if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop) }
+    if not dense { return arm_chain(s, st, first, last, default_, expect, cx, in_loop, show_call) }
     let end_ = new_label()
     let def = new_label()
     // In a loop match a speed build lays the arms out twice (see @threaded_continue).
@@ -282,14 +284,14 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
         // Close arm p's block, then its code.
         w_node(Op.Block, vt_none, labels[p], 0, marks[total - 1 - p])
         if in_loop { loop_matches[lm + 8] = p }
-        let arm_t = arm_body(arm_nodes[first + p % n], if expect >= 0 { expect } else { t }, cx, in_loop)
+        let arm_t = arm_body(arm_nodes[first + p % n], if expect >= 0 { expect } else { t }, cx, in_loop, show_call)
         if arm_t >= 0 { t = arm_t }
         if not in_loop { w_node(Op.Br, vt_unreachable, end_, 0, w_mark() - 1) }
         else { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0) }
     }
     loop_matches.resize(lm)
     w_node(Op.Block, vt_none, def, 0, m_def)
-    let default_t = default_body(default_, if expect >= 0 { expect } else { t }, cx, in_loop)
+    let default_t = default_body(default_, if expect >= 0 { expect } else { t }, cx, in_loop, show_call)
     if default_t >= 0 { t = default_t }
     let result = if t >= 0 { t } else { ty_never() }
     w_node(Op.Block, repr(result), end_, 0, m_end)
@@ -298,11 +300,16 @@ fn dispatch(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, 
 
 /// An arm's expression as the match's value (or dropped in a loop match).
 /// `t` is the result so far (-1 when not yet known); returns it.
-fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
+fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool, show_call: I32) I32 {
     let e = last_child(arm)
     if in_loop {
         discard(check_expr(e, ty_void(), cx))
         return t
+    }
+    if show_call >= 0 {
+        let actual = check_wutu_show_expr(e, show_call, cx)
+        if ty_is(actual, Ty.Never) { return -1 }
+        return prelude(Prelude.Externref)
     }
     let actual = check_expr(e, t, cx)
     if ty_is(actual, Ty.Never) and t >= 0 and ty_is(t, Ty.Void) { return -1 }
@@ -315,18 +322,18 @@ fn arm_body(arm: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
 }
 
 /// The default arm, as @arm_body does an arm (`unreachable` when there is none).
-fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool) I32 {
+fn default_body(default_: I32, t: I32, cx: Cx, in_loop: Bool, show_call: I32) I32 {
     if default_ < 0 {
         // Every value has an arm; another can only come from Tag(i).
         w_leaf(Op.Unreachable, vt_unreachable, 0, 0)
         return if in_loop { t } else { -1 }
     }
-    return arm_body(default_, t, cx, in_loop)
+    return arm_body(default_, t, cx, in_loop, show_call)
 }
 
 /// Arms `first` to `last` as a chain of ifs comparing `s` with each value, the
 /// default last.
-fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool) I32 {
+fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32, cx: Cx, in_loop: Bool, show_call: I32) I32 {
     // A loop, not a recursion: a match may have thousands of arms. By arm:
     // its mark, its else's mark, and its type (-1 when never); each `if` is
     // closed after the arms past it, innermost first.
@@ -339,7 +346,7 @@ fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32,
         ms[k - first] = w_mark()
         push_pattern_test(s, st, arm_values[k])
         let mt = w_mark()
-        let t = arm_body(arm_nodes[k], if in_loop { ty_void() } else { exp }, cx, in_loop)
+        let t = arm_body(arm_nodes[k], if in_loop { ty_void() } else { exp }, cx, in_loop, show_call)
         if in_loop { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0) }
         let tt = if t >= 0 { t } else { ty_never() }
         w_node(Op.Seq, repr(tt), 0, 0, mt)
@@ -348,7 +355,7 @@ fn arm_chain(s: I32, st: I32, first: I32, last: I32, default_: I32, expect: I32,
         if t >= 0 { exp = t }
     }
     let m = w_mark()
-    let t = default_body(default_, if in_loop { ty_void() } else { exp }, cx, in_loop)
+    let t = default_body(default_, if in_loop { ty_void() } else { exp }, cx, in_loop, show_call)
     if in_loop and default_ >= 0 { w_leaf(Op.Br, vt_unreachable, loop_break[loop_break.len() - 1], 0) }
     let result = if t >= 0 { t } else { ty_never() }
     w_node(Op.Seq, repr(result), 0, 0, m)
@@ -378,7 +385,7 @@ fn loop_match(s: I32, st: I32, first: I32, last: I32, default_: I32, cx: Cx) I32
     let m = w_mark()
     let ml = w_mark()
     enter_loop(brk, top, s, st)
-    dispatch(s, st, first, last, default_, -1, cx, true)
+    dispatch(s, st, first, last, default_, -1, cx, true, -1)
     leave_loop()
     w_node(Op.Loop, vt_none, top, 0, ml)
     w_node(Op.Block, vt_none, brk, 0, m)

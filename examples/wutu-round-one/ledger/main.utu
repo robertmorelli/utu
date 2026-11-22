@@ -33,7 +33,7 @@ fn ledger_form(state: LedgerState) Browser.HTMLElement {
         }
         p {
             role = "status"
-            = if amount.text.len()>0 {
+            |> if amount.text.len()>0 {
                 amount.error(0.01,10000.0)
             }
             else {
@@ -63,7 +63,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
     return @wutu/\
     @island "ledger-workspace"
     section.workspace {
-        = ledger_form(state)
+        |> ledger_form(state)
         div.grid {
             article.well.stack {
                 p.eyebrow {
@@ -78,7 +78,7 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
                     "REMAINING"
                 }
                 strong.big {
-                    = wutu.money(50000-(state.purchases map |p| {
+                    |> wutu.money(50000-(state.purchases map |p| {
                         p.cents
                     }
                     sum))
@@ -88,11 +88,11 @@ fn workspace(state: LedgerState) Browser.HTMLElement {
         for state.purchases |purchase,index| {
             article.panel.bar {
                 h3 {
-                    = purchase.title
+                    | purchase.title
                 }
                 div.bar {
                     strong {
-                        = wutu.money(purchase.cents)
+                        |> wutu.money(purchase.cents)
                     }
                     button {
                         aria-label = "Remove "+purchase.title
@@ -151,14 +151,14 @@ main {
                 "A simple monthly spending notebook. Set a limit, record purchases, and see what remains before the next one."
             }
         }
-        = workspace(state)
+        |> workspace(state)
         footer {
             p {
                 "Stored on this device. Built with Utu + Wutu."
             }
             p {
                 role = "status"
-                = wutu.storage_error()
+                |> wutu.storage_error()
             }
         }
     }
