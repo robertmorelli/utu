@@ -129,6 +129,7 @@ fn inline_into(f: I32) Void {
         let forced = func_inline[g] == 1
         if g != f and inlinable(g) and inl_state[g] == 2 and node_holders[c] == 1 and func_inline[g] != 2
             and (forced or inl_forced_only[0] == 0)
+            and (forced or luge_all == 0 or not looped[i] or not has_op(func_body[g], Op.Loop.i32()))
             and not has_op(func_body[g], Op.MemoryGrow.i32())
             and (forced or (size + inl_size[g] <= inline_caller_nodes
                 and (inl_size[g] <= inline_always_nodes or (looped[i] and inl_size[g] <= inline_loop_nodes)
@@ -1329,7 +1330,10 @@ fn sm_move_all() Bool {
     sm_gone = 0
     // (1: moves; 2: stays; 3: moved.)
     sm_state.resize(n)
-    for (0 ..< n) |g| { sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and func_inline[g] != 2 and sm_movable(g) { 1 } else { 2 } }
+    for (0 ..< n) |g| {
+        let keep_for_luge = luge_all == 1 and func_inline[g] != 1 and func_body[g] >= 0 and has_op(func_body[g], Op.Loop.i32())
+        sm_state[g] = if sm_count[g] == 1 and sm_bad[g] == 0 and func_inline[g] != 2 and not keep_for_luge and sm_movable(g) { 1 } else { 2 }
+    }
     sm_size.resize(n)
     for (0 ..< n) |f| { sm_size[f] = if sm_cap > 0 and func_live[f] == 1 { sm_body_nodes[f] } else { 0 } }
     let any = false
@@ -2036,3 +2040,289 @@ fn leb_len(v: I32) I32 => 1 + (31 - I32.clz(v | 1)) / 7
 
 /// Signed LEB128 needs a sign bit after the bits that differ from the sign.
 fn sleb_len(v: I32) I32 => 1 + (32 - I32.clz(v ^ (v >> 31))) / 7
+
+//! = Loop tier-up outlining (-O fast)
+//!
+//! V8 (Liftoff -> TurboFan) has no Wasm loop OSR: a hot loop that runs once
+//! stays in Liftoff until its function returns. Outlining an outermost loop
+//! into a `#noinline` helper with an exponential-backoff `return_call` to
+//! itself (`cnt == next`, `next <<= 1`) crosses the jump table every
+//! 1024, 2048, 4096, ... iterations so TurboFan takes over mid-run.
+
+vec tl_cands_parent: I32
+vec tl_cands_kid: I32
+vec tl_cands_reg: I32
+vec tl_cands_loop: I32
+vec tl_cands_depth: I32
+vec tl_labels: I32
+vec tl_in_read: I32
+vec tl_in_write: I32
+vec tl_out_read: I32
+vec tl_out_write: I32
+vec tl_params: I32
+vec tl_outs: I32
+vec tl_priv: I32
+vec tl_map: I32
+let tl_nodes: I32 = 0
+let tl_inner_loops: I32 = 0
+let tl_bad: I32 = 0
+let tl_seen: I32 = 0
+
+fn tl_local_type(f: I32, x: I32) I32 {
+    let plist = ht_a[func_type_of[f]]
+    let np = vl_len[plist]
+    if x < np { return vl_item(plist, x) }
+    return local_types[func_locals[f] + (x - np)]
+}
+
+fn tl_find(n: I32, parent: I32, kid: I32, depth: I32) Void {
+    let op = w_op[n]
+    if op == Op.Block.i32() and w_type[n] == vt_none and w_count[n] == 1 {
+        let inner = w_kid(n, 0)
+        if w_op[inner] == Op.Loop.i32() and w_type[inner] == vt_none {
+            tl_cands_parent.push(parent)
+            tl_cands_kid.push(kid)
+            tl_cands_reg.push(n)
+            tl_cands_loop.push(inner)
+            tl_cands_depth.push(depth)
+            for (0 ..< w_count[inner]) |i| { tl_find(w_kid(inner, i), inner, i, depth + 1) }
+            return
+        }
+    }
+    if op == Op.Loop.i32() {
+        if w_type[n] == vt_none {
+            tl_cands_parent.push(parent)
+            tl_cands_kid.push(kid)
+            tl_cands_reg.push(n)
+            tl_cands_loop.push(n)
+            tl_cands_depth.push(depth)
+        }
+        for (0 ..< w_count[n]) |i| { tl_find(w_kid(n, i), n, i, depth + 1) }
+        return
+    }
+    if op == Op.Try.i32() or op == Op.CastArms.i32() { return }
+    for (0 ..< w_count[n]) |i| { tl_find(w_kid(n, i), n, i, depth) }
+}
+
+fn tl_scan_in(n: I32, root_loop: I32) Void {
+    tl_nodes += 1
+    let op = w_op[n]
+    if op == Op.Loop.i32() and n != root_loop { tl_inner_loops += 1 }
+    if op == Op.Return.i32() or op == Op.ReturnCall.i32() or op == Op.Rethrow.i32()
+        or op == Op.Held.i32() or op == Op.Try.i32() {
+        tl_bad = 1
+        return
+    }
+    if (op == Op.Block.i32() or op == Op.Loop.i32() or op == Op.If.i32()) and w_a[n] > 0 {
+        tl_labels.push(w_a[n])
+    }
+    if op == Op.LocalGet.i32() {
+        tl_in_read[w_a[n]] += 1
+    } else if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
+        tl_in_write[w_a[n]] += 1
+    }
+    for (0 ..< w_count[n]) |i| { tl_scan_in(w_kid(n, i), root_loop) }
+}
+
+fn tl_has_label(lbl: I32) Bool {
+    for (0 ..< tl_labels.len()) |i| { if tl_labels[i] == lbl { return true } }
+    return false
+}
+
+fn tl_check_br(n: I32) Void {
+    if tl_bad != 0 { return }
+    let op = w_op[n]
+    if op == Op.Br.i32() or op == Op.BrIf.i32() {
+        if not tl_has_label(w_a[n]) { tl_bad = 1; return }
+    } else if op == Op.BrTable.i32() {
+        for (0 ..< w_b[n]) |i| {
+            if not tl_has_label(w_aux[w_a[n] + i]) { tl_bad = 1; return }
+        }
+    }
+    for (0 ..< w_count[n]) |i| { tl_check_br(w_kid(n, i)) }
+}
+
+fn tl_scan_out(n: I32, skip: I32) Void {
+    if n == skip { tl_seen += 1; return }
+    let op = w_op[n]
+    if op == Op.LocalGet.i32() {
+        tl_out_read[w_a[n]] += 1
+    } else if op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
+        tl_out_write[w_a[n]] += 1
+    }
+    for (0 ..< w_count[n]) |i| { tl_scan_out(w_kid(n, i), skip) }
+}
+
+fn tl_clone(n: I32, target_loop: I32, inject: I32) I32 {
+    let op = w_op[n]
+    let a = w_a[n]
+    if op == Op.LocalGet.i32() or op == Op.LocalSet.i32() or op == Op.LocalTee.i32() {
+        a = tl_map[a]
+    }
+    let count = w_count[n]
+    let extra = if n == target_loop { 1 } else { 0 }
+    let first = w_kid_end()
+    for (0 ..< count + extra) |i| { w_append_kid(-1) }
+    if extra == 1 { w_kids[first] = inject }
+    for (0 ..< count) |i| {
+        let kid = tl_clone(w_kid(n, i), target_loop, inject)
+        w_kids[first + extra + i] = kid
+    }
+    let vt = w_type[n]
+    if vt >= vt_tuple { func_type(vl_empty(), vt - vt_tuple) }
+    return add_ir(op, vt, a, w_b[n], first, count + extra, w_src[n], -1)
+}
+
+fn tierup_loops() Bool {
+    if comptime_fuel >= 0 { return false }
+    let orig_funcs = func_kind.len()
+    let outlined = false
+    for (0 ..< orig_funcs) |f| {
+        if not optimizable(f) { continue }
+        tl_cands_parent.clear()
+        tl_cands_kid.clear()
+        tl_cands_reg.clear()
+        tl_cands_loop.clear()
+        tl_cands_depth.clear()
+        tl_find(func_body[f], -1, 0, 0)
+        if tl_cands_reg.len() == 0 { continue }
+        let np = vl_len[ht_a[func_type_of[f]]]
+        let total = np + func_local_count[f]
+        tl_in_read.resize(total)
+        tl_in_write.resize(total)
+        tl_out_read.resize(total)
+        tl_out_write.resize(total)
+        tl_map.resize(total)
+        for (0 ..< tl_cands_reg.len()) |ci| {
+            let parent = tl_cands_parent[ci]
+            let kid = tl_cands_kid[ci]
+            let reg = tl_cands_reg[ci]
+            let lp = tl_cands_loop[ci]
+            let depth = tl_cands_depth[ci]
+            for (0 ..< total) |x| {
+                tl_in_read[x] = 0
+                tl_in_write[x] = 0
+                tl_out_read[x] = 0
+                tl_out_write[x] = 0
+                tl_map[x] = -1
+            }
+            let forced = loop_luge_directive(w_src[lp]) or loop_luge_directive(w_src[reg])
+            if not forced and optimize_level != 2 and luge_all == 0 { continue }
+            tl_labels.clear()
+            tl_nodes = 0
+            tl_inner_loops = 0
+            tl_bad = 0
+            tl_scan_in(reg, lp)
+            // Skip tiny leaf loops (which pay for cnt == next on warm runs)
+            // and leaf loops nested inside another loop (called per outer iter),
+            // unless explicitly forced with `#luge`.
+            if tl_bad != 0 { continue }
+            if not forced and tl_inner_loops == 0 and (depth > 0 or tl_nodes < 80) { continue }
+            tl_check_br(reg)
+            if tl_bad != 0 { continue }
+            tl_seen = 0
+            tl_scan_out(func_body[f], reg)
+            if tl_seen != 1 { continue }
+
+            tl_params.clear()
+            tl_outs.clear()
+            tl_priv.clear()
+            for (0 ..< total) |x| {
+                if tl_in_read[x] == 0 and tl_in_write[x] == 0 { continue }
+                let vt = tl_local_type(f, x)
+                let shared = x < np or tl_out_read[x] > 0 or tl_out_write[x] > 0
+                if non_null(vt) {
+                    if shared and x >= np { tl_bad = 1; break }
+                    if shared {
+                        tl_params.push(x)
+                        if tl_in_write[x] > 0 and tl_out_read[x] > 0 { tl_outs.push(x) }
+                    } else {
+                        tl_priv.push(x)
+                    }
+                } else {
+                    tl_params.push(x)
+                    if tl_in_write[x] > 0 and tl_out_read[x] > 0 { tl_outs.push(x) }
+                }
+            }
+            if tl_bad != 0 or tl_params.len() > 14 { continue }
+
+            // Build helper signature: (params..., next: i32) -> (outs...)
+            let pm = vl_begin()
+            for (0 ..< tl_params.len()) |i| { vl_add(tl_local_type(f, tl_params[i])) }
+            vl_add(vt_i32)
+            let pvl = vl_end(pm)
+            let rm = vl_begin()
+            for (0 ..< tl_outs.len()) |i| { vl_add(tl_local_type(f, tl_outs[i])) }
+            let rvl = vl_end(rm)
+            let rvt = if tl_outs.len() == 0 { vt_none } else if tl_outs.len() == 1 { tl_local_type(f, tl_outs[0]) } else { vt_tuple_of(rvl) }
+            let g = new_func(FuncKind.Defined, func_type(pvl, rvl))
+            func_inline[g] = 2
+            func_src[g] = func_src[f]
+            let next_idx = tl_params.len()
+            let cnt_idx = add_local(g, vt_i32)
+            for (0 ..< tl_params.len()) |i| { tl_map[tl_params[i]] = i }
+            for (0 ..< tl_priv.len()) |i| { tl_map[tl_priv[i]] = add_local(g, tl_local_type(f, tl_priv[i])) }
+
+            // Build tier-up check: if ((cnt = cnt + 1) == next) return_call g(params..., next << 1)
+            let m_if = w_mark()
+            let m_eq = w_mark()
+            let m_tee = w_mark()
+            let m_add = w_mark()
+            w_get(vt_i32, cnt_idx)
+            w_i32(1)
+            w_i32_op(i32_add, m_add)
+            w_node(Op.LocalTee, vt_i32, cnt_idx, 0, m_tee)
+            w_get(vt_i32, next_idx)
+            w_i32_op(i32_eq, m_eq)
+            let m_rc = w_mark()
+            for (0 ..< tl_params.len()) |i| { w_get(tl_local_type(f, tl_params[i]), i) }
+            let m_shl = w_mark()
+            w_get(vt_i32, next_idx)
+            w_i32(1)
+            w_i32_op(i32_shl, m_shl)
+            w_node(Op.ReturnCall, vt_unreachable, g, 0, m_rc)
+            let inject = w_node(Op.If, vt_none, 0, 0, m_if)
+            w_pop()
+
+            // Clone loop body with check prepended, followed by live-out returns
+            let cloned = tl_clone(reg, lp, inject)
+            if tl_outs.len() == 0 {
+                func_body[g] = cloned
+            } else {
+                let mb = w_mark()
+                w_push(cloned)
+                for (0 ..< tl_outs.len()) |i| {
+                    let x = tl_outs[i]
+                    w_get(tl_local_type(f, x), tl_map[x])
+                }
+                func_body[g] = w_node(Op.Seq, rvt, 0, 0, mb)
+                w_pop()
+            }
+
+            // Replace loop in caller with call g(params..., 1024) + unpack outs
+            let mr = w_mark()
+            let mc = w_mark()
+            for (0 ..< tl_params.len()) |i| { w_get(tl_local_type(f, tl_params[i]), tl_params[i]) }
+            w_i32(1024)
+            w_node(Op.Call, rvt, g, 0, mc)
+            let repl = -1
+            if tl_outs.len() == 0 {
+                repl = w_pop()
+            } else if tl_outs.len() == 1 {
+                repl = w_node(Op.LocalSet, vt_none, tl_outs[0], 0, mr)
+                w_pop()
+            } else {
+                let k = tl_outs.len()
+                while (k > 0) {
+                    k -= 1
+                    w_leaf(Op.LocalSet, vt_none, tl_outs[k], 0)
+                }
+                repl = w_node(Op.Seq, vt_none, 0, 0, mr)
+                w_pop()
+            }
+            if parent < 0 { func_body[f] = repl } else { w_kids[w_first[parent] + kid] = repl }
+            outlined = true
+        }
+    }
+    return outlined
+}

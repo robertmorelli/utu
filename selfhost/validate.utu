@@ -140,13 +140,20 @@ fn validate_program() Void {
 //! when it is #cache's (0, no bound, or a power of 2), and is given once; a
 //! function is not both #inline and #noinline.
 
-/// What a directive's name says: 0 unknown, 1 `#inline`, 2 `#noinline`, 3 `#cache`.
+/// What a directive's name says: 0 unknown, 1 `#inline`, 2 `#noinline`, 3 `#cache`, 4 `#luge`.
 fn directive_kind(d: I32) I32 {
     let w = word_text(word_of(first_child(d)))
     if w == "inline" { return 1 }
     if w == "noinline" { return 2 }
     if w == "cache" { return 3 }
+    if w == "luge" { return 4 }
     return 0
+}
+
+fn is_loop_node(n: I32) Bool {
+    if n < 0 { return false }
+    let k = node_kind[n]
+    return k == Node.While_expr.i32() or k == Node.For_expr.i32() or k == Node.Loop_match_expr.i32()
 }
 
 /// A `#cache` directive's size: 256 when it gives none, 0 for no bound, or
@@ -171,9 +178,14 @@ fn validate_directive(k: I32) Void {
     let d = dir_node[k]
     let w = word_of(first_child(d))
     let kind = directive_kind(d)
-    if kind == 0 {
+    let on_loop = is_loop_node(dir_fn[k])
+    if kind == 0 or (on_loop and kind != 4) or (not on_loop and kind == 4) {
         report2(Diag.InvalidDirective, d, w, DirectiveRule.Unknown.i32(), -1)
-        diag_note("A function's directives are #inline, #noinline, #cache, and #cache(N)")
+        if on_loop {
+            diag_note("A loop's directive is #luge")
+        } else {
+            diag_note("A function's directives are #inline, #noinline, #cache, and #cache(N)")
+        }
         return
     }
     if kind != 3 and next_sibling(first_child(d)) >= 0 {
@@ -226,6 +238,23 @@ fn fn_cache_directive(item: I32) I32 {
         }
     }
     return -1
+}
+
+/// Whether loop syntax node `n` has a `#luge` directive.
+fn loop_luge_directive(n: I32) Bool {
+    if n < 0 { return false }
+    for (0 ..< dir_node.len()) |k| {
+        if dir_fn[k] == n and directive_kind(dir_node[k]) == 4 { return true }
+    }
+    return false
+}
+
+/// Whether any loop in the program has a `#luge` directive.
+fn has_luge_directives() Bool {
+    for (0 ..< dir_node.len()) |k| {
+        if directive_kind(dir_node[k]) == 4 { return true }
+    }
+    return false
 }
 
 //! = Modules of one name

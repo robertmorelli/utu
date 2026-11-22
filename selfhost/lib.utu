@@ -249,6 +249,9 @@ lib {
     /// How builds are optimized: 0 none, 1 size (the default), 2 speed.
     fn set_optimize(level: I32) Void { optimize_level = level }
 
+    /// Whether to run loop tier-up outlining even at -O small (--luge).
+    fn set_luge(on: I32) Void { luge_all = on }
+
     /// -O small moves a function called once into its caller, a body
     /// growing to at most this many nodes (0, the default: any).
     fn set_move_limit(nodes: I32) Void { sm_cap = nodes }

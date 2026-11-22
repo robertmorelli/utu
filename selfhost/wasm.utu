@@ -1803,6 +1803,7 @@ fn encode_module() I32 {
     if optimize_level != 0 and struct_returns() { sweep() }
     finish_mems()
     if optimize_level != 0 { optimize_module() }
+    if (optimize_level == 2 or luge_all == 1 or has_luge_directives()) and tierup_loops() { sweep() }
     write_host_json()
     assign_indices()
     out.clear()
@@ -1848,6 +1849,9 @@ export mem host_json: U8
 /// Whether the module carries a name section (function names for stack
 /// traces): off unless asked for, as stage 0 has none.
 let debug_names: I32 = 0
+
+/// Whether to outline loops with exponential-backoff return_call even at -O small (--luge).
+let luge_all: I32 = 0
 
 //! = Source maps
 //!

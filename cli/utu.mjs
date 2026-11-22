@@ -155,8 +155,10 @@ async function main() {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', ['utu build FILE --blame writes NAME.blame.json and NAME.blame.html.']);
     } else if (arg === '--source-map') {
       if (command !== 'build') fail(`${arg} is only for build`, 'unknown-option', [`utu ${command} places traps by a map in every mode but the unsafe ones.`]);
+    } else if (arg === '--luge') {
+      // accepted for build/run/test/wat
     } else if (arg.startsWith('-') && arg !== '-') {
-      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map, --blame, --target browser|node, --profile [--interval ms]']);
+      fail(`Unknown option ${arg}`, 'unknown-option', ['-O small|fast|smallUnsafe|fastUnsafe|debug, -o dir, --source-map, --blame, --luge, --target browser|node, --profile [--interval ms]']);
     } else files.push(arg);
   }
   if (!files.length) fail('No file', 'missing-file', [], `utu ${command} <file.utu>`);
@@ -179,7 +181,7 @@ async function main() {
   const asked = ours.includes('--source-map');
   if (asked && !safe) fail(`No source map in ${mode}`, 'source-map', ['The unsafe modes keep none; -O small, fast, or debug do.']);
   try {
-    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
+    await commands[command](file, { optimize, safe, out, argv, mode, title, port, noPrerender, sourceMap: mode === 'debug' || asked, blame: ours.includes('--blame'), luge: ours.includes('--luge'), target, profile, interval, utu: await loadNodeCompiler({ module: COMPILING }) });
   } catch (error) {
     // A place build cannot write (-o somewhere read-only, or under a file).
     if (!FS_REASONS[error?.code] || !error.path) throw error;
@@ -366,7 +368,7 @@ async function run(file, options) {
   // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
   // Named functions and a source map, so a trap says which and where.
   // An array main's result is read by the build's readers (`run`), to print as one.
-  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile, run: true });
+  const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile, luge: options.luge, run: true });
   if (usesWutu(built.spec)) {
     return (await import('./site.mjs')).serveCommand(siteApp(file, options), { port: options.port ?? 4176 });
   }
@@ -682,8 +684,8 @@ function duration(ms) {
 
 /** NAME.wasm and NAME.mjs: an ES module whose `exports` are the instance's. */
 async function build(file, options) {
-  const { utu, optimize, safe, out, sourceMap, blame, target } = options;
-  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame });
+  const { utu, optimize, safe, out, sourceMap, blame, target, luge } = options;
+  const built = await buildOrExit(utu, file, { optimize, safe, sourceMap, blame, luge });
   if (usesWutu(built.spec)) {
     if (target === 'node' || blame || sourceMap && options.mode !== 'debug') fail('Site builds do not support --target node, --blame, or --source-map', 'unknown-option');
     return (await import('./site.mjs')).buildCommand({ ...siteApp(file, options), compiled: built }, { prerender: !options.noPrerender });

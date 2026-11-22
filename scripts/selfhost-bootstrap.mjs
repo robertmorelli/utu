@@ -22,16 +22,16 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 
  * Stages 1 to 3, timed. Returns stage 2 (its bytes and spec) when it builds
  * itself to the same module; throws otherwise.
  */
-export async function bootstrap({ log = console.log } = {}) {
+export async function bootstrap({ log = console.log, luge = false } = {}) {
   let started = performance.now();
   const { exports: stage1, builder } = await loadStage1();
   const stage1Time = performance.now() - started;
   started = performance.now();
-  const stage2 = await buildWith(stage1);
+  const stage2 = await buildWith(stage1, { luge });
   const stage2Time = performance.now() - started;
   const compiler = (await instantiateBuilt(stage2.wasm, stage2.spec)).instance.exports;
   started = performance.now();
-  const stage3 = await buildWith(compiler);
+  const stage3 = await buildWith(compiler, { luge });
   const stage3Time = performance.now() - started;
   log(`stage 1: built by ${builder} in ${stage1Time.toFixed(0)} ms`);
   log(`stage 2: ${stage2.wasm.length} bytes (${hash(stage2.wasm)}), built by stage 1 in ${stage2Time.toFixed(0)} ms`);
@@ -58,8 +58,9 @@ export function writeCompiler(out, { wasm, spec }) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = process.argv.find(arg => arg.startsWith('--out='))?.slice(6);
+  const luge = process.argv.includes('--luge');
   try {
-    const stage2 = await bootstrap();
+    const stage2 = await bootstrap({ luge });
     if (out) writeCompiler(out, stage2);
     console.log('stage 2 and stage 3 are identical');
   } catch (error) {

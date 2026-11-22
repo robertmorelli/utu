@@ -1010,6 +1010,31 @@ fn directed_fn(p: Parser) Void {
     }
 }
 
+/// `#luge` above a `while`, `for`, or `loop match`: directives, then the loop.
+fn directed_loop(p: Parser) I32 {
+    let from = dir_node.len()
+    while (is(p, Tok.Hash)) { directive(p) }
+    let lp = -1
+    if is_kw(p, Kw.While) {
+        lp = while_expr(p)
+    } else if is_kw(p, Kw.For) {
+        lp = for_expr(p)
+    } else if is_kw(p, Kw.Loop) {
+        let at = mark()
+        let first = p.pos
+        advance(p)
+        expect_kw(p, Kw.Match)
+        lp = match_expr(p, Node.Loop_match_expr, at, first)
+    } else {
+        fail_wanting(p, kw_wanted + Kw.While.i32())
+    }
+    for (from ..< dir_node.len()) |k| {
+        dir_fn[k] = lp
+        node_parent[dir_node[k]] = lp
+    }
+    return lp
+}
+
 /// `#name` or `#name(N)`, `#` and the name written together.
 fn directive(p: Parser) Void {
     let at = mark()
@@ -1433,13 +1458,19 @@ fn written_semi(p: Parser) Bool => pkind[p.pos] == Tok.Semi.i32()
 /// `&` is a new statement.
 fn statement_end(p: Parser) I32 {
     let i = p.pos
+    // Directive lines (`#luge`) continue onto the loop they decorate.
+    while (pkind[i] == Tok.Hash.i32()) {
+        i += 1
+        while (pkind[i] != Tok.End.i32() and not line_break_before(i)) { i += 1 }
+    }
+    let start = i
     let depth = 0
     while (true) {
         let k = pkind[i]
         if k == Tok.End.i32() { return i }
         if depth == 0 {
             if k == Tok.Semi.i32() or k == Tok.RBrace.i32() or k == Tok.RParen.i32() or k == Tok.RBracket.i32() { return i }
-            if i > p.pos and line_break_before(i) and not continues_line(i) { return i }
+            if i > start and line_break_before(i) and not continues_line(i) { return i }
         }
         let flags = parse_flags[k]
         if (flags & opens_delimiter) != 0 {
@@ -1813,6 +1844,7 @@ fn prefix(p: Parser) I32 {
         return node(p, Node.Implicit_struct_init, at, first)
     }
     if is(p, Tok.At) { return dsl_expr(p) }
+    if is(p, Tok.Hash) { return directed_loop(p) }
     fail(p)
     return -1
 }
@@ -1940,7 +1972,7 @@ fn starts_expression(p: Parser) Bool {
     }
     return is(p, Tok.Int) or is(p, Tok.Float) or is(p, Tok.String) or is(p, Tok.TemplateFull) or is(p, Tok.TemplateHead) or is(p, Tok.MultilineLine) or is(p, Tok.Minus)
         or is(p, Tok.Tilde) or is(p, Tok.LParen) or is(p, Tok.LBracket) or is(p, Tok.Dot) or is(p, Tok.LBrace)
-        or is(p, Tok.Amp) or is(p, Tok.At)
+        or is(p, Tok.Amp) or is(p, Tok.At) or is(p, Tok.Hash)
 }
 
 fn word_expression(p: Parser) I32 {

@@ -109,6 +109,13 @@ loadPort().then(e => {
     e.setup(+setupArg);
   }
   const run = () => e.bench(+n);
+  if (+warmups < 0) {
+    const start = performance.now();
+    const result = String(norm(run()));
+    const ms = performance.now() - start;
+    print('RESULT ' + JSON.stringify({ result, median: ms, best: ms, times: [ms] }));
+    return;
+  }
   const result = String(norm(run()));
   for (let i = 0; i < +warmups; i++) run();
   const times = [];
@@ -161,8 +168,9 @@ async function runProgram(name) {
   const n = Number(option('n') ?? config.n);
   if (!Number.isFinite(n)) throw new Error('program.json needs "n" (bench\'s argument)');
   const setupArg = config.setup === true ? n : typeof config.setup === 'number' ? config.setup : null;
-  const samples = Number(option('samples') ?? process.env.BENCH_SAMPLES ?? config.samples ?? 10);
-  const warmups = Number(option('warmups') ?? process.env.BENCH_WARMUPS ?? config.warmups ?? 3);
+  const cold = flag('cold');
+  const samples = cold ? 1 : Number(option('samples') ?? process.env.BENCH_SAMPLES ?? config.samples ?? 10);
+  const warmups = cold ? -1 : Number(option('warmups') ?? process.env.BENCH_WARMUPS ?? config.warmups ?? 3);
   const tmp = path.join(ROOT, '.tmp', 'bg', name);
   await fs.mkdir(tmp, { recursive: true });
   const driver = path.join(tmp, 'd8-driver.js');

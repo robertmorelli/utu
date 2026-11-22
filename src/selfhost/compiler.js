@@ -80,8 +80,9 @@ export async function compile(utu, entry, host) {
   // (Own names only: `constructor` is no mode.)
   const chosen = host.mode && Object.hasOwn(MODES, host.mode) ? MODES[host.mode] : null;
   if (host.mode && !chosen) throw new Error(`no build mode ${host.mode}: ${Object.keys(MODES).join(', ')}`);
-  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false } = { ...host, ...chosen };
+  const { target = 'normal', optimize = 'size', debugNames = false, safe = false, sourceMap = false, blame = false, profile = false, run = false, luge = false } = { ...host, ...chosen };
   utu.set_optimize(OPTIMIZE[optimize] ?? OPTIMIZE.size);
+  utu.set_luge?.(luge ? 1 : 0);
   utu.set_safe(safe ? 1 : 0);
   utu.set_debug_names(debugNames ? 1 : 0);
   utu.set_move_limit?.(host.moveLimit ?? 0);
