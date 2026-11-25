@@ -77,7 +77,7 @@ assert.ok(fs.existsSync(path.join(dir, 'hot.flame.html')));
 // Deep recursion a normal run survives: profiled too, in every mode.
 const deep = path.join(dir, 'deep.utu');
 fs.writeFileSync(deep, `fn down(n: I32) I32 { if n == 0 { return 0; }; return 1 + down(n - 1); }
-main { let t = 0; for (0 ..< 3000) |_i| { t = down(10000); }; console.log(t); }
+main { let t = 0; for (0 ..< 15000) |_i| { t = down(10000); }; console.log(t); }
 using console from std:console
 `);
 for (const mode of ['debug', 'small', 'fast']) {

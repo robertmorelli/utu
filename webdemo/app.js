@@ -26,7 +26,7 @@ main {
         background: honeydew;
         border-radius: 1.5rem;
         h1 { "Hello, Wutu"; }
-        p { "Clicks: "; $[state.count.f64().toString()]; }
+        p { "Clicks: "; | state.count }
         button {
             padding: 0.75rem 1rem;
             background: seagreen;
