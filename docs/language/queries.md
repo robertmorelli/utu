@@ -105,7 +105,7 @@ promise of logarithmic nearest-neighbor queries. Result storage is O(k).
 and `finish` support non-defaultable structs as well as scalars; `finish` returns
 an exact-length copy. Growth doubles capacity; append is amortized O(1).
 
-Runnable examples: [iterators](../examples/queries/iterators.utu),
-[indexes](../examples/queries/indexes.utu). Run `node scripts/test-query-features.mjs`
+Runnable examples: [iterators](../../examples/queries/iterators.utu),
+[indexes](../../examples/queries/indexes.utu). Run `node scripts/test-query-features.mjs`
 for edge cases plus deterministic brute-force comparisons of 320 spatial and
 720 mutable/persistent range queries.

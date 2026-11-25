@@ -54,14 +54,14 @@ code --install-extension dist/utu-vscode.vsix
 
 ## Documentation
 
-- [Language specification](docs/spec.md)
-- [Design principles](docs/principles.md)
-- [Type system](docs/types.md)
-- [TypeScript ABI & JS interop](docs/typescript-abi.md)
-- [Wutu (web DSL)](docs/wutu.md)
-- [Typed JSON](docs/json.md)
-- [Iterators](docs/iterators.md)
-- [Self-hosting & bootstrap](docs/self-hosting.md)
+See [docs/](docs/README.md) for the full index, including:
+
+- [Language specification](docs/language/spec.md)
+- [Type system](docs/language/types.md)
+- [TypeScript ABI & JS interop](docs/language/typescript-abi.md)
+- [Wutu (web DSL)](docs/language/wutu.md)
+- [Design principles](docs/compiler/principles.md)
+- [Self-hosting & bootstrap](docs/compiler/self-hosting.md)
 
 ## License
 

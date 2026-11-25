@@ -368,7 +368,7 @@ mod javascript {
                 }
                 ", the browser task board is 2,565 bytes of JavaScript and Wasm gzipped, and the Pantry dashboard 4,658. A thousand unused declarations add zero bytes. Each boundary crossing still costs time, so call once per operation, not once per element."
             }
-            = ui.further("docs/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI")
+            = ui.further("docs/language/typescript-abi.md", "TypeScript declarations as utu's JavaScript ABI")
         }
         \/
     }

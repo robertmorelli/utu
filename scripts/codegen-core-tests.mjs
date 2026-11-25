@@ -491,7 +491,7 @@ export function registerCodegenCoreTests({ test, assert, assertEq, assertNoError
   // The preferred spelling: leading `import` declarations are hoisted to the top
   // of the generated glue module. A named import is what lets a bundler shake
   // unused members out of the package — the `(await import('pkg')).x` form pulls
-  // in the whole namespace instead. See docs/minification.md.
+  // in the whole namespace instead. See docs/compiler/minification.md.
   test('codegen: @es hoists leading import declarations out of the body', async ({ ROOT }) => {
     const { instance } = await compileAndInstantiate({
       ROOT,

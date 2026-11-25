@@ -233,4 +233,4 @@ Order[Str].sort(words)            // apple fig pear
 Order[Version].max_of(versions)
 ```
 
-See [examples/bounds.utu](../examples/bounds.utu).
+See [examples/bounds.utu](../../examples/bounds.utu).

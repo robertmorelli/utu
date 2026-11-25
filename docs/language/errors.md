@@ -102,5 +102,5 @@ block's end, `a()` runs, then `b()`'s exception leaves the block.
 | `try` inside a `defer` | `try in defer` |
 | `r._value` | `Result has no field _value` |
 
-See [examples/results.utu](../examples/results.utu) for a program that uses
+See [examples/results.utu](../../examples/results.utu) for a program that uses
 all three.

@@ -2135,7 +2135,7 @@ mod iterators {
                 }
                 = code.block(recipe_matrix_sample())
             }
-            = ui.further("docs/iterators.md", "Syntax-level iterators")
+            = ui.further("docs/language/iterators.md", "Syntax-level iterators")
         }
         \/
     }

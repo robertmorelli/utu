@@ -27,5 +27,3 @@ node scripts/test-wutu-five.mjs --webkit
 Tests cover interaction paths, reload persistence, CSV quoting, ICS contents, literal text rendering, mobile overflow at 390px, source parity, and a 7,000-byte gzip budget per complete page. They also save desktop/mobile screenshots in the build directory. Run the build before these tests. Playwright's Chromium and WebKit binaries must be installed.
 
 `sizes.json` in the gallery root records measured sizes. The gzip totals add separately compressed HTML, Wasm and JavaScript (including generated CSS); they exclude source viewers, screenshots, HTTP headers, and the optional gallery. The Python preview server sends uncompressed assets; compression figures describe deployment with compression enabled.
-
-See [the rough-edge review](../../docs/wutu-five-review.md) for limitations and proposed iterators.

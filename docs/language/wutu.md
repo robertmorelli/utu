@@ -628,8 +628,8 @@ Incoming cross-tab changes pass through the generated decoder. Dirty local state
 blocks conflicting writes; explicitly save to keep local state or call
 `wutu.reload_store(key)` to accept storage. Errors appear through
 `wutu.storage_error()`. There is no automatic field merge or server sync.
-See the [complete reactive example](../examples/wutu-reactive/main.utu) and
-[Folio](../examples/wutu-five/folio/main.utu).
+See the [complete reactive example](../../examples/wutu-reactive/main.utu) and
+[Folio](../../examples/wutu-five/folio/main.utu).
 
 ## Formatting, editor support, and preview
 

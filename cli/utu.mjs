@@ -365,7 +365,7 @@ async function run(file, options) {
     return (await import('./site.mjs')).serveCommand(siteApp(file, options), { port: options.port ?? 4176 });
   }
   // Profiled, on the stack a plain run has, so --profile changes no output but at
-  // the edge: the instrumentation takes about 3100 frames of it (docs/profiling.md).
+  // the edge: the instrumentation takes about 3100 frames of it (docs/tooling/profiling.md).
   // Named functions and a source map, so a trap says which and where.
   // An array main's result is read by the build's readers (`run`), to print as one.
   const built = await buildOrExit(utu, file, { optimize, safe, debugNames: true, sourceMap: safe, profile, luge: options.luge, run: true });

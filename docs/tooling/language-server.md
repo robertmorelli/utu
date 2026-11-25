@@ -2,7 +2,7 @@
 
 `utu lsp` is a language server on stdin and stdout, for any editor that speaks
 LSP. It is the self-hosted compiler (`dist/utu.wasm`) answering the editor's
-questions; there is no second analyzer (PRINCIPLES #4).
+questions; there is no second analyzer ([principles](../compiler/principles.md)).
 
 ```sh
 node cli/utu.mjs lsp
@@ -70,7 +70,7 @@ vim.filetype.add({ extension = { utu = 'utu' } })
 
 Helix: `node editors/helix/install.mjs` installs the language server, the
 tree-sitter grammar, and highlight, injection, text-object, and indent queries
-(see [editors/helix](../editors/helix/README.md)). By hand, `languages.toml`:
+(see [editors/helix](../../editors/helix/README.md)). By hand, `languages.toml`:
 
 ```toml
 [language-server.utu]

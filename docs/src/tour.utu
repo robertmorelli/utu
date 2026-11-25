@@ -2010,7 +2010,7 @@ mod tour {
             }
             = code.block(lib_sample())
             = code.block(lib_js())
-            = ui.further("docs/spec.md", "the language specification")
+            = ui.further("docs/language/spec.md", "the language specification")
         }
         \/
     }

@@ -886,7 +886,7 @@ mod web {
                 "."
             }
             = code.shell(build_shell())
-            = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression")
+            = ui.further("docs/language/wutu.md", "Wutu: markup and CSS in one expression")
             = ui.further("examples/wutu-five/README.md", "five working Wutu websites")
         }
         \/

@@ -280,9 +280,9 @@ mod tooling {
             p {
                 "Zed, Sublime, Emacs, and Kakoune take the same command."
             }
-            = ui.further("docs/language-server.md", "The language server")
-            = ui.further("docs/diagnostics.md", "Diagnostics")
-            = ui.further("docs/grep.md", "utu grep")
+            = ui.further("docs/tooling/language-server.md", "The language server")
+            = ui.further("docs/tooling/profiling.md", "Profiling")
+            = ui.further("docs/tooling/grep.md", "utu grep")
         }
         \/
     }

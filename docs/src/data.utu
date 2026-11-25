@@ -341,7 +341,7 @@ mod data {
             p {
                 "A 4 MB save file of 40,000 entities decodes to native structs in 23 ms on V8. The generated code adds about 4 KB per module plus a few hundred bytes per type."
             }
-            = ui.further("docs/json.md", "Typed JSON")
+            = ui.further("docs/language/json.md", "Typed JSON")
             h2 {
                 "Iterators"
             }
@@ -415,7 +415,7 @@ mod data {
                 ". Results come in no particular order."
             }
             = code.block(spatial_sample())
-            = ui.further("docs/queries.md", "Native range and spatial indexes")
+            = ui.further("docs/language/queries.md", "Native range and spatial indexes")
             p {
                 "More modules ("
                 code {

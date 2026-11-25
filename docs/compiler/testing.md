@@ -62,7 +62,7 @@ unless a regression demonstrates that removing them is sound.
 
 `bun run test:bindings` runs declaration/runtime coverage, the in-memory browser
 Worker linker check, and the browser demo. Run `bun scripts/dts-abi-tests.mjs` as
-well to exercise JavaScriptCore. See [the ABI guide](typescript-abi.md) for test
+well to exercise JavaScriptCore. See [the ABI guide](../language/typescript-abi.md) for test
 dependencies and scope. Compiler regressions also cover module host bindings
 beside intrinsic methods, and value-returning expressions in void functions.
 

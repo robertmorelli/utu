@@ -25,7 +25,7 @@
 A native Wasm array is opaque to JavaScript, so an array literal never reaches
 a JS slot as one: `JSON.stringify([1, 2])` receives a real JS array. An
 `@es` binding typed to take or give an `Array[T]` passes it as an opaque
-handle JS can hold and give back, but not read (docs/typescript-abi.md): pass
+handle JS can hold and give back, but not read ([typescript-abi.md](typescript-abi.md)): pass
 its elements, or a `Str` from `@json encode`, for JS to read.
 
 Generic module instances are created before types are known. When typing

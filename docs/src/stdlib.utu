@@ -788,7 +788,7 @@ mod stdlib {
             = module("Ord  Order[T[Ord]]", "An order: a.cmp(b) for the numbers and Str, and a bounded module of what to do with one. Implement it for your own type with fn Ord[T].cmp.", "using Order from std:Ord;")
             = code.block(ord_sample())
             = api(ord_rows())
-            = ui.further("docs/generics.md", "Generics and bounds")
+            = ui.further("docs/language/generics.md", "Generics and bounds")
             = module("Found[T] Group[K, T]", "What iterator terminals return: first_where gives ?Found[T], group_by gives Array[Group[K, T]].", "prelude")
             = code.block(found_sample())
             = group("std-indexes", "Indexes")
@@ -801,7 +801,7 @@ mod stdlib {
             = module("Spatial", "A static 2D index of points with ids: rectangles, three-sided ranges, circles, nearest.", "using Spatial from std:Spatial;")
             = code.block(spatial_sample())
             = api(spatial_rows())
-            = ui.further("docs/queries.md", "Native range and spatial indexes")
+            = ui.further("docs/language/queries.md", "Native range and spatial indexes")
             = group("std-async", "Async")
             = module("Promise[T]", "A real JavaScript promise. Await it, or subscribe with then and catch.", "prelude")
             = code.block(promise_sample())
@@ -826,7 +826,7 @@ mod stdlib {
             = code.block(js_sample())
             = code.block(web_sample())
             = api(binding_rows())
-            = ui.further("docs/typescript-abi.md", "The TypeScript declaration ABI")
+            = ui.further("docs/language/typescript-abi.md", "The TypeScript declaration ABI")
             = ui.further("std/README.md", "the standard library notes")
         }
         \/

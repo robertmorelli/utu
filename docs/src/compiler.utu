@@ -68,7 +68,7 @@ mod compiler {
             p {
                 "The TypeScript declaration linker, the CLI, the editor extension, and file and process I/O stay in JavaScript as hosts of the compiler. The compiler itself touches no file system."
             }
-            = ui.further("docs/self-hosting.md", "Fast compiler, then self-hosted compiler")
+            = ui.further("docs/compiler/self-hosting.md", "Fast compiler, then self-hosted compiler")
             h2 {
                 "The Wasm backend"
             }
@@ -118,7 +118,7 @@ mod compiler {
                 }
                 ". No escape analysis changes a closure's representation; the boundary is explicit by design."
             }
-            = ui.further("docs/closure-lowering.md", "Closure lowering and callable ABI")
+            = ui.further("docs/compiler/closure-lowering.md", "Closure lowering and callable ABI")
             h2 {
                 "Names and representations"
             }
@@ -157,7 +157,7 @@ mod compiler {
                 }
                 ". The checker never peeks at representations and codegen never branches on names."
             }
-            = ui.further("docs/types.md", "utu types: name versus representation")
+            = ui.further("docs/language/types.md", "utu types: name versus representation")
             h2 {
                 "Principles"
             }
@@ -184,7 +184,7 @@ mod compiler {
                     "One person should be able to ship it."
                 }
             }
-            = ui.further("docs/principles.md", "utu design principles")
+            = ui.further("docs/compiler/principles.md", "utu design principles")
         }
         \/
     }

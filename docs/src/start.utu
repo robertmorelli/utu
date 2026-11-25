@@ -151,7 +151,7 @@ mod start {
             p {
                 "In VS Code, run UTU: Create Wutu Website for a starter file and UTU: Preview Wutu Website for the live preview."
             }
-            = ui.further("docs/wutu.md", "Wutu: markup and CSS in one expression")
+            = ui.further("docs/language/wutu.md", "Wutu: markup and CSS in one expression")
         }
         \/
     }

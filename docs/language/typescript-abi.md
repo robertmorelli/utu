@@ -46,9 +46,9 @@ Use `new Browser.Date(0.0)` to select a constructor when a host value supports
 both calling and construction. A constructor-only value can also be called
 directly, such as `Package.Counter(2.0)`.
 
-The [browser task board](../examples/browser-board/main.utu) uses this interface
+The [browser task board](../../examples/browser-board/main.utu) uses this interface
 for DOM construction, events, JSON, arrays, and persistent storage. The
-[Pantry dashboard](../examples/browser-pantry/README.md) exercises much more of
+[Pantry dashboard](../../examples/browser-pantry/README.md) exercises much more of
 the platform and lists the friction it found. It contains
 no `@es`, application JavaScript, or helper modules.
 
@@ -88,7 +88,7 @@ and bind `T` when every element has the same type. A record binds `T` of an
 index signature `{ [k: string]: T }` from its first field, so
 `get(&{ a: 1.0 }, "z")` of `get<T>(o: { [k: string]: T }, k: string): T | undefined`
 is `?F64`. Without a declaration slot, `[...]` is a native WasmGC `Array[T]`
-(see the language notes in `docs/arrays.md`); a `let` bound to a literal waits
+(see the language notes in `docs/language/arrays.md`); a `let` bound to a literal waits
 for its first use, so `let xs = [1.0, 2.0]; Api.sum(xs);` passes a JS array
 (not a tuple slot, as TypeScript's `let xs = [1]` is a `number[]`).
 
@@ -412,7 +412,7 @@ live-glue bytes. The browser app enforces a 9 KB combined JS/Wasm gzip budget;
 catalog metadata never ships with it.
 
 The boundary still costs time. The compiler does not automatically move UTU
-loops into JavaScript. See the archived [d8 array comparison](../benchmarks/abi/README.md):
+loops into JavaScript. See the archived [d8 array comparison](../../benchmarks/abi/README.md):
 a crossing per element is materially slower than making one call for the whole
 operation. Ergonomic syntax does not remove that cost.
 

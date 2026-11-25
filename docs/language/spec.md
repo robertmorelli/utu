@@ -306,8 +306,7 @@ language.
 > **Why closures are always JS functions.** Any closure can be handed to any JS
 > callback with no marshalling, which is what makes DOM work feel invisible.
 > The cost is that a closure call from utu crosses the JS boundary, and that
-> utu requires a JS host — see `the_future.md`, which drops non-JS wasm hosts
-> for this reason. Iteration and stream combinators are planned as syntax
+> utu requires a JS host. Iteration and stream combinators are syntax-level
 > rather than callbacks so that hot paths never pay this cost.
 
 ---
